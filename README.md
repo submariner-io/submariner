@@ -28,7 +28,7 @@ The submariner-route-agent runs as a DaemonSet on all Kubernetes nodes, and ensu
 Submariner has a few requirements in order to get started:
 
 - At least 3 Kubernetes clusters, one of which is designated to serve as the central broker that is accessible by all of your connected clusters; this can be one of your connected clusters, but comes with the limitation that the cluster is required to be up in order to facilitate interconnectivity/negotiation
-- Different pod/cluster CIDR's (as well as different kubernetes DNS suffixes) between clusters. This is to prevent traffic selector/policy/routing conflicts.
+- Different cluster/service CIDR's (as well as different kubernetes DNS suffixes) between clusters. This is to prevent traffic selector/policy/routing conflicts.
 - Direct IP connectivity between instances through the internet (or on the same network if not running Submariner over the internet). Submariner supports 1:1 NAT setups, but has a few caveats/provider specific configuration instructions in this configuration.
 - Knowledge of each cluster's network configuration
 - Helm version that supports crd-install hook
