@@ -1,0 +1,25 @@
+#!/bin/bash
+set -e
+
+source $(dirname $0)/version
+
+ARCH=${ARCH:-"amd64"}
+SUFFIX=""
+[ "${ARCH}" != "amd64" ] && SUFFIX="_${ARCH}"
+
+TAG=${TAG:-${VERSION}${SUFFIX}}
+REPO=${REPO:-rancher}
+
+cd $(dirname $0)/../package
+
+cp ../strongswan/strongswan*.tar.gz .
+cp ../bin/submariner-engine submariner-engine
+cp ../bin/submariner-route-agent submariner-route-agent
+
+IMAGE=${REPO}/submariner:${TAG}
+ROUTEAGENT_IMAGE=${REPO}/submariner-route-agent:${TAG}
+
+docker build -t ${IMAGE} .
+docker build -t ${ROUTEAGENT_IMAGE} -f Dockerfile.routeagent .
+
+echo "Built submariner to image: ${IMAGE} and submariner-route-agent to image: ${ROUTEAGENT_IMAGE}"
