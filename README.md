@@ -6,12 +6,24 @@ Note that Submariner is in the <strong>pre-alpha</strong> stage, and should not 
 
 # Architecture
 
-Submariner consists of a few components that work and operate off of Kubernetes Custom Resource Definitions (CRDs). The two primary components within connected clusters are:
+The basic architecture diagram for Submariner is as follows:
 
-- submariner
-- submariner-route-agent
+![submariner architecture](https://raw.githubusercontent.com/rancher/submariner/master/docs/img/architecture.png)
 
-Submariner uses a central broker to facilitate the exchange of information and sync CRD's between clusters. Thus, each cluster has a unique ID, which is set by the user, to ensure exclusivity. If there are two clusters with the same name, i.e. ID, then it will not work as expectd as the networking will be constantly fighting with each other. 
+Submariner consists of a few components that work and operate off of Kubernetes Custom Resource Definitions (CRDs). The Submariner CRDs are `clusters.submariner.io` and `endpoints.submariner.io`. 
+
+The two primary Submariner components within connected clusters are:
+
+- submariner (Deployment)
+- submariner-route-agent (DaemonSet)
+
+The submariner pods are run on the gateway nodes, and will perform leader election between them to elect an active IPsec endpoint. On gateway nodes that are idle, the `submariner-route-agent` will configure routes to enable full connectivity to remote clusters from non-leader gateway and worker nodes. `submariner-route-agent` as a component is run on every node, and is aware of the current leader. When run on the gateway node that is the leader, it will simply sit idle awaiting leader loss.
+
+Upon startup, the `submariner` pod that is elected leader will perform a reconciliation process that ensures it is the sole endpoint for this cluster. This is part of the reason why it is important to have unique cluster IDs between clusters, as two clusters with the same ID will reconcile each other out of existence.
+
+Upon failure, another Submariner pod (on one of the other gateway hosts) will gain leadership and perform reconciliation to ensure it is the active leader. When done, the remote clusters will reconcile the IPsec endpoint to the new endpoint, and connection will be re-established. In the interim, the `submariner-route-agent` pods will update the route tables on each node to point towards the new endpoint host.
+
+Submariner uses a central broker to facilitate the exchange of information and sync CRD's between clusters. The `datastoresyncer` runs as a controller within the leader-elected `submariner` pod, and is responsible for performing a two-way synchronization between the datastore and local cluster of Submariner CRDs. The `datastoresyncer` will only push CRD data to the central broker for the local cluster (based on cluster ID), and will sync all data from the broker the local cluster when the data does not match the local cluster (to prevent circular loops)
 
 #### submariner
 
@@ -23,6 +35,12 @@ submariner-engine runs and utilizes leader election to establish an active gatew
 
 The submariner-route-agent runs as a DaemonSet on all Kubernetes nodes, and ensures route rules to allow all pods/nodes to communicate through the elected gateway node for remote cluster networks. It will ensure state and react on CRD changes, which means that it is able to remove/add routes as leader election occurs.
 
+### Network Path
+
+The network path of Submariner varies depending on the origin/destination of the IP traffic. In all cases, traffic between two clusters will transit between the leader elected (in each cluster) gateway nodes, through `ip xfrm` rules. Each gateway node has a running Charon daemon which will perform IPsec keying and policy management. 
+
+When the source pod is on a worker node that is not the elected gateway node, the traffic destined for the remote cluster will transit through the kernel routing rules table to the cluster-local gateway node, which will perform source network address translation (SNAT) to the remote network. This allows for much more efficient traffic selectors to be configured, as well as more predictable routing paths. Once the traffic reaches the destination gateway node, it is routed one of two ways, depending on the destination CIDR. If the destination CIDR is a pod network, the traffic is routed however the CNI-compatible network routes traffic destined for pod IPs. If the destination CIDR is a service network, then traffic is routed through the facility configured via `kube-proxy` on the destination gateway node.
+
 # Prerequisites
 
 Submariner has a few requirements in order to get started:
@@ -31,7 +49,7 @@ Submariner has a few requirements in order to get started:
 - Different cluster/service CIDR's (as well as different kubernetes DNS suffixes) between clusters. This is to prevent traffic selector/policy/routing conflicts.
 - Direct IP connectivity between instances through the internet (or on the same network if not running Submariner over the internet). Submariner supports 1:1 NAT setups, but has a few caveats/provider specific configuration instructions in this configuration.
 - Knowledge of each cluster's network configuration
-- Helm version that supports crd-install hook
+- Helm version that supports crd-install hook (v2.12.1+)
 
 An example of three clusters configured to use with Submariner would look like the following:
 
