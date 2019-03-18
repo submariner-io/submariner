@@ -9,7 +9,7 @@ rm -f ${CHARON_PID_FILE}
 if [ "${SUBMARINER_DEBUG}" == "true" ]; then
     DEBUG="--debug -v=9"
 else
-    DEBUG=""
+    DEBUG="-v=4"
 fi
 
 mkdir -p /etc/ipsec
