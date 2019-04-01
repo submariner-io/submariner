@@ -153,13 +153,13 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder rec
 	if err != nil {
 		klog.Fatalf("error getting hostname: %s", err.Error())
 	}
+	
 	kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		clientcmd.NewDefaultClientConfigLoadingRules(),
 		&clientcmd.ConfigOverrides{},
 	)
 	namespace, _, err := kubeconfig.Namespace()
 	if err != nil {
-		panic(err)
 		klog.Fatalf("error getting namespace: %s", err.Error())
 	}
 
