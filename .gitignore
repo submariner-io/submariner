@@ -2,3 +2,5 @@
 submariner-engine
 .dapper
 bin
+.project
+.settings
