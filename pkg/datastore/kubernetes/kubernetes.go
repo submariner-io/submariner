@@ -79,16 +79,19 @@ func NewK8sDatastore(thisClusterID string, stopCh <-chan struct{}) *k8s {
 	return &kubeDatastore
 }
 
-// todo: need to fix this O(n^2) solution...
 func stringSliceOverlaps(left []string, right []string) bool {
-	for _, s := range left {
-		for _, t := range right {
-			if s == t {
-				return true
-			}
-		}
-	}
-	return false
+    hash := make(map[string]bool)
+    for _, s := range left {
+        hash[s] = true
+    }
+
+    for _, s := range right {
+        if hash[s] {
+            return true
+        }
+    }
+
+    return false
 }
 
 func (k *k8s) GetClusters(colorCodes []string) ([]types.SubmarinerCluster, error) {
