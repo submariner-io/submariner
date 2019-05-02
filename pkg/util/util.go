@@ -14,7 +14,6 @@ import (
 	"syscall"
 )
 
-const tokenChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 const tokenLength = 64
 
 func getAPIIdentifier(token string) (string, error) {
@@ -133,7 +132,7 @@ func GetEndpointCRDNameFromParams(clusterID, cableName string) (string, error) {
 }
 
 func GetClusterCRDName(cluster types.SubmarinerCluster) (string, error) {
-	return fmt.Sprintf("%s", cluster.Spec.ClusterID), nil
+	return cluster.Spec.ClusterID, nil
 }
 
 func CompareEndpointSpec(left, right subv1.EndpointSpec) bool {
