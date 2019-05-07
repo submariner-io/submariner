@@ -329,10 +329,11 @@ func (r *RouteController) reconcileRoutes() error {
 	if err != nil {
 		return fmt.Errorf("error while retrieving link by name %s: %v", r.link.Name, err)
 	}
+
 	currentRouteList, err := netlink.RouteList(link, syscall.AF_INET)
 
 	if err != nil {
-		return fmt.Errorf("error while retrieving routes for link %s")
+		return fmt.Errorf("error while retrieving routes for link %s: %v", r.link.Name, err)
 	}
 
 	// First lets delete all of the routes that don't match
@@ -350,11 +351,13 @@ func (r *RouteController) reconcileRoutes() error {
 			}
 		}
 	}
+
 	currentRouteList, err = netlink.RouteList(link, syscall.AF_INET)
 
 	if err != nil {
-		return fmt.Errorf("error while retrieving routes for link %s")
+		return fmt.Errorf("error while retrieving routes for link %s: %v", r.link.Name, err)
 	}
+
 	// let's now add the routes that are missing
 	for _, cidrBlock := range r.subnets {
 		_, dst, err := net.ParseCIDR(cidrBlock)
