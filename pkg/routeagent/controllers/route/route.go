@@ -132,15 +132,14 @@ func (r *RouteController) processNextCluster() bool {
 	err := func() error {
 		defer r.clusterWorkqueue.Done(obj)
 		klog.V(4).Infof("Processing cluster object: %v", obj)
-		ns, key, err := cache.SplitMetaNamespaceKey(obj.(string))
+		key := obj.(string)
+		ns, name, err := cache.SplitMetaNamespaceKey(key)
 		if err != nil {
-			klog.Errorf("error while splitting meta namespace key: %v", err)
-			return nil
+			return fmt.Errorf("Error while splitting meta namespace key %s: %v", key, err)
 		}
-		cluster, err := r.submarinerClientSet.SubmarinerV1().Clusters(ns).Get(key, metav1.GetOptions{})
+		cluster, err := r.submarinerClientSet.SubmarinerV1().Clusters(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
-			klog.Errorf("Error while retrieving submariner cluster object %s", obj)
-			return nil
+			return fmt.Errorf("Error retrieving submariner cluster object %s: %v", name, err)
 		}
 
 		if cluster.Spec.ClusterID == r.clusterId {
@@ -173,15 +172,14 @@ func (r *RouteController) processNextEndpoint() bool {
 		defer r.endpointWorkqueue.Done(obj)
 		klog.V(4).Infof("Handling object in handleEndpoint")
 		klog.V(4).Infof("Processing endpoint object: %v", obj)
-		ns, key, err := cache.SplitMetaNamespaceKey(obj.(string))
+		key := obj.(string)
+		ns, name, err := cache.SplitMetaNamespaceKey(key)
 		if err != nil {
-			klog.Errorf("error while splitting meta namespace key: %v", err)
-			return nil
+			return fmt.Errorf("Error while splitting meta namespace key %s: %v", key, err)
 		}
-		endpoint, err := r.submarinerClientSet.SubmarinerV1().Endpoints(ns).Get(key, metav1.GetOptions{})
+		endpoint, err := r.submarinerClientSet.SubmarinerV1().Endpoints(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
-			klog.Errorf("Error while retrieving submariner endpoint object %s", obj)
-			return nil
+			return fmt.Errorf("Error retrieving submariner endpoint object %s: %v", name, err)
 		}
 
 		if endpoint.Spec.ClusterID != r.clusterId {
@@ -208,9 +206,8 @@ func (r *RouteController) processNextEndpoint() bool {
 		err = r.reconcileRoutes()
 
 		if err != nil {
-			klog.Errorf("Error while reconciling routes %v", err)
 			r.endpointWorkqueue.AddRateLimited(obj)
-			return nil
+			return fmt.Errorf("Error while reconciling routes %v", err)
 		}
 
 		r.endpointWorkqueue.Forget(obj)
@@ -256,14 +253,12 @@ func (r *RouteController) handleRemovedEndpoint(obj interface{}) {
 	if object, ok = obj.(*v1.Endpoint); !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("error decoding object, invalid type"))
-			klog.V(4).Infof("problem decoding object")
+			klog.Errorf("Could not convert object %v to an Endpoint", obj)
 			return
 		}
 		object, ok = tombstone.Obj.(*v1.Endpoint)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("error decoding object tombstone, invalid type"))
-			klog.V(4).Infof("problem decoding object tombstone")
+			klog.Errorf("Could not convert object tombstone %v to an Endpoint", tombstone.Obj)
 			return
 		}
 		klog.V(4).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
@@ -283,14 +278,16 @@ func (r *RouteController) handleRemovedCluster(obj interface{}) {
 	// ideally we should attempt to remove all routes if the endpoint matches our cluster ID
 }
 
-func (r *RouteController) cleanRoutes() error {
+func (r *RouteController) cleanRoutes() {
 	link, err := netlink.LinkByName(r.link.Name)
 	if err != nil {
-		return fmt.Errorf("error while retrieving link by name %s: %v", r.link.Name, err)
+		klog.Errorf("Error retrieving link by name %s: %v", r.link.Name, err)
+		return
 	}
 	currentRouteList, err := netlink.RouteList(link, syscall.AF_INET)
 	if err != nil {
-		return fmt.Errorf("error while retrieving routes: %v", err)
+		klog.Errorf("Error retrieving routes: %v", err)
+		return
 	}
 	for _, route := range currentRouteList {
 		klog.V(6).Infof("Processing route %v", route)
@@ -299,41 +296,41 @@ func (r *RouteController) cleanRoutes() error {
 		} else {
 			if containsString(r.subnets, route.Dst.String()) {
 				klog.V(6).Infof("Removing route %s", route.String())
-				netlink.RouteDel(&route)
+				if err = netlink.RouteDel(&route); err != nil {
+					klog.Errorf("Error removing route %s: %v", route.String(), err)
+				}
 			}
 		}
 	}
-
-	return nil
 }
 
-func (r *RouteController) cleanXfrmPolicies() error {
+func (r *RouteController) cleanXfrmPolicies() {
 
 	currentXfrmPolicyList, err := netlink.XfrmPolicyList(syscall.AF_INET)
 
 	if err != nil {
-		return fmt.Errorf("error while retrieving current xfrm policies: %v", err)
+		klog.Errorf("Error retrieving current xfrm policies: %v", err)
+		return
 	}
 
 	for _, xfrmPolicy := range currentXfrmPolicyList {
 		klog.V(6).Infof("Deleting XFRM policy %s", xfrmPolicy.String())
-		netlink.XfrmPolicyDel(&xfrmPolicy)
+		if err = netlink.XfrmPolicyDel(&xfrmPolicy); err != nil {
+			klog.Errorf("Error Deleting XFRM policy %s: %v", xfrmPolicy.String(), err)
+		}
 	}
-
-	return nil
-
 }
 // Reconcile the routes installed on this device using rtnetlink
 func (r *RouteController) reconcileRoutes() error {
 	link, err := netlink.LinkByName(r.link.Name)
 	if err != nil {
-		return fmt.Errorf("error while retrieving link by name %s: %v", r.link.Name, err)
+		return fmt.Errorf("Error retrieving link by name %s: %v", r.link.Name, err)
 	}
 
 	currentRouteList, err := netlink.RouteList(link, syscall.AF_INET)
 
 	if err != nil {
-		return fmt.Errorf("error while retrieving routes for link %s: %v", r.link.Name, err)
+		return fmt.Errorf("Error retrieving routes for link %s: %v", r.link.Name, err)
 	}
 
 	// First lets delete all of the routes that don't match
@@ -347,7 +344,9 @@ func (r *RouteController) reconcileRoutes() error {
 				klog.V(6).Infof("Found route %s with gw %s already installed", route.String(), route.Gw.String())
 			} else {
 				klog.V(6).Infof("Removing route %s", route.String())
-				netlink.RouteDel(&route)
+				if err = netlink.RouteDel(&route); err != nil {
+					klog.Errorf("Error removing route %s: %v", route.String(), err)
+				}
 			}
 		}
 	}
@@ -355,14 +354,14 @@ func (r *RouteController) reconcileRoutes() error {
 	currentRouteList, err = netlink.RouteList(link, syscall.AF_INET)
 
 	if err != nil {
-		return fmt.Errorf("error while retrieving routes for link %s: %v", r.link.Name, err)
+		return fmt.Errorf("Error retrieving routes for link %s: %v", r.link.Name, err)
 	}
 
 	// let's now add the routes that are missing
 	for _, cidrBlock := range r.subnets {
 		_, dst, err := net.ParseCIDR(cidrBlock)
 		if err != nil {
-			klog.Errorf("error while parsing cidr block %s: %v", cidrBlock, err)
+			klog.Errorf("Error parsing cidr block %s: %v", cidrBlock, err)
 			break
 		}
 		route := netlink.Route{
@@ -385,7 +384,7 @@ func (r *RouteController) reconcileRoutes() error {
 		if !found {
 			err = netlink.RouteAdd(&route)
 			if err != nil {
-				klog.Errorf("error while adding route %s: %v", route.String(), err)
+				klog.Errorf("Error adding route %s: %v", route.String(), err)
 			}
 		}
 	}
