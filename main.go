@@ -52,8 +52,8 @@ func main() {
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
 
-	var ss types.SubmarinerSpecification
-	err := envconfig.Process("submariner", &ss)
+	var submSpec types.SubmarinerSpecification
+	err := envconfig.Process("submariner", &submSpec)
 	if err != nil {
 		klog.Fatal(err)
 	}
@@ -73,64 +73,71 @@ func main() {
 		klog.Fatalf("Error building submariner clientset: %s", err.Error())
 	}
 
-	kubeInformerFactory := kubeInformers.NewSharedInformerFactoryWithOptions(kubeClient, time.Second*30, kubeInformers.WithNamespace(ss.Namespace))
-	submarinerInformerFactory := submarinerInformers.NewSharedInformerFactoryWithOptions(submarinerClient, time.Second*30, submarinerInformers.WithNamespace(ss.Namespace))
-	
-	start := func(context.Context) {
-		var ce cableengine.CableEngine
-		localCluster, err := util.GetLocalCluster(ss)
-		if err != nil {
-			klog.Fatalf("Fatal error occurred while retrieving local cluster %v", localCluster)
-		}
-		localEndpoint, err := util.GetLocalEndpoint(ss.ClusterId, "ipsec", nil, ss.NatEnabled, append(ss.ServiceCidr, ss.ClusterCidr...))
-		if err != nil {
-			klog.Fatalf("Fatal error occurred while retrieving local endpoint %v", localCluster)
-		}
-		ce = ipsec.NewEngine(append(ss.ClusterCidr, ss.ServiceCidr...), localCluster, localEndpoint)
+	kubeInformerFactory := kubeInformers.NewSharedInformerFactoryWithOptions(kubeClient, time.Second*30,
+		kubeInformers.WithNamespace(submSpec.Namespace))
+	submarinerInformerFactory := submarinerInformers.NewSharedInformerFactoryWithOptions(submarinerClient, time.Second*30,
+		submarinerInformers.WithNamespace(submSpec.Namespace))
 
-		tunnelController := tunnel.NewTunnelController(ss.Namespace, ce, kubeClient, submarinerClient,
+	start := func(context.Context) {
+		localCluster, err := util.GetLocalCluster(submSpec)
+		if err != nil {
+			klog.Fatalf("Fatal error occurred while retrieving local cluster from %#v: %v", submSpec, err)
+		}
+		localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterId, "ipsec", nil, submSpec.NatEnabled,
+			append(submSpec.ServiceCidr, submSpec.ClusterCidr...))
+		if err != nil {
+			klog.Fatalf("Fatal error occurred while retrieving local endpoint from %#v: %v", submSpec, err)
+		}
+
+		var cableEngine cableengine.CableEngine = ipsec.NewEngine(append(submSpec.ClusterCidr, submSpec.ServiceCidr...), localCluster, localEndpoint)
+
+		tunnelController := tunnel.NewTunnelController(submSpec.Namespace, cableEngine, kubeClient, submarinerClient,
 			submarinerInformerFactory.Submariner().V1().Endpoints())
 
-		var ds datastore.Datastore
-
-		switch ss.Broker {
+		var datastore datastore.Datastore
+		switch submSpec.Broker {
 		case "phpapi":
-			secure, err := util.ParseSecure(ss.Token)
+			secure, err := util.ParseSecure(submSpec.Token)
 			if err != nil {
 				klog.Fatalf("Error parsing secure token: %v", err)
 			}
-			ds = phpapi.NewPHPAPI(secure.ApiKey)
+			datastore = phpapi.NewPHPAPI(secure.ApiKey)
 		case "k8s":
-			ds = subk8s.NewK8sDatastore(ss.ClusterId, stopCh)
+			datastore = subk8s.NewK8sDatastore(submSpec.ClusterId, stopCh)
 		default:
-			panic("No backend was specified")
+			klog.Fatalf("Invalid backend '%s' was specified", submSpec.Broker)
 		}
+
 		klog.V(6).Infof("Creating new datastore syncer")
-		dsSyncer := datastoresyncer.NewDatastoreSyncer(ss.ClusterId, ss.Namespace, kubeClient, submarinerClient, submarinerInformerFactory.Submariner().V1().Clusters(), submarinerInformerFactory.Submariner().V1().Endpoints(), ds, ss.ColorCodes, localCluster, localEndpoint)
+		dsSyncer := datastoresyncer.NewDatastoreSyncer(submSpec.ClusterId, submSpec.Namespace, kubeClient, submarinerClient,
+			submarinerInformerFactory.Submariner().V1().Clusters(), submarinerInformerFactory.Submariner().V1().Endpoints(), datastore,
+			submSpec.ColorCodes, localCluster, localEndpoint)
 
 		kubeInformerFactory.Start(stopCh)
 		submarinerInformerFactory.Start(stopCh)
 
 		klog.V(4).Infof("Starting controllers")
+
 		var wg sync.WaitGroup
 		wg.Add(3)
-
 		go func() {
 			defer wg.Done()
-			ce.StartEngine(true)
+			if err = cableEngine.StartEngine(true); err != nil {
+				klog.Fatalf("Error starting the cable engine: %v", err)
+			}
 		}()
 
 		go func() {
 			defer wg.Done()
 			if err = tunnelController.Run(stopCh); err != nil {
-				klog.Fatalf("Error running tunnel controller: %s", err.Error())
+				klog.Fatalf("Error running tunnel controller: %v", err)
 			}
 		}()
 
 		go func() {
 			defer wg.Done()
 			if err = dsSyncer.Run(stopCh); err != nil {
-				klog.Fatalf("Error running datastoresyncer controller: %s", err.Error())
+				klog.Fatalf("Error running datastoresyncer controller: %v", err)
 			}
 		}()
 
@@ -138,12 +145,14 @@ func main() {
 	}
 
 	leClient, err := kubernetes.NewForConfig(rest.AddUserAgent(cfg, "leader-election"))
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.V(4).Infof)
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "submariner-controller"})
 	if err != nil {
 		klog.Fatal(err)
 	}
+
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartLogging(klog.V(4).Infof)
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "submariner-controller"})
+
 	startLeaderElection(leClient, recorder, start)
 	klog.Fatal("All controllers stopped or exited. Stopping main loop")
 }
@@ -151,7 +160,7 @@ func main() {
 func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder record.EventRecorder, run func(ctx context.Context)) {
 	id, err := os.Hostname()
 	if err != nil {
-		klog.Fatalf("error getting hostname: %s", err.Error())
+		klog.Fatalf("error getting hostname: %v", err)
 	}
 
 	// Lock required for leader election
