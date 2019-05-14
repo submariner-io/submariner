@@ -109,7 +109,7 @@ func (i *Engine) StartEngine(ignition bool) error {
 		}
 
 		// If the FORWARD Chain does not have any REJECT rule, append the
-		// forwardToSubForwardRuleSpec rule, otherwise insert it at the appropriate location.
+		// forwardToSubForwardRuleSpec rule. Otherwise, insert it at the appropriate location.
 		if insertAt == -1 {
 			ipt.AppendUnique("filter", "FORWARD", forwardToSubForwardRuleSpec...)
 		} else if rules[insertAt-1] != "-A FORWARD -j SUBMARINER-FORWARD" {
