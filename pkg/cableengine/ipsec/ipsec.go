@@ -100,19 +100,23 @@ func (i *Engine) StartEngine(ignition bool) error {
 			klog.Fatalf("error listing the rules in FORWARD chain: %v", err)
 		}
 
-		insertAt := -1
+		appendAt := len(rules) + 1
+		insertAt := appendAt
 		for i, rule := range rules {
-			if rule == "-A FORWARD -j REJECT --reject-with icmp-host-prohibited" {
+			if rule == "-A FORWARD -j SUBMARINER-FORWARD" {
+				insertAt = -1
+				break
+			} else if rule == "-A FORWARD -j REJECT --reject-with icmp-host-prohibited" {
 				insertAt = i
 				break
 			}
 		}
 
-		// If the FORWARD Chain does not have any REJECT rule, append the
-		// forwardToSubForwardRuleSpec rule, otherwise insert it at the appropriate location.
-		if insertAt == -1 {
+		if insertAt == appendAt {
+			// Append the rule at the end of the FORWARD Chain.
 			ipt.AppendUnique("filter", "FORWARD", forwardToSubForwardRuleSpec...)
-		} else if rules[insertAt-1] != "-A FORWARD -j SUBMARINER-FORWARD" {
+		} else if insertAt > 0 {
+			// Insert the rule in the FORWARD Chain.
 			ipt.Insert("filter", "FORWARD", insertAt, forwardToSubForwardRuleSpec...)
 		}
 
