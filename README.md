@@ -190,7 +190,7 @@ Each cluster that will be connected must have Submariner installed within it. Yo
    ```
    kubectl -n kube-system  rollout status deploy/tiller-deploy
    ```
-1. Grant  the appropriate security context for the service accounts (if required)
+1. Grant the appropriate security context for the service accounts (if required)
    
    For installation based on platforms like Openshift, the service account user needs to be associated with the appropriate security context. This may not be required for Kubernetes based installations as by default security context constraints are not configured in Kubernetes.
    ```
@@ -246,6 +246,15 @@ If you don't see a command prompt, try pressing enter.
 ### AWS Notes
 
 When running in AWS, it is necessary to disable source/dest checking of the instances that are gateway hosts to allow the instances to pass traffic for remote clusters. 
+
+
+### Openshift Notes
+
+When running in Openshift, we need to grant the appropriate security context for the service accounts
+   
+   ```
+   oc adm policy add-scc-to-user privileged system:serviceaccount:submariner:submariner-routeagent
+   oc adm policy add-scc-to-user privileged system:serviceaccount:submariner:submariner-engine 
 
 # Building/Contributing
 
