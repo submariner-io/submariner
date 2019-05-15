@@ -190,13 +190,6 @@ Each cluster that will be connected must have Submariner installed within it. Yo
    ```
    kubectl -n kube-system  rollout status deploy/tiller-deploy
    ```
-1. Grant the appropriate security context for the service accounts (if required)
-   
-   For installation based on platforms like Openshift, the service account user needs to be associated with the appropriate security context. This may not be required for Kubernetes based installations as by default security context constraints are not configured in Kubernetes.
-   ```
-   oc adm policy add-scc-to-user privileged system:serviceaccount:submariner:submariner-routeagent
-   oc adm policy add-scc-to-user privileged system:serviceaccount:submariner:submariner-engine 
-   ```
 1. Install submariner into this cluster. The values within the following command correspond to the table below.
 
    ```
