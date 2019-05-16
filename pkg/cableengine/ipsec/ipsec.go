@@ -113,8 +113,8 @@ func (i *Engine) StartEngine(ignition bool) error {
 		}
 
 		if insertAt == appendAt {
-			// Append the rule at the end of the FORWARD Chain.
-			ipt.AppendUnique("filter", "FORWARD", forwardToSubForwardRuleSpec...)
+			// Append the rule at the end of FORWARD Chain.
+			ipt.Append("filter", "FORWARD", forwardToSubForwardRuleSpec...)
 		} else if insertAt > 0 {
 			// Insert the rule in the FORWARD Chain.
 			ipt.Insert("filter", "FORWARD", insertAt, forwardToSubForwardRuleSpec...)
