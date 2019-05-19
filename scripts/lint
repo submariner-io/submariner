@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -e
+
+cd $(dirname $0)/..
+
+VERSION=v1.16.0
+curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin ${VERSION}
+
+golangci-lint run -D megacheck -E unused,gosimple,staticcheck
