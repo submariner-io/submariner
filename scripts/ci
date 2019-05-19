@@ -6,5 +6,6 @@ cd $(dirname $0)
 ./build-routeagent
 #./test
 #./validate
+./lint
 ./download
 ./package
