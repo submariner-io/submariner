@@ -95,7 +95,30 @@ func (i *Engine) StartEngine(ignition bool) error {
 		forwardToSubPostroutingRuleSpec := []string{"-j", "SUBMARINER-POSTROUTING"}
 		ipt.AppendUnique("nat", "POSTROUTING", forwardToSubPostroutingRuleSpec...)
 		forwardToSubForwardRuleSpec := []string{"-j", "SUBMARINER-FORWARD"}
-		ipt.AppendUnique("filter", "FORWARD", forwardToSubForwardRuleSpec...)
+		rules, err := ipt.List("filter", "FORWARD")
+		if err != nil {
+			klog.Fatalf("error listing the rules in FORWARD chain: %v", err)
+		}
+
+		appendAt := len(rules) + 1
+		insertAt := appendAt
+		for i, rule := range rules {
+			if rule == "-A FORWARD -j SUBMARINER-FORWARD" {
+				insertAt = -1
+				break
+			} else if rule == "-A FORWARD -j REJECT --reject-with icmp-host-prohibited" {
+				insertAt = i
+				break
+			}
+		}
+
+		if insertAt == appendAt {
+			// Append the rule at the end of FORWARD Chain.
+			ipt.Append("filter", "FORWARD", forwardToSubForwardRuleSpec...)
+		} else if insertAt > 0 {
+			// Insert the rule in the FORWARD Chain.
+			ipt.Insert("filter", "FORWARD", insertAt, forwardToSubForwardRuleSpec...)
+		}
 
 		go runCharon(i.Debug, i.LogFile)
 	}
