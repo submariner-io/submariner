@@ -60,17 +60,17 @@ func main() {
 
 	cfg, err := clientcmd.BuildConfigFromFlags(localMasterUrl, localKubeconfig)
 	if err != nil {
-		klog.Fatalf("Error building kubeconfig: %s", err.Error())
+		klog.Exitf("Error building kubeconfig: %s", err.Error())
 	}
 
 	kubeClient, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
-		klog.Fatalf("Error building kubernetes clientset: %s", err.Error())
+		klog.Exitf("Error building kubernetes clientset: %s", err.Error())
 	}
 
 	submarinerClient, err := submarinerClientset.NewForConfig(cfg)
 	if err != nil {
-		klog.Fatalf("Error building submariner clientset: %s", err.Error())
+		klog.Exitf("Error building submariner clientset: %s", err.Error())
 	}
 
 	kubeInformerFactory := kubeInformers.NewSharedInformerFactoryWithOptions(kubeClient, time.Second*30, kubeInformers.WithNamespace(ss.Namespace))
