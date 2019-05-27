@@ -66,11 +66,11 @@ func (p *PHPAPI) GetCluster(clusterId string) (types.SubmarinerCluster, error) {
 	requestUrl := fmt.Sprintf("%s://%s/clusters.php?plurality=false&identifier=%s&cluster_id=%s", p.Proto, p.Server, p.APIToken, clusterId)
 	klog.V(8).Infof("request url: %s", requestUrl)
 	clustersGetter, err := http.Get(requestUrl)
-	defer clustersGetter.Body.Close()
 	if err != nil {
 		klog.Errorf("Encountered error while trying to retrieve clusters from the apiserver")
 		return types.SubmarinerCluster{}, err
 	}
+	defer clustersGetter.Body.Close()
 	clustersRaw, err := ioutil.ReadAll(clustersGetter.Body)
 	klog.V(8).Infof("response body: %v", string(clustersRaw[:]))
 	var cluster types.SubmarinerCluster
@@ -81,11 +81,11 @@ func (p *PHPAPI) GetCluster(clusterId string) (types.SubmarinerCluster, error) {
 func (p *PHPAPI) GetEndpoints(clusterId string) ([]types.SubmarinerEndpoint, error) {
 	requestUrl := fmt.Sprintf("%s://%s/endpoints.php?plurality=true&identifier=%s&cluster_id=%s", p.Proto, p.Server, p.APIToken, clusterId)
 	endpointsGetter, err := http.Get(requestUrl)
-	defer endpointsGetter.Body.Close()
 	if err != nil {
 		klog.Errorf("encountered error while trying to retrieve endpoints from the apiserver: %v", err)
 		return nil, err
 	}
+	defer endpointsGetter.Body.Close()
 	endpointsRaw, err := ioutil.ReadAll(endpointsGetter.Body)
 	klog.V(8).Infof("response body: %v", string(endpointsRaw[:]))
 	var endpoints []types.SubmarinerEndpoint
@@ -188,10 +188,14 @@ func (p *PHPAPI) SetEndpoint(local types.SubmarinerEndpoint) error {
 	}
 	formVal := url.Values{}
 	formVal.Set("action", "reconcile")
-	formVal.Add("endpoint",string(marshaledEndpoint))
+	formVal.Add("endpoint", string(marshaledEndpoint))
 	formedURL := fmt.Sprintf("%s://%s/endpoints.php?identifier=%s&cluster_id=%s", p.Proto, p.Server, p.APIToken, local.Spec.ClusterID)
 	klog.V(8).Infof("Formed URL was %s", formedURL)
 	poster, err := http.PostForm(formedURL, formVal)
+	if err != nil {
+		klog.Errorf("Error while setting endpoint %v", err)
+		return err
+	}
 	defer poster.Body.Close()
 
 	return nil
@@ -204,11 +208,11 @@ func (p *PHPAPI) RemoveEndpoint(clusterId, cableName string) error {
 	formedURL := fmt.Sprintf("%s://%s/endpoints.php?identifier=%s&cluster_id=%s", p.Proto, p.Server, p.APIToken, clusterId)
 	klog.V(8).Infof("Formed URL was %s", formedURL)
 	poster, err := http.PostForm(formedURL, formVal)
-	defer poster.Body.Close()
 	if err != nil {
 		klog.Errorf("Error while removing endpoint %v", err)
 		return err
 	}
+	defer poster.Body.Close()
 	return nil
 }
 func (p *PHPAPI) RemoveCluster(clusterId string) error {
