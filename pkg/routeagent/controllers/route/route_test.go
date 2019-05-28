@@ -1,8 +1,6 @@
 package routecontroller
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -29,7 +27,6 @@ var _ = Describe("Route", func() {
 				rc.populateCidrBlockList(testinputcidrblocks)
 				want := []string{"10.10.10.0/24", "192.168.1.0/24", "192.168.0.0./24"}
 				Expect(rc.subnets).To(Equal(want))
-				fmt.Println("nonono")
 			})
 
 		})
