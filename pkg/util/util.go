@@ -34,20 +34,19 @@ func getConnectSecret(token string) (string, error) {
 }
 
 func ParseSecure(token string) (types.Secure, error) {
-	if len(token) != tokenLength {
-		klog.Fatalf("Token %s length was not %d", token, tokenLength)
-	}
-	secure := types.Secure{}
-	var err error
-	secure.SecretKey, err = getConnectSecret(token)
+	secretKey, err := getConnectSecret(token)
 	if err != nil {
-		klog.Fatalf("Could not parse token to secret")
+		return types.Secure{}, err
 	}
-	secure.APIKey, err = getAPIIdentifier(token)
+
 	if err != nil {
-		klog.Fatalf("Could not parse token to apikey")
+		return types.Secure{}, err
 	}
-	return secure, nil
+
+	return types.Secure{
+		APIKey: apiKey,
+		SecretKey: secretKey,
+	}, nil
 }
 
 func GetLocalIP() net.IP {
@@ -63,6 +62,10 @@ func GetLocalIP() net.IP {
 }
 
 func FlattenColors(colorCodes []string) string {
+	if len(colorCodes) == 0 {
+		return ""
+	}
+
 	flattenedColors := colorCodes[0]
 	for k, v := range colorCodes {
 		if k != 0 {
