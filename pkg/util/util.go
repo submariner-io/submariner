@@ -136,6 +136,10 @@ func GetEndpointCRDNameFromParams(clusterID, cableName string) (string, error) {
 }
 
 func GetClusterCRDName(cluster types.SubmarinerCluster) (string, error) {
+	if cluster.Spec.ClusterID == "" {
+		return "", fmt.Errorf("ClusterID was nil or empty")
+	}
+
 	return cluster.Spec.ClusterID, nil
 }
 

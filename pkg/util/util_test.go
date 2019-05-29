@@ -150,12 +150,25 @@ var _ = Describe("Util", func() {
 	})
 
 	Describe("Function GetClusterCRDName", func() {
-		It("should return the cluster ID", func() {
-			Expect(GetClusterCRDName(types.SubmarinerCluster {
-				Spec: subv1.ClusterSpec{
-					ClusterID: "ClusterID",
-				},
-			})).To(Equal("ClusterID"))
+		Context("With valid input", func() {
+			It("should return the cluster ID", func() {
+				Expect(GetClusterCRDName(types.SubmarinerCluster {
+					Spec: subv1.ClusterSpec{
+						ClusterID: "ClusterID",
+					},
+				})).To(Equal("ClusterID"))
+			})
+		})
+
+		Context("With a nil cluster ID", func() {
+			It("should return an error", func() {
+				_, err := GetClusterCRDName(types.SubmarinerCluster {
+					Spec: subv1.ClusterSpec{
+					},
+				})
+
+				Expect(err).To(HaveOccurred())
+			})
 		})
 	})
 
