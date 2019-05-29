@@ -48,15 +48,15 @@ type Engine struct {
 	LogFile string
 }
 
-type IPSecSpecification struct {
-	PSK string
-	Debug bool
+type Specification struct {
+	PSK     string
+	Debug   bool
 	LogFile string
 }
 
 func NewEngine(localSubnets []string, localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) *Engine {
 
-	ipSecSpec := IPSecSpecification{}
+	ipSecSpec := Specification{}
 
 	err := envconfig.Process("ce_ipsec", &ipSecSpec)
 	if err != nil {
@@ -140,16 +140,16 @@ func (i *Engine) StopEngine() error {
 	return nil
 }
 
-func (i *Engine) SyncCables(clusterId string, endpoints []types.SubmarinerEndpoint) error {
+func (i *Engine) SyncCables(clusterID string, endpoints []types.SubmarinerEndpoint) error {
 	klog.V(2).Infof("Starting selective cable sync")
-	
+
 	client, err := getClient()
 	if err != nil {
 		return err
 	}
 	defer client.Close()
-	
-	activeConnections, err := i.getActiveConns(false, clusterId, client)
+
+	activeConnections, err := i.getActiveConns(false, clusterID, client)
 	if err != nil {
 		return err
 	}
@@ -355,41 +355,41 @@ func (i *Engine) installCableInternal(endpoint types.SubmarinerEndpoint, client 
 	return nil
 }
 
-func (i *Engine) RemoveCable(cableId string) error {
+func (i *Engine) RemoveCable(cableID string) error {
 	client, err := getClient()
 	if err != nil {
 		return err
 
 	}
 	defer client.Close()
-	
-	return i.removeCableInternal(cableId, client)
+
+	return i.removeCableInternal(cableID, client)
 }
 
-func (i *Engine) removeCableInternal(cableId string, client *goStrongswanVici.ClientConn) error {
+func (i *Engine) removeCableInternal(cableID string, client *goStrongswanVici.ClientConn) error {
 	i.Lock()
 	defer i.Unlock()
 
 	/*
 	err = client.Terminate(&goStrongswanVici.TerminateRequest{
-		Child: "submariner-child-" + cableId,
+		Child: "submariner-child-" + cableID,
 	})
 	if err != nil {
-		klog.Errorf("Error when terminating child connection %s : %v", cableId, err)
+		klog.Errorf("Error when terminating child connection %s : %v", cableID, err)
 	}
 
 	err = client.Terminate(&goStrongswanVici.TerminateRequest{
-		Ike: cableId,
+		Ike: cableID,
 	})
 	if err != nil {
-		klog.Errorf("Error when terminating ike connection %s : %v", cableId, err)
+		klog.Errorf("Error when terminating ike connection %s : %v", cableID, err)
 	} */
-	klog.Infof("Unloading connection %s", cableId)
+	klog.Infof("Unloading connection %s", cableID)
 	err := client.UnloadConn(&goStrongswanVici.UnloadConnRequest{
-		Name: cableId,
+		Name: cableID,
 	})
 	if err != nil {
-		klog.Errorf("Error when unloading connection %s : %v", cableId, err)
+		klog.Errorf("Error when unloading connection %s : %v", cableID, err)
 		return err
 	}
 
@@ -411,11 +411,11 @@ func (i *Engine) removeCableInternal(cableId string, client *goStrongswanVici.Cl
 		if count > 2 {
 			klog.Infof("Waited for connection terminate for 2 iterations, triggering a force delete of the IKE")
 			err = client.Terminate(&goStrongswanVici.TerminateRequest{
-				Ike: cableId,
+				Ike:   cableID,
 				Force: "yes",
 			})
 			if err != nil {
-				klog.Errorf("error when terminating ike connection %s : %v", cableId, err)
+				klog.Errorf("error when terminating ike connection %s : %v", cableID, err)
 			}
 		}
 		sas, err := client.ListSas("", "")
@@ -425,7 +425,7 @@ func (i *Engine) removeCableInternal(cableId string, client *goStrongswanVici.Cl
 			found := false
 			for _, samap := range sas {
 				klog.V(6).Infof("Found SA %v", samap)
-				sa, stillExists := samap[cableId]
+				sa, stillExists := samap[cableID]
 				if stillExists && ( sa.State == "DELETING" || sa.State == "CONNECTING" ){
 					found = true
 					break
@@ -448,7 +448,7 @@ func (i *Engine) removeCableInternal(cableId string, client *goStrongswanVici.Cl
 			}
 		}
 	}
-	klog.Infof("Removed connection %s", cableId)
+	klog.Infof("Removed connection %s", cableID)
 	return nil
 }
 
@@ -465,7 +465,7 @@ func (i *Engine) PrintConns() {
 	}
 }
 
-func (i *Engine) getActiveConns(getAll bool, clusterId string, client *goStrongswanVici.ClientConn) ([]string, error) {
+func (i *Engine) getActiveConns(getAll bool, clusterID string, client *goStrongswanVici.ClientConn) ([]string, error) {
 	i.Lock()
 	defer i.Unlock()
 	var connections []string
@@ -473,7 +473,7 @@ func (i *Engine) getActiveConns(getAll bool, clusterId string, client *goStrongs
 	if getAll {
 		prefix = "submariner-cable-"
 	} else {
-		prefix = fmt.Sprintf("submariner-cable-%s-", clusterId)
+		prefix = fmt.Sprintf("submariner-cable-%s-", clusterID)
 	}
 
 	conns, err := client.ListConns("")

@@ -35,13 +35,13 @@ import (
 )
 
 var (
-	localMasterUrl  string
+	localMasterURL  string
 	localKubeconfig string
 )
 
 func init() {
 	flag.StringVar(&localKubeconfig, "kubeconfig", "", "Path to kubeconfig of local cluster. Only required if out-of-cluster.")
-	flag.StringVar(&localMasterUrl, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+	flag.StringVar(&localMasterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 }
 
 func main() {
@@ -58,7 +58,7 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	cfg, err := clientcmd.BuildConfigFromFlags(localMasterUrl, localKubeconfig)
+	cfg, err := clientcmd.BuildConfigFromFlags(localMasterURL, localKubeconfig)
 	if err != nil {
 		klog.Exitf("Error building kubeconfig: %s", err.Error())
 	}
