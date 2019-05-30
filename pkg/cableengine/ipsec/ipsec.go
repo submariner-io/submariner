@@ -48,15 +48,15 @@ type Engine struct {
 	LogFile string
 }
 
-type IPSecSpecification struct {
-	PSK string
-	Debug bool
+type Specification struct {
+	PSK     string
+	Debug   bool
 	LogFile string
 }
 
 func NewEngine(localSubnets []string, localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) *Engine {
 
-	ipSecSpec := IPSecSpecification{}
+	ipSecSpec := Specification{}
 
 	err := envconfig.Process("ce_ipsec", &ipSecSpec)
 	if err != nil {
@@ -95,7 +95,30 @@ func (i *Engine) StartEngine(ignition bool) error {
 		forwardToSubPostroutingRuleSpec := []string{"-j", "SUBMARINER-POSTROUTING"}
 		ipt.AppendUnique("nat", "POSTROUTING", forwardToSubPostroutingRuleSpec...)
 		forwardToSubForwardRuleSpec := []string{"-j", "SUBMARINER-FORWARD"}
-		ipt.AppendUnique("filter", "FORWARD", forwardToSubForwardRuleSpec...)
+		rules, err := ipt.List("filter", "FORWARD")
+		if err != nil {
+			klog.Fatalf("error listing the rules in FORWARD chain: %v", err)
+		}
+
+		appendAt := len(rules) + 1
+		insertAt := appendAt
+		for i, rule := range rules {
+			if rule == "-A FORWARD -j SUBMARINER-FORWARD" {
+				insertAt = -1
+				break
+			} else if rule == "-A FORWARD -j REJECT --reject-with icmp-host-prohibited" {
+				insertAt = i
+				break
+			}
+		}
+
+		if insertAt == appendAt {
+			// Append the rule at the end of FORWARD Chain.
+			ipt.Append("filter", "FORWARD", forwardToSubForwardRuleSpec...)
+		} else if insertAt > 0 {
+			// Insert the rule in the FORWARD Chain.
+			ipt.Insert("filter", "FORWARD", insertAt, forwardToSubForwardRuleSpec...)
+		}
 
 		go runCharon(i.Debug, i.LogFile)
 	}
@@ -119,7 +142,14 @@ func (i *Engine) StopEngine() error {
 
 func (i *Engine) SyncCables(clusterID string, endpoints []types.SubmarinerEndpoint) error {
 	klog.V(2).Infof("Starting selective cable sync")
-	activeConnections, err := i.getActiveConns(false, clusterID)
+
+	client, err := getClient()
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	activeConnections, err := i.getActiveConns(false, clusterID, client)
 	if err != nil {
 		return err
 	}
@@ -135,7 +165,7 @@ func (i *Engine) SyncCables(clusterID string, endpoints []types.SubmarinerEndpoi
 		}
 		if delete {
 			klog.Infof("Triggering remove cable of connection %s", active)
-			i.RemoveCable(active)
+			i.removeCableInternal(active, client)
 		}
 	}
 
@@ -150,7 +180,7 @@ func (i *Engine) SyncCables(clusterID string, endpoints []types.SubmarinerEndpoi
 		}
 		if !connInstalled {
 			klog.Infof("Marking cable %s to be installed", endpoint.Spec.CableName)
-			i.InstallCable(endpoint)
+			i.installCableInternal(endpoint, client)
 		}
 	}
 
@@ -158,6 +188,16 @@ func (i *Engine) SyncCables(clusterID string, endpoints []types.SubmarinerEndpoi
 }
 
 func (i *Engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
+	client, err := getClient()
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	return i.installCableInternal(endpoint, client);
+}
+
+func (i *Engine) installCableInternal(endpoint types.SubmarinerEndpoint, client *goStrongswanVici.ClientConn) error {
 	if endpoint.Spec.ClusterID == i.LocalCluster.ID {
 		klog.V(4).Infof("Not installing cable for local cluster")
 		return nil
@@ -166,8 +206,9 @@ func (i *Engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 		klog.V(4).Infof("Not installing self")
 		return nil
 	}
+
 	klog.V(2).Infof("Installing cable %s", endpoint.Spec.CableName)
-	activeConnections, err := i.getActiveConns(false, endpoint.Spec.ClusterID)
+	activeConnections, err := i.getActiveConns(false, endpoint.Spec.ClusterID, client)
 	if err != nil {
 		return err
 	}
@@ -182,16 +223,10 @@ func (i *Engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 		}
 	}
 
-	client, err := getClient()
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
 	i.Lock()
 	defer i.Unlock()
 
-	if err := i.loadSharedKey(endpoint); err != nil {
+	if err := i.loadSharedKey(endpoint, client); err != nil {
 		klog.Errorf("Encountered issue while trying to load shared keys")
 		return err
 	}
@@ -321,9 +356,6 @@ func (i *Engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 }
 
 func (i *Engine) RemoveCable(cableID string) error {
-	i.Lock()
-	defer i.Unlock()
-
 	client, err := getClient()
 	if err != nil {
 		return err
@@ -331,22 +363,29 @@ func (i *Engine) RemoveCable(cableID string) error {
 	}
 	defer client.Close()
 
-	/*
-	err = client.Terminate(&goStrongswanVici.TerminateRequest{
-		Child: "submariner-child-" + cableID,
-	})
-	if err != nil {
-		klog.Errorf("Error when terminating child connection %s : %v", cableID, err)
-	}
+	return i.removeCableInternal(cableID, client)
+}
 
-	err = client.Terminate(&goStrongswanVici.TerminateRequest{
-		Ike: cableID,
-	})
-	if err != nil {
-		klog.Errorf("Error when terminating ike connection %s : %v", cableID, err)
-	} */
+func (i *Engine) removeCableInternal(cableID string, client *goStrongswanVici.ClientConn) error {
+	i.Lock()
+	defer i.Unlock()
+
+	/*
+		err = client.Terminate(&goStrongswanVici.TerminateRequest{
+			Child: "submariner-child-" + cableID,
+		})
+		if err != nil {
+			klog.Errorf("Error when terminating child connection %s : %v", cableID, err)
+		}
+
+		err = client.Terminate(&goStrongswanVici.TerminateRequest{
+			Ike: cableID,
+		})
+		if err != nil {
+			klog.Errorf("Error when terminating ike connection %s : %v", cableID, err)
+		} */
 	klog.Infof("Unloading connection %s", cableID)
-	err =  client.UnloadConn(&goStrongswanVici.UnloadConnRequest{
+	err := client.UnloadConn(&goStrongswanVici.UnloadConnRequest{
 		Name: cableID,
 	})
 	if err != nil {
@@ -372,7 +411,7 @@ func (i *Engine) RemoveCable(cableID string) error {
 		if count > 2 {
 			klog.Infof("Waited for connection terminate for 2 iterations, triggering a force delete of the IKE")
 			err = client.Terminate(&goStrongswanVici.TerminateRequest{
-				Ike: cableID,
+				Ike:   cableID,
 				Force: "yes",
 			})
 			if err != nil {
@@ -426,7 +465,7 @@ func (i *Engine) PrintConns() {
 	}
 }
 
-func (i *Engine) getActiveConns(getAll bool, clusterID string) ([]string, error) {
+func (i *Engine) getActiveConns(getAll bool, clusterID string, client *goStrongswanVici.ClientConn) ([]string, error) {
 	i.Lock()
 	defer i.Unlock()
 	var connections []string
@@ -436,11 +475,6 @@ func (i *Engine) getActiveConns(getAll bool, clusterID string) ([]string, error)
 	} else {
 		prefix = fmt.Sprintf("submariner-cable-%s-", clusterID)
 	}
-	client, err := getClient()
-	if err != nil {
-		return nil, err
-	}
-	defer client.Close()
 
 	conns, err := client.ListConns("")
 	if err != nil {
@@ -458,12 +492,7 @@ func (i *Engine) getActiveConns(getAll bool, clusterID string) ([]string, error)
 	return connections, nil
 }
 
-func (i *Engine) loadSharedKey(endpoint types.SubmarinerEndpoint) error {
-	client, err := getClient()
-	if err != nil {
-		return err
-	}
-	defer client.Close()
+func (i *Engine) loadSharedKey(endpoint types.SubmarinerEndpoint, client *goStrongswanVici.ClientConn) error {
 	klog.Infof("Loading shared key for endpoint")
 	var identities []string
 	var publicIP, privateIP string
@@ -480,7 +509,8 @@ func (i *Engine) loadSharedKey(endpoint types.SubmarinerEndpoint) error {
 		Data:   i.SecretKey,
 		Owners: identities,
 	}
-	err = client.LoadShared(sharedKey)
+
+	err := client.LoadShared(sharedKey)
 	if err != nil {
 		klog.Infof("Failed to load pre-shared key for %s: %v", privateIP, err)
 		if endpoint.Spec.NATEnabled {

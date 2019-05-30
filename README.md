@@ -190,7 +190,6 @@ Each cluster that will be connected must have Submariner installed within it. Yo
    ```
    kubectl -n kube-system  rollout status deploy/tiller-deploy
    ```
-   
 1. Install submariner into this cluster. The values within the following command correspond to the table below.
 
    ```
@@ -241,6 +240,15 @@ If you don't see a command prompt, try pressing enter.
 
 When running in AWS, it is necessary to disable source/dest checking of the instances that are gateway hosts to allow the instances to pass traffic for remote clusters. 
 
+### Openshift Notes
+
+When running in Openshift, we need to grant the appropriate security context for the service accounts
+   
+   ```
+   oc adm policy add-scc-to-user privileged system:serviceaccount:submariner:submariner-routeagent
+   oc adm policy add-scc-to-user privileged system:serviceaccount:submariner:submariner-engine 
+   ```
+   
 # Building/Contributing
 
 To build `submariner-engine` and `submariner-route-agent` you can trigger `make`, which will perform a Dapperized build of the components.
