@@ -24,7 +24,7 @@ import (
 
 type DatastoreSyncer struct {
 	objectNamespace string
-	thisClusterId string
+	thisClusterID string
 	colorCodes []string
 	kubeClientSet kubernetes.Interface
 	submarinerClientset submarinerClientset.Interface
@@ -38,9 +38,9 @@ type DatastoreSyncer struct {
 	endpointWorkqueue workqueue.RateLimitingInterface
 }
 
-func NewDatastoreSyncer(thisClusterId string, objectNamespace string, kubeClientSet kubernetes.Interface, submarinerClientset submarinerClientset.Interface, submarinerClusterInformer submarinerInformers.ClusterInformer, submarinerEndpointInformer submarinerInformers.EndpointInformer, datastore datastore.Datastore, colorcodes []string, localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) *DatastoreSyncer {
+func NewDatastoreSyncer(thisClusterID string, objectNamespace string, kubeClientSet kubernetes.Interface, submarinerClientset submarinerClientset.Interface, submarinerClusterInformer submarinerInformers.ClusterInformer, submarinerEndpointInformer submarinerInformers.EndpointInformer, datastore datastore.Datastore, colorcodes []string, localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) *DatastoreSyncer {
 	newDatastoreSyncer := DatastoreSyncer{
-		thisClusterId: thisClusterId,
+		thisClusterID: thisClusterID,
 		objectNamespace: objectNamespace,
 		kubeClientSet: kubeClientSet,
 		submarinerClientset: submarinerClientset,
@@ -148,8 +148,8 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 		return fmt.Errorf("Error reconciling local Endpoint CRD: %v", err)
 	}
 
-	go utilruntime.HandleError(d.datastore.WatchClusters(context.TODO(), d.thisClusterId, d.colorCodes, d.reconcileClusterCRD))
-	go utilruntime.HandleError(d.datastore.WatchEndpoints(context.TODO(), d.thisClusterId, d.colorCodes, d.reconcileEndpointCRD))
+	go utilruntime.HandleError(d.datastore.WatchClusters(context.TODO(), d.thisClusterID, d.colorCodes, d.reconcileClusterCRD))
+	go utilruntime.HandleError(d.datastore.WatchEndpoints(context.TODO(), d.thisClusterID, d.colorCodes, d.reconcileEndpointCRD))
 
 	klog.Info("Started datastoresyncer workers")
 
@@ -182,7 +182,7 @@ func (d *DatastoreSyncer) processNextClusterWorkItem() bool {
 			klog.Errorf("error while splitting meta namespace key: %v", err)
 			return nil
 		}
-		if d.thisClusterId != key {
+		if d.thisClusterID != key {
 			klog.V(6).Infof("The updated cluster object was not for this cluster, skipping updating the datastore")
 			// not actually an error but we should forget about this and return
 			d.clusterWorkqueue.Forget(obj)
@@ -239,7 +239,7 @@ func (d *DatastoreSyncer) processNextEndpointWorkItem() bool {
 			d.endpointWorkqueue.Forget(obj)
 			return nil
 		}
-		if d.thisClusterId != endpoint.Spec.ClusterID {
+		if d.thisClusterID != endpoint.Spec.ClusterID {
 			klog.V(4).Infof("The updated endpoint object was not for this cluster, skipping updating the datastore")
 			// not actually an error but we should forget about this and return
 			d.endpointWorkqueue.Forget(obj)
@@ -391,9 +391,9 @@ func (d *DatastoreSyncer) runReaper() {
 
 // basic brute force search for now
 // returns true if the endpoint was found in the passed in list
-func searchEndpoints(endpoints []types.SubmarinerEndpoint, cableName string, clusterId string) bool {
+func searchEndpoints(endpoints []types.SubmarinerEndpoint, cableName string, clusterID string) bool {
 	for _, endpoint := range endpoints {
-		if endpoint.Spec.CableName == cableName && endpoint.Spec.ClusterID == clusterId {
+		if endpoint.Spec.CableName == cableName && endpoint.Spec.ClusterID == clusterID {
 			return true
 		}
 	}

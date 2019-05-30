@@ -117,9 +117,9 @@ func (i *Engine) StopEngine() error {
 	return nil
 }
 
-func (i *Engine) SyncCables(clusterId string, endpoints []types.SubmarinerEndpoint) error {
+func (i *Engine) SyncCables(clusterID string, endpoints []types.SubmarinerEndpoint) error {
 	klog.V(2).Infof("Starting selective cable sync")
-	activeConnections, err := i.getActiveConns(false, clusterId)
+	activeConnections, err := i.getActiveConns(false, clusterID)
 	if err != nil {
 		return err
 	}
@@ -177,7 +177,7 @@ func (i *Engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 			klog.V(6).Infof("Cable %s is already installed, not installing twice", active)
 			return nil
 		}
-		if util.GetClusterIdFromCableName(active) == endpoint.Spec.ClusterID {
+		if util.GetClusterIDFromCableName(active) == endpoint.Spec.ClusterID {
 			return fmt.Errorf("error while installing cable %s, already found a pre-existing cable belonging to this cluster %s", active, endpoint.Spec.ClusterID)
 		}
 	}
@@ -320,7 +320,7 @@ func (i *Engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 	return nil
 }
 
-func (i *Engine) RemoveCable(cableId string) error {
+func (i *Engine) RemoveCable(cableID string) error {
 	i.Lock()
 	defer i.Unlock()
 
@@ -333,24 +333,24 @@ func (i *Engine) RemoveCable(cableId string) error {
 
 	/*
 	err = client.Terminate(&goStrongswanVici.TerminateRequest{
-		Child: "submariner-child-" + cableId,
+		Child: "submariner-child-" + cableID,
 	})
 	if err != nil {
-		klog.Errorf("Error when terminating child connection %s : %v", cableId, err)
+		klog.Errorf("Error when terminating child connection %s : %v", cableID, err)
 	}
 
 	err = client.Terminate(&goStrongswanVici.TerminateRequest{
-		Ike: cableId,
+		Ike: cableID,
 	})
 	if err != nil {
-		klog.Errorf("Error when terminating ike connection %s : %v", cableId, err)
+		klog.Errorf("Error when terminating ike connection %s : %v", cableID, err)
 	} */
-	klog.Infof("Unloading connection %s", cableId)
+	klog.Infof("Unloading connection %s", cableID)
 	err =  client.UnloadConn(&goStrongswanVici.UnloadConnRequest{
-		Name: cableId,
+		Name: cableID,
 	})
 	if err != nil {
-		klog.Errorf("Error when unloading connection %s : %v", cableId, err)
+		klog.Errorf("Error when unloading connection %s : %v", cableID, err)
 		return err
 	}
 
@@ -372,11 +372,11 @@ func (i *Engine) RemoveCable(cableId string) error {
 		if count > 2 {
 			klog.Infof("Waited for connection terminate for 2 iterations, triggering a force delete of the IKE")
 			err = client.Terminate(&goStrongswanVici.TerminateRequest{
-				Ike: cableId,
+				Ike: cableID,
 				Force: "yes",
 			})
 			if err != nil {
-				klog.Errorf("error when terminating ike connection %s : %v", cableId, err)
+				klog.Errorf("error when terminating ike connection %s : %v", cableID, err)
 			}
 		}
 		sas, err := client.ListSas("", "")
@@ -386,7 +386,7 @@ func (i *Engine) RemoveCable(cableId string) error {
 			found := false
 			for _, samap := range sas {
 				klog.V(6).Infof("Found SA %v", samap)
-				sa, stillExists := samap[cableId]
+				sa, stillExists := samap[cableID]
 				if stillExists && ( sa.State == "DELETING" || sa.State == "CONNECTING" ){
 					found = true
 					break
@@ -409,7 +409,7 @@ func (i *Engine) RemoveCable(cableId string) error {
 			}
 		}
 	}
-	klog.Infof("Removed connection %s", cableId)
+	klog.Infof("Removed connection %s", cableID)
 	return nil
 }
 
@@ -426,7 +426,7 @@ func (i *Engine) PrintConns() {
 	}
 }
 
-func (i *Engine) getActiveConns(getAll bool, clusterId string) ([]string, error) {
+func (i *Engine) getActiveConns(getAll bool, clusterID string) ([]string, error) {
 	i.Lock()
 	defer i.Unlock()
 	var connections []string
@@ -434,7 +434,7 @@ func (i *Engine) getActiveConns(getAll bool, clusterId string) ([]string, error)
 	if getAll {
 		prefix = "submariner-cable-"
 	} else {
-		prefix = fmt.Sprintf("submariner-cable-%s-", clusterId)
+		prefix = fmt.Sprintf("submariner-cable-%s-", clusterID)
 	}
 	client, err := getClient()
 	if err != nil {

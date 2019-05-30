@@ -16,7 +16,7 @@ type SubmarinerEndpoint struct {
 type SubmarinerSpecification struct {
 	Namespace string
 	Debug	bool
-	ClusterId string
+	ClusterID string
 	Token string
 	ClusterCidr	[]string
 	ServiceCidr []string
@@ -26,6 +26,6 @@ type SubmarinerSpecification struct {
 }
 
 type Secure struct {
-	ApiKey string
+	APIKey string
 	SecretKey string
 }
