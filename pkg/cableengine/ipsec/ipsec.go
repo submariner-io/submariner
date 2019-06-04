@@ -350,6 +350,18 @@ func (i *Engine) installCableInternal(endpoint types.SubmarinerEndpoint, client 
 		}
 	}
 
+	// MASQUERADE (on the GatewayNode) the incoming traffic from the remote cluster (i.e, remoteEndpointIP)
+	// and destined to the local PODs (i.e., localSubnet) scheduled on the non-gateway node.
+	// This will make the return traffic from the POD to go via the GatewayNode.
+	for _, localSubnet := range i.LocalSubnets {
+		ruleSpec := []string{"-s", remoteEndpointIP, "-d", localSubnet, "-j", "MASQUERADE"}
+		klog.V(8).Infof("Installing iptables rule for MASQ incoming traffic: %s", strings.Join(ruleSpec, " "))
+		err = ipt.AppendUnique("nat", "SUBMARINER-POSTROUTING", ruleSpec...)
+		if err != nil {
+			klog.Errorf("error while installing iptables MASQ rule: %v", err)
+		}
+	}
+
 	klog.V(2).Infof("Loaded connection: %v", endpoint.Spec.CableName)
 
 	return nil
