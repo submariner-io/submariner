@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-type k8s struct {
+type Datastore struct {
 	client *submarinerClientset.Clientset
 	informerFactory submarinerInformers.SharedInformerFactory
 
@@ -30,7 +30,7 @@ type k8s struct {
 	stopCh <-chan struct{}
 }
 
-type k8sSpecification struct {
+type datastoreSpecification struct {
 	APIServer string
 	APIServerToken string
 	RemoteNamespace string
@@ -38,13 +38,13 @@ type k8sSpecification struct {
 	Ca string
 }
 
-func NewK8sDatastore(thisClusterID string, stopCh <-chan struct{}) *k8s {
-	kubeDatastore := k8s{
+func NewK8sDatastore(thisClusterID string, stopCh <-chan struct{}) *Datastore {
+	kubeDatastore := Datastore{
 		thisClusterID: thisClusterID,
 		stopCh: stopCh,
 	}
 
-	k8sSpec := k8sSpecification{}
+	k8sSpec := datastoreSpecification{}
 
 	err := envconfig.Process("broker_k8s", &k8sSpec)
 	if err != nil {
@@ -95,7 +95,7 @@ func stringSliceOverlaps(left []string, right []string) bool {
     return false
 }
 
-func (k *k8s) GetClusters(colorCodes []string) ([]types.SubmarinerCluster, error) {
+func (k *Datastore) GetClusters(colorCodes []string) ([]types.SubmarinerCluster, error) {
 	var clusters []types.SubmarinerCluster
 
 	k8sClusters, err := k.client.SubmarinerV1().Clusters(k.remoteNamespace).List(metav1.ListOptions{})
@@ -114,7 +114,7 @@ func (k *k8s) GetClusters(colorCodes []string) ([]types.SubmarinerCluster, error
 	}
 	return clusters, nil
 }
-func (k *k8s) GetCluster(clusterID string) (types.SubmarinerCluster, error) {
+func (k *Datastore) GetCluster(clusterID string) (types.SubmarinerCluster, error) {
 
 	k8sClusters, err := k.client.SubmarinerV1().Clusters(k.remoteNamespace).List(metav1.ListOptions{})
 
@@ -133,7 +133,7 @@ func (k *k8s) GetCluster(clusterID string) (types.SubmarinerCluster, error) {
 
 	return types.SubmarinerCluster{}, fmt.Errorf("cluster wasn't found")
 }
-func (k *k8s) GetEndpoints(clusterID string) ([]types.SubmarinerEndpoint, error) {
+func (k *Datastore) GetEndpoints(clusterID string) ([]types.SubmarinerEndpoint, error) {
 
 	k8sEndpoints, err := k.client.SubmarinerV1().Endpoints(k.remoteNamespace).List(metav1.ListOptions{})
 
@@ -151,7 +151,7 @@ func (k *k8s) GetEndpoints(clusterID string) ([]types.SubmarinerEndpoint, error)
 
 	return endpoints, nil
 }
-func (k *k8s) GetEndpoint(clusterID string, cableName string) (types.SubmarinerEndpoint, error) {
+func (k *Datastore) GetEndpoint(clusterID string, cableName string) (types.SubmarinerEndpoint, error) {
 
 	k8sEndpoints, err := k.client.SubmarinerV1().Endpoints(k.remoteNamespace).List(metav1.ListOptions{})
 
@@ -166,7 +166,7 @@ func (k *k8s) GetEndpoint(clusterID string, cableName string) (types.SubmarinerE
 	}
 	return types.SubmarinerEndpoint{}, fmt.Errorf("endpoint wasn't found")
 }
-func (k *k8s) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onClusterChange func(cluster types.SubmarinerCluster, deleted bool) error) error {
+func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onClusterChange func(cluster types.SubmarinerCluster, deleted bool) error) error {
 
 	k.informerFactory.Submariner().V1().Clusters().Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: func (obj interface{}) {
@@ -243,7 +243,7 @@ func (k *k8s) WatchClusters(ctx context.Context, selfClusterID string, colorCode
 	k.informerFactory.Start(k.stopCh)
 	return nil
 }
-func (k *k8s) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onEndpointChange func (endpoint types.SubmarinerEndpoint, deleted bool) error) error {
+func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onEndpointChange func(endpoint types.SubmarinerEndpoint, deleted bool) error) error {
 
 	k.informerFactory.Submariner().V1().Endpoints().Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: func (obj interface{}) {
@@ -317,7 +317,7 @@ func (k *k8s) WatchEndpoints(ctx context.Context, selfClusterID string, colorCod
 	k.informerFactory.Start(k.stopCh)
 	return nil
 }
-func (k *k8s) SetCluster(cluster types.SubmarinerCluster) error {
+func (k *Datastore) SetCluster(cluster types.SubmarinerCluster) error {
 	clusterCRDName, err := util.GetClusterCRDName(cluster)
 	if err != nil {
 		return fmt.Errorf("Error converting the Cluster CRD name: %v", err)
@@ -358,7 +358,7 @@ func (k *k8s) SetCluster(cluster types.SubmarinerCluster) error {
 	}
 	return nil
 }
-func (k *k8s) SetEndpoint(endpoint types.SubmarinerEndpoint) error {
+func (k *Datastore) SetEndpoint(endpoint types.SubmarinerEndpoint) error {
 	endpointCRDName, err := util.GetEndpointCRDName(endpoint)
 	if err != nil {
 		return fmt.Errorf("Error converting the Endpoint CRD name: %v", err)
@@ -399,7 +399,7 @@ func (k *k8s) SetEndpoint(endpoint types.SubmarinerEndpoint) error {
 	}
 	return nil
 }
-func (k *k8s) RemoveEndpoint(clusterID, cableName string) error {
+func (k *Datastore) RemoveEndpoint(clusterID, cableName string) error {
 	endpointName, err := util.GetEndpointCRDNameFromParams(clusterID, cableName)
 
 	if err != nil {
@@ -408,7 +408,7 @@ func (k *k8s) RemoveEndpoint(clusterID, cableName string) error {
 
 	return k.client.SubmarinerV1().Endpoints(k.remoteNamespace).Delete(endpointName, &metav1.DeleteOptions{})
 }
-func (k *k8s) RemoveCluster(clusterID string) error {
+func (k *Datastore) RemoveCluster(clusterID string) error {
 	// not implemented yet
 	return nil
 }
