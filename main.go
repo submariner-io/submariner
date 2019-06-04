@@ -106,7 +106,10 @@ func main() {
 
 			datastore = phpapi.NewPHPAPI(secure.APIKey)
 		case "k8s":
-			datastore = subk8s.NewK8sDatastore(submSpec.ClusterID, stopCh)
+			datastore, err = subk8s.NewDatastore(submSpec.ClusterID, stopCh)
+			if err != nil {
+				klog.Fatalf("Error creating kubernetes datastore: %v", err)
+			}
 		default:
 			klog.Fatalf("Invalid backend '%s' was specified", submSpec.Broker)
 		}
