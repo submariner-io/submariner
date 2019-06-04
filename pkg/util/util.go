@@ -82,7 +82,7 @@ func GetLocalCluster(ss types.SubmarinerSpecification) (types.SubmarinerCluster,
 func GetLocalEndpoint(clusterID string, backend string, backendConfig map[string]string, natEnabled bool, subnets []string) (types.SubmarinerEndpoint, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
-		klog.Fatalf("error getting hostname: %s", err.Error())
+		return types.SubmarinerEndpoint{}, fmt.Errorf("Error getting hostname: %v", err)
 	}
 	privateIP := GetLocalIP()
 	endpoint := types.SubmarinerEndpoint{
@@ -100,7 +100,7 @@ func GetLocalEndpoint(clusterID string, backend string, backendConfig map[string
 	if natEnabled {
 		publicIP, err := ipify.GetIp()
 		if err != nil {
-			klog.Fatalf("could not determine public IP: %v", err)
+			return types.SubmarinerEndpoint{}, fmt.Errorf("Could not determine public IP: %v", err)
 		}
 		endpoint.Spec.PublicIP = net.ParseIP(publicIP)
 	}
