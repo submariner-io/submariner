@@ -1,4 +1,4 @@
-package routecontroller
+package route
 
 import (
 	"fmt"
@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-type RouteController struct {
+type Controller struct {
 	clusterID string
 	objectNamespace string
 
@@ -36,8 +36,9 @@ type RouteController struct {
 	link *net.Interface
 }
 
-func NewRouteController(clusterID string, objectNamespace string, link *net.Interface, submarinerClientSet clientset.Interface, clusterInformer informers.ClusterInformer, endpointInformer informers.EndpointInformer) *RouteController {
-	routeController := RouteController{
+func NewController(clusterID string, objectNamespace string, link *net.Interface, submarinerClientSet clientset.Interface,
+	clusterInformer informers.ClusterInformer, endpointInformer informers.EndpointInformer) *Controller {
+	controller := Controller{
 		clusterID: clusterID,
 		objectNamespace: objectNamespace,
 		submarinerClientSet: submarinerClientSet,
@@ -49,25 +50,25 @@ func NewRouteController(clusterID string, objectNamespace string, link *net.Inte
 	}
 
 	clusterInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: routeController.enqueueCluster,
+		AddFunc: controller.enqueueCluster,
 		UpdateFunc: func(old, new interface{}) {
-			routeController.enqueueCluster(new)
+			controller.enqueueCluster(new)
 		},
-		DeleteFunc: routeController.handleRemovedCluster,
+		DeleteFunc: controller.handleRemovedCluster,
 	})
 
 	endpointInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: routeController.enqueueEndpoint,
+		AddFunc: controller.enqueueEndpoint,
 		UpdateFunc: func(old, new interface{}) {
-			routeController.enqueueEndpoint(new)
+			controller.enqueueEndpoint(new)
 		},
-		DeleteFunc: routeController.handleRemovedEndpoint,
+		DeleteFunc: controller.handleRemovedEndpoint,
 	})
 
-	return &routeController
+	return &controller
 }
 
-func (r *RouteController) Run(stopCh <-chan struct{}) error {
+func (r *Controller) Run(stopCh <-chan struct{}) error {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	defer utilruntime.HandleCrash()
@@ -104,19 +105,19 @@ func (r *RouteController) Run(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (r *RouteController) runClusterWorker() {
+func (r *Controller) runClusterWorker() {
 	for r.processNextCluster() {
 
 	}
 }
 
-func (r *RouteController) runEndpointWorker() {
+func (r *Controller) runEndpointWorker() {
 	for r.processNextEndpoint() {
 
 	}
 }
 
-func (r *RouteController) populateCidrBlockList(inputCidrBlocks []string) {
+func (r *Controller) populateCidrBlockList(inputCidrBlocks []string) {
 	for _, cidrBlock := range inputCidrBlocks {
 		if !containsString(r.subnets, cidrBlock) {
 			r.subnets = append(r.subnets, cidrBlock)
@@ -124,7 +125,7 @@ func (r *RouteController) populateCidrBlockList(inputCidrBlocks []string) {
 	}
 }
 
-func (r *RouteController) processNextCluster() bool {
+func (r *Controller) processNextCluster() bool {
 	obj, shutdown := r.clusterWorkqueue.Get()
 	if shutdown {
 		return false
@@ -163,7 +164,7 @@ func (r *RouteController) processNextCluster() bool {
 	return true
 }
 
-func (r *RouteController) processNextEndpoint() bool {
+func (r *Controller) processNextEndpoint() bool {
 	obj, shutdown := r.endpointWorkqueue.Get()
 	if shutdown {
 		return false
@@ -223,7 +224,7 @@ func (r *RouteController) processNextEndpoint() bool {
 	return true
 }
 
-func (r *RouteController) enqueueCluster(obj interface{}) {
+func (r *Controller) enqueueCluster(obj interface{}) {
 	var key string
 	var err error
 	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
@@ -234,7 +235,7 @@ func (r *RouteController) enqueueCluster(obj interface{}) {
 	r.clusterWorkqueue.AddRateLimited(key)
 }
 
-func (r *RouteController) enqueueEndpoint(obj interface{}) {
+func (r *Controller) enqueueEndpoint(obj interface{}) {
 	var key string
 	var err error
 	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
@@ -245,7 +246,7 @@ func (r *RouteController) enqueueEndpoint(obj interface{}) {
 	r.endpointWorkqueue.AddRateLimited(key)
 }
 
-func (r *RouteController) handleRemovedEndpoint(obj interface{}) {
+func (r *Controller) handleRemovedEndpoint(obj interface{}) {
 	// ideally we should attempt to remove all routes if the endpoint matches our cluster ID
 	var object *v1.Endpoint
 	var ok bool
@@ -274,11 +275,11 @@ func (r *RouteController) handleRemovedEndpoint(obj interface{}) {
 	klog.V(4).Infof("Removed routes from host")
 }
 
-func (r *RouteController) handleRemovedCluster(obj interface{}) {
+func (r *Controller) handleRemovedCluster(obj interface{}) {
 	// ideally we should attempt to remove all routes if the endpoint matches our cluster ID
 }
 
-func (r *RouteController) cleanRoutes() {
+func (r *Controller) cleanRoutes() {
 	link, err := netlink.LinkByName(r.link.Name)
 	if err != nil {
 		klog.Errorf("Error retrieving link by name %s: %v", r.link.Name, err)
@@ -304,7 +305,7 @@ func (r *RouteController) cleanRoutes() {
 	}
 }
 
-func (r *RouteController) cleanXfrmPolicies() {
+func (r *Controller) cleanXfrmPolicies() {
 
 	currentXfrmPolicyList, err := netlink.XfrmPolicyList(syscall.AF_INET)
 
@@ -320,8 +321,9 @@ func (r *RouteController) cleanXfrmPolicies() {
 		}
 	}
 }
+
 // Reconcile the routes installed on this device using rtnetlink
-func (r *RouteController) reconcileRoutes() error {
+func (r *Controller) reconcileRoutes() error {
 	link, err := netlink.LinkByName(r.link.Name)
 	if err != nil {
 		return fmt.Errorf("Error retrieving link by name %s: %v", r.link.Name, err)

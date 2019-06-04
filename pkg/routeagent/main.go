@@ -53,7 +53,7 @@ func main() {
 	submarinerInformerFactory := submarinerInformers.NewSharedInformerFactoryWithOptions(submarinerClient, time.Second*30, submarinerInformers.WithNamespace(srcs.Namespace))
 
 	defLink, err := util.GetDefaultGatewayInterface()
-	routeController := routecontroller.NewRouteController(srcs.ClusterID, srcs.Namespace, defLink, submarinerClient, submarinerInformerFactory.Submariner().V1().Clusters(), submarinerInformerFactory.Submariner().V1().Endpoints())
+	routeController := route.NewController(srcs.ClusterID, srcs.Namespace, defLink, submarinerClient, submarinerInformerFactory.Submariner().V1().Clusters(), submarinerInformerFactory.Submariner().V1().Endpoints())
 
 	submarinerInformerFactory.Start(stopCh)
 
