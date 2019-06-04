@@ -166,7 +166,7 @@ func (k *k8s) GetEndpoint(clusterID string, cableName string) (types.SubmarinerE
 	}
 	return types.SubmarinerEndpoint{}, fmt.Errorf("endpoint wasn't found")
 }
-func (k *k8s) WatchClusters(ctx context.Context, selfClusterIDstring, colorCodes []string, onClusterChange func(cluster types.SubmarinerCluster, deleted bool) error) error {
+func (k *k8s) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onClusterChange func(cluster types.SubmarinerCluster, deleted bool) error) error {
 
 	k.informerFactory.Submariner().V1().Clusters().Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: func (obj interface{}) {
@@ -243,7 +243,7 @@ func (k *k8s) WatchClusters(ctx context.Context, selfClusterIDstring, colorCodes
 	k.informerFactory.Start(k.stopCh)
 	return nil
 }
-func (k *k8s) WatchEndpoints(ctx context.Context, selfClusterIDstring, colorCodes []string, onEndpointChange func (endpoint types.SubmarinerEndpoint, deleted bool) error) error {
+func (k *k8s) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onEndpointChange func (endpoint types.SubmarinerEndpoint, deleted bool) error) error {
 
 	k.informerFactory.Submariner().V1().Endpoints().Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: func (obj interface{}) {
