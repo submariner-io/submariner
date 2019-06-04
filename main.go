@@ -96,7 +96,7 @@ func main() {
 			klog.Fatalf("Fatal error occurred creating ipsec engine: %v", err)
 		}
 
-		tunnelController := tunnel.NewTunnelController(submSpec.Namespace, cableEngine, kubeClient, submarinerClient,
+		tunnelController := tunnel.NewController(submSpec.Namespace, cableEngine, kubeClient, submarinerClient,
 			submarinerInformerFactory.Submariner().V1().Endpoints())
 
 		var datastore datastore.Datastore
