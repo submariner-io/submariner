@@ -193,11 +193,11 @@ func (i *Engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 		return err
 	}
 	defer client.Close()
-	
+
 	return i.installCableInternal(endpoint, client);
 }
 
-func (i *Engine) installCableInternal(endpoint types.SubmarinerEndpoint, client *goStrongswanVici.ClientConn) error {	
+func (i *Engine) installCableInternal(endpoint types.SubmarinerEndpoint, client *goStrongswanVici.ClientConn) error {
 	if endpoint.Spec.ClusterID == i.LocalCluster.ID {
 		klog.V(4).Infof("Not installing cable for local cluster")
 		return nil
@@ -206,7 +206,7 @@ func (i *Engine) installCableInternal(endpoint types.SubmarinerEndpoint, client 
 		klog.V(4).Infof("Not installing self")
 		return nil
 	}
-	
+
 	klog.V(2).Infof("Installing cable %s", endpoint.Spec.CableName)
 	activeConnections, err := i.getActiveConns(false, endpoint.Spec.ClusterID, client)
 	if err != nil {
@@ -218,7 +218,7 @@ func (i *Engine) installCableInternal(endpoint types.SubmarinerEndpoint, client 
 			klog.V(6).Infof("Cable %s is already installed, not installing twice", active)
 			return nil
 		}
-		if util.GetClusterIdFromCableName(active) == endpoint.Spec.ClusterID {
+		if util.GetClusterIDFromCableName(active) == endpoint.Spec.ClusterID {
 			return fmt.Errorf("error while installing cable %s, already found a pre-existing cable belonging to this cluster %s", active, endpoint.Spec.ClusterID)
 		}
 	}
@@ -521,7 +521,7 @@ func (i *Engine) loadSharedKey(endpoint types.SubmarinerEndpoint, client *goStro
 		Data:   i.SecretKey,
 		Owners: identities,
 	}
-	
+
 	err := client.LoadShared(sharedKey)
 	if err != nil {
 		klog.Infof("Failed to load pre-shared key for %s: %v", privateIP, err)

@@ -42,7 +42,7 @@ func ParseSecure(token string) (types.Secure, error) {
 	if err != nil {
 		klog.Fatalf("Could not parse token to secret")
 	}
-	secure.ApiKey, err = getAPIIdentifier(token)
+	secure.APIKey, err = getAPIIdentifier(token)
 	if err != nil {
 		klog.Fatalf("Could not parse token to apikey")
 	}
@@ -72,8 +72,8 @@ func FlattenColors(colorCodes []string) string {
 }
 func GetLocalCluster(ss types.SubmarinerSpecification) (types.SubmarinerCluster, error) {
 	var localCluster types.SubmarinerCluster
-	localCluster.ID = ss.ClusterId
-	localCluster.Spec.ClusterID = ss.ClusterId
+	localCluster.ID = ss.ClusterID
+	localCluster.Spec.ClusterID = ss.ClusterID
 	localCluster.Spec.ClusterCIDR = ss.ClusterCidr
 	localCluster.Spec.ServiceCIDR = ss.ServiceCidr
 	localCluster.Spec.ColorCodes = ss.ColorCodes
@@ -107,16 +107,16 @@ func GetLocalEndpoint(clusterID string, backend string, backendConfig map[string
 	return endpoint, nil
 }
 
-func GetClusterIdFromCableName(cableName string) string {
+func GetClusterIDFromCableName(cableName string) string {
 	// length is 11
 	// 0           1    2   3    4    5       6   7  8 9  10
 	//submariner-cable-my-super-long_cluster-id-172-16-32-5
 	cableSplit := strings.Split(cableName, "-")
-	clusterId := cableSplit[2]
+	clusterID := cableSplit[2]
 	for i := 3; i < len(cableSplit)-4; i++ {
-		clusterId = clusterId + "-" + cableSplit[i]
+		clusterID = clusterID + "-" + cableSplit[i]
 	}
-	return clusterId
+	return clusterID
 }
 
 func GetEndpointCRDName(endpoint types.SubmarinerEndpoint) (string, error) {

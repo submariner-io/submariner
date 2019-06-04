@@ -31,8 +31,8 @@ type k8s struct {
 }
 
 type k8sSpecification struct {
-	ApiServer string
-	ApiServerToken string
+	APIServer string
+	APIServerToken string
 	RemoteNamespace string
 	Insecure bool `default:"false"`
 	Ca string
@@ -52,7 +52,7 @@ func NewK8sDatastore(thisClusterID string, stopCh <-chan struct{}) *k8s {
 	}
 
 	kubeDatastore.remoteNamespace = k8sSpec.RemoteNamespace
-	host := fmt.Sprintf("https://%s", k8sSpec.ApiServer)
+	host := fmt.Sprintf("https://%s", k8sSpec.APIServer)
 	klog.V(6).Infof("Rendered host for access was: %s", host)
 	tlsClientConfig := rest.TLSClientConfig{}
 	if k8sSpec.Insecure {
@@ -68,7 +68,7 @@ func NewK8sDatastore(thisClusterID string, stopCh <-chan struct{}) *k8s {
 		// TODO: switch to using cluster DNS.
 		Host:            host,
 		TLSClientConfig: tlsClientConfig,
-		BearerToken: k8sSpec.ApiServerToken,
+		BearerToken: k8sSpec.APIServerToken,
 	}
 
 	submarinerClient, err := submarinerClientset.NewForConfig(&k8sClientConfig)
@@ -114,7 +114,7 @@ func (k *k8s) GetClusters(colorCodes []string) ([]types.SubmarinerCluster, error
 	}
 	return clusters, nil
 }
-func (k *k8s) GetCluster(clusterId string) (types.SubmarinerCluster, error) {
+func (k *k8s) GetCluster(clusterID string) (types.SubmarinerCluster, error) {
 
 	k8sClusters, err := k.client.SubmarinerV1().Clusters(k.remoteNamespace).List(metav1.ListOptions{})
 
@@ -123,9 +123,9 @@ func (k *k8s) GetCluster(clusterId string) (types.SubmarinerCluster, error) {
 	}
 
 	for _, cluster := range k8sClusters.Items {
-		if cluster.Spec.ClusterID == clusterId {
+		if cluster.Spec.ClusterID == clusterID {
 			return types.SubmarinerCluster{
-				ID: clusterId,
+				ID: clusterID,
 				Spec: cluster.Spec,
 			}, nil
 		}
@@ -133,7 +133,7 @@ func (k *k8s) GetCluster(clusterId string) (types.SubmarinerCluster, error) {
 
 	return types.SubmarinerCluster{}, fmt.Errorf("cluster wasn't found")
 }
-func (k *k8s) GetEndpoints(clusterId string) ([]types.SubmarinerEndpoint, error) {
+func (k *k8s) GetEndpoints(clusterID string) ([]types.SubmarinerEndpoint, error) {
 
 	k8sEndpoints, err := k.client.SubmarinerV1().Endpoints(k.remoteNamespace).List(metav1.ListOptions{})
 
@@ -144,14 +144,14 @@ func (k *k8s) GetEndpoints(clusterId string) ([]types.SubmarinerEndpoint, error)
 	endpoints := []types.SubmarinerEndpoint{}
 
 	for _, endpoint := range k8sEndpoints.Items {
-		if endpoint.Spec.ClusterID == clusterId {
+		if endpoint.Spec.ClusterID == clusterID {
 			endpoints = append(endpoints, types.SubmarinerEndpoint{Spec: endpoint.Spec})
 		}
 	}
 
 	return endpoints, nil
 }
-func (k *k8s) GetEndpoint(clusterId string, cableName string) (types.SubmarinerEndpoint, error) {
+func (k *k8s) GetEndpoint(clusterID string, cableName string) (types.SubmarinerEndpoint, error) {
 
 	k8sEndpoints, err := k.client.SubmarinerV1().Endpoints(k.remoteNamespace).List(metav1.ListOptions{})
 
@@ -160,13 +160,13 @@ func (k *k8s) GetEndpoint(clusterId string, cableName string) (types.SubmarinerE
 	}
 
 	for _, endpoint := range k8sEndpoints.Items {
-		if endpoint.Spec.ClusterID == clusterId && endpoint.Spec.CableName == cableName {
+		if endpoint.Spec.ClusterID == clusterID && endpoint.Spec.CableName == cableName {
 			return types.SubmarinerEndpoint{Spec: endpoint.Spec}, nil
 		}
 	}
 	return types.SubmarinerEndpoint{}, fmt.Errorf("endpoint wasn't found")
 }
-func (k *k8s) WatchClusters(ctx context.Context, selfClusterId string, colorCodes []string, onClusterChange func(cluster types.SubmarinerCluster, deleted bool) error) error {
+func (k *k8s) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onClusterChange func(cluster types.SubmarinerCluster, deleted bool) error) error {
 
 	k.informerFactory.Submariner().V1().Clusters().Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: func (obj interface{}) {
@@ -243,7 +243,7 @@ func (k *k8s) WatchClusters(ctx context.Context, selfClusterId string, colorCode
 	k.informerFactory.Start(k.stopCh)
 	return nil
 }
-func (k *k8s) WatchEndpoints(ctx context.Context, selfClusterId string, colorCodes []string, onEndpointChange func (endpoint types.SubmarinerEndpoint, deleted bool) error) error {
+func (k *k8s) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onEndpointChange func (endpoint types.SubmarinerEndpoint, deleted bool) error) error {
 
 	k.informerFactory.Submariner().V1().Endpoints().Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: func (obj interface{}) {
@@ -399,8 +399,8 @@ func (k *k8s) SetEndpoint(endpoint types.SubmarinerEndpoint) error {
 	}
 	return nil
 }
-func (k *k8s) RemoveEndpoint(clusterId, cableName string) error {
-	endpointName, err := util.GetEndpointCRDNameFromParams(clusterId, cableName)
+func (k *k8s) RemoveEndpoint(clusterID, cableName string) error {
+	endpointName, err := util.GetEndpointCRDNameFromParams(clusterID, cableName)
 
 	if err != nil {
 		return fmt.Errorf("Error converting the Endpoint CRD name: %v", err)
@@ -408,7 +408,7 @@ func (k *k8s) RemoveEndpoint(clusterId, cableName string) error {
 
 	return k.client.SubmarinerV1().Endpoints(k.remoteNamespace).Delete(endpointName, &metav1.DeleteOptions{})
 }
-func (k *k8s) RemoveCluster(clusterId string) error {
+func (k *k8s) RemoveCluster(clusterID string) error {
 	// not implemented yet
 	return nil
 }

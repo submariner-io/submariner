@@ -20,7 +20,7 @@ import (
 )
 
 type RouteController struct {
-	clusterId string
+	clusterID string
 	objectNamespace string
 
 	submarinerClientSet clientset.Interface
@@ -36,9 +36,9 @@ type RouteController struct {
 	link *net.Interface
 }
 
-func NewRouteController(clusterId string, objectNamespace string, link *net.Interface, submarinerClientSet clientset.Interface, clusterInformer informers.ClusterInformer, endpointInformer informers.EndpointInformer) *RouteController {
+func NewRouteController(clusterID string, objectNamespace string, link *net.Interface, submarinerClientSet clientset.Interface, clusterInformer informers.ClusterInformer, endpointInformer informers.EndpointInformer) *RouteController {
 	routeController := RouteController{
-		clusterId: clusterId,
+		clusterID: clusterID,
 		objectNamespace: objectNamespace,
 		submarinerClientSet: submarinerClientSet,
 		link: link,
@@ -90,7 +90,7 @@ func (r *RouteController) Run(stopCh <-chan struct{}) error {
 	}
 
 	for _, cluster := range clusters.Items {
-		if cluster.Spec.ClusterID != r.clusterId {
+		if cluster.Spec.ClusterID != r.clusterID {
 			r.populateCidrBlockList(append(cluster.Spec.ClusterCIDR, cluster.Spec.ServiceCIDR...))
 		}
 	}
@@ -142,7 +142,7 @@ func (r *RouteController) processNextCluster() bool {
 			return fmt.Errorf("Error retrieving submariner cluster object %s: %v", name, err)
 		}
 
-		if cluster.Spec.ClusterID == r.clusterId {
+		if cluster.Spec.ClusterID == r.clusterID {
 			klog.V(6).Infof("cluster ID matched the cluster ID of this cluster, not adding it to the cidr list")
 			return nil
 			// no need to reconcile because this endpoint isn't ours
@@ -182,7 +182,7 @@ func (r *RouteController) processNextEndpoint() bool {
 			return fmt.Errorf("Error retrieving submariner endpoint object %s: %v", name, err)
 		}
 
-		if endpoint.Spec.ClusterID != r.clusterId {
+		if endpoint.Spec.ClusterID != r.clusterID {
 			klog.V(6).Infof("Endpoint didn't match the cluster ID of this cluster")
 			return nil
 			// no need to reconcile because this endpoint isn't ours

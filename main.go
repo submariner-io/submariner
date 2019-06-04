@@ -83,8 +83,10 @@ func main() {
 		if err != nil {
 			klog.Fatalf("Fatal error occurred while retrieving local cluster from %#v: %v", submSpec, err)
 		}
-		localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterId, "ipsec", nil, submSpec.NatEnabled,
+
+		localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterID, "ipsec", nil, submSpec.NatEnabled,
 			append(submSpec.ServiceCidr, submSpec.ClusterCidr...))
+
 		if err != nil {
 			klog.Fatalf("Fatal error occurred while retrieving local endpoint from %#v: %v", submSpec, err)
 		}
@@ -101,15 +103,16 @@ func main() {
 			if err != nil {
 				klog.Fatalf("Error parsing secure token: %v", err)
 			}
-			datastore = phpapi.NewPHPAPI(secure.ApiKey)
+
+			datastore = phpapi.NewPHPAPI(secure.APIKey)
 		case "k8s":
-			datastore = subk8s.NewK8sDatastore(submSpec.ClusterId, stopCh)
+			datastore = subk8s.NewK8sDatastore(submSpec.ClusterID, stopCh)
 		default:
 			klog.Fatalf("Invalid backend '%s' was specified", submSpec.Broker)
 		}
 
 		klog.V(6).Infof("Creating new datastore syncer")
-		dsSyncer := datastoresyncer.NewDatastoreSyncer(submSpec.ClusterId, submSpec.Namespace, kubeClient, submarinerClient,
+		dsSyncer := datastoresyncer.NewDatastoreSyncer(submSpec.ClusterID, submSpec.Namespace, kubeClient, submarinerClient,
 			submarinerInformerFactory.Submariner().V1().Clusters(), submarinerInformerFactory.Submariner().V1().Endpoints(), datastore,
 			submSpec.ColorCodes, localCluster, localEndpoint)
 
