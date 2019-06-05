@@ -12,7 +12,6 @@ import (
 	"github.com/rancher/submariner/pkg/types"
 	"github.com/rdegges/go-ipify"
 	"github.com/vishvananda/netlink"
-	"k8s.io/klog"
 )
 
 const tokenLength = 64
@@ -39,12 +38,13 @@ func ParseSecure(token string) (types.Secure, error) {
 		return types.Secure{}, err
 	}
 
+	apiKey, err := getAPIIdentifier(token)
 	if err != nil {
 		return types.Secure{}, err
 	}
 
 	return types.Secure{
-		APIKey: apiKey,
+		APIKey:    apiKey,
 		SecretKey: secretKey,
 	}, nil
 }
@@ -74,6 +74,7 @@ func FlattenColors(colorCodes []string) string {
 	}
 	return flattenedColors
 }
+
 func GetLocalCluster(ss types.SubmarinerSpecification) (types.SubmarinerCluster, error) {
 	var localCluster types.SubmarinerCluster
 	localCluster.ID = ss.ClusterID
@@ -83,12 +84,13 @@ func GetLocalCluster(ss types.SubmarinerSpecification) (types.SubmarinerCluster,
 	localCluster.Spec.ColorCodes = ss.ColorCodes
 	return localCluster, nil
 }
-func GetLocalEndpoint(clusterID string, backend string, backendConfig map[string]string, natEnabled bool, subnets []string) (types.SubmarinerEndpoint, error) {
+
+func GetLocalEndpoint(clusterID string, backend string, backendConfig map[string]string, natEnabled bool,
+	subnets []string, privateIP net.IP) (types.SubmarinerEndpoint, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return types.SubmarinerEndpoint{}, fmt.Errorf("Error getting hostname: %v", err)
 	}
-	privateIP := GetLocalIP()
 	endpoint := types.SubmarinerEndpoint{
 		Spec: subv1.EndpointSpec{
 			CableName:     fmt.Sprintf("submariner-cable-%s-%s", clusterID, strings.Replace(privateIP.String(), ".", "-", -1)),

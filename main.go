@@ -85,7 +85,7 @@ func main() {
 		}
 
 		localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterID, "ipsec", nil, submSpec.NatEnabled,
-			append(submSpec.ServiceCidr, submSpec.ClusterCidr...))
+			append(submSpec.ServiceCidr, submSpec.ClusterCidr...), util.GetLocalIP())
 
 		if err != nil {
 			klog.Fatalf("Fatal error occurred while retrieving local endpoint from %#v: %v", submSpec, err)

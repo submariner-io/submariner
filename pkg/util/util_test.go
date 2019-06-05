@@ -1,6 +1,8 @@
 package util_test
 
 import (
+	"net"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -11,8 +13,6 @@ import (
 
 var _ = Describe("Util", func() {
 	Describe("Function ParseSecure", testParseSecure)
-	
-	Describe("Function GetLocalIP", testGetLocalIP)
 
 	Describe("Function FlattenColors", testFlattenColors)
 
@@ -20,14 +20,14 @@ var _ = Describe("Util", func() {
 
 	Describe("Function GetLocalEndpoint", testGetLocalEndpoint)
 
-	Describe("Function GetClusterIdFromCableName", testGetClusterIdFromCableName)
+	Describe("Function GetClusterIDFromCableName", testGetClusterIDFromCableName)
 
 	Describe("Function GetEndpointCRDName", testGetEndpointCRDName)
 
 	Describe("Function GetClusterCRDName", testGetClusterCRDName)
 
 	Describe("Function CompareEndpointSpec", testCompareEndpointSpec)
-	
+
 	Describe("Function GetDefaultGatewayInterface", testGetDefaultGatewayInterface)
 })
 
@@ -38,7 +38,7 @@ func testParseSecure() {
 			secretKey := "AValidSecretKeyWithLength32Chars"
 			secure, err := util.ParseSecure(apiKey + secretKey)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(secure.ApiKey).To(Equal(apiKey))
+			Expect(secure.APIKey).To(Equal(apiKey))
 			Expect(secure.SecretKey).To(Equal(secretKey))
 		})
 	})
@@ -48,12 +48,6 @@ func testParseSecure() {
 			_, err := util.ParseSecure("InvalidToken")
 			Expect(err).To(HaveOccurred())
 		})
-	})
-}
-
-func testGetLocalIP() {
-	It("should return a non-nil IP", func() {
-		Expect(util.GetLocalIP()).NotTo(BeNil())
 	})
 }
 
@@ -69,7 +63,7 @@ func testFlattenColors() {
 			Expect(util.FlattenColors([]string{"red", "white", "blue"})).To(Equal("red,white,blue"))
 		})
 	})
-	
+
 	Context("with no elements", func() {
 		It("should return an empty string", func() {
 			Expect(util.FlattenColors([]string{})).To(Equal(""))
@@ -83,11 +77,11 @@ func testGetLocalCluster() {
 		clusterCidr := []string{"1.2.3.4/16"}
 		serviceCidr := []string{"5.6.7.8/16"}
 		colorCodes := []string{"red"}
-		cluster, err := util.GetLocalCluster(types.SubmarinerSpecification {
-			ClusterId: clusterId,
+		cluster, err := util.GetLocalCluster(types.SubmarinerSpecification{
+			ClusterID:   clusterId,
 			ClusterCidr: clusterCidr,
 			ServiceCidr: serviceCidr,
-			ColorCodes: colorCodes,
+			ColorCodes:  colorCodes,
 		})
 
 		Expect(err).ToNot(HaveOccurred())
@@ -102,29 +96,30 @@ func testGetLocalCluster() {
 func testGetLocalEndpoint() {
 	It("should return a valid SubmarinerEndpoint object", func() {
 		subnets := []string{"1.2.3.4/16"}
-		endpoint, err := util.GetLocalEndpoint("east", "backend", map[string]string{}, false, subnets)
+		privateIP := net.IP{1, 2, 3, 4}
+		endpoint, err := util.GetLocalEndpoint("east", "backend", map[string]string{}, false, subnets, privateIP)
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(endpoint.Spec.ClusterID).To(Equal("east"))
 		Expect(endpoint.Spec.CableName).To(HavePrefix("submariner-cable-east-"))
 		Expect(endpoint.Spec.Hostname).NotTo(Equal(""))
-		Expect(endpoint.Spec.PrivateIP).NotTo(BeNil())
+		Expect(endpoint.Spec.PrivateIP).To(Equal(privateIP))
 		Expect(endpoint.Spec.Backend).To(Equal("backend"))
 		Expect(endpoint.Spec.Subnets).To(Equal(subnets))
 		Expect(endpoint.Spec.NATEnabled).To(Equal(false))
 	})
 }
 
-func testGetClusterIdFromCableName() {
+func testGetClusterIDFromCableName() {
 	Context("with a simple embedded cluster ID", func() {
 		It("should extract and return the cluster ID", func() {
-			Expect(util.GetClusterIdFromCableName("submariner-cable-east-172-16-32-5")).To(Equal("east"))
+			Expect(util.GetClusterIDFromCableName("submariner-cable-east-172-16-32-5")).To(Equal("east"))
 		})
 	})
 
 	Context("with an embedded cluster ID containing dashes", func() {
 		It("should extract and return the cluster ID", func() {
-			Expect(util.GetClusterIdFromCableName("submariner-cable-my-super-long_cluster-id-172-16-32-5")).To(
+			Expect(util.GetClusterIDFromCableName("submariner-cable-my-super-long_cluster-id-172-16-32-5")).To(
 				Equal("my-super-long_cluster-id"))
 		})
 	})
@@ -133,7 +128,7 @@ func testGetClusterIdFromCableName() {
 func testGetEndpointCRDName() {
 	Context("with valid SubmarinerEndpoint input", func() {
 		It("should return <cluster ID>-<cable name>", func() {
-			name, err := util.GetEndpointCRDName(types.SubmarinerEndpoint {
+			name, err := util.GetEndpointCRDName(types.SubmarinerEndpoint{
 				Spec: subv1.EndpointSpec{
 					ClusterID: "ClusterID",
 					CableName: "CableName",
@@ -147,7 +142,7 @@ func testGetEndpointCRDName() {
 
 	Context("with a nil cluster ID", func() {
 		It("should return an error", func() {
-			_, err := util.GetEndpointCRDName(types.SubmarinerEndpoint {
+			_, err := util.GetEndpointCRDName(types.SubmarinerEndpoint{
 				Spec: subv1.EndpointSpec{
 					CableName: "CableName",
 				},
@@ -156,10 +151,10 @@ func testGetEndpointCRDName() {
 			Expect(err).To(HaveOccurred())
 		})
 	})
-	
+
 	Context("with a nil cable name", func() {
 		It("should return an error", func() {
-			_, err := util.GetEndpointCRDName(types.SubmarinerEndpoint {
+			_, err := util.GetEndpointCRDName(types.SubmarinerEndpoint{
 				Spec: subv1.EndpointSpec{
 					ClusterID: "ClusterID",
 				},
@@ -173,7 +168,7 @@ func testGetEndpointCRDName() {
 func testGetClusterCRDName() {
 	Context("with valid input", func() {
 		It("should return the cluster ID", func() {
-			Expect(util.GetClusterCRDName(types.SubmarinerCluster {
+			Expect(util.GetClusterCRDName(types.SubmarinerCluster{
 				Spec: subv1.ClusterSpec{
 					ClusterID: "ClusterID",
 				},
@@ -183,9 +178,8 @@ func testGetClusterCRDName() {
 
 	Context("with a nil cluster ID", func() {
 		It("should return an error", func() {
-			_, err := util.GetClusterCRDName(types.SubmarinerCluster {
-				Spec: subv1.ClusterSpec{
-				},
+			_, err := util.GetClusterCRDName(types.SubmarinerCluster{
+				Spec: subv1.ClusterSpec{},
 			})
 
 			Expect(err).To(HaveOccurred())
@@ -197,15 +191,15 @@ func testCompareEndpointSpec() {
 	Context("with equal input", func() {
 		It("should return true", func() {
 			Expect(util.CompareEndpointSpec(
-				subv1.EndpointSpec {
+				subv1.EndpointSpec{
 					ClusterID: "east",
 					CableName: "submariner-cable-east-172-16-32-5",
-					Hostname: "my-host",
+					Hostname:  "my-host",
 				},
-				subv1.EndpointSpec {
+				subv1.EndpointSpec{
 					ClusterID: "east",
 					CableName: "submariner-cable-east-172-16-32-5",
-					Hostname: "my-host",
+					Hostname:  "my-host",
 				})).To(BeTrue())
 		})
 	})
@@ -213,31 +207,31 @@ func testCompareEndpointSpec() {
 	Context("with different cluster IDs", func() {
 		It("should return false", func() {
 			Expect(util.CompareEndpointSpec(
-				subv1.EndpointSpec {
+				subv1.EndpointSpec{
 					ClusterID: "east",
 					CableName: "submariner-cable-east-172-16-32-5",
-					Hostname: "my-host",
+					Hostname:  "my-host",
 				},
-				subv1.EndpointSpec {
+				subv1.EndpointSpec{
 					ClusterID: "west",
 					CableName: "submariner-cable-east-172-16-32-5",
-					Hostname: "my-host",
+					Hostname:  "my-host",
 				})).To(BeFalse())
 		})
 	})
-	
+
 	Context("with different cable names", func() {
 		It("should return false", func() {
 			Expect(util.CompareEndpointSpec(
-				subv1.EndpointSpec {
+				subv1.EndpointSpec{
 					ClusterID: "east",
 					CableName: "submariner-cable-east-1-2-3-4",
-					Hostname: "my-host",
+					Hostname:  "my-host",
 				},
-				subv1.EndpointSpec {
+				subv1.EndpointSpec{
 					ClusterID: "east",
 					CableName: "submariner-cable-east-5-6-7-8",
-					Hostname: "my-host",
+					Hostname:  "my-host",
 				})).To(BeFalse())
 		})
 	})
@@ -245,15 +239,15 @@ func testCompareEndpointSpec() {
 	Context("with different host names", func() {
 		It("should return false", func() {
 			Expect(util.CompareEndpointSpec(
-				subv1.EndpointSpec {
+				subv1.EndpointSpec{
 					ClusterID: "east",
 					CableName: "submariner-cable-east-172-16-32-5",
-					Hostname: "host1",
+					Hostname:  "host1",
 				},
-				subv1.EndpointSpec {
+				subv1.EndpointSpec{
 					ClusterID: "east",
 					CableName: "submariner-cable-east-172-16-32-5",
-					Hostname: "host2",
+					Hostname:  "host2",
 				})).To(BeFalse())
 		})
 	})
@@ -264,4 +258,3 @@ func testGetDefaultGatewayInterface() {
 		Expect(util.GetDefaultGatewayInterface()).NotTo(BeNil())
 	})
 }
-
