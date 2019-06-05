@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/rancher/submariner/test/e2e/framework"
+
+	_ "github.com/rancher/submariner/test/e2e/example"
 )
 
 func init() {
