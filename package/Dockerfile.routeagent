@@ -1,8 +1,11 @@
-FROM ubuntu:16.04
+FROM ubuntu:18.04
 
 WORKDIR /var/submariner
 
-RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections && apt-get -y update && apt-get -y install iproute2 iptables libatm1 libgmp10 libmnl0 libnfnetlink0 libssl1.0.0
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get -y update && \
+    apt-get -y install iproute2 iptables libatm1 libgmp10
 
 COPY submariner-route-agent.sh /usr/local/bin
 
