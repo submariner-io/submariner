@@ -1,0 +1,14 @@
+kind: Cluster
+apiVersion: kind.sigs.k8s.io/v1alpha3
+kubeadmConfigPatches:
+- |
+  apiVersion: kubeadm.k8s.io/v1beta1
+  kind: ClusterConfiguration
+  metadata:
+    name: config
+  networking:
+    podSubnet: 10.244.0.0/16
+    serviceSubnet: 100.94.0.0/16
+    dnsDomain: cluster1.local
+nodes:
+- role: control-plane

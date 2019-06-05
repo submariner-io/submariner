@@ -253,6 +253,8 @@ When running in Openshift, we need to grant the appropriate security context for
 
 To build `submariner-engine` and `submariner-route-agent` you can trigger `make`, which will perform a Dapperized build of the components.
 
+To run basic e2e tests you can trigger `make e2e` command.
+
 We welcome issues/PR's to Submariner, if you encounter issues that you'd like to fix while working on it or find new features that you'd like.
 
 # TODO
