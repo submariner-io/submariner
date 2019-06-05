@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/submariner/test/e2e/framework"
 
 	_ "github.com/rancher/submariner/test/e2e/example"
+	_ "github.com/rancher/submariner/test/e2e/dataplane"
 )
 
 func init() {
