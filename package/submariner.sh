@@ -16,4 +16,6 @@ mkdir -p /etc/ipsec
 
 sysctl -w net.ipv4.conf.all.send_redirects=0
 
+export PATH=$PATH:/usr/lib/ipsec
+
 exec submariner-engine ${DEBUG} -alsologtostderr

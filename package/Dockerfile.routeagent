@@ -15,5 +15,4 @@ COPY submariner-route-agent /usr/local/bin
 COPY ./iptables /usr/sbin/
 COPY ./iptables-save /usr/sbin/
 
-# temporary sleep infinity so that we can do our debugging
 ENTRYPOINT submariner-route-agent.sh
