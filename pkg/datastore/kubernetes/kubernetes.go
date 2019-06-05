@@ -38,20 +38,14 @@ type datastoreSpecification struct {
 	Ca string
 }
 
-func NewK8sDatastore(thisClusterID string, stopCh <-chan struct{}) *Datastore {
-	kubeDatastore := Datastore{
-		thisClusterID: thisClusterID,
-		stopCh: stopCh,
-	}
-
+func NewDatastore(thisClusterID string, stopCh <-chan struct{}) (*Datastore, error) {
 	k8sSpec := datastoreSpecification{}
 
 	err := envconfig.Process("broker_k8s", &k8sSpec)
 	if err != nil {
-		klog.Fatal(err)
+		return nil, err
 	}
 
-	kubeDatastore.remoteNamespace = k8sSpec.RemoteNamespace
 	host := fmt.Sprintf("https://%s", k8sSpec.APIServer)
 	klog.V(6).Infof("Rendered host for access was: %s", host)
 	tlsClientConfig := rest.TLSClientConfig{}
@@ -60,10 +54,11 @@ func NewK8sDatastore(thisClusterID string, stopCh <-chan struct{}) *Datastore {
 	} else {
 		caDecoded, err := base64.StdEncoding.DecodeString(k8sSpec.Ca)
 		if err != nil {
-			klog.Fatalf("error decoding CA data: %v", err)
+			return nil, fmt.Errorf("error decoding CA data: %v", err)
 		}
 		tlsClientConfig.CAData = caDecoded
 	}
+
 	k8sClientConfig := rest.Config{
 		// TODO: switch to using cluster DNS.
 		Host:            host,
@@ -73,11 +68,17 @@ func NewK8sDatastore(thisClusterID string, stopCh <-chan struct{}) *Datastore {
 
 	submarinerClient, err := submarinerClientset.NewForConfig(&k8sClientConfig)
 	if err != nil {
-		klog.Fatalf("Error building submariner clientset: %s", err.Error())
+		return nil, fmt.Errorf("Error building submariner clientset: %v", err)
 	}
-	kubeDatastore.client = submarinerClient
-	kubeDatastore.informerFactory = submarinerInformers.NewSharedInformerFactoryWithOptions(submarinerClient, time.Second*30, submarinerInformers.WithNamespace(k8sSpec.RemoteNamespace))
-	return &kubeDatastore
+
+	return &Datastore{
+		client: submarinerClient,
+		informerFactory: submarinerInformers.NewSharedInformerFactoryWithOptions(submarinerClient, time.Second*30, 
+			submarinerInformers.WithNamespace(k8sSpec.RemoteNamespace)),
+		thisClusterID: thisClusterID,
+		remoteNamespace: k8sSpec.RemoteNamespace,
+		stopCh:        stopCh,
+	}, nil
 }
 
 func stringSliceOverlaps(left []string, right []string) bool {
