@@ -130,7 +130,14 @@ function cleanup {
   for i in 1 2 3; do kind delete cluster --name=cluster${i}; done
 }
 
-trap cleanup EXIT
+if [[ $1 = -c ]]; then
+    cleanup
+    exit 0
+fi
+
+if [[ $1 != -k ]]; then
+    trap cleanup EXIT
+fi
 
 helm init --client-only
 helm repo add submariner-latest https://releases.rancher.com/submariner-charts/latest
