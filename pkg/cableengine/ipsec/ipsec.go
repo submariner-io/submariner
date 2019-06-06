@@ -2,12 +2,7 @@ package ipsec
 
 import (
 	"fmt"
-	"github.com/bronze1man/goStrongswanVici"
-	"github.com/kelseyhightower/envconfig"
-	"github.com/rancher/submariner/pkg/types"
-	"github.com/rancher/submariner/pkg/util"
 	"io/ioutil"
-	"k8s.io/klog"
 	"net"
 	"os"
 	"os/exec"
@@ -17,11 +12,17 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/bronze1man/goStrongswanVici"
 	"github.com/coreos/go-iptables/iptables"
+	"github.com/kelseyhightower/envconfig"
+	"github.com/rancher/submariner/pkg/types"
+	"github.com/rancher/submariner/pkg/util"
+	"k8s.io/klog"
 )
 
 const (
-	pidFile  = "/var/run/charon.pid"
+	pidFile = "/var/run/charon.pid"
 
 	// DefaultReplayWindowSize specifies the replay window size for charon
 	DefaultReplayWindowSize = "1024"
@@ -36,15 +37,15 @@ const (
 type Engine struct {
 	sync.Mutex
 
-	LocalSubnets []string
-	LocalCluster types.SubmarinerCluster
-	LocalEndpoint types.SubmarinerEndpoint
-	SecretKey string
+	LocalSubnets              []string
+	LocalCluster              types.SubmarinerCluster
+	LocalEndpoint             types.SubmarinerEndpoint
+	SecretKey                 string
 	ReplayWindowSize          string
 	IPSecIkeSaRekeyInterval   string
 	IPSecChildSaRekeyInterval string
 
-	Debug bool
+	Debug   bool
 	LogFile string
 }
 
@@ -67,12 +68,12 @@ func NewEngine(localSubnets []string, localCluster types.SubmarinerCluster, loca
 		ReplayWindowSize:          DefaultReplayWindowSize,
 		IPSecIkeSaRekeyInterval:   DefaultIkeSaRekeyInterval,
 		IPSecChildSaRekeyInterval: DefaultChildSaRekeyInterval,
-		LocalCluster: localCluster,
-		LocalEndpoint: localEndpoint,
-		LocalSubnets: localSubnets,
-		SecretKey: ipSecSpec.PSK,
-		Debug: ipSecSpec.Debug,
-		LogFile: ipSecSpec.LogFile,
+		LocalCluster:              localCluster,
+		LocalEndpoint:             localEndpoint,
+		LocalSubnets:              localSubnets,
+		SecretKey:                 ipSecSpec.PSK,
+		Debug:                     ipSecSpec.Debug,
+		LogFile:                   ipSecSpec.LogFile,
 	}
 }
 
@@ -194,7 +195,7 @@ func (i *Engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 	}
 	defer client.Close()
 
-	return i.installCableInternal(endpoint, client);
+	return i.installCableInternal(endpoint, client)
 }
 
 func (i *Engine) installCableInternal(endpoint types.SubmarinerEndpoint, client *goStrongswanVici.ClientConn) error {
@@ -266,11 +267,11 @@ func (i *Engine) installCableInternal(endpoint types.SubmarinerEndpoint, client 
 	klog.V(6).Infof("Using ReplayWindowSize: %v", i.ReplayWindowSize)
 	childSAConf.ReplayWindow = i.ReplayWindowSize
 	authLConf := goStrongswanVici.AuthConf{
-		ID: localEndpointIP,
+		ID:         localEndpointIP,
 		AuthMethod: "psk",
 	}
 	authRConf := goStrongswanVici.AuthConf{
-		ID: remoteEndpointIP,
+		ID:         remoteEndpointIP,
 		AuthMethod: "psk",
 	}
 	ikeConf := goStrongswanVici.IKEConf{
@@ -280,7 +281,7 @@ func (i *Engine) installCableInternal(endpoint types.SubmarinerEndpoint, client 
 		Version:     "2",
 		LocalAuth:   authLConf,
 		RemoteAuth:  authRConf,
-		RekeyTime:	 i.IPSecIkeSaRekeyInterval,
+		RekeyTime:   i.IPSecIkeSaRekeyInterval,
 		Encap:       "yes",
 		Mobike:      "no",
 	}
@@ -383,19 +384,19 @@ func (i *Engine) removeCableInternal(cableID string, client *goStrongswanVici.Cl
 	defer i.Unlock()
 
 	/*
-	err = client.Terminate(&goStrongswanVici.TerminateRequest{
-		Child: "submariner-child-" + cableID,
-	})
-	if err != nil {
-		klog.Errorf("Error when terminating child connection %s : %v", cableID, err)
-	}
+		err = client.Terminate(&goStrongswanVici.TerminateRequest{
+			Child: "submariner-child-" + cableID,
+		})
+		if err != nil {
+			klog.Errorf("Error when terminating child connection %s : %v", cableID, err)
+		}
 
-	err = client.Terminate(&goStrongswanVici.TerminateRequest{
-		Ike: cableID,
-	})
-	if err != nil {
-		klog.Errorf("Error when terminating ike connection %s : %v", cableID, err)
-	} */
+		err = client.Terminate(&goStrongswanVici.TerminateRequest{
+			Ike: cableID,
+		})
+		if err != nil {
+			klog.Errorf("Error when terminating ike connection %s : %v", cableID, err)
+		} */
 	klog.Infof("Unloading connection %s", cableID)
 	err := client.UnloadConn(&goStrongswanVici.UnloadConnRequest{
 		Name: cableID,
@@ -438,7 +439,7 @@ func (i *Engine) removeCableInternal(cableID string, client *goStrongswanVici.Cl
 			for _, samap := range sas {
 				klog.V(6).Infof("Found SA %v", samap)
 				sa, stillExists := samap[cableID]
-				if stillExists && ( sa.State == "DELETING" || sa.State == "CONNECTING" ){
+				if stillExists && (sa.State == "DELETING" || sa.State == "CONNECTING") {
 					found = true
 					break
 				} else if sa.State == "ESTABLISHED" {

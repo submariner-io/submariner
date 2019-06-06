@@ -2,35 +2,36 @@ package route
 
 import (
 	"fmt"
-	clientset "github.com/rancher/submariner/pkg/client/clientset/versioned"
-	informers "github.com/rancher/submariner/pkg/client/informers/externalversions/submariner.io/v1"
-	"github.com/vishvananda/netlink"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"github.com/rancher/submariner/pkg/apis/submariner.io/v1"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
 	"net"
 	"os"
 	"sync"
 	"syscall"
 	"time"
+
+	v1 "github.com/rancher/submariner/pkg/apis/submariner.io/v1"
+	clientset "github.com/rancher/submariner/pkg/client/clientset/versioned"
+	informers "github.com/rancher/submariner/pkg/client/informers/externalversions/submariner.io/v1"
+	"github.com/vishvananda/netlink"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
 )
 
 type Controller struct {
-	clusterID string
+	clusterID       string
 	objectNamespace string
 
 	submarinerClientSet clientset.Interface
-	clustersSynced cache.InformerSynced
-	endpointsSynced cache.InformerSynced
+	clustersSynced      cache.InformerSynced
+	endpointsSynced     cache.InformerSynced
 
-	clusterWorkqueue workqueue.RateLimitingInterface
+	clusterWorkqueue  workqueue.RateLimitingInterface
 	endpointWorkqueue workqueue.RateLimitingInterface
 
-	gw net.IP
+	gw      net.IP
 	subnets []string
 
 	link *net.Interface
@@ -39,14 +40,14 @@ type Controller struct {
 func NewController(clusterID string, objectNamespace string, link *net.Interface, submarinerClientSet clientset.Interface,
 	clusterInformer informers.ClusterInformer, endpointInformer informers.EndpointInformer) *Controller {
 	controller := Controller{
-		clusterID: clusterID,
-		objectNamespace: objectNamespace,
+		clusterID:           clusterID,
+		objectNamespace:     objectNamespace,
 		submarinerClientSet: submarinerClientSet,
-		link: link,
-		clustersSynced: clusterInformer.Informer().HasSynced,
-		endpointsSynced: endpointInformer.Informer().HasSynced,
-		clusterWorkqueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Clusters"),
-		endpointWorkqueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Endpoints"),
+		link:                link,
+		clustersSynced:      clusterInformer.Informer().HasSynced,
+		endpointsSynced:     endpointInformer.Informer().HasSynced,
+		clusterWorkqueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Clusters"),
+		endpointWorkqueue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Endpoints"),
 	}
 
 	clusterInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -367,8 +368,8 @@ func (r *Controller) reconcileRoutes() error {
 			break
 		}
 		route := netlink.Route{
-			Dst: dst,
-			Gw: r.gw,
+			Dst:       dst,
+			Gw:        r.gw,
 			LinkIndex: link.Attrs().Index,
 		}
 		found := false

@@ -5,7 +5,7 @@ import (
 )
 
 type SubmarinerCluster struct {
-	ID string `json:"id"`
+	ID   string            `json:"id"`
 	Spec subv1.ClusterSpec `json:"spec"`
 }
 
@@ -14,18 +14,18 @@ type SubmarinerEndpoint struct {
 }
 
 type SubmarinerSpecification struct {
-	Namespace string
-	Debug	bool
-	ClusterID string
-	Token string
-	ClusterCidr	[]string
+	Namespace   string
+	Debug       bool
+	ClusterID   string
+	Token       string
+	ClusterCidr []string
 	ServiceCidr []string
-	ColorCodes []string
-	NatEnabled bool
-	Broker string
+	ColorCodes  []string
+	NatEnabled  bool
+	Broker      string
 }
 
 type Secure struct {
-	APIKey string
+	APIKey    string
 	SecretKey string
 }

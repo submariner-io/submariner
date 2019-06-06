@@ -2,7 +2,9 @@ package tunnel
 
 import (
 	"fmt"
-	"github.com/rancher/submariner/pkg/apis/submariner.io/v1"
+	"time"
+
+	v1 "github.com/rancher/submariner/pkg/apis/submariner.io/v1"
 	"github.com/rancher/submariner/pkg/cableengine"
 	submarinerClientset "github.com/rancher/submariner/pkg/client/clientset/versioned"
 	submarinerInformers "github.com/rancher/submariner/pkg/client/informers/externalversions/submariner.io/v1"
@@ -14,28 +16,27 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
-	"time"
 )
 
 type TunnelController struct {
-	ce cableengine.CableEngine
-	kubeClientSet kubernetes.Interface
+	ce                  cableengine.CableEngine
+	kubeClientSet       kubernetes.Interface
 	submarinerClientSet submarinerClientset.Interface
-	endpointsSynced cache.InformerSynced
+	endpointsSynced     cache.InformerSynced
 
 	objectNamespace string
 
 	endpointWorkqueue workqueue.RateLimitingInterface
 }
 
-func NewTunnelController (objectNamespace string, ce cableengine.CableEngine, kubeClientSet kubernetes.Interface, submarinerClientSet submarinerClientset.Interface, endpointInformer submarinerInformers.EndpointInformer) *TunnelController {
+func NewTunnelController(objectNamespace string, ce cableengine.CableEngine, kubeClientSet kubernetes.Interface, submarinerClientSet submarinerClientset.Interface, endpointInformer submarinerInformers.EndpointInformer) *TunnelController {
 	tunnelController := &TunnelController{
-		ce: ce,
-		kubeClientSet: kubeClientSet,
+		ce:                  ce,
+		kubeClientSet:       kubeClientSet,
 		submarinerClientSet: submarinerClientSet,
-		endpointsSynced: endpointInformer.Informer().HasSynced,
-		endpointWorkqueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Endpoints"),
-		objectNamespace: objectNamespace,
+		endpointsSynced:     endpointInformer.Informer().HasSynced,
+		endpointWorkqueue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Endpoints"),
+		objectNamespace:     objectNamespace,
 	}
 	klog.Info("Setting up event handlers")
 	endpointInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
@@ -44,7 +45,7 @@ func NewTunnelController (objectNamespace string, ce cableengine.CableEngine, ku
 			tunnelController.enqueueEndpoint(new)
 		},
 		DeleteFunc: tunnelController.handleRemovedEndpoint,
-	}, 60 * time.Second)
+	}, 60*time.Second)
 
 	return tunnelController
 }

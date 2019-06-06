@@ -2,16 +2,17 @@ package util
 
 import (
 	"fmt"
-	subv1 "github.com/rancher/submariner/pkg/apis/submariner.io/v1"
-	"github.com/rancher/submariner/pkg/types"
-	"github.com/rdegges/go-ipify"
-	"github.com/vishvananda/netlink"
-	"k8s.io/klog"
 	"log"
 	"net"
 	"os"
 	"strings"
 	"syscall"
+
+	subv1 "github.com/rancher/submariner/pkg/apis/submariner.io/v1"
+	"github.com/rancher/submariner/pkg/types"
+	"github.com/rdegges/go-ipify"
+	"github.com/vishvananda/netlink"
+	"k8s.io/klog"
 )
 
 const tokenLength = 64
@@ -20,7 +21,7 @@ func getAPIIdentifier(token string) (string, error) {
 	if len(token) != tokenLength {
 		return "", fmt.Errorf("Token %s length was not %d", token, tokenLength)
 	}
-	clusterID := token[0:tokenLength/2]
+	clusterID := token[0 : tokenLength/2]
 	return clusterID, nil
 }
 
@@ -28,7 +29,7 @@ func getConnectSecret(token string) (string, error) {
 	if len(token) != tokenLength {
 		return "", fmt.Errorf("Token %s length was not %d", token, tokenLength)
 	}
-	connectSecret := token[tokenLength/2:tokenLength]
+	connectSecret := token[tokenLength/2 : tokenLength]
 	return connectSecret, nil
 }
 
@@ -87,13 +88,13 @@ func GetLocalEndpoint(clusterID string, backend string, backendConfig map[string
 	privateIP := GetLocalIP()
 	endpoint := types.SubmarinerEndpoint{
 		Spec: subv1.EndpointSpec{
-			CableName: fmt.Sprintf("submariner-cable-%s-%s", clusterID, strings.Replace(privateIP.String(), ".", "-", -1)),
-			ClusterID: clusterID,
-			Hostname: hostname,
-			PrivateIP: privateIP,
-			NATEnabled: natEnabled,
-			Subnets: subnets,
-			Backend: backend,
+			CableName:     fmt.Sprintf("submariner-cable-%s-%s", clusterID, strings.Replace(privateIP.String(), ".", "-", -1)),
+			ClusterID:     clusterID,
+			Hostname:      hostname,
+			PrivateIP:     privateIP,
+			NATEnabled:    natEnabled,
+			Subnets:       subnets,
+			Backend:       backend,
 			BackendConfig: backendConfig,
 		},
 	}
