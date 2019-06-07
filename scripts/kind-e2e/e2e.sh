@@ -190,6 +190,22 @@ function enable_logging() {
     fi
 }
 
+function test_with_e2e_tests {
+
+    cd ../test/e2e
+
+    # Grab any test-only related dependencies, like ginkgo and gomega
+    go get -t ./...
+
+    # Setup the KUBECONFIG env
+    export KUBECONFIG=$(kind get kubeconfig-path --name=cluster1):$(kind get kubeconfig-path --name=cluster2):$(kind get kubeconfig-path --name=cluster3)
+
+    go test -args -ginkgo.v -ginkgo.randomizeAllSpecs \
+        -dp-context cluster2 -dp-context cluster3  \
+        -report-dir ${DAPPER_SOURCE}/${DAPPER_OUTPUT}/junit 2>&1 | \
+        tee ${DAPPER_SOURCE}/${DAPPER_OUTPUT}/e2e-tests.log
+}
+
 function cleanup {
   for i in 1 2 3; do
 
@@ -240,3 +256,4 @@ setup_broker
 setup_cluster2_gateway
 setup_cluster3_gateway
 test_connection
+test_with_e2e_tests
