@@ -55,13 +55,13 @@ type Specification struct {
 	LogFile string
 }
 
-func NewEngine(localSubnets []string, localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) *Engine {
+func NewEngine(localSubnets []string, localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) (*Engine, error) {
 
 	ipSecSpec := Specification{}
 
 	err := envconfig.Process("ce_ipsec", &ipSecSpec)
 	if err != nil {
-		klog.Fatal(err)
+		return nil, fmt.Errorf("error processing environment config for ce_ipsec: %v", err)
 	}
 
 	return &Engine{
@@ -74,7 +74,7 @@ func NewEngine(localSubnets []string, localCluster types.SubmarinerCluster, loca
 		SecretKey:                 ipSecSpec.PSK,
 		Debug:                     ipSecSpec.Debug,
 		LogFile:                   ipSecSpec.LogFile,
-	}
+	}, nil
 }
 
 func (i *Engine) StartEngine(ignition bool) error {
@@ -82,23 +82,33 @@ func (i *Engine) StartEngine(ignition bool) error {
 		klog.Infof("Starting IPSec Engine (Charon)")
 		ifi, err := util.GetDefaultGatewayInterface()
 		if err != nil {
-			klog.Fatal(err)
+			return err
 		}
+
 		klog.V(8).Infof("Device of default gateway interface was %s", ifi.Name)
 		ipt, err := iptables.New()
 		if err != nil {
-			klog.Fatalf("error while initializing iptables: %v", err)
+			return fmt.Errorf("error while initializing iptables: %v", err)
 		}
 
 		klog.V(6).Infof("Installing/ensuring the SUBMARINER-POSTROUTING and SUBMARINER-FORWARD chains")
-		ipt.NewChain("nat", "SUBMARINER-POSTROUTING")
-		ipt.NewChain("filter", "SUBMARINER-FORWARD")
+		if err = ipt.NewChain("nat", "SUBMARINER-POSTROUTING"); err != nil {
+			klog.Errorf("Unable to create SUBMARINER-POSTROUTING chain in iptables: %v", err)
+		}
+
+		if err = ipt.NewChain("filter", "SUBMARINER-FORWARD"); err != nil {
+			klog.Errorf("Unable to create SUBMARINER-FORWARD chain in iptables: %v", err)
+		}
+
 		forwardToSubPostroutingRuleSpec := []string{"-j", "SUBMARINER-POSTROUTING"}
-		ipt.AppendUnique("nat", "POSTROUTING", forwardToSubPostroutingRuleSpec...)
+		if err = ipt.AppendUnique("nat", "POSTROUTING", forwardToSubPostroutingRuleSpec...); err != nil {
+			klog.Errorf("Unable to append iptables rule \"%s\": %v\n", strings.Join(forwardToSubPostroutingRuleSpec, " "), err)
+		}
+
 		forwardToSubForwardRuleSpec := []string{"-j", "SUBMARINER-FORWARD"}
 		rules, err := ipt.List("filter", "FORWARD")
 		if err != nil {
-			klog.Fatalf("error listing the rules in FORWARD chain: %v", err)
+			return fmt.Errorf("error listing the rules in FORWARD chain: %v", err)
 		}
 
 		appendAt := len(rules) + 1
@@ -115,18 +125,24 @@ func (i *Engine) StartEngine(ignition bool) error {
 
 		if insertAt == appendAt {
 			// Append the rule at the end of FORWARD Chain.
-			ipt.Append("filter", "FORWARD", forwardToSubForwardRuleSpec...)
+			if err = ipt.Append("filter", "FORWARD", forwardToSubForwardRuleSpec...); err != nil {
+				klog.Errorf("Unable to append iptables rule \"%s\": %v\n", strings.Join(forwardToSubForwardRuleSpec, " "), err)
+			}
 		} else if insertAt > 0 {
 			// Insert the rule in the FORWARD Chain.
-			ipt.Insert("filter", "FORWARD", insertAt, forwardToSubForwardRuleSpec...)
+			if err = ipt.Insert("filter", "FORWARD", insertAt, forwardToSubForwardRuleSpec...); err != nil {
+				klog.Errorf("Unable to insert iptables rule \"%s\" at position %d: %v\n", strings.Join(forwardToSubForwardRuleSpec, " "),
+					insertAt, err)
+			}
 		}
 
-		go runCharon(i.Debug, i.LogFile)
+		if err = runCharon(i.Debug, i.LogFile); err != nil {
+			return err
+		}
 	}
 
 	if err := i.loadConns(); err != nil {
-		klog.Fatalf("Failed to load connections from charon: %v", err)
-		return err
+		return fmt.Errorf("Failed to load connections from charon: %v", err)
 	}
 	return nil
 }
@@ -154,6 +170,7 @@ func (i *Engine) SyncCables(clusterID string, endpoints []types.SubmarinerEndpoi
 	if err != nil {
 		return err
 	}
+
 	for _, active := range activeConnections {
 		klog.V(6).Infof("Analyzing currently active connection: %s", active)
 		delete := true
@@ -166,7 +183,9 @@ func (i *Engine) SyncCables(clusterID string, endpoints []types.SubmarinerEndpoi
 		}
 		if delete {
 			klog.Infof("Triggering remove cable of connection %s", active)
-			i.removeCableInternal(active, client)
+			if err = i.removeCableInternal(active, client); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -181,7 +200,9 @@ func (i *Engine) SyncCables(clusterID string, endpoints []types.SubmarinerEndpoi
 		}
 		if !connInstalled {
 			klog.Infof("Marking cable %s to be installed", endpoint.Spec.CableName)
-			i.installCableInternal(endpoint, client)
+			if err = i.installCableInternal(endpoint, client); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -228,8 +249,7 @@ func (i *Engine) installCableInternal(endpoint types.SubmarinerEndpoint, client 
 	defer i.Unlock()
 
 	if err := i.loadSharedKey(endpoint, client); err != nil {
-		klog.Errorf("Encountered issue while trying to load shared keys")
-		return err
+		return fmt.Errorf("Encountered issue while trying to load shared keys: %v", err)
 	}
 
 	var localEndpointIP, remoteEndpointIP string
@@ -299,51 +319,50 @@ func (i *Engine) installCableInternal(endpoint types.SubmarinerEndpoint, client 
 		}
 	}
 	if err != nil {
-		klog.Errorf("failed loading connection %s: %v", endpoint.Spec.CableName, err)
-		return err
+		return fmt.Errorf("failed loading connection %s: %v", endpoint.Spec.CableName, err)
 	}
 
 	ifi, err := util.GetDefaultGatewayInterface()
 	if err != nil {
-		klog.Fatal(err)
+		return err
 	}
 	klog.V(4).Infof("Device of default gateway interface was %s", ifi.Name)
 	ipt, err := iptables.New()
 	if err != nil {
-		klog.Fatalf("error while initializing iptables: %v", err)
+		return fmt.Errorf("error while initializing iptables: %v", err)
 	}
 
 	addresses, err := ifi.Addrs()
 	if err != nil {
-		klog.Fatal(err)
+		return err
 	}
 
 	for _, addr := range addresses {
 		ipAddr, ipNet, err := net.ParseCIDR(addr.String())
 		if err != nil {
-			klog.Errorf("error while parsing address %v", err)
+			klog.Errorf("Error while parsing CIDR %s: %v", addr.String(), err)
+			continue
 		}
+
 		if ipAddr.To4() != nil {
 			for _, subnet := range endpoint.Spec.Subnets {
 				ruleSpec := []string{"-s", ipNet.String(), "-d", subnet, "-i", ifi.Name, "-j", "ACCEPT"}
 				klog.V(8).Infof("Installing iptables rule: %s", strings.Join(ruleSpec, " "))
-				err = ipt.AppendUnique("filter", "SUBMARINER-FORWARD", ruleSpec...)
-				if err != nil {
-					klog.Errorf("error while installing iptables rule: %v", err)
+				if err = ipt.AppendUnique("filter", "SUBMARINER-FORWARD", ruleSpec...); err != nil {
+					klog.Errorf("error appending iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
 				}
 
 				ruleSpec = []string{"-d", ipNet.String(), "-s", subnet, "-i", ifi.Name, "-j", "ACCEPT"}
-				klog.V(8).Infof("Installing iptables rule: %s", strings.Join(ruleSpec, " "))
-				err = ipt.AppendUnique("filter", "SUBMARINER-FORWARD", ruleSpec...)
-				if err != nil {
-					klog.Errorf("error while installing iptables rule: %v", err)
+				klog.V(8).Infof("Installing iptables rule: %v", ruleSpec)
+				if err = ipt.AppendUnique("filter", "SUBMARINER-FORWARD", ruleSpec...); err != nil {
+					klog.Errorf("error appending iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
 				}
+
 				// -t nat -I POSTROUTING -s <local-network-cidr> -d <remote-cidr> -j SNAT --to-source <this-local-ip>
 				ruleSpec = []string{"-s", ipNet.String(), "-d", subnet, "-j", "SNAT", "--to-source", ipAddr.String()}
 				klog.V(8).Infof("Installing iptables rule: %s", strings.Join(ruleSpec, " "))
-				err = ipt.AppendUnique("nat", "SUBMARINER-POSTROUTING", ruleSpec...)
-				if err != nil {
-					klog.Errorf("error while installing iptables rule: %v", err)
+				if err = ipt.AppendUnique("nat", "SUBMARINER-POSTROUTING", ruleSpec...); err != nil {
+					klog.Errorf("error appending iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
 				}
 			}
 		} else {
@@ -356,10 +375,9 @@ func (i *Engine) installCableInternal(endpoint types.SubmarinerEndpoint, client 
 	// This will make the return traffic from the POD to go via the GatewayNode.
 	for _, localSubnet := range i.LocalSubnets {
 		ruleSpec := []string{"-s", remoteEndpointIP, "-d", localSubnet, "-j", "MASQUERADE"}
-		klog.V(8).Infof("Installing iptables rule for MASQ incoming traffic: %s", strings.Join(ruleSpec, " "))
-		err = ipt.AppendUnique("nat", "SUBMARINER-POSTROUTING", ruleSpec...)
-		if err != nil {
-			klog.Errorf("error while installing iptables MASQ rule: %v", err)
+		klog.V(8).Infof("Installing iptables rule for MASQ incoming traffic: %v", ruleSpec)
+		if err = ipt.AppendUnique("nat", "SUBMARINER-POSTROUTING", ruleSpec...); err != nil {
+			klog.Errorf("error appending iptables MASQ rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
 		}
 	}
 
@@ -402,8 +420,7 @@ func (i *Engine) removeCableInternal(cableID string, client *goStrongswanVici.Cl
 		Name: cableID,
 	})
 	if err != nil {
-		klog.Errorf("Error when unloading connection %s : %v", cableID, err)
-		return err
+		return fmt.Errorf("Error when unloading connection %s : %v", cableID, err)
 	}
 
 	connections, err := client.ListConns("")
@@ -470,7 +487,8 @@ func (i *Engine) PrintConns() {
 	defer client.Close()
 	connList, err := client.ListConns("")
 	if err != nil {
-		klog.Errorf("error list-conns: %v \n", err)
+		klog.Errorf("Error from ListConns: %v", err)
+		return
 	}
 
 	for _, connection := range connList {
@@ -534,7 +552,7 @@ func (i *Engine) loadSharedKey(endpoint types.SubmarinerEndpoint, client *goStro
 	return nil
 }
 
-func runCharon(debug bool, logFile string) {
+func runCharon(debug bool, logFile string) error {
 	klog.Infof("Starting Charon")
 	// Ignore error
 	os.Remove("/var/run/charon.vici")
@@ -553,23 +571,34 @@ func runCharon(debug bool, logFile string) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
+	var outputFile *os.File
 	if logFile != "" {
-		output, err := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		out, err := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 		if err != nil {
-			klog.Fatalf("Failed to log to file %s: %v", logFile, err)
+			return fmt.Errorf("Failed to open log file %s: %v", logFile, err)
 		}
-		defer output.Close()
-		cmd.Stdout = output
-		cmd.Stderr = output
+
+		cmd.Stdout = out
+		cmd.Stderr = out
+		outputFile = out
 	}
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Pdeathsig: syscall.SIGTERM,
 	}
 
-	cmd.Start()
+	if err := cmd.Start(); err != nil {
+		// Note - Close handles nil receiver
+		outputFile.Close()
+		return fmt.Errorf("error starting the charon process wih args %v: %v", args, err)
+	}
 
-	klog.Fatalf("charon exited: %v", cmd.Wait())
+	go func() {
+		defer outputFile.Close()
+		klog.Fatalf("charon exited: %v", cmd.Wait())
+	}()
+
+	return nil
 }
 
 func (i *Engine) killCharon(pid string) {
@@ -611,29 +640,34 @@ func (i *Engine) loadConns() error {
 func (i *Engine) monitorCharon() {
 	pid := ""
 	for {
-		newPidBytes, err := ioutil.ReadFile(pidFile)
-		if err != nil {
-			klog.Fatalf("Failed to read %s", pidFile)
-		}
-		newPid := strings.TrimSpace(string(newPidBytes))
-		if pid == "" {
-			pid = newPid
-			klog.Infof("Charon running PID: %s", pid)
-		} else if pid != newPid {
-			klog.Fatalf("Charon restarted, old PID: %s, new PID: %s", pid, newPid)
-		} else {
-			i.Lock()
-			if err := Test(); err != nil {
-				klog.Errorf("Killing charon due to: %v", err)
-				i.killCharon(pid)
+		func() {
+			newPidBytes, err := ioutil.ReadFile(pidFile)
+			if err != nil {
+				klog.Errorf("Failed to read charon pid file %s: %v", pidFile, err)
+				return
 			}
-			i.Unlock()
-		}
+
+			newPid := strings.TrimSpace(string(newPidBytes))
+			if pid == "" {
+				pid = newPid
+				klog.Infof("Charon running with PID: %s", pid)
+			} else if pid != newPid {
+				klog.Errorf("Charon restarted, old PID: %s, new PID: %s", pid, newPid)
+			} else {
+				i.Lock()
+				defer i.Unlock()
+				if err := testCharon(); err != nil {
+					klog.Errorf("Killing charon due to: %v", err)
+					i.killCharon(pid)
+				}
+			}
+		}()
+
 		time.Sleep(2 * time.Second)
 	}
 }
 
-func Test() error {
+func testCharon() error {
 	client, err := getClient()
 	if err != nil {
 		return err
