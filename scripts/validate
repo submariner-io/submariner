@@ -3,4 +3,9 @@ set -e
 
 cd $(dirname $0)/..
 
+if [[ $(goimports -l main.go pkg test | wc -l) -gt 0 ]]; then
+    echo Incorrect formatting, please run goimports
+    exit 1
+fi
+
 golangci-lint run -D megacheck -E unused,gosimple,staticcheck
