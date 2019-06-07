@@ -2,11 +2,12 @@ package main
 
 import (
 	"flag"
+	"sync"
+	"time"
+
 	"github.com/kelseyhightower/envconfig"
 	"github.com/rancher/submariner/pkg/routeagent/controllers/route"
 	"github.com/rancher/submariner/pkg/util"
-	"sync"
-	"time"
 
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"

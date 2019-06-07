@@ -3,6 +3,10 @@ package datastoresyncer
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"sync"
+	"time"
+
 	submarinerv1 "github.com/rancher/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientset "github.com/rancher/submariner/pkg/client/clientset/versioned"
 	submarinerInformers "github.com/rancher/submariner/pkg/client/informers/externalversions/submariner.io/v1"
@@ -17,41 +21,38 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
-	"reflect"
-	"sync"
-	"time"
 )
 
 type DatastoreSyncer struct {
-	objectNamespace string
-	thisClusterID string
-	colorCodes []string
-	kubeClientSet kubernetes.Interface
-	submarinerClientset submarinerClientset.Interface
-	submarinerClusterInformer submarinerInformers.ClusterInformer
+	objectNamespace            string
+	thisClusterID              string
+	colorCodes                 []string
+	kubeClientSet              kubernetes.Interface
+	submarinerClientset        submarinerClientset.Interface
+	submarinerClusterInformer  submarinerInformers.ClusterInformer
 	submarinerEndpointInformer submarinerInformers.EndpointInformer
-	datastore datastore.Datastore
-	localCluster types.SubmarinerCluster
-	localEndpoint types.SubmarinerEndpoint
+	datastore                  datastore.Datastore
+	localCluster               types.SubmarinerCluster
+	localEndpoint              types.SubmarinerEndpoint
 
-	clusterWorkqueue workqueue.RateLimitingInterface
+	clusterWorkqueue  workqueue.RateLimitingInterface
 	endpointWorkqueue workqueue.RateLimitingInterface
 }
 
 func NewDatastoreSyncer(thisClusterID string, objectNamespace string, kubeClientSet kubernetes.Interface, submarinerClientset submarinerClientset.Interface, submarinerClusterInformer submarinerInformers.ClusterInformer, submarinerEndpointInformer submarinerInformers.EndpointInformer, datastore datastore.Datastore, colorcodes []string, localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) *DatastoreSyncer {
 	newDatastoreSyncer := DatastoreSyncer{
-		thisClusterID: thisClusterID,
-		objectNamespace: objectNamespace,
-		kubeClientSet: kubeClientSet,
-		submarinerClientset: submarinerClientset,
-		datastore: datastore,
-		submarinerClusterInformer: submarinerClusterInformer,
+		thisClusterID:              thisClusterID,
+		objectNamespace:            objectNamespace,
+		kubeClientSet:              kubeClientSet,
+		submarinerClientset:        submarinerClientset,
+		datastore:                  datastore,
+		submarinerClusterInformer:  submarinerClusterInformer,
 		submarinerEndpointInformer: submarinerEndpointInformer,
-		clusterWorkqueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Clusters"),
-		endpointWorkqueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Endpoints"),
-		colorCodes: colorcodes,
-		localCluster: localCluster,
-		localEndpoint: localEndpoint,
+		clusterWorkqueue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Clusters"),
+		endpointWorkqueue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Endpoints"),
+		colorCodes:                 colorcodes,
+		localCluster:               localCluster,
+		localEndpoint:              localEndpoint,
 	}
 
 	submarinerClusterInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
@@ -60,8 +61,7 @@ func NewDatastoreSyncer(thisClusterID string, objectNamespace string, kubeClient
 			newDatastoreSyncer.enqueueCluster(new)
 		},
 		DeleteFunc: newDatastoreSyncer.enqueueCluster,
-	}, 60 * time.Second)
-
+	}, 60*time.Second)
 
 	submarinerEndpointInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: newDatastoreSyncer.enqueueEndpoint,
@@ -69,7 +69,7 @@ func NewDatastoreSyncer(thisClusterID string, objectNamespace string, kubeClient
 			newDatastoreSyncer.enqueueEndpoint(new)
 		},
 		DeleteFunc: newDatastoreSyncer.enqueueEndpoint,
-	}, 60 * time.Second)
+	}, 60*time.Second)
 
 	return &newDatastoreSyncer
 }
@@ -139,12 +139,12 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 	d.ensureExclusiveEndpoint()
 
 	err := d.reconcileClusterCRD(d.localCluster, false)
-	if (err != nil) {
+	if err != nil {
 		return fmt.Errorf("Error reconciling local Cluster CRD: %v", err)
 	}
 
 	err = d.reconcileEndpointCRD(d.localEndpoint, false)
-	if (err != nil) {
+	if err != nil {
 		return fmt.Errorf("Error reconciling local Endpoint CRD: %v", err)
 	}
 
@@ -195,7 +195,7 @@ func (d *DatastoreSyncer) processNextClusterWorkItem() bool {
 			return nil
 		}
 		myCluster := types.SubmarinerCluster{
-			ID: cluster.Name,
+			ID:   cluster.Name,
 			Spec: cluster.Spec,
 		}
 		klog.V(4).Infof("Attempting to trigger an update of the central datastore with the updated CRD")
@@ -280,7 +280,7 @@ func (d *DatastoreSyncer) reconcileClusterCRD(localCluster types.SubmarinerClust
 	cluster, err := d.submarinerClientset.SubmarinerV1().Clusters(d.objectNamespace).Get(clusterCRDName, metav1.GetOptions{})
 	if err != nil {
 		klog.V(4).Infof("There was an error retrieving the local Cluster CRD for %s, assuming it does not exist and creating a new one. The error was: %v",
-		    clusterCRDName, err)
+			clusterCRDName, err)
 		found = false
 	} else {
 		found = true
@@ -340,7 +340,7 @@ func (d *DatastoreSyncer) runReaper() {
 			clusters, err := d.datastore.GetClusters(d.colorCodes)
 			if err != nil {
 				klog.Errorf("Error retrieving remote Clusters: %v", err)
-				return;
+				return
 			}
 			for _, cluster := range clusters {
 				endpoints, err := d.datastore.GetEndpoints(cluster.ID)
@@ -410,7 +410,7 @@ func (d *DatastoreSyncer) reconcileEndpointCRD(rawEndpoint types.SubmarinerEndpo
 	endpoint, err := d.submarinerClientset.SubmarinerV1().Endpoints(d.objectNamespace).Get(endpointName, metav1.GetOptions{})
 	if err != nil {
 		klog.V(4).Infof("There was an error retrieving the local Endpoint CRD for %s, assuming it does not exist and creating a new one. The error was: %v",
-		    endpointName, err)
+			endpointName, err)
 		found = false
 	} else {
 		found = true
@@ -459,4 +459,3 @@ func (d *DatastoreSyncer) reconcileEndpointCRD(rawEndpoint types.SubmarinerEndpo
 	}
 	return nil
 }
-

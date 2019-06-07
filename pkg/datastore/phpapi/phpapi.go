@@ -2,23 +2,24 @@ package phpapi
 
 import (
 	"context"
-"encoding/json"
-"fmt"
-"github.com/kelseyhightower/envconfig"
-"github.com/rancher/submariner/pkg/types"
-"github.com/rancher/submariner/pkg/util"
-"io/ioutil"
-"net/http"
-"net/url"
-"sync"
-"time"
-"k8s.io/klog"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"sync"
+	"time"
+
+	"github.com/kelseyhightower/envconfig"
+	"github.com/rancher/submariner/pkg/types"
+	"github.com/rancher/submariner/pkg/util"
+	"k8s.io/klog"
 )
 
 type PHPAPI struct {
 	sync.Mutex
-	Proto string
-	Server string
+	Proto    string
+	Server   string
 	APIToken string
 }
 
@@ -35,8 +36,8 @@ func NewPHPAPI(apitoken string) *PHPAPI {
 	}
 	klog.Infof("Instantiating PHPAPI Backend at %s://%s with APIToken %s", pais.Proto, pais.Server, apitoken)
 	return &PHPAPI{
-		Proto: pais.Proto,
-		Server: pais.Server,
+		Proto:    pais.Proto,
+		Server:   pais.Server,
 		APIToken: apitoken,
 	}
 }
@@ -171,7 +172,7 @@ func (p *PHPAPI) SetCluster(cluster types.SubmarinerCluster) error {
 	}
 	formVal := url.Values{}
 	formVal.Set("action", "reconcile")
-	formVal.Add("cluster",string(marshaledCluster))
+	formVal.Add("cluster", string(marshaledCluster))
 	poster, err := http.PostForm(fmt.Sprintf("%s://%s/clusters.php?identifier=%s", p.Proto, p.Server, p.APIToken), formVal)
 	if err != nil {
 		klog.Errorf("encountered error setting cluster")

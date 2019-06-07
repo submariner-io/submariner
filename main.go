@@ -3,6 +3,10 @@ package main
 import (
 	"context"
 	"flag"
+	"os"
+	"sync"
+	"time"
+
 	"github.com/kelseyhightower/envconfig"
 	"github.com/rancher/submariner/pkg/cableengine"
 	"github.com/rancher/submariner/pkg/cableengine/ipsec"
@@ -10,16 +14,13 @@ import (
 	"github.com/rancher/submariner/pkg/datastore"
 	"github.com/rancher/submariner/pkg/types"
 	"github.com/rancher/submariner/pkg/util"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
-	"os"
-	"sync"
-	"time"
 
 	kubeInformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -28,8 +29,8 @@ import (
 
 	submarinerClientset "github.com/rancher/submariner/pkg/client/clientset/versioned"
 	submarinerInformers "github.com/rancher/submariner/pkg/client/informers/externalversions"
-	subk8s "github.com/rancher/submariner/pkg/datastore/kubernetes"
 	"github.com/rancher/submariner/pkg/controllers/tunnel"
+	subk8s "github.com/rancher/submariner/pkg/datastore/kubernetes"
 	"github.com/rancher/submariner/pkg/datastore/phpapi"
 	"github.com/rancher/submariner/pkg/signals"
 )
@@ -184,9 +185,9 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder rec
 
 	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
 		Lock:          &rl,
-		LeaseDuration: 15*time.Second,
-		RenewDeadline: 10*time.Second,
-		RetryPeriod:   3*time.Second,
+		LeaseDuration: 15 * time.Second,
+		RenewDeadline: 10 * time.Second,
+		RetryPeriod:   3 * time.Second,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: run,
 			OnStoppedLeading: func() {

@@ -2,6 +2,7 @@ package datastore
 
 import (
 	"context"
+
 	"github.com/rancher/submariner/pkg/types"
 )
 
@@ -22,7 +23,7 @@ type Datastore interface {
 	// Watches all clusters and calls the passed in function on cluster change
 	WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onClusterChange func(cluster types.SubmarinerCluster, deleted bool) error) error
 	// Performs a watch of all endpoints and calls the passed in function based on information
-	WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onEndpointChange func (endpoint types.SubmarinerEndpoint, deleted bool) error) error
+	WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onEndpointChange func(endpoint types.SubmarinerEndpoint, deleted bool) error) error
 	// This should be called to set the local cluster information.
 	SetCluster(cluster types.SubmarinerCluster) error
 	// This should only ever be called to set the endpoint of the local node.

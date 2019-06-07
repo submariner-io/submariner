@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"reflect"
+	"time"
+
 	"github.com/kelseyhightower/envconfig"
 	submarinerv1 "github.com/rancher/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientset "github.com/rancher/submariner/pkg/client/clientset/versioned"
@@ -16,26 +19,24 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
-	"reflect"
-	"time"
 )
 
 type Datastore struct {
-	client *submarinerClientset.Clientset
+	client          *submarinerClientset.Clientset
 	informerFactory submarinerInformers.SharedInformerFactory
 
-	thisClusterID string
+	thisClusterID   string
 	remoteNamespace string
 
 	stopCh <-chan struct{}
 }
 
 type datastoreSpecification struct {
-	APIServer string
-	APIServerToken string
+	APIServer       string
+	APIServerToken  string
 	RemoteNamespace string
-	Insecure bool `default:"false"`
-	Ca string
+	Insecure        bool `default:"false"`
+	Ca              string
 }
 
 func NewDatastore(thisClusterID string, stopCh <-chan struct{}) (*Datastore, error) {
@@ -63,7 +64,7 @@ func NewDatastore(thisClusterID string, stopCh <-chan struct{}) (*Datastore, err
 		// TODO: switch to using cluster DNS.
 		Host:            host,
 		TLSClientConfig: tlsClientConfig,
-		BearerToken: k8sSpec.APIServerToken,
+		BearerToken:     k8sSpec.APIServerToken,
 	}
 
 	submarinerClient, err := submarinerClientset.NewForConfig(&k8sClientConfig)
@@ -73,27 +74,27 @@ func NewDatastore(thisClusterID string, stopCh <-chan struct{}) (*Datastore, err
 
 	return &Datastore{
 		client: submarinerClient,
-		informerFactory: submarinerInformers.NewSharedInformerFactoryWithOptions(submarinerClient, time.Second*30, 
+		informerFactory: submarinerInformers.NewSharedInformerFactoryWithOptions(submarinerClient, time.Second*30,
 			submarinerInformers.WithNamespace(k8sSpec.RemoteNamespace)),
-		thisClusterID: thisClusterID,
+		thisClusterID:   thisClusterID,
 		remoteNamespace: k8sSpec.RemoteNamespace,
-		stopCh:        stopCh,
+		stopCh:          stopCh,
 	}, nil
 }
 
 func stringSliceOverlaps(left []string, right []string) bool {
-    hash := make(map[string]bool)
-    for _, s := range left {
-        hash[s] = true
-    }
+	hash := make(map[string]bool)
+	for _, s := range left {
+		hash[s] = true
+	}
 
-    for _, s := range right {
-        if hash[s] {
-            return true
-        }
-    }
+	for _, s := range right {
+		if hash[s] {
+			return true
+		}
+	}
 
-    return false
+	return false
 }
 
 func (k *Datastore) GetClusters(colorCodes []string) ([]types.SubmarinerCluster, error) {
@@ -108,7 +109,7 @@ func (k *Datastore) GetClusters(colorCodes []string) ([]types.SubmarinerCluster,
 	for _, cluster := range k8sClusters.Items {
 		if stringSliceOverlaps(cluster.Spec.ColorCodes, colorCodes) {
 			clusters = append(clusters, types.SubmarinerCluster{
-				ID: cluster.Spec.ClusterID,
+				ID:   cluster.Spec.ClusterID,
 				Spec: cluster.Spec,
 			}) // this is likely going to add duplicate clusters
 		}
@@ -126,7 +127,7 @@ func (k *Datastore) GetCluster(clusterID string) (types.SubmarinerCluster, error
 	for _, cluster := range k8sClusters.Items {
 		if cluster.Spec.ClusterID == clusterID {
 			return types.SubmarinerCluster{
-				ID: clusterID,
+				ID:   clusterID,
 				Spec: cluster.Spec,
 			}, nil
 		}
@@ -170,7 +171,7 @@ func (k *Datastore) GetEndpoint(clusterID string, cableName string) (types.Subma
 func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onClusterChange func(cluster types.SubmarinerCluster, deleted bool) error) error {
 
 	k.informerFactory.Submariner().V1().Clusters().Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
-		AddFunc: func (obj interface{}) {
+		AddFunc: func(obj interface{}) {
 			var object *submarinerv1.Cluster
 			var ok bool
 			klog.V(8).Infof("AddFunc in WatchClusters called")
@@ -189,11 +190,11 @@ func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, col
 			}
 
 			utilruntime.HandleError(onClusterChange(types.SubmarinerCluster{
-				ID: object.Spec.ClusterID,
+				ID:   object.Spec.ClusterID,
 				Spec: object.Spec,
 			}, false))
 		},
-		UpdateFunc: func (old, obj interface{}) {
+		UpdateFunc: func(old, obj interface{}) {
 			var object *submarinerv1.Cluster
 			var ok bool
 			klog.V(8).Infof("UpdateFunc in WatchClusters called")
@@ -212,11 +213,11 @@ func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, col
 			}
 
 			utilruntime.HandleError(onClusterChange(types.SubmarinerCluster{
-				ID: object.Spec.ClusterID,
+				ID:   object.Spec.ClusterID,
 				Spec: object.Spec,
 			}, false))
 		},
-		DeleteFunc: func (obj interface{}) {
+		DeleteFunc: func(obj interface{}) {
 			var object *submarinerv1.Cluster
 			var ok bool
 			klog.V(8).Infof("DeleteFunc in WatchClusters called")
@@ -235,11 +236,11 @@ func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, col
 			}
 
 			utilruntime.HandleError(onClusterChange(types.SubmarinerCluster{
-				ID: object.Spec.ClusterID,
+				ID:   object.Spec.ClusterID,
 				Spec: object.Spec,
 			}, true))
 		},
-	}, time.Second * 30)
+	}, time.Second*30)
 
 	k.informerFactory.Start(k.stopCh)
 	return nil
@@ -247,7 +248,7 @@ func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, col
 func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onEndpointChange func(endpoint types.SubmarinerEndpoint, deleted bool) error) error {
 
 	k.informerFactory.Submariner().V1().Endpoints().Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
-		AddFunc: func (obj interface{}) {
+		AddFunc: func(obj interface{}) {
 			var object *submarinerv1.Endpoint
 			var ok bool
 			klog.V(8).Infof("AddFunc in WatchEndpoints called")
@@ -269,7 +270,7 @@ func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, co
 				Spec: object.Spec,
 			}, false))
 		},
-		UpdateFunc: func (old, obj interface{}) {
+		UpdateFunc: func(old, obj interface{}) {
 			var object *submarinerv1.Endpoint
 			var ok bool
 			klog.V(8).Infof("UpdateFunc in WatchEndpoints called")
@@ -291,7 +292,7 @@ func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, co
 				Spec: object.Spec,
 			}, false))
 		},
-		DeleteFunc: func (obj interface{}) {
+		DeleteFunc: func(obj interface{}) {
 			var object *submarinerv1.Endpoint
 			var ok bool
 			klog.V(8).Infof("DeleteFunc in WatchEndpoints called")
@@ -313,7 +314,7 @@ func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, co
 				Spec: object.Spec,
 			}, true))
 		},
-	}, time.Second * 30)
+	}, time.Second*30)
 
 	k.informerFactory.Start(k.stopCh)
 	return nil
@@ -327,9 +328,9 @@ func (k *Datastore) SetCluster(cluster types.SubmarinerCluster) error {
 	retrievedCluster, err := k.client.SubmarinerV1().Clusters(k.remoteNamespace).Get(clusterCRDName, metav1.GetOptions{})
 	if err != nil {
 		klog.V(4).Infof("There was an error retrieving the remote Cluster CRD for %s, assuming it does not exist and creating a new one. The error was: %v",
-		    clusterCRDName, err)
+			clusterCRDName, err)
 		newClusterObject := &submarinerv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta {
+			ObjectMeta: metav1.ObjectMeta{
 				Name: clusterCRDName,
 			},
 			Spec: cluster.Spec,
@@ -368,9 +369,9 @@ func (k *Datastore) SetEndpoint(endpoint types.SubmarinerEndpoint) error {
 	retrievedEndpoint, err := k.client.SubmarinerV1().Endpoints(k.remoteNamespace).Get(endpointCRDName, metav1.GetOptions{})
 	if err != nil {
 		klog.V(4).Infof("There was an error retrieving the local Endpoint CRD for %s, assuming it does not exist and creating a new one. The error was: %v",
-		    endpointCRDName, err)
+			endpointCRDName, err)
 		newEndpointObject := &submarinerv1.Endpoint{
-			ObjectMeta: metav1.ObjectMeta {
+			ObjectMeta: metav1.ObjectMeta{
 				Name: endpointCRDName,
 			},
 			Spec: endpoint.Spec,
