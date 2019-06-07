@@ -8,14 +8,13 @@ import (
 	"k8s.io/klog"
 )
 
-
-type contextArray [] string
+type contextArray []string
 
 type TestContextType struct {
-	KubeConfig                      string
-	KubeContexts                    contextArray
-	ReportDir      					string
-	ReportPrefix   					string
+	KubeConfig   string
+	KubeContexts contextArray
+	ReportDir    string
+	ReportPrefix string
 }
 
 func (contexts *contextArray) String() string {
@@ -26,7 +25,6 @@ func (contexts *contextArray) Set(value string) error {
 	*contexts = append(*contexts, value)
 	return nil
 }
-
 
 var TestContext *TestContextType = &TestContextType{}
 
