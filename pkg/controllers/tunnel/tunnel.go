@@ -88,23 +88,20 @@ func (t *TunnelController) processNextEndpoint() bool {
 		klog.V(4).Infof("Processing endpoint object: %v", obj)
 		ns, key, err := cache.SplitMetaNamespaceKey(obj.(string))
 		if err != nil {
-			klog.Errorf("error while splitting meta namespace key: %v", err)
-			return nil
+			return fmt.Errorf("error splitting meta namespace key for endpoint %s: %v", obj, err)
 		}
 		endpoint, err := t.submarinerClientSet.SubmarinerV1().Endpoints(ns).Get(key, metav1.GetOptions{})
 		if err != nil {
-			klog.Errorf("Error while retrieving submariner endpoint object %s: %v", obj, err)
 			t.endpointWorkqueue.Forget(obj)
-			return nil
+			return fmt.Errorf("error retrieving submariner endpoint key %s: %v", key, err)
 		}
 		myEndpoint := types.SubmarinerEndpoint{
 			Spec: endpoint.Spec,
 		}
 		err = t.ce.InstallCable(myEndpoint)
 		if err != nil {
-			klog.Errorf("Error while installing cable %v", myEndpoint)
 			t.endpointWorkqueue.AddRateLimited(obj)
-			return nil
+			return fmt.Errorf("error installing cable for endpoint %#v, %v", myEndpoint, err)
 		}
 		t.endpointWorkqueue.Forget(obj)
 		klog.V(4).Infof("endpoint processed by tunnel controller")
@@ -113,7 +110,6 @@ func (t *TunnelController) processNextEndpoint() bool {
 
 	if err != nil {
 		utilruntime.HandleError(err)
-		return true
 	}
 
 	return true
@@ -137,19 +133,23 @@ func (t *TunnelController) handleRemovedEndpoint(obj interface{}) {
 	if object, ok = obj.(*v1.Endpoint); !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("error decoding object, invalid type"))
-			klog.Errorf("problem decoding object")
+			utilruntime.HandleError(fmt.Errorf("Could not convert object %v to an Endpoint", obj))
 			return
 		}
 		object, ok = tombstone.Obj.(*v1.Endpoint)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("error decoding object tombstone, invalid type"))
-			klog.Errorf("problem decoding object tombstone")
+			utilruntime.HandleError(fmt.Errorf("Could not convert object tombstone %v to an Endpoint", tombstone.Obj))
 			return
 		}
 		klog.V(4).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 	}
-	klog.V(4).Infof("Informed of removed endpoint for tunnel controller object: %v", object)
-	t.ce.RemoveCable(object.Spec.CableName)
-	klog.V(4).Infof("Removed endpoint from cable engine %s", object.Name)
+
+	klog.V(4).Infof("Informed of removed endpoint for tunnel controller object: %#v", object)
+	if err := t.ce.RemoveCable(object.Spec.CableName); err != nil {
+		utilruntime.HandleError(fmt.Errorf("error removing endpoint cable %s from engine: %v",
+			object.Spec.CableName, err))
+		return
+	}
+
+	klog.V(4).Infof("Removed endpoint cable %s from engine", object.Spec.CableName)
 }
