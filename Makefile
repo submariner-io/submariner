@@ -17,3 +17,6 @@ trash-keep: .dapper
 	./.dapper -m bind trash -k
 
 .DEFAULT_GOAL := ci
+
+.PHONY: test
+
