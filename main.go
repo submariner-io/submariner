@@ -107,7 +107,10 @@ func main() {
 				klog.Fatalf("Error parsing secure token: %v", err)
 			}
 
-			datastore = phpapi.NewPHPAPI(secure.APIKey)
+			datastore, err = phpapi.NewPHPAPI(secure.APIKey)
+			if err != nil {
+				klog.Fatalf("Error creating PHPAPI datastore: %v", err)
+			}
 		case "k8s":
 			datastore, err = subk8s.NewDatastore(submSpec.ClusterID, stopCh)
 			if err != nil {
