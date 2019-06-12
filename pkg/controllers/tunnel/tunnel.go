@@ -18,7 +18,7 @@ import (
 	"k8s.io/klog"
 )
 
-type TunnelController struct {
+type Controller struct {
 	ce                  cableengine.CableEngine
 	kubeClientSet       kubernetes.Interface
 	submarinerClientSet submarinerClientset.Interface
@@ -29,8 +29,8 @@ type TunnelController struct {
 	endpointWorkqueue workqueue.RateLimitingInterface
 }
 
-func NewTunnelController(objectNamespace string, ce cableengine.CableEngine, kubeClientSet kubernetes.Interface, submarinerClientSet submarinerClientset.Interface, endpointInformer submarinerInformers.EndpointInformer) *TunnelController {
-	tunnelController := &TunnelController{
+func NewController(objectNamespace string, ce cableengine.CableEngine, kubeClientSet kubernetes.Interface, submarinerClientSet submarinerClientset.Interface, endpointInformer submarinerInformers.EndpointInformer) *Controller {
+	tunnelController := &Controller{
 		ce:                  ce,
 		kubeClientSet:       kubeClientSet,
 		submarinerClientSet: submarinerClientSet,
@@ -50,7 +50,7 @@ func NewTunnelController(objectNamespace string, ce cableengine.CableEngine, kub
 	return tunnelController
 }
 
-func (t *TunnelController) Run(stopCh <-chan struct{}) error {
+func (t *Controller) Run(stopCh <-chan struct{}) error {
 	defer utilruntime.HandleCrash()
 
 	// Start the informer factories to begin populating the informer caches
@@ -72,13 +72,13 @@ func (t *TunnelController) Run(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (t *TunnelController) runWorker() {
+func (t *Controller) runWorker() {
 	for t.processNextEndpoint() {
 
 	}
 }
 
-func (t *TunnelController) processNextEndpoint() bool {
+func (t *Controller) processNextEndpoint() bool {
 	obj, shutdown := t.endpointWorkqueue.Get()
 	if shutdown {
 		return false
@@ -115,7 +115,7 @@ func (t *TunnelController) processNextEndpoint() bool {
 	return true
 }
 
-func (t *TunnelController) enqueueEndpoint(obj interface{}) {
+func (t *Controller) enqueueEndpoint(obj interface{}) {
 	var key string
 	var err error
 	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
@@ -126,7 +126,7 @@ func (t *TunnelController) enqueueEndpoint(obj interface{}) {
 	t.endpointWorkqueue.AddRateLimited(key)
 }
 
-func (t *TunnelController) handleRemovedEndpoint(obj interface{}) {
+func (t *Controller) handleRemovedEndpoint(obj interface{}) {
 	var object *v1.Endpoint
 	var ok bool
 	klog.V(4).Infof("Handling object in handleEndpoint")
