@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/rancher/submariner/pkg/cableengine"
 	"github.com/rancher/submariner/pkg/cableengine/ipsec"
 	"github.com/rancher/submariner/pkg/controllers/datastoresyncer"
 	"github.com/rancher/submariner/pkg/datastore"
@@ -92,7 +91,10 @@ func main() {
 			klog.Fatalf("Fatal error occurred while retrieving local endpoint from %#v: %v", submSpec, err)
 		}
 
-		var cableEngine cableengine.CableEngine = ipsec.NewEngine(append(submSpec.ClusterCidr, submSpec.ServiceCidr...), localCluster, localEndpoint)
+		cableEngine, err := ipsec.NewEngine(append(submSpec.ClusterCidr, submSpec.ServiceCidr...), localCluster, localEndpoint)
+		if err != nil {
+			klog.Fatalf("Fatal error occurred creating ipsec engine: %v", err)
+		}
 
 		tunnelController := tunnel.NewTunnelController(submSpec.Namespace, cableEngine, kubeClient, submarinerClient,
 			submarinerInformerFactory.Submariner().V1().Endpoints())
