@@ -116,25 +116,26 @@ func (k *Datastore) GetClusters(colorCodes []string) ([]types.SubmarinerCluster,
 	}
 	return clusters, nil
 }
-func (k *Datastore) GetCluster(clusterID string) (types.SubmarinerCluster, error) {
 
+func (k *Datastore) GetCluster(clusterID string) (*types.SubmarinerCluster, error) {
 	k8sClusters, err := k.client.SubmarinerV1().Clusters(k.remoteNamespace).List(metav1.ListOptions{})
 
 	if err != nil {
-		return types.SubmarinerCluster{}, err
+		return nil, err
 	}
 
 	for _, cluster := range k8sClusters.Items {
 		if cluster.Spec.ClusterID == clusterID {
-			return types.SubmarinerCluster{
+			return &types.SubmarinerCluster{
 				ID:   clusterID,
 				Spec: cluster.Spec,
 			}, nil
 		}
 	}
 
-	return types.SubmarinerCluster{}, fmt.Errorf("cluster wasn't found")
+	return nil, fmt.Errorf("cluster wasn't found")
 }
+
 func (k *Datastore) GetEndpoints(clusterID string) ([]types.SubmarinerEndpoint, error) {
 
 	k8sEndpoints, err := k.client.SubmarinerV1().Endpoints(k.remoteNamespace).List(metav1.ListOptions{})
@@ -153,22 +154,23 @@ func (k *Datastore) GetEndpoints(clusterID string) ([]types.SubmarinerEndpoint, 
 
 	return endpoints, nil
 }
-func (k *Datastore) GetEndpoint(clusterID string, cableName string) (types.SubmarinerEndpoint, error) {
 
+func (k *Datastore) GetEndpoint(clusterID string, cableName string) (*types.SubmarinerEndpoint, error) {
 	k8sEndpoints, err := k.client.SubmarinerV1().Endpoints(k.remoteNamespace).List(metav1.ListOptions{})
 
 	if err != nil {
-		return types.SubmarinerEndpoint{}, err
+		return nil, err
 	}
 
 	for _, endpoint := range k8sEndpoints.Items {
 		if endpoint.Spec.ClusterID == clusterID && endpoint.Spec.CableName == cableName {
-			return types.SubmarinerEndpoint{Spec: endpoint.Spec}, nil
+			return &types.SubmarinerEndpoint{Spec: endpoint.Spec}, nil
 		}
 	}
-	return types.SubmarinerEndpoint{}, fmt.Errorf("endpoint wasn't found")
+	return nil, fmt.Errorf("endpoint wasn't found")
 }
-func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onClusterChange func(cluster types.SubmarinerCluster, deleted bool) error) error {
+
+func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onClusterChange func(cluster *types.SubmarinerCluster, deleted bool) error) error {
 
 	k.informerFactory.Submariner().V1().Clusters().Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -189,7 +191,7 @@ func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, col
 				klog.V(6).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
 
-			utilruntime.HandleError(onClusterChange(types.SubmarinerCluster{
+			utilruntime.HandleError(onClusterChange(&types.SubmarinerCluster{
 				ID:   object.Spec.ClusterID,
 				Spec: object.Spec,
 			}, false))
@@ -212,7 +214,7 @@ func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, col
 				klog.V(6).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
 
-			utilruntime.HandleError(onClusterChange(types.SubmarinerCluster{
+			utilruntime.HandleError(onClusterChange(&types.SubmarinerCluster{
 				ID:   object.Spec.ClusterID,
 				Spec: object.Spec,
 			}, false))
@@ -235,7 +237,7 @@ func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, col
 				klog.V(6).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
 
-			utilruntime.HandleError(onClusterChange(types.SubmarinerCluster{
+			utilruntime.HandleError(onClusterChange(&types.SubmarinerCluster{
 				ID:   object.Spec.ClusterID,
 				Spec: object.Spec,
 			}, true))
@@ -245,7 +247,8 @@ func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, col
 	k.informerFactory.Start(k.stopCh)
 	return nil
 }
-func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onEndpointChange func(endpoint types.SubmarinerEndpoint, deleted bool) error) error {
+
+func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onEndpointChange func(endpoint *types.SubmarinerEndpoint, deleted bool) error) error {
 
 	k.informerFactory.Submariner().V1().Endpoints().Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -266,7 +269,7 @@ func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, co
 				klog.V(6).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
 
-			utilruntime.HandleError(onEndpointChange(types.SubmarinerEndpoint{
+			utilruntime.HandleError(onEndpointChange(&types.SubmarinerEndpoint{
 				Spec: object.Spec,
 			}, false))
 		},
@@ -288,7 +291,7 @@ func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, co
 				klog.V(6).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
 
-			utilruntime.HandleError(onEndpointChange(types.SubmarinerEndpoint{
+			utilruntime.HandleError(onEndpointChange(&types.SubmarinerEndpoint{
 				Spec: object.Spec,
 			}, false))
 		},
@@ -310,7 +313,7 @@ func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, co
 				klog.V(6).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
 
-			utilruntime.HandleError(onEndpointChange(types.SubmarinerEndpoint{
+			utilruntime.HandleError(onEndpointChange(&types.SubmarinerEndpoint{
 				Spec: object.Spec,
 			}, true))
 		},
@@ -319,7 +322,8 @@ func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, co
 	k.informerFactory.Start(k.stopCh)
 	return nil
 }
-func (k *Datastore) SetCluster(cluster types.SubmarinerCluster) error {
+
+func (k *Datastore) SetCluster(cluster *types.SubmarinerCluster) error {
 	clusterCRDName, err := util.GetClusterCRDName(cluster)
 	if err != nil {
 		return fmt.Errorf("Error converting the Cluster CRD name: %v", err)
@@ -360,7 +364,8 @@ func (k *Datastore) SetCluster(cluster types.SubmarinerCluster) error {
 	}
 	return nil
 }
-func (k *Datastore) SetEndpoint(endpoint types.SubmarinerEndpoint) error {
+
+func (k *Datastore) SetEndpoint(endpoint *types.SubmarinerEndpoint) error {
 	endpointCRDName, err := util.GetEndpointCRDName(endpoint)
 	if err != nil {
 		return fmt.Errorf("Error converting the Endpoint CRD name: %v", err)
@@ -401,6 +406,7 @@ func (k *Datastore) SetEndpoint(endpoint types.SubmarinerEndpoint) error {
 	}
 	return nil
 }
+
 func (k *Datastore) RemoveEndpoint(clusterID, cableName string) error {
 	endpointName, err := util.GetEndpointCRDNameFromParams(clusterID, cableName)
 
@@ -410,6 +416,7 @@ func (k *Datastore) RemoveEndpoint(clusterID, cableName string) error {
 
 	return k.client.SubmarinerV1().Endpoints(k.remoteNamespace).Delete(endpointName, &metav1.DeleteOptions{})
 }
+
 func (k *Datastore) RemoveCluster(clusterID string) error {
 	// not implemented yet
 	return nil

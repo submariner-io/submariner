@@ -83,7 +83,7 @@ func (d *DatastoreSyncer) ensureExclusiveEndpoint() {
 
 	for _, endpoint := range endpoints {
 		if !util.CompareEndpointSpec(endpoint.Spec, d.localEndpoint.Spec) {
-			endpointCrdName, err := util.GetEndpointCRDName(endpoint)
+			endpointCrdName, err := util.GetEndpointCRDName(&endpoint)
 			if err != nil {
 				klog.Errorf("Error while converting endpoint to CRD Name %s", endpoint.Spec.CableName)
 				break
@@ -138,12 +138,12 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 
 	d.ensureExclusiveEndpoint()
 
-	err := d.reconcileClusterCRD(d.localCluster, false)
+	err := d.reconcileClusterCRD(&d.localCluster, false)
 	if err != nil {
 		return fmt.Errorf("Error reconciling local Cluster CRD: %v", err)
 	}
 
-	err = d.reconcileEndpointCRD(d.localEndpoint, false)
+	err = d.reconcileEndpointCRD(&d.localEndpoint, false)
 	if err != nil {
 		return fmt.Errorf("Error reconciling local Endpoint CRD: %v", err)
 	}
@@ -199,7 +199,7 @@ func (d *DatastoreSyncer) processNextClusterWorkItem() bool {
 			Spec: cluster.Spec,
 		}
 		klog.V(4).Infof("Attempting to trigger an update of the central datastore with the updated CRD")
-		err = d.datastore.SetCluster(myCluster)
+		err = d.datastore.SetCluster(&myCluster)
 		klog.V(4).Infof("Update of cluster in central datastore was successful")
 		if err != nil {
 			klog.Errorf("There was an error updating the cluster in the central datastore, error: %v", err)
@@ -254,7 +254,7 @@ func (d *DatastoreSyncer) processNextEndpointWorkItem() bool {
 			Spec: endpoint.Spec,
 		}
 		klog.V(4).Infof("Attempting to trigger an update of the central datastore with the updated endpoint CRD")
-		err = d.datastore.SetEndpoint(myEndpoint)
+		err = d.datastore.SetEndpoint(&myEndpoint)
 		if err != nil {
 			klog.Errorf("There was an error updating the endpoint in the central datastore, error: %v", err)
 		} else {
@@ -271,7 +271,7 @@ func (d *DatastoreSyncer) processNextEndpointWorkItem() bool {
 	return true
 }
 
-func (d *DatastoreSyncer) reconcileClusterCRD(localCluster types.SubmarinerCluster, delete bool) error {
+func (d *DatastoreSyncer) reconcileClusterCRD(localCluster *types.SubmarinerCluster, delete bool) error {
 	clusterCRDName, err := util.GetClusterCRDName(localCluster)
 	if err != nil {
 		return fmt.Errorf("Error converting the Cluster CRD name: %v", err)
@@ -400,7 +400,7 @@ func searchEndpoints(endpoints []types.SubmarinerEndpoint, cableName string, clu
 	return false
 }
 
-func (d *DatastoreSyncer) reconcileEndpointCRD(rawEndpoint types.SubmarinerEndpoint, delete bool) error {
+func (d *DatastoreSyncer) reconcileEndpointCRD(rawEndpoint *types.SubmarinerEndpoint, delete bool) error {
 	endpointName, err := util.GetEndpointCRDName(rawEndpoint)
 	if err != nil {
 		return fmt.Errorf("Error converting the Enndpoint CRD name: %v", err)

@@ -125,7 +125,7 @@ func GetClusterIDFromCableName(cableName string) string {
 	return clusterID
 }
 
-func GetEndpointCRDName(endpoint types.SubmarinerEndpoint) (string, error) {
+func GetEndpointCRDName(endpoint *types.SubmarinerEndpoint) (string, error) {
 	return GetEndpointCRDNameFromParams(endpoint.Spec.ClusterID, endpoint.Spec.CableName)
 }
 
@@ -137,7 +137,7 @@ func GetEndpointCRDNameFromParams(clusterID, cableName string) (string, error) {
 	return fmt.Sprintf("%s-%s", clusterID, cableName), nil
 }
 
-func GetClusterCRDName(cluster types.SubmarinerCluster) (string, error) {
+func GetClusterCRDName(cluster *types.SubmarinerCluster) (string, error) {
 	if cluster.Spec.ClusterID == "" {
 		return "", fmt.Errorf("ClusterID was empty")
 	}
