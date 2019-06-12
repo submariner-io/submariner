@@ -3,5 +3,9 @@ submariner-engine
 submariner-route-agent
 .dapper
 bin
+dist
+output
+strongswan
+package/strongswan-*
 .project
 .settings
