@@ -75,8 +75,3 @@ var _ clientset.Interface = &Clientset{}
 func (c *Clientset) SubmarinerV1() submarinerv1.SubmarinerV1Interface {
 	return &fakesubmarinerv1.FakeSubmarinerV1{Fake: &c.Fake}
 }
-
-// Submariner retrieves the SubmarinerV1Client
-func (c *Clientset) Submariner() submarinerv1.SubmarinerV1Interface {
-	return &fakesubmarinerv1.FakeSubmarinerV1{Fake: &c.Fake}
-}

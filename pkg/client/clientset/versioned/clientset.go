@@ -28,8 +28,6 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	SubmarinerV1() submarinerv1.SubmarinerV1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Submariner() submarinerv1.SubmarinerV1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -41,12 +39,6 @@ type Clientset struct {
 
 // SubmarinerV1 retrieves the SubmarinerV1Client
 func (c *Clientset) SubmarinerV1() submarinerv1.SubmarinerV1Interface {
-	return c.submarinerV1
-}
-
-// Deprecated: Submariner retrieves the default version of SubmarinerClient.
-// Please explicitly pick a version.
-func (c *Clientset) Submariner() submarinerv1.SubmarinerV1Interface {
 	return c.submarinerV1
 }
 
