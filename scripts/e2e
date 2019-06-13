@@ -2,9 +2,13 @@
 set -e
 
 cd $(dirname $0)
-./test
-./build
-./build-routeagent
-./download
-./package
-./../scripts/kind-e2e/e2e.sh
+
+if [[ $1 = clean ]]; then
+    ./../scripts/kind-e2e/e2e.sh clean
+else
+    ./build
+    ./build-routeagent
+    ./download
+    ./package
+    ./../scripts/kind-e2e/e2e.sh "$@"
+fi
