@@ -12,7 +12,6 @@ import (
 	"github.com/rancher/submariner/pkg/types"
 	"github.com/rdegges/go-ipify"
 	"github.com/vishvananda/netlink"
-	"k8s.io/klog"
 )
 
 const tokenLength = 64
@@ -34,20 +33,20 @@ func getConnectSecret(token string) (string, error) {
 }
 
 func ParseSecure(token string) (types.Secure, error) {
-	if len(token) != tokenLength {
-		klog.Fatalf("Token %s length was not %d", token, tokenLength)
-	}
-	secure := types.Secure{}
-	var err error
-	secure.SecretKey, err = getConnectSecret(token)
+	secretKey, err := getConnectSecret(token)
 	if err != nil {
-		klog.Fatalf("Could not parse token to secret")
+		return types.Secure{}, err
 	}
-	secure.APIKey, err = getAPIIdentifier(token)
+
+	apiKey, err := getAPIIdentifier(token)
 	if err != nil {
-		klog.Fatalf("Could not parse token to apikey")
+		return types.Secure{}, err
 	}
-	return secure, nil
+
+	return types.Secure{
+		APIKey:    apiKey,
+		SecretKey: secretKey,
+	}, nil
 }
 
 func GetLocalIP() net.IP {
@@ -63,6 +62,10 @@ func GetLocalIP() net.IP {
 }
 
 func FlattenColors(colorCodes []string) string {
+	if len(colorCodes) == 0 {
+		return ""
+	}
+
 	flattenedColors := colorCodes[0]
 	for k, v := range colorCodes {
 		if k != 0 {
@@ -71,6 +74,7 @@ func FlattenColors(colorCodes []string) string {
 	}
 	return flattenedColors
 }
+
 func GetLocalCluster(ss types.SubmarinerSpecification) (types.SubmarinerCluster, error) {
 	var localCluster types.SubmarinerCluster
 	localCluster.ID = ss.ClusterID
@@ -80,12 +84,13 @@ func GetLocalCluster(ss types.SubmarinerSpecification) (types.SubmarinerCluster,
 	localCluster.Spec.ColorCodes = ss.ColorCodes
 	return localCluster, nil
 }
-func GetLocalEndpoint(clusterID string, backend string, backendConfig map[string]string, natEnabled bool, subnets []string) (types.SubmarinerEndpoint, error) {
+
+func GetLocalEndpoint(clusterID string, backend string, backendConfig map[string]string, natEnabled bool,
+	subnets []string, privateIP net.IP) (types.SubmarinerEndpoint, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return types.SubmarinerEndpoint{}, fmt.Errorf("Error getting hostname: %v", err)
 	}
-	privateIP := GetLocalIP()
 	endpoint := types.SubmarinerEndpoint{
 		Spec: subv1.EndpointSpec{
 			CableName:     fmt.Sprintf("submariner-cable-%s-%s", clusterID, strings.Replace(privateIP.String(), ".", "-", -1)),
@@ -133,6 +138,10 @@ func GetEndpointCRDNameFromParams(clusterID, cableName string) (string, error) {
 }
 
 func GetClusterCRDName(cluster types.SubmarinerCluster) (string, error) {
+	if cluster.Spec.ClusterID == "" {
+		return "", fmt.Errorf("ClusterID was empty")
+	}
+
 	return cluster.Spec.ClusterID, nil
 }
 

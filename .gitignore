@@ -9,3 +9,4 @@ strongswan
 package/strongswan-*
 .project
 .settings
+*.coverprofile
