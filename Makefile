@@ -22,4 +22,5 @@ trash-keep: .dapper
 
 .DEFAULT_GOAL := ci
 
-.PHONY: test
+.PHONY: $(TARGETS)
+
