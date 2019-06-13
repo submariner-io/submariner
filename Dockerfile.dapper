@@ -20,7 +20,8 @@ RUN apt-get -q update && \
     curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin ${LINT_VERSION} && \
     curl https://storage.googleapis.com/kubernetes-helm/helm-v2.14.0-linux-amd64.tar.gz | tar -xzf - && \
     cp linux-${ARCH}/helm /usr/bin/ && \
-    curl -Lo /usr/bin/kind https://github.com/kubernetes-sigs/kind/releases/download/v0.3.0/kind-linux-${ARCH} && chmod a+x /usr/bin/kind
+    curl -Lo /usr/bin/kind https://github.com/kubernetes-sigs/kind/releases/download/v0.3.0/kind-linux-${ARCH} && chmod a+x /usr/bin/kind && \
+    go get -v github.com/onsi/ginkgo/ginkgo && go get -v github.com/onsi/gomega/...
 
 WORKDIR ${DAPPER_SOURCE}
 
