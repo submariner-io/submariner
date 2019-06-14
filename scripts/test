@@ -3,10 +3,12 @@ set -e
 
 cd $(dirname $0)/..
 
+source $(dirname $0)/lib/find_functions
+
 echo Looking for packages to test
 
-PACKAGES=". $(find -name '*.go' | xargs -I{} dirname {} |  cut -f2 -d/ | sort -u | grep -Ev '(^\.$|.git|.trash-cache|vendor|bin|test)' | sed -e 's!^!./!' -e 's!$!/...!')"
+PACKAGES=$(find_go_pkg_dirs)
 
 echo Running tests in ${PACKAGES}
 [ "${ARCH}" == "amd64" ] && RACE=-race
-ginkgo ${RACE} -cover -v ${PACKAGES}
+ginkgo ${RACE} -cover ${PACKAGES}

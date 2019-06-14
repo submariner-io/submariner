@@ -28,7 +28,6 @@ var _ = Describe("Util", func() {
 
 	Describe("Function CompareEndpointSpec", testCompareEndpointSpec)
 
-	Describe("Function GetDefaultGatewayInterface", testGetDefaultGatewayInterface)
 })
 
 func testParseSecure() {
@@ -250,11 +249,5 @@ func testCompareEndpointSpec() {
 					Hostname:  "host2",
 				})).To(BeFalse())
 		})
-	})
-}
-
-func testGetDefaultGatewayInterface() {
-	It("should find and return a non-nil Interface object", func() {
-		Expect(util.GetDefaultGatewayInterface()).NotTo(BeNil())
 	})
 }
