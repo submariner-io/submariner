@@ -1,23 +1,21 @@
 function find_go_pkg_dirs() {
 
+    local BASE EXCLUDED_PKG_DIRS FIND_EXCLUDE PACKAGE_DIRS
+
     BASE=${2:-.}
-    EXCLUDED_PKG_DIRS=${EXCLUDED_PKG_DIRS:-"vendor test .git .trash-cache bin"}
+    EXCLUDED_PKG_DIRS=${EXCLUDED_PKG_DIRS:-vendor test .git .trash-cache bin}
 
     for excldir in $EXCLUDED_PKG_DIRS; do
         FIND_EXCLUDE="-path ./$excldir -prune -o $FIND_EXCLUDE"
     done
 
 
- 
-    PACKAGE_DIRS="$(find . $FIND_EXCLUDE -name '*.go' | \
-                      grep .go | \
-                      xargs -I{} dirname {} | \
+    PACKAGE_DIRS="$(find . $FIND_EXCLUDE -path './*/*.go' -print | \
                       cut -f2 -d/ | \
-                      sort -u | \
-                      grep -Ev '(^\.$)')"
+                      sort -u)"
 
     if [[ "x$1" != "x--no-trailing-dots" ]]; then
-        PACKAGE_DIRS=$(echo $PACKAGE_DIRS | sed -e 's!^!./!' -e 's!$!/...!')
+        PACKAGE_DIRS=$(echo $PACKAGE_DIRS | sed -e 's!.*!./&/...!')
     fi
 
     echo "$BASE $PACKAGE_DIRS"
