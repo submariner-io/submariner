@@ -1,0 +1,15 @@
+#!/bin/bash
+
+CODEGEN_SCRIPT_DIR="${GOPATH:-~/go}/src/k8s.io/code-generator"
+CODEGEN_SCRIPT="${CODEGEN_SCRIPT_DIR}/generate-groups.sh"
+CODEGEN_RELEASE_TAG=kubernetes-1.14.1
+
+if [ ! -f "$CODEGEN_SCRIPT" ]; then
+    echo "$CODEGEN_SCRIPT does not exist - downloading..."
+    go get -d k8s.io/code-generator
+    cd $CODEGEN_SCRIPT_DIR
+    git checkout tags/$CODEGEN_RELEASE_TAG
+    echo "Successsfully checked out release tag $CODEGEN_RELEASE_TAG"
+fi
+
+$CODEGEN_SCRIPT all github.com/rancher/submariner/pkg/client github.com/rancher/submariner/pkg/apis submariner.io:v1
