@@ -160,7 +160,7 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder rec
 	)
 	namespace, _, err := kubeconfig.Namespace()
 	if err != nil {
-		klog.Fatalf("error getting namespace: %s", err.Error())
+		namespace = "submariner"
 	}
 
 	// Lock required for leader election
