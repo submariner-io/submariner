@@ -63,13 +63,13 @@ func (p *PHPAPI) GetClusters(colorCodes []string) ([]types.SubmarinerCluster, er
 	}
 	return clusters, nil
 }
-func (p *PHPAPI) GetCluster(clusterID string) (types.SubmarinerCluster, error) {
+func (p *PHPAPI) GetCluster(clusterID string) (*types.SubmarinerCluster, error) {
 	requestURL := fmt.Sprintf("%s://%s/clusters.php?plurality=false&identifier=%s&cluster_id=%s", p.Proto, p.Server, p.APIToken, clusterID)
 	klog.V(8).Infof("request url: %s", requestURL)
 	clustersGetter, err := http.Get(requestURL)
 	if err != nil {
 		klog.Errorf("Encountered error while trying to retrieve clusters from the apiserver")
-		return types.SubmarinerCluster{}, err
+		return nil, err
 	}
 	defer clustersGetter.Body.Close()
 	clustersRaw, err := ioutil.ReadAll(clustersGetter.Body)
@@ -77,7 +77,7 @@ func (p *PHPAPI) GetCluster(clusterID string) (types.SubmarinerCluster, error) {
 	var cluster types.SubmarinerCluster
 	json.Unmarshal(clustersRaw, &cluster)
 
-	return cluster, nil
+	return &cluster, nil
 }
 func (p *PHPAPI) GetEndpoints(clusterID string) ([]types.SubmarinerEndpoint, error) {
 	requestURL := fmt.Sprintf("%s://%s/endpoints.php?plurality=true&identifier=%s&cluster_id=%s", p.Proto, p.Server, p.APIToken, clusterID)
@@ -97,11 +97,10 @@ func (p *PHPAPI) GetEndpoints(clusterID string) ([]types.SubmarinerEndpoint, err
 	}
 	return endpoints, nil
 }
-func (p *PHPAPI) GetEndpoint(clusterID string, cableName string) (types.SubmarinerEndpoint, error) {
-	klog.Errorf("GetEndpoint not implemented")
-	return types.SubmarinerEndpoint{}, nil
+func (p *PHPAPI) GetEndpoint(clusterID string, cableName string) (*types.SubmarinerEndpoint, error) {
+	return nil, fmt.Errorf("GetEndpoint is not implemented")
 }
-func (p *PHPAPI) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onChange func(cluster types.SubmarinerCluster, deleted bool) error) error {
+func (p *PHPAPI) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onChange func(cluster *types.SubmarinerCluster, deleted bool) error) error {
 	colorCode := util.FlattenColors(colorCodes)
 	klog.Infof("Starting watch for colorCode %s", colorCode)
 	var wg sync.WaitGroup
@@ -117,7 +116,7 @@ func (p *PHPAPI) WatchClusters(ctx context.Context, selfClusterID string, colorC
 
 			for _, cluster := range clusters {
 				if selfClusterID != cluster.ID {
-					onChange(cluster, false)
+					onChange(&cluster, false)
 				}
 			}
 
@@ -129,7 +128,7 @@ func (p *PHPAPI) WatchClusters(ctx context.Context, selfClusterID string, colorC
 	klog.Errorf("I shouldn't have exited")
 	return nil
 }
-func (p *PHPAPI) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onChange func(endpoint types.SubmarinerEndpoint, deleted bool) error) error {
+func (p *PHPAPI) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onChange func(endpoint *types.SubmarinerEndpoint, deleted bool) error) error {
 
 	colorCode := util.FlattenColors(colorCodes)
 	klog.Infof("Starting PHPAPI endpoint watch for colorCode %s", colorCode)
@@ -151,7 +150,7 @@ func (p *PHPAPI) WatchEndpoints(ctx context.Context, selfClusterID string, color
 				}
 				for _, endpoint := range endpoints {
 					if selfClusterID != endpoint.Spec.ClusterID {
-						onChange(endpoint, false)
+						onChange(&endpoint, false)
 					}
 				}
 			}
@@ -164,7 +163,7 @@ func (p *PHPAPI) WatchEndpoints(ctx context.Context, selfClusterID string, color
 	klog.Errorf("I shouldn't have exited")
 	return nil
 }
-func (p *PHPAPI) SetCluster(cluster types.SubmarinerCluster) error {
+func (p *PHPAPI) SetCluster(cluster *types.SubmarinerCluster) error {
 	marshaledCluster, err := json.Marshal(cluster)
 	klog.Infof("Setting cluster %s", string(marshaledCluster))
 	if err != nil {
@@ -182,15 +181,15 @@ func (p *PHPAPI) SetCluster(cluster types.SubmarinerCluster) error {
 	defer poster.Body.Close()
 	return nil
 }
-func (p *PHPAPI) SetEndpoint(local types.SubmarinerEndpoint) error {
-	marshaledEndpoint, err := json.Marshal(local)
+func (p *PHPAPI) SetEndpoint(endpoint *types.SubmarinerEndpoint) error {
+	marshaledEndpoint, err := json.Marshal(endpoint)
 	if err != nil {
 		return err
 	}
 	formVal := url.Values{}
 	formVal.Set("action", "reconcile")
 	formVal.Add("endpoint", string(marshaledEndpoint))
-	formedURL := fmt.Sprintf("%s://%s/endpoints.php?identifier=%s&cluster_id=%s", p.Proto, p.Server, p.APIToken, local.Spec.ClusterID)
+	formedURL := fmt.Sprintf("%s://%s/endpoints.php?identifier=%s&cluster_id=%s", p.Proto, p.Server, p.APIToken, endpoint.Spec.ClusterID)
 	klog.V(8).Infof("Formed URL was %s", formedURL)
 	poster, err := http.PostForm(formedURL, formVal)
 	if err != nil {

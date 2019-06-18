@@ -128,7 +128,7 @@ func testGetClusterIDFromCableName() {
 func testGetEndpointCRDName() {
 	Context("with valid SubmarinerEndpoint input", func() {
 		It("should return <cluster ID>-<cable name>", func() {
-			name, err := util.GetEndpointCRDName(types.SubmarinerEndpoint{
+			name, err := util.GetEndpointCRDName(&types.SubmarinerEndpoint{
 				Spec: subv1.EndpointSpec{
 					ClusterID: "ClusterID",
 					CableName: "CableName",
@@ -142,7 +142,7 @@ func testGetEndpointCRDName() {
 
 	Context("with a nil cluster ID", func() {
 		It("should return an error", func() {
-			_, err := util.GetEndpointCRDName(types.SubmarinerEndpoint{
+			_, err := util.GetEndpointCRDName(&types.SubmarinerEndpoint{
 				Spec: subv1.EndpointSpec{
 					CableName: "CableName",
 				},
@@ -154,7 +154,7 @@ func testGetEndpointCRDName() {
 
 	Context("with a nil cable name", func() {
 		It("should return an error", func() {
-			_, err := util.GetEndpointCRDName(types.SubmarinerEndpoint{
+			_, err := util.GetEndpointCRDName(&types.SubmarinerEndpoint{
 				Spec: subv1.EndpointSpec{
 					ClusterID: "ClusterID",
 				},
@@ -168,7 +168,7 @@ func testGetEndpointCRDName() {
 func testGetClusterCRDName() {
 	Context("with valid input", func() {
 		It("should return the cluster ID", func() {
-			Expect(util.GetClusterCRDName(types.SubmarinerCluster{
+			Expect(util.GetClusterCRDName(&types.SubmarinerCluster{
 				Spec: subv1.ClusterSpec{
 					ClusterID: "ClusterID",
 				},
@@ -178,7 +178,7 @@ func testGetClusterCRDName() {
 
 	Context("with a nil cluster ID", func() {
 		It("should return an error", func() {
-			_, err := util.GetClusterCRDName(types.SubmarinerCluster{
+			_, err := util.GetClusterCRDName(&types.SubmarinerCluster{
 				Spec: subv1.ClusterSpec{},
 			})
 
