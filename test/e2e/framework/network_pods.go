@@ -29,8 +29,8 @@ func (f *Framework) CreateTCPCheckListenerPod(cluster int, sendString string) *v
 			RestartPolicy: v1.RestartPolicyNever,
 			Containers: []v1.Container{
 				{
-					Name:    "tcp-check-listener",
-					Image:   "busybox",
+					Name:  "tcp-check-listener",
+					Image: "busybox",
 					// We send the string 50 times to put more pressure on the TCP connection and avoid limited
 					// resource environments from not sending at least some data before timeout.
 					Command: []string{"sh", "-c", "for i in $(seq 50); do echo listener says $SEND_STRING; done | nc -l -v -p $LISTEN_PORT -s 0.0.0.0 >/dev/termination-log 2>&1"},
@@ -66,8 +66,8 @@ func (f *Framework) CreateTCPCheckConnectorPod(cluster int, remoteCheckPod *v1.P
 			RestartPolicy: v1.RestartPolicyNever,
 			Containers: []v1.Container{
 				{
-					Name:    "tcp-check-connector",
-					Image:   "busybox",
+					Name:  "tcp-check-connector",
+					Image: "busybox",
 					// We send the string 50 times to put more pressure on the TCP connection and avoid limited
 					// resource environments from not sending at least some data before timeout.
 					Command: []string{"sh", "-c", "for in in $(seq 50); do echo connector says $SEND_STRING; done | nc -v $REMOTE_IP $REMOTE_PORT -w 5 >/dev/termination-log 2>&1"},
