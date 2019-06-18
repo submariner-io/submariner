@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kubernetes/kubernetes/test/e2e/framework/ginkgowrapper"
+	"github.com/rancher/submariner/test/e2e/framework/ginkgowrapper"
+
 	. "github.com/onsi/ginkgo"
 )
 
