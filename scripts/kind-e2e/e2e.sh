@@ -9,20 +9,20 @@ function kind_clusters() {
             echo Cluster cluster${i} already exists, skipping cluster creation...
         else
             if [[ -n ${version} ]]; then
-                kind create cluster --image=kindest/node:v${version} --name=cluster${i} --wait=5m --config=./kind-e2e/cluster${i}-config.yaml
+                kind create cluster --image=kindest/node:v${version} --name=cluster${i} --wait=5m --config=${PRJ_ROOT}/scripts/kind-e2e/cluster${i}-config.yaml
             else
-                kind create cluster --name=cluster${i} --wait=5m --config=./kind-e2e/cluster${i}-config.yaml
+                kind create cluster --name=cluster${i} --wait=5m --config=${PRJ_ROOT}/scripts/kind-e2e/cluster${i}-config.yaml
             fi
             master_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster${i}-control-plane | head -n 1)
             sed -i -- "s/user: kubernetes-admin/user: cluster$i/g" $(kind get kubeconfig-path --name="cluster$i")
             sed -i -- "s/name: kubernetes-admin.*/name: cluster$i/g" $(kind get kubeconfig-path --name="cluster$i")
 
             if [[ ${status} = keep ]]; then
-                cp -r $(kind get kubeconfig-path --name="cluster$i") ../output/kind-config/local-dev/kind-config-cluster${i}
+                cp -r $(kind get kubeconfig-path --name="cluster$i") ${PRJ_ROOT}/output/kind-config/local-dev/kind-config-cluster${i}
             fi
 
             sed -i -- "s/server: .*/server: https:\/\/$master_ip:6443/g" $(kind get kubeconfig-path --name="cluster$i")
-            cp -r $(kind get kubeconfig-path --name="cluster$i") ../output/kind-config/dapper/kind-config-cluster${i}
+            cp -r $(kind get kubeconfig-path --name="cluster$i") ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster${i}
             export KUBECONFIG=$(kind get kubeconfig-path --name=cluster1):$(kind get kubeconfig-path --name=cluster2):$(kind get kubeconfig-path --name=cluster3)
         fi
     done
@@ -89,7 +89,7 @@ function setup_cluster2_gateway() {
             kubectl wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s
             kubectl wait --for=condition=Ready pods -l app=submariner-routeagent -n submariner --timeout=60s
             echo Deploying netshoot on cluster2 worker: ${worker_ip}
-            kubectl apply -f ./kind-e2e/netshoot.yaml
+            kubectl apply -f ${PRJ_ROOT}/scripts/kind-e2e/netshoot.yaml
             echo Waiting for netshoot pods to be Ready on cluster2.
             kubectl rollout status deploy/netshoot --timeout=120s
     fi
@@ -125,7 +125,7 @@ function setup_cluster3_gateway() {
             kubectl wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s
             kubectl wait --for=condition=Ready pods -l app=submariner-routeagent -n submariner --timeout=60s
             echo Deploying nginx on cluster3 worker: ${worker_ip}
-            kubectl apply -f ./kind-e2e/nginx-demo.yaml
+            kubectl apply -f ${PRJ_ROOT}/scripts/kind-e2e/nginx-demo.yaml
             echo Waiting for nginx-demo deployment to be Ready on cluster3.
             kubectl rollout status deploy/nginx-demo --timeout=120s
     fi
@@ -153,7 +153,7 @@ function test_connection() {
     attempt_counter=0
     max_attempts=5
     until $(kubectl exec -it ${netshoot_pod} -- curl --output /dev/null -m 30 --silent --head --fail ${nginx_svc_ip_cluster3}); do
-        if [ ${attempt_counter} -eq ${max_attempts} ];then
+        if [[ ${attempt_counter} -eq ${max_attempts} ]];then
           echo "Max attempts reached, connection test failed!"
           exit 1
         fi
@@ -178,13 +178,13 @@ function enable_logging() {
     else
         echo Installing Elasticsearch...
         es_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster1-control-plane | head -n 1)
-        kubectl apply -f ./kind-e2e/logging/elasticsearch.yaml
-        kubectl apply -f ./kind-e2e/logging/filebeat.yaml
+        kubectl apply -f ${PRJ_ROOT}/scripts/kind-e2e/logging/elasticsearch.yaml
+        kubectl apply -f ${PRJ_ROOT}/scripts/kind-e2e/logging/filebeat.yaml
         echo Waiting for Elasticsearch to be ready...
         kubectl wait --for=condition=Ready pods -l app=elasticsearch --timeout=300s
         for i in 2 3; do
             kubectl config use-context cluster${i}
-            kubectl apply -f ./kind-e2e/logging/filebeat.yaml
+            kubectl apply -f ${PRJ_ROOT}/scripts/kind-e2e/logging/filebeat.yaml
             kubectl set env daemonset/filebeat -n kube-system ELASTICSEARCH_HOST=${es_ip} ELASTICSEARCH_PORT=30000
         done
     fi
@@ -198,7 +198,7 @@ function test_with_e2e_tests {
     go get -t ./...
 
     # Setup the KUBECONFIG env
-    export KUBECONFIG=$(kind get kubeconfig-path --name=cluster1):$(kind get kubeconfig-path --name=cluster2):$(kind get kubeconfig-path --name=cluster3)
+    export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
 
     go test -args -ginkgo.v -ginkgo.randomizeAllSpecs \
         -dp-context cluster2 -dp-context cluster3  \
@@ -241,10 +241,11 @@ if [[ $1 != keep ]]; then
 fi
 
 echo Starting with status: $1, k8s version: $2, logging: $3.
-mkdir -p ../output/kind-config/dapper/ ../output/kind-config/local-dev/
+PRJ_ROOT=$(git rev-parse --show-toplevel)
+mkdir -p ${PRJ_ROOT}/output/kind-config/dapper/ ${PRJ_ROOT}/output/kind-config/local-dev/
 SUBMARINER_BROKER_NS=submariner-k8s-broker
 SUBMARINER_PSK=$(cat /dev/urandom | LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 64 | head -n 1)
-export KUBECONFIG=../output/kind-config/dapper/kind-config-cluster1:../output/kind-config/dapper/kind-config-cluster2:../output/kind-config/dapper/kind-config-cluster3
+export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
 
 kind_clusters "$@"
 kind_import_images
