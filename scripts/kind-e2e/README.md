@@ -59,7 +59,7 @@ After a permanent run completes, the configuration for the running clusters can 
 You can export the kube configs in order to interact with the clusters.
 
 ```bash
-export KUBECONFIG=$GOPATH/src/github.com/rancher/submariner/output/kind-config/local-dev/kind-config-cluster1:$GOPATH/src/github.com/rancher/submariner/output/kind-config/local-dev/kind-config-cluster2:$GOPATH/src/github.com/rancher/submariner/output/kind-config/local-dev/kind-config-cluster3
+export KUBECONFIG=$(echo $(git rev-parse --show-toplevel)/output/kind-config/local-dev/kind-config-cluster{1..3} | sed 's/ /:/g')
 ```
 
 List the contexts:

@@ -258,3 +258,14 @@ setup_cluster2_gateway
 setup_cluster3_gateway
 test_connection
 test_with_e2e_tests
+
+if [[ $1 = keep ]]; then
+    echo "your 3 virtual clusters are deployed and working properly with your local"
+    echo "submariner source code, and can be accessed with:"
+    echo ""
+    echo "export KUBECONFIG=\$(echo \$(git rev-parse --show-toplevel)/output/kind-config/local-dev/kind-config-cluster{1..3} | sed 's/ /:/g')"
+    echo ""
+    echo "$ kubectl config use-context cluster1 # or cluster2, cluster3.."
+    echo ""
+    echo "to cleanup, just run: make e2e status=clean"
+fi
