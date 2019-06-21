@@ -16,6 +16,7 @@ import (
 	"github.com/bronze1man/goStrongswanVici"
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/rancher/submariner/pkg/cableengine"
 	"github.com/rancher/submariner/pkg/types"
 	"github.com/rancher/submariner/pkg/util"
 	"k8s.io/klog"
@@ -34,50 +35,50 @@ const (
 	DefaultChildSaRekeyInterval = "1h"
 )
 
-type Engine struct {
+type engine struct {
 	sync.Mutex
 
-	LocalSubnets              []string
-	LocalCluster              types.SubmarinerCluster
-	LocalEndpoint             types.SubmarinerEndpoint
-	SecretKey                 string
-	ReplayWindowSize          string
-	IPSecIkeSaRekeyInterval   string
-	IPSecChildSaRekeyInterval string
+	localSubnets              []string
+	localCluster              types.SubmarinerCluster
+	localEndpoint             types.SubmarinerEndpoint
+	secretKey                 string
+	replayWindowSize          string
+	ipSecIkeSaRekeyInterval   string
+	ipSecChildSaRekeyInterval string
 
-	Debug   bool
-	LogFile string
+	debug   bool
+	logFile string
 }
 
-type Specification struct {
+type specification struct {
 	PSK     string
 	Debug   bool
 	LogFile string
 }
 
-func NewEngine(localSubnets []string, localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) (*Engine, error) {
+func NewEngine(localSubnets []string, localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) (cableengine.Engine, error) {
 
-	ipSecSpec := Specification{}
+	ipSecSpec := specification{}
 
 	err := envconfig.Process("ce_ipsec", &ipSecSpec)
 	if err != nil {
 		return nil, fmt.Errorf("error processing environment config for ce_ipsec: %v", err)
 	}
 
-	return &Engine{
-		ReplayWindowSize:          DefaultReplayWindowSize,
-		IPSecIkeSaRekeyInterval:   DefaultIkeSaRekeyInterval,
-		IPSecChildSaRekeyInterval: DefaultChildSaRekeyInterval,
-		LocalCluster:              localCluster,
-		LocalEndpoint:             localEndpoint,
-		LocalSubnets:              localSubnets,
-		SecretKey:                 ipSecSpec.PSK,
-		Debug:                     ipSecSpec.Debug,
-		LogFile:                   ipSecSpec.LogFile,
+	return &engine{
+		replayWindowSize:          DefaultReplayWindowSize,
+		ipSecIkeSaRekeyInterval:   DefaultIkeSaRekeyInterval,
+		ipSecChildSaRekeyInterval: DefaultChildSaRekeyInterval,
+		localCluster:              localCluster,
+		localEndpoint:             localEndpoint,
+		localSubnets:              localSubnets,
+		secretKey:                 ipSecSpec.PSK,
+		debug:                     ipSecSpec.Debug,
+		logFile:                   ipSecSpec.LogFile,
 	}, nil
 }
 
-func (i *Engine) StartEngine(ignition bool) error {
+func (i *engine) StartEngine(ignition bool) error {
 	if ignition {
 		klog.Infof("Starting IPSec Engine (Charon)")
 		ifi, err := util.GetDefaultGatewayInterface()
@@ -136,7 +137,7 @@ func (i *Engine) StartEngine(ignition bool) error {
 			}
 		}
 
-		if err = runCharon(i.Debug, i.LogFile); err != nil {
+		if err = runCharon(i.debug, i.logFile); err != nil {
 			return err
 		}
 	}
@@ -147,17 +148,17 @@ func (i *Engine) StartEngine(ignition bool) error {
 	return nil
 }
 
-func (i *Engine) ReloadEngine() error {
+func (i *engine) ReloadEngine() error {
 	// to be implemented
 	return nil
 
 }
-func (i *Engine) StopEngine() error {
+func (i *engine) StopEngine() error {
 	// to be implemented
 	return nil
 }
 
-func (i *Engine) SyncCables(clusterID string, endpoints []types.SubmarinerEndpoint) error {
+func (i *engine) SyncCables(clusterID string, endpoints []types.SubmarinerEndpoint) error {
 	klog.V(2).Infof("Starting selective cable sync")
 
 	client, err := getClient()
@@ -209,7 +210,7 @@ func (i *Engine) SyncCables(clusterID string, endpoints []types.SubmarinerEndpoi
 	return nil
 }
 
-func (i *Engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
+func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 	client, err := getClient()
 	if err != nil {
 		return err
@@ -219,12 +220,12 @@ func (i *Engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 	return i.installCableInternal(endpoint, client)
 }
 
-func (i *Engine) installCableInternal(endpoint types.SubmarinerEndpoint, client *goStrongswanVici.ClientConn) error {
-	if endpoint.Spec.ClusterID == i.LocalCluster.ID {
+func (i *engine) installCableInternal(endpoint types.SubmarinerEndpoint, client *goStrongswanVici.ClientConn) error {
+	if endpoint.Spec.ClusterID == i.localCluster.ID {
 		klog.V(4).Infof("Not installing cable for local cluster")
 		return nil
 	}
-	if reflect.DeepEqual(endpoint.Spec, i.LocalEndpoint.Spec) {
+	if reflect.DeepEqual(endpoint.Spec, i.localEndpoint.Spec) {
 		klog.V(4).Infof("Not installing self")
 		return nil
 	}
@@ -255,18 +256,18 @@ func (i *Engine) installCableInternal(endpoint types.SubmarinerEndpoint, client 
 	var localEndpointIP, remoteEndpointIP string
 
 	if endpoint.Spec.NATEnabled {
-		localEndpointIP = i.LocalEndpoint.Spec.PublicIP.String()
+		localEndpointIP = i.localEndpoint.Spec.PublicIP.String()
 		remoteEndpointIP = endpoint.Spec.PublicIP.String()
 	} else {
-		localEndpointIP = i.LocalEndpoint.Spec.PrivateIP.String()
+		localEndpointIP = i.localEndpoint.Spec.PrivateIP.String()
 		remoteEndpointIP = endpoint.Spec.PrivateIP.String()
 	}
 
 	var localTs, remoteTs, localAddr, remoteAddr []string
-	localTs = append(localTs, fmt.Sprintf("%s/32", i.LocalEndpoint.Spec.PrivateIP.String()))
-	localTs = append(localTs, i.LocalSubnets...)
+	localTs = append(localTs, fmt.Sprintf("%s/32", i.localEndpoint.Spec.PrivateIP.String()))
+	localTs = append(localTs, i.localSubnets...)
 
-	localAddr = append(localAddr, i.LocalEndpoint.Spec.PrivateIP.String())
+	localAddr = append(localAddr, i.localEndpoint.Spec.PrivateIP.String())
 
 	remoteTs = append(remoteTs, fmt.Sprintf("%s/32", endpoint.Spec.PrivateIP.String()))
 	remoteTs = append(remoteTs, endpoint.Spec.Subnets...)
@@ -281,11 +282,11 @@ func (i *Engine) installCableInternal(endpoint types.SubmarinerEndpoint, client 
 		CloseAction:   "restart",
 		Mode:          "tunnel",
 		ReqID:         "0",
-		RekeyTime:     i.IPSecChildSaRekeyInterval,
+		RekeyTime:     i.ipSecChildSaRekeyInterval,
 		InstallPolicy: "yes",
 	}
-	klog.V(6).Infof("Using ReplayWindowSize: %v", i.ReplayWindowSize)
-	childSAConf.ReplayWindow = i.ReplayWindowSize
+	klog.V(6).Infof("Using ReplayWindowSize: %v", i.replayWindowSize)
+	childSAConf.ReplayWindow = i.replayWindowSize
 	authLConf := goStrongswanVici.AuthConf{
 		ID:         localEndpointIP,
 		AuthMethod: "psk",
@@ -301,7 +302,7 @@ func (i *Engine) installCableInternal(endpoint types.SubmarinerEndpoint, client 
 		Version:     "2",
 		LocalAuth:   authLConf,
 		RemoteAuth:  authRConf,
-		RekeyTime:   i.IPSecIkeSaRekeyInterval,
+		RekeyTime:   i.ipSecIkeSaRekeyInterval,
 		Encap:       "yes",
 		Mobike:      "no",
 	}
@@ -373,7 +374,7 @@ func (i *Engine) installCableInternal(endpoint types.SubmarinerEndpoint, client 
 	// MASQUERADE (on the GatewayNode) the incoming traffic from the remote cluster (i.e, remoteEndpointIP)
 	// and destined to the local PODs (i.e., localSubnet) scheduled on the non-gateway node.
 	// This will make the return traffic from the POD to go via the GatewayNode.
-	for _, localSubnet := range i.LocalSubnets {
+	for _, localSubnet := range i.localSubnets {
 		ruleSpec := []string{"-s", remoteEndpointIP, "-d", localSubnet, "-j", "MASQUERADE"}
 		klog.V(8).Infof("Installing iptables rule for MASQ incoming traffic: %v", ruleSpec)
 		if err = ipt.AppendUnique("nat", "SUBMARINER-POSTROUTING", ruleSpec...); err != nil {
@@ -386,7 +387,7 @@ func (i *Engine) installCableInternal(endpoint types.SubmarinerEndpoint, client 
 	return nil
 }
 
-func (i *Engine) RemoveCable(cableID string) error {
+func (i *engine) RemoveCable(cableID string) error {
 	client, err := getClient()
 	if err != nil {
 		return err
@@ -397,7 +398,7 @@ func (i *Engine) RemoveCable(cableID string) error {
 	return i.removeCableInternal(cableID, client)
 }
 
-func (i *Engine) removeCableInternal(cableID string, client *goStrongswanVici.ClientConn) error {
+func (i *engine) removeCableInternal(cableID string, client *goStrongswanVici.ClientConn) error {
 	i.Lock()
 	defer i.Unlock()
 
@@ -482,7 +483,7 @@ func (i *Engine) removeCableInternal(cableID string, client *goStrongswanVici.Cl
 	return nil
 }
 
-func (i *Engine) PrintConns() {
+func (i *engine) PrintConns() {
 	client, _ := getClient()
 	defer client.Close()
 	connList, err := client.ListConns("")
@@ -496,7 +497,7 @@ func (i *Engine) PrintConns() {
 	}
 }
 
-func (i *Engine) getActiveConns(getAll bool, clusterID string, client *goStrongswanVici.ClientConn) ([]string, error) {
+func (i *engine) getActiveConns(getAll bool, clusterID string, client *goStrongswanVici.ClientConn) ([]string, error) {
 	i.Lock()
 	defer i.Unlock()
 	var connections []string
@@ -523,7 +524,7 @@ func (i *Engine) getActiveConns(getAll bool, clusterID string, client *goStrongs
 	return connections, nil
 }
 
-func (i *Engine) loadSharedKey(endpoint types.SubmarinerEndpoint, client *goStrongswanVici.ClientConn) error {
+func (i *engine) loadSharedKey(endpoint types.SubmarinerEndpoint, client *goStrongswanVici.ClientConn) error {
 	klog.Infof("Loading shared key for endpoint")
 	var identities []string
 	var publicIP, privateIP string
@@ -537,7 +538,7 @@ func (i *Engine) loadSharedKey(endpoint types.SubmarinerEndpoint, client *goStro
 	}
 	sharedKey := &goStrongswanVici.Key{
 		Typ:    "IKE",
-		Data:   i.SecretKey,
+		Data:   i.secretKey,
 		Owners: identities,
 	}
 
@@ -601,7 +602,7 @@ func runCharon(debug bool, logFile string) error {
 	return nil
 }
 
-func (i *Engine) killCharon(pid string) {
+func (i *engine) killCharon(pid string) {
 	pidNum, err := strconv.Atoi(pid)
 	if err == nil {
 		err = syscall.Kill(pidNum, syscall.SIGKILL)
@@ -612,7 +613,7 @@ func (i *Engine) killCharon(pid string) {
 	}
 }
 
-func (i *Engine) loadConns() error {
+func (i *engine) loadConns() error {
 	i.Lock()
 	defer i.Unlock()
 
@@ -637,7 +638,7 @@ func (i *Engine) loadConns() error {
 	return nil
 }
 
-func (i *Engine) monitorCharon() {
+func (i *engine) monitorCharon() {
 	pid := ""
 	for {
 		func() {

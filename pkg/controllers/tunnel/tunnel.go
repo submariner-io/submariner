@@ -19,7 +19,7 @@ import (
 )
 
 type Controller struct {
-	ce                  cableengine.CableEngine
+	ce                  cableengine.Engine
 	kubeClientSet       kubernetes.Interface
 	submarinerClientSet submarinerClientset.Interface
 	endpointsSynced     cache.InformerSynced
@@ -29,7 +29,7 @@ type Controller struct {
 	endpointWorkqueue workqueue.RateLimitingInterface
 }
 
-func NewController(objectNamespace string, ce cableengine.CableEngine, kubeClientSet kubernetes.Interface, submarinerClientSet submarinerClientset.Interface, endpointInformer submarinerInformers.EndpointInformer) *Controller {
+func NewController(objectNamespace string, ce cableengine.Engine, kubeClientSet kubernetes.Interface, submarinerClientSet submarinerClientset.Interface, endpointInformer submarinerInformers.EndpointInformer) *Controller {
 	tunnelController := &Controller{
 		ce:                  ce,
 		kubeClientSet:       kubeClientSet,
