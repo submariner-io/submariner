@@ -14,4 +14,8 @@ if [[ $(goimports -l ${PACKAGES} | wc -l) -gt 0 ]]; then
     exit 1
 fi
 
+# grab e2e-test only related packages to avoid linting
+# errors for packages we didn't vendor.
+go get -t ./test/e2e/...
+
 golangci-lint run -D megacheck -E unused,gosimple,staticcheck
