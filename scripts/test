@@ -3,7 +3,7 @@ set -e
 
 cd $(dirname $0)/..
 
-source $(dirname $0)/lib/find_functions
+source scripts/lib/find_functions
 
 echo Looking for packages to test
 
