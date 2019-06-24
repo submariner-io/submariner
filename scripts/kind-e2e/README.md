@@ -103,6 +103,23 @@ the following lucene query example can be used to query the logs.
 kubernetes.namespace:"submariner" AND kubernetes.node.name: (cluster2* OR cluster3*) AND kubernetes.labels.app: submariner*
 ```
 
+#### Federation V2
+Providing **kubefed=true** parameter to **make e2e** command will setup federation.
+Federation control plane will be created on cluster1 and clusters 2/3 will be added as members. 
+
+```bash
+make e2e status=keep kubefed=true
+```
+
+To get the status of federated clusters:
+
+```bash
+kubectl -n kube-federation-system get kubefedclusters
+``` 
+
+Federated deployment example resides in **scripts/kind-e2e/nginx-federated.sh**. 
+To federate resources across the clusters [kubefedctl] tool must be installed on the local system.
+
 #### Cleanup
 At any time you can run a cleanup command that will remove kind resources.
 
@@ -120,7 +137,7 @@ docker system prune --all
 #### Full example
 
 ```bash
-make e2e status=keep version=1.14.1 logging=true
+make e2e status=keep version=1.14.1 logging=true kubefed=true
 ```
 
 <!--links-->
@@ -129,7 +146,7 @@ make e2e status=keep version=1.14.1 logging=true
 [kubectl]: https://kubernetes.io/docs/tasks/tools/install-kubectl/
 [k9s]: https://github.com/derailed/k9s
 [kubetail]: https://github.com/johanhaleby/kubetail
+[kubefedctl]: https://github.com/kubernetes-sigs/kubefed/releases
 [kind release page]: https://github.com/kubernetes-sigs/kind/releases
 [Change SELinux to permissive]: https://www.ibm.com/support/knowledgecenter/en/POWER8/p8ef9/p8ef9_selinux_setup.htm
 [Add local user to docker group]: https://docs.docker.com/install/linux/linux-postinstall/
-

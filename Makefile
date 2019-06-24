@@ -1,6 +1,7 @@
 status ?= onetime
 version ?= 1.14.2
 logging ?= false
+kubefed ?= false
 
 TARGETS := $(shell ls scripts)
 
@@ -12,7 +13,7 @@ TARGETS := $(shell ls scripts)
 	@mv .dapper.tmp .dapper
 
 $(TARGETS): .dapper
-	./.dapper -m bind $@ $(status) $(version) $(logging)
+	./.dapper -m bind $@ $(status) $(version) $(logging) $(kubefed)
 
 trash: .dapper
 	./.dapper -m bind trash

@@ -65,6 +65,7 @@ function setup_cluster2_gateway() {
             echo Submariner already installed, skipping submariner helm installation...
             update_subm_pods
         else
+            echo Installing submariner on cluster2...
             worker_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster2-worker | head -n 1)
             kubectl label node cluster2-worker "submariner.io/gateway=true" --overwrite
             helm install submariner-latest/submariner \
@@ -101,6 +102,7 @@ function setup_cluster3_gateway() {
             echo Submariner already installed, skipping submariner helm installation...
             update_subm_pods
         else
+            echo Installing submariner on cluster3...
             worker_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster3-worker | head -n 1)
             kubectl label node cluster3-worker "submariner.io/gateway=true" --overwrite
             helm install submariner-latest/submariner \
@@ -164,10 +166,10 @@ function test_connection() {
 
 function update_subm_pods() {
     echo Removing submariner engine pods...
-    kubectl get pods -n submariner -l app=submariner-engine | awk 'FNR > 1 {print $1}' | xargs kubectl delete pods -n submariner
+    kubectl delete pods -n submariner -l app=submariner-engine
     kubectl wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s
     echo Removing submariner route agent pods...
-    kubectl get pods -n submariner -l app=submariner-routeagent | awk 'FNR > 1 {print $1}' | xargs kubectl delete pods -n submariner
+    kubectl delete pods -n submariner -l app=submariner-routeagent
     kubectl wait --for=condition=Ready pods -l app=submariner-routeagent -n submariner --timeout=60s
 }
 
@@ -187,6 +189,26 @@ function enable_logging() {
             kubectl apply -f ${PRJ_ROOT}/scripts/kind-e2e/logging/filebeat.yaml
             kubectl set env daemonset/filebeat -n kube-system ELASTICSEARCH_HOST=${es_ip} ELASTICSEARCH_PORT=30000
         done
+    fi
+}
+
+function enable_kubefed() {
+    kubectl config use-context cluster1
+    if kubectl rollout status deploy/kubefed-controller-manager -n ${KUBEFED_NS} > /dev/null 2>&1; then
+        echo Kubefed already installed, skipping setup...
+    else
+        helm repo add kubefed-charts https://raw.githubusercontent.com/kubernetes-sigs/kubefed/master/charts
+        helm install kubefed-charts/kubefed --version=0.1.0-rc2 --name kubefed --namespace ${KUBEFED_NS} --set controllermanager.replicaCount=1
+        for i in 1 2 3; do
+            kubefedctl join cluster${i} --cluster-context cluster${i} --host-cluster-context cluster1 --v=2
+            #master_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster${i}-control-plane | head -n 1)
+            #kind_endpoint="https://${master_ip}:6443"
+            #kubectl patch kubefedclusters -n ${KUBEFED_NS} cluster${i} --type merge --patch "{\"spec\":{\"apiEndpoint\":\"${kind_endpoint}\"}}"
+        done
+        #kubectl delete pod -l control-plane=controller-manager -n ${KUBEFED_NS}
+        echo Waiting for kubefed control plain to be ready...
+        kubectl wait --for=condition=Ready pods -l control-plane=controller-manager -n ${KUBEFED_NS} --timeout=120s
+        kubectl wait --for=condition=Ready pods -l kubefed-admission-webhook=true -n ${KUBEFED_NS} --timeout=120s
     fi
 }
 
@@ -240,19 +262,23 @@ if [[ $1 != keep ]]; then
     trap cleanup EXIT
 fi
 
-echo Starting with status: $1, k8s version: $2, logging: $3.
+echo Starting with status: $1, k8s_version: $2, logging: $3, kubefed: $4.
 PRJ_ROOT=$(git rev-parse --show-toplevel)
 mkdir -p ${PRJ_ROOT}/output/kind-config/dapper/ ${PRJ_ROOT}/output/kind-config/local-dev/
 SUBMARINER_BROKER_NS=submariner-k8s-broker
 SUBMARINER_PSK=$(cat /dev/urandom | LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 64 | head -n 1)
+KUBEFED_NS=kube-federation-system
 export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
 
 kind_clusters "$@"
-kind_import_images
-install_helm
 if [[ $3 = true ]]; then
     enable_logging
 fi
+install_helm
+if [[ $4 = true ]]; then
+    enable_kubefed
+fi
+kind_import_images
 setup_broker
 setup_cluster2_gateway
 setup_cluster3_gateway
