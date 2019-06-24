@@ -4,7 +4,7 @@ import (
 	"github.com/rancher/submariner/pkg/types"
 )
 
-type CableEngine interface {
+type Engine interface {
 	StartEngine(ignition bool) error
 	ReloadEngine() error
 	StopEngine() error
