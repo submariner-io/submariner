@@ -160,7 +160,7 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder rec
 	)
 	namespace, _, err := kubeconfig.Namespace()
 	if err != nil {
-		klog.Infof("Could not obtain a namespace to use for the leader election lock - the error was: %v. Using the default \"submariner\ "namespace.", err)
+		klog.Infof("Could not obtain a namespace to use for the leader election lock - the error was: %v. Using the default \"submariner\" namespace.", err)
 		namespace = "submariner"
 	} else {
 		klog.Infof("Using namespace %s for the leader election lock", namespace)
