@@ -174,11 +174,23 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder rec
 	if err != nil {
 		klog.Fatalf("error getting hostname: %v", err)
 	}
+	
+	kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		clientcmd.NewDefaultClientConfigLoadingRules(),
+		&clientcmd.ConfigOverrides{},
+	)
+	namespace, _, err := kubeconfig.Namespace()
+	if err != nil {
+		klog.Infof("Could not obtain a namespace to use for the leader election lock - the error was: %v. Using the default \"submariner\" namespace.", err)
+		namespace = "submariner"
+	} else {
+		klog.Infof("Using namespace %s for the leader election lock", namespace)
+	}
 
 	// Lock required for leader election
 	rl := resourcelock.ConfigMapLock{
 		ConfigMapMeta: metav1.ObjectMeta{
-			Namespace: "submariner",
+			Namespace: namespace,
 			Name:      "submariner-engine-lock",
 		},
 		Client: leaderElectionClient.CoreV1(),
