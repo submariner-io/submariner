@@ -1,6 +1,6 @@
 # E2E environment
 
-The e2e environment can be used for local testing,development and CI purposes.
+The e2e environment can be used for local testing, development, and CI purposes.
 
 E2E environment consists of:
 - 3 k8s clusters deployed with [kind].
@@ -15,7 +15,6 @@ E2E environment consists of:
 
 - [docker]
 - [kubectl]
-- [Change SELinux to permissive]
 - [Add local user to docker group]
 
 Optional useful tools for troubleshooting:
@@ -29,7 +28,7 @@ The environment can be used in two modes:
 
 ### 1. Ephemeral/Onetime
  
-This mode will create e2e environment on a local workstation,run unit tests,E2E tests and clean up the created resources afterwards.
+This mode will create e2e environment on a local workstation, run unit tests, E2E tests, and clean up the created resources afterwards.
 This mode is very convenient for CI purposes.
     
 ```bash
@@ -96,7 +95,7 @@ kubectl port-forward ${kibana_pod} 8080:5601
 
 Open new browser tab/window and access Kibana at http://localhost:8080.
 
-Create default index **filebeat-*** and choose **@timestamp** as time filter field. After the default index pattern is configured,
+Create default index **filebeat-** and choose **@timestamp** as time filter field. After the default index pattern is configured,
 the following lucene query example can be used to query the logs.
 
 ```bash
@@ -148,5 +147,4 @@ make e2e status=keep version=1.14.1 logging=true kubefed=true
 [kubetail]: https://github.com/johanhaleby/kubetail
 [kubefedctl]: https://github.com/kubernetes-sigs/kubefed/releases
 [kind release page]: https://github.com/kubernetes-sigs/kind/releases
-[Change SELinux to permissive]: https://www.ibm.com/support/knowledgecenter/en/POWER8/p8ef9/p8ef9_selinux_setup.htm
 [Add local user to docker group]: https://docs.docker.com/install/linux/linux-postinstall/
