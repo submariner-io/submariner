@@ -338,20 +338,6 @@ func (i *engine) removeCableInternal(cableID string, client *goStrongswanVici.Cl
 	i.Lock()
 	defer i.Unlock()
 
-	/*
-		err = client.Terminate(&goStrongswanVici.TerminateRequest{
-			Child: "submariner-child-" + cableID,
-		})
-		if err != nil {
-			klog.Errorf("Error when terminating child connection %s : %v", cableID, err)
-		}
-
-		err = client.Terminate(&goStrongswanVici.TerminateRequest{
-			Ike: cableID,
-		})
-		if err != nil {
-			klog.Errorf("Error when terminating ike connection %s : %v", cableID, err)
-		} */
 	klog.Infof("Unloading connection %s", cableID)
 	err := client.UnloadConn(&goStrongswanVici.UnloadConnRequest{
 		Name: cableID,
