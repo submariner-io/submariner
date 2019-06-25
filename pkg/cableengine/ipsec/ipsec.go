@@ -78,68 +78,66 @@ func NewEngine(localSubnets []string, localCluster types.SubmarinerCluster, loca
 	}, nil
 }
 
-func (i *engine) StartEngine(ignition bool) error {
-	if ignition {
-		klog.Infof("Starting IPSec Engine (Charon)")
-		ifi, err := util.GetDefaultGatewayInterface()
-		if err != nil {
-			return err
-		}
+func (i *engine) StartEngine() error {
+	klog.Infof("Starting IPSec Engine (Charon)")
+	ifi, err := util.GetDefaultGatewayInterface()
+	if err != nil {
+		return err
+	}
 
-		klog.V(8).Infof("Device of default gateway interface was %s", ifi.Name)
-		ipt, err := iptables.New()
-		if err != nil {
-			return fmt.Errorf("error while initializing iptables: %v", err)
-		}
+	klog.V(8).Infof("Device of default gateway interface was %s", ifi.Name)
+	ipt, err := iptables.New()
+	if err != nil {
+		return fmt.Errorf("error while initializing iptables: %v", err)
+	}
 
-		klog.V(6).Infof("Installing/ensuring the SUBMARINER-POSTROUTING and SUBMARINER-FORWARD chains")
-		if err = ipt.NewChain("nat", "SUBMARINER-POSTROUTING"); err != nil {
-			klog.Errorf("Unable to create SUBMARINER-POSTROUTING chain in iptables: %v", err)
-		}
+	klog.V(6).Infof("Installing/ensuring the SUBMARINER-POSTROUTING and SUBMARINER-FORWARD chains")
+	if err = ipt.NewChain("nat", "SUBMARINER-POSTROUTING"); err != nil {
+		klog.Errorf("Unable to create SUBMARINER-POSTROUTING chain in iptables: %v", err)
+	}
 
-		if err = ipt.NewChain("filter", "SUBMARINER-FORWARD"); err != nil {
-			klog.Errorf("Unable to create SUBMARINER-FORWARD chain in iptables: %v", err)
-		}
+	if err = ipt.NewChain("filter", "SUBMARINER-FORWARD"); err != nil {
+		klog.Errorf("Unable to create SUBMARINER-FORWARD chain in iptables: %v", err)
+	}
 
-		forwardToSubPostroutingRuleSpec := []string{"-j", "SUBMARINER-POSTROUTING"}
-		if err = ipt.AppendUnique("nat", "POSTROUTING", forwardToSubPostroutingRuleSpec...); err != nil {
-			klog.Errorf("Unable to append iptables rule \"%s\": %v\n", strings.Join(forwardToSubPostroutingRuleSpec, " "), err)
-		}
+	forwardToSubPostroutingRuleSpec := []string{"-j", "SUBMARINER-POSTROUTING"}
+	if err = ipt.AppendUnique("nat", "POSTROUTING", forwardToSubPostroutingRuleSpec...); err != nil {
+		klog.Errorf("Unable to append iptables rule \"%s\": %v\n", strings.Join(forwardToSubPostroutingRuleSpec, " "), err)
+	}
 
-		forwardToSubForwardRuleSpec := []string{"-j", "SUBMARINER-FORWARD"}
-		rules, err := ipt.List("filter", "FORWARD")
-		if err != nil {
-			return fmt.Errorf("error listing the rules in FORWARD chain: %v", err)
-		}
+	forwardToSubForwardRuleSpec := []string{"-j", "SUBMARINER-FORWARD"}
+	rules, err := ipt.List("filter", "FORWARD")
+	if err != nil {
+		return fmt.Errorf("error listing the rules in FORWARD chain: %v", err)
+	}
 
-		appendAt := len(rules) + 1
-		insertAt := appendAt
-		for i, rule := range rules {
-			if rule == "-A FORWARD -j SUBMARINER-FORWARD" {
-				insertAt = -1
-				break
-			} else if rule == "-A FORWARD -j REJECT --reject-with icmp-host-prohibited" {
-				insertAt = i
-				break
-			}
+	appendAt := len(rules) + 1
+	insertAt := appendAt
+	for i, rule := range rules {
+		if rule == "-A FORWARD -j SUBMARINER-FORWARD" {
+			insertAt = -1
+			break
+		} else if rule == "-A FORWARD -j REJECT --reject-with icmp-host-prohibited" {
+			insertAt = i
+			break
 		}
+	}
 
-		if insertAt == appendAt {
-			// Append the rule at the end of FORWARD Chain.
-			if err = ipt.Append("filter", "FORWARD", forwardToSubForwardRuleSpec...); err != nil {
-				klog.Errorf("Unable to append iptables rule \"%s\": %v\n", strings.Join(forwardToSubForwardRuleSpec, " "), err)
-			}
-		} else if insertAt > 0 {
-			// Insert the rule in the FORWARD Chain.
-			if err = ipt.Insert("filter", "FORWARD", insertAt, forwardToSubForwardRuleSpec...); err != nil {
-				klog.Errorf("Unable to insert iptables rule \"%s\" at position %d: %v\n", strings.Join(forwardToSubForwardRuleSpec, " "),
-					insertAt, err)
-			}
+	if insertAt == appendAt {
+		// Append the rule at the end of FORWARD Chain.
+		if err = ipt.Append("filter", "FORWARD", forwardToSubForwardRuleSpec...); err != nil {
+			klog.Errorf("Unable to append iptables rule \"%s\": %v\n", strings.Join(forwardToSubForwardRuleSpec, " "), err)
 		}
+	} else if insertAt > 0 {
+		// Insert the rule in the FORWARD Chain.
+		if err = ipt.Insert("filter", "FORWARD", insertAt, forwardToSubForwardRuleSpec...); err != nil {
+			klog.Errorf("Unable to insert iptables rule \"%s\" at position %d: %v\n", strings.Join(forwardToSubForwardRuleSpec, " "),
+				insertAt, err)
+		}
+	}
 
-		if err = runCharon(i.debug, i.logFile); err != nil {
-			return err
-		}
+	if err = runCharon(i.debug, i.logFile); err != nil {
+		return err
 	}
 
 	if err := i.loadConns(); err != nil {
