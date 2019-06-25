@@ -148,68 +148,6 @@ func (i *engine) StartEngine(ignition bool) error {
 	return nil
 }
 
-func (i *engine) ReloadEngine() error {
-	// to be implemented
-	return nil
-
-}
-func (i *engine) StopEngine() error {
-	// to be implemented
-	return nil
-}
-
-func (i *engine) SyncCables(clusterID string, endpoints []types.SubmarinerEndpoint) error {
-	klog.V(2).Infof("Starting selective cable sync")
-
-	client, err := getClient()
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	activeConnections, err := i.getActiveConns(false, clusterID, client)
-	if err != nil {
-		return err
-	}
-
-	for _, active := range activeConnections {
-		klog.V(6).Infof("Analyzing currently active connection: %s", active)
-		delete := true
-		for _, endpoint := range endpoints {
-			connName := endpoint.Spec.CableName
-			if active == connName {
-				klog.V(6).Infof("Active connection %s was found in the list of endpoints, not stopping it", connName)
-				delete = false
-			}
-		}
-		if delete {
-			klog.Infof("Triggering remove cable of connection %s", active)
-			if err = i.removeCableInternal(active, client); err != nil {
-				return err
-			}
-		}
-	}
-
-	for _, endpoint := range endpoints {
-		connInstalled := false
-		connName := endpoint.Spec.CableName
-		for _, cname := range activeConnections {
-			if connName == cname {
-				klog.Infof("Cable with name: %s was already installed", connName)
-				connInstalled = true
-			}
-		}
-		if !connInstalled {
-			klog.Infof("Marking cable %s to be installed", endpoint.Spec.CableName)
-			if err = i.installCableInternal(endpoint, client); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
 func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 	client, err := getClient()
 	if err != nil {
