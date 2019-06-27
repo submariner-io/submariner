@@ -405,20 +405,6 @@ func (i *engine) removeCableInternal(cableID string, client *goStrongswanVici.Cl
 	return nil
 }
 
-func (i *engine) PrintConns() {
-	client, _ := getClient()
-	defer client.Close()
-	connList, err := client.ListConns("")
-	if err != nil {
-		klog.Errorf("Error from ListConns: %v", err)
-		return
-	}
-
-	for _, connection := range connList {
-		klog.Infof("connection map: %v", connection)
-	}
-}
-
 func (i *engine) getActiveConns(clusterID string, client *goStrongswanVici.ClientConn) ([]string, error) {
 	i.Lock()
 	defer i.Unlock()
