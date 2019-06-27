@@ -2,12 +2,10 @@ package ipsec
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
 	"reflect"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -505,17 +503,6 @@ func runCharon(debug bool, logFile string) error {
 	return nil
 }
 
-func (i *engine) killCharon(pid string) {
-	pidNum, err := strconv.Atoi(pid)
-	if err == nil {
-		err = syscall.Kill(pidNum, syscall.SIGKILL)
-	}
-
-	if err != nil {
-		klog.Errorf("Can't kill %s: %v", pid, err)
-	}
-}
-
 func (i *engine) loadConns() error {
 	i.Lock()
 	defer i.Unlock()
@@ -538,50 +525,6 @@ func (i *engine) loadConns() error {
 			}
 		}
 	}
-	return nil
-}
-
-func (i *engine) monitorCharon() {
-	pid := ""
-	for {
-		func() {
-			newPidBytes, err := ioutil.ReadFile(pidFile)
-			if err != nil {
-				klog.Errorf("Failed to read charon pid file %s: %v", pidFile, err)
-				return
-			}
-
-			newPid := strings.TrimSpace(string(newPidBytes))
-			if pid == "" {
-				pid = newPid
-				klog.Infof("Charon running with PID: %s", pid)
-			} else if pid != newPid {
-				klog.Errorf("Charon restarted, old PID: %s, new PID: %s", pid, newPid)
-			} else {
-				i.Lock()
-				defer i.Unlock()
-				if err := testCharon(); err != nil {
-					klog.Errorf("Killing charon due to: %v", err)
-					i.killCharon(pid)
-				}
-			}
-		}()
-
-		time.Sleep(2 * time.Second)
-	}
-}
-
-func testCharon() error {
-	client, err := getClient()
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	if _, err := client.ListConns(""); err != nil {
-		return err
-	}
-
 	return nil
 }
 
