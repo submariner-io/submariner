@@ -167,7 +167,7 @@ func (i *engine) installCableInternal(endpoint types.SubmarinerEndpoint, client 
 	}
 
 	klog.V(2).Infof("Installing cable %s", endpoint.Spec.CableName)
-	activeConnections, err := i.getActiveConns(false, endpoint.Spec.ClusterID, client)
+	activeConnections, err := i.getActiveConns(endpoint.Spec.ClusterID, client)
 	if err != nil {
 		return err
 	}
@@ -419,16 +419,11 @@ func (i *engine) PrintConns() {
 	}
 }
 
-func (i *engine) getActiveConns(getAll bool, clusterID string, client *goStrongswanVici.ClientConn) ([]string, error) {
+func (i *engine) getActiveConns(clusterID string, client *goStrongswanVici.ClientConn) ([]string, error) {
 	i.Lock()
 	defer i.Unlock()
 	var connections []string
-	var prefix string
-	if getAll {
-		prefix = "submariner-cable-"
-	} else {
-		prefix = fmt.Sprintf("submariner-cable-%s-", clusterID)
-	}
+	prefix := fmt.Sprintf("submariner-cable-%s-", clusterID)
 
 	conns, err := client.ListConns("")
 	if err != nil {
