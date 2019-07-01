@@ -2,12 +2,10 @@ package ipsec
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
 	"reflect"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -78,135 +76,71 @@ func NewEngine(localSubnets []string, localCluster types.SubmarinerCluster, loca
 	}, nil
 }
 
-func (i *engine) StartEngine(ignition bool) error {
-	if ignition {
-		klog.Infof("Starting IPSec Engine (Charon)")
-		ifi, err := util.GetDefaultGatewayInterface()
-		if err != nil {
-			return err
-		}
+func (i *engine) StartEngine() error {
+	klog.Infof("Starting IPSec Engine (Charon)")
+	ifi, err := util.GetDefaultGatewayInterface()
+	if err != nil {
+		return err
+	}
 
-		klog.V(8).Infof("Device of default gateway interface was %s", ifi.Name)
-		ipt, err := iptables.New()
-		if err != nil {
-			return fmt.Errorf("error while initializing iptables: %v", err)
-		}
+	klog.V(8).Infof("Device of default gateway interface was %s", ifi.Name)
+	ipt, err := iptables.New()
+	if err != nil {
+		return fmt.Errorf("error while initializing iptables: %v", err)
+	}
 
-		klog.V(6).Infof("Installing/ensuring the SUBMARINER-POSTROUTING and SUBMARINER-FORWARD chains")
-		if err = ipt.NewChain("nat", "SUBMARINER-POSTROUTING"); err != nil {
-			klog.Errorf("Unable to create SUBMARINER-POSTROUTING chain in iptables: %v", err)
-		}
+	klog.V(6).Infof("Installing/ensuring the SUBMARINER-POSTROUTING and SUBMARINER-FORWARD chains")
+	if err = ipt.NewChain("nat", "SUBMARINER-POSTROUTING"); err != nil {
+		klog.Errorf("Unable to create SUBMARINER-POSTROUTING chain in iptables: %v", err)
+	}
 
-		if err = ipt.NewChain("filter", "SUBMARINER-FORWARD"); err != nil {
-			klog.Errorf("Unable to create SUBMARINER-FORWARD chain in iptables: %v", err)
-		}
+	if err = ipt.NewChain("filter", "SUBMARINER-FORWARD"); err != nil {
+		klog.Errorf("Unable to create SUBMARINER-FORWARD chain in iptables: %v", err)
+	}
 
-		forwardToSubPostroutingRuleSpec := []string{"-j", "SUBMARINER-POSTROUTING"}
-		if err = ipt.AppendUnique("nat", "POSTROUTING", forwardToSubPostroutingRuleSpec...); err != nil {
-			klog.Errorf("Unable to append iptables rule \"%s\": %v\n", strings.Join(forwardToSubPostroutingRuleSpec, " "), err)
-		}
+	forwardToSubPostroutingRuleSpec := []string{"-j", "SUBMARINER-POSTROUTING"}
+	if err = ipt.AppendUnique("nat", "POSTROUTING", forwardToSubPostroutingRuleSpec...); err != nil {
+		klog.Errorf("Unable to append iptables rule \"%s\": %v\n", strings.Join(forwardToSubPostroutingRuleSpec, " "), err)
+	}
 
-		forwardToSubForwardRuleSpec := []string{"-j", "SUBMARINER-FORWARD"}
-		rules, err := ipt.List("filter", "FORWARD")
-		if err != nil {
-			return fmt.Errorf("error listing the rules in FORWARD chain: %v", err)
-		}
+	forwardToSubForwardRuleSpec := []string{"-j", "SUBMARINER-FORWARD"}
+	rules, err := ipt.List("filter", "FORWARD")
+	if err != nil {
+		return fmt.Errorf("error listing the rules in FORWARD chain: %v", err)
+	}
 
-		appendAt := len(rules) + 1
-		insertAt := appendAt
-		for i, rule := range rules {
-			if rule == "-A FORWARD -j SUBMARINER-FORWARD" {
-				insertAt = -1
-				break
-			} else if rule == "-A FORWARD -j REJECT --reject-with icmp-host-prohibited" {
-				insertAt = i
-				break
-			}
+	appendAt := len(rules) + 1
+	insertAt := appendAt
+	for i, rule := range rules {
+		if rule == "-A FORWARD -j SUBMARINER-FORWARD" {
+			insertAt = -1
+			break
+		} else if rule == "-A FORWARD -j REJECT --reject-with icmp-host-prohibited" {
+			insertAt = i
+			break
 		}
+	}
 
-		if insertAt == appendAt {
-			// Append the rule at the end of FORWARD Chain.
-			if err = ipt.Append("filter", "FORWARD", forwardToSubForwardRuleSpec...); err != nil {
-				klog.Errorf("Unable to append iptables rule \"%s\": %v\n", strings.Join(forwardToSubForwardRuleSpec, " "), err)
-			}
-		} else if insertAt > 0 {
-			// Insert the rule in the FORWARD Chain.
-			if err = ipt.Insert("filter", "FORWARD", insertAt, forwardToSubForwardRuleSpec...); err != nil {
-				klog.Errorf("Unable to insert iptables rule \"%s\" at position %d: %v\n", strings.Join(forwardToSubForwardRuleSpec, " "),
-					insertAt, err)
-			}
+	if insertAt == appendAt {
+		// Append the rule at the end of FORWARD Chain.
+		if err = ipt.Append("filter", "FORWARD", forwardToSubForwardRuleSpec...); err != nil {
+			klog.Errorf("Unable to append iptables rule \"%s\": %v\n", strings.Join(forwardToSubForwardRuleSpec, " "), err)
 		}
+	} else if insertAt > 0 {
+		// Insert the rule in the FORWARD Chain.
+		if err = ipt.Insert("filter", "FORWARD", insertAt, forwardToSubForwardRuleSpec...); err != nil {
+			klog.Errorf("Unable to insert iptables rule \"%s\" at position %d: %v\n", strings.Join(forwardToSubForwardRuleSpec, " "),
+				insertAt, err)
+		}
+	}
 
-		if err = runCharon(i.debug, i.logFile); err != nil {
-			return err
-		}
+	if err = runCharon(i.debug, i.logFile); err != nil {
+		return err
 	}
 
 	if err := i.loadConns(); err != nil {
 		return fmt.Errorf("Failed to load connections from charon: %v", err)
 	}
-	return nil
-}
-
-func (i *engine) ReloadEngine() error {
-	// to be implemented
-	return nil
-
-}
-func (i *engine) StopEngine() error {
-	// to be implemented
-	return nil
-}
-
-func (i *engine) SyncCables(clusterID string, endpoints []types.SubmarinerEndpoint) error {
-	klog.V(2).Infof("Starting selective cable sync")
-
-	client, err := getClient()
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	activeConnections, err := i.getActiveConns(false, clusterID, client)
-	if err != nil {
-		return err
-	}
-
-	for _, active := range activeConnections {
-		klog.V(6).Infof("Analyzing currently active connection: %s", active)
-		delete := true
-		for _, endpoint := range endpoints {
-			connName := endpoint.Spec.CableName
-			if active == connName {
-				klog.V(6).Infof("Active connection %s was found in the list of endpoints, not stopping it", connName)
-				delete = false
-			}
-		}
-		if delete {
-			klog.Infof("Triggering remove cable of connection %s", active)
-			if err = i.removeCableInternal(active, client); err != nil {
-				return err
-			}
-		}
-	}
-
-	for _, endpoint := range endpoints {
-		connInstalled := false
-		connName := endpoint.Spec.CableName
-		for _, cname := range activeConnections {
-			if connName == cname {
-				klog.Infof("Cable with name: %s was already installed", connName)
-				connInstalled = true
-			}
-		}
-		if !connInstalled {
-			klog.Infof("Marking cable %s to be installed", endpoint.Spec.CableName)
-			if err = i.installCableInternal(endpoint, client); err != nil {
-				return err
-			}
-		}
-	}
-
 	return nil
 }
 
@@ -231,7 +165,7 @@ func (i *engine) installCableInternal(endpoint types.SubmarinerEndpoint, client 
 	}
 
 	klog.V(2).Infof("Installing cable %s", endpoint.Spec.CableName)
-	activeConnections, err := i.getActiveConns(false, endpoint.Spec.ClusterID, client)
+	activeConnections, err := i.getActiveConns(endpoint.Spec.ClusterID, client)
 	if err != nil {
 		return err
 	}
@@ -402,20 +336,6 @@ func (i *engine) removeCableInternal(cableID string, client *goStrongswanVici.Cl
 	i.Lock()
 	defer i.Unlock()
 
-	/*
-		err = client.Terminate(&goStrongswanVici.TerminateRequest{
-			Child: "submariner-child-" + cableID,
-		})
-		if err != nil {
-			klog.Errorf("Error when terminating child connection %s : %v", cableID, err)
-		}
-
-		err = client.Terminate(&goStrongswanVici.TerminateRequest{
-			Ike: cableID,
-		})
-		if err != nil {
-			klog.Errorf("Error when terminating ike connection %s : %v", cableID, err)
-		} */
 	klog.Infof("Unloading connection %s", cableID)
 	err := client.UnloadConn(&goStrongswanVici.UnloadConnRequest{
 		Name: cableID,
@@ -483,30 +403,11 @@ func (i *engine) removeCableInternal(cableID string, client *goStrongswanVici.Cl
 	return nil
 }
 
-func (i *engine) PrintConns() {
-	client, _ := getClient()
-	defer client.Close()
-	connList, err := client.ListConns("")
-	if err != nil {
-		klog.Errorf("Error from ListConns: %v", err)
-		return
-	}
-
-	for _, connection := range connList {
-		klog.Infof("connection map: %v", connection)
-	}
-}
-
-func (i *engine) getActiveConns(getAll bool, clusterID string, client *goStrongswanVici.ClientConn) ([]string, error) {
+func (i *engine) getActiveConns(clusterID string, client *goStrongswanVici.ClientConn) ([]string, error) {
 	i.Lock()
 	defer i.Unlock()
 	var connections []string
-	var prefix string
-	if getAll {
-		prefix = "submariner-cable-"
-	} else {
-		prefix = fmt.Sprintf("submariner-cable-%s-", clusterID)
-	}
+	prefix := fmt.Sprintf("submariner-cable-%s-", clusterID)
 
 	conns, err := client.ListConns("")
 	if err != nil {
@@ -602,17 +503,6 @@ func runCharon(debug bool, logFile string) error {
 	return nil
 }
 
-func (i *engine) killCharon(pid string) {
-	pidNum, err := strconv.Atoi(pid)
-	if err == nil {
-		err = syscall.Kill(pidNum, syscall.SIGKILL)
-	}
-
-	if err != nil {
-		klog.Errorf("Can't kill %s: %v", pid, err)
-	}
-}
-
 func (i *engine) loadConns() error {
 	i.Lock()
 	defer i.Unlock()
@@ -635,50 +525,6 @@ func (i *engine) loadConns() error {
 			}
 		}
 	}
-	return nil
-}
-
-func (i *engine) monitorCharon() {
-	pid := ""
-	for {
-		func() {
-			newPidBytes, err := ioutil.ReadFile(pidFile)
-			if err != nil {
-				klog.Errorf("Failed to read charon pid file %s: %v", pidFile, err)
-				return
-			}
-
-			newPid := strings.TrimSpace(string(newPidBytes))
-			if pid == "" {
-				pid = newPid
-				klog.Infof("Charon running with PID: %s", pid)
-			} else if pid != newPid {
-				klog.Errorf("Charon restarted, old PID: %s, new PID: %s", pid, newPid)
-			} else {
-				i.Lock()
-				defer i.Unlock()
-				if err := testCharon(); err != nil {
-					klog.Errorf("Killing charon due to: %v", err)
-					i.killCharon(pid)
-				}
-			}
-		}()
-
-		time.Sleep(2 * time.Second)
-	}
-}
-
-func testCharon() error {
-	client, err := getClient()
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	if _, err := client.ListConns(""); err != nil {
-		return err
-	}
-
 	return nil
 }
 

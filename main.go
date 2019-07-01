@@ -134,7 +134,7 @@ func main() {
 		wg.Add(3)
 		go func() {
 			defer wg.Done()
-			if err = cableEngine.StartEngine(true); err != nil {
+			if err = cableEngine.StartEngine(); err != nil {
 				klog.Fatalf("Error starting the cable engine: %v", err)
 			}
 		}()
@@ -174,7 +174,7 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder rec
 	if err != nil {
 		klog.Fatalf("error getting hostname: %v", err)
 	}
-	
+
 	kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		clientcmd.NewDefaultClientConfigLoadingRules(),
 		&clientcmd.ConfigOverrides{},
