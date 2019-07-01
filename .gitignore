@@ -6,6 +6,7 @@ bin
 dist
 output
 strongswan
+/vendor
 package/strongswan-*
 .project
 .settings

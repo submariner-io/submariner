@@ -253,6 +253,7 @@ Assuming that we have cluster1, cluster2 and cluster3 contexts, and that
 cluster1 is our broker cluster, **to execute the E2E tests** we would do:
 
   ```bash
+  export GO111MODULE=on
   cd test/e2e
   go test -args -kubeconfig=creds/cluster1:creds/cluster2:creds/cluster3 \
                 -dp-context cluster2 \
@@ -271,6 +272,7 @@ If you want to execute just a subset of the available E2E tests, you can
 specify the ginkgo.focus argument
 
   ```bash
+  export GO111MODULE=on
   cd test/e2e
   go test -args -kubeconfig=creds/cluster1:creds/cluster2:creds/cluster3 \
                 -dp-context cluster2 \
@@ -281,6 +283,7 @@ specify the ginkgo.focus argument
 
 It's possible to generate jUnit XML report files
   ```bash
+  export GO111MODULE=on
   cd test/e2e
   go test -args  -kubeconfig=creds/cluster1:creds/cluster2:creds/cluster3 \
                  -dp-context cluster2 \
@@ -300,6 +303,7 @@ It may be helpful to use the [delve debugger](https://github.com/derekparker/del
 to gain insight into the test:
 
   ```bash
+  export GO111MODULE=on
   cd test/e2e
   dlv test
   ```
@@ -310,6 +314,7 @@ to gain insight into the test:
   `-ginkgo.focus=mytest` is required, for example:
 
   ```bash
+  export GO111MODULES=on
   cd test/e2e
   dlv test -- -ginkgo.v -ginkgo.focus=mytest
   ```
