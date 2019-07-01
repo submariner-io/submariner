@@ -21,8 +21,6 @@ import (
 )
 
 const (
-	pidFile = "/var/run/charon.pid"
-
 	// DefaultReplayWindowSize specifies the replay window size for charon
 	DefaultReplayWindowSize = "1024"
 
