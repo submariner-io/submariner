@@ -15,12 +15,6 @@ TARGETS := $(shell ls scripts)
 $(TARGETS): .dapper
 	./.dapper -m bind $@ $(status) $(version) $(logging) $(kubefed)
 
-trash: .dapper
-	./.dapper -m bind trash
-
-trash-keep: .dapper
-	./.dapper -m bind trash -k
-
 .DEFAULT_GOAL := ci
 
 .PHONY: $(TARGETS)
