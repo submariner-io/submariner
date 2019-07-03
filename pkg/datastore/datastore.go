@@ -3,7 +3,7 @@ package datastore
 import (
 	"context"
 
-	"github.com/rancher/submariner/pkg/types"
+	"github.com/submariner-io/submariner/pkg/types"
 )
 
 /*

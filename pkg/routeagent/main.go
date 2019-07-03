@@ -6,15 +6,15 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/rancher/submariner/pkg/routeagent/controllers/route"
-	"github.com/rancher/submariner/pkg/util"
+	"github.com/submariner-io/submariner/pkg/routeagent/controllers/route"
+	"github.com/submariner-io/submariner/pkg/util"
 
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 
-	submarinerClientset "github.com/rancher/submariner/pkg/client/clientset/versioned"
-	submarinerInformers "github.com/rancher/submariner/pkg/client/informers/externalversions"
-	"github.com/rancher/submariner/pkg/signals"
+	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions"
+	"github.com/submariner-io/submariner/pkg/signals"
 )
 
 var (

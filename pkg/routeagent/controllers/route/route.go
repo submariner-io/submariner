@@ -8,9 +8,9 @@ import (
 	"syscall"
 	"time"
 
-	v1 "github.com/rancher/submariner/pkg/apis/submariner.io/v1"
-	clientset "github.com/rancher/submariner/pkg/client/clientset/versioned"
-	informers "github.com/rancher/submariner/pkg/client/informers/externalversions/submariner.io/v1"
+	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	informers "github.com/submariner-io/submariner/pkg/client/informers/externalversions/submariner.io/v1"
 	"github.com/vishvananda/netlink"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"

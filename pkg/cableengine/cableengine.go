@@ -1,7 +1,7 @@
 package cableengine
 
 import (
-	"github.com/rancher/submariner/pkg/types"
+	"github.com/submariner-io/submariner/pkg/types"
 )
 
 type Engine interface {

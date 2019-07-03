@@ -11,7 +11,7 @@ import (
 	"github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/gomega"
 
-	"github.com/rancher/submariner/test/e2e/framework"
+	"github.com/submariner-io/submariner/test/e2e/framework"
 )
 
 // There are certain operations we only want to run once per overall test invocation

@@ -12,4 +12,4 @@ if [ ! -f "$CODEGEN_SCRIPT" ]; then
     echo "Successsfully checked out release tag $CODEGEN_RELEASE_TAG"
 fi
 
-$CODEGEN_SCRIPT all github.com/rancher/submariner/pkg/client github.com/rancher/submariner/pkg/apis submariner.io:v1
+$CODEGEN_SCRIPT all github.com/submariner-io/submariner/pkg/client github.com/submariner-io/submariner/pkg/apis submariner.io:v1
