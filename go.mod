@@ -1,4 +1,4 @@
-module github.com/rancher/submariner
+module github.com/submariner-io/submariner
 
 go 1.12
 
