@@ -8,9 +8,9 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/rdegges/go-ipify"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/rdegges/go-ipify"
 	"github.com/vishvananda/netlink"
 )
 
