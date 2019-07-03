@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"sync"
 	"time"
 
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -328,76 +327,6 @@ func (d *DatastoreSyncer) reconcileClusterCRD(localCluster *types.SubmarinerClus
 		}
 	}
 	return nil
-}
-
-func (d *DatastoreSyncer) runReaper() {
-	var wg sync.WaitGroup
-	klog.V(4).Infof("Starting reaper")
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for {
-			clusters, err := d.datastore.GetClusters(d.colorCodes)
-			if err != nil {
-				klog.Errorf("Error retrieving remote Clusters: %v", err)
-				return
-			}
-			for _, cluster := range clusters {
-				endpoints, err := d.datastore.GetEndpoints(cluster.ID)
-				if err != nil {
-					klog.Errorf("Error retrieving remote Endpoints for cluster %s: %v", cluster.ID, err)
-					continue
-				}
-
-				crdEndpoints, err := d.submarinerClientset.SubmarinerV1().Endpoints(d.objectNamespace).List(metav1.ListOptions{})
-				if err != nil {
-					klog.Errorf("Error retrieving local Endpoints: %v", err)
-					continue
-				}
-
-				for _, crde := range crdEndpoints.Items {
-					if util.CompareEndpointSpec(crde.Spec, d.localEndpoint.Spec) {
-						klog.V(4).Infof("Not going to delete self from kubernetes")
-					} else {
-						if searchEndpoints(endpoints, crde.Spec.CableName, crde.Spec.ClusterID) {
-							klog.V(4).Infof("Found CRD %s in the API server list of endpoints, not doing anything", crde.Name)
-						} else {
-							// remove the crde
-							if cluster.ID == crde.Spec.ClusterID {
-								if reflect.DeepEqual(crde.Spec, d.localEndpoint.Spec) {
-									klog.V(4).Infof("Not reaping own endpoint %s", crde.Name)
-								} else {
-									klog.V(4).Infof("Removing the CRD %s because it was not found in the API server list", crde.Name)
-									err = d.submarinerClientset.SubmarinerV1().Endpoints(d.objectNamespace).Delete(crde.Name, &metav1.DeleteOptions{})
-									if err != nil {
-										klog.Errorf("Error deleting local CRDE %s: %v", crde.Name, err)
-									}
-								}
-							} else {
-								klog.V(4).Infof("CRDE wasn't found in list but did not match the cluster we're searching for right now")
-							}
-						}
-					}
-				}
-
-			}
-			klog.V(4).Infof("Sleeping for 15 seconds")
-			time.Sleep(15 * time.Second)
-		}
-	}()
-	wg.Wait()
-	klog.Fatalf("reaper exited")
-}
-
-// basic brute force search for now
-// returns true if the endpoint was found in the passed in list
-func searchEndpoints(endpoints []types.SubmarinerEndpoint, cableName string, clusterID string) bool {
-	for _, endpoint := range endpoints {
-		if endpoint.Spec.CableName == cableName && endpoint.Spec.ClusterID == clusterID {
-			return true
-		}
-	}
-	return false
 }
 
 func (d *DatastoreSyncer) reconcileEndpointCRD(rawEndpoint *types.SubmarinerEndpoint, delete bool) error {
