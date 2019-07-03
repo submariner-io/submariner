@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/rancher/submariner/pkg/cableengine/ipsec"
-	"github.com/rancher/submariner/pkg/controllers/datastoresyncer"
-	"github.com/rancher/submariner/pkg/datastore"
-	"github.com/rancher/submariner/pkg/types"
-	"github.com/rancher/submariner/pkg/util"
+	"github.com/submariner-io/submariner/pkg/cableengine/ipsec"
+	"github.com/submariner-io/submariner/pkg/controllers/datastoresyncer"
+	"github.com/submariner-io/submariner/pkg/datastore"
+	"github.com/submariner-io/submariner/pkg/types"
+	"github.com/submariner-io/submariner/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -26,12 +26,12 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 
-	submarinerClientset "github.com/rancher/submariner/pkg/client/clientset/versioned"
-	submarinerInformers "github.com/rancher/submariner/pkg/client/informers/externalversions"
-	"github.com/rancher/submariner/pkg/controllers/tunnel"
-	subk8s "github.com/rancher/submariner/pkg/datastore/kubernetes"
-	"github.com/rancher/submariner/pkg/datastore/phpapi"
-	"github.com/rancher/submariner/pkg/signals"
+	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions"
+	"github.com/submariner-io/submariner/pkg/controllers/tunnel"
+	subk8s "github.com/submariner-io/submariner/pkg/datastore/kubernetes"
+	"github.com/submariner-io/submariner/pkg/datastore/phpapi"
+	"github.com/submariner-io/submariner/pkg/signals"
 )
 
 var (

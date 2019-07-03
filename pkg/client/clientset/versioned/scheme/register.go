@@ -19,7 +19,7 @@ limitations under the License.
 package scheme
 
 import (
-	submarinerv1 "github.com/rancher/submariner/pkg/apis/submariner.io/v1"
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

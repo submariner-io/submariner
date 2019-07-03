@@ -87,7 +87,7 @@ make e2e status=keep logging=true
 To access Kibana, run the following from new terminal tab/window:
 
 ```bash
-export KUBECONFIG=$GOPATH/src/github.com/rancher/submariner/output/kind-config/local-dev/kind-config-cluster1:$GOPATH/src/github.com/rancher/submariner/output/kind-config/local-dev/kind-config-cluster2:$GOPATH/src/github.com/rancher/submariner/output/kind-config/local-dev/kind-config-cluster3
+export KUBECONFIG=$GOPATH/src/github.com/submariner-io/submariner/output/kind-config/local-dev/kind-config-cluster1:$GOPATH/src/github.com/submariner-io/submariner/output/kind-config/local-dev/kind-config-cluster2:$GOPATH/src/github.com/submariner-io/submariner/output/kind-config/local-dev/kind-config-cluster3
 kubectl config use-context cluster1
 kibana_pod=$(kubectl get pods -l app=kibana | awk 'FNR > 1 {print $1}')
 kubectl port-forward ${kibana_pod} 8080:5601

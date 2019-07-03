@@ -14,9 +14,9 @@ import (
 	"github.com/bronze1man/goStrongswanVici"
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/kelseyhightower/envconfig"
-	"github.com/rancher/submariner/pkg/cableengine"
-	"github.com/rancher/submariner/pkg/types"
-	"github.com/rancher/submariner/pkg/util"
+	"github.com/submariner-io/submariner/pkg/cableengine"
+	"github.com/submariner-io/submariner/pkg/types"
+	"github.com/submariner-io/submariner/pkg/util"
 	"k8s.io/klog"
 )
 

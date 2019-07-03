@@ -3,10 +3,10 @@ package e2e
 import (
 	"testing"
 
-	"github.com/rancher/submariner/test/e2e/framework"
+	"github.com/submariner-io/submariner/test/e2e/framework"
 
-	_ "github.com/rancher/submariner/test/e2e/dataplane"
-	_ "github.com/rancher/submariner/test/e2e/example"
+	_ "github.com/submariner-io/submariner/test/e2e/dataplane"
+	_ "github.com/submariner-io/submariner/test/e2e/example"
 )
 
 func init() {

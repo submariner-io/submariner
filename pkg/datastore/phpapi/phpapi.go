@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/rancher/submariner/pkg/types"
-	"github.com/rancher/submariner/pkg/util"
+	"github.com/submariner-io/submariner/pkg/types"
+	"github.com/submariner-io/submariner/pkg/util"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog"
 )

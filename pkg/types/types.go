@@ -1,7 +1,7 @@
 package types
 
 import (
-	subv1 "github.com/rancher/submariner/pkg/apis/submariner.io/v1"
+	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 )
 
 type SubmarinerCluster struct {

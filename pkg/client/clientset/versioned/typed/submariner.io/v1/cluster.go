@@ -21,8 +21,8 @@ package v1
 import (
 	"time"
 
-	v1 "github.com/rancher/submariner/pkg/apis/submariner.io/v1"
-	scheme "github.com/rancher/submariner/pkg/client/clientset/versioned/scheme"
+	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	scheme "github.com/submariner-io/submariner/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"

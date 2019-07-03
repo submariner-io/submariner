@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rancher/submariner/test/e2e/framework/ginkgowrapper"
+	"github.com/submariner-io/submariner/test/e2e/framework/ginkgowrapper"
 
 	. "github.com/onsi/ginkgo"
 )

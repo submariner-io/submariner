@@ -3,7 +3,7 @@ package dataplane
 import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 
-	"github.com/rancher/submariner/test/e2e/framework"
+	"github.com/submariner-io/submariner/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

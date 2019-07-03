@@ -19,8 +19,8 @@ limitations under the License.
 package submariner
 
 import (
-	internalinterfaces "github.com/rancher/submariner/pkg/client/informers/externalversions/internalinterfaces"
-	v1 "github.com/rancher/submariner/pkg/client/informers/externalversions/submariner.io/v1"
+	internalinterfaces "github.com/submariner-io/submariner/pkg/client/informers/externalversions/internalinterfaces"
+	v1 "github.com/submariner-io/submariner/pkg/client/informers/externalversions/submariner.io/v1"
 )
 
 // Interface provides access to each of this group's versions.
