@@ -14,4 +14,4 @@ if [[ $(goimports -l ${PACKAGES} | wc -l) -gt 0 ]]; then
     exit 1
 fi
 
-golangci-lint run -D megacheck -E unused,gosimple,staticcheck
+golangci-lint run
