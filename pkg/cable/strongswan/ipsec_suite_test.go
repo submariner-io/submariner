@@ -1,4 +1,4 @@
-package ipsec_test
+package strongswan_test
 
 import (
 	"testing"
