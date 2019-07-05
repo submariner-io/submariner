@@ -37,11 +37,13 @@ import (
 var (
 	localMasterURL  string
 	localKubeconfig string
+	localEngine     string
 )
 
 func init() {
 	flag.StringVar(&localKubeconfig, "kubeconfig", "", "Path to kubeconfig of local cluster. Only required if out-of-cluster.")
 	flag.StringVar(&localMasterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+	flag.StringVar(&localEngine, "engine", "strongswan", "The IKE implementation to use: strongswan or libreswan.")
 }
 
 func main() {
@@ -91,7 +93,7 @@ func main() {
 			klog.Fatalf("Fatal error occurred while retrieving local endpoint from %#v: %v", submSpec, err)
 		}
 
-		cableEngine, err := ipsec.NewEngine(append(submSpec.ClusterCidr, submSpec.ServiceCidr...), localCluster, localEndpoint)
+		cableEngine, err := ipsec.NewEngine(localEngine, append(submSpec.ClusterCidr, submSpec.ServiceCidr...), localCluster, localEndpoint)
 		if err != nil {
 			klog.Fatalf("Fatal error occurred creating ipsec engine: %v", err)
 		}

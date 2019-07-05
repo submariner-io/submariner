@@ -23,8 +23,8 @@ type engine struct {
 	localEndpoint types.SubmarinerEndpoint
 }
 
-func NewEngine(localSubnets []string, localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) (cableengine.Engine, error) {
-	driver, err := NewStrongSwan(localSubnets, localEndpoint)
+func NewEngine(engineName string, localSubnets []string, localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) (cableengine.Engine, error) {
+	driver, err := getDriver(engineName, localSubnets, localEndpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -35,6 +35,17 @@ func NewEngine(localSubnets []string, localCluster types.SubmarinerCluster, loca
 		localSubnets:  localSubnets,
 		driver:        driver,
 	}, nil
+}
+
+func getDriver(engineName string, localSubnets []string, localEndpoint types.SubmarinerEndpoint) (Driver, error) {
+	switch engineName {
+	case "strongswan":
+		return NewStrongSwan(localSubnets, localEndpoint)
+	case "libreswan":
+		return NewLibreSwan(localSubnets, localEndpoint)
+	default:
+		return nil, fmt.Errorf("Unknown engine %s", engineName)
+	}
 }
 
 func (i *engine) StartEngine() error {
