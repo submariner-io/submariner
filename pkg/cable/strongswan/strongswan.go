@@ -1,4 +1,4 @@
-package ipsec
+package strongswan
 
 import (
 	"fmt"
