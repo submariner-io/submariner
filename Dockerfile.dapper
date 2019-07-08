@@ -16,6 +16,21 @@ RUN rm -f /bin/sh && ln -s /bin/bash /bin/sh
 ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
     GOPATH=/go GO111MODULE=on PATH=/go/bin:/usr/local/go/bin:${PATH} SHELL=/bin/bash GOFLAGS=-mod=vendor
 
+# Requirements:
+# Component      | Usage
+# -----------------------------------------------------------
+# gcc            | ginkgo
+# git            | find the workspace root
+# curl           | download other tools
+# docker.io      | Dapper
+# golang         | build
+# kubectl        | e2e tests
+# golangci-lint  | code linting
+# helm           | e2e tests
+# kubefedctl     | e2e tests
+# kind           | e2e tests
+# ginkgo         | tests
+# goimports      | code formatting
 RUN apt-get -q update && \
     apt-get install -y gcc git curl docker.io && \
     curl https://storage.googleapis.com/golang/go${GO_VERSION}.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local && \
