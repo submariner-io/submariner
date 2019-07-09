@@ -1,11 +1,10 @@
-FROM ubuntu:18.04
+FROM registry.access.redhat.com/ubi8/ubi-minimal
 
 WORKDIR /var/submariner
 
-ENV DEBIAN_FRONTEND=noninteractive
-
-RUN apt-get -y update && \
-    apt-get -y install iproute2 iptables libatm1 libgmp10
+# These are all available in the UBI8 base OS repository
+RUN microdnf -y install --nodocs iproute iptables && \
+    microdnf clean all
 
 COPY submariner-route-agent.sh /usr/local/bin
 
