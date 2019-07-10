@@ -123,7 +123,7 @@ To federate resources across the clusters [kubefedctl] tool must be installed on
 At any time you can run a cleanup command that will remove kind resources.
 
 ```bash
-make e2e status=cleanup
+make e2e status=clean
 ```
 
 You can do full docker cleanup, but it will force all the docker images to be removed and invalidate the local docker cache. 
