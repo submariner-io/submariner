@@ -162,7 +162,7 @@ func (i *strongSwan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (strin
 	return remoteEndpointIP, nil
 }
 
-func (i *strongSwan) DisconnectFromEndpoint(cableID string) error {
+func (i *strongSwan) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) error {
 	client, err := getClient()
 	if err != nil {
 		return err
@@ -170,6 +170,7 @@ func (i *strongSwan) DisconnectFromEndpoint(cableID string) error {
 	}
 	defer client.Close()
 
+	cableID := endpoint.Spec.CableName
 	klog.Infof("Unloading connection %s", cableID)
 	err = client.UnloadConn(&goStrongswanVici.UnloadConnRequest{
 		Name: cableID,

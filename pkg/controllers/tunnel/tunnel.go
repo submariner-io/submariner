@@ -145,11 +145,14 @@ func (t *Controller) handleRemovedEndpoint(obj interface{}) {
 	}
 
 	klog.V(4).Infof("Informed of removed endpoint for tunnel controller object: %#v", object)
-	if err := t.ce.RemoveCable(object.Spec.CableName); err != nil {
-		utilruntime.HandleError(fmt.Errorf("error removing endpoint cable %s from engine: %v",
-			object.Spec.CableName, err))
+	myEndpoint := types.SubmarinerEndpoint{
+		Spec: object.Spec,
+	}
+	if err := t.ce.RemoveCable(myEndpoint); err != nil {
+		utilruntime.HandleError(fmt.Errorf("error removing endpoint cable %#v from engine: %v",
+			myEndpoint, err))
 		return
 	}
 
-	klog.V(4).Infof("Removed endpoint cable %s from engine", object.Spec.CableName)
+	klog.V(4).Infof("Removed endpoint cable %#v from engine", myEndpoint)
 }

@@ -17,6 +17,6 @@ type Driver interface {
 	// representation of the IP address of the target endpoint.
 	ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string, error)
 
-	// DisconnectFromEndpoint disconnects from the endpoint identified by the cable ID.
-	DisconnectFromEndpoint(cableID string) error
+	// DisconnectFromEndpoint disconnects from the connection to the given endpoint.
+	DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) error
 }
