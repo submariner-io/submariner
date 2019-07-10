@@ -1,0 +1,14 @@
+#!/bin/sh
+
+# Checks pre-requisites and starts the Pluto daemon, without forking
+
+set -e
+
+# These are the ExecStartPre lines from the systemd service definition
+/usr/libexec/ipsec/addconn --config /etc/ipsec.conf --checkconfig
+/usr/libexec/ipsec/_stackmanager start
+/usr/sbin/ipsec --checknss
+/usr/sbin/ipsec --checknflog
+
+# Start the daemon itself with any additional arguments passed in
+/usr/libexec/ipsec/pluto --leak-detective --config /etc/ipsec.conf --nofork  "$@"

@@ -20,3 +20,9 @@ type Driver interface {
 	// DisconnectFromEndpoint disconnects from the connection to the given endpoint.
 	DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) error
 }
+
+type specification struct {
+	PSK     string
+	Debug   bool
+	LogFile string
+}

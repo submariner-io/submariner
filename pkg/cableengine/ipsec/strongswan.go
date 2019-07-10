@@ -37,12 +37,6 @@ type strongSwan struct {
 	logFile string
 }
 
-type specification struct {
-	PSK     string
-	Debug   bool
-	LogFile string
-}
-
 func NewStrongSwan(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (Driver, error) {
 	ipSecSpec := specification{}
 

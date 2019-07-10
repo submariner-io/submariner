@@ -1,22 +1,13 @@
-FROM ubuntu:18.04
+FROM registry.fedoraproject.org/fedora-minimal:30
 
 WORKDIR /var/submariner
 
-COPY strongswan*.tar.gz /var/tmp
+# iproute and iptables are used internally
+# libreswan provides IKE
+# procps is needed for sysctl
+RUN microdnf install iproute iptables libreswan procps
 
-ENV DEBIAN_FRONTEND=noninteractive
-
-RUN apt-get -y update && \
-    apt-get -y install curl iproute2 iptables libatm1 libgmp10
-
-RUN /bin/bash -c "cd / && tar xf /var/tmp/strongswan*.tar.gz && rm -f /var/tmp/strongswan*.tar.gz"
-
-COPY charon.conf /usr/local/etc/strongswan.d/charon.conf
-COPY submariner.sh /usr/local/bin
-
-RUN chmod +x /usr/local/bin/submariner.sh
-
-COPY submariner-engine /usr/local/bin
+COPY submariner.sh pluto submariner-engine /usr/local/bin/
 
 # temporary sleep infinity so that we can do our debugging
 ENTRYPOINT submariner.sh
