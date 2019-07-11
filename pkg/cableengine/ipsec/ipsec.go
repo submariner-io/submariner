@@ -194,9 +194,9 @@ func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 	return nil
 }
 
-func (i *engine) RemoveCable(cableID string) error {
+func (i *engine) RemoveCable(endpoint types.SubmarinerEndpoint) error {
 	i.Lock()
 	defer i.Unlock()
 
-	return i.driver.DisconnectFromEndpoint(cableID)
+	return i.driver.DisconnectFromEndpoint(endpoint)
 }

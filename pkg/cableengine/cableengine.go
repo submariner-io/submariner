@@ -7,5 +7,5 @@ import (
 type Engine interface {
 	StartEngine() error
 	InstallCable(types.SubmarinerEndpoint) error
-	RemoveCable(string) error
+	RemoveCable(types.SubmarinerEndpoint) error
 }
