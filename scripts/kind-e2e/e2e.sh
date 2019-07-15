@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
-set -e
+set -em
 
 function kind_clusters() {
     status=$1
     version=$2
+    pids=(-1 -1 -1)
+    logs=()
     for i in 1 2 3; do
         if [[ $(kind get clusters | grep cluster${i} | wc -l) -gt 0  ]]; then
             echo Cluster cluster${i} already exists, skipping cluster creation...
         else
+            logs[$i]=$(mktemp)
+            echo Creating cluster${i}, logging to ${logs[$i]}...
+            (
             if [[ -n ${version} ]]; then
                 kind create cluster --image=kindest/node:v${version} --name=cluster${i} --wait=5m --config=${PRJ_ROOT}/scripts/kind-e2e/cluster${i}-config.yaml
             else
@@ -23,9 +28,21 @@ function kind_clusters() {
 
             sed -i -- "s/server: .*/server: https:\/\/$master_ip:6443/g" $(kind get kubeconfig-path --name="cluster$i")
             cp -r $(kind get kubeconfig-path --name="cluster$i") ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster${i}
-            export KUBECONFIG=$(kind get kubeconfig-path --name=cluster1):$(kind get kubeconfig-path --name=cluster2):$(kind get kubeconfig-path --name=cluster3)
+            ) > ${logs[$i]} 2>&1 &
+            set pids[$i] = $!
         fi
     done
+    for i in 1 2 3; do
+        if [[ pids[$i] -gt -1 ]]; then
+            wait ${pids[$i]}
+            if [[ $? -ne 0 && $? -ne 127 ]]; then
+                echo Cluster $i creation failed:
+                cat $logs[$i]
+            fi
+            rm -f $logs[$i]
+        fi
+    done
+    export KUBECONFIG=$(kind get kubeconfig-path --name=cluster1):$(kind get kubeconfig-path --name=cluster2):$(kind get kubeconfig-path --name=cluster3)
 }
 
 function install_helm() {
