@@ -254,8 +254,7 @@ cluster1 is our broker cluster, **to execute the E2E tests** we would do:
 
   ```bash
   export GO111MODULE=on
-  cd test/e2e
-  go test -args -kubeconfig=creds/cluster1:creds/cluster2:creds/cluster3 \
+  go test ./test/e2e -args -kubeconfig=creds/cluster1:creds/cluster2:creds/cluster3 \
                 -dp-context cluster2 \
                 -dp-context cluster3 \
                 -ginkgo.randomizeAllSpecs
@@ -273,8 +272,7 @@ specify the ginkgo.focus argument
 
   ```bash
   export GO111MODULE=on
-  cd test/e2e
-  go test -args -kubeconfig=creds/cluster1:creds/cluster2:creds/cluster3 \
+  go test ./test/e2e -args -kubeconfig=creds/cluster1:creds/cluster2:creds/cluster3 \
                 -dp-context cluster2 \
                 -dp-context cluster3 \
                 -ginkgo.focus=dataplane \
@@ -284,8 +282,7 @@ specify the ginkgo.focus argument
 It's possible to generate jUnit XML report files
   ```bash
   export GO111MODULE=on
-  cd test/e2e
-  go test -args  -kubeconfig=creds/cluster1:creds/cluster2:creds/cluster3 \
+  go test ./test/e2e -args -kubeconfig=creds/cluster1:creds/cluster2:creds/cluster3 \
                  -dp-context cluster2 \
                  -dp-context cluster3 \
                  -ginkgo.v -report-dir ./junit -ginkgo.randomizeAllSpecs
