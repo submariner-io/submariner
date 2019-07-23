@@ -32,33 +32,55 @@ function kind_clusters() {
             set pids[$i] = $!
         fi
     done
-    for i in 1 2 3; do
-        if [[ pids[$i] -gt -1 ]]; then
-            wait ${pids[$i]}
-            if [[ $? -ne 0 && $? -ne 127 ]]; then
-                echo Cluster $i creation failed:
-                cat $logs[$i]
+    if [[ ${#logs[@]} -gt 0 ]]; then
+        echo "(Watch the installation processes with \"tail -f ${logs[@]}\".)"
+        for i in 1 2 3; do
+            if [[ pids[$i] -gt -1 ]]; then
+                wait ${pids[$i]}
+                if [[ $? -ne 0 && $? -ne 127 ]]; then
+                    echo Cluster $i creation failed:
+                    cat $logs[$i]
+                fi
+                rm -f $logs[$i]
             fi
-            rm -f $logs[$i]
-        fi
-    done
+        done
+    fi
     export KUBECONFIG=$(kind get kubeconfig-path --name=cluster1):$(kind get kubeconfig-path --name=cluster2):$(kind get kubeconfig-path --name=cluster3)
 }
 
 function install_helm() {
     helm init --client-only
     helm repo add submariner-latest https://releases.rancher.com/submariner-charts/latest
+    pids=(-1 -1 -1)
+    logs=()
     for i in 1 2 3; do
         if kubectl --context=cluster${i} -n kube-system rollout status deploy/tiller-deploy > /dev/null 2>&1; then
             echo Helm already installed on cluster${i}, skipping helm installation...
         else
-            echo Installing helm on cluster${i}.
+            logs[$i]=$(mktemp)
+            echo Installing helm on cluster${i}, logging to ${logs[$i]}...
+            (
             kubectl --context=cluster${i} -n kube-system create serviceaccount tiller
             kubectl --context=cluster${i} create clusterrolebinding tiller --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
             helm --kube-context cluster${i} init --service-account tiller
             kubectl --context=cluster${i} -n kube-system rollout status deploy/tiller-deploy
+            ) > ${logs[$i]} 2>&1 &
+            set pids[$i] = $!
         fi
     done
+    if [[ ${#logs[@]} -gt 0 ]]; then
+        echo "(Watch the installation processes with \"tail -f ${logs[@]}\".)"
+        for i in 1 2 3; do
+            if [[ pids[$i] -gt -1 ]]; then
+                wait ${pids[$i]}
+                if [[ $? -ne 0 && $? -ne 127 ]]; then
+                    echo Cluster $i creation failed:
+                    cat $logs[$i]
+                fi
+                rm -f $logs[$i]
+            fi
+        done
+    fi
 }
 
 function setup_broker() {
