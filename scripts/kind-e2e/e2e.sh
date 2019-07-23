@@ -49,43 +49,40 @@ function install_helm() {
     helm init --client-only
     helm repo add submariner-latest https://releases.rancher.com/submariner-charts/latest
     for i in 1 2 3; do
-        kubectl config use-context cluster${i}
-        if kubectl -n kube-system rollout status deploy/tiller-deploy > /dev/null 2>&1; then
+        if kubectl --context=cluster${i} -n kube-system rollout status deploy/tiller-deploy > /dev/null 2>&1; then
             echo Helm already installed on cluster${i}, skipping helm installation...
         else
             echo Installing helm on cluster${i}.
-            kubectl -n kube-system create serviceaccount tiller
-            kubectl create clusterrolebinding tiller --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
-            helm init --service-account tiller
-            kubectl -n kube-system  rollout status deploy/tiller-deploy
+            kubectl --context=cluster${i} -n kube-system create serviceaccount tiller
+            kubectl --context=cluster${i} create clusterrolebinding tiller --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
+            helm --kube-context cluster${i} init --service-account tiller
+            kubectl --context=cluster${i} -n kube-system rollout status deploy/tiller-deploy
         fi
     done
 }
 
 function setup_broker() {
-    kubectl config use-context cluster1
-    if kubectl get crd clusters.submariner.io > /dev/null 2>&1; then
+    if kubectl --context=cluster1 get crd clusters.submariner.io > /dev/null 2>&1; then
         echo Submariner CRDs already exist, skipping broker creation...
     else
         echo Installing broker on cluster1.
-        helm install submariner-latest/submariner-k8s-broker --name ${SUBMARINER_BROKER_NS} --namespace ${SUBMARINER_BROKER_NS}
+        helm --kube-context cluster1 install submariner-latest/submariner-k8s-broker --name ${SUBMARINER_BROKER_NS} --namespace ${SUBMARINER_BROKER_NS}
     fi
 
-    SUBMARINER_BROKER_URL=$(kubectl -n default get endpoints kubernetes -o jsonpath="{.subsets[0].addresses[0].ip}:{.subsets[0].ports[?(@.name=='https')].port}")
-    SUBMARINER_BROKER_CA=$(kubectl -n ${SUBMARINER_BROKER_NS} get secrets -o jsonpath="{.items[?(@.metadata.annotations['kubernetes\.io/service-account\.name']=='${SUBMARINER_BROKER_NS}-client')].data['ca\.crt']}")
-    SUBMARINER_BROKER_TOKEN=$(kubectl -n ${SUBMARINER_BROKER_NS} get secrets -o jsonpath="{.items[?(@.metadata.annotations['kubernetes\.io/service-account\.name']=='${SUBMARINER_BROKER_NS}-client')].data.token}"|base64 --decode)
+    SUBMARINER_BROKER_URL=$(kubectl --context=cluster1 -n default get endpoints kubernetes -o jsonpath="{.subsets[0].addresses[0].ip}:{.subsets[0].ports[?(@.name=='https')].port}")
+    SUBMARINER_BROKER_CA=$(kubectl --context=cluster1 -n ${SUBMARINER_BROKER_NS} get secrets -o jsonpath="{.items[?(@.metadata.annotations['kubernetes\.io/service-account\.name']=='${SUBMARINER_BROKER_NS}-client')].data['ca\.crt']}")
+    SUBMARINER_BROKER_TOKEN=$(kubectl --context=cluster1 -n ${SUBMARINER_BROKER_NS} get secrets -o jsonpath="{.items[?(@.metadata.annotations['kubernetes\.io/service-account\.name']=='${SUBMARINER_BROKER_NS}-client')].data.token}"|base64 --decode)
 }
 
 function setup_cluster2_gateway() {
-    kubectl config use-context cluster2
-    if kubectl wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s > /dev/null 2>&1; then
+    if kubectl --context=cluster2 wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s > /dev/null 2>&1; then
             echo Submariner already installed, skipping submariner helm installation...
-            update_subm_pods
+            update_subm_pods cluster2
         else
             echo Installing submariner on cluster2...
             worker_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster2-worker | head -n 1)
-            kubectl label node cluster2-worker "submariner.io/gateway=true" --overwrite
-            helm install submariner-latest/submariner \
+            kubectl --context=cluster2 label node cluster2-worker "submariner.io/gateway=true" --overwrite
+            helm --kube-context cluster2 install submariner-latest/submariner \
             --name submariner \
             --namespace submariner \
             --set ipsec.psk="${SUBMARINER_PSK}" \
@@ -104,25 +101,24 @@ function setup_cluster2_gateway() {
             --set engine.image.tag="local" \
             --set engine.image.pullPolicy="IfNotPresent"
             echo Waiting for submariner pods to be Ready on cluster2...
-            kubectl wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s
-            kubectl wait --for=condition=Ready pods -l app=submariner-routeagent -n submariner --timeout=60s
+            kubectl --context=cluster2 wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s
+            kubectl --context=cluster2 wait --for=condition=Ready pods -l app=submariner-routeagent -n submariner --timeout=60s
             echo Deploying netshoot on cluster2 worker: ${worker_ip}
-            kubectl apply -f ${PRJ_ROOT}/scripts/kind-e2e/netshoot.yaml
+            kubectl --context=cluster2 apply -f ${PRJ_ROOT}/scripts/kind-e2e/netshoot.yaml
             echo Waiting for netshoot pods to be Ready on cluster2.
-            kubectl rollout status deploy/netshoot --timeout=120s
+            kubectl --context=cluster2 rollout status deploy/netshoot --timeout=120s
     fi
 }
 
 function setup_cluster3_gateway() {
-    kubectl config use-context cluster3
-    if kubectl wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s > /dev/null 2>&1; then
+    if kubectl --context=cluster3 wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s > /dev/null 2>&1; then
             echo Submariner already installed, skipping submariner helm installation...
-            update_subm_pods
+            update_subm_pods cluster3
         else
             echo Installing submariner on cluster3...
             worker_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster3-worker | head -n 1)
-            kubectl label node cluster3-worker "submariner.io/gateway=true" --overwrite
-            helm install submariner-latest/submariner \
+            kubectl --context=cluster3 label node cluster3-worker "submariner.io/gateway=true" --overwrite
+            helm --kube-context cluster3 install submariner-latest/submariner \
              --name submariner \
              --namespace submariner \
              --set ipsec.psk="${SUBMARINER_PSK}" \
@@ -141,12 +137,12 @@ function setup_cluster3_gateway() {
              --set engine.image.tag="local" \
              --set engine.image.pullPolicy="IfNotPresent"
             echo Waiting for submariner pods to be Ready on cluster3...
-            kubectl wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s
-            kubectl wait --for=condition=Ready pods -l app=submariner-routeagent -n submariner --timeout=60s
+            kubectl --context=cluster3 wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s
+            kubectl --context=cluster3 wait --for=condition=Ready pods -l app=submariner-routeagent -n submariner --timeout=60s
             echo Deploying nginx on cluster3 worker: ${worker_ip}
-            kubectl apply -f ${PRJ_ROOT}/scripts/kind-e2e/nginx-demo.yaml
+            kubectl --context=cluster3 apply -f ${PRJ_ROOT}/scripts/kind-e2e/nginx-demo.yaml
             echo Waiting for nginx-demo deployment to be Ready on cluster3.
-            kubectl rollout status deploy/nginx-demo --timeout=120s
+            kubectl --context=cluster3 rollout status deploy/nginx-demo --timeout=120s
     fi
 }
 
@@ -162,16 +158,14 @@ function kind_import_images() {
 }
 
 function test_connection() {
-    kubectl config use-context cluster3
-    nginx_svc_ip_cluster3=$(kubectl get svc -l app=nginx-demo | awk 'FNR == 2 {print $3}')
-    kubectl config use-context cluster2
-    netshoot_pod=$(kubectl get pods -l app=netshoot | awk 'FNR == 2 {print $1}')
+    nginx_svc_ip_cluster3=$(kubectl --context=cluster3 get svc -l app=nginx-demo | awk 'FNR == 2 {print $3}')
+    netshoot_pod=$(kubectl --context=cluster2 get pods -l app=netshoot | awk 'FNR == 2 {print $1}')
 
     echo "Testing connectivity between clusters - $netshoot_pod cluster2 --> $nginx_svc_ip_cluster3 nginx service cluster3"
 
     attempt_counter=0
     max_attempts=5
-    until $(kubectl exec -it ${netshoot_pod} -- curl --output /dev/null -m 30 --silent --head --fail ${nginx_svc_ip_cluster3}); do
+    until $(kubectl --context=cluster2 exec -it ${netshoot_pod} -- curl --output /dev/null -m 30 --silent --head --fail ${nginx_svc_ip_cluster3}); do
         if [[ ${attempt_counter} -eq ${max_attempts} ]];then
           echo "Max attempts reached, connection test failed!"
           exit 1
@@ -183,39 +177,36 @@ function test_connection() {
 
 function update_subm_pods() {
     echo Removing submariner engine pods...
-    kubectl delete pods -n submariner -l app=submariner-engine
-    kubectl wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s
+    kubectl --context=$1 delete pods -n submariner -l app=submariner-engine
+    kubectl --context=$1 wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s
     echo Removing submariner route agent pods...
-    kubectl delete pods -n submariner -l app=submariner-routeagent
-    kubectl wait --for=condition=Ready pods -l app=submariner-routeagent -n submariner --timeout=60s
+    kubectl --context=$1 delete pods -n submariner -l app=submariner-routeagent
+    kubectl --context=$1 wait --for=condition=Ready pods -l app=submariner-routeagent -n submariner --timeout=60s
 }
 
 function enable_logging() {
-    kubectl config use-context cluster1
-    if kubectl rollout status deploy/kibana > /dev/null 2>&1; then
+    if kubectl --context=cluster1 rollout status deploy/kibana > /dev/null 2>&1; then
         echo Elasticsearch stack already installed, skipping...
     else
         echo Installing Elasticsearch...
         es_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster1-control-plane | head -n 1)
-        kubectl apply -f ${PRJ_ROOT}/scripts/kind-e2e/logging/elasticsearch.yaml
-        kubectl apply -f ${PRJ_ROOT}/scripts/kind-e2e/logging/filebeat.yaml
+        kubectl --context=cluster1 apply -f ${PRJ_ROOT}/scripts/kind-e2e/logging/elasticsearch.yaml
+        kubectl --context=cluster1 apply -f ${PRJ_ROOT}/scripts/kind-e2e/logging/filebeat.yaml
         echo Waiting for Elasticsearch to be ready...
-        kubectl wait --for=condition=Ready pods -l app=elasticsearch --timeout=300s
+        kubectl --context=cluster1 wait --for=condition=Ready pods -l app=elasticsearch --timeout=300s
         for i in 2 3; do
-            kubectl config use-context cluster${i}
-            kubectl apply -f ${PRJ_ROOT}/scripts/kind-e2e/logging/filebeat.yaml
-            kubectl set env daemonset/filebeat -n kube-system ELASTICSEARCH_HOST=${es_ip} ELASTICSEARCH_PORT=30000
+            kubectl --context=cluster${i} apply -f ${PRJ_ROOT}/scripts/kind-e2e/logging/filebeat.yaml
+            kubectl --context=cluster${i} set env daemonset/filebeat -n kube-system ELASTICSEARCH_HOST=${es_ip} ELASTICSEARCH_PORT=30000
         done
     fi
 }
 
 function enable_kubefed() {
-    kubectl config use-context cluster1
-    if kubectl rollout status deploy/kubefed-controller-manager -n ${KUBEFED_NS} > /dev/null 2>&1; then
+    if kubectl --context=cluster1 rollout status deploy/kubefed-controller-manager -n ${KUBEFED_NS} > /dev/null 2>&1; then
         echo Kubefed already installed, skipping setup...
     else
         helm repo add kubefed-charts https://raw.githubusercontent.com/kubernetes-sigs/kubefed/master/charts
-        helm install kubefed-charts/kubefed --version=0.1.0-rc2 --name kubefed --namespace ${KUBEFED_NS} --set controllermanager.replicaCount=1
+        helm --kube-context cluster1 install kubefed-charts/kubefed --version=0.1.0-rc2 --name kubefed --namespace ${KUBEFED_NS} --set controllermanager.replicaCount=1
         for i in 1 2 3; do
             kubefedctl join cluster${i} --cluster-context cluster${i} --host-cluster-context cluster1 --v=2
             #master_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster${i}-control-plane | head -n 1)
@@ -224,8 +215,8 @@ function enable_kubefed() {
         done
         #kubectl delete pod -l control-plane=controller-manager -n ${KUBEFED_NS}
         echo Waiting for kubefed control plain to be ready...
-        kubectl wait --for=condition=Ready pods -l control-plane=controller-manager -n ${KUBEFED_NS} --timeout=120s
-        kubectl wait --for=condition=Ready pods -l kubefed-admission-webhook=true -n ${KUBEFED_NS} --timeout=120s
+        kubectl --context=cluster1 wait --for=condition=Ready pods -l control-plane=controller-manager -n ${KUBEFED_NS} --timeout=120s
+        kubectl --context=cluster1 wait --for=condition=Ready pods -l kubefed-admission-webhook=true -n ${KUBEFED_NS} --timeout=120s
     fi
 }
 
