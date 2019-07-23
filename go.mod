@@ -42,3 +42,5 @@ require (
 )
 
 replace github.com/bronze1man/goStrongswanVici => github.com/mangelajo/goStrongswanVici v0.0.0-20190223031456-9a5ae4453bd
+
+replace github.com/onsi/ginkgo => github.com/onsi/ginkgo v0.0.0-20190716150225-054541502288
