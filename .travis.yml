@@ -4,5 +4,14 @@ language: go
 git:
   depth: 1
 
+before_script:
+  - CHANGED_FILES=$(git diff --name-only HEAD $(git merge-base HEAD $TRAVIS_BRANCH))
+
 script:
   - make ci e2e status=keep
+
+after_success:
+  - if [[ "${CHANGED_FILES[@]}" =~ "scripts/kind-e2e/e2e.sh" ]]; then
+      echo "scripts/kind-e2e/e2e.sh was modified, testing again on already deployed environment.";
+      make e2e status=keep;
+    fi
