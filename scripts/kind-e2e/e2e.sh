@@ -45,7 +45,6 @@ function kind_clusters() {
             fi
         done
     fi
-    export KUBECONFIG=$(kind get kubeconfig-path --name=cluster1):$(kind get kubeconfig-path --name=cluster2):$(kind get kubeconfig-path --name=cluster3)
 }
 
 function install_helm() {
