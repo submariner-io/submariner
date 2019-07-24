@@ -24,19 +24,19 @@ func testPod2ServiceTCP(f *framework.Framework) {
 	By("Creating a listener pod in cluster B, which will wait for a handshake over TCP")
 	listenerPod := f.CreateTCPCheckListenerPod(framework.ClusterB, listenerUUID)
 
-	By("Pointing a service ClusterIP to the listerner pod in cluster B")
+	By("Pointing a service ClusterIP to the listener pod in cluster B")
 	service := f.CreateTCPService(framework.ClusterB, listenerPod.Labels[framework.TestAppLabel], framework.TestPort)
 	framework.Logf("Service for listener pod has ClusterIP: %v", service.Spec.ClusterIP)
 
-	By("Creating a connector pod in cluster B, which will attempt the specific UUID handshake over TCP")
+	By("Creating a connector pod in cluster A, which will attempt the specific UUID handshake over TCP")
 	connectorPod := f.CreateTCPCheckConnectorPod(framework.ClusterA, listenerPod, service.Spec.ClusterIP, connectorUUID)
 
-	By("Waiting for the connector pod to exit with code 0, returning what listener sent")
+	By("Waiting for the listener pod to exit with code 0, returning what listener sent")
 	exitStatusL, exitMessageL := f.WaitForPodFinishStatus(listenerPod, framework.ClusterB)
 	framework.Logf("Listener output:\n%s", exitMessageL)
 	Expect(exitStatusL).To(Equal(int32(0)))
 
-	By("Waiting for the listener pod to exit with code 0, returning what connector sent")
+	By("Waiting for the connector pod to exit with code 0, returning what connector sent")
 	exitStatusC, exitMessageC := f.WaitForPodFinishStatus(connectorPod, framework.ClusterA)
 	framework.Logf("Connector output\n%s", exitMessageC)
 	Expect(exitStatusC).To(Equal(int32(0)))
