@@ -1,0 +1,18 @@
+### Constants ###
+
+export CYAN_COLOR='\e[36m'
+export NO_COLOR='\e[0m'
+
+### Functions ###
+
+function trap_commands() {
+    # Function to print each bash command before it is executed
+    trap '! [[ "$BASH_COMMAND" =~ ^(echo|read|\[\[|while|for|prompt) ]] && \
+    cmd=`eval echo -e "$BASH_COMMAND" 2>/dev/null` && \
+    echo -e "${CYAN_COLOR} $cmd ${NO_COLOR}"' DEBUG
+}
+
+### Main ###
+
+export -f trap_commands
+trap_commands
