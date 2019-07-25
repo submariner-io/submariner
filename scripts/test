@@ -1,14 +1,14 @@
 #!/bin/bash
 set -e
 
-cd $(dirname $0)/..
+source $(dirname $0)/lib/find_functions
 
-source scripts/lib/find_functions
+cd $(git rev-parse --show-toplevel)
 
 echo Looking for packages to test
 
 PACKAGES=$(find_go_pkg_dirs)
 
-echo Running tests in ${PACKAGES}
+echo Running tests in \"${PACKAGES}\" under $(pwd) 
 [ "${ARCH}" == "amd64" ] && RACE=-race
 ginkgo ${RACE} -cover ${PACKAGES}

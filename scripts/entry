@@ -7,13 +7,13 @@ mkdir -p bin dist output
 
 # download all go mod modules to the vendor directory 
 if [[ ! -d vendor ]]; then
-	./scripts/vendor
+	./$(dirname $0)/vendor
 else
 	echo "Skipping go modules download as your vendor directory is already populated"
 fi
 
-if [ -e ./scripts/$1 ]; then
-    ./scripts/"$@"
+if [ -e ./$(dirname $0)/$1 ]; then
+    ./$(dirname $0)/"$@"
 else
     "$@"
 fi

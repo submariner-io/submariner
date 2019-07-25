@@ -1,13 +1,15 @@
 #!/bin/bash
 set -e
 
-cd $(dirname $0)/..
+source $(dirname $0)/lib/find_functions
 
-source scripts/lib/find_functions
+cd $(git rev-parse --show-toplevel)
 
 EXCLUDE_PKG_DIRS=".git .trash-cache vendor bin"
 
 PACKAGES=$(find_go_pkg_dirs --no-trailing-dots "*.go")
+
+echo Validating \"$PACKAGES\" under $(pwd)
 
 if [[ $(goimports -l ${PACKAGES} | wc -l) -gt 0 ]]; then
     echo Incorrect formatting, please run goimports
