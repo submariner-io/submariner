@@ -120,7 +120,7 @@ function setup_cluster2_gateway() {
             --set broker.namespace="${SUBMARINER_BROKER_NS}" \
             --set broker.ca="${SUBMARINER_BROKER_CA}" \
             --set submariner.clusterId="cluster2" \
-            --set submariner.clusterCidr="$worker_ip/32" \
+            --set submariner.clusterCidr="10.245.0.0/16" \
             --set submariner.serviceCidr="100.95.0.0/16" \
             --set submariner.natEnabled="false" \
             --set routeAgent.image.repository="submariner-route-agent" \
@@ -157,7 +157,7 @@ function setup_cluster3_gateway() {
              --set broker.namespace="${SUBMARINER_BROKER_NS}" \
              --set broker.ca="${SUBMARINER_BROKER_CA}" \
              --set submariner.clusterId="cluster3" \
-             --set submariner.clusterCidr="$worker_ip/32" \
+             --set submariner.clusterCidr="10.246.0.0/16" \
              --set submariner.serviceCidr="100.96.0.0/16" \
              --set submariner.natEnabled="false" \
              --set routeAgent.image.repository="submariner-route-agent" \
