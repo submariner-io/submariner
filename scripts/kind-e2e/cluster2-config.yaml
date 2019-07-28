@@ -1,5 +1,7 @@
 kind: Cluster
 apiVersion: kind.sigs.k8s.io/v1alpha3
+networking:
+  disableDefaultCNI: true
 kubeadmConfigPatches:
 - |
   apiVersion: kubeadm.k8s.io/v1beta1
