@@ -4,14 +4,19 @@ language: go
 git:
   depth: 1
 
+services:
+  - docker
 before_script:
-  - CHANGED_FILES=$(git diff --name-only HEAD $(git merge-base HEAD $TRAVIS_BRANCH))
-
+  - CHANGED_FILES_PR=$(git diff --name-only HEAD $(git merge-base HEAD $TRAVIS_BRANCH))
 script:
   - make ci e2e status=keep
-
 after_success:
-  - if [[ "${CHANGED_FILES[@]}" =~ "scripts/kind-e2e/e2e.sh" ]]; then
-      echo "scripts/kind-e2e/e2e.sh was modified, testing again on already deployed environment.";
+  - if [[ "${CHANGED_FILES_PR[@]}" =~ "scripts/kind-e2e/e2e.sh" ]]; then
+      echo "scripts/kind-e2e/e2e.sh was modified, testing recurring run on already deployed infrastructure.";
       make e2e status=keep;
     fi
+deploy:
+  provider: script
+  script: bash scripts/release
+  on:
+    branch: master
