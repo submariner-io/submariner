@@ -19,13 +19,14 @@ function kind_clusters() {
             echo Creating cluster${i}, logging to ${logs[$i]}...
             (
             if [[ -n ${version} ]]; then
-                kind create cluster --image=kindest/node:v${version} --name=cluster${i} --wait=5m --config=${PRJ_ROOT}/scripts/kind-e2e/cluster${i}-config.yaml
+                kind create cluster --image=kindest/node:v${version} --name=cluster${i} --config=${PRJ_ROOT}/scripts/kind-e2e/cluster${i}-config.yaml
             else
-                kind create cluster --name=cluster${i} --wait=5m --config=${PRJ_ROOT}/scripts/kind-e2e/cluster${i}-config.yaml
+                kind create cluster --name=cluster${i} --config=${PRJ_ROOT}/scripts/kind-e2e/cluster${i}-config.yaml
             fi
             master_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster${i}-control-plane | head -n 1)
             sed -i -- "s/user: kubernetes-admin/user: cluster$i/g" $(kind get kubeconfig-path --name="cluster$i")
             sed -i -- "s/name: kubernetes-admin.*/name: cluster$i/g" $(kind get kubeconfig-path --name="cluster$i")
+            sed -i -- "s/current-context: kubernetes-admin.*/current-context: cluster$i/g" $(kind get kubeconfig-path --name="cluster$i")
 
             if [[ ${status} = keep ]]; then
                 cp -r $(kind get kubeconfig-path --name="cluster$i") ${PRJ_ROOT}/output/kind-config/local-dev/kind-config-cluster${i}
@@ -86,6 +87,23 @@ function install_helm() {
             fi
         done
     fi
+}
+
+function setup_custom_cni(){
+    trap_commands
+    declare -A POD_CIDR=( ["cluster2"]="10.245.0.0/16" ["cluster3"]="10.246.0.0/16" )
+    for i in 2 3; do
+        if kubectl --context=cluster${i} wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=60s > /dev/null 2>&1; then
+            echo "Weave already deployed cluster${i}."
+        else
+            echo "Applying weave network in to cluster${i}..."
+            kubectl --context=cluster${i} apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&env.IPALLOC_RANGE=${POD_CIDR[cluster${i}]}"
+            echo "Waiting for weave-net pods to be ready cluster${i}..."
+            kubectl --context=cluster${i} wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=300s
+            echo "Waiting for core-dns deployment to be ready cluster${i}..."
+            kubectl --context=cluster${i} -n kube-system rollout status deploy/coredns --timeout=300s
+        fi
+    done
 }
 
 function setup_broker() {
@@ -313,6 +331,7 @@ KUBEFED_NS=kube-federation-system
 export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
 
 kind_clusters "$@"
+setup_custom_cni
 if [[ $3 = true ]]; then
     enable_logging
 fi
