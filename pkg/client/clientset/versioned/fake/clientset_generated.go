@@ -19,9 +19,9 @@ limitations under the License.
 package fake
 
 import (
-	clientset "github.com/rancher/submariner/pkg/client/clientset/versioned"
-	submarinerv1 "github.com/rancher/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
-	fakesubmarinerv1 "github.com/rancher/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1/fake"
+	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	submarinerv1 "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
+	fakesubmarinerv1 "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -73,10 +73,5 @@ var _ clientset.Interface = &Clientset{}
 
 // SubmarinerV1 retrieves the SubmarinerV1Client
 func (c *Clientset) SubmarinerV1() submarinerv1.SubmarinerV1Interface {
-	return &fakesubmarinerv1.FakeSubmarinerV1{Fake: &c.Fake}
-}
-
-// Submariner retrieves the SubmarinerV1Client
-func (c *Clientset) Submariner() submarinerv1.SubmarinerV1Interface {
 	return &fakesubmarinerv1.FakeSubmarinerV1{Fake: &c.Fake}
 }

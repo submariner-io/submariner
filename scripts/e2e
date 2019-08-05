@@ -1,0 +1,16 @@
+#!/bin/bash
+set -e
+
+source $(git rev-parse --show-toplevel)/scripts/lib/debug_functions
+
+cd $(dirname $0)
+
+if [[ $1 = clean ]]; then
+    ./../scripts/kind-e2e/e2e.sh clean
+else
+    ./build
+    ./build-routeagent
+    ./download
+    ./package
+    ./../scripts/kind-e2e/e2e.sh "$@"
+fi

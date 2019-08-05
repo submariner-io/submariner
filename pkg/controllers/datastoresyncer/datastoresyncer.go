@@ -3,12 +3,15 @@ package datastoresyncer
 import (
 	"context"
 	"fmt"
-	submarinerv1 "github.com/rancher/submariner/pkg/apis/submariner.io/v1"
-	submarinerClientset "github.com/rancher/submariner/pkg/client/clientset/versioned"
-	submarinerInformers "github.com/rancher/submariner/pkg/client/informers/externalversions/submariner.io/v1"
-	"github.com/rancher/submariner/pkg/datastore"
-	"github.com/rancher/submariner/pkg/types"
-	"github.com/rancher/submariner/pkg/util"
+	"reflect"
+	"time"
+
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/datastore"
+	"github.com/submariner-io/submariner/pkg/types"
+	"github.com/submariner-io/submariner/pkg/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -17,41 +20,38 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
-	"reflect"
-	"sync"
-	"time"
 )
 
 type DatastoreSyncer struct {
-	objectNamespace string
-	thisClusterId string
-	colorCodes []string
-	kubeClientSet kubernetes.Interface
-	submarinerClientset submarinerClientset.Interface
-	submarinerClusterInformer submarinerInformers.ClusterInformer
+	objectNamespace            string
+	thisClusterID              string
+	colorCodes                 []string
+	kubeClientSet              kubernetes.Interface
+	submarinerClientset        submarinerClientset.Interface
+	submarinerClusterInformer  submarinerInformers.ClusterInformer
 	submarinerEndpointInformer submarinerInformers.EndpointInformer
-	datastore datastore.Datastore
-	localCluster types.SubmarinerCluster
-	localEndpoint types.SubmarinerEndpoint
+	datastore                  datastore.Datastore
+	localCluster               types.SubmarinerCluster
+	localEndpoint              types.SubmarinerEndpoint
 
-	clusterWorkqueue workqueue.RateLimitingInterface
+	clusterWorkqueue  workqueue.RateLimitingInterface
 	endpointWorkqueue workqueue.RateLimitingInterface
 }
 
-func NewDatastoreSyncer(thisClusterId string, objectNamespace string, kubeClientSet kubernetes.Interface, submarinerClientset submarinerClientset.Interface, submarinerClusterInformer submarinerInformers.ClusterInformer, submarinerEndpointInformer submarinerInformers.EndpointInformer, datastore datastore.Datastore, colorcodes []string, localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) *DatastoreSyncer {
+func NewDatastoreSyncer(thisClusterID string, objectNamespace string, kubeClientSet kubernetes.Interface, submarinerClientset submarinerClientset.Interface, submarinerClusterInformer submarinerInformers.ClusterInformer, submarinerEndpointInformer submarinerInformers.EndpointInformer, datastore datastore.Datastore, colorcodes []string, localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) *DatastoreSyncer {
 	newDatastoreSyncer := DatastoreSyncer{
-		thisClusterId: thisClusterId,
-		objectNamespace: objectNamespace,
-		kubeClientSet: kubeClientSet,
-		submarinerClientset: submarinerClientset,
-		datastore: datastore,
-		submarinerClusterInformer: submarinerClusterInformer,
+		thisClusterID:              thisClusterID,
+		objectNamespace:            objectNamespace,
+		kubeClientSet:              kubeClientSet,
+		submarinerClientset:        submarinerClientset,
+		datastore:                  datastore,
+		submarinerClusterInformer:  submarinerClusterInformer,
 		submarinerEndpointInformer: submarinerEndpointInformer,
-		clusterWorkqueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Clusters"),
-		endpointWorkqueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Endpoints"),
-		colorCodes: colorcodes,
-		localCluster: localCluster,
-		localEndpoint: localEndpoint,
+		clusterWorkqueue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Clusters"),
+		endpointWorkqueue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Endpoints"),
+		colorCodes:                 colorcodes,
+		localCluster:               localCluster,
+		localEndpoint:              localEndpoint,
 	}
 
 	submarinerClusterInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
@@ -60,8 +60,7 @@ func NewDatastoreSyncer(thisClusterId string, objectNamespace string, kubeClient
 			newDatastoreSyncer.enqueueCluster(new)
 		},
 		DeleteFunc: newDatastoreSyncer.enqueueCluster,
-	}, 60 * time.Second)
-
+	}, 60*time.Second)
 
 	submarinerEndpointInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: newDatastoreSyncer.enqueueEndpoint,
@@ -69,7 +68,7 @@ func NewDatastoreSyncer(thisClusterId string, objectNamespace string, kubeClient
 			newDatastoreSyncer.enqueueEndpoint(new)
 		},
 		DeleteFunc: newDatastoreSyncer.enqueueEndpoint,
-	}, 60 * time.Second)
+	}, 60*time.Second)
 
 	return &newDatastoreSyncer
 }
@@ -83,7 +82,7 @@ func (d *DatastoreSyncer) ensureExclusiveEndpoint() {
 
 	for _, endpoint := range endpoints {
 		if !util.CompareEndpointSpec(endpoint.Spec, d.localEndpoint.Spec) {
-			endpointCrdName, err := util.GetEndpointCRDName(endpoint)
+			endpointCrdName, err := util.GetEndpointCRDName(&endpoint)
 			if err != nil {
 				klog.Errorf("Error while converting endpoint to CRD Name %s", endpoint.Spec.CableName)
 				break
@@ -138,18 +137,18 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 
 	d.ensureExclusiveEndpoint()
 
-	err := d.reconcileClusterCRD(d.localCluster, false)
-	if (err != nil) {
+	err := d.reconcileClusterCRD(&d.localCluster, false)
+	if err != nil {
 		return fmt.Errorf("Error reconciling local Cluster CRD: %v", err)
 	}
 
-	err = d.reconcileEndpointCRD(d.localEndpoint, false)
-	if (err != nil) {
+	err = d.reconcileEndpointCRD(&d.localEndpoint, false)
+	if err != nil {
 		return fmt.Errorf("Error reconciling local Endpoint CRD: %v", err)
 	}
 
-	go utilruntime.HandleError(d.datastore.WatchClusters(context.TODO(), d.thisClusterId, d.colorCodes, d.reconcileClusterCRD))
-	go utilruntime.HandleError(d.datastore.WatchEndpoints(context.TODO(), d.thisClusterId, d.colorCodes, d.reconcileEndpointCRD))
+	go utilruntime.HandleError(d.datastore.WatchClusters(context.TODO(), d.thisClusterID, d.colorCodes, d.reconcileClusterCRD))
+	go utilruntime.HandleError(d.datastore.WatchEndpoints(context.TODO(), d.thisClusterID, d.colorCodes, d.reconcileEndpointCRD))
 
 	klog.Info("Started datastoresyncer workers")
 
@@ -182,7 +181,7 @@ func (d *DatastoreSyncer) processNextClusterWorkItem() bool {
 			klog.Errorf("error while splitting meta namespace key: %v", err)
 			return nil
 		}
-		if d.thisClusterId != key {
+		if d.thisClusterID != key {
 			klog.V(6).Infof("The updated cluster object was not for this cluster, skipping updating the datastore")
 			// not actually an error but we should forget about this and return
 			d.clusterWorkqueue.Forget(obj)
@@ -195,11 +194,11 @@ func (d *DatastoreSyncer) processNextClusterWorkItem() bool {
 			return nil
 		}
 		myCluster := types.SubmarinerCluster{
-			ID: cluster.Name,
+			ID:   cluster.Name,
 			Spec: cluster.Spec,
 		}
 		klog.V(4).Infof("Attempting to trigger an update of the central datastore with the updated CRD")
-		err = d.datastore.SetCluster(myCluster)
+		err = d.datastore.SetCluster(&myCluster)
 		klog.V(4).Infof("Update of cluster in central datastore was successful")
 		if err != nil {
 			klog.Errorf("There was an error updating the cluster in the central datastore, error: %v", err)
@@ -239,7 +238,7 @@ func (d *DatastoreSyncer) processNextEndpointWorkItem() bool {
 			d.endpointWorkqueue.Forget(obj)
 			return nil
 		}
-		if d.thisClusterId != endpoint.Spec.ClusterID {
+		if d.thisClusterID != endpoint.Spec.ClusterID {
 			klog.V(4).Infof("The updated endpoint object was not for this cluster, skipping updating the datastore")
 			// not actually an error but we should forget about this and return
 			d.endpointWorkqueue.Forget(obj)
@@ -254,7 +253,7 @@ func (d *DatastoreSyncer) processNextEndpointWorkItem() bool {
 			Spec: endpoint.Spec,
 		}
 		klog.V(4).Infof("Attempting to trigger an update of the central datastore with the updated endpoint CRD")
-		err = d.datastore.SetEndpoint(myEndpoint)
+		err = d.datastore.SetEndpoint(&myEndpoint)
 		if err != nil {
 			klog.Errorf("There was an error updating the endpoint in the central datastore, error: %v", err)
 		} else {
@@ -271,7 +270,7 @@ func (d *DatastoreSyncer) processNextEndpointWorkItem() bool {
 	return true
 }
 
-func (d *DatastoreSyncer) reconcileClusterCRD(localCluster types.SubmarinerCluster, delete bool) error {
+func (d *DatastoreSyncer) reconcileClusterCRD(localCluster *types.SubmarinerCluster, delete bool) error {
 	clusterCRDName, err := util.GetClusterCRDName(localCluster)
 	if err != nil {
 		return fmt.Errorf("Error converting the Cluster CRD name: %v", err)
@@ -280,7 +279,7 @@ func (d *DatastoreSyncer) reconcileClusterCRD(localCluster types.SubmarinerClust
 	cluster, err := d.submarinerClientset.SubmarinerV1().Clusters(d.objectNamespace).Get(clusterCRDName, metav1.GetOptions{})
 	if err != nil {
 		klog.V(4).Infof("There was an error retrieving the local Cluster CRD for %s, assuming it does not exist and creating a new one. The error was: %v",
-		    clusterCRDName, err)
+			clusterCRDName, err)
 		found = false
 	} else {
 		found = true
@@ -330,77 +329,7 @@ func (d *DatastoreSyncer) reconcileClusterCRD(localCluster types.SubmarinerClust
 	return nil
 }
 
-func (d *DatastoreSyncer) runReaper() {
-	var wg sync.WaitGroup
-	klog.V(4).Infof("Starting reaper")
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for {
-			clusters, err := d.datastore.GetClusters(d.colorCodes)
-			if err != nil {
-				klog.Errorf("Error retrieving remote Clusters: %v", err)
-				return;
-			}
-			for _, cluster := range clusters {
-				endpoints, err := d.datastore.GetEndpoints(cluster.ID)
-				if err != nil {
-					klog.Errorf("Error retrieving remote Endpoints for cluster %s: %v", cluster.ID, err)
-					continue
-				}
-
-				crdEndpoints, err := d.submarinerClientset.SubmarinerV1().Endpoints(d.objectNamespace).List(metav1.ListOptions{})
-				if err != nil {
-					klog.Errorf("Error retrieving local Endpoints: %v", err)
-					continue
-				}
-
-				for _, crde := range crdEndpoints.Items {
-					if util.CompareEndpointSpec(crde.Spec, d.localEndpoint.Spec) {
-						klog.V(4).Infof("Not going to delete self from kubernetes")
-					} else {
-						if searchEndpoints(endpoints, crde.Spec.CableName, crde.Spec.ClusterID) {
-							klog.V(4).Infof("Found CRD %s in the API server list of endpoints, not doing anything", crde.Name)
-						} else {
-							// remove the crde
-							if cluster.ID == crde.Spec.ClusterID {
-								if reflect.DeepEqual(crde.Spec, d.localEndpoint.Spec) {
-									klog.V(4).Infof("Not reaping own endpoint %s", crde.Name)
-								} else {
-									klog.V(4).Infof("Removing the CRD %s because it was not found in the API server list", crde.Name)
-									err = d.submarinerClientset.SubmarinerV1().Endpoints(d.objectNamespace).Delete(crde.Name, &metav1.DeleteOptions{})
-									if err != nil {
-										klog.Errorf("Error deleting local CRDE %s: %v", crde.Name, err)
-									}
-								}
-							} else {
-								klog.V(4).Infof("CRDE wasn't found in list but did not match the cluster we're searching for right now")
-							}
-						}
-					}
-				}
-
-			}
-			klog.V(4).Infof("Sleeping for 15 seconds")
-			time.Sleep(15 * time.Second)
-		}
-	}()
-	wg.Wait()
-	klog.Fatalf("reaper exited")
-}
-
-// basic brute force search for now
-// returns true if the endpoint was found in the passed in list
-func searchEndpoints(endpoints []types.SubmarinerEndpoint, cableName string, clusterId string) bool {
-	for _, endpoint := range endpoints {
-		if endpoint.Spec.CableName == cableName && endpoint.Spec.ClusterID == clusterId {
-			return true
-		}
-	}
-	return false
-}
-
-func (d *DatastoreSyncer) reconcileEndpointCRD(rawEndpoint types.SubmarinerEndpoint, delete bool) error {
+func (d *DatastoreSyncer) reconcileEndpointCRD(rawEndpoint *types.SubmarinerEndpoint, delete bool) error {
 	endpointName, err := util.GetEndpointCRDName(rawEndpoint)
 	if err != nil {
 		return fmt.Errorf("Error converting the Enndpoint CRD name: %v", err)
@@ -410,7 +339,7 @@ func (d *DatastoreSyncer) reconcileEndpointCRD(rawEndpoint types.SubmarinerEndpo
 	endpoint, err := d.submarinerClientset.SubmarinerV1().Endpoints(d.objectNamespace).Get(endpointName, metav1.GetOptions{})
 	if err != nil {
 		klog.V(4).Infof("There was an error retrieving the local Endpoint CRD for %s, assuming it does not exist and creating a new one. The error was: %v",
-		    endpointName, err)
+			endpointName, err)
 		found = false
 	} else {
 		found = true
@@ -459,4 +388,3 @@ func (d *DatastoreSyncer) reconcileEndpointCRD(rawEndpoint types.SubmarinerEndpo
 	}
 	return nil
 }
-

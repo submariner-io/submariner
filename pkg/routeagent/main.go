@@ -2,18 +2,19 @@ package main
 
 import (
 	"flag"
-	"github.com/kelseyhightower/envconfig"
-	"github.com/rancher/submariner/pkg/routeagent/controllers/route"
-	"github.com/rancher/submariner/pkg/util"
 	"sync"
 	"time"
+
+	"github.com/kelseyhightower/envconfig"
+	"github.com/submariner-io/submariner/pkg/routeagent/controllers/route"
+	"github.com/submariner-io/submariner/pkg/util"
 
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 
-	submarinerClientset "github.com/rancher/submariner/pkg/client/clientset/versioned"
-	submarinerInformers "github.com/rancher/submariner/pkg/client/informers/externalversions"
-	"github.com/rancher/submariner/pkg/signals"
+	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions"
+	"github.com/submariner-io/submariner/pkg/signals"
 )
 
 var (
@@ -22,7 +23,7 @@ var (
 )
 
 type SubmarinerRouteControllerSpecification struct {
-	ClusterId string
+	ClusterID string
 	Namespace string
 }
 
@@ -53,7 +54,7 @@ func main() {
 	submarinerInformerFactory := submarinerInformers.NewSharedInformerFactoryWithOptions(submarinerClient, time.Second*30, submarinerInformers.WithNamespace(srcs.Namespace))
 
 	defLink, err := util.GetDefaultGatewayInterface()
-	routeController := routecontroller.NewRouteController(srcs.ClusterId, srcs.Namespace, defLink, submarinerClient, submarinerInformerFactory.Submariner().V1().Clusters(), submarinerInformerFactory.Submariner().V1().Endpoints())
+	routeController := route.NewController(srcs.ClusterID, srcs.Namespace, defLink, submarinerClient, submarinerInformerFactory.Submariner().V1().Clusters(), submarinerInformerFactory.Submariner().V1().Endpoints())
 
 	submarinerInformerFactory.Start(stopCh)
 

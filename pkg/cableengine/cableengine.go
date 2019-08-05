@@ -1,14 +1,11 @@
 package cableengine
 
 import (
-	"github.com/rancher/submariner/pkg/types"
+	"github.com/submariner-io/submariner/pkg/types"
 )
 
-type CableEngine interface {
-	StartEngine(ignition bool) error
-	ReloadEngine() error
-	StopEngine() error
+type Engine interface {
+	StartEngine() error
 	InstallCable(types.SubmarinerEndpoint) error
-	RemoveCable(string) error
-	SyncCables(string, []types.SubmarinerEndpoint) error
+	RemoveCable(types.SubmarinerEndpoint) error
 }

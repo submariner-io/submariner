@@ -1,10 +1,12 @@
 #!/bin/bash
 set -e
 
+source $(git rev-parse --show-toplevel)/scripts/lib/debug_functions
+
 cd $(dirname $0)
+./validate
+./test
 ./build
 ./build-routeagent
-#./test
-#./validate
 ./download
 ./package

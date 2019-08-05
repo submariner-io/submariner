@@ -21,10 +21,10 @@ package v1
 import (
 	time "time"
 
-	submarineriov1 "github.com/rancher/submariner/pkg/apis/submariner.io/v1"
-	versioned "github.com/rancher/submariner/pkg/client/clientset/versioned"
-	internalinterfaces "github.com/rancher/submariner/pkg/client/informers/externalversions/internalinterfaces"
-	v1 "github.com/rancher/submariner/pkg/client/listers/submariner.io/v1"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	versioned "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	internalinterfaces "github.com/submariner-io/submariner/pkg/client/informers/externalversions/internalinterfaces"
+	v1 "github.com/submariner-io/submariner/pkg/client/listers/submariner.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"

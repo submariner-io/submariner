@@ -1,20 +1,19 @@
 #!/bin/bash
 set -e
 
+source $(git rev-parse --show-toplevel)/scripts/lib/debug_functions
+
 cd $(dirname $0)/..
 
-echo Running validation
+source scripts/lib/find_functions
 
-PACKAGES=". $(find -name '*.go' | xargs -I{} dirname {} |  cut -f2 -d/ | sort -u | grep -Ev '(^\.$|.git|.trash-cache|vendor|bin)' | sed -e 's!^!./!' -e 's!$!/...!')"
+EXCLUDE_PKG_DIRS=".git .trash-cache vendor bin"
 
-echo Running: go vet
-go vet ${PACKAGES}
-echo Running: golint
-for i in ${PACKAGES}; do
-    if [ -n "$(golint $i | grep -v 'should have comment.*or be unexported' | tee /dev/stderr)" ]; then
-        failed=true
-    fi
-done
-test -z "$failed"
-echo Running: go fmt
-test -z "$(go fmt ${PACKAGES} | tee /dev/stderr)"
+PACKAGES=$(find_go_pkg_dirs --no-trailing-dots "*.go")
+
+if [[ $(goimports -l ${PACKAGES} | wc -l) -gt 0 ]]; then
+    echo Incorrect formatting, please run goimports
+    exit 1
+fi
+
+golangci-lint run

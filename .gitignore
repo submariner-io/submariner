@@ -1,6 +1,13 @@
 .idea
 submariner-engine
+submariner-route-agent
 .dapper
 bin
+dist
+output
+strongswan
+/vendor
+package/strongswan-*
 .project
 .settings
+*.coverprofile

@@ -23,9 +23,9 @@ import (
 	sync "sync"
 	time "time"
 
-	versioned "github.com/rancher/submariner/pkg/client/clientset/versioned"
-	internalinterfaces "github.com/rancher/submariner/pkg/client/informers/externalversions/internalinterfaces"
-	submarinerio "github.com/rancher/submariner/pkg/client/informers/externalversions/submariner.io"
+	versioned "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	internalinterfaces "github.com/submariner-io/submariner/pkg/client/informers/externalversions/internalinterfaces"
+	submarinerio "github.com/submariner-io/submariner/pkg/client/informers/externalversions/submariner.io"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

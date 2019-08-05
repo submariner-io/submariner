@@ -4,54 +4,50 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"reflect"
+	"time"
+
 	"github.com/kelseyhightower/envconfig"
-	submarinerv1 "github.com/rancher/submariner/pkg/apis/submariner.io/v1"
-	submarinerClientset "github.com/rancher/submariner/pkg/client/clientset/versioned"
-	submarinerInformers "github.com/rancher/submariner/pkg/client/informers/externalversions"
-	"github.com/rancher/submariner/pkg/types"
-	"github.com/rancher/submariner/pkg/util"
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions"
+	"github.com/submariner-io/submariner/pkg/types"
+	"github.com/submariner-io/submariner/pkg/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
-	"reflect"
-	"time"
 )
 
-type k8s struct {
-	client *submarinerClientset.Clientset
+type Datastore struct {
+	client          *submarinerClientset.Clientset
 	informerFactory submarinerInformers.SharedInformerFactory
 
-	thisClusterID string
+	thisClusterID   string
 	remoteNamespace string
 
 	stopCh <-chan struct{}
 }
 
-type k8sSpecification struct {
-	ApiServer string
-	ApiServerToken string
+type datastoreSpecification struct {
+	APIServer       string
+	APIServerToken  string
 	RemoteNamespace string
-	Insecure bool `default:"false"`
-	Ca string
+	Insecure        bool `default:"false"`
+	Ca              string
 }
 
-func NewK8sDatastore(thisClusterID string, stopCh <-chan struct{}) *k8s {
-	kubeDatastore := k8s{
-		thisClusterID: thisClusterID,
-		stopCh: stopCh,
-	}
-
-	k8sSpec := k8sSpecification{}
+func NewDatastore(thisClusterID string, stopCh <-chan struct{}) (*Datastore, error) {
+	k8sSpec := datastoreSpecification{}
 
 	err := envconfig.Process("broker_k8s", &k8sSpec)
 	if err != nil {
-		klog.Fatal(err)
+		return nil, err
 	}
 
-	kubeDatastore.remoteNamespace = k8sSpec.RemoteNamespace
-	host := fmt.Sprintf("https://%s", k8sSpec.ApiServer)
+	host := fmt.Sprintf("https://%s", k8sSpec.APIServer)
 	klog.V(6).Infof("Rendered host for access was: %s", host)
 	tlsClientConfig := rest.TLSClientConfig{}
 	if k8sSpec.Insecure {
@@ -59,39 +55,49 @@ func NewK8sDatastore(thisClusterID string, stopCh <-chan struct{}) *k8s {
 	} else {
 		caDecoded, err := base64.StdEncoding.DecodeString(k8sSpec.Ca)
 		if err != nil {
-			klog.Fatalf("error decoding CA data: %v", err)
+			return nil, fmt.Errorf("error decoding CA data: %v", err)
 		}
 		tlsClientConfig.CAData = caDecoded
 	}
+
 	k8sClientConfig := rest.Config{
 		// TODO: switch to using cluster DNS.
 		Host:            host,
 		TLSClientConfig: tlsClientConfig,
-		BearerToken: k8sSpec.ApiServerToken,
+		BearerToken:     k8sSpec.APIServerToken,
 	}
 
 	submarinerClient, err := submarinerClientset.NewForConfig(&k8sClientConfig)
 	if err != nil {
-		klog.Fatalf("Error building submariner clientset: %s", err.Error())
+		return nil, fmt.Errorf("Error building submariner clientset: %v", err)
 	}
-	kubeDatastore.client = submarinerClient
-	kubeDatastore.informerFactory = submarinerInformers.NewSharedInformerFactoryWithOptions(submarinerClient, time.Second*30, submarinerInformers.WithNamespace(k8sSpec.RemoteNamespace))
-	return &kubeDatastore
+
+	return &Datastore{
+		client: submarinerClient,
+		informerFactory: submarinerInformers.NewSharedInformerFactoryWithOptions(submarinerClient, time.Second*30,
+			submarinerInformers.WithNamespace(k8sSpec.RemoteNamespace)),
+		thisClusterID:   thisClusterID,
+		remoteNamespace: k8sSpec.RemoteNamespace,
+		stopCh:          stopCh,
+	}, nil
 }
 
-// todo: need to fix this O(n^2) solution...
 func stringSliceOverlaps(left []string, right []string) bool {
+	hash := make(map[string]bool)
 	for _, s := range left {
-		for _, t := range right {
-			if s == t {
-				return true
-			}
+		hash[s] = true
+	}
+
+	for _, s := range right {
+		if hash[s] {
+			return true
 		}
 	}
+
 	return false
 }
 
-func (k *k8s) GetClusters(colorCodes []string) ([]types.SubmarinerCluster, error) {
+func (k *Datastore) GetClusters(colorCodes []string) ([]types.SubmarinerCluster, error) {
 	var clusters []types.SubmarinerCluster
 
 	k8sClusters, err := k.client.SubmarinerV1().Clusters(k.remoteNamespace).List(metav1.ListOptions{})
@@ -103,33 +109,34 @@ func (k *k8s) GetClusters(colorCodes []string) ([]types.SubmarinerCluster, error
 	for _, cluster := range k8sClusters.Items {
 		if stringSliceOverlaps(cluster.Spec.ColorCodes, colorCodes) {
 			clusters = append(clusters, types.SubmarinerCluster{
-				ID: cluster.Spec.ClusterID,
+				ID:   cluster.Spec.ClusterID,
 				Spec: cluster.Spec,
 			}) // this is likely going to add duplicate clusters
 		}
 	}
 	return clusters, nil
 }
-func (k *k8s) GetCluster(clusterId string) (types.SubmarinerCluster, error) {
 
+func (k *Datastore) GetCluster(clusterID string) (*types.SubmarinerCluster, error) {
 	k8sClusters, err := k.client.SubmarinerV1().Clusters(k.remoteNamespace).List(metav1.ListOptions{})
 
 	if err != nil {
-		return types.SubmarinerCluster{}, nil
+		return nil, err
 	}
 
 	for _, cluster := range k8sClusters.Items {
-		if cluster.Spec.ClusterID == clusterId {
-			return types.SubmarinerCluster{
-				ID: clusterId,
+		if cluster.Spec.ClusterID == clusterID {
+			return &types.SubmarinerCluster{
+				ID:   clusterID,
 				Spec: cluster.Spec,
 			}, nil
 		}
 	}
 
-	return types.SubmarinerCluster{}, fmt.Errorf("cluster wasn't found")
+	return nil, fmt.Errorf("cluster wasn't found")
 }
-func (k *k8s) GetEndpoints(clusterId string) ([]types.SubmarinerEndpoint, error) {
+
+func (k *Datastore) GetEndpoints(clusterID string) ([]types.SubmarinerEndpoint, error) {
 
 	k8sEndpoints, err := k.client.SubmarinerV1().Endpoints(k.remoteNamespace).List(metav1.ListOptions{})
 
@@ -140,192 +147,203 @@ func (k *k8s) GetEndpoints(clusterId string) ([]types.SubmarinerEndpoint, error)
 	endpoints := []types.SubmarinerEndpoint{}
 
 	for _, endpoint := range k8sEndpoints.Items {
-		if endpoint.Spec.ClusterID == clusterId {
+		if endpoint.Spec.ClusterID == clusterID {
 			endpoints = append(endpoints, types.SubmarinerEndpoint{Spec: endpoint.Spec})
 		}
 	}
 
 	return endpoints, nil
 }
-func (k *k8s) GetEndpoint(clusterId string, cableName string) (types.SubmarinerEndpoint, error) {
 
+func (k *Datastore) GetEndpoint(clusterID string, cableName string) (*types.SubmarinerEndpoint, error) {
 	k8sEndpoints, err := k.client.SubmarinerV1().Endpoints(k.remoteNamespace).List(metav1.ListOptions{})
 
 	if err != nil {
-		return types.SubmarinerEndpoint{}, nil
+		return nil, err
 	}
 
 	for _, endpoint := range k8sEndpoints.Items {
-		if endpoint.Spec.ClusterID == clusterId && endpoint.Spec.CableName == cableName {
-			return types.SubmarinerEndpoint{Spec: endpoint.Spec}, nil
+		if endpoint.Spec.ClusterID == clusterID && endpoint.Spec.CableName == cableName {
+			return &types.SubmarinerEndpoint{Spec: endpoint.Spec}, nil
 		}
 	}
-	return types.SubmarinerEndpoint{}, fmt.Errorf("endpoint wasn't found")
+	return nil, fmt.Errorf("endpoint wasn't found")
 }
-func (k *k8s) WatchClusters(ctx context.Context, selfClusterId string, colorCodes []string, onClusterChange func(cluster types.SubmarinerCluster, deleted bool) error) error {
+
+func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onClusterChange func(cluster *types.SubmarinerCluster, deleted bool) error) error {
 
 	k.informerFactory.Submariner().V1().Clusters().Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
-		AddFunc: func (obj interface{}) {
+		AddFunc: func(obj interface{}) {
 			var object *submarinerv1.Cluster
 			var ok bool
 			klog.V(8).Infof("AddFunc in WatchClusters called")
 			if object, ok = obj.(*submarinerv1.Cluster); !ok {
 				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
-					klog.Errorf("problem decoding object")
+					klog.Errorf("Could not convert object %v to a Cluster", obj)
 					return
 				}
 				object, ok = tombstone.Obj.(*submarinerv1.Cluster)
 				if !ok {
-					klog.Errorf("problem decoding object tombstone")
+					klog.Errorf("Could not convert object tombstone %v to a Cluster", tombstone.Obj)
 					return
 				}
 				klog.V(6).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
-			onClusterChange(types.SubmarinerCluster{
-				ID: object.Spec.ClusterID,
+
+			utilruntime.HandleError(onClusterChange(&types.SubmarinerCluster{
+				ID:   object.Spec.ClusterID,
 				Spec: object.Spec,
-			}, false)
+			}, false))
 		},
-		UpdateFunc: func (old, obj interface{}) {
+		UpdateFunc: func(old, obj interface{}) {
 			var object *submarinerv1.Cluster
 			var ok bool
 			klog.V(8).Infof("UpdateFunc in WatchClusters called")
 			if object, ok = obj.(*submarinerv1.Cluster); !ok {
 				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
-					klog.Errorf("problem decoding object")
+					klog.Errorf("Could not convert object %v to a Cluster", obj)
 					return
 				}
 				object, ok = tombstone.Obj.(*submarinerv1.Cluster)
 				if !ok {
-					klog.Errorf("problem decoding object tombstone")
+					klog.Errorf("Could not convert object tombstone %v to a Cluster", tombstone.Obj)
 					return
 				}
 				klog.V(6).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
-			onClusterChange(types.SubmarinerCluster{
-				ID: object.Spec.ClusterID,
+
+			utilruntime.HandleError(onClusterChange(&types.SubmarinerCluster{
+				ID:   object.Spec.ClusterID,
 				Spec: object.Spec,
-			}, false)
+			}, false))
 		},
-		DeleteFunc: func (obj interface{}) {
+		DeleteFunc: func(obj interface{}) {
 			var object *submarinerv1.Cluster
 			var ok bool
 			klog.V(8).Infof("DeleteFunc in WatchClusters called")
 			if object, ok = obj.(*submarinerv1.Cluster); !ok {
 				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
-					klog.Errorf("problem decoding object")
+					klog.Errorf("Could not convert object %v to a Cluster", obj)
 					return
 				}
 				object, ok = tombstone.Obj.(*submarinerv1.Cluster)
 				if !ok {
-					klog.Errorf("problem decoding object tombstone")
+					klog.Errorf("Could not convert object tombstone %v to a Cluster", tombstone.Obj)
 					return
 				}
 				klog.V(6).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
-			onClusterChange(types.SubmarinerCluster{
-				ID: object.Spec.ClusterID,
+
+			utilruntime.HandleError(onClusterChange(&types.SubmarinerCluster{
+				ID:   object.Spec.ClusterID,
 				Spec: object.Spec,
-			}, true)
+			}, true))
 		},
-	}, time.Second * 30)
+	}, time.Second*30)
 
 	k.informerFactory.Start(k.stopCh)
 	return nil
 }
-func (k *k8s) WatchEndpoints(ctx context.Context, selfClusterId string, colorCodes []string, onEndpointChange func (endpoint types.SubmarinerEndpoint, deleted bool) error) error {
+
+func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onEndpointChange func(endpoint *types.SubmarinerEndpoint, deleted bool) error) error {
 
 	k.informerFactory.Submariner().V1().Endpoints().Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
-		AddFunc: func (obj interface{}) {
+		AddFunc: func(obj interface{}) {
 			var object *submarinerv1.Endpoint
 			var ok bool
 			klog.V(8).Infof("AddFunc in WatchEndpoints called")
 			if object, ok = obj.(*submarinerv1.Endpoint); !ok {
 				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
-					klog.Errorf("problem decoding object")
+					klog.Errorf("Could not convert object %v to an Endpoint", obj)
 					return
 				}
 				object, ok = tombstone.Obj.(*submarinerv1.Endpoint)
 				if !ok {
-					klog.Errorf("problem decoding object tombstone")
+					klog.Errorf("Could not convert object tombstone %v to an Endpoint", tombstone.Obj)
 					return
 				}
 				klog.V(6).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
-			onEndpointChange(types.SubmarinerEndpoint{
+
+			utilruntime.HandleError(onEndpointChange(&types.SubmarinerEndpoint{
 				Spec: object.Spec,
-			}, false)
+			}, false))
 		},
-		UpdateFunc: func (old, obj interface{}) {
+		UpdateFunc: func(old, obj interface{}) {
 			var object *submarinerv1.Endpoint
 			var ok bool
 			klog.V(8).Infof("UpdateFunc in WatchEndpoints called")
 			if object, ok = obj.(*submarinerv1.Endpoint); !ok {
 				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
-					klog.Errorf("problem decoding object")
+					klog.Errorf("Could not convert object %v to an Endpoint", obj)
 					return
 				}
 				object, ok = tombstone.Obj.(*submarinerv1.Endpoint)
 				if !ok {
-					klog.Errorf("problem decoding object tombstone")
+					klog.Errorf("Could not convert object tombstone %v to an Endpoint", tombstone.Obj)
 					return
 				}
 				klog.V(6).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
-			onEndpointChange(types.SubmarinerEndpoint{
+
+			utilruntime.HandleError(onEndpointChange(&types.SubmarinerEndpoint{
 				Spec: object.Spec,
-			}, false)
+			}, false))
 		},
-		DeleteFunc: func (obj interface{}) {
+		DeleteFunc: func(obj interface{}) {
 			var object *submarinerv1.Endpoint
 			var ok bool
 			klog.V(8).Infof("DeleteFunc in WatchEndpoints called")
 			if object, ok = obj.(*submarinerv1.Endpoint); !ok {
 				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
-					klog.Errorf("problem decoding object")
+					klog.Errorf("Could not convert object %v to an Endpoint", obj)
 					return
 				}
 				object, ok = tombstone.Obj.(*submarinerv1.Endpoint)
 				if !ok {
-					klog.Errorf("problem decoding object tombstone")
+					klog.Errorf("Could not convert object tombstone %v to an Endpoint", tombstone.Obj)
 					return
 				}
 				klog.V(6).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
-			onEndpointChange(types.SubmarinerEndpoint{
+
+			utilruntime.HandleError(onEndpointChange(&types.SubmarinerEndpoint{
 				Spec: object.Spec,
-			}, true)
+			}, true))
 		},
-	}, time.Second * 30)
+	}, time.Second*30)
 
 	k.informerFactory.Start(k.stopCh)
 	return nil
 }
-func (k *k8s) SetCluster(cluster types.SubmarinerCluster) error {
+
+func (k *Datastore) SetCluster(cluster *types.SubmarinerCluster) error {
 	clusterCRDName, err := util.GetClusterCRDName(cluster)
 	if err != nil {
-		klog.Errorf("encountered error while parsing submarinercluster to cluster CRD name: %v", err)
-		return err
+		return fmt.Errorf("Error converting the Cluster CRD name: %v", err)
 	}
 
 	retrievedCluster, err := k.client.SubmarinerV1().Clusters(k.remoteNamespace).Get(clusterCRDName, metav1.GetOptions{})
 	if err != nil {
-		klog.Errorf("error while retrieving cluster from remote kubernetes broker: %v", err)
-		klog.V(4).Infof("There was an error retrieving the cluster CRD, assuming it does not exist and creating a new one")
+		klog.V(4).Infof("There was an error retrieving the remote Cluster CRD for %s, assuming it does not exist and creating a new one. The error was: %v",
+			clusterCRDName, err)
 		newClusterObject := &submarinerv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta {
+			ObjectMeta: metav1.ObjectMeta{
 				Name: clusterCRDName,
 			},
 			Spec: cluster.Spec,
 		}
-		k.client.SubmarinerV1().Clusters(k.remoteNamespace).Create(newClusterObject)
-		return nil
+
+		_, err = k.client.SubmarinerV1().Clusters(k.remoteNamespace).Create(newClusterObject)
+		if err != nil {
+			return fmt.Errorf("Error creating Cluster CRD %s in the remote broker: %v", clusterCRDName, err)
+		}
 	} else {
 		if reflect.DeepEqual(cluster.Spec, retrievedCluster.Spec) {
 			klog.V(4).Infof("Cluster CRD matched what we received from k8s broker, not reconciling")
@@ -334,37 +352,40 @@ func (k *k8s) SetCluster(cluster types.SubmarinerCluster) error {
 		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			result, getErr := k.client.SubmarinerV1().Clusters(k.remoteNamespace).Get(clusterCRDName, metav1.GetOptions{})
 			if getErr != nil {
-				panic(fmt.Errorf("failed to get latest version of cluster: %v", getErr))
+				return fmt.Errorf("Error retrieving latest version of Cluster %s: %v", clusterCRDName, getErr)
 			}
 			result.Spec = cluster.Spec
 			_, updateErr := k.client.SubmarinerV1().Clusters(k.remoteNamespace).Update(result)
 			return updateErr
 		})
 		if retryErr != nil {
-			panic(fmt.Errorf("update failed: %v", retryErr))
+			return fmt.Errorf("Error updating Cluster CRD %s in remote broker: %v", clusterCRDName, retryErr)
 		}
 	}
 	return nil
 }
-func (k *k8s) SetEndpoint(endpoint types.SubmarinerEndpoint) error {
+
+func (k *Datastore) SetEndpoint(endpoint *types.SubmarinerEndpoint) error {
 	endpointCRDName, err := util.GetEndpointCRDName(endpoint)
 	if err != nil {
-		klog.Errorf("encountered error while parsing submarinerendpoint to endpoint CRD name: %v", err)
-		return err
+		return fmt.Errorf("Error converting the Endpoint CRD name: %v", err)
 	}
 
 	retrievedEndpoint, err := k.client.SubmarinerV1().Endpoints(k.remoteNamespace).Get(endpointCRDName, metav1.GetOptions{})
 	if err != nil {
-		klog.Errorf("error while retrieving endpoint from remote kubernetes broker: %v", err)
-		klog.V(4).Infof("There was an error retrieving the endpoint CRD, assuming it does not exist and creating a new one")
+		klog.V(4).Infof("There was an error retrieving the local Endpoint CRD for %s, assuming it does not exist and creating a new one. The error was: %v",
+			endpointCRDName, err)
 		newEndpointObject := &submarinerv1.Endpoint{
-			ObjectMeta: metav1.ObjectMeta {
+			ObjectMeta: metav1.ObjectMeta{
 				Name: endpointCRDName,
 			},
 			Spec: endpoint.Spec,
 		}
-		k.client.SubmarinerV1().Endpoints(k.remoteNamespace).Create(newEndpointObject)
-		return nil
+
+		_, err = k.client.SubmarinerV1().Endpoints(k.remoteNamespace).Create(newEndpointObject)
+		if err != nil {
+			return fmt.Errorf("Error creating Endpoint CRD %s in the remote broker: %v", endpointCRDName, err)
+		}
 	} else {
 		if reflect.DeepEqual(endpoint.Spec, retrievedEndpoint.Spec) {
 			klog.V(4).Infof("Endpoint CRD matched what we received from k8s broker, not reconciling")
@@ -373,28 +394,30 @@ func (k *k8s) SetEndpoint(endpoint types.SubmarinerEndpoint) error {
 		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			result, getErr := k.client.SubmarinerV1().Endpoints(k.remoteNamespace).Get(endpointCRDName, metav1.GetOptions{})
 			if getErr != nil {
-				panic(fmt.Errorf("failed to get latest version of endpoint: %v", getErr))
+				return fmt.Errorf("Error retrieving latest version of Endpoint %s: %v", endpointCRDName, getErr)
 			}
 			result.Spec = endpoint.Spec
 			_, updateErr := k.client.SubmarinerV1().Endpoints(k.remoteNamespace).Update(result)
 			return updateErr
 		})
 		if retryErr != nil {
-			panic(fmt.Errorf("update failed: %v", retryErr))
+			return fmt.Errorf("Error updating endpoint CRD %s: %v", endpointCRDName, retryErr)
 		}
 	}
 	return nil
 }
-func (k *k8s) RemoveEndpoint(clusterId, cableName string) error {
-	endpointName, err := util.GetEndpointCRDNameFromParams(clusterId, cableName)
+
+func (k *Datastore) RemoveEndpoint(clusterID, cableName string) error {
+	endpointName, err := util.GetEndpointCRDNameFromParams(clusterID, cableName)
 
 	if err != nil {
-		return fmt.Errorf("error while removing endpoint, encountered error while converting name: %v", err)
+		return fmt.Errorf("Error converting the Endpoint CRD name: %v", err)
 	}
 
 	return k.client.SubmarinerV1().Endpoints(k.remoteNamespace).Delete(endpointName, &metav1.DeleteOptions{})
 }
-func (k *k8s) RemoveCluster(clusterId string) error {
+
+func (k *Datastore) RemoveCluster(clusterID string) error {
 	// not implemented yet
 	return nil
 }
