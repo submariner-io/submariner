@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -em
 
-source $(dirname $0)/../lib/debug_functions
+source $(git rev-parse --show-toplevel)/scripts/lib/debug_functions
 
 ### Functions ###
 

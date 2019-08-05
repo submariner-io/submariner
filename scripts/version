@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source $(git rev-parse --show-toplevel)/scripts/lib/debug_functions
+
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
     DIRTY="-dirty"
 fi

@@ -1,3 +1,5 @@
 #!/bin/bash
 
+source $(git rev-parse --show-toplevel)/scripts/lib/debug_functions
+
 exec $(dirname $0)/ci
