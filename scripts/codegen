@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source $(git rev-parse --show-toplevel)/scripts/lib/debug_functions
+
 K8S_IO_DIR="${GOPATH:-~/go}/src/k8s.io"
 CODEGEN_SCRIPT_DIR="${K8S_IO_DIR}/code-generator"
 CODEGEN_SCRIPT="${CODEGEN_SCRIPT_DIR}/generate-groups.sh"
