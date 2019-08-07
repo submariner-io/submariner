@@ -7,9 +7,9 @@ export NO_COLOR='\e[0m'
 
 function trap_commands() {
     # Function to print each bash command before it is executed
-    trap '! [[ "$BASH_COMMAND" =~ ^(echo|read|\[\[|while|for|prompt) ]] && \
-    cmd=`eval echo -e "$BASH_COMMAND" 2>/dev/null` && \
-    echo -e "${CYAN_COLOR} $cmd ${NO_COLOR}"' DEBUG
+    trap '! [[ "$BASH_COMMAND" =~ ^(echo|read|\[|while|for) ]] && \
+    cmd=`eval echo -e "[${PWD##*/}]\$ $BASH_COMMAND" 2>/dev/null` && \
+    echo -e "${CYAN_COLOR}$cmd${NO_COLOR}"' DEBUG
 }
 
 ### Main ###

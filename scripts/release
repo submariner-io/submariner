@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
+source $(git rev-parse --show-toplevel)/scripts/lib/debug_functions
+
 echo "$QUAY_PASSWORD" | docker login quay.io -u "$QUAY_USERNAME" --password-stdin
 docker tag rancher/submariner:dev quay.io/submariner/submariner:latest
 docker tag rancher/submariner:dev quay.io/submariner/submariner:"${TRAVIS_COMMIT:0:7}"
