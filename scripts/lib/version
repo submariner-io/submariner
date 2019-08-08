@@ -1,6 +1,8 @@
-#!/bin/bash
-
-source $(git rev-parse --show-toplevel)/scripts/lib/debug_functions
+# This should only be sourced
+if [ "${0##*/}" = "version" ]; then
+    echo "Don't run me, source me" >&2
+    exit 1
+fi
 
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
     DIRTY="-dirty"
