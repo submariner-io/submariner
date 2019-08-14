@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-source $(git rev-parse --show-toplevel)/scripts/lib/debug_functions
+source $(dirname $0)/lib/debug_functions
 
 cd $(dirname $0)
 ./validate
