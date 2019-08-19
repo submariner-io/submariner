@@ -8,6 +8,8 @@ docker tag rancher/submariner:dev quay.io/submariner/submariner:latest
 docker tag rancher/submariner:dev quay.io/submariner/submariner:"${TRAVIS_COMMIT:0:7}"
 docker tag rancher/submariner-route-agent:dev quay.io/submariner/submariner-route-agent:latest
 docker tag rancher/submariner-route-agent:dev quay.io/submariner/submariner-route-agent:"${TRAVIS_COMMIT:0:7}"
+docker tag rancher/dapper-base:dev quay.io/submariner/dapper-base:latest
+docker tag rancher/dapper-base:dev quay.io/submariner/dapper-base:"${TRAVIS_COMMIT:0:7}"
 docker tag quay.io/submariner/submariner-operator:dev quay.io/submariner/submariner-operator:latest
 docker tag quay.io/submariner/submariner-operator:dev quay.io/submariner/submariner-operator:"${TRAVIS_COMMIT:0:7}"
 for i in $(docker images --format "{{.Repository}}:{{.Tag}}" | grep "quay.io/submariner"); do docker push $i; done

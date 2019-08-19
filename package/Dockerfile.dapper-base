@@ -1,0 +1,41 @@
+FROM fedora:30
+
+ENV DAPPER_HOST_ARCH=amd64
+ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH} \
+    LINT_VERSION=v1.16.0 \
+    HELM_VERSION=v2.14.1 \
+    KIND_VERSION=v0.3.0 \
+    KUBEFED_VERSION=0.1.0-rc2
+
+ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
+    GOPATH=/go GO111MODULE=on PATH=/go/bin:/usr/local/go/bin:${PATH} SHELL=/bin/bash GOFLAGS=-mod=vendor \
+    GOPROXY=https://proxy.golang.org
+
+# Requirements:
+# Component      | Usage
+# -----------------------------------------------------------
+# gcc            | ginkgo
+# git            | find the workspace root
+# curl           | download other tools
+# moby-engine    | Dapper (Docker)
+# golang         | build
+# kubectl        | e2e tests (in kubernetes-client)
+# golangci-lint  | code linting
+# helm           | e2e tests
+# kubefedctl     | e2e tests
+# kind           | e2e tests
+# ginkgo         | tests
+# goimports      | code formatting
+# make           | OLM installation
+# findutils      | e2e cleanup (xargs)
+RUN dnf -y distrosync && \
+    dnf -y install --nodocs --setopt=install_weak_deps=False gcc git-core curl moby-engine make golang kubernetes-client findutils && \
+    dnf -y clean all && \
+    curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin ${LINT_VERSION} && \
+    curl "https://storage.googleapis.com/kubernetes-helm/helm-${HELM_VERSION}-linux-${ARCH}.tar.gz" | tar -xzf - && \
+    cp linux-${ARCH}/helm /usr/bin/ && chmod a+x /usr/bin/helm && \
+    curl -LO "https://github.com/kubernetes-sigs/kubefed/releases/download/v${KUBEFED_VERSION}/kubefedctl-${KUBEFED_VERSION}-linux-${ARCH}.tgz" && \
+    tar -xzf kubefedctl-${KUBEFED_VERSION}-linux-${ARCH}.tgz && cp kubefedctl /usr/bin/ && chmod a+x /usr/bin/kubefedctl && \
+    curl -Lo /usr/bin/kind "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-${ARCH}" && chmod a+x /usr/bin/kind && \
+    GOFLAGS="" go get -v github.com/onsi/ginkgo/ginkgo && \
+    GOFLAGS="" go get -v golang.org/x/tools/cmd/goimports
