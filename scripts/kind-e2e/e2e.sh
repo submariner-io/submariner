@@ -262,6 +262,60 @@ function enable_kubefed() {
     fi
 }
 
+function install_olm() {
+    # This builds https://github.com/operator-framework/operator-lifecycle-manager/
+    # master which includes a few fixes we need
+    pushd $(mktemp -d)
+    git clone https://github.com/operator-framework/operator-lifecycle-manager.git
+    cd operator-lifecycle-manager
+    export NO_MINIKUBE=1
+    make build-linux build-wait
+    ./scripts/build_local.sh
+    mkdir -p build/resources
+    for i in 1 2 3; do
+        kind --name=cluster${i} load docker-image quay.io/operator-framework/olm:local
+    done
+    ./scripts/package_release.sh 1.0.0 build/resources doc/install/local-values.yaml
+    for i in 1 2 3; do
+        KUBECONFIG="$(kind --name=cluster${i} get kubeconfig-path)" ./scripts/install_local.sh olm build/resources
+    done
+    popd
+    return 0
+
+    pids=(-1 -1 -1)
+    logs=()
+    url=https://github.com/operator-framework/operator-lifecycle-manager/releases/download/${OLM_VERSION}
+    for i in 1 2 3; do
+        if kubectl --context=cluster${i} -n olm rollout status deploy/packageserver > /dev/null 2>&1; then
+            echo OLM already installed on cluster${i}, skipping OLM installation...
+        else
+            logs[$i]=$(mktemp)
+            echo Installing OLM on cluster${i}, logging to ${logs[$i]}...
+            (
+            kubectl --context=cluster${i} apply -f ${url}/crds.yaml
+            kubectl --context=cluster${i} apply -f ${url}/olm.yaml
+            kubectl --context=cluster${i} rollout status -w deploy/olm-operator -n olm
+            kubectl --context=cluster${i} rollout status -w deploy/catalog-operator -n olm
+            kubectl --context=cluster${i} rollout status -w deploy/packageserver -n olm
+            ) > ${logs[$i]} 2>&1 &
+            set pids[$i] = $!
+        fi
+    done
+    if [[ ${#logs[@]} -gt 0 ]]; then
+        echo "(Watch the installation processes with \"tail -f ${logs[@]}\".)"
+        for i in 1 2 3; do
+            if [[ pids[$i] -gt -1 ]]; then
+                wait ${pids[$i]}
+                if [[ $? -ne 0 && $? -ne 127 ]]; then
+                    echo OLM installation on cluster${i} failed:
+                    cat "${logs[$i]}"
+                fi
+                rm -f "${logs[$i]}"
+            fi
+        done
+    fi
+}
+
 function test_with_e2e_tests {
     set -o pipefail 
 
@@ -317,6 +371,7 @@ mkdir -p ${PRJ_ROOT}/output/kind-config/dapper/ ${PRJ_ROOT}/output/kind-config/l
 SUBMARINER_BROKER_NS=submariner-k8s-broker
 SUBMARINER_PSK=$(cat /dev/urandom | LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 64 | head -n 1)
 KUBEFED_NS=kube-federation-system
+OLM_VERSION=0.11.0
 export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
 
 kind_clusters "$@"
@@ -324,6 +379,7 @@ setup_custom_cni
 if [[ $3 = true ]]; then
     enable_logging
 fi
+install_olm
 install_helm
 if [[ $4 = true ]]; then
     enable_kubefed

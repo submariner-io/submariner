@@ -31,8 +31,9 @@ ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH=GOLANG_ARCH_${ARC
 # kind           | e2e tests
 # ginkgo         | tests
 # goimports      | code formatting
+# make           | OLM installation
 RUN apt-get -q update && \
-    apt-get install -y gcc git curl docker.io && \
+    apt-get install -y gcc git curl docker.io make && \
     curl https://storage.googleapis.com/golang/go${GO_VERSION}.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local && \
     curl -Lo /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/${ARCH}/kubectl && \
     chmod a+x /usr/bin/kubectl && \
