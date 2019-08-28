@@ -21,8 +21,6 @@ limitations under the License.
 package v1
 
 import (
-	net "net"
-
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -183,16 +181,6 @@ func (in *EndpointSpec) DeepCopyInto(out *EndpointSpec) {
 	if in.Subnets != nil {
 		in, out := &in.Subnets, &out.Subnets
 		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
-	if in.PrivateIP != nil {
-		in, out := &in.PrivateIP, &out.PrivateIP
-		*out = make(net.IP, len(*in))
-		copy(*out, *in)
-	}
-	if in.PublicIP != nil {
-		in, out := &in.PublicIP, &out.PublicIP
-		*out = make(net.IP, len(*in))
 		copy(*out, *in)
 	}
 	if in.BackendConfig != nil {
