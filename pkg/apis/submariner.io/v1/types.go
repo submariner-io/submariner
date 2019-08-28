@@ -1,8 +1,6 @@
 package v1
 
 import (
-	"net"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -46,8 +44,8 @@ type EndpointSpec struct {
 	CableName     string            `json:"cable_name"`
 	Hostname      string            `json:"hostname"`
 	Subnets       []string          `json:"subnets"`
-	PrivateIP     net.IP            `json:"private_ip"`
-	PublicIP      net.IP            `json:"public_ip"`
+	PrivateIP     string            `json:"private_ip"`
+	PublicIP      string            `json:"public_ip"`
 	NATEnabled    bool              `json:"nat_enabled"`
 	Backend       string            `json:"backend"`
 	BackendConfig map[string]string `json:"backend_config,omitempty"`

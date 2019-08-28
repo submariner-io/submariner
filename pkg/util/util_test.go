@@ -1,8 +1,6 @@
 package util_test
 
 import (
-	"net"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -95,7 +93,7 @@ func testGetLocalCluster() {
 func testGetLocalEndpoint() {
 	It("should return a valid SubmarinerEndpoint object", func() {
 		subnets := []string{"1.2.3.4/16"}
-		privateIP := net.IP{1, 2, 3, 4}
+		privateIP := "1.2.3.4"
 		endpoint, err := util.GetLocalEndpoint("east", "backend", map[string]string{}, false, subnets, privateIP)
 
 		Expect(err).ToNot(HaveOccurred())
