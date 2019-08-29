@@ -7,12 +7,18 @@ cd $(dirname $0)/..
 
 source scripts/lib/find_functions
 
+# FIXME: This var name is different than in find_go_pkg_dirs fn
 EXCLUDE_PKG_DIRS=".git .trash-cache vendor bin"
 
-PACKAGES=$(find_go_pkg_dirs --no-trailing-dots "*.go")
+#PACKAGES=$(find_go_pkg_dirs --no-trailing-dots "*.go")
+PACKAGES="main.go pkg operators/go/submariner-operator/pkg"
 
 if [[ $(goimports -l ${PACKAGES} | wc -l) -gt 0 ]]; then
-    echo Incorrect formatting, please run goimports
+    echo Incorrect formatting
+    echo These are the files with formatting errrors:
+    goimports -l ${PACKAGES}
+    echo These are the formatting errors:
+    goimports -d ${PACKAGES}
     exit 1
 fi
 

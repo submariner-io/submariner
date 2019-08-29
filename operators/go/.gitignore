@@ -1,0 +1,3 @@
+# The Operator is currently auto-generated, not stored in VCS
+# Use ./gen_subm_operator.sh to build it
+submariner-operator/

@@ -3,6 +3,11 @@ set -em
 
 source $(git rev-parse --show-toplevel)/scripts/lib/debug_functions
 
+# Import functions for deploying/testing with Operator
+# NB: These are also used to verify non-Operator deployments, thereby asserting the two are mostly equivalent
+. kind-e2e/lib_operator_deploy_subm.sh
+. kind-e2e/lib_operator_verify_subm.sh
+
 ### Functions ###
 
 function kind_clusters() {
@@ -313,6 +318,7 @@ echo Starting with status: $1, k8s_version: $2, logging: $3, kubefed: $4.
 PRJ_ROOT=$(git rev-parse --show-toplevel)
 mkdir -p ${PRJ_ROOT}/output/kind-config/dapper/ ${PRJ_ROOT}/output/kind-config/local-dev/
 SUBMARINER_BROKER_NS=submariner-k8s-broker
+# FIXME: This can change and break re-running deployments
 SUBMARINER_PSK=$(cat /dev/urandom | LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 64 | head -n 1)
 KUBEFED_NS=kube-federation-system
 export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
@@ -322,14 +328,102 @@ setup_custom_cni
 if [[ $3 = true ]]; then
     enable_logging
 fi
+
 install_helm
 if [[ $4 = true ]]; then
     enable_kubefed
 fi
 kind_import_images
 setup_broker
-setup_cluster2_gateway
-setup_cluster3_gateway
+# Verify SubM Broker secrets
+context=cluster1
+kubectl config use-context $context
+create_subm_vars
+verify_subm_broker_secrets
+
+if [[ $5 = operator ]]; then
+    operator=true
+
+    for i in 2 3; do
+      context=cluster$i
+      kubectl config use-context $context
+
+      # Create CRDs required as prerequisite submariner-engine
+      # TODO: Eventually OLM should handle this
+      create_subm_endpoints_crd
+      verify_endpoints_crd
+      create_subm_clusters_crd
+      verify_clusters_crd
+      create_routeagents_crd
+      verify_routeagents_crd
+
+      # Add SubM gateway labels
+      add_subm_gateway_label
+      # Verify SubM gateway labels
+      verify_subm_gateway_label
+
+      # Deploy SubM Operator
+      deploy_subm_operator
+      # Verify SubM CRD
+      verify_subm_crd
+      # Verify SubM Operator
+      verify_subm_operator
+      # Verify SubM Operator pod
+      verify_subm_op_pod
+      # Verify SubM Operator container
+      verify_subm_operator_container
+
+      # Collect SubM vars for use in SubM CRs
+      create_subm_vars
+
+      # FIXME: Rename all of these submariner-engine or engine, vs submariner
+      # Create SubM CR
+      create_subm_cr
+      # Deploy SubM CR
+      deploy_subm_cr
+      # Verify SubM CR
+      verify_subm_cr
+      # Verify SubM Engine Pod
+      verify_subm_engine_pod
+      # Verify SubM Engine container
+      verify_subm_engine_container
+      # Verify Engine secrets
+      verify_subm_engine_secrets
+
+      # Create Routeagent CR
+      create_routeagent_cr
+      # Deploy Routeagent CR
+      deploy_routeagent_cr
+      # Verify Routeagent CR
+      verify_routeagent_cr
+      # Verify SubM Routeagent Pods
+      verify_subm_routeagent_pod
+      # Verify SubM Routeagent container
+      verify_subm_routeagent_container
+      # Verify Routeagent secrets
+      verify_subm_routeagent_secrets
+    done
+
+    deploy_netshoot_cluster2
+    deploy_nginx_cluster3
+elif [[ $5 = helm ]]; then
+    helm=true
+    setup_cluster2_gateway
+    setup_cluster3_gateway
+    for i in 2 3; do
+      context=cluster$i
+      kubectl config use-context $context
+
+      create_subm_vars
+      verify_subm_engine_pod
+      verify_subm_routeagent_pod
+      verify_subm_engine_container
+      verify_subm_routeagent_container
+      verify_subm_engine_secrets
+      verify_subm_routeagent_secrets
+    done
+fi
+
 test_connection
 test_with_e2e_tests
 
