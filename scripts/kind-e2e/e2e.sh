@@ -58,6 +58,12 @@ function install_helm() {
     pids=(-1 -1 -1)
     logs=()
     for i in 1 2 3; do
+        # Skip other clusters on operator deployment, we only need it on the first
+        if [ "$i" != 1 ] && [ "$deploy_operator" = true ]; then
+            echo "Skipping other clusters since we're deploying with operator."
+            break
+        fi
+
         if kubectl --context=cluster${i} -n kube-system rollout status deploy/tiller-deploy > /dev/null 2>&1; then
             echo Helm already installed on cluster${i}, skipping helm installation...
         else
@@ -96,7 +102,7 @@ function setup_custom_cni(){
             echo "Applying weave network in to cluster${i}..."
             kubectl --context=cluster${i} apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&env.IPALLOC_RANGE=${POD_CIDR[cluster${i}]}"
             echo "Waiting for weave-net pods to be ready cluster${i}..."
-            kubectl --context=cluster${i} wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=300s
+            kubectl --context=cluster${i} wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=700s
             echo "Waiting for core-dns deployment to be ready cluster${i}..."
             kubectl --context=cluster${i} -n kube-system rollout status deploy/coredns --timeout=300s
         fi
@@ -192,11 +198,48 @@ function kind_import_images() {
     docker tag rancher/submariner:dev submariner:local
     docker tag rancher/submariner-route-agent:dev submariner-route-agent:local
 
+    if [[ "$deploy_operator" = true ]]; then
+       docker tag quay.io/submariner/submariner-operator:dev submariner-operator:local
+    fi
+
     for i in 2 3; do
         echo "Loading submariner images in to cluster${i}..."
         kind --name cluster${i} load docker-image submariner:local
         kind --name cluster${i} load docker-image submariner-route-agent:local
+        if [[ "$deploy_operator" = true ]]; then
+             kind --name cluster${i} load docker-image submariner-operator:local
+	fi
     done
+}
+
+function create_subm_vars() {
+  # FIXME A better name might be submariner-engine, but just kinda-matching submariner-<random hash> name used by Helm/upstream tests
+  deployment_name=submariner
+  operator_deployment_name=submariner-operator
+  engine_deployment_name=submariner-engine
+  routeagent_deployment_name=submariner-routeagent
+  broker_deployment_name=submariner-k8s-broker
+
+  clusterCIDR_cluster2=10.245.0.0/16
+  clusterCIDR_cluster3=10.246.0.0/16
+  serviceCIDR_cluster2=100.95.0.0/16
+  serviceCIDR_cluster3=100.96.0.0/16
+  natEnabled=false
+
+  subm_engine_image_repo=local
+  subm_engine_image_tag=local
+
+  # FIXME: Actually act on this size request in controller
+  subm_engine_size=3
+  subm_colorcodes=blue
+  subm_debug=false
+  subm_broker=k8s
+  ce_ipsec_debug=false
+  ce_ipsec_ikeport=500
+  ce_ipsec_nattport=4500
+
+  subm_ns=operators
+  subm_broker_ns=submariner-k8s-broker
 }
 
 function test_connection() {
@@ -311,10 +354,16 @@ if [[ $1 != keep ]]; then
     trap cleanup EXIT
 fi
 
+if [ "$5" = operator ]; then
+   echo Deploying with operator
+   deploy_operator=true
+fi
+
 echo Starting with status: $1, k8s_version: $2, logging: $3, kubefed: $4.
 PRJ_ROOT=$(git rev-parse --show-toplevel)
 mkdir -p ${PRJ_ROOT}/output/kind-config/dapper/ ${PRJ_ROOT}/output/kind-config/local-dev/
 SUBMARINER_BROKER_NS=submariner-k8s-broker
+# FIXME: This can change and break re-running deployments
 SUBMARINER_PSK=$(cat /dev/urandom | LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 64 | head -n 1)
 KUBEFED_NS=kube-federation-system
 export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
@@ -324,14 +373,105 @@ setup_custom_cni
 if [[ $3 = true ]]; then
     enable_logging
 fi
+
 install_helm
 if [[ $4 = true ]]; then
     enable_kubefed
 fi
+
 kind_import_images
 setup_broker
-setup_cluster2_gateway
-setup_cluster3_gateway
+
+context=cluster1
+kubectl config use-context $context
+
+# Import functions for testing with Operator
+# NB: These are also used to verify non-Operator deployments, thereby asserting the two are mostly equivalent
+. kind-e2e/lib_operator_verify_subm.sh
+
+create_subm_vars
+verify_subm_broker_secrets
+
+if [ "$deploy_operator" = true ]; then
+    . kind-e2e/lib_operator_deploy_subm.sh
+
+    for i in 2 3; do
+      context=cluster$i
+      kubectl config use-context $context
+
+      # Create CRDs required as prerequisite submariner-engine
+      # TODO: Eventually OLM should handle this
+      create_subm_endpoints_crd
+      verify_endpoints_crd
+      create_subm_clusters_crd
+      verify_clusters_crd
+
+      # Add SubM gateway labels
+      add_subm_gateway_label
+      # Verify SubM gateway labels
+      verify_subm_gateway_label
+
+      # Deploy SubM Operator
+      deploy_subm_operator
+      # Verify SubM CRD
+      verify_subm_crd
+      # Verify SubM Operator
+      verify_subm_operator
+      # Verify SubM Operator pod
+      verify_subm_op_pod
+      # Verify SubM Operator container
+      verify_subm_operator_container
+
+      # FIXME: Rename all of these submariner-engine or engine, vs submariner
+      # Create SubM CR
+      create_subm_cr
+      # Deploy SubM CR
+      deploy_subm_cr
+      # Verify SubM CR
+      verify_subm_cr
+      # Verify SubM Engine Deployment
+      verify_subm_engine_deployment
+      # Verify SubM Engine Pod
+      verify_subm_engine_pod
+      # Verify SubM Engine container
+      verify_subm_engine_container
+      # Verify Engine secrets
+      verify_subm_engine_secrets
+
+      # Verify SubM Routeagent DaemonSet
+      verify_subm_routeagent_daemonset
+      # Verify SubM Routeagent Pods
+      verify_subm_routeagent_pod
+      # Verify SubM Routeagent container
+      verify_subm_routeagent_container
+      # Verify Routeagent secrets
+      verify_subm_routeagent_secrets
+    done
+
+    deploy_netshoot_cluster2
+    deploy_nginx_cluster3
+elif [[ $5 = helm ]]; then
+    helm=true
+    setup_cluster2_gateway
+    setup_cluster3_gateway
+    for i in 2 3; do
+      context=cluster$i
+      kubectl config use-context $context
+
+      # The Helm deploy doesn't respect namespace config, hardcode to what it uses
+      subm_ns=submariner
+
+      verify_subm_engine_deployment
+      verify_subm_engine_pod
+      verify_subm_routeagent_daemonset
+      verify_subm_routeagent_pod
+      verify_subm_engine_container
+      verify_subm_routeagent_container
+      verify_subm_engine_secrets
+      verify_subm_routeagent_secrets
+    done
+fi
+
 test_connection
 test_with_e2e_tests
 
