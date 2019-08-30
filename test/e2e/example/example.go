@@ -38,7 +38,7 @@ func testListingNodesFromCluster(cs *kubernetes.Clientset) {
 	By("Requesting node list from API")
 	nodes, err := nc.List(metav1.ListOptions{})
 	Expect(err).NotTo(HaveOccurred())
-	By("Checking that we had more than 0 nodes on the reponse")
+	By("Checking that we had more than 0 nodes on the response")
 	Expect(len(nodes.Items)).ToNot(BeZero())
 	for _, node := range nodes.Items {
 		inIP, err := getIP(v1.NodeInternalIP, &node)
