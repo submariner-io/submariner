@@ -316,6 +316,16 @@ function install_olm() {
     fi
 }
 
+function install_marketplace {
+    pushd $(mktemp -d)
+    git clone https://github.com/operator-framework/operator-marketplace.git
+    cd operator-marketplace
+    for i in 1 2 3; do
+        KUBECONFIG="$(kind --name=cluster${i} get kubeconfig-path)" kubectl apply -f deploy/upstream/
+    done
+    popd
+}
+
 function test_with_e2e_tests {
     set -o pipefail 
 
@@ -380,6 +390,7 @@ if [[ $3 = true ]]; then
     enable_logging
 fi
 install_olm
+install_marketplace
 install_helm
 if [[ $4 = true ]]; then
     enable_kubefed
