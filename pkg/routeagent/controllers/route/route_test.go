@@ -11,18 +11,18 @@ var _ = Describe("Route", func() {
 	Describe("Function populateCidrBlockList", func() {
 		Context("When input CIDR blocks are not present in the existing subnets", func() {
 			It("Should append the CIDR blocks to subnets", func() {
-				routeController := Controller{subnets: []string{"192.168.1.0/24"}}
-				routeController.populateCidrBlockList([]string{"10.10.10.0/24", "192.168.1.0/24"})
+				routeController := Controller{remoteSubnets: []string{"192.168.1.0/24"}}
+				routeController.updateIptableRulesForInterclusterTraffic([]string{"10.10.10.0/24", "192.168.1.0/24"})
 				want := []string{"192.168.1.0/24", "10.10.10.0/24"}
-				Expect(routeController.subnets).To(Equal(want))
+				Expect(routeController.remoteSubnets).To(Equal(want))
 			})
 		})
 		Context("When input CIDR blocks are present in the existing subnets", func() {
 			It("Should not append the CIDR blocks to subnets", func() {
-				routeController := Controller{subnets: []string{"10.10.10.0/24"}}
-				routeController.populateCidrBlockList([]string{"10.10.10.0/24", "192.168.1.0/24"})
+				routeController := Controller{remoteSubnets: []string{"10.10.10.0/24"}}
+				routeController.updateIptableRulesForInterclusterTraffic([]string{"10.10.10.0/24", "192.168.1.0/24"})
 				want := []string{"10.10.10.0/24", "192.168.1.0/24"}
-				Expect(routeController.subnets).To(Equal(want))
+				Expect(routeController.remoteSubnets).To(Equal(want))
 			})
 		})
 	})

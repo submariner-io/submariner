@@ -6,6 +6,10 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+
 	"github.com/submariner-io/submariner/pkg/routeagent/controllers/route"
 	"github.com/submariner-io/submariner/pkg/util"
 
@@ -23,8 +27,14 @@ var (
 )
 
 type SubmarinerRouteControllerSpecification struct {
-	ClusterID string
-	Namespace string
+	ClusterID   string
+	Namespace   string
+	ClusterCidr []string
+	ServiceCidr []string
+}
+
+func filterRouteAgentPods(options *v1.ListOptions) {
+	options.LabelSelector = route.SM_ROUTE_AGENT_FILTER
 }
 
 func main() {
@@ -53,10 +63,19 @@ func main() {
 
 	submarinerInformerFactory := submarinerInformers.NewSharedInformerFactoryWithOptions(submarinerClient, time.Second*30, submarinerInformers.WithNamespace(srcs.Namespace))
 
+	clientSet, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		klog.Errorf("Error building clientset: %s", err.Error())
+		return
+	}
+
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(clientSet, time.Second*60, informers.WithNamespace(srcs.Namespace), informers.WithTweakListOptions(filterRouteAgentPods))
+
 	defLink, err := util.GetDefaultGatewayInterface()
-	routeController := route.NewController(srcs.ClusterID, srcs.Namespace, defLink, submarinerClient, submarinerInformerFactory.Submariner().V1().Clusters(), submarinerInformerFactory.Submariner().V1().Endpoints())
+	routeController := route.NewController(srcs.ClusterID, srcs.ClusterCidr, srcs.ServiceCidr, srcs.Namespace, defLink, submarinerClient, clientSet, submarinerInformerFactory.Submariner().V1().Clusters(), submarinerInformerFactory.Submariner().V1().Endpoints(), informerFactory.Core().V1().Pods())
 
 	submarinerInformerFactory.Start(stopCh)
+	informerFactory.Start(stopCh)
 
 	var wg sync.WaitGroup
 
