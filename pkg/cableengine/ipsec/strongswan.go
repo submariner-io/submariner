@@ -329,7 +329,7 @@ func runCharon(debug bool, logFile string) error {
 	if err := cmd.Start(); err != nil {
 		// Note - Close handles nil receiver
 		outputFile.Close()
-		return fmt.Errorf("error starting the charon process wih args %v: %v", args, err)
+		return fmt.Errorf("error starting the charon process with args %v: %v", args, err)
 	}
 
 	go func() {
