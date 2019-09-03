@@ -34,7 +34,7 @@ type SubmarinerRouteControllerSpecification struct {
 }
 
 func filterRouteAgentPods(options *v1.ListOptions) {
-	options.LabelSelector = route.SM_ROUTE_AGENT_FILTER
+	options.LabelSelector = route.SmRouteAgentFilter
 }
 
 func main() {

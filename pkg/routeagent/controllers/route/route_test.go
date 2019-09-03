@@ -1,43 +1,29 @@
 package route
 
 import (
+	"strconv"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Route", func() {
-	Describe("Function populateCidrBlockList", func() {
-		Context("When input CIDR blocks are not present in the existing subnets", func() {
-			It("Should append the CIDR blocks to subnets", func() {
-				routeController := Controller{remoteSubnets: []string{"192.168.1.0/24"}}
-				routeController.updateIptableRulesForInterclusterTraffic([]string{"10.10.10.0/24", "192.168.1.0/24"})
-				want := []string{"192.168.1.0/24", "10.10.10.0/24"}
-				Expect(routeController.remoteSubnets).To(Equal(want))
+var _ = Describe("getVxlanVtepIPAddress", func() {
+	Describe("Unit tests for getVxlanVtepIPAddress", func() {
+		Context("When a valid ipaddress is provided to getVxlanVtepIPAddress", func() {
+			It("Should return the VxLAN VtepIP that can be configured", func() {
+				routeController := Controller{}
+				vtepIP, _ := routeController.getVxlanVtepIPAddress("192.168.100.24")
+				Expect(vtepIP.String()).Should(Equal(strconv.Itoa(VxLANVTepNetworkPrefix) + ".168.100.24"))
 			})
 		})
-		Context("When input CIDR blocks are present in the existing subnets", func() {
-			It("Should not append the CIDR blocks to subnets", func() {
-				routeController := Controller{remoteSubnets: []string{"10.10.10.0/24"}}
-				routeController.updateIptableRulesForInterclusterTraffic([]string{"10.10.10.0/24", "192.168.1.0/24"})
-				want := []string{"10.10.10.0/24", "192.168.1.0/24"}
-				Expect(routeController.remoteSubnets).To(Equal(want))
-			})
-		})
-	})
 
-	Describe("Function containsString", func() {
-		Context("When the given array of strings contains specified string", func() {
-			It("Should return true", func() {
-				Expect(containsString([]string{"unit", "test"}, "unit")).To(BeTrue())
+		Context("When an invalid ipaddress is provided to getVxlanVtepIPAddress", func() {
+			It("Should return an error", func() {
+				routeController := Controller{}
+				_, err := routeController.getVxlanVtepIPAddress("10.0.0")
+				Expect(err).ShouldNot(Equal(nil))
 			})
-		})
-		Context("When the given array of strings does not contain specified string", func() {
-			It("Should return false", func() {
-				Expect(containsString([]string{"unit", "test"}, "ginkgo")).To(BeFalse())
-			})
-
 		})
 	})
 })

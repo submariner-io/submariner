@@ -2,6 +2,7 @@ package route
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/coreos/go-iptables/iptables"
@@ -15,13 +16,13 @@ func (r *Controller) createIPTableChains() error {
 		return err
 	}
 
-	klog.V(4).Infof("Install/ensure %s chain exists", SM_POSTROUTING_CHAIN)
-	if err = ipt.NewChain("nat", SM_POSTROUTING_CHAIN); err != nil {
-		klog.Errorf("Unable to create %s chain in iptables: %v", SM_POSTROUTING_CHAIN, err)
+	klog.V(4).Infof("Install/ensure %s chain exists", SmPostRoutingChain)
+	if err = ipt.NewChain("nat", SmPostRoutingChain); err != nil {
+		klog.Errorf("Unable to create %s chain in iptables: %v", SmPostRoutingChain, err)
 	}
 
-	klog.V(4).Infof("Insert %s rule that has rules for inter-cluster traffic", SM_POSTROUTING_CHAIN)
-	forwardToSubPostroutingRuleSpec := []string{"-j", SM_POSTROUTING_CHAIN}
+	klog.V(4).Infof("Insert %s rule that has rules for inter-cluster traffic", SmPostRoutingChain)
+	forwardToSubPostroutingRuleSpec := []string{"-j", SmPostRoutingChain}
 	if err = r.insertUnique(ipt, "nat", "POSTROUTING", 1, forwardToSubPostroutingRuleSpec); err != nil {
 		klog.Errorf("Unable to insert iptable rule in NAT table, POSTROUTING chain: %v", err)
 	}
@@ -37,13 +38,13 @@ func (r *Controller) createIPTableChains() error {
 	}
 
 	klog.V(4).Infof("Allow VxLAN incoming traffic in SUBMARINER-INPUT Chain")
-	ruleSpec := []string{"-p", "udp", "-m", "udp", "--dport", VXLAN_PORT, "-j", "ACCEPT"}
+	ruleSpec := []string{"-p", "udp", "-m", "udp", "--dport", strconv.Itoa(VxLANPort), "-j", "ACCEPT"}
 	if err = ipt.AppendUnique("filter", "SUBMARINER-INPUT", ruleSpec...); err != nil {
 		klog.Errorf("Unable to append iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
 	}
 
-	klog.V(4).Infof("Insert rule to allow traffic over %s interface in FORWARDing Chain", VXLAN_IFACE)
-	ruleSpec = []string{"-o", VXLAN_IFACE, "-j", "ACCEPT"}
+	klog.V(4).Infof("Insert rule to allow traffic over %s interface in FORWARDing Chain", VxLANIface)
+	ruleSpec = []string{"-o", VxLANIface, "-j", "ACCEPT"}
 	if err = r.insertUnique(ipt, "filter", "FORWARD", 1, ruleSpec); err != nil {
 		klog.Errorf("Unable to insert iptable rule in filter table to allow vxlan traffic: %v", err)
 	}
@@ -60,14 +61,14 @@ func (r *Controller) programIptableRulesForInterClusterTraffic(remoteCidrBlock s
 	for _, localClusterCidr := range r.localClusterCidr {
 		ruleSpec := []string{"-s", localClusterCidr, "-d", remoteCidrBlock, "-j", "ACCEPT"}
 		klog.V(4).Infof("Installing iptables rule for outgoing traffic: %s", strings.Join(ruleSpec, " "))
-		if err = ipt.AppendUnique("nat", SM_POSTROUTING_CHAIN, ruleSpec...); err != nil {
+		if err = ipt.AppendUnique("nat", SmPostRoutingChain, ruleSpec...); err != nil {
 			klog.Errorf("error appending iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
 		}
 
-		// Todo: revisit we only have to program to the PODCidr
+		// Todo: revisit, we only have to program rules to allow traffic from the podCidr
 		ruleSpec = []string{"-s", remoteCidrBlock, "-d", localClusterCidr, "-j", "ACCEPT"}
 		klog.V(4).Infof("Installing iptables rule for incoming traffic: %s", strings.Join(ruleSpec, " "))
-		if err = ipt.AppendUnique("nat", SM_POSTROUTING_CHAIN, ruleSpec...); err != nil {
+		if err = ipt.AppendUnique("nat", SmPostRoutingChain, ruleSpec...); err != nil {
 			klog.Errorf("error appending iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
 		}
 	}
