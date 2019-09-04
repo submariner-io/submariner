@@ -1,7 +1,7 @@
-package route
+package util
 
 type StringSet struct {
-	set map[string]bool
+	Set map[string]bool
 }
 
 func NewStringSet() *StringSet {
@@ -9,20 +9,20 @@ func NewStringSet() *StringSet {
 }
 
 func (set *StringSet) Add(s string) bool {
-	_, found := set.set[s]
-	set.set[s] = true
+	_, found := set.Set[s]
+	set.Set[s] = true
 	return !found
 }
 
 func (set *StringSet) Contains(s string) bool {
-	_, found := set.set[s]
+	_, found := set.Set[s]
 	return found
 }
 
 func (set *StringSet) Size() int {
-	return len(set.set)
+	return len(set.Set)
 }
 
 func (set *StringSet) Delete(s string) {
-	delete(set.set, s)
+	delete(set.Set, s)
 }

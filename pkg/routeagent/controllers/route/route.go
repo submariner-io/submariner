@@ -14,6 +14,7 @@ import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	informers "github.com/submariner-io/submariner/pkg/client/informers/externalversions/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/util"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	k8sv1 "k8s.io/api/core/v1"
@@ -44,11 +45,11 @@ type Controller struct {
 	gatewayNodeIP    net.IP
 	localClusterCidr []string
 	localServiceCidr []string
-	remoteSubnets    *StringSet
+	remoteSubnets    *util.StringSet
 
 	vxlanDevice *vxLanIface
 	vxlanGw     net.IP
-	remoteVTEPs *StringSet
+	remoteVTEPs *util.StringSet
 
 	isGatewayNode bool
 	link          *net.Interface
@@ -72,8 +73,8 @@ func NewController(clusterID string, ClusterCidr []string, ServiceCidr []string,
 		clientSet:              clientSet,
 		link:                   link,
 		isGatewayNode:          false,
-		remoteSubnets:          NewStringSet(),
-		remoteVTEPs:            NewStringSet(),
+		remoteSubnets:          util.NewStringSet(),
+		remoteVTEPs:            util.NewStringSet(),
 		clustersSynced:         clusterInformer.Informer().HasSynced,
 		endpointsSynced:        endpointInformer.Informer().HasSynced,
 		smRouteAgentPodsSynced: podInformer.Informer().HasSynced,
@@ -290,7 +291,7 @@ func (r *Controller) createVxLANInterface(isGatewayDevice bool) error {
 			klog.Fatalf("Failed to create vxlan interface on Gateway Node: %v", err)
 		}
 
-		for fdbAddress, _ := range r.remoteVTEPs.set {
+		for fdbAddress, _ := range r.remoteVTEPs.Set {
 			err = r.vxlanDevice.AddFDB(net.ParseIP(fdbAddress), "00:00:00:00:00:00")
 			if err != nil {
 				klog.Fatalf("Failed to add FDB entry on the Gateway Node vxlan iface %v", err)
@@ -598,7 +599,7 @@ func (r *Controller) reconcileRoutes() error {
 	}
 
 	// let's now add the routes that are missing
-	for cidrBlock, _ := range r.remoteSubnets.set {
+	for cidrBlock, _ := range r.remoteSubnets.Set {
 		_, dst, err := net.ParseCIDR(cidrBlock)
 		if err != nil {
 			klog.Errorf("Error parsing cidr block %s: %v", cidrBlock, err)
