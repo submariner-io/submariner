@@ -56,8 +56,27 @@ type Controller struct {
 }
 
 const (
-	VxLANIface             = "vxlan100"
-	VxLANPort              = 4800
+	VxLANIface = "vxlan100"
+	VxLANPort  = 4800
+
+	/* Why VxLANVTepNetworkPrefix is 240?
+	   On VxLAN interfaces we need a unique IPAddress which does not collide with the
+	   host ip-address. This is going to be tricky as currently there is no specific
+	   CIDR in K8s that can be used for this purpose. If really required, this can be
+	   taken as an input from the user (i.e., as a configuration parameter).
+	   But we want to avoid any additional inputs particularly if there is a way to automate it.
+
+	   So, the approach we are taking is to derive the VxLAN ip from the hostIPAddress as shown below.
+	   Example: Say the host ipaddress is "192.168.1.100/16", we prepend 240 to the host-ip address
+	   and configure it on the VxLAN interface (i.e., 240.168.1.100/16).
+
+	   The reason behind choosing 240 is that "240.0.0.0/4" is a Reserved IPAddress [*] which
+	   normally will not be assigned on any of the hosts. Also, note that the VxLAN IPs that are
+	   so configured are only used within the local cluster and traffic will not leave the cluster
+	   with the VxLAN ipaddress.
+
+	   [*] https://en.wikipedia.org/wiki/Reserved_IP_addresses */
+
 	VxLANVTepNetworkPrefix = 240
 	SmPostRoutingChain     = "SUBMARINER-POSTROUTING"
 	SmRouteAgentFilter     = "app=submariner-routeagent"

@@ -63,16 +63,16 @@ func createVxLanIface(iface *vxLanIface) error {
 
 		// Config does not match, delete the existing interface and re-create it.
 		if err = netlink.LinkDel(existing); err != nil {
-			klog.V(4).Infof("Failed to delete the existing vxlan interface: %v", err)
+			klog.Errorf("Failed to delete the existing vxlan interface: %v", err)
 			return err
 		}
 
 		if err = netlink.LinkAdd(iface.link); err != nil {
-			klog.V(4).Infof("Failed to re-create the the vxlan interface: %v", err)
+			klog.Errorf("Failed to re-create the the vxlan interface: %v", err)
 			return err
 		}
 	} else if err != nil {
-		klog.V(4).Infof("Failed to create the the vxlan interface: %v", err)
+		klog.Errorf("Failed to create the the vxlan interface: %v", err)
 		return err
 	}
 

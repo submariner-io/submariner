@@ -65,7 +65,7 @@ func (r *Controller) programIptableRulesForInterClusterTraffic(remoteCidrBlock s
 			klog.Errorf("error appending iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
 		}
 
-		// Todo: revisit, we only have to program rules to allow traffic from the podCidr
+		// TODO: revisit, we only have to program rules to allow traffic from the podCidr
 		ruleSpec = []string{"-s", remoteCidrBlock, "-d", localClusterCidr, "-j", "ACCEPT"}
 		klog.V(4).Infof("Installing iptables rule for incoming traffic: %s", strings.Join(ruleSpec, " "))
 		if err = ipt.AppendUnique("nat", SmPostRoutingChain, ruleSpec...); err != nil {
