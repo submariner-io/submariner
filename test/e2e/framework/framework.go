@@ -105,17 +105,7 @@ func (f *Framework) BeforeEach() {
 		namespaceLabels := map[string]string{
 			"e2e-framework": f.BaseName,
 		}
-
-		for idx, clientSet := range f.ClusterClients {
-			switch idx {
-			case ClusterA: // On the first cluster we let k8s generate a name for the namespace
-				namespace := generateNamespace(clientSet, f.BaseName, namespaceLabels)
-				f.Namespace = namespace.GetName()
-				f.UniqueName = namespace.GetName()
-			default: // On the other clusters we use the same name to make tracing easier
-				f.CreateNamespace(clientSet, f.Namespace, namespaceLabels)
-			}
-		}
+		f.GenerateNamespace(f.BaseName, namespaceLabels)
 	} else {
 		f.UniqueName = string(uuid.NewUUID())
 	}
@@ -272,4 +262,18 @@ func createNamespace(client kubeclientset.Interface, name string, labels map[str
 	namespace, err := client.CoreV1().Namespaces().Create(namespaceObj)
 	Expect(err).NotTo(HaveOccurred(), "Error creating namespace %v", namespaceObj)
 	return namespace
+}
+
+func (f *Framework) GenerateNamespace(name string, namespacelables map[string]string) string {
+	for idx, clientSet := range f.ClusterClients {
+		switch idx {
+		case ClusterA: // On the first cluster we let k8s generate a name for the namespace
+			namespace := generateNamespace(clientSet, f.BaseName, namespacelables)
+			f.Namespace = namespace.GetName()
+			f.UniqueName = namespace.GetName()
+		default: // On the other clusters we use the same name to make tracing easier
+			f.CreateNamespace(clientSet, f.Namespace, namespacelables)
+		}
+	}
+	return f.Namespace
 }

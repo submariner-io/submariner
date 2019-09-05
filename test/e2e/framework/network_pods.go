@@ -16,7 +16,7 @@ const (
 // create a test pod inside the current test namespace on the specified cluster.
 // The pod will listen on TestPort over TCP, send sendString over the connection,
 // and write the network response in the pod  termination log, then exit with 0 status
-func (f *Framework) CreateTCPCheckListenerPod(cluster int, sendString string) *v1.Pod {
+func (f *Framework) CreateTCPCheckListenerPod(cluster int, sendString string, namespace string) *v1.Pod {
 
 	tcpCheckListenerPod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -24,6 +24,7 @@ func (f *Framework) CreateTCPCheckListenerPod(cluster int, sendString string) *v
 			Labels: map[string]string{
 				TestAppLabel: "tcp-check-listener",
 			},
+			Namespace : namespace,
 		},
 		Spec: v1.PodSpec{
 			RestartPolicy: v1.RestartPolicyNever,
@@ -53,7 +54,7 @@ func (f *Framework) CreateTCPCheckListenerPod(cluster int, sendString string) *v
 // The pod will connect to remoteIP:TestPort over TCP, send sendString over the
 // connection, and write the network response in the pod termination log, then
 // exit with 0 status
-func (f *Framework) CreateTCPCheckConnectorPod(cluster int, remoteCheckPod *v1.Pod, remoteIP string, sendString string) *v1.Pod {
+func (f *Framework) CreateTCPCheckConnectorPod(cluster int, remoteCheckPod *v1.Pod, remoteIP string, sendString string, namespace string) *v1.Pod {
 
 	tcpCheckConnectorPod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -61,6 +62,7 @@ func (f *Framework) CreateTCPCheckConnectorPod(cluster int, remoteCheckPod *v1.P
 			Labels: map[string]string{
 				TestAppLabel: "tcp-check-pod",
 			},
+			Namespace : namespace,
 		},
 		Spec: v1.PodSpec{
 			RestartPolicy: v1.RestartPolicyNever,

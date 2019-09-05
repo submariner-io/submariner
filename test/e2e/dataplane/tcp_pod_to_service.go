@@ -22,14 +22,14 @@ func testPod2ServiceTCP(f *framework.Framework) {
 	connectorUUID := string(uuid.NewUUID())
 
 	By("Creating a listener pod in cluster B, which will wait for a handshake over TCP")
-	listenerPod := f.CreateTCPCheckListenerPod(framework.ClusterB, listenerUUID)
+	listenerPod := f.CreateTCPCheckListenerPod(framework.ClusterB, listenerUUID, f.Namespace)
 
 	By("Pointing a service ClusterIP to the listener pod in cluster B")
 	service := f.CreateTCPService(framework.ClusterB, listenerPod.Labels[framework.TestAppLabel], framework.TestPort)
 	framework.Logf("Service for listener pod has ClusterIP: %v", service.Spec.ClusterIP)
 
 	By("Creating a connector pod in cluster A, which will attempt the specific UUID handshake over TCP")
-	connectorPod := f.CreateTCPCheckConnectorPod(framework.ClusterA, listenerPod, service.Spec.ClusterIP, connectorUUID)
+	connectorPod := f.CreateTCPCheckConnectorPod(framework.ClusterA, listenerPod, service.Spec.ClusterIP, connectorUUID, f.Namespace)
 
 	By("Waiting for the listener pod to exit with code 0, returning what listener sent")
 	exitStatusL, exitMessageL := f.WaitForPodFinishStatus(listenerPod, framework.ClusterB)
