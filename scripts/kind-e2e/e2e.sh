@@ -54,7 +54,7 @@ function kind_clusters() {
 
 function install_helm() {
     helm init --client-only
-    helm repo add submariner-latest https://releases.rancher.com/submariner-charts/latest
+    helm repo add submariner-latest https://submariner-io.github.io/submariner-charts/charts
     pids=(-1 -1 -1)
     logs=()
     for i in 1 2 3; do
