@@ -42,22 +42,22 @@ type Controller struct {
 	endpointWorkqueue workqueue.RateLimitingInterface
 	podWorkqueue      workqueue.RateLimitingInterface
 
-	gatewayNodeIP    net.IP
 	localClusterCidr []string
 	localServiceCidr []string
 	remoteSubnets    *util.StringSet
 
 	vxlanDevice *vxLanIface
-	vxlanGw     net.IP
 	remoteVTEPs *util.StringSet
 
-	isGatewayNode bool
-	link          *net.Interface
+	isGatewayNode    bool
+	defaultHostIface *net.Interface
 }
 
 const (
-	VxLANIface = "vxlan100"
-	VxLANPort  = 4800
+	VxLANIface         = "vx-submariner"
+	VxInterfaceWorker  = 0
+	VxInterfaceGateway = 1
+	VxLANPort          = 4800
 
 	/* Why VxLANVTepNetworkPrefix is 240?
 	   On VxLAN interfaces we need a unique IPAddress which does not collide with the
@@ -90,7 +90,7 @@ func NewController(clusterID string, ClusterCidr []string, ServiceCidr []string,
 		localServiceCidr:       ServiceCidr,
 		submarinerClientSet:    submarinerClientSet,
 		clientSet:              clientSet,
-		link:                   link,
+		defaultHostIface:       link,
 		isGatewayNode:          false,
 		remoteSubnets:          util.NewStringSet(),
 		remoteVTEPs:            util.NewStringSet(),
@@ -135,7 +135,7 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 	defer utilruntime.HandleCrash()
 
 	// Start the informer factories to begin populating the informer caches
-	klog.V(4).Infof("Starting Route Controller. ClusterID: %s, localClusterCIDR: %v, localServiceCIDR: %v", r.clusterID, r.localClusterCidr, r.localServiceCidr)
+	klog.Infof("Starting Route Controller. ClusterID: %s, localClusterCIDR: %v, localServiceCIDR: %v", r.clusterID, r.localClusterCidr, r.localServiceCidr)
 
 	// Wait for the caches to be synced before starting workers
 	klog.Info("Waiting for endpoint informer caches to sync.")
@@ -146,13 +146,13 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 	// Create the necessary IPTable chains in the filter and nat tables.
 	err := r.createIPTableChains()
 	if err != nil {
-		return fmt.Errorf("Failed to program the necessary iptable rules.")
+		return fmt.Errorf("createIPTableChains returned error. %v", err)
 	}
 
 	// let's go ahead and pre-populate clusters
 	clusters, err := r.submarinerClientSet.SubmarinerV1().Clusters(r.objectNamespace).List(metav1.ListOptions{})
 	if err != nil {
-		klog.Fatalf("error while retrieving all clusters: %v", err)
+		return fmt.Errorf("error while retrieving all clusters: %v", err)
 	}
 
 	// Program iptables rules for traffic destined to all the remote cluster CIDRs
@@ -165,7 +165,7 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 	// Query all the submariner-route-agent daemonSet PODs running in the local cluster.
 	podList, err := r.clientSet.CoreV1().Pods(r.objectNamespace).List(metav1.ListOptions{LabelSelector: SmRouteAgentFilter})
 	if err != nil {
-		klog.Fatalf("error while retrieving all submariner-route-agent pods: %v", err)
+		return fmt.Errorf("error while retrieving submariner-route-agent pods: %v", err)
 	}
 
 	for index, pod := range podList.Items {
@@ -205,7 +205,10 @@ func (r *Controller) updateIptableRulesForInterclusterTraffic(inputCidrBlocks []
 	for _, inputCidrBlock := range inputCidrBlocks {
 		if !r.remoteSubnets.Contains(inputCidrBlock) {
 			r.remoteSubnets.Add(inputCidrBlock)
-			r.programIptableRulesForInterClusterTraffic(inputCidrBlock)
+			err := r.programIptableRulesForInterClusterTraffic(inputCidrBlock)
+			if err != nil {
+				klog.Errorf("Failed to program iptable rule. %v", err)
+			}
 		}
 	}
 }
@@ -267,7 +270,11 @@ func (r *Controller) getVxlanVtepIPAddress(ipAddr string) (net.IP, error) {
 }
 
 func (r *Controller) getHostIfaceIPAddress() (net.IP, *net.IPNet, error) {
-	addrs, err := r.link.Addrs()
+	addrs, err := r.defaultHostIface.Addrs()
+	if err != nil {
+		return nil, nil, err
+	}
+
 	if len(addrs) > 0 {
 		for i := range addrs {
 			ipAddr, ipNetwork, err := net.ParseCIDR(addrs[i].String())
@@ -282,20 +289,18 @@ func (r *Controller) getHostIfaceIPAddress() (net.IP, *net.IPNet, error) {
 	return nil, nil, err
 }
 
-func (r *Controller) createVxLANInterface(isGatewayDevice bool) error {
+func (r *Controller) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP) error {
 	ipAddr, vtepMask, err := r.getHostIfaceIPAddress()
 	if err != nil {
-		klog.Errorf("Unable to retrieve the IPv4 address on the Host %v", err)
-		return err
+		return fmt.Errorf("Unable to retrieve the IPv4 address on the Host %v", err)
 	}
 
 	vtepIP, err := r.getVxlanVtepIPAddress(ipAddr.String())
 	if err != nil {
-		klog.Errorf("Failed to derive the vxlan vtepIP %v", err)
-		return err
+		return fmt.Errorf("Failed to derive the vxlan vtepIP %v", err)
 	}
 
-	if isGatewayDevice {
+	if ifaceType == VxInterfaceGateway {
 		attrs := &vxLanAttributes{
 			name:     VxLANIface,
 			vxlanId:  100,
@@ -307,31 +312,30 @@ func (r *Controller) createVxLANInterface(isGatewayDevice bool) error {
 
 		r.vxlanDevice, err = newVxlanIface(attrs)
 		if err != nil {
-			klog.Fatalf("Failed to create vxlan interface on Gateway Node: %v", err)
+			return fmt.Errorf("Failed to create vxlan interface on Gateway Node: %v", err)
 		}
 
-		for fdbAddress, _ := range r.remoteVTEPs.Set {
+		for fdbAddress := range r.remoteVTEPs.Set {
 			err = r.vxlanDevice.AddFDB(net.ParseIP(fdbAddress), "00:00:00:00:00:00")
 			if err != nil {
-				klog.Fatalf("Failed to add FDB entry on the Gateway Node vxlan iface %v", err)
+				return fmt.Errorf("Failed to add FDB entry on the Gateway Node vxlan iface %v", err)
 			}
 		}
 
 		// Enable loose mode (rp_filter=2) reverse path filtering on the vxlan interface.
 		err = ioutil.WriteFile("/proc/sys/net/ipv4/conf/"+VxLANIface+"/rp_filter", []byte("2"), 0644)
 		if err != nil {
-			klog.Errorf("Unable to update proc entry, err: %s", err)
-			return err
+			return fmt.Errorf("Unable to update vxlan rp_filter proc entry, err: %s", err)
 		} else {
-			klog.Errorf("Successfully updated proc entry ")
+			klog.Info("Successfully configured rp_filter to loose mode(2) ")
 		}
 
-	} else {
+	} else if ifaceType == VxInterfaceWorker {
 		// non-Gateway/Worker Node
 		attrs := &vxLanAttributes{
 			name:     VxLANIface,
 			vxlanId:  100,
-			group:    r.gatewayNodeIP,
+			group:    gatewayNodeIP,
 			srcAddr:  vtepIP,
 			vtepPort: VxLANPort,
 			mtu:      1450,
@@ -339,26 +343,36 @@ func (r *Controller) createVxLANInterface(isGatewayDevice bool) error {
 
 		r.vxlanDevice, err = newVxlanIface(attrs)
 		if err != nil {
-			klog.Fatalf("Failed to create vxlan interface on non-Gateway Node: %v", err)
+			return fmt.Errorf("Failed to create vxlan interface on non-Gateway Node: %v", err)
 		}
 	}
 
 	err = r.vxlanDevice.configureIPAddress(vtepIP, vtepMask.Mask)
 	if err != nil {
-		klog.Fatalf("Failed to configure vxlan interface ipaddress on the Gateway Node %v", err)
+		return fmt.Errorf("Failed to configure vxlan interface ipaddress on the Gateway Node %v", err)
 	}
 
 	return nil
 }
 
 func (r *Controller) processNextPod() bool {
-	pod, shutdown := r.podWorkqueue.Get()
+	obj, shutdown := r.podWorkqueue.Get()
 	if shutdown {
 		return false
 	}
 	err := func() error {
-		defer r.podWorkqueue.Done(pod)
-		pod := pod.(*k8sv1.Pod)
+		defer r.podWorkqueue.Done(obj)
+
+		key := obj.(string)
+		ns, name, err := cache.SplitMetaNamespaceKey(key)
+		if err != nil {
+			return fmt.Errorf("Error while splitting meta namespace key %s: %v", key, err)
+		}
+
+		pod, err := r.clientSet.CoreV1().Pods(ns).Get(name, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("Error retrieving submariner-route-agent pod object %s: %v", name, err)
+		}
 
 		klog.V(4).Infof("In processNextPod, POD HostIP is %s", pod.Status.HostIP)
 		r.populateRemoteVtepIps(pod.Status.PodIP)
@@ -366,13 +380,19 @@ func (r *Controller) processNextPod() bool {
 		// A new Node (identified via a Submariner-route-agent daemonset pod event) is added to the cluster.
 		// On the GatewayDevice, update the vxlan fdb entry (i.e., remote Vtep) for the newly added node.
 		if r.isGatewayNode {
-			ret := r.vxlanDevice.AddFDB(net.ParseIP(pod.Status.PodIP), "00:00:00:00:00:00")
-			if ret != nil {
-				klog.Errorf("Failed to add FDB entry on the Gateway Node vxlan iface %v", ret)
+			if r.vxlanDevice != nil {
+				err := r.vxlanDevice.AddFDB(net.ParseIP(pod.Status.PodIP), "00:00:00:00:00:00")
+				if err != nil {
+					return fmt.Errorf("Failed to add FDB entry on the Gateway Node vxlan iface %v", err)
+				}
+			} else {
+				r.podWorkqueue.AddRateLimited(obj)
+				klog.Errorf("vxlanDevice is not yet created on the Gateway node")
+				return nil
 			}
 		}
 
-		r.podWorkqueue.Forget(pod)
+		r.podWorkqueue.Forget(obj)
 		klog.V(4).Infof("Pod event processed by route controller")
 		return nil
 	}()
@@ -416,31 +436,31 @@ func (r *Controller) processNextEndpoint() bool {
 		}
 
 		klog.V(6).Infof("Local Cluster Gateway Node IP is %s", endpoint.Spec.PrivateIP)
-		r.gatewayNodeIP = net.ParseIP(endpoint.Spec.PrivateIP)
 
-		ipSlice := strings.Split(r.gatewayNodeIP.String(), ".")
-		ipSlice[0] = strconv.Itoa(VxLANVTepNetworkPrefix)
-		// remoteVtepIP is used while programming the routing rules
-		remoteVtepIP := net.ParseIP(strings.Join(ipSlice, "."))
-		r.vxlanGw = remoteVtepIP
-
+		// If the endpoint hostname matches with our hostname, it implies we are on gateway node
 		if endpoint.Spec.Hostname == hostname {
 			r.cleanRoutes()
 			r.isGatewayNode = true
-			if r.createVxLANInterface(true) != nil {
+			if r.createVxLANInterface(VxInterfaceGateway, nil) != nil {
 				klog.Fatalf("Unable to create VxLAN interface on GatewayNode (%s): %v", hostname, err)
 			}
 			klog.V(6).Infof("not reconciling routes because we appear to be the gateway host")
 			return nil
 		}
 
+		localClusterGwNodeIP := net.ParseIP(endpoint.Spec.PrivateIP)
+		remoteVtepIP, err := r.getVxlanVtepIPAddress(localClusterGwNodeIP.String())
+		if err != nil {
+			return fmt.Errorf("Failed to derive the remoteVtepIP %v", err)
+		}
+
 		r.isGatewayNode = false
-		if r.createVxLANInterface(false) != nil {
+		if r.createVxLANInterface(VxInterfaceWorker, localClusterGwNodeIP) != nil {
 			klog.Fatalf("Unable to create VxLAN interface on non-GatewayNode (%s): %v", endpoint.Spec.Hostname, err)
 		}
 
 		r.cleanXfrmPolicies()
-		err = r.reconcileRoutes()
+		err = r.reconcileRoutes(remoteVtepIP)
 		if err != nil {
 			r.endpointWorkqueue.AddRateLimited(obj)
 			return fmt.Errorf("Error while reconciling routes %v", err)
@@ -466,6 +486,7 @@ func (r *Controller) enqueueCluster(obj interface{}) {
 		utilruntime.HandleError(err)
 		return
 	}
+	klog.V(4).Infof("Enqueueing cluster for route controller %v", obj)
 	r.clusterWorkqueue.AddRateLimited(key)
 }
 
@@ -476,16 +497,23 @@ func (r *Controller) enqueueEndpoint(obj interface{}) {
 		utilruntime.HandleError(err)
 		return
 	}
+	klog.V(4).Infof("Enqueueing endpoint for route controller %v", obj)
 	r.endpointWorkqueue.AddRateLimited(key)
 }
 
 func (r *Controller) enqueuePod(obj interface{}) {
-	klog.V(6).Infof("Enqueueing pod for route controller %v", obj)
-	pod := obj.(*k8sv1.Pod)
+	var key string
+	var err error
+	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
+		utilruntime.HandleError(err)
+		return
+	}
 
+	pod := obj.(*k8sv1.Pod)
 	// Add the POD event to the workqueue only if the sm-route-agent podIP does not exist in the local cache.
 	if !r.remoteVTEPs.Contains(pod.Status.HostIP) {
-		r.podWorkqueue.AddRateLimited(obj)
+		klog.V(4).Infof("Enqueueing sm-route-agent-pod event, ip: %s", pod.Status.HostIP)
+		r.podWorkqueue.AddRateLimited(key)
 	}
 }
 
@@ -515,6 +543,17 @@ func (r *Controller) handleRemovedEndpoint(obj interface{}) {
 	if object.Spec.Hostname == hostname {
 		r.cleanRoutes()
 	}
+
+	if object.Spec.ClusterID == r.clusterID {
+		klog.V(6).Infof("Endpoint matches the cluster ID of this cluster")
+		err := r.vxlanDevice.deleteVxLanIface()
+		if err != nil {
+			klog.Errorf("Failed to delete the the vxlan interface on endpoint removal: %v", err)
+			return
+		}
+		r.vxlanDevice = nil
+	}
+
 	klog.V(4).Infof("Removed routes from host")
 }
 
@@ -528,7 +567,7 @@ func (r *Controller) handleRemovedPod(obj interface{}) {
 
 	if r.remoteVTEPs.Contains(pod.Status.HostIP) {
 		r.remoteVTEPs.Delete(pod.Status.HostIP)
-		if r.isGatewayNode {
+		if r.isGatewayNode && r.vxlanDevice != nil {
 			ret := r.vxlanDevice.DelFDB(net.ParseIP(pod.Status.PodIP), "00:00:00:00:00:00")
 			if ret != nil {
 				klog.Errorf("Failed to delete FDB entry on the Gateway Node vxlan iface %v", ret)
@@ -581,7 +620,7 @@ func (r *Controller) cleanXfrmPolicies() {
 }
 
 // Reconcile the routes installed on this device using rtnetlink
-func (r *Controller) reconcileRoutes() error {
+func (r *Controller) reconcileRoutes(vxlanGw net.IP) error {
 	link, err := netlink.LinkByName(VxLANIface)
 	if err != nil {
 		return fmt.Errorf("Error retrieving link by name %s: %v", VxLANIface, err)
@@ -600,7 +639,7 @@ func (r *Controller) reconcileRoutes() error {
 		if route.Dst == nil || route.Gw == nil {
 			klog.V(6).Infof("Found nil gw or dst")
 		} else {
-			if r.remoteSubnets.Contains(route.Dst.String()) && route.Gw.Equal(r.vxlanGw) {
+			if r.remoteSubnets.Contains(route.Dst.String()) && route.Gw.Equal(vxlanGw) {
 				klog.V(6).Infof("Found route %s with gw %s already installed", route.String(), route.Gw.String())
 			} else {
 				klog.V(6).Infof("Removing route %s", route.String())
@@ -618,7 +657,7 @@ func (r *Controller) reconcileRoutes() error {
 	}
 
 	// let's now add the routes that are missing
-	for cidrBlock, _ := range r.remoteSubnets.Set {
+	for cidrBlock := range r.remoteSubnets.Set {
 		_, dst, err := net.ParseCIDR(cidrBlock)
 		if err != nil {
 			klog.Errorf("Error parsing cidr block %s: %v", cidrBlock, err)
@@ -626,7 +665,7 @@ func (r *Controller) reconcileRoutes() error {
 		}
 		route := netlink.Route{
 			Dst:       dst,
-			Gw:        r.vxlanGw,
+			Gw:        vxlanGw,
 			Scope:     unix.RT_SCOPE_UNIVERSE,
 			LinkIndex: link.Attrs().Index,
 			Protocol:  4,

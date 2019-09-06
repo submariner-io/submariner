@@ -79,6 +79,16 @@ func createVxLanIface(iface *vxLanIface) error {
 	return nil
 }
 
+func (iface *vxLanIface) deleteVxLanIface() error {
+	err := netlink.LinkDel(iface.link)
+	if err != nil {
+		klog.Errorf("Failed to delete the the vxlan interface: %v", err)
+		return err
+	}
+
+	return nil
+}
+
 func isVxlanConfigTheSame(new, current netlink.Link) bool {
 
 	required := new.(*netlink.Vxlan)
