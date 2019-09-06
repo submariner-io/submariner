@@ -49,7 +49,7 @@ func ParseSecure(token string) (types.Secure, error) {
 	}, nil
 }
 
-func GetLocalIP() net.IP {
+func GetLocalIP() string {
 	conn, err := net.Dial("udp", "8.8.8.8:53")
 	if err != nil {
 		log.Fatal(err)
@@ -58,7 +58,7 @@ func GetLocalIP() net.IP {
 
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 
-	return localAddr.IP
+	return localAddr.IP.String()
 }
 
 func FlattenColors(colorCodes []string) string {
@@ -86,14 +86,14 @@ func GetLocalCluster(ss types.SubmarinerSpecification) (types.SubmarinerCluster,
 }
 
 func GetLocalEndpoint(clusterID string, backend string, backendConfig map[string]string, natEnabled bool,
-	subnets []string, privateIP net.IP) (types.SubmarinerEndpoint, error) {
+	subnets []string, privateIP string) (types.SubmarinerEndpoint, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return types.SubmarinerEndpoint{}, fmt.Errorf("Error getting hostname: %v", err)
 	}
 	endpoint := types.SubmarinerEndpoint{
 		Spec: subv1.EndpointSpec{
-			CableName:     fmt.Sprintf("submariner-cable-%s-%s", clusterID, strings.Replace(privateIP.String(), ".", "-", -1)),
+			CableName:     fmt.Sprintf("submariner-cable-%s-%s", clusterID, strings.Replace(privateIP, ".", "-", -1)),
 			ClusterID:     clusterID,
 			Hostname:      hostname,
 			PrivateIP:     privateIP,
@@ -108,7 +108,7 @@ func GetLocalEndpoint(clusterID string, backend string, backendConfig map[string
 		if err != nil {
 			return types.SubmarinerEndpoint{}, fmt.Errorf("Could not determine public IP: %v", err)
 		}
-		endpoint.Spec.PublicIP = net.ParseIP(publicIP)
+		endpoint.Spec.PublicIP = publicIP
 	}
 	return endpoint, nil
 }

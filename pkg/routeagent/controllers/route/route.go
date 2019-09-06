@@ -201,9 +201,9 @@ func (r *Controller) processNextEndpoint() bool {
 			return nil
 		}
 
-		klog.V(6).Infof("Setting gateway to gw: %s", endpoint.Spec.PrivateIP.String())
+		klog.V(6).Infof("Setting gateway to gw: %s", endpoint.Spec.PrivateIP)
 
-		r.gw = endpoint.Spec.PrivateIP
+		r.gw = net.ParseIP(endpoint.Spec.PrivateIP)
 		r.cleanXfrmPolicies()
 		err = r.reconcileRoutes()
 

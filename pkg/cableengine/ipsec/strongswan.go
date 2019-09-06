@@ -88,20 +88,20 @@ func (i *strongSwan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (strin
 	var localEndpointIP, remoteEndpointIP string
 
 	if endpoint.Spec.NATEnabled {
-		localEndpointIP = i.localEndpoint.Spec.PublicIP.String()
-		remoteEndpointIP = endpoint.Spec.PublicIP.String()
+		localEndpointIP = i.localEndpoint.Spec.PublicIP
+		remoteEndpointIP = endpoint.Spec.PublicIP
 	} else {
-		localEndpointIP = i.localEndpoint.Spec.PrivateIP.String()
-		remoteEndpointIP = endpoint.Spec.PrivateIP.String()
+		localEndpointIP = i.localEndpoint.Spec.PrivateIP
+		remoteEndpointIP = endpoint.Spec.PrivateIP
 	}
 
 	var localTs, remoteTs, localAddr, remoteAddr []string
-	localTs = append(localTs, fmt.Sprintf("%s/32", i.localEndpoint.Spec.PrivateIP.String()))
+	localTs = append(localTs, fmt.Sprintf("%s/32", i.localEndpoint.Spec.PrivateIP))
 	localTs = append(localTs, i.localSubnets...)
 
-	localAddr = append(localAddr, i.localEndpoint.Spec.PrivateIP.String())
+	localAddr = append(localAddr, i.localEndpoint.Spec.PrivateIP)
 
-	remoteTs = append(remoteTs, fmt.Sprintf("%s/32", endpoint.Spec.PrivateIP.String()))
+	remoteTs = append(remoteTs, fmt.Sprintf("%s/32", endpoint.Spec.PrivateIP))
 	remoteTs = append(remoteTs, endpoint.Spec.Subnets...)
 
 	remoteAddr = append(remoteAddr, remoteEndpointIP)
@@ -266,10 +266,10 @@ func (i *strongSwan) loadSharedKey(endpoint types.SubmarinerEndpoint, client *go
 	klog.Infof("Loading shared key for endpoint")
 	var identities []string
 	var publicIP, privateIP string
-	privateIP = endpoint.Spec.PrivateIP.String()
+	privateIP = endpoint.Spec.PrivateIP
 	identities = append(identities, privateIP)
 	if endpoint.Spec.NATEnabled {
-		publicIP = endpoint.Spec.PublicIP.String()
+		publicIP = endpoint.Spec.PublicIP
 		if publicIP != privateIP {
 			identities = append(identities, publicIP)
 		}
@@ -329,7 +329,7 @@ func runCharon(debug bool, logFile string) error {
 	if err := cmd.Start(); err != nil {
 		// Note - Close handles nil receiver
 		outputFile.Close()
-		return fmt.Errorf("error starting the charon process wih args %v: %v", args, err)
+		return fmt.Errorf("error starting the charon process with args %v: %v", args, err)
 	}
 
 	go func() {
