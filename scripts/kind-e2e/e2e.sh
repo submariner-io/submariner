@@ -263,6 +263,8 @@ function enable_kubefed() {
 }
 
 function test_with_e2e_tests {
+    set -o pipefail 
+
     cd ../test/e2e
 
     # Setup the KUBECONFIG env
