@@ -65,14 +65,26 @@ func main() {
 
 	clientSet, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
-		klog.Errorf("Error building clientset: %s", err.Error())
-		return
+		klog.Fatalf("Error building clientset: %s", err.Error())
 	}
 
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(clientSet, time.Second*60, informers.WithNamespace(srcs.Namespace), informers.WithTweakListOptions(filterRouteAgentPods))
 
+	informerConfig := route.InformerConfigStruct{
+		SubmarinerClientSet: submarinerClient,
+		ClientSet:           clientSet,
+		ClusterInformer:     submarinerInformerFactory.Submariner().V1().Clusters(),
+		EndpointInformer:    submarinerInformerFactory.Submariner().V1().Endpoints(),
+		PodInformer:         informerFactory.Core().V1().Pods(),
+	}
+
 	defLink, err := util.GetDefaultGatewayInterface()
-	routeController := route.NewController(srcs.ClusterID, srcs.ClusterCidr, srcs.ServiceCidr, srcs.Namespace, defLink, submarinerClient, clientSet, submarinerInformerFactory.Submariner().V1().Clusters(), submarinerInformerFactory.Submariner().V1().Endpoints(), informerFactory.Core().V1().Pods())
+	if err != nil {
+		klog.Errorf("Unable to find the default interface on host: %s", err.Error())
+		return
+	}
+
+	routeController := route.NewController(srcs.ClusterID, srcs.ClusterCidr, srcs.ServiceCidr, srcs.Namespace, defLink, informerConfig)
 
 	submarinerInformerFactory.Start(stopCh)
 	informerFactory.Start(stopCh)

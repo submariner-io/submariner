@@ -1,6 +1,7 @@
 package route
 
 import (
+	"fmt"
 	"net"
 	"syscall"
 
@@ -56,24 +57,21 @@ func createVxLanIface(iface *vxLanIface) error {
 		}
 
 		if isVxlanConfigTheSame(iface.link, existing) {
-			klog.V(4).Infof("VxLAN interface already exists with same configuration.")
+			klog.V(6).Infof("VxLAN interface already exists with same configuration.")
 			iface.link = existing.(*netlink.Vxlan)
 			return nil
 		}
 
 		// Config does not match, delete the existing interface and re-create it.
 		if err = netlink.LinkDel(existing); err != nil {
-			klog.Errorf("Failed to delete the existing vxlan interface: %v", err)
-			return err
+			return fmt.Errorf("failed to delete the existing vxlan interface: %v", err)
 		}
 
 		if err = netlink.LinkAdd(iface.link); err != nil {
-			klog.Errorf("Failed to re-create the the vxlan interface: %v", err)
-			return err
+			return fmt.Errorf("failed to re-create the the vxlan interface: %v", err)
 		}
 	} else if err != nil {
-		klog.Errorf("Failed to create the the vxlan interface: %v", err)
-		return err
+		return fmt.Errorf("failed to create the the vxlan interface: %v", err)
 	}
 
 	return nil
@@ -82,8 +80,7 @@ func createVxLanIface(iface *vxLanIface) error {
 func (iface *vxLanIface) deleteVxLanIface() error {
 	err := netlink.LinkDel(iface.link)
 	if err != nil {
-		klog.Errorf("Failed to delete the the vxlan interface: %v", err)
-		return err
+		return fmt.Errorf("failed to delete the the vxlan interface: %v", err)
 	}
 
 	return nil
@@ -100,17 +97,17 @@ func isVxlanConfigTheSame(new, current netlink.Link) bool {
 	}
 
 	if len(required.Group) > 0 && len(existing.Group) > 0 && !required.Group.Equal(existing.Group) {
-		klog.V(4).Infof("Vxlan Group of existing interface (%v) does not match with required Group (%v)", existing.Group, required.Group)
+		klog.V(4).Infof("Vxlan Group (%v) of existing interface does not match with required Group (%v)", existing.Group, required.Group)
 		return false
 	}
 
 	if len(required.SrcAddr) > 0 && len(existing.SrcAddr) > 0 && !required.SrcAddr.Equal(existing.SrcAddr) {
-		klog.V(4).Infof("Vxlan SrcAddr of existing interface (%v) does not match with required SrcAddr (%v)", existing.SrcAddr, required.SrcAddr)
+		klog.V(4).Infof("Vxlan SrcAddr (%v) of existing interface does not match with required SrcAddr (%v)", existing.SrcAddr, required.SrcAddr)
 		return false
 	}
 
 	if required.Port > 0 && existing.Port > 0 && required.Port != existing.Port {
-		klog.V(4).Infof("Vxlan Port of existing interface (%d) does not match with required Port (%d)", existing.Port, required.Port)
+		klog.V(4).Infof("Vxlan Port (%d) of existing interface does not match with required Port (%d)", existing.Port, required.Port)
 		return false
 	}
 
@@ -127,8 +124,7 @@ func (iface *vxLanIface) configureIPAddress(ipAddress net.IP, mask net.IPMask) e
 	if err == syscall.EEXIST {
 		return nil
 	} else if err != nil {
-		klog.Errorf("Unable to configure address (%s) on vxlan interface (%s). %v", ipAddress, iface.link.Name, err)
-		return err
+		return fmt.Errorf("unable to configure address (%s) on vxlan interface (%s). %v", ipAddress, iface.link.Name, err)
 	}
 	return nil
 }
@@ -136,8 +132,7 @@ func (iface *vxLanIface) configureIPAddress(ipAddress net.IP, mask net.IPMask) e
 func (iface *vxLanIface) AddFDB(ipAddress net.IP, hwAddr string) error {
 	macAddr, err := net.ParseMAC(hwAddr)
 	if err != nil {
-		klog.Errorf("Invalid MAC Address (%s) supplied. %v", hwAddr, err)
-		return err
+		return fmt.Errorf("invalid MAC Address (%s) supplied. %v", hwAddr, err)
 	}
 
 	neigh := &netlink.Neigh{
@@ -152,8 +147,7 @@ func (iface *vxLanIface) AddFDB(ipAddress net.IP, hwAddr string) error {
 
 	err = netlink.NeighAppend(neigh)
 	if err != nil {
-		klog.Errorf("Unable to add the bridge fdb entry %v, err: %s", neigh, err)
-		return err
+		return fmt.Errorf("unable to add the bridge fdb entry %v, err: %s", neigh, err)
 	} else {
 		klog.V(4).Infof("Successfully added the bridge fdb entry %v", neigh)
 	}
@@ -163,8 +157,7 @@ func (iface *vxLanIface) AddFDB(ipAddress net.IP, hwAddr string) error {
 func (iface *vxLanIface) DelFDB(ipAddress net.IP, hwAddr string) error {
 	macAddr, err := net.ParseMAC(hwAddr)
 	if err != nil {
-		klog.Errorf("Invalid MAC Address (%s) supplied. %v", hwAddr, err)
-		return err
+		return fmt.Errorf("invalid MAC Address (%s) supplied. %v", hwAddr, err)
 	}
 
 	neigh := &netlink.Neigh{
@@ -179,8 +172,7 @@ func (iface *vxLanIface) DelFDB(ipAddress net.IP, hwAddr string) error {
 
 	err = netlink.NeighDel(neigh)
 	if err != nil {
-		klog.Errorf("Unable to delete the bridge fdb entry %v, err: %s", neigh, err)
-		return err
+		return fmt.Errorf("unable to delete the bridge fdb entry %v, err: %s", neigh, err)
 	} else {
 		klog.V(4).Infof("Successfully deleted the bridge fdb entry %v", neigh)
 	}

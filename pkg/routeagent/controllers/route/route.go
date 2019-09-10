@@ -28,12 +28,20 @@ import (
 	"k8s.io/klog"
 )
 
+type InformerConfigStruct struct {
+	SubmarinerClientSet clientset.Interface
+	ClientSet           kubernetes.Interface
+	ClusterInformer     informers.ClusterInformer
+	EndpointInformer    informers.EndpointInformer
+	PodInformer         podinformer.PodInformer
+}
+
 type Controller struct {
 	clusterID       string
 	objectNamespace string
 
 	submarinerClientSet    clientset.Interface
-	clientSet              *kubernetes.Clientset
+	clientSet              kubernetes.Interface
 	clustersSynced         cache.InformerSynced
 	endpointsSynced        cache.InformerSynced
 	smRouteAgentPodsSynced cache.InformerSynced
@@ -82,27 +90,28 @@ const (
 	SmRouteAgentFilter     = "app=submariner-routeagent"
 )
 
-func NewController(clusterID string, ClusterCidr []string, ServiceCidr []string, objectNamespace string, link *net.Interface, submarinerClientSet clientset.Interface, clientSet *kubernetes.Clientset, clusterInformer informers.ClusterInformer, endpointInformer informers.EndpointInformer, podInformer podinformer.PodInformer) *Controller {
+func NewController(clusterID string, ClusterCidr []string, ServiceCidr []string, objectNamespace string,
+	link *net.Interface, config InformerConfigStruct) *Controller {
 	controller := Controller{
 		clusterID:              clusterID,
 		objectNamespace:        objectNamespace,
 		localClusterCidr:       ClusterCidr,
 		localServiceCidr:       ServiceCidr,
-		submarinerClientSet:    submarinerClientSet,
-		clientSet:              clientSet,
+		submarinerClientSet:    config.SubmarinerClientSet,
+		clientSet:              config.ClientSet,
 		defaultHostIface:       link,
 		isGatewayNode:          false,
 		remoteSubnets:          util.NewStringSet(),
 		remoteVTEPs:            util.NewStringSet(),
-		clustersSynced:         clusterInformer.Informer().HasSynced,
-		endpointsSynced:        endpointInformer.Informer().HasSynced,
-		smRouteAgentPodsSynced: podInformer.Informer().HasSynced,
+		clustersSynced:         config.ClusterInformer.Informer().HasSynced,
+		endpointsSynced:        config.EndpointInformer.Informer().HasSynced,
+		smRouteAgentPodsSynced: config.PodInformer.Informer().HasSynced,
 		clusterWorkqueue:       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Clusters"),
 		endpointWorkqueue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Endpoints"),
 		podWorkqueue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Pods"),
 	}
 
-	clusterInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	config.ClusterInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: controller.enqueueCluster,
 		UpdateFunc: func(old, new interface{}) {
 			controller.enqueueCluster(new)
@@ -110,7 +119,7 @@ func NewController(clusterID string, ClusterCidr []string, ServiceCidr []string,
 		DeleteFunc: controller.handleRemovedCluster,
 	})
 
-	endpointInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	config.EndpointInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: controller.enqueueEndpoint,
 		UpdateFunc: func(old, new interface{}) {
 			controller.enqueueEndpoint(new)
@@ -118,7 +127,7 @@ func NewController(clusterID string, ClusterCidr []string, ServiceCidr []string,
 		DeleteFunc: controller.handleRemovedEndpoint,
 	})
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	config.PodInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: controller.enqueuePod,
 		UpdateFunc: func(old, new interface{}) {
 			controller.enqueuePod(new)
@@ -230,11 +239,11 @@ func (r *Controller) processNextCluster() bool {
 		key := obj.(string)
 		ns, name, err := cache.SplitMetaNamespaceKey(key)
 		if err != nil {
-			return fmt.Errorf("Error while splitting meta namespace key %s: %v", key, err)
+			return fmt.Errorf("error while splitting meta namespace key %s: %v", key, err)
 		}
 		cluster, err := r.submarinerClientSet.SubmarinerV1().Clusters(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
-			return fmt.Errorf("Error retrieving submariner cluster object %s: %v", name, err)
+			return fmt.Errorf("error retrieving submariner cluster object %s: %v", name, err)
 		}
 
 		if cluster.Spec.ClusterID == r.clusterID {
@@ -261,7 +270,7 @@ func (r *Controller) processNextCluster() bool {
 func (r *Controller) getVxlanVtepIPAddress(ipAddr string) (net.IP, error) {
 	ipSlice := strings.Split(ipAddr, ".")
 	if len(ipSlice) < 4 {
-		return nil, fmt.Errorf("Invalid ipAddr [%s]", ipAddr)
+		return nil, fmt.Errorf("invalid ipAddr [%s]", ipAddr)
 	}
 
 	ipSlice[0] = strconv.Itoa(VxLANVTepNetworkPrefix)
@@ -286,18 +295,18 @@ func (r *Controller) getHostIfaceIPAddress() (net.IP, *net.IPNet, error) {
 			}
 		}
 	}
-	return nil, nil, err
+	return nil, nil, nil
 }
 
 func (r *Controller) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP) error {
 	ipAddr, vtepMask, err := r.getHostIfaceIPAddress()
 	if err != nil {
-		return fmt.Errorf("Unable to retrieve the IPv4 address on the Host %v", err)
+		return fmt.Errorf("unable to retrieve the IPv4 address on the Host %v", err)
 	}
 
 	vtepIP, err := r.getVxlanVtepIPAddress(ipAddr.String())
 	if err != nil {
-		return fmt.Errorf("Failed to derive the vxlan vtepIP %v", err)
+		return fmt.Errorf("failed to derive the vxlan vtepIP for %s, %v", ipAddr, err)
 	}
 
 	if ifaceType == VxInterfaceGateway {
@@ -312,20 +321,20 @@ func (r *Controller) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP) e
 
 		r.vxlanDevice, err = newVxlanIface(attrs)
 		if err != nil {
-			return fmt.Errorf("Failed to create vxlan interface on Gateway Node: %v", err)
+			return fmt.Errorf("failed to create vxlan interface on Gateway Node: %v", err)
 		}
 
 		for fdbAddress := range r.remoteVTEPs.Set {
 			err = r.vxlanDevice.AddFDB(net.ParseIP(fdbAddress), "00:00:00:00:00:00")
 			if err != nil {
-				return fmt.Errorf("Failed to add FDB entry on the Gateway Node vxlan iface %v", err)
+				return fmt.Errorf("failed to add FDB entry on the Gateway Node vxlan iface %v", err)
 			}
 		}
 
 		// Enable loose mode (rp_filter=2) reverse path filtering on the vxlan interface.
 		err = ioutil.WriteFile("/proc/sys/net/ipv4/conf/"+VxLANIface+"/rp_filter", []byte("2"), 0644)
 		if err != nil {
-			return fmt.Errorf("Unable to update vxlan rp_filter proc entry, err: %s", err)
+			return fmt.Errorf("unable to update vxlan rp_filter proc entry, err: %s", err)
 		} else {
 			klog.Info("Successfully configured rp_filter to loose mode(2) ")
 		}
@@ -343,13 +352,13 @@ func (r *Controller) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP) e
 
 		r.vxlanDevice, err = newVxlanIface(attrs)
 		if err != nil {
-			return fmt.Errorf("Failed to create vxlan interface on non-Gateway Node: %v", err)
+			return fmt.Errorf("failed to create vxlan interface on non-Gateway Node: %v", err)
 		}
 	}
 
 	err = r.vxlanDevice.configureIPAddress(vtepIP, vtepMask.Mask)
 	if err != nil {
-		return fmt.Errorf("Failed to configure vxlan interface ipaddress on the Gateway Node %v", err)
+		return fmt.Errorf("failed to configure vxlan interface ipaddress on the Gateway Node %v", err)
 	}
 
 	return nil
@@ -366,12 +375,14 @@ func (r *Controller) processNextPod() bool {
 		key := obj.(string)
 		ns, name, err := cache.SplitMetaNamespaceKey(key)
 		if err != nil {
-			return fmt.Errorf("Error while splitting meta namespace key %s: %v", key, err)
+			r.podWorkqueue.Forget(obj)
+			return fmt.Errorf("error while splitting meta namespace key %s: %v", key, err)
 		}
 
 		pod, err := r.clientSet.CoreV1().Pods(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
-			return fmt.Errorf("Error retrieving submariner-route-agent pod object %s: %v", name, err)
+			r.podWorkqueue.Forget(obj)
+			return fmt.Errorf("error retrieving submariner-route-agent pod object %s: %v", name, err)
 		}
 
 		klog.V(4).Infof("In processNextPod, POD HostIP is %s", pod.Status.HostIP)
@@ -383,7 +394,8 @@ func (r *Controller) processNextPod() bool {
 			if r.vxlanDevice != nil {
 				err := r.vxlanDevice.AddFDB(net.ParseIP(pod.Status.PodIP), "00:00:00:00:00:00")
 				if err != nil {
-					return fmt.Errorf("Failed to add FDB entry on the Gateway Node vxlan iface %v", err)
+					r.podWorkqueue.Forget(obj)
+					return fmt.Errorf("failed to add FDB entry on the Gateway Node vxlan iface %v", err)
 				}
 			} else {
 				r.podWorkqueue.AddRateLimited(obj)
@@ -417,11 +429,11 @@ func (r *Controller) processNextEndpoint() bool {
 		key := obj.(string)
 		ns, name, err := cache.SplitMetaNamespaceKey(key)
 		if err != nil {
-			return fmt.Errorf("Error while splitting meta namespace key %s: %v", key, err)
+			return fmt.Errorf("error while splitting meta namespace key %s: %v", key, err)
 		}
 		endpoint, err := r.submarinerClientSet.SubmarinerV1().Endpoints(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
-			return fmt.Errorf("Error retrieving submariner endpoint object %s: %v", name, err)
+			return fmt.Errorf("error retrieving submariner endpoint object %s: %v", name, err)
 		}
 
 		if endpoint.Spec.ClusterID != r.clusterID {
@@ -451,7 +463,7 @@ func (r *Controller) processNextEndpoint() bool {
 		localClusterGwNodeIP := net.ParseIP(endpoint.Spec.PrivateIP)
 		remoteVtepIP, err := r.getVxlanVtepIPAddress(localClusterGwNodeIP.String())
 		if err != nil {
-			return fmt.Errorf("Failed to derive the remoteVtepIP %v", err)
+			return fmt.Errorf("failed to derive the remoteVtepIP %v", err)
 		}
 
 		r.isGatewayNode = false
@@ -463,7 +475,7 @@ func (r *Controller) processNextEndpoint() bool {
 		err = r.reconcileRoutes(remoteVtepIP)
 		if err != nil {
 			r.endpointWorkqueue.AddRateLimited(obj)
-			return fmt.Errorf("Error while reconciling routes %v", err)
+			return fmt.Errorf("error while reconciling routes %v", err)
 		}
 
 		r.endpointWorkqueue.Forget(obj)
@@ -623,13 +635,13 @@ func (r *Controller) cleanXfrmPolicies() {
 func (r *Controller) reconcileRoutes(vxlanGw net.IP) error {
 	link, err := netlink.LinkByName(VxLANIface)
 	if err != nil {
-		return fmt.Errorf("Error retrieving link by name %s: %v", VxLANIface, err)
+		return fmt.Errorf("error retrieving link by name %s: %v", VxLANIface, err)
 	}
 
 	currentRouteList, err := netlink.RouteList(link, syscall.AF_INET)
 
 	if err != nil {
-		return fmt.Errorf("Error retrieving routes for link %s: %v", VxLANIface, err)
+		return fmt.Errorf("error retrieving routes for link %s: %v", VxLANIface, err)
 	}
 
 	// First lets delete all of the routes that don't match
@@ -653,7 +665,7 @@ func (r *Controller) reconcileRoutes(vxlanGw net.IP) error {
 	currentRouteList, err = netlink.RouteList(link, syscall.AF_INET)
 
 	if err != nil {
-		return fmt.Errorf("Error retrieving routes for link %s: %v", VxLANIface, err)
+		return fmt.Errorf("error retrieving routes for link %s: %v", VxLANIface, err)
 	}
 
 	// let's now add the routes that are missing
