@@ -13,7 +13,7 @@ const (
 	TestAppLabel = "test-app"
 )
 
-func (f *Framework) CreateTCPService(cluster int, selectorName string, port int) *v1.Service {
+func (f *Framework) CreateTCPService(cluster ClusterIndex, selectorName string, port int) *v1.Service {
 
 	tcpService := v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
