@@ -9,14 +9,10 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-const (
-	TestPort = 1234
-)
-
 // create a test pod inside the current test namespace on the specified cluster.
 // The pod will listen on TestPort over TCP, send sendString over the connection,
 // and write the network response in the pod  termination log, then exit with 0 status
-func (f *Framework) CreateTCPCheckListenerPod(cluster ClusterIndex, scheduling TestPodScheduling, sendString string) *v1.Pod {
+func (tp *TestPod) buildTCPCheckListenerPod() {
 
 	tcpCheckListenerPod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -26,7 +22,7 @@ func (f *Framework) CreateTCPCheckListenerPod(cluster ClusterIndex, scheduling T
 			},
 		},
 		Spec: v1.PodSpec{
-			Affinity:      nodeAffinity(scheduling),
+			Affinity:      nodeAffinity(tp.Config.Scheduling),
 			RestartPolicy: v1.RestartPolicyNever,
 			Containers: []v1.Container{
 				{
@@ -36,25 +32,26 @@ func (f *Framework) CreateTCPCheckListenerPod(cluster ClusterIndex, scheduling T
 					// resource environments from not sending at least some data before timeout.
 					Command: []string{"sh", "-c", "for i in $(seq 50); do echo listener says $SEND_STRING; done | nc -l -v -p $LISTEN_PORT -s 0.0.0.0 >/dev/termination-log 2>&1"},
 					Env: []v1.EnvVar{
-						{Name: "LISTEN_PORT", Value: strconv.Itoa(TestPort)},
-						{Name: "SEND_STRING", Value: sendString},
+						{Name: "LISTEN_PORT", Value: strconv.Itoa(tp.Config.Port)},
+						{Name: "SEND_STRING", Value: tp.Config.Data},
 					},
 				},
 			},
 		},
 	}
 
-	pc := f.ClusterClients[cluster].CoreV1().Pods(f.Namespace)
-	tcpListenerPod, err := pc.Create(&tcpCheckListenerPod)
+	pc := tp.framework.ClusterClients[tp.Config.Cluster].CoreV1().Pods(tp.framework.Namespace)
+	var err error
+	tp.Pod, err = pc.Create(&tcpCheckListenerPod)
 	Expect(err).NotTo(HaveOccurred())
-	return f.WaitForPodToBeReady(tcpListenerPod, cluster)
+	tp.WaitToBeReady()
 }
 
 // create a test pod inside the current test namespace on the specified cluster.
 // The pod will connect to remoteIP:TestPort over TCP, send sendString over the
 // connection, and write the network response in the pod termination log, then
 // exit with 0 status
-func (f *Framework) CreateTCPCheckConnectorPod(cluster ClusterIndex, scheduling TestPodScheduling, remoteIP string, sendString string) *v1.Pod {
+func (tp *TestPod) buildTCPCheckConnectorPod() {
 
 	tcpCheckConnectorPod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -64,7 +61,7 @@ func (f *Framework) CreateTCPCheckConnectorPod(cluster ClusterIndex, scheduling 
 			},
 		},
 		Spec: v1.PodSpec{
-			Affinity:      nodeAffinity(scheduling),
+			Affinity:      nodeAffinity(tp.Config.Scheduling),
 			RestartPolicy: v1.RestartPolicyNever,
 			Containers: []v1.Container{
 				{
@@ -74,28 +71,20 @@ func (f *Framework) CreateTCPCheckConnectorPod(cluster ClusterIndex, scheduling 
 					// resource environments from not sending at least some data before timeout.
 					Command: []string{"sh", "-c", "for in in $(seq 50); do echo connector says $SEND_STRING; done | nc -v $REMOTE_IP $REMOTE_PORT -w 8 >/dev/termination-log 2>&1"},
 					Env: []v1.EnvVar{
-						{Name: "REMOTE_PORT", Value: strconv.Itoa(TestPort)},
-						{Name: "SEND_STRING", Value: sendString},
-						{Name: "REMOTE_IP", Value: remoteIP},
+						{Name: "REMOTE_PORT", Value: strconv.Itoa(tp.Config.Port)},
+						{Name: "SEND_STRING", Value: tp.Config.Data},
+						{Name: "REMOTE_IP", Value: tp.Config.RemoteIP},
 					},
 				},
 			},
 		},
 	}
 
-	pc := f.ClusterClients[cluster].CoreV1().Pods(f.Namespace)
-	tcpCheckPod, err := pc.Create(&tcpCheckConnectorPod)
+	pc := tp.framework.ClusterClients[tp.Config.Cluster].CoreV1().Pods(tp.framework.Namespace)
+	var err error
+	tp.Pod, err = pc.Create(&tcpCheckConnectorPod)
 	Expect(err).NotTo(HaveOccurred())
-	return tcpCheckPod
 }
-
-type TestPodScheduling int
-
-const (
-	InvalidScheduling TestPodScheduling = iota
-	GatewayNode
-	NonGatewayNode
-)
 
 func nodeAffinity(scheduling TestPodScheduling) *v1.Affinity {
 
