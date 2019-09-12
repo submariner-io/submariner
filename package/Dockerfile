@@ -1,13 +1,10 @@
-FROM ubuntu:18.04
+FROM fedora:30
 
 WORKDIR /var/submariner
 
-RUN apt-get -y update && \
-    apt-get -y upgrade && \
-    apt-mark auto \* > /dev/null && \
-    apt-get -y install iproute2 iptables libatm1 strongswan-charon strongswan-swanctl && \
-    apt-get -y autoremove --purge && \
-    rm -rf /var/lib/apt/lists
+RUN dnf -y distrosync && \
+    dnf -y install iproute iptables strongswan procps-ng && \
+    dnf -y clean all
 
 COPY charon.conf /etc/strongswan.d/charon.conf
 COPY submariner.sh submariner-engine /usr/local/bin/
