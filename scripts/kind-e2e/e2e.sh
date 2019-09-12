@@ -6,7 +6,6 @@ source $(git rev-parse --show-toplevel)/scripts/lib/debug_functions
 ### Functions ###
 
 function kind_clusters() {
-    trap_commands
     status=$1
     version=$2
     pids=(-1 -1 -1)
@@ -54,9 +53,8 @@ function kind_clusters() {
 }
 
 function install_helm() {
-    trap_commands
     helm init --client-only
-    helm repo add submariner-latest https://releases.rancher.com/submariner-charts/latest
+    helm repo add submariner-latest https://submariner-io.github.io/submariner-charts/charts
     pids=(-1 -1 -1)
     logs=()
     for i in 1 2 3; do
@@ -90,7 +88,6 @@ function install_helm() {
 }
 
 function setup_custom_cni(){
-    trap_commands
     declare -A POD_CIDR=( ["cluster2"]="10.245.0.0/16" ["cluster3"]="10.246.0.0/16" )
     for i in 2 3; do
         if kubectl --context=cluster${i} wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=60s > /dev/null 2>&1; then
@@ -107,7 +104,6 @@ function setup_custom_cni(){
 }
 
 function setup_broker() {
-    trap_commands
     if kubectl --context=cluster1 get crd clusters.submariner.io > /dev/null 2>&1; then
         echo Submariner CRDs already exist, skipping broker creation...
     else
@@ -121,7 +117,6 @@ function setup_broker() {
 }
 
 function setup_cluster2_gateway() {
-    trap_commands
     if kubectl --context=cluster2 wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s > /dev/null 2>&1; then
             echo Submariner already installed, skipping submariner helm installation...
             update_subm_pods cluster2
@@ -158,7 +153,6 @@ function setup_cluster2_gateway() {
 }
 
 function setup_cluster3_gateway() {
-    trap_commands
     if kubectl --context=cluster3 wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s > /dev/null 2>&1; then
             echo Submariner already installed, skipping submariner helm installation...
             update_subm_pods cluster3
@@ -195,7 +189,6 @@ function setup_cluster3_gateway() {
 }
 
 function kind_import_images() {
-    trap_commands
     docker tag rancher/submariner:dev submariner:local
     docker tag rancher/submariner-route-agent:dev submariner-route-agent:local
 
@@ -207,7 +200,6 @@ function kind_import_images() {
 }
 
 function test_connection() {
-    trap_commands
     nginx_svc_ip_cluster3=$(kubectl --context=cluster3 get svc -l app=nginx-demo | awk 'FNR == 2 {print $3}')
     netshoot_pod=$(kubectl --context=cluster2 get pods -l app=netshoot | awk 'FNR == 2 {print $1}')
 
@@ -226,7 +218,6 @@ function test_connection() {
 }
 
 function update_subm_pods() {
-    trap_commands
     echo Removing submariner engine pods...
     kubectl --context=$1 delete pods -n submariner -l app=submariner-engine
     kubectl --context=$1 wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s
@@ -236,7 +227,6 @@ function update_subm_pods() {
 }
 
 function enable_logging() {
-    trap_commands
     if kubectl --context=cluster1 rollout status deploy/kibana > /dev/null 2>&1; then
         echo Elasticsearch stack already installed, skipping...
     else
@@ -254,7 +244,6 @@ function enable_logging() {
 }
 
 function enable_kubefed() {
-    trap_commands
     if kubectl --context=cluster1 rollout status deploy/kubefed-controller-manager -n ${KUBEFED_NS} > /dev/null 2>&1; then
         echo Kubefed already installed, skipping setup...
     else
@@ -274,7 +263,6 @@ function enable_kubefed() {
 }
 
 function test_with_e2e_tests {
-    trap_commands
     cd ../test/e2e
 
     # Setup the KUBECONFIG env
@@ -287,7 +275,6 @@ function test_with_e2e_tests {
 }
 
 function cleanup {
-    trap_commands
     for i in 1 2 3; do
       if [[ $(kind get clusters | grep cluster${i} | wc -l) -gt 0  ]]; then
         kind delete cluster --name=cluster${i};

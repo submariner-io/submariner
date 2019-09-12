@@ -1,18 +1,19 @@
 ### Constants ###
 
-export CYAN_COLOR='\e[36m'
-export NO_COLOR='\e[0m'
+export CYAN_COLOR=$(echo -e '\e[36m')
+export NO_COLOR=$(echo -e '\e[0m')
 
 ### Functions ###
 
 function trap_commands() {
     # Function to print each bash command before it is executed
     trap '! [[ "$BASH_COMMAND" =~ ^(echo|read|\[|while|for) ]] && \
-    cmd=`eval echo -e "[${PWD##*/}]\$ $BASH_COMMAND" 2>/dev/null` && \
-    echo -e "${CYAN_COLOR}$cmd${NO_COLOR}"' DEBUG
+    cmd=`eval echo "[${PWD##*/}]\$ $BASH_COMMAND" 2>/dev/null` && \
+    echo "${CYAN_COLOR}$cmd${NO_COLOR}" >&2; true' DEBUG
 }
 
 ### Main ###
 
 export -f trap_commands
+shopt -s extdebug
 trap_commands
