@@ -80,18 +80,17 @@ func (r *Controller) prependUnique(ipt *iptables.IPTables, table string, chain s
 		return fmt.Errorf("error listing the rules in %s chain: %v", chain, err)
 	}
 
-	/* Submariner requires certain iptable rules to be programmed at the beginning of an iptables Chain so that we can
-	preserve the sourceIP for inter-cluster traffic and avoid K8s SDN making changes to the traffic.
+	// Submariner requires certain iptable rules to be programmed at the beginning of an iptables Chain
+	// so that we can preserve the sourceIP for inter-cluster traffic and avoid K8s SDN making changes
+	// to the traffic.
+	// In this API, we check if the required iptable rule is present at the beginning of the chain.
+	// If the rule is already present and there are no stale[1] flows, we simply return. If not, we create one.
+	// [1] Sometimes after we program the rule at the beginning of the chain, K8s SDN might insert some
+	// new rules ahead of the rule that we programmed. In such cases, the rule that we programmed will
+	// not be the first rule to hit and Submariner behavior might get affected. So, we query the rules
+	// in the chain to see if the rule slipped its position, and if so, delete all such occurrences.
+	// We then re-program a new rule at the beginning of the chain as required.
 
-	In this API, we check if the required iptable rule is present at the beginning of the chain. If the rule is
-	already present and there are no stale[1] flows, we simply return. If not, we create one.
-
-	[1] Sometimes after we program the rule at the beginning of the chain, K8s SDN might insert some new rules
-	ahead of the rule that we programmed. In such cases, the rule that we programmed will not be the first rule
-	to hit and Submariner behavior might get affected. So, we query the rules in the chain to see if the rule
-	slipped its position, and if so, delete all such occurrences.  We then re-program a new rule at the beginning
-	of the chain as required.
-	*/
 	isPresentAtRequiredPosition := false
 	numOccurrences := 0
 	for index, rule := range rules {
@@ -105,8 +104,8 @@ func (r *Controller) prependUnique(ipt *iptables.IPTables, table string, chain s
 		}
 	}
 
-	/* The required rule is present in the Chain, but either there are multiple occurrences or its not at the desired
-	location */
+	// The required rule is present in the Chain, but either there are multiple occurrences or its
+	// not at the desired location
 	if numOccurrences > 1 || isPresentAtRequiredPosition == false {
 		for i := 0; i < numOccurrences; i++ {
 			if err = ipt.Delete(table, chain, ruleSpec...); err != nil {
@@ -115,7 +114,7 @@ func (r *Controller) prependUnique(ipt *iptables.IPTables, table string, chain s
 		}
 	}
 
-	/* The required rule is present only once and is at the desired location */
+	// The required rule is present only once and is at the desired location
 	if numOccurrences == 1 && isPresentAtRequiredPosition == true {
 		klog.V(4).Infof("In %s table, iptables rule \"%s\", already exists.", table, strings.Join(ruleSpec, " "))
 		return nil

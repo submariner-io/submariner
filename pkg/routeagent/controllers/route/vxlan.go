@@ -53,7 +53,7 @@ func createVxLanIface(iface *vxLanIface) error {
 		// Get the properties of existing vxlan interface
 		existing, err := netlink.LinkByName(iface.link.Name)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to retrieve link info: %v", err)
 		}
 
 		if isVxlanConfigTheSame(iface.link, existing) {
