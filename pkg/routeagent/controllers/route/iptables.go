@@ -95,7 +95,7 @@ func (r *Controller) prependUnique(ipt *iptables.IPTables, table string, chain s
 	numOccurrences := 0
 	for index, rule := range rules {
 		if strings.Contains(rule, strings.Join(ruleSpec, " ")) {
-			klog.V(4).Infof("In %s table, iptables rule \"%s\", exists at index %d.", index, table, strings.Join(ruleSpec, " "))
+			klog.V(4).Infof("In %s table, iptables rule \"%s\", exists at index %d.", table, strings.Join(ruleSpec, " "), index)
 			numOccurrences++
 
 			if index == 1 {
@@ -106,7 +106,7 @@ func (r *Controller) prependUnique(ipt *iptables.IPTables, table string, chain s
 
 	// The required rule is present in the Chain, but either there are multiple occurrences or its
 	// not at the desired location
-	if numOccurrences > 1 || isPresentAtRequiredPosition == false {
+	if numOccurrences > 1 || !isPresentAtRequiredPosition {
 		for i := 0; i < numOccurrences; i++ {
 			if err = ipt.Delete(table, chain, ruleSpec...); err != nil {
 				return fmt.Errorf("error deleting stale iptable rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
@@ -115,7 +115,7 @@ func (r *Controller) prependUnique(ipt *iptables.IPTables, table string, chain s
 	}
 
 	// The required rule is present only once and is at the desired location
-	if numOccurrences == 1 && isPresentAtRequiredPosition == true {
+	if numOccurrences == 1 && isPresentAtRequiredPosition {
 		klog.V(4).Infof("In %s table, iptables rule \"%s\", already exists.", table, strings.Join(ruleSpec, " "))
 		return nil
 	} else {
