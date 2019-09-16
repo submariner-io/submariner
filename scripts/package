@@ -13,7 +13,6 @@ REPO=${REPO:-rancher}
 
 cd $(dirname $0)/../package
 
-cp ../strongswan/strongswan*.tar.gz .
 cp ../bin/submariner-engine submariner-engine
 cp ../bin/submariner-route-agent submariner-route-agent
 
