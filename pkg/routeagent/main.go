@@ -6,6 +6,10 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+
 	"github.com/submariner-io/submariner/pkg/routeagent/controllers/route"
 	"github.com/submariner-io/submariner/pkg/util"
 
@@ -23,8 +27,14 @@ var (
 )
 
 type SubmarinerRouteControllerSpecification struct {
-	ClusterID string
-	Namespace string
+	ClusterID   string
+	Namespace   string
+	ClusterCidr []string
+	ServiceCidr []string
+}
+
+func filterRouteAgentPods(options *v1.ListOptions) {
+	options.LabelSelector = route.SmRouteAgentFilter
 }
 
 func main() {
@@ -53,10 +63,31 @@ func main() {
 
 	submarinerInformerFactory := submarinerInformers.NewSharedInformerFactoryWithOptions(submarinerClient, time.Second*30, submarinerInformers.WithNamespace(srcs.Namespace))
 
+	clientSet, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		klog.Fatalf("Error building clientset: %s", err.Error())
+	}
+
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(clientSet, time.Second*60, informers.WithNamespace(srcs.Namespace), informers.WithTweakListOptions(filterRouteAgentPods))
+
+	informerConfig := route.InformerConfigStruct{
+		SubmarinerClientSet: submarinerClient,
+		ClientSet:           clientSet,
+		ClusterInformer:     submarinerInformerFactory.Submariner().V1().Clusters(),
+		EndpointInformer:    submarinerInformerFactory.Submariner().V1().Endpoints(),
+		PodInformer:         informerFactory.Core().V1().Pods(),
+	}
+
 	defLink, err := util.GetDefaultGatewayInterface()
-	routeController := route.NewController(srcs.ClusterID, srcs.Namespace, defLink, submarinerClient, submarinerInformerFactory.Submariner().V1().Clusters(), submarinerInformerFactory.Submariner().V1().Endpoints())
+	if err != nil {
+		klog.Errorf("Unable to find the default interface on host: %s", err.Error())
+		return
+	}
+
+	routeController := route.NewController(srcs.ClusterID, srcs.ClusterCidr, srcs.ServiceCidr, srcs.Namespace, defLink, informerConfig)
 
 	submarinerInformerFactory.Start(stopCh)
+	informerFactory.Start(stopCh)
 
 	var wg sync.WaitGroup
 

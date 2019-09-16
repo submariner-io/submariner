@@ -29,6 +29,7 @@ require (
 	github.com/vishvananda/netlink v1.0.0
 	github.com/vishvananda/netns v0.0.0-20180720170159-13995c7128cc // indirect
 	golang.org/x/oauth2 v0.0.0-20170412232759-a6bd8cefa181 // indirect
+	golang.org/x/sys v0.0.0-20190606165138-5da285871e9c
 	golang.org/x/time v0.0.0-20161028155119-f51c12702a4d // indirect
 	google.golang.org/appengine v1.6.1 // indirect
 	gopkg.in/inf.v0 v0.0.0-20150911125757-3887ee99ecf0 // indirect
@@ -41,6 +42,6 @@ require (
 	sigs.k8s.io/yaml v0.0.0-20181102190223-fd68e9863619 // indirect
 )
 
-replace github.com/bronze1man/goStrongswanVici => github.com/mangelajo/goStrongswanVici v0.0.0-20190223031456-9a5ae4453bd
+replace github.com/bronze1man/goStrongswanVici => github.com/mangelajo/goStrongswanVici v0.0.0-20190701121157-9a5ae4453bda
 
 replace github.com/onsi/ginkgo => github.com/onsi/ginkgo v0.0.0-20190716150225-054541502288
