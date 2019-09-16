@@ -8,5 +8,4 @@ cd $(dirname $0)
 ./test
 ./build
 ./build-routeagent
-./download
 ./package

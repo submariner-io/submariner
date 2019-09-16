@@ -10,7 +10,6 @@ if [[ $1 = clean ]]; then
 else
     ./build
     ./build-routeagent
-    ./download
     ./package
     ./../scripts/kind-e2e/e2e.sh "$@"
 fi
