@@ -1,5 +1,4 @@
-FROM ubuntu:16.04
-# FROM arm=armhf/ubuntu:16.04
+FROM fedora:30
 
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH} DAPPER_ENV=REPO DAPPER_ENV=TAG \
@@ -8,10 +7,7 @@ ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH} DAPPER_ENV=REPO DAPPE
     LINT_VERSION=v1.16.0 \
     HELM_VERSION=v2.14.1 \
     KIND_VERSION=v0.3.0 \
-    KUBEFED_VERSION=0.1.0-rc2 \
-    GO_VERSION=1.12.6
-
-RUN rm -f /bin/sh && ln -s /bin/bash /bin/sh
+    KUBEFED_VERSION=0.1.0-rc2
 
 ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
     GOPATH=/go GO111MODULE=on PATH=/go/bin:/usr/local/go/bin:/root/go/bin:${PATH} SHELL=/bin/bash GOFLAGS=-mod=vendor \
@@ -23,20 +19,20 @@ ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH=GOLANG_ARCH_${ARC
 # gcc            | ginkgo
 # git            | find the workspace root
 # curl           | download other tools
-# docker.io      | Dapper
+# moby-engine    | Dapper (Docker)
 # golang         | build
-# kubectl        | e2e tests
+# kubectl        | e2e tests (in kubernetes-client)
 # golangci-lint  | code linting
 # helm           | e2e tests
 # kubefedctl     | e2e tests
 # kind           | e2e tests
 # ginkgo         | tests
 # goimports      | code formatting
-RUN apt-get -q update && \
-    apt-get install -y gcc git curl docker.io mercurial make && \
-    curl https://storage.googleapis.com/golang/go${GO_VERSION}.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local && \
-    curl -Lo /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/${ARCH}/kubectl && \
-    chmod a+x /usr/bin/kubectl && \
+# make           | OLM installation
+# findutils      | e2e cleanup (xargs)
+RUN dnf -y distrosync && \
+    dnf -y install --nodocs --setopt=install_weak_deps=False gcc git-core curl moby-engine make golang kubernetes-client findutils mercurial && \
+    dnf -y clean all && \
     curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin ${LINT_VERSION} && \
     curl "https://storage.googleapis.com/kubernetes-helm/helm-${HELM_VERSION}-linux-${ARCH}.tar.gz" | tar -xzf - && \
     cp linux-${ARCH}/helm /usr/bin/ && chmod a+x /usr/bin/helm && \
