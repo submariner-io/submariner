@@ -42,6 +42,6 @@ require (
 	sigs.k8s.io/yaml v0.0.0-20181102190223-fd68e9863619 // indirect
 )
 
-replace github.com/bronze1man/goStrongswanVici => github.com/mangelajo/goStrongswanVici v0.0.0-20190701121157-9a5ae4453bda
+replace github.com/bronze1man/goStrongswanVici => github.com/mangelajo/goStrongswanVici v0.0.0-20190701121157-73b0716138ff
 
 replace github.com/onsi/ginkgo => github.com/onsi/ginkgo v0.0.0-20190716150225-054541502288
