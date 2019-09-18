@@ -348,7 +348,7 @@ func (r *Controller) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP) e
 			name:     VxLANIface,
 			vxlanId:  100,
 			group:    gatewayNodeIP,
-			srcAddr:  vtepIP,
+			srcAddr:  nil,
 			vtepPort: VxLANPort,
 			mtu:      1450,
 		}
