@@ -130,6 +130,7 @@ func (i *strongSwan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (strin
 	ikeConf := goStrongswanVici.IKEConf{
 		LocalAddrs:  localAddr,
 		RemoteAddrs: remoteAddr,
+		RemotePort:  "4501",
 		Proposals:   []string{"aes128gcm16-sha256-modp2048", "aes-sha1-modp2048"},
 		Version:     "2",
 		LocalAuth:   authLConf,
