@@ -1,0 +1,410 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  name: submariner-operator.v0.0.1
+  namespace: placeholder
+  annotations:
+    alm-examples: |
+      [
+        {
+          "apiVersion": "submariner.io/v1alpha1",
+          "kind": "Submariner",
+          "metadata": {
+            "name": "submariner"
+          },
+          "spec": {
+            "size": 3,
+            "namespace": "submariner",
+            "serviceCIDR": "100.95.0.0/16",
+            "clusterCIDR": "10.245.0.0/16",
+            "token": "SECRET TO FILL IN",
+            "clusterID": "clusterid",
+            "colorCodes": "blue",
+            "debug": false,
+            "natEnabled": false,
+            "broker": "k8s",
+            "brokerK8sApiServer":"URL TO FILL IN",
+            "brokerK8sApiServerToken": "SECRET TO FILL IN",
+            "brokerK8sRemoteNamespace": "submariner",
+            "brokerK8sCA": "CA TO FILL IN",
+            "ceIPSecPSK": "SHARED PSK",
+            "ceIPSecDebug": false,
+            "ceIPSecIKEPort": 500,
+            "ceIPSecNATTPort": 4500,
+            "repository": "quay.io/submariner",
+            "version": "latest"
+          }
+        }
+      ]
+    capabilities: Basic Install
+    categories: Networking
+    certified: 'false'
+    containerImage: 'quay.io/submariner/submariner-operator:0.0.1'
+    createdAt: 2019-10-14T07:00:00Z
+    description: Operator that creates and manages Submariner engines and route agents.
+    repository: 'https://github.com/submariner-io/submariner'
+    support: Submariner
+spec:
+  displayName: Submariner
+  description: >
+    [Submariner](https://submariner.io) provides connectivity between multiple
+    Kubernetes clusters.
+
+    It establishs IPsec tunnels between each Kubernetes cluster.
+
+    It uses a central broker to facilitate exchange of information and sync CRDs
+    between clusters.
+
+    The two primary Submariner components within connected clusters are:
+
+      * the Submariner engine (deployment)
+      * the Submariner route agent (daemonset)
+
+    Submariner pods run on gateway nodes and perform leader election to elect an
+    active IPSec endpoint.
+
+    This also updates the broker with local cluster information which is then
+    shared to other clusters.
+
+
+    The Submariner route agent configures routes to enable full connectivity
+    among all nodes between the clusters.
+
+
+    This operator uses a single CRD to control deployment of all
+    Submariner-related resources.
+
+
+    ## Prerequisites
+      * At least 3 Kubernetes clusters, one of which is designated to serve as the central broker that is accessible by
+        all of your connected clusters;
+        this can be one of your connected clusters, but comes with the limitation that the cluster is required to be up
+        in order to facilitate interconnectivity/negotiation.
+      * Different cluster/service CIDRs (as well as different Kubernetes DNS suffixes) between clusters.
+        This is to prevent traffic selector/policy/routing conflicts.
+      * Direct IP connectivity between instances through the Internet (or on the same network if not running Submariner
+        over the internet).
+        Submariner supports 1:1 NAT setups, but has a few caveats/provider specific configuration instructions in this
+        configuration.
+      * Knowledge of each cluster's network configuration.
+
+    ## Deploying the broker
+
+    This currently requires Helm and Tiller. On the cluster which will host the
+    broker:
+
+        helm repo add submariner-latest https://submariner-io.github.io/submariner-charts/charts
+        helm repo update
+        helm install submariner-latest/submariner-k8s-broker --name submariner-k8s-broker --namespace submariner-k8s-broker
+
+    Three values must be retrieved from the broker; they will be used in the CR
+    for the operator:
+
+      * the broker URL:
+      
+            kubectl -n default get endpoints kubernetes -o jsonpath="{.subsets[0].addresses[0].ip}:{.subsets[0].ports[?(@.name=='https')].port}"
+      
+      * the broker CA:
+
+            kubectl -n submariner-k8s-broker get secrets -o jsonpath="{.items[?(@.metadata.annotations['kubernetes\.io/service-account\.name']=='submariner-k8s-broker-client')].data['ca\.crt']}"
+
+      * the broker token:
+
+            kubectl -n submariner-k8s-broker get secrets -o jsonpath="{.items[?(@.metadata.annotations['kubernetes\.io/service-account\.name']=='submariner-k8s-broker-client')].data.token}"|base64 --decode
+
+    [The detailed broker installation
+    instructions](https://github.com/submariner-io/submariner/blob/master/README.md#broker-installationsetup)
+
+    provide more details.
+
+
+    ## Deploying Submariner
+
+    Submariner is deployed using the Submariner CR. The following values can be
+    specified:
+      * `namespace`: the namespace to install in;
+      * `serviceCIDR`: the service CIDR;
+      * `clusterCIDR`: the cluster CIDR;
+      * `token`: the Submariner token
+        (`kubectl -n submariner get secrets -o jsonpath="{.items[?(@.metadata.annotations['kubernetes\.io/service-account\.name']=='submariner-client')].data.token}"|base64 --decode`
+        on the broker cluster, assuming the broker is running in the `submariner` namespace — replace the two
+        `submariner` instances as appropriate);
+      * `clusterID`: the Submariner cluster ID;
+      * `colorCodes`: the Submariner color code(s) for this cluster;
+      * `debug`: `'true'` to enable logging debugging information;
+      * `natEnabled`: `'true'` to enable NAT, for use in clusters with 1:1 NAT between instances (such as
+        AWS VPC);
+      * `broker`: this must be `k8s` currently;
+      * `brokerK8sApiServer`: the broker’s API server URL
+        (`kubectl -n default get endpoints kubernetes -o jsonpath="{.subsets[0].addresses[0].ip}:{.subsets[0].ports[?(@.name=='https')].port}"`
+        on the broker cluster);
+      * `brokerK8sApiServerToken`: the broker’s API server token (same as `submariner_token`);
+      * `brokerK8sRemoteNamespace`: the broker’s namespace;
+      * `brokerK8sCA`: the broker’s certificate authority
+        (`kubectl -n submariner get secrets -o jsonpath="{.items[?(@.metadata.annotations['kubernetes\.io/service-account\.name']=='submariner-client')].data['ca\.crt']}"`
+        on the broker cluster, assuming the broker is running in the `submariner` namespace — replace the two
+        `submariner` instances as appropriate);
+      * `ceIPSecPSK`: the IPsec PSK (which must be identical in all route agents across the cluster);
+      * `ceIPSecDebug`: `'true'` to enable logging IPsec debugging information (from the IPsec daemon);
+      * `ceIPSecIKEPort`: the IPsec IKE port (500 usually);
+      * `ceIPSecNATTPort`: the IPsec NAT traversal port (4500 usually);
+      * `repository`: the container repository to use.
+      * `version`: the container version to use.
+  maturity: alpha
+  version: 0.0.1
+  replaces: ''
+  minKubeVersion: 1.11.0
+  keywords: ['multi-cluster', 'ipsec', 'tunnel']
+  maintainers:
+    - name: Submariner development discussion
+      email: submariner-dev@googlegroups.com
+    - name: Submariner user support
+      email: submariner-users@googlegroups.com
+  provider:
+    name: Submariner
+  labels:
+    name: submariner-operator
+  selector:
+    matchLabels:
+      name: submariner-operator
+  links:
+    - name: Submariner homepage
+      url: 'https://submariner.io/submariner'
+  icon:
+    - base64data: >-
+        PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiIHN0YW5kYWxvbmU9Im5vIj8+CjxzdmcKICAgeG1sbnM6ZGM9Imh0dHA6Ly9wdXJsLm9yZy9kYy9lbGVtZW50cy8xLjEvIgogICB4bWxuczpjYz0iaHR0cDovL2NyZWF0aXZlY29tbW9ucy5vcmcvbnMjIgogICB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiCiAgIHhtbG5zOnN2Zz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciCiAgIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIKICAgeG1sbnM6c29kaXBvZGk9Imh0dHA6Ly9zb2RpcG9kaS5zb3VyY2Vmb3JnZS5uZXQvRFREL3NvZGlwb2RpLTAuZHRkIgogICB4bWxuczppbmtzY2FwZT0iaHR0cDovL3d3dy5pbmtzY2FwZS5vcmcvbmFtZXNwYWNlcy9pbmtzY2FwZSIKICAgdmlld0JveD0iMCAwIDE4NS40OTg5NiAxODUuNDk4OTQiCiAgIHZlcnNpb249IjEuMSIKICAgaWQ9InN2ZzQ2NTYiCiAgIHNvZGlwb2RpOmRvY25hbWU9ImxvZ28uc3ZnIgogICB3aWR0aD0iMTg1LjQ5ODk2IgogICBoZWlnaHQ9IjE4NS40OTg5NSIKICAgaW5rc2NhcGU6dmVyc2lvbj0iMC45Mi40ICh1bmtub3duKSI+CiAgPG1ldGFkYXRhCiAgICAgaWQ9Im1ldGFkYXRhNDY2MCI+CiAgICA8cmRmOlJERj4KICAgICAgPGNjOldvcmsKICAgICAgICAgcmRmOmFib3V0PSIiPgogICAgICAgIDxkYzpmb3JtYXQ+aW1hZ2Uvc3ZnK3htbDwvZGM6Zm9ybWF0PgogICAgICAgIDxkYzp0eXBlCiAgICAgICAgICAgcmRmOnJlc291cmNlPSJodHRwOi8vcHVybC5vcmcvZGMvZGNtaXR5cGUvU3RpbGxJbWFnZSIgLz4KICAgICAgICA8ZGM6dGl0bGU+bG9nbzwvZGM6dGl0bGU+CiAgICAgIDwvY2M6V29yaz4KICAgIDwvcmRmOlJERj4KICA8L21ldGFkYXRhPgogIDxzb2RpcG9kaTpuYW1lZHZpZXcKICAgICBwYWdlY29sb3I9IiNmZmZmZmYiCiAgICAgYm9yZGVyY29sb3I9IiM2NjY2NjYiCiAgICAgYm9yZGVyb3BhY2l0eT0iMSIKICAgICBvYmplY3R0b2xlcmFuY2U9IjEwIgogICAgIGdyaWR0b2xlcmFuY2U9IjEwIgogICAgIGd1aWRldG9sZXJhbmNlPSIxMCIKICAgICBpbmtzY2FwZTpwYWdlb3BhY2l0eT0iMCIKICAgICBpbmtzY2FwZTpwYWdlc2hhZG93PSIyIgogICAgIGlua3NjYXBlOndpbmRvdy13aWR0aD0iMTkyMCIKICAgICBpbmtzY2FwZTp3aW5kb3ctaGVpZ2h0PSIxMDE2IgogICAgIGlkPSJuYW1lZHZpZXc0NjU4IgogICAgIHNob3dncmlkPSJmYWxzZSIKICAgICBmaXQtbWFyZ2luLXRvcD0iMCIKICAgICBmaXQtbWFyZ2luLWxlZnQ9IjAiCiAgICAgZml0LW1hcmdpbi1yaWdodD0iMCIKICAgICBmaXQtbWFyZ2luLWJvdHRvbT0iMCIKICAgICBpbmtzY2FwZTp6b29tPSIxLjM2OTIwODQiCiAgICAgaW5rc2NhcGU6Y3g9IjQ4Mi43NjA3MSIKICAgICBpbmtzY2FwZTpjeT0iOTIuNzQ5NDY5IgogICAgIGlua3NjYXBlOndpbmRvdy14PSIwIgogICAgIGlua3NjYXBlOndpbmRvdy15PSIyNyIKICAgICBpbmtzY2FwZTp3aW5kb3ctbWF4aW1pemVkPSIxIgogICAgIGlua3NjYXBlOmN1cnJlbnQtbGF5ZXI9IkxheWVyXzEiIC8+CiAgPGRlZnMKICAgICBpZD0iZGVmczQ2MTEiPgogICAgPHN0eWxlCiAgICAgICBpZD0ic3R5bGU0NjA5Ij4uY2xzLTF7ZmlsbDojMmFkZmMzO30uY2xzLTJ7ZmlsbDojMjg3ZWZiO30uY2xzLTN7ZmlsbDojMzg0NzQ1O308L3N0eWxlPgogIDwvZGVmcz4KICA8dGl0bGUKICAgICBpZD0idGl0bGU0NjEzIj5sb2dvPC90aXRsZT4KICA8ZwogICAgIGlkPSJMYXllcl8xIgogICAgIGRhdGEtbmFtZT0iTGF5ZXIgMSI+CiAgICA8cGF0aAogICAgICAgY2xhc3M9ImNscy0xIgogICAgICAgZD0iTSAxNzYuNjM0NDQsOC44NjQ1MyBWIDE3Ni42MzQ0MSBIIDguODY0NTMgViA4Ljg2NDUzIGggMTY3Ljc2OTkxIG0gMCwtOC44NjQ1MyBIIDguODY0NTMgQSA4Ljg2NDU2LDguODY0NTYgMCAwIDAgMCw4Ljg2NDUzIHYgMTY3Ljc2OTg4IGEgOC44NjQ1Niw4Ljg2NDU2IDAgMCAwIDguODY0NTMsOC44NjQ1MyBoIDE2Ny43Njk5MSBhIDguODY0NTUsOC44NjQ1NSAwIDAgMCA4Ljg2NDUzLC04Ljg2NDUzIFYgOC44NjQ1MyBBIDguODY0NTUsOC44NjQ1NSAwIDAgMCAxNzYuNjM0NDQsMCBaIgogICAgICAgaWQ9InBhdGg0NjE1IgogICAgICAgaW5rc2NhcGU6Y29ubmVjdG9yLWN1cnZhdHVyZT0iMCIKICAgICAgIHN0eWxlPSJmaWxsOiMyYWRmYzMiIC8+CiAgICA8cGF0aAogICAgICAgY2xhc3M9ImNscy0yIgogICAgICAgZD0ibSAxMDUuNjc1NTcsMTMxLjM0NDUxIGggLTgyLjAzNyBWIDEyMi40OCBoIDgwLjIwNzU0IGwgMjMuMjkzNjMsLTIzLjE3ODIgYSA0LjQzMTgzLDQuNDMxODMgMCAwIDEgMy4xMjYyNSwtMS4yOTA0NCBoIDMxLjU5NDMxIHYgOC44NjQ1MyBoIC0yOS43NjQ4NSBsIC0yMy4yOTM2MywyMy4xNzgyMSBhIDQuNDMyMzcsNC40MzIzNyAwIDAgMSAtMy4xMjYyNSwxLjI5MDQxIHoiCiAgICAgICBpZD0icGF0aDQ2MTciCiAgICAgICBpbmtzY2FwZTpjb25uZWN0b3ItY3VydmF0dXJlPSIwIgogICAgICAgc3R5bGU9ImZpbGw6IzI4N2VmYiIgLz4KICAgIDxwYXRoCiAgICAgICBjbGFzcz0iY2xzLTIiCiAgICAgICBkPSJNIDExNy44NzIzOCwxNjAuODkyOTQgSCAyMy42Mzg1NyB2IC04Ljg2NDUzIGggOTIuNDA0MzUgbCAyMy4yOTM2MywtMjMuMTc4MiBhIDQuNDMxODMsNC40MzE4MyAwIDAgMSAzLjEyNjI0LC0xLjI5MDQ0IGggMTkuMzk3NTEgdiA4Ljg2NDUzIGggLTE3LjU2OCBsIC0yMy4yOTM2MywyMy4xNzgyMSBhIDQuNDMxODcsNC40MzE4NyAwIDAgMSAtMy4xMjYyOSwxLjI5MDQzIHoiCiAgICAgICBpZD0icGF0aDQ2MTkiCiAgICAgICBpbmtzY2FwZTpjb25uZWN0b3ItY3VydmF0dXJlPSIwIgogICAgICAgc3R5bGU9ImZpbGw6IzI4N2VmYiIgLz4KICAgIDxwYXRoCiAgICAgICBjbGFzcz0iY2xzLTIiCiAgICAgICBkPSJNIDQ5LjEzNDE5LDcyLjcxMjggSCAyMy42Mzg1NyB2IC04Ljg2NDUzIGggMjMuNjY2MTUgbCAyMy4yOTQyMSwtMjMuMTc4MiBhIDQuNDMyMzgsNC40MzIzOCAwIDAgMSAzLjEyNjI1LC0xLjI5MDQ0IGggODguMTM1MTIgdiA4Ljg2NDUzIEggNzUuNTU0NjQgTCA1Mi4yNjA0Myw3MS40MjIzNyBhIDQuNDMyMzUsNC40MzIzNSAwIDAgMSAtMy4xMjYyNCwxLjI5MDQzIHoiCiAgICAgICBpZD0icGF0aDQ2MjEiCiAgICAgICBpbmtzY2FwZTpjb25uZWN0b3ItY3VydmF0dXJlPSIwIgogICAgICAgc3R5bGU9ImZpbGw6IzI4N2VmYiIgLz4KICAgIDxwYXRoCiAgICAgICBjbGFzcz0iY2xzLTEiCiAgICAgICBkPSJtIDE2MS44NjAzLDEwNi44NzU4NyBoIC0xOS42NDIyIGEgNC40MzIzNCw0LjQzMjM0IDAgMCAxIC0zLjEyNjI1LC0xLjI5MDQ0IEwgMTE1Ljc5ODIyLDgyLjQwNzIzIEggODAuMDY4MjggQSA0LjQzMjM0LDQuNDMyMzQgMCAwIDEgNzYuOTQyLDgxLjExNjc5IEwgNTMuNjQ3OCw1Ny45Mzg1OSBIIDIzLjYzODU3IHYgLTguODY0NTMgaCAzMS44Mzg3MiBhIDQuNDMyMzksNC40MzIzOSAwIDAgMSAzLjEyNjI1LDEuMjkwNDMgbCAyMy4yOTQyLDIzLjE3ODIxIGggMzUuNzI5OTQgYSA0LjQzMTg3LDQuNDMxODcgMCAwIDEgMy4xMjYyNSwxLjI5MDQzIGwgMjMuMjkzNjMsMjMuMTc4MjEgaCAxNy44MTI3NCB6IgogICAgICAgaWQ9InBhdGg0NjIzIgogICAgICAgaW5rc2NhcGU6Y29ubmVjdG9yLWN1cnZhdHVyZT0iMCIKICAgICAgIHN0eWxlPSJmaWxsOiMyYWRmYzMiIC8+CiAgICA8cGF0aAogICAgICAgY2xhc3M9ImNscy0xIgogICAgICAgZD0ibSAxNjEuODYwMywxMzYuNDI0MyBoIC0zMS44MzkgYSA0LjQzMTg3LDQuNDMxODcgMCAwIDEgLTMuMTI2MjUsLTEuMjkwNDMgTCAxMDMuNjAxNDIsMTExLjk1NTY2IEggNjcuODcyMDUgQSA0LjQzMjM3LDQuNDMyMzcgMCAwIDEgNjQuNzQ1OCwxMTAuNjY1MjMgTCA0MS40NTE1OSw4Ny40ODcgaCAtMTcuODEzIHYgLTguODY0NTEgaCAxOS42NDI0NyBhIDQuNDMyMzYsNC40MzIzNiAwIDAgMSAzLjEyNjI1LDEuMjkwNDQgbCAyMy4yOTQyLDIzLjE3ODIgaCAzNS43MjkzNiBhIDQuNDMyMzQsNC40MzIzNCAwIDAgMSAzLjEyNjI1LDEuMjkwNDQgbCAyMy4yOTM2MywyMy4xNzgyIGggMzAuMDA5NTUgeiIKICAgICAgIGlkPSJwYXRoNDYyNSIKICAgICAgIGlua3NjYXBlOmNvbm5lY3Rvci1jdXJ2YXR1cmU9IjAiCiAgICAgICBzdHlsZT0iZmlsbDojMmFkZmMzIiAvPgogICAgPHBhdGgKICAgICAgIGNsYXNzPSJjbHMtMSIKICAgICAgIGQ9Ik0gMTYxLjg2MDMsMTIxLjY1MDA5IEggMTM2LjEyIGEgNC40MzI0LDQuNDMyNCAwIDAgMSAtMy4xMjYyNSwtMS4yOTA0NCBMIDEwOS42OTk1NSw5Ny4xODE0NCBIIDczLjk2OTg3IEEgNC40MzIzNyw0LjQzMjM3IDAgMCAxIDcwLjg0MzYzLDk1Ljg5MSBMIDQ3LjU0OTQyLDcyLjcxMjggSCAyMy42Mzg1NyB2IC04Ljg2NDUzIGggMjUuNzQwMzEgYSA0LjQzMjM4LDQuNDMyMzggMCAwIDEgMy4xMjYyNSwxLjI5MDQ0IEwgNzUuNzk5MzQsODguMzE2OTIgSCAxMTEuNTI5IGEgNC40MzE4OCw0LjQzMTg4IDAgMCAxIDMuMTI2MjUsMS4yOTA0MyBsIDIzLjI5NDIsMjMuMTc4MjEgaCAyMy45MTA4NSB6IgogICAgICAgaWQ9InBhdGg0NjI3IgogICAgICAgaW5rc2NhcGU6Y29ubmVjdG9yLWN1cnZhdHVyZT0iMCIKICAgICAgIHN0eWxlPSJmaWxsOiMyYWRmYzMiIC8+CiAgICA8cGF0aAogICAgICAgY2xhc3M9ImNscy0yIgogICAgICAgZD0iTSAxMTEuNzczNjksMTQ2LjExODczIEggMjMuNjM4NTcgdiAtOC44NjQ1MyBoIDg2LjMwNTY1IGwgMjMuMjk0MjEsLTIzLjE3ODIgYSA0LjQzMjM3LDQuNDMyMzcgMCAwIDEgMy4xMjYyNSwtMS4yOTA0MyBoIDI1LjQ5NTYyIHYgOC44NjQ1MyBoIC0yMy42NjYxNiBsIC0yMy4yOTQyLDIzLjE3ODIgYSA0LjQzMjQsNC40MzI0IDAgMCAxIC0zLjEyNjI1LDEuMjkwNDMgeiIKICAgICAgIGlkPSJwYXRoNDYyOSIKICAgICAgIGlua3NjYXBlOmNvbm5lY3Rvci1jdXJ2YXR1cmU9IjAiCiAgICAgICBzdHlsZT0iZmlsbDojMjg3ZWZiIiAvPgogICAgPHBhdGgKICAgICAgIGNsYXNzPSJjbHMtMiIKICAgICAgIGQ9Ik0gNDMuMDM2MzYsNTcuOTM4NTkgSCAyMy42Mzg1NyBWIDQ5LjA3NDA2IEggNDEuMjA2OSBMIDY0LjUwMTEsMjUuODk2NDMgQSA0LjQzMjQsNC40MzI0IDAgMCAxIDY3LjYyNzM1LDI0LjYwNiBoIDk0LjIzMjk1IHYgOC44NjQ1MyBIIDY5LjQ1NjgxIGwgLTIzLjI5NDIsMjMuMTc3NjIgYSA0LjQzMjM2LDQuNDMyMzYgMCAwIDEgLTMuMTI2MjUsMS4yOTA0NCB6IgogICAgICAgaWQ9InBhdGg0NjMxIgogICAgICAgaW5rc2NhcGU6Y29ubmVjdG9yLWN1cnZhdHVyZT0iMCIKICAgICAgIHN0eWxlPSJmaWxsOiMyODdlZmIiIC8+CiAgICA8cGF0aAogICAgICAgY2xhc3M9ImNscy0yIgogICAgICAgZD0iTSA1NS4yMzIsODcuNDg3IEggMjMuNjM4NTcgdiAtOC44NjQ1MSBoIDI5Ljc2NCBMIDc2LjY5Njc2LDU1LjQ0NDg2IEEgNC40MzIzNSw0LjQzMjM1IDAgMCAxIDc5LjgyMyw1NC4xNTQ0MyBoIDgyLjAzNzMgViA2My4wMTkgSCA4MS42NTI0NyBMIDU4LjM1ODI2LDg2LjE5NjU4IEEgNC40MzIzNCw0LjQzMjM0IDAgMCAxIDU1LjIzMiw4Ny40ODcgWiIKICAgICAgIGlkPSJwYXRoNDYzMyIKICAgICAgIGlua3NjYXBlOmNvbm5lY3Rvci1jdXJ2YXR1cmU9IjAiCiAgICAgICBzdHlsZT0iZmlsbDojMjg3ZWZiIiAvPgogIDwvZz4KPC9zdmc+Cg==
+      mediatype: image/svg+xml
+  customresourcedefinitions:
+    owned:
+      - description: The Submariner engine.
+        displayName: Submariner
+        kind: Submariner
+        name: submariners.submariner.io
+        version: v1alpha1
+        specDescriptors:
+          - description: The desired number of pod instances in the Submariner cluster
+            displayName: Pod instances
+            path: size
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:podCount'
+          - description: The managed namespace
+            displayName: Namespace
+            path: namespace
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:namespaceSelector'
+          - description: The service CIDR
+            displayName: Service CIDR
+            path: serviceCIDR
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - description: The cluster CIDR
+            displayName: Cluster CIDR
+            path: clusterCIDR
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - description: The broker token
+            displayName: Broker token
+            path: token
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - description: The cluster identifier
+            displayName: Cluster id
+            path: clusterID
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - description: The Submariner color codes
+            displayName: Color codes
+            path: colorCodes
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - description: Whether to provide debug information
+            displayName: Debug logs
+            path: debug
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+          - description: Whether to enable NAT
+            displayName: NAT
+            path: natEnabled
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+          - description: The type of Submariner broker
+            displayName: Broker type
+            path: broker
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - description: The URL of the broker API server
+            displayName: Broker API server URL
+            path: brokerK8sApiServer
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - description: The broker token
+            displayName: Broker token
+            path: brokerK8sApiServerToken
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - description: The namespace of the Submariner broker
+            displayName: Broker namespace
+            path: brokerK8sRemoteNamespace
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - description: The Submariner broker certificate authority
+            displayName: Broker CA
+            path: brokerK8sCA
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - description: The shared PSK
+            displayName: PSK
+            path: ceIPSecPSK
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - description: Whether to provide IPsec debug logs
+            displayName: IPsec debug logs
+            path: ceIPSecDebug
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+          - description: The IPsec IKE port (500 usually)
+            displayName: IPsec IKE port
+            path: ceIPSecIKEPort
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:number'
+          - description: The IPsec NAT traversal port (4500 usually)
+            displayName: IPsec NAT traversal port
+            path: ceIPSecNATTPort
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:number'
+          - description: The repository from which to retrieve the container images
+            displayName: Container repository
+            path: repository
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - description: The version of the container images to use
+            displayName: Container version
+            path: version
+            x-descriptors:
+              - 'urn:alm:descriptor:com.tectonic.ui:text'
+        statusDescriptors: []
+        resources:
+          - version: v1
+            kind: Deployment
+          - version: v1
+            kind: Service
+          - version: v1
+            kind: ReplicaSet
+          - version: v1
+            kind: Pod
+          - version: v1
+            kind: Secret
+          - version: v1
+            kind: ConfigMap
+      - kind: Endpoint
+        name: endpoints.submariner.io
+        version: v1
+        displayName: Endpoint
+        description: Represents a Submariner endpoint.
+      - name: clusters.submariner.io
+        displayName: Cluster
+        kind: Cluster
+        version: v1
+        description: Represents a cluster of Submariner nodes.
+  install:
+    strategy: deployment
+    spec:
+      clusterPermissions:
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          - services
+          - services/finalizers
+          - endpoints
+          - persistentvolumeclaims
+          - events
+          - configmaps
+          - secrets
+          verbs:
+          - '*'
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          - daemonsets
+          - replicasets
+          - statefulsets
+          verbs:
+          - '*'
+        - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - servicemonitors
+          verbs:
+          - get
+          - create
+        - apiGroups:
+          - apps
+          resourceNames:
+          - submariner-operator
+          resources:
+          - deployments/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          verbs:
+          - get
+        - apiGroups:
+          - apps
+          resources:
+          - replicasets
+          verbs:
+          - get
+        - apiGroups:
+          - submariner.io
+          resources:
+          - '*'
+          - routeagents
+          verbs:
+          - '*'
+        serviceAccountName: submariner-operator
+      deployments:
+        - name: submariner-operator
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                name: submariner-operator
+            template:
+              metadata:
+                labels:
+                  name: submariner-operator
+              spec:
+                containers:
+                  - command:
+                      - submariner-operator
+                    env:
+                      - name: WATCH_NAMESPACE
+                        valueFrom:
+                          fieldRef:
+                            fieldPath: metadata.annotations['olm.targetNamespaces']
+                      - name: POD_NAME
+                        valueFrom:
+                          fieldRef:
+                            fieldPath: metadata.name
+                      - name: OPERATOR_NAME
+                        value: submariner-operator
+                    image: 'quay.io/submariner/submariner-operator:0.0.1'
+                    imagePullPolicy: Always
+                    name: submariner-operator
+                serviceAccountName: submariner-operator
+  installModes:
+    - type: OwnNamespace
+      supported: true
+    - type: SingleNamespace
+      supported: true
+    - type: MultiNamespace
+      supported: false
+    - type: AllNamespaces
+      supported: true
+  apiservicedefinitions: {}

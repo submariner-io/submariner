@@ -1,0 +1,11 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: clusters.submariner.io
+spec:
+  group: submariner.io
+  version: v1
+  names:
+    kind: Cluster
+    plural: clusters
+  scope: Namespaced

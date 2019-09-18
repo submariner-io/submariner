@@ -1,0 +1,4 @@
+packageName: submariner
+channels:
+  - name: alpha
+    currentCSV: submariner-operator.v0.0.1
