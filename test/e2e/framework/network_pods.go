@@ -16,7 +16,7 @@ const (
 // create a test pod inside the current test namespace on the specified cluster.
 // The pod will listen on TestPort over TCP, send sendString over the connection,
 // and write the network response in the pod  termination log, then exit with 0 status
-func (f *Framework) CreateTCPCheckListenerPod(cluster int, sendString string) *v1.Pod {
+func (f *Framework) CreateTCPCheckListenerPod(cluster ClusterIndex, scheduling TestPodScheduling, sendString string) *v1.Pod {
 
 	tcpCheckListenerPod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -26,6 +26,7 @@ func (f *Framework) CreateTCPCheckListenerPod(cluster int, sendString string) *v
 			},
 		},
 		Spec: v1.PodSpec{
+			Affinity:      nodeAffinity(scheduling),
 			RestartPolicy: v1.RestartPolicyNever,
 			Containers: []v1.Container{
 				{
@@ -53,7 +54,7 @@ func (f *Framework) CreateTCPCheckListenerPod(cluster int, sendString string) *v
 // The pod will connect to remoteIP:TestPort over TCP, send sendString over the
 // connection, and write the network response in the pod termination log, then
 // exit with 0 status
-func (f *Framework) CreateTCPCheckConnectorPod(cluster int, remoteCheckPod *v1.Pod, remoteIP string, sendString string) *v1.Pod {
+func (f *Framework) CreateTCPCheckConnectorPod(cluster ClusterIndex, scheduling TestPodScheduling, remoteIP string, sendString string) *v1.Pod {
 
 	tcpCheckConnectorPod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -63,6 +64,7 @@ func (f *Framework) CreateTCPCheckConnectorPod(cluster int, remoteCheckPod *v1.P
 			},
 		},
 		Spec: v1.PodSpec{
+			Affinity:      nodeAffinity(scheduling),
 			RestartPolicy: v1.RestartPolicyNever,
 			Containers: []v1.Container{
 				{
@@ -85,4 +87,50 @@ func (f *Framework) CreateTCPCheckConnectorPod(cluster int, remoteCheckPod *v1.P
 	tcpCheckPod, err := pc.Create(&tcpCheckConnectorPod)
 	Expect(err).NotTo(HaveOccurred())
 	return tcpCheckPod
+}
+
+type TestPodScheduling int
+
+const (
+	InvalidScheduling TestPodScheduling = iota
+	GatewayNode
+	NonGatewayNode
+)
+
+func nodeAffinity(scheduling TestPodScheduling) *v1.Affinity {
+
+	const gatewayLabel = "submariner.io/gateway"
+
+	var nodeSelReqs []v1.NodeSelectorRequirement
+
+	switch scheduling {
+	case GatewayNode:
+		nodeSelReqs = addNodeSelectorRequirement(nodeSelReqs, gatewayLabel, v1.NodeSelectorOpIn, []string{"true"})
+
+	case NonGatewayNode:
+		nodeSelReqs = addNodeSelectorRequirement(nodeSelReqs, gatewayLabel, v1.NodeSelectorOpDoesNotExist, nil)
+		nodeSelReqs = addNodeSelectorRequirement(nodeSelReqs, gatewayLabel, v1.NodeSelectorOpNotIn, []string{"true"})
+	}
+
+	affinity := v1.Affinity{
+		NodeAffinity: &v1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						MatchExpressions: nodeSelReqs,
+					},
+				},
+			},
+		},
+	}
+	return &affinity
+}
+
+func addNodeSelectorRequirement(nodeSelReqs []v1.NodeSelectorRequirement, label string,
+	op v1.NodeSelectorOperator, values []string) []v1.NodeSelectorRequirement {
+	return append(nodeSelReqs, v1.NodeSelectorRequirement{
+		Key:      label,
+		Operator: v1.NodeSelectorOpNotIn,
+		Values:   []string{"true"},
+	})
 }
