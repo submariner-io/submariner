@@ -78,7 +78,7 @@ const (
 	// So, the approach we are taking is to derive the VxLAN ip from the hostIPAddress
 	// as shown below.
 	// For example: Say, the host ipaddress is "192.168.1.100/16", we prepend 240 to the
-	// host-ip address, derive the vxlan vtepIP (i.e., 240.168.1.100/16) and configure it
+	// host-ip address, derive the vxlan vtepIP (i.e., 240.168.1.100/8) and configure it
 	// on the VxLAN interface.
 
 	// The reason behind choosing 240 is that "240.0.0.0/4" is a Reserved IPAddress [*]
@@ -281,28 +281,28 @@ func (r *Controller) getVxlanVtepIPAddress(ipAddr string) (net.IP, error) {
 	return vxlanIP, nil
 }
 
-func (r *Controller) getHostIfaceIPAddress() (net.IP, *net.IPNet, error) {
+func (r *Controller) getHostIfaceIPAddress() (net.IP, error) {
 	addrs, err := r.defaultHostIface.Addrs()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if len(addrs) > 0 {
 		for i := range addrs {
-			ipAddr, ipNetwork, err := net.ParseCIDR(addrs[i].String())
+			ipAddr, _, err := net.ParseCIDR(addrs[i].String())
 			if err != nil {
 				klog.Errorf("Unable to ParseCIDR : %v\n", addrs)
 			}
 			if ipAddr.To4() != nil {
-				return ipAddr, ipNetwork, nil
+				return ipAddr, nil
 			}
 		}
 	}
-	return nil, nil, nil
+	return nil, nil
 }
 
 func (r *Controller) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP) error {
-	ipAddr, vtepMask, err := r.getHostIfaceIPAddress()
+	ipAddr, err := r.getHostIfaceIPAddress()
 	if err != nil {
 		return fmt.Errorf("unable to retrieve the IPv4 address on the Host %v", err)
 	}
@@ -348,7 +348,7 @@ func (r *Controller) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP) e
 			name:     VxLANIface,
 			vxlanId:  100,
 			group:    gatewayNodeIP,
-			srcAddr:  vtepIP,
+			srcAddr:  nil,
 			vtepPort: VxLANPort,
 			mtu:      1450,
 		}
@@ -359,7 +359,7 @@ func (r *Controller) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP) e
 		}
 	}
 
-	err = r.vxlanDevice.configureIPAddress(vtepIP, vtepMask.Mask)
+	err = r.vxlanDevice.configureIPAddress(vtepIP, net.CIDRMask(8, 32))
 	if err != nil {
 		return fmt.Errorf("failed to configure vxlan interface ipaddress on the Gateway Node %v", err)
 	}
