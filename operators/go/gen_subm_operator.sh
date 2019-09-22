@@ -13,8 +13,8 @@ add_routeagent=true
 openapi_checks_enabled=false
 push_image=false
 op_dir=$GOPATH/src/github.com/submariner-operator/submariner-operator
-op_gen_dir=$GOPATH/src/github.com/submariner-io/submariner/operators/go
-op_out_dir=$GOPATH/src/github.com/submariner-io/submariner/operators/go/submariner-operator
+op_gen_dir=$(pwd)
+op_out_dir=$op_gen_dir/submariner-operator
 
 function setup_prereqs(){
   if ! command -v dep; then
@@ -106,7 +106,7 @@ function add_subm_engine_to_operator() {
 
   operator-sdk add controller --api-version=$api_version --kind=$kind
 
-  controller_file_src=$op_gen_dir/submariner_controller.go
+  controller_file_src=$op_gen_dir/submariner_controller.go.spec
   controller_file_dst=pkg/controller/submariner/submariner_controller.go
   cp $controller_file_src $controller_file_dst
 
@@ -145,7 +145,7 @@ function add_subm_routeagent_to_operator() {
 
   operator-sdk add controller --api-version=$api_version --kind=$kind
 
-  controller_file_src=$op_gen_dir/routeagent_controller.go
+  controller_file_src=$op_gen_dir/routeagent_controller.go.spec
   controller_file_dst=pkg/controller/routeagent/routeagent_controller.go
   cp $controller_file_src $controller_file_dst
 
@@ -156,9 +156,9 @@ function build_subm_operator() {
   pushd $op_dir
   go mod vendor
   # This seems like a bug in operator-sdk, that this is needed?
-  go get k8s.io/kube-state-metrics/pkg/collector
-  go get k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1
-  go get github.com/coreos/prometheus-operator/pkg/apis/monitoring
+#  go get k8s.io/kube-state-metrics/pkg/collector
+#  go get k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1
+#  go get github.com/coreos/prometheus-operator/pkg/apis/monitoring
 
   operator-sdk build quay.io/submariner/submariner-operator:$version --verbose
   if [[ $push_image = true ]]; then
