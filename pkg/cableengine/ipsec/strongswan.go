@@ -25,6 +25,9 @@ const (
 
 	// DefaultChildSaRekeyInterval specifies the default rekey interval for CHILD_SA
 	DefaultChildSaRekeyInterval = "1h"
+
+	// strongswanCharonConfigFilePAth points to the config file charon will use at start
+	strongswanCharonConfigFilePath = "/etc/strongswan/strongswan.d/charon.conf"
 )
 
 type strongSwan struct {
@@ -312,6 +315,10 @@ func (i *strongSwan) loadSharedKey(endpoint types.SubmarinerEndpoint, client *go
 	return nil
 }
 
+// charonConfTemplate defines the configuration for strongswan IKE keying daemon,
+// * port and port_nat_t define the IKE and IKE NATT UDP ports
+// * make_before_break ensures dataplane connectivity while re-authenticating endpoints (check this)
+// TODO : check what * ignore_acquire_ts means
 const charonConfTemplate = `
 	charon {
 		port = {{.ipSecIKEPort}}
@@ -328,10 +335,15 @@ func (i *strongSwan) writeCharonConfig(path string) {
 	}
 
 	f, err := os.Create(path)
+
 	if err != nil {
 		klog.Fatalf("Error creating %s: %s", path, err)
 	}
 	i.renderCharonConfigTemplate(f)
+
+	if err = f.Close(); err != nil {
+		klog.Fatalf("Unable to close %s: %s", path, err)
+	}
 }
 
 func (i *strongSwan) renderCharonConfigTemplate(f io.Writer) {
@@ -339,16 +351,19 @@ func (i *strongSwan) renderCharonConfigTemplate(f io.Writer) {
 	if err != nil {
 		klog.Fatalf("Error creating template for charon.conf")
 	}
-	if err = t.Execute(f, map[string]string{
+
+	err = t.Execute(f, map[string]string{
 		"ipSecIKEPort":  i.ipSecIKEPort,
-		"ipSecNATTPort": i.ipSecNATTPort}); err != nil {
+		"ipSecNATTPort": i.ipSecNATTPort})
+
+	if err != nil {
 		klog.Fatalf("Error rendering charon config file: %s", err)
 	}
 }
 
 func (i *strongSwan) runCharon() error {
 
-	i.writeCharonConfig("/etc/strongswan/strongswan.d/charon.conf")
+	i.writeCharonConfig(strongswanCharonConfigFilePath)
 
 	klog.Infof("Starting Charon")
 	// Ignore error

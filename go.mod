@@ -3,7 +3,7 @@ module github.com/submariner-io/submariner
 go 1.12
 
 require (
-	github.com/bronze1man/goStrongswanVici v0.0.0-20181105005556-92d3927c899e
+	github.com/bronze1man/goStrongswanVici v0.0.0-20190921045355-4c81bd8d0bd5
 	github.com/coreos/go-iptables v0.4.0
 	github.com/evanphx/json-patch v0.0.0-20180908160633-36442dbdb585 // indirect
 	github.com/gogo/protobuf v0.0.0-20171007142547-342cbe0a0415 // indirect
@@ -41,7 +41,5 @@ require (
 	k8s.io/kube-openapi v0.0.0-20181109181836-c59034cc13d5 // indirect
 	sigs.k8s.io/yaml v0.0.0-20181102190223-fd68e9863619 // indirect
 )
-
-replace github.com/bronze1man/goStrongswanVici => github.com/mangelajo/goStrongswanVici v0.0.0-20190701121157-73b0716138ff
 
 replace github.com/onsi/ginkgo => github.com/onsi/ginkgo v0.0.0-20190716150225-054541502288

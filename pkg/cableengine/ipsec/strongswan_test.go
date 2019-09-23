@@ -25,6 +25,8 @@ func testCharonConfigPortsGen() {
 
 			Expect(buf.String()).To(ContainSubstring("port = 500"))
 			Expect(buf.String()).To(ContainSubstring("port_nat_t = 4500"))
+			Expect(buf.String()).To(ContainSubstring("make_before_break = yes"))
+			Expect(buf.String()).To(ContainSubstring("ignore_acquire_ts = yes"))
 
 		})
 	})
