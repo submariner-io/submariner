@@ -328,28 +328,32 @@ const charonConfTemplate = `
 	}
 `
 
-func (i *strongSwan) writeCharonConfig(path string) {
+func (i *strongSwan) writeCharonConfig(path string) error {
 	err := os.Remove(path)
 	if err != nil {
-		klog.Infof("Error deleting %s", path)
+		klog.Warningf("Error deleting %s: %s", path, err)
 	}
 
 	f, err := os.Create(path)
 
 	if err != nil {
-		klog.Fatalf("Error creating %s: %s", path, err)
+		return fmt.Errorf("Error creating %s: %s", path, err)
 	}
-	i.renderCharonConfigTemplate(f)
+	if err = i.renderCharonConfigTemplate(f); err != nil {
+		return err
+	}
 
 	if err = f.Close(); err != nil {
-		klog.Fatalf("Unable to close %s: %s", path, err)
+		return fmt.Errorf("Unable to close %s: %s", path, err)
 	}
+
+	return nil
 }
 
-func (i *strongSwan) renderCharonConfigTemplate(f io.Writer) {
+func (i *strongSwan) renderCharonConfigTemplate(f io.Writer) error {
 	t, err := template.New("charon.conf").Parse(charonConfTemplate)
 	if err != nil {
-		klog.Fatalf("Error creating template for charon.conf")
+		return fmt.Errorf("Error creating template for charon.conf: %s", err)
 	}
 
 	err = t.Execute(f, map[string]string{
@@ -357,13 +361,16 @@ func (i *strongSwan) renderCharonConfigTemplate(f io.Writer) {
 		"ipSecNATTPort": i.ipSecNATTPort})
 
 	if err != nil {
-		klog.Fatalf("Error rendering charon config file: %s", err)
+		return fmt.Errorf("Error rendering charon config file: %s", err)
 	}
+	return nil
 }
 
 func (i *strongSwan) runCharon() error {
 
-	i.writeCharonConfig(strongswanCharonConfigFilePath)
+	if err := i.writeCharonConfig(strongswanCharonConfigFilePath); err != nil {
+		return fmt.Errorf("Error writing strongswan charon config: %s", err)
+	}
 
 	klog.Infof("Starting Charon")
 	// Ignore error

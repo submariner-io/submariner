@@ -11,7 +11,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Util", func() {
+var _ = Describe("Strongswan", func() {
 	Describe("Charon port configuration", testCharonConfigPortsGen)
 })
 
@@ -21,7 +21,9 @@ func testCharonConfigPortsGen() {
 			ss := strongSwan{ipSecIKEPort: "500", ipSecNATTPort: "4500"}
 			buf := new(bytes.Buffer)
 
-			ss.renderCharonConfigTemplate(buf)
+			err := ss.renderCharonConfigTemplate(buf)
+
+			Expect(err).ShouldNot(HaveOccurred())
 
 			Expect(buf.String()).To(ContainSubstring("port = 500"))
 			Expect(buf.String()).To(ContainSubstring("port_nat_t = 4500"))
@@ -36,7 +38,7 @@ func testCharonConfigPortsGen() {
 			checkEnvVarParsingPorts("500", "4500")
 		})
 
-		It("should get the rigth environment variable names", func() {
+		It("should get the right environment variable names", func() {
 			const (
 				ikePort        = "555"
 				nattPort       = "4555"
@@ -62,7 +64,7 @@ func checkEnvVarParsingPorts(ikePort string, nattPort string) {
 	Expect(ipSecSpec.NATTPort).To(Equal(nattPort))
 }
 
-func TestUtil(t *testing.T) {
+func TestStrongswan(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Strongswan Suite")
 }
