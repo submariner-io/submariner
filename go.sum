@@ -10,6 +10,8 @@ cloud.google.com/go/datastore v1.0.0/go.mod h1:LXYbyblFSglQ5pkeyhO+Qmw7ukd3C+pD7
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
+github.com/bronze1man/goStrongswanVici v0.0.0-20190921045355-4c81bd8d0bd5 h1:Vf6H6edn93L8a9veAAWAJO+puYBr2MjYNgGNZ60s2aw=
+github.com/bronze1man/goStrongswanVici v0.0.0-20190921045355-4c81bd8d0bd5/go.mod h1:fWUtBEPt2yjrr3WFhOqvajM8JSEU8bEeBcoeSCsKRpc=
 github.com/coreos/go-iptables v0.4.0 h1:wh4UbVs8DhLUbpyq97GLJDKrQMjEDD63T1xE4CrsKzQ=
 github.com/coreos/go-iptables v0.4.0/go.mod h1:/mVI274lEDI2ns62jHCDnCyBF9Iwsmekav8Dbxlm1MU=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
@@ -63,8 +65,6 @@ github.com/json-iterator/go v0.0.0-20180701071628-ab8a2e0c74be/go.mod h1:+SdeFBv
 github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024/go.mod h1:6v2b51hI/fHJwM22ozAgKL4VKDeJcHhJFhtBdhmNjmU=
 github.com/kelseyhightower/envconfig v1.3.0 h1:IvRS4f2VcIQy6j4ORGIf9145T/AsUB+oY8LyvN8BXNM=
 github.com/kelseyhightower/envconfig v1.3.0/go.mod h1:cccZRl6mQpaq41TPp5QxidR+Sa3axMbJDNb//FQX6Gg=
-github.com/mangelajo/goStrongswanVici v0.0.0-20190701121157-9a5ae4453bda h1:/+TyeDEvC0xdyiIQg17E5wrWxTxO+oTcnOCjvM/V34U=
-github.com/mangelajo/goStrongswanVici v0.0.0-20190701121157-9a5ae4453bda/go.mod h1:jBWUR9RyXtXsgAghFahi+vhaF5sup3XXAST2nvBkjug=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd h1:TRLaZ9cD/w8PVh93nsPXa1VrQ6jlwL5oN8l14QlcNfg=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
 github.com/modern-go/reflect2 v1.0.1 h1:9f412s+6RmYXLWZSEzVVgPGK7C2PphHj5RJrvfx9AWI=

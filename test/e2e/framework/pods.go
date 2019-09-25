@@ -11,7 +11,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func (f *Framework) WaitForPodToBeReady(waitedPod *v1.Pod, cluster int) *v1.Pod {
+func (f *Framework) WaitForPodToBeReady(waitedPod *v1.Pod, cluster ClusterIndex) *v1.Pod {
 	var finalPod *v1.Pod
 	pc := f.ClusterClients[cluster].CoreV1().Pods(f.Namespace)
 	err := wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
@@ -36,7 +36,7 @@ func (f *Framework) WaitForPodToBeReady(waitedPod *v1.Pod, cluster int) *v1.Pod 
 	return finalPod
 }
 
-func (f *Framework) WaitForPodFinishStatus(waitedPod *v1.Pod, cluster int) (terminationCode int32, terminationMessage string) {
+func (f *Framework) WaitForPodFinishStatus(waitedPod *v1.Pod, cluster ClusterIndex) (terminationCode int32, terminationMessage string) {
 	pc := f.ClusterClients[cluster].CoreV1().Pods(f.Namespace)
 	err := wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
 		pod, err := pc.Get(waitedPod.Name, metav1.GetOptions{})

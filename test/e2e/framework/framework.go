@@ -26,10 +26,12 @@ const (
 	PollInterval = 100 * time.Millisecond
 )
 
+type ClusterIndex int
+
 const (
-	ClusterA = 0
-	ClusterB = 1
-	ClusterC = 2
+	ClusterA ClusterIndex = iota
+	ClusterB
+	ClusterC
 )
 
 // Framework supports common operations used by e2e tests; it will keep a client & a namespace for you.
@@ -107,7 +109,7 @@ func (f *Framework) BeforeEach() {
 		}
 
 		for idx, clientSet := range f.ClusterClients {
-			switch idx {
+			switch ClusterIndex(idx) {
 			case ClusterA: // On the first cluster we let k8s generate a name for the namespace
 				namespace := generateNamespace(clientSet, f.BaseName, namespaceLabels)
 				f.Namespace = namespace.GetName()
