@@ -3,16 +3,16 @@ module github.com/submariner-io/submariner
 go 1.12
 
 require (
-	github.com/bronze1man/goStrongswanVici v0.0.0-20181105005556-92d3927c899e
+	cloud.google.com/go v0.45.1 // indirect
+	github.com/bronze1man/goStrongswanVici v0.0.0-20190921045355-4c81bd8d0bd5
 	github.com/coreos/go-iptables v0.4.0
 	github.com/evanphx/json-patch v0.0.0-20180908160633-36442dbdb585 // indirect
 	github.com/gogo/protobuf v0.0.0-20171007142547-342cbe0a0415 // indirect
 	github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903 // indirect
-	github.com/google/btree v0.0.0-20160524151835-7d79101e329e // indirect
+	github.com/google/btree v1.0.0 // indirect
 	github.com/google/gofuzz v0.0.0-20161122191042-44d81051d367 // indirect
 	github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d // indirect
 	github.com/gregjones/httpcache v0.0.0-20170728041850-787624de3eb7 // indirect
-	github.com/hashicorp/golang-lru v0.0.0-20160207214719-a0d98a5f2880 // indirect
 	github.com/imdario/mergo v0.0.0-20180608140156-9316a62528ac // indirect
 	github.com/jpillora/backoff v0.0.0-20170918002102-8eab2debe79d // indirect
 	github.com/json-iterator/go v0.0.0-20180701071628-ab8a2e0c74be // indirect
@@ -28,10 +28,7 @@ require (
 	github.com/spf13/pflag v0.0.0-20180412120913-583c0c0531f0 // indirect
 	github.com/vishvananda/netlink v1.0.0
 	github.com/vishvananda/netns v0.0.0-20180720170159-13995c7128cc // indirect
-	golang.org/x/oauth2 v0.0.0-20170412232759-a6bd8cefa181 // indirect
-	golang.org/x/sys v0.0.0-20190606165138-5da285871e9c
-	golang.org/x/time v0.0.0-20161028155119-f51c12702a4d // indirect
-	google.golang.org/appengine v1.6.1 // indirect
+	golang.org/x/sys v0.0.0-20190624142023-c5567b49c5d0
 	gopkg.in/inf.v0 v0.0.0-20150911125757-3887ee99ecf0 // indirect
 	gopkg.in/yaml.v2 v2.2.2 // indirect
 	k8s.io/api v0.0.0-20190222213804-5cb15d344471
@@ -41,7 +38,5 @@ require (
 	k8s.io/kube-openapi v0.0.0-20181109181836-c59034cc13d5 // indirect
 	sigs.k8s.io/yaml v0.0.0-20181102190223-fd68e9863619 // indirect
 )
-
-replace github.com/bronze1man/goStrongswanVici => github.com/mangelajo/goStrongswanVici v0.0.0-20190701121157-9a5ae4453bda
 
 replace github.com/onsi/ginkgo => github.com/onsi/ginkgo v0.0.0-20190716150225-054541502288
