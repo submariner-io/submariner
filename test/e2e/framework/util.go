@@ -3,12 +3,12 @@ package framework
 import (
 	"strings"
 
+	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
+	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-
-	. "github.com/onsi/gomega"
 )
 
 func loadConfig(configPath, context string) (*restclient.Config, *clientcmdapi.Config, error) {
