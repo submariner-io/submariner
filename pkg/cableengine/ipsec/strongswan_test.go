@@ -5,19 +5,18 @@ import (
 	"os"
 	"testing"
 
-	"github.com/kelseyhightower/envconfig"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/submariner/pkg/types"
 )
 
 var _ = Describe("Strongswan", func() {
-	Describe("Charon port configuration", testCharonConfigPortsGen)
+	Describe("Charon port configuration", testCharonPortConfiguration)
 })
 
-func testCharonConfigPortsGen() {
-	Context("config rendering", func() {
-		It("should render config correctly out of strongSwan parameters", func() {
+func testCharonPortConfiguration() {
+	When("renderCharonConfigTemplate is called", func() {
+		It("should render the config file properties correctly from the strongSwan fields", func() {
 			ss := strongSwan{ipSecIKEPort: "500", ipSecNATTPort: "4500"}
 			buf := new(bytes.Buffer)
 
@@ -33,35 +32,46 @@ func testCharonConfigPortsGen() {
 		})
 	})
 
-	Context("environment variable processing", func() {
-		It("should get the defaults from the specification definition", func() {
-			checkEnvVarParsingPorts("500", "4500")
+	When("NewStrongSwan is called with no port environment variables set", func() {
+		It("should set the port fields from the defaults in the specification definition", func() {
+			checkStrongSwanPorts(defaultIKEPort, defaultNATTPort)
 		})
+	})
 
-		It("should get the right environment variable names", func() {
-			const (
-				ikePort        = "555"
-				nattPort       = "4555"
-				ikePortEnvVar  = "CE_IPSEC_IKEPORT"
-				nattPortEnvVar = "CE_IPSEC_NATTPORT"
-			)
+	When("NewStrongSwan is called with port environment variables set", func() {
+		const (
+			ikePort        = "555"
+			nattPort       = "4555"
+			ikePortEnvVar  = "CE_IPSEC_IKEPORT"
+			nattPortEnvVar = "CE_IPSEC_NATTPORT"
+		)
+
+		BeforeEach(func() {
 			os.Setenv(ikePortEnvVar, ikePort)
 			os.Setenv(nattPortEnvVar, nattPort)
+		})
 
-			checkEnvVarParsingPorts(ikePort, nattPort)
-
+		AfterEach(func() {
 			os.Unsetenv(ikePortEnvVar)
 			os.Unsetenv(nattPortEnvVar)
+		})
+
+		It("should set the port fields from the environment variables", func() {
+			checkStrongSwanPorts(ikePort, nattPort)
 		})
 	})
 }
 
-func checkEnvVarParsingPorts(ikePort string, nattPort string) {
-	ipSecSpec := specification{}
-	err := envconfig.Process(ipsecSpecEnvVarPrefix, &ipSecSpec)
+func createStrongSwan() *strongSwan {
+	ss, err := NewStrongSwan([]string{}, types.SubmarinerEndpoint{})
 	Expect(err).NotTo(HaveOccurred())
-	Expect(ipSecSpec.IKEPort).To(Equal(ikePort))
-	Expect(ipSecSpec.NATTPort).To(Equal(nattPort))
+	return ss.(*strongSwan)
+}
+
+func checkStrongSwanPorts(ikePort string, nattPort string) {
+	ss := createStrongSwan()
+	Expect(ss.ipSecIKEPort).To(Equal(ikePort))
+	Expect(ss.ipSecNATTPort).To(Equal(nattPort))
 }
 
 func TestStrongswan(t *testing.T) {
