@@ -2,10 +2,12 @@ package ipsec
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
 	"syscall"
+	"text/template"
 	"time"
 
 	"github.com/bronze1man/goStrongswanVici"
@@ -23,6 +25,9 @@ const (
 
 	// DefaultChildSaRekeyInterval specifies the default rekey interval for CHILD_SA
 	DefaultChildSaRekeyInterval = "1h"
+
+	// strongswanCharonConfigFilePAth points to the config file charon will use at start
+	strongswanCharonConfigFilePath = "/etc/strongswan/strongswan.d/charon.conf"
 )
 
 type strongSwan struct {
@@ -32,21 +37,29 @@ type strongSwan struct {
 	replayWindowSize          string
 	ipSecIkeSaRekeyInterval   string
 	ipSecChildSaRekeyInterval string
+	ipSecIKEPort              string
+	ipSecNATTPort             string
 
 	debug   bool
 	logFile string
 }
 
 type specification struct {
-	PSK     string
-	Debug   bool
-	LogFile string
+	PSK      string
+	Debug    bool
+	LogFile  string
+	IKEPort  string `default:"500"`
+	NATTPort string `default:"4500"`
 }
+
+const defaultIKEPort = "500"
+const defaultNATTPort = "4500"
+const ipsecSpecEnvVarPrefix = "ce_ipsec"
 
 func NewStrongSwan(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (Driver, error) {
 	ipSecSpec := specification{}
 
-	err := envconfig.Process("ce_ipsec", &ipSecSpec)
+	err := envconfig.Process(ipsecSpecEnvVarPrefix, &ipSecSpec)
 	if err != nil {
 		return nil, fmt.Errorf("error processing environment config for ce_ipsec: %v", err)
 	}
@@ -55,6 +68,8 @@ func NewStrongSwan(localSubnets []string, localEndpoint types.SubmarinerEndpoint
 		replayWindowSize:          DefaultReplayWindowSize,
 		ipSecIkeSaRekeyInterval:   DefaultIkeSaRekeyInterval,
 		ipSecChildSaRekeyInterval: DefaultChildSaRekeyInterval,
+		ipSecIKEPort:              ipSecSpec.IKEPort,
+		ipSecNATTPort:             ipSecSpec.NATTPort,
 		localEndpoint:             localEndpoint,
 		localSubnets:              localSubnets,
 		secretKey:                 ipSecSpec.PSK,
@@ -64,7 +79,7 @@ func NewStrongSwan(localSubnets []string, localEndpoint types.SubmarinerEndpoint
 }
 
 func (i *strongSwan) Init() error {
-	if err := runCharon(i.debug, i.logFile); err != nil {
+	if err := i.runCharon(); err != nil {
 		return err
 	}
 
@@ -138,6 +153,15 @@ func (i *strongSwan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (strin
 		Encap:       "yes",
 		Mobike:      "no",
 	}
+
+	// We point to the remote port that has proven to work by trial and error
+	// with strongswan over non-standard UDP ports
+	if i.ipSecNATTPort != defaultNATTPort {
+		ikeConf.RemotePort = i.ipSecNATTPort
+	} else if i.ipSecIKEPort != defaultIKEPort {
+		ikeConf.RemotePort = i.ipSecIKEPort
+	}
+
 	ikeConf.Children = map[string]goStrongswanVici.ChildSAConf{
 		"submariner-child-" + endpoint.Spec.CableName: childSAConf,
 	}
@@ -291,15 +315,71 @@ func (i *strongSwan) loadSharedKey(endpoint types.SubmarinerEndpoint, client *go
 	return nil
 }
 
-func runCharon(debug bool, logFile string) error {
+// charonConfTemplate defines the configuration for strongswan IKE keying daemon,
+// * port and port_nat_t define the IKE and IKE NATT UDP ports
+// * make_before_break ensures dataplane connectivity while re-authenticating endpoints (check this)
+// TODO : check what * ignore_acquire_ts means
+const charonConfTemplate = `
+	charon {
+		port = {{.ipSecIKEPort}}
+		port_nat_t = {{.ipSecNATTPort}}
+		make_before_break = yes
+		ignore_acquire_ts = yes
+	}
+`
+
+func (i *strongSwan) writeCharonConfig(path string) error {
+	err := os.Remove(path)
+	if err != nil {
+		klog.Warningf("Error deleting %s: %s", path, err)
+	}
+
+	f, err := os.Create(path)
+
+	if err != nil {
+		return fmt.Errorf("Error creating %s: %s", path, err)
+	}
+	if err = i.renderCharonConfigTemplate(f); err != nil {
+		return err
+	}
+
+	if err = f.Close(); err != nil {
+		return fmt.Errorf("Unable to close %s: %s", path, err)
+	}
+
+	return nil
+}
+
+func (i *strongSwan) renderCharonConfigTemplate(f io.Writer) error {
+	t, err := template.New("charon.conf").Parse(charonConfTemplate)
+	if err != nil {
+		return fmt.Errorf("Error creating template for charon.conf: %s", err)
+	}
+
+	err = t.Execute(f, map[string]string{
+		"ipSecIKEPort":  i.ipSecIKEPort,
+		"ipSecNATTPort": i.ipSecNATTPort})
+
+	if err != nil {
+		return fmt.Errorf("Error rendering charon config file: %s", err)
+	}
+	return nil
+}
+
+func (i *strongSwan) runCharon() error {
+
+	if err := i.writeCharonConfig(strongswanCharonConfigFilePath); err != nil {
+		return fmt.Errorf("Error writing strongswan charon config: %s", err)
+	}
+
 	klog.Infof("Starting Charon")
 	// Ignore error
 	os.Remove("/var/run/charon.vici")
 
 	args := []string{}
-	for _, i := range strings.Split("dmn|mgr|ike|chd|cfg|knl|net|asn|tnc|imc|imv|pts|tls|esp|lib", "|") {
-		args = append(args, "--debug-"+i)
-		if debug {
+	for _, idx := range strings.Split("dmn|mgr|ike|chd|cfg|knl|net|asn|tnc|imc|imv|pts|tls|esp|lib", "|") {
+		args = append(args, "--debug-"+idx)
+		if i.debug {
 			args = append(args, "3")
 		} else {
 			args = append(args, "1")
@@ -311,10 +391,10 @@ func runCharon(debug bool, logFile string) error {
 	cmd.Stderr = os.Stderr
 
 	var outputFile *os.File
-	if logFile != "" {
-		out, err := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if i.logFile != "" {
+		out, err := os.OpenFile(i.logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 		if err != nil {
-			return fmt.Errorf("Failed to open log file %s: %v", logFile, err)
+			return fmt.Errorf("Failed to open log file %s: %v", i.logFile, err)
 		}
 
 		cmd.Stdout = out

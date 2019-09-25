@@ -1,3 +1,5 @@
+github.com/bronze1man/goStrongswanVici v0.0.0-20190921045355-4c81bd8d0bd5 h1:Vf6H6edn93L8a9veAAWAJO+puYBr2MjYNgGNZ60s2aw=
+github.com/bronze1man/goStrongswanVici v0.0.0-20190921045355-4c81bd8d0bd5/go.mod h1:fWUtBEPt2yjrr3WFhOqvajM8JSEU8bEeBcoeSCsKRpc=
 github.com/coreos/go-iptables v0.4.0 h1:wh4UbVs8DhLUbpyq97GLJDKrQMjEDD63T1xE4CrsKzQ=
 github.com/coreos/go-iptables v0.4.0/go.mod h1:/mVI274lEDI2ns62jHCDnCyBF9Iwsmekav8Dbxlm1MU=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
@@ -35,18 +37,13 @@ github.com/json-iterator/go v0.0.0-20180701071628-ab8a2e0c74be h1:AHimNtVIpiBjPU
 github.com/json-iterator/go v0.0.0-20180701071628-ab8a2e0c74be/go.mod h1:+SdeFBvtyEkXs7REEP0seUULqWtbJapLOCVDaaPEHmU=
 github.com/kelseyhightower/envconfig v1.3.0 h1:IvRS4f2VcIQy6j4ORGIf9145T/AsUB+oY8LyvN8BXNM=
 github.com/kelseyhightower/envconfig v1.3.0/go.mod h1:cccZRl6mQpaq41TPp5QxidR+Sa3axMbJDNb//FQX6Gg=
-github.com/mangelajo/goStrongswanVici v0.0.0-20190223031456-9a5ae4453bd h1:hOq4ymLKjuNeXCJrTbPG/DAPK4DIroOaQUGu60Q7BXI=
-github.com/mangelajo/goStrongswanVici v0.0.0-20190223031456-9a5ae4453bd/go.mod h1:jBWUR9RyXtXsgAghFahi+vhaF5sup3XXAST2nvBkjug=
-github.com/mangelajo/goStrongswanVici v0.0.0-20190701121157-9a5ae4453bda h1:/+TyeDEvC0xdyiIQg17E5wrWxTxO+oTcnOCjvM/V34U=
-github.com/mangelajo/goStrongswanVici v0.0.0-20190701121157-9a5ae4453bda/go.mod h1:jBWUR9RyXtXsgAghFahi+vhaF5sup3XXAST2nvBkjug=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd h1:TRLaZ9cD/w8PVh93nsPXa1VrQ6jlwL5oN8l14QlcNfg=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
 github.com/modern-go/reflect2 v1.0.1 h1:9f412s+6RmYXLWZSEzVVgPGK7C2PphHj5RJrvfx9AWI=
 github.com/modern-go/reflect2 v1.0.1/go.mod h1:bx2lNnkwVCuqBIxFjflWJWanXIb3RllmbCylyMrvgv0=
 github.com/onsi/ginkgo v0.0.0-20190716150225-054541502288 h1:IrDHY8COHGFX/oYjUAS2vB0qfHfQ09YzChm5RikI9Z8=
 github.com/onsi/ginkgo v0.0.0-20190716150225-054541502288/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
-github.com/onsi/gomega v1.4.1 h1:PZSj/UFNaVp3KxrzHOcS7oyuWA7LoOY/77yCTEFu21U=
-github.com/onsi/gomega v1.4.1/go.mod h1:C1qb7wdrVGGVU+Z6iS04AVkA3Q65CEZX59MT0QO5uiA=
+github.com/onsi/gomega v1.5.0 h1:izbySO9zDPmjJ8rDjLvkA2zJHIo+HkYXHnf7eN7SSyo=
 github.com/onsi/gomega v1.5.0/go.mod h1:ex+gbHU/CVuBBDIJjb2X0qEXbFg53c61hWP/1CpauHY=
 github.com/pborman/uuid v1.2.0 h1:J7Q5mO4ysT1dv8hyrUGHb9+ooztCXu1D8MY8DZYsu3g=
 github.com/pborman/uuid v1.2.0/go.mod h1:X/NO0urCmaxf9VXbdlT7C2Yzkj2IKimNn4k+gtPdI/k=
