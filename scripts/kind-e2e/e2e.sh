@@ -128,6 +128,8 @@ function setup_cluster2_gateway() {
             --name submariner \
             --namespace submariner \
             --set ipsec.psk="${SUBMARINER_PSK}" \
+            --set ipsec.ikePort=501 \
+            --set ipsec.natPort=4501 \
             --set broker.server="${SUBMARINER_BROKER_URL}" \
             --set broker.token="${SUBMARINER_BROKER_TOKEN}" \
             --set broker.namespace="${SUBMARINER_BROKER_NS}" \
@@ -164,6 +166,8 @@ function setup_cluster3_gateway() {
              --name submariner \
              --namespace submariner \
              --set ipsec.psk="${SUBMARINER_PSK}" \
+             --set ipsec.ikePort=501 \
+             --set ipsec.natPort=4501 \
              --set broker.server="${SUBMARINER_BROKER_URL}" \
              --set broker.token="${SUBMARINER_BROKER_TOKEN}" \
              --set broker.namespace="${SUBMARINER_BROKER_NS}" \
