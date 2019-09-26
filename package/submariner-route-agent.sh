@@ -20,8 +20,8 @@ for f in iptables-save iptables; do
 		cp /usr/sbin/${f}.wrapper /usr/sbin/$f
 	else
 		echo "WARNING: not using iptables wrapper because /host/usr/sbin/$f was not detected."
-		echo "either the host file system isn't mounted or the host does not have iptables"
-		echo "installed the pod will use the image installed iptables version"
+		echo "Either the host file system isn't mounted or the host does not have iptables"
+		echo "installed. The pod will use the image installed iptables version."
 	fi
 done
 
