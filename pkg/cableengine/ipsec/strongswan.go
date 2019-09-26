@@ -14,6 +14,8 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/submariner-io/submariner/pkg/types"
 	"k8s.io/klog"
+
+	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 )
 
 const (
@@ -277,13 +279,58 @@ func (i *strongSwan) GetActiveConnections(clusterID string) ([]string, error) {
 
 	for _, conn := range conns {
 		for k := range conn {
-			if strings.HasPrefix(k, prefix) {
+			if !strings.HasPrefix(k, prefix) {
+				continue
+			}
+
+			removed, err := i.removeStaleCable(client, k)
+			if err != nil {
+				return nil, err
+			}
+			if !removed {
 				klog.V(4).Infof("Found existing connection: %s", k)
 				connections = append(connections, k)
 			}
 		}
 	}
 	return connections, nil
+}
+
+// removeStaleCable removes cables that have no active SAS and returns a
+// boolean indicating removal of the cable. The status of the error is nil
+// in case of no errors, otherwise the returns values are false and the
+// error.
+func (i *strongSwan) removeStaleCable(client *goStrongswanVici.ClientConn, cableID string) (bool, error) {
+	sas, err := client.ListSas("", "")
+	if err != nil {
+		klog.Errorf("error while retrieving active sas")
+		return false, err
+	}
+
+	for _, samap := range sas {
+		klog.V(6).Infof("Found SA %v", samap)
+		sa, exists := samap[cableID]
+		if exists && (sa.State == "ESTABLISHED" || sa.State == "CONNECTING") {
+			// Cable with an active SA and thus not stale
+			return false, nil
+		}
+	}
+
+	klog.V(4).Infof("Remove stale cable: %s", cableID)
+	// Creating this stub Endpoint is not ideal but to avoid a refactor
+	// TODO(mpeterson): refactor code to make this not a requirement
+	err = i.DisconnectFromEndpoint(types.SubmarinerEndpoint{
+		Spec: subv1.EndpointSpec{
+			CableName: cableID,
+		},
+	})
+	if err != nil {
+		klog.Errorf("error while removing stale cable")
+		return false, err
+	}
+
+	return true, nil
+
 }
 
 func (i *strongSwan) loadSharedKey(endpoint types.SubmarinerEndpoint, client *goStrongswanVici.ClientConn) error {
