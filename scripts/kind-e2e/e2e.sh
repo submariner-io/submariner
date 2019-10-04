@@ -7,10 +7,12 @@ source $(git rev-parse --show-toplevel)/scripts/lib/debug_functions
 
 function kind_clusters() {
     status=$1
-    version=$2
+    shift
+    version=$1
+    shift
     declare -A pids
     declare -A logs
-    for cluster in cluster{1,2,3}; do
+    for cluster in "$@"; do
         if [[ $(kind get clusters | grep ${cluster} | wc -l) -gt 0  ]]; then
             echo Cluster ${cluster} already exists, skipping cluster creation...
         else
@@ -39,7 +41,7 @@ function kind_clusters() {
     done
     if [[ ${#logs[@]} -gt 0 ]]; then
         echo "(Watch the installation processes with \"tail -f ${logs[*]}\".)"
-        for cluster in cluster{1,2,3}; do
+        for cluster in "$@"; do
             if [[ pids[${cluster}] -gt -1 ]]; then
                 wait ${pids[${cluster}]}
                 if [[ $? -ne 0 && $? -ne 127 ]]; then
@@ -57,7 +59,7 @@ function install_helm() {
     helm repo add submariner-latest https://submariner-io.github.io/submariner-charts/charts
     declare -A pids
     declare -A logs
-    for cluster in cluster{1,2,3}; do
+    for cluster in "$@"; do
         if kubectl --context=${cluster} -n kube-system rollout status deploy/tiller-deploy > /dev/null 2>&1; then
             echo Helm already installed on ${cluster}, skipping helm installation...
         else
@@ -74,7 +76,7 @@ function install_helm() {
     done
     if [[ ${#logs[@]} -gt 0 ]]; then
         echo "(Watch the installation processes with \"tail -f ${logs[*]}\".)"
-        for cluster in cluster{1,2,3}; do
+        for cluster in "$@"; do
             if [[ pids[${cluster}] -gt -1 ]]; then
                 wait ${pids[${cluster}]}
                 if [[ $? -ne 0 && $? -ne 127 ]]; then
@@ -89,7 +91,7 @@ function install_helm() {
 
 function setup_custom_cni(){
     declare -A POD_CIDR=( ["cluster2"]="10.245.0.0/16" ["cluster3"]="10.246.0.0/16" )
-    for cluster in cluster{2,3}; do
+    for cluster in "$@"; do
         if kubectl --context=${cluster} wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=60s > /dev/null 2>&1; then
             echo "Weave already deployed ${cluster}."
         else
@@ -104,16 +106,16 @@ function setup_custom_cni(){
 }
 
 function setup_broker() {
-    if kubectl --context=cluster1 get crd clusters.submariner.io > /dev/null 2>&1; then
+    if kubectl --context=$1 get crd clusters.submariner.io > /dev/null 2>&1; then
         echo Submariner CRDs already exist, skipping broker creation...
     else
-        echo Installing broker on cluster1.
-        helm --kube-context cluster1 install submariner-latest/submariner-k8s-broker --name ${SUBMARINER_BROKER_NS} --namespace ${SUBMARINER_BROKER_NS}
+        echo Installing broker on $1.
+        helm --kube-context $1 install submariner-latest/submariner-k8s-broker --name ${SUBMARINER_BROKER_NS} --namespace ${SUBMARINER_BROKER_NS}
     fi
 
-    SUBMARINER_BROKER_URL=$(kubectl --context=cluster1 -n default get endpoints kubernetes -o jsonpath="{.subsets[0].addresses[0].ip}:{.subsets[0].ports[?(@.name=='https')].port}")
-    SUBMARINER_BROKER_CA=$(kubectl --context=cluster1 -n ${SUBMARINER_BROKER_NS} get secrets -o jsonpath="{.items[?(@.metadata.annotations['kubernetes\.io/service-account\.name']=='${SUBMARINER_BROKER_NS}-client')].data['ca\.crt']}")
-    SUBMARINER_BROKER_TOKEN=$(kubectl --context=cluster1 -n ${SUBMARINER_BROKER_NS} get secrets -o jsonpath="{.items[?(@.metadata.annotations['kubernetes\.io/service-account\.name']=='${SUBMARINER_BROKER_NS}-client')].data.token}"|base64 --decode)
+    SUBMARINER_BROKER_URL=$(kubectl --context=$1 -n default get endpoints kubernetes -o jsonpath="{.subsets[0].addresses[0].ip}:{.subsets[0].ports[?(@.name=='https')].port}")
+    SUBMARINER_BROKER_CA=$(kubectl --context=$1 -n ${SUBMARINER_BROKER_NS} get secrets -o jsonpath="{.items[?(@.metadata.annotations['kubernetes\.io/service-account\.name']=='${SUBMARINER_BROKER_NS}-client')].data['ca\.crt']}")
+    SUBMARINER_BROKER_TOKEN=$(kubectl --context=$1 -n ${SUBMARINER_BROKER_NS} get secrets -o jsonpath="{.items[?(@.metadata.annotations['kubernetes\.io/service-account\.name']=='${SUBMARINER_BROKER_NS}-client')].data.token}"|base64 --decode)
 }
 
 function setup_cluster2_gateway() {
@@ -122,6 +124,10 @@ function setup_cluster2_gateway() {
             update_subm_pods cluster2
         else
             echo Installing submariner on cluster2...
+            crds=true
+            if kubectl --context=cluster2 get crd clusters.submariner.io > /dev/null 2>&1; then
+                crds=false
+            fi
             worker_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster2-worker | head -n 1)
             kubectl --context=cluster2 label node cluster2-worker "submariner.io/gateway=true" --overwrite
             helm --kube-context cluster2 install submariner-latest/submariner \
@@ -141,7 +147,8 @@ function setup_cluster2_gateway() {
             --set routeAgent.image.pullPolicy="IfNotPresent" \
             --set engine.image.repository="submariner" \
             --set engine.image.tag="local" \
-            --set engine.image.pullPolicy="IfNotPresent"
+            --set engine.image.pullPolicy="IfNotPresent" \
+            --set crd.create="${crds}"
             echo Waiting for submariner pods to be Ready on cluster2...
             kubectl --context=cluster2 wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s
             kubectl --context=cluster2 wait --for=condition=Ready pods -l app=submariner-routeagent -n submariner --timeout=60s
@@ -158,6 +165,10 @@ function setup_cluster3_gateway() {
             update_subm_pods cluster3
         else
             echo Installing submariner on cluster3...
+            crds=true
+            if kubectl --context=cluster3 get crd clusters.submariner.io > /dev/null 2>&1; then
+                crds=false
+            fi
             worker_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster3-worker | head -n 1)
             kubectl --context=cluster3 label node cluster3-worker "submariner.io/gateway=true" --overwrite
             helm --kube-context cluster3 install submariner-latest/submariner \
@@ -177,7 +188,8 @@ function setup_cluster3_gateway() {
              --set routeAgent.image.pullPolicy="IfNotPresent" \
              --set engine.image.repository="submariner" \
              --set engine.image.tag="local" \
-             --set engine.image.pullPolicy="IfNotPresent"
+             --set engine.image.pullPolicy="IfNotPresent" \
+             --set crd.create="${crds}"
             echo Waiting for submariner pods to be Ready on cluster3...
             kubectl --context=cluster3 wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s
             kubectl --context=cluster3 wait --for=condition=Ready pods -l app=submariner-routeagent -n submariner --timeout=60s
@@ -192,7 +204,7 @@ function kind_import_images() {
     docker tag rancher/submariner:dev submariner:local
     docker tag rancher/submariner-route-agent:dev submariner-route-agent:local
 
-    for cluster in cluster{2,3}; do
+    for cluster in "$@"; do
         echo "Loading submariner images in to ${cluster}..."
         kind --name ${cluster} load docker-image submariner:local
         kind --name ${cluster} load docker-image submariner-route-agent:local
@@ -311,7 +323,7 @@ if [[ $1 != keep ]]; then
     trap cleanup EXIT
 fi
 
-echo Starting with status: $1, k8s_version: $2, logging: $3, kubefed: $4.
+echo Starting with status: $1, k8s_version: $2, logging: $3, kubefed: $4, broker :$5.
 PRJ_ROOT=$(git rev-parse --show-toplevel)
 mkdir -p ${PRJ_ROOT}/output/kind-config/dapper/ ${PRJ_ROOT}/output/kind-config/local-dev/
 SUBMARINER_BROKER_NS=submariner-k8s-broker
@@ -319,17 +331,33 @@ SUBMARINER_PSK=$(cat /dev/urandom | LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 64 |
 KUBEFED_NS=kube-federation-system
 export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
 
-kind_clusters "$@"
-setup_custom_cni
+broker_cluster=cluster1
+if [[ $5 = cluster1 || $5 = cluster2 || $5 = cluster3 ]]; then
+    echo Broker on $5
+    broker_cluster=$5
+elif [[ -n $5 ]]; then
+    echo Invalid broker setting $5, ignoring
+fi
+
+client_clusters=(cluster2 cluster3)
+
+if [[ $broker_cluster = cluster2 || $broker_cluster = cluster3 ]]; then
+    clusters=(cluster2 cluster3)
+else
+    clusters=(cluster1 cluster2 cluster3)
+fi
+
+kind_clusters "$1" "$2" "${clusters[@]}"
+setup_custom_cni "${client_clusters[@]}"
 if [[ $3 = true ]]; then
     enable_logging
 fi
-install_helm
+install_helm "${clusters[@]}"
 if [[ $4 = true ]]; then
     enable_kubefed
 fi
-kind_import_images
-setup_broker
+kind_import_images "${client_clusters[@]}"
+setup_broker $broker_cluster
 setup_cluster2_gateway
 setup_cluster3_gateway
 test_connection
