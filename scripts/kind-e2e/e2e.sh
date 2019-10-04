@@ -8,45 +8,45 @@ source $(git rev-parse --show-toplevel)/scripts/lib/debug_functions
 function kind_clusters() {
     status=$1
     version=$2
-    pids=(-1 -1 -1)
-    logs=()
-    for i in 1 2 3; do
-        if [[ $(kind get clusters | grep cluster${i} | wc -l) -gt 0  ]]; then
-            echo Cluster cluster${i} already exists, skipping cluster creation...
+    declare -A pids
+    declare -A logs
+    for cluster in cluster{1,2,3}; do
+        if [[ $(kind get clusters | grep ${cluster} | wc -l) -gt 0  ]]; then
+            echo Cluster ${cluster} already exists, skipping cluster creation...
         else
-            logs[$i]=$(mktemp)
-            echo Creating cluster${i}, logging to ${logs[$i]}...
+            logs[${cluster}]=$(mktemp)
+            echo Creating ${cluster}, logging to ${logs[${cluster}]}...
             (
             if [[ -n ${version} ]]; then
-                kind create cluster --image=kindest/node:v${version} --name=cluster${i} --config=${PRJ_ROOT}/scripts/kind-e2e/cluster${i}-config.yaml
+                kind create cluster --image=kindest/node:v${version} --name=${cluster} --config=${PRJ_ROOT}/scripts/kind-e2e/${cluster}-config.yaml
             else
-                kind create cluster --name=cluster${i} --config=${PRJ_ROOT}/scripts/kind-e2e/cluster${i}-config.yaml
+                kind create cluster --name=${cluster} --config=${PRJ_ROOT}/scripts/kind-e2e/${cluster}-config.yaml
             fi
-            master_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster${i}-control-plane | head -n 1)
-            sed -i -- "s/user: kubernetes-admin/user: cluster$i/g" $(kind get kubeconfig-path --name="cluster$i")
-            sed -i -- "s/name: kubernetes-admin.*/name: cluster$i/g" $(kind get kubeconfig-path --name="cluster$i")
-            sed -i -- "s/current-context: kubernetes-admin.*/current-context: cluster$i/g" $(kind get kubeconfig-path --name="cluster$i")
+            master_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${cluster}-control-plane | head -n 1)
+            sed -i -- "s/user: kubernetes-admin/user: ${cluster}/g" $(kind get kubeconfig-path --name="${cluster}")
+            sed -i -- "s/name: kubernetes-admin.*/name: ${cluster}/g" $(kind get kubeconfig-path --name="${cluster}")
+            sed -i -- "s/current-context: kubernetes-admin.*/current-context: ${cluster}/g" $(kind get kubeconfig-path --name="${cluster}")
 
             if [[ ${status} = keep ]]; then
-                cp -r $(kind get kubeconfig-path --name="cluster$i") ${PRJ_ROOT}/output/kind-config/local-dev/kind-config-cluster${i}
+                cp -r $(kind get kubeconfig-path --name="${cluster}") ${PRJ_ROOT}/output/kind-config/local-dev/kind-config-${cluster}
             fi
 
-            sed -i -- "s/server: .*/server: https:\/\/$master_ip:6443/g" $(kind get kubeconfig-path --name="cluster$i")
-            cp -r $(kind get kubeconfig-path --name="cluster$i") ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster${i}
-            ) > ${logs[$i]} 2>&1 &
-            set pids[$i] = $!
+            sed -i -- "s/server: .*/server: https:\/\/$master_ip:6443/g" $(kind get kubeconfig-path --name="${cluster}")
+            cp -r $(kind get kubeconfig-path --name="${cluster}") ${PRJ_ROOT}/output/kind-config/dapper/kind-config-${cluster}
+            ) > ${logs[${cluster}]} 2>&1 &
+            set pids[${cluster}] = $!
         fi
     done
     if [[ ${#logs[@]} -gt 0 ]]; then
         echo "(Watch the installation processes with \"tail -f ${logs[*]}\".)"
-        for i in 1 2 3; do
-            if [[ pids[$i] -gt -1 ]]; then
-                wait ${pids[$i]}
+        for cluster in cluster{1,2,3}; do
+            if [[ pids[${cluster}] -gt -1 ]]; then
+                wait ${pids[${cluster}]}
                 if [[ $? -ne 0 && $? -ne 127 ]]; then
-                    echo Cluster $i creation failed:
-                    cat ${logs[$i]}
+                    echo Cluster ${cluster} creation failed:
+                    cat ${logs[${cluster}]}
                 fi
-                rm -f ${logs[$i]}
+                rm -f ${logs[${cluster}]}
             fi
         done
     fi
@@ -55,33 +55,33 @@ function kind_clusters() {
 function install_helm() {
     helm init --client-only
     helm repo add submariner-latest https://submariner-io.github.io/submariner-charts/charts
-    pids=(-1 -1 -1)
-    logs=()
-    for i in 1 2 3; do
-        if kubectl --context=cluster${i} -n kube-system rollout status deploy/tiller-deploy > /dev/null 2>&1; then
-            echo Helm already installed on cluster${i}, skipping helm installation...
+    declare -A pids
+    declare -A logs
+    for cluster in cluster{1,2,3}; do
+        if kubectl --context=${cluster} -n kube-system rollout status deploy/tiller-deploy > /dev/null 2>&1; then
+            echo Helm already installed on ${cluster}, skipping helm installation...
         else
-            logs[$i]=$(mktemp)
-            echo Installing helm on cluster${i}, logging to ${logs[$i]}...
+            logs[${cluster}]=$(mktemp)
+            echo Installing helm on ${cluster}, logging to ${logs[${cluster}]}...
             (
-            kubectl --context=cluster${i} -n kube-system create serviceaccount tiller
-            kubectl --context=cluster${i} create clusterrolebinding tiller --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
-            helm --kube-context cluster${i} init --service-account tiller
-            kubectl --context=cluster${i} -n kube-system rollout status deploy/tiller-deploy
-            ) > ${logs[$i]} 2>&1 &
-            set pids[$i] = $!
+            kubectl --context=${cluster} -n kube-system create serviceaccount tiller
+            kubectl --context=${cluster} create clusterrolebinding tiller --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
+            helm --kube-context ${cluster} init --service-account tiller
+            kubectl --context=${cluster} -n kube-system rollout status deploy/tiller-deploy
+            ) > ${logs[${cluster}]} 2>&1 &
+            set pids[${cluster}] = $!
         fi
     done
     if [[ ${#logs[@]} -gt 0 ]]; then
         echo "(Watch the installation processes with \"tail -f ${logs[*]}\".)"
-        for i in 1 2 3; do
-            if [[ pids[$i] -gt -1 ]]; then
-                wait ${pids[$i]}
+        for cluster in cluster{1,2,3}; do
+            if [[ pids[${cluster}] -gt -1 ]]; then
+                wait ${pids[${cluster}]}
                 if [[ $? -ne 0 && $? -ne 127 ]]; then
-                    echo Cluster $i creation failed:
-                    cat ${logs[$i]}
+                    echo Helm installation in cluster ${cluster} failed:
+                    cat ${logs[${cluster}]}
                 fi
-                rm -f ${logs[$i]}
+                rm -f ${logs[${cluster}]}
             fi
         done
     fi
@@ -89,16 +89,16 @@ function install_helm() {
 
 function setup_custom_cni(){
     declare -A POD_CIDR=( ["cluster2"]="10.245.0.0/16" ["cluster3"]="10.246.0.0/16" )
-    for i in 2 3; do
-        if kubectl --context=cluster${i} wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=60s > /dev/null 2>&1; then
-            echo "Weave already deployed cluster${i}."
+    for cluster in cluster{2,3}; do
+        if kubectl --context=${cluster} wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=60s > /dev/null 2>&1; then
+            echo "Weave already deployed ${cluster}."
         else
-            echo "Applying weave network in to cluster${i}..."
-            kubectl --context=cluster${i} apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl --context=cluster${i} version | base64 | tr -d '\n')&env.IPALLOC_RANGE=${POD_CIDR[cluster${i}]}"
-            echo "Waiting for weave-net pods to be ready cluster${i}..."
-            kubectl --context=cluster${i} wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=300s
-            echo "Waiting for core-dns deployment to be ready cluster${i}..."
-            kubectl --context=cluster${i} -n kube-system rollout status deploy/coredns --timeout=300s
+            echo "Applying weave network in to ${cluster}..."
+            kubectl --context=${cluster} apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl --context=${cluster} version | base64 | tr -d '\n')&env.IPALLOC_RANGE=${POD_CIDR[${cluster}]}"
+            echo "Waiting for weave-net pods to be ready ${cluster}..."
+            kubectl --context=${cluster} wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=300s
+            echo "Waiting for core-dns deployment to be ready ${cluster}..."
+            kubectl --context=${cluster} -n kube-system rollout status deploy/coredns --timeout=300s
         fi
     done
 }
@@ -192,10 +192,10 @@ function kind_import_images() {
     docker tag rancher/submariner:dev submariner:local
     docker tag rancher/submariner-route-agent:dev submariner-route-agent:local
 
-    for i in 2 3; do
-        echo "Loading submariner images in to cluster${i}..."
-        kind --name cluster${i} load docker-image submariner:local
-        kind --name cluster${i} load docker-image submariner-route-agent:local
+    for cluster in cluster{2,3}; do
+        echo "Loading submariner images in to ${cluster}..."
+        kind --name ${cluster} load docker-image submariner:local
+        kind --name ${cluster} load docker-image submariner-route-agent:local
     done
 }
 
@@ -236,9 +236,9 @@ function enable_logging() {
         kubectl --context=cluster1 apply -f ${PRJ_ROOT}/scripts/kind-e2e/logging/filebeat.yaml
         echo Waiting for Elasticsearch to be ready...
         kubectl --context=cluster1 wait --for=condition=Ready pods -l app=elasticsearch --timeout=300s
-        for i in 2 3; do
-            kubectl --context=cluster${i} apply -f ${PRJ_ROOT}/scripts/kind-e2e/logging/filebeat.yaml
-            kubectl --context=cluster${i} set env daemonset/filebeat -n kube-system ELASTICSEARCH_HOST=${es_ip} ELASTICSEARCH_PORT=30000
+        for cluster in cluster{1,2}; do
+            kubectl --context=${cluster} apply -f ${PRJ_ROOT}/scripts/kind-e2e/logging/filebeat.yaml
+            kubectl --context=${cluster} set env daemonset/filebeat -n kube-system ELASTICSEARCH_HOST=${es_ip} ELASTICSEARCH_PORT=30000
         done
     fi
 }
@@ -249,11 +249,11 @@ function enable_kubefed() {
     else
         helm repo add kubefed-charts https://raw.githubusercontent.com/kubernetes-sigs/kubefed/master/charts
         helm --kube-context cluster1 install kubefed-charts/kubefed --version=0.1.0-rc2 --name kubefed --namespace ${KUBEFED_NS} --set controllermanager.replicaCount=1
-        for i in 1 2 3; do
-            kubefedctl join cluster${i} --cluster-context cluster${i} --host-cluster-context cluster1 --v=2
-            #master_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster${i}-control-plane | head -n 1)
+        for cluster in cluster{1,2,3}; do
+            kubefedctl join ${cluster} --cluster-context ${cluster} --host-cluster-context cluster1 --v=2
+            #master_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${cluster}-control-plane | head -n 1)
             #kind_endpoint="https://${master_ip}:6443"
-            #kubectl patch kubefedclusters -n ${KUBEFED_NS} cluster${i} --type merge --patch "{\"spec\":{\"apiEndpoint\":\"${kind_endpoint}\"}}"
+            #kubectl patch kubefedclusters -n ${KUBEFED_NS} ${cluster} --type merge --patch "{\"spec\":{\"apiEndpoint\":\"${kind_endpoint}\"}}"
         done
         #kubectl delete pod -l control-plane=controller-manager -n ${KUBEFED_NS}
         echo Waiting for kubefed control plain to be ready...
@@ -277,9 +277,9 @@ function test_with_e2e_tests {
 }
 
 function cleanup {
-    for i in 1 2 3; do
-      if [[ $(kind get clusters | grep cluster${i} | wc -l) -gt 0  ]]; then
-        kind delete cluster --name=cluster${i};
+    for cluster in cluster{1,2,3}; do
+      if [[ $(kind get clusters | grep ${cluster} | wc -l) -gt 0  ]]; then
+        kind delete cluster --name=${cluster};
       fi
     done
 
