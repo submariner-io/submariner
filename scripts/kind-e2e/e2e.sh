@@ -38,15 +38,15 @@ function kind_clusters() {
         fi
     done
     if [[ ${#logs[@]} -gt 0 ]]; then
-        echo "(Watch the installation processes with \"tail -f ${logs[@]}\".)"
+        echo "(Watch the installation processes with \"tail -f ${logs[*]}\".)"
         for i in 1 2 3; do
             if [[ pids[$i] -gt -1 ]]; then
                 wait ${pids[$i]}
                 if [[ $? -ne 0 && $? -ne 127 ]]; then
                     echo Cluster $i creation failed:
-                    cat $logs[$i]
+                    cat ${logs[$i]}
                 fi
-                rm -f $logs[$i]
+                rm -f ${logs[$i]}
             fi
         done
     fi
@@ -73,15 +73,15 @@ function install_helm() {
         fi
     done
     if [[ ${#logs[@]} -gt 0 ]]; then
-        echo "(Watch the installation processes with \"tail -f ${logs[@]}\".)"
+        echo "(Watch the installation processes with \"tail -f ${logs[*]}\".)"
         for i in 1 2 3; do
             if [[ pids[$i] -gt -1 ]]; then
                 wait ${pids[$i]}
                 if [[ $? -ne 0 && $? -ne 127 ]]; then
                     echo Cluster $i creation failed:
-                    cat $logs[$i]
+                    cat ${logs[$i]}
                 fi
-                rm -f $logs[$i]
+                rm -f ${logs[$i]}
             fi
         done
     fi
