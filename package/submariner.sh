@@ -7,7 +7,7 @@ export CHARON_PID_FILE=/var/run/charon.pid
 rm -f ${CHARON_PID_FILE}
 
 if [ "${SUBMARINER_DEBUG}" == "true" ]; then
-    DEBUG="--debug -v=9"
+    DEBUG="-v=9"
 else
     DEBUG="-v=4"
 fi
