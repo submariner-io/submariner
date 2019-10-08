@@ -32,13 +32,19 @@ This mode will create e2e environment on a local workstation, run unit tests, E2
 This mode is very convenient for CI purposes.
     
 ```bash
-make e2e
+make ci e2e
+```
+
+If you want to minimize runtime another option is to skip unit tests and source
+code validation:
+```bash
+make build package e2e
 ```
 
 To test specific k8s version, additional **version** parameter can be passed to **make e2e** command.
 
 ```bash
-make e2e version=1.14.1
+make ci e2e version=1.14.1
 ```
 
 Full list of supported k8s versions can found on [kind release page] page. We are using kind vesion 0.3.0.
@@ -51,7 +57,7 @@ This mode will **keep** the e2e environment running on a local workstation for f
 This mode can be triggered by adding **status=keep** parameter to **make e2e** command.
 
 ```bash
-make e2e status=keep
+make ci e2e status=keep
 ```
 
 After a permanent run completes, the configuration for the running clusters can be found inside **output/kind-config/local-dev** folder.
@@ -81,7 +87,7 @@ The logs from three clusters will be shipped to an elasticsearch deployment on c
 Logging should be used only in addition to **status=keep** command. The default value for **logging** is **false**.
 
 ```bash
-make e2e status=keep logging=true
+make ci e2e status=keep logging=true
 ```
 
 To access Kibana, run the following from new terminal tab/window:
@@ -107,7 +113,7 @@ Providing **kubefed=true** parameter to **make e2e** command will setup federati
 Federation control plane will be created on cluster1 and clusters 2/3 will be added as members. 
 
 ```bash
-make e2e status=keep kubefed=true
+make ci e2e status=keep kubefed=true
 ```
 
 To get the status of federated clusters:
@@ -123,7 +129,7 @@ To federate resources across the clusters [kubefedctl] tool must be installed on
 At any time you can run a cleanup command that will remove kind resources.
 
 ```bash
-make e2e status=clean
+make ci e2e status=clean
 ```
 
 You can do full docker cleanup, but it will force all the docker images to be removed and invalidate the local docker cache. 
@@ -136,7 +142,7 @@ docker system prune --all
 #### Full example
 
 ```bash
-make e2e status=keep version=1.14.1 logging=true kubefed=true
+make ci e2e status=keep version=1.14.1 logging=true kubefed=true
 ```
 
 <!--links-->

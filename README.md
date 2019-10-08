@@ -342,6 +342,9 @@ To build `submariner-engine` and `submariner-route-agent` you can trigger `make`
 
 To run basic e2e tests you can trigger `make e2e` command.
 
+If you want to avoid part of the ci validation with make while testing your changes
+you can speedup the process by running: `make build package e2e`
+
 We welcome issues/PR's to Submariner, if you encounter issues that you'd like to fix while working on it or find new features that you'd like.
 
 # TODO
