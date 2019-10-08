@@ -252,8 +252,14 @@ function verify_subm_routeagent_daemonset() {
         exit 1
      else
 
-        desiredNumberScheduled=$(kubectl get DaemonSet routeagent -n $subm_ns -o jsonpath='{.status.desiredNumberScheduled}')
-        numberReady=$(kubectl get DaemonSet routeagent -n $subm_ns -o jsonpath='{.status.numberReady}')
+        # Operator uses preferred DaemonSet name routeagent, Helm uses old submariner-routeagent
+        if [ "$deploy_operator" = true ]; then
+          daemonset_name=routeagent
+        else
+          daemonset_name=submariner-routeagent
+        fi
+        desiredNumberScheduled=$(kubectl get DaemonSet $daemonset_name -n $subm_ns -o jsonpath='{.status.desiredNumberScheduled}')
+        numberReady=$(kubectl get DaemonSet $daemonset_name -n $subm_ns -o jsonpath='{.status.numberReady}')
 
         ((SECONDS+=2))
         sleep 2
