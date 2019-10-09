@@ -4,6 +4,12 @@ set -e
 source $(dirname $0)/lib/debug_functions
 
 cd $(dirname $0)
+
+if [[ $5 = operator ]]; then
+   test -d ../operators/go/submariner-operator || ./codegen-operator
+   ./build-operator
+fi
+
 ./validate
 ./test
 ./build

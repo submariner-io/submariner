@@ -14,7 +14,8 @@ ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH} DAPPER_ENV=REPO DAPPE
 RUN rm -f /bin/sh && ln -s /bin/bash /bin/sh
 
 ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
-    GOPATH=/go GO111MODULE=on PATH=/go/bin:/usr/local/go/bin:${PATH} SHELL=/bin/bash GOFLAGS=-mod=vendor
+    GOPATH=/go GO111MODULE=on PATH=/go/bin:/usr/local/go/bin:/root/go/bin:${PATH} SHELL=/bin/bash GOFLAGS=-mod=vendor \
+    GOPROXY=https://proxy.golang.org
 
 # Requirements:
 # Component      | Usage
@@ -32,7 +33,7 @@ ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH=GOLANG_ARCH_${ARC
 # ginkgo         | tests
 # goimports      | code formatting
 RUN apt-get -q update && \
-    apt-get install -y gcc git curl docker.io && \
+    apt-get install -y gcc git curl docker.io mercurial make && \
     curl https://storage.googleapis.com/golang/go${GO_VERSION}.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local && \
     curl -Lo /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/${ARCH}/kubectl && \
     chmod a+x /usr/bin/kubectl && \
@@ -44,6 +45,15 @@ RUN apt-get -q update && \
     curl -Lo /usr/bin/kind "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-${ARCH}" && chmod a+x /usr/bin/kind && \
     GOFLAGS="" go get -v github.com/onsi/ginkgo/ginkgo && \
     GOFLAGS="" go get -v golang.org/x/tools/cmd/goimports
+
+# TODO(mangelajo): the operator-sdk install guide recommends go get -d , but that doesn't pull
+# the sources where we expect. We need to figure out what's going on and remove the git clone
+# hack.
+RUN OP_FRAMEWORK="$GOPATH/src/github.com/operator-framework" && \
+    mkdir -p $OP_FRAMEWORK && cd $OP_FRAMEWORK && \
+    git clone https://github.com/operator-framework/operator-sdk && \
+    cd operator-sdk && git checkout 3a85983ecc72bea079973269db429292141d165a  && \
+    make tidy && GOFLAGS="" make install
 
 WORKDIR ${DAPPER_SOURCE}
 

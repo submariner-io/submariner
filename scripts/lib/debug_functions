@@ -14,6 +14,5 @@ function trap_commands() {
 
 ### Main ###
 
-export -f trap_commands
-shopt -s extdebug
+set -T
 trap_commands

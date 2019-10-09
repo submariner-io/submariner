@@ -9,11 +9,11 @@ services:
 before_script:
   - CHANGED_FILES_PR=$(git diff --name-only HEAD $(git merge-base HEAD $TRAVIS_BRANCH))
 script:
-  - make ci e2e status=keep
+  - make ci e2e status=keep deploytool=operator
 after_success:
   - if [[ "${CHANGED_FILES_PR[@]}" =~ "scripts/kind-e2e/e2e.sh" ]]; then
       echo "scripts/kind-e2e/e2e.sh was modified, testing recurring run on already deployed infrastructure.";
-      make e2e status=keep;
+      make e2e status=keep deploytool=operator;
     fi
 deploy:
   provider: script
