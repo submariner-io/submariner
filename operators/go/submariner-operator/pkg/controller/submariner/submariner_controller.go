@@ -376,7 +376,7 @@ func setSubmarinerDefaults(submariner *submarinerv1alpha1.Submariner) {
 	}
 
 	if spec.Version == "" {
-		spec.Version = "latest"
+		spec.Version = "0.0.2"
 	}
 }
 
