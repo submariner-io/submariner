@@ -1,3 +1,19 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+- [E2E environment](#e2e-environment)
+  - [Prerequisites](#prerequisites)
+  - [Installation and usage](#installation-and-usage)
+    - [1. Ephemeral/Onetime](#1-ephemeralonetime)
+    - [2. Permanent](#2-permanent)
+      - [Logging](#logging)
+      - [Federation V2](#federation-v2)
+      - [Cleanup](#cleanup)
+      - [Full example](#full-example)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # E2E environment
 
 The e2e environment can be used for local testing, development, and CI purposes.
