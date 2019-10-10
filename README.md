@@ -4,24 +4,20 @@
 
 - [Submariner](#submariner)
 - [Architecture](#architecture)
-      - [submariner](#submariner)
-      - [submariner-route-agent](#submariner-route-agent)
-    - [Network Path](#network-path)
+  - [submariner](#submariner)
+  - [submariner-route-agent](#submariner-route-agent)
+  - [Network Path](#network-path)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
+  - [Installation using operator](#installation-using-operator)
   - [Manual installation using helm charts](#manual-installation-using-helm-charts)
     - [Setup](#setup)
     - [Broker Installation/Setup](#broker-installationsetup)
     - [Submariner Installation/Setup](#submariner-installationsetup)
       - [Installation of Submariner in each cluster](#installation-of-submariner-in-each-cluster)
-  - [Installation using operator](#installation-using-operator)
-    - [Generating the Operator](#generating-the-operator)
-    - [Builiding the operator](#builiding-the-operator)
-    - [Deploying Submariner using the Operator](#deploying-submariner-using-the-operator)
   - [Validate Submariner is Working](#validate-submariner-is-working)
 - [Testing](#testing)
 - [Known Issues/Notes](#known-issuesnotes)
-    - [AWS Notes](#aws-notes)
     - [Openshift Notes](#openshift-notes)
 - [Building](#building)
 - [Contributing](#contributing)
@@ -58,17 +54,17 @@ Upon failure, another Submariner pod (on one of the other gateway hosts) will ga
 
 Submariner uses a central broker to facilitate the exchange of information and sync CRD's between clusters. The `datastoresyncer` runs as a controller within the leader-elected `submariner` pod, and is responsible for performing a two-way synchronization between the datastore and local cluster of Submariner CRDs. The `datastoresyncer` will only push CRD data to the central broker for the local cluster (based on cluster ID), and will sync all data from the broker the local cluster when the data does not match the local cluster (to prevent circular loops)
 
-#### submariner
+## submariner
 
 submariner (compiled as the binary `submariner-engine`) has a few controllers built into it that establish state. It is responsible for running/interfacing with Charon to establish IPsec tunnels, as well as updating local cluster information into the central broker to share information between clusters. 
 
 submariner-engine runs and utilizes leader election to establish an active gateway node, which is used to facilitate IPsec tunnel connections to remote clusters. It also manipulates the IPtables rules on each node to enable a. forwarding of traffic and b. SNAT for local node traffic.
 
-#### submariner-route-agent
+## submariner-route-agent
 
 The submariner-route-agent runs as a DaemonSet on all Kubernetes nodes, and ensures route rules to allow all pods/nodes to communicate through the elected gateway node for remote cluster networks. It will ensure state and react on CRD changes, which means that it is able to remove/add routes as leader election occurs.
 
-### Network Path
+## Network Path
 
 The network path of Submariner varies depending on the origin/destination of the IP traffic. In all cases, traffic between two clusters will transit between the leader elected (in each cluster) gateway nodes, through `ip xfrm` rules. Each gateway node has a running Charon daemon which will perform IPsec keying and policy management. 
 
@@ -94,7 +90,13 @@ An example of three clusters configured to use with Submariner would look like t
 
 # Installation
 
-Submariner installation can be done manually using helm charts or by using its operator. Both of the methods are described here.
+Submariner installation can be done manually using helm charts or by using its operator. Both methods are described here.
+
+## Installation using operator
+
+An operator is a tool to package, manage and deploy any Kubernetes application. A submariner operator will soon be available on [OperatorHub.io](https://operatorhub.io).
+
+##TODO: Add instructions on how to install using operator
 
 ## Manual installation using helm charts
 
@@ -252,46 +254,6 @@ Each cluster that will be connected must have Submariner installed within it. Yo
    |\<SERVICE_CIDR>|Service CIDR for Cluster|""|`10.43.0.0/16`|
    |\<NAT_ENABLED>|If in a cloud provider that uses 1:1 NAT between instances (for example, AWS VPC), you should set this to `true` so that Submariner is aware of the 1:1 NAT condition.|"false"|`false`|
 
-
-## Installation using operator
-
-An operator is a tool to package, manage and deploy any Kubernetes application. A submariner operator will soon be available on [OperatorHub.io](https://operatorhub.io).
-
-Current implementation builds submariner operator and deploys submariner in a [Kind setup](https://github.com/submariner-io/submariner/blob/master/scripts/kind-e2e/README.md).
-
-### Generating the Operator
-
-The current (developer-oriented) implementation dynamically generates the
-operator. This allows us to consume updates to the underlying best practices of
-the Operator SDK. It also results in a clear, working example of how to use the
-Operator SDK to create additional operators (perhaps for future parts of
-Submariner).
-
-```
-  cd operators/go
-  make codegen-operator
-```
-
-That will run the operator sourcecode generation logic in ./gen_subm_operator.sh
-
-### Builiding the operator
-
-```
-cd operators/go
-make build-operator
-```
-
-### Deploying Submariner using the Operator
-
-After generating the Operator (see docs above), your newly generated operator
-is automatically fully integrated into the Submariner CI automation. Simply use
-the `deploytool` flag to the standard `make` commands.
-
-```make e2e status=keep deploytool=operator```
-
-A large set of verifications for the Operator and the resulting Submariner
-deployment will automatically run during and after the deployment.
-
 ## Validate Submariner is Working
 
 Switch to the context of one of your clusters, i.e. `kubectl config use-context west`
@@ -313,14 +275,10 @@ If you don't see a command prompt, try pressing enter.
 
 # Testing
 
-Submariner functionality can be testing by running [E2E test suites](https://github.com/submariner-io/submariner/tree/master/test/e2e). 
+Submariner functionality can be tested by running [E2E test suites](https://github.com/submariner-io/submariner/tree/master/test/e2e). 
 Please refer [testing guide](https://github.com/submariner-io/submariner/tree/master/docs/testing.md) for more details.
 
 # Known Issues/Notes
-
-### AWS Notes
-
-When running in AWS, it is necessary to disable source/dest checking of the instances that are gateway hosts to allow the instances to pass traffic for remote clusters. 
 
 ### Openshift Notes
 
@@ -334,6 +292,8 @@ When running in Openshift, we need to grant the appropriate security context for
 # Building
 
 To build `submariner-engine` and `submariner-route-agent` you can trigger `make`, which will perform a Dapperized build of the components.
+
+To build the operator, you can trigger `make build-operator`.
 
 # Contributing
 
