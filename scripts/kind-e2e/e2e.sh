@@ -250,7 +250,7 @@ function test_connection() {
 
     attempt_counter=0
     max_attempts=5
-    until $(kubectl --context=cluster2 exec -it ${netshoot_pod} -- curl --output /dev/null -m 30 --silent --head --fail ${nginx_svc_ip_cluster3}); do
+    until $(kubectl --context=cluster2 exec ${netshoot_pod} -- curl --output /dev/null -m 30 --silent --head --fail ${nginx_svc_ip_cluster3}); do
         if [[ ${attempt_counter} -eq ${max_attempts} ]];then
           echo "Max attempts reached, connection test failed!"
           exit 1
