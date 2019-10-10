@@ -252,8 +252,8 @@ function verify_subm_routeagent_daemonset() {
         exit 1
      else
 
-        desiredNumberScheduled=$(kubectl get DaemonSet routeagent -n $subm_ns -o jsonpath='{.status.desiredNumberScheduled}')
-        numberReady=$(kubectl get DaemonSet routeagent -n $subm_ns -o jsonpath='{.status.numberReady}')
+        desiredNumberScheduled=$(kubectl get DaemonSet submariner-routeagent -n $subm_ns -o jsonpath='{.status.desiredNumberScheduled}')
+        numberReady=$(kubectl get DaemonSet submariner-routeagent -n $subm_ns -o jsonpath='{.status.numberReady}')
 
         ((SECONDS+=2))
         sleep 2
