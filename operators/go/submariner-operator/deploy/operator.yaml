@@ -16,7 +16,7 @@ spec:
       containers:
         - name: submariner-operator
           # Replace this with the built image name
-          image: quay.io/submariner/submariner-operator:0.0.1
+          image: quay.io/submariner/submariner-operator:0.0.2
           command:
           - submariner-operator
           imagePullPolicy: Always
