@@ -2,7 +2,7 @@ locals {
   machine_set_config_file = "${path.cwd}/submariner-gw-machine-set-${data.aws_subnet.target_public_subnet.availability_zone}.yaml"
 }
 
-# Get wokrer instances.
+# Get worker instances.
 data "aws_instances" "worker_instances" {
 
   filter {

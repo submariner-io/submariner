@@ -24,18 +24,10 @@ resource "aws_security_group_rule" "worker_sg_vxlan_rule" {
 }
 
 
-# Create a submariner agteway security group.
+# Create a submariner gateway security group.
 resource "aws_security_group" "submariner_gw_sg" {
   name   = "${var.cluster_id}-submariner-gw-sg"
   vpc_id = data.aws_vpc.env_vpc.id
-
-  egress {
-    from_port = 0
-    protocol  = "-1"
-    to_port   = 0
-
-    cidr_blocks = ["0.0.0.0/0"]
-  }
 
   ingress {
     from_port   = 4500
