@@ -19,7 +19,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
-	github.com/onsi/ginkgo v1.8.0
+	github.com/onsi/ginkgo v1.10.2
 	github.com/onsi/gomega v1.7.0
 	github.com/pborman/uuid v1.2.0 // indirect
 	github.com/peterbourgon/diskv v0.0.0-20170814173558-5f041e8faa00 // indirect
@@ -38,5 +38,3 @@ require (
 	k8s.io/kube-openapi v0.0.0-20181109181836-c59034cc13d5 // indirect
 	sigs.k8s.io/yaml v0.0.0-20181102190223-fd68e9863619 // indirect
 )
-
-replace github.com/onsi/ginkgo => github.com/onsi/ginkgo v0.0.0-20190716150225-054541502288
