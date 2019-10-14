@@ -321,7 +321,7 @@ func newRouteAgentDaemonSet(cr *submarinerv1alpha1.Submariner) *appsv1.DaemonSet
 	routeAgentDaemonSet := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cr.Namespace,
-			Name:      "routeagent",
+			Name:      "submariner-routeagent",
 			Labels:    labels,
 		},
 		Spec: appsv1.DaemonSetSpec{
