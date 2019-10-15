@@ -238,7 +238,7 @@ function create_subm_vars() {
   ce_ipsec_ikeport=500
   ce_ipsec_nattport=4500
 
-  subm_ns=operators
+  subm_ns=submariner
   subm_broker_ns=submariner-k8s-broker
 }
 
@@ -425,8 +425,6 @@ if [ "$deploy_operator" = true ]; then
       # FIXME: Rename all of these submariner-engine or engine, vs submariner
       # Create SubM CR
       create_subm_cr
-      # Deploy SubM CR
-      deploy_subm_cr
       # Verify SubM CR
       verify_subm_cr
       # Verify SubM Engine Deployment

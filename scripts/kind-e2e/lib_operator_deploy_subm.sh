@@ -47,6 +47,9 @@ EOF
   # NB: This must be done before submariner-engine pod is deployed
   create_resource_if_missing crd clusters.submariner.io $clusters_crd_file
 
+  # Cleanup CRD file
+  rm -rf $clusters_crd_file
+
   popd
 }
 
@@ -76,6 +79,9 @@ EOF
   # Create endpoints CRD
   # NB: This must be done before submariner-engine pod is deployed
   create_resource_if_missing crd endpoints.submariner.io $endpoints_crd_file
+
+  # Cleanup CRD file
+  rm -rf $endpoints_crd_file
 
   popd
 }
@@ -167,19 +173,13 @@ function create_subm_cr() {
   # Show completed CR file for debugging help
   cat $cr_file
 
-  popd
-}
-
-function deploy_subm_cr() {
-  pushd $subm_op_dir
-
-  # FIXME: This must match cr_file value used in create_subm_cr fn
-  cr_file=deploy/crds/submariner-cr-$context.yaml
-
   # Create SubM CR if it doesn't exist
   if kubectl get submariner 2>&1 | grep -q "No resources found"; then
     kubectl apply --namespace=$subm_ns -f $cr_file
   fi
+
+  # Cleanup CR file
+  rm -rf $cr_file
 
   popd
 }
