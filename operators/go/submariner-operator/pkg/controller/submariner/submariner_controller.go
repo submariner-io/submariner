@@ -3,6 +3,7 @@ package submariner
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"strconv"
 
 	"github.com/go-logr/logr"
@@ -365,18 +366,31 @@ func newRouteAgentDaemonSet(cr *submarinerv1alpha1.Submariner) *appsv1.DaemonSet
 	return routeAgentDaemonSet
 }
 
+const (
+	letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+)
+
 //TODO: move to a method on the API definitions, as the example shown by the etcd operator here :
 //      https://github.com/coreos/etcd-operator/blob/8347d27afa18b6c76d4a8bb85ad56a2e60927018/pkg/apis/etcd/v1beta2/cluster.go#L185
 func setSubmarinerDefaults(submariner *submarinerv1alpha1.Submariner) {
 
 	spec := submariner.Spec
-	if spec.Repository == "" {
+	if len(spec.Repository) == 0 {
 		// An empty field is converted to the default upstream submariner repository where all images live
 		spec.Repository = "quay.io/submariner"
 	}
 
-	if spec.Version == "" {
+	if len(spec.Version) == 0 {
 		spec.Version = "0.0.2"
+	}
+
+	if len(spec.ClusterID) == 0 {
+		// Generate a random, 16-character cluster id
+		b := make([]byte, 16)
+		for i := range b {
+			b[i] = letters[rand.Intn(len(letters))]
+		}
+		spec.ClusterID = string(b)
 	}
 }
 

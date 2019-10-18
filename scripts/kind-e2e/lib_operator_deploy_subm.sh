@@ -145,7 +145,6 @@ function create_subm_cr() {
     sed -i "/spec:/a \ \ serviceCIDR: $serviceCIDR_cluster3" $cr_file
     sed -i "/spec:/a \ \ clusterCIDR: $clusterCIDR_cluster3" $cr_file
   fi
-  sed -i "/spec:/a \ \ clusterID: $context" $cr_file
   sed -i "/spec:/a \ \ colorCodes: $subm_colorcodes" $cr_file
   # NB: Quoting bool-like vars is required or Go will type as bool and fail when set as env vars as strs
   sed -i "/spec:/a \ \ debug: $subm_debug" $cr_file

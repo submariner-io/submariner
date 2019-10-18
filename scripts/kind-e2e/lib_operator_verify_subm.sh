@@ -129,7 +129,8 @@ function verify_subm_cr() {
   kubectl get submariner $deployment_name --namespace=$subm_ns -o jsonpath='{.spec.version}' | grep $subm_engine_image_tag
   kubectl get submariner $deployment_name --namespace=$subm_ns -o jsonpath='{.spec.size}' | grep $subm_engine_size
   kubectl get submariner $deployment_name --namespace=$subm_ns -o jsonpath='{.spec.broker}' | grep $subm_broker
-  kubectl get submariner $deployment_name --namespace=$subm_ns -o jsonpath='{.spec.clusterID}' | grep $context
+  echo Generated cluster id:
+  kubectl get submariner $deployment_name --namespace=$subm_ns -o jsonpath='{.spec.clusterID}'
   kubectl get submariner $deployment_name --namespace=$subm_ns -o jsonpath='{.spec.colorCodes}' | grep $subm_colorcodes
   kubectl get submariner $deployment_name --namespace=$subm_ns -o jsonpath='{.spec.debug}' | grep $subm_debug
   kubectl get submariner $deployment_name --namespace=$subm_ns -o jsonpath='{.spec.namespace}' | grep $subm_ns
@@ -180,7 +181,6 @@ function verify_subm_engine_pod() {
     kubectl get pod $subm_engine_pod_name --namespace=$subm_ns -o jsonpath='{.spec.containers..env}' | grep "name:SUBMARINER_SERVICECIDR value:$serviceCIDR_cluster3"
     kubectl get pod $subm_engine_pod_name --namespace=$subm_ns -o jsonpath='{.spec.containers..env}' | grep "name:SUBMARINER_CLUSTERCIDR value:$clusterCIDR_cluster3"
   fi
-  kubectl get pod $subm_engine_pod_name --namespace=$subm_ns -o jsonpath='{.spec.containers..env}' | grep "name:SUBMARINER_CLUSTERID value:$context"
   kubectl get pod $subm_engine_pod_name --namespace=$subm_ns -o jsonpath='{.spec.containers..env}' | grep "name:SUBMARINER_COLORCODES value:$subm_colorcodes"
   kubectl get pod $subm_engine_pod_name --namespace=$subm_ns -o jsonpath='{.spec.containers..env}' | grep "name:SUBMARINER_DEBUG value:$subm_debug"
   kubectl get pod $subm_engine_pod_name --namespace=$subm_ns -o jsonpath='{.spec.containers..env}' | grep "name:SUBMARINER_NATENABLED value:$natEnabled"
@@ -281,7 +281,6 @@ function verify_subm_routeagent_pod() {
     kubectl get pod $subm_routeagent_pod_name --namespace=$subm_ns -o jsonpath='{.spec.containers..command}' | grep submariner-route-agent.sh
     kubectl get pod $subm_routeagent_pod_name --namespace=$subm_ns -o jsonpath='{.spec.containers..env}'
     kubectl get pod $subm_routeagent_pod_name --namespace=$subm_ns -o jsonpath='{.spec.containers..env}' | grep "name:SUBMARINER_NAMESPACE value:$subm_ns"
-    kubectl get pod $subm_routeagent_pod_name --namespace=$subm_ns -o jsonpath='{.spec.containers..env}' | grep "name:SUBMARINER_CLUSTERID value:$context"
     kubectl get pod $subm_routeagent_pod_name --namespace=$subm_ns -o jsonpath='{.spec.containers..env}' | grep "name:SUBMARINER_DEBUG value:$subm_debug"
     if [[ $context = cluster2 ]]; then
       kubectl get pod $subm_routeagent_pod_name --namespace=$subm_ns -o jsonpath='{.spec.containers..env}' | grep "name:SUBMARINER_SERVICECIDR value:$serviceCIDR_cluster2"
@@ -345,7 +344,6 @@ function verify_subm_engine_container() {
   kubectl exec $subm_engine_pod_name --namespace=$subm_ns -- env | grep "HOSTNAME=$context-worker"
   kubectl exec $subm_engine_pod_name --namespace=$subm_ns -- env | grep "BROKER_K8S_APISERVER=$SUBMARINER_BROKER_URL"
   kubectl exec $subm_engine_pod_name --namespace=$subm_ns -- env | grep "SUBMARINER_NAMESPACE=$subm_ns"
-  kubectl exec $subm_engine_pod_name --namespace=$subm_ns -- env | grep "SUBMARINER_CLUSTERID=$context"
   kubectl exec $subm_engine_pod_name --namespace=$subm_ns -- env | grep "SUBMARINER_BROKER=$subm_broker"
   kubectl exec $subm_engine_pod_name --namespace=$subm_ns -- env | grep "BROKER_K8S_CA=$SUBMARINER_BROKER_CA"
   kubectl exec $subm_engine_pod_name --namespace=$subm_ns -- env | grep "CE_IPSEC_DEBUG=$ce_ipsec_debug"
@@ -396,7 +394,6 @@ function verify_subm_routeagent_container() {
     kubectl exec $subm_routeagent_pod_name --namespace=$subm_ns -- env | grep "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     kubectl exec $subm_routeagent_pod_name --namespace=$subm_ns -- env | grep "HOSTNAME=$context-worker"
     kubectl exec $subm_routeagent_pod_name --namespace=$subm_ns -- env | grep "SUBMARINER_NAMESPACE=$subm_ns"
-    kubectl exec $subm_routeagent_pod_name --namespace=$subm_ns -- env | grep "SUBMARINER_CLUSTERID=$context"
     kubectl exec $subm_routeagent_pod_name --namespace=$subm_ns -- env | grep "SUBMARINER_DEBUG=$subm_debug"
     if [[ $context = cluster2 ]]; then
       kubectl exec $subm_routeagent_pod_name --namespace=$subm_ns -- env | grep "SUBMARINER_SERVICECIDR=$serviceCIDRcluster2"
