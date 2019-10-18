@@ -100,6 +100,8 @@ func (r *ReconcileSubmariner) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
+	setSubmarinerDefaults(instance)
+
 	// Create submariner-engine SA
 	//subm_engine_sa := corev1.ServiceAccount{}
 	//subm_engine_sa.Name = "submariner-engine"
