@@ -6,7 +6,7 @@ if [ "${0##*/}" = "lib_operator_deploy_subm.sh" ]; then
 fi
 
 openapi_checks_enabled=false
-subm_op_dir=$(realpath ../operators/go/submariner-operator)
+subm_op_dir=$(realpath ./kind-e2e/operator)
 
 function create_resource_if_missing() {
   resource_type=$1
@@ -24,7 +24,7 @@ function add_subm_gateway_label() {
 function create_subm_clusters_crd() {
   pushd $subm_op_dir
 
-  clusters_crd_file=deploy/crds/submariner_clusters_crd.yaml
+  clusters_crd_file=submariner_clusters_crd.yaml
 
   # TODO: Can/should we create this with Op-SDK?
 cat <<EOF > $clusters_crd_file
@@ -53,7 +53,7 @@ EOF
 function create_subm_endpoints_crd() {
   pushd $subm_op_dir
 
-  endpoints_crd_file=deploy/crds/submariner_endpoints_crd.yaml
+  endpoints_crd_file=submariner_endpoints_crd.yaml
 
   # TODO: Can/should we create this with Op-SDK?
 cat <<EOF > $endpoints_crd_file
@@ -86,28 +86,28 @@ function deploy_subm_operator() {
   # If SubM namespace doesn't exist, create it
   if ! kubectl get ns $subm_ns; then
     # Customize namespace definition for subm_ns defined here
-    cat deploy/namespace.yaml
-    sed -i "s|submariner|$subm_ns|g" deploy/namespace.yaml
-    cat deploy/namespace.yaml
+    cat namespace.yaml
+    sed -i "s|submariner|$subm_ns|g" namespace.yaml
+    cat namespace.yaml
 
-    kubectl create -f deploy/namespace.yaml
+    kubectl create -f namespace.yaml
   fi
 
   if ! kubectl get crds submariners.submariner.io; then
-    kubectl create -f deploy/crds/submariner.io_submariners_crd.yaml
+    kubectl create -f submariner.io_submariners_crd.yaml
   fi
 
   # Create SubM Operator service account if it doesn't exist
-  create_resource_if_missing sa submariner-operator deploy/service_account.yaml
+  create_resource_if_missing sa submariner-operator service_account.yaml
 
   # Create SubM Operator role if it doesn't exist
-  create_resource_if_missing role submariner-operator deploy/role.yaml
+  create_resource_if_missing role submariner-operator role.yaml
 
   # Create SubM Operator role binding if it doesn't exist
-  create_resource_if_missing rolebinding submariner-operator deploy/role_binding.yaml
+  create_resource_if_missing rolebinding submariner-operator role_binding.yaml
 
   # Create SubM Operator deployment if it doesn't exist
-  create_resource_if_missing deployment submariner-operator ../deploy-operator-local.yml
+  create_resource_if_missing deployment submariner-operator deploy-operator-local.yml
 
   # Wait for SubM Operator pod to be ready
   kubectl wait --for=condition=Ready pods -l name=submariner-operator --timeout=120s --namespace=$subm_ns
@@ -119,8 +119,8 @@ function deploy_subm_operator() {
 function create_subm_cr() {
   pushd $subm_op_dir
 
-  cr_file_base=deploy/crds/submariner.io_v1alpha1_submariner_cr.yaml
-  cr_file=deploy/crds/submariner-cr-$context.yaml
+  cr_file_base=submariner.io_v1alpha1_submariner_cr.yaml
+  cr_file=submariner-cr-$context.yaml
 
   # Create copy of default SubM CR (from operator-sdk)
   cp $cr_file_base $cr_file
@@ -174,7 +174,7 @@ function deploy_subm_cr() {
   pushd $subm_op_dir
 
   # FIXME: This must match cr_file value used in create_subm_cr fn
-  cr_file=deploy/crds/submariner-cr-$context.yaml
+  cr_file=submariner-cr-$context.yaml
 
   # Create SubM CR if it doesn't exist
   if kubectl get submariner 2>&1 | grep -q "No resources found"; then
