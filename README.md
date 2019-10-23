@@ -1,3 +1,30 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+- [Submariner](#submariner)
+- [Architecture](#architecture)
+  - [submariner](#submariner)
+  - [submariner-route-agent](#submariner-route-agent)
+  - [Network Path](#network-path)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+  - [Installation using operator](#installation-using-operator)
+  - [Manual installation using helm charts](#manual-installation-using-helm-charts)
+    - [Setup](#setup)
+    - [Broker Installation/Setup](#broker-installationsetup)
+    - [Submariner Installation/Setup](#submariner-installationsetup)
+      - [Installation of Submariner in each cluster](#installation-of-submariner-in-each-cluster)
+  - [Validate Submariner is Working](#validate-submariner-is-working)
+- [Testing](#testing)
+- [Known Issues/Notes](#known-issuesnotes)
+    - [Openshift Notes](#openshift-notes)
+- [Building](#building)
+- [Contributing](#contributing)
+- [TODO](#todo)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # Submariner
 
 [![Build Status](https://travis-ci.com/submariner-io/submariner.svg?branch=master)](https://travis-ci.com/submariner-io/submariner) [![GoDoc](https://godoc.org/github.com/submariner-io/submariner?status.svg)](https://godoc.org/github.com/submariner-io/submariner) [![Go Report Card](https://goreportcard.com/badge/github.com/submariner-io/submariner)](https://goreportcard.com/report/github.com/submariner-io/submariner)
@@ -27,17 +54,17 @@ Upon failure, another Submariner pod (on one of the other gateway hosts) will ga
 
 Submariner uses a central broker to facilitate the exchange of information and sync CRD's between clusters. The `datastoresyncer` runs as a controller within the leader-elected `submariner` pod, and is responsible for performing a two-way synchronization between the datastore and local cluster of Submariner CRDs. The `datastoresyncer` will only push CRD data to the central broker for the local cluster (based on cluster ID), and will sync all data from the broker the local cluster when the data does not match the local cluster (to prevent circular loops)
 
-#### submariner
+## submariner
 
 submariner (compiled as the binary `submariner-engine`) has a few controllers built into it that establish state. It is responsible for running/interfacing with Charon to establish IPsec tunnels, as well as updating local cluster information into the central broker to share information between clusters. 
 
 submariner-engine runs and utilizes leader election to establish an active gateway node, which is used to facilitate IPsec tunnel connections to remote clusters. It also manipulates the IPtables rules on each node to enable a. forwarding of traffic and b. SNAT for local node traffic.
 
-#### submariner-route-agent
+## submariner-route-agent
 
 The submariner-route-agent runs as a DaemonSet on all Kubernetes nodes, and ensures route rules to allow all pods/nodes to communicate through the elected gateway node for remote cluster networks. It will ensure state and react on CRD changes, which means that it is able to remove/add routes as leader election occurs.
 
-### Network Path
+## Network Path
 
 The network path of Submariner varies depending on the origin/destination of the IP traffic. In all cases, traffic between two clusters will transit between the leader elected (in each cluster) gateway nodes, through `ip xfrm` rules. Each gateway node has a running Charon daemon which will perform IPsec keying and policy management. 
 
@@ -63,7 +90,17 @@ An example of three clusters configured to use with Submariner would look like t
 
 # Installation
 
-## Setup
+Submariner installation can be done manually using helm charts or by using its operator. Both methods are described here.
+
+## Installation using operator
+
+An operator is a tool to package, manage and deploy any Kubernetes application. A submariner operator will soon be available on [OperatorHub.io](https://operatorhub.io).
+
+##TODO: Add instructions on how to install using operator
+
+## Manual installation using helm charts
+
+### Setup
 
 Submariner utilizes the following tools for installation:
 
@@ -91,7 +128,7 @@ Before you start, you should add the `submariner-latest` chart repository to dep
 helm repo add submariner-latest https://releases.rancher.com/submariner-charts/latest
 ```
 
-## Broker Installation/Setup
+### Broker Installation/Setup
 
 The broker is the component that Submariner utilizes to exchange metadata information between clusters for connection information. This should only be installed once on your central broker cluster. Currently, the broker is implemented by utilizing the Kubernetes API, but is modular and will be enhanced in the future to bring support for other interfaces. The broker can be installed by using a helm chart.
 
@@ -142,7 +179,7 @@ SUBMARINER_BROKER_TOKEN=$(kubectl -n ${SUBMARINER_BROKER_NS} get secrets -o json
 
 These environment variables will be utilized in later steps, so keep the values in a safe place.
 
-## Submariner Installation/Setup
+### Submariner Installation/Setup
 
 Submariner is installed by using a helm chart. Once you populate the environment variables for the token and broker URL, you should be able to install Submariner into your clusters.
 
@@ -238,94 +275,10 @@ If you don't see a command prompt, try pressing enter.
 
 # Testing
 
-## E2E testing
-
-E2E testing purpose is to validate submariner behaviour from an integration point of
-view. It needs to be executed in connection to an existing set of clusters.
-
-The E2E tests require kubeconfigs for at least 2 dataplane clusters. By dataplane
-clusters we mean clusters which are interconnected by a deployment of submariner.
-
-E2E tests identify each cluster by their associated kubeconfig context names,
-so you need to specify the -dp-context flag for each context name you want
-the E2E tests to use.
-
-
-Assuming that we have cluster1, cluster2 and cluster3 contexts, and that
-cluster1 is our broker cluster, **to execute the E2E tests** we would do:
-
-  ```bash
-  export GO111MODULE=on
-  cd test/e2e
-  go test -args -kubeconfig=creds/cluster1:creds/cluster2:creds/cluster3 \
-                -dp-context cluster2 \
-                -dp-context cluster3 \
-                -ginkgo.randomizeAllSpecs
-  ```
-
-The -kubeconfig flag can be ommited if the KUBECONFIG environment variable
-is set to point to the kubernetes config files.
-
-  ```bash
-  export KUBECONFIG=creds/cluster1:creds/cluster2:creds/cluster3
-  ```
-
-If you want to execute just a subset of the available E2E tests, you can
-specify the ginkgo.focus argument
-
-  ```bash
-  export GO111MODULE=on
-  cd test/e2e
-  go test -args -kubeconfig=creds/cluster1:creds/cluster2:creds/cluster3 \
-                -dp-context cluster2 \
-                -dp-context cluster3 \
-                -ginkgo.focus=dataplane \
-                -ginkgo.randomizeAllSpecs
-  ```
-
-It's possible to generate jUnit XML report files
-  ```bash
-  export GO111MODULE=on
-  cd test/e2e
-  go test -args  -kubeconfig=creds/cluster1:creds/cluster2:creds/cluster3 \
-                 -dp-context cluster2 \
-                 -dp-context cluster3 \
-                 -ginkgo.v -ginkgo.reportPassed -report-dir ./junit -ginkgo.randomizeAllSpecs
-  ```
-
-Suggested arguments
-  ```
-  -test.v       : verbose output from go test
-  -ginkgo.v     : verbose output from ginkgo
-  -ginkgo.trace : output stack track on failure
-  -ginkgo.randomizeAllSpecs  : prevent test-ordering dependencies from creeping in
-  ```
-
-It may be helpful to use the [delve debugger](https://github.com/derekparker/delve)
-to gain insight into the test:
-
-  ```bash
-  export GO111MODULE=on
-  cd test/e2e
-  dlv test
-  ```
-
-  When using delve please note, the equivalent of `go test -args` is `dlv test --`,
-  dlv test treats both single and double quotes literally.
-  Neither `-ginkgo.focus="mytest"` nor `-ginkgo.focus='mytest'` will match `mytest`
-  `-ginkgo.focus=mytest` is required, for example:
-
-  ```bash
-  export GO111MODULES=on
-  cd test/e2e
-  dlv test -- -ginkgo.v -ginkgo.focus=mytest
-  ```
+Submariner functionality can be tested by running [E2E test suites](https://github.com/submariner-io/submariner/tree/master/test/e2e). 
+Please refer [testing guide](https://github.com/submariner-io/submariner/tree/master/docs/testing.md) for more details.
 
 # Known Issues/Notes
-
-### AWS Notes
-
-When running in AWS, it is necessary to disable source/dest checking of the instances that are gateway hosts to allow the instances to pass traffic for remote clusters. 
 
 ### Openshift Notes
 
@@ -336,16 +289,18 @@ When running in Openshift, we need to grant the appropriate security context for
    oc adm policy add-scc-to-user privileged system:serviceaccount:submariner:submariner-engine 
    ```
    
-# Building/Contributing
+# Building
 
 To build `submariner-engine` and `submariner-route-agent` you can trigger `make`, which will perform a Dapperized build of the components.
 
-To run basic e2e tests you can trigger `make e2e` command.
+To build the operator, you can trigger `make build-operator`.
+
+# Contributing
+
+We welcome issues/PR's to Submariner, if you encounter issues that you'd like to fix while working on it or find new features that you'd like. Please refer [contributing guide](https://github.com/submariner-io/submariner/tree/master/docs/contributing.md) for more details.
 
 If you want to avoid part of the ci validation with make while testing your changes
 you can speedup the process by running: `make build package e2e`
-
-We welcome issues/PR's to Submariner, if you encounter issues that you'd like to fix while working on it or find new features that you'd like.
 
 # TODO
 

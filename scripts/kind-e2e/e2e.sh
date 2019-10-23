@@ -483,5 +483,5 @@ if [[ $1 = keep ]]; then
     echo ""
     echo "$ kubectl config use-context cluster1 # or cluster2, cluster3.."
     echo ""
-    echo "to cleanup, just run: make e2e status=clean"
+    echo "to cleanup, just run: make ci e2e status=clean"
 fi
