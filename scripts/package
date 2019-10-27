@@ -16,10 +16,18 @@ cd $(dirname $0)/../package
 cp ../bin/submariner-engine submariner-engine
 cp ../bin/submariner-route-agent submariner-route-agent
 
-IMAGE=${REPO}/submariner:${TAG}
+ENGINE_IMAGE=${REPO}/submariner:${TAG}
 ROUTEAGENT_IMAGE=${REPO}/submariner-route-agent:${TAG}
+DAPPER_BASE_IMAGE=${REPO}/dapper-base:${TAG}
 
-docker build -t ${IMAGE} .
+# We expect the Dapper base image to change rarely, so pull it first
+docker pull ${REPO}/dapper-base:latest || :
+
+docker build -t ${ENGINE_IMAGE} .
 docker build -t ${ROUTEAGENT_IMAGE} -f Dockerfile.routeagent .
+docker build -t ${DAPPER_BASE_IMAGE} -f Dockerfile.dapper-base .
 
-echo "Built submariner to image: ${IMAGE} and submariner-route-agent to image: ${ROUTEAGENT_IMAGE}"
+echo "Built the following images:"
+echo "* Submariner engine in ${ENGINE_IMAGE}"
+echo "* Submariner route agent in ${ROUTEAGENT_IMAGE}"
+echo "* Dapper base image in ${DAPPER_BASE_IMAGE}"

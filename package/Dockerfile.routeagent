@@ -3,7 +3,7 @@ FROM registry.access.redhat.com/ubi8/ubi-minimal
 WORKDIR /var/submariner
 
 # These are all available in the UBI8 base OS repository
-RUN microdnf -y install --nodocs iproute && \
+RUN microdnf -y install --nodocs iproute iptables && \
     microdnf clean all
 
 COPY submariner-route-agent.sh /usr/local/bin
@@ -11,8 +11,9 @@ COPY submariner-route-agent.sh /usr/local/bin
 RUN chmod +x /usr/local/bin/submariner-route-agent.sh
 
 COPY submariner-route-agent /usr/local/bin
-# We use iptables from the host
-COPY ./iptables /usr/sbin/
-COPY ./iptables-save /usr/sbin/
+
+# Wrapper scripts to use iptables from the host when that's available
+COPY ./iptables.wrapper /usr/sbin/
+COPY ./iptables-save.wrapper /usr/sbin/
 
 ENTRYPOINT submariner-route-agent.sh

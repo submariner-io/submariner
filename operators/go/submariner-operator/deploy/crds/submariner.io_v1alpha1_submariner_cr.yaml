@@ -1,0 +1,7 @@
+apiVersion: submariner.io/v1alpha1
+kind: Submariner
+metadata:
+  name: example-submariner
+spec:
+  # Add fields here
+  size: 3
