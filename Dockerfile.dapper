@@ -31,7 +31,7 @@ ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH=GOLANG_ARCH_${ARC
 # make           | OLM installation
 # findutils      | e2e cleanup (xargs)
 RUN dnf -y distrosync && \
-    dnf -y install --nodocs --setopt=install_weak_deps=False gcc git-core curl moby-engine make golang kubernetes-client findutils mercurial && \
+    dnf -y install --nodocs --setopt=install_weak_deps=False gcc git-core curl moby-engine make golang kubernetes-client findutils && \
     dnf -y clean all && \
     curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin ${LINT_VERSION} && \
     curl "https://storage.googleapis.com/kubernetes-helm/helm-${HELM_VERSION}-linux-${ARCH}.tar.gz" | tar -xzf - && \
@@ -41,15 +41,6 @@ RUN dnf -y distrosync && \
     curl -Lo /usr/bin/kind "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-${ARCH}" && chmod a+x /usr/bin/kind && \
     GOFLAGS="" go get -v github.com/onsi/ginkgo/ginkgo && \
     GOFLAGS="" go get -v golang.org/x/tools/cmd/goimports
-
-# TODO(mangelajo): the operator-sdk install guide recommends go get -d , but that doesn't pull
-# the sources where we expect. We need to figure out what's going on and remove the git clone
-# hack.
-RUN OP_FRAMEWORK="$GOPATH/src/github.com/operator-framework" && \
-    mkdir -p $OP_FRAMEWORK && cd $OP_FRAMEWORK && \
-    git clone https://github.com/operator-framework/operator-sdk && \
-    cd operator-sdk && git checkout 3a85983ecc72bea079973269db429292141d165a  && \
-    make tidy && GOFLAGS="" make install
 
 WORKDIR ${DAPPER_SOURCE}
 

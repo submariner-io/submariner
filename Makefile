@@ -14,7 +14,7 @@ TARGETS := $(shell ls scripts)
 	@mv .dapper.tmp .dapper
 
 $(TARGETS): .dapper
-	./.dapper -m bind $@ $(status) $(version) $(logging) $(kubefed) $(deploytool)
+	DAPPER_ENV="OPERATOR_IMAGE" ./.dapper -m bind $@ $(status) $(version) $(logging) $(kubefed) $(deploytool)
 
 .DEFAULT_GOAL := ci
 
