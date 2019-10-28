@@ -195,11 +195,17 @@ function setup_cluster3_gateway() {
 }
 
 function kind_import_images() {
+    OPERATOR_IMAGE=${OPERATOR_IMAGE:-quay.io/submariner/submariner-operator:0.0.1}
     docker tag rancher/submariner:dev submariner:local
     docker tag rancher/submariner-route-agent:dev submariner-route-agent:local
 
     if [[ "$deploy_operator" = true ]]; then
-       docker tag quay.io/submariner/submariner-operator:dev submariner-operator:local
+
+       # if the image is not local, first pull it from the remote docker registry
+       if ! docker image inspect $OPERATOR_IMAGE 2>/dev/null ; then
+          docker pull $OPERATOR_IMAGE
+       fi
+       docker tag $OPERATOR_IMAGE submariner-operator:local
     fi
 
     for i in 2 3; do
