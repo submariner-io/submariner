@@ -4,7 +4,14 @@ set -e
 source $(dirname $0)/lib/debug_functions
 source $(dirname $0)/lib/version
 
+debug=${1:-false}
+
 cd $(dirname $0)/..
 mkdir -p bin
 echo Building submariner-route-agent version $VERSION
-CGO_ENABLED=0 go build -ldflags "-X main.VERSION=$VERSION" -o bin/submariner-route-agent ./pkg/routeagent/main.go
+ldflags="-X main.VERSION=$VERSION"
+if [ "$debug" = "false" ]; then
+    ldflags="-s -w ${ldflags}"
+fi
+CGO_ENABLED=0 go build -ldflags "${ldflags}" -o bin/submariner-route-agent ./pkg/routeagent/main.go
+[ "$debug" = "false" ] && command -v upx > /dev/null && upx bin/submariner-route-agent || :
