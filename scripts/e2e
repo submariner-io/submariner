@@ -8,8 +8,5 @@ cd $(dirname $0)
 if [[ $1 = clean ]]; then
     ./../scripts/kind-e2e/e2e.sh clean
 else
-    ./build
-    ./build-routeagent
-    ./package
     ./../scripts/kind-e2e/e2e.sh "$@"
 fi

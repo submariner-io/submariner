@@ -2,7 +2,7 @@
 submariner-engine
 submariner-route-agent
 .dapper
-bin
+/bin
 dist
 output
 strongswan
