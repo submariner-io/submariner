@@ -8,8 +8,3 @@ cd $(dirname $0)/
 
 ./build-engine
 ./build-routeagent
-
-if [[ $5 = operator ]]; then
-   test -d ../operators/go/submariner-operator || ./codegen-operator
-   ./build-operator
-fi
