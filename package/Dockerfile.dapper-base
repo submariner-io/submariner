@@ -1,16 +1,14 @@
 FROM fedora:30
 
-ARG DAPPER_HOST_ARCH
-ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH} DAPPER_ENV=REPO DAPPER_ENV=TAG \
-    DAPPER_SOURCE=/go/src/github.com/submariner-io/submariner DAPPER_DOCKER_SOCKET=true \
-    TRASH_CACHE=${DAPPER_SOURCE}/.trash-cache HOME=${DAPPER_SOURCE} DAPPER_OUTPUT=output \
+ENV DAPPER_HOST_ARCH=amd64
+ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH} \
     LINT_VERSION=v1.16.0 \
     HELM_VERSION=v2.14.1 \
     KIND_VERSION=v0.3.0 \
     KUBEFED_VERSION=0.1.0-rc2
 
 ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
-    GOPATH=/go GO111MODULE=on PATH=/go/bin:/usr/local/go/bin:/root/go/bin:${PATH} SHELL=/bin/bash GOFLAGS=-mod=vendor \
+    GOPATH=/go GO111MODULE=on PATH=/go/bin:/usr/local/go/bin:${PATH} SHELL=/bin/bash GOFLAGS=-mod=vendor \
     GOPROXY=https://proxy.golang.org
 
 # Requirements:
@@ -30,9 +28,8 @@ ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH=GOLANG_ARCH_${ARC
 # goimports      | code formatting
 # make           | OLM installation
 # findutils      | e2e cleanup (xargs)
-# upx            | binary compression
 RUN dnf -y distrosync && \
-    dnf -y install --nodocs --setopt=install_weak_deps=False gcc git-core curl moby-engine make golang kubernetes-client findutils upx && \
+    dnf -y install --nodocs --setopt=install_weak_deps=False gcc git-core curl moby-engine make golang kubernetes-client findutils && \
     dnf -y clean all && \
     curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin ${LINT_VERSION} && \
     curl "https://storage.googleapis.com/kubernetes-helm/helm-${HELM_VERSION}-linux-${ARCH}.tar.gz" | tar -xzf - && \
@@ -42,8 +39,3 @@ RUN dnf -y distrosync && \
     curl -Lo /usr/bin/kind "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-${ARCH}" && chmod a+x /usr/bin/kind && \
     GOFLAGS="" go get -v github.com/onsi/ginkgo/ginkgo && \
     GOFLAGS="" go get -v golang.org/x/tools/cmd/goimports
-
-WORKDIR ${DAPPER_SOURCE}
-
-ENTRYPOINT ["./scripts/entry"]
-CMD ["ci"]
