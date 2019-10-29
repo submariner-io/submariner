@@ -3,12 +3,13 @@ set -e
 
 source $(dirname $0)/lib/debug_functions
 
-echo "$QUAY_PASSWORD" | docker login quay.io -u "$QUAY_USERNAME" --password-stdin
-docker tag rancher/submariner:dev quay.io/submariner/submariner:latest
-docker tag rancher/submariner:dev quay.io/submariner/submariner:"${TRAVIS_COMMIT:0:7}"
-docker tag rancher/submariner-route-agent:dev quay.io/submariner/submariner-route-agent:latest
-docker tag rancher/submariner-route-agent:dev quay.io/submariner/submariner-route-agent:"${TRAVIS_COMMIT:0:7}"
-docker tag rancher/dapper-base:dev quay.io/submariner/dapper-base:latest
-docker tag rancher/dapper-base:dev quay.io/submariner/dapper-base:"${TRAVIS_COMMIT:0:7}"
+DOCKER_TAG=${1:-latest}
 
+echo "$QUAY_PASSWORD" | docker login quay.io -u "$QUAY_USERNAME" --password-stdin
+docker tag rancher/submariner:dev quay.io/submariner/submariner:${DOCKER_TAG#"v"}
+docker tag rancher/submariner:dev quay.io/submariner/submariner:"${TRAVIS_COMMIT:0:7}"
+docker tag rancher/submariner-route-agent:dev quay.io/submariner/submariner-route-agent:${DOCKER_TAG#"v"}
+docker tag rancher/submariner-route-agent:dev quay.io/submariner/submariner-route-agent:"${TRAVIS_COMMIT:0:7}"
+docker tag rancher/dapper-base:dev quay.io/submariner/dapper-base:${DOCKER_TAG#"v"}
+docker tag rancher/dapper-base:dev quay.io/submariner/dapper-base:"${TRAVIS_COMMIT:0:7}"
 for i in $(docker images --format "{{.Repository}}:{{.Tag}}" | grep "quay.io/submariner"); do docker push $i; done
