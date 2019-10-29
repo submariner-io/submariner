@@ -196,8 +196,8 @@ function setup_cluster3_gateway() {
 
 function kind_import_images() {
     OPERATOR_IMAGE=${OPERATOR_IMAGE:-quay.io/submariner/submariner-operator:0.0.1}
-    docker tag rancher/submariner:dev submariner:local
-    docker tag rancher/submariner-route-agent:dev submariner-route-agent:local
+    docker tag quay.io/submariner/submariner:dev submariner:local
+    docker tag quay.io/submariner/submariner-route-agent:dev submariner-route-agent:local
 
     if [[ "$deploy_operator" = true ]]; then
 
