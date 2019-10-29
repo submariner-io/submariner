@@ -6,7 +6,6 @@ submariner-route-agent
 dist
 output
 strongswan
-vendor
 _output
 package/strongswan-*
 .project
