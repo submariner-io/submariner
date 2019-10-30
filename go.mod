@@ -38,3 +38,5 @@ require (
 	k8s.io/kube-openapi v0.0.0-20181109181836-c59034cc13d5 // indirect
 	sigs.k8s.io/yaml v0.0.0-20181102190223-fd68e9863619 // indirect
 )
+
+replace github.com/onsi/ginkgo => github.com/onsi/ginkgo v0.0.0-20191002161935-034fd2551d22
