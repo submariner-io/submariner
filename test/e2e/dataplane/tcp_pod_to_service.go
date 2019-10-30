@@ -30,36 +30,38 @@ var _ = Describe("[dataplane] Basic Pod to Service tests across clusters without
 	})
 })
 
-func testPod2ServiceTCP(f *framework.Framework, leftScheduling framework.TestPodScheduling, rightScheduling framework.TestPodScheduling) {
+func testPod2ServiceTCP(f *framework.Framework, leftScheduling framework.NetworkPodScheduling, rightScheduling framework.NetworkPodScheduling) {
 
-	listenerPod, connectorPod := createListenerConnectorPair(f, leftScheduling, rightScheduling)
+	listenerPod, connectorPod := runAndVerifyNetworkPod2ServicePair(f, leftScheduling, rightScheduling)
 
 	By("Verifying what the pods sent to each other contain the right UUIDs")
 	Expect(listenerPod.TerminationMessage).To(ContainSubstring(connectorPod.Config.Data))
 	Expect(connectorPod.TerminationMessage).To(ContainSubstring(listenerPod.Config.Data))
-
 }
 
-func testPod2ServiceTCPIPPreservation(f *framework.Framework, leftScheduling framework.TestPodScheduling, rightScheduling framework.TestPodScheduling) {
+func testPod2ServiceTCPIPPreservation(f *framework.Framework, leftScheduling framework.NetworkPodScheduling, rightScheduling framework.NetworkPodScheduling) {
 
-	listenerPod, connectorPod := createListenerConnectorPair(f, rightScheduling, leftScheduling)
+	listenerPod, connectorPod := runAndVerifyNetworkPod2ServicePair(f, rightScheduling, leftScheduling)
+
 	framework.Logf("Connector pod has IP: %s", connectorPod.Pod.Status.PodIP)
 	By("Verifying the output of listener pod which must contain the source IP")
 	Expect(listenerPod.TerminationMessage).To(ContainSubstring(connectorPod.Pod.Status.PodIP))
 }
 
-func createListenerConnectorPair(f *framework.Framework, leftScheduling framework.TestPodScheduling, rightScheduling framework.TestPodScheduling) (*framework.TestPod, *framework.TestPod) {
+func runAndVerifyNetworkPod2ServicePair(f *framework.Framework, leftScheduling framework.NetworkPodScheduling, rightScheduling framework.NetworkPodScheduling) (*framework.NetworkPod, *framework.NetworkPod) {
 	By("Creating a listener pod in cluster B, which will wait for a handshake over TCP")
-	listenerPod := f.NewTestPod(&framework.TestPodConfig{
+	listenerPod := f.NewNetworkPod(&framework.NetworkPodConfig{
 		Type:       framework.ListenerPod,
 		Cluster:    framework.ClusterB,
 		Scheduling: rightScheduling,
 	})
+
 	By("Pointing a service ClusterIP to the listener pod in cluster B")
 	service := listenerPod.CreateService()
 	framework.Logf("Service for listener pod has ClusterIP: %v", service.Spec.ClusterIP)
+
 	By("Creating a connector pod in cluster A, which will attempt the specific UUID handshake over TCP")
-	connectorPod := f.NewTestPod(&framework.TestPodConfig{
+	connectorPod := f.NewNetworkPod(&framework.NetworkPodConfig{
 		Type:       framework.ConnectorPod,
 		Cluster:    framework.ClusterA,
 		Scheduling: leftScheduling,
@@ -67,14 +69,12 @@ func createListenerConnectorPair(f *framework.Framework, leftScheduling framewor
 	})
 
 	By("Waiting for the listener pod to exit with code 0, returning what listener sent")
-	listenerPod.WaitForFinishStatus()
+	listenerPod.AwaitSuccessfulFinish()
 	framework.Logf("Listener output:\n%s", keepLines(listenerPod.TerminationMessage, 3))
-	Expect(listenerPod.TerminationCode).To(Equal(int32(0)))
 
 	By("Waiting for the connector pod to exit with code 0, returning what connector sent")
-	connectorPod.WaitForFinishStatus()
+	connectorPod.AwaitSuccessfulFinish()
 	framework.Logf("Connector output\n%s", keepLines(connectorPod.TerminationMessage, 2))
-	Expect(connectorPod.TerminationCode).To(Equal(int32(0)))
 
 	return listenerPod, connectorPod
 }
