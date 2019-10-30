@@ -196,8 +196,8 @@ function setup_cluster3_gateway() {
 
 function kind_import_images() {
     OPERATOR_IMAGE=${OPERATOR_IMAGE:-quay.io/submariner/submariner-operator:0.0.1}
-    docker tag rancher/submariner:dev submariner:local
-    docker tag rancher/submariner-route-agent:dev submariner-route-agent:local
+    docker tag quay.io/submariner/submariner:dev submariner:local
+    docker tag quay.io/submariner/submariner-route-agent:dev submariner-route-agent:local
 
     if [[ "$deploy_operator" = true ]]; then
 
@@ -319,9 +319,10 @@ function test_with_e2e_tests {
     # Setup the KUBECONFIG env
     export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
 
-    go test -args -ginkgo.v -ginkgo.randomizeAllSpecs -ginkgo.reportPassed \
+    go test -v -args -ginkgo.v -ginkgo.randomizeAllSpecs \
         -dp-context cluster2 -dp-context cluster3  \
-        -report-dir ${DAPPER_SOURCE}/${DAPPER_OUTPUT}/junit 2>&1 | \
+	-ginkgo.noColor -ginkgo.reportPassed \
+        -ginkgo.reportFile ${DAPPER_SOURCE}/${DAPPER_OUTPUT}/e2e-junit.xml 2>&1 | \
         tee ${DAPPER_SOURCE}/${DAPPER_OUTPUT}/e2e-tests.log
 }
 

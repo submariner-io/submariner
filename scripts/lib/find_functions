@@ -14,7 +14,7 @@ function find_go_pkg_dirs() {
                       sort -u)"
 
     if [[ "x$1" != "x--no-trailing-dots" ]]; then
-        PACKAGE_DIRS=$(echo $PACKAGE_DIRS | sed -e 's!.*!./&/...!')
+        PACKAGE_DIRS=$(echo "$PACKAGE_DIRS" | sed -e 's![^ ]*!./&/...!g')
     fi
 
     echo "$BASE $PACKAGE_DIRS"

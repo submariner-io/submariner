@@ -3,6 +3,7 @@ version ?= 1.14.2
 logging ?= false
 kubefed ?= false
 deploytool ?= helm
+debug ?= false
 
 TARGETS := $(shell ls scripts)
 
@@ -14,7 +15,7 @@ TARGETS := $(shell ls scripts)
 	@mv .dapper.tmp .dapper
 
 $(TARGETS): .dapper
-	DAPPER_ENV="OPERATOR_IMAGE" ./.dapper -m bind $@ $(status) $(version) $(logging) $(kubefed) $(deploytool)
+	DAPPER_ENV="OPERATOR_IMAGE"  ./.dapper -m bind $@ $(status) $(version) $(logging) $(kubefed) $(deploytool) $(debug)
 
 .DEFAULT_GOAL := ci
 
