@@ -29,6 +29,14 @@ var _ = Describe("[dataplane] Basic Pod to Service tests across clusters without
 			verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode)
 		})
 
+		When("the pod is not on the gateway and the service (pod) is on the gateway", func() {
+			verifyInteraction(framework.GatewayNode, framework.NonGatewayNode)
+		})
+
+		When("the pod is on the gateway and the service (pod) is not on the gateway", func() {
+			verifyInteraction(framework.NonGatewayNode, framework.GatewayNode)
+		})
+
 		When("the pod is on the gateway and the service (pod) is on the gateway", func() {
 			verifyInteraction(framework.GatewayNode, framework.GatewayNode)
 		})
