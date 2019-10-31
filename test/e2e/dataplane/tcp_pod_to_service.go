@@ -10,48 +10,37 @@ import (
 )
 
 var _ = Describe("[dataplane] Basic Pod to Service tests across clusters without discovery", func() {
-
 	f := framework.NewDefaultFramework("dataplane-p2s-nd")
 
-	It("Should be able to perform a Pod to Service TCP connection and exchange data between different clusters NonGW to NonGW", func() {
-		TestPod2ServiceTCP(f, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterB, framework.ClusterA)
-	})
+	verifyInteraction := func(listenerScheduling, connectorScheduling framework.NetworkPodScheduling) {
+		It("should have sent the expected data from the pod to the other pod", func() {
+			listenerPod, connectorPod := runAndVerifyNetworkPod2ServicePair(f, listenerScheduling, connectorScheduling, framework.ClusterB, framework.ClusterA)
+			Expect(listenerPod.TerminationMessage).To(ContainSubstring(connectorPod.Config.Data))
+			Expect(connectorPod.TerminationMessage).To(ContainSubstring(listenerPod.Config.Data))
 
-	It("Should be able to perform a Pod to Service TCP connection and exchange data between different clusters GW to GW", func() {
-		TestPod2ServiceTCP(f, framework.GatewayNode, framework.GatewayNode, framework.ClusterB, framework.ClusterA)
-	})
+			framework.Logf("Connector pod has IP: %s", connectorPod.Pod.Status.PodIP)
+			By("Verifying the output of listener pod which must contain the source IP")
+			Expect(listenerPod.TerminationMessage).To(ContainSubstring(connectorPod.Pod.Status.PodIP))
+		})
+	}
 
-	It("Should preserve the source IP (GW to GW node)", func() {
-		testPod2ServiceTCPIPPreservation(f, framework.GatewayNode, framework.GatewayNode)
-	})
+	When("a pod connects via TCP to a service and sends it data", func() {
+		When("the pod is not on the gateway and the service (pod) is not on the gateway", func() {
+			verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode)
+		})
 
-	It("Should preserve the source IP (NonGW to NonGW node)", func() {
-		testPod2ServiceTCPIPPreservation(f, framework.NonGatewayNode, framework.NonGatewayNode)
+		When("the pod is on the gateway and the service (pod) is on the gateway", func() {
+			verifyInteraction(framework.GatewayNode, framework.GatewayNode)
+		})
 	})
 })
 
-func TestPod2ServiceTCP(f *framework.Framework, leftScheduling framework.NetworkPodScheduling, rightScheduling framework.NetworkPodScheduling, listenerPodCluster framework.ClusterIndex, connectorPodCluster framework.ClusterIndex) {
-
-	listenerPod, connectorPod := runAndVerifyNetworkPod2ServicePair(f, leftScheduling, rightScheduling, listenerPodCluster, connectorPodCluster)
-
-	By("Verifying what the pods sent to each other contain the right UUIDs")
-	Expect(listenerPod.TerminationMessage).To(ContainSubstring(connectorPod.Config.Data))
-	Expect(connectorPod.TerminationMessage).To(ContainSubstring(listenerPod.Config.Data))
-}
-
-func testPod2ServiceTCPIPPreservation(f *framework.Framework, leftScheduling framework.NetworkPodScheduling, rightScheduling framework.NetworkPodScheduling) {
-	listenerPod, connectorPod := runAndVerifyNetworkPod2ServicePair(f, rightScheduling, leftScheduling, framework.ClusterB, framework.ClusterA)
-	framework.Logf("Connector pod has IP: %s", connectorPod.Pod.Status.PodIP)
-	By("Verifying the output of listener pod which must contain the source IP")
-	Expect(listenerPod.TerminationMessage).To(ContainSubstring(connectorPod.Pod.Status.PodIP))
-}
-
-func runAndVerifyNetworkPod2ServicePair(f *framework.Framework, leftScheduling framework.NetworkPodScheduling, rightScheduling framework.NetworkPodScheduling, listenerPodCluster framework.ClusterIndex, connectorPodCluster framework.ClusterIndex) (*framework.NetworkPod, *framework.NetworkPod) {
+func runAndVerifyNetworkPod2ServicePair(f *framework.Framework, listenerScheduling framework.NetworkPodScheduling, connectorScheduling framework.NetworkPodScheduling, listenerCluster framework.ClusterIndex, connectorCluster framework.ClusterIndex) (*framework.NetworkPod, *framework.NetworkPod) {
 	By("Creating a listener pod in cluster B, which will wait for a handshake over TCP")
 	listenerPod := f.NewNetworkPod(&framework.NetworkPodConfig{
 		Type:       framework.ListenerPod,
-		Cluster:    listenerPodCluster,
-		Scheduling: rightScheduling,
+		Cluster:    listenerCluster,
+		Scheduling: listenerScheduling,
 	})
 
 	By("Pointing a service ClusterIP to the listener pod in cluster B")
@@ -61,8 +50,8 @@ func runAndVerifyNetworkPod2ServicePair(f *framework.Framework, leftScheduling f
 	By("Creating a connector pod in cluster A, which will attempt the specific UUID handshake over TCP")
 	connectorPod := f.NewNetworkPod(&framework.NetworkPodConfig{
 		Type:       framework.ConnectorPod,
-		Cluster:    connectorPodCluster,
-		Scheduling: leftScheduling,
+		Cluster:    connectorCluster,
+		Scheduling: connectorScheduling,
 		RemoteIP:   service.Spec.ClusterIP,
 	})
 
