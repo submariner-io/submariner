@@ -3,12 +3,10 @@ package framework
 import (
 	"fmt"
 	"strconv"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/apimachinery/pkg/util/wait"
 
 	. "github.com/onsi/gomega"
 )
@@ -79,43 +77,31 @@ func (f *Framework) NewNetworkPod(config *NetworkPodConfig) *NetworkPod {
 }
 
 func (np *NetworkPod) AwaitReady() {
-	var finalPod *v1.Pod
-	pc := np.framework.ClusterClients[np.Config.Cluster].CoreV1().Pods(np.framework.Namespace)
-	err := wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
-		pod, err := pc.Get(np.Pod.Name, metav1.GetOptions{})
-		if err != nil {
-			if IsTransientError(err) {
-				Logf("Transient failure when attempting to list pods: %v", err)
-				return false, nil // return nil to avoid PollImmediate from stopping
-			}
-			return false, err
-		}
+	pods := np.framework.ClusterClients[np.Config.Cluster].CoreV1().Pods(np.framework.Namespace)
+
+	np.Pod = AwaitUntil("get pod", func() (interface{}, error) {
+		return pods.Get(np.Pod.Name, metav1.GetOptions{})
+	}, func(result interface{}) (bool, error) {
+		pod := result.(*v1.Pod)
 		if pod.Status.Phase != v1.PodRunning {
 			if pod.Status.Phase != v1.PodPending {
 				return false, fmt.Errorf("expected pod to be in phase \"Pending\" or \"Running\"")
 			}
 			return false, nil // pod is still pending
 		}
-		finalPod = pod
-		return true, nil // pods is running
-	})
-	Expect(err).NotTo(HaveOccurred())
-	np.Pod = finalPod
+
+		return true, nil // pod is running
+	}).(*v1.Pod)
 }
 
 func (np *NetworkPod) AwaitSuccessfulFinish() {
-	pc := np.framework.ClusterClients[np.Config.Cluster].CoreV1().Pods(np.framework.Namespace)
+	pods := np.framework.ClusterClients[np.Config.Cluster].CoreV1().Pods(np.framework.Namespace)
 
-	err := wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
-		var err error
-		np.Pod, err = pc.Get(np.Pod.Name, metav1.GetOptions{})
-		if err != nil {
-			if IsTransientError(err) {
-				Logf("Transient failure when attempting to list pods: %v", err)
-				return false, nil // return nil to avoid PollImmediate from stopping
-			}
-			return false, err
-		}
+	np.Pod = AwaitUntil("get pod", func() (interface{}, error) {
+		return pods.Get(np.Pod.Name, metav1.GetOptions{})
+	}, func(result interface{}) (bool, error) {
+		np.Pod = result.(*v1.Pod)
+
 		switch np.Pod.Status.Phase {
 		case v1.PodSucceeded:
 			return true, nil
@@ -124,9 +110,7 @@ func (np *NetworkPod) AwaitSuccessfulFinish() {
 		default:
 			return false, nil
 		}
-	})
-
-	Expect(err).NotTo(HaveOccurred())
+	}).(*v1.Pod)
 
 	finished := np.Pod.Status.Phase == v1.PodSucceeded || np.Pod.Status.Phase == v1.PodFailed
 	Expect(finished).To(BeTrue())
@@ -219,18 +203,15 @@ func (np *NetworkPod) buildTCPCheckConnectorPod() {
 }
 
 func nodeAffinity(scheduling NetworkPodScheduling) *v1.Affinity {
-
-	const gatewayLabel = "submariner.io/gateway"
-
 	var nodeSelReqs []v1.NodeSelectorRequirement
 
 	switch scheduling {
 	case GatewayNode:
-		nodeSelReqs = addNodeSelectorRequirement(nodeSelReqs, gatewayLabel, v1.NodeSelectorOpIn, []string{"true"})
+		nodeSelReqs = addNodeSelectorRequirement(nodeSelReqs, GatewayLabel, v1.NodeSelectorOpIn, []string{"true"})
 
 	case NonGatewayNode:
-		nodeSelReqs = addNodeSelectorRequirement(nodeSelReqs, gatewayLabel, v1.NodeSelectorOpDoesNotExist, nil)
-		nodeSelReqs = addNodeSelectorRequirement(nodeSelReqs, gatewayLabel, v1.NodeSelectorOpNotIn, []string{"true"})
+		nodeSelReqs = addNodeSelectorRequirement(nodeSelReqs, GatewayLabel, v1.NodeSelectorOpDoesNotExist, nil)
+		nodeSelReqs = addNodeSelectorRequirement(nodeSelReqs, GatewayLabel, v1.NodeSelectorOpNotIn, []string{"true"})
 	}
 
 	affinity := v1.Affinity{
