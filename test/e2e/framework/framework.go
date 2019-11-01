@@ -51,6 +51,7 @@ type PatchStringValue struct {
 }
 
 type DoOperationFunc func() (interface{}, error)
+
 type CheckResultFunc func(result interface{}) (bool, string, error)
 
 // Framework supports common operations used by e2e tests; it will keep a client & a namespace for you.
