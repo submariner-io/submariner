@@ -28,8 +28,9 @@ ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH=GOLANG_ARCH_${ARC
 # goimports      | code formatting
 # make           | OLM installation
 # findutils      | e2e cleanup (xargs)
+# upx            | binary compression
 RUN dnf -y distrosync && \
-    dnf -y install --nodocs --setopt=install_weak_deps=False gcc git-core curl moby-engine make golang kubernetes-client findutils && \
+    dnf -y install --nodocs --setopt=install_weak_deps=False gcc git-core curl moby-engine make golang kubernetes-client findutils upx && \
     dnf -y clean all && \
     curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin ${LINT_VERSION} && \
     curl "https://storage.googleapis.com/kubernetes-helm/helm-${HELM_VERSION}-linux-${ARCH}.tar.gz" | tar -xzf - && \
