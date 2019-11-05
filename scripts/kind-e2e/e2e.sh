@@ -237,7 +237,7 @@ function kind_import_images() {
        docker tag $OPERATOR_IMAGE submariner-operator:local
     fi
 
-    for i in 2 3; do
+    for i in 1 2 3; do
         echo "Loading submariner images in to cluster${i}..."
         kind --name cluster${i} load docker-image submariner:local
         kind --name cluster${i} load docker-image submariner-route-agent:local
@@ -348,7 +348,7 @@ function test_with_e2e_tests {
     # Setup the KUBECONFIG env
     export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
 
-    go test -v -args -ginkgo.v -ginkgo.randomizeAllSpecs \
+    go test -v -args -ginkgo.v -ginkgo.randomizeAllSpecs -submariner-namespace $subm_ns \
         -dp-context cluster2 -dp-context cluster3 -dp-context cluster1 \
 	      -ginkgo.noColor -ginkgo.reportPassed \
         -ginkgo.reportFile ${DAPPER_SOURCE}/${DAPPER_OUTPUT}/e2e-junit.xml 2>&1 | \

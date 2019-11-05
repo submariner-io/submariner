@@ -27,7 +27,7 @@ func (f *Framework) AwaitPodsByAppLabel(cluster ClusterIndex, appName string, na
 // AwaitSubmarinerEnginePod finds the submariner engine pod in a given cluster, waiting if necessary for a period of time
 // for the pod to materialize.
 func (f *Framework) AwaitSubmarinerEnginePod(cluster ClusterIndex) *v1.Pod {
-	return &f.AwaitPodsByAppLabel(cluster, SubmarinerEngine, TestContext.SubmarinerNamespace, 1).Items[0]
+	return &f.AwaitPodsByAppLabel(cluster, SubmarinerEngine, "submariner", 1).Items[0]
 }
 
 // DeletePod deletes the pod for the given name and namespace.
