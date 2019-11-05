@@ -295,6 +295,7 @@ func createNamespace(client kubeclientset.Interface, name string, labels map[str
 	return namespace
 }
 
+// DoPatchOperation performs a REST patch operation for the given path and value.
 func DoPatchOperation(path string, value string, patchFunc PatchFunc) {
 	payload := []PatchStringValue{{
 		Op:    "add",
@@ -314,6 +315,8 @@ func NoopCheckResult(interface{}) (bool, error) {
 	return true, nil
 }
 
+// AwaitUntil periodically performs the given operation until the given CheckResultFunc returns true, an error, or a
+// timeout is reached.
 func AwaitUntil(opMsg string, doOperation DoOperationFunc, checkResult CheckResultFunc) interface{} {
 	var finalResult interface{}
 	err := wait.PollImmediate(5*time.Second, 1*time.Minute, func() (bool, error) {
