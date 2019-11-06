@@ -1,0 +1,29 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: submariner-ipam
+  namespace: submariner
+spec:
+  selector:
+    matchLabels:
+      app: submariner-ipam
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: submariner-ipam
+    spec:
+      containers:
+        - name: submariner-ipam
+          image: submariner-ipam:local
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: SUBMARINER_GLOBALCIDR
+              value: 169.254.1.0/24
+            - name: SUBMARINER_EXCLUDENS
+              value: "submariner,kube-system"
+
+      serviceAccountName: submariner-ipam
+      serviceAccount: submariner-ipam
+
