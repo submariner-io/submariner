@@ -214,6 +214,10 @@ function kind_import_images() {
         echo "Loading submariner images in to cluster${i}..."
         kind --name cluster${i} load docker-image submariner:local
         kind --name cluster${i} load docker-image submariner-route-agent:local
+        kind --name cluster${i} load docker-image submariner-ipam:local
+        if [[ "$deploy_operator" = true ]]; then
+             kind --name cluster${i} load docker-image submariner-operator:local
+	fi
     done
 }
 
@@ -331,6 +335,14 @@ function test_with_e2e_tests {
         tee ${DAPPER_SOURCE}/${DAPPER_OUTPUT}/e2e-tests.log
 }
 
+function deploy_ipam {
+    for i in 2 3; do
+      kubectl --context=cluster${i} -n submariner create serviceaccount submariner-ipam
+      kubectl --context=cluster${i} -n submariner apply -f ${PRJ_ROOT}/scripts/kind-e2e/ipam/role-ipam.yaml
+      kubectl --context=cluster${i} -n submariner apply -f ${PRJ_ROOT}/scripts/kind-e2e/ipam/deploy-ipam-${i}.yaml
+    done
+}
+
 function cleanup {
     for i in 1 2 3; do
       if [[ $(kind get clusters | grep cluster${i} | wc -l) -gt 0  ]]; then
@@ -442,6 +454,7 @@ elif [[ $deploy = helm ]]; then
     setup_cluster3_gateway
 fi
 
+deploy_ipam
 test_connection
 
 if [[ $status = keep || $status = onetime ]]; then
