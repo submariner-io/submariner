@@ -85,6 +85,10 @@ function kind_import_images() {
         echo "Loading submariner images in to cluster${i}..."
         kind --name cluster${i} load docker-image submariner:local
         kind --name cluster${i} load docker-image submariner-route-agent:local
+        kind --name cluster${i} load docker-image submariner-ipam:local
+        if [[ "$deploy_operator" = true ]]; then
+             kind --name cluster${i} load docker-image submariner-operator:local
+	fi
     done
 }
 
@@ -200,6 +204,14 @@ function delete_subm_pods() {
     fi
 }
 
+function deploy_ipam {
+    for i in 2 3; do
+      kubectl --context=cluster${i} -n submariner create serviceaccount submariner-ipam
+      kubectl --context=cluster${i} -n submariner apply -f ${PRJ_ROOT}/scripts/kind-e2e/ipam/role-ipam.yaml
+      kubectl --context=cluster${i} -n submariner apply -f ${PRJ_ROOT}/scripts/kind-e2e/ipam/deploy-ipam-${i}.yaml
+    done
+}
+
 function cleanup {
     for i in 1 2 3; do
       if [[ $(kind get clusters | grep cluster${i} | wc -l) -gt 0  ]]; then
@@ -292,6 +304,7 @@ deploytool_postreqs
 deploy_netshoot cluster2
 deploy_nginx cluster3
 
+deploy_ipam
 test_connection
 
 if [[ $status = keep || $status = onetime ]]; then
