@@ -51,7 +51,7 @@ type PatchStringValue struct {
 }
 
 type DoOperationFunc func() (interface{}, error)
-type CheckResultFunc func(result interface{}) (bool, error)
+type CheckResultFunc func(result interface{}) (bool, string, error)
 
 // Framework supports common operations used by e2e tests; it will keep a client & a namespace for you.
 // Eventual goal is to merge this with integration test framework.
@@ -115,6 +115,7 @@ func (f *Framework) BeforeEach() {
 	f.cleanupHandle = AddCleanupAction(f.AfterEach)
 
 	ginkgo.By("Creating kubernetes clients")
+
 	for _, context := range TestContext.KubeContexts {
 		client := f.createKubernetesClient(context)
 		f.ClusterClients = append(f.ClusterClients, client)
@@ -311,14 +312,15 @@ func DoPatchOperation(path string, value string, patchFunc PatchFunc) {
 	}, NoopCheckResult)
 }
 
-func NoopCheckResult(interface{}) (bool, error) {
-	return true, nil
+func NoopCheckResult(interface{}) (bool, string, error) {
+	return true, "", nil
 }
 
 // AwaitUntil periodically performs the given operation until the given CheckResultFunc returns true, an error, or a
 // timeout is reached.
 func AwaitUntil(opMsg string, doOperation DoOperationFunc, checkResult CheckResultFunc) interface{} {
 	var finalResult interface{}
+	var lastMsg string
 	err := wait.PollImmediate(5*time.Second, 1*time.Minute, func() (bool, error) {
 		result, err := doOperation()
 		if err != nil {
@@ -328,7 +330,7 @@ func AwaitUntil(opMsg string, doOperation DoOperationFunc, checkResult CheckResu
 			return false, err
 		}
 
-		ok, err := checkResult(result)
+		ok, msg, err := checkResult(result)
 		if err != nil {
 			return false, err
 		}
@@ -338,9 +340,15 @@ func AwaitUntil(opMsg string, doOperation DoOperationFunc, checkResult CheckResu
 			return true, nil
 		}
 
+		lastMsg = msg
 		return false, nil
 	})
 
-	Expect(err).NotTo(HaveOccurred(), "Failed to "+opMsg)
+	errMsg := "Failed to " + opMsg
+	if lastMsg != "" {
+		errMsg += ". " + lastMsg
+	}
+
+	Expect(err).NotTo(HaveOccurred(), errMsg)
 	return finalResult
 }
