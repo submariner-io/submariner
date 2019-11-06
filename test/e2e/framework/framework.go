@@ -1,6 +1,7 @@
 package framework
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -8,7 +9,9 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 
@@ -33,6 +36,22 @@ const (
 	ClusterB
 	ClusterC
 )
+
+const (
+	SubmarinerEngine = "submariner-engine"
+	GatewayLabel     = "submariner.io/gateway"
+)
+
+type PatchFunc func(pt types.PatchType, payload []byte) error
+
+type PatchStringValue struct {
+	Op    string `json:"op"`
+	Path  string `json:"path"`
+	Value string `json:"value"`
+}
+
+type DoOperationFunc func() (interface{}, error)
+type CheckResultFunc func(result interface{}) (bool, error)
 
 // Framework supports common operations used by e2e tests; it will keep a client & a namespace for you.
 // Eventual goal is to merge this with integration test framework.
@@ -274,4 +293,54 @@ func createNamespace(client kubeclientset.Interface, name string, labels map[str
 	namespace, err := client.CoreV1().Namespaces().Create(namespaceObj)
 	Expect(err).NotTo(HaveOccurred(), "Error creating namespace %v", namespaceObj)
 	return namespace
+}
+
+// DoPatchOperation performs a REST patch operation for the given path and value.
+func DoPatchOperation(path string, value string, patchFunc PatchFunc) {
+	payload := []PatchStringValue{{
+		Op:    "add",
+		Path:  path,
+		Value: value,
+	}}
+
+	payloadBytes, err := json.Marshal(payload)
+	Expect(err).NotTo(HaveOccurred())
+
+	AwaitUntil("perform patch operation", func() (interface{}, error) {
+		return nil, patchFunc(types.JSONPatchType, payloadBytes)
+	}, NoopCheckResult)
+}
+
+func NoopCheckResult(interface{}) (bool, error) {
+	return true, nil
+}
+
+// AwaitUntil periodically performs the given operation until the given CheckResultFunc returns true, an error, or a
+// timeout is reached.
+func AwaitUntil(opMsg string, doOperation DoOperationFunc, checkResult CheckResultFunc) interface{} {
+	var finalResult interface{}
+	err := wait.PollImmediate(5*time.Second, 1*time.Minute, func() (bool, error) {
+		result, err := doOperation()
+		if err != nil {
+			if IsTransientError(err, opMsg) {
+				return false, nil
+			}
+			return false, err
+		}
+
+		ok, err := checkResult(result)
+		if err != nil {
+			return false, err
+		}
+
+		if ok {
+			finalResult = result
+			return true, nil
+		}
+
+		return false, nil
+	})
+
+	Expect(err).NotTo(HaveOccurred(), "Failed to "+opMsg)
+	return finalResult
 }

@@ -11,10 +11,11 @@ import (
 type contextArray []string
 
 type TestContextType struct {
-	KubeConfig   string
-	KubeContexts contextArray
-	ReportDir    string
-	ReportPrefix string
+	KubeConfig          string
+	KubeContexts        contextArray
+	ReportDir           string
+	ReportPrefix        string
+	SubmarinerNamespace string
 }
 
 func (contexts *contextArray) String() string {
@@ -34,6 +35,7 @@ func registerFlags(t *TestContextType) {
 	flag.Var(&TestContext.KubeContexts, "dp-context", "kubeconfig context for dataplane clusters (use several times).")
 	flag.StringVar(&TestContext.ReportPrefix, "report-prefix", "", "Optional prefix for JUnit XML reports. Default is empty, which doesn't prepend anything to the default name.")
 	flag.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
+	flag.StringVar(&TestContext.SubmarinerNamespace, "submariner-namespace", "submariner", "Namespace in which the submariner components are deployed.")
 }
 
 func validateFlags(t *TestContextType) {
