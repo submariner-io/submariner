@@ -81,16 +81,16 @@ func (np *NetworkPod) AwaitReady() {
 
 	np.Pod = AwaitUntil("get pod", func() (interface{}, error) {
 		return pods.Get(np.Pod.Name, metav1.GetOptions{})
-	}, func(result interface{}) (bool, error) {
+	}, func(result interface{}) (bool, string, error) {
 		pod := result.(*v1.Pod)
 		if pod.Status.Phase != v1.PodRunning {
 			if pod.Status.Phase != v1.PodPending {
-				return false, fmt.Errorf("expected pod to be in phase \"Pending\" or \"Running\"")
+				return false, "", fmt.Errorf("expected pod to be in phase \"Pending\" or \"Running\"")
 			}
-			return false, nil // pod is still pending
+			return false, "Pod is still pending", nil
 		}
 
-		return true, nil // pod is running
+		return true, "", nil // pod is running
 	}).(*v1.Pod)
 }
 
@@ -99,16 +99,16 @@ func (np *NetworkPod) AwaitSuccessfulFinish() {
 
 	np.Pod = AwaitUntil("get pod", func() (interface{}, error) {
 		return pods.Get(np.Pod.Name, metav1.GetOptions{})
-	}, func(result interface{}) (bool, error) {
+	}, func(result interface{}) (bool, string, error) {
 		np.Pod = result.(*v1.Pod)
 
 		switch np.Pod.Status.Phase {
 		case v1.PodSucceeded:
-			return true, nil
+			return true, "", nil
 		case v1.PodFailed:
-			return true, nil
+			return true, "", nil
 		default:
-			return false, nil
+			return false, fmt.Sprintf("Pod status is %v", np.Pod.Status.Phase), nil
 		}
 	}).(*v1.Pod)
 
