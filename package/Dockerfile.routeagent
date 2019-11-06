@@ -1,4 +1,9 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.0
+
+# Pinned to image 8.0 because of this bug
+#    https://github.com/rpm-software-management/microdnf/issues/50
+# TODO(dimaunx,majopela):  we should remove the :8.0 pin when the
+#                          bug has been solved for the UBI image.
 
 WORKDIR /var/submariner
 
