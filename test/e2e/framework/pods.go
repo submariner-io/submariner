@@ -16,11 +16,17 @@ func (f *Framework) AwaitPodsByAppLabel(cluster ClusterIndex, appName string, na
 		})
 	}, func(result interface{}) (bool, string, error) {
 		pods := result.(*v1.PodList)
-		if expectedCount < 0 || len(pods.Items) == expectedCount {
-			return true, "", nil
+		if expectedCount >= 0 && len(pods.Items) != expectedCount {
+			return false, fmt.Sprintf("Actual pod count %d does not match the expected pod count %d", len(pods.Items), expectedCount), nil
 		}
 
-		return false, fmt.Sprintf("Actual pod count %d does not match the expected pod count %d", len(pods.Items), expectedCount), nil
+		for _, pod := range pods.Items {
+			if pod.Status.Phase != v1.PodRunning {
+				return false, fmt.Sprintf("Status for pod %q is %v", pod.Name, pod.Status.Phase), nil
+			}
+		}
+
+		return true, "", nil
 	}).(*v1.PodList)
 }
 
@@ -32,7 +38,7 @@ func (f *Framework) AwaitSubmarinerEnginePod(cluster ClusterIndex) *v1.Pod {
 
 // DeletePod deletes the pod for the given name and namespace.
 func (f *Framework) DeletePod(cluster ClusterIndex, podName string, namespace string) {
-	AwaitUntil("list pods", func() (interface{}, error) {
+	AwaitUntil("delete pod", func() (interface{}, error) {
 		return nil, f.ClusterClients[cluster].CoreV1().Pods(namespace).Delete(podName, &metav1.DeleteOptions{})
 	}, NoopCheckResult)
 }

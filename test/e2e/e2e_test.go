@@ -7,6 +7,7 @@ import (
 
 	_ "github.com/submariner-io/submariner/test/e2e/dataplane"
 	_ "github.com/submariner-io/submariner/test/e2e/example"
+	_ "github.com/submariner-io/submariner/test/e2e/redundancy"
 )
 
 func init() {
