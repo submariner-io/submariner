@@ -122,6 +122,38 @@ function setup_broker() {
     SUBMARINER_BROKER_TOKEN=$(kubectl --context=cluster1 -n ${SUBMARINER_BROKER_NS} get secrets -o jsonpath="{.items[?(@.metadata.annotations['kubernetes\.io/service-account\.name']=='${SUBMARINER_BROKER_NS}-client')].data.token}"|base64 --decode)
 }
 
+# Only install Submariner on broker cluster with 2 worker nodes but do not tag any worker nodes with gateway label
+function install_subm_in_cluster1() {
+    if kubectl --context=cluster1 wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s > /dev/null 2>&1; then
+            echo Submariner already installed, skipping submariner helm installation...
+            update_subm_pods cluster1
+        else
+            echo Installing submariner on cluster1...
+            helm --kube-context cluster1 install submariner-latest/submariner \
+            --name submariner \
+            --namespace submariner \
+            --set ipsec.psk="${SUBMARINER_PSK}" \
+            --set broker.server="${SUBMARINER_BROKER_URL}" \
+            --set broker.token="${SUBMARINER_BROKER_TOKEN}" \
+            --set broker.namespace="${SUBMARINER_BROKER_NS}" \
+            --set broker.ca="${SUBMARINER_BROKER_CA}" \
+            --set submariner.clusterId="cluster1" \
+            --set submariner.clusterCidr="10.244.0.0/16" \
+            --set submariner.serviceCidr="100.94.0.0/16" \
+            --set submariner.natEnabled="false" \
+            --set routeAgent.image.repository="submariner-route-agent" \
+            --set routeAgent.image.tag="local" \
+            --set routeAgent.image.pullPolicy="IfNotPresent" \
+            --set engine.image.repository="submariner" \
+            --set engine.image.tag="local" \
+            --set engine.image.pullPolicy="IfNotPresent" \
+            --set crd.create="false"
+            echo Waiting for submariner pods to be Ready on cluster1...
+            kubectl --context=cluster1 wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s
+            kubectl --context=cluster1 wait --for=condition=Ready pods -l app=submariner-routeagent -n submariner --timeout=60s
+    fi
+}
+
 function setup_cluster2_gateway() {
     if kubectl --context=cluster2 wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s > /dev/null 2>&1; then
             echo Submariner already installed, skipping submariner helm installation...
@@ -320,8 +352,8 @@ function test_with_e2e_tests {
     export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
 
     go test -v -args -ginkgo.v -ginkgo.randomizeAllSpecs \
-        -dp-context cluster2 -dp-context cluster3  \
-	-ginkgo.noColor -ginkgo.reportPassed \
+        -dp-context cluster2 -dp-context cluster3 -dp-context cluster1 \
+	      -ginkgo.noColor -ginkgo.reportPassed \
         -ginkgo.reportFile ${DAPPER_SOURCE}/${DAPPER_OUTPUT}/e2e-junit.xml 2>&1 | \
         tee ${DAPPER_SOURCE}/${DAPPER_OUTPUT}/e2e-tests.log
 }
@@ -459,6 +491,7 @@ if [ "$deploy_operator" = true ]; then
     deploy_nginx_cluster3
 elif [[ $5 = helm ]]; then
     helm=true
+    install_subm_in_cluster1
     setup_cluster2_gateway
     setup_cluster3_gateway
     for i in 2 3; do

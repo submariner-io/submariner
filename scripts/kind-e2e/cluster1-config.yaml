@@ -12,3 +12,5 @@ kubeadmConfigPatches:
     dnsDomain: cluster1.local
 nodes:
 - role: control-plane
+- role: worker
+- role: worker
