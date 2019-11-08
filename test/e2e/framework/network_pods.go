@@ -3,6 +3,7 @@ package framework
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,11 +39,14 @@ type NetworkPodConfig struct {
 }
 
 type NetworkPod struct {
-	Pod                *v1.Pod
-	Config             *NetworkPodConfig
-	TerminationCode    int32
-	TerminationMessage string
-	framework          *Framework
+	Pod                 *v1.Pod
+	Config              *NetworkPodConfig
+	TerminationError    error
+	TerminationErrorMsg string
+	TerminationCode     int32
+	TerminationMessage  string
+	ConnectionTimeout   int
+	framework           *Framework
 }
 
 const (
@@ -64,7 +68,7 @@ func (f *Framework) NewNetworkPod(config *NetworkPodConfig) *NetworkPod {
 		config.Data = string(uuid.NewUUID())
 	}
 
-	networkPod := &NetworkPod{Config: config, framework: f, TerminationCode: -1}
+	networkPod := &NetworkPod{Config: config, framework: f, TerminationCode: -1, ConnectionTimeout: 45}
 
 	switch config.Type {
 	case ListenerPod:
@@ -79,25 +83,25 @@ func (f *Framework) NewNetworkPod(config *NetworkPodConfig) *NetworkPod {
 func (np *NetworkPod) AwaitReady() {
 	pods := np.framework.ClusterClients[np.Config.Cluster].CoreV1().Pods(np.framework.Namespace)
 
-	np.Pod = AwaitUntil("get pod", func() (interface{}, error) {
+	np.Pod = AwaitUntil("await pod ready", func() (interface{}, error) {
 		return pods.Get(np.Pod.Name, metav1.GetOptions{})
 	}, func(result interface{}) (bool, string, error) {
 		pod := result.(*v1.Pod)
 		if pod.Status.Phase != v1.PodRunning {
 			if pod.Status.Phase != v1.PodPending {
-				return false, "", fmt.Errorf("expected pod to be in phase \"Pending\" or \"Running\"")
+				return false, "", fmt.Errorf("unexpected pod phase %v - expected %v or %v", pod.Status.Phase, v1.PodPending, v1.PodRunning)
 			}
-			return false, "Pod is still pending", nil
+			return false, fmt.Sprintf("Pod %q is still pending", pod.Name), nil
 		}
 
 		return true, "", nil // pod is running
 	}).(*v1.Pod)
 }
 
-func (np *NetworkPod) AwaitSuccessfulFinish() {
+func (np *NetworkPod) AwaitFinish() {
 	pods := np.framework.ClusterClients[np.Config.Cluster].CoreV1().Pods(np.framework.Namespace)
 
-	np.Pod = AwaitUntil("get pod", func() (interface{}, error) {
+	_, np.TerminationErrorMsg, np.TerminationError = AwaitResultOrError(fmt.Sprintf("await pod %q finished", np.Pod.Name), func() (interface{}, error) {
 		return pods.Get(np.Pod.Name, metav1.GetOptions{})
 	}, func(result interface{}) (bool, string, error) {
 		np.Pod = result.(*v1.Pod)
@@ -110,14 +114,19 @@ func (np *NetworkPod) AwaitSuccessfulFinish() {
 		default:
 			return false, fmt.Sprintf("Pod status is %v", np.Pod.Status.Phase), nil
 		}
-	}).(*v1.Pod)
+	})
 
 	finished := np.Pod.Status.Phase == v1.PodSucceeded || np.Pod.Status.Phase == v1.PodFailed
-	Expect(finished).To(BeTrue())
+	if finished {
+		np.TerminationCode = np.Pod.Status.ContainerStatuses[0].State.Terminated.ExitCode
+		np.TerminationMessage = np.Pod.Status.ContainerStatuses[0].State.Terminated.Message
 
-	np.TerminationCode = np.Pod.Status.ContainerStatuses[0].State.Terminated.ExitCode
-	np.TerminationMessage = np.Pod.Status.ContainerStatuses[0].State.Terminated.Message
+		Logf("Pod %q output:\n%s", np.Pod.Name, removeDupDataplaneLines(np.TerminationMessage))
+	}
+}
 
+func (np *NetworkPod) CheckSuccessfulFinish() {
+	Expect(np.TerminationError).NotTo(HaveOccurred(), np.TerminationErrorMsg)
 	Expect(np.TerminationCode).To(Equal(int32(0)))
 }
 
@@ -146,10 +155,11 @@ func (np *NetworkPod) buildTCPCheckListenerPod() {
 					Image: "busybox",
 					// We send the string 50 times to put more pressure on the TCP connection and avoid limited
 					// resource environments from not sending at least some data before timeout.
-					Command: []string{"sh", "-c", "for i in $(seq 50); do echo listener says $SEND_STRING; done | nc -l -v -p $LISTEN_PORT -s 0.0.0.0 >/dev/termination-log 2>&1"},
+					Command: []string{"sh", "-c", "for i in $(seq 50); do echo [dataplane] listener says $SEND_STRING; done | nc -w $CONN_TIMEOUT -l -v -p $LISTEN_PORT -s 0.0.0.0 >/dev/termination-log 2>&1"},
 					Env: []v1.EnvVar{
 						{Name: "LISTEN_PORT", Value: strconv.Itoa(np.Config.Port)},
 						{Name: "SEND_STRING", Value: np.Config.Data},
+						{Name: "CONN_TIMEOUT", Value: strconv.Itoa(np.ConnectionTimeout)},
 					},
 				},
 			},
@@ -169,6 +179,7 @@ func (np *NetworkPod) buildTCPCheckListenerPod() {
 // exit with 0 status
 func (np *NetworkPod) buildTCPCheckConnectorPod() {
 
+	ncatConnectTimeout := 4 // seconds
 	tcpCheckConnectorPod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "tcp-check-pod",
@@ -185,11 +196,13 @@ func (np *NetworkPod) buildTCPCheckConnectorPod() {
 					Image: "busybox",
 					// We send the string 50 times to put more pressure on the TCP connection and avoid limited
 					// resource environments from not sending at least some data before timeout.
-					Command: []string{"sh", "-c", "for in in $(seq 50); do echo connector says $SEND_STRING; done | nc -v $REMOTE_IP $REMOTE_PORT -w 8 >/dev/termination-log 2>&1"},
+					Command: []string{"sh", "-c", "for in in $(seq 50); do echo [dataplane] connector says $SEND_STRING; done | for i in $(seq $CONN_TRIES); do if nc -v $REMOTE_IP $REMOTE_PORT -w $CONN_TIMEOUT; then break; fi; done >/dev/termination-log 2>&1"},
 					Env: []v1.EnvVar{
 						{Name: "REMOTE_PORT", Value: strconv.Itoa(np.Config.Port)},
 						{Name: "SEND_STRING", Value: np.Config.Data},
 						{Name: "REMOTE_IP", Value: np.Config.RemoteIP},
+						{Name: "CONN_TRIES", Value: strconv.Itoa(np.ConnectionTimeout / ncatConnectTimeout)},
+						{Name: "CONN_TIMEOUT", Value: strconv.Itoa(ncatConnectTimeout)},
 					},
 				},
 			},
@@ -234,4 +247,18 @@ func addNodeSelectorRequirement(nodeSelReqs []v1.NodeSelectorRequirement, label 
 		Operator: op,
 		Values:   values,
 	})
+}
+
+func removeDupDataplaneLines(output string) string {
+	var newLines []string
+	var lastLine string
+	for _, line := range strings.Split(output, "\n") {
+		if !strings.HasPrefix(line, "[dataplane]") || line != lastLine {
+			newLines = append(newLines, line)
+		}
+
+		lastLine = line
+	}
+
+	return strings.Join(newLines, "\n")
 }
