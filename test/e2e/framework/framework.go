@@ -319,6 +319,12 @@ func NoopCheckResult(interface{}) (bool, string, error) {
 // AwaitUntil periodically performs the given operation until the given CheckResultFunc returns true, an error, or a
 // timeout is reached.
 func AwaitUntil(opMsg string, doOperation DoOperationFunc, checkResult CheckResultFunc) interface{} {
+	result, errMsg, err := AwaitResultOrError(opMsg, doOperation, checkResult)
+	Expect(err).NotTo(HaveOccurred(), errMsg)
+	return result
+}
+
+func AwaitResultOrError(opMsg string, doOperation DoOperationFunc, checkResult CheckResultFunc) (interface{}, string, error) {
 	var finalResult interface{}
 	var lastMsg string
 	err := wait.PollImmediate(5*time.Second, 1*time.Minute, func() (bool, error) {
@@ -344,11 +350,13 @@ func AwaitUntil(opMsg string, doOperation DoOperationFunc, checkResult CheckResu
 		return false, nil
 	})
 
-	errMsg := "Failed to " + opMsg
-	if lastMsg != "" {
-		errMsg += ". " + lastMsg
+	errMsg := ""
+	if err != nil {
+		errMsg = "Failed to " + opMsg
+		if lastMsg != "" {
+			errMsg += ". " + lastMsg
+		}
 	}
 
-	Expect(err).NotTo(HaveOccurred(), errMsg)
-	return finalResult
+	return finalResult, errMsg, err
 }
