@@ -148,9 +148,6 @@ function install_subm_in_cluster1() {
             --set engine.image.tag="local" \
             --set engine.image.pullPolicy="IfNotPresent" \
             --set crd.create="false"
-            echo Waiting for submariner pods to be Ready on cluster1...
-            kubectl --context=cluster1 wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s
-            kubectl --context=cluster1 wait --for=condition=Ready pods -l app=submariner-routeagent -n submariner --timeout=60s
     fi
 }
 
