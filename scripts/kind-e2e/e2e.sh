@@ -317,7 +317,7 @@ function test_with_e2e_tests {
     export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
 
     go test -v -args -ginkgo.v -ginkgo.randomizeAllSpecs \
-        -dp-context cluster2 -dp-context cluster3 -dp-context cluster1 \
+        -submariner-namespace $subm_ns -dp-context cluster2 -dp-context cluster3 -dp-context cluster1 \
 	      -ginkgo.noColor -ginkgo.reportPassed \
         -ginkgo.reportFile ${DAPPER_SOURCE}/${DAPPER_OUTPUT}/e2e-junit.xml 2>&1 | \
         tee ${DAPPER_SOURCE}/${DAPPER_OUTPUT}/e2e-tests.log
