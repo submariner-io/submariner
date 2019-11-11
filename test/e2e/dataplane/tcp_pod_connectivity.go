@@ -15,7 +15,7 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 
 	verifyInteraction := func(listenerScheduling, connectorScheduling framework.NetworkPodScheduling) {
 		It("should have sent the expected data from the pod to the other pod", func() {
-			runConnectivityTest(f, useService, listenerScheduling, connectorScheduling, framework.ClusterB, framework.ClusterA)
+			RunConnectivityTest(f, useService, listenerScheduling, connectorScheduling, framework.ClusterB, framework.ClusterA)
 		})
 	}
 
@@ -64,7 +64,7 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 	})
 })
 
-func runConnectivityTest(f *framework.Framework, useService bool, listenerScheduling framework.NetworkPodScheduling, connectorScheduling framework.NetworkPodScheduling, listenerCluster framework.ClusterIndex, connectorCluster framework.ClusterIndex) (*framework.NetworkPod, *framework.NetworkPod) {
+func RunConnectivityTest(f *framework.Framework, useService bool, listenerScheduling framework.NetworkPodScheduling, connectorScheduling framework.NetworkPodScheduling, listenerCluster framework.ClusterIndex, connectorCluster framework.ClusterIndex) (*framework.NetworkPod, *framework.NetworkPod) {
 	By("Creating a listener pod in cluster B, which will wait for a handshake over TCP")
 	listenerPod := f.NewNetworkPod(&framework.NetworkPodConfig{
 		Type:       framework.ListenerPod,
@@ -105,7 +105,7 @@ func runConnectivityTest(f *framework.Framework, useService bool, listenerSchedu
 	By("Verifying the output of listener pod which must contain the source IP")
 	Expect(listenerPod.TerminationMessage).To(ContainSubstring(connectorPod.Pod.Status.PodIP))
 
-	// Return the pods in case further verificastion is needed
+	// Return the pods in case further verification is needed
 	return listenerPod, connectorPod
 }
 
