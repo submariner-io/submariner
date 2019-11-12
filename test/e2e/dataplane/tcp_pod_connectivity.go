@@ -12,16 +12,18 @@ import (
 var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters without discovery", func() {
 	f := framework.NewDefaultFramework("dataplane-conn-nd")
 	var useService bool
+	var noConnection bool
 
 	verifyInteraction := func(listenerScheduling, connectorScheduling framework.NetworkPodScheduling) {
 		It("should have sent the expected data from the pod to the other pod", func() {
-			RunConnectivityTest(f, useService, listenerScheduling, connectorScheduling, framework.ClusterB, framework.ClusterA)
+			RunConnectivityTest(f, useService, noConnection, listenerScheduling, connectorScheduling, framework.ClusterB, framework.ClusterA)
 		})
 	}
 
 	When("a pod connects via TCP to a remote pod", func() {
 		BeforeEach(func() {
 			useService = false
+			noConnection = false
 		})
 
 		When("the pod is not on a gateway and the remote pod is not on a gateway", func() {
@@ -44,6 +46,7 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 	When("a pod connects via TCP to a remote service", func() {
 		BeforeEach(func() {
 			useService = true
+			noConnection = false
 		})
 
 		When("the pod is not on a gateway and the remote service is not on a gateway", func() {
@@ -62,9 +65,18 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 			verifyInteraction(framework.GatewayNode, framework.GatewayNode)
 		})
 	})
+
+	When("a pod on gateway node can not connect to remote pod on non-gateway node", func() {
+		BeforeEach(func() {
+			noConnection = true
+			useService = false
+		})
+		verifyInteraction(framework.GatewayNode, framework.NonGatewayNode)
+	})
 })
 
-func RunConnectivityTest(f *framework.Framework, useService bool, listenerScheduling framework.NetworkPodScheduling, connectorScheduling framework.NetworkPodScheduling, listenerCluster framework.ClusterIndex, connectorCluster framework.ClusterIndex) (*framework.NetworkPod, *framework.NetworkPod) {
+func RunConnectivityTest(f *framework.Framework, useService bool, noConnection bool, listenerScheduling framework.NetworkPodScheduling, connectorScheduling framework.NetworkPodScheduling, listenerCluster framework.ClusterIndex, connectorCluster framework.ClusterIndex) (*framework.NetworkPod, *framework.NetworkPod) {
+	framework.Logf("nocoonection is %v", noConnection)
 	By("Creating a listener pod in cluster B, which will wait for a handshake over TCP")
 	listenerPod := f.NewNetworkPod(&framework.NetworkPodConfig{
 		Type:       framework.ListenerPod,
@@ -77,6 +89,11 @@ func RunConnectivityTest(f *framework.Framework, useService bool, listenerSchedu
 		By("Pointing a service ClusterIP to the listener pod in cluster B")
 		service := listenerPod.CreateService()
 		remoteIP = service.Spec.ClusterIP
+	}
+
+	if noConnection && !useService {
+		remoteIP = "127.0.0.1"
+		framework.Logf("inside noconnection, remoteIP is %v", remoteIP)
 	}
 
 	framework.Logf("Will send traffic to IP: %v", remoteIP)
