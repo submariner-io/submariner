@@ -214,7 +214,7 @@ func nodeAffinity(scheduling NetworkPodScheduling) *v1.Affinity {
 		nodeSelReqs = addNodeSelectorRequirement(nodeSelReqs, GatewayLabel, v1.NodeSelectorOpNotIn, []string{"true"})
 	}
 
-	affinity := v1.Affinity{
+	return &v1.Affinity{
 		NodeAffinity: &v1.NodeAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 				NodeSelectorTerms: []v1.NodeSelectorTerm{
@@ -225,14 +225,13 @@ func nodeAffinity(scheduling NetworkPodScheduling) *v1.Affinity {
 			},
 		},
 	}
-	return &affinity
 }
 
 func addNodeSelectorRequirement(nodeSelReqs []v1.NodeSelectorRequirement, label string,
 	op v1.NodeSelectorOperator, values []string) []v1.NodeSelectorRequirement {
 	return append(nodeSelReqs, v1.NodeSelectorRequirement{
 		Key:      label,
-		Operator: v1.NodeSelectorOpNotIn,
-		Values:   []string{"true"},
+		Operator: op,
+		Values:   values,
 	})
 }
