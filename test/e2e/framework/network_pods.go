@@ -216,37 +216,35 @@ func (np *NetworkPod) buildTCPCheckConnectorPod() {
 }
 
 func nodeAffinity(scheduling NetworkPodScheduling) *v1.Affinity {
-	var nodeSelReqs []v1.NodeSelectorRequirement
+	var nodeSelTerms []v1.NodeSelectorTerm
 
 	switch scheduling {
 	case GatewayNode:
-		nodeSelReqs = addNodeSelectorRequirement(nodeSelReqs, GatewayLabel, v1.NodeSelectorOpIn, []string{"true"})
+		nodeSelTerms = addNodeSelectorTerm(nodeSelTerms, GatewayLabel, v1.NodeSelectorOpIn, []string{"true"})
 
 	case NonGatewayNode:
-		nodeSelReqs = addNodeSelectorRequirement(nodeSelReqs, GatewayLabel, v1.NodeSelectorOpDoesNotExist, nil)
-		nodeSelReqs = addNodeSelectorRequirement(nodeSelReqs, GatewayLabel, v1.NodeSelectorOpNotIn, []string{"true"})
+		nodeSelTerms = addNodeSelectorTerm(nodeSelTerms, GatewayLabel, v1.NodeSelectorOpDoesNotExist, nil)
+		nodeSelTerms = addNodeSelectorTerm(nodeSelTerms, GatewayLabel, v1.NodeSelectorOpNotIn, []string{"true"})
 	}
 
 	return &v1.Affinity{
 		NodeAffinity: &v1.NodeAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-				NodeSelectorTerms: []v1.NodeSelectorTerm{
-					{
-						MatchExpressions: nodeSelReqs,
-					},
-				},
+				NodeSelectorTerms: nodeSelTerms,
 			},
 		},
 	}
 }
 
-func addNodeSelectorRequirement(nodeSelReqs []v1.NodeSelectorRequirement, label string,
-	op v1.NodeSelectorOperator, values []string) []v1.NodeSelectorRequirement {
-	return append(nodeSelReqs, v1.NodeSelectorRequirement{
-		Key:      label,
-		Operator: op,
-		Values:   values,
-	})
+func addNodeSelectorTerm(nodeSelTerms []v1.NodeSelectorTerm, label string,
+	op v1.NodeSelectorOperator, values []string) []v1.NodeSelectorTerm {
+	return append(nodeSelTerms, v1.NodeSelectorTerm{MatchExpressions: []v1.NodeSelectorRequirement{
+		{
+			Key:      label,
+			Operator: op,
+			Values:   values,
+		},
+	}})
 }
 
 func removeDupDataplaneLines(output string) string {
