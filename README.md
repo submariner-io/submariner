@@ -115,9 +115,15 @@ Submariner utilizes the following tools for installation:
 These instructions assume you have a combined kube config file with at least three contexts that correspond to the respective clusters. Thus, you should be able to perform commands like
 
 ```
-kubectl config use-context broker
-kubectl config use-context west
-kubectl config use-context east
+funciton use-context {
+    kubectl config use-context $1
+}
+```
+
+```
+use-context broker
+use-context west
+use-context east
 ```
 
 Submariner utilizes Helm as a package management tool. 
@@ -128,13 +134,118 @@ Before you start, you should add the `submariner-latest` chart repository to dep
 helm repo add submariner-latest https://releases.rancher.com/submariner-charts/latest
 ```
 
+### Cluster Installation/Setup
+
+In case you don't have an available setup you can create the three clusters for test purposes.
+
+To run this section you need the following tools:
+- `docker`
+- `kind`
+
+Create cluster broker
+
+```
+CLUSTER_ID=broker
+CLUSTER_CIDR=10.244.0.0/16
+SERVICE_CIDR=100.94.0.0/16
+
+cat <<EOF |
+kind: Cluster
+apiVersion: kind.sigs.k8s.io/v1alpha3
+kubeadmConfigPatches:
+- |
+  apiVersion: kubeadm.k8s.io/v1beta2
+  kind: ClusterConfiguration
+  metadata:
+    name: config
+  networking:
+    podSubnet: ${CLUSTER_CIDR}
+    serviceSubnet: ${SERVICE_CIDR}
+    dnsDomain: ${CLUSTER_ID}.local
+nodes:
+- role: control-plane
+EOF
+kind create cluster --name ${CLUSTER_ID} --config -
+```
+
+Create cluster west
+
+```
+CLUSTER_ID=west
+CLUSTER_CIDR=10.245.0.0/16
+SERVICE_CIDR=100.95.0.0/16
+
+cat <<EOF |
+apiVersion: kind.sigs.k8s.io/v1alpha3
+kubeadmConfigPatches:
+- |
+  apiVersion: kubeadm.k8s.io/v1beta2
+  kind: ClusterConfiguration
+  metadata:
+    name: config
+  networking:
+    podSubnet: ${CLUSTER_CIDR}
+    serviceSubnet: ${SERVICE_CIDR}
+    dnsDomain: ${CLUSTER_ID}.local
+nodes:
+- role: control-plane
+- role: worker
+- role: worker
+EOF
+kind create cluster --name ${CLUSTER_ID} --config -
+```
+
+Create cluster east
+
+```
+CLUSTER_ID=east
+CLUSTER_CIDR=10.246.0.0/16
+SERVICE_CIDR=100.96.0.0/16
+
+cat <<EOF |
+kind: Cluster
+apiVersion: kind.sigs.k8s.io/v1alpha3
+kubeadmConfigPatches:
+- |
+  apiVersion: kubeadm.k8s.io/v1beta2
+  kind: ClusterConfiguration
+  metadata:
+    name: config
+  networking:
+    podSubnet: ${CLUSTER_CIDR}
+    serviceSubnet: ${SERVICE_CIDR}
+    dnsDomain: ${CLUSTER_ID}.local
+nodes:
+- role: control-plane
+- role: worker
+- role: worker
+EOF
+kind create cluster --name ${CLUSTER_ID} --config -
+```
+
+Setup helper function so that we are able to move between cluster contexts
+
+```
+function use-context {
+    export KUBECONFIG="$(kind get kubeconfig-path --name="$1")"
+}
+```
+
+And now verify all is working
+
+```
+use-context broker
+use-context west
+use-context east
+```
+
 ### Broker Installation/Setup
 
 The broker is the component that Submariner utilizes to exchange metadata information between clusters for connection information. This should only be installed once on your central broker cluster. Currently, the broker is implemented by utilizing the Kubernetes API, but is modular and will be enhanced in the future to bring support for other interfaces. The broker can be installed by using a helm chart.
 
 First, you should switch into the context for the broker cluster
 ```
-kubectl config use-context <BROKER_CONTEXT>
+use-context broker
 ```
 
 If you have not yet initialized Tiller on the cluster, you can do so with the following commands:
@@ -200,16 +311,25 @@ Submariner is installed by using a helm chart. Once you populate the environment
 
 Each cluster that will be connected must have Submariner installed within it. You must repeat these steps for each cluster that you add.
    
-1. Set your kubeconfig context to your desired installation cluster
+1. Set your kubeconfig context to your desired installation cluster, repeat
+   the entire section for each of the following:
 
    ```
-   kubectl config use-context <CLUSTER_CONTEXT>
+   CLUSTER_ID=west
+
+   use-context ${CLUSTER_ID}
    ```
 
+   |Placeholder|Description|Default|Example|
+   |:----------|:----------|:------|:------|
+   |CLUSTER_ID|Cluster ID|""|west|
+ 
 1. Label your gateway nodes with the annotation `submariner.io/gateway=true`
 
    ```
-   kubectl label node <DESIRED_NODE> "submariner.io/gateway=true"
+   for node in $(kubectl get --no-headers=true nodes -o custom-columns=:metadata.name); do
+       kubectl label node $node "submariner.io/gateway=true";
+   done
    ```
 
 1. Initialize Helm (if not yet done)
@@ -232,6 +352,11 @@ Each cluster that will be connected must have Submariner installed within it. Yo
 1. Install submariner into this cluster. The values within the following command correspond to the table below.
 
    ```
+   CLUSTER_ID=west
+   CLUSTER_CIDR=10.245.0.0/16
+   SERVICE_CIDR=100.95.0.0/16
+   NAT_ENABLED=false
+
    helm install submariner-latest/submariner \
    --name submariner \
    --namespace submariner \
@@ -241,36 +366,51 @@ Each cluster that will be connected must have Submariner installed within it. Yo
    --set broker.namespace="${SUBMARINER_BROKER_NS}" \
    --set broker.ca="${SUBMARINER_BROKER_CA}" \
    \
-   --set submariner.clusterId="<CLUSTER_ID>" \
-   --set submariner.clusterCidr="<CLUSTER_CIDR>" \
-   --set submariner.serviceCidr="<SERVICE_CIDR>" \
-   --set submariner.natEnabled="<NAT_ENABLED>"
+   --set submariner.clusterId="${CLUSTER_ID}" \
+   --set submariner.clusterCidr="${CLUSTER_CIDR}" \
+   --set submariner.serviceCidr="${SERVICE_CIDR}" \
+   --set submariner.natEnabled="${NAT_ENABLED}"
    ```
    
-   |Placeholder|Description|Default|Example|
+   |Placeholder|Description|Default|Example(s)|
    |:----------|:----------|:------|:------|
-   |\<CLUSTER_ID>|Cluster ID (Must be RFC 1123 compliant)|""|west-cluster|
-   |\<CLUSTER_CIDR>|Cluster CIDR for Cluster|""|`10.42.0.0/16`|
-   |\<SERVICE_CIDR>|Service CIDR for Cluster|""|`10.43.0.0/16`|
-   |\<NAT_ENABLED>|If in a cloud provider that uses 1:1 NAT between instances (for example, AWS VPC), you should set this to `true` so that Submariner is aware of the 1:1 NAT condition.|"false"|`false`|
+   |CLUSTER_ID|Cluster ID (Must be RFC 1123 compliant)|""|west|
+   |CLUSTER_CIDR|Cluster CIDR for Cluster|""|`10.245.0.0/16`|
+   |SERVICE_CIDR|Service CIDR for Cluster|""|`10.95.0.0/16`|
+   |NAT_ENABLED|If in a cloud provider that uses 1:1 NAT between instances (for example, AWS VPC), you should set this to `true` so that Submariner is aware of the 1:1 NAT condition.|"false"|`false`|
 
 ## Validate Submariner is Working
 
-Switch to the context of one of your clusters, i.e. `kubectl config use-context west`
+Switch to the context of one of your clusters
 
-Run an nginx container in this cluster, i.e. `kubectl run -n default nginx --image=nginx`
+```
+use-context west
+```
 
-Retrieve the pod IP of the nginx container, looking under the "Pod IP" column for `kubectl get pod -n default`
+Run an nginx container in this cluster
 
-Change contexts to your other workload cluster, i.e. `kubectl config use-context east`
+```
+kubectl run -n default nginx --image=nginx
+```
+
+Retrieve the pod IP of the nginx container
+
+```
+NGINX_POD_IP=$(kubectl get pods -n default -l run=nginx --no-headers=true -o wide | awk '{print $6}')
+echo "West cluster nginx pod ip is ${NGINX_POD_IP}"
+```
+
+Change contexts to your other workload cluster
+
+```
+use-context east
+```
 
 Run a busybox pod and ping/curl the nginx pod:
 
 ```
-kubectl run -i -t busybox --image=busybox --restart=Never
-If you don't see a command prompt, try pressing enter.
-/ # ping <NGINX_POD_IP>
-/ # wget -O - <NGINX_POD_IP>
+kubectl run -i -t ping --image=busybox --restart=Never -- ping ${NGINX_POD_IP}
+kubectl run -i -t wget --image=busybox --restart=Never -- wget -O - ${NGINX_POD_IP}
 ```
 
 # Testing
