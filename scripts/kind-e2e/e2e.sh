@@ -122,6 +122,32 @@ function setup_broker() {
     SUBMARINER_BROKER_TOKEN=$(kubectl --context=cluster1 -n ${SUBMARINER_BROKER_NS} get secrets -o jsonpath="{.items[?(@.metadata.annotations['kubernetes\.io/service-account\.name']=='${SUBMARINER_BROKER_NS}-client')].data.token}"|base64 --decode)
 }
 
+function helm_install_subm() {
+    cluster_id=$1
+    cluster_cidr=$2
+    service_cidr=$3
+    crd_create=$4
+    helm --kube-context ${cluster_id} install submariner-latest/submariner \
+	--name submariner \
+	--namespace submariner \
+	--set ipsec.psk="${SUBMARINER_PSK}" \
+	--set broker.server="${SUBMARINER_BROKER_URL}" \
+	--set broker.token="${SUBMARINER_BROKER_TOKEN}" \
+	--set broker.namespace="${SUBMARINER_BROKER_NS}" \
+	--set broker.ca="${SUBMARINER_BROKER_CA}" \
+	--set submariner.clusterId="${cluster_id}" \
+	--set submariner.clusterCidr="${cluster_cidr}" \
+	--set submariner.serviceCidr="${service_cidr}" \
+	--set submariner.natEnabled="false" \
+	--set routeAgent.image.repository="submariner-route-agent" \
+	--set routeAgent.image.tag="local" \
+	--set routeAgent.image.pullPolicy="IfNotPresent" \
+	--set engine.image.repository="submariner" \
+	--set engine.image.tag="local" \
+	--set engine.image.pullPolicy="IfNotPresent" \
+	--set crd.create="${crd_create}"
+}
+
 # Only install Submariner on broker cluster with 2 worker nodes but do not tag any worker nodes with gateway label
 function install_subm_in_cluster1() {
     if kubectl --context=cluster1 wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s > /dev/null 2>&1; then
@@ -129,25 +155,7 @@ function install_subm_in_cluster1() {
             update_subm_pods cluster1
         else
             echo Installing submariner on cluster1...
-            helm --kube-context cluster1 install submariner-latest/submariner \
-            --name submariner \
-            --namespace submariner \
-            --set ipsec.psk="${SUBMARINER_PSK}" \
-            --set broker.server="${SUBMARINER_BROKER_URL}" \
-            --set broker.token="${SUBMARINER_BROKER_TOKEN}" \
-            --set broker.namespace="${SUBMARINER_BROKER_NS}" \
-            --set broker.ca="${SUBMARINER_BROKER_CA}" \
-            --set submariner.clusterId="cluster1" \
-            --set submariner.clusterCidr="10.244.0.0/16" \
-            --set submariner.serviceCidr="100.94.0.0/16" \
-            --set submariner.natEnabled="false" \
-            --set routeAgent.image.repository="submariner-route-agent" \
-            --set routeAgent.image.tag="local" \
-            --set routeAgent.image.pullPolicy="IfNotPresent" \
-            --set engine.image.repository="submariner" \
-            --set engine.image.tag="local" \
-            --set engine.image.pullPolicy="IfNotPresent" \
-            --set crd.create="false"
+	    helm_install_subm cluster1 10.244.0.0/16 100.94.0.0/16 false
     fi
 }
 
@@ -159,27 +167,12 @@ function setup_cluster2_gateway() {
             echo Installing submariner on cluster2...
             worker_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster2-worker | head -n 1)
             kubectl --context=cluster2 label node cluster2-worker "submariner.io/gateway=true" --overwrite
-            helm --kube-context cluster2 install submariner-latest/submariner \
-            --name submariner \
-            --namespace submariner \
-            --set ipsec.psk="${SUBMARINER_PSK}" \
-            --set broker.server="${SUBMARINER_BROKER_URL}" \
-            --set broker.token="${SUBMARINER_BROKER_TOKEN}" \
-            --set broker.namespace="${SUBMARINER_BROKER_NS}" \
-            --set broker.ca="${SUBMARINER_BROKER_CA}" \
-            --set submariner.clusterId="cluster2" \
-            --set submariner.clusterCidr="10.245.0.0/16" \
-            --set submariner.serviceCidr="100.95.0.0/16" \
-            --set submariner.natEnabled="false" \
-            --set routeAgent.image.repository="submariner-route-agent" \
-            --set routeAgent.image.tag="local" \
-            --set routeAgent.image.pullPolicy="IfNotPresent" \
-            --set engine.image.repository="submariner" \
-            --set engine.image.tag="local" \
-            --set engine.image.pullPolicy="IfNotPresent"
+	    helm_install_subm cluster2 10.245.0.0/16 100.95.0.0/16 true
+
             echo Waiting for submariner pods to be Ready on cluster2...
             kubectl --context=cluster2 wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s
             kubectl --context=cluster2 wait --for=condition=Ready pods -l app=submariner-routeagent -n submariner --timeout=60s
+
             echo Deploying netshoot on cluster2 worker: ${worker_ip}
             kubectl --context=cluster2 apply -f ${PRJ_ROOT}/scripts/kind-e2e/netshoot.yaml
             echo Waiting for netshoot pods to be Ready on cluster2.
@@ -195,27 +188,12 @@ function setup_cluster3_gateway() {
             echo Installing submariner on cluster3...
             worker_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster3-worker | head -n 1)
             kubectl --context=cluster3 label node cluster3-worker "submariner.io/gateway=true" --overwrite
-            helm --kube-context cluster3 install submariner-latest/submariner \
-             --name submariner \
-             --namespace submariner \
-             --set ipsec.psk="${SUBMARINER_PSK}" \
-             --set broker.server="${SUBMARINER_BROKER_URL}" \
-             --set broker.token="${SUBMARINER_BROKER_TOKEN}" \
-             --set broker.namespace="${SUBMARINER_BROKER_NS}" \
-             --set broker.ca="${SUBMARINER_BROKER_CA}" \
-             --set submariner.clusterId="cluster3" \
-             --set submariner.clusterCidr="10.246.0.0/16" \
-             --set submariner.serviceCidr="100.96.0.0/16" \
-             --set submariner.natEnabled="false" \
-             --set routeAgent.image.repository="submariner-route-agent" \
-             --set routeAgent.image.tag="local" \
-             --set routeAgent.image.pullPolicy="IfNotPresent" \
-             --set engine.image.repository="submariner" \
-             --set engine.image.tag="local" \
-             --set engine.image.pullPolicy="IfNotPresent"
+	    helm_install_subm cluster3 10.246.0.0/16 100.96.0.0/16 true
+
             echo Waiting for submariner pods to be Ready on cluster3...
             kubectl --context=cluster3 wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s
             kubectl --context=cluster3 wait --for=condition=Ready pods -l app=submariner-routeagent -n submariner --timeout=60s
+
             echo Deploying nginx on cluster3 worker: ${worker_ip}
             kubectl --context=cluster3 apply -f ${PRJ_ROOT}/scripts/kind-e2e/nginx-demo.yaml
             echo Waiting for nginx-demo deployment to be Ready on cluster3.
