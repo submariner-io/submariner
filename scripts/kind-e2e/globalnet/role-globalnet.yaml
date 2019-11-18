@@ -1,0 +1,35 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: submariner:globalnet
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - services
+      - namespaces
+      - pods
+    verbs:
+      - list
+      - watch
+      - get
+      - update
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: submariner:globalnet
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: submariner:globalnet
+subjects:
+  - kind: ServiceAccount
+    name: submariner-globalnet
+    namespace: operators
