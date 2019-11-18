@@ -201,18 +201,25 @@ function setup_cluster3_gateway() {
     fi
 }
 
+function docker_pull_and_tag() {
+    image=$1
+    tag=$2
+
+    # if the image is not local, first pull it from the remote docker registry
+    if ! docker image inspect $image 1>/dev/null 2>/dev/null ; then
+        docker pull $image
+    fi
+
+    docker tag $image $tag
+}
+
 function kind_import_images() {
     OPERATOR_IMAGE=${OPERATOR_IMAGE:-quay.io/submariner/submariner-operator:0.0.1}
-    docker tag quay.io/submariner/submariner:dev submariner:local
-    docker tag quay.io/submariner/submariner-route-agent:dev submariner-route-agent:local
+    docker_pull_and_tag quay.io/submariner/submariner:latest submariner:local
+    docker_pull_and_tag quay.io/submariner/submariner-route-agent:latest submariner-route-agent:local
 
     if [[ "$deploy_operator" = true ]]; then
-
-       # if the image is not local, first pull it from the remote docker registry
-       if ! docker image inspect $OPERATOR_IMAGE 2>/dev/null ; then
-          docker pull $OPERATOR_IMAGE
-       fi
-       docker tag $OPERATOR_IMAGE submariner-operator:local
+       docker_pull_and_tag $OPERATOR_IMAGE submariner-operator:local
     fi
 
     for i in 2 3; do
