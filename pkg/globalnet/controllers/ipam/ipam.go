@@ -7,6 +7,7 @@ import (
 
 	k8sv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
@@ -33,18 +34,22 @@ func NewController(spec *SubmarinerIpamControllerSpecification, config *Informer
 		podsSynced:       config.PodInformer.Informer().HasSynced,
 
 		excludeNamespaces: exclusionMap,
-		pool: pool,
+		pool:              pool,
 	}
 	klog.Info("Setting up event handlers")
 	config.ServiceInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
-		AddFunc: ipamController.enqueueService,
+		AddFunc: func(obj interface{}) {
+			ipamController.enqueueObject(obj, ipamController.serviceWorkqueue)
+		},
 		UpdateFunc: func(old, new interface{}) {
-			ipamController.enqueueService(new)
+			ipamController.handleUpdateService(old, new)
 		},
 		DeleteFunc: ipamController.handleRemovedService,
 	}, handlerResync)
 	config.PodInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
-		AddFunc: ipamController.enqueuePod,
+		AddFunc: func(obj interface{}) {
+			ipamController.enqueueObject(obj, ipamController.podWorkqueue)
+		},
 		UpdateFunc: func(old, new interface{}) {
 			ipamController.handleUpdatePod(old, new)
 		},
@@ -79,59 +84,48 @@ func (i *Controller) Run(stopCh <-chan struct{}) error {
 }
 
 func (i *Controller) runServiceWorker() {
-	for i.processNextService() {
+	for i.processNextObject(i.serviceWorkqueue, i.serviceGetter, i.serviceUpdater) {
 	}
 }
 
 func (i *Controller) runPodWorker() {
-	for i.processNextPod() {
+	for i.processNextObject(i.podWorkqueue, i.podGetter, i.podUpdater) {
 	}
 }
 
-func (i *Controller) processNextService() bool {
-	obj, shutdown := i.serviceWorkqueue.Get()
+func (i *Controller) processNextObject(objWorkqueue workqueue.RateLimitingInterface, objGetter func(namespace, name string) (runtime.Object, error), objUpdater func(runtimeObj runtime.Object, key string) error) bool {
+	obj, shutdown := objWorkqueue.Get()
 	if shutdown {
 		return false
 	}
 	err := func() error {
-		defer i.serviceWorkqueue.Done(obj)
+		defer objWorkqueue.Done(obj)
 
 		key := obj.(string)
 		ns, name, err := cache.SplitMetaNamespaceKey(key)
 		if err != nil {
-			i.serviceWorkqueue.Forget(obj)
+			objWorkqueue.Forget(obj)
 			return fmt.Errorf("error while splitting meta namespace key %s: %v", key, err)
-		}
-		if i.excludeNamespaces[ns] {
-			i.serviceWorkqueue.Forget(obj)
-			return nil
 		}
 
 		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			// Retrieve the latest version of Service before attempting update
+			// Retrieve the latest version of object before attempting update
 			// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
-			service, err := i.kubeClientSet.CoreV1().Services(ns).Get(name, metav1.GetOptions{})
+			runtimeObj, err := objGetter(ns, name)
 
 			if err != nil {
-				return fmt.Errorf("error retrieving submariner-ipam-controller service object %s: %v", name, err)
+				// mostly this means object already deleted
+				objWorkqueue.Forget(obj)
+				return fmt.Errorf("error retrieving submariner-ipam-controller object %s: %v", name, err)
 			}
-			annotations, err := i.annotateGlobalIp(&service.Name, service.GetAnnotations())
-			if err != nil {
-				return fmt.Errorf("failed to annotated GlobalIp to service %s", service.Name)
-			}
-			if annotations != nil {
-				service.SetAnnotations(annotations)
-				_, updateErr := i.kubeClientSet.CoreV1().Services(ns).Update(service)
-				return updateErr
-			}
-			return nil
+			return objUpdater(runtimeObj, key)
 		})
 		if retryErr != nil {
-			i.serviceWorkqueue.Forget(obj)
+			// failed to get globalIp or failed to update, we want to retry
 			return retryErr
 		}
 
-		i.serviceWorkqueue.Forget(obj)
+		objWorkqueue.Forget(obj)
 		return nil
 	}()
 
@@ -143,72 +137,10 @@ func (i *Controller) processNextService() bool {
 	return true
 }
 
-func (i *Controller) processNextPod() bool {
-	obj, shutdown := i.podWorkqueue.Get()
-	if shutdown {
-		return false
-	}
-	err := func() error {
-		defer i.podWorkqueue.Done(obj)
-
-		key := obj.(string)
-		ns, name, err := cache.SplitMetaNamespaceKey(key)
-		if err != nil {
-			i.podWorkqueue.Forget(obj)
-			return fmt.Errorf("error while splitting meta namespace key %s: %v", key, err)
-		}
-		if i.excludeNamespaces[ns] {
-			i.podWorkqueue.Forget(obj)
-			return nil
-		}
-
-		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			// Retrieve the latest version of Pod before attempting update
-			// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
-			pod, err := i.kubeClientSet.CoreV1().Pods(ns).Get(name, metav1.GetOptions{})
-
-			if err != nil {
-				return fmt.Errorf("error retrieving submariner-ipam-controller pod object %s: %v", name, err)
-			}
-			annotations, err := i.annotateGlobalIp(&pod.Name, pod.GetAnnotations())
-			if err != nil {
-				return fmt.Errorf("failed to annotated GlobalIp to service %s", pod.Name)
-			}
-			if annotations != nil {
-				pod.SetAnnotations(annotations)
-				_, updateErr := i.kubeClientSet.CoreV1().Pods(ns).Update(pod)
-				return updateErr
-			}
-			return nil
-		})
-		if retryErr != nil {
-			i.podWorkqueue.Forget(obj)
-			return retryErr
-		}
-
-		i.podWorkqueue.Forget(obj)
-		return nil
-	}()
-
-	if err != nil {
-		utilruntime.HandleError(err)
-		return true
-	}
-
-	return true
-}
-
-func (i *Controller) enqueueService(obj interface{}) {
+func (i *Controller) enqueueObject(obj interface{}, workqueue workqueue.RateLimitingInterface) {
 	if key := i.allowEnqueue(obj); key != "" {
-		klog.V(4).Infof("Enqueueing service for ipam controller %v", key)
-		i.serviceWorkqueue.AddRateLimited(key)
-	}
-}
-
-func (i *Controller) enqueuePod(obj interface{}) {
-	if key := i.allowEnqueue(obj); key != "" {
-		klog.V(4).Infof("Enqueueing pod for ipam controller %v", key)
-		i.podWorkqueue.AddRateLimited(key)
+		klog.V(4).Infof("Enqueueing %v for ipam controller", key)
+		workqueue.AddRateLimited(key)
 	}
 }
 
@@ -230,19 +162,31 @@ func (i *Controller) allowEnqueue(obj interface{}) string {
 	return key
 }
 
+func (i *Controller) handleUpdateService(old interface{}, new interface{}) {
+	service := new.(*k8sv1.Service)
+	oldGlobalIp := old.(*k8sv1.Service).GetAnnotations()[submarinerIpamGlobalIp]
+	newGlobalIp := new.(*k8sv1.Service).GetAnnotations()[submarinerIpamGlobalIp]
+	if oldGlobalIp != "" && oldGlobalIp != newGlobalIp && newGlobalIp != i.pool.GetAllocatedIp(service.Name) {
+		klog.V(4).Infof("GlobalIp changed from %s to %s for %s", oldGlobalIp, newGlobalIp, old.(*k8sv1.Service).Name)
+		i.enqueueObject(new, i.serviceWorkqueue)
+	}
+}
+
 func (i *Controller) handleUpdatePod(old interface{}, new interface{}) {
 	pod := new.(*k8sv1.Pod)
 	oldGlobalIp := old.(*k8sv1.Pod).GetAnnotations()[submarinerIpamGlobalIp]
 	newGlobalIp := new.(*k8sv1.Pod).GetAnnotations()[submarinerIpamGlobalIp]
-	if oldGlobalIp != newGlobalIp  && newGlobalIp != i.pool.GetAllocatedIp(pod.Name) {
+	if oldGlobalIp != "" && oldGlobalIp != newGlobalIp && newGlobalIp != i.pool.GetAllocatedIp(pod.Name) {
 		klog.V(4).Infof("GlobalIp changed from %s to %s for %s", oldGlobalIp, newGlobalIp, old.(*k8sv1.Pod).Name)
-		i.enqueuePod(new)
+		i.enqueueObject(new, i.podWorkqueue)
 	}
 }
 
 func (i *Controller) handleRemovedService(obj interface{}) {
 	var service *k8sv1.Service
 	var ok bool
+	var key string
+	var err error
 	if service, ok = obj.(*k8sv1.Service); !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
@@ -258,8 +202,12 @@ func (i *Controller) handleRemovedService(obj interface{}) {
 	if !i.excludeNamespaces[service.Namespace] {
 		globalIp := service.Annotations[submarinerIpamGlobalIp]
 		if globalIp != "" {
-			i.pool.Release(globalIp)
-			klog.V(4).Infof("Released ip %s for service %s", globalIp, service.Name)
+			if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
+				utilruntime.HandleError(err)
+				return
+			}
+			i.pool.Release(key)
+			klog.V(4).Infof("Released ip %s for service %s", globalIp, key)
 		}
 	}
 }
@@ -267,6 +215,8 @@ func (i *Controller) handleRemovedService(obj interface{}) {
 func (i *Controller) handleRemovedPod(obj interface{}) {
 	var pod *k8sv1.Pod
 	var ok bool
+	var key string
+	var err error
 	if pod, ok = obj.(*k8sv1.Pod); !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
@@ -282,31 +232,77 @@ func (i *Controller) handleRemovedPod(obj interface{}) {
 	if !i.excludeNamespaces[pod.Namespace] {
 		globalIp := pod.Annotations[submarinerIpamGlobalIp]
 		if globalIp != "" {
-			i.pool.Release(globalIp)
-			klog.V(4).Infof("Released ip %s for pod %s", globalIp, pod.Name)
+			if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
+				utilruntime.HandleError(err)
+				return
+			}
+			i.pool.Release(key)
+			klog.V(4).Infof("Released ip %s for pod %s", globalIp, key)
 		}
 	}
 }
 
-func (i* Controller) annotateGlobalIp(name *string, annotations map[string]string) (map[string]string, error) {
+func (i *Controller) annotateGlobalIp(key string, annotations map[string]string) (map[string]string, error) {
 	if annotations == nil {
 		annotations = map[string]string{}
 	}
 	var ip string
+	var err error
 	globalIp := annotations[submarinerIpamGlobalIp]
-	if globalIp== "" {
-		ip = i.pool.Allocate(*name)
+	if globalIp == "" {
+		ip, err = i.pool.Allocate(key)
+		if err != nil {
+			return nil, err
+		}
 		annotations[submarinerIpamGlobalIp] = ip
-		klog.V(4).Infof("Allocating GlobalIp %s to %s ", ip, *name)
+		klog.V(4).Infof("Allocating GlobalIp %s to %s ", ip, key)
 		return annotations, nil
 	}
-	givenIp := i.pool.RequestIp(*name, globalIp)
+	givenIp, err := i.pool.RequestIp(key, globalIp)
+	if err != nil {
+		return nil, err
+	}
 	if globalIp != givenIp {
 		// This resource has been allocated a different IP
 		annotations[submarinerIpamGlobalIp] = givenIp
-		klog.V(4).Infof("Updating GlobalIP for %s from %s to %s", *name, globalIp, givenIp)
+		klog.V(4).Infof("Updating GlobalIp for %s from %s to %s", key, globalIp, givenIp)
 		return annotations, nil
 	}
 	return nil, nil
+}
 
+func (i *Controller) serviceGetter(namespace, name string) (runtime.Object, error) {
+	return i.kubeClientSet.CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
+}
+
+func (i *Controller) podGetter(namespace, name string) (runtime.Object, error) {
+	return i.kubeClientSet.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+}
+
+func (i *Controller) serviceUpdater(obj runtime.Object, key string) error {
+	service := obj.(*k8sv1.Service)
+	annotations, err := i.annotateGlobalIp(key, service.GetAnnotations())
+	if err != nil {
+		return fmt.Errorf("failed to annotate GlobalIp to service %s: %v", key, err)
+	}
+	if annotations != nil {
+		service.SetAnnotations(annotations)
+		_, updateErr := i.kubeClientSet.CoreV1().Services(service.Namespace).Update(service)
+		return updateErr
+	}
+	return nil
+}
+
+func (i *Controller) podUpdater(obj runtime.Object, key string) error {
+	pod := obj.(*k8sv1.Pod)
+	annotations, err := i.annotateGlobalIp(key, pod.GetAnnotations())
+	if err != nil {
+		return fmt.Errorf("failed to annotate GlobalIp to Pod %s: %v", key, err)
+	}
+	if annotations != nil {
+		pod.SetAnnotations(annotations)
+		_, updateErr := i.kubeClientSet.CoreV1().Pods(pod.Namespace).Update(pod)
+		return updateErr
+	}
+	return nil
 }

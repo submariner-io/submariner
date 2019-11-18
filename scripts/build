@@ -8,4 +8,4 @@ cd $(dirname $0)/
 
 ./build-engine $6
 ./build-routeagent $6
-./build-ipam $6
+./build-globalnet $6
