@@ -241,6 +241,7 @@ function kind_import_images() {
         echo "Loading submariner images in to cluster${i}..."
         kind --name cluster${i} load docker-image submariner:local
         kind --name cluster${i} load docker-image submariner-route-agent:local
+        kind --name cluster${i} load docker-image submariner-globalnet:local
         if [[ "$deploy_operator" = true ]]; then
              kind --name cluster${i} load docker-image submariner-operator:local
 	fi
@@ -353,6 +354,14 @@ function test_with_e2e_tests {
 	      -ginkgo.noColor -ginkgo.reportPassed \
         -ginkgo.reportFile ${DAPPER_SOURCE}/${DAPPER_OUTPUT}/e2e-junit.xml 2>&1 | \
         tee ${DAPPER_SOURCE}/${DAPPER_OUTPUT}/e2e-tests.log
+}
+
+function deploy_globalnet {
+    for i in 2 3; do
+      kubectl --context=cluster${i} -n submariner create serviceaccount submariner-globalnet
+      kubectl --context=cluster${i} -n submariner apply -f ${PRJ_ROOT}/scripts/kind-e2e/globalnet/role-globalnet.yaml
+      kubectl --context=cluster${i} -n submariner apply -f ${PRJ_ROOT}/scripts/kind-e2e/globalnet/deploy-globalnet-${i}.yaml
+    done
 }
 
 function cleanup {
@@ -509,6 +518,7 @@ elif [[ $5 = helm ]]; then
     done
 fi
 
+deploy_globalnet
 test_connection
 test_with_e2e_tests
 
