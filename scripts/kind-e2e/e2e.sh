@@ -80,11 +80,13 @@ function setup_custom_cni(){
 function kind_import_images() {
     docker tag quay.io/submariner/submariner:dev submariner:local
     docker tag quay.io/submariner/submariner-route-agent:dev submariner-route-agent:local
+    docker tag quay.io/submariner/submariner-globalnet:dev submariner-globalnet:local
 
     for i in 1 2 3; do
         echo "Loading submariner images in to cluster${i}..."
         kind --name cluster${i} load docker-image submariner:local
         kind --name cluster${i} load docker-image submariner-route-agent:local
+        kind --name cluster${i} load docker-image submariner-globalnet:local
         if [[ "$deploy_operator" = true ]]; then
              kind --name cluster${i} load docker-image submariner-operator:local
 	fi
@@ -203,6 +205,14 @@ function delete_subm_pods() {
     fi
 }
 
+function deploy_globalnet {
+    for i in 2 3; do
+      kubectl --context=cluster${i} -n $subm_ns create serviceaccount submariner-globalnet
+      sed "s|namespace: operators|namespace: $subm_ns|g" ${PRJ_ROOT}/scripts/kind-e2e/globalnet/role-globalnet.yaml | kubectl --context=cluster${i} apply -f -
+      kubectl --context=cluster${i} -n $subm_ns apply -f ${PRJ_ROOT}/scripts/kind-e2e/globalnet/deploy-globalnet-${i}.yaml
+    done
+}
+
 function cleanup {
     for i in 1 2 3; do
       if [[ $(kind get clusters | grep cluster${i} | wc -l) -gt 0  ]]; then
@@ -295,6 +305,7 @@ deploytool_postreqs
 deploy_netshoot cluster2
 deploy_nginx cluster3
 
+deploy_globalnet
 test_connection
 
 if [[ $status = keep || $status = onetime ]]; then
