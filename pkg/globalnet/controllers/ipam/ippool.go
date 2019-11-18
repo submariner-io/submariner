@@ -2,17 +2,18 @@ package ipam
 
 import (
 	"encoding/binary"
+	"errors"
 	"math"
 	"net"
 	"sync"
 )
 
 type IpPool struct {
-	cidr string
-	net  *net.IPNet
-	size int
-	available map[string]bool //IP.String() is key
-	allocated map[string]string //resource name is key, ipString is value
+	cidr      string
+	net       *net.IPNet
+	size      int
+	available map[string]bool   //IP.String() is key
+	allocated map[string]string //resource "namespace/name" is key, ipString is value
 	sync.RWMutex
 }
 
@@ -22,11 +23,11 @@ func NewIpPool(cidr string) (*IpPool, error) {
 		return nil, err
 	}
 	ones, totalbits := network.Mask.Size()
-	size := int(math.Exp2(float64(totalbits - ones))) - 2 // don't count net and broadcast
+	size := int(math.Exp2(float64(totalbits-ones))) - 2 // don't count net and broadcast
 	pool := &IpPool{
-		cidr: cidr,
-		net: network,
-		size: size,
+		cidr:      cidr,
+		net:       network,
+		size:      size,
 		available: make(map[string]bool),
 		allocated: make(map[string]string),
 	}
@@ -52,21 +53,22 @@ func intToIP(ip int) net.IP {
 	return netIp
 }
 
-func (p *IpPool) Allocate(key string) string{
+func (p *IpPool) Allocate(key string) (string, error) {
+	if p.IsFull() {
+		return "", errors.New("IPAM: No IP available for allocation")
+	}
 	p.Lock()
+	defer p.Unlock()
 	allocatedIp := p.allocated[key]
-	if  allocatedIp == "" {
+	if allocatedIp == "" {
 		for k := range p.available {
 			p.allocated[key] = k
 			delete(p.available, k)
-			p.Unlock()
-			return k
+			return k, nil
 		}
-		p.Unlock()
-		return ""
+		return "", errors.New("IPAM: Unable to allocate IP")
 	}
-	p.Unlock()
-	return allocatedIp
+	return allocatedIp, nil
 }
 
 func (p *IpPool) Release(key string) string {
@@ -80,18 +82,18 @@ func (p *IpPool) Release(key string) string {
 	return ip
 }
 
-func (p *IpPool) IsAvailable (ip string) bool {
+func (p *IpPool) IsAvailable(ip string) bool {
 	return p.available[ip]
 }
 
-func (p *IpPool) GetAllocatedIp (name string) string {
+func (p *IpPool) GetAllocatedIp(key string) string {
 	p.RLock()
-	ip := p.allocated[name]
+	ip := p.allocated[key]
 	p.RUnlock()
 	return ip
 }
 
-func (p *IpPool) IsFull () bool {
+func (p *IpPool) IsFull() bool {
 	var result bool
 	p.RLock()
 	result = len(p.available) == 0
@@ -99,16 +101,16 @@ func (p *IpPool) IsFull () bool {
 	return result
 }
 
-func (p *IpPool) RequestIp(key string, ip string) string {
+func (p *IpPool) RequestIp(key string, ip string) (string, error) {
 	if p.GetAllocatedIp(key) == ip {
-		return ip
+		return ip, nil
 	}
 	if p.IsAvailable(ip) {
 		p.Lock()
 		p.allocated[key] = ip
 		delete(p.available, ip)
 		p.Unlock()
-		return ip
+		return ip, nil
 	}
 	// It is neither allocated for this key, nor available, give another.
 	return p.Allocate(key)
