@@ -1,0 +1,27 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: submariner-globalnet
+spec:
+  selector:
+    matchLabels:
+      app: submariner-globalnet
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: submariner-globalnet
+    spec:
+      containers:
+        - name: submariner-globalnet
+          image: submariner-globalnet:local
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: SUBMARINER_GLOBALCIDR
+              value: 169.254.2.0/24
+            - name: SUBMARINER_EXCLUDENS
+              value: "submariner,kube-system,operators"
+
+      serviceAccountName: submariner-globalnet
+      serviceAccount: submariner-globalnet
