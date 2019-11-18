@@ -2,6 +2,7 @@ package ipam
 
 import (
 	"encoding/binary"
+	"errors"
 	"math"
 	"net"
 	"sync"
@@ -52,21 +53,22 @@ func intToIP(ip int) net.IP {
 	return netIp
 }
 
-func (p *IpPool) Allocate(key string) string{
+func (p *IpPool) Allocate(key string) (string, error) {
+	if p.IsFull() {
+		return "", errors.New("IPAM: No IP available for allocation")
+	}
 	p.Lock()
+	defer p.Unlock()
 	allocatedIp := p.allocated[key]
 	if  allocatedIp == "" {
 		for k := range p.available {
 			p.allocated[key] = k
 			delete(p.available, k)
-			p.Unlock()
-			return k
+			return k, nil
 		}
-		p.Unlock()
-		return ""
+		return "", errors.New("IPAM: Unable to allocate IP")
 	}
-	p.Unlock()
-	return allocatedIp
+	return allocatedIp, nil
 }
 
 func (p *IpPool) Release(key string) string {
@@ -99,16 +101,16 @@ func (p *IpPool) IsFull () bool {
 	return result
 }
 
-func (p *IpPool) RequestIp(key string, ip string) string {
+func (p *IpPool) RequestIp(key string, ip string) (string, error) {
 	if p.GetAllocatedIp(key) == ip {
-		return ip
+		return ip, nil
 	}
 	if p.IsAvailable(ip) {
 		p.Lock()
 		p.allocated[key] = ip
 		delete(p.available, ip)
 		p.Unlock()
-		return ip
+		return ip, nil
 	}
 	// It is neither allocated for this key, nor available, give another.
 	return p.Allocate(key)

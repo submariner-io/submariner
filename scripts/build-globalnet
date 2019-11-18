@@ -8,10 +8,10 @@ debug=${1:-false}
 
 cd $(dirname $0)/..
 mkdir -p bin
-echo Building submariner-ipam version $VERSION
+echo Building submariner-globalnet version $VERSION
 ldflags="-X main.VERSION=$VERSION"
 if [ "$debug" = "false" ]; then
     ldflags="-s -w ${ldflags}"
 fi
-CGO_ENABLED=0 go build -ldflags "${ldflags}" -o bin/submariner-ipam ./pkg/ipmanager/main.go
-[ "$debug" = "false" ] && command -v upx > /dev/null && upx bin/submariner-ipam || :
+CGO_ENABLED=0 go build -ldflags "${ldflags}" -o bin/submariner-globalnet ./pkg/globalnet/main.go
+[ "$debug" = "false" ] && command -v upx > /dev/null && upx bin/submariner-globalnet || :

@@ -9,7 +9,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/submariner-io/submariner/pkg/ipmanager/ipam"
+	"github.com/submariner-io/submariner/pkg/globalnet/controllers/ipam"
 
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
@@ -33,7 +33,7 @@ func main() {
 	if err != nil {
 		klog.Fatal(err)
 	}
-	klog.V(2).Info("Starting submariner-ipam")
+	klog.V(2).Info("Starting submariner-globalnet %v", ipamSpec)
 
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
