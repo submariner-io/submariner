@@ -11,8 +11,6 @@ docker tag ${REPO}/submariner:dev ${REPO}/submariner:${DOCKER_TAG#"v"}
 docker tag ${REPO}/submariner:dev ${REPO}/submariner:"${TRAVIS_COMMIT:0:7}"
 docker tag ${REPO}/submariner-route-agent:dev ${REPO}/submariner-route-agent:${DOCKER_TAG#"v"}
 docker tag ${REPO}/submariner-route-agent:dev ${REPO}/submariner-route-agent:"${TRAVIS_COMMIT:0:7}"
-docker tag ${REPO}/submariner-ipam:dev ${REPO}/submariner-ipam:${DOCKER_TAG#"v"}
-docker tag ${REPO}/submariner-ipam:dev ${REPO}/submariner-ipam:"${TRAVIS_COMMIT:0:7}"
 docker tag ${REPO}/dapper-base:dev ${REPO}/dapper-base:${DOCKER_TAG#"v"}
 docker tag ${REPO}/dapper-base:dev ${REPO}/dapper-base:"${TRAVIS_COMMIT:0:7}"
 for i in $(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "${REPO}/.*:(${DOCKER_TAG#v}|${TRAVIS_COMMIT:0:7})"); do docker push $i; done
