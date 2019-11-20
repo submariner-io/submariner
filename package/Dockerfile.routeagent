@@ -18,7 +18,6 @@ RUN chmod +x /usr/local/bin/submariner-route-agent.sh
 COPY submariner-route-agent /usr/local/bin
 
 # Wrapper scripts to use iptables from the host when that's available
-COPY ./iptables.wrapper /usr/sbin/
-COPY ./iptables-save.wrapper /usr/sbin/
+COPY ./iptables*.wrapper /usr/sbin/
 
 ENTRYPOINT submariner-route-agent.sh
