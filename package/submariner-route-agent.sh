@@ -18,8 +18,11 @@ fi
 for f in iptables-save iptables; do
 	if [[ -x /host/usr/sbin/$f ]]; then
 		cp /usr/sbin/${f}.wrapper /usr/sbin/$f
+	elif [[ -x /host/sbin/$f ]]; then
+		cp /usr/sbin/${f}.sbin.wrapper /usr/sbin/$f
 	else
-		echo "WARNING: not using iptables wrapper because /host/usr/sbin/$f was not detected."
+		echo "WARNING: not using iptables wrapper because iptables was not detected on the"
+	        echo "host at the following paths [/usr/sbin, /sbin]."
 		echo "Either the host file system isn't mounted or the host does not have iptables"
 		echo "installed. The pod will use the image installed iptables version."
 	fi
