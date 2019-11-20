@@ -289,13 +289,6 @@ When running in Openshift, we need to grant the appropriate security context for
    oc adm policy add-scc-to-user privileged system:serviceaccount:submariner:submariner-engine 
    ```
 
-### Flannel Notes
-
-When using flannel CNI, configure reverse path filtering to loose mode on the non-gateway nodes (i.e., worker nodes).
-Also, to preserve the setting, you can add it to /etc/sysctl.conf file
-
-sysctl -w net.ipv4.conf.flannel.1.rp_filter=2
-
 # Building
 
 To build `submariner-engine` and `submariner-route-agent` you can trigger `make`, which will perform a Dapperized build of the components.
