@@ -80,7 +80,7 @@ as with any normal k8s cluster.
 as docker images, submariner will be redeployed on the clusters from pushed images and E2E tests will be executed.
 This mode allows the developers to test their local code fast on a very close to real world scenario setup.
 
-**NOTE**: If you only want to create the test  environment without running the e2e tests, you can do it by executing 
+**NOTE**: If you only want to create the test environment without running the e2e tests, you can do it by executing 
 the following command: 
 
 ```bash
