@@ -477,7 +477,7 @@ fi
 
 test_connection
 
-if [[ $1 != create ]]; then
+if [[ $1 = keep ]]; then
     test_with_e2e_tests
 fi
 
