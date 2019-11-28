@@ -9,10 +9,10 @@ else
     DEBUG="-v=4"
 fi
 
-function verify_iptables_on_host() {
-    chroot /host test -x /usr/sbin/$1 && { echo "0"; return; }
-    chroot /host test -x /sbin/$1 && { echo "1"; return; }
-    echo "-1"
+function find_iptables_on_host() {
+    chroot /host test -x /usr/sbin/$1 && { echo "/usr/sbin"; return; }
+    chroot /host test -x /sbin/$1 && { echo "/sbin"; return; }
+    echo "unknown"
 }
 
 
@@ -23,11 +23,11 @@ function verify_iptables_on_host() {
 # and iptables-save which program nftables under the hood. 
 
 for f in iptables-save iptables; do
-  iptablesExists=$(verify_iptables_on_host $f)
-  if [ $iptablesExists == "0" ]; then
+  iptablesLocation=$(find_iptables_on_host $f)
+  if [ $iptablesLocation == "/usr/sbin" ]; then
     echo "$f is present on the host at /usr/sbin/$f"
     cp /usr/sbin/${f}.wrapper /usr/sbin/$f
-  elif [ $iptablesExists == "1" ]; then
+  elif [ $iptablesLocation == "/sbin" ]; then
     echo "$f is present on the host at /sbin/$f"
     cp /usr/sbin/${f}.sbin.wrapper /usr/sbin/$f
   else
