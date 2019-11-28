@@ -59,7 +59,7 @@ function install_helm() {
     logs=()
     for i in 1 2 3; do
         # Skip other clusters on operator deployment, we only need it on the first
-        if [ "$i" != 1 ] && [ "$deploy_operator" = true ]; then
+        if [ "$deploy_operator" = true ]; then
             echo "Skipping other clusters since we're deploying with operator."
             break
         fi
@@ -109,18 +109,37 @@ function setup_custom_cni(){
     done
 }
 
-function setup_broker() {
+function setup_broker_helm() {
+
     if kubectl --context=cluster1 get crd clusters.submariner.io > /dev/null 2>&1; then
         echo Submariner CRDs already exist, skipping broker creation...
     else
         echo Installing broker on cluster1.
         helm --kube-context cluster1 install submariner-latest/submariner-k8s-broker --name ${SUBMARINER_BROKER_NS} --namespace ${SUBMARINER_BROKER_NS}
+        # TODO, we may want to separate this dataplane setup to a "setup_cluster1_gateway"
         helm_install_subm cluster1 10.244.0.0/16 100.94.0.0/16 false
     fi
 
     SUBMARINER_BROKER_URL=$(kubectl --context=cluster1 -n default get endpoints kubernetes -o jsonpath="{.subsets[0].addresses[0].ip}:{.subsets[0].ports[?(@.name=='https')].port}")
     SUBMARINER_BROKER_CA=$(kubectl --context=cluster1 -n ${SUBMARINER_BROKER_NS} get secrets -o jsonpath="{.items[?(@.metadata.annotations['kubernetes\.io/service-account\.name']=='${SUBMARINER_BROKER_NS}-client')].data['ca\.crt']}")
     SUBMARINER_BROKER_TOKEN=$(kubectl --context=cluster1 -n ${SUBMARINER_BROKER_NS} get secrets -o jsonpath="{.items[?(@.metadata.annotations['kubernetes\.io/service-account\.name']=='${SUBMARINER_BROKER_NS}-client')].data.token}"|base64 --decode)
+}
+
+function setup_broker_subctl() {
+    if kubectl --context=cluster1 get crd clusters.submariner.io > /dev/null 2>&1; then
+        echo Submariner CRDs already exist, skipping broker creation...
+    else
+        echo Installing broker on cluster1.
+        subctl --kubeconfig ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster1 deploy-broker --no-dataplane
+    fi
+}
+
+function setup_broker() {
+    if [[ "$deploy_operator" = true ]]; then
+        setup_broker_subctl
+    else
+        setup_broker_helm
+    fi
 }
 
 function helm_install_subm() {
@@ -192,26 +211,13 @@ function setup_cluster3_gateway() {
 }
 
 function kind_import_images() {
-    OPERATOR_IMAGE=${OPERATOR_IMAGE:-quay.io/submariner/submariner-operator:0.0.1}
     docker tag quay.io/submariner/submariner:dev submariner:local
     docker tag quay.io/submariner/submariner-route-agent:dev submariner-route-agent:local
-
-    if [[ "$deploy_operator" = true ]]; then
-
-       # if the image is not local, first pull it from the remote docker registry
-       if ! docker image inspect $OPERATOR_IMAGE 2>/dev/null ; then
-          docker pull $OPERATOR_IMAGE
-       fi
-       docker tag $OPERATOR_IMAGE submariner-operator:local
-    fi
 
     for i in 1 2 3; do
         echo "Loading submariner images in to cluster${i}..."
         kind --name cluster${i} load docker-image submariner:local
         kind --name cluster${i} load docker-image submariner-route-agent:local
-        if [[ "$deploy_operator" = true ]]; then
-             kind --name cluster${i} load docker-image submariner-operator:local
-	fi
     done
 }
 
@@ -223,10 +229,12 @@ function create_subm_vars() {
   routeagent_deployment_name=submariner-routeagent
   broker_deployment_name=submariner-k8s-broker
 
+  clusterCIDR_cluster1=10.244.0.0/16
   clusterCIDR_cluster2=10.245.0.0/16
   clusterCIDR_cluster3=10.246.0.0/16
   serviceCIDR_cluster2=100.95.0.0/16
   serviceCIDR_cluster3=100.96.0.0/16
+  serviceCIDR_cluster1=100.94.0.0/16
   natEnabled=false
 
   subm_engine_image_repo=local
@@ -241,7 +249,11 @@ function create_subm_vars() {
   ce_ipsec_ikeport=500
   ce_ipsec_nattport=4500
 
-  subm_ns=operators
+  if [[ "$deploy_operator" = "true" ]]; then
+    subm_ns=submariner-operator
+  else
+    subm_ns=submariner
+  fi
   subm_broker_ns=submariner-k8s-broker
 }
 
@@ -382,97 +394,48 @@ if [[ $4 = true ]]; then
     enable_kubefed
 fi
 
+if [ "$deploy_operator" = true ]; then
+    . kind-e2e/lib_operator_deploy_subm.sh
+fi
+
 kind_import_images
 setup_broker
 
 context=cluster1
 kubectl config use-context $context
 
-# Import functions for testing with Operator
-# NB: These are also used to verify non-Operator deployments, thereby asserting the two are mostly equivalent
-. kind-e2e/lib_operator_verify_subm.sh
-
 create_subm_vars
-verify_subm_broker_secrets
 
 if [ "$deploy_operator" = true ]; then
-    . kind-e2e/lib_operator_deploy_subm.sh
-
-    for i in 2 3; do
+    for i in 1 2 3; do
       context=cluster$i
       kubectl config use-context $context
-
-      # Create CRDs required as prerequisite submariner-engine
-      # TODO: Eventually OLM should handle this
-      create_subm_endpoints_crd
-      verify_endpoints_crd
-      create_subm_clusters_crd
-      verify_clusters_crd
-
-      # Add SubM gateway labels
       add_subm_gateway_label
-      # Verify SubM gateway labels
-      verify_subm_gateway_label
+      subctl join --kubeconfig ${PRJ_ROOT}/output/kind-config/dapper/kind-config-$context \
+                  --clusterid ${context} \
+                  --repository ${subm_engine_image_repo} \
+                  --version ${subm_engine_image_tag} \
+                  --nattport ${ce_ipsec_nattport} \
+                  --ikeport ${ce_ipsec_ikeport} \
+                  --colorcodes ${subm_colorcodes} \
+			            --disable-nat \
+                  broker-info.subm
 
-      # Deploy SubM Operator
-      deploy_subm_operator
-      # Verify SubM CRD
-      verify_subm_crd
-      # Verify SubM Operator
-      verify_subm_operator
-      # Verify SubM Operator pod
-      verify_subm_op_pod
-      # Verify SubM Operator container
-      verify_subm_operator_container
-
-      # FIXME: Rename all of these submariner-engine or engine, vs submariner
-      # Create SubM CR
-      create_subm_cr
-      # Deploy SubM CR
-      deploy_subm_cr
-      # Verify SubM CR
-      verify_subm_cr
-      # Verify SubM Engine Deployment
-      verify_subm_engine_deployment
-      # Verify SubM Engine Pod
-      verify_subm_engine_pod
-      # Verify SubM Engine container
-      verify_subm_engine_container
-      # Verify Engine secrets
-      verify_subm_engine_secrets
-
-      # Verify SubM Routeagent DaemonSet
-      verify_subm_routeagent_daemonset
-      # Verify SubM Routeagent Pods
-      verify_subm_routeagent_pod
-      # Verify SubM Routeagent container
-      verify_subm_routeagent_container
-      # Verify Routeagent secrets
-      verify_subm_routeagent_secrets
     done
 
     deploy_netshoot_cluster2
     deploy_nginx_cluster3
+
+    # subctl wants a gateway node labeled, or it will ask, but this script is not interactive,
+    # and E2E expects cluster1 to not have the gateway configured at start, so we remove it
+    context=cluster1
+    kubectl config use-context $context
+    del_subm_gateway_label
+
 elif [[ $5 = helm ]]; then
     helm=true
     setup_cluster2_gateway
     setup_cluster3_gateway
-    for i in 2 3; do
-      context=cluster$i
-      kubectl config use-context $context
-
-      # The Helm deploy doesn't respect namespace config, hardcode to what it uses
-      subm_ns=submariner
-
-      verify_subm_engine_deployment
-      verify_subm_engine_pod
-      verify_subm_routeagent_daemonset
-      verify_subm_routeagent_pod
-      verify_subm_engine_container
-      verify_subm_routeagent_container
-      verify_subm_engine_secrets
-      verify_subm_routeagent_secrets
-    done
 fi
 
 test_connection
