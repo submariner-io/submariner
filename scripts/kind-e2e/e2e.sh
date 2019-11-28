@@ -353,8 +353,7 @@ if [[ $1 = clean ]]; then
     cleanup
     exit 0
 fi
-
-if [[ $1 != keep ]]; then
+if [[ $1 != keep && $1 != create ]]; then
     trap cleanup EXIT
 fi
 
@@ -477,9 +476,12 @@ elif [[ $5 = helm ]]; then
 fi
 
 test_connection
-test_with_e2e_tests
 
 if [[ $1 = keep ]]; then
+    test_with_e2e_tests
+fi
+
+if [[ $1 = keep || $1 = create ]]; then
     echo "your 3 virtual clusters are deployed and working properly with your local"
     echo "submariner source code, and can be accessed with:"
     echo ""
