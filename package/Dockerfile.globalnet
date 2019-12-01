@@ -7,10 +7,17 @@ FROM registry.access.redhat.com/ubi8/ubi-minimal:8.0
 
 WORKDIR /var/submariner
 
+# These are all available in the UBI8 base OS repository
+RUN microdnf -y install --nodocs iproute iptables && \
+    microdnf clean all
+
 COPY submariner-globalnet.sh /usr/local/bin
 
 RUN chmod +x /usr/local/bin/submariner-globalnet.sh
 
 COPY submariner-globalnet /usr/local/bin
+
+# Wrapper scripts to use iptables from the host when that's available
+COPY ./iptables*.wrapper /usr/sbin/
 
 ENTRYPOINT submariner-globalnet.sh

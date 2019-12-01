@@ -1,6 +1,7 @@
 package ipam
 
 import (
+	"github.com/coreos/go-iptables/iptables"
 	kubeInformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -28,4 +29,6 @@ type Controller struct {
 
 	excludeNamespaces map[string]bool
 	pool              *IpPool
+
+	ipt *iptables.IPTables
 }
