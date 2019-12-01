@@ -8,10 +8,12 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/coreos/go-iptables/iptables"
 	"github.com/rdegges/go-ipify"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/vishvananda/netlink"
+	"k8s.io/klog"
 )
 
 const tokenLength = 64
@@ -172,4 +174,73 @@ func GetDefaultGatewayInterface() (*net.Interface, error) {
 	}
 
 	return nil, fmt.Errorf("unable to find default route")
+}
+
+func CreateChainIfNotExists(ipt *iptables.IPTables, table, chain string) error {
+	existingChains, err := ipt.ListChains(table)
+	if err != nil {
+		return err
+	}
+
+	for _, val := range existingChains {
+		if val == chain {
+			// Chain already exists
+			return nil
+		}
+	}
+
+	return ipt.NewChain(table, chain)
+}
+
+func PrependUnique(ipt *iptables.IPTables, table string, chain string, ruleSpec []string) error {
+	rules, err := ipt.List(table, chain)
+	if err != nil {
+		return fmt.Errorf("error listing the rules in %s chain: %v", chain, err)
+	}
+
+	// Submariner requires certain iptable rules to be programmed at the beginning of an iptables Chain
+	// so that we can preserve the sourceIP for inter-cluster traffic and avoid K8s SDN making changes
+	// to the traffic.
+	// In this API, we check if the required iptable rule is present at the beginning of the chain.
+	// If the rule is already present and there are no stale[1] flows, we simply return. If not, we create one.
+	// [1] Sometimes after we program the rule at the beginning of the chain, K8s SDN might insert some
+	// new rules ahead of the rule that we programmed. In such cases, the rule that we programmed will
+	// not be the first rule to hit and Submariner behavior might get affected. So, we query the rules
+	// in the chain to see if the rule slipped its position, and if so, delete all such occurrences.
+	// We then re-program a new rule at the beginning of the chain as required.
+
+	isPresentAtRequiredPosition := false
+	numOccurrences := 0
+	for index, rule := range rules {
+		if strings.Contains(rule, strings.Join(ruleSpec, " ")) {
+			klog.V(4).Infof("In %s table, iptables rule \"%s\", exists at index %d.", table, strings.Join(ruleSpec, " "), index)
+			numOccurrences++
+
+			if index == 1 {
+				isPresentAtRequiredPosition = true
+			}
+		}
+	}
+
+	// The required rule is present in the Chain, but either there are multiple occurrences or its
+	// not at the desired location
+	if numOccurrences > 1 || !isPresentAtRequiredPosition {
+		for i := 0; i < numOccurrences; i++ {
+			if err = ipt.Delete(table, chain, ruleSpec...); err != nil {
+				return fmt.Errorf("error deleting stale iptable rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
+			}
+		}
+	}
+
+	// The required rule is present only once and is at the desired location
+	if numOccurrences == 1 && isPresentAtRequiredPosition {
+		klog.V(4).Infof("In %s table, iptables rule \"%s\", already exists.", table, strings.Join(ruleSpec, " "))
+		return nil
+	} else {
+		if err = ipt.Insert(table, chain, 1, ruleSpec...); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
