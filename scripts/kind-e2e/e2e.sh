@@ -440,7 +440,7 @@ fi
 
 test_connection
 
-if [[ $1 = keep ]]; then
+if [[ $1 = keep || $1 = onetime ]]; then
     test_with_e2e_tests
 fi
 
