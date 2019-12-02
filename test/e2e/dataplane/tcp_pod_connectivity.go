@@ -19,6 +19,15 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 		})
 	}
 
+	verifyNoInteraction := func(listenerScheduling, connectorScheduling framework.NetworkPodScheduling) {
+		It("should not be able to set connectivity between remote pods", func() {
+			RunNoConnectivityTest(f, false, listenerScheduling, connectorScheduling, framework.ClusterC, framework.ClusterA)
+		})
+		It("should not be able to set connectivity between pod and remote service", func() {
+			RunNoConnectivityTest(f, true, listenerScheduling, connectorScheduling, framework.ClusterC, framework.ClusterA)
+		})
+	}
+
 	When("a pod connects via TCP to a remote pod", func() {
 		BeforeEach(func() {
 			useService = false
@@ -62,9 +71,45 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 			verifyInteraction(framework.GatewayNode, framework.GatewayNode)
 		})
 	})
+
+	When("a pod can not connect to remote pod or service", func() {
+		verifyNoInteraction(framework.NonGatewayNode, framework.NonGatewayNode)
+	})
 })
 
 func RunConnectivityTest(f *framework.Framework, useService bool, listenerScheduling framework.NetworkPodScheduling, connectorScheduling framework.NetworkPodScheduling, listenerCluster framework.ClusterIndex, connectorCluster framework.ClusterIndex) (*framework.NetworkPod, *framework.NetworkPod) {
+
+	listenerPod, connectorPod := createPods(f, useService, listenerScheduling, connectorScheduling, listenerCluster, connectorCluster)
+	listenerPod.CheckSuccessfulFinish()
+	connectorPod.CheckSuccessfulFinish()
+
+	By("Verifying that the listener got the connector's data and the connector got the listener's data")
+	Expect(listenerPod.TerminationMessage).To(ContainSubstring(connectorPod.Config.Data))
+	Expect(connectorPod.TerminationMessage).To(ContainSubstring(listenerPod.Config.Data))
+
+	By("Verifying the output of listener pod which must contain the source IP")
+	Expect(listenerPod.TerminationMessage).To(ContainSubstring(connectorPod.Pod.Status.PodIP))
+
+	// Return the pods in case further verification is needed
+	return listenerPod, connectorPod
+}
+
+func RunNoConnectivityTest(f *framework.Framework, useService bool, listenerScheduling framework.NetworkPodScheduling, connectorScheduling framework.NetworkPodScheduling, listenerCluster framework.ClusterIndex, connectorCluster framework.ClusterIndex) (*framework.NetworkPod, *framework.NetworkPod) {
+	listenerPod, connectorPod := createPods(f, useService, listenerScheduling, connectorScheduling, listenerCluster, connectorCluster)
+
+	By("Verifying that listener pod exits with non-zero code and timed out message")
+	Expect(listenerPod.TerminationMessage).To(ContainSubstring("nc: timeout"))
+	Expect(listenerPod.TerminationCode).To(Equal(int32(1)))
+
+	By("Verifying that connector pod exists with zero code but times out")
+	Expect(connectorPod.TerminationMessage).To(ContainSubstring("Connection timed out"))
+	Expect(connectorPod.TerminationCode).To(Equal(int32(0)))
+
+	// Return the pods in case further verification is needed
+	return listenerPod, connectorPod
+}
+
+func createPods(f *framework.Framework, useService bool, listenerScheduling framework.NetworkPodScheduling, connectorScheduling framework.NetworkPodScheduling, listenerCluster framework.ClusterIndex, connectorCluster framework.ClusterIndex) (*framework.NetworkPod, *framework.NetworkPod) {
 	By(fmt.Sprintf("Creating a listener pod in cluster %q, which will wait for a handshake over TCP", framework.TestContext.KubeContexts[listenerCluster]))
 	listenerPod := f.NewNetworkPod(&framework.NetworkPodConfig{
 		Type:       framework.ListenerPod,
@@ -89,23 +134,13 @@ func RunConnectivityTest(f *framework.Framework, useService bool, listenerSchedu
 		RemoteIP:   remoteIP,
 	})
 
-	By(fmt.Sprintf("Waiting for the listener pod %q to exit with code 0, returning what listener sent", listenerPod.Pod.Name))
+	framework.Logf("Connector pod has IP: %s", connectorPod.Pod.Status.PodIP)
+
+	By(fmt.Sprintf("Waiting for the listener pod %q to exit, returning what listener sent", listenerPod.Pod.Name))
 	listenerPod.AwaitFinish()
 
-	By(fmt.Sprintf("Waiting for the connector pod %q to exit with code 0, returning what connector sent", connectorPod.Pod.Name))
+	By(fmt.Sprintf("Waiting for the connector pod %q to exit, returning what connector sent", connectorPod.Pod.Name))
 	connectorPod.AwaitFinish()
 
-	listenerPod.CheckSuccessfulFinish()
-	connectorPod.CheckSuccessfulFinish()
-
-	By("Verifying that the listener got the connector's data and the connector got the listener's data")
-	Expect(listenerPod.TerminationMessage).To(ContainSubstring(connectorPod.Config.Data))
-	Expect(connectorPod.TerminationMessage).To(ContainSubstring(listenerPod.Config.Data))
-
-	framework.Logf("Connector pod has IP: %s", connectorPod.Pod.Status.PodIP)
-	By("Verifying the output of listener pod which must contain the source IP")
-	Expect(listenerPod.TerminationMessage).To(ContainSubstring(connectorPod.Pod.Status.PodIP))
-
-	// Return the pods in case further verification is needed
 	return listenerPod, connectorPod
 }
