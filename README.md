@@ -9,6 +9,10 @@
   - [Network Path](#network-path)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
+  - [Installation using subctl](#installation-using-subctl)
+    - [Download](#download)
+    - [Broker](#broker)
+    - [Engine and route agent](#engine-and-route-agent)
   - [Installation using operator](#installation-using-operator)
   - [Manual installation using helm charts](#manual-installation-using-helm-charts)
     - [Setup](#setup)
@@ -90,7 +94,46 @@ An example of three clusters configured to use with Submariner would look like t
 
 # Installation
 
-Submariner installation can be done manually using helm charts or by using its operator. Both methods are described here.
+Submariner installation can be done manually using a dedicated tool, `subctl`, or Helm charts, or
+by using its operator. All three methods are described here.
+
+## Installation using subctl
+
+`subctl` is a Submariner-specific tool developed to simplify Submariner installation. It drives
+[the operator](#installation-using-operator). You can see it in action in
+[this demo](https://youtu.be/cInmBXuZsU8).
+
+### Download
+
+`subctl` is maintained in the operator project; binaries are available for download from
+[the operator releases](https://github.com/submariner-io/submariner-operator/releases).
+Download the latest binary for your operating system and architecture, and install it on your path;
+it has no external dependencies.
+
+### Broker
+
+To set the broker up (on a specific cluster or one of the multi-cluster member clusters), run
+
+    subctl deploy-broker --kubeconfig /path/to/your/config --no-dataplane
+
+`/path/to/your/config` must correspond to the `kubeconfig` for your cluster.
+
+This will deploy the broker on the target cluster, and save a file, `broker-info.subm`, that will
+be used to join the multi-cluster.
+
+### Engine and route agent
+
+To install the engine and route agent, run
+
+    subctl join --kubeconfig /path/to/your/config broker-info.subm
+
+Again, `/path/to/your/config` must correspond to the `kubeconfig` for your cluster; it will vary
+from one cluster to another.
+
+This will ask for any missing information, in particular a cluster identifier (a unique name for
+the cluster), and the node to use as a gateway.
+It will then install [the Submariner operator](#installation-using-operator) and configure it to
+deploy Submariner and join the clusters configured using the broker above.
 
 ## Installation using operator
 
