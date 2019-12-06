@@ -19,15 +19,6 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 		})
 	}
 
-	verifyNoInteraction := func(listenerScheduling, connectorScheduling framework.NetworkPodScheduling) {
-		It("should not be able to set connectivity between remote pods", func() {
-			RunNoConnectivityTest(f, false, listenerScheduling, connectorScheduling, framework.ClusterC, framework.ClusterA)
-		})
-		It("should not be able to set connectivity between pod and remote service", func() {
-			RunNoConnectivityTest(f, true, listenerScheduling, connectorScheduling, framework.ClusterC, framework.ClusterA)
-		})
-	}
-
 	When("a pod connects via TCP to a remote pod", func() {
 		BeforeEach(func() {
 			useService = false
@@ -70,10 +61,6 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 		When("the pod is on a gateway and the remote service is on a gateway", func() {
 			verifyInteraction(framework.GatewayNode, framework.GatewayNode)
 		})
-	})
-
-	When("a pod can not connect to remote pod or service", func() {
-		verifyNoInteraction(framework.NonGatewayNode, framework.NonGatewayNode)
 	})
 })
 
