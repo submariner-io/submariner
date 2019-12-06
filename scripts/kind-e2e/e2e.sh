@@ -207,6 +207,12 @@ function delete_subm_pods() {
 
 function deploy_globalnet {
     for i in 2 3; do
+      if kubectl --context=cluster${i} -n $subm_ns get serviceaccount submariner-globalnet > /dev/null 2>&1; then
+        echo submariner-globalnet already exists in cluster${i}, deleting the existing deployment
+        sed "s|namespace: operators|namespace: $subm_ns|g" ${PRJ_ROOT}/scripts/kind-e2e/globalnet/role-globalnet.yaml | kubectl --context=cluster${i} delete -f -
+        kubectl --context=cluster${i} -n $subm_ns delete -f ${PRJ_ROOT}/scripts/kind-e2e/globalnet/deploy-globalnet-${i}.yaml
+        kubectl --context=cluster${i} -n $subm_ns delete serviceaccount submariner-globalnet
+      fi
       kubectl --context=cluster${i} -n $subm_ns create serviceaccount submariner-globalnet
       sed "s|namespace: operators|namespace: $subm_ns|g" ${PRJ_ROOT}/scripts/kind-e2e/globalnet/role-globalnet.yaml | kubectl --context=cluster${i} apply -f -
       kubectl --context=cluster${i} -n $subm_ns apply -f ${PRJ_ROOT}/scripts/kind-e2e/globalnet/deploy-globalnet-${i}.yaml
