@@ -9,6 +9,10 @@
   - [Network Path](#network-path)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
+  - [Installation using subctl](#installation-using-subctl)
+    - [Download](#download)
+    - [Broker](#broker)
+    - [Engine and route agent](#engine-and-route-agent)
   - [Installation using operator](#installation-using-operator)
   - [Manual installation using helm charts](#manual-installation-using-helm-charts)
     - [Setup](#setup)
@@ -90,7 +94,46 @@ An example of three clusters configured to use with Submariner would look like t
 
 # Installation
 
-Submariner installation can be done manually using helm charts or by using its operator. Both methods are described here.
+Submariner installation can be done manually using a dedicated tool, `subctl`, or Helm charts, or
+by using its operator. All three methods are described here.
+
+## Installation using subctl
+
+`subctl` is a Submariner-specific tool developed to simplify Submariner installation. It drives
+[the operator](#installation-using-operator). You can see it in action in
+[this demo](https://youtu.be/cInmBXuZsU8).
+
+### Download
+
+`subctl` is maintained in the operator project and its binaries are available for download from
+[the operator releases](https://github.com/submariner-io/submariner-operator/releases).
+Download the latest binary for your operating system and architecture, then install it on your
+path. The binary has no external dependencies so you won’t need anything else.
+
+### Broker
+
+To deploy only the broker in a cluster, run
+
+    subctl deploy-broker --kubeconfig /path/to/your/config --no-dataplane
+
+`/path/to/your/config` must correspond to the `kubeconfig` of the target cluster.
+
+This command also saves a file, `broker-info.subm`, that will
+be used to join other clusters to the broker.
+
+### Engine and route agent
+
+To install the engine and route agent, run
+
+    subctl join --kubeconfig /path/to/your/config broker-info.subm
+
+`/path/to/your/config` must correspond to the `kubeconfig` of the joining cluster.
+`broker-info.subm` is the file obtained from the broker deployment and is used to join the cluster to that broker.
+
+This command will ask for any missing information, in particular a unique identifier/name for
+the cluster and the cluster node to use as a gateway.
+It will then install [the Submariner operator](#installation-using-operator) and configure it to
+deploy the Submariner components and join the cluster to the broker.
 
 ## Installation using operator
 
