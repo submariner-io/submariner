@@ -3,8 +3,8 @@ package framework
 import (
 	"fmt"
 
-	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -31,11 +31,19 @@ func (f *Framework) CreateTCPService(cluster ClusterIndex, selectorName string, 
 		},
 	}
 
-	kube := f.ClusterClients[cluster]
-	services := kube.CoreV1().Services(f.Namespace)
+	services := f.ClusterClients[cluster].CoreV1().Services(f.Namespace)
 
-	service, err := services.Create(&tcpService)
-	Expect(err).NotTo(HaveOccurred())
+	return AwaitUntil("create service", func() (interface{}, error) {
+		service, err := services.Create(&tcpService)
+		if errors.IsAlreadyExists(err) {
+			err = services.Delete(tcpService.Name, &metav1.DeleteOptions{})
+			if err != nil {
+				return nil, err
+			}
 
-	return service
+			service, err = services.Create(&tcpService)
+		}
+
+		return service, err
+	}, NoopCheckResult).(*v1.Service)
 }
