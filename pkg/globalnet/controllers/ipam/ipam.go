@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/coreos/go-iptables/iptables"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +28,11 @@ func NewController(spec *SubmarinerIpamControllerSpecification, config *Informer
 		return nil, err
 	}
 
+	iptableHandler, err := iptables.New()
+	if err != nil {
+		return nil, err
+	}
+
 	ipamController := &Controller{
 		kubeClientSet:    config.KubeClientSet,
 		serviceWorkqueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Services"),
@@ -36,6 +42,7 @@ func NewController(spec *SubmarinerIpamControllerSpecification, config *Informer
 
 		excludeNamespaces: exclusionMap,
 		pool:              pool,
+		ipt:               iptableHandler,
 	}
 	klog.Info("Setting up event handlers")
 	config.ServiceInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
@@ -72,6 +79,22 @@ func (i *Controller) Run(stopCh <-chan struct{}) error {
 	klog.Info("Waiting for informer caches to sync")
 	if ok := cache.WaitForCacheSync(stopCh, i.servicesSynced, i.podsSynced); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
+	}
+
+	// Query kube-proxy pods in the cluster
+	kubeProxyPodList, err := i.kubeClientSet.CoreV1().Pods(kubeProxyNameSpace).List(metav1.ListOptions{LabelSelector: kubeProxyLabelSelector})
+	if err != nil {
+		return fmt.Errorf("error while retrieving kube-proxy pods: %v", err)
+	}
+
+	// Currently submariner global-net implementation works only with kube-proxy.
+	if len(kubeProxyPodList.Items) == 0 {
+		return fmt.Errorf("cluster does not seem to use kube-proxy")
+	}
+
+	err = i.initIPTableChains()
+	if err != nil {
+		return fmt.Errorf("initIPTableChains returned error. %v", err)
 	}
 
 	klog.Info("Starting workers")
@@ -124,6 +147,34 @@ func (i *Controller) processNextObject(objWorkqueue workqueue.RateLimitingInterf
 				}
 				return fmt.Errorf("error retrieving submariner-ipam-controller object %s: %v", name, err)
 			}
+
+			switch runtimeObj.(type) {
+			case *k8sv1.Service:
+				service := runtimeObj.(*k8sv1.Service)
+				switch i.evaluateService(service) {
+				case Ignore:
+					objWorkqueue.Forget(obj)
+					return nil
+				case Requeue:
+					objWorkqueue.AddRateLimited(obj)
+					return fmt.Errorf("service %s requeued %d times", key, objWorkqueue.NumRequeues(obj))
+				}
+			case *k8sv1.Pod:
+				pod := runtimeObj.(*k8sv1.Pod)
+				// Process pod event only when it has an ipaddress. Pods skipped here will be handled subsequently
+				// during podUpdate event when an ipaddress is assigned to it.
+				if pod.Status.PodIP == "" {
+					objWorkqueue.Forget(obj)
+					return nil
+				}
+
+				// Privileged pods that use hostNetwork will be ignored.
+				if pod.Status.PodIP == pod.Status.HostIP {
+					klog.V(4).Infof("Ignoring pod %s on host %s as it uses hostNetworking", pod.Name, pod.Status.PodIP)
+					return nil
+				}
+			}
+
 			return objUpdater(runtimeObj, key)
 		})
 		if retryErr != nil {
@@ -190,6 +241,29 @@ func (i *Controller) handleUpdatePod(old interface{}, newObj interface{}) {
 		utilruntime.HandleError(err)
 		return
 	}
+
+	oldPodIp := old.(*k8sv1.Pod).Status.PodIP
+	updatedPodIp := newObj.(*k8sv1.Pod).Status.PodIP
+	podHostIP := newObj.(*k8sv1.Pod).Status.HostIP
+	// Pod events that are skipped during addEvent are handled here when they are assigned an ipaddress.
+	if updatedPodIp != "" && oldPodIp != updatedPodIp {
+		klog.V(4).Infof("In handleUpdatePod, pod %s is now assigned %s address, enqueing", old.(*k8sv1.Pod).Name, updatedPodIp)
+		i.enqueueObject(newObj, i.podWorkqueue)
+		return
+	}
+
+	// When the POD is getting terminated, sometimes we get pod update event with podIp removed.
+	if oldPodIp != "" && updatedPodIp == "" {
+		klog.V(4).Infof("Pod %s with ip %s is being terminated", old.(*k8sv1.Pod).Name, oldPodIp)
+		i.handleRemovedPod(old)
+	}
+
+	// Ignore privileged pods that use hostNetwork
+	if updatedPodIp != "" && updatedPodIp == podHostIP {
+		klog.V(4).Infof("Pod %s on host %s uses hostNetwork, ignoring", old.(*k8sv1.Pod).Name, podHostIP)
+		return
+	}
+
 	oldGlobalIp := old.(*k8sv1.Pod).GetAnnotations()[submarinerIpamGlobalIp]
 	newGlobalIp := newObj.(*k8sv1.Pod).GetAnnotations()[submarinerIpamGlobalIp]
 	if oldGlobalIp != newGlobalIp && newGlobalIp != i.pool.GetAllocatedIp(key) {
@@ -224,6 +298,7 @@ func (i *Controller) handleRemovedService(obj interface{}) {
 				return
 			}
 			i.pool.Release(key)
+			i.syncServiceRules(service, globalIp, DeleteRules)
 			klog.V(4).Infof("Released ip %s for service %s", globalIp, key)
 		}
 	}
@@ -248,13 +323,14 @@ func (i *Controller) handleRemovedPod(obj interface{}) {
 	}
 	if !i.excludeNamespaces[pod.Namespace] {
 		globalIp := pod.Annotations[submarinerIpamGlobalIp]
-		if globalIp != "" {
+		if globalIp != "" && pod.Status.PodIP != "" {
 			if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
 				utilruntime.HandleError(err)
 				return
 			}
 			i.pool.Release(key)
-			klog.V(4).Infof("Released ip %s for pod %s", globalIp, key)
+			i.syncPodRules(pod.Status.PodIP, globalIp, DeleteRules)
+			klog.V(4).Infof("Released GlobalIp %s for pod %s", globalIp, key)
 		}
 	}
 }
@@ -305,6 +381,7 @@ func (i *Controller) serviceUpdater(obj runtime.Object, key string) error {
 	}
 	if annotations != nil {
 		service.SetAnnotations(annotations)
+		i.syncServiceRules(service, annotations[submarinerIpamGlobalIp], AddRules)
 		_, updateErr := i.kubeClientSet.CoreV1().Services(service.Namespace).Update(service)
 		return updateErr
 	}
@@ -321,6 +398,7 @@ func (i *Controller) podUpdater(obj runtime.Object, key string) error {
 	}
 	if annotations != nil {
 		pod.SetAnnotations(annotations)
+		i.syncPodRules(pod.Status.PodIP, annotations[submarinerIpamGlobalIp], AddRules)
 		_, updateErr := i.kubeClientSet.CoreV1().Pods(pod.Namespace).Update(pod)
 		return updateErr
 	}
