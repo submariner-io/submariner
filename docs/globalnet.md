@@ -3,7 +3,7 @@
 Submariner is a tool built to connect overlay networks of different Kubernetes clusters. These clusters can be on different public clouds or on-premise. An important use case for Submariner is to connect disparate independent clusters into a single cohesive multi-cluster.
  However, one key limitation of submariner's current design is that it doesn't support overlapping CIDRs (ServiceCIDR and ClusterCIDR) across these clusters. Each cluster must use distinct CIDRs that don't conflict or overlap with any other cluster that is going to be part of cluster fleet.
 
-<!-- TODO: Add diagram showing the problem --> 
+![Figure 1 - Problem with overlapping CIDRs](img/globalnet/overlappingcidr-problem.png)
 
 This is largely problematic because most actual deployments use the default CIDRs for a cluster so every cluster ends up using the same CIDRs. Changing CIDRs on existing clusters is a very disruptive process and requires a cluster restart. So submariner needs a way to allow clusters with overlapping CIDRs to connect together.
 
@@ -12,6 +12,8 @@ This is largely problematic because most actual deployments use the default CIDR
 To support overlapping CIDRs in clusters connected through submariner, we're introducing a new component called Global Private Network, GlobalNet (`globalnet`). This GlobalNet is a virtual network specifically to support submariner's multi-cluster solution with a Global CIDR. Each cluster is given a subnet from this Global Private Network, configured as new cluster parameter `GlobalCIDR` (e.g. 169.254.0.0/16) which is configurable at time of deployment
 
 Once configured, each service and pod that requires cross-cluster access is allocated an IP, `GlobalIp` from this `GlobalCIDR` and it is annotated on the Pod/Service object. This `GlobalIp` is used for all cross-cluster communication to and from to this Pod/Service. Routing and IPTable/OVS/OVN rules are configured to use this IP for ingress and egress. All address translations occur on the Gateway node.
+
+![Figure 1 - Proposed solution](img/globalnet/overlappingcidr-solution.png)
 
 ## submariner-globalnet
 
@@ -36,8 +38,6 @@ This component is responsible for programming the routing entries and IPTable ru
 * On deletion of pod/service, clean up the rules from the gateway node.
 
 Globalnet currently relies on `kube-proxy` and thus will only work with deployments that use `kube-proxy`.
-
-<!-- TODO: Add a block diagram showing the solution -->
 
 ## Service Discovery - Lighthouse
 
