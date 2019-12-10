@@ -24,6 +24,9 @@ func NewIpPool(cidr string) (*IpPool, error) {
 	}
 	ones, totalbits := network.Mask.Size()
 	size := int(math.Exp2(float64(totalbits-ones))) - 2 // don't count net and broadcast
+	if size < 2 {
+		return nil, errors.New("Invalid CIDR Prefix")
+	}
 	pool := &IpPool{
 		cidr:      cidr,
 		net:       network,
