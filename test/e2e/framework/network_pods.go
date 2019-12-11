@@ -29,12 +29,13 @@ const (
 )
 
 type NetworkPodConfig struct {
-	Type       NetworkPodType
-	Cluster    ClusterIndex
-	Scheduling NetworkPodScheduling
-	Port       int
-	Data       string
-	RemoteIP   string
+	Type              NetworkPodType
+	Cluster           ClusterIndex
+	Scheduling        NetworkPodScheduling
+	Port              int
+	Data              string
+	RemoteIP          string
+	ConnectionTimeout int
 	// TODO: namespace, once https://github.com/submariner-io/submariner/pull/141 is merged
 }
 
@@ -45,7 +46,6 @@ type NetworkPod struct {
 	TerminationErrorMsg string
 	TerminationCode     int32
 	TerminationMessage  string
-	ConnectionTimeout   int
 	framework           *Framework
 }
 
@@ -68,7 +68,7 @@ func (f *Framework) NewNetworkPod(config *NetworkPodConfig) *NetworkPod {
 		config.Data = string(uuid.NewUUID())
 	}
 
-	networkPod := &NetworkPod{Config: config, framework: f, TerminationCode: -1, ConnectionTimeout: 45}
+	networkPod := &NetworkPod{Config: config, framework: f, TerminationCode: -1}
 
 	switch config.Type {
 	case ListenerPod:
@@ -159,7 +159,7 @@ func (np *NetworkPod) buildTCPCheckListenerPod() {
 					Env: []v1.EnvVar{
 						{Name: "LISTEN_PORT", Value: strconv.Itoa(np.Config.Port)},
 						{Name: "SEND_STRING", Value: np.Config.Data},
-						{Name: "CONN_TIMEOUT", Value: strconv.Itoa(np.ConnectionTimeout)},
+						{Name: "CONN_TIMEOUT", Value: strconv.Itoa(np.Config.ConnectionTimeout)},
 					},
 				},
 			},
@@ -201,7 +201,7 @@ func (np *NetworkPod) buildTCPCheckConnectorPod() {
 						{Name: "REMOTE_PORT", Value: strconv.Itoa(np.Config.Port)},
 						{Name: "SEND_STRING", Value: np.Config.Data},
 						{Name: "REMOTE_IP", Value: np.Config.RemoteIP},
-						{Name: "CONN_TRIES", Value: strconv.Itoa(np.ConnectionTimeout / ncatConnectTimeout)},
+						{Name: "CONN_TRIES", Value: strconv.Itoa(np.Config.ConnectionTimeout / ncatConnectTimeout)},
 						{Name: "CONN_TIMEOUT", Value: strconv.Itoa(ncatConnectTimeout)},
 					},
 				},
