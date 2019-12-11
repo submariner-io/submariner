@@ -8,18 +8,18 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
-
+	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	kubeclientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 
 	. "github.com/onsi/gomega"
 )
@@ -63,7 +63,8 @@ type Framework struct {
 	// test multiple times in parallel.
 	UniqueName string
 
-	ClusterClients []*kubeclientset.Clientset
+	ClusterClients    []*kubeclientset.Clientset
+	SubmarinerClients []*submarinerClientset.Clientset
 
 	SkipNamespaceCreation    bool            // Whether to skip creating a namespace
 	Namespace                string          // Every test has a namespace at least unless creation is skipped
@@ -117,8 +118,8 @@ func (f *Framework) BeforeEach() {
 	ginkgo.By("Creating kubernetes clients")
 
 	for _, context := range TestContext.KubeContexts {
-		client := f.createKubernetesClient(context)
-		f.ClusterClients = append(f.ClusterClients, client)
+		f.ClusterClients = append(f.ClusterClients, f.createKubernetesClient(context))
+		f.SubmarinerClients = append(f.SubmarinerClients, f.createSubmarinerClient(context))
 	}
 
 	if !f.SkipNamespaceCreation {
@@ -146,28 +147,7 @@ func (f *Framework) BeforeEach() {
 
 func (f *Framework) createKubernetesClient(context string) *kubeclientset.Clientset {
 
-	restConfig, _, err := loadConfig(TestContext.KubeConfig, context)
-	if err != nil {
-		Errorf("Unable to load kubeconfig file %s for context %s, this is a non-recoverable error",
-			TestContext.KubeConfig, context)
-		Errorf("loadConfig err: %s", err.Error())
-		os.Exit(1)
-	}
-
-	testDesc := ginkgo.CurrentGinkgoTestDescription()
-	if len(testDesc.ComponentTexts) > 0 {
-		componentTexts := strings.Join(testDesc.ComponentTexts, " ")
-		restConfig.UserAgent = fmt.Sprintf(
-			"%v -- %v",
-			rest.DefaultKubernetesUserAgent(),
-			componentTexts)
-	}
-
-	restConfig.QPS = f.Options.ClientQPS
-	restConfig.Burst = f.Options.ClientBurst
-	if f.Options.GroupVersion != nil {
-		restConfig.GroupVersion = f.Options.GroupVersion
-	}
+	restConfig := f.createRestConfig(context)
 	clientSet, err := kubeclientset.NewForConfig(restConfig)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -180,6 +160,30 @@ func (f *Framework) createKubernetesClient(context string) *kubeclientset.Client
 		restConfig.NegotiatedSerializer = scheme.Codecs
 	}
 	return clientSet
+}
+
+func (f *Framework) createRestConfig(context string) *rest.Config {
+	restConfig, _, err := loadConfig(TestContext.KubeConfig, context)
+	if err != nil {
+		Errorf("Unable to load kubeconfig file %s for context %s, this is a non-recoverable error",
+			TestContext.KubeConfig, context)
+		Errorf("loadConfig err: %s", err.Error())
+		os.Exit(1)
+	}
+	testDesc := ginkgo.CurrentGinkgoTestDescription()
+	if len(testDesc.ComponentTexts) > 0 {
+		componentTexts := strings.Join(testDesc.ComponentTexts, " ")
+		restConfig.UserAgent = fmt.Sprintf(
+			"%v -- %v",
+			rest.DefaultKubernetesUserAgent(),
+			componentTexts)
+	}
+	restConfig.QPS = f.Options.ClientQPS
+	restConfig.Burst = f.Options.ClientBurst
+	if f.Options.GroupVersion != nil {
+		restConfig.GroupVersion = f.Options.GroupVersion
+	}
+	return restConfig
 }
 
 func deleteNamespace(client kubeclientset.Interface, namespaceName string) error {
