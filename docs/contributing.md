@@ -40,3 +40,6 @@ Join #submariner slack channel at [Rancher-users workspace](https://rancher-user
 
 ### Google group
 Join [Submariner's google group](https://groups.google.com/forum/#!forum/submariner-dev).
+
+### Weekly Meeting
+Join [Submariner's weekly meeting](https://bluejeans.com/3472508766) from 11:00-11:30AM ET ([agendas and notes](https://docs.google.com/document/d/1qnZ2LpF_rXGfnYYPNTldQ4WbeEUxwnuQD-xTC6GbZdg)).
