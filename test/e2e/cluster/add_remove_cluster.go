@@ -29,7 +29,7 @@ var _ = Describe("[expansion] Test expanding/shrinking an existing cluster fleet
 		dataplane.RunNoConnectivityTest(f, true, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterC, framework.ClusterB)
 
 		nonGatewayNodes := f.FindNodesByGatewayLabel(framework.ClusterC, false)
-		Expect(nonGatewayNodes).ToNot(HaveLen(0), fmt.Sprintf("Found non-gateway node on %q", clusterCName))
+		Expect(nonGatewayNodes).ToNot(HaveLen(0), fmt.Sprintf("No non-gateway nodes found on %q", clusterCName))
 		nonGatewayNode := nonGatewayNodes[0].Name
 		By(fmt.Sprintf("Adding cluster %q by setting the gateway label on node %q", clusterCName, nonGatewayNode))
 		f.SetGatewayLabelOnNode(framework.ClusterC, nonGatewayNode, true)
