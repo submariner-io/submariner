@@ -431,6 +431,8 @@ if [ "$deploy_operator" = true ]; then
     context=cluster1
     kubectl config use-context $context
     del_subm_gateway_label
+    # Just removing the label does not stop Subm pod.
+    kubectl delete pod -n submariner-operator -l app=submariner-engine
 
 elif [[ $5 = helm ]]; then
     helm=true
@@ -440,7 +442,7 @@ fi
 
 test_connection
 
-if [[ $1 = keep ]]; then
+if [[ $1 = keep || $1 = onetime ]]; then
     test_with_e2e_tests
 fi
 
