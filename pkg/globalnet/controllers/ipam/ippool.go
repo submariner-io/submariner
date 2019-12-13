@@ -83,7 +83,10 @@ func (p *IpPool) Release(key string) string {
 }
 
 func (p *IpPool) IsAvailable(ip string) bool {
-	return p.available[ip]
+	p.RLock()
+	result := p.available[ip]
+	p.RUnlock()
+	return result
 }
 
 func (p *IpPool) GetAllocatedIp(key string) string {
