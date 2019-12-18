@@ -11,3 +11,7 @@ package/strongswan-*
 .project
 .settings
 *.coverprofile
+
+.terraform
+.terraform.tfstate.lock.info
+terraform.tfstate*
