@@ -50,6 +50,12 @@ type PatchStringValue struct {
 	Value string `json:"value"`
 }
 
+type PatchUInt32Value struct {
+	Op    string `json:"op"`
+	Path  string `json:"path"`
+	Value uint32 `json:"value"`
+}
+
 type DoOperationFunc func() (interface{}, error)
 type CheckResultFunc func(result interface{}) (bool, string, error)
 
@@ -300,14 +306,29 @@ func createNamespace(client kubeclientset.Interface, name string, labels map[str
 	return namespace
 }
 
-// DoPatchOperation performs a REST patch operation for the given path and value.
-func DoPatchOperation(path string, value string, patchFunc PatchFunc) {
+// PatchString performs a REST patch operation for the given path and string value.
+func PatchString(path string, value string, patchFunc PatchFunc) {
 	payload := []PatchStringValue{{
 		Op:    "add",
 		Path:  path,
 		Value: value,
 	}}
 
+	doPatchOperation(payload, patchFunc)
+}
+
+// PatchInt performs a REST patch operation for the given path and int value.
+func PatchInt(path string, value uint32, patchFunc PatchFunc) {
+	payload := []PatchUInt32Value{{
+		Op:    "add",
+		Path:  path,
+		Value: value,
+	}}
+
+	doPatchOperation(payload, patchFunc)
+}
+
+func doPatchOperation(payload interface{}, patchFunc PatchFunc) {
 	payloadBytes, err := json.Marshal(payload)
 	Expect(err).NotTo(HaveOccurred())
 
