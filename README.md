@@ -110,12 +110,12 @@ by using its operator. All three methods are described here.
 Download the latest binary for your operating system and architecture, then install it on your
 path. The binary has no external dependencies so you won’t need anything else.
 
-For example, to download v0.0.2 for Linux amd64 and install it in `~/.local/bin`:
+For example, to download v0.0.3 for Linux amd64 and install it in `~/.local/bin`:
 
     mkdir -p ~/.local/bin
-    wget https://github.com/submariner-io/submariner-operator/releases/download/v0.0.2/subctl-v0.0.2-linux-amd64
-    install subctl-v0.0.2-linux-amd64 ~/.local/bin/subctl
-    rm subctl-v0.0.2-linux-amd64
+    wget https://github.com/submariner-io/submariner-operator/releases/download/v0.0.3/subctl-v0.0.3-linux-amd64
+    install subctl-v0.0.3-linux-amd64 ~/.local/bin/subctl
+    rm subctl-v0.0.3-linux-amd64
 
 If `~/.local/bin` is on your `PATH`, you will then be able to run `subctl`.
 
