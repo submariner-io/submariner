@@ -57,9 +57,6 @@ func intToIP(ip int) net.IP {
 }
 
 func (p *IpPool) Allocate(key string) (string, error) {
-	if p.IsFull() {
-		return "", errors.New("IPAM: No IP available for allocation")
-	}
 	p.Lock()
 	defer p.Unlock()
 	allocatedIp := p.allocated[key]
@@ -69,7 +66,7 @@ func (p *IpPool) Allocate(key string) (string, error) {
 			delete(p.available, k)
 			return k, nil
 		}
-		return "", errors.New("IPAM: Unable to allocate IP")
+		return "", errors.New("IPAM: No IP available for allocation")
 	}
 	return allocatedIp, nil
 }
@@ -97,14 +94,6 @@ func (p *IpPool) GetAllocatedIp(key string) string {
 	ip := p.allocated[key]
 	p.RUnlock()
 	return ip
-}
-
-func (p *IpPool) IsFull() bool {
-	var result bool
-	p.RLock()
-	result = len(p.available) == 0
-	p.RUnlock()
-	return result
 }
 
 func (p *IpPool) RequestIp(key string, ip string) (string, error) {
