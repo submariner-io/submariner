@@ -83,6 +83,7 @@ func GetLocalCluster(ss types.SubmarinerSpecification) (types.SubmarinerCluster,
 	localCluster.Spec.ClusterID = ss.ClusterID
 	localCluster.Spec.ClusterCIDR = ss.ClusterCidr
 	localCluster.Spec.ServiceCIDR = ss.ServiceCidr
+	localCluster.Spec.GlobalCIDR = ss.GlobalCidr
 	localCluster.Spec.ColorCodes = ss.ColorCodes
 	return localCluster, nil
 }
