@@ -79,19 +79,27 @@ func main() {
 		submarinerInformers.WithNamespace(submSpec.Namespace))
 
 	start := func(context.Context) {
+		var localSubnets []string
+
 		localCluster, err := util.GetLocalCluster(submSpec)
 		if err != nil {
 			klog.Fatalf("Fatal error occurred while retrieving local cluster from %#v: %v", submSpec, err)
 		}
 
+		if len(submSpec.GlobalCidr) > 0 {
+			localSubnets = submSpec.GlobalCidr
+		} else {
+			localSubnets = append(submSpec.ServiceCidr, submSpec.ClusterCidr...)
+		}
+
 		localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterID, "ipsec", nil, submSpec.NatEnabled,
-			append(submSpec.ServiceCidr, submSpec.ClusterCidr...), util.GetLocalIP())
+			localSubnets, util.GetLocalIP())
 
 		if err != nil {
 			klog.Fatalf("Fatal error occurred while retrieving local endpoint from %#v: %v", submSpec, err)
 		}
 
-		cableEngine, err := ipsec.NewEngine(append(submSpec.ClusterCidr, submSpec.ServiceCidr...), localCluster, localEndpoint)
+		cableEngine, err := ipsec.NewEngine(localSubnets, localCluster, localEndpoint)
 		if err != nil {
 			klog.Fatalf("Fatal error occurred creating ipsec engine: %v", err)
 		}
