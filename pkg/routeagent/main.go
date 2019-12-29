@@ -73,7 +73,6 @@ func main() {
 	informerConfig := route.InformerConfigStruct{
 		SubmarinerClientSet: submarinerClient,
 		ClientSet:           clientSet,
-		ClusterInformer:     submarinerInformerFactory.Submariner().V1().Clusters(),
 		EndpointInformer:    submarinerInformerFactory.Submariner().V1().Endpoints(),
 		PodInformer:         informerFactory.Core().V1().Pods(),
 	}
