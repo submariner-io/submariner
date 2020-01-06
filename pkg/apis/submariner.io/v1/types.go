@@ -19,6 +19,7 @@ type ClusterSpec struct {
 	ColorCodes  []string `json:"color_codes"`
 	ServiceCIDR []string `json:"service_cidr"`
 	ClusterCIDR []string `json:"cluster_cidr"`
+	GlobalCIDR  []string `json:"global_cidr"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
