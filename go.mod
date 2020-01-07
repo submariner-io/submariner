@@ -5,7 +5,7 @@ go 1.12
 require (
 	cloud.google.com/go v0.45.1 // indirect
 	github.com/bronze1man/goStrongswanVici v0.0.0-20190921045355-4c81bd8d0bd5
-	github.com/coreos/go-iptables v0.4.3
+	github.com/coreos/go-iptables v0.4.5
 	github.com/evanphx/json-patch v0.0.0-20180908160633-36442dbdb585 // indirect
 	github.com/gogo/protobuf v0.0.0-20171007142547-342cbe0a0415 // indirect
 	github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903 // indirect
