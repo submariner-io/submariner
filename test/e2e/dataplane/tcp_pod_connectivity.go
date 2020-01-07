@@ -66,7 +66,8 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 
 func RunConnectivityTest(f *framework.Framework, useService bool, listenerScheduling framework.NetworkPodScheduling, connectorScheduling framework.NetworkPodScheduling, listenerCluster framework.ClusterIndex, connectorCluster framework.ClusterIndex) (*framework.NetworkPod, *framework.NetworkPod) {
 
-	listenerPod, connectorPod := createPods(f, useService, listenerScheduling, connectorScheduling, listenerCluster, connectorCluster, 45)
+	listenerPod, connectorPod := createPods(f, useService, listenerScheduling, connectorScheduling, listenerCluster, connectorCluster,
+		framework.TestContext.ConnectionTimeout, framework.TestContext.ConnectionAttempts)
 	listenerPod.CheckSuccessfulFinish()
 	connectorPod.CheckSuccessfulFinish()
 
@@ -82,7 +83,7 @@ func RunConnectivityTest(f *framework.Framework, useService bool, listenerSchedu
 }
 
 func RunNoConnectivityTest(f *framework.Framework, useService bool, listenerScheduling framework.NetworkPodScheduling, connectorScheduling framework.NetworkPodScheduling, listenerCluster framework.ClusterIndex, connectorCluster framework.ClusterIndex) (*framework.NetworkPod, *framework.NetworkPod) {
-	listenerPod, connectorPod := createPods(f, useService, listenerScheduling, connectorScheduling, listenerCluster, connectorCluster, 5)
+	listenerPod, connectorPod := createPods(f, useService, listenerScheduling, connectorScheduling, listenerCluster, connectorCluster, 5, 1)
 
 	By("Verifying that listener pod exits with non-zero code and timed out message")
 	Expect(listenerPod.TerminationMessage).To(ContainSubstring("nc: timeout"))
@@ -96,13 +97,16 @@ func RunNoConnectivityTest(f *framework.Framework, useService bool, listenerSche
 	return listenerPod, connectorPod
 }
 
-func createPods(f *framework.Framework, useService bool, listenerScheduling framework.NetworkPodScheduling, connectorScheduling framework.NetworkPodScheduling, listenerCluster framework.ClusterIndex, connectorCluster framework.ClusterIndex, connectionTimeout int) (*framework.NetworkPod, *framework.NetworkPod) {
+func createPods(f *framework.Framework, useService bool, listenerScheduling framework.NetworkPodScheduling, connectorScheduling framework.NetworkPodScheduling, listenerCluster framework.ClusterIndex,
+	connectorCluster framework.ClusterIndex, connectionTimeout uint, connectionAttempts uint) (*framework.NetworkPod, *framework.NetworkPod) {
+
 	By(fmt.Sprintf("Creating a listener pod in cluster %q, which will wait for a handshake over TCP", framework.TestContext.KubeContexts[listenerCluster]))
 	listenerPod := f.NewNetworkPod(&framework.NetworkPodConfig{
-		Type:              framework.ListenerPod,
-		Cluster:           listenerCluster,
-		Scheduling:        listenerScheduling,
-		ConnectionTimeout: connectionTimeout,
+		Type:               framework.ListenerPod,
+		Cluster:            listenerCluster,
+		Scheduling:         listenerScheduling,
+		ConnectionTimeout:  connectionTimeout,
+		ConnectionAttempts: connectionAttempts,
 	})
 
 	remoteIP := listenerPod.Pod.Status.PodIP
@@ -116,11 +120,12 @@ func createPods(f *framework.Framework, useService bool, listenerScheduling fram
 
 	By(fmt.Sprintf("Creating a connector pod in cluster %q, which will attempt the specific UUID handshake over TCP", framework.TestContext.KubeContexts[connectorCluster]))
 	connectorPod := f.NewNetworkPod(&framework.NetworkPodConfig{
-		Type:              framework.ConnectorPod,
-		Cluster:           connectorCluster,
-		Scheduling:        connectorScheduling,
-		RemoteIP:          remoteIP,
-		ConnectionTimeout: connectionTimeout,
+		Type:               framework.ConnectorPod,
+		Cluster:            connectorCluster,
+		Scheduling:         connectorScheduling,
+		RemoteIP:           remoteIP,
+		ConnectionTimeout:  connectionTimeout,
+		ConnectionAttempts: connectionAttempts,
 	})
 
 	By(fmt.Sprintf("Waiting for the listener pod %q to exit, returning what listener sent", listenerPod.Pod.Name))

@@ -5,6 +5,23 @@ source $(git rev-parse --show-toplevel)/scripts/lib/debug_functions
 
 ### Functions ###
 
+function print_logs() {
+    logs=("$@")
+    if [[ ${#logs[@]} -gt 0 ]]; then
+        echo "(Watch the installation processes with \"tail -f ${logs[*]}\".)"
+        for i in 1 2 3; do
+            if [[ pids[$i] -gt -1 ]]; then
+                wait ${pids[$i]}
+                if [[ $? -ne 0 && $? -ne 127 ]]; then
+                    echo Cluster $i creation failed:
+                    cat ${logs[$i]}
+                fi
+                rm -f ${logs[$i]}
+            fi
+        done
+    fi
+}
+
 function kind_clusters() {
     status=$1
     version=$2
@@ -37,19 +54,7 @@ function kind_clusters() {
             set pids[$i] = $!
         fi
     done
-    if [[ ${#logs[@]} -gt 0 ]]; then
-        echo "(Watch the installation processes with \"tail -f ${logs[*]}\".)"
-        for i in 1 2 3; do
-            if [[ pids[$i] -gt -1 ]]; then
-                wait ${pids[$i]}
-                if [[ $? -ne 0 && $? -ne 127 ]]; then
-                    echo Cluster $i creation failed:
-                    cat ${logs[$i]}
-                fi
-                rm -f ${logs[$i]}
-            fi
-        done
-    fi
+    print_logs "${logs[@]}"
 }
 
 function install_helm() {
@@ -78,19 +83,7 @@ function install_helm() {
             set pids[$i] = $!
         fi
     done
-    if [[ ${#logs[@]} -gt 0 ]]; then
-        echo "(Watch the installation processes with \"tail -f ${logs[*]}\".)"
-        for i in 1 2 3; do
-            if [[ pids[$i] -gt -1 ]]; then
-                wait ${pids[$i]}
-                if [[ $? -ne 0 && $? -ne 127 ]]; then
-                    echo Cluster $i creation failed:
-                    cat ${logs[$i]}
-                fi
-                rm -f ${logs[$i]}
-            fi
-        done
-    fi
+    print_logs "${logs[@]}"
 }
 
 function setup_custom_cni(){
@@ -148,24 +141,31 @@ function helm_install_subm() {
     service_cidr=$3
     crd_create=$4
     helm --kube-context ${cluster_id} install submariner-latest/submariner \
-	--name submariner \
-	--namespace submariner \
-	--set ipsec.psk="${SUBMARINER_PSK}" \
-	--set broker.server="${SUBMARINER_BROKER_URL}" \
-	--set broker.token="${SUBMARINER_BROKER_TOKEN}" \
-	--set broker.namespace="${SUBMARINER_BROKER_NS}" \
-	--set broker.ca="${SUBMARINER_BROKER_CA}" \
-	--set submariner.clusterId="${cluster_id}" \
-	--set submariner.clusterCidr="${cluster_cidr}" \
-	--set submariner.serviceCidr="${service_cidr}" \
-	--set submariner.natEnabled="false" \
-	--set routeAgent.image.repository="submariner-route-agent" \
-	--set routeAgent.image.tag="local" \
-	--set routeAgent.image.pullPolicy="IfNotPresent" \
-	--set engine.image.repository="submariner" \
-	--set engine.image.tag="local" \
-	--set engine.image.pullPolicy="IfNotPresent" \
-	--set crd.create="${crd_create}"
+        --name submariner \
+        --namespace submariner \
+        --set ipsec.psk="${SUBMARINER_PSK}" \
+        --set broker.server="${SUBMARINER_BROKER_URL}" \
+        --set broker.token="${SUBMARINER_BROKER_TOKEN}" \
+        --set broker.namespace="${SUBMARINER_BROKER_NS}" \
+        --set broker.ca="${SUBMARINER_BROKER_CA}" \
+        --set submariner.clusterId="${cluster_id}" \
+        --set submariner.clusterCidr="${cluster_cidr}" \
+        --set submariner.serviceCidr="${service_cidr}" \
+        --set submariner.natEnabled="false" \
+        --set routeAgent.image.repository="submariner-route-agent" \
+        --set routeAgent.image.tag="local" \
+        --set routeAgent.image.pullPolicy="IfNotPresent" \
+        --set engine.image.repository="submariner" \
+        --set engine.image.tag="local" \
+        --set engine.image.pullPolicy="IfNotPresent" \
+        --set crd.create="${crd_create}"
+}
+
+function wait_for_subm_pods() {
+    context=$1
+    echo Waiting for submariner pods to be Ready on ${context}...
+    kubectl --context=${context} wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s
+    kubectl --context=${context} wait --for=condition=Ready pods -l app=submariner-routeagent -n submariner --timeout=60s
 }
 
 function setup_cluster2_gateway() {
@@ -178,9 +178,7 @@ function setup_cluster2_gateway() {
         kubectl --context=cluster2 label node cluster2-worker "submariner.io/gateway=true" --overwrite
         helm_install_subm cluster2 10.245.0.0/16 100.95.0.0/16 true
 
-        echo Waiting for submariner pods to be Ready on cluster2...
-        kubectl --context=cluster2 wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s
-        kubectl --context=cluster2 wait --for=condition=Ready pods -l app=submariner-routeagent -n submariner --timeout=60s
+        wait_for_subm_pods cluster2
 
         echo Deploying netshoot on cluster2 worker: ${worker_ip}
         kubectl --context=cluster2 apply -f ${PRJ_ROOT}/scripts/kind-e2e/netshoot.yaml
@@ -199,9 +197,7 @@ function setup_cluster3_gateway() {
         kubectl --context=cluster3 label node cluster3-worker "submariner.io/gateway=true" --overwrite
         helm_install_subm cluster3 10.246.0.0/16 100.96.0.0/16 true
 
-        echo Waiting for submariner pods to be Ready on cluster3...
-        kubectl --context=cluster3 wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s
-        kubectl --context=cluster3 wait --for=condition=Ready pods -l app=submariner-routeagent -n submariner --timeout=60s
+        wait_for_subm_pods cluster3
 
         echo Deploying nginx on cluster3 worker: ${worker_ip}
         kubectl --context=cluster3 apply -f ${PRJ_ROOT}/scripts/kind-e2e/nginx-demo.yaml
@@ -361,20 +357,26 @@ function cleanup {
 
 ### Main ###
 
-if [[ $1 = clean ]]; then
+status=$1
+version=$2
+logging=$3
+kubefed=$4
+deploy=$5
+
+if [[ $status = clean ]]; then
     cleanup
     exit 0
 fi
-if [[ $1 != keep && $1 != create ]]; then
+if [[ $status != keep && $status != create ]]; then
     trap cleanup EXIT
 fi
 
-if [ "$5" = operator ]; then
+if [ "$deploy" = operator ]; then
    echo Deploying with operator
    deploy_operator=true
 fi
 
-echo Starting with status: $1, k8s_version: $2, logging: $3, kubefed: $4.
+echo Starting with status: $status, k8s_version: $version, logging: $logging, kubefed: $kubefed, deploy: $deploy
 PRJ_ROOT=$(git rev-parse --show-toplevel)
 mkdir -p ${PRJ_ROOT}/output/kind-config/dapper/ ${PRJ_ROOT}/output/kind-config/local-dev/
 SUBMARINER_BROKER_NS=submariner-k8s-broker
@@ -385,12 +387,12 @@ export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-clust
 
 kind_clusters "$@"
 setup_custom_cni
-if [[ $3 = true ]]; then
+if [[ $logging = true ]]; then
     enable_logging
 fi
 
 install_helm
-if [[ $4 = true ]]; then
+if [[ $kubefed = true ]]; then
     enable_kubefed
 fi
 
@@ -434,7 +436,7 @@ if [ "$deploy_operator" = true ]; then
     # Just removing the label does not stop Subm pod.
     kubectl delete pod -n submariner-operator -l app=submariner-engine
 
-elif [[ $5 = helm ]]; then
+elif [[ $deploy = helm ]]; then
     helm=true
     setup_cluster2_gateway
     setup_cluster3_gateway
@@ -442,11 +444,11 @@ fi
 
 test_connection
 
-if [[ $1 = keep || $1 = onetime ]]; then
+if [[ $status = keep || $status = onetime ]]; then
     test_with_e2e_tests
 fi
 
-if [[ $1 = keep || $1 = create ]]; then
+if [[ $status = keep || $status = create ]]; then
     echo "your 3 virtual clusters are deployed and working properly with your local"
     echo "submariner source code, and can be accessed with:"
     echo ""

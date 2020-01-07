@@ -10,7 +10,7 @@ import (
 	"github.com/submariner-io/submariner/test/e2e/framework"
 )
 
-var _ = Describe("[expansion] Test expanding/shrinking an existing cluster fleet", func() {
+var _ = PDescribe("[expansion] Test expanding/shrinking an existing cluster fleet", func() {
 	f := framework.NewDefaultFramework("add-remove-cluster")
 
 	It("Should be able to add and remove third cluster", func() {
