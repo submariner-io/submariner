@@ -7,7 +7,8 @@ type Operation string
 const (
 	handlerResync          = time.Hour * 24
 	submarinerIpamGlobalIp = "submariner.io/globalIp"
-	submarinerGlobalNet    = "SUBMARINER-GLOBALNET"
+	submarinerIngress      = "SUBMARINER-GN-INGRESS"
+	submarinerEgress       = "SUBMARINER-GN-EGRESS"
 
 	// Currently Submariner Globalnet implementation (for services) works with kube-proxy
 	// and uses iptable chain-names programmed by kube-proxy. If the internal implementation

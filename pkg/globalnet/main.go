@@ -3,11 +3,8 @@ package main
 import (
 	"flag"
 	"sync"
-	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
 
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers/ipam"
 
@@ -16,8 +13,6 @@ import (
 
 	"github.com/submariner-io/submariner/pkg/signals"
 )
-
-const defaultResync = 60 * time.Second
 
 var (
 	masterURL  string
@@ -43,34 +38,18 @@ func main() {
 		klog.Fatalf("Error building kubeconfig: %s", err.Error())
 	}
 
-	clientSet, err := kubernetes.NewForConfig(cfg)
+	gatewayMonitor, err := ipam.NewGatewayMonitor(&ipamSpec, cfg, stopCh)
 	if err != nil {
-		klog.Fatalf("Error building clientset: %s", err.Error())
+		klog.Fatalf("Error creating gatewayMonitor: %s", err.Error())
 	}
-
-	informerFactory := informers.NewSharedInformerFactoryWithOptions(clientSet, defaultResync)
-
-	informerConfig := ipam.InformerConfigStruct{
-		KubeClientSet:   clientSet,
-		ServiceInformer: informerFactory.Core().V1().Services(),
-		PodInformer:     informerFactory.Core().V1().Pods(),
-	}
-
-	ipamController, err := ipam.NewController(&ipamSpec, &informerConfig)
-	if err != nil {
-		klog.Fatalf("Error creating controller: %s", err.Error())
-	}
-
-	informerFactory.Start(stopCh)
 
 	var wg sync.WaitGroup
-
 	wg.Add(1)
 
 	go func() {
 		defer wg.Done()
-		if err = ipamController.Run(stopCh); err != nil {
-			klog.Fatalf("Error running ipam controller: %s", err.Error())
+		if err = gatewayMonitor.Run(stopCh); err != nil {
+			klog.Fatalf("Error running gatewayMonitor: %s", err.Error())
 		}
 	}()
 
