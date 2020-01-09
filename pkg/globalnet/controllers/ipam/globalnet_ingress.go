@@ -8,33 +8,18 @@ import (
 
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
-
-	"github.com/submariner-io/submariner/pkg/util"
 )
-
-func (i *Controller) initIPTableChains() error {
-	klog.V(4).Infof("Install/ensure %s chain exists", submarinerGlobalNet)
-	if err := util.CreateChainIfNotExists(i.ipt, "nat", submarinerGlobalNet); err != nil {
-		return fmt.Errorf("error creating iptables chain %s: %v", submarinerGlobalNet, err)
-	}
-
-	forwardToSubGlobalNetRuleSpec := []string{"-j", submarinerGlobalNet}
-	if err := util.PrependUnique(i.ipt, "nat", "PREROUTING", forwardToSubGlobalNetRuleSpec); err != nil {
-		klog.Errorf("error appending iptables rule \"%s\": %v\n", strings.Join(forwardToSubGlobalNetRuleSpec, " "), err)
-	}
-	return nil
-}
 
 func (i *Controller) updateIngressRulesForService(globalIP, chainName string, addRules bool) error {
 	ruleSpec := []string{"-d", globalIP, "-j", chainName}
 	if addRules {
 		klog.V(4).Infof("Installing iptables rule for Service %s", strings.Join(ruleSpec, " "))
-		if err := i.ipt.AppendUnique("nat", submarinerGlobalNet, ruleSpec...); err != nil {
+		if err := i.ipt.AppendUnique("nat", submarinerIngress, ruleSpec...); err != nil {
 			return fmt.Errorf("error appending iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
 		}
 	} else {
 		klog.V(4).Infof("Deleting iptable ingress rule for Service: %s", strings.Join(ruleSpec, " "))
-		if err := i.ipt.Delete("nat", submarinerGlobalNet, ruleSpec...); err != nil {
+		if err := i.ipt.Delete("nat", submarinerIngress, ruleSpec...); err != nil {
 			return fmt.Errorf("error deleting iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
 		}
 	}

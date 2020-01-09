@@ -2,7 +2,6 @@ package ipam
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/coreos/go-iptables/iptables"
@@ -68,18 +67,10 @@ func NewController(spec *SubmarinerIpamControllerSpecification, config *Informer
 }
 
 func (i *Controller) Run(stopCh <-chan struct{}) error {
-	var wg sync.WaitGroup
-	wg.Add(1)
 	defer utilruntime.HandleCrash()
 
 	// Start the informer factories to begin populating the informer caches
 	klog.Info("Starting IPAM Controller")
-
-	// Wait for the caches to be synced before starting workers
-	klog.Info("Waiting for informer caches to sync")
-	if ok := cache.WaitForCacheSync(stopCh, i.servicesSynced, i.podsSynced); !ok {
-		return fmt.Errorf("failed to wait for caches to sync")
-	}
 
 	// Query kube-proxy pods in the cluster
 	kubeProxyPodList, err := i.kubeClientSet.CoreV1().Pods(kubeProxyNameSpace).List(metav1.ListOptions{LabelSelector: kubeProxyLabelSelector})
@@ -97,13 +88,18 @@ func (i *Controller) Run(stopCh <-chan struct{}) error {
 		return fmt.Errorf("initIPTableChains returned error. %v", err)
 	}
 
+	// Wait for the caches to be synced before starting workers
+	klog.Info("Waiting for informer caches to sync")
+	if ok := cache.WaitForCacheSync(stopCh, i.servicesSynced, i.podsSynced); !ok {
+		return fmt.Errorf("failed to wait for caches to sync")
+	}
+
 	klog.Info("Starting workers")
 	go wait.Until(i.runServiceWorker, time.Second, stopCh)
 	go wait.Until(i.runPodWorker, time.Second, stopCh)
-	wg.Wait()
 	<-stopCh
 	klog.Info("Shutting down workers")
-
+	i.cleanupIPTableRules()
 	return nil
 }
 
@@ -335,33 +331,27 @@ func (i *Controller) handleRemovedPod(obj interface{}) {
 	}
 }
 
-func (i *Controller) annotateGlobalIp(key string, annotations map[string]string) (map[string]string, error) {
-	if annotations == nil {
-		annotations = map[string]string{}
-	}
+func (i *Controller) annotateGlobalIp(key string, globalIp string) (string, error) {
 	var ip string
 	var err error
-	globalIp := annotations[submarinerIpamGlobalIp]
 	if globalIp == "" {
 		ip, err = i.pool.Allocate(key)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
-		annotations[submarinerIpamGlobalIp] = ip
 		klog.V(4).Infof("Allocating GlobalIp %s to %s ", ip, key)
-		return annotations, nil
+		return ip, nil
 	}
 	givenIp, err := i.pool.RequestIp(key, globalIp)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	if globalIp != givenIp {
 		// This resource has been allocated a different IP
-		annotations[submarinerIpamGlobalIp] = givenIp
 		klog.V(4).Infof("Updating GlobalIp for %s from %s to %s", key, globalIp, givenIp)
-		return annotations, nil
+		return givenIp, nil
 	}
-	return nil, nil
+	return "", nil
 }
 
 func (i *Controller) serviceGetter(namespace, name string) (runtime.Object, error) {
@@ -374,16 +364,30 @@ func (i *Controller) podGetter(namespace, name string) (runtime.Object, error) {
 
 func (i *Controller) serviceUpdater(obj runtime.Object, key string) error {
 	service := obj.(*k8sv1.Service)
-	annotations, err := i.annotateGlobalIp(key, service.GetAnnotations())
+	existingGlobalIp := service.GetAnnotations()[submarinerIpamGlobalIp]
+	allocatedIp, err := i.annotateGlobalIp(key, existingGlobalIp)
 	if err != nil { // failed to get globalIp or failed to update, we want to retry
 		logAndRequeue(key, i.serviceWorkqueue)
 		return fmt.Errorf("failed to annotate GlobalIp to service %s: %v", key, err)
 	}
-	if annotations != nil {
+
+	// This case is hit when the Service does not have the globalIp annotation and a new globalIp is allocated
+	// or when the existing annotation on the Service does not match with the allocated globalIp.
+	if allocatedIp != "" {
+		annotations := service.GetAnnotations()
+		if annotations == nil {
+			annotations = map[string]string{}
+		}
+		annotations[submarinerIpamGlobalIp] = allocatedIp
 		service.SetAnnotations(annotations)
-		i.syncServiceRules(service, annotations[submarinerIpamGlobalIp], AddRules)
+		i.syncServiceRules(service, allocatedIp, AddRules)
 		_, updateErr := i.kubeClientSet.CoreV1().Services(service.Namespace).Update(service)
 		return updateErr
+	} else if existingGlobalIp != "" {
+		// When Globalnet Controller is migrated, we get notification for all the existing services.
+		// For services that already have the annotation, we update the local ipPool cache and sync
+		// the iptable rules on the node.
+		i.syncServiceRules(service, existingGlobalIp, AddRules)
 	}
 	return nil
 }
@@ -391,16 +395,30 @@ func (i *Controller) serviceUpdater(obj runtime.Object, key string) error {
 func (i *Controller) podUpdater(obj runtime.Object, key string) error {
 	pod := obj.(*k8sv1.Pod)
 	pod.GetSelfLink()
-	annotations, err := i.annotateGlobalIp(key, pod.GetAnnotations())
+	existingGlobalIp := pod.GetAnnotations()[submarinerIpamGlobalIp]
+	allocatedIp, err := i.annotateGlobalIp(key, existingGlobalIp)
 	if err != nil { // failed to get globalIp or failed to update, we want to retry
 		logAndRequeue(key, i.podWorkqueue)
 		return fmt.Errorf("failed to annotate GlobalIp to Pod %s: %v", key, err)
 	}
-	if annotations != nil {
+
+	// This case is hit when the POD does not have the globalIp annotation and a new globalIp is allocated
+	// or when the existing annotation on the POD does not match with the allocated globalIp.
+	if allocatedIp != "" {
+		annotations := pod.GetAnnotations()
+		if annotations == nil {
+			annotations = map[string]string{}
+		}
+		annotations[submarinerIpamGlobalIp] = allocatedIp
 		pod.SetAnnotations(annotations)
-		i.syncPodRules(pod.Status.PodIP, annotations[submarinerIpamGlobalIp], AddRules)
+		i.syncPodRules(pod.Status.PodIP, allocatedIp, AddRules)
 		_, updateErr := i.kubeClientSet.CoreV1().Pods(pod.Namespace).Update(pod)
 		return updateErr
+	} else if existingGlobalIp != "" {
+		// When Globalnet Controller is migrated, we get notification for all the existing PODs.
+		// For PODs that already have the annotation, we update the local ipPool cache and sync
+		// the iptable rules on the node.
+		i.syncPodRules(pod.Status.PodIP, existingGlobalIp, AddRules)
 	}
 	return nil
 }
