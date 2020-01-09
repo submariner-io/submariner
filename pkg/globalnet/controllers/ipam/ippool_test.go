@@ -121,10 +121,6 @@ func testIpAllocation() {
 		It("should mark allocated IP as not available", func() {
 			Expect(pool.IsAvailable(service1Ip)).To(BeFalse())
 		})
-
-		It("IsFull should return false", func() {
-			Expect(pool.IsFull()).To(BeFalse())
-		})
 	})
 
 	When("Specific IP is Requested", func() {
@@ -161,16 +157,10 @@ func testIpAllocation() {
 	When("All IPs are allocated", func() {
 		pool, _ := NewIpPool(testCidr)
 		service1Ip, err := pool.Allocate(service1)
-		_, err = pool.Allocate(pod1)
+		pod1Ip, err := pool.Allocate(pod1)
 
 		It("should not return an error", func() {
 			Expect(err).NotTo(HaveOccurred())
-		})
-
-		When("IsFull is called", func() {
-			It("should return true", func() {
-				Expect(pool.IsFull()).To(BeTrue())
-			})
 		})
 
 		When("any IP is requested for an unallocated key", func() {
@@ -194,12 +184,15 @@ func testIpAllocation() {
 			})
 		})
 
-		When("a different IP is requested for an allocated key", func() {
-			requestedIp, err := pool.RequestIp(pod1, requestIp1)
+		When("an allocated IP is requested for an allocated key", func() {
+			requestedIp, err := pool.RequestIp(pod1, service1Ip)
 
-			It("should return an error", func() {
-				Expect(err).To(HaveOccurred())
-				Expect(requestedIp).Should(Equal(""))
+			It("should not return an error", func() {
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should return same IP", func() {
+				Expect(requestedIp).Should(Equal(pod1Ip))
 			})
 		})
 	})
