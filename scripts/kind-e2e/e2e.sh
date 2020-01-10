@@ -87,9 +87,6 @@ function kind_import_images() {
         kind --name cluster${i} load docker-image submariner:local
         kind --name cluster${i} load docker-image submariner-route-agent:local
         kind --name cluster${i} load docker-image submariner-globalnet:local
-        if [[ "$deploy_operator" = true ]]; then
-             kind --name cluster${i} load docker-image submariner-operator:local
-	fi
     done
 }
 

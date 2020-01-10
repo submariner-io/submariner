@@ -4,6 +4,7 @@ language: go
 branches:
   only:
   - master
+  - overlapping-cidrs
 
 git:
   depth: 1
