@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/coreos/go-iptables/iptables"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -47,6 +48,12 @@ func NewGatewayMonitor(spec *SubmarinerIpamControllerSpecification, cfg *rest.Co
 		time.Second*30, submarinerInformers.WithNamespace(spec.Namespace))
 	EndpointInformer := submarinerInformerFactory.Submariner().V1().Endpoints()
 
+	iptableHandler, err := iptables.New()
+	if err != nil {
+		return nil, err
+	}
+
+	gatewayMonitor.ipt = iptableHandler
 	gatewayMonitor.kubeClientSet = clientSet
 	gatewayMonitor.submarinerClientSet = submarinerClient
 	gatewayMonitor.endpointsSynced = EndpointInformer.Informer().HasSynced
@@ -75,10 +82,15 @@ func (i *GatewayMonitor) Run(stopCh <-chan struct{}) error {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
 
+	if err := CreateGlobalNetMarkingChain(i.ipt); err != nil {
+		return fmt.Errorf("error while calling createGlobalNetMarkingChain: %v", err)
+	}
+
 	klog.Info("Starting endpoint worker.")
 	go wait.Until(i.runEndpointWorker, time.Second, stopCh)
 	<-stopCh
 	klog.Info("Shutting down endpoint worker.")
+	ClearGlobalNetMarkingChain(i.ipt)
 	return nil
 }
 
@@ -107,7 +119,10 @@ func (i *GatewayMonitor) processNextEndpoint() bool {
 		}
 
 		if endpoint.Spec.ClusterID != i.clusterID {
-			klog.V(6).Infof("Endpoint didn't match the cluster ID of this cluster")
+			klog.V(4).Infof("Endpoint %s belongs to a remote cluster", endpoint.Spec.Hostname)
+			for _, remoteSubnet := range endpoint.Spec.Subnets {
+				MarkRemoteClusterTraffic(i.ipt, remoteSubnet, AddRules)
+			}
 			i.endpointWorkqueue.Forget(obj)
 			return nil
 		}
@@ -188,6 +203,10 @@ func (i *GatewayMonitor) handleRemovedEndpoint(obj interface{}) {
 			i.isGatewayNode = false
 		}
 		i.syncMutex.Unlock()
+	} else {
+		for _, remoteSubnet := range object.Spec.Subnets {
+			MarkRemoteClusterTraffic(i.ipt, remoteSubnet, DeleteRules)
+		}
 	}
 }
 
