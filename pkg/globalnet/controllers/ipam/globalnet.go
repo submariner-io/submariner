@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/coreos/go-iptables/iptables"
 	k8sv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
@@ -37,6 +38,16 @@ func (i *Controller) initIPTableChains() error {
 	if err := util.PrependUnique(i.ipt, "nat", route.SmPostRoutingChain, forwardToSubGlobalNetChain); err != nil {
 		klog.Errorf("error inserting iptables rule %q: %v\n", strings.Join(forwardToSubGlobalNetChain, " "), err)
 	}
+
+	if err := CreateGlobalNetMarkingChain(i.ipt); err != nil {
+		return err
+	}
+
+	forwardToSubGlobalNetChain = []string{"-j", submarinerMark}
+	if err := util.PrependUnique(i.ipt, "nat", submarinerEgress, forwardToSubGlobalNetChain); err != nil {
+		klog.Errorf("error inserting iptables rule %q: %v\n", strings.Join(forwardToSubGlobalNetChain, " "), err)
+	}
+
 	return nil
 }
 
@@ -89,5 +100,20 @@ func (i *Controller) cleanupIPTableRules() {
 	err = i.ipt.ClearChain("nat", submarinerEgress)
 	if err != nil {
 		klog.Errorf("Error while flushing rules in %s chain: %v", submarinerEgress, err)
+	}
+}
+
+func CreateGlobalNetMarkingChain(ipt *iptables.IPTables) error {
+	klog.V(4).Infof("Install/ensure %s chain exists", submarinerMark)
+	if err := util.CreateChainIfNotExists(ipt, "nat", submarinerMark); err != nil {
+		return fmt.Errorf("error creating iptables chain %s: %v", submarinerMark, err)
+	}
+	return nil
+}
+
+func ClearGlobalNetMarkingChain(ipt *iptables.IPTables) {
+	err := ipt.ClearChain("nat", submarinerMark)
+	if err != nil {
+		klog.Errorf("Error while flushing rules in %s chain: %v", submarinerMark, err)
 	}
 }
