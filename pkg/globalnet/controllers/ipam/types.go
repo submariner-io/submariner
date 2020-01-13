@@ -45,6 +45,7 @@ type GatewayMonitor struct {
 	endpointWorkqueue   workqueue.RateLimitingInterface
 	endpointsSynced     cache.InformerSynced
 	ipamSpec            *SubmarinerIpamControllerSpecification
+	ipt                 *iptables.IPTables
 	stopProcessing      chan struct{}
 	isGatewayNode       bool
 	syncMutex           *sync.Mutex
