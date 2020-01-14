@@ -302,7 +302,7 @@ for context in cluster{1..3}; do
   echo "= ${context} ============================================="
   kubectl exec $POD -n $subm_ns strongswan status
   echo "--"
-  kubect get pods -n $subm_ns
+  kubectl get pods -n $subm_ns
   echo ""
 done
 
