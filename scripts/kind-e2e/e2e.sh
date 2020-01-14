@@ -292,6 +292,21 @@ deploytool_postreqs
 deploy_netshoot cluster2
 deploy_nginx cluster3
 
+free -h
+
+for context in cluster{1..3}; do
+  kubectl config use-context $context
+
+  POD=$(kubectl get pod -n $subm_ns -l app=submariner-engine -o jsonpath="{.items[0].metadata.name}")
+
+  echo "= ${context} ============================================="
+  kubectl exec $POD -n $subm_ns strongswan status
+  echo "--"
+  kubect get pods -n $subm_ns
+  echo ""
+done
+
+
 test_connection
 
 if [[ $status = keep || $status = onetime ]]; then
