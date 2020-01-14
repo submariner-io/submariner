@@ -264,6 +264,10 @@ function test_connection() {
     until $(kubectl --context=cluster2 exec ${netshoot_pod} -- curl --output /dev/null -m 30 --silent --head --fail ${nginx_svc_ip_cluster3}); do
         if [[ ${attempt_counter} -eq ${max_attempts} ]];then
           echo "Max attempts reached, connection test failed!"
+          echo Dumping cluster states
+          for i in 1 2 3; do
+            kubectl --context=cluster$i cluster-info dump | fpaste
+          done
           exit 1
         fi
         attempt_counter=$(($attempt_counter+1))

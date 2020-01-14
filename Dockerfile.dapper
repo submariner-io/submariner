@@ -1,5 +1,7 @@
 FROM quay.io/submariner/dapper-base
 
+RUN dnf -y install --nodocs --setopt=install_weak_deps=False fpaste
+
 ENV DAPPER_ENV=REPO DAPPER_ENV=TAG \
     DAPPER_SOURCE=/go/src/github.com/submariner-io/submariner DAPPER_DOCKER_SOCKET=true \
     TRASH_CACHE=${DAPPER_SOURCE}/.trash-cache HOME=${DAPPER_SOURCE} DAPPER_OUTPUT=output
