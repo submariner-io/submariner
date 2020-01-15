@@ -203,7 +203,8 @@ func (i *GatewayMonitor) handleRemovedEndpoint(obj interface{}) {
 			i.isGatewayNode = false
 		}
 		i.syncMutex.Unlock()
-	} else {
+	} else if object.Spec.ClusterID != i.clusterID {
+		// Endpoint associated with remote cluster is removed, delete the associated flows.
 		for _, remoteSubnet := range object.Spec.Subnets {
 			MarkRemoteClusterTraffic(i.ipt, remoteSubnet, DeleteRules)
 		}
