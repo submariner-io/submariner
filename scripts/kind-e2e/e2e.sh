@@ -237,7 +237,16 @@ function status_report {
       kubectl exec $POD -n $subm_ns strongswan status || true
       echo "--"
       kubectl get pods -n $subm_ns
-      echo ""
+      echo "--"
+
+      BROKEN_PODS=$(kubectl get pods -n $subm_ns | egrep "Error|Crash" | cut -d\  -f 1)
+
+      for pod in $BROKEN_PODS; do
+        echo "-- logs for pod ${pod} in error/crash state --"
+        kubectl logs -n $subm_ns $pod
+        echo ""
+      done
+
     done
 }
 
