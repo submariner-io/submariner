@@ -224,6 +224,28 @@ function cleanup {
     fi
 }
 
+function status_report {
+    echo "STATUS REPORT ========================================================="
+    free -h
+
+    for context in cluster{1..3}; do
+      kubectl config use-context $context
+
+      POD=$(kubectl get pod -n $subm_ns -l app=submariner-engine -o jsonpath="{.items[0].metadata.name}")
+
+      echo "= ${context} ============================================="
+      kubectl exec $POD -n $subm_ns strongswan status || true
+      echo "--"
+      kubectl get pods -n $subm_ns
+      echo ""
+    done
+}
+
+function status_report_and_cleanup {
+     status_report
+     cleanup
+}
+
 ### Main ###
 
 status=$1
@@ -239,7 +261,9 @@ if [[ $status = clean ]]; then
     exit 0
 elif [[ $status = onetime ]]; then
     echo Status $status: Will cleanup on EXIT signal
-    trap cleanup EXIT
+    trap status_report_and_cleanup EXIT
+elif [[ $status = keep ]]; then
+    trap status_report EXIT
 elif [[ $status != keep && $status != create ]]; then
     echo Unknown status: $status
     cleanup
@@ -292,20 +316,10 @@ deploytool_postreqs
 deploy_netshoot cluster2
 deploy_nginx cluster3
 
-free -h
 
-for context in cluster{1..3}; do
-  kubectl config use-context $context
+sleep 5
 
-  POD=$(kubectl get pod -n $subm_ns -l app=submariner-engine -o jsonpath="{.items[0].metadata.name}")
-
-  echo "= ${context} ============================================="
-  kubectl exec $POD -n $subm_ns strongswan status
-  echo "--"
-  kubectl get pods -n $subm_ns
-  echo ""
-done
-
+status_report
 
 test_connection
 
