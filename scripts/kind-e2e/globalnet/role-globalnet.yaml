@@ -24,6 +24,7 @@ rules:
       - "submariner.io"
     resources:
       - endpoints
+      - clusters
     verbs:
       - list
       - watch
