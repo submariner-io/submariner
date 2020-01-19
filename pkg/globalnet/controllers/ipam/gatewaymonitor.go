@@ -135,10 +135,33 @@ func (i *GatewayMonitor) processNextEndpoint() bool {
 		// If the endpoint hostname matches with our hostname, it implies we are on gateway node
 		if endpoint.Spec.Hostname == hostname {
 			klog.V(4).Infof("We are now on GatewayNode %s", endpoint.Spec.PrivateIP)
+
+			clusterList, err := i.submarinerClientSet.SubmarinerV1().Clusters(i.ipamSpec.Namespace).List(metav1.ListOptions{})
+			if err != nil {
+				i.endpointWorkqueue.AddRateLimited(key)
+				return fmt.Errorf("error while retrieving the cluster info: %v", err)
+			}
+
+			globalCIDR := ""
+			for _, cluster := range clusterList.Items {
+				if cluster.Spec.ClusterID == i.clusterID {
+					klog.V(4).Infof("GlobalCidr configured in %s is %s", i.clusterID, cluster.Spec.GlobalCIDR)
+					if cluster.Spec.GlobalCIDR != nil && len(cluster.Spec.GlobalCIDR) > 0 {
+						// TODO: Revisit when support for more than one globalCIDR is implemented.
+						globalCIDR = cluster.Spec.GlobalCIDR[0]
+					}
+					break
+				}
+			}
+
 			i.syncMutex.Lock()
 			if !i.isGatewayNode {
 				i.isGatewayNode = true
-				i.initializeIpamController()
+				if globalCIDR != "" {
+					i.initializeIpamController(globalCIDR)
+				} else {
+					klog.Errorf("Cluster %s is not configured to use globalCidr", i.clusterID)
+				}
 			}
 			i.syncMutex.Unlock()
 		} else {
@@ -211,7 +234,7 @@ func (i *GatewayMonitor) handleRemovedEndpoint(obj interface{}) {
 	}
 }
 
-func (i *GatewayMonitor) initializeIpamController() {
+func (i *GatewayMonitor) initializeIpamController(globalCIDR string) {
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(i.kubeClientSet, defaultResync)
 
 	informerConfig := InformerConfigStruct{
@@ -221,7 +244,7 @@ func (i *GatewayMonitor) initializeIpamController() {
 	}
 
 	klog.V(4).Infof("On Gateway Node, initializing ipamController.")
-	ipamController, err := NewController(i.ipamSpec, &informerConfig)
+	ipamController, err := NewController(i.ipamSpec, &informerConfig, globalCIDR)
 	if err != nil {
 		klog.Fatalf("Error creating controller: %s", err.Error())
 	}
