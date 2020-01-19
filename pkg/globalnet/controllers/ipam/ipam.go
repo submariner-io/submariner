@@ -17,12 +17,12 @@ import (
 	"k8s.io/klog"
 )
 
-func NewController(spec *SubmarinerIpamControllerSpecification, config *InformerConfigStruct) (*Controller, error) {
+func NewController(spec *SubmarinerIpamControllerSpecification, config *InformerConfigStruct, globalCIDR string) (*Controller, error) {
 	exclusionMap := make(map[string]bool)
 	for _, v := range spec.ExcludeNS {
 		exclusionMap[v] = true
 	}
-	pool, err := NewIpPool(spec.GlobalCIDR)
+	pool, err := NewIpPool(globalCIDR)
 	if err != nil {
 		return nil, err
 	}

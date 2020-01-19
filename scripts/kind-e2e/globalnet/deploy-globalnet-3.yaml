@@ -20,8 +20,6 @@ spec:
           env:
             - name: SUBMARINER_CLUSTERID
               value: "cluster3"
-            - name: SUBMARINER_GLOBALCIDR
-              value: 169.254.3.0/24
             - name: SUBMARINER_EXCLUDENS
               value: "submariner,kube-system,operators"
             - name: SUBMARINER_NAMESPACE
