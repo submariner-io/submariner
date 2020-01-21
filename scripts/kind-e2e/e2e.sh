@@ -3,6 +3,11 @@ set -em
 
 source $(git rev-parse --show-toplevel)/scripts/lib/debug_functions
 
+### Variables ###
+
+declare -A cluster_CIDRs=( ["cluster1"]="10.244.0.0/16" ["cluster2"]="10.245.0.0/16" ["cluster3"]="10.246.0.0/16" )
+declare -A service_CIDRs=( ["cluster1"]="100.94.0.0/16" ["cluster2"]="100.95.0.0/16" ["cluster3"]="100.96.0.0/16" )
+
 ### Functions ###
 
 function print_logs() {
@@ -58,13 +63,12 @@ function kind_clusters() {
 }
 
 function setup_custom_cni(){
-    declare -A POD_CIDR=( ["cluster2"]="10.245.0.0/16" ["cluster3"]="10.246.0.0/16" )
     for i in 2 3; do
         if kubectl --context=cluster${i} wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=60s > /dev/null 2>&1; then
             echo "Weave already deployed cluster${i}."
         else
             echo "Applying weave network in to cluster${i}..."
-            kubectl --context=cluster${i} apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&env.IPALLOC_RANGE=${POD_CIDR[cluster${i}]}"
+            kubectl --context=cluster${i} apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&env.IPALLOC_RANGE=${cluster_CIDRs[cluster${i}]}"
             echo "Waiting for weave-net pods to be ready cluster${i}..."
             # FIXME: This timeout doesn't need to be so long
             kubectl --context=cluster${i} wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=700s
@@ -259,8 +263,6 @@ PRJ_ROOT=$(git rev-parse --show-toplevel)
 mkdir -p ${PRJ_ROOT}/output/kind-config/dapper/ ${PRJ_ROOT}/output/kind-config/local-dev/
 export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
 
-create_subm_vars
-
 if [[ $logging = true ]]; then
     enable_logging
 fi
@@ -270,7 +272,7 @@ kind_import_images
 setup_custom_cni
 
 if [[ $kubefed = true ]]; then
-    # FIXME: Kubefed deploys are broken (not becuase of this commit)
+    # FIXME: Kubefed deploys are broken (not because of this commit)
     enable_kubefed
 fi
 
@@ -279,7 +281,7 @@ deploytool_prereqs
 
 for i in 1 2 3; do
     context=cluster$i
-    preinstall_cleanup_subm $context
+    delete_subm_pods $context $subm_ns
     add_subm_gateway_label $context
 done
 
