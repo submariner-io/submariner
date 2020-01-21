@@ -5,11 +5,13 @@ if [ "${0##*/}" = "lib_helm_deploy_subm.sh" ]; then
     exit 1
 fi
 
-function create_subm_vars() {
-    SUBMARINER_BROKER_NS=submariner-k8s-broker
-    SUBMARINER_PSK=$(cat /dev/urandom | LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 64 | head -n 1)
-    subm_ns=submariner
-}
+### Variables ###
+
+SUBMARINER_BROKER_NS=submariner-k8s-broker
+SUBMARINER_PSK=$(cat /dev/urandom | LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 64 | head -n 1)
+subm_ns=submariner
+
+### Functions ###
 
 function install_helm() {
     helm init --client-only
@@ -36,11 +38,6 @@ function install_helm() {
 
 function deploytool_prereqs() {
     install_helm
-}
-
-function preinstall_cleanup_subm() {
-    context=$1
-    delete_subm_pods $context submariner
 }
 
 function setup_broker() {
@@ -86,9 +83,9 @@ function helm_install_subm() {
 
 
 function install_subm_all_clusters() {
-    helm_install_subm cluster1 10.244.0.0/16 100.94.0.0/16 false
-    helm_install_subm cluster2 10.245.0.0/16 100.95.0.0/16 true
-    helm_install_subm cluster3 10.246.0.0/16 100.96.0.0/16 true
+    helm_install_subm cluster1 ${cluster_CIDRs[cluster1]} ${service_CIDRs[cluster1]} false
+    helm_install_subm cluster2 ${cluster_CIDRs[cluster2]} ${service_CIDRs[cluster2]} true
+    helm_install_subm cluster3 ${cluster_CIDRs[cluster3]} ${service_CIDRs[cluster3]} true
 }
 
 function deploytool_postreqs() {
