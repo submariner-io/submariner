@@ -38,7 +38,7 @@ func (f *Framework) FindNodesByGatewayLabel(cluster ClusterIndex, isGateway bool
 // SetGatewayLabelOnNode sets the 'submariner.io/gateway' value for a node to the specified value.
 func (f *Framework) SetGatewayLabelOnNode(cluster ClusterIndex, nodeName string, isGateway bool) {
 	// Escape the '/' char in the label name with the special sequence "~1" so it isn't treated as part of the path
-	DoPatchOperation("/metadata/labels/"+strings.Replace(GatewayLabel, "/", "~1", -1), strconv.FormatBool(isGateway),
+	PatchString("/metadata/labels/"+strings.Replace(GatewayLabel, "/", "~1", -1), strconv.FormatBool(isGateway),
 		func(pt types.PatchType, payload []byte) error {
 			_, err := f.ClusterClients[cluster].CoreV1().Nodes().Patch(nodeName, pt, payload)
 			return err
