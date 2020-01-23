@@ -3,6 +3,7 @@ version ?= 1.14.2
 logging ?= false
 kubefed ?= false
 deploytool ?= helm
+armada ?= true
 debug ?= false
 
 TARGETS := $(shell ls scripts | grep -v dapper-image)
@@ -21,7 +22,7 @@ shell:
 	./.dapper -m bind -s
 
 $(TARGETS): .dapper dapper-image vendor/modules.txt
-	DAPPER_ENV="OPERATOR_IMAGE"  ./.dapper -m bind $@ $(status) $(version) $(logging) $(kubefed) $(deploytool) $(debug)
+	DAPPER_ENV="OPERATOR_IMAGE"  ./.dapper -m bind $@ $(status) $(version) $(logging) $(kubefed) $(deploytool) $(armada) $(debug)
 
 vendor/modules.txt: .dapper go.mod
 	./.dapper -m bind vendor
