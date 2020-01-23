@@ -10,7 +10,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 )
 
-var _ = Describe("[redundancy] Gateway fail-over tests", func() {
+var _ = PDescribe("[redundancy] Gateway fail-over tests", func() {
 	f := framework.NewDefaultFramework("gateway-redundancy")
 
 	When("one gateway node is configured and the submariner engine pod fails", func() {
