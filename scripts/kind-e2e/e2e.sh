@@ -6,9 +6,6 @@ source $(git rev-parse --show-toplevel)/scripts/lib/version
 
 ### Variables ###
 
-declare -A cluster_CIDRs=( ["cluster1"]="10.244.0.0/16" ["cluster2"]="10.245.0.0/16" ["cluster3"]="10.246.0.0/16" )
-declare -A service_CIDRs=( ["cluster1"]="100.94.0.0/16" ["cluster2"]="100.95.0.0/16" ["cluster3"]="100.96.0.0/16" )
-
 ### Functions ###
 
 function print_logs() {
@@ -28,65 +25,11 @@ function print_logs() {
     fi
 }
 
-function kind_clusters() {
-    status=$1
-    version=$2
-    pids=(-1 -1 -1)
-    logs=()
-    for i in 1 2 3; do
-        if [[ $(kind get clusters | grep cluster${i} | wc -l) -gt 0  ]]; then
-            echo Cluster cluster${i} already exists, skipping cluster creation...
-        else
-            logs[$i]=$(mktemp)
-            echo Creating cluster${i}, logging to ${logs[$i]}...
-            (
-            if [[ -n ${version} ]]; then
-                kind create cluster --image=kindest/node:v${version} --name=cluster${i} --config=${PRJ_ROOT}/scripts/kind-e2e/cluster${i}-config.yaml
-            else
-                kind create cluster --name=cluster${i} --config=${PRJ_ROOT}/scripts/kind-e2e/cluster${i}-config.yaml
-            fi
-            master_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster${i}-control-plane | head -n 1)
-            sed -i -- "s/user: kubernetes-admin/user: cluster$i/g" $(kind get kubeconfig-path --name="cluster$i")
-            sed -i -- "s/name: kubernetes-admin.*/name: cluster$i/g" $(kind get kubeconfig-path --name="cluster$i")
-            sed -i -- "s/current-context: kubernetes-admin.*/current-context: cluster$i/g" $(kind get kubeconfig-path --name="cluster$i")
-
-            if [[ ${status} = keep ]]; then
-                cp -r $(kind get kubeconfig-path --name="cluster$i") ${PRJ_ROOT}/output/kind-config/local-dev/kind-config-cluster${i}
-            fi
-
-            sed -i -- "s/server: .*/server: https:\/\/$master_ip:6443/g" $(kind get kubeconfig-path --name="cluster$i")
-            cp -r $(kind get kubeconfig-path --name="cluster$i") ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster${i}
-            ) > ${logs[$i]} 2>&1 &
-            set pids[$i] = $!
-        fi
-    done
-    print_logs "${logs[@]}"
-}
-
-function setup_custom_cni(){
-    for i in 2 3; do
-        if kubectl --context=cluster${i} wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=60s > /dev/null 2>&1; then
-            echo "Weave already deployed cluster${i}."
-        else
-            echo "Applying weave network in to cluster${i}..."
-            kubectl --context=cluster${i} apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&env.IPALLOC_RANGE=${cluster_CIDRs[cluster${i}]}"
-            echo "Waiting for weave-net pods to be ready cluster${i}..."
-            kubectl --context=cluster${i} wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=300s
-            echo "Waiting for core-dns deployment to be ready cluster${i}..."
-            kubectl --context=cluster${i} -n kube-system rollout status deploy/coredns --timeout=300s
-        fi
-    done
-}
-
-function kind_import_images() {
-    docker tag quay.io/submariner/submariner:$VERSION submariner:local
-    docker tag quay.io/submariner/submariner-route-agent:$VERSION submariner-route-agent:local
-
-    for i in 1 2 3; do
-        echo "Loading submariner images into cluster${i}..."
-        kind --name cluster${i} load docker-image submariner:local
-        kind --name cluster${i} load docker-image submariner-route-agent:local
-    done
+function export_kubeconfig() {
+    # TODO: Are both these mkdirs really necessary?
+    mkdir -p ${DAPPER_SOURCE}/output/kind-config/dapper/
+    mkdir -p ${DAPPER_SOURCE}/output/kind-config/local-dev/
+    export KUBECONFIG=$(echo $kubecfgs_dir/kind-config-cluster{1..3} | sed 's/ /:/g')
 }
 
 function test_connection() {
@@ -113,12 +56,12 @@ function enable_logging() {
     else
         echo Installing Elasticsearch...
         es_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster1-control-plane | head -n 1)
-        kubectl --context=cluster1 apply -f ${PRJ_ROOT}/scripts/kind-e2e/logging/elasticsearch.yaml
-        kubectl --context=cluster1 apply -f ${PRJ_ROOT}/scripts/kind-e2e/logging/filebeat.yaml
+        kubectl --context=cluster1 apply -f ${DAPPER_SOURCE}/scripts/kind-e2e/logging/elasticsearch.yaml
+        kubectl --context=cluster1 apply -f ${DAPPER_SOURCE}/scripts/kind-e2e/logging/filebeat.yaml
         echo Waiting for Elasticsearch to be ready...
         kubectl --context=cluster1 wait --for=condition=Ready pods -l app=elasticsearch --timeout=300s
         for i in 2 3; do
-            kubectl --context=cluster${i} apply -f ${PRJ_ROOT}/scripts/kind-e2e/logging/filebeat.yaml
+            kubectl --context=cluster${i} apply -f ${DAPPER_SOURCE}/scripts/kind-e2e/logging/filebeat.yaml
             kubectl --context=cluster${i} set env daemonset/filebeat -n kube-system ELASTICSEARCH_HOST=${es_ip} ELASTICSEARCH_PORT=30000
         done
     fi
@@ -159,7 +102,7 @@ function deploy_netshoot() {
     context=$1
     worker_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $context-worker | head -n 1)
     echo Deploying netshoot on $context worker: ${worker_ip}
-    kubectl --context=$context apply -f ${PRJ_ROOT}/scripts/kind-e2e/netshoot.yaml
+    kubectl --context=$context apply -f ${DAPPER_SOURCE}/scripts/kind-e2e/netshoot.yaml
     echo Waiting for netshoot pods to be Ready on $context.
     kubectl --context=$context rollout status deploy/netshoot --timeout=120s
 }
@@ -168,7 +111,7 @@ function deploy_nginx() {
     context=$1
     worker_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $context-worker | head -n 1)
     echo Deploying nginx on $context worker: ${worker_ip}
-    kubectl --context=$context apply -f ${PRJ_ROOT}/scripts/kind-e2e/nginx-demo.yaml
+    kubectl --context=$context apply -f ${DAPPER_SOURCE}/scripts/kind-e2e/nginx-demo.yaml
     echo Waiting for nginx-demo deployment to be Ready on $context.
     kubectl --context=$context rollout status deploy/nginx-demo --timeout=120s
 }
@@ -178,8 +121,7 @@ function test_with_e2e_tests {
 
     cd ../test/e2e
 
-    # Setup the KUBECONFIG env
-    export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
+    export_kubeconfig
 
     go test -v -args -ginkgo.v -ginkgo.randomizeAllSpecs \
         -submariner-namespace $subm_ns -dp-context cluster2 -dp-context cluster3 -dp-context cluster1 \
@@ -202,11 +144,7 @@ function delete_subm_pods() {
 }
 
 function cleanup {
-    for i in 1 2 3; do
-      if [[ $(kind get clusters | grep cluster${i} | wc -l) -gt 0  ]]; then
-        kind delete cluster --name=cluster${i};
-      fi
-    done
+    destroy_kind_clusters
 
     if [[ $(docker ps -qf status=exited | wc -l) -gt 0 ]]; then
         echo Cleaning containers...
@@ -232,8 +170,17 @@ version=$2
 logging=$3
 kubefed=$4
 deploy=$5
+armada=$6
 
-echo Starting with status: $status, k8s_version: $version, logging: $logging, kubefed: $kubefed, deploy: $deploy
+echo Starting with status: $status, k8s_version: $version, logging: $logging, kubefed: $kubefed, deploy: $deploy, armada: $armada
+
+if [[ $armada = true ]]; then
+    echo Will deploy k8s clusters using armada abstracting kind
+    . kind-e2e/lib_armada_deploy_kind.sh
+else
+    echo Will deploy k8s clusters using kind
+    . kind-e2e/lib_bash_deploy_kind.sh
+fi
 
 if [[ $status = clean ]]; then
     cleanup
@@ -248,10 +195,10 @@ elif [[ $status != keep && $status != create ]]; then
 fi
 
 if [[ $deploy = operator ]]; then
-    echo Deploying with operator
+    echo Will deploy submariner using the operator
     . kind-e2e/lib_operator_deploy_subm.sh
 elif [ "$deploy" = helm ]; then
-    echo Deploying with helm
+    echo Will deploy submariner using helm
     . kind-e2e/lib_helm_deploy_subm.sh
 else
     echo Unknown deploy method: $deploy
@@ -259,17 +206,16 @@ else
     exit 1
 fi
 
-PRJ_ROOT=$(git rev-parse --show-toplevel)
-mkdir -p ${PRJ_ROOT}/output/kind-config/dapper/ ${PRJ_ROOT}/output/kind-config/local-dev/
-export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
+export_kubeconfig
+
+create_kind_clusters $status $version $deploy
 
 if [[ $logging = true ]]; then
+    # TODO: Test this code path in CI
     enable_logging
 fi
 
-kind_clusters "$@"
-kind_import_images
-setup_custom_cni
+import_subm_images
 
 if [[ $kubefed = true ]]; then
     # FIXME: Kubefed deploys are broken (not because of this commit)
@@ -303,7 +249,7 @@ if [[ $status = keep || $status = create ]]; then
     echo "your 3 virtual clusters are deployed and working properly with your local"
     echo "submariner source code, and can be accessed with:"
     echo ""
-    echo "export KUBECONFIG=\$(echo \$(git rev-parse --show-toplevel)/output/kind-config/local-dev/kind-config-cluster{1..3} | sed 's/ /:/g')"
+    echo "export KUBECONFIG=\$(echo \$(git rev-parse --show-toplevel)/$kubecfgs_rel_dir/kind-config-cluster{1..3} | sed 's/ /:/g')"
     echo ""
     echo "$ kubectl config use-context cluster1 # or cluster2, cluster3.."
     echo ""
