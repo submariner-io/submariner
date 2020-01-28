@@ -20,18 +20,12 @@ cp ../bin/submariner-globalnet submariner-globalnet
 ENGINE_IMAGE=${REPO}/submariner:${TAG}
 ROUTEAGENT_IMAGE=${REPO}/submariner-route-agent:${TAG}
 GLOBALNET_IMAGE=${REPO}/submariner-globalnet:${TAG}
-DAPPER_BASE_IMAGE=${REPO}/dapper-base:${TAG}
-
-# We expect the Dapper base image to change rarely, so pull it first
-docker pull ${REPO}/dapper-base:latest || :
 
 docker build -t ${ENGINE_IMAGE} .
 docker build -t ${ROUTEAGENT_IMAGE} -f Dockerfile.routeagent .
 docker build -t ${GLOBALNET_IMAGE} -f Dockerfile.globalnet .
-docker build -t ${DAPPER_BASE_IMAGE} -f Dockerfile.dapper-base .
 
 echo "Built the following images:"
 echo "* Submariner engine in ${ENGINE_IMAGE}"
 echo "* Submariner route agent in ${ROUTEAGENT_IMAGE}"
 echo "* Submariner globalnet in ${GLOBALNET_IMAGE}"
-echo "* Dapper base image in ${DAPPER_BASE_IMAGE}"
