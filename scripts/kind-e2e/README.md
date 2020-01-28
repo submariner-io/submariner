@@ -80,6 +80,18 @@ as with any normal k8s cluster.
 as docker images, submariner will be redeployed on the clusters from pushed images and E2E tests will be executed.
 This mode allows the developers to test their local code fast on a very close to real world scenario setup.
 
+**NOTE**: If you only want to create the test environment without running the e2e tests, you can do it by executing 
+the following command: 
+
+```bash
+make build package e2e status=create
+```
+or, if you don't want to rebuild your Submariner images, by:
+
+```bash
+make e2e status=create
+```
+
 #### Logging
 
 Providing **logging=true** parameter to **make e2e** command will setup ELK stack on the kind clusters.
@@ -129,7 +141,13 @@ To federate resources across the clusters [kubefedctl] tool must be installed on
 At any time you can run a cleanup command that will remove kind resources.
 
 ```bash
-make ci e2e status=clean
+make e2e status=clean
+```
+
+or just
+
+```bash
+make e2e status=clean
 ```
 
 You can do full docker cleanup, but it will force all the docker images to be removed and invalidate the local docker cache. 

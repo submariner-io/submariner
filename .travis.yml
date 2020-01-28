@@ -1,6 +1,10 @@
 dist: xenial
 language: go
 
+branches:
+  only:
+  - master
+
 git:
   depth: 1
 

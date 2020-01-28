@@ -3,7 +3,29 @@ set -em
 
 source $(git rev-parse --show-toplevel)/scripts/lib/debug_functions
 
+### Variables ###
+
+declare -A cluster_CIDRs=( ["cluster1"]="10.244.0.0/16" ["cluster2"]="10.245.0.0/16" ["cluster3"]="10.246.0.0/16" )
+declare -A service_CIDRs=( ["cluster1"]="100.94.0.0/16" ["cluster2"]="100.95.0.0/16" ["cluster3"]="100.96.0.0/16" )
+
 ### Functions ###
+
+function print_logs() {
+    logs=("$@")
+    if [[ ${#logs[@]} -gt 0 ]]; then
+        echo "(Watch the installation processes with \"tail -f ${logs[*]}\".)"
+        for i in 1 2 3; do
+            if [[ pids[$i] -gt -1 ]]; then
+                wait ${pids[$i]}
+                if [[ $? -ne 0 && $? -ne 127 ]]; then
+                    echo Cluster $i creation failed:
+                    cat ${logs[$i]}
+                fi
+                rm -f ${logs[$i]}
+            fi
+        done
+    fi
+}
 
 function kind_clusters() {
     status=$1
@@ -37,71 +59,18 @@ function kind_clusters() {
             set pids[$i] = $!
         fi
     done
-    if [[ ${#logs[@]} -gt 0 ]]; then
-        echo "(Watch the installation processes with \"tail -f ${logs[*]}\".)"
-        for i in 1 2 3; do
-            if [[ pids[$i] -gt -1 ]]; then
-                wait ${pids[$i]}
-                if [[ $? -ne 0 && $? -ne 127 ]]; then
-                    echo Cluster $i creation failed:
-                    cat ${logs[$i]}
-                fi
-                rm -f ${logs[$i]}
-            fi
-        done
-    fi
-}
-
-function install_helm() {
-    helm init --client-only
-    helm repo add submariner-latest https://submariner-io.github.io/submariner-charts/charts
-    pids=(-1 -1 -1)
-    logs=()
-    for i in 1 2 3; do
-        # Skip other clusters on operator deployment, we only need it on the first
-        if [ "$i" != 1 ] && [ "$deploy_operator" = true ]; then
-            echo "Skipping other clusters since we're deploying with operator."
-            break
-        fi
-
-        if kubectl --context=cluster${i} -n kube-system rollout status deploy/tiller-deploy > /dev/null 2>&1; then
-            echo Helm already installed on cluster${i}, skipping helm installation...
-        else
-            logs[$i]=$(mktemp)
-            echo Installing helm on cluster${i}, logging to ${logs[$i]}...
-            (
-            kubectl --context=cluster${i} -n kube-system create serviceaccount tiller
-            kubectl --context=cluster${i} create clusterrolebinding tiller --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
-            helm --kube-context cluster${i} init --service-account tiller
-            kubectl --context=cluster${i} -n kube-system rollout status deploy/tiller-deploy
-            ) > ${logs[$i]} 2>&1 &
-            set pids[$i] = $!
-        fi
-    done
-    if [[ ${#logs[@]} -gt 0 ]]; then
-        echo "(Watch the installation processes with \"tail -f ${logs[*]}\".)"
-        for i in 1 2 3; do
-            if [[ pids[$i] -gt -1 ]]; then
-                wait ${pids[$i]}
-                if [[ $? -ne 0 && $? -ne 127 ]]; then
-                    echo Cluster $i creation failed:
-                    cat ${logs[$i]}
-                fi
-                rm -f ${logs[$i]}
-            fi
-        done
-    fi
+    print_logs "${logs[@]}"
 }
 
 function setup_custom_cni(){
-    declare -A POD_CIDR=( ["cluster2"]="10.245.0.0/16" ["cluster3"]="10.246.0.0/16" )
     for i in 2 3; do
         if kubectl --context=cluster${i} wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=60s > /dev/null 2>&1; then
             echo "Weave already deployed cluster${i}."
         else
             echo "Applying weave network in to cluster${i}..."
-            kubectl --context=cluster${i} apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&env.IPALLOC_RANGE=${POD_CIDR[cluster${i}]}"
+            kubectl --context=cluster${i} apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&env.IPALLOC_RANGE=${cluster_CIDRs[cluster${i}]}"
             echo "Waiting for weave-net pods to be ready cluster${i}..."
+            # FIXME: This timeout doesn't need to be so long
             kubectl --context=cluster${i} wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=700s
             echo "Waiting for core-dns deployment to be ready cluster${i}..."
             kubectl --context=cluster${i} -n kube-system rollout status deploy/coredns --timeout=300s
@@ -109,143 +78,15 @@ function setup_custom_cni(){
     done
 }
 
-function setup_broker() {
-    if kubectl --context=cluster1 get crd clusters.submariner.io > /dev/null 2>&1; then
-        echo Submariner CRDs already exist, skipping broker creation...
-    else
-        echo Installing broker on cluster1.
-        helm --kube-context cluster1 install submariner-latest/submariner-k8s-broker --name ${SUBMARINER_BROKER_NS} --namespace ${SUBMARINER_BROKER_NS}
-    fi
-
-    SUBMARINER_BROKER_URL=$(kubectl --context=cluster1 -n default get endpoints kubernetes -o jsonpath="{.subsets[0].addresses[0].ip}:{.subsets[0].ports[?(@.name=='https')].port}")
-    SUBMARINER_BROKER_CA=$(kubectl --context=cluster1 -n ${SUBMARINER_BROKER_NS} get secrets -o jsonpath="{.items[?(@.metadata.annotations['kubernetes\.io/service-account\.name']=='${SUBMARINER_BROKER_NS}-client')].data['ca\.crt']}")
-    SUBMARINER_BROKER_TOKEN=$(kubectl --context=cluster1 -n ${SUBMARINER_BROKER_NS} get secrets -o jsonpath="{.items[?(@.metadata.annotations['kubernetes\.io/service-account\.name']=='${SUBMARINER_BROKER_NS}-client')].data.token}"|base64 --decode)
-}
-
-function setup_cluster2_gateway() {
-    if kubectl --context=cluster2 wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s > /dev/null 2>&1; then
-            echo Submariner already installed, skipping submariner helm installation...
-            update_subm_pods cluster2
-        else
-            echo Installing submariner on cluster2...
-            worker_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster2-worker | head -n 1)
-            kubectl --context=cluster2 label node cluster2-worker "submariner.io/gateway=true" --overwrite
-            helm --kube-context cluster2 install submariner-latest/submariner \
-            --name submariner \
-            --namespace submariner \
-            --set ipsec.psk="${SUBMARINER_PSK}" \
-            --set broker.server="${SUBMARINER_BROKER_URL}" \
-            --set broker.token="${SUBMARINER_BROKER_TOKEN}" \
-            --set broker.namespace="${SUBMARINER_BROKER_NS}" \
-            --set broker.ca="${SUBMARINER_BROKER_CA}" \
-            --set submariner.clusterId="cluster2" \
-            --set submariner.clusterCidr="10.245.0.0/16" \
-            --set submariner.serviceCidr="100.95.0.0/16" \
-            --set submariner.natEnabled="false" \
-            --set routeAgent.image.repository="submariner-route-agent" \
-            --set routeAgent.image.tag="local" \
-            --set routeAgent.image.pullPolicy="IfNotPresent" \
-            --set engine.image.repository="submariner" \
-            --set engine.image.tag="local" \
-            --set engine.image.pullPolicy="IfNotPresent"
-            echo Waiting for submariner pods to be Ready on cluster2...
-            kubectl --context=cluster2 wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s
-            kubectl --context=cluster2 wait --for=condition=Ready pods -l app=submariner-routeagent -n submariner --timeout=60s
-            echo Deploying netshoot on cluster2 worker: ${worker_ip}
-            kubectl --context=cluster2 apply -f ${PRJ_ROOT}/scripts/kind-e2e/netshoot.yaml
-            echo Waiting for netshoot pods to be Ready on cluster2.
-            kubectl --context=cluster2 rollout status deploy/netshoot --timeout=120s
-    fi
-}
-
-function setup_cluster3_gateway() {
-    if kubectl --context=cluster3 wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s > /dev/null 2>&1; then
-            echo Submariner already installed, skipping submariner helm installation...
-            update_subm_pods cluster3
-        else
-            echo Installing submariner on cluster3...
-            worker_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster3-worker | head -n 1)
-            kubectl --context=cluster3 label node cluster3-worker "submariner.io/gateway=true" --overwrite
-            helm --kube-context cluster3 install submariner-latest/submariner \
-             --name submariner \
-             --namespace submariner \
-             --set ipsec.psk="${SUBMARINER_PSK}" \
-             --set broker.server="${SUBMARINER_BROKER_URL}" \
-             --set broker.token="${SUBMARINER_BROKER_TOKEN}" \
-             --set broker.namespace="${SUBMARINER_BROKER_NS}" \
-             --set broker.ca="${SUBMARINER_BROKER_CA}" \
-             --set submariner.clusterId="cluster3" \
-             --set submariner.clusterCidr="10.246.0.0/16" \
-             --set submariner.serviceCidr="100.96.0.0/16" \
-             --set submariner.natEnabled="false" \
-             --set routeAgent.image.repository="submariner-route-agent" \
-             --set routeAgent.image.tag="local" \
-             --set routeAgent.image.pullPolicy="IfNotPresent" \
-             --set engine.image.repository="submariner" \
-             --set engine.image.tag="local" \
-             --set engine.image.pullPolicy="IfNotPresent"
-            echo Waiting for submariner pods to be Ready on cluster3...
-            kubectl --context=cluster3 wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s
-            kubectl --context=cluster3 wait --for=condition=Ready pods -l app=submariner-routeagent -n submariner --timeout=60s
-            echo Deploying nginx on cluster3 worker: ${worker_ip}
-            kubectl --context=cluster3 apply -f ${PRJ_ROOT}/scripts/kind-e2e/nginx-demo.yaml
-            echo Waiting for nginx-demo deployment to be Ready on cluster3.
-            kubectl --context=cluster3 rollout status deploy/nginx-demo --timeout=120s
-    fi
-}
-
 function kind_import_images() {
-    OPERATOR_IMAGE=${OPERATOR_IMAGE:-quay.io/submariner/submariner-operator:0.0.1}
-    docker tag rancher/submariner:dev submariner:local
-    docker tag rancher/submariner-route-agent:dev submariner-route-agent:local
+    docker tag quay.io/submariner/submariner:dev submariner:local
+    docker tag quay.io/submariner/submariner-route-agent:dev submariner-route-agent:local
 
-    if [[ "$deploy_operator" = true ]]; then
-
-       # if the image is not local, first pull it from the remote docker registry
-       if ! docker image inspect $OPERATOR_IMAGE 2>/dev/null ; then
-          docker pull $OPERATOR_IMAGE
-       fi
-       docker tag $OPERATOR_IMAGE submariner-operator:local
-    fi
-
-    for i in 2 3; do
+    for i in 1 2 3; do
         echo "Loading submariner images in to cluster${i}..."
         kind --name cluster${i} load docker-image submariner:local
         kind --name cluster${i} load docker-image submariner-route-agent:local
-        if [[ "$deploy_operator" = true ]]; then
-             kind --name cluster${i} load docker-image submariner-operator:local
-	fi
     done
-}
-
-function create_subm_vars() {
-  # FIXME A better name might be submariner-engine, but just kinda-matching submariner-<random hash> name used by Helm/upstream tests
-  deployment_name=submariner
-  operator_deployment_name=submariner-operator
-  engine_deployment_name=submariner-engine
-  routeagent_deployment_name=submariner-routeagent
-  broker_deployment_name=submariner-k8s-broker
-
-  clusterCIDR_cluster2=10.245.0.0/16
-  clusterCIDR_cluster3=10.246.0.0/16
-  serviceCIDR_cluster2=100.95.0.0/16
-  serviceCIDR_cluster3=100.96.0.0/16
-  natEnabled=false
-
-  subm_engine_image_repo=local
-  subm_engine_image_tag=local
-
-  # FIXME: Actually act on this size request in controller
-  subm_engine_size=3
-  subm_colorcodes=blue
-  subm_debug=false
-  subm_broker=k8s
-  ce_ipsec_debug=false
-  ce_ipsec_ikeport=500
-  ce_ipsec_nattport=4500
-
-  subm_ns=operators
-  subm_broker_ns=submariner-k8s-broker
 }
 
 function test_connection() {
@@ -266,15 +107,6 @@ function test_connection() {
     echo "Connection test was successful!"
 }
 
-function update_subm_pods() {
-    echo Removing submariner engine pods...
-    kubectl --context=$1 delete pods -n submariner -l app=submariner-engine
-    kubectl --context=$1 wait --for=condition=Ready pods -l app=submariner-engine -n submariner --timeout=60s
-    echo Removing submariner route agent pods...
-    kubectl --context=$1 delete pods -n submariner -l app=submariner-routeagent
-    kubectl --context=$1 wait --for=condition=Ready pods -l app=submariner-routeagent -n submariner --timeout=60s
-}
-
 function enable_logging() {
     if kubectl --context=cluster1 rollout status deploy/kibana > /dev/null 2>&1; then
         echo Elasticsearch stack already installed, skipping...
@@ -293,9 +125,11 @@ function enable_logging() {
 }
 
 function enable_kubefed() {
+    KUBEFED_NS=kube-federation-system
     if kubectl --context=cluster1 rollout status deploy/kubefed-controller-manager -n ${KUBEFED_NS} > /dev/null 2>&1; then
         echo Kubefed already installed, skipping setup...
     else
+        helm init --client-only
         helm repo add kubefed-charts https://raw.githubusercontent.com/kubernetes-sigs/kubefed/master/charts
         helm --kube-context cluster1 install kubefed-charts/kubefed --version=0.1.0-rc2 --name kubefed --namespace ${KUBEFED_NS} --set controllermanager.replicaCount=1
         for i in 1 2 3; do
@@ -311,6 +145,34 @@ function enable_kubefed() {
     fi
 }
 
+function add_subm_gateway_label() {
+    context=$1
+    kubectl --context=$context label node $context-worker "submariner.io/gateway=true" --overwrite
+}
+
+function del_subm_gateway_label() {
+    context=$1
+    kubectl --context=$context label node $context-worker "submariner.io/gateway-" --overwrite
+}
+
+function deploy_netshoot() {
+    context=$1
+    worker_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $context-worker | head -n 1)
+    echo Deploying netshoot on $context worker: ${worker_ip}
+    kubectl --context=$context apply -f ${PRJ_ROOT}/scripts/kind-e2e/netshoot.yaml
+    echo Waiting for netshoot pods to be Ready on $context.
+    kubectl --context=$context rollout status deploy/netshoot --timeout=120s
+}
+
+function deploy_nginx() {
+    context=$1
+    worker_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $context-worker | head -n 1)
+    echo Deploying nginx on $context worker: ${worker_ip}
+    kubectl --context=$context apply -f ${PRJ_ROOT}/scripts/kind-e2e/nginx-demo.yaml
+    echo Waiting for nginx-demo deployment to be Ready on $context.
+    kubectl --context=$context rollout status deploy/nginx-demo --timeout=120s
+}
+
 function test_with_e2e_tests {
     set -o pipefail 
 
@@ -319,10 +181,24 @@ function test_with_e2e_tests {
     # Setup the KUBECONFIG env
     export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
 
-    go test -args -ginkgo.v -ginkgo.randomizeAllSpecs -ginkgo.reportPassed \
-        -dp-context cluster2 -dp-context cluster3  \
-        -report-dir ${DAPPER_SOURCE}/${DAPPER_OUTPUT}/junit 2>&1 | \
+    go test -v -args -ginkgo.v -ginkgo.randomizeAllSpecs \
+        -submariner-namespace $subm_ns -dp-context cluster2 -dp-context cluster3 -dp-context cluster1 \
+        -ginkgo.noColor -ginkgo.reportPassed \
+        -ginkgo.reportFile ${DAPPER_SOURCE}/${DAPPER_OUTPUT}/e2e-junit.xml 2>&1 | \
         tee ${DAPPER_SOURCE}/${DAPPER_OUTPUT}/e2e-tests.log
+}
+
+function delete_subm_pods() {
+    context=$1
+    ns=$2
+    if kubectl --context=$context wait --for=condition=Ready pods -l app=submariner-engine -n $ns --timeout=60s > /dev/null 2>&1; then
+        echo Removing submariner engine pods...
+        kubectl --context=$context delete pods -n submariner -l app=submariner-engine
+    fi
+    if kubectl --context=$context wait --for=condition=Ready pods -l app=submariner-routeagent -n $ns --timeout=60s > /dev/null 2>&1; then
+        echo Removing submariner route agent pods...
+        kubectl --context=$context delete pods -n submariner -l app=submariner-routeagent
+    fi
 }
 
 function cleanup {
@@ -351,137 +227,79 @@ function cleanup {
 
 ### Main ###
 
-if [[ $1 = clean ]]; then
+status=$1
+version=$2
+logging=$3
+kubefed=$4
+deploy=$5
+
+echo Starting with status: $status, k8s_version: $version, logging: $logging, kubefed: $kubefed, deploy: $deploy
+
+if [[ $status = clean ]]; then
     cleanup
     exit 0
-fi
-
-if [[ $1 != keep ]]; then
+elif [[ $status = onetime ]]; then
+    echo Status $status: Will cleanup on EXIT signal
     trap cleanup EXIT
+elif [[ $status != keep && $status != create ]]; then
+    echo Unknown status: $status
+    cleanup
+    exit 1
 fi
 
-if [ "$5" = operator ]; then
-   echo Deploying with operator
-   deploy_operator=true
+if [[ $deploy = operator ]]; then
+    echo Deploying with operator
+    . kind-e2e/lib_operator_deploy_subm.sh
+elif [ "$deploy" = helm ]; then
+    echo Deploying with helm
+    . kind-e2e/lib_helm_deploy_subm.sh
+else
+    echo Unknown deploy method: $deploy
+    cleanup
+    exit 1
 fi
 
-echo Starting with status: $1, k8s_version: $2, logging: $3, kubefed: $4.
 PRJ_ROOT=$(git rev-parse --show-toplevel)
 mkdir -p ${PRJ_ROOT}/output/kind-config/dapper/ ${PRJ_ROOT}/output/kind-config/local-dev/
-SUBMARINER_BROKER_NS=submariner-k8s-broker
-# FIXME: This can change and break re-running deployments
-SUBMARINER_PSK=$(cat /dev/urandom | LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 64 | head -n 1)
-KUBEFED_NS=kube-federation-system
 export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
 
-kind_clusters "$@"
-setup_custom_cni
-if [[ $3 = true ]]; then
+if [[ $logging = true ]]; then
     enable_logging
 fi
 
-install_helm
-if [[ $4 = true ]]; then
+kind_clusters "$@"
+kind_import_images
+setup_custom_cni
+
+if [[ $kubefed = true ]]; then
+    # FIXME: Kubefed deploys are broken (not because of this commit)
     enable_kubefed
 fi
 
-kind_import_images
-setup_broker
+# Install Helm/Operator deploy tool prerequisites
+deploytool_prereqs
 
-context=cluster1
-kubectl config use-context $context
+for i in 1 2 3; do
+    context=cluster$i
+    delete_subm_pods $context $subm_ns
+    add_subm_gateway_label $context
+done
 
-# Import functions for testing with Operator
-# NB: These are also used to verify non-Operator deployments, thereby asserting the two are mostly equivalent
-. kind-e2e/lib_operator_verify_subm.sh
+setup_broker cluster1
+install_subm_all_clusters
 
-create_subm_vars
-verify_subm_broker_secrets
+deploytool_postreqs
 
-if [ "$deploy_operator" = true ]; then
-    . kind-e2e/lib_operator_deploy_subm.sh
-
-    for i in 2 3; do
-      context=cluster$i
-      kubectl config use-context $context
-
-      # Create CRDs required as prerequisite submariner-engine
-      # TODO: Eventually OLM should handle this
-      create_subm_endpoints_crd
-      verify_endpoints_crd
-      create_subm_clusters_crd
-      verify_clusters_crd
-
-      # Add SubM gateway labels
-      add_subm_gateway_label
-      # Verify SubM gateway labels
-      verify_subm_gateway_label
-
-      # Deploy SubM Operator
-      deploy_subm_operator
-      # Verify SubM CRD
-      verify_subm_crd
-      # Verify SubM Operator
-      verify_subm_operator
-      # Verify SubM Operator pod
-      verify_subm_op_pod
-      # Verify SubM Operator container
-      verify_subm_operator_container
-
-      # FIXME: Rename all of these submariner-engine or engine, vs submariner
-      # Create SubM CR
-      create_subm_cr
-      # Deploy SubM CR
-      deploy_subm_cr
-      # Verify SubM CR
-      verify_subm_cr
-      # Verify SubM Engine Deployment
-      verify_subm_engine_deployment
-      # Verify SubM Engine Pod
-      verify_subm_engine_pod
-      # Verify SubM Engine container
-      verify_subm_engine_container
-      # Verify Engine secrets
-      verify_subm_engine_secrets
-
-      # Verify SubM Routeagent DaemonSet
-      verify_subm_routeagent_daemonset
-      # Verify SubM Routeagent Pods
-      verify_subm_routeagent_pod
-      # Verify SubM Routeagent container
-      verify_subm_routeagent_container
-      # Verify Routeagent secrets
-      verify_subm_routeagent_secrets
-    done
-
-    deploy_netshoot_cluster2
-    deploy_nginx_cluster3
-elif [[ $5 = helm ]]; then
-    helm=true
-    setup_cluster2_gateway
-    setup_cluster3_gateway
-    for i in 2 3; do
-      context=cluster$i
-      kubectl config use-context $context
-
-      # The Helm deploy doesn't respect namespace config, hardcode to what it uses
-      subm_ns=submariner
-
-      verify_subm_engine_deployment
-      verify_subm_engine_pod
-      verify_subm_routeagent_daemonset
-      verify_subm_routeagent_pod
-      verify_subm_engine_container
-      verify_subm_routeagent_container
-      verify_subm_engine_secrets
-      verify_subm_routeagent_secrets
-    done
-fi
+deploy_netshoot cluster2
+deploy_nginx cluster3
 
 test_connection
-test_with_e2e_tests
 
-if [[ $1 = keep ]]; then
+if [[ $status = keep || $status = onetime ]]; then
+    test_with_e2e_tests
+fi
+
+if [[ $status = keep || $status = create ]]; then
     echo "your 3 virtual clusters are deployed and working properly with your local"
     echo "submariner source code, and can be accessed with:"
     echo ""
@@ -489,5 +307,5 @@ if [[ $1 = keep ]]; then
     echo ""
     echo "$ kubectl config use-context cluster1 # or cluster2, cluster3.."
     echo ""
-    echo "to cleanup, just run: make ci e2e status=clean"
+    echo "to cleanup, just run: make e2e status=clean"
 fi

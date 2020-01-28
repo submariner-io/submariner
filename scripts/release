@@ -4,12 +4,13 @@ set -e
 source $(dirname $0)/lib/debug_functions
 
 DOCKER_TAG=${1:-latest}
+REPO=${REPO:-quay.io/submariner}
 
 echo "$QUAY_PASSWORD" | docker login quay.io -u "$QUAY_USERNAME" --password-stdin
-docker tag rancher/submariner:dev quay.io/submariner/submariner:${DOCKER_TAG#"v"}
-docker tag rancher/submariner:dev quay.io/submariner/submariner:"${TRAVIS_COMMIT:0:7}"
-docker tag rancher/submariner-route-agent:dev quay.io/submariner/submariner-route-agent:${DOCKER_TAG#"v"}
-docker tag rancher/submariner-route-agent:dev quay.io/submariner/submariner-route-agent:"${TRAVIS_COMMIT:0:7}"
-docker tag rancher/dapper-base:dev quay.io/submariner/dapper-base:${DOCKER_TAG#"v"}
-docker tag rancher/dapper-base:dev quay.io/submariner/dapper-base:"${TRAVIS_COMMIT:0:7}"
-for i in $(docker images --format "{{.Repository}}:{{.Tag}}" | grep "quay.io/submariner"); do docker push $i; done
+docker tag ${REPO}/submariner:dev ${REPO}/submariner:${DOCKER_TAG#"v"}
+docker tag ${REPO}/submariner:dev ${REPO}/submariner:"${TRAVIS_COMMIT:0:7}"
+docker tag ${REPO}/submariner-route-agent:dev ${REPO}/submariner-route-agent:${DOCKER_TAG#"v"}
+docker tag ${REPO}/submariner-route-agent:dev ${REPO}/submariner-route-agent:"${TRAVIS_COMMIT:0:7}"
+docker tag ${REPO}/dapper-base:dev ${REPO}/dapper-base:${DOCKER_TAG#"v"}
+docker tag ${REPO}/dapper-base:dev ${REPO}/dapper-base:"${TRAVIS_COMMIT:0:7}"
+for i in $(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "${REPO}/.*:(${DOCKER_TAG#v}|${TRAVIS_COMMIT:0:7})"); do docker push $i; done

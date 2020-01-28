@@ -13,4 +13,4 @@ PACKAGES=$(find_go_pkg_dirs)
 
 echo Running tests in ${PACKAGES}
 [ "${ARCH}" == "amd64" ] && RACE=-race
-ginkgo ${RACE} -cover ${PACKAGES}
+go test -v ${RACE} -cover ${PACKAGES} -ginkgo.reportPassed -ginkgo.reportFile junit.xml

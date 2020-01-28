@@ -2,6 +2,10 @@ FROM registry.access.redhat.com/ubi8/ubi-minimal
 
 WORKDIR /var/submariner
 
+# Workaround for
+# https://github.com/rpm-software-management/microdnf/issues/50
+RUN mkdir -p /run/user/$(id -u)
+
 # These are all available in the UBI8 base OS repository
 RUN microdnf -y install --nodocs iproute iptables && \
     microdnf clean all
@@ -13,7 +17,6 @@ RUN chmod +x /usr/local/bin/submariner-route-agent.sh
 COPY submariner-route-agent /usr/local/bin
 
 # Wrapper scripts to use iptables from the host when that's available
-COPY ./iptables.wrapper /usr/sbin/
-COPY ./iptables-save.wrapper /usr/sbin/
+COPY ./iptables-wrapper.in /usr/sbin/
 
 ENTRYPOINT submariner-route-agent.sh
