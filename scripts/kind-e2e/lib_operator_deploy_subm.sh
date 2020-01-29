@@ -18,7 +18,7 @@ subm_ns=submariner-operator
 
 function get_subctl() {
     test -x /go/bin/subctl && return
-    curl -L https://github.com/submariner-io/submariner-operator/releases/download/v0.0.2/subctl-v0.0.2-linux-amd64 \
+    curl -L https://github.com/submariner-io/submariner-operator/releases/download/v0.0.3/subctl-v0.0.3-linux-amd64 \
          -o /go/bin/subctl
     chmod a+x /go/bin/subctl
 }
