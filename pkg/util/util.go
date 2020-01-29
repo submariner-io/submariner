@@ -9,10 +9,10 @@ import (
 	"syscall"
 
 	"github.com/rdegges/go-ipify"
+	"github.com/vishvananda/netlink"
+
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/vishvananda/netlink"
-	"k8s.io/klog"
 )
 
 const tokenLength = 64
@@ -173,31 +173,4 @@ func GetDefaultGatewayInterface() (*net.Interface, error) {
 	}
 
 	return nil, fmt.Errorf("unable to find default route")
-}
-
-func GetIPv4AddressOnInterface(interfaceName string) (string, error) {
-	iface, err := net.InterfaceByName(interfaceName)
-	if err != nil {
-		return "", err
-	}
-
-	addrs, err := iface.Addrs()
-	if err != nil {
-		return "", fmt.Errorf("error reading interface [%s] address: %v", interfaceName, err)
-	}
-
-	if len(addrs) > 0 {
-		for i := range addrs {
-			ipAddr, _, err := net.ParseCIDR(addrs[i].String())
-			if err != nil {
-				klog.Errorf("Unable to ParseCIDR : %v\n", addrs[i].String())
-			} else if ipAddr.To4() != nil {
-				klog.V(4).Infof("Interface [%s] has [%s] address", interfaceName, ipAddr)
-				return ipAddr.String(), nil
-			}
-		}
-		return "", fmt.Errorf("interface [%s] does not have an IPv4 address", interfaceName)
-	} else {
-		return "", fmt.Errorf("interface [%s] does not have any IPAddress", interfaceName)
-	}
 }

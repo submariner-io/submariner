@@ -7,8 +7,6 @@ import (
 
 	"github.com/coreos/go-iptables/iptables"
 	"k8s.io/klog"
-
-	"github.com/submariner-io/submariner/pkg/util"
 )
 
 func (r *Controller) createIPTableChains() error {
@@ -25,7 +23,7 @@ func (r *Controller) createIPTableChains() error {
 	klog.V(4).Infof("Insert %s rule that has rules for inter-cluster traffic", SmPostRoutingChain)
 	forwardToSubPostroutingRuleSpec := []string{"-j", SmPostRoutingChain}
 	if err = r.prependUnique(ipt, "nat", "POSTROUTING", forwardToSubPostroutingRuleSpec); err != nil {
-		klog.Errorf("unable to insert iptable rule in NAT table, POSTROUTING chain: %v", err)
+		return fmt.Errorf("unable to insert iptable rule in NAT table, POSTROUTING chain: %v", err)
 	}
 
 	klog.V(4).Infof("Install/ensure SUBMARINER-INPUT chain exists")
@@ -50,15 +48,10 @@ func (r *Controller) createIPTableChains() error {
 		return fmt.Errorf("unable to insert iptable rule in filter table to allow vxlan traffic: %v", err)
 	}
 
-	if r.cniInterfaceName != "" {
+	if r.cniIface != nil {
 		// Program rules to support communication from HostNetwork to remoteCluster
-		snatIPAddress, err := util.GetIPv4AddressOnInterface(r.cniInterfaceName)
-		if err != nil {
-			return fmt.Errorf("error reading IPv4 address on CNI interface: %v", err)
-		}
-
 		sourceAddress := strconv.Itoa(VxLANVTepNetworkPrefix) + ".0.0.0/8"
-		ruleSpec = []string{"-s", sourceAddress, "-o", VxLANIface, "-j", "SNAT", "--to", snatIPAddress}
+		ruleSpec = []string{"-s", sourceAddress, "-o", VxLANIface, "-j", "SNAT", "--to", r.cniIface.ipAddress}
 		klog.V(4).Infof("Installing rule for hostNetwork to remoteCluster communication:"+
 			" %s", strings.Join(ruleSpec, " "))
 		if err = ipt.AppendUnique("nat", SmPostRoutingChain, ruleSpec...); err != nil {

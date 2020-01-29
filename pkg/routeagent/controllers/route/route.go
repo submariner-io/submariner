@@ -36,6 +36,11 @@ type InformerConfigStruct struct {
 	PodInformer         podinformer.PodInformer
 }
 
+type cniInterface struct {
+	name      string
+	ipAddress string
+}
+
 type Controller struct {
 	clusterID       string
 	objectNamespace string
@@ -61,7 +66,7 @@ type Controller struct {
 	isGatewayNode    bool
 	defaultHostIface *net.Interface
 
-	cniInterfaceName string
+	cniIface *cniInterface
 }
 
 const (
@@ -157,12 +162,11 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
 
-	iface := discoverCNIInterface(r.localClusterCidr[0])
-	if iface != "" {
-		r.cniInterfaceName = iface
+	r.cniIface = discoverCNIInterface(r.localClusterCidr[0])
+	if r.cniIface != nil {
 
 		// Configure CNI Specific changes
-		err := toggleCNISpecificConfiguration(iface)
+		err := toggleCNISpecificConfiguration(r.cniIface.name)
 		if err != nil {
 			return fmt.Errorf("toggleCNISpecificConfiguration returned error. %v", err)
 		}

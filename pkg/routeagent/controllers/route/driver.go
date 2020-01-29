@@ -5,47 +5,49 @@ import (
 	"io/ioutil"
 	"net"
 
-	"github.com/vishvananda/netlink"
 	"k8s.io/klog"
-
-	"github.com/submariner-io/submariner/pkg/util"
 )
 
-func interfaceExists(iface string) bool {
-	_, err := netlink.LinkByName(iface)
-	return err == nil
-}
-
-func discoverCNIInterface(clusterCIDR string) string {
-	cniInterfaceList := []string{
-		"weave",     // Weave
-		"tun0",      // OpenShift
-		"flannel.1", // Flannel
+func discoverCNIInterface(clusterCIDR string) *cniInterface {
+	_, clusterNetwork, err := net.ParseCIDR(clusterCIDR)
+	if err != nil {
+		klog.Errorf("Unable to ParseCIDR %q : %v", clusterCIDR, err)
+		return nil
 	}
 
-	for _, iface := range cniInterfaceList {
-		if interfaceExists(iface) {
-			klog.Infof("Found CNI interface [%s] on the Host", iface)
-			ipv4Addr, err := util.GetIPv4AddressOnInterface(iface)
-			if err != nil {
-				klog.Errorf("error reading IPv4 address on CNI interface [%s]: %v", iface, err)
-				return ""
-			}
-			address := net.ParseIP(ipv4Addr)
+	hostInterfaces, err := net.Interfaces()
+	if err != nil {
+		klog.Errorf("net.Interfaces() returned error : %v", err)
+		return nil
+	}
 
-			_, clusterNetwork, err := net.ParseCIDR(clusterCIDR)
-			if err != nil {
-				klog.Errorf("Unable to ParseCIDR [%s] : %v\n", clusterCIDR, err)
-				return ""
-			}
+	for _, iface := range hostInterfaces {
+		addrs, err := iface.Addrs()
+		if err != nil {
+			klog.Errorf("For interface %q, iface.Addrs returned error: %v", iface.Name, err)
+			return nil
+		}
 
-			// Verify that iface has an address from cluster CIDR
-			if clusterNetwork.Contains(address) {
-				return iface
+		if len(addrs) > 0 {
+			for i := range addrs {
+				ipAddr, _, err := net.ParseCIDR(addrs[i].String())
+				if err != nil {
+					klog.Errorf("Unable to ParseCIDR : %v", addrs[i].String())
+				} else if ipAddr.To4() != nil {
+					klog.V(4).Infof("Interface %q has %q address", iface.Name, ipAddr)
+					address := net.ParseIP(ipAddr.String())
+
+					// Verify that interface has an address from cluster CIDR
+					if clusterNetwork.Contains(address) {
+						klog.V(4).Infof("Found CNI Interface %q that has IP %q from ClusterCIDR %q",
+							iface.Name, ipAddr.String(), clusterCIDR)
+						return &cniInterface{ipAddress: ipAddr.String(), name: iface.Name}
+					}
+				}
 			}
 		}
 	}
-	return ""
+	return nil
 }
 
 func toggleCNISpecificConfiguration(iface string) error {
@@ -53,7 +55,7 @@ func toggleCNISpecificConfiguration(iface string) error {
 	if err != nil {
 		return fmt.Errorf("unable to update rp_filter for "+iface+", err: %s", err)
 	} else {
-		klog.Info("Successfully configured rp_filter to loose mode(2) on " + iface)
+		klog.Infof("Successfully configured rp_filter to loose mode(2) on cniInterface %q", iface)
 	}
 	return nil
 }
