@@ -10,9 +10,10 @@ import (
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/rdegges/go-ipify"
+	"github.com/vishvananda/netlink"
+
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/vishvananda/netlink"
 	"k8s.io/klog"
 )
 
