@@ -70,8 +70,7 @@ function setup_custom_cni(){
             echo "Applying weave network in to cluster${i}..."
             kubectl --context=cluster${i} apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&env.IPALLOC_RANGE=${cluster_CIDRs[cluster${i}]}"
             echo "Waiting for weave-net pods to be ready cluster${i}..."
-            # FIXME: This timeout doesn't need to be so long
-            kubectl --context=cluster${i} wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=700s
+            kubectl --context=cluster${i} wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=300s
             echo "Waiting for core-dns deployment to be ready cluster${i}..."
             kubectl --context=cluster${i} -n kube-system rollout status deploy/coredns --timeout=300s
         fi
