@@ -359,3 +359,4 @@ you can speedup the process by running: `make build package e2e`
 - Potentially spin out Charon into it's own pod to help decrease downtime
 - Better clean up of IPtables rules when node loses leader election
 - Central API server that is hosted by Rancher
+- Support for [Overlapping CIDRs](docs/globalnet.md) in clusters.

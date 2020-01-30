@@ -20,6 +20,7 @@ type SubmarinerSpecification struct {
 	Token       string
 	ClusterCidr []string
 	ServiceCidr []string
+	GlobalCidr  []string
 	ColorCodes  []string
 	NatEnabled  bool
 	Broker      string

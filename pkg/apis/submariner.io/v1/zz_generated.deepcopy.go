@@ -102,6 +102,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.GlobalCIDR != nil {
+		in, out := &in.GlobalCIDR, &out.GlobalCIDR
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
