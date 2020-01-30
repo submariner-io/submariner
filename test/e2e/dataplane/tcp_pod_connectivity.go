@@ -9,7 +9,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters without discovery", func() {
+var _ = Describe("[dataplane,diagnostics] Basic TCP connectivity tests across clusters without discovery", func() {
 	f := framework.NewDefaultFramework("dataplane-conn-nd")
 	var useService bool
 
