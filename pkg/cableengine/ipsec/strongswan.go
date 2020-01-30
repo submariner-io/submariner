@@ -30,6 +30,9 @@ const (
 
 	// strongswanCharonConfigFilePAth points to the config file charon will use at start
 	strongswanCharonConfigFilePath = "/etc/strongswan/strongswan.d/charon.conf"
+
+	// charonViciSocket points to the vici socket exposed by charon
+	charonViciSocket = "/var/run/charon.vici"
 )
 
 type strongSwan struct {
@@ -372,6 +375,12 @@ const charonConfTemplate = `
 		port_nat_t = {{.ipSecNATTPort}}
 		make_before_break = yes
 		ignore_acquire_ts = yes
+		plugins {
+			vici {
+				load = yes
+				socket = unix://{{.charonViciSocket}}
+			}
+		}
 	}
 `
 
@@ -404,8 +413,9 @@ func (i *strongSwan) renderCharonConfigTemplate(f io.Writer) error {
 	}
 
 	err = t.Execute(f, map[string]string{
-		"ipSecIKEPort":  i.ipSecIKEPort,
-		"ipSecNATTPort": i.ipSecNATTPort})
+		"ipSecIKEPort":     i.ipSecIKEPort,
+		"ipSecNATTPort":    i.ipSecNATTPort,
+		"charonViciSocket": charonViciSocket})
 
 	if err != nil {
 		return fmt.Errorf("Error rendering charon config file: %s", err)
@@ -421,7 +431,8 @@ func (i *strongSwan) runCharon() error {
 
 	klog.Infof("Starting Charon")
 	// Ignore error
-	os.Remove("/var/run/charon.vici")
+
+	os.Remove(charonViciSocket)
 
 	args := []string{}
 	for _, idx := range strings.Split("dmn|mgr|ike|chd|cfg|knl|net|asn|tnc|imc|imv|pts|tls|esp|lib", "|") {

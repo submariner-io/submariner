@@ -1,10 +1,13 @@
 package framework
 
 import (
+	"fmt"
+
 	. "github.com/onsi/gomega"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 type CheckEndpointFunc func(endpoint *submarinerv1.Endpoint) (bool, string, error)
@@ -46,4 +49,14 @@ func (f *Framework) AwaitSubmarinerEndpoint(cluster ClusterIndex, checkEndpoint 
 	})
 
 	return retEndpoint
+}
+
+func (f *Framework) AwaitNewSubmarinerEndpoint(cluster ClusterIndex, prevEndpointUID types.UID) *submarinerv1.Endpoint {
+	return f.AwaitSubmarinerEndpoint(cluster, func(endpoint *submarinerv1.Endpoint) (bool, string, error) {
+		if endpoint.ObjectMeta.UID != prevEndpointUID {
+			return true, "", nil
+		}
+
+		return false, fmt.Sprintf("Expecting new Endpoint instance (UUID %q matches previous instance)", endpoint.ObjectMeta.UID), nil
+	})
 }

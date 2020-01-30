@@ -5,6 +5,17 @@ if [ "${0##*/}" = "lib_operator_deploy_subm.sh" ]; then
     exit 1
 fi
 
+### Variables ###
+
+ce_ipsec_ikeport=500
+ce_ipsec_nattport=4500
+subm_colorcodes=blue
+subm_engine_image_repo=local
+subm_engine_image_tag=local
+subm_ns=submariner-operator
+
+### Functions ###
+
 function get_subctl() {
     test -x /go/bin/subctl && return
     curl -L https://github.com/submariner-io/submariner-operator/releases/download/v0.0.2/subctl-v0.0.2-linux-amd64 \
@@ -12,33 +23,42 @@ function get_subctl() {
     chmod a+x /go/bin/subctl
 }
 
-function add_subm_gateway_label() {
-  kubectl label node $context-worker "submariner.io/gateway=true" --overwrite
+function deploytool_prereqs() {
+    get_subctl
 }
 
-function del_subm_gateway_label() {
-  kubectl label node $context-worker "submariner.io/gateway-" --overwrite
+function setup_broker() {
+    context=$1
+    echo Installing broker on $context.
+    subctl --kubeconfig ${PRJ_ROOT}/output/kind-config/dapper/kind-config-$context deploy-broker --no-dataplane
 }
 
-function deploy_netshoot_cluster2() {
-    kubectl config use-context cluster2
-    echo Deploying netshoot on cluster2 worker: ${worker_ip}
-    kubectl apply -f ./kind-e2e/netshoot.yaml
-    echo Waiting for netshoot pods to be Ready on cluster2.
-    kubectl rollout status deploy/netshoot --timeout=120s
-
-    # TODO: Add verifications
+function subctl_install_subm() {
+    context=$1
+    kubectl config use-context $context
+    subctl join --kubeconfig ${PRJ_ROOT}/output/kind-config/dapper/kind-config-$context \
+                --clusterid ${context} \
+                --repository ${subm_engine_image_repo} \
+                --version ${subm_engine_image_tag} \
+                --nattport ${ce_ipsec_nattport} \
+                --ikeport ${ce_ipsec_ikeport} \
+                --colorcodes ${subm_colorcodes} \
+                --disable-nat \
+                broker-info.subm
 }
 
-function deploy_nginx_cluster3() {
-    kubectl config use-context cluster3
-    echo Deploying nginx on cluster3 worker: ${worker_ip}
-    kubectl apply -f ./kind-e2e/nginx-demo.yaml
-    echo Waiting for nginx-demo deployment to be Ready on cluster3.
-    kubectl rollout status deploy/nginx-demo --timeout=120s
-
-    # TODO: Add verifications
-    # TODO: Do this with nginx operator?
+function install_subm_all_clusters() {
+    for i in 1 2 3; do
+        context=cluster$i
+        subctl_install_subm $context
+    done
 }
 
-get_subctl
+function deploytool_postreqs() {
+    # FIXME: Make this unnecessary using subctl v0.0.4 --no-label flag
+    # subctl wants a gateway node labeled, or it will ask, but this script is not interactive,
+    # and E2E expects cluster1 to not have the gateway configured at start, so we remove it
+    del_subm_gateway_label cluster1
+    # Just removing the label does not stop Subm pod.
+    kubectl --context=cluster1 delete pod -n submariner-operator -l app=submariner-engine
+}
