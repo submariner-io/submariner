@@ -31,7 +31,7 @@ func (f *Framework) AwaitSubmarinerEndpoint(cluster ClusterIndex, checkEndpoint 
 		endpoints := result.(*submarinerv1.EndpointList)
 		retEndpoint = nil
 		for i := range endpoints.Items {
-			if endpoints.Items[i].Spec.ClusterID == TestContext.KubeContexts[cluster] {
+			if endpoints.Items[i].Spec.ClusterID == TestContext.ClusterIDs[cluster] {
 				if retEndpoint == nil {
 					retEndpoint = &endpoints.Items[i]
 				} else {

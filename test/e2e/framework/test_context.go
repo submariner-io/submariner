@@ -14,6 +14,7 @@ type TestContextType struct {
 	KubeConfigs         []string // KubeConfigs provides an alternative to KubeConfig + KubeContexts
 	KubeConfig          string
 	KubeContexts        contextArray
+	ClusterIDs          []string
 	ReportDir           string
 	ReportPrefix        string
 	SubmarinerNamespace string
@@ -59,4 +60,7 @@ func ParseFlags() {
 	registerFlags(TestContext)
 	flag.Parse()
 	validateFlags(TestContext)
+	// fill in the cluster names out of the kubecontexts, those are used just for logging and
+	// information during test runs
+	TestContext.ClusterIDs = TestContext.KubeContexts
 }
