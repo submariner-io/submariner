@@ -80,13 +80,11 @@ function setup_custom_cni(){
 function kind_import_images() {
     docker tag quay.io/submariner/submariner:dev submariner:local
     docker tag quay.io/submariner/submariner-route-agent:dev submariner-route-agent:local
-    docker tag quay.io/submariner/submariner-globalnet:dev submariner-globalnet:local
 
     for i in 1 2 3; do
         echo "Loading submariner images in to cluster${i}..."
         kind --name cluster${i} load docker-image submariner:local
         kind --name cluster${i} load docker-image submariner-route-agent:local
-        kind --name cluster${i} load docker-image submariner-globalnet:local
     done
 }
 
@@ -202,20 +200,6 @@ function delete_subm_pods() {
     fi
 }
 
-function deploy_globalnet {
-    for i in 2 3; do
-      if kubectl --context=cluster${i} -n $subm_ns get serviceaccount submariner-globalnet > /dev/null 2>&1; then
-        echo submariner-globalnet already exists in cluster${i}, deleting the existing deployment
-        sed "s|namespace: operators|namespace: $subm_ns|g" ${PRJ_ROOT}/scripts/kind-e2e/globalnet/role-globalnet.yaml | kubectl --context=cluster${i} delete -f -
-        kubectl --context=cluster${i} -n $subm_ns delete -f ${PRJ_ROOT}/scripts/kind-e2e/globalnet/deploy-globalnet-${i}.yaml
-        kubectl --context=cluster${i} -n $subm_ns delete serviceaccount submariner-globalnet
-      fi
-      kubectl --context=cluster${i} -n $subm_ns create serviceaccount submariner-globalnet
-      sed "s|namespace: operators|namespace: $subm_ns|g" ${PRJ_ROOT}/scripts/kind-e2e/globalnet/role-globalnet.yaml | kubectl --context=cluster${i} apply -f -
-      kubectl --context=cluster${i} -n $subm_ns apply -f ${PRJ_ROOT}/scripts/kind-e2e/globalnet/deploy-globalnet-${i}.yaml
-    done
-}
-
 function cleanup {
     for i in 1 2 3; do
       if [[ $(kind get clusters | grep cluster${i} | wc -l) -gt 0  ]]; then
@@ -308,7 +292,6 @@ deploytool_postreqs
 deploy_netshoot cluster2
 deploy_nginx cluster3
 
-deploy_globalnet
 test_connection
 
 if [[ $status = keep || $status = onetime ]]; then
