@@ -12,8 +12,8 @@ import (
 
 type CheckEndpointFunc func(endpoint *submarinerv1.Endpoint) (bool, string, error)
 
-func (f *Framework) createSubmarinerClient(context string) *submarinerClientset.Clientset {
-	restConfig := f.createRestConfig(context)
+func (f *Framework) createSubmarinerClient(kubeConfig, context string) *submarinerClientset.Clientset {
+	restConfig := f.createRestConfig(kubeConfig, context)
 	clientSet, err := submarinerClientset.NewForConfig(restConfig)
 	Expect(err).NotTo(HaveOccurred())
 	return clientSet

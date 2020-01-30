@@ -123,9 +123,18 @@ func (f *Framework) BeforeEach() {
 
 	ginkgo.By("Creating kubernetes clients")
 
+	// We accept either KubeContexts + a single KubeConfig variable, or lots of individual
+	// KubeConfigs
+	Expect(len(TestContext.KubeConfigs) > 0 && len(TestContext.KubeContexts) > 0).NotTo(BeTrue())
+
 	for _, context := range TestContext.KubeContexts {
-		f.ClusterClients = append(f.ClusterClients, f.createKubernetesClient(context))
-		f.SubmarinerClients = append(f.SubmarinerClients, f.createSubmarinerClient(context))
+		f.ClusterClients = append(f.ClusterClients, f.createKubernetesClient(TestContext.KubeConfig, context))
+		f.SubmarinerClients = append(f.SubmarinerClients, f.createSubmarinerClient(TestContext.KubeConfig, context))
+	}
+
+	for _, kubeConfig := range TestContext.KubeConfigs {
+		f.ClusterClients = append(f.ClusterClients, f.createKubernetesClient(kubeConfig, ""))
+		f.SubmarinerClients = append(f.SubmarinerClients, f.createSubmarinerClient(kubeConfig, ""))
 	}
 
 	if !f.SkipNamespaceCreation {
@@ -151,9 +160,9 @@ func (f *Framework) BeforeEach() {
 
 }
 
-func (f *Framework) createKubernetesClient(context string) *kubeclientset.Clientset {
+func (f *Framework) createKubernetesClient(kubeConfig, context string) *kubeclientset.Clientset {
 
-	restConfig := f.createRestConfig(context)
+	restConfig := f.createRestConfig(kubeConfig, context)
 	clientSet, err := kubeclientset.NewForConfig(restConfig)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -168,8 +177,8 @@ func (f *Framework) createKubernetesClient(context string) *kubeclientset.Client
 	return clientSet
 }
 
-func (f *Framework) createRestConfig(context string) *rest.Config {
-	restConfig, _, err := loadConfig(TestContext.KubeConfig, context)
+func (f *Framework) createRestConfig(kubeConfig, context string) *rest.Config {
+	restConfig, _, err := loadConfig(kubeConfig, context)
 	if err != nil {
 		Errorf("Unable to load kubeconfig file %s for context %s, this is a non-recoverable error",
 			TestContext.KubeConfig, context)
