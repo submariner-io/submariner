@@ -64,6 +64,7 @@ const (
 	VxInterfaceWorker  = 0
 	VxInterfaceGateway = 1
 	VxLANPort          = 4800
+	VxLANOverhead      = 50
 
 	// Why VxLANVTepNetworkPrefix is 240?
 	// On VxLAN interfaces we need a unique IPAddress which does not collide with the
@@ -259,6 +260,9 @@ func (r *Controller) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP) e
 		return fmt.Errorf("failed to derive the vxlan vtepIP for %s, %v", ipAddr, err)
 	}
 
+	// Derive the MTU based on the default outgoing interface
+	vxlanMtu := r.defaultHostIface.MTU - VxLANOverhead
+
 	if ifaceType == VxInterfaceGateway {
 		attrs := &vxLanAttributes{
 			name:     VxLANIface,
@@ -266,7 +270,7 @@ func (r *Controller) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP) e
 			group:    nil,
 			srcAddr:  nil,
 			vtepPort: VxLANPort,
-			mtu:      1450,
+			mtu:      vxlanMtu,
 		}
 
 		r.vxlanDevice, err = newVxlanIface(attrs)
@@ -297,7 +301,7 @@ func (r *Controller) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP) e
 			group:    gatewayNodeIP,
 			srcAddr:  nil,
 			vtepPort: VxLANPort,
-			mtu:      1450,
+			mtu:      vxlanMtu,
 		}
 
 		r.vxlanDevice, err = newVxlanIface(attrs)
