@@ -33,13 +33,13 @@ func (r *Controller) createIPTableChains() error {
 
 	forwardToSubInputRuleSpec := []string{"-p", "udp", "-m", "udp", "-j", "SUBMARINER-INPUT"}
 	if err = ipt.AppendUnique("filter", "INPUT", forwardToSubInputRuleSpec...); err != nil {
-		return fmt.Errorf("unable to append iptables rule \"%s\": %v\n", strings.Join(forwardToSubInputRuleSpec, " "), err)
+		return fmt.Errorf("unable to append iptables rule %q: %v\n", strings.Join(forwardToSubInputRuleSpec, " "), err)
 	}
 
 	klog.V(4).Infof("Allow VxLAN incoming traffic in SUBMARINER-INPUT Chain")
 	ruleSpec := []string{"-p", "udp", "-m", "udp", "--dport", strconv.Itoa(VxLANPort), "-j", "ACCEPT"}
 	if err = ipt.AppendUnique("filter", "SUBMARINER-INPUT", ruleSpec...); err != nil {
-		return fmt.Errorf("unable to append iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
+		return fmt.Errorf("unable to append iptables rule %q: %v\n", strings.Join(ruleSpec, " "), err)
 	}
 
 	klog.V(4).Infof("Insert rule to allow traffic over %s interface in FORWARDing Chain", VxLANIface)
@@ -52,10 +52,9 @@ func (r *Controller) createIPTableChains() error {
 		// Program rules to support communication from HostNetwork to remoteCluster
 		sourceAddress := strconv.Itoa(VxLANVTepNetworkPrefix) + ".0.0.0/8"
 		ruleSpec = []string{"-s", sourceAddress, "-o", VxLANIface, "-j", "SNAT", "--to", r.cniIface.ipAddress}
-		klog.V(4).Infof("Installing rule for hostNetwork to remoteCluster communication:"+
-			" %s", strings.Join(ruleSpec, " "))
+		klog.V(4).Infof("Installing rule for host network to remote cluster communication: %s", strings.Join(ruleSpec, " "))
 		if err = ipt.AppendUnique("nat", SmPostRoutingChain, ruleSpec...); err != nil {
-			return fmt.Errorf("error appending iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
+			return fmt.Errorf("error appending iptables rule %q: %v\n", strings.Join(ruleSpec, " "), err)
 		}
 	}
 

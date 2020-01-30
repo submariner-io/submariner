@@ -164,7 +164,6 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 
 	r.cniIface = discoverCNIInterface(r.localClusterCidr[0])
 	if r.cniIface != nil {
-
 		// Configure CNI Specific changes
 		err := toggleCNISpecificConfiguration(r.cniIface.name)
 		if err != nil {

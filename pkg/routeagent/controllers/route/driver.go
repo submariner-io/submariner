@@ -28,21 +28,19 @@ func discoverCNIInterface(clusterCIDR string) *cniInterface {
 			return nil
 		}
 
-		if len(addrs) > 0 {
-			for i := range addrs {
-				ipAddr, _, err := net.ParseCIDR(addrs[i].String())
-				if err != nil {
-					klog.Errorf("Unable to ParseCIDR : %v", addrs[i].String())
-				} else if ipAddr.To4() != nil {
-					klog.V(4).Infof("Interface %q has %q address", iface.Name, ipAddr)
-					address := net.ParseIP(ipAddr.String())
+		for i := range addrs {
+			ipAddr, _, err := net.ParseCIDR(addrs[i].String())
+			if err != nil {
+				klog.Errorf("Unable to ParseCIDR : %q", addrs[i].String())
+			} else if ipAddr.To4() != nil {
+				klog.V(4).Infof("Interface %q has %q address", iface.Name, ipAddr)
+				address := net.ParseIP(ipAddr.String())
 
-					// Verify that interface has an address from cluster CIDR
-					if clusterNetwork.Contains(address) {
-						klog.V(4).Infof("Found CNI Interface %q that has IP %q from ClusterCIDR %q",
-							iface.Name, ipAddr.String(), clusterCIDR)
-						return &cniInterface{ipAddress: ipAddr.String(), name: iface.Name}
-					}
+				// Verify that interface has an address from cluster CIDR
+				if clusterNetwork.Contains(address) {
+					klog.V(4).Infof("Found CNI Interface %q that has IP %q from ClusterCIDR %q",
+						iface.Name, ipAddr.String(), clusterCIDR)
+					return &cniInterface{ipAddress: ipAddr.String(), name: iface.Name}
 				}
 			}
 		}
@@ -53,7 +51,7 @@ func discoverCNIInterface(clusterCIDR string) *cniInterface {
 func toggleCNISpecificConfiguration(iface string) error {
 	err := ioutil.WriteFile("/proc/sys/net/ipv4/conf/"+iface+"/rp_filter", []byte("2"), 0644)
 	if err != nil {
-		return fmt.Errorf("unable to update rp_filter for "+iface+", err: %s", err)
+		return fmt.Errorf("unable to update rp_filter for cni_interface %q, err: %s", iface, err)
 	} else {
 		klog.Infof("Successfully configured rp_filter to loose mode(2) on cniInterface %q", iface)
 	}
