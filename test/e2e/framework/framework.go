@@ -123,14 +123,25 @@ func (f *Framework) BeforeEach() {
 
 	ginkgo.By("Creating kubernetes clients")
 
-	// We accept either KubeContexts + a single KubeConfig variable, or lots of individual
-	// KubeConfigs
-	Expect(len(TestContext.KubeConfigs) > 0 && len(TestContext.KubeContexts) > 0).NotTo(BeTrue())
+	Expect(len(TestContext.KubeConfigs) > 0 && len(TestContext.KubeContexts) > 0).NotTo(BeTrue(),
+		"Mixing multiple KubeConfigs (contextless) and one KubeConfig variable"+
+			"with mutiple contexts is not supported.")
+
+	if len(TestContext.KubeContexts) > 0 {
+		Expect(len(TestContext.KubeConfig)).NotTo(BeZero(),
+			"When the KubeContexts array is provided, at least a kubeconfig must be provided via KubeConfig")
+		Expect(len(TestContext.KubeContexts)).To(Equal(len(TestContext.ClusterIDs)),
+			"When using KubeContexts, one ClusterID must be provided per context")
+	}
 
 	for _, context := range TestContext.KubeContexts {
 		f.ClusterClients = append(f.ClusterClients, f.createKubernetesClient(TestContext.KubeConfig, context))
 		f.SubmarinerClients = append(f.SubmarinerClients, f.createSubmarinerClient(TestContext.KubeConfig, context))
 	}
+
+	Expect(len(TestContext.KubeConfigs)).To(Equal(len(TestContext.ClusterIDs)),
+		"When providing multiple contextless KubeConfig files, one ClusterID must be provided"+
+			"for each config file")
 
 	for _, kubeConfig := range TestContext.KubeConfigs {
 		f.ClusterClients = append(f.ClusterClients, f.createKubernetesClient(kubeConfig, ""))
