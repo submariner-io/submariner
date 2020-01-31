@@ -139,9 +139,11 @@ func (f *Framework) BeforeEach() {
 		f.SubmarinerClients = append(f.SubmarinerClients, f.createSubmarinerClient(TestContext.KubeConfig, context))
 	}
 
-	Expect(len(TestContext.KubeConfigs)).To(Equal(len(TestContext.ClusterIDs)),
-		"When providing multiple contextless KubeConfig files, one ClusterID must be provided"+
-			"for each config file")
+	if len(TestContext.KubeConfigs) > 0 {
+		Expect(len(TestContext.KubeConfigs)).To(Equal(len(TestContext.ClusterIDs)),
+			"When providing multiple contextless KubeConfig files, one ClusterID must be provided"+
+				"for each config file")
+	}
 
 	for _, kubeConfig := range TestContext.KubeConfigs {
 		f.ClusterClients = append(f.ClusterClients, f.createKubernetesClient(kubeConfig, ""))
