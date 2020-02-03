@@ -7,7 +7,7 @@ branches:
   - overlapping-cidrs
 
 git:
-  depth: 1
+  depth: false
 
 services:
   - docker
