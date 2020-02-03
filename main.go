@@ -21,7 +21,6 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 
-	kubeInformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
@@ -73,8 +72,6 @@ func main() {
 		klog.Exitf("Error building submariner clientset: %s", err.Error())
 	}
 
-	kubeInformerFactory := kubeInformers.NewSharedInformerFactoryWithOptions(kubeClient, time.Second*30,
-		kubeInformers.WithNamespace(submSpec.Namespace))
 	submarinerInformerFactory := submarinerInformers.NewSharedInformerFactoryWithOptions(submarinerClient, time.Second*30,
 		submarinerInformers.WithNamespace(submSpec.Namespace))
 
@@ -133,7 +130,6 @@ func main() {
 			submarinerInformerFactory.Submariner().V1().Clusters(), submarinerInformerFactory.Submariner().V1().Endpoints(), datastore,
 			submSpec.ColorCodes, localCluster, localEndpoint)
 
-		kubeInformerFactory.Start(stopCh)
 		submarinerInformerFactory.Start(stopCh)
 
 		klog.V(4).Infof("Starting controllers")
