@@ -12,16 +12,18 @@ import (
 var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters without discovery", func() {
 	f := framework.NewDefaultFramework("dataplane-conn-nd")
 	var useService bool
+	var useHostNetworking bool
 
 	verifyInteraction := func(listenerScheduling, connectorScheduling framework.NetworkPodScheduling) {
 		It("should have sent the expected data from the pod to the other pod", func() {
-			RunConnectivityTest(f, useService, listenerScheduling, connectorScheduling, framework.ClusterB, framework.ClusterA)
+			RunConnectivityTest(f, useService, useHostNetworking, listenerScheduling, connectorScheduling, framework.ClusterB, framework.ClusterA)
 		})
 	}
 
 	When("a pod connects via TCP to a remote pod", func() {
 		BeforeEach(func() {
 			useService = false
+			useHostNetworking = false
 		})
 
 		When("the pod is not on a gateway and the remote pod is not on a gateway", func() {
@@ -44,6 +46,7 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 	When("a pod connects via TCP to a remote service", func() {
 		BeforeEach(func() {
 			useService = true
+			useHostNetworking = false
 		})
 
 		When("the pod is not on a gateway and the remote service is not on a gateway", func() {
@@ -62,11 +65,26 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 			verifyInteraction(framework.GatewayNode, framework.GatewayNode)
 		})
 	})
+
+	When("a pod with HostNetworking connects via TCP to a remote pod", func() {
+		BeforeEach(func() {
+			useService = false
+			useHostNetworking = true
+		})
+
+		When("the pod is not on a gateway and the remote pod is not on a gateway", func() {
+			verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode)
+		})
+
+		When("the pod is on a gateway and the remote pod is not on a gateway", func() {
+			verifyInteraction(framework.NonGatewayNode, framework.GatewayNode)
+		})
+	})
 })
 
-func RunConnectivityTest(f *framework.Framework, useService bool, listenerScheduling framework.NetworkPodScheduling, connectorScheduling framework.NetworkPodScheduling, listenerCluster framework.ClusterIndex, connectorCluster framework.ClusterIndex) (*framework.NetworkPod, *framework.NetworkPod) {
+func RunConnectivityTest(f *framework.Framework, useService bool, useHostNetwork bool, listenerScheduling framework.NetworkPodScheduling, connectorScheduling framework.NetworkPodScheduling, listenerCluster framework.ClusterIndex, connectorCluster framework.ClusterIndex) (*framework.NetworkPod, *framework.NetworkPod) {
 
-	listenerPod, connectorPod := createPods(f, useService, listenerScheduling, connectorScheduling, listenerCluster, connectorCluster,
+	listenerPod, connectorPod := createPods(f, useService, useHostNetwork, listenerScheduling, connectorScheduling, listenerCluster, connectorCluster,
 		framework.TestContext.ConnectionTimeout, framework.TestContext.ConnectionAttempts)
 	listenerPod.CheckSuccessfulFinish()
 	connectorPod.CheckSuccessfulFinish()
@@ -75,15 +93,17 @@ func RunConnectivityTest(f *framework.Framework, useService bool, listenerSchedu
 	Expect(listenerPod.TerminationMessage).To(ContainSubstring(connectorPod.Config.Data))
 	Expect(connectorPod.TerminationMessage).To(ContainSubstring(listenerPod.Config.Data))
 
-	By("Verifying the output of listener pod which must contain the source IP")
-	Expect(listenerPod.TerminationMessage).To(ContainSubstring(connectorPod.Pod.Status.PodIP))
+	if !useHostNetwork {
+		By("Verifying the output of listener pod which must contain the source IP")
+		Expect(listenerPod.TerminationMessage).To(ContainSubstring(connectorPod.Pod.Status.PodIP))
+	}
 
 	// Return the pods in case further verification is needed
 	return listenerPod, connectorPod
 }
 
 func RunNoConnectivityTest(f *framework.Framework, useService bool, listenerScheduling framework.NetworkPodScheduling, connectorScheduling framework.NetworkPodScheduling, listenerCluster framework.ClusterIndex, connectorCluster framework.ClusterIndex) (*framework.NetworkPod, *framework.NetworkPod) {
-	listenerPod, connectorPod := createPods(f, useService, listenerScheduling, connectorScheduling, listenerCluster, connectorCluster, 5, 1)
+	listenerPod, connectorPod := createPods(f, useService, false, listenerScheduling, connectorScheduling, listenerCluster, connectorCluster, 5, 1)
 
 	By("Verifying that listener pod exits with non-zero code and timed out message")
 	Expect(listenerPod.TerminationMessage).To(ContainSubstring("nc: timeout"))
@@ -97,7 +117,7 @@ func RunNoConnectivityTest(f *framework.Framework, useService bool, listenerSche
 	return listenerPod, connectorPod
 }
 
-func createPods(f *framework.Framework, useService bool, listenerScheduling framework.NetworkPodScheduling, connectorScheduling framework.NetworkPodScheduling, listenerCluster framework.ClusterIndex,
+func createPods(f *framework.Framework, useService bool, useHostNetwork bool, listenerScheduling framework.NetworkPodScheduling, connectorScheduling framework.NetworkPodScheduling, listenerCluster framework.ClusterIndex,
 	connectorCluster framework.ClusterIndex, connectionTimeout uint, connectionAttempts uint) (*framework.NetworkPod, *framework.NetworkPod) {
 
 	By(fmt.Sprintf("Creating a listener pod in cluster %q, which will wait for a handshake over TCP", framework.TestContext.KubeContexts[listenerCluster]))
@@ -126,6 +146,7 @@ func createPods(f *framework.Framework, useService bool, listenerScheduling fram
 		RemoteIP:           remoteIP,
 		ConnectionTimeout:  connectionTimeout,
 		ConnectionAttempts: connectionAttempts,
+		UseHostNetwork:     useHostNetwork,
 	})
 
 	By(fmt.Sprintf("Waiting for the listener pod %q to exit, returning what listener sent", listenerPod.Pod.Name))
