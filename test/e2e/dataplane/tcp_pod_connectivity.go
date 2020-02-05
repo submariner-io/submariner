@@ -100,7 +100,7 @@ func RunNoConnectivityTest(f *framework.Framework, useService bool, listenerSche
 func createPods(f *framework.Framework, useService bool, listenerScheduling framework.NetworkPodScheduling, connectorScheduling framework.NetworkPodScheduling, listenerCluster framework.ClusterIndex,
 	connectorCluster framework.ClusterIndex, connectionTimeout uint, connectionAttempts uint) (*framework.NetworkPod, *framework.NetworkPod) {
 
-	By(fmt.Sprintf("Creating a listener pod in cluster %q, which will wait for a handshake over TCP", framework.TestContext.KubeContexts[listenerCluster]))
+	By(fmt.Sprintf("Creating a listener pod in cluster %q, which will wait for a handshake over TCP", framework.TestContext.ClusterIDs[listenerCluster]))
 	listenerPod := f.NewNetworkPod(&framework.NetworkPodConfig{
 		Type:               framework.ListenerPod,
 		Cluster:            listenerCluster,
@@ -111,14 +111,14 @@ func createPods(f *framework.Framework, useService bool, listenerScheduling fram
 
 	remoteIP := listenerPod.Pod.Status.PodIP
 	if useService {
-		By(fmt.Sprintf("Pointing a service ClusterIP to the listener pod in cluster %q", framework.TestContext.KubeContexts[listenerCluster]))
+		By(fmt.Sprintf("Pointing a service ClusterIP to the listener pod in cluster %q", framework.TestContext.ClusterIDs[listenerCluster]))
 		service := listenerPod.CreateService()
 		remoteIP = service.Spec.ClusterIP
 	}
 
 	framework.Logf("Will send traffic to IP: %v", remoteIP)
 
-	By(fmt.Sprintf("Creating a connector pod in cluster %q, which will attempt the specific UUID handshake over TCP", framework.TestContext.KubeContexts[connectorCluster]))
+	By(fmt.Sprintf("Creating a connector pod in cluster %q, which will attempt the specific UUID handshake over TCP", framework.TestContext.ClusterIDs[connectorCluster]))
 	connectorPod := f.NewNetworkPod(&framework.NetworkPodConfig{
 		Type:               framework.ConnectorPod,
 		Cluster:            connectorCluster,
