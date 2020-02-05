@@ -123,31 +123,28 @@ func (f *Framework) BeforeEach() {
 
 	ginkgo.By("Creating kubernetes clients")
 
-	Expect(len(TestContext.KubeConfigs) > 0 && len(TestContext.KubeContexts) > 0).NotTo(BeTrue(),
-		"Mixing multiple KubeConfigs (contextless) and one KubeConfig variable"+
-			"with mutiple contexts is not supported.")
+	if len(TestContext.KubeConfig) > 0 {
+		Expect(len(TestContext.KubeConfigs)).To(BeZero(),
+			"Either KubeConfig or KubeConfigs must be specified but not both")
+		for _, context := range TestContext.KubeContexts {
+			f.ClusterClients = append(f.ClusterClients, f.createKubernetesClient(TestContext.KubeConfig, context))
+			f.SubmarinerClients = append(f.SubmarinerClients, f.createSubmarinerClient(TestContext.KubeConfig, context))
+		}
 
-	if len(TestContext.KubeContexts) > 0 {
-		Expect(len(TestContext.KubeConfig)).NotTo(BeZero(),
-			"When the KubeContexts array is provided, at least a kubeconfig must be provided via KubeConfig")
-		Expect(len(TestContext.KubeContexts)).To(Equal(len(TestContext.ClusterIDs)),
-			"When using KubeContexts, one ClusterID must be provided per context")
-	}
+		// if cluster IDs are not provided we assume that cluster-id == context
+		if len(TestContext.ClusterIDs) == 0 {
+			TestContext.ClusterIDs = TestContext.KubeContexts
+		}
 
-	for _, context := range TestContext.KubeContexts {
-		f.ClusterClients = append(f.ClusterClients, f.createKubernetesClient(TestContext.KubeConfig, context))
-		f.SubmarinerClients = append(f.SubmarinerClients, f.createSubmarinerClient(TestContext.KubeConfig, context))
-	}
-
-	if len(TestContext.KubeConfigs) > 0 {
+	} else if len(TestContext.KubeConfigs) > 0 {
 		Expect(len(TestContext.KubeConfigs)).To(Equal(len(TestContext.ClusterIDs)),
-			"When providing multiple contextless KubeConfig files, one ClusterID must be provided"+
-				"for each config file")
-	}
-
-	for _, kubeConfig := range TestContext.KubeConfigs {
-		f.ClusterClients = append(f.ClusterClients, f.createKubernetesClient(kubeConfig, ""))
-		f.SubmarinerClients = append(f.SubmarinerClients, f.createSubmarinerClient(kubeConfig, ""))
+			"One ClusterID must be provided for each item in the KubeConfigs")
+		for _, kubeConfig := range TestContext.KubeConfigs {
+			f.ClusterClients = append(f.ClusterClients, f.createKubernetesClient(kubeConfig, ""))
+			f.SubmarinerClients = append(f.SubmarinerClients, f.createSubmarinerClient(kubeConfig, ""))
+		}
+	} else {
+		ginkgo.Fail("One of KubeConfig or KubeConfigs must be specified")
 	}
 
 	if !f.SkipNamespaceCreation {
