@@ -50,11 +50,11 @@ The two primary Submariner components within connected clusters are:
 - submariner-gateway (DaemonSet)
 - submariner-route-agent (DaemonSet)
 
-The `submariner-gateway` pods are run on the gateway labelled nodes, and will perform leader election between them to elect an active IPsec endpoint. `submariner-route-agent` as a component is run on every node, and is aware of the current leader. While running on the gateway node that is the leader, it will create a VxLAN VTEP interface to which all the worker nodes are connected, whereas on the non-leader nodes, it will setup a VXLAN tunnel with remote VTEP as the active gateway node, configures routes, programs necessary iptable rules and enables full connectivity to the remote clusters. The MTU of Submariner VxLAN tunnel is configured based on the MTU of the default interface on the host minus VxLAN overhead.
+The `submariner-gateway` pods are run on the gateway-labeled nodes and perform a leader election between them to elect an active IPsec endpoint. The `submariner-route-agent` component runs on every node and is aware of the current active gateway. When running on the active gateway node, the `submariner-route-agent` creates a VxLAN VTEP interface to which the `submariner-route-agent` instances running on the other worker nodes connect by establishing a VXLAN tunnel with the VTEP of the active gateway node. The `submariner-route-agent` also configures routes and programs the necessary iptable rules to enable full connectivity to the remote clusters. The MTU of Submariner VxLAN tunnel is configured based on the MTU of the default interface on the host minus VxLAN overhead.
 
 Upon startup, the `submariner-gateway` pod that is elected leader will perform a reconciliation process that ensures it is the sole endpoint for this cluster. This is part of the reason why it is important to have unique cluster IDs between clusters, as two clusters with the same ID will reconcile each other out of existence.
 
-Upon failure, another `submariner-gateway` pod (on one of the other gateway hosts) will gain leadership and perform reconciliation to ensure it is the active leader. When done, the remote clusters will reconcile the IPsec endpoint to the new endpoint, and connection will be re-established. In the interim, the `submariner-route-agent` pods will update the route tables on each node to point towards the new endpoint host.
+Upon failure, another `submariner-gateway` pod (on one of the other gateway nodes) will gain leadership and perform reconciliation to ensure it is the active leader. When done, the remote clusters will reconcile the IPsec endpoint to the new endpoint, and connection will be re-established. In addition, the `submariner-route-agent` pods will update the route tables on each node to point to the new active gateway node.
 
 Submariner uses a central broker to facilitate the exchange of information and sync CRD's between clusters. The `datastoresyncer` runs as a controller within the leader-elected `submariner` pod, and is responsible for performing a two-way synchronization between the datastore and local cluster of Submariner CRDs. The `datastoresyncer` will only push CRD data to the central broker for the local cluster (based on cluster ID), and will sync all data from the broker the local cluster when the data does not match the local cluster (to prevent circular loops)
 
@@ -62,7 +62,7 @@ Submariner uses a central broker to facilitate the exchange of information and s
 
 submariner-gateway (compiled as the binary `submariner-engine`) has a few controllers built into it that establish state. It is responsible for running/interfacing with Charon to establish IPsec tunnels, as well as updating local cluster information into the central broker to share information between clusters.
 
-submariner-gateway runs as a DaemonSet on the gateway labelled nodes and utilizes leader election to establish an active gateway node, which is used to facilitate IPsec tunnel connections to remote clusters.
+submariner-gateway runs as a DaemonSet on the gateway-labelled nodes and utilizes leader election to establish an active gateway node, which is used to facilitate IPsec tunnel connections to remote clusters.
 
 ## submariner-route-agent
 
@@ -83,6 +83,7 @@ Submariner has a few requirements in order to get started:
 - Direct IP connectivity between instances through the internet (or on the same network if not running Submariner over the internet). Submariner supports 1:1 NAT setups, but has a few caveats/provider specific configuration instructions in this configuration.
 - Knowledge of each cluster's network configuration
 - Helm version that supports crd-install hook (v2.12.1+)
+- Worker node IPs on all the clusters must be outside of the cluster/service CIDR ranges.
 
 An example of three clusters configured to use with Submariner would look like the following:
 
