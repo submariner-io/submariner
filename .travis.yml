@@ -9,16 +9,18 @@ branches:
 git:
   depth: false
 
+install:
+  - sudo apt-get install moreutils # make ts available
 services:
   - docker
 before_script:
   - CHANGED_FILES_PR=$(git diff --name-only HEAD $(git merge-base HEAD $TRAVIS_BRANCH))
 script:
-  - make ci e2e status=keep deploytool=operator
+  - make ci e2e status=keep deploytool=operator 2>&1 | ts '[%H:%M:%.S]' -s
 after_success:
   - if [[ "${CHANGED_FILES_PR[@]}" =~ "scripts/kind-e2e/e2e.sh" ]]; then
       echo "scripts/kind-e2e/e2e.sh was modified, testing recurring run on already deployed infrastructure.";
-      make e2e status=keep deploytool=operator;
+      make e2e status=keep deploytool=operator 2>&1 |  ts '[%H:%M:%.S]' -s ;
     fi
 deploy:
   - provider: script
