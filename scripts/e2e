@@ -5,8 +5,4 @@ source $(dirname $0)/lib/debug_functions
 
 cd $(dirname $0)
 
-if [[ $1 = clean ]]; then
-    ./../scripts/kind-e2e/e2e.sh clean
-else
-    ./../scripts/kind-e2e/e2e.sh "$@"
-fi
+./../scripts/kind-e2e/e2e.sh "$@"
