@@ -11,8 +11,10 @@ import (
 type contextArray []string
 
 type TestContextType struct {
+	KubeConfigs         []string // KubeConfigs provides an alternative to KubeConfig + KubeContexts
 	KubeConfig          string
 	KubeContexts        contextArray
+	ClusterIDs          []string
 	ReportDir           string
 	ReportPrefix        string
 	SubmarinerNamespace string

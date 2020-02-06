@@ -123,9 +123,28 @@ func (f *Framework) BeforeEach() {
 
 	ginkgo.By("Creating kubernetes clients")
 
-	for _, context := range TestContext.KubeContexts {
-		f.ClusterClients = append(f.ClusterClients, f.createKubernetesClient(context))
-		f.SubmarinerClients = append(f.SubmarinerClients, f.createSubmarinerClient(context))
+	if len(TestContext.KubeConfig) > 0 {
+		Expect(len(TestContext.KubeConfigs)).To(BeZero(),
+			"Either KubeConfig or KubeConfigs must be specified but not both")
+		for _, context := range TestContext.KubeContexts {
+			f.ClusterClients = append(f.ClusterClients, f.createKubernetesClient(TestContext.KubeConfig, context))
+			f.SubmarinerClients = append(f.SubmarinerClients, f.createSubmarinerClient(TestContext.KubeConfig, context))
+		}
+
+		// if cluster IDs are not provided we assume that cluster-id == context
+		if len(TestContext.ClusterIDs) == 0 {
+			TestContext.ClusterIDs = TestContext.KubeContexts
+		}
+
+	} else if len(TestContext.KubeConfigs) > 0 {
+		Expect(len(TestContext.KubeConfigs)).To(Equal(len(TestContext.ClusterIDs)),
+			"One ClusterID must be provided for each item in the KubeConfigs")
+		for _, kubeConfig := range TestContext.KubeConfigs {
+			f.ClusterClients = append(f.ClusterClients, f.createKubernetesClient(kubeConfig, ""))
+			f.SubmarinerClients = append(f.SubmarinerClients, f.createSubmarinerClient(kubeConfig, ""))
+		}
+	} else {
+		ginkgo.Fail("One of KubeConfig or KubeConfigs must be specified")
 	}
 
 	if !f.SkipNamespaceCreation {
@@ -151,9 +170,9 @@ func (f *Framework) BeforeEach() {
 
 }
 
-func (f *Framework) createKubernetesClient(context string) *kubeclientset.Clientset {
+func (f *Framework) createKubernetesClient(kubeConfig, context string) *kubeclientset.Clientset {
 
-	restConfig := f.createRestConfig(context)
+	restConfig := f.createRestConfig(kubeConfig, context)
 	clientSet, err := kubeclientset.NewForConfig(restConfig)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -168,8 +187,8 @@ func (f *Framework) createKubernetesClient(context string) *kubeclientset.Client
 	return clientSet
 }
 
-func (f *Framework) createRestConfig(context string) *rest.Config {
-	restConfig, _, err := loadConfig(TestContext.KubeConfig, context)
+func (f *Framework) createRestConfig(kubeConfig, context string) *rest.Config {
+	restConfig, _, err := loadConfig(kubeConfig, context)
 	if err != nil {
 		Errorf("Unable to load kubeconfig file %s for context %s, this is a non-recoverable error",
 			TestContext.KubeConfig, context)
