@@ -14,9 +14,9 @@ var _ = PDescribe("[expansion] Test expanding/shrinking an existing cluster flee
 	f := framework.NewDefaultFramework("add-remove-cluster")
 
 	It("Should be able to add and remove third cluster", func() {
-		clusterAName := framework.TestContext.KubeContexts[framework.ClusterA]
-		clusterBName := framework.TestContext.KubeContexts[framework.ClusterB]
-		clusterCName := framework.TestContext.KubeContexts[framework.ClusterC]
+		clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
+		clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
+		clusterCName := framework.TestContext.ClusterIDs[framework.ClusterC]
 
 		By(fmt.Sprintf("Verifying no GW nodes are present on cluster %q", clusterCName))
 		gatewayNode := f.FindNodesByGatewayLabel(framework.ClusterC, true)

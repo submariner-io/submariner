@@ -43,8 +43,8 @@ var _ = PDescribe("[redundancy] Gateway fail-over tests", func() {
 })
 
 func testOneGatewayNode(f *framework.Framework) {
-	clusterAName := framework.TestContext.KubeContexts[framework.ClusterA]
-	clusterBName := framework.TestContext.KubeContexts[framework.ClusterB]
+	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
+	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
 	By(fmt.Sprintf("Sanity check - ensuring there's only one gateway node on %q", clusterAName))
 	gatewayNodes := f.FindNodesByGatewayLabel(framework.ClusterA, true)
@@ -67,8 +67,8 @@ func testOneGatewayNode(f *framework.Framework) {
 }
 
 func testTwoGatewayNodesWithOneReplica(f *framework.Framework) {
-	clusterAName := framework.TestContext.KubeContexts[framework.ClusterA]
-	clusterBName := framework.TestContext.KubeContexts[framework.ClusterB]
+	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
+	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
 	gatewayNodes := f.FindNodesByGatewayLabel(framework.ClusterA, true)
 	Expect(gatewayNodes).To(HaveLen(1), fmt.Sprintf("Expected only one gateway node on %q", clusterAName))
@@ -120,8 +120,8 @@ func testTwoGatewayNodesWithOneReplica(f *framework.Framework) {
 }
 
 func testTwoGatewayNodesWithTwoReplicas(f *framework.Framework, deployment *appsv1.Deployment) {
-	clusterAName := framework.TestContext.KubeContexts[framework.ClusterA]
-	clusterBName := framework.TestContext.KubeContexts[framework.ClusterB]
+	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
+	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
 	gatewayNodes := f.FindNodesByGatewayLabel(framework.ClusterA, true)
 	Expect(gatewayNodes).To(HaveLen(1), fmt.Sprintf("Expected only one gateway node on %q", clusterAName))
