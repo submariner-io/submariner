@@ -38,8 +38,8 @@ var _ = PDescribe("[expansion] Test expanding/shrinking an existing cluster flee
 		By(fmt.Sprintf("Found submariner engine pod %q on %q", enginePod.Name, clusterCName))
 
 		By(fmt.Sprintf("Checking connectivity between clusters"))
-		dataplane.RunConnectivityTest(f, false, framework.GatewayNode, framework.GatewayNode, framework.ClusterC, framework.ClusterB)
-		dataplane.RunConnectivityTest(f, true, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterC, framework.ClusterA)
+		dataplane.RunConnectivityTest(f, false, framework.PodNetworking, framework.GatewayNode, framework.GatewayNode, framework.ClusterC, framework.ClusterB)
+		dataplane.RunConnectivityTest(f, true, framework.PodNetworking, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterC, framework.ClusterA)
 
 		By(fmt.Sprintf("Removing cluster %q by unsetting the gateway label and deleting submariner engine pod %q", clusterCName, enginePod.Name))
 		f.SetGatewayLabelOnNode(framework.ClusterC, nonGatewayNode, false)
