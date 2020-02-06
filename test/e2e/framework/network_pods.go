@@ -37,7 +37,7 @@ type NetworkPodConfig struct {
 	RemoteIP           string
 	ConnectionTimeout  uint
 	ConnectionAttempts uint
-	UseHostNetwork     bool
+	NetworkType        bool
 	// TODO: namespace, once https://github.com/submariner-io/submariner/pull/141 is merged
 }
 
@@ -191,7 +191,7 @@ func (np *NetworkPod) buildTCPCheckConnectorPod() {
 		Spec: v1.PodSpec{
 			Affinity:      nodeAffinity(np.Config.Scheduling),
 			RestartPolicy: v1.RestartPolicyNever,
-			HostNetwork:   np.Config.UseHostNetwork,
+			HostNetwork:   np.Config.NetworkType,
 			Containers: []v1.Container{
 				{
 					Name:  "tcp-check-connector",

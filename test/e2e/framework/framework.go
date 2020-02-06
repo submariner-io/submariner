@@ -29,6 +29,11 @@ const (
 	PollInterval = 100 * time.Millisecond
 )
 
+const (
+	HostNetworking = true
+	PodNetworking  = false
+)
+
 type ClusterIndex int
 
 const (
