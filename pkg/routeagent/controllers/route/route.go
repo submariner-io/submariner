@@ -487,7 +487,7 @@ func (r *Controller) enqueuePod(obj interface{}) {
 
 	pod := obj.(*k8sv1.Pod)
 	// Add the POD event to the workqueue only if the sm-route-agent podIP does not exist in the local cache.
-	if !r.remoteVTEPs.Contains(pod.Status.HostIP) {
+	if pod.Status.HostIP != "" && !r.remoteVTEPs.Contains(pod.Status.HostIP) {
 		klog.V(4).Infof("Enqueueing sm-route-agent-pod event, ip: %s", pod.Status.HostIP)
 		r.podWorkqueue.AddRateLimited(key)
 	}

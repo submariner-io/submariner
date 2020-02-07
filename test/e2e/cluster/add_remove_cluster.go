@@ -14,9 +14,9 @@ var _ = PDescribe("[expansion] Test expanding/shrinking an existing cluster flee
 	f := framework.NewDefaultFramework("add-remove-cluster")
 
 	It("Should be able to add and remove third cluster", func() {
-		clusterAName := framework.TestContext.KubeContexts[framework.ClusterA]
-		clusterBName := framework.TestContext.KubeContexts[framework.ClusterB]
-		clusterCName := framework.TestContext.KubeContexts[framework.ClusterC]
+		clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
+		clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
+		clusterCName := framework.TestContext.ClusterIDs[framework.ClusterC]
 
 		By(fmt.Sprintf("Verifying no GW nodes are present on cluster %q", clusterCName))
 		gatewayNode := f.FindNodesByGatewayLabel(framework.ClusterC, true)
@@ -38,8 +38,8 @@ var _ = PDescribe("[expansion] Test expanding/shrinking an existing cluster flee
 		By(fmt.Sprintf("Found submariner engine pod %q on %q", enginePod.Name, clusterCName))
 
 		By(fmt.Sprintf("Checking connectivity between clusters"))
-		dataplane.RunConnectivityTest(f, false, framework.GatewayNode, framework.GatewayNode, framework.ClusterC, framework.ClusterB)
-		dataplane.RunConnectivityTest(f, true, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterC, framework.ClusterA)
+		dataplane.RunConnectivityTest(f, false, framework.PodNetworking, framework.GatewayNode, framework.GatewayNode, framework.ClusterC, framework.ClusterB)
+		dataplane.RunConnectivityTest(f, true, framework.PodNetworking, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterC, framework.ClusterA)
 
 		By(fmt.Sprintf("Removing cluster %q by unsetting the gateway label and deleting submariner engine pod %q", clusterCName, enginePod.Name))
 		f.SetGatewayLabelOnNode(framework.ClusterC, nonGatewayNode, false)
