@@ -5,8 +5,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/submariner/test/e2e/dataplane"
 	"github.com/submariner-io/submariner/test/e2e/framework"
+	"github.com/submariner-io/submariner/test/e2e/tcp"
 	appsv1 "k8s.io/api/apps/v1"
 )
 
@@ -60,10 +60,10 @@ func testOneGatewayNode(f *framework.Framework) {
 	By(fmt.Sprintf("Found new submariner engine pod %q", newEnginePod.Name))
 
 	By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
-	dataplane.RunConnectivityTest(f, false, framework.PodNetworking, framework.GatewayNode, framework.GatewayNode, framework.ClusterA, framework.ClusterB)
+	tcp.RunConnectivityTest(f, false, framework.PodNetworking, framework.GatewayNode, framework.GatewayNode, framework.ClusterA, framework.ClusterB)
 
 	By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
-	dataplane.RunConnectivityTest(f, false, framework.PodNetworking, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterA, framework.ClusterB)
+	tcp.RunConnectivityTest(f, false, framework.PodNetworking, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterA, framework.ClusterB)
 }
 
 func testTwoGatewayNodesWithOneReplica(f *framework.Framework) {
@@ -113,10 +113,10 @@ func testTwoGatewayNodesWithOneReplica(f *framework.Framework) {
 	By(fmt.Sprintf("Found new submariner endpoint for %q: %#v", clusterAName, newSubmEndpoint))
 
 	By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
-	dataplane.RunConnectivityTest(f, false, framework.PodNetworking, framework.GatewayNode, framework.GatewayNode, framework.ClusterA, framework.ClusterB)
+	tcp.RunConnectivityTest(f, false, framework.PodNetworking, framework.GatewayNode, framework.GatewayNode, framework.ClusterA, framework.ClusterB)
 
 	By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
-	dataplane.RunConnectivityTest(f, false, framework.PodNetworking, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterA, framework.ClusterB)
+	tcp.RunConnectivityTest(f, false, framework.PodNetworking, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterA, framework.ClusterB)
 }
 
 func testTwoGatewayNodesWithTwoReplicas(f *framework.Framework, deployment *appsv1.Deployment) {
@@ -160,8 +160,8 @@ func testTwoGatewayNodesWithTwoReplicas(f *framework.Framework, deployment *apps
 	By(fmt.Sprintf("Found new submariner endpoint for %q: %#v", clusterAName, newSubmEndpoint))
 
 	By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
-	dataplane.RunConnectivityTest(f, false, framework.PodNetworking, framework.GatewayNode, framework.GatewayNode, framework.ClusterA, framework.ClusterB)
+	tcp.RunConnectivityTest(f, false, framework.PodNetworking, framework.GatewayNode, framework.GatewayNode, framework.ClusterA, framework.ClusterB)
 
 	By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
-	dataplane.RunConnectivityTest(f, false, framework.PodNetworking, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterA, framework.ClusterB)
+	tcp.RunConnectivityTest(f, false, framework.PodNetworking, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterA, framework.ClusterB)
 }
