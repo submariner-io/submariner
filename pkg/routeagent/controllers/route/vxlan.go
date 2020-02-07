@@ -135,6 +135,10 @@ func (iface *vxLanIface) AddFDB(ipAddress net.IP, hwAddr string) error {
 		return fmt.Errorf("invalid MAC Address (%s) supplied. %v", hwAddr, err)
 	}
 
+	if ipAddress == nil {
+		return fmt.Errorf("invalid ipAddress (%v) supplied", ipAddress)
+	}
+
 	neigh := &netlink.Neigh{
 		LinkIndex:    iface.link.Index,
 		Family:       unix.AF_BRIDGE,
