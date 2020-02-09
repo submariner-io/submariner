@@ -4,6 +4,7 @@ import (
 	"flag"
 	"os"
 	"strings"
+	"testing"
 
 	"k8s.io/klog"
 )
@@ -58,6 +59,11 @@ func validateFlags(t *TestContextType) {
 
 func ParseFlags() {
 	registerFlags(TestContext)
+	// Since Go 1.13, testing.Init() is required to register testing flags before calling flag.Parse()
+	var _ = func() bool {
+		testing.Init()
+		return true
+	}()
 	flag.Parse()
 	validateFlags(TestContext)
 }
