@@ -21,7 +21,6 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 
-	kubeInformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
@@ -73,25 +72,31 @@ func main() {
 		klog.Exitf("Error building submariner clientset: %s", err.Error())
 	}
 
-	kubeInformerFactory := kubeInformers.NewSharedInformerFactoryWithOptions(kubeClient, time.Second*30,
-		kubeInformers.WithNamespace(submSpec.Namespace))
 	submarinerInformerFactory := submarinerInformers.NewSharedInformerFactoryWithOptions(submarinerClient, time.Second*30,
 		submarinerInformers.WithNamespace(submSpec.Namespace))
 
 	start := func(context.Context) {
+		var localSubnets []string
+
 		localCluster, err := util.GetLocalCluster(submSpec)
 		if err != nil {
 			klog.Fatalf("Fatal error occurred while retrieving local cluster from %#v: %v", submSpec, err)
 		}
 
+		if len(submSpec.GlobalCidr) > 0 {
+			localSubnets = submSpec.GlobalCidr
+		} else {
+			localSubnets = append(submSpec.ServiceCidr, submSpec.ClusterCidr...)
+		}
+
 		localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterID, "ipsec", nil, submSpec.NatEnabled,
-			append(submSpec.ServiceCidr, submSpec.ClusterCidr...), util.GetLocalIP())
+			localSubnets, util.GetLocalIP())
 
 		if err != nil {
 			klog.Fatalf("Fatal error occurred while retrieving local endpoint from %#v: %v", submSpec, err)
 		}
 
-		cableEngine, err := ipsec.NewEngine(append(submSpec.ClusterCidr, submSpec.ServiceCidr...), localCluster, localEndpoint)
+		cableEngine, err := ipsec.NewEngine(localSubnets, localCluster, localEndpoint)
 		if err != nil {
 			klog.Fatalf("Fatal error occurred creating ipsec engine: %v", err)
 		}
@@ -125,7 +130,6 @@ func main() {
 			submarinerInformerFactory.Submariner().V1().Clusters(), submarinerInformerFactory.Submariner().V1().Endpoints(), datastore,
 			submSpec.ColorCodes, localCluster, localEndpoint)
 
-		kubeInformerFactory.Start(stopCh)
 		submarinerInformerFactory.Start(stopCh)
 
 		klog.V(4).Infof("Starting controllers")

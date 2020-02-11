@@ -5,7 +5,7 @@ kubefed ?= false
 deploytool ?= helm
 debug ?= false
 
-TARGETS := $(shell ls scripts)
+TARGETS := $(shell ls scripts | grep -v dapper-image)
 
 .dapper:
 	@echo Downloading dapper
@@ -14,7 +14,10 @@ TARGETS := $(shell ls scripts)
 	@./.dapper.tmp -v
 	@mv .dapper.tmp .dapper
 
-$(TARGETS): .dapper
+dapper-image: .dapper
+	./.dapper -m bind dapper-image
+
+$(TARGETS): .dapper dapper-image
 	DAPPER_ENV="OPERATOR_IMAGE"  ./.dapper -m bind $@ $(status) $(version) $(logging) $(kubefed) $(deploytool) $(debug)
 
 .DEFAULT_GOAL := ci
