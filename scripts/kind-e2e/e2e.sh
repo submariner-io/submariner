@@ -82,7 +82,7 @@ function kind_import_images() {
     docker tag quay.io/submariner/submariner-route-agent:dev submariner-route-agent:local
 
     for i in 1 2 3; do
-        echo "Loading submariner images in to cluster${i}..."
+        echo "Loading submariner images into cluster${i}..."
         kind --name cluster${i} load docker-image submariner:local
         kind --name cluster${i} load docker-image submariner-route-agent:local
     done
