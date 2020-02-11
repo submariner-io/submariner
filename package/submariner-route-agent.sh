@@ -3,10 +3,12 @@ set -e -x
 
 trap "exit 1" SIGTERM SIGINT
 
+SUBMARINER_VERBOSITY=${SUBMARINER_VERBOSITY:-1}
+
 if [ "${SUBMARINER_DEBUG}" == "true" ]; then
-    DEBUG="-v=9"
+    DEBUG="-v=2"
 else
-    DEBUG="-v=4"
+    DEBUG="-v=${SUBMARINER_VERBOSITY}"
 fi
 
 function find_iptables_on_host() {
