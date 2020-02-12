@@ -12,10 +12,20 @@ import (
 	"k8s.io/klog"
 )
 
+// Engine represents an implementation of some remote connectivity mechanism, such as
+// a VPN gateway.
+// An Engine cooperates with, and delegates work to, a cable.Driver for implementing
+// a secure connection to remote clusters.
 type Engine interface {
+	// StartEngine performs any general set up work needed independent of any remote connections.
 	StartEngine() error
-	InstallCable(types.SubmarinerEndpoint) error
-	RemoveCable(types.SubmarinerEndpoint) error
+	// InstallCable performs any set up work needed for connecting to given remote endpoint.
+	// Once InstallCable completes, it should be possible to connect to remote
+	// Pods or Services behind the given endpoint.
+	InstallCable(remote types.SubmarinerEndpoint) error
+	// RemoveCable disconnects the Engine from the given remote endpoint. Upon completion.
+	// remote Pods and Service may not be accessible any more.
+	RemoveCable(remote types.SubmarinerEndpoint) error
 }
 
 type engine struct {
@@ -26,6 +36,7 @@ type engine struct {
 	localEndpoint types.SubmarinerEndpoint
 }
 
+// NewEngine creates a new Engine for the local cluster
 func NewEngine(localSubnets []string, localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) (Engine, error) {
 	driver, err := cable.NewDriver(localSubnets, localEndpoint)
 	if err != nil {
