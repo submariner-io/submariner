@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/submariner-io/submariner/pkg/cableengine/ipsec"
 	"github.com/submariner-io/submariner/pkg/controllers/datastoresyncer"
 	"github.com/submariner-io/submariner/pkg/datastore"
 	"github.com/submariner-io/submariner/pkg/log"
@@ -26,6 +25,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 
+	"github.com/submariner-io/submariner/pkg/cableengine"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions"
 	"github.com/submariner-io/submariner/pkg/controllers/tunnel"
@@ -106,14 +106,14 @@ func main() {
 			localSubnets = append(submSpec.ServiceCidr, submSpec.ClusterCidr...)
 		}
 
-		localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterID, "ipsec", nil, submSpec.NatEnabled,
+		localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterID, cable.IPSec, nil, submSpec.NatEnabled,
 			localSubnets, util.GetLocalIP())
 
 		if err != nil {
 			klog.Fatalf("Error creating local endpoint object from %#v: %v", submSpec, err)
 		}
 
-		cableEngine, err := ipsec.NewEngine(localSubnets, localCluster, localEndpoint)
+		cableEngine, err := cableengine.NewEngine(localSubnets, localCluster, localEndpoint)
 		if err != nil {
 			klog.Fatalf("Error creating the cable engine: %v", err)
 		}
