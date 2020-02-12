@@ -43,6 +43,19 @@ func init() {
 	flag.StringVar(&localMasterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 }
 
+type leaderConfig struct {
+	LeaseDuration int64
+	RenewDeadline int64
+	RetryPeriod   int64
+}
+
+const (
+	leadershipConfigEnvPrefix = "leadership"
+	defaultLeaseDuration      = 5 // In Seconds
+	defaultRenewDeadline      = 3 // In Seconds
+	defaultRetryPeriod        = 2 // In Seconds
+)
+
 func main() {
 	klog.InitFlags(nil)
 	flag.Parse()
@@ -174,6 +187,28 @@ func main() {
 }
 
 func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder record.EventRecorder, run func(ctx context.Context)) {
+	gwLeadershipConfig := leaderConfig{}
+
+	err := envconfig.Process(leadershipConfigEnvPrefix, &gwLeadershipConfig)
+	if err != nil {
+		klog.Fatalf("error processing environment config for %s: %v", leadershipConfigEnvPrefix, err)
+	}
+
+	// Use default values when GatewayLeadership environment variables are not configured
+	if gwLeadershipConfig.LeaseDuration == 0 {
+		gwLeadershipConfig.LeaseDuration = defaultLeaseDuration
+	}
+
+	if gwLeadershipConfig.RenewDeadline == 0 {
+		gwLeadershipConfig.RenewDeadline = defaultRenewDeadline
+	}
+
+	if gwLeadershipConfig.RetryPeriod == 0 {
+		gwLeadershipConfig.RetryPeriod = defaultRetryPeriod
+	}
+
+	klog.Infof("Gateway Leader Election Config values: %v ", gwLeadershipConfig)
+
 	id, err := os.Hostname()
 	if err != nil {
 		klog.Fatalf("error getting hostname: %v", err)
@@ -206,9 +241,9 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder rec
 
 	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
 		Lock:          &rl,
-		LeaseDuration: 15 * time.Second,
-		RenewDeadline: 10 * time.Second,
-		RetryPeriod:   3 * time.Second,
+		LeaseDuration: time.Duration(gwLeadershipConfig.LeaseDuration) * time.Second,
+		RenewDeadline: time.Duration(gwLeadershipConfig.RenewDeadline) * time.Second,
+		RetryPeriod:   time.Duration(gwLeadershipConfig.RetryPeriod) * time.Second,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: run,
 			OnStoppedLeading: func() {
