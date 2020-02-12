@@ -61,7 +61,7 @@ const defaultIKEPort = "500"
 const defaultNATTPort = "4500"
 const ipsecSpecEnvVarPrefix = "ce_ipsec"
 
-func NewStrongSwan(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (Driver, error) {
+func NewStrongSwan(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (*strongSwan, error) {
 	ipSecSpec := specification{}
 
 	err := envconfig.Process(ipsecSpecEnvVarPrefix, &ipSecSpec)
