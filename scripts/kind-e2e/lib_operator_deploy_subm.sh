@@ -31,6 +31,7 @@ function deploytool_prereqs() {
 function setup_broker() {
     context=$1
     echo Installing broker on $context.
+    kubectl config use-context $context
     subctl --kubeconfig ${PRJ_ROOT}/output/kind-config/dapper/kind-config-$context deploy-broker --no-dataplane
 }
 

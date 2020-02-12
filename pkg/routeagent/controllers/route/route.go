@@ -18,6 +18,7 @@ import (
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	k8sv1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -345,7 +346,13 @@ func (r *Controller) processNextPod() bool {
 
 		pod, err := r.clientSet.CoreV1().Pods(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
-			r.podWorkqueue.Forget(obj)
+			if errors.IsNotFound(err) {
+				r.podWorkqueue.Forget(obj)
+				klog.Infof("submariner-route-agent pod for key %q not found - probably was deleted", key)
+				return nil
+			}
+
+			r.podWorkqueue.AddRateLimited(obj)
 			return fmt.Errorf("error retrieving submariner-route-agent pod object %s: %v", name, err)
 		}
 
@@ -398,8 +405,16 @@ func (r *Controller) processNextEndpoint() bool {
 		if err != nil {
 			return fmt.Errorf("error while splitting meta namespace key %s: %v", key, err)
 		}
+
 		endpoint, err := r.submarinerClientSet.SubmarinerV1().Endpoints(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
+			if errors.IsNotFound(err) {
+				r.endpointWorkqueue.Forget(obj)
+				klog.Infof("Endpoint for key %q not found - probably was deleted", key)
+				return nil
+			}
+
+			r.endpointWorkqueue.AddRateLimited(obj)
 			return fmt.Errorf("error retrieving submariner endpoint object %s: %v", name, err)
 		}
 
@@ -429,12 +444,14 @@ func (r *Controller) processNextEndpoint() bool {
 				klog.Fatalf("Unable to create VxLAN interface on GatewayNode (%s): %v", hostname, err)
 			}
 			klog.V(6).Infof("not reconciling routes because we appear to be the gateway host")
+			r.endpointWorkqueue.Forget(obj)
 			return nil
 		}
 
 		localClusterGwNodeIP := net.ParseIP(endpoint.Spec.PrivateIP)
 		remoteVtepIP, err := r.getVxlanVtepIPAddress(localClusterGwNodeIP.String())
 		if err != nil {
+			r.endpointWorkqueue.Forget(obj)
 			return fmt.Errorf("failed to derive the remoteVtepIP %v", err)
 		}
 

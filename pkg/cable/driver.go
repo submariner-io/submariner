@@ -41,6 +41,4 @@ func NewDriver(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (D
 		// TODO define ERROR
 		return nil, fmt.Errorf("Unsupported backend type - %s", localEndpoint.Spec.Backend)
 	}
-
-
 }
