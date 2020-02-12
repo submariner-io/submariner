@@ -2,13 +2,14 @@ package cable
 
 import (
 	"fmt"
+
 	"github.com/submariner-io/submariner/pkg/cable/ipsec"
 	"github.com/submariner-io/submariner/pkg/types"
 )
 
 const (
-	IPSec 		= "ipsec"
-	WireGuard 	= "wg"
+	IPSec     = "ipsec"
+	WireGuard = "wg"
 )
 
 // Driver is used by the ipsec engine to actually connect the tunnels.
