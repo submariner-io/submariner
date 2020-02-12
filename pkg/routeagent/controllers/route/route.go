@@ -290,7 +290,7 @@ func (r *Controller) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP) e
 			return fmt.Errorf("failed to create vxlan interface on Gateway Node: %v", err)
 		}
 
-		for fdbAddress := range r.remoteVTEPs.Set {
+		for _, fdbAddress := range r.remoteVTEPs.Elements() {
 			err = r.vxlanDevice.AddFDB(net.ParseIP(fdbAddress), "00:00:00:00:00:00")
 			if err != nil {
 				return fmt.Errorf("failed to add FDB entry on the Gateway Node vxlan iface %v", err)
@@ -671,7 +671,7 @@ func (r *Controller) reconcileRoutes(vxlanGw net.IP) error {
 	}
 
 	// let's now add the routes that are missing
-	for cidrBlock := range r.remoteSubnets.Set {
+	for _, cidrBlock := range r.remoteSubnets.Elements() {
 		_, dst, err := net.ParseCIDR(cidrBlock)
 		if err != nil {
 			klog.Errorf("Error parsing cidr block %s: %v", cidrBlock, err)
