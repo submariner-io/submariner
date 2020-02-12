@@ -65,7 +65,7 @@ func testCharonPortConfiguration() {
 func createStrongSwan() *strongSwan {
 	ss, err := NewStrongSwan([]string{}, types.SubmarinerEndpoint{})
 	Expect(err).NotTo(HaveOccurred())
-	return ss.(*strongSwan)
+	return ss
 }
 
 func checkStrongSwanPorts(ikePort string, nattPort string) {
