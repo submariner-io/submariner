@@ -33,7 +33,6 @@ func NewDriver(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (D
 	switch localEndpoint.Spec.Backend {
 	case IPSec:
 		return ipsec.NewStrongSwan(localSubnets, localEndpoint)
-
 	case WireGuard:
 		// TODO
 		err := fmt.Errorf("WireGuard is unsupported yet")
