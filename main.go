@@ -89,7 +89,7 @@ func main() {
 			localSubnets = append(submSpec.ServiceCidr, submSpec.ClusterCidr...)
 		}
 
-		localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterID, cable.IPSec, nil, submSpec.NatEnabled,
+		localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterID, cable.IPsec, nil /*map[string]string{cable.DriverImpl: cable.StrongSwan}*/, submSpec.NatEnabled,
 			localSubnets, util.GetLocalIP())
 
 		if err != nil {

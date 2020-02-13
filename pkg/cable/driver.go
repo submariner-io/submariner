@@ -8,8 +8,12 @@ import (
 )
 
 const (
-	IPSec     = "ipsec"
-	WireGuard = "wg"
+	IPsec      = "ipsec"
+	WireGuard  = "wireguard"
+	StrongSwan = "strongswan"
+	LibreSwan  = "libreswan"
+
+	DriverImpl = "driver"
 )
 
 // Driver is used by the ipsec engine to actually connect the tunnels.
@@ -31,14 +35,23 @@ type Driver interface {
 
 func NewDriver(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (Driver, error) {
 	switch localEndpoint.Spec.Backend {
-	case IPSec:
-		return ipsec.NewStrongSwan(localSubnets, localEndpoint)
+	case IPsec:
+		driver := StrongSwan
+		if localEndpoint.Spec.BackendConfig != nil {
+			if d, ok := localEndpoint.Spec.BackendConfig[DriverImpl]; ok {
+				driver = d
+			}
+		}
+		switch driver {
+		case StrongSwan:
+			return ipsec.NewStrongSwan(localSubnets, localEndpoint)
+		case LibreSwan:
+			// TODO add LibreSwan support
+		}
+		return nil, fmt.Errorf("Unsupported %s driver for %s", driver, IPsec)
 	case WireGuard:
-		// TODO
-		err := fmt.Errorf("WireGuard is unsupported yet")
-		return nil, err
-	default:
-		// TODO define ERROR
-		return nil, fmt.Errorf("Unsupported backend type - %s", localEndpoint.Spec.Backend)
+		// TODO add WireGuard support
 	}
+	// TODO define ERROR
+	return nil, fmt.Errorf("Unsupported backend type - %s", localEndpoint.Spec.Backend)
 }
