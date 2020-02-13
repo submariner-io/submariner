@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -463,7 +464,10 @@ func (r *Controller) processNextEndpoint() bool {
 		}
 		r.gwVxLanMutex.Unlock()
 
+		// NOTE(mangelajo): This may not belong here, it's a gateway cleanup thing
+		r.cleanStrongswanRoutingTable()
 		r.cleanXfrmPolicies()
+
 		err = r.reconcileRoutes(remoteVtepIP)
 		if err != nil {
 			r.endpointWorkqueue.AddRateLimited(obj)
@@ -594,6 +598,21 @@ func (r *Controller) cleanRoutes() {
 				}
 			}
 		}
+	}
+}
+
+//NOTE: the following two methods method will probably need to be either moved to another
+//      process, or re-architected in some form. Those are strongswan/ipsec specific
+//      methods, and eventually we will have other types of cable engines. At least
+//      we may want to call the cable-engine specific cleanups depending on the cable
+//      engine which was used.
+
+func (r *Controller) cleanStrongswanRoutingTable() {
+	cmd := exec.Command("/sbin/ip", "r", "flush", "table", "220")
+	if err := cmd.Run(); err != nil {
+		// We can safely ignore this error, as this table
+		// won't exist in most nodes (only gateway nodes)
+		return
 	}
 }
 
