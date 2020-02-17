@@ -16,9 +16,18 @@ subm_ns=submariner-operator
 
 ### Functions ###
 
+function get_latest_subctl_tag() {
+    curl https://api.github.com/repos/submariner-io/submariner-operator/releases | jq -r '.[0].tag_name'
+}
+
+function travis_retry() {
+    # We don't pretend to support commands with multiple words
+    $1 || (sleep 2 && $1) || (sleep 10 && $1)
+}
+
 function get_subctl() {
     test -x /go/bin/subctl && return
-    version=$(curl https://api.github.com/repos/submariner-io/submariner-operator/releases | jq -r '.[0].tag_name')
+    version=$(travis_retry get_latest_subctl_tag || echo v0.1.0)
     curl -L https://github.com/submariner-io/submariner-operator/releases/download/${version}/subctl-${version}-linux-amd64 \
          -o /go/bin/subctl
     chmod a+x /go/bin/subctl
