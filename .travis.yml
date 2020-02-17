@@ -9,6 +9,12 @@ branches:
 git:
   depth: false
 
+jobs:
+  include:
+  - env: CMD="make test validate"
+  - env: CMD="make build package e2e status=keep deploytool=operator"
+  - env: CMD="make build package e2e status=keep deploytool=helm"
+
 install:
   - sudo apt-get install moreutils # make ts available
 services:
@@ -17,12 +23,12 @@ before_script:
   - CHANGED_FILES_PR=$(git diff --name-only HEAD $(git merge-base HEAD $TRAVIS_BRANCH))
 script:
   - set -o pipefail;
-    make ci e2e status=keep deploytool=operator 2>&1 | ts '[%H:%M:%.S]' -s
+    $CMD 2>&1 | ts '[%H:%M:%.S]' -s
 after_success:
   - if [[ "${CHANGED_FILES_PR[@]}" =~ "scripts/kind-e2e/e2e.sh" ]]; then
       echo "scripts/kind-e2e/e2e.sh was modified, testing recurring run on already deployed infrastructure.";
       set -o pipefail;
-      make e2e status=keep deploytool=operator 2>&1 |  ts '[%H:%M:%.S]' -s;
+      $CMD 2>&1 |  ts '[%H:%M:%.S]' -s;
     fi;
     echo "Testing cleaning up clusters";
     set -o pipefail;
