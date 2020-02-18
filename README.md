@@ -348,6 +348,14 @@ To build `submariner-engine` and `submariner-route-agent` you can trigger `make`
 
 To build the operator, you can trigger `make build-operator`.
 
+Buidling submariner happens inside a docker based virtual environment (based in dapper).
+You can jump into a virtual environment shell by typing:
+
+   ```
+   make shell
+   ```
+
+
 # Contributing
 
 We welcome issues/PR's to Submariner, if you encounter issues that you'd like to fix while working on it or find new features that you'd like. Please refer [contributing guide](https://github.com/submariner-io/submariner/tree/master/docs/contributing.md) for more details.

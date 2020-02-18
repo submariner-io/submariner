@@ -4,7 +4,7 @@ language: go
 branches:
   only:
   - master
-  - overlapping-cidrs
+  - /^v\d+\.\d+\.\d+.*$/
 
 git:
   depth: false

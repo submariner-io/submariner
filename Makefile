@@ -17,6 +17,9 @@ TARGETS := $(shell ls scripts | grep -v dapper-image)
 dapper-image: .dapper
 	./.dapper -m bind dapper-image
 
+shell:
+	./.dapper -m bind -s
+
 $(TARGETS): .dapper dapper-image
 	DAPPER_ENV="OPERATOR_IMAGE"  ./.dapper -m bind $@ $(status) $(version) $(logging) $(kubefed) $(deploytool) $(debug)
 
