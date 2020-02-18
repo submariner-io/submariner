@@ -12,6 +12,7 @@ const (
 	WireGuard  = "wireguard"
 	StrongSwan = "strongswan"
 	LibreSwan  = "libreswan"
+	Vxlan      = "vxlan"
 
 	DriverImpl = "driver"
 )
