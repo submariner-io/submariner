@@ -111,12 +111,12 @@ by using its operator. All three methods are described here.
 Download the latest binary for your operating system and architecture, then install it on your
 path. The binary has no external dependencies so you won’t need anything else.
 
-For example, to download v0.0.3 for Linux amd64 and install it in `~/.local/bin`:
+For example, to download v0.1.0 for Linux amd64 and install it in `~/.local/bin`:
 
     mkdir -p ~/.local/bin
-    wget https://github.com/submariner-io/submariner-operator/releases/download/v0.0.3/subctl-v0.0.3-linux-amd64
-    install subctl-v0.0.3-linux-amd64 ~/.local/bin/subctl
-    rm subctl-v0.0.3-linux-amd64
+    wget https://github.com/submariner-io/submariner-operator/releases/download/v0.1.0/subctl-v0.1.0-linux-amd64
+    install subctl-v0.1.0-linux-amd64 ~/.local/bin/subctl
+    rm subctl-v0.1.0-linux-amd64
 
 If `~/.local/bin` is on your `PATH`, you will then be able to run `subctl`.
 
@@ -347,6 +347,14 @@ When running in Openshift, we need to grant the appropriate security context for
 To build `submariner-engine` and `submariner-route-agent` you can trigger `make`, which will perform a Dapperized build of the components.
 
 To build the operator, you can trigger `make build-operator`.
+
+Buidling submariner happens inside a docker based virtual environment (based in dapper).
+You can jump into a virtual environment shell by typing:
+
+   ```
+   make shell
+   ```
+
 
 # Contributing
 
