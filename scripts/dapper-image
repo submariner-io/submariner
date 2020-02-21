@@ -1,0 +1,37 @@
+#!/bin/bash
+set -e
+
+#
+# The purpose of this script is to ensure that dapper-base:latest is updated and available locally
+# and if dapper-base is modified we make sure it's rebuilt and tagged locally so any next
+# execution through dapper will have the new image.
+#
+
+source $(dirname $0)/lib/debug_functions
+source $(dirname $0)/lib/version
+
+ARCH=${ARCH:-"amd64"}
+SUFFIX=""
+[ "${ARCH}" != "amd64" ] && SUFFIX="_${ARCH}"
+
+TAG=${TAG:-${VERSION}${SUFFIX}}
+REPO=${REPO:-quay.io/submariner}
+
+DAPPER_BASE_IMAGE=${REPO}/dapper-base:${TAG}
+
+# always compare with upstream master, which is the source for the published dapper image
+UPSTREAM_REMOTE=$(git remote -v | grep submariner-io/submariner | awk '{ print $1 }' | head -n 1)
+CHANGED_FILES_LOCAL=$(git diff --name-only remotes/$UPSTREAM_REMOTE/master)
+
+if [[ "${CHANGED_FILES_PR[@]}" =~ "package/Dockerfile.dapper-base" ]] ||
+   [[ "${CHANGED_FILES_LOCAL[@]}" =~ "package/Dockerfile.dapper-base" ]] ; then
+      echo "Dockerfile.dapper-base was modified, rebuilding dapper image"
+      docker build -t ${DAPPER_BASE_IMAGE} -f package/Dockerfile.dapper-base .
+      docker tag ${DAPPER_BASE_IMAGE} ${REPO}/dapper-base:latest
+else
+      docker pull ${REPO}/dapper-base:latest || :
+      # make sure the tag is also available for release, even if no changes happened
+      docker tag ${REPO}/dapper-base:latest ${DAPPER_BASE_IMAGE}
+fi
+
+

@@ -1,55 +1,80 @@
-package util
+package util_test
 
 import (
-	"testing"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/submariner/pkg/util"
 )
 
 var _ = Describe("StringSet", func() {
-	Describe("Unit tests for NewStringSet", func() {
-		Context("When subnetList contains a specified string", func() {
-			It("Should return true", func() {
-				subnetList := NewStringSet()
-				subnetList.Add("192.168.1.0/24")
-				subnetList.Add("192.168.2.0/24")
-				Expect(subnetList.Contains("192.168.2.0/24")).Should(Equal(true))
-			})
+	var set *util.StringSet
+
+	BeforeEach(func() {
+		set = util.NewStringSet()
+		Expect(set.Add("192.168.1.0/24")).To(BeTrue())
+		Expect(set.Add("192.168.2.0/24")).To(BeTrue())
+	})
+
+	It("should return the correct size", func() {
+		Expect(set.Size()).To(Equal(2))
+	})
+
+	When("it contains a specified string", func() {
+		It("should return true", func() {
+			Expect(set.Contains("192.168.1.0/24")).To(BeTrue())
+			Expect(set.Contains("192.168.2.0/24")).To(BeTrue())
 		})
-		Context("When subnetList does not contain a specified string", func() {
-			It("Should return false", func() {
-				subnetList := NewStringSet()
-				subnetList.Add("192.168.1.0/24")
-				subnetList.Add("192.168.2.0/24")
-				Expect(subnetList.Contains("192.168.3.0/24")).Should(Equal(false))
-			})
+	})
+
+	When("it does not contain a specified string", func() {
+		It("should return false", func() {
+			Expect(set.Contains("192.168.3.0/24")).To(BeFalse())
 		})
-		Context("When subnetList already has an entry", func() {
-			It("Should not append to the list", func() {
-				subnetList := NewStringSet()
-				subnetList.Add("192.168.1.0/24")
-				subnetList.Add("192.168.2.0/24")
-				subnetList.Add("192.168.3.0/24")
-				subnetList.Add("192.168.2.0/24")
-				Expect(subnetList.Size()).Should(Equal(3))
-			})
+	})
+
+	When("adding a string that already exists", func() {
+		It("should not add it again", func() {
+			Expect(set.Add("192.168.1.0/24")).To(BeFalse())
+			Expect(set.Size()).To(Equal(2))
+			Expect(set.Contains("192.168.1.0/24")).To(BeTrue())
 		})
-		Context("When an entry is deleted from subnetList", func() {
-			It("Should be removed from the list", func() {
-				subnetList := NewStringSet()
-				subnetList.Add("192.168.1.0/24")
-				subnetList.Add("192.168.2.0/24")
-				subnetList.Add("192.168.3.0/24")
-				subnetList.Delete("192.168.2.0/24")
-				Expect(subnetList.Contains("192.168.2.0/24")).Should(Equal(false))
-				Expect(subnetList.Size()).Should(Equal(2))
-			})
+	})
+
+	When("a string is deleted", func() {
+		It("should no longer be observed in the set", func() {
+			set.Delete("192.168.2.0/24")
+			Expect(set.Contains("192.168.2.0/24")).To(BeFalse())
+			Expect(set.Size()).To(Equal(1))
 		})
+	})
+
+	When("a string is re-added", func() {
+		It("should be observed in the set", func() {
+			set.Delete("192.168.2.0/24")
+			set.Add("192.168.2.0/24")
+			Expect(set.Contains("192.168.2.0/24")).To(BeTrue())
+			Expect(set.Size()).To(Equal(2))
+		})
+	})
+
+	It("should return the correct elements", func() {
+		containsElements(set.Elements(), "192.168.1.0/24", "192.168.2.0/24")
+
+		set.Add("192.168.3.0/24")
+		containsElements(set.Elements(), "192.168.1.0/24", "192.168.2.0/24", "192.168.3.0/24")
+
+		set.Delete("192.168.1.0/24")
+		set.Delete("192.168.3.0/24")
+		containsElements(set.Elements(), "192.168.2.0/24")
+
+		containsElements(util.NewStringSet().Elements())
 	})
 })
 
-func TestStringSet(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "StringSet Suite")
+func containsElements(actual []string, exp ...string) {
+	for _, s := range exp {
+		Expect(actual).To(ContainElement(s))
+	}
+
+	Expect(actual).To(HaveLen(len(exp)))
 }
