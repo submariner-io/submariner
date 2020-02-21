@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,6 +19,7 @@ import (
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	k8sv1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -31,9 +33,13 @@ import (
 type InformerConfigStruct struct {
 	SubmarinerClientSet clientset.Interface
 	ClientSet           kubernetes.Interface
-	ClusterInformer     informers.ClusterInformer
 	EndpointInformer    informers.EndpointInformer
 	PodInformer         podinformer.PodInformer
+}
+
+type cniInterface struct {
+	name      string
+	ipAddress string
 }
 
 type Controller struct {
@@ -42,11 +48,9 @@ type Controller struct {
 
 	submarinerClientSet    clientset.Interface
 	clientSet              kubernetes.Interface
-	clustersSynced         cache.InformerSynced
 	endpointsSynced        cache.InformerSynced
 	smRouteAgentPodsSynced cache.InformerSynced
 
-	clusterWorkqueue  workqueue.RateLimitingInterface
 	endpointWorkqueue workqueue.RateLimitingInterface
 	podWorkqueue      workqueue.RateLimitingInterface
 
@@ -60,6 +64,8 @@ type Controller struct {
 
 	isGatewayNode    bool
 	defaultHostIface *net.Interface
+
+	cniIface *cniInterface
 }
 
 const (
@@ -67,6 +73,7 @@ const (
 	VxInterfaceWorker  = 0
 	VxInterfaceGateway = 1
 	VxLANPort          = 4800
+	VxLANOverhead      = 50
 
 	// Why VxLANVTepNetworkPrefix is 240?
 	// On VxLAN interfaces we need a unique IPAddress which does not collide with the
@@ -105,22 +112,12 @@ func NewController(clusterID string, ClusterCidr []string, ServiceCidr []string,
 		isGatewayNode:          false,
 		remoteSubnets:          util.NewStringSet(),
 		remoteVTEPs:            util.NewStringSet(),
-		clustersSynced:         config.ClusterInformer.Informer().HasSynced,
 		endpointsSynced:        config.EndpointInformer.Informer().HasSynced,
 		smRouteAgentPodsSynced: config.PodInformer.Informer().HasSynced,
 		gwVxLanMutex:           &sync.Mutex{},
-		clusterWorkqueue:       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Clusters"),
 		endpointWorkqueue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Endpoints"),
 		podWorkqueue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Pods"),
 	}
-
-	config.ClusterInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: controller.enqueueCluster,
-		UpdateFunc: func(old, new interface{}) {
-			controller.enqueueCluster(new)
-		},
-		DeleteFunc: controller.handleRemovedCluster,
-	})
 
 	config.EndpointInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: controller.enqueueEndpoint,
@@ -151,32 +148,35 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 
 	// Wait for the caches to be synced before starting workers
 	klog.Info("Waiting for endpoint informer caches to sync.")
-	if ok := cache.WaitForCacheSync(stopCh, r.endpointsSynced, r.clustersSynced, r.smRouteAgentPodsSynced); !ok {
+	if ok := cache.WaitForCacheSync(stopCh, r.endpointsSynced, r.smRouteAgentPodsSynced); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
 
-	// Configure CNI Specific changes
-	err := toggleCNISpecificConfiguration()
-	if err != nil {
-		return fmt.Errorf("toggleCNISpecificConfiguration returned error. %v", err)
+	r.cniIface = discoverCNIInterface(r.localClusterCidr[0])
+	if r.cniIface != nil {
+		// Configure CNI Specific changes
+		err := toggleCNISpecificConfiguration(r.cniIface.name)
+		if err != nil {
+			return fmt.Errorf("toggleCNISpecificConfiguration returned error. %v", err)
+		}
 	}
 
 	// Create the necessary IPTable chains in the filter and nat tables.
-	err = r.createIPTableChains()
+	err := r.createIPTableChains()
 	if err != nil {
 		return fmt.Errorf("createIPTableChains returned error. %v", err)
 	}
 
-	// let's go ahead and pre-populate clusters
-	clusters, err := r.submarinerClientSet.SubmarinerV1().Clusters(r.objectNamespace).List(metav1.ListOptions{})
+	// let's go ahead and pre-populate routes
+	endpoints, err := r.submarinerClientSet.SubmarinerV1().Endpoints(r.objectNamespace).List(metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("error while retrieving all clusters: %v", err)
+		return fmt.Errorf("error while retrieving all endpoints: %v", err)
 	}
 
 	// Program iptables rules for traffic destined to all the remote cluster CIDRs
-	for _, cluster := range clusters.Items {
-		if cluster.Spec.ClusterID != r.clusterID {
-			r.updateIptableRulesForInterclusterTraffic(append(cluster.Spec.ClusterCIDR, cluster.Spec.ServiceCIDR...))
+	for _, endpoint := range endpoints.Items {
+		if endpoint.Spec.ClusterID != r.clusterID {
+			r.updateIptableRulesForInterclusterTraffic(endpoint.Spec.Subnets)
 		}
 	}
 
@@ -192,19 +192,12 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 	}
 
 	klog.Info("Starting workers")
-	go wait.Until(r.runClusterWorker, time.Second, stopCh)
 	go wait.Until(r.runEndpointWorker, time.Second, stopCh)
 	go wait.Until(r.runPodWorker, time.Second, stopCh)
 	wg.Wait()
 	<-stopCh
 	klog.Info("Shutting down workers")
 	return nil
-}
-
-func (r *Controller) runClusterWorker() {
-	for r.processNextCluster() {
-
-	}
 }
 
 func (r *Controller) runEndpointWorker() {
@@ -235,45 +228,6 @@ func (r *Controller) populateRemoteVtepIps(vtepIP string) {
 	if !r.remoteVTEPs.Contains(vtepIP) {
 		r.remoteVTEPs.Add(vtepIP)
 	}
-}
-
-func (r *Controller) processNextCluster() bool {
-	obj, shutdown := r.clusterWorkqueue.Get()
-	if shutdown {
-		return false
-	}
-	err := func() error {
-		defer r.clusterWorkqueue.Done(obj)
-		klog.V(4).Infof("Processing cluster object: %v", obj)
-		key := obj.(string)
-		ns, name, err := cache.SplitMetaNamespaceKey(key)
-		if err != nil {
-			return fmt.Errorf("error while splitting meta namespace key %s: %v", key, err)
-		}
-		cluster, err := r.submarinerClientSet.SubmarinerV1().Clusters(ns).Get(name, metav1.GetOptions{})
-		if err != nil {
-			return fmt.Errorf("error retrieving submariner cluster object %s: %v", name, err)
-		}
-
-		if cluster.Spec.ClusterID == r.clusterID {
-			klog.V(6).Infof("cluster ID matched the cluster ID of this cluster, not adding it to the cidr list")
-			return nil
-			// no need to reconcile because this endpoint isn't ours
-		}
-
-		r.updateIptableRulesForInterclusterTraffic(append(cluster.Spec.ClusterCIDR, cluster.Spec.ServiceCIDR...))
-
-		r.clusterWorkqueue.Forget(obj)
-		klog.V(4).Infof("cluster processed by route controller")
-		return nil
-	}()
-
-	if err != nil {
-		utilruntime.HandleError(err)
-		return true
-	}
-
-	return true
 }
 
 func (r *Controller) getVxlanVtepIPAddress(ipAddr string) (net.IP, error) {
@@ -318,6 +272,9 @@ func (r *Controller) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP) e
 		return fmt.Errorf("failed to derive the vxlan vtepIP for %s, %v", ipAddr, err)
 	}
 
+	// Derive the MTU based on the default outgoing interface
+	vxlanMtu := r.defaultHostIface.MTU - VxLANOverhead
+
 	if ifaceType == VxInterfaceGateway {
 		attrs := &vxLanAttributes{
 			name:     VxLANIface,
@@ -325,7 +282,7 @@ func (r *Controller) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP) e
 			group:    nil,
 			srcAddr:  nil,
 			vtepPort: VxLANPort,
-			mtu:      1450,
+			mtu:      vxlanMtu,
 		}
 
 		r.vxlanDevice, err = newVxlanIface(attrs)
@@ -333,7 +290,7 @@ func (r *Controller) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP) e
 			return fmt.Errorf("failed to create vxlan interface on Gateway Node: %v", err)
 		}
 
-		for fdbAddress := range r.remoteVTEPs.Set {
+		for _, fdbAddress := range r.remoteVTEPs.Elements() {
 			err = r.vxlanDevice.AddFDB(net.ParseIP(fdbAddress), "00:00:00:00:00:00")
 			if err != nil {
 				return fmt.Errorf("failed to add FDB entry on the Gateway Node vxlan iface %v", err)
@@ -356,7 +313,7 @@ func (r *Controller) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP) e
 			group:    gatewayNodeIP,
 			srcAddr:  nil,
 			vtepPort: VxLANPort,
-			mtu:      1450,
+			mtu:      vxlanMtu,
 		}
 
 		r.vxlanDevice, err = newVxlanIface(attrs)
@@ -390,7 +347,13 @@ func (r *Controller) processNextPod() bool {
 
 		pod, err := r.clientSet.CoreV1().Pods(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
-			r.podWorkqueue.Forget(obj)
+			if errors.IsNotFound(err) {
+				r.podWorkqueue.Forget(obj)
+				klog.Infof("submariner-route-agent pod for key %q not found - probably was deleted", key)
+				return nil
+			}
+
+			r.podWorkqueue.AddRateLimited(obj)
 			return fmt.Errorf("error retrieving submariner-route-agent pod object %s: %v", name, err)
 		}
 
@@ -443,15 +406,24 @@ func (r *Controller) processNextEndpoint() bool {
 		if err != nil {
 			return fmt.Errorf("error while splitting meta namespace key %s: %v", key, err)
 		}
+
 		endpoint, err := r.submarinerClientSet.SubmarinerV1().Endpoints(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
+			if errors.IsNotFound(err) {
+				r.endpointWorkqueue.Forget(obj)
+				klog.Infof("Endpoint for key %q not found - probably was deleted", key)
+				return nil
+			}
+
+			r.endpointWorkqueue.AddRateLimited(obj)
 			return fmt.Errorf("error retrieving submariner endpoint object %s: %v", name, err)
 		}
 
 		if endpoint.Spec.ClusterID != r.clusterID {
-			klog.V(6).Infof("Endpoint didn't match the cluster ID of this cluster")
+			klog.V(6).Infof("setting routes of endpoint object %s", name)
+			r.updateIptableRulesForInterclusterTraffic(endpoint.Spec.Subnets)
+			r.endpointWorkqueue.Forget(obj)
 			return nil
-			// no need to reconcile because this endpoint isn't ours
 		}
 
 		hostname, err := os.Hostname()
@@ -473,12 +445,14 @@ func (r *Controller) processNextEndpoint() bool {
 				klog.Fatalf("Unable to create VxLAN interface on GatewayNode (%s): %v", hostname, err)
 			}
 			klog.V(6).Infof("not reconciling routes because we appear to be the gateway host")
+			r.endpointWorkqueue.Forget(obj)
 			return nil
 		}
 
 		localClusterGwNodeIP := net.ParseIP(endpoint.Spec.PrivateIP)
 		remoteVtepIP, err := r.getVxlanVtepIPAddress(localClusterGwNodeIP.String())
 		if err != nil {
+			r.endpointWorkqueue.Forget(obj)
 			return fmt.Errorf("failed to derive the remoteVtepIP %v", err)
 		}
 
@@ -490,7 +464,10 @@ func (r *Controller) processNextEndpoint() bool {
 		}
 		r.gwVxLanMutex.Unlock()
 
+		// NOTE(mangelajo): This may not belong here, it's a gateway cleanup thing
+		r.cleanStrongswanRoutingTable()
 		r.cleanXfrmPolicies()
+
 		err = r.reconcileRoutes(remoteVtepIP)
 		if err != nil {
 			r.endpointWorkqueue.AddRateLimited(obj)
@@ -508,17 +485,6 @@ func (r *Controller) processNextEndpoint() bool {
 	}
 
 	return true
-}
-
-func (r *Controller) enqueueCluster(obj interface{}) {
-	var key string
-	var err error
-	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
-		utilruntime.HandleError(err)
-		return
-	}
-	klog.V(4).Infof("Enqueueing cluster for route controller %v", obj)
-	r.clusterWorkqueue.AddRateLimited(key)
 }
 
 func (r *Controller) enqueueEndpoint(obj interface{}) {
@@ -542,7 +508,7 @@ func (r *Controller) enqueuePod(obj interface{}) {
 
 	pod := obj.(*k8sv1.Pod)
 	// Add the POD event to the workqueue only if the sm-route-agent podIP does not exist in the local cache.
-	if !r.remoteVTEPs.Contains(pod.Status.HostIP) {
+	if pod.Status.HostIP != "" && !r.remoteVTEPs.Contains(pod.Status.HostIP) {
 		klog.V(4).Infof("Enqueueing sm-route-agent-pod event, ip: %s", pod.Status.HostIP)
 		r.podWorkqueue.AddRateLimited(key)
 	}
@@ -591,10 +557,6 @@ func (r *Controller) handleRemovedEndpoint(obj interface{}) {
 	klog.V(4).Infof("Removed routes from host")
 }
 
-func (r *Controller) handleRemovedCluster(obj interface{}) {
-	// ideally we should attempt to remove all routes if the endpoint matches our cluster ID
-}
-
 func (r *Controller) handleRemovedPod(obj interface{}) {
 	klog.V(6).Infof("Removing podIP in route controller %v", obj)
 	pod := obj.(*k8sv1.Pod)
@@ -636,6 +598,21 @@ func (r *Controller) cleanRoutes() {
 				}
 			}
 		}
+	}
+}
+
+//NOTE: the following two methods method will probably need to be either moved to another
+//      process, or re-architected in some form. Those are strongswan/ipsec specific
+//      methods, and eventually we will have other types of cable engines. At least
+//      we may want to call the cable-engine specific cleanups depending on the cable
+//      engine which was used.
+
+func (r *Controller) cleanStrongswanRoutingTable() {
+	cmd := exec.Command("/sbin/ip", "r", "flush", "table", "220")
+	if err := cmd.Run(); err != nil {
+		// We can safely ignore this error, as this table
+		// won't exist in most nodes (only gateway nodes)
+		return
 	}
 }
 
@@ -694,7 +671,7 @@ func (r *Controller) reconcileRoutes(vxlanGw net.IP) error {
 	}
 
 	// let's now add the routes that are missing
-	for cidrBlock := range r.remoteSubnets.Set {
+	for _, cidrBlock := range r.remoteSubnets.Elements() {
 		_, dst, err := net.ParseCIDR(cidrBlock)
 		if err != nil {
 			klog.Errorf("Error parsing cidr block %s: %v", cidrBlock, err)

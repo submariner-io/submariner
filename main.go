@@ -21,7 +21,6 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 
-	kubeInformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
@@ -43,6 +42,19 @@ func init() {
 	flag.StringVar(&localKubeconfig, "kubeconfig", "", "Path to kubeconfig of local cluster. Only required if out-of-cluster.")
 	flag.StringVar(&localMasterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 }
+
+type leaderConfig struct {
+	LeaseDuration int64
+	RenewDeadline int64
+	RetryPeriod   int64
+}
+
+const (
+	leadershipConfigEnvPrefix = "leadership"
+	defaultLeaseDuration      = 5 // In Seconds
+	defaultRenewDeadline      = 3 // In Seconds
+	defaultRetryPeriod        = 2 // In Seconds
+)
 
 func main() {
 	klog.InitFlags(nil)
@@ -73,25 +85,31 @@ func main() {
 		klog.Exitf("Error building submariner clientset: %s", err.Error())
 	}
 
-	kubeInformerFactory := kubeInformers.NewSharedInformerFactoryWithOptions(kubeClient, time.Second*30,
-		kubeInformers.WithNamespace(submSpec.Namespace))
 	submarinerInformerFactory := submarinerInformers.NewSharedInformerFactoryWithOptions(submarinerClient, time.Second*30,
 		submarinerInformers.WithNamespace(submSpec.Namespace))
 
 	start := func(context.Context) {
+		var localSubnets []string
+
 		localCluster, err := util.GetLocalCluster(submSpec)
 		if err != nil {
 			klog.Fatalf("Fatal error occurred while retrieving local cluster from %#v: %v", submSpec, err)
 		}
 
+		if len(submSpec.GlobalCidr) > 0 {
+			localSubnets = submSpec.GlobalCidr
+		} else {
+			localSubnets = append(submSpec.ServiceCidr, submSpec.ClusterCidr...)
+		}
+
 		localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterID, "ipsec", nil, submSpec.NatEnabled,
-			append(submSpec.ServiceCidr, submSpec.ClusterCidr...), util.GetLocalIP())
+			localSubnets, util.GetLocalIP())
 
 		if err != nil {
 			klog.Fatalf("Fatal error occurred while retrieving local endpoint from %#v: %v", submSpec, err)
 		}
 
-		cableEngine, err := ipsec.NewEngine(append(submSpec.ClusterCidr, submSpec.ServiceCidr...), localCluster, localEndpoint)
+		cableEngine, err := ipsec.NewEngine(localSubnets, localCluster, localEndpoint)
 		if err != nil {
 			klog.Fatalf("Fatal error occurred creating ipsec engine: %v", err)
 		}
@@ -125,7 +143,6 @@ func main() {
 			submarinerInformerFactory.Submariner().V1().Clusters(), submarinerInformerFactory.Submariner().V1().Endpoints(), datastore,
 			submSpec.ColorCodes, localCluster, localEndpoint)
 
-		kubeInformerFactory.Start(stopCh)
 		submarinerInformerFactory.Start(stopCh)
 
 		klog.V(4).Infof("Starting controllers")
@@ -170,6 +187,28 @@ func main() {
 }
 
 func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder record.EventRecorder, run func(ctx context.Context)) {
+	gwLeadershipConfig := leaderConfig{}
+
+	err := envconfig.Process(leadershipConfigEnvPrefix, &gwLeadershipConfig)
+	if err != nil {
+		klog.Fatalf("error processing environment config for %s: %v", leadershipConfigEnvPrefix, err)
+	}
+
+	// Use default values when GatewayLeadership environment variables are not configured
+	if gwLeadershipConfig.LeaseDuration == 0 {
+		gwLeadershipConfig.LeaseDuration = defaultLeaseDuration
+	}
+
+	if gwLeadershipConfig.RenewDeadline == 0 {
+		gwLeadershipConfig.RenewDeadline = defaultRenewDeadline
+	}
+
+	if gwLeadershipConfig.RetryPeriod == 0 {
+		gwLeadershipConfig.RetryPeriod = defaultRetryPeriod
+	}
+
+	klog.Infof("Gateway Leader Election Config values: %v ", gwLeadershipConfig)
+
 	id, err := os.Hostname()
 	if err != nil {
 		klog.Fatalf("error getting hostname: %v", err)
@@ -202,9 +241,9 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder rec
 
 	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
 		Lock:          &rl,
-		LeaseDuration: 15 * time.Second,
-		RenewDeadline: 10 * time.Second,
-		RetryPeriod:   3 * time.Second,
+		LeaseDuration: time.Duration(gwLeadershipConfig.LeaseDuration) * time.Second,
+		RenewDeadline: time.Duration(gwLeadershipConfig.RenewDeadline) * time.Second,
+		RetryPeriod:   time.Duration(gwLeadershipConfig.RetryPeriod) * time.Second,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: run,
 			OnStoppedLeading: func() {
