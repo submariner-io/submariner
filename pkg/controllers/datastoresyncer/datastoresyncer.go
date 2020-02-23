@@ -8,7 +8,7 @@ import (
 
 	"github.com/submariner-io/admiral/pkg/log"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
 	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/datastore"
 	"github.com/submariner-io/submariner/pkg/types"
@@ -17,7 +17,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
@@ -25,11 +24,10 @@ import (
 )
 
 type DatastoreSyncer struct {
-	objectNamespace            string
 	thisClusterID              string
 	colorCodes                 []string
-	kubeClientSet              kubernetes.Interface
-	submarinerClientset        submarinerClientset.Interface
+	submarinerClusters         submarinerClientset.ClusterInterface
+	submarinerEndpoints        submarinerClientset.EndpointInterface
 	submarinerClusterInformer  submarinerInformers.ClusterInformer
 	submarinerEndpointInformer submarinerInformers.EndpointInformer
 	datastore                  datastore.Datastore
@@ -40,12 +38,14 @@ type DatastoreSyncer struct {
 	endpointWorkqueue workqueue.RateLimitingInterface
 }
 
-func NewDatastoreSyncer(thisClusterID string, objectNamespace string, kubeClientSet kubernetes.Interface, submarinerClientset submarinerClientset.Interface, submarinerClusterInformer submarinerInformers.ClusterInformer, submarinerEndpointInformer submarinerInformers.EndpointInformer, datastore datastore.Datastore, colorcodes []string, localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) *DatastoreSyncer {
+func NewDatastoreSyncer(thisClusterID string, submarinerClusters submarinerClientset.ClusterInterface, submarinerClusterInformer submarinerInformers.ClusterInformer,
+	submarinerEndpoints submarinerClientset.EndpointInterface, submarinerEndpointInformer submarinerInformers.EndpointInformer, datastore datastore.Datastore, colorcodes []string,
+	localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) *DatastoreSyncer {
+
 	newDatastoreSyncer := DatastoreSyncer{
 		thisClusterID:              thisClusterID,
-		objectNamespace:            objectNamespace,
-		kubeClientSet:              kubeClientSet,
-		submarinerClientset:        submarinerClientset,
+		submarinerClusters:         submarinerClusters,
+		submarinerEndpoints:        submarinerEndpoints,
 		datastore:                  datastore,
 		submarinerClusterInformer:  submarinerClusterInformer,
 		submarinerEndpointInformer: submarinerEndpointInformer,
@@ -86,19 +86,19 @@ func (d *DatastoreSyncer) ensureExclusiveEndpoint() error {
 		if !util.CompareEndpointSpec(endpoint.Spec, d.localEndpoint.Spec) {
 			endpointName, err := util.GetEndpointCRDName(&endpoint)
 			if err != nil {
-				klog.Errorf("error extracting the submariner Endpoint name from %#v: %v", endpoint, err)
+				klog.Errorf("Error extracting the submariner Endpoint name from %#v: %v", endpoint, err)
 				continue
 			}
 
 			// we need to remove this endpoint
-			err = d.submarinerClientset.SubmarinerV1().Endpoints(d.objectNamespace).Delete(endpointName, &metav1.DeleteOptions{})
-			if err != nil {
-				klog.Errorf("error deleting submariner Endpoint %q from the local datastore: %v", endpointName, err)
+			err = d.submarinerEndpoints.Delete(endpointName, &metav1.DeleteOptions{})
+			if err != nil && !errors.IsNotFound(err) {
+				return fmt.Errorf("error deleting submariner Endpoint %q from the local datastore: %v", endpointName, err)
 			}
 
 			err = d.datastore.RemoveEndpoint(d.localCluster.ID, endpoint.Spec.CableName)
-			if err != nil {
-				klog.Errorf("error removing submariner Endpoint with cable name %q from the central datastore: %v", endpoint.Spec.CableName, err)
+			if err != nil && !errors.IsNotFound(err) {
+				return fmt.Errorf("error removing submariner Endpoint with cable name %q from the central datastore: %v", endpoint.Spec.CableName, err)
 			}
 
 			klog.Infof("Successfully deleted existing submariner Endpoint %q", endpointName)
@@ -243,13 +243,13 @@ func (d *DatastoreSyncer) processNextEndpointWorkItem() bool {
 	err := func() error {
 		defer d.endpointWorkqueue.Done(key)
 
-		ns, name, err := cache.SplitMetaNamespaceKey(key.(string))
+		_, name, err := cache.SplitMetaNamespaceKey(key.(string))
 		if err != nil {
 			d.endpointWorkqueue.Forget(key)
 			return err
 		}
 
-		endpoint, err := d.submarinerClientset.SubmarinerV1().Endpoints(ns).Get(name, metav1.GetOptions{})
+		endpoint, err := d.submarinerEndpoints.Get(name, metav1.GetOptions{})
 		if err != nil {
 			d.endpointWorkqueue.Forget(key)
 			return err
@@ -299,7 +299,7 @@ func (d *DatastoreSyncer) reconcileClusterCRD(fromCluster *types.SubmarinerClust
 	}
 
 	var found bool
-	cluster, err := d.submarinerClientset.SubmarinerV1().Clusters(d.objectNamespace).Get(clusterName, metav1.GetOptions{})
+	cluster, err := d.submarinerClusters.Get(clusterName, metav1.GetOptions{})
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("error retrieving submariner Cluster object %q from the local datastore: %v", clusterName, err)
@@ -312,7 +312,7 @@ func (d *DatastoreSyncer) reconcileClusterCRD(fromCluster *types.SubmarinerClust
 
 	if delete {
 		if found {
-			err = d.submarinerClientset.SubmarinerV1().Clusters(d.objectNamespace).Delete(clusterName, &metav1.DeleteOptions{})
+			err = d.submarinerClusters.Delete(clusterName, &metav1.DeleteOptions{})
 			if err != nil {
 				return fmt.Errorf("error deleting submariner Cluster %q from the local datastore: %v", clusterName, err)
 			}
@@ -330,7 +330,7 @@ func (d *DatastoreSyncer) reconcileClusterCRD(fromCluster *types.SubmarinerClust
 				Spec: fromCluster.Spec,
 			}
 
-			_, err = d.submarinerClientset.SubmarinerV1().Clusters(d.objectNamespace).Create(cluster)
+			_, err = d.submarinerClusters.Create(cluster)
 			if err != nil {
 				return fmt.Errorf("error creating submariner Cluster %#v in the local datastore: %v", cluster, err)
 			}
@@ -343,13 +343,13 @@ func (d *DatastoreSyncer) reconcileClusterCRD(fromCluster *types.SubmarinerClust
 			}
 
 			retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				result, getErr := d.submarinerClientset.SubmarinerV1().Clusters(d.objectNamespace).Get(clusterName, metav1.GetOptions{})
+				result, getErr := d.submarinerClusters.Get(clusterName, metav1.GetOptions{})
 				if getErr != nil {
 					return fmt.Errorf("error retrieving submariner Cluster object %q from the local datastore: %v", clusterName, getErr)
 				}
 
 				result.Spec = fromCluster.Spec
-				_, updateErr := d.submarinerClientset.SubmarinerV1().Clusters(d.objectNamespace).Update(result)
+				_, updateErr := d.submarinerClusters.Update(result)
 				return updateErr
 			})
 
@@ -372,7 +372,7 @@ func (d *DatastoreSyncer) reconcileEndpointCRD(fromEndpoint *types.SubmarinerEnd
 	}
 
 	var found bool
-	endpoint, err := d.submarinerClientset.SubmarinerV1().Endpoints(d.objectNamespace).Get(endpointName, metav1.GetOptions{})
+	endpoint, err := d.submarinerEndpoints.Get(endpointName, metav1.GetOptions{})
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("error retrieving submariner Endpoint object %q from the local datastore: %v", endpointName, err)
@@ -385,7 +385,7 @@ func (d *DatastoreSyncer) reconcileEndpointCRD(fromEndpoint *types.SubmarinerEnd
 
 	if delete {
 		if found {
-			err = d.submarinerClientset.SubmarinerV1().Endpoints(d.objectNamespace).Delete(endpointName, &metav1.DeleteOptions{})
+			err = d.submarinerEndpoints.Delete(endpointName, &metav1.DeleteOptions{})
 			if err != nil {
 				return fmt.Errorf("error deleting submariner Endpoint %q from the local datastore: %v", endpointName, err)
 			}
@@ -403,7 +403,7 @@ func (d *DatastoreSyncer) reconcileEndpointCRD(fromEndpoint *types.SubmarinerEnd
 				Spec: fromEndpoint.Spec,
 			}
 
-			_, err = d.submarinerClientset.SubmarinerV1().Endpoints(d.objectNamespace).Create(endpoint)
+			_, err = d.submarinerEndpoints.Create(endpoint)
 			if err != nil {
 				return fmt.Errorf("error creating submariner Endpoint %#v in the local datastore: %v", endpoint, err)
 			}
@@ -416,12 +416,12 @@ func (d *DatastoreSyncer) reconcileEndpointCRD(fromEndpoint *types.SubmarinerEnd
 			}
 
 			retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				result, getErr := d.submarinerClientset.SubmarinerV1().Endpoints(d.objectNamespace).Get(endpointName, metav1.GetOptions{})
+				result, getErr := d.submarinerEndpoints.Get(endpointName, metav1.GetOptions{})
 				if getErr != nil {
 					return fmt.Errorf("error retrieving submariner Endpoint object %q from the local datastore: %v", endpointName, getErr)
 				}
 				result.Spec = fromEndpoint.Spec
-				_, updateErr := d.submarinerClientset.SubmarinerV1().Endpoints(d.objectNamespace).Update(result)
+				_, updateErr := d.submarinerEndpoints.Update(result)
 				return updateErr
 			})
 

@@ -151,9 +151,9 @@ func main() {
 		}
 
 		klog.Info("Creating the datastore syncer")
-		dsSyncer := datastoresyncer.NewDatastoreSyncer(submSpec.ClusterID, submSpec.Namespace, kubeClient, submarinerClient,
-			submarinerInformerFactory.Submariner().V1().Clusters(), submarinerInformerFactory.Submariner().V1().Endpoints(), datastore,
-			submSpec.ColorCodes, localCluster, localEndpoint)
+		dsSyncer := datastoresyncer.NewDatastoreSyncer(submSpec.ClusterID, submarinerClient.SubmarinerV1().Clusters(submSpec.Namespace),
+			submarinerInformerFactory.Submariner().V1().Clusters(), submarinerClient.SubmarinerV1().Endpoints(submSpec.Namespace),
+			submarinerInformerFactory.Submariner().V1().Endpoints(), datastore, submSpec.ColorCodes, localCluster, localEndpoint)
 
 		submarinerInformerFactory.Start(stopCh)
 
