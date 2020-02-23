@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/submariner-io/submariner/pkg/datastore"
 	"github.com/submariner-io/submariner/pkg/log"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
@@ -121,7 +122,7 @@ func (p *PHPAPI) GetEndpoint(clusterID string, cableName string) (*types.Submari
 	return nil, fmt.Errorf("GetEndpoint is not implemented")
 }
 
-func (p *PHPAPI) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onChange func(cluster *types.SubmarinerCluster, deleted bool) error) error {
+func (p *PHPAPI) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onChange datastore.OnClusterChange) error {
 	colorCode := util.FlattenColors(colorCodes)
 	klog.Infof("Starting watch for colorCode %s", colorCode)
 	var wg sync.WaitGroup
@@ -150,7 +151,7 @@ func (p *PHPAPI) WatchClusters(ctx context.Context, selfClusterID string, colorC
 	return nil
 }
 
-func (p *PHPAPI) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onChange func(endpoint *types.SubmarinerEndpoint, deleted bool) error) error {
+func (p *PHPAPI) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onChange datastore.OnEndpointChange) error {
 	colorCode := util.FlattenColors(colorCodes)
 	klog.Infof("Starting PHPAPI endpoint watch for colorCode %s", colorCode)
 	var wg sync.WaitGroup
