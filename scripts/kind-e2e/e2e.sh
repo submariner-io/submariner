@@ -87,6 +87,15 @@ function kind_import_images() {
         kind --name cluster${i} load docker-image submariner:local
         kind --name cluster${i} load docker-image submariner-route-agent:local
     done
+
+    if [ ! -z "${global_CIDRs[cluster1]}" ]
+    then
+        docker tag quay.io/submariner/submariner-globalnet:$VERSION submariner-globalnet:local
+        for i in 1 2 3; do
+            echo "Loading globalnet image into cluster${i}..."
+            kind --name cluster${i} load docker-image submariner-globalnet:local
+        done
+    fi
 }
 
 function test_connection() {
@@ -191,14 +200,12 @@ function test_with_e2e_tests {
 function delete_subm_pods() {
     context=$1
     ns=$2
-    if kubectl --context=$context wait --for=condition=Ready pods -l app=submariner-engine -n $ns --timeout=60s > /dev/null 2>&1; then
-        echo Removing submariner engine pods...
-        kubectl --context=$context delete pods -n submariner -l app=submariner-engine
-    fi
-    if kubectl --context=$context wait --for=condition=Ready pods -l app=submariner-routeagent -n $ns --timeout=60s > /dev/null 2>&1; then
-        echo Removing submariner route agent pods...
-        kubectl --context=$context delete pods -n submariner -l app=submariner-routeagent
-    fi
+    for app in submariner-engine submariner-routeagent submariner-globalnet; do
+        if kubectl --context=$context wait --for=condition=Ready pods -l app=$app -n $ns --timeout=60s > /dev/null 2>&1; then
+            echo Removing $app pods...
+            kubectl --context=$context delete pods -n $ns -l app=$app
+        fi
+    done
 }
 
 function cleanup {
@@ -232,8 +239,14 @@ version=$2
 logging=$3
 kubefed=$4
 deploy=$5
+debug=$6
+globalnet=$7
 
-echo Starting with status: $status, k8s_version: $version, logging: $logging, kubefed: $kubefed, deploy: $deploy
+echo Starting with status: $status, k8s_version: $version, logging: $logging, kubefed: $kubefed, deploy: $deploy, debug: $debug, globalnet: $globalnet
+
+if [[ $globalnet = true ]]; then
+  declare -A global_CIDRs=( ["cluster1"]="169.254.1.0/24" ["cluster2"]="169.254.2.0/24" ["cluster3"]="169.254.3.0/24" )
+fi
 
 if [[ $status = clean ]]; then
     cleanup
