@@ -17,7 +17,7 @@ subm_ns=submariner-operator
 ### Functions ###
 
 function get_latest_subctl_tag() {
-    curl https://api.github.com/repos/submariner-io/submariner-operator/releases | jq -r '.[0].tag_name'
+    curl https://api.github.com/repos/submariner-io/submariner-operator/releases/latest | jq -r '.tag_name'
 }
 
 function travis_retry() {
