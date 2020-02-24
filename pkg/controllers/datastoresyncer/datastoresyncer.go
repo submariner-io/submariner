@@ -33,8 +33,8 @@ type DatastoreSyncer struct {
 	submarinerClusterInformer  submarinerInformers.ClusterInformer
 	submarinerEndpointInformer submarinerInformers.EndpointInformer
 	datastore                  datastore.Datastore
-	localCluster               *types.SubmarinerCluster
-	localEndpoint              *types.SubmarinerEndpoint
+	localCluster               types.SubmarinerCluster
+	localEndpoint              types.SubmarinerEndpoint
 
 	clusterWorkqueue  workqueue.RateLimitingInterface
 	endpointWorkqueue workqueue.RateLimitingInterface
@@ -52,8 +52,8 @@ func NewDatastoreSyncer(thisClusterID string, objectNamespace string, kubeClient
 		clusterWorkqueue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Clusters"),
 		endpointWorkqueue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Endpoints"),
 		colorCodes:                 colorcodes,
-		localCluster:               &localCluster,
-		localEndpoint:              &localEndpoint,
+		localCluster:               localCluster,
+		localEndpoint:              localEndpoint,
 	}
 
 	submarinerClusterInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
@@ -148,12 +148,12 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 	}
 
 	klog.Infof("Reconciling local submariner Cluster: %#v ", d.localCluster)
-	if err := d.reconcileClusterCRD(d.localCluster, false); err != nil {
+	if err := d.reconcileClusterCRD(&d.localCluster, false); err != nil {
 		return fmt.Errorf("error reconciling the local submariner Cluster: %v", err)
 	}
 
 	klog.Infof("Reconciling local submariner Endpoint: %#v ", d.localEndpoint)
-	if err := d.reconcileEndpointCRD(d.localEndpoint, false); err != nil {
+	if err := d.reconcileEndpointCRD(&d.localEndpoint, false); err != nil {
 		return fmt.Errorf("error reconciling the local submariner Endpoint: %v", err)
 	}
 
