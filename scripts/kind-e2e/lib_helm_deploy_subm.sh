@@ -56,9 +56,12 @@ function setup_broker() {
 
 function helm_install_subm() {
     cluster_id=$1
-    cluster_cidr=$2
-    service_cidr=$3
-    crd_create=$4
+    crd_create=$2
+    cluster_cidr=$3
+    service_cidr=$4
+    global_cidr=$5
+    globalnet_enable="true" && [[ -z $global_cidr ]] && globalnet_enable="false"
+
     kubectl config use-context $cluster_id
     helm --kube-context ${cluster_id} install submariner-latest/submariner \
         --name submariner \
@@ -71,6 +74,8 @@ function helm_install_subm() {
         --set submariner.clusterId="${cluster_id}" \
         --set submariner.clusterCidr="${cluster_cidr}" \
         --set submariner.serviceCidr="${service_cidr}" \
+        --set submariner.globalCidr="${global_cidr}" \
+        --set serviceAccounts.globalnet.create=${globalnet_enable} \
         --set submariner.natEnabled="false" \
         --set routeAgent.image.repository="submariner-route-agent" \
         --set routeAgent.image.tag="local" \
@@ -87,7 +92,7 @@ function install_subm_all_clusters() {
         echo Submariner CRDs already exist, skipping broker creation...
     else
         echo Installing Submariner Broker in cluster1...
-        helm_install_subm cluster1 ${cluster_CIDRs[cluster1]} ${service_CIDRs[cluster1]} false
+        helm_install_subm cluster1 false ${cluster_CIDRs[cluster1]} ${service_CIDRs[cluster1]} ${global_CIDRs[cluster1]}
     fi
 
     for i in 2 3; do
@@ -96,7 +101,7 @@ function install_subm_all_clusters() {
           echo Submariner already installed in $cluster_id, skipping submariner helm installation...
       else
           echo Installing Submariner in $cluster_id...
-          helm_install_subm $cluster_id ${cluster_CIDRs[$cluster_id]} ${service_CIDRs[$cluster_id]} true
+          helm_install_subm $cluster_id true ${cluster_CIDRs[$cluster_id]} ${service_CIDRs[$cluster_id]} ${global_CIDRs[$cluster_id]}
       fi
     done
 }
