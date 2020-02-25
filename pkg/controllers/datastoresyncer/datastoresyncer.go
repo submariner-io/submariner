@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/submariner-io/admiral/pkg/workqueue"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
 	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions/submariner.io/v1"
@@ -16,10 +17,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 )
 
@@ -34,8 +33,8 @@ type DatastoreSyncer struct {
 	localCluster               types.SubmarinerCluster
 	localEndpoint              types.SubmarinerEndpoint
 
-	clusterWorkqueue  workqueue.RateLimitingInterface
-	endpointWorkqueue workqueue.RateLimitingInterface
+	clusterWorkqueue  workqueue.Interface
+	endpointWorkqueue workqueue.Interface
 }
 
 func NewDatastoreSyncer(thisClusterID string, submarinerClusters submarinerClientset.ClusterInterface, submarinerClusterInformer submarinerInformers.ClusterInformer,
@@ -49,27 +48,25 @@ func NewDatastoreSyncer(thisClusterID string, submarinerClusters submarinerClien
 		datastore:                  datastore,
 		submarinerClusterInformer:  submarinerClusterInformer,
 		submarinerEndpointInformer: submarinerEndpointInformer,
-		clusterWorkqueue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Clusters"),
-		endpointWorkqueue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Endpoints"),
+		clusterWorkqueue:           workqueue.New("Cluster datastore syncer"),
+		endpointWorkqueue:          workqueue.New("Endpoint datastore syncer"),
 		colorCodes:                 colorcodes,
 		localCluster:               localCluster,
 		localEndpoint:              localEndpoint,
 	}
 
 	submarinerClusterInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
-		AddFunc: newDatastoreSyncer.enqueueCluster,
+		AddFunc: newDatastoreSyncer.clusterWorkqueue.Enqueue,
 		UpdateFunc: func(old, new interface{}) {
-			newDatastoreSyncer.enqueueCluster(new)
+			newDatastoreSyncer.clusterWorkqueue.Enqueue(new)
 		},
-		DeleteFunc: newDatastoreSyncer.enqueueCluster,
 	}, 60*time.Second)
 
 	submarinerEndpointInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
-		AddFunc: newDatastoreSyncer.enqueueEndpoint,
+		AddFunc: newDatastoreSyncer.endpointWorkqueue.Enqueue,
 		UpdateFunc: func(old, new interface{}) {
-			newDatastoreSyncer.enqueueEndpoint(new)
+			newDatastoreSyncer.endpointWorkqueue.Enqueue(new)
 		},
-		DeleteFunc: newDatastoreSyncer.enqueueEndpoint,
 	}, 60*time.Second)
 
 	return &newDatastoreSyncer
@@ -108,28 +105,6 @@ func (d *DatastoreSyncer) ensureExclusiveEndpoint() error {
 	return nil
 }
 
-func (d *DatastoreSyncer) enqueueCluster(obj interface{}) {
-	var key string
-	var err error
-	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
-		utilruntime.HandleError(err)
-		return
-	}
-	klog.V(log.TRACE).Infof("Enqueueing cluster %v", key)
-	d.clusterWorkqueue.AddRateLimited(key)
-}
-
-func (d *DatastoreSyncer) enqueueEndpoint(obj interface{}) {
-	var key string
-	var err error
-	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
-		utilruntime.HandleError(err)
-		return
-	}
-	klog.V(log.TRACE).Infof("Enqueueing endpoint %v", key)
-	d.endpointWorkqueue.AddRateLimited(key)
-}
-
 func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 	defer utilruntime.HandleCrash()
 
@@ -160,9 +135,9 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 	go utilruntime.HandleError(d.datastore.WatchClusters(context.TODO(), d.thisClusterID, d.colorCodes, d.reconcileClusterCRD))
 	go utilruntime.HandleError(d.datastore.WatchEndpoints(context.TODO(), d.thisClusterID, d.colorCodes, d.reconcileEndpointCRD))
 
-	go wait.Until(d.runClusterWorker, time.Second, stopCh)
+	d.clusterWorkqueue.Run(stopCh, d.processNextClusterWorkItem)
 
-	go wait.Until(d.runEndpointWorker, time.Second, stopCh)
+	d.endpointWorkqueue.Run(stopCh, d.processNextEndpointWorkItem)
 
 	//go wait.Until(d.runReaper, time.Second, stopCh)
 
@@ -173,121 +148,60 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (d *DatastoreSyncer) runClusterWorker() {
-	for d.processNextClusterWorkItem() {
-	}
-}
-
-func (d *DatastoreSyncer) processNextClusterWorkItem() bool {
-	key, shutdown := d.clusterWorkqueue.Get()
-	if shutdown {
-		return false
+func (d *DatastoreSyncer) processNextClusterWorkItem(name, ns string) (bool, error) {
+	if d.thisClusterID != name {
+		klog.V(log.TRACE).Infof("The updated submariner Cluster %q is not for this cluster, skipping updating the datastore", name)
+		// not actually an error but we should forget about this and return
+		return false, nil
 	}
 
-	err := func() error {
-		defer d.clusterWorkqueue.Done(key)
-
-		ns, name, err := cache.SplitMetaNamespaceKey(key.(string))
-		if err != nil {
-			d.clusterWorkqueue.Forget(key)
-			return err
-		}
-
-		if d.thisClusterID != name {
-			klog.V(log.TRACE).Infof("The updated submariner Cluster %q is not for this cluster, skipping updating the datastore", name)
-			// not actually an error but we should forget about this and return
-			d.clusterWorkqueue.Forget(key)
-			return nil
-		}
-
-		cluster, err := d.submarinerClusterInformer.Lister().Clusters(ns).Get(name)
-		if err != nil {
-			d.clusterWorkqueue.Forget(key)
-			return err
-		}
-
-		klog.V(log.TRACE).Infof("Processing local submariner Cluster object: %#v", cluster)
-
-		myCluster := types.SubmarinerCluster{
-			ID:   cluster.Name,
-			Spec: cluster.Spec,
-		}
-
-		if err = d.datastore.SetCluster(&myCluster); err != nil {
-			d.clusterWorkqueue.Forget(key)
-			return err
-		}
-
-		d.clusterWorkqueue.Forget(key)
-		return nil
-	}()
-
+	cluster, err := d.submarinerClusterInformer.Lister().Clusters(ns).Get(name)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Failed to process submariner Cluster with key %q: %v", key, err))
-		return true
+		return false, err
 	}
-	return true
+
+	klog.V(log.TRACE).Infof("Processing local submariner Cluster object: %#v", cluster)
+
+	myCluster := types.SubmarinerCluster{
+		ID:   cluster.Name,
+		Spec: cluster.Spec,
+	}
+
+	if err = d.datastore.SetCluster(&myCluster); err != nil {
+		return false, err
+	}
+
+	return false, nil
 }
 
-func (d *DatastoreSyncer) runEndpointWorker() {
-	for d.processNextEndpointWorkItem() {
-	}
-}
-
-func (d *DatastoreSyncer) processNextEndpointWorkItem() bool {
-	key, shutdown := d.endpointWorkqueue.Get()
-	if shutdown {
-		return false
-	}
-
-	err := func() error {
-		defer d.endpointWorkqueue.Done(key)
-
-		_, name, err := cache.SplitMetaNamespaceKey(key.(string))
-		if err != nil {
-			d.endpointWorkqueue.Forget(key)
-			return err
-		}
-
-		endpoint, err := d.submarinerEndpoints.Get(name, metav1.GetOptions{})
-		if err != nil {
-			d.endpointWorkqueue.Forget(key)
-			return err
-		}
-
-		if d.thisClusterID != endpoint.Spec.ClusterID {
-			klog.V(log.DEBUG).Infof("The updated submariner Endpoint %q is not for this cluster - skipping updating the datastore", endpoint.Spec.ClusterID)
-			// not actually an error but we should forget about this and return
-			d.endpointWorkqueue.Forget(key)
-			return nil
-		}
-
-		if d.localEndpoint.Spec.CableName != endpoint.Spec.CableName {
-			klog.V(log.DEBUG).Infof("The updated submariner Endpoint with CableName %q is not mine - skipping updating the datastore", endpoint.Spec.CableName)
-			d.endpointWorkqueue.Forget(key)
-			return nil
-		}
-
-		klog.V(log.DEBUG).Infof("Processing local submariner Endpoint object: %#v", endpoint)
-
-		myEndpoint := types.SubmarinerEndpoint{
-			Spec: endpoint.Spec,
-		}
-
-		if err = d.datastore.SetEndpoint(&myEndpoint); err != nil {
-			d.endpointWorkqueue.Forget(key)
-			return err
-		}
-
-		d.endpointWorkqueue.Forget(key)
-		return nil
-	}()
-
+func (d *DatastoreSyncer) processNextEndpointWorkItem(name, ns string) (bool, error) {
+	endpoint, err := d.submarinerEndpointInformer.Lister().Endpoints(ns).Get(name)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Failed to process submariner Endpoint with key %q: %v", key, err))
-		return true
+		return false, err
 	}
-	return true
+
+	if d.thisClusterID != endpoint.Spec.ClusterID {
+		klog.V(log.DEBUG).Infof("The updated submariner Endpoint %q is not for this cluster - skipping updating the datastore", endpoint.Spec.ClusterID)
+		// not actually an error but we should forget about this and return
+		return false, nil
+	}
+
+	if d.localEndpoint.Spec.CableName != endpoint.Spec.CableName {
+		klog.V(log.DEBUG).Infof("The updated submariner Endpoint with CableName %q is not mine - skipping updating the datastore", endpoint.Spec.CableName)
+		return false, nil
+	}
+
+	klog.V(log.DEBUG).Infof("Processing local submariner Endpoint object: %#v", endpoint)
+
+	myEndpoint := types.SubmarinerEndpoint{
+		Spec: endpoint.Spec,
+	}
+
+	if err = d.datastore.SetEndpoint(&myEndpoint); err != nil {
+		return false, err
+	}
+
+	return false, nil
 }
 
 func (d *DatastoreSyncer) reconcileClusterCRD(fromCluster *types.SubmarinerCluster, delete bool) error {
