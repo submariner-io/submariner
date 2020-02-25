@@ -27,10 +27,11 @@ var (
 )
 
 type SubmarinerRouteControllerSpecification struct {
-	ClusterID   string
-	Namespace   string
-	ClusterCidr []string
-	ServiceCidr []string
+	ClusterID             string
+	Namespace             string
+	ClusterCidr           []string
+	ServiceCidr           []string
+	ResyncIntervalMinutes int `default:"0"`
 }
 
 func filterRouteAgentPods(options *v1.ListOptions) {
@@ -47,7 +48,9 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	klog.V(2).Info("Starting submariner-route-agent")
+	resyncInterval := time.Duration(srcs.ResyncIntervalMinutes) * time.Minute
+
+	klog.Info("Starting submariner-route-agent")
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
 
@@ -61,14 +64,14 @@ func main() {
 		klog.Fatalf("Error building submariner clientset: %s", err.Error())
 	}
 
-	submarinerInformerFactory := submarinerInformers.NewSharedInformerFactoryWithOptions(submarinerClient, time.Second*30, submarinerInformers.WithNamespace(srcs.Namespace))
+	submarinerInformerFactory := submarinerInformers.NewSharedInformerFactoryWithOptions(submarinerClient, resyncInterval, submarinerInformers.WithNamespace(srcs.Namespace))
 
 	clientSet, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
 		klog.Fatalf("Error building clientset: %s", err.Error())
 	}
 
-	informerFactory := informers.NewSharedInformerFactoryWithOptions(clientSet, time.Second*60, informers.WithNamespace(srcs.Namespace), informers.WithTweakListOptions(filterRouteAgentPods))
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(clientSet, resyncInterval, informers.WithNamespace(srcs.Namespace), informers.WithTweakListOptions(filterRouteAgentPods))
 
 	informerConfig := route.InformerConfigStruct{
 		SubmarinerClientSet: submarinerClient,
