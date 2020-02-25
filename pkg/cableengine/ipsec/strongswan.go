@@ -12,6 +12,7 @@ import (
 
 	"github.com/bronze1man/goStrongswanVici"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/submariner-io/submariner/pkg/log"
 	"github.com/submariner-io/submariner/pkg/types"
 	"k8s.io/klog"
 
@@ -84,12 +85,14 @@ func NewStrongSwan(localSubnets []string, localEndpoint types.SubmarinerEndpoint
 }
 
 func (i *strongSwan) Init() error {
+	klog.Info("Initializing StrongSwan IPSec driver")
+
 	if err := i.runCharon(); err != nil {
 		return err
 	}
 
 	if err := i.loadConns(); err != nil {
-		return fmt.Errorf("Failed to load connections from charon: %v", err)
+		return fmt.Errorf("failed to load connections from charon: %v", err)
 	}
 	return nil
 }
@@ -102,7 +105,7 @@ func (i *strongSwan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (strin
 	defer client.Close()
 
 	if err := i.loadSharedKey(endpoint, client); err != nil {
-		return "", fmt.Errorf("Encountered issue while trying to load shared keys: %v", err)
+		return "", fmt.Errorf("error loading shared keys: %v", err)
 	}
 
 	var localEndpointIP, remoteEndpointIP string
@@ -137,7 +140,8 @@ func (i *strongSwan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (strin
 		RekeyTime:     i.ipSecChildSaRekeyInterval,
 		InstallPolicy: "yes",
 	}
-	klog.V(6).Infof("Using ReplayWindowSize: %v", i.replayWindowSize)
+
+	klog.V(log.TRACE).Infof("Using ReplayWindowSize: %v", i.replayWindowSize)
 	childSAConf.ReplayWindow = i.replayWindowSize
 	authLConf := goStrongswanVici.AuthConf{
 		ID:         localEndpointIP,
@@ -176,15 +180,15 @@ func (i *strongSwan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (strin
 		err = client.LoadConn(&map[string]goStrongswanVici.IKEConf{
 			endpoint.Spec.CableName: ikeConf,
 		})
+
 		if err == nil {
 			break
 		}
 	}
-	if err != nil {
-		return "", fmt.Errorf("failed loading connection %s: %v", endpoint.Spec.CableName, err)
-	}
 
-	klog.V(2).Infof("Loaded connection: %v", endpoint.Spec.CableName)
+	if err != nil {
+		return "", fmt.Errorf("error loading connection %q with config %#v into charon: %v", endpoint.Spec.CableName, ikeConf, err)
+	}
 
 	return remoteEndpointIP, nil
 }
@@ -198,20 +202,20 @@ func (i *strongSwan) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) e
 	defer client.Close()
 
 	cableID := endpoint.Spec.CableName
-	klog.Infof("Unloading connection %s", cableID)
 	err = client.UnloadConn(&goStrongswanVici.UnloadConnRequest{
 		Name: cableID,
 	})
+
 	if err != nil {
-		return fmt.Errorf("Error when unloading connection %s : %v", cableID, err)
+		return fmt.Errorf("error unloading connection %q from charon: %v", cableID, err)
 	}
 
 	connections, err := client.ListConns("")
 	if err != nil {
-		klog.Errorf("Error while retrieving connections active after delete")
+		klog.Errorf("Error while retrieving active connections after delete: %v", err)
 	} else {
 		for _, conn := range connections {
-			klog.V(6).Infof("Found connection %v", conn)
+			klog.V(log.TRACE).Infof("Found connection %#v", conn)
 		}
 	}
 
@@ -221,23 +225,26 @@ func (i *strongSwan) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) e
 		if saDeleted {
 			break
 		}
+
 		if count > 2 {
-			klog.Infof("Waited for connection terminate for 2 iterations, triggering a force delete of the IKE")
+			klog.Infof("Waited for connection termination for 2 iterations - triggering a force delete of the IKE")
 			err = client.Terminate(&goStrongswanVici.TerminateRequest{
 				Ike:   cableID,
 				Force: "yes",
 			})
+
 			if err != nil {
-				klog.Errorf("error when terminating ike connection %s : %v", cableID, err)
+				klog.Errorf("Error terminating connection %q: %v", cableID, err)
 			}
 		}
+
 		sas, err := client.ListSas("", "")
 		if err != nil {
-			klog.Errorf("error while retrieving sas active after delete")
+			klog.Errorf("Error while retrieving active IKE_SAs after delete: %v", err)
 		} else {
 			found := false
 			for _, samap := range sas {
-				klog.V(6).Infof("Found SA %v", samap)
+				klog.V(log.TRACE).Infof("Found SA %v", samap)
 				sa, stillExists := samap[cableID]
 				if stillExists && (sa.State == "DELETING" || sa.State == "CONNECTING") {
 					found = true
@@ -247,13 +254,14 @@ func (i *strongSwan) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) e
 					// i.e. datastore expired a good connection that was dead temporarily... in this case the sa shows up the way we want
 					// if a true failover happens there should never be an established connection, but perhaps we should force delete
 					// the connection anyway
-					klog.V(4).Infof("It appears the peer became healthy again, and this connection was established")
+					klog.V(log.DEBUG).Infof("It appears the peer became healthy again, and this connection was established")
 					saDeleted = true
 					break
 				}
 			}
+
 			if found {
-				klog.V(6).Infof("SA is still in deleting state; waiting 5 seconds before looking again")
+				klog.V(log.DEBUG).Infof("SA is still in deleting state - waiting 5 seconds before checking again")
 				count++
 				time.Sleep(5 * time.Second)
 			} else {
@@ -261,7 +269,7 @@ func (i *strongSwan) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) e
 			}
 		}
 	}
-	klog.Infof("Removed connection %s", cableID)
+
 	return nil
 }
 
@@ -281,18 +289,19 @@ func (i *strongSwan) GetActiveConnections(clusterID string) ([]string, error) {
 	}
 
 	for _, conn := range conns {
-		for k := range conn {
-			if !strings.HasPrefix(k, prefix) {
+		for cableID := range conn {
+			if !strings.HasPrefix(cableID, prefix) {
 				continue
 			}
 
-			removed, err := i.removeStaleCable(client, k)
+			removed, err := i.removeStaleCable(client, cableID)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("error removing stale cable %q: %v", cableID, err)
 			}
+
 			if !removed {
-				klog.V(4).Infof("Found existing connection: %s", k)
-				connections = append(connections, k)
+				klog.V(log.TRACE).Infof("Found existing connection %q", cableID)
+				connections = append(connections, cableID)
 			}
 		}
 	}
@@ -306,12 +315,11 @@ func (i *strongSwan) GetActiveConnections(clusterID string) ([]string, error) {
 func (i *strongSwan) removeStaleCable(client *goStrongswanVici.ClientConn, cableID string) (bool, error) {
 	sas, err := client.ListSas("", "")
 	if err != nil {
-		klog.Errorf("error while retrieving active sas")
-		return false, err
+		return false, fmt.Errorf("error while retrieving active IKE_SAs: %v", err)
 	}
 
 	for _, samap := range sas {
-		klog.V(6).Infof("Found SA %v", samap)
+		klog.V(log.TRACE).Infof("Found SA %v", samap)
 		sa, exists := samap[cableID]
 		if exists && (sa.State == "ESTABLISHED" || sa.State == "CONNECTING") {
 			// Cable with an active SA and thus not stale
@@ -319,7 +327,8 @@ func (i *strongSwan) removeStaleCable(client *goStrongswanVici.ClientConn, cable
 		}
 	}
 
-	klog.V(4).Infof("Remove stale cable: %s", cableID)
+	klog.V(log.DEBUG).Infof("Removing stale cable: %s", cableID)
+
 	// Creating this stub Endpoint is not ideal but to avoid a refactor
 	// TODO(mpeterson): refactor code to make this not a requirement
 	err = i.DisconnectFromEndpoint(types.SubmarinerEndpoint{
@@ -327,27 +336,25 @@ func (i *strongSwan) removeStaleCable(client *goStrongswanVici.ClientConn, cable
 			CableName: cableID,
 		},
 	})
+
 	if err != nil {
-		klog.Errorf("error while removing stale cable")
 		return false, err
 	}
 
 	return true, nil
-
 }
 
 func (i *strongSwan) loadSharedKey(endpoint types.SubmarinerEndpoint, client *goStrongswanVici.ClientConn) error {
-	klog.Infof("Loading shared key for endpoint")
 	var identities []string
-	var publicIP, privateIP string
-	privateIP = endpoint.Spec.PrivateIP
+
+	privateIP := endpoint.Spec.PrivateIP
 	identities = append(identities, privateIP)
 	if endpoint.Spec.NATEnabled {
-		publicIP = endpoint.Spec.PublicIP
-		if publicIP != privateIP {
-			identities = append(identities, publicIP)
+		if endpoint.Spec.PublicIP != privateIP {
+			identities = append(identities, endpoint.Spec.PublicIP)
 		}
 	}
+
 	sharedKey := &goStrongswanVici.Key{
 		Typ:    "IKE",
 		Data:   i.secretKey,
@@ -356,11 +363,7 @@ func (i *strongSwan) loadSharedKey(endpoint types.SubmarinerEndpoint, client *go
 
 	err := client.LoadShared(sharedKey)
 	if err != nil {
-		klog.Infof("Failed to load pre-shared key for %s: %v", privateIP, err)
-		if endpoint.Spec.NATEnabled {
-			klog.Infof("Failed to load pre-shared key for %s: %v", publicIP, err)
-		}
-		return err
+		return fmt.Errorf("Error loading pre-shared key for %v: %v", identities, err)
 	}
 	return nil
 }
@@ -387,20 +390,21 @@ const charonConfTemplate = `
 func (i *strongSwan) writeCharonConfig(path string) error {
 	err := os.Remove(path)
 	if err != nil {
-		klog.Warningf("Error deleting %s: %s", path, err)
+		klog.Warningf("Error deleting charon config file %q: %v", path, err)
 	}
 
 	f, err := os.Create(path)
 
 	if err != nil {
-		return fmt.Errorf("Error creating %s: %s", path, err)
+		return fmt.Errorf("error creating charon config file %q: %s", path, err)
 	}
+
 	if err = i.renderCharonConfigTemplate(f); err != nil {
 		return err
 	}
 
 	if err = f.Close(); err != nil {
-		return fmt.Errorf("Unable to close %s: %s", path, err)
+		return fmt.Errorf("error closing charon config file %q: %v", path, err)
 	}
 
 	return nil
@@ -409,7 +413,7 @@ func (i *strongSwan) writeCharonConfig(path string) error {
 func (i *strongSwan) renderCharonConfigTemplate(f io.Writer) error {
 	t, err := template.New("charon.conf").Parse(charonConfTemplate)
 	if err != nil {
-		return fmt.Errorf("Error creating template for charon.conf: %s", err)
+		return fmt.Errorf("error creating template for charon.conf: %v", err)
 	}
 
 	err = t.Execute(f, map[string]string{
@@ -418,20 +422,19 @@ func (i *strongSwan) renderCharonConfigTemplate(f io.Writer) error {
 		"charonViciSocket": charonViciSocket})
 
 	if err != nil {
-		return fmt.Errorf("Error rendering charon config file: %s", err)
+		return fmt.Errorf("error rendering charon config file: %v", err)
 	}
 	return nil
 }
 
 func (i *strongSwan) runCharon() error {
-
 	if err := i.writeCharonConfig(strongswanCharonConfigFilePath); err != nil {
-		return fmt.Errorf("Error writing strongswan charon config: %s", err)
+		return fmt.Errorf("error writing strongswan charon config: %v", err)
 	}
 
-	klog.Infof("Starting Charon")
-	// Ignore error
+	klog.Infof("Starting charon")
 
+	// Ignore error
 	os.Remove(charonViciSocket)
 
 	args := []string{}
@@ -452,7 +455,7 @@ func (i *strongSwan) runCharon() error {
 	if i.logFile != "" {
 		out, err := os.OpenFile(i.logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 		if err != nil {
-			return fmt.Errorf("Failed to open log file %s: %v", i.logFile, err)
+			return fmt.Errorf("failed to open log file %q: %v", i.logFile, err)
 		}
 
 		cmd.Stdout = out
@@ -493,7 +496,7 @@ func (i *strongSwan) loadConns() error {
 	for _, conn := range conns {
 		for k := range conn {
 			if strings.HasPrefix(k, "submariner-conn-") {
-				klog.Infof("Found existing connection: %s", k)
+				klog.Infof("Found existing charon connection %q", k)
 			}
 		}
 	}
@@ -509,9 +512,7 @@ func getClient() (*goStrongswanVici.ClientConn, error) {
 			return client, nil
 		}
 
-		if i > 0 {
-			klog.Errorf("Failed to connect to charon: %v", err)
-		}
+		klog.Warningf("Failed to connect to charon - retrying: %v", err)
 		time.Sleep(1 * time.Second)
 	}
 

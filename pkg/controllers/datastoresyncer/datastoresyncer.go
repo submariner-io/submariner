@@ -10,8 +10,10 @@ import (
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/datastore"
+	"github.com/submariner-io/submariner/pkg/log"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -74,30 +76,32 @@ func NewDatastoreSyncer(thisClusterID string, objectNamespace string, kubeClient
 }
 
 func (d *DatastoreSyncer) ensureExclusiveEndpoint() error {
-	klog.V(4).Infof("Ensuring we are the only endpoint active for this cluster")
+	klog.Info("Ensuring we are the only endpoint active for this cluster")
 	endpoints, err := d.datastore.GetEndpoints(d.localCluster.ID)
 	if err != nil {
-		return fmt.Errorf("error retrieving endpoints %v", err)
+		return fmt.Errorf("error retrieving submariner Endpoints %v", err)
 	}
 
 	for _, endpoint := range endpoints {
 		if !util.CompareEndpointSpec(endpoint.Spec, d.localEndpoint.Spec) {
-			endpointCrdName, err := util.GetEndpointCRDName(&endpoint)
+			endpointName, err := util.GetEndpointCRDName(&endpoint)
 			if err != nil {
-				klog.Errorf("error converting endpoint %#v to CRD Name: %v", endpoint, err)
+				klog.Errorf("error extracting the submariner Endpoint name from %#v: %v", endpoint, err)
 				continue
 			}
+
 			// we need to remove this endpoint
-			klog.V(4).Infof("Found endpoint (%s) that wasn't us but is part of our cluster, triggered delete in central datastore as well as removing CRD", endpointCrdName)
-			err = d.submarinerClientset.SubmarinerV1().Endpoints(d.objectNamespace).Delete(endpointCrdName, &metav1.DeleteOptions{})
+			err = d.submarinerClientset.SubmarinerV1().Endpoints(d.objectNamespace).Delete(endpointName, &metav1.DeleteOptions{})
 			if err != nil {
-				klog.Errorf("error deleting endpoint CRD for %s: %v", endpointCrdName, err)
+				klog.Errorf("error deleting submariner Endpoint %q from the local datastore: %v", endpointName, err)
 			}
+
 			err = d.datastore.RemoveEndpoint(d.localCluster.ID, endpoint.Spec.CableName)
 			if err != nil {
-				klog.Errorf("error removing endpoint in remote datastore for %s: %v", endpoint.Spec.CableName, d.localCluster.ID)
+				klog.Errorf("error removing submariner Endpoint with cable name %q from the central datastore: %v", endpoint.Spec.CableName, err)
 			}
-			klog.V(4).Infof("Removed endpoint %s", endpointCrdName)
+
+			klog.Infof("Successfully deleted existing submariner Endpoint %q", endpointName)
 		}
 	}
 
@@ -111,7 +115,7 @@ func (d *DatastoreSyncer) enqueueCluster(obj interface{}) {
 		utilruntime.HandleError(err)
 		return
 	}
-	klog.V(8).Infof("Enqueueing cluster %v", obj)
+	klog.V(log.TRACE).Infof("Enqueueing cluster %v", key)
 	d.clusterWorkqueue.AddRateLimited(key)
 }
 
@@ -122,7 +126,7 @@ func (d *DatastoreSyncer) enqueueEndpoint(obj interface{}) {
 		utilruntime.HandleError(err)
 		return
 	}
-	klog.V(8).Infof("Enqueueing endpoint %v", obj)
+	klog.V(log.TRACE).Infof("Enqueueing endpoint %v", key)
 	d.endpointWorkqueue.AddRateLimited(key)
 }
 
@@ -131,28 +135,30 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 
 	defer d.clusterWorkqueue.ShutDown()
 	defer d.endpointWorkqueue.ShutDown()
-	klog.V(4).Infof("Starting the DatastoreSyncer")
+
+	klog.Info("Starting the datastore syncer")
+
 	klog.Info("Waiting for informer caches to sync")
 	if ok := cache.WaitForCacheSync(stopCh, d.submarinerClusterInformer.Informer().HasSynced, d.submarinerEndpointInformer.Informer().HasSynced); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
 
 	if err := d.ensureExclusiveEndpoint(); err != nil {
-		return fmt.Errorf("could not ensure exclusive endpoint: %v", err)
+		return fmt.Errorf("could not ensure exclusive submariner Endpoint: %v", err)
 	}
 
+	klog.Infof("Reconciling local submariner Cluster: %#v ", d.localCluster)
 	if err := d.reconcileClusterCRD(&d.localCluster, false); err != nil {
-		return fmt.Errorf("error reconciling local Cluster CRD: %v", err)
+		return fmt.Errorf("error reconciling the local submariner Cluster: %v", err)
 	}
 
+	klog.Infof("Reconciling local submariner Endpoint: %#v ", d.localEndpoint)
 	if err := d.reconcileEndpointCRD(&d.localEndpoint, false); err != nil {
-		return fmt.Errorf("error reconciling local Endpoint CRD: %v", err)
+		return fmt.Errorf("error reconciling the local submariner Endpoint: %v", err)
 	}
 
 	go utilruntime.HandleError(d.datastore.WatchClusters(context.TODO(), d.thisClusterID, d.colorCodes, d.reconcileClusterCRD))
 	go utilruntime.HandleError(d.datastore.WatchEndpoints(context.TODO(), d.thisClusterID, d.colorCodes, d.reconcileEndpointCRD))
-
-	klog.Info("Started datastoresyncer workers")
 
 	go wait.Until(d.runClusterWorker, time.Second, stopCh)
 
@@ -160,8 +166,10 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 
 	//go wait.Until(d.runReaper, time.Second, stopCh)
 
+	klog.Info("Datastore syncer started")
+
 	<-stopCh
-	klog.Info("Shutting down datastoresyncer workers")
+	klog.Info("Datastore syncer stopping")
 	return nil
 }
 
@@ -171,48 +179,51 @@ func (d *DatastoreSyncer) runClusterWorker() {
 }
 
 func (d *DatastoreSyncer) processNextClusterWorkItem() bool {
-	obj, shutdown := d.clusterWorkqueue.Get()
+	key, shutdown := d.clusterWorkqueue.Get()
 	if shutdown {
 		return false
 	}
+
 	err := func() error {
-		defer d.clusterWorkqueue.Done(obj)
-		klog.V(8).Infof("Processing cluster object: %v", obj)
-		ns, key, err := cache.SplitMetaNamespaceKey(obj.(string))
+		defer d.clusterWorkqueue.Done(key)
+
+		ns, name, err := cache.SplitMetaNamespaceKey(key.(string))
 		if err != nil {
-			d.clusterWorkqueue.Forget(obj)
-			return fmt.Errorf("error splitting meta namespace key for %s: %v", obj, err)
+			d.clusterWorkqueue.Forget(key)
+			return err
 		}
 
-		if d.thisClusterID != key {
-			klog.V(6).Infof("The updated cluster object for key %s was not for this cluster, skipping updating the datastore", key)
+		if d.thisClusterID != name {
+			klog.V(log.TRACE).Infof("The updated submariner Cluster %q is not for this cluster, skipping updating the datastore", name)
 			// not actually an error but we should forget about this and return
-			d.clusterWorkqueue.Forget(obj)
+			d.clusterWorkqueue.Forget(key)
 			return nil
 		}
 
-		cluster, err := d.submarinerClusterInformer.Lister().Clusters(ns).Get(key)
+		cluster, err := d.submarinerClusterInformer.Lister().Clusters(ns).Get(name)
 		if err != nil {
-			d.clusterWorkqueue.Forget(obj)
-			return fmt.Errorf("error retrieving submariner cluster object for %s: %v", key, err)
+			d.clusterWorkqueue.Forget(key)
+			return err
 		}
+
+		klog.V(log.TRACE).Infof("Processing local submariner Cluster object: %#v", cluster)
+
 		myCluster := types.SubmarinerCluster{
 			ID:   cluster.Name,
 			Spec: cluster.Spec,
 		}
-		klog.V(4).Infof("Attempting to trigger an update of the central datastore with the updated CRD")
+
 		if err = d.datastore.SetCluster(&myCluster); err != nil {
-			d.clusterWorkqueue.Forget(obj)
-			return fmt.Errorf("error updating the cluster %#v in the central datastore: %v", myCluster, err)
+			d.clusterWorkqueue.Forget(key)
+			return err
 		}
 
-		klog.V(4).Infof("Update of cluster %#v in central datastore was successful", myCluster)
-		d.clusterWorkqueue.Forget(obj)
+		d.clusterWorkqueue.Forget(key)
 		return nil
 	}()
 
 	if err != nil {
-		utilruntime.HandleError(err)
+		utilruntime.HandleError(fmt.Errorf("Failed to process submariner Cluster with key %q: %v", key, err))
 		return true
 	}
 	return true
@@ -224,70 +235,76 @@ func (d *DatastoreSyncer) runEndpointWorker() {
 }
 
 func (d *DatastoreSyncer) processNextEndpointWorkItem() bool {
-	obj, shutdown := d.endpointWorkqueue.Get()
+	key, shutdown := d.endpointWorkqueue.Get()
 	if shutdown {
 		return false
 	}
+
 	err := func() error {
-		defer d.endpointWorkqueue.Done(obj)
-		klog.V(8).Infof("Processing endpoint object: %v", obj)
-		ns, key, err := cache.SplitMetaNamespaceKey(obj.(string))
+		defer d.endpointWorkqueue.Done(key)
+
+		ns, name, err := cache.SplitMetaNamespaceKey(key.(string))
 		if err != nil {
-			d.endpointWorkqueue.Forget(obj)
-			return fmt.Errorf("error splitting meta namespace key for %s: %v", obj, err)
+			d.endpointWorkqueue.Forget(key)
+			return err
 		}
 
-		endpoint, err := d.submarinerClientset.SubmarinerV1().Endpoints(ns).Get(key, metav1.GetOptions{})
+		endpoint, err := d.submarinerClientset.SubmarinerV1().Endpoints(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
-			d.endpointWorkqueue.Forget(obj)
-			return fmt.Errorf("error retrieving submariner endpoint object for %s: %v", key, err)
+			d.endpointWorkqueue.Forget(key)
+			return err
 		}
 
 		if d.thisClusterID != endpoint.Spec.ClusterID {
-			klog.V(4).Infof("The updated endpoint object was not for this cluster, skipping updating the datastore")
+			klog.V(log.DEBUG).Infof("The updated submariner Endpoint %q is not for this cluster - skipping updating the datastore", endpoint.Spec.ClusterID)
 			// not actually an error but we should forget about this and return
-			d.endpointWorkqueue.Forget(obj)
+			d.endpointWorkqueue.Forget(key)
 			return nil
 		}
 
 		if d.localEndpoint.Spec.CableName != endpoint.Spec.CableName {
-			klog.V(4).Infof("This endpoint is not me, not updating central datastore")
-			d.endpointWorkqueue.Forget(obj)
+			klog.V(log.DEBUG).Infof("The updated submariner Endpoint with CableName %q is not mine - skipping updating the datastore", endpoint.Spec.CableName)
+			d.endpointWorkqueue.Forget(key)
 			return nil
 		}
+
+		klog.V(log.DEBUG).Infof("Processing local submariner Endpoint object: %#v", endpoint)
 
 		myEndpoint := types.SubmarinerEndpoint{
 			Spec: endpoint.Spec,
 		}
-		klog.V(4).Infof("Attempting to trigger an update of the central datastore with the updated endpoint CRD")
+
 		if err = d.datastore.SetEndpoint(&myEndpoint); err != nil {
-			d.endpointWorkqueue.Forget(obj)
-			return fmt.Errorf("error updating the endpoint %#v in the central datastore: %v", myEndpoint, err)
+			d.endpointWorkqueue.Forget(key)
+			return err
 		}
 
-		klog.V(4).Infof("Update of endpoint %#v in central datastore was successful", myEndpoint)
-		d.endpointWorkqueue.Forget(obj)
+		d.endpointWorkqueue.Forget(key)
 		return nil
 	}()
 
 	if err != nil {
-		utilruntime.HandleError(err)
+		utilruntime.HandleError(fmt.Errorf("Failed to process submariner Endpoint with key %q: %v", key, err))
 		return true
 	}
 	return true
 }
 
-func (d *DatastoreSyncer) reconcileClusterCRD(localCluster *types.SubmarinerCluster, delete bool) error {
-	clusterCRDName, err := util.GetClusterCRDName(localCluster)
+func (d *DatastoreSyncer) reconcileClusterCRD(fromCluster *types.SubmarinerCluster, delete bool) error {
+	klog.V(log.DEBUG).Infof("In reconcileClusterCRD: %#v", fromCluster)
+
+	clusterName, err := util.GetClusterCRDName(fromCluster)
 	if err != nil {
-		return fmt.Errorf("error extracting the Cluster CRD name for %#v: %v", localCluster, err)
+		return fmt.Errorf("error extracting the submariner Cluster name from %#v: %v", fromCluster, err)
 	}
 
 	var found bool
-	cluster, err := d.submarinerClientset.SubmarinerV1().Clusters(d.objectNamespace).Get(clusterCRDName, metav1.GetOptions{})
+	cluster, err := d.submarinerClientset.SubmarinerV1().Clusters(d.objectNamespace).Get(clusterName, metav1.GetOptions{})
 	if err != nil {
-		klog.V(4).Infof("There was an error retrieving the local Cluster CRD for %s, assuming it does not exist and creating a new one. The error was: %v",
-			clusterCRDName, err)
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("error retrieving submariner Cluster object %q from the local datastore: %v", clusterName, err)
+		}
+
 		found = false
 	} else {
 		found = true
@@ -295,59 +312,72 @@ func (d *DatastoreSyncer) reconcileClusterCRD(localCluster *types.SubmarinerClus
 
 	if delete {
 		if found {
-			klog.V(6).Infof("Attempting to delete Cluster CRD %s from the local datastore", clusterCRDName)
-			err = d.submarinerClientset.SubmarinerV1().Clusters(d.objectNamespace).Delete(clusterCRDName, &metav1.DeleteOptions{})
+			err = d.submarinerClientset.SubmarinerV1().Clusters(d.objectNamespace).Delete(clusterName, &metav1.DeleteOptions{})
 			if err != nil {
-				return fmt.Errorf("error deleting Cluster CRD %s from the local datastore: %v", clusterCRDName, err)
+				return fmt.Errorf("error deleting submariner Cluster %q from the local datastore: %v", clusterName, err)
 			}
+
+			klog.Infof("Successfully deleted submariner Cluster %q in the local datastore", clusterName)
 		} else {
-			klog.V(6).Infof("Cluster CRD %s was not found for deletion", clusterCRDName)
+			klog.V(log.DEBUG).Infof("Submariner Cluster %q was not found for deletion", clusterName)
 		}
 	} else {
 		if !found {
 			cluster = &submarinerv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: clusterCRDName,
+					Name: clusterName,
 				},
-				Spec: localCluster.Spec,
+				Spec: fromCluster.Spec,
 			}
+
 			_, err = d.submarinerClientset.SubmarinerV1().Clusters(d.objectNamespace).Create(cluster)
 			if err != nil {
-				return fmt.Errorf("error creating Cluster CRD %s in the local datastore: %v", clusterCRDName, err)
+				return fmt.Errorf("error creating submariner Cluster %#v in the local datastore: %v", cluster, err)
 			}
+
+			klog.Infof("Successfully created submariner Cluster %q in the local datastore", clusterName)
 		} else {
-			if reflect.DeepEqual(cluster.Spec, localCluster.Spec) {
-				klog.V(4).Infof("Cluster CRD matched what we received from datastore, not reconciling")
+			if reflect.DeepEqual(cluster.Spec, fromCluster.Spec) {
+				klog.V(log.DEBUG).Infof("Cluster %q matched what we received from datastore - not updating", clusterName)
 				return nil
 			}
+
 			retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				result, getErr := d.submarinerClientset.SubmarinerV1().Clusters(d.objectNamespace).Get(clusterCRDName, metav1.GetOptions{})
+				result, getErr := d.submarinerClientset.SubmarinerV1().Clusters(d.objectNamespace).Get(clusterName, metav1.GetOptions{})
 				if getErr != nil {
-					return fmt.Errorf("error retrieving latest version of Cluster %s: %v", clusterCRDName, getErr)
+					return fmt.Errorf("error retrieving submariner Cluster object %q from the local datastore: %v", clusterName, getErr)
 				}
-				result.Spec = localCluster.Spec
+
+				result.Spec = fromCluster.Spec
 				_, updateErr := d.submarinerClientset.SubmarinerV1().Clusters(d.objectNamespace).Update(result)
 				return updateErr
 			})
+
 			if retryErr != nil {
-				return fmt.Errorf("error updating cluster CRD %s: %v", clusterCRDName, retryErr)
+				return fmt.Errorf("error updating submariner Cluster object %q in the local datastore: %v", clusterName, retryErr)
 			}
+
+			klog.Infof("Successfully updated submariner Cluster %q in the local datastore", clusterName)
 		}
 	}
 	return nil
 }
 
-func (d *DatastoreSyncer) reconcileEndpointCRD(rawEndpoint *types.SubmarinerEndpoint, delete bool) error {
-	endpointName, err := util.GetEndpointCRDName(rawEndpoint)
+func (d *DatastoreSyncer) reconcileEndpointCRD(fromEndpoint *types.SubmarinerEndpoint, delete bool) error {
+	klog.V(log.DEBUG).Infof("In reconcileEndpointCRD: %#v", fromEndpoint)
+
+	endpointName, err := util.GetEndpointCRDName(fromEndpoint)
 	if err != nil {
-		return fmt.Errorf("error extracting the Endpoint CRD name for %#v: %v", rawEndpoint, err)
+		return fmt.Errorf("error extracting the submariner Endpoint name from %#v: %v", fromEndpoint, err)
 	}
 
 	var found bool
 	endpoint, err := d.submarinerClientset.SubmarinerV1().Endpoints(d.objectNamespace).Get(endpointName, metav1.GetOptions{})
 	if err != nil {
-		klog.V(4).Infof("There was an error retrieving the local Endpoint CRD for %s, assuming it does not exist and creating a new one. The error was: %v",
-			endpointName, err)
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("error retrieving submariner Endpoint object %q from the local datastore: %v", endpointName, err)
+		}
+
 		found = false
 	} else {
 		found = true
@@ -355,13 +385,14 @@ func (d *DatastoreSyncer) reconcileEndpointCRD(rawEndpoint *types.SubmarinerEndp
 
 	if delete {
 		if found {
-			klog.V(6).Infof("Attempting to delete Endpoint CRD %s from local datastore", endpointName)
 			err = d.submarinerClientset.SubmarinerV1().Endpoints(d.objectNamespace).Delete(endpointName, &metav1.DeleteOptions{})
 			if err != nil {
-				return fmt.Errorf("error deleting Endpoint CRD %s from the local datastore: %v", endpointName, err)
+				return fmt.Errorf("error deleting submariner Endpoint %q from the local datastore: %v", endpointName, err)
 			}
+
+			klog.Infof("Successfully deleted submariner Endpoint %q in the local datastore", endpointName)
 		} else {
-			klog.V(6).Infof("Endpoint CRD %s was not found for deletion", endpointName)
+			klog.V(log.DEBUG).Infof("Submariner Endpoint %q was not found for deletion", endpointName)
 		}
 	} else {
 		if !found {
@@ -369,29 +400,36 @@ func (d *DatastoreSyncer) reconcileEndpointCRD(rawEndpoint *types.SubmarinerEndp
 				ObjectMeta: metav1.ObjectMeta{
 					Name: endpointName,
 				},
-				Spec: rawEndpoint.Spec,
+				Spec: fromEndpoint.Spec,
 			}
+
 			_, err = d.submarinerClientset.SubmarinerV1().Endpoints(d.objectNamespace).Create(endpoint)
 			if err != nil {
-				return fmt.Errorf("error creating Endpoint CRD %s in the local datastore: %v", endpointName, err)
+				return fmt.Errorf("error creating submariner Endpoint %#v in the local datastore: %v", endpoint, err)
 			}
+
+			klog.Infof("Successfully created submariner Endpoint %q in the local datastore", endpointName)
 		} else {
-			if reflect.DeepEqual(endpoint.Spec, rawEndpoint.Spec) {
-				klog.V(4).Infof("Endpoint CRD matched what we received from datastore, not reconciling")
+			if reflect.DeepEqual(endpoint.Spec, fromEndpoint.Spec) {
+				klog.V(log.DEBUG).Infof("Endpoint %q matched what we received from datastore - not updating", endpointName)
 				return nil
 			}
+
 			retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 				result, getErr := d.submarinerClientset.SubmarinerV1().Endpoints(d.objectNamespace).Get(endpointName, metav1.GetOptions{})
 				if getErr != nil {
-					return fmt.Errorf("error retrieving latest version of Endpoint %s: %v", endpointName, getErr)
+					return fmt.Errorf("error retrieving submariner Endpoint object %q from the local datastore: %v", endpointName, getErr)
 				}
-				result.Spec = rawEndpoint.Spec
+				result.Spec = fromEndpoint.Spec
 				_, updateErr := d.submarinerClientset.SubmarinerV1().Endpoints(d.objectNamespace).Update(result)
 				return updateErr
 			})
+
 			if retryErr != nil {
-				return fmt.Errorf("error updating endpoint CRD %s: %v", endpointName, retryErr)
+				return fmt.Errorf("error updating submariner Endpoint object %q in the local datastore: %v", endpointName, retryErr)
 			}
+
+			klog.Infof("Successfully updated submariner Endpoint %q in the local datastore", endpointName)
 		}
 	}
 	return nil
