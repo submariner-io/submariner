@@ -3,7 +3,7 @@ version ?= 1.14.2
 logging ?= false
 kubefed ?= false
 deploytool ?= helm
-armada ?= true
+armada ?= false
 debug ?= false
 
 TARGETS := $(shell ls scripts | grep -v dapper-image)
