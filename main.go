@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -20,7 +21,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 
-	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/cableengine"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions"
@@ -32,6 +32,9 @@ import (
 	"github.com/submariner-io/submariner/pkg/signals"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
+
+	// Add supported drivers
+	_ "github.com/submariner-io/submariner/pkg/cable/ipsec"
 )
 
 var (
@@ -106,7 +109,9 @@ func main() {
 			localSubnets = append(submSpec.ServiceCidr, submSpec.ClusterCidr...)
 		}
 
-		localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterID, cable.IPsec, nil /*map[string]string{cable.DriverImpl: cable.StrongSwan}*/, submSpec.NatEnabled,
+		submSpec.Cable = strings.ToLower(submSpec.Cable)
+
+		localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterID, submSpec.Cable, map[string]string{}, submSpec.NatEnabled,
 			localSubnets, util.GetLocalIP())
 
 		if err != nil {

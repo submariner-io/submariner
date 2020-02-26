@@ -1,19 +1,7 @@
 package cable
 
 import (
-	"fmt"
-
-	"github.com/submariner-io/submariner/pkg/cable/ipsec"
 	"github.com/submariner-io/submariner/pkg/types"
-)
-
-const (
-	IPsec      = "ipsec"
-	WireGuard  = "wireguard"
-	StrongSwan = "strongswan"
-	LibreSwan  = "libreswan"
-
-	DriverImpl = "driver"
 )
 
 // Driver is used by the ipsec engine to actually connect the tunnels.
@@ -33,25 +21,8 @@ type Driver interface {
 	DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) error
 }
 
-func NewDriver(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (Driver, error) {
-	switch localEndpoint.Spec.Backend {
-	case IPsec:
-		driver := StrongSwan
-		if localEndpoint.Spec.BackendConfig != nil {
-			if d, ok := localEndpoint.Spec.BackendConfig[DriverImpl]; ok {
-				driver = d
-			}
-		}
-		switch driver {
-		case StrongSwan:
-			return ipsec.NewStrongSwan(localSubnets, localEndpoint)
-		case LibreSwan:
-			// TODO add LibreSwan support
-		}
-		return nil, fmt.Errorf("Unsupported %s driver for %s", driver, IPsec)
-	case WireGuard:
-		// TODO add WireGuard support
-	}
-	// TODO define ERROR
-	return nil, fmt.Errorf("Unsupported backend type - %s", localEndpoint.Spec.Backend)
-}
+// Function prototype to create a new driver
+type DriverCreateFunc func(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (Driver, error)
+
+// Static map of supported drivers
+var Drivers = map[string]DriverCreateFunc{}

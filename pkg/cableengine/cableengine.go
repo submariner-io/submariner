@@ -2,11 +2,11 @@ package cableengine
 
 import (
 	"fmt"
-
 	"reflect"
 	"sync"
 
 	"github.com/submariner-io/submariner/pkg/cable"
+	"github.com/submariner-io/submariner/pkg/log"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
 	"k8s.io/klog"
@@ -30,6 +30,7 @@ type Engine interface {
 
 type engine struct {
 	sync.Mutex
+
 	driver        cable.Driver
 	localSubnets  []string
 	localCluster  types.SubmarinerCluster
@@ -38,10 +39,16 @@ type engine struct {
 
 // NewEngine creates a new Engine for the local cluster
 func NewEngine(localSubnets []string, localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) (Engine, error) {
-	driver, err := cable.NewDriver(localSubnets, localEndpoint)
+	driverCreate, ok := cable.Drivers[localEndpoint.Spec.Backend]
+	if !ok {
+		return nil, fmt.Errorf("unsupported cable type %s", localEndpoint.Spec.Backend)
+	}
+
+	driver, err := driverCreate(localSubnets, localEndpoint)
 	if err != nil {
 		return nil, err
 	}
+
 	return &engine{
 		localCluster:  localCluster,
 		localEndpoint: localEndpoint,
@@ -57,30 +64,34 @@ func (i *engine) StartEngine() error {
 
 func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 	if endpoint.Spec.ClusterID == i.localCluster.ID {
-		klog.V(4).Infof("Not installing cable for local cluster")
+		klog.V(log.DEBUG).Infof("Not installing cable for local cluster")
 		return nil
 	}
+
 	if reflect.DeepEqual(endpoint.Spec, i.localEndpoint.Spec) {
-		klog.V(4).Infof("Not installing self")
+		klog.V(log.DEBUG).Infof("Not installing cable for local endpoint")
 		return nil
 	}
+
+	klog.Infof("Installing Endpoint cable %q", endpoint.Spec.CableName)
 
 	i.Lock()
 	defer i.Unlock()
 
-	klog.V(2).Infof("Installing cable %s", endpoint.Spec.CableName)
 	activeConnections, err := i.driver.GetActiveConnections(endpoint.Spec.ClusterID)
 	if err != nil {
 		return err
 	}
+
 	for _, active := range activeConnections {
-		klog.V(6).Infof("Analyzing currently active connection: %s", active)
+		klog.V(log.TRACE).Infof("Analyzing currently active connection %q", active)
 		if active == endpoint.Spec.CableName {
-			klog.V(6).Infof("Cable %s is already installed, not installing twice", active)
+			klog.V(log.DEBUG).Infof("Cable %q is already installed - not installing again", active)
 			return nil
 		}
+
 		if util.GetClusterIDFromCableName(active) == endpoint.Spec.ClusterID {
-			return fmt.Errorf("error while installing cable %s, already found a pre-existing cable belonging to this cluster %s", active, endpoint.Spec.ClusterID)
+			return fmt.Errorf("found a pre-existing cable %q that belongs to this cluster %s", active, endpoint.Spec.ClusterID)
 		}
 	}
 
@@ -88,13 +99,22 @@ func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 	if err != nil {
 		return err
 	}
-	klog.V(4).Infof("Connected to remoteEndpointIP %s", remoteEndpointIP)
+
+	klog.Infof("Successfully installed Endpoint cable %q with remote IP %s", endpoint.Spec.CableName, remoteEndpointIP)
 	return nil
 }
 
 func (i *engine) RemoveCable(endpoint types.SubmarinerEndpoint) error {
+	klog.Infof("Removing Endpoint cable %q", endpoint.Spec.CableName)
+
 	i.Lock()
 	defer i.Unlock()
 
-	return i.driver.DisconnectFromEndpoint(endpoint)
+	err := i.driver.DisconnectFromEndpoint(endpoint)
+	if err != nil {
+		return err
+	}
+
+	klog.Infof("Successfully removed Endpoint cable %q", endpoint.Spec.CableName)
+	return nil
 }
