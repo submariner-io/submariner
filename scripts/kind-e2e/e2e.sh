@@ -205,16 +205,16 @@ else
     exit 1
 fi
 
-export_kubeconfig
+time export_kubeconfig
 
-create_kind_clusters $status $version $deploy
+time create_kind_clusters $status $version $deploy
 
 if [[ $logging = true ]]; then
     # TODO: Test this code path in CI
     enable_logging
 fi
 
-import_subm_images
+time import_subm_images
 
 if [[ $kubefed = true ]]; then
     # FIXME: Kubefed deploys are broken (not because of this commit)
@@ -222,7 +222,7 @@ if [[ $kubefed = true ]]; then
 fi
 
 # Install Helm/Operator deploy tool prerequisites
-deploytool_prereqs
+time deploytool_prereqs
 
 for i in 1 2 3; do
     context=cluster$i
@@ -230,13 +230,13 @@ for i in 1 2 3; do
     add_subm_gateway_label $context
 done
 
-setup_broker cluster1
-install_subm_all_clusters
+time setup_broker cluster1
+time install_subm_all_clusters
 
-deploytool_postreqs
+time deploytool_postreqs
 
-deploy_netshoot cluster2
-deploy_nginx cluster3
+time deploy_netshoot cluster2
+time deploy_nginx cluster3
 
 test_connection
 
