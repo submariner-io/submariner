@@ -8,30 +8,30 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/submariner-io/submariner/pkg/controllers/datastoresyncer"
-	"github.com/submariner-io/submariner/pkg/datastore"
 	"github.com/submariner-io/submariner/pkg/log"
-	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/submariner-io/submariner/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
-
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 
+	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/cableengine"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions"
+	"github.com/submariner-io/submariner/pkg/controllers/datastoresyncer"
 	"github.com/submariner-io/submariner/pkg/controllers/tunnel"
+	"github.com/submariner-io/submariner/pkg/datastore"
 	subk8s "github.com/submariner-io/submariner/pkg/datastore/kubernetes"
 	"github.com/submariner-io/submariner/pkg/datastore/phpapi"
 	"github.com/submariner-io/submariner/pkg/signals"
+	"github.com/submariner-io/submariner/pkg/types"
+	"github.com/submariner-io/submariner/pkg/util"
 )
 
 var (
@@ -115,7 +115,7 @@ func main() {
 
 		cableEngine, err := cableengine.NewEngine(localSubnets, localCluster, localEndpoint)
 		if err != nil {
-			klog.Fatalf("Error creating the cable engine: %v", err)
+			klog.Fatalf("Fatal error occurred creating engine: %v", err)
 		}
 
 		klog.Info("Creating the tunnel controller")
