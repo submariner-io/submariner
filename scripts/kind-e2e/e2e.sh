@@ -64,14 +64,12 @@ function kind_fixup_config() {
     fi
 }
 
-function kind_clusters() {
-    status=$1
-    version=$2
+function create_kind_clusters() {
     pids=(-1 -1 -1)
     logs=()
     for i in 1 2 3; do
         export KUBECONFIG=${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster${i}
-        if [[ $(kind get clusters | grep cluster${i} | wc -l) -gt 0  ]]; then
+        if [[ $(kind get clusters | grep "^cluster${i}$" | wc -l) -gt 0  ]]; then
             echo Cluster cluster${i} already exists, skipping cluster creation...
             kind export kubeconfig --name=cluster${i}
             kind_fixup_config cluster${i}
@@ -82,12 +80,12 @@ function kind_clusters() {
         echo Creating cluster${i}, logging to ${logs[$i]}...
         (
             generate_cluster_yaml "cluster${i}"
+            image_flag=''
             if [[ -n ${version} ]]; then
-                kind create cluster --image=kindest/node:v${version} --name=cluster${i} --config=${E2E_DIR}/cluster${i}-config.yaml
-            else
-                kind create cluster --name=cluster${i} --config=${E2E_DIR}/cluster${i}-config.yaml
+                image_flag="--image=kindest/node:v${version}"
             fi
 
+            kind create cluster $image_flag --name=cluster${i} --config=${E2E_DIR}/cluster${i}-config.yaml
             kind_fixup_config cluster${i}
         ) > ${logs[$i]} 2>&1 &
         set pids[$i] = $!
@@ -399,7 +397,7 @@ else
 fi
 registry_ip="$(docker inspect -f '{{.NetworkSettings.IPAddress}}' "$KIND_REGISTRY")"
 
-kind_clusters $status $version
+create_kind_clusters
 export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
 setup_custom_cni
 kind_import_images
