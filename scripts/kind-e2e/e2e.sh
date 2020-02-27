@@ -97,8 +97,8 @@ function use_kube_context() {
     kubectl config use-context $1
 }
 
-function setup_custom_cni(){
-    for i in 2 3; do
+function deploy_weave_cni(){
+    for i in "$@"; do
         use_kube_context cluster$i
         if kubectl wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=60s > /dev/null 2>&1; then
             echo "Weave already deployed cluster${i}."
@@ -106,7 +106,7 @@ function setup_custom_cni(){
         fi
 
         echo "Applying weave network in to cluster${i}..."
-        kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&env.IPALLOC_RANGE=${cluster_CIDRs[cluster${i}]}"
+        kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=v$version&env.IPALLOC_RANGE=${cluster_CIDRs[cluster${i}]}"
         echo "Waiting for weave-net pods to be ready cluster${i}..."
         kubectl wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=300s
         echo "Waiting for core-dns deployment to be ready cluster${i}..."
@@ -399,7 +399,7 @@ registry_ip="$(docker inspect -f '{{.NetworkSettings.IPAddress}}' "$KIND_REGISTR
 
 create_kind_clusters
 export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
-setup_custom_cni
+deploy_weave_cni 2 3
 kind_import_images
 
 if [[ $kubefed = true ]]; then
