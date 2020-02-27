@@ -10,6 +10,9 @@ import (
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
 	"k8s.io/klog"
+
+	// Add supported drivers
+	_ "github.com/submariner-io/submariner/pkg/cable/ipsec"
 )
 
 // Engine represents an implementation of some remote connectivity mechanism, such as
@@ -39,12 +42,7 @@ type engine struct {
 
 // NewEngine creates a new Engine for the local cluster
 func NewEngine(localSubnets []string, localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) (Engine, error) {
-	driverCreate, ok := cable.Drivers[localEndpoint.Spec.Backend]
-	if !ok {
-		return nil, fmt.Errorf("unsupported cable type %s", localEndpoint.Spec.Backend)
-	}
-
-	driver, err := driverCreate(localSubnets, localEndpoint)
+	driver, err := cable.NewDriver(localSubnets, localEndpoint)
 	if err != nil {
 		return nil, err
 	}

@@ -32,9 +32,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/signals"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
-
-	// Add supported drivers
-	_ "github.com/submariner-io/submariner/pkg/cable/ipsec"
 )
 
 var (
@@ -109,9 +106,9 @@ func main() {
 			localSubnets = append(submSpec.ServiceCidr, submSpec.ClusterCidr...)
 		}
 
-		submSpec.Cable = strings.ToLower(submSpec.Cable)
+		submSpec.CableDriver = strings.ToLower(submSpec.CableDriver)
 
-		localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterID, submSpec.Cable, map[string]string{}, submSpec.NatEnabled,
+		localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterID, submSpec.CableDriver, map[string]string{}, submSpec.NatEnabled,
 			localSubnets, util.GetLocalIP())
 
 		if err != nil {

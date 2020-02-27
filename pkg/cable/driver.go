@@ -1,7 +1,10 @@
 package cable
 
 import (
+	"fmt"
+
 	"github.com/submariner-io/submariner/pkg/types"
+	"k8s.io/klog"
 )
 
 // Driver is used by the ipsec engine to actually connect the tunnels.
@@ -25,4 +28,21 @@ type Driver interface {
 type DriverCreateFunc func(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (Driver, error)
 
 // Static map of supported drivers
-var Drivers = map[string]DriverCreateFunc{}
+var drivers = map[string]DriverCreateFunc{}
+
+// Adds a supported driver, prints a fatal error in teh case of double registration
+func AddDriver(name string, driverCreate DriverCreateFunc) {
+	if drivers[name] != nil {
+		klog.Fatalf("Multiple cable engine drivers attempting to register with name %q", name)
+	}
+	drivers[name] = driverCreate
+}
+
+// Returns a new driver according the required Backend
+func NewDriver(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (Driver, error) {
+	driverCreate, ok := drivers[localEndpoint.Spec.Backend]
+	if !ok {
+		return nil, fmt.Errorf("unsupported cable type %s", localEndpoint.Spec.Backend)
+	}
+	return driverCreate(localSubnets, localEndpoint)
+}

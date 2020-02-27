@@ -39,9 +39,9 @@ const (
 )
 
 func init() {
-	cable.Drivers[""] = NewStrongSwan //default
-	cable.Drivers["ipsec"] = NewStrongSwan
-	cable.Drivers["ipsec/strongswan"] = NewStrongSwan
+	cable.AddDriver("", NewStrongSwan) //default
+	cable.AddDriver("ipsec", NewStrongSwan)
+	cable.AddDriver("ipsec/strongswan", NewStrongSwan)
 }
 
 type strongSwan struct {

@@ -24,7 +24,7 @@ type SubmarinerSpecification struct {
 	ColorCodes  []string
 	NatEnabled  bool
 	Broker      string
-	Cable       string
+	CableDriver string
 }
 
 type Secure struct {
