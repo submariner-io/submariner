@@ -66,7 +66,7 @@ submariner-gateway runs as a DaemonSet on the gateway-labelled nodes and utilize
 
 ## submariner-route-agent
 
-The submariner-route-agent runs as a DaemonSet on all Kubernetes nodes, and ensures route rules to allow all pods/nodes to communicate through the elected gateway node for remote cluster networks. It will ensure state and react on CRD changes, which means that it is able to remove/add routes as leader election occurs.
+The submariner-route-agent runs as a DaemonSet on all Kubernetes worker nodes, and ensures route rules to allow all pods/nodes to communicate through the elected gateway node for remote cluster networks. It will ensure state and react on CRD changes, which means that it is able to remove/add routes as leader election occurs.
 
 ## Network Path
 
