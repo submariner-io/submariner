@@ -13,19 +13,24 @@ E2E_DIR=$(dirname "$(readlink -f "$0")")
 
 function print_logs() {
     logs=("$@")
-    if [[ ${#logs[@]} -gt 0 ]]; then
-        echo "(Watch the installation processes with \"tail -f ${logs[*]}\".)"
-        for i in 1 2 3; do
-            if [[ pids[$i] -gt -1 ]]; then
-                wait ${pids[$i]}
-                if [[ $? -ne 0 && $? -ne 127 ]]; then
-                    echo Cluster $i creation failed:
-                    cat ${logs[$i]}
-                fi
-                rm -f ${logs[$i]}
-            fi
-        done
+    if [[ ${#logs[@]} -eq 0 ]]; then
+        return
     fi
+
+    echo "(Watch the installation processes with \"tail -f ${logs[*]}\".)"
+    for i in 1 2 3; do
+        if [[ pids[$i] -eq -1 ]]; then
+            continue
+        fi
+
+        wait ${pids[$i]}
+        if [[ $? -ne 0 && $? -ne 127 ]]; then
+            echo Cluster $i creation failed:
+            cat ${logs[$i]}
+        fi
+
+        rm -f ${logs[$i]}
+    done
 }
 
 function render_template() {
@@ -70,20 +75,22 @@ function kind_clusters() {
             echo Cluster cluster${i} already exists, skipping cluster creation...
             kind export kubeconfig --name=cluster${i}
             kind_fixup_config cluster${i}
-        else
-            logs[$i]=$(mktemp)
-            echo Creating cluster${i}, logging to ${logs[$i]}...
-            (
+            continue
+        fi
+
+        logs[$i]=$(mktemp)
+        echo Creating cluster${i}, logging to ${logs[$i]}...
+        (
             generate_cluster_yaml "cluster${i}"
             if [[ -n ${version} ]]; then
                 kind create cluster --image=kindest/node:v${version} --name=cluster${i} --config=${E2E_DIR}/cluster${i}-config.yaml
             else
                 kind create cluster --name=cluster${i} --config=${E2E_DIR}/cluster${i}-config.yaml
             fi
+
             kind_fixup_config cluster${i}
-            ) > ${logs[$i]} 2>&1 &
-            set pids[$i] = $!
-        fi
+        ) > ${logs[$i]} 2>&1 &
+        set pids[$i] = $!
     done
     print_logs "${logs[@]}"
 }
@@ -92,14 +99,15 @@ function setup_custom_cni(){
     for i in 2 3; do
         if kubectl --context=cluster${i} wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=60s > /dev/null 2>&1; then
             echo "Weave already deployed cluster${i}."
-        else
-            echo "Applying weave network in to cluster${i}..."
-            kubectl --context=cluster${i} apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&env.IPALLOC_RANGE=${cluster_CIDRs[cluster${i}]}"
-            echo "Waiting for weave-net pods to be ready cluster${i}..."
-            kubectl --context=cluster${i} wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=300s
-            echo "Waiting for core-dns deployment to be ready cluster${i}..."
-            kubectl --context=cluster${i} -n kube-system rollout status deploy/coredns --timeout=300s
+            continue
         fi
+
+        echo "Applying weave network in to cluster${i}..."
+        kubectl --context=cluster${i} apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&env.IPALLOC_RANGE=${cluster_CIDRs[cluster${i}]}"
+        echo "Waiting for weave-net pods to be ready cluster${i}..."
+        kubectl --context=cluster${i} wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=300s
+        echo "Waiting for core-dns deployment to be ready cluster${i}..."
+        kubectl --context=cluster${i} -n kube-system rollout status deploy/coredns --timeout=300s
     done
 }
 
@@ -164,39 +172,41 @@ function test_connection() {
 function enable_logging() {
     if kubectl --context=cluster1 rollout status deploy/kibana > /dev/null 2>&1; then
         echo Elasticsearch stack already installed, skipping...
-    else
-        echo Installing Elasticsearch...
-        es_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster1-control-plane | head -n 1)
-        kubectl --context=cluster1 apply -f ${E2E_DIR}/logging/elasticsearch.yaml
-        kubectl --context=cluster1 apply -f ${E2E_DIR}/logging/filebeat.yaml
-        echo Waiting for Elasticsearch to be ready...
-        kubectl --context=cluster1 wait --for=condition=Ready pods -l app=elasticsearch --timeout=300s
-        for i in 2 3; do
-            kubectl --context=cluster${i} apply -f ${E2E_DIR}/logging/filebeat.yaml
-            kubectl --context=cluster${i} set env daemonset/filebeat -n kube-system ELASTICSEARCH_HOST=${es_ip} ELASTICSEARCH_PORT=30000
-        done
+        return
     fi
+
+    echo Installing Elasticsearch...
+    es_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster1-control-plane | head -n 1)
+    kubectl --context=cluster1 apply -f ${E2E_DIR}/logging/elasticsearch.yaml
+    kubectl --context=cluster1 apply -f ${E2E_DIR}/logging/filebeat.yaml
+    echo Waiting for Elasticsearch to be ready...
+    kubectl --context=cluster1 wait --for=condition=Ready pods -l app=elasticsearch --timeout=300s
+    for i in 2 3; do
+        kubectl --context=cluster${i} apply -f ${E2E_DIR}/logging/filebeat.yaml
+        kubectl --context=cluster${i} set env daemonset/filebeat -n kube-system ELASTICSEARCH_HOST=${es_ip} ELASTICSEARCH_PORT=30000
+    done
 }
 
 function enable_kubefed() {
     KUBEFED_NS=kube-federation-system
     if kubectl --context=cluster1 rollout status deploy/kubefed-controller-manager -n ${KUBEFED_NS} > /dev/null 2>&1; then
         echo Kubefed already installed, skipping setup...
-    else
-        helm init --client-only
-        helm repo add kubefed-charts https://raw.githubusercontent.com/kubernetes-sigs/kubefed/master/charts
-        helm --kube-context cluster1 install kubefed-charts/kubefed --version=0.1.0-rc2 --name kubefed --namespace ${KUBEFED_NS} --set controllermanager.replicaCount=1
-        for i in 1 2 3; do
-            kubefedctl join cluster${i} --cluster-context cluster${i} --host-cluster-context cluster1 --v=2
-            #master_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster${i}-control-plane | head -n 1)
-            #kind_endpoint="https://${master_ip}:6443"
-            #kubectl patch kubefedclusters -n ${KUBEFED_NS} cluster${i} --type merge --patch "{\"spec\":{\"apiEndpoint\":\"${kind_endpoint}\"}}"
-        done
-        #kubectl delete pod -l control-plane=controller-manager -n ${KUBEFED_NS}
-        echo Waiting for kubefed control plain to be ready...
-        kubectl --context=cluster1 wait --for=condition=Ready pods -l control-plane=controller-manager -n ${KUBEFED_NS} --timeout=120s
-        kubectl --context=cluster1 wait --for=condition=Ready pods -l kubefed-admission-webhook=true -n ${KUBEFED_NS} --timeout=120s
+        return
     fi
+
+    helm init --client-only
+    helm repo add kubefed-charts https://raw.githubusercontent.com/kubernetes-sigs/kubefed/master/charts
+    helm --kube-context cluster1 install kubefed-charts/kubefed --version=0.1.0-rc2 --name kubefed --namespace ${KUBEFED_NS} --set controllermanager.replicaCount=1
+    for i in 1 2 3; do
+        kubefedctl join cluster${i} --cluster-context cluster${i} --host-cluster-context cluster1 --v=2
+        #master_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster${i}-control-plane | head -n 1)
+        #kind_endpoint="https://${master_ip}:6443"
+        #kubectl patch kubefedclusters -n ${KUBEFED_NS} cluster${i} --type merge --patch "{\"spec\":{\"apiEndpoint\":\"${kind_endpoint}\"}}"
+    done
+    #kubectl delete pod -l control-plane=controller-manager -n ${KUBEFED_NS}
+    echo Waiting for kubefed control plain to be ready...
+    kubectl --context=cluster1 wait --for=condition=Ready pods -l control-plane=controller-manager -n ${KUBEFED_NS} --timeout=120s
+    kubectl --context=cluster1 wait --for=condition=Ready pods -l kubefed-admission-webhook=true -n ${KUBEFED_NS} --timeout=120s
 }
 
 function add_subm_gateway_label() {
