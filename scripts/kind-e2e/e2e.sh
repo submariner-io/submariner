@@ -95,19 +95,24 @@ function kind_clusters() {
     print_logs "${logs[@]}"
 }
 
+function use_kube_context() {
+    kubectl config use-context $1
+}
+
 function setup_custom_cni(){
     for i in 2 3; do
-        if kubectl --context=cluster${i} wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=60s > /dev/null 2>&1; then
+        use_kube_context cluster$i
+        if kubectl wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=60s > /dev/null 2>&1; then
             echo "Weave already deployed cluster${i}."
             continue
         fi
 
         echo "Applying weave network in to cluster${i}..."
-        kubectl --context=cluster${i} apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&env.IPALLOC_RANGE=${cluster_CIDRs[cluster${i}]}"
+        kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&env.IPALLOC_RANGE=${cluster_CIDRs[cluster${i}]}"
         echo "Waiting for weave-net pods to be ready cluster${i}..."
-        kubectl --context=cluster${i} wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=300s
+        kubectl wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=300s
         echo "Waiting for core-dns deployment to be ready cluster${i}..."
-        kubectl --context=cluster${i} -n kube-system rollout status deploy/coredns --timeout=300s
+        kubectl -n kube-system rollout status deploy/coredns --timeout=300s
     done
 }
 
@@ -170,26 +175,30 @@ function test_connection() {
 }
 
 function enable_logging() {
-    if kubectl --context=cluster1 rollout status deploy/kibana > /dev/null 2>&1; then
+    use_kube_context cluster1
+
+    if kubectl rollout status deploy/kibana > /dev/null 2>&1; then
         echo Elasticsearch stack already installed, skipping...
         return
     fi
 
     echo Installing Elasticsearch...
     es_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster1-control-plane | head -n 1)
-    kubectl --context=cluster1 apply -f ${E2E_DIR}/logging/elasticsearch.yaml
-    kubectl --context=cluster1 apply -f ${E2E_DIR}/logging/filebeat.yaml
+    kubectl apply -f ${E2E_DIR}/logging/elasticsearch.yaml
+    kubectl apply -f ${E2E_DIR}/logging/filebeat.yaml
     echo Waiting for Elasticsearch to be ready...
-    kubectl --context=cluster1 wait --for=condition=Ready pods -l app=elasticsearch --timeout=300s
+    kubectl wait --for=condition=Ready pods -l app=elasticsearch --timeout=300s
     for i in 2 3; do
-        kubectl --context=cluster${i} apply -f ${E2E_DIR}/logging/filebeat.yaml
-        kubectl --context=cluster${i} set env daemonset/filebeat -n kube-system ELASTICSEARCH_HOST=${es_ip} ELASTICSEARCH_PORT=30000
+        use_kube_context cluster$i
+        kubectl apply -f ${E2E_DIR}/logging/filebeat.yaml
+        kubectl set env daemonset/filebeat -n kube-system ELASTICSEARCH_HOST=${es_ip} ELASTICSEARCH_PORT=30000
     done
 }
 
 function enable_kubefed() {
+    use_kube_context cluster1
     KUBEFED_NS=kube-federation-system
-    if kubectl --context=cluster1 rollout status deploy/kubefed-controller-manager -n ${KUBEFED_NS} > /dev/null 2>&1; then
+    if kubectl rollout status deploy/kubefed-controller-manager -n ${KUBEFED_NS} > /dev/null 2>&1; then
         echo Kubefed already installed, skipping setup...
         return
     fi
@@ -205,8 +214,8 @@ function enable_kubefed() {
     done
     #kubectl delete pod -l control-plane=controller-manager -n ${KUBEFED_NS}
     echo Waiting for kubefed control plain to be ready...
-    kubectl --context=cluster1 wait --for=condition=Ready pods -l control-plane=controller-manager -n ${KUBEFED_NS} --timeout=120s
-    kubectl --context=cluster1 wait --for=condition=Ready pods -l kubefed-admission-webhook=true -n ${KUBEFED_NS} --timeout=120s
+    kubectl wait --for=condition=Ready pods -l control-plane=controller-manager -n ${KUBEFED_NS} --timeout=120s
+    kubectl wait --for=condition=Ready pods -l kubefed-admission-webhook=true -n ${KUBEFED_NS} --timeout=120s
 }
 
 function add_subm_gateway_label() {
@@ -221,20 +230,22 @@ function del_subm_gateway_label() {
 
 function deploy_netshoot() {
     context=$1
+    use_kube_context $context
     worker_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $context-worker | head -n 1)
     echo Deploying netshoot on $context worker: ${worker_ip}
-    kubectl --context=$context apply -f ${E2E_DIR}/netshoot.yaml
+    kubectl apply -f ${E2E_DIR}/netshoot.yaml
     echo Waiting for netshoot pods to be Ready on $context.
-    kubectl --context=$context rollout status deploy/netshoot --timeout=120s
+    kubectl rollout status deploy/netshoot --timeout=120s
 }
 
 function deploy_nginx() {
     context=$1
+    use_kube_context $context
     worker_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $context-worker | head -n 1)
     echo Deploying nginx on $context worker: ${worker_ip}
-    kubectl --context=$context apply -f ${E2E_DIR}/nginx-demo.yaml
+    kubectl apply -f ${E2E_DIR}/nginx-demo.yaml
     echo Waiting for nginx-demo deployment to be Ready on $context.
-    kubectl --context=$context rollout status deploy/nginx-demo --timeout=120s
+    kubectl rollout status deploy/nginx-demo --timeout=120s
 }
 
 function test_with_e2e_tests {
@@ -253,14 +264,13 @@ function test_with_e2e_tests {
 }
 
 function delete_subm_pods() {
-    context=$1
+    use_kube_context $1
     ns=$2
     app=$3
-    if kubectl --context=$context wait --for=condition=Ready pods -l app=$app -n $ns --timeout=60s > /dev/null 2>&1; then
+    if kubectl wait --for=condition=Ready pods -l app=$app -n $ns --timeout=60s > /dev/null 2>&1; then
         echo Removing $app pods...
-        kubectl --context=$context delete pods -n $ns -l app=$app
+        kubectl delete pods -n $ns -l app=$app
     fi
-
 }
 
 function registry_running() {
