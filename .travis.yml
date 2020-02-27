@@ -5,6 +5,7 @@ branches:
   only:
   - master
   - /^v\d+\.\d+\.\d+.*$/
+  - /^release-\d+.\d+.*$/
 
 git:
   depth: false
