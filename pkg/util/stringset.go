@@ -39,11 +39,13 @@ func (set *StringSet) Size() int {
 	return len(set.set)
 }
 
-func (set *StringSet) Delete(s string) {
+func (set *StringSet) Delete(s string) bool {
 	set.syncMutex.Lock()
 	defer set.syncMutex.Unlock()
 
+	_, found := set.set[s]
 	delete(set.set, s)
+	return found
 }
 
 func (set *StringSet) Elements() []string {

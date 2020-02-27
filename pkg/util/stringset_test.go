@@ -40,11 +40,17 @@ var _ = Describe("StringSet", func() {
 		})
 	})
 
-	When("a string is deleted", func() {
-		It("should no longer be observed in the set", func() {
-			set.Delete("192.168.2.0/24")
+	When("an existing string is deleted", func() {
+		It("should return true and no longer be observed in the set", func() {
+			Expect(set.Delete("192.168.2.0/24")).To(BeTrue())
 			Expect(set.Contains("192.168.2.0/24")).To(BeFalse())
 			Expect(set.Size()).To(Equal(1))
+		})
+	})
+
+	When("a non-existent string is deleted", func() {
+		It("should return false", func() {
+			Expect(set.Delete("192.168.5.0/24")).To(BeFalse())
 		})
 	})
 
