@@ -21,17 +21,18 @@ function install_helm() {
     for i in 1 2 3; do
         if kubectl --context=cluster${i} -n kube-system rollout status deploy/tiller-deploy > /dev/null 2>&1; then
             echo Helm already installed on cluster${i}, skipping helm installation...
-        else
-            logs[$i]=$(mktemp)
-            echo Installing helm on cluster${i}, logging to ${logs[$i]}...
-            (
+            continue
+        fi
+
+        logs[$i]=$(mktemp)
+        echo Installing helm on cluster${i}, logging to ${logs[$i]}...
+        (
             kubectl --context=cluster${i} -n kube-system create serviceaccount tiller
             kubectl --context=cluster${i} create clusterrolebinding tiller --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
             helm --kube-context cluster${i} init --service-account tiller
             kubectl --context=cluster${i} -n kube-system rollout status deploy/tiller-deploy
-            ) > ${logs[$i]} 2>&1 &
-            set pids[$i] = $!
-        fi
+        ) > ${logs[$i]} 2>&1 &
+        set pids[$i] = $!
     done
     print_logs "${logs[@]}"
 }
