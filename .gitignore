@@ -12,3 +12,6 @@ package/strongswan-*
 .project
 .settings
 *.coverprofile
+junit.xml
+scripts/broker-info.subm*
+Dockerfile.dapper[0-9]*
