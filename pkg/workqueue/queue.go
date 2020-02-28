@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/submariner-io/submariner/pkg/log"
+	"golang.org/x/time/rate"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
@@ -30,8 +31,13 @@ type queueType struct {
 
 func New(name string) Interface {
 	return &queueType{
-		RateLimitingInterface: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), name),
-		name:                  name,
+		RateLimitingInterface: workqueue.NewNamedRateLimitingQueue(workqueue.NewMaxOfRateLimiter(
+			// exponential per-item rate limiter
+			workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 30*time.Second),
+			// overall rate limiter (not per item)
+			&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+		), name),
+		name: name,
 	}
 }
 
