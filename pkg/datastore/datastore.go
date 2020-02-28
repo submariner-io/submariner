@@ -11,6 +11,9 @@ import (
  * the datastoresyncer can facilitate the management of local CRDs
  */
 
+type OnClusterChange func(cluster *types.SubmarinerCluster, deleted bool) error
+type OnEndpointChange func(endpoint *types.SubmarinerEndpoint, deleted bool) error
+
 type Datastore interface {
 	// This gets all clusters that match the color code
 	GetClusters(colorCodes []string) ([]types.SubmarinerCluster, error)
@@ -25,12 +28,10 @@ type Datastore interface {
 	GetEndpoint(clusterID string, cableName string) (*types.SubmarinerEndpoint, error)
 
 	// Watches all clusters and calls the passed in function on cluster change
-	WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string,
-		onClusterChange func(cluster *types.SubmarinerCluster, deleted bool) error) error
+	WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onClusterChange OnClusterChange) error
 
 	// Performs a watch of all endpoints and calls the passed in function based on information
-	WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string,
-		onEndpointChange func(endpoint *types.SubmarinerEndpoint, deleted bool) error) error
+	WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onEndpointChange OnEndpointChange) error
 
 	// This should be called to set the local cluster information.
 	SetCluster(cluster *types.SubmarinerCluster) error
