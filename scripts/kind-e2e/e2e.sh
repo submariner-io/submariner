@@ -206,6 +206,23 @@ function del_subm_gateway_label() {
     kubectl --context=$context label node $context-worker "submariner.io/gateway-" --overwrite
 }
 
+function get_latest_subctl_tag() {
+    curl https://api.github.com/repos/submariner-io/submariner-operator/releases | jq -r '.[0].tag_name'
+}
+
+function travis_retry() {
+    # We don't pretend to support commands with multiple words
+    $1 || (sleep 2 && $1) || (sleep 10 && $1)
+}
+
+function install_subctl() {
+    test -x /go/bin/subctl && return
+    version=$(travis_retry get_latest_subctl_tag || echo v0.1.1)
+    curl -L https://github.com/submariner-io/submariner-operator/releases/download/${version}/subctl-${version}-linux-amd64 \
+         -o /go/bin/subctl
+    chmod a+x /go/bin/subctl
+}
+
 function deploy_netshoot() {
     context=$1
     worker_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $context-worker | head -n 1)

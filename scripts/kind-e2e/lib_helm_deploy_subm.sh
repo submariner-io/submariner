@@ -38,6 +38,7 @@ function install_helm() {
 
 function deploytool_prereqs() {
     install_helm
+    install_subctl
 }
 
 function setup_broker() {
@@ -54,12 +55,33 @@ function setup_broker() {
     SUBMARINER_BROKER_TOKEN=$(kubectl --context=$context -n ${SUBMARINER_BROKER_NS} get secrets -o jsonpath="{.items[?(@.metadata.annotations['kubernetes\.io/service-account\.name']=='${SUBMARINER_BROKER_NS}-client')].data.token}"|base64 --decode)
 }
 
+function get_cluster_cidr() {
+    context=$1
+    set -o pipefail
+    # TODO: Remove left side of this OR after a release with #204 is in-use
+    # Regex means "between square brackets"
+    cluster_cidr=$(set -o pipefail && \
+                   subctl info --kubeconfig ${PRJ_ROOT}/output/kind-config/dapper/kind-config-$context \
+                               --kubecontext ${context} \
+                   | grep "Pod CIDRs\|Cluster CIDRs" | grep -o -P '(?<=\[).*(?=\])')
+    echo $cluster_cidr
+}
+
+function get_service_cidr() {
+    context=$1
+    # TODO: Remove left side of this OR after a release with #204 is in-use
+    # Regex means "between square brackets"
+    service_cidr=$(set -o pipefail && \
+                   subctl info --kubeconfig ${PRJ_ROOT}/output/kind-config/dapper/kind-config-$context \
+                               --kubecontext ${context} \
+                   | grep "ClusterIP CIDRs\|Service CIDRs" | grep -o -P '(?<=\[).*(?=\])')
+    echo $service_cidr
+}
+
 function helm_install_subm() {
     cluster_id=$1
     crd_create=$2
-    cluster_cidr=$3
-    service_cidr=$4
-    global_cidr=$5
+    global_cidr=$3
     if [ -z $global_cidr ]; then globalnet_enable="false"; else globalnet_enable="true"; fi
 
     kubectl config use-context $cluster_id
@@ -72,8 +94,8 @@ function helm_install_subm() {
         --set broker.namespace="${SUBMARINER_BROKER_NS}" \
         --set broker.ca="${SUBMARINER_BROKER_CA}" \
         --set submariner.clusterId="${cluster_id}" \
-        --set submariner.clusterCidr="${cluster_cidr}" \
-        --set submariner.serviceCidr="${service_cidr}" \
+        --set submariner.clusterCidr="$(get_cluster_cidr $cluster_id)" \
+        --set submariner.serviceCidr="$(get_service_cidr $cluster_id)" \
         --set submariner.globalCidr="${global_cidr}" \
         --set serviceAccounts.globalnet.create=${globalnet_enable} \
         --set submariner.natEnabled="false" \
@@ -89,13 +111,12 @@ function helm_install_subm() {
         --set crd.create="${crd_create}"
 }
 
-
 function install_subm_all_clusters() {
     if kubectl --context=cluster1 get crd clusters.submariner.io > /dev/null 2>&1; then
         echo Submariner CRDs already exist, skipping broker creation...
     else
         echo Installing Submariner Broker in cluster1...
-        helm_install_subm cluster1 false ${cluster_CIDRs[cluster1]} ${service_CIDRs[cluster1]} ${global_CIDRs[cluster1]}
+        helm_install_subm cluster1 false ${global_CIDRs[cluster1]}
     fi
 
     for i in 2 3; do
@@ -104,7 +125,7 @@ function install_subm_all_clusters() {
           echo Submariner already installed in $cluster_id, skipping submariner helm installation...
       else
           echo Installing Submariner in $cluster_id...
-          helm_install_subm $cluster_id true ${cluster_CIDRs[$cluster_id]} ${service_CIDRs[$cluster_id]} ${global_CIDRs[$cluster_id]}
+          helm_install_subm $cluster_id true ${global_CIDRs[$cluster_id]}
       fi
     done
 }
