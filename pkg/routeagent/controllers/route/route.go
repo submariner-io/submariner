@@ -100,8 +100,13 @@ const (
 	SmRouteAgentFilter     = "app=submariner-routeagent"
 )
 
+func newRateLimiter() workqueue.RateLimiter {
+	return workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 30*time.Second)
+}
+
 func NewController(clusterID string, ClusterCidr []string, ServiceCidr []string, objectNamespace string,
 	link *net.Interface, config InformerConfigStruct) *Controller {
+
 	controller := Controller{
 		clusterID:              clusterID,
 		objectNamespace:        objectNamespace,
@@ -116,8 +121,8 @@ func NewController(clusterID string, ClusterCidr []string, ServiceCidr []string,
 		endpointsSynced:        config.EndpointInformer.Informer().HasSynced,
 		smRouteAgentPodsSynced: config.PodInformer.Informer().HasSynced,
 		gwVxLanMutex:           &sync.Mutex{},
-		endpointWorkqueue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Endpoints"),
-		podWorkqueue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Pods"),
+		endpointWorkqueue:      workqueue.NewNamedRateLimitingQueue(newRateLimiter(), "Endpoints"),
+		podWorkqueue:           workqueue.NewNamedRateLimitingQueue(newRateLimiter(), "Pods"),
 	}
 
 	config.EndpointInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
