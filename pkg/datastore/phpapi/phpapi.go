@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/submariner-io/submariner/pkg/datastore"
+	"github.com/submariner-io/submariner/pkg/log"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -47,7 +49,7 @@ func NewPHPAPI(apitoken string) (*PHPAPI, error) {
 func (p *PHPAPI) GetClusters(colorCodes []string) ([]types.SubmarinerCluster, error) {
 	colorCode := util.FlattenColors(colorCodes)
 	requestURL := fmt.Sprintf("%s://%s/clusters.php?plurality=true&identifier=%s&colorcode=%s", p.Proto, p.Server, p.APIToken, colorCode)
-	klog.V(8).Infof("request url: %s", requestURL)
+	klog.V(log.DEBUG).Infof("GetClusters: request url: %s", requestURL)
 	clustersGetter, err := http.Get(requestURL)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving clusters from %s: %v", requestURL, err)
@@ -59,7 +61,7 @@ func (p *PHPAPI) GetClusters(colorCodes []string) ([]types.SubmarinerCluster, er
 		return nil, fmt.Errorf("error reading response from %s: %v", requestURL, err)
 	}
 
-	klog.V(8).Infof("Response body: %v", string(clustersRaw[:]))
+	klog.V(log.DEBUG).Infof("GetClusters: response body: %v", string(clustersRaw[:]))
 
 	// let's unmarshal into our type the cluster into
 	// need to actually make the API return json that works for this
@@ -72,7 +74,7 @@ func (p *PHPAPI) GetClusters(colorCodes []string) ([]types.SubmarinerCluster, er
 
 func (p *PHPAPI) GetCluster(clusterID string) (*types.SubmarinerCluster, error) {
 	requestURL := fmt.Sprintf("%s://%s/clusters.php?plurality=false&identifier=%s&cluster_id=%s", p.Proto, p.Server, p.APIToken, clusterID)
-	klog.V(8).Infof("request url: %s", requestURL)
+	klog.V(log.DEBUG).Infof("GetCluster: request url: %s", requestURL)
 	clustersGetter, err := http.Get(requestURL)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving clusters from %s: %v", requestURL, err)
@@ -84,7 +86,7 @@ func (p *PHPAPI) GetCluster(clusterID string) (*types.SubmarinerCluster, error) 
 		return nil, fmt.Errorf("error reading response from %s: %v", requestURL, err)
 	}
 
-	klog.V(8).Infof("response body: %v", string(clustersRaw[:]))
+	klog.V(log.DEBUG).Infof("GetCluster: response body: %v", string(clustersRaw[:]))
 
 	var cluster types.SubmarinerCluster
 	if err = json.Unmarshal(clustersRaw, &cluster); err != nil {
@@ -107,7 +109,7 @@ func (p *PHPAPI) GetEndpoints(clusterID string) ([]types.SubmarinerEndpoint, err
 		return nil, fmt.Errorf("error reading response from %s: %v", requestURL, err)
 	}
 
-	klog.V(8).Infof("response body: %v", string(endpointsRaw[:]))
+	klog.V(log.DEBUG).Infof("GetEndpoints: response body: %v", string(endpointsRaw[:]))
 
 	var endpoints []types.SubmarinerEndpoint
 	if err = json.Unmarshal(endpointsRaw, &endpoints); err != nil {
@@ -120,7 +122,7 @@ func (p *PHPAPI) GetEndpoint(clusterID string, cableName string) (*types.Submari
 	return nil, fmt.Errorf("GetEndpoint is not implemented")
 }
 
-func (p *PHPAPI) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onChange func(cluster *types.SubmarinerCluster, deleted bool) error) error {
+func (p *PHPAPI) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onChange datastore.OnClusterChange) error {
 	colorCode := util.FlattenColors(colorCodes)
 	klog.Infof("Starting watch for colorCode %s", colorCode)
 	var wg sync.WaitGroup
@@ -132,7 +134,7 @@ func (p *PHPAPI) WatchClusters(ctx context.Context, selfClusterID string, colorC
 			if err != nil {
 				utilruntime.HandleError(err)
 			} else {
-				klog.V(8).Infof("Got clusters from API: %#v", clusters)
+				klog.V(log.DEBUG).Infof("Got clusters from API: %#v", clusters)
 				for _, cluster := range clusters {
 					if selfClusterID != cluster.ID {
 						utilruntime.HandleError(onChange(&cluster, false))
@@ -140,7 +142,7 @@ func (p *PHPAPI) WatchClusters(ctx context.Context, selfClusterID string, colorC
 				}
 			}
 
-			klog.V(8).Infof("Sleeping 5 seconds")
+			klog.V(log.TRACE).Infof("Sleeping 5 seconds")
 			time.Sleep(5 * time.Second)
 		}
 	}()
@@ -149,7 +151,7 @@ func (p *PHPAPI) WatchClusters(ctx context.Context, selfClusterID string, colorC
 	return nil
 }
 
-func (p *PHPAPI) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onChange func(endpoint *types.SubmarinerEndpoint, deleted bool) error) error {
+func (p *PHPAPI) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onChange datastore.OnEndpointChange) error {
 	colorCode := util.FlattenColors(colorCodes)
 	klog.Infof("Starting PHPAPI endpoint watch for colorCode %s", colorCode)
 	var wg sync.WaitGroup
@@ -161,7 +163,7 @@ func (p *PHPAPI) WatchEndpoints(ctx context.Context, selfClusterID string, color
 			if err != nil {
 				utilruntime.HandleError(err)
 			} else {
-				klog.V(8).Infof("Got clusters from API: %#v", clusters)
+				klog.V(log.DEBUG).Infof("Got clusters from API: %#v", clusters)
 				for _, cluster := range clusters {
 					endpoints, err := p.GetEndpoints(cluster.ID)
 					if err != nil {
@@ -169,7 +171,7 @@ func (p *PHPAPI) WatchEndpoints(ctx context.Context, selfClusterID string, color
 						continue
 					}
 
-					klog.Infof("Got endpoints from API: %#v", endpoints)
+					klog.V(log.DEBUG).Infof("Got endpoints from API: %#v", endpoints)
 					for _, endpoint := range endpoints {
 						if selfClusterID != endpoint.Spec.ClusterID {
 							utilruntime.HandleError(onChange(&endpoint, false))
@@ -178,7 +180,7 @@ func (p *PHPAPI) WatchEndpoints(ctx context.Context, selfClusterID string, color
 				}
 			}
 
-			klog.V(8).Infof("Sleeping 5 seconds")
+			klog.V(log.TRACE).Infof("Sleeping 5 seconds")
 			time.Sleep(5 * time.Second)
 		}
 	}()
@@ -198,7 +200,7 @@ func (p *PHPAPI) SetCluster(cluster *types.SubmarinerCluster) error {
 	formVal.Add("cluster", string(marshaledCluster))
 	requestURL := fmt.Sprintf("%s://%s/clusters.php?identifier=%s", p.Proto, p.Server, p.APIToken)
 
-	klog.V(8).Infof("Setting cluster %s via URL %s", string(marshaledCluster), requestURL)
+	klog.V(log.DEBUG).Infof("Setting cluster %s via URL %s", string(marshaledCluster), requestURL)
 	poster, err := http.PostForm(requestURL, formVal)
 	if err != nil {
 		return fmt.Errorf("error setting cluster %s via URL %s: %v", string(marshaledCluster), requestURL, err)
@@ -219,7 +221,7 @@ func (p *PHPAPI) SetEndpoint(endpoint *types.SubmarinerEndpoint) error {
 	requestURL := fmt.Sprintf("%s://%s/endpoints.php?identifier=%s&cluster_id=%s", p.Proto, p.Server, p.APIToken,
 		endpoint.Spec.ClusterID)
 
-	klog.V(8).Infof("Setting endpoint %s via URL %s", string(marshaledEndpoint), requestURL)
+	klog.V(log.DEBUG).Infof("Setting endpoint %s via URL %s", string(marshaledEndpoint), requestURL)
 	poster, err := http.PostForm(requestURL, formVal)
 	if err != nil {
 		return fmt.Errorf("error setting endpoint %s via URL %s: %v", string(marshaledEndpoint), requestURL, err)
@@ -235,7 +237,7 @@ func (p *PHPAPI) RemoveEndpoint(clusterID, cableName string) error {
 	formVal.Add("cable_name", cableName)
 	requestURL := fmt.Sprintf("%s://%s/endpoints.php?identifier=%s&cluster_id=%s", p.Proto, p.Server, p.APIToken, clusterID)
 
-	klog.V(8).Infof("Removing endpoint %s via URL %s", cableName, requestURL)
+	klog.V(log.DEBUG).Infof("Removing endpoint %s via URL %s", cableName, requestURL)
 	poster, err := http.PostForm(requestURL, formVal)
 	if err != nil {
 		return fmt.Errorf("error removing endpoint %s via URL %s: %v", cableName, requestURL, err)
