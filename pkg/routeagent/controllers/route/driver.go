@@ -6,6 +6,8 @@ import (
 	"net"
 
 	"k8s.io/klog"
+
+	"github.com/submariner-io/submariner/pkg/log"
 )
 
 func discoverCNIInterface(clusterCIDR string) *cniInterface {
@@ -33,12 +35,12 @@ func discoverCNIInterface(clusterCIDR string) *cniInterface {
 			if err != nil {
 				klog.Errorf("Unable to ParseCIDR : %q", addrs[i].String())
 			} else if ipAddr.To4() != nil {
-				klog.V(4).Infof("Interface %q has %q address", iface.Name, ipAddr)
+				klog.V(log.DEBUG).Infof("Interface %q has %q address", iface.Name, ipAddr)
 				address := net.ParseIP(ipAddr.String())
 
 				// Verify that interface has an address from cluster CIDR
 				if clusterNetwork.Contains(address) {
-					klog.V(4).Infof("Found CNI Interface %q that has IP %q from ClusterCIDR %q",
+					klog.V(log.DEBUG).Infof("Found CNI Interface %q that has IP %q from ClusterCIDR %q",
 						iface.Name, ipAddr.String(), clusterCIDR)
 					return &cniInterface{ipAddress: ipAddr.String(), name: iface.Name}
 				}
@@ -53,7 +55,7 @@ func toggleCNISpecificConfiguration(iface string) error {
 	if err != nil {
 		return fmt.Errorf("unable to update rp_filter for cni_interface %q, err: %s", iface, err)
 	} else {
-		klog.Infof("Successfully configured rp_filter to loose mode(2) on cniInterface %q", iface)
+		klog.V(log.DEBUG).Infof("Successfully configured rp_filter to loose mode(2) on cniInterface %q", iface)
 	}
 	return nil
 }
