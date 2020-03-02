@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/submariner-io/submariner/pkg/log"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 )
@@ -13,12 +14,12 @@ import (
 func (i *Controller) updateIngressRulesForService(globalIP, chainName string, addRules bool) error {
 	ruleSpec := []string{"-d", globalIP, "-j", chainName}
 	if addRules {
-		klog.V(4).Infof("Installing iptables rule for Service %s", strings.Join(ruleSpec, " "))
+		klog.V(log.DEBUG).Infof("Installing iptables rule for Service %s", strings.Join(ruleSpec, " "))
 		if err := i.ipt.AppendUnique("nat", submarinerIngress, ruleSpec...); err != nil {
 			return fmt.Errorf("error appending iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
 		}
 	} else {
-		klog.V(4).Infof("Deleting iptable ingress rule for Service: %s", strings.Join(ruleSpec, " "))
+		klog.V(log.DEBUG).Infof("Deleting iptable ingress rule for Service: %s", strings.Join(ruleSpec, " "))
 		if err := i.ipt.Delete("nat", submarinerIngress, ruleSpec...); err != nil {
 			return fmt.Errorf("error deleting iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
 		}
@@ -40,13 +41,13 @@ func (i *Controller) kubeProxyClusterIpServiceChainName(service *k8sv1.Service) 
 func (i *Controller) doesIPTablesChainExist(table, chain string) (bool, error) {
 	existingChains, err := i.ipt.ListChains(table)
 	if err != nil {
-		klog.V(4).Infof("Error listing iptables chains in %s table: %s", table, err)
+		klog.V(log.DEBUG).Infof("Error listing iptables chains in %s table: %s", table, err)
 		return false, err
 	}
 
 	for _, val := range existingChains {
 		if val == chain {
-			klog.V(4).Infof("%s chain exists in %s table", chain, table)
+			klog.V(log.DEBUG).Infof("%s chain exists in %s table", chain, table)
 			return true, nil
 		}
 	}
