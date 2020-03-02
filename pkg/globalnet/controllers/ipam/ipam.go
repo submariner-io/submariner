@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-iptables/iptables"
+	"github.com/submariner-io/submariner/pkg/log"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -166,7 +167,7 @@ func (i *Controller) processNextObject(objWorkqueue workqueue.RateLimitingInterf
 
 				// Privileged pods that use hostNetwork will be ignored.
 				if pod.Status.PodIP == pod.Status.HostIP {
-					klog.V(4).Infof("Ignoring pod %s on host %s as it uses hostNetworking", pod.Name, pod.Status.PodIP)
+					klog.V(log.DEBUG).Infof("Ignoring pod %s on host %s as it uses hostNetworking", pod.Name, pod.Status.PodIP)
 					return nil
 				}
 			}
@@ -191,7 +192,7 @@ func (i *Controller) processNextObject(objWorkqueue workqueue.RateLimitingInterf
 
 func (i *Controller) enqueueObject(obj interface{}, workqueue workqueue.RateLimitingInterface) {
 	if key := i.getEnqueueKey(obj); key != "" {
-		klog.V(4).Infof("Enqueueing %v for ipam controller", key)
+		klog.V(log.TRACE).Infof("Enqueueing %v for ipam controller", key)
 		workqueue.AddRateLimited(key)
 	}
 }
@@ -225,7 +226,7 @@ func (i *Controller) handleUpdateService(old interface{}, newObj interface{}) {
 	oldGlobalIp := old.(*k8sv1.Service).GetAnnotations()[submarinerIpamGlobalIp]
 	newGlobalIp := newObj.(*k8sv1.Service).GetAnnotations()[submarinerIpamGlobalIp]
 	if oldGlobalIp != newGlobalIp && newGlobalIp != i.pool.GetAllocatedIp(key) {
-		klog.V(4).Infof("GlobalIp changed from %s to %s for %s", oldGlobalIp, newGlobalIp, key)
+		klog.V(log.DEBUG).Infof("GlobalIp changed from %s to %s for %s", oldGlobalIp, newGlobalIp, key)
 		i.enqueueObject(newObj, i.serviceWorkqueue)
 	}
 }
@@ -243,27 +244,27 @@ func (i *Controller) handleUpdatePod(old interface{}, newObj interface{}) {
 	podHostIP := newObj.(*k8sv1.Pod).Status.HostIP
 	// Pod events that are skipped during addEvent are handled here when they are assigned an ipaddress.
 	if updatedPodIp != "" && oldPodIp != updatedPodIp {
-		klog.V(4).Infof("In handleUpdatePod, pod %s is now assigned %s address, enqueing", old.(*k8sv1.Pod).Name, updatedPodIp)
+		klog.V(log.DEBUG).Infof("In handleUpdatePod, pod %s is now assigned %s address, enqueing", old.(*k8sv1.Pod).Name, updatedPodIp)
 		i.enqueueObject(newObj, i.podWorkqueue)
 		return
 	}
 
 	// When the POD is getting terminated, sometimes we get pod update event with podIp removed.
 	if oldPodIp != "" && updatedPodIp == "" {
-		klog.V(4).Infof("Pod %s with ip %s is being terminated", old.(*k8sv1.Pod).Name, oldPodIp)
+		klog.V(log.DEBUG).Infof("Pod %s with ip %s is being terminated", old.(*k8sv1.Pod).Name, oldPodIp)
 		i.handleRemovedPod(old)
 	}
 
 	// Ignore privileged pods that use hostNetwork
 	if updatedPodIp != "" && updatedPodIp == podHostIP {
-		klog.V(4).Infof("Pod %s on host %s uses hostNetwork, ignoring", old.(*k8sv1.Pod).Name, podHostIP)
+		klog.V(log.DEBUG).Infof("Pod %s on host %s uses hostNetwork, ignoring", old.(*k8sv1.Pod).Name, podHostIP)
 		return
 	}
 
 	oldGlobalIp := old.(*k8sv1.Pod).GetAnnotations()[submarinerIpamGlobalIp]
 	newGlobalIp := newObj.(*k8sv1.Pod).GetAnnotations()[submarinerIpamGlobalIp]
 	if oldGlobalIp != newGlobalIp && newGlobalIp != i.pool.GetAllocatedIp(key) {
-		klog.V(4).Infof("GlobalIp changed from %s to %s for %s", oldGlobalIp, newGlobalIp, key)
+		klog.V(log.DEBUG).Infof("GlobalIp changed from %s to %s for %s", oldGlobalIp, newGlobalIp, key)
 		i.enqueueObject(newObj, i.podWorkqueue)
 	}
 }
@@ -295,7 +296,7 @@ func (i *Controller) handleRemovedService(obj interface{}) {
 			}
 			i.pool.Release(key)
 			i.syncServiceRules(service, globalIp, DeleteRules)
-			klog.V(4).Infof("Released ip %s for service %s", globalIp, key)
+			klog.V(log.DEBUG).Infof("Released ip %s for service %s", globalIp, key)
 		}
 	}
 }
@@ -326,7 +327,7 @@ func (i *Controller) handleRemovedPod(obj interface{}) {
 			}
 			i.pool.Release(key)
 			i.syncPodRules(pod.Status.PodIP, globalIp, DeleteRules)
-			klog.V(4).Infof("Released GlobalIp %s for pod %s", globalIp, key)
+			klog.V(log.DEBUG).Infof("Released GlobalIp %s for pod %s", globalIp, key)
 		}
 	}
 }
@@ -339,7 +340,7 @@ func (i *Controller) annotateGlobalIp(key string, globalIp string) (string, erro
 		if err != nil {
 			return "", err
 		}
-		klog.V(4).Infof("Allocating GlobalIp %s to %s ", ip, key)
+		klog.V(log.DEBUG).Infof("Allocating GlobalIp %s to %s ", ip, key)
 		return ip, nil
 	}
 	givenIp, err := i.pool.RequestIp(key, globalIp)
@@ -348,7 +349,7 @@ func (i *Controller) annotateGlobalIp(key string, globalIp string) (string, erro
 	}
 	if globalIp != givenIp {
 		// This resource has been allocated a different IP
-		klog.V(4).Infof("Updating GlobalIp for %s from %s to %s", key, globalIp, givenIp)
+		klog.V(log.DEBUG).Infof("Updating GlobalIp for %s from %s to %s", key, globalIp, givenIp)
 		return givenIp, nil
 	}
 	return "", nil
@@ -424,6 +425,6 @@ func (i *Controller) podUpdater(obj runtime.Object, key string) error {
 }
 
 func logAndRequeue(key string, workqueue workqueue.RateLimitingInterface) {
-	klog.V(4).Infof("%s enqueued %d times", key, workqueue.NumRequeues(key))
+	klog.V(log.DEBUG).Infof("%s enqueued %d times", key, workqueue.NumRequeues(key))
 	workqueue.AddRateLimited(key)
 }
