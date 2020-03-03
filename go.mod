@@ -26,7 +26,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/rdegges/go-ipify v0.0.0-20150526035502-2d94a6a86c40
 	github.com/spf13/pflag v0.0.0-20180412120913-583c0c0531f0 // indirect
-	github.com/vishvananda/netlink v1.0.0
+	github.com/vishvananda/netlink v1.1.0
 	github.com/vishvananda/netns v0.0.0-20180720170159-13995c7128cc // indirect
 	golang.org/x/sys v0.0.0-20190624142023-c5567b49c5d0
 	gopkg.in/inf.v0 v0.0.0-20150911125757-3887ee99ecf0 // indirect
