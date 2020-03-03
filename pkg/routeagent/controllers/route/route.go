@@ -609,8 +609,10 @@ func (r *Controller) handleRemovedPod(obj interface{}) {
 func (r *Controller) cleanVxSubmarinerRoutes() {
 	link, err := netlink.LinkByName(VxLANIface)
 	if err != nil {
-		// if the vx-submariner interface does not exist then there are no routes to be cleaned up, we're fine.
-		return
+		if _, ok := err.(netlink.LinkNotFoundError); !ok {
+			klog.Errorf("Error retrieving link by name %q: %v", VxLANIface, err)
+			return
+		}
 	}
 	currentRouteList, err := netlink.RouteList(link, syscall.AF_INET)
 	if err != nil {
