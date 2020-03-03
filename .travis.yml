@@ -13,8 +13,7 @@ git:
 jobs:
   include:
   - env: CMD="make test validate"
-  - env: CMD="make build package e2e status=keep deploytool=operator"
-    env: DEPLOY=true
+  - env: CMD="make build package e2e status=keep deploytool=operator" DEPLOY=true
   - env: CMD="make build package e2e status=keep deploytool=helm"
 
 install:
