@@ -20,13 +20,18 @@ kubecfgs_dir=${DAPPER_SOURCE}/$kubecfgs_rel_dir
 function create_kind_clusters() {
     version=$2
     deploy=$3
+    overlap_cidrs=$4
 
     # FIXME: Somehow don't leak helm/operator-specific logic into this lib
-    if [[ $deploy = operator ]]; then
-        /usr/bin/armada create clusters --image=kindest/node:v${version} -n 3 --weave
-    elif [ "$deploy" = helm ]; then
-        /usr/bin/armada create clusters --image=kindest/node:v${version} -n 3 --weave --tiller
+    if [[ $deploy = helm ]]; then
+        deploy_flag="--tiller"
     fi
+
+    if [[ $overlap_cidrs = true ]]; then
+        overlap_flag="--overlap"
+    fi
+
+    /usr/bin/armada create clusters --image=kindest/node:v${version} -n 3 --weave $deploy_flag $overlap_flag
 }
 
 function import_subm_images() {

@@ -170,8 +170,9 @@ logging=$3
 kubefed=$4
 deploy=$5
 armada=$6
+overlap_cidrs=$7
 
-echo Starting with status: $status, k8s_version: $version, logging: $logging, kubefed: $kubefed, deploy: $deploy, armada: $armada
+echo Starting with status: $status, k8s_version: $version, logging: $logging, kubefed: $kubefed, deploy: $deploy, armada: $armada, overlap_cidrs: $overlap_cidrs
 
 if [[ $armada = true ]]; then
     echo Will deploy k8s clusters using armada abstracting kind
@@ -207,7 +208,7 @@ fi
 
 export_kubeconfig
 
-create_kind_clusters $status $version $deploy
+create_kind_clusters $status $version $deploy $overlap_cidrs
 
 if [[ $logging = true ]]; then
     # TODO: Test this code path in CI

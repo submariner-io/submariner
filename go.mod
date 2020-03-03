@@ -27,10 +27,9 @@ require (
 	github.com/rdegges/go-ipify v0.0.0-20150526035502-2d94a6a86c40
 	github.com/spf13/pflag v0.0.0-20180412120913-583c0c0531f0 // indirect
 	github.com/vishvananda/netlink v1.1.0
-	github.com/vishvananda/netns v0.0.0-20180720170159-13995c7128cc // indirect
 	golang.org/x/sys v0.0.0-20190624142023-c5567b49c5d0
+	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
 	gopkg.in/inf.v0 v0.0.0-20150911125757-3887ee99ecf0 // indirect
-	gopkg.in/yaml.v2 v2.2.2 // indirect
 	k8s.io/api v0.0.0-20190222213804-5cb15d344471
 	k8s.io/apimachinery v0.0.0-20190629003722-e20a3a656cff
 	k8s.io/client-go v0.0.0-20190521190702-177766529176

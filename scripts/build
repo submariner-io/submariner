@@ -6,6 +6,6 @@ source $(dirname $0)/lib/version
 
 cd $(dirname $0)/
 
-./build-engine $7
-./build-routeagent $7
-./build-globalnet $7
+./build-engine $8
+./build-routeagent $8
+./build-globalnet $8
