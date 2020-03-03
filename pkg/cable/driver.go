@@ -30,6 +30,9 @@ type DriverCreateFunc func(localSubnets []string, localEndpoint types.Submariner
 // Static map of supported drivers
 var drivers = map[string]DriverCreateFunc{}
 
+// Default cable and driver names
+var defaultCableDriver string
+
 // Adds a supported driver, prints a fatal error in teh case of double registration
 func AddDriver(name string, driverCreate DriverCreateFunc) {
 	if drivers[name] != nil {
@@ -45,4 +48,14 @@ func NewDriver(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (D
 		return nil, fmt.Errorf("unsupported cable type %s", localEndpoint.Spec.Backend)
 	}
 	return driverCreate(localSubnets, localEndpoint)
+}
+
+// Sets the default cable/driver name, if it is not specified by user.
+func SetDefautCableDriver(driver string) {
+	defaultCableDriver = driver
+}
+
+// Returns the default cable/driver name
+func GetDefaultCableDriver() string {
+	return defaultCableDriver
 }

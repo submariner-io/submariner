@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/submariner-io/submariner/pkg/cable"
+
 	"github.com/kelseyhightower/envconfig"
 	"github.com/submariner-io/submariner/pkg/log"
 	v1 "k8s.io/api/core/v1"
@@ -107,6 +109,9 @@ func main() {
 		}
 
 		submSpec.CableDriver = strings.ToLower(submSpec.CableDriver)
+		if len(submSpec.CableDriver) == 0 {
+			submSpec.CableDriver = cable.GetDefaultCableDriver()
+		}
 
 		localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterID, submSpec.CableDriver, map[string]string{}, submSpec.NatEnabled,
 			localSubnets, util.GetLocalIP())
