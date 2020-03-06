@@ -12,9 +12,9 @@ git:
 
 jobs:
   include:
-  - env: CMD="make test validate"
-  - env: CMD="make build package e2e status=keep deploytool=operator"
-  - env: CMD="make build package e2e status=keep deploytool=helm"
+  - env: CMD="make test validate" DEPLOY=false
+  - env: CMD="make build package e2e status=keep deploytool=operator" DEPLOY=true
+  - env: CMD="make build package e2e status=keep deploytool=helm" DEPLOY=false
 
 install:
   - sudo apt-get install moreutils # make ts available
@@ -36,11 +36,16 @@ after_success:
     make e2e status=clean 2>&1 | ts '[%H:%M:%.S]' -s
 deploy:
   - provider: script
-    script: bash scripts/release
+    script: [[ "${DEPLOY}" == "true" ]] && bash scripts/release
     on:
       branch: master
   - provider: script
-    script: bash scripts/release $TRAVIS_TAG
+    script: [[ "${DEPLOY}" == "true" ]] && bash scripts/release
+    on:
+      branch: /^release-\d+.\d+.*$/
+
+  - provider: script
+    script: [[ "${DEPLOY}" == "true" ]] && bash scripts/release $TRAVIS_TAG
     skip_cleanup: true
     on:
       tags: true
