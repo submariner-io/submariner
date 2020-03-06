@@ -40,10 +40,12 @@ deploy:
     on:
       branch: master
       condition: $DEPLOY = true
+
   - provider: script
     script: bash scripts/release
     on:
       branch: /^release-\d+.\d+.*$/
+      condition: $DEPLOY = true
 
   - provider: script
     script: bash scripts/release $TRAVIS_TAG
