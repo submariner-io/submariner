@@ -4,13 +4,18 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog"
 
+	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/test/e2e/framework"
 )
 
@@ -28,7 +33,6 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Wait for readiness of registered clusters to ensure tests
 	// run against a healthy federation.
 	//framework.WaitForUnmanagedClusterReadiness()
-
 	return nil
 
 }, func(data []byte) {
@@ -47,6 +51,40 @@ var _ = ginkgo.SynchronizedAfterSuite(func() {
 }, func() {
 	// Run only Ginkgo on node 1
 })
+
+func queryAndUpdateGlobalnetStatus() {
+	testContext := framework.TestContext
+	var kubeConfig string
+	if len(testContext.KubeConfig) > 0 {
+		config := strings.Split(framework.TestContext.KubeConfig, ":")
+		if config == nil {
+			klog.Fatalf("Error parsing the kubeconfig param. %v", framework.TestContext.KubeConfig)
+		}
+		kubeConfig = config[framework.ClusterB]
+	} else if len(testContext.KubeConfigs) > 0 {
+		kubeConfig = testContext.KubeConfigs[framework.ClusterB]
+	}
+
+	cfg, err := clientcmd.BuildConfigFromFlags("", kubeConfig)
+	if err != nil {
+		klog.Fatalf("Error building cluster config: %s", err.Error())
+	}
+
+	submarinerClient, err := submarinerClientset.NewForConfig(cfg)
+	if err != nil {
+		klog.Fatalf("Error building submariner clientset: %s", err.Error())
+	}
+
+	submClusterCRD, err := submarinerClient.SubmarinerV1().Clusters(testContext.SubmarinerNamespace).Get(testContext.KubeContexts[framework.ClusterB], metav1.GetOptions{})
+	if err != nil {
+		klog.Fatalf("Error retrieving clusterCRD from cluster %s, %v", testContext.KubeContexts[framework.ClusterB], err)
+	}
+
+	if submClusterCRD.Spec.GlobalCIDR != nil && len(submClusterCRD.Spec.GlobalCIDR) != 0 {
+		// Based on the status of GlobalnetEnabled, certain tests will be skipped/executed.
+		framework.TestContext.GlobalnetEnabled = true
+	}
+}
 
 func RunE2ETests(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
@@ -72,5 +110,6 @@ func RunE2ETests(t *testing.T) {
 		config.GinkgoConfig.ParallelNode)
 	junitPath := filepath.Join(reportDir, junitFile)
 	reporterList = append(reporterList, reporters.NewJUnitReporter(junitPath))
+	queryAndUpdateGlobalnetStatus()
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Submariner E2E suite", reporterList)
 }

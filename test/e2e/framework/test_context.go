@@ -21,6 +21,7 @@ type TestContextType struct {
 	ConnectionTimeout   uint
 	ConnectionAttempts  uint
 	OperationTimeout    uint
+	GlobalnetEnabled    bool
 }
 
 func (contexts *contextArray) String() string {
