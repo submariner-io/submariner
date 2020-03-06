@@ -7,5 +7,5 @@ cd $(dirname $0)
 
 ./validate
 ./test
-./build $*
+./build "$@"
 ./package

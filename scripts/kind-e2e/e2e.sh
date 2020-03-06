@@ -6,6 +6,8 @@ source $(git rev-parse --show-toplevel)/scripts/lib/version
 
 ### Variables ###
 
+KIND_REGISTRY=kind-registry
+
 ### Functions ###
 
 function print_logs() {
@@ -286,16 +288,43 @@ function cleanup {
 
 ### Main ###
 
-status=$1
-version=$2
-logging=$3
-kubefed=$4
-deploy=$5
-debug=$6
-globalnet=$7
-KIND_REGISTRY=kind-registry
+LONGOPTS=status:,k8s_version:,logging:,kubefed:,deploytool:,globalnet:
+# Only accept longopts, but must pass null shortopts or first param after "--" will be incorrectly used
+SHORTOPTS=""
+! PARSED=$(getopt --options=$SHORTOPTS --longoptions=$LONGOPTS --name "$0" -- "$@")
+eval set -- "$PARSED"
 
-echo Starting with status: $status, k8s_version: $version, logging: $logging, kubefed: $kubefed, deploy: $deploy, debug: $debug, globalnet: $globalnet
+while true; do
+    case "$1" in
+        --status)
+            status="$2"
+            ;;
+        --k8s_version)
+            version="$2"
+            ;;
+        --logging)
+            logging="$2"
+            ;;
+        --kubefed)
+            kubefed="$2"
+            ;;
+        --deploytool)
+            deploy="$2"
+            ;;
+        --globalnet)
+            globalnet="$2"
+            ;;
+        --)
+            break
+            ;;
+        *)
+            echo "Ignoring unknown option: $1 $2"
+            ;;
+    esac
+    shift 2
+done
+
+echo Starting with status: $status, k8s_version: $version, logging: $logging, kubefed: $kubefed, deploy: $deploy, globalnet: $globalnet
 
 if [[ $globalnet = "true" ]]; then
   # When globalnet is set to true, we want to deploy clusters with overlapping CIDRs
@@ -349,7 +378,7 @@ else
 fi
 registry_ip="$(docker inspect -f '{{.NetworkSettings.IPAddress}}' "$KIND_REGISTRY")"
 
-kind_clusters "$@"
+kind_clusters $status $version
 export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
 setup_custom_cni
 kind_import_images
