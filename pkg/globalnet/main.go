@@ -28,7 +28,7 @@ func main() {
 	if err != nil {
 		klog.Fatal(err)
 	}
-	klog.V(2).Info("Starting submariner-globalnet", ipamSpec)
+	klog.Info("Starting submariner-globalnet", ipamSpec)
 
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
@@ -54,7 +54,7 @@ func main() {
 	}()
 
 	wg.Wait()
-	klog.Fatal("All controllers stopped or exited. Stopping main loop")
+	klog.Infof("All controllers stopped or exited. Stopping main loop")
 }
 
 func init() {

@@ -127,10 +127,12 @@ func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, col
 				klog.V(log.DEBUG).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
 
-			utilruntime.HandleError(onClusterChange(&types.SubmarinerCluster{
-				ID:   object.Spec.ClusterID,
-				Spec: object.Spec,
-			}, false))
+			if selfClusterID != object.Spec.ClusterID {
+				utilruntime.HandleError(onClusterChange(&types.SubmarinerCluster{
+					ID:   object.Spec.ClusterID,
+					Spec: object.Spec,
+				}, false))
+			}
 		},
 		UpdateFunc: func(old, obj interface{}) {
 			var object *submarinerv1.Cluster
@@ -150,10 +152,12 @@ func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, col
 				klog.V(log.DEBUG).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
 
-			utilruntime.HandleError(onClusterChange(&types.SubmarinerCluster{
-				ID:   object.Spec.ClusterID,
-				Spec: object.Spec,
-			}, false))
+			if selfClusterID != object.Spec.ClusterID {
+				utilruntime.HandleError(onClusterChange(&types.SubmarinerCluster{
+					ID:   object.Spec.ClusterID,
+					Spec: object.Spec,
+				}, false))
+			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			var object *submarinerv1.Cluster
@@ -173,10 +177,12 @@ func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, col
 				klog.V(log.DEBUG).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
 
-			utilruntime.HandleError(onClusterChange(&types.SubmarinerCluster{
-				ID:   object.Spec.ClusterID,
-				Spec: object.Spec,
-			}, true))
+			if selfClusterID != object.Spec.ClusterID {
+				utilruntime.HandleError(onClusterChange(&types.SubmarinerCluster{
+					ID:   object.Spec.ClusterID,
+					Spec: object.Spec,
+				}, true))
+			}
 		},
 	}, time.Second*30)
 
@@ -205,9 +211,11 @@ func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, co
 				klog.V(log.DEBUG).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
 
-			utilruntime.HandleError(onEndpointChange(&types.SubmarinerEndpoint{
-				Spec: object.Spec,
-			}, false))
+			if selfClusterID != object.Spec.ClusterID {
+				utilruntime.HandleError(onEndpointChange(&types.SubmarinerEndpoint{
+					Spec: object.Spec,
+				}, false))
+			}
 		},
 		UpdateFunc: func(old, obj interface{}) {
 			var object *submarinerv1.Endpoint
@@ -227,9 +235,11 @@ func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, co
 				klog.V(log.DEBUG).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
 
-			utilruntime.HandleError(onEndpointChange(&types.SubmarinerEndpoint{
-				Spec: object.Spec,
-			}, false))
+			if selfClusterID != object.Spec.ClusterID {
+				utilruntime.HandleError(onEndpointChange(&types.SubmarinerEndpoint{
+					Spec: object.Spec,
+				}, false))
+			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			var object *submarinerv1.Endpoint
@@ -249,9 +259,11 @@ func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, co
 				klog.V(log.DEBUG).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
 
-			utilruntime.HandleError(onEndpointChange(&types.SubmarinerEndpoint{
-				Spec: object.Spec,
-			}, true))
+			if selfClusterID != object.Spec.ClusterID {
+				utilruntime.HandleError(onEndpointChange(&types.SubmarinerEndpoint{
+					Spec: object.Spec,
+				}, true))
+			}
 		},
 	}, time.Second*30)
 
