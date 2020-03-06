@@ -13,6 +13,10 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 
 	verifyInteraction := func(listenerScheduling, connectorScheduling framework.NetworkPodScheduling) {
 		It("should have sent the expected data from the pod to the other pod", func() {
+			if framework.TestContext.GlobalnetEnabled {
+				framework.Skipf("Globalnet enabled, skipping the test...")
+				return
+			}
 			tcp.RunConnectivityTest(f, useService, networkType, listenerScheduling, connectorScheduling, framework.ClusterB, framework.ClusterA)
 		})
 	}
