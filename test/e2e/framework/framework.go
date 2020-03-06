@@ -79,7 +79,7 @@ type Framework struct {
 
 	SkipNamespaceCreation    bool            // Whether to skip creating a namespace
 	Namespace                string          // Every test has a namespace at least unless creation is skipped
-	namespacesToDelete       []*v1.Namespace // Some tests have more than one.
+	namespacesToDelete       map[string]bool // Some tests have more than one.
 	NamespaceDeletionTimeout time.Duration
 
 	// To make sure that this framework cleans up after itself, no matter what,
@@ -111,8 +111,9 @@ func NewDefaultFramework(baseName string) *Framework {
 // NewFramework creates a test framework.
 func NewFramework(baseName string, options Options) *Framework {
 	f := &Framework{
-		BaseName: baseName,
-		Options:  options,
+		BaseName:           baseName,
+		Options:            options,
+		namespacesToDelete: map[string]bool{},
 	}
 
 	ginkgo.BeforeEach(f.BeforeEach)
@@ -153,7 +154,7 @@ func (f *Framework) BeforeEach() {
 	}
 
 	if !f.SkipNamespaceCreation {
-		ginkgo.By(fmt.Sprintf("Building namespace api objects, basename %s", f.BaseName))
+		ginkgo.By(fmt.Sprintf("Creating namespace objects with basename %q", f.BaseName))
 
 		namespaceLabels := map[string]string{
 			"e2e-framework": f.BaseName,
@@ -165,7 +166,10 @@ func (f *Framework) BeforeEach() {
 				namespace := generateNamespace(clientSet, f.BaseName, namespaceLabels)
 				f.Namespace = namespace.GetName()
 				f.UniqueName = namespace.GetName()
+				f.AddNamespacesToDelete(namespace)
+				ginkgo.By(fmt.Sprintf("Generated namespace %q in cluster %q to execute the tests in", f.Namespace, TestContext.KubeContexts[idx]))
 			default: // On the other clusters we use the same name to make tracing easier
+				ginkgo.By(fmt.Sprintf("Creating namespace %q in cluster %q", f.Namespace, TestContext.KubeContexts[idx]))
 				f.CreateNamespace(clientSet, f.Namespace, namespaceLabels)
 			}
 		}
@@ -217,11 +221,9 @@ func (f *Framework) createRestConfig(kubeConfig, context string) *rest.Config {
 }
 
 func deleteNamespace(client kubeclientset.Interface, namespaceName string) error {
-
 	return client.CoreV1().Namespaces().Delete(
 		namespaceName,
 		&metav1.DeleteOptions{})
-
 }
 
 // AfterEach deletes the namespace, after reading its events.
@@ -235,17 +237,17 @@ func (f *Framework) AfterEach() {
 		// Whether to delete namespace is determined by 3 factors: delete-namespace flag, delete-namespace-on-failure flag and the test result
 		// if delete-namespace set to false, namespace will always be preserved.
 		// if delete-namespace is true and delete-namespace-on-failure is false, namespace will be preserved if test failed.
-		for _, ns := range f.namespacesToDelete {
-			ginkgo.By(fmt.Sprintf("Destroying namespace %q for this suite on all clusters.", ns.Name))
+		for ns := range f.namespacesToDelete {
 			if errors := f.deleteNamespaceFromAllClusters(ns); errors != nil {
-				nsDeletionErrors[ns.Name] = errors
+				nsDeletionErrors[ns] = errors
 			}
+
+			delete(f.namespacesToDelete, ns)
 		}
 
 		// Paranoia-- prevent reuse!
 		f.Namespace = ""
 		f.ClusterClients = nil
-		f.namespacesToDelete = nil
 
 		// if we had errors deleting, report them now.
 		if len(nsDeletionErrors) != 0 {
@@ -262,17 +264,18 @@ func (f *Framework) AfterEach() {
 
 }
 
-func (f *Framework) deleteNamespaceFromAllClusters(ns *v1.Namespace) []error {
+func (f *Framework) deleteNamespaceFromAllClusters(ns string) []error {
 	var errors []error
-	for _, clientSet := range f.ClusterClients {
-		if err := deleteNamespace(clientSet, ns.Name); err != nil {
+	for i, clientSet := range f.ClusterClients {
+		ginkgo.By(fmt.Sprintf("Deleting namespace %q on cluster %q", ns, TestContext.KubeContexts[i]))
+		if err := deleteNamespace(clientSet, ns); err != nil {
 			switch {
 			case apierrors.IsNotFound(err):
-				Logf("Namespace %v was already deleted", ns.Name)
+				Logf("Namespace %q was already deleted", ns)
 			case apierrors.IsConflict(err):
-				Logf("Namespace %v scheduled for deletion, resources being purged", ns.Name)
+				Logf("Namespace %v scheduled for deletion, resources being purged", ns)
 			default:
-				Logf("Failed deleting namespace: %v", err)
+				Logf("Failed to delete namespace %q: %v", ns, err)
 				errors = append(errors, err)
 			}
 		}
@@ -294,7 +297,8 @@ func (f *Framework) AddNamespacesToDelete(namespaces ...*v1.Namespace) {
 		if ns == nil {
 			continue
 		}
-		f.namespacesToDelete = append(f.namespacesToDelete, ns)
+
+		f.namespacesToDelete[ns.Name] = true
 	}
 }
 
@@ -312,7 +316,6 @@ func generateNamespace(client kubeclientset.Interface, baseName string, labels m
 }
 
 func createTestNamespace(client kubeclientset.Interface, name string, labels map[string]string) *v1.Namespace {
-	ginkgo.By(fmt.Sprintf("Creating a namespace %s to execute the test in", name))
 	namespace := createNamespace(client, name, labels)
 	return namespace
 }
