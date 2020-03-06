@@ -7,6 +7,7 @@ source $(git rev-parse --show-toplevel)/scripts/lib/version
 ### Variables ###
 
 KIND_REGISTRY=kind-registry
+E2E_DIR=$(dirname "$(readlink -f "$0")")
 
 ### Functions ###
 
@@ -40,7 +41,7 @@ function generate_cluster_yaml() {
         disable_cni="false"
     fi
 
-    render_template ${PRJ_ROOT}/scripts/kind-e2e/kind-cluster-config.yaml > ${PRJ_ROOT}/scripts/kind-e2e/$1-config.yaml
+    render_template ${E2E_DIR}/kind-cluster-config.yaml > ${E2E_DIR}/$1-config.yaml
 }
 
 function kind_fixup_config() {
@@ -75,9 +76,9 @@ function kind_clusters() {
             (
             generate_cluster_yaml "cluster${i}"
             if [[ -n ${version} ]]; then
-                kind create cluster --image=kindest/node:v${version} --name=cluster${i} --config=${PRJ_ROOT}/scripts/kind-e2e/cluster${i}-config.yaml
+                kind create cluster --image=kindest/node:v${version} --name=cluster${i} --config=${E2E_DIR}/cluster${i}-config.yaml
             else
-                kind create cluster --name=cluster${i} --config=${PRJ_ROOT}/scripts/kind-e2e/cluster${i}-config.yaml
+                kind create cluster --name=cluster${i} --config=${E2E_DIR}/cluster${i}-config.yaml
             fi
             kind_fixup_config cluster${i}
             ) > ${logs[$i]} 2>&1 &
@@ -166,12 +167,12 @@ function enable_logging() {
     else
         echo Installing Elasticsearch...
         es_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster1-control-plane | head -n 1)
-        kubectl --context=cluster1 apply -f ${PRJ_ROOT}/scripts/kind-e2e/logging/elasticsearch.yaml
-        kubectl --context=cluster1 apply -f ${PRJ_ROOT}/scripts/kind-e2e/logging/filebeat.yaml
+        kubectl --context=cluster1 apply -f ${E2E_DIR}/logging/elasticsearch.yaml
+        kubectl --context=cluster1 apply -f ${E2E_DIR}/logging/filebeat.yaml
         echo Waiting for Elasticsearch to be ready...
         kubectl --context=cluster1 wait --for=condition=Ready pods -l app=elasticsearch --timeout=300s
         for i in 2 3; do
-            kubectl --context=cluster${i} apply -f ${PRJ_ROOT}/scripts/kind-e2e/logging/filebeat.yaml
+            kubectl --context=cluster${i} apply -f ${E2E_DIR}/logging/filebeat.yaml
             kubectl --context=cluster${i} set env daemonset/filebeat -n kube-system ELASTICSEARCH_HOST=${es_ip} ELASTICSEARCH_PORT=30000
         done
     fi
@@ -212,7 +213,7 @@ function deploy_netshoot() {
     context=$1
     worker_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $context-worker | head -n 1)
     echo Deploying netshoot on $context worker: ${worker_ip}
-    kubectl --context=$context apply -f ${PRJ_ROOT}/scripts/kind-e2e/netshoot.yaml
+    kubectl --context=$context apply -f ${E2E_DIR}/netshoot.yaml
     echo Waiting for netshoot pods to be Ready on $context.
     kubectl --context=$context rollout status deploy/netshoot --timeout=120s
 }
@@ -221,7 +222,7 @@ function deploy_nginx() {
     context=$1
     worker_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $context-worker | head -n 1)
     echo Deploying nginx on $context worker: ${worker_ip}
-    kubectl --context=$context apply -f ${PRJ_ROOT}/scripts/kind-e2e/nginx-demo.yaml
+    kubectl --context=$context apply -f ${E2E_DIR}/nginx-demo.yaml
     echo Waiting for nginx-demo deployment to be Ready on $context.
     kubectl --context=$context rollout status deploy/nginx-demo --timeout=120s
 }
@@ -349,11 +350,11 @@ elif [[ $status != keep && $status != create ]]; then
 fi
 
 if [[ $deploy = operator ]]; then
-    echo Deploying with operator
-    . kind-e2e/lib_operator_deploy_subm.sh
+    echo Will deploy submariner using the operator
+    . ${E2E_DIR}/lib_operator_deploy_subm.sh
 elif [ "$deploy" = helm ]; then
-    echo Deploying with helm
-    . kind-e2e/lib_helm_deploy_subm.sh
+    echo Will deploy submariner using helm
+    . ${E2E_DIR}/lib_helm_deploy_subm.sh
 else
     echo Unknown deploy method: $deploy
     cleanup
