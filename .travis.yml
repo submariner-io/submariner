@@ -13,7 +13,7 @@ git:
 jobs:
   include:
   - env: CMD="make test validate"
-  - env: CMD="make build package e2e status=keep deploytool=operator"
+  - env: CMD="make build package e2e status=keep deploytool=operator" DEPLOY=true
   - env: CMD="make build package e2e status=keep deploytool=helm"
 
 install:
@@ -39,6 +39,11 @@ deploy:
     script: bash scripts/release
     on:
       branch: master
+  - provider: script
+    script: bash scripts/release
+    on:
+      branch: /^release-\d+.\d+.*$/
+
   - provider: script
     script: bash scripts/release $TRAVIS_TAG
     skip_cleanup: true

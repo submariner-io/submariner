@@ -2,6 +2,7 @@
 set -em
 
 source $(git rev-parse --show-toplevel)/scripts/lib/debug_functions
+source $(git rev-parse --show-toplevel)/scripts/lib/version
 
 ### Variables ###
 
@@ -78,8 +79,8 @@ function setup_custom_cni(){
 }
 
 function kind_import_images() {
-    docker tag quay.io/submariner/submariner:dev submariner:local
-    docker tag quay.io/submariner/submariner-route-agent:dev submariner-route-agent:local
+    docker tag quay.io/submariner/submariner:$VERSION submariner:local
+    docker tag quay.io/submariner/submariner-route-agent:$VERSION submariner-route-agent:local
 
     for i in 1 2 3; do
         echo "Loading submariner images into cluster${i}..."
