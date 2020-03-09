@@ -7,9 +7,9 @@ kubeadmConfigPatches:
   metadata:
     name: config
   networking:
-    podSubnet: 10.244.0.0/16
-    serviceSubnet: 100.94.0.0/16
-    dnsDomain: cluster1.local
+    podSubnet: ${pod_cidr}
+    serviceSubnet: ${service_cidr}
+    dnsDomain: ${dns_domain}
 nodes:
 - role: control-plane
 - role: worker
