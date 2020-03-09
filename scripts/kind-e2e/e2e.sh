@@ -28,6 +28,22 @@ function print_logs() {
     fi
 }
 
+function render_template() {
+    eval "echo \"$(cat $1)\""
+}
+
+function generate_cluster_yaml() {
+    pod_cidr="${cluster_CIDRs[$1]}"
+    service_cidr="${service_CIDRs[$1]}"
+    dns_domain="$1.local"
+    disable_cni="true"
+    if [[ "$1" = "cluster1" ]]; then
+        disable_cni="false"
+    fi
+
+    render_template ${PRJ_ROOT}/scripts/kind-e2e/kind-cluster-config.yaml > ${PRJ_ROOT}/scripts/kind-e2e/$1-config.yaml
+}
+
 function kind_clusters() {
     status=$1
     version=$2
@@ -40,6 +56,7 @@ function kind_clusters() {
             logs[$i]=$(mktemp)
             echo Creating cluster${i}, logging to ${logs[$i]}...
             (
+            generate_cluster_yaml "cluster${i}"
             if [[ -n ${version} ]]; then
                 kind create cluster --image=kindest/node:v${version} --name=cluster${i} --config=${PRJ_ROOT}/scripts/kind-e2e/cluster${i}-config.yaml
             else
