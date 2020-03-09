@@ -2,6 +2,10 @@ kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 networking:
   disableDefaultCNI: ${disable_cni}
+containerdConfigPatches:
+- |-
+  [plugins.cri.registry.mirrors.\"localhost:5000\"]
+    endpoint = [\"http://${registry_ip}:5000\"]
 kubeadmConfigPatches:
 - |
   apiVersion: kubeadm.k8s.io/v1beta1

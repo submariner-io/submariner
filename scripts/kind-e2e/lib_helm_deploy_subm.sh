@@ -77,12 +77,15 @@ function helm_install_subm() {
         --set submariner.globalCidr="${global_cidr}" \
         --set serviceAccounts.globalnet.create=${globalnet_enable} \
         --set submariner.natEnabled="false" \
-        --set routeAgent.image.repository="submariner-route-agent" \
+        --set routeAgent.image.repository="localhost:5000/submariner-route-agent" \
         --set routeAgent.image.tag="local" \
         --set routeAgent.image.pullPolicy="IfNotPresent" \
-        --set engine.image.repository="submariner" \
+        --set engine.image.repository="localhost:5000/submariner" \
         --set engine.image.tag="local" \
         --set engine.image.pullPolicy="IfNotPresent" \
+        --set globalnet.image.repository="localhost:5000/submariner-globalnet" \
+        --set globalnet.image.tag="local" \
+        --set globalnet.image.pullPolicy="IfNotPresent" \
         --set crd.create="${crd_create}"
 }
 
