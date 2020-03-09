@@ -56,7 +56,6 @@ func NewEngine(localSubnets []string, localCluster types.SubmarinerCluster, loca
 }
 
 func (i *engine) StartEngine() error {
-	klog.Infof("Starting IPSec Engine (Charon)")
 	return i.driver.Init()
 }
 
