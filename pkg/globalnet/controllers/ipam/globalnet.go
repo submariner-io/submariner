@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/coreos/go-iptables/iptables"
+	"github.com/submariner-io/submariner/pkg/log"
 	k8sv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
@@ -14,7 +15,7 @@ import (
 )
 
 func (i *Controller) initIPTableChains() error {
-	klog.V(4).Infof("Install/ensure %s chain exists", submarinerIngress)
+	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", submarinerIngress)
 	if err := util.CreateChainIfNotExists(i.ipt, "nat", submarinerIngress); err != nil {
 		return fmt.Errorf("error creating iptables chain %s: %v", submarinerIngress, err)
 	}
@@ -24,12 +25,12 @@ func (i *Controller) initIPTableChains() error {
 		klog.Errorf("error appending iptables rule %q: %v\n", strings.Join(forwardToSubGlobalNetChain, " "), err)
 	}
 
-	klog.V(4).Infof("Install/ensure %s chain exists", submarinerEgress)
+	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", submarinerEgress)
 	if err := util.CreateChainIfNotExists(i.ipt, "nat", submarinerEgress); err != nil {
 		return fmt.Errorf("error creating iptables chain %s: %v", submarinerEgress, err)
 	}
 
-	klog.V(4).Infof("Install/ensure %s chain exists", route.SmPostRoutingChain)
+	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", route.SmPostRoutingChain)
 	if err := util.CreateChainIfNotExists(i.ipt, "nat", route.SmPostRoutingChain); err != nil {
 		return fmt.Errorf("error creating iptables chain %s: %v", route.SmPostRoutingChain, err)
 	}
@@ -104,7 +105,7 @@ func (i *Controller) cleanupIPTableRules() {
 }
 
 func CreateGlobalNetMarkingChain(ipt *iptables.IPTables) error {
-	klog.V(4).Infof("Install/ensure %s chain exists", submarinerMark)
+	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", submarinerMark)
 	if err := util.CreateChainIfNotExists(ipt, "nat", submarinerMark); err != nil {
 		return fmt.Errorf("error creating iptables chain %s: %v", submarinerMark, err)
 	}
