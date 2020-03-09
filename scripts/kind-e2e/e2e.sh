@@ -101,21 +101,17 @@ function setup_custom_cni(){
 }
 
 function kind_import_images() {
-    docker tag quay.io/submariner/submariner:$VERSION submariner:local
-    docker tag quay.io/submariner/submariner-route-agent:$VERSION submariner-route-agent:local
+    docker tag quay.io/submariner/submariner:$VERSION localhost:5000/submariner:local
+    docker tag quay.io/submariner/submariner-route-agent:$VERSION localhost:5000/submariner-route-agent:local
     if [[ $globalnet = "true" ]]; then
-        docker tag quay.io/submariner/submariner-globalnet:$VERSION submariner-globalnet:local
+        docker tag quay.io/submariner/submariner-globalnet:$VERSION localhost:5000/submariner-globalnet:local
     fi
 
-    for i in 1 2 3; do
-        echo "Loading submariner images into cluster${i}..."
-        kind --name cluster${i} load docker-image submariner:local
-        kind --name cluster${i} load docker-image submariner-route-agent:local
-        if [[ $globalnet = "true" ]]; then
-            echo "Loading globalnet image into cluster${i}..."
-            kind --name cluster${i} load docker-image submariner-globalnet:local
-        fi
-    done
+    docker push localhost:5000/submariner:local
+    docker push localhost:5000/submariner-route-agent:local
+    if [[ $globalnet = "true" ]]; then
+        docker push localhost:5000/submariner-globalnet:local
+    fi
 }
 
 function get_globalip() {
@@ -253,12 +249,22 @@ function delete_subm_pods() {
 
 }
 
+function registry_running() {
+    docker ps --filter name="^/?$KIND_REGISTRY$" | grep $KIND_REGISTRY
+    return $?
+}
+
 function cleanup {
     for i in 1 2 3; do
       if [[ $(kind get clusters | grep cluster${i} | wc -l) -gt 0  ]]; then
         kind delete cluster --name=cluster${i};
       fi
     done
+
+    echo Removing local KIND registry...
+    if registry_running; then
+        docker stop $KIND_REGISTRY
+    fi
 
     if [[ $(docker ps -qf status=exited | wc -l) -gt 0 ]]; then
         echo Cleaning containers...
@@ -286,6 +292,7 @@ kubefed=$4
 deploy=$5
 debug=$6
 globalnet=$7
+KIND_REGISTRY=kind-registry
 
 echo Starting with status: $status, k8s_version: $version, logging: $logging, kubefed: $kubefed, deploy: $deploy, debug: $debug, globalnet: $globalnet
 
@@ -331,6 +338,15 @@ export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-clust
 if [[ $logging = true ]]; then
     enable_logging
 fi
+
+# Run a local registry to avoid loading images manually to kind
+if registry_running; then
+    echo Local registry $KIND_REGISTRY already running.
+else
+    echo Deploying local registry $KIND_REGISTRY to serve images centrally.
+    docker run -d -p 5000:5000 --restart=always --name $KIND_REGISTRY registry:2
+fi
+registry_ip="$(docker inspect -f '{{.NetworkSettings.IPAddress}}' "$KIND_REGISTRY")"
 
 kind_clusters "$@"
 export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')

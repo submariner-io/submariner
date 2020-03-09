@@ -10,7 +10,7 @@ fi
 ce_ipsec_ikeport=500
 ce_ipsec_nattport=4500
 subm_colorcodes=blue
-subm_engine_image_repo=local
+subm_engine_image_repo=localhost:5000
 subm_engine_image_tag=local
 subm_ns=submariner-operator
 
