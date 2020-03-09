@@ -1,5 +1,7 @@
 kind: Cluster
 apiVersion: kind.sigs.k8s.io/v1alpha3
+networking:
+  disableDefaultCNI: true
 containerdConfigPatches:
 - |-
   [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:5000"]

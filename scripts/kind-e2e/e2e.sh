@@ -77,7 +77,7 @@ function kind_clusters() {
 }
 
 function setup_custom_cni(){
-    for i in 2 3; do
+    for i in 1 2 3; do
         if kubectl --context=cluster${i} wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=60s > /dev/null 2>&1; then
             echo "Weave already deployed cluster${i}."
         else
