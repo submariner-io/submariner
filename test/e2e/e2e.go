@@ -11,10 +11,12 @@ import (
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/gomega"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/test/e2e/framework"
 )
@@ -75,15 +77,26 @@ func queryAndUpdateGlobalnetStatus() {
 		klog.Fatalf("Error building submariner clientset: %s", err.Error())
 	}
 
-	submClusterCRD, err := submarinerClient.SubmarinerV1().Clusters(testContext.SubmarinerNamespace).Get(testContext.KubeContexts[framework.ClusterB], metav1.GetOptions{})
-	if err != nil {
-		klog.Fatalf("Error retrieving clusterCRD from cluster %s, %v", testContext.KubeContexts[framework.ClusterB], err)
-	}
+	framework.AwaitUntil("find the submariner Cluster for "+testContext.KubeContexts[framework.ClusterB], func() (interface{}, error) {
+		cluster, err := submarinerClient.SubmarinerV1().Clusters(testContext.SubmarinerNamespace).Get(testContext.KubeContexts[framework.ClusterB], metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return cluster, err
+	}, func(result interface{}) (bool, string, error) {
+		if result == nil {
+			return false, "No Cluster  found", nil
+		}
 
-	if submClusterCRD.Spec.GlobalCIDR != nil && len(submClusterCRD.Spec.GlobalCIDR) != 0 {
-		// Based on the status of GlobalnetEnabled, certain tests will be skipped/executed.
-		framework.TestContext.GlobalnetEnabled = true
-	}
+		cluster := result.(*submarinerv1.Cluster)
+		if len(cluster.Spec.GlobalCIDR) != 0 {
+			// Based on the status of GlobalnetEnabled, certain tests will be skipped/executed.
+			framework.TestContext.GlobalnetEnabled = true
+		}
+
+		return true, "", nil
+	})
+
 }
 
 func RunE2ETests(t *testing.T) {

@@ -60,7 +60,7 @@ function helm_install_subm() {
     cluster_cidr=$3
     service_cidr=$4
     global_cidr=$5
-    globalnet_enable="true" && [[ -z $global_cidr ]] && globalnet_enable="false"
+    if [ -z $global_cidr ]; then globalnet_enable="false"; else globalnet_enable="true"; fi
 
     kubectl config use-context $cluster_id
     helm --kube-context ${cluster_id} install submariner-latest/submariner \
