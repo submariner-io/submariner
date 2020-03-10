@@ -106,6 +106,10 @@ func (i *strongSwan) Init() error {
 	return nil
 }
 
+func (i *strongSwan) GetName() string {
+	return cableDriverName
+}
+
 func (i *strongSwan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string, error) {
 	client, err := getClient()
 	if err != nil {
