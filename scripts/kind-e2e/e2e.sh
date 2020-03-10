@@ -81,43 +81,39 @@ function setup_custom_cni(){
 function kind_import_images() {
     docker tag quay.io/submariner/submariner:$VERSION submariner:local
     docker tag quay.io/submariner/submariner-route-agent:$VERSION submariner-route-agent:local
+    if [[ $globalnet = "true" ]]; then
+        docker tag quay.io/submariner/submariner-globalnet:$VERSION submariner-globalnet:local
+    fi
 
     for i in 1 2 3; do
         echo "Loading submariner images into cluster${i}..."
         kind --name cluster${i} load docker-image submariner:local
         kind --name cluster${i} load docker-image submariner-route-agent:local
-    done
-
-    if [ ! -z "${global_CIDRs[cluster1]}" ]
-    then
-        docker tag quay.io/submariner/submariner-globalnet:$VERSION submariner-globalnet:local
-        for i in 1 2 3; do
+        if [[ $globalnet = "true" ]]; then
             echo "Loading globalnet image into cluster${i}..."
             kind --name cluster${i} load docker-image submariner-globalnet:local
-        done
-    fi
+        fi
+    done
 }
 
 function get_globalip() {
     svcname=$1
-    gip=
-    attempt_counter=0
-    max_attempts=5
     # It takes a while for globalIp annotation to show up on a service
-    until [[ $gip ]]; do
-        sleep 1
-        gip=$(kubectl get svc nginx-demo -o jsonpath='{.metadata.annotations.submariner\.io/globalIp}')
-        if [[ ${attempt_counter} -eq ${max_attempts} ]];then
-          echo "Max attempts reached, failed to get globalIp!"
-          exit 1
+    for i in {0..30}
+    do
+        gip=$(kubectl get svc $svcname -o jsonpath='{.metadata.annotations.submariner\.io/globalIp}')
+        if [ $gip != "" ]; then
+          echo $gip
+          return
         fi
-        attempt_counter=$(($attempt_counter+1))
+        sleep 1
     done
-    echo $gip
+    echo "Max attempts reached, failed to get globalIp!"
+    exit 1
 }
 
 function test_connection() {
-    if [[ $globalnet = true ]]; then
+    if [[ $globalnet = "true" ]]; then
         nginx_svc_ip_cluster3=$(get_globalip nginx-demo)
     else
         nginx_svc_ip_cluster3=$(kubectl --context=cluster3 get svc -l app=nginx-demo | awk 'FNR == 2 {print $3}')
@@ -227,12 +223,12 @@ function test_with_e2e_tests {
 function delete_subm_pods() {
     context=$1
     ns=$2
-    for app in submariner-engine submariner-routeagent submariner-globalnet; do
-        if kubectl --context=$context wait --for=condition=Ready pods -l app=$app -n $ns --timeout=60s > /dev/null 2>&1; then
-            echo Removing $app pods...
-            kubectl --context=$context delete pods -n $ns -l app=$app
-        fi
-    done
+    app=$3
+    if kubectl --context=$context wait --for=condition=Ready pods -l app=$app -n $ns --timeout=60s > /dev/null 2>&1; then
+        echo Removing $app pods...
+        kubectl --context=$context delete pods -n $ns -l app=$app
+    fi
+
 }
 
 function cleanup {
@@ -271,7 +267,7 @@ globalnet=$7
 
 echo Starting with status: $status, k8s_version: $version, logging: $logging, kubefed: $kubefed, deploy: $deploy, debug: $debug, globalnet: $globalnet
 
-if [[ $globalnet = true ]]; then
+if [[ $globalnet = "true" ]]; then
   declare -A global_CIDRs=( ["cluster1"]="169.254.1.0/24" ["cluster2"]="169.254.2.0/24" ["cluster3"]="169.254.3.0/24" )
 fi
 
@@ -321,7 +317,9 @@ deploytool_prereqs
 
 for i in 1 2 3; do
     context=cluster$i
-    delete_subm_pods $context $subm_ns
+    for app in submariner-engine submariner-routeagent submariner-globalnet; do
+      delete_subm_pods $context $subm_ns $app
+    done
     add_subm_gateway_label $context
 done
 
