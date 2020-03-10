@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
@@ -20,8 +22,6 @@ import (
 	kubeclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-
-	. "github.com/onsi/gomega"
 )
 
 const (
@@ -74,6 +74,7 @@ type Framework struct {
 	// test multiple times in parallel.
 	UniqueName string
 
+	// These are now set in TestContext but remain here as well for now for legacy.
 	ClusterClients    []*kubeclientset.Clientset
 	SubmarinerClients []*submarinerClientset.Clientset
 
@@ -86,33 +87,18 @@ type Framework struct {
 	// we install a Cleanup action before each test and clear it after.  If we
 	// should abort, the AfterSuite hook should run all Cleanup actions.
 	cleanupHandle CleanupActionHandle
-
-	// configuration for framework's client
-	Options Options
-}
-
-// Options is a struct for managing test framework options.
-type Options struct {
-	ClientQPS    float32
-	ClientBurst  int
-	GroupVersion *schema.GroupVersion
 }
 
 // NewDefaultFramework makes a new framework and sets up a BeforeEach/AfterEach for
 // you (you can write additional before/after each functions).
 func NewDefaultFramework(baseName string) *Framework {
-	options := Options{
-		ClientQPS:   20,
-		ClientBurst: 50,
-	}
-	return NewFramework(baseName, options)
+	return NewFramework(baseName)
 }
 
 // NewFramework creates a test framework.
-func NewFramework(baseName string, options Options) *Framework {
+func NewFramework(baseName string) *Framework {
 	f := &Framework{
 		BaseName:           baseName,
-		Options:            options,
 		namespacesToDelete: map[string]bool{},
 	}
 
@@ -122,19 +108,15 @@ func NewFramework(baseName string, options Options) *Framework {
 	return f
 }
 
-func (f *Framework) BeforeEach() {
-	// workaround for a bug in ginkgo.
-	// https://github.com/onsi/ginkgo/issues/222
-	f.cleanupHandle = AddCleanupAction(f.AfterEach)
-
+func BeforeSuite() {
 	ginkgo.By("Creating kubernetes clients")
 
 	if len(TestContext.KubeConfig) > 0 {
 		Expect(len(TestContext.KubeConfigs)).To(BeZero(),
 			"Either KubeConfig or KubeConfigs must be specified but not both")
 		for _, context := range TestContext.KubeContexts {
-			f.ClusterClients = append(f.ClusterClients, f.createKubernetesClient(TestContext.KubeConfig, context))
-			f.SubmarinerClients = append(f.SubmarinerClients, f.createSubmarinerClient(TestContext.KubeConfig, context))
+			TestContext.ClusterClients = append(TestContext.ClusterClients, createKubernetesClient(TestContext.KubeConfig, context))
+			TestContext.SubmarinerClients = append(TestContext.SubmarinerClients, createSubmarinerClient(TestContext.KubeConfig, context))
 		}
 
 		// if cluster IDs are not provided we assume that cluster-id == context
@@ -146,12 +128,49 @@ func (f *Framework) BeforeEach() {
 		Expect(len(TestContext.KubeConfigs)).To(Equal(len(TestContext.ClusterIDs)),
 			"One ClusterID must be provided for each item in the KubeConfigs")
 		for _, kubeConfig := range TestContext.KubeConfigs {
-			f.ClusterClients = append(f.ClusterClients, f.createKubernetesClient(kubeConfig, ""))
-			f.SubmarinerClients = append(f.SubmarinerClients, f.createSubmarinerClient(kubeConfig, ""))
+			TestContext.ClusterClients = append(TestContext.ClusterClients, createKubernetesClient(kubeConfig, ""))
+			TestContext.SubmarinerClients = append(TestContext.SubmarinerClients, createSubmarinerClient(kubeConfig, ""))
 		}
 	} else {
 		ginkgo.Fail("One of KubeConfig or KubeConfigs must be specified")
 	}
+
+	queryAndUpdateGlobalnetStatus()
+}
+
+func queryAndUpdateGlobalnetStatus() {
+	TestContext.GlobalnetEnabled = false
+	clusterIndex := ClusterB
+	clusterName := TestContext.KubeContexts[clusterIndex]
+	clusters := TestContext.SubmarinerClients[clusterIndex].SubmarinerV1().Clusters(TestContext.SubmarinerNamespace)
+	AwaitUntil("find the submariner Cluster for "+clusterName, func() (interface{}, error) {
+		cluster, err := clusters.Get(clusterName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return cluster, err
+	}, func(result interface{}) (bool, string, error) {
+		if result == nil {
+			return false, "No Cluster found", nil
+		}
+
+		cluster := result.(*submarinerv1.Cluster)
+		if len(cluster.Spec.GlobalCIDR) != 0 {
+			// Based on the status of GlobalnetEnabled, certain tests will be skipped/executed.
+			TestContext.GlobalnetEnabled = true
+		}
+
+		return true, "", nil
+	})
+}
+
+func (f *Framework) BeforeEach() {
+	// workaround for a bug in ginkgo.
+	// https://github.com/onsi/ginkgo/issues/222
+	f.cleanupHandle = AddCleanupAction(f.AfterEach)
+
+	f.ClusterClients = TestContext.ClusterClients
+	f.SubmarinerClients = TestContext.SubmarinerClients
 
 	if !f.SkipNamespaceCreation {
 		ginkgo.By(fmt.Sprintf("Creating namespace objects with basename %q", f.BaseName))
@@ -179,9 +198,8 @@ func (f *Framework) BeforeEach() {
 
 }
 
-func (f *Framework) createKubernetesClient(kubeConfig, context string) *kubeclientset.Clientset {
-
-	restConfig := f.createRestConfig(kubeConfig, context)
+func createKubernetesClient(kubeConfig, context string) *kubeclientset.Clientset {
+	restConfig := createRestConfig(kubeConfig, context)
 	clientSet, err := kubeclientset.NewForConfig(restConfig)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -196,7 +214,7 @@ func (f *Framework) createKubernetesClient(kubeConfig, context string) *kubeclie
 	return clientSet
 }
 
-func (f *Framework) createRestConfig(kubeConfig, context string) *rest.Config {
+func createRestConfig(kubeConfig, context string) *rest.Config {
 	restConfig, _, err := loadConfig(kubeConfig, context)
 	if err != nil {
 		Errorf("Unable to load kubeconfig file %s for context %s, this is a non-recoverable error",
@@ -212,10 +230,10 @@ func (f *Framework) createRestConfig(kubeConfig, context string) *rest.Config {
 			rest.DefaultKubernetesUserAgent(),
 			componentTexts)
 	}
-	restConfig.QPS = f.Options.ClientQPS
-	restConfig.Burst = f.Options.ClientBurst
-	if f.Options.GroupVersion != nil {
-		restConfig.GroupVersion = f.Options.GroupVersion
+	restConfig.QPS = TestContext.ClientQPS
+	restConfig.Burst = TestContext.ClientBurst
+	if TestContext.GroupVersion != nil {
+		restConfig.GroupVersion = TestContext.GroupVersion
 	}
 	return restConfig
 }
