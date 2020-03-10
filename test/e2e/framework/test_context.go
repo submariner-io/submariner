@@ -5,6 +5,9 @@ import (
 	"os"
 	"strings"
 
+	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	kubeclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 )
 
@@ -22,6 +25,11 @@ type TestContextType struct {
 	ConnectionAttempts  uint
 	OperationTimeout    uint
 	GlobalnetEnabled    bool
+	ClusterClients      []*kubeclientset.Clientset
+	SubmarinerClients   []*submarinerClientset.Clientset
+	ClientQPS           float32
+	ClientBurst         int
+	GroupVersion        *schema.GroupVersion
 }
 
 func (contexts *contextArray) String() string {
@@ -33,7 +41,10 @@ func (contexts *contextArray) Set(value string) error {
 	return nil
 }
 
-var TestContext *TestContextType = &TestContextType{}
+var TestContext *TestContextType = &TestContextType{
+	ClientQPS:   20,
+	ClientBurst: 50,
+}
 
 func registerFlags(t *TestContextType) {
 	flag.StringVar(&t.KubeConfig, "kubeconfig", os.Getenv("KUBECONFIG"),
