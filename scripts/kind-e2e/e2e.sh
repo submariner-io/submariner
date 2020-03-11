@@ -41,14 +41,32 @@ function generate_cluster_yaml() {
     render_template ${PRJ_ROOT}/scripts/kind-e2e/kind-cluster-config.yaml > ${PRJ_ROOT}/scripts/kind-e2e/$1-config.yaml
 }
 
+function kind_fixup_config() {
+    cluster=$1
+    master_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${cluster}-control-plane | head -n 1)
+    sed -i -- "s/server: .*/server: https:\/\/$master_ip:6443/g" $KUBECONFIG
+    sed -i -- "s/user: kind-.*/user: ${cluster}/g" $KUBECONFIG
+    sed -i -- "s/name: kind-.*/name: ${cluster}/g" $KUBECONFIG
+    sed -i -- "s/cluster: kind-.*/cluster: ${cluster}/g" $KUBECONFIG
+    sed -i -- "s/current-context: .*/current-context: ${cluster}/g" $KUBECONFIG
+    sudo chmod a+r $KUBECONFIG
+
+    if [[ ${status} = keep ]]; then
+        cp -r $KUBECONFIG ${PRJ_ROOT}/output/kind-config/local-dev/kind-config-${cluster}
+    fi
+}
+
 function kind_clusters() {
     status=$1
     version=$2
     pids=(-1 -1 -1)
     logs=()
     for i in 1 2 3; do
+        export KUBECONFIG=${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster${i}
         if [[ $(kind get clusters | grep cluster${i} | wc -l) -gt 0  ]]; then
             echo Cluster cluster${i} already exists, skipping cluster creation...
+            kind export kubeconfig --name=cluster${i}
+            kind_fixup_config cluster${i}
         else
             logs[$i]=$(mktemp)
             echo Creating cluster${i}, logging to ${logs[$i]}...
@@ -59,17 +77,7 @@ function kind_clusters() {
             else
                 kind create cluster --name=cluster${i} --config=${PRJ_ROOT}/scripts/kind-e2e/cluster${i}-config.yaml
             fi
-            master_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster${i}-control-plane | head -n 1)
-            sed -i -- "s/user: kubernetes-admin/user: cluster$i/g" $(kind get kubeconfig-path --name="cluster$i")
-            sed -i -- "s/name: kubernetes-admin.*/name: cluster$i/g" $(kind get kubeconfig-path --name="cluster$i")
-            sed -i -- "s/current-context: kubernetes-admin.*/current-context: cluster$i/g" $(kind get kubeconfig-path --name="cluster$i")
-
-            if [[ ${status} = keep ]]; then
-                cp -r $(kind get kubeconfig-path --name="cluster$i") ${PRJ_ROOT}/output/kind-config/local-dev/kind-config-cluster${i}
-            fi
-
-            sed -i -- "s/server: .*/server: https:\/\/$master_ip:6443/g" $(kind get kubeconfig-path --name="cluster$i")
-            cp -r $(kind get kubeconfig-path --name="cluster$i") ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster${i}
+            kind_fixup_config cluster${i}
             ) > ${logs[$i]} 2>&1 &
             set pids[$i] = $!
         fi
@@ -316,6 +324,7 @@ else
 fi
 
 PRJ_ROOT=$(git rev-parse --show-toplevel)
+rm -rf ${PRJ_ROOT}/output/kind-config/dapper/ ${PRJ_ROOT}/output/kind-config/local-dev/
 mkdir -p ${PRJ_ROOT}/output/kind-config/dapper/ ${PRJ_ROOT}/output/kind-config/local-dev/
 export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
 
@@ -324,8 +333,9 @@ if [[ $logging = true ]]; then
 fi
 
 kind_clusters "$@"
-kind_import_images
+export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
 setup_custom_cni
+kind_import_images
 
 if [[ $kubefed = true ]]; then
     # FIXME: Kubefed deploys are broken (not because of this commit)

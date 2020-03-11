@@ -141,8 +141,8 @@ To test specific k8s version, additional **version** parameter can be passed to 
 make ci e2e version=1.14.1
 ```
 
-Full list of supported k8s versions can found on [kind release page] page. We are using kind vesion 0.3.0.
-Default **version** is 1.14.2.
+Full list of supported k8s versions can found on [kind release page] page. We are using kind vesion 0.6.1.
+Default **version** is 1.14.6
 
 ### Permanent
 
