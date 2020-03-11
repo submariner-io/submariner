@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/submariner-io/submariner/pkg/datastore"
 	"github.com/submariner-io/submariner/pkg/log"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
@@ -30,7 +31,7 @@ type Specification struct {
 	Server string
 }
 
-func NewPHPAPI(apitoken string) (*PHPAPI, error) {
+func NewPHPAPI(apitoken string) (datastore.Datastore, error) {
 	var pais Specification
 	err := envconfig.Process("backend_phpapi", &pais)
 	if err != nil {
@@ -117,11 +118,7 @@ func (p *PHPAPI) GetEndpoints(clusterID string) ([]types.SubmarinerEndpoint, err
 	return endpoints, nil
 }
 
-func (p *PHPAPI) GetEndpoint(clusterID string, cableName string) (*types.SubmarinerEndpoint, error) {
-	return nil, fmt.Errorf("GetEndpoint is not implemented")
-}
-
-func (p *PHPAPI) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onChange func(cluster *types.SubmarinerCluster, deleted bool) error) error {
+func (p *PHPAPI) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onChange datastore.OnClusterChange) error {
 	colorCode := util.FlattenColors(colorCodes)
 	klog.Infof("Starting watch for colorCode %s", colorCode)
 	var wg sync.WaitGroup
@@ -150,7 +147,7 @@ func (p *PHPAPI) WatchClusters(ctx context.Context, selfClusterID string, colorC
 	return nil
 }
 
-func (p *PHPAPI) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onChange func(endpoint *types.SubmarinerEndpoint, deleted bool) error) error {
+func (p *PHPAPI) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onChange datastore.OnEndpointChange) error {
 	colorCode := util.FlattenColors(colorCodes)
 	klog.Infof("Starting PHPAPI endpoint watch for colorCode %s", colorCode)
 	var wg sync.WaitGroup
@@ -243,8 +240,4 @@ func (p *PHPAPI) RemoveEndpoint(clusterID, cableName string) error {
 	}
 	defer poster.Body.Close()
 	return nil
-}
-
-func (p *PHPAPI) RemoveCluster(clusterID string) error {
-	return fmt.Errorf("RemoveCluster is not implemented")
 }

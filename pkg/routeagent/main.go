@@ -47,7 +47,7 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	klog.V(2).Info("Starting submariner-route-agent")
+	klog.Info("Starting submariner-route-agent")
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
 
@@ -100,7 +100,7 @@ func main() {
 	}()
 
 	wg.Wait()
-	klog.Fatal("All controllers stopped or exited. Stopping main loop")
+	klog.Info("All controllers stopped or exited. Stopping main loop")
 }
 
 func init() {

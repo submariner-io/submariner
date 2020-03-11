@@ -10,11 +10,13 @@ import (
 	"text/template"
 	"time"
 
+	"k8s.io/klog"
+
 	"github.com/bronze1man/goStrongswanVici"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/log"
 	"github.com/submariner-io/submariner/pkg/types"
-	"k8s.io/klog"
 
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 )
@@ -34,7 +36,14 @@ const (
 
 	// charonViciSocket points to the vici socket exposed by charon
 	charonViciSocket = "/var/run/charon.vici"
+
+	cableDriverName = "strongswan"
 )
+
+func init() {
+	cable.SetDefautCableDriver(cableDriverName)
+	cable.AddDriver(cableDriverName, NewStrongSwan)
+}
 
 type strongSwan struct {
 	localSubnets              []string
@@ -62,7 +71,7 @@ const defaultIKEPort = "500"
 const defaultNATTPort = "4500"
 const ipsecSpecEnvVarPrefix = "ce_ipsec"
 
-func NewStrongSwan(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (Driver, error) {
+func NewStrongSwan(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (cable.Driver, error) {
 	ipSecSpec := specification{}
 
 	err := envconfig.Process(ipsecSpecEnvVarPrefix, &ipSecSpec)

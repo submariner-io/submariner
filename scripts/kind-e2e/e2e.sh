@@ -2,6 +2,7 @@
 set -em
 
 source $(git rev-parse --show-toplevel)/scripts/lib/debug_functions
+source $(git rev-parse --show-toplevel)/scripts/lib/version
 
 ### Variables ###
 
@@ -78,18 +79,50 @@ function setup_custom_cni(){
 }
 
 function kind_import_images() {
-    docker tag quay.io/submariner/submariner:dev submariner:local
-    docker tag quay.io/submariner/submariner-route-agent:dev submariner-route-agent:local
+    docker tag quay.io/submariner/submariner:$VERSION submariner:local
+    docker tag quay.io/submariner/submariner-route-agent:$VERSION submariner-route-agent:local
+    if [[ $globalnet = "true" ]]; then
+        docker tag quay.io/submariner/submariner-globalnet:$VERSION submariner-globalnet:local
+    fi
 
     for i in 1 2 3; do
         echo "Loading submariner images into cluster${i}..."
         kind --name cluster${i} load docker-image submariner:local
         kind --name cluster${i} load docker-image submariner-route-agent:local
+        if [[ $globalnet = "true" ]]; then
+            echo "Loading globalnet image into cluster${i}..."
+            kind --name cluster${i} load docker-image submariner-globalnet:local
+        fi
     done
 }
 
+function get_globalip() {
+    svcname=$1
+    # It takes a while for globalIp annotation to show up on a service
+    for i in {0..30}
+    do
+        gip=$(kubectl get svc $svcname -o jsonpath='{.metadata.annotations.submariner\.io/globalIp}')
+        if [ $gip != "" ]; then
+          echo $gip
+          return
+        fi
+        sleep 1
+    done
+    echo "Max attempts reached, failed to get globalIp!"
+    exit 1
+}
+
 function test_connection() {
-    nginx_svc_ip_cluster3=$(kubectl --context=cluster3 get svc -l app=nginx-demo | awk 'FNR == 2 {print $3}')
+    if [[ $globalnet = "true" ]]; then
+        nginx_svc_ip_cluster3=$(get_globalip nginx-demo)
+    else
+        nginx_svc_ip_cluster3=$(kubectl --context=cluster3 get svc -l app=nginx-demo | awk 'FNR == 2 {print $3}')
+    fi
+
+    if [[ -z "$nginx_svc_ip_cluster3" ]]; then
+        echo "Failed to get nginx-demo IP"
+        exit 1
+    fi
     netshoot_pod=$(kubectl --context=cluster2 get pods -l app=netshoot | awk 'FNR == 2 {print $1}')
 
     echo "Testing connectivity between clusters - $netshoot_pod cluster2 --> $nginx_svc_ip_cluster3 nginx service cluster3"
@@ -190,14 +223,12 @@ function test_with_e2e_tests {
 function delete_subm_pods() {
     context=$1
     ns=$2
-    if kubectl --context=$context wait --for=condition=Ready pods -l app=submariner-engine -n $ns --timeout=60s > /dev/null 2>&1; then
-        echo Removing submariner engine pods...
-        kubectl --context=$context delete pods -n submariner -l app=submariner-engine
+    app=$3
+    if kubectl --context=$context wait --for=condition=Ready pods -l app=$app -n $ns --timeout=60s > /dev/null 2>&1; then
+        echo Removing $app pods...
+        kubectl --context=$context delete pods -n $ns -l app=$app
     fi
-    if kubectl --context=$context wait --for=condition=Ready pods -l app=submariner-routeagent -n $ns --timeout=60s > /dev/null 2>&1; then
-        echo Removing submariner route agent pods...
-        kubectl --context=$context delete pods -n submariner -l app=submariner-routeagent
-    fi
+
 }
 
 function cleanup {
@@ -231,8 +262,14 @@ version=$2
 logging=$3
 kubefed=$4
 deploy=$5
+debug=$6
+globalnet=$7
 
-echo Starting with status: $status, k8s_version: $version, logging: $logging, kubefed: $kubefed, deploy: $deploy
+echo Starting with status: $status, k8s_version: $version, logging: $logging, kubefed: $kubefed, deploy: $deploy, debug: $debug, globalnet: $globalnet
+
+if [[ $globalnet = "true" ]]; then
+  declare -A global_CIDRs=( ["cluster1"]="169.254.1.0/24" ["cluster2"]="169.254.2.0/24" ["cluster3"]="169.254.3.0/24" )
+fi
 
 if [[ $status = clean ]]; then
     cleanup
@@ -280,7 +317,9 @@ deploytool_prereqs
 
 for i in 1 2 3; do
     context=cluster$i
-    delete_subm_pods $context $subm_ns
+    for app in submariner-engine submariner-routeagent submariner-globalnet; do
+      delete_subm_pods $context $subm_ns $app
+    done
     add_subm_gateway_label $context
 done
 

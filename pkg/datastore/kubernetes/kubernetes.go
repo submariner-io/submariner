@@ -11,6 +11,7 @@ import (
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions"
+	"github.com/submariner-io/submariner/pkg/datastore"
 	"github.com/submariner-io/submariner/pkg/log"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
@@ -41,7 +42,7 @@ type datastoreSpecification struct {
 	Ca              string
 }
 
-func NewDatastore(thisClusterID string, stopCh <-chan struct{}) (*Datastore, error) {
+func NewDatastore(thisClusterID string, stopCh <-chan struct{}) (datastore.Datastore, error) {
 	k8sSpec := datastoreSpecification{}
 
 	err := envconfig.Process("broker_k8s", &k8sSpec)
@@ -86,60 +87,6 @@ func NewDatastore(thisClusterID string, stopCh <-chan struct{}) (*Datastore, err
 	}, nil
 }
 
-func stringSliceOverlaps(left []string, right []string) bool {
-	hash := make(map[string]bool)
-	for _, s := range left {
-		hash[s] = true
-	}
-
-	for _, s := range right {
-		if hash[s] {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (k *Datastore) GetClusters(colorCodes []string) ([]types.SubmarinerCluster, error) {
-	var clusters []types.SubmarinerCluster
-
-	k8sClusters, err := k.client.SubmarinerV1().Clusters(k.remoteNamespace).List(metav1.ListOptions{})
-
-	if err != nil {
-		return nil, err
-	}
-
-	for _, cluster := range k8sClusters.Items {
-		if stringSliceOverlaps(cluster.Spec.ColorCodes, colorCodes) {
-			clusters = append(clusters, types.SubmarinerCluster{
-				ID:   cluster.Spec.ClusterID,
-				Spec: cluster.Spec,
-			}) // this is likely going to add duplicate clusters
-		}
-	}
-	return clusters, nil
-}
-
-func (k *Datastore) GetCluster(clusterID string) (*types.SubmarinerCluster, error) {
-	k8sClusters, err := k.client.SubmarinerV1().Clusters(k.remoteNamespace).List(metav1.ListOptions{})
-
-	if err != nil {
-		return nil, err
-	}
-
-	for _, cluster := range k8sClusters.Items {
-		if cluster.Spec.ClusterID == clusterID {
-			return &types.SubmarinerCluster{
-				ID:   clusterID,
-				Spec: cluster.Spec,
-			}, nil
-		}
-	}
-
-	return nil, fmt.Errorf("cluster wasn't found")
-}
-
 func (k *Datastore) GetEndpoints(clusterID string) ([]types.SubmarinerEndpoint, error) {
 
 	k8sEndpoints, err := k.client.SubmarinerV1().Endpoints(k.remoteNamespace).List(metav1.ListOptions{})
@@ -159,22 +106,7 @@ func (k *Datastore) GetEndpoints(clusterID string) ([]types.SubmarinerEndpoint, 
 	return endpoints, nil
 }
 
-func (k *Datastore) GetEndpoint(clusterID string, cableName string) (*types.SubmarinerEndpoint, error) {
-	k8sEndpoints, err := k.client.SubmarinerV1().Endpoints(k.remoteNamespace).List(metav1.ListOptions{})
-
-	if err != nil {
-		return nil, err
-	}
-
-	for _, endpoint := range k8sEndpoints.Items {
-		if endpoint.Spec.ClusterID == clusterID && endpoint.Spec.CableName == cableName {
-			return &types.SubmarinerEndpoint{Spec: endpoint.Spec}, nil
-		}
-	}
-	return nil, fmt.Errorf("endpoint wasn't found")
-}
-
-func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onClusterChange func(cluster *types.SubmarinerCluster, deleted bool) error) error {
+func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onClusterChange datastore.OnClusterChange) error {
 
 	k.informerFactory.Submariner().V1().Clusters().Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -195,10 +127,12 @@ func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, col
 				klog.V(log.DEBUG).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
 
-			utilruntime.HandleError(onClusterChange(&types.SubmarinerCluster{
-				ID:   object.Spec.ClusterID,
-				Spec: object.Spec,
-			}, false))
+			if selfClusterID != object.Spec.ClusterID {
+				utilruntime.HandleError(onClusterChange(&types.SubmarinerCluster{
+					ID:   object.Spec.ClusterID,
+					Spec: object.Spec,
+				}, false))
+			}
 		},
 		UpdateFunc: func(old, obj interface{}) {
 			var object *submarinerv1.Cluster
@@ -218,10 +152,12 @@ func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, col
 				klog.V(log.DEBUG).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
 
-			utilruntime.HandleError(onClusterChange(&types.SubmarinerCluster{
-				ID:   object.Spec.ClusterID,
-				Spec: object.Spec,
-			}, false))
+			if selfClusterID != object.Spec.ClusterID {
+				utilruntime.HandleError(onClusterChange(&types.SubmarinerCluster{
+					ID:   object.Spec.ClusterID,
+					Spec: object.Spec,
+				}, false))
+			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			var object *submarinerv1.Cluster
@@ -241,10 +177,12 @@ func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, col
 				klog.V(log.DEBUG).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
 
-			utilruntime.HandleError(onClusterChange(&types.SubmarinerCluster{
-				ID:   object.Spec.ClusterID,
-				Spec: object.Spec,
-			}, true))
+			if selfClusterID != object.Spec.ClusterID {
+				utilruntime.HandleError(onClusterChange(&types.SubmarinerCluster{
+					ID:   object.Spec.ClusterID,
+					Spec: object.Spec,
+				}, true))
+			}
 		},
 	}, time.Second*30)
 
@@ -252,7 +190,7 @@ func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, col
 	return nil
 }
 
-func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onEndpointChange func(endpoint *types.SubmarinerEndpoint, deleted bool) error) error {
+func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onEndpointChange datastore.OnEndpointChange) error {
 
 	k.informerFactory.Submariner().V1().Endpoints().Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -273,9 +211,11 @@ func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, co
 				klog.V(log.DEBUG).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
 
-			utilruntime.HandleError(onEndpointChange(&types.SubmarinerEndpoint{
-				Spec: object.Spec,
-			}, false))
+			if selfClusterID != object.Spec.ClusterID {
+				utilruntime.HandleError(onEndpointChange(&types.SubmarinerEndpoint{
+					Spec: object.Spec,
+				}, false))
+			}
 		},
 		UpdateFunc: func(old, obj interface{}) {
 			var object *submarinerv1.Endpoint
@@ -295,9 +235,11 @@ func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, co
 				klog.V(log.DEBUG).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
 
-			utilruntime.HandleError(onEndpointChange(&types.SubmarinerEndpoint{
-				Spec: object.Spec,
-			}, false))
+			if selfClusterID != object.Spec.ClusterID {
+				utilruntime.HandleError(onEndpointChange(&types.SubmarinerEndpoint{
+					Spec: object.Spec,
+				}, false))
+			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			var object *submarinerv1.Endpoint
@@ -317,9 +259,11 @@ func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, co
 				klog.V(log.DEBUG).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
 
-			utilruntime.HandleError(onEndpointChange(&types.SubmarinerEndpoint{
-				Spec: object.Spec,
-			}, true))
+			if selfClusterID != object.Spec.ClusterID {
+				utilruntime.HandleError(onEndpointChange(&types.SubmarinerEndpoint{
+					Spec: object.Spec,
+				}, true))
+			}
 		},
 	}, time.Second*30)
 
@@ -439,9 +383,4 @@ func (k *Datastore) RemoveEndpoint(clusterID, cableName string) error {
 	}
 
 	return k.client.SubmarinerV1().Endpoints(k.remoteNamespace).Delete(endpointName, &metav1.DeleteOptions{})
-}
-
-func (k *Datastore) RemoveCluster(clusterID string) error {
-	// not implemented yet
-	return nil
 }
