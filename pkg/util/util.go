@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"reflect"
 	"strings"
 	"syscall"
 
@@ -150,10 +151,9 @@ func GetClusterCRDName(cluster *types.SubmarinerCluster) (string, error) {
 }
 
 func CompareEndpointSpec(left, right subv1.EndpointSpec) bool {
-	if left.ClusterID == right.ClusterID && left.CableName == right.CableName && left.Hostname == right.Hostname {
-		return true
-	}
-	return false
+	// maybe we have to use just reflect.DeepEqual(left, right), but in this case the subnets order will influence.
+	return left.ClusterID == right.ClusterID && left.CableName == right.CableName && left.Hostname == right.Hostname &&
+		left.Backend == right.Backend && reflect.DeepEqual(left.BackendConfig, right.BackendConfig)
 }
 
 func GetDefaultGatewayInterface() (*net.Interface, error) {
