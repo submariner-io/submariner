@@ -34,7 +34,7 @@ const (
 
 func init() {
 	// uncomment next line to set as default
-	//cable.SetDefautCableDriver(cableDriverName)
+	cable.SetDefautCableDriver(cableDriverName)
 	cable.AddDriver(cableDriverName, NewWGDriver)
 }
 
@@ -283,6 +283,7 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 }
 
 func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoint) error {
+	klog.V(log.TRACE).Infof("Removing endpoint %v+", remoteEndpoint)
 	var err error
 	var found bool
 
@@ -296,22 +297,33 @@ func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoi
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 	if remoteKey, err = wgtypes.ParseKey(key); err != nil {
-		klog.Warningf("Failed to parse public key %s: %v, search by clusterID", key, err)
-		if remoteKey, found = w.peers[remoteEndpoint.Spec.ClusterID]; !found {
-			return fmt.Errorf("missing peer public key")
-		}
+		return fmt.Errorf("failed to parse public key %s: %v", key, err)
+	}
+	var oldKey wgtypes.Key
+	badKey := false
+	if oldKey, found = w.peers[remoteEndpoint.Spec.ClusterID]; !found {
+		badKey = true
+		klog.Warningf("Key missmatch, cluster %s has no key but asked to remove %s", remoteEndpoint.Spec.ClusterID, remoteKey.String())
+	} else if oldKey.String() != remoteKey.String() {
+		badKey = true
+		klog.Warningf("Key missmatch, cluster %s key is %s but asked to remove %s", remoteEndpoint.Spec.ClusterID, oldKey.String(), remoteKey.String())
 	}
 
 	// wg remove
+	klog.V(log.TRACE).Infof("Removing wireguard peer with key %s", remoteKey.String())
 	peerCfg := []wgtypes.PeerConfig{{
 		PublicKey: remoteKey,
 		Remove:    true,
 	}}
 	if err = w.client.ConfigureDevice(DefaultDeviceName, wgtypes.Config{
-		ReplacePeers: true,
+		ReplacePeers: false,
 		Peers:        peerCfg,
 	}); err != nil {
-		return fmt.Errorf("failed to remove old key %s: %v", remoteKey.String(), err)
+		return fmt.Errorf("failed to remove wireguard peer with key %s: %v", remoteKey.String(), err)
+	}
+	if badKey {
+		klog.Warningf("Key missmatch for peer cluster %s, keeping existing routes", remoteEndpoint.Spec.ClusterID)
+		return nil
 	}
 	delete(w.peers, remoteEndpoint.Spec.ClusterID)
 
@@ -334,6 +346,7 @@ func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoi
 		}
 	}
 
+	klog.V(log.TRACE).Infof("Done removing endpoint for cluster %s", remoteEndpoint.Spec.ClusterID)
 	return nil
 }
 
