@@ -551,40 +551,36 @@ func (r *Controller) handleRemovedEndpoint(obj interface{}) {
 		}
 	}
 	klog.V(log.DEBUG).Infof("Informed of removed endpoint: %v", object.String())
-	hostname, err := os.Hostname()
-	if err != nil {
-		klog.Fatalf("Could not retrieve hostname: %v", err)
-	}
-	if object.Spec.Hostname == hostname {
-		r.cleanVxSubmarinerRoutes()
-		klog.V(log.DEBUG).Infof("Removed routes from host")
-	}
 
-	if object.Spec.ClusterID == r.clusterID {
-		r.gwVxLanMutex.Lock()
-		defer r.gwVxLanMutex.Unlock()
-
-		if object.Spec.Hostname == hostname {
-			klog.Infof("Local Gateway Endpoint (IP %s) removed: deleting vxlan interface",
-				object.Spec.PrivateIP)
-		} else {
-			klog.Infof("Gateway Endpoint (IP %s) for our cluster removed: deleting vxlan interface",
-				object.Spec.PrivateIP)
-		}
-
-		err := r.vxlanDevice.deleteVxLanIface()
-
-		if err != nil {
-			klog.Errorf("Failed to delete the the vxlan interface on endpoint removal: %s", err.Error())
-			return
-		}
-		r.vxlanDevice = nil
-
-	} else {
+	if object.Spec.ClusterID != r.clusterID {
 		// TODO: Handle a remote endpoint removal use-case
 		//         - remove routes to remote cluster
 		//         - remove related iptable rules
 		return
+	}
+
+	r.gwVxLanMutex.Lock()
+	defer r.gwVxLanMutex.Unlock()
+
+	if r.vxlanDevice == nil {
+		klog.Warningf("vxlanDevice is not set - ignoring removed local Endpoint %q", object.Name)
+		return
+	}
+
+	if r.isGatewayNode {
+		klog.Infof("Local Gateway Endpoint %q with IP %s was removed: deleting vxlan interface",
+			object.Name, object.Spec.PrivateIP)
+		r.cleanVxSubmarinerRoutes()
+	} else {
+		klog.Infof("Local non-gateway Endpoint %q with IP %q was removed: deleting vxlan interface",
+			object.Name, object.Spec.PrivateIP)
+	}
+
+	r.isGatewayNode = false
+	err := r.vxlanDevice.deleteVxLanIface()
+	r.vxlanDevice = nil
+	if err != nil {
+		klog.Errorf("Failed to delete the the vxlan interface on Endpoint removal: %v", err)
 	}
 }
 
