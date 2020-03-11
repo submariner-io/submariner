@@ -13,6 +13,7 @@ import (
 
 	// Add supported drivers
 	_ "github.com/submariner-io/submariner/pkg/cable/ipsec"
+	_ "github.com/submariner-io/submariner/pkg/cable/wireguard"
 )
 
 // Engine represents an implementation of some remote connectivity mechanism, such as
