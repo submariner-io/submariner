@@ -1,5 +1,5 @@
 status ?= onetime
-version ?= 1.14.2
+version ?= 1.14.6
 logging ?= false
 kubefed ?= false
 deploytool ?= helm
