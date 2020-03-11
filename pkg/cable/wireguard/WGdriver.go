@@ -284,29 +284,33 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 
 func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoint) error {
 	klog.V(log.TRACE).Infof("Removing endpoint %v+", remoteEndpoint)
+
+	if w.localEndpoint.Spec.ClusterID ==  remoteEndpoint.Spec.ClusterID {
+		klog.V(log.TRACE).Infof("Will not disconnect self" )
+		return nil
+	}
 	var err error
 	var found bool
-
-	var remoteKey wgtypes.Key
 
 	// public key
 	var key string
 	if key, found = remoteEndpoint.Spec.BackendConfig[PublicKey]; !found {
 		return fmt.Errorf("missing peer public key")
 	}
-	w.mutex.Lock()
-	defer w.mutex.Unlock()
+	var remoteKey wgtypes.Key
 	if remoteKey, err = wgtypes.ParseKey(key); err != nil {
 		return fmt.Errorf("failed to parse public key %s: %v", key, err)
 	}
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
 	var oldKey wgtypes.Key
-	badKey := false
+	keyMismatch := false
 	if oldKey, found = w.peers[remoteEndpoint.Spec.ClusterID]; !found {
-		badKey = true
-		klog.Warningf("Key missmatch, cluster %s has no key but asked to remove %s", remoteEndpoint.Spec.ClusterID, remoteKey.String())
+		keyMismatch = true
+		klog.Warningf("Key mismatch, cluster %s has no key but asked to remove %s", remoteEndpoint.Spec.ClusterID, remoteKey.String())
 	} else if oldKey.String() != remoteKey.String() {
-		badKey = true
-		klog.Warningf("Key missmatch, cluster %s key is %s but asked to remove %s", remoteEndpoint.Spec.ClusterID, oldKey.String(), remoteKey.String())
+		keyMismatch = true
+		klog.Warningf("Key mismatch, cluster %s key is %s but asked to remove %s", remoteEndpoint.Spec.ClusterID, oldKey.String(), remoteKey.String())
 	}
 
 	// wg remove
@@ -321,8 +325,8 @@ func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoi
 	}); err != nil {
 		return fmt.Errorf("failed to remove wireguard peer with key %s: %v", remoteKey.String(), err)
 	}
-	if badKey {
-		klog.Warningf("Key missmatch for peer cluster %s, keeping existing routes", remoteEndpoint.Spec.ClusterID)
+	if keyMismatch {
+		klog.Warningf("Key mismatch for peer cluster %s, keeping existing routes", remoteEndpoint.Spec.ClusterID)
 		return nil
 	}
 	delete(w.peers, remoteEndpoint.Spec.ClusterID)
