@@ -116,11 +116,12 @@ function kind_import_images() {
 
 function get_globalip() {
     svcname=$1
+    context=$2
     # It takes a while for globalIp annotation to show up on a service
     for i in {0..30}
     do
-        gip=$(kubectl get svc $svcname -o jsonpath='{.metadata.annotations.submariner\.io/globalIp}')
-        if [ $gip != "" ]; then
+        gip=$(kubectl --context=$context get svc $svcname -o jsonpath='{.metadata.annotations.submariner\.io/globalIp}')
+        if [[ -n ${gip} ]]; then
           echo $gip
           return
         fi
@@ -132,7 +133,7 @@ function get_globalip() {
 
 function test_connection() {
     if [[ $globalnet = "true" ]]; then
-        nginx_svc_ip_cluster3=$(get_globalip nginx-demo)
+        nginx_svc_ip_cluster3=$(get_globalip nginx-demo cluster3)
     else
         nginx_svc_ip_cluster3=$(kubectl --context=cluster3 get svc -l app=nginx-demo | awk 'FNR == 2 {print $3}')
     fi
