@@ -23,8 +23,15 @@ DAPPER_BASE_IMAGE=${REPO}/dapper-base:${TAG}
 UPSTREAM_REMOTE=$(git remote -v | grep submariner-io/submariner | awk '{ print $1 }' | head -n 1)
 CHANGED_FILES_LOCAL=$(git diff --name-only remotes/$UPSTREAM_REMOTE/master)
 
+# Detect when we are on a merged patch
+LAST_COMMIT_LOCAL=$(git rev-parse HEAD)
+LAST_COMMIT_MASTER=$(git rev-parse remotes/$UPSTREAM_REMOTE/master)
+
+
+
 if [[ "${CHANGED_FILES_PR[@]}" =~ "package/Dockerfile.dapper-base" ]] ||
-   [[ "${CHANGED_FILES_LOCAL[@]}" =~ "package/Dockerfile.dapper-base" ]] ; then
+   [[ "${CHANGED_FILES_LOCAL[@]}" =~ "package/Dockerfile.dapper-base" ]] ||
+   [[ "${LAST_COMMIT_LOCAL}" == "${LAST_COMMIT_MASTER}" ]]; then
       echo "Dockerfile.dapper-base was modified, rebuilding dapper image"
       docker build -t ${DAPPER_BASE_IMAGE} -f package/Dockerfile.dapper-base .
       docker tag ${DAPPER_BASE_IMAGE} ${REPO}/dapper-base:latest
