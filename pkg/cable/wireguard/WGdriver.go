@@ -34,7 +34,7 @@ const (
 
 func init() {
 	// uncomment next line to set as default
-	cable.SetDefautCableDriver(cableDriverName)
+	//cable.SetDefautCableDriver(cableDriverName)
 	cable.AddDriver(cableDriverName, NewWGDriver)
 }
 
