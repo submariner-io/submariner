@@ -9,6 +9,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/pkg/errors"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	corev1 "k8s.io/api/core/v1"
@@ -17,6 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	k8serrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kubeclientset "k8s.io/client-go/kubernetes"
@@ -251,13 +253,14 @@ func (f *Framework) AfterEach() {
 	// DeleteNamespace at the very end in defer, to avoid any
 	// expectation failures preventing deleting the namespace.
 	defer func() {
-		nsDeletionErrors := map[string][]error{}
+		var nsDeletionErrors []error
+
 		// Whether to delete namespace is determined by 3 factors: delete-namespace flag, delete-namespace-on-failure flag and the test result
 		// if delete-namespace set to false, namespace will always be preserved.
 		// if delete-namespace is true and delete-namespace-on-failure is false, namespace will be preserved if test failed.
 		for ns := range f.namespacesToDelete {
-			if errors := f.deleteNamespaceFromAllClusters(ns); errors != nil {
-				nsDeletionErrors[ns] = errors
+			if err := f.deleteNamespaceFromAllClusters(ns); err != nil {
+				nsDeletionErrors = append(nsDeletionErrors, err)
 			}
 
 			delete(f.namespacesToDelete, ns)
@@ -269,21 +272,14 @@ func (f *Framework) AfterEach() {
 
 		// if we had errors deleting, report them now.
 		if len(nsDeletionErrors) != 0 {
-			messages := []string{}
-			for namespaceKey, namespaceErrors := range nsDeletionErrors {
-				for clusterIdx, namespaceErr := range namespaceErrors {
-					messages = append(messages, fmt.Sprintf("Couldn't delete ns: %q (@cluster %d): %s (%#v)",
-						namespaceKey, clusterIdx, namespaceErr, namespaceErr))
-				}
-			}
-			Failf(strings.Join(messages, ","))
+			Failf(k8serrors.NewAggregate(nsDeletionErrors).Error())
 		}
 	}()
 
 }
 
-func (f *Framework) deleteNamespaceFromAllClusters(ns string) []error {
-	var errors []error
+func (f *Framework) deleteNamespaceFromAllClusters(ns string) error {
+	var errs []error
 	for i, clientSet := range f.ClusterClients {
 		ginkgo.By(fmt.Sprintf("Deleting namespace %q on cluster %q", ns, TestContext.KubeContexts[i]))
 		if err := deleteNamespace(clientSet, ns); err != nil {
@@ -293,12 +289,12 @@ func (f *Framework) deleteNamespaceFromAllClusters(ns string) []error {
 			case apierrors.IsConflict(err):
 				Logf("Namespace %v scheduled for deletion, resources being purged", ns)
 			default:
-				Logf("Failed to delete namespace %q: %v", ns, err)
-				errors = append(errors, err)
+				errs = append(errs, errors.WithMessagef(err, "Failed to delete namespace %q on cluster %q", ns, TestContext.KubeContexts[i]))
 			}
 		}
 	}
-	return errors
+
+	return k8serrors.NewAggregate(errs)
 }
 
 // CreateNamespace creates a namespace for e2e testing.
