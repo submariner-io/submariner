@@ -17,7 +17,7 @@ Traffic is encrypted and encapsulated in UDP packets.
 
 - The driver uses [`wgctrl`](https://github.com/WireGuard/wgctrl-go "WgCtrl github"), a go package that enables control of WireGuard devices on multiple platforms. Link creation and removal are done through [`netlink`](https://github.com/vishvananda/netlink "Netlink github").
 
-## Installation, limitations
+## Installation
 
 - WireGuard needs to be [installed](https://www.wireguard.com/install "WireGuard installation instructions") on the gateway nodes. For example, (Ubuntu < 19.04),  
   ```ShellSession
@@ -25,10 +25,31 @@ Traffic is encrypted and encapsulated in UDP packets.
   $ sudo apt-get update
   $ sudo apt-get install wireguard
   ```
-- Support for testing with `kind` is not iplemented yet. 
+   
+- The driver needs to be enbaled with 
+  ```ShellSession
+  $ bin/subctl join --kubeconfig wg3-conf --cable-driver wireguard --disable-nat  --repository roytman --version  latest broker-info.subm
+  ```
+
+## Troubleshooting, limitations
+    
+- If you get the following message 
+  ```
+  Fatal error occurred creating engine: failed to add wireguard device: operation not supported
+  ```
+  you probably did not install WireGuard on the Gateway node.
+  
+- Support for e2e testing with `kind` is not iplemented yet. The e2e tests can be run with WireGuard by setting it as the default driver in `pkg/cable/wireguard/WGdriver.go` **and** unsetting StrogSwan in `pkg/cable/ipsec/strongswan.go` 
+  ```GoLang
+  func init() {
+    // uncomment next line to set as default
+    //cable.SetDefautCableDriver(cableDriverName)
+    cable.AddDriver(cableDriverName, NewWGDriver)
+  }
+
+  ```
 
 - No new `iptables` rules were added, although source NAT needs to be disabled for cross cluster communication. This is similar to disabling SNAT when sending cross-cluster traffic between nodes to `submariner-gateway`, so the existing rules should be enough.
   **The driver will fail if the CNI does SNAT before routing to Wireguard** (e.g., failed with Calico, works with Flannel).
-  
   
   
