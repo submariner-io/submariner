@@ -41,13 +41,13 @@ function setup_broker() {
     context=$1
     echo Installing broker on $context.
     kubectl config use-context $context
-    subctl --kubeconfig ${PRJ_ROOT}/output/kind-config/dapper/kind-config-$context deploy-broker --no-dataplane
+    subctl --kubeconfig ${DAPPER_SOURCE}/output/kind-config/dapper/kind-config-$context deploy-broker --no-dataplane
 }
 
 function subctl_install_subm() {
     context=$1
     kubectl config use-context $context
-    subctl join --kubeconfig ${PRJ_ROOT}/output/kind-config/dapper/kind-config-$context \
+    subctl join --kubeconfig ${DAPPER_SOURCE}/output/kind-config/dapper/kind-config-$context \
                 --clusterid ${context} \
                 --repository ${subm_engine_image_repo} \
                 --version ${subm_engine_image_tag} \
