@@ -11,25 +11,32 @@ E2E_DIR=$(dirname "$(readlink -f "$0")")
 
 ### Functions ###
 
-function print_logs() {
-    logs=("$@")
-    if [[ ${#logs[@]} -eq 0 ]]; then
-        return
+# Mask kubectl to use cluster context if the variable is set and context isn't specified,
+# otherwise use the config context as always.
+function kubectl() {
+    context_flag=""
+    if [[ -n "${cluster}" && ! "${@}" =~ "context" ]]; then
+        context_flag="--context=${cluster}"
     fi
+    command kubectl ${context_flag} "$@"
+}
 
-    echo "(Watch the installation processes with \"tail -f ${logs[*]}\".)"
-    for i in 1 2 3; do
-        if [[ pids[$i] -eq -1 ]]; then
-            continue
-        fi
+# Run cluster commands in parallel.
+# 1st argument is the numbers of the clusters to run for, supports "1 2 3" or "{1..3}" for range
+# 2nd argument is the command to execute, which will have the $cluster variable set.
+function run_parallel() {
+    clusters=$(eval echo "$1")
+    cmnd=$2
+    declare -A pids
+    for i in ${clusters}; do
+        cluster="cluster${i}"
+        ( $cmnd | sed "s/^/[${cluster}] /" ) &
+        unset cluster
+        pids["${i}"]=$!
+    done
 
+    for i in ${!pids[@]}; do
         wait ${pids[$i]}
-        if [[ $? -ne 0 && $? -ne 127 ]]; then
-            echo Cluster $i creation failed:
-            cat ${logs[$i]}
-        fi
-
-        rm -f ${logs[$i]}
     done
 }
 
@@ -50,7 +57,6 @@ function generate_cluster_yaml() {
 }
 
 function kind_fixup_config() {
-    cluster=$1
     master_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${cluster}-control-plane | head -n 1)
     sed -i -- "s/server: .*/server: https:\/\/$master_ip:6443/g" $KUBECONFIG
     sed -i -- "s/user: kind-.*/user: ${cluster}/g" $KUBECONFIG
@@ -64,33 +70,24 @@ function kind_fixup_config() {
     fi
 }
 
-function create_kind_clusters() {
-    pids=(-1 -1 -1)
-    logs=()
-    for i in 1 2 3; do
-        export KUBECONFIG=${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster${i}
-        if [[ $(kind get clusters | grep "^cluster${i}$" | wc -l) -gt 0  ]]; then
-            echo Cluster cluster${i} already exists, skipping cluster creation...
-            kind export kubeconfig --name=cluster${i}
-            kind_fixup_config cluster${i}
-            continue
-        fi
+function create_kind_cluster() {
+    export KUBECONFIG=${PRJ_ROOT}/output/kind-config/dapper/kind-config-${cluster}
+    if [[ $(kind get clusters | grep "^${cluster}$" | wc -l) -gt 0  ]]; then
+        echo "KIND cluster already exists, skipping its creation..."
+        kind export kubeconfig --name=${cluster}
+        kind_fixup_config ${cluster}
+        return
+    fi
 
-        logs[$i]=$(mktemp)
-        echo Creating cluster${i}, logging to ${logs[$i]}...
-        (
-            generate_cluster_yaml "cluster${i}"
-            image_flag=''
-            if [[ -n ${version} ]]; then
-                image_flag="--image=kindest/node:v${version}"
-            fi
+    echo "Creating KIND cluster..."
+    generate_cluster_yaml "${cluster}"
+    image_flag=''
+    if [[ -n ${version} ]]; then
+        image_flag="--image=kindest/node:v${version}"
+    fi
 
-            kind create cluster $image_flag --name=cluster${i} --config=${E2E_DIR}/cluster${i}-config.yaml
-            kind_fixup_config cluster${i}
-        ) > ${logs[$i]} 2>&1 &
-        set pids[$i] = $!
-    done
-    print_logs "${logs[@]}"
+    kind create cluster $image_flag --name=${cluster} --config=${E2E_DIR}/${cluster}-config.yaml
+    kind_fixup_config ${cluster}
 }
 
 function use_kube_context() {
@@ -386,7 +383,7 @@ else
 fi
 registry_ip="$(docker inspect -f '{{.NetworkSettings.IPAddress}}' "$KIND_REGISTRY")"
 
-create_kind_clusters
+run_parallel "{1..3}" create_kind_cluster
 export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
 deploy_weave_cni 2 3
 kind_import_images
