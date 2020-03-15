@@ -14,31 +14,22 @@ subm_ns=submariner
 ### Functions ###
 
 function install_helm() {
-    helm init --client-only
-    helm repo add submariner-latest https://submariner-io.github.io/submariner-charts/charts
-    pids=(-1 -1 -1)
-    logs=()
-    for i in 1 2 3; do
-        if kubectl --context=cluster${i} -n kube-system rollout status deploy/tiller-deploy > /dev/null 2>&1; then
-            echo Helm already installed on cluster${i}, skipping helm installation...
-            continue
-        fi
+    if kubectl -n kube-system rollout status deploy/tiller-deploy > /dev/null 2>&1; then
+        echo "Helm already installed, skipping helm installation..."
+        return
+    fi
 
-        logs[$i]=$(mktemp)
-        echo Installing helm on cluster${i}, logging to ${logs[$i]}...
-        (
-            kubectl --context=cluster${i} -n kube-system create serviceaccount tiller
-            kubectl --context=cluster${i} create clusterrolebinding tiller --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
-            helm --kube-context cluster${i} init --service-account tiller
-            kubectl --context=cluster${i} -n kube-system rollout status deploy/tiller-deploy
-        ) > ${logs[$i]} 2>&1 &
-        set pids[$i] = $!
-    done
-    print_logs "${logs[@]}"
+    echo "Installing helm..."
+    kubectl -n kube-system create serviceaccount tiller
+    kubectl create clusterrolebinding tiller --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
+    helm --kube-context ${cluster} init --service-account tiller
+    kubectl -n kube-system rollout status deploy/tiller-deploy
 }
 
 function deploytool_prereqs() {
-    install_helm
+    helm init --client-only
+    helm repo add submariner-latest https://submariner-io.github.io/submariner-charts/charts
+    run_parallel "{1..3}" install_helm
 }
 
 function setup_broker() {
