@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -em
 
-source $(git rev-parse --show-toplevel)/scripts/lib/debug_functions
-source $(git rev-parse --show-toplevel)/scripts/lib/version
+source ${DAPPER_SOURCE}/scripts/lib/debug_functions
+source ${DAPPER_SOURCE}/scripts/lib/version
 
 ### Variables ###
 
@@ -66,12 +66,12 @@ function kind_fixup_config() {
     sudo chmod a+r $KUBECONFIG
 
     if [[ ${status} = keep ]]; then
-        cp -r $KUBECONFIG ${PRJ_ROOT}/output/kind-config/local-dev/kind-config-${cluster}
+        cp -r $KUBECONFIG ${DAPPER_SOURCE}/output/kind-config/local-dev/kind-config-${cluster}
     fi
 }
 
 function create_kind_cluster() {
-    export KUBECONFIG=${PRJ_ROOT}/output/kind-config/dapper/kind-config-${cluster}
+    export KUBECONFIG=${DAPPER_SOURCE}/output/kind-config/dapper/kind-config-${cluster}
     if [[ $(kind get clusters | grep "^${cluster}$" | wc -l) -gt 0  ]]; then
         echo "KIND cluster already exists, skipping its creation..."
         kind export kubeconfig --name=${cluster}
@@ -238,7 +238,7 @@ function test_with_e2e_tests {
     cd ../test/e2e
 
     # Setup the KUBECONFIG env
-    export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
+    export KUBECONFIG=$(echo ${DAPPER_SOURCE}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
 
     go test -v -args -ginkgo.v -ginkgo.randomizeAllSpecs \
         -submariner-namespace $subm_ns -dp-context cluster2 -dp-context cluster3 -dp-context cluster1 \
@@ -365,10 +365,9 @@ else
     exit 1
 fi
 
-PRJ_ROOT=$(git rev-parse --show-toplevel)
-rm -rf ${PRJ_ROOT}/output/kind-config/dapper/ ${PRJ_ROOT}/output/kind-config/local-dev/
-mkdir -p ${PRJ_ROOT}/output/kind-config/dapper/ ${PRJ_ROOT}/output/kind-config/local-dev/
-export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
+rm -rf ${DAPPER_SOURCE}/output/kind-config/dapper/ ${DAPPER_SOURCE}/output/kind-config/local-dev/
+mkdir -p ${DAPPER_SOURCE}/output/kind-config/dapper/ ${DAPPER_SOURCE}/output/kind-config/local-dev/
+export KUBECONFIG=$(echo ${DAPPER_SOURCE}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
 
 if [[ $logging = true ]]; then
     enable_logging
@@ -384,7 +383,7 @@ fi
 registry_ip="$(docker inspect -f '{{.NetworkSettings.IPAddress}}' "$KIND_REGISTRY")"
 
 run_parallel "{1..3}" create_kind_cluster
-export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
+export KUBECONFIG=$(echo ${DAPPER_SOURCE}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
 deploy_weave_cni 2 3
 kind_import_images
 
