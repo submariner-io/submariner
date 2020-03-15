@@ -160,6 +160,11 @@ func (w *wireguard) Init() error {
 
 func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (string, error) {
 
+	if w.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
+		klog.V(log.TRACE).Infof("Will not connect to self")
+		return "", nil
+	}
+
 	var err error
 	var found bool
 
@@ -285,8 +290,8 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoint) error {
 	klog.V(log.TRACE).Infof("Removing endpoint %v+", remoteEndpoint)
 
-	if w.localEndpoint.Spec.ClusterID ==  remoteEndpoint.Spec.ClusterID {
-		klog.V(log.TRACE).Infof("Will not disconnect self" )
+	if w.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
+		klog.V(log.TRACE).Infof("Will not disconnect self")
 		return nil
 	}
 	var err error
