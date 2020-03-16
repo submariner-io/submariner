@@ -2,7 +2,7 @@ status ?= onetime
 version ?= 1.14.6
 logging ?= false
 kubefed ?= false
-deploytool ?= helm
+deploytool ?= operator
 globalnet ?= false
 build_debug ?= false
 
