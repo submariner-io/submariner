@@ -46,8 +46,8 @@ var TestContext *TestContextType = &TestContextType{
 	ClientBurst: 50,
 }
 
-func registerFlags(t *TestContextType) {
-	flag.StringVar(&t.KubeConfig, "kubeconfig", os.Getenv("KUBECONFIG"),
+func init() {
+	flag.StringVar(&TestContext.KubeConfig, "kubeconfig", os.Getenv("KUBECONFIG"),
 		"Path to kubeconfig containing embedded authinfo.")
 	flag.Var(&TestContext.KubeContexts, "dp-context", "kubeconfig context for dataplane clusters (use several times).")
 	flag.StringVar(&TestContext.ReportPrefix, "report-prefix", "", "Optional prefix for JUnit XML reports. Default is empty, which doesn't prepend anything to the default name.")
@@ -58,7 +58,7 @@ func registerFlags(t *TestContextType) {
 	flag.UintVar(&TestContext.OperationTimeout, "operation-timeout", 60, "The general operation timeout in seconds.")
 }
 
-func validateFlags(t *TestContextType) {
+func ValidateFlags(t *TestContextType) {
 	if len(t.KubeConfig) == 0 {
 		klog.Fatalf("kubeconfig parameter or KUBECONFIG environment variable is required")
 	}
@@ -66,10 +66,4 @@ func validateFlags(t *TestContextType) {
 	if len(t.KubeContexts) < 2 {
 		klog.Fatalf("several kubernetes contexts are necessary east, west, etc..")
 	}
-}
-
-func ParseFlags() {
-	registerFlags(TestContext)
-	flag.Parse()
-	validateFlags(TestContext)
 }

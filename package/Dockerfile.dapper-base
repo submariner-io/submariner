@@ -1,8 +1,8 @@
-FROM fedora:30
+FROM fedora:31
 
 ENV DAPPER_HOST_ARCH=amd64
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH} \
-    LINT_VERSION=v1.16.0 \
+    LINT_VERSION=v1.18.0 \
     HELM_VERSION=v2.14.1 \
     KIND_VERSION=v0.6.1 \
     KUBEFED_VERSION=0.1.0-rc3
@@ -32,9 +32,10 @@ ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH=GOLANG_ARCH_${ARC
 # jq             | JSON processing (GitHub API)
 # diffutils      | required for goimports
 RUN dnf -y distrosync --nodocs --setopt=install_weak_deps=False && \
-    dnf -y install --nodocs --setopt=install_weak_deps=False gcc git-core curl moby-engine make golang kubernetes-client findutils upx jq && \
-    dnf -y remove acl dnf-yum langpacks-en libevent libsemanage libsss_idmap libxcrypt-compat mkpasswd openssl python3-pip python3-setuptools \
-           sssd-client unbound-libs whois-nls && \
+    dnf -y install --nodocs --setopt=install_weak_deps=False \
+                   gcc git-core curl moby-engine make golang kubernetes-client \
+                   findutils upx jq golang-x-tools-goimports && \
+    dnf -y remove libsemanage && \
     rpm -e --nodeps selinux-policy-targeted && \
     dnf -y clean all && \
     curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin ${LINT_VERSION} && \
@@ -44,8 +45,7 @@ RUN dnf -y distrosync --nodocs --setopt=install_weak_deps=False && \
     mv kubefedctl /usr/bin/ && chmod a+x /usr/bin/kubefedctl && \
     curl -Lo /usr/bin/kind "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-${ARCH}" && chmod a+x /usr/bin/kind && \
     GOFLAGS="" go get -v github.com/onsi/ginkgo/ginkgo && \
-    GOFLAGS="" go get -v golang.org/x/tools/cmd/goimports && \
-    upx /go/bin/ginkgo /go/bin/goimports /go/bin/golangci-lint /usr/bin/containerd /usr/bin/docker /usr/bin/dockerd /usr/bin/helm /usr/bin/kubectl \
+    upx /go/bin/ginkgo /go/bin/golangci-lint /usr/bin/containerd /usr/bin/docker /usr/bin/dockerd /usr/bin/goimports /usr/bin/helm /usr/bin/kubectl \
         /usr/bin/kubefedctl && \
     ln -f /usr/bin/kubectl /usr/bin/hyperkube
 

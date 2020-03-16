@@ -45,6 +45,8 @@ var _ = ginkgo.SynchronizedAfterSuite(func() {
 })
 
 func RunE2ETests(t *testing.T) {
+	framework.ValidateFlags(framework.TestContext)
+
 	gomega.RegisterFailHandler(ginkgo.Fail)
 
 	// If the ginkgo default for slow test was not modified, bump it to 45 seconds
