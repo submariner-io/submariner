@@ -259,12 +259,14 @@ function registry_running() {
     return $?
 }
 
+function delete_cluster() {
+    if [[ $(kind get clusters | grep ${cluster} | wc -l) -gt 0  ]]; then
+        kind delete cluster --name=${cluster};
+    fi
+}
+
 function cleanup {
-    for i in 1 2 3; do
-      if [[ $(kind get clusters | grep cluster${i} | wc -l) -gt 0  ]]; then
-        kind delete cluster --name=cluster${i};
-      fi
-    done
+    run_parallel "{1..3}" delete_cluster
 
     echo Removing local KIND registry...
     if registry_running; then
