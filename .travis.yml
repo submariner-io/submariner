@@ -26,8 +26,11 @@ script:
   - set -o pipefail;
     $CMD 2>&1 | ts '[%H:%M:%.S]' -s
 after_success:
-  - if [[ "${CHANGED_FILES_PR[@]}" =~ "scripts/kind-e2e/e2e.sh" ]]; then
-      echo "scripts/kind-e2e/e2e.sh was modified, testing recurring run on already deployed infrastructure.";
+  - if [[ $CMD =~ "e2e" &&
+          ( "${CHANGED_FILES_PR[@]}" =~ "scripts/kind-e2e/e2e.sh" ) ||
+          ( $CMD =~ "helm" && "${CHANGED_FILES_PR[@]}" =~ "scripts/kind-e2e/lib_helm_deploy_subm.sh" ) ||
+          ( ! $CMD =~ "helm" && "${CHANGED_FILES_PR[@]}" =~ "scripts/kind-e2e/lib_operator_deploy_subm.sh" ) ]]; then
+      echo "scripts/kind-e2e/*.sh files used by this job were modified, testing recurring run on already deployed infrastructure.";
       set -o pipefail;
       $CMD 2>&1 |  ts '[%H:%M:%.S]' -s;
     fi;
