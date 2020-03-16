@@ -33,13 +33,12 @@ function deploytool_prereqs() {
 }
 
 function setup_broker() {
-    context=$1
-    use_kube_context $context
+    cluster=$1
     if kubectl get crd clusters.submariner.io > /dev/null 2>&1; then
         echo Submariner CRDs already exist, skipping broker creation...
     else
-        echo Installing broker on $context.
-        helm --kube-context $context install submariner-latest/submariner-k8s-broker --name ${SUBMARINER_BROKER_NS} --namespace ${SUBMARINER_BROKER_NS}
+        echo Installing broker on ${cluster}.
+        helm --kube-context ${cluster} install submariner-latest/submariner-k8s-broker --name ${SUBMARINER_BROKER_NS} --namespace ${SUBMARINER_BROKER_NS}
     fi
 
     SUBMARINER_BROKER_URL=$(kubectl -n default get endpoints kubernetes -o jsonpath="{.subsets[0].addresses[0].ip}:{.subsets[0].ports[?(@.name=='https')].port}")

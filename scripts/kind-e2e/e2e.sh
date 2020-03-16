@@ -90,10 +90,6 @@ function create_kind_cluster() {
     kind_fixup_config ${cluster}
 }
 
-function use_kube_context() {
-    kubectl config use-context $1
-}
-
 function deploy_weave_cni(){
     if kubectl wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=60s > /dev/null 2>&1; then
         echo "Weave already deployed."
@@ -167,7 +163,7 @@ function test_connection() {
 }
 
 function enable_logging() {
-    use_kube_context cluster1
+    cluster=cluster1
 
     if kubectl rollout status deploy/kibana > /dev/null 2>&1; then
         echo Elasticsearch stack already installed, skipping...
@@ -181,14 +177,14 @@ function enable_logging() {
     echo Waiting for Elasticsearch to be ready...
     kubectl wait --for=condition=Ready pods -l app=elasticsearch --timeout=300s
     for i in 2 3; do
-        use_kube_context cluster$i
+        cluster=cluster$i
         kubectl apply -f ${E2E_DIR}/logging/filebeat.yaml
         kubectl set env daemonset/filebeat -n kube-system ELASTICSEARCH_HOST=${es_ip} ELASTICSEARCH_PORT=30000
     done
 }
 
 function enable_kubefed() {
-    use_kube_context cluster1
+    cluster=cluster1
     KUBEFED_NS=kube-federation-system
     if kubectl rollout status deploy/kubefed-controller-manager -n ${KUBEFED_NS} > /dev/null 2>&1; then
         echo Kubefed already installed, skipping setup...
@@ -231,7 +227,7 @@ function prepare_cluster() {
 }
 
 function deploy_resource() {
-    use_kube_context $1
+    cluster=$1
     resource_file=$2
     resource_name=$(basename "$2" ".yaml")
     kubectl apply -f ${resource_file}
