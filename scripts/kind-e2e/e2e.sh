@@ -220,6 +220,16 @@ function del_subm_gateway_label() {
     kubectl --context=$context label node $context-worker "submariner.io/gateway-" --overwrite
 }
 
+function prepare_cluster() {
+    for app in submariner-engine submariner-routeagent submariner-globalnet; do
+        if kubectl wait --for=condition=Ready pods -l app=$app -n $subm_ns --timeout=60s > /dev/null 2>&1; then
+            echo Removing $app pods...
+            kubectl delete pods -n $subm_ns -l app=$app
+        fi
+    done
+    add_subm_gateway_label $cluster
+}
+
 function deploy_resource() {
     use_kube_context $1
     resource_file=$2
@@ -242,16 +252,6 @@ function test_with_e2e_tests {
         -ginkgo.noColor -ginkgo.reportPassed \
         -ginkgo.reportFile ${DAPPER_SOURCE}/${DAPPER_OUTPUT}/e2e-junit.xml 2>&1 | \
         tee ${DAPPER_SOURCE}/${DAPPER_OUTPUT}/e2e-tests.log
-}
-
-function delete_subm_pods() {
-    use_kube_context $1
-    ns=$2
-    app=$3
-    if kubectl wait --for=condition=Ready pods -l app=$app -n $ns --timeout=60s > /dev/null 2>&1; then
-        echo Removing $app pods...
-        kubectl delete pods -n $ns -l app=$app
-    fi
 }
 
 function registry_running() {
@@ -394,13 +394,7 @@ fi
 # Install Helm/Operator deploy tool prerequisites
 deploytool_prereqs
 
-for i in 1 2 3; do
-    context=cluster$i
-    for app in submariner-engine submariner-routeagent submariner-globalnet; do
-      delete_subm_pods $context $subm_ns $app
-    done
-    add_subm_gateway_label $context
-done
+run_parallel "{1..3}" prepare_cluster
 
 setup_broker cluster1
 install_subm_all_clusters
