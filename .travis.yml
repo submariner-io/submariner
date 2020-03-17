@@ -6,6 +6,7 @@ branches:
   - master
   - /^v\d+\.\d+\.\d+.*$/
   - /^release-\d+.\d+.*$/
+  - /^z_pr.*$/
 
 git:
   depth: false
