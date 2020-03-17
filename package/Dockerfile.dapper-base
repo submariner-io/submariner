@@ -48,3 +48,7 @@ RUN dnf -y distrosync --nodocs --setopt=install_weak_deps=False && \
     upx /go/bin/ginkgo /go/bin/goimports /go/bin/golangci-lint /usr/bin/containerd /usr/bin/docker /usr/bin/dockerd /usr/bin/helm /usr/bin/kubectl \
         /usr/bin/kubefedctl && \
     ln -f /usr/bin/kubectl /usr/bin/hyperkube
+
+# Copy CI deployment scripts into image to share with all submariner-io/* projects
+WORKDIR /opt/kind-e2e
+COPY scripts/kind-e2e/ .
