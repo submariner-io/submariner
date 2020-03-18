@@ -70,6 +70,4 @@ function deploytool_postreqs() {
     # subctl wants a gateway node labeled, or it will ask, but this script is not interactive,
     # and E2E expects cluster1 to not have the gateway configured at start, so we remove it
     del_subm_gateway_label cluster1
-    # Just removing the label does not stop Subm pod.
-    kubectl --context=cluster1 delete pod -n submariner-operator -l app=submariner-engine
 }
