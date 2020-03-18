@@ -36,6 +36,14 @@ const (
 	PodNetworking  = false
 )
 
+type RemoteEndpoint int
+
+const (
+	PodIP RemoteEndpoint = iota
+	ServiceIP
+	GlobalIP
+)
+
 type ClusterIndex int
 
 const (

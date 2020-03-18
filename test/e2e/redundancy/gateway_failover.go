@@ -44,10 +44,10 @@ func testEnginePodRestartScenario(f *framework.Framework) {
 	By(fmt.Sprintf("Found new submariner engine pod %q", newEnginePod.Name))
 
 	By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
-	tcp.RunConnectivityTest(f, false, framework.PodNetworking, framework.GatewayNode, framework.GatewayNode, framework.ClusterA, framework.ClusterB)
+	tcp.RunConnectivityTest(f, framework.PodIP, framework.PodNetworking, framework.GatewayNode, framework.GatewayNode, framework.ClusterA, framework.ClusterB)
 
 	By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
-	tcp.RunConnectivityTest(f, false, framework.PodNetworking, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterA, framework.ClusterB)
+	tcp.RunConnectivityTest(f, framework.PodIP, framework.PodNetworking, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterA, framework.ClusterB)
 }
 
 func testGatewayFailOverScenario(f *framework.Framework) {
@@ -94,8 +94,8 @@ func testGatewayFailOverScenario(f *framework.Framework) {
 	By(fmt.Sprintf("Found new submariner endpoint for %q: %#v", clusterAName, newSubmEndpoint))
 
 	By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
-	tcp.RunConnectivityTest(f, false, framework.PodNetworking, framework.GatewayNode, framework.GatewayNode, framework.ClusterA, framework.ClusterB)
+	tcp.RunConnectivityTest(f, framework.PodIP, framework.PodNetworking, framework.GatewayNode, framework.GatewayNode, framework.ClusterA, framework.ClusterB)
 
 	By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
-	tcp.RunConnectivityTest(f, false, framework.PodNetworking, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterA, framework.ClusterB)
+	tcp.RunConnectivityTest(f, framework.PodIP, framework.PodNetworking, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterA, framework.ClusterB)
 }

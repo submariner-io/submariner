@@ -224,8 +224,8 @@ func (i *Controller) handleUpdateService(old interface{}, newObj interface{}) {
 		utilruntime.HandleError(err)
 		return
 	}
-	oldGlobalIp := old.(*k8sv1.Service).GetAnnotations()[submarinerIpamGlobalIp]
-	newGlobalIp := newObj.(*k8sv1.Service).GetAnnotations()[submarinerIpamGlobalIp]
+	oldGlobalIp := old.(*k8sv1.Service).GetAnnotations()[SubmarinerIpamGlobalIp]
+	newGlobalIp := newObj.(*k8sv1.Service).GetAnnotations()[SubmarinerIpamGlobalIp]
 	if oldGlobalIp != newGlobalIp && newGlobalIp != i.pool.GetAllocatedIp(key) {
 		klog.V(log.DEBUG).Infof("GlobalIp changed from %s to %s for %s", oldGlobalIp, newGlobalIp, key)
 		i.enqueueObject(newObj, i.serviceWorkqueue)
@@ -262,8 +262,8 @@ func (i *Controller) handleUpdatePod(old interface{}, newObj interface{}) {
 		return
 	}
 
-	oldGlobalIp := old.(*k8sv1.Pod).GetAnnotations()[submarinerIpamGlobalIp]
-	newGlobalIp := newObj.(*k8sv1.Pod).GetAnnotations()[submarinerIpamGlobalIp]
+	oldGlobalIp := old.(*k8sv1.Pod).GetAnnotations()[SubmarinerIpamGlobalIp]
+	newGlobalIp := newObj.(*k8sv1.Pod).GetAnnotations()[SubmarinerIpamGlobalIp]
 	if oldGlobalIp != newGlobalIp && newGlobalIp != i.pool.GetAllocatedIp(key) {
 		klog.V(log.DEBUG).Infof("GlobalIp changed from %s to %s for %s", oldGlobalIp, newGlobalIp, key)
 		i.enqueueObject(newObj, i.podWorkqueue)
@@ -289,7 +289,7 @@ func (i *Controller) handleRemovedService(obj interface{}) {
 		}
 	}
 	if !i.excludeNamespaces[service.Namespace] {
-		globalIp := service.Annotations[submarinerIpamGlobalIp]
+		globalIp := service.Annotations[SubmarinerIpamGlobalIp]
 		if globalIp != "" {
 			if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
 				utilruntime.HandleError(err)
@@ -320,7 +320,7 @@ func (i *Controller) handleRemovedPod(obj interface{}) {
 		}
 	}
 	if !i.excludeNamespaces[pod.Namespace] {
-		globalIp := pod.Annotations[submarinerIpamGlobalIp]
+		globalIp := pod.Annotations[SubmarinerIpamGlobalIp]
 		if globalIp != "" && pod.Status.PodIP != "" {
 			if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
 				utilruntime.HandleError(err)
@@ -366,7 +366,7 @@ func (i *Controller) podGetter(namespace, name string) (runtime.Object, error) {
 
 func (i *Controller) serviceUpdater(obj runtime.Object, key string) error {
 	service := obj.(*k8sv1.Service)
-	existingGlobalIp := service.GetAnnotations()[submarinerIpamGlobalIp]
+	existingGlobalIp := service.GetAnnotations()[SubmarinerIpamGlobalIp]
 	allocatedIp, err := i.annotateGlobalIp(key, existingGlobalIp)
 	if err != nil { // failed to get globalIp or failed to update, we want to retry
 		logAndRequeue(key, i.serviceWorkqueue)
@@ -380,7 +380,7 @@ func (i *Controller) serviceUpdater(obj runtime.Object, key string) error {
 		if annotations == nil {
 			annotations = map[string]string{}
 		}
-		annotations[submarinerIpamGlobalIp] = allocatedIp
+		annotations[SubmarinerIpamGlobalIp] = allocatedIp
 		service.SetAnnotations(annotations)
 		i.syncServiceRules(service, allocatedIp, AddRules)
 		_, updateErr := i.kubeClientSet.CoreV1().Services(service.Namespace).Update(service)
@@ -397,7 +397,7 @@ func (i *Controller) serviceUpdater(obj runtime.Object, key string) error {
 func (i *Controller) podUpdater(obj runtime.Object, key string) error {
 	pod := obj.(*k8sv1.Pod)
 	pod.GetSelfLink()
-	existingGlobalIp := pod.GetAnnotations()[submarinerIpamGlobalIp]
+	existingGlobalIp := pod.GetAnnotations()[SubmarinerIpamGlobalIp]
 	allocatedIp, err := i.annotateGlobalIp(key, existingGlobalIp)
 	if err != nil { // failed to get globalIp or failed to update, we want to retry
 		logAndRequeue(key, i.podWorkqueue)
@@ -411,7 +411,7 @@ func (i *Controller) podUpdater(obj runtime.Object, key string) error {
 		if annotations == nil {
 			annotations = map[string]string{}
 		}
-		annotations[submarinerIpamGlobalIp] = allocatedIp
+		annotations[SubmarinerIpamGlobalIp] = allocatedIp
 		pod.SetAnnotations(annotations)
 		i.syncPodRules(pod.Status.PodIP, allocatedIp, AddRules)
 		_, updateErr := i.kubeClientSet.CoreV1().Pods(pod.Namespace).Update(pod)

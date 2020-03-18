@@ -6,10 +6,11 @@ type Operation string
 
 const (
 	handlerResync          = time.Hour * 24
-	submarinerIpamGlobalIp = "submariner.io/globalIp"
-	submarinerIngress      = "SUBMARINER-GN-INGRESS"
-	submarinerEgress       = "SUBMARINER-GN-EGRESS"
-	submarinerMark         = "SUBMARINER-GN-MARK"
+	SubmarinerIpamGlobalIp = "submariner.io/globalIp"
+
+	submarinerIngress = "SUBMARINER-GN-INGRESS"
+	submarinerEgress  = "SUBMARINER-GN-EGRESS"
+	submarinerMark    = "SUBMARINER-GN-MARK"
 
 	// Globalnet uses MARK target to mark traffic destined to remote clusters.
 	// Some of the CNIs also use iptable MARK targets in the pipeline. This should not

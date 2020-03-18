@@ -47,3 +47,16 @@ func (f *Framework) CreateTCPService(cluster ClusterIndex, selectorName string, 
 		return service, err
 	}, NoopCheckResult).(*v1.Service)
 }
+
+// AwaitServiceByAnnotation queries the service and looks for the presence of annotation.
+func (f *Framework) AwaitServiceByAnnotation(cluster ClusterIndex, annotation string, svcName string, namespace string) *v1.Service {
+	return AwaitUntil("get"+annotation+" annotation for service "+svcName, func() (interface{}, error) {
+		return f.ClusterClients[cluster].CoreV1().Services(namespace).Get(svcName, metav1.GetOptions{})
+	}, func(result interface{}) (bool, string, error) {
+		svc := result.(*v1.Service)
+		if svc.GetAnnotations()[annotation] == "" {
+			return false, fmt.Sprintf("Service %q does not have annotation %q yet", svcName, annotation), nil
+		}
+		return true, "", nil
+	}).(*v1.Service)
+}
