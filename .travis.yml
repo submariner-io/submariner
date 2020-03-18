@@ -18,6 +18,10 @@ jobs:
 
 install:
   - sudo apt-get install moreutils # make ts available
+  - sudo add-apt-repository -y ppa:wireguard/wireguard # add WireGuard support
+  - sudo apt-get update
+  - sudo apt-get install wireguard -y
+
 services:
   - docker
 before_script:
