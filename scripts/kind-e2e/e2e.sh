@@ -6,6 +6,9 @@ source $(git rev-parse --show-toplevel)/scripts/lib/version
 
 ### Variables ###
 
+KIND_REGISTRY=kind-registry
+E2E_DIR=$(dirname "$(readlink -f "$0")")
+
 ### Functions ###
 
 function print_logs() {
@@ -38,7 +41,7 @@ function generate_cluster_yaml() {
         disable_cni="false"
     fi
 
-    render_template ${PRJ_ROOT}/scripts/kind-e2e/kind-cluster-config.yaml > ${PRJ_ROOT}/scripts/kind-e2e/$1-config.yaml
+    render_template ${E2E_DIR}/kind-cluster-config.yaml > ${E2E_DIR}/$1-config.yaml
 }
 
 function kind_fixup_config() {
@@ -73,9 +76,9 @@ function kind_clusters() {
             (
             generate_cluster_yaml "cluster${i}"
             if [[ -n ${version} ]]; then
-                kind create cluster --image=kindest/node:v${version} --name=cluster${i} --config=${PRJ_ROOT}/scripts/kind-e2e/cluster${i}-config.yaml
+                kind create cluster --image=kindest/node:v${version} --name=cluster${i} --config=${E2E_DIR}/cluster${i}-config.yaml
             else
-                kind create cluster --name=cluster${i} --config=${PRJ_ROOT}/scripts/kind-e2e/cluster${i}-config.yaml
+                kind create cluster --name=cluster${i} --config=${E2E_DIR}/cluster${i}-config.yaml
             fi
             kind_fixup_config cluster${i}
             ) > ${logs[$i]} 2>&1 &
@@ -116,11 +119,12 @@ function kind_import_images() {
 
 function get_globalip() {
     svcname=$1
+    context=$2
     # It takes a while for globalIp annotation to show up on a service
     for i in {0..30}
     do
-        gip=$(kubectl get svc $svcname -o jsonpath='{.metadata.annotations.submariner\.io/globalIp}')
-        if [ $gip != "" ]; then
+        gip=$(kubectl --context=$context get svc $svcname -o jsonpath='{.metadata.annotations.submariner\.io/globalIp}')
+        if [[ -n ${gip} ]]; then
           echo $gip
           return
         fi
@@ -132,7 +136,7 @@ function get_globalip() {
 
 function test_connection() {
     if [[ $globalnet = "true" ]]; then
-        nginx_svc_ip_cluster3=$(get_globalip nginx-demo)
+        nginx_svc_ip_cluster3=$(get_globalip nginx-demo cluster3)
     else
         nginx_svc_ip_cluster3=$(kubectl --context=cluster3 get svc -l app=nginx-demo | awk 'FNR == 2 {print $3}')
     fi
@@ -163,12 +167,12 @@ function enable_logging() {
     else
         echo Installing Elasticsearch...
         es_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster1-control-plane | head -n 1)
-        kubectl --context=cluster1 apply -f ${PRJ_ROOT}/scripts/kind-e2e/logging/elasticsearch.yaml
-        kubectl --context=cluster1 apply -f ${PRJ_ROOT}/scripts/kind-e2e/logging/filebeat.yaml
+        kubectl --context=cluster1 apply -f ${E2E_DIR}/logging/elasticsearch.yaml
+        kubectl --context=cluster1 apply -f ${E2E_DIR}/logging/filebeat.yaml
         echo Waiting for Elasticsearch to be ready...
         kubectl --context=cluster1 wait --for=condition=Ready pods -l app=elasticsearch --timeout=300s
         for i in 2 3; do
-            kubectl --context=cluster${i} apply -f ${PRJ_ROOT}/scripts/kind-e2e/logging/filebeat.yaml
+            kubectl --context=cluster${i} apply -f ${E2E_DIR}/logging/filebeat.yaml
             kubectl --context=cluster${i} set env daemonset/filebeat -n kube-system ELASTICSEARCH_HOST=${es_ip} ELASTICSEARCH_PORT=30000
         done
     fi
@@ -209,7 +213,7 @@ function deploy_netshoot() {
     context=$1
     worker_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $context-worker | head -n 1)
     echo Deploying netshoot on $context worker: ${worker_ip}
-    kubectl --context=$context apply -f ${PRJ_ROOT}/scripts/kind-e2e/netshoot.yaml
+    kubectl --context=$context apply -f ${E2E_DIR}/netshoot.yaml
     echo Waiting for netshoot pods to be Ready on $context.
     kubectl --context=$context rollout status deploy/netshoot --timeout=120s
 }
@@ -218,7 +222,7 @@ function deploy_nginx() {
     context=$1
     worker_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $context-worker | head -n 1)
     echo Deploying nginx on $context worker: ${worker_ip}
-    kubectl --context=$context apply -f ${PRJ_ROOT}/scripts/kind-e2e/nginx-demo.yaml
+    kubectl --context=$context apply -f ${E2E_DIR}/nginx-demo.yaml
     echo Waiting for nginx-demo deployment to be Ready on $context.
     kubectl --context=$context rollout status deploy/nginx-demo --timeout=120s
 }
@@ -285,16 +289,43 @@ function cleanup {
 
 ### Main ###
 
-status=$1
-version=$2
-logging=$3
-kubefed=$4
-deploy=$5
-debug=$6
-globalnet=$7
-KIND_REGISTRY=kind-registry
+LONGOPTS=status:,k8s_version:,logging:,kubefed:,deploytool:,globalnet:
+# Only accept longopts, but must pass null shortopts or first param after "--" will be incorrectly used
+SHORTOPTS=""
+! PARSED=$(getopt --options=$SHORTOPTS --longoptions=$LONGOPTS --name "$0" -- "$@")
+eval set -- "$PARSED"
 
-echo Starting with status: $status, k8s_version: $version, logging: $logging, kubefed: $kubefed, deploy: $deploy, debug: $debug, globalnet: $globalnet
+while true; do
+    case "$1" in
+        --status)
+            status="$2"
+            ;;
+        --k8s_version)
+            version="$2"
+            ;;
+        --logging)
+            logging="$2"
+            ;;
+        --kubefed)
+            kubefed="$2"
+            ;;
+        --deploytool)
+            deploy="$2"
+            ;;
+        --globalnet)
+            globalnet="$2"
+            ;;
+        --)
+            break
+            ;;
+        *)
+            echo "Ignoring unknown option: $1 $2"
+            ;;
+    esac
+    shift 2
+done
+
+echo Starting with status: $status, k8s_version: $version, logging: $logging, kubefed: $kubefed, deploy: $deploy, globalnet: $globalnet
 
 if [[ $globalnet = "true" ]]; then
   # When globalnet is set to true, we want to deploy clusters with overlapping CIDRs
@@ -319,11 +350,11 @@ elif [[ $status != keep && $status != create ]]; then
 fi
 
 if [[ $deploy = operator ]]; then
-    echo Deploying with operator
-    . kind-e2e/lib_operator_deploy_subm.sh
+    echo Will deploy submariner using the operator
+    . ${E2E_DIR}/lib_operator_deploy_subm.sh
 elif [ "$deploy" = helm ]; then
-    echo Deploying with helm
-    . kind-e2e/lib_helm_deploy_subm.sh
+    echo Will deploy submariner using helm
+    . ${E2E_DIR}/lib_helm_deploy_subm.sh
 else
     echo Unknown deploy method: $deploy
     cleanup
@@ -348,7 +379,7 @@ else
 fi
 registry_ip="$(docker inspect -f '{{.NetworkSettings.IPAddress}}' "$KIND_REGISTRY")"
 
-kind_clusters "$@"
+kind_clusters $status $version
 export KUBECONFIG=$(echo ${PRJ_ROOT}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
 setup_custom_cni
 kind_import_images

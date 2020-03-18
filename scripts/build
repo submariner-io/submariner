@@ -6,6 +6,27 @@ source $(dirname $0)/lib/version
 
 cd $(dirname $0)/
 
-./build-engine $6
-./build-routeagent $6
-./build-globalnet $6
+LONGOPTS=build_debug:
+# Only accept longopts, but must pass null shortopts or first param after "--" will be incorrectly used
+SHORTOPTS=""
+! PARSED=$(getopt --options=$SHORTOPTS --longoptions=$LONGOPTS --name "$0" -- "$@")
+eval set -- "$PARSED"
+
+while true; do
+    case "$1" in
+        --build_debug)
+            build_debug="$2"
+            ;;
+        --)
+            break
+            ;;
+        *)
+            echo "Ignoring unknown option: $1 $2"
+            ;;
+    esac
+    shift 2
+done
+
+./build-engine $build_debug
+./build-routeagent $build_debug
+./build-globalnet $build_debug
