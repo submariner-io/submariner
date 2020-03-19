@@ -81,7 +81,8 @@ func (i *Controller) Run(stopCh <-chan struct{}) error {
 
 	// Currently submariner global-net implementation works only with kube-proxy.
 	if len(kubeProxyPodList.Items) == 0 {
-		return fmt.Errorf("cluster does not seem to use kube-proxy")
+		// TODO: The current logic to validate the presence of kube-proxy needs to be revisited
+		klog.Info("REVISIT: Cluster does not seem to use kube-proxy")
 	}
 
 	err = i.initIPTableChains()
