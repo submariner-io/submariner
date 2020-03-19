@@ -6,7 +6,7 @@ Traffic is encrypted and encapsulated in UDP packets.
 
 ## Driver design
 
-- WireGuard creates a virtual network device which is created and accessesed through netlink. It looks like any network device and currenly has a hardcoded name `subwg0`.
+- WireGuard creates a virtual network device that is accessed via netlink. It appears like any network device and currently has a hardcoded name `subwg0`.
 
 - WireGuard identifies peers by their cryptographic public key (no need to exchange shared secrets) -- owner must have the corresponding private key to prove idenity
 
