@@ -8,7 +8,7 @@ Traffic is encrypted and encapsulated in UDP packets.
 
 - WireGuard creates a virtual network device that is accessed via netlink. It appears like any network device and currently has a hardcoded name `subwg0`.
 
-- WireGuard identifies peers by their cryptographic public key (no need to exchange shared secrets) -- owner must have the corresponding private key to prove idenity
+- WireGuard identifies peers by their cryptographic public key without the need to exchange shared secrets. The owner of the public key must have the corresponding private key to prove identity.
 
 - The driver creates the key pair and adds the public key to the local endpoint so other clusters can connect. Like `ipsec`, the node IP address is used as the endpoint udp address of the WireGuard tunnels. A fixed (hardcoded) port is used for all endpoints.
 
