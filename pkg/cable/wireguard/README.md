@@ -10,7 +10,7 @@ Traffic is encrypted and encapsulated in UDP packets.
 
 - WireGuard identifies peers by their cryptographic public key without the need to exchange shared secrets. The owner of the public key must have the corresponding private key to prove identity.
 
-- The driver creates the key pair and adds the public key to the local endpoint so other clusters can connect. Like `ipsec`, the node IP address is used as the endpoint udp address of the WireGuard tunnels. A fixed (hardcoded) port is used for all endpoints.
+- The driver creates the key pair and adds the public key to the local endpoint so other clusters can connect. Like `ipsec`, the node IP address is used as the endpoint udp address of the WireGuard tunnels. A fixed port is used for all endpoints.
 
 - The drivers adds routing rules to redirect cross cluster communication through `subwg0`. 
   (*note: this is different from `ipsec`, which intercepts packets at netfilter level.*)
