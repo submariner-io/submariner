@@ -12,7 +12,7 @@ Traffic is encrypted and encapsulated in UDP packets.
 
 - The driver creates the key pair and adds the public key to the local endpoint so other clusters can connect. Like `ipsec`, the node IP address is used as the endpoint udp address of the WireGuard tunnels. A fixed port is used for all endpoints.
 
-- The drivers adds routing rules to redirect cross cluster communication through `subwg0`. 
+- The driver adds routing rules to redirect cross cluster communication through the virtual network device `subwg0`. 
   (*note: this is different from `ipsec`, which intercepts packets at netfilter level.*)
 
 - The driver uses [`wgctrl`](https://github.com/WireGuard/wgctrl-go "WgCtrl github"), a go package that enables control of WireGuard devices on multiple platforms. Link creation and removal are done through [`netlink`](https://github.com/vishvananda/netlink "Netlink github").
