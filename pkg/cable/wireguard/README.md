@@ -39,7 +39,7 @@ Traffic is encrypted and encapsulated in UDP packets.
   ```
   you probably did not install WireGuard on the Gateway node.
   
-- Support for e2e testing with `kind` is not iplemented yet. The e2e tests can be run with WireGuard by setting it as the default driver in `pkg/cable/wireguard/WGdriver.go` **and** unsetting StrogSwan in `pkg/cable/ipsec/strongswan.go` 
+- Support for e2e testing with `kind` is not implemented yet. The e2e tests can be run with WireGuard by setting it as the default driver in `pkg/cable/wireguard/WGdriver.go` **and** unsetting StrongSwan in `pkg/cable/ipsec/strongswan.go` 
   ```GoLang
   func init() {
     // uncomment next line to set as default
