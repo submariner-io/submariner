@@ -26,7 +26,7 @@ Traffic is encrypted and encapsulated in UDP packets.
   $ sudo apt-get install wireguard
   ```
    
-- The driver needs to be enbaled with 
+- The driver needs to be enabled with 
   ```ShellSession
   $ bin/subctl join --kubeconfig wg3-conf --cable-driver wireguard --disable-nat  --repository roytman --version  latest broker-info.subm
   ```
