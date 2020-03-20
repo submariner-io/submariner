@@ -73,21 +73,14 @@ func (i *Controller) Run(stopCh <-chan struct{}) error {
 	// Start the informer factories to begin populating the informer caches
 	klog.Info("Starting IPAM Controller")
 
-	// Query kube-proxy pods in the cluster
-	kubeProxyPodList, err := i.kubeClientSet.CoreV1().Pods(kubeProxyNameSpace).List(metav1.ListOptions{LabelSelector: kubeProxyLabelSelector})
+	err := i.initIPTableChains()
 	if err != nil {
-		return fmt.Errorf("error while retrieving kube-proxy pods: %v", err)
+		return fmt.Errorf("initIPTableChains returned error. %v", err)
 	}
 
 	// Currently submariner global-net implementation works only with kube-proxy.
-	if len(kubeProxyPodList.Items) == 0 {
-		// TODO: The current logic to validate the presence of kube-proxy needs to be revisited
-		klog.Info("REVISIT: Cluster does not seem to use kube-proxy")
-	}
-
-	err = i.initIPTableChains()
-	if err != nil {
-		return fmt.Errorf("initIPTableChains returned error. %v", err)
+	if chainExists, _ := i.doesIPTablesChainExist("nat", kubeProxyServiceChainName); !chainExists {
+		return fmt.Errorf("%q chain missing, cluster does not seem to use kube-proxy", kubeProxyServiceChainName)
 	}
 
 	// Wait for the caches to be synced before starting workers
