@@ -31,7 +31,7 @@ func (i *Controller) kubeProxyClusterIpServiceChainName(service *k8sv1.Service) 
 	// CNIs that use kube-proxy with iptables for loadbalancing create an iptables chain for each service
 	// and incoming traffic to the clusterIP Service is directed into the respective chain.
 	// Reference: https://bit.ly/2OPhlwk
-	serviceName := service.GetNamespace() + "/" + service.GetName() + ":"
+	serviceName := service.GetNamespace() + "/" + service.GetName() + ":" + service.Spec.Ports[0].Name
 	protocol := strings.ToLower(string(service.Spec.Ports[0].Protocol))
 	hash := sha256.Sum256([]byte(serviceName + protocol))
 	encoded := base32.StdEncoding.EncodeToString(hash[:])
