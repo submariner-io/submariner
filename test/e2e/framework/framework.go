@@ -53,8 +53,9 @@ const (
 )
 
 const (
-	SubmarinerEngine = "submariner-engine"
-	GatewayLabel     = "submariner.io/gateway"
+	SubmarinerEngine            = "submariner-engine"
+	GatewayLabel                = "submariner.io/gateway"
+	GlobalnetGlobalIPAnnotation = "submariner.io/globalIp"
 )
 
 type PatchFunc func(pt types.PatchType, payload []byte) error
