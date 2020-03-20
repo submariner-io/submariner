@@ -5,12 +5,13 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/submariner/test/e2e/framework"
-	"github.com/submariner-io/submariner/test/e2e/tcp"
+	"github.com/submariner-io/shipyard/test/e2e/framework"
+	"github.com/submariner-io/shipyard/test/e2e/tcp"
+	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
 )
 
 var _ = PDescribe("[redundancy] Gateway fail-over tests", func() {
-	f := framework.NewDefaultFramework("gateway-redundancy")
+	f := subFramework.NewFramework("gateway-redundancy")
 
 	When("one gateway node is configured and the submariner engine pod fails", func() {
 		It("should start a new submariner engine pod and be able to connect from another cluster", func() {
@@ -26,7 +27,7 @@ var _ = PDescribe("[redundancy] Gateway fail-over tests", func() {
 
 })
 
-func testEnginePodRestartScenario(f *framework.Framework) {
+func testEnginePodRestartScenario(f *subFramework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
@@ -44,13 +45,25 @@ func testEnginePodRestartScenario(f *framework.Framework) {
 	By(fmt.Sprintf("Found new submariner engine pod %q", newEnginePod.Name))
 
 	By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
-	tcp.RunConnectivityTest(f, framework.PodIP, framework.PodNetworking, framework.GatewayNode, framework.GatewayNode, framework.ClusterA, framework.ClusterB)
+	tcp.RunConnectivityTest(tcp.ConnectivityTestParams{
+		Framework:             f.Framework,
+		FromCluster:           framework.ClusterB,
+		FromClusterScheduling: framework.GatewayNode,
+		ToCluster:             framework.ClusterA,
+		ToClusterScheduling:   framework.GatewayNode,
+	})
 
 	By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
-	tcp.RunConnectivityTest(f, framework.PodIP, framework.PodNetworking, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterA, framework.ClusterB)
+	tcp.RunConnectivityTest(tcp.ConnectivityTestParams{
+		Framework:             f.Framework,
+		FromCluster:           framework.ClusterB,
+		FromClusterScheduling: framework.NonGatewayNode,
+		ToCluster:             framework.ClusterA,
+		ToClusterScheduling:   framework.NonGatewayNode,
+	})
 }
 
-func testGatewayFailOverScenario(f *framework.Framework) {
+func testGatewayFailOverScenario(f *subFramework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
@@ -69,7 +82,7 @@ func testGatewayFailOverScenario(f *framework.Framework) {
 	enginePod := f.AwaitSubmarinerEnginePod(framework.ClusterA)
 	By(fmt.Sprintf("Found submariner engine pod %q on %q", enginePod.Name, clusterAName))
 
-	submEndpoint := f.AwaitSubmarinerEndpoint(framework.ClusterA, framework.NoopCheckEndpoint)
+	submEndpoint := f.AwaitSubmarinerEndpoint(framework.ClusterA, subFramework.NoopCheckEndpoint)
 	By(fmt.Sprintf("Found submariner endpoint for %q: %#v", clusterAName, submEndpoint))
 
 	By(fmt.Sprintf("Setting the gateway label for node %q to true", initialNonGatewayNode.Name))
@@ -94,8 +107,20 @@ func testGatewayFailOverScenario(f *framework.Framework) {
 	By(fmt.Sprintf("Found new submariner endpoint for %q: %#v", clusterAName, newSubmEndpoint))
 
 	By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
-	tcp.RunConnectivityTest(f, framework.PodIP, framework.PodNetworking, framework.GatewayNode, framework.GatewayNode, framework.ClusterA, framework.ClusterB)
+	tcp.RunConnectivityTest(tcp.ConnectivityTestParams{
+		Framework:             f.Framework,
+		FromCluster:           framework.ClusterB,
+		FromClusterScheduling: framework.GatewayNode,
+		ToCluster:             framework.ClusterA,
+		ToClusterScheduling:   framework.GatewayNode,
+	})
 
 	By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
-	tcp.RunConnectivityTest(f, framework.PodIP, framework.PodNetworking, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterA, framework.ClusterB)
+	tcp.RunConnectivityTest(tcp.ConnectivityTestParams{
+		Framework:             f.Framework,
+		FromCluster:           framework.ClusterB,
+		FromClusterScheduling: framework.NonGatewayNode,
+		ToCluster:             framework.ClusterA,
+		ToClusterScheduling:   framework.NonGatewayNode,
+	})
 }

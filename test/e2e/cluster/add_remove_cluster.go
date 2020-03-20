@@ -5,13 +5,12 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"github.com/submariner-io/submariner/test/e2e/framework"
-	"github.com/submariner-io/submariner/test/e2e/tcp"
+	"github.com/submariner-io/shipyard/test/e2e/framework"
+	"github.com/submariner-io/shipyard/test/e2e/tcp"
 )
 
 var _ = PDescribe("[expansion] Test expanding/shrinking an existing cluster fleet", func() {
-	f := framework.NewDefaultFramework("add-remove-cluster")
+	f := framework.NewFramework("add-remove-cluster")
 
 	It("Should be able to add and remove third cluster", func() {
 		clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
@@ -23,10 +22,23 @@ var _ = PDescribe("[expansion] Test expanding/shrinking an existing cluster flee
 		Expect(gatewayNode).To(HaveLen(0), fmt.Sprintf("Expected no gateway node on %q", framework.ClusterC))
 
 		By(fmt.Sprintf("Verifying that a pod in cluster %q cannot connect to a pod in cluster %q", clusterAName, clusterCName))
-		tcp.RunNoConnectivityTest(f, framework.PodIP, framework.NonGatewayNode, framework.GatewayNode, framework.ClusterC, framework.ClusterA)
+		tcp.RunNoConnectivityTest(tcp.ConnectivityTestParams{
+			Framework:             f,
+			FromCluster:           framework.ClusterA,
+			FromClusterScheduling: framework.GatewayNode,
+			ToCluster:             framework.ClusterC,
+			ToClusterScheduling:   framework.NonGatewayNode,
+		})
 
 		By(fmt.Sprintf("Verifying that a pod in cluster %q cannot connect to a service in cluster %q", clusterBName, clusterCName))
-		tcp.RunNoConnectivityTest(f, framework.ServiceIP, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterC, framework.ClusterB)
+		tcp.RunNoConnectivityTest(tcp.ConnectivityTestParams{
+			Framework:             f,
+			ToEndpointType:        tcp.ServiceIP,
+			FromCluster:           framework.ClusterB,
+			FromClusterScheduling: framework.NonGatewayNode,
+			ToCluster:             framework.ClusterC,
+			ToClusterScheduling:   framework.NonGatewayNode,
+		})
 
 		nonGatewayNodes := f.FindNodesByGatewayLabel(framework.ClusterC, false)
 		Expect(nonGatewayNodes).ToNot(HaveLen(0), fmt.Sprintf("No non-gateway nodes found on %q", clusterCName))
@@ -38,17 +50,44 @@ var _ = PDescribe("[expansion] Test expanding/shrinking an existing cluster flee
 		By(fmt.Sprintf("Found submariner engine pod %q on %q", enginePod.Name, clusterCName))
 
 		By(fmt.Sprintf("Checking connectivity between clusters"))
-		tcp.RunConnectivityTest(f, framework.PodIP, framework.PodNetworking, framework.GatewayNode, framework.GatewayNode, framework.ClusterC, framework.ClusterB)
-		tcp.RunConnectivityTest(f, framework.ServiceIP, framework.PodNetworking, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterC, framework.ClusterA)
+		tcp.RunConnectivityTest(tcp.ConnectivityTestParams{
+			Framework:             f,
+			FromCluster:           framework.ClusterB,
+			FromClusterScheduling: framework.GatewayNode,
+			ToCluster:             framework.ClusterC,
+			ToClusterScheduling:   framework.GatewayNode,
+		})
+
+		tcp.RunConnectivityTest(tcp.ConnectivityTestParams{
+			Framework:             f,
+			ToEndpointType:        tcp.ServiceIP,
+			FromCluster:           framework.ClusterA,
+			FromClusterScheduling: framework.NonGatewayNode,
+			ToCluster:             framework.ClusterC,
+			ToClusterScheduling:   framework.NonGatewayNode,
+		})
 
 		By(fmt.Sprintf("Removing cluster %q by unsetting the gateway label and deleting submariner engine pod %q", clusterCName, enginePod.Name))
 		f.SetGatewayLabelOnNode(framework.ClusterC, nonGatewayNode, false)
 		f.DeletePod(framework.ClusterC, enginePod.Name, framework.TestContext.SubmarinerNamespace)
 
 		By(fmt.Sprintf("Verifying that a pod in cluster %q cannot connect to a service in cluster %q", clusterAName, clusterCName))
-		tcp.RunNoConnectivityTest(f, framework.PodIP, framework.NonGatewayNode, framework.GatewayNode, framework.ClusterC, framework.ClusterA)
+		tcp.RunNoConnectivityTest(tcp.ConnectivityTestParams{
+			Framework:             f,
+			FromCluster:           framework.ClusterA,
+			FromClusterScheduling: framework.GatewayNode,
+			ToCluster:             framework.ClusterC,
+			ToClusterScheduling:   framework.NonGatewayNode,
+		})
 
 		By(fmt.Sprintf("Verifying that a pod in cluster %q cannot connect to a pod in cluster %q", clusterBName, clusterCName))
-		tcp.RunNoConnectivityTest(f, framework.ServiceIP, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterC, framework.ClusterB)
+		tcp.RunNoConnectivityTest(tcp.ConnectivityTestParams{
+			Framework:             f,
+			ToEndpointType:        tcp.ServiceIP,
+			FromCluster:           framework.ClusterB,
+			FromClusterScheduling: framework.NonGatewayNode,
+			ToCluster:             framework.ClusterC,
+			ToClusterScheduling:   framework.NonGatewayNode,
+		})
 	})
 })
