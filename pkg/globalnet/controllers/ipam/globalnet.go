@@ -80,14 +80,9 @@ func (i *Controller) evaluateService(service *k8sv1.Service) Operation {
 		return Ignore
 	}
 
-	if len(service.Spec.Selector) != 0 {
-		chainName := i.kubeProxyClusterIpServiceChainName(service)
-		if chainExists, _ := i.doesIPTablesChainExist("nat", chainName); !chainExists {
-			return Requeue
-		}
-	} else {
-		// Ignore services that do not have selectors
-		return Ignore
+	chainName := i.kubeProxyClusterIpServiceChainName(service)
+	if chainExists, _ := i.doesIPTablesChainExist("nat", chainName); !chainExists {
+		return Requeue
 	}
 	return Process
 }
