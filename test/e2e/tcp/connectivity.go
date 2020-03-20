@@ -3,7 +3,6 @@ package tcp
 import (
 	"fmt"
 
-	"github.com/submariner-io/submariner/pkg/globalnet/controllers/ipam"
 	"github.com/submariner-io/submariner/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -34,7 +33,7 @@ func RunConnectivityTest(f *framework.Framework, remoteEp framework.RemoteEndpoi
 	// the source-ip of the POD to the corresponding global-ip that is assigned to the POD.
 	if remoteEp == framework.GlobalIP {
 		By("Verifying the output of listener pod which must contain the globalIP of the connector POD")
-		podGlobalIP := connectorPod.Pod.GetAnnotations()[ipam.SubmarinerIpamGlobalIp]
+		podGlobalIP := connectorPod.Pod.GetAnnotations()[framework.GlobalnetGlobalIPAnnotation]
 		Expect(podGlobalIP).ToNot(Equal(""))
 		Expect(listenerPod.TerminationMessage).To(ContainSubstring(podGlobalIP))
 	}
@@ -77,8 +76,8 @@ func createPods(f *framework.Framework, remoteEp framework.RemoteEndpoint, netwo
 		remoteIP = service.Spec.ClusterIP
 		if remoteEp == framework.GlobalIP {
 			// Wait for the globalIP annotation on the service.
-			service = f.AwaitServiceByAnnotation(listenerCluster, ipam.SubmarinerIpamGlobalIp, service.Name, service.Namespace)
-			remoteIP = service.GetAnnotations()[ipam.SubmarinerIpamGlobalIp]
+			service = f.AwaitServiceByAnnotation(listenerCluster, framework.GlobalnetGlobalIPAnnotation, service.Name, service.Namespace)
+			remoteIP = service.GetAnnotations()[framework.GlobalnetGlobalIPAnnotation]
 		}
 	}
 
