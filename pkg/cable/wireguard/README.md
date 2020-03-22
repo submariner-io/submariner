@@ -1,6 +1,6 @@
 # WireGuard Cable Driver (WIP)
 
-[WireGuard](https://www.wireguard.com "Wireguard homepage") is an extremely simple yet fast and modern VPN that utilizes state-of-the-art cryptography. 
+[WireGuard](https://www.wireguard.com "WireGuard homepage") is an extremely simple yet fast and modern VPN that utilizes state-of-the-art cryptography. 
 
 Traffic is encrypted and encapsulated in UDP packets.
 
