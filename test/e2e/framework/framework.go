@@ -8,6 +8,9 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+	"github.com/pkg/errors"
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
@@ -15,13 +18,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	k8serrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kubeclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-
-	. "github.com/onsi/gomega"
 )
 
 const (
@@ -34,6 +36,14 @@ const (
 	PodNetworking  = false
 )
 
+type RemoteEndpoint int
+
+const (
+	PodIP RemoteEndpoint = iota
+	ServiceIP
+	GlobalIP
+)
+
 type ClusterIndex int
 
 const (
@@ -43,8 +53,9 @@ const (
 )
 
 const (
-	SubmarinerEngine = "submariner-engine"
-	GatewayLabel     = "submariner.io/gateway"
+	SubmarinerEngine            = "submariner-engine"
+	GatewayLabel                = "submariner.io/gateway"
+	GlobalnetGlobalIPAnnotation = "submariner.io/globalIp"
 )
 
 type PatchFunc func(pt types.PatchType, payload []byte) error
@@ -74,45 +85,32 @@ type Framework struct {
 	// test multiple times in parallel.
 	UniqueName string
 
+	// These are now set in TestContext but remain here as well for now for legacy.
 	ClusterClients    []*kubeclientset.Clientset
 	SubmarinerClients []*submarinerClientset.Clientset
 
 	SkipNamespaceCreation    bool            // Whether to skip creating a namespace
 	Namespace                string          // Every test has a namespace at least unless creation is skipped
-	namespacesToDelete       []*v1.Namespace // Some tests have more than one.
+	namespacesToDelete       map[string]bool // Some tests have more than one.
 	NamespaceDeletionTimeout time.Duration
 
 	// To make sure that this framework cleans up after itself, no matter what,
 	// we install a Cleanup action before each test and clear it after.  If we
 	// should abort, the AfterSuite hook should run all Cleanup actions.
 	cleanupHandle CleanupActionHandle
-
-	// configuration for framework's client
-	Options Options
-}
-
-// Options is a struct for managing test framework options.
-type Options struct {
-	ClientQPS    float32
-	ClientBurst  int
-	GroupVersion *schema.GroupVersion
 }
 
 // NewDefaultFramework makes a new framework and sets up a BeforeEach/AfterEach for
 // you (you can write additional before/after each functions).
 func NewDefaultFramework(baseName string) *Framework {
-	options := Options{
-		ClientQPS:   20,
-		ClientBurst: 50,
-	}
-	return NewFramework(baseName, options)
+	return NewFramework(baseName)
 }
 
 // NewFramework creates a test framework.
-func NewFramework(baseName string, options Options) *Framework {
+func NewFramework(baseName string) *Framework {
 	f := &Framework{
-		BaseName: baseName,
-		Options:  options,
+		BaseName:           baseName,
+		namespacesToDelete: map[string]bool{},
 	}
 
 	ginkgo.BeforeEach(f.BeforeEach)
@@ -121,19 +119,15 @@ func NewFramework(baseName string, options Options) *Framework {
 	return f
 }
 
-func (f *Framework) BeforeEach() {
-	// workaround for a bug in ginkgo.
-	// https://github.com/onsi/ginkgo/issues/222
-	f.cleanupHandle = AddCleanupAction(f.AfterEach)
-
+func BeforeSuite() {
 	ginkgo.By("Creating kubernetes clients")
 
 	if len(TestContext.KubeConfig) > 0 {
 		Expect(len(TestContext.KubeConfigs)).To(BeZero(),
 			"Either KubeConfig or KubeConfigs must be specified but not both")
 		for _, context := range TestContext.KubeContexts {
-			f.ClusterClients = append(f.ClusterClients, f.createKubernetesClient(TestContext.KubeConfig, context))
-			f.SubmarinerClients = append(f.SubmarinerClients, f.createSubmarinerClient(TestContext.KubeConfig, context))
+			TestContext.ClusterClients = append(TestContext.ClusterClients, createKubernetesClient(TestContext.KubeConfig, context))
+			TestContext.SubmarinerClients = append(TestContext.SubmarinerClients, createSubmarinerClient(TestContext.KubeConfig, context))
 		}
 
 		// if cluster IDs are not provided we assume that cluster-id == context
@@ -145,15 +139,52 @@ func (f *Framework) BeforeEach() {
 		Expect(len(TestContext.KubeConfigs)).To(Equal(len(TestContext.ClusterIDs)),
 			"One ClusterID must be provided for each item in the KubeConfigs")
 		for _, kubeConfig := range TestContext.KubeConfigs {
-			f.ClusterClients = append(f.ClusterClients, f.createKubernetesClient(kubeConfig, ""))
-			f.SubmarinerClients = append(f.SubmarinerClients, f.createSubmarinerClient(kubeConfig, ""))
+			TestContext.ClusterClients = append(TestContext.ClusterClients, createKubernetesClient(kubeConfig, ""))
+			TestContext.SubmarinerClients = append(TestContext.SubmarinerClients, createSubmarinerClient(kubeConfig, ""))
 		}
 	} else {
 		ginkgo.Fail("One of KubeConfig or KubeConfigs must be specified")
 	}
 
+	queryAndUpdateGlobalnetStatus()
+}
+
+func queryAndUpdateGlobalnetStatus() {
+	TestContext.GlobalnetEnabled = false
+	clusterIndex := ClusterB
+	clusterName := TestContext.KubeContexts[clusterIndex]
+	clusters := TestContext.SubmarinerClients[clusterIndex].SubmarinerV1().Clusters(TestContext.SubmarinerNamespace)
+	AwaitUntil("find the submariner Cluster for "+clusterName, func() (interface{}, error) {
+		cluster, err := clusters.Get(clusterName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return cluster, err
+	}, func(result interface{}) (bool, string, error) {
+		if result == nil {
+			return false, "No Cluster found", nil
+		}
+
+		cluster := result.(*submarinerv1.Cluster)
+		if len(cluster.Spec.GlobalCIDR) != 0 {
+			// Based on the status of GlobalnetEnabled, certain tests will be skipped/executed.
+			TestContext.GlobalnetEnabled = true
+		}
+
+		return true, "", nil
+	})
+}
+
+func (f *Framework) BeforeEach() {
+	// workaround for a bug in ginkgo.
+	// https://github.com/onsi/ginkgo/issues/222
+	f.cleanupHandle = AddCleanupAction(f.AfterEach)
+
+	f.ClusterClients = TestContext.ClusterClients
+	f.SubmarinerClients = TestContext.SubmarinerClients
+
 	if !f.SkipNamespaceCreation {
-		ginkgo.By(fmt.Sprintf("Building namespace api objects, basename %s", f.BaseName))
+		ginkgo.By(fmt.Sprintf("Creating namespace objects with basename %q", f.BaseName))
 
 		namespaceLabels := map[string]string{
 			"e2e-framework": f.BaseName,
@@ -165,7 +196,10 @@ func (f *Framework) BeforeEach() {
 				namespace := generateNamespace(clientSet, f.BaseName, namespaceLabels)
 				f.Namespace = namespace.GetName()
 				f.UniqueName = namespace.GetName()
+				f.AddNamespacesToDelete(namespace)
+				ginkgo.By(fmt.Sprintf("Generated namespace %q in cluster %q to execute the tests in", f.Namespace, TestContext.KubeContexts[idx]))
 			default: // On the other clusters we use the same name to make tracing easier
+				ginkgo.By(fmt.Sprintf("Creating namespace %q in cluster %q", f.Namespace, TestContext.KubeContexts[idx]))
 				f.CreateNamespace(clientSet, f.Namespace, namespaceLabels)
 			}
 		}
@@ -175,9 +209,8 @@ func (f *Framework) BeforeEach() {
 
 }
 
-func (f *Framework) createKubernetesClient(kubeConfig, context string) *kubeclientset.Clientset {
-
-	restConfig := f.createRestConfig(kubeConfig, context)
+func createKubernetesClient(kubeConfig, context string) *kubeclientset.Clientset {
+	restConfig := createRestConfig(kubeConfig, context)
 	clientSet, err := kubeclientset.NewForConfig(restConfig)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -192,7 +225,7 @@ func (f *Framework) createKubernetesClient(kubeConfig, context string) *kubeclie
 	return clientSet
 }
 
-func (f *Framework) createRestConfig(kubeConfig, context string) *rest.Config {
+func createRestConfig(kubeConfig, context string) *rest.Config {
 	restConfig, _, err := loadConfig(kubeConfig, context)
 	if err != nil {
 		Errorf("Unable to load kubeconfig file %s for context %s, this is a non-recoverable error",
@@ -208,20 +241,18 @@ func (f *Framework) createRestConfig(kubeConfig, context string) *rest.Config {
 			rest.DefaultKubernetesUserAgent(),
 			componentTexts)
 	}
-	restConfig.QPS = f.Options.ClientQPS
-	restConfig.Burst = f.Options.ClientBurst
-	if f.Options.GroupVersion != nil {
-		restConfig.GroupVersion = f.Options.GroupVersion
+	restConfig.QPS = TestContext.ClientQPS
+	restConfig.Burst = TestContext.ClientBurst
+	if TestContext.GroupVersion != nil {
+		restConfig.GroupVersion = TestContext.GroupVersion
 	}
 	return restConfig
 }
 
 func deleteNamespace(client kubeclientset.Interface, namespaceName string) error {
-
 	return client.CoreV1().Namespaces().Delete(
 		namespaceName,
 		&metav1.DeleteOptions{})
-
 }
 
 // AfterEach deletes the namespace, after reading its events.
@@ -231,53 +262,48 @@ func (f *Framework) AfterEach() {
 	// DeleteNamespace at the very end in defer, to avoid any
 	// expectation failures preventing deleting the namespace.
 	defer func() {
-		nsDeletionErrors := map[string][]error{}
+		var nsDeletionErrors []error
+
 		// Whether to delete namespace is determined by 3 factors: delete-namespace flag, delete-namespace-on-failure flag and the test result
 		// if delete-namespace set to false, namespace will always be preserved.
 		// if delete-namespace is true and delete-namespace-on-failure is false, namespace will be preserved if test failed.
-		for _, ns := range f.namespacesToDelete {
-			ginkgo.By(fmt.Sprintf("Destroying namespace %q for this suite on all clusters.", ns.Name))
-			if errors := f.deleteNamespaceFromAllClusters(ns); errors != nil {
-				nsDeletionErrors[ns.Name] = errors
+		for ns := range f.namespacesToDelete {
+			if err := f.deleteNamespaceFromAllClusters(ns); err != nil {
+				nsDeletionErrors = append(nsDeletionErrors, err)
 			}
+
+			delete(f.namespacesToDelete, ns)
 		}
 
 		// Paranoia-- prevent reuse!
 		f.Namespace = ""
 		f.ClusterClients = nil
-		f.namespacesToDelete = nil
 
 		// if we had errors deleting, report them now.
 		if len(nsDeletionErrors) != 0 {
-			messages := []string{}
-			for namespaceKey, namespaceErrors := range nsDeletionErrors {
-				for clusterIdx, namespaceErr := range namespaceErrors {
-					messages = append(messages, fmt.Sprintf("Couldn't delete ns: %q (@cluster %d): %s (%#v)",
-						namespaceKey, clusterIdx, namespaceErr, namespaceErr))
-				}
-			}
-			Failf(strings.Join(messages, ","))
+			Failf(k8serrors.NewAggregate(nsDeletionErrors).Error())
 		}
 	}()
 
 }
 
-func (f *Framework) deleteNamespaceFromAllClusters(ns *v1.Namespace) []error {
-	var errors []error
-	for _, clientSet := range f.ClusterClients {
-		if err := deleteNamespace(clientSet, ns.Name); err != nil {
+func (f *Framework) deleteNamespaceFromAllClusters(ns string) error {
+	var errs []error
+	for i, clientSet := range f.ClusterClients {
+		ginkgo.By(fmt.Sprintf("Deleting namespace %q on cluster %q", ns, TestContext.KubeContexts[i]))
+		if err := deleteNamespace(clientSet, ns); err != nil {
 			switch {
 			case apierrors.IsNotFound(err):
-				Logf("Namespace %v was already deleted", ns.Name)
+				Logf("Namespace %q was already deleted", ns)
 			case apierrors.IsConflict(err):
-				Logf("Namespace %v scheduled for deletion, resources being purged", ns.Name)
+				Logf("Namespace %v scheduled for deletion, resources being purged", ns)
 			default:
-				Logf("Failed deleting namespace: %v", err)
-				errors = append(errors, err)
+				errs = append(errs, errors.WithMessagef(err, "Failed to delete namespace %q on cluster %q", ns, TestContext.KubeContexts[i]))
 			}
 		}
 	}
-	return errors
+
+	return k8serrors.NewAggregate(errs)
 }
 
 // CreateNamespace creates a namespace for e2e testing.
@@ -294,7 +320,8 @@ func (f *Framework) AddNamespacesToDelete(namespaces ...*v1.Namespace) {
 		if ns == nil {
 			continue
 		}
-		f.namespacesToDelete = append(f.namespacesToDelete, ns)
+
+		f.namespacesToDelete[ns.Name] = true
 	}
 }
 
@@ -312,7 +339,6 @@ func generateNamespace(client kubeclientset.Interface, baseName string, labels m
 }
 
 func createTestNamespace(client kubeclientset.Interface, name string, labels map[string]string) *v1.Namespace {
-	ginkgo.By(fmt.Sprintf("Creating a namespace %s to execute the test in", name))
 	namespace := createNamespace(client, name, labels)
 	return namespace
 }

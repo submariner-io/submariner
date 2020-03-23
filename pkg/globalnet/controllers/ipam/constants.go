@@ -23,8 +23,7 @@ const (
 	// of kube-proxy changes, globalnet needs to be modified accordingly.
 	// Reference: https://bit.ly/2OPhlwk
 	kubeProxyServiceChainPrefix = "KUBE-SVC-"
-	kubeProxyNameSpace          = "kube-system"
-	kubeProxyLabelSelector      = "k8s-app=kube-proxy"
+	kubeProxyServiceChainName   = "KUBE-SERVICES"
 
 	AddRules    = true
 	DeleteRules = false

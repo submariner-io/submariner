@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onsi/ginkgo"
 	"github.com/submariner-io/submariner/test/e2e/framework/ginkgowrapper"
-
-	. "github.com/onsi/ginkgo"
 )
 
 func nowStamp() string {
@@ -14,7 +13,7 @@ func nowStamp() string {
 }
 
 func log(level string, format string, args ...interface{}) {
-	fmt.Fprintf(GinkgoWriter, nowStamp()+": "+level+": "+format+"\n", args...)
+	fmt.Fprintf(ginkgo.GinkgoWriter, nowStamp()+": "+level+": "+format+"\n", args...)
 }
 
 func Errorf(format string, args ...interface{}) {

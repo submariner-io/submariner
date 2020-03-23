@@ -42,7 +42,7 @@ type datastoreSpecification struct {
 	Ca              string
 }
 
-func NewDatastore(thisClusterID string, stopCh <-chan struct{}) (*Datastore, error) {
+func NewDatastore(thisClusterID string, stopCh <-chan struct{}) (datastore.Datastore, error) {
 	k8sSpec := datastoreSpecification{}
 
 	err := envconfig.Process("broker_k8s", &k8sSpec)
@@ -87,60 +87,6 @@ func NewDatastore(thisClusterID string, stopCh <-chan struct{}) (*Datastore, err
 	}, nil
 }
 
-func stringSliceOverlaps(left []string, right []string) bool {
-	hash := make(map[string]bool)
-	for _, s := range left {
-		hash[s] = true
-	}
-
-	for _, s := range right {
-		if hash[s] {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (k *Datastore) GetClusters(colorCodes []string) ([]types.SubmarinerCluster, error) {
-	var clusters []types.SubmarinerCluster
-
-	k8sClusters, err := k.client.SubmarinerV1().Clusters(k.remoteNamespace).List(metav1.ListOptions{})
-
-	if err != nil {
-		return nil, err
-	}
-
-	for _, cluster := range k8sClusters.Items {
-		if stringSliceOverlaps(cluster.Spec.ColorCodes, colorCodes) {
-			clusters = append(clusters, types.SubmarinerCluster{
-				ID:   cluster.Spec.ClusterID,
-				Spec: cluster.Spec,
-			}) // this is likely going to add duplicate clusters
-		}
-	}
-	return clusters, nil
-}
-
-func (k *Datastore) GetCluster(clusterID string) (*types.SubmarinerCluster, error) {
-	k8sClusters, err := k.client.SubmarinerV1().Clusters(k.remoteNamespace).List(metav1.ListOptions{})
-
-	if err != nil {
-		return nil, err
-	}
-
-	for _, cluster := range k8sClusters.Items {
-		if cluster.Spec.ClusterID == clusterID {
-			return &types.SubmarinerCluster{
-				ID:   clusterID,
-				Spec: cluster.Spec,
-			}, nil
-		}
-	}
-
-	return nil, fmt.Errorf("cluster wasn't found")
-}
-
 func (k *Datastore) GetEndpoints(clusterID string) ([]types.SubmarinerEndpoint, error) {
 
 	k8sEndpoints, err := k.client.SubmarinerV1().Endpoints(k.remoteNamespace).List(metav1.ListOptions{})
@@ -158,21 +104,6 @@ func (k *Datastore) GetEndpoints(clusterID string) ([]types.SubmarinerEndpoint, 
 	}
 
 	return endpoints, nil
-}
-
-func (k *Datastore) GetEndpoint(clusterID string, cableName string) (*types.SubmarinerEndpoint, error) {
-	k8sEndpoints, err := k.client.SubmarinerV1().Endpoints(k.remoteNamespace).List(metav1.ListOptions{})
-
-	if err != nil {
-		return nil, err
-	}
-
-	for _, endpoint := range k8sEndpoints.Items {
-		if endpoint.Spec.ClusterID == clusterID && endpoint.Spec.CableName == cableName {
-			return &types.SubmarinerEndpoint{Spec: endpoint.Spec}, nil
-		}
-	}
-	return nil, fmt.Errorf("endpoint wasn't found")
 }
 
 func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onClusterChange datastore.OnClusterChange) error {
@@ -452,9 +383,4 @@ func (k *Datastore) RemoveEndpoint(clusterID, cableName string) error {
 	}
 
 	return k.client.SubmarinerV1().Endpoints(k.remoteNamespace).Delete(endpointName, &metav1.DeleteOptions{})
-}
-
-func (k *Datastore) RemoveCluster(clusterID string) error {
-	// not implemented yet
-	return nil
 }

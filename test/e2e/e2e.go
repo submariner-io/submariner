@@ -10,7 +10,6 @@ import (
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/gomega"
-
 	"github.com/submariner-io/submariner/test/e2e/framework"
 )
 
@@ -25,10 +24,7 @@ import (
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only on Ginkgo node 1
 
-	// Wait for readiness of registered clusters to ensure tests
-	// run against a healthy federation.
-	//framework.WaitForUnmanagedClusterReadiness()
-
+	framework.BeforeSuite()
 	return nil
 
 }, func(data []byte) {
@@ -49,6 +45,8 @@ var _ = ginkgo.SynchronizedAfterSuite(func() {
 })
 
 func RunE2ETests(t *testing.T) {
+	framework.ValidateFlags(framework.TestContext)
+
 	gomega.RegisterFailHandler(ginkgo.Fail)
 
 	// If the ginkgo default for slow test was not modified, bump it to 45 seconds

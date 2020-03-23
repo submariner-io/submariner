@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-iptables/iptables"
+	"github.com/submariner-io/submariner/pkg/log"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -119,7 +120,7 @@ func (i *GatewayMonitor) processNextEndpoint() bool {
 		}
 
 		if endpoint.Spec.ClusterID != i.clusterID {
-			klog.V(4).Infof("Endpoint %s belongs to a remote cluster", endpoint.Spec.Hostname)
+			klog.V(log.DEBUG).Infof("Endpoint %s belongs to a remote cluster", endpoint.Spec.Hostname)
 			for _, remoteSubnet := range endpoint.Spec.Subnets {
 				MarkRemoteClusterTraffic(i.ipt, remoteSubnet, AddRules)
 			}
@@ -134,7 +135,7 @@ func (i *GatewayMonitor) processNextEndpoint() bool {
 
 		// If the endpoint hostname matches with our hostname, it implies we are on gateway node
 		if endpoint.Spec.Hostname == hostname {
-			klog.V(4).Infof("We are now on GatewayNode %s", endpoint.Spec.PrivateIP)
+			klog.V(log.DEBUG).Infof("We are now on GatewayNode %s", endpoint.Spec.PrivateIP)
 
 			clusterList, err := i.submarinerClientSet.SubmarinerV1().Clusters(i.ipamSpec.Namespace).List(metav1.ListOptions{})
 			if err != nil {
@@ -145,7 +146,7 @@ func (i *GatewayMonitor) processNextEndpoint() bool {
 			globalCIDR := ""
 			for _, cluster := range clusterList.Items {
 				if cluster.Spec.ClusterID == i.clusterID {
-					klog.V(4).Infof("GlobalCidr configured in %s is %s", i.clusterID, cluster.Spec.GlobalCIDR)
+					klog.V(log.DEBUG).Infof("GlobalCidr configured in %s is %s", i.clusterID, cluster.Spec.GlobalCIDR)
 					if cluster.Spec.GlobalCIDR != nil && len(cluster.Spec.GlobalCIDR) > 0 {
 						// TODO: Revisit when support for more than one globalCIDR is implemented.
 						globalCIDR = cluster.Spec.GlobalCIDR[0]
@@ -165,7 +166,7 @@ func (i *GatewayMonitor) processNextEndpoint() bool {
 			}
 			i.syncMutex.Unlock()
 		} else {
-			klog.V(4).Infof("We are on non-gatewayNode. GatewayNode ip is %s", endpoint.Spec.PrivateIP)
+			klog.V(log.DEBUG).Infof("We are on non-gatewayNode. GatewayNode ip is %s", endpoint.Spec.PrivateIP)
 			i.syncMutex.Lock()
 			if i.isGatewayNode {
 				i.stopIpamController()
@@ -192,7 +193,7 @@ func (i *GatewayMonitor) enqueueEndpoint(obj interface{}) {
 		utilruntime.HandleError(err)
 		return
 	}
-	klog.V(4).Infof("Enqueueing endpoint in gatewayMonitor %v", obj)
+	klog.V(log.TRACE).Infof("Enqueueing endpoint in gatewayMonitor %v", obj)
 	i.endpointWorkqueue.AddRateLimited(key)
 }
 
@@ -210,10 +211,10 @@ func (i *GatewayMonitor) handleRemovedEndpoint(obj interface{}) {
 			klog.Errorf("Could not convert object tombstone %v to an Endpoint", tombstone.Obj)
 			return
 		}
-		klog.V(4).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
+		klog.V(log.DEBUG).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 	}
 
-	klog.V(4).Infof("Informed of removed endpoint for gateway monitor: %v", object)
+	klog.V(log.DEBUG).Infof("Informed of removed endpoint for gateway monitor: %v", object)
 	hostname, err := os.Hostname()
 	if err != nil {
 		klog.Fatalf("Could not retrieve hostname: %v", err)
@@ -243,7 +244,7 @@ func (i *GatewayMonitor) initializeIpamController(globalCIDR string) {
 		PodInformer:     informerFactory.Core().V1().Pods(),
 	}
 
-	klog.V(4).Infof("On Gateway Node, initializing ipamController.")
+	klog.V(log.DEBUG).Infof("On Gateway Node, initializing ipamController.")
 	ipamController, err := NewController(i.ipamSpec, &informerConfig, globalCIDR)
 	if err != nil {
 		klog.Fatalf("Error creating controller: %s", err.Error())
@@ -258,14 +259,14 @@ func (i *GatewayMonitor) initializeIpamController(globalCIDR string) {
 	}()
 
 	informerFactory.Start(i.stopProcessing)
-	klog.V(4).Infof("Successfully initialized ipamController.")
+	klog.V(log.DEBUG).Infof("Successfully initialized ipamController.")
 }
 
 func (i *GatewayMonitor) stopIpamController() {
 	if i.stopProcessing != nil {
-		klog.V(4).Infof("Submariner GatewayEngine migrated to a new node, stopping ipamController.")
+		klog.V(log.DEBUG).Infof("Submariner GatewayEngine migrated to a new node, stopping ipamController.")
 		close(i.stopProcessing)
 		i.stopProcessing = nil
 	}
-	klog.V(4).Infof("Notified ipamController to stop processing.")
+	klog.V(log.DEBUG).Infof("Notified ipamController to stop processing.")
 }
