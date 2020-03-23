@@ -35,7 +35,7 @@ const (
 func init() {
 	// uncomment next line to set as default
 	//cable.SetDefautCableDriver(cableDriverName)
-	cable.AddDriver(cableDriverName, NewWGDriver)
+	cable.AddDriver(cableDriverName, NewDriver)
 }
 
 type wireguard struct {
@@ -49,8 +49,8 @@ type wireguard struct {
 	//logFile string
 }
 
-// NewWGDriver creates a new WireGuard driver
-func NewWGDriver(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (cable.Driver, error) {
+// NewDriver creates a new WireGuard driver
+func NewDriver(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (cable.Driver, error) {
 
 	var err error
 
