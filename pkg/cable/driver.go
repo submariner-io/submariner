@@ -51,7 +51,7 @@ func NewDriver(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (D
 }
 
 // Sets the default cable driver name, if it is not specified by user.
-func SetDefautCableDriver(driver string) {
+func SetDefaultCableDriver(driver string) {
 	defaultCableDriver = driver
 }
 
