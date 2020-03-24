@@ -1,6 +1,6 @@
 # WireGuard Cable Driver (WIP)
 
-[WireGuard](https://www.wireguard.com "WireGuard homepage") is an extremely simple yet fast and modern VPN that utilizes state-of-the-art cryptography. 
+[WireGuard](https://www.wireguard.com "WireGuard homepage") is an extremely simple yet fast and modern VPN that utilizes state-of-the-art cryptography.
 
 Traffic is encrypted and encapsulated in UDP packets.
 
@@ -19,27 +19,27 @@ Traffic is encrypted and encapsulated in UDP packets.
 
 ## Installation
 
-- WireGuard needs to be [installed](https://www.wireguard.com/install "WireGuard installation instructions") on the gateway nodes. For example, (Ubuntu < 19.04),  
+- WireGuard needs to be [installed](https://www.wireguard.com/install "WireGuard installation instructions") on the gateway nodes. For example, (Ubuntu < 19.04),
   ```ShellSession
   $ sudo add-apt-repository ppa:wireguard/wireguard
   $ sudo apt-get update
   $ sudo apt-get install wireguard
   ```
    
-- The driver needs to be enabled with 
+- The driver needs to be enabled with
   ```ShellSession
   $ bin/subctl join --kubeconfig wg3-conf --cable-driver wireguard --disable-nat  --repository roytman --version  latest broker-info.subm
   ```
 
 ## Troubleshooting, limitations
     
-- If you get the following message 
+- If you get the following message
   ```
   Fatal error occurred creating engine: failed to add wireguard device: operation not supported
   ```
   you probably did not install WireGuard on the Gateway node.
   
-- Support for e2e testing with `kind` is not implemented yet. The e2e tests can be run with WireGuard by setting it as the default driver in `pkg/cable/wireguard/WGdriver.go` **and** unsetting StrongSwan in `pkg/cable/ipsec/strongswan.go` 
+- Support for e2e testing with `kind` is not implemented yet. The e2e tests can be run with WireGuard by setting it as the default driver in `pkg/cable/wireguard/WGdriver.go` **and** unsetting StrongSwan in `pkg/cable/ipsec/strongswan.go`
   ```GoLang
   func init() {
     // uncomment next line to set as default
@@ -51,5 +51,4 @@ Traffic is encrypted and encapsulated in UDP packets.
 
 - No new `iptables` rules were added, although source NAT needs to be disabled for cross cluster communication. This is similar to disabling SNAT when sending cross-cluster traffic between nodes to `submariner-gateway`, so the existing rules should be enough.
   **The driver will fail if the CNI does SNAT before routing to Wireguard** (e.g., failed with Calico, works with Flannel).
-  
   
