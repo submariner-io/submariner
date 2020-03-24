@@ -45,8 +45,6 @@ type wireguard struct {
 	mutex         sync.Mutex
 	client        *wgctrl.Client
 	link          netlink.Link
-	//debug   bool
-	//logFile string
 }
 
 // NewDriver creates a new WireGuard driver
@@ -54,17 +52,17 @@ func NewDriver(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (c
 
 	var err error
 
-	wg := wireguard{
+	w := wireguard{
 		peers:         make(map[string]wgtypes.Key),
 		localEndpoint: localEndpoint,
 	}
 
-	if err = setWGLink(&wg, localSubnets); err != nil {
+	if err = w.setWGLink(localSubnets); err != nil {
 		return nil, fmt.Errorf("failed to setup WireGuard link: %v", err)
 	}
 
 	// create controller
-	if wg.client, err = wgctrl.New(); err != nil {
+	if w.client, err = wgctrl.New(); err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("wgctrl is not available on this system")
 		}
@@ -72,10 +70,10 @@ func NewDriver(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (c
 	}
 	defer func() {
 		if err != nil {
-			if e := wg.client.Close(); e != nil {
+			if e := w.client.Close(); e != nil {
 				klog.Errorf("Failed to close client %v", e)
 			}
-			wg.client = nil
+			w.client = nil
 		}
 	}()
 
@@ -100,12 +98,12 @@ func NewDriver(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (c
 		ReplacePeers: true,
 		Peers:        peerConfigs,
 	}
-	if err = wg.client.ConfigureDevice(DefaultDeviceName, cfg); err != nil {
+	if err = w.client.ConfigureDevice(DefaultDeviceName, cfg); err != nil {
 		return nil, fmt.Errorf("failed to configure WireGuard device: %v", err)
 	}
 
 	klog.V(log.DEBUG).Infof("Initialized WireGuard %s with publicKey %s", DefaultDeviceName, pub)
-	return &wg, nil
+	return &w, nil
 }
 
 func (w *wireguard) Init() error {
@@ -151,7 +149,7 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 		}
 
 		// new peer will take over subnets so can ignore error
-		_ = removePeer(w.client, &oldKey)
+		_ = w.removePeer(&oldKey)
 
 		delete(w.peers, remoteEndpoint.Spec.ClusterID)
 	}
@@ -180,7 +178,7 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 
 	// verify peer was added
 	// TODO verify configuration
-	if p, err := peerByKey(w.client, remoteKey); err != nil {
+	if p, err := w.peerByKey(remoteKey); err != nil {
 		klog.Errorf("Failed to verify peer configuration: %v", err)
 	} else {
 		klog.V(log.DEBUG).Infof("Peer configured: %+v", p)
@@ -247,7 +245,7 @@ func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoi
 	}
 
 	// wg remove
-	_ = removePeer(w.client, remoteKey)
+	_ = w.removePeer(remoteKey)
 
 	if keyMismatch {
 		// ClusterID probably already associated with new key. Do not remove peers entry nor routes
@@ -280,7 +278,7 @@ func (w *wireguard) GetActiveConnections(clusterID string) ([]string, error) {
 }
 
 // Create new wg link and assign addr from local subnets
-func setWGLink(w *wireguard, localSubnets []string) error {
+func (w *wireguard) setWGLink(localSubnets []string) error {
 
 	// delete existing wg device if needed
 	if link, err := netlink.LinkByName(DefaultDeviceName); err == nil {
@@ -363,13 +361,14 @@ func parseSubnets(subnets []string) []net.IPNet {
 		if err != nil {
 			// this should not happen. Log and continue
 			klog.Errorf("failed to parse subnet %s: %v", sn, err)
+			continue
 		}
 		nets = append(nets, *cidr)
 	}
 	return nets
 }
 
-func removePeer(c *wgctrl.Client, key *wgtypes.Key) error {
+func (w *wireguard) removePeer(key *wgtypes.Key) error {
 	// remove old
 	klog.V(log.DEBUG).Infof("Removing WireGuard peer with key %s", key)
 	peerCfg := []wgtypes.PeerConfig{
@@ -378,7 +377,7 @@ func removePeer(c *wgctrl.Client, key *wgtypes.Key) error {
 			Remove:    true,
 		},
 	}
-	err := c.ConfigureDevice(DefaultDeviceName, wgtypes.Config{
+	err := w.client.ConfigureDevice(DefaultDeviceName, wgtypes.Config{
 		ReplacePeers: false,
 		Peers:        peerCfg,
 	})
@@ -390,8 +389,8 @@ func removePeer(c *wgctrl.Client, key *wgtypes.Key) error {
 	return nil
 }
 
-func peerByKey(c *wgctrl.Client, key *wgtypes.Key) (*wgtypes.Peer, error) {
-	d, err := c.Device(DefaultDeviceName)
+func (w *wireguard) peerByKey(key *wgtypes.Key) (*wgtypes.Peer, error) {
+	d, err := w.client.Device(DefaultDeviceName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find device %s: %v", DefaultDeviceName, err)
 	}
