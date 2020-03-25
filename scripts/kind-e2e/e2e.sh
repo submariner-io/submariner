@@ -11,64 +11,6 @@ E2E_DIR=${DAPPER_SOURCE}/scripts/kind-e2e/
 
 ### Functions ###
 
-function kind_import_images() {
-    docker tag quay.io/submariner/submariner:$VERSION localhost:5000/submariner:local
-    docker tag quay.io/submariner/submariner-route-agent:$VERSION localhost:5000/submariner-route-agent:local
-    if [[ $globalnet = "true" ]]; then
-        docker tag quay.io/submariner/submariner-globalnet:$VERSION localhost:5000/submariner-globalnet:local
-    fi
-
-    docker push localhost:5000/submariner:local
-    docker push localhost:5000/submariner-route-agent:local
-    if [[ $globalnet = "true" ]]; then
-        docker push localhost:5000/submariner-globalnet:local
-    fi
-}
-
-function get_globalip() {
-    svcname=$1
-    context=$2
-    # It takes a while for globalIp annotation to show up on a service
-    for i in {0..30}
-    do
-        gip=$(kubectl --context=$context get svc $svcname -o jsonpath='{.metadata.annotations.submariner\.io/globalIp}')
-        if [[ -n ${gip} ]]; then
-          echo $gip
-          return
-        fi
-        sleep 1
-    done
-    echo "Max attempts reached, failed to get globalIp!"
-    exit 1
-}
-
-function test_connection() {
-    if [[ $globalnet = "true" ]]; then
-        nginx_svc_ip_cluster3=$(get_globalip nginx-demo cluster3)
-    else
-        nginx_svc_ip_cluster3=$(kubectl --context=cluster3 get svc -l app=nginx-demo | awk 'FNR == 2 {print $3}')
-    fi
-
-    if [[ -z "$nginx_svc_ip_cluster3" ]]; then
-        echo "Failed to get nginx-demo IP"
-        exit 1
-    fi
-    netshoot_pod=$(kubectl --context=cluster2 get pods -l app=netshoot | awk 'FNR == 2 {print $1}')
-
-    echo "Testing connectivity between clusters - $netshoot_pod cluster2 --> $nginx_svc_ip_cluster3 nginx service cluster3"
-
-    attempt_counter=0
-    max_attempts=5
-    until $(kubectl --context=cluster2 exec ${netshoot_pod} -- curl --output /dev/null -m 30 --silent --head --fail ${nginx_svc_ip_cluster3}); do
-        if [[ ${attempt_counter} -eq ${max_attempts} ]];then
-          echo "Max attempts reached, connection test failed!"
-          exit 1
-        fi
-        attempt_counter=$(($attempt_counter+1))
-    done
-    echo "Connection test was successful!"
-}
-
 function enable_logging() {
     cluster=cluster1
 
@@ -113,33 +55,16 @@ function enable_kubefed() {
     kubectl wait --for=condition=Ready pods -l kubefed-admission-webhook=true -n ${KUBEFED_NS} --timeout=120s
 }
 
-function add_subm_gateway_label() {
-    context=$1
-    kubectl --context=$context label node $context-worker "submariner.io/gateway=true" --overwrite
-}
+# TODO: Copied from shipyard since deploytool determines the namespace, we should fix operator to use the same namespace (or receive it).
+function load_deploytool() {
+    local deploy_lib=${SCRIPTS_DIR}/lib/deploy_${deploytool}
+    if [[ ! -f $deploy_lib ]]; then
+        echo "Unknown deploy method: ${deploytool}"
+        exit 1
+    fi
 
-function del_subm_gateway_label() {
-    context=$1
-    kubectl --context=$context label node $context-worker "submariner.io/gateway-" --overwrite
-}
-
-function prepare_cluster() {
-    for app in submariner-engine submariner-routeagent submariner-globalnet; do
-        if kubectl wait --for=condition=Ready pods -l app=$app -n $subm_ns --timeout=60s > /dev/null 2>&1; then
-            echo Removing $app pods...
-            kubectl delete pods -n $subm_ns -l app=$app
-        fi
-    done
-    add_subm_gateway_label $cluster
-}
-
-function deploy_resource() {
-    cluster=$1
-    resource_file=$2
-    resource_name=$(basename "$2" ".yaml")
-    kubectl apply -f ${resource_file}
-    echo Waiting for ${resource_name} pods to be ready.
-    kubectl rollout status deploy/${resource_name} --timeout=120s
+    echo "Will deploy submariner using ${deploytool}"
+    . $deploy_lib
 }
 
 function test_with_e2e_tests {
@@ -148,7 +73,7 @@ function test_with_e2e_tests {
     cd ../test/e2e
 
     go test -v -args -ginkgo.v -ginkgo.randomizeAllSpecs \
-        -submariner-namespace $subm_ns -dp-context cluster2 -dp-context cluster3 -dp-context cluster1 \
+        -submariner-namespace $SUBM_NS -dp-context cluster2 -dp-context cluster3 -dp-context cluster1 \
         -ginkgo.noColor -ginkgo.reportPassed \
         -ginkgo.reportFile ${DAPPER_OUTPUT}/e2e-junit.xml 2>&1 | \
         tee ${DAPPER_OUTPUT}/e2e-tests.log
@@ -192,7 +117,7 @@ function cleanup {
 
 ### Main ###
 
-LONGOPTS=status:,logging:,kubefed:,deploytool:,globalnet:
+LONGOPTS=status:,logging:,kubefed:,deploytool:
 # Only accept longopts, but must pass null shortopts or first param after "--" will be incorrectly used
 SHORTOPTS=""
 ! PARSED=$(getopt --options=$SHORTOPTS --longoptions=$LONGOPTS --name "$0" -- "$@")
@@ -210,10 +135,7 @@ while true; do
             kubefed="$2"
             ;;
         --deploytool)
-            deploy="$2"
-            ;;
-        --globalnet)
-            globalnet="$2"
+            deploytool="$2"
             ;;
         --)
             break
@@ -225,9 +147,8 @@ while true; do
     shift 2
 done
 
-echo Starting with status: $status, logging: $logging, kubefed: $kubefed, deploy: $deploy, globalnet: $globalnet
+echo Starting with status: $status, logging: $logging, kubefed: $kubefed, deploytool: $deploytool
 
-declare_cidrs
 declare_kubeconfig
 
 if [[ $status = clean ]]; then
@@ -242,43 +163,16 @@ elif [[ $status != keep && $status != create ]]; then
     exit 1
 fi
 
-if [[ $deploy = operator ]]; then
-    echo Will deploy submariner using the operator
-    . ${E2E_DIR}/lib_operator_deploy_subm.sh
-elif [ "$deploy" = helm ]; then
-    echo Will deploy submariner using helm
-    . ${E2E_DIR}/lib_helm_deploy_subm.sh
-else
-    echo Unknown deploy method: $deploy
-    cleanup
-    exit 1
-fi
+load_deploytool
 
 if [[ $logging = true ]]; then
     enable_logging
 fi
 
-kind_import_images
-
 if [[ $kubefed = true ]]; then
     # FIXME: Kubefed deploys are broken (not because of this commit)
     enable_kubefed
 fi
-
-# Install Helm/Operator deploy tool prerequisites
-deploytool_prereqs
-
-run_parallel "{1..3}" prepare_cluster
-
-setup_broker cluster1
-install_subm_all_clusters
-
-deploytool_postreqs
-
-deploy_resource "cluster2" "${E2E_DIR}/netshoot.yaml"
-deploy_resource "cluster3" "${E2E_DIR}/nginx-demo.yaml"
-
-test_connection
 
 if [[ $status = keep || $status = onetime ]]; then
     test_with_e2e_tests
