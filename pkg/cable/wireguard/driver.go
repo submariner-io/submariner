@@ -112,6 +112,10 @@ func (w *wireguard) Init() error {
 	return nil
 }
 
+func (w *wireguard) GetName() string {
+	return cableDriverName
+}
+
 func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (string, error) {
 
 	if w.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
