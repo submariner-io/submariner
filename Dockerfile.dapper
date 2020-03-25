@@ -2,7 +2,8 @@ FROM quay.io/submariner/shipyard-dapper-base
 
 ENV DAPPER_ENV=REPO DAPPER_ENV=TAG \
     DAPPER_SOURCE=/go/src/github.com/submariner-io/submariner DAPPER_DOCKER_SOCKET=true \
-    TRASH_CACHE=${DAPPER_SOURCE}/.trash-cache HOME=${DAPPER_SOURCE} DAPPER_OUTPUT=output
+    TRASH_CACHE=${DAPPER_SOURCE}/.trash-cache HOME=${DAPPER_SOURCE}
+ENV DAPPER_OUTPUT=${DAPPER_SOURCE}/output
 
 WORKDIR ${DAPPER_SOURCE}
 
