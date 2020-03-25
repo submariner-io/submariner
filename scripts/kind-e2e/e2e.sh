@@ -4,6 +4,10 @@ set -em
 source ${DAPPER_SOURCE}/scripts/lib/debug_functions
 source ${DAPPER_SOURCE}/scripts/lib/version
 
+### Constants ###
+
+readonly KUBECONFIGS_DIR=${DAPPER_OUTPUT}/kubeconfigs
+
 ### Variables ###
 
 KIND_REGISTRY=kind-registry
@@ -38,70 +42,6 @@ function run_parallel() {
     for i in ${!pids[@]}; do
         wait ${pids[$i]}
     done
-}
-
-function render_template() {
-    eval "echo \"$(cat $1)\""
-}
-
-function generate_cluster_yaml() {
-    pod_cidr="${cluster_CIDRs[$1]}"
-    service_cidr="${service_CIDRs[$1]}"
-    dns_domain="$1.local"
-    disable_cni="true"
-    if [[ "$1" = "cluster1" ]]; then
-        disable_cni="false"
-    fi
-
-    render_template ${E2E_DIR}/kind-cluster-config.yaml > ${E2E_DIR}/$1-config.yaml
-}
-
-function kind_fixup_config() {
-    master_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${cluster}-control-plane | head -n 1)
-    sed -i -- "s/server: .*/server: https:\/\/$master_ip:6443/g" $KUBECONFIG
-    sed -i -- "s/user: kind-.*/user: ${cluster}/g" $KUBECONFIG
-    sed -i -- "s/name: kind-.*/name: ${cluster}/g" $KUBECONFIG
-    sed -i -- "s/cluster: kind-.*/cluster: ${cluster}/g" $KUBECONFIG
-    sed -i -- "s/current-context: .*/current-context: ${cluster}/g" $KUBECONFIG
-    sudo chmod a+r $KUBECONFIG
-
-    if [[ ${status} = keep ]]; then
-        cp -r $KUBECONFIG ${DAPPER_SOURCE}/output/kind-config/local-dev/kind-config-${cluster}
-    fi
-}
-
-function create_kind_cluster() {
-    export KUBECONFIG=${DAPPER_SOURCE}/output/kind-config/dapper/kind-config-${cluster}
-    if [[ $(kind get clusters | grep "^${cluster}$" | wc -l) -gt 0  ]]; then
-        echo "KIND cluster already exists, skipping its creation..."
-        kind export kubeconfig --name=${cluster}
-        kind_fixup_config ${cluster}
-        return
-    fi
-
-    echo "Creating KIND cluster..."
-    generate_cluster_yaml "${cluster}"
-    image_flag=''
-    if [[ -n ${version} ]]; then
-        image_flag="--image=kindest/node:v${version}"
-    fi
-
-    kind create cluster $image_flag --name=${cluster} --config=${E2E_DIR}/${cluster}-config.yaml
-    kind_fixup_config ${cluster}
-}
-
-function deploy_weave_cni(){
-    if kubectl wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=60s > /dev/null 2>&1; then
-        echo "Weave already deployed."
-        return
-    fi
-
-    echo "Applying weave network..."
-    kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=v$version&env.IPALLOC_RANGE=${cluster_CIDRs[${cluster}]}"
-    echo "Waiting for weave-net pods to be ready..."
-    kubectl wait --for=condition=Ready pods -l name=weave-net -n kube-system --timeout=300s
-    echo "Waiting for core-dns deployment to be ready..."
-    kubectl -n kube-system rollout status deploy/coredns --timeout=300s
 }
 
 function kind_import_images() {
@@ -240,14 +180,11 @@ function test_with_e2e_tests {
 
     cd ../test/e2e
 
-    # Setup the KUBECONFIG env
-    export KUBECONFIG=$(echo ${DAPPER_SOURCE}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
-
     go test -v -args -ginkgo.v -ginkgo.randomizeAllSpecs \
         -submariner-namespace $subm_ns -dp-context cluster2 -dp-context cluster3 -dp-context cluster1 \
         -ginkgo.noColor -ginkgo.reportPassed \
-        -ginkgo.reportFile ${DAPPER_SOURCE}/${DAPPER_OUTPUT}/e2e-junit.xml 2>&1 | \
-        tee ${DAPPER_SOURCE}/${DAPPER_OUTPUT}/e2e-tests.log
+        -ginkgo.reportFile ${DAPPER_OUTPUT}/e2e-junit.xml 2>&1 | \
+        tee ${DAPPER_OUTPUT}/e2e-tests.log
 }
 
 function registry_running() {
@@ -288,7 +225,7 @@ function cleanup {
 
 ### Main ###
 
-LONGOPTS=status:,k8s_version:,logging:,kubefed:,deploytool:,globalnet:
+LONGOPTS=status:,logging:,kubefed:,deploytool:,globalnet:
 # Only accept longopts, but must pass null shortopts or first param after "--" will be incorrectly used
 SHORTOPTS=""
 ! PARSED=$(getopt --options=$SHORTOPTS --longoptions=$LONGOPTS --name "$0" -- "$@")
@@ -298,9 +235,6 @@ while true; do
     case "$1" in
         --status)
             status="$2"
-            ;;
-        --k8s_version)
-            version="$2"
             ;;
         --logging)
             logging="$2"
@@ -324,7 +258,7 @@ while true; do
     shift 2
 done
 
-echo Starting with status: $status, k8s_version: $version, logging: $logging, kubefed: $kubefed, deploy: $deploy, globalnet: $globalnet
+echo Starting with status: $status, logging: $logging, kubefed: $kubefed, deploy: $deploy, globalnet: $globalnet
 
 if [[ $globalnet = "true" ]]; then
   # When globalnet is set to true, we want to deploy clusters with overlapping CIDRs
@@ -360,26 +294,11 @@ else
     exit 1
 fi
 
-rm -rf ${DAPPER_SOURCE}/output/kind-config/dapper/ ${DAPPER_SOURCE}/output/kind-config/local-dev/
-mkdir -p ${DAPPER_SOURCE}/output/kind-config/dapper/ ${DAPPER_SOURCE}/output/kind-config/local-dev/
-export KUBECONFIG=$(echo ${DAPPER_SOURCE}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
-
 if [[ $logging = true ]]; then
     enable_logging
 fi
 
-# Run a local registry to avoid loading images manually to kind
-if registry_running; then
-    echo Local registry $KIND_REGISTRY already running.
-else
-    echo Deploying local registry $KIND_REGISTRY to serve images centrally.
-    docker run -d -p 5000:5000 --restart=always --name $KIND_REGISTRY registry:2
-fi
-registry_ip="$(docker inspect -f '{{.NetworkSettings.IPAddress}}' "$KIND_REGISTRY")"
-
-run_parallel "{1..3}" create_kind_cluster
-export KUBECONFIG=$(echo ${DAPPER_SOURCE}/output/kind-config/dapper/kind-config-cluster{1..3} | sed 's/ /:/g')
-run_parallel "2 3" deploy_weave_cni
+export KUBECONFIG=$(echo ${KUBECONFIGS_DIR}/kind-config-cluster{1..3} | sed 's/ /:/g')
 kind_import_images
 
 if [[ $kubefed = true ]]; then
@@ -410,7 +329,7 @@ if [[ $status = keep || $status = create ]]; then
     echo "your 3 virtual clusters are deployed and working properly with your local"
     echo "submariner source code, and can be accessed with:"
     echo ""
-    echo "export KUBECONFIG=\$(echo \$(git rev-parse --show-toplevel)/output/kind-config/local-dev/kind-config-cluster{1..3} | sed 's/ /:/g')"
+    echo "export KUBECONFIG=\$(echo \$(git rev-parse --show-toplevel)/output/kubeconfigs/kind-config-cluster{1..3} | sed 's/ /:/g')"
     echo ""
     echo "$ kubectl config use-context cluster1 # or cluster2, cluster3.."
     echo ""

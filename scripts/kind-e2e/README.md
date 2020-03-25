@@ -60,11 +60,11 @@ This mode can be triggered by adding **status=keep** parameter to **make e2e** c
 make ci e2e status=keep
 ```
 
-After a permanent run completes, the configuration for the running clusters can be found inside **output/kind-config/local-dev** folder.
+After a permanent run completes, the configuration for the running clusters can be found inside **output/kubeconfigs** folder.
 You can export the kube configs in order to interact with the clusters.
 
 ```bash
-export KUBECONFIG=$(echo $(git rev-parse --show-toplevel)/output/kind-config/local-dev/kind-config-cluster{1..3} | sed 's/ /:/g')
+export KUBECONFIG=$(echo $(git rev-parse --show-toplevel)/output/kubeconfigs/kind-config-cluster{1..3} | sed 's/ /:/g')
 ```
 
 List the contexts:
@@ -105,7 +105,7 @@ make ci e2e status=keep logging=true
 To access Kibana, run the following from new terminal tab/window:
 
 ```bash
-export KUBECONFIG=$GOPATH/src/github.com/submariner-io/submariner/output/kind-config/local-dev/kind-config-cluster1:$GOPATH/src/github.com/submariner-io/submariner/output/kind-config/local-dev/kind-config-cluster2:$GOPATH/src/github.com/submariner-io/submariner/output/kind-config/local-dev/kind-config-cluster3
+export KUBECONFIG=$GOPATH/src/github.com/submariner-io/submariner/output/kubeconfigs/kind-config-cluster1:$GOPATH/src/github.com/submariner-io/submariner/output/kubeconfigs/kind-config-cluster2:$GOPATH/src/github.com/submariner-io/submariner/output/kubeconfigs/kind-config-cluster3
 kubectl config use-context cluster1
 kibana_pod=$(kubectl get pods -l app=kibana | awk 'FNR > 1 {print $1}')
 kubectl port-forward ${kibana_pod} 8080:5601
