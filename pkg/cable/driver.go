@@ -22,6 +22,9 @@ type Driver interface {
 
 	// DisconnectFromEndpoint disconnects from the connection to the given endpoint.
 	DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) error
+
+	// GetName returns driver's name
+	GetName() string
 }
 
 // Function prototype to create a new driver
