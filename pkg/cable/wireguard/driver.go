@@ -33,8 +33,6 @@ const (
 )
 
 func init() {
-	// uncomment next line to set as default
-	//cable.SetDefautCableDriver(cableDriverName)
 	cable.AddDriver(cableDriverName, NewDriver)
 }
 
@@ -305,6 +303,9 @@ func (w *wireguard) setWGLink(localSubnets []string) error {
 	w.localSubnets = parseSubnets(localSubnets)
 	ip, err := discoverInternalIP(w.localSubnets)
 	if err != nil {
+		klog.Errorf("Error while attempting to discover internal IP: %v", err)
+	}
+	if ip == "" {
 		klog.V(log.DEBUG).Infof("Using endpoint IP as internal address; %v", err)
 		ip = endpointIP(&w.localEndpoint)
 	}
@@ -350,7 +351,8 @@ func discoverInternalIP(cidrs []net.IPNet) (string, error) {
 			}
 		}
 	}
-	return "", fmt.Errorf("could not find internal address in local subnets")
+	klog.Warningf("could not find internal address in local subnets")
+	return "", nil
 }
 
 // parse CIDR string and skip errors
