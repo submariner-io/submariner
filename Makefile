@@ -27,7 +27,7 @@ deploy: clusters
 e2e: deploy
 
 $(TARGETS): .dapper vendor/modules.txt
-	DAPPER_ENV="OPERATOR_IMAGE"  ./.dapper -m bind $@ --status $(status) --k8s_version $(version) --logging $(logging) --kubefed $(kubefed) --deploytool $(deploytool) --globalnet $(globalnet) --build_debug $(build_debug)
+	./.dapper -m bind $@ --status $(status) --k8s_version $(version) --logging $(logging) --kubefed $(kubefed) --deploytool $(deploytool) --globalnet $(globalnet) --build_debug $(build_debug)
 
 vendor/modules.txt: .dapper go.mod
 ifneq ($(status),clean)
