@@ -7,7 +7,7 @@ source ${DAPPER_SOURCE}/scripts/lib/version
 ### Variables ###
 
 KIND_REGISTRY=kind-registry
-E2E_DIR=$(dirname "$(readlink -f "$0")")
+E2E_DIR=${DAPPER_SOURCE}/scripts/kind-e2e/
 
 ### Functions ###
 
