@@ -6,7 +6,7 @@ deploytool ?= operator
 globalnet ?= false
 build_debug ?= false
 
-TARGETS := $(shell ls scripts | grep -v clusters)
+TARGETS := $(shell ls scripts | grep -v -e clusters -e deploy)
 
 .dapper:
 	@echo Downloading dapper
@@ -21,7 +21,10 @@ shell:
 clusters: ci
 	./.dapper -m bind $@ --k8s_version $(version) --globalnet $(globalnet)
 
-e2e: clusters
+deploy: clusters
+	DAPPER_ENV="OPERATOR_IMAGE"  ./.dapper -m bind $@ --globalnet $(globalnet) --deploytool $(deploytool)
+
+e2e: deploy
 
 $(TARGETS): .dapper vendor/modules.txt
 	DAPPER_ENV="OPERATOR_IMAGE"  ./.dapper -m bind $@ --status $(status) --k8s_version $(version) --logging $(logging) --kubefed $(kubefed) --deploytool $(deploytool) --globalnet $(globalnet) --build_debug $(build_debug)
