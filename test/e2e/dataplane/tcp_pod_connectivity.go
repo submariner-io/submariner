@@ -8,18 +8,22 @@ import (
 
 var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters without discovery", func() {
 	f := framework.NewDefaultFramework("dataplane-conn-nd")
-	var useService bool
+	var listenerEndpoint framework.RemoteEndpoint
 	var networkType bool
 
 	verifyInteraction := func(listenerScheduling, connectorScheduling framework.NetworkPodScheduling) {
 		It("should have sent the expected data from the pod to the other pod", func() {
-			tcp.RunConnectivityTest(f, useService, networkType, listenerScheduling, connectorScheduling, framework.ClusterB, framework.ClusterA)
+			if framework.TestContext.GlobalnetEnabled {
+				framework.Skipf("Globalnet enabled, skipping the test...")
+				return
+			}
+			tcp.RunConnectivityTest(f, listenerEndpoint, networkType, listenerScheduling, connectorScheduling, framework.ClusterB, framework.ClusterA)
 		})
 	}
 
 	When("a pod connects via TCP to a remote pod", func() {
 		BeforeEach(func() {
-			useService = false
+			listenerEndpoint = framework.PodIP
 			networkType = framework.PodNetworking
 		})
 
@@ -42,7 +46,7 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 
 	When("a pod connects via TCP to a remote service", func() {
 		BeforeEach(func() {
-			useService = true
+			listenerEndpoint = framework.ServiceIP
 			networkType = framework.PodNetworking
 		})
 
@@ -65,7 +69,7 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 
 	When("a pod with HostNetworking connects via TCP to a remote pod", func() {
 		BeforeEach(func() {
-			useService = false
+			listenerEndpoint = framework.PodIP
 			networkType = framework.HostNetworking
 		})
 

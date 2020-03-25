@@ -9,9 +9,9 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func RunConnectivityTest(f *framework.Framework, useService bool, networkType bool, listenerScheduling framework.NetworkPodScheduling, connectorScheduling framework.NetworkPodScheduling, listenerCluster framework.ClusterIndex, connectorCluster framework.ClusterIndex) (*framework.NetworkPod, *framework.NetworkPod) {
+func RunConnectivityTest(f *framework.Framework, remoteEp framework.RemoteEndpoint, networkType bool, listenerScheduling framework.NetworkPodScheduling, connectorScheduling framework.NetworkPodScheduling, listenerCluster framework.ClusterIndex, connectorCluster framework.ClusterIndex) (*framework.NetworkPod, *framework.NetworkPod) {
 
-	listenerPod, connectorPod := createPods(f, useService, networkType, listenerScheduling, connectorScheduling, listenerCluster, connectorCluster,
+	listenerPod, connectorPod := createPods(f, remoteEp, networkType, listenerScheduling, connectorScheduling, listenerCluster, connectorCluster,
 		framework.TestContext.ConnectionTimeout, framework.TestContext.ConnectionAttempts)
 	listenerPod.CheckSuccessfulFinish()
 	connectorPod.CheckSuccessfulFinish()
@@ -24,17 +24,26 @@ func RunConnectivityTest(f *framework.Framework, useService bool, networkType bo
 	// HostNetwork, it does not get an IPAddress from the podCIDR and it uses the HostIP. Submariner, for such PODs,
 	// would MASQUERADE the external traffic from that POD to the corresponding CNI interface ip-address on that
 	// Host. So, we skip source-ip validation for PODs using HostNetworking.
-	if networkType == framework.PodNetworking {
+	if networkType == framework.PodNetworking && remoteEp != framework.GlobalIP {
 		By("Verifying the output of listener pod which must contain the source IP")
 		Expect(listenerPod.TerminationMessage).To(ContainSubstring(connectorPod.Pod.Status.PodIP))
+	}
+
+	// When Globalnet is enabled (i.e., remoteEndpoint is a globalIP), Globalnet Controller MASQUERADEs
+	// the source-ip of the POD to the corresponding global-ip that is assigned to the POD.
+	if remoteEp == framework.GlobalIP {
+		By("Verifying the output of listener pod which must contain the globalIP of the connector POD")
+		podGlobalIP := connectorPod.Pod.GetAnnotations()[framework.GlobalnetGlobalIPAnnotation]
+		Expect(podGlobalIP).ToNot(Equal(""))
+		Expect(listenerPod.TerminationMessage).To(ContainSubstring(podGlobalIP))
 	}
 
 	// Return the pods in case further verification is needed
 	return listenerPod, connectorPod
 }
 
-func RunNoConnectivityTest(f *framework.Framework, useService bool, listenerScheduling framework.NetworkPodScheduling, connectorScheduling framework.NetworkPodScheduling, listenerCluster framework.ClusterIndex, connectorCluster framework.ClusterIndex) (*framework.NetworkPod, *framework.NetworkPod) {
-	listenerPod, connectorPod := createPods(f, useService, framework.PodNetworking, listenerScheduling, connectorScheduling, listenerCluster, connectorCluster, 5, 1)
+func RunNoConnectivityTest(f *framework.Framework, remoteEp framework.RemoteEndpoint, listenerScheduling framework.NetworkPodScheduling, connectorScheduling framework.NetworkPodScheduling, listenerCluster framework.ClusterIndex, connectorCluster framework.ClusterIndex) (*framework.NetworkPod, *framework.NetworkPod) {
+	listenerPod, connectorPod := createPods(f, remoteEp, framework.PodNetworking, listenerScheduling, connectorScheduling, listenerCluster, connectorCluster, 5, 1)
 
 	By("Verifying that listener pod exits with non-zero code and timed out message")
 	Expect(listenerPod.TerminationMessage).To(ContainSubstring("nc: timeout"))
@@ -48,7 +57,7 @@ func RunNoConnectivityTest(f *framework.Framework, useService bool, listenerSche
 	return listenerPod, connectorPod
 }
 
-func createPods(f *framework.Framework, useService bool, networkType bool, listenerScheduling framework.NetworkPodScheduling, connectorScheduling framework.NetworkPodScheduling, listenerCluster framework.ClusterIndex,
+func createPods(f *framework.Framework, remoteEp framework.RemoteEndpoint, networkType bool, listenerScheduling framework.NetworkPodScheduling, connectorScheduling framework.NetworkPodScheduling, listenerCluster framework.ClusterIndex,
 	connectorCluster framework.ClusterIndex, connectionTimeout uint, connectionAttempts uint) (*framework.NetworkPod, *framework.NetworkPod) {
 
 	By(fmt.Sprintf("Creating a listener pod in cluster %q, which will wait for a handshake over TCP", framework.TestContext.ClusterIDs[listenerCluster]))
@@ -61,10 +70,15 @@ func createPods(f *framework.Framework, useService bool, networkType bool, liste
 	})
 
 	remoteIP := listenerPod.Pod.Status.PodIP
-	if useService {
+	if remoteEp == framework.ServiceIP || remoteEp == framework.GlobalIP {
 		By(fmt.Sprintf("Pointing a service ClusterIP to the listener pod in cluster %q", framework.TestContext.ClusterIDs[listenerCluster]))
 		service := listenerPod.CreateService()
 		remoteIP = service.Spec.ClusterIP
+		if remoteEp == framework.GlobalIP {
+			// Wait for the globalIP annotation on the service.
+			service = f.AwaitServiceByAnnotation(listenerCluster, framework.GlobalnetGlobalIPAnnotation, service.Name, service.Namespace)
+			remoteIP = service.GetAnnotations()[framework.GlobalnetGlobalIPAnnotation]
+		}
 	}
 
 	framework.Logf("Will send traffic to IP: %v", remoteIP)

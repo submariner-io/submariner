@@ -23,10 +23,10 @@ var _ = PDescribe("[expansion] Test expanding/shrinking an existing cluster flee
 		Expect(gatewayNode).To(HaveLen(0), fmt.Sprintf("Expected no gateway node on %q", framework.ClusterC))
 
 		By(fmt.Sprintf("Verifying that a pod in cluster %q cannot connect to a pod in cluster %q", clusterAName, clusterCName))
-		tcp.RunNoConnectivityTest(f, false, framework.NonGatewayNode, framework.GatewayNode, framework.ClusterC, framework.ClusterA)
+		tcp.RunNoConnectivityTest(f, framework.PodIP, framework.NonGatewayNode, framework.GatewayNode, framework.ClusterC, framework.ClusterA)
 
 		By(fmt.Sprintf("Verifying that a pod in cluster %q cannot connect to a service in cluster %q", clusterBName, clusterCName))
-		tcp.RunNoConnectivityTest(f, true, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterC, framework.ClusterB)
+		tcp.RunNoConnectivityTest(f, framework.ServiceIP, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterC, framework.ClusterB)
 
 		nonGatewayNodes := f.FindNodesByGatewayLabel(framework.ClusterC, false)
 		Expect(nonGatewayNodes).ToNot(HaveLen(0), fmt.Sprintf("No non-gateway nodes found on %q", clusterCName))
@@ -38,17 +38,17 @@ var _ = PDescribe("[expansion] Test expanding/shrinking an existing cluster flee
 		By(fmt.Sprintf("Found submariner engine pod %q on %q", enginePod.Name, clusterCName))
 
 		By(fmt.Sprintf("Checking connectivity between clusters"))
-		tcp.RunConnectivityTest(f, false, framework.PodNetworking, framework.GatewayNode, framework.GatewayNode, framework.ClusterC, framework.ClusterB)
-		tcp.RunConnectivityTest(f, true, framework.PodNetworking, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterC, framework.ClusterA)
+		tcp.RunConnectivityTest(f, framework.PodIP, framework.PodNetworking, framework.GatewayNode, framework.GatewayNode, framework.ClusterC, framework.ClusterB)
+		tcp.RunConnectivityTest(f, framework.ServiceIP, framework.PodNetworking, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterC, framework.ClusterA)
 
 		By(fmt.Sprintf("Removing cluster %q by unsetting the gateway label and deleting submariner engine pod %q", clusterCName, enginePod.Name))
 		f.SetGatewayLabelOnNode(framework.ClusterC, nonGatewayNode, false)
 		f.DeletePod(framework.ClusterC, enginePod.Name, framework.TestContext.SubmarinerNamespace)
 
 		By(fmt.Sprintf("Verifying that a pod in cluster %q cannot connect to a service in cluster %q", clusterAName, clusterCName))
-		tcp.RunNoConnectivityTest(f, false, framework.NonGatewayNode, framework.GatewayNode, framework.ClusterC, framework.ClusterA)
+		tcp.RunNoConnectivityTest(f, framework.PodIP, framework.NonGatewayNode, framework.GatewayNode, framework.ClusterC, framework.ClusterA)
 
 		By(fmt.Sprintf("Verifying that a pod in cluster %q cannot connect to a pod in cluster %q", clusterBName, clusterCName))
-		tcp.RunNoConnectivityTest(f, true, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterC, framework.ClusterB)
+		tcp.RunNoConnectivityTest(f, framework.ServiceIP, framework.NonGatewayNode, framework.NonGatewayNode, framework.ClusterC, framework.ClusterB)
 	})
 })

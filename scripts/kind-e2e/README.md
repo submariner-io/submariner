@@ -6,7 +6,7 @@ E2E environment consists of:
 - 3 k8s clusters deployed with [kind].
   - Cluster1: One master node for broker and elasticsearch if required.
   - Cluster{2..3}: One master node and two workers for gateways nodes.
-  The configuration can be viewed or changed at **scripts/kind-e2e/cluster{1..3}-config.yaml**.
+  The configuration can be viewed or changed at **/kind-e2e/cluster{1..3}-config.yaml**.
 - Submariner installed and configured on top of the clusters.
 
 [kind] is a tool for running local Kubernetes clusters using Docker container “nodes”.
@@ -47,8 +47,8 @@ To test specific k8s version, additional **version** parameter can be passed to 
 make ci e2e version=1.14.1
 ```
 
-Full list of supported k8s versions can found on [kind release page] page. We are using kind vesion 0.3.0.
-Default **version** is 1.14.2.
+Full list of supported k8s versions can found on [kind release page] page. We are using kind vesion 0.6.1.
+Default **version** is 1.14.6.
 
 ### 2. Permanent
 
@@ -134,7 +134,7 @@ To get the status of federated clusters:
 kubectl -n kube-federation-system get kubefedclusters
 ``` 
 
-Federated deployment example resides in **scripts/kind-e2e/nginx-federated.sh**. 
+Federated deployment example resides in **/kind-e2e/nginx-federated.sh**.
 To federate resources across the clusters [kubefedctl] tool must be installed on the local system.
 
 #### Cleanup

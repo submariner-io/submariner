@@ -5,6 +5,9 @@ import (
 	"os"
 	"strings"
 
+	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	kubeclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 )
 
@@ -21,6 +24,12 @@ type TestContextType struct {
 	ConnectionTimeout   uint
 	ConnectionAttempts  uint
 	OperationTimeout    uint
+	GlobalnetEnabled    bool
+	ClusterClients      []*kubeclientset.Clientset
+	SubmarinerClients   []*submarinerClientset.Clientset
+	ClientQPS           float32
+	ClientBurst         int
+	GroupVersion        *schema.GroupVersion
 }
 
 func (contexts *contextArray) String() string {
@@ -32,10 +41,13 @@ func (contexts *contextArray) Set(value string) error {
 	return nil
 }
 
-var TestContext *TestContextType = &TestContextType{}
+var TestContext *TestContextType = &TestContextType{
+	ClientQPS:   20,
+	ClientBurst: 50,
+}
 
-func registerFlags(t *TestContextType) {
-	flag.StringVar(&t.KubeConfig, "kubeconfig", os.Getenv("KUBECONFIG"),
+func init() {
+	flag.StringVar(&TestContext.KubeConfig, "kubeconfig", os.Getenv("KUBECONFIG"),
 		"Path to kubeconfig containing embedded authinfo.")
 	flag.Var(&TestContext.KubeContexts, "dp-context", "kubeconfig context for dataplane clusters (use several times).")
 	flag.StringVar(&TestContext.ReportPrefix, "report-prefix", "", "Optional prefix for JUnit XML reports. Default is empty, which doesn't prepend anything to the default name.")
@@ -46,7 +58,7 @@ func registerFlags(t *TestContextType) {
 	flag.UintVar(&TestContext.OperationTimeout, "operation-timeout", 60, "The general operation timeout in seconds.")
 }
 
-func validateFlags(t *TestContextType) {
+func ValidateFlags(t *TestContextType) {
 	if len(t.KubeConfig) == 0 {
 		klog.Fatalf("kubeconfig parameter or KUBECONFIG environment variable is required")
 	}
@@ -54,10 +66,4 @@ func validateFlags(t *TestContextType) {
 	if len(t.KubeContexts) < 2 {
 		klog.Fatalf("several kubernetes contexts are necessary east, west, etc..")
 	}
-}
-
-func ParseFlags() {
-	registerFlags(TestContext)
-	flag.Parse()
-	validateFlags(TestContext)
 }

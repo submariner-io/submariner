@@ -51,7 +51,7 @@ TBD.
 
 # Testing
 
-Refer [Testing guide](testing.md) for instructions on how to test, same steps apply.
+Refer [testing guide](testing.md) for instructions on how to test, same steps apply.
 
 # Known Issues
 
@@ -61,10 +61,6 @@ Nothing extra needs to be done to build `submariner-globalnet` as it is built wi
 
 # TODO
 
-Not everything mentioned in the architecture is currently implemented. This section lists work items that are pending.
-
-* Operator support for globalnet installation
-* Helm support for globalnet installation
-* `subctl` support for globalnet
-* Lighthouse changes for globalnet
-* User guide
+* [Host Network to remote Service Connectivity](https://github.com/submariner-io/submariner/issues/464)
+* [Provision to specify globalnet-cluster-size during subctl join](https://github.com/submariner-io/submariner-operator/issues/268)
+* [Globalnet Controller support for non IPTables based kubeproxy](https://github.com/submariner-io/submariner/issues/382)

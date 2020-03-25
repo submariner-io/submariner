@@ -33,7 +33,7 @@
 
 [![Build Status](https://travis-ci.com/submariner-io/submariner.svg?branch=master)](https://travis-ci.com/submariner-io/submariner) [![GoDoc](https://godoc.org/github.com/submariner-io/submariner?status.svg)](https://godoc.org/github.com/submariner-io/submariner) [![Go Report Card](https://goreportcard.com/badge/github.com/submariner-io/submariner)](https://goreportcard.com/report/github.com/submariner-io/submariner)
 
-Submariner is a tool built to connect overlay networks of different Kubernetes clusters. While most testing is performed against Kubernetes clusters that have enabled Flannel/Canal, Submariner should be compatible with any CNI-compatible cluster network provider, as it utilizes off-the-shelf components such as strongSwan/Charon to establish IPsec tunnels between each Kubernetes cluster.
+Submariner is a tool built to connect overlay networks of different Kubernetes clusters. While most testing is performed against Kubernetes clusters that have enabled Flannel/Canal/Weavenet/OpenShiftSDN, Submariner should be compatible with any CNI-compatible cluster network provider, as it utilizes off-the-shelf components such as strongSwan/Charon to establish IPsec tunnels between each Kubernetes cluster.
 
 Note that Submariner is in the <strong>pre-alpha</strong> stage, and should not be used for production purposes. While we welcome usage/experimentation with it, it is quite possible that you could run into severe bugs with it, and as such this is why it has this labeled status.
 
@@ -79,7 +79,7 @@ When the source pod is on a worker node that is not the elected gateway node, th
 Submariner has a few requirements in order to get started:
 
 - At least 2 Kubernetes clusters, one of which is designated to serve as the central broker that is accessible by all of your connected clusters; this can be one of your connected clusters, but comes with the limitation that the cluster is required to be up in order to facilitate interconnectivity/negotiation
-- Different cluster/service CIDR's (as well as different kubernetes DNS suffixes) between clusters. This is to prevent traffic selector/policy/routing conflicts.
+- Different cluster/service CIDR's (as well as different kubernetes DNS suffixes) between clusters. This is to prevent traffic selector/policy/routing conflicts. Note: Submariner also supports clusters with Overlapping CIDRs via [Globalnet Controller](docs/globalnet.md).
 - Direct IP connectivity between instances through the internet (or on the same network if not running Submariner over the internet). Submariner supports 1:1 NAT setups, but has a few caveats/provider specific configuration instructions in this configuration.
 - Knowledge of each cluster's network configuration
 - Helm version that supports crd-install hook (v2.12.1+)
@@ -346,8 +346,6 @@ When running in Openshift, we need to grant the appropriate security context for
 
 To build `submariner-engine` and `submariner-route-agent` you can trigger `make`, which will perform a Dapperized build of the components.
 
-To build the operator, you can trigger `make build-operator`.
-
 Buidling submariner happens inside a docker based virtual environment (based in dapper).
 You can jump into a virtual environment shell by typing:
 
@@ -368,4 +366,3 @@ you can speedup the process by running: `make build package e2e`
 - Potentially spin out Charon into it's own pod to help decrease downtime
 - Better clean up of IPtables rules when node loses leader election
 - Central API server that is hosted by Rancher
-- Support for [Overlapping CIDRs](docs/globalnet.md) in clusters.

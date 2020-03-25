@@ -10,7 +10,7 @@ fi
 ce_ipsec_ikeport=500
 ce_ipsec_nattport=4500
 subm_colorcodes=blue
-subm_engine_image_repo=local
+subm_engine_image_repo=localhost:5000
 subm_engine_image_tag=local
 subm_ns=submariner-operator
 
@@ -41,13 +41,13 @@ function setup_broker() {
     context=$1
     echo Installing broker on $context.
     kubectl config use-context $context
-    subctl --kubeconfig ${PRJ_ROOT}/output/kind-config/dapper/kind-config-$context deploy-broker --no-dataplane
+    subctl --kubeconfig ${DAPPER_SOURCE}/output/kind-config/dapper/kind-config-$context deploy-broker --no-dataplane
 }
 
 function subctl_install_subm() {
     context=$1
     kubectl config use-context $context
-    subctl join --kubeconfig ${PRJ_ROOT}/output/kind-config/dapper/kind-config-$context \
+    subctl join --kubeconfig ${DAPPER_SOURCE}/output/kind-config/dapper/kind-config-$context \
                 --clusterid ${context} \
                 --repository ${subm_engine_image_repo} \
                 --version ${subm_engine_image_tag} \
@@ -70,6 +70,4 @@ function deploytool_postreqs() {
     # subctl wants a gateway node labeled, or it will ask, but this script is not interactive,
     # and E2E expects cluster1 to not have the gateway configured at start, so we remove it
     del_subm_gateway_label cluster1
-    # Just removing the label does not stop Subm pod.
-    kubectl --context=cluster1 delete pod -n submariner-operator -l app=submariner-engine
 }
