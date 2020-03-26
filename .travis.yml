@@ -42,7 +42,7 @@ after_success:
     fi;
     echo "Testing cleaning up clusters";
     set -o pipefail;
-    make e2e status=clean 2>&1 | ts '[%H:%M:%.S]' -s
+    make cleanup 2>&1 | ts '[%H:%M:%.S]' -s
 deploy:
   - provider: script
     script: bash scripts/release
