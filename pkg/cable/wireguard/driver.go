@@ -355,7 +355,7 @@ func discoverInternalIP(cidrs []net.IPNet) (string, error) {
 			}
 		}
 	}
-	klog.Warningf("could not find internal address in local subnets")
+	klog.Warningf("Could not find an internal address in %v that matches a local subnet in %v", addrs, cidrs)
 	return "", nil
 }
 
