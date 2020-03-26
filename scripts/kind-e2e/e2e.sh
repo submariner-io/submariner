@@ -1,48 +1,15 @@
 #!/usr/bin/env bash
 set -em
 
-source ${DAPPER_SOURCE}/scripts/lib/debug_functions
-source ${DAPPER_SOURCE}/scripts/lib/version
-
-### Constants ###
-
-readonly KUBECONFIGS_DIR=${DAPPER_OUTPUT}/kubeconfigs
+source ${SCRIPTS_DIR}/lib/debug_functions
+source ${SCRIPTS_DIR}/lib/version
+source ${SCRIPTS_DIR}/lib/utils
 
 ### Variables ###
 
-KIND_REGISTRY=kind-registry
 E2E_DIR=${DAPPER_SOURCE}/scripts/kind-e2e/
 
 ### Functions ###
-
-# Mask kubectl to use cluster context if the variable is set and context isn't specified,
-# otherwise use the config context as always.
-function kubectl() {
-    context_flag=""
-    if [[ -n "${cluster}" && ! "${@}" =~ "context" ]]; then
-        context_flag="--context=${cluster}"
-    fi
-    command kubectl ${context_flag} "$@"
-}
-
-# Run cluster commands in parallel.
-# 1st argument is the numbers of the clusters to run for, supports "1 2 3" or "{1..3}" for range
-# 2nd argument is the command to execute, which will have the $cluster variable set.
-function run_parallel() {
-    clusters=$(eval echo "$1")
-    cmnd=$2
-    declare -A pids
-    for i in ${clusters}; do
-        cluster="cluster${i}"
-        ( $cmnd | sed "s/^/[${cluster}] /" ) &
-        unset cluster
-        pids["${i}"]=$!
-    done
-
-    for i in ${!pids[@]}; do
-        wait ${pids[$i]}
-    done
-}
 
 function kind_import_images() {
     docker tag quay.io/submariner/submariner:$VERSION localhost:5000/submariner:local
@@ -260,15 +227,8 @@ done
 
 echo Starting with status: $status, logging: $logging, kubefed: $kubefed, deploy: $deploy, globalnet: $globalnet
 
-if [[ $globalnet = "true" ]]; then
-  # When globalnet is set to true, we want to deploy clusters with overlapping CIDRs
-  declare -A cluster_CIDRs=( ["cluster1"]="10.244.0.0/16" ["cluster2"]="10.244.0.0/16" ["cluster3"]="10.244.0.0/16" )
-  declare -A service_CIDRs=( ["cluster1"]="100.94.0.0/16" ["cluster2"]="100.94.0.0/16" ["cluster3"]="100.94.0.0/16" )
-  declare -A global_CIDRs=( ["cluster1"]="169.254.1.0/24" ["cluster2"]="169.254.2.0/24" ["cluster3"]="169.254.3.0/24" )
-else
-  declare -A cluster_CIDRs=( ["cluster1"]="10.244.0.0/16" ["cluster2"]="10.245.0.0/16" ["cluster3"]="10.246.0.0/16" )
-  declare -A service_CIDRs=( ["cluster1"]="100.94.0.0/16" ["cluster2"]="100.95.0.0/16" ["cluster3"]="100.96.0.0/16" )
-fi
+declare_cidrs
+declare_kubeconfig
 
 if [[ $status = clean ]]; then
     cleanup
@@ -298,7 +258,6 @@ if [[ $logging = true ]]; then
     enable_logging
 fi
 
-export KUBECONFIG=$(echo ${KUBECONFIGS_DIR}/kind-config-cluster{1..3} | sed 's/ /:/g')
 kind_import_images
 
 if [[ $kubefed = true ]]; then
