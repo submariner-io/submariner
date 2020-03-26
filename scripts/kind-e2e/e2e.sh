@@ -79,40 +79,8 @@ function test_with_e2e_tests {
         tee ${DAPPER_OUTPUT}/e2e-tests.log
 }
 
-function registry_running() {
-    docker ps --filter name="^/?$KIND_REGISTRY$" | grep $KIND_REGISTRY
-    return $?
-}
-
-function delete_cluster() {
-    if [[ $(kind get clusters | grep ${cluster} | wc -l) -gt 0  ]]; then
-        kind delete cluster --name=${cluster};
-    fi
-}
-
 function cleanup {
-    run_parallel "{1..3}" delete_cluster
-
-    echo Removing local KIND registry...
-    if registry_running; then
-        docker stop $KIND_REGISTRY
-    fi
-
-    if [[ $(docker ps -qf status=exited | wc -l) -gt 0 ]]; then
-        echo Cleaning containers...
-        docker ps -qf status=exited | xargs docker rm -f
-    fi
-    if [[ $(docker images -qf dangling=true | wc -l) -gt 0 ]]; then
-        echo Cleaning images...
-        docker images -qf dangling=true | xargs docker rmi -f
-    fi
-#    if [[ $(docker images -q --filter=reference='submariner*:local' | wc -l) -gt 0 ]]; then
-#        docker images -q --filter=reference='submariner*:local' | xargs docker rmi -f
-#    fi
-    if [[ $(docker volume ls -qf dangling=true | wc -l) -gt 0 ]]; then
-        echo Cleaning volumes...
-        docker volume ls -qf dangling=true | xargs docker volume rm -f
-    fi
+    "${SCRIPTS_DIR}"/cleanup.sh
 }
 
 ### Main ###
