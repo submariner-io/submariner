@@ -6,7 +6,7 @@ deploytool ?= operator
 globalnet ?= false
 build_debug ?= false
 
-TARGETS := $(shell ls scripts | grep -v -e clusters -e deploy)
+TARGETS := $(shell ls scripts | grep -v -e clusters -e deploy -e cleanup)
 
 .dapper:
 	@echo Downloading dapper
@@ -17,6 +17,9 @@ TARGETS := $(shell ls scripts | grep -v -e clusters -e deploy)
 
 shell:
 	./.dapper -m bind -s
+
+cleanup: .dapper
+	./.dapper -m bind $@
 
 clusters: ci
 	./.dapper -m bind $@ --k8s_version $(version) --globalnet $(globalnet)
