@@ -6,7 +6,8 @@ deploytool ?= operator
 globalnet ?= false
 build_debug ?= false
 
-TARGETS := $(shell ls scripts | grep -v -e clusters -e deploy -e cleanup)
+TARGETS := $(shell ls scripts)
+SCRIPTS_DIR ?= /opt/shipyard/scripts
 
 .dapper:
 	@echo Downloading dapper
@@ -19,13 +20,13 @@ shell:
 	./.dapper -m bind -s
 
 cleanup: .dapper
-	./.dapper -m bind $@
+	./.dapper -m bind $(SCRIPTS_DIR)/cleanup.sh
 
 clusters: ci
-	./.dapper -m bind $@ --k8s_version $(version) --globalnet $(globalnet)
+	./.dapper -m bind $(SCRIPTS_DIR)/clusters.sh --k8s_version $(version) --globalnet $(globalnet)
 
 deploy: clusters
-	DAPPER_ENV="OPERATOR_IMAGE"  ./.dapper -m bind $@ --globalnet $(globalnet) --deploytool $(deploytool)
+	DAPPER_ENV="OPERATOR_IMAGE" ./.dapper -m bind $(SCRIPTS_DIR)/deploy.sh --globalnet $(globalnet) --deploytool $(deploytool)
 
 e2e: deploy
 

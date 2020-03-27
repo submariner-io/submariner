@@ -1,6 +1,0 @@
-#!/bin/bash
-set -e
-
-source ${SCRIPTS_DIR}/lib/debug_functions
-
-${SCRIPTS_DIR}/deploy.sh "$@"
