@@ -4,16 +4,17 @@ import (
 	"fmt"
 
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/shipyard/test/e2e/framework"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
 )
 
 type CheckEndpointFunc func(endpoint *submarinerv1.Endpoint) (bool, string, error)
 
-func createSubmarinerClient(kubeConfig, context string) *submarinerClientset.Clientset {
-	restConfig := createRestConfig(kubeConfig, context)
+func createSubmarinerClient(restConfig *rest.Config) *submarinerClientset.Clientset {
 	clientSet, err := submarinerClientset.NewForConfig(restConfig)
 	Expect(err).NotTo(HaveOccurred())
 	return clientSet
@@ -23,15 +24,15 @@ func NoopCheckEndpoint(endpoint *submarinerv1.Endpoint) (bool, string, error) {
 	return true, "", nil
 }
 
-func (f *Framework) AwaitSubmarinerEndpoint(cluster ClusterIndex, checkEndpoint CheckEndpointFunc) *submarinerv1.Endpoint {
+func (f *Framework) AwaitSubmarinerEndpoint(cluster framework.ClusterIndex, checkEndpoint CheckEndpointFunc) *submarinerv1.Endpoint {
 	var retEndpoint *submarinerv1.Endpoint
-	AwaitUntil("find the submariner endpoint for "+TestContext.KubeContexts[cluster], func() (interface{}, error) {
-		return f.SubmarinerClients[cluster].SubmarinerV1().Endpoints(TestContext.SubmarinerNamespace).List(metav1.ListOptions{})
+	framework.AwaitUntil("find the submariner endpoint for "+framework.TestContext.ClusterIDs[cluster], func() (interface{}, error) {
+		return SubmarinerClients[cluster].SubmarinerV1().Endpoints(framework.TestContext.SubmarinerNamespace).List(metav1.ListOptions{})
 	}, func(result interface{}) (bool, string, error) {
 		endpoints := result.(*submarinerv1.EndpointList)
 		retEndpoint = nil
 		for i := range endpoints.Items {
-			if endpoints.Items[i].Spec.ClusterID == TestContext.ClusterIDs[cluster] {
+			if endpoints.Items[i].Spec.ClusterID == framework.TestContext.ClusterIDs[cluster] {
 				if retEndpoint == nil {
 					retEndpoint = &endpoints.Items[i]
 				} else {
@@ -51,7 +52,7 @@ func (f *Framework) AwaitSubmarinerEndpoint(cluster ClusterIndex, checkEndpoint 
 	return retEndpoint
 }
 
-func (f *Framework) AwaitNewSubmarinerEndpoint(cluster ClusterIndex, prevEndpointUID types.UID) *submarinerv1.Endpoint {
+func (f *Framework) AwaitNewSubmarinerEndpoint(cluster framework.ClusterIndex, prevEndpointUID types.UID) *submarinerv1.Endpoint {
 	return f.AwaitSubmarinerEndpoint(cluster, func(endpoint *submarinerv1.Endpoint) (bool, string, error) {
 		if endpoint.ObjectMeta.UID != prevEndpointUID {
 			return true, "", nil
