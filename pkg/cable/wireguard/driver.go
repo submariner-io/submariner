@@ -26,9 +26,6 @@ const (
 	// PublicKey is name (key) of publicKey entry in back-end map
 	PublicKey = "publicKey"
 
-	// we assume Linux
-	//deviceType = wgtypes.LinuxKernel
-
 	cableDriverName = "wireguard"
 )
 
