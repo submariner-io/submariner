@@ -15,7 +15,7 @@ Traffic is encrypted and encapsulated in UDP packets.
 - The driver adds routing rules to redirect cross cluster communication through the virtual network device `subwg0`.
   (*note: this is different from `ipsec`, which intercepts packets at netfilter level.*)
 
-- The driver uses [`wgctrl`](https://github.com/WireGuard/wgctrl-go "WgCtrl github"), a go package that enables control of WireGuard devices on multiple platforms. Link creation and removal are done through [`netlink`](https://github.com/vishvananda/netlink "Netlink github").
+- The driver uses [`wgctrl`](https://github.com/WireGuard/wgctrl-go "WgCtrl github"), a go package that enables control of WireGuard devices on multiple platforms. Link creation and removal are done through [`netlink`](https://github.com/vishvananda/netlink "Netlink github"). Currently assuming Linux Kernel WireGuard (`wgtypes.LinuxKernel`).
 
 ## Installation
 
@@ -28,7 +28,7 @@ Traffic is encrypted and encapsulated in UDP packets.
 
 - The driver needs to be enabled with
   ```ShellSession
-  $ bin/subctl join --kubeconfig wg3-conf --cable-driver wireguard --disable-nat  --repository roytman --version  latest broker-info.subm
+  $ bin/subctl join --cable-driver wireguard --disable-nat broker-info.subm
   ```
 
 ## Troubleshooting, limitations
