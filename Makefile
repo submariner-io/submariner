@@ -6,7 +6,7 @@ deploytool ?= operator
 globalnet ?= false
 build_debug ?= false
 
-TARGETS := $(shell ls scripts)
+TARGETS := $(shell ls scripts | grep -v e2e)
 SCRIPTS_DIR ?= /opt/shipyard/scripts
 
 .dapper:
@@ -29,6 +29,7 @@ deploy: clusters
 	DAPPER_ENV="OPERATOR_IMAGE" ./.dapper -m bind $(SCRIPTS_DIR)/deploy.sh --globalnet $(globalnet) --deploytool $(deploytool)
 
 e2e: deploy
+	./.dapper -m bind $@ --status $(status) --logging $(logging) --kubefed $(kubefed) --deploytool $(deploytool)
 
 $(TARGETS): .dapper vendor/modules.txt
 	./.dapper -m bind $@ --status $(status) --k8s_version $(version) --logging $(logging) --kubefed $(kubefed) --deploytool $(deploytool) --globalnet $(globalnet) --build_debug $(build_debug)

@@ -1,4 +1,21 @@
 #!/usr/bin/env bash
+
+## Process command line flags ##
+
+source /usr/share/shflags/shflags
+DEFINE_string 'deploytool' 'operator' 'Tool to use for deploying (operator/helm)'
+DEFINE_string 'kubefed' 'false' "Deploy with kubefed"
+DEFINE_string 'logging' 'false' "Deploy with logging"
+DEFINE_string 'status' 'onetime' "Status flag (onetime, create, keep, clean)"
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+deploytool="${FLAGS_deploytool}"
+kubefed="${FLAGS_kubefed}"
+logging="${FLAGS_logging}"
+status="${FLAGS_status}"
+echo "Running with: deploytool=${deploytool}, kubefed=${kubefed}, logging=${logging}, status=${status}"
+
 set -em
 
 source ${SCRIPTS_DIR}/lib/debug_functions
@@ -84,38 +101,6 @@ function cleanup {
 }
 
 ### Main ###
-
-LONGOPTS=status:,logging:,kubefed:,deploytool:
-# Only accept longopts, but must pass null shortopts or first param after "--" will be incorrectly used
-SHORTOPTS=""
-! PARSED=$(getopt --options=$SHORTOPTS --longoptions=$LONGOPTS --name "$0" -- "$@")
-eval set -- "$PARSED"
-
-while true; do
-    case "$1" in
-        --status)
-            status="$2"
-            ;;
-        --logging)
-            logging="$2"
-            ;;
-        --kubefed)
-            kubefed="$2"
-            ;;
-        --deploytool)
-            deploytool="$2"
-            ;;
-        --)
-            break
-            ;;
-        *)
-            echo "Ignoring unknown option: $1 $2"
-            ;;
-    esac
-    shift 2
-done
-
-echo Starting with status: $status, logging: $logging, kubefed: $kubefed, deploytool: $deploytool
 
 declare_kubeconfig
 
