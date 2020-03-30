@@ -94,8 +94,6 @@ func (t *testDriver) stop(expectedErr error) {
 		return
 	}
 
-	utilruntime.ErrorHandlers = t.savedErrorHandlers
-
 	if expectedErr == nil {
 		close(t.stopCh)
 	}
@@ -111,6 +109,7 @@ func (t *testDriver) stop(expectedErr error) {
 	}()
 
 	t.stopCh = nil
+	utilruntime.ErrorHandlers = t.savedErrorHandlers
 	if expectedErr == nil {
 		Expect(err).To(Succeed())
 	} else {
