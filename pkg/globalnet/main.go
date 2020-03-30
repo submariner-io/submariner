@@ -5,13 +5,10 @@ import (
 	"sync"
 
 	"github.com/kelseyhightower/envconfig"
-
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers/ipam"
-
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
-
-	"github.com/submariner-io/submariner/pkg/signals"
+	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
 )
 
 var (
