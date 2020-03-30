@@ -6,19 +6,16 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions"
+	"github.com/submariner-io/submariner/pkg/routeagent/controllers/route"
+	"github.com/submariner-io/submariner/pkg/util"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-
-	"github.com/submariner-io/submariner/pkg/routeagent/controllers/route"
-	"github.com/submariner-io/submariner/pkg/util"
-
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
-
-	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
-	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions"
-	"github.com/submariner-io/submariner/pkg/signals"
+	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
 )
 
 var (

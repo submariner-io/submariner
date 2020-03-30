@@ -8,10 +8,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/submariner-io/submariner/pkg/cable"
-
 	"github.com/kelseyhightower/envconfig"
+	"github.com/submariner-io/submariner/pkg/cable"
+	"github.com/submariner-io/submariner/pkg/cableengine"
+	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions"
+	"github.com/submariner-io/submariner/pkg/controllers/datastoresyncer"
+	"github.com/submariner-io/submariner/pkg/controllers/tunnel"
+	"github.com/submariner-io/submariner/pkg/datastore"
+	subk8s "github.com/submariner-io/submariner/pkg/datastore/kubernetes"
+	"github.com/submariner-io/submariner/pkg/datastore/phpapi"
 	"github.com/submariner-io/submariner/pkg/log"
+	"github.com/submariner-io/submariner/pkg/types"
+	"github.com/submariner-io/submariner/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -22,18 +31,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
-
-	"github.com/submariner-io/submariner/pkg/cableengine"
-	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
-	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions"
-	"github.com/submariner-io/submariner/pkg/controllers/datastoresyncer"
-	"github.com/submariner-io/submariner/pkg/controllers/tunnel"
-	"github.com/submariner-io/submariner/pkg/datastore"
-	subk8s "github.com/submariner-io/submariner/pkg/datastore/kubernetes"
-	"github.com/submariner-io/submariner/pkg/datastore/phpapi"
-	"github.com/submariner-io/submariner/pkg/signals"
-	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/submariner-io/submariner/pkg/util"
+	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
 )
 
 var (
