@@ -26,7 +26,7 @@ func testLocalEndpointSyncing() {
 	var d *testDriver
 
 	BeforeEach(func() {
-		d = newTestDiver()
+		d = newTestDriver()
 	})
 
 	JustBeforeEach(func() {
@@ -135,7 +135,7 @@ func testRemoteEndpointSyncing() {
 	)
 
 	BeforeEach(func() {
-		d = newTestDiver()
+		d = newTestDriver()
 		remoteEndpoint = newSubmarinerEndpoint(otherClusterID)
 	})
 
@@ -234,7 +234,7 @@ func testEndpointExclusivityFailures() {
 
 	BeforeEach(func() {
 		expectedErr = nil
-		d = newTestDiver()
+		d = newTestDriver()
 		existingEndpoint = &types.SubmarinerEndpoint{
 			Spec: submarinerv1.EndpointSpec{
 				CableName: "submariner-cable-east-1-2-3-4",

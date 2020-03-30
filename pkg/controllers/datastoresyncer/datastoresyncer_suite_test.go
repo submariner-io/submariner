@@ -53,7 +53,7 @@ type testDriver struct {
 	initialObjs         []runtime.Object
 }
 
-func newTestDiver() *testDriver {
+func newTestDriver() *testDriver {
 	return &testDriver{
 		mockDatastore:       fakeDatastore.New(),
 		localCluster:        newSubmarinerCluster(clusterID),

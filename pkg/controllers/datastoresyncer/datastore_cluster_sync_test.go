@@ -24,7 +24,7 @@ func testLocalClusterSyncing() {
 	var d *testDriver
 
 	BeforeEach(func() {
-		d = newTestDiver()
+		d = newTestDriver()
 	})
 
 	JustBeforeEach(func() {
@@ -91,7 +91,7 @@ func testRemoteClusterSyncing() {
 	)
 
 	BeforeEach(func() {
-		d = newTestDiver()
+		d = newTestDriver()
 		remoteCluster = newSubmarinerCluster(otherClusterID)
 	})
 
