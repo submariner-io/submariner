@@ -4,17 +4,15 @@
 
 source /usr/share/shflags/shflags
 DEFINE_string 'deploytool' 'operator' 'Tool to use for deploying (operator/helm)'
-DEFINE_string 'kubefed' 'false' "Deploy with kubefed"
 DEFINE_string 'logging' 'false' "Deploy with logging"
 DEFINE_string 'status' 'onetime' "Status flag (onetime, create, keep, clean)"
 FLAGS "$@" || exit $?
 eval set -- "${FLAGS_ARGV}"
 
 deploytool="${FLAGS_deploytool}"
-kubefed="${FLAGS_kubefed}"
 logging="${FLAGS_logging}"
 status="${FLAGS_status}"
-echo "Running with: deploytool=${deploytool}, kubefed=${kubefed}, logging=${logging}, status=${status}"
+echo "Running with: deploytool=${deploytool}, logging=${logging}, status=${status}"
 
 set -em
 
@@ -47,29 +45,6 @@ function enable_logging() {
         kubectl apply -f ${E2E_DIR}/logging/filebeat.yaml
         kubectl set env daemonset/filebeat -n kube-system ELASTICSEARCH_HOST=${es_ip} ELASTICSEARCH_PORT=30000
     done
-}
-
-function enable_kubefed() {
-    cluster=cluster1
-    KUBEFED_NS=kube-federation-system
-    if kubectl rollout status deploy/kubefed-controller-manager -n ${KUBEFED_NS} > /dev/null 2>&1; then
-        echo Kubefed already installed, skipping setup...
-        return
-    fi
-
-    helm init --client-only
-    helm repo add kubefed-charts https://raw.githubusercontent.com/kubernetes-sigs/kubefed/master/charts
-    helm --kube-context cluster1 install kubefed-charts/kubefed --version=0.1.0-rc2 --name kubefed --namespace ${KUBEFED_NS} --set controllermanager.replicaCount=1
-    for i in 1 2 3; do
-        kubefedctl join cluster${i} --cluster-context cluster${i} --host-cluster-context cluster1 --v=2
-        #master_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster${i}-control-plane | head -n 1)
-        #kind_endpoint="https://${master_ip}:6443"
-        #kubectl patch kubefedclusters -n ${KUBEFED_NS} cluster${i} --type merge --patch "{\"spec\":{\"apiEndpoint\":\"${kind_endpoint}\"}}"
-    done
-    #kubectl delete pod -l control-plane=controller-manager -n ${KUBEFED_NS}
-    echo Waiting for kubefed control plain to be ready...
-    kubectl wait --for=condition=Ready pods -l control-plane=controller-manager -n ${KUBEFED_NS} --timeout=120s
-    kubectl wait --for=condition=Ready pods -l kubefed-admission-webhook=true -n ${KUBEFED_NS} --timeout=120s
 }
 
 # TODO: Copied from shipyard since deploytool determines the namespace, we should fix operator to use the same namespace (or receive it).
@@ -120,11 +95,6 @@ load_deploytool
 
 if [[ $logging = true ]]; then
     enable_logging
-fi
-
-if [[ $kubefed = true ]]; then
-    # FIXME: Kubefed deploys are broken (not because of this commit)
-    enable_kubefed
 fi
 
 if [[ $status = keep || $status = onetime ]]; then
