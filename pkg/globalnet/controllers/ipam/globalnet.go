@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/coreos/go-iptables/iptables"
-	"github.com/submariner-io/submariner/pkg/log"
+	"github.com/submariner-io/admiral/pkg/log"
 	k8sv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
