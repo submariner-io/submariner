@@ -32,7 +32,7 @@ e2e: deploy
 	./.dapper -m bind $@ --status $(status) --logging $(logging) --kubefed $(kubefed) --deploytool $(deploytool)
 
 $(TARGETS): .dapper vendor/modules.txt
-	./.dapper -m bind $@ --status $(status) --k8s_version $(version) --logging $(logging) --kubefed $(kubefed) --deploytool $(deploytool) --globalnet $(globalnet) --build_debug $(build_debug)
+	./.dapper -m bind $@ --build_debug $(build_debug)
 
 vendor/modules.txt: .dapper go.mod
 ifneq ($(status),clean)
