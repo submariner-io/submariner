@@ -29,7 +29,7 @@ deploy: clusters
 	DAPPER_ENV="OPERATOR_IMAGE" ./.dapper -m bind $(SCRIPTS_DIR)/deploy.sh --globalnet $(globalnet) --deploytool $(deploytool)
 
 e2e: deploy
-	./.dapper -m bind $@ --status $(status) --logging $(logging) --kubefed $(kubefed) --deploytool $(deploytool)
+	./.dapper -m bind ./scripts/kind-e2e/e2e.sh --status $(status) --logging $(logging) --kubefed $(kubefed) --deploytool $(deploytool)
 
 $(TARGETS): .dapper vendor/modules.txt
 	./.dapper -m bind $@ --build_debug $(build_debug)
