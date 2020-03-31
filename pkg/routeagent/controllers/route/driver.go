@@ -9,7 +9,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
 
-	"github.com/submariner-io/submariner/pkg/log"
+	"github.com/submariner-io/admiral/pkg/log"
 )
 
 func discoverCNIInterface(clusterCIDR string) (*cniInterface, error) {

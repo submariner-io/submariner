@@ -12,11 +12,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable/wireguard"
 	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	informers "github.com/submariner-io/submariner/pkg/client/informers/externalversions/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/log"
 	"github.com/submariner-io/submariner/pkg/util"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
