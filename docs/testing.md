@@ -9,7 +9,6 @@
     - [Ephemeral/Onetime](#ephemeralonetime)
     - [Permanent](#permanent)
       - [Logging](#logging)
-      - [Federation V2](#federation-v2)
       - [Operator](#operator)
       - [Cleanup](#cleanup)
       - [Full example](#full-example)
@@ -201,23 +200,6 @@ the following lucene query example can be used to query the logs.
 ```bash
 kubernetes.namespace:"submariner" AND kubernetes.node.name: (cluster2* OR cluster3*) AND kubernetes.labels.app: submariner*
 ```
-
-#### Federation V2
-Providing **kubefed=true** parameter to **make ci e2e** command will setup federation.
-Federation control plane will be created on cluster1 and clusters 2/3 will be added as members. 
-
-```bash
-make ci e2e status=keep kubefed=true
-```
-
-To get the status of federated clusters:
-
-```bash
-kubectl -n kube-federation-system get kubefedclusters
-``` 
-
-Federated deployment example resides in **scripts/kind-e2e/nginx-federated.sh**. 
-To federate resources across the clusters [kubefedctl] tool must be installed on the local system.
 
 #### Operator
 After generating the Operator by running `make build-operator`, your newly generated operator

@@ -1,7 +1,6 @@
 status ?= onetime
 version ?= 1.14.6
 logging ?= false
-kubefed ?= false
 deploytool ?= operator
 globalnet ?= false
 build_debug ?= false
@@ -29,7 +28,7 @@ deploy: clusters
 	DAPPER_ENV="OPERATOR_IMAGE" ./.dapper -m bind $(SCRIPTS_DIR)/deploy.sh --globalnet $(globalnet) --deploytool $(deploytool)
 
 e2e: deploy
-	./.dapper -m bind ./scripts/kind-e2e/e2e.sh --status $(status) --logging $(logging) --kubefed $(kubefed) --deploytool $(deploytool)
+	./.dapper -m bind ./scripts/kind-e2e/e2e.sh --status $(status) --logging $(logging) --deploytool $(deploytool)
 
 $(TARGETS): .dapper vendor/modules.txt
 	./.dapper -m bind $@ --build_debug $(build_debug)

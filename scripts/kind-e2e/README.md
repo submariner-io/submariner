@@ -120,23 +120,6 @@ the following lucene query example can be used to query the logs.
 kubernetes.namespace:"submariner" AND kubernetes.node.name: (cluster2* OR cluster3*) AND kubernetes.labels.app: submariner*
 ```
 
-#### Federation V2
-Providing **kubefed=true** parameter to **make e2e** command will setup federation.
-Federation control plane will be created on cluster1 and clusters 2/3 will be added as members. 
-
-```bash
-make ci e2e status=keep kubefed=true
-```
-
-To get the status of federated clusters:
-
-```bash
-kubectl -n kube-federation-system get kubefedclusters
-``` 
-
-Federated deployment example resides in **/kind-e2e/nginx-federated.sh**.
-To federate resources across the clusters [kubefedctl] tool must be installed on the local system.
-
 #### Cleanup
 At any time you can run a cleanup command that will remove kind resources.
 
