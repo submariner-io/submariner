@@ -92,34 +92,6 @@ or, if you don't want to rebuild your Submariner images, by:
 make e2e status=create
 ```
 
-#### Logging
-
-Providing **logging=true** parameter to **make e2e** command will setup ELK stack on the kind clusters.
-The logs from three clusters will be shipped to an elasticsearch deployment on cluster1.
-Logging should be used only in addition to **status=keep** command. The default value for **logging** is **false**.
-
-```bash
-make ci e2e status=keep logging=true
-```
-
-To access Kibana, run the following from new terminal tab/window:
-
-```bash
-export KUBECONFIG=$GOPATH/src/github.com/submariner-io/submariner/output/kubeconfigs/kind-config-cluster1:$GOPATH/src/github.com/submariner-io/submariner/output/kubeconfigs/kind-config-cluster2:$GOPATH/src/github.com/submariner-io/submariner/output/kubeconfigs/kind-config-cluster3
-kubectl config use-context cluster1
-kibana_pod=$(kubectl get pods -l app=kibana | awk 'FNR > 1 {print $1}')
-kubectl port-forward ${kibana_pod} 8080:5601
-```
-
-Open new browser tab/window and access Kibana at http://localhost:8080.
-
-Create default index **filebeat-** and choose **@timestamp** as time filter field. After the default index pattern is configured,
-the following lucene query example can be used to query the logs.
-
-```bash
-kubernetes.namespace:"submariner" AND kubernetes.node.name: (cluster2* OR cluster3*) AND kubernetes.labels.app: submariner*
-```
-
 #### Cleanup
 At any time you can run a cleanup command that will remove kind resources.
 
@@ -143,7 +115,7 @@ docker system prune --all
 #### Full example
 
 ```bash
-make ci e2e status=keep version=1.14.1 logging=true kubefed=true
+make ci e2e status=keep version=1.14.1 kubefed=true
 ```
 
 <!--links-->
