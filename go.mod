@@ -22,7 +22,7 @@ require (
 	k8s.io/apimachinery v0.0.0-20190629003722-e20a3a656cff
 	k8s.io/client-go v0.0.0-20190521190702-177766529176
 	k8s.io/klog v0.0.0-20181108234604-8139d8cb77af
-	sigs.k8s.io/controller-runtime v0.1.12
+	sigs.k8s.io/controller-runtime v0.5.2
 )
 
 replace github.com/onsi/ginkgo => github.com/onsi/ginkgo v0.0.0-20191002161935-034fd2551d22
