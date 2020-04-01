@@ -1,43 +1,37 @@
 status ?= onetime
-version ?= 1.14.6
-deploytool ?= operator
-globalnet ?= false
 build_debug ?= false
 
-TARGETS := $(shell ls scripts | grep -v e2e)
-SCRIPTS_DIR ?= /opt/shipyard/scripts
+ifneq (,$(DAPPER_HOST_ARCH))
 
-.dapper:
-	@echo Downloading dapper
-	@curl -sL https://releases.rancher.com/dapper/latest/dapper-`uname -s`-`uname -m` > .dapper.tmp
-	@@chmod +x .dapper.tmp
-	@./.dapper.tmp -v
-	@mv .dapper.tmp .dapper
+# Running in Dapper
 
-shell:
-	./.dapper -m bind -s
+include $(SHIPYARD_DIR)/Makefile.inc
 
-cleanup: .dapper
-	./.dapper -m bind $(SCRIPTS_DIR)/cleanup.sh
+TARGETS := $(shell ls -p scripts | grep -v -e /)
 
 clusters: build package
-	./.dapper -m bind $(SCRIPTS_DIR)/clusters.sh --k8s_version $(version) --globalnet $(globalnet)
-
-deploy: clusters
-	DAPPER_ENV="OPERATOR_IMAGE" ./.dapper -m bind $(SCRIPTS_DIR)/deploy.sh --globalnet $(globalnet) --deploytool $(deploytool)
 
 e2e: deploy
-	./.dapper -m bind ./scripts/kind-e2e/e2e.sh --status $(status) --deploytool $(deploytool)
+	./scripts/kind-e2e/e2e.sh --status $(status) --deploytool $(deploytool)
 
-$(TARGETS): .dapper vendor/modules.txt
-	./.dapper -m bind $@ --build_debug $(build_debug)
+$(TARGETS): vendor/modules.txt
+	./scripts/$@ --build_debug $(build_debug)
 
-vendor/modules.txt: .dapper go.mod
+vendor/modules.txt: go.mod
 ifneq ($(status),clean)
-	./.dapper -m bind vendor
+	go mod download
+	go mod vendor
 endif
-
-.DEFAULT_GOAL := ci
 
 .PHONY: $(TARGETS)
 
+else
+
+# Not running in Dapper
+
+include Makefile.dapper
+
+endif
+
+# Disable rebuilding Makefile
+Makefile Makefile.dapper Makefile.inc: ;
