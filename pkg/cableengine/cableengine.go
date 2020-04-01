@@ -30,6 +30,8 @@ type Engine interface {
 	// RemoveCable disconnects the Engine from the given remote endpoint. Upon completion.
 	// remote Pods and Service may not be accessible any more.
 	RemoveCable(remote types.SubmarinerEndpoint) error
+	// ListCableConnections returns a list of cable connection, and the related status
+	ListCableConnections() (*[]cable.Connection, error)
 }
 
 type engine struct {
@@ -116,4 +118,8 @@ func (i *engine) RemoveCable(endpoint types.SubmarinerEndpoint) error {
 
 	klog.Infof("Successfully removed Endpoint cable %q", endpoint.Spec.CableName)
 	return nil
+}
+
+func (i *engine) ListCableConnections() (*[]cable.Connection, error) {
+	return nil, fmt.Errorf("Not implemented yet")
 }
