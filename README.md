@@ -358,9 +358,6 @@ You can jump into a virtual environment shell by typing:
 
 We welcome issues/PR's to Submariner, if you encounter issues that you'd like to fix while working on it or find new features that you'd like. Please refer [contributing guide](https://github.com/submariner-io/submariner/tree/master/docs/contributing.md) for more details.
 
-If you want to avoid part of the ci validation with make while testing your changes
-you can speedup the process by running: `make build package e2e`
-
 # TODO
 
 - Potentially spin out Charon into it's own pod to help decrease downtime

@@ -13,8 +13,8 @@ git:
 jobs:
   include:
   - env: CMD="make test validate"
-  - env: CMD="make build package e2e status=keep" DEPLOY=true
-  - env: CMD="make build package e2e status=keep deploytool=helm globalnet=true"
+  - env: CMD="make e2e" DEPLOY=true
+  - env: CMD="make e2e deploytool=helm globalnet=true"
 
 install:
   - sudo apt-get install moreutils # make ts available
