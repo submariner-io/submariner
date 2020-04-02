@@ -20,7 +20,7 @@ shell:
 cleanup: .dapper
 	./.dapper -m bind $(SCRIPTS_DIR)/cleanup.sh
 
-clusters: ci
+clusters: build package
 	./.dapper -m bind $(SCRIPTS_DIR)/clusters.sh --k8s_version $(version) --globalnet $(globalnet)
 
 deploy: clusters
