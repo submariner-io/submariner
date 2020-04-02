@@ -39,7 +39,7 @@ function load_deploytool() {
 function test_with_e2e_tests {
     set -o pipefail 
 
-    cd ../test/e2e
+    cd ${DAPPER_SOURCE}/test/e2e
 
     go test -v -args -ginkgo.v -ginkgo.randomizeAllSpecs \
         -submariner-namespace $SUBM_NS -dp-context cluster2 -dp-context cluster3 -dp-context cluster1 \
