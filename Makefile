@@ -11,6 +11,9 @@ TARGETS := $(shell ls -p scripts | grep -v -e /)
 
 clusters: build package
 
+e2e-tests:
+	./scripts/kind-e2e/e2e.sh --status keep --deploytool $(deploytool)
+
 e2e: deploy
 	./scripts/kind-e2e/e2e.sh --status $(status) --deploytool $(deploytool)
 
