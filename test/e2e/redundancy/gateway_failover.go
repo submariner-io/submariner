@@ -2,15 +2,18 @@ package redundancy
 
 import (
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
+	v1 "k8s.io/api/core/v1"
+
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
 )
 
-var _ = PDescribe("[redundancy] Gateway fail-over tests", func() {
+var _ = Describe("[redundancy] Gateway fail-over tests", func() {
 	f := subFramework.NewFramework("gateway-redundancy")
 
 	When("one gateway node is configured and the submariner engine pod fails", func() {
@@ -94,9 +97,17 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 	f.SetGatewayLabelOnNode(framework.ClusterA, initialGatewayNode.Name, false)
 
 	// Ensure the new engine pod is started before we run the connectivity tests to eliminate possible timing issue where,
-	// after deleting the old pod, we actually run the connectivity test against the oold engine instance before k8s has
+	// after deleting the old pod, we actually run the connectivity test against the old engine instance before k8s has
 	// a chance to react to stop the process/container etc.
-	newEnginePod := f.AwaitSubmarinerEnginePod(framework.ClusterA)
+	var newEnginePod *v1.Pod
+	for retries := 1; retries < 10; retries++ {
+		newEnginePod = f.AwaitSubmarinerEnginePod(framework.ClusterA)
+		if newEnginePod.Spec.NodeName == initialGatewayNode.Name {
+			time.Sleep(5 * time.Second)
+		} else {
+			break
+		}
+	}
 	Expect(newEnginePod.Spec.NodeName).To(Equal(initialNonGatewayNode.Name),
 		"The new engine pod is not running on the expected node")
 	By(fmt.Sprintf("Found new submariner engine pod %q", newEnginePod.Name))
