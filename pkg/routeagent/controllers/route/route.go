@@ -588,8 +588,7 @@ func (r *Controller) handleRemovedPod(obj interface{}) {
 	klog.V(log.DEBUG).Infof("Removing podIP in route controller %v", obj)
 	pod := obj.(*k8sv1.Pod)
 
-	if r.remoteVTEPs.Contains(pod.Status.HostIP) {
-		r.remoteVTEPs.Delete(pod.Status.HostIP)
+	if r.remoteVTEPs.Delete(pod.Status.HostIP) {
 		r.gwVxLanMutex.Lock()
 		defer r.gwVxLanMutex.Unlock()
 
