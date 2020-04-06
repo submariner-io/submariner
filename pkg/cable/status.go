@@ -1,21 +1,20 @@
 package cable
 
+import v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+
 type ConnectionStatus string
 
 const (
-	Established     ConnectionStatus = "ESTABLISHED"
+	Connected       ConnectionStatus = "CONNECTED"
 	Connecting      ConnectionStatus = "CONNECTING"
 	ConnectionError ConnectionStatus = "ERROR"
-	Unreachable     ConnectionStatus = "UNREACHABLE"
-	AuthError       ConnectionStatus = "AUTH ERROR"
 )
 
+// Connection structure represents the status of an existing cable connection,
+// it includes details the endpoint details, and it's meant to be exposed
+// through an HTTP API on the submariner-engine.
 type Connection struct {
-	CableName     string           `json:"cableName"`
-	ClusterID     string           `json:"clusterID"`
 	Status        ConnectionStatus `json:"status"`
-	RemoteIP      string           `json:"remoteIP"`
-	LocalIP       string           `json:"localIP"`
-	CableDriver   string           `json:"cableDriver"`
-	RemoteSubnets []string         `json:"remoteSubnets"`
+	StatusMessage string           `json:"statusMessage"`
+	Endpoint      v1.EndpointSpec  `json:"endpoint"`
 }
