@@ -102,9 +102,8 @@ The e2e environment can be used for local testing, development, and CI purposes.
 
 E2E environment consists of:
 - 3 k8s clusters deployed with [kind].
-  - Cluster1: One master node for broker and elasticsearch if required.
-  - Cluster{2..3}: One master node and two workers for gateways nodes.
-  The configuration can be viewed or changed at **scripts/kind-e2e/cluster{1..3}-config.yaml**.
+  - Cluster1: One master node for broker.
+  - Cluster{2..3}: One master node and workers for gateways nodes.
 - Submariner installed and configured on top of the clusters.
 
 [kind] is a tool for running local Kubernetes clusters using Docker container “nodes”.
@@ -122,35 +121,18 @@ Optional useful tools for troubleshooting:
 
 ## Installation and usage
 
-The environment can be used in two modes:
-
-### Ephemeral/Onetime
- 
-This mode will create e2e environment on a local workstation, run unit tests, E2E tests, and clean up the created resources afterwards.
-This mode is very convenient for CI purposes.
-    
+To run the tests simply execute the following:
 ```bash
-make ci e2e
+make e2e
 ```
 
-To test specific k8s version, additional **version** parameter can be passed to **make ci e2e** command.
-
+To test with a specific k8s version, an additional **version** parameter can be passed to **make e2e** command:
 ```bash
 make ci e2e version=1.14.1
 ```
 
 Full list of supported k8s versions can found on [kind release page] page. We are using kind vesion 0.6.1.
-Default **version** is 1.14.6
-
-### Permanent
-
-This mode will **keep** the e2e environment running on a local workstation for further development and debugging.
-
-This mode can be triggered by adding **status=keep** parameter to **make ci e2e** command.
-
-```bash
-make ci e2e status=keep
-```
+Default **version** is 1.14.6.
 
 After a permanent run completes, the configuration for the running clusters can be found inside **output/kubeconfigs** folder.
 You can export the kube configs in order to interact with the clusters.
@@ -168,7 +150,7 @@ kubectl config list-contexts
 You should be able to see 3 contexts. From this stage you can interact with the clusters
 as with any normal k8s cluster.
 
-**NOTE**: Each time **make ci e2e status=keep** command is executed, the local code will be build, pushed to kind clusters
+**NOTE**: Each time **make e2e** command is executed, the local code will be build, pushed to kind clusters
 as docker images, submariner will be redeployed on the clusters from pushed images and E2E tests will be executed.
 This mode allows the developers to test their local code fast on a very close to real world scenario setup.
 
@@ -177,7 +159,7 @@ After generating the Operator by running `make build-operator`, your newly gener
 is automatically fully integrated into the Submariner CI automation. Simply use
 the `deploytool` flag to the standard `make` commands.
 
-```make ci e2e status=keep deploytool=operator```
+```make e2e deploytool=operator```
 
 A large set of verifications for the Operator and the resulting Submariner
 deployment will automatically run during and after the deployment.
@@ -186,7 +168,7 @@ deployment will automatically run during and after the deployment.
 At any time you can run a cleanup command that will remove kind resources.
 
 ```bash
-make ci e2e status=clean
+make cleanup
 ```
 
 You can do full docker cleanup, but it will force all the docker images to be removed and invalidate the local docker cache. 
@@ -199,7 +181,7 @@ docker system prune --all
 #### Full example
 
 ```bash
-make ci e2e status=keep version=1.14.1
+make e2e version=1.14.1 globalnet=true deploytool=operator
 ```
 
 <!--links-->
