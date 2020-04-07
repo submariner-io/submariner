@@ -1,4 +1,3 @@
-status ?= onetime
 build_debug ?= false
 
 ifneq (,$(DAPPER_HOST_ARCH))
@@ -13,16 +12,14 @@ CLUSTERS_ARGS = --cluster_settings $(DAPPER_SOURCE)/scripts/kind-e2e/cluster_set
 clusters: build package
 
 e2e: deploy
-	./scripts/kind-e2e/e2e.sh --status $(status) --deploytool $(deploytool)
+	./scripts/kind-e2e/e2e.sh --deploytool $(deploytool)
 
 $(TARGETS): vendor/modules.txt
 	./scripts/$@ --build_debug $(build_debug)
 
 vendor/modules.txt: go.mod
-ifneq ($(status),clean)
 	go mod download
 	go mod vendor
-endif
 
 .PHONY: $(TARGETS)
 

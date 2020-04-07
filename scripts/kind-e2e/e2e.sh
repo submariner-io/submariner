@@ -4,13 +4,11 @@
 
 source /usr/share/shflags/shflags
 DEFINE_string 'deploytool' 'operator' 'Tool to use for deploying (operator/helm)'
-DEFINE_string 'status' 'onetime' "Status flag (onetime, create, keep, clean)"
 FLAGS "$@" || exit $?
 eval set -- "${FLAGS_ARGV}"
 
 deploytool="${FLAGS_deploytool}"
-status="${FLAGS_status}"
-echo "Running with: deploytool=${deploytool}, status=${status}"
+echo "Running with: deploytool=${deploytool}"
 
 set -em
 
@@ -56,31 +54,16 @@ function cleanup {
 
 declare_kubeconfig
 
-if [[ $status = clean ]]; then
-    cleanup
-    exit 0
-elif [[ $status = onetime ]]; then
-    echo Status $status: Will cleanup on EXIT signal
-    trap cleanup EXIT
-elif [[ $status != keep && $status != create ]]; then
-    echo Unknown status: $status
-    cleanup
-    exit 1
-fi
-
 load_deploytool
 
-if [[ $status = keep || $status = onetime ]]; then
-    test_with_e2e_tests
-fi
+test_with_e2e_tests
 
-if [[ $status = keep || $status = create ]]; then
-    echo "your 3 virtual clusters are deployed and working properly with your local"
-    echo "submariner source code, and can be accessed with:"
-    echo ""
-    echo "export KUBECONFIG=\$(echo \$(git rev-parse --show-toplevel)/output/kubeconfigs/kind-config-cluster{1..3} | sed 's/ /:/g')"
-    echo ""
-    echo "$ kubectl config use-context cluster1 # or cluster2, cluster3.."
-    echo ""
-    echo "to cleanup, just run: make e2e status=clean"
-fi
+cat << EOM
+Your 3 virtual clusters are deployed and working properly with your local submariner source code, and can be accessed with:
+
+export KUBECONFIG=\$(echo \$(git rev-parse --show-toplevel)/output/kubeconfigs/kind-config-cluster{1..3} | sed 's/ /:/g')
+
+$ kubectl config use-context cluster1 # or cluster2, cluster3..
+
+To clean evertyhing up, just run: make cleanup
+EOM
