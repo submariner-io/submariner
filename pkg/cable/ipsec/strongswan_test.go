@@ -3,10 +3,10 @@ package ipsec
 import (
 	"bytes"
 	"os"
-	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	"github.com/submariner-io/submariner/pkg/types"
 )
 
@@ -72,9 +72,4 @@ func checkStrongSwanPorts(ikePort string, nattPort string) {
 	ss := createStrongSwan()
 	Expect(ss.ipSecIKEPort).To(Equal(ikePort))
 	Expect(ss.ipSecNATTPort).To(Equal(nattPort))
-}
-
-func TestStrongswan(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Strongswan Suite")
 }

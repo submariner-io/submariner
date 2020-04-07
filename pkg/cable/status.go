@@ -1,6 +1,10 @@
 package cable
 
-import v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+import (
+	"fmt"
+
+	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+)
 
 type ConnectionStatus string
 
@@ -17,4 +21,13 @@ type Connection struct {
 	Status        ConnectionStatus `json:"status"`
 	StatusMessage string           `json:"statusMessage"`
 	Endpoint      v1.EndpointSpec  `json:"endpoint"`
+}
+
+func NewConnection(endpointSpec v1.EndpointSpec) *Connection {
+	return &Connection{Endpoint: endpointSpec}
+}
+
+func (c *Connection) SetStatus(status ConnectionStatus, messageFormat string, a ...interface{}) {
+	c.Status = status
+	c.StatusMessage = fmt.Sprintf(messageFormat, a...)
 }
