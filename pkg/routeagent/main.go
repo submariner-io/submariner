@@ -44,7 +44,7 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	klog.Info("Starting submariner-route-agent")
+	klog.Info("[BUBU] Starting submariner-route-agent")
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
 

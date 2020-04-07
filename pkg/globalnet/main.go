@@ -25,7 +25,7 @@ func main() {
 	if err != nil {
 		klog.Fatal(err)
 	}
-	klog.Info("Starting submariner-globalnet", ipamSpec)
+	klog.Info("[BUBU] Starting submariner-globalnet", ipamSpec)
 
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
