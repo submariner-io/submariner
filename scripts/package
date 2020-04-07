@@ -18,12 +18,18 @@ cp ../bin/submariner-route-agent submariner-route-agent
 cp ../bin/submariner-globalnet submariner-globalnet
 
 ENGINE_IMAGE=${REPO}/submariner:${TAG}
+ENGINE_IMAGE_LATEST=${REPO}/submariner:latest
 ROUTEAGENT_IMAGE=${REPO}/submariner-route-agent:${TAG}
+ROUTEAGENT_IMAGE_LATEST=${REPO}/submariner-route-agent:latest
 GLOBALNET_IMAGE=${REPO}/submariner-globalnet:${TAG}
+GLOBALNET_IMAGE_LATEST=${REPO}/submariner-globalnet:latest
 
-docker build -t ${ENGINE_IMAGE} .
-docker build -t ${ROUTEAGENT_IMAGE} -f Dockerfile.routeagent .
-docker build -t ${GLOBALNET_IMAGE} -f Dockerfile.globalnet .
+docker pull ${ENGINE_IMAGE_LATEST}
+docker pull ${ROUTEAGENT_IMAGE_LATEST}
+docker pull ${GLOBALNET_IMAGE_LATEST}
+docker build -t ${ENGINE_IMAGE} --cache-from ${ENGINE_IMAGE_LATEST} .
+docker build -t ${ROUTEAGENT_IMAGE} --cache-from ${ROUTEAGENT_IMAGE_LATEST} -f Dockerfile.routeagent .
+docker build -t ${GLOBALNET_IMAGE} --cache-from ${GLOBALNET_IMAGE_LATEST} -f Dockerfile.globalnet .
 
 echo "Built the following images:"
 echo "* Submariner engine in ${ENGINE_IMAGE}"
