@@ -16,6 +16,9 @@ type Driver interface {
 	// GetActiveConnections returns an array of all the active connections for the given cluster.
 	GetActiveConnections(clusterID string) ([]string, error)
 
+	// GetConnections() returns an array of the existing connections, including status and endpoint info
+	GetConnections() (*[]Connection, error)
+
 	// ConnectToEndpoint establishes a connection to the given endpoint and returns a string
 	// representation of the IP address of the target endpoint.
 	ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string, error)

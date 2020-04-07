@@ -48,6 +48,7 @@ func init() {
 type strongSwan struct {
 	localSubnets              []string
 	localEndpoint             types.SubmarinerEndpoint
+	remoteEndpoints           map[string]subv1.EndpointSpec
 	secretKey                 string
 	replayWindowSize          string
 	ipSecIkeSaRekeyInterval   string
@@ -203,6 +204,8 @@ func (i *strongSwan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (strin
 		return "", fmt.Errorf("error loading connection %q with config %#v into charon: %v", endpoint.Spec.CableName, ikeConf, err)
 	}
 
+	i.remoteEndpoints[endpoint.Spec.CableName] = endpoint.Spec
+
 	return remoteEndpointIP, nil
 }
 
@@ -282,6 +285,8 @@ func (i *strongSwan) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) e
 			}
 		}
 	}
+
+	delete(i.remoteEndpoints, endpoint.Spec.CableName)
 
 	return nil
 }

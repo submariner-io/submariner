@@ -121,5 +121,6 @@ func (i *engine) RemoveCable(endpoint types.SubmarinerEndpoint) error {
 }
 
 func (i *engine) ListCableConnections() (*[]cable.Connection, error) {
-	return nil, fmt.Errorf("Not implemented yet")
+
+	return i.driver.GetConnections()
 }

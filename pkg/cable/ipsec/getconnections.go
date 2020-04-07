@@ -1,0 +1,88 @@
+package ipsec
+
+import (
+	"github.com/bronze1man/goStrongswanVici"
+	"k8s.io/klog"
+
+	"github.com/submariner-io/submariner/pkg/cable"
+)
+
+func (i *strongSwan) GetConnections() (*[]cable.Connection, error) {
+
+	client, err := getClient()
+	if err != nil {
+		return nil, err
+	}
+	defer client.Close()
+
+	sas, err := client.ListSas("", "")
+	if err != nil {
+		klog.Errorf("Error while retrieving active IKE_SAs during connection list: %v", err)
+		return nil, err
+	}
+
+	return i.getSAListConnections(sas)
+}
+
+// getSAListConnections converts an IKE SA List from ListSas, and converts into a cable connection list
+// it's made a separate function for testability (unit tests)
+func (i *strongSwan) getSAListConnections(sas []map[string]goStrongswanVici.IkeSa) (*[]cable.Connection, error) {
+
+	connections := []cable.Connection{}
+	for cableID, endpoint := range i.remoteEndpoints {
+		connection := cable.NewConnection(endpoint)
+		found := false
+		for _, saMap := range sas {
+			if sa, ok := saMap[cableID]; ok {
+				found = true
+				updateConnectionState(&sa, connection)
+				break
+			}
+		}
+		if !found {
+			connection.SetStatus(cable.ConnectionError, "No IKE SA found for cable %s", cableID)
+		}
+		connections = append(connections, *connection)
+	}
+	return &connections, nil
+}
+
+// updateConnectionState reads the IKE SA connection state and translates that into the cable
+// connection status, IKE SA states for strongswan can be found here:
+//  https://github.com/strongswan/strongswan/blob/d30498edf1ebda4c6f49dab8192a632b871cc7da/src/libcharon/sa/ike_sa.h#L304
+//
+func updateConnectionState(sa *goStrongswanVici.IkeSa, connection *cable.Connection) {
+	switch sa.State {
+
+	case "CREATED":
+		connection.SetStatus(cable.ConnectionError, "Connection created but not started.")
+
+	case "CONNECTING":
+		connection.SetStatus(cable.Connecting,
+			"Connecting to %s:%s", sa.Remote_host, sa.Remote_port)
+
+	case "ESTABLISHED":
+		connection.SetStatus(cable.Connected,
+			"Encryption alg=%s, keysize=%s rekey-time=%s", sa.Encr_alg, sa.Encr_keysize, sa.Rekey_time)
+
+	case "REKEYING":
+		connection.SetStatus(cable.Connected, "Connection is being re-keyed")
+
+	case "REKEYED":
+		connection.SetStatus(cable.Connected,
+			"Connection has been re-keyed, encryption alg=%s, keysize %s rekey-time=%s",
+			sa.Encr_alg, sa.Encr_keysize, sa.Rekey_time)
+
+	case "DELETING":
+		connection.SetStatus(cable.ConnectionError, "The endpoint connection is in DELETING State")
+
+	case "DESTROYING":
+		connection.SetStatus(cable.ConnectionError, "The endpoint connection is in DESTROYING State")
+
+	case "PASSIVE":
+		connection.SetStatus(cable.ConnectionError, "Connection is in passive state.")
+
+	default:
+		connection.SetStatus(cable.ConnectionError, "Unexpected IKE SA state: %s", sa.State)
+	}
+}
