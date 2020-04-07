@@ -89,6 +89,5 @@ make e2e version=1.14.1 globalnet=true
 [kubectl]: https://kubernetes.io/docs/tasks/tools/install-kubectl/
 [k9s]: https://github.com/derailed/k9s
 [kubetail]: https://github.com/johanhaleby/kubetail
-[kubefedctl]: https://github.com/kubernetes-sigs/kubefed/releases
 [kind release page]: https://github.com/kubernetes-sigs/kind/releases
 [Add local user to docker group]: https://docs.docker.com/install/linux/linux-postinstall/
