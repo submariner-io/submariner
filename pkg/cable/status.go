@@ -10,8 +10,8 @@ const (
 	ConnectionError ConnectionStatus = "ERROR"
 )
 
-// Connection structure represents the status of an existing cable connection,
-// it includes details the endpoint details, and it's meant to be exposed
+// Connection structure represents the state of an existing cable connection
+// including the Endpoint details. It is meant to be exposed
 // through an HTTP API on the submariner-engine.
 type Connection struct {
 	Status        ConnectionStatus `json:"status"`
