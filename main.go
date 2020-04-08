@@ -19,6 +19,7 @@ import (
 	subk8s "github.com/submariner-io/submariner/pkg/datastore/kubernetes"
 	"github.com/submariner-io/submariner/pkg/datastore/phpapi"
 	"github.com/submariner-io/submariner/pkg/log"
+	"github.com/submariner-io/submariner/pkg/statusserver"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
 	v1 "k8s.io/api/core/v1"
@@ -57,6 +58,8 @@ const (
 	defaultRetryPeriod        = 2 // In Seconds
 )
 
+var VERSION = "not-properly-compiled" // this is set from the build-gateway script
+
 func main() {
 	klog.InitFlags(nil)
 	flag.Parse()
@@ -89,6 +92,11 @@ func main() {
 
 	submarinerInformerFactory := submarinerInformers.NewSharedInformerFactoryWithOptions(submarinerClient, time.Second*30,
 		submarinerInformers.WithNamespace(submSpec.Namespace))
+
+	statusServer := statusserver.New("0.0.0.0:9080", VERSION)
+	go func() {
+		statusServer.Run(stopCh)
+	}()
 
 	start := func(context.Context) {
 		var localSubnets []string
@@ -165,6 +173,7 @@ func main() {
 			if err = cableEngine.StartEngine(); err != nil {
 				klog.Fatalf("Error starting the cable engine: %v", err)
 			}
+			statusServer.SetCableEngine(cableEngine)
 		}()
 
 		go func() {
