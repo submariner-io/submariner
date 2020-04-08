@@ -45,17 +45,17 @@ after_success:
     make cleanup 2>&1 | ts '[%H:%M:%.S]' -s
 deploy:
   - provider: script
-    script: make release images="submariner submariner-route-agent submariner-globalnet"
+    script: make images images_flags="--nocache" release images="submariner submariner-route-agent submariner-globalnet"
     on:
       branch: master
       condition: $DEPLOY = true
   - provider: script
-    script: make release images="submariner submariner-route-agent submariner-globalnet"
+    script: make images images_flags="--nocache" release images="submariner submariner-route-agent submariner-globalnet"
     on:
       branch: /^release-\d+.\d+.*$/
 
   - provider: script
-    script: make release images="submariner submariner-route-agent submariner-globalnet" image_tag="$TRAVIS_TAG"
+    script: make images images_flags="--nocache" release images="submariner submariner-route-agent submariner-globalnet" image_tag="$TRAVIS_TAG"
     skip_cleanup: true
     on:
       tags: true
