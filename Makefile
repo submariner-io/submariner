@@ -9,7 +9,7 @@ include $(SHIPYARD_DIR)/Makefile.inc
 TARGETS := $(shell ls -p scripts | grep -v -e /)
 CLUSTERS_ARGS = --cluster_settings $(DAPPER_SOURCE)/scripts/kind-e2e/cluster_settings
 
-clusters: build package
+clusters: build images
 
 e2e: deploy
 	./scripts/kind-e2e/e2e.sh --deploytool $(deploytool)
