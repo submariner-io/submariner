@@ -6,7 +6,7 @@ ifneq (,$(DAPPER_HOST_ARCH))
 
 include $(SHIPYARD_DIR)/Makefile.inc
 
-TARGETS := $(shell ls -p scripts | grep -v -e / | grep -v reload-images)
+TARGETS := $(shell ls -p scripts | grep -v -e / -e images -e reload-images)
 CLUSTERS_ARGS = --cluster_settings $(DAPPER_SOURCE)/scripts/kind-e2e/cluster_settings
 
 clusters: build images
@@ -16,6 +16,9 @@ e2e: deploy
 
 reload-images: build images
 	./scripts/$@
+
+images: build
+	./scripts/$@ $(images_flags)
 
 $(TARGETS): vendor/modules.txt
 	./scripts/$@ --build_debug $(build_debug)

@@ -4,12 +4,7 @@ set -e
 source $(dirname $0)/lib/debug_functions
 source $(dirname $0)/lib/version
 
-ARCH=${ARCH:-"amd64"}
-SUFFIX=""
-[ "${ARCH}" != "amd64" ] && SUFFIX="_${ARCH}"
-
-TAG=${TAG:-${VERSION}${SUFFIX}}
-REPO=${REPO:-quay.io/submariner}
+extra_flags="$@"
 
 cd $(dirname $0)/../package
 
@@ -17,15 +12,7 @@ cp ../bin/submariner-engine submariner-engine
 cp ../bin/submariner-route-agent submariner-route-agent
 cp ../bin/submariner-globalnet submariner-globalnet
 
-ENGINE_IMAGE=${REPO}/submariner:${TAG}
-ROUTEAGENT_IMAGE=${REPO}/submariner-route-agent:${TAG}
-GLOBALNET_IMAGE=${REPO}/submariner-globalnet:${TAG}
+${SCRIPTS_DIR}/build_image.sh -i submariner -f Dockerfile ${extra_flags}
+${SCRIPTS_DIR}/build_image.sh -i submariner-route-agent -f Dockerfile.routeagent ${extra_flags}
+${SCRIPTS_DIR}/build_image.sh -i submariner-globalnet -f Dockerfile.globalnet ${extra_flags}
 
-docker build -t ${ENGINE_IMAGE} .
-docker build -t ${ROUTEAGENT_IMAGE} -f Dockerfile.routeagent .
-docker build -t ${GLOBALNET_IMAGE} -f Dockerfile.globalnet .
-
-echo "Built the following images:"
-echo "* Submariner engine in ${ENGINE_IMAGE}"
-echo "* Submariner route agent in ${ROUTEAGENT_IMAGE}"
-echo "* Submariner globalnet in ${GLOBALNET_IMAGE}"
