@@ -87,6 +87,7 @@ func NewStrongSwan(localSubnets []string, localEndpoint types.SubmarinerEndpoint
 		ipSecIKEPort:              ipSecSpec.IKEPort,
 		ipSecNATTPort:             ipSecSpec.NATTPort,
 		localEndpoint:             localEndpoint,
+		remoteEndpoints:           map[string]subv1.EndpointSpec{},
 		localSubnets:              localSubnets,
 		secretKey:                 ipSecSpec.PSK,
 		debug:                     ipSecSpec.Debug,
