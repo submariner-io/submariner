@@ -98,6 +98,21 @@ const (
 	VxLANVTepNetworkPrefix = 240
 	SmPostRoutingChain     = "SUBMARINER-POSTROUTING"
 	SmRouteAgentFilter     = "app=submariner-routeagent"
+
+	// In order to support connectivity from HostNetwork to remoteCluster, route-agent tries
+	// to discover the CNIInterface[#] on the respective node and does SNAT of outgoing
+	// traffic from that node to the corresponding CNIInterfaceIP. It is to be noted that
+	// only traffic destined to the remoteClusters connected via Submariner is SNAT'ed and not
+	// any other traffic.
+	// At the same time, when Globalnet controller is deployed (i.e., clusters with overlapping
+	// Service/Cluster CIDRs) it needs this information so that it can map the CNIInterfaceIP
+	// with the corresponding globalIP assigned to the node. Since globalnet controller does
+	// not run on all the worker-nodes and there is no well defined mechanism to get the
+	// CNIInterfaceIP for each of the nodes, we annotate the node with CNIInterfaceIPInfo as
+	// part of route-agent and this will subsequently be used in globalnet controller for
+	// supporting connectivity from HostNetwork to remoteClusters.
+	// [#] interface on the node that has an IPAddress from the clusterCIDR
+	CniInterfaceIp = "submariner.io/cniIfaceIp"
 )
 
 func newRateLimiter() workqueue.RateLimiter {
@@ -186,6 +201,11 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 		}
 	}
 
+	hostname, err := os.Hostname()
+	if err != nil {
+		klog.Fatalf("unable to determine hostname: %v", err)
+	}
+
 	// Query all the submariner-route-agent daemonSet PODs running in the local cluster.
 	podList, err := r.clientSet.CoreV1().Pods(r.objectNamespace).List(metav1.ListOptions{LabelSelector: SmRouteAgentFilter})
 	if err != nil {
@@ -195,6 +215,12 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 	for index, pod := range podList.Items {
 		klog.V(log.DEBUG).Infof("In %s, podIP of submariner-route-agent[%d] is %s", r.clusterID, index, pod.Status.PodIP)
 		r.populateRemoteVtepIps(pod.Status.PodIP)
+		// Each route-agent pod will annotate its own node with the respective CNIInterfaceIP
+		if hostname == pod.Spec.NodeName {
+			if err = r.annotateNodeWithCNIInterfaceIP(pod.Spec.NodeName); err != nil {
+				return fmt.Errorf("error annotating the node %q with cniIfaceIP: %v", hostname, err)
+			}
+		}
 	}
 
 	go wait.Until(r.runEndpointWorker, time.Second, stopCh)
