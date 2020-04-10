@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"sync"
 
+	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/log"
 	"github.com/submariner-io/submariner/pkg/types"
@@ -31,7 +32,7 @@ type Engine interface {
 	// remote Pods and Service may not be accessible any more.
 	RemoveCable(remote types.SubmarinerEndpoint) error
 	// ListCableConnections returns a list of cable connection, and the related status
-	ListCableConnections() (*[]cable.Connection, error)
+	ListCableConnections() (*[]v1.Connection, error)
 }
 
 type engine struct {
@@ -120,7 +121,7 @@ func (i *engine) RemoveCable(endpoint types.SubmarinerEndpoint) error {
 	return nil
 }
 
-func (i *engine) ListCableConnections() (*[]cable.Connection, error) {
+func (i *engine) ListCableConnections() (*[]v1.Connection, error) {
 
 	return i.driver.GetConnections()
 }

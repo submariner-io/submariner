@@ -4,10 +4,10 @@ import (
 	"github.com/bronze1man/goStrongswanVici"
 	"github.com/pkg/errors"
 
-	"github.com/submariner-io/submariner/pkg/cable"
+	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 )
 
-func (i *strongSwan) GetConnections() (*[]cable.Connection, error) {
+func (i *strongSwan) GetConnections() (*[]v1.Connection, error) {
 
 	client, err := getClient()
 	if err != nil {
@@ -25,11 +25,11 @@ func (i *strongSwan) GetConnections() (*[]cable.Connection, error) {
 
 // getSAListConnections converts an IKE SA List from ListSas, and converts into a cable connection list
 // It's made a separate function for testability (unit tests)
-func (i *strongSwan) getSAListConnections(sas []map[string]goStrongswanVici.IkeSa) (*[]cable.Connection, error) {
+func (i *strongSwan) getSAListConnections(sas []map[string]goStrongswanVici.IkeSa) (*[]v1.Connection, error) {
 
-	connections := []cable.Connection{}
+	connections := []v1.Connection{}
 	for cableID, endpoint := range i.remoteEndpoints {
-		connection := cable.NewConnection(endpoint)
+		connection := v1.NewConnection(endpoint)
 		found := false
 		for _, saMap := range sas {
 			if sa, ok := saMap[cableID]; ok {
@@ -39,7 +39,7 @@ func (i *strongSwan) getSAListConnections(sas []map[string]goStrongswanVici.IkeS
 			}
 		}
 		if !found {
-			connection.SetStatus(cable.ConnectionError, "No IKE SA found for cable %s", cableID)
+			connection.SetStatus(v1.ConnectionError, "No IKE SA found for cable %s", cableID)
 		}
 		connections = append(connections, *connection)
 	}
@@ -50,39 +50,39 @@ func (i *strongSwan) getSAListConnections(sas []map[string]goStrongswanVici.IkeS
 // connection status, IKE SA states for strongswan can be found here:
 //  https://github.com/strongswan/strongswan/blob/d30498edf1ebda4c6f49dab8192a632b871cc7da/src/libcharon/sa/ike_sa.h#L304
 //
-func updateConnectionState(sa *goStrongswanVici.IkeSa, connection *cable.Connection) {
+func updateConnectionState(sa *goStrongswanVici.IkeSa, connection *v1.Connection) {
 	switch sa.State {
 
 	case "CREATED":
-		connection.SetStatus(cable.ConnectionError, "Connection has been created but not yet started")
+		connection.SetStatus(v1.ConnectionError, "Connection has been created but not yet started")
 
 	case "CONNECTING":
-		connection.SetStatus(cable.Connecting,
+		connection.SetStatus(v1.Connecting,
 			"Connecting to %s:%s", sa.Remote_host, sa.Remote_port)
 
 	case "ESTABLISHED":
-		connection.SetStatus(cable.Connected,
+		connection.SetStatus(v1.Connected,
 			"Connected to %s:%s - encryption alg=%s, keysize=%s rekey-time=%s",
 			sa.Remote_host, sa.Remote_port, sa.Encr_alg, sa.Encr_keysize, sa.Rekey_time)
 
 	case "REKEYING":
-		connection.SetStatus(cable.Connected, "The connection is being re-keyed")
+		connection.SetStatus(v1.Connected, "The connection is being re-keyed")
 
 	case "REKEYED":
-		connection.SetStatus(cable.Connected,
+		connection.SetStatus(v1.Connected,
 			"Connection has been re-keyed, encryption alg=%s, keysize %s rekey-time=%s",
 			sa.Encr_alg, sa.Encr_keysize, sa.Rekey_time)
 
 	case "DELETING":
-		connection.SetStatus(cable.ConnectionError, "The connection is being deleted")
+		connection.SetStatus(v1.ConnectionError, "The connection is being deleted")
 
 	case "DESTROYING":
-		connection.SetStatus(cable.ConnectionError, "The connection is being destroyed")
+		connection.SetStatus(v1.ConnectionError, "The connection is being destroyed")
 
 	case "PASSIVE":
-		connection.SetStatus(cable.ConnectionError, "Connection is in a passive state")
+		connection.SetStatus(v1.ConnectionError, "Connection is in a passive state")
 
 	default:
-		connection.SetStatus(cable.ConnectionError, "Unexpected IKE SA state: %s", sa.State)
+		connection.SetStatus(v1.ConnectionError, "Unexpected IKE SA state: %s", sa.State)
 	}
 }
