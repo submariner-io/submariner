@@ -12,6 +12,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/onsi/ginkgo v1.12.0
 	github.com/onsi/gomega v1.9.0
+	github.com/pkg/errors v0.9.1
 	github.com/rdegges/go-ipify v0.0.0-20150526035502-2d94a6a86c40
 	github.com/submariner-io/shipyard v0.0.0-20200324112155-1429f74326da
 	github.com/vishvananda/netlink v1.1.0

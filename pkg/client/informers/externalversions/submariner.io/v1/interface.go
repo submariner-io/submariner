@@ -28,6 +28,8 @@ type Interface interface {
 	Clusters() ClusterInformer
 	// Endpoints returns a EndpointInformer.
 	Endpoints() EndpointInformer
+	// Gateways returns a GatewayInformer.
+	Gateways() GatewayInformer
 }
 
 type version struct {
@@ -49,4 +51,9 @@ func (v *version) Clusters() ClusterInformer {
 // Endpoints returns a EndpointInformer.
 func (v *version) Endpoints() EndpointInformer {
 	return &endpointInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// Gateways returns a GatewayInformer.
+func (v *version) Gateways() GatewayInformer {
+	return &gatewayInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

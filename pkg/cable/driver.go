@@ -3,6 +3,8 @@ package cable
 import (
 	"fmt"
 
+	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+
 	"github.com/submariner-io/submariner/pkg/types"
 	"k8s.io/klog"
 )
@@ -17,7 +19,7 @@ type Driver interface {
 	GetActiveConnections(clusterID string) ([]string, error)
 
 	// GetConnections() returns an array of the existing connections, including status and endpoint info
-	GetConnections() (*[]Connection, error)
+	GetConnections() (*[]v1.Connection, error)
 
 	// ConnectToEndpoint establishes a connection to the given endpoint and returns a string
 	// representation of the IP address of the target endpoint.

@@ -29,6 +29,7 @@ type SubmarinerV1Interface interface {
 	RESTClient() rest.Interface
 	ClustersGetter
 	EndpointsGetter
+	GatewaysGetter
 }
 
 // SubmarinerV1Client is used to interact with features provided by the submariner.io group.
@@ -42,6 +43,10 @@ func (c *SubmarinerV1Client) Clusters(namespace string) ClusterInterface {
 
 func (c *SubmarinerV1Client) Endpoints(namespace string) EndpointInterface {
 	return newEndpoints(c, namespace)
+}
+
+func (c *SubmarinerV1Client) Gateways(namespace string) GatewayInterface {
+	return newGateways(c, namespace)
 }
 
 // NewForConfig creates a new SubmarinerV1Client for the given config.

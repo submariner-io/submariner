@@ -36,6 +36,10 @@ func (c *FakeSubmarinerV1) Endpoints(namespace string) v1.EndpointInterface {
 	return &FakeEndpoints{c, namespace}
 }
 
+func (c *FakeSubmarinerV1) Gateways(namespace string) v1.GatewayInterface {
+	return &FakeGateways{c, namespace}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeSubmarinerV1) RESTClient() rest.Interface {

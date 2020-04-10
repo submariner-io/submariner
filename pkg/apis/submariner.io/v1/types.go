@@ -1,6 +1,8 @@
 package v1
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -58,4 +60,59 @@ type EndpointList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
 	Items           []Endpoint `json:"items"`
+}
+
+// +genclient
+// +genclient:noStatus
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type Gateway struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Status            GatewayStatus `json:"status"`
+}
+
+type GatewayStatus struct {
+	Version     string       `json:"version"`
+	HAStatus    HAStatus     `json:"haStatus"`
+	Host        string       `json:"host"`
+	Connections []Connection `json:"connections"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type GatewayList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+	Items           []Gateway `json:"items"`
+}
+
+type HAStatus string
+
+const (
+	HAStatusActive  HAStatus = "ACTIVE"
+	HAStatusPassive HAStatus = "PASSIVE"
+)
+
+type Connection struct {
+	Status        ConnectionStatus `json:"status"`
+	StatusMessage string           `json:"statusMessage"`
+	Endpoint      EndpointSpec     `json:"endpoint"`
+}
+
+type ConnectionStatus string
+
+const (
+	Connected       ConnectionStatus = "CONNECTED"
+	Connecting      ConnectionStatus = "CONNECTING"
+	ConnectionError ConnectionStatus = "ERROR"
+)
+
+func NewConnection(endpointSpec EndpointSpec) *Connection {
+	return &Connection{Endpoint: endpointSpec}
+}
+
+func (c *Connection) SetStatus(status ConnectionStatus, messageFormat string, a ...interface{}) {
+	c.Status = status
+	c.StatusMessage = fmt.Sprintf(messageFormat, a...)
 }

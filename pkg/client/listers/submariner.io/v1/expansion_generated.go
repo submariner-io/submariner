@@ -33,3 +33,11 @@ type EndpointListerExpansion interface{}
 // EndpointNamespaceListerExpansion allows custom methods to be added to
 // EndpointNamespaceLister.
 type EndpointNamespaceListerExpansion interface{}
+
+// GatewayListerExpansion allows custom methods to be added to
+// GatewayLister.
+type GatewayListerExpansion interface{}
+
+// GatewayNamespaceListerExpansion allows custom methods to be added to
+// GatewayNamespaceLister.
+type GatewayNamespaceListerExpansion interface{}
