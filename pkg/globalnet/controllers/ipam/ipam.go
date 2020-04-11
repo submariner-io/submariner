@@ -39,6 +39,8 @@ func NewController(spec *SubmarinerIpamControllerSpecification, config *Informer
 		servicesSynced:   config.ServiceInformer.Informer().HasSynced,
 		podWorkqueue:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Pods"),
 		podsSynced:       config.PodInformer.Informer().HasSynced,
+		nodeWorkqueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Nodes"),
+		nodesSynced:      config.NodeInformer.Informer().HasSynced,
 
 		excludeNamespaces: exclusionMap,
 		pool:              pool,
@@ -62,6 +64,15 @@ func NewController(spec *SubmarinerIpamControllerSpecification, config *Informer
 			ipamController.handleUpdatePod(old, newObj)
 		},
 		DeleteFunc: ipamController.handleRemovedPod,
+	}, handlerResync)
+	config.NodeInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			ipamController.enqueueObject(obj, ipamController.nodeWorkqueue)
+		},
+		UpdateFunc: func(old, newObj interface{}) {
+			ipamController.handleUpdateNode(old, newObj)
+		},
+		DeleteFunc: ipamController.handleRemovedNode,
 	}, handlerResync)
 
 	return ipamController, nil
@@ -92,6 +103,7 @@ func (i *Controller) Run(stopCh <-chan struct{}) error {
 	klog.Info("Starting workers")
 	go wait.Until(i.runServiceWorker, time.Second, stopCh)
 	go wait.Until(i.runPodWorker, time.Second, stopCh)
+	go wait.Until(i.runNodeWorker, time.Second, stopCh)
 	<-stopCh
 	klog.Info("Shutting down workers")
 	i.cleanupIPTableRules()
@@ -105,6 +117,11 @@ func (i *Controller) runServiceWorker() {
 
 func (i *Controller) runPodWorker() {
 	for i.processNextObject(i.podWorkqueue, i.podGetter, i.podUpdater) {
+	}
+}
+
+func (i *Controller) runNodeWorker() {
+	for i.processNextObject(i.nodeWorkqueue, i.nodeGetter, i.nodeUpdater) {
 	}
 }
 
@@ -263,6 +280,22 @@ func (i *Controller) handleUpdatePod(old interface{}, newObj interface{}) {
 	}
 }
 
+func (i *Controller) handleUpdateNode(old interface{}, newObj interface{}) {
+	// Todo minimize the duplication
+	var key string
+	var err error
+	if key, err = cache.MetaNamespaceKeyFunc(newObj); err != nil {
+		utilruntime.HandleError(err)
+		return
+	}
+	oldGlobalIp := old.(*k8sv1.Node).GetAnnotations()[submarinerIpamGlobalIp]
+	newGlobalIp := newObj.(*k8sv1.Node).GetAnnotations()[submarinerIpamGlobalIp]
+	if oldGlobalIp != newGlobalIp && newGlobalIp != i.pool.GetAllocatedIp(key) {
+		klog.V(log.DEBUG).Infof("GlobalIp changed from %s to %s for %s", oldGlobalIp, newGlobalIp, key)
+		i.enqueueObject(newObj, i.serviceWorkqueue)
+	}
+}
+
 func (i *Controller) handleRemovedService(obj interface{}) {
 	//TODO: further minimize duplication between this and handleRemovedPod
 	var service *k8sv1.Service
@@ -326,6 +359,38 @@ func (i *Controller) handleRemovedPod(obj interface{}) {
 	}
 }
 
+func (i *Controller) handleRemovedNode(obj interface{}) {
+	// TODO: further minimize duplication between this and handleRemovedPod
+	var node *k8sv1.Node
+	var ok bool
+	var key string
+	var err error
+	if node, ok = obj.(*k8sv1.Node); !ok {
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			klog.Errorf("Could not convert object %v to Node", obj)
+			return
+		}
+		node, ok = tombstone.Obj.(*k8sv1.Node)
+		if !ok {
+			klog.Errorf("Could not convert object tombstone %v to Node", tombstone.Obj)
+			return
+		}
+	}
+
+	globalIp := node.Annotations[submarinerIpamGlobalIp]
+	if globalIp != "" {
+		if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
+			utilruntime.HandleError(err)
+			return
+		}
+		i.pool.Release(key)
+		// TODO: Program necessary iptable rules
+		//i.syncNodeRules(pod.Status.PodIP, globalIp, DeleteRules)
+		klog.V(log.DEBUG).Infof("Released ip %s for Node %s", globalIp, key)
+	}
+}
+
 func (i *Controller) annotateGlobalIp(key string, globalIp string) (string, error) {
 	var ip string
 	var err error
@@ -355,6 +420,10 @@ func (i *Controller) serviceGetter(namespace, name string) (runtime.Object, erro
 
 func (i *Controller) podGetter(namespace, name string) (runtime.Object, error) {
 	return i.kubeClientSet.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+}
+
+func (i *Controller) nodeGetter(namespace, name string) (runtime.Object, error) {
+	return i.kubeClientSet.CoreV1().Nodes().Get(name, metav1.GetOptions{})
 }
 
 func (i *Controller) serviceUpdater(obj runtime.Object, key string) error {
@@ -414,6 +483,39 @@ func (i *Controller) podUpdater(obj runtime.Object, key string) error {
 		// For PODs that already have the annotation, we update the local ipPool cache and sync
 		// the iptable rules on the node.
 		i.syncPodRules(pod.Status.PodIP, existingGlobalIp, AddRules)
+	}
+	return nil
+}
+
+func (i *Controller) nodeUpdater(obj runtime.Object, key string) error {
+	node := obj.(*k8sv1.Node)
+	existingGlobalIp := node.GetAnnotations()[submarinerIpamGlobalIp]
+	allocatedIp, err := i.annotateGlobalIp(key, existingGlobalIp)
+	if err != nil { // failed to get globalIp or failed to update, we want to retry
+		logAndRequeue(key, i.nodeWorkqueue)
+		return fmt.Errorf("failed to annotate GlobalIp to node %s: %v", key, err)
+	}
+
+	// This case is hit when the Node does not have the globalIp annotation and a new globalIp is allocated
+	// or when the existing annotation on the Node does not match with the allocated globalIp.
+	if allocatedIp != "" {
+		annotations := node.GetAnnotations()
+		if annotations == nil {
+			annotations = map[string]string{}
+		}
+		annotations[submarinerIpamGlobalIp] = allocatedIp
+		node.SetAnnotations(annotations)
+		// TODO: Program necessary iptable rules
+		//i.syncNodeRules(pod.Status.PodIP, globalIp, AddRules)
+		_, updateErr := i.kubeClientSet.CoreV1().Nodes().Update(node)
+		return updateErr
+	} else if existingGlobalIp != "" {
+		// When Globalnet Controller is migrated, we get notification for all the existing nodes.
+		// For nodes that already have the annotation, we update the local ipPool cache and sync
+		// the iptable rules on the node.
+		// TODO: Program necessary iptable rules
+		//i.syncNodeRules(pod.Status.PodIP, globalIp, AddRules)
+		klog.V(log.DEBUG).Infof("TODO: Globalnet is migrated, handle this use-case for the node %#v", node)
 	}
 	return nil
 }

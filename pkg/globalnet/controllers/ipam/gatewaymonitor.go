@@ -242,6 +242,7 @@ func (i *GatewayMonitor) initializeIpamController(globalCIDR string) {
 		KubeClientSet:   i.kubeClientSet,
 		ServiceInformer: informerFactory.Core().V1().Services(),
 		PodInformer:     informerFactory.Core().V1().Pods(),
+		NodeInformer:    informerFactory.Core().V1().Nodes(),
 	}
 
 	klog.V(log.DEBUG).Infof("On Gateway Node, initializing ipamController.")
