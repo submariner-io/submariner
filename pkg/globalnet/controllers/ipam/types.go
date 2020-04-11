@@ -22,6 +22,7 @@ type InformerConfigStruct struct {
 	KubeClientSet   kubernetes.Interface
 	ServiceInformer kubeInformers.ServiceInformer
 	PodInformer     kubeInformers.PodInformer
+	NodeInformer    kubeInformers.NodeInformer
 }
 
 type Controller struct {
@@ -30,6 +31,8 @@ type Controller struct {
 	servicesSynced   cache.InformerSynced
 	podWorkqueue     workqueue.RateLimitingInterface
 	podsSynced       cache.InformerSynced
+	nodeWorkqueue    workqueue.RateLimitingInterface
+	nodesSynced      cache.InformerSynced
 
 	excludeNamespaces map[string]bool
 	pool              *IpPool
