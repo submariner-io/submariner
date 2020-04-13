@@ -6,6 +6,8 @@ import (
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/submariner-io/submariner/pkg/log"
+	"github.com/submariner-io/submariner/pkg/routeagent/controllers/route"
+
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -181,6 +183,13 @@ func (i *Controller) processNextObject(objWorkqueue workqueue.RateLimitingInterf
 					klog.V(log.DEBUG).Infof("Ignoring pod %s on host %s as it uses hostNetworking", pod.Name, pod.Status.PodIP)
 					return nil
 				}
+			case *k8sv1.Node:
+				node := runtimeObj.(*k8sv1.Node)
+				switch i.evaluateNode(node) {
+				case Requeue:
+					objWorkqueue.AddRateLimited(obj)
+					return fmt.Errorf("Node %s requeued %d times", key, objWorkqueue.NumRequeues(obj))
+				}
 			}
 
 			return objUpdater(runtimeObj, key)
@@ -288,11 +297,20 @@ func (i *Controller) handleUpdateNode(old interface{}, newObj interface{}) {
 		utilruntime.HandleError(err)
 		return
 	}
+
+	oldCniIfaceIpOnNode := old.(*k8sv1.Node).GetAnnotations()[route.CniInterfaceIp]
+	newCniIfaceIpOnNode := newObj.(*k8sv1.Node).GetAnnotations()[route.CniInterfaceIp]
+	if oldCniIfaceIpOnNode == "" && newCniIfaceIpOnNode == "" {
+		klog.V(log.DEBUG).Infof("In handleUpdateNode, node %q is not yet annotated with cniIfaceIP, enqueing", newObj.(*k8sv1.Node).Name)
+		i.enqueueObject(newObj, i.nodeWorkqueue)
+		return
+	}
+
 	oldGlobalIp := old.(*k8sv1.Node).GetAnnotations()[submarinerIpamGlobalIp]
 	newGlobalIp := newObj.(*k8sv1.Node).GetAnnotations()[submarinerIpamGlobalIp]
 	if oldGlobalIp != newGlobalIp && newGlobalIp != i.pool.GetAllocatedIp(key) {
 		klog.V(log.DEBUG).Infof("GlobalIp changed from %s to %s for %s", oldGlobalIp, newGlobalIp, key)
-		i.enqueueObject(newObj, i.serviceWorkqueue)
+		i.enqueueObject(newObj, i.nodeWorkqueue)
 	}
 }
 

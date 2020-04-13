@@ -87,6 +87,18 @@ func (i *Controller) evaluateService(service *k8sv1.Service) Operation {
 	return Process
 }
 
+func (i *Controller) evaluateNode(node *k8sv1.Node) Operation {
+	cniIfaceIP := node.GetAnnotations()[route.CniInterfaceIp]
+	if cniIfaceIP == "" {
+		// To support connectivity from HostNetwork to remoteCluster, globalnet requires the
+		// cniIfaceIP of the respective node. Route-agent running on the node annotates the
+		// respective node with the cniIfaceIP. In this API, we check for the presence of this
+		// annotation and process the node event only when the annotation exists.
+		return Requeue
+	}
+	return Process
+}
+
 func (i *Controller) cleanupIPTableRules() {
 	err := i.ipt.ClearChain("nat", submarinerIngress)
 	if err != nil {
