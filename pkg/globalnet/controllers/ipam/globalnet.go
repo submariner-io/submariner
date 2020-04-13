@@ -53,7 +53,7 @@ func (i *Controller) initIPTableChains() error {
 }
 
 func (i *Controller) syncPodRules(podIP, globalIP string, addRules bool) {
-	err := i.updateEgressRulesForPod(podIP, globalIP, addRules)
+	err := i.updateEgressRulesForResource("Pod", podIP, globalIP, addRules)
 	if err != nil {
 		klog.Errorf("Error updating egress rules for pod %s: %v", podIP, err)
 		return
@@ -65,6 +65,14 @@ func (i *Controller) syncServiceRules(service *k8sv1.Service, globalIP string, a
 	err := i.updateIngressRulesForService(globalIP, chainName, addRules)
 	if err != nil {
 		klog.Errorf("Error updating ingress rules for service %#v: %v", service, err)
+		return
+	}
+}
+
+func (i *Controller) syncNodeRules(cniIfaceIP, globalIP string, addRules bool) {
+	err := i.updateEgressRulesForResource("Node", cniIfaceIP, globalIP, addRules)
+	if err != nil {
+		klog.Errorf("Error updating egress rules for Node %s: %v", cniIfaceIP, err)
 		return
 	}
 }

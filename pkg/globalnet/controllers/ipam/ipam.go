@@ -397,14 +397,14 @@ func (i *Controller) handleRemovedNode(obj interface{}) {
 	}
 
 	globalIp := node.Annotations[submarinerIpamGlobalIp]
-	if globalIp != "" {
+	cniIfaceIp := node.Annotations[route.CniInterfaceIp]
+	if globalIp != "" && cniIfaceIp != "" {
 		if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
 			utilruntime.HandleError(err)
 			return
 		}
 		i.pool.Release(key)
-		// TODO: Program necessary iptable rules
-		//i.syncNodeRules(pod.Status.PodIP, globalIp, DeleteRules)
+		i.syncNodeRules(cniIfaceIp, globalIp, DeleteRules)
 		klog.V(log.DEBUG).Infof("Released ip %s for Node %s", globalIp, key)
 	}
 }
@@ -466,6 +466,7 @@ func (i *Controller) serviceUpdater(obj runtime.Object, key string) error {
 		_, updateErr := i.kubeClientSet.CoreV1().Services(service.Namespace).Update(service)
 		return updateErr
 	} else if existingGlobalIp != "" {
+		klog.V(log.DEBUG).Infof("GatewayNode seems to have migrated, sync rules for Service %q", service.Name)
 		// When Globalnet Controller is migrated, we get notification for all the existing services.
 		// For services that already have the annotation, we update the local ipPool cache and sync
 		// the iptable rules on the node.
@@ -497,6 +498,7 @@ func (i *Controller) podUpdater(obj runtime.Object, key string) error {
 		_, updateErr := i.kubeClientSet.CoreV1().Pods(pod.Namespace).Update(pod)
 		return updateErr
 	} else if existingGlobalIp != "" {
+		klog.V(log.DEBUG).Infof("GatewayNode seems to have migrated, sync rules for Pod %q", pod.Name)
 		// When Globalnet Controller is migrated, we get notification for all the existing PODs.
 		// For PODs that already have the annotation, we update the local ipPool cache and sync
 		// the iptable rules on the node.
@@ -507,6 +509,7 @@ func (i *Controller) podUpdater(obj runtime.Object, key string) error {
 
 func (i *Controller) nodeUpdater(obj runtime.Object, key string) error {
 	node := obj.(*k8sv1.Node)
+	cniIfaceIP := node.GetAnnotations()[route.CniInterfaceIp]
 	existingGlobalIp := node.GetAnnotations()[submarinerIpamGlobalIp]
 	allocatedIp, err := i.annotateGlobalIp(key, existingGlobalIp)
 	if err != nil { // failed to get globalIp or failed to update, we want to retry
@@ -523,17 +526,15 @@ func (i *Controller) nodeUpdater(obj runtime.Object, key string) error {
 		}
 		annotations[submarinerIpamGlobalIp] = allocatedIp
 		node.SetAnnotations(annotations)
-		// TODO: Program necessary iptable rules
-		//i.syncNodeRules(pod.Status.PodIP, globalIp, AddRules)
+		i.syncNodeRules(cniIfaceIP, allocatedIp, AddRules)
 		_, updateErr := i.kubeClientSet.CoreV1().Nodes().Update(node)
 		return updateErr
 	} else if existingGlobalIp != "" {
+		klog.V(log.DEBUG).Infof("GatewayNode seems to have migrated, sync rules for node %q", node.Name)
 		// When Globalnet Controller is migrated, we get notification for all the existing nodes.
 		// For nodes that already have the annotation, we update the local ipPool cache and sync
 		// the iptable rules on the node.
-		// TODO: Program necessary iptable rules
-		//i.syncNodeRules(pod.Status.PodIP, globalIp, AddRules)
-		klog.V(log.DEBUG).Infof("TODO: Globalnet is migrated, handle this use-case for the node %#v", node)
+		i.syncNodeRules(cniIfaceIP, existingGlobalIp, AddRules)
 	}
 	return nil
 }

@@ -9,15 +9,15 @@ import (
 	"k8s.io/klog"
 )
 
-func (i *Controller) updateEgressRulesForPod(podIP, globalIP string, addRules bool) error {
-	ruleSpec := []string{"-p", "all", "-s", podIP, "-m", "mark", "--mark", globalNetIPTableMark, "-j", "SNAT", "--to", globalIP}
+func (i *Controller) updateEgressRulesForResource(resourceName, sourceIP, globalIP string, addRules bool) error {
+	ruleSpec := []string{"-p", "all", "-s", sourceIP, "-m", "mark", "--mark", globalNetIPTableMark, "-j", "SNAT", "--to", globalIP}
 	if addRules {
-		klog.V(log.DEBUG).Infof("Installing iptable egress rules for pod: %s", strings.Join(ruleSpec, " "))
+		klog.V(log.DEBUG).Infof("Installing iptable egress rules for %s: %s", resourceName, strings.Join(ruleSpec, " "))
 		if err := i.ipt.AppendUnique("nat", submarinerEgress, ruleSpec...); err != nil {
 			return fmt.Errorf("error appending iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
 		}
 	} else {
-		klog.V(log.DEBUG).Infof("Deleting iptable egress rules for pod: %s", strings.Join(ruleSpec, " "))
+		klog.V(log.DEBUG).Infof("Deleting iptable egress rules for %s : %s", resourceName, strings.Join(ruleSpec, " "))
 		if err := i.ipt.Delete("nat", submarinerEgress, ruleSpec...); err != nil {
 			return fmt.Errorf("error deleting iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
 		}
