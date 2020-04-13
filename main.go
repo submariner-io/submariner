@@ -57,6 +57,8 @@ const (
 	defaultRetryPeriod        = 2 // In Seconds
 )
 
+var VERSION = "not-compiled-properly"
+
 func main() {
 	klog.InitFlags(nil)
 	flag.Parse()
@@ -90,39 +92,40 @@ func main() {
 	submarinerInformerFactory := submarinerInformers.NewSharedInformerFactoryWithOptions(submarinerClient, time.Second*30,
 		submarinerInformers.WithNamespace(submSpec.Namespace))
 
+	var localSubnets []string
+
+	klog.Info("Creating the cable engine")
+
+	localCluster, err := util.GetLocalCluster(submSpec)
+	if err != nil {
+		klog.Fatalf("Error creating local cluster object from %#v: %v", submSpec, err)
+	}
+
+	if len(submSpec.GlobalCidr) > 0 {
+		localSubnets = submSpec.GlobalCidr
+	} else {
+		localSubnets = append(submSpec.ServiceCidr, submSpec.ClusterCidr...)
+	}
+
+	if len(submSpec.CableDriver) == 0 {
+		submSpec.CableDriver = cable.GetDefaultCableDriver()
+	}
+	submSpec.CableDriver = strings.ToLower(submSpec.CableDriver)
+
+	localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterID, submSpec.CableDriver, map[string]string{}, submSpec.NatEnabled,
+		localSubnets, util.GetLocalIP())
+
+	if err != nil {
+		klog.Fatalf("Error creating local endpoint object from %#v: %v", submSpec, err)
+	}
+
+	cableEngine, err := cableengine.NewEngine(localSubnets, localCluster, localEndpoint, submarinerClient,
+		submSpec.Namespace, VERSION, stopCh)
+	if err != nil {
+		klog.Fatalf("Fatal error occurred creating engine: %v", err)
+	}
+
 	start := func(context.Context) {
-		var localSubnets []string
-
-		klog.Info("Creating the cable engine")
-
-		localCluster, err := util.GetLocalCluster(submSpec)
-		if err != nil {
-			klog.Fatalf("Error creating local cluster object from %#v: %v", submSpec, err)
-		}
-
-		if len(submSpec.GlobalCidr) > 0 {
-			localSubnets = submSpec.GlobalCidr
-		} else {
-			localSubnets = append(submSpec.ServiceCidr, submSpec.ClusterCidr...)
-		}
-
-		if len(submSpec.CableDriver) == 0 {
-			submSpec.CableDriver = cable.GetDefaultCableDriver()
-		}
-		submSpec.CableDriver = strings.ToLower(submSpec.CableDriver)
-
-		localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterID, submSpec.CableDriver, map[string]string{}, submSpec.NatEnabled,
-			localSubnets, util.GetLocalIP())
-
-		if err != nil {
-			klog.Fatalf("Error creating local endpoint object from %#v: %v", submSpec, err)
-		}
-
-		cableEngine, err := cableengine.NewEngine(localSubnets, localCluster, localEndpoint)
-		if err != nil {
-			klog.Fatalf("Fatal error occurred creating engine: %v", err)
-		}
-
 		klog.Info("Creating the tunnel controller")
 
 		tunnelController := tunnel.NewController(submSpec.Namespace, cableEngine, kubeClient, submarinerClient,
