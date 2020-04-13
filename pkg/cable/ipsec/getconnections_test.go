@@ -48,11 +48,10 @@ var _ = Describe("Strongswan Connection status", func() {
 
 		When("provided a remoteEndpoint, but empty list of SAs", func() {
 			It("should return the remoteEndpoint as failed", func() {
-				f.addRemoteEndpoint(testCable1, v1.EndpointSpec{CableName: "not-found-cable"})
+				f.addRemoteEndpoint(testCable1, v1.EndpointSpec{CableName: testCable1})
 
-				connections := f.getConnections()
-				Expect(*connections).To(HaveLen(1))
-				Expect((*connections)[0].Status).To(Equal(v1.ConnectionError))
+				f.expectConnectionsLen(1)
+				f.expectConnectionStatus(testCable1, v1.ConnectionError)
 			})
 		})
 
@@ -61,10 +60,8 @@ var _ = Describe("Strongswan Connection status", func() {
 				f.addRemoteEndpoint(testCable1, v1.EndpointSpec{CableName: testCable1})
 				f.addSA(testCable1, goStrongswanVici.IkeSa{State: establishedState})
 
-				connections := f.getConnections()
-				Expect(*connections).To(HaveLen(1))
-				Expect((*connections)[0].Endpoint.CableName).To(Equal(testCable1))
-				Expect((*connections)[0].Status).To(Equal(v1.Connected))
+				f.expectConnectionsLen(1)
+				f.expectConnectionStatus(testCable1, v1.Connected)
 			})
 		})
 
@@ -77,14 +74,9 @@ var _ = Describe("Strongswan Connection status", func() {
 				f.addSA(testCable2, goStrongswanVici.IkeSa{State: connectingState})
 				f.addSA(testCable1, goStrongswanVici.IkeSa{State: establishedState})
 
-				connections := f.getConnections()
-				Expect(*connections).To(HaveLen(2))
-
-				Expect((*connections)[0].Endpoint.CableName).To(Equal(testCable1))
-				Expect((*connections)[0].Status).To(Equal(v1.Connected))
-
-				Expect((*connections)[1].Endpoint.CableName).To(Equal(testCable2))
-				Expect((*connections)[1].Status).To(Equal(v1.Connecting))
+				f.expectConnectionsLen(2)
+				f.expectConnectionStatus(testCable1, v1.Connected)
+				f.expectConnectionStatus(testCable2, v1.Connecting)
 			})
 		})
 
@@ -96,18 +88,10 @@ var _ = Describe("Strongswan Connection status", func() {
 
 				f.addSA(testCable1, goStrongswanVici.IkeSa{State: establishedState})
 
-				connections := f.getConnections()
-				Expect(*connections).To(HaveLen(2))
+				f.expectConnectionsLen(2)
+				f.expectConnectionStatus(testCable1, v1.Connected)
+				f.expectConnectionStatus(testCable2, v1.ConnectionError)
 
-				if (*connections)[0].Endpoint.CableName == testCable1 {
-					Expect((*connections)[0].Status).To(Equal(v1.Connected))
-					Expect((*connections)[1].Endpoint.CableName).To(Equal(testCable2))
-					Expect((*connections)[1].Status).To(Equal(v1.ConnectionError))
-				} else {
-					Expect((*connections)[0].Status).To(Equal(v1.ConnectionError))
-					Expect((*connections)[1].Endpoint.CableName).To(Equal(testCable1))
-					Expect((*connections)[1].Status).To(Equal(v1.Connected))
-				}
 			})
 		})
 	})
@@ -139,4 +123,22 @@ func (st *strongswanConnectionsTest) getConnections() *[]v1.Connection {
 	Expect(err).ShouldNot(HaveOccurred())
 	Expect(connections).ToNot(BeNil())
 	return connections
+}
+
+func (st *strongswanConnectionsTest) expectConnectionStatus(cableID string, status v1.ConnectionStatus) {
+	connections := st.getConnections()
+	foundCable := false
+	for _, connection := range *connections {
+		if connection.Endpoint.CableName == cableID {
+			Expect(foundCable).To(BeFalse())
+			Expect(connection.Status).Should(Equal(status))
+			foundCable = true
+		}
+	}
+	Expect(foundCable).To(BeTrue())
+}
+
+func (st *strongswanConnectionsTest) expectConnectionsLen(length int) {
+	connections := st.getConnections()
+	Expect(*connections).To(HaveLen(length))
 }
