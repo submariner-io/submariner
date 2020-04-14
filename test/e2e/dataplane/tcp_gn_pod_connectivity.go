@@ -8,6 +8,8 @@ import (
 
 var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across overlapping clusters without discovery", func() {
 	f := framework.NewFramework("dataplane-gn-conn-nd")
+	var toEndpointType tcp.EndpointType
+	var networking framework.NetworkingType
 
 	verifyInteraction := func(fromClusterScheduling, toClusterScheduling framework.NetworkPodScheduling) {
 		It("should have sent the expected data from the pod to the other pod", func() {
@@ -18,8 +20,8 @@ var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across over
 
 			tcp.RunConnectivityTest(tcp.ConnectivityTestParams{
 				Framework:             f,
-				ToEndpointType:        tcp.GlobalIP,
-				Networking:            framework.PodNetworking,
+				ToEndpointType:        toEndpointType,
+				Networking:            networking,
 				FromCluster:           framework.ClusterA,
 				FromClusterScheduling: fromClusterScheduling,
 				ToCluster:             framework.ClusterB,
@@ -28,7 +30,12 @@ var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across over
 		})
 	}
 
-	When("a pod connects via TCP to a remote service", func() {
+	When("a pod connects via TCP to a remote service globalIP", func() {
+		BeforeEach(func() {
+			toEndpointType = tcp.GlobalIP
+			networking = framework.PodNetworking
+		})
+
 		When("the pod is not on a gateway and the remote service is not on a gateway", func() {
 			verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode)
 		})
@@ -43,6 +50,21 @@ var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across over
 
 		When("the pod is on a gateway and the remote service is on a gateway", func() {
 			verifyInteraction(framework.GatewayNode, framework.GatewayNode)
+		})
+	})
+
+	When("a pod with HostNetworking connects via TCP to a remote service globalIP", func() {
+		BeforeEach(func() {
+			toEndpointType = tcp.GlobalIP
+			networking = framework.HostNetworking
+		})
+
+		When("the pod is not on a gateway and the remote service is not on a gateway", func() {
+			verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode)
+		})
+
+		When("the pod is on a gateway and the remote service is not on a gateway", func() {
+			verifyInteraction(framework.GatewayNode, framework.NonGatewayNode)
 		})
 	})
 })
