@@ -30,7 +30,7 @@ var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across over
 		})
 	}
 
-	When("a pod connects via TCP to a remote service globalIP", func() {
+	When("a pod connects via TCP to the globalIP of a remote service", func() {
 		BeforeEach(func() {
 			toEndpointType = tcp.GlobalIP
 			networking = framework.PodNetworking
@@ -53,7 +53,7 @@ var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across over
 		})
 	})
 
-	When("a pod with HostNetworking connects via TCP to a remote service globalIP", func() {
+	When("a pod with HostNetworking connects via TCP to the globalIP of a remote service", func() {
 		BeforeEach(func() {
 			toEndpointType = tcp.GlobalIP
 			networking = framework.HostNetworking
