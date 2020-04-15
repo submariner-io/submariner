@@ -15,7 +15,7 @@ e2e: deploy
 	./scripts/kind-e2e/e2e.sh --deploytool $(deploytool)
 
 reload-images: build images
-	./scripts/$@ --globalnet true
+	./scripts/$@
 
 $(TARGETS): vendor/modules.txt
 	./scripts/$@ --build_debug $(build_debug)
