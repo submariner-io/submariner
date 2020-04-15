@@ -73,10 +73,10 @@ type Gateway struct {
 }
 
 type GatewayStatus struct {
-	Version     string       `json:"version"`
-	HAStatus    HAStatus     `json:"haStatus"`
-	Host        string       `json:"host"`
-	Connections []Connection `json:"connections"`
+	Version       string       `json:"version"`
+	HAStatus      HAStatus     `json:"haStatus"`
+	LocalEndpoint EndpointSpec `json:"localEndpoint"`
+	Connections   []Connection `json:"connections"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
