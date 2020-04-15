@@ -6,6 +6,8 @@ K8S_IO_DIR="${GOPATH:-~/go}/src/k8s.io"
 CODEGEN_SCRIPT_DIR="${K8S_IO_DIR}/code-generator"
 CODEGEN_SCRIPT="${CODEGEN_SCRIPT_DIR}/generate-groups.sh"
 CODEGEN_RELEASE_TAG=kubernetes-1.14.1
+export GO111MODULE=off
+mkdir -p $K8S_IO_DIR
 
 if [ ! -f "$CODEGEN_SCRIPT" ]; then
     echo "$CODEGEN_SCRIPT does not exist - downloading..."
