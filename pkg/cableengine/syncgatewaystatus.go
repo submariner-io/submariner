@@ -79,7 +79,7 @@ func (i *engine) generateGatewayObject() (*v1.Gateway, error) {
 	}
 
 	gateway := v1.Gateway{
-		Status:     v1.GatewayStatus{Version: i.version, Host: hostName},
+		Status:     v1.GatewayStatus{Version: i.version, LocalEndpoint: i.localEndpoint.Spec},
 		ObjectMeta: metav1.ObjectMeta{Name: hostName},
 	}
 
