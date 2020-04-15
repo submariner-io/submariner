@@ -1,8 +1,11 @@
 package cableengine
 
 import (
+	"fmt"
 	"os"
 	"reflect"
+	"strconv"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,6 +16,8 @@ import (
 )
 
 const GatewayUpdateIntervalSeconds = 5
+const GatewayStaleTimeoutSeconds = GatewayUpdateIntervalSeconds * 3
+const updateTimestampAnnotation = "update-timestamp"
 
 func (i *engine) syncGatewayStatus() {
 
@@ -49,6 +54,7 @@ func (i *engine) syncGatewayStatus() {
 			klog.V(log.TRACE).Infof("Gateway object needs an update: %+v", gatewayObj)
 			existingGw.Status = gatewayObj.Status
 			existingGw.Labels = gatewayObj.Labels
+			existingGw.Annotations = gatewayObj.Annotations
 
 			gw, err := gwClient.Update(existingGw)
 			if err != nil {
@@ -61,6 +67,54 @@ func (i *engine) syncGatewayStatus() {
 			klog.V(log.TRACE).Info("Gateway object didn't need an update")
 		}
 	}
+
+	if gatewayObj.Status.HAStatus == v1.HAStatusActive {
+		err := i.cleanupStaleGatewayEntries()
+		if err != nil {
+			klog.Errorf("cleaning up stale gateway entries: %s", err)
+		}
+	}
+}
+
+func (i *engine) cleanupStaleGatewayEntries() error {
+	gwClient := i.clientset.SubmarinerV1().Gateways(i.namespace)
+	gateways, err := gwClient.List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, gw := range gateways.Items {
+		stale, err := isGatewayStale(gw)
+		if err != nil {
+			// In this case we don't want to stop the cleanup loop and just log it
+			klog.Errorf("error processing stale gateway: %+v , %s", gw, err)
+		}
+		if stale {
+			err := gwClient.Delete(gw.Name, &metav1.DeleteOptions{})
+			if err != nil {
+				// In this case we don't want to stop the cleanup loop and just log it
+				klog.Errorf("error deleting stale gateway: %+v, %s", gw, err)
+			}
+			klog.Warningf("deleted stale gateway: %s, didn't report for %d seconds",
+				gw.Name, GatewayStaleTimeoutSeconds)
+		}
+	}
+	return nil
+}
+
+func isGatewayStale(gateway v1.Gateway) (bool, error) {
+
+	timestamp, ok := gateway.ObjectMeta.Annotations[updateTimestampAnnotation]
+	if !ok {
+		return true, fmt.Errorf("update-timestamp annotation not found")
+	}
+
+	timestampInt, err := strconv.ParseInt(timestamp, 10, 64)
+	if err != nil {
+		return true, fmt.Errorf("error parsing update-timestamp: %s", err)
+	}
+	now := time.Now().UTC().Unix()
+
+	return now >= (timestampInt + GatewayStaleTimeoutSeconds), nil
 }
 
 func (i *engine) getLastSyncedGateway(name string) (*v1.Gateway, error) {
@@ -79,8 +133,13 @@ func (i *engine) generateGatewayObject() (*v1.Gateway, error) {
 	}
 
 	gateway := v1.Gateway{
-		Status:     v1.GatewayStatus{Version: i.version, LocalEndpoint: i.localEndpoint.Spec},
-		ObjectMeta: metav1.ObjectMeta{Name: hostName},
+		Status: v1.GatewayStatus{
+			Version:       i.version,
+			LocalEndpoint: i.localEndpoint.Spec,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        hostName,
+			Annotations: map[string]string{updateTimestampAnnotation: strconv.FormatInt(time.Now().UTC().Unix(), 10)}},
 	}
 
 	if i.driver == nil {
