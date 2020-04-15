@@ -1,12 +1,63 @@
 #!/usr/bin/env bash
 
+## Process command line flags ##
+
+source /usr/share/shflags/shflags
+DEFINE_string 'restart' 'all' "Which pods to restart: all, gateway, routeagent, globalnet"
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+restart="${FLAGS_restart}"
+
+echo "Running with: restart=${restart}"
+
 set -em
 
 source ${SCRIPTS_DIR}/lib/debug_functions
 source ${SCRIPTS_DIR}/lib/version
 source ${SCRIPTS_DIR}/lib/deploy_funcs
+source ${SCRIPTS_DIR}/lib/utils
 
 import_image quay.io/submariner/submariner
 import_image quay.io/submariner/submariner-route-agent
 import_image quay.io/submariner/submariner-globalnet
+
+declare_kubeconfig
+
+case "${restart}" in
+	gateway)
+		for i in 1 2 3; do
+			kubectl config use-context cluster$i
+			reload_pods daemonset submariner-gateway
+		done
+		;;
+	routeagent)
+		for i in 1 2 3; do
+			kubectl config use-context cluster$i
+			reload_pods daemonset submariner-routeagent
+		done
+		;;
+	globalnet)
+		for i in 1 2 3; do
+			kubectl config use-context cluster$i
+			reload_pods daemonset submariner-globalnet
+		done
+		;;
+	all)
+
+		for i in 1 2 3; do
+			kubectl config use-context cluster$i
+			reload_pods daemonset submariner-gateway
+			reload_pods daemonset submariner-routeagent
+			reload_pods daemonset submariner-globalnet || true # globalnet is not always enabled
+		done
+		;;
+	none)
+		;;
+	*)
+		echo "restart must be any in none, gateway, routeagent, globalnet or all (default)"
+		exit 1
+		;;
+esac
+
 
