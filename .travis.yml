@@ -12,7 +12,7 @@ git:
 
 jobs:
   include:
-  - env: CMD="make test validate"
+  - env: CMD="make test validate codegen"
   - env: CMD="make e2e" DEPLOY=true
   - env: CMD="make e2e deploytool=helm globalnet=true"
 
