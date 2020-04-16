@@ -3,7 +3,7 @@
 ## Process command line flags ##
 
 source /usr/share/shflags/shflags
-DEFINE_string 'restart' 'all' "Which pods to restart: all, gateway, routeagent, globalnet"
+DEFINE_string 'restart' 'all' "Which pods to restart: none, all, gateway, routeagent, globalnet"
 FLAGS "$@" || exit $?
 eval set -- "${FLAGS_ARGV}"
 
@@ -40,4 +40,3 @@ case "${restart}" in
 		exit 1
 		;;
 esac
-
