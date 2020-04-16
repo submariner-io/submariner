@@ -1,4 +1,5 @@
 build_debug ?= false
+restart ?= all
 
 ifneq (,$(DAPPER_HOST_ARCH))
 
@@ -15,7 +16,7 @@ e2e: deploy
 	./scripts/kind-e2e/e2e.sh --deploytool $(deploytool)
 
 reload-images: build images
-	./scripts/$@
+	./scripts/$@ --restart $(restart)
 
 images: build
 	./scripts/$@ $(images_flags)

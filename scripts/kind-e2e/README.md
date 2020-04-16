@@ -63,6 +63,29 @@ the following command:
 make deploy
 ```
 
+#### Reloading your code changes
+During the development of new features you may want to compile submariner and push the images
+into the local registry used by the kind clusters. You can use the reload-images make target
+for that.
+
+This target depends on the build and packaging of the container images. It will push
+the new images to the local registry and restart all the services (gateway, routeagent, globalnet).
+
+```bash
+make reload-images
+```
+
+If you are working on a specific service, you can specify to only restart that service, for example:
+```bash
+make reload-images restart=gateway
+```
+
+If you don't want to restart any service because you plan to restart specific pods in specific clusters
+manually, then run:
+```bash
+make reload-images restart=none
+```
+
 #### Cleanup
 At any time you can run a cleanup command that will remove all the kind clusters.
 
