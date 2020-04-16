@@ -36,9 +36,8 @@ case "${restart}" in
 	none)
 		;;
 	*)
-		echo "restart must be any in none, gateway, routeagent, globalnet or all (default)"
+		echo "restart must be one of: none, gateway, routeagent, globalnet or all (default)"
 		exit 1
 		;;
 esac
-
 
