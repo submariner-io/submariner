@@ -25,32 +25,13 @@ import_image quay.io/submariner/submariner-globalnet
 declare_kubeconfig
 
 case "${restart}" in
-	gateway)
-		for i in 1 2 3; do
-			kubectl config use-context cluster$i
-			reload_pods daemonset submariner-gateway
-		done
-		;;
-	routeagent)
-		for i in 1 2 3; do
-			kubectl config use-context cluster$i
-			reload_pods daemonset submariner-routeagent
-		done
-		;;
-	globalnet)
-		for i in 1 2 3; do
-			kubectl config use-context cluster$i
-			reload_pods daemonset submariner-globalnet
-		done
+	gateway|routeagent|globalnet)
+		run_parallel "{1..3}" reload_pods daemonset submariner-${restart}
 		;;
 	all)
-
-		for i in 1 2 3; do
-			kubectl config use-context cluster$i
-			reload_pods daemonset submariner-gateway
-			reload_pods daemonset submariner-routeagent
-			reload_pods daemonset submariner-globalnet || true # globalnet is not always enabled
-		done
+		run_parallel "{1..3}" reload_pods daemonset submariner-gateway
+		run_parallel "{1..3}" reload_pods daemonset submariner-routeagent
+		run_parallel "{1..3}" reload_pods daemonset submariner-globalnet || true # globalnet is not always enabled
 		;;
 	none)
 		;;
