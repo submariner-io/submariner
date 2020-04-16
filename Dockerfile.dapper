@@ -1,6 +1,6 @@
 FROM quay.io/submariner/shipyard-dapper-base
 
-ENV DAPPER_ENV="REPO TAG" \
+ENV DAPPER_ENV="REPO TAG QUAY_USERNAME QUAY_PASSWORD TRAVIS_COMMIT" \
     DAPPER_SOURCE=/go/src/github.com/submariner-io/submariner DAPPER_DOCKER_SOCKET=true
 ENV DAPPER_OUTPUT=${DAPPER_SOURCE}/output
 
