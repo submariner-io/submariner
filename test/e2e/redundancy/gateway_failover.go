@@ -54,6 +54,7 @@ func testEnginePodRestartScenario(f *subFramework.Framework) {
 		FromClusterScheduling: framework.GatewayNode,
 		ToCluster:             framework.ClusterA,
 		ToClusterScheduling:   framework.GatewayNode,
+		ToEndpointType:        defaultEndpointType(),
 	})
 
 	By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
@@ -63,7 +64,15 @@ func testEnginePodRestartScenario(f *subFramework.Framework) {
 		FromClusterScheduling: framework.NonGatewayNode,
 		ToCluster:             framework.ClusterA,
 		ToClusterScheduling:   framework.NonGatewayNode,
+		ToEndpointType:        defaultEndpointType(),
 	})
+}
+
+func defaultEndpointType() tcp.EndpointType {
+	if framework.TestContext.GlobalnetEnabled {
+		return tcp.GlobalIP
+	}
+	return tcp.PodIP
 }
 
 func testGatewayFailOverScenario(f *subFramework.Framework) {
@@ -124,6 +133,7 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 		FromClusterScheduling: framework.GatewayNode,
 		ToCluster:             framework.ClusterA,
 		ToClusterScheduling:   framework.GatewayNode,
+		ToEndpointType:        defaultEndpointType(),
 	})
 
 	By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
@@ -133,5 +143,6 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 		FromClusterScheduling: framework.NonGatewayNode,
 		ToCluster:             framework.ClusterA,
 		ToClusterScheduling:   framework.NonGatewayNode,
+		ToEndpointType:        defaultEndpointType(),
 	})
 }
