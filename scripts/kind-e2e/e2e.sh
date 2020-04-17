@@ -4,11 +4,13 @@
 
 source /usr/share/shflags/shflags
 DEFINE_string 'deploytool' 'operator' 'Tool to use for deploying (operator/helm)'
+DEFINE_string 'focus' '.*' 'Ginkgo focus for the E2E tests'
 FLAGS "$@" || exit $?
 eval set -- "${FLAGS_ARGV}"
 
 deploytool="${FLAGS_deploytool}"
-echo "Running with: deploytool=${deploytool}"
+focus="${FLAGS_focus}"
+echo "Running with: deploytool=${deploytool} focus=${focus}"
 
 set -em
 
@@ -51,6 +53,7 @@ function test_with_e2e_tests {
     go test -v -args -ginkgo.v -ginkgo.randomizeAllSpecs \
         -submariner-namespace $SUBM_NS -dp-context cluster2 -dp-context cluster3 -dp-context cluster1 \
         -ginkgo.noColor -ginkgo.reportPassed \
+        -ginkgo.focus "\[${focus}\]" \
         -ginkgo.reportFile ${DAPPER_OUTPUT}/e2e-junit.xml 2>&1 | \
         tee ${DAPPER_OUTPUT}/e2e-tests.log
 }
