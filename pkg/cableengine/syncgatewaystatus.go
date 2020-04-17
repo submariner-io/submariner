@@ -28,7 +28,7 @@ func (i *engine) syncGatewayStatus() {
 
 	gatewayObj, err := i.generateGatewayObject()
 	if err != nil {
-		klog.Errorf("generating gateway object from driver connections: %s", err)
+		klog.Errorf("error generating gateway object from driver connections: %s", err)
 		return
 	}
 
@@ -36,7 +36,7 @@ func (i *engine) syncGatewayStatus() {
 
 	// log and stop for any error different to a not-found error
 	if err != nil && !errors.IsNotFound(err) {
-		klog.Errorf("trying to read existing gateway from k8s api: %s", err)
+		klog.Errorf("error trying to read existing gateway from k8s api: %s", err)
 		return
 	}
 
@@ -46,7 +46,7 @@ func (i *engine) syncGatewayStatus() {
 		klog.V(log.TRACE).Infof("Gateway object needs creation: %+v", gatewayObj)
 		_, err = gwClient.Create(gatewayObj)
 		if err != nil {
-			klog.Errorf("creating Gateway object: %s", err)
+			klog.Errorf("error creating Gateway object: %s", err)
 			return
 		}
 	} else {
@@ -58,7 +58,7 @@ func (i *engine) syncGatewayStatus() {
 
 			gw, err := gwClient.Update(existingGw)
 			if err != nil {
-				klog.Errorf("updating Gateway object: %s", err)
+				klog.Errorf("error updating Gateway object: %s", err)
 				return
 			} else {
 				klog.V(log.TRACE).Infof("Gateway updated correctly: %+v", gw)
@@ -71,7 +71,7 @@ func (i *engine) syncGatewayStatus() {
 	if gatewayObj.Status.HAStatus == v1.HAStatusActive {
 		err := i.cleanupStaleGatewayEntries()
 		if err != nil {
-			klog.Errorf("cleaning up stale gateway entries: %s", err)
+			klog.Errorf("error cleaning up stale gateway entries: %s", err)
 		}
 	}
 }
@@ -105,7 +105,7 @@ func isGatewayStale(gateway v1.Gateway) (bool, error) {
 
 	timestamp, ok := gateway.ObjectMeta.Annotations[updateTimestampAnnotation]
 	if !ok {
-		return true, fmt.Errorf("update-timestamp annotation not found")
+		return true, fmt.Errorf("%q annotation not found", updateTimestampAnnotation)
 	}
 
 	timestampInt, err := strconv.ParseInt(timestamp, 10, 64)
@@ -150,7 +150,7 @@ func (i *engine) generateGatewayObject() (*v1.Gateway, error) {
 		gateway.SetLabels(map[string]string{v1.HAStatusGatewayLabel: string(v1.HAStatusActive)})
 		connections, err := i.driver.GetConnections()
 		if err != nil {
-			klog.Errorf("getting driver connections: %s", err)
+			klog.Errorf("error getting driver connections: %s", err)
 			return nil, err
 		}
 		gateway.Status.Connections = *connections
