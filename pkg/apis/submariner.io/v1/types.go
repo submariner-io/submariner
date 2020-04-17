@@ -72,6 +72,10 @@ type Gateway struct {
 	Status            GatewayStatus `json:"status"`
 }
 
+const HAStatusGatewayLabel = "ha-status"
+const HAStatusActiveSelector = string(HAStatusGatewayLabel + "=" + HAStatusActive)
+const HAStatusPassiveSelector = string(HAStatusGatewayLabel + "=" + HAStatusPassive)
+
 type GatewayStatus struct {
 	Version       string       `json:"version"`
 	HAStatus      HAStatus     `json:"haStatus"`
@@ -90,8 +94,8 @@ type GatewayList struct {
 type HAStatus string
 
 const (
-	HAStatusActive  HAStatus = "ACTIVE"
-	HAStatusPassive HAStatus = "PASSIVE"
+	HAStatusActive  HAStatus = "active"
+	HAStatusPassive HAStatus = "passive"
 )
 
 type Connection struct {
@@ -103,9 +107,9 @@ type Connection struct {
 type ConnectionStatus string
 
 const (
-	Connected       ConnectionStatus = "CONNECTED"
-	Connecting      ConnectionStatus = "CONNECTING"
-	ConnectionError ConnectionStatus = "ERROR"
+	Connected       ConnectionStatus = "connected"
+	Connecting      ConnectionStatus = "connecting"
+	ConnectionError ConnectionStatus = "error"
 )
 
 func NewConnection(endpointSpec EndpointSpec) *Connection {

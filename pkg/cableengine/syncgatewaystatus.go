@@ -144,10 +144,10 @@ func (i *engine) generateGatewayObject() (*v1.Gateway, error) {
 
 	if i.driver == nil {
 		gateway.Status.HAStatus = v1.HAStatusPassive
-		gateway.SetLabels(map[string]string{"ha-status": "passive"})
+		gateway.SetLabels(map[string]string{v1.HAStatusGatewayLabel: string(v1.HAStatusPassive)})
 	} else {
 		gateway.Status.HAStatus = v1.HAStatusActive
-		gateway.SetLabels(map[string]string{"ha-status": "active"})
+		gateway.SetLabels(map[string]string{v1.HAStatusGatewayLabel: string(v1.HAStatusActive)})
 		connections, err := i.driver.GetConnections()
 		if err != nil {
 			klog.Errorf("getting driver connections: %s", err)
