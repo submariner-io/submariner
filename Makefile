@@ -12,7 +12,7 @@ CLUSTERS_ARGS = --cluster_settings $(DAPPER_SOURCE)/scripts/kind-e2e/cluster_set
 
 clusters: build images
 
-e2e: deploy
+e2e: # internally depends on deploy target, which will execute only if not already deployed
 	./scripts/kind-e2e/e2e.sh --deploytool $(deploytool)
 
 reload-images: build images
