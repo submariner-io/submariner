@@ -1,15 +1,5 @@
 #!/usr/bin/env bash
 
-## Process command line flags ##
-
-source /usr/share/shflags/shflags
-DEFINE_string 'deploytool' 'operator' 'Tool to use for deploying (operator/helm)'
-FLAGS "$@" || exit $?
-eval set -- "${FLAGS_ARGV}"
-
-deploytool="${FLAGS_deploytool}"
-echo "Running with: deploytool=${deploytool}"
-
 set -em
 
 source ${SCRIPTS_DIR}/lib/debug_functions
@@ -21,18 +11,6 @@ source ${SCRIPTS_DIR}/lib/utils
 E2E_DIR=${DAPPER_SOURCE}/scripts/kind-e2e/
 
 ### Functions ###
-
-# TODO: Copied from shipyard since deploytool determines the namespace, we should fix operator to use the same namespace (or receive it).
-function load_deploytool() {
-    local deploy_lib=${SCRIPTS_DIR}/lib/deploy_${deploytool}
-    if [[ ! -f $deploy_lib ]]; then
-        echo "Unknown deploy method: ${deploytool}"
-        exit 1
-    fi
-
-    echo "Will deploy submariner using ${deploytool}"
-    . $deploy_lib
-}
 
 function test_with_e2e_tests {
     set -o pipefail 
@@ -46,15 +24,9 @@ function test_with_e2e_tests {
         tee ${DAPPER_OUTPUT}/e2e-tests.log
 }
 
-function cleanup {
-    "${SCRIPTS_DIR}"/cleanup.sh
-}
-
 ### Main ###
 
 declare_kubeconfig
-
-load_deploytool
 
 test_with_e2e_tests
 
