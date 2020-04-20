@@ -1,25 +1,54 @@
-package cableengine
+package syncer
 
 import (
 	"fmt"
 	"os"
 	"reflect"
 	"strconv"
+	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cableengine"
+	v1typed "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/log"
 )
+
+type CableEngineSyncer struct {
+	sync.Mutex
+	client  v1typed.GatewayInterface
+	engine  cableengine.Engine
+	version string
+}
 
 const GatewayUpdateIntervalSeconds = 5
 const GatewayStaleTimeoutSeconds = GatewayUpdateIntervalSeconds * 3
 const updateTimestampAnnotation = "update-timestamp"
 
-func (i *engine) syncGatewayStatus() {
+// NewEngine creates a new Engine for the local cluster
+func NewCableEngineSyncer(engine cableengine.Engine, client v1typed.GatewayInterface,
+	version string) *CableEngineSyncer {
+
+	s := CableEngineSyncer{
+		client:  client,
+		engine:  engine,
+		version: version,
+	}
+
+	return &s
+}
+
+func (s *CableEngineSyncer) Run(stopCh <-chan struct{}) {
+	go wait.Until(s.syncGatewayStatus, GatewayUpdateIntervalSeconds*time.Second, stopCh)
+	klog.Info("CableEngine syncer started")
+}
+
+func (i *CableEngineSyncer) syncGatewayStatus() {
 
 	i.Lock()
 	defer i.Unlock()
@@ -40,11 +69,9 @@ func (i *engine) syncGatewayStatus() {
 		return
 	}
 
-	gwClient := i.clientset.SubmarinerV1().Gateways(i.namespace)
-
 	if err != nil && errors.IsNotFound(err) {
 		klog.V(log.TRACE).Infof("Gateway object needs creation: %+v", gatewayObj)
-		_, err = gwClient.Create(gatewayObj)
+		_, err = i.client.Create(gatewayObj)
 		if err != nil {
 			klog.Errorf("error creating Gateway object: %s", err)
 			return
@@ -56,7 +83,7 @@ func (i *engine) syncGatewayStatus() {
 			existingGw.Labels = gatewayObj.Labels
 			existingGw.Annotations = gatewayObj.Annotations
 
-			gw, err := gwClient.Update(existingGw)
+			gw, err := i.client.Update(existingGw)
 			if err != nil {
 				klog.Errorf("error updating Gateway object: %s", err)
 				return
@@ -76,9 +103,8 @@ func (i *engine) syncGatewayStatus() {
 	}
 }
 
-func (i *engine) cleanupStaleGatewayEntries() error {
-	gwClient := i.clientset.SubmarinerV1().Gateways(i.namespace)
-	gateways, err := gwClient.List(metav1.ListOptions{})
+func (i *CableEngineSyncer) cleanupStaleGatewayEntries() error {
+	gateways, err := i.client.List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -89,7 +115,7 @@ func (i *engine) cleanupStaleGatewayEntries() error {
 			klog.Errorf("error processing stale gateway: %+v , %s", gw, err)
 		}
 		if stale {
-			err := gwClient.Delete(gw.Name, &metav1.DeleteOptions{})
+			err := i.client.Delete(gw.Name, &metav1.DeleteOptions{})
 			if err != nil {
 				// In this case we don't want to stop the cleanup loop and just log it
 				klog.Errorf("error deleting stale gateway: %+v, %s", gw, err)
@@ -117,14 +143,14 @@ func isGatewayStale(gateway v1.Gateway) (bool, error) {
 	return now >= (timestampInt + GatewayStaleTimeoutSeconds), nil
 }
 
-func (i *engine) getLastSyncedGateway(name string) (*v1.Gateway, error) {
+func (i *CableEngineSyncer) getLastSyncedGateway(name string) (*v1.Gateway, error) {
 
-	existingGw, err := i.clientset.SubmarinerV1().Gateways(i.namespace).Get(name, metav1.GetOptions{})
+	existingGw, err := i.client.Get(name, metav1.GetOptions{})
 	klog.V(log.TRACE).Infof("getLastSyncedGateway: %+v", existingGw)
 	return existingGw, err
 }
 
-func (i *engine) generateGatewayObject() (*v1.Gateway, error) {
+func (i *CableEngineSyncer) generateGatewayObject() (*v1.Gateway, error) {
 	var hostName string
 	var err error
 
@@ -135,26 +161,22 @@ func (i *engine) generateGatewayObject() (*v1.Gateway, error) {
 	gateway := v1.Gateway{
 		Status: v1.GatewayStatus{
 			Version:       i.version,
-			LocalEndpoint: i.localEndpoint.Spec,
+			LocalEndpoint: i.engine.GetLocalEndpoint().Spec,
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        hostName,
 			Annotations: map[string]string{updateTimestampAnnotation: strconv.FormatInt(time.Now().UTC().Unix(), 10)}},
 	}
 
-	if i.driver == nil {
-		gateway.Status.HAStatus = v1.HAStatusPassive
-		gateway.SetLabels(map[string]string{v1.HAStatusGatewayLabel: string(v1.HAStatusPassive)})
-	} else {
-		gateway.Status.HAStatus = v1.HAStatusActive
-		gateway.SetLabels(map[string]string{v1.HAStatusGatewayLabel: string(v1.HAStatusActive)})
-		connections, err := i.driver.GetConnections()
-		if err != nil {
-			klog.Errorf("error getting driver connections: %s", err)
-			return nil, err
-		}
-		gateway.Status.Connections = *connections
+	gateway.Status.HAStatus = i.engine.GetHAStatus()
+	gateway.SetLabels(map[string]string{v1.HAStatusGatewayLabel: string(gateway.Status.HAStatus)})
+
+	connections, err := i.engine.ListCableConnections()
+	if err != nil {
+		klog.Errorf("error getting driver connections: %s", err)
+		return nil, err
 	}
+	gateway.Status.Connections = *connections
 
 	klog.V(log.TRACE).Infof("generateGatewayObject: %+v", gateway)
 	return &gateway, nil

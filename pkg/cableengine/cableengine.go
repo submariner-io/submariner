@@ -4,14 +4,12 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
-	"time"
 
+	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
-	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/log"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 
 	// Add supported drivers
@@ -33,47 +31,45 @@ type Engine interface {
 	// RemoveCable disconnects the Engine from the given remote endpoint. Upon completion.
 	// remote Pods and Service may not be accessible any more.
 	RemoveCable(remote types.SubmarinerEndpoint) error
+	// ListCableConnections returns a list of cable connection, and the related status
+	ListCableConnections() (*[]v1.Connection, error)
+	// GetLocalEndpoint returns the local endpoint for this cable engine
+	GetLocalEndpoint() *types.SubmarinerEndpoint
+	// GetHAStatus returns the HA status for this cable engine
+	GetHAStatus() v1.HAStatus
 }
 
 type engine struct {
 	sync.Mutex
-
-	clientset     *submarinerClientset.Clientset
 	driver        cable.Driver
 	localSubnets  []string
 	localCluster  types.SubmarinerCluster
 	localEndpoint types.SubmarinerEndpoint
-	version       string
-	namespace     string
 }
 
 // NewEngine creates a new Engine for the local cluster
-func NewEngine(localSubnets []string, localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint,
-	clientset *submarinerClientset.Clientset, submNamespace string, version string, stopCh <-chan struct{}) (Engine, error) {
+func NewEngine(localSubnets []string, localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) (Engine, error) {
 
 	i := engine{
-		clientset:     clientset,
-		namespace:     submNamespace,
 		localCluster:  localCluster,
 		localEndpoint: localEndpoint,
 		localSubnets:  localSubnets,
 		driver:        nil,
-		version:       version,
 	}
-
-	go wait.Until(i.syncGatewayStatus, GatewayUpdateIntervalSeconds*time.Second, stopCh)
-
-	klog.Info("CableEngine controller started")
 
 	return &i, nil
 }
 
+func (i *engine) GetLocalEndpoint() *types.SubmarinerEndpoint {
+	return &i.localEndpoint
+}
+
 func (i *engine) StartEngine() error {
+
+	klog.Infof("CableEngine controller started, driver: %q", i.driver.GetName())
 	if err := i.startDriver(); err != nil {
 		return err
 	}
-
-	klog.Infof("Starting %s", i.driver.GetName())
 
 	return nil
 
@@ -147,4 +143,24 @@ func (i *engine) RemoveCable(endpoint types.SubmarinerEndpoint) error {
 
 	klog.Infof("Successfully removed Endpoint cable %q", endpoint.Spec.CableName)
 	return nil
+}
+
+func (i *engine) GetHAStatus() v1.HAStatus {
+	if i.driver == nil {
+		return v1.HAStatusPassive
+	} else {
+		// we may want to add a call to the driver in the future, for situations where
+		// the driver is running from the start, but could be in passive status, or
+		// in active/active.
+		return v1.HAStatusActive
+	}
+}
+
+func (i *engine) ListCableConnections() (*[]v1.Connection, error) {
+
+	if i.driver != nil {
+		return i.driver.GetConnections()
+	}
+	// if no driver, we can safely report that no connections exist
+	return &[]v1.Connection{}, nil
 }

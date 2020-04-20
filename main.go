@@ -11,6 +11,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/cableengine"
+	"github.com/submariner-io/submariner/pkg/cableengine/syncer"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions"
 	"github.com/submariner-io/submariner/pkg/controllers/datastoresyncer"
@@ -119,11 +120,18 @@ func main() {
 		klog.Fatalf("Error creating local endpoint object from %#v: %v", submSpec, err)
 	}
 
-	cableEngine, err := cableengine.NewEngine(localSubnets, localCluster, localEndpoint, submarinerClient,
-		submSpec.Namespace, VERSION, stopCh)
+	cableEngine, err := cableengine.NewEngine(localSubnets, localCluster, localEndpoint)
+
 	if err != nil {
 		klog.Fatalf("Fatal error occurred creating engine: %v", err)
 	}
+
+	cableEngineSyncer := syncer.NewCableEngineSyncer(
+		cableEngine,
+		submarinerClient.SubmarinerV1().Gateways(submSpec.Namespace),
+		VERSION)
+
+	cableEngineSyncer.Run(stopCh)
 
 	start := func(context.Context) {
 		klog.Info("Creating the tunnel controller")
