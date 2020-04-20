@@ -6,6 +6,8 @@ import (
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/submariner-io/submariner/pkg/log"
+	"github.com/submariner-io/submariner/pkg/routeagent/controllers/route"
+
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,6 +41,8 @@ func NewController(spec *SubmarinerIpamControllerSpecification, config *Informer
 		servicesSynced:   config.ServiceInformer.Informer().HasSynced,
 		podWorkqueue:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Pods"),
 		podsSynced:       config.PodInformer.Informer().HasSynced,
+		nodeWorkqueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Nodes"),
+		nodesSynced:      config.NodeInformer.Informer().HasSynced,
 
 		excludeNamespaces: exclusionMap,
 		pool:              pool,
@@ -62,6 +66,15 @@ func NewController(spec *SubmarinerIpamControllerSpecification, config *Informer
 			ipamController.handleUpdatePod(old, newObj)
 		},
 		DeleteFunc: ipamController.handleRemovedPod,
+	}, handlerResync)
+	config.NodeInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			ipamController.enqueueObject(obj, ipamController.nodeWorkqueue)
+		},
+		UpdateFunc: func(old, newObj interface{}) {
+			ipamController.handleUpdateNode(old, newObj)
+		},
+		DeleteFunc: ipamController.handleRemovedNode,
 	}, handlerResync)
 
 	return ipamController, nil
@@ -92,6 +105,7 @@ func (i *Controller) Run(stopCh <-chan struct{}) error {
 	klog.Info("Starting workers")
 	go wait.Until(i.runServiceWorker, time.Second, stopCh)
 	go wait.Until(i.runPodWorker, time.Second, stopCh)
+	go wait.Until(i.runNodeWorker, time.Second, stopCh)
 	<-stopCh
 	klog.Info("Shutting down workers")
 	i.cleanupIPTableRules()
@@ -105,6 +119,11 @@ func (i *Controller) runServiceWorker() {
 
 func (i *Controller) runPodWorker() {
 	for i.processNextObject(i.podWorkqueue, i.podGetter, i.podUpdater) {
+	}
+}
+
+func (i *Controller) runNodeWorker() {
+	for i.processNextObject(i.nodeWorkqueue, i.nodeGetter, i.nodeUpdater) {
 	}
 }
 
@@ -163,6 +182,13 @@ func (i *Controller) processNextObject(objWorkqueue workqueue.RateLimitingInterf
 				if pod.Status.PodIP == pod.Status.HostIP {
 					klog.V(log.DEBUG).Infof("Ignoring pod %s on host %s as it uses hostNetworking", pod.Name, pod.Status.PodIP)
 					return nil
+				}
+			case *k8sv1.Node:
+				node := runtimeObj.(*k8sv1.Node)
+				switch i.evaluateNode(node) {
+				case Requeue:
+					objWorkqueue.AddRateLimited(obj)
+					return fmt.Errorf("Node %s requeued %d times", key, objWorkqueue.NumRequeues(obj))
 				}
 			}
 
@@ -263,6 +289,31 @@ func (i *Controller) handleUpdatePod(old interface{}, newObj interface{}) {
 	}
 }
 
+func (i *Controller) handleUpdateNode(old interface{}, newObj interface{}) {
+	// Todo minimize the duplication
+	var key string
+	var err error
+	if key, err = cache.MetaNamespaceKeyFunc(newObj); err != nil {
+		utilruntime.HandleError(err)
+		return
+	}
+
+	oldCniIfaceIpOnNode := old.(*k8sv1.Node).GetAnnotations()[route.CniInterfaceIp]
+	newCniIfaceIpOnNode := newObj.(*k8sv1.Node).GetAnnotations()[route.CniInterfaceIp]
+	if oldCniIfaceIpOnNode == "" && newCniIfaceIpOnNode == "" {
+		klog.V(log.DEBUG).Infof("In handleUpdateNode, node %q is not yet annotated with cniIfaceIP, enqueing", newObj.(*k8sv1.Node).Name)
+		i.enqueueObject(newObj, i.nodeWorkqueue)
+		return
+	}
+
+	oldGlobalIp := old.(*k8sv1.Node).GetAnnotations()[submarinerIpamGlobalIp]
+	newGlobalIp := newObj.(*k8sv1.Node).GetAnnotations()[submarinerIpamGlobalIp]
+	if oldGlobalIp != newGlobalIp && newGlobalIp != i.pool.GetAllocatedIp(key) {
+		klog.V(log.DEBUG).Infof("GlobalIp changed from %s to %s for %s", oldGlobalIp, newGlobalIp, key)
+		i.enqueueObject(newObj, i.nodeWorkqueue)
+	}
+}
+
 func (i *Controller) handleRemovedService(obj interface{}) {
 	//TODO: further minimize duplication between this and handleRemovedPod
 	var service *k8sv1.Service
@@ -326,6 +377,38 @@ func (i *Controller) handleRemovedPod(obj interface{}) {
 	}
 }
 
+func (i *Controller) handleRemovedNode(obj interface{}) {
+	// TODO: further minimize duplication between this and handleRemovedPod
+	var node *k8sv1.Node
+	var ok bool
+	var key string
+	var err error
+	if node, ok = obj.(*k8sv1.Node); !ok {
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			klog.Errorf("Could not convert object %v to Node", obj)
+			return
+		}
+		node, ok = tombstone.Obj.(*k8sv1.Node)
+		if !ok {
+			klog.Errorf("Could not convert object tombstone %v to Node", tombstone.Obj)
+			return
+		}
+	}
+
+	globalIp := node.Annotations[submarinerIpamGlobalIp]
+	cniIfaceIp := node.Annotations[route.CniInterfaceIp]
+	if globalIp != "" && cniIfaceIp != "" {
+		if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
+			utilruntime.HandleError(err)
+			return
+		}
+		i.pool.Release(key)
+		i.syncNodeRules(cniIfaceIp, globalIp, DeleteRules)
+		klog.V(log.DEBUG).Infof("Released ip %s for Node %s", globalIp, key)
+	}
+}
+
 func (i *Controller) annotateGlobalIp(key string, globalIp string) (string, error) {
 	var ip string
 	var err error
@@ -357,6 +440,10 @@ func (i *Controller) podGetter(namespace, name string) (runtime.Object, error) {
 	return i.kubeClientSet.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
 }
 
+func (i *Controller) nodeGetter(namespace, name string) (runtime.Object, error) {
+	return i.kubeClientSet.CoreV1().Nodes().Get(name, metav1.GetOptions{})
+}
+
 func (i *Controller) serviceUpdater(obj runtime.Object, key string) error {
 	service := obj.(*k8sv1.Service)
 	existingGlobalIp := service.GetAnnotations()[submarinerIpamGlobalIp]
@@ -379,6 +466,7 @@ func (i *Controller) serviceUpdater(obj runtime.Object, key string) error {
 		_, updateErr := i.kubeClientSet.CoreV1().Services(service.Namespace).Update(service)
 		return updateErr
 	} else if existingGlobalIp != "" {
+		klog.V(log.DEBUG).Infof("GatewayNode seems to have migrated, sync rules for Service %q", service.Name)
 		// When Globalnet Controller is migrated, we get notification for all the existing services.
 		// For services that already have the annotation, we update the local ipPool cache and sync
 		// the iptable rules on the node.
@@ -410,10 +498,43 @@ func (i *Controller) podUpdater(obj runtime.Object, key string) error {
 		_, updateErr := i.kubeClientSet.CoreV1().Pods(pod.Namespace).Update(pod)
 		return updateErr
 	} else if existingGlobalIp != "" {
+		klog.V(log.DEBUG).Infof("GatewayNode seems to have migrated, sync rules for Pod %q", pod.Name)
 		// When Globalnet Controller is migrated, we get notification for all the existing PODs.
 		// For PODs that already have the annotation, we update the local ipPool cache and sync
 		// the iptable rules on the node.
 		i.syncPodRules(pod.Status.PodIP, existingGlobalIp, AddRules)
+	}
+	return nil
+}
+
+func (i *Controller) nodeUpdater(obj runtime.Object, key string) error {
+	node := obj.(*k8sv1.Node)
+	cniIfaceIP := node.GetAnnotations()[route.CniInterfaceIp]
+	existingGlobalIp := node.GetAnnotations()[submarinerIpamGlobalIp]
+	allocatedIp, err := i.annotateGlobalIp(key, existingGlobalIp)
+	if err != nil { // failed to get globalIp or failed to update, we want to retry
+		logAndRequeue(key, i.nodeWorkqueue)
+		return fmt.Errorf("failed to annotate GlobalIp to node %s: %v", key, err)
+	}
+
+	// This case is hit when the Node does not have the globalIp annotation and a new globalIp is allocated
+	// or when the existing annotation on the Node does not match with the allocated globalIp.
+	if allocatedIp != "" {
+		annotations := node.GetAnnotations()
+		if annotations == nil {
+			annotations = map[string]string{}
+		}
+		annotations[submarinerIpamGlobalIp] = allocatedIp
+		node.SetAnnotations(annotations)
+		i.syncNodeRules(cniIfaceIP, allocatedIp, AddRules)
+		_, updateErr := i.kubeClientSet.CoreV1().Nodes().Update(node)
+		return updateErr
+	} else if existingGlobalIp != "" {
+		klog.V(log.DEBUG).Infof("GatewayNode seems to have migrated, sync rules for node %q", node.Name)
+		// When Globalnet Controller is migrated, we get notification for all the existing nodes.
+		// For nodes that already have the annotation, we update the local ipPool cache and sync
+		// the iptable rules on the node.
+		i.syncNodeRules(cniIfaceIP, existingGlobalIp, AddRules)
 	}
 	return nil
 }

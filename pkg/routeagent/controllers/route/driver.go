@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"net"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
 
 	"github.com/submariner-io/submariner/pkg/log"
@@ -57,5 +59,30 @@ func toggleCNISpecificConfiguration(iface string) error {
 	} else {
 		klog.V(log.DEBUG).Infof("Successfully configured rp_filter to loose mode(2) on cniInterface %q", iface)
 	}
+	return nil
+}
+
+func (r *Controller) annotateNodeWithCNIInterfaceIP(nodeName string) error {
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		node, err := r.clientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("unable to get node info for node %v, err: %s", nodeName, err)
+		} else {
+			annotations := node.GetAnnotations()
+			if annotations == nil {
+				annotations = map[string]string{}
+			}
+			annotations[CniInterfaceIp] = r.cniIface.ipAddress
+			node.SetAnnotations(annotations)
+			_, updateErr := r.clientSet.CoreV1().Nodes().Update(node)
+			return updateErr
+		}
+	})
+
+	if retryErr != nil {
+		return fmt.Errorf("error updatating node %q, err: %s", nodeName, retryErr)
+	}
+
+	klog.Infof("Successfully annotated node %q with cniIfaceIP %q", nodeName, r.cniIface.ipAddress)
 	return nil
 }

@@ -12,6 +12,15 @@ E2E_DIR=${DAPPER_SOURCE}/scripts/kind-e2e/
 
 ### Functions ###
 
+function deploy_env_once() {
+    if with_context cluster3 kubectl wait --for=condition=Ready pods -l app=submariner-engine -n "${SUBM_NS}" --timeout=3s > /dev/null 2>&1; then
+        echo "Submariner already deployed, skipping deployment..."
+        return
+    fi
+
+    make deploy
+}
+
 function test_with_e2e_tests {
     set -o pipefail 
 
@@ -28,6 +37,7 @@ function test_with_e2e_tests {
 
 declare_kubeconfig
 
+deploy_env_once
 test_with_e2e_tests
 
 cat << EOM

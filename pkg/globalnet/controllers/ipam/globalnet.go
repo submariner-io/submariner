@@ -53,7 +53,7 @@ func (i *Controller) initIPTableChains() error {
 }
 
 func (i *Controller) syncPodRules(podIP, globalIP string, addRules bool) {
-	err := i.updateEgressRulesForPod(podIP, globalIP, addRules)
+	err := i.updateEgressRulesForResource("Pod", podIP, globalIP, addRules)
 	if err != nil {
 		klog.Errorf("Error updating egress rules for pod %s: %v", podIP, err)
 		return
@@ -65,6 +65,14 @@ func (i *Controller) syncServiceRules(service *k8sv1.Service, globalIP string, a
 	err := i.updateIngressRulesForService(globalIP, chainName, addRules)
 	if err != nil {
 		klog.Errorf("Error updating ingress rules for service %#v: %v", service, err)
+		return
+	}
+}
+
+func (i *Controller) syncNodeRules(cniIfaceIP, globalIP string, addRules bool) {
+	err := i.updateEgressRulesForResource("Node", cniIfaceIP, globalIP, addRules)
+	if err != nil {
+		klog.Errorf("Error updating egress rules for Node %s: %v", cniIfaceIP, err)
 		return
 	}
 }
@@ -82,6 +90,18 @@ func (i *Controller) evaluateService(service *k8sv1.Service) Operation {
 
 	chainName := i.kubeProxyClusterIpServiceChainName(service)
 	if chainExists, _ := i.doesIPTablesChainExist("nat", chainName); !chainExists {
+		return Requeue
+	}
+	return Process
+}
+
+func (i *Controller) evaluateNode(node *k8sv1.Node) Operation {
+	cniIfaceIP := node.GetAnnotations()[route.CniInterfaceIp]
+	if cniIfaceIP == "" {
+		// To support connectivity from HostNetwork to remoteCluster, globalnet requires the
+		// cniIfaceIP of the respective node. Route-agent running on the node annotates the
+		// respective node with the cniIfaceIP. In this API, we check for the presence of this
+		// annotation and process the node event only when the annotation exists.
 		return Requeue
 	}
 	return Process

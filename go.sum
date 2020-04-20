@@ -161,6 +161,8 @@ github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UV
 github.com/submariner-io/shipyard v0.0.0-20200318121825-f090de57e01b/go.mod h1:tm9TSwLsOFQxsOgbXCC4EpPQF01K4fsxUJaV+0rn4pI=
 github.com/submariner-io/shipyard v0.0.0-20200324112155-1429f74326da h1:UdL2BuLqaFepyEI9BpSVZBYsxIF19hTxPkKbYohJtuM=
 github.com/submariner-io/shipyard v0.0.0-20200324112155-1429f74326da/go.mod h1:tm9TSwLsOFQxsOgbXCC4EpPQF01K4fsxUJaV+0rn4pI=
+github.com/submariner-io/shipyard v0.0.0-20200415131458-43e0c8dc8ea3 h1:ORpKiuzSyL3pMHt6y9RbMSlyBkhcVxO7mtddatr1HMo=
+github.com/submariner-io/shipyard v0.0.0-20200415131458-43e0c8dc8ea3/go.mod h1:tm9TSwLsOFQxsOgbXCC4EpPQF01K4fsxUJaV+0rn4pI=
 github.com/submariner-io/submariner v0.2.0/go.mod h1:rQ/EyWEE9fZT9xx1lsi6fP75ig9Rye+b4pmP2Tw8qSE=
 github.com/vishvananda/netlink v1.0.0 h1:bqNY2lgheFIu1meHUFSH3d7vG93AFyqg3oGbJCOJgSM=
 github.com/vishvananda/netlink v1.0.0/go.mod h1:+SR5DhBJrl6ZM7CoCKvpw5BKroDKQ+PJqOg65H/2ktk=

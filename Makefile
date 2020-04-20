@@ -1,4 +1,5 @@
 build_debug ?= false
+restart ?= all
 
 ifneq (,$(DAPPER_HOST_ARCH))
 
@@ -11,11 +12,11 @@ CLUSTERS_ARGS = --cluster_settings $(DAPPER_SOURCE)/scripts/kind-e2e/cluster_set
 
 clusters: build images
 
-e2e: deploy
+e2e: # internally depends on deploy target, which will execute only if not already deployed
 	./scripts/kind-e2e/e2e.sh
 
 reload-images: build images
-	./scripts/$@
+	./scripts/$@ --restart $(restart)
 
 images: build
 	./scripts/$@ $(images_flags)
