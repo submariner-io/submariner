@@ -66,11 +66,13 @@ func (i *engine) GetLocalEndpoint() *types.SubmarinerEndpoint {
 
 func (i *engine) StartEngine() error {
 
-	klog.Infof("CableEngine controller started, driver: %q", i.driver.GetName())
+	i.Lock()
+	defer i.Unlock()
+
 	if err := i.startDriver(); err != nil {
 		return err
 	}
-
+	klog.Infof("CableEngine controller started, driver: %q", i.driver.GetName())
 	return nil
 
 }
@@ -146,6 +148,8 @@ func (i *engine) RemoveCable(endpoint types.SubmarinerEndpoint) error {
 }
 
 func (i *engine) GetHAStatus() v1.HAStatus {
+	i.Lock()
+	defer i.Unlock()
 	if i.driver == nil {
 		return v1.HAStatusPassive
 	} else {
@@ -157,6 +161,8 @@ func (i *engine) GetHAStatus() v1.HAStatus {
 }
 
 func (i *engine) ListCableConnections() (*[]v1.Connection, error) {
+	i.Lock()
+	defer i.Unlock()
 
 	if i.driver != nil {
 		return i.driver.GetConnections()

@@ -14,6 +14,7 @@ import (
 
 var _ = Describe("[gateway] Gateway reporting tests", func() {
 	f := subFramework.NewFramework("gateway-reporting")
+	AfterEach(f.GatewayCleanup)
 
 	When("any gateway node is configured", func() {
 		It("should be reported to the Gateway API", func() {

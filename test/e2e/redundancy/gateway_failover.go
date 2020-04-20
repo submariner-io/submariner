@@ -15,7 +15,7 @@ import (
 
 var _ = Describe("[redundancy] Gateway fail-over tests", func() {
 	f := subFramework.NewFramework("gateway-redundancy")
-
+	AfterEach(f.GatewayCleanup)
 	When("one gateway node is configured and the submariner engine pod fails", func() {
 		It("should start a new submariner engine pod and be able to connect from another cluster", func() {
 			testEnginePodRestartScenario(f)

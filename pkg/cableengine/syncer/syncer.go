@@ -2,7 +2,6 @@ package syncer
 
 import (
 	"fmt"
-	"os"
 	"reflect"
 	"strconv"
 	"sync"
@@ -19,7 +18,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/log"
 )
 
-type CableEngineSyncer struct {
+type GatewaySyncer struct {
 	sync.Mutex
 	client  v1typed.GatewayInterface
 	engine  cableengine.Engine
@@ -31,24 +30,22 @@ const GatewayStaleTimeoutSeconds = GatewayUpdateIntervalSeconds * 3
 const updateTimestampAnnotation = "update-timestamp"
 
 // NewEngine creates a new Engine for the local cluster
-func NewCableEngineSyncer(engine cableengine.Engine, client v1typed.GatewayInterface,
-	version string) *CableEngineSyncer {
+func NewGatewaySyncer(engine cableengine.Engine, client v1typed.GatewayInterface,
+	version string) *GatewaySyncer {
 
-	s := CableEngineSyncer{
+	return &GatewaySyncer{
 		client:  client,
 		engine:  engine,
 		version: version,
 	}
-
-	return &s
 }
 
-func (s *CableEngineSyncer) Run(stopCh <-chan struct{}) {
+func (s *GatewaySyncer) Run(stopCh <-chan struct{}) {
 	go wait.Until(s.syncGatewayStatus, GatewayUpdateIntervalSeconds*time.Second, stopCh)
 	klog.Info("CableEngine syncer started")
 }
 
-func (i *CableEngineSyncer) syncGatewayStatus() {
+func (i *GatewaySyncer) syncGatewayStatus() {
 
 	i.Lock()
 	defer i.Unlock()
@@ -103,7 +100,7 @@ func (i *CableEngineSyncer) syncGatewayStatus() {
 	}
 }
 
-func (i *CableEngineSyncer) cleanupStaleGatewayEntries() error {
+func (i *GatewaySyncer) cleanupStaleGatewayEntries() error {
 	gateways, err := i.client.List(metav1.ListOptions{})
 	if err != nil {
 		return err
@@ -129,6 +126,10 @@ func (i *CableEngineSyncer) cleanupStaleGatewayEntries() error {
 
 func isGatewayStale(gateway v1.Gateway) (bool, error) {
 
+	if gateway.ObjectMeta.Annotations == nil {
+		return true, nil
+	}
+
 	timestamp, ok := gateway.ObjectMeta.Annotations[updateTimestampAnnotation]
 	if !ok {
 		return true, fmt.Errorf("%q annotation not found", updateTimestampAnnotation)
@@ -143,36 +144,31 @@ func isGatewayStale(gateway v1.Gateway) (bool, error) {
 	return now >= (timestampInt + GatewayStaleTimeoutSeconds), nil
 }
 
-func (i *CableEngineSyncer) getLastSyncedGateway(name string) (*v1.Gateway, error) {
+func (i *GatewaySyncer) getLastSyncedGateway(name string) (*v1.Gateway, error) {
 
 	existingGw, err := i.client.Get(name, metav1.GetOptions{})
 	klog.V(log.TRACE).Infof("getLastSyncedGateway: %+v", existingGw)
 	return existingGw, err
 }
 
-func (i *CableEngineSyncer) generateGatewayObject() (*v1.Gateway, error) {
-	var hostName string
-	var err error
-
-	if hostName, err = os.Hostname(); err != nil {
-		return nil, err
-	}
+func (i *GatewaySyncer) generateGatewayObject() (*v1.Gateway, error) {
+	localEndpoint := i.engine.GetLocalEndpoint()
 
 	gateway := v1.Gateway{
 		Status: v1.GatewayStatus{
 			Version:       i.version,
-			LocalEndpoint: i.engine.GetLocalEndpoint().Spec,
+			LocalEndpoint: localEndpoint.Spec,
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        hostName,
+			Name:        localEndpoint.Spec.Hostname,
 			Annotations: map[string]string{updateTimestampAnnotation: strconv.FormatInt(time.Now().UTC().Unix(), 10)}},
 	}
 
 	gateway.Status.HAStatus = i.engine.GetHAStatus()
-	gateway.SetLabels(map[string]string{v1.HAStatusGatewayLabel: string(gateway.Status.HAStatus)})
 
 	connections, err := i.engine.ListCableConnections()
 	if err != nil {
+		gateway.Status.StatusFailure = fmt.Sprintf("error getting driver connections: %s", err)
 		klog.Errorf("error getting driver connections: %s", err)
 		return nil, err
 	}

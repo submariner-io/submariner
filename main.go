@@ -126,7 +126,7 @@ func main() {
 		klog.Fatalf("Fatal error occurred creating engine: %v", err)
 	}
 
-	cableEngineSyncer := syncer.NewCableEngineSyncer(
+	cableEngineSyncer := syncer.NewGatewaySyncer(
 		cableEngine,
 		submarinerClient.SubmarinerV1().Gateways(submSpec.Namespace),
 		VERSION)

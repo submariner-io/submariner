@@ -27,7 +27,6 @@ func init() {
 // NewFramework creates a test framework.
 func NewFramework(baseName string) *Framework {
 	f := &Framework{Framework: framework.NewFramework(baseName)}
-	framework.AddCleanupAction(f.gatewayCleanup)
 	return f
 }
 
@@ -108,13 +107,14 @@ func (f *Framework) AwaitForGatewayGone(cluster framework.ClusterIndex, name str
 
 }
 
-// gatewayCleanup ensures that only the active gateway node is flagged as gateway node
+// GatewayCleanup ensures that only the active gateway node is flagged as gateway node
 //                which could not be after a failed test which left the system on an
 //                unexpected state
-func (f *Framework) gatewayCleanup() {
+func (f *Framework) GatewayCleanup() {
 	gatewayClient := SubmarinerClients[framework.ClusterA].SubmarinerV1().Gateways(
 		framework.TestContext.SubmarinerNamespace)
-	gwList, err := gatewayClient.List(metav1.ListOptions{LabelSelector: submarinerv1.HAStatusPassiveSelector})
+	gwList, err := gatewayClient.List(
+		metav1.ListOptions{FieldSelector: "status.haStatus=" + submarinerv1.HAStatusPassiveSelector})
 	Expect(err).NotTo(HaveOccurred())
 
 	if len(gwList.Items) == 0 {
