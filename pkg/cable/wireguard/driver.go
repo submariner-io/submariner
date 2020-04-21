@@ -5,6 +5,9 @@ import (
 	"net"
 	"os"
 	"sync"
+	"time"
+
+	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/log"
@@ -26,6 +29,9 @@ const (
 	// PublicKey is name (key) of publicKey entry in back-end map
 	PublicKey = "publicKey"
 
+	// KeepAliveInterval specifies 1/3 timeout for announcing a connection ERROR
+	KeepAliveInterval = 10 * time.Second
+
 	cableDriverName = "wireguard"
 )
 
@@ -36,7 +42,8 @@ func init() {
 type wireguard struct {
 	localSubnets  []net.IPNet
 	localEndpoint types.SubmarinerEndpoint
-	peers         map[string]wgtypes.Key // clusterID -> publicKey
+	peers         map[string]wgtypes.Key    // clusterID -> publicKey
+	connections   map[string]*v1.Connection // clusterID -> publicKey
 	mutex         sync.Mutex
 	client        *wgctrl.Client
 	link          netlink.Link
@@ -49,6 +56,7 @@ func NewDriver(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (c
 
 	w := wireguard{
 		peers:         make(map[string]wgtypes.Key),
+		connections:   make(map[string]*v1.Connection),
 		localEndpoint: localEndpoint,
 	}
 
@@ -134,16 +142,24 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 		return "", fmt.Errorf("failed to parse peer public key: %v", err)
 	}
 
-	klog.V(log.DEBUG).Infof("Connecting cluster %s endpoint %s with publicKey %s", remoteEndpoint.Spec.ClusterID, remoteIP, remoteKey)
+	klog.V(log.DEBUG).Infof("Connecting cluster %s endpoint %s with publicKey %s",
+		remoteEndpoint.Spec.ClusterID, remoteIP, remoteKey)
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 
-	// delete old peers for ClusterID
+	// create connection, overwrite existing connection
+	connection := v1.NewConnection(remoteEndpoint.Spec)
+	w.connections[remoteEndpoint.Spec.ClusterID] = connection
+
+	// delete or update old peers for ClusterID
 	oldKey, found := w.peers[remoteEndpoint.Spec.ClusterID]
 	if found {
 		if oldKey.String() == remoteKey.String() {
-			//TODO check that peer config has not changed (eg allowedIPs)
-			klog.V(log.DEBUG).Infof("Skipping update of existing peer key %s", oldKey)
+			// keys match, existing peer, so lets update status
+			if err := w.updatePeerStatus(remoteKey, connection); err != nil {
+				klog.Warningf("Could not update peer %s status, ignoring: %v", remoteKey, err)
+			}
+			klog.V(log.DEBUG).Infof("Skipping connect for existing peer key %s", oldKey)
 			return ip, nil
 		}
 
@@ -154,6 +170,8 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 	}
 
 	// configure peer
+	connection.SetStatus(v1.Connecting, "Connection has been created but not yet started")
+	ka := KeepAliveInterval
 	peerCfg := []wgtypes.PeerConfig{{
 		PublicKey:    *remoteKey,
 		Remove:       false,
@@ -163,7 +181,7 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 			IP:   remoteIP,
 			Port: DefaultListenPort,
 		},
-		PersistentKeepaliveInterval: nil,
+		PersistentKeepaliveInterval: &ka,
 		ReplaceAllowedIPs:           true,
 		AllowedIPs:                  allowedIPs,
 	}}
@@ -176,10 +194,10 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 	}
 
 	// verify peer was added
-	// TODO verify configuration
 	if p, err := w.peerByKey(remoteKey); err != nil {
 		klog.Errorf("Failed to verify peer configuration: %v", err)
 	} else {
+		// TODO verify configuration
 		klog.V(log.DEBUG).Infof("Peer configured: %+v", p)
 	}
 
@@ -253,6 +271,7 @@ func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoi
 	}
 	// no delete on mismatch
 	delete(w.peers, remoteEndpoint.Spec.ClusterID)
+	delete(w.connections, remoteEndpoint.Spec.ClusterID)
 
 	// del routes
 	allowedIPs := parseSubnets(remoteEndpoint.Spec.Subnets)
