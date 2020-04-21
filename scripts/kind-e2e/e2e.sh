@@ -3,14 +3,12 @@
 ## Process command line flags ##
 
 source /usr/share/shflags/shflags
-DEFINE_string 'deploytool' 'operator' 'Tool to use for deploying (operator/helm)'
 DEFINE_string 'focus' '.*' 'Ginkgo focus for the E2E tests'
 FLAGS "$@" || exit $?
 eval set -- "${FLAGS_ARGV}"
 
-deploytool="${FLAGS_deploytool}"
 focus="${FLAGS_focus}"
-echo "Running with: deploytool=${deploytool} focus=${focus}"
+echo "Running with: focus=${focus}"
 
 set -em
 
@@ -23,18 +21,6 @@ source ${SCRIPTS_DIR}/lib/utils
 E2E_DIR=${DAPPER_SOURCE}/scripts/kind-e2e/
 
 ### Functions ###
-
-# TODO: Copied from shipyard since deploytool determines the namespace, we should fix operator to use the same namespace (or receive it).
-function load_deploytool() {
-    local deploy_lib=${SCRIPTS_DIR}/lib/deploy_${deploytool}
-    if [[ ! -f $deploy_lib ]]; then
-        echo "Unknown deploy method: ${deploytool}"
-        exit 1
-    fi
-
-    echo "Will deploy submariner using ${deploytool}"
-    . $deploy_lib
-}
 
 function deploy_env_once() {
     if with_context cluster3 kubectl wait --for=condition=Ready pods -l app=submariner-engine -n "${SUBM_NS}" --timeout=3s > /dev/null 2>&1; then
@@ -58,15 +44,9 @@ function test_with_e2e_tests {
         tee ${DAPPER_OUTPUT}/e2e-tests.log
 }
 
-function cleanup {
-    "${SCRIPTS_DIR}"/cleanup.sh
-}
-
 ### Main ###
 
 declare_kubeconfig
-
-load_deploytool
 
 deploy_env_once
 test_with_e2e_tests
