@@ -14,7 +14,7 @@ jobs:
   include:
   - env: CMD="make test validate codegen"
   - env: CMD="make e2e" DEPLOY=true
-  - env: CMD="make e2e deploytool=helm globalnet=true"
+  - env: CMD="make e2e" CLUSTERS_ARGS="--globalnet true" DEPLOY_ARGS="${CLUSTERS_ARGS} --deploytool helm"
 
 install:
   - sudo apt-get install moreutils # make ts available
