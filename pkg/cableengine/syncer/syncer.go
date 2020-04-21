@@ -77,7 +77,6 @@ func (i *GatewaySyncer) syncGatewayStatus() {
 		if !reflect.DeepEqual(gatewayObj.Status, existingGw.Status) {
 			klog.V(log.TRACE).Infof("Gateway object needs an update: %+v", gatewayObj)
 			existingGw.Status = gatewayObj.Status
-			existingGw.Labels = gatewayObj.Labels
 			existingGw.Annotations = gatewayObj.Annotations
 
 			gw, err := i.client.Update(existingGw)

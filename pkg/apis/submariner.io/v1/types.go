@@ -72,10 +72,6 @@ type Gateway struct {
 	Status            GatewayStatus `json:"status"`
 }
 
-const HAStatusGatewayLabel = "ha-status"
-const HAStatusActiveSelector = string(HAStatusGatewayLabel + "=" + HAStatusActive)
-const HAStatusPassiveSelector = string(HAStatusGatewayLabel + "=" + HAStatusPassive)
-
 type GatewayStatus struct {
 	Version       string       `json:"version"`
 	HAStatus      HAStatus     `json:"haStatus"`
