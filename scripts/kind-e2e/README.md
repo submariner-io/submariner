@@ -86,6 +86,28 @@ manually, then run:
 make reload-images restart=none
 ```
 
+#### Re-running e2e tests after your code changes
+Once your kind virtual clusters and submariner are deployed, you can re-run e2e just by repeating the `make e2e` call.
+Deployment and install will be avoided, hence the existing environment will remain as is.
+If you need to load new container images, please check `make reload-images` from the previous section.
+
+In case you want to re-run just the tests:
+```bash
+make e2e
+```
+
+In case you want to use updated images and re-run the tests:
+```bash
+make reload-images e2e
+```
+
+You can focus the e2e tests on specific tags by using the focus makefile env. The following
+example runs only the tests tagged as [redundancy].
+
+```bash
+make e2e focus=redundancy
+```
+
 #### Cleanup
 At any time you can run a cleanup command that will remove all the kind clusters.
 
