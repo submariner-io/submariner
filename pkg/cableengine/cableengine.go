@@ -33,11 +33,14 @@ type Engine interface {
 	RemoveCable(remote types.SubmarinerEndpoint) error
 	// ListCableConnections returns a list of cable connection, and the related status
 	ListCableConnections() (*[]v1.Connection, error)
+	// GetLocalEndpoint returns the local endpoint for this cable engine
+	GetLocalEndpoint() *types.SubmarinerEndpoint
+	// GetHAStatus returns the HA status for this cable engine
+	GetHAStatus() v1.HAStatus
 }
 
 type engine struct {
 	sync.Mutex
-
 	driver        cable.Driver
 	localSubnets  []string
 	localCluster  types.SubmarinerCluster
@@ -46,22 +49,45 @@ type engine struct {
 
 // NewEngine creates a new Engine for the local cluster
 func NewEngine(localSubnets []string, localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) (Engine, error) {
-	driver, err := cable.NewDriver(localSubnets, localEndpoint)
-	if err != nil {
-		return nil, err
-	}
 
-	return &engine{
+	i := engine{
 		localCluster:  localCluster,
 		localEndpoint: localEndpoint,
 		localSubnets:  localSubnets,
-		driver:        driver,
-	}, nil
+		driver:        nil,
+	}
+
+	return &i, nil
+}
+
+func (i *engine) GetLocalEndpoint() *types.SubmarinerEndpoint {
+	return &i.localEndpoint
 }
 
 func (i *engine) StartEngine() error {
-	klog.Infof("Starting %s", i.driver.GetName())
-	return i.driver.Init()
+
+	i.Lock()
+	defer i.Unlock()
+
+	if err := i.startDriver(); err != nil {
+		return err
+	}
+	klog.Infof("CableEngine controller started, driver: %q", i.driver.GetName())
+	return nil
+
+}
+
+func (i *engine) startDriver() error {
+	var err error
+
+	if i.driver, err = cable.NewDriver(i.localSubnets, i.localEndpoint); err != nil {
+		return err
+	}
+
+	if err = i.driver.Init(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
@@ -121,7 +147,26 @@ func (i *engine) RemoveCable(endpoint types.SubmarinerEndpoint) error {
 	return nil
 }
 
-func (i *engine) ListCableConnections() (*[]v1.Connection, error) {
+func (i *engine) GetHAStatus() v1.HAStatus {
+	i.Lock()
+	defer i.Unlock()
+	if i.driver == nil {
+		return v1.HAStatusPassive
+	} else {
+		// we may want to add a call to the driver in the future, for situations where
+		// the driver is running from the start, but could be in passive status, or
+		// in active/active.
+		return v1.HAStatusActive
+	}
+}
 
-	return i.driver.GetConnections()
+func (i *engine) ListCableConnections() (*[]v1.Connection, error) {
+	i.Lock()
+	defer i.Unlock()
+
+	if i.driver != nil {
+		return i.driver.GetConnections()
+	}
+	// if no driver, we can safely report that no connections exist
+	return &[]v1.Connection{}, nil
 }

@@ -73,10 +73,11 @@ type Gateway struct {
 }
 
 type GatewayStatus struct {
-	Version     string       `json:"version"`
-	HAStatus    HAStatus     `json:"haStatus"`
-	Host        string       `json:"host"`
-	Connections []Connection `json:"connections"`
+	Version       string       `json:"version"`
+	HAStatus      HAStatus     `json:"haStatus"`
+	LocalEndpoint EndpointSpec `json:"localEndpoint"`
+	StatusFailure string       `json:"statusMessage"`
+	Connections   []Connection `json:"connections"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -90,8 +91,8 @@ type GatewayList struct {
 type HAStatus string
 
 const (
-	HAStatusActive  HAStatus = "ACTIVE"
-	HAStatusPassive HAStatus = "PASSIVE"
+	HAStatusActive  HAStatus = "active"
+	HAStatusPassive HAStatus = "passive"
 )
 
 type Connection struct {
@@ -103,9 +104,9 @@ type Connection struct {
 type ConnectionStatus string
 
 const (
-	Connected       ConnectionStatus = "CONNECTED"
-	Connecting      ConnectionStatus = "CONNECTING"
-	ConnectionError ConnectionStatus = "ERROR"
+	Connected       ConnectionStatus = "connected"
+	Connecting      ConnectionStatus = "connecting"
+	ConnectionError ConnectionStatus = "error"
 )
 
 func NewConnection(endpointSpec EndpointSpec) *Connection {
