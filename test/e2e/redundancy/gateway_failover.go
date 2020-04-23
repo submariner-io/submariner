@@ -41,9 +41,8 @@ var _ = Describe("[redundancy] Gateway fail-over tests", func() {
 
 func testBasicGatewayReporting(f *subFramework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
-
-	By(fmt.Sprintf("Ensuring that one gateway reports as active %q", clusterAName))
-	activeGateways := f.GetGatewaysWithHAStatus(subv1.HAStatusActive)
+	By(fmt.Sprintf("Ensuring that only one gateway reports as active %q", clusterAName))
+	activeGateways := f.AwaitGatewaysWithStatus(framework.ClusterA, subv1.HAStatusActive)
 	Expect(activeGateways).To(HaveLen(1))
 
 	By(fmt.Sprintf("Ensuring that the gateway %q is reporting connections", activeGateways[0].Name))
@@ -61,23 +60,18 @@ func testEnginePodRestartScenario(f *subFramework.Framework) {
 	enginePod := f.AwaitSubmarinerEnginePod(framework.ClusterA)
 	By(fmt.Sprintf("Found submariner engine pod %q on %q", enginePod.Name, clusterAName))
 
-	By(fmt.Sprintf("Ensuring that the gateway reports as active %q", clusterAName))
-	activeGateways := f.GetGatewaysWithHAStatus(subv1.HAStatusActive)
-	Expect(activeGateways).To(HaveLen(1))
+	By(fmt.Sprintf("Ensuring that the gateway reports as active on %q", clusterAName))
+	activeGateway := f.AwaitGatewayFullyConnected(framework.ClusterA, gatewayNodes[0].Name)
 
-	gw := activeGateways[0]
-	By(fmt.Sprintf("Ensuring that the gateway %q is reporting connections", gw.Name))
-	Expect(gw.Status.Connections).NotTo(BeEmpty())
-	Expect(gw.Status.Connections[0].Status).To(Equal(subv1.Connected))
-
-	By(fmt.Sprintf("Deleting submariner engine pod %q", enginePod.Name))
+	By(fmt.Sprintf("Deleting submariner engine pod and gateway entries %q", enginePod.Name))
 	f.DeletePod(framework.ClusterA, enginePod.Name, framework.TestContext.SubmarinerNamespace)
+	f.DeleteGateway(framework.ClusterA, activeGateway.Name)
 
 	newEnginePod := f.AwaitSubmarinerEnginePod(framework.ClusterA)
 	By(fmt.Sprintf("Found new submariner engine pod %q", newEnginePod.Name))
 
 	By(fmt.Sprintf("Waiting for the gateway to be up and connected %q", newEnginePod.Name))
-	f.AwaitGatewayFullyConnected(framework.ClusterA, gw.Name)
+	f.AwaitGatewayFullyConnected(framework.ClusterA, activeGateway.Name)
 
 	By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
 	tcp.RunConnectivityTest(tcp.ConnectivityTestParams{
@@ -134,9 +128,8 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 
 	By(fmt.Sprintf("Ensuring that two Gateways become available in cluster %q", clusterAName))
 
-	gwActive := f.AwaitGatewayWithStatus(framework.ClusterA, initialGatewayNode.Name, subv1.HAStatusActive)
+	f.AwaitGatewayFullyConnected(framework.ClusterA, initialGatewayNode.Name)
 	gwPassive := f.AwaitGatewayWithStatus(framework.ClusterA, initialNonGatewayNode.Name, subv1.HAStatusPassive)
-	Expect(gwActive.Status.Connections).ToNot(BeEmpty(), "The active gateway must have active connections")
 	Expect(gwPassive.Status.Connections).To(BeEmpty(), "The passive gateway must have no connections")
 
 	// Set the gateway label for the active gateway worker node to false so the submariner engine pod will be

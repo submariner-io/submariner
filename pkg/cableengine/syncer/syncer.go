@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
-	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -19,7 +18,6 @@ import (
 )
 
 type GatewaySyncer struct {
-	sync.Mutex
 	client  v1typed.GatewayInterface
 	engine  cableengine.Engine
 	version string
@@ -46,9 +44,6 @@ func (s *GatewaySyncer) Run(stopCh <-chan struct{}) {
 }
 
 func (i *GatewaySyncer) syncGatewayStatus() {
-
-	i.Lock()
-	defer i.Unlock()
 
 	klog.V(log.TRACE).Info("Running syncGatewayStatus()")
 
@@ -167,7 +162,7 @@ func (i *GatewaySyncer) generateGatewayObject() (*v1.Gateway, error) {
 
 	connections, err := i.engine.ListCableConnections()
 	if err != nil {
-		gateway.Status.StatusFailure = fmt.Sprintf("error getting driver connections: %s", err)
+		gateway.Status.StatusFailure = fmt.Sprintf("Error getting driver connections: %s", err)
 		klog.Errorf("error getting driver connections: %s", err)
 		return nil, err
 	}
