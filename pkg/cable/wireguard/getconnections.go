@@ -2,6 +2,7 @@ package wireguard
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -30,15 +31,11 @@ func (w *wireguard) GetConnections() (*[]v1.Connection, error) {
 			}
 			continue
 		}
-		connection, found := w.connections[cid]
-		if !found {
-			// This should not happen -- peer and connection are set together
-			// TODO delete WireGuard peer entry and peer
-			return nil, fmt.Errorf("failed to find connection for peer with ClusterId %s", key)
-		}
-		if err := updateConnectionForPeer(connection, &p); err != nil {
-			connection.SetStatus(v1.ConnectionError, "Cannot update status for cluster id %s: %v",
-				cid, err)
+		connection, err := w.updateConnectionForPeer(&p, cid)
+		if err != nil {
+			// this should not happen, we do not have the spec, so cannot create a new connection
+			klog.Errorf("Found peer but no connection for cluster %s, ignoring: %v", cid, err)
+			continue
 		}
 		connections = append(connections, *connection)
 	}
@@ -54,30 +51,66 @@ func (w *wireguard) clusterIDByPeer(key *wgtypes.Key) (string, error) {
 	return "", fmt.Errorf("cluser id not found for key %s", key)
 }
 
-func updateConnectionForPeer(connection *v1.Connection, p *wgtypes.Peer) error {
-	silence := time.Since(p.LastHandshakeTime)
-	if silence > (3 * KeepAliveInterval) {
-		connection.SetStatus(v1.ConnectionError, "connection has been silent for %.1f seconds",
-			silence.Seconds())
-		return nil
+func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, cid string) (*v1.Connection, error) {
+	connection, found := w.connections[cid]
+	if !found {
+		return nil, fmt.Errorf("failed to find connection for peer with ClusterId %s", cid)
 	}
-	connection.SetStatus(v1.Connected,
-		"last handshake was %.1f seconds ago, Rx=%d Bytes, Tx=%d Bytes",
-		silence.Seconds(), p.ReceiveBytes, p.TransmitBytes)
+	now := time.Now().UnixNano()
+	if peerTrafficDelta(connection, lastChecked, now) < KeepAliveInterval.Nanoseconds() {
+		// too fast to see any change, leave status as is
+		return connection, nil
+	}
+	tx := peerTrafficDelta(connection, transmitBytes, p.TransmitBytes)
+	rx := peerTrafficDelta(connection, receiveBytes, p.ReceiveBytes)
+	if tx > 0 || rx > 0 {
+		connection.SetStatus(v1.Connected, "Rx=%d Bytes, Tx=%d Bytes", p.ReceiveBytes, p.TransmitBytes)
+		return connection, nil
+	}
+	if p.LastHandshakeTime.IsZero() {
+		connection.SetStatus(v1.Connecting, "no handshake yet")
+		return connection, nil
+	}
+	silence := time.Since(p.LastHandshakeTime)
+	if silence < KeepAliveInterval * 2 {
+		connection.SetStatus(v1.Connecting, "handshake was %.1f seconds ago, no traffic yet",
+			silence.Seconds())
+		return connection, nil
+	}
+	if silence > handshakeTimeout {
+		connection.SetStatus(v1.ConnectionError, "no handshake for %.1f seconds",
+			silence.Seconds())
+		return connection, nil
+	}
+	connection.SetStatus(v1.ConnectionError, "handshake, but no bytes sent or received for %.1f seconds",
+		silence.Seconds())
 
-	// TODO compare spec
-	return nil
+	return connection, nil
 }
 
-func (w *wireguard) updatePeerStatus(key *wgtypes.Key, connection *v1.Connection) error {
+func (w *wireguard) updatePeerStatus(key *wgtypes.Key, cid string) error {
 	p, err := w.peerByKey(key)
 	if err != nil {
-		connection.SetStatus(v1.ConnectionError, "cannot fetch status for peer %s: %v", key, err)
+		if connection, found := w.connections[cid]; found {
+			connection.SetStatus(v1.ConnectionError, "cannot fetch status for peer %s: %v", key, err)
+			return nil
+		}
 		return fmt.Errorf("failed to fetch peer configuration: %v", err)
 	}
-	if err := updateConnectionForPeer(connection, p); err != nil {
-		connection.SetStatus(v1.ConnectionError, "cannot update status for peer %s: %v", key, err)
-		return fmt.Errorf("failed to update connection status: %v", err)
+	if _, err := w.updateConnectionForPeer(p, cid); err != nil {
+		return fmt.Errorf("failed to update connection status for peer %s of cluster %s: %v", key, cid, err)
 	}
 	return nil
 }
+
+func peerTrafficDelta(c *v1.Connection, key string, newVal int64) int64 {
+	delta := int64(1) // if no parsable history default to not zero
+	if s, found := c.Endpoint.BackendConfig[key]; found {
+		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
+			delta = newVal - i
+		}
+	}
+	c.Endpoint.BackendConfig[key] = strconv.FormatInt(newVal, 10)
+	return delta
+}
+

@@ -29,10 +29,16 @@ const (
 	// PublicKey is name (key) of publicKey entry in back-end map
 	PublicKey = "publicKey"
 
-	// KeepAliveInterval specifies 1/3 timeout for announcing a connection ERROR
+	// KeepAliveInterval to use for wg peers
 	KeepAliveInterval = 10 * time.Second
 
+	// handshakeTimeout is maximal time from handshake a connections is still considered connected
+	handshakeTimeout = 2 * time.Minute + 10 * time.Second
+
 	cableDriverName = "wireguard"
+	receiveBytes    = "ReceiveBytes"   // for peer connection status
+	transmitBytes   = "TransmitBytes"  // for peer connection status
+	lastChecked     = "LastChecked" // for connection peer status
 )
 
 func init() {
@@ -147,27 +153,29 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 
-	// create connection, overwrite existing connection
-	connection := v1.NewConnection(remoteEndpoint.Spec)
-	w.connections[remoteEndpoint.Spec.ClusterID] = connection
-
 	// delete or update old peers for ClusterID
 	oldKey, found := w.peers[remoteEndpoint.Spec.ClusterID]
 	if found {
 		if oldKey.String() == remoteKey.String() {
 			// keys match, existing peer, so lets update status
-			if err := w.updatePeerStatus(remoteKey, connection); err != nil {
-				klog.Warningf("Could not update peer %s status, ignoring: %v", remoteKey, err)
+			if err := w.updatePeerStatus(remoteKey, remoteEndpoint.Spec.ClusterID); err == nil {
+				klog.V(log.DEBUG).Infof("Skipping connect for existing peer key %s", oldKey)
+				return ip, nil
 			}
-			klog.V(log.DEBUG).Infof("Skipping connect for existing peer key %s", oldKey)
-			return ip, nil
+			klog.Warningf("Could not update peer %s status, deleting and reconnecting: %v", remoteKey, err)
 		}
 
 		// new peer will take over subnets so can ignore error
 		_ = w.removePeer(&oldKey)
 
 		delete(w.peers, remoteEndpoint.Spec.ClusterID)
+		delete(w.connections, remoteEndpoint.Spec.ClusterID)
 	}
+
+	// create connection, overwrite existing connection
+	connection := v1.NewConnection(remoteEndpoint.Spec)
+	klog.V(log.DEBUG).Infof("Adding connection for cluster %s, %v", remoteEndpoint.Spec.ClusterID, connection)
+	w.connections[remoteEndpoint.Spec.ClusterID] = connection
 
 	// configure peer
 	connection.SetStatus(v1.Connecting, "Connection has been created but not yet started")
@@ -291,6 +299,15 @@ func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoi
 }
 
 func (w *wireguard) GetActiveConnections(clusterID string) ([]string, error) {
+
+	//klog.V(log.DEBUG).Infof("WG STATUS for cluster %s", clusterID)
+	//if conns, err := w.GetConnections(); err == nil {
+	//	for _, c := range *conns {
+	//		klog.V(log.DEBUG).Infof("Peer Status: %s, %s, %s, %s, %v",
+	//			c.Endpoint.CableName, c.Endpoint.ClusterID, c.Status, c.StatusMessage, c.Endpoint.BackendConfig)
+	//	}
+	//}
+
 	// force caller to skip duplicate handling
 	return make([]string, 0), nil
 }
