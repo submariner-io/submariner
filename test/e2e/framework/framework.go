@@ -92,7 +92,25 @@ func (f *Framework) AwaitGatewayWithStatus(cluster framework.ClusterIndex,
 	return gw.(*submarinerv1.Gateway)
 }
 
-func (f *Framework) AwaitForGatewayRemoved(cluster framework.ClusterIndex, name string) {
+func (f *Framework) AwaitGatewaysWithStatus(
+	cluster framework.ClusterIndex, status submarinerv1.HAStatus) []submarinerv1.Gateway {
+
+	gwList := framework.AwaitUntil(fmt.Sprintf("await Gateways with status %q", status),
+		func() (interface{}, error) {
+			return f.GetGatewaysWithHAStatus(cluster, status), nil
+		},
+		func(result interface{}) (bool, string, error) {
+			gateways := result.([]submarinerv1.Gateway)
+			if len(gateways) == 0 {
+				return false, "no gateway found yet", nil
+			}
+
+			return true, "", nil
+		})
+	return gwList.([]submarinerv1.Gateway)
+}
+
+func (f *Framework) AwaitGatewayRemoved(cluster framework.ClusterIndex, name string) {
 	gwClient := SubmarinerClients[cluster].SubmarinerV1().Gateways(framework.TestContext.SubmarinerNamespace)
 	framework.AwaitUntil(fmt.Sprintf("await Gateway on %q removed", name),
 		func() (interface{}, error) {
@@ -148,16 +166,18 @@ func (f *Framework) AwaitGatewayFullyConnected(cluster framework.ClusterIndex, n
 //                unexpected state
 func (f *Framework) GatewayCleanup() {
 
-	passiveGateways := f.GetGatewaysWithHAStatus(submarinerv1.HAStatusPassive)
+	for cluster := range SubmarinerClients {
+		passiveGateways := f.GetGatewaysWithHAStatus(framework.ClusterIndex(cluster), submarinerv1.HAStatusPassive)
 
-	if len(passiveGateways) == 0 {
-		return
-	}
+		if len(passiveGateways) == 0 {
+			continue
+		}
 
-	ginkgo.By(fmt.Sprintf("Cleaning up any non-active gateways: %v", gatewayNames(passiveGateways)))
-	for _, nonActiveGw := range passiveGateways {
-		f.SetGatewayLabelOnNode(framework.ClusterA, nonActiveGw.Name, false)
-		f.AwaitForGatewayRemoved(framework.ClusterA, nonActiveGw.Name)
+		ginkgo.By(fmt.Sprintf("Cleaning up any non-active gateways: %v", gatewayNames(passiveGateways)))
+		for _, nonActiveGw := range passiveGateways {
+			f.SetGatewayLabelOnNode(framework.ClusterA, nonActiveGw.Name, false)
+			f.AwaitGatewayRemoved(framework.ClusterA, nonActiveGw.Name)
+		}
 	}
 }
 
@@ -169,14 +189,20 @@ func gatewayNames(gateways []submarinerv1.Gateway) []string {
 	return names
 }
 
-func (f *Framework) GetGatewaysWithHAStatus(status submarinerv1.HAStatus) []submarinerv1.Gateway {
+func (f *Framework) GetGatewaysWithHAStatus(
+	cluster framework.ClusterIndex, status submarinerv1.HAStatus) []submarinerv1.Gateway {
 
-	gatewayClient := SubmarinerClients[framework.ClusterA].SubmarinerV1().Gateways(
+	gatewayClient := SubmarinerClients[cluster].SubmarinerV1().Gateways(
 		framework.TestContext.SubmarinerNamespace)
 	gwList, err := gatewayClient.List(metav1.ListOptions{})
-	Expect(err).NotTo(HaveOccurred())
 
 	filteredGateways := []submarinerv1.Gateway{}
+	// List will return "NotFound" if the CRD is not registered in the specific cluster (broker-only)
+	if apierrors.IsNotFound(err) {
+		return filteredGateways
+	}
+
+	Expect(err).NotTo(HaveOccurred())
 
 	for _, gw := range gwList.Items {
 		if gw.Status.HAStatus == status {
@@ -184,4 +210,16 @@ func (f *Framework) GetGatewaysWithHAStatus(status submarinerv1.HAStatus) []subm
 		}
 	}
 	return filteredGateways
+}
+
+func (f *Framework) DeleteGateway(cluster framework.ClusterIndex, name string) {
+
+	framework.AwaitUntil("delete gateway", func() (interface{}, error) {
+		err := SubmarinerClients[cluster].SubmarinerV1().Gateways(
+			framework.TestContext.SubmarinerNamespace).Delete(name, &metav1.DeleteOptions{})
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}, framework.NoopCheckResult)
 }

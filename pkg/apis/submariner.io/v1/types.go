@@ -76,7 +76,7 @@ type GatewayStatus struct {
 	Version       string       `json:"version"`
 	HAStatus      HAStatus     `json:"haStatus"`
 	LocalEndpoint EndpointSpec `json:"localEndpoint"`
-	StatusFailure string       `json:"statusMessage"`
+	StatusFailure string       `json:"statusFailure"`
 	Connections   []Connection `json:"connections"`
 }
 
