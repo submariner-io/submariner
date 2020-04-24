@@ -195,9 +195,14 @@ func (f *Framework) GetGatewaysWithHAStatus(
 	gatewayClient := SubmarinerClients[cluster].SubmarinerV1().Gateways(
 		framework.TestContext.SubmarinerNamespace)
 	gwList, err := gatewayClient.List(metav1.ListOptions{})
-	Expect(err).NotTo(HaveOccurred())
 
 	filteredGateways := []submarinerv1.Gateway{}
+	// List will return "NotFound" if the CRD is not registered in the specific cluster (broker-only)
+	if apierrors.IsNotFound(err) {
+		return filteredGateways
+	}
+
+	Expect(err).NotTo(HaveOccurred())
 
 	for _, gw := range gwList.Items {
 		if gw.Status.HAStatus == status {
