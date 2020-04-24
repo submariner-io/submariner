@@ -133,7 +133,7 @@ func main() {
 
 	cableEngineSyncer.Run(stopCh)
 
-	start := func(context.Context) {
+	becameLeader := func(context.Context) {
 		klog.Info("Creating the tunnel controller")
 
 		tunnelController := tunnel.NewController(submSpec.Namespace, cableEngine, kubeClient, submarinerClient,
@@ -204,10 +204,16 @@ func main() {
 	eventBroadcaster.StartLogging(klog.V(log.DEBUG).Infof)
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "submariner-controller"})
 
-	startLeaderElection(leClient, recorder, start)
+	lostLeader := func() {
+		cableEngineSyncer.CleanupGatewayEntry()
+		klog.Fatalf("Leader election lost, shutting down")
+	}
+
+	startLeaderElection(leClient, recorder, becameLeader, lostLeader)
 }
 
-func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder record.EventRecorder, run func(ctx context.Context)) {
+func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder record.EventRecorder,
+	run func(ctx context.Context), end func()) {
 	gwLeadershipConfig := leaderConfig{}
 
 	err := envconfig.Process(leadershipConfigEnvPrefix, &gwLeadershipConfig)
@@ -267,9 +273,7 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder rec
 		RetryPeriod:   time.Duration(gwLeadershipConfig.RetryPeriod) * time.Second,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: run,
-			OnStoppedLeading: func() {
-				klog.Fatalf("Leader election lost")
-			},
+			OnStoppedLeading: end,
 		},
 	})
 }

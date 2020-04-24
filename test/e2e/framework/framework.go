@@ -8,9 +8,11 @@ import (
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/cache"
 
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	"github.com/submariner-io/submariner/pkg/client/informers/externalversions"
 )
 
 // Framework supports common operations used by e2e tests; it will keep a client & a namespace for you.
@@ -222,4 +224,32 @@ func (f *Framework) DeleteGateway(cluster framework.ClusterIndex, name string) {
 		}
 		return nil, err
 	}, framework.NoopCheckResult)
+}
+
+func (f *Framework) GetGatewayInformer(cluster framework.ClusterIndex) (cache.SharedIndexInformer, chan struct{}) {
+	stopCh := make(chan struct{})
+	informerFactory := externalversions.NewSharedInformerFactory(SubmarinerClients[cluster], 0)
+	informer := informerFactory.Submariner().V1().Gateways().Informer()
+	go informer.Run(stopCh)
+	Expect(cache.WaitForCacheSync(stopCh, informer.HasSynced)).To(BeTrue())
+	return informer, stopCh
+}
+
+func GetDeletionChannel(informer cache.SharedIndexInformer) chan string {
+	deletionChannel := make(chan string, 100)
+
+	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		DeleteFunc: func(obj interface{}) {
+			if object, ok := obj.(metav1.Object); !ok {
+				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+				Expect(ok).To(BeTrue(), "tombstone extraction failed")
+				object, ok = tombstone.Obj.(metav1.Object)
+				Expect(ok).To(BeTrue(), "tombstone inner object extraction failed")
+				deletionChannel <- object.GetName()
+			} else {
+				deletionChannel <- object.GetName()
+			}
+		},
+	})
+	return deletionChannel
 }

@@ -132,10 +132,19 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 	gwPassive := f.AwaitGatewayWithStatus(framework.ClusterA, initialNonGatewayNode.Name, subv1.HAStatusPassive)
 	Expect(gwPassive.Status.Connections).To(BeEmpty(), "The passive gateway must have no connections")
 
+	// Start watching the API for Gateway deletions
+	gwInformer, stopInformer := f.GetGatewayInformer(framework.ClusterA)
+	defer close(stopInformer)
+
+	deleteCh := subFramework.GetDeletionChannel(gwInformer)
+
 	// Set the gateway label for the active gateway worker node to false so the submariner engine pod will be
 	// terminated.
 	By(fmt.Sprintf("Setting the gateway label for node %q to false", initialGatewayNode.Name))
 	f.SetGatewayLabelOnNode(framework.ClusterA, initialGatewayNode.Name, false)
+
+	By(fmt.Sprintf("Verifying that the gateway %q was deleted", initialGatewayNode.Name))
+	Eventually(deleteCh, framework.TestContext.OperationTimeout).Should(Receive(Equal(initialGatewayNode.Name)))
 
 	// Ensure the new engine pod is started before we run the connectivity tests to eliminate possible timing issue where,
 	// after deleting the old pod, we actually run the connectivity test against the old engine instance before k8s has
