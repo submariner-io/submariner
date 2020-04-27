@@ -13,8 +13,11 @@ git:
 jobs:
   include:
   - env: CMD="make test validate codegen"
-  - env: CMD="make e2e" DEPLOY=true
-  - env: CMD="make e2e" CLUSTERS_ARGS="--globalnet true" DEPLOY_ARGS="${CLUSTERS_ARGS} --deploytool helm"
+  - env: CMD="make e2e"
+         RELEASE=true
+  - env: CMD="make e2e"
+         CLUSTERS_ARGS="--globalnet true"
+         DEPLOY_ARGS="${CLUSTERS_ARGS} --deploytool helm"
 
 install:
   - sudo apt-get install moreutils # make ts available
@@ -48,7 +51,7 @@ deploy:
     script: make images images_flags="--nocache" release release_images="submariner submariner-route-agent submariner-globalnet"
     on:
       branch: master
-      condition: $DEPLOY = true
+      condition: $RELEASE = true
   - provider: script
     script: make images images_flags="--nocache" release release_images="submariner submariner-route-agent submariner-globalnet"
     on:
@@ -59,4 +62,4 @@ deploy:
     skip_cleanup: true
     on:
       tags: true
-      condition: $DEPLOY = true
+      condition: $RELEASE = true
