@@ -173,17 +173,20 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
 
-	r.cniIface = discoverCNIInterface(r.localClusterCidr[0])
-	if r.cniIface != nil {
+	cniIface, err := discoverCNIInterface(r.localClusterCidr[0])
+	if err != nil {
 		// Configure CNI Specific changes
+		r.cniIface = cniIface
 		err := toggleCNISpecificConfiguration(r.cniIface.name)
 		if err != nil {
 			return fmt.Errorf("toggleCNISpecificConfiguration returned error. %v", err)
 		}
+	} else {
+		return fmt.Errorf("discoverCNIInterface returned error. %v", err)
 	}
 
 	// Create the necessary IPTable chains in the filter and nat tables.
-	err := r.createIPTableChains()
+	err = r.createIPTableChains()
 	if err != nil {
 		return fmt.Errorf("createIPTableChains returned error. %v", err)
 	}
