@@ -16,7 +16,7 @@ jobs:
   - env: CMD="make e2e"
          RELEASE=true
   - env: CMD="make e2e"
-         CLUSTERS_ARGS="--globalnet true"
+         CLUSTERS_ARGS="--globalnet"
          DEPLOY_ARGS="${CLUSTERS_ARGS} --deploytool helm"
 
 install:
