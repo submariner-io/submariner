@@ -17,6 +17,8 @@ source ${SCRIPTS_DIR}/lib/debug_functions
 source ${SCRIPTS_DIR}/lib/version
 source ${SCRIPTS_DIR}/lib/deploy_funcs
 source ${SCRIPTS_DIR}/lib/utils
+source ${SCRIPTS_DIR}/lib/cluster_settings
+source ${DAPPER_SOURCE}/scripts/kind-e2e/cluster_settings
 
 import_image quay.io/submariner/submariner
 import_image quay.io/submariner/submariner-route-agent
@@ -26,12 +28,12 @@ declare_kubeconfig
 
 case "${restart}" in
 	gateway|routeagent|globalnet)
-		run_parallel "{1..3}" reload_pods daemonset submariner-${restart}
+		run_subm_clusters reload_pods daemonset submariner-${restart}
 		;;
 	all)
-		run_parallel "{1..3}" reload_pods daemonset submariner-gateway
-		run_parallel "{1..3}" reload_pods daemonset submariner-routeagent
-		run_parallel "{1..3}" reload_pods daemonset submariner-globalnet || true # globalnet is not always enabled
+		run_subm_clusters reload_pods daemonset submariner-gateway
+		run_subm_clusters reload_pods daemonset submariner-routeagent
+		run_subm_clusters reload_pods daemonset submariner-globalnet || true # globalnet is not always enabled
 		;;
 	none)
 		;;
