@@ -174,7 +174,7 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 	}
 
 	cniIface, err := discoverCNIInterface(r.localClusterCidr[0])
-	if err != nil {
+	if err == nil {
 		// Configure CNI Specific changes
 		r.cniIface = cniIface
 		err := toggleCNISpecificConfiguration(r.cniIface.name)
@@ -182,7 +182,7 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 			return fmt.Errorf("toggleCNISpecificConfiguration returned error. %v", err)
 		}
 	} else {
-		return fmt.Errorf("discoverCNIInterface returned error. %v", err)
+		klog.Errorf("discoverCNIInterface returned error %v", err)
 	}
 
 	// Create the necessary IPTable chains in the filter and nat tables.
@@ -203,6 +203,26 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 			r.updateIptableRulesForInterclusterTraffic(endpoint.Spec.Subnets)
 		}
 	}
+
+	if r.cniIface != nil {
+		err = r.annotateThisNodeWithCNInterfaceIP()
+		if err != nil {
+			return err
+		}
+	} else {
+		klog.Warning("cniInterface wasn't found, hostNetwork to remote pod/service connectivity won't work")
+	}
+
+	go wait.Until(r.runEndpointWorker, time.Second, stopCh)
+	go wait.Until(r.runPodWorker, time.Second, stopCh)
+	wg.Wait()
+	klog.Info("Route agent workers started")
+	<-stopCh
+	klog.Info("Route agent stopping")
+	return nil
+}
+
+func (r *Controller) annotateThisNodeWithCNInterfaceIP() error {
 
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -225,13 +245,6 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 			}
 		}
 	}
-
-	go wait.Until(r.runEndpointWorker, time.Second, stopCh)
-	go wait.Until(r.runPodWorker, time.Second, stopCh)
-	wg.Wait()
-	klog.Info("Route agent workers started")
-	<-stopCh
-	klog.Info("Route agent stopping")
 	return nil
 }
 
