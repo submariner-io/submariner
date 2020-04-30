@@ -1,0 +1,54 @@
+on:
+  pull_request:
+    branches:
+      - '**'
+  push:
+    branches:
+      - master
+    tags:
+      - 'v**'
+
+name: validation
+jobs:
+  validate:
+    name: Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@master
+      - name: Run validation
+        run: make validate
+  unit-testing:
+    name: Unit Testing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@master
+
+      - name: Create artifacts directory
+        run: mkdir artifacts
+
+      - name: Run validation
+        run: make test 2>&1 | tee artifacts/unittest.log
+
+      - name: Collect artifacts
+        run: |
+          for f in $(find ./pkg -name "*.xml"); do
+            mkdir -p artifacts/$(dirname $f)
+            cp $f -rfp artifacts/$f
+          done
+
+      - name: Upload test
+        uses: actions/upload-artifact@v1
+        with:
+          name: Unit test artifacts
+          path: artifacts
+
+  code-gen:
+    name: Submariner K8s API code generation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@master
+      - name: Run validation
+        run: make codegen
