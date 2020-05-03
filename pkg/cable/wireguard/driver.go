@@ -2,6 +2,7 @@ package wireguard
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"sync"
@@ -31,6 +32,15 @@ const (
 
 func init() {
 	cable.AddDriver(cableDriverName, NewDriver)
+	wgDeviceCreator = realDeviceCreator{}
+}
+
+// A Client is a type which can control a WireGuard device.
+type wgClient interface {
+	io.Closer
+	Devices() ([]*wgtypes.Device, error)
+	Device(name string) (*wgtypes.Device, error)
+	ConfigureDevice(name string, cfg wgtypes.Config) error
 }
 
 type wireguard struct {
@@ -38,9 +48,37 @@ type wireguard struct {
 	localEndpoint types.SubmarinerEndpoint
 	peers         map[string]wgtypes.Key // clusterID -> publicKey
 	mutex         sync.Mutex
-	client        *wgctrl.Client
+	client        wgClient
 	link          netlink.Link
 }
+
+// Interface to create WG mock device
+type intDevice interface {
+	createWGClient() (wgClient, error)
+	setWGLink(w *wireguard, localSubnets []string) error
+	addRoute(link netlink.Link, allowedIPs []net.IPNet) error
+	delRoute(link netlink.Link, allowedIPs []net.IPNet) error
+}
+
+type realDeviceCreator struct{}
+
+func (cr realDeviceCreator) createWGClient() (wgClient, error) {
+	return wgctrl.New()
+}
+
+func (cr realDeviceCreator) setWGLink(w *wireguard, localSubnets []string) error {
+	return setWGLink(w, localSubnets)
+}
+
+func (cr realDeviceCreator) addRoute(link netlink.Link, allowedIPs []net.IPNet) error {
+	return addRoute(link, allowedIPs)
+}
+
+func (cr realDeviceCreator) delRoute(link netlink.Link, allowedIPs []net.IPNet) error {
+	return delRoute(link, allowedIPs)
+}
+
+var wgDeviceCreator intDevice
 
 // NewDriver creates a new WireGuard driver
 func NewDriver(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (cable.Driver, error) {
@@ -52,12 +90,12 @@ func NewDriver(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (c
 		localEndpoint: localEndpoint,
 	}
 
-	if err = w.setWGLink(localSubnets); err != nil {
+	if err = wgDeviceCreator.setWGLink(&w, localSubnets); err != nil {
 		return nil, fmt.Errorf("failed to setup WireGuard link: %v", err)
 	}
 
 	// create controller
-	if w.client, err = wgctrl.New(); err != nil {
+	if w.client, err = wgDeviceCreator.createWGClient(); err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("wgctrl is not available on this system")
 		}
@@ -122,10 +160,12 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 
 	// parse remote addresses and allowed IPs
 	ip := endpointIP(&remoteEndpoint)
+
 	remoteIP := net.ParseIP(ip)
 	if remoteIP == nil {
 		return "", fmt.Errorf("failed to parse remote IP %s", ip)
 	}
+
 	allowedIPs := parseSubnets(remoteEndpoint.Spec.Subnets)
 
 	// parse remote public key
@@ -185,33 +225,14 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 
 	w.peers[remoteEndpoint.Spec.ClusterID] = *remoteKey
 
-	// Add routes to peer
-	//TODO save old routes for removal
-	idx := w.link.Attrs().Index
-	for _, peerNet := range allowedIPs {
-		route := netlink.Route{
-			LinkIndex: idx,
-			Dst:       &peerNet,
-		}
-		if err = netlink.RouteAdd(&route); err != nil {
-			return "", fmt.Errorf("failed to add route %s: %v", route, err)
-		}
+	err = wgDeviceCreator.addRoute(w.link, allowedIPs)
+	if err != nil {
+		return "", err
 	}
 
 	klog.V(log.DEBUG).Infof("Done connecting endpoint peer %+v", peerCfg)
 	return ip, nil
-}
 
-func publicKey(ep types.SubmarinerEndpoint) (*wgtypes.Key, error) {
-	s, found := ep.Spec.BackendConfig[PublicKey]
-	if !found {
-		return nil, fmt.Errorf("endpoint is missing public key")
-	}
-	key, err := wgtypes.ParseKey(s)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse public key %s: %v", s, err)
-	}
-	return &key, nil
 }
 
 func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoint) error {
@@ -256,19 +277,47 @@ func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoi
 
 	// del routes
 	allowedIPs := parseSubnets(remoteEndpoint.Spec.Subnets)
-	idx := w.link.Attrs().Index
-	for _, peerNet := range allowedIPs {
-		route := netlink.Route{
-			LinkIndex: idx,
-			Dst:       &peerNet,
-		}
-		if err = netlink.RouteDel(&route); err != nil {
-			return fmt.Errorf("failed to delete route %s: %v", route, err)
-		}
+
+	if err := wgDeviceCreator.delRoute(w.link, allowedIPs); err != nil {
+		return err
 	}
 
 	klog.V(log.DEBUG).Infof("Done removing endpoint for cluster %s", remoteEndpoint.Spec.ClusterID)
 	return nil
+}
+
+func (w *wireguard) removePeer(key *wgtypes.Key) error {
+	// remove old
+	klog.V(log.DEBUG).Infof("Removing WireGuard peer with key %s", key)
+	peerCfg := []wgtypes.PeerConfig{
+		{
+			PublicKey: *key,
+			Remove:    true,
+		},
+	}
+	err := w.client.ConfigureDevice(DefaultDeviceName, wgtypes.Config{
+		ReplacePeers: false,
+		Peers:        peerCfg,
+	})
+	if err != nil {
+		klog.Errorf("Failed to remove WireGuard peer with key %s: %v", key, err)
+		return err
+	}
+	klog.V(log.DEBUG).Infof("Done removing WireGuard peer with key %s", key)
+	return nil
+}
+
+func (w *wireguard) peerByKey(key *wgtypes.Key) (*wgtypes.Peer, error) {
+	d, err := w.client.Device(DefaultDeviceName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find device %s: %v", DefaultDeviceName, err)
+	}
+	for _, p := range d.Peers {
+		if p.PublicKey.String() == key.String() {
+			return &p, nil
+		}
+	}
+	return nil, fmt.Errorf("peer not found for key %s", key)
 }
 
 func (w *wireguard) GetActiveConnections(clusterID string) ([]string, error) {
@@ -276,8 +325,50 @@ func (w *wireguard) GetActiveConnections(clusterID string) ([]string, error) {
 	return make([]string, 0), nil
 }
 
+func publicKey(ep types.SubmarinerEndpoint) (*wgtypes.Key, error) {
+	s, found := ep.Spec.BackendConfig[PublicKey]
+	if !found {
+		return nil, fmt.Errorf("endpoint is missing public key")
+	}
+	key, err := wgtypes.ParseKey(s)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse public key %s: %v", s, err)
+	}
+	return &key, nil
+}
+
+// Add routes to peer
+func addRoute(link netlink.Link, allowedIPs []net.IPNet) error {
+	//TODO save old routes for removal
+	idx := link.Attrs().Index
+	for _, peerNet := range allowedIPs {
+		route := netlink.Route{
+			LinkIndex: idx,
+			Dst:       &peerNet,
+		}
+		if err := netlink.RouteAdd(&route); err != nil {
+			return fmt.Errorf("failed to add route %s: %v", route, err)
+		}
+	}
+	return nil
+}
+
+func delRoute(link netlink.Link, allowedIPs []net.IPNet) error {
+	idx := link.Attrs().Index
+	for _, peerNet := range allowedIPs {
+		route := netlink.Route{
+			LinkIndex: idx,
+			Dst:       &peerNet,
+		}
+		if err := netlink.RouteDel(&route); err != nil {
+			return fmt.Errorf("failed to delete route %s: %v", route, err)
+		}
+	}
+	return nil
+}
+
 // Create new wg link and assign addr from local subnets
-func (w *wireguard) setWGLink(localSubnets []string) error {
+func setWGLink(w *wireguard, localSubnets []string) error {
 
 	// delete existing wg device if needed
 	if link, err := netlink.LinkByName(DefaultDeviceName); err == nil {
@@ -369,40 +460,6 @@ func parseSubnets(subnets []string) []net.IPNet {
 		nets = append(nets, *cidr)
 	}
 	return nets
-}
-
-func (w *wireguard) removePeer(key *wgtypes.Key) error {
-	// remove old
-	klog.V(log.DEBUG).Infof("Removing WireGuard peer with key %s", key)
-	peerCfg := []wgtypes.PeerConfig{
-		{
-			PublicKey: *key,
-			Remove:    true,
-		},
-	}
-	err := w.client.ConfigureDevice(DefaultDeviceName, wgtypes.Config{
-		ReplacePeers: false,
-		Peers:        peerCfg,
-	})
-	if err != nil {
-		klog.Errorf("Failed to remove WireGuard peer with key %s: %v", key, err)
-		return err
-	}
-	klog.V(log.DEBUG).Infof("Done removing WireGuard peer with key %s", key)
-	return nil
-}
-
-func (w *wireguard) peerByKey(key *wgtypes.Key) (*wgtypes.Peer, error) {
-	d, err := w.client.Device(DefaultDeviceName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find device %s: %v", DefaultDeviceName, err)
-	}
-	for _, p := range d.Peers {
-		if p.PublicKey.String() == key.String() {
-			return &p, nil
-		}
-	}
-	return nil, fmt.Errorf("peer not found for key %s", key)
 }
 
 func endpointIP(ep *types.SubmarinerEndpoint) string {
