@@ -160,12 +160,10 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 
 	// parse remote addresses and allowed IPs
 	ip := endpointIP(&remoteEndpoint)
-
 	remoteIP := net.ParseIP(ip)
 	if remoteIP == nil {
 		return "", fmt.Errorf("failed to parse remote IP %s", ip)
 	}
-
 	allowedIPs := parseSubnets(remoteEndpoint.Spec.Subnets)
 
 	// parse remote public key
@@ -232,7 +230,6 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 
 	klog.V(log.DEBUG).Infof("Done connecting endpoint peer %+v", peerCfg)
 	return ip, nil
-
 }
 
 func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoint) error {

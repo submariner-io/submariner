@@ -125,6 +125,7 @@ func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 
 	remoteEndpointIP, err := i.driver.ConnectToEndpoint(endpoint)
 	if err != nil {
+		fmt.Printf("===> ConnectToEndpoint error %v \n\n", err)
 		return err
 	}
 
