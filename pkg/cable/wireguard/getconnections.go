@@ -23,94 +23,107 @@ func (w *wireguard) GetConnections() (*[]v1.Connection, error) {
 
 	for _, p := range d.Peers {
 		key := p.PublicKey
-		cid, err := w.clusterIDByPeer(&key)
+		connection, err := w.connectionByKey(&key)
 		if err != nil {
 			klog.Warningf("Found unknown peer with key %s, removing", key)
-			if err2 := w.removePeer(&key); err2 != nil {
+			if err := w.removePeer(&key); err != nil {
 				klog.Errorf("Could not delete WireGuard peer with key %s, ignoring: %v", key, err)
 			}
 			continue
 		}
-		connection, err := w.updateConnectionForPeer(&p, cid)
-		if err != nil {
-			// this should not happen, we do not have the spec, so cannot create a new connection
-			klog.Errorf("Found peer but no connection for cluster %s, ignoring: %v", cid, err)
-			continue
-		}
-		connections = append(connections, *connection)
+		w.updateConnectionForPeer(&p, connection)
+		connections = append(connections, *connection.DeepCopy())
 	}
 	return &connections, nil
 }
 
-func (w *wireguard) clusterIDByPeer(key *wgtypes.Key) (string, error) {
-	for cid, k := range w.peers {
-		if key.String() == k.String() {
-			return cid, nil
+func (w *wireguard) connectionByKey(key *wgtypes.Key) (*v1.Connection, error) {
+	for cid, con := range w.connections {
+		if k, err := keyFromSpec(&con.Endpoint); err == nil {
+			if key.String() == k.String() {
+				return con, nil
+			}
+		} else {
+			klog.Errorf("Could not compare key for cluster %s, skipping: %v", cid, err)
 		}
 	}
-	return "", fmt.Errorf("cluser id not found for key %s", key)
+	return nil, fmt.Errorf("connection not found for key %s", key)
 }
 
-func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, cid string) (*v1.Connection, error) {
-	connection, found := w.connections[cid]
-	if !found {
-		return nil, fmt.Errorf("failed to find connection for peer with ClusterId %s", cid)
-	}
-	now := time.Now().UnixNano()
-	if peerTrafficDelta(connection, lastChecked, now) < KeepAliveInterval.Nanoseconds() {
+// update logic, based on delta from last check
+// good state requires a handshake and traffic
+// if no handshake or stale handshake
+func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Connection) {
+	now := int64(time.Nanosecond) * time.Now().UnixNano() / int64(time.Millisecond)
+	kaMS := KeepAliveInterval.Milliseconds()
+	lc := peerTrafficDelta(connection, lastChecked, now, kaMS)
+	if lc < kaMS {
 		// too fast to see any change, leave status as is
-		return connection, nil
+		return
 	}
-	tx := peerTrafficDelta(connection, transmitBytes, p.TransmitBytes)
-	rx := peerTrafficDelta(connection, receiveBytes, p.ReceiveBytes)
-	if tx > 0 || rx > 0 {
-		connection.SetStatus(v1.Connected, "Rx=%d Bytes, Tx=%d Bytes", p.ReceiveBytes, p.TransmitBytes)
-		return connection, nil
-	}
+	// longer than keep-alive interval, expect bytes>0
+	tx := peerTrafficDelta(connection, transmitBytes, p.TransmitBytes, 0)
+	rx := peerTrafficDelta(connection, receiveBytes, p.ReceiveBytes, 0)
 	if p.LastHandshakeTime.IsZero() {
-		connection.SetStatus(v1.Connecting, "no handshake yet")
-		return connection, nil
+		if lc > handshakeTimeout.Milliseconds() {
+			// no initial handshake for too long
+			connection.SetStatus(v1.ConnectionError, "no initial handshake for %.1f seconds",
+				time.Duration(int64(time.Millisecond)*lc).Seconds())
+			return
+		}
+		// rollback last checked time
+		peerTrafficDelta(connection, lastChecked, now-lc, 0)
+		if tx > 0 || rx > 0 {
+			// no handshake, but at least some communication in progress
+			connection.SetStatus(v1.Connecting, "no initial handshake yet")
+			return
+		}
+	}
+	if tx > 0 || rx > 0 {
+		// all is good
+		connection.SetStatus(v1.Connected, "Rx=%d Bytes, Tx=%d Bytes", p.ReceiveBytes, p.TransmitBytes)
+		return
 	}
 	silence := time.Since(p.LastHandshakeTime)
-	if silence < KeepAliveInterval * 2 {
-		connection.SetStatus(v1.Connecting, "handshake was %.1f seconds ago, no traffic yet",
-			silence.Seconds())
-		return connection, nil
+	if silence < 2*KeepAliveInterval {
+		// grace period, leave status unchanged
+		klog.Warningf("No traffic for connection; handshake was %.1f seconds ago: %v", silence.Seconds(),
+			connection)
+		return
 	}
 	if silence > handshakeTimeout {
+		// hard error, really long time since handshake
 		connection.SetStatus(v1.ConnectionError, "no handshake for %.1f seconds",
 			silence.Seconds())
-		return connection, nil
+		return
 	}
+	// soft error, no traffic, stale handshake
 	connection.SetStatus(v1.ConnectionError, "handshake, but no bytes sent or received for %.1f seconds",
 		silence.Seconds())
-
-	return connection, nil
 }
 
-func (w *wireguard) updatePeerStatus(key *wgtypes.Key, cid string) error {
+func (w *wireguard) updatePeerStatus(c *v1.Connection, key *wgtypes.Key) {
 	p, err := w.peerByKey(key)
 	if err != nil {
-		if connection, found := w.connections[cid]; found {
-			connection.SetStatus(v1.ConnectionError, "cannot fetch status for peer %s: %v", key, err)
-			return nil
-		}
-		return fmt.Errorf("failed to fetch peer configuration: %v", err)
+		c.SetStatus(v1.ConnectionError, "cannot fetch status for peer %s: %v", key, err)
+		return
 	}
-	if _, err := w.updateConnectionForPeer(p, cid); err != nil {
-		return fmt.Errorf("failed to update connection status for peer %s of cluster %s: %v", key, cid, err)
-	}
-	return nil
+	w.updateConnectionForPeer(p, c)
 }
 
-func peerTrafficDelta(c *v1.Connection, key string, newVal int64) int64 {
-	delta := int64(1) // if no parsable history default to not zero
-	if s, found := c.Endpoint.BackendConfig[key]; found {
+// Compare and update backendConfig[key]
+// Return delta from previous value or 0 if no previous value
+// Do not update if delta smaller than threshold, unless threshold is 0 or no previous value
+func peerTrafficDelta(c *v1.Connection, key string, newVal int64, minDeltaForUpdate int64) int64 {
+	delta := int64(0) // if no parsable history default to zero
+	s, found := c.Endpoint.BackendConfig[key]
+	if found {
 		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
 			delta = newVal - i
 		}
 	}
-	c.Endpoint.BackendConfig[key] = strconv.FormatInt(newVal, 10)
+	if delta >= minDeltaForUpdate || !found || minDeltaForUpdate == 0 {
+		c.Endpoint.BackendConfig[key] = strconv.FormatInt(newVal, 10)
+	}
 	return delta
 }
-
