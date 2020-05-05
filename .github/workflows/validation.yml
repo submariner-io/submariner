@@ -29,7 +29,9 @@ jobs:
         run: mkdir artifacts
 
       - name: Run validation
-        run: make test 2>&1 | tee artifacts/unittest.log
+        run: |
+          set -o pipefail
+          make test 2>&1 | tee artifacts/unittest.log
 
       - name: Collect artifacts
         run: |
