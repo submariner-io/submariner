@@ -36,7 +36,7 @@ const (
 	handshakeTimeout = 2*time.Minute + 10*time.Second
 
 	//TODO generalize cleanStrongswanRoutingTable, for now must use 220
-	routingTable    = 220
+	routingTable = 220
 
 	cableDriverName = "wireguard"
 	receiveBytes    = "ReceiveBytes"  // for peer connection status
@@ -212,7 +212,7 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 		route := netlink.Route{
 			LinkIndex: idx,
 			Dst:       &peerNet,
-			Table:	   220,
+			Table:     routingTable,
 		}
 		if err = netlink.RouteAdd(&route); err != nil {
 			return "", fmt.Errorf("failed to add route %s: %v", route, err)
@@ -291,7 +291,7 @@ func (w *wireguard) GetActiveConnections(clusterID string) ([]string, error) {
 func (w *wireguard) setWGLink(localSubnets []string) error {
 	// create routing table
 	if err := setRoutingTable(); err != nil {
-		fmt.Errorf("failed to create routing table: %v", err)
+		return fmt.Errorf("failed to create routing table: %v", err)
 	}
 
 	// delete existing wg device if needed
