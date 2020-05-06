@@ -53,9 +53,9 @@ type leaderConfig struct {
 
 const (
 	leadershipConfigEnvPrefix = "leadership"
-	defaultLeaseDuration      = 5 // In Seconds
-	defaultRenewDeadline      = 3 // In Seconds
-	defaultRetryPeriod        = 2 // In Seconds
+	defaultLeaseDuration      = 10 // In Seconds
+	defaultRenewDeadline      = 5  // In Seconds
+	defaultRetryPeriod        = 2  // In Seconds
 )
 
 var VERSION = "not-compiled-properly"

@@ -12,24 +12,21 @@ import (
 	"github.com/submariner-io/submariner/pkg/log"
 )
 
-func discoverCNIInterface(clusterCIDR string) *cniInterface {
+func discoverCNIInterface(clusterCIDR string) (*cniInterface, error) {
 	_, clusterNetwork, err := net.ParseCIDR(clusterCIDR)
 	if err != nil {
-		klog.Errorf("Unable to ParseCIDR %q : %v", clusterCIDR, err)
-		return nil
+		return nil, fmt.Errorf("unable to ParseCIDR %q : %v", clusterCIDR, err)
 	}
 
 	hostInterfaces, err := net.Interfaces()
 	if err != nil {
-		klog.Errorf("net.Interfaces() returned error : %v", err)
-		return nil
+		return nil, fmt.Errorf("net.Interfaces() returned error : %v", err)
 	}
 
 	for _, iface := range hostInterfaces {
 		addrs, err := iface.Addrs()
 		if err != nil {
-			klog.Errorf("For interface %q, iface.Addrs returned error: %v", iface.Name, err)
-			return nil
+			return nil, fmt.Errorf("for interface %q, iface.Addrs returned error: %v", iface.Name, err)
 		}
 
 		for i := range addrs {
@@ -44,12 +41,12 @@ func discoverCNIInterface(clusterCIDR string) *cniInterface {
 				if clusterNetwork.Contains(address) {
 					klog.V(log.DEBUG).Infof("Found CNI Interface %q that has IP %q from ClusterCIDR %q",
 						iface.Name, ipAddr.String(), clusterCIDR)
-					return &cniInterface{ipAddress: ipAddr.String(), name: iface.Name}
+					return &cniInterface{ipAddress: ipAddr.String(), name: iface.Name}, nil
 				}
 			}
 		}
 	}
-	return nil
+	return nil, fmt.Errorf("unable to find CNI Interface on the host which has IP from %q", clusterCIDR)
 }
 
 func toggleCNISpecificConfiguration(iface string) error {

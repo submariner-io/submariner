@@ -79,7 +79,7 @@ When the source pod is on a worker node that is not the elected gateway node, th
 Submariner has a few requirements in order to get started:
 
 - At least 2 Kubernetes clusters, one of which is designated to serve as the central broker that is accessible by all of your connected clusters; this can be one of your connected clusters, but comes with the limitation that the cluster is required to be up in order to facilitate interconnectivity/negotiation
-- Different cluster/service CIDR's (as well as different kubernetes DNS suffixes) between clusters. This is to prevent traffic selector/policy/routing conflicts. Note: Submariner also supports clusters with Overlapping CIDRs via [Globalnet Controller](docs/globalnet.md).
+- Different cluster/service CIDR's (as well as different kubernetes DNS suffixes) between clusters. This is to prevent traffic selector/policy/routing conflicts. Note: Submariner also supports clusters with Overlapping CIDRs via [Globalnet Controller](https://submariner-io.github.io/architecture/globalnet/).
 - Direct IP connectivity between instances through the internet (or on the same network if not running Submariner over the internet). Submariner supports 1:1 NAT setups, but has a few caveats/provider specific configuration instructions in this configuration.
 - Knowledge of each cluster's network configuration
 - Helm version that supports crd-install hook (v2.12.1+)
