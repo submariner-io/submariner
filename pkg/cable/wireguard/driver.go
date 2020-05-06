@@ -35,7 +35,7 @@ const (
 	// handshakeTimeout is maximal time from handshake a connections is still considered connected
 	handshakeTimeout = 2*time.Minute + 10*time.Second
 
-	//TODO generalize cleanStrongswanRoutingTable, for now must use 220
+	//TODO generalize cleanStrongswanRoutingTable, for now, must use 220
 	routingTable = 220
 
 	cableDriverName = "wireguard"
