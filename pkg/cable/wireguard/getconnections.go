@@ -55,24 +55,25 @@ func (w *wireguard) connectionByKey(key *wgtypes.Key) (*v1.Connection, error) {
 // if no handshake or stale handshake
 func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Connection) {
 	now := int64(time.Nanosecond) * time.Now().UnixNano() / int64(time.Millisecond)
-	kaMS := KeepAliveInterval.Milliseconds()
-	lc := peerTrafficDelta(connection, lastChecked, now, kaMS)
-	if lc < kaMS {
+	keepAliveMS := KeepAliveInterval.Milliseconds() + 2  // +2 for rounding
+
+	lc := peerTrafficDelta(connection, lastChecked, now)
+	lcSec := time.Duration(int64(time.Millisecond) * lc).Seconds()
+	if lc < keepAliveMS {
 		// too fast to see any change, leave status as is
 		return
 	}
+
 	// longer than keep-alive interval, expect bytes>0
-	tx := peerTrafficDelta(connection, transmitBytes, p.TransmitBytes, 0)
-	rx := peerTrafficDelta(connection, receiveBytes, p.ReceiveBytes, 0)
+	tx := peerTrafficDelta(connection, transmitBytes, p.TransmitBytes)
+	rx := peerTrafficDelta(connection, receiveBytes, p.ReceiveBytes)
+
 	if p.LastHandshakeTime.IsZero() {
 		if lc > handshakeTimeout.Milliseconds() {
 			// no initial handshake for too long
-			connection.SetStatus(v1.ConnectionError, "no initial handshake for %.1f seconds",
-				time.Duration(int64(time.Millisecond)*lc).Seconds())
+			connection.SetStatus(v1.ConnectionError, "no initial handshake for %.1f seconds", lcSec)
 			return
 		}
-		// rollback last checked time
-		peerTrafficDelta(connection, lastChecked, now-lc, 0)
 		if tx > 0 || rx > 0 {
 			// no handshake, but at least some communication in progress
 			connection.SetStatus(v1.Connecting, "no initial handshake yet")
@@ -82,24 +83,25 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 	if tx > 0 || rx > 0 {
 		// all is good
 		connection.SetStatus(v1.Connected, "Rx=%d Bytes, Tx=%d Bytes", p.ReceiveBytes, p.TransmitBytes)
+		savePeerTraffic(connection, now, p.TransmitBytes, p.ReceiveBytes)
 		return
 	}
-	silence := time.Since(p.LastHandshakeTime)
-	if silence < 2*KeepAliveInterval {
+	handshakeDelta := time.Since(p.LastHandshakeTime)
+	if handshakeDelta > handshakeTimeout {
+		// hard error, really long time since handshake
+		connection.SetStatus(v1.ConnectionError, "no handshake for %.1f seconds",
+			handshakeDelta.Seconds())
+		return
+	}
+	if lc < 2*keepAliveMS {
 		// grace period, leave status unchanged
-		klog.Warningf("No traffic for connection; handshake was %.1f seconds ago: %v", silence.Seconds(),
+		klog.Warningf("No traffic for connection; handshake was %.1f seconds ago: %v", lcSec,
 			connection)
 		return
 	}
-	if silence > handshakeTimeout {
-		// hard error, really long time since handshake
-		connection.SetStatus(v1.ConnectionError, "no handshake for %.1f seconds",
-			silence.Seconds())
-		return
-	}
 	// soft error, no traffic, stale handshake
-	connection.SetStatus(v1.ConnectionError, "handshake, but no bytes sent or received for %.1f seconds",
-		silence.Seconds())
+	connection.SetStatus(v1.ConnectionError, "no bytes sent or received for %.1f seconds",
+		lcSec)
 }
 
 func (w *wireguard) updatePeerStatus(c *v1.Connection, key *wgtypes.Key) {
@@ -111,19 +113,22 @@ func (w *wireguard) updatePeerStatus(c *v1.Connection, key *wgtypes.Key) {
 	w.updateConnectionForPeer(p, c)
 }
 
-// Compare and update backendConfig[key]
+// Compare backendConfig[key] or initialize entry
 // Return delta from previous value or 0 if no previous value
-// Do not update if delta smaller than threshold, unless threshold is 0 or no previous value
-func peerTrafficDelta(c *v1.Connection, key string, newVal int64, minDeltaForUpdate int64) int64 {
-	delta := int64(0) // if no parsable history default to zero
+func peerTrafficDelta(c *v1.Connection, key string, newVal int64) int64 {
 	s, found := c.Endpoint.BackendConfig[key]
 	if found {
 		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
-			delta = newVal - i
+			return newVal - i
 		}
 	}
-	if delta >= minDeltaForUpdate || !found || minDeltaForUpdate == 0 {
-		c.Endpoint.BackendConfig[key] = strconv.FormatInt(newVal, 10)
-	}
-	return delta
+	c.Endpoint.BackendConfig[key] = strconv.FormatInt(newVal, 10)
+	return 0
+}
+
+// Save backendConfig[key]
+func savePeerTraffic(c *v1.Connection, lc int64, tx int64, rx int64) {
+	c.Endpoint.BackendConfig[lastChecked] = strconv.FormatInt(lc, 10)
+	c.Endpoint.BackendConfig[transmitBytes] = strconv.FormatInt(tx, 10)
+	c.Endpoint.BackendConfig[receiveBytes] = strconv.FormatInt(rx, 10)
 }
