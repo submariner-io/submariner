@@ -35,6 +35,9 @@ const (
 	// handshakeTimeout is maximal time from handshake a connections is still considered connected
 	handshakeTimeout = 2*time.Minute + 10*time.Second
 
+	//TODO generalize cleanStrongswanRoutingTable, for now must use 220
+	routingTable    = 220
+
 	cableDriverName = "wireguard"
 	receiveBytes    = "ReceiveBytes"  // for peer connection status
 	transmitBytes   = "TransmitBytes" // for peer connection status
@@ -209,6 +212,7 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 		route := netlink.Route{
 			LinkIndex: idx,
 			Dst:       &peerNet,
+			Table:	   220,
 		}
 		if err = netlink.RouteAdd(&route); err != nil {
 			return "", fmt.Errorf("failed to add route %s: %v", route, err)
@@ -267,6 +271,7 @@ func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoi
 		route := netlink.Route{
 			LinkIndex: idx,
 			Dst:       &peerNet,
+			Table:     routingTable,
 		}
 		if err = netlink.RouteDel(&route); err != nil {
 			return fmt.Errorf("failed to delete route %s: %v", route, err)
@@ -284,6 +289,11 @@ func (w *wireguard) GetActiveConnections(clusterID string) ([]string, error) {
 
 // Create new wg link and assign addr from local subnets
 func (w *wireguard) setWGLink(localSubnets []string) error {
+	// create routing table
+	if err := setRoutingTable(); err != nil {
+		fmt.Errorf("failed to create routing table: %v", err)
+	}
+
 	// delete existing wg device if needed
 	if link, err := netlink.LinkByName(DefaultDeviceName); err == nil {
 		// delete existing device
@@ -432,4 +442,15 @@ func endpointIP(ep *types.SubmarinerEndpoint) string {
 		return ep.Spec.PublicIP
 	}
 	return ep.Spec.PrivateIP
+}
+
+func setRoutingTable() error {
+	r := netlink.NewRule()
+	r.Table = routingTable
+	r.Priority = routingTable
+	err := netlink.RuleAdd(r)
+	if err == nil || os.IsExist(err) {
+		return nil
+	}
+	return fmt.Errorf("could not add rule for routing table: %v", err)
 }

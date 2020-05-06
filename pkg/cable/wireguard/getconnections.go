@@ -55,7 +55,7 @@ func (w *wireguard) connectionByKey(key *wgtypes.Key) (*v1.Connection, error) {
 // if no handshake or stale handshake
 func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Connection) {
 	now := int64(time.Nanosecond) * time.Now().UnixNano() / int64(time.Millisecond)
-	keepAliveMS := KeepAliveInterval.Milliseconds() + 2  // +2 for rounding
+	keepAliveMS := KeepAliveInterval.Milliseconds() + 2 // +2 for rounding
 
 	lc := peerTrafficDelta(connection, lastChecked, now)
 	lcSec := time.Duration(int64(time.Millisecond) * lc).Seconds()
