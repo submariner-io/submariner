@@ -21,6 +21,9 @@ jobs:
         exclude:
           - deploytool: 'helm'
             cable_driver: 'wireguard'
+# TODO: Remove exclusion when issue #552 is fixed
+          - globalnet: '--globalnet'
+            cable_driver: 'wireguard'
     steps:
       - name: Checkout the repository
         uses: actions/checkout@master
@@ -41,10 +44,11 @@ jobs:
           df -h
           free -h
 
-      - name: Run E2E
+      - name: Run E2E deployment and tests
+        env:
+          CLUSTERS_ARGS: ${{ matrix.globalnet }}
+          DEPLOY_ARGS: ${{ matrix.globalnet }} --deploytool ${{ matrix.deploytool }}
         run: |
-          export CLUSTERS_ARGS="${{ matrix.globalnet }}"
-          export DEPLOY_ARGS="${{ matrix.globalnet }} --deploytool ${{ matrix.deploytool }}"
           [[ -z "${{ matrix.cable_driver }}" ]] || DEPLOY_ARGS+=" --deploytool_submariner_args '--cable-driver ${{ matrix.cable_driver }}'"
           make e2e
 
