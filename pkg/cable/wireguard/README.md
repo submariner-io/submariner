@@ -23,6 +23,7 @@ Traffic is encrypted and encapsulated in UDP packets.
   ```ShellSession
   $ sudo add-apt-repository ppa:wireguard/wireguard
   $ sudo apt-get update
+  $ sudo apt-get install linux-headers-`uname -r` -y
   $ sudo apt-get install wireguard
   ```
 

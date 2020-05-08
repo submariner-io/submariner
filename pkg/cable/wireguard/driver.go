@@ -5,6 +5,9 @@ import (
 	"net"
 	"os"
 	"sync"
+	"time"
+
+	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/log"
@@ -26,7 +29,19 @@ const (
 	// PublicKey is name (key) of publicKey entry in back-end map
 	PublicKey = "publicKey"
 
+	// KeepAliveInterval to use for wg peers
+	KeepAliveInterval = 10 * time.Second
+
+	// handshakeTimeout is maximal time from handshake a connections is still considered connected
+	handshakeTimeout = 2*time.Minute + 10*time.Second
+
+	//TODO generalize cleanStrongswanRoutingTable, for now, must use 220
+	routingTable = 220
+
 	cableDriverName = "wireguard"
+	receiveBytes    = "ReceiveBytes"  // for peer connection status
+	transmitBytes   = "TransmitBytes" // for peer connection status
+	lastChecked     = "LastChecked"   // for connection peer status
 )
 
 func init() {
@@ -36,7 +51,7 @@ func init() {
 type wireguard struct {
 	localSubnets  []net.IPNet
 	localEndpoint types.SubmarinerEndpoint
-	peers         map[string]wgtypes.Key // clusterID -> publicKey
+	connections   map[string]*v1.Connection // clusterID -> remote ep connection
 	mutex         sync.Mutex
 	client        *wgctrl.Client
 	link          netlink.Link
@@ -44,11 +59,10 @@ type wireguard struct {
 
 // NewDriver creates a new WireGuard driver
 func NewDriver(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (cable.Driver, error) {
-
 	var err error
 
 	w := wireguard{
-		peers:         make(map[string]wgtypes.Key),
+		connections:   make(map[string]*v1.Connection),
 		localEndpoint: localEndpoint,
 	}
 
@@ -114,7 +128,6 @@ func (w *wireguard) GetName() string {
 }
 
 func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (string, error) {
-
 	if w.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
 		klog.V(log.DEBUG).Infof("Will not connect to self")
 		return "", nil
@@ -129,31 +142,40 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 	allowedIPs := parseSubnets(remoteEndpoint.Spec.Subnets)
 
 	// parse remote public key
-	remoteKey, err := publicKey(remoteEndpoint)
+	remoteKey, err := keyFromSpec(&remoteEndpoint.Spec)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse peer public key: %v", err)
 	}
 
-	klog.V(log.DEBUG).Infof("Connecting cluster %s endpoint %s with publicKey %s", remoteEndpoint.Spec.ClusterID, remoteIP, remoteKey)
+	klog.V(log.DEBUG).Infof("Connecting cluster %s endpoint %s with publicKey %s",
+		remoteEndpoint.Spec.ClusterID, remoteIP, remoteKey)
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 
-	// delete old peers for ClusterID
-	oldKey, found := w.peers[remoteEndpoint.Spec.ClusterID]
+	// delete or update old peers for ClusterID
+	oldCon, found := w.connections[remoteEndpoint.Spec.ClusterID]
 	if found {
-		if oldKey.String() == remoteKey.String() {
-			//TODO check that peer config has not changed (eg allowedIPs)
-			klog.V(log.DEBUG).Infof("Skipping update of existing peer key %s", oldKey)
-			return ip, nil
+		if oldKey, err := keyFromSpec(&oldCon.Endpoint); err == nil {
+			if oldKey.String() == remoteKey.String() {
+				// existing connection, update status and skip
+				w.updatePeerStatus(oldCon, oldKey)
+				klog.V(log.DEBUG).Infof("Skipping connect for existing peer key %s", oldKey)
+				return ip, nil
+			}
+			// new peer will take over subnets so can ignore error
+			_ = w.removePeer(oldKey)
 		}
-
-		// new peer will take over subnets so can ignore error
-		_ = w.removePeer(&oldKey)
-
-		delete(w.peers, remoteEndpoint.Spec.ClusterID)
+		delete(w.connections, remoteEndpoint.Spec.ClusterID)
 	}
 
+	// create connection, overwrite existing connection
+	connection := v1.NewConnection(remoteEndpoint.Spec)
+	connection.SetStatus(v1.Connecting, "Connection has been created but not yet started")
+	klog.V(log.DEBUG).Infof("Adding connection for cluster %s, %v", remoteEndpoint.Spec.ClusterID, connection)
+	w.connections[remoteEndpoint.Spec.ClusterID] = connection
+
 	// configure peer
+	ka := KeepAliveInterval
 	peerCfg := []wgtypes.PeerConfig{{
 		PublicKey:    *remoteKey,
 		Remove:       false,
@@ -163,7 +185,7 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 			IP:   remoteIP,
 			Port: DefaultListenPort,
 		},
-		PersistentKeepaliveInterval: nil,
+		PersistentKeepaliveInterval: &ka,
 		ReplaceAllowedIPs:           true,
 		AllowedIPs:                  allowedIPs,
 	}}
@@ -176,14 +198,12 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 	}
 
 	// verify peer was added
-	// TODO verify configuration
 	if p, err := w.peerByKey(remoteKey); err != nil {
 		klog.Errorf("Failed to verify peer configuration: %v", err)
 	} else {
+		// TODO verify configuration
 		klog.V(log.DEBUG).Infof("Peer configured: %+v", p)
 	}
-
-	w.peers[remoteEndpoint.Spec.ClusterID] = *remoteKey
 
 	// Add routes to peer
 	//TODO save old routes for removal
@@ -192,6 +212,7 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 		route := netlink.Route{
 			LinkIndex: idx,
 			Dst:       &peerNet,
+			Table:     routingTable,
 		}
 		if err = netlink.RouteAdd(&route); err != nil {
 			return "", fmt.Errorf("failed to add route %s: %v", route, err)
@@ -202,8 +223,8 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 	return ip, nil
 }
 
-func publicKey(ep types.SubmarinerEndpoint) (*wgtypes.Key, error) {
-	s, found := ep.Spec.BackendConfig[PublicKey]
+func keyFromSpec(ep *v1.EndpointSpec) (*wgtypes.Key, error) {
+	s, found := ep.BackendConfig[PublicKey]
 	if !found {
 		return nil, fmt.Errorf("endpoint is missing public key")
 	}
@@ -223,36 +244,25 @@ func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoi
 	}
 
 	// parse remote public key
-	remoteKey, err := publicKey(remoteEndpoint)
+	remoteKey, err := keyFromSpec(&remoteEndpoint.Spec)
 	if err != nil {
 		return fmt.Errorf("failed to parse peer public key: %v", err)
-	}
-
-	w.mutex.Lock()
-	defer w.mutex.Unlock()
-
-	// key mismatch indicates removal of old peer key, where clusterID is already associated with new key or no key
-	keyMismatch := false
-
-	oldKey, found := w.peers[remoteEndpoint.Spec.ClusterID]
-	if !found {
-		keyMismatch = true
-		klog.Warningf("Key mismatch, cluster %s has no key but asked to remove %s", remoteEndpoint.Spec.ClusterID, remoteKey)
-	} else if oldKey.String() != remoteKey.String() {
-		keyMismatch = true
-		klog.Warningf("Key mismatch, cluster %s key is %s but asked to remove %s", remoteEndpoint.Spec.ClusterID, oldKey, remoteKey)
 	}
 
 	// wg remove
 	_ = w.removePeer(remoteKey)
 
-	if keyMismatch {
-		// ClusterID probably already associated with new key. Do not remove peers entry nor routes
-		klog.Warningf("Key mismatch for peer cluster %s, keeping existing routes and public key", remoteEndpoint.Spec.ClusterID)
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+
+	if w.keyMismatch(remoteEndpoint.Spec.ClusterID, remoteKey) {
+		// ClusterID probably already associated with new spec. Do not remove connections entry nor routes
+		klog.Warningf("Key mismatch for peer cluster %s, keeping existing routes and spec",
+			remoteEndpoint.Spec.ClusterID)
 		return nil
 	}
-	// no delete on mismatch
-	delete(w.peers, remoteEndpoint.Spec.ClusterID)
+
+	delete(w.connections, remoteEndpoint.Spec.ClusterID)
 
 	// del routes
 	allowedIPs := parseSubnets(remoteEndpoint.Spec.Subnets)
@@ -261,6 +271,7 @@ func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoi
 		route := netlink.Route{
 			LinkIndex: idx,
 			Dst:       &peerNet,
+			Table:     routingTable,
 		}
 		if err = netlink.RouteDel(&route); err != nil {
 			return fmt.Errorf("failed to delete route %s: %v", route, err)
@@ -278,6 +289,10 @@ func (w *wireguard) GetActiveConnections(clusterID string) ([]string, error) {
 
 // Create new wg link and assign addr from local subnets
 func (w *wireguard) setWGLink(localSubnets []string) error {
+	// create routing table
+	if err := setRoutingTable(); err != nil {
+		return fmt.Errorf("failed to create routing table: %v", err)
+	}
 
 	// delete existing wg device if needed
 	if link, err := netlink.LinkByName(DefaultDeviceName); err == nil {
@@ -330,7 +345,6 @@ func (w *wireguard) setWGLink(localSubnets []string) error {
 // find internal host IP inside one of the local CIDRs
 // TODO move this to utils
 func discoverInternalIP(cidrs []net.IPNet) (string, error) {
-
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
 		return "", fmt.Errorf("net.InterfaceAddrs() returned error : %v", err)
@@ -372,7 +386,6 @@ func parseSubnets(subnets []string) []net.IPNet {
 }
 
 func (w *wireguard) removePeer(key *wgtypes.Key) error {
-	// remove old
 	klog.V(log.DEBUG).Infof("Removing WireGuard peer with key %s", key)
 	peerCfg := []wgtypes.PeerConfig{
 		{
@@ -405,9 +418,39 @@ func (w *wireguard) peerByKey(key *wgtypes.Key) (*wgtypes.Peer, error) {
 	return nil, fmt.Errorf("peer not found for key %s", key)
 }
 
+// find if key matches connection spec (from spec clusterID)
+func (w *wireguard) keyMismatch(cid string, key *wgtypes.Key) bool {
+	c, found := w.connections[cid]
+	if !found {
+		klog.Warningf("Could not find spec for cluster %s, mismatched endpoint key %s", cid, key)
+		return true
+	}
+	oldKey, err := keyFromSpec(&c.Endpoint)
+	if err != nil {
+		klog.Warningf("Could not find old key of cluster %s, mismatched endpoint key %s", cid, key)
+		return true
+	}
+	if oldKey.String() != key.String() {
+		klog.Warningf("Key mismatch, cluster %s key is %s, endpoint key is %s", cid, oldKey, key)
+		return true
+	}
+	return false
+}
+
 func endpointIP(ep *types.SubmarinerEndpoint) string {
 	if ep.Spec.NATEnabled {
 		return ep.Spec.PublicIP
 	}
 	return ep.Spec.PrivateIP
+}
+
+func setRoutingTable() error {
+	r := netlink.NewRule()
+	r.Table = routingTable
+	r.Priority = routingTable
+	err := netlink.RuleAdd(r)
+	if err == nil || os.IsExist(err) {
+		return nil
+	}
+	return fmt.Errorf("could not add rule for routing table: %v", err)
 }
