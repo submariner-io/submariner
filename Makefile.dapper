@@ -11,7 +11,7 @@
 	@mv .dapper.tmp .dapper
 
 %: .dapper
-	./.dapper -m bind make $@ $(MAKEFLAGS)
+	+./.dapper -m bind make $@ $(MAKEFLAGS)
 
 shell: .dapper
 	./.dapper -m bind -s
