@@ -29,6 +29,7 @@ function deploy_env_once() {
     fi
 
     make deploy
+    declare_kubeconfig
 }
 
 function test_with_e2e_tests {
