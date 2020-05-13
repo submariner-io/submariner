@@ -133,7 +133,7 @@ func (w *wireguard) Init() error {
 	}
 	d, err := w.client.Device(DefaultDeviceName)
 	if err != nil {
-		return fmt.Errorf("wgctrl cannot find WireGaurd device: %v", err)
+		return fmt.Errorf("wgctrl cannot find WireGuard device: %v", err)
 	}
 	k, err := keyFromSpec(&w.localEndpoint.Spec)
 	if err != nil {
@@ -245,7 +245,11 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 			Table:     routingTable,
 		}
 		if err = netlink.RouteAdd(&route); err != nil {
-			return "", fmt.Errorf("failed to add route %s: %v", route, err)
+			klog.V(log.DEBUG).Infof("adding route %s", route)
+			if !os.IsExist(err) {
+				return "", fmt.Errorf("failed to add route %s: %v", route, err)
+			}
+			klog.V(log.DEBUG).Infof("route already exists")
 		}
 	}
 
