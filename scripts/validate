@@ -20,3 +20,4 @@ if [[ $(goimports -l ${PACKAGES} | wc -l) -gt 0 ]]; then
 fi
 
 golangci-lint run
+

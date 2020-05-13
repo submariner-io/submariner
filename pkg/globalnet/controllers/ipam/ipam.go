@@ -158,10 +158,9 @@ func (i *Controller) processNextObject(objWorkqueue workqueue.RateLimitingInterf
 				return fmt.Errorf("error retrieving submariner-ipam-controller object %s: %v", name, err)
 			}
 
-			switch runtimeObj.(type) {
+			switch runtimeObj := runtimeObj.(type) {
 			case *k8sv1.Service:
-				service := runtimeObj.(*k8sv1.Service)
-				switch i.evaluateService(service) {
+				switch i.evaluateService(runtimeObj) {
 				case Ignore:
 					objWorkqueue.Forget(obj)
 					return nil
@@ -170,22 +169,20 @@ func (i *Controller) processNextObject(objWorkqueue workqueue.RateLimitingInterf
 					return fmt.Errorf("service %s requeued %d times", key, objWorkqueue.NumRequeues(obj))
 				}
 			case *k8sv1.Pod:
-				pod := runtimeObj.(*k8sv1.Pod)
 				// Process pod event only when it has an ipaddress. Pods skipped here will be handled subsequently
 				// during podUpdate event when an ipaddress is assigned to it.
-				if pod.Status.PodIP == "" {
+				if runtimeObj.Status.PodIP == "" {
 					objWorkqueue.Forget(obj)
 					return nil
 				}
 
 				// Privileged pods that use hostNetwork will be ignored.
-				if pod.Status.PodIP == pod.Status.HostIP {
-					klog.V(log.DEBUG).Infof("Ignoring pod %s on host %s as it uses hostNetworking", pod.Name, pod.Status.PodIP)
+				if runtimeObj.Status.PodIP == runtimeObj.Status.HostIP {
+					klog.V(log.DEBUG).Infof("Ignoring pod %s on host %s as it uses hostNetworking", runtimeObj.Name, runtimeObj.Status.PodIP)
 					return nil
 				}
 			case *k8sv1.Node:
-				node := runtimeObj.(*k8sv1.Node)
-				switch i.evaluateNode(node) {
+				switch i.evaluateNode(runtimeObj) {
 				case Requeue:
 					objWorkqueue.AddRateLimited(obj)
 					return fmt.Errorf("Node %s requeued %d times", key, objWorkqueue.NumRequeues(obj))
