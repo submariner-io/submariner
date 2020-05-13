@@ -19,5 +19,4 @@ if [[ $(goimports -l ${PACKAGES} | wc -l) -gt 0 ]]; then
     exit 1
 fi
 
-golangci-lint run
-
+golangci-lint run --timeout 5m --skip-dirs pkg/client
