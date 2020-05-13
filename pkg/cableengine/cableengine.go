@@ -81,7 +81,7 @@ func (i *engine) StartEngine() error {
 func (i *engine) startDriver() error {
 	var err error
 
-	if i.driver, err = cable.NewDriver(i.localSubnets, i.localEndpoint); err != nil {
+	if i.driver, err = cable.NewDriver(i.localSubnets, i.localEndpoint, i.localCluster); err != nil {
 		return err
 	}
 
