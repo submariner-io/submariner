@@ -20,7 +20,7 @@ type libreSwan struct {
 }
 
 // NewLibreSwan starts an IKE daemon using LibreSwan and configures it to manage Submariner's endpoints
-func NewLibreSwan(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (cable.Driver, error) {
+func NewLibreSwan(localSubnets []string, localEndpoint types.SubmarinerEndpoint, localCluster types.SubmarinerCluster) (cable.Driver, error) {
 	return &libreSwan{}, nil
 }
 

@@ -33,7 +33,7 @@ type Driver interface {
 }
 
 // Function prototype to create a new driver
-type DriverCreateFunc func(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (Driver, error)
+type DriverCreateFunc func(localSubnets []string, localEndpoint types.SubmarinerEndpoint, localCluster types.SubmarinerCluster) (Driver, error)
 
 // Static map of supported drivers
 var drivers = map[string]DriverCreateFunc{}
@@ -50,12 +50,12 @@ func AddDriver(name string, driverCreate DriverCreateFunc) {
 }
 
 // Returns a new driver according the required Backend
-func NewDriver(localSubnets []string, localEndpoint types.SubmarinerEndpoint) (Driver, error) {
+func NewDriver(localSubnets []string, localEndpoint types.SubmarinerEndpoint, localCluster types.SubmarinerCluster) (Driver, error) {
 	driverCreate, ok := drivers[localEndpoint.Spec.Backend]
 	if !ok {
 		return nil, fmt.Errorf("unsupported cable type %s", localEndpoint.Spec.Backend)
 	}
-	return driverCreate(localSubnets, localEndpoint)
+	return driverCreate(localSubnets, localEndpoint, localCluster)
 }
 
 // Sets the default cable driver name, if it is not specified by user.

@@ -95,8 +95,8 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 	}
 	if lc < 2*keepAliveMS {
 		// grace period, leave status unchanged
-		klog.Warningf("No traffic for connection; handshake was %.1f seconds ago: %v", lcSec,
-			connection)
+		klog.Warningf("No traffic for %.1f seconds; handshake was %.1f seconds ago: %v", lcSec,
+			handshakeDelta.Seconds(), connection)
 		return
 	}
 	// soft error, no traffic, stale handshake
