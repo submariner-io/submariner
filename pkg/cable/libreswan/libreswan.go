@@ -198,7 +198,7 @@ func extractSubnets(endpoint subv1.EndpointSpec) []string {
 	return subnets
 }
 
-func whack(args ...string) error {
+func runWhack(args ...string) error {
 	var err error
 
 	for i := 0; i < 3; i++ {
@@ -240,7 +240,7 @@ func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string
 	rightSubnets := extractSubnets(endpoint.Spec)
 
 	// Ensure we’re listening
-	if err := whack("--listen"); err != nil {
+	if err := runWhack("--listen"); err != nil {
 		return "", fmt.Errorf("error listening: %v", err)
 	}
 
@@ -272,16 +272,16 @@ func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string
 
 				klog.Infof("Creating connection to %v", endpoint)
 
-				if err := whack(args...); err != nil {
+				if err := runWhack(args...); err != nil {
 					return "", err
 				}
 
-				if err := whack("--route", "--name", connectionName); err != nil {
-					return "", err
+				if err := Route(connectionName); err != nil {
+					return "", fmt.Errorf("Error routing connection %v: %v", endpoint.Spec.CableName, err)
 				}
 
-				if err := whack("--initiate", "--asynchronous", "--name", connectionName); err != nil {
-					return "", err
+				if err := Initiate(connectionName); err != nil {
+					return "", fmt.Errorf("Error initiating connection %v: %v", endpoint.Spec.CableName, err)
 				}
 			}
 		}
