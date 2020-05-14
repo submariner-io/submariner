@@ -46,7 +46,7 @@ func beforeSuite() {
 func queryAndUpdateGlobalnetStatus() {
 	framework.TestContext.GlobalnetEnabled = false
 	clusterIndex := framework.ClusterB
-	clusterName := framework.TestContext.KubeContexts[clusterIndex]
+	clusterName := framework.TestContext.ClusterIDs[clusterIndex]
 	clusters := SubmarinerClients[clusterIndex].SubmarinerV1().Clusters(framework.TestContext.SubmarinerNamespace)
 	framework.AwaitUntil("find the submariner Cluster for "+clusterName, func() (interface{}, error) {
 		cluster, err := clusters.Get(clusterName, metav1.GetOptions{})
