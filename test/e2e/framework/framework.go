@@ -58,6 +58,9 @@ func queryAndUpdateGlobalnetStatus() {
 		}
 
 		clusterList := result.(*submarinerv1.ClusterList)
+		if len(clusterList.Items) == 0 {
+			return false, "No Cluster found", nil
+		}
 		for _, cluster := range clusterList.Items {
 			if len(cluster.Spec.GlobalCIDR) != 0 {
 				// Based on the status of GlobalnetEnabled, certain tests will be skipped/executed.
