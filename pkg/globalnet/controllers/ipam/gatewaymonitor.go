@@ -8,6 +8,8 @@ import (
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/submariner-io/submariner/pkg/log"
+	"github.com/submariner-io/submariner/pkg/util"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -121,6 +123,20 @@ func (i *GatewayMonitor) processNextEndpoint() bool {
 
 		if endpoint.Spec.ClusterID != i.clusterID {
 			klog.V(log.DEBUG).Infof("Endpoint %s belongs to a remote cluster", endpoint.Spec.Hostname)
+
+			overlap, err := util.IsOverlappingCIDR(endpoint.Spec.Subnets, i.ipamSpec.GlobalCIDR[0])
+			if err != nil {
+				// Ideally this case will never hit, as the subnets are valid CIDRs
+				klog.Warningf("unable to validate overlapping Service CIDR: %s", err)
+			}
+			if overlap {
+				// When GlobalNet is used, globalCIDRs allocated to the clusters should not overlap.
+				// If they overlap, it implies that its an invalid configuration which we do not support.
+				klog.Errorf("GlobalCIDR %q of local cluster %q overlaps with remote cluster %s",
+					i.ipamSpec.GlobalCIDR[0], i.ipamSpec.ClusterID, endpoint.Spec.ClusterID)
+				os.Exit(1)
+			}
+
 			for _, remoteSubnet := range endpoint.Spec.Subnets {
 				MarkRemoteClusterTraffic(i.ipt, remoteSubnet, AddRules)
 			}
@@ -137,32 +153,10 @@ func (i *GatewayMonitor) processNextEndpoint() bool {
 		if endpoint.Spec.Hostname == hostname {
 			klog.V(log.DEBUG).Infof("We are now on GatewayNode %s", endpoint.Spec.PrivateIP)
 
-			clusterList, err := i.submarinerClientSet.SubmarinerV1().Clusters(i.ipamSpec.Namespace).List(metav1.ListOptions{})
-			if err != nil {
-				i.endpointWorkqueue.AddRateLimited(key)
-				return fmt.Errorf("error while retrieving the cluster info: %v", err)
-			}
-
-			globalCIDR := ""
-			for _, cluster := range clusterList.Items {
-				if cluster.Spec.ClusterID == i.clusterID {
-					klog.V(log.DEBUG).Infof("GlobalCidr configured in %s is %s", i.clusterID, cluster.Spec.GlobalCIDR)
-					if cluster.Spec.GlobalCIDR != nil && len(cluster.Spec.GlobalCIDR) > 0 {
-						// TODO: Revisit when support for more than one globalCIDR is implemented.
-						globalCIDR = cluster.Spec.GlobalCIDR[0]
-					}
-					break
-				}
-			}
-
 			i.syncMutex.Lock()
 			if !i.isGatewayNode {
 				i.isGatewayNode = true
-				if globalCIDR != "" {
-					i.initializeIpamController(globalCIDR)
-				} else {
-					klog.Errorf("Cluster %s is not configured to use globalCidr", i.clusterID)
-				}
+				i.initializeIpamController(i.ipamSpec.GlobalCIDR[0])
 			}
 			i.syncMutex.Unlock()
 		} else {

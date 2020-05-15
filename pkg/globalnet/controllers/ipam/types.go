@@ -13,9 +13,10 @@ import (
 )
 
 type SubmarinerIpamControllerSpecification struct {
-	ClusterID string
-	ExcludeNS []string
-	Namespace string
+	ClusterID  string
+	ExcludeNS  []string
+	Namespace  string
+	GlobalCIDR []string
 }
 
 type InformerConfigStruct struct {
