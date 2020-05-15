@@ -200,6 +200,7 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 	// Program iptables rules for traffic destined to all the remote cluster CIDRs
 	for _, endpoint := range endpoints.Items {
 		if endpoint.Spec.ClusterID != r.clusterID {
+			r.checkOverlappingSubnets(endpoint.Spec.Subnets)
 			r.updateIptableRulesForInterclusterTraffic(endpoint.Spec.Subnets)
 		}
 	}
@@ -257,6 +258,42 @@ func (r *Controller) runEndpointWorker() {
 func (r *Controller) runPodWorker() {
 	for r.processNextPod() {
 
+	}
+}
+
+func (r *Controller) checkOverlappingSubnets(remoteSubnets []string) {
+	// If the remoteSubnets [*] overlap with local cluster Pod/Service CIDRs we
+	// should not update the IPTable rules on the host, as it will disrupt the
+	// functionality of the local cluster. So, lets validate that subnets do not
+	// overlap before we program any IPTable rules on the host for inter-cluster
+	// traffic.
+	// [*] Note: In a non-GlobalNet deployment, remoteSubnets will be a list of
+	// Pod/Service CIDRs, whereas in a GlobalNet deployment, it will be a list of
+	// globalCIDRs allocated to the clusters.
+
+	for _, serviceCidr := range r.localServiceCidr {
+		overlap, err := util.IsOverlappingCIDR(remoteSubnets, serviceCidr)
+		if err != nil {
+			// Ideally this case will never hit, as the subnets are valid CIDRs
+			klog.Warningf("unable to validate overlapping Service CIDR: %s", err)
+		}
+		if overlap {
+			// This is a deployment issue.
+			klog.Errorf("Local Service CIDR %q, overlaps with remote cluster %s", serviceCidr, err)
+			os.Exit(1)
+		}
+	}
+
+	for _, podCidr := range r.localClusterCidr {
+		overlap, err := util.IsOverlappingCIDR(remoteSubnets, podCidr)
+		if err != nil {
+			klog.Warningf("unable to validate overlapping Pod CIDR: %s", err)
+		}
+		if overlap {
+			// This is a deployment issue.
+			klog.Errorf("Local Pod CIDR %q, overlaps with remote cluster %s", podCidr, err)
+			os.Exit(1)
+		}
 	}
 }
 
@@ -473,6 +510,9 @@ func (r *Controller) processNextEndpoint() bool {
 		klog.V(log.TRACE).Infof("Processing endpoint %q : %s", name, endpoint)
 
 		if endpoint.Spec.ClusterID != r.clusterID {
+			// Before we make any changes on the host, verify that subnets do not overlap.
+			r.checkOverlappingSubnets(endpoint.Spec.Subnets)
+
 			klog.Infof("Updating iptable rules for remote cluster's Endpoint %q with subnets %v",
 				endpoint.Name, endpoint.Spec.Subnets)
 			r.updateIptableRulesForInterclusterTraffic(endpoint.Spec.Subnets)
