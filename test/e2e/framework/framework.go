@@ -45,26 +45,28 @@ func beforeSuite() {
 
 func queryAndUpdateGlobalnetStatus() {
 	framework.TestContext.GlobalnetEnabled = false
-	clusterIndex := framework.ClusterB
-	clusterName := framework.TestContext.KubeContexts[clusterIndex]
-	clusters := SubmarinerClients[clusterIndex].SubmarinerV1().Clusters(framework.TestContext.SubmarinerNamespace)
-	framework.AwaitUntil("find the submariner Cluster for "+clusterName, func() (interface{}, error) {
-		cluster, err := clusters.Get(clusterName, metav1.GetOptions{})
+	clusters := SubmarinerClients[framework.ClusterB].SubmarinerV1().Clusters(framework.TestContext.SubmarinerNamespace)
+	framework.AwaitUntil("find clusters to figure out if Globalnet is enabled", func() (interface{}, error) {
+		clusters, err := clusters.List(metav1.ListOptions{})
 		if apierrors.IsNotFound(err) {
 			return nil, nil
 		}
-		return cluster, err
+		return clusters, err
 	}, func(result interface{}) (bool, string, error) {
 		if result == nil {
 			return false, "No Cluster found", nil
 		}
 
-		cluster := result.(*submarinerv1.Cluster)
-		if len(cluster.Spec.GlobalCIDR) != 0 {
-			// Based on the status of GlobalnetEnabled, certain tests will be skipped/executed.
-			framework.TestContext.GlobalnetEnabled = true
+		clusterList := result.(*submarinerv1.ClusterList)
+		if len(clusterList.Items) == 0 {
+			return false, "No Cluster found", nil
 		}
-
+		for _, cluster := range clusterList.Items {
+			if len(cluster.Spec.GlobalCIDR) != 0 {
+				// Based on the status of GlobalnetEnabled, certain tests will be skipped/executed.
+				framework.TestContext.GlobalnetEnabled = true
+			}
+		}
 		return true, "", nil
 	})
 }
