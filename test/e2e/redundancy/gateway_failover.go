@@ -14,7 +14,7 @@ import (
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
 )
 
-var _ = Describe("[redundancy] Gateway fail-over tests", func() {
+var _ = PDescribe("[redundancy] Gateway fail-over tests", func() {
 	f := subFramework.NewFramework("gateway-redundancy")
 
 	// After each test, we make sure that the system again has a single gateway, the active one
