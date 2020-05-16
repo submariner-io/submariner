@@ -6,7 +6,7 @@ import (
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
 )
 
-var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across overlapping clusters without discovery ", func() {
+var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across overlapping clusters without discovery using GN", func() {
 	f := framework.NewFramework("dataplane-gn-conn-nd")
 	var toEndpointType tcp.EndpointType
 	var networking framework.NetworkingType
