@@ -12,6 +12,7 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         globalnet: ['', '--globalnet']
         deploytool: ['operator', 'helm']
