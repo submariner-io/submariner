@@ -49,7 +49,7 @@ jobs:
           DEPLOY_ARGS: ${{ matrix.globalnet }} --deploytool ${{ matrix.deploytool }}
         run: |
           [[ -z "${{ matrix.cable_driver }}" ]] || DEPLOY_ARGS+=" --deploytool_submariner_args '--cable-driver ${{ matrix.cable_driver }}'"
-          make e2e
+          make e2e2
 
       - name: Post Mortem
         if: failure()
