@@ -106,6 +106,34 @@ func (k *Datastore) GetEndpoints(clusterID string) ([]types.SubmarinerEndpoint, 
 	return endpoints, nil
 }
 
+func (k *Datastore) GetClusters(colorCodes []string) ([]types.SubmarinerCluster, error) {
+	k8sClusters, err := k.client.SubmarinerV1().Clusters(k.remoteNamespace).List(metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	clusters := []types.SubmarinerCluster{}
+
+	for _, cluster := range k8sClusters.Items {
+		for _, colorCode := range colorCodes {
+			if colorCodeMatches(colorCode, cluster.Spec.ColorCodes) {
+				clusters = append(clusters, types.SubmarinerCluster{Spec: cluster.Spec})
+				break
+			}
+		}
+	}
+	return clusters, nil
+}
+
+func colorCodeMatches(item string, colorCodes []string) bool {
+	for _, colorCode := range colorCodes {
+		if colorCode == item {
+			return true
+		}
+	}
+	return false
+}
+
 func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onClusterChange datastore.OnClusterChange) error {
 
 	k.informerFactory.Submariner().V1().Clusters().Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
@@ -128,10 +156,15 @@ func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, col
 			}
 
 			if selfClusterID != object.Spec.ClusterID {
-				utilruntime.HandleError(onClusterChange(&types.SubmarinerCluster{
-					ID:   object.Spec.ClusterID,
-					Spec: object.Spec,
-				}, false))
+				for _, colorCode := range colorCodes {
+					if colorCodeMatches(colorCode, object.Spec.ColorCodes) {
+						utilruntime.HandleError(onClusterChange(&types.SubmarinerCluster{
+							ID:   object.Spec.ClusterID,
+							Spec: object.Spec,
+						}, false))
+						break
+					}
+				}
 			}
 		},
 		UpdateFunc: func(old, obj interface{}) {
@@ -153,10 +186,15 @@ func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, col
 			}
 
 			if selfClusterID != object.Spec.ClusterID {
-				utilruntime.HandleError(onClusterChange(&types.SubmarinerCluster{
-					ID:   object.Spec.ClusterID,
-					Spec: object.Spec,
-				}, false))
+				for _, colorCode := range colorCodes {
+					if colorCodeMatches(colorCode, object.Spec.ColorCodes) {
+						utilruntime.HandleError(onClusterChange(&types.SubmarinerCluster{
+							ID:   object.Spec.ClusterID,
+							Spec: object.Spec,
+						}, false))
+						break
+					}
+				}
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -178,10 +216,15 @@ func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, col
 			}
 
 			if selfClusterID != object.Spec.ClusterID {
-				utilruntime.HandleError(onClusterChange(&types.SubmarinerCluster{
-					ID:   object.Spec.ClusterID,
-					Spec: object.Spec,
-				}, true))
+				for _, colorCode := range colorCodes {
+					if colorCodeMatches(colorCode, object.Spec.ColorCodes) {
+						utilruntime.HandleError(onClusterChange(&types.SubmarinerCluster{
+							ID:   object.Spec.ClusterID,
+							Spec: object.Spec,
+						}, true))
+						break
+					}
+				}
 			}
 		},
 	}, time.Second*30)
@@ -211,10 +254,27 @@ func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, co
 				klog.V(log.DEBUG).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
 
-			if selfClusterID != object.Spec.ClusterID {
-				utilruntime.HandleError(onEndpointChange(&types.SubmarinerEndpoint{
-					Spec: object.Spec,
-				}, false))
+			clusters, err := k.GetClusters(colorCodes)
+			if err != nil {
+				utilruntime.HandleError(err)
+			}
+
+			klog.V(log.DEBUG).Infof("Got clusters : %#v", clusters)
+			for _, cluster := range clusters {
+				endpoints, err := k.GetEndpoints(cluster.Spec.ClusterID)
+				if err != nil {
+					utilruntime.HandleError(err)
+					continue
+				}
+
+				klog.V(log.DEBUG).Infof("Got endpoints : %#v", endpoints)
+				for _, endpoint := range endpoints {
+					if selfClusterID != endpoint.Spec.ClusterID {
+						utilruntime.HandleError(onEndpointChange(&types.SubmarinerEndpoint{
+							Spec: endpoint.Spec,
+						}, false))
+					}
+				}
 			}
 		},
 		UpdateFunc: func(old, obj interface{}) {
@@ -235,10 +295,27 @@ func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, co
 				klog.V(log.DEBUG).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
 
-			if selfClusterID != object.Spec.ClusterID {
-				utilruntime.HandleError(onEndpointChange(&types.SubmarinerEndpoint{
-					Spec: object.Spec,
-				}, false))
+			clusters, err := k.GetClusters(colorCodes)
+			if err != nil {
+				utilruntime.HandleError(err)
+			}
+
+			klog.V(log.DEBUG).Infof("Got clusters : %#v", clusters)
+			for _, cluster := range clusters {
+				endpoints, err := k.GetEndpoints(cluster.Spec.ClusterID)
+				if err != nil {
+					utilruntime.HandleError(err)
+					continue
+				}
+
+				klog.V(log.DEBUG).Infof("Got endpoints : %#v", endpoints)
+				for _, endpoint := range endpoints {
+					if selfClusterID != endpoint.Spec.ClusterID {
+						utilruntime.HandleError(onEndpointChange(&types.SubmarinerEndpoint{
+							Spec: endpoint.Spec,
+						}, false))
+					}
+				}
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -259,10 +336,27 @@ func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, co
 				klog.V(log.DEBUG).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
 			}
 
-			if selfClusterID != object.Spec.ClusterID {
-				utilruntime.HandleError(onEndpointChange(&types.SubmarinerEndpoint{
-					Spec: object.Spec,
-				}, true))
+			clusters, err := k.GetClusters(colorCodes)
+			if err != nil {
+				utilruntime.HandleError(err)
+			}
+
+			klog.V(log.DEBUG).Infof("Got clusters : %#v", clusters)
+			for _, cluster := range clusters {
+				endpoints, err := k.GetEndpoints(cluster.Spec.ClusterID)
+				if err != nil {
+					utilruntime.HandleError(err)
+					continue
+				}
+
+				klog.V(log.DEBUG).Infof("Got endpoints : %#v", endpoints)
+				for _, endpoint := range endpoints {
+					if selfClusterID != endpoint.Spec.ClusterID {
+						utilruntime.HandleError(onEndpointChange(&types.SubmarinerEndpoint{
+							Spec: endpoint.Spec,
+						}, true))
+					}
+				}
 			}
 		},
 	}, time.Second*30)
