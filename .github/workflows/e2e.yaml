@@ -32,7 +32,11 @@ jobs:
         run: |
           sudo add-apt-repository -y ppa:wireguard/wireguard # add WireGuard support
           sudo apt-get update
-          sudo apt-get install linux-headers-`uname -r` wireguard -y
+          sudo apt-get install  linux-headers-$(uname -r) wireguard  -y
+          # temporary solution for Ubuntu 16.04 azure-1020
+          sudo curl -Lk https://git.zx2c4.com/wireguard-linux/plain/drivers/net/wireguard/queueing.h\?id\=428c491332bca498c8eb2127669af51506c346c7  -o /usr/src/wireguard-1.0.20200506/queueing.h
+          sudo dpkg-reconfigure wireguard-dkms
+
           sudo modprobe wireguard
 
       - name: Reclaim free space!
