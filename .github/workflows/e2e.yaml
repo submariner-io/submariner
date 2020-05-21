@@ -11,6 +11,7 @@ jobs:
   e2e:
     timeout-minutes: 30
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.cable_driver == 'wireguard' }}
     strategy:
       fail-fast: false
       matrix:
