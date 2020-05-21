@@ -49,7 +49,7 @@ jobs:
           CLUSTERS_ARGS: ${{ matrix.globalnet }}
           DEPLOY_ARGS: ${{ matrix.globalnet }} --deploytool ${{ matrix.deploytool }}
         run: |
-         if [[ -z "${{ matrix.cable_driver }}" ]]; then
+         if [[ -n "${{ matrix.cable_driver }}" ]]; then
               [[ ${{ matrix.deploytool }} == "operator" ]] && DEPLOY_ARGS+=" --deploytool_submariner_args '--cable-driver ${{ matrix.cable_driver }}'"
               [[ ${{ matrix.deploytool }} == "helm" ]] && DEPLOY_ARGS+=" --deploytool_submariner_args '--set cable-driver=${{ matrix.cable_driver }}'"
          fi 
