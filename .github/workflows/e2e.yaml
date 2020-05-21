@@ -16,7 +16,7 @@ jobs:
       matrix:
         globalnet: ['', '--globalnet']
         deploytool: ['operator', 'helm']
-        cable_driver: ['', 'wireguard']
+        cable_driver: ['']
         exclude:
           - deploytool: 'helm'
             cable_driver: 'wireguard'
@@ -32,6 +32,7 @@ jobs:
         run: |
           sudo add-apt-repository -y ppa:wireguard/wireguard # add WireGuard support
           sudo apt-get update
+          sudo apt-cache policy wireguard
           sudo apt-get install linux-headers-`uname -r` wireguard -y
           sudo modprobe wireguard
 
