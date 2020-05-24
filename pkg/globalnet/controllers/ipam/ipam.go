@@ -155,7 +155,7 @@ func (i *Controller) processNextObject(objWorkqueue workqueue.RateLimitingInterf
 					// could be API error, so we want to requeue
 					logAndRequeue(key, objWorkqueue)
 				}
-				return fmt.Errorf("error retrieving submariner-ipam-controller object %s: %v", name, err)
+				return fmt.Errorf("error retrieving submariner-ipam-controller object %s: %v", key, err)
 			}
 
 			switch runtimeObj := runtimeObj.(type) {
@@ -330,6 +330,7 @@ func (i *Controller) handleRemovedService(obj interface{}) {
 		}
 	}
 	if !i.excludeNamespaces[service.Namespace] {
+		klog.V(log.TRACE).Infof("handleRemovedService called for service %s", key)
 		globalIp := service.Annotations[submarinerIpamGlobalIp]
 		if globalIp != "" {
 			if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
@@ -361,6 +362,7 @@ func (i *Controller) handleRemovedPod(obj interface{}) {
 		}
 	}
 	if !i.excludeNamespaces[pod.Namespace] {
+		klog.V(log.TRACE).Infof("handleRemovedPod called for Pod %s", key)
 		globalIp := pod.Annotations[submarinerIpamGlobalIp]
 		if globalIp != "" && pod.Status.PodIP != "" {
 			if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
