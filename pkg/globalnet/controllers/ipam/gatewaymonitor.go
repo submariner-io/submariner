@@ -131,10 +131,11 @@ func (i *GatewayMonitor) processNextEndpoint() bool {
 			}
 			if overlap {
 				// When GlobalNet is used, globalCIDRs allocated to the clusters should not overlap.
-				// If they overlap, it implies that its an invalid configuration which we do not support.
+				// If they overlap, skip the endpoint as its an invalid configuration which is not supported.
 				klog.Errorf("GlobalCIDR %q of local cluster %q overlaps with remote cluster %s",
 					i.ipamSpec.GlobalCIDR[0], i.ipamSpec.ClusterID, endpoint.Spec.ClusterID)
-				os.Exit(1)
+				i.endpointWorkqueue.Forget(obj)
+				return nil
 			}
 
 			for _, remoteSubnet := range endpoint.Spec.Subnets {
