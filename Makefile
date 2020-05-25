@@ -8,12 +8,10 @@ ifneq (,$(DAPPER_HOST_ARCH))
 include $(SHIPYARD_DIR)/Makefile.inc
 
 TARGETS := $(shell ls -p scripts | grep -v -e / -e build -e images -e reload-images)
-CLUSTERS_ARGS += --cluster_settings $(DAPPER_SOURCE)/scripts/kind-e2e/cluster_settings
+CLUSTERS_ARGS += --cluster_settings $(DAPPER_SOURCE)/scripts/cluster_settings
+E2E_ARGS += --focus $(focus) cluster2 cluster3 cluster1
 
 clusters: build images
-
-e2e: # internally depends on deploy target, which will execute only if not already deployed
-	./scripts/kind-e2e/e2e.sh --focus $(focus)
 
 reload-images: build images
 	./scripts/$@ --restart $(restart)
