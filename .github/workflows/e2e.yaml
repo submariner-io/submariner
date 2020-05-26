@@ -20,9 +20,6 @@ jobs:
         exclude:
           - deploytool: 'helm'
             cable_driver: 'wireguard'
-# TODO: Remove exclusion when issue #552 is fixed
-          - globalnet: '--globalnet'
-            cable_driver: 'wireguard'
     steps:
       - name: Checkout the repository
         uses: actions/checkout@master
