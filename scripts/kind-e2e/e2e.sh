@@ -39,7 +39,7 @@ function test_with_e2e_tests {
 
     go test -v -args -ginkgo.v -ginkgo.randomizeAllSpecs \
         -submariner-namespace $SUBM_NS -dp-context cluster2 -dp-context cluster3 -dp-context cluster1 \
-        -ginkgo.noColor -ginkgo.reportPassed \
+        -ginkgo.noColor -test.timeout 15m -ginkgo.reportPassed \
         -ginkgo.focus "\[${focus}\]" \
         -ginkgo.reportFile ${DAPPER_OUTPUT}/e2e-junit.xml 2>&1 | \
         tee ${DAPPER_OUTPUT}/e2e-tests.log
