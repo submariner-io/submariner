@@ -120,7 +120,7 @@ func main() {
 		klog.Fatalf("Error creating local endpoint object from %#v: %v", submSpec, err)
 	}
 
-	cableEngine, err := cableengine.NewEngine(localSubnets, localCluster, localEndpoint)
+	cableEngine, err := cableengine.NewEngine(localCluster, localEndpoint)
 
 	if err != nil {
 		klog.Fatalf("Fatal error occurred creating engine: %v", err)

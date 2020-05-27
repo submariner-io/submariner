@@ -61,7 +61,7 @@ type wireguard struct {
 }
 
 // NewDriver creates a new WireGuard driver
-func NewDriver(localSubnets []string, localEndpoint types.SubmarinerEndpoint, localCluster types.SubmarinerCluster) (cable.Driver, error) {
+func NewDriver(localEndpoint types.SubmarinerEndpoint, localCluster types.SubmarinerCluster) (cable.Driver, error) {
 	var err error
 
 	w := wireguard{
@@ -69,7 +69,7 @@ func NewDriver(localSubnets []string, localEndpoint types.SubmarinerEndpoint, lo
 		localEndpoint: localEndpoint,
 	}
 
-	if err = w.setWGLink(localSubnets, localCluster); err != nil {
+	if err = w.setWGLink(localEndpoint.Spec.Subnets, localCluster); err != nil {
 		return nil, fmt.Errorf("failed to setup WireGuard link: %v", err)
 	}
 

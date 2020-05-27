@@ -46,7 +46,6 @@ func init() {
 }
 
 type strongSwan struct {
-	localSubnets              []string
 	localEndpoint             types.SubmarinerEndpoint
 	remoteEndpoints           map[string]subv1.EndpointSpec
 	secretKey                 string
@@ -72,7 +71,7 @@ const defaultIKEPort = "500"
 const defaultNATTPort = "4500"
 const ipsecSpecEnvVarPrefix = "ce_ipsec"
 
-func NewStrongSwan(localSubnets []string, localEndpoint types.SubmarinerEndpoint, localCluster types.SubmarinerCluster) (cable.Driver, error) {
+func NewStrongSwan(localEndpoint types.SubmarinerEndpoint, localCluster types.SubmarinerCluster) (cable.Driver, error) {
 	ipSecSpec := specification{}
 
 	err := envconfig.Process(ipsecSpecEnvVarPrefix, &ipSecSpec)
@@ -88,7 +87,6 @@ func NewStrongSwan(localSubnets []string, localEndpoint types.SubmarinerEndpoint
 		ipSecNATTPort:             ipSecSpec.NATTPort,
 		localEndpoint:             localEndpoint,
 		remoteEndpoints:           map[string]subv1.EndpointSpec{},
-		localSubnets:              localSubnets,
 		secretKey:                 ipSecSpec.PSK,
 		debug:                     ipSecSpec.Debug,
 		logFile:                   ipSecSpec.LogFile,
@@ -135,7 +133,7 @@ func (i *strongSwan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (strin
 
 	var localTs, remoteTs, localAddr, remoteAddr []string
 	localTs = append(localTs, fmt.Sprintf("%s/32", i.localEndpoint.Spec.PrivateIP))
-	localTs = append(localTs, i.localSubnets...)
+	localTs = append(localTs, i.localEndpoint.Spec.Subnets...)
 
 	localAddr = append(localAddr, i.localEndpoint.Spec.PrivateIP)
 
