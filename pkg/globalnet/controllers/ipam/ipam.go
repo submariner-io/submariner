@@ -183,6 +183,9 @@ func (i *Controller) processNextObject(objWorkqueue workqueue.RateLimitingInterf
 				}
 			case *k8sv1.Node:
 				switch i.evaluateNode(runtimeObj) {
+				case Ignore:
+					objWorkqueue.Forget(obj)
+					return nil
 				case Requeue:
 					objWorkqueue.AddRateLimited(obj)
 					return fmt.Errorf("Node %s requeued %d times", key, objWorkqueue.NumRequeues(obj))
@@ -295,6 +298,11 @@ func (i *Controller) handleUpdateNode(old interface{}, newObj interface{}) {
 		return
 	}
 
+	if i.isControlNode(newObj.(*k8sv1.Node)) {
+		klog.V(log.TRACE).Infof("Node %q is a control node, skip processing.", newObj.(*k8sv1.Node).Name)
+		return
+	}
+
 	oldCniIfaceIpOnNode := old.(*k8sv1.Node).GetAnnotations()[route.CniInterfaceIp]
 	newCniIfaceIpOnNode := newObj.(*k8sv1.Node).GetAnnotations()[route.CniInterfaceIp]
 	if oldCniIfaceIpOnNode == "" && newCniIfaceIpOnNode == "" {
@@ -399,6 +407,11 @@ func (i *Controller) handleRemovedNode(obj interface{}) {
 			klog.Errorf("Could not convert object tombstone %v to Node", tombstone.Obj)
 			return
 		}
+	}
+
+	if i.isControlNode(node) {
+		klog.V(log.TRACE).Infof("Node %q is a control node, skip processing.", node.Name)
+		return
 	}
 
 	globalIp := node.Annotations[submarinerIpamGlobalIp]
