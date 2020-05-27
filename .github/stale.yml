@@ -1,6 +1,6 @@
 # Configuration for probot-stale - https://github.com/probot/stale
 
-# Number of days of inactivity before an Issue or Pull Request becomes stale
+# Number of days of inactivity before an Issue becomes stale (pull request is overridden later) 
 daysUntilStale: 120
 
 # Number of days of inactivity before an Issue or Pull Request with the stale label is closed.
@@ -54,4 +54,3 @@ pulls:
      This pull request has been automatically marked as stale because it has not had
      recent activity. It will be closed if no further activity occurs. Thank you
      for your contributions.
-
