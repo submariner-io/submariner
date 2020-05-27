@@ -43,18 +43,16 @@ type Engine interface {
 type engine struct {
 	sync.Mutex
 	driver        cable.Driver
-	localSubnets  []string
 	localCluster  types.SubmarinerCluster
 	localEndpoint types.SubmarinerEndpoint
 }
 
 // NewEngine creates a new Engine for the local cluster
-func NewEngine(localSubnets []string, localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) (Engine, error) {
+func NewEngine(localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) (Engine, error) {
 
 	i := engine{
 		localCluster:  localCluster,
 		localEndpoint: localEndpoint,
-		localSubnets:  localSubnets,
 		driver:        nil,
 	}
 
@@ -81,7 +79,7 @@ func (i *engine) StartEngine() error {
 func (i *engine) startDriver() error {
 	var err error
 
-	if i.driver, err = cable.NewDriver(i.localSubnets, i.localEndpoint, i.localCluster); err != nil {
+	if i.driver, err = cable.NewDriver(i.localEndpoint, i.localCluster); err != nil {
 		return err
 	}
 

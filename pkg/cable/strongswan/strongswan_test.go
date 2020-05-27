@@ -63,7 +63,7 @@ func testCharonPortConfiguration() {
 }
 
 func createStrongSwan() *strongSwan {
-	ss, err := NewStrongSwan([]string{}, types.SubmarinerEndpoint{}, types.SubmarinerCluster{})
+	ss, err := NewStrongSwan(types.SubmarinerEndpoint{}, types.SubmarinerCluster{})
 	Expect(err).NotTo(HaveOccurred())
 	return ss.(*strongSwan)
 }
