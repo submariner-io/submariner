@@ -1,0 +1,12 @@
+FROM fedora:31
+
+# iproute and iptables are used internally
+# libreswan or strongswan provide IKE
+# procps-ng is needed for sysctl
+RUN dnf -y distrosync --nodocs --setopt=install_weak_deps=False && \
+    dnf -y install --nodocs --setopt=install_weak_deps=False \
+                   iproute iptables libreswan strongswan procps-ng
+
+COPY submariner.sh submariner-engine /usr/local/bin/
+
+ENTRYPOINT submariner.sh

@@ -1,0 +1,5 @@
+FROM quay.io/submariner/submariner-engine-debug:latest
+
+COPY engine-build.sh /usr/local/bin/
+
+ENTRYPOINT engine-build.sh

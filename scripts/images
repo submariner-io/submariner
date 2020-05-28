@@ -12,7 +12,11 @@ cp ../bin/submariner-engine submariner-engine
 cp ../bin/submariner-route-agent submariner-route-agent
 cp ../bin/submariner-globalnet submariner-globalnet
 
-${SCRIPTS_DIR}/build_image.sh -i submariner -f Dockerfile ${extra_flags}
+${SCRIPTS_DIR}/build_image.sh -i submariner-engine-debug -f Dockerfile.engine-debug ${extra_flags}
+${SCRIPTS_DIR}/build_image.sh -i submariner-engine-builder -f Dockerfile.engine-builder ${extra_flags}
+docker run --rm quay.io/submariner/submariner-engine-builder:latest > Dockerfile.engine
+${SCRIPTS_DIR}/build_image.sh -i submariner -f Dockerfile.engine ${extra_flags}
+rm Dockerfile.engine
 ${SCRIPTS_DIR}/build_image.sh -i submariner-route-agent -f Dockerfile.routeagent ${extra_flags}
 ${SCRIPTS_DIR}/build_image.sh -i submariner-globalnet -f Dockerfile.globalnet ${extra_flags}
 
