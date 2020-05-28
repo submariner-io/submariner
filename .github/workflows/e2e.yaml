@@ -30,6 +30,7 @@ jobs:
           sudo add-apt-repository -y ppa:wireguard/wireguard # add WireGuard support
           sudo apt-get update
           sudo apt-get install  linux-headers-$(uname -r) wireguard  -y || true
+          cat /var/lib/dkms/wireguard/1.0.20200520/build/make.log
           
           # temporary solution for Ubuntu 16.04 azure-1020
           WIREGUARD_SRC=$(find /usr/src/ -name "wireguard-1.0.*")
