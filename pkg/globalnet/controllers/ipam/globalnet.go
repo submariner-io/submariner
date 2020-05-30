@@ -127,8 +127,18 @@ func CreateGlobalNetMarkingChain(ipt *iptables.IPTables) error {
 	return nil
 }
 
-func ClearGlobalNetMarkingChain(ipt *iptables.IPTables) {
-	err := ipt.ClearChain("nat", submarinerMark)
+func ClearGlobalNetChains(ipt *iptables.IPTables) {
+	err := ipt.ClearChain("nat", submarinerIngress)
+	if err != nil {
+		klog.Errorf("Error while flushing rules in %s chain: %v", submarinerIngress, err)
+	}
+
+	err = ipt.ClearChain("nat", submarinerEgress)
+	if err != nil {
+		klog.Errorf("Error while flushing rules in %s chain: %v", submarinerEgress, err)
+	}
+
+	err = ipt.ClearChain("nat", submarinerMark)
 	if err != nil {
 		klog.Errorf("Error while flushing rules in %s chain: %v", submarinerMark, err)
 	}

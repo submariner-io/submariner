@@ -77,6 +77,7 @@ func NewGatewayMonitor(spec *SubmarinerIpamControllerSpecification, cfg *rest.Co
 
 func (i *GatewayMonitor) Run(stopCh <-chan struct{}) error {
 	defer utilruntime.HandleCrash()
+	defer ClearGlobalNetChains(i.ipt)
 
 	klog.Info("Starting GatewayMonitor to monitor the active Gateway node in the cluster.")
 
@@ -93,7 +94,6 @@ func (i *GatewayMonitor) Run(stopCh <-chan struct{}) error {
 	go wait.Until(i.runEndpointWorker, time.Second, stopCh)
 	<-stopCh
 	klog.Info("Shutting down endpoint worker.")
-	ClearGlobalNetMarkingChain(i.ipt)
 	return nil
 }
 
