@@ -14,3 +14,4 @@ package/strongswan-*
 junit.xml
 scripts/broker-info.subm*
 Dockerfile.dapper[0-9]*
+.shflags
