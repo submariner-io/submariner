@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        globalnet: ['', '--globalnet']
+        globalnet: ['', 'globalnet']
         deploytool: ['operator', 'helm']
         cable_driver: ['', 'wireguard', 'libreswan']
         exclude:
@@ -48,12 +48,8 @@ jobs:
           free -h
 
       - name: Run E2E deployment and tests
-        env:
-          CLUSTERS_ARGS: ${{ matrix.globalnet }}
-          DEPLOY_ARGS: ${{ matrix.globalnet }} --deploytool ${{ matrix.deploytool }}
         run: |
-          [[ -z "${{ matrix.cable_driver }}" ]] || DEPLOY_ARGS+=" --deploytool_submariner_args '--cable-driver ${{ matrix.cable_driver }}'"
-          make e2e
+          make e2e using="${{ matrix.globalnet }} ${{ matrix.deploytool }} ${{ matrix.cable_driver }}"
 
       - name: Post Mortem
         if: failure()
