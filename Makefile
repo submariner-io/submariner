@@ -1,5 +1,7 @@
 restart ?= all
 focus ?= .\*
+, := ,
+_using = $(subst $(,), ,$(using))
 
 ifneq (,$(DAPPER_HOST_ARCH))
 
@@ -11,6 +13,24 @@ TARGETS := $(shell ls -p scripts | grep -v -e / -e build -e images -e reload-ima
 override BUILD_ARGS += $(shell source ${SCRIPTS_DIR}/lib/version; echo --ldflags \'-X main.VERSION=$${VERSION}\')
 override CLUSTERS_ARGS += --cluster_settings $(DAPPER_SOURCE)/scripts/cluster_settings
 override E2E_ARGS += --focus $(focus) cluster2 cluster3 cluster1
+
+# Process extra flags from the `using=a,b,c` optional flag
+
+ifneq (,$(filter libreswan,$(_using)))
+cable_driver = libreswan
+else ifneq (,$(filter wireguard,$(_using)))
+cable_driver = wireguard
+endif
+
+ifneq (,$(cable_driver))
+ifneq (,$(filter helm,$(_using)))
+override DEPLOY_ARGS += --deploytool_submariner_args '--set cable-driver=$(cable_driver)'
+else
+override DEPLOY_ARGS += --deploytool_submariner_args '--cable-driver $(cable_driver)'
+endif
+endif
+
+# Targets to make
 
 clusters: build images
 
