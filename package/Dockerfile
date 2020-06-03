@@ -12,4 +12,7 @@ RUN dnf -y distrosync --nodocs --setopt=install_weak_deps=False && \
 
 COPY submariner.sh pluto submariner-engine /usr/local/bin/
 
+# Wrapper scripts to use iptables from the host when that's available
+COPY ./iptables-wrapper.in /usr/sbin/
+
 ENTRYPOINT submariner.sh
