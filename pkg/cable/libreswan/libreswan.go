@@ -180,12 +180,10 @@ func extractEndpointIP(endpoint subv1.EndpointSpec) string {
 }
 
 func extractSubnets(endpoint subv1.EndpointSpec) []string {
-	endpointIP := extractEndpointIP(endpoint)
-
 	// Subnets
-	subnets := []string{endpointIP + "/32"}
+	subnets := []string{endpoint.PrivateIP + "/32"}
 	for _, subnet := range endpoint.Subnets {
-		if !strings.HasPrefix(subnet, endpointIP) {
+		if !strings.HasPrefix(subnet, endpoint.PrivateIP) {
 			subnets = append(subnets, subnet)
 		}
 	}
@@ -196,7 +194,7 @@ func extractSubnets(endpoint subv1.EndpointSpec) []string {
 // ConnectToEndpoint establishes a connection to the given endpoint and returns a string
 // representation of the IP address of the target endpoint.
 func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string, error) {
-	localEndpointIP := extractEndpointIP(i.localEndpoint.Spec)
+	localEndpointIP := i.localEndpoint.Spec.PrivateIP
 	remoteEndpointIP := extractEndpointIP(endpoint.Spec)
 	leftSubnets := extractSubnets(i.localEndpoint.Spec)
 	rightSubnets := extractSubnets(endpoint.Spec)
