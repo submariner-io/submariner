@@ -1,4 +1,4 @@
-package ipsec
+package strongswan
 
 import (
 	"github.com/bronze1man/goStrongswanVici"

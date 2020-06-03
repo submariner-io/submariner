@@ -52,29 +52,29 @@ func (i *Controller) initIPTableChains() error {
 	return nil
 }
 
-func (i *Controller) syncPodRules(podIP, globalIP string, addRules bool) {
+func (i *Controller) syncPodRules(podIP, globalIP string, addRules bool) error {
 	err := i.updateEgressRulesForResource("Pod", podIP, globalIP, addRules)
 	if err != nil {
-		klog.Errorf("Error updating egress rules for pod %s: %v", podIP, err)
-		return
+		return fmt.Errorf("error updating egress rules for pod %s: %v", podIP, err)
 	}
+	return nil
 }
 
-func (i *Controller) syncServiceRules(service *k8sv1.Service, globalIP string, addRules bool) {
+func (i *Controller) syncServiceRules(service *k8sv1.Service, globalIP string, addRules bool) error {
 	chainName := i.kubeProxyClusterIpServiceChainName(service)
 	err := i.updateIngressRulesForService(globalIP, chainName, addRules)
 	if err != nil {
-		klog.Errorf("Error updating ingress rules for service %#v: %v", service, err)
-		return
+		return fmt.Errorf("error updating ingress rules for service %#v: %v", service, err)
 	}
+	return nil
 }
 
-func (i *Controller) syncNodeRules(cniIfaceIP, globalIP string, addRules bool) {
+func (i *Controller) syncNodeRules(cniIfaceIP, globalIP string, addRules bool) error {
 	err := i.updateEgressRulesForResource("Node", cniIfaceIP, globalIP, addRules)
 	if err != nil {
-		klog.Errorf("Error updating egress rules for Node %s: %v", cniIfaceIP, err)
-		return
+		return fmt.Errorf("error updating egress rules for Node %s: %v", cniIfaceIP, err)
 	}
+	return nil
 }
 
 func (i *Controller) evaluateService(service *k8sv1.Service) Operation {
@@ -95,7 +95,23 @@ func (i *Controller) evaluateService(service *k8sv1.Service) Operation {
 	return Process
 }
 
+func (i *Controller) isControlNode(node *k8sv1.Node) bool {
+	for _, taint := range node.Spec.Taints {
+		if taint.Key == k8sMasterNode && taint.Effect == "NoSchedule" {
+			return true
+		}
+	}
+	return false
+}
+
 func (i *Controller) evaluateNode(node *k8sv1.Node) Operation {
+	if i.isControlNode(node) {
+		// On the control nodes, we do not run the submariner route-agent pod which annotates
+		// the node with route.CniInterfaceIp. So, we skip control nodes in globalnet.
+		klog.V(log.DEBUG).Infof("Skip processing %q node, as its a master node.", node.Name)
+		return Ignore
+	}
+
 	cniIfaceIP := node.GetAnnotations()[route.CniInterfaceIp]
 	if cniIfaceIP == "" {
 		// To support connectivity from HostNetwork to remoteCluster, globalnet requires the
@@ -127,8 +143,18 @@ func CreateGlobalNetMarkingChain(ipt *iptables.IPTables) error {
 	return nil
 }
 
-func ClearGlobalNetMarkingChain(ipt *iptables.IPTables) {
-	err := ipt.ClearChain("nat", submarinerMark)
+func ClearGlobalNetChains(ipt *iptables.IPTables) {
+	err := ipt.ClearChain("nat", submarinerIngress)
+	if err != nil {
+		klog.Errorf("Error while flushing rules in %s chain: %v", submarinerIngress, err)
+	}
+
+	err = ipt.ClearChain("nat", submarinerEgress)
+	if err != nil {
+		klog.Errorf("Error while flushing rules in %s chain: %v", submarinerEgress, err)
+	}
+
+	err = ipt.ClearChain("nat", submarinerMark)
 	if err != nil {
 		klog.Errorf("Error while flushing rules in %s chain: %v", submarinerMark, err)
 	}

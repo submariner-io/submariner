@@ -2,13 +2,18 @@ package main
 
 import (
 	"flag"
+	"os"
 	"sync"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers/ipam"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
+
+	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 )
 
 var (
@@ -33,6 +38,24 @@ func main() {
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
 	if err != nil {
 		klog.Fatalf("Error building kubeconfig: %s", err.Error())
+	}
+
+	submarinerClient, err := submarinerClientset.NewForConfig(cfg)
+	if err != nil {
+		klog.Fatalf("error building submariner clientset: %s", err.Error())
+	}
+
+	localCluster, err := submarinerClient.SubmarinerV1().Clusters(ipamSpec.Namespace).Get(ipamSpec.ClusterID, metav1.GetOptions{})
+	if err != nil {
+		klog.Fatalf("error while retrieving the local cluster %q info: %v", ipamSpec.ClusterID, err)
+	}
+
+	if localCluster.Spec.GlobalCIDR != nil && len(localCluster.Spec.GlobalCIDR) > 0 {
+		// TODO: Revisit when support for more than one globalCIDR is implemented.
+		ipamSpec.GlobalCIDR = localCluster.Spec.GlobalCIDR
+	} else {
+		klog.Errorf("Cluster %s is not configured to use globalCidr", ipamSpec.ClusterID)
+		os.Exit(1)
 	}
 
 	gatewayMonitor, err := ipam.NewGatewayMonitor(&ipamSpec, cfg, stopCh)

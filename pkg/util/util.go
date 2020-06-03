@@ -246,3 +246,20 @@ func PrependUnique(ipt *iptables.IPTables, table string, chain string, ruleSpec 
 
 	return nil
 }
+
+func IsOverlappingCIDR(cidrList []string, cidr string) (bool, error) {
+	_, newNet, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return false, err
+	}
+	for _, v := range cidrList {
+		_, baseNet, err := net.ParseCIDR(v)
+		if err != nil {
+			return false, err
+		}
+		if baseNet.Contains(newNet.IP) || newNet.Contains(baseNet.IP) {
+			return true, nil
+		}
+	}
+	return false, nil
+}

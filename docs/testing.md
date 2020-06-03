@@ -154,6 +154,13 @@ as with any normal k8s cluster.
 as docker images, submariner will be redeployed on the clusters from pushed images and E2E tests will be executed.
 This mode allows the developers to test their local code fast on a very close to real world scenario setup.
 
+**NOTE**: If you only want to create the test environment without running the e2e tests, you can do it by executing
+the following command:
+
+```bash
+make deploy
+```
+
 #### Operator
 After generating the Operator by running `make build-operator`, your newly generated operator
 is automatically fully integrated into the Submariner CI automation. Simply use
@@ -164,8 +171,54 @@ the `deploytool` flag to the standard `make` commands.
 A large set of verifications for the Operator and the resulting Submariner
 deployment will automatically run during and after the deployment.
 
+
+#### Reloading your code changes
+During the development of new features you may want to compile submariner and push the images
+into the local registry used by the kind clusters. You can use the reload-images make target
+for that.
+
+This target depends on the build and packaging of the container images. It will push
+the new images to the local registry and restart all the services (gateway, routeagent, globalnet).
+
+```bash
+make reload-images
+```
+
+If you are working on a specific service, you can specify to only restart that service, for example:
+```bash
+make reload-images restart=gateway
+```
+
+If you don't want to restart any service because you plan to restart specific pods in specific clusters
+manually, then run:
+```bash
+make reload-images restart=none
+```
+
+#### Re-running e2e tests after your code changes
+Once your kind virtual clusters and submariner are deployed, you can re-run e2e just by repeating the `make e2e` call.
+Deployment and install will be avoided, hence the existing environment will remain as is.
+If you need to load new container images, please check `make reload-images` from the previous section.
+
+In case you want to re-run just the tests:
+```bash
+make e2e
+```
+
+In case you want to use updated images and re-run the tests:
+```bash
+make reload-images e2e
+```
+
+You can focus the e2e tests on specific tags by using the focus makefile env. The following
+example runs only the tests tagged as [redundancy].
+
+```bash
+make e2e focus=redundancy
+```
+
 #### Cleanup
-At any time you can run a cleanup command that will remove kind resources.
+At any time you can run a cleanup command that will remove all the kind clusters.
 
 ```bash
 make cleanup
