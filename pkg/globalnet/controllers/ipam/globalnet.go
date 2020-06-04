@@ -146,6 +146,7 @@ func CreateGlobalNetMarkingChain(ipt *iptables.IPTables) error {
 }
 
 func ClearGlobalNetChains(ipt *iptables.IPTables) {
+	klog.Info("In ClearGlobalNetChains, clearing Submariner Globalnet chains.")
 	err := ipt.ClearChain("nat", submarinerIngress)
 	if err != nil {
 		klog.Errorf("Error while flushing rules in %s chain: %v", submarinerIngress, err)

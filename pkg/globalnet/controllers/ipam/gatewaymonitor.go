@@ -77,7 +77,7 @@ func NewGatewayMonitor(spec *SubmarinerIpamControllerSpecification, cfg *rest.Co
 
 func (i *GatewayMonitor) Run(stopCh <-chan struct{}) error {
 	defer utilruntime.HandleCrash()
-	defer ClearGlobalNetChains(i.ipt)
+	//defer ClearGlobalNetChains(i.ipt)
 
 	klog.Info("Starting GatewayMonitor to monitor the active Gateway node in the cluster.")
 
@@ -93,6 +93,7 @@ func (i *GatewayMonitor) Run(stopCh <-chan struct{}) error {
 	klog.Info("Starting endpoint worker.")
 	go wait.Until(i.runEndpointWorker, time.Second, stopCh)
 	<-stopCh
+	ClearGlobalNetChains(i.ipt)
 	klog.Info("Shutting down endpoint worker.")
 	return nil
 }
@@ -121,6 +122,7 @@ func (i *GatewayMonitor) processNextEndpoint() bool {
 			return fmt.Errorf("error retrieving submariner endpoint object %s: %v", name, err)
 		}
 
+		klog.V(log.DEBUG).Infof("In processNextEndpoint, endpoint info: %v", endpoint)
 		if endpoint.Spec.ClusterID != i.clusterID {
 			klog.V(log.DEBUG).Infof("Endpoint %s belongs to a remote cluster", endpoint.Spec.Hostname)
 
