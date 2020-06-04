@@ -11,4 +11,7 @@ RUN microdnf -y install --nodocs --setopt=install_weak_deps=0 \
 
 COPY submariner.sh pluto submariner-engine /usr/local/bin/
 
+# Wrapper scripts to use iptables from the host when that's available
+COPY ./iptables-wrapper.in /usr/sbin/
+
 ENTRYPOINT submariner.sh
