@@ -1,22 +1,17 @@
-FROM fedora:31
+FROM registry.fedoraproject.org/fedora-minimal:32
 
 WORKDIR /var/submariner
 
 # iproute and iptables are used internally
 # libreswan or strongswan provide IKE
 # procps-ng is needed for sysctl
-RUN dnf -y distrosync --nodocs --setopt=install_weak_deps=False && \
-    dnf -y install --nodocs --setopt=install_weak_deps=False \
-                   iproute iptables libreswan strongswan procps-ng && \
-    dnf -y clean all && \
-    rpm -e gnupg2 rpm-sign-libs gpgme dnf libdnf yum python3-rpm \
-           python3-dnf python3-gpg librepo python3-libdnf python3-hawkey \
-           glib2 libmodulemd libsolv libyaml libassuan \
-           shadow-utils tss2 ima-evm-utils \
-           zchunk-libs vim-minimal npth sudo tar libusbx acl dnf-data \
-           libksba libreport-filesystem libsemanage libstdc++ openssl \
-           python3-libcomps rpm-build-libs sssd-client
+RUN microdnf -y install --nodocs --setopt=install_weak_deps=0 \
+             iproute iptables libreswan strongswan procps-ng && \
+    microdnf -y clean all
 
 COPY submariner.sh pluto submariner-engine /usr/local/bin/
+
+# Wrapper scripts to use iptables from the host when that's available
+COPY ./iptables-wrapper.in /usr/sbin/
 
 ENTRYPOINT submariner.sh
