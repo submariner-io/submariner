@@ -93,7 +93,7 @@ func (i *Controller) evaluateService(service *k8sv1.Service) Operation {
 		return Requeue
 	}
 	serviceName := service.GetNamespace() + "/" + service.GetName()
-	klog.V(log.DEBUG).Infof("kube-proxy chain %s for service %s now exists.", chainName, serviceName)
+	klog.V(log.DEBUG).Infof("kube-proxy chain %q for service %q now exists.", chainName, serviceName)
 	return Process
 }
 
@@ -146,7 +146,6 @@ func CreateGlobalNetMarkingChain(ipt *iptables.IPTables) error {
 }
 
 func ClearGlobalNetChains(ipt *iptables.IPTables) {
-	klog.Info("In ClearGlobalNetChains, clearing Submariner Globalnet chains.")
 	err := ipt.ClearChain("nat", submarinerIngress)
 	if err != nil {
 		klog.Errorf("Error while flushing rules in %s chain: %v", submarinerIngress, err)
