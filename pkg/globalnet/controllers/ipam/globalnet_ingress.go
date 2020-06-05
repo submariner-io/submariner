@@ -47,7 +47,6 @@ func (i *Controller) doesIPTablesChainExist(table, chain string) (bool, error) {
 
 	for _, val := range existingChains {
 		if val == chain {
-			klog.V(log.DEBUG).Infof("%s chain exists in %s table", chain, table)
 			return true, nil
 		}
 	}

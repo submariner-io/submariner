@@ -167,6 +167,8 @@ github.com/stretchr/testify v1.4.0 h1:2E4SXV/wtOkTonXsotYi4li6zVWxYlZuYNCXe9XRJy
 github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
 github.com/submariner-io/shipyard v0.0.0-20200415131458-43e0c8dc8ea3 h1:ORpKiuzSyL3pMHt6y9RbMSlyBkhcVxO7mtddatr1HMo=
 github.com/submariner-io/shipyard v0.0.0-20200415131458-43e0c8dc8ea3/go.mod h1:tm9TSwLsOFQxsOgbXCC4EpPQF01K4fsxUJaV+0rn4pI=
+github.com/submariner-io/shipyard v0.3.1-0.20200604152443-d185e59a7388 h1:hSBpa/+NMrSI1p9MKAm3ozSDzOUzzBlngVtUViQyl8c=
+github.com/submariner-io/shipyard v0.3.1-0.20200604152443-d185e59a7388/go.mod h1:zGQ3LzJ8KO4NN+EQAcHWEK73pyy6lW51ku552FhRMqI=
 github.com/vishvananda/netlink v1.1.0 h1:1iyaYNBLmP6L0220aDnYQpo1QEV4t4hJ+xEEhhJH8j0=
 github.com/vishvananda/netlink v1.1.0/go.mod h1:cTgwzPIzzgDAYoQrMm0EdrjRUBkTqKYppBueQtXaqoE=
 github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df h1:OviZH7qLw/7ZovXvuNyL3XQl8UFofeikI1NW1Gypu7k=
