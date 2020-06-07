@@ -1,11 +1,14 @@
 package wireguard
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"net"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/kelseyhightower/envconfig"
 
 	"golang.org/x/sys/unix"
 
@@ -23,9 +26,6 @@ import (
 )
 
 const (
-	// DefaultListenPort specifies UDP port address of WireGuard
-	DefaultListenPort = 5871
-
 	// DefaultDeviceName specifies name of WireGuard network device
 	DefaultDeviceName = "subwg0"
 
@@ -46,10 +46,18 @@ const (
 	receiveBytes    = "ReceiveBytes"  // for peer connection status
 	transmitBytes   = "TransmitBytes" // for peer connection status
 	lastChecked     = "LastChecked"   // for connection peer status
+
+	//TODO use submariner prefix
+	specEnvPrefix = "ce_ipsec"
 )
 
 func init() {
 	cable.AddDriver(cableDriverName, NewDriver)
+}
+
+type specification struct {
+	PSK      string `default:"default psk"`
+	NATTPort int    `default:"5871"`
 }
 
 type wireguard struct {
@@ -58,6 +66,8 @@ type wireguard struct {
 	mutex         sync.Mutex
 	client        *wgctrl.Client
 	link          netlink.Link
+	spec          *specification
+	psk           *wgtypes.Key
 }
 
 // NewDriver creates a new WireGuard driver
@@ -67,6 +77,11 @@ func NewDriver(localEndpoint types.SubmarinerEndpoint, localCluster types.Submar
 	w := wireguard{
 		connections:   make(map[string]*v1.Connection),
 		localEndpoint: localEndpoint,
+		spec:          new(specification),
+	}
+
+	if err := envconfig.Process(specEnvPrefix, w.spec); err != nil {
+		return nil, fmt.Errorf("error processing environment config for wireguard: %v", err)
 	}
 
 	if err = w.setWGLink(localEndpoint.Spec.Subnets, localCluster); err != nil {
@@ -90,7 +105,11 @@ func NewDriver(localEndpoint types.SubmarinerEndpoint, localCluster types.Submar
 	}()
 
 	// generate local keys and set public key in BackendConfig
-	var priv, pub wgtypes.Key
+	var priv, pub, psk wgtypes.Key
+	if psk, err = genPsk(w.spec.PSK); err != nil {
+		return nil, fmt.Errorf("error generating pre-shared key: %v", err)
+	}
+	w.psk = &psk
 	if priv, err = wgtypes.GeneratePrivateKey(); err != nil {
 		return nil, fmt.Errorf("error generating private key: %v", err)
 	}
@@ -101,7 +120,7 @@ func NewDriver(localEndpoint types.SubmarinerEndpoint, localCluster types.Submar
 	localEndpoint.Spec.BackendConfig[PublicKey] = pub.String()
 
 	// configure the device. still not up
-	port := DefaultListenPort
+	port := w.spec.NATTPort
 	peerConfigs := make([]wgtypes.PeerConfig, 0)
 	cfg := wgtypes.Config{
 		PrivateKey:   &priv,
@@ -210,10 +229,10 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 		PublicKey:    *remoteKey,
 		Remove:       false,
 		UpdateOnly:   false,
-		PresharedKey: nil,
+		PresharedKey: w.psk,
 		Endpoint: &net.UDPAddr{
 			IP:   remoteIP,
-			Port: DefaultListenPort,
+			Port: w.spec.NATTPort, //TODO move port to endpoint spec
 		},
 		PersistentKeepaliveInterval: &ka,
 		ReplaceAllowedIPs:           true,
@@ -232,7 +251,7 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 		klog.Errorf("Failed to verify peer configuration: %v", err)
 	} else {
 		// TODO verify configuration
-		klog.V(log.DEBUG).Infof("Peer configured: %+v", p)
+		klog.V(log.DEBUG).Infof("Peer configured, PubKey:%s, EndPoint:%s, AllowedIPs:%v", p.PublicKey, p.Endpoint, p.AllowedIPs)
 	}
 
 	// Add routes to peer
@@ -253,7 +272,7 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 		}
 	}
 
-	klog.V(log.DEBUG).Infof("Done connecting endpoint peer %+v", peerCfg)
+	klog.V(log.DEBUG).Infof("Done connecting endpoint peer %s@%s", *remoteKey, remoteIP)
 	return ip, nil
 }
 
@@ -508,4 +527,10 @@ func setRoutingTable() error {
 		return nil
 	}
 	return fmt.Errorf("could not add rule for routing table: %v", err)
+}
+
+func genPsk(psk string) (wgtypes.Key, error) {
+	// Convert spec PSK string to right length byte array, using sha256.Size == wgtypes.KeyLen
+	pskBytes := sha256.Sum256([]byte(psk))
+	return wgtypes.NewKey(pskBytes[:])
 }
