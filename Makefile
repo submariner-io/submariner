@@ -48,6 +48,8 @@ bin/submariner-globalnet: vendor/modules.txt $(shell find pkg/globalnet)
 
 build: bin/submariner-engine bin/submariner-route-agent bin/submariner-globalnet
 
+ci: validate test build images
+
 images: build
 	./scripts/$@ $(IMAGES_ARGS)
 
@@ -58,7 +60,7 @@ vendor/modules.txt: go.mod
 	go mod download
 	go mod vendor
 
-.PHONY: $(TARGETS) build
+.PHONY: $(TARGETS) build ci
 
 else
 
