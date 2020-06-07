@@ -6,5 +6,4 @@ ENV DAPPER_OUTPUT=${DAPPER_SOURCE}/output
 
 WORKDIR ${DAPPER_SOURCE}
 
-ENTRYPOINT ["./scripts/entry"]
-CMD ["ci"]
+ENTRYPOINT ["/opt/shipyard/scripts/entry"]
