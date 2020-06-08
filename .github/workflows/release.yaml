@@ -37,7 +37,7 @@ jobs:
           QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
           QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}
           RELEASE_ARGS: submariner submariner-route-agent submariner-globalnet
-          images_flags: --nocache
+          IMAGES_ARGS: --nocache
         run: |
           [[ $GITHUB_REF =~ "/tags/" ]] && RELEASE_ARGS+=" --tag ${GITHUB_REF##*/}"
           make images release
