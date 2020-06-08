@@ -49,7 +49,7 @@ bin/submariner-globalnet: vendor/modules.txt $(shell find pkg/globalnet)
 build: bin/submariner-engine bin/submariner-route-agent bin/submariner-globalnet
 
 images: build
-	./scripts/$@ $(images_flags)
+	./scripts/$@ $(IMAGES_ARGS)
 
 $(TARGETS): vendor/modules.txt
 	./scripts/$@
