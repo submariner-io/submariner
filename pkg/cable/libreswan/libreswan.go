@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/kelseyhightower/envconfig"
 	"k8s.io/klog"
@@ -374,6 +375,19 @@ func (i *libreswan) runPluto() error {
 		defer outputFile.Close()
 		klog.Fatalf("Pluto exited: %v", cmd.Wait())
 	}()
+
+	// Wait up to 5s for the control socket
+	for i := 0; i < 5; i++ {
+		_, err := os.Stat("/run/pluto/pluto.ctl")
+		if err == nil {
+			break
+		}
+		if !os.IsNotExist(err) {
+			klog.Infof("Failed to stat the control socket: %v", err)
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
 
 	return nil
 }
