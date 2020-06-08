@@ -28,6 +28,7 @@ jobs:
 
   release:
     needs: e2e
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
 
