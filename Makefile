@@ -1,7 +1,5 @@
 restart ?= all
 focus ?= .\*
-, := ,
-_using = $(subst $(,), ,$(using))
 
 ifneq (,$(DAPPER_HOST_ARCH))
 
@@ -55,10 +53,6 @@ images: build
 
 $(TARGETS): vendor/modules.txt
 	./scripts/$@
-
-vendor/modules.txt: go.mod
-	go mod download
-	go mod vendor
 
 .PHONY: $(TARGETS) build ci
 
