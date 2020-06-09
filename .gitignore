@@ -1,9 +1,7 @@
 .idea
-submariner-engine
-submariner-route-agent
-submariner-globalnet
 .dapper
 /bin
+/package/.image.*
 dist
 output
 /vendor
