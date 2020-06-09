@@ -11,6 +11,8 @@ TARGETS := $(shell ls -p scripts | grep -v -e / -e build -e images -e reload-ima
 override BUILD_ARGS += $(shell source ${SCRIPTS_DIR}/lib/version; echo --ldflags \'-X main.VERSION=$${VERSION}\')
 override CLUSTERS_ARGS += --cluster_settings $(DAPPER_SOURCE)/scripts/cluster_settings
 override E2E_ARGS += --focus $(focus) cluster2 cluster3 cluster1
+override UNIT_TEST_ARGS += test/e2e
+override VALIDATE_ARGS += --skip-dirs pkg/client
 
 # Process extra flags from the `using=a,b,c` optional flag
 
@@ -31,6 +33,8 @@ endif
 # Targets to make
 
 deploy: images
+
+test: unit-test
 
 reload-images: build images
 	./scripts/$@ --restart $(restart)
@@ -69,7 +73,7 @@ images: package/.image.submariner package/.image.submariner-route-agent package/
 $(TARGETS): vendor/modules.txt
 	./scripts/$@
 
-.PHONY: $(TARGETS) build ci images
+.PHONY: $(TARGETS) build ci images test validate
 
 else
 
