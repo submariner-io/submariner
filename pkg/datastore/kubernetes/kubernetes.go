@@ -2,8 +2,10 @@ package kubernetes
 
 import (
 	"context"
+	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"net/url"
 	"reflect"
 	"time"
 
@@ -42,6 +44,9 @@ type datastoreSpecification struct {
 	Ca              string
 }
 
+// defaultPrivate indicates whether to start with a private TLS chain
+var defaultPrivate bool = false
+
 func NewDatastore(thisClusterID string, stopCh <-chan struct{}) (datastore.Datastore, error) {
 	k8sSpec := datastoreSpecification{}
 
@@ -54,25 +59,7 @@ func NewDatastore(thisClusterID string, stopCh <-chan struct{}) (datastore.Datas
 
 	klog.V(log.DEBUG).Infof("Rendered API server host: %q", host)
 
-	tlsClientConfig := rest.TLSClientConfig{}
-	if k8sSpec.Insecure {
-		tlsClientConfig.Insecure = true
-	} else {
-		caDecoded, err := base64.StdEncoding.DecodeString(k8sSpec.Ca)
-		if err != nil {
-			return nil, fmt.Errorf("error decoding CA data: %v", err)
-		}
-		tlsClientConfig.CAData = caDecoded
-	}
-
-	k8sClientConfig := rest.Config{
-		// TODO: switch to using cluster DNS.
-		Host:            host,
-		TLSClientConfig: tlsClientConfig,
-		BearerToken:     k8sSpec.APIServerToken,
-	}
-
-	submarinerClient, err := submarinerClientset.NewForConfig(&k8sClientConfig)
+	submarinerClient, err := getSubmarinerClientset(host, &k8sSpec)
 	if err != nil {
 		return nil, fmt.Errorf("error building submariner clientset: %v", err)
 	}
@@ -85,6 +72,57 @@ func NewDatastore(thisClusterID string, stopCh <-chan struct{}) (datastore.Datas
 		remoteNamespace: k8sSpec.RemoteNamespace,
 		stopCh:          stopCh,
 	}, nil
+}
+
+func getSubmarinerClientset(host string, k8sSpec *datastoreSpecification) (*submarinerClientset.Clientset, error) {
+	// We need to check whether we need the provided CA (for a secure connection)
+	// For an insecure connection, both cases are equivalent, but we’ll never get the X.509 error
+	// First, try without specifying anything (using the system trust store)
+	clientset, err := getAndCheckSubmarinerClientset(host, defaultPrivate, k8sSpec)
+	if err != nil {
+		if urlError, ok := err.(*url.Error); ok {
+			if _, ok := urlError.Unwrap().(x509.UnknownAuthorityError); ok {
+				// Certificate error, try with the trust chain (and remember for next time)
+				defaultPrivate = !defaultPrivate
+				clientset, err = getAndCheckSubmarinerClientset(host, defaultPrivate, k8sSpec)
+			}
+		}
+	}
+	return clientset, err
+}
+
+func getAndCheckSubmarinerClientset(host string, private bool, k8sSpec *datastoreSpecification) (*submarinerClientset.Clientset, error) {
+	config, err := getSubmarinerRESTConfig(host, private, k8sSpec)
+	if err != nil {
+		return nil, err
+	}
+	clientset, err := submarinerClientset.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	// Check we can list endpoints
+	_, err = clientset.SubmarinerV1().Endpoints(k8sSpec.RemoteNamespace).List(metav1.ListOptions{})
+	return clientset, err
+}
+
+func getSubmarinerRESTConfig(host string, private bool, k8sSpec *datastoreSpecification) (*rest.Config, error) {
+	k8sClientConfig := rest.Config{
+		// TODO: switch to using cluster DNS.
+		Host:        host,
+		BearerToken: k8sSpec.APIServerToken,
+	}
+	if k8sSpec.Insecure {
+		k8sClientConfig.TLSClientConfig = rest.TLSClientConfig{Insecure: true}
+	} else if private {
+		caDecoded, err := base64.StdEncoding.DecodeString(k8sSpec.Ca)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding CA data: %v", err)
+		}
+
+		k8sClientConfig.TLSClientConfig = rest.TLSClientConfig{CAData: caDecoded}
+	} // In other cases, use the default TLS client config
+
+	return &k8sClientConfig, nil
 }
 
 func (k *Datastore) GetEndpoints(clusterID string) ([]types.SubmarinerEndpoint, error) {
