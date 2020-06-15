@@ -32,7 +32,7 @@ jobs:
         run: |
           sudo add-apt-repository -y ppa:wireguard/wireguard # add WireGuard support
           sudo apt update
-          sudo apt install -y linux-headers-$(uname -r) wireguard
+          sudo apt install -y linux-headers-$(uname -r) wireguard wireguard-dkms
           if [[ "$(uname -r)" =~ -1020- ]]; then
             # the 1020 kernel doesn't have skb_reset_redirect in skbuff.h, patch Wireguard so it doesn't need it
             curl https://git.zx2c4.com/wireguard-linux/patch/drivers/net/wireguard/queueing.h\?id=2c64605b590edadb3fb46d1ec6badb49e940b479 | sudo patch -R /usr/src/wireguard*/queueing.h
