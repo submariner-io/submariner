@@ -32,7 +32,7 @@ endif
 
 # Targets to make
 
-clusters: build images
+deploy: images
 
 reload-images: build images
 	./scripts/$@ --restart $(restart)
