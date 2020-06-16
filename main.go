@@ -18,7 +18,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/controllers/tunnel"
 	"github.com/submariner-io/submariner/pkg/datastore"
 	subk8s "github.com/submariner-io/submariner/pkg/datastore/kubernetes"
-	"github.com/submariner-io/submariner/pkg/datastore/phpapi"
 	"github.com/submariner-io/submariner/pkg/log"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
@@ -141,17 +140,6 @@ func main() {
 
 		var datastore datastore.Datastore
 		switch submSpec.Broker {
-		case "phpapi":
-			klog.Info("Creating the PHPAPI central datastore")
-			secure, err := util.ParseSecure(submSpec.Token)
-			if err != nil {
-				klog.Fatalf("Error parsing secure token: %v", err)
-			}
-
-			datastore, err = phpapi.NewPHPAPI(secure.APIKey)
-			if err != nil {
-				klog.Fatalf("Error creating the PHPAPI datastore: %v", err)
-			}
 		case "k8s":
 			klog.Info("Creating the kubernetes central datastore")
 			datastore, err = subk8s.NewDatastore(submSpec.ClusterID, stopCh)
