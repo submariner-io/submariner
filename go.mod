@@ -11,11 +11,11 @@ require (
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/onsi/ginkgo v1.12.3
+	github.com/onsi/ginkgo v1.13.0
 	github.com/onsi/gomega v1.10.1
 	github.com/pkg/errors v0.9.1
 	github.com/rdegges/go-ipify v0.0.0-20150526035502-2d94a6a86c40
-	github.com/submariner-io/shipyard v0.0.0-20200415131458-43e0c8dc8ea3
+	github.com/submariner-io/shipyard v0.3.1-0.20200604152443-d185e59a7388
 	github.com/vishvananda/netlink v1.1.0
 	go.uber.org/zap v1.15.0 // indirect
 	golang.org/x/sys v0.0.0-20200519105757-fe76b779f299
@@ -24,7 +24,7 @@ require (
 	k8s.io/api v0.0.0-20190918195907-bd6ac527cfd2
 	k8s.io/apimachinery v0.0.0-20190817020851-f2f3a405f61d
 	k8s.io/client-go v0.0.0-20190918200256-06eb1244587a
-	k8s.io/klog v0.3.3
+	k8s.io/klog v0.4.0
 	k8s.io/utils v0.0.0-20200520001619-278ece378a50 // indirect
 	sigs.k8s.io/controller-runtime v0.3.0
 	sigs.k8s.io/testing_frameworks v0.1.2 // indirect

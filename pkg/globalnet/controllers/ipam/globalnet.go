@@ -92,6 +92,8 @@ func (i *Controller) evaluateService(service *k8sv1.Service) Operation {
 	if chainExists, _ := i.doesIPTablesChainExist("nat", chainName); !chainExists {
 		return Requeue
 	}
+	serviceName := service.GetNamespace() + "/" + service.GetName()
+	klog.V(log.DEBUG).Infof("kube-proxy chain %q for service %q now exists.", chainName, serviceName)
 	return Process
 }
 
