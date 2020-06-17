@@ -10,8 +10,6 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 
-	"golang.org/x/sys/unix"
-
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 
 	"github.com/submariner-io/admiral/pkg/log"
@@ -27,7 +25,7 @@ import (
 
 const (
 	// DefaultDeviceName specifies name of WireGuard network device
-	DefaultDeviceName = "subwg0"
+	DefaultDeviceName = "submariner"
 
 	// PublicKey is name (key) of publicKey entry in back-end map
 	PublicKey = "publicKey"
@@ -37,10 +35,6 @@ const (
 
 	// handshakeTimeout is maximal time from handshake a connections is still considered connected
 	handshakeTimeout = 2*time.Minute + 10*time.Second
-
-	//TODO generalize cleanStrongswanRoutingTable, for now, must use 220
-	routingTable = 220
-	fwMark       = 5871
 
 	cableDriverName = "wireguard"
 	receiveBytes    = "ReceiveBytes"  // for peer connection status
@@ -84,7 +78,7 @@ func NewDriver(localEndpoint types.SubmarinerEndpoint, localCluster types.Submar
 		return nil, fmt.Errorf("error processing environment config for wireguard: %v", err)
 	}
 
-	if err = w.setWGLink(localEndpoint.Spec.Subnets, localCluster); err != nil {
+	if err = w.setWGLink(); err != nil {
 		return nil, fmt.Errorf("failed to setup WireGuard link: %v", err)
 	}
 
@@ -146,9 +140,10 @@ func (w *wireguard) Init() error {
 	if len(w.connections) != 0 {
 		return fmt.Errorf("cannot initialize with existing connections: %+v", w.connections)
 	}
-	a, err := netlink.AddrList(w.link, unix.AF_INET)
-	if err != nil || len(a) == 0 {
-		return fmt.Errorf("cannot get WireGuard link address: %v", err)
+
+	l, err := net.InterfaceByName(DefaultDeviceName)
+	if err != nil {
+		return fmt.Errorf("cannot get wireguard link by name %s: %v", DefaultDeviceName, err)
 	}
 	d, err := w.client.Device(DefaultDeviceName)
 	if err != nil {
@@ -167,8 +162,8 @@ func (w *wireguard) Init() error {
 		return fmt.Errorf("failed to bring up WireGuard device: %v", err)
 	}
 
-	klog.V(log.DEBUG).Infof("WireGuard device %s, is up on %s, listening on port :%d, with key %s",
-		w.link.Attrs().Name, a[0], d.ListenPort, d.PublicKey)
+	klog.V(log.DEBUG).Infof("WireGuard device %s, is up on i/f number %d, listening on port :%d, with key %s",
+		w.link.Attrs().Name, l.Index, d.ListenPort, d.PublicKey)
 	return nil
 }
 
@@ -254,24 +249,6 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 		klog.V(log.DEBUG).Infof("Peer configured, PubKey:%s, EndPoint:%s, AllowedIPs:%v", p.PublicKey, p.Endpoint, p.AllowedIPs)
 	}
 
-	// Add routes to peer
-	//TODO save old routes for removal
-	idx := w.link.Attrs().Index
-	for _, peerNet := range allowedIPs {
-		route := netlink.Route{
-			LinkIndex: idx,
-			Dst:       &peerNet,
-			Table:     routingTable,
-		}
-		if err = netlink.RouteAdd(&route); err != nil {
-			klog.V(log.DEBUG).Infof("adding route %s", route)
-			if !os.IsExist(err) {
-				return "", fmt.Errorf("failed to add route %s: %v", route, err)
-			}
-			klog.V(log.DEBUG).Infof("route already exists")
-		}
-	}
-
 	klog.V(log.DEBUG).Infof("Done connecting endpoint peer %s@%s", *remoteKey, remoteIP)
 	return ip, nil
 }
@@ -309,27 +286,12 @@ func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoi
 	defer w.mutex.Unlock()
 
 	if w.keyMismatch(remoteEndpoint.Spec.ClusterID, remoteKey) {
-		// ClusterID probably already associated with new spec. Do not remove connections entry nor routes
-		klog.Warningf("Key mismatch for peer cluster %s, keeping existing routes and spec",
-			remoteEndpoint.Spec.ClusterID)
+		// ClusterID probably already associated with new spec. Do not remove connections.
+		klog.Warningf("Key mismatch for peer cluster %s, keeping existing spec", remoteEndpoint.Spec.ClusterID)
 		return nil
 	}
 
 	delete(w.connections, remoteEndpoint.Spec.ClusterID)
-
-	// del routes
-	allowedIPs := parseSubnets(remoteEndpoint.Spec.Subnets)
-	idx := w.link.Attrs().Index
-	for _, peerNet := range allowedIPs {
-		route := netlink.Route{
-			LinkIndex: idx,
-			Dst:       &peerNet,
-			Table:     routingTable,
-		}
-		if err = netlink.RouteDel(&route); err != nil {
-			return fmt.Errorf("failed to delete route %s: %v", route, err)
-		}
-	}
 
 	klog.V(log.DEBUG).Infof("Done removing endpoint for cluster %s", remoteEndpoint.Spec.ClusterID)
 	return nil
@@ -341,12 +303,7 @@ func (w *wireguard) GetActiveConnections(clusterID string) ([]string, error) {
 }
 
 // Create new wg link and assign addr from local subnets
-func (w *wireguard) setWGLink(localSubnets []string, localCluster types.SubmarinerCluster) error {
-	// create routing table
-	if err := setRoutingTable(); err != nil {
-		return fmt.Errorf("failed to create routing table: %v", err)
-	}
-
+func (w *wireguard) setWGLink() error {
 	// delete existing wg device if needed
 	if link, err := netlink.LinkByName(DefaultDeviceName); err == nil {
 		// delete existing device
@@ -368,78 +325,7 @@ func (w *wireguard) setWGLink(localSubnets []string, localCluster types.Submarin
 		return fmt.Errorf("failed to add WireGuard device: %v", err)
 	}
 
-	ip, err := w.discoverInternalIP(localSubnets, localCluster)
-	if err != nil {
-		klog.Errorf("Error while attempting to discover internal IP: %v", err)
-	}
-	if ip == "" {
-		klog.V(log.DEBUG).Infof("Using endpoint IP as internal address; %v", err)
-		ip = endpointIP(&w.localEndpoint)
-	}
-	klog.V(log.DEBUG).Infof("Setting interface address to  %s", ip)
-
-	// setup local address (ip address add dev $DefaultDeviceName $PublicIP
-	localIP, err := netlink.ParseAddr(ip + "/32")
-	if err != nil {
-		// try again as CIDR
-		if localIP, err = netlink.ParseAddr(ip); err != nil {
-			return fmt.Errorf("failed to parse IP address %s: %v", ip, err)
-		}
-	}
-	if err = netlink.AddrAdd(w.link, localIP); err != nil {
-		return fmt.Errorf("failed to add local address: %v", err)
-	}
-
 	return nil
-}
-
-// find a host interface with IP inside one of the given CIDRs
-// TODO move this to utils
-func matchLocalIP(cidrs []net.IPNet) (string, error) {
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return "", fmt.Errorf("net.InterfaceAddrs() returned error : %v", err)
-	}
-
-	for _, a := range addrs {
-		ip, _, err := net.ParseCIDR(a.String())
-		if err != nil {
-			klog.V(log.DEBUG).Infof("Skipping local address %v, unable to ParseCIDR: %v", a, err)
-			continue
-		}
-		if ip.To4() == nil {
-			klog.V(log.DEBUG).Infof("Skipping local address %+v: not IP4", ip)
-			continue
-		}
-		for _, c := range cidrs {
-			if c.Contains(ip) {
-				return ip.String(), nil
-			}
-		}
-	}
-	klog.Warningf("Could not find an internal address in %v that matches a local subnet in %v", addrs, cidrs)
-	return "", nil
-}
-
-// look at local subnets, cluster cidrs, and vxlan subnets
-func (w *wireguard) discoverInternalIP(localSubnets []string, localCluster types.SubmarinerCluster) (string, error) {
-	cidrs := parseSubnets(localSubnets)
-	ip, err := matchLocalIP(cidrs)
-	if ip != "" {
-		return ip, nil
-	}
-	if err != nil {
-		return "", err
-	}
-
-	// no match, fallback to cluster cidr
-	cc := localCluster.Spec.ClusterCIDR
-	cidrs = parseSubnets(cc)
-	ip, err = matchLocalIP(cidrs)
-	if err == nil {
-		return ip, nil
-	}
-	return "", err
 }
 
 // parse CIDR string and skip errors
@@ -514,19 +400,6 @@ func endpointIP(ep *types.SubmarinerEndpoint) string {
 		return ep.Spec.PublicIP
 	}
 	return ep.Spec.PrivateIP
-}
-
-func setRoutingTable() error {
-	r := netlink.NewRule()
-	r.Table = routingTable
-	r.Priority = routingTable
-	r.Mark = fwMark
-	r.Invert = true
-	err := netlink.RuleAdd(r)
-	if err == nil || os.IsExist(err) {
-		return nil
-	}
-	return fmt.Errorf("could not add rule for routing table: %v", err)
 }
 
 func genPsk(psk string) (wgtypes.Key, error) {
