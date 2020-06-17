@@ -150,15 +150,9 @@ func (i *libreswan) refreshConnectionStatus() error {
 
 // GetActiveConnections returns an array of all the active connections for the given cluster.
 func (i *libreswan) GetActiveConnections(clusterID string) ([]string, error) {
-	if err := i.refreshConnectionStatus(); err != nil {
-		return []string{}, err
-	}
-
 	connections := []string{}
 	for j := range i.connections {
-		if i.connections[j].Status == subv1.Connected {
-			connections = append(connections, i.connections[j].Endpoint.CableName)
-		}
+		connections = append(connections, i.connections[j].Endpoint.CableName)
 	}
 	klog.Infof("Active connections: %v", connections)
 	return connections, nil
