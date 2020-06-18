@@ -13,6 +13,7 @@ e.g. (at)example_user
 ### Requirements
 - [ ] I have reviewed the community membership guidelines (https://submariner-io.github.io/en/contributing/community-membership/)
 - [ ] I have enabled 2FA on my GitHub account (https://github.com/settings/security)
+- [ ] I have reviewed the Developer Certificate Of Origin (https://submariner-io.github.io/contributing/community-membership/#new-contributors) and sign-off my commits
 - [ ] I have subscribed to the submariner-dev e-mail list (https://groups.google.com/forum/#!forum/submariner-dev)
 - [ ] I have multiple contributions to Submariner that meet the requirements listed in the community membership guidelines
 - [ ] I have two sponsors that meet the sponsor requirements listed in the community membership guidelines
