@@ -19,12 +19,12 @@ require (
 	golang.org/x/sys v0.0.0-20200519105757-fe76b779f299
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20200324154536-ceff61240acf
-	k8s.io/api v0.0.0-20190918195907-bd6ac527cfd2
-	k8s.io/apimachinery v0.0.0-20190817020851-f2f3a405f61d
-	k8s.io/client-go v0.0.0-20190918200256-06eb1244587a
+	k8s.io/api v0.18.2
+	k8s.io/apimachinery v0.18.2
+	k8s.io/client-go v0.18.2
 	k8s.io/klog v0.4.0
 	k8s.io/utils v0.0.0-20200520001619-278ece378a50 // indirect
-	sigs.k8s.io/controller-runtime v0.3.0
+	sigs.k8s.io/controller-runtime v0.6.0
 	sigs.k8s.io/testing_frameworks v0.1.2 // indirect
 )
 
