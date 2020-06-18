@@ -13,6 +13,7 @@ import (
 	"time"
 
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cable/wireguard"
 	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	informers "github.com/submariner-io/submariner/pkg/client/informers/externalversions/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/log"
@@ -55,6 +56,7 @@ type Controller struct {
 	endpointWorkqueue workqueue.RateLimitingInterface
 	podWorkqueue      workqueue.RateLimitingInterface
 
+	localCableDriver string
 	localClusterCidr []string
 	localServiceCidr []string
 	remoteSubnets    *util.StringSet
@@ -139,6 +141,7 @@ func NewController(clusterID string, ClusterCidr []string, ServiceCidr []string,
 	controller := Controller{
 		clusterID:              clusterID,
 		objectNamespace:        objectNamespace,
+		localCableDriver:       "",
 		localClusterCidr:       ClusterCidr,
 		localServiceCidr:       ServiceCidr,
 		submarinerClientSet:    config.SubmarinerClientSet,
@@ -220,6 +223,8 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 				continue
 			}
 			r.updateIptableRulesForInterclusterTraffic(endpoint.Spec.Subnets)
+		} else {
+			r.localCableDriver = endpoint.Spec.Backend
 		}
 	}
 
@@ -330,31 +335,31 @@ func (r *Controller) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks []s
 		r.routeCacheGWNode.DeleteAll()
 		cmd := exec.Command("/sbin/ip", "r", "flush", "table", strconv.Itoa(RouteAgentHostNetworkTableID))
 		if err := cmd.Run(); err != nil {
-			// We can safely ignore this error, as this table
-			// won't exist in most nodes (only gateway nodes)
+			// We can safely ignore this error, as this table will exist only on GW nodes
+			klog.V(log.TRACE).Infof("Flushing routing table %d returned error. Can be ignored on non-Gw node: %v",
+				RouteAgentHostNetworkTableID, err)
 			return
 		}
-	} else {
+	} else if r.isGatewayNode && r.cniIface != nil {
 		// These routing rules are required ONLY on the Gateway Node.
 		// On the non-Gateway nodes, we use iptable rules to support this use-case.
-		if r.isGatewayNode && r.cniIface != nil {
-			switch operation {
-			case AddRoute:
-				for _, inputCidrBlock := range inputCidrBlocks {
-					if !r.routeCacheGWNode.Contains(inputCidrBlock) {
-						r.routeCacheGWNode.Add(inputCidrBlock)
-						if err := r.configureRoute(inputCidrBlock, operation); err != nil {
-							klog.Errorf("Failed to add route for HostNetwork support on the Gateway node. %v", err)
-						}
+		switch operation {
+		case AddRoute:
+			for _, inputCidrBlock := range inputCidrBlocks {
+				if r.routeCacheGWNode.Add(inputCidrBlock) {
+					if err := r.configureRoute(inputCidrBlock, operation); err != nil {
+						r.routeCacheGWNode.Delete(inputCidrBlock)
+						klog.Errorf("Failed to add route %q for HostNetwork support on the Gateway node: %v",
+							inputCidrBlock, err)
 					}
 				}
-			case DeleteRoute:
-				for _, inputCidrBlock := range inputCidrBlocks {
-					if r.routeCacheGWNode.Contains(inputCidrBlock) {
-						r.routeCacheGWNode.Delete(inputCidrBlock)
-						if err := r.configureRoute(inputCidrBlock, operation); err != nil {
-							klog.Errorf("Failed to delete route for HostNetwork support on the Gateway node. %v", err)
-						}
+			}
+		case DeleteRoute:
+			for _, inputCidrBlock := range inputCidrBlocks {
+				if r.routeCacheGWNode.Delete(inputCidrBlock) {
+					if err := r.configureRoute(inputCidrBlock, operation); err != nil {
+						klog.Errorf("Failed to delete route %q for HostNetwork support on the Gateway node. %v",
+							inputCidrBlock, err)
 					}
 				}
 			}
@@ -612,6 +617,9 @@ func (r *Controller) processNextEndpoint() bool {
 					RouteAgentHostNetworkTableID, hostname, err)
 			}
 
+			if r.localCableDriver == "" {
+				r.localCableDriver = endpoint.Spec.Backend
+			}
 			// On the GatewayNode, add routes for the remoteSubnets
 			r.updateRoutingRulesForHostNetworkSupport(r.remoteSubnets.Elements(), AddRoute)
 
@@ -937,11 +945,21 @@ func (r *Controller) configureRoute(remoteSubnet string, operation Operation) er
 	if err != nil {
 		return fmt.Errorf("error parsing cidr block %s: %v", remoteSubnet, err)
 	}
+
+	ifaceIndex := r.defaultHostIface.Index
+	// TODO: Add support for this in the CableDrivers themselves.
+	if r.localCableDriver == "wireguard" {
+		if wg, err := net.InterfaceByName(wireguard.DefaultDeviceName); err == nil {
+			ifaceIndex = wg.Index
+		} else {
+			klog.Errorf("Wireguard interface %s not found on the node.", wireguard.DefaultDeviceName)
+		}
+	}
 	route := netlink.Route{
 		Dst:       dst,
 		Src:       src,
 		Scope:     unix.RT_SCOPE_LINK,
-		LinkIndex: r.defaultHostIface.Index,
+		LinkIndex: ifaceIndex,
 		Protocol:  4,
 		Table:     RouteAgentHostNetworkTableID,
 	}
