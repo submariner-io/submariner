@@ -201,7 +201,7 @@ func whack(args ...string) error {
 			break
 		}
 
-		klog.Errorf("error %v whacking with args: %v", err, args)
+		klog.Warningf("error %v whacking with args: %v", err, args)
 		time.Sleep(1 * time.Second)
 
 	}
