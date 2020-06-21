@@ -5,11 +5,10 @@ import (
 	"net"
 	"syscall"
 
+	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	"k8s.io/klog"
-
-	"github.com/submariner-io/submariner/pkg/log"
 )
 
 type vxLanAttributes struct {

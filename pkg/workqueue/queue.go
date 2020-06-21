@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/submariner-io/submariner/pkg/log"
+	"github.com/submariner-io/admiral/pkg/log"
 	"golang.org/x/time/rate"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"

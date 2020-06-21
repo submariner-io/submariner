@@ -7,10 +7,12 @@ import (
 	"os/exec"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/kelseyhightower/envconfig"
 	"k8s.io/klog"
 
+	"github.com/submariner-io/admiral/pkg/log"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/types"
@@ -149,15 +151,9 @@ func (i *libreswan) refreshConnectionStatus() error {
 
 // GetActiveConnections returns an array of all the active connections for the given cluster.
 func (i *libreswan) GetActiveConnections(clusterID string) ([]string, error) {
-	if err := i.refreshConnectionStatus(); err != nil {
-		return []string{}, err
-	}
-
 	connections := []string{}
 	for j := range i.connections {
-		if i.connections[j].Status == subv1.Connected {
-			connections = append(connections, i.connections[j].Endpoint.CableName)
-		}
+		connections = append(connections, i.connections[j].Endpoint.CableName)
 	}
 	klog.Infof("Active connections: %v", connections)
 	return connections, nil
@@ -191,6 +187,31 @@ func extractSubnets(endpoint subv1.EndpointSpec) []string {
 	return subnets
 }
 
+func whack(args ...string) error {
+
+	var err error
+	for i := 0; i < 3; i++ {
+		cmd := exec.Command("/usr/libexec/ipsec/whack", args...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		klog.V(log.TRACE).Infof("Whacking with %v", args)
+
+		if err = cmd.Run(); err == nil {
+			break
+		}
+
+		klog.Warningf("error %v whacking with args: %v", err, args)
+		time.Sleep(1 * time.Second)
+
+	}
+
+	if err != nil {
+		return fmt.Errorf("error whacking with args %v: %v", args, err)
+	}
+	return nil
+}
+
 // ConnectToEndpoint establishes a connection to the given endpoint and returns a string
 // representation of the IP address of the target endpoint.
 func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string, error) {
@@ -208,11 +229,7 @@ func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string
 	rightSubnets := extractSubnets(endpoint.Spec)
 
 	// Ensure we’re listening
-	cmd := exec.Command("/usr/libexec/ipsec/whack", "--listen")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
+	if err := whack("--listen"); err != nil {
 		return "", fmt.Errorf("error listening: %v", err)
 	}
 
@@ -242,35 +259,16 @@ func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string
 				args = append(args, "--client", rightSubnets[rsi])
 
 				klog.Infof("Creating connection to %v", endpoint)
-				klog.Infof("Whacking with %v", args)
 
-				cmd = exec.Command("/usr/libexec/ipsec/whack", args...)
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-
-				if err := cmd.Run(); err != nil {
-					switch err := err.(type) {
-					case *exec.ExitError:
-						klog.Errorf("error adding a connection with args %v; got exit code %d: %v", args, err.ExitCode(), err)
-					default:
-						return "", fmt.Errorf("error adding a connection with args %v: %v", args, err)
-					}
+				if err := whack(args...); err != nil {
+					return "", err
 				}
 
-				cmd = exec.Command("/usr/libexec/ipsec/whack", "--route", "--name", connectionName)
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-
-				if err := cmd.Run(); err != nil {
-					klog.Errorf("error routing connection %s: %v", connectionName, err)
+				if err := whack("--route", "--name", connectionName); err != nil {
+					return "", err
 				}
-
-				cmd = exec.Command("/usr/libexec/ipsec/whack", "--initiate", "--name", connectionName)
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-
-				if err := cmd.Run(); err != nil {
-					klog.Errorf("error initiating a connection with args %v: %v", args, err)
+				if err := whack("--initiate", "--asynchronous", "--name", connectionName); err != nil {
+					return "", err
 				}
 			}
 		}
@@ -374,6 +372,19 @@ func (i *libreswan) runPluto() error {
 		defer outputFile.Close()
 		klog.Fatalf("Pluto exited: %v", cmd.Wait())
 	}()
+
+	// Wait up to 5s for the control socket
+	for i := 0; i < 5; i++ {
+		_, err := os.Stat("/run/pluto/pluto.ctl")
+		if err == nil {
+			break
+		}
+		if !os.IsNotExist(err) {
+			klog.Infof("Failed to stat the control socket: %v", err)
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
 
 	return nil
 }

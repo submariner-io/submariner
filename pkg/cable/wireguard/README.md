@@ -1,4 +1,4 @@
-# WireGuard Cable Driver (WIP)
+# WireGuard Cable Driver
 
 [WireGuard](https://www.wireguard.com "WireGuard homepage") is an extremely simple yet fast and modern VPN that utilizes state-of-the-art cryptography.
 
@@ -32,6 +32,8 @@ Traffic is encrypted and encapsulated in UDP packets.
   $ bin/subctl join --cable-driver wireguard --disable-nat broker-info.subm
   ```
 
+- The default UDP listen port for WireGuard is `5871`. It can be changed by setting the env var `CE_IPSEC_NATTPORT`
+
 ## Troubleshooting, limitations
 
 - If you get the following message
@@ -40,14 +42,9 @@ Traffic is encrypted and encapsulated in UDP packets.
   ```
   you probably did not install WireGuard on the Gateway node.
 
-- Support for e2e testing with `kind` is not implemented yet. The e2e tests can be run with WireGuard by setting it as the default driver in `pkg/cable/wireguard/WGdriver.go` **and** unsetting StrongSwan in `pkg/cable/ipsec/strongswan.go`
-  ```GoLang
-  func init() {
-    // uncomment next line to set as default
-    //cable.SetDefautCableDriver(cableDriverName)
-    cable.AddDriver(cableDriverName, NewWGDriver)
-  }
-
+- The e2e tests can be run with WireGuard by setting `DEPLOY_ARGS` before calling `make e2e`
+  ```ShellSession
+  $ export DEPLOY_ARGS="--deploytool operator --deploytool_submariner_args '--cable-driver=wireguard'"
   ```
 
 - No new `iptables` rules were added, although source NAT needs to be disabled for cross cluster communication. This is similar to disabling SNAT when sending cross-cluster traffic between nodes to `submariner-gateway`, so the existing rules should be enough.

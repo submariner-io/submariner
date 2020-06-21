@@ -11,8 +11,8 @@ import (
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/rdegges/go-ipify"
+	level "github.com/submariner-io/admiral/pkg/log"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	sublog "github.com/submariner-io/submariner/pkg/log"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/vishvananda/netlink"
 	"k8s.io/klog"
@@ -215,7 +215,7 @@ func PrependUnique(ipt *iptables.IPTables, table string, chain string, ruleSpec 
 	numOccurrences := 0
 	for index, rule := range rules {
 		if strings.Contains(rule, strings.Join(ruleSpec, " ")) {
-			klog.V(sublog.DEBUG).Infof("In %s table, iptables rule \"%s\", exists at index %d.", table, strings.Join(ruleSpec, " "), index)
+			klog.V(level.DEBUG).Infof("In %s table, iptables rule \"%s\", exists at index %d.", table, strings.Join(ruleSpec, " "), index)
 			numOccurrences++
 
 			if index == 1 {
@@ -236,7 +236,7 @@ func PrependUnique(ipt *iptables.IPTables, table string, chain string, ruleSpec 
 
 	// The required rule is present only once and is at the desired location
 	if numOccurrences == 1 && isPresentAtRequiredPosition {
-		klog.V(sublog.DEBUG).Infof("In %s table, iptables rule \"%s\", already exists.", table, strings.Join(ruleSpec, " "))
+		klog.V(level.DEBUG).Infof("In %s table, iptables rule \"%s\", already exists.", table, strings.Join(ruleSpec, " "))
 		return nil
 	} else {
 		if err = ipt.Insert(table, chain, 1, ruleSpec...); err != nil {

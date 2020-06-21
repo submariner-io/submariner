@@ -65,7 +65,6 @@ func testEnginePodRestartScenario(f *subFramework.Framework) {
 
 	By(fmt.Sprintf("Deleting submariner engine pod and gateway entries %q", enginePod.Name))
 	f.DeletePod(framework.ClusterA, enginePod.Name, framework.TestContext.SubmarinerNamespace)
-	f.DeleteGateway(framework.ClusterA, activeGateway.Name)
 
 	newEnginePod := f.AwaitSubmarinerEnginePod(framework.ClusterA)
 	By(fmt.Sprintf("Found new submariner engine pod %q", newEnginePod.Name))

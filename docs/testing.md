@@ -126,13 +126,18 @@ To run the tests simply execute the following:
 make e2e
 ```
 
-To test with a specific k8s version, an additional **version** parameter can be passed to **make e2e** command:
-```bash
-make ci e2e version=1.14.1
-```
+To test with optional functionality, use the `using=` flag to enable the extra options.
 
-Full list of supported k8s versions can found on [kind release page] page. We are using kind vesion 0.6.1.
-Default **version** is 1.14.6.
+Currently, these options are supported:
+* **globalnet:** To deploy with globalnet (and overlapping IPs)
+* **helm:** To deploy using helm instead of the operator.
+* **libreswan:** To use libreswan to establish connectivity.
+* **wireguard:** To use wireguard to establish connectivity.
+
+For example:
+```bash
+make e2e using=globalnet,wireguard,helm
+```
 
 After a permanent run completes, the configuration for the running clusters can be found inside **output/kubeconfigs** folder.
 You can export the kube configs in order to interact with the clusters.
