@@ -14,8 +14,8 @@ import (
 
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 
+	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/cable"
-	"github.com/submariner-io/submariner/pkg/log"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/vishvananda/netlink"
 

@@ -14,8 +14,8 @@ import (
 
 	"github.com/bronze1man/goStrongswanVici"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/cable"
-	"github.com/submariner-io/submariner/pkg/log"
 	"github.com/submariner-io/submariner/pkg/types"
 
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"

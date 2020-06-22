@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-iptables/iptables"
-	"github.com/submariner-io/submariner/pkg/log"
+	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/util"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

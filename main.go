@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/cableengine"
 	"github.com/submariner-io/submariner/pkg/cableengine/syncer"
@@ -18,7 +19,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/controllers/tunnel"
 	"github.com/submariner-io/submariner/pkg/datastore"
 	subk8s "github.com/submariner-io/submariner/pkg/datastore/kubernetes"
-	"github.com/submariner-io/submariner/pkg/log"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
 	v1 "k8s.io/api/core/v1"
