@@ -66,7 +66,7 @@ It's possible to generate jUnit XML report files
   go test -args  -kubeconfig=creds/cluster1:creds/cluster2:creds/cluster3 \
                  -dp-context cluster2 \
                  -dp-context cluster3 \
-                 -ginkgo.v -ginkgo.reportPassed -report-dir ./junit -ginkgo.randomizeAllSpecs
+                 -ginkgo.v -ginkgo.reportPassed -ginkgo.reportFile ./junit -ginkgo.randomizeAllSpecs
   ```
 
 Suggested arguments
