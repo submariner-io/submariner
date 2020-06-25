@@ -1,4 +1,7 @@
 * @mangelajo @tpantelis @Oats87
+/submariner/pkg/globalnet/* @sridhargaddam
+/submariner/pkg/routeagent/* @sridhargaddam
+/submariner/pkg/cable/strongswan/* @sridhargaddam
 go.mod @skitt
 go.sum @skitt
 /package/* @skitt
