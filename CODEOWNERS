@@ -1,4 +1,9 @@
 * @mangelajo @tpantelis @Oats87
+/.github/workflows/ 	@mkolesnik
+/scripts/ 		@mkolesnik
+Makefile* 		@mkolesnik
+Dockerfile.dapper 	@mkolesnik
+package/* 		@mkolesnik
 /submariner/pkg/globalnet/* @sridhargaddam
 /submariner/pkg/routeagent/* @sridhargaddam
 /submariner/pkg/cable/strongswan/* @sridhargaddam
