@@ -23,8 +23,9 @@ type GatewaySyncer struct {
 	version string
 }
 
-const GatewayUpdateIntervalSeconds = 5
-const GatewayStaleTimeoutSeconds = GatewayUpdateIntervalSeconds * 3
+var GatewayUpdateInterval = 5 * time.Second
+var GatewayStaleTimeout = time.Duration(GatewayUpdateInterval.Seconds()) * 3 * time.Second
+
 const updateTimestampAnnotation = "update-timestamp"
 
 // NewEngine creates a new Engine for the local cluster
@@ -40,7 +41,7 @@ func NewGatewaySyncer(engine cableengine.Engine, client v1typed.GatewayInterface
 
 func (s *GatewaySyncer) Run(stopCh <-chan struct{}) {
 	go func() {
-		wait.Until(s.syncGatewayStatus, GatewayUpdateIntervalSeconds*time.Second, stopCh)
+		wait.Until(s.syncGatewayStatus, GatewayUpdateInterval, stopCh)
 		s.CleanupGatewayEntry()
 	}()
 
@@ -115,8 +116,8 @@ func (i *GatewaySyncer) cleanupStaleGatewayEntries() error {
 				// In this case we don't want to stop the cleanup loop and just log it
 				klog.Errorf("error deleting stale gateway: %+v, %s", gw, err)
 			}
-			klog.Warningf("deleted stale gateway: %s, didn't report for %d seconds",
-				gw.Name, GatewayStaleTimeoutSeconds)
+			klog.Warningf("Deleted stale gateway: %s, didn't report for %s",
+				gw.Name, GatewayStaleTimeout)
 		}
 	}
 	return nil
@@ -139,7 +140,7 @@ func isGatewayStale(gateway v1.Gateway) (bool, error) {
 	}
 	now := time.Now().UTC().Unix()
 
-	return now >= (timestampInt + GatewayStaleTimeoutSeconds), nil
+	return now >= (timestampInt + int64(GatewayStaleTimeout.Seconds())), nil
 }
 
 func (i *GatewaySyncer) getLastSyncedGateway(name string) (*v1.Gateway, error) {
