@@ -160,11 +160,14 @@ func (i *GatewaySyncer) generateGatewayObject() (*v1.Gateway, error) {
 
 	connections, err := i.engine.ListCableConnections()
 	if err != nil {
-		gateway.Status.StatusFailure = fmt.Sprintf("Error getting driver connections: %s", err)
-		klog.Errorf("error getting driver connections: %s", err)
-		return nil, err
+		gateway.Status.StatusFailure = fmt.Sprintf("Error retrieving driver connections: %s", err)
 	}
-	gateway.Status.Connections = *connections
+
+	if connections != nil {
+		gateway.Status.Connections = *connections
+	} else {
+		gateway.Status.Connections = []v1.Connection{}
+	}
 
 	klog.V(log.TRACE).Infof("Generated Gateway object: %+v", gateway)
 	return &gateway, nil

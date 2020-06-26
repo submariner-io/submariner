@@ -52,6 +52,10 @@ func testGatewaySyncing() {
 	})
 
 	When("the cable engine info changes", func() {
+		BeforeEach(func() {
+			t.engine.Connections = nil
+		})
+
 		It("should update the Gateway Status with the correct information", func() {
 			t.awaitGatewayUpdated(t.expectedGateway)
 
@@ -224,6 +228,17 @@ func testGatewaySyncErrors() {
 			Eventually(t.handledError, 5).Should(Receive(ContainErrorSubstring(expectedErr)))
 		})
 	})
+
+	When("listing of cable engine connections fails", func() {
+		BeforeEach(func() {
+			t.engine.ListCableConnectionsError = expectedErr
+			t.expectedGateway.Status.StatusFailure = expectedErr.Error()
+		})
+
+		It("update the Gateway Status failure", func() {
+			t.awaitGatewayUpdated(t.expectedGateway)
+		})
+	})
 }
 
 type testDriver struct {
@@ -349,6 +364,13 @@ func (t *testDriver) awaitGateway(gatewayChan chan *submarinerv1.Gateway, msg st
 
 	Expect(err).To(Succeed())
 	Expect(actual.Name).To(Equal(expected.Name))
+
+	if expected.Status.StatusFailure != "" {
+		Expect(actual.Status.StatusFailure).To(ContainSubstring(expected.Status.StatusFailure))
+		actual = actual.DeepCopy()
+		actual.Status.StatusFailure = expected.Status.StatusFailure
+	}
+
 	Expect(actual.Status).To(Equal(expected.Status))
 }
 
