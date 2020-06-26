@@ -92,19 +92,24 @@ func (i *GatewaySyncer) syncGatewayStatus() {
 	}
 
 	if gatewayObj.Status.HAStatus == v1.HAStatusActive {
-		err := i.cleanupStaleGatewayEntries()
+		err := i.cleanupStaleGatewayEntries(gatewayObj.Name)
 		if err != nil {
 			klog.Errorf("error cleaning up stale gateway entries: %s", err)
 		}
 	}
 }
 
-func (i *GatewaySyncer) cleanupStaleGatewayEntries() error {
+func (i *GatewaySyncer) cleanupStaleGatewayEntries(localGatewayName string) error {
 	gateways, err := i.client.List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
+
 	for _, gw := range gateways.Items {
+		if gw.Name == localGatewayName {
+			continue
+		}
+
 		stale, err := isGatewayStale(gw)
 		if err != nil {
 			// In this case we don't want to stop the cleanup loop and just log it
