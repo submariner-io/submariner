@@ -15,6 +15,7 @@ import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cableengine"
 	v1typed "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
 type GatewaySyncer struct {
@@ -53,7 +54,7 @@ func (i *GatewaySyncer) syncGatewayStatus() {
 
 	gatewayObj, err := i.generateGatewayObject()
 	if err != nil {
-		klog.Errorf("Error generating Gateway object: %s", err)
+		utilruntime.HandleError(fmt.Errorf("Error generating Gateway object: %s", err))
 		return
 	}
 
@@ -63,20 +64,20 @@ func (i *GatewaySyncer) syncGatewayStatus() {
 		klog.V(log.TRACE).Infof("Gateway does not exist - creating: %+v", gatewayObj)
 		_, err = i.client.Create(gatewayObj)
 		if err != nil {
-			klog.Errorf("Error creating Gateway object:  %+v: %s", gatewayObj, err)
+			utilruntime.HandleError(fmt.Errorf("Error creating Gateway object %+v: %s", gatewayObj, err))
 			return
 		}
 	} else if err != nil {
-		klog.Errorf("Error getting existing Gateway: %s", err)
+		utilruntime.HandleError(fmt.Errorf("Error getting existing Gateway: %s", err))
 		return
 	} else if !reflect.DeepEqual(gatewayObj.Status, existingGw.Status) {
-		klog.V(log.TRACE).Infof("Gateway already exists - updating: %+v", gatewayObj)
+		klog.V(log.TRACE).Infof("Gateway already exists - updating %+v", gatewayObj)
 		existingGw.Status = gatewayObj.Status
 		existingGw.Annotations = gatewayObj.Annotations
 
 		_, err := i.client.Update(existingGw)
 		if err != nil {
-			klog.Errorf("Error updating Gateway object: %+v: %s", gatewayObj, err)
+			utilruntime.HandleError(fmt.Errorf("Error updating Gateway object %+v: %s", gatewayObj, err))
 			return
 		}
 	} else {
@@ -86,7 +87,7 @@ func (i *GatewaySyncer) syncGatewayStatus() {
 	if gatewayObj.Status.HAStatus == v1.HAStatusActive {
 		err := i.cleanupStaleGatewayEntries(gatewayObj.Name)
 		if err != nil {
-			klog.Errorf("Error cleaning up stale gateway entries: %s", err)
+			utilruntime.HandleError(fmt.Errorf("Error cleaning up stale gateway entries: %s", err))
 		}
 	}
 }
@@ -105,13 +106,13 @@ func (i *GatewaySyncer) cleanupStaleGatewayEntries(localGatewayName string) erro
 		stale, err := isGatewayStale(gw)
 		if err != nil {
 			// In this case we don't want to stop the cleanup loop and just log it
-			klog.Errorf("Error processing stale Gateway: %+v: %s", gw, err)
+			utilruntime.HandleError(fmt.Errorf("Error processing stale Gateway %+v: %s", gw, err))
 		}
 		if stale {
 			err := i.client.Delete(gw.Name, &metav1.DeleteOptions{})
 			if err != nil {
 				// In this case we don't want to stop the cleanup loop and just log it
-				klog.Errorf("Error deleting stale Gateway: %+v: %s", gw, err)
+				utilruntime.HandleError(fmt.Errorf("Error deleting stale Gateway %+v: %s", gw, err))
 			} else {
 				klog.Warningf("Deleted stale gateway: %s, didn't report for %s",
 					gw.Name, GatewayStaleTimeout)
