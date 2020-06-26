@@ -129,11 +129,6 @@ func (i *GatewaySyncer) cleanupStaleGatewayEntries(localGatewayName string) erro
 }
 
 func isGatewayStale(gateway v1.Gateway) (bool, error) {
-
-	if gateway.ObjectMeta.Annotations == nil {
-		return true, nil
-	}
-
 	timestamp, ok := gateway.ObjectMeta.Annotations[updateTimestampAnnotation]
 	if !ok {
 		return true, fmt.Errorf("%q annotation not found", updateTimestampAnnotation)
