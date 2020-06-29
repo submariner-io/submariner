@@ -43,7 +43,19 @@ var _ = Describe("", func() {
 })
 
 func testGatewaySyncing() {
-	t := newTestDriver()
+	var t *testDriver
+
+	BeforeEach(func() {
+		t = newTestDriver()
+	})
+
+	JustBeforeEach(func() {
+		t.run()
+	})
+
+	AfterEach(func() {
+		t.stop()
+	})
 
 	When("the syncer is started", func() {
 		It("should create the Gateway resource with the correct information", func() {
@@ -97,11 +109,11 @@ func testGatewaySyncing() {
 }
 
 func testStaleGatewayCleanup() {
-	t := newTestDriver()
-
+	var t *testDriver
 	var staleGateway *submarinerv1.Gateway
 
 	BeforeEach(func() {
+		t = newTestDriver()
 		staleGateway = &submarinerv1.Gateway{
 			ObjectMeta: v1.ObjectMeta{
 				Name: "raiders",
@@ -116,12 +128,18 @@ func testStaleGatewayCleanup() {
 	})
 
 	JustBeforeEach(func() {
+		t.run()
+
 		t.awaitGatewayUpdated(t.expectedGateway)
 
 		_, err := t.gateways.Create(staleGateway)
 		Expect(err).To(Succeed())
 
 		t.awaitGatewayUpdated(staleGateway)
+	})
+
+	AfterEach(func() {
+		t.stop()
 	})
 
 	When("the Gateway's update timestamp expires", func() {
@@ -184,13 +202,21 @@ func testStaleGatewayCleanup() {
 }
 
 func testGatewaySyncErrors() {
-	t := newTestDriver()
-
+	var t *testDriver
 	var expectedErr error
 
 	BeforeEach(func() {
+		t = newTestDriver()
 		expectedErr = errors.New("fake error")
 		t.expectedDeletedAfter = nil
+	})
+
+	JustBeforeEach(func() {
+		t.run()
+	})
+
+	AfterEach(func() {
+		t.stop()
 	})
 
 	When("Gateway create fails", func() {
@@ -256,84 +282,80 @@ type testDriver struct {
 }
 
 func newTestDriver() *testDriver {
-	t := &testDriver{}
+	t := &testDriver{
+		engine:             fakeEngine.New(),
+		gateways:           &fakeClientsetv1.FailingGateways{},
+		gatewayUpdated:     make(chan *submarinerv1.Gateway, 10),
+		gatewayDeleted:     make(chan *submarinerv1.Gateway, 10),
+		stopSyncer:         make(chan struct{}),
+		stopInformer:       make(chan struct{}),
+		savedErrorHandlers: utilruntime.ErrorHandlers,
+		handledError:       make(chan error, 10),
+	}
 
-	BeforeEach(func() {
-		t.engine = fakeEngine.New()
+	t.engine.LocalEndPoint = &types.SubmarinerEndpoint{Spec: submarinerv1.EndpointSpec{
+		ClusterID: "east",
+		CableName: "submariner-cable-east-192-68-1-2",
+		Hostname:  "redsox",
+		PrivateIP: "192.6.1.3",
+		Backend:   "libreswan",
+	}}
 
-		t.engine.LocalEndPoint = &types.SubmarinerEndpoint{Spec: submarinerv1.EndpointSpec{
-			ClusterID: "east",
-			CableName: "submariner-cable-east-192-68-1-2",
-			Hostname:  "redsox",
-			PrivateIP: "192.6.1.3",
-			Backend:   "libreswan",
-		}}
+	t.expectedGateway = &submarinerv1.Gateway{
+		ObjectMeta: v1.ObjectMeta{
+			Name: t.engine.LocalEndPoint.Spec.Hostname,
+		},
+		Status: submarinerv1.GatewayStatus{
+			Version:       "1",
+			HAStatus:      t.engine.GetHAStatus(),
+			LocalEndpoint: t.engine.LocalEndPoint.Spec,
+			Connections:   t.engine.Connections,
+		},
+	}
 
-		t.expectedGateway = &submarinerv1.Gateway{
-			ObjectMeta: v1.ObjectMeta{
-				Name: t.engine.LocalEndPoint.Spec.Hostname,
-			},
-			Status: submarinerv1.GatewayStatus{
-				Version:       "1",
-				HAStatus:      t.engine.GetHAStatus(),
-				LocalEndpoint: t.engine.LocalEndPoint.Spec,
-				Connections:   t.engine.Connections,
-			},
-		}
-
-		t.expectedDeletedAfter = t.expectedGateway
-		t.gateways = &fakeClientsetv1.FailingGateways{}
-		t.savedErrorHandlers = utilruntime.ErrorHandlers
-	})
-
-	JustBeforeEach(func() {
-		t.stopSyncer = make(chan struct{})
-		t.stopInformer = make(chan struct{})
-		t.gatewayUpdated = make(chan *submarinerv1.Gateway, 10)
-		t.gatewayDeleted = make(chan *submarinerv1.Gateway, 10)
-		t.handledError = make(chan error, 10)
-
-		utilruntime.ErrorHandlers = append(utilruntime.ErrorHandlers, func(err error) {
-			t.handledError <- err
-		})
-
-		client := fakeClientset.NewSimpleClientset()
-		t.gateways.GatewayInterface = client.SubmarinerV1().Gateways(namespace)
-		t.syncer = syncer.NewGatewaySyncer(t.engine, t.gateways, t.expectedGateway.Status.Version)
-
-		informerFactory := submarinerInformers.NewSharedInformerFactory(client, 0)
-		informer := informerFactory.Submariner().V1().Gateways().Informer()
-
-		informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				t.gatewayUpdated <- obj.(*submarinerv1.Gateway)
-			},
-			UpdateFunc: func(oldObj, newObj interface{}) {
-				t.gatewayUpdated <- newObj.(*submarinerv1.Gateway)
-			},
-			DeleteFunc: func(obj interface{}) {
-				t.gatewayDeleted <- obj.(*submarinerv1.Gateway)
-			},
-		})
-
-		go informer.Run(t.stopInformer)
-		Expect(cache.WaitForCacheSync(t.stopInformer, informer.HasSynced)).To(BeTrue())
-
-		t.syncer.Run(t.stopSyncer)
-	})
-
-	AfterEach(func() {
-		close(t.stopSyncer)
-
-		if t.expectedDeletedAfter != nil {
-			t.awaitGatewayDeleted(t.expectedDeletedAfter)
-		}
-
-		close(t.stopInformer)
-		utilruntime.ErrorHandlers = t.savedErrorHandlers
-	})
-
+	t.expectedDeletedAfter = t.expectedGateway
 	return t
+}
+
+func (t *testDriver) run() {
+	utilruntime.ErrorHandlers = append(utilruntime.ErrorHandlers, func(err error) {
+		t.handledError <- err
+	})
+
+	client := fakeClientset.NewSimpleClientset()
+	t.gateways.GatewayInterface = client.SubmarinerV1().Gateways(namespace)
+	t.syncer = syncer.NewGatewaySyncer(t.engine, t.gateways, t.expectedGateway.Status.Version)
+
+	informerFactory := submarinerInformers.NewSharedInformerFactory(client, 0)
+	informer := informerFactory.Submariner().V1().Gateways().Informer()
+
+	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			t.gatewayUpdated <- obj.(*submarinerv1.Gateway)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			t.gatewayUpdated <- newObj.(*submarinerv1.Gateway)
+		},
+		DeleteFunc: func(obj interface{}) {
+			t.gatewayDeleted <- obj.(*submarinerv1.Gateway)
+		},
+	})
+
+	go informer.Run(t.stopInformer)
+	Expect(cache.WaitForCacheSync(t.stopInformer, informer.HasSynced)).To(BeTrue())
+
+	t.syncer.Run(t.stopSyncer)
+}
+
+func (t *testDriver) stop() {
+	close(t.stopSyncer)
+
+	if t.expectedDeletedAfter != nil {
+		t.awaitGatewayDeleted(t.expectedDeletedAfter)
+	}
+
+	close(t.stopInformer)
+	utilruntime.ErrorHandlers = t.savedErrorHandlers
 }
 
 func (t *testDriver) awaitGatewayUpdated(expected *submarinerv1.Gateway) {
