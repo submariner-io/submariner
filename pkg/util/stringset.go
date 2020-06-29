@@ -48,6 +48,15 @@ func (set *StringSet) Delete(s string) bool {
 	return found
 }
 
+func (set *StringSet) DeleteAll() {
+	set.syncMutex.Lock()
+	defer set.syncMutex.Unlock()
+
+	for v := range set.set {
+		delete(set.set, v)
+	}
+}
+
 func (set *StringSet) Elements() []string {
 	set.syncMutex.Lock()
 	defer set.syncMutex.Unlock()

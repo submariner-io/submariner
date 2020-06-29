@@ -12,10 +12,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cable/wireguard"
 	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	informers "github.com/submariner-io/submariner/pkg/client/informers/externalversions/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/log"
 	"github.com/submariner-io/submariner/pkg/util"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
@@ -55,9 +56,11 @@ type Controller struct {
 	endpointWorkqueue workqueue.RateLimitingInterface
 	podWorkqueue      workqueue.RateLimitingInterface
 
+	localCableDriver string
 	localClusterCidr []string
 	localServiceCidr []string
 	remoteSubnets    *util.StringSet
+	routeCacheGWNode *util.StringSet
 
 	gwVxLanMutex *sync.Mutex
 	vxlanDevice  *vxLanIface
@@ -113,6 +116,19 @@ const (
 	// supporting connectivity from HostNetwork to remoteClusters.
 	// [#] interface on the node that has an IPAddress from the clusterCIDR
 	CniInterfaceIp = "submariner.io/cniIfaceIp"
+
+	// To support connectivity for Pods with HostNetworking on the GatewayNode, we program
+	// certain routing rules in table 150. As part of these routes, we set the source-ip of
+	// the egress traffic to the corresponding CNIInterfaceIP on that host.
+	RouteAgentHostNetworkTableID = 150
+)
+
+type Operation int
+
+const (
+	AddRoute Operation = iota
+	DeleteRoute
+	FlushRouteTable
 )
 
 func newRateLimiter() workqueue.RateLimiter {
@@ -125,6 +141,7 @@ func NewController(clusterID string, ClusterCidr []string, ServiceCidr []string,
 	controller := Controller{
 		clusterID:              clusterID,
 		objectNamespace:        objectNamespace,
+		localCableDriver:       "",
 		localClusterCidr:       ClusterCidr,
 		localServiceCidr:       ServiceCidr,
 		submarinerClientSet:    config.SubmarinerClientSet,
@@ -132,6 +149,7 @@ func NewController(clusterID string, ClusterCidr []string, ServiceCidr []string,
 		defaultHostIface:       link,
 		isGatewayNode:          false,
 		remoteSubnets:          util.NewStringSet(),
+		routeCacheGWNode:       util.NewStringSet(),
 		remoteVTEPs:            util.NewStringSet(),
 		endpointsSynced:        config.EndpointInformer.Informer().HasSynced,
 		smRouteAgentPodsSynced: config.PodInformer.Informer().HasSynced,
@@ -205,6 +223,8 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 				continue
 			}
 			r.updateIptableRulesForInterclusterTraffic(endpoint.Spec.Subnets)
+		} else {
+			r.localCableDriver = endpoint.Spec.Backend
 		}
 	}
 
@@ -305,6 +325,43 @@ func (r *Controller) updateIptableRulesForInterclusterTraffic(inputCidrBlocks []
 			err := r.programIptableRulesForInterClusterTraffic(inputCidrBlock)
 			if err != nil {
 				klog.Errorf("Failed to program iptable rule. %v", err)
+			}
+		}
+	}
+}
+
+func (r *Controller) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks []string, operation Operation) {
+	if operation == FlushRouteTable {
+		r.routeCacheGWNode.DeleteAll()
+		cmd := exec.Command("/sbin/ip", "r", "flush", "table", strconv.Itoa(RouteAgentHostNetworkTableID))
+		if err := cmd.Run(); err != nil {
+			// We can safely ignore this error, as this table will exist only on GW nodes
+			klog.V(log.TRACE).Infof("Flushing routing table %d returned error. Can be ignored on non-Gw node: %v",
+				RouteAgentHostNetworkTableID, err)
+			return
+		}
+	} else if r.isGatewayNode && r.cniIface != nil {
+		// These routing rules are required ONLY on the Gateway Node.
+		// On the non-Gateway nodes, we use iptable rules to support this use-case.
+		switch operation {
+		case AddRoute:
+			for _, inputCidrBlock := range inputCidrBlocks {
+				if r.routeCacheGWNode.Add(inputCidrBlock) {
+					if err := r.configureRoute(inputCidrBlock, operation); err != nil {
+						r.routeCacheGWNode.Delete(inputCidrBlock)
+						klog.Errorf("Failed to add route %q for HostNetwork support on the Gateway node: %v",
+							inputCidrBlock, err)
+					}
+				}
+			}
+		case DeleteRoute:
+			for _, inputCidrBlock := range inputCidrBlocks {
+				if r.routeCacheGWNode.Delete(inputCidrBlock) {
+					if err := r.configureRoute(inputCidrBlock, operation); err != nil {
+						klog.Errorf("Failed to delete route %q for HostNetwork support on the Gateway node. %v",
+							inputCidrBlock, err)
+					}
+				}
 			}
 		}
 	}
@@ -521,6 +578,12 @@ func (r *Controller) processNextEndpoint() bool {
 			klog.Infof("Updating iptable rules for remote cluster's Endpoint %q with subnets %v",
 				endpoint.Name, endpoint.Spec.Subnets)
 			r.updateIptableRulesForInterclusterTraffic(endpoint.Spec.Subnets)
+
+			r.gwVxLanMutex.Lock()
+			// Add routes to the new endpoint on the GatewayNode.
+			r.updateRoutingRulesForHostNetworkSupport(endpoint.Spec.Subnets, AddRoute)
+			r.gwVxLanMutex.Unlock()
+
 			r.endpointWorkqueue.Forget(obj)
 			return nil
 		}
@@ -548,6 +611,18 @@ func (r *Controller) processNextEndpoint() bool {
 				klog.Fatalf("Unable to create VxLAN interface on gateway node (%s): %v", hostname, err)
 			}
 
+			err = r.configureIPRule(AddRoute)
+			if err != nil {
+				klog.Errorf("Unable to add ip rule to table %d on Gateway node %s: %v",
+					RouteAgentHostNetworkTableID, hostname, err)
+			}
+
+			if r.localCableDriver == "" {
+				r.localCableDriver = endpoint.Spec.Backend
+			}
+			// On the GatewayNode, add routes for the remoteSubnets
+			r.updateRoutingRulesForHostNetworkSupport(r.remoteSubnets.Elements(), AddRoute)
+
 			r.endpointWorkqueue.Forget(obj)
 			return nil
 		}
@@ -568,6 +643,8 @@ func (r *Controller) processNextEndpoint() bool {
 		if err != nil {
 			klog.Fatalf("Unable to create VxLAN interface on non-GatewayNode (%s): %v", endpoint.Spec.Hostname, err)
 		}
+		// If the active Gateway transitions to a new node, we flush the HostNetwork routing table.
+		r.updateRoutingRulesForHostNetworkSupport(nil, FlushRouteTable)
 		r.gwVxLanMutex.Unlock()
 
 		// NOTE(mangelajo): This may not belong here, it's a gateway cleanup thing
@@ -578,6 +655,12 @@ func (r *Controller) processNextEndpoint() bool {
 		if err != nil {
 			r.endpointWorkqueue.AddRateLimited(obj)
 			return fmt.Errorf("error while reconciling routes %v", err)
+		}
+
+		err = r.configureIPRule(DeleteRoute)
+		if err != nil {
+			klog.Errorf("Unable to delete ip rule to table %d on non-Gateway node %s: %v",
+				RouteAgentHostNetworkTableID, hostname, err)
 		}
 
 		r.endpointWorkqueue.Forget(obj)
@@ -639,15 +722,16 @@ func (r *Controller) handleRemovedEndpoint(obj interface{}) {
 	}
 	klog.V(log.DEBUG).Infof("Informed of removed endpoint: %v", object.String())
 
+	r.gwVxLanMutex.Lock()
+	defer r.gwVxLanMutex.Unlock()
+
 	if object.Spec.ClusterID != r.clusterID {
 		// TODO: Handle a remote endpoint removal use-case
 		//         - remove routes to remote cluster
 		//         - remove related iptable rules
+		r.updateRoutingRulesForHostNetworkSupport(object.Spec.Subnets, DeleteRoute)
 		return
 	}
-
-	r.gwVxLanMutex.Lock()
-	defer r.gwVxLanMutex.Unlock()
 
 	if r.vxlanDevice == nil {
 		klog.Warningf("vxlanDevice is not set - ignoring removed local Endpoint %q", object.Name)
@@ -658,6 +742,12 @@ func (r *Controller) handleRemovedEndpoint(obj interface{}) {
 		klog.Infof("Local Gateway Endpoint %q with IP %s was removed: deleting vxlan interface",
 			object.Name, object.Spec.PrivateIP)
 		r.cleanVxSubmarinerRoutes()
+		// Active Gateway seems to have transitioned to a new node, flush the Host Network routing table.
+		r.updateRoutingRulesForHostNetworkSupport(nil, FlushRouteTable)
+		err := r.configureIPRule(DeleteRoute)
+		if err != nil {
+			klog.Errorf("Unable to delete ip rule to table %d : %v", RouteAgentHostNetworkTableID, err)
+		}
 	} else {
 		klog.Infof("Local non-gateway Endpoint %q with IP %q was removed: deleting vxlan interface",
 			object.Name, object.Spec.PrivateIP)
@@ -822,6 +912,68 @@ func (r *Controller) reconcileRoutes(vxlanGw net.IP) error {
 			if err != nil {
 				klog.Errorf("Error adding route %s: %v", route.String(), err)
 			}
+		}
+	}
+	return nil
+}
+
+func (r *Controller) configureIPRule(operation Operation) error {
+	if r.cniIface != nil {
+		rule := netlink.NewRule()
+		rule.Table = RouteAgentHostNetworkTableID
+		rule.Priority = RouteAgentHostNetworkTableID
+
+		switch operation {
+		case AddRoute:
+			err := netlink.RuleAdd(rule)
+			if err != nil && !os.IsExist(err) {
+				return fmt.Errorf("failed to add ip rule %s: %v", rule.String(), err)
+			}
+		case DeleteRoute:
+			err := netlink.RuleDel(rule)
+			if err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("failed to delete ip rule %s: %v", rule.String(), err)
+			}
+		}
+	}
+	return nil
+}
+
+func (r *Controller) configureRoute(remoteSubnet string, operation Operation) error {
+	src := net.ParseIP(r.cniIface.ipAddress)
+	_, dst, err := net.ParseCIDR(remoteSubnet)
+	if err != nil {
+		return fmt.Errorf("error parsing cidr block %s: %v", remoteSubnet, err)
+	}
+
+	ifaceIndex := r.defaultHostIface.Index
+	// TODO: Add support for this in the CableDrivers themselves.
+	if r.localCableDriver == "wireguard" {
+		if wg, err := net.InterfaceByName(wireguard.DefaultDeviceName); err == nil {
+			ifaceIndex = wg.Index
+		} else {
+			klog.Errorf("Wireguard interface %s not found on the node.", wireguard.DefaultDeviceName)
+		}
+	}
+	route := netlink.Route{
+		Dst:       dst,
+		Src:       src,
+		Scope:     unix.RT_SCOPE_LINK,
+		LinkIndex: ifaceIndex,
+		Protocol:  4,
+		Table:     RouteAgentHostNetworkTableID,
+	}
+
+	switch operation {
+	case AddRoute:
+		err = netlink.RouteAdd(&route)
+		if err != nil && !os.IsExist(err) {
+			return fmt.Errorf("error adding the route %s: %v", route.String(), err)
+		}
+	case DeleteRoute:
+		err = netlink.RouteDel(&route)
+		if err != nil {
+			return fmt.Errorf("error deleting the route %s: %v", route.String(), err)
 		}
 	}
 	return nil

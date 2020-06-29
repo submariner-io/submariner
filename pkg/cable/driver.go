@@ -2,6 +2,7 @@ package cable
 
 import (
 	"fmt"
+	"strings"
 
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 
@@ -53,7 +54,14 @@ func AddDriver(name string, driverCreate DriverCreateFunc) {
 func NewDriver(localEndpoint types.SubmarinerEndpoint, localCluster types.SubmarinerCluster) (Driver, error) {
 	driverCreate, ok := drivers[localEndpoint.Spec.Backend]
 	if !ok {
-		return nil, fmt.Errorf("unsupported cable type %s", localEndpoint.Spec.Backend)
+		var driverList strings.Builder
+		for driver := range drivers {
+			if driverList.Len() > 0 {
+				driverList.WriteString(", ")
+			}
+			driverList.WriteString(driver)
+		}
+		return nil, fmt.Errorf("unsupported cable type %s; supported types: %s", localEndpoint.Spec.Backend, driverList.String())
 	}
 	return driverCreate(localEndpoint, localCluster)
 }
