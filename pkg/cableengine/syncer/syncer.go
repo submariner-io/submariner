@@ -25,7 +25,7 @@ type GatewaySyncer struct {
 }
 
 var GatewayUpdateInterval = 5 * time.Second
-var GatewayStaleTimeout = time.Duration(GatewayUpdateInterval.Seconds()) * 3 * time.Second
+var GatewayStaleTimeout = GatewayUpdateInterval * 3
 
 const updateTimestampAnnotation = "update-timestamp"
 
