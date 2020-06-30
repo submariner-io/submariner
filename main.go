@@ -130,8 +130,7 @@ func main() {
 	becameLeader := func(context.Context) {
 		klog.Info("Creating the tunnel controller")
 
-		tunnelController := tunnel.NewController(cableEngine, submarinerClient,
-			submarinerInformerFactory.Submariner().V1().Endpoints())
+		tunnelController := tunnel.NewController(cableEngine, submarinerInformerFactory.Submariner().V1().Endpoints())
 
 		var datastore datastore.Datastore
 		switch submSpec.Broker {

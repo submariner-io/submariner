@@ -7,10 +7,8 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cableengine"
-	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
@@ -19,21 +17,19 @@ import (
 )
 
 type Controller struct {
-	ce                  cableengine.Engine
-	submarinerClientSet submarinerClientset.Interface
-	endpointsSynced     cache.InformerSynced
-	endpointWorkqueue   workqueue.RateLimitingInterface
+	ce                cableengine.Engine
+	informer          cache.SharedIndexInformer
+	endpointWorkqueue workqueue.RateLimitingInterface
 }
 
-func NewController(ce cableengine.Engine, submarinerClientSet submarinerClientset.Interface, endpointInformer submarinerInformers.EndpointInformer) *Controller {
+func NewController(ce cableengine.Engine, endpointInformer submarinerInformers.EndpointInformer) *Controller {
 	tunnelController := &Controller{
-		ce:                  ce,
-		submarinerClientSet: submarinerClientSet,
-		endpointsSynced:     endpointInformer.Informer().HasSynced,
-		endpointWorkqueue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Endpoints"),
+		ce:                ce,
+		informer:          endpointInformer.Informer(),
+		endpointWorkqueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Endpoints"),
 	}
 
-	endpointInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
+	tunnelController.informer.AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: tunnelController.enqueueEndpoint,
 		UpdateFunc: func(old, new interface{}) {
 			tunnelController.enqueueEndpoint(new)
@@ -52,7 +48,7 @@ func (t *Controller) Run(stopCh <-chan struct{}) error {
 
 	// Wait for the caches to be synced before starting workers
 	klog.Info("Waiting for informer caches to sync")
-	if ok := cache.WaitForCacheSync(stopCh, t.endpointsSynced); !ok {
+	if ok := cache.WaitForCacheSync(stopCh, t.informer.HasSynced); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
 
@@ -80,16 +76,19 @@ func (t *Controller) processNextEndpoint() bool {
 	err := func() error {
 		defer t.endpointWorkqueue.Done(key)
 
-		ns, name, err := cache.SplitMetaNamespaceKey(key.(string))
-		if err != nil {
-			return fmt.Errorf("error splitting meta namespace key for endpoint %s: %v", key, err)
-		}
-
-		endpoint, err := t.submarinerClientSet.SubmarinerV1().Endpoints(ns).Get(name, metav1.GetOptions{})
+		obj, exists, err := t.informer.GetStore().GetByKey(key.(string))
 		if err != nil {
 			t.endpointWorkqueue.Forget(key)
-			return fmt.Errorf("error retrieving submariner Endpoint %q: %v", name, err)
+			return fmt.Errorf("error retrieving submariner Endpoint %q: %v", key, err)
 		}
+
+		if !exists {
+			klog.V(log.DEBUG).Infof("Tunnel controller processing - submariner Endpoint object not found for key %q", key)
+			t.endpointWorkqueue.Forget(key)
+			return nil
+		}
+
+		endpoint := obj.(*v1.Endpoint)
 
 		klog.V(log.DEBUG).Infof("Tunnel controller processing added or updated submariner Endpoint object: %#v", endpoint)
 
