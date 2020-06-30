@@ -79,11 +79,6 @@ func main() {
 		klog.Fatalf("Error building kubeconfig: %s", err.Error())
 	}
 
-	kubeClient, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		klog.Fatalf("Error creating kubernetes clientset: %s", err.Error())
-	}
-
 	submarinerClient, err := submarinerClientset.NewForConfig(cfg)
 	if err != nil {
 		klog.Fatalf("Error creating submariner clientset: %s", err.Error())
@@ -135,7 +130,7 @@ func main() {
 	becameLeader := func(context.Context) {
 		klog.Info("Creating the tunnel controller")
 
-		tunnelController := tunnel.NewController(submSpec.Namespace, cableEngine, kubeClient, submarinerClient,
+		tunnelController := tunnel.NewController(cableEngine, submarinerClient,
 			submarinerInformerFactory.Submariner().V1().Endpoints())
 
 		var datastore datastore.Datastore

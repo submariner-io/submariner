@@ -13,7 +13,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
@@ -21,23 +20,17 @@ import (
 
 type Controller struct {
 	ce                  cableengine.Engine
-	kubeClientSet       kubernetes.Interface
 	submarinerClientSet submarinerClientset.Interface
 	endpointsSynced     cache.InformerSynced
-
-	objectNamespace string
-
-	endpointWorkqueue workqueue.RateLimitingInterface
+	endpointWorkqueue   workqueue.RateLimitingInterface
 }
 
-func NewController(objectNamespace string, ce cableengine.Engine, kubeClientSet kubernetes.Interface, submarinerClientSet submarinerClientset.Interface, endpointInformer submarinerInformers.EndpointInformer) *Controller {
+func NewController(ce cableengine.Engine, submarinerClientSet submarinerClientset.Interface, endpointInformer submarinerInformers.EndpointInformer) *Controller {
 	tunnelController := &Controller{
 		ce:                  ce,
-		kubeClientSet:       kubeClientSet,
 		submarinerClientSet: submarinerClientSet,
 		endpointsSynced:     endpointInformer.Informer().HasSynced,
 		endpointWorkqueue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Endpoints"),
-		objectNamespace:     objectNamespace,
 	}
 
 	endpointInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
