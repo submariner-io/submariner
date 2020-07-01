@@ -41,6 +41,7 @@ func beforeSuite() {
 	}
 
 	queryAndUpdateGlobalnetStatus()
+	framework.TestContext.OperationTimeout = 200
 }
 
 func queryAndUpdateGlobalnetStatus() {
