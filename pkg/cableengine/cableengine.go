@@ -49,7 +49,6 @@ type engine struct {
 
 // NewEngine creates a new Engine for the local cluster
 func NewEngine(localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) (Engine, error) {
-
 	i := engine{
 		localCluster:  localCluster,
 		localEndpoint: localEndpoint,
@@ -64,7 +63,6 @@ func (i *engine) GetLocalEndpoint() *types.SubmarinerEndpoint {
 }
 
 func (i *engine) StartEngine() error {
-
 	i.Lock()
 	defer i.Unlock()
 
@@ -73,7 +71,6 @@ func (i *engine) StartEngine() error {
 	}
 	klog.Infof("CableEngine controller started, driver: %q", i.driver.GetName())
 	return nil
-
 }
 
 func (i *engine) startDriver() error {

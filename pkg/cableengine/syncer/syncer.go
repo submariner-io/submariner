@@ -32,7 +32,6 @@ const updateTimestampAnnotation = "update-timestamp"
 // NewEngine creates a new Engine for the local cluster
 func NewGatewaySyncer(engine cableengine.Engine, client v1typed.GatewayInterface,
 	version string) *GatewaySyncer {
-
 	return &GatewaySyncer{
 		client:  client,
 		engine:  engine,

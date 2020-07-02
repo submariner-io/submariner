@@ -137,7 +137,6 @@ func newRateLimiter() workqueue.RateLimiter {
 
 func NewController(clusterID string, ClusterCidr []string, ServiceCidr []string, objectNamespace string,
 	link *net.Interface, config InformerConfigStruct) *Controller {
-
 	controller := Controller{
 		clusterID:              clusterID,
 		objectNamespace:        objectNamespace,
@@ -247,7 +246,6 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 }
 
 func (r *Controller) annotateThisNodeWithCNInterfaceIP() error {
-
 	hostname, err := os.Hostname()
 	if err != nil {
 		klog.Fatalf("unable to determine hostname: %v", err)
@@ -451,7 +449,6 @@ func (r *Controller) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP) e
 		} else {
 			klog.V(log.DEBUG).Infof("Successfully configured rp_filter to loose mode(2) on %s", VxLANIface)
 		}
-
 	} else if ifaceType == VxInterfaceWorker {
 		// non-Gateway/Worker Node
 		attrs := &vxLanAttributes{
@@ -826,7 +823,6 @@ func (r *Controller) cleanStrongswanRoutingTable() {
 }
 
 func (r *Controller) cleanXfrmPolicies() {
-
 	currentXfrmPolicyList, err := netlink.XfrmPolicyList(syscall.AF_INET)
 
 	if err != nil {
@@ -847,7 +843,6 @@ func (r *Controller) cleanXfrmPolicies() {
 
 // Reconcile the routes installed on this device using rtnetlink
 func (r *Controller) reconcileRoutes(vxlanGw net.IP) error {
-
 	klog.V(log.DEBUG).Infof("Reconciling routes to gw: %s", vxlanGw.String())
 
 	link, err := netlink.LinkByName(VxLANIface)

@@ -98,7 +98,6 @@ func (f *Framework) AwaitGatewayWithStatus(cluster framework.ClusterIndex,
 
 func (f *Framework) AwaitGatewaysWithStatus(
 	cluster framework.ClusterIndex, status submarinerv1.HAStatus) []submarinerv1.Gateway {
-
 	gwList := framework.AwaitUntil(fmt.Sprintf("await Gateways with status %q", status),
 		func() (interface{}, error) {
 			return f.GetGatewaysWithHAStatus(cluster, status), nil
@@ -128,7 +127,6 @@ func (f *Framework) AwaitGatewayRemoved(cluster framework.ClusterIndex, name str
 			gone := result.(bool)
 			return gone, "", nil
 		})
-
 }
 
 func (f *Framework) AwaitGatewayFullyConnected(cluster framework.ClusterIndex, name string) *submarinerv1.Gateway {
@@ -169,7 +167,6 @@ func (f *Framework) AwaitGatewayFullyConnected(cluster framework.ClusterIndex, n
 //                which could not be after a failed test which left the system on an
 //                unexpected state
 func (f *Framework) GatewayCleanup() {
-
 	for cluster := range SubmarinerClients {
 		passiveGateways := f.GetGatewaysWithHAStatus(framework.ClusterIndex(cluster), submarinerv1.HAStatusPassive)
 
@@ -195,7 +192,6 @@ func gatewayNames(gateways []submarinerv1.Gateway) []string {
 
 func (f *Framework) GetGatewaysWithHAStatus(
 	cluster framework.ClusterIndex, status submarinerv1.HAStatus) []submarinerv1.Gateway {
-
 	gatewayClient := SubmarinerClients[cluster].SubmarinerV1().Gateways(
 		framework.TestContext.SubmarinerNamespace)
 	gwList, err := gatewayClient.List(metav1.ListOptions{})
@@ -217,7 +213,6 @@ func (f *Framework) GetGatewaysWithHAStatus(
 }
 
 func (f *Framework) DeleteGateway(cluster framework.ClusterIndex, name string) {
-
 	framework.AwaitUntil("delete gateway", func() (interface{}, error) {
 		err := SubmarinerClients[cluster].SubmarinerV1().Gateways(
 			framework.TestContext.SubmarinerNamespace).Delete(name, &metav1.DeleteOptions{})
