@@ -200,7 +200,7 @@ func main() {
 	startLeaderElection(leClient, recorder, becameLeader, lostLeader)
 }
 
-func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder record.EventRecorder,
+func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder resourcelock.EventRecorder,
 	run func(ctx context.Context), end func()) {
 	gwLeadershipConfig := leaderConfig{}
 
