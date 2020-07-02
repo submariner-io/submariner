@@ -333,6 +333,8 @@ func (r *Controller) updateIptableRulesForInterclusterTraffic(inputCidrBlocks []
 func (r *Controller) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks []string, operation Operation) {
 	if operation == FlushRouteTable {
 		r.routeCacheGWNode.DeleteAll()
+		// The conversion doesn't introduce a security problem
+		// #nosec G204
 		cmd := exec.Command("/sbin/ip", "r", "flush", "table", strconv.Itoa(RouteAgentHostNetworkTableID))
 		if err := cmd.Run(); err != nil {
 			// We can safely ignore this error, as this table will exist only on GW nodes
@@ -441,6 +443,8 @@ func (r *Controller) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP) e
 		}
 
 		// Enable loose mode (rp_filter=2) reverse path filtering on the vxlan interface.
+		// We won't ever create rp_filter, and its permissions are 644
+		// #nosec G306
 		err = ioutil.WriteFile("/proc/sys/net/ipv4/conf/"+VxLANIface+"/rp_filter", []byte("2"), 0644)
 		if err != nil {
 			return fmt.Errorf("unable to update vxlan rp_filter proc entry, err: %s", err)
