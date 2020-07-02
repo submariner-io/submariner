@@ -42,7 +42,7 @@ var drivers = map[string]DriverCreateFunc{}
 // Default name of the cable driver
 var defaultCableDriver string
 
-// Adds a supported driver, prints a fatal error in teh case of double registration
+// Adds a supported driver, prints a fatal error in the case of double registration
 func AddDriver(name string, driverCreate DriverCreateFunc) {
 	if drivers[name] != nil {
 		klog.Fatalf("Multiple cable engine drivers attempting to register with name %q", name)

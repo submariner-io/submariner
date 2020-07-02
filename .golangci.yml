@@ -23,7 +23,7 @@ linters:
     - ineffassign
     - interfacer
     #- lll
-    #- misspell
+    - misspell
     - nakedret
     #- scopelint
     - staticcheck

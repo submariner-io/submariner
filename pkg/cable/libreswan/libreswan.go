@@ -363,7 +363,7 @@ func (i *libreswan) runPluto() error {
 	if err := cmd.Start(); err != nil {
 		// Note - Close handles nil receiver
 		outputFile.Close()
-		return fmt.Errorf("error starting the Pluto process wih args %v: %v", args, err)
+		return fmt.Errorf("error starting the Pluto process with args %v: %v", args, err)
 	}
 
 	go func() {
