@@ -535,7 +535,6 @@ func (i *Controller) serviceUpdater(obj runtime.Object, key string) error {
 			logAndRequeue(key, i.serviceWorkqueue)
 			return err
 		}
-
 	}
 	return nil
 }

@@ -41,7 +41,6 @@ type DatastoreSyncer struct {
 func NewDatastoreSyncer(thisClusterID string, submarinerClusters submarinerClientset.ClusterInterface, submarinerClusterInformer submarinerInformers.ClusterInformer,
 	submarinerEndpoints submarinerClientset.EndpointInterface, submarinerEndpointInformer submarinerInformers.EndpointInformer, datastore datastore.Datastore, colorcodes []string,
 	localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) *DatastoreSyncer {
-
 	newDatastoreSyncer := DatastoreSyncer{
 		thisClusterID:              thisClusterID,
 		submarinerClusters:         submarinerClusters,

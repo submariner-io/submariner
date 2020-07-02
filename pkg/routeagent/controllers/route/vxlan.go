@@ -88,7 +88,6 @@ func (iface *vxLanIface) deleteVxLanIface() error {
 }
 
 func isVxlanConfigTheSame(new, current netlink.Link) bool {
-
 	required := new.(*netlink.Vxlan)
 	existing := current.(*netlink.Vxlan)
 

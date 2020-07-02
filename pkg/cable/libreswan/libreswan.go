@@ -188,7 +188,6 @@ func extractSubnets(endpoint subv1.EndpointSpec) []string {
 }
 
 func whack(args ...string) error {
-
 	var err error
 	for i := 0; i < 3; i++ {
 		cmd := exec.Command("/usr/libexec/ipsec/whack", args...)
@@ -203,7 +202,6 @@ func whack(args ...string) error {
 
 		klog.Warningf("error %v whacking with args: %v", err, args)
 		time.Sleep(1 * time.Second)
-
 	}
 
 	if err != nil {

@@ -8,7 +8,6 @@ import (
 )
 
 func (i *strongSwan) GetConnections() (*[]v1.Connection, error) {
-
 	client, err := getClient()
 	if err != nil {
 		return nil, err
@@ -26,7 +25,6 @@ func (i *strongSwan) GetConnections() (*[]v1.Connection, error) {
 // getSAListConnections converts an IKE SA List from ListSas, and converts into a cable connection list
 // It's made a separate function for testability (unit tests)
 func (i *strongSwan) getSAListConnections(sas []map[string]goStrongswanVici.IkeSa) (*[]v1.Connection, error) {
-
 	connections := []v1.Connection{}
 	for cableID, endpoint := range i.remoteEndpoints {
 		connection := v1.NewConnection(endpoint)
@@ -52,7 +50,6 @@ func (i *strongSwan) getSAListConnections(sas []map[string]goStrongswanVici.IkeS
 //
 func updateConnectionState(sa *goStrongswanVici.IkeSa, connection *v1.Connection) {
 	switch sa.State {
-
 	case "CREATED":
 		connection.SetStatus(v1.ConnectionError, "Connection has been created but not yet started")
 

@@ -126,7 +126,6 @@ func getSubmarinerRESTConfig(host string, private bool, k8sSpec *datastoreSpecif
 }
 
 func (k *Datastore) GetEndpoints(clusterID string) ([]types.SubmarinerEndpoint, error) {
-
 	k8sEndpoints, err := k.client.SubmarinerV1().Endpoints(k.remoteNamespace).List(metav1.ListOptions{})
 
 	if err != nil {
@@ -145,7 +144,6 @@ func (k *Datastore) GetEndpoints(clusterID string) ([]types.SubmarinerEndpoint, 
 }
 
 func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onClusterChange datastore.OnClusterChange) error {
-
 	k.informerFactory.Submariner().V1().Clusters().Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			var object *submarinerv1.Cluster
@@ -229,7 +227,6 @@ func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, col
 }
 
 func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onEndpointChange datastore.OnEndpointChange) error {
-
 	k.informerFactory.Submariner().V1().Endpoints().Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			var object *submarinerv1.Endpoint

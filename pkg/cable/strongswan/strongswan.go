@@ -212,7 +212,6 @@ func (i *strongSwan) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) e
 	client, err := getClient()
 	if err != nil {
 		return err
-
 	}
 	defer client.Close()
 
