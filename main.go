@@ -41,7 +41,8 @@ var (
 
 func init() {
 	flag.StringVar(&localKubeconfig, "kubeconfig", "", "Path to kubeconfig of local cluster. Only required if out-of-cluster.")
-	flag.StringVar(&localMasterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+	flag.StringVar(&localMasterURL, "master", "",
+		"The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 }
 
 type leaderConfig struct {
@@ -230,7 +231,8 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder res
 	namespace, _, err := kubeconfig.Namespace()
 	if err != nil {
 		namespace = "submariner"
-		klog.Infof("Could not obtain a namespace to use for the leader election lock - the error was: %v. Using the default %q namespace.", namespace, err)
+		klog.Infof("Could not obtain a namespace to use for the leader election lock - the error was: %v. Using the default %q namespace.",
+			namespace, err)
 	} else {
 		klog.Infof("Using namespace %q for the leader election lock", namespace)
 	}

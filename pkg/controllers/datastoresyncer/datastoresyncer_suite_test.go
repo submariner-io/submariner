@@ -324,10 +324,12 @@ func (t *testDatastore) RemoveEndpoint(clusterID, cableName string) error {
 	return t.endpoints.Delete(endpointName, &metav1.DeleteOptions{})
 }
 
-func (t *testDatastore) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onClusterChange datastore.OnClusterChange) error {
+func (t *testDatastore) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string,
+	onClusterChange datastore.OnClusterChange) error {
 	return nil
 }
 
-func (t *testDatastore) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onEndpointChange datastore.OnEndpointChange) error {
+func (t *testDatastore) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string,
+	onEndpointChange datastore.OnEndpointChange) error {
 	return nil
 }

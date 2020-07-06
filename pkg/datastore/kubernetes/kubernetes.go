@@ -143,7 +143,8 @@ func (k *Datastore) GetEndpoints(clusterID string) ([]types.SubmarinerEndpoint, 
 	return endpoints, nil
 }
 
-func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onClusterChange datastore.OnClusterChange) error {
+func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string,
+	onClusterChange datastore.OnClusterChange) error {
 	k.informerFactory.Submariner().V1().Clusters().Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			var object *submarinerv1.Cluster
@@ -226,7 +227,8 @@ func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, col
 	return nil
 }
 
-func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onEndpointChange datastore.OnEndpointChange) error {
+func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string,
+	onEndpointChange datastore.OnEndpointChange) error {
 	k.informerFactory.Submariner().V1().Endpoints().Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			var object *submarinerv1.Endpoint

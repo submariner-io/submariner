@@ -1,6 +1,8 @@
 linters-settings:
   gocyclo:
     min-complexity: 20
+  lll:
+    line-length: 140
   maligned:
     suggest-new: true
 linters:
@@ -24,7 +26,7 @@ linters:
     - govet
     - ineffassign
     - interfacer
-    #- lll
+    - lll
     - maligned
     - misspell
     - nakedret

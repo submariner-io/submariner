@@ -58,14 +58,16 @@ func main() {
 		klog.Fatalf("Error building submariner clientset: %s", err.Error())
 	}
 
-	submarinerInformerFactory := submarinerInformers.NewSharedInformerFactoryWithOptions(submarinerClient, time.Second*30, submarinerInformers.WithNamespace(srcs.Namespace))
+	submarinerInformerFactory := submarinerInformers.NewSharedInformerFactoryWithOptions(submarinerClient, time.Second*30,
+		submarinerInformers.WithNamespace(srcs.Namespace))
 
 	clientSet, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
 		klog.Fatalf("Error building clientset: %s", err.Error())
 	}
 
-	informerFactory := informers.NewSharedInformerFactoryWithOptions(clientSet, time.Second*60, informers.WithNamespace(srcs.Namespace), informers.WithTweakListOptions(filterRouteAgentPods))
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(clientSet, time.Second*60, informers.WithNamespace(srcs.Namespace),
+		informers.WithTweakListOptions(filterRouteAgentPods))
 
 	informerConfig := route.InformerConfigStruct{
 		SubmarinerClientSet: submarinerClient,
@@ -102,5 +104,6 @@ func main() {
 
 func init() {
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
-	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+	flag.StringVar(&masterURL, "master", "",
+		"The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 }

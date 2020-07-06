@@ -127,7 +127,8 @@ func (i *Controller) runNodeWorker() {
 	}
 }
 
-func (i *Controller) processNextObject(objWorkqueue workqueue.RateLimitingInterface, objGetter func(namespace, name string) (runtime.Object, error), objUpdater func(runtimeObj runtime.Object, key string) error) bool {
+func (i *Controller) processNextObject(objWorkqueue workqueue.RateLimitingInterface, objGetter func(namespace, name string) (runtime.Object,
+	error), objUpdater func(runtimeObj runtime.Object, key string) error) bool {
 	obj, shutdown := objWorkqueue.Get()
 	if shutdown {
 		return false
