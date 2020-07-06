@@ -81,11 +81,11 @@ func (d *DatastoreSyncer) ensureExclusiveEndpoint() error {
 		return fmt.Errorf("error retrieving submariner Endpoints %v", err)
 	}
 
-	for _, endpoint := range endpoints {
-		if !util.CompareEndpointSpec(endpoint.Spec, d.localEndpoint.Spec) {
-			endpointName, err := util.GetEndpointCRDName(&endpoint)
+	for i := range endpoints {
+		if !util.CompareEndpointSpec(endpoints[i].Spec, d.localEndpoint.Spec) {
+			endpointName, err := util.GetEndpointCRDName(&endpoints[i])
 			if err != nil {
-				klog.Errorf("Error extracting the submariner Endpoint name from %#v: %v", endpoint, err)
+				klog.Errorf("Error extracting the submariner Endpoint name from %#v: %v", endpoints[i], err)
 				continue
 			}
 
@@ -95,9 +95,9 @@ func (d *DatastoreSyncer) ensureExclusiveEndpoint() error {
 				return fmt.Errorf("error deleting submariner Endpoint %q from the local datastore: %v", endpointName, err)
 			}
 
-			err = d.datastore.RemoveEndpoint(d.localCluster.ID, endpoint.Spec.CableName)
+			err = d.datastore.RemoveEndpoint(d.localCluster.ID, endpoints[i].Spec.CableName)
 			if err != nil && !errors.IsNotFound(err) {
-				return fmt.Errorf("error removing submariner Endpoint with cable name %q from the central datastore: %v", endpoint.Spec.CableName, err)
+				return fmt.Errorf("error removing submariner Endpoint with cable name %q from the central datastore: %v", endpoints[i].Spec.CableName, err)
 			}
 
 			klog.Infof("Successfully deleted existing submariner Endpoint %q", endpointName)
