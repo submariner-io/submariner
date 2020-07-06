@@ -1,6 +1,8 @@
 linters-settings:
   gocyclo:
     min-complexity: 20
+  maligned:
+    suggest-new: true
 linters:
   disable-all: true
   enable:
@@ -23,6 +25,7 @@ linters:
     - ineffassign
     - interfacer
     #- lll
+    - maligned
     - misspell
     - nakedret
     #- scopelint

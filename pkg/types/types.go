@@ -14,17 +14,17 @@ type SubmarinerEndpoint struct {
 }
 
 type SubmarinerSpecification struct {
-	Namespace   string
-	Debug       bool
-	ClusterID   string
-	Token       string
 	ClusterCidr []string
-	ServiceCidr []string
-	GlobalCidr  []string
 	ColorCodes  []string
-	NatEnabled  bool
+	GlobalCidr  []string
+	ServiceCidr []string
 	Broker      string
 	CableDriver string
+	ClusterID   string
+	Namespace   string
+	Token       string
+	Debug       bool
+	NatEnabled  bool
 }
 
 type Secure struct {
