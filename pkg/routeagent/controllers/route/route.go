@@ -792,15 +792,15 @@ func (r *Controller) cleanVxSubmarinerRoutes() {
 		klog.Errorf("Unable to cleanup routes, error retrieving routes on the link %s: %v", VxLANIface, err)
 		return
 	}
-	for _, route := range currentRouteList {
-		klog.V(log.DEBUG).Infof("Processing route %v", route)
-		if route.Dst == nil || route.Gw == nil {
+	for i := range currentRouteList {
+		klog.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])
+		if currentRouteList[i].Dst == nil || currentRouteList[i].Gw == nil {
 			klog.V(log.DEBUG).Infof("Found nil gw or dst")
 		} else {
-			if r.remoteSubnets.Contains(route.Dst.String()) {
-				klog.V(log.DEBUG).Infof("Removing route %s", route.String())
-				if err = netlink.RouteDel(&route); err != nil {
-					klog.Errorf("Error removing route %s: %v", route.String(), err)
+			if r.remoteSubnets.Contains(currentRouteList[i].Dst.String()) {
+				klog.V(log.DEBUG).Infof("Removing route %s", currentRouteList[i])
+				if err = netlink.RouteDel(&currentRouteList[i]); err != nil {
+					klog.Errorf("Error removing route %s: %v", currentRouteList[i], err)
 				}
 			}
 		}
@@ -833,10 +833,10 @@ func (r *Controller) cleanXfrmPolicies() {
 	if len(currentXfrmPolicyList) > 0 {
 		klog.Infof("Cleaning up %d XFRM policies", len(currentXfrmPolicyList))
 	}
-	for _, xfrmPolicy := range currentXfrmPolicyList {
-		klog.V(log.DEBUG).Infof("Deleting XFRM policy %s", xfrmPolicy.String())
-		if err = netlink.XfrmPolicyDel(&xfrmPolicy); err != nil {
-			klog.Errorf("Error Deleting XFRM policy %s: %v", xfrmPolicy.String(), err)
+	for i := range currentXfrmPolicyList {
+		klog.V(log.DEBUG).Infof("Deleting XFRM policy %s", currentXfrmPolicyList[i])
+		if err = netlink.XfrmPolicyDel(&currentXfrmPolicyList[i]); err != nil {
+			klog.Errorf("Error Deleting XFRM policy %s: %v", currentXfrmPolicyList[i], err)
 		}
 	}
 }
@@ -857,18 +857,18 @@ func (r *Controller) reconcileRoutes(vxlanGw net.IP) error {
 	}
 
 	// First lets delete all of the routes that don't match
-	for _, route := range currentRouteList {
+	for i := range currentRouteList {
 		// contains(endpoint destinations, route destination string, and the route gateway is our actual destination
-		klog.V(log.DEBUG).Infof("Processing route %v", route)
-		if route.Dst == nil || route.Gw == nil {
+		klog.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])
+		if currentRouteList[i].Dst == nil || currentRouteList[i].Gw == nil {
 			klog.V(log.DEBUG).Infof("Found nil gw or dst")
 		} else {
-			if r.remoteSubnets.Contains(route.Dst.String()) && route.Gw.Equal(vxlanGw) {
-				klog.V(log.DEBUG).Infof("Found route %s with gw %s already installed", route.String(), route.Gw.String())
+			if r.remoteSubnets.Contains(currentRouteList[i].Dst.String()) && currentRouteList[i].Gw.Equal(vxlanGw) {
+				klog.V(log.DEBUG).Infof("Found route %s with gw %s already installed", currentRouteList[i], currentRouteList[i].Gw)
 			} else {
-				klog.V(log.DEBUG).Infof("Removing route %s", route.String())
-				if err = netlink.RouteDel(&route); err != nil {
-					klog.Errorf("Error removing route %s: %v", route.String(), err)
+				klog.V(log.DEBUG).Infof("Removing route %s", currentRouteList[i])
+				if err = netlink.RouteDel(&currentRouteList[i]); err != nil {
+					klog.Errorf("Error removing route %s: %v", currentRouteList[i], err)
 				}
 			}
 		}

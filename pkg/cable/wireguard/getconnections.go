@@ -21,8 +21,8 @@ func (w *wireguard) GetConnections() (*[]v1.Connection, error) {
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 
-	for _, p := range d.Peers {
-		key := p.PublicKey
+	for i := range d.Peers {
+		key := d.Peers[i].PublicKey
 		connection, err := w.connectionByKey(&key)
 		if err != nil {
 			klog.Warningf("Found unknown peer with key %s, removing", key)
@@ -31,7 +31,7 @@ func (w *wireguard) GetConnections() (*[]v1.Connection, error) {
 			}
 			continue
 		}
-		w.updateConnectionForPeer(&p, connection)
+		w.updateConnectionForPeer(&d.Peers[i], connection)
 		connections = append(connections, *connection.DeepCopy())
 	}
 	return &connections, nil
