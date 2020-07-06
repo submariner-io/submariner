@@ -49,7 +49,7 @@ var _ = PDescribe("[expansion] Test expanding/shrinking an existing cluster flee
 		enginePod := f.AwaitSubmarinerEnginePod(framework.ClusterC)
 		By(fmt.Sprintf("Found submariner engine pod %q on %q", enginePod.Name, clusterCName))
 
-		By(fmt.Sprintf("Checking connectivity between clusters"))
+		By("Checking connectivity between clusters")
 		tcp.RunConnectivityTest(tcp.ConnectivityTestParams{
 			Framework:             f,
 			FromCluster:           framework.ClusterB,
