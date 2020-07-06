@@ -13,9 +13,10 @@ linters:
     - depguard
     #- dupl
     - errcheck
+    - exportloopref
     #- funlen
+    #- gochecknoglobals
     #- gochecknoinits
-    #- goconst
     #- gocritic
     - gocyclo
     - gofmt
@@ -30,10 +31,10 @@ linters:
     - maligned
     - misspell
     - nakedret
-    #- scopelint
     - staticcheck
     - structcheck
     #- stylecheck
+    #- testpackage
     - typecheck
     - unconvert
     #- unparam
