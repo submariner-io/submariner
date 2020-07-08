@@ -41,7 +41,7 @@ const (
 	transmitBytes   = "TransmitBytes" // for peer connection status
 	lastChecked     = "LastChecked"   // for connection peer status
 
-	//TODO use submariner prefix
+	// TODO use submariner prefix
 	specEnvPrefix = "ce_ipsec"
 )
 
@@ -227,7 +227,7 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 		PresharedKey: w.psk,
 		Endpoint: &net.UDPAddr{
 			IP:   remoteIP,
-			Port: w.spec.NATTPort, //TODO move port to endpoint spec
+			Port: w.spec.NATTPort, // TODO move port to endpoint spec
 		},
 		PersistentKeepaliveInterval: &ka,
 		ReplaceAllowedIPs:           true,

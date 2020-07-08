@@ -415,7 +415,7 @@ func (i *strongSwan) writeCharonConfig(path string) error {
 		return fmt.Errorf("error creating charon config file %q: %s", path, err)
 	}
 
-	if err = i.renderCharonConfigTemplate(f); err != nil {
+	if err := i.renderCharonConfigTemplate(f); err != nil {
 		return err
 	}
 

@@ -79,9 +79,10 @@ func (e *Engine) ListCableConnections() (*[]v1.Connection, error) {
 
 func (e *Engine) GetHAStatus() v1.HAStatus {
 	e.Lock()
-	defer e.Unlock()
+	ret := e.HAStatus
+	e.Unlock()
 
-	return e.HAStatus
+	return ret
 }
 
 func (e *Engine) VerifyInstallCable(expected *v1.EndpointSpec) {

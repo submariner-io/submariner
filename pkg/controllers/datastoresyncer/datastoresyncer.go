@@ -10,7 +10,7 @@ import (
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
 	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/datastore"
+	submarinerDatastore "github.com/submariner-io/submariner/pkg/datastore"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -30,7 +30,7 @@ type DatastoreSyncer struct {
 	submarinerEndpoints        submarinerClientset.EndpointInterface
 	submarinerClusterInformer  submarinerInformers.ClusterInformer
 	submarinerEndpointInformer submarinerInformers.EndpointInformer
-	datastore                  datastore.Datastore
+	datastore                  submarinerDatastore.Datastore
 	localCluster               types.SubmarinerCluster
 	localEndpoint              types.SubmarinerEndpoint
 
@@ -40,7 +40,7 @@ type DatastoreSyncer struct {
 
 func NewDatastoreSyncer(thisClusterID string, submarinerClusters submarinerClientset.ClusterInterface,
 	submarinerClusterInformer submarinerInformers.ClusterInformer, submarinerEndpoints submarinerClientset.EndpointInterface,
-	submarinerEndpointInformer submarinerInformers.EndpointInformer, datastore datastore.Datastore, colorcodes []string,
+	submarinerEndpointInformer submarinerInformers.EndpointInformer, datastore submarinerDatastore.Datastore, colorcodes []string,
 	localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) *DatastoreSyncer {
 	newDatastoreSyncer := DatastoreSyncer{
 		thisClusterID:              thisClusterID,
@@ -83,27 +83,28 @@ func (d *DatastoreSyncer) ensureExclusiveEndpoint() error {
 	}
 
 	for i := range endpoints {
-		if !util.CompareEndpointSpec(endpoints[i].Spec, d.localEndpoint.Spec) {
-			endpointName, err := util.GetEndpointCRDName(&endpoints[i])
-			if err != nil {
-				klog.Errorf("Error extracting the submariner Endpoint name from %#v: %v", endpoints[i], err)
-				continue
-			}
-
-			// we need to remove this endpoint
-			err = d.submarinerEndpoints.Delete(endpointName, &metav1.DeleteOptions{})
-			if err != nil && !errors.IsNotFound(err) {
-				return fmt.Errorf("error deleting submariner Endpoint %q from the local datastore: %v", endpointName, err)
-			}
-
-			err = d.datastore.RemoveEndpoint(d.localCluster.ID, endpoints[i].Spec.CableName)
-			if err != nil && !errors.IsNotFound(err) {
-				return fmt.Errorf("error removing submariner Endpoint with cable name %q from the central datastore: %v",
-					endpoints[i].Spec.CableName, err)
-			}
-
-			klog.Infof("Successfully deleted existing submariner Endpoint %q", endpointName)
+		if util.CompareEndpointSpec(endpoints[i].Spec, d.localEndpoint.Spec) {
+			continue
 		}
+		endpointName, err := util.GetEndpointCRDName(&endpoints[i])
+		if err != nil {
+			klog.Errorf("Error extracting the submariner Endpoint name from %#v: %v", endpoints[i], err)
+			continue
+		}
+
+		// we need to remove this endpoint
+		err = d.submarinerEndpoints.Delete(endpointName, &metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			return fmt.Errorf("error deleting submariner Endpoint %q from the local datastore: %v", endpointName, err)
+		}
+
+		err = d.datastore.RemoveEndpoint(d.localCluster.ID, endpoints[i].Spec.CableName)
+		if err != nil && !errors.IsNotFound(err) {
+			return fmt.Errorf("error removing submariner Endpoint with cable name %q from the central datastore: %v",
+				endpoints[i].Spec.CableName, err)
+		}
+
+		klog.Infof("Successfully deleted existing submariner Endpoint %q", endpointName)
 	}
 
 	return nil
@@ -165,8 +166,6 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 	go wait.Until(d.runClusterWorker, time.Second, stopCh)
 
 	go wait.Until(d.runEndpointWorker, time.Second, stopCh)
-
-	//go wait.Until(d.runReaper, time.Second, stopCh)
 
 	klog.Info("Datastore syncer started")
 
@@ -294,7 +293,7 @@ func (d *DatastoreSyncer) processNextEndpointWorkItem() bool {
 	return true
 }
 
-func (d *DatastoreSyncer) reconcileClusterCRD(fromCluster *types.SubmarinerCluster, delete bool) error {
+func (d *DatastoreSyncer) reconcileClusterCRD(fromCluster *types.SubmarinerCluster, deleteCRD bool) error {
 	klog.V(log.DEBUG).Infof("In reconcileClusterCRD: %#v", fromCluster)
 
 	clusterName, err := util.GetClusterCRDName(fromCluster)
@@ -314,7 +313,7 @@ func (d *DatastoreSyncer) reconcileClusterCRD(fromCluster *types.SubmarinerClust
 		found = true
 	}
 
-	if delete {
+	if deleteCRD {
 		if found {
 			err = d.submarinerClusters.Delete(clusterName, &metav1.DeleteOptions{})
 			if err != nil {
@@ -367,7 +366,7 @@ func (d *DatastoreSyncer) reconcileClusterCRD(fromCluster *types.SubmarinerClust
 	return nil
 }
 
-func (d *DatastoreSyncer) reconcileEndpointCRD(fromEndpoint *types.SubmarinerEndpoint, delete bool) error {
+func (d *DatastoreSyncer) reconcileEndpointCRD(fromEndpoint *types.SubmarinerEndpoint, deleteCRD bool) error {
 	klog.V(log.DEBUG).Infof("In reconcileEndpointCRD: %#v", fromEndpoint)
 
 	endpointName, err := util.GetEndpointCRDName(fromEndpoint)
@@ -387,7 +386,7 @@ func (d *DatastoreSyncer) reconcileEndpointCRD(fromEndpoint *types.SubmarinerEnd
 		found = true
 	}
 
-	if delete {
+	if deleteCRD {
 		if found {
 			err = d.submarinerEndpoints.Delete(endpointName, &metav1.DeleteOptions{})
 			if err != nil {
