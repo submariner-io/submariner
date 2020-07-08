@@ -67,7 +67,7 @@ func createStrongSwan() *strongSwan {
 	return ss.(*strongSwan)
 }
 
-func checkStrongSwanPorts(ikePort string, nattPort string) {
+func checkStrongSwanPorts(ikePort, nattPort string) {
 	ss := createStrongSwan()
 	Expect(ss.ipSecIKEPort).To(Equal(ikePort))
 	Expect(ss.ipSecNATTPort).To(Equal(nattPort))

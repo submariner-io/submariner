@@ -87,9 +87,9 @@ func (iface *vxLanIface) deleteVxLanIface() error {
 	return nil
 }
 
-func isVxlanConfigTheSame(new, current netlink.Link) bool {
-	required := new.(*netlink.Vxlan)
-	existing := current.(*netlink.Vxlan)
+func isVxlanConfigTheSame(newLink, currentLink netlink.Link) bool {
+	required := newLink.(*netlink.Vxlan)
+	existing := currentLink.(*netlink.Vxlan)
 
 	if required.VxlanId != existing.VxlanId {
 		klog.Errorf("VxlanId of existing interface (%d) does not match with required VxlanId (%d)", existing.VxlanId, required.VxlanId)

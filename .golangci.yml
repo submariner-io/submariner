@@ -1,4 +1,13 @@
 linters-settings:
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - opinionated
+      #- performance
+      - style
+    disabled-checks:
+      - ifElseChain
+      - unnamedResult
   gocyclo:
     min-complexity: 20
   lll:
@@ -17,7 +26,7 @@ linters:
     #- funlen
     #- gochecknoglobals
     #- gochecknoinits
-    #- gocritic
+    - gocritic
     - gocyclo
     - gofmt
     - goimports

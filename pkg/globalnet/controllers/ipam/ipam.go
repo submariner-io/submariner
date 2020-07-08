@@ -211,10 +211,10 @@ func (i *Controller) processNextObject(objWorkqueue workqueue.RateLimitingInterf
 	return true
 }
 
-func (i *Controller) enqueueObject(obj interface{}, workqueue workqueue.RateLimitingInterface) {
+func (i *Controller) enqueueObject(obj interface{}, queue workqueue.RateLimitingInterface) {
 	if key := i.getEnqueueKey(obj); key != "" {
 		klog.V(log.TRACE).Infof("Enqueueing %v for ipam controller", key)
-		workqueue.AddRateLimited(key)
+		queue.AddRateLimited(key)
 	}
 }
 
@@ -236,7 +236,7 @@ func (i *Controller) getEnqueueKey(obj interface{}) string {
 	return key
 }
 
-func (i *Controller) handleUpdateService(old interface{}, newObj interface{}) {
+func (i *Controller) handleUpdateService(old, newObj interface{}) {
 	//TODO: further minimize duplication between this and handleUpdatePod
 	var key string
 	var err error
@@ -263,7 +263,7 @@ func (i *Controller) handleUpdateService(old interface{}, newObj interface{}) {
 	}
 }
 
-func (i *Controller) handleUpdatePod(old interface{}, newObj interface{}) {
+func (i *Controller) handleUpdatePod(old, newObj interface{}) {
 	var key string
 	var err error
 	if key, err = cache.MetaNamespaceKeyFunc(newObj); err != nil {
@@ -312,7 +312,7 @@ func (i *Controller) handleUpdatePod(old interface{}, newObj interface{}) {
 	}
 }
 
-func (i *Controller) handleUpdateNode(old interface{}, newObj interface{}) {
+func (i *Controller) handleUpdateNode(old, newObj interface{}) {
 	// Todo minimize the duplication
 	var key string
 	var err error
@@ -458,7 +458,7 @@ func (i *Controller) handleRemovedNode(obj interface{}) {
 	}
 }
 
-func (i *Controller) annotateGlobalIp(key string, globalIp string) (string, error) {
+func (i *Controller) annotateGlobalIp(key, globalIp string) (string, error) {
 	var ip string
 	var err error
 	if globalIp == "" {
@@ -635,7 +635,7 @@ func (i *Controller) nodeUpdater(obj runtime.Object, key string) error {
 	return nil
 }
 
-func logAndRequeue(key string, workqueue workqueue.RateLimitingInterface) {
-	klog.V(log.DEBUG).Infof("%s enqueued %d times", key, workqueue.NumRequeues(key))
-	workqueue.AddRateLimited(key)
+func logAndRequeue(key string, queue workqueue.RateLimitingInterface) {
+	klog.V(log.DEBUG).Infof("%s enqueued %d times", key, queue.NumRequeues(key))
+	queue.AddRateLimited(key)
 }

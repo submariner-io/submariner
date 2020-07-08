@@ -50,7 +50,7 @@ func createLibreswan() *libreswan {
 	return ls.(*libreswan)
 }
 
-func checkLibreswanPorts(ikePort string, nattPort string) {
+func checkLibreswanPorts(ikePort, nattPort string) {
 	ls := createLibreswan()
 	Expect(ls.ipSecIKEPort).To(Equal(ikePort))
 	Expect(ls.ipSecNATTPort).To(Equal(nattPort))

@@ -135,14 +135,14 @@ func newRateLimiter() workqueue.RateLimiter {
 	return workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 30*time.Second)
 }
 
-func NewController(clusterID string, ClusterCidr []string, ServiceCidr []string, objectNamespace string,
+func NewController(clusterID string, clusterCidr, serviceCidr []string, objectNamespace string,
 	link *net.Interface, config InformerConfigStruct) *Controller {
 	controller := Controller{
 		clusterID:              clusterID,
 		objectNamespace:        objectNamespace,
 		localCableDriver:       "",
-		localClusterCidr:       ClusterCidr,
-		localServiceCidr:       ServiceCidr,
+		localClusterCidr:       clusterCidr,
+		localServiceCidr:       serviceCidr,
 		submarinerClientSet:    config.SubmarinerClientSet,
 		clientSet:              config.ClientSet,
 		defaultHostIface:       link,
@@ -797,12 +797,10 @@ func (r *Controller) cleanVxSubmarinerRoutes() {
 		klog.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])
 		if currentRouteList[i].Dst == nil || currentRouteList[i].Gw == nil {
 			klog.V(log.DEBUG).Infof("Found nil gw or dst")
-		} else {
-			if r.remoteSubnets.Contains(currentRouteList[i].Dst.String()) {
-				klog.V(log.DEBUG).Infof("Removing route %s", currentRouteList[i])
-				if err = netlink.RouteDel(&currentRouteList[i]); err != nil {
-					klog.Errorf("Error removing route %s: %v", currentRouteList[i], err)
-				}
+		} else if r.remoteSubnets.Contains(currentRouteList[i].Dst.String()) {
+			klog.V(log.DEBUG).Infof("Removing route %s", currentRouteList[i])
+			if err = netlink.RouteDel(&currentRouteList[i]); err != nil {
+				klog.Errorf("Error removing route %s: %v", currentRouteList[i], err)
 			}
 		}
 	}
@@ -899,11 +897,9 @@ func (r *Controller) reconcileRoutes(vxlanGw net.IP) error {
 		for _, curRoute := range currentRouteList {
 			if curRoute.Gw == nil || curRoute.Dst == nil {
 
-			} else {
-				if curRoute.Gw.Equal(route.Gw) && curRoute.Dst.String() == route.Dst.String() {
-					klog.V(log.DEBUG).Infof("Found equivalent route, not adding")
-					found = true
-				}
+			} else if curRoute.Gw.Equal(route.Gw) && curRoute.Dst.String() == route.Dst.String() {
+				klog.V(log.DEBUG).Infof("Found equivalent route, not adding")
+				found = true
 			}
 		}
 

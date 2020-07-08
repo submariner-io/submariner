@@ -12,7 +12,6 @@ import (
 	. "github.com/submariner-io/admiral/pkg/gomega"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	fakeClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned/fake"
-	clientsetv1 "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
 	fakeClientsetv1 "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1/fake"
 	informers "github.com/submariner-io/submariner/pkg/client/informers/externalversions"
@@ -161,7 +160,7 @@ func newEndpoint(spec *submarinerv1.EndpointSpec) *submarinerv1.Endpoint {
 	}
 }
 
-func createEndpoint(endpoints clientsetv1.EndpointInterface, spec *submarinerv1.EndpointSpec) string {
+func createEndpoint(endpoints submarinerClientset.EndpointInterface, spec *submarinerv1.EndpointSpec) string {
 	endpointName := getEndpointName(spec)
 	_, err := endpoints.Create(&submarinerv1.Endpoint{
 		ObjectMeta: metav1.ObjectMeta{

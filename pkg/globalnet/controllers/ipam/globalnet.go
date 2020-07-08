@@ -7,7 +7,6 @@ import (
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/submariner-io/admiral/pkg/log"
 	k8sv1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 
 	"github.com/submariner-io/submariner/pkg/routeagent/controllers/route"
@@ -78,7 +77,7 @@ func (i *Controller) syncNodeRules(cniIfaceIP, globalIP string, addRules bool) e
 }
 
 func (i *Controller) evaluateService(service *k8sv1.Service) Operation {
-	if service.Spec.Type != v1.ServiceTypeClusterIP {
+	if service.Spec.Type != k8sv1.ServiceTypeClusterIP {
 		// Normally ClusterIPServices can be accessed only within the local cluster.
 		// When multiple K8s clusters are connected via Submariner, it enables access
 		// to ClusterIPService even from remote clusters. So, as part of Submariner

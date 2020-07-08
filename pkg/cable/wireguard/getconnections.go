@@ -127,7 +127,7 @@ func peerTrafficDelta(c *v1.Connection, key string, newVal int64) int64 {
 }
 
 // Save backendConfig[key]
-func savePeerTraffic(c *v1.Connection, lc int64, tx int64, rx int64) {
+func savePeerTraffic(c *v1.Connection, lc, tx, rx int64) {
 	c.Endpoint.BackendConfig[lastChecked] = strconv.FormatInt(lc, 10)
 	c.Endpoint.BackendConfig[transmitBytes] = strconv.FormatInt(tx, 10)
 	c.Endpoint.BackendConfig[receiveBytes] = strconv.FormatInt(rx, 10)

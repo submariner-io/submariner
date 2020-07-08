@@ -80,7 +80,7 @@ func (i *engine) startDriver() error {
 		return err
 	}
 
-	if err = i.driver.Init(); err != nil {
+	if err := i.driver.Init(); err != nil {
 		return err
 	}
 	return nil

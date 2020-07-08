@@ -54,7 +54,7 @@ func (d *Datastore) GetEndpoints(clusterID string) ([]types.SubmarinerEndpoint, 
 	return []types.SubmarinerEndpoint{}, nil
 }
 
-func (d *Datastore) GetEndpoint(clusterID string, cableName string) (*types.SubmarinerEndpoint, error) {
+func (d *Datastore) GetEndpoint(clusterID, cableName string) (*types.SubmarinerEndpoint, error) {
 	return nil, errors.New("Not implemented")
 }
 

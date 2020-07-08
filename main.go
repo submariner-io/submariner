@@ -100,10 +100,11 @@ func main() {
 	if len(submSpec.GlobalCidr) > 0 {
 		localSubnets = submSpec.GlobalCidr
 	} else {
-		localSubnets = append(submSpec.ServiceCidr, submSpec.ClusterCidr...)
+		localSubnets = append(localSubnets, submSpec.ServiceCidr...)
+		localSubnets = append(localSubnets, submSpec.ClusterCidr...)
 	}
 
-	if len(submSpec.CableDriver) == 0 {
+	if submSpec.CableDriver == "" {
 		submSpec.CableDriver = cable.GetDefaultCableDriver()
 	}
 	submSpec.CableDriver = strings.ToLower(submSpec.CableDriver)
