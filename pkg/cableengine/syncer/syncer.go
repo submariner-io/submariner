@@ -51,11 +51,7 @@ func (s *GatewaySyncer) Run(stopCh <-chan struct{}) {
 func (i *GatewaySyncer) syncGatewayStatus() {
 	klog.V(log.TRACE).Info("Running Gateway status sync")
 
-	gatewayObj, err := i.generateGatewayObject()
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Error generating Gateway object: %s", err))
-		return
-	}
+	gatewayObj := i.generateGatewayObject()
 
 	existingGw, err := i.getLastSyncedGateway(gatewayObj.Name)
 
@@ -142,7 +138,7 @@ func (i *GatewaySyncer) getLastSyncedGateway(name string) (*v1.Gateway, error) {
 	return existingGw, err
 }
 
-func (i *GatewaySyncer) generateGatewayObject() (*v1.Gateway, error) {
+func (i *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 	localEndpoint := i.engine.GetLocalEndpoint()
 
 	gateway := v1.Gateway{
@@ -169,7 +165,7 @@ func (i *GatewaySyncer) generateGatewayObject() (*v1.Gateway, error) {
 	}
 
 	klog.V(log.TRACE).Infof("Generated Gateway object: %+v", gateway)
-	return &gateway, nil
+	return &gateway
 }
 
 // CleanupGatewayEntry removes this Gateway entry from the k8s API, it does not
