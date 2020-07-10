@@ -58,12 +58,14 @@ func (d *Datastore) GetEndpoint(clusterID string, cableName string) (*types.Subm
 	return nil, errors.New("Not implemented")
 }
 
-func (d *Datastore) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string, onClusterChange datastore.OnClusterChange) error {
+func (d *Datastore) WatchClusters(ctx context.Context, selfClusterID string, icolorCodes []string,
+	onClusterChange datastore.OnClusterChange) error {
 	d.watchClusters <- onClusterChange
 	return nil
 }
 
-func (d *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string, onEndpointChange datastore.OnEndpointChange) error {
+func (d *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string,
+	onEndpointChange datastore.OnEndpointChange) error {
 	d.watchEndpoints <- onEndpointChange
 	return nil
 }

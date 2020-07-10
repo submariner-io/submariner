@@ -38,8 +38,9 @@ type DatastoreSyncer struct {
 	endpointWorkqueue workqueue.RateLimitingInterface
 }
 
-func NewDatastoreSyncer(thisClusterID string, submarinerClusters submarinerClientset.ClusterInterface, submarinerClusterInformer submarinerInformers.ClusterInformer,
-	submarinerEndpoints submarinerClientset.EndpointInterface, submarinerEndpointInformer submarinerInformers.EndpointInformer, datastore datastore.Datastore, colorcodes []string,
+func NewDatastoreSyncer(thisClusterID string, submarinerClusters submarinerClientset.ClusterInterface,
+	submarinerClusterInformer submarinerInformers.ClusterInformer, submarinerEndpoints submarinerClientset.EndpointInterface,
+	submarinerEndpointInformer submarinerInformers.EndpointInformer, datastore datastore.Datastore, colorcodes []string,
 	localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) *DatastoreSyncer {
 	newDatastoreSyncer := DatastoreSyncer{
 		thisClusterID:              thisClusterID,
@@ -97,7 +98,8 @@ func (d *DatastoreSyncer) ensureExclusiveEndpoint() error {
 
 			err = d.datastore.RemoveEndpoint(d.localCluster.ID, endpoints[i].Spec.CableName)
 			if err != nil && !errors.IsNotFound(err) {
-				return fmt.Errorf("error removing submariner Endpoint with cable name %q from the central datastore: %v", endpoints[i].Spec.CableName, err)
+				return fmt.Errorf("error removing submariner Endpoint with cable name %q from the central datastore: %v",
+					endpoints[i].Spec.CableName, err)
 			}
 
 			klog.Infof("Successfully deleted existing submariner Endpoint %q", endpointName)
@@ -138,7 +140,8 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 	klog.Info("Starting the datastore syncer")
 
 	klog.Info("Waiting for informer caches to sync")
-	if ok := cache.WaitForCacheSync(stopCh, d.submarinerClusterInformer.Informer().HasSynced, d.submarinerEndpointInformer.Informer().HasSynced); !ok {
+	if ok := cache.WaitForCacheSync(stopCh, d.submarinerClusterInformer.Informer().HasSynced,
+		d.submarinerEndpointInformer.Informer().HasSynced); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
 
@@ -255,14 +258,16 @@ func (d *DatastoreSyncer) processNextEndpointWorkItem() bool {
 		}
 
 		if d.thisClusterID != endpoint.Spec.ClusterID {
-			klog.V(log.DEBUG).Infof("The updated submariner Endpoint %q is not for this cluster - skipping updating the datastore", endpoint.Spec.ClusterID)
+			klog.V(log.DEBUG).Infof("The updated submariner Endpoint %q is not for this cluster - skipping updating the datastore",
+				endpoint.Spec.ClusterID)
 			// not actually an error but we should forget about this and return
 			d.endpointWorkqueue.Forget(key)
 			return nil
 		}
 
 		if d.localEndpoint.Spec.CableName != endpoint.Spec.CableName {
-			klog.V(log.DEBUG).Infof("The updated submariner Endpoint with CableName %q is not mine - skipping updating the datastore", endpoint.Spec.CableName)
+			klog.V(log.DEBUG).Infof("The updated submariner Endpoint with CableName %q is not mine - skipping updating the datastore",
+				endpoint.Spec.CableName)
 			d.endpointWorkqueue.Forget(key)
 			return nil
 		}
