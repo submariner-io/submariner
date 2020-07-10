@@ -185,6 +185,8 @@ github.com/submariner-io/shipyard v0.4.0 h1:bO8yk6OVGX5vGGREzY1+aV4pt9d1lcL0+TuX
 github.com/submariner-io/shipyard v0.4.0/go.mod h1:9ECh6Pvt8OnlhZKwo2UF0DXQBgxpEYeP4Jc18KRkpIQ=
 github.com/submariner-io/shipyard v0.4.2-0.20200630085729-f78b626b2e2a h1:pAOHoi48fNTH7y56mj3ilGsvZLyunaY24BHBSwlq/XA=
 github.com/submariner-io/shipyard v0.4.2-0.20200630085729-f78b626b2e2a/go.mod h1:9ECh6Pvt8OnlhZKwo2UF0DXQBgxpEYeP4Jc18KRkpIQ=
+github.com/submariner-io/shipyard v0.5.0-pre0.0.20200710123458-54c046ab99e3 h1:/hFqrqJ9ZnyOtRcSsHbpVIjdn430N+HhaE18TY+pNxY=
+github.com/submariner-io/shipyard v0.5.0-pre0.0.20200710123458-54c046ab99e3/go.mod h1:2OrKoDmJSo1jVurxiVH9FqGFmDwshIU7Vgu9pFLBsYo=
 github.com/vishvananda/netlink v1.1.0 h1:1iyaYNBLmP6L0220aDnYQpo1QEV4t4hJ+xEEhhJH8j0=
 github.com/vishvananda/netlink v1.1.0/go.mod h1:cTgwzPIzzgDAYoQrMm0EdrjRUBkTqKYppBueQtXaqoE=
 github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df h1:OviZH7qLw/7ZovXvuNyL3XQl8UFofeikI1NW1Gypu7k=
