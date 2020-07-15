@@ -13,8 +13,8 @@ require (
 	github.com/onsi/gomega v1.10.1
 	github.com/pkg/errors v0.9.1
 	github.com/rdegges/go-ipify v0.0.0-20150526035502-2d94a6a86c40
-	github.com/submariner-io/admiral v0.4.1
-	github.com/submariner-io/shipyard v0.5.0-pre0.0.20200710123458-54c046ab99e3
+	github.com/submariner-io/admiral v0.5.0
+	github.com/submariner-io/shipyard v0.5.0
 	github.com/vishvananda/netlink v1.1.0
 	go.uber.org/zap v1.15.0 // indirect
 	golang.org/x/sys v0.0.0-20200519105757-fe76b779f299
