@@ -134,8 +134,6 @@ github.com/onsi/ginkgo v0.0.0-20170829012221-11459a886d9c/go.mod h1:lLunBs/Ym6LB
 github.com/onsi/ginkgo v1.4.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.12.1/go.mod h1:zj2OWP4+oCPe1qIXoGWkgMRwljMUYCdkwsT2108oapk=
-github.com/onsi/ginkgo v1.13.0 h1:M76yO2HkZASFjXL0HSoZJ1AYEmQxNJmY41Jx1zNUq1Y=
-github.com/onsi/ginkgo v1.13.0/go.mod h1:+REjRxOmWfHCjfv9TTWB1jD1Frx4XydAD3zm1lskyM0=
 github.com/onsi/ginkgo v1.14.0 h1:2mOpI4JVVPBN+WQRa0WKH2eXR+Ey+uK4n7Zj0aYpIQA=
 github.com/onsi/ginkgo v1.14.0/go.mod h1:iSB4RoI2tjJc9BBv4NKIKWKya62Rps+oPG/Lv9klQyY=
 github.com/onsi/gomega v0.0.0-20170829124025-dcabb60a477c/go.mod h1:C1qb7wdrVGGVU+Z6iS04AVkA3Q65CEZX59MT0QO5uiA=
@@ -164,7 +162,6 @@ github.com/rdegges/go-ipify v0.0.0-20150526035502-2d94a6a86c40 h1:31Y7UZ1yTYBU4E
 github.com/rdegges/go-ipify v0.0.0-20150526035502-2d94a6a86c40/go.mod h1:j4c6zEU0eMG1oiZPUy+zD4ykX0NIpjZAEOEAviTWC18=
 github.com/rogpeppe/go-charset v0.0.0-20180617210344-2471d30d28b4/go.mod h1:qgYeAmZ5ZIpBWTGllZSQnw97Dj+woV0toclVaRGI8pc=
 github.com/rogpeppe/go-internal v1.3.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
-github.com/sclevine/agouti v3.0.0+incompatible/go.mod h1:b4WX9W9L1sfQKXeJf1mUTLZKJ48R1S7H23Ji7oFO5Bw=
 github.com/sirupsen/logrus v1.2.0/go.mod h1:LxeOpSwHxABJmUn/MG1IvRgCAasNZTLOkJPxbbu5VWo=
 github.com/spf13/afero v1.2.2/go.mod h1:9ZxEEn6pIJ8Rxe320qSDBk6AsU0r9pR7Q4OcevTdifk=
 github.com/spf13/pflag v0.0.0-20170130214245-9ff6c6923cff/go.mod h1:DYY7MBk1bdzusC3SYhjObp+wFpr4gzcvqqNjLnInEg4=
@@ -179,14 +176,10 @@ github.com/stretchr/testify v1.3.0 h1:TivCn/peBQ7UY8ooIcPgZFpTNSz0Q2U6UrFlUfqbe0
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/stretchr/testify v1.4.0 h1:2E4SXV/wtOkTonXsotYi4li6zVWxYlZuYNCXe9XRJyk=
 github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
-github.com/submariner-io/admiral v0.4.1 h1:2lEQtjP2iciaEVL6ZhPMbAs/17W7zbb5NupfAHXUdxY=
-github.com/submariner-io/admiral v0.4.1/go.mod h1:cPwX5Xwr6tZs7qQZmCPKNFL5LxOHR1W4MlRSZgwVBcw=
-github.com/submariner-io/shipyard v0.4.0 h1:bO8yk6OVGX5vGGREzY1+aV4pt9d1lcL0+TuXqQVeq0Y=
-github.com/submariner-io/shipyard v0.4.0/go.mod h1:9ECh6Pvt8OnlhZKwo2UF0DXQBgxpEYeP4Jc18KRkpIQ=
-github.com/submariner-io/shipyard v0.4.2-0.20200630085729-f78b626b2e2a h1:pAOHoi48fNTH7y56mj3ilGsvZLyunaY24BHBSwlq/XA=
-github.com/submariner-io/shipyard v0.4.2-0.20200630085729-f78b626b2e2a/go.mod h1:9ECh6Pvt8OnlhZKwo2UF0DXQBgxpEYeP4Jc18KRkpIQ=
-github.com/submariner-io/shipyard v0.5.0-pre0.0.20200710123458-54c046ab99e3 h1:/hFqrqJ9ZnyOtRcSsHbpVIjdn430N+HhaE18TY+pNxY=
-github.com/submariner-io/shipyard v0.5.0-pre0.0.20200710123458-54c046ab99e3/go.mod h1:2OrKoDmJSo1jVurxiVH9FqGFmDwshIU7Vgu9pFLBsYo=
+github.com/submariner-io/admiral v0.5.0 h1:TaGc0hrB9WOSY2IWXBA3LfZC7c/FDDlTmiEfUah5hIs=
+github.com/submariner-io/admiral v0.5.0/go.mod h1:cBv1Zvfai117idhYv5WPxTZEsgWQfeSqwPpxo0EMZXg=
+github.com/submariner-io/shipyard v0.5.0 h1:o4kTCubLFLeh+PaBDac1J7zNY3JKWwj7QrMLNb4g/p8=
+github.com/submariner-io/shipyard v0.5.0/go.mod h1:2OrKoDmJSo1jVurxiVH9FqGFmDwshIU7Vgu9pFLBsYo=
 github.com/vishvananda/netlink v1.1.0 h1:1iyaYNBLmP6L0220aDnYQpo1QEV4t4hJ+xEEhhJH8j0=
 github.com/vishvananda/netlink v1.1.0/go.mod h1:cTgwzPIzzgDAYoQrMm0EdrjRUBkTqKYppBueQtXaqoE=
 github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df h1:OviZH7qLw/7ZovXvuNyL3XQl8UFofeikI1NW1Gypu7k=
