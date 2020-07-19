@@ -193,7 +193,10 @@ func main() {
 		klog.Fatalf("Leader election lost, shutting down")
 	}
 
-	startLeaderElection(leClient, recorder, becameLeader, lostLeader)
+	go startLeaderElection(leClient, recorder, becameLeader, lostLeader)
+	<-stopCh
+	cableEngineSyncer.CleanupGatewayEntry()
+	klog.Info("All controllers stopped or exited. Stopping main loop")
 }
 
 func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder resourcelock.EventRecorder,
