@@ -28,7 +28,6 @@ func testCharonPortConfiguration() {
 			Expect(buf.String()).To(ContainSubstring("port_nat_t = 4500"))
 			Expect(buf.String()).To(ContainSubstring("make_before_break = yes"))
 			Expect(buf.String()).To(ContainSubstring("ignore_acquire_ts = yes"))
-
 		})
 	})
 
@@ -68,7 +67,7 @@ func createStrongSwan() *strongSwan {
 	return ss.(*strongSwan)
 }
 
-func checkStrongSwanPorts(ikePort string, nattPort string) {
+func checkStrongSwanPorts(ikePort, nattPort string) {
 	ss := createStrongSwan()
 	Expect(ss.ipSecIKEPort).To(Equal(ikePort))
 	Expect(ss.ipSecNATTPort).To(Equal(nattPort))

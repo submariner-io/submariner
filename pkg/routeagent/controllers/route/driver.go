@@ -50,6 +50,8 @@ func discoverCNIInterface(clusterCIDR string) (*cniInterface, error) {
 }
 
 func toggleCNISpecificConfiguration(iface string) error {
+	// We won't ever create rp_filter, and its permissions are 644
+	// #nosec G306
 	err := ioutil.WriteFile("/proc/sys/net/ipv4/conf/"+iface+"/rp_filter", []byte("2"), 0644)
 	if err != nil {
 		return fmt.Errorf("unable to update rp_filter for cni_interface %q, err: %s", iface, err)

@@ -12,8 +12,8 @@ type IpPool struct {
 	cidr      string
 	net       *net.IPNet
 	size      int
-	available map[string]bool   //IP.String() is key
-	allocated map[string]string //resource "namespace/name" is key, ipString is value
+	available map[string]bool   // IP.String() is key
+	allocated map[string]string // resource "namespace/name" is key, ipString is value
 	sync.RWMutex
 }
 
@@ -96,7 +96,7 @@ func (p *IpPool) GetAllocatedIp(key string) string {
 	return ip
 }
 
-func (p *IpPool) RequestIp(key string, ip string) (string, error) {
+func (p *IpPool) RequestIp(key, ip string) (string, error) {
 	if p.GetAllocatedIp(key) == ip {
 		return ip, nil
 	}

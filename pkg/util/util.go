@@ -90,7 +90,7 @@ func GetLocalCluster(ss types.SubmarinerSpecification) (types.SubmarinerCluster,
 	return localCluster, nil
 }
 
-func GetLocalEndpoint(clusterID string, backend string, backendConfig map[string]string, natEnabled bool,
+func GetLocalEndpoint(clusterID, backend string, backendConfig map[string]string, natEnabled bool,
 	subnets []string, privateIP string) (types.SubmarinerEndpoint, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -98,7 +98,7 @@ func GetLocalEndpoint(clusterID string, backend string, backendConfig map[string
 	}
 	endpoint := types.SubmarinerEndpoint{
 		Spec: subv1.EndpointSpec{
-			CableName:     fmt.Sprintf("submariner-cable-%s-%s", clusterID, strings.Replace(privateIP, ".", "-", -1)),
+			CableName:     fmt.Sprintf("submariner-cable-%s-%s", clusterID, strings.ReplaceAll(privateIP, ".", "-")),
 			ClusterID:     clusterID,
 			Hostname:      hostname,
 			PrivateIP:     privateIP,
@@ -121,7 +121,7 @@ func GetLocalEndpoint(clusterID string, backend string, backendConfig map[string
 func GetClusterIDFromCableName(cableName string) string {
 	// length is 11
 	// 0           1    2   3    4    5       6   7  8 9  10
-	//submariner-cable-my-super-long_cluster-id-172-16-32-5
+	// submariner-cable-my-super-long_cluster-id-172-16-32-5
 	cableSplit := strings.Split(cableName, "-")
 	clusterID := cableSplit[2]
 	for i := 3; i < len(cableSplit)-4; i++ {
@@ -194,7 +194,7 @@ func CreateChainIfNotExists(ipt *iptables.IPTables, table, chain string) error {
 	return ipt.NewChain(table, chain)
 }
 
-func PrependUnique(ipt *iptables.IPTables, table string, chain string, ruleSpec []string) error {
+func PrependUnique(ipt *iptables.IPTables, table, chain string, ruleSpec []string) error {
 	rules, err := ipt.List(table, chain)
 	if err != nil {
 		return fmt.Errorf("error listing the rules in %s chain: %v", chain, err)
@@ -238,10 +238,8 @@ func PrependUnique(ipt *iptables.IPTables, table string, chain string, ruleSpec 
 	if numOccurrences == 1 && isPresentAtRequiredPosition {
 		klog.V(level.DEBUG).Infof("In %s table, iptables rule \"%s\", already exists.", table, strings.Join(ruleSpec, " "))
 		return nil
-	} else {
-		if err = ipt.Insert(table, chain, 1, ruleSpec...); err != nil {
-			return err
-		}
+	} else if err := ipt.Insert(table, chain, 1, ruleSpec...); err != nil {
+		return err
 	}
 
 	return nil

@@ -188,7 +188,6 @@ func extractSubnets(endpoint subv1.EndpointSpec) []string {
 }
 
 func whack(args ...string) error {
-
 	var err error
 	for i := 0; i < 3; i++ {
 		cmd := exec.Command("/usr/libexec/ipsec/whack", args...)
@@ -203,7 +202,6 @@ func whack(args ...string) error {
 
 		klog.Warningf("error %v whacking with args: %v", err, args)
 		time.Sleep(1 * time.Second)
-
 	}
 
 	if err != nil {
@@ -322,14 +320,8 @@ func (i *libreswan) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) er
 func removeConnectionForEndpoint(connections []subv1.Connection, endpoint types.SubmarinerEndpoint) []subv1.Connection {
 	for j := range connections {
 		if connections[j].Endpoint.CableName == endpoint.Spec.CableName {
-			if j == 0 && j == len(connections)-1 {
-				return []subv1.Connection{}
-			} else if j == 0 {
-				return connections[j+1:]
-			} else if j == len(connections)-1 {
-				return connections[:j]
-			}
-			return append(connections[:j], connections[j+1:]...)
+			copy(connections[j:], connections[j+1:])
+			return connections[:len(connections)-1]
 		}
 	}
 	return connections
@@ -365,7 +357,7 @@ func (i *libreswan) runPluto() error {
 	if err := cmd.Start(); err != nil {
 		// Note - Close handles nil receiver
 		outputFile.Close()
-		return fmt.Errorf("error starting the Pluto process wih args %v: %v", args, err)
+		return fmt.Errorf("error starting the Pluto process with args %v: %v", args, err)
 	}
 
 	go func() {

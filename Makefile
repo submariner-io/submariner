@@ -7,7 +7,7 @@ ifneq (,$(DAPPER_HOST_ARCH))
 
 include $(SHIPYARD_DIR)/Makefile.inc
 
-TARGETS := $(shell ls -p scripts | grep -v -e / -e build -e images -e reload-images)
+TARGETS := $(shell ls -p scripts | grep -v -e / -e reload-images)
 override BUILD_ARGS += $(shell source ${SCRIPTS_DIR}/lib/version; echo --ldflags \'-X main.VERSION=$${VERSION}\')
 override CLUSTERS_ARGS += --cluster_settings $(DAPPER_SOURCE)/scripts/cluster_settings
 override E2E_ARGS += --focus $(focus) cluster2 cluster3 cluster1
@@ -52,23 +52,7 @@ build: bin/submariner-engine bin/submariner-route-agent bin/submariner-globalnet
 
 ci: validate test build images
 
-# Dockerfile dependencies are the file and any file copied into it
-docker_deps = $(1) $(shell grep COPY $(1) | sed 's/COPY \(.*\) .*/\1/')
-define image-pack =
-$(SCRIPTS_DIR)/build_image.sh -i $(lastword $(subst ., ,$@)) -f $(firstword $^) $(IMAGES_ARGS)
-touch $@
-endef
-
-package/.image.submariner: $(call docker_deps,package/Dockerfile)
-	$(image-pack)
-
-package/.image.submariner-route-agent: $(call docker_deps,package/Dockerfile.routeagent)
-	$(image-pack)
-
-package/.image.submariner-globalnet: $(call docker_deps,package/Dockerfile.globalnet)
-	$(image-pack)
-
-images: package/.image.submariner package/.image.submariner-route-agent package/.image.submariner-globalnet
+images: build package/.image.submariner package/.image.submariner-route-agent package/.image.submariner-globalnet
 
 $(TARGETS): vendor/modules.txt
 	./scripts/$@

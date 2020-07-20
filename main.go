@@ -41,7 +41,8 @@ var (
 
 func init() {
 	flag.StringVar(&localKubeconfig, "kubeconfig", "", "Path to kubeconfig of local cluster. Only required if out-of-cluster.")
-	flag.StringVar(&localMasterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+	flag.StringVar(&localMasterURL, "master", "",
+		"The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 }
 
 type leaderConfig struct {
@@ -79,11 +80,6 @@ func main() {
 		klog.Fatalf("Error building kubeconfig: %s", err.Error())
 	}
 
-	kubeClient, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		klog.Fatalf("Error creating kubernetes clientset: %s", err.Error())
-	}
-
 	submarinerClient, err := submarinerClientset.NewForConfig(cfg)
 	if err != nil {
 		klog.Fatalf("Error creating submariner clientset: %s", err.Error())
@@ -104,10 +100,11 @@ func main() {
 	if len(submSpec.GlobalCidr) > 0 {
 		localSubnets = submSpec.GlobalCidr
 	} else {
-		localSubnets = append(submSpec.ServiceCidr, submSpec.ClusterCidr...)
+		localSubnets = append(localSubnets, submSpec.ServiceCidr...)
+		localSubnets = append(localSubnets, submSpec.ClusterCidr...)
 	}
 
-	if len(submSpec.CableDriver) == 0 {
+	if submSpec.CableDriver == "" {
 		submSpec.CableDriver = cable.GetDefaultCableDriver()
 	}
 	submSpec.CableDriver = strings.ToLower(submSpec.CableDriver)
@@ -135,8 +132,7 @@ func main() {
 	becameLeader := func(context.Context) {
 		klog.Info("Creating the tunnel controller")
 
-		tunnelController := tunnel.NewController(submSpec.Namespace, cableEngine, kubeClient, submarinerClient,
-			submarinerInformerFactory.Submariner().V1().Endpoints())
+		tunnelController := tunnel.NewController(cableEngine, submarinerInformerFactory.Submariner().V1().Endpoints())
 
 		var datastore datastore.Datastore
 		switch submSpec.Broker {
@@ -151,9 +147,9 @@ func main() {
 		}
 
 		klog.Info("Creating the datastore syncer")
-		dsSyncer := datastoresyncer.NewDatastoreSyncer(submSpec.ClusterID, submSpec.Namespace, kubeClient, submarinerClient,
-			submarinerInformerFactory.Submariner().V1().Clusters(), submarinerInformerFactory.Submariner().V1().Endpoints(), datastore,
-			submSpec.ColorCodes, localCluster, localEndpoint)
+		dsSyncer := datastoresyncer.NewDatastoreSyncer(submSpec.ClusterID, submarinerClient.SubmarinerV1().Clusters(submSpec.Namespace),
+			submarinerInformerFactory.Submariner().V1().Clusters(), submarinerClient.SubmarinerV1().Endpoints(submSpec.Namespace),
+			submarinerInformerFactory.Submariner().V1().Endpoints(), datastore, submSpec.ColorCodes, localCluster, localEndpoint)
 
 		submarinerInformerFactory.Start(stopCh)
 
@@ -200,7 +196,7 @@ func main() {
 	startLeaderElection(leClient, recorder, becameLeader, lostLeader)
 }
 
-func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder record.EventRecorder,
+func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder resourcelock.EventRecorder,
 	run func(ctx context.Context), end func()) {
 	gwLeadershipConfig := leaderConfig{}
 
@@ -236,7 +232,8 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder rec
 	namespace, _, err := kubeconfig.Namespace()
 	if err != nil {
 		namespace = "submariner"
-		klog.Infof("Could not obtain a namespace to use for the leader election lock - the error was: %v. Using the default %q namespace.", namespace, err)
+		klog.Infof("Could not obtain a namespace to use for the leader election lock - the error was: %v. Using the default %q namespace.",
+			namespace, err)
 	} else {
 		klog.Infof("Using namespace %q for the leader election lock", namespace)
 	}

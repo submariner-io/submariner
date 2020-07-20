@@ -135,15 +135,14 @@ func newRateLimiter() workqueue.RateLimiter {
 	return workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 30*time.Second)
 }
 
-func NewController(clusterID string, ClusterCidr []string, ServiceCidr []string, objectNamespace string,
+func NewController(clusterID string, clusterCidr, serviceCidr []string, objectNamespace string,
 	link *net.Interface, config InformerConfigStruct) *Controller {
-
 	controller := Controller{
 		clusterID:              clusterID,
 		objectNamespace:        objectNamespace,
 		localCableDriver:       "",
-		localClusterCidr:       ClusterCidr,
-		localServiceCidr:       ServiceCidr,
+		localClusterCidr:       clusterCidr,
+		localServiceCidr:       serviceCidr,
 		submarinerClientSet:    config.SubmarinerClientSet,
 		clientSet:              config.ClientSet,
 		defaultHostIface:       link,
@@ -183,7 +182,8 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 	defer utilruntime.HandleCrash()
 
 	// Start the informer factories to begin populating the informer caches
-	klog.Infof("Starting Route Controller. ClusterID: %s, localClusterCIDR: %v, localServiceCIDR: %v", r.clusterID, r.localClusterCidr, r.localServiceCidr)
+	klog.Infof("Starting Route Controller. ClusterID: %s, localClusterCIDR: %v, localServiceCIDR: %v", r.clusterID, r.localClusterCidr,
+		r.localServiceCidr)
 
 	// Wait for the caches to be synced before starting workers
 	klog.Info("Waiting for Endpoint informer caches to sync.")
@@ -247,7 +247,6 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 }
 
 func (r *Controller) annotateThisNodeWithCNInterfaceIP() error {
-
 	hostname, err := os.Hostname()
 	if err != nil {
 		klog.Fatalf("unable to determine hostname: %v", err)
@@ -333,6 +332,8 @@ func (r *Controller) updateIptableRulesForInterclusterTraffic(inputCidrBlocks []
 func (r *Controller) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks []string, operation Operation) {
 	if operation == FlushRouteTable {
 		r.routeCacheGWNode.DeleteAll()
+		// The conversion doesn't introduce a security problem
+		// #nosec G204
 		cmd := exec.Command("/sbin/ip", "r", "flush", "table", strconv.Itoa(RouteAgentHostNetworkTableID))
 		if err := cmd.Run(); err != nil {
 			// We can safely ignore this error, as this table will exist only on GW nodes
@@ -441,13 +442,14 @@ func (r *Controller) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP) e
 		}
 
 		// Enable loose mode (rp_filter=2) reverse path filtering on the vxlan interface.
+		// We won't ever create rp_filter, and its permissions are 644
+		// #nosec G306
 		err = ioutil.WriteFile("/proc/sys/net/ipv4/conf/"+VxLANIface+"/rp_filter", []byte("2"), 0644)
 		if err != nil {
 			return fmt.Errorf("unable to update vxlan rp_filter proc entry, err: %s", err)
 		} else {
 			klog.V(log.DEBUG).Infof("Successfully configured rp_filter to loose mode(2) on %s", VxLANIface)
 		}
-
 	} else if ifaceType == VxInterfaceWorker {
 		// non-Gateway/Worker Node
 		attrs := &vxLanAttributes{
@@ -791,16 +793,14 @@ func (r *Controller) cleanVxSubmarinerRoutes() {
 		klog.Errorf("Unable to cleanup routes, error retrieving routes on the link %s: %v", VxLANIface, err)
 		return
 	}
-	for _, route := range currentRouteList {
-		klog.V(log.DEBUG).Infof("Processing route %v", route)
-		if route.Dst == nil || route.Gw == nil {
+	for i := range currentRouteList {
+		klog.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])
+		if currentRouteList[i].Dst == nil || currentRouteList[i].Gw == nil {
 			klog.V(log.DEBUG).Infof("Found nil gw or dst")
-		} else {
-			if r.remoteSubnets.Contains(route.Dst.String()) {
-				klog.V(log.DEBUG).Infof("Removing route %s", route.String())
-				if err = netlink.RouteDel(&route); err != nil {
-					klog.Errorf("Error removing route %s: %v", route.String(), err)
-				}
+		} else if r.remoteSubnets.Contains(currentRouteList[i].Dst.String()) {
+			klog.V(log.DEBUG).Infof("Removing route %s", currentRouteList[i])
+			if err = netlink.RouteDel(&currentRouteList[i]); err != nil {
+				klog.Errorf("Error removing route %s: %v", currentRouteList[i], err)
 			}
 		}
 	}
@@ -822,7 +822,6 @@ func (r *Controller) cleanStrongswanRoutingTable() {
 }
 
 func (r *Controller) cleanXfrmPolicies() {
-
 	currentXfrmPolicyList, err := netlink.XfrmPolicyList(syscall.AF_INET)
 
 	if err != nil {
@@ -833,17 +832,16 @@ func (r *Controller) cleanXfrmPolicies() {
 	if len(currentXfrmPolicyList) > 0 {
 		klog.Infof("Cleaning up %d XFRM policies", len(currentXfrmPolicyList))
 	}
-	for _, xfrmPolicy := range currentXfrmPolicyList {
-		klog.V(log.DEBUG).Infof("Deleting XFRM policy %s", xfrmPolicy.String())
-		if err = netlink.XfrmPolicyDel(&xfrmPolicy); err != nil {
-			klog.Errorf("Error Deleting XFRM policy %s: %v", xfrmPolicy.String(), err)
+	for i := range currentXfrmPolicyList {
+		klog.V(log.DEBUG).Infof("Deleting XFRM policy %s", currentXfrmPolicyList[i])
+		if err = netlink.XfrmPolicyDel(&currentXfrmPolicyList[i]); err != nil {
+			klog.Errorf("Error Deleting XFRM policy %s: %v", currentXfrmPolicyList[i], err)
 		}
 	}
 }
 
 // Reconcile the routes installed on this device using rtnetlink
 func (r *Controller) reconcileRoutes(vxlanGw net.IP) error {
-
 	klog.V(log.DEBUG).Infof("Reconciling routes to gw: %s", vxlanGw.String())
 
 	link, err := netlink.LinkByName(VxLANIface)
@@ -858,18 +856,18 @@ func (r *Controller) reconcileRoutes(vxlanGw net.IP) error {
 	}
 
 	// First lets delete all of the routes that don't match
-	for _, route := range currentRouteList {
+	for i := range currentRouteList {
 		// contains(endpoint destinations, route destination string, and the route gateway is our actual destination
-		klog.V(log.DEBUG).Infof("Processing route %v", route)
-		if route.Dst == nil || route.Gw == nil {
+		klog.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])
+		if currentRouteList[i].Dst == nil || currentRouteList[i].Gw == nil {
 			klog.V(log.DEBUG).Infof("Found nil gw or dst")
 		} else {
-			if r.remoteSubnets.Contains(route.Dst.String()) && route.Gw.Equal(vxlanGw) {
-				klog.V(log.DEBUG).Infof("Found route %s with gw %s already installed", route.String(), route.Gw.String())
+			if r.remoteSubnets.Contains(currentRouteList[i].Dst.String()) && currentRouteList[i].Gw.Equal(vxlanGw) {
+				klog.V(log.DEBUG).Infof("Found route %s with gw %s already installed", currentRouteList[i], currentRouteList[i].Gw)
 			} else {
-				klog.V(log.DEBUG).Infof("Removing route %s", route.String())
-				if err = netlink.RouteDel(&route); err != nil {
-					klog.Errorf("Error removing route %s: %v", route.String(), err)
+				klog.V(log.DEBUG).Infof("Removing route %s", currentRouteList[i])
+				if err = netlink.RouteDel(&currentRouteList[i]); err != nil {
+					klog.Errorf("Error removing route %s: %v", currentRouteList[i], err)
 				}
 			}
 		}
@@ -899,11 +897,9 @@ func (r *Controller) reconcileRoutes(vxlanGw net.IP) error {
 		for _, curRoute := range currentRouteList {
 			if curRoute.Gw == nil || curRoute.Dst == nil {
 
-			} else {
-				if curRoute.Gw.Equal(route.Gw) && curRoute.Dst.String() == route.Dst.String() {
-					klog.V(log.DEBUG).Infof("Found equivalent route, not adding")
-					found = true
-				}
+			} else if curRoute.Gw.Equal(route.Gw) && curRoute.Dst.String() == route.Dst.String() {
+				klog.V(log.DEBUG).Infof("Found equivalent route, not adding")
+				found = true
 			}
 		}
 

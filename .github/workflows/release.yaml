@@ -31,6 +31,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
+        with:
+          fetch-depth: 0
 
       - name: Release the submariner images
         env:
@@ -39,5 +41,9 @@ jobs:
           RELEASE_ARGS: submariner submariner-route-agent submariner-globalnet
           IMAGES_ARGS: --nocache
         run: |
-          [[ $GITHUB_REF =~ "/tags/" ]] && RELEASE_ARGS+=" --tag ${GITHUB_REF##*/}"
+          if [[ $GITHUB_REF =~ "/tags/" ]]; then
+              tags="${GITHUB_REF##*/}"
+              { echo $tags | grep -q -v -; } && tags+=" latest"
+              RELEASE_ARGS+=" --tag \"$tags\""
+          fi
           make images release
