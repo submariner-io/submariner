@@ -177,8 +177,6 @@ func NewController(clusterID string, clusterCidr, serviceCidr []string, objectNa
 }
 
 func (r *Controller) Run(stopCh <-chan struct{}) error {
-	var wg sync.WaitGroup
-	wg.Add(1)
 	defer utilruntime.HandleCrash()
 
 	// Start the informer factories to begin populating the informer caches
@@ -239,7 +237,6 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 
 	go wait.Until(r.runEndpointWorker, time.Second, stopCh)
 	go wait.Until(r.runPodWorker, time.Second, stopCh)
-	wg.Wait()
 	klog.Info("Route agent workers started")
 	<-stopCh
 	klog.Info("Route agent stopping")
