@@ -4,8 +4,10 @@ import (
 	"flag"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers/ipam"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,7 +47,16 @@ func main() {
 		klog.Fatalf("error building submariner clientset: %s", err.Error())
 	}
 
-	localCluster, err := submarinerClient.SubmarinerV1().Clusters(ipamSpec.Namespace).Get(ipamSpec.ClusterID, metav1.GetOptions{})
+	var localCluster *submarinerv1.Cluster
+	// During installation, sometimes creation of clusterCRD by submariner-gateway-pod would take few secs.
+	for i := 0; i < 5; i++ {
+		localCluster, err = submarinerClient.SubmarinerV1().Clusters(ipamSpec.Namespace).Get(ipamSpec.ClusterID, metav1.GetOptions{})
+		if err == nil {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+
 	if err != nil {
 		klog.Fatalf("error while retrieving the local cluster %q info: %v", ipamSpec.ClusterID, err)
 	}
