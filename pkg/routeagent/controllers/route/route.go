@@ -226,18 +226,9 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 		}
 	}
 
-	if r.cniIface != nil {
-		hostname, err := os.Hostname()
-		if err != nil {
-			klog.Fatalf("unable to determine hostname: %v", err)
-		}
-
-		// Each route-agent pod will annotate its own node with the respective CNIInterfaceIP
-		if err = r.annotateNodeWithCNIInterfaceIP(hostname); err != nil {
-			return fmt.Errorf("error annotating the node %q with cniIfaceIP: %v", hostname, err)
-		}
-	} else {
-		klog.Warning("cniInterface wasn't found, hostNetwork to remote pod/service connectivity won't work")
+	hostname, err := os.Hostname()
+	if err != nil {
+		klog.Fatalf("unable to determine hostname: %v", err)
 	}
 
 	// Query all the submariner-route-agent daemonSet PODs running in the local cluster.
@@ -246,9 +237,30 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 		return fmt.Errorf("error while retrieving submariner-route-agent pods: %v", err)
 	}
 
+	var routeAgentNodeName string
 	for index, pod := range podList.Items {
 		klog.V(log.DEBUG).Infof("In %s, podIP of submariner-route-agent[%d] is %s", r.clusterID, index, pod.Status.PodIP)
 		r.populateRemoteVtepIps(pod.Status.PodIP)
+		// On some platforms (like AWS), it was seen that nodeName is configured as FQDN
+		podNodeName := strings.Split(pod.Spec.NodeName, ".")
+		if hostname == podNodeName[0] {
+			routeAgentNodeName = pod.Spec.NodeName
+		}
+	}
+
+	klog.Infof("Hostname is %q and routeAgentNodeName is %q", hostname, routeAgentNodeName)
+
+	if r.cniIface != nil {
+		if routeAgentNodeName == "" {
+			return fmt.Errorf("could not get the nodeName on host %q", hostname)
+		}
+
+		// Each route-agent pod will annotate its own node with the respective CNIInterfaceIP
+		if err = r.annotateNodeWithCNIInterfaceIP(routeAgentNodeName); err != nil {
+			return fmt.Errorf("error annotating the node %q with cniIfaceIP: %v", hostname, err)
+		}
+	} else {
+		klog.Warning("cniInterface wasn't found, hostNetwork to remote pod/service connectivity won't work")
 	}
 
 	go wait.Until(r.runEndpointWorker, time.Second, stopCh)
