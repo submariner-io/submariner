@@ -243,7 +243,8 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 		r.populateRemoteVtepIps(pod.Status.PodIP)
 		// On some platforms (like AWS), it was seen that nodeName is configured as FQDN
 		podNodeName := strings.Split(pod.Spec.NodeName, ".")
-		if hostname == podNodeName[0] {
+		// Similarly, hostnames on some platforms are configured in FQDN
+		if hostname == pod.Spec.NodeName || hostname == podNodeName[0] {
 			routeAgentNodeName = pod.Spec.NodeName
 		}
 	}
