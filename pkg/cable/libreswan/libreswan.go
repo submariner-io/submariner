@@ -96,6 +96,7 @@ func (i *libreswan) Init() error {
 	if err := i.runPluto(); err != nil {
 		return fmt.Errorf("error starting Pluto: %v", err)
 	}
+
 	return nil
 }
 
@@ -107,12 +108,15 @@ func (i *libreswan) refreshConnectionStatus() error {
 		klog.Errorf("error retrieving whack's stdout: %v", err)
 		return err
 	}
+
 	if err := cmd.Start(); err != nil {
 		klog.Errorf("error starting whack: %v", err)
 		return err
 	}
+
 	scanner := bufio.NewScanner(stdout)
 	activeConnections := util.NewStringSet()
+
 	for scanner.Scan() {
 		line := scanner.Text()
 		// Line format: 006 #3: "submariner-cable-cluster3-172-17-0-8-0-0", type=ESP, add_time=1590508783, inBytes=0, outBytes=0, id='172.17.0.8'
@@ -121,12 +125,14 @@ func (i *libreswan) refreshConnectionStatus() error {
 			activeConnections.Add(components[1])
 		}
 	}
+
 	if err := cmd.Wait(); err != nil {
 		klog.Errorf("error waiting for whack: %v", err)
 		return err
 	}
 
 	localSubnets := extractSubnets(i.localEndpoint.Spec)
+
 	for j := range i.connections {
 		allConnected := true
 		remoteSubnets := extractSubnets(i.connections[j].Endpoint)
@@ -138,6 +144,7 @@ func (i *libreswan) refreshConnectionStatus() error {
 				}
 			}
 		}
+
 		if allConnected {
 			i.connections[j].Status = subv1.Connected
 		} else {
@@ -155,7 +162,9 @@ func (i *libreswan) GetActiveConnections(clusterID string) ([]string, error) {
 	for j := range i.connections {
 		connections = append(connections, i.connections[j].Endpoint.CableName)
 	}
+
 	klog.Infof("Active connections: %v", connections)
+
 	return connections, nil
 }
 
@@ -164,6 +173,7 @@ func (i *libreswan) GetConnections() (*[]subv1.Connection, error) {
 	if err := i.refreshConnectionStatus(); err != nil {
 		return &[]subv1.Connection{}, err
 	}
+
 	return &i.connections, nil
 }
 
@@ -178,6 +188,7 @@ func extractEndpointIP(endpoint subv1.EndpointSpec) string {
 func extractSubnets(endpoint subv1.EndpointSpec) []string {
 	// Subnets
 	subnets := []string{endpoint.PrivateIP + "/32"}
+
 	for _, subnet := range endpoint.Subnets {
 		if !strings.HasPrefix(subnet, endpoint.PrivateIP) {
 			subnets = append(subnets, subnet)
@@ -189,6 +200,7 @@ func extractSubnets(endpoint subv1.EndpointSpec) []string {
 
 func whack(args ...string) error {
 	var err error
+
 	for i := 0; i < 3; i++ {
 		cmd := exec.Command("/usr/libexec/ipsec/whack", args...)
 		cmd.Stdout = os.Stdout
@@ -207,6 +219,7 @@ func whack(args ...string) error {
 	if err != nil {
 		return fmt.Errorf("error whacking with args %v: %v", args, err)
 	}
+
 	return nil
 }
 
@@ -242,6 +255,7 @@ func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string
 				if endpoint.Spec.NATEnabled {
 					args = append(args, "--forceencaps")
 				}
+
 				args = append(args, "--name", connectionName)
 
 				// Left-hand side
@@ -265,6 +279,7 @@ func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string
 				if err := whack("--route", "--name", connectionName); err != nil {
 					return "", err
 				}
+
 				if err := whack("--initiate", "--asynchronous", "--name", connectionName); err != nil {
 					return "", err
 				}
@@ -324,6 +339,7 @@ func removeConnectionForEndpoint(connections []subv1.Connection, endpoint types.
 			return connections[:len(connections)-1]
 		}
 	}
+
 	return connections
 }
 
@@ -339,6 +355,7 @@ func (i *libreswan) runPluto() error {
 	cmd.Stderr = os.Stderr
 
 	var outputFile *os.File
+
 	if i.logFile != "" {
 		out, err := os.OpenFile(i.logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 		if err != nil {
@@ -371,10 +388,12 @@ func (i *libreswan) runPluto() error {
 		if err == nil {
 			break
 		}
+
 		if !os.IsNotExist(err) {
 			klog.Infof("Failed to stat the control socket: %v", err)
 			break
 		}
+
 		time.Sleep(1 * time.Second)
 	}
 

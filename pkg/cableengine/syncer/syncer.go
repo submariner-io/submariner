@@ -103,6 +103,7 @@ func (i *GatewaySyncer) cleanupStaleGatewayEntries(localGatewayName string) erro
 			// In this case we don't want to stop the cleanup loop and just log it
 			utilruntime.HandleError(fmt.Errorf("Error processing stale Gateway %+v: %s", gw, err))
 		}
+
 		if stale {
 			err := i.client.Delete(gw.Name, &metav1.DeleteOptions{})
 			if err != nil {
@@ -114,6 +115,7 @@ func (i *GatewaySyncer) cleanupStaleGatewayEntries(localGatewayName string) erro
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -127,6 +129,7 @@ func isGatewayStale(gateway v1.Gateway) (bool, error) {
 	if err != nil {
 		return true, fmt.Errorf("error parsing update-timestamp: %s", err)
 	}
+
 	now := time.Now().UTC().Unix()
 
 	return now >= (timestampInt + int64(GatewayStaleTimeout.Seconds())), nil
@@ -135,6 +138,7 @@ func isGatewayStale(gateway v1.Gateway) (bool, error) {
 func (i *GatewaySyncer) getLastSyncedGateway(name string) (*v1.Gateway, error) {
 	existingGw, err := i.client.Get(name, metav1.GetOptions{})
 	klog.V(log.TRACE).Infof("Last synced Gateway: %+v", existingGw)
+
 	return existingGw, err
 }
 
@@ -165,6 +169,7 @@ func (i *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 	}
 
 	klog.V(log.TRACE).Infof("Generated Gateway object: %+v", gateway)
+
 	return &gateway
 }
 
@@ -177,5 +182,6 @@ func (s *GatewaySyncer) CleanupGatewayEntry() {
 		klog.Errorf("Error while trying to delete own Gateway %q : %s", hostName, err)
 		return
 	}
+
 	klog.Infof("The Gateway entry for %q has been deleted", hostName)
 }

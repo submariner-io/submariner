@@ -87,30 +87,39 @@ func NewDriver(localEndpoint types.SubmarinerEndpoint, localCluster types.Submar
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("wgctrl is not available on this system")
 		}
+
 		return nil, fmt.Errorf("failed to open wgctl client: %v", err)
 	}
+
 	defer func() {
 		if err != nil {
 			if e := w.client.Close(); e != nil {
 				klog.Errorf("Failed to close client %v", e)
 			}
+
 			w.client = nil
 		}
 	}()
 
 	// generate local keys and set public key in BackendConfig
 	var priv, pub, psk wgtypes.Key
+
 	if psk, err = genPsk(w.spec.PSK); err != nil {
 		return nil, fmt.Errorf("error generating pre-shared key: %v", err)
 	}
+
 	w.psk = &psk
+
 	if priv, err = wgtypes.GeneratePrivateKey(); err != nil {
 		return nil, fmt.Errorf("error generating private key: %v", err)
 	}
+
 	pub = priv.PublicKey()
+
 	if localEndpoint.Spec.BackendConfig == nil {
 		localEndpoint.Spec.BackendConfig = make(map[string]string)
 	}
+
 	localEndpoint.Spec.BackendConfig[PublicKey] = pub.String()
 
 	// configure the device. still not up
@@ -128,6 +137,7 @@ func NewDriver(localEndpoint types.SubmarinerEndpoint, localCluster types.Submar
 	}
 
 	klog.V(log.DEBUG).Infof("Created WireGuard %s with publicKey %s", DefaultDeviceName, pub)
+
 	return &w, nil
 }
 
@@ -145,14 +155,17 @@ func (w *wireguard) Init() error {
 	if err != nil {
 		return fmt.Errorf("cannot get wireguard link by name %s: %v", DefaultDeviceName, err)
 	}
+
 	d, err := w.client.Device(DefaultDeviceName)
 	if err != nil {
 		return fmt.Errorf("wgctrl cannot find WireGuard device: %v", err)
 	}
+
 	k, err := keyFromSpec(&w.localEndpoint.Spec)
 	if err != nil {
 		return fmt.Errorf("endpoint is missing public key %s: %v", d.PublicKey, err)
 	}
+
 	if k.String() != d.PublicKey.String() {
 		return fmt.Errorf("endpoint public key %s is different from device key %s", k, d.PublicKey)
 	}
@@ -164,6 +177,7 @@ func (w *wireguard) Init() error {
 
 	klog.V(log.DEBUG).Infof("WireGuard device %s, is up on i/f number %d, listening on port :%d, with key %s",
 		w.link.Attrs().Name, l.Index, d.ListenPort, d.PublicKey)
+
 	return nil
 }
 
@@ -183,6 +197,7 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 	if remoteIP == nil {
 		return "", fmt.Errorf("failed to parse remote IP %s", ip)
 	}
+
 	allowedIPs := parseSubnets(remoteEndpoint.Spec.Subnets)
 
 	// parse remote public key
@@ -204,11 +219,13 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 				// existing connection, update status and skip
 				w.updatePeerStatus(oldCon, oldKey)
 				klog.V(log.DEBUG).Infof("Skipping connect for existing peer key %s", oldKey)
+
 				return ip, nil
 			}
 			// new peer will take over subnets so can ignore error
 			_ = w.removePeer(oldKey)
 		}
+
 		delete(w.connections, remoteEndpoint.Spec.ClusterID)
 	}
 
@@ -250,6 +267,7 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 	}
 
 	klog.V(log.DEBUG).Infof("Done connecting endpoint peer %s@%s", *remoteKey, remoteIP)
+
 	return ip, nil
 }
 
@@ -258,10 +276,12 @@ func keyFromSpec(ep *v1.EndpointSpec) (*wgtypes.Key, error) {
 	if !found {
 		return nil, fmt.Errorf("endpoint is missing public key")
 	}
+
 	key, err := wgtypes.ParseKey(s)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse public key %s: %v", s, err)
 	}
+
 	return &key, nil
 }
 
@@ -294,6 +314,7 @@ func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoi
 	delete(w.connections, remoteEndpoint.Spec.ClusterID)
 
 	klog.V(log.DEBUG).Infof("Done removing endpoint for cluster %s", remoteEndpoint.Spec.ClusterID)
+
 	return nil
 }
 
@@ -331,6 +352,7 @@ func (w *wireguard) setWGLink() error {
 // parse CIDR string and skip errors
 func parseSubnets(subnets []string) []net.IPNet {
 	nets := make([]net.IPNet, 0, len(subnets))
+
 	for _, sn := range subnets {
 		_, cidr, err := net.ParseCIDR(sn)
 		if err != nil {
@@ -338,13 +360,16 @@ func parseSubnets(subnets []string) []net.IPNet {
 			klog.Errorf("failed to parse subnet %s: %v", sn, err)
 			continue
 		}
+
 		nets = append(nets, *cidr)
 	}
+
 	return nets
 }
 
 func (w *wireguard) removePeer(key *wgtypes.Key) error {
 	klog.V(log.DEBUG).Infof("Removing WireGuard peer with key %s", key)
+
 	peerCfg := []wgtypes.PeerConfig{
 		{
 			PublicKey: *key,
@@ -359,7 +384,9 @@ func (w *wireguard) removePeer(key *wgtypes.Key) error {
 		klog.Errorf("Failed to remove WireGuard peer with key %s: %v", key, err)
 		return err
 	}
+
 	klog.V(log.DEBUG).Infof("Done removing WireGuard peer with key %s", key)
+
 	return nil
 }
 
@@ -373,6 +400,7 @@ func (w *wireguard) peerByKey(key *wgtypes.Key) (*wgtypes.Peer, error) {
 			return &p, nil
 		}
 	}
+
 	return nil, fmt.Errorf("peer not found for key %s", key)
 }
 
@@ -383,15 +411,18 @@ func (w *wireguard) keyMismatch(cid string, key *wgtypes.Key) bool {
 		klog.Warningf("Could not find spec for cluster %s, mismatched endpoint key %s", cid, key)
 		return true
 	}
+
 	oldKey, err := keyFromSpec(&c.Endpoint)
 	if err != nil {
 		klog.Warningf("Could not find old key of cluster %s, mismatched endpoint key %s", cid, key)
 		return true
 	}
+
 	if oldKey.String() != key.String() {
 		klog.Warningf("Key mismatch, cluster %s key is %s, endpoint key is %s", cid, oldKey, key)
 		return true
 	}
+
 	return false
 }
 
@@ -399,6 +430,7 @@ func endpointIP(ep *types.SubmarinerEndpoint) string {
 	if ep.Spec.NATEnabled {
 		return ep.Spec.PublicIP
 	}
+
 	return ep.Spec.PrivateIP
 }
 

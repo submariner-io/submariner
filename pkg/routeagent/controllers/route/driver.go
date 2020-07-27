@@ -46,6 +46,7 @@ func discoverCNIInterface(clusterCIDR string) (*cniInterface, error) {
 			}
 		}
 	}
+
 	return nil, fmt.Errorf("unable to find CNI Interface on the host which has IP from %q", clusterCIDR)
 }
 
@@ -58,6 +59,7 @@ func toggleCNISpecificConfiguration(iface string) error {
 	} else {
 		klog.V(log.DEBUG).Infof("Successfully configured rp_filter to loose mode(2) on cniInterface %q", iface)
 	}
+
 	return nil
 }
 
@@ -83,5 +85,6 @@ func (r *Controller) annotateNodeWithCNIInterfaceIP(nodeName string) error {
 	}
 
 	klog.Infof("Successfully annotated node %q with cniIfaceIP %q", nodeName, r.cniIface.ipAddress)
+
 	return nil
 }

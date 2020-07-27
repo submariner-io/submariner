@@ -171,6 +171,7 @@ func createEndpoint(endpoints submarinerClientset.EndpointInterface, spec *subma
 	})
 
 	Expect(err).To(Succeed())
+
 	return endpointName
 }
 
@@ -184,17 +185,20 @@ func createCluster(clusters submarinerClientset.ClusterInterface, spec *submarin
 	})
 
 	Expect(err).To(Succeed())
+
 	return spec.ClusterID
 }
 
 func getEndpointName(from *submarinerv1.EndpointSpec) string {
 	endpointName, err := util.GetEndpointCRDNameFromParams(from.ClusterID, from.CableName)
 	Expect(err).To(Succeed())
+
 	return endpointName
 }
 
 func awaitCluster(clusters submarinerClientset.ClusterInterface, expected *submarinerv1.ClusterSpec) {
 	var foundCluster *submarinerv1.Cluster
+
 	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
 		cluster, err := clusters.Get(expected.ClusterID, metav1.GetOptions{})
 		if err != nil {
@@ -233,6 +237,7 @@ func awaitEndpoint(endpoints submarinerClientset.EndpointInterface, expected *su
 	endpointName := getEndpointName(expected)
 
 	var foundEndpoint *submarinerv1.Endpoint
+
 	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
 		endpoint, err := endpoints.Get(endpointName, metav1.GetOptions{})
 		if err != nil {
@@ -280,6 +285,7 @@ func (t *testDatastore) GetEndpoints(clusterID string) ([]types.SubmarinerEndpoi
 	}
 
 	subEndpoints := []types.SubmarinerEndpoint{}
+
 	for _, endpoint := range endpoints.Items {
 		if endpoint.Spec.ClusterID == clusterID {
 			subEndpoints = append(subEndpoints, types.SubmarinerEndpoint{Spec: endpoint.Spec})
@@ -296,6 +302,7 @@ func (t *testDatastore) SetCluster(cluster *types.SubmarinerCluster) error {
 		},
 		Spec: cluster.Spec,
 	})
+
 	return err
 }
 
@@ -307,6 +314,7 @@ func (t *testDatastore) SetEndpoint(endpoint *types.SubmarinerEndpoint) error {
 		},
 		Spec: endpoint.Spec,
 	})
+
 	return err
 }
 

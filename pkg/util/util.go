@@ -24,7 +24,9 @@ func getAPIIdentifier(token string) (string, error) {
 	if len(token) != tokenLength {
 		return "", fmt.Errorf("Token %s length was not %d", token, tokenLength)
 	}
+
 	clusterID := token[0 : tokenLength/2]
+
 	return clusterID, nil
 }
 
@@ -32,7 +34,9 @@ func getConnectSecret(token string) (string, error) {
 	if len(token) != tokenLength {
 		return "", fmt.Errorf("Token %s length was not %d", token, tokenLength)
 	}
+
 	connectSecret := token[tokenLength/2 : tokenLength]
+
 	return connectSecret, nil
 }
 
@@ -71,11 +75,13 @@ func FlattenColors(colorCodes []string) string {
 	}
 
 	flattenedColors := colorCodes[0]
+
 	for k, v := range colorCodes {
 		if k != 0 {
 			flattenedColors = flattenedColors + "," + v
 		}
 	}
+
 	return flattenedColors
 }
 
@@ -87,6 +93,7 @@ func GetLocalCluster(ss types.SubmarinerSpecification) (types.SubmarinerCluster,
 	localCluster.Spec.ServiceCIDR = ss.ServiceCidr
 	localCluster.Spec.GlobalCIDR = ss.GlobalCidr
 	localCluster.Spec.ColorCodes = ss.ColorCodes
+
 	return localCluster, nil
 }
 
@@ -96,6 +103,7 @@ func GetLocalEndpoint(clusterID, backend string, backendConfig map[string]string
 	if err != nil {
 		return types.SubmarinerEndpoint{}, fmt.Errorf("Error getting hostname: %v", err)
 	}
+
 	endpoint := types.SubmarinerEndpoint{
 		Spec: subv1.EndpointSpec{
 			CableName:     fmt.Sprintf("submariner-cable-%s-%s", clusterID, strings.ReplaceAll(privateIP, ".", "-")),
@@ -108,13 +116,16 @@ func GetLocalEndpoint(clusterID, backend string, backendConfig map[string]string
 			BackendConfig: backendConfig,
 		},
 	}
+
 	if natEnabled {
 		publicIP, err := ipify.GetIp()
 		if err != nil {
 			return types.SubmarinerEndpoint{}, fmt.Errorf("Could not determine public IP: %v", err)
 		}
+
 		endpoint.Spec.PublicIP = publicIP
 	}
+
 	return endpoint, nil
 }
 
@@ -124,9 +135,11 @@ func GetClusterIDFromCableName(cableName string) string {
 	// submariner-cable-my-super-long_cluster-id-172-16-32-5
 	cableSplit := strings.Split(cableName, "-")
 	clusterID := cableSplit[2]
+
 	for i := 3; i < len(cableSplit)-4; i++ {
 		clusterID = clusterID + "-" + cableSplit[i]
 	}
+
 	return clusterID
 }
 
@@ -167,10 +180,12 @@ func GetDefaultGatewayInterface() (*net.Interface, error) {
 			if route.LinkIndex == 0 {
 				return nil, fmt.Errorf("default gateway interface could not be determined")
 			}
+
 			iface, err := net.InterfaceByIndex(route.LinkIndex)
 			if err != nil {
 				return nil, err
 			}
+
 			return iface, nil
 		}
 	}
@@ -250,14 +265,17 @@ func IsOverlappingCIDR(cidrList []string, cidr string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
 	for _, v := range cidrList {
 		_, baseNet, err := net.ParseCIDR(v)
 		if err != nil {
 			return false, err
 		}
+
 		if baseNet.Contains(newNet.IP) || newNet.Contains(baseNet.IP) {
 			return true, nil
 		}
 	}
+
 	return false, nil
 }

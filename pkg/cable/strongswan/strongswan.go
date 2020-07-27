@@ -103,6 +103,7 @@ func (i *strongSwan) Init() error {
 	if err := i.loadConns(); err != nil {
 		return fmt.Errorf("failed to load connections from charon: %v", err)
 	}
+
 	return nil
 }
 
@@ -235,6 +236,7 @@ func (i *strongSwan) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) e
 
 	saDeleted := false
 	count := 0
+
 	for {
 		if saDeleted {
 			break
@@ -242,6 +244,7 @@ func (i *strongSwan) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) e
 
 		if count > 2 {
 			klog.Infof("Waited for connection termination for 2 iterations - triggering a force delete of the IKE")
+
 			err = client.Terminate(&goStrongswanVici.TerminateRequest{
 				Ike:   cableID,
 				Force: "yes",
@@ -297,6 +300,7 @@ func (i *strongSwan) GetActiveConnections(clusterID string) ([]string, error) {
 	defer client.Close()
 
 	var connections []string
+
 	prefix := fmt.Sprintf("submariner-cable-%s-", clusterID)
 
 	conns, err := client.ListConns("")
@@ -321,6 +325,7 @@ func (i *strongSwan) GetActiveConnections(clusterID string) ([]string, error) {
 			}
 		}
 	}
+
 	return connections, nil
 }
 
@@ -381,6 +386,7 @@ func (i *strongSwan) loadSharedKey(endpoint types.SubmarinerEndpoint, client *go
 	if err != nil {
 		return fmt.Errorf("Error loading pre-shared key for %v: %v", identities, err)
 	}
+
 	return nil
 }
 
@@ -440,6 +446,7 @@ func (i *strongSwan) renderCharonConfigTemplate(f io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("error rendering charon config file: %v", err)
 	}
+
 	return nil
 }
 
@@ -468,6 +475,7 @@ func (i *strongSwan) runCharon() error {
 	cmd.Stderr = os.Stderr
 
 	var outputFile *os.File
+
 	if i.logFile != "" {
 		out, err := os.OpenFile(i.logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 		if err != nil {
@@ -516,11 +524,13 @@ func (i *strongSwan) loadConns() error {
 			}
 		}
 	}
+
 	return nil
 }
 
 func getClient() (*goStrongswanVici.ClientConn, error) {
 	var err error
+
 	for i := 0; i < 3; i++ {
 		var client *goStrongswanVici.ClientConn
 		client, err = goStrongswanVici.NewClientConnFromDefaultSocket()

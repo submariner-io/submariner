@@ -122,6 +122,7 @@ func (st *strongswanConnectionsTest) getConnections() *[]v1.Connection {
 	connections, err := st.ss.getSAListConnections(st.saList)
 	Expect(err).ShouldNot(HaveOccurred())
 	Expect(connections).ToNot(BeNil())
+
 	return connections
 }
 
@@ -132,9 +133,11 @@ func (st *strongswanConnectionsTest) expectConnectionStatus(cableID string, stat
 		if connection.Endpoint.CableName == cableID {
 			Expect(foundCable).To(BeFalse())
 			Expect(connection.Status).Should(Equal(status))
+
 			foundCable = true
 		}
 	}
+
 	Expect(foundCable).To(BeTrue())
 }
 

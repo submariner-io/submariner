@@ -32,6 +32,7 @@ func main() {
 	if err != nil {
 		klog.Fatal(err)
 	}
+
 	klog.Info("Starting submariner-globalnet", ipamSpec)
 
 	// set up signals so we handle the first shutdown signal gracefully
@@ -54,6 +55,7 @@ func main() {
 		if err == nil {
 			break
 		}
+
 		time.Sleep(1 * time.Second)
 	}
 
@@ -75,10 +77,12 @@ func main() {
 	}
 
 	var wg sync.WaitGroup
+
 	wg.Add(1)
 
 	go func() {
 		defer wg.Done()
+
 		if err = gatewayMonitor.Run(stopCh); err != nil {
 			klog.Fatalf("Error running gatewayMonitor: %s", err.Error())
 		}

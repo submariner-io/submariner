@@ -185,6 +185,7 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 
 	// Wait for the caches to be synced before starting workers
 	klog.Info("Waiting for Endpoint informer caches to sync.")
+
 	if ok := cache.WaitForCacheSync(stopCh, r.endpointsSynced, r.smRouteAgentPodsSynced); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
@@ -220,6 +221,7 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 				// Skip processing the endpoint when CIDRs overlap
 				continue
 			}
+
 			r.updateIptableRulesForInterclusterTraffic(endpoint.Spec.Subnets)
 		} else {
 			r.localCableDriver = endpoint.Spec.Backend
@@ -238,6 +240,7 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 	}
 
 	var routeAgentNodeName string
+
 	for index, pod := range podList.Items {
 		klog.V(log.DEBUG).Infof("In %s, podIP of submariner-route-agent[%d] is %s", r.clusterID, index, pod.Status.PodIP)
 		r.populateRemoteVtepIps(pod.Status.PodIP)
@@ -269,6 +272,7 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 	klog.Info("Route agent workers started")
 	<-stopCh
 	klog.Info("Route agent stopping")
+
 	return nil
 }
 
@@ -299,6 +303,7 @@ func (r *Controller) overlappingSubnets(remoteSubnets []string) bool {
 			// Ideally this case will never hit, as the subnets are valid CIDRs
 			klog.Warningf("unable to validate overlapping Service CIDR: %s", err)
 		}
+
 		if overlap {
 			klog.Errorf("Local Service CIDR %q, overlaps with remote cluster %s", serviceCidr, err)
 			return true
@@ -310,11 +315,13 @@ func (r *Controller) overlappingSubnets(remoteSubnets []string) bool {
 		if err != nil {
 			klog.Warningf("unable to validate overlapping Pod CIDR: %s", err)
 		}
+
 		if overlap {
 			klog.Errorf("Local Pod CIDR %q, overlaps with remote cluster %s", podCidr, err)
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -383,6 +390,7 @@ func (r *Controller) getVxlanVtepIPAddress(ipAddr string) (net.IP, error) {
 
 	ipSlice[0] = strconv.Itoa(VxLANVTepNetworkPrefix)
 	vxlanIP := net.ParseIP(strings.Join(ipSlice, "."))
+
 	return vxlanIP, nil
 }
 
@@ -398,11 +406,13 @@ func (r *Controller) getHostIfaceIPAddress() (net.IP, error) {
 			if err != nil {
 				klog.Errorf("Unable to ParseCIDR : %v\n", addrs)
 			}
+
 			if ipAddr.To4() != nil {
 				return ipAddr, nil
 			}
 		}
 	}
+
 	return nil, nil
 }
 
@@ -481,6 +491,7 @@ func (r *Controller) processNextPod() bool {
 	if shutdown {
 		return false
 	}
+
 	err := func() error {
 		defer r.podWorkqueue.Done(obj)
 
@@ -496,10 +507,12 @@ func (r *Controller) processNextPod() bool {
 			if errors.IsNotFound(err) {
 				r.podWorkqueue.Forget(obj)
 				klog.Infof("submariner-route-agent pod for key %q not found - probably was deleted", key)
+
 				return nil
 			}
 
 			r.podWorkqueue.AddRateLimited(obj)
+
 			return fmt.Errorf("error retrieving submariner-route-agent pod object %s: %v", name, err)
 		}
 
@@ -520,6 +533,7 @@ func (r *Controller) processNextPod() bool {
 					r.podWorkqueue.Forget(obj)
 					return fmt.Errorf("failed to add FDB entry on the Gateway Node vxlan iface %v", err)
 				}
+
 				klog.Infof("FDB entry added on the Gateway node's vxlan iface for "+
 					"route-agent pod %q, IP %q", pod.Name, pod.Status.PodIP)
 			} else {
@@ -531,6 +545,7 @@ func (r *Controller) processNextPod() bool {
 
 		r.podWorkqueue.Forget(obj)
 		klog.V(log.DEBUG).Infof("Successfully processed submariner-route-agent pod %q", name)
+
 		return nil
 	}()
 
@@ -547,6 +562,7 @@ func (r *Controller) processNextEndpoint() bool {
 	if shutdown {
 		return false
 	}
+
 	err := func() error {
 		defer r.endpointWorkqueue.Done(obj)
 		key := obj.(string)
@@ -561,10 +577,12 @@ func (r *Controller) processNextEndpoint() bool {
 			if errors.IsNotFound(err) {
 				r.endpointWorkqueue.Forget(obj)
 				klog.Infof("Endpoint for key %q not found - probably was deleted", key)
+
 				return nil
 			}
 
 			r.endpointWorkqueue.AddRateLimited(obj)
+
 			return fmt.Errorf("error retrieving submariner endpoint object %s: %v", name, err)
 		}
 
@@ -588,6 +606,7 @@ func (r *Controller) processNextEndpoint() bool {
 			r.gwVxLanMutex.Unlock()
 
 			r.endpointWorkqueue.Forget(obj)
+
 			return nil
 		}
 
@@ -608,7 +627,9 @@ func (r *Controller) processNextEndpoint() bool {
 			defer r.gwVxLanMutex.Unlock()
 
 			r.isGatewayNode = true
+
 			klog.Infof("Creating the vxlan interface: %s on the gateway node", VxLANIface)
+
 			err = r.createVxLANInterface(VxInterfaceGateway, nil)
 			if err != nil {
 				klog.Fatalf("Unable to create VxLAN interface on gateway node (%s): %v", hostname, err)
@@ -627,6 +648,7 @@ func (r *Controller) processNextEndpoint() bool {
 			r.updateRoutingRulesForHostNetworkSupport(r.remoteSubnets.Elements(), AddRoute)
 
 			r.endpointWorkqueue.Forget(obj)
+
 			return nil
 		}
 
@@ -641,7 +663,9 @@ func (r *Controller) processNextEndpoint() bool {
 
 		r.gwVxLanMutex.Lock()
 		r.isGatewayNode = false
+
 		klog.Infof("Creating the vxlan interface %s with gateway node IP %s", VxLANIface, localClusterGwNodeIP)
+
 		err = r.createVxLANInterface(VxInterfaceWorker, localClusterGwNodeIP)
 		if err != nil {
 			klog.Fatalf("Unable to create VxLAN interface on non-GatewayNode (%s): %v", endpoint.Spec.Hostname, err)
@@ -668,6 +692,7 @@ func (r *Controller) processNextEndpoint() bool {
 
 		r.endpointWorkqueue.Forget(obj)
 		klog.V(log.DEBUG).Infof("Successfully processed local Endpoint %q", endpoint.Name)
+
 		return nil
 	}()
 
@@ -686,6 +711,7 @@ func (r *Controller) enqueueEndpoint(obj interface{}) {
 		utilruntime.HandleError(err)
 		return
 	}
+
 	klog.V(log.DEBUG).Infof("Enqueueing endpoint for route controller %v", obj)
 	r.endpointWorkqueue.AddRateLimited(key)
 }
@@ -710,19 +736,23 @@ func (r *Controller) handleRemovedEndpoint(obj interface{}) {
 	// ideally we should attempt to remove all routes if the endpoint matches our cluster ID
 	var object *v1.Endpoint
 	var ok bool
+
 	klog.V(log.TRACE).Infof("Handling object in handleRemoveEndpoint")
+
 	if object, ok = obj.(*v1.Endpoint); !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			klog.Errorf("Could not convert object %v to an Endpoint", obj)
 			return
 		}
+
 		object, ok = tombstone.Obj.(*v1.Endpoint)
 		if !ok {
 			klog.Errorf("Could not convert object tombstone %v to an Endpoint", tombstone.Obj)
 			return
 		}
 	}
+
 	klog.V(log.DEBUG).Infof("Informed of removed endpoint: %v", object.String())
 
 	r.gwVxLanMutex.Lock()
@@ -789,13 +819,16 @@ func (r *Controller) cleanVxSubmarinerRoutes() {
 			return
 		}
 	}
+
 	currentRouteList, err := netlink.RouteList(link, syscall.AF_INET)
 	if err != nil {
 		klog.Errorf("Unable to cleanup routes, error retrieving routes on the link %s: %v", VxLANIface, err)
 		return
 	}
+
 	for i := range currentRouteList {
 		klog.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])
+
 		if currentRouteList[i].Dst == nil || currentRouteList[i].Gw == nil {
 			klog.V(log.DEBUG).Infof("Found nil gw or dst")
 		} else if r.remoteSubnets.Contains(currentRouteList[i].Dst.String()) {
@@ -833,8 +866,10 @@ func (r *Controller) cleanXfrmPolicies() {
 	if len(currentXfrmPolicyList) > 0 {
 		klog.Infof("Cleaning up %d XFRM policies", len(currentXfrmPolicyList))
 	}
+
 	for i := range currentXfrmPolicyList {
 		klog.V(log.DEBUG).Infof("Deleting XFRM policy %s", currentXfrmPolicyList[i])
+
 		if err = netlink.XfrmPolicyDel(&currentXfrmPolicyList[i]); err != nil {
 			klog.Errorf("Error Deleting XFRM policy %s: %v", currentXfrmPolicyList[i], err)
 		}
@@ -860,6 +895,7 @@ func (r *Controller) reconcileRoutes(vxlanGw net.IP) error {
 	for i := range currentRouteList {
 		// contains(endpoint destinations, route destination string, and the route gateway is our actual destination
 		klog.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])
+
 		if currentRouteList[i].Dst == nil || currentRouteList[i].Gw == nil {
 			klog.V(log.DEBUG).Infof("Found nil gw or dst")
 		} else {
@@ -887,6 +923,7 @@ func (r *Controller) reconcileRoutes(vxlanGw net.IP) error {
 			klog.Errorf("Error parsing cidr block %s: %v", cidrBlock, err)
 			break
 		}
+
 		route := netlink.Route{
 			Dst:       dst,
 			Gw:        vxlanGw,
@@ -911,6 +948,7 @@ func (r *Controller) reconcileRoutes(vxlanGw net.IP) error {
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -933,6 +971,7 @@ func (r *Controller) configureIPRule(operation Operation) error {
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -952,6 +991,7 @@ func (r *Controller) configureRoute(remoteSubnet string, operation Operation) er
 			klog.Errorf("Wireguard interface %s not found on the node.", wireguard.DefaultDeviceName)
 		}
 	}
+
 	route := netlink.Route{
 		Dst:       dst,
 		Src:       src,
@@ -973,5 +1013,6 @@ func (r *Controller) configureRoute(remoteSubnet string, operation Operation) er
 			return fmt.Errorf("error deleting the route %s: %v", route.String(), err)
 		}
 	}
+
 	return nil
 }

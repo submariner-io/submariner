@@ -15,6 +15,7 @@ import (
 
 func (i *Controller) initIPTableChains() error {
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", submarinerIngress)
+
 	if err := util.CreateChainIfNotExists(i.ipt, "nat", submarinerIngress); err != nil {
 		return fmt.Errorf("error creating iptables chain %s: %v", submarinerIngress, err)
 	}
@@ -25,11 +26,13 @@ func (i *Controller) initIPTableChains() error {
 	}
 
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", submarinerEgress)
+
 	if err := util.CreateChainIfNotExists(i.ipt, "nat", submarinerEgress); err != nil {
 		return fmt.Errorf("error creating iptables chain %s: %v", submarinerEgress, err)
 	}
 
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", route.SmPostRoutingChain)
+
 	if err := util.CreateChainIfNotExists(i.ipt, "nat", route.SmPostRoutingChain); err != nil {
 		return fmt.Errorf("error creating iptables chain %s: %v", route.SmPostRoutingChain, err)
 	}
@@ -56,6 +59,7 @@ func (i *Controller) syncPodRules(podIP, globalIP string, addRules bool) error {
 	if err != nil {
 		return fmt.Errorf("error updating egress rules for pod %s: %v", podIP, err)
 	}
+
 	return nil
 }
 
@@ -65,6 +69,7 @@ func (i *Controller) syncServiceRules(service *k8sv1.Service, globalIP string, a
 	if err != nil {
 		return fmt.Errorf("error updating ingress rules for service %#v: %v", service, err)
 	}
+
 	return nil
 }
 
@@ -73,6 +78,7 @@ func (i *Controller) syncNodeRules(cniIfaceIP, globalIP string, addRules bool) e
 	if err != nil {
 		return fmt.Errorf("error updating egress rules for Node %s: %v", cniIfaceIP, err)
 	}
+
 	return nil
 }
 
@@ -91,8 +97,10 @@ func (i *Controller) evaluateService(service *k8sv1.Service) Operation {
 	if chainExists, _ := i.doesIPTablesChainExist("nat", chainName); !chainExists {
 		return Requeue
 	}
+
 	serviceName := service.GetNamespace() + "/" + service.GetName()
 	klog.V(log.DEBUG).Infof("kube-proxy chain %q for service %q now exists.", chainName, serviceName)
+
 	return Process
 }
 
@@ -102,6 +110,7 @@ func (i *Controller) isControlNode(node *k8sv1.Node) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -121,6 +130,7 @@ func (i *Controller) evaluateNode(node *k8sv1.Node) Operation {
 		// annotation and process the node event only when the annotation exists.
 		return Requeue
 	}
+
 	return Process
 }
 
@@ -138,9 +148,11 @@ func (i *Controller) cleanupIPTableRules() {
 
 func CreateGlobalNetMarkingChain(ipt *iptables.IPTables) error {
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", submarinerMark)
+
 	if err := util.CreateChainIfNotExists(ipt, "nat", submarinerMark); err != nil {
 		return fmt.Errorf("error creating iptables chain %s: %v", submarinerMark, err)
 	}
+
 	return nil
 }
 

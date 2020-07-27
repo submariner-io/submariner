@@ -88,6 +88,7 @@ func getSubmarinerClientset(host string, k8sSpec *datastoreSpecification) (*subm
 			}
 		}
 	}
+
 	return clientset, err
 }
 
@@ -96,12 +97,14 @@ func getAndCheckSubmarinerClientset(host string, private bool, k8sSpec *datastor
 	if err != nil {
 		return nil, err
 	}
+
 	clientset, err := submarinerClientset.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
 	// Check we can list endpoints
 	_, err = clientset.SubmarinerV1().Endpoints(k8sSpec.RemoteNamespace).List(metav1.ListOptions{})
+
 	return clientset, err
 }
 
@@ -224,6 +227,7 @@ func (k *Datastore) WatchClusters(ctx context.Context, selfClusterID string, col
 	}, time.Second*30)
 
 	k.informerFactory.Start(k.stopCh)
+
 	return nil
 }
 
@@ -305,6 +309,7 @@ func (k *Datastore) WatchEndpoints(ctx context.Context, selfClusterID string, co
 	}, time.Second*30)
 
 	k.informerFactory.Start(k.stopCh)
+
 	return nil
 }
 
@@ -357,6 +362,7 @@ func (k *Datastore) SetCluster(cluster *types.SubmarinerCluster) error {
 
 		klog.Infof("Successfully updated submariner Cluster %q in the central datastore", clusterName)
 	}
+
 	return nil
 }
 
@@ -410,6 +416,7 @@ func (k *Datastore) SetEndpoint(endpoint *types.SubmarinerEndpoint) error {
 
 		klog.Infof("Successfully updated submariner Endpoint %q in the central datastore", endpointName)
 	}
+
 	return nil
 }
 

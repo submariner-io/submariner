@@ -77,6 +77,7 @@ func NewDatastoreSyncer(thisClusterID string, submarinerClusters submarinerClien
 
 func (d *DatastoreSyncer) ensureExclusiveEndpoint() error {
 	klog.Info("Ensuring we are the only endpoint active for this cluster")
+
 	endpoints, err := d.datastore.GetEndpoints(d.localCluster.ID)
 	if err != nil {
 		return fmt.Errorf("error retrieving submariner Endpoints %v", err)
@@ -86,6 +87,7 @@ func (d *DatastoreSyncer) ensureExclusiveEndpoint() error {
 		if util.CompareEndpointSpec(endpoints[i].Spec, d.localEndpoint.Spec) {
 			continue
 		}
+
 		endpointName, err := util.GetEndpointCRDName(&endpoints[i])
 		if err != nil {
 			klog.Errorf("Error extracting the submariner Endpoint name from %#v: %v", endpoints[i], err)
@@ -117,6 +119,7 @@ func (d *DatastoreSyncer) enqueueCluster(obj interface{}) {
 		utilruntime.HandleError(err)
 		return
 	}
+
 	klog.V(log.TRACE).Infof("Enqueueing cluster %v", key)
 	d.clusterWorkqueue.AddRateLimited(key)
 }
@@ -128,6 +131,7 @@ func (d *DatastoreSyncer) enqueueEndpoint(obj interface{}) {
 		utilruntime.HandleError(err)
 		return
 	}
+
 	klog.V(log.TRACE).Infof("Enqueueing endpoint %v", key)
 	d.endpointWorkqueue.AddRateLimited(key)
 }
@@ -141,6 +145,7 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 	klog.Info("Starting the datastore syncer")
 
 	klog.Info("Waiting for informer caches to sync")
+
 	if ok := cache.WaitForCacheSync(stopCh, d.submarinerClusterInformer.Informer().HasSynced,
 		d.submarinerEndpointInformer.Informer().HasSynced); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
@@ -151,11 +156,13 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 	}
 
 	klog.Infof("Reconciling local submariner Cluster: %#v ", d.localCluster)
+
 	if err := d.reconcileClusterCRD(&d.localCluster, false); err != nil {
 		return fmt.Errorf("error reconciling the local submariner Cluster: %v", err)
 	}
 
 	klog.Infof("Reconciling local submariner Endpoint: %#v ", d.localEndpoint)
+
 	if err := d.reconcileEndpointCRD(&d.localEndpoint, false); err != nil {
 		return fmt.Errorf("error reconciling the local submariner Endpoint: %v", err)
 	}
@@ -171,6 +178,7 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 
 	<-stopCh
 	klog.Info("Datastore syncer stopping")
+
 	return nil
 }
 
@@ -198,6 +206,7 @@ func (d *DatastoreSyncer) processNextClusterWorkItem() bool {
 			klog.V(log.TRACE).Infof("The updated submariner Cluster %q is not for this cluster, skipping updating the datastore", name)
 			// not actually an error but we should forget about this and return
 			d.clusterWorkqueue.Forget(key)
+
 			return nil
 		}
 
@@ -220,6 +229,7 @@ func (d *DatastoreSyncer) processNextClusterWorkItem() bool {
 		}
 
 		d.clusterWorkqueue.Forget(key)
+
 		return nil
 	}()
 
@@ -227,6 +237,7 @@ func (d *DatastoreSyncer) processNextClusterWorkItem() bool {
 		utilruntime.HandleError(fmt.Errorf("Failed to process submariner Cluster with key %q: %v", key, err))
 		return true
 	}
+
 	return true
 }
 
@@ -261,6 +272,7 @@ func (d *DatastoreSyncer) processNextEndpointWorkItem() bool {
 				endpoint.Spec.ClusterID)
 			// not actually an error but we should forget about this and return
 			d.endpointWorkqueue.Forget(key)
+
 			return nil
 		}
 
@@ -268,6 +280,7 @@ func (d *DatastoreSyncer) processNextEndpointWorkItem() bool {
 			klog.V(log.DEBUG).Infof("The updated submariner Endpoint with CableName %q is not mine - skipping updating the datastore",
 				endpoint.Spec.CableName)
 			d.endpointWorkqueue.Forget(key)
+
 			return nil
 		}
 
@@ -283,6 +296,7 @@ func (d *DatastoreSyncer) processNextEndpointWorkItem() bool {
 		}
 
 		d.endpointWorkqueue.Forget(key)
+
 		return nil
 	}()
 
@@ -290,6 +304,7 @@ func (d *DatastoreSyncer) processNextEndpointWorkItem() bool {
 		utilruntime.HandleError(fmt.Errorf("Failed to process submariner Endpoint with key %q: %v", key, err))
 		return true
 	}
+
 	return true
 }
 
@@ -302,6 +317,7 @@ func (d *DatastoreSyncer) reconcileClusterCRD(fromCluster *types.SubmarinerClust
 	}
 
 	var found bool
+
 	cluster, err := d.submarinerClusters.Get(clusterName, metav1.GetOptions{})
 	if err != nil {
 		if !errors.IsNotFound(err) {
@@ -363,6 +379,7 @@ func (d *DatastoreSyncer) reconcileClusterCRD(fromCluster *types.SubmarinerClust
 			klog.Infof("Successfully updated submariner Cluster %q in the local datastore", clusterName)
 		}
 	}
+
 	return nil
 }
 
@@ -375,6 +392,7 @@ func (d *DatastoreSyncer) reconcileEndpointCRD(fromEndpoint *types.SubmarinerEnd
 	}
 
 	var found bool
+
 	endpoint, err := d.submarinerEndpoints.Get(endpointName, metav1.GetOptions{})
 	if err != nil {
 		if !errors.IsNotFound(err) {
@@ -435,5 +453,6 @@ func (d *DatastoreSyncer) reconcileEndpointCRD(fromEndpoint *types.SubmarinerEnd
 			klog.Infof("Successfully updated submariner Endpoint %q in the local datastore", endpointName)
 		}
 	}
+
 	return nil
 }
