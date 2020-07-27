@@ -44,6 +44,7 @@ func (e *Engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 	}
 
 	e.installCable <- &endpoint.Spec
+
 	return nil
 }
 
@@ -55,6 +56,7 @@ func (e *Engine) RemoveCable(endpoint types.SubmarinerEndpoint) error {
 	}
 
 	e.removeCable <- &endpoint.Spec
+
 	return nil
 }
 

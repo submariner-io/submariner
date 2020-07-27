@@ -48,6 +48,7 @@ func (t *Controller) Run(stopCh <-chan struct{}) error {
 
 	// Wait for the caches to be synced before starting workers
 	klog.Info("Waiting for informer caches to sync")
+
 	if ok := cache.WaitForCacheSync(stopCh, t.informer.HasSynced); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
@@ -85,6 +86,7 @@ func (t *Controller) processNextEndpoint() bool {
 		if !exists {
 			klog.V(log.DEBUG).Infof("Tunnel controller processing - submariner Endpoint object not found for key %q", key)
 			t.endpointWorkqueue.Forget(key)
+
 			return nil
 		}
 
@@ -104,6 +106,7 @@ func (t *Controller) processNextEndpoint() bool {
 
 		t.endpointWorkqueue.Forget(key)
 		klog.V(log.DEBUG).Infof("Tunnel controller successfully installed Endpoint cable %s in the engine", endpoint.Spec.CableName)
+
 		return nil
 	}()
 
@@ -135,15 +138,18 @@ func (t *Controller) handleRemovedEndpoint(obj interface{}) {
 			utilruntime.HandleError(fmt.Errorf("Could not convert object %v to an Endpoint", obj))
 			return
 		}
+
 		object, ok = tombstone.Obj.(*v1.Endpoint)
 		if !ok {
 			utilruntime.HandleError(fmt.Errorf("Could not convert object tombstone %v to an Endpoint", tombstone.Obj))
 			return
 		}
+
 		klog.V(log.DEBUG).Infof("Tunnel controller recovered deleted Endpoint %q from tombstone", object.Name)
 	}
 
 	klog.V(log.DEBUG).Infof("Tunnel controller processing removed submariner Endpoint object: %#v", object)
+
 	myEndpoint := types.SubmarinerEndpoint{
 		Spec: object.Spec,
 	}

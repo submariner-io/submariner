@@ -107,6 +107,7 @@ func main() {
 	if submSpec.CableDriver == "" {
 		submSpec.CableDriver = cable.GetDefaultCableDriver()
 	}
+
 	submSpec.CableDriver = strings.ToLower(submSpec.CableDriver)
 
 	localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterID, submSpec.CableDriver, map[string]string{}, submSpec.NatEnabled,
@@ -135,9 +136,11 @@ func main() {
 		tunnelController := tunnel.NewController(cableEngine, submarinerInformerFactory.Submariner().V1().Endpoints())
 
 		var datastore datastore.Datastore
+
 		switch submSpec.Broker {
 		case "k8s":
 			klog.Info("Creating the kubernetes central datastore")
+
 			datastore, err = subk8s.NewDatastore(submSpec.ClusterID, stopCh)
 			if err != nil {
 				klog.Fatalf("Error creating the kubernetes datastore: %v", err)
@@ -147,6 +150,7 @@ func main() {
 		}
 
 		klog.Info("Creating the datastore syncer")
+
 		dsSyncer := datastoresyncer.NewDatastoreSyncer(submSpec.ClusterID, submarinerClient.SubmarinerV1().Clusters(submSpec.Namespace),
 			submarinerInformerFactory.Submariner().V1().Clusters(), submarinerClient.SubmarinerV1().Endpoints(submSpec.Namespace),
 			submarinerInformerFactory.Submariner().V1().Endpoints(), datastore, submSpec.ColorCodes, localCluster, localEndpoint)
@@ -154,9 +158,12 @@ func main() {
 		submarinerInformerFactory.Start(stopCh)
 
 		var wg sync.WaitGroup
+
 		wg.Add(3)
+
 		go func() {
 			defer wg.Done()
+
 			if err = cableEngine.StartEngine(); err != nil {
 				klog.Fatalf("Error starting the cable engine: %v", err)
 			}
@@ -164,6 +171,7 @@ func main() {
 
 		go func() {
 			defer wg.Done()
+
 			if err = tunnelController.Run(stopCh); err != nil {
 				klog.Fatalf("Error running the tunnel controller: %v", err)
 			}
@@ -171,6 +179,7 @@ func main() {
 
 		go func() {
 			defer wg.Done()
+
 			if err = dsSyncer.Run(stopCh); err != nil {
 				klog.Fatalf("Error running the datastore syncer: %v", err)
 			}

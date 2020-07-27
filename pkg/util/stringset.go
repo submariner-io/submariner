@@ -21,6 +21,7 @@ func (set *StringSet) Add(s string) bool {
 
 	_, found := set.set[s]
 	set.set[s] = true
+
 	return !found
 }
 
@@ -29,6 +30,7 @@ func (set *StringSet) Contains(s string) bool {
 	defer set.syncMutex.Unlock()
 
 	_, found := set.set[s]
+
 	return found
 }
 
@@ -44,7 +46,9 @@ func (set *StringSet) Delete(s string) bool {
 	defer set.syncMutex.Unlock()
 
 	_, found := set.set[s]
+
 	delete(set.set, s)
+
 	return found
 }
 
@@ -63,6 +67,7 @@ func (set *StringSet) Elements() []string {
 
 	elements := make([]string, len(set.set))
 	i := 0
+
 	for v := range set.set {
 		elements[i] = v
 		i++

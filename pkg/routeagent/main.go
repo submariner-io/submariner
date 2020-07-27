@@ -93,6 +93,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
+
 		if err = routeController.Run(stopCh); err != nil {
 			klog.Fatalf("Error running route controller: %s", err.Error())
 		}

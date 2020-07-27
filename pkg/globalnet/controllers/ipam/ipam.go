@@ -25,7 +25,9 @@ func NewController(spec *SubmarinerIpamControllerSpecification, config *Informer
 	for _, v := range spec.ExcludeNS {
 		exclusionMap[v] = true
 	}
+
 	pool, err := NewIpPool(globalCIDR)
+
 	if err != nil {
 		return nil, err
 	}
@@ -48,6 +50,7 @@ func NewController(spec *SubmarinerIpamControllerSpecification, config *Informer
 		pool:              pool,
 		ipt:               iptableHandler,
 	}
+
 	klog.Info("Setting up event handlers")
 	config.ServiceInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -98,17 +101,20 @@ func (i *Controller) Run(stopCh <-chan struct{}) error {
 
 	// Wait for the caches to be synced before starting workers
 	klog.Info("Waiting for informer caches to sync")
+
 	if ok := cache.WaitForCacheSync(stopCh, i.servicesSynced, i.podsSynced); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
 
 	klog.Info("Starting workers")
+
 	go wait.Until(i.runServiceWorker, time.Second, stopCh)
 	go wait.Until(i.runPodWorker, time.Second, stopCh)
 	go wait.Until(i.runNodeWorker, time.Second, stopCh)
 	<-stopCh
 	klog.Info("Shutting down workers")
 	i.cleanupIPTableRules()
+
 	return nil
 }
 
@@ -133,6 +139,7 @@ func (i *Controller) processNextObject(objWorkqueue workqueue.RateLimitingInterf
 	if shutdown {
 		return false
 	}
+
 	err := func() error {
 		defer objWorkqueue.Done(obj)
 
@@ -200,6 +207,7 @@ func (i *Controller) processNextObject(objWorkqueue workqueue.RateLimitingInterf
 		}
 
 		objWorkqueue.Forget(obj)
+
 		return nil
 	}()
 
@@ -225,14 +233,17 @@ func (i *Controller) getEnqueueKey(obj interface{}) string {
 		utilruntime.HandleError(err)
 		return ""
 	}
+
 	ns, _, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		utilruntime.HandleError(err)
 		return ""
 	}
+
 	if i.excludeNamespaces[ns] {
 		return ""
 	}
+
 	return key
 }
 
@@ -255,6 +266,7 @@ func (i *Controller) handleUpdateService(old, newObj interface{}) {
 	if oldGlobalIp != newGlobalIp && newGlobalIp != i.pool.GetAllocatedIp(key) {
 		klog.V(log.DEBUG).Infof("GlobalIp changed from %s to %s for Service %q", oldGlobalIp, newGlobalIp, key)
 		i.serviceWorkqueue.Add(key)
+
 		return
 	}
 
@@ -288,6 +300,7 @@ func (i *Controller) handleUpdatePod(old, newObj interface{}) {
 	if oldPodIp != "" && updatedPodIp == "" {
 		klog.V(log.DEBUG).Infof("Pod %q with ip %s is being terminated", key, oldPodIp)
 		i.handleRemovedPod(old)
+
 		return
 	}
 
@@ -297,6 +310,7 @@ func (i *Controller) handleUpdatePod(old, newObj interface{}) {
 		if updatedPodIp != "" {
 			klog.V(log.DEBUG).Infof("In handleUpdatePod, pod %q is now assigned %s address, enqueing", key, updatedPodIp)
 			i.podWorkqueue.Add(key)
+
 			return
 		} else {
 			klog.Warningf("In handleUpdatePod, waiting for K8s to assign an IpAddress to pod %s, state %s", key, newObj.(*k8sv1.Pod).Status.Phase)
@@ -308,6 +322,7 @@ func (i *Controller) handleUpdatePod(old, newObj interface{}) {
 	if oldGlobalIp != newGlobalIp && newGlobalIp != i.pool.GetAllocatedIp(key) {
 		klog.V(log.DEBUG).Infof("GlobalIp changed from %s to %s for %s", oldGlobalIp, newGlobalIp, key)
 		i.podWorkqueue.Add(key)
+
 		return
 	}
 }
@@ -331,6 +346,7 @@ func (i *Controller) handleUpdateNode(old, newObj interface{}) {
 	if oldCniIfaceIpOnNode == "" && newCniIfaceIpOnNode == "" {
 		klog.V(log.DEBUG).Infof("In handleUpdateNode, node %q is not yet annotated with cniIfaceIP, enqueing", newObj.(*k8sv1.Node).Name)
 		i.enqueueObject(newObj, i.nodeWorkqueue)
+
 		return
 	}
 
@@ -354,12 +370,14 @@ func (i *Controller) handleRemovedService(obj interface{}) {
 			klog.Errorf("Could not convert object %v to Service", obj)
 			return
 		}
+
 		service, ok = tombstone.Obj.(*k8sv1.Service)
 		if !ok {
 			klog.Errorf("Could not convert object tombstone %v to Service", tombstone.Obj)
 			return
 		}
 	}
+
 	if !i.excludeNamespaces[service.Namespace] {
 		globalIp := service.Annotations[submarinerIpamGlobalIp]
 		if globalIp != "" {
@@ -367,8 +385,10 @@ func (i *Controller) handleRemovedService(obj interface{}) {
 				utilruntime.HandleError(err)
 				return
 			}
+
 			i.pool.Release(key)
 			klog.V(log.DEBUG).Infof("Released ip %s for service %s", globalIp, key)
+
 			err = i.syncServiceRules(service, globalIp, DeleteRules)
 			if err != nil {
 				klog.Errorf("Error while cleaning up Service %q ingress rules. %v", key, err)
@@ -390,12 +410,14 @@ func (i *Controller) handleRemovedPod(obj interface{}) {
 			klog.Errorf("Could not convert object %v to pod", obj)
 			return
 		}
+
 		pod, ok = tombstone.Obj.(*k8sv1.Pod)
 		if !ok {
 			klog.Errorf("Could not convert object tombstone %v to Pod", tombstone.Obj)
 			return
 		}
 	}
+
 	if !i.excludeNamespaces[pod.Namespace] {
 		globalIp := pod.Annotations[submarinerIpamGlobalIp]
 		if globalIp != "" && pod.Status.PodIP != "" {
@@ -403,8 +425,10 @@ func (i *Controller) handleRemovedPod(obj interface{}) {
 				utilruntime.HandleError(err)
 				return
 			}
+
 			i.pool.Release(key)
 			klog.V(log.DEBUG).Infof("Released globalIp %s for pod %q", globalIp, key)
+
 			err = i.syncPodRules(pod.Status.PodIP, globalIp, DeleteRules)
 			if err != nil {
 				klog.Errorf("Error while cleaning up Pod egress rules. %v", err)
@@ -428,6 +452,7 @@ func (i *Controller) handleRemovedNode(obj interface{}) {
 			klog.Errorf("Could not convert object %v to Node", obj)
 			return
 		}
+
 		node, ok = tombstone.Obj.(*k8sv1.Node)
 		if !ok {
 			klog.Errorf("Could not convert object tombstone %v to Node", tombstone.Obj)
@@ -447,8 +472,10 @@ func (i *Controller) handleRemovedNode(obj interface{}) {
 			utilruntime.HandleError(err)
 			return
 		}
+
 		i.pool.Release(key)
 		klog.V(log.DEBUG).Infof("Released ip %s for Node %s", globalIp, key)
+
 		err = i.syncNodeRules(cniIfaceIp, globalIp, DeleteRules)
 		if err != nil {
 			klog.Errorf("Error while cleaning up HostNetwork egress rules. %v", err)
@@ -466,12 +493,15 @@ func (i *Controller) annotateGlobalIp(key, globalIp string) (string, error) {
 		if err != nil {
 			return "", err
 		}
+
 		return ip, nil
 	}
+
 	givenIp, err := i.pool.RequestIp(key, globalIp)
 	if err != nil {
 		return "", err
 	}
+
 	if globalIp != givenIp {
 		// This resource has been allocated a different IP
 		klog.Warningf("Updating globalIp for %q from %s to %s", key, globalIp, givenIp)
@@ -518,7 +548,9 @@ func (i *Controller) serviceUpdater(obj runtime.Object, key string) error {
 		if annotations == nil {
 			annotations = map[string]string{}
 		}
+
 		annotations[submarinerIpamGlobalIp] = allocatedIp
+
 		service.SetAnnotations(annotations)
 		_, err := i.kubeClientSet.CoreV1().Services(service.Namespace).Update(service)
 		if err != nil {
@@ -537,6 +569,7 @@ func (i *Controller) serviceUpdater(obj runtime.Object, key string) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -565,7 +598,9 @@ func (i *Controller) podUpdater(obj runtime.Object, key string) error {
 		if annotations == nil {
 			annotations = map[string]string{}
 		}
+
 		annotations[submarinerIpamGlobalIp] = allocatedIp
+
 		pod.SetAnnotations(annotations)
 		_, err := i.kubeClientSet.CoreV1().Pods(pod.Namespace).Update(pod)
 		if err != nil {
@@ -584,6 +619,7 @@ func (i *Controller) podUpdater(obj runtime.Object, key string) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -612,7 +648,9 @@ func (i *Controller) nodeUpdater(obj runtime.Object, key string) error {
 		if annotations == nil {
 			annotations = map[string]string{}
 		}
+
 		annotations[submarinerIpamGlobalIp] = allocatedIp
+
 		node.SetAnnotations(annotations)
 
 		_, err := i.kubeClientSet.CoreV1().Nodes().Update(node)
@@ -632,6 +670,7 @@ func (i *Controller) nodeUpdater(obj runtime.Object, key string) error {
 			return err
 		}
 	}
+
 	return nil
 }
 

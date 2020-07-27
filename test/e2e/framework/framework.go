@@ -30,6 +30,7 @@ func init() {
 func NewFramework(baseName string) *Framework {
 	f := &Framework{Framework: framework.NewFramework(baseName)}
 	framework.AddCleanupAction(f.GatewayCleanup)
+
 	return f
 }
 
@@ -93,6 +94,7 @@ func (f *Framework) AwaitGatewayWithStatus(cluster framework.ClusterIndex,
 			}
 			return true, "", nil
 		})
+
 	return gw.(*submarinerv1.Gateway)
 }
 
@@ -110,6 +112,7 @@ func (f *Framework) AwaitGatewaysWithStatus(
 
 			return true, "", nil
 		})
+
 	return gwList.([]submarinerv1.Gateway)
 }
 
@@ -160,6 +163,7 @@ func (f *Framework) AwaitGatewayFullyConnected(cluster framework.ClusterIndex, n
 
 			return true, "", nil
 		})
+
 	return gw.(*submarinerv1.Gateway)
 }
 
@@ -175,6 +179,7 @@ func (f *Framework) GatewayCleanup() {
 		}
 
 		ginkgo.By(fmt.Sprintf("Cleaning up any non-active gateways: %v", gatewayNames(passiveGateways)))
+
 		for _, nonActiveGw := range passiveGateways {
 			f.SetGatewayLabelOnNode(framework.ClusterA, nonActiveGw.Name, false)
 			f.AwaitGatewayRemoved(framework.ClusterA, nonActiveGw.Name)
@@ -187,6 +192,7 @@ func gatewayNames(gateways []submarinerv1.Gateway) []string {
 	for _, gw := range gateways {
 		names = append(names, gw.Name)
 	}
+
 	return names
 }
 
@@ -209,6 +215,7 @@ func (f *Framework) GetGatewaysWithHAStatus(
 			filteredGateways = append(filteredGateways, gw)
 		}
 	}
+
 	return filteredGateways
 }
 
@@ -227,8 +234,10 @@ func (f *Framework) GetGatewayInformer(cluster framework.ClusterIndex) (cache.Sh
 	stopCh := make(chan struct{})
 	informerFactory := externalversions.NewSharedInformerFactory(SubmarinerClients[cluster], 0)
 	informer := informerFactory.Submariner().V1().Gateways().Informer()
+
 	go informer.Run(stopCh)
 	Expect(cache.WaitForCacheSync(stopCh, informer.HasSynced)).To(BeTrue())
+
 	return informer, stopCh
 }
 
@@ -248,5 +257,6 @@ func GetDeletionChannel(informer cache.SharedIndexInformer) chan string {
 			}
 		},
 	})
+
 	return deletionChannel
 }

@@ -69,7 +69,9 @@ func (i *engine) StartEngine() error {
 	if err := i.startDriver(); err != nil {
 		return err
 	}
+
 	klog.Infof("CableEngine controller started, driver: %q", i.driver.GetName())
+
 	return nil
 }
 
@@ -83,6 +85,7 @@ func (i *engine) startDriver() error {
 	if err := i.driver.Init(); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -109,6 +112,7 @@ func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 
 	for _, active := range activeConnections {
 		klog.V(log.TRACE).Infof("Analyzing currently active connection %q", active)
+
 		if active == endpoint.Spec.CableName {
 			klog.V(log.DEBUG).Infof("Cable %q is already installed - not installing again", active)
 			return nil
@@ -125,6 +129,7 @@ func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 	}
 
 	klog.Infof("Successfully installed Endpoint cable %q with remote IP %s", endpoint.Spec.CableName, remoteEndpointIP)
+
 	return nil
 }
 
@@ -140,12 +145,14 @@ func (i *engine) RemoveCable(endpoint types.SubmarinerEndpoint) error {
 	}
 
 	klog.Infof("Successfully removed Endpoint cable %q", endpoint.Spec.CableName)
+
 	return nil
 }
 
 func (i *engine) GetHAStatus() v1.HAStatus {
 	i.Lock()
 	defer i.Unlock()
+
 	if i.driver == nil {
 		return v1.HAStatusPassive
 	} else {

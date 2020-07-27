@@ -59,7 +59,9 @@ func createVxLanIface(iface *vxLanIface) error {
 
 		if isVxlanConfigTheSame(iface.link, existing) {
 			klog.V(log.DEBUG).Infof("VxLAN interface already exists with same configuration.")
+
 			iface.link = existing.(*netlink.Vxlan)
+
 			return nil
 		}
 
@@ -126,6 +128,7 @@ func (iface *vxLanIface) configureIPAddress(ipAddress net.IP, mask net.IPMask) e
 	} else if err != nil {
 		return fmt.Errorf("unable to configure address (%s) on vxlan interface (%s). %v", ipAddress, iface.link.Name, err)
 	}
+
 	return nil
 }
 
@@ -155,6 +158,7 @@ func (iface *vxLanIface) AddFDB(ipAddress net.IP, hwAddr string) error {
 	} else {
 		klog.V(log.DEBUG).Infof("Successfully added the bridge fdb entry %v", neigh)
 	}
+
 	return nil
 }
 
@@ -180,5 +184,6 @@ func (iface *vxLanIface) DelFDB(ipAddress net.IP, hwAddr string) error {
 	} else {
 		klog.V(log.DEBUG).Infof("Successfully deleted the bridge fdb entry %v", neigh)
 	}
+
 	return nil
 }

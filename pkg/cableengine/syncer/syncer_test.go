@@ -314,6 +314,7 @@ func newTestDriver() *testDriver {
 	}
 
 	t.expectedDeletedAfter = t.expectedGateway
+
 	return t
 }
 

@@ -50,3 +50,22 @@ linters:
     - unused
     - varcheck
     - whitespace
+    - wsl
+issues:
+  exclude-rules:
+    # Separating explicit var declarations by blank lines seems excessive.
+    - linters:
+        - wsl
+      text: "declarations should never be cuddled"
+
+    # This rule incorrectly flags code where two logically-related lines are
+    # followed by an if conditional to check their err return.
+    - linters:
+        - wsl
+      text: "only one cuddle assignment allowed before if statement"
+
+    # This rule incorrectly flags code where two logically-related lines are
+    # used to create vars that are consumed in a loop.
+    - linters:
+        - wsl
+      text: "only one cuddle assignment allowed before range statement"

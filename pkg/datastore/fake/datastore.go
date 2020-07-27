@@ -78,6 +78,7 @@ func (d *Datastore) SetCluster(cluster *types.SubmarinerCluster) error {
 	}
 
 	d.setCluster <- cluster
+
 	return nil
 }
 
@@ -89,6 +90,7 @@ func (d *Datastore) SetEndpoint(endpoint *types.SubmarinerEndpoint) error {
 	}
 
 	d.setEndpoint <- endpoint
+
 	return nil
 }
 
@@ -100,6 +102,7 @@ func (d *Datastore) RemoveEndpoint(clusterID, cableName string) error {
 	}
 
 	d.removeEndpoint <- makeCableStr(clusterID, cableName)
+
 	return nil
 }
 

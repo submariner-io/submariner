@@ -41,8 +41,11 @@ var _ = Describe("[redundancy] Gateway fail-over tests", func() {
 
 func testBasicGatewayReporting(f *subFramework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
+
 	By(fmt.Sprintf("Ensuring that only one gateway reports as active %q", clusterAName))
+
 	activeGateways := f.AwaitGatewaysWithStatus(framework.ClusterA, subv1.HAStatusActive)
+
 	Expect(activeGateways).To(HaveLen(1))
 
 	By(fmt.Sprintf("Ensuring that the gateway %q is reporting connections", activeGateways[0].Name))
@@ -54,6 +57,7 @@ func testEnginePodRestartScenario(f *subFramework.Framework) {
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
 	By(fmt.Sprintf("Sanity check - ensuring there's only one gateway node on %q", clusterAName))
+
 	gatewayNodes := f.FindNodesByGatewayLabel(framework.ClusterA, true)
 	Expect(gatewayNodes).To(HaveLen(1), fmt.Sprintf("Expected only one gateway node on %q", clusterAName))
 
@@ -61,6 +65,7 @@ func testEnginePodRestartScenario(f *subFramework.Framework) {
 	By(fmt.Sprintf("Found submariner engine pod %q on %q", enginePod.Name, clusterAName))
 
 	By(fmt.Sprintf("Ensuring that the gateway reports as active on %q", clusterAName))
+
 	activeGateway := f.AwaitGatewayFullyConnected(framework.ClusterA, gatewayNodes[0].Name)
 
 	By(fmt.Sprintf("Deleting submariner engine pod and gateway entries %q", enginePod.Name))
@@ -97,6 +102,7 @@ func defaultEndpointType() tcp.EndpointType {
 	if framework.TestContext.GlobalnetEnabled {
 		return tcp.GlobalIP
 	}
+
 	return tcp.PodIP
 }
 
