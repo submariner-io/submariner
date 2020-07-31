@@ -177,8 +177,6 @@ func NewController(clusterID string, clusterCidr, serviceCidr []string, objectNa
 }
 
 func (r *Controller) Run(stopCh <-chan struct{}) error {
-	var wg sync.WaitGroup
-	wg.Add(1)
 	defer utilruntime.HandleCrash()
 
 	// Start the informer factories to begin populating the informer caches
@@ -228,25 +226,6 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 		}
 	}
 
-	if r.cniIface != nil {
-		err = r.annotateThisNodeWithCNInterfaceIP()
-		if err != nil {
-			return err
-		}
-	} else {
-		klog.Warning("cniInterface wasn't found, hostNetwork to remote pod/service connectivity won't work")
-	}
-
-	go wait.Until(r.runEndpointWorker, time.Second, stopCh)
-	go wait.Until(r.runPodWorker, time.Second, stopCh)
-	wg.Wait()
-	klog.Info("Route agent workers started")
-	<-stopCh
-	klog.Info("Route agent stopping")
-	return nil
-}
-
-func (r *Controller) annotateThisNodeWithCNInterfaceIP() error {
 	hostname, err := os.Hostname()
 	if err != nil {
 		klog.Fatalf("unable to determine hostname: %v", err)
@@ -258,16 +237,38 @@ func (r *Controller) annotateThisNodeWithCNInterfaceIP() error {
 		return fmt.Errorf("error while retrieving submariner-route-agent pods: %v", err)
 	}
 
+	var routeAgentNodeName string
 	for index, pod := range podList.Items {
 		klog.V(log.DEBUG).Infof("In %s, podIP of submariner-route-agent[%d] is %s", r.clusterID, index, pod.Status.PodIP)
 		r.populateRemoteVtepIps(pod.Status.PodIP)
-		// Each route-agent pod will annotate its own node with the respective CNIInterfaceIP
-		if hostname == pod.Spec.NodeName {
-			if err = r.annotateNodeWithCNIInterfaceIP(pod.Spec.NodeName); err != nil {
-				return fmt.Errorf("error annotating the node %q with cniIfaceIP: %v", hostname, err)
-			}
+		// On some platforms (like AWS), it was seen that nodeName is configured as FQDN
+		podNodeName := strings.Split(pod.Spec.NodeName, ".")
+		// Similarly, hostnames on some platforms are configured in FQDN
+		if hostname == pod.Spec.NodeName || hostname == podNodeName[0] {
+			routeAgentNodeName = pod.Spec.NodeName
 		}
 	}
+
+	klog.Infof("Hostname is %q and routeAgentNodeName is %q", hostname, routeAgentNodeName)
+
+	if r.cniIface != nil {
+		if routeAgentNodeName == "" {
+			return fmt.Errorf("could not get the nodeName on host %q", hostname)
+		}
+
+		// Each route-agent pod will annotate its own node with the respective CNIInterfaceIP
+		if err = r.annotateNodeWithCNIInterfaceIP(routeAgentNodeName); err != nil {
+			return fmt.Errorf("error annotating the node %q with cniIfaceIP: %v", hostname, err)
+		}
+	} else {
+		klog.Warning("cniInterface wasn't found, hostNetwork to remote pod/service connectivity won't work")
+	}
+
+	go wait.Until(r.runEndpointWorker, time.Second, stopCh)
+	go wait.Until(r.runPodWorker, time.Second, stopCh)
+	klog.Info("Route agent workers started")
+	<-stopCh
+	klog.Info("Route agent stopping")
 	return nil
 }
 
