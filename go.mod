@@ -6,7 +6,6 @@ require (
 	github.com/bronze1man/goStrongswanVici v0.0.0-20190921045355-4c81bd8d0bd5
 	github.com/coreos/go-iptables v0.4.5
 	github.com/go-logr/zapr v0.1.1 // indirect
-	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/onsi/ginkgo v1.14.0
@@ -19,11 +18,11 @@ require (
 	go.uber.org/zap v1.15.0 // indirect
 	golang.org/x/sys v0.0.0-20200519105757-fe76b779f299
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20200324154536-ceff61240acf
-	k8s.io/api v0.17.0
-	k8s.io/apimachinery v0.17.0
-	k8s.io/client-go v0.17.0
+	k8s.io/api v0.18.6
+	k8s.io/apimachinery v0.18.6
+	k8s.io/client-go v0.18.6
 	k8s.io/klog v1.0.0
-	sigs.k8s.io/controller-runtime v0.3.0
+	sigs.k8s.io/controller-runtime v0.6.2
 	sigs.k8s.io/testing_frameworks v0.1.2 // indirect
 )
 
