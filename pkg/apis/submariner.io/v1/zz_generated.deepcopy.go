@@ -55,7 +55,7 @@ func (in *Cluster) DeepCopyObject() runtime.Object {
 func (in *ClusterList) DeepCopyInto(out *ClusterList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Cluster, len(*in))
@@ -168,7 +168,7 @@ func (in *Endpoint) DeepCopyObject() runtime.Object {
 func (in *EndpointList) DeepCopyInto(out *EndpointList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Endpoint, len(*in))
@@ -256,7 +256,7 @@ func (in *Gateway) DeepCopyObject() runtime.Object {
 func (in *GatewayList) DeepCopyInto(out *GatewayList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Gateway, len(*in))
