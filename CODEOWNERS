@@ -4,9 +4,9 @@
 Makefile* 		@mkolesnik
 Dockerfile.dapper 	@mkolesnik
 package/* 		@mkolesnik
-/submariner/pkg/globalnet/* @sridhargaddam
-/submariner/pkg/routeagent/* @sridhargaddam
-/submariner/pkg/cable/strongswan/* @sridhargaddam
+/pkg/globalnet/* @sridhargaddam
+/pkg/routeagent/* @sridhargaddam
+/pkg/cable/strongswan/* @sridhargaddam
 go.mod @skitt
 go.sum @skitt
 /package/* @skitt
