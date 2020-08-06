@@ -20,7 +20,7 @@ require (
 	golang.org/x/sys v0.0.0-20200519105757-fe76b779f299
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20200324154536-ceff61240acf
 	k8s.io/api v0.17.0
-	k8s.io/apimachinery v0.17.0
+	k8s.io/apimachinery v0.18.6
 	k8s.io/client-go v0.17.0
 	k8s.io/klog v1.0.0
 	sigs.k8s.io/controller-runtime v0.3.0
