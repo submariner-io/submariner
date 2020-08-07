@@ -11,4 +11,4 @@ set -e
 /usr/sbin/ipsec --checknflog
 
 # Start the daemon itself with any additional arguments passed in
-/usr/libexec/ipsec/pluto --leak-detective --config /etc/ipsec.conf --nofork  "$@"
+exec /usr/libexec/ipsec/pluto --leak-detective --config /etc/ipsec.conf --nofork  "$@"
