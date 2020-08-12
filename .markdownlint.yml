@@ -20,4 +20,3 @@ ul-indent: false
 no-bare-urls: false
 no-multiple-blanks: false
 header-increment: false
-no-missing-space-atx: false
