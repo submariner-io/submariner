@@ -149,7 +149,7 @@ deploy the Submariner components and join the cluster to the broker.
 
 An operator is a tool to package, manage and deploy any Kubernetes application. A submariner operator will soon be available on [OperatorHub.io](https://operatorhub.io).
 
-##TODO: Add instructions on how to install using operator
+## TODO: Add instructions on how to install using operator
 
 ## Manual installation using helm charts
 
