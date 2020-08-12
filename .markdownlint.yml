@@ -1,11 +1,10 @@
 # Breaks reusing MD snippets extracted to files
 first-line-heading: false
 
-# FIXME: Remove HTML elements other than span
 # Allow HTML span elements to set font sizes
-#no-inline-html:
-#  allowed_elements:
-#    - span
+no-inline-html:
+  allowed_elements:
+    - span
 
 # FIXME: Enable these, fix errors
 line-length: false
@@ -22,5 +21,3 @@ no-bare-urls: false
 no-multiple-blanks: false
 header-increment: false
 no-missing-space-atx: false
-no-inline-html: false
-
