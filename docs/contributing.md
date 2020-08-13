@@ -6,8 +6,9 @@
   - [Overview](#overview)
   - [How to contribute](#how-to-contribute)
   - [Reaching out](#reaching-out)
-    - [slack](#slack)
+    - [Slack](#slack)
     - [Google group](#google-group)
+    - [Weekly Meeting](#weekly-meeting)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 

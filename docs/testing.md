@@ -6,11 +6,11 @@
 - [Testing with E2E](#testing-with-e2e)
   - [Prerequisites](#prerequisites)
   - [Installation and usage](#installation-and-usage)
-    - [Ephemeral/Onetime](#ephemeralonetime)
-    - [Permanent](#permanent)
-      - [Operator](#operator)
+    - [Operator](#operator)
+      - [Reloading your code changes](#reloading-your-code-changes)
+    - [Re-running e2e tests after your code changes](#re-running-e2e-tests-after-your-code-changes)
       - [Cleanup](#cleanup)
-      - [Full example](#full-example)
+    - [Full example](#full-example)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
