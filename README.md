@@ -353,7 +353,6 @@ You can jump into a virtual environment shell by typing:
    make shell
    ```
 
-
 # Contributing
 
 We welcome issues/PR's to Submariner, if you encounter issues that you'd like to fix while working on it or find new features that you'd like. Please refer [contributing guide](https://github.com/submariner-io/submariner/tree/master/docs/contributing.md) for more details.

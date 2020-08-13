@@ -26,7 +26,6 @@ E2E tests identify each cluster by their associated kubeconfig context names,
 so you need to specify the -dp-context flag for each context name you want
 the E2E tests to use.
 
-
 Assuming that we have cluster1, cluster2 and cluster3 contexts, and that
 cluster1 is our broker cluster, **to execute the E2E tests** we would do:
 
@@ -175,7 +174,6 @@ the `deploytool` flag to the standard `make` commands.
 
 A large set of verifications for the Operator and the resulting Submariner
 deployment will automatically run during and after the deployment.
-
 
 #### Reloading your code changes
 During the development of new features you may want to compile submariner and push the images
