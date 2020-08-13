@@ -37,7 +37,7 @@ Traffic is encrypted and encapsulated in UDP packets.
 ## Troubleshooting, limitations
 
 - If you get the following message
-  ```
+  ```text
   Fatal error occurred creating engine: failed to add wireguard device: operation not supported
   ```
   you probably did not install WireGuard on the Gateway node.
