@@ -18,4 +18,3 @@ blanks-around-headings: false
 commands-show-output: false
 ul-indent: false
 no-bare-urls: false
-no-multiple-blanks: false
