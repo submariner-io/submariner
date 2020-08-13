@@ -97,6 +97,7 @@ to gain insight into the test:
   ```
 
 # Testing with E2E 
+
 The e2e environment can be used for local testing, development, and CI purposes.
 
 E2E environment consists of:
@@ -166,6 +167,7 @@ make deploy
 ```
 
 ### Operator
+
 After generating the Operator by running `make build-operator`, your newly generated operator
 is automatically fully integrated into the Submariner CI automation. Simply use
 the `deploytool` flag to the standard `make` commands.
@@ -176,6 +178,7 @@ A large set of verifications for the Operator and the resulting Submariner
 deployment will automatically run during and after the deployment.
 
 #### Reloading your code changes
+
 During the development of new features you may want to compile submariner and push the images
 into the local registry used by the kind clusters. You can use the reload-images make target
 for that.
@@ -199,6 +202,7 @@ make reload-images restart=none
 ```
 
 ### Re-running e2e tests after your code changes
+
 Once your kind virtual clusters and submariner are deployed, you can re-run e2e just by repeating the `make e2e` call.
 Deployment and install will be avoided, hence the existing environment will remain as is.
 If you need to load new container images, please check `make reload-images` from the previous section.
@@ -221,6 +225,7 @@ make e2e focus=redundancy
 ```
 
 #### Cleanup
+
 At any time you can run a cleanup command that will remove all the kind clusters.
 
 ```bash

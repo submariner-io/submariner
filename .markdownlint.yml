@@ -14,4 +14,3 @@ blanks-around-lists: false
 no-trailing-spaces: false
 fenced-code-language: false
 ul-style: false
-blanks-around-headings: false

@@ -34,13 +34,17 @@ Refer to [this link](https://help.github.com/en/articles/creating-a-pull-request
 A good PR commit message clearly explains the purpose of a PR and the logic implemented.
 
 ## Reaching out
+
 You can reach out to Submariner folks on Slack and Google Groups.
 
 ### Slack
+
 Join the #submariner Slack channel on [the Kubernetes workspace](https://kubernetes.slack.com/).
 
 ### Google group
+
 Join [Submariner's Google group](https://groups.google.com/forum/#!forum/submariner-dev).
 
 ### Weekly Meeting
+
 Join [Submariner's weekly meeting](https://bluejeans.com/3472508766) from 11:00-11:30AM ET ([agendas and notes](https://docs.google.com/document/d/1qnZ2LpF_rXGfnYYPNTldQ4WbeEUxwnuQD-xTC6GbZdg)).
