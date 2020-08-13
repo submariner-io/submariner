@@ -101,6 +101,7 @@ to gain insight into the test:
 The e2e environment can be used for local testing, development, and CI purposes.
 
 E2E environment consists of:
+
 - 3 k8s clusters deployed with [kind].
   - Cluster1: One master node for broker.
   - Cluster{2..3}: One master node and workers for gateways nodes.
@@ -129,6 +130,7 @@ make e2e
 To test with optional functionality, use the `using=` flag to enable the extra options.
 
 Currently, these options are supported:
+
 - **globalnet:** To deploy with globalnet (and overlapping IPs)
 - **helm:** To deploy using helm instead of the operator.
 - **libreswan:** To use libreswan to establish connectivity.

@@ -10,4 +10,3 @@ no-inline-html:
 line-length: false
 code-block-style: false
 blanks-around-fences: false
-blanks-around-lists: false
