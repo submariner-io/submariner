@@ -16,4 +16,3 @@ fenced-code-language: false
 ul-style: false
 blanks-around-headings: false
 commands-show-output: false
-ul-indent: false
