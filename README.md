@@ -44,7 +44,7 @@ The basic architecture diagram for Submariner is as follows:
 
 ![submariner architecture](docs/img/architecture.jpg)
 
-Submariner consists of a few components that work and operate off of Kubernetes Custom Resource Definitions (CRDs). The Submariner CRDs are `clusters.submariner.io` and `endpoints.submariner.io`. 
+Submariner consists of a few components that work and operate off of Kubernetes Custom Resource Definitions (CRDs). The Submariner CRDs are `clusters.submariner.io` and `endpoints.submariner.io`.
 
 The two primary Submariner components within connected clusters are:
 
@@ -71,7 +71,7 @@ The submariner-route-agent runs as a DaemonSet on all Kubernetes worker nodes, a
 
 ## Network Path
 
-The network path of Submariner varies depending on the origin/destination of the IP traffic. In all cases, traffic between two clusters will transit between the leader elected (in each cluster) gateway nodes, through `ip xfrm` rules. Each gateway node has a running Charon daemon which will perform IPsec keying and policy management. 
+The network path of Submariner varies depending on the origin/destination of the IP traffic. In all cases, traffic between two clusters will transit between the leader elected (in each cluster) gateway nodes, through `ip xfrm` rules. Each gateway node has a running Charon daemon which will perform IPsec keying and policy management.
 
 When the source pod is on a worker node that is not the elected gateway node, the traffic destined for the remote cluster will transit through the submariner VxLAN tunnel (`vx-submariner`) to the local cluster gateway node. On the gateway node, traffic is encapsulated in an IPSEC tunnel and forwarded to the remote cluster. Once the traffic reaches the destination gateway node, it is routed in one of two ways, depending on the destination CIDR. If the destination CIDR is a pod network, the traffic is routed via CNI-programmed network. If the destination CIDR is a service network, then traffic is routed through the facility configured via kube-proxy on the destination gateway node.
 
@@ -174,7 +174,7 @@ kubectl config use-context west
 kubectl config use-context east
 ```
 
-Submariner utilizes Helm as a package management tool. 
+Submariner utilizes Helm as a package management tool.
 
 Before you start, you should add the `submariner-latest` chart repository to deploy the Submariner helm charts.
 
@@ -249,11 +249,11 @@ Submariner is installed by using a helm chart. Once you populate the environment
    ```shell
    helm repo update
    ```
-   
+
 #### Installation of Submariner in each cluster
 
 Each cluster that will be connected must have Submariner installed within it. You must repeat these steps for each cluster that you add.
-   
+
 1. Set your kubeconfig context to your desired installation cluster
 
    ```shell
@@ -300,7 +300,7 @@ Each cluster that will be connected must have Submariner installed within it. Yo
    --set submariner.serviceCidr="<SERVICE_CIDR>" \
    --set submariner.natEnabled="<NAT_ENABLED>"
    ```
-   
+
    |Placeholder|Description|Default|Example|
    |:----------|:----------|:------|:------|
    |\<CLUSTER_ID>|Cluster ID (Must be RFC 1123 compliant)|""|west-cluster|
@@ -333,7 +333,7 @@ wget -O - <NGINX_POD_IP>
 
 # Testing
 
-Submariner functionality can be tested by running [E2E test suites](https://github.com/submariner-io/submariner/tree/master/test/e2e). 
+Submariner functionality can be tested by running [E2E test suites](https://github.com/submariner-io/submariner/tree/master/test/e2e).
 Please refer [testing guide](https://github.com/submariner-io/submariner/tree/master/docs/testing.md) for more details.
 
 # Known Issues/Notes
@@ -341,12 +341,12 @@ Please refer [testing guide](https://github.com/submariner-io/submariner/tree/ma
 ## Openshift Notes
 
 When running in Openshift, we need to grant the appropriate security context for the service accounts
-   
+
    ```shell
    oc adm policy add-scc-to-user privileged system:serviceaccount:submariner:submariner-routeagent
-   oc adm policy add-scc-to-user privileged system:serviceaccount:submariner:submariner-engine 
+   oc adm policy add-scc-to-user privileged system:serviceaccount:submariner:submariner-engine
    ```
-   
+
 # Building
 
 To build `submariner-engine` and `submariner-route-agent` you can trigger `make`, which will perform a Dapperized build of the components.
