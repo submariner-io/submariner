@@ -168,7 +168,7 @@ Submariner utilizes the following tools for installation:
 
 These instructions assume you have a combined kube config file with at least three contexts that correspond to the respective clusters. Thus, you should be able to perform commands like
 
-```
+```shell
 kubectl config use-context broker
 kubectl config use-context west
 kubectl config use-context east
@@ -178,7 +178,7 @@ Submariner utilizes Helm as a package management tool.
 
 Before you start, you should add the `submariner-latest` chart repository to deploy the Submariner helm charts.
 
-```
+```shell
 helm repo add submariner-latest https://releases.rancher.com/submariner-charts/latest
 ```
 
@@ -187,13 +187,13 @@ helm repo add submariner-latest https://releases.rancher.com/submariner-charts/l
 The broker is the component that Submariner utilizes to exchange metadata information between clusters for connection information. This should only be installed once on your central broker cluster. Currently, the broker is implemented by utilizing the Kubernetes API, but is modular and will be enhanced in the future to bring support for other interfaces. The broker can be installed by using a helm chart.
 
 First, you should switch into the context for the broker cluster
-```
+```shell
 kubectl config use-context <BROKER_CONTEXT>
 ```
 
 If you have not yet initialized Tiller on the cluster, you can do so with the following commands:
 
-```
+```shell
 kubectl -n kube-system create serviceaccount tiller
 
 kubectl create clusterrolebinding tiller \
@@ -205,13 +205,13 @@ helm init --service-account tiller
 
 Wait for Tiller to initialize
 
-```
+```shell
 kubectl -n kube-system  rollout status deploy/tiller-deploy
 ```
 
 Once tiller is initialized, you can install the Submariner K8s Broker
 
-```
+```shell
 helm repo update
 
 SUBMARINER_BROKER_NS=submariner-k8s-broker
@@ -223,7 +223,7 @@ helm install submariner-latest/submariner-k8s-broker \
 
 Once you install the broker, you can retrieve the Kubernetes API server information (if not known) and service account token for the client by utilizing the following commands:
 
-```
+```shell
 SUBMARINER_BROKER_URL=$(kubectl -n default get endpoints kubernetes -o jsonpath="{.subsets[0].addresses[0].ip}:{.subsets[0].ports[?(@.name=='https')].port}")
 
 SUBMARINER_BROKER_CA=$(kubectl -n ${SUBMARINER_BROKER_NS} get secrets -o jsonpath="{.items[?(@.metadata.annotations['kubernetes\.io/service-account\.name']=='${SUBMARINER_BROKER_NS}-client')].data['ca\.crt']}")
@@ -239,14 +239,14 @@ Submariner is installed by using a helm chart. Once you populate the environment
 
 1. Generate a Pre-Shared Key for Submariner. This key will be used for all of your clusters, so keep it somewhere safe.
 
-   ```
+   ```shell
    SUBMARINER_PSK=$(cat /dev/urandom | LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 64 | head -n 1)
    echo $SUBMARINER_PSK
    ```
 
 1. Update the helm repository to pull the latest version of the Submariner charts
 
-   ```
+   ```shell
    helm repo update
    ```
    
@@ -256,19 +256,19 @@ Each cluster that will be connected must have Submariner installed within it. Yo
    
 1. Set your kubeconfig context to your desired installation cluster
 
-   ```
+   ```shell
    kubectl config use-context <CLUSTER_CONTEXT>
    ```
 
 1. Label your gateway nodes with the annotation `submariner.io/gateway=true`
 
-   ```
+   ```shell
    kubectl label node <DESIRED_NODE> "submariner.io/gateway=true"
    ```
 
 1. Initialize Helm (if not yet done)
 
-   ```
+   ```shell
    kubectl -n kube-system create serviceaccount tiller
 
    kubectl create clusterrolebinding tiller \
@@ -280,12 +280,12 @@ Each cluster that will be connected must have Submariner installed within it. Yo
 
 1. Wait for Tiller to initialize
 
-   ```
+   ```shell
    kubectl -n kube-system  rollout status deploy/tiller-deploy
    ```
 1. Install submariner into this cluster. The values within the following command correspond to the table below.
 
-   ```
+   ```shell
    helm install submariner-latest/submariner \
    --name submariner \
    --namespace submariner \
@@ -320,11 +320,15 @@ Change contexts to your other workload cluster, i.e. `kubectl config use-context
 
 Run a busybox pod and ping/curl the nginx pod:
 
-```
+```shell
 kubectl run -i -t busybox --image=busybox --restart=Never
+```
+
 If you don't see a command prompt, try pressing enter.
-/ # ping <NGINX_POD_IP>
-/ # wget -O - <NGINX_POD_IP>
+
+```shell
+ping <NGINX_POD_IP>
+wget -O - <NGINX_POD_IP>
 ```
 
 # Testing
@@ -338,7 +342,7 @@ Please refer [testing guide](https://github.com/submariner-io/submariner/tree/ma
 
 When running in Openshift, we need to grant the appropriate security context for the service accounts
    
-   ```
+   ```shell
    oc adm policy add-scc-to-user privileged system:serviceaccount:submariner:submariner-routeagent
    oc adm policy add-scc-to-user privileged system:serviceaccount:submariner:submariner-engine 
    ```
@@ -350,7 +354,7 @@ To build `submariner-engine` and `submariner-route-agent` you can trigger `make`
 Buidling submariner happens inside a docker based virtual environment (based in dapper).
 You can jump into a virtual environment shell by typing:
 
-   ```
+   ```shell
    make shell
    ```
 

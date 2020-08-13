@@ -69,7 +69,7 @@ It's possible to generate jUnit XML report files
   ```
 
 Suggested arguments
-  ```
+  ```text
   -test.v       : verbose output from go test
   -ginkgo.v     : verbose output from ginkgo
   -ginkgo.trace : output stack track on failure
