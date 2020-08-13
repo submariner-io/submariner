@@ -59,6 +59,7 @@ specify the ginkgo.focus argument
   ```
 
 It's possible to generate jUnit XML report files
+
   ```bash
   export GO111MODULE=on
   cd test/e2e
@@ -69,6 +70,7 @@ It's possible to generate jUnit XML report files
   ```
 
 Suggested arguments
+
   ```text
   -test.v       : verbose output from go test
   -ginkgo.v     : verbose output from ginkgo
@@ -123,6 +125,7 @@ Optional useful tools for troubleshooting:
 ## Installation and usage
 
 To run the tests simply execute the following:
+
 ```bash
 make e2e
 ```
@@ -137,6 +140,7 @@ Currently, these options are supported:
 - **wireguard:** To use wireguard to establish connectivity.
 
 For example:
+
 ```bash
 make e2e using=globalnet,wireguard,helm
 ```
@@ -193,12 +197,14 @@ make reload-images
 ```
 
 If you are working on a specific service, you can specify to only restart that service, for example:
+
 ```bash
 make reload-images restart=gateway
 ```
 
 If you don't want to restart any service because you plan to restart specific pods in specific clusters
 manually, then run:
+
 ```bash
 make reload-images restart=none
 ```
@@ -210,11 +216,13 @@ Deployment and install will be avoided, hence the existing environment will rema
 If you need to load new container images, please check `make reload-images` from the previous section.
 
 In case you want to re-run just the tests:
+
 ```bash
 make e2e
 ```
 
 In case you want to use updated images and re-run the tests:
+
 ```bash
 make reload-images e2e
 ```
