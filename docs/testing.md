@@ -129,10 +129,10 @@ make e2e
 To test with optional functionality, use the `using=` flag to enable the extra options.
 
 Currently, these options are supported:
-* **globalnet:** To deploy with globalnet (and overlapping IPs)
-* **helm:** To deploy using helm instead of the operator.
-* **libreswan:** To use libreswan to establish connectivity.
-* **wireguard:** To use wireguard to establish connectivity.
+- **globalnet:** To deploy with globalnet (and overlapping IPs)
+- **helm:** To deploy using helm instead of the operator.
+- **libreswan:** To use libreswan to establish connectivity.
+- **wireguard:** To use wireguard to establish connectivity.
 
 For example:
 ```bash
