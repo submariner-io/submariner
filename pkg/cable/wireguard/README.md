@@ -20,6 +20,7 @@ Traffic is encrypted and encapsulated in UDP packets.
 ## Installation
 
 - WireGuard needs to be [installed](https://www.wireguard.com/install "WireGuard installation instructions") on the gateway nodes. For example, (Ubuntu < 19.04),
+
   ```shell
   sudo add-apt-repository ppa:wireguard/wireguard
   sudo apt-get update
@@ -28,6 +29,7 @@ Traffic is encrypted and encapsulated in UDP packets.
   ```
 
 - The driver needs to be enabled with
+
   ```shell
   bin/subctl join --cable-driver wireguard --disable-nat broker-info.subm
   ```
@@ -37,12 +39,15 @@ Traffic is encrypted and encapsulated in UDP packets.
 ## Troubleshooting, limitations
 
 - If you get the following message
+
   ```text
   Fatal error occurred creating engine: failed to add wireguard device: operation not supported
   ```
+
   you probably did not install WireGuard on the Gateway node.
 
 - The e2e tests can be run with WireGuard by setting `DEPLOY_ARGS` before calling `make e2e`
+
   ```shell
   export DEPLOY_ARGS="--deploytool operator --deploytool_submariner_args '--cable-driver=wireguard'"
   ```

@@ -187,6 +187,7 @@ helm repo add submariner-latest https://releases.rancher.com/submariner-charts/l
 The broker is the component that Submariner utilizes to exchange metadata information between clusters for connection information. This should only be installed once on your central broker cluster. Currently, the broker is implemented by utilizing the Kubernetes API, but is modular and will be enhanced in the future to bring support for other interfaces. The broker can be installed by using a helm chart.
 
 First, you should switch into the context for the broker cluster
+
 ```shell
 kubectl config use-context <BROKER_CONTEXT>
 ```
@@ -283,6 +284,7 @@ Each cluster that will be connected must have Submariner installed within it. Yo
    ```shell
    kubectl -n kube-system  rollout status deploy/tiller-deploy
    ```
+
 1. Install submariner into this cluster. The values within the following command correspond to the table below.
 
    ```shell
