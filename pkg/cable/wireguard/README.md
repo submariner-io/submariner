@@ -20,16 +20,16 @@ Traffic is encrypted and encapsulated in UDP packets.
 ## Installation
 
 - WireGuard needs to be [installed](https://www.wireguard.com/install "WireGuard installation instructions") on the gateway nodes. For example, (Ubuntu < 19.04),
-  ```ShellSession
-  $ sudo add-apt-repository ppa:wireguard/wireguard
-  $ sudo apt-get update
-  $ sudo apt-get install linux-headers-`uname -r` -y
-  $ sudo apt-get install wireguard
+  ```shell
+  sudo add-apt-repository ppa:wireguard/wireguard
+  sudo apt-get update
+  sudo apt-get install linux-headers-`uname -r` -y
+  sudo apt-get install wireguard
   ```
 
 - The driver needs to be enabled with
-  ```ShellSession
-  $ bin/subctl join --cable-driver wireguard --disable-nat broker-info.subm
+  ```shell
+  bin/subctl join --cable-driver wireguard --disable-nat broker-info.subm
   ```
 
 - The default UDP listen port for WireGuard is `5871`. It can be changed by setting the env var `CE_IPSEC_NATTPORT`
@@ -43,8 +43,8 @@ Traffic is encrypted and encapsulated in UDP packets.
   you probably did not install WireGuard on the Gateway node.
 
 - The e2e tests can be run with WireGuard by setting `DEPLOY_ARGS` before calling `make e2e`
-  ```ShellSession
-  $ export DEPLOY_ARGS="--deploytool operator --deploytool_submariner_args '--cable-driver=wireguard'"
+  ```shell
+  export DEPLOY_ARGS="--deploytool operator --deploytool_submariner_args '--cable-driver=wireguard'"
   ```
 
 - No new `iptables` rules were added, although source NAT needs to be disabled for cross cluster communication. This is similar to disabling SNAT when sending cross-cluster traffic between nodes to `submariner-gateway`, so the existing rules should be enough.
