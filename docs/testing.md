@@ -166,7 +166,7 @@ the following command:
 make deploy
 ```
 
-#### Operator
+### Operator
 After generating the Operator by running `make build-operator`, your newly generated operator
 is automatically fully integrated into the Submariner CI automation. Simply use
 the `deploytool` flag to the standard `make` commands.
@@ -200,7 +200,7 @@ manually, then run:
 make reload-images restart=none
 ```
 
-#### Re-running e2e tests after your code changes
+### Re-running e2e tests after your code changes
 Once your kind virtual clusters and submariner are deployed, you can re-run e2e just by repeating the `make e2e` call.
 Deployment and install will be avoided, hence the existing environment will remain as is.
 If you need to load new container images, please check `make reload-images` from the previous section.
@@ -236,7 +236,7 @@ The next run will be a cold run and will take more time.
 docker system prune --all
 ``` 
 
-#### Full example
+### Full example
 
 ```bash
 make e2e version=1.14.1 globalnet=true deploytool=operator

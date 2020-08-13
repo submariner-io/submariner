@@ -333,7 +333,7 @@ Please refer [testing guide](https://github.com/submariner-io/submariner/tree/ma
 
 # Known Issues/Notes
 
-### Openshift Notes
+## Openshift Notes
 
 When running in Openshift, we need to grant the appropriate security context for the service accounts
    
