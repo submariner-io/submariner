@@ -96,7 +96,7 @@ to gain insight into the test:
   dlv test -- -ginkgo.v -ginkgo.focus=mytest
   ```
 
-# Testing with E2E 
+# Testing with E2E
 
 The e2e environment can be used for local testing, development, and CI purposes.
 
@@ -232,12 +232,12 @@ At any time you can run a cleanup command that will remove all the kind clusters
 make cleanup
 ```
 
-You can do full docker cleanup, but it will force all the docker images to be removed and invalidate the local docker cache. 
+You can do full docker cleanup, but it will force all the docker images to be removed and invalidate the local docker cache.
 The next run will be a cold run and will take more time.
 
 ```bash
 docker system prune --all
-``` 
+```
 
 ### Full example
 
