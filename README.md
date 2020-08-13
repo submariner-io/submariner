@@ -114,10 +114,12 @@ path. The binary has no external dependencies so you won’t need anything else.
 
 For example, to download v0.1.0 for Linux amd64 and install it in `~/.local/bin`:
 
-    mkdir -p ~/.local/bin
-    wget https://github.com/submariner-io/submariner-operator/releases/download/v0.1.0/subctl-v0.1.0-linux-amd64
-    install subctl-v0.1.0-linux-amd64 ~/.local/bin/subctl
-    rm subctl-v0.1.0-linux-amd64
+```shell
+mkdir -p ~/.local/bin
+wget https://github.com/submariner-io/submariner-operator/releases/download/v0.1.0/subctl-v0.1.0-linux-amd64
+install subctl-v0.1.0-linux-amd64 ~/.local/bin/subctl
+rm subctl-v0.1.0-linux-amd64
+```
 
 If `~/.local/bin` is on your `PATH`, you will then be able to run `subctl`.
 
@@ -125,7 +127,9 @@ If `~/.local/bin` is on your `PATH`, you will then be able to run `subctl`.
 
 To deploy only the broker in a cluster, run
 
-    subctl deploy-broker --kubeconfig /path/to/your/config --no-dataplane
+```shell
+subctl deploy-broker --kubeconfig /path/to/your/config --no-dataplane
+```
 
 `/path/to/your/config` must correspond to the `kubeconfig` of the target cluster.
 
@@ -136,7 +140,9 @@ be used to join other clusters to the broker.
 
 To install the engine and route agent, run
 
-    subctl join --kubeconfig /path/to/your/config broker-info.subm
+```shell
+subctl join --kubeconfig /path/to/your/config broker-info.subm
+```
 
 `/path/to/your/config` must correspond to the `kubeconfig` of the joining cluster.
 `broker-info.subm` is the file obtained from the broker deployment and is used to join the cluster to that broker.

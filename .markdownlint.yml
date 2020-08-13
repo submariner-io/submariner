@@ -8,4 +8,3 @@ no-inline-html:
 
 # FIXME: Enable these, fix errors
 line-length: false
-code-block-style: false
