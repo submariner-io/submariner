@@ -27,7 +27,7 @@ To contribute to Submariner:
 1. Fork this repository
 2. Make your changes in the fork
 3. Test your changes by running `make e2e` which deploys [Submariner in a Kind 3 cluster
-   setup](https://github.com/submariner-io/submariner/blob/master/scripts/kind-e2e/README.md) and runs E2E tests
+   setup](https://submariner.io/contributing/building_testing/#end-to-end-tests) and runs E2E tests
 4. Submit a pull request (PR) to Submariner master branch
 5. (Optionally) Run `make cleanup` to tear down the test clusters once you're finished.
 
