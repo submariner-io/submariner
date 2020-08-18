@@ -14,21 +14,21 @@ import (
 )
 
 func (i *Controller) initIPTableChains() error {
-	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", submarinerIngress)
+	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", route.SmGlobalnetIngressChain)
 
-	if err := util.CreateChainIfNotExists(i.ipt, "nat", submarinerIngress); err != nil {
-		return fmt.Errorf("error creating iptables chain %s: %v", submarinerIngress, err)
+	if err := util.CreateChainIfNotExists(i.ipt, "nat", route.SmGlobalnetIngressChain); err != nil {
+		return fmt.Errorf("error creating iptables chain %s: %v", route.SmGlobalnetIngressChain, err)
 	}
 
-	forwardToSubGlobalNetChain := []string{"-j", submarinerIngress}
+	forwardToSubGlobalNetChain := []string{"-j", route.SmGlobalnetIngressChain}
 	if err := util.PrependUnique(i.ipt, "nat", "PREROUTING", forwardToSubGlobalNetChain); err != nil {
 		klog.Errorf("error appending iptables rule %q: %v\n", strings.Join(forwardToSubGlobalNetChain, " "), err)
 	}
 
-	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", submarinerEgress)
+	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", route.SmGlobalnetEgressChain)
 
-	if err := util.CreateChainIfNotExists(i.ipt, "nat", submarinerEgress); err != nil {
-		return fmt.Errorf("error creating iptables chain %s: %v", submarinerEgress, err)
+	if err := util.CreateChainIfNotExists(i.ipt, "nat", route.SmGlobalnetEgressChain); err != nil {
+		return fmt.Errorf("error creating iptables chain %s: %v", route.SmGlobalnetEgressChain, err)
 	}
 
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", route.SmPostRoutingChain)
@@ -37,7 +37,7 @@ func (i *Controller) initIPTableChains() error {
 		return fmt.Errorf("error creating iptables chain %s: %v", route.SmPostRoutingChain, err)
 	}
 
-	forwardToSubGlobalNetChain = []string{"-j", submarinerEgress}
+	forwardToSubGlobalNetChain = []string{"-j", route.SmGlobalnetEgressChain}
 	if err := util.PrependUnique(i.ipt, "nat", route.SmPostRoutingChain, forwardToSubGlobalNetChain); err != nil {
 		klog.Errorf("error inserting iptables rule %q: %v\n", strings.Join(forwardToSubGlobalNetChain, " "), err)
 	}
@@ -46,8 +46,8 @@ func (i *Controller) initIPTableChains() error {
 		return err
 	}
 
-	forwardToSubGlobalNetChain = []string{"-j", submarinerMark}
-	if err := util.PrependUnique(i.ipt, "nat", submarinerEgress, forwardToSubGlobalNetChain); err != nil {
+	forwardToSubGlobalNetChain = []string{"-j", route.SmGlobalnetMarkChain}
+	if err := util.PrependUnique(i.ipt, "nat", route.SmGlobalnetEgressChain, forwardToSubGlobalNetChain); err != nil {
 		klog.Errorf("error inserting iptables rule %q: %v\n", strings.Join(forwardToSubGlobalNetChain, " "), err)
 	}
 
@@ -134,41 +134,12 @@ func (i *Controller) evaluateNode(node *k8sv1.Node) Operation {
 	return Process
 }
 
-func (i *Controller) cleanupIPTableRules() {
-	err := i.ipt.ClearChain("nat", submarinerIngress)
-	if err != nil {
-		klog.Errorf("Error while flushing rules in %s chain: %v", submarinerIngress, err)
-	}
-
-	err = i.ipt.ClearChain("nat", submarinerEgress)
-	if err != nil {
-		klog.Errorf("Error while flushing rules in %s chain: %v", submarinerEgress, err)
-	}
-}
-
 func CreateGlobalNetMarkingChain(ipt *iptables.IPTables) error {
-	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", submarinerMark)
+	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", route.SmGlobalnetMarkChain)
 
-	if err := util.CreateChainIfNotExists(ipt, "nat", submarinerMark); err != nil {
-		return fmt.Errorf("error creating iptables chain %s: %v", submarinerMark, err)
+	if err := util.CreateChainIfNotExists(ipt, "nat", route.SmGlobalnetMarkChain); err != nil {
+		return fmt.Errorf("error creating iptables chain %s: %v", route.SmGlobalnetMarkChain, err)
 	}
 
 	return nil
-}
-
-func ClearGlobalNetChains(ipt *iptables.IPTables) {
-	err := ipt.ClearChain("nat", submarinerIngress)
-	if err != nil {
-		klog.Errorf("Error while flushing rules in %s chain: %v", submarinerIngress, err)
-	}
-
-	err = ipt.ClearChain("nat", submarinerEgress)
-	if err != nil {
-		klog.Errorf("Error while flushing rules in %s chain: %v", submarinerEgress, err)
-	}
-
-	err = ipt.ClearChain("nat", submarinerMark)
-	if err != nil {
-		klog.Errorf("Error while flushing rules in %s chain: %v", submarinerMark, err)
-	}
 }
