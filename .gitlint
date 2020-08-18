@@ -1,0 +1,3 @@
+[general]
+# Allow commit messages with only a title
+ignore=body-is-missing
