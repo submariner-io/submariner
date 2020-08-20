@@ -204,7 +204,6 @@ func main() {
 
 	go startLeaderElection(leClient, recorder, becameLeader, lostLeader)
 	<-stopCh
-	cableEngineSyncer.CleanupGatewayEntry()
 	klog.Info("All controllers stopped or exited. Stopping main loop")
 }
 
