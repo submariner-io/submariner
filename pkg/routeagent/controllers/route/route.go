@@ -243,7 +243,11 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 
 	for index, pod := range podList.Items {
 		klog.V(log.DEBUG).Infof("In %s, podIP of submariner-route-agent[%d] is %s", r.clusterID, index, pod.Status.PodIP)
-		r.populateRemoteVtepIps(pod.Status.PodIP)
+		// If Pod is not yet assigned with an ip-address it will be processed subsequently during pod update event.
+		if pod.Status.PodIP != "" {
+			r.populateRemoteVtepIps(pod.Status.PodIP)
+		}
+
 		// On some platforms (like AWS), it was seen that nodeName is configured as FQDN
 		podNodeName := strings.Split(pod.Spec.NodeName, ".")
 		// Similarly, hostnames on some platforms are configured in FQDN
@@ -514,6 +518,11 @@ func (r *Controller) processNextPod() bool {
 			r.podWorkqueue.AddRateLimited(obj)
 
 			return fmt.Errorf("error retrieving submariner-route-agent pod object %s: %v", name, err)
+		}
+
+		if pod.Status.PodIP == "" {
+			r.podWorkqueue.Forget(obj)
+			return fmt.Errorf("submariner-route-agent pod %q does not have an ip-address yet", name)
 		}
 
 		klog.V(log.DEBUG).Infof("Processing submariner-route-agent pod %q with host IP %q, pod IP %q",

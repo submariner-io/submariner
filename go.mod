@@ -13,11 +13,11 @@ require (
 	github.com/onsi/gomega v1.10.1
 	github.com/pkg/errors v0.9.1
 	github.com/rdegges/go-ipify v0.0.0-20150526035502-2d94a6a86c40
-	github.com/submariner-io/admiral v0.5.0
-	github.com/submariner-io/shipyard v0.5.0
+	github.com/submariner-io/admiral v0.6.0
+	github.com/submariner-io/shipyard v0.6.0
 	github.com/vishvananda/netlink v1.1.0
 	go.uber.org/zap v1.15.0 // indirect
-	golang.org/x/sys v0.0.0-20200519105757-fe76b779f299
+	golang.org/x/sys v0.0.0-20200615200032-f1bc736245b1
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20200324154536-ceff61240acf
 	k8s.io/api v0.17.0
 	k8s.io/apimachinery v0.17.0

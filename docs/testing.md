@@ -6,11 +6,11 @@
 - [Testing with E2E](#testing-with-e2e)
   - [Prerequisites](#prerequisites)
   - [Installation and usage](#installation-and-usage)
-    - [Ephemeral/Onetime](#ephemeralonetime)
-    - [Permanent](#permanent)
-      - [Operator](#operator)
+    - [Operator](#operator)
+      - [Reloading your code changes](#reloading-your-code-changes)
+    - [Re-running e2e tests after your code changes](#re-running-e2e-tests-after-your-code-changes)
       - [Cleanup](#cleanup)
-      - [Full example](#full-example)
+    - [Full example](#full-example)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -25,7 +25,6 @@ clusters we mean clusters which are interconnected by a deployment of submariner
 E2E tests identify each cluster by their associated kubeconfig context names,
 so you need to specify the -dp-context flag for each context name you want
 the E2E tests to use.
-
 
 Assuming that we have cluster1, cluster2 and cluster3 contexts, and that
 cluster1 is our broker cluster, **to execute the E2E tests** we would do:
@@ -60,6 +59,7 @@ specify the ginkgo.focus argument
   ```
 
 It's possible to generate jUnit XML report files
+
   ```bash
   export GO111MODULE=on
   cd test/e2e
@@ -70,7 +70,8 @@ It's possible to generate jUnit XML report files
   ```
 
 Suggested arguments
-  ```
+
+  ```text
   -test.v       : verbose output from go test
   -ginkgo.v     : verbose output from ginkgo
   -ginkgo.trace : output stack track on failure
@@ -97,10 +98,12 @@ to gain insight into the test:
   dlv test -- -ginkgo.v -ginkgo.focus=mytest
   ```
 
-# Testing with E2E 
+# Testing with E2E
+
 The e2e environment can be used for local testing, development, and CI purposes.
 
 E2E environment consists of:
+
 - 3 k8s clusters deployed with [kind].
   - Cluster1: One master node for broker.
   - Cluster{2..3}: One master node and workers for gateways nodes.
@@ -122,6 +125,7 @@ Optional useful tools for troubleshooting:
 ## Installation and usage
 
 To run the tests simply execute the following:
+
 ```bash
 make e2e
 ```
@@ -129,12 +133,14 @@ make e2e
 To test with optional functionality, use the `using=` flag to enable the extra options.
 
 Currently, these options are supported:
-* **globalnet:** To deploy with globalnet (and overlapping IPs)
-* **helm:** To deploy using helm instead of the operator.
-* **libreswan:** To use libreswan to establish connectivity.
-* **wireguard:** To use wireguard to establish connectivity.
+
+- **globalnet:** To deploy with globalnet (and overlapping IPs)
+- **helm:** To deploy using helm instead of the operator.
+- **libreswan:** To use libreswan to establish connectivity.
+- **wireguard:** To use wireguard to establish connectivity.
 
 For example:
+
 ```bash
 make e2e using=globalnet,wireguard,helm
 ```
@@ -166,7 +172,8 @@ the following command:
 make deploy
 ```
 
-#### Operator
+### Operator
+
 After generating the Operator by running `make build-operator`, your newly generated operator
 is automatically fully integrated into the Submariner CI automation. Simply use
 the `deploytool` flag to the standard `make` commands.
@@ -176,8 +183,8 @@ the `deploytool` flag to the standard `make` commands.
 A large set of verifications for the Operator and the resulting Submariner
 deployment will automatically run during and after the deployment.
 
-
 #### Reloading your code changes
+
 During the development of new features you may want to compile submariner and push the images
 into the local registry used by the kind clusters. You can use the reload-images make target
 for that.
@@ -190,27 +197,32 @@ make reload-images
 ```
 
 If you are working on a specific service, you can specify to only restart that service, for example:
+
 ```bash
 make reload-images restart=gateway
 ```
 
 If you don't want to restart any service because you plan to restart specific pods in specific clusters
 manually, then run:
+
 ```bash
 make reload-images restart=none
 ```
 
-#### Re-running e2e tests after your code changes
+### Re-running e2e tests after your code changes
+
 Once your kind virtual clusters and submariner are deployed, you can re-run e2e just by repeating the `make e2e` call.
 Deployment and install will be avoided, hence the existing environment will remain as is.
 If you need to load new container images, please check `make reload-images` from the previous section.
 
 In case you want to re-run just the tests:
+
 ```bash
 make e2e
 ```
 
 In case you want to use updated images and re-run the tests:
+
 ```bash
 make reload-images e2e
 ```
@@ -223,20 +235,21 @@ make e2e focus=redundancy
 ```
 
 #### Cleanup
+
 At any time you can run a cleanup command that will remove all the kind clusters.
 
 ```bash
 make cleanup
 ```
 
-You can do full docker cleanup, but it will force all the docker images to be removed and invalidate the local docker cache. 
+You can do full docker cleanup, but it will force all the docker images to be removed and invalidate the local docker cache.
 The next run will be a cold run and will take more time.
 
 ```bash
 docker system prune --all
-``` 
+```
 
-#### Full example
+### Full example
 
 ```bash
 make e2e version=1.14.1 globalnet=true deploytool=operator
