@@ -157,17 +157,13 @@ func main() {
 
 		submarinerInformerFactory.Start(stopCh)
 
+		if err = cableEngine.StartEngine(); err != nil {
+			klog.Fatalf("Error starting the cable engine: %v", err)
+		}
+
 		var wg sync.WaitGroup
 
-		wg.Add(3)
-
-		go func() {
-			defer wg.Done()
-
-			if err = cableEngine.StartEngine(); err != nil {
-				klog.Fatalf("Error starting the cable engine: %v", err)
-			}
-		}()
+		wg.Add(2)
 
 		go func() {
 			defer wg.Done()
