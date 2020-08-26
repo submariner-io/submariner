@@ -1,3 +1,4 @@
+---
 name: Markdown Link Checks
 on: pull_request
 
@@ -6,11 +7,11 @@ jobs:
     runs-on: ubuntu-latest
     name: Markdown Link Checks
     steps:
-    - name: Check out code
-      uses: actions/checkout@v1
+      - name: Check out code
+        uses: actions/checkout@v1
 
-    - name: Run markdown-link-check
-      uses: gaurav-nelson/github-action-markdown-link-check@0.6.0
-      with:
-        config-file: ".markdownlinkcheck.json"
-        check-modified-files-only: "yes"
+      - name: Run markdown-link-check
+        uses: gaurav-nelson/github-action-markdown-link-check@0.6.0
+        with:
+          config-file: ".markdownlinkcheck.json"
+          check-modified-files-only: "yes"

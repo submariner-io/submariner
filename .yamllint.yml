@@ -1,0 +1,14 @@
+---
+extends: default
+
+rules:
+  line-length:
+    max: 140
+  # Allow standard GHA syntax for "on: *"
+  truthy:
+    ignore: '.github/workflows/*.yml'
+
+ignore: |
+  /vendor
+
+strict: true
