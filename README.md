@@ -225,7 +225,7 @@ Submariner utilizes Helm as a package management tool.
 Before you start, you should add the `submariner-latest` chart repository to deploy the Submariner helm charts.
 
 ```shell
-helm repo add submariner-latest https://releases.rancher.com/submariner-charts/latest
+helm repo add submariner-latest https://submariner-io.github.io/submariner-charts/charts
 ```
 
 ### Broker Installation/Setup
