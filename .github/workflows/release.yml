@@ -1,4 +1,6 @@
 ---
+name: Release Images
+
 on:
   push:
     branches:
@@ -6,7 +8,6 @@ on:
     tags:
       - 'v**'
 
-name: Release Images
 jobs:
   e2e:
     timeout-minutes: 30

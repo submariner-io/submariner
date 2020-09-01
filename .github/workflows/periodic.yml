@@ -1,13 +1,14 @@
 ---
-name: Markdown Link Checks
+name: Periodic
+
 on:
   schedule:
     - cron: "0 0 * * 0"
 
 jobs:
   markdown-link-check-periodic:
+    name: Markdown Links (all files)
     runs-on: ubuntu-latest
-    name: Markdown Link Checks
     steps:
       - name: Check out code
         uses: actions/checkout@v1

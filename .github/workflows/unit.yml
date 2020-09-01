@@ -1,26 +1,15 @@
 ---
+name: Unit Tests
+
 on:
   pull_request:
-    branches:
-      - '**'
   push:
-    branches:
-      - master
     tags:
       - 'v**'
 
-name: validation
 jobs:
-  validate:
-    name: Linting
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@master
-      - name: Run validation
-        run: make validate
   unit-testing:
-    name: Unit Testing
+    name: Go Unit Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repository
@@ -46,12 +35,3 @@ jobs:
         with:
           name: Unit test artifacts
           path: artifacts
-
-  code-gen:
-    name: Submariner K8s API code generation
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@master
-      - name: Run validation
-        run: make codegen
