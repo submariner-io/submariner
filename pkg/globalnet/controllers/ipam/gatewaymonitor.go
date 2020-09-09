@@ -163,7 +163,6 @@ func (i *GatewayMonitor) processNextEndpoint() bool {
 
 			for _, endpoint := range endpoints.Items {
 				if endpoint.Spec.ClusterID != i.clusterID {
-					klog.Infof("Marking rules for remote endpoint %q", endpoint.Spec.ClusterID)
 					for _, remoteSubnet := range endpoint.Spec.Subnets {
 						MarkRemoteClusterTraffic(i.ipt, remoteSubnet, AddRules)
 					}

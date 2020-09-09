@@ -104,7 +104,7 @@ func (r *Controller) clearGlobalnetChains() error {
 			return fmt.Errorf("error while retrieving the local ClusterInfo: %v", err)
 		}
 
-		if localCluster.Spec.GlobalCIDR != nil && len(localCluster.Spec.GlobalCIDR) > 0 {
+		if len(localCluster.Spec.GlobalCIDR) > 0 {
 			r.globalnetStatus = GN_Enabled
 		} else {
 			r.globalnetStatus = GN_Disabled
