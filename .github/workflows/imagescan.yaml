@@ -1,0 +1,26 @@
+name: Security checks
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+    - name: Build the Docker image
+      run: make bin/submariner-engine package/.image.submariner
+    - uses: anchore/scan-action@v1
+      with:
+        image-reference: "quay.io/submariner/submariner:devel"
+        dockerfile-path: "package/Dockerfile.submariner"
+        fail-build: true
+        acs-report-enable: true
+        #acs-report-severity-cutoff: "Medium"
+    - name: anchore inline scan JSON results
+      run: for j in `ls ./anchore-reports/*.json`; do echo "---- ${j} ----"; cat ${j}; echo; done
+    - name: anchore action SARIF report
+      run: cat results.sarif
+    - name: upload Anchore scan SARIF report
+      uses: github/codeql-action/upload-sarif@v1
+      with:
+        sarif_file: results.sarif
