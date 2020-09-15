@@ -3,11 +3,10 @@
 /scripts/ 		@mkolesnik
 Makefile* 		@mkolesnik
 Dockerfile.dapper 	@mkolesnik
-package/* 		@mkolesnik
-/pkg/globalnet/* @sridhargaddam
-/pkg/routeagent/* @sridhargaddam
+/pkg/globalnet/*	@sridhargaddam
+/pkg/routeagent/*	@sridhargaddam
 /pkg/cable/strongswan/* @sridhargaddam
-go.mod @skitt
-go.sum @skitt
-/package/* @skitt
-/pkg/cable/libreswan/* @skitt
+go.mod			@skitt
+go.sum 			@skitt
+/package/* 		@mkolesnik @skitt
+/pkg/cable/libreswan/*	@skitt
