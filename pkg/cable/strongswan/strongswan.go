@@ -71,6 +71,8 @@ const defaultIKEPort = "500"
 const defaultNATTPort = "4500"
 const ipsecSpecEnvVarPrefix = "ce_ipsec"
 
+const DefaultRoutingTable = 220
+
 func NewStrongSwan(localEndpoint types.SubmarinerEndpoint, localCluster types.SubmarinerCluster) (cable.Driver, error) {
 	ipSecSpec := specification{}
 
