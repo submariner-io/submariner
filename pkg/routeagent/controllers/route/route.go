@@ -13,11 +13,6 @@ import (
 	"time"
 
 	"github.com/submariner-io/admiral/pkg/log"
-	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/cable/wireguard"
-	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
-	informers "github.com/submariner-io/submariner/pkg/client/informers/externalversions/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/util"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	k8sv1 "k8s.io/api/core/v1"
@@ -30,6 +25,14 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
+
+	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	cableCleanup "github.com/submariner-io/submariner/pkg/cable/cleanup"
+	"github.com/submariner-io/submariner/pkg/cable/wireguard"
+	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	informers "github.com/submariner-io/submariner/pkg/client/informers/externalversions/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/routeagent/cleanup"
+	"github.com/submariner-io/submariner/pkg/util"
 )
 
 type InformerConfigStruct struct {
@@ -70,6 +73,8 @@ type Controller struct {
 	defaultHostIface *net.Interface
 
 	cniIface *cniInterface
+
+	cleanupHandlers []cleanup.Handler
 }
 
 const (
@@ -156,6 +161,9 @@ func NewController(clusterID string, clusterCidr, serviceCidr []string, objectNa
 		endpointWorkqueue:      workqueue.NewNamedRateLimitingQueue(newRateLimiter(), "Endpoints"),
 		podWorkqueue:           workqueue.NewNamedRateLimitingQueue(newRateLimiter(), "Pods"),
 	}
+
+	// For now we get all the cleanups
+	controller.installCleanupHandlers(cableCleanup.GetCleanupHandlers())
 
 	config.EndpointInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: controller.enqueueEndpoint,
@@ -681,11 +689,10 @@ func (r *Controller) processNextEndpoint() bool {
 		}
 		// If the active Gateway transitions to a new node, we flush the HostNetwork routing table.
 		r.updateRoutingRulesForHostNetworkSupport(nil, FlushRouteTable)
-		r.gwVxLanMutex.Unlock()
 
-		// NOTE(mangelajo): This may not belong here, it's a gateway cleanup thing
-		r.cleanStrongswanRoutingTable()
-		r.cleanXfrmPolicies()
+		r.gatewayToNonGatewayTransitionCleanups()
+
+		r.gwVxLanMutex.Unlock()
 
 		err = r.reconcileRoutes(remoteVtepIP)
 		if err != nil {
@@ -845,42 +852,6 @@ func (r *Controller) cleanVxSubmarinerRoutes() {
 			if err = netlink.RouteDel(&currentRouteList[i]); err != nil {
 				klog.Errorf("Error removing route %s: %v", currentRouteList[i], err)
 			}
-		}
-	}
-}
-
-//NOTE: the following two methods method will probably need to be either moved to another
-//      process, or re-architected in some form. Those are strongswan/ipsec specific
-//      methods, and eventually we will have other types of cable engines. At least
-//      we may want to call the cable-engine specific cleanups depending on the cable
-//      engine which was used.
-
-func (r *Controller) cleanStrongswanRoutingTable() {
-	cmd := exec.Command("/sbin/ip", "r", "flush", "table", "220")
-	if err := cmd.Run(); err != nil {
-		// We can safely ignore this error, as this table
-		// won't exist in most nodes (only gateway nodes)
-		return
-	}
-}
-
-func (r *Controller) cleanXfrmPolicies() {
-	currentXfrmPolicyList, err := netlink.XfrmPolicyList(syscall.AF_INET)
-
-	if err != nil {
-		klog.Errorf("Error retrieving current xfrm policies: %v", err)
-		return
-	}
-
-	if len(currentXfrmPolicyList) > 0 {
-		klog.Infof("Cleaning up %d XFRM policies", len(currentXfrmPolicyList))
-	}
-
-	for i := range currentXfrmPolicyList {
-		klog.V(log.DEBUG).Infof("Deleting XFRM policy %s", currentXfrmPolicyList[i])
-
-		if err = netlink.XfrmPolicyDel(&currentXfrmPolicyList[i]); err != nil {
-			klog.Errorf("Error Deleting XFRM policy %s: %v", currentXfrmPolicyList[i], err)
 		}
 	}
 }
