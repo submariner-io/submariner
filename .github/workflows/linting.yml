@@ -13,6 +13,8 @@ jobs:
         uses: actions/checkout@v2
       - name: Run codegen
         run: make codegen
+      - name: Make sure there's no pending changes
+        run: git add -A && git diff --staged --exit-code
 
   dco:
     name: DCO in Commit Message(s)
