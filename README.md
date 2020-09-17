@@ -32,13 +32,11 @@
 
 # Submariner
 
-[![End to End
-Tests](https://github.com/submariner-io/submariner/workflows/End%20to%20End%20Tests/badge.svg?branch=master)](https://github.com/submariner-io/submariner/actions?query=workflow%3A%22End+to+End+Tests%22+branch%3Amaster)
-[![Validation
-Tests](https://github.com/submariner-io/submariner/workflows/validation/badge.svg?branch=master)](https://github.com/submariner-io/submariner/actions?query=workflow%3Avalidation+branch%3Amaster)
-[![GoDoc](https://godoc.org/github.com/submariner-io/submariner?status.svg)](https://godoc.org/github.com/submariner-io/submariner) [![Go
-Report
-Card](https://goreportcard.com/badge/github.com/submariner-io/submariner)](https://goreportcard.com/report/github.com/submariner-io/submariner)
+[![End to End Tests](https://github.com/submariner-io/submariner/workflows/End%20to%20End%20Tests/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3A%22End+to+End+Tests%22+branch%3Amaster)
+[![Unit Tests](https://github.com/submariner-io/submariner/workflows/Unit%20Tests/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3A%22Unit+Tests%22)
+[![Linting](https://github.com/submariner-io/submariner/workflows/Linting/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3ALinting+branch%3Amaster)
+[![Release Images](https://github.com/submariner-io/submariner/workflows/Release%20Images/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3A%22Release+Images%22)
+[![Periodic](https://github.com/submariner-io/submariner/workflows/Periodic/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3APeriodic+branch%3Amaster)
 
 Submariner is a tool built to connect overlay networks of different Kubernetes clusters. While most testing is performed against Kubernetes
 clusters that have enabled Flannel/Canal/Weavenet/OpenShiftSDN, Submariner should be compatible with any CNI-compatible cluster network
