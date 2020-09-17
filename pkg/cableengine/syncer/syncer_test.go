@@ -106,6 +106,18 @@ func testGatewaySyncing() {
 			t.awaitNoGatewayUpdated()
 		})
 	})
+
+	When("a specific status error is set", func() {
+		It("should create the Gateway resource with the correct StatusFailure", func() {
+			t.awaitGatewayUpdated(t.expectedGateway)
+
+			statusErr := errors.New("fake error")
+			t.expectedGateway.Status.StatusFailure = statusErr.Error()
+
+			t.syncer.SetGatewayStatusError(statusErr)
+			t.awaitGatewayUpdated(t.expectedGateway)
+		})
+	})
 }
 
 func testStaleGatewayCleanup() {
