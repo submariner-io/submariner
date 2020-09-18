@@ -4,8 +4,6 @@
 
 - [Submariner](#submariner)
 - [Architecture](#architecture)
-  - [submariner-gateway](#submariner-gateway)
-  - [submariner-route-agent](#submariner-route-agent)
   - [Network Path](#network-path)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
@@ -20,10 +18,9 @@
     - [Submariner Installation/Setup](#submariner-installationsetup)
       - [Installation of Submariner in each cluster](#installation-of-submariner-in-each-cluster)
   - [Validate Submariner is Working](#validate-submariner-is-working)
-- [Testing](#testing)
+- [Building and Testing](#building-and-testing)
 - [Known Issues/Notes](#known-issuesnotes)
   - [Openshift Notes](#openshift-notes)
-- [Building](#building)
 - [Contributing](#contributing)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
