@@ -45,54 +45,7 @@ with it, it is quite possible that you could run into severe bugs with it, and a
 
 # Architecture
 
-The basic architecture diagram for Submariner is as follows:
-
-![submariner architecture](docs/img/architecture.jpg)
-
-Submariner consists of a few components that work and operate off of Kubernetes Custom Resource Definitions (CRDs). The Submariner CRDs are
-`clusters.submariner.io` and `endpoints.submariner.io`.
-
-The two primary Submariner components within connected clusters are:
-
-- submariner-gateway (DaemonSet)
-- submariner-route-agent (DaemonSet)
-
-The `submariner-gateway` pods are run on the gateway-labeled nodes and perform a leader election between them to elect an active IPsec
-endpoint. The `submariner-route-agent` component runs on every node and is aware of the current active gateway. When running on the active
-gateway node, the `submariner-route-agent` creates a VxLAN VTEP interface to which the `submariner-route-agent` instances running on the
-other worker nodes connect by establishing a VXLAN tunnel with the VTEP of the active gateway node. The `submariner-route-agent` also
-configures routes and programs the necessary iptable rules to enable full connectivity to the remote clusters. The MTU of Submariner VxLAN
-tunnel is configured based on the MTU of the default interface on the host minus VxLAN overhead.
-
-Upon startup, the `submariner-gateway` pod that is elected leader will perform a reconciliation process that ensures it is the sole endpoint
-for this cluster. This is part of the reason why it is important to have unique cluster IDs between clusters, as two clusters with the same
-ID will reconcile each other out of existence.
-
-Upon failure, another `submariner-gateway` pod (on one of the other gateway nodes) will gain leadership and perform reconciliation to ensure
-it is the active leader. When done, the remote clusters will reconcile the IPsec endpoint to the new endpoint, and connection will be
-re-established. In addition, the `submariner-route-agent` pods will update the route tables on each node to point to the new active gateway
-node.
-
-Submariner uses a central broker to facilitate the exchange of information and sync CRD's between clusters. The `datastoresyncer` runs as a
-controller within the leader-elected `submariner` pod, and is responsible for performing a two-way synchronization between the datastore and
-local cluster of Submariner CRDs. The `datastoresyncer` will only push CRD data to the central broker for the local cluster (based on
-cluster ID), and will sync all data from the broker the local cluster when the data does not match the local cluster (to prevent circular
-loops)
-
-## submariner-gateway
-
-submariner-gateway (compiled as the binary `submariner-engine`) has a few controllers built into it that establish state. It is responsible
-for running/interfacing with Charon to establish IPsec tunnels, as well as updating local cluster information into the central broker to
-share information between clusters.
-
-submariner-gateway runs as a DaemonSet on the gateway-labelled nodes and utilizes leader election to establish an active gateway node, which
-is used to facilitate IPsec tunnel connections to remote clusters.
-
-## submariner-route-agent
-
-The submariner-route-agent runs as a DaemonSet on all Kubernetes worker nodes, and ensures route rules to allow all pods/nodes to
-communicate through the elected gateway node for remote cluster networks. It will ensure state and react on CRD changes, which means that it
-is able to remove/add routes as leader election occurs.
+See the [Architecture docs on Submainer's website](https://submariner.io/architecture/).
 
 ## Network Path
 
