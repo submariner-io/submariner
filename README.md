@@ -1,22 +1,13 @@
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
-
 - [Submariner](#submariner)
 - [Architecture](#architecture)
   - [Network Path](#network-path)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
-  - [Installation using subctl](#installation-using-subctl)
-    - [Download](#download)
-    - [Broker](#broker)
-    - [Engine and route agent](#engine-and-route-agent)
-  - [Installation using operator](#installation-using-operator)
-  - [Manual installation using helm charts](#manual-installation-using-helm-charts)
-    - [Setup](#setup)
-    - [Broker Installation/Setup](#broker-installationsetup)
-    - [Submariner Installation/Setup](#submariner-installationsetup)
-      - [Installation of Submariner in each cluster](#installation-of-submariner-in-each-cluster)
+  - [Installation using Operator via subctl](#installation-using-operator-via-subctl)
+  - [Installation using Helm](#installation-using-helm)
   - [Validate Submariner is Working](#validate-submariner-is-working)
 - [Building and Testing](#building-and-testing)
 - [Known Issues/Notes](#known-issuesnotes)
