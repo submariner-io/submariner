@@ -76,48 +76,15 @@ operator](#installation-using-operator). You can see it in action in [this demo]
 
 ### Download
 
-`subctl` is maintained in the operator project and its binaries are available for download from
-[the operator releases](https://github.com/submariner-io/submariner-operator/releases).
-Download the latest binary for your operating system and architecture, then install it on your
-path. The binary has no external dependencies so you won’t need anything else.
-
-For example, to download v0.1.0 for Linux amd64 and install it in `~/.local/bin`:
-
-```shell
-mkdir -p ~/.local/bin
-wget https://github.com/submariner-io/submariner-operator/releases/download/v0.1.0/subctl-v0.1.0-linux-amd64
-install subctl-v0.1.0-linux-amd64 ~/.local/bin/subctl
-rm subctl-v0.1.0-linux-amd64
-```
-
-If `~/.local/bin` is on your `PATH`, you will then be able to run `subctl`.
+See the [`subctl` installation  docs on Submainer's website](https://submariner.io/deployment/subctl/#installation).
 
 ### Broker
 
-To deploy only the broker in a cluster, run
-
-```shell
-subctl deploy-broker --kubeconfig /path/to/your/config --no-dataplane
-```
-
-`/path/to/your/config` must correspond to the `kubeconfig` of the target cluster.
-
-This command also saves a file, `broker-info.subm`, that will be used to join other clusters to the broker.
+See the [`subctl deploy-broker` docs on Submainer's website](https://submariner.io/deployment/subctl/#deploy-broker).
 
 ### Engine and route agent
 
-To install the engine and route agent, run
-
-```shell
-subctl join --kubeconfig /path/to/your/config broker-info.subm
-```
-
-`/path/to/your/config` must correspond to the `kubeconfig` of the joining cluster.
-`broker-info.subm` is the file obtained from the broker deployment and is used to join the cluster to that broker.
-
-This command will ask for any missing information, in particular a unique identifier/name for the cluster and the cluster node to use as a
-gateway.  It will then install [the Submariner operator](#installation-using-operator) and configure it to deploy the Submariner components
-and join the cluster to the broker.
+See the [`subctl join` docs on Submainer's website](https://submariner.io/deployment/subctl/#join).
 
 ## Installation using operator
 
