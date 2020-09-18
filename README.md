@@ -281,10 +281,9 @@ ping <NGINX_POD_IP>
 wget -O - <NGINX_POD_IP>
 ```
 
-# Testing
+# Building and Testing
 
-Submariner functionality can be tested by running [E2E test suites](https://github.com/submariner-io/submariner/tree/master/test/e2e).
-Please refer [testing guide](https://github.com/submariner-io/submariner/tree/master/docs/testing.md) for more details.
+See the [Building and Testing docs on Submainer's website](https://submariner.io/contributing/building_testing/).
 
 # Known Issues/Notes
 
@@ -295,17 +294,6 @@ When running in Openshift, we need to grant the appropriate security context for
    ```shell
    oc adm policy add-scc-to-user privileged system:serviceaccount:submariner:submariner-routeagent
    oc adm policy add-scc-to-user privileged system:serviceaccount:submariner:submariner-engine
-   ```
-
-# Building
-
-To build `submariner-engine` and `submariner-route-agent` you can trigger `make`, which will perform a Dapperized build of the components.
-
-Buidling submariner happens inside a docker based virtual environment (based in dapper).
-You can jump into a virtual environment shell by typing:
-
-   ```shell
-   make shell
    ```
 
 # Contributing
