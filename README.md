@@ -14,7 +14,6 @@
     - [Broker](#broker)
     - [Engine and route agent](#engine-and-route-agent)
   - [Installation using operator](#installation-using-operator)
-  - [TODO: Add instructions on how to install using operator](#todo-add-instructions-on-how-to-install-using-operator)
   - [Manual installation using helm charts](#manual-installation-using-helm-charts)
     - [Setup](#setup)
     - [Broker Installation/Setup](#broker-installationsetup)
@@ -26,7 +25,6 @@
   - [Openshift Notes](#openshift-notes)
 - [Building](#building)
 - [Contributing](#contributing)
-- [TODO](#todo)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -192,8 +190,6 @@ and join the cluster to the broker.
 
 An operator is a tool to package, manage and deploy any Kubernetes application. A submariner operator will soon be available on
 [OperatorHub.io](https://operatorhub.io).
-
-## TODO: Add instructions on how to install using operator
 
 ## Manual installation using helm charts
 
@@ -416,9 +412,3 @@ You can jump into a virtual environment shell by typing:
 
 We welcome issues/PR's to Submariner, if you encounter issues that you'd like to fix while working on it or find new features that you'd
 like. Please refer [contributing guide](https://github.com/submariner-io/submariner/tree/master/docs/contributing.md) for more details.
-
-# TODO
-
-- Potentially spin out Charon into it's own pod to help decrease downtime
-- Better clean up of IPtables rules when node loses leader election
-- Central API server that is hosted by Rancher
