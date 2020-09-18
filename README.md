@@ -83,26 +83,7 @@ Updated docs will be in the [Helm Deployments](https://submariner.io/deployment/
 
 ## Validate Submariner is Working
 
-Switch to the context of one of your clusters, i.e. `kubectl config use-context west`
-
-Run an nginx container in this cluster, i.e. `kubectl run -n default nginx --image=nginx`
-
-Retrieve the pod IP of the nginx container, looking under the "Pod IP" column for `kubectl get pod -n default`
-
-Change contexts to your other workload cluster, i.e. `kubectl config use-context east`
-
-Run a busybox pod and ping/curl the nginx pod:
-
-```shell
-kubectl run -i -t busybox --image=busybox --restart=Never
-```
-
-If you don't see a command prompt, try pressing enter.
-
-```shell
-ping <NGINX_POD_IP>
-wget -O - <NGINX_POD_IP>
-```
+See the [`subctl verify` docs on Submainer's website](https://submariner.io/deployment/subctl/#verify).
 
 # Building and Testing
 
