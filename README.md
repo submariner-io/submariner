@@ -63,30 +63,15 @@ See the [Prerequisites docs on Submainer's website](https://submariner.io/quicks
 
 # Installation
 
-Submariner installation can be done manually using a dedicated tool, `subctl`, or Helm charts, or by using its operator. All three methods
-are described here.
+Submariner supports a number of different deployment models. An Operator is provided to manage Submariner deployments. The Operator can be
+deployed via the `subctl` CLI helper utility, or via Helm charts, or directly. Submariner can also be deployed directly, without the
+Operator, via Helm charts.
 
-## Installation using subctl
+## Installation using Operator via subctl
 
-`subctl` is a Submariner-specific tool developed to simplify Submariner installation. It drives [the
-operator](#installation-using-operator). You can see it in action in [this demo](https://youtu.be/cInmBXuZsU8).
+Submairner provides the `subctl` CLI utility to simplify the deployment and maintenance of Submariner across your clusters.
 
-### Download
-
-See the [`subctl` installation  docs on Submainer's website](https://submariner.io/deployment/subctl/#installation).
-
-### Broker
-
-See the [`subctl deploy-broker` docs on Submainer's website](https://submariner.io/deployment/subctl/#deploy-broker).
-
-### Engine and route agent
-
-See the [`subctl join` docs on Submainer's website](https://submariner.io/deployment/subctl/#join).
-
-## Installation using operator
-
-An operator is a tool to package, manage and deploy any Kubernetes application. A submariner operator will soon be available on
-[OperatorHub.io](https://operatorhub.io).
+See the [`subctl` docs on Submainer's website](https://submariner.io/deployment/subctl/).
 
 ## Manual installation using helm charts
 
