@@ -102,7 +102,7 @@ which will perform IPsec keying and policy management.
 
 When the source pod is on a worker node that is not the elected gateway node, the traffic destined for the remote cluster will transit
 through the submariner VxLAN tunnel (`vx-submariner`) to the local cluster gateway node. On the gateway node, traffic is encapsulated in an
-IPSEC tunnel and forwarded to the remote cluster. Once the traffic reaches the destination gateway node, it is routed in one of two ways,
+IPsec tunnel and forwarded to the remote cluster. Once the traffic reaches the destination gateway node, it is routed in one of two ways,
 depending on the destination CIDR. If the destination CIDR is a pod network, the traffic is routed via CNI-programmed network. If the
 destination CIDR is a service network, then traffic is routed through the facility configured via kube-proxy on the destination gateway
 node.
