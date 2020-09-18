@@ -94,16 +94,7 @@ func main() {
 
 	klog.Info("Creating the cable engine")
 
-	localCluster := types.SubmarinerCluster{
-		ID: submSpec.ClusterID,
-		Spec: subv1.ClusterSpec{
-			ClusterID:   submSpec.ClusterID,
-			ColorCodes:  submSpec.ColorCodes,
-			ServiceCIDR: submSpec.ServiceCidr,
-			ClusterCIDR: submSpec.ClusterCidr,
-			GlobalCIDR:  submSpec.GlobalCidr,
-		},
-	}
+	localCluster := submarinerClusterFrom(&submSpec)
 
 	if len(submSpec.GlobalCidr) > 0 {
 		localSubnets = submSpec.GlobalCidr
@@ -210,6 +201,19 @@ func main() {
 
 	<-stopCh
 	klog.Info("All controllers stopped or exited. Stopping main loop")
+}
+
+func submarinerClusterFrom(submSpec *types.SubmarinerSpecification) types.SubmarinerCluster {
+	return types.SubmarinerCluster{
+		ID: submSpec.ClusterID,
+		Spec: subv1.ClusterSpec{
+			ClusterID:   submSpec.ClusterID,
+			ColorCodes:  submSpec.ColorCodes,
+			ServiceCIDR: submSpec.ServiceCidr,
+			ClusterCIDR: submSpec.ClusterCidr,
+			GlobalCIDR:  submSpec.GlobalCidr,
+		},
+	}
 }
 
 func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder resourcelock.EventRecorder,
