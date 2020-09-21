@@ -1,22 +1,22 @@
 ---
+name: End to End Tests
+
 on:
   pull_request:
   push:
-    branches:
-      - master
     tags:
       - 'v**'
 
-name: End to End Tests
 jobs:
   e2e:
+    name: E2E
     timeout-minutes: 30
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        globalnet: ['', 'globalnet']
         deploytool: ['operator', 'helm']
+        globalnet: ['', 'globalnet']
         cable_driver: ['', 'wireguard', 'libreswan']
         exclude:
           # Our Helm setup doesn’t know how to deploy other cable drivers
