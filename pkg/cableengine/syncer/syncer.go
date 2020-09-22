@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -19,9 +20,11 @@ import (
 )
 
 type GatewaySyncer struct {
-	client  v1typed.GatewayInterface
-	engine  cableengine.Engine
-	version string
+	sync.Mutex
+	client      v1typed.GatewayInterface
+	engine      cableengine.Engine
+	version     string
+	statusError error
 }
 
 var GatewayUpdateInterval = 5 * time.Second
@@ -49,6 +52,21 @@ func (s *GatewaySyncer) Run(stopCh <-chan struct{}) {
 }
 
 func (i *GatewaySyncer) syncGatewayStatus() {
+	i.Lock()
+	defer i.Unlock()
+
+	i.syncGatewayStatusSafe()
+}
+
+func (i *GatewaySyncer) SetGatewayStatusError(err error) {
+	i.Lock()
+	defer i.Unlock()
+
+	i.statusError = err
+	i.syncGatewayStatusSafe()
+}
+
+func (i *GatewaySyncer) syncGatewayStatusSafe() {
 	klog.V(log.TRACE).Info("Running Gateway status sync")
 
 	gatewayObj := i.generateGatewayObject()
@@ -157,9 +175,16 @@ func (i *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 
 	gateway.Status.HAStatus = i.engine.GetHAStatus()
 
-	connections, err := i.engine.ListCableConnections()
-	if err != nil {
-		gateway.Status.StatusFailure = fmt.Sprintf("Error retrieving driver connections: %s", err)
+	var connections *[]v1.Connection
+
+	if i.statusError != nil {
+		gateway.Status.StatusFailure = i.statusError.Error()
+	} else {
+		var err error
+		connections, err = i.engine.ListCableConnections()
+		if err != nil {
+			gateway.Status.StatusFailure = fmt.Sprintf("Error retrieving driver connections: %s", err)
+		}
 	}
 
 	if connections != nil {

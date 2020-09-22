@@ -48,14 +48,12 @@ type engine struct {
 }
 
 // NewEngine creates a new Engine for the local cluster
-func NewEngine(localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) (Engine, error) {
-	i := engine{
+func NewEngine(localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) Engine {
+	return &engine{
 		localCluster:  localCluster,
 		localEndpoint: localEndpoint,
 		driver:        nil,
 	}
-
-	return &i, nil
 }
 
 func (i *engine) GetLocalEndpoint() *types.SubmarinerEndpoint {
