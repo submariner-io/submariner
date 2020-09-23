@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@master
+        uses: actions/checkout@v2
       - name: Run codegen
         run: make codegen
 
@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@master
+        uses: actions/checkout@v2
         with:
           fetch-depth: 0
       - name: Run gitlint
@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@master
+        uses: actions/checkout@v2
       - name: Run golangci-lint
         run: make golangci-lint
 
@@ -56,7 +56,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
 
       - name: Run markdown-link-check
         uses: gaurav-nelson/github-action-markdown-link-check@v1
@@ -69,7 +69,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@master
+        uses: actions/checkout@v2
       - name: Run markdownlint
         run: make markdownlint
 
@@ -78,7 +78,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
 
       - name: Run yamllint
         uses: ibiqlik/action-yamllint@v1

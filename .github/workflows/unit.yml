@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@master
+        uses: actions/checkout@v2
 
       - name: Create artifacts directory
         run: mkdir artifacts

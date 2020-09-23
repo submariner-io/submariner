@@ -26,7 +26,7 @@ jobs:
             cable_driver: 'libreswan'
     steps:
       - name: Check out the repository
-        uses: actions/checkout@master
+        uses: actions/checkout@v2
 
       - name: Install WireGuard kernel module (only in WireGuard jobs)
         if: matrix.cable_driver == 'wireguard'
