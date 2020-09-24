@@ -12,21 +12,21 @@ jobs:
     name: Submariner K8s API Code Generation
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout the repository
+      - name: Check out the repository
         uses: actions/checkout@master
-      - name: Run validation
+      - name: Run codegen
         run: make codegen
 
   dco:
-    runs-on: ubuntu-latest
     name: DCO in Commit Message(s)
+    runs-on: ubuntu-latest
     steps:
-      - name: Get PR Commits
+      - name: Get PR commits
         id: 'get-pr-commits'
         uses: tim-actions/get-pr-commits@master
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: DCO Check
+      - name: Run DCO check
         uses: tim-actions/dco@master
         with:
           commits: ${{ steps.get-pr-commits.outputs.commits }}
@@ -35,16 +35,18 @@ jobs:
     name: Commit Message(s)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@master
+      - name: Check out the repository
+        uses: actions/checkout@master
         with:
           fetch-depth: 0
-      - run: make gitlint
+      - name: Run gitlint
+        run: make gitlint
 
   markdown-link-check:
     name: Markdown Links (modified files)
     runs-on: ubuntu-latest
     steps:
-      - name: Check out code
+      - name: Check out the repository
         uses: actions/checkout@v1
 
       - name: Run markdown-link-check
@@ -57,7 +59,7 @@ jobs:
     name: Go and Markdown
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout the repository
+      - name: Check out the repository
         uses: actions/checkout@master
       - name: Run golangci-lint
         run: make validate
@@ -66,7 +68,7 @@ jobs:
     name: YAML
     runs-on: ubuntu-latest
     steps:
-      - name: Check out code
+      - name: Check out the repository
         uses: actions/checkout@v1
 
       - name: Run yamllint
