@@ -12,13 +12,13 @@ jobs:
     name: Go Unit Tests
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout the repository
+      - name: Check out the repository
         uses: actions/checkout@master
 
       - name: Create artifacts directory
         run: mkdir artifacts
 
-      - name: Run validation
+      - name: Run Go unit tests
         run: |
           set -o pipefail
           make test 2>&1 | tee artifacts/unittest.log
@@ -30,7 +30,7 @@ jobs:
             cp $f -rfp artifacts/$f
           done
 
-      - name: Upload test
+      - name: Upload artifacts
         uses: actions/upload-artifact@v1
         with:
           name: Unit test artifacts
