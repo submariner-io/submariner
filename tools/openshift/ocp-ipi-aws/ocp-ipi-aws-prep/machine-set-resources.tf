@@ -44,7 +44,6 @@ data "template_file" "machine_set_template" {
     rhos_ami_id          = data.aws_instance.worker_instance.ami
     submariner_sg_name   = aws_security_group.submariner_gw_sg.name
     public_subnet_name   = "${var.cluster_id}-public-${data.aws_subnet.target_public_subnet.availability_zone}"
-    worker_instance_type = data.aws_instance.worker_instance.instance_type
   }
 
   depends_on = [

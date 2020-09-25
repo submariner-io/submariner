@@ -24,22 +24,20 @@ spec:
       metadata:
         labels:
           submariner.io/gateway: "true"
+      taints:
+        - effect: NoSchedule
+          key: node-role.submariner.io/gateway
       providerSpec:
         value:
           ami:
             id: ${rhos_ami_id}
           apiVersion: awsproviderconfig.openshift.io/v1beta1
-          blockDevices:
-            - ebs:
-                iops: 0
-                volumeSize: 120
-                volumeType: gp2
           credentialsSecret:
             name: aws-cloud-credentials
           deviceIndex: 0
           iamInstanceProfile:
             id: ${cluster_id}-worker-profile
-          instanceType: ${worker_instance_type}
+          instanceType: m5n.large
           kind: AWSMachineProviderConfig
           placement:
             availabilityZone: ${az}
