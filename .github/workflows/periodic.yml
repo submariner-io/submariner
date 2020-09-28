@@ -10,7 +10,7 @@ jobs:
     name: Markdown Links (all files)
     runs-on: ubuntu-latest
     steps:
-      - name: Check out code
+      - name: Check out the repository
         uses: actions/checkout@v1
 
       - name: Run markdown-link-check
