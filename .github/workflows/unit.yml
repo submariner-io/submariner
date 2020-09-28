@@ -21,7 +21,7 @@ jobs:
       - name: Run Go unit tests
         run: |
           set -o pipefail
-          make test 2>&1 | tee artifacts/unittest.log
+          make unit 2>&1 | tee artifacts/unittest.log
 
       - name: Collect artifacts
         run: |
