@@ -46,7 +46,7 @@ func beforeSuite() {
 
 func queryAndUpdateGlobalnetStatus() {
 	framework.TestContext.GlobalnetEnabled = false
-	clusters := SubmarinerClients[framework.ClusterB].SubmarinerV1().Clusters(framework.TestContext.SubmarinerNamespace)
+	clusters := SubmarinerClients[framework.ClusterA].SubmarinerV1().Clusters(framework.TestContext.SubmarinerNamespace)
 	framework.AwaitUntil("find clusters to figure out if Globalnet is enabled", func() (interface{}, error) {
 		clusters, err := clusters.List(metav1.ListOptions{})
 		if apierrors.IsNotFound(err) {
