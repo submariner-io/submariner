@@ -79,9 +79,5 @@ jobs:
     steps:
       - name: Check out the repository
         uses: actions/checkout@v2
-
       - name: Run yamllint
-        uses: ibiqlik/action-yamllint@v1
-        with:
-          file_or_dir: .
-          config_file: .yamllint.yml
+        run: make yamllint
