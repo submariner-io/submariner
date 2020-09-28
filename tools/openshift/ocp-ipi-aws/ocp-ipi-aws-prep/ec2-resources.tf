@@ -45,6 +45,5 @@ resource "aws_security_group" "submariner_gw_sg" {
 
   tags = merge(map(
     "Name", "${var.cluster_id}-submariner-gw-sg",
-    "kubernetes.io/cluster/${var.cluster_id}", "owned"
   ))
 }
