@@ -25,24 +25,24 @@ jobs:
           - deploytool: 'helm'
             cable_driver: 'libreswan'
     steps:
-      - name: Checkout the repository
+      - name: Check out the repository
         uses: actions/checkout@master
 
-      - name: Install WireGuard module (On WireGuard tests)
+      - name: Install WireGuard kernel module (only in WireGuard jobs)
         if: matrix.cable_driver == 'wireguard'
         run: |
           sudo add-apt-repository -y ppa:wireguard/wireguard # add WireGuard support
           sudo apt update
           sudo apt install -y linux-headers-$(uname -r) wireguard wireguard-dkms
           if [[ "$(uname -r)" =~ -1020- ]]; then
-            # the 1020 kernel doesn't have skb_reset_redirect in skbuff.h, patch Wireguard so it doesn't need it
+            # The 1020 kernel doesn't have skb_reset_redirect in skbuff.h, patch Wireguard so it doesn't need it
             curl https://git.zx2c4.com/wireguard-linux/patch/drivers/net/wireguard/queueing.h\?id=2c64605b590edadb3fb46d1ec6badb49e940b479 \
               | sudo patch -R /usr/src/wireguard*/queueing.h
             sudo dpkg-reconfigure wireguard-dkms
           fi
           sudo modprobe wireguard
 
-      - name: Reclaim free space!
+      - name: Reclaim free space
         run: |
           sudo swapoff -a
           sudo rm -f /swapfile
@@ -53,7 +53,7 @@ jobs:
         run: |
           make e2e using="${{ matrix.globalnet }} ${{ matrix.deploytool }} ${{ matrix.cable_driver }}"
 
-      - name: Post Mortem
+      - name: Post mortem
         if: failure()
         run: |
           df -h

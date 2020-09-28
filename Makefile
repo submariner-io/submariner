@@ -34,8 +34,6 @@ endif
 
 deploy: images
 
-test: unit-test
-
 reload-images: build images
 	./scripts/$@ --restart $(restart)
 
@@ -50,7 +48,7 @@ bin/submariner-globalnet: vendor/modules.txt $(shell find pkg/globalnet)
 
 build: bin/submariner-engine bin/submariner-route-agent bin/submariner-globalnet
 
-ci: validate test build images
+ci: validate unit build images
 
 images: build package/.image.submariner package/.image.submariner-route-agent package/.image.submariner-globalnet
 
@@ -66,7 +64,7 @@ import-submariner-libreswan-git:  images-submariner-libreswan-git
 $(TARGETS): vendor/modules.txt
 	./scripts/$@
 
-.PHONY: $(TARGETS) build ci images test validate
+.PHONY: $(TARGETS) build ci images unit validate
 
 else
 
