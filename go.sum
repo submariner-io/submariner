@@ -348,6 +348,8 @@ github.com/submariner-io/admiral v0.6.1 h1:EWGnf7Yem6dEvbvF/MaQYcYhZ8rTflPgQukl2
 github.com/submariner-io/admiral v0.6.1/go.mod h1:bPMiLdXmGVj3EHnrPoVzn6jTukKeaH2IoWoZdFg2blM=
 github.com/submariner-io/admiral v0.6.2 h1:6iPGX8gSFQq02nNwkpj/zrqA1CbRkc+Too3TziI2HzA=
 github.com/submariner-io/admiral v0.6.2/go.mod h1:/lm9D8AUs/cZE0lhxBfKDwkaU1XhmLkRnRwoD6BNsfg=
+github.com/submariner-io/admiral v0.6.3 h1:96wOqGEDKv0Oq6QXozE6C7/HJ87kEIdHZp4AutykC5s=
+github.com/submariner-io/admiral v0.6.3/go.mod h1:/lm9D8AUs/cZE0lhxBfKDwkaU1XhmLkRnRwoD6BNsfg=
 github.com/submariner-io/shipyard v0.6.0 h1:i1I2ZDCkU8aeL1KGmidac9L00UFhyaK2J0JrIPizjF4=
 github.com/submariner-io/shipyard v0.6.0/go.mod h1:9H9ctEv+K61bMy5teo/fG2azZswmXsPVfFTVdk8ZGk0=
 github.com/submariner-io/shipyard v0.6.1 h1:jkZc9WJpK+ZKjHmuDOM7BT0rkp41pOAsEGJtPAqFs14=
