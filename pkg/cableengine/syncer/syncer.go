@@ -183,7 +183,9 @@ func (i *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 		var err error
 		connections, err = i.engine.ListCableConnections()
 		if err != nil {
-			gateway.Status.StatusFailure = fmt.Sprintf("Error retrieving driver connections: %s", err)
+			msg := fmt.Sprintf("Error retrieving driver connections: %s", err)
+			klog.Errorf(msg)
+			gateway.Status.StatusFailure = msg
 		}
 	}
 

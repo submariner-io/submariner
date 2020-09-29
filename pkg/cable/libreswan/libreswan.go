@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/pkg/errors"
 	"k8s.io/klog"
 
 	"github.com/submariner-io/admiral/pkg/log"
@@ -105,13 +106,11 @@ func (i *libreswan) refreshConnectionStatus() error {
 	cmd := exec.Command("/usr/libexec/ipsec/whack", "--trafficstatus")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		klog.Errorf("error retrieving whack's stdout: %v", err)
-		return err
+		return errors.WithMessage(err, "error retrieving whack's stdout")
 	}
 
 	if err := cmd.Start(); err != nil {
-		klog.Errorf("error starting whack: %v", err)
-		return err
+		return errors.WithMessage(err, "error starting whack")
 	}
 
 	scanner := bufio.NewScanner(stdout)
@@ -123,12 +122,13 @@ func (i *libreswan) refreshConnectionStatus() error {
 		components := strings.Split(line, "\"")
 		if len(components) == 3 {
 			activeConnections.Add(components[1])
+		} else {
+			klog.V(log.DEBUG).Infof("Ignoring whack output line: %q", line)
 		}
 	}
 
 	if err := cmd.Wait(); err != nil {
-		klog.Errorf("error waiting for whack: %v", err)
-		return err
+		return errors.WithMessage(err, "error waiting for whack")
 	}
 
 	localSubnets := extractSubnets(i.localEndpoint.Spec)
@@ -141,6 +141,9 @@ func (i *libreswan) refreshConnectionStatus() error {
 				connectionName := fmt.Sprintf("%s-%d-%d", i.connections[j].Endpoint.CableName, lsi, rsi)
 				if !activeConnections.Contains(connectionName) {
 					allConnected = false
+
+					klog.V(log.DEBUG).Infof("Connection %q not found in active connections obtained from whack: %v",
+						connectionName, activeConnections.Elements())
 				}
 			}
 		}
@@ -244,6 +247,8 @@ func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string
 		return "", fmt.Errorf("error listening: %v", err)
 	}
 
+	klog.Infof("Creating connection(s) for %v", endpoint)
+
 	if len(leftSubnets) > 0 && len(rightSubnets) > 0 {
 		for lsi := range leftSubnets {
 			for rsi := range rightSubnets {
@@ -270,7 +275,7 @@ func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string
 				args = append(args, "--host", remoteEndpointIP)
 				args = append(args, "--client", rightSubnets[rsi])
 
-				klog.Infof("Creating connection to %v", endpoint)
+				klog.Infof("Executing whack with args: %v", args)
 
 				if err := whack(args...); err != nil {
 					return "", err
