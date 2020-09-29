@@ -30,7 +30,7 @@ clusters that have enabled Flannel/Calico/Canal/Weave/OpenShiftSDN, Submariner s
 provider, as it utilizes off-the-shelf components to establish encrypted tunnels between each Kubernetes cluster.
 
 Note that Submariner is in the **pre-alpha** stage, and should not be used for production purposes. While we welcome usage and
-experimentation with it, it is quite possible that you could run into bugs.
+experimentation, it is quite possible that you could run into bugs.
 
 # Architecture
 
@@ -55,9 +55,8 @@ See the [Prerequisites docs on Submainer's website](https://submariner.io/quicks
 
 # Installation
 
-Submariner supports a number of different deployment models, including an Operator and Helm Charts. The Operator can be deployed directly
-or via the `subctl` CLI helper utility. `subctl` greatly simplifies the deployment of Submariner, and is therefore the recommended
-deployment method.
+Submariner supports deployment via an Operator as well as Helm Charts. The Operator can be deployed directly or via the `subctl` CLI helper
+utility. `subctl` greatly simplifies the deployment of Submariner, and is therefore the recommended deployment method.
 
 ## Installation using Operator via subctl
 
