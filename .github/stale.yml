@@ -2,7 +2,7 @@
 # Configuration for probot-stale - https://github.com/probot/stale
 
 # Number of days of inactivity before an Issue becomes stale (pull request is overridden later)
-daysUntilStale: 120
+daysUntilStale: 60
 
 # Number of days of inactivity before an Issue or Pull Request with the stale label is closed.
 # Set to false to disable. If disabled, issues still need to be closed manually, but will remain marked as stale.
@@ -31,7 +31,7 @@ staleLabel: wontfix
 # Comment to post when marking as stale. Set to `false` to disable
 markComment: >
   This issue has been automatically marked as stale because it has not had
-  activity for 120 days. It will be closed if no further activity occurs.
+  activity for 60 days. It will be closed if no further activity occurs.
   Please make a comment if this issue/pr is still valid. Thank you
   for your contributions.
 
