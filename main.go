@@ -4,12 +4,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/submariner-io/admiral/pkg/log"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
@@ -70,6 +72,8 @@ func main() {
 
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
+
+	httpServer := startHttpServer()
 
 	var submSpec types.SubmarinerSpecification
 	err := envconfig.Process("submariner", &submSpec)
@@ -201,6 +205,10 @@ func main() {
 
 	<-stopCh
 	klog.Info("All controllers stopped or exited. Stopping main loop")
+
+	if err := httpServer.Shutdown(context.TODO()); err != nil {
+		klog.Errorf("Error shutting down metrics HTTP server: %v", err)
+	}
 }
 
 func submarinerClusterFrom(submSpec *types.SubmarinerSpecification) types.SubmarinerCluster {
@@ -214,6 +222,20 @@ func submarinerClusterFrom(submSpec *types.SubmarinerSpecification) types.Submar
 			GlobalCIDR:  submSpec.GlobalCidr,
 		},
 	}
+}
+
+func startHttpServer() *http.Server {
+	srv := &http.Server{Addr: ":8080"}
+
+	http.Handle("/metrics", promhttp.Handler())
+
+	go func() {
+		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+			klog.Errorf("Error starting metrics server: %v", err)
+		}
+	}()
+
+	return srv
 }
 
 func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder resourcelock.EventRecorder,
