@@ -152,12 +152,12 @@ func (f *Framework) AwaitGatewayFullyConnected(cluster framework.ClusterIndex, n
 					gw.Name), nil
 			}
 			if len(gw.Status.Connections) == 0 {
-				return false, fmt.Sprintf("Gateway %q exist but has no connections yet", name), nil
+				return false, fmt.Sprintf("Gateway %q is active but has no connections yet", name), nil
 			}
 			for _, conn := range gw.Status.Connections {
 				if conn.Status != submarinerv1.Connected {
-					return false, fmt.Sprintf("Gateway %q exist but connection to cluster %q is not up yet",
-						name, conn.Endpoint.ClusterID), nil
+					return false, fmt.Sprintf("Gateway %q is active but cluster %q is not connected: Status: %q, Message: %q",
+						name, conn.Endpoint.ClusterID, conn.Status, conn.StatusMessage), nil
 				}
 			}
 
