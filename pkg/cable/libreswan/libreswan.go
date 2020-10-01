@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -17,7 +19,6 @@ import (
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/submariner-io/submariner/pkg/util"
 )
 
 const (
@@ -102,6 +103,9 @@ func (i *libreswan) Init() error {
 	return nil
 }
 
+// Line format: 006 #3: "submariner-cable-cluster3-172-17-0-8-0-0", type=ESP, add_time=1590508783, inBytes=0, outBytes=0, id='172.17.0.8'
+var trafficStatusRE = regexp.MustCompile(`.* "([^"]+)", .*inBytes=(\d+), outBytes=(\d+).*`)
+
 func (i *libreswan) refreshConnectionStatus() error {
 	// Retrieve active tunnels from the daemon
 	cmd := exec.Command("/usr/libexec/ipsec/whack", "--trafficstatus")
@@ -115,14 +119,36 @@ func (i *libreswan) refreshConnectionStatus() error {
 	}
 
 	scanner := bufio.NewScanner(stdout)
-	activeConnections := util.NewStringSet()
+	activeConnectionsRx := make(map[string]int)
+	activeConnectionsTx := make(map[string]int)
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		// Line format: 006 #3: "submariner-cable-cluster3-172-17-0-8-0-0", type=ESP, add_time=1590508783, inBytes=0, outBytes=0, id='172.17.0.8'
-		components := strings.Split(line, "\"")
-		if len(components) == 3 {
-			activeConnections.Add(components[1])
+		matches := trafficStatusRE.FindStringSubmatch(line)
+		if matches != nil {
+			_, ok := activeConnectionsRx[matches[1]]
+			if !ok {
+				activeConnectionsRx[matches[1]] = 0
+			}
+
+			_, ok = activeConnectionsTx[matches[1]]
+			if !ok {
+				activeConnectionsTx[matches[1]] = 0
+			}
+
+			inBytes, err := strconv.Atoi(matches[2])
+			if err != nil {
+				klog.Warningf("Invalid inBytes in whack output line: %q", line)
+			} else {
+				activeConnectionsRx[matches[1]] += inBytes
+			}
+
+			outBytes, err := strconv.Atoi(matches[3])
+			if err != nil {
+				klog.Warningf("Invalid outBytes in whack output line: %q", line)
+			} else {
+				activeConnectionsTx[matches[1]] += outBytes
+			}
 		} else {
 			klog.V(log.DEBUG).Infof("Ignoring whack output line: %q", line)
 		}
@@ -134,26 +160,40 @@ func (i *libreswan) refreshConnectionStatus() error {
 
 	cable.RecordNoConnections()
 
+	localSubnets := extractSubnets(i.localEndpoint.Spec)
+
 	for j := range i.connections {
 		isConnected := false
 
-		for _, activeConnection := range activeConnections.Elements() {
-			if strings.HasPrefix(activeConnection, i.connections[j].Endpoint.CableName) {
-				i.connections[j].Status = subv1.Connected
-				isConnected = true
-
-				cable.RecordConnection(cableDriverName, &i.localEndpoint.Spec, &i.connections[j].Endpoint, string(i.connections[j].Status), false)
-
-				break
+		remoteSubnets := extractSubnets(i.connections[j].Endpoint)
+		rx, tx := 0, 0
+		for lsi := range localSubnets {
+			for rsi := range remoteSubnets {
+				connectionName := fmt.Sprintf("%s-%d-%d", i.connections[j].Endpoint.CableName, lsi, rsi)
+				subRx, okRx := activeConnectionsRx[connectionName]
+				subTx, okTx := activeConnectionsTx[connectionName]
+				if okRx || okTx {
+					i.connections[j].Status = subv1.Connected
+					isConnected = true
+					rx += subRx
+					tx += subTx
+				} else {
+					klog.V(log.DEBUG).Infof("Connection %q not found in active connections obtained from whack: %v, %v",
+						connectionName, activeConnectionsRx, activeConnectionsTx)
+				}
 			}
 		}
+
+		cable.RecordConnection(cableDriverName, &i.localEndpoint.Spec, &i.connections[j].Endpoint, string(i.connections[j].Status), false)
+		cable.RecordRxBytes(cableDriverName, &i.localEndpoint.Spec, &i.connections[j].Endpoint, rx)
+		cable.RecordTxBytes(cableDriverName, &i.localEndpoint.Spec, &i.connections[j].Endpoint, tx)
 
 		if !isConnected {
 			// Pluto should be connecting for us
 			i.connections[j].Status = subv1.Connecting
 			cable.RecordConnection(cableDriverName, &i.localEndpoint.Spec, &i.connections[j].Endpoint, string(i.connections[j].Status), false)
-			klog.V(log.DEBUG).Infof("Connection %q not found in active connections obtained from whack: %v",
-				i.connections[j].Endpoint.CableName, activeConnections.Elements())
+			klog.V(log.DEBUG).Infof("Connection %q not found in active connections obtained from whack: %v, %v",
+				i.connections[j].Endpoint.CableName, activeConnectionsRx, activeConnectionsTx)
 		}
 	}
 
