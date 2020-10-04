@@ -1,7 +1,6 @@
-package route
+package constants
 
 const (
-	// IPTable chains used by Globalnet Controller
 	SmGlobalnetIngressChain = "SUBMARINER-GN-INGRESS"
 	SmGlobalnetEgressChain  = "SUBMARINER-GN-EGRESS"
 	SmGlobalnetMarkChain    = "SUBMARINER-GN-MARK"

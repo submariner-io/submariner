@@ -32,6 +32,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/cable/wireguard"
 	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	informers "github.com/submariner-io/submariner/pkg/client/informers/externalversions/submariner.io/v1"
+	globalnetCleanup "github.com/submariner-io/submariner/pkg/globalnet/cleanup"
 	"github.com/submariner-io/submariner/pkg/routeagent/cleanup"
 	"github.com/submariner-io/submariner/pkg/util"
 )
@@ -47,8 +48,6 @@ type cniInterface struct {
 	name      string
 	ipAddress string
 }
-
-type GlobalnetStatus int
 
 type Controller struct {
 	clusterID       string
@@ -76,18 +75,10 @@ type Controller struct {
 	wasGatewayPreviously bool
 	defaultHostIface     *net.Interface
 
-	globalnetStatus GlobalnetStatus
-
 	cniIface *cniInterface
 
 	cleanupHandlers []cleanup.Handler
 }
-
-const (
-	GN_Status_Not_Verified = iota
-	GN_Enabled
-	GN_Disabled
-)
 
 const (
 	VxLANIface         = "vx-submariner"
@@ -164,7 +155,6 @@ func NewController(clusterID string, clusterCidr, serviceCidr []string, objectNa
 		defaultHostIface:       link,
 		isGatewayNode:          false,
 		wasGatewayPreviously:   false,
-		globalnetStatus:        GN_Status_Not_Verified,
 		remoteSubnets:          util.NewStringSet(),
 		routeCacheGWNode:       util.NewStringSet(),
 		remoteVTEPs:            util.NewStringSet(),
@@ -177,6 +167,7 @@ func NewController(clusterID string, clusterCidr, serviceCidr []string, objectNa
 
 	// For now we get all the cleanups
 	controller.installCleanupHandlers(cableCleanup.GetCleanupHandlers())
+	controller.installCleanupHandlers(globalnetCleanup.GlobalnetCleanupHandler(clusterID, objectNamespace, config.SubmarinerClientSet))
 
 	config.EndpointInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: controller.enqueueEndpoint,
@@ -703,11 +694,8 @@ func (r *Controller) processNextEndpoint() bool {
 		}
 		// If the active Gateway transitions to a new node, we flush the HostNetwork routing table.
 		r.updateRoutingRulesForHostNetworkSupport(nil, FlushRouteTable)
-		err = r.clearGlobalnetChains()
-		if err != nil {
-			klog.Errorf("Unable to clearGlobalnetChains : %v", err)
-		}
 		r.gatewayToNonGatewayTransitionCleanups()
+		r.nonGatewayCleanups()
 
 		r.gwVxLanMutex.Unlock()
 

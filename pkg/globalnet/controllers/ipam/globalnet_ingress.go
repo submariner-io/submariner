@@ -10,7 +10,7 @@ import (
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 
-	"github.com/submariner-io/submariner/pkg/routeagent/controllers/route"
+	"github.com/submariner-io/submariner/pkg/routeagent/constants"
 )
 
 func (i *Controller) updateIngressRulesForService(globalIP, chainName string, addRules bool) error {
@@ -19,13 +19,13 @@ func (i *Controller) updateIngressRulesForService(globalIP, chainName string, ad
 	if addRules {
 		klog.V(log.DEBUG).Infof("Installing iptables rule for Service %s", strings.Join(ruleSpec, " "))
 
-		if err := i.ipt.AppendUnique("nat", route.SmGlobalnetIngressChain, ruleSpec...); err != nil {
+		if err := i.ipt.AppendUnique("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
 			return fmt.Errorf("error appending iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
 		}
 	} else {
 		klog.V(log.DEBUG).Infof("Deleting iptable ingress rule for Service: %s", strings.Join(ruleSpec, " "))
 
-		if err := i.ipt.Delete("nat", route.SmGlobalnetIngressChain, ruleSpec...); err != nil {
+		if err := i.ipt.Delete("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
 			return fmt.Errorf("error deleting iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
 		}
 	}
