@@ -167,7 +167,7 @@ func NewController(clusterID string, clusterCidr, serviceCidr []string, objectNa
 
 	// For now we get all the cleanups
 	controller.installCleanupHandlers(cableCleanup.GetCleanupHandlers())
-	controller.installCleanupHandlers(globalnetCleanup.GlobalnetCleanupHandler(clusterID, objectNamespace, config.SubmarinerClientSet))
+	controller.installCleanupHandlers(globalnetCleanup.GetGlobalnetCleanupHandlers(clusterID, objectNamespace, config.SubmarinerClientSet))
 
 	config.EndpointInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: controller.enqueueEndpoint,

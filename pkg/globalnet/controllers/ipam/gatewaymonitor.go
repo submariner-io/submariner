@@ -154,18 +154,18 @@ func (i *GatewayMonitor) processNextEndpoint() bool {
 			i.endpointWorkqueue.Forget(obj)
 
 			return nil
-		} else {
-			endpoints, err := i.submarinerClientSet.SubmarinerV1().Endpoints(ns).List(metav1.ListOptions{})
-			if err != nil {
-				i.endpointWorkqueue.Forget(obj)
-				return fmt.Errorf("error retrieving submariner endpoint list %v", err)
-			}
+		}
 
-			for _, endpoint := range endpoints.Items {
-				if endpoint.Spec.ClusterID != i.clusterID {
-					for _, remoteSubnet := range endpoint.Spec.Subnets {
-						MarkRemoteClusterTraffic(i.ipt, remoteSubnet, AddRules)
-					}
+		endpoints, err := i.submarinerClientSet.SubmarinerV1().Endpoints(ns).List(metav1.ListOptions{})
+		if err != nil {
+			i.endpointWorkqueue.Forget(obj)
+			return fmt.Errorf("error retrieving submariner endpoint list %v", err)
+		}
+
+		for _, endpoint := range endpoints.Items {
+			if endpoint.Spec.ClusterID != i.clusterID {
+				for _, remoteSubnet := range endpoint.Spec.Subnets {
+					MarkRemoteClusterTraffic(i.ipt, remoteSubnet, AddRules)
 				}
 			}
 		}

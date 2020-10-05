@@ -21,21 +21,21 @@ const (
 
 type GlobalnetStatus int
 
-func GlobalnetCleanupHandler(clusterID, objectNamespace string, submarinerClientSet clientset.Interface) []cleanup.Handler {
+func GetGlobalnetCleanupHandlers(clusterID, objectNamespace string, submarinerClientSet clientset.Interface) []cleanup.Handler {
 	return []cleanup.Handler{
-		NewGlobalnetCleanupHandler(clusterID, objectNamespace, submarinerClientSet),
+		newCleanupGlobalnetRules(clusterID, objectNamespace, submarinerClientSet),
 	}
 }
 
-type CleanupGlobalnetRules struct {
+type cleanupGlobalnetRules struct {
 	clusterID       string
 	objectNamespace string
 	clientSet       clientset.Interface
 	globalnetStatus GlobalnetStatus
 }
 
-func NewGlobalnetCleanupHandler(clusterID, objectNamespace string, submarinerClientSet clientset.Interface) cleanup.Handler {
-	return &CleanupGlobalnetRules{
+func newCleanupGlobalnetRules(clusterID, objectNamespace string, submarinerClientSet clientset.Interface) cleanup.Handler {
+	return &cleanupGlobalnetRules{
 		clusterID:       clusterID,
 		objectNamespace: objectNamespace,
 		clientSet:       submarinerClientSet,
@@ -43,15 +43,15 @@ func NewGlobalnetCleanupHandler(clusterID, objectNamespace string, submarinerCli
 	}
 }
 
-func (gn *CleanupGlobalnetRules) GetName() string {
-	return "Globalnet cleanup handler"
+func (gn *cleanupGlobalnetRules) GetName() string {
+	return "Globalnet rules cleanup handler"
 }
 
-func (gn *CleanupGlobalnetRules) NonGatewayCleanup() error {
+func (gn *cleanupGlobalnetRules) NonGatewayCleanup() error {
 	return nil
 }
 
-func (gn *CleanupGlobalnetRules) GatewayToNonGatewayTransition() error {
+func (gn *cleanupGlobalnetRules) GatewayToNonGatewayTransition() error {
 	if gn.globalnetStatus == GN_Status_Not_Verified {
 		localCluster, err := gn.clientSet.SubmarinerV1().Clusters(gn.objectNamespace).Get(gn.clusterID, metav1.GetOptions{})
 		if err != nil {
