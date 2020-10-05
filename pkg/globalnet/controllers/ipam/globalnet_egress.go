@@ -7,6 +7,8 @@ import (
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/submariner-io/admiral/pkg/log"
 	"k8s.io/klog"
+
+	"github.com/submariner-io/submariner/pkg/routeagent/constants"
 )
 
 func (i *Controller) updateEgressRulesForResource(resourceName, sourceIP, globalIP string, addRules bool) error {
@@ -15,12 +17,12 @@ func (i *Controller) updateEgressRulesForResource(resourceName, sourceIP, global
 	if addRules {
 		klog.V(log.DEBUG).Infof("Installing iptable egress rules for %s: %s", resourceName, strings.Join(ruleSpec, " "))
 
-		if err := i.ipt.AppendUnique("nat", submarinerEgress, ruleSpec...); err != nil {
+		if err := i.ipt.AppendUnique("nat", constants.SmGlobalnetEgressChain, ruleSpec...); err != nil {
 			return fmt.Errorf("error appending iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
 		}
 	} else {
 		klog.V(log.DEBUG).Infof("Deleting iptable egress rules for %s : %s", resourceName, strings.Join(ruleSpec, " "))
-		if err := i.ipt.Delete("nat", submarinerEgress, ruleSpec...); err != nil {
+		if err := i.ipt.Delete("nat", constants.SmGlobalnetEgressChain, ruleSpec...); err != nil {
 			return fmt.Errorf("error deleting iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
 		}
 	}
@@ -34,12 +36,12 @@ func MarkRemoteClusterTraffic(ipt *iptables.IPTables, remoteCidr string, addRule
 	if addRules {
 		klog.V(log.DEBUG).Infof("Marking traffic destined to remote cluster: %s", strings.Join(ruleSpec, " "))
 
-		if err := ipt.AppendUnique("nat", submarinerMark, ruleSpec...); err != nil {
+		if err := ipt.AppendUnique("nat", constants.SmGlobalnetMarkChain, ruleSpec...); err != nil {
 			klog.Errorf("error appending iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
 		}
 	} else {
 		klog.V(log.DEBUG).Infof("Deleting rule that marks remote cluster traffic: %s", strings.Join(ruleSpec, " "))
-		if err := ipt.Delete("nat", submarinerMark, ruleSpec...); err != nil {
+		if err := ipt.Delete("nat", constants.SmGlobalnetMarkChain, ruleSpec...); err != nil {
 			klog.Errorf("error deleting iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
 		}
 	}

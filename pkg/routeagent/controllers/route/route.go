@@ -27,10 +27,12 @@ import (
 	"k8s.io/klog"
 
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+
 	cableCleanup "github.com/submariner-io/submariner/pkg/cable/cleanup"
 	"github.com/submariner-io/submariner/pkg/cable/wireguard"
 	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	informers "github.com/submariner-io/submariner/pkg/client/informers/externalversions/submariner.io/v1"
+	globalnetCleanup "github.com/submariner-io/submariner/pkg/globalnet/cleanup"
 	"github.com/submariner-io/submariner/pkg/routeagent/cleanup"
 	"github.com/submariner-io/submariner/pkg/util"
 )
@@ -69,8 +71,9 @@ type Controller struct {
 	vxlanDevice  *vxLanIface
 	remoteVTEPs  *util.StringSet
 
-	isGatewayNode    bool
-	defaultHostIface *net.Interface
+	isGatewayNode        bool
+	wasGatewayPreviously bool
+	defaultHostIface     *net.Interface
 
 	cniIface *cniInterface
 
@@ -104,7 +107,6 @@ const (
 	// [*] https://en.wikipedia.org/wiki/Reserved_IP_addresses
 
 	VxLANVTepNetworkPrefix = 240
-	SmPostRoutingChain     = "SUBMARINER-POSTROUTING"
 	SmRouteAgentFilter     = "app=submariner-routeagent"
 
 	// In order to support connectivity from HostNetwork to remoteCluster, route-agent tries
@@ -152,6 +154,7 @@ func NewController(clusterID string, clusterCidr, serviceCidr []string, objectNa
 		clientSet:              config.ClientSet,
 		defaultHostIface:       link,
 		isGatewayNode:          false,
+		wasGatewayPreviously:   false,
 		remoteSubnets:          util.NewStringSet(),
 		routeCacheGWNode:       util.NewStringSet(),
 		remoteVTEPs:            util.NewStringSet(),
@@ -164,6 +167,7 @@ func NewController(clusterID string, clusterCidr, serviceCidr []string, objectNa
 
 	// For now we get all the cleanups
 	controller.installCleanupHandlers(cableCleanup.GetCleanupHandlers())
+	controller.installCleanupHandlers(globalnetCleanup.GetGlobalnetCleanupHandlers(clusterID, objectNamespace, config.SubmarinerClientSet))
 
 	config.EndpointInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: controller.enqueueEndpoint,
@@ -644,6 +648,7 @@ func (r *Controller) processNextEndpoint() bool {
 			defer r.gwVxLanMutex.Unlock()
 
 			r.isGatewayNode = true
+			r.wasGatewayPreviously = true
 
 			klog.Infof("Creating the vxlan interface: %s on the gateway node", VxLANIface)
 
@@ -689,8 +694,8 @@ func (r *Controller) processNextEndpoint() bool {
 		}
 		// If the active Gateway transitions to a new node, we flush the HostNetwork routing table.
 		r.updateRoutingRulesForHostNetworkSupport(nil, FlushRouteTable)
-
 		r.gatewayToNonGatewayTransitionCleanups()
+		r.nonGatewayCleanups()
 
 		r.gwVxLanMutex.Unlock()
 
