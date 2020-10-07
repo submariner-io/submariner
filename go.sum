@@ -265,7 +265,6 @@ github.com/onsi/ginkgo v1.4.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+W
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.10.1/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.12.1/go.mod h1:zj2OWP4+oCPe1qIXoGWkgMRwljMUYCdkwsT2108oapk=
-github.com/onsi/ginkgo v1.14.0/go.mod h1:iSB4RoI2tjJc9BBv4NKIKWKya62Rps+oPG/Lv9klQyY=
 github.com/onsi/ginkgo v1.14.1 h1:jMU0WaQrP0a/YAEq8eJmJKjBoMs+pClEr1vDMlM/Do4=
 github.com/onsi/ginkgo v1.14.1/go.mod h1:iSB4RoI2tjJc9BBv4NKIKWKya62Rps+oPG/Lv9klQyY=
 github.com/onsi/gomega v0.0.0-20170829124025-dcabb60a477c/go.mod h1:C1qb7wdrVGGVU+Z6iS04AVkA3Q65CEZX59MT0QO5uiA=
@@ -331,10 +330,10 @@ github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UV
 github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
 github.com/stretchr/testify v1.6.1 h1:hDPOHmpOpP40lSULcqw7IrRb/u7w6RpDC9399XyoNd0=
 github.com/stretchr/testify v1.6.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
-github.com/submariner-io/admiral v0.6.3 h1:96wOqGEDKv0Oq6QXozE6C7/HJ87kEIdHZp4AutykC5s=
-github.com/submariner-io/admiral v0.6.3/go.mod h1:/lm9D8AUs/cZE0lhxBfKDwkaU1XhmLkRnRwoD6BNsfg=
-github.com/submariner-io/shipyard v0.6.1 h1:jkZc9WJpK+ZKjHmuDOM7BT0rkp41pOAsEGJtPAqFs14=
-github.com/submariner-io/shipyard v0.6.1/go.mod h1:9H9ctEv+K61bMy5teo/fG2azZswmXsPVfFTVdk8ZGk0=
+github.com/submariner-io/admiral v0.7.0 h1:1Ddjx8PvmeUjqO9+qMAPoFgkDSq8asmXl/tlsiTDlNE=
+github.com/submariner-io/admiral v0.7.0/go.mod h1:S5Aemqu4Ac2sZWW9AEfPIhSC4eMCWmCVQ/rSSEHRt2o=
+github.com/submariner-io/shipyard v0.7.1 h1:2+CdN9c7BZX7AUKvBrRkqvha+qqEfbWRjgutbFNaiKo=
+github.com/submariner-io/shipyard v0.7.1/go.mod h1:m2Gs15WS6bCDMY2QUjjeC3p4Q95H+pG2UW4k2S9rhQc=
 github.com/tidwall/pretty v1.0.0/go.mod h1:XNkn88O1ChpSDQmQeStsy+sBenx6DDtFZJxhVysOjyk=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
 github.com/ugorji/go/codec v0.0.0-20181204163529-d75b2dcb6bc8/go.mod h1:VFNgLljTbGfSG7qAOspJ7OScBnGdDN/yBr0sguwnwf0=
