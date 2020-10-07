@@ -131,28 +131,23 @@ func (i *libreswan) refreshConnectionStatus() error {
 		return errors.WithMessage(err, "error waiting for whack")
 	}
 
-	localSubnets := extractSubnets(i.localEndpoint.Spec)
-
 	for j := range i.connections {
-		allConnected := true
-		remoteSubnets := extractSubnets(i.connections[j].Endpoint)
-		for lsi := range localSubnets {
-			for rsi := range remoteSubnets {
-				connectionName := fmt.Sprintf("%s-%d-%d", i.connections[j].Endpoint.CableName, lsi, rsi)
-				if !activeConnections.Contains(connectionName) {
-					allConnected = false
+		isConnected := false
 
-					klog.V(log.DEBUG).Infof("Connection %q not found in active connections obtained from whack: %v",
-						connectionName, activeConnections.Elements())
-				}
+		for _, activeConnection := range activeConnections.Elements() {
+			if strings.HasPrefix(activeConnection, i.connections[j].Endpoint.CableName) {
+				i.connections[j].Status = subv1.Connected
+				isConnected = true
+
+				break
 			}
 		}
 
-		if allConnected {
-			i.connections[j].Status = subv1.Connected
-		} else {
+		if !isConnected {
 			// Pluto should be connecting for us
 			i.connections[j].Status = subv1.Connecting
+			klog.V(log.DEBUG).Infof("Connection %q not found in active connections obtained from whack: %v",
+				i.connections[j].Endpoint.CableName, activeConnections.Elements())
 		}
 	}
 

@@ -21,7 +21,7 @@ func (xc *XFRMCleanupHandler) GetName() string {
 	return "XFRM cleanup handler"
 }
 
-func (xc *XFRMCleanupHandler) GatewayToNonGatewayTransition() error {
+func (xc *XFRMCleanupHandler) NonGatewayCleanup() error {
 	currentXfrmPolicyList, err := netlink.XfrmPolicyList(syscall.AF_INET)
 
 	if err != nil {
@@ -40,5 +40,9 @@ func (xc *XFRMCleanupHandler) GatewayToNonGatewayTransition() error {
 		}
 	}
 
+	return nil
+}
+
+func (xc *XFRMCleanupHandler) GatewayToNonGatewayTransition() error {
 	return nil
 }

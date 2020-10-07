@@ -113,7 +113,6 @@ func (i *Controller) Run(stopCh <-chan struct{}) error {
 	go wait.Until(i.runNodeWorker, time.Second, stopCh)
 	<-stopCh
 	klog.Info("Shutting down workers")
-	i.cleanupIPTableRules()
 
 	return nil
 }
