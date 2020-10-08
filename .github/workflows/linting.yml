@@ -3,9 +3,6 @@ name: Linting
 
 on:
   pull_request:
-  push:
-    tags:
-      - 'v**'
 
 jobs:
   code-gen:
