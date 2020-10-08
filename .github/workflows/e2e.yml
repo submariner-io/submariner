@@ -3,9 +3,6 @@ name: End to End Tests
 
 on:
   pull_request:
-  push:
-    tags:
-      - 'v**'
 
 jobs:
   e2e:
