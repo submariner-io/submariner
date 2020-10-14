@@ -64,6 +64,9 @@ if [[ -z "$REGION" ]]; then
   exit 4
 fi
 
+mkdir -p $OCP_INS_DIR/submariner_prep
+cd $OCP_INS_DIR/submariner_prep
+
 if [[ ! -d ocp-ipi-aws-prep ]]; then
   download_ocp_ipi_aws_tool
 fi
