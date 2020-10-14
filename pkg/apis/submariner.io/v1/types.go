@@ -65,6 +65,7 @@ type EndpointList struct {
 // +genclient
 // +genclient:noStatus
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:printcolumn:JSONPath=".status.haStatus",name="HA Status",description="High availability status of the Gateway",type="string"
 
 type Gateway struct {
 	metav1.TypeMeta   `json:",inline"`

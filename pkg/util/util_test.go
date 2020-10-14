@@ -14,8 +14,6 @@ var _ = Describe("Util", func() {
 
 	Describe("Function FlattenColors", testFlattenColors)
 
-	Describe("Function GetLocalCluster", testGetLocalCluster)
-
 	Describe("Function GetLocalEndpoint", testGetLocalEndpoint)
 
 	Describe("Function GetClusterIDFromCableName", testGetClusterIDFromCableName)
@@ -65,28 +63,6 @@ func testFlattenColors() {
 		It("should return an empty string", func() {
 			Expect(util.FlattenColors([]string{})).To(Equal(""))
 		})
-	})
-}
-
-func testGetLocalCluster() {
-	It("should return a valid SubmarinerCluster object", func() {
-		clusterId := "east"
-		clusterCidr := []string{"1.2.3.4/16"}
-		serviceCidr := []string{"5.6.7.8/16"}
-		colorCodes := []string{"red"}
-		cluster, err := util.GetLocalCluster(types.SubmarinerSpecification{
-			ClusterID:   clusterId,
-			ClusterCidr: clusterCidr,
-			ServiceCidr: serviceCidr,
-			ColorCodes:  colorCodes,
-		})
-
-		Expect(err).ToNot(HaveOccurred())
-		Expect(cluster.ID).To(Equal(clusterId))
-		Expect(cluster.Spec.ClusterID).To(Equal(clusterId))
-		Expect(cluster.Spec.ServiceCIDR).To(Equal(serviceCidr))
-		Expect(cluster.Spec.ClusterCIDR).To(Equal(clusterCidr))
-		Expect(cluster.Spec.ColorCodes).To(Equal(colorCodes))
 	})
 }
 

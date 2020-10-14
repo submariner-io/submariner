@@ -95,10 +95,7 @@ func (i *GatewayMonitor) Run(stopCh <-chan struct{}) error {
 
 	go wait.Until(i.runEndpointWorker, time.Second, stopCh)
 	<-stopCh
-	// TODO (revisit): This cleanup should ideally be handled in some other Pod just like
-	// how route-agent is cleaning up stale rules when there is a migration.
-	ClearGlobalNetChains(i.ipt)
-	klog.Info("Cleared GlobalNet rules, shutting down endpoint worker.")
+	klog.Info("Shutting down endpoint worker.")
 
 	return nil
 }
@@ -157,6 +154,20 @@ func (i *GatewayMonitor) processNextEndpoint() bool {
 			i.endpointWorkqueue.Forget(obj)
 
 			return nil
+		}
+
+		endpoints, err := i.submarinerClientSet.SubmarinerV1().Endpoints(ns).List(metav1.ListOptions{})
+		if err != nil {
+			i.endpointWorkqueue.Forget(obj)
+			return fmt.Errorf("error retrieving submariner endpoint list %v", err)
+		}
+
+		for _, endpoint := range endpoints.Items {
+			if endpoint.Spec.ClusterID != i.clusterID {
+				for _, remoteSubnet := range endpoint.Spec.Subnets {
+					MarkRemoteClusterTraffic(i.ipt, remoteSubnet, AddRules)
+				}
+			}
 		}
 
 		hostname, err := os.Hostname()
