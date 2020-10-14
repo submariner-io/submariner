@@ -64,15 +64,14 @@ if [[ -z "$REGION" ]]; then
   exit 4
 fi
 
-mkdir -p $OCP_INS_DIR/submariner_prep
-cd $OCP_INS_DIR/submariner_prep
+cd "$OCP_INS_DIR"
 
 if [[ ! -d ocp-ipi-aws-prep ]]; then
   download_ocp_ipi_aws_tool
 fi
 
-sed -i "s/\"cluster_id\"/\"$INFRA_ID\"/g" main.tf
-sed -i "s/\"aws_region\"/\"$REGION\"/g" main.tf
+sed -r "s/(cluster_id = ).*/\1\"$INFRA_ID\"/" -i main.tf
+sed -r "s/(aws_region = ).*/\1\"$REGION\"/" -i main.tf
 
 terraform init
 terraform apply "${TERRAFORM_ARGS[@]}"
