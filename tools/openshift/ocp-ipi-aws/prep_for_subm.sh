@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+IPSEC_IKE_PORT=${IPSEC_IKE_PORT:-500}
+IPSEC_NATT_PORT=${IPSEC_NATT_PORT:-4500}
+GW_INSTANCE_TYPE=${GW_INSTANCE_TYPE:-m5n.large}
+
 # Get OCP installer path, or use current directory
 OCP_INS_DIR="$(realpath -- ${1:-.})"
 METADATA_JSON="${OCP_INS_DIR}/metadata.json"
@@ -71,8 +75,11 @@ if [[ ! -d ocp-ipi-aws-prep ]]; then
   download_ocp_ipi_aws_tool
 fi
 
-sed -i "s/\"cluster_id\"/\"$INFRA_ID\"/g" main.tf
-sed -i "s/\"aws_region\"/\"$REGION\"/g" main.tf
+sed -r "s/(cluster_id = ).*/\1\"$INFRA_ID\"/" -i main.tf
+sed -r "s/(aws_region = ).*/\1\"$REGION\"/" -i main.tf
+sed -r "s/(ipsec_natt_port = ).*/\1$IPSEC_NATT_PORT/" -i main.tf
+sed -r "s/(ipsec_ike_port = ).*/\1$IPSEC_IKE_PORT/" -i main.tf
+sed -r "s/(gw_instance_type = ).*/\1\"$GW_INSTANCE_TYPE\"/" -i main.tf
 
 terraform init
 terraform apply "${TERRAFORM_ARGS[@]}"
