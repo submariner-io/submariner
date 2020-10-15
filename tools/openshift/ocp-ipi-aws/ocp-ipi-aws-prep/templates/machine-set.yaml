@@ -37,7 +37,7 @@ spec:
           deviceIndex: 0
           iamInstanceProfile:
             id: ${cluster_id}-worker-profile
-          instanceType: m5n.large
+          instanceType: ${gw_instance_type}
           kind: AWSMachineProviderConfig
           placement:
             availabilityZone: ${az}

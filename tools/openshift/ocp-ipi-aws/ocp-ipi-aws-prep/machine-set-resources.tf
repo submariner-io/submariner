@@ -41,6 +41,7 @@ data "template_file" "machine_set_template" {
     az                   = data.aws_subnet.target_public_subnet.availability_zone
     aws_region           = var.aws_region
     cluster_id           = var.cluster_id
+    gw_instance_type     = var.gw_instance_type
     rhos_ami_id          = data.aws_instance.worker_instance.ami
     submariner_sg_name   = aws_security_group.submariner_gw_sg.name
     public_subnet_name   = "${var.cluster_id}-public-${data.aws_subnet.target_public_subnet.availability_zone}"

@@ -30,16 +30,16 @@ resource "aws_security_group" "submariner_gw_sg" {
   vpc_id = data.aws_vpc.env_vpc.id
 
   ingress {
-    from_port   = 4500
+    from_port   = var.ipsec_natt_port
     protocol    = "UDP"
-    to_port     = 4500
+    to_port     = var.ipsec_natt_port
     cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
-    from_port   = 500
+    from_port   = var.ipsec_ike_port
     protocol    = "UDP"
-    to_port     = 500
+    to_port     = var.ipsec_ike_port
     cidr_blocks = ["0.0.0.0/0"]
   }
 
