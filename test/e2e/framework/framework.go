@@ -35,7 +35,7 @@ func NewFramework(baseName string) *Framework {
 }
 
 func beforeSuite() {
-	ginkgo.By("Creating submariner clients")
+	framework.By("Creating submariner clients")
 
 	for _, restConfig := range framework.RestConfigs {
 		SubmarinerClients = append(SubmarinerClients, createSubmarinerClient(restConfig))

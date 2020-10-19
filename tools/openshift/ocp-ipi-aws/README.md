@@ -14,6 +14,15 @@ chmod a+x ./prep_for_subm.sh
 ./prep_for_subm.sh
 ```
 
+You can override some of the defaults by using environment variables, like:
+
+```bash
+export IPSEC_NATT_PORT=4501
+export IPSEC_IKE_PORT=501
+export GW_INSTANCE_TYPE=m4.xlarge
+./prep_for_subm.sh
+```
+
 ## Prerequisites
 
 You will need:
