@@ -35,7 +35,7 @@ func NewFramework(baseName string) *Framework {
 }
 
 func beforeSuite() {
-	ginkgo.By("Creating submariner clients")
+	framework.By("Creating submariner clients")
 
 	for _, restConfig := range framework.RestConfigs {
 		SubmarinerClients = append(SubmarinerClients, createSubmarinerClient(restConfig))
@@ -46,7 +46,7 @@ func beforeSuite() {
 
 func queryAndUpdateGlobalnetStatus() {
 	framework.TestContext.GlobalnetEnabled = false
-	clusters := SubmarinerClients[framework.ClusterB].SubmarinerV1().Clusters(framework.TestContext.SubmarinerNamespace)
+	clusters := SubmarinerClients[framework.ClusterA].SubmarinerV1().Clusters(framework.TestContext.SubmarinerNamespace)
 	framework.AwaitUntil("find clusters to figure out if Globalnet is enabled", func() (interface{}, error) {
 		clusters, err := clusters.List(metav1.ListOptions{})
 		if apierrors.IsNotFound(err) {
@@ -152,12 +152,12 @@ func (f *Framework) AwaitGatewayFullyConnected(cluster framework.ClusterIndex, n
 					gw.Name), nil
 			}
 			if len(gw.Status.Connections) == 0 {
-				return false, fmt.Sprintf("Gateway %q exist but has no connections yet", name), nil
+				return false, fmt.Sprintf("Gateway %q is active but has no connections yet", name), nil
 			}
 			for _, conn := range gw.Status.Connections {
 				if conn.Status != submarinerv1.Connected {
-					return false, fmt.Sprintf("Gateway %q exist but connection to cluster %q is not up yet",
-						name, conn.Endpoint.ClusterID), nil
+					return false, fmt.Sprintf("Gateway %q is active but cluster %q is not connected: Status: %q, Message: %q",
+						name, conn.Endpoint.ClusterID, conn.Status, conn.StatusMessage), nil
 				}
 			}
 
