@@ -181,8 +181,8 @@ func (f *Framework) GatewayCleanup() {
 		ginkgo.By(fmt.Sprintf("Cleaning up any non-active gateways: %v", gatewayNames(passiveGateways)))
 
 		for _, nonActiveGw := range passiveGateways {
-			f.SetGatewayLabelOnNode(framework.ClusterA, nonActiveGw.Name, false)
-			f.AwaitGatewayRemoved(framework.ClusterA, nonActiveGw.Name)
+			f.SetGatewayLabelOnNode(framework.ClusterIndex(cluster), nonActiveGw.Name, false)
+			f.AwaitGatewayRemoved(framework.ClusterIndex(cluster), nonActiveGw.Name)
 		}
 	}
 }

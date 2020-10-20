@@ -13,6 +13,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/submariner-io/admiral/pkg/log"
+	admUtil "github.com/submariner-io/admiral/pkg/util"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/cableengine"
@@ -25,8 +26,9 @@ import (
 	subk8s "github.com/submariner-io/submariner/pkg/datastore/kubernetes"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -129,10 +131,23 @@ func main() {
 
 	cableEngineSyncer.Run(stopCh)
 
+	err = subv1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		fatal(cableEngineSyncer, "Error adding submariner types to the scheme: %v", err)
+	}
+
+	restMapper, err := admUtil.BuildRestMapper(cfg)
+	if err != nil {
+		fatal(cableEngineSyncer, err.Error())
+	}
+
+	dynClient, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		fatal(cableEngineSyncer, "error creating dynamic client: %v", err)
+	}
+
 	becameLeader := func(context.Context) {
 		klog.Info("Creating the tunnel controller")
-
-		tunnelController := tunnel.NewController(cableEngine, submarinerInformerFactory.Submariner().V1().Endpoints())
 
 		var datastore datastore.Datastore
 
@@ -167,7 +182,7 @@ func main() {
 		go func() {
 			defer wg.Done()
 
-			if err = tunnelController.Run(stopCh); err != nil {
+			if err = tunnel.StartController(cableEngine, submSpec.Namespace, dynClient, restMapper, scheme.Scheme, stopCh); err != nil {
 				fatal(cableEngineSyncer, "Error running the tunnel controller: %v", err)
 			}
 		}()
@@ -190,7 +205,7 @@ func main() {
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(klog.V(log.DEBUG).Infof)
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "submariner-controller"})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "submariner-controller"})
 
 	lostLeader := func() {
 		cableEngineSyncer.CleanupGatewayEntry()
