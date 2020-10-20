@@ -60,6 +60,7 @@ func testEnginePodRestartScenario(f *subFramework.Framework) {
 
 	gatewayNodes := f.FindNodesByGatewayLabel(framework.ClusterA, true)
 	Expect(gatewayNodes).To(HaveLen(1), fmt.Sprintf("Expected only one gateway node on %q", clusterAName))
+	By(fmt.Sprintf("Found gateway on node %q on %q", gatewayNodes[0].Name, clusterAName))
 
 	enginePod := f.AwaitSubmarinerEnginePod(framework.ClusterA)
 	By(fmt.Sprintf("Found submariner engine pod %q on %q", enginePod.Name, clusterAName))
@@ -68,7 +69,7 @@ func testEnginePodRestartScenario(f *subFramework.Framework) {
 
 	activeGateway := f.AwaitGatewayFullyConnected(framework.ClusterA, gatewayNodes[0].Name)
 
-	By(fmt.Sprintf("Deleting submariner engine pod and gateway entries %q", enginePod.Name))
+	By(fmt.Sprintf("Deleting submariner engine pod %q", enginePod.Name))
 	f.DeletePod(framework.ClusterA, enginePod.Name, framework.TestContext.SubmarinerNamespace)
 
 	newEnginePod := f.AwaitSubmarinerEnginePod(framework.ClusterA)
