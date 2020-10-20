@@ -10,24 +10,21 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"time"
 
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	k8sv1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	podinformer "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 
+	"github.com/submariner-io/admiral/pkg/workqueue"
 	cableCleanup "github.com/submariner-io/submariner/pkg/cable/cleanup"
 	"github.com/submariner-io/submariner/pkg/cable/wireguard"
 	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
@@ -58,8 +55,10 @@ type Controller struct {
 	endpointsSynced        cache.InformerSynced
 	smRouteAgentPodsSynced cache.InformerSynced
 
-	endpointWorkqueue workqueue.RateLimitingInterface
-	podWorkqueue      workqueue.RateLimitingInterface
+	endpointWorkqueue workqueue.Interface
+	endpointStore     cache.Store
+	podWorkqueue      workqueue.Interface
+	podStore          cache.Store
 
 	localCableDriver string
 	localClusterCidr []string
@@ -138,10 +137,6 @@ const (
 	FlushRouteTable
 )
 
-func newRateLimiter() workqueue.RateLimiter {
-	return workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 30*time.Second)
-}
-
 func NewController(clusterID string, clusterCidr, serviceCidr []string, objectNamespace string,
 	link *net.Interface, config InformerConfigStruct) *Controller {
 	controller := Controller{
@@ -161,8 +156,10 @@ func NewController(clusterID string, clusterCidr, serviceCidr []string, objectNa
 		endpointsSynced:        config.EndpointInformer.Informer().HasSynced,
 		smRouteAgentPodsSynced: config.PodInformer.Informer().HasSynced,
 		gwVxLanMutex:           &sync.Mutex{},
-		endpointWorkqueue:      workqueue.NewNamedRateLimitingQueue(newRateLimiter(), "Endpoints"),
-		podWorkqueue:           workqueue.NewNamedRateLimitingQueue(newRateLimiter(), "Pods"),
+		endpointWorkqueue:      workqueue.New("Endpoints"),
+		endpointStore:          config.EndpointInformer.Informer().GetStore(),
+		podWorkqueue:           workqueue.New("Pods"),
+		podStore:               config.PodInformer.Informer().GetStore(),
 	}
 
 	// For now we get all the cleanups
@@ -170,9 +167,9 @@ func NewController(clusterID string, clusterCidr, serviceCidr []string, objectNa
 	controller.installCleanupHandlers(globalnetCleanup.GetGlobalnetCleanupHandlers(clusterID, objectNamespace, config.SubmarinerClientSet))
 
 	config.EndpointInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: controller.enqueueEndpoint,
+		AddFunc: controller.endpointWorkqueue.Enqueue,
 		UpdateFunc: func(old, new interface{}) {
-			controller.enqueueEndpoint(new)
+			controller.endpointWorkqueue.Enqueue(new)
 		},
 		DeleteFunc: controller.handleRemovedEndpoint,
 	})
@@ -283,25 +280,14 @@ func (r *Controller) Run(stopCh <-chan struct{}) error {
 		klog.Warning("cniInterface wasn't found, hostNetwork to remote pod/service connectivity won't work")
 	}
 
-	go wait.Until(r.runEndpointWorker, time.Second, stopCh)
-	go wait.Until(r.runPodWorker, time.Second, stopCh)
+	r.endpointWorkqueue.Run(stopCh, r.processNextEndpoint)
+	r.podWorkqueue.Run(stopCh, r.processNextPod)
+
 	klog.Info("Route agent workers started")
 	<-stopCh
 	klog.Info("Route agent stopping")
 
 	return nil
-}
-
-func (r *Controller) runEndpointWorker() {
-	for r.processNextEndpoint() {
-
-	}
-}
-
-func (r *Controller) runPodWorker() {
-	for r.processNextPod() {
-
-	}
 }
 
 func (r *Controller) overlappingSubnets(remoteSubnets []string) bool {
@@ -502,254 +488,173 @@ func (r *Controller) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP) e
 	return nil
 }
 
-func (r *Controller) processNextPod() bool {
-	obj, shutdown := r.podWorkqueue.Get()
-	if shutdown {
-		return false
+func (r *Controller) processNextPod(key, name, ns string) (bool, error) {
+	obj, exists, err := r.podStore.GetByKey(key)
+	if err != nil {
+		return true, fmt.Errorf("error retrieving submariner-route-agent pod object %s: %v", name, err)
 	}
 
-	err := func() error {
-		defer r.podWorkqueue.Done(obj)
+	if !exists {
+		klog.Infof("submariner-route-agent pod for key %q not found - probably was deleted", key)
+		return false, nil
+	}
 
-		key := obj.(string)
-		ns, name, err := cache.SplitMetaNamespaceKey(key)
-		if err != nil {
-			r.podWorkqueue.Forget(obj)
-			return fmt.Errorf("error while splitting meta namespace key %s: %v", key, err)
-		}
+	pod := obj.(*k8sv1.Pod)
+	if pod.Status.PodIP == "" {
+		return false, fmt.Errorf("submariner-route-agent pod %q does not have an ip-address yet", name)
+	}
 
-		pod, err := r.clientSet.CoreV1().Pods(ns).Get(name, metav1.GetOptions{})
-		if err != nil {
-			if errors.IsNotFound(err) {
-				r.podWorkqueue.Forget(obj)
-				klog.Infof("submariner-route-agent pod for key %q not found - probably was deleted", key)
+	klog.V(log.DEBUG).Infof("Processing submariner-route-agent pod %q with host IP %q, pod IP %q",
+		name, pod.Status.HostIP, pod.Status.PodIP)
 
-				return nil
+	r.populateRemoteVtepIps(pod.Status.PodIP)
+
+	r.gwVxLanMutex.Lock()
+	defer r.gwVxLanMutex.Unlock()
+
+	// A new Node (identified via a Submariner-route-agent daemonset pod event) is added to the cluster.
+	// On the GatewayDevice, update the vxlan fdb entry (i.e., remote Vtep) for the newly added node.
+	if r.isGatewayNode {
+		if r.vxlanDevice != nil {
+			err := r.vxlanDevice.AddFDB(net.ParseIP(pod.Status.PodIP), "00:00:00:00:00:00")
+			if err != nil {
+				return false, fmt.Errorf("failed to add FDB entry on the Gateway Node vxlan iface %v", err)
 			}
 
-			r.podWorkqueue.AddRateLimited(obj)
+			klog.Infof("FDB entry added on the Gateway node's vxlan iface for "+
+				"route-agent pod %q, IP %q", pod.Name, pod.Status.PodIP)
+		} else {
+			return true, fmt.Errorf("vxlanDevice is not yet created on the Gateway node")
+		}
+	}
 
-			return fmt.Errorf("error retrieving submariner-route-agent pod object %s: %v", name, err)
+	klog.V(log.DEBUG).Infof("Successfully processed submariner-route-agent pod %q", name)
+
+	return false, nil
+}
+
+func (r *Controller) processNextEndpoint(key, name, ns string) (bool, error) {
+	obj, exists, err := r.endpointStore.GetByKey(key)
+	if err != nil {
+		return true, fmt.Errorf("error retrieving submariner endpoint object %s: %v", name, err)
+	}
+
+	if !exists {
+		klog.Infof("Endpoint for key %q not found - probably was deleted", key)
+		return false, nil
+	}
+
+	endpoint := obj.(*v1.Endpoint)
+
+	klog.V(log.TRACE).Infof("Processing endpoint %q : %s", name, endpoint)
+
+	if endpoint.Spec.ClusterID != r.clusterID {
+		// Before we make any changes on the host, verify that subnets do not overlap.
+		if r.overlappingSubnets(endpoint.Spec.Subnets) {
+			// Skip processing the endpoint when CIDRs are overlapping.
+			return false, nil
 		}
 
-		if pod.Status.PodIP == "" {
-			r.podWorkqueue.Forget(obj)
-			return fmt.Errorf("submariner-route-agent pod %q does not have an ip-address yet", name)
-		}
+		klog.Infof("Updating iptable rules for remote cluster's Endpoint %q with subnets %v",
+			endpoint.Name, endpoint.Spec.Subnets)
+		r.updateIptableRulesForInterclusterTraffic(endpoint.Spec.Subnets)
 
-		klog.V(log.DEBUG).Infof("Processing submariner-route-agent pod %q with host IP %q, pod IP %q",
-			name, pod.Status.HostIP, pod.Status.PodIP)
+		r.gwVxLanMutex.Lock()
+		// Add routes to the new endpoint on the GatewayNode.
+		r.updateRoutingRulesForHostNetworkSupport(endpoint.Spec.Subnets, AddRoute)
+		r.gwVxLanMutex.Unlock()
 
-		r.populateRemoteVtepIps(pod.Status.PodIP)
+		return false, nil
+	}
+
+	klog.Infof("Processing local Endpoint %s with IP %s, Host %s for this cluster",
+		endpoint.Name, endpoint.Spec.PrivateIP, endpoint.Spec.Hostname)
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		klog.Fatalf("unable to determine hostname: %v", err)
+	}
+
+	// If the endpoint hostname matches with our hostname, it implies we are on gateway node
+	if endpoint.Spec.Hostname == hostname {
+		r.cleanVxSubmarinerRoutes()
+
+		klog.Infof("This route agent is running on the active gateway node")
 
 		r.gwVxLanMutex.Lock()
 		defer r.gwVxLanMutex.Unlock()
 
-		// A new Node (identified via a Submariner-route-agent daemonset pod event) is added to the cluster.
-		// On the GatewayDevice, update the vxlan fdb entry (i.e., remote Vtep) for the newly added node.
-		if r.isGatewayNode {
-			if r.vxlanDevice != nil {
-				err := r.vxlanDevice.AddFDB(net.ParseIP(pod.Status.PodIP), "00:00:00:00:00:00")
-				if err != nil {
-					r.podWorkqueue.Forget(obj)
-					return fmt.Errorf("failed to add FDB entry on the Gateway Node vxlan iface %v", err)
-				}
+		r.isGatewayNode = true
+		r.wasGatewayPreviously = true
 
-				klog.Infof("FDB entry added on the Gateway node's vxlan iface for "+
-					"route-agent pod %q, IP %q", pod.Name, pod.Status.PodIP)
-			} else {
-				r.podWorkqueue.AddRateLimited(obj)
-				klog.Errorf("vxlanDevice is not yet created on the Gateway node")
-				return nil
-			}
-		}
+		klog.Infof("Creating the vxlan interface: %s on the gateway node", VxLANIface)
 
-		r.podWorkqueue.Forget(obj)
-		klog.V(log.DEBUG).Infof("Successfully processed submariner-route-agent pod %q", name)
-
-		return nil
-	}()
-
-	if err != nil {
-		utilruntime.HandleError(err)
-		return true
-	}
-
-	return true
-}
-
-func (r *Controller) processNextEndpoint() bool {
-	obj, shutdown := r.endpointWorkqueue.Get()
-	if shutdown {
-		return false
-	}
-
-	err := func() error {
-		defer r.endpointWorkqueue.Done(obj)
-		key := obj.(string)
-
-		ns, name, err := cache.SplitMetaNamespaceKey(key)
+		err = r.createVxLANInterface(VxInterfaceGateway, nil)
 		if err != nil {
-			return fmt.Errorf("error while splitting meta namespace key %s: %v", key, err)
+			klog.Fatalf("Unable to create VxLAN interface on gateway node (%s): %v", hostname, err)
 		}
 
-		endpoint, err := r.submarinerClientSet.SubmarinerV1().Endpoints(ns).Get(name, metav1.GetOptions{})
+		err = r.configureIPRule(AddRoute)
 		if err != nil {
-			if errors.IsNotFound(err) {
-				r.endpointWorkqueue.Forget(obj)
-				klog.Infof("Endpoint for key %q not found - probably was deleted", key)
-
-				return nil
-			}
-
-			r.endpointWorkqueue.AddRateLimited(obj)
-
-			return fmt.Errorf("error retrieving submariner endpoint object %s: %v", name, err)
-		}
-
-		klog.V(log.TRACE).Infof("Processing endpoint %q : %s", name, endpoint)
-
-		if endpoint.Spec.ClusterID != r.clusterID {
-			// Before we make any changes on the host, verify that subnets do not overlap.
-			if r.overlappingSubnets(endpoint.Spec.Subnets) {
-				// Skip processing the endpoint when CIDRs are overlapping.
-				r.endpointWorkqueue.Forget(obj)
-				return nil
-			}
-
-			klog.Infof("Updating iptable rules for remote cluster's Endpoint %q with subnets %v",
-				endpoint.Name, endpoint.Spec.Subnets)
-			r.updateIptableRulesForInterclusterTraffic(endpoint.Spec.Subnets)
-
-			r.gwVxLanMutex.Lock()
-			// Add routes to the new endpoint on the GatewayNode.
-			r.updateRoutingRulesForHostNetworkSupport(endpoint.Spec.Subnets, AddRoute)
-			r.gwVxLanMutex.Unlock()
-
-			r.endpointWorkqueue.Forget(obj)
-
-			return nil
-		}
-
-		klog.Infof("Processing local Endpoint %s with IP %s, Host %s for this cluster",
-			endpoint.Name, endpoint.Spec.PrivateIP, endpoint.Spec.Hostname)
-
-		hostname, err := os.Hostname()
-		if err != nil {
-			klog.Fatalf("unable to determine hostname: %v", err)
-		}
-
-		// If the endpoint hostname matches with our hostname, it implies we are on gateway node
-		if endpoint.Spec.Hostname == hostname {
-			r.cleanVxSubmarinerRoutes()
-			klog.Infof("This route agent is running on the active gateway node")
-
-			r.gwVxLanMutex.Lock()
-			defer r.gwVxLanMutex.Unlock()
-
-			r.isGatewayNode = true
-			r.wasGatewayPreviously = true
-
-			klog.Infof("Creating the vxlan interface: %s on the gateway node", VxLANIface)
-
-			err = r.createVxLANInterface(VxInterfaceGateway, nil)
-			if err != nil {
-				klog.Fatalf("Unable to create VxLAN interface on gateway node (%s): %v", hostname, err)
-			}
-
-			err = r.configureIPRule(AddRoute)
-			if err != nil {
-				klog.Errorf("Unable to add ip rule to table %d on Gateway node %s: %v",
-					RouteAgentHostNetworkTableID, hostname, err)
-			}
-
-			if r.localCableDriver == "" {
-				r.localCableDriver = endpoint.Spec.Backend
-			}
-			// On the GatewayNode, add routes for the remoteSubnets
-			r.updateRoutingRulesForHostNetworkSupport(r.remoteSubnets.Elements(), AddRoute)
-
-			r.endpointWorkqueue.Forget(obj)
-
-			return nil
-		}
-
-		klog.Infof("This route agent is running on a non-gateway/non-active node")
-
-		localClusterGwNodeIP := net.ParseIP(endpoint.Spec.PrivateIP)
-		remoteVtepIP, err := r.getVxlanVtepIPAddress(localClusterGwNodeIP.String())
-		if err != nil {
-			r.endpointWorkqueue.Forget(obj)
-			return fmt.Errorf("failed to derive the remoteVtepIP %v", err)
-		}
-
-		r.gwVxLanMutex.Lock()
-		r.isGatewayNode = false
-
-		klog.Infof("Creating the vxlan interface %s with gateway node IP %s", VxLANIface, localClusterGwNodeIP)
-
-		err = r.createVxLANInterface(VxInterfaceWorker, localClusterGwNodeIP)
-		if err != nil {
-			klog.Fatalf("Unable to create VxLAN interface on non-GatewayNode (%s): %v", endpoint.Spec.Hostname, err)
-		}
-		// If the active Gateway transitions to a new node, we flush the HostNetwork routing table.
-		r.updateRoutingRulesForHostNetworkSupport(nil, FlushRouteTable)
-		r.gatewayToNonGatewayTransitionCleanups()
-		r.nonGatewayCleanups()
-
-		r.gwVxLanMutex.Unlock()
-
-		err = r.reconcileRoutes(remoteVtepIP)
-		if err != nil {
-			r.endpointWorkqueue.AddRateLimited(obj)
-			return fmt.Errorf("error while reconciling routes %v", err)
-		}
-
-		err = r.configureIPRule(DeleteRoute)
-		if err != nil {
-			klog.Errorf("Unable to delete ip rule to table %d on non-Gateway node %s: %v",
+			klog.Errorf("Unable to add ip rule to table %d on Gateway node %s: %v",
 				RouteAgentHostNetworkTableID, hostname, err)
 		}
 
-		r.endpointWorkqueue.Forget(obj)
-		klog.V(log.DEBUG).Infof("Successfully processed local Endpoint %q", endpoint.Name)
+		if r.localCableDriver == "" {
+			r.localCableDriver = endpoint.Spec.Backend
+		}
+		// On the GatewayNode, add routes for the remoteSubnets
+		r.updateRoutingRulesForHostNetworkSupport(r.remoteSubnets.Elements(), AddRoute)
 
-		return nil
-	}()
+		return false, nil
+	}
 
+	klog.Infof("This route agent is running on a non-gateway/non-active node")
+
+	localClusterGwNodeIP := net.ParseIP(endpoint.Spec.PrivateIP)
+	remoteVtepIP, err := r.getVxlanVtepIPAddress(localClusterGwNodeIP.String())
 	if err != nil {
-		utilruntime.HandleError(err)
-		return true
+		return false, fmt.Errorf("failed to derive the remoteVtepIP %v", err)
 	}
 
-	return true
-}
+	r.gwVxLanMutex.Lock()
+	r.isGatewayNode = false
 
-func (r *Controller) enqueueEndpoint(obj interface{}) {
-	var key string
-	var err error
-	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
-		utilruntime.HandleError(err)
-		return
+	klog.Infof("Creating the vxlan interface %s with gateway node IP %s", VxLANIface, localClusterGwNodeIP)
+
+	err = r.createVxLANInterface(VxInterfaceWorker, localClusterGwNodeIP)
+	if err != nil {
+		klog.Fatalf("Unable to create VxLAN interface on non-GatewayNode (%s): %v", endpoint.Spec.Hostname, err)
+	}
+	// If the active Gateway transitions to a new node, we flush the HostNetwork routing table.
+	r.updateRoutingRulesForHostNetworkSupport(nil, FlushRouteTable)
+	r.gatewayToNonGatewayTransitionCleanups()
+	r.nonGatewayCleanups()
+
+	r.gwVxLanMutex.Unlock()
+
+	err = r.reconcileRoutes(remoteVtepIP)
+	if err != nil {
+		return true, fmt.Errorf("error while reconciling routes %v", err)
 	}
 
-	klog.V(log.DEBUG).Infof("Enqueueing endpoint for route controller %v", obj)
-	r.endpointWorkqueue.AddRateLimited(key)
+	err = r.configureIPRule(DeleteRoute)
+	if err != nil {
+		klog.Errorf("Unable to delete ip rule to table %d on non-Gateway node %s: %v",
+			RouteAgentHostNetworkTableID, hostname, err)
+	}
+
+	klog.V(log.DEBUG).Infof("Successfully processed local Endpoint %q", endpoint.Name)
+
+	return false, nil
 }
 
 func (r *Controller) enqueuePod(obj interface{}) {
-	var key string
-	var err error
-	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
-		utilruntime.HandleError(err)
-		return
-	}
-
 	pod := obj.(*k8sv1.Pod)
 	// Add the POD event to the workqueue only if the sm-route-agent podIP does not exist in the local cache.
 	if pod.Status.HostIP != "" && !r.remoteVTEPs.Contains(pod.Status.HostIP) {
 		klog.V(log.DEBUG).Infof("Enqueueing sm-route-agent-pod event, ip: %s", pod.Status.HostIP)
-		r.podWorkqueue.AddRateLimited(key)
+		r.podWorkqueue.Enqueue(pod)
 	}
 }
 
