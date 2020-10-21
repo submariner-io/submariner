@@ -85,18 +85,6 @@ func FlattenColors(colorCodes []string) string {
 	return flattenedColors
 }
 
-func GetLocalCluster(ss types.SubmarinerSpecification) (types.SubmarinerCluster, error) {
-	var localCluster types.SubmarinerCluster
-	localCluster.ID = ss.ClusterID
-	localCluster.Spec.ClusterID = ss.ClusterID
-	localCluster.Spec.ClusterCIDR = ss.ClusterCidr
-	localCluster.Spec.ServiceCIDR = ss.ServiceCidr
-	localCluster.Spec.GlobalCIDR = ss.GlobalCidr
-	localCluster.Spec.ColorCodes = ss.ColorCodes
-
-	return localCluster, nil
-}
-
 func GetLocalEndpoint(clusterID, backend string, backendConfig map[string]string, natEnabled bool,
 	subnets []string, privateIP string) (types.SubmarinerEndpoint, error) {
 	hostname, err := os.Hostname()

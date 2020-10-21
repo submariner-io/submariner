@@ -9,15 +9,16 @@ require (
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/onsi/ginkgo v1.14.1
-	github.com/onsi/gomega v1.10.2
+	github.com/onsi/ginkgo v1.14.2
+	github.com/onsi/gomega v1.10.3
 	github.com/pkg/errors v0.9.1
+	github.com/prometheus/client_golang v1.0.0
 	github.com/rdegges/go-ipify v0.0.0-20150526035502-2d94a6a86c40
-	github.com/submariner-io/admiral v0.6.2
-	github.com/submariner-io/shipyard v0.6.1
+	github.com/submariner-io/admiral v0.7.0
+	github.com/submariner-io/shipyard v0.7.1
 	github.com/vishvananda/netlink v1.1.0
 	go.uber.org/zap v1.15.0 // indirect
-	golang.org/x/sys v0.0.0-20200615200032-f1bc736245b1
+	golang.org/x/sys v0.0.0-20200930185726-fdedc70b468f
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20200324154536-ceff61240acf
 	k8s.io/api v0.17.0
 	k8s.io/apimachinery v0.17.0

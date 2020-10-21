@@ -10,11 +10,11 @@ jobs:
     name: Markdown Links (all files)
     runs-on: ubuntu-latest
     steps:
-      - name: Check out code
-        uses: actions/checkout@v1
+      - name: Check out the repository
+        uses: actions/checkout@v2
 
       - name: Run markdown-link-check
-        uses: gaurav-nelson/github-action-markdown-link-checkv1
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
         with:
           config-file: ".markdownlinkcheck.json"
 

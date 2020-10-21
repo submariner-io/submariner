@@ -14,10 +14,19 @@ chmod a+x ./prep_for_subm.sh
 ./prep_for_subm.sh
 ```
 
+You can override some of the defaults by using environment variables, like:
+
+```bash
+export IPSEC_NATT_PORT=4501
+export IPSEC_IKE_PORT=501
+export GW_INSTANCE_TYPE=m4.xlarge
+./prep_for_subm.sh
+```
+
 ## Prerequisites
 
 You will need:
 
 * [Terraform](https://www.terraform.io/downloads.html)
 * [AWS CLI tool](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html)
-* Unzip
+* [OC](https://cloud.redhat.com/openshift/install/aws/installer-provisioned)

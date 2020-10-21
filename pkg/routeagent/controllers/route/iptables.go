@@ -7,8 +7,10 @@ import (
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/submariner/pkg/util"
 	"k8s.io/klog"
+
+	"github.com/submariner-io/submariner/pkg/routeagent/constants"
+	"github.com/submariner-io/submariner/pkg/util"
 )
 
 func (r *Controller) createIPTableChains() error {
@@ -17,14 +19,14 @@ func (r *Controller) createIPTableChains() error {
 		return fmt.Errorf("error initializing iptables: %v", err)
 	}
 
-	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", SmPostRoutingChain)
+	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmPostRoutingChain)
 
-	if err = util.CreateChainIfNotExists(ipt, "nat", SmPostRoutingChain); err != nil {
-		return fmt.Errorf("unable to create %s chain in iptables: %v", SmPostRoutingChain, err)
+	if err = util.CreateChainIfNotExists(ipt, "nat", constants.SmPostRoutingChain); err != nil {
+		return fmt.Errorf("unable to create %s chain in iptables: %v", constants.SmPostRoutingChain, err)
 	}
 
-	klog.V(log.DEBUG).Infof("Insert %s rule that has rules for inter-cluster traffic", SmPostRoutingChain)
-	forwardToSubPostroutingRuleSpec := []string{"-j", SmPostRoutingChain}
+	klog.V(log.DEBUG).Infof("Insert %s rule that has rules for inter-cluster traffic", constants.SmPostRoutingChain)
+	forwardToSubPostroutingRuleSpec := []string{"-j", constants.SmPostRoutingChain}
 	if err = util.PrependUnique(ipt, "nat", "POSTROUTING", forwardToSubPostroutingRuleSpec); err != nil {
 		return fmt.Errorf("unable to insert iptable rule in NAT table, POSTROUTING chain: %v", err)
 	}
@@ -62,7 +64,7 @@ func (r *Controller) createIPTableChains() error {
 		ruleSpec = []string{"-s", sourceAddress, "-o", VxLANIface, "-j", "SNAT", "--to", r.cniIface.ipAddress}
 		klog.V(log.DEBUG).Infof("Installing rule for host network to remote cluster communication: %s", strings.Join(ruleSpec, " "))
 
-		if err = ipt.AppendUnique("nat", SmPostRoutingChain, ruleSpec...); err != nil {
+		if err = ipt.AppendUnique("nat", constants.SmPostRoutingChain, ruleSpec...); err != nil {
 			return fmt.Errorf("error appending iptables rule %q: %v\n", strings.Join(ruleSpec, " "), err)
 		}
 	}
@@ -80,7 +82,7 @@ func (r *Controller) programIptableRulesForInterClusterTraffic(remoteCidrBlock s
 		ruleSpec := []string{"-s", localClusterCidr, "-d", remoteCidrBlock, "-j", "ACCEPT"}
 		klog.V(log.DEBUG).Infof("Installing iptables rule for outgoing traffic: %s", strings.Join(ruleSpec, " "))
 
-		if err = ipt.AppendUnique("nat", SmPostRoutingChain, ruleSpec...); err != nil {
+		if err = ipt.AppendUnique("nat", constants.SmPostRoutingChain, ruleSpec...); err != nil {
 			return fmt.Errorf("error appending iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
 		}
 
@@ -88,7 +90,7 @@ func (r *Controller) programIptableRulesForInterClusterTraffic(remoteCidrBlock s
 		ruleSpec = []string{"-s", remoteCidrBlock, "-d", localClusterCidr, "-j", "ACCEPT"}
 		klog.V(log.DEBUG).Infof("Installing iptables rule for incoming traffic: %s", strings.Join(ruleSpec, " "))
 
-		if err = ipt.AppendUnique("nat", SmPostRoutingChain, ruleSpec...); err != nil {
+		if err = ipt.AppendUnique("nat", constants.SmPostRoutingChain, ruleSpec...); err != nil {
 			return fmt.Errorf("error appending iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
 		}
 	}
