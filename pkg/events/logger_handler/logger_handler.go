@@ -10,7 +10,7 @@ import (
 )
 
 type LoggerHandler struct {
-	events.EventHandlerBase
+	events.HandlerBase
 }
 
 // GetName returns the name of the event handler
