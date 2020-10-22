@@ -1,11 +1,11 @@
-*				@mangelajo @tpantelis @Oats87
-/.github/workflows/		@mangelajo @tpantelis @Oats87 @mkolesnik
-/scripts/			@mangelajo @tpantelis @Oats87 @mkolesnik
-Makefile*			@mangelajo @tpantelis @Oats87 @mkolesnik
-Dockerfile.dapper		@mangelajo @tpantelis @Oats87 @mkolesnik
-/pkg/globalnet/*		@mangelajo @tpantelis @Oats87 @sridhargaddam
-/pkg/routeagent/*		@mangelajo @tpantelis @Oats87 @sridhargaddam
-/pkg/cable/strongswan/*		@mangelajo @tpantelis @Oats87 @sridhargaddam
+*				@mangelajo @tpantelis @Oats87 @skitt
+/.github/workflows/		@mangelajo @tpantelis @Oats87 @skitt @mkolesnik
+/scripts/			@mangelajo @tpantelis @Oats87 @skitt @mkolesnik
+Makefile*			@mangelajo @tpantelis @Oats87 @skitt @mkolesnik
+Dockerfile.dapper		@mangelajo @tpantelis @Oats87 @skitt @mkolesnik
+/pkg/globalnet/*		@mangelajo @tpantelis @Oats87 @skitt @sridhargaddam
+/pkg/routeagent/*		@mangelajo @tpantelis @Oats87 @skitt @sridhargaddam
+/pkg/cable/strongswan/*		@mangelajo @tpantelis @Oats87 @skitt @sridhargaddam
 go.mod				@mangelajo @tpantelis @Oats87 @skitt
 go.sum				@mangelajo @tpantelis @Oats87 @skitt
 /package/*			@mangelajo @tpantelis @Oats87 @skitt @mkolesnik
