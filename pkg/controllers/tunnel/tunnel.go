@@ -27,7 +27,7 @@ func StartController(engine cableengine.Engine, namespace string, client dynamic
 		Name:            "Tunnel controller",
 		SourceClient:    client,
 		SourceNamespace: namespace,
-		Direction:       syncer.LocalToRemote,
+		Direction:       syncer.RemoteToLocal,
 		RestMapper:      restMapper,
 		Federator:       federate.NewNoopFederator(),
 		ResourceType:    &v1.Endpoint{},
