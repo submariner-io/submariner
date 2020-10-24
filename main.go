@@ -19,11 +19,8 @@ import (
 	"github.com/submariner-io/submariner/pkg/cableengine"
 	"github.com/submariner-io/submariner/pkg/cableengine/syncer"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
-	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions"
 	"github.com/submariner-io/submariner/pkg/controllers/datastoresyncer"
 	"github.com/submariner-io/submariner/pkg/controllers/tunnel"
-	"github.com/submariner-io/submariner/pkg/datastore"
-	subk8s "github.com/submariner-io/submariner/pkg/datastore/kubernetes"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
 	corev1 "k8s.io/api/core/v1"
@@ -93,9 +90,6 @@ func main() {
 		klog.Fatalf("Error creating submariner clientset: %s", err.Error())
 	}
 
-	submarinerInformerFactory := submarinerInformers.NewSharedInformerFactoryWithOptions(submarinerClient, time.Second*30,
-		submarinerInformers.WithNamespace(submSpec.Namespace))
-
 	var localSubnets []string
 
 	klog.Info("Creating the cable engine")
@@ -147,29 +141,9 @@ func main() {
 	}
 
 	becameLeader := func(context.Context) {
-		klog.Info("Creating the tunnel controller")
-
-		var datastore datastore.Datastore
-
-		switch submSpec.Broker {
-		case "k8s":
-			klog.Info("Creating the kubernetes central datastore")
-
-			datastore, err = subk8s.NewDatastore(submSpec.ClusterID, stopCh)
-			if err != nil {
-				fatal(cableEngineSyncer, "Error creating the kubernetes datastore: %v", err)
-			}
-		default:
-			fatal(cableEngineSyncer, "Invalid backend %q was specified", submSpec.Broker)
-		}
-
 		klog.Info("Creating the datastore syncer")
 
-		dsSyncer := datastoresyncer.NewDatastoreSyncer(submSpec.ClusterID, submarinerClient.SubmarinerV1().Clusters(submSpec.Namespace),
-			submarinerInformerFactory.Submariner().V1().Clusters(), submarinerClient.SubmarinerV1().Endpoints(submSpec.Namespace),
-			submarinerInformerFactory.Submariner().V1().Endpoints(), datastore, submSpec.ColorCodes, localCluster, localEndpoint)
-
-		submarinerInformerFactory.Start(stopCh)
+		dsSyncer := datastoresyncer.New(cfg, submSpec.Namespace, localCluster, localEndpoint, submSpec.ColorCodes)
 
 		if err = cableEngine.StartEngine(); err != nil {
 			fatal(cableEngineSyncer, "Error starting the cable engine: %v", err)

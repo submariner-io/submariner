@@ -1,35 +1,35 @@
 package datastoresyncer_test
 
 import (
-	"context"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/fake"
 	. "github.com/submariner-io/admiral/pkg/gomega"
+	"github.com/submariner-io/admiral/pkg/syncer/broker"
+	"github.com/submariner-io/admiral/pkg/syncer/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	fakeClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned/fake"
-	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
-	fakeClientsetv1 "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1/fake"
-	informers "github.com/submariner-io/submariner/pkg/client/informers/externalversions"
 	"github.com/submariner-io/submariner/pkg/controllers/datastoresyncer"
-	"github.com/submariner-io/submariner/pkg/datastore"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog"
 )
 
 const (
 	clusterID       = "east"
 	otherClusterID  = "west"
-	namespace       = "submariner"
+	localNamespace  = "submariner"
 	brokerNamespace = "submariner-broker"
 )
 
@@ -38,22 +38,30 @@ func TestDatastoresyncer(t *testing.T) {
 	RunSpecs(t, "Datastore syncer Suite")
 }
 
-var _ = Describe("", func() {
+func init() {
 	klog.InitFlags(nil)
-})
+
+	err := submarinerv1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		panic(err)
+	}
+}
 
 type testDriver struct {
-	syncer              *datastoresyncer.DatastoreSyncer
-	datastore           *testDatastore
-	localCluster        *types.SubmarinerCluster
-	localEndpoint       *types.SubmarinerEndpoint
-	submarinerClusters  *fakeClientsetv1.FailingClusters
-	submarinerEndpoints *fakeClientsetv1.FailingEndpoints
-	stopCh              chan struct{}
-	runCompleted        chan error
-	initialLocalObjs    []runtime.Object
-	initialRemoteObjs   []runtime.Object
-	expectedRunErr      error
+	syncer          *datastoresyncer.DatastoreSyncer
+	localCluster    *types.SubmarinerCluster
+	localEndpoint   *types.SubmarinerEndpoint
+	localClient     dynamic.Interface
+	brokerClient    dynamic.Interface
+	localClusters   *fake.DynamicResourceClient
+	brokerClusters  dynamic.ResourceInterface
+	localEndpoints  *fake.DynamicResourceClient
+	brokerEndpoints dynamic.ResourceInterface
+	syncerScheme    *runtime.Scheme
+	restMapper      meta.RESTMapper
+	stopCh          chan struct{}
+	runCompleted    chan error
+	expectedRunErr  error
 }
 
 func newTestDriver() *testDriver {
@@ -80,11 +88,22 @@ func newTestDriver() *testDriver {
 
 	BeforeEach(func() {
 		t.expectedRunErr = nil
-		t.initialLocalObjs = nil
-		t.initialRemoteObjs = nil
-		t.datastore = &testDatastore{}
-		t.submarinerClusters = &fakeClientsetv1.FailingClusters{}
-		t.submarinerEndpoints = &fakeClientsetv1.FailingEndpoints{}
+
+		t.syncerScheme = runtime.NewScheme()
+		Expect(submarinerv1.AddToScheme(t.syncerScheme)).To(Succeed())
+
+		t.localClient = fake.NewDynamicClient(t.syncerScheme)
+		t.brokerClient = fake.NewDynamicClient(t.syncerScheme)
+
+		t.restMapper = test.GetRESTMapperFor(&submarinerv1.Cluster{}, &submarinerv1.Endpoint{})
+
+		clusterGVR := test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.Cluster{})
+		t.localClusters = t.localClient.Resource(*clusterGVR).Namespace(localNamespace).(*fake.DynamicResourceClient)
+		t.brokerClusters = t.brokerClient.Resource(*clusterGVR).Namespace(brokerNamespace)
+
+		endpointGVR := test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.Endpoint{})
+		t.localEndpoints = t.localClient.Resource(*endpointGVR).Namespace(localNamespace).(*fake.DynamicResourceClient)
+		t.brokerEndpoints = t.brokerClient.Resource(*endpointGVR).Namespace(brokerNamespace)
 	})
 
 	JustBeforeEach(func() {
@@ -102,21 +121,15 @@ func (t *testDriver) run() {
 	t.stopCh = make(chan struct{})
 	t.runCompleted = make(chan error, 1)
 
-	remoteClient := fakeClientset.NewSimpleClientset(t.initialRemoteObjs...).SubmarinerV1()
-	t.datastore.clusters = remoteClient.Clusters(brokerNamespace)
-	t.datastore.endpoints = remoteClient.Endpoints(brokerNamespace)
-
-	localClient := fakeClientset.NewSimpleClientset(t.initialLocalObjs...)
-	t.submarinerClusters.ClusterInterface = localClient.SubmarinerV1().Clusters(namespace)
-	t.submarinerEndpoints.EndpointInterface = localClient.SubmarinerV1().Endpoints(namespace)
-
-	informerFactory := informers.NewSharedInformerFactoryWithOptions(localClient, 0,
-		informers.WithNamespace(namespace))
-
-	t.syncer = datastoresyncer.NewDatastoreSyncer(clusterID, t.submarinerClusters, informerFactory.Submariner().V1().Clusters(),
-		t.submarinerEndpoints, informerFactory.Submariner().V1().Endpoints(), t.datastore, []string{}, *t.localCluster, *t.localEndpoint)
-
-	informerFactory.Start(t.stopCh)
+	t.syncer = datastoresyncer.NewWithDetail(clusterID, localNamespace, *t.localCluster, *t.localEndpoint, []string{},
+		broker.SyncerConfig{
+			LocalNamespace:  localNamespace,
+			LocalClusterID:  clusterID,
+			BrokerNamespace: brokerNamespace,
+			Scheme:          t.syncerScheme,
+		}, func(config *broker.SyncerConfig) (*broker.Syncer, error) {
+			return broker.NewSyncerWithDetail(config, t.localClient, t.brokerClient, t.restMapper)
+		})
 
 	go func() {
 		t.runCompleted <- t.syncer.Run(t.stopCh)
@@ -153,40 +166,19 @@ func (t *testDriver) stop() {
 func newEndpoint(spec *submarinerv1.EndpointSpec) *submarinerv1.Endpoint {
 	return &submarinerv1.Endpoint{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      getEndpointName(spec),
-			Namespace: namespace,
+			Name: getEndpointName(spec),
 		},
 		Spec: *spec,
 	}
 }
 
-func createEndpoint(endpoints submarinerClientset.EndpointInterface, spec *submarinerv1.EndpointSpec) string {
-	endpointName := getEndpointName(spec)
-	_, err := endpoints.Create(&submarinerv1.Endpoint{
+func newCluster(spec *submarinerv1.ClusterSpec) *submarinerv1.Cluster {
+	return &submarinerv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      endpointName,
-			Namespace: namespace,
+			Name: spec.ClusterID,
 		},
 		Spec: *spec,
-	})
-
-	Expect(err).To(Succeed())
-
-	return endpointName
-}
-
-func createCluster(clusters submarinerClientset.ClusterInterface, spec *submarinerv1.ClusterSpec) string {
-	_, err := clusters.Create(&submarinerv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      spec.ClusterID,
-			Namespace: namespace,
-		},
-		Spec: *spec,
-	})
-
-	Expect(err).To(Succeed())
-
-	return spec.ClusterID
+	}
 }
 
 func getEndpointName(from *submarinerv1.EndpointSpec) string {
@@ -196,147 +188,20 @@ func getEndpointName(from *submarinerv1.EndpointSpec) string {
 	return endpointName
 }
 
-func awaitCluster(clusters submarinerClientset.ClusterInterface, expected *submarinerv1.ClusterSpec) {
-	var foundCluster *submarinerv1.Cluster
-
-	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
-		cluster, err := clusters.Get(expected.ClusterID, metav1.GetOptions{})
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				return false, nil
-			}
-			return false, err
-		}
-
-		foundCluster = cluster
-		return true, nil
+func awaitCluster(clusters dynamic.ResourceInterface, expected *submarinerv1.ClusterSpec) {
+	test.AwaitAndVerifyResource(clusters, expected.ClusterID, func(obj *unstructured.Unstructured) bool {
+		defer GinkgoRecover()
+		actual := &submarinerv1.Cluster{}
+		Expect(scheme.Scheme.Convert(obj, actual, nil)).To(Succeed())
+		return reflect.DeepEqual(actual.Spec, *expected)
 	})
-
-	Expect(err).To(Succeed())
-	Expect(foundCluster.Spec).To(Equal(*expected))
 }
 
-func awaitNoCluster(clusters submarinerClientset.ClusterInterface, name string) {
-	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
-		_, err := clusters.Get(name, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			return true, nil
-		}
-
-		if err != nil {
-			return false, err
-		}
-
-		return false, nil
+func awaitEndpoint(endpoints dynamic.ResourceInterface, expected *submarinerv1.EndpointSpec) {
+	test.AwaitAndVerifyResource(endpoints, getEndpointName(expected), func(obj *unstructured.Unstructured) bool {
+		defer GinkgoRecover()
+		actual := &submarinerv1.Endpoint{}
+		Expect(scheme.Scheme.Convert(obj, actual, nil)).To(Succeed())
+		return reflect.DeepEqual(actual.Spec, *expected)
 	})
-
-	Expect(err).To(Succeed())
-}
-
-func awaitEndpoint(endpoints submarinerClientset.EndpointInterface, expected *submarinerv1.EndpointSpec) {
-	endpointName := getEndpointName(expected)
-
-	var foundEndpoint *submarinerv1.Endpoint
-
-	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
-		endpoint, err := endpoints.Get(endpointName, metav1.GetOptions{})
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				return false, nil
-			}
-			return false, err
-		}
-
-		foundEndpoint = endpoint
-		return true, nil
-	})
-
-	Expect(err).To(Succeed())
-	Expect(foundEndpoint.Spec).To(Equal(*expected))
-}
-
-func awaitNoEndpoint(endpoints submarinerClientset.EndpointInterface, name string) {
-	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
-		_, err := endpoints.Get(name, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			return true, nil
-		}
-
-		if err != nil {
-			return false, err
-		}
-
-		return false, nil
-	})
-
-	Expect(err).To(Succeed())
-}
-
-type testDatastore struct {
-	clusters             submarinerClientset.ClusterInterface
-	endpoints            submarinerClientset.EndpointInterface
-	failOnRemoveEndpoint error
-}
-
-func (t *testDatastore) GetEndpoints(clusterID string) ([]types.SubmarinerEndpoint, error) {
-	endpoints, err := t.endpoints.List(metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	subEndpoints := []types.SubmarinerEndpoint{}
-
-	for _, endpoint := range endpoints.Items {
-		if endpoint.Spec.ClusterID == clusterID {
-			subEndpoints = append(subEndpoints, types.SubmarinerEndpoint{Spec: endpoint.Spec})
-		}
-	}
-
-	return subEndpoints, nil
-}
-
-func (t *testDatastore) SetCluster(cluster *types.SubmarinerCluster) error {
-	_, err := t.clusters.Create(&submarinerv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: cluster.Spec.ClusterID,
-		},
-		Spec: cluster.Spec,
-	})
-
-	return err
-}
-
-func (t *testDatastore) SetEndpoint(endpoint *types.SubmarinerEndpoint) error {
-	endpointName := getEndpointName(&endpoint.Spec)
-	_, err := t.endpoints.Create(&submarinerv1.Endpoint{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: endpointName,
-		},
-		Spec: endpoint.Spec,
-	})
-
-	return err
-}
-
-func (t *testDatastore) RemoveEndpoint(clusterID, cableName string) error {
-	if t.failOnRemoveEndpoint != nil {
-		return t.failOnRemoveEndpoint
-	}
-
-	endpointName, err := util.GetEndpointCRDNameFromParams(clusterID, cableName)
-	if err != nil {
-		return err
-	}
-
-	return t.endpoints.Delete(endpointName, &metav1.DeleteOptions{})
-}
-
-func (t *testDatastore) WatchClusters(ctx context.Context, selfClusterID string, colorCodes []string,
-	onClusterChange datastore.OnClusterChange) error {
-	return nil
-}
-
-func (t *testDatastore) WatchEndpoints(ctx context.Context, selfClusterID string, colorCodes []string,
-	onEndpointChange datastore.OnEndpointChange) error {
-	return nil
 }
