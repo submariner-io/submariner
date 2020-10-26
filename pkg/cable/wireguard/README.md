@@ -40,7 +40,8 @@ Currently assuming Linux Kernel WireGuard (`wgtypes.LinuxKernel`).
   bin/subctl join --cable-driver wireguard --disable-nat broker-info.subm
   ```
 
-- The default UDP listen port for WireGuard is `5871`. It can be changed by setting the env var `CE_IPSEC_NATTPORT`
+- The default UDP listen port for submariner WireGuard driver is `4500`. It can be changed by setting the env var `CE_IPSEC_NATTPORT`
+- It is assumed that the wireguard network device named `submariner` is exclusively used by submariner-gateway and should not be edited manually.
 
 ## Troubleshooting, limitations
 
@@ -61,3 +62,12 @@ Currently assuming Linux Kernel WireGuard (`wgtypes.LinuxKernel`).
 - No new `iptables` rules were added, although source NAT needs to be disabled for cross cluster communication. This is similar to disabling
   SNAT when sending cross-cluster traffic between nodes to `submariner-gateway`, so the existing rules should be enough.  **The driver will
 fail if the CNI does SNAT before routing to Wireguard** (e.g., failed with Calico, works with Flannel).
+
+## Monitoring
+
+The following metrics are exposed per gateway:
+
+- `connection_status`: indicates whether or not the connection is established where the value 1 means connected and 0 means disconnected.
+- `connection_established_timestamp` the Unix timestamp at which the connection established.
+- `gateway_tx_bytes` Bytes transmitted for the connection.
+- `gateway_rx_bytes` Bytes received for the connection.
