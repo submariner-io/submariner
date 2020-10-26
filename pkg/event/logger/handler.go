@@ -13,6 +13,10 @@ type Handler struct {
 	event.HandlerBase
 }
 
+func NewHandler() event.Handler {
+	return &Handler{}
+}
+
 func (l *Handler) GetName() string {
 	return "logger"
 }
@@ -64,7 +68,7 @@ func (l *Handler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	return nil
 }
 
-func (l *Handler) NodeAdded(node *k8sV1.Node) error {
+func (l *Handler) NodeCreated(node *k8sV1.Node) error {
 	klog.V(log.DEBUG).Infof("A Node with name %q and addresses %#v has been added to the cluster",
 		node.Name, node.Status.Addresses)
 	return nil
