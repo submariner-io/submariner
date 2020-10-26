@@ -151,7 +151,7 @@ func RecordConnection(cableDriverName string, localEndpoint, remoteEndpoint *sub
 	}
 
 	labels[connectionsStatusLabel] = status
-	connectionsGauge.With(labels).Inc()
+	connectionsGauge.With(labels).Set(1)
 }
 
 func RecordDisconnected(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec) {
@@ -161,6 +161,7 @@ func RecordDisconnected(cableDriverName string, localEndpoint, remoteEndpoint *s
 	connectionEstablishedTimestampGauge.Delete(labels)
 	rxGauge.Delete(labels)
 	txGauge.Delete(labels)
+	connectionsGauge.Delete(labels)
 }
 
 func RecordNoConnections() {
