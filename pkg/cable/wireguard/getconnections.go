@@ -9,6 +9,7 @@ import (
 	"k8s.io/klog"
 
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cable"
 )
 
 func (w *wireguard) GetConnections() (*[]v1.Connection, error) {
@@ -36,7 +37,6 @@ func (w *wireguard) GetConnections() (*[]v1.Connection, error) {
 		}
 
 		w.updateConnectionForPeer(&d.Peers[i], connection)
-
 		connections = append(connections, *connection.DeepCopy())
 	}
 
@@ -79,12 +79,16 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 		if lc > handshakeTimeout.Milliseconds() {
 			// no initial handshake for too long
 			connection.SetStatus(v1.ConnectionError, "no initial handshake for %.1f seconds", lcSec)
+			cable.RecordConnection(cableDriverName, &w.localEndpoint.Spec, &connection.Endpoint, string(connection.Status), false)
+
 			return
 		}
 
 		if tx > 0 || rx > 0 {
 			// no handshake, but at least some communication in progress
 			connection.SetStatus(v1.Connecting, "no initial handshake yet")
+			cable.RecordConnection(cableDriverName, &w.localEndpoint.Spec, &connection.Endpoint, string(connection.Status), false)
+
 			return
 		}
 	}
@@ -92,16 +96,20 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 	if tx > 0 || rx > 0 {
 		// all is good
 		connection.SetStatus(v1.Connected, "Rx=%d Bytes, Tx=%d Bytes", p.ReceiveBytes, p.TransmitBytes)
-		savePeerTraffic(connection, now, p.TransmitBytes, p.ReceiveBytes)
+		cable.RecordConnection(cableDriverName, &w.localEndpoint.Spec, &connection.Endpoint, string(connection.Status), false)
+		saveAndRecordPeerTraffic(&w.localEndpoint.Spec, &connection.Endpoint, now, p.TransmitBytes, p.ReceiveBytes)
 
 		return
 	}
 
 	handshakeDelta := time.Since(p.LastHandshakeTime)
+
 	if handshakeDelta > handshakeTimeout {
 		// hard error, really long time since handshake
 		connection.SetStatus(v1.ConnectionError, "no handshake for %.1f seconds",
 			handshakeDelta.Seconds())
+		cable.RecordConnection(cableDriverName, &w.localEndpoint.Spec, &connection.Endpoint, string(connection.Status), false)
+
 		return
 	}
 
@@ -114,12 +122,15 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 	// soft error, no traffic, stale handshake
 	connection.SetStatus(v1.ConnectionError, "no bytes sent or received for %.1f seconds",
 		lcSec)
+	cable.RecordConnection(cableDriverName, &w.localEndpoint.Spec, &connection.Endpoint, string(connection.Status), false)
 }
 
 func (w *wireguard) updatePeerStatus(c *v1.Connection, key *wgtypes.Key) {
 	p, err := w.peerByKey(key)
 	if err != nil {
 		c.SetStatus(v1.ConnectionError, "cannot fetch status for peer %s: %v", key, err)
+		cable.RecordConnection(cableDriverName, &w.localEndpoint.Spec, &c.Endpoint, string(c.Status), false)
+
 		return
 	}
 
@@ -141,9 +152,12 @@ func peerTrafficDelta(c *v1.Connection, key string, newVal int64) int64 {
 	return 0
 }
 
-// Save backendConfig[key]
-func savePeerTraffic(c *v1.Connection, lc, tx, rx int64) {
-	c.Endpoint.BackendConfig[lastChecked] = strconv.FormatInt(lc, 10)
-	c.Endpoint.BackendConfig[transmitBytes] = strconv.FormatInt(tx, 10)
-	c.Endpoint.BackendConfig[receiveBytes] = strconv.FormatInt(rx, 10)
+// Save backendConfig[key] and export the metrics to prometheus
+func saveAndRecordPeerTraffic(localEndpoint, remoteEndpoint *v1.EndpointSpec, lc, tx, rx int64) {
+	remoteEndpoint.BackendConfig[lastChecked] = strconv.FormatInt(lc, 10)
+	remoteEndpoint.BackendConfig[transmitBytes] = strconv.FormatInt(tx, 10)
+	remoteEndpoint.BackendConfig[receiveBytes] = strconv.FormatInt(rx, 10)
+
+	cable.RecordTxBytes(cableDriverName, localEndpoint, remoteEndpoint, int(tx))
+	cable.RecordRxBytes(cableDriverName, localEndpoint, remoteEndpoint, int(rx))
 }
