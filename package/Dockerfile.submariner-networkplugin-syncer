@@ -1,0 +1,10 @@
+FROM registry.access.redhat.com/ubi8/ubi-minimal
+
+WORKDIR /var/submariner
+
+# install the networkpluginc-sync
+COPY package/submariner-networkplugin-syncer.sh bin/submariner-networkplugin-syncer /usr/local/bin/
+
+ENTRYPOINT ["/usr/local/bin/submariner-networkplugin-syncer.sh"]
+
+USER ${USER_UID}
