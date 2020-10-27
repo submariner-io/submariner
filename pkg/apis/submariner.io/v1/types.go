@@ -2,6 +2,7 @@ package v1
 
 import (
 	"fmt"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -43,8 +44,10 @@ type Endpoint struct {
 }
 
 type EndpointSpec struct {
-	ClusterID     string            `json:"cluster_id"`
-	CableName     string            `json:"cable_name"`
+	ClusterID string `json:"cluster_id"`
+	CableName string `json:"cable_name"`
+	// +optional
+	HealthCheckIP string            `json:"healthCheckIP,omitempty"`
 	Hostname      string            `json:"hostname"`
 	Subnets       []string          `json:"subnets"`
 	PrivateIP     string            `json:"private_ip"`
@@ -81,6 +84,16 @@ type GatewayStatus struct {
 	Connections   []Connection `json:"connections"`
 }
 
+// LatencySpec describes the round trip time information in nanoseconds for a packet
+// between the gateway pods of two clusters.
+type LatencySpec struct {
+	LastRTT    time.Duration `json:"lastRTT"`
+	MinRTT     time.Duration `json:"minRTT"`
+	AverageRTT time.Duration `json:"averageRTT"`
+	MaxRTT     time.Duration `json:"maxRTT"`
+	StdDevRTT  time.Duration `json:"stddevRTT"`
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type GatewayList struct {
@@ -100,6 +113,8 @@ type Connection struct {
 	Status        ConnectionStatus `json:"status"`
 	StatusMessage string           `json:"statusMessage"`
 	Endpoint      EndpointSpec     `json:"endpoint"`
+	// +optional
+	Latency *LatencySpec `json:"latency,omitempty"`
 }
 
 type ConnectionStatus string
