@@ -1,4 +1,4 @@
-FROM fedora:32
+FROM fedora:33
 
 RUN dnf -y install --nodocs git-core 'dnf-command(builddep)' rpm-build
 
@@ -11,7 +11,7 @@ RUN dnf -y builddep --nodocs libreswan/packaging/fedora/libreswan.spec
 
 RUN make -C libreswan git-rpm 
 
-FROM fedora:32
+FROM fedora:33
 
 WORKDIR /var/submariner
 
