@@ -46,11 +46,15 @@ bin/submariner-route-agent: vendor/modules.txt $(shell find pkg/routeagent)
 bin/submariner-globalnet: vendor/modules.txt $(shell find pkg/globalnet)
 	${SCRIPTS_DIR}/compile.sh $@ ./pkg/globalnet/main.go $(BUILD_ARGS)
 
-build: bin/submariner-engine bin/submariner-route-agent bin/submariner-globalnet
+bin/submariner-networkplugin-syncer: vendor/modules.txt $(shell find pkg/networkplugin-syncer)
+	${SCRIPTS_DIR}/compile.sh $@ ./pkg/networkplugin-syncer/main.go $(BUILD_ARGS)
+
+build: bin/submariner-engine bin/submariner-route-agent bin/submariner-globalnet bin/submariner-networkplugin-syncer
 
 ci: validate unit build images
 
-images: build package/.image.submariner package/.image.submariner-route-agent package/.image.submariner-globalnet
+images: build package/.image.submariner package/.image.submariner-route-agent package/.image.submariner-globalnet \
+		package/.image.submariner-networkplugin-syncer
 
 images-submariner-libreswan-git: build package/Dockerfile.submariner-libreswan-git
 	$(SCRIPTS_DIR)/build_image.sh -i submariner-libreswan-git -f package/Dockerfile.submariner-libreswan-git

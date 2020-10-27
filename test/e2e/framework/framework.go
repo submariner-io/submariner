@@ -41,35 +41,7 @@ func beforeSuite() {
 		SubmarinerClients = append(SubmarinerClients, createSubmarinerClient(restConfig))
 	}
 
-	queryAndUpdateGlobalnetStatus()
-}
-
-func queryAndUpdateGlobalnetStatus() {
-	framework.TestContext.GlobalnetEnabled = false
-	clusters := SubmarinerClients[framework.ClusterA].SubmarinerV1().Clusters(framework.TestContext.SubmarinerNamespace)
-	framework.AwaitUntil("find clusters to figure out if Globalnet is enabled", func() (interface{}, error) {
-		clusters, err := clusters.List(metav1.ListOptions{})
-		if apierrors.IsNotFound(err) {
-			return nil, nil
-		}
-		return clusters, err
-	}, func(result interface{}) (bool, string, error) {
-		if result == nil {
-			return false, "No Cluster found", nil
-		}
-
-		clusterList := result.(*submarinerv1.ClusterList)
-		if len(clusterList.Items) == 0 {
-			return false, "No Cluster found", nil
-		}
-		for _, cluster := range clusterList.Items {
-			if len(cluster.Spec.GlobalCIDR) != 0 {
-				// Based on the status of GlobalnetEnabled, certain tests will be skipped/executed.
-				framework.TestContext.GlobalnetEnabled = true
-			}
-		}
-		return true, "", nil
-	})
+	framework.DetectGlobalnet()
 }
 
 func (f *Framework) AwaitGatewayWithStatus(cluster framework.ClusterIndex,
