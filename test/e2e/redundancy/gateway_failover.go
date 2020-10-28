@@ -9,6 +9,7 @@ import (
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
@@ -72,7 +73,7 @@ func testEnginePodRestartScenario(f *subFramework.Framework) {
 	By(fmt.Sprintf("Deleting submariner engine pod %q", enginePod.Name))
 	f.DeletePod(framework.ClusterA, enginePod.Name, framework.TestContext.SubmarinerNamespace)
 
-	newEnginePod := f.AwaitSubmarinerEnginePod(framework.ClusterA)
+	newEnginePod := AwaitNewSubmarinerEnginePod(f, framework.ClusterA, enginePod.ObjectMeta.UID)
 	By(fmt.Sprintf("Found new submariner engine pod %q", newEnginePod.Name))
 
 	By(fmt.Sprintf("Waiting for the gateway to be up and connected %q", newEnginePod.Name))
@@ -97,6 +98,20 @@ func testEnginePodRestartScenario(f *subFramework.Framework) {
 		ToClusterScheduling:   framework.NonGatewayNode,
 		ToEndpointType:        defaultEndpointType(),
 	})
+}
+
+func AwaitNewSubmarinerEnginePod(f *subFramework.Framework, cluster framework.ClusterIndex, prevPodUID types.UID) *v1.Pod {
+	return framework.AwaitUntil("await new submariner engine pod", func() (interface{}, error) {
+		pod := f.AwaitSubmarinerEnginePod(cluster)
+		return pod, nil
+	}, func(result interface{}) (bool, string, error) {
+		pod := result.(*v1.Pod)
+		if pod.ObjectMeta.UID != prevPodUID {
+			return true, "", nil
+		}
+
+		return false, fmt.Sprintf("Expecting new engine pod (UID %q matches previous instance)", prevPodUID), nil
+	}).(*v1.Pod)
 }
 
 func defaultEndpointType() tcp.EndpointType {
