@@ -32,17 +32,11 @@ type TestHandler struct {
 	Initialized   bool
 }
 
-var allTestEvents chan TestEvent = make(chan TestEvent, 1000)
-
-func cleanupTestEvents() {
-	allTestEvents = make(chan TestEvent, 1000)
-}
-
-func NewTestHandler(name, networkPlugin string) *TestHandler {
+func NewTestHandler(name, networkPlugin string, events chan TestEvent) *TestHandler {
 	return &TestHandler{
 		Name:          name,
 		NetworkPlugin: networkPlugin,
-		Events:        make(chan TestEvent, 100),
+		Events:        events,
 		Initialized:   false,
 	}
 }
@@ -51,14 +45,10 @@ func (t *TestHandler) addEvent(eventName string, param interface{}) error {
 	ev := TestEvent{
 		Name:      eventName,
 		Parameter: param,
+		Handler:   t.Name,
 	}
 
 	t.Events <- ev
-
-	// On the global channel we also include the handler name
-	// so we can verify ordering
-	ev.Handler = t.Name
-	allTestEvents <- ev
 
 	return t.FailOnEvent
 }
