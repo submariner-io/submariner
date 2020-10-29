@@ -47,8 +47,8 @@ type Handler interface {
 	// RemoteEndpointRemoved is called when an endpoint associated with a remote cluster is removed
 	RemoteEndpointRemoved(endpoint *submV1.Endpoint) error
 
-	// NodeAdded indicates when a node has been added to the cluster
-	NodeAdded(node *k8sV1.Node) error
+	// NodeCreated indicates when a node has been added to the cluster
+	NodeCreated(node *k8sV1.Node) error
 
 	// NodeUpdated indicates when a node has been updated in the cluster
 	NodeUpdated(node *k8sV1.Node) error
@@ -101,7 +101,7 @@ func (ev *HandlerBase) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	return nil
 }
 
-func (ev *HandlerBase) NodeAdded(node *k8sV1.Node) error {
+func (ev *HandlerBase) NodeCreated(node *k8sV1.Node) error {
 	return nil
 }
 
