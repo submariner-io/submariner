@@ -48,19 +48,17 @@ func NewTestHandler(name, networkPlugin string) *TestHandler {
 }
 
 func (t *TestHandler) addEvent(eventName string, param interface{}) error {
-	if t.FailOnEvent == nil {
-		ev := TestEvent{
-			Name:      eventName,
-			Parameter: param,
-		}
-
-		t.Events <- ev
-
-		// On the global channel we also include the handler name
-		// so we can verify ordering
-		ev.Handler = t.Name
-		allTestEvents <- ev
+	ev := TestEvent{
+		Name:      eventName,
+		Parameter: param,
 	}
+
+	t.Events <- ev
+
+	// On the global channel we also include the handler name
+	// so we can verify ordering
+	ev.Handler = t.Name
+	allTestEvents <- ev
 
 	return t.FailOnEvent
 }
