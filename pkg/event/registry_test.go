@@ -54,26 +54,8 @@ var _ = Describe("Event Registry", func() {
 			}
 		})
 
-		It("should invoke all matching handlers of all events", func() {
-			endpoint := &submV1.Endpoint{ObjectMeta: v1meta.ObjectMeta{Name: "endpoint1"}}
-			node := &k8sV1.Node{ObjectMeta: v1meta.ObjectMeta{Name: "node1"}}
-
-			events := map[TestEvent]func() error{
-				{Name: evStop, Parameter: false}:                     func() error { return registry.StopHandlers(false) },
-				{Name: evTransitionToGateway}:                        registry.TransitionToGateway,
-				{Name: evTransitionToNonGateway}:                     registry.TransitionToNonGateway,
-				{Name: evNodeCreated, Parameter: node}:               func() error { return registry.NodeCreated(node) },
-				{Name: evNodeUpdated, Parameter: node}:               func() error { return registry.NodeUpdated(node) },
-				{Name: evNodeRemoved, Parameter: node}:               func() error { return registry.NodeRemoved(node) },
-				{Name: evLocalEndpointCreated, Parameter: endpoint}:  func() error { return registry.LocalEndpointCreated(endpoint) },
-				{Name: evLocalEndpointUpdated, Parameter: endpoint}:  func() error { return registry.LocalEndpointUpdated(endpoint) },
-				{Name: evLocalEndpointRemoved, Parameter: endpoint}:  func() error { return registry.LocalEndpointRemoved(endpoint) },
-				{Name: evRemoteEndpointCreated, Parameter: endpoint}: func() error { return registry.RemoteEndpointCreated(endpoint) },
-				{Name: evRemoteEndpointUpdated, Parameter: endpoint}: func() error { return registry.RemoteEndpointUpdated(endpoint) },
-				{Name: evRemoteEndpointRemoved, Parameter: endpoint}: func() error { return registry.RemoteEndpointRemoved(endpoint) },
-			}
-
-			for ev, f := range events {
+		It("should invoke all matching handlers of all events in registration order", func() {
+			for ev, f := range allEvents(registry) {
 				err := f()
 				Expect(err).To(Succeed())
 
@@ -89,14 +71,37 @@ var _ = Describe("Event Registry", func() {
 		When("one handler returns an error", func() {
 			It("should invoke subsequent matching handlers", func() {
 				matchingHandlers[0].FailOnEvent = errors.New("I shall fail!")
-				err := registry.TransitionToGateway()
 
-				for _, h := range matchingHandlers {
-					Expect(h.Events).To(Receive())
+				for ev, f := range allEvents(registry) {
+					err := f()
+					Expect(err).To(HaveOccurred())
+
+					for _, h := range matchingHandlers {
+						ev.Handler = h.Name
+						Expect(allTestEvents).To(Receive(Equal(ev)))
+					}
 				}
-
-				Expect(err).To(HaveOccurred())
 			})
 		})
 	})
 })
+
+func allEvents(registry event.Registry) map[TestEvent]func() error {
+	endpoint := &submV1.Endpoint{ObjectMeta: v1meta.ObjectMeta{Name: "endpoint1"}}
+	node := &k8sV1.Node{ObjectMeta: v1meta.ObjectMeta{Name: "node1"}}
+
+	return map[TestEvent]func() error{
+		{Name: evStop, Parameter: false}:                     func() error { return registry.StopHandlers(false) },
+		{Name: evTransitionToGateway}:                        registry.TransitionToGateway,
+		{Name: evTransitionToNonGateway}:                     registry.TransitionToNonGateway,
+		{Name: evNodeCreated, Parameter: node}:               func() error { return registry.NodeCreated(node) },
+		{Name: evNodeUpdated, Parameter: node}:               func() error { return registry.NodeUpdated(node) },
+		{Name: evNodeRemoved, Parameter: node}:               func() error { return registry.NodeRemoved(node) },
+		{Name: evLocalEndpointCreated, Parameter: endpoint}:  func() error { return registry.LocalEndpointCreated(endpoint) },
+		{Name: evLocalEndpointUpdated, Parameter: endpoint}:  func() error { return registry.LocalEndpointUpdated(endpoint) },
+		{Name: evLocalEndpointRemoved, Parameter: endpoint}:  func() error { return registry.LocalEndpointRemoved(endpoint) },
+		{Name: evRemoteEndpointCreated, Parameter: endpoint}: func() error { return registry.RemoteEndpointCreated(endpoint) },
+		{Name: evRemoteEndpointUpdated, Parameter: endpoint}: func() error { return registry.RemoteEndpointUpdated(endpoint) },
+		{Name: evRemoteEndpointRemoved, Parameter: endpoint}: func() error { return registry.RemoteEndpointRemoved(endpoint) },
+	}
+}
