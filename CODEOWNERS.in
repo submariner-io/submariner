@@ -1,0 +1,6 @@
+@mangelajo	*
+@Oats87		*
+@skitt		*
+@tpantelis	*
+@mkolesnik	/.github/workflows/ /scripts/ Makefile* Dockerfile.dapper /package/*
+@sridhargaddam	/pkg/globalnet/* /pkg/routeagent/* /pkg/cable/strongswan/*
