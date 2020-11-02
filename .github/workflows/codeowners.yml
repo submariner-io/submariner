@@ -19,4 +19,4 @@ jobs:
       - name: Run gen-codeowners to rebuild CODEOWNERS file
         run: make CODEOWNERS
       - name: Validate new CODEOWNERS file is the same as tracked by Git
-        run: git diff --exit-code
+        run: git diff --exit-code CODEOWNERS
