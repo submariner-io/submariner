@@ -1,0 +1,22 @@
+---
+name: CODEOWNERS
+
+on:
+  pull_request:
+    paths:
+      - 'CODEOWNERS'
+      - 'CODEOWNERS.in'
+
+jobs:
+  updated:
+    name: Up-to-date
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v2
+      - name: Delete current CODEOWNERS file
+        run: rm CODEOWNERS
+      - name: Run gen-codeowners to rebuild CODEOWNERS file
+        run: make CODEOWNERS
+      - name: Validate new CODEOWNERS file is the same as tracked by Git
+        run: git diff --exit-code
