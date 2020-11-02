@@ -1,12 +1,4 @@
 ---
-# Breaks reusing MD snippets extracted to files
-first-line-heading: false
-
 # Set maximum line Length to 140c to match Go linting
 line-length:
   line_length: 140
-
-# Allow HTML span elements to set font sizes
-no-inline-html:
-  allowed_elements:
-    - span
