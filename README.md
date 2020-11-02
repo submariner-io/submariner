@@ -32,11 +32,11 @@ provider, as it utilizes off-the-shelf components to establish encrypted tunnels
 Note that Submariner is in the **pre-alpha** stage, and should not be used for production purposes. While we welcome usage and
 experimentation, it is quite possible that you could run into bugs.
 
-# Architecture
+## Architecture
 
 See the [Architecture section on Submainer's website](https://submariner.io/architecture/).
 
-## Network Path
+### Network Path
 
 The network path of Submariner varies depending on the origin/destination of the IP traffic. In all cases, traffic between two clusters will
 transit between the leader elected (in each cluster) gateway nodes, through `ip xfrm` rules. Each gateway node has a running Charon daemon
@@ -49,36 +49,36 @@ depending on the destination CIDR. If the destination CIDR is a Pod network, the
 destination CIDR is a Service network, then traffic is routed through the facility configured via kube-proxy on the destination gateway
 node.
 
-# Prerequisites
+## Prerequisites
 
 See the [Prerequisites docs on Submainer's website](https://submariner.io/quickstart/#prerequisites).
 
-# Installation
+## Installation
 
 Submariner supports deployment via an Operator as well as Helm Charts. The Operator can be deployed directly or via the `subctl` CLI helper
 utility. `subctl` greatly simplifies the deployment of Submariner, and is therefore the recommended deployment method.
 
-## Installation using Operator via subctl
+### Installation using Operator via subctl
 
 Submariner provides the `subctl` CLI utility to simplify the deployment and maintenance of Submariner across your clusters.
 
 See the [`subctl` docs on Submainer's website](https://submariner.io/deployment/subctl/).
 
-## Installation using Helm
+### Installation using Helm
 
 See the [Helm Deployments](https://submariner.io/deployment/helm/) section of Submariner's website.
 
-## Validate Submariner is Working
+### Validate Submariner is Working
 
 See the [`subctl verify` docs on Submainer's website](https://submariner.io/deployment/subctl/#verify).
 
-# Building and Testing
+## Building and Testing
 
 See the [Building and Testing docs on Submainer's website](https://submariner.io/contributing/building_testing/).
 
-# Known Issues/Notes
+## Known Issues/Notes
 
-## OpenShift Notes
+### OpenShift Notes
 
 When running in OpenShift, Submariner needs to grant the appropriate security context for the service accounts (SAs):
 
@@ -87,6 +87,6 @@ When running in OpenShift, Submariner needs to grant the appropriate security co
    oc adm policy add-scc-to-user privileged system:serviceaccount:submariner:submariner-engine
    ```
 
-# Contributing
+## Contributing
 
 See the [Contributing docs on Submainer's website](https://submariner.io/contributing/).
