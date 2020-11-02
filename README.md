@@ -1,7 +1,8 @@
+# Submariner
+
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
-- [Submariner](#submariner)
 - [Architecture](#architecture)
   - [Network Path](#network-path)
 - [Prerequisites](#prerequisites)
@@ -16,7 +17,6 @@
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
-# Submariner
 <!-- markdownlint-disable line-length -->
 [![End to End Tests](https://github.com/submariner-io/submariner/workflows/End%20to%20End%20Tests/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3A%22End+to+End+Tests%22+branch%3Amaster)
 [![Unit Tests](https://github.com/submariner-io/submariner/workflows/Unit%20Tests/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3A%22Unit+Tests%22)
