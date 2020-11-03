@@ -262,6 +262,11 @@ func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string
 				args = append(args, "--id", localEndpointIdentifier)
 				args = append(args, "--host", localEndpointIP)
 				args = append(args, "--client", leftSubnets[lsi])
+				if endpoint.Spec.NATEnabled {
+					args = append(args, "--ikeport", i.ipSecNATTPort)
+				} else {
+					args = append(args, "--ikeport", i.ipSecIKEPort)
+				}
 
 				args = append(args, "--to")
 
@@ -269,6 +274,11 @@ func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string
 				args = append(args, "--id", remoteEndpointIdentifier)
 				args = append(args, "--host", remoteEndpointIP)
 				args = append(args, "--client", rightSubnets[rsi])
+				if endpoint.Spec.NATEnabled {
+					args = append(args, "--ikeport", i.ipSecNATTPort)
+				} else {
+					args = append(args, "--ikeport", i.ipSecIKEPort)
+				}
 
 				klog.Infof("Executing whack with args: %v", args)
 
@@ -347,8 +357,6 @@ func (i *libreswan) runPluto() error {
 	klog.Info("Starting Pluto")
 
 	args := []string{}
-	args = append(args, "--ikeport", i.ipSecIKEPort)
-	args = append(args, "--natikeport", i.ipSecNATTPort)
 
 	cmd := exec.Command("/usr/local/bin/pluto", args...)
 	cmd.Stdout = os.Stdout
