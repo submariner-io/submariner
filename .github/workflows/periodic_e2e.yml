@@ -1,0 +1,51 @@
+---
+name: Periodic E2E
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+
+jobs:
+  e2e:
+    name: E2E
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        deploytool: ['operator', 'helm']
+        globalnet: ['', 'globalnet']
+        cable_driver: ['', 'wireguard', 'libreswan']
+        exclude:
+          # Our Helm setup doesn’t know how to deploy other cable drivers
+          - deploytool: 'helm'
+            cable_driver: 'wireguard'
+          - deploytool: 'helm'
+            cable_driver: 'libreswan'
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v2
+
+      - name: Install WireGuard kernel module (only in WireGuard jobs)
+        if: matrix.cable_driver == 'wireguard'
+        run: |
+          sudo apt install -y linux-headers-$(uname -r) wireguard wireguard-dkms
+          sudo modprobe wireguard
+
+      - name: Reclaim free space
+        run: |
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          df -h
+          free -h
+
+      - name: Run E2E deployment and tests
+        run: |
+          make e2e using="${{ matrix.globalnet }} ${{ matrix.deploytool }} ${{ matrix.cable_driver }}"
+
+      - name: Post mortem
+        if: failure()
+        run: |
+          df -h
+          free -h
+          make post-mortem
