@@ -31,7 +31,10 @@ func main() {
 		klog.Fatalf("Error registering the handlers: %s", err.Error())
 	}
 
-	ctl, err := controller.New(&eventHandlers, masterURL, kubeconfig)
+	ctl, err := controller.New(&controller.Config{
+		Registry:   &eventHandlers,
+		MasterURL:  masterURL,
+		Kubeconfig: kubeconfig})
 
 	if err != nil {
 		klog.Fatalf("Error creating controller for event handling %v", err)

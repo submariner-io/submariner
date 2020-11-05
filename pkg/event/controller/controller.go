@@ -8,7 +8,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	k8sv1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 
@@ -34,14 +37,31 @@ type Controller struct {
 	isGatewayNode bool
 }
 
-func New(registry *event.Registry, masterURL, kubeconfig string) (*Controller, error) {
+type Config struct {
+	// Registry is the event handler registry where controller events will be sent.
+	Registry *event.Registry
+
+	// MasterURL accepts the K8s API URL. By default the in-cluster-config will be used.
+	MasterURL string
+
+	// Kubeconfig accepts the kubeconfig with the cluster credentials. By default the in-cluster-config will be used.
+	Kubeconfig string
+
+	// RestMapper can be provided for unit testing. By default New will create its own RestMapper.
+	RestMapper meta.RESTMapper
+
+	// Client can be provided for unit testing. By default New will create its own dynamic client.
+	Client dynamic.Interface
+}
+
+func New(config *Config) (*Controller, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, fmt.Errorf("Unable to read hostname: %v", err)
 	}
 
 	ctl := Controller{
-		handlers:  registry,
+		handlers:  config.Registry,
 		syncMutex: &sync.Mutex{},
 		hostname:  hostname,
 	}
@@ -56,9 +76,12 @@ func New(registry *event.Registry, masterURL, kubeconfig string) (*Controller, e
 		return nil, fmt.Errorf("Error adding submariner types to the scheme: %v", err)
 	}
 
-	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
-	if err != nil {
-		return nil, fmt.Errorf("Error building config from flags %v", err.Error())
+	var cfg *restclient.Config
+	if config.Client == nil {
+		cfg, err = clientcmd.BuildConfigFromFlags(config.MasterURL, config.MasterURL)
+		if err != nil {
+			return nil, fmt.Errorf("Error building config from flags %v", err.Error())
+		}
 	}
 
 	ctl.resourceWatcher, err = watcher.New(&watcher.Config{
@@ -66,7 +89,7 @@ func New(registry *event.Registry, masterURL, kubeconfig string) (*Controller, e
 		RestConfig: cfg,
 		ResourceConfigs: []watcher.ResourceConfig{
 			{
-				Name:            fmt.Sprintf("Endpoint watcher for %s registry", registry.GetName()),
+				Name:            fmt.Sprintf("Endpoint watcher for %s registry", ctl.handlers.GetName()),
 				ResourceType:    &subv1.Endpoint{},
 				SourceNamespace: ctl.env.Namespace,
 				Handler: watcher.EventHandlerFuncs{
@@ -75,7 +98,7 @@ func New(registry *event.Registry, masterURL, kubeconfig string) (*Controller, e
 					OnDeleteFunc: ctl.handleRemovedEndpoint,
 				},
 			}, {
-				Name:                fmt.Sprintf("Node watcher for %s registry", registry.GetName()),
+				Name:                fmt.Sprintf("Node watcher for %s registry", ctl.handlers.GetName()),
 				ResourceType:        &k8sv1.Node{},
 				ResourcesEquivalent: ctl.isNodeEquivalent,
 				Handler: watcher.EventHandlerFuncs{
@@ -85,6 +108,8 @@ func New(registry *event.Registry, masterURL, kubeconfig string) (*Controller, e
 				},
 			},
 		},
+		Client:     config.Client,
+		RestMapper: config.RestMapper,
 	})
 
 	if err != nil {
