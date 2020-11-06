@@ -2,7 +2,6 @@ package v1
 
 import (
 	"fmt"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -84,14 +83,14 @@ type GatewayStatus struct {
 	Connections   []Connection `json:"connections"`
 }
 
-// LatencySpec describes the round trip time information in nanoseconds for a packet
+// LatencySpec describes the round trip time information in miliseconds for a packet
 // between the gateway pods of two clusters.
 type LatencySpec struct {
-	LastRTT    time.Duration `json:"lastRTT"`
-	MinRTT     time.Duration `json:"minRTT"`
-	AverageRTT time.Duration `json:"averageRTT"`
-	MaxRTT     time.Duration `json:"maxRTT"`
-	StdDevRTT  time.Duration `json:"stddevRTT"`
+	LastRTT    float64 `json:"lastRTT"`
+	MinRTT     float64 `json:"minRTT"`
+	AverageRTT float64 `json:"averageRTT"`
+	MaxRTT     float64 `json:"maxRTT"`
+	StdDevRTT  float64 `json:"stddevRTT"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
