@@ -28,6 +28,11 @@ func NewRegistry(name, networkPlugin string) Registry {
 	}
 }
 
+// GetName returns the name of the registry
+func (er *Registry) GetName() string {
+	return er.name
+}
+
 func (er *Registry) addHandler(eventHandler Handler) error {
 	evNetworkPlugin := eventHandler.GetNetworkPlugin()
 
