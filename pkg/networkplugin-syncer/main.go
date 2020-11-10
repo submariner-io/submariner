@@ -45,6 +45,9 @@ func main() {
 		klog.Fatalf("Error starting controller: %v", err)
 	}
 
+	<-stopCh
+	ctl.Stop()
+
 	klog.Info("All controllers stopped or exited. Stopping submariner-networkplugin-syncer")
 }
 

@@ -119,23 +119,25 @@ func New(config *Config) (*Controller, error) {
 	return &ctl, nil
 }
 
-// Start will start the controller, and wait until stopCh receives a message
+// Start starts the controller.
 func (c *Controller) Start(stopCh <-chan struct{}) error {
-	klog.Info("Starting Controller")
+	klog.Info("Starting the Event controller...")
 
 	err := c.resourceWatcher.Start(stopCh)
 	if err != nil {
 		return err
 	}
 
-	klog.Info("Event Controller workers started")
-	<-stopCh
-	klog.Info("Event Controller stopping")
+	klog.Info("Event controller started")
+
+	return nil
+}
+
+func (c *Controller) Stop() {
+	klog.Info("Event controller stopping")
 
 	// TODO: Detect if it's an uninstall and invoke StopHandlers with uninstall=true if it's the case
 	if err := c.handlers.StopHandlers(false); err != nil {
 		klog.Warningf("In Event Controller, StopHandlers returned error: %v", err)
 	}
-
-	return nil
 }
