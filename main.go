@@ -13,7 +13,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/submariner-io/admiral/pkg/log"
-	admUtil "github.com/submariner-io/admiral/pkg/util"
+	"github.com/submariner-io/admiral/pkg/watcher"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/cableengine"
@@ -25,7 +25,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -130,16 +129,6 @@ func main() {
 		fatal(cableEngineSyncer, "Error adding submariner types to the scheme: %v", err)
 	}
 
-	restMapper, err := admUtil.BuildRestMapper(cfg)
-	if err != nil {
-		fatal(cableEngineSyncer, err.Error())
-	}
-
-	dynClient, err := dynamic.NewForConfig(cfg)
-	if err != nil {
-		fatal(cableEngineSyncer, "error creating dynamic client: %v", err)
-	}
-
 	becameLeader := func(context.Context) {
 		klog.Info("Creating the datastore syncer")
 
@@ -156,7 +145,7 @@ func main() {
 		go func() {
 			defer wg.Done()
 
-			if err = tunnel.StartController(cableEngine, submSpec.Namespace, dynClient, restMapper, scheme.Scheme, stopCh); err != nil {
+			if err = tunnel.StartController(cableEngine, submSpec.Namespace, &watcher.Config{RestConfig: cfg}, stopCh); err != nil {
 				fatal(cableEngineSyncer, "Error running the tunnel controller: %v", err)
 			}
 		}()

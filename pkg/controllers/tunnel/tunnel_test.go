@@ -3,10 +3,12 @@ package tunnel_test
 import (
 	"errors"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
+	"github.com/submariner-io/admiral/pkg/watcher"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	fakeEngine "github.com/submariner-io/submariner/pkg/cableengine/fake"
 	"github.com/submariner-io/submariner/pkg/controllers/tunnel"
@@ -22,14 +24,15 @@ const (
 	namespace = "submariner"
 )
 
-var _ = Describe("", func() {
+func init() {
 	klog.InitFlags(nil)
-})
+}
 
 var _ = Describe("Managing tunnels", func() {
 	var (
 		engine    *fakeEngine.Engine
 		endpoints dynamic.ResourceInterface
+		clusters  dynamic.ResourceInterface
 		endpoint  *v1.Endpoint
 		stopCh    chan struct{}
 	)
@@ -60,11 +63,18 @@ var _ = Describe("Managing tunnels", func() {
 
 		client := fakeClient.NewSimpleDynamicClient(scheme)
 
-		restMapper, gvr := test.GetRESTMapperAndGroupVersionResourceFor(&v1.Endpoint{})
+		restMapper := test.GetRESTMapperFor(&v1.Endpoint{}, &v1.Cluster{})
+		gvr := test.GetGroupVersionResourceFor(restMapper, &v1.Endpoint{})
 
 		endpoints = client.Resource(*gvr).Namespace(namespace)
 
-		Expect(tunnel.StartController(engine, namespace, client, restMapper, scheme, stopCh)).To(Succeed())
+		clusters = client.Resource(*test.GetGroupVersionResourceFor(restMapper, &v1.Cluster{})).Namespace(namespace)
+
+		Expect(tunnel.StartController(engine, namespace, &watcher.Config{
+			RestMapper: restMapper,
+			Client:     client,
+			Scheme:     scheme,
+		}, stopCh)).To(Succeed())
 	})
 
 	AfterEach(func() {
@@ -75,6 +85,12 @@ var _ = Describe("Managing tunnels", func() {
 		It("should install the cable", func() {
 			test.CreateResource(endpoints, endpoint)
 			engine.VerifyInstallCable(&endpoint.Spec)
+			test.CreateResource(clusters, &v1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-cluster",
+				},
+			})
+			time.Sleep(1 * time.Second)
 		})
 	})
 
