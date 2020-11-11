@@ -22,7 +22,7 @@ var _ = Describe("Event Registry", func() {
 		var (
 			matchingHandlers    []*testing.TestHandler
 			nonMatchingHandlers []*testing.TestHandler
-			registry            event.Registry
+			registry            *event.Registry
 			allTestEvents       chan testing.TestEvent
 		)
 
@@ -87,7 +87,7 @@ var _ = Describe("Event Registry", func() {
 	})
 })
 
-func allEvents(registry event.Registry) map[testing.TestEvent]func() error {
+func allEvents(registry *event.Registry) map[testing.TestEvent]func() error {
 	endpoint := &submV1.Endpoint{ObjectMeta: v1meta.ObjectMeta{Name: "endpoint1"}}
 	node := &k8sV1.Node{ObjectMeta: v1meta.ObjectMeta{Name: "node1"}}
 
