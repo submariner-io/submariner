@@ -17,6 +17,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cableengine"
+	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
 	v1typed "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
 )
 
@@ -26,6 +27,7 @@ type GatewaySyncer struct {
 	engine      cableengine.Engine
 	version     string
 	statusError error
+	latencyMap  *sync.Map
 }
 
 var GatewayUpdateInterval = 5 * time.Second
@@ -44,11 +46,12 @@ func init() {
 
 // NewEngine creates a new Engine for the local cluster
 func NewGatewaySyncer(engine cableengine.Engine, client v1typed.GatewayInterface,
-	version string) *GatewaySyncer {
+	version string, latencyMap *sync.Map) *GatewaySyncer {
 	return &GatewaySyncer{
-		client:  client,
-		engine:  engine,
-		version: version,
+		client:     client,
+		engine:     engine,
+		version:    version,
+		latencyMap: latencyMap,
 	}
 }
 
@@ -201,6 +204,19 @@ func (i *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 	}
 
 	if connections != nil {
+		for index, connection := range *connections {
+			latencySpec, ok := i.latencyMap.Load(connection.Endpoint.Hostname)
+			if ok {
+				latencyInfo := latencySpec.(*healthchecker.LatencyInfo)
+				connection.Latency = latencyInfo.Latency
+				if connection.Status == v1.Connected && latencyInfo.Status != v1.Connected {
+					connection.Status = latencyInfo.Status
+				}
+
+				(*connections)[index] = connection
+			}
+		}
+
 		gateway.Status.Connections = *connections
 	} else {
 		gateway.Status.Connections = []v1.Connection{}

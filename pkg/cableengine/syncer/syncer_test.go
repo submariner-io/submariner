@@ -3,6 +3,7 @@ package syncer_test
 import (
 	"fmt"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -337,7 +338,7 @@ func (t *testDriver) run() {
 
 	client := fakeClientset.NewSimpleClientset()
 	t.gateways.GatewayInterface = client.SubmarinerV1().Gateways(namespace)
-	t.syncer = syncer.NewGatewaySyncer(t.engine, t.gateways, t.expectedGateway.Status.Version)
+	t.syncer = syncer.NewGatewaySyncer(t.engine, t.gateways, t.expectedGateway.Status.Version, new(sync.Map))
 
 	informerFactory := submarinerInformers.NewSharedInformerFactory(client, 0)
 	informer := informerFactory.Submariner().V1().Gateways().Informer()

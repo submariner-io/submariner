@@ -17,6 +17,7 @@ import (
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/cableengine"
+	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
 	"github.com/submariner-io/submariner/pkg/cableengine/syncer"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/controllers/datastoresyncer"
@@ -115,12 +116,20 @@ func main() {
 		klog.Fatalf("Error creating local endpoint object from %#v: %v", submSpec, err)
 	}
 
+	latencyMap := new(sync.Map)
 	cableEngine := cableengine.NewEngine(localCluster, localEndpoint)
+
+	if len(submSpec.GlobalCidr) == 0 {
+		cableHealthchecker := healthchecker.NewHealthChecker(localEndpoint.Spec.Hostname,
+			submarinerClient.SubmarinerV1().Gateways(submSpec.Namespace), latencyMap)
+
+		cableHealthchecker.Run(stopCh)
+	}
 
 	cableEngineSyncer := syncer.NewGatewaySyncer(
 		cableEngine,
 		submarinerClient.SubmarinerV1().Gateways(submSpec.Namespace),
-		VERSION)
+		VERSION, latencyMap)
 
 	cableEngineSyncer.Run(stopCh)
 

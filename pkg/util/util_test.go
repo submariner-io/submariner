@@ -68,9 +68,9 @@ func testFlattenColors() {
 
 func testGetLocalEndpoint() {
 	It("should return a valid SubmarinerEndpoint object", func() {
-		subnets := []string{"1.2.3.4/16"}
-		privateIP := "1.2.3.4"
-		endpoint, err := util.GetLocalEndpoint("east", "backend", map[string]string{}, false, subnets, privateIP)
+		subnets := []string{"127.0.0.1/16"}
+		privateIP := "127.0.0.1"
+		endpoint, err := util.GetLocalEndpoint("east", "backend", map[string]string{}, false, subnets, privateIP, subnets)
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(endpoint.Spec.ClusterID).To(Equal("east"))
@@ -80,6 +80,7 @@ func testGetLocalEndpoint() {
 		Expect(endpoint.Spec.Backend).To(Equal("backend"))
 		Expect(endpoint.Spec.Subnets).To(Equal(subnets))
 		Expect(endpoint.Spec.NATEnabled).To(Equal(false))
+		Expect(endpoint.Spec.HealthCheckIP).To(Equal(privateIP))
 	})
 }
 
