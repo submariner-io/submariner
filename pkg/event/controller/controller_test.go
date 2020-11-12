@@ -26,14 +26,15 @@ const testLocalClusterID = "local-cluster"
 
 var _ = Describe("Event controller", func() {
 	var (
-		endpoints  dynamic.ResourceInterface
-		nodes      dynamic.ResourceInterface
-		node       *corev1.Node
-		endpoint   *submV1.Endpoint
-		hostname   string
-		testEvents chan testing.TestEvent
-		stopCh     chan struct{}
-		registry   event.Registry
+		endpoints       dynamic.ResourceInterface
+		nodes           dynamic.ResourceInterface
+		node            *corev1.Node
+		endpoint        *submV1.Endpoint
+		hostname        string
+		testEvents      chan testing.TestEvent
+		stopCh          chan struct{}
+		registry        event.Registry
+		eventController *controller.Controller
 	)
 
 	BeforeEach(func() {
@@ -41,10 +42,9 @@ var _ = Describe("Event controller", func() {
 		testEvents = make(chan testing.TestEvent, 1000)
 		testHandler := testing.NewTestHandler(testHandlerName, event.AnyNetworkPlugin, testEvents)
 		registry = event.NewRegistry("test-registry", "test-plugin")
-		_ = registry.AddHandlers(testHandler)
+		Expect(registry.AddHandlers(testHandler)).To(Succeed())
 		hostname, _ = os.Hostname()
 		node = NewNode(hostname)
-
 	})
 
 	JustBeforeEach(func() {
@@ -62,16 +62,17 @@ var _ = Describe("Event controller", func() {
 		endpoints = config.Client.Resource(*test.GetGroupVersionResourceFor(config.RestMapper,
 			&submV1.Endpoint{})).Namespace(testNamespace)
 
-		eventController, err := controller.New(&config)
+		var err error
+
+		eventController, err = controller.New(&config)
 
 		Expect(err).To(Succeed())
-		go func() {
-			Expect(eventController.Start(stopCh)).To(Succeed())
-		}()
+		Expect(eventController.Start(stopCh)).To(Succeed())
 	})
 
 	AfterEach(func() {
 		close(stopCh)
+		eventController.Stop()
 	})
 
 	When("a Node is created, updated and deleted", func() {
