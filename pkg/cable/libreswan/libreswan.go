@@ -298,6 +298,7 @@ func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string
 	}
 
 	i.connections = append(i.connections, subv1.Connection{Endpoint: endpoint.Spec, Status: subv1.Connected})
+	cable.RecordConnectionStatusActive(cableDriverName, &i.localEndpoint.Spec, &endpoint.Spec)
 
 	return remoteEndpointIP, nil
 }
@@ -338,6 +339,7 @@ func (i *libreswan) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) er
 	}
 
 	i.connections = removeConnectionForEndpoint(i.connections, endpoint)
+	cable.RecordConnectionStatusInactive(cableDriverName, &i.localEndpoint.Spec, &endpoint.Spec)
 
 	return nil
 }
