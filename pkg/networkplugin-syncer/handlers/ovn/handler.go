@@ -1,0 +1,109 @@
+package ovn
+
+import (
+	"errors"
+
+	goovn "github.com/ebay/go-ovn"
+
+	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/event"
+	"github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn/nbctl"
+)
+
+type SyncHandler struct {
+	event.HandlerBase
+	nbctl            *nbctl.NbCtl
+	nbdb             goovn.Client
+	sbdb             goovn.Client
+	localEndpoint    *submV1.Endpoint
+	remoteEndpoints  map[string]*submV1.Endpoint
+	lastOvnGwChassis string
+}
+
+func (ovn *SyncHandler) GetName() string {
+	return "ovn-sync-handler"
+}
+
+func (ovn *SyncHandler) GetNetworkPlugin() string {
+	return "OVNKubernetes"
+}
+
+func NewSyncHandler() *SyncHandler {
+	return &SyncHandler{
+		remoteEndpoints: make(map[string]*submV1.Endpoint),
+	}
+}
+
+func (ovn *SyncHandler) Init() error {
+	if err := ovn.initClients(); err != nil {
+		return err
+	}
+
+	if err := ovn.ensureSubmarinerInfra(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (ovn *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
+	ovn.localEndpoint = endpoint
+
+	return ovn.updateGatewayNode()
+}
+
+func (ovn *SyncHandler) LocalEndpointUpdated(endpoint *submV1.Endpoint) error {
+	ovn.localEndpoint = endpoint
+
+	return ovn.updateGatewayNode()
+}
+
+func (ovn *SyncHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
+	if ovn.localEndpoint.Name == endpoint.Name {
+		ovn.localEndpoint = nil
+	}
+
+	return ovn.updateGatewayNode()
+}
+
+func (ovn *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
+	ovn.remoteEndpoints[endpoint.Name] = endpoint
+	return ovn.updateRemoteEndpointsInfra()
+}
+
+func (ovn *SyncHandler) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
+	ovn.remoteEndpoints[endpoint.Name] = endpoint
+	return ovn.updateRemoteEndpointsInfra()
+}
+
+func (ovn *SyncHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
+	delete(ovn.remoteEndpoints, endpoint.Name)
+	return ovn.updateRemoteEndpointsInfra()
+}
+
+var WaitingForLocalEndpoint = errors.New("Waiting for the local endpoint details before we can " +
+	"setup any remote-endpoint related information, this will be retried.")
+
+func (ovn *SyncHandler) updateRemoteEndpointsInfra() error {
+	if ovn.localEndpoint == nil {
+		// If we don't have information on the localEndpoint chances are that we are not detecting
+		// the local endpoint yet (right CLUSTER_ID set), with the risk of setting up local routes as
+		// remote routes and breaking the cluster.
+		return WaitingForLocalEndpoint // this will be retried eventually
+	}
+
+	// Synchronize the policy rules inserted by submariner in the ovn_cluster_router, those point to submariner_router
+	err := ovn.setupOvnClusterRouterRemoteRules()
+	if err != nil {
+		return err
+	}
+
+	// Synchronize the routing rules inserted into submariner_router pointing to the remote clusters via the node IP in
+	// the ovs external network bridge used by OVN kubernetes to talk to the host.
+	err = ovn.updateSubmarinerRouterRemoteRoutes()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

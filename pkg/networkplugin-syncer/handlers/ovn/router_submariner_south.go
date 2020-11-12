@@ -1,0 +1,97 @@
+package ovn
+
+import (
+	"strings"
+
+	goovn "github.com/ebay/go-ovn"
+	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
+	"k8s.io/klog"
+)
+
+const (
+	// The downstream port connects to ovn_cluster_router, allowing connectivity to pods and services
+	submarinerDownstreamSwitch = "submariner_join"
+	submarinerDownstreamRPort  = "submariner_j_lrp"
+	submarinerDownstreamSwPort = "submariner_j_lsp"
+	submarinerDownstreamMAC    = "00:60:2f:10:01:03"
+	submarinerDownstreamNET    = submarinerDownstreamIP + "/29"
+	submarinerDownstreamIP     = "169.254.34.1"
+)
+
+func (ovn *SyncHandler) updateGatewayNode() error {
+	if ovn.localEndpoint == nil {
+		klog.Warningf("No local endpoint, cannot update local endpoint information in OVN NBDB")
+		return nil
+	}
+
+	gwHostname := ovn.localEndpoint.Spec.Hostname
+	chassis, err := ovn.findChassisByHostname(gwHostname)
+
+	if errors.Is(err, goovn.ErrorNotFound) {
+		klog.Fatalf("The OVN chassis for hostname %q could not be found", gwHostname)
+	} else if err != nil {
+		// Hopefully this error can be retried
+		return err
+	}
+
+	klog.V(log.DEBUG).Infof("Chassis for gw %q is %q, host: %q", gwHostname, chassis.Name, chassis.Hostname)
+
+	// Create/update the submariner external port associated to one of the external switches
+	if err := ovn.createOrUpdateSubmarinerExternalPort("ext_" + chassis.Hostname); err != nil && !errors.Is(err, goovn.ErrorExist) {
+		return err
+	}
+
+	// Associate the port to an specific chassis (=host) on OVN so the traffic flows out/in through that host
+	// the active submariner-gateway in our case
+	if err := ovn.associateSubmarinerExternalPortToChassis(chassis); err != nil {
+		return err
+	}
+
+	return ovn.updateSubmarinerRouterLocalRoutes()
+}
+
+func (ovn *SyncHandler) findChassisByHostname(hostname string) (*goovn.Chassis, error) {
+	chassisList, err := ovn.sbdb.ChassisList()
+	if err != nil {
+		return nil, errors.Wrap(err, "Unable to get chassis list from OVN")
+	}
+	for _, chassis := range chassisList {
+		if chassis.Hostname == hostname || strings.HasPrefix(chassis.Hostname, hostname) ||
+			strings.HasPrefix(hostname, chassis.Hostname) {
+			return chassis, nil
+		}
+	}
+
+	return nil, goovn.ErrorNotFound
+}
+
+func (ovn *SyncHandler) updateSubmarinerRouterLocalRoutes() error {
+	existingRoutes, err := ovn.getExistingSubmarinerRouterRoutesToPort(submarinerDownstreamRPort)
+	if err != nil {
+		return err
+	}
+
+	klog.V(log.DEBUG).Infof("Existing south routes in %q router for subnets %v", submarinerLogicalRouter, existingRoutes.Elements())
+
+	toAdd, toRemove := ovn.getSouthSubnetsToAddAndRemove(existingRoutes)
+
+	ovn.logRoutingChanges("south routes", submarinerLogicalRouter, toAdd, toRemove)
+
+	ovnCommands, err := ovn.addSubmRoutesToSubnets(toAdd, submarinerDownstreamRPort, ovnClusterSubmarinerIP, []*goovn.OvnCommand{})
+	if err != nil {
+		return err
+	}
+
+	ovnCommands, err = ovn.removeRoutesToSubnets(toRemove, submarinerDownstreamRPort, ovnCommands)
+	if err != nil {
+		return err
+	}
+
+	err = ovn.nbdb.Execute(ovnCommands...)
+	if err != nil {
+		return errors.Wrapf(err, "Executing routing rule modifications for router %q", submarinerLogicalRouter)
+	}
+
+	return nil
+}

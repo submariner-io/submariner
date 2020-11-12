@@ -75,3 +75,20 @@ func (set *StringSet) Elements() []string {
 
 	return elements
 }
+
+func (set *StringSet) Difference(set2 *StringSet) []string {
+	set.syncMutex.Lock()
+	set2.syncMutex.Lock()
+	defer set.syncMutex.Unlock()
+	defer set2.syncMutex.Unlock()
+
+	notFound := []string{}
+
+	for item := range set2.set {
+		if _, found := set.set[item]; !found {
+			notFound = append(notFound, item)
+		}
+	}
+
+	return notFound
+}
