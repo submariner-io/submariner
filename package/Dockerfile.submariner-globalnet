@@ -1,10 +1,10 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal
+ARG ARCH=
+FROM ${ARCH}fedora:33
 
 WORKDIR /var/submariner
 
-# These are all available in the UBI8 base OS repository
-RUN microdnf -y install --nodocs iproute iptables && \
-    microdnf clean all
+RUN dnf -y install --nodocs --setopt=install_weak_deps=0 \
+           iproute iptables
 
 COPY package/submariner-globalnet.sh bin/submariner-globalnet /usr/local/bin/
 
