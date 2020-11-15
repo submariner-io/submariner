@@ -96,7 +96,7 @@ var (
 			remoteEndpointIpLabel,
 		},
 	)
-	connectionLatencySecondsGague = prometheus.NewGaugeVec(
+	connectionLatencySecondsGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "connection_latency_seconds",
 			Help: "Connection latency in seconds (average RTT, by cable driver and cable)",
@@ -114,47 +114,11 @@ var (
 )
 
 func init() {
-	prometheus.MustRegister(rxGauge, txGauge, connectionStatusGauge, connectionEstablishedTimestampGauge, connectionLatencySecondsGague)
+	prometheus.MustRegister(rxGauge, txGauge, connectionStatusGauge, connectionEstablishedTimestampGauge, connectionLatencySecondsGauge)
 }
 
-func RecordRxBytes(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec, bytes int) {
-	rxGauge.With(prometheus.Labels{
-		cableDriverLabel:      cableDriverName,
-		localClusterLabel:     localEndpoint.ClusterID,
-		localHostnameLabel:    localEndpoint.Hostname,
-		localEndpointIpLabel:  localEndpoint.PublicIP,
-		remoteClusterLabel:    remoteEndpoint.ClusterID,
-		remoteHostnameLabel:   remoteEndpoint.Hostname,
-		remoteEndpointIpLabel: remoteEndpoint.PublicIP,
-	}).Set(float64(bytes))
-}
-
-func RecordTxBytes(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec, bytes int) {
-	txGauge.With(prometheus.Labels{
-		cableDriverLabel:      cableDriverName,
-		localClusterLabel:     localEndpoint.ClusterID,
-		localHostnameLabel:    localEndpoint.Hostname,
-		localEndpointIpLabel:  localEndpoint.PublicIP,
-		remoteClusterLabel:    remoteEndpoint.ClusterID,
-		remoteHostnameLabel:   remoteEndpoint.Hostname,
-		remoteEndpointIpLabel: remoteEndpoint.PublicIP,
-	}).Set(float64(bytes))
-}
-
-func RecordConnectionLatency(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec, latencySeconds float64) {
-	connectionLatencySecondsGague.With(prometheus.Labels{
-		cableDriverLabel:      cableDriverName,
-		localClusterLabel:     localEndpoint.ClusterID,
-		localHostnameLabel:    localEndpoint.Hostname,
-		localEndpointIpLabel:  localEndpoint.PublicIP,
-		remoteClusterLabel:    remoteEndpoint.ClusterID,
-		remoteHostnameLabel:   remoteEndpoint.Hostname,
-		remoteEndpointIpLabel: remoteEndpoint.PublicIP,
-	}).Set(latencySeconds)
-}
-
-func RecordConnectionStatusActive(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec) {
-	labels := prometheus.Labels{
+func getLabels(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec) prometheus.Labels {
+	return prometheus.Labels{
 		cableDriverLabel:      cableDriverName,
 		localClusterLabel:     localEndpoint.ClusterID,
 		localHostnameLabel:    localEndpoint.Hostname,
@@ -163,23 +127,33 @@ func RecordConnectionStatusActive(cableDriverName string, localEndpoint, remoteE
 		remoteHostnameLabel:   remoteEndpoint.Hostname,
 		remoteEndpointIpLabel: remoteEndpoint.PublicIP,
 	}
+}
+
+func RecordRxBytes(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec, bytes int) {
+	rxGauge.With(getLabels(cableDriverName, localEndpoint, remoteEndpoint)).Set(float64(bytes))
+}
+
+func RecordTxBytes(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec, bytes int) {
+	txGauge.With(getLabels(cableDriverName, localEndpoint, remoteEndpoint)).Set(float64(bytes))
+}
+
+func RecordConnectionLatency(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec, latencySeconds float64) {
+	connectionLatencySecondsGauge.With(getLabels(cableDriverName, localEndpoint, remoteEndpoint)).Set(latencySeconds)
+}
+
+func RecordConnectionStatusActive(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec) {
+	labels := getLabels(cableDriverName, localEndpoint, remoteEndpoint)
+
 	connectionStatusGauge.With(labels).Set(float64(1))
 	connectionEstablishedTimestampGauge.With(labels).Set(float64(time.Now().Unix()))
 }
 
 func RecordConnectionStatusInactive(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec) {
-	labels := prometheus.Labels{
-		cableDriverLabel:      cableDriverName,
-		localClusterLabel:     localEndpoint.ClusterID,
-		localHostnameLabel:    localEndpoint.Hostname,
-		localEndpointIpLabel:  localEndpoint.PublicIP,
-		remoteClusterLabel:    remoteEndpoint.ClusterID,
-		remoteHostnameLabel:   remoteEndpoint.Hostname,
-		remoteEndpointIpLabel: remoteEndpoint.PublicIP,
-	}
+	labels := getLabels(cableDriverName, localEndpoint, remoteEndpoint)
+
 	txGauge.Delete(labels)
 	rxGauge.Delete(labels)
 	connectionStatusGauge.Delete(labels)
 	connectionEstablishedTimestampGauge.Delete(labels)
-	connectionLatencySecondsGague.Delete(labels)
+	connectionLatencySecondsGauge.Delete(labels)
 }
