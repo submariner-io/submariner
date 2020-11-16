@@ -36,35 +36,35 @@ func (l *Handler) TransitionToGateway() error {
 }
 
 func (l *Handler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
-	klog.V(log.DEBUG).Infof("A new Endpoint for the local cluster has been created: %#v", endpoint)
+	klog.V(log.DEBUG).Infof("A new Endpoint for the local cluster has been created: %#v", endpoint.Spec)
 	return nil
 }
 
 func (l *Handler) LocalEndpointUpdated(endpoint *submV1.Endpoint) error {
-	klog.V(log.DEBUG).Infof("The Endpoint for the local cluster has been updated: %#v", endpoint)
+	klog.V(log.DEBUG).Infof("The Endpoint for the local cluster has been updated: %#v", endpoint.Spec)
 	return nil
 }
 
 func (l *Handler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
-	klog.V(log.DEBUG).Infof("The Endpoint for the local cluster has been removed: %#v", endpoint)
+	klog.V(log.DEBUG).Infof("The Endpoint for the local cluster has been removed: %#v", endpoint.Spec)
 	return nil
 }
 
 func (l *Handler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	klog.V(log.DEBUG).Infof("A new Endpoint for remote cluster %q has been created: %#v",
-		endpoint.Spec.ClusterID, endpoint)
+		endpoint.Spec.ClusterID, endpoint.Spec)
 	return nil
 }
 
 func (l *Handler) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
 	klog.V(log.DEBUG).Infof("A new Endpoint for remote cluster %q has been updated: %#v",
-		endpoint.Spec.ClusterID, endpoint)
+		endpoint.Spec.ClusterID, endpoint.Spec)
 	return nil
 }
 
 func (l *Handler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	klog.V(log.DEBUG).Infof("A new Endpoint for remote cluster %q has been removed: %#v",
-		endpoint.Spec.ClusterID, endpoint)
+		endpoint.Spec.ClusterID, endpoint.Spec)
 	return nil
 }
 
