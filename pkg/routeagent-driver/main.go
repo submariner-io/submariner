@@ -4,13 +4,15 @@ import (
 	"flag"
 	"os"
 
+	"github.com/kelseyhightower/envconfig"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/controller"
 	"github.com/submariner-io/submariner/pkg/event/logger"
-	kp "github.com/submariner-io/submariner/pkg/routeagent-driver/handlers/kubeproxy-iptables"
+	"github.com/submariner-io/submariner/pkg/routeagent-driver/constants"
+	kp_iptables "github.com/submariner-io/submariner/pkg/routeagent-driver/handlers/kubeproxy-iptables"
 )
 
 var (
@@ -26,8 +28,14 @@ func main() {
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
 
+	var env constants.Specification
+	err := envconfig.Process("submariner", &env)
+	if err != nil {
+		klog.Fatalf("Error reading the environment variables: %s", err.Error())
+	}
+
 	eventHandlers := event.NewRegistry("routeagent-driver", os.Getenv("NETWORK_PLUGIN"))
-	if err := eventHandlers.AddHandlers(logger.NewHandler(), kp.NewSyncHandler()); err != nil {
+	if err := eventHandlers.AddHandlers(logger.NewHandler(), kp_iptables.NewSyncHandler(env)); err != nil {
 		klog.Fatalf("Error registering the handlers: %s", err.Error())
 	}
 
