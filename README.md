@@ -6,6 +6,7 @@
 [![Linting](https://github.com/submariner-io/submariner/workflows/Linting/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3ALinting)
 [![Release Images](https://github.com/submariner-io/submariner/workflows/Release%20Images/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3A%22Release+Images%22)
 [![Periodic](https://github.com/submariner-io/submariner/workflows/Periodic/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3APeriodic)
+[![Flake Finder](https://github.com/submariner-io/submariner/workflows/Flake%20Finder/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3A%22Flake+Finder%22)
 <!-- markdownlint-enable line-length -->
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
