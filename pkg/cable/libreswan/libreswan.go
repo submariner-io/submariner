@@ -131,6 +131,8 @@ func (i *libreswan) refreshConnectionStatus() error {
 		return errors.WithMessage(err, "error waiting for whack")
 	}
 
+	cable.RecordNoConnections()
+
 	for j := range i.connections {
 		isConnected := false
 
@@ -139,6 +141,8 @@ func (i *libreswan) refreshConnectionStatus() error {
 				i.connections[j].Status = subv1.Connected
 				isConnected = true
 
+				cable.RecordConnection(cableDriverName, &i.localEndpoint.Spec, &i.connections[j].Endpoint, string(i.connections[j].Status), false)
+
 				break
 			}
 		}
@@ -146,6 +150,7 @@ func (i *libreswan) refreshConnectionStatus() error {
 		if !isConnected {
 			// Pluto should be connecting for us
 			i.connections[j].Status = subv1.Connecting
+			cable.RecordConnection(cableDriverName, &i.localEndpoint.Spec, &i.connections[j].Endpoint, string(i.connections[j].Status), false)
 			klog.V(log.DEBUG).Infof("Connection %q not found in active connections obtained from whack: %v",
 				i.connections[j].Endpoint.CableName, activeConnections.Elements())
 		}
@@ -298,7 +303,7 @@ func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string
 	}
 
 	i.connections = append(i.connections, subv1.Connection{Endpoint: endpoint.Spec, Status: subv1.Connected})
-	cable.RecordConnectionStatusActive(cableDriverName, &i.localEndpoint.Spec, &endpoint.Spec)
+	cable.RecordConnection(cableDriverName, &i.localEndpoint.Spec, &endpoint.Spec, string(subv1.Connected), true)
 
 	return remoteEndpointIP, nil
 }
@@ -339,7 +344,7 @@ func (i *libreswan) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) er
 	}
 
 	i.connections = removeConnectionForEndpoint(i.connections, endpoint)
-	cable.RecordConnectionStatusInactive(cableDriverName, &i.localEndpoint.Spec, &endpoint.Spec)
+	cable.RecordDisconnected(cableDriverName, &i.localEndpoint.Spec, &endpoint.Spec)
 
 	return nil
 }
