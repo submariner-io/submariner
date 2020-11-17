@@ -24,13 +24,14 @@ import (
 )
 
 const (
-	cableDriverLabel      = "cable_driver"
-	localClusterLabel     = "local_cluster"
-	localHostnameLabel    = "local_hostname"
-	localEndpointIpLabel  = "local_endpoint_ip"
-	remoteClusterLabel    = "remote_cluster"
-	remoteHostnameLabel   = "remote_hostname"
-	remoteEndpointIpLabel = "remote_endpoint_ip"
+	cableDriverLabel       = "cable_driver"
+	localClusterLabel      = "local_cluster"
+	localHostnameLabel     = "local_hostname"
+	localEndpointIpLabel   = "local_endpoint_ip"
+	remoteClusterLabel     = "remote_cluster"
+	remoteHostnameLabel    = "remote_hostname"
+	remoteEndpointIpLabel  = "remote_endpoint_ip"
+	connectionsStatusLabel = "status"
 )
 
 var (
@@ -45,10 +46,8 @@ var (
 			cableDriverLabel,
 			localClusterLabel,
 			localHostnameLabel,
-			localEndpointIpLabel,
 			remoteClusterLabel,
 			remoteHostnameLabel,
-			remoteEndpointIpLabel,
 		},
 	)
 	txGauge = prometheus.NewGaugeVec(
@@ -60,15 +59,13 @@ var (
 			cableDriverLabel,
 			localClusterLabel,
 			localHostnameLabel,
-			localEndpointIpLabel,
 			remoteClusterLabel,
 			remoteHostnameLabel,
-			remoteEndpointIpLabel,
 		},
 	)
-	connectionStatusGauge = prometheus.NewGaugeVec(
+	connectionsGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "connection_status",
+			Name: "connections",
 			Help: "Number of connections and corresponding status (by cable driver and cable)",
 		},
 		[]string{
@@ -79,6 +76,7 @@ var (
 			remoteClusterLabel,
 			remoteHostnameLabel,
 			remoteEndpointIpLabel,
+			connectionsStatusLabel,
 		},
 	)
 	connectionEstablishedTimestampGauge = prometheus.NewGaugeVec(
@@ -114,7 +112,7 @@ var (
 )
 
 func init() {
-	prometheus.MustRegister(rxGauge, txGauge, connectionStatusGauge, connectionEstablishedTimestampGauge, connectionLatencySecondsGauge)
+	prometheus.MustRegister(rxGauge, txGauge, connectionsGauge, connectionEstablishedTimestampGauge, connectionLatencySecondsGauge)
 }
 
 func getLabels(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec) prometheus.Labels {
@@ -129,31 +127,51 @@ func getLabels(cableDriverName string, localEndpoint, remoteEndpoint *submv1.End
 	}
 }
 
+func getTxRxLabels(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec) prometheus.Labels {
+	return prometheus.Labels{
+		cableDriverLabel:    cableDriverName,
+		localClusterLabel:   localEndpoint.ClusterID,
+		localHostnameLabel:  localEndpoint.Hostname,
+		remoteClusterLabel:  remoteEndpoint.ClusterID,
+		remoteHostnameLabel: remoteEndpoint.Hostname,
+	}
+}
+
 func RecordRxBytes(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec, bytes int) {
-	rxGauge.With(getLabels(cableDriverName, localEndpoint, remoteEndpoint)).Set(float64(bytes))
+	rxGauge.With(getTxRxLabels(cableDriverName, localEndpoint, remoteEndpoint)).Set(float64(bytes))
 }
 
 func RecordTxBytes(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec, bytes int) {
-	txGauge.With(getLabels(cableDriverName, localEndpoint, remoteEndpoint)).Set(float64(bytes))
+	txGauge.With(getTxRxLabels(cableDriverName, localEndpoint, remoteEndpoint)).Set(float64(bytes))
 }
 
 func RecordConnectionLatency(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec, latencySeconds float64) {
 	connectionLatencySecondsGauge.With(getLabels(cableDriverName, localEndpoint, remoteEndpoint)).Set(latencySeconds)
 }
 
-func RecordConnectionStatusActive(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec) {
+func RecordConnection(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec, status string, isNew bool) {
 	labels := getLabels(cableDriverName, localEndpoint, remoteEndpoint)
 
-	connectionStatusGauge.With(labels).Set(float64(1))
-	connectionEstablishedTimestampGauge.With(labels).Set(float64(time.Now().Unix()))
+	if isNew {
+		connectionEstablishedTimestampGauge.With(labels).Set(float64(time.Now().Unix()))
+	}
+
+	labels[connectionsStatusLabel] = status
+	connectionsGauge.With(labels).Inc()
 }
 
-func RecordConnectionStatusInactive(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec) {
+func RecordDisconnected(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec) {
 	labels := getLabels(cableDriverName, localEndpoint, remoteEndpoint)
+	rxTxLabels := getTxRxLabels(cableDriverName, localEndpoint, remoteEndpoint)
 
-	txGauge.Delete(labels)
-	rxGauge.Delete(labels)
-	connectionStatusGauge.Delete(labels)
-	connectionEstablishedTimestampGauge.Delete(labels)
 	connectionLatencySecondsGauge.Delete(labels)
+	connectionEstablishedTimestampGauge.Delete(labels)
+	rxGauge.Delete(rxTxLabels)
+	txGauge.Delete(rxTxLabels)
+}
+
+func RecordNoConnections() {
+	//TODO: assuming only 1 cable driver is active at a time, calling Reset() will work.
+	// once this is changed, there is a need to be updated accordingly
+	connectionsGauge.Reset()
 }
