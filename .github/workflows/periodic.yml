@@ -1,5 +1,5 @@
 ---
-name: Periodic Linting
+name: Periodic
 
 on:
   schedule:
