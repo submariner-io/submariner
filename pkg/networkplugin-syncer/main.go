@@ -26,13 +26,13 @@ func main() {
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
 
-	eventHandlers := event.NewRegistry("networkplugin-syncer", os.Getenv("NETWORK_PLUGIN"))
-	if err := eventHandlers.AddHandlers(logger.NewHandler(), ovn.NewSyncHandler()); err != nil {
+	registry := event.NewRegistry("networkplugin-syncer", os.Getenv("NETWORK_PLUGIN"))
+	if err := registry.AddHandlers(logger.NewHandler(), ovn.NewSyncHandler()); err != nil {
 		klog.Fatalf("Error registering the handlers: %s", err.Error())
 	}
 
 	ctl, err := controller.New(&controller.Config{
-		Registry:   &eventHandlers,
+		Registry:   registry,
 		MasterURL:  masterURL,
 		Kubeconfig: kubeconfig})
 

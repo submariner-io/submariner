@@ -33,7 +33,7 @@ var _ = Describe("Event controller", func() {
 		hostname        string
 		testEvents      chan testing.TestEvent
 		stopCh          chan struct{}
-		registry        event.Registry
+		registry        *event.Registry
 		eventController *controller.Controller
 	)
 
@@ -53,7 +53,7 @@ var _ = Describe("Event controller", func() {
 		config := controller.Config{
 			RestMapper: test.GetRESTMapperFor(&corev1.Node{}, &submV1.Endpoint{}),
 			Client:     fake.NewDynamicClient(scheme.Scheme),
-			Registry:   &registry,
+			Registry:   registry,
 		}
 		os.Setenv("SUBMARINER_NAMESPACE", testNamespace)
 		os.Setenv("SUBMARINER_CLUSTERID", testLocalClusterID)
