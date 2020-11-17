@@ -5,6 +5,9 @@ import (
 	"io/ioutil"
 	"net"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
 
 	"github.com/submariner-io/admiral/pkg/log"
@@ -62,6 +65,37 @@ func ConfigureRpFilter(iface string) error {
 	} else {
 		klog.V(log.DEBUG).Infof("Successfully configured rp_filter to loose mode(2) on cniInterface %q", iface)
 	}
+
+	return nil
+}
+
+func AnnotateNodeWithCNIInterfaceIP(nodeName, cniAnnotation string, clientSet kubernetes.Interface, clusterCidr []string) error {
+	cniIface, err := Discover(clusterCidr[0])
+	if err != nil {
+		return fmt.Errorf("DiscoverCNIInterface returned error %v", err)
+	}
+
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		node, err := clientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("unable to get node info for node %v, err: %s", nodeName, err)
+		} else {
+			annotations := node.GetAnnotations()
+			if annotations == nil {
+				annotations = map[string]string{}
+			}
+			annotations[cniAnnotation] = cniIface.IPAddress
+			node.SetAnnotations(annotations)
+			_, updateErr := clientSet.CoreV1().Nodes().Update(node)
+			return updateErr
+		}
+	})
+
+	if retryErr != nil {
+		return fmt.Errorf("error updatating node %q, err: %s", nodeName, retryErr)
+	}
+
+	klog.Infof("Successfully annotated node %q with cniIfaceIP %q", nodeName, cniIface.IPAddress)
 
 	return nil
 }
