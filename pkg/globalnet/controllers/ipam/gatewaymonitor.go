@@ -8,6 +8,7 @@ import (
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/submariner-io/admiral/pkg/log"
+	globalnetCleanup "github.com/submariner-io/submariner/pkg/globalnet/cleanup"
 	"github.com/submariner-io/submariner/pkg/util"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,6 +72,8 @@ func NewGatewayMonitor(spec *SubmarinerIpamControllerSpecification, cfg *rest.Co
 		DeleteFunc: gatewayMonitor.handleRemovedEndpoint,
 	}, handlerResync)
 
+	gatewayMonitor.cleanupHandlers = globalnetCleanup.GetGlobalnetCleanupHandlers(spec.ClusterID, spec.Namespace, submarinerClient)
+
 	submarinerInformerFactory.Start(stopCh)
 
 	return gatewayMonitor, nil
@@ -78,6 +81,7 @@ func NewGatewayMonitor(spec *SubmarinerIpamControllerSpecification, cfg *rest.Co
 
 func (i *GatewayMonitor) Run(stopCh <-chan struct{}) error {
 	defer utilruntime.HandleCrash()
+	defer i.gatewayToNonGatewayTransitionCleanups()
 
 	klog.Info("Starting GatewayMonitor to monitor the active Gateway node in the cluster.")
 
@@ -298,4 +302,13 @@ func (i *GatewayMonitor) stopIpamController() {
 	}
 
 	klog.V(log.DEBUG).Infof("Notified ipamController to stop processing.")
+}
+
+func (i *GatewayMonitor) gatewayToNonGatewayTransitionCleanups() {
+	for _, handler := range i.cleanupHandlers {
+		if err := handler.GatewayToNonGatewayTransition(); err != nil {
+			klog.Errorf("Error handling GatewayToNonGateway cleanup in %q, %s",
+				handler.GetName(), err)
+		}
+	}
 }
