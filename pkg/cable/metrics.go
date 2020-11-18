@@ -46,8 +46,10 @@ var (
 			cableDriverLabel,
 			localClusterLabel,
 			localHostnameLabel,
+			localEndpointIpLabel,
 			remoteClusterLabel,
 			remoteHostnameLabel,
+			remoteEndpointIpLabel,
 		},
 	)
 	txGauge = prometheus.NewGaugeVec(
@@ -59,8 +61,10 @@ var (
 			cableDriverLabel,
 			localClusterLabel,
 			localHostnameLabel,
+			localEndpointIpLabel,
 			remoteClusterLabel,
 			remoteHostnameLabel,
+			remoteEndpointIpLabel,
 		},
 	)
 	connectionsGauge = prometheus.NewGaugeVec(
@@ -127,22 +131,12 @@ func getLabels(cableDriverName string, localEndpoint, remoteEndpoint *submv1.End
 	}
 }
 
-func getTxRxLabels(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec) prometheus.Labels {
-	return prometheus.Labels{
-		cableDriverLabel:    cableDriverName,
-		localClusterLabel:   localEndpoint.ClusterID,
-		localHostnameLabel:  localEndpoint.Hostname,
-		remoteClusterLabel:  remoteEndpoint.ClusterID,
-		remoteHostnameLabel: remoteEndpoint.Hostname,
-	}
-}
-
 func RecordRxBytes(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec, bytes int) {
-	rxGauge.With(getTxRxLabels(cableDriverName, localEndpoint, remoteEndpoint)).Set(float64(bytes))
+	rxGauge.With(getLabels(cableDriverName, localEndpoint, remoteEndpoint)).Set(float64(bytes))
 }
 
 func RecordTxBytes(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec, bytes int) {
-	txGauge.With(getTxRxLabels(cableDriverName, localEndpoint, remoteEndpoint)).Set(float64(bytes))
+	txGauge.With(getLabels(cableDriverName, localEndpoint, remoteEndpoint)).Set(float64(bytes))
 }
 
 func RecordConnectionLatency(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec, latencySeconds float64) {
@@ -162,12 +156,11 @@ func RecordConnection(cableDriverName string, localEndpoint, remoteEndpoint *sub
 
 func RecordDisconnected(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec) {
 	labels := getLabels(cableDriverName, localEndpoint, remoteEndpoint)
-	rxTxLabels := getTxRxLabels(cableDriverName, localEndpoint, remoteEndpoint)
 
 	connectionLatencySecondsGauge.Delete(labels)
 	connectionEstablishedTimestampGauge.Delete(labels)
-	rxGauge.Delete(rxTxLabels)
-	txGauge.Delete(rxTxLabels)
+	rxGauge.Delete(labels)
+	txGauge.Delete(labels)
 }
 
 func RecordNoConnections() {
