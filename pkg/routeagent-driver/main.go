@@ -28,7 +28,7 @@ func main() {
 	klog.InitFlags(nil)
 	flag.Parse()
 
-	klog.Info("SGM: Starting submariner-route-agent using the event framework")
+	klog.Info("SGM:: Starting submariner-route-agent using the event framework")
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
 
@@ -42,13 +42,13 @@ func main() {
 		klog.Errorf("Error while annotating the node: %s", err.Error())
 	}
 
-	eventHandlers := event.NewRegistry("routeagent-driver", os.Getenv("NETWORK_PLUGIN"))
-	if err := eventHandlers.AddHandlers(logger.NewHandler(), kp_iptables.NewSyncHandler(env)); err != nil {
+	registry := event.NewRegistry("routeagent-driver", os.Getenv("NETWORK_PLUGIN"))
+	if err := registry.AddHandlers(logger.NewHandler(), kp_iptables.NewSyncHandler(env)); err != nil {
 		klog.Fatalf("Error registering the handlers: %s", err.Error())
 	}
 
 	ctl, err := controller.New(&controller.Config{
-		Registry:   &eventHandlers,
+		Registry:   registry,
 		MasterURL:  masterURL,
 		Kubeconfig: kubeconfig})
 

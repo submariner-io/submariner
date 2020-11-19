@@ -9,7 +9,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"k8s.io/klog"
 
-	"github.com/submariner-io/submariner/pkg/routeagent/constants"
+	"github.com/submariner-io/submariner/pkg/routeagent-driver/constants"
 	"github.com/submariner-io/submariner/pkg/util"
 )
 
@@ -66,6 +66,44 @@ func (kp *SyncHandler) createIPTableChains() error {
 
 		if err = ipt.AppendUnique("nat", constants.SmPostRoutingChain, ruleSpec...); err != nil {
 			return fmt.Errorf("error appending iptables rule %q: %v\n", strings.Join(ruleSpec, " "), err)
+		}
+	}
+
+	return nil
+}
+
+func (kp *SyncHandler) updateIptableRulesForInterclusterTraffic(inputCidrBlocks []string) {
+	for _, inputCidrBlock := range inputCidrBlocks {
+		if !kp.remoteSubnets.Contains(inputCidrBlock) {
+			kp.remoteSubnets.Add(inputCidrBlock)
+			err := kp.programIptableRulesForInterClusterTraffic(inputCidrBlock)
+			if err != nil {
+				klog.Errorf("Failed to program iptable rule. %v", err)
+			}
+		}
+	}
+}
+
+func (kp *SyncHandler) programIptableRulesForInterClusterTraffic(remoteCidrBlock string) error {
+	ipt, err := iptables.New()
+	if err != nil {
+		return fmt.Errorf("error initializing iptables: %v", err)
+	}
+
+	for _, localClusterCidr := range kp.localClusterCidr {
+		ruleSpec := []string{"-s", localClusterCidr, "-d", remoteCidrBlock, "-j", "ACCEPT"}
+		klog.V(log.DEBUG).Infof("Installing iptables rule for outgoing traffic: %s", strings.Join(ruleSpec, " "))
+
+		if err = ipt.AppendUnique("nat", constants.SmPostRoutingChain, ruleSpec...); err != nil {
+			return fmt.Errorf("error appending iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
+		}
+
+		// TODO: revisit, we only have to program rules to allow traffic from the podCidr
+		ruleSpec = []string{"-s", remoteCidrBlock, "-d", localClusterCidr, "-j", "ACCEPT"}
+		klog.V(log.DEBUG).Infof("Installing iptables rule for incoming traffic: %s", strings.Join(ruleSpec, " "))
+
+		if err = ipt.AppendUnique("nat", constants.SmPostRoutingChain, ruleSpec...); err != nil {
+			return fmt.Errorf("error appending iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
 		}
 	}
 
