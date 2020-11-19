@@ -15,3 +15,9 @@ func (kp *SyncHandler) TransitionToGateway() error {
 	klog.V(log.DEBUG).Info("The current node has become a Gateway")
 	return nil
 }
+
+func (kp *SyncHandler) populateRemoteVtepIps(vtepIP string) {
+	if !kp.remoteVTEPs.Contains(vtepIP) {
+		kp.remoteVTEPs.Add(vtepIP)
+	}
+}
