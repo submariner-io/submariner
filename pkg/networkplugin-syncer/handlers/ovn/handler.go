@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	goovn "github.com/ebay/go-ovn"
+	clientset "k8s.io/client-go/kubernetes"
 
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event"
@@ -12,6 +13,7 @@ import (
 
 type SyncHandler struct {
 	event.HandlerBase
+	k8sClientset     clientset.Interface
 	nbctl            *nbctl.NbCtl
 	nbdb             goovn.Client
 	sbdb             goovn.Client
@@ -28,9 +30,10 @@ func (ovn *SyncHandler) GetNetworkPlugin() string {
 	return "OVNKubernetes"
 }
 
-func NewSyncHandler() *SyncHandler {
+func NewSyncHandler(k8sClientset clientset.Interface) *SyncHandler {
 	return &SyncHandler{
 		remoteEndpoints: make(map[string]*submV1.Endpoint),
+		k8sClientset:    k8sClientset,
 	}
 }
 
