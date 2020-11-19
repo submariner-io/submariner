@@ -83,7 +83,7 @@ type GatewayStatus struct {
 	Connections   []Connection `json:"connections"`
 }
 
-// LatencySpec describes the round trip time information in miliseconds for a packet
+// LatencySpec describes the round trip time information in nanoseconds for a packet
 // between the gateway pods of two clusters.
 type LatencySpec struct {
 	LastRTT    uint64 `json:"lastRTT"`
