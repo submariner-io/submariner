@@ -13,13 +13,13 @@ import (
 
 func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 	klog.V(log.DEBUG).Infof("A new Endpoint for the local cluster has been created: %#v", endpoint)
-	// TODO: If subnets are overlapping, ignore that endpoint
+	kp.localCableDriver = endpoint.Spec.Backend
+
 	return nil
 }
 
 func (kp *SyncHandler) LocalEndpointUpdated(endpoint *submV1.Endpoint) error {
 	klog.V(log.DEBUG).Infof("The Endpoint for the local cluster has been updated: %#v", endpoint)
-	// TODO: If subnets are overlapping, ignore that endpoint
 	return nil
 }
 
@@ -31,10 +31,13 @@ func (kp *SyncHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	klog.V(log.DEBUG).Infof("A new Endpoint for remote cluster %q has been created: %#v",
 		endpoint.Spec.ClusterID, endpoint)
+
 	if err := kp.overlappingSubnets(endpoint.Spec.Subnets); err != nil {
 		// Skip processing the endpoint when CIDRs overlap
 		return err
 	}
+
+	kp.updateIptableRulesForInterclusterTraffic(endpoint.Spec.Subnets)
 
 	return nil
 }
@@ -42,6 +45,7 @@ func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 func (kp *SyncHandler) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
 	klog.V(log.DEBUG).Infof("A new Endpoint for remote cluster %q has been updated: %#v",
 		endpoint.Spec.ClusterID, endpoint)
+
 	if err := kp.overlappingSubnets(endpoint.Spec.Subnets); err != nil {
 		// Skip processing the endpoint when CIDRs overlap
 		return err

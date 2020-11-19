@@ -10,7 +10,14 @@ import (
 func (kp *SyncHandler) NodeCreated(node *k8sV1.Node) error {
 	klog.V(log.DEBUG).Infof("A Node with name %q and addresses %#v has been added to the cluster",
 		node.Name, node.Status.Addresses)
-	// TODO: Here we have to annotate node with cni-iface ip
+
+	for i, addr := range node.Status.Addresses {
+		if addr.Type == k8sV1.NodeInternalIP {
+			kp.populateRemoteVtepIps(node.Status.Addresses[i].Address)
+			break
+		}
+	}
+
 	return nil
 }
 

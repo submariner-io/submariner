@@ -9,14 +9,19 @@ import (
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/routeagent-driver/cni_interface"
 	"github.com/submariner-io/submariner/pkg/routeagent-driver/constants"
+	"github.com/submariner-io/submariner/pkg/util"
 )
 
 type SyncHandler struct {
 	event.HandlerBase
 	clusterID        string
 	namespace        string
+	localCableDriver string
 	localClusterCidr []string
 	localServiceCidr []string
+
+	remoteSubnets *util.StringSet
+	remoteVTEPs   *util.StringSet
 
 	hostname string
 	cniIface *cni_interface.CniInterface
@@ -28,6 +33,9 @@ func NewSyncHandler(env constants.Specification) *SyncHandler {
 		namespace:        env.Namespace,
 		localClusterCidr: env.ClusterCidr,
 		localServiceCidr: env.ServiceCidr,
+		localCableDriver: "",
+		remoteSubnets:    util.NewStringSet(),
+		remoteVTEPs:      util.NewStringSet(),
 	}
 }
 
