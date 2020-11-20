@@ -36,10 +36,10 @@ func (ovn *SyncHandler) createOrUpdateSubmarinerExternalPort(extLogicalSwitch st
 
 		err = ovn.nbdb.Execute(linkCmd)
 		if err != nil {
-			return errors.Wrapf(err, "Creating the submariner upstream port %q", submarinerUpstreamRPort)
+			return errors.Wrapf(err, "error creating the submariner upstream port %q", submarinerUpstreamRPort)
 		}
 	} else {
-		return errors.Wrapf(err, "Creating the submariner upstream port command %q", submarinerUpstreamRPort)
+		return errors.Wrapf(err, "error creating the submariner upstream port command %q", submarinerUpstreamRPort)
 	}
 
 	return nil
@@ -69,7 +69,7 @@ func (ovn *SyncHandler) updateSubmarinerRouterRemoteRoutes() error {
 
 	err = ovn.nbdb.Execute(ovnCommands...)
 	if err != nil {
-		return errors.Wrapf(err, "Executing routing rule modifications for router %q", submarinerLogicalRouter)
+		return errors.Wrapf(err, "error executing routing rule modifications for router %q", submarinerLogicalRouter)
 	}
 
 	return nil
@@ -80,7 +80,7 @@ func (ovn *SyncHandler) removeRoutesToSubnets(toRemove []string, viaPort string,
 	for _, subnet := range toRemove {
 		delCmd, err := ovn.nbdb.LRSRDel(submarinerLogicalRouter, subnet, nil, &viaPort, nil)
 		if err != nil {
-			return nil, errors.Wrapf(err, "Creating LRSRDel for router %q", submarinerLogicalRouter)
+			return nil, errors.Wrapf(err, "error creating LRSRDel for router %q", submarinerLogicalRouter)
 		}
 
 		ovnCommands = append(ovnCommands, delCmd)

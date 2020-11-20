@@ -14,6 +14,7 @@ const (
 	ovnClusterSubmarinerMAC    = "00:60:2f:10:01:02"
 	ovnClusterSubmarinerNET    = ovnClusterSubmarinerIP + "/29"
 	ovnClusterSubmarinerIP     = "169.254.34.2"
+	ovnRoutePoliciesPrio       = 10
 )
 
 func (ovn *SyncHandler) connectOvnClusterRouterToSubm() error {
@@ -26,7 +27,7 @@ func (ovn *SyncHandler) connectOvnClusterRouterToSubm() error {
 
 	err := ovn.nbdb.Execute(linkCmd)
 	if err != nil {
-		return errors.Wrapf(err, "Creating %q port %q", ovnClusterRouter, ovnClusterSubmarinerRPort)
+		return errors.Wrapf(err, "error creating %q port %q", ovnClusterRouter, ovnClusterSubmarinerRPort)
 	}
 
 	return nil
@@ -39,13 +40,13 @@ func (ovn *SyncHandler) associateSubmarinerExternalPortToChassis(chassis *goovn.
 		if ovn.lastOvnGwChassis != "" {
 			err := ovn.nbctl.DelGatewayChassis(submarinerUpstreamRPort, chassis.Name, 0)
 			if err != nil {
-				return errors.Wrapf(err, "Error deleting the gateway chassis for %q", submarinerUpstreamRPort)
+				return errors.Wrapf(err, "error deleting the gateway chassis for %q", submarinerUpstreamRPort)
 			}
 		}
 
 		err := ovn.nbctl.SetGatewayChassis(submarinerUpstreamRPort, chassis.Name, 0)
 		if err != nil {
-			return errors.Wrapf(err, "Error setting the new gateway chassis for %q", submarinerUpstreamRPort)
+			return errors.Wrapf(err, "error setting the new gateway chassis for %q", submarinerUpstreamRPort)
 		}
 	}
 
@@ -55,7 +56,7 @@ func (ovn *SyncHandler) associateSubmarinerExternalPortToChassis(chassis *goovn.
 func (ovn *SyncHandler) setupOvnClusterRouterRemoteRules() error {
 	existingSubnetPolicies, err := ovn.nbctl.LrPolicyGetSubnets(ovnClusterRouter, submarinerDownstreamIP)
 	if err != nil {
-		return errors.Wrapf(err, "Reading existing routing policies from %q", ovnClusterRouter)
+		return errors.Wrapf(err, "error reading existing routing policies from %q", ovnClusterRouter)
 	}
 
 	klog.V(log.DEBUG).Infof("Existing routing policies in %q router for subnets %v", ovnClusterRouter, existingSubnetPolicies.Elements())
@@ -79,9 +80,9 @@ func (ovn *SyncHandler) setupOvnClusterRouterRemoteRules() error {
 
 func (ovn *SyncHandler) removePoliciesForRemoteSubnets(toRemove []string) error {
 	for _, subnet := range toRemove {
-		err := ovn.nbctl.LrPolicyDel(ovnClusterRouter, 10, "ip4.dst == "+subnet)
+		err := ovn.nbctl.LrPolicyDel(ovnClusterRouter, ovnRoutePoliciesPrio, "ip4.dst == "+subnet)
 		if err != nil {
-			return errors.Wrapf(err, "Adding routing rule to router %q", ovnClusterRouter)
+			return errors.Wrapf(err, "error removing the %q routing rule to router %q", subnet, ovnClusterRouter)
 		}
 	}
 
@@ -91,9 +92,9 @@ func (ovn *SyncHandler) removePoliciesForRemoteSubnets(toRemove []string) error 
 func (ovn *SyncHandler) addPoliciesForRemoteSubnets(toAdd []string) error {
 	for _, subnet := range toAdd {
 		// add policy to ovn_cluster_router via submainer router 169.254.34.1
-		err := ovn.nbctl.LrPolicyAdd(ovnClusterRouter, 10, "ip4.dst == "+subnet, "reroute", submarinerDownstreamIP)
+		err := ovn.nbctl.LrPolicyAdd(ovnClusterRouter, ovnRoutePoliciesPrio, "ip4.dst == "+subnet, "reroute", submarinerDownstreamIP)
 		if err != nil {
-			return errors.Wrapf(err, "Adding routing rule to router %q", ovnClusterRouter)
+			return errors.Wrapf(err, "error adding the %q routing rule to router %q", subnet, ovnClusterRouter)
 		}
 	}
 
