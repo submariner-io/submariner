@@ -9,10 +9,16 @@ type StringSet struct {
 	set       map[string]bool
 }
 
-func NewStringSet() *StringSet {
-	return &StringSet{
+func NewStringSet(strings ...string) *StringSet {
+	ss := &StringSet{
 		syncMutex: &sync.Mutex{},
 		set:       make(map[string]bool)}
+
+	for _, str := range strings {
+		ss.Add(str)
+	}
+
+	return ss
 }
 
 func (set *StringSet) Add(s string) bool {
