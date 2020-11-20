@@ -53,7 +53,7 @@ const (
 type Operation int
 
 const (
-	AddRoute Operation = iota
-	DeleteRoute
-	FlushRouteTable
+	Add Operation = iota
+	Delete
+	Flush
 )
