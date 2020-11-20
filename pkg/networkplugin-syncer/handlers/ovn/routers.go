@@ -14,15 +14,21 @@ func (ovn *SyncHandler) getExistingSubmarinerRouterRoutesToPort(lrp string) (*ut
 		return nil, errors.Wrapf(err, "Reading existing routes from %q going via port %q", submarinerLogicalRouter, lrp)
 	}
 
-	existingRoutes := util.NewStringSet()
+	existingRoutes := filterRouteSubnetsViaPort(subnetRouteObjs, lrp)
+
+	return existingRoutes, nil
+}
+
+func filterRouteSubnetsViaPort(subnetRouteObjs []*goovn.LogicalRouterStaticRoute, lrp string) *util.StringSet {
+	routeSubnets := util.NewStringSet()
 
 	for _, route := range subnetRouteObjs {
 		if route.OutputPort != nil && *route.OutputPort == lrp {
-			existingRoutes.Add(route.IPPrefix)
+			routeSubnets.Add(route.IPPrefix)
 		}
 	}
 
-	return existingRoutes, nil
+	return routeSubnets
 }
 
 func (ovn *SyncHandler) addSubmRoutesToSubnets(toAdd []string, viaPort, nextHop string,
