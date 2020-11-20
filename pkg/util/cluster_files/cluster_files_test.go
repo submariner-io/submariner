@@ -44,15 +44,15 @@ var _ = Describe("Cluster Files Get", func() {
 
 	})
 
-	When("The schema is unknown", func() {
-		It("should return error", func() {
+	When("The scheme is unknown", func() {
+		It("should return an error", func() {
 			_, err := cluster_files.Get(client, "randomschema://ns1/my-secret-noo/data1")
-			Expect(err).To(Equal(cluster_files.UnsupportedSchema))
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
-	When("The files don't exist", func() {
-		It("should return error", func() {
+	When("a file source does not exist", func() {
+		It("should return an error", func() {
 			_, err := cluster_files.Get(client, "secret://ns1/my-secret-noo/data1")
 			Expect(err).To(HaveOccurred())
 			_, err = cluster_files.Get(client, "configmap://ns1/my-configmap-noo/data1")
@@ -60,43 +60,44 @@ var _ = Describe("Cluster Files Get", func() {
 		})
 	})
 
-	When("The content inside the file does not exist", func() {
-		It("should return the data in a tmp file for a secret", func() {
+	When("the content inside the file does not exist", func() {
+		It("should return an error", func() {
 			_, err := cluster_files.Get(client, "secret://ns1/my-secret/data1-does-not-exist")
-			Expect(err).To(Equal(cluster_files.FileContentNotFound))
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
-	When("The URL is malformed for this module", func() {
-		It("should return malformed URL error", func() {
+	When("the URL is malformed", func() {
+		It("should return an error", func() {
 			_, err := cluster_files.Get(client, "secret://ns1/")
-			Expect(err).To(Equal(cluster_files.MalformedURL))
+			Expect(err).To(HaveOccurred())
+			_, err = cluster_files.Get(client, "secret://ns1/secret-with-no-content-detail")
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
-	When("The URL is malformed for this module", func() {
-		It("should return malformed URL error", func() {
-			_, err := cluster_files.Get(client, "secret://ns1/secret-with-no-content-detail")
-			Expect(err).To(Equal(cluster_files.MalformedURL))
-		})
-	})
-
-	When("The files exist", func() {
-		It("should return the data in a tmp file for a secret", func() {
+	When("the source secret exist", func() {
+		It("should return the data in a tmp file", func() {
 			file, err := cluster_files.Get(client, "secret://ns1/my-secret/data1")
 			Expect(err).NotTo(HaveOccurred())
 			fileContent, err := ioutil.ReadFile(file)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(fileContent).To(Equal(theData))
 		})
-		It("should return the data in a tmp file for a configmap", func() {
+	})
+
+	When("the source configmap exist", func() {
+		It("should return the data in a tmp file", func() {
 			file, err := cluster_files.Get(client, "configmap://ns1/my-configmap/data1")
 			Expect(err).NotTo(HaveOccurred())
 			fileContent, err := ioutil.ReadFile(file)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(fileContent).To(Equal(theData))
 		})
-		It("should return the data in a tmp file for a configmap with binary data", func() {
+	})
+
+	When("the source configmap exist and has binary data", func() {
+		It("should return the data in a tmp file", func() {
 			file, err := cluster_files.Get(client, "configmap://ns1/my-configmap-binary/data1")
 			Expect(err).NotTo(HaveOccurred())
 			fileContent, err := ioutil.ReadFile(file)
@@ -106,14 +107,16 @@ var _ = Describe("Cluster Files Get", func() {
 
 	})
 
-	It("should return the original path for the file:/// scheme", func() {
-		file, err := cluster_files.Get(nil, "file:///dir/file")
-		Expect(err).NotTo(HaveOccurred())
-		Expect(file).To(Equal("/dir/file"))
+	When("the source is a file", func() {
+		It("should return the original path for the file:/// scheme", func() {
+			file, err := cluster_files.Get(nil, "file:///dir/file")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(file).To(Equal("/dir/file"))
+		})
 	})
 })
 
-func TestUtil(t *testing.T) {
+func TestClusterFiles(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Cluster Files Suite")
 }
