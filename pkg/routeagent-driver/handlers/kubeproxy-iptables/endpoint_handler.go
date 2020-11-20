@@ -5,47 +5,49 @@ import (
 
 	"k8s.io/klog"
 
-	"github.com/submariner-io/admiral/pkg/log"
-
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/util"
 )
 
 func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
-	klog.V(log.DEBUG).Infof("A new Endpoint for the local cluster has been created: %#v", endpoint)
 	kp.localCableDriver = endpoint.Spec.Backend
 
 	return nil
 }
 
 func (kp *SyncHandler) LocalEndpointUpdated(endpoint *submV1.Endpoint) error {
-	klog.V(log.DEBUG).Infof("The Endpoint for the local cluster has been updated: %#v", endpoint)
 	return nil
 }
 
 func (kp *SyncHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
-	klog.V(log.DEBUG).Infof("The Endpoint for the local cluster has been removed: %#v", endpoint)
+	kp.syncHandlerMutex.Lock()
+	defer kp.syncHandlerMutex.Unlock()
+	// Add routes to the new endpoint on the GatewayNode.
+	if kp.isGatewayNode {
+		kp.updateRoutingRulesForHostNetworkSupport(nil, FlushRouteTable)
+	}
+
+	kp.isGatewayNode = false
+
 	return nil
 }
 
 func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
-	klog.V(log.DEBUG).Infof("A new Endpoint for remote cluster %q has been created: %#v",
-		endpoint.Spec.ClusterID, endpoint)
-
 	if err := kp.overlappingSubnets(endpoint.Spec.Subnets); err != nil {
 		// Skip processing the endpoint when CIDRs overlap
 		return err
 	}
 
 	kp.updateIptableRulesForInterclusterTraffic(endpoint.Spec.Subnets)
+	kp.syncHandlerMutex.Lock()
+	defer kp.syncHandlerMutex.Unlock()
+	// Add routes to the new endpoint on the GatewayNode.
+	kp.updateRoutingRulesForHostNetworkSupport(endpoint.Spec.Subnets, AddRoute)
 
 	return nil
 }
 
 func (kp *SyncHandler) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
-	klog.V(log.DEBUG).Infof("A new Endpoint for remote cluster %q has been updated: %#v",
-		endpoint.Spec.ClusterID, endpoint)
-
 	if err := kp.overlappingSubnets(endpoint.Spec.Subnets); err != nil {
 		// Skip processing the endpoint when CIDRs overlap
 		return err
@@ -55,8 +57,10 @@ func (kp *SyncHandler) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
 }
 
 func (kp *SyncHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
-	klog.V(log.DEBUG).Infof("A new Endpoint for remote cluster %q has been removed: %#v",
-		endpoint.Spec.ClusterID, endpoint)
+	kp.syncHandlerMutex.Lock()
+	defer kp.syncHandlerMutex.Unlock()
+	kp.updateRoutingRulesForHostNetworkSupport(endpoint.Spec.Subnets, DeleteRoute)
+
 	return nil
 }
 
