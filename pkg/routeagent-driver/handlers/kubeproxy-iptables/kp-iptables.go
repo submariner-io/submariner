@@ -2,7 +2,9 @@ package kp_iptables
 
 import (
 	"fmt"
+	"net"
 	"os"
+	"sync"
 
 	"k8s.io/klog"
 
@@ -20,11 +22,16 @@ type SyncHandler struct {
 	localClusterCidr []string
 	localServiceCidr []string
 
-	remoteSubnets *util.StringSet
-	remoteVTEPs   *util.StringSet
+	remoteSubnets    *util.StringSet
+	remoteVTEPs      *util.StringSet
+	routeCacheGWNode *util.StringSet
 
-	hostname string
-	cniIface *cni_interface.CniInterface
+	syncHandlerMutex *sync.Mutex
+	isGatewayNode    bool
+
+	hostname         string
+	cniIface         *cni_interface.CniInterface
+	defaultHostIface *net.Interface
 }
 
 func NewSyncHandler(env constants.Specification) *SyncHandler {
@@ -36,6 +43,9 @@ func NewSyncHandler(env constants.Specification) *SyncHandler {
 		localCableDriver: "",
 		remoteSubnets:    util.NewStringSet(),
 		remoteVTEPs:      util.NewStringSet(),
+		routeCacheGWNode: util.NewStringSet(),
+		syncHandlerMutex: &sync.Mutex{},
+		isGatewayNode:    false,
 	}
 }
 
@@ -52,6 +62,11 @@ func (kp *SyncHandler) Init() error {
 	kp.hostname, err = os.Hostname()
 	if err != nil {
 		klog.Fatalf("unable to determine hostname: %v", err)
+	}
+
+	kp.defaultHostIface, err = util.GetDefaultGatewayInterface()
+	if err != nil {
+		klog.Fatalf("Unable to find the default interface on host: %s", err.Error())
 	}
 
 	cniIface, err := cni_interface.Discover(kp.localClusterCidr[0])
