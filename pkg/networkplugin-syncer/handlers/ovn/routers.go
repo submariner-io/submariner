@@ -11,7 +11,7 @@ import (
 func (ovn *SyncHandler) getExistingSubmarinerRouterRoutesToPort(lrp string) (*util.StringSet, error) {
 	subnetRouteObjs, err := ovn.nbdb.LRSRList(submarinerLogicalRouter)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Reading existing routes from %q going via port %q", submarinerLogicalRouter, lrp)
+		return nil, errors.Wrapf(err, "error reading existing routes from %q going via port %q", submarinerLogicalRouter, lrp)
 	}
 
 	existingRoutes := filterRouteSubnetsViaPort(subnetRouteObjs, lrp)
@@ -36,7 +36,7 @@ func (ovn *SyncHandler) addSubmRoutesToSubnets(toAdd []string, viaPort, nextHop 
 	for _, subnet := range toAdd {
 		addCmd, err := ovn.nbdb.LRSRAdd(submarinerLogicalRouter, subnet, nextHop, &viaPort, nil, nil)
 		if err != nil {
-			return nil, errors.Wrapf(err, "Creating LRSRAdd for router %q", submarinerLogicalRouter)
+			return nil, errors.Wrapf(err, "error creating LRSRAdd for router %q", submarinerLogicalRouter)
 		}
 
 		ovnCommands = append(ovnCommands, addCmd)
@@ -50,7 +50,7 @@ func (ovn *SyncHandler) logRoutingChanges(kind, router string, toAdd, toRemove [
 		klog.Infof("%s for %q are up to date", kind, router)
 	} else {
 		if len(toAdd) > 0 {
-			klog.Infof("New %s to    add   to %q : %v", kind, router, toAdd)
+			klog.Infof("New %s to add to %q : %v", kind, router, toAdd)
 		}
 		if len(toRemove) > 0 {
 			klog.Infof("Old %s to remove from %q : %v", kind, router, toRemove)

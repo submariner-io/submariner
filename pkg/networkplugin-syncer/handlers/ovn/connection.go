@@ -42,7 +42,7 @@ func (ovn *SyncHandler) initClients() error {
 		Db:        goovn.DBNB})
 
 	if err != nil {
-		return errors.Wrap(err, "Error creating NBDB connection")
+		return errors.Wrap(err, "error creating NBDB connection")
 	}
 
 	ovn.sbdb, err = goovn.NewClient(&goovn.Config{
@@ -52,7 +52,7 @@ func (ovn *SyncHandler) initClients() error {
 		Db:        goovn.DBSB})
 
 	if err != nil {
-		return errors.Wrap(err, "Error creating SBDB connection")
+		return errors.Wrap(err, "error creating SBDB connection")
 	}
 
 	return nil
@@ -69,7 +69,7 @@ func getOVNTLSConfig(pkFile, certFile, caFile string) (*tls.Config, error) {
 	data, err := ioutil.ReadFile(caFile)
 
 	if err != nil {
-		return nil, errors.Wrap(err, "Failure loading OVNDB CA bundle")
+		return nil, errors.Wrap(err, "failure loading OVNDB ca bundle")
 	}
 
 	rootCAs.AppendCertsFromPEM(data)

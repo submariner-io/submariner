@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestUtil(t *testing.T) {
+func TestOvn(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "OVN Test Suite")
 }

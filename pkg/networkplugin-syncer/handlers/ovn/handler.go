@@ -2,6 +2,7 @@ package ovn
 
 import (
 	"errors"
+	"sync"
 
 	goovn "github.com/ebay/go-ovn"
 	clientset "k8s.io/client-go/kubernetes"
@@ -11,8 +12,12 @@ import (
 	"github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn/nbctl"
 )
 
+var WaitingForLocalEndpoint = errors.New("Waiting for the local endpoint details before we can " +
+	"setup any remote endpoint related information, this will be retried.")
+
 type SyncHandler struct {
 	event.HandlerBase
+	syncMutex        sync.Mutex
 	k8sClientset     clientset.Interface
 	nbctl            *nbctl.NbCtl
 	nbdb             goovn.Client
@@ -50,42 +55,60 @@ func (ovn *SyncHandler) Init() error {
 }
 
 func (ovn *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
+	ovn.syncMutex.Lock()
+	defer ovn.syncMutex.Unlock()
+
 	ovn.localEndpoint = endpoint
 
 	return ovn.updateGatewayNode()
 }
 
 func (ovn *SyncHandler) LocalEndpointUpdated(endpoint *submV1.Endpoint) error {
+	ovn.syncMutex.Lock()
+	defer ovn.syncMutex.Unlock()
+
 	ovn.localEndpoint = endpoint
 
 	return ovn.updateGatewayNode()
 }
 
 func (ovn *SyncHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
+	ovn.syncMutex.Lock()
+	defer ovn.syncMutex.Unlock()
+
 	if ovn.localEndpoint.Name == endpoint.Name {
 		ovn.localEndpoint = nil
 	}
 
-	return ovn.updateGatewayNode()
+	return nil
 }
 
 func (ovn *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
+	ovn.syncMutex.Lock()
+	defer ovn.syncMutex.Unlock()
+
 	ovn.remoteEndpoints[endpoint.Name] = endpoint
+
 	return ovn.updateRemoteEndpointsInfra()
 }
 
 func (ovn *SyncHandler) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
+	ovn.syncMutex.Lock()
+	defer ovn.syncMutex.Unlock()
+
 	ovn.remoteEndpoints[endpoint.Name] = endpoint
+
 	return ovn.updateRemoteEndpointsInfra()
 }
 
 func (ovn *SyncHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
+	ovn.syncMutex.Lock()
+	defer ovn.syncMutex.Unlock()
+
 	delete(ovn.remoteEndpoints, endpoint.Name)
+
 	return ovn.updateRemoteEndpointsInfra()
 }
-
-var WaitingForLocalEndpoint = errors.New("Waiting for the local endpoint details before we can " +
-	"setup any remote-endpoint related information, this will be retried.")
 
 func (ovn *SyncHandler) updateRemoteEndpointsInfra() error {
 	if ovn.localEndpoint == nil {

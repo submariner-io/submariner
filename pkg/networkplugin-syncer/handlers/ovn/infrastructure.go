@@ -34,13 +34,13 @@ func (ovn *SyncHandler) ensureSubmarinerInfra() error {
 func (ovn *SyncHandler) ensureSubmarinerJoinSwitch() error {
 	lsCmd, err := ovn.nbdb.LSAdd(submarinerDownstreamSwitch)
 	if err == nil {
-		klog.Infof("Creating submariner switch %q", submarinerDownstreamSwitch)
+		klog.Infof("error creating submariner switch %q", submarinerDownstreamSwitch)
 
 		err = ovn.nbdb.Execute(lsCmd)
 	}
 
 	if !errors.Is(err, goovn.ErrorExist) {
-		return errors.Wrapf(err, "Creating submariner switch %q", submarinerDownstreamSwitch)
+		return errors.Wrapf(err, "error creating submariner switch %q", submarinerDownstreamSwitch)
 	}
 
 	return nil
@@ -55,10 +55,11 @@ func (ovn *SyncHandler) ensureSubmarinerRouter() error {
 	}
 
 	if !errors.Is(err, goovn.ErrorExist) {
-		return errors.Wrapf(err, "Creating submariner router %q", submarinerLogicalRouter)
+		return errors.Wrapf(err, "error creating submariner router %q", submarinerLogicalRouter)
 	}
 
-	// TODO: Improve this so we don't need to delete/recreate everytime
+	// TODO: Improve this in goovn so we don't need to delete/recreate everytime, LinkSwitchToRouter
+	//       does not provide good error handling and ignores many corner cases.
 	delOldRouterPort, _ := ovn.nbdb.LRPDel(submarinerLogicalRouter, submarinerDownstreamRPort)
 	_ = ovn.nbdb.Execute(delOldRouterPort)
 	delOldLSP, _ := ovn.nbdb.LSPDel(submarinerDownstreamSwPort)
@@ -73,7 +74,7 @@ func (ovn *SyncHandler) ensureSubmarinerRouter() error {
 
 	err = ovn.nbdb.Execute(linkCmd)
 	if err != nil {
-		return errors.Wrapf(err, "Creating %q port %q", submarinerLogicalRouter, submarinerDownstreamRPort)
+		return errors.Wrapf(err, "error creating %q port %q", submarinerLogicalRouter, submarinerDownstreamRPort)
 	}
 
 	return nil

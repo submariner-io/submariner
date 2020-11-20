@@ -54,7 +54,7 @@ func (ovn *SyncHandler) updateGatewayNode() error {
 func (ovn *SyncHandler) findChassisByHostname(hostname string) (*goovn.Chassis, error) {
 	chassisList, err := ovn.sbdb.ChassisList()
 	if err != nil {
-		return nil, errors.Wrap(err, "Unable to get chassis list from OVN")
+		return nil, errors.Wrap(err, "unable to get chassis list from OVN")
 	}
 	for _, chassis := range chassisList {
 		if chassis.Hostname == hostname || strings.HasPrefix(chassis.Hostname, hostname) ||
@@ -90,7 +90,7 @@ func (ovn *SyncHandler) updateSubmarinerRouterLocalRoutes() error {
 
 	err = ovn.nbdb.Execute(ovnCommands...)
 	if err != nil {
-		return errors.Wrapf(err, "Executing routing rule modifications for router %q", submarinerLogicalRouter)
+		return errors.Wrapf(err, "error executing routing rule modifications for router %q", submarinerLogicalRouter)
 	}
 
 	return nil
