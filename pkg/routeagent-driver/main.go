@@ -28,7 +28,7 @@ func main() {
 	klog.InitFlags(nil)
 	flag.Parse()
 
-	klog.Info("SGM:: Starting submariner-route-agent using the event framework")
+	klog.Info("Starting submariner-route-agent using the event framework")
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
 

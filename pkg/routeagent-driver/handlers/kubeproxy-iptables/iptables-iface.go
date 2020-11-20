@@ -72,14 +72,16 @@ func (kp *SyncHandler) createIPTableChains() error {
 	return nil
 }
 
-func (kp *SyncHandler) updateIptableRulesForInterclusterTraffic(inputCidrBlocks []string) {
+func (kp *SyncHandler) updateIptableRulesForInterClusterTraffic(inputCidrBlocks []string, operation Operation) {
 	for _, inputCidrBlock := range inputCidrBlocks {
-		if !kp.remoteSubnets.Contains(inputCidrBlock) {
-			kp.remoteSubnets.Add(inputCidrBlock)
+		if operation == Add {
 			err := kp.programIptableRulesForInterClusterTraffic(inputCidrBlock)
 			if err != nil {
 				klog.Errorf("Failed to program iptable rule. %v", err)
 			}
+		} else if operation == Delete {
+			// TODO: Handle this use-case
+			klog.Warning("Handle the delete use-case")
 		}
 	}
 }

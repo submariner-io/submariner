@@ -29,6 +29,8 @@ type SyncHandler struct {
 	syncHandlerMutex *sync.Mutex
 	isGatewayNode    bool
 
+	vxlanDevice      *vxLanIface
+	vxlanGwIP        *net.IP
 	hostname         string
 	cniIface         *cni_interface.CniInterface
 	defaultHostIface *net.Interface
@@ -46,6 +48,8 @@ func NewSyncHandler(env constants.Specification) *SyncHandler {
 		routeCacheGWNode: util.NewStringSet(),
 		syncHandlerMutex: &sync.Mutex{},
 		isGatewayNode:    false,
+		vxlanDevice:      nil,
+		vxlanGwIP:        nil,
 	}
 }
 
