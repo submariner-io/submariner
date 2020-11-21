@@ -24,10 +24,11 @@ type vxLanAttributes struct {
 }
 
 type vxLanIface struct {
-	link *netlink.Vxlan
+	link                   *netlink.Vxlan
+	activeEndpointHostname string
 }
 
-func newVxlanIface(attrs *vxLanAttributes) (*vxLanIface, error) {
+func newVxlanIface(attrs *vxLanAttributes, activeEndPoint string) (*vxLanIface, error) {
 	iface := &netlink.Vxlan{
 		LinkAttrs: netlink.LinkAttrs{
 			Name:  attrs.name,
@@ -41,7 +42,8 @@ func newVxlanIface(attrs *vxLanAttributes) (*vxLanIface, error) {
 	}
 
 	vxLANIface := &vxLanIface{
-		link: iface,
+		link:                   iface,
+		activeEndpointHostname: activeEndPoint,
 	}
 
 	if err := createVxLanIface(vxLANIface); err != nil {
@@ -203,7 +205,7 @@ func (kp *SyncHandler) getVxlanVtepIPAddress(ipAddr string) (net.IP, error) {
 	return vxlanIP, nil
 }
 
-func (kp *SyncHandler) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP) error {
+func (kp *SyncHandler) createVxLANInterface(activeEndPoint string, ifaceType int, gatewayNodeIP net.IP) error {
 	ipAddr, err := kp.getHostIfaceIPAddress()
 	if err != nil {
 		return fmt.Errorf("unable to retrieve the IPv4 address on the Host %v", err)
@@ -227,7 +229,7 @@ func (kp *SyncHandler) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP)
 			mtu:      vxlanMtu,
 		}
 
-		kp.vxlanDevice, err = newVxlanIface(attrs)
+		kp.vxlanDevice, err = newVxlanIface(attrs, activeEndPoint)
 		if err != nil {
 			return fmt.Errorf("failed to create vxlan interface on Gateway Node: %v", err)
 		}
@@ -259,7 +261,7 @@ func (kp *SyncHandler) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP)
 			mtu:      vxlanMtu,
 		}
 
-		kp.vxlanDevice, err = newVxlanIface(attrs)
+		kp.vxlanDevice, err = newVxlanIface(attrs, activeEndPoint)
 		if err != nil {
 			return fmt.Errorf("failed to create vxlan interface on non-Gateway Node: %v", err)
 		}
