@@ -17,6 +17,18 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 
 	// We are on nonGateway node
 	if endpoint.Spec.Hostname != kp.hostname {
+		// If the node already has a vxLAN interface that points to an oldEndpoint
+		// (i.e., during gateway migration), delete it.
+		if kp.vxlanDevice != nil && kp.vxlanDevice.activeEndpointHostname != endpoint.Spec.Hostname {
+			err := kp.vxlanDevice.deleteVxLanIface()
+			if err != nil {
+				return fmt.Errorf("failed to delete the the vxlan interface that points to old endpoint %s : %v",
+					kp.vxlanDevice.activeEndpointHostname, err)
+			}
+
+			kp.vxlanDevice = nil
+		}
+
 		kp.isGatewayNode = false
 		localClusterGwNodeIP := net.ParseIP(endpoint.Spec.PrivateIP)
 		remoteVtepIP, err := kp.getVxlanVtepIPAddress(localClusterGwNodeIP.String())
@@ -25,7 +37,7 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 		}
 
 		klog.Infof("Creating the vxlan interface %s with gateway node IP %s", VxLANIface, localClusterGwNodeIP)
-		err = kp.createVxLANInterface(VxInterfaceWorker, localClusterGwNodeIP)
+		err = kp.createVxLANInterface(endpoint.Spec.Hostname, VxInterfaceWorker, localClusterGwNodeIP)
 		if err != nil {
 			klog.Fatalf("Unable to create VxLAN interface on non-GatewayNode (%s): %v", endpoint.Spec.Hostname, err)
 		}
@@ -49,12 +61,13 @@ func (kp *SyncHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 	defer kp.syncHandlerMutex.Unlock()
 	kp.isGatewayNode = false
 
-	if kp.vxlanDevice != nil {
+	// If the vxLAN device exists and it points to the same endpoint, delete it.
+	if kp.vxlanDevice != nil && kp.vxlanDevice.activeEndpointHostname == endpoint.Spec.Hostname {
 		err := kp.vxlanDevice.deleteVxLanIface()
 		kp.vxlanDevice = nil
 		kp.vxlanGwIP = nil
 		if err != nil {
-			return fmt.Errorf("Failed to delete the the vxlan interface on Endpoint removal: %v", err)
+			return fmt.Errorf("failed to delete the the vxlan interface on Endpoint removal: %v", err)
 		}
 	}
 
@@ -63,8 +76,9 @@ func (kp *SyncHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 
 func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	if err := kp.overlappingSubnets(endpoint.Spec.Subnets); err != nil {
-		// Skip processing the endpoint when CIDRs overlap
-		return err
+		// Skip processing the endpoint when CIDRs overlap and return nil to avoid re-queuing.
+		klog.Errorf("IsoverlappingSubnets returned error: %v", err)
+		return nil
 	}
 
 	kp.syncHandlerMutex.Lock()
@@ -128,7 +142,8 @@ func (kp *SyncHandler) overlappingSubnets(remoteSubnets []string) error {
 		}
 
 		if overlap {
-			return fmt.Errorf("Local Service CIDR %q, overlaps with remote cluster %s", serviceCidr, err)
+			return fmt.Errorf("Local Service CIDR %q, overlaps with remote cluster %s",
+				serviceCidr, remoteSubnets)
 		}
 	}
 
@@ -139,7 +154,7 @@ func (kp *SyncHandler) overlappingSubnets(remoteSubnets []string) error {
 		}
 
 		if overlap {
-			return fmt.Errorf("Local Pod CIDR %q, overlaps with remote cluster %s", podCidr, err)
+			return fmt.Errorf("Local Pod CIDR %q, overlaps with remote cluster %s", podCidr, remoteSubnets)
 		}
 	}
 
