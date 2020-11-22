@@ -34,7 +34,7 @@ experimentation, it is quite possible that you could run into bugs.
 
 ## Architecture
 
-See the [Architecture section on Submainer's website](https://submariner.io/architecture/).
+See the [Architecture section on Submainer's website](https://submariner.io/getting_started/architecture/).
 
 ### Network Path
 
@@ -51,7 +51,7 @@ node.
 
 ## Prerequisites
 
-See the [Prerequisites docs on Submainer's website](https://submariner.io/quickstart/#prerequisites).
+See the [Prerequisites docs on Submainer's website]https://submariner.io/getting_started/#prerequisites).
 
 ## Installation
 
@@ -62,19 +62,19 @@ utility. `subctl` greatly simplifies the deployment of Submariner, and is theref
 
 Submariner provides the `subctl` CLI utility to simplify the deployment and maintenance of Submariner across your clusters.
 
-See the [`subctl` docs on Submainer's website](https://submariner.io/deployment/subctl/).
+See the [`subctl` docs on Submainer's website](https://submariner.io/operations/deployment/subctl/).
 
 ### Installation using Helm
 
-See the [Helm Deployments](https://submariner.io/deployment/helm/) section of Submariner's website.
+See the [Helm](https://submariner.io/operations/deployment/helm/) section on Submariner's website.
 
 ### Validate Submariner is Working
 
-See the [`subctl verify` docs on Submainer's website](https://submariner.io/deployment/subctl/#verify).
+See the [`subctl verify` docs on Submainer's website](https://submariner.io/operations/deployment/subctl/#verify).
 
 ## Building and Testing
 
-See the [Building and Testing docs on Submainer's website](https://submariner.io/contributing/building_testing/).
+See the [Building and Testing docs on Submainer's website](https://submariner.io/for_developers/building_testing/).
 
 ## Known Issues/Notes
 
@@ -89,4 +89,4 @@ When running in OpenShift, Submariner needs to grant the appropriate security co
 
 ## Contributing
 
-See the [Contributing docs on Submainer's website](https://submariner.io/contributing/).
+See the [For Developers section on Submainer's website](https://submariner.io/for_developers/).
