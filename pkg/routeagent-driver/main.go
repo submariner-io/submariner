@@ -7,10 +7,12 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 
+	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/controller"
 	"github.com/submariner-io/submariner/pkg/event/logger"
@@ -38,12 +40,22 @@ func main() {
 		klog.Fatalf("Error reading the environment variables: %s", err.Error())
 	}
 
-	if err = annotateNode(env.ClusterCidr); err != nil {
+	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
+	if err != nil {
+		klog.Fatalf("Error building kubeconfig: %s", err.Error())
+	}
+
+	smClientset, err := submarinerClientset.NewForConfig(cfg)
+	if err != nil {
+		klog.Fatalf("Error building submariner clientset: %s", err.Error())
+	}
+
+	if err = annotateNode(env.ClusterCidr, cfg); err != nil {
 		klog.Errorf("Error while annotating the node: %s", err.Error())
 	}
 
 	registry := event.NewRegistry("routeagent-driver", os.Getenv("NETWORK_PLUGIN"))
-	if err := registry.AddHandlers(logger.NewHandler(), kp_iptables.NewSyncHandler(env)); err != nil {
+	if err := registry.AddHandlers(logger.NewHandler(), kp_iptables.NewSyncHandler(env, smClientset)); err != nil {
 		klog.Fatalf("Error registering the handlers: %s", err.Error())
 	}
 
@@ -73,13 +85,8 @@ func init() {
 		"The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 }
 
-func annotateNode(clusterCidr []string) error {
-	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
-	if err != nil {
-		klog.Fatalf("Error building kubeconfig: %s", err.Error())
-	}
-
-	clientSet, err := kubernetes.NewForConfig(cfg)
+func annotateNode(clusterCidr []string, cfg *restclient.Config) error {
+	k8sClientSet, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
 		klog.Fatalf("Error building clientset: %s", err.Error())
 	}
@@ -89,7 +96,7 @@ func annotateNode(clusterCidr []string) error {
 		return fmt.Errorf("Error reading the NODE_NAME from the environment")
 	}
 
-	err = cni_interface.AnnotateNodeWithCNIInterfaceIP(nodeName, constants.CniInterfaceIp, clientSet, clusterCidr)
+	err = cni_interface.AnnotateNodeWithCNIInterfaceIP(nodeName, constants.CniInterfaceIp, k8sClientSet, clusterCidr)
 	if err != nil {
 		return fmt.Errorf("AnnotateNodeWithCNIInterfaceIP returned error %v", err)
 	}
