@@ -8,9 +8,13 @@ import (
 
 	"k8s.io/klog"
 
+	cableCleanup "github.com/submariner-io/submariner/pkg/cable/cleanup"
+	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/event"
+	globalnetCleanup "github.com/submariner-io/submariner/pkg/globalnet/cleanup"
 	"github.com/submariner-io/submariner/pkg/routeagent-driver/cni_interface"
 	"github.com/submariner-io/submariner/pkg/routeagent-driver/constants"
+	"github.com/submariner-io/submariner/pkg/routeagent/cleanup"
 	"github.com/submariner-io/submariner/pkg/util"
 )
 
@@ -26,30 +30,36 @@ type SyncHandler struct {
 	remoteVTEPs      *util.StringSet
 	routeCacheGWNode *util.StringSet
 
-	syncHandlerMutex *sync.Mutex
-	isGatewayNode    bool
+	syncHandlerMutex     *sync.Mutex
+	isGatewayNode        bool
+	wasGatewayPreviously bool
 
 	vxlanDevice      *vxLanIface
 	vxlanGwIP        *net.IP
 	hostname         string
 	cniIface         *cni_interface.CniInterface
 	defaultHostIface *net.Interface
+
+	smClientSet     clientset.Interface
+	cleanupHandlers []cleanup.Handler
 }
 
-func NewSyncHandler(env constants.Specification) *SyncHandler {
+func NewSyncHandler(env constants.Specification, smClientSet clientset.Interface) *SyncHandler {
 	return &SyncHandler{
-		clusterID:        env.ClusterID,
-		namespace:        env.Namespace,
-		localClusterCidr: env.ClusterCidr,
-		localServiceCidr: env.ServiceCidr,
-		localCableDriver: "",
-		remoteSubnets:    util.NewStringSet(),
-		remoteVTEPs:      util.NewStringSet(),
-		routeCacheGWNode: util.NewStringSet(),
-		syncHandlerMutex: &sync.Mutex{},
-		isGatewayNode:    false,
-		vxlanDevice:      nil,
-		vxlanGwIP:        nil,
+		clusterID:            env.ClusterID,
+		namespace:            env.Namespace,
+		localClusterCidr:     env.ClusterCidr,
+		localServiceCidr:     env.ServiceCidr,
+		localCableDriver:     "",
+		remoteSubnets:        util.NewStringSet(),
+		remoteVTEPs:          util.NewStringSet(),
+		routeCacheGWNode:     util.NewStringSet(),
+		syncHandlerMutex:     &sync.Mutex{},
+		isGatewayNode:        false,
+		wasGatewayPreviously: false,
+		vxlanDevice:          nil,
+		vxlanGwIP:            nil,
+		smClientSet:          smClientSet,
 	}
 }
 
@@ -90,6 +100,10 @@ func (kp *SyncHandler) Init() error {
 	if err != nil {
 		return fmt.Errorf("createIPTableChains returned error. %v", err)
 	}
+
+	// For now we get all the cleanups
+	kp.installCleanupHandlers(cableCleanup.GetCleanupHandlers())
+	kp.installCleanupHandlers(globalnetCleanup.GetGlobalnetCleanupHandlers(kp.clusterID, kp.namespace, kp.smClientSet))
 
 	return nil
 }
