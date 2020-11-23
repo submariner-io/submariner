@@ -108,7 +108,7 @@ func main() {
 
 	submSpec.CableDriver = strings.ToLower(submSpec.CableDriver)
 
-	localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterID, submSpec.CableDriver, map[string]string{}, submSpec.NatEnabled,
+	localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterID, submSpec.CableDriver, nil, submSpec.NatEnabled,
 		localSubnets, util.GetLocalIP())
 
 	if err != nil {
