@@ -1,4 +1,5 @@
 FROM registry.access.redhat.com/ubi8/ubi-minimal
+ARG TARGETPLATFORM
 
 WORKDIR /var/submariner
 
@@ -6,7 +7,7 @@ WORKDIR /var/submariner
 RUN microdnf -y install --nodocs iproute iptables && \
     microdnf clean all
 
-COPY package/submariner-route-agent.sh bin/submariner-route-agent /usr/local/bin/
+COPY package/submariner-route-agent.sh bin/${TARGETPLATFORM}/submariner-route-agent /usr/local/bin/
 
 # Wrapper scripts to use iptables from the host when that's available
 COPY package/iptables-wrapper.in /usr/sbin/

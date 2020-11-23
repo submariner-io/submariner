@@ -1,4 +1,5 @@
 FROM fedora:33 
+ARG TARGETPLATFORM
 
 WORKDIR /var/submariner
 
@@ -7,7 +8,7 @@ RUN dnf -y install --nodocs --setopt=install_weak_deps=0 \
     dnf -y clean all
 
 # install the networkpluginc-sync
-COPY package/submariner-networkplugin-syncer.sh bin/submariner-networkplugin-syncer /usr/local/bin/
+COPY package/submariner-networkplugin-syncer.sh bin/${TARGETPLATFORM}/submariner-networkplugin-syncer /usr/local/bin/
 
 ENTRYPOINT ["/usr/local/bin/submariner-networkplugin-syncer.sh"]
 
