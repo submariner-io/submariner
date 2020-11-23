@@ -6,6 +6,7 @@ import (
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/submariner/pkg/globalnet/cleanup"
 	"github.com/submariner-io/submariner/pkg/routeagent/controllers/route"
 
 	k8sv1 "k8s.io/api/core/v1"
@@ -85,6 +86,7 @@ func NewController(spec *SubmarinerIpamControllerSpecification, config *Informer
 
 func (i *Controller) Run(stopCh <-chan struct{}) error {
 	defer utilruntime.HandleCrash()
+	defer cleanup.ClearGlobalnetChains()
 
 	// Start the informer factories to begin populating the informer caches
 	klog.Info("Starting IPAM Controller")
