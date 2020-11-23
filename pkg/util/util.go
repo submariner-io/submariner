@@ -5,7 +5,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"reflect"
 	"strings"
 	"syscall"
 
@@ -15,6 +14,7 @@ import (
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/vishvananda/netlink"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/klog"
 )
 
@@ -92,6 +92,10 @@ func GetLocalEndpoint(clusterID, backend string, backendConfig map[string]string
 		return types.SubmarinerEndpoint{}, fmt.Errorf("Error getting hostname: %v", err)
 	}
 
+	if backendConfig == nil {
+		backendConfig = make(map[string]string)
+	}
+
 	endpoint := types.SubmarinerEndpoint{
 		Spec: subv1.EndpointSpec{
 			CableName:     fmt.Sprintf("submariner-cable-%s-%s", clusterID, strings.ReplaceAll(privateIP, ".", "-")),
@@ -154,7 +158,7 @@ func GetClusterCRDName(cluster *types.SubmarinerCluster) (string, error) {
 func CompareEndpointSpec(left, right subv1.EndpointSpec) bool {
 	// maybe we have to use just reflect.DeepEqual(left, right), but in this case the subnets order will influence.
 	return left.ClusterID == right.ClusterID && left.CableName == right.CableName && left.Hostname == right.Hostname &&
-		left.Backend == right.Backend && reflect.DeepEqual(left.BackendConfig, right.BackendConfig)
+		left.Backend == right.Backend && equality.Semantic.DeepEqual(left.BackendConfig, right.BackendConfig)
 }
 
 func GetDefaultGatewayInterface() (*net.Interface, error) {

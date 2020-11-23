@@ -116,11 +116,7 @@ func NewDriver(localEndpoint types.SubmarinerEndpoint, localCluster types.Submar
 
 	pub = priv.PublicKey()
 
-	if localEndpoint.Spec.BackendConfig == nil {
-		localEndpoint.Spec.BackendConfig = make(map[string]string)
-	}
-
-	localEndpoint.Spec.BackendConfig[PublicKey] = pub.String()
+	w.localEndpoint.Spec.BackendConfig[PublicKey] = pub.String()
 
 	// configure the device. still not up
 	port := w.spec.NATTPort
