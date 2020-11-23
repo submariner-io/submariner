@@ -1,4 +1,5 @@
 FROM fedora:33
+ARG TARGETPLATFORM
 
 WORKDIR /var/submariner
 
@@ -9,10 +10,9 @@ RUN dnf -y install --nodocs --setopt=install_weak_deps=0 \
            iproute iptables libreswan procps-ng && \
     dnf -y clean all
 
-COPY package/submariner.sh package/pluto bin/submariner-engine /usr/local/bin/
+COPY package/submariner.sh package/pluto bin/${TARGETPLATFORM}/submariner-engine /usr/local/bin/
 
 # Wrapper scripts to use iptables from the host when that's available
 COPY package/iptables-wrapper.in /usr/sbin/
 
-#bubu
 ENTRYPOINT submariner.sh
