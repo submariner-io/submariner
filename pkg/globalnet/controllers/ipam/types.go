@@ -10,7 +10,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
-	"github.com/submariner-io/submariner/pkg/routeagent/cleanup"
 )
 
 type SubmarinerIpamControllerSpecification struct {
@@ -52,6 +51,5 @@ type GatewayMonitor struct {
 	ipt                 *iptables.IPTables
 	stopProcessing      chan struct{}
 	isGatewayNode       bool
-	cleanupHandlers     []cleanup.Handler
 	syncMutex           *sync.Mutex
 }
