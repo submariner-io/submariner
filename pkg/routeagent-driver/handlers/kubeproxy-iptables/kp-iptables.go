@@ -11,7 +11,6 @@ import (
 	cableCleanup "github.com/submariner-io/submariner/pkg/cable/cleanup"
 	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/event"
-	globalnetCleanup "github.com/submariner-io/submariner/pkg/globalnet/cleanup"
 	"github.com/submariner-io/submariner/pkg/routeagent-driver/cni_interface"
 	"github.com/submariner-io/submariner/pkg/routeagent-driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent/cleanup"
@@ -103,7 +102,6 @@ func (kp *SyncHandler) Init() error {
 
 	// For now we get all the cleanups
 	kp.installCleanupHandlers(cableCleanup.GetCleanupHandlers())
-	kp.installCleanupHandlers(globalnetCleanup.GetGlobalnetCleanupHandlers(kp.clusterID, kp.namespace, kp.smClientSet))
 
 	return nil
 }

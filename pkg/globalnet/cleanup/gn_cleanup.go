@@ -67,24 +67,28 @@ func (gn *cleanupGlobalnetRules) GatewayToNonGatewayTransition() error {
 
 	if gn.globalnetStatus == GN_Enabled {
 		klog.Info("Globalnet is enabled and active gateway migrated, flushing Globalnet chains.")
-
-		ipt, err := iptables.New()
-		if err != nil {
-			return fmt.Errorf("error initializing iptables: %v", err)
-		}
-
-		if err = ipt.ClearChain("nat", constants.SmGlobalnetIngressChain); err != nil {
-			klog.Errorf("Error while flushing rules in %s chain: %v", constants.SmGlobalnetIngressChain, err)
-		}
-
-		if err = ipt.ClearChain("nat", constants.SmGlobalnetEgressChain); err != nil {
-			klog.Errorf("Error while flushing rules in %s chain: %v", constants.SmGlobalnetEgressChain, err)
-		}
-
-		if err = ipt.ClearChain("nat", constants.SmGlobalnetMarkChain); err != nil {
-			klog.Errorf("Error while flushing rules in %s chain: %v", constants.SmGlobalnetMarkChain, err)
-		}
+		ClearGlobalnetChains()
 	}
 
 	return nil
+}
+
+func ClearGlobalnetChains() {
+	ipt, err := iptables.New()
+	if err != nil {
+		klog.Errorf("error initializing iptables: %v", err)
+		return
+	}
+
+	if err = ipt.ClearChain("nat", constants.SmGlobalnetIngressChain); err != nil {
+		klog.Errorf("Error while flushing rules in %s chain: %v", constants.SmGlobalnetIngressChain, err)
+	}
+
+	if err = ipt.ClearChain("nat", constants.SmGlobalnetEgressChain); err != nil {
+		klog.Errorf("Error while flushing rules in %s chain: %v", constants.SmGlobalnetEgressChain, err)
+	}
+
+	if err = ipt.ClearChain("nat", constants.SmGlobalnetMarkChain); err != nil {
+		klog.Errorf("Error while flushing rules in %s chain: %v", constants.SmGlobalnetMarkChain, err)
+	}
 }
