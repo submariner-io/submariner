@@ -8,17 +8,16 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog"
-
 	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cableengine"
 	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
 	v1typed "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog"
 )
 
 type GatewaySyncer struct {
@@ -27,7 +26,7 @@ type GatewaySyncer struct {
 	engine      cableengine.Engine
 	version     string
 	statusError error
-	latencyMap  *sync.Map
+	healthcheck *healthchecker.HealthChecker
 }
 
 var GatewayUpdateInterval = 5 * time.Second
@@ -46,12 +45,12 @@ func init() {
 
 // NewEngine creates a new Engine for the local cluster
 func NewGatewaySyncer(engine cableengine.Engine, client v1typed.GatewayInterface,
-	version string, latencyMap *sync.Map) *GatewaySyncer {
+	version string, healthcheck *healthchecker.HealthChecker) *GatewaySyncer {
 	return &GatewaySyncer{
-		client:     client,
-		engine:     engine,
-		version:    version,
-		latencyMap: latencyMap,
+		client:      client,
+		engine:      engine,
+		version:     version,
+		healthcheck: healthcheck,
 	}
 }
 
@@ -204,16 +203,17 @@ func (i *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 	}
 
 	if connections != nil {
-		for index, connection := range *connections {
-			latencySpec, ok := i.latencyMap.Load(connection.Endpoint.Hostname)
-			if ok {
-				latencyInfo := latencySpec.(*healthchecker.LatencyInfo)
-				connection.Latency = latencyInfo.Latency
-				if connection.Status == v1.Connected && latencyInfo.Status != v1.Connected {
-					connection.Status = latencyInfo.Status
+		if i.healthcheck != nil {
+			for index := range *connections {
+				connection := &(*connections)[index]
+				latencyInfo := i.healthcheck.GetLatencyInfo(connection.Endpoint.Hostname)
+				if latencyInfo != nil {
+					connection.Latency = latencyInfo.Spec
+					if connection.Status == v1.Connected && latencyInfo.ConnectionError != "" {
+						connection.Status = v1.ConnectionError
+						connection.StatusMessage = latencyInfo.ConnectionError
+					}
 				}
-
-				(*connections)[index] = connection
 			}
 		}
 

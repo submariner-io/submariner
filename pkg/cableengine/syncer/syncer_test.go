@@ -3,7 +3,6 @@ package syncer_test
 import (
 	"fmt"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 
@@ -11,8 +10,10 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	. "github.com/submariner-io/admiral/pkg/gomega"
+	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	fakeEngine "github.com/submariner-io/submariner/pkg/cableengine/fake"
+	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
 	"github.com/submariner-io/submariner/pkg/cableengine/syncer"
 	fakeClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned/fake"
 	fakeClientsetv1 "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1/fake"
@@ -284,6 +285,7 @@ type testDriver struct {
 	engine               *fakeEngine.Engine
 	gateways             *fakeClientsetv1.FailingGateways
 	syncer               *syncer.GatewaySyncer
+	healthChecker        *healthchecker.HealthChecker
 	expectedGateway      *submarinerv1.Gateway
 	expectedDeletedAfter *submarinerv1.Gateway
 	gatewayUpdated       chan *submarinerv1.Gateway
@@ -338,7 +340,8 @@ func (t *testDriver) run() {
 
 	client := fakeClientset.NewSimpleClientset()
 	t.gateways.GatewayInterface = client.SubmarinerV1().Gateways(namespace)
-	t.syncer = syncer.NewGatewaySyncer(t.engine, t.gateways, t.expectedGateway.Status.Version, new(sync.Map))
+	t.healthChecker, _ = healthchecker.New(&watcher.Config{}, namespace, "west")
+	t.syncer = syncer.NewGatewaySyncer(t.engine, t.gateways, t.expectedGateway.Status.Version, t.healthChecker)
 
 	informerFactory := submarinerInformers.NewSharedInformerFactory(client, 0)
 	informer := informerFactory.Submariner().V1().Gateways().Informer()

@@ -116,27 +116,34 @@ func main() {
 		klog.Fatalf("Error creating local endpoint object from %#v: %v", submSpec, err)
 	}
 
-	latencyMap := new(sync.Map)
+	klog.Errorf("The local endpoint is %v", localEndpoint)
 	cableEngine := cableengine.NewEngine(localCluster, localEndpoint)
 
-	if len(submSpec.GlobalCidr) == 0 {
-		cableHealthchecker := healthchecker.NewHealthChecker(localEndpoint.Spec.Hostname,
-			submarinerClient.SubmarinerV1().Gateways(submSpec.Namespace), latencyMap)
+	err = subv1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		klog.Errorf("Error adding submariner types to the scheme: %v", err)
+	}
 
-		cableHealthchecker.Run(stopCh)
+	var cableHealthchecker *healthchecker.HealthChecker
+	if len(submSpec.GlobalCidr) == 0 {
+		cableHealthchecker, err = healthchecker.New(&watcher.Config{RestConfig: cfg}, submSpec.Namespace, submSpec.ClusterID)
+		if err != nil {
+			klog.Errorf("Error creating healthChecker: %v", err)
+		}
+
+		err = cableHealthchecker.Start(stopCh)
+
+		if err != nil {
+			klog.Errorf("Error starting healthChecker: %v", err)
+		}
 	}
 
 	cableEngineSyncer := syncer.NewGatewaySyncer(
 		cableEngine,
 		submarinerClient.SubmarinerV1().Gateways(submSpec.Namespace),
-		VERSION, latencyMap)
+		VERSION, cableHealthchecker)
 
 	cableEngineSyncer.Run(stopCh)
-
-	err = subv1.AddToScheme(scheme.Scheme)
-	if err != nil {
-		fatal(cableEngineSyncer, "Error adding submariner types to the scheme: %v", err)
-	}
 
 	becameLeader := func(context.Context) {
 		klog.Info("Creating the datastore syncer")
