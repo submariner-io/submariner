@@ -16,20 +16,6 @@ override VALIDATE_ARGS += --skip-dirs pkg/client
 
 # Process extra flags from the `using=a,b,c` optional flag
 
-ifneq (,$(filter libreswan,$(_using)))
-cable_driver = libreswan
-else ifneq (,$(filter wireguard,$(_using)))
-cable_driver = wireguard
-endif
-
-ifneq (,$(cable_driver))
-ifneq (,$(filter helm,$(_using)))
-override DEPLOY_ARGS += --deploytool_submariner_args '--set cable-driver=$(cable_driver)'
-else
-override DEPLOY_ARGS += --deploytool_submariner_args '--cable-driver $(cable_driver)'
-endif
-endif
-
 # Targets to make
 
 deploy: images
