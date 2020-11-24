@@ -197,6 +197,23 @@ func testCompareEndpointSpec() {
 					BackendConfig: map[string]string{"key": "aaa"},
 				})).To(BeTrue())
 		})
+
+		It("should return true", func() {
+			Expect(util.CompareEndpointSpec(
+				subv1.EndpointSpec{
+					ClusterID:     "east",
+					CableName:     "submariner-cable-east-172-16-32-5",
+					Hostname:      "my-host",
+					Backend:       "strongswan",
+					BackendConfig: map[string]string{},
+				},
+				subv1.EndpointSpec{
+					ClusterID: "east",
+					CableName: "submariner-cable-east-172-16-32-5",
+					Hostname:  "my-host",
+					Backend:   "strongswan",
+				})).To(BeTrue())
+		})
 	})
 
 	Context("with different cluster IDs", func() {

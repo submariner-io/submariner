@@ -20,8 +20,8 @@ type Registry struct {
 
 // NewRegistry creates a new registry with the given name,  typically referencing the owner, to manage event
 // Handlers that match the given networkPlugin name.
-func NewRegistry(name, networkPlugin string) Registry {
-	return Registry{
+func NewRegistry(name, networkPlugin string) *Registry {
+	return &Registry{
 		name:          name,
 		networkPlugin: networkPlugin,
 		eventHandlers: []Handler{},

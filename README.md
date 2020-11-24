@@ -1,5 +1,13 @@
 # Submariner
 
+<!-- markdownlint-disable line-length -->
+[![End to End Tests](https://github.com/submariner-io/submariner/workflows/End%20to%20End%20Tests/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3A%22End+to+End+Tests%22)
+[![Unit Tests](https://github.com/submariner-io/submariner/workflows/Unit%20Tests/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3A%22Unit+Tests%22)
+[![Linting](https://github.com/submariner-io/submariner/workflows/Linting/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3ALinting)
+[![Release Images](https://github.com/submariner-io/submariner/workflows/Release%20Images/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3A%22Release+Images%22)
+[![Periodic](https://github.com/submariner-io/submariner/workflows/Periodic/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3APeriodic)
+<!-- markdownlint-enable line-length -->
+
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
@@ -17,14 +25,6 @@
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
-<!-- markdownlint-disable line-length -->
-[![End to End Tests](https://github.com/submariner-io/submariner/workflows/End%20to%20End%20Tests/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3A%22End+to+End+Tests%22)
-[![Unit Tests](https://github.com/submariner-io/submariner/workflows/Unit%20Tests/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3A%22Unit+Tests%22)
-[![Linting](https://github.com/submariner-io/submariner/workflows/Linting/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3ALinting)
-[![Release Images](https://github.com/submariner-io/submariner/workflows/Release%20Images/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3A%22Release+Images%22)
-[![Periodic](https://github.com/submariner-io/submariner/workflows/Periodic/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3APeriodic)
-<!-- markdownlint-enable line-length -->
-
 Submariner is a tool built to connect overlay networks of different Kubernetes clusters. While most testing is performed against Kubernetes
 clusters that have enabled Flannel/Calico/Canal/Weave/OpenShiftSDN, Submariner should be compatible with any CNI cluster network
 provider, as it utilizes off-the-shelf components to establish encrypted tunnels between each Kubernetes cluster.
@@ -34,7 +34,7 @@ experimentation, it is quite possible that you could run into bugs.
 
 ## Architecture
 
-See the [Architecture section on Submainer's website](https://submariner.io/architecture/).
+See the [Architecture section on Submariner's website](https://submariner.io/getting_started/architecture/).
 
 ### Network Path
 
@@ -51,7 +51,7 @@ node.
 
 ## Prerequisites
 
-See the [Prerequisites docs on Submainer's website](https://submariner.io/quickstart/#prerequisites).
+See the [Prerequisites docs on Submariner's website](https://submariner.io/getting_started/#prerequisites).
 
 ## Installation
 
@@ -62,19 +62,19 @@ utility. `subctl` greatly simplifies the deployment of Submariner, and is theref
 
 Submariner provides the `subctl` CLI utility to simplify the deployment and maintenance of Submariner across your clusters.
 
-See the [`subctl` docs on Submainer's website](https://submariner.io/deployment/subctl/).
+See the [`subctl` docs on Submariner's website](https://submariner.io/operations/deployment/subctl/).
 
 ### Installation using Helm
 
-See the [Helm Deployments](https://submariner.io/deployment/helm/) section of Submariner's website.
+See the [Helm](https://submariner.io/operations/deployment/helm/) section on Submariner's website.
 
 ### Validate Submariner is Working
 
-See the [`subctl verify` docs on Submainer's website](https://submariner.io/deployment/subctl/#verify).
+See the [`subctl verify` docs on Submariner's website](https://submariner.io/operations/deployment/subctl/#verify).
 
 ## Building and Testing
 
-See the [Building and Testing docs on Submainer's website](https://submariner.io/contributing/building_testing/).
+See the [Building and Testing docs on Submariner's website](https://submariner.io/for_developers/building_testing/).
 
 ## Known Issues/Notes
 
@@ -89,4 +89,4 @@ When running in OpenShift, Submariner needs to grant the appropriate security co
 
 ## Contributing
 
-See the [Contributing docs on Submainer's website](https://submariner.io/contributing/).
+See the [For Developers section on Submariner's website](https://submariner.io/for_developers/).

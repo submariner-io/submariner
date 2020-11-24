@@ -13,6 +13,22 @@ data "aws_security_group" "worker_sg" {
   }
 }
 
+# Get security group associated with master nodes.
+data "aws_security_group" "master_sg" {
+  vpc_id = data.aws_vpc.env_vpc.id
+
+  filter {
+    name   = "tag:kubernetes.io/cluster/${var.cluster_id}"
+    values = ["owned"]
+  }
+
+  filter {
+    name   = "tag:Name"
+    values = ["${var.cluster_id}-master-sg"]
+  }
+}
+
+
 # Add a rule for vxlan traffic for all workers.
 resource "aws_security_group_rule" "worker_sg_vxlan_rule" {
   security_group_id        = data.aws_security_group.worker_sg.id
@@ -22,6 +38,27 @@ resource "aws_security_group_rule" "worker_sg_vxlan_rule" {
   to_port                  = 4800
   type                     = "ingress"
 }
+
+# Add a rule for vxlan traffic from master nodes to worker nodes.
+resource "aws_security_group_rule" "master_to_worker_sg_vxlan_rule" {
+  security_group_id        = data.aws_security_group.worker_sg.id
+  source_security_group_id = data.aws_security_group.master_sg.id
+  from_port                = 4800
+  protocol                 = "udp"
+  to_port                  = 4800
+  type                     = "ingress"
+}
+
+# Add a rule for vxlan traffic from worker nodes to master nodes.
+resource "aws_security_group_rule" "worker_to_master_sg_vxlan_rule" {
+  security_group_id        = data.aws_security_group.master_sg.id
+  source_security_group_id = data.aws_security_group.worker_sg.id
+  from_port                = 4800
+  protocol                 = "udp"
+  to_port                  = 4800
+  type                     = "ingress"
+}
+
 
 
 # Create a submariner gateway security group.
