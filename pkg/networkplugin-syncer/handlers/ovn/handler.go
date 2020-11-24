@@ -31,11 +31,11 @@ func (ovn *SyncHandler) GetName() string {
 	return "ovn-sync-handler"
 }
 
-func (ovn *SyncHandler) GetNetworkPlugin() string {
-	return "OVNKubernetes"
+func (ovn *SyncHandler) GetNetworkPlugins() []string {
+	return []string{"OVNKubernetes"}
 }
 
-func NewSyncHandler(k8sClientset clientset.Interface) *SyncHandler {
+func NewSyncHandler(k8sClientset clientset.Interface) event.Handler {
 	return &SyncHandler{
 		remoteEndpoints: make(map[string]*submV1.Endpoint),
 		k8sClientset:    k8sClientset,

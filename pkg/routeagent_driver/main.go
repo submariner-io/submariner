@@ -60,9 +60,16 @@ func main() {
 		klog.Errorf("Error while annotating the node: %s", err.Error())
 	}
 
-	registry := event.NewRegistry("routeagent_driver", os.Getenv("NETWORK_PLUGIN"))
-	if err := registry.AddHandlers(logger.NewHandler(),
-		kp_iptables.NewSyncHandler(env.ClusterCidr, env.ServiceCidr, smClientset)); err != nil {
+	np := os.Getenv("SUBMARINER_NETWORKPLUGIN")
+	if np == "" {
+		np = "generic"
+	}
+
+	registry := event.NewRegistry("routeagent_driver", np)
+	if err := registry.AddHandlers(
+		logger.NewHandler(),
+		kp_iptables.NewSyncHandler(env.ClusterCidr, env.ServiceCidr, smClientset),
+	); err != nil {
 		klog.Fatalf("Error registering the handlers: %s", err.Error())
 	}
 

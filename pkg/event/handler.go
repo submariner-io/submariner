@@ -17,7 +17,7 @@ type Handler interface {
 	GetName() string
 
 	// GetNetworkPlugin returns the kubernetes network plugin that this handler supports.
-	GetNetworkPlugin() string
+	GetNetworkPlugins() []string
 
 	// Stop is called once during shutdown to let the handler perform any cleanup. The uninstall flag indicates
 	// whether or not Submariner is being completely uninstalled from the system.
