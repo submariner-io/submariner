@@ -11,6 +11,15 @@ var _ = Describe("", func() {
 	Context("Test Statistics", testStatistics)
 })
 
+const (
+	testMinRTT     = 404351
+	testMaxRTT     = 1048263
+	testLastRTT    = 1044609
+	testNewMinRTT  = 404300
+	testNewMaxRTT  = 1048264
+	testNewLastRTT = 609555
+)
+
 func testStatistics() {
 	size := 10
 	statistics := &Statistics{
@@ -18,25 +27,32 @@ func testStatistics() {
 		previousRtts: make([]uint64, size),
 	}
 
-	sampleSpace := [10]uint64{404351, 490406, 530333, 609556, 609650, 685106, 726265, 785707, 1044609, 1048263}
+	sampleSpace := [10]uint64{testMinRTT, 490406, 530333, 609556, 609650, 685106, 726265, 785707, testMaxRTT, testLastRTT}
+	expectedMean := 693424
+	expectedSD := 205994
+
 	for _, v := range sampleSpace {
 		statistics.updateStatistics(v)
 	}
 
-	Expect(statistics.maxRtt).To(Equal(uint64(1048263)))
-	Expect(statistics.minRtt).To(Equal(uint64(404351)))
-	Expect(statistics.lastRtt).To(Equal(uint64(1048263)))
-	Expect(statistics.mean).To(Equal(uint64(693424)))
-	Expect(statistics.stdDev).To(Equal(uint64(205994)))
+	Expect(statistics.maxRtt).To(Equal(uint64(testMaxRTT)))
+	Expect(statistics.minRtt).To(Equal(uint64(testMinRTT)))
+	Expect(statistics.lastRtt).To(Equal(uint64(testLastRTT)))
+	Expect(statistics.mean).To(Equal(uint64(expectedMean)))
+	Expect(statistics.stdDev).To(Equal(uint64(expectedSD)))
 
-	statistics.updateStatistics(404300)
-	statistics.updateStatistics(1048264)
+	statistics.updateStatistics(testNewMinRTT)
+	statistics.updateStatistics(testNewMaxRTT)
+	statistics.updateStatistics(testNewLastRTT)
 
-	Expect(statistics.maxRtt).To(Equal(uint64(1048264)))
-	Expect(statistics.minRtt).To(Equal(uint64(404300)))
-	Expect(statistics.lastRtt).To(Equal(uint64(1048264)))
-	Expect(statistics.mean).To(Equal(uint64(886359)))
-	Expect(statistics.stdDev).To(Equal(uint64(278320)))
+	newExpectedMean := 830998
+	newExpectedSD := 272450
+
+	Expect(statistics.maxRtt).To(Equal(uint64(testNewMaxRTT)))
+	Expect(statistics.minRtt).To(Equal(uint64(testNewMinRTT)))
+	Expect(statistics.lastRtt).To(Equal(uint64(testNewLastRTT)))
+	Expect(statistics.mean).To(Equal(uint64(newExpectedMean)))
+	Expect(statistics.stdDev).To(Equal(uint64(newExpectedSD)))
 }
 
 func TestSyncer(t *testing.T) {
