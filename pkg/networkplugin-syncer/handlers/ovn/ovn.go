@@ -14,6 +14,6 @@ func (ovn *SyncHandler) GetName() string {
 	return "ovn-sync-handler"
 }
 
-func (ovn *SyncHandler) GetNetworkPlugin() string {
-	return "OVNKubernetes"
+func (ovn *SyncHandler) GetNetworkPlugins() []string {
+	return []string{"OVNKubernetes"}
 }

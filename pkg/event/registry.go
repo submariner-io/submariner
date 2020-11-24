@@ -10,6 +10,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/util"
 )
 
 type Registry struct {
@@ -34,9 +35,13 @@ func (er *Registry) GetName() string {
 }
 
 func (er *Registry) addHandler(eventHandler Handler) error {
-	evNetworkPlugin := eventHandler.GetNetworkPlugin()
+	evNetworkPlugins := util.NewStringSet()
 
-	if evNetworkPlugin == AnyNetworkPlugin || evNetworkPlugin == er.networkPlugin {
+	for _, np := range eventHandler.GetNetworkPlugins() {
+		evNetworkPlugins.Add(np)
+	}
+
+	if evNetworkPlugins.Contains(AnyNetworkPlugin) || evNetworkPlugins.Contains(er.networkPlugin) {
 		if err := eventHandler.Init(); err != nil {
 			return errors.Wrapf(err, "Event handler %q failed to initialize", eventHandler.GetName())
 		}

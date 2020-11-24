@@ -26,7 +26,13 @@ func main() {
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
 
-	registry := event.NewRegistry("networkplugin-syncer", os.Getenv("NETWORK_PLUGIN"))
+	networkPlugin := os.Getenv("SUBMARINER_NETWORKPLUGIN")
+
+	if networkPlugin == "" {
+		networkPlugin = "generic"
+	}
+
+	registry := event.NewRegistry("networkplugin-syncer", networkPlugin)
 	if err := registry.AddHandlers(logger.NewHandler(), ovn.NewSyncHandler()); err != nil {
 		klog.Fatalf("Error registering the handlers: %s", err.Error())
 	}

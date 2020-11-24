@@ -54,7 +54,7 @@ func main() {
 		klog.Errorf("Error while annotating the node: %s", err.Error())
 	}
 
-	registry := event.NewRegistry("routeagent-driver", os.Getenv("NETWORK_PLUGIN"))
+	registry := event.NewRegistry("routeagent-driver", os.Getenv("SUBMARINER_NETWORKPLUGIN"))
 	if err := registry.AddHandlers(logger.NewHandler(), kp_iptables.NewSyncHandler(env, smClientset)); err != nil {
 		klog.Fatalf("Error registering the handlers: %s", err.Error())
 	}
