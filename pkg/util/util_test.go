@@ -80,7 +80,6 @@ func testGetLocalEndpoint() {
 		Expect(endpoint.Spec.Backend).To(Equal("backend"))
 		Expect(endpoint.Spec.Subnets).To(Equal(subnets))
 		Expect(endpoint.Spec.NATEnabled).To(Equal(false))
-		Expect(endpoint.Spec.HealthCheckIP).To(Equal(privateIP))
 	})
 }
 

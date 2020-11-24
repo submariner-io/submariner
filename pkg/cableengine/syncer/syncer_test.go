@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	. "github.com/submariner-io/admiral/pkg/gomega"
+	"github.com/submariner-io/admiral/pkg/syncer/test"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	fakeEngine "github.com/submariner-io/submariner/pkg/cableengine/fake"
@@ -20,7 +21,10 @@ import (
 	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions"
 	"github.com/submariner-io/submariner/pkg/types"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	fakeClient "k8s.io/client-go/dynamic/fake"
+	kubeScheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
 )
@@ -338,9 +342,21 @@ func (t *testDriver) run() {
 		t.handledError <- err
 	})
 
+	Expect(submarinerv1.AddToScheme(kubeScheme.Scheme)).To(Succeed())
+
+	scheme := runtime.NewScheme()
+	Expect(submarinerv1.AddToScheme(scheme)).To(Succeed())
+
+	dynamicClient := fakeClient.NewSimpleDynamicClient(scheme)
+	restMapper := test.GetRESTMapperFor(&submarinerv1.Endpoint{})
+
 	client := fakeClientset.NewSimpleClientset()
 	t.gateways.GatewayInterface = client.SubmarinerV1().Gateways(namespace)
-	t.healthChecker, _ = healthchecker.New(&watcher.Config{}, namespace, "west")
+	t.healthChecker, _ = healthchecker.New(&watcher.Config{
+		RestMapper: restMapper,
+		Client:     dynamicClient,
+		Scheme:     scheme,
+	}, namespace, "west")
 	t.syncer = syncer.NewGatewaySyncer(t.engine, t.gateways, t.expectedGateway.Status.Version, t.healthChecker)
 
 	informerFactory := submarinerInformers.NewSharedInformerFactory(client, 0)

@@ -110,13 +110,12 @@ func main() {
 	submSpec.CableDriver = strings.ToLower(submSpec.CableDriver)
 
 	localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterID, submSpec.CableDriver, nil, submSpec.NatEnabled,
-		localSubnets, util.GetLocalIP())
+		localSubnets, util.GetLocalIP(), submSpec.ClusterCidr)
 
 	if err != nil {
 		klog.Fatalf("Error creating local endpoint object from %#v: %v", submSpec, err)
 	}
 
-	klog.Errorf("The local endpoint is %v", localEndpoint)
 	cableEngine := cableengine.NewEngine(localCluster, localEndpoint)
 
 	err = subv1.AddToScheme(scheme.Scheme)

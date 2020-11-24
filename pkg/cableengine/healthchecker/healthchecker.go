@@ -34,7 +34,7 @@ func New(config *watcher.Config, endpointNameSpace, clusterID string) (*HealthCh
 
 	config.ResourceConfigs = []watcher.ResourceConfig{
 		{
-			Name:         "HelathChecker Endoint Controller",
+			Name:         "HealthChecker Endpoint Controller",
 			ResourceType: &submarinerv1.Endpoint{},
 			Handler: watcher.EventHandlerFuncs{
 				OnCreateFunc: serviceExportController.endpointCreatedorUpdated,
@@ -114,8 +114,8 @@ func (h *HealthChecker) endpointCreatedorUpdated(obj runtime.Object) bool {
 	klog.V(log.TRACE).Infof("Starting Pinger for Hostname: %q, with HealthCheckIP: %q",
 		endpointCreated.Spec.HealthCheckIP, endpointCreated.Spec.Hostname)
 
-	pinger := NewPinger(endpointCreated.Spec.Hostname, endpointCreated.Spec.HealthCheckIP)
-	h.healthCheckers.Store(endpointCreated.Spec.Hostname, pinger)
+	pinger := NewPinger(endpointCreated.Spec.HealthCheckIP)
+	h.healthCheckers.Store(endpointCreated.Spec.HealthCheckIP, pinger)
 	pinger.Run()
 
 	return false

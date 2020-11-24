@@ -127,6 +127,7 @@ func GetLocalEndpoint(clusterID, backend string, backendConfig map[string]string
 	return endpoint, nil
 }
 
+//TODO: to handle de-duplication of code/finding common parts with the route agent
 func getCNIInterfaceIPAddress(clusterCIDRs []string) (string, error) {
 	for _, clusterCIDR := range clusterCIDRs {
 		_, clusterNetwork, err := net.ParseCIDR(clusterCIDR)
