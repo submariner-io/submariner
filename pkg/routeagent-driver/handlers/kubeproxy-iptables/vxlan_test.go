@@ -1,4 +1,4 @@
-package kp_iptables
+package kubeproxy_iptables
 
 import (
 	"strconv"
@@ -9,17 +9,17 @@ import (
 )
 
 var _ = Describe("getVxlanVtepIPAddress", func() {
-	Describe("Unit tests for getVxlanVtepIPAddress", func() {
-		Context("When a valid ipaddress is provided to getVxlanVtepIPAddress", func() {
-			It("Should return the VxLAN VtepIP that can be configured", func() {
+	Describe("Function getVxlanVtepIPAddress tests", func() {
+		When("a valid IP address is provided", func() {
+			It("should return the VxLAN VtepIP that can be configured", func() {
 				routeController := SyncHandler{}
 				vtepIP, _ := routeController.getVxlanVtepIPAddress("192.168.100.24")
 				Expect(vtepIP.String()).Should(Equal(strconv.Itoa(VxLANVTepNetworkPrefix) + ".168.100.24"))
 			})
 		})
 
-		Context("When an invalid ipaddress is provided to getVxlanVtepIPAddress", func() {
-			It("Should return an error", func() {
+		When("an invalid IP address is provided", func() {
+			It("should return an error", func() {
 				routeController := SyncHandler{}
 				_, err := routeController.getVxlanVtepIPAddress("10.0.0")
 				Expect(err).ShouldNot(Equal(nil))
@@ -28,7 +28,7 @@ var _ = Describe("getVxlanVtepIPAddress", func() {
 	})
 })
 
-func TestRoute(t *testing.T) {
+func TestKubeProxyIPTables(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Route Suite")
+	RunSpecs(t, "Kubeproxy IP Tables Suite")
 }

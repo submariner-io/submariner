@@ -1,4 +1,4 @@
-package kp_iptables
+package kubeproxy_iptables
 
 import (
 	"github.com/submariner-io/admiral/pkg/log"

@@ -96,7 +96,7 @@ func annotateNode(clusterCidr []string, cfg *restclient.Config) error {
 		return fmt.Errorf("Error reading the NODE_NAME from the environment")
 	}
 
-	err = cni_interface.AnnotateNodeWithCNIInterfaceIP(nodeName, constants.CniInterfaceIp, k8sClientSet, clusterCidr)
+	err = cni_interface.AnnotateNodeWithCNIInterfaceIP(nodeName, k8sClientSet, clusterCidr)
 	if err != nil {
 		return fmt.Errorf("AnnotateNodeWithCNIInterfaceIP returned error %v", err)
 	}

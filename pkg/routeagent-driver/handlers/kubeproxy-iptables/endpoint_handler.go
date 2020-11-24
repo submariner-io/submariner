@@ -1,4 +1,4 @@
-package kp_iptables
+package kubeproxy_iptables
 
 import (
 	"fmt"
@@ -77,7 +77,7 @@ func (kp *SyncHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	if err := kp.overlappingSubnets(endpoint.Spec.Subnets); err != nil {
 		// Skip processing the endpoint when CIDRs overlap and return nil to avoid re-queuing.
-		klog.Errorf("IsoverlappingSubnets returned error: %v", err)
+		klog.Errorf("overlappingSubnets for new remote %#v returned error: %v", endpoint, err)
 		return nil
 	}
 
@@ -90,7 +90,8 @@ func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	}
 
 	if err := kp.updateRoutingRulesForInterClusterSupport(endpoint.Spec.Subnets, Add); err != nil {
-		klog.Errorf("updateRoutingRulesForInterClusterSupport returned error: %+v", err)
+		klog.Errorf("updateRoutingRulesForInterClusterSupport for new remote %#v returned error: %+v",
+			endpoint, err)
 		return err
 	}
 	// Add routes to the new endpoint on the GatewayNode.
@@ -115,7 +116,8 @@ func (kp *SyncHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	// TODO: Handle a remote endpoint removal use-case
 	//         - remove related iptable rules
 	if err := kp.updateRoutingRulesForInterClusterSupport(endpoint.Spec.Subnets, Delete); err != nil {
-		klog.Errorf("updateRoutingRulesForInterClusterSupport returned error: %+v", err)
+		klog.Errorf("updateRoutingRulesForInterClusterSupport for removed remote %#v returned error: %+v",
+			err, endpoint)
 		return err
 	}
 
@@ -142,7 +144,7 @@ func (kp *SyncHandler) overlappingSubnets(remoteSubnets []string) error {
 		}
 
 		if overlap {
-			return fmt.Errorf("Local Service CIDR %q, overlaps with remote cluster %s",
+			return fmt.Errorf("Local Service CIDR %q, overlaps with remote cluster subnets %s",
 				serviceCidr, remoteSubnets)
 		}
 	}
@@ -154,7 +156,8 @@ func (kp *SyncHandler) overlappingSubnets(remoteSubnets []string) error {
 		}
 
 		if overlap {
-			return fmt.Errorf("Local Pod CIDR %q, overlaps with remote cluster %s", podCidr, remoteSubnets)
+			return fmt.Errorf("Local Pod CIDR %q, overlaps with remote cluster subnets %s",
+				podCidr, remoteSubnets)
 		}
 	}
 
@@ -171,7 +174,7 @@ func (kp *SyncHandler) getHostIfaceIPAddress() (net.IP, error) {
 		for i := range addrs {
 			ipAddr, _, err := net.ParseCIDR(addrs[i].String())
 			if err != nil {
-				klog.Errorf("Unable to ParseCIDR : %v\n", addrs)
+				klog.Errorf("Unable to ParseCIDR  %v: %v", addrs, err)
 			}
 
 			if ipAddr.To4() != nil {
