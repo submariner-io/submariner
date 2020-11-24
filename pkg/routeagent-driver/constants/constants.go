@@ -21,7 +21,7 @@ const (
 	// part of route-agent and this will subsequently be used in globalnet controller for
 	// supporting connectivity from HostNetwork to remoteClusters.
 	// [#] interface on the node that has an IPAddress from the clusterCIDR
-	CniInterfaceIp = "submariner.io/cniIfaceIp"
+	CniInterfaceIP = "submariner.io/cniIfaceIp"
 )
 
 type Specification struct {

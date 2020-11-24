@@ -1,4 +1,4 @@
-package kp_iptables
+package kubeproxy_iptables
 
 import (
 	"fmt"
@@ -86,12 +86,12 @@ func (kp *SyncHandler) configureRoute(remoteSubnet string, operation Operation) 
 	case Add:
 		err = netlink.RouteAdd(&route)
 		if err != nil && !os.IsExist(err) {
-			return fmt.Errorf("error adding the route %s: %v", route.String(), err)
+			return fmt.Errorf("error adding the route %s: %v", route, err)
 		}
 	case Delete:
 		err = netlink.RouteDel(&route)
 		if err != nil {
-			return fmt.Errorf("error deleting the route %s: %v", route.String(), err)
+			return fmt.Errorf("error deleting the route %s: %v", route, err)
 		}
 	}
 
@@ -195,7 +195,7 @@ func (kp *SyncHandler) reconcileRoutes(vxlanGw net.IP) error {
 		if !found {
 			err = netlink.RouteAdd(&route)
 			if err != nil {
-				klog.Errorf("Error adding route %s: %v", route.String(), err)
+				klog.Errorf("Error adding route %s: %v", route, err)
 			}
 		}
 	}
@@ -233,12 +233,12 @@ func (kp *SyncHandler) updateRoutingRulesForInterClusterSupport(remoteCIDRs []st
 			if operation == Add {
 				err = netlink.RouteAdd(&route)
 				if err != nil {
-					return fmt.Errorf("error adding route %s: %v", route.String(), err)
+					return fmt.Errorf("error adding route %s: %v", route, err)
 				}
 			} else if operation == Delete {
 				err = netlink.RouteDel(&route)
 				if err != nil {
-					return fmt.Errorf("error deleting route %s: %v", route.String(), err)
+					return fmt.Errorf("error deleting route %s: %v", route, err)
 				}
 			}
 		}
@@ -257,12 +257,12 @@ func (kp *SyncHandler) configureIPRule(operation Operation) error {
 		case Add:
 			err := netlink.RuleAdd(rule)
 			if err != nil && !os.IsExist(err) {
-				return fmt.Errorf("failed to add ip rule %s: %v", rule.String(), err)
+				return fmt.Errorf("failed to add ip rule %s: %v", rule, err)
 			}
 		case Delete:
 			err := netlink.RuleDel(rule)
 			if err != nil && !os.IsNotExist(err) {
-				return fmt.Errorf("failed to delete ip rule %s: %v", rule.String(), err)
+				return fmt.Errorf("failed to delete ip rule %s: %v", rule, err)
 			}
 		}
 	}

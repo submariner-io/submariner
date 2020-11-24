@@ -1,4 +1,4 @@
-package kp_iptables
+package kubeproxy_iptables
 
 import (
 	"fmt"
@@ -97,7 +97,7 @@ func (kp *SyncHandler) programIptableRulesForInterClusterTraffic(remoteCidrBlock
 		klog.V(log.DEBUG).Infof("Installing iptables rule for outgoing traffic: %s", strings.Join(ruleSpec, " "))
 
 		if err = ipt.AppendUnique("nat", constants.SmPostRoutingChain, ruleSpec...); err != nil {
-			return fmt.Errorf("error appending iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
+			return fmt.Errorf("error appending iptables rule %q: %v\n", strings.Join(ruleSpec, " "), err)
 		}
 
 		// TODO: revisit, we only have to program rules to allow traffic from the podCidr
@@ -105,7 +105,7 @@ func (kp *SyncHandler) programIptableRulesForInterClusterTraffic(remoteCidrBlock
 		klog.V(log.DEBUG).Infof("Installing iptables rule for incoming traffic: %s", strings.Join(ruleSpec, " "))
 
 		if err = ipt.AppendUnique("nat", constants.SmPostRoutingChain, ruleSpec...); err != nil {
-			return fmt.Errorf("error appending iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
+			return fmt.Errorf("error appending iptables rule %q: %v\n", strings.Join(ruleSpec, " "), err)
 		}
 	}
 

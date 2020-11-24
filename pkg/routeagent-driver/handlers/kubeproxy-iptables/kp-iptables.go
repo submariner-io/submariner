@@ -1,4 +1,4 @@
-package kp_iptables
+package kubeproxy_iptables
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/pkg/errors"
 	"k8s.io/klog"
 
 	cableCleanup "github.com/submariner-io/submariner/pkg/cable/cleanup"
@@ -19,8 +20,6 @@ import (
 
 type SyncHandler struct {
 	event.HandlerBase
-	clusterID        string
-	namespace        string
 	localCableDriver string
 	localClusterCidr []string
 	localServiceCidr []string
@@ -29,14 +28,14 @@ type SyncHandler struct {
 	remoteVTEPs      *util.StringSet
 	routeCacheGWNode *util.StringSet
 
-	syncHandlerMutex     *sync.Mutex
+	syncHandlerMutex     sync.Mutex
 	isGatewayNode        bool
 	wasGatewayPreviously bool
 
 	vxlanDevice      *vxLanIface
 	vxlanGwIP        *net.IP
 	hostname         string
-	cniIface         *cni_interface.CniInterface
+	cniIface         *cni_interface.Interface
 	defaultHostIface *net.Interface
 
 	smClientSet     clientset.Interface
@@ -45,15 +44,12 @@ type SyncHandler struct {
 
 func NewSyncHandler(env constants.Specification, smClientSet clientset.Interface) *SyncHandler {
 	return &SyncHandler{
-		clusterID:            env.ClusterID,
-		namespace:            env.Namespace,
 		localClusterCidr:     env.ClusterCidr,
 		localServiceCidr:     env.ServiceCidr,
 		localCableDriver:     "",
 		remoteSubnets:        util.NewStringSet(),
 		remoteVTEPs:          util.NewStringSet(),
 		routeCacheGWNode:     util.NewStringSet(),
-		syncHandlerMutex:     &sync.Mutex{},
 		isGatewayNode:        false,
 		wasGatewayPreviously: false,
 		vxlanDevice:          nil,
@@ -74,12 +70,12 @@ func (kp *SyncHandler) Init() error {
 	var err error
 	kp.hostname, err = os.Hostname()
 	if err != nil {
-		klog.Fatalf("unable to determine hostname: %v", err)
+		return errors.Wrapf(err, "unable to determine hostname")
 	}
 
 	kp.defaultHostIface, err = util.GetDefaultGatewayInterface()
 	if err != nil {
-		klog.Fatalf("Unable to find the default interface on host: %s", err.Error())
+		return errors.Wrapf(err, "Unable to find the default interface on host: %s", kp.hostname)
 	}
 
 	cniIface, err := cni_interface.Discover(kp.localClusterCidr[0])
@@ -91,7 +87,9 @@ func (kp *SyncHandler) Init() error {
 			return fmt.Errorf("ConfigureRpFilter returned error. %v", err)
 		}
 	} else {
-		klog.Errorf("DiscoverCNIInterface returned error %v", err)
+		// This is not a fatal error. Hostnetworking to remote cluster support will be broken
+		// but other use-cases can continue to work.
+		klog.Errorf("Error discovering the CNI interface %v", err)
 	}
 
 	// Create the necessary IPTable chains in the filter and nat tables.
