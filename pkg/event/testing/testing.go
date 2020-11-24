@@ -52,8 +52,8 @@ func (t *TestHandler) GetName() string {
 	return t.Name
 }
 
-func (t *TestHandler) GetNetworkPlugin() string {
-	return t.NetworkPlugin
+func (t *TestHandler) GetNetworkPlugins() []string {
+	return []string{t.NetworkPlugin}
 }
 
 const EvTransitionToNonGateway = "TransitionToNonGateway"
