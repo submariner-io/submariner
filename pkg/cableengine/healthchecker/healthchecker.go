@@ -18,7 +18,7 @@ type LatencyInfo struct {
 type Interface interface {
 	Start(stopCh <-chan struct{}) error
 
-	GetLatencyInfo(endpoint submarinerv1.EndpointSpec) *LatencyInfo
+	GetLatencyInfo(endpoint *submarinerv1.EndpointSpec) *LatencyInfo
 }
 
 type controller struct {
@@ -55,7 +55,7 @@ func New(config *watcher.Config, endpointNameSpace, clusterID string) (Interface
 	return controller, nil
 }
 
-func (h *controller) GetLatencyInfo(endpoint submarinerv1.EndpointSpec) *LatencyInfo {
+func (h *controller) GetLatencyInfo(endpoint *submarinerv1.EndpointSpec) *LatencyInfo {
 	if obj, found := h.pingers.Load(endpoint.CableName); found {
 		pinger := obj.(*pingerInfo)
 
