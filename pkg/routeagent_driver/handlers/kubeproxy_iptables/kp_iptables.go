@@ -1,7 +1,6 @@
 package kubeproxy_iptables
 
 import (
-	"fmt"
 	"net"
 	"os"
 	"sync"
@@ -12,9 +11,8 @@ import (
 	cableCleanup "github.com/submariner-io/submariner/pkg/cable/cleanup"
 	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/event"
-	"github.com/submariner-io/submariner/pkg/routeagent-driver/cni_interface"
-	"github.com/submariner-io/submariner/pkg/routeagent-driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent/cleanup"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni_interface"
 	"github.com/submariner-io/submariner/pkg/util"
 )
 
@@ -42,10 +40,10 @@ type SyncHandler struct {
 	cleanupHandlers []cleanup.Handler
 }
 
-func NewSyncHandler(env constants.Specification, smClientSet clientset.Interface) *SyncHandler {
+func NewSyncHandler(localClusterCidr, localServiceCidr []string, smClientSet clientset.Interface) *SyncHandler {
 	return &SyncHandler{
-		localClusterCidr:     env.ClusterCidr,
-		localServiceCidr:     env.ServiceCidr,
+		localClusterCidr:     localClusterCidr,
+		localServiceCidr:     localServiceCidr,
 		localCableDriver:     "",
 		remoteSubnets:        util.NewStringSet(),
 		remoteVTEPs:          util.NewStringSet(),
@@ -84,7 +82,7 @@ func (kp *SyncHandler) Init() error {
 		kp.cniIface = cniIface
 		err := cni_interface.ConfigureRpFilter(kp.cniIface.Name)
 		if err != nil {
-			return fmt.Errorf("ConfigureRpFilter returned error. %v", err)
+			return errors.Wrapf(err, "ConfigureRpFilter returned error")
 		}
 	} else {
 		// This is not a fatal error. Hostnetworking to remote cluster support will be broken
@@ -95,7 +93,7 @@ func (kp *SyncHandler) Init() error {
 	// Create the necessary IPTable chains in the filter and nat tables.
 	err = kp.createIPTableChains()
 	if err != nil {
-		return fmt.Errorf("createIPTableChains returned error. %v", err)
+		return errors.Wrapf(err, "createIPTableChains returned error")
 	}
 
 	// For now we get all the cleanups
