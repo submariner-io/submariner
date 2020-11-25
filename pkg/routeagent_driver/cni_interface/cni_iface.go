@@ -13,7 +13,7 @@ import (
 
 	"github.com/submariner-io/admiral/pkg/log"
 
-	"github.com/submariner-io/submariner/pkg/routeagent-driver/constants"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 )
 
 type Interface struct {

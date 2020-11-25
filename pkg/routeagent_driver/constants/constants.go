@@ -23,10 +23,3 @@ const (
 	// [#] interface on the node that has an IPAddress from the clusterCIDR
 	CniInterfaceIP = "submariner.io/cniIfaceIp"
 )
-
-type Specification struct {
-	ClusterID   string
-	Namespace   string
-	ClusterCidr []string
-	ServiceCidr []string
-}

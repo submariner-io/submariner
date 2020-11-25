@@ -16,15 +16,21 @@ import (
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/controller"
 	"github.com/submariner-io/submariner/pkg/event/logger"
-	"github.com/submariner-io/submariner/pkg/routeagent-driver/cni_interface"
-	"github.com/submariner-io/submariner/pkg/routeagent-driver/constants"
-	kp_iptables "github.com/submariner-io/submariner/pkg/routeagent-driver/handlers/kubeproxy-iptables"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni_interface"
+	kp_iptables "github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy_iptables"
 )
 
 var (
 	masterURL  string
 	kubeconfig string
 )
+
+type specification struct {
+	ClusterID   string
+	Namespace   string
+	ClusterCidr []string
+	ServiceCidr []string
+}
 
 func main() {
 	klog.InitFlags(nil)
@@ -34,7 +40,7 @@ func main() {
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
 
-	var env constants.Specification
+	var env specification
 	err := envconfig.Process("submariner", &env)
 	if err != nil {
 		klog.Fatalf("Error reading the environment variables: %s", err.Error())
@@ -54,8 +60,9 @@ func main() {
 		klog.Errorf("Error while annotating the node: %s", err.Error())
 	}
 
-	registry := event.NewRegistry("routeagent-driver", os.Getenv("NETWORK_PLUGIN"))
-	if err := registry.AddHandlers(logger.NewHandler(), kp_iptables.NewSyncHandler(env, smClientset)); err != nil {
+	registry := event.NewRegistry("routeagent_driver", os.Getenv("NETWORK_PLUGIN"))
+	if err := registry.AddHandlers(logger.NewHandler(),
+		kp_iptables.NewSyncHandler(env.ClusterCidr, env.ServiceCidr, smClientset)); err != nil {
 		klog.Fatalf("Error registering the handlers: %s", err.Error())
 	}
 

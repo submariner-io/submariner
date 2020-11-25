@@ -9,7 +9,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"k8s.io/klog"
 
-	"github.com/submariner-io/submariner/pkg/routeagent-driver/constants"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/util"
 )
 
