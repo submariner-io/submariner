@@ -206,9 +206,8 @@ func (i *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 		if i.healthCheck != nil {
 			for index := range *connections {
 				connection := &(*connections)[index]
-				obj := i.healthCheck.GetLatencyInfo(connection.Endpoint.HealthCheckIP)
-				if obj != nil {
-					latencyInfo := obj.(*healthchecker.LatencyInfo)
+				latencyInfo := i.healthCheck.GetLatencyInfo(connection.Endpoint)
+				if latencyInfo != nil {
 					connection.Latency = latencyInfo.Spec
 					if connection.Status == v1.Connected && latencyInfo.ConnectionError != "" {
 						connection.Status = v1.ConnectionError

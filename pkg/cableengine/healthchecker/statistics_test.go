@@ -15,8 +15,8 @@ var _ = Describe("Test Statistics", func() {
 		testNewLastRTT = 609555
 	)
 
-	When("Update statistics is called with a sample space", func() {
-		It("The statistics should be computes as expected", func() {
+	When("update is called with a sample space", func() {
+		It("should correctly compute the statistics", func() {
 			size := 10
 			statistics := &statistics{
 				size:         uint64(size),

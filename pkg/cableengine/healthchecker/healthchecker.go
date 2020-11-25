@@ -18,7 +18,7 @@ type LatencyInfo struct {
 type Interface interface {
 	Start(stopCh <-chan struct{}) error
 
-	GetLatencyInfo(hostName string) interface{}
+	GetLatencyInfo(endpoint submarinerv1.EndpointSpec) *LatencyInfo
 }
 
 type controller struct {
@@ -55,8 +55,8 @@ func New(config *watcher.Config, endpointNameSpace, clusterID string) (Interface
 	return controller, nil
 }
 
-func (h *controller) GetLatencyInfo(hostName string) interface{} {
-	if obj, found := h.pingers.Load(hostName); found {
+func (h *controller) GetLatencyInfo(endpoint submarinerv1.EndpointSpec) *LatencyInfo {
+	if obj, found := h.pingers.Load(endpoint.CableName); found {
 		pinger := obj.(*pingerInfo)
 
 		return &LatencyInfo{
@@ -89,13 +89,13 @@ func (h *controller) endpointCreatedorUpdated(obj runtime.Object) bool {
 		return false
 	}
 
-	if endpointCreated.Spec.HealthCheckIP == "" || endpointCreated.Spec.Hostname == "" {
-		klog.Infof("HealthCheckIP (%q) and/or Hostname (%q) for Endpoint %q empty - will not monitor endpoint health",
-			endpointCreated.Spec.HealthCheckIP, endpointCreated.Spec.Hostname, endpointCreated.Name)
+	if endpointCreated.Spec.HealthCheckIP == "" || endpointCreated.Spec.CableName == "" {
+		klog.Infof("HealthCheckIP (%q) and/or CableName (%q) for Endpoint %q empty - will not monitor endpoint health",
+			endpointCreated.Spec.HealthCheckIP, endpointCreated.Spec.CableName, endpointCreated.Name)
 		return false
 	}
 
-	if obj, found := h.pingers.Load(endpointCreated.Spec.Hostname); found {
+	if obj, found := h.pingers.Load(endpointCreated.Spec.CableName); found {
 		pinger := obj.(*pingerInfo)
 		if pinger.healthCheckIP == endpointCreated.Spec.HealthCheckIP {
 			return false
@@ -103,14 +103,14 @@ func (h *controller) endpointCreatedorUpdated(obj runtime.Object) bool {
 
 		klog.V(log.DEBUG).Infof("HealthChecker is already running for %q - stopping", endpointCreated.Name)
 		pinger.stop()
-		h.pingers.Delete(endpointCreated.Spec.Hostname)
+		h.pingers.Delete(endpointCreated.Spec.CableName)
 	}
 
-	klog.V(log.TRACE).Infof("Starting Pinger for Hostname: %q, with HealthCheckIP: %q",
-		endpointCreated.Spec.HealthCheckIP, endpointCreated.Spec.Hostname)
+	klog.V(log.TRACE).Infof("Starting Pinger for CableName: %q, with HealthCheckIP: %q",
+		endpointCreated.Spec.CableName, endpointCreated.Spec.HealthCheckIP)
 
 	pinger := newPinger(endpointCreated.Spec.HealthCheckIP)
-	h.pingers.Store(endpointCreated.Spec.HealthCheckIP, pinger)
+	h.pingers.Store(endpointCreated.Spec.CableName, pinger)
 	pinger.start()
 
 	return false
@@ -118,14 +118,14 @@ func (h *controller) endpointCreatedorUpdated(obj runtime.Object) bool {
 
 func (h *controller) endpointDeleted(obj runtime.Object) bool {
 	endpointDeleted := obj.(*submarinerv1.Endpoint)
-	if endpointDeleted.Spec.Hostname == "" {
+	if endpointDeleted.Spec.CableName == "" {
 		return false
 	}
 
-	if obj, found := h.pingers.Load(endpointDeleted.Spec.HealthCheckIP); found {
+	if obj, found := h.pingers.Load(endpointDeleted.Spec.CableName); found {
 		pinger := obj.(*pingerInfo)
 		pinger.stop()
-		h.pingers.Delete(endpointDeleted.Spec.Hostname)
+		h.pingers.Delete(endpointDeleted.Spec.CableName)
 	}
 
 	return false

@@ -1,6 +1,7 @@
 package healthchecker
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/go-ping/ping"
@@ -69,10 +70,12 @@ func (p *pingerInfo) sendPing() {
 	}
 
 	pinger.OnFinish = func(stats *ping.Statistics) {
-		p.failureMsg = "Failed to successfully ping the remote endpoint"
+		// Since we are setting a timeout and not a count, it will be an endless ping.
+		// If the timeout is reached with no successful packets, onFinish will be called and it is a failed ping.
+		p.failureMsg = fmt.Sprintf("Failed to successfully ping the remote endpoint IP %q", p.healthCheckIP)
 	}
 	err = pinger.Run()
 	if err != nil {
-		klog.Errorf("Ping to ip %q failed: %v", p.healthCheckIP, err)
+		klog.Errorf("Error running ping for the remote endpoint IP %q: %v", p.healthCheckIP, err)
 	}
 }
