@@ -7,21 +7,25 @@ import (
 	"k8s.io/klog"
 )
 
-var waitTime time.Duration = 15
+var waitTime time.Duration = 15 * time.Second
+var timeout = 3 * time.Second
+
+// The RTT will be stored and will be used to calculate the statistics until
+// the size is reached. Once the size is reached the array will be reset and
+// the last elements will be added to the array for statistics.
 var size uint64 = 1000
 
-type Pinger struct {
-	healthCheckIp string
-	statistics    Statistics
-	Status        string
+type pingerInfo struct {
+	healthCheckIP string
+	statistics    statistics
+	failureMsg    string
 	stopCh        chan struct{}
-	pinger        *ping.Pinger
 }
 
-func NewPinger(healthCheckIP string) *Pinger {
-	return &Pinger{
-		healthCheckIp: healthCheckIP,
-		statistics: Statistics{
+func newPinger(healthCheckIP string) *pingerInfo {
+	return &pingerInfo{
+		healthCheckIP: healthCheckIP,
+		statistics: statistics{
 			size:         size,
 			previousRtts: make([]uint64, size),
 		},
@@ -29,50 +33,46 @@ func NewPinger(healthCheckIP string) *Pinger {
 	}
 }
 
-func (p *Pinger) Run() {
+func (p *pingerInfo) start() {
 	go func() {
-		var err error
-
 		for {
 			select {
 			case <-p.stopCh:
 				return
-			default:
-				// Wait for a while for the connection to be ready.
-				time.Sleep(waitTime * time.Second)
-
-				p.pinger, err = ping.NewPinger(p.healthCheckIp)
-				if err != nil {
-					klog.Errorf("Creating pinger for the ip %v failed due to %v", p.healthCheckIp, err)
-
-					return
-				}
-
-				p.sendPing(p.pinger, p.healthCheckIp)
+			case <-time.After(waitTime):
+				p.sendPing()
 			}
 		}
 	}()
-	klog.Infof("CableEngine HealthChecker started")
+	klog.Infof("CableEngine HealthChecker started pinger for IP %q", p.healthCheckIP)
 }
 
-func (p *Pinger) stop() {
-	p.pinger.Stop()
+func (p *pingerInfo) stop() {
+	close(p.stopCh)
 }
 
-func (p *Pinger) sendPing(pinger *ping.Pinger, healthCheckIp string) {
+func (p *pingerInfo) sendPing() {
+	pinger, err := ping.NewPinger(p.healthCheckIP)
+	if err != nil {
+		klog.Errorf("Error creating pinger for IP %q: %v", p.healthCheckIP, err)
+		return
+	}
+
 	pinger.SetPrivileged(true)
 	pinger.RecordRtts = false
+	// After 3 seconds stop waiting.
+	pinger.Timeout = timeout
 
 	pinger.OnRecv = func(packet *ping.Packet) {
-		p.Status = ""
-		p.statistics.updateStatistics(uint64(packet.Rtt.Nanoseconds()))
+		p.failureMsg = ""
+		p.statistics.update(uint64(packet.Rtt.Nanoseconds()))
 	}
 
 	pinger.OnFinish = func(stats *ping.Statistics) {
-		p.Status = "Failed to successfully ping the remote endpoint"
+		p.failureMsg = "Failed to successfully ping the remote endpoint"
 	}
-	err := pinger.Run()
+	err = pinger.Run()
 	if err != nil {
-		klog.Errorf("Ping to ip %q failed due to  %v", healthCheckIp, err)
+		klog.Errorf("Ping to ip %q failed: %v", p.healthCheckIP, err)
 	}
 }

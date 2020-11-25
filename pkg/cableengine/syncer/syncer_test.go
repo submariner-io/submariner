@@ -289,7 +289,7 @@ type testDriver struct {
 	engine               *fakeEngine.Engine
 	gateways             *fakeClientsetv1.FailingGateways
 	syncer               *syncer.GatewaySyncer
-	healthChecker        *healthchecker.HealthChecker
+	healthChecker        healthchecker.Interface
 	expectedGateway      *submarinerv1.Gateway
 	expectedDeletedAfter *submarinerv1.Gateway
 	gatewayUpdated       chan *submarinerv1.Gateway

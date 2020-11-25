@@ -26,7 +26,7 @@ type GatewaySyncer struct {
 	engine      cableengine.Engine
 	version     string
 	statusError error
-	healthcheck *healthchecker.HealthChecker
+	healthCheck healthchecker.Interface
 }
 
 var GatewayUpdateInterval = 5 * time.Second
@@ -45,12 +45,12 @@ func init() {
 
 // NewEngine creates a new Engine for the local cluster
 func NewGatewaySyncer(engine cableengine.Engine, client v1typed.GatewayInterface,
-	version string, healthcheck *healthchecker.HealthChecker) *GatewaySyncer {
+	version string, healthCheck healthchecker.Interface) *GatewaySyncer {
 	return &GatewaySyncer{
 		client:      client,
 		engine:      engine,
 		version:     version,
-		healthcheck: healthcheck,
+		healthCheck: healthCheck,
 	}
 }
 
@@ -203,11 +203,12 @@ func (i *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 	}
 
 	if connections != nil {
-		if i.healthcheck != nil {
+		if i.healthCheck != nil {
 			for index := range *connections {
 				connection := &(*connections)[index]
-				latencyInfo := i.healthcheck.GetLatencyInfo(connection.Endpoint.HealthCheckIP)
-				if latencyInfo != nil {
+				obj := i.healthCheck.GetLatencyInfo(connection.Endpoint.HealthCheckIP)
+				if obj != nil {
+					latencyInfo := obj.(*healthchecker.LatencyInfo)
 					connection.Latency = latencyInfo.Spec
 					if connection.Status == v1.Connected && latencyInfo.ConnectionError != "" {
 						connection.Status = v1.ConnectionError

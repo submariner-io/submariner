@@ -4,7 +4,7 @@ import (
 	"math"
 )
 
-type Statistics struct {
+type statistics struct {
 	previousRtts []uint64
 	sum          uint64
 	mean         uint64
@@ -17,7 +17,7 @@ type Statistics struct {
 	size         uint64
 }
 
-func (s *Statistics) updateStatistics(rtt uint64) {
+func (s *statistics) update(rtt uint64) {
 	s.lastRtt = rtt
 
 	// TODO Take more samples while resetting, for example samples in last 2 hours

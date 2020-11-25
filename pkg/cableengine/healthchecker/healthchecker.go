@@ -16,58 +16,57 @@ type LatencyInfo struct {
 }
 
 type Interface interface {
-	Start(stopCh <-chan struct{})
+	Start(stopCh <-chan struct{}) error
 
-	GetLatencyInfo(hostName string) *LatencyInfo
+	GetLatencyInfo(hostName string) interface{}
 }
 
-type HealthChecker struct {
+type controller struct {
 	endpointWatcher watcher.Interface
-	healthCheckers  sync.Map
+	pingers         sync.Map
 	clusterID       string
 }
 
-func New(config *watcher.Config, endpointNameSpace, clusterID string) (*HealthChecker, error) {
-	serviceExportController := HealthChecker{
+func New(config *watcher.Config, endpointNameSpace, clusterID string) (Interface, error) {
+	controller := &controller{
 		clusterID: clusterID,
 	}
-
 	config.ResourceConfigs = []watcher.ResourceConfig{
 		{
 			Name:         "HealthChecker Endpoint Controller",
 			ResourceType: &submarinerv1.Endpoint{},
 			Handler: watcher.EventHandlerFuncs{
-				OnCreateFunc: serviceExportController.endpointCreatedorUpdated,
-				OnUpdateFunc: serviceExportController.endpointCreatedorUpdated,
-				OnDeleteFunc: serviceExportController.endpointDeleted,
+				OnCreateFunc: controller.endpointCreatedorUpdated,
+				OnUpdateFunc: controller.endpointCreatedorUpdated,
+				OnDeleteFunc: controller.endpointDeleted,
 			},
 			SourceNamespace: endpointNameSpace,
 		},
 	}
 
 	endpointWatcher, err := watcher.New(config)
+
 	if err != nil {
 		return nil, err
 	}
 
-	serviceExportController.endpointWatcher = endpointWatcher
+	controller.endpointWatcher = endpointWatcher
 
-	return &serviceExportController, nil
+	return controller, nil
 }
 
-func (h *HealthChecker) GetLatencyInfo(hostName string) *LatencyInfo {
-	if obj, found := h.healthCheckers.Load(hostName); found {
-		pinger := obj.(*Pinger)
-		statistics := pinger.statistics
+func (h *controller) GetLatencyInfo(hostName string) interface{} {
+	if obj, found := h.pingers.Load(hostName); found {
+		pinger := obj.(*pingerInfo)
 
 		return &LatencyInfo{
-			ConnectionError: pinger.Status,
+			ConnectionError: pinger.failureMsg,
 			Spec: &submarinerv1.LatencySpec{
-				LastRTT:    statistics.lastRtt,
-				MinRTT:     statistics.minRtt,
-				AverageRTT: statistics.mean,
-				MaxRTT:     statistics.maxRtt,
-				StdDevRTT:  statistics.stdDev,
+				LastRTT:    pinger.statistics.lastRtt,
+				MinRTT:     pinger.statistics.minRtt,
+				AverageRTT: pinger.statistics.mean,
+				MaxRTT:     pinger.statistics.maxRtt,
+				StdDevRTT:  pinger.statistics.stdDev,
 			},
 		}
 	}
@@ -75,7 +74,7 @@ func (h *HealthChecker) GetLatencyInfo(hostName string) *LatencyInfo {
 	return nil
 }
 
-func (h *HealthChecker) Start(stopCh <-chan struct{}) error {
+func (h *controller) Start(stopCh <-chan struct{}) error {
 	if err := h.endpointWatcher.Start(stopCh); err != nil {
 		return err
 	}
@@ -83,54 +82,50 @@ func (h *HealthChecker) Start(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (h *HealthChecker) endpointCreatedorUpdated(obj runtime.Object) bool {
-	klog.V(log.TRACE).Infof("Endpoint created: %v", obj)
+func (h *controller) endpointCreatedorUpdated(obj runtime.Object) bool {
+	klog.V(log.TRACE).Infof("Endpoint created: %#v", obj)
 	endpointCreated := obj.(*submarinerv1.Endpoint)
 	if endpointCreated.Spec.ClusterID == h.clusterID {
-		klog.Infof("Skipping endpoint creation for the local cluster %q", h.clusterID)
 		return false
 	}
 
 	if endpointCreated.Spec.HealthCheckIP == "" || endpointCreated.Spec.Hostname == "" {
-		klog.Infof("HealthCheckIP or Hostname is Nil, hence returning %q: %q", endpointCreated.Spec.HealthCheckIP,
-			endpointCreated.Spec.Hostname)
+		klog.Infof("HealthCheckIP (%q) and/or Hostname (%q) for Endpoint %q empty - will not monitor endpoint health",
+			endpointCreated.Spec.HealthCheckIP, endpointCreated.Spec.Hostname, endpointCreated.Name)
 		return false
 	}
 
-	if obj, found := h.healthCheckers.Load(endpointCreated.Spec.Hostname); found {
-		klog.V(log.TRACE).Infof("HealthChecker is already running %q: %q, and hence stopping", endpointCreated.Spec.HealthCheckIP,
-			endpointCreated.Spec.Hostname)
-
-		pinger := obj.(*Pinger)
-		if pinger.healthCheckIp == endpointCreated.Spec.HealthCheckIP {
+	if obj, found := h.pingers.Load(endpointCreated.Spec.Hostname); found {
+		pinger := obj.(*pingerInfo)
+		if pinger.healthCheckIP == endpointCreated.Spec.HealthCheckIP {
 			return false
 		}
 
-		close(pinger.stopCh)
+		klog.V(log.DEBUG).Infof("HealthChecker is already running for %q - stopping", endpointCreated.Name)
 		pinger.stop()
-		h.healthCheckers.Delete(endpointCreated.Spec.Hostname)
+		h.pingers.Delete(endpointCreated.Spec.Hostname)
 	}
 
 	klog.V(log.TRACE).Infof("Starting Pinger for Hostname: %q, with HealthCheckIP: %q",
 		endpointCreated.Spec.HealthCheckIP, endpointCreated.Spec.Hostname)
 
-	pinger := NewPinger(endpointCreated.Spec.HealthCheckIP)
-	h.healthCheckers.Store(endpointCreated.Spec.HealthCheckIP, pinger)
-	pinger.Run()
+	pinger := newPinger(endpointCreated.Spec.HealthCheckIP)
+	h.pingers.Store(endpointCreated.Spec.HealthCheckIP, pinger)
+	pinger.start()
 
 	return false
 }
 
-func (h *HealthChecker) endpointDeleted(obj runtime.Object) bool {
+func (h *controller) endpointDeleted(obj runtime.Object) bool {
 	endpointDeleted := obj.(*submarinerv1.Endpoint)
 	if endpointDeleted.Spec.Hostname == "" {
 		return false
 	}
 
-	if obj, found := h.healthCheckers.Load(endpointDeleted.Spec.Hostname); found {
-		pinger := obj.(*Pinger)
+	if obj, found := h.pingers.Load(endpointDeleted.Spec.HealthCheckIP); found {
+		pinger := obj.(*pingerInfo)
 		pinger.stop()
-		h.healthCheckers.Delete(endpointDeleted.Spec.Hostname)
+		h.pingers.Delete(endpointDeleted.Spec.Hostname)
 	}
 
 	return false

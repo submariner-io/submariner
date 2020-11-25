@@ -123,7 +123,7 @@ func main() {
 		klog.Errorf("Error adding submariner types to the scheme: %v", err)
 	}
 
-	var cableHealthchecker *healthchecker.HealthChecker
+	var cableHealthchecker healthchecker.Interface
 	if len(submSpec.GlobalCidr) == 0 {
 		cableHealthchecker, err = healthchecker.New(&watcher.Config{RestConfig: cfg}, submSpec.Namespace, submSpec.ClusterID)
 		if err != nil {
