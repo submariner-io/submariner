@@ -11,6 +11,8 @@ import (
 var waitTime time.Duration = 15 * time.Second
 var timeout = 3 * time.Second
 
+const allpackets = 100
+
 // The RTT will be stored and will be used to calculate the statistics until
 // the size is reached. Once the size is reached the array will be reset and
 // the last elements will be added to the array for statistics.
@@ -72,7 +74,9 @@ func (p *pingerInfo) sendPing() {
 	pinger.OnFinish = func(stats *ping.Statistics) {
 		// Since we are setting a timeout and not a count, it will be an endless ping.
 		// If the timeout is reached with no successful packets, onFinish will be called and it is a failed ping.
-		p.failureMsg = fmt.Sprintf("Failed to successfully ping the remote endpoint IP %q", p.healthCheckIP)
+		if stats.PacketLoss == allpackets {
+			p.failureMsg = fmt.Sprintf("Failed to successfully ping the remote endpoint IP %q", p.healthCheckIP)
+		}
 	}
 	err = pinger.Run()
 	if err != nil {
