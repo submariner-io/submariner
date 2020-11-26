@@ -1,6 +1,10 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal
+FROM fedora:33 
 
 WORKDIR /var/submariner
+
+RUN dnf -y install --nodocs --setopt=install_weak_deps=0 \
+           ovn && \
+    dnf -y clean all
 
 # install the networkpluginc-sync
 COPY package/submariner-networkplugin-syncer.sh bin/submariner-networkplugin-syncer /usr/local/bin/
