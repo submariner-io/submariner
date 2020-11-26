@@ -6,8 +6,8 @@ require (
 	github.com/bronze1man/goStrongswanVici v0.0.0-20190921045355-4c81bd8d0bd5
 	github.com/coreos/go-iptables v0.4.5
 	github.com/go-logr/zapr v0.1.1 // indirect
+	github.com/go-ping/ping v0.0.0-20201022122018-3977ed72668a
 	github.com/imdario/mergo v0.3.9 // indirect
-	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/onsi/ginkgo v1.14.2
 	github.com/onsi/gomega v1.10.3

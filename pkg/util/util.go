@@ -86,7 +86,7 @@ func FlattenColors(colorCodes []string) string {
 }
 
 func GetLocalEndpoint(clusterID, backend string, backendConfig map[string]string, natEnabled bool,
-	subnets []string, privateIP string) (types.SubmarinerEndpoint, error) {
+	subnets []string, privateIP string, clusterCIDR []string) (types.SubmarinerEndpoint, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return types.SubmarinerEndpoint{}, fmt.Errorf("Error getting hostname: %v", err)
@@ -118,7 +118,54 @@ func GetLocalEndpoint(clusterID, backend string, backendConfig map[string]string
 		endpoint.Spec.PublicIP = publicIP
 	}
 
+	endpoint.Spec.HealthCheckIP, err = getCNIInterfaceIPAddress(clusterCIDR)
+
+	if err != nil {
+		return types.SubmarinerEndpoint{}, fmt.Errorf("Error getting CNI Interface IP address: %v", err)
+	}
+
 	return endpoint, nil
+}
+
+//TODO: to handle de-duplication of code/finding common parts with the route agent
+func getCNIInterfaceIPAddress(clusterCIDRs []string) (string, error) {
+	for _, clusterCIDR := range clusterCIDRs {
+		_, clusterNetwork, err := net.ParseCIDR(clusterCIDR)
+		if err != nil {
+			return "", fmt.Errorf("unable to ParseCIDR %q : %v", clusterCIDR, err)
+		}
+
+		hostInterfaces, err := net.Interfaces()
+		if err != nil {
+			return "", fmt.Errorf("net.Interfaces() returned error : %v", err)
+		}
+
+		for _, iface := range hostInterfaces {
+			addrs, err := iface.Addrs()
+			if err != nil {
+				return "", fmt.Errorf("for interface %q, iface.Addrs returned error: %v", iface.Name, err)
+			}
+
+			for i := range addrs {
+				ipAddr, _, err := net.ParseCIDR(addrs[i].String())
+				if err != nil {
+					klog.Errorf("Unable to ParseCIDR : %q", addrs[i].String())
+				} else if ipAddr.To4() != nil {
+					klog.V(level.DEBUG).Infof("Interface %q has %q address", iface.Name, ipAddr)
+					address := net.ParseIP(ipAddr.String())
+
+					// Verify that interface has an address from cluster CIDR
+					if clusterNetwork.Contains(address) {
+						klog.V(level.DEBUG).Infof("Found CNI Interface %q that has IP %q from ClusterCIDR %q",
+							iface.Name, ipAddr.String(), clusterCIDR)
+						return ipAddr.String(), nil
+					}
+				}
+			}
+		}
+	}
+
+	return "", fmt.Errorf("unable to find CNI Interface on the host which has IP from %q", clusterCIDRs)
 }
 
 func GetClusterIDFromCableName(cableName string) string {
