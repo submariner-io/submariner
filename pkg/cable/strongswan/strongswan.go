@@ -41,7 +41,6 @@ const (
 )
 
 func init() {
-	cable.SetDefaultCableDriver(cableDriverName)
 	cable.AddDriver(cableDriverName, NewStrongSwan)
 }
 
