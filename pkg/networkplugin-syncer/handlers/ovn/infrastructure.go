@@ -72,6 +72,10 @@ func (ovn *SyncHandler) ensureSubmarinerRouter() error {
 		[]string{submarinerDownstreamNET}, nil,
 	)
 
+	if err != nil {
+		return errors.Wrapf(err, "error link for port %q", submarinerDownstreamRPort)
+	}
+
 	err = ovn.nbdb.Execute(linkCmd)
 	if err != nil {
 		return errors.Wrapf(err, "error creating %q port %q", submarinerLogicalRouter, submarinerDownstreamRPort)

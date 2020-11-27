@@ -6,24 +6,24 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/vishvananda/netlink"
-)
 
-const ovnRoutingRulesTable = 5
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+)
 
 // handleSubnets builds ip rules, and passes them to the specified netlink function
 //               for provided subnet list
 func (ovn *Handler) handleSubnets(subnets []string, ruleFunc func(rule *netlink.Rule) error,
-	ignoredErrorFunc func(error) bool, event string) error {
+	ignoredErrorFunc func(error) bool) error {
 	for _, subnetToHandle := range subnets {
 		for _, localSubnet := range ovn.localEndpoint.Spec.Subnets {
-			rule, err := ovn.ruleForSouthTraffic(localSubnet, subnetToHandle, event)
+			rule, err := ovn.ruleForSouthTraffic(localSubnet, subnetToHandle)
 			if err != nil {
-				return err
+				return errors.Wrapf(err, "creating rule %#v", rule)
 			}
 
 			err = ruleFunc(rule)
 			if err != nil && !ignoredErrorFunc(err) {
-				return err
+				return errors.Wrapf(err, "handling rule %#v with dst=%q src=%q", rule, rule.Dst.String(), rule.Src.String())
 			}
 		}
 	}
@@ -31,21 +31,23 @@ func (ovn *Handler) handleSubnets(subnets []string, ruleFunc func(rule *netlink.
 	return nil
 }
 
-func (ovn *Handler) ruleForSouthTraffic(localSubnet, remoteSubnet, event string) (*netlink.Rule, error) {
+func (ovn *Handler) ruleForSouthTraffic(localSubnet, remoteSubnet string) (*netlink.Rule, error) {
 	_, dstCIDR, err := net.ParseCIDR(localSubnet)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error trying to parse local subnet %q on %q", localSubnet, event)
+		return nil, errors.Wrapf(err, "error trying to parse local subnet %q", localSubnet)
 	}
 
 	_, srcCIDR, err := net.ParseCIDR(remoteSubnet)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error trying to parse remote subnet %q on %q", remoteSubnet, event)
+		return nil, errors.Wrapf(err, "error trying to parse remote subnet %q", remoteSubnet)
 	}
 
-	return &netlink.Rule{
-		Dst:   dstCIDR,
-		Src:   srcCIDR,
-		Table: ovnRoutingRulesTable}, nil
+	rule := netlink.NewRule()
+	rule.Dst = dstCIDR
+	rule.Src = srcCIDR
+	rule.Table = constants.RouteAgentHostNetworkTableID
+
+	return rule, nil
 }
 
 func (ovn *Handler) getExistingRuleSubnets() (stringset.Interface, error) {
@@ -56,7 +58,7 @@ func (ovn *Handler) getExistingRuleSubnets() (stringset.Interface, error) {
 	}
 
 	for _, rule := range rules {
-		if rule.Table == ovnRoutingRulesTable && rule.Src != nil {
+		if rule.Table == constants.RouteAgentHostNetworkTableID && rule.Src != nil {
 			currentRuleRemotes.Add(rule.Src.String())
 		}
 	}

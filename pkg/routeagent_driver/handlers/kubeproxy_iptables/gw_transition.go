@@ -4,6 +4,8 @@ import (
 	"k8s.io/klog"
 
 	"github.com/submariner-io/admiral/pkg/log"
+
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 )
 
 func (kp *SyncHandler) TransitionToNonGateway() error {
@@ -20,7 +22,7 @@ func (kp *SyncHandler) TransitionToNonGateway() error {
 	err := kp.configureIPRule(Delete)
 	if err != nil {
 		klog.Errorf("Unable to delete ip rule to table %d on non-Gateway node %s: %v",
-			RouteAgentHostNetworkTableID, kp.hostname, err)
+			constants.RouteAgentHostNetworkTableID, kp.hostname, err)
 	}
 
 	return nil
@@ -45,7 +47,7 @@ func (kp *SyncHandler) TransitionToGateway() error {
 	err = kp.configureIPRule(Add)
 	if err != nil {
 		klog.Errorf("Unable to add ip rule to table %d on Gateway node %s: %v",
-			RouteAgentHostNetworkTableID, kp.hostname, err)
+			constants.RouteAgentHostNetworkTableID, kp.hostname, err)
 	}
 
 	// Add routes to the new endpoint on the GatewayNode.
