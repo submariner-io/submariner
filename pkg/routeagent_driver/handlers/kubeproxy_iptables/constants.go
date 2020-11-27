@@ -32,7 +32,7 @@ const (
 	// To support connectivity for Pods with HostNetworking on the GatewayNode, we program
 	// certain routing rules in table 150. As part of these routes, we set the source-ip of
 	// the egress traffic to the corresponding CNIInterfaceIP on that host.
-	RouteAgentHostNetworkTableID = 150
+
 )
 
 type Operation int

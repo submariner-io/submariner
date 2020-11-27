@@ -31,8 +31,9 @@ type Handler struct {
 
 func NewHandler(env environment.Specification, smClientSet clientset.Interface) *Handler {
 	return &Handler{
-		config:   &env,
-		smClient: smClientSet,
+		config:          &env,
+		smClient:        smClientSet,
+		remoteEndpoints: map[string]*submV1.Endpoint{},
 	}
 }
 
@@ -45,13 +46,6 @@ func (ovn *Handler) GetNetworkPlugins() []string {
 }
 
 func (ovn *Handler) Init() error {
-	var err error
-
-	ovn.cableRoutingInterface, err = util.GetDefaultGatewayInterface()
-	if err != nil {
-		klog.Fatalf("Unable to find the default interface on host: %s", err.Error())
-	}
-
 	// For now we get all the cleanups
 	ovn.cleanupHandlers = cableCleanup.GetCleanupHandlers()
 
@@ -59,20 +53,26 @@ func (ovn *Handler) Init() error {
 }
 
 func (ovn *Handler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
-	ovn.mutex.Lock()
-	defer ovn.mutex.Unlock()
-
-	ovn.localEndpoint = endpoint
+	var routingInterface *net.Interface
+	var err error
 
 	// TODO: this logic belongs to the cabledrivers instead
 	if endpoint.Spec.Backend == "wireguard" {
 		//NOTE: This assumes that LocalEndpointCreated happens before than TransitionToGatewayNode
-		if wg, err := net.InterfaceByName(wireguard.DefaultDeviceName); err == nil {
-			ovn.cableRoutingInterface = wg
-		} else {
+		if routingInterface, err = net.InterfaceByName(wireguard.DefaultDeviceName); err != nil {
 			return errors.Wrapf(err, "Wireguard interface %s not found on the node.", wireguard.DefaultDeviceName)
 		}
+	} else {
+		if routingInterface, err = util.GetDefaultGatewayInterface(); err != nil {
+			klog.Fatalf("Unable to find the default interface on host: %s", err.Error())
+		}
 	}
+
+	ovn.mutex.Lock()
+	defer ovn.mutex.Unlock()
+
+	ovn.localEndpoint = endpoint
+	ovn.cableRoutingInterface = routingInterface
 
 	return nil
 }
