@@ -17,6 +17,7 @@ import (
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/cableengine"
+	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
 	"github.com/submariner-io/submariner/pkg/cableengine/syncer"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/controllers/datastoresyncer"
@@ -109,7 +110,7 @@ func main() {
 	submSpec.CableDriver = strings.ToLower(submSpec.CableDriver)
 
 	localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterID, submSpec.CableDriver, nil, submSpec.NatEnabled,
-		localSubnets, util.GetLocalIP())
+		localSubnets, util.GetLocalIP(), submSpec.ClusterCidr)
 
 	if err != nil {
 		klog.Fatalf("Error creating local endpoint object from %#v: %v", submSpec, err)
@@ -117,17 +118,31 @@ func main() {
 
 	cableEngine := cableengine.NewEngine(localCluster, localEndpoint)
 
+	err = subv1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		klog.Errorf("Error adding submariner types to the scheme: %v", err)
+	}
+
+	var cableHealthchecker healthchecker.Interface
+	if len(submSpec.GlobalCidr) == 0 {
+		cableHealthchecker, err = healthchecker.New(&watcher.Config{RestConfig: cfg}, submSpec.Namespace, submSpec.ClusterID)
+		if err != nil {
+			klog.Errorf("Error creating healthChecker: %v", err)
+		}
+
+		err = cableHealthchecker.Start(stopCh)
+
+		if err != nil {
+			klog.Errorf("Error starting healthChecker: %v", err)
+		}
+	}
+
 	cableEngineSyncer := syncer.NewGatewaySyncer(
 		cableEngine,
 		submarinerClient.SubmarinerV1().Gateways(submSpec.Namespace),
-		VERSION)
+		VERSION, cableHealthchecker)
 
 	cableEngineSyncer.Run(stopCh)
-
-	err = subv1.AddToScheme(scheme.Scheme)
-	if err != nil {
-		fatal(cableEngineSyncer, "Error adding submariner types to the scheme: %v", err)
-	}
 
 	becameLeader := func(context.Context) {
 		klog.Info("Creating the datastore syncer")

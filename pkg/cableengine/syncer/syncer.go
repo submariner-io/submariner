@@ -8,16 +8,16 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/submariner-io/admiral/pkg/log"
+	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cableengine"
+	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
+	v1typed "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
-
-	"github.com/submariner-io/admiral/pkg/log"
-	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/cableengine"
-	v1typed "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
 )
 
 type GatewaySyncer struct {
@@ -26,6 +26,7 @@ type GatewaySyncer struct {
 	engine      cableengine.Engine
 	version     string
 	statusError error
+	healthCheck healthchecker.Interface
 }
 
 var GatewayUpdateInterval = 5 * time.Second
@@ -44,11 +45,12 @@ func init() {
 
 // NewEngine creates a new Engine for the local cluster
 func NewGatewaySyncer(engine cableengine.Engine, client v1typed.GatewayInterface,
-	version string) *GatewaySyncer {
+	version string, healthCheck healthchecker.Interface) *GatewaySyncer {
 	return &GatewaySyncer{
-		client:  client,
-		engine:  engine,
-		version: version,
+		client:      client,
+		engine:      engine,
+		version:     version,
+		healthCheck: healthCheck,
 	}
 }
 
@@ -201,6 +203,20 @@ func (i *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 	}
 
 	if connections != nil {
+		if i.healthCheck != nil {
+			for index := range *connections {
+				connection := &(*connections)[index]
+				latencyInfo := i.healthCheck.GetLatencyInfo(&connection.Endpoint)
+				if latencyInfo != nil {
+					connection.Latency = latencyInfo.Spec
+					if connection.Status == v1.Connected && latencyInfo.ConnectionError != "" {
+						connection.Status = v1.ConnectionError
+						connection.StatusMessage = latencyInfo.ConnectionError
+					}
+				}
+			}
+		}
+
 		gateway.Status.Connections = *connections
 	} else {
 		gateway.Status.Connections = []v1.Connection{}
