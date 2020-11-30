@@ -5,8 +5,6 @@ on:
   push:
     branches:
       - master
-    tags:
-      - 'v**'
 
 jobs:
   e2e:
@@ -42,16 +40,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Release container images
+      - name: Build new images
+        env:
+          IMAGES_ARGS: --nocache
+        run: make images
+
+      - name: Release the images
         env:
           QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
           QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}
           RELEASE_ARGS: submariner submariner-route-agent submariner-globalnet submariner-networkplugin-syncer
-          IMAGES_ARGS: --nocache
-        run: |
-          if [[ $GITHUB_REF =~ "/tags/" ]]; then
-              tags="${GITHUB_REF##*/}"
-              { echo $tags | grep -q -v -; } && tags+=" latest"
-              RELEASE_ARGS+=" --tag \"$tags\""
-          fi
-          make images release
+        run: make release
