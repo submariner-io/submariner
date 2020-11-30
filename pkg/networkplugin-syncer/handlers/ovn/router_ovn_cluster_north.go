@@ -18,14 +18,26 @@ const (
 )
 
 func (ovn *SyncHandler) connectOvnClusterRouterToSubm() error {
-	linkCmd, _ := ovn.nbdb.LinkSwitchToRouter(
+	klog.Infof("Ensuring %q is connected to %q", submarinerLogicalRouter, ovnClusterRouter)
+	// TODO: Improve this in goovn so we don't need to delete/recreate everytime, LinkSwitchToRouter
+	//       does not provide good error handling and ignores many corner cases.
+	delOldRouterPort, _ := ovn.nbdb.LRPDel(ovnClusterRouter, ovnClusterSubmarinerRPort)
+	_ = ovn.nbdb.Execute(delOldRouterPort)
+	delOldLSP, _ := ovn.nbdb.LSPDel(ovnClusterSubmarinerSwPort)
+	_ = ovn.nbdb.Execute(delOldLSP)
+
+	linkCmd, err := ovn.nbdb.LinkSwitchToRouter(
 		submarinerDownstreamSwitch, ovnClusterSubmarinerSwPort,
 		ovnClusterRouter, ovnClusterSubmarinerRPort,
 		ovnClusterSubmarinerMAC,
 		[]string{ovnClusterSubmarinerNET}, nil,
 	)
 
-	err := ovn.nbdb.Execute(linkCmd)
+	if err != nil && !errors.Is(err, goovn.ErrorExist) {
+		return errors.Wrapf(err, "creating command to connect ovn_cluster_router")
+	}
+
+	err = ovn.nbdb.Execute(linkCmd)
 	if err != nil {
 		return errors.Wrapf(err, "error creating %q port %q", ovnClusterRouter, ovnClusterSubmarinerRPort)
 	}
