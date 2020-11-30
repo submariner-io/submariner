@@ -8,9 +8,9 @@ import (
 	"k8s.io/klog"
 )
 
-var waitTime time.Duration = 15 * time.Second
-var timeout = 3 * time.Second
+var waitTime = 15 * time.Second
 
+const threshold = 5
 const allpackets = 100
 
 // The RTT will be stored and will be used to calculate the statistics until
@@ -63,8 +63,16 @@ func (p *pingerInfo) sendPing() {
 
 	pinger.SetPrivileged(true)
 	pinger.RecordRtts = false
-	// After 3 seconds stop waiting.
-	pinger.Timeout = timeout
+
+	pinger.OnSend = func(packet *ping.Packet) {
+		// Pinger will be stopped once the packet loss reaches threshold and
+		// if packet loss is not 100% recreates the Pinger without marking an error
+		if pinger.Statistics().PacketsSent-pinger.Statistics().PacketsRecv > threshold {
+			klog.Infof("Packet loss reached a threshold of %d and hence stopping the pinger for HealthCheckIP: %q",
+				threshold, p.healthCheckIP)
+			pinger.Stop()
+		}
+	}
 
 	pinger.OnRecv = func(packet *ping.Packet) {
 		p.failureMsg = ""
