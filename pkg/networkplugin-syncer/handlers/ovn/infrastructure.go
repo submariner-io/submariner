@@ -32,14 +32,15 @@ func (ovn *SyncHandler) ensureSubmarinerInfra() error {
 }
 
 func (ovn *SyncHandler) ensureSubmarinerJoinSwitch() error {
+	klog.Infof("Ensuring %q switch", submarinerDownstreamSwitch)
 	lsCmd, err := ovn.nbdb.LSAdd(submarinerDownstreamSwitch)
 	if err == nil {
-		klog.Infof("error creating submariner switch %q", submarinerDownstreamSwitch)
+		klog.Infof("Creating submariner join switch %q", submarinerDownstreamSwitch)
 
 		err = ovn.nbdb.Execute(lsCmd)
 	}
 
-	if !errors.Is(err, goovn.ErrorExist) {
+	if err != nil && !errors.Is(err, goovn.ErrorExist) {
 		return errors.Wrapf(err, "error creating submariner switch %q", submarinerDownstreamSwitch)
 	}
 
@@ -47,6 +48,7 @@ func (ovn *SyncHandler) ensureSubmarinerJoinSwitch() error {
 }
 
 func (ovn *SyncHandler) ensureSubmarinerRouter() error {
+	klog.Infof("Ensuring %q", submarinerLogicalRouter)
 	lrCmd, err := ovn.nbdb.LRAdd(submarinerLogicalRouter, nil)
 	if err == nil {
 		klog.Infof("Creating submariner router %q", submarinerLogicalRouter)
@@ -54,7 +56,7 @@ func (ovn *SyncHandler) ensureSubmarinerRouter() error {
 		err = ovn.nbdb.Execute(lrCmd)
 	}
 
-	if !errors.Is(err, goovn.ErrorExist) {
+	if err != nil && !errors.Is(err, goovn.ErrorExist) {
 		return errors.Wrapf(err, "error creating submariner router %q", submarinerLogicalRouter)
 	}
 
@@ -65,15 +67,15 @@ func (ovn *SyncHandler) ensureSubmarinerRouter() error {
 	delOldLSP, _ := ovn.nbdb.LSPDel(submarinerDownstreamSwPort)
 	_ = ovn.nbdb.Execute(delOldLSP)
 
-	linkCmd, _ := ovn.nbdb.LinkSwitchToRouter(
+	linkCmd, err := ovn.nbdb.LinkSwitchToRouter(
 		submarinerDownstreamSwitch, submarinerDownstreamSwPort,
 		submarinerLogicalRouter, submarinerDownstreamRPort,
 		submarinerDownstreamMAC,
 		[]string{submarinerDownstreamNET}, nil,
 	)
 
-	if err != nil {
-		return errors.Wrapf(err, "error link for port %q", submarinerDownstreamRPort)
+	if err != nil && !errors.Is(err, goovn.ErrorExist) {
+		return errors.Wrapf(err, "error link for port %q, linkCmd: %#v", submarinerDownstreamRPort, linkCmd)
 	}
 
 	err = ovn.nbdb.Execute(linkCmd)
