@@ -18,12 +18,12 @@ func (ovn *Handler) handleSubnets(subnets []string, ruleFunc func(rule *netlink.
 		for _, localSubnet := range ovn.localEndpoint.Spec.Subnets {
 			rule, err := ovn.ruleForSouthTraffic(localSubnet, subnetToHandle)
 			if err != nil {
-				return errors.Wrapf(err, "creating rule %#v", rule)
+				return errors.Wrapf(err, "error creating rule %#v", rule)
 			}
 
 			err = ruleFunc(rule)
 			if err != nil && !ignoredErrorFunc(err) {
-				return errors.Wrapf(err, "handling rule %#v with dst=%q src=%q", rule, rule.Dst.String(), rule.Src.String())
+				return errors.Wrapf(err, "error handling rule %#v", rule)
 			}
 		}
 	}
@@ -50,7 +50,7 @@ func (ovn *Handler) ruleForSouthTraffic(localSubnet, remoteSubnet string) (*netl
 	return rule, nil
 }
 
-func (ovn *Handler) getExistingRuleSubnets() (stringset.Interface, error) {
+func (ovn *Handler) getExistingIPv4RuleSubnets() (stringset.Interface, error) {
 	currentRuleRemotes := stringset.New()
 	rules, err := netlink.RuleList(netlink.FAMILY_V4)
 	if err != nil {
