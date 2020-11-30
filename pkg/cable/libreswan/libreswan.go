@@ -26,6 +26,7 @@ const (
 
 func init() {
 	cable.AddDriver(cableDriverName, NewLibreswan)
+	cable.SetDefaultCableDriver(cableDriverName)
 }
 
 type libreswan struct {
