@@ -15,7 +15,7 @@ import (
 )
 
 func (ovn *Handler) cleanupGatewayDataplane() error {
-	currentRemoteSubnets, err := ovn.getExistingRuleSubnets()
+	currentRemoteSubnets, err := ovn.getExistingIPv4RuleSubnets()
 	if err != nil {
 		return errors.Wrapf(err, "error reading ip rule list for IPv4")
 	}
@@ -47,7 +47,7 @@ func (ovn *Handler) cleanupGatewayDataplane() error {
 }
 
 func (ovn *Handler) updateGatewayDataplane() error {
-	currentRuleRemotes, err := ovn.getExistingRuleSubnets()
+	currentRuleRemotes, err := ovn.getExistingIPv4RuleSubnets()
 	if err != nil {
 		return errors.Wrapf(err, "error reading ip rule list for IPv4")
 	}
