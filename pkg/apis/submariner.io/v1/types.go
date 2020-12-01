@@ -86,7 +86,7 @@ type GatewayStatus struct {
 // LatencySpec describes the round trip time information in nanoseconds for a packet
 // between the gateway pods of two clusters.
 type LatencySpec struct {
-	// This shall be merged once the operator is using the latest.
+	// TODO This shall be deleted once the operator is using the latest.
 	// Using Optional to avoid validation errors when this field
 	// is not used.
 	// +optional
@@ -101,15 +101,15 @@ type LatencySpec struct {
 	StdDevRTT uint64 `json:"stddevRTT,omitempty"`
 
 	// +optional
-	LastRTTInNs uint64 `json:"lastRTTInNs,omitempty"`
+	LastRTTInNanos uint64 `json:"lastRTTInNanos,omitempty"`
 	// +optional
-	MinRTTInNs uint64 `json:"minRTTInNs,omitempty"`
+	MinRTTInNanos uint64 `json:"minRTTInNanos,omitempty"`
 	// +optional
-	AverageRTTInNs uint64 `json:"averageRTTInNs,omitempty"`
+	AverageRTTInNanos uint64 `json:"averageRTTInNanos,omitempty"`
 	// +optional
-	MaxRTTInNs uint64 `json:"maxRTTInNs,omitempty"`
+	MaxRTTInNanos uint64 `json:"maxRTTInNanos,omitempty"`
 	// +optional
-	StdDevRTTInNs uint64 `json:"stddevRTTInNs,omitempty"`
+	StdDevRTTInNanos uint64 `json:"stddevRTTInNanos,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
