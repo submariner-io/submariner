@@ -10,7 +10,7 @@ import (
 
 var waitTime = 15 * time.Second
 
-const threshold = 5
+const maxLosablePackets = 5
 
 // The RTT will be stored and will be used to calculate the statistics until
 // the size is reached. Once the size is reached the array will be reset and
@@ -65,7 +65,7 @@ func (p *pingerInfo) sendPing() {
 
 	pinger.OnSend = func(packet *ping.Packet) {
 		// Pinger will mark a connection as an error if the packet loss reaches the threshold
-		if pinger.PacketsSent-pinger.PacketsRecv > threshold {
+		if pinger.PacketsSent-pinger.PacketsRecv > maxLosablePackets {
 			p.failureMsg = fmt.Sprintf("Failed to successfully ping the remote endpoint IP %q", p.healthCheckIP)
 			pinger.PacketsSent = 0
 			pinger.PacketsRecv = 0
