@@ -15,6 +15,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 
 	"github.com/submariner-io/submariner/pkg/cable/wireguard"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 )
 
 func (kp *SyncHandler) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks []string, operation Operation) {
@@ -22,11 +23,11 @@ func (kp *SyncHandler) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks [
 		kp.routeCacheGWNode.DeleteAll()
 		// The conversion doesn't introduce a security problem
 		// #nosec G204
-		cmd := exec.Command("/sbin/ip", "r", "flush", "table", strconv.Itoa(RouteAgentHostNetworkTableID))
+		cmd := exec.Command("/sbin/ip", "r", "flush", "table", strconv.Itoa(constants.RouteAgentHostNetworkTableID))
 		if err := cmd.Run(); err != nil {
 			// We can safely ignore this error, as this table will exist only on GW nodes
 			klog.V(log.TRACE).Infof("Flushing routing table %d returned error. Can be ignored on non-Gw node: %v",
-				RouteAgentHostNetworkTableID, err)
+				constants.RouteAgentHostNetworkTableID, err)
 			return
 		}
 	} else if kp.isGatewayNode && kp.cniIface != nil {
@@ -79,7 +80,7 @@ func (kp *SyncHandler) configureRoute(remoteSubnet string, operation Operation) 
 		Scope:     unix.RT_SCOPE_LINK,
 		LinkIndex: ifaceIndex,
 		Protocol:  4,
-		Table:     RouteAgentHostNetworkTableID,
+		Table:     constants.RouteAgentHostNetworkTableID,
 	}
 
 	switch operation {
@@ -250,8 +251,8 @@ func (kp *SyncHandler) updateRoutingRulesForInterClusterSupport(remoteCIDRs []st
 func (kp *SyncHandler) configureIPRule(operation Operation) error {
 	if kp.cniIface != nil {
 		rule := netlink.NewRule()
-		rule.Table = RouteAgentHostNetworkTableID
-		rule.Priority = RouteAgentHostNetworkTableID
+		rule.Table = constants.RouteAgentHostNetworkTableID
+		rule.Priority = constants.RouteAgentHostNetworkTableID
 
 		switch operation {
 		case Add:

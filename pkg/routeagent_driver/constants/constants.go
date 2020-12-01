@@ -22,4 +22,6 @@ const (
 	// supporting connectivity from HostNetwork to remoteClusters.
 	// [#] interface on the node that has an IPAddress from the clusterCIDR
 	CniInterfaceIP = "submariner.io/cniIfaceIp"
+
+	RouteAgentHostNetworkTableID = 150
 )

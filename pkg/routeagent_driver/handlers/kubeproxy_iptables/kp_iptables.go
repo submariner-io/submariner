@@ -60,8 +60,8 @@ func (kp *SyncHandler) GetName() string {
 	return "kubeproxy-iptables-handler"
 }
 
-func (kp *SyncHandler) GetNetworkPlugin() string {
-	return event.AnyNetworkPlugin
+func (kp *SyncHandler) GetNetworkPlugins() []string {
+	return []string{"generic", "canal-flannel", "weave-net", "OpenShiftSDN"}
 }
 
 func (kp *SyncHandler) Init() error {
