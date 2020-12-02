@@ -14,17 +14,20 @@ type SubmarinerEndpoint struct {
 }
 
 type SubmarinerSpecification struct {
-	ClusterCidr []string
-	ColorCodes  []string
-	GlobalCidr  []string
-	ServiceCidr []string
-	Broker      string
-	CableDriver string
-	ClusterID   string
-	Namespace   string
-	Token       string
-	Debug       bool
-	NatEnabled  bool
+	ClusterCidr                   []string
+	ColorCodes                    []string
+	GlobalCidr                    []string
+	ServiceCidr                   []string
+	Broker                        string
+	CableDriver                   string
+	ClusterID                     string
+	Namespace                     string
+	Token                         string
+	Debug                         bool
+	NatEnabled                    bool
+	HealthCheckEnabled            bool
+	HealthCheckInterval           uint
+	HealthCheckMaxPacketLossCount uint
 }
 
 type Secure struct {

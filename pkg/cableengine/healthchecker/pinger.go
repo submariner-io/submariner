@@ -10,23 +10,29 @@ import (
 
 var waitTime = 15 * time.Second
 
-const maxLosablePackets = 5
+var DefaultMaxPacketLossCount uint = 5
 
 // The RTT will be stored and will be used to calculate the statistics until
 // the size is reached. Once the size is reached the array will be reset and
 // the last elements will be added to the array for statistics.
 var size uint64 = 1000
 
+var DefaultPingInterval = 1 * time.Second
+
 type pingerInfo struct {
-	healthCheckIP string
-	statistics    statistics
-	failureMsg    string
-	stopCh        chan struct{}
+	healthCheckIP      string
+	pingInterval       time.Duration
+	maxPacketLossCount uint
+	statistics         statistics
+	failureMsg         string
+	stopCh             chan struct{}
 }
 
-func newPinger(healthCheckIP string) *pingerInfo {
+func newPinger(healthCheckIP string, pingInterval time.Duration, maxPacketLossCount uint) *pingerInfo {
 	return &pingerInfo{
-		healthCheckIP: healthCheckIP,
+		healthCheckIP:      healthCheckIP,
+		pingInterval:       pingInterval,
+		maxPacketLossCount: maxPacketLossCount,
 		statistics: statistics{
 			size:         size,
 			previousRtts: make([]uint64, size),
@@ -60,12 +66,13 @@ func (p *pingerInfo) sendPing() {
 		return
 	}
 
+	pinger.Interval = p.pingInterval
 	pinger.SetPrivileged(true)
 	pinger.RecordRtts = false
 
 	pinger.OnSend = func(packet *ping.Packet) {
 		// Pinger will mark a connection as an error if the packet loss reaches the threshold
-		if pinger.PacketsSent-pinger.PacketsRecv > maxLosablePackets {
+		if pinger.PacketsSent-pinger.PacketsRecv > int(p.maxPacketLossCount) {
 			p.failureMsg = fmt.Sprintf("Failed to successfully ping the remote endpoint IP %q", p.healthCheckIP)
 			pinger.PacketsSent = 0
 			pinger.PacketsRecv = 0
