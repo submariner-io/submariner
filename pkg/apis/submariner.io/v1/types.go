@@ -99,17 +99,16 @@ type LatencySpec struct {
 	MaxRTT uint64 `json:"maxRTT,omitempty"`
 	// +optional
 	StdDevRTT uint64 `json:"stddevRTT,omitempty"`
+}
 
-	// +optional
-	LastRTTInNanos uint64 `json:"lastRTTInNanos,omitempty"`
-	// +optional
-	MinRTTInNanos uint64 `json:"minRTTInNanos,omitempty"`
-	// +optional
-	AverageRTTInNanos uint64 `json:"averageRTTInNanos,omitempty"`
-	// +optional
-	MaxRTTInNanos uint64 `json:"maxRTTInNanos,omitempty"`
-	// +optional
-	StdDevRTTInNanos uint64 `json:"stddevRTTInNanos,omitempty"`
+// LatencySpec describes the round trip time information for a packet
+// between the gateway pods of two clusters.
+type LatencyRTTSpec struct {
+	Last    string `json:"last,omitempty"`
+	Min     string `json:"min,omitempty"`
+	Average string `json:"average,omitempty"`
+	Max     string `json:"max,omitempty"`
+	StdDev  string `json:"stddev,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -133,6 +132,8 @@ type Connection struct {
 	Endpoint      EndpointSpec     `json:"endpoint"`
 	// +optional
 	Latency *LatencySpec `json:"latency,omitempty"`
+	// +optional
+	LatencyRTT *LatencyRTTSpec `json:"latencyRTT,omitempty"`
 }
 
 type ConnectionStatus string
