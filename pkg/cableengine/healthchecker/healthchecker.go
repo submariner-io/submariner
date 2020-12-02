@@ -1,7 +1,9 @@
 package healthchecker
 
 import (
+	"strconv"
 	"sync"
+	"time"
 
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/watcher"
@@ -12,7 +14,7 @@ import (
 
 type LatencyInfo struct {
 	ConnectionError string
-	Spec            *submarinerv1.LatencySpec
+	Spec            *submarinerv1.LatencyRTTSpec
 }
 
 type Interface interface {
@@ -59,14 +61,20 @@ func (h *controller) GetLatencyInfo(endpoint *submarinerv1.EndpointSpec) *Latenc
 	if obj, found := h.pingers.Load(endpoint.CableName); found {
 		pinger := obj.(*pingerInfo)
 
+		lastTime, _ := time.ParseDuration(strconv.FormatUint(pinger.statistics.lastRtt, 10) + "ns")
+		minTime, _ := time.ParseDuration(strconv.FormatUint(pinger.statistics.minRtt, 10) + "ns")
+		averageTime, _ := time.ParseDuration(strconv.FormatUint(pinger.statistics.mean, 10) + "ns")
+		maxTime, _ := time.ParseDuration(strconv.FormatUint(pinger.statistics.maxRtt, 10) + "ns")
+		stdDevTime, _ := time.ParseDuration(strconv.FormatUint(pinger.statistics.stdDev, 10) + "ns")
+
 		return &LatencyInfo{
 			ConnectionError: pinger.failureMsg,
-			Spec: &submarinerv1.LatencySpec{
-				LastRTT:    pinger.statistics.lastRtt,
-				MinRTT:     pinger.statistics.minRtt,
-				AverageRTT: pinger.statistics.mean,
-				MaxRTT:     pinger.statistics.maxRtt,
-				StdDevRTT:  pinger.statistics.stdDev,
+			Spec: &submarinerv1.LatencyRTTSpec{
+				Last:    lastTime.String(),
+				Min:     minTime.String(),
+				Average: averageTime.String(),
+				Max:     maxTime.String(),
+				StdDev:  stdDevTime.String(),
 			},
 		}
 	}

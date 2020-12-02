@@ -208,7 +208,7 @@ func (i *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 				connection := &(*connections)[index]
 				latencyInfo := i.healthCheck.GetLatencyInfo(&connection.Endpoint)
 				if latencyInfo != nil {
-					connection.Latency = latencyInfo.Spec
+					connection.LatencyRTT = latencyInfo.Spec
 					if connection.Status == v1.Connected && latencyInfo.ConnectionError != "" {
 						connection.Status = v1.ConnectionError
 						connection.StatusMessage = latencyInfo.ConnectionError
