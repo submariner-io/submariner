@@ -2,7 +2,6 @@ package healthchecker
 
 import (
 	"fmt"
-	"strconv"
 	"sync"
 	"time"
 
@@ -19,6 +18,11 @@ var defaultMaxPacketLossCount uint = 5
 var size uint64 = 1000
 
 var defaultPingInterval = 1 * time.Second
+
+// Even though we set up the pinger to run continuously, we still have to give it a non-zero timeout else it will
+// fail so set a really long one.
+var defaultPingTimeout = 87600 * time.Hour
+var pingTimeout = defaultPingTimeout
 
 type PingerInterface interface {
 	Start()
@@ -68,7 +72,12 @@ func (p *pingerInfo) Start() {
 }
 
 func (p *pingerInfo) Stop() {
-	close(p.stopCh)
+	select {
+	case <-p.stopCh:
+		return
+	default:
+		close(p.stopCh)
+	}
 }
 
 func (p *pingerInfo) doPing() error {
@@ -82,6 +91,7 @@ func (p *pingerInfo) doPing() error {
 	pinger.Interval = p.pingInterval
 	pinger.SetPrivileged(true)
 	pinger.RecordRtts = false
+	pinger.Timeout = pingTimeout
 
 	pinger.OnSend = func(packet *ping.Packet) {
 		select {
@@ -128,20 +138,14 @@ func (p *pingerInfo) GetLatencyInfo() *LatencyInfo {
 	p.Lock()
 	defer p.Unlock()
 
-	lastTime, _ := time.ParseDuration(strconv.FormatUint(p.statistics.lastRtt, 10) + "ns")
-	minTime, _ := time.ParseDuration(strconv.FormatUint(p.statistics.minRtt, 10) + "ns")
-	averageTime, _ := time.ParseDuration(strconv.FormatUint(p.statistics.mean, 10) + "ns")
-	maxTime, _ := time.ParseDuration(strconv.FormatUint(p.statistics.maxRtt, 10) + "ns")
-	stdDevTime, _ := time.ParseDuration(strconv.FormatUint(p.statistics.stdDev, 10) + "ns")
-
 	return &LatencyInfo{
 		ConnectionError: p.failureMsg,
 		Spec: &submarinerv1.LatencyRTTSpec{
-			Last:    lastTime.String(),
-			Min:     minTime.String(),
-			Average: averageTime.String(),
-			Max:     maxTime.String(),
-			StdDev:  stdDevTime.String(),
+			Last:    time.Duration(p.statistics.lastRtt).String(),
+			Min:     time.Duration(p.statistics.minRtt).String(),
+			Average: time.Duration(p.statistics.mean).String(),
+			Max:     time.Duration(p.statistics.maxRtt).String(),
+			StdDev:  time.Duration(p.statistics.stdDev).String(),
 		},
 	}
 }
