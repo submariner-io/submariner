@@ -124,8 +124,9 @@ func main() {
 	}
 
 	var cableHealthchecker healthchecker.Interface
-	if len(submSpec.GlobalCidr) == 0 {
-		cableHealthchecker, err = healthchecker.New(&watcher.Config{RestConfig: cfg}, submSpec.Namespace, submSpec.ClusterID)
+	if len(submSpec.GlobalCidr) == 0 && submSpec.HealthCheckEnabled {
+		cableHealthchecker, err = healthchecker.New(&watcher.Config{RestConfig: cfg}, submSpec.Namespace,
+			submSpec.ClusterID, submSpec.HealthCheckInterval, submSpec.HealthCheckMaxPacketLossCount)
 		if err != nil {
 			klog.Errorf("Error creating healthChecker: %v", err)
 		}

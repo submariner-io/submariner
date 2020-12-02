@@ -24,14 +24,18 @@ type Interface interface {
 }
 
 type controller struct {
-	endpointWatcher watcher.Interface
-	pingers         sync.Map
-	clusterID       string
+	endpointWatcher    watcher.Interface
+	pingers            sync.Map
+	clusterID          string
+	pingInterval       uint
+	maxPacketLossCount uint
 }
 
-func New(config *watcher.Config, endpointNameSpace, clusterID string) (Interface, error) {
+func New(config *watcher.Config, endpointNameSpace, clusterID string, pingInterval, maxPacketLossCount uint) (Interface, error) {
 	controller := &controller{
-		clusterID: clusterID,
+		clusterID:          clusterID,
+		pingInterval:       pingInterval,
+		maxPacketLossCount: maxPacketLossCount,
 	}
 	config.ResourceConfigs = []watcher.ResourceConfig{
 		{
@@ -117,7 +121,18 @@ func (h *controller) endpointCreatedorUpdated(obj runtime.Object) bool {
 	klog.V(log.TRACE).Infof("Starting Pinger for CableName: %q, with HealthCheckIP: %q",
 		endpointCreated.Spec.CableName, endpointCreated.Spec.HealthCheckIP)
 
-	pinger := newPinger(endpointCreated.Spec.HealthCheckIP)
+	pingInterval := DefaultPingInterval
+	if h.pingInterval != 0 {
+		pingInterval = time.Second * time.Duration(h.pingInterval)
+	}
+
+	maxPacketLossCount := DefaultMaxPacketLossCount
+
+	if h.maxPacketLossCount != 0 {
+		maxPacketLossCount = h.maxPacketLossCount
+	}
+
+	pinger := newPinger(endpointCreated.Spec.HealthCheckIP, pingInterval, maxPacketLossCount)
 	h.pingers.Store(endpointCreated.Spec.CableName, pinger)
 	pinger.start()
 
