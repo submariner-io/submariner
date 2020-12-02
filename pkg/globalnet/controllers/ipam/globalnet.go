@@ -105,24 +105,7 @@ func (i *Controller) evaluateService(service *k8sv1.Service) Operation {
 	return Process
 }
 
-func (i *Controller) isControlNode(node *k8sv1.Node) bool {
-	for _, taint := range node.Spec.Taints {
-		if taint.Key == k8sMasterNode && taint.Effect == "NoSchedule" {
-			return true
-		}
-	}
-
-	return false
-}
-
 func (i *Controller) evaluateNode(node *k8sv1.Node) Operation {
-	if i.isControlNode(node) {
-		// On the control nodes, we do not run the submariner route-agent pod which annotates
-		// the node with route.CniInterfaceIp. So, we skip control nodes in globalnet.
-		klog.V(log.DEBUG).Infof("Skip processing %q node, as its a master node.", node.Name)
-		return Ignore
-	}
-
 	cniIfaceIP := node.GetAnnotations()[route.CniInterfaceIp]
 	if cniIfaceIP == "" {
 		// To support connectivity from HostNetwork to remoteCluster, globalnet requires the

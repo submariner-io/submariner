@@ -22,8 +22,6 @@ const (
 	kubeProxyServiceChainPrefix = "KUBE-SVC-"
 	kubeProxyServiceChainName   = "KUBE-SERVICES"
 
-	k8sMasterNode = "node-role.kubernetes.io/master"
-
 	AddRules    = true
 	DeleteRules = false
 
