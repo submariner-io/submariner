@@ -21,8 +21,8 @@ func (l *Handler) GetName() string {
 	return "logger"
 }
 
-func (l *Handler) GetNetworkPlugin() string {
-	return event.AnyNetworkPlugin
+func (l *Handler) GetNetworkPlugins() []string {
+	return []string{event.AnyNetworkPlugin}
 }
 
 func (l *Handler) TransitionToNonGateway() error {

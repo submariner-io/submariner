@@ -12,8 +12,8 @@ const (
 	submarinerUpstreamSwPort = "submariner_up_lsp"
 	submarinerUpstreamRPort  = "submariner_up_lrp"
 	submarinerUpstreamMAC    = "00:60:2f:10:01:01"
-	submarinerUpstreamNET    = submarinerUpstreamIP + "/24"
-	submarinerUpstreamIP     = "169.254.33.7"
+	submarinerUpstreamNET    = SubmarinerUpstreamIP + "/24"
+	SubmarinerUpstreamIP     = "169.254.33.7" // public constant, used in the route-agent handler
 	hostUpstreamIP           = "169.254.33.1"
 )
 
