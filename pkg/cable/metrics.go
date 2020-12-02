@@ -101,7 +101,7 @@ var (
 	connectionLatencySecondsGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "connection_latency_seconds",
-			Help: "Connection latency in seconds (average RTT, by cable driver and cable)",
+			Help: "Connection latency in seconds (last RTT, by cable driver and cable)",
 		},
 		[]string{
 			cableDriverLabel,
