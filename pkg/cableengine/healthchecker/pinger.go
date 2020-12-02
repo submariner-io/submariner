@@ -3,6 +3,7 @@ package healthchecker
 import (
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/go-ping/ping"
@@ -27,6 +28,7 @@ type PingerInterface interface {
 }
 
 type pingerInfo struct {
+	sync.Mutex
 	ip                 string
 	pingInterval       time.Duration
 	maxPacketLossCount uint
@@ -91,6 +93,9 @@ func (p *pingerInfo) doPing() error {
 
 		// Pinger will mark a connection as an error if the packet loss reaches the threshold
 		if pinger.PacketsSent-pinger.PacketsRecv > int(p.maxPacketLossCount) {
+			p.Lock()
+			defer p.Unlock()
+
 			p.failureMsg = fmt.Sprintf("Failed to successfully ping the remote endpoint IP %q", p.ip)
 			pinger.PacketsSent = 0
 			pinger.PacketsRecv = 0
@@ -98,6 +103,9 @@ func (p *pingerInfo) doPing() error {
 	}
 
 	pinger.OnRecv = func(packet *ping.Packet) {
+		p.Lock()
+		defer p.Unlock()
+
 		p.failureMsg = ""
 		p.statistics.update(uint64(packet.Rtt.Nanoseconds()))
 	}
@@ -117,6 +125,9 @@ func (p *pingerInfo) GetIP() string {
 }
 
 func (p *pingerInfo) GetLatencyInfo() *LatencyInfo {
+	p.Lock()
+	defer p.Unlock()
+
 	lastTime, _ := time.ParseDuration(strconv.FormatUint(p.statistics.lastRtt, 10) + "ns")
 	minTime, _ := time.ParseDuration(strconv.FormatUint(p.statistics.minRtt, 10) + "ns")
 	averageTime, _ := time.ParseDuration(strconv.FormatUint(p.statistics.mean, 10) + "ns")
