@@ -10,8 +10,6 @@ import (
 	"k8s.io/klog"
 )
 
-var waitTime = 15 * time.Second
-
 var defaultMaxPacketLossCount uint = 5
 
 // The RTT will be stored and will be used to calculate the statistics until
@@ -56,8 +54,12 @@ func (p *pingerInfo) Start() {
 			select {
 			case <-p.stopCh:
 				return
-			case <-time.After(waitTime):
-				p.sendPing()
+			default:
+				err := p.doPing()
+				if err != nil {
+					klog.Errorf("Unable to start pinger for IP %q: %v", p.ip, err)
+					return
+				}
 			}
 		}
 	}()
@@ -67,11 +69,12 @@ func (p *pingerInfo) Stop() {
 	close(p.stopCh)
 }
 
-func (p *pingerInfo) sendPing() {
+func (p *pingerInfo) doPing() error {
+	klog.Infof("Starting pinger for IP %q", p.ip)
+
 	pinger, err := ping.NewPinger(p.ip)
 	if err != nil {
-		klog.Errorf("Error creating pinger for IP %q: %v", p.ip, err)
-		return
+		return err
 	}
 
 	pinger.Interval = p.pingInterval
@@ -79,6 +82,13 @@ func (p *pingerInfo) sendPing() {
 	pinger.RecordRtts = false
 
 	pinger.OnSend = func(packet *ping.Packet) {
+		select {
+		case <-p.stopCh:
+			pinger.Stop()
+			return
+		default:
+		}
+
 		// Pinger will mark a connection as an error if the packet loss reaches the threshold
 		if pinger.PacketsSent-pinger.PacketsRecv > int(p.maxPacketLossCount) {
 			p.failureMsg = fmt.Sprintf("Failed to successfully ping the remote endpoint IP %q", p.ip)
@@ -94,8 +104,12 @@ func (p *pingerInfo) sendPing() {
 
 	err = pinger.Run()
 	if err != nil {
-		klog.Errorf("Error running ping for the remote endpoint IP %q: %v", p.ip, err)
+		return err
 	}
+
+	klog.Infof("Pinger for IP %q stopped", p.ip)
+
+	return nil
 }
 
 func (p *pingerInfo) GetIP() string {
