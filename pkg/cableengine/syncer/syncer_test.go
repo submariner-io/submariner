@@ -356,7 +356,7 @@ func (t *testDriver) run() {
 		RestMapper: restMapper,
 		Client:     dynamicClient,
 		Scheme:     scheme,
-	}, namespace, "west")
+	}, namespace, "west", 1, 15)
 	t.syncer = syncer.NewGatewaySyncer(t.engine, t.gateways, t.expectedGateway.Status.Version, t.healthChecker)
 
 	informerFactory := submarinerInformers.NewSharedInformerFactory(client, 0)
