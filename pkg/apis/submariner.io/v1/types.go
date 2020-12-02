@@ -108,7 +108,7 @@ type LatencyRTTSpec struct {
 	Min     string `json:"min,omitempty"`
 	Average string `json:"average,omitempty"`
 	Max     string `json:"max,omitempty"`
-	StdDev  string `json:"stddev,omitempty"`
+	StdDev  string `json:"stdDev,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
