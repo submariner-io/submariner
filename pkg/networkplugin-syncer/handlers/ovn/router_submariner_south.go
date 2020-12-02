@@ -42,6 +42,11 @@ func (ovn *SyncHandler) updateGatewayNode() error {
 		return err
 	}
 
+	// Update ovn-kubernetes host management ACL to allow return of fragmentation ICMP for PMTU discovery
+	if err := ovn.changeMgmtAllowRelatedACL(chassis.Hostname); err != nil {
+		return err
+	}
+
 	// Associate the port to an specific chassis (=host) on OVN so the traffic flows out/in through that host
 	// the active submariner-gateway in our case
 	if err := ovn.associateSubmarinerExternalPortToChassis(chassis); err != nil {
