@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/cableengine"
 	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
 	v1typed "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
@@ -209,9 +210,14 @@ func (i *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 				latencyInfo := i.healthCheck.GetLatencyInfo(&connection.Endpoint)
 				if latencyInfo != nil {
 					connection.LatencyRTT = latencyInfo.Spec
-					if connection.Status == v1.Connected && latencyInfo.ConnectionError != "" {
-						connection.Status = v1.ConnectionError
-						connection.StatusMessage = latencyInfo.ConnectionError
+					if connection.Status == v1.Connected {
+						lastRTT, _ := time.ParseDuration(latencyInfo.Spec.Last)
+						cable.RecordConnectionLatency(localEndpoint.Spec.CableName, &localEndpoint.Spec, &connection.Endpoint, lastRTT.Seconds())
+
+						if latencyInfo.ConnectionError != "" {
+							connection.Status = v1.ConnectionError
+							connection.StatusMessage = latencyInfo.ConnectionError
+						}
 					}
 				}
 			}
