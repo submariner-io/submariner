@@ -46,7 +46,7 @@ jobs:
         env:
           QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
           QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}
-          RELEASE_ARGS: submariner submariner-route-agent submariner-globalnet
+          RELEASE_ARGS: submariner submariner-route-agent submariner-globalnet submariner-networkplugin-syncer
           IMAGES_ARGS: --nocache
         run: |
           if [[ $GITHUB_REF =~ "/tags/" ]]; then
