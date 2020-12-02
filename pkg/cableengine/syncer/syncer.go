@@ -210,12 +210,14 @@ func (i *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 				latencyInfo := i.healthCheck.GetLatencyInfo(&connection.Endpoint)
 				if latencyInfo != nil {
 					connection.LatencyRTT = latencyInfo.Spec
-					lastRTT, _ := time.ParseDuration(latencyInfo.Spec.Last)
-					cable.RecordConnectionLatency(localEndpoint.Spec.CableName, &localEndpoint.Spec, &connection.Endpoint, lastRTT.Seconds())
+					if connection.Status == v1.Connected {
+						lastRTT, _ := time.ParseDuration(latencyInfo.Spec.Last)
+						cable.RecordConnectionLatency(localEndpoint.Spec.CableName, &localEndpoint.Spec, &connection.Endpoint, lastRTT.Seconds())
 
-					if connection.Status == v1.Connected && latencyInfo.ConnectionError != "" {
-						connection.Status = v1.ConnectionError
-						connection.StatusMessage = latencyInfo.ConnectionError
+						if latencyInfo.ConnectionError != "" {
+							connection.Status = v1.ConnectionError
+							connection.StatusMessage = latencyInfo.ConnectionError
+						}
 					}
 				}
 			}
