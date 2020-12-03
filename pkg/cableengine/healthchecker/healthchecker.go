@@ -1,7 +1,6 @@
 package healthchecker
 
 import (
-	"strconv"
 	"sync"
 	"time"
 
@@ -23,21 +22,27 @@ type Interface interface {
 	GetLatencyInfo(endpoint *submarinerv1.EndpointSpec) *LatencyInfo
 }
 
-type controller struct {
-	endpointWatcher    watcher.Interface
-	pingers            sync.Map
-	clusterID          string
-	pingInterval       uint
-	maxPacketLossCount uint
+type Config struct {
+	WatcherConfig      *watcher.Config
+	EndpointNamespace  string
+	ClusterID          string
+	PingInterval       uint
+	MaxPacketLossCount uint
+	NewPinger          func(string, time.Duration, uint) PingerInterface
 }
 
-func New(config *watcher.Config, endpointNameSpace, clusterID string, pingInterval, maxPacketLossCount uint) (Interface, error) {
+type controller struct {
+	endpointWatcher watcher.Interface
+	pingers         sync.Map
+	config          *Config
+}
+
+func New(config *Config) (Interface, error) {
 	controller := &controller{
-		clusterID:          clusterID,
-		pingInterval:       pingInterval,
-		maxPacketLossCount: maxPacketLossCount,
+		config: config,
 	}
-	config.ResourceConfigs = []watcher.ResourceConfig{
+
+	config.WatcherConfig.ResourceConfigs = []watcher.ResourceConfig{
 		{
 			Name:         "HealthChecker Endpoint Controller",
 			ResourceType: &submarinerv1.Endpoint{},
@@ -46,41 +51,23 @@ func New(config *watcher.Config, endpointNameSpace, clusterID string, pingInterv
 				OnUpdateFunc: controller.endpointCreatedorUpdated,
 				OnDeleteFunc: controller.endpointDeleted,
 			},
-			SourceNamespace: endpointNameSpace,
+			SourceNamespace: config.EndpointNamespace,
 		},
 	}
 
-	endpointWatcher, err := watcher.New(config)
+	var err error
 
+	controller.endpointWatcher, err = watcher.New(config.WatcherConfig)
 	if err != nil {
 		return nil, err
 	}
-
-	controller.endpointWatcher = endpointWatcher
 
 	return controller, nil
 }
 
 func (h *controller) GetLatencyInfo(endpoint *submarinerv1.EndpointSpec) *LatencyInfo {
 	if obj, found := h.pingers.Load(endpoint.CableName); found {
-		pinger := obj.(*pingerInfo)
-
-		lastTime, _ := time.ParseDuration(strconv.FormatUint(pinger.statistics.lastRtt, 10) + "ns")
-		minTime, _ := time.ParseDuration(strconv.FormatUint(pinger.statistics.minRtt, 10) + "ns")
-		averageTime, _ := time.ParseDuration(strconv.FormatUint(pinger.statistics.mean, 10) + "ns")
-		maxTime, _ := time.ParseDuration(strconv.FormatUint(pinger.statistics.maxRtt, 10) + "ns")
-		stdDevTime, _ := time.ParseDuration(strconv.FormatUint(pinger.statistics.stdDev, 10) + "ns")
-
-		return &LatencyInfo{
-			ConnectionError: pinger.failureMsg,
-			Spec: &submarinerv1.LatencyRTTSpec{
-				Last:    lastTime.String(),
-				Min:     minTime.String(),
-				Average: averageTime.String(),
-				Max:     maxTime.String(),
-				StdDev:  stdDevTime.String(),
-			},
-		}
+		return obj.(PingerInterface).GetLatencyInfo()
 	}
 
 	return nil
@@ -91,13 +78,16 @@ func (h *controller) Start(stopCh <-chan struct{}) error {
 		return err
 	}
 
+	klog.Infof("CableEngine HealthChecker started with PingInterval: %v, MaxPacketLossCount: %v", h.config.PingInterval,
+		h.config.MaxPacketLossCount)
+
 	return nil
 }
 
 func (h *controller) endpointCreatedorUpdated(obj runtime.Object) bool {
 	klog.V(log.TRACE).Infof("Endpoint created: %#v", obj)
 	endpointCreated := obj.(*submarinerv1.Endpoint)
-	if endpointCreated.Spec.ClusterID == h.clusterID {
+	if endpointCreated.Spec.ClusterID == h.config.ClusterID {
 		return false
 	}
 
@@ -108,33 +98,38 @@ func (h *controller) endpointCreatedorUpdated(obj runtime.Object) bool {
 	}
 
 	if obj, found := h.pingers.Load(endpointCreated.Spec.CableName); found {
-		pinger := obj.(*pingerInfo)
-		if pinger.healthCheckIP == endpointCreated.Spec.HealthCheckIP {
+		pinger := obj.(PingerInterface)
+		if pinger.GetIP() == endpointCreated.Spec.HealthCheckIP {
 			return false
 		}
 
 		klog.V(log.DEBUG).Infof("HealthChecker is already running for %q - stopping", endpointCreated.Name)
-		pinger.stop()
+		pinger.Stop()
 		h.pingers.Delete(endpointCreated.Spec.CableName)
 	}
 
-	klog.V(log.TRACE).Infof("Starting Pinger for CableName: %q, with HealthCheckIP: %q",
-		endpointCreated.Spec.CableName, endpointCreated.Spec.HealthCheckIP)
-
-	pingInterval := DefaultPingInterval
-	if h.pingInterval != 0 {
-		pingInterval = time.Second * time.Duration(h.pingInterval)
+	pingInterval := defaultPingInterval
+	if h.config.PingInterval != 0 {
+		pingInterval = time.Second * time.Duration(h.config.PingInterval)
 	}
 
-	maxPacketLossCount := DefaultMaxPacketLossCount
+	maxPacketLossCount := defaultMaxPacketLossCount
 
-	if h.maxPacketLossCount != 0 {
-		maxPacketLossCount = h.maxPacketLossCount
+	if h.config.MaxPacketLossCount != 0 {
+		maxPacketLossCount = h.config.MaxPacketLossCount
 	}
 
-	pinger := newPinger(endpointCreated.Spec.HealthCheckIP, pingInterval, maxPacketLossCount)
+	newPingerFunc := h.config.NewPinger
+	if newPingerFunc == nil {
+		newPingerFunc = newPinger
+	}
+
+	pinger := newPingerFunc(endpointCreated.Spec.HealthCheckIP, pingInterval, maxPacketLossCount)
 	h.pingers.Store(endpointCreated.Spec.CableName, pinger)
-	pinger.start()
+	pinger.Start()
+
+	klog.Infof("CableEngine HealthChecker started pinger for CableName: %q with HealthCheckIP %q",
+		endpointCreated.Spec.CableName, endpointCreated.Spec.HealthCheckIP)
 
 	return false
 }
@@ -146,8 +141,8 @@ func (h *controller) endpointDeleted(obj runtime.Object) bool {
 	}
 
 	if obj, found := h.pingers.Load(endpointDeleted.Spec.CableName); found {
-		pinger := obj.(*pingerInfo)
-		pinger.stop()
+		pinger := obj.(PingerInterface)
+		pinger.Stop()
 		h.pingers.Delete(endpointDeleted.Spec.CableName)
 	}
 
