@@ -17,14 +17,18 @@ var WaitingForLocalEndpoint = errors.New("Waiting for the local endpoint details
 
 type SyncHandler struct {
 	event.HandlerBase
-	syncMutex        sync.Mutex
-	k8sClientset     clientset.Interface
-	nbctl            *nbctl.NbCtl
-	nbdb             goovn.Client
-	sbdb             goovn.Client
-	localEndpoint    *submV1.Endpoint
-	remoteEndpoints  map[string]*submV1.Endpoint
-	lastOvnGwChassis string
+	syncMutex             sync.Mutex
+	k8sClientset          clientset.Interface
+	nbctl                 *nbctl.NbCtl
+	nbdb                  goovn.Client
+	sbdb                  goovn.Client
+	localEndpoint         *submV1.Endpoint
+	remoteEndpoints       map[string]*submV1.Endpoint
+	lastOvnGwChassis      string
+	submarinerUpstreamIP  string
+	submarinerUpstreamNet string
+	hostUpstreamIP        string
+	hasNodeLocalSwitch    bool
 }
 
 func (ovn *SyncHandler) GetName() string {
@@ -44,6 +48,10 @@ func NewSyncHandler(k8sClientset clientset.Interface) event.Handler {
 
 func (ovn *SyncHandler) Init() error {
 	if err := ovn.initClients(); err != nil {
+		return err
+	}
+
+	if err := ovn.detectOvnKubernetesImplementation(); err != nil {
 		return err
 	}
 
