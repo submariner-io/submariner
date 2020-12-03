@@ -133,7 +133,8 @@ func (ovn *Handler) cleanupForwardingIptables() error {
 
 func getSubmDefaultRoute() *netlink.Route {
 	return &netlink.Route{
-		Gw:    net.ParseIP(npSyncerOvn.SubmarinerUpstreamIP),
+		// TODO WIP: detect as we have now two options
+		Gw:    net.ParseIP(npSyncerOvn.SubmarinerUpstreamIPv2),
 		Table: constants.RouteAgentHostNetworkTableID,
 	}
 }

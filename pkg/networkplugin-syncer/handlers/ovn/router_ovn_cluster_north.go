@@ -16,8 +16,8 @@ const (
 	ovnClusterSubmarinerSwPort = "ovn_cluster_subm_lsp"
 	ovnClusterSubmarinerMAC    = "00:60:2f:10:01:02"
 	ovnClusterSubmarinerNET    = ovnClusterSubmarinerIP + "/29"
-	ovnClusterSubmarinerIP     = "169.254.34.2"
-	ovnRoutePoliciesPrio       = 10
+	ovnClusterSubmarinerIP     = "169.254.254.2"
+	ovnRoutePoliciesPrio       = 20000
 )
 
 func (ovn *SyncHandler) connectOvnClusterRouterToSubm() error {
