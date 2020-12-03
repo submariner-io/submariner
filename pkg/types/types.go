@@ -25,7 +25,7 @@ type SubmarinerSpecification struct {
 	Token                         string
 	Debug                         bool
 	NatEnabled                    bool
-	HealthCheckEnabled            bool
+	HealthCheckEnabled            bool `default:"true"`
 	HealthCheckInterval           uint
 	HealthCheckMaxPacketLossCount uint
 }

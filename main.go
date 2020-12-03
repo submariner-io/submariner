@@ -124,7 +124,12 @@ func main() {
 	}
 
 	var cableHealthchecker healthchecker.Interface
-	if len(submSpec.GlobalCidr) == 0 && submSpec.HealthCheckEnabled {
+
+	if !submSpec.HealthCheckEnabled {
+		klog.Info("The CableEngine HealthChecker is disabled")
+	} else if len(submSpec.GlobalCidr) > 0 {
+		klog.Info("Globalnet is enabled - not running the CableEngine HealthChecker")
+	} else {
 		cableHealthchecker, err = healthchecker.New(&healthchecker.Config{
 			WatcherConfig:      &watcher.Config{RestConfig: cfg},
 			EndpointNamespace:  submSpec.Namespace,

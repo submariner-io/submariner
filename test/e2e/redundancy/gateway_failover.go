@@ -21,12 +21,6 @@ var _ = Describe("[redundancy] Gateway fail-over tests", func() {
 	// After each test, we make sure that the system again has a single gateway, the active one
 	AfterEach(f.GatewayCleanup)
 
-	When("any gateway node is configured", func() {
-		It("should be reported to the Gateway API", func() {
-			testBasicGatewayReporting(f)
-		})
-	})
-
 	When("one gateway node is configured and the submariner engine pod fails", func() {
 		It("should start a new submariner engine pod and be able to connect from another cluster", func() {
 			testEnginePodRestartScenario(f)
@@ -39,19 +33,6 @@ var _ = Describe("[redundancy] Gateway fail-over tests", func() {
 		})
 	})
 })
-
-func testBasicGatewayReporting(f *subFramework.Framework) {
-	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
-
-	By(fmt.Sprintf("Ensuring that only one gateway reports as active %q", clusterAName))
-
-	activeGateways := f.AwaitGatewaysWithStatus(framework.ClusterA, subv1.HAStatusActive)
-
-	Expect(activeGateways).To(HaveLen(1))
-
-	By(fmt.Sprintf("Ensuring that the gateway %q is reporting connections", activeGateways[0].Name))
-	f.AwaitGatewayFullyConnected(framework.ClusterA, activeGateways[0].Name)
-}
 
 func testEnginePodRestartScenario(f *subFramework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
