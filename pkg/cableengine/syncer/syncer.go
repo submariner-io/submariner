@@ -218,6 +218,9 @@ func (i *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 							connection.Status = v1.ConnectionError
 							connection.StatusMessage = latencyInfo.ConnectionError
 						}
+					} else if connection.Status == v1.ConnectionError && latencyInfo.ConnectionError == "" {
+						connection.Status = v1.Connected
+						connection.StatusMessage = ""
 					}
 				}
 			}
