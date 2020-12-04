@@ -28,7 +28,7 @@ jobs:
       - name: Install WireGuard kernel module (only in WireGuard jobs)
         if: matrix.cable_driver == 'wireguard'
         run: |
-          sudo apt install -y linux-headers-$(uname -r) wireguard wireguard-dkms
+          sudo apt install -y linux-headers-$(uname -r) wireguard
           sudo modprobe wireguard
 
       - name: Reclaim free space
