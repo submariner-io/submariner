@@ -351,7 +351,8 @@ func testGatewayLatencyInfo() {
 			}
 
 			t.pinger.SetLatencyInfo(&healthchecker.LatencyInfo{
-				Spec: t.expectedGateway.Status.Connections[0].LatencyRTT,
+				ConnectionStatus: healthchecker.Connected,
+				Spec:             t.expectedGateway.Status.Connections[0].LatencyRTT,
 			})
 
 			t.engine.Unlock()
@@ -362,8 +363,9 @@ func testGatewayLatencyInfo() {
 			t.expectedGateway.Status.Connections[0].StatusMessage = "Ping failed"
 
 			t.pinger.SetLatencyInfo(&healthchecker.LatencyInfo{
-				ConnectionError: t.expectedGateway.Status.Connections[0].StatusMessage,
-				Spec:            t.expectedGateway.Status.Connections[0].LatencyRTT,
+				ConnectionStatus: healthchecker.ConnectionError,
+				ConnectionError:  t.expectedGateway.Status.Connections[0].StatusMessage,
+				Spec:             t.expectedGateway.Status.Connections[0].LatencyRTT,
 			})
 
 			t.awaitGatewayUpdated(t.expectedGateway)
@@ -372,7 +374,8 @@ func testGatewayLatencyInfo() {
 			t.expectedGateway.Status.Connections[0].StatusMessage = ""
 
 			t.pinger.SetLatencyInfo(&healthchecker.LatencyInfo{
-				Spec: t.expectedGateway.Status.Connections[0].LatencyRTT,
+				ConnectionStatus: healthchecker.Connected,
+				Spec:             t.expectedGateway.Status.Connections[0].LatencyRTT,
 			})
 
 			t.awaitGatewayUpdated(t.expectedGateway)
