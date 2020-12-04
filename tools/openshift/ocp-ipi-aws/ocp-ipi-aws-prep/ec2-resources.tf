@@ -61,6 +61,28 @@ resource "aws_security_group_rule" "worker_to_master_sg_vxlan_rule" {
 
 
 
+# Add a rule for metrics traffic for all workers.
+resource "aws_security_group_rule" "worker_sg_metrics_rule" {
+  security_group_id        = data.aws_security_group.worker_sg.id
+  source_security_group_id = data.aws_security_group.worker_sg.id
+  from_port                = 8080
+  protocol                 = "tcp"
+  to_port                  = 8080
+  type                     = "ingress"
+}
+
+# Add a rule for metrics traffic from master nodes to worker nodes.
+resource "aws_security_group_rule" "master_to_worker_sg_metrics_rule" {
+  security_group_id        = data.aws_security_group.worker_sg.id
+  source_security_group_id = data.aws_security_group.master_sg.id
+  from_port                = 8080
+  protocol                 = "tcp"
+  to_port                  = 8080
+  type                     = "ingress"
+}
+
+
+
 # Create a submariner gateway security group.
 resource "aws_security_group" "submariner_gw_sg" {
   name   = "${var.cluster_id}-submariner-gw-sg"
