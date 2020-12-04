@@ -87,8 +87,8 @@ func (p *pingerInfo) doPing() error {
 	pinger, err := ping.NewPinger(p.ip)
 	if err != nil {
 		p.connectionStatus = ConnectionUnknown
-		p.failureMsg = fmt.Sprintf("Failed to start healthchecker for the remote endpoint " +
-			"IP %q due to %v ", p.ip, err)
+		p.failureMsg = fmt.Sprintf("Failed to create the pinger for the remote endpoint IP %q: %v ", p.ip, err)
+
 		return err
 	}
 
@@ -129,8 +129,8 @@ func (p *pingerInfo) doPing() error {
 	err = pinger.Run()
 	if err != nil {
 		p.connectionStatus = ConnectionUnknown
-		p.failureMsg = fmt.Sprintf("Failed to start healthchecker for the remote endpoint " +
-			"IP %q due to %v ", p.ip, err)
+		p.failureMsg = fmt.Sprintf("Failed to create the pinger for the remote endpoint IP %q: %v ", p.ip, err)
+
 		return err
 	}
 
@@ -149,7 +149,7 @@ func (p *pingerInfo) GetLatencyInfo() *LatencyInfo {
 
 	return &LatencyInfo{
 		ConnectionStatus: p.connectionStatus,
-		ConnectionError: p.failureMsg,
+		ConnectionError:  p.failureMsg,
 		Spec: &submarinerv1.LatencyRTTSpec{
 			Last:    time.Duration(p.statistics.lastRtt).String(),
 			Min:     time.Duration(p.statistics.minRtt).String(),
