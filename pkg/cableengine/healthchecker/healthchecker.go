@@ -12,9 +12,18 @@ import (
 )
 
 type LatencyInfo struct {
-	ConnectionError string
-	Spec            *submarinerv1.LatencyRTTSpec
+	ConnectionError  string
+	ConnectionStatus ConnectionStatus
+	Spec             *submarinerv1.LatencyRTTSpec
 }
+
+type ConnectionStatus string
+
+const (
+	Connected         ConnectionStatus = "connected"
+	ConnectionUnknown ConnectionStatus = "unknown"
+	ConnectionError   ConnectionStatus = "error"
+)
 
 type Interface interface {
 	Start(stopCh <-chan struct{}) error

@@ -38,6 +38,7 @@ type pingerInfo struct {
 	maxPacketLossCount uint
 	statistics         statistics
 	failureMsg         string
+	connectionStatus   ConnectionStatus
 	stopCh             chan struct{}
 }
 
@@ -85,6 +86,9 @@ func (p *pingerInfo) doPing() error {
 
 	pinger, err := ping.NewPinger(p.ip)
 	if err != nil {
+		p.connectionStatus = ConnectionUnknown
+		p.failureMsg = fmt.Sprintf("Failed to start healthchecker for the remote endpoint " +
+			"IP %q due to %v ", p.ip, err)
 		return err
 	}
 
@@ -106,6 +110,7 @@ func (p *pingerInfo) doPing() error {
 			p.Lock()
 			defer p.Unlock()
 
+			p.connectionStatus = ConnectionError
 			p.failureMsg = fmt.Sprintf("Failed to successfully ping the remote endpoint IP %q", p.ip)
 			pinger.PacketsSent = 0
 			pinger.PacketsRecv = 0
@@ -116,12 +121,16 @@ func (p *pingerInfo) doPing() error {
 		p.Lock()
 		defer p.Unlock()
 
+		p.connectionStatus = Connected
 		p.failureMsg = ""
 		p.statistics.update(uint64(packet.Rtt.Nanoseconds()))
 	}
 
 	err = pinger.Run()
 	if err != nil {
+		p.connectionStatus = ConnectionUnknown
+		p.failureMsg = fmt.Sprintf("Failed to start healthchecker for the remote endpoint " +
+			"IP %q due to %v ", p.ip, err)
 		return err
 	}
 
@@ -139,6 +148,7 @@ func (p *pingerInfo) GetLatencyInfo() *LatencyInfo {
 	defer p.Unlock()
 
 	return &LatencyInfo{
+		ConnectionStatus: p.connectionStatus,
 		ConnectionError: p.failureMsg,
 		Spec: &submarinerv1.LatencyRTTSpec{
 			Last:    time.Duration(p.statistics.lastRtt).String(),
