@@ -15,7 +15,7 @@ jobs:
       matrix:
         deploytool: ['operator', 'helm']
         globalnet: ['', 'globalnet']
-        cable_driver: ['', 'wireguard', 'libreswan']
+        cable_driver: ['libreswan', 'strongswan', 'wireguard']
         exclude:
           # Our Helm setup doesn’t know how to deploy other cable drivers
           - deploytool: 'helm'
