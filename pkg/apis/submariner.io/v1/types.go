@@ -83,24 +83,6 @@ type GatewayStatus struct {
 	Connections   []Connection `json:"connections"`
 }
 
-// LatencySpec describes the round trip time information in nanoseconds for a packet
-// between the gateway pods of two clusters.
-type LatencySpec struct {
-	// TODO This shall be deleted once the operator is using the latest.
-	// Using Optional to avoid validation errors when this field
-	// is not used.
-	// +optional
-	LastRTT uint64 `json:"lastRTT,omitempty"`
-	// +optional
-	MinRTT uint64 `json:"minRTT,omitempty"`
-	// +optional
-	AverageRTT uint64 `json:"averageRTT,omitempty"`
-	// +optional
-	MaxRTT uint64 `json:"maxRTT,omitempty"`
-	// +optional
-	StdDevRTT uint64 `json:"stddevRTT,omitempty"`
-}
-
 // LatencySpec describes the round trip time information for a packet
 // between the gateway pods of two clusters.
 type LatencyRTTSpec struct {
@@ -130,8 +112,6 @@ type Connection struct {
 	Status        ConnectionStatus `json:"status"`
 	StatusMessage string           `json:"statusMessage"`
 	Endpoint      EndpointSpec     `json:"endpoint"`
-	// +optional
-	Latency *LatencySpec `json:"latency,omitempty"`
 	// +optional
 	LatencyRTT *LatencyRTTSpec `json:"latencyRTT,omitempty"`
 }
