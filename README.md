@@ -34,7 +34,7 @@ experimentation, it is quite possible that you could run into bugs.
 
 ## Architecture
 
-See the [Architecture section on Submariner's website](https://submariner.io/getting_started/architecture/).
+See the [Architecture section on Submariner's website](https://submariner.io/getting-started/architecture/).
 
 ### Network Path
 
@@ -51,7 +51,7 @@ node.
 
 ## Prerequisites
 
-See the [Prerequisites docs on Submariner's website](https://submariner.io/getting_started/#prerequisites).
+See the [Prerequisites docs on Submariner's website](https://submariner.io/getting-started/#prerequisites).
 
 ## Installation
 
@@ -74,7 +74,7 @@ See the [`subctl verify` docs on Submariner's website](https://submariner.io/ope
 
 ## Building and Testing
 
-See the [Building and Testing docs on Submariner's website](https://submariner.io/for_developers/building_testing/).
+See the [Building and Testing docs on Submariner's website](https://submariner.io/development/building-testing/).
 
 ## Known Issues/Notes
 
@@ -89,4 +89,4 @@ When running in OpenShift, Submariner needs to grant the appropriate security co
 
 ## Contributing
 
-See the [For Developers section on Submariner's website](https://submariner.io/for_developers/).
+See the [For Developers section on Submariner's website](https://submariner.io/development/).
