@@ -8,7 +8,7 @@ import (
 	"github.com/vishvananda/netlink"
 	"k8s.io/klog"
 
-	"github.com/submariner-io/submariner/pkg/routeagent/cleanup"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/cleanup"
 )
 
 type XFRMCleanupHandler struct{}

@@ -2,7 +2,7 @@ package cleanup
 
 import (
 	"github.com/submariner-io/submariner/pkg/cable/strongswan"
-	"github.com/submariner-io/submariner/pkg/routeagent/cleanup"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/cleanup"
 )
 
 // TODO(mangelajo) This is a generic GetCleanupHandlers as a first step, on a later step
