@@ -3,7 +3,7 @@ package kubeproxy_iptables
 import (
 	"github.com/submariner-io/admiral/pkg/log"
 
-	"github.com/submariner-io/submariner/pkg/routeagent/cleanup"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/cleanup"
 
 	"k8s.io/klog"
 )

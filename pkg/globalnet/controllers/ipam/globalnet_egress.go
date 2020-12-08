@@ -8,7 +8,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"k8s.io/klog"
 
-	"github.com/submariner-io/submariner/pkg/routeagent/constants"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 )
 
 func (i *Controller) updateEgressRulesForResource(resourceName, sourceIP, globalIP string, addRules bool) error {
