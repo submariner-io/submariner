@@ -9,8 +9,7 @@ import (
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 
-	"github.com/submariner-io/submariner/pkg/routeagent/constants"
-	"github.com/submariner-io/submariner/pkg/routeagent/controllers/route"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/util"
 )
 
@@ -106,7 +105,7 @@ func (i *Controller) evaluateService(service *k8sv1.Service) Operation {
 }
 
 func (i *Controller) evaluateNode(node *k8sv1.Node) Operation {
-	cniIfaceIP := node.GetAnnotations()[route.CniInterfaceIp]
+	cniIfaceIP := node.GetAnnotations()[constants.CniInterfaceIP]
 	if cniIfaceIP == "" {
 		// To support connectivity from HostNetwork to remoteCluster, globalnet requires the
 		// cniIfaceIP of the respective node. Route-agent running on the node annotates the

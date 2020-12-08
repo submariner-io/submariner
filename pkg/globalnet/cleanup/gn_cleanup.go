@@ -7,8 +7,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
-	"github.com/submariner-io/submariner/pkg/routeagent/cleanup"
-	"github.com/submariner-io/submariner/pkg/routeagent/constants"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/cleanup"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 
 	"k8s.io/klog"
 )

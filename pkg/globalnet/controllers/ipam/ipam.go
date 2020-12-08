@@ -7,7 +7,7 @@ import (
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/globalnet/cleanup"
-	"github.com/submariner-io/submariner/pkg/routeagent/controllers/route"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -337,8 +337,8 @@ func (i *Controller) handleUpdateNode(old, newObj interface{}) {
 		return
 	}
 
-	oldCniIfaceIpOnNode := old.(*k8sv1.Node).GetAnnotations()[route.CniInterfaceIp]
-	newCniIfaceIpOnNode := newObj.(*k8sv1.Node).GetAnnotations()[route.CniInterfaceIp]
+	oldCniIfaceIpOnNode := old.(*k8sv1.Node).GetAnnotations()[constants.CniInterfaceIP]
+	newCniIfaceIpOnNode := newObj.(*k8sv1.Node).GetAnnotations()[constants.CniInterfaceIP]
 	if oldCniIfaceIpOnNode == "" && newCniIfaceIpOnNode == "" {
 		klog.V(log.DEBUG).Infof("In handleUpdateNode, node %q is not yet annotated with cniIfaceIP, enqueing", newObj.(*k8sv1.Node).Name)
 		i.enqueueObject(newObj, i.nodeWorkqueue)
@@ -457,7 +457,7 @@ func (i *Controller) handleRemovedNode(obj interface{}) {
 	}
 
 	globalIp := node.Annotations[submarinerIpamGlobalIp]
-	cniIfaceIp := node.Annotations[route.CniInterfaceIp]
+	cniIfaceIp := node.Annotations[constants.CniInterfaceIP]
 	if globalIp != "" && cniIfaceIp != "" {
 		if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
 			utilruntime.HandleError(err)
@@ -616,7 +616,7 @@ func (i *Controller) podUpdater(obj runtime.Object, key string) error {
 
 func (i *Controller) nodeUpdater(obj runtime.Object, key string) error {
 	node := obj.(*k8sv1.Node)
-	cniIfaceIP := node.GetAnnotations()[route.CniInterfaceIp]
+	cniIfaceIP := node.GetAnnotations()[constants.CniInterfaceIP]
 	existingGlobalIp := node.GetAnnotations()[submarinerIpamGlobalIp]
 	allocatedIp, err := i.annotateGlobalIp(key, existingGlobalIp)
 	if err != nil { // failed to get globalIp or failed to update, we want to retry
