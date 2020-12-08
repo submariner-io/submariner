@@ -16,25 +16,9 @@ override VALIDATE_ARGS += --skip-dirs pkg/client
 
 # Process extra flags from the `using=a,b,c` optional flag
 
-ifneq (,$(filter libreswan,$(_using)))
-cable_driver = libreswan
-else ifneq (,$(filter wireguard,$(_using)))
-cable_driver = wireguard
-endif
-
-ifneq (,$(cable_driver))
-ifneq (,$(filter helm,$(_using)))
-override DEPLOY_ARGS += --deploytool_submariner_args '--set cable-driver=$(cable_driver)'
-else
-override DEPLOY_ARGS += --deploytool_submariner_args '--cable-driver $(cable_driver)'
-endif
-endif
-
 # Targets to make
 
 deploy: images
-
-test: unit-test
 
 reload-images: build images
 	./scripts/$@ --restart $(restart)
@@ -42,22 +26,26 @@ reload-images: build images
 bin/submariner-engine: vendor/modules.txt main.go $(shell find pkg -not \( -path 'pkg/globalnet*' -o -path 'pkg/routeagent*' \))
 	${SCRIPTS_DIR}/compile.sh $@ main.go $(BUILD_ARGS)
 
-bin/submariner-route-agent: vendor/modules.txt $(shell find pkg/routeagent)
-	${SCRIPTS_DIR}/compile.sh $@ ./pkg/routeagent/main.go $(BUILD_ARGS)
+bin/submariner-route-agent: vendor/modules.txt $(shell find pkg/routeagent_driver)
+	${SCRIPTS_DIR}/compile.sh $@ ./pkg/routeagent_driver/main.go $(BUILD_ARGS)
 
 bin/submariner-globalnet: vendor/modules.txt $(shell find pkg/globalnet)
 	${SCRIPTS_DIR}/compile.sh $@ ./pkg/globalnet/main.go $(BUILD_ARGS)
 
-build: bin/submariner-engine bin/submariner-route-agent bin/submariner-globalnet
+bin/submariner-networkplugin-syncer: vendor/modules.txt $(shell find pkg/networkplugin-syncer)
+	${SCRIPTS_DIR}/compile.sh $@ ./pkg/networkplugin-syncer/main.go $(BUILD_ARGS)
 
-ci: validate test build images
+build: bin/submariner-engine bin/submariner-route-agent bin/submariner-globalnet bin/submariner-networkplugin-syncer
 
-images: build package/.image.submariner package/.image.submariner-route-agent package/.image.submariner-globalnet
+ci: validate unit build images
+
+images: build package/.image.submariner package/.image.submariner-route-agent package/.image.submariner-globalnet \
+		package/.image.submariner-networkplugin-syncer
 
 $(TARGETS): vendor/modules.txt
 	./scripts/$@
 
-.PHONY: $(TARGETS) build ci images test validate
+.PHONY: $(TARGETS) build ci images unit validate
 
 else
 

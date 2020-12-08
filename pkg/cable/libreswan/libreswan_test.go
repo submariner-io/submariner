@@ -47,6 +47,7 @@ func testIPsecPortConfiguration() {
 func createLibreswan() *libreswan {
 	ls, err := NewLibreswan(types.SubmarinerEndpoint{}, types.SubmarinerCluster{})
 	Expect(err).NotTo(HaveOccurred())
+
 	return ls.(*libreswan)
 }
 

@@ -48,14 +48,12 @@ type engine struct {
 }
 
 // NewEngine creates a new Engine for the local cluster
-func NewEngine(localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) (Engine, error) {
-	i := engine{
+func NewEngine(localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) Engine {
+	return &engine{
 		localCluster:  localCluster,
 		localEndpoint: localEndpoint,
 		driver:        nil,
 	}
-
-	return &i, nil
 }
 
 func (i *engine) GetLocalEndpoint() *types.SubmarinerEndpoint {
@@ -69,7 +67,9 @@ func (i *engine) StartEngine() error {
 	if err := i.startDriver(); err != nil {
 		return err
 	}
+
 	klog.Infof("CableEngine controller started, driver: %q", i.driver.GetName())
+
 	return nil
 }
 
@@ -83,6 +83,7 @@ func (i *engine) startDriver() error {
 	if err := i.driver.Init(); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -107,11 +108,33 @@ func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 		return err
 	}
 
+	var connections *[]v1.Connection
+	if len(activeConnections) > 0 {
+		connections, err = i.driver.GetConnections()
+		if err != nil {
+			return err
+		}
+	}
+
 	for _, active := range activeConnections {
 		klog.V(log.TRACE).Infof("Analyzing currently active connection %q", active)
+
 		if active == endpoint.Spec.CableName {
-			klog.V(log.DEBUG).Infof("Cable %q is already installed - not installing again", active)
-			return nil
+			activeEndpointInfo := i.getEndpointInfo(active, connections)
+			if activeEndpointInfo != nil {
+				// There could be scenarios where the cableName would be the same but the
+				// PublicIP of the active GatewayNode changes.
+				if activeEndpointInfo.PublicIP == endpoint.Spec.PublicIP {
+					klog.V(log.DEBUG).Infof("Cable %q is already installed - not installing again", active)
+					return nil
+				} else {
+					klog.V(log.DEBUG).Infof("Cable %q is already installed - but PublicIP changed", active)
+					err = i.driver.DisconnectFromEndpoint(endpoint)
+					if err != nil {
+						return err
+					}
+				}
+			}
 		}
 
 		if util.GetClusterIDFromCableName(active) == endpoint.Spec.ClusterID {
@@ -125,6 +148,17 @@ func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 	}
 
 	klog.Infof("Successfully installed Endpoint cable %q with remote IP %s", endpoint.Spec.CableName, remoteEndpointIP)
+
+	return nil
+}
+
+func (i *engine) getEndpointInfo(cableName string, connections *[]v1.Connection) *v1.EndpointSpec {
+	for _, conn := range *connections {
+		if conn.Endpoint.CableName == cableName {
+			return &conn.Endpoint
+		}
+	}
+
 	return nil
 }
 
@@ -140,12 +174,14 @@ func (i *engine) RemoveCable(endpoint types.SubmarinerEndpoint) error {
 	}
 
 	klog.Infof("Successfully removed Endpoint cable %q", endpoint.Spec.CableName)
+
 	return nil
 }
 
 func (i *engine) GetHAStatus() v1.HAStatus {
 	i.Lock()
 	defer i.Unlock()
+
 	if i.driver == nil {
 		return v1.HAStatusPassive
 	} else {

@@ -35,5 +35,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&GatewayList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
+
 	return nil
 }

@@ -26,21 +26,27 @@ func (i *strongSwan) GetConnections() (*[]v1.Connection, error) {
 // It's made a separate function for testability (unit tests)
 func (i *strongSwan) getSAListConnections(sas []map[string]goStrongswanVici.IkeSa) (*[]v1.Connection, error) {
 	connections := []v1.Connection{}
+
 	for cableID, endpoint := range i.remoteEndpoints {
 		connection := v1.NewConnection(endpoint)
 		found := false
 		for _, saMap := range sas {
 			if sa, ok := saMap[cableID]; ok {
 				found = true
+
 				updateConnectionState(&sa, connection)
+
 				break
 			}
 		}
+
 		if !found {
 			connection.SetStatus(v1.ConnectionError, "No IKE SA found for cable %s", cableID)
 		}
+
 		connections = append(connections, *connection)
 	}
+
 	return &connections, nil
 }
 

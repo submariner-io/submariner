@@ -47,6 +47,7 @@ func AddDriver(name string, driverCreate DriverCreateFunc) {
 	if drivers[name] != nil {
 		klog.Fatalf("Multiple cable engine drivers attempting to register with name %q", name)
 	}
+
 	drivers[name] = driverCreate
 }
 
@@ -55,14 +56,18 @@ func NewDriver(localEndpoint types.SubmarinerEndpoint, localCluster types.Submar
 	driverCreate, ok := drivers[localEndpoint.Spec.Backend]
 	if !ok {
 		var driverList strings.Builder
+
 		for driver := range drivers {
 			if driverList.Len() > 0 {
 				driverList.WriteString(", ")
 			}
+
 			driverList.WriteString(driver)
 		}
+
 		return nil, fmt.Errorf("unsupported cable type %s; supported types: %s", localEndpoint.Spec.Backend, driverList.String())
 	}
+
 	return driverCreate(localEndpoint, localCluster)
 }
 

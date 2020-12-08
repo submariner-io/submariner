@@ -5,7 +5,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"reflect"
 	"strings"
 	"syscall"
 
@@ -15,6 +14,7 @@ import (
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/vishvananda/netlink"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/klog"
 )
 
@@ -24,7 +24,9 @@ func getAPIIdentifier(token string) (string, error) {
 	if len(token) != tokenLength {
 		return "", fmt.Errorf("Token %s length was not %d", token, tokenLength)
 	}
+
 	clusterID := token[0 : tokenLength/2]
+
 	return clusterID, nil
 }
 
@@ -32,7 +34,9 @@ func getConnectSecret(token string) (string, error) {
 	if len(token) != tokenLength {
 		return "", fmt.Errorf("Token %s length was not %d", token, tokenLength)
 	}
+
 	connectSecret := token[tokenLength/2 : tokenLength]
+
 	return connectSecret, nil
 }
 
@@ -71,31 +75,27 @@ func FlattenColors(colorCodes []string) string {
 	}
 
 	flattenedColors := colorCodes[0]
+
 	for k, v := range colorCodes {
 		if k != 0 {
 			flattenedColors = flattenedColors + "," + v
 		}
 	}
+
 	return flattenedColors
 }
 
-func GetLocalCluster(ss types.SubmarinerSpecification) (types.SubmarinerCluster, error) {
-	var localCluster types.SubmarinerCluster
-	localCluster.ID = ss.ClusterID
-	localCluster.Spec.ClusterID = ss.ClusterID
-	localCluster.Spec.ClusterCIDR = ss.ClusterCidr
-	localCluster.Spec.ServiceCIDR = ss.ServiceCidr
-	localCluster.Spec.GlobalCIDR = ss.GlobalCidr
-	localCluster.Spec.ColorCodes = ss.ColorCodes
-	return localCluster, nil
-}
-
 func GetLocalEndpoint(clusterID, backend string, backendConfig map[string]string, natEnabled bool,
-	subnets []string, privateIP string) (types.SubmarinerEndpoint, error) {
+	subnets []string, privateIP string, clusterCIDR []string) (types.SubmarinerEndpoint, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return types.SubmarinerEndpoint{}, fmt.Errorf("Error getting hostname: %v", err)
 	}
+
+	if backendConfig == nil {
+		backendConfig = make(map[string]string)
+	}
+
 	endpoint := types.SubmarinerEndpoint{
 		Spec: subv1.EndpointSpec{
 			CableName:     fmt.Sprintf("submariner-cable-%s-%s", clusterID, strings.ReplaceAll(privateIP, ".", "-")),
@@ -108,14 +108,64 @@ func GetLocalEndpoint(clusterID, backend string, backendConfig map[string]string
 			BackendConfig: backendConfig,
 		},
 	}
+
 	if natEnabled {
 		publicIP, err := ipify.GetIp()
 		if err != nil {
 			return types.SubmarinerEndpoint{}, fmt.Errorf("Could not determine public IP: %v", err)
 		}
+
 		endpoint.Spec.PublicIP = publicIP
 	}
+
+	endpoint.Spec.HealthCheckIP, err = getCNIInterfaceIPAddress(clusterCIDR)
+
+	if err != nil {
+		return types.SubmarinerEndpoint{}, fmt.Errorf("Error getting CNI Interface IP address: %v", err)
+	}
+
 	return endpoint, nil
+}
+
+//TODO: to handle de-duplication of code/finding common parts with the route agent
+func getCNIInterfaceIPAddress(clusterCIDRs []string) (string, error) {
+	for _, clusterCIDR := range clusterCIDRs {
+		_, clusterNetwork, err := net.ParseCIDR(clusterCIDR)
+		if err != nil {
+			return "", fmt.Errorf("unable to ParseCIDR %q : %v", clusterCIDR, err)
+		}
+
+		hostInterfaces, err := net.Interfaces()
+		if err != nil {
+			return "", fmt.Errorf("net.Interfaces() returned error : %v", err)
+		}
+
+		for _, iface := range hostInterfaces {
+			addrs, err := iface.Addrs()
+			if err != nil {
+				return "", fmt.Errorf("for interface %q, iface.Addrs returned error: %v", iface.Name, err)
+			}
+
+			for i := range addrs {
+				ipAddr, _, err := net.ParseCIDR(addrs[i].String())
+				if err != nil {
+					klog.Errorf("Unable to ParseCIDR : %q", addrs[i].String())
+				} else if ipAddr.To4() != nil {
+					klog.V(level.DEBUG).Infof("Interface %q has %q address", iface.Name, ipAddr)
+					address := net.ParseIP(ipAddr.String())
+
+					// Verify that interface has an address from cluster CIDR
+					if clusterNetwork.Contains(address) {
+						klog.V(level.DEBUG).Infof("Found CNI Interface %q that has IP %q from ClusterCIDR %q",
+							iface.Name, ipAddr.String(), clusterCIDR)
+						return ipAddr.String(), nil
+					}
+				}
+			}
+		}
+	}
+
+	return "", fmt.Errorf("unable to find CNI Interface on the host which has IP from %q", clusterCIDRs)
 }
 
 func GetClusterIDFromCableName(cableName string) string {
@@ -124,9 +174,11 @@ func GetClusterIDFromCableName(cableName string) string {
 	// submariner-cable-my-super-long_cluster-id-172-16-32-5
 	cableSplit := strings.Split(cableName, "-")
 	clusterID := cableSplit[2]
+
 	for i := 3; i < len(cableSplit)-4; i++ {
 		clusterID = clusterID + "-" + cableSplit[i]
 	}
+
 	return clusterID
 }
 
@@ -153,7 +205,7 @@ func GetClusterCRDName(cluster *types.SubmarinerCluster) (string, error) {
 func CompareEndpointSpec(left, right subv1.EndpointSpec) bool {
 	// maybe we have to use just reflect.DeepEqual(left, right), but in this case the subnets order will influence.
 	return left.ClusterID == right.ClusterID && left.CableName == right.CableName && left.Hostname == right.Hostname &&
-		left.Backend == right.Backend && reflect.DeepEqual(left.BackendConfig, right.BackendConfig)
+		left.Backend == right.Backend && equality.Semantic.DeepEqual(left.BackendConfig, right.BackendConfig)
 }
 
 func GetDefaultGatewayInterface() (*net.Interface, error) {
@@ -167,10 +219,12 @@ func GetDefaultGatewayInterface() (*net.Interface, error) {
 			if route.LinkIndex == 0 {
 				return nil, fmt.Errorf("default gateway interface could not be determined")
 			}
+
 			iface, err := net.InterfaceByIndex(route.LinkIndex)
 			if err != nil {
 				return nil, err
 			}
+
 			return iface, nil
 		}
 	}
@@ -250,14 +304,17 @@ func IsOverlappingCIDR(cidrList []string, cidr string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
 	for _, v := range cidrList {
 		_, baseNet, err := net.ParseCIDR(v)
 		if err != nil {
 			return false, err
 		}
+
 		if baseNet.Contains(newNet.IP) || newNet.Contains(baseNet.IP) {
 			return true, nil
 		}
 	}
+
 	return false, nil
 }

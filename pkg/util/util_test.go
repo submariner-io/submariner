@@ -14,8 +14,6 @@ var _ = Describe("Util", func() {
 
 	Describe("Function FlattenColors", testFlattenColors)
 
-	Describe("Function GetLocalCluster", testGetLocalCluster)
-
 	Describe("Function GetLocalEndpoint", testGetLocalEndpoint)
 
 	Describe("Function GetClusterIDFromCableName", testGetClusterIDFromCableName)
@@ -68,33 +66,11 @@ func testFlattenColors() {
 	})
 }
 
-func testGetLocalCluster() {
-	It("should return a valid SubmarinerCluster object", func() {
-		clusterId := "east"
-		clusterCidr := []string{"1.2.3.4/16"}
-		serviceCidr := []string{"5.6.7.8/16"}
-		colorCodes := []string{"red"}
-		cluster, err := util.GetLocalCluster(types.SubmarinerSpecification{
-			ClusterID:   clusterId,
-			ClusterCidr: clusterCidr,
-			ServiceCidr: serviceCidr,
-			ColorCodes:  colorCodes,
-		})
-
-		Expect(err).ToNot(HaveOccurred())
-		Expect(cluster.ID).To(Equal(clusterId))
-		Expect(cluster.Spec.ClusterID).To(Equal(clusterId))
-		Expect(cluster.Spec.ServiceCIDR).To(Equal(serviceCidr))
-		Expect(cluster.Spec.ClusterCIDR).To(Equal(clusterCidr))
-		Expect(cluster.Spec.ColorCodes).To(Equal(colorCodes))
-	})
-}
-
 func testGetLocalEndpoint() {
 	It("should return a valid SubmarinerEndpoint object", func() {
-		subnets := []string{"1.2.3.4/16"}
-		privateIP := "1.2.3.4"
-		endpoint, err := util.GetLocalEndpoint("east", "backend", map[string]string{}, false, subnets, privateIP)
+		subnets := []string{"127.0.0.1/16"}
+		privateIP := "127.0.0.1"
+		endpoint, err := util.GetLocalEndpoint("east", "backend", map[string]string{}, false, subnets, privateIP, subnets)
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(endpoint.Spec.ClusterID).To(Equal("east"))
@@ -192,13 +168,13 @@ func testCompareEndpointSpec() {
 					ClusterID: "east",
 					CableName: "submariner-cable-east-172-16-32-5",
 					Hostname:  "my-host",
-					Backend:   "strongswan",
+					Backend:   "libreswan",
 				},
 				subv1.EndpointSpec{
 					ClusterID: "east",
 					CableName: "submariner-cable-east-172-16-32-5",
 					Hostname:  "my-host",
-					Backend:   "strongswan",
+					Backend:   "libreswan",
 				})).To(BeTrue())
 		})
 	})
@@ -210,15 +186,32 @@ func testCompareEndpointSpec() {
 					ClusterID:     "east",
 					CableName:     "submariner-cable-east-172-16-32-5",
 					Hostname:      "my-host",
-					Backend:       "strongswan",
+					Backend:       "libreswan",
 					BackendConfig: map[string]string{"key": "aaa"},
 				},
 				subv1.EndpointSpec{
 					ClusterID:     "east",
 					CableName:     "submariner-cable-east-172-16-32-5",
 					Hostname:      "my-host",
-					Backend:       "strongswan",
+					Backend:       "libreswan",
 					BackendConfig: map[string]string{"key": "aaa"},
+				})).To(BeTrue())
+		})
+
+		It("should return true", func() {
+			Expect(util.CompareEndpointSpec(
+				subv1.EndpointSpec{
+					ClusterID:     "east",
+					CableName:     "submariner-cable-east-172-16-32-5",
+					Hostname:      "my-host",
+					Backend:       "libreswan",
+					BackendConfig: map[string]string{},
+				},
+				subv1.EndpointSpec{
+					ClusterID: "east",
+					CableName: "submariner-cable-east-172-16-32-5",
+					Hostname:  "my-host",
+					Backend:   "libreswan",
 				})).To(BeTrue())
 		})
 	})
@@ -230,13 +223,13 @@ func testCompareEndpointSpec() {
 					ClusterID: "east",
 					CableName: "submariner-cable-east-172-16-32-5",
 					Hostname:  "my-host",
-					Backend:   "strongswan",
+					Backend:   "libreswan",
 				},
 				subv1.EndpointSpec{
 					ClusterID: "west",
 					CableName: "submariner-cable-east-172-16-32-5",
 					Hostname:  "my-host",
-					Backend:   "strongswan",
+					Backend:   "libreswan",
 				})).To(BeFalse())
 		})
 	})
@@ -248,13 +241,13 @@ func testCompareEndpointSpec() {
 					ClusterID: "east",
 					CableName: "submariner-cable-east-1-2-3-4",
 					Hostname:  "my-host",
-					Backend:   "strongswan",
+					Backend:   "libreswan",
 				},
 				subv1.EndpointSpec{
 					ClusterID: "east",
 					CableName: "submariner-cable-east-5-6-7-8",
 					Hostname:  "my-host",
-					Backend:   "strongswan",
+					Backend:   "libreswan",
 				})).To(BeFalse())
 		})
 	})
@@ -266,13 +259,13 @@ func testCompareEndpointSpec() {
 					ClusterID: "east",
 					CableName: "submariner-cable-east-172-16-32-5",
 					Hostname:  "host1",
-					Backend:   "strongswan",
+					Backend:   "libreswan",
 				},
 				subv1.EndpointSpec{
 					ClusterID: "east",
 					CableName: "submariner-cable-east-172-16-32-5",
 					Hostname:  "host2",
-					Backend:   "strongswan",
+					Backend:   "libreswan",
 				})).To(BeFalse())
 		})
 	})
@@ -284,13 +277,13 @@ func testCompareEndpointSpec() {
 					ClusterID: "east",
 					CableName: "submariner-cable-east-172-16-32-5",
 					Hostname:  "host1",
-					Backend:   "strongswan",
+					Backend:   "libreswan",
 				},
 				subv1.EndpointSpec{
 					ClusterID: "east",
 					CableName: "submariner-cable-east-172-16-32-5",
 					Hostname:  "host1",
-					Backend:   "libreswan",
+					Backend:   "wireguard",
 				})).To(BeFalse())
 		})
 	})
@@ -302,14 +295,14 @@ func testCompareEndpointSpec() {
 					ClusterID:     "east",
 					CableName:     "submariner-cable-east-172-16-32-5",
 					Hostname:      "host1",
-					Backend:       "strongswan",
+					Backend:       "libreswan",
 					BackendConfig: map[string]string{"key": "aaa"},
 				},
 				subv1.EndpointSpec{
 					ClusterID:     "east",
 					CableName:     "submariner-cable-east-172-16-32-5",
 					Hostname:      "host1",
-					Backend:       "strongswan",
+					Backend:       "libreswan",
 					BackendConfig: map[string]string{"key": "bbb"},
 				})).To(BeFalse())
 		})

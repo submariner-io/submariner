@@ -1,158 +1,85 @@
 package tunnel
 
 import (
-	"fmt"
-	"time"
-
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/watcher"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cableengine"
-	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog"
 )
 
-type Controller struct {
-	ce                cableengine.Engine
-	informer          cache.SharedIndexInformer
-	endpointWorkqueue workqueue.RateLimitingInterface
+type controller struct {
+	engine cableengine.Engine
 }
 
-func NewController(ce cableengine.Engine, endpointInformer submarinerInformers.EndpointInformer) *Controller {
-	tunnelController := &Controller{
-		ce:                ce,
-		informer:          endpointInformer.Informer(),
-		endpointWorkqueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Endpoints"),
-	}
-
-	tunnelController.informer.AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
-		AddFunc: tunnelController.enqueueEndpoint,
-		UpdateFunc: func(old, new interface{}) {
-			tunnelController.enqueueEndpoint(new)
-		},
-		DeleteFunc: tunnelController.handleRemovedEndpoint,
-	}, 60*time.Second)
-
-	return tunnelController
-}
-
-func (t *Controller) Run(stopCh <-chan struct{}) error {
-	defer utilruntime.HandleCrash()
-
-	// Start the informer factories to begin populating the informer caches
+func StartController(engine cableengine.Engine, namespace string, config *watcher.Config, stopCh <-chan struct{}) error {
 	klog.Info("Starting the tunnel controller")
 
-	// Wait for the caches to be synced before starting workers
-	klog.Info("Waiting for informer caches to sync")
-	if ok := cache.WaitForCacheSync(stopCh, t.informer.HasSynced); !ok {
-		return fmt.Errorf("failed to wait for caches to sync")
+	c := &controller{engine: engine}
+
+	config.ResourceConfigs = []watcher.ResourceConfig{
+		{
+			Name:         "Tunnel Controller",
+			ResourceType: &v1.Endpoint{},
+			Handler: watcher.EventHandlerFuncs{
+				OnCreateFunc: c.handleCreatedOrUpdatedEndpoint,
+				OnUpdateFunc: c.handleCreatedOrUpdatedEndpoint,
+				OnDeleteFunc: c.handleRemovedEndpoint,
+			},
+			SourceNamespace: namespace,
+		},
 	}
 
-	go wait.Until(t.runWorker, time.Second, stopCh)
+	endpointWatcher, err := watcher.New(config)
+	if err != nil {
+		return err
+	}
 
-	klog.Info("Tunnel controller started")
-	<-stopCh
-	klog.Info("Tunnel controller stopping")
+	err = endpointWatcher.Start(stopCh)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func (t *Controller) runWorker() {
-	for t.processNextEndpoint() {
+func (c *controller) handleCreatedOrUpdatedEndpoint(obj runtime.Object) bool {
+	endpoint := obj.(*v1.Endpoint)
 
-	}
-}
+	klog.V(log.DEBUG).Infof("Tunnel controller processing added or updated submariner Endpoint object: %#v", endpoint)
 
-func (t *Controller) processNextEndpoint() bool {
-	key, shutdown := t.endpointWorkqueue.Get()
-	if shutdown {
-		return false
-	}
-
-	err := func() error {
-		defer t.endpointWorkqueue.Done(key)
-
-		obj, exists, err := t.informer.GetStore().GetByKey(key.(string))
-		if err != nil {
-			t.endpointWorkqueue.Forget(key)
-			return fmt.Errorf("error retrieving submariner Endpoint %q: %v", key, err)
-		}
-
-		if !exists {
-			klog.V(log.DEBUG).Infof("Tunnel controller processing - submariner Endpoint object not found for key %q", key)
-			t.endpointWorkqueue.Forget(key)
-			return nil
-		}
-
-		endpoint := obj.(*v1.Endpoint)
-
-		klog.V(log.DEBUG).Infof("Tunnel controller processing added or updated submariner Endpoint object: %#v", endpoint)
-
-		myEndpoint := types.SubmarinerEndpoint{
-			Spec: endpoint.Spec,
-		}
-
-		err = t.ce.InstallCable(myEndpoint)
-		if err != nil {
-			t.endpointWorkqueue.AddRateLimited(key)
-			return fmt.Errorf("error installing cable for Endpoint %#v, %v", myEndpoint, err)
-		}
-
-		t.endpointWorkqueue.Forget(key)
-		klog.V(log.DEBUG).Infof("Tunnel controller successfully installed Endpoint cable %s in the engine", endpoint.Spec.CableName)
-		return nil
-	}()
-
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Tunnel controller failed to process submariner Endpoint with key %q: %v", key, err))
-	}
-
-	return true
-}
-
-func (t *Controller) enqueueEndpoint(obj interface{}) {
-	var key string
-	var err error
-	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
-		utilruntime.HandleError(err)
-		return
-	}
-
-	klog.V(log.TRACE).Infof("Tunnel controller enqueueing Endpoint %v", obj)
-	t.endpointWorkqueue.AddRateLimited(key)
-}
-
-func (t *Controller) handleRemovedEndpoint(obj interface{}) {
-	var object *v1.Endpoint
-	var ok bool
-	if object, ok = obj.(*v1.Endpoint); !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Could not convert object %v to an Endpoint", obj))
-			return
-		}
-		object, ok = tombstone.Obj.(*v1.Endpoint)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Could not convert object tombstone %v to an Endpoint", tombstone.Obj))
-			return
-		}
-		klog.V(log.DEBUG).Infof("Tunnel controller recovered deleted Endpoint %q from tombstone", object.Name)
-	}
-
-	klog.V(log.DEBUG).Infof("Tunnel controller processing removed submariner Endpoint object: %#v", object)
 	myEndpoint := types.SubmarinerEndpoint{
-		Spec: object.Spec,
+		Spec: endpoint.Spec,
 	}
 
-	if err := t.ce.RemoveCable(myEndpoint); err != nil {
-		utilruntime.HandleError(fmt.Errorf("Tunnel controller failed to remove Endpoint cable %#v from the engine: %v",
-			myEndpoint, err))
-		return
+	err := c.engine.InstallCable(myEndpoint)
+	if err != nil {
+		klog.Errorf("error installing cable for Endpoint %#v, %v", myEndpoint, err)
+		return true
 	}
 
-	klog.V(log.DEBUG).Infof("Tunnel controller successfully removed Endpoint cable %s from the engine", object.Spec.CableName)
+	klog.V(log.DEBUG).Infof("Tunnel controller successfully installed Endpoint cable %s in the engine", endpoint.Spec.CableName)
+
+	return false
+}
+
+func (c *controller) handleRemovedEndpoint(obj runtime.Object) bool {
+	endpoint := obj.(*v1.Endpoint)
+
+	klog.V(log.DEBUG).Infof("Tunnel controller processing removed submariner Endpoint object: %#v", endpoint)
+
+	myEndpoint := types.SubmarinerEndpoint{
+		Spec: endpoint.Spec,
+	}
+
+	if err := c.engine.RemoveCable(myEndpoint); err != nil {
+		klog.Errorf("Tunnel controller failed to remove Endpoint cable %#v from the engine: %v", myEndpoint, err)
+		return true
+	}
+
+	klog.V(log.DEBUG).Infof("Tunnel controller successfully removed Endpoint cable %s from the engine", endpoint.Spec.CableName)
+
+	return false
 }

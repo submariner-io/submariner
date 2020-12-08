@@ -17,6 +17,7 @@ type CheckEndpointFunc func(endpoint *submarinerv1.Endpoint) (bool, string, erro
 func createSubmarinerClient(restConfig *rest.Config) *submarinerClientset.Clientset {
 	clientSet, err := submarinerClientset.NewForConfig(restConfig)
 	Expect(err).NotTo(HaveOccurred())
+
 	return clientSet
 }
 
@@ -26,6 +27,7 @@ func NoopCheckEndpoint(endpoint *submarinerv1.Endpoint) (bool, string, error) {
 
 func (f *Framework) AwaitSubmarinerEndpoint(cluster framework.ClusterIndex, checkEndpoint CheckEndpointFunc) *submarinerv1.Endpoint {
 	var retEndpoint *submarinerv1.Endpoint
+
 	framework.AwaitUntil("find the submariner endpoint for "+framework.TestContext.ClusterIDs[cluster], func() (interface{}, error) {
 		return SubmarinerClients[cluster].SubmarinerV1().Endpoints(framework.TestContext.SubmarinerNamespace).List(metav1.ListOptions{})
 	}, func(result interface{}) (bool, string, error) {

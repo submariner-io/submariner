@@ -16,6 +16,7 @@ func (w *wireguard) GetConnections() (*[]v1.Connection, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to find device %s: %v", DefaultDeviceName, err)
 	}
+
 	connections := make([]v1.Connection, 0)
 
 	w.mutex.Lock()
@@ -26,14 +27,19 @@ func (w *wireguard) GetConnections() (*[]v1.Connection, error) {
 		connection, err := w.connectionByKey(&key)
 		if err != nil {
 			klog.Warningf("Found unknown peer with key %s, removing", key)
+
 			if err := w.removePeer(&key); err != nil {
 				klog.Errorf("Could not delete WireGuard peer with key %s, ignoring: %v", key, err)
 			}
+
 			continue
 		}
+
 		w.updateConnectionForPeer(&d.Peers[i], connection)
+
 		connections = append(connections, *connection.DeepCopy())
 	}
+
 	return &connections, nil
 }
 
@@ -47,6 +53,7 @@ func (w *wireguard) connectionByKey(key *wgtypes.Key) (*v1.Connection, error) {
 			klog.Errorf("Could not compare key for cluster %s, skipping: %v", cid, err)
 		}
 	}
+
 	return nil, fmt.Errorf("connection not found for key %s", key)
 }
 
@@ -74,18 +81,22 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 			connection.SetStatus(v1.ConnectionError, "no initial handshake for %.1f seconds", lcSec)
 			return
 		}
+
 		if tx > 0 || rx > 0 {
 			// no handshake, but at least some communication in progress
 			connection.SetStatus(v1.Connecting, "no initial handshake yet")
 			return
 		}
 	}
+
 	if tx > 0 || rx > 0 {
 		// all is good
 		connection.SetStatus(v1.Connected, "Rx=%d Bytes, Tx=%d Bytes", p.ReceiveBytes, p.TransmitBytes)
 		savePeerTraffic(connection, now, p.TransmitBytes, p.ReceiveBytes)
+
 		return
 	}
+
 	handshakeDelta := time.Since(p.LastHandshakeTime)
 	if handshakeDelta > handshakeTimeout {
 		// hard error, really long time since handshake
@@ -93,6 +104,7 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 			handshakeDelta.Seconds())
 		return
 	}
+
 	if lc < 2*keepAliveMS {
 		// grace period, leave status unchanged
 		klog.Warningf("No traffic for %.1f seconds; handshake was %.1f seconds ago: %v", lcSec,
@@ -110,6 +122,7 @@ func (w *wireguard) updatePeerStatus(c *v1.Connection, key *wgtypes.Key) {
 		c.SetStatus(v1.ConnectionError, "cannot fetch status for peer %s: %v", key, err)
 		return
 	}
+
 	w.updateConnectionForPeer(p, c)
 }
 
@@ -122,7 +135,9 @@ func peerTrafficDelta(c *v1.Connection, key string, newVal int64) int64 {
 			return newVal - i
 		}
 	}
+
 	c.Endpoint.BackendConfig[key] = strconv.FormatInt(newVal, 10)
+
 	return 0
 }
 

@@ -9,6 +9,7 @@ import (
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
@@ -19,12 +20,6 @@ var _ = Describe("[redundancy] Gateway fail-over tests", func() {
 
 	// After each test, we make sure that the system again has a single gateway, the active one
 	AfterEach(f.GatewayCleanup)
-
-	When("any gateway node is configured", func() {
-		It("should be reported to the Gateway API", func() {
-			testBasicGatewayReporting(f)
-		})
-	})
 
 	When("one gateway node is configured and the submariner engine pod fails", func() {
 		It("should start a new submariner engine pod and be able to connect from another cluster", func() {
@@ -39,34 +34,27 @@ var _ = Describe("[redundancy] Gateway fail-over tests", func() {
 	})
 })
 
-func testBasicGatewayReporting(f *subFramework.Framework) {
-	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
-	By(fmt.Sprintf("Ensuring that only one gateway reports as active %q", clusterAName))
-	activeGateways := f.AwaitGatewaysWithStatus(framework.ClusterA, subv1.HAStatusActive)
-	Expect(activeGateways).To(HaveLen(1))
-
-	By(fmt.Sprintf("Ensuring that the gateway %q is reporting connections", activeGateways[0].Name))
-	f.AwaitGatewayFullyConnected(framework.ClusterA, activeGateways[0].Name)
-}
-
 func testEnginePodRestartScenario(f *subFramework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
 	By(fmt.Sprintf("Sanity check - ensuring there's only one gateway node on %q", clusterAName))
+
 	gatewayNodes := f.FindNodesByGatewayLabel(framework.ClusterA, true)
 	Expect(gatewayNodes).To(HaveLen(1), fmt.Sprintf("Expected only one gateway node on %q", clusterAName))
+	By(fmt.Sprintf("Found gateway on node %q on %q", gatewayNodes[0].Name, clusterAName))
 
 	enginePod := f.AwaitSubmarinerEnginePod(framework.ClusterA)
 	By(fmt.Sprintf("Found submariner engine pod %q on %q", enginePod.Name, clusterAName))
 
 	By(fmt.Sprintf("Ensuring that the gateway reports as active on %q", clusterAName))
+
 	activeGateway := f.AwaitGatewayFullyConnected(framework.ClusterA, gatewayNodes[0].Name)
 
-	By(fmt.Sprintf("Deleting submariner engine pod and gateway entries %q", enginePod.Name))
+	By(fmt.Sprintf("Deleting submariner engine pod %q", enginePod.Name))
 	f.DeletePod(framework.ClusterA, enginePod.Name, framework.TestContext.SubmarinerNamespace)
 
-	newEnginePod := f.AwaitSubmarinerEnginePod(framework.ClusterA)
+	newEnginePod := AwaitNewSubmarinerEnginePod(f, framework.ClusterA, enginePod.ObjectMeta.UID)
 	By(fmt.Sprintf("Found new submariner engine pod %q", newEnginePod.Name))
 
 	By(fmt.Sprintf("Waiting for the gateway to be up and connected %q", newEnginePod.Name))
@@ -93,10 +81,25 @@ func testEnginePodRestartScenario(f *subFramework.Framework) {
 	})
 }
 
+func AwaitNewSubmarinerEnginePod(f *subFramework.Framework, cluster framework.ClusterIndex, prevPodUID types.UID) *v1.Pod {
+	return framework.AwaitUntil("await new submariner engine pod", func() (interface{}, error) {
+		pod := f.AwaitSubmarinerEnginePod(cluster)
+		return pod, nil
+	}, func(result interface{}) (bool, string, error) {
+		pod := result.(*v1.Pod)
+		if pod.ObjectMeta.UID != prevPodUID {
+			return true, "", nil
+		}
+
+		return false, fmt.Sprintf("Expecting new engine pod (UID %q matches previous instance)", prevPodUID), nil
+	}).(*v1.Pod)
+}
+
 func defaultEndpointType() tcp.EndpointType {
 	if framework.TestContext.GlobalnetEnabled {
 		return tcp.GlobalIP
 	}
+
 	return tcp.PodIP
 }
 

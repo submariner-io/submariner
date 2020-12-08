@@ -30,45 +30,18 @@ func init() {
 func NewFramework(baseName string) *Framework {
 	f := &Framework{Framework: framework.NewFramework(baseName)}
 	framework.AddCleanupAction(f.GatewayCleanup)
+
 	return f
 }
 
 func beforeSuite() {
-	ginkgo.By("Creating submariner clients")
+	framework.By("Creating submariner clients")
 
 	for _, restConfig := range framework.RestConfigs {
 		SubmarinerClients = append(SubmarinerClients, createSubmarinerClient(restConfig))
 	}
 
-	queryAndUpdateGlobalnetStatus()
-}
-
-func queryAndUpdateGlobalnetStatus() {
-	framework.TestContext.GlobalnetEnabled = false
-	clusters := SubmarinerClients[framework.ClusterB].SubmarinerV1().Clusters(framework.TestContext.SubmarinerNamespace)
-	framework.AwaitUntil("find clusters to figure out if Globalnet is enabled", func() (interface{}, error) {
-		clusters, err := clusters.List(metav1.ListOptions{})
-		if apierrors.IsNotFound(err) {
-			return nil, nil
-		}
-		return clusters, err
-	}, func(result interface{}) (bool, string, error) {
-		if result == nil {
-			return false, "No Cluster found", nil
-		}
-
-		clusterList := result.(*submarinerv1.ClusterList)
-		if len(clusterList.Items) == 0 {
-			return false, "No Cluster found", nil
-		}
-		for _, cluster := range clusterList.Items {
-			if len(cluster.Spec.GlobalCIDR) != 0 {
-				// Based on the status of GlobalnetEnabled, certain tests will be skipped/executed.
-				framework.TestContext.GlobalnetEnabled = true
-			}
-		}
-		return true, "", nil
-	})
+	framework.DetectGlobalnet()
 }
 
 func (f *Framework) AwaitGatewayWithStatus(cluster framework.ClusterIndex,
@@ -93,6 +66,7 @@ func (f *Framework) AwaitGatewayWithStatus(cluster framework.ClusterIndex,
 			}
 			return true, "", nil
 		})
+
 	return gw.(*submarinerv1.Gateway)
 }
 
@@ -110,6 +84,7 @@ func (f *Framework) AwaitGatewaysWithStatus(
 
 			return true, "", nil
 		})
+
 	return gwList.([]submarinerv1.Gateway)
 }
 
@@ -149,17 +124,18 @@ func (f *Framework) AwaitGatewayFullyConnected(cluster framework.ClusterIndex, n
 					gw.Name), nil
 			}
 			if len(gw.Status.Connections) == 0 {
-				return false, fmt.Sprintf("Gateway %q exist but has no connections yet", name), nil
+				return false, fmt.Sprintf("Gateway %q is active but has no connections yet", name), nil
 			}
 			for _, conn := range gw.Status.Connections {
 				if conn.Status != submarinerv1.Connected {
-					return false, fmt.Sprintf("Gateway %q exist but connection to cluster %q is not up yet",
-						name, conn.Endpoint.ClusterID), nil
+					return false, fmt.Sprintf("Gateway %q is active but cluster %q is not connected: Status: %q, Message: %q",
+						name, conn.Endpoint.ClusterID, conn.Status, conn.StatusMessage), nil
 				}
 			}
 
 			return true, "", nil
 		})
+
 	return gw.(*submarinerv1.Gateway)
 }
 
@@ -175,9 +151,10 @@ func (f *Framework) GatewayCleanup() {
 		}
 
 		ginkgo.By(fmt.Sprintf("Cleaning up any non-active gateways: %v", gatewayNames(passiveGateways)))
+
 		for _, nonActiveGw := range passiveGateways {
-			f.SetGatewayLabelOnNode(framework.ClusterA, nonActiveGw.Name, false)
-			f.AwaitGatewayRemoved(framework.ClusterA, nonActiveGw.Name)
+			f.SetGatewayLabelOnNode(framework.ClusterIndex(cluster), nonActiveGw.Name, false)
+			f.AwaitGatewayRemoved(framework.ClusterIndex(cluster), nonActiveGw.Name)
 		}
 	}
 }
@@ -187,6 +164,7 @@ func gatewayNames(gateways []submarinerv1.Gateway) []string {
 	for _, gw := range gateways {
 		names = append(names, gw.Name)
 	}
+
 	return names
 }
 
@@ -209,6 +187,7 @@ func (f *Framework) GetGatewaysWithHAStatus(
 			filteredGateways = append(filteredGateways, gw)
 		}
 	}
+
 	return filteredGateways
 }
 
@@ -227,8 +206,10 @@ func (f *Framework) GetGatewayInformer(cluster framework.ClusterIndex) (cache.Sh
 	stopCh := make(chan struct{})
 	informerFactory := externalversions.NewSharedInformerFactory(SubmarinerClients[cluster], 0)
 	informer := informerFactory.Submariner().V1().Gateways().Informer()
+
 	go informer.Run(stopCh)
 	Expect(cache.WaitForCacheSync(stopCh, informer.HasSynced)).To(BeTrue())
+
 	return informer, stopCh
 }
 
@@ -248,5 +229,6 @@ func GetDeletionChannel(informer cache.SharedIndexInformer) chan string {
 			}
 		},
 	})
+
 	return deletionChannel
 }

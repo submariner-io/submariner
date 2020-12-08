@@ -5,18 +5,20 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/pkg/errors"
 	"k8s.io/klog"
 
 	"github.com/submariner-io/admiral/pkg/log"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/submariner-io/submariner/pkg/util"
 )
 
 const (
@@ -25,6 +27,7 @@ const (
 
 func init() {
 	cable.AddDriver(cableDriverName, NewLibreswan)
+	cable.SetDefaultCableDriver(cableDriverName)
 }
 
 type libreswan struct {
@@ -96,53 +99,101 @@ func (i *libreswan) Init() error {
 	if err := i.runPluto(); err != nil {
 		return fmt.Errorf("error starting Pluto: %v", err)
 	}
+
 	return nil
 }
+
+// Line format: 006 #3: "submariner-cable-cluster3-172-17-0-8-0-0", type=ESP, add_time=1590508783, inBytes=0, outBytes=0, id='172.17.0.8'
+var trafficStatusRE = regexp.MustCompile(`.* "([^"]+)", .*inBytes=(\d+), outBytes=(\d+).*`)
 
 func (i *libreswan) refreshConnectionStatus() error {
 	// Retrieve active tunnels from the daemon
 	cmd := exec.Command("/usr/libexec/ipsec/whack", "--trafficstatus")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		klog.Errorf("error retrieving whack's stdout: %v", err)
-		return err
-	}
-	if err := cmd.Start(); err != nil {
-		klog.Errorf("error starting whack: %v", err)
-		return err
-	}
-	scanner := bufio.NewScanner(stdout)
-	activeConnections := util.NewStringSet()
-	for scanner.Scan() {
-		line := scanner.Text()
-		// Line format: 006 #3: "submariner-cable-cluster3-172-17-0-8-0-0", type=ESP, add_time=1590508783, inBytes=0, outBytes=0, id='172.17.0.8'
-		components := strings.Split(line, "\"")
-		if len(components) == 3 {
-			activeConnections.Add(components[1])
-		}
-	}
-	if err := cmd.Wait(); err != nil {
-		klog.Errorf("error waiting for whack: %v", err)
-		return err
+		return errors.WithMessage(err, "error retrieving whack's stdout")
 	}
 
+	if err := cmd.Start(); err != nil {
+		return errors.WithMessage(err, "error starting whack")
+	}
+
+	scanner := bufio.NewScanner(stdout)
+	activeConnectionsRx := make(map[string]int)
+	activeConnectionsTx := make(map[string]int)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		matches := trafficStatusRE.FindStringSubmatch(line)
+		if matches != nil {
+			_, ok := activeConnectionsRx[matches[1]]
+			if !ok {
+				activeConnectionsRx[matches[1]] = 0
+			}
+
+			_, ok = activeConnectionsTx[matches[1]]
+			if !ok {
+				activeConnectionsTx[matches[1]] = 0
+			}
+
+			inBytes, err := strconv.Atoi(matches[2])
+			if err != nil {
+				klog.Warningf("Invalid inBytes in whack output line: %q", line)
+			} else {
+				activeConnectionsRx[matches[1]] += inBytes
+			}
+
+			outBytes, err := strconv.Atoi(matches[3])
+			if err != nil {
+				klog.Warningf("Invalid outBytes in whack output line: %q", line)
+			} else {
+				activeConnectionsTx[matches[1]] += outBytes
+			}
+		} else {
+			klog.V(log.DEBUG).Infof("Ignoring whack output line: %q", line)
+		}
+	}
+
+	if err := cmd.Wait(); err != nil {
+		return errors.WithMessage(err, "error waiting for whack")
+	}
+
+	cable.RecordNoConnections()
+
 	localSubnets := extractSubnets(i.localEndpoint.Spec)
+
 	for j := range i.connections {
-		allConnected := true
+		isConnected := false
+
 		remoteSubnets := extractSubnets(i.connections[j].Endpoint)
+		rx, tx := 0, 0
 		for lsi := range localSubnets {
 			for rsi := range remoteSubnets {
 				connectionName := fmt.Sprintf("%s-%d-%d", i.connections[j].Endpoint.CableName, lsi, rsi)
-				if !activeConnections.Contains(connectionName) {
-					allConnected = false
+				subRx, okRx := activeConnectionsRx[connectionName]
+				subTx, okTx := activeConnectionsTx[connectionName]
+				if okRx || okTx {
+					i.connections[j].Status = subv1.Connected
+					isConnected = true
+					rx += subRx
+					tx += subTx
+				} else {
+					klog.V(log.DEBUG).Infof("Connection %q not found in active connections obtained from whack: %v, %v",
+						connectionName, activeConnectionsRx, activeConnectionsTx)
 				}
 			}
 		}
-		if allConnected {
-			i.connections[j].Status = subv1.Connected
-		} else {
+
+		cable.RecordConnection(cableDriverName, &i.localEndpoint.Spec, &i.connections[j].Endpoint, string(i.connections[j].Status), false)
+		cable.RecordRxBytes(cableDriverName, &i.localEndpoint.Spec, &i.connections[j].Endpoint, rx)
+		cable.RecordTxBytes(cableDriverName, &i.localEndpoint.Spec, &i.connections[j].Endpoint, tx)
+
+		if !isConnected {
 			// Pluto should be connecting for us
 			i.connections[j].Status = subv1.Connecting
+			cable.RecordConnection(cableDriverName, &i.localEndpoint.Spec, &i.connections[j].Endpoint, string(i.connections[j].Status), false)
+			klog.V(log.DEBUG).Infof("Connection %q not found in active connections obtained from whack: %v, %v",
+				i.connections[j].Endpoint.CableName, activeConnectionsRx, activeConnectionsTx)
 		}
 	}
 
@@ -155,7 +206,9 @@ func (i *libreswan) GetActiveConnections(clusterID string) ([]string, error) {
 	for j := range i.connections {
 		connections = append(connections, i.connections[j].Endpoint.CableName)
 	}
+
 	klog.Infof("Active connections: %v", connections)
+
 	return connections, nil
 }
 
@@ -164,6 +217,7 @@ func (i *libreswan) GetConnections() (*[]subv1.Connection, error) {
 	if err := i.refreshConnectionStatus(); err != nil {
 		return &[]subv1.Connection{}, err
 	}
+
 	return &i.connections, nil
 }
 
@@ -178,6 +232,7 @@ func extractEndpointIP(endpoint subv1.EndpointSpec) string {
 func extractSubnets(endpoint subv1.EndpointSpec) []string {
 	// Subnets
 	subnets := []string{endpoint.PrivateIP + "/32"}
+
 	for _, subnet := range endpoint.Subnets {
 		if !strings.HasPrefix(subnet, endpoint.PrivateIP) {
 			subnets = append(subnets, subnet)
@@ -189,6 +244,7 @@ func extractSubnets(endpoint subv1.EndpointSpec) []string {
 
 func whack(args ...string) error {
 	var err error
+
 	for i := 0; i < 3; i++ {
 		cmd := exec.Command("/usr/libexec/ipsec/whack", args...)
 		cmd.Stdout = os.Stdout
@@ -207,6 +263,7 @@ func whack(args ...string) error {
 	if err != nil {
 		return fmt.Errorf("error whacking with args %v: %v", args, err)
 	}
+
 	return nil
 }
 
@@ -231,6 +288,8 @@ func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string
 		return "", fmt.Errorf("error listening: %v", err)
 	}
 
+	klog.Infof("Creating connection(s) for %v", endpoint)
+
 	if len(leftSubnets) > 0 && len(rightSubnets) > 0 {
 		for lsi := range leftSubnets {
 			for rsi := range rightSubnets {
@@ -242,12 +301,18 @@ func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string
 				if endpoint.Spec.NATEnabled {
 					args = append(args, "--forceencaps")
 				}
+
 				args = append(args, "--name", connectionName)
 
 				// Left-hand side
 				args = append(args, "--id", localEndpointIdentifier)
 				args = append(args, "--host", localEndpointIP)
 				args = append(args, "--client", leftSubnets[lsi])
+				if endpoint.Spec.NATEnabled {
+					args = append(args, "--ikeport", i.ipSecNATTPort)
+				} else {
+					args = append(args, "--ikeport", i.ipSecIKEPort)
+				}
 
 				args = append(args, "--to")
 
@@ -255,8 +320,13 @@ func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string
 				args = append(args, "--id", remoteEndpointIdentifier)
 				args = append(args, "--host", remoteEndpointIP)
 				args = append(args, "--client", rightSubnets[rsi])
+				if endpoint.Spec.NATEnabled {
+					args = append(args, "--ikeport", i.ipSecNATTPort)
+				} else {
+					args = append(args, "--ikeport", i.ipSecIKEPort)
+				}
 
-				klog.Infof("Creating connection to %v", endpoint)
+				klog.Infof("Executing whack with args: %v", args)
 
 				if err := whack(args...); err != nil {
 					return "", err
@@ -265,6 +335,7 @@ func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string
 				if err := whack("--route", "--name", connectionName); err != nil {
 					return "", err
 				}
+
 				if err := whack("--initiate", "--asynchronous", "--name", connectionName); err != nil {
 					return "", err
 				}
@@ -273,6 +344,7 @@ func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string
 	}
 
 	i.connections = append(i.connections, subv1.Connection{Endpoint: endpoint.Spec, Status: subv1.Connected})
+	cable.RecordConnection(cableDriverName, &i.localEndpoint.Spec, &endpoint.Spec, string(subv1.Connected), true)
 
 	return remoteEndpointIP, nil
 }
@@ -313,6 +385,7 @@ func (i *libreswan) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) er
 	}
 
 	i.connections = removeConnectionForEndpoint(i.connections, endpoint)
+	cable.RecordDisconnected(cableDriverName, &i.localEndpoint.Spec, &endpoint.Spec)
 
 	return nil
 }
@@ -324,6 +397,7 @@ func removeConnectionForEndpoint(connections []subv1.Connection, endpoint types.
 			return connections[:len(connections)-1]
 		}
 	}
+
 	return connections
 }
 
@@ -331,14 +405,13 @@ func (i *libreswan) runPluto() error {
 	klog.Info("Starting Pluto")
 
 	args := []string{}
-	args = append(args, "--ikeport", i.ipSecIKEPort)
-	args = append(args, "--natikeport", i.ipSecNATTPort)
 
 	cmd := exec.Command("/usr/local/bin/pluto", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
 	var outputFile *os.File
+
 	if i.logFile != "" {
 		out, err := os.OpenFile(i.logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 		if err != nil {
@@ -371,10 +444,12 @@ func (i *libreswan) runPluto() error {
 		if err == nil {
 			break
 		}
+
 		if !os.IsNotExist(err) {
 			klog.Infof("Failed to stat the control socket: %v", err)
 			break
 		}
+
 		time.Sleep(1 * time.Second)
 	}
 

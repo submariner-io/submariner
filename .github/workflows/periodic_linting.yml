@@ -1,0 +1,27 @@
+---
+name: Periodic Linting
+
+on:
+  schedule:
+    - cron: "0 0 * * 0"
+
+jobs:
+  markdown-link-check-periodic:
+    name: Markdown Links (all files)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v2
+
+      - name: Run markdown-link-check
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          config-file: ".markdownlinkcheck.json"
+
+      - name: Raise an Issue to report broken links
+        if: ${{ failure() }}
+        uses: JasonEtco/create-an-issue@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          filename: .github/ISSUE_TEMPLATE/broken-link.md

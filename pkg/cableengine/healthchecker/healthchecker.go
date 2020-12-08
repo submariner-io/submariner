@@ -1,0 +1,159 @@
+package healthchecker
+
+import (
+	"sync"
+	"time"
+
+	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/watcher"
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog"
+)
+
+type LatencyInfo struct {
+	ConnectionError  string
+	ConnectionStatus ConnectionStatus
+	Spec             *submarinerv1.LatencyRTTSpec
+}
+
+type ConnectionStatus string
+
+const (
+	Connected         ConnectionStatus = "connected"
+	ConnectionUnknown ConnectionStatus = "unknown"
+	ConnectionError   ConnectionStatus = "error"
+)
+
+type Interface interface {
+	Start(stopCh <-chan struct{}) error
+
+	GetLatencyInfo(endpoint *submarinerv1.EndpointSpec) *LatencyInfo
+}
+
+type Config struct {
+	WatcherConfig      *watcher.Config
+	EndpointNamespace  string
+	ClusterID          string
+	PingInterval       uint
+	MaxPacketLossCount uint
+	NewPinger          func(string, time.Duration, uint) PingerInterface
+}
+
+type controller struct {
+	endpointWatcher watcher.Interface
+	pingers         sync.Map
+	config          *Config
+}
+
+func New(config *Config) (Interface, error) {
+	controller := &controller{
+		config: config,
+	}
+
+	config.WatcherConfig.ResourceConfigs = []watcher.ResourceConfig{
+		{
+			Name:         "HealthChecker Endpoint Controller",
+			ResourceType: &submarinerv1.Endpoint{},
+			Handler: watcher.EventHandlerFuncs{
+				OnCreateFunc: controller.endpointCreatedorUpdated,
+				OnUpdateFunc: controller.endpointCreatedorUpdated,
+				OnDeleteFunc: controller.endpointDeleted,
+			},
+			SourceNamespace: config.EndpointNamespace,
+		},
+	}
+
+	var err error
+
+	controller.endpointWatcher, err = watcher.New(config.WatcherConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return controller, nil
+}
+
+func (h *controller) GetLatencyInfo(endpoint *submarinerv1.EndpointSpec) *LatencyInfo {
+	if obj, found := h.pingers.Load(endpoint.CableName); found {
+		return obj.(PingerInterface).GetLatencyInfo()
+	}
+
+	return nil
+}
+
+func (h *controller) Start(stopCh <-chan struct{}) error {
+	if err := h.endpointWatcher.Start(stopCh); err != nil {
+		return err
+	}
+
+	klog.Infof("CableEngine HealthChecker started with PingInterval: %v, MaxPacketLossCount: %v", h.config.PingInterval,
+		h.config.MaxPacketLossCount)
+
+	return nil
+}
+
+func (h *controller) endpointCreatedorUpdated(obj runtime.Object) bool {
+	klog.V(log.TRACE).Infof("Endpoint created: %#v", obj)
+	endpointCreated := obj.(*submarinerv1.Endpoint)
+	if endpointCreated.Spec.ClusterID == h.config.ClusterID {
+		return false
+	}
+
+	if endpointCreated.Spec.HealthCheckIP == "" || endpointCreated.Spec.CableName == "" {
+		klog.Infof("HealthCheckIP (%q) and/or CableName (%q) for Endpoint %q empty - will not monitor endpoint health",
+			endpointCreated.Spec.HealthCheckIP, endpointCreated.Spec.CableName, endpointCreated.Name)
+		return false
+	}
+
+	if obj, found := h.pingers.Load(endpointCreated.Spec.CableName); found {
+		pinger := obj.(PingerInterface)
+		if pinger.GetIP() == endpointCreated.Spec.HealthCheckIP {
+			return false
+		}
+
+		klog.V(log.DEBUG).Infof("HealthChecker is already running for %q - stopping", endpointCreated.Name)
+		pinger.Stop()
+		h.pingers.Delete(endpointCreated.Spec.CableName)
+	}
+
+	pingInterval := defaultPingInterval
+	if h.config.PingInterval != 0 {
+		pingInterval = time.Second * time.Duration(h.config.PingInterval)
+	}
+
+	maxPacketLossCount := defaultMaxPacketLossCount
+
+	if h.config.MaxPacketLossCount != 0 {
+		maxPacketLossCount = h.config.MaxPacketLossCount
+	}
+
+	newPingerFunc := h.config.NewPinger
+	if newPingerFunc == nil {
+		newPingerFunc = newPinger
+	}
+
+	pinger := newPingerFunc(endpointCreated.Spec.HealthCheckIP, pingInterval, maxPacketLossCount)
+	h.pingers.Store(endpointCreated.Spec.CableName, pinger)
+	pinger.Start()
+
+	klog.Infof("CableEngine HealthChecker started pinger for CableName: %q with HealthCheckIP %q",
+		endpointCreated.Spec.CableName, endpointCreated.Spec.HealthCheckIP)
+
+	return false
+}
+
+func (h *controller) endpointDeleted(obj runtime.Object) bool {
+	endpointDeleted := obj.(*submarinerv1.Endpoint)
+	if endpointDeleted.Spec.CableName == "" {
+		return false
+	}
+
+	if obj, found := h.pingers.Load(endpointDeleted.Spec.CableName); found {
+		pinger := obj.(PingerInterface)
+		pinger.Stop()
+		h.pingers.Delete(endpointDeleted.Spec.CableName)
+	}
+
+	return false
+}

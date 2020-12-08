@@ -43,8 +43,10 @@ type Endpoint struct {
 }
 
 type EndpointSpec struct {
-	ClusterID     string            `json:"cluster_id"`
-	CableName     string            `json:"cable_name"`
+	ClusterID string `json:"cluster_id"`
+	CableName string `json:"cable_name"`
+	// +optional
+	HealthCheckIP string            `json:"healthCheckIP,omitempty"`
 	Hostname      string            `json:"hostname"`
 	Subnets       []string          `json:"subnets"`
 	PrivateIP     string            `json:"private_ip"`
@@ -65,6 +67,7 @@ type EndpointList struct {
 // +genclient
 // +genclient:noStatus
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:printcolumn:JSONPath=".status.haStatus",name="HA Status",description="High availability status of the Gateway",type="string"
 
 type Gateway struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -78,6 +81,16 @@ type GatewayStatus struct {
 	LocalEndpoint EndpointSpec `json:"localEndpoint"`
 	StatusFailure string       `json:"statusFailure"`
 	Connections   []Connection `json:"connections"`
+}
+
+// LatencySpec describes the round trip time information for a packet
+// between the gateway pods of two clusters.
+type LatencyRTTSpec struct {
+	Last    string `json:"last,omitempty"`
+	Min     string `json:"min,omitempty"`
+	Average string `json:"average,omitempty"`
+	Max     string `json:"max,omitempty"`
+	StdDev  string `json:"stdDev,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -99,6 +112,8 @@ type Connection struct {
 	Status        ConnectionStatus `json:"status"`
 	StatusMessage string           `json:"statusMessage"`
 	Endpoint      EndpointSpec     `json:"endpoint"`
+	// +optional
+	LatencyRTT *LatencyRTTSpec `json:"latencyRTT,omitempty"`
 }
 
 type ConnectionStatus string

@@ -75,6 +75,16 @@ var _ = Describe("StringSet", func() {
 
 		containsElements(util.NewStringSet().Elements())
 	})
+
+	It("should calculate the diff correctly", func() {
+
+		set2 := util.NewStringSet()
+		_ = set2.Add("192.168.1.0/24")
+		_ = set2.Add("192.168.3.0/24")
+
+		containsElements(set2.Difference(set), "192.168.2.0/24")
+		containsElements(set.Difference(set2), "192.168.3.0/24")
+	})
 })
 
 func containsElements(actual []string, exp ...string) {

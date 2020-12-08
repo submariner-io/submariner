@@ -1,0 +1,108 @@
+package event_test
+
+import (
+	"errors"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+	k8sV1 "k8s.io/api/core/v1"
+	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/event"
+	"github.com/submariner-io/submariner/pkg/event/logger"
+	"github.com/submariner-io/submariner/pkg/event/testing"
+)
+
+const npOVNKubernetes = "OVNKubernetes"
+const npGenericKubeproxyIptables = "GenericKubeproxyIptables"
+
+var _ = Describe("Event Registry", func() {
+	When("handlers with various network plugins are added to the registry", func() {
+		var (
+			matchingHandlers    []*testing.TestHandler
+			nonMatchingHandlers []*testing.TestHandler
+			registry            *event.Registry
+			allTestEvents       chan testing.TestEvent
+		)
+
+		BeforeEach(func() {
+			allTestEvents = make(chan testing.TestEvent, 1000)
+			registry = event.NewRegistry("test-registry", npGenericKubeproxyIptables)
+
+			nonMatchingHandlers = []*testing.TestHandler{
+				testing.NewTestHandler("ovn-handler", npOVNKubernetes, allTestEvents),
+			}
+
+			matchingHandlers = []*testing.TestHandler{
+				testing.NewTestHandler("kubeproxy-handler1", npGenericKubeproxyIptables, allTestEvents),
+				testing.NewTestHandler("kubeproxy-handler2", npGenericKubeproxyIptables, allTestEvents),
+				testing.NewTestHandler("wildcard-handler", event.AnyNetworkPlugin, allTestEvents),
+			}
+
+			err := registry.AddHandlers(logger.NewHandler(), matchingHandlers[0], nonMatchingHandlers[0], matchingHandlers[1],
+				matchingHandlers[2])
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should initialize all matching handlers", func() {
+			for _, h := range matchingHandlers {
+				Expect(h.Initialized).To(BeTrue())
+			}
+
+			for _, h := range nonMatchingHandlers {
+				Expect(h.Initialized).To(BeFalse())
+			}
+		})
+
+		It("should invoke all matching handlers of all events in registration order", func() {
+			for ev, f := range allEvents(registry) {
+				err := f()
+				Expect(err).To(Succeed())
+
+				for _, h := range matchingHandlers {
+					ev.Handler = h.Name
+					Expect(allTestEvents).To(Receive(Equal(ev)))
+				}
+			}
+
+			Expect(allTestEvents).ToNot(Receive())
+		})
+
+		When("one handler returns an error", func() {
+			It("should invoke subsequent matching handlers", func() {
+				matchingHandlers[0].FailOnEvent = errors.New("I shall fail!")
+
+				for ev, f := range allEvents(registry) {
+					err := f()
+					Expect(err).To(HaveOccurred())
+
+					for _, h := range matchingHandlers {
+						ev.Handler = h.Name
+						Expect(allTestEvents).To(Receive(Equal(ev)))
+					}
+				}
+			})
+		})
+	})
+})
+
+func allEvents(registry *event.Registry) map[testing.TestEvent]func() error {
+	endpoint := &submV1.Endpoint{ObjectMeta: v1meta.ObjectMeta{Name: "endpoint1"}}
+	node := &k8sV1.Node{ObjectMeta: v1meta.ObjectMeta{Name: "node1"}}
+
+	return map[testing.TestEvent]func() error{
+		{Name: testing.EvStop, Parameter: false}:                     func() error { return registry.StopHandlers(false) },
+		{Name: testing.EvTransitionToGateway}:                        registry.TransitionToGateway,
+		{Name: testing.EvTransitionToNonGateway}:                     registry.TransitionToNonGateway,
+		{Name: testing.EvNodeCreated, Parameter: node}:               func() error { return registry.NodeCreated(node) },
+		{Name: testing.EvNodeUpdated, Parameter: node}:               func() error { return registry.NodeUpdated(node) },
+		{Name: testing.EvNodeRemoved, Parameter: node}:               func() error { return registry.NodeRemoved(node) },
+		{Name: testing.EvLocalEndpointCreated, Parameter: endpoint}:  func() error { return registry.LocalEndpointCreated(endpoint) },
+		{Name: testing.EvLocalEndpointUpdated, Parameter: endpoint}:  func() error { return registry.LocalEndpointUpdated(endpoint) },
+		{Name: testing.EvLocalEndpointRemoved, Parameter: endpoint}:  func() error { return registry.LocalEndpointRemoved(endpoint) },
+		{Name: testing.EvRemoteEndpointCreated, Parameter: endpoint}: func() error { return registry.RemoteEndpointCreated(endpoint) },
+		{Name: testing.EvRemoteEndpointUpdated, Parameter: endpoint}: func() error { return registry.RemoteEndpointUpdated(endpoint) },
+		{Name: testing.EvRemoteEndpointRemoved, Parameter: endpoint}: func() error { return registry.RemoteEndpointRemoved(endpoint) },
+	}
+}

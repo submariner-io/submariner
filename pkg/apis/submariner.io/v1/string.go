@@ -11,5 +11,6 @@ func (e *Endpoint) String() string {
 	if err != nil {
 		return fmt.Sprintf("%#v", e)
 	}
+
 	return string(bytes)
 }

@@ -4,38 +4,54 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog"
-
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/cableengine"
+	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
 	v1typed "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog"
 )
 
 type GatewaySyncer struct {
-	client  v1typed.GatewayInterface
-	engine  cableengine.Engine
-	version string
+	sync.Mutex
+	client      v1typed.GatewayInterface
+	engine      cableengine.Engine
+	version     string
+	statusError error
+	healthCheck healthchecker.Interface
 }
 
 var GatewayUpdateInterval = 5 * time.Second
 var GatewayStaleTimeout = GatewayUpdateInterval * 3
 
+var gatewaySyncIterations = prometheus.NewCounter(prometheus.CounterOpts{
+	Name: "gateway_sync_iterations",
+	Help: "Gateway synchronization iterations",
+})
+
 const updateTimestampAnnotation = "update-timestamp"
+
+func init() {
+	prometheus.MustRegister(gatewaySyncIterations)
+}
 
 // NewEngine creates a new Engine for the local cluster
 func NewGatewaySyncer(engine cableengine.Engine, client v1typed.GatewayInterface,
-	version string) *GatewaySyncer {
+	version string, healthCheck healthchecker.Interface) *GatewaySyncer {
 	return &GatewaySyncer{
-		client:  client,
-		engine:  engine,
-		version: version,
+		client:      client,
+		engine:      engine,
+		version:     version,
+		healthCheck: healthCheck,
 	}
 }
 
@@ -49,7 +65,23 @@ func (s *GatewaySyncer) Run(stopCh <-chan struct{}) {
 }
 
 func (i *GatewaySyncer) syncGatewayStatus() {
+	i.Lock()
+	defer i.Unlock()
+
+	i.syncGatewayStatusSafe()
+}
+
+func (i *GatewaySyncer) SetGatewayStatusError(err error) {
+	i.Lock()
+	defer i.Unlock()
+
+	i.statusError = err
+	i.syncGatewayStatusSafe()
+}
+
+func (i *GatewaySyncer) syncGatewayStatusSafe() {
 	klog.V(log.TRACE).Info("Running Gateway status sync")
+	gatewaySyncIterations.Inc()
 
 	gatewayObj := i.generateGatewayObject()
 
@@ -103,6 +135,7 @@ func (i *GatewaySyncer) cleanupStaleGatewayEntries(localGatewayName string) erro
 			// In this case we don't want to stop the cleanup loop and just log it
 			utilruntime.HandleError(fmt.Errorf("Error processing stale Gateway %+v: %s", gw, err))
 		}
+
 		if stale {
 			err := i.client.Delete(gw.Name, &metav1.DeleteOptions{})
 			if err != nil {
@@ -114,6 +147,7 @@ func (i *GatewaySyncer) cleanupStaleGatewayEntries(localGatewayName string) erro
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -127,6 +161,7 @@ func isGatewayStale(gateway v1.Gateway) (bool, error) {
 	if err != nil {
 		return true, fmt.Errorf("error parsing update-timestamp: %s", err)
 	}
+
 	now := time.Now().UTC().Unix()
 
 	return now >= (timestampInt + int64(GatewayStaleTimeout.Seconds())), nil
@@ -135,6 +170,7 @@ func isGatewayStale(gateway v1.Gateway) (bool, error) {
 func (i *GatewaySyncer) getLastSyncedGateway(name string) (*v1.Gateway, error) {
 	existingGw, err := i.client.Get(name, metav1.GetOptions{})
 	klog.V(log.TRACE).Infof("Last synced Gateway: %+v", existingGw)
+
 	return existingGw, err
 }
 
@@ -153,18 +189,52 @@ func (i *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 
 	gateway.Status.HAStatus = i.engine.GetHAStatus()
 
-	connections, err := i.engine.ListCableConnections()
-	if err != nil {
-		gateway.Status.StatusFailure = fmt.Sprintf("Error retrieving driver connections: %s", err)
+	var connections *[]v1.Connection
+
+	if i.statusError != nil {
+		gateway.Status.StatusFailure = i.statusError.Error()
+	} else {
+		var err error
+		connections, err = i.engine.ListCableConnections()
+		if err != nil {
+			msg := fmt.Sprintf("Error retrieving driver connections: %s", err)
+			klog.Errorf(msg)
+			gateway.Status.StatusFailure = msg
+		}
 	}
 
 	if connections != nil {
+		if i.healthCheck != nil {
+			for index := range *connections {
+				connection := &(*connections)[index]
+				latencyInfo := i.healthCheck.GetLatencyInfo(&connection.Endpoint)
+				if latencyInfo != nil {
+					connection.LatencyRTT = latencyInfo.Spec
+					if connection.Status == v1.Connected {
+						lastRTT, _ := time.ParseDuration(latencyInfo.Spec.Last)
+						cable.RecordConnectionLatency(localEndpoint.Spec.CableName, &localEndpoint.Spec, &connection.Endpoint, lastRTT.Seconds())
+
+						if latencyInfo.ConnectionStatus == healthchecker.ConnectionError {
+							connection.Status = v1.ConnectionError
+							connection.StatusMessage = latencyInfo.ConnectionError
+						} else if latencyInfo.ConnectionStatus == healthchecker.ConnectionUnknown {
+							connection.StatusMessage = latencyInfo.ConnectionError
+						}
+					} else if connection.Status == v1.ConnectionError && latencyInfo.ConnectionStatus == healthchecker.Connected {
+						connection.Status = v1.Connected
+						connection.StatusMessage = ""
+					}
+				}
+			}
+		}
+
 		gateway.Status.Connections = *connections
 	} else {
 		gateway.Status.Connections = []v1.Connection{}
 	}
 
 	klog.V(log.TRACE).Infof("Generated Gateway object: %+v", gateway)
+
 	return &gateway
 }
 
@@ -177,5 +247,6 @@ func (s *GatewaySyncer) CleanupGatewayEntry() {
 		klog.Errorf("Error while trying to delete own Gateway %q : %s", hostName, err)
 		return
 	}
+
 	klog.Infof("The Gateway entry for %q has been deleted", hostName)
 }
