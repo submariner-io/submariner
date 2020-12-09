@@ -5,7 +5,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Test Statistics", func() {
+var _ = Describe("Statistics", func() {
 	const (
 		testMinRTT     = 404351
 		testMaxRTT     = 1048263
