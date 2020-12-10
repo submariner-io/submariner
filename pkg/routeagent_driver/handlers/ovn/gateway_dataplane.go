@@ -211,7 +211,7 @@ func (ovn *Handler) getSubmDefaultRoute() *netlink.Route {
 
 	return &netlink.Route{
 		Gw:    net.ParseIP(submarinerUpstreamIP),
-		Table: constants.RouteAgentHostNetworkTableID,
+		Table: constants.RouteAgentInterClusterNetworkTableID,
 	}
 }
 

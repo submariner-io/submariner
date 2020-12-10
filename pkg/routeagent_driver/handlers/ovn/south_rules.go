@@ -16,7 +16,7 @@ func (ovn *Handler) handleSubnets(subnets []string, ruleFunc func(rule *netlink.
 	ignoredErrorFunc func(error) bool) error {
 	for _, subnetToHandle := range subnets {
 		for _, localSubnet := range ovn.localEndpoint.Spec.Subnets {
-			rule, err := ovn.ruleForSouthTraffic(localSubnet, subnetToHandle)
+			rule, err := ovn.programRule(localSubnet, subnetToHandle, constants.RouteAgentInterClusterNetworkTableID)
 			if err != nil {
 				return errors.Wrapf(err, "error creating rule %#v", rule)
 			}
@@ -31,21 +31,29 @@ func (ovn *Handler) handleSubnets(subnets []string, ruleFunc func(rule *netlink.
 	return nil
 }
 
-func (ovn *Handler) ruleForSouthTraffic(localSubnet, remoteSubnet string) (*netlink.Rule, error) {
-	_, dstCIDR, err := net.ParseCIDR(localSubnet)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error trying to parse local subnet %q", localSubnet)
-	}
-
-	_, srcCIDR, err := net.ParseCIDR(remoteSubnet)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error trying to parse remote subnet %q", remoteSubnet)
-	}
-
+func (ovn *Handler) programRule(dest, src string, tableId int) (*netlink.Rule, error) {
 	rule := netlink.NewRule()
-	rule.Dst = dstCIDR
-	rule.Src = srcCIDR
-	rule.Table = constants.RouteAgentHostNetworkTableID
+
+	if dest != "" {
+		_, dstCIDR, err := net.ParseCIDR(dest)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error trying to parse toSubnet %q", dest)
+		}
+
+		rule.Dst = dstCIDR
+	}
+
+	if src != "" {
+		_, srcCIDR, err := net.ParseCIDR(src)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error trying to parse fromSubnet %q", src)
+		}
+
+		rule.Src = srcCIDR
+	}
+
+	rule.Table = tableId
+	rule.Priority = tableId
 
 	return rule, nil
 }
@@ -58,7 +66,7 @@ func (ovn *Handler) getExistingIPv4RuleSubnets() (stringset.Interface, error) {
 	}
 
 	for _, rule := range rules {
-		if rule.Table == constants.RouteAgentHostNetworkTableID && rule.Src != nil {
+		if rule.Table == constants.RouteAgentInterClusterNetworkTableID && rule.Src != nil {
 			currentRuleRemotes.Add(rule.Src.String())
 		}
 	}
