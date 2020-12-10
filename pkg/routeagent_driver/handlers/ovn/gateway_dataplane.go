@@ -3,6 +3,7 @@ package ovn
 import (
 	"net"
 	"os"
+	"strings"
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/pkg/errors"
@@ -25,7 +26,7 @@ func (ovn *Handler) cleanupGatewayDataplane() error {
 		return errors.Wrapf(err, "error removing routing rule")
 	}
 
-	err = netlink.RouteDel(getSubmDefaultRoute())
+	err = netlink.RouteDel(ovn.getSubmDefaultRoute())
 	if err != nil && !os.IsNotExist(err) {
 		return errors.Wrap(err, "error deleting submariner default route")
 	}
@@ -68,7 +69,7 @@ func (ovn *Handler) updateGatewayDataplane() error {
 		return errors.Wrapf(err, "error removing routing rule")
 	}
 
-	err = netlink.RouteAdd(getSubmDefaultRoute())
+	err = netlink.RouteAdd(ovn.getSubmDefaultRoute())
 	if err != nil && !os.IsExist(err) {
 		return errors.Wrap(err, "error adding submariner default")
 	}
@@ -83,8 +84,8 @@ func (ovn *Handler) getForwardingRuleSpecs() ([][]string, error) {
 	}
 
 	return [][]string{
-		{"-i", "ovn-k8s-gw0", "-o", ovn.cableRoutingInterface.Name, "-j", "ACCEPT"},
-		{"-i", ovn.cableRoutingInterface.Name, "-o", "ovn-k8s-gw0", "-j", "ACCEPT"},
+		{"-i", ovnK8sGatewayInterface, "-o", ovn.cableRoutingInterface.Name, "-j", "ACCEPT"},
+		{"-i", ovn.cableRoutingInterface.Name, "-o", ovnK8sGatewayInterface, "-j", "ACCEPT"},
 	}, nil
 }
 
@@ -131,10 +132,53 @@ func (ovn *Handler) cleanupForwardingIptables() error {
 	return nil
 }
 
-func getSubmDefaultRoute() *netlink.Route {
+func (ovn *Handler) getSubmDefaultRoute() *netlink.Route {
+	submarinerUpstreamIP, err := ovn.getSubmarinerUpstreamIP()
+
+	// This is a non-retriable error, if this happens we want a hard &
+	// visible error: the route-agent pod exiting with error
+	if err != nil {
+		klog.Fatal(err)
+	}
+
 	return &netlink.Route{
-		// TODO WIP: detect as we have now two options
-		Gw:    net.ParseIP(npSyncerOvn.SubmarinerUpstreamIPv2),
+		Gw:    net.ParseIP(submarinerUpstreamIP),
 		Table: constants.RouteAgentHostNetworkTableID,
 	}
+}
+
+func (ovn *Handler) getSubmarinerUpstreamIP() (string, error) {
+	if ovn.submarinerUpstreamIP != "" {
+		return ovn.submarinerUpstreamIP, nil
+	}
+
+	iface, err := net.InterfaceByName(ovnK8sGatewayInterface)
+	if err != nil {
+		return "", errors.Wrapf(err, "error looking for %q interface, trying to detect the submariner_router upstream IP",
+			ovnK8sGatewayInterface)
+	}
+
+	addresses, err := iface.Addrs()
+	if err != nil {
+		return "", errors.Wrapf(err, "error listing %q interface addresses while trying to detect the submariner_router upstream IP",
+			ovnK8sGatewayInterface)
+	}
+
+	for _, addr := range addresses {
+		switch {
+		case strings.HasPrefix(addr.String(), "169.254.0."):
+			ovn.submarinerUpstreamIP = npSyncerOvn.SubmarinerUpstreamIPv2
+		case strings.HasPrefix(addr.String(), "169.254.33."):
+			ovn.submarinerUpstreamIP = npSyncerOvn.SubmarinerUpstreamIP
+		}
+	}
+
+	if ovn.submarinerUpstreamIP == "" {
+		return "", errors.Errorf("Unable to figure out the submariner_router upstream IP address based on %q addresses %#v",
+			ovnK8sGatewayInterface, addresses)
+	}
+
+	klog.Infof("Submariner router upstream ip found to be: %q", ovn.submarinerUpstreamIP)
+
+	return ovn.submarinerUpstreamIP, nil
 }
