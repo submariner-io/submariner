@@ -27,6 +27,7 @@ type Handler struct {
 	localEndpoint         *submV1.Endpoint
 	remoteEndpoints       map[string]*submV1.Endpoint
 	isGateway             bool
+	submarinerUpstreamIP  string
 }
 
 func NewHandler(env environment.Specification, smClientSet clientset.Interface) *Handler {
