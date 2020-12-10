@@ -50,7 +50,7 @@ func (ovn *Handler) Init() error {
 	// For now we get all the cleanups
 	ovn.cleanupHandlers = cableCleanup.GetCleanupHandlers()
 
-	return nil
+	return ovn.initIPtablesChains()
 }
 
 func (ovn *Handler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
