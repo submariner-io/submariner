@@ -60,6 +60,11 @@ func (ovn *SyncHandler) updateGatewayNode() error {
 		return err
 	}
 
+	// Associate the current chassis k8s load balancers to the submariner_router
+	if err := ovn.ensureServiceLoadBalancersFrom(chassis.Hostname); err != nil {
+		return err
+	}
+
 	return ovn.updateSubmarinerRouterLocalRoutes()
 }
 
