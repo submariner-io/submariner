@@ -77,6 +77,13 @@ func (n *NbCtl) GetGatewayChassis(lrp, chassis string) (string, error) {
 	return output, err
 }
 
+func (n *NbCtl) LrSetLoadBalancers(lrId string, lbIDs []string) error {
+	loadBalancerSet := fmt.Sprintf("load_balancer=[%s]", strings.Join(lbIDs, ","))
+	_, err := n.nbctl("set", "Logical_Router", lrId, loadBalancerSet)
+
+	return err
+}
+
 func (n *NbCtl) LrPolicyAdd(logicalRouter string, prio int, filter string, actions ...string) error {
 	allParameters := []string{"lr-policy-add", logicalRouter, strconv.Itoa(prio), filter}
 	allParameters = append(allParameters, actions...)
