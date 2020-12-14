@@ -62,6 +62,11 @@ func (n *NbCtl) nbctl(parameters ...string) (output string, err error) {
 	return strOut, err
 }
 
+func (n *NbCtl) SetRouterChassis(router, chassis string) error {
+	_, err := n.nbctl("set", "Logical_Router", router, "options:chassis="+chassis)
+	return err
+}
+
 func (n *NbCtl) SetGatewayChassis(lrp, chassis string, prio int) error {
 	_, err := n.nbctl("lrp-set-gateway-chassis", lrp, chassis, strconv.Itoa(prio))
 	return err
