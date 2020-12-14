@@ -24,7 +24,6 @@ type SyncHandler struct {
 	sbdb                  goovn.Client
 	localEndpoint         *submV1.Endpoint
 	remoteEndpoints       map[string]*submV1.Endpoint
-	lastOvnGwChassis      string
 	submarinerUpstreamIP  string
 	submarinerUpstreamNet string
 	hostUpstreamIP        string
