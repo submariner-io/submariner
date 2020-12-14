@@ -3,6 +3,7 @@ package ovn
 import (
 	"net"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/coreos/go-iptables/iptables"
@@ -83,16 +84,30 @@ func (ovn *Handler) updateGatewayDataplane() error {
 	return ovn.setupForwardingIptables()
 }
 
+// TODO: if the #1022 workaround needs to be sustained for some time, instead of this we should be calculating
+//       the PMTU with a tool like tracepath between the gateway endpoints, reporting back so we can use such
+//		 information here.
+const IPTCPOverHead = 40
+const ExpectedIPSECOverhead = 62
+const MSSFor1500MTU = 1500 - IPTCPOverHead - ExpectedIPSECOverhead
+
 func (ovn *Handler) getForwardingRuleSpecs() ([][]string, error) {
 	if ovn.cableRoutingInterface == nil {
 		return nil, errors.New("error setting up forwarding iptables, the cable interface isn't discovered yet, " +
 			"this will be retried")
 	}
 
-	return [][]string{
+	rules := [][]string{
 		{"-i", ovnK8sGatewayInterface, "-o", ovn.cableRoutingInterface.Name, "-j", "ACCEPT"},
-		{"-i", ovn.cableRoutingInterface.Name, "-o", ovnK8sGatewayInterface, "-j", "ACCEPT"},
-	}, nil
+		{"-i", ovn.cableRoutingInterface.Name, "-o", ovnK8sGatewayInterface, "-j", "ACCEPT"}}
+
+	// NOTE: This is a workaround for submariner issue https://github.com/submariner-io/submariner/issues/1022
+	for _, serviceCIDR := range ovn.config.ServiceCidr {
+		rules = append(rules, []string{"-o", ovnK8sGatewayInterface, "-d", serviceCIDR, "-p", "tcp",
+			"--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", strconv.Itoa(MSSFor1500MTU)})
+	}
+
+	return rules, nil
 }
 
 func (ovn *Handler) setupForwardingIptables() error {

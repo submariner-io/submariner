@@ -122,24 +122,8 @@ func (ovn *SyncHandler) getMgmtPortIP(chassisSwitch string) (string, error) {
 	return macIP[1], nil
 }
 
-func (ovn *SyncHandler) associateSubmarinerExternalPortToChassis(chassis *goovn.Chassis) error {
-	if ovn.lastOvnGwChassis != chassis.Name {
-		// TODO: make this less stateful, by listing the existing gateway chassis entries, and leaving only
-		//       the desired state
-		if ovn.lastOvnGwChassis != "" {
-			err := ovn.nbctl.DelGatewayChassis(submarinerUpstreamRPort, chassis.Name, 0)
-			if err != nil {
-				return errors.Wrapf(err, "error deleting the gateway chassis for %q", submarinerUpstreamRPort)
-			}
-		}
-
-		err := ovn.nbctl.SetGatewayChassis(submarinerUpstreamRPort, chassis.Name, 0)
-		if err != nil {
-			return errors.Wrapf(err, "error setting the new gateway chassis for %q", submarinerUpstreamRPort)
-		}
-	}
-
-	return nil
+func (ovn *SyncHandler) associateSubmarinerRouterToChassis(chassis *goovn.Chassis) error {
+	return ovn.nbctl.SetRouterChassis(submarinerLogicalRouter, chassis.Name)
 }
 
 func (ovn *SyncHandler) setupOvnClusterRouterRemoteRules() error {
