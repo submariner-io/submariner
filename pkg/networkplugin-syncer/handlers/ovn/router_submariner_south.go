@@ -16,7 +16,7 @@ const (
 	submarinerDownstreamSwPort = "submariner_j_lsp"
 	submarinerDownstreamMAC    = "00:60:2f:10:01:03"
 	submarinerDownstreamNET    = submarinerDownstreamIP + "/29"
-	submarinerDownstreamIP     = "169.254.34.1"
+	submarinerDownstreamIP     = "169.254.254.1"
 )
 
 func (ovn *SyncHandler) updateGatewayNode() error {
@@ -37,8 +37,15 @@ func (ovn *SyncHandler) updateGatewayNode() error {
 
 	klog.V(log.DEBUG).Infof("Chassis for gw %q is %q, host: %q", gwHostname, chassis.Name, chassis.Hostname)
 
+	var submExternalPortSwitch string
+	if ovn.hasNodeLocalSwitch {
+		submExternalPortSwitch = nodeLocalSwitch
+	} else {
+		submExternalPortSwitch = "ext_" + chassis.Hostname
+	}
+
 	// Create/update the submariner external port associated to one of the external switches
-	if err := ovn.createOrUpdateSubmarinerExternalPort("ext_" + chassis.Hostname); err != nil && !errors.Is(err, goovn.ErrorExist) {
+	if err := ovn.createOrUpdateSubmarinerExternalPort(submExternalPortSwitch); err != nil && !errors.Is(err, goovn.ErrorExist) {
 		return err
 	}
 
@@ -49,7 +56,12 @@ func (ovn *SyncHandler) updateGatewayNode() error {
 
 	// Associate the port to an specific chassis (=host) on OVN so the traffic flows out/in through that host
 	// the active submariner-gateway in our case
-	if err := ovn.associateSubmarinerExternalPortToChassis(chassis); err != nil {
+	if err := ovn.associateSubmarinerRouterToChassis(chassis); err != nil {
+		return err
+	}
+
+	// Associate the current chassis k8s load balancers to the submariner_router
+	if err := ovn.ensureServiceLoadBalancersFrom(chassis.Hostname); err != nil {
 		return err
 	}
 

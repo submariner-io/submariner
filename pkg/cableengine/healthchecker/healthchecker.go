@@ -145,10 +145,6 @@ func (h *controller) endpointCreatedorUpdated(obj runtime.Object) bool {
 
 func (h *controller) endpointDeleted(obj runtime.Object) bool {
 	endpointDeleted := obj.(*submarinerv1.Endpoint)
-	if endpointDeleted.Spec.CableName == "" {
-		return false
-	}
-
 	if obj, found := h.pingers.Load(endpointDeleted.Spec.CableName); found {
 		pinger := obj.(PingerInterface)
 		pinger.Stop()
