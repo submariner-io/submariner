@@ -1,8 +1,12 @@
 package healthchecker
 
 import (
+	"net"
+	"os"
+	"syscall"
 	"time"
 
+	"github.com/go-ping/ping"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -18,9 +22,42 @@ var _ = Describe("Pinger", func() {
 		ip                 string
 		pingInterval       time.Duration
 		maxPacketLossCount uint
+		testsEnabled       bool
 	)
 
+	testsEnabled = func() bool {
+		// Run a pinger to check if listening on an ICMP socket is permitted.
+		err := func() error {
+			p, err := ping.NewPinger("127.0.0.1")
+			if err != nil {
+				return err
+			}
+
+			p.Count = 1
+			p.Timeout = 50 * time.Millisecond
+			p.SetPrivileged(privileged)
+
+			return p.Run()
+		}()
+
+		if opErr, ok := err.(*net.OpError); ok {
+			if sysCallErr, ok := opErr.Unwrap().(*os.SyscallError); ok {
+				if errNo, ok := sysCallErr.Unwrap().(syscall.Errno); ok {
+					// errNo 1 is "operation not permitted".
+					return !(opErr.Op == "listen" && sysCallErr.Syscall == "socket" && errNo == 1)
+				}
+			}
+		}
+
+		return true
+	}()
+
 	BeforeEach(func() {
+		if !testsEnabled {
+			Skip("Ping operation not permitted, skipping the test...")
+			return
+		}
+
 		ip = "127.0.0.1"
 		pingInterval = 300 * time.Millisecond
 		maxPacketLossCount = defaultMaxPacketLossCount
