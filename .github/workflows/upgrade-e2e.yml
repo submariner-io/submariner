@@ -7,7 +7,7 @@ on:
 jobs:
   upgrade-e2e:
     name: Latest Release to Latest Version
-    timeout-minutes: 30
+    timeout-minutes: 45
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
