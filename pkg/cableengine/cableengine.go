@@ -1,16 +1,16 @@
 package cableengine
 
 import (
-	"fmt"
 	"reflect"
 	"sync"
 
 	"github.com/submariner-io/admiral/pkg/log"
+	"k8s.io/klog"
+
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
-	"k8s.io/klog"
 
 	// Add supported drivers
 	_ "github.com/submariner-io/submariner/pkg/cable/libreswan"
@@ -119,26 +119,31 @@ func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 	for _, active := range activeConnections {
 		klog.V(log.TRACE).Infof("Analyzing currently active connection %q", active)
 
-		if active == endpoint.Spec.CableName {
-			activeEndpointInfo := i.getEndpointInfo(active, connections)
-			if activeEndpointInfo != nil {
-				// There could be scenarios where the cableName would be the same but the
-				// PublicIP of the active GatewayNode changes.
-				if activeEndpointInfo.PublicIP == endpoint.Spec.PublicIP {
-					klog.V(log.DEBUG).Infof("Cable %q is already installed - not installing again", active)
-					return nil
-				} else {
-					klog.V(log.DEBUG).Infof("Cable %q is already installed - but PublicIP changed", active)
-					err = i.driver.DisconnectFromEndpoint(endpoint)
-					if err != nil {
-						return err
-					}
-				}
-			}
+		activeEndpointInfo := i.getEndpointInfo(active, connections)
+		if activeEndpointInfo == nil {
+			klog.Warningf("No Connection found for active Endpoint cable name %q", active)
+			continue
 		}
 
-		if util.GetClusterIDFromCableName(active) == endpoint.Spec.ClusterID {
-			return fmt.Errorf("found a pre-existing cable %q that belongs to this cluster %s", active, endpoint.Spec.ClusterID)
+		if active == endpoint.Spec.CableName {
+			// There could be scenarios where the cableName would be the same but the
+			// PublicIP of the active GatewayNode changes.
+			if activeEndpointInfo.PublicIP == endpoint.Spec.PublicIP {
+				klog.V(log.DEBUG).Infof("Cable %q is already installed - not installing again", active)
+				return nil
+			} else {
+				klog.V(log.DEBUG).Infof("Cable %q is already installed - but PublicIP changed", active)
+				err = i.driver.DisconnectFromEndpoint(types.SubmarinerEndpoint{Spec: *activeEndpointInfo})
+				if err != nil {
+					return err
+				}
+			}
+		} else if util.GetClusterIDFromCableName(active) == endpoint.Spec.ClusterID {
+			klog.V(log.DEBUG).Infof("Found a pre-existing cable %q that belongs to this cluster %s", active, endpoint.Spec.ClusterID)
+			err = i.driver.DisconnectFromEndpoint(types.SubmarinerEndpoint{Spec: *activeEndpointInfo})
+			if err != nil {
+				return err
+			}
 		}
 	}
 
