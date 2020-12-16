@@ -14,7 +14,7 @@ e.g. (at)example_user
 e.g. submariner-operator/\* or submariner-operator/scripts/\*
 
 ### Requirements
-- [ ] I have reviewed the community membership guidelines (https://submariner.io/contributing/community-membership/)
+- [ ] I have reviewed the contributor roles guidelines (https://submariner.io/community/contributor-roles/)
 - [ ] I have enabled 2FA on my GitHub account (https://github.com/settings/security)
 - [ ] I have subscribed to the submariner-dev e-mail list (https://groups.google.com/forum/#!forum/submariner-dev)
 - [ ] I have been actively contributing to Submariner for at least 3 months
