@@ -7,6 +7,7 @@ import (
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
@@ -62,4 +63,20 @@ func (f *Framework) AwaitNewSubmarinerEndpoint(cluster framework.ClusterIndex, p
 
 		return false, fmt.Sprintf("Expecting new Endpoint instance (UUID %q matches previous instance)", endpoint.ObjectMeta.UID), nil
 	})
+}
+
+func (f *Framework) AwaitSubmarinerEndpointRemoved(cluster framework.ClusterIndex, endpointName string) {
+	framework.AwaitUntil(fmt.Sprintf("await submariner Endpoint %q on %q removed", endpointName,
+		framework.TestContext.ClusterIDs[cluster]),
+		func() (interface{}, error) {
+			_, err := SubmarinerClients[cluster].SubmarinerV1().Endpoints(framework.TestContext.SubmarinerNamespace).Get(
+				endpointName, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
+		},
+		func(result interface{}) (bool, string, error) {
+			return result.(bool), "", nil
+		})
 }
