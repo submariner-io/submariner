@@ -10,6 +10,7 @@ import (
 	"k8s.io/klog"
 
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	iptcommon "github.com/submariner-io/submariner/pkg/routeagent_driver/iptables"
 	"github.com/submariner-io/submariner/pkg/util"
 )
 
@@ -19,16 +20,8 @@ func (kp *SyncHandler) createIPTableChains() error {
 		return fmt.Errorf("error initializing iptables: %v", err)
 	}
 
-	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmPostRoutingChain)
-
-	if err = util.CreateChainIfNotExists(ipt, "nat", constants.SmPostRoutingChain); err != nil {
-		return fmt.Errorf("unable to create %s chain in iptables: %v", constants.SmPostRoutingChain, err)
-	}
-
-	klog.V(log.DEBUG).Infof("Insert %s rule that has rules for inter-cluster traffic", constants.SmPostRoutingChain)
-	forwardToSubPostroutingRuleSpec := []string{"-j", constants.SmPostRoutingChain}
-	if err = util.PrependUnique(ipt, "nat", "POSTROUTING", forwardToSubPostroutingRuleSpec); err != nil {
-		return fmt.Errorf("unable to insert iptable rule in NAT table, POSTROUTING chain: %v", err)
+	if err := iptcommon.InitSubmarinerPostRoutingChain(ipt); err != nil {
+		return err
 	}
 
 	klog.V(log.DEBUG).Infof("Install/ensure SUBMARINER-INPUT chain exists")

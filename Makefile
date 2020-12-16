@@ -16,20 +16,6 @@ override VALIDATE_ARGS += --skip-dirs pkg/client
 
 # Process extra flags from the `using=a,b,c` optional flag
 
-ifneq (,$(filter libreswan,$(_using)))
-cable_driver = libreswan
-else ifneq (,$(filter wireguard,$(_using)))
-cable_driver = wireguard
-endif
-
-ifneq (,$(cable_driver))
-ifneq (,$(filter helm,$(_using)))
-override DEPLOY_ARGS += --deploytool_submariner_args '--set cable-driver=$(cable_driver)'
-else
-override DEPLOY_ARGS += --deploytool_submariner_args '--cable-driver $(cable_driver)'
-endif
-endif
-
 # Targets to make
 
 deploy: images
@@ -55,15 +41,6 @@ ci: validate unit build images
 
 images: build package/.image.submariner package/.image.submariner-route-agent package/.image.submariner-globalnet \
 		package/.image.submariner-networkplugin-syncer
-
-images-submariner-libreswan-git: build package/Dockerfile.submariner-libreswan-git
-	$(SCRIPTS_DIR)/build_image.sh -i submariner-libreswan-git -f package/Dockerfile.submariner-libreswan-git
-
-import-submariner-libreswan-git:  images-submariner-libreswan-git
-	source $(SCRIPTS_DIR)/lib/deploy_funcs && \
-	source $(SCRIPTS_DIR)/lib/version && \
-	docker tag quay.io/submariner/submariner-libreswan-git:$${DEV_VERSION} quay.io/submariner/submariner:$${DEV_VERSION} && \
-	import_image quay.io/submariner/submariner
 
 $(TARGETS): vendor/modules.txt
 	./scripts/$@

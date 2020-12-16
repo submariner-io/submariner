@@ -28,7 +28,7 @@ func (ovn *SyncHandler) initClients() error {
 		return err
 	}
 
-	ovn.nbctl = nbctl.New(defaultOVNNBDB, pkFile, certFile, caFile)
+	ovn.nbctl = nbctl.New(getOVNNBDBAddress(), pkFile, certFile, caFile)
 
 	tlsConfig, err := getOVNTLSConfig(pkFile, certFile, caFile)
 	if err != nil {
