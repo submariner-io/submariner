@@ -172,6 +172,9 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 	newSubmEndpoint := f.AwaitNewSubmarinerEndpoint(framework.ClusterA, submEndpoint.ObjectMeta.UID)
 	By(fmt.Sprintf("Found new submariner endpoint for %q: %#v", clusterAName, newSubmEndpoint))
 
+	By(fmt.Sprintf("Waiting for the previous submariner endpoint %q to be removed on %q", newEnginePod.Name, clusterBName))
+	f.AwaitSubmarinerEndpointRemoved(framework.ClusterB, submEndpoint.Name)
+
 	By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
 	tcp.RunConnectivityTest(tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
