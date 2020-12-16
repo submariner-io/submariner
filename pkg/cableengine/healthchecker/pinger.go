@@ -10,6 +10,8 @@ import (
 	"k8s.io/klog"
 )
 
+const privileged = true
+
 var defaultMaxPacketLossCount uint = 5
 
 // The RTT will be stored and will be used to calculate the statistics until
@@ -87,13 +89,13 @@ func (p *pingerInfo) doPing() error {
 	pinger, err := ping.NewPinger(p.ip)
 	if err != nil {
 		p.connectionStatus = ConnectionUnknown
-		p.failureMsg = fmt.Sprintf("Failed to create the pinger for the remote endpoint IP %q: %v ", p.ip, err)
+		p.failureMsg = fmt.Sprintf("Failed to create the pinger for the remote endpoint IP %q: %v", p.ip, err)
 
 		return err
 	}
 
 	pinger.Interval = p.pingInterval
-	pinger.SetPrivileged(true)
+	pinger.SetPrivileged(privileged)
 	pinger.RecordRtts = false
 	pinger.Timeout = pingTimeout
 
@@ -129,7 +131,7 @@ func (p *pingerInfo) doPing() error {
 	err = pinger.Run()
 	if err != nil {
 		p.connectionStatus = ConnectionUnknown
-		p.failureMsg = fmt.Sprintf("Failed to create the pinger for the remote endpoint IP %q: %v ", p.ip, err)
+		p.failureMsg = fmt.Sprintf("Failed to run the pinger for the remote endpoint IP %q: %v", p.ip, err)
 
 		return err
 	}
