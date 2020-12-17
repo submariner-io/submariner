@@ -3,12 +3,11 @@ package ovn
 import (
 	goovn "github.com/ebay/go-ovn"
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/stringset"
 	"k8s.io/klog"
-
-	"github.com/submariner-io/submariner/pkg/util"
 )
 
-func (ovn *SyncHandler) getExistingSubmarinerRouterRoutesToPort(lrp string) (*util.StringSet, error) {
+func (ovn *SyncHandler) getExistingSubmarinerRouterRoutesToPort(lrp string) (stringset.Interface, error) {
 	subnetRouteObjs, err := ovn.nbdb.LRSRList(submarinerLogicalRouter)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error reading existing routes from %q going via port %q", submarinerLogicalRouter, lrp)
@@ -19,8 +18,8 @@ func (ovn *SyncHandler) getExistingSubmarinerRouterRoutesToPort(lrp string) (*ut
 	return existingRoutes, nil
 }
 
-func filterRouteSubnetsViaPort(subnetRouteObjs []*goovn.LogicalRouterStaticRoute, lrp string) *util.StringSet {
-	routeSubnets := util.NewStringSet()
+func filterRouteSubnetsViaPort(subnetRouteObjs []*goovn.LogicalRouterStaticRoute, lrp string) stringset.Interface {
+	routeSubnets := stringset.New()
 
 	for _, route := range subnetRouteObjs {
 		if route.OutputPort != nil && *route.OutputPort == lrp {

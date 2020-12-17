@@ -20,7 +20,7 @@ import (
 
 func (kp *SyncHandler) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks []string, operation Operation) {
 	if operation == Flush {
-		kp.routeCacheGWNode.DeleteAll()
+		kp.routeCacheGWNode.RemoveAll()
 		// The conversion doesn't introduce a security problem
 		// #nosec G204
 		cmd := exec.Command("/sbin/ip", "r", "flush", "table", strconv.Itoa(constants.RouteAgentHostNetworkTableID))
@@ -38,7 +38,7 @@ func (kp *SyncHandler) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks [
 			for _, inputCidrBlock := range inputCidrBlocks {
 				if kp.routeCacheGWNode.Add(inputCidrBlock) {
 					if err := kp.configureRoute(inputCidrBlock, operation); err != nil {
-						kp.routeCacheGWNode.Delete(inputCidrBlock)
+						kp.routeCacheGWNode.Remove(inputCidrBlock)
 						klog.Errorf("Failed to add route %q for HostNetwork support on the Gateway node: %v",
 							inputCidrBlock, err)
 					}
@@ -46,7 +46,7 @@ func (kp *SyncHandler) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks [
 			}
 		case Delete:
 			for _, inputCidrBlock := range inputCidrBlocks {
-				if kp.routeCacheGWNode.Delete(inputCidrBlock) {
+				if kp.routeCacheGWNode.Remove(inputCidrBlock) {
 					if err := kp.configureRoute(inputCidrBlock, operation); err != nil {
 						klog.Errorf("Failed to delete route %q for HostNetwork support on the Gateway node. %v",
 							inputCidrBlock, err)

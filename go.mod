@@ -16,7 +16,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.8.0
 	github.com/rdegges/go-ipify v0.0.0-20150526035502-2d94a6a86c40
-	github.com/submariner-io/admiral v0.8.0
+	github.com/submariner-io/admiral v0.8.1-0.20201218153659-b6de92b83dd5
 	github.com/submariner-io/shipyard v0.8.0
 	github.com/vishvananda/netlink v1.1.0
 	go.uber.org/zap v1.15.0 // indirect
