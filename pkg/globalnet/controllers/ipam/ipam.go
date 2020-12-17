@@ -174,6 +174,15 @@ func (i *Controller) processNextObject(objWorkqueue workqueue.RateLimitingInterf
 					objWorkqueue.Forget(obj)
 					return nil
 				case Requeue:
+					// If the kubeproxy chain for the service is missing on the node (might happen if there is
+					// some issue with kubeproxy pod itself or if using non-iptables based kubeproxy), instead
+					// of re-queuing forever, we place a hard-limit of maxServiceRequeues.
+					if objWorkqueue.NumRequeues(obj) >= maxServiceRequeues {
+						objWorkqueue.Forget(obj)
+						klog.Warningf("Service %s requeued max(%q) allowed iterations, ignoring it",
+							key, maxServiceRequeues)
+						return nil
+					}
 					objWorkqueue.AddRateLimited(obj)
 					return fmt.Errorf("service %s requeued %d times", key, objWorkqueue.NumRequeues(obj))
 				}

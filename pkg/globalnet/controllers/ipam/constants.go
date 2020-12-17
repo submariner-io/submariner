@@ -22,6 +22,8 @@ const (
 	kubeProxyServiceChainPrefix = "KUBE-SVC-"
 	kubeProxyServiceChainName   = "KUBE-SERVICES"
 
+	maxServiceRequeues = 20
+
 	AddRules    = true
 	DeleteRules = false
 
