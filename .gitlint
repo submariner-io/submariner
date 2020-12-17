@@ -5,5 +5,5 @@ ignore=body-is-missing,body-min-length
 
 [ignore-by-body]
 # Dependabot doesn't follow our conventions, unfortunately
-regex=^Signed-off-by: dependabot-preview\[bot\](.*)
+regex=^Signed-off-by: dependabot\[bot\](.*)
 ignore=all
