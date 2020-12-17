@@ -82,14 +82,23 @@ func (i *Controller) syncNodeRules(cniIfaceIP, globalIP string, addRules bool) e
 	return nil
 }
 
-func (i *Controller) evaluateService(service *k8sv1.Service) Operation {
-	if service.Spec.Type != k8sv1.ServiceTypeClusterIP {
+func (i *Controller) isServiceSupported(service *k8sv1.Service) bool {
+	if service.Spec.Type != k8sv1.ServiceTypeClusterIP || service.Spec.ClusterIP == "None" {
 		// Normally ClusterIPServices can be accessed only within the local cluster.
 		// When multiple K8s clusters are connected via Submariner, it enables access
 		// to ClusterIPService even from remote clusters. So, as part of Submariner
 		// Globalnet implementation, we are only interested in ClusterIP Services and
 		// not the other types of Services like LoadBalancer Services, NodePort Services
 		// etc which are externally accessible.
+		// TODO: Currently, Globalnet does not support headless services, hence we skip them here.
+		return false
+	}
+
+	return true
+}
+
+func (i *Controller) evaluateService(service *k8sv1.Service) Operation {
+	if !i.isServiceSupported(service) {
 		return Ignore
 	}
 
