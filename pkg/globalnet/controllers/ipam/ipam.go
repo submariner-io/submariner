@@ -257,8 +257,14 @@ func (i *Controller) handleUpdateService(old, newObj interface{}) {
 		return
 	}
 
-	if i.excludeNamespaces[newObj.(*k8sv1.Service).Namespace] {
+	service := newObj.(*k8sv1.Service)
+	if i.excludeNamespaces[service.Namespace] {
 		klog.V(log.DEBUG).Infof("In handleUpdateService, skipping Service %q as it belongs to excluded namespace.", key)
+		return
+	}
+
+	if !i.isServiceSupported(service) {
+		klog.V(log.DEBUG).Infof("In handleUpdateService, skipping Service %q.", key)
 		return
 	}
 
@@ -389,7 +395,7 @@ func (i *Controller) handleRemovedService(obj interface{}) {
 			if err != nil {
 				klog.Errorf("Error while cleaning up Service %q ingress rules. %v", key, err)
 			}
-		} else {
+		} else if i.isServiceSupported(service) {
 			klog.Errorf("Error: handleRemovedService called for %q, but globalIp annotation is missing.", key)
 		}
 	}
