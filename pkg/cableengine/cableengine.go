@@ -183,6 +183,11 @@ func (i *engine) getEndpointInfo(cableName string, connections []v1.Connection) 
 }
 
 func (i *engine) RemoveCable(endpoint types.SubmarinerEndpoint) error {
+	if endpoint.Spec.ClusterID == i.localCluster.ID {
+		klog.V(log.DEBUG).Infof("Cables are not added/removed for the local cluster, skipping removal")
+		return nil
+	}
+
 	klog.Infof("Removing Endpoint cable %q", endpoint.Spec.CableName)
 
 	i.Lock()
