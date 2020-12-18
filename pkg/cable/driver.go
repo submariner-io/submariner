@@ -35,7 +35,7 @@ type Driver interface {
 	GetActiveConnections(clusterID string) ([]string, error)
 
 	// GetConnections() returns an array of the existing connections, including status and endpoint info
-	GetConnections() (*[]v1.Connection, error)
+	GetConnections() ([]v1.Connection, error)
 
 	// ConnectToEndpoint establishes a connection to the given endpoint and returns a string
 	// representation of the IP address of the target endpoint.

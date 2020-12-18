@@ -22,7 +22,7 @@ import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 )
 
-func (i *strongSwan) GetConnections() (*[]v1.Connection, error) {
+func (i *strongSwan) GetConnections() ([]v1.Connection, error) {
 	client, err := getClient()
 	if err != nil {
 		return nil, err
@@ -39,7 +39,7 @@ func (i *strongSwan) GetConnections() (*[]v1.Connection, error) {
 
 // getSAListConnections converts an IKE SA List from ListSas, and converts into a cable connection list
 // It's made a separate function for testability (unit tests)
-func (i *strongSwan) getSAListConnections(sas []map[string]goStrongswanVici.IkeSa) (*[]v1.Connection, error) {
+func (i *strongSwan) getSAListConnections(sas []map[string]goStrongswanVici.IkeSa) ([]v1.Connection, error) {
 	connections := []v1.Connection{}
 
 	for cableID, endpoint := range i.remoteEndpoints {
@@ -62,7 +62,7 @@ func (i *strongSwan) getSAListConnections(sas []map[string]goStrongswanVici.IkeS
 		connections = append(connections, *connection)
 	}
 
-	return &connections, nil
+	return connections, nil
 }
 
 // updateConnectionState reads the IKE SA connection state and translates that into the cable
