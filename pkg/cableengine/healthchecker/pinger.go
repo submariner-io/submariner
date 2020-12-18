@@ -114,8 +114,8 @@ func (p *pingerInfo) doPing() error {
 
 			p.connectionStatus = ConnectionError
 			p.failureMsg = fmt.Sprintf("Failed to successfully ping the remote endpoint IP %q", p.ip)
-			pinger.PacketsSent = 0
-			pinger.PacketsRecv = 0
+
+			pinger.Stop()
 		}
 	}
 
@@ -126,6 +126,9 @@ func (p *pingerInfo) doPing() error {
 		p.connectionStatus = Connected
 		p.failureMsg = ""
 		p.statistics.update(uint64(packet.Rtt.Nanoseconds()))
+
+		pinger.PacketsSent = 0
+		pinger.PacketsRecv = 0
 	}
 
 	err = pinger.Run()
