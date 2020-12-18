@@ -126,6 +126,8 @@ func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 	for _, active := range activeConnections {
 		klog.V(log.TRACE).Infof("Analyzing currently active connection %q", active.Endpoint.CableName)
 
+		disconnect := false
+
 		if active.Endpoint.CableName == endpoint.Spec.CableName {
 			// There could be scenarios where the cableName would be the same but the
 			// PublicIP of the active GatewayNode changes.
@@ -134,14 +136,15 @@ func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 				return nil
 			} else {
 				klog.V(log.DEBUG).Infof("Cable %q is already installed - but PublicIP changed", active.Endpoint.CableName)
-				err = i.driver.DisconnectFromEndpoint(types.SubmarinerEndpoint{Spec: active.Endpoint})
-				if err != nil {
-					return err
-				}
+				disconnect = true
 			}
 		} else if util.GetClusterIDFromCableName(active.Endpoint.CableName) == endpoint.Spec.ClusterID {
 			klog.V(log.DEBUG).Infof("Found a pre-existing cable %q that belongs to this cluster %s",
 				active.Endpoint.CableName, endpoint.Spec.ClusterID)
+			disconnect = true
+		}
+
+		if disconnect {
 			err = i.driver.DisconnectFromEndpoint(types.SubmarinerEndpoint{Spec: active.Endpoint})
 			if err != nil {
 				return err
