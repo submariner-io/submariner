@@ -111,19 +111,11 @@ func (p *pingerInfo) doPing() error {
 		if pinger.PacketsSent-pinger.PacketsRecv > int(p.maxPacketLossCount) {
 			p.Lock()
 			defer p.Unlock()
-			// The counter will be reset to once to ensure that it is continuous packet loss
-			// before marking the connection as down.
-			if pinger.PacketsSent <= int(p.maxPacketLossCount)+1 {
-				p.failureMsg = fmt.Sprintf("Failed to successfully ping the remote endpoint IP %q", p.ip)
-				p.connectionStatus = ConnectionError
 
-				pinger.Stop()
+			p.connectionStatus = ConnectionError
+			p.failureMsg = fmt.Sprintf("Failed to successfully ping the remote endpoint IP %q", p.ip)
 
-				return
-			}
-
-			pinger.PacketsSent = 0
-			pinger.PacketsRecv = 0
+			pinger.Stop()
 		}
 	}
 
@@ -134,6 +126,9 @@ func (p *pingerInfo) doPing() error {
 		p.connectionStatus = Connected
 		p.failureMsg = ""
 		p.statistics.update(uint64(packet.Rtt.Nanoseconds()))
+
+		pinger.PacketsSent = 0
+		pinger.PacketsRecv = 0
 	}
 
 	err = pinger.Run()
