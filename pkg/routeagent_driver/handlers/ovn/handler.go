@@ -27,6 +27,7 @@ type Handler struct {
 	localEndpoint         *submV1.Endpoint
 	remoteEndpoints       map[string]*submV1.Endpoint
 	isGateway             bool
+	submarinerUpstreamIP  string
 }
 
 func NewHandler(env environment.Specification, smClientSet clientset.Interface) *Handler {
@@ -49,7 +50,7 @@ func (ovn *Handler) Init() error {
 	// For now we get all the cleanups
 	ovn.cleanupHandlers = cableCleanup.GetCleanupHandlers()
 
-	return nil
+	return ovn.initIPtablesChains()
 }
 
 func (ovn *Handler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
@@ -103,6 +104,11 @@ func (ovn *Handler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 
 	ovn.remoteEndpoints[endpoint.Name] = endpoint
 
+	err := ovn.updateHostNetworkDataplane()
+	if err != nil {
+		return errors.Wrapf(err, "updateHostNetworkDataplane returned error")
+	}
+
 	if ovn.isGateway {
 		return ovn.updateGatewayDataplane()
 	}
@@ -116,6 +122,11 @@ func (ovn *Handler) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
 
 	ovn.remoteEndpoints[endpoint.Name] = endpoint
 
+	err := ovn.updateHostNetworkDataplane()
+	if err != nil {
+		return errors.Wrapf(err, "updateHostNetworkDataplane returned error")
+	}
+
 	if ovn.isGateway {
 		return ovn.updateGatewayDataplane()
 	}
@@ -128,6 +139,11 @@ func (ovn *Handler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	defer ovn.mutex.Unlock()
 
 	delete(ovn.remoteEndpoints, endpoint.Name)
+
+	err := ovn.updateHostNetworkDataplane()
+	if err != nil {
+		return errors.Wrapf(err, "updateHostNetworkDataplane returned error")
+	}
 
 	if ovn.isGateway {
 		return ovn.updateGatewayDataplane()

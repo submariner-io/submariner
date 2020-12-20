@@ -1,5 +1,5 @@
 ---
-name: Periodic E2E
+name: Flake Finder
 
 on:
   schedule:

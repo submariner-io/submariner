@@ -2,6 +2,7 @@ package fake
 
 import (
 	"sync/atomic"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -54,9 +55,17 @@ func (p *Pinger) GetIP() string {
 }
 
 func (p *Pinger) AwaitStart() {
-	Eventually(p.start).Should(BeClosed(), "Start was not called")
+	Eventually(p.start, 5).Should(BeClosed(), "Start was not called")
+}
+
+func (p *Pinger) AwaitNoStart() {
+	Consistently(p.start, 500*time.Millisecond).ShouldNot(BeClosed(), "Start was unexpectedly called")
 }
 
 func (p *Pinger) AwaitStop() {
-	Eventually(p.stop).Should(BeClosed(), "Stop was not called")
+	Eventually(p.stop, 5).Should(BeClosed(), "Stop was not called")
+}
+
+func (p *Pinger) AwaitNoStop() {
+	Consistently(p.stop, 500*time.Millisecond).ShouldNot(BeClosed(), "Stop was unexpectedly called")
 }

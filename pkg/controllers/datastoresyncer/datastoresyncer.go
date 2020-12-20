@@ -4,12 +4,14 @@ import (
 	"fmt"
 
 	"github.com/submariner-io/admiral/pkg/federate"
+	resourceSyncer "github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog"
@@ -63,11 +65,13 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 		{
 			LocalSourceNamespace: d.syncerConfig.LocalNamespace,
 			LocalResourceType:    &submarinerv1.Cluster{},
+			LocalTransform:       d.shouldSyncCluster,
 			BrokerResourceType:   &submarinerv1.Cluster{},
 		},
 		{
 			LocalSourceNamespace: d.syncerConfig.LocalNamespace,
 			LocalResourceType:    &submarinerv1.Endpoint{},
+			LocalTransform:       d.shouldSyncEndpoint,
 			BrokerResourceType:   &submarinerv1.Endpoint{},
 		},
 	}
@@ -102,6 +106,26 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 	klog.Info("Datastore syncer stopping")
 
 	return nil
+}
+
+func (d *DatastoreSyncer) shouldSyncEndpoint(obj runtime.Object, op resourceSyncer.Operation) (runtime.Object, bool) {
+	// Ensure we don't try to sync a remote endpoint to the broker. While the syncer handles this normally using a
+	// label, on upgrade to 0.8.0 where the syncer was introduced, the label won't exist so check the ClusterID field here.
+	endpoint := obj.(*submarinerv1.Endpoint)
+	if endpoint.Spec.ClusterID == d.localCluster.Spec.ClusterID {
+		return obj, false
+	}
+
+	return nil, false
+}
+
+func (d *DatastoreSyncer) shouldSyncCluster(obj runtime.Object, op resourceSyncer.Operation) (runtime.Object, bool) {
+	cluster := obj.(*submarinerv1.Cluster)
+	if cluster.Spec.ClusterID == d.localCluster.Spec.ClusterID {
+		return obj, false
+	}
+
+	return nil, false
 }
 
 func (d *DatastoreSyncer) ensureExclusiveEndpoint(syncer *broker.Syncer) error {

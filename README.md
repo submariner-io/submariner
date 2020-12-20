@@ -5,7 +5,9 @@
 [![Unit Tests](https://github.com/submariner-io/submariner/workflows/Unit%20Tests/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3A%22Unit+Tests%22)
 [![Linting](https://github.com/submariner-io/submariner/workflows/Linting/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3ALinting)
 [![Release Images](https://github.com/submariner-io/submariner/workflows/Release%20Images/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3A%22Release+Images%22)
+[![Upgrade](https://github.com/submariner-io/submariner/workflows/Upgrade/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3AUpgrade)
 [![Periodic](https://github.com/submariner-io/submariner/workflows/Periodic/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3APeriodic)
+[![Flake Finder](https://github.com/submariner-io/submariner/workflows/Flake%20Finder/badge.svg)](https://github.com/submariner-io/submariner/actions?query=workflow%3A%22Flake+Finder%22)
 <!-- markdownlint-enable line-length -->
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
@@ -34,7 +36,7 @@ experimentation, it is quite possible that you could run into bugs.
 
 ## Architecture
 
-See the [Architecture section on Submariner's website](https://submariner.io/getting_started/architecture/).
+See the [Architecture section on Submariner's website](https://submariner.io/getting-started/architecture/).
 
 ### Network Path
 
@@ -51,7 +53,7 @@ node.
 
 ## Prerequisites
 
-See the [Prerequisites docs on Submariner's website](https://submariner.io/getting_started/#prerequisites).
+See the [Prerequisites docs on Submariner's website](https://submariner.io/getting-started/#prerequisites).
 
 ## Installation
 
@@ -74,7 +76,7 @@ See the [`subctl verify` docs on Submariner's website](https://submariner.io/ope
 
 ## Building and Testing
 
-See the [Building and Testing docs on Submariner's website](https://submariner.io/for_developers/building_testing/).
+See the [Building and Testing docs on Submariner's website](https://submariner.io/development/building-testing/).
 
 ## Known Issues/Notes
 
@@ -89,4 +91,4 @@ When running in OpenShift, Submariner needs to grant the appropriate security co
 
 ## Contributing
 
-See the [For Developers section on Submariner's website](https://submariner.io/for_developers/).
+See the [For Developers section on Submariner's website](https://submariner.io/development/).

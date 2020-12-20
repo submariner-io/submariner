@@ -2,9 +2,11 @@ package nbctl
 
 import (
 	"fmt"
+	"net"
 	"os/exec"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
@@ -30,8 +32,13 @@ func New(db, clientkey, clientcert, ca string) *NbCtl {
 }
 
 func (n *NbCtl) nbctl(parameters ...string) (output string, err error) {
+	dbConnection, err := expandConnectionStringIPs(n.connectionString)
+	if err != nil {
+		return "", err
+	}
+
 	allParameters := []string{
-		fmt.Sprintf("--db=%s", n.connectionString),
+		fmt.Sprintf("--db=%s", dbConnection),
 		"-c", n.clientCert,
 		"-p", n.clientKey,
 		"-C", n.ca,
@@ -55,6 +62,11 @@ func (n *NbCtl) nbctl(parameters ...string) (output string, err error) {
 	return strOut, err
 }
 
+func (n *NbCtl) SetRouterChassis(router, chassis string) error {
+	_, err := n.nbctl("set", "Logical_Router", router, "options:chassis="+chassis)
+	return err
+}
+
 func (n *NbCtl) SetGatewayChassis(lrp, chassis string, prio int) error {
 	_, err := n.nbctl("lrp-set-gateway-chassis", lrp, chassis, strconv.Itoa(prio))
 	return err
@@ -68,6 +80,13 @@ func (n *NbCtl) DelGatewayChassis(lrp, chassis string, prio int) error {
 func (n *NbCtl) GetGatewayChassis(lrp, chassis string) (string, error) {
 	output, err := n.nbctl("lrp-get-gateway-chassis", lrp, chassis)
 	return output, err
+}
+
+func (n *NbCtl) LrSetLoadBalancers(lrId string, lbIDs []string) error {
+	loadBalancerSet := fmt.Sprintf("load_balancer=[%s]", strings.Join(lbIDs, ","))
+	_, err := n.nbctl("set", "Logical_Router", lrId, loadBalancerSet)
+
+	return err
 }
 
 func (n *NbCtl) LrPolicyAdd(logicalRouter string, prio int, filter string, actions ...string) error {
@@ -108,4 +127,35 @@ func parseLrPolicyGetOutput(output, rerouteIp string) *util.StringSet {
 	}
 
 	return subnets
+}
+
+// expand strings in the form of
+// ssl:ovnkube-db.openshift-ovn-kubernetes.svc.cluster.local:9641 to
+// ssl:<ip1>:9641,ssl:<ip2>:9641,ssl:<ip3>:9641
+func expandConnectionStringIPs(db string) (string, error) {
+	return expandConnectionStringIPsDetail(db, net.LookupIP)
+}
+
+func expandConnectionStringIPsDetail(db string, resolver func(host string) ([]net.IP, error)) (string, error) {
+	parts := strings.Split(db, ":")
+	if len(parts) != 3 {
+		return db, nil
+	}
+
+	protocol := parts[0]
+	host := parts[1]
+	port := parts[2]
+	ips, err := resolver(host)
+
+	if err != nil {
+		return "", errors.Wrapf(err, "error resolving %q", host)
+	}
+
+	connections := []string{}
+
+	for _, ip := range ips {
+		connections = append(connections, fmt.Sprintf("%s:%s:%s", protocol, ip.String(), port))
+	}
+
+	return strings.Join(connections, ","), nil
 }
