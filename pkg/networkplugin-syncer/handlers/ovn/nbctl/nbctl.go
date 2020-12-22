@@ -37,11 +37,18 @@ func (n *NbCtl) nbctl(parameters ...string) (output string, err error) {
 		return "", err
 	}
 
-	allParameters := []string{
-		fmt.Sprintf("--db=%s", dbConnection),
-		"-c", n.clientCert,
-		"-p", n.clientKey,
-		"-C", n.ca,
+	allParameters := []string{fmt.Sprintf("--db=%s", dbConnection)}
+
+	if n.clientCert != "" {
+		allParameters = append(allParameters, []string{"-c", n.clientCert}...)
+	}
+
+	if n.clientKey != "" {
+		allParameters = append(allParameters, []string{"-p", n.clientKey}...)
+	}
+
+	if n.ca != "" {
+		allParameters = append(allParameters, []string{"-C", n.ca}...)
 	}
 
 	allParameters = append(allParameters, parameters...)
