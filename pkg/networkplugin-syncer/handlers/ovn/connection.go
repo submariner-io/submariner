@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"io/ioutil"
+	"strings"
 
 	goovn "github.com/ebay/go-ovn"
 	"github.com/pkg/errors"
@@ -13,27 +14,35 @@ import (
 )
 
 func (ovn *SyncHandler) initClients() error {
-	certFile, err := cluster_files.Get(ovn.k8sClientset, getOVNCertPath())
-	if err != nil {
-		return err
+	var tlsConfig *tls.Config
+
+	if strings.HasPrefix(getOVNNBDBAddress(), "ssl://") || strings.HasPrefix(getOVNSBDBAddress(), "ssl://") {
+		certFile, err := cluster_files.Get(ovn.k8sClientset, getOVNCertPath())
+		if err != nil {
+			return err
+		}
+
+		pkFile, err := cluster_files.Get(ovn.k8sClientset, getOVNPrivKeyPath())
+		if err != nil {
+			return err
+		}
+
+		caFile, err := cluster_files.Get(ovn.k8sClientset, getOVNCaBundlePath())
+		if err != nil {
+			return err
+		}
+
+		tlsConfig, err = getOVNTLSConfig(pkFile, certFile, caFile)
+		if err != nil {
+			return err
+		}
+
+		ovn.nbctl = nbctl.New(getOVNNBDBAddress(), pkFile, certFile, caFile)
+	} else {
+		ovn.nbctl = nbctl.New(getOVNNBDBAddress(), "", "", "")
 	}
 
-	pkFile, err := cluster_files.Get(ovn.k8sClientset, getOVNPrivKeyPath())
-	if err != nil {
-		return err
-	}
-
-	caFile, err := cluster_files.Get(ovn.k8sClientset, getOVNCaBundlePath())
-	if err != nil {
-		return err
-	}
-
-	ovn.nbctl = nbctl.New(getOVNNBDBAddress(), pkFile, certFile, caFile)
-
-	tlsConfig, err := getOVNTLSConfig(pkFile, certFile, caFile)
-	if err != nil {
-		return err
-	}
+	var err error
 
 	ovn.nbdb, err = goovn.NewClient(&goovn.Config{
 		Addr:      getOVNNBDBAddress(),
