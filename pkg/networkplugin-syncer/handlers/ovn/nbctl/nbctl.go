@@ -10,9 +10,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/stringset"
 	"k8s.io/klog"
-
-	"github.com/submariner-io/submariner/pkg/util"
 )
 
 type NbCtl struct {
@@ -108,7 +107,7 @@ func (n *NbCtl) LrPolicyDel(logicalRouter string, prio int, filter string) error
 	return err
 }
 
-func (n *NbCtl) LrPolicyGetSubnets(logicalRouter, rerouteIp string) (*util.StringSet, error) {
+func (n *NbCtl) LrPolicyGetSubnets(logicalRouter, rerouteIp string) (stringset.Interface, error) {
 	output, err := n.nbctl("lr-policy-list", logicalRouter)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error getting existing routing policies for router %q", logicalRouter)
@@ -117,14 +116,14 @@ func (n *NbCtl) LrPolicyGetSubnets(logicalRouter, rerouteIp string) (*util.Strin
 	return parseLrPolicyGetOutput(output, rerouteIp), nil
 }
 
-func parseLrPolicyGetOutput(output, rerouteIp string) *util.StringSet {
+func parseLrPolicyGetOutput(output, rerouteIp string) stringset.Interface {
 	// Example output:
 	// $ ovn-nbctl lr-policy-list submariner_router
 	// Routing Policies
 	//        10                                 ip.src==1.1.1.1/32         reroute              169.254.34.1
 	//        10                                 ip.src==1.1.1.2/32         reroute              169.254.34.1
 	//
-	subnets := util.NewStringSet()
+	subnets := stringset.New()
 	//TODO: make this regex more generic in a global variable, so we avoid re-compiling the regex on each call
 	r := regexp.MustCompile("ip4\\.dst == ([0-9\\.]+/[0-9]+)[\\s\\t]+reroute[\\s\\t]+" + rerouteIp)
 	for _, match := range r.FindAllStringSubmatch(output, -1) {

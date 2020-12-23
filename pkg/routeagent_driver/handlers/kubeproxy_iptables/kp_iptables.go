@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/stringset"
 	"k8s.io/klog"
 
 	cableCleanup "github.com/submariner-io/submariner/pkg/cable/cleanup"
@@ -22,9 +23,9 @@ type SyncHandler struct {
 	localClusterCidr []string
 	localServiceCidr []string
 
-	remoteSubnets    *util.StringSet
-	remoteVTEPs      *util.StringSet
-	routeCacheGWNode *util.StringSet
+	remoteSubnets    stringset.Interface
+	remoteVTEPs      stringset.Interface
+	routeCacheGWNode stringset.Interface
 
 	syncHandlerMutex     sync.Mutex
 	isGatewayNode        bool
@@ -45,9 +46,9 @@ func NewSyncHandler(localClusterCidr, localServiceCidr []string, smClientSet cli
 		localClusterCidr:     localClusterCidr,
 		localServiceCidr:     localServiceCidr,
 		localCableDriver:     "",
-		remoteSubnets:        util.NewStringSet(),
-		remoteVTEPs:          util.NewStringSet(),
-		routeCacheGWNode:     util.NewStringSet(),
+		remoteSubnets:        stringset.NewSynchronized(),
+		remoteVTEPs:          stringset.NewSynchronized(),
+		routeCacheGWNode:     stringset.NewSynchronized(),
 		isGatewayNode:        false,
 		wasGatewayPreviously: false,
 		vxlanDevice:          nil,
