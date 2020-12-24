@@ -75,3 +75,22 @@ func (i *Controller) doesIPTablesChainExist(table, chain string) (bool, error) {
 
 	return false, nil
 }
+
+func (i *Controller) updateIngressRulesForHealthCheck(resourceName, cniIfaceIP, globalIP string, addRules bool) error {
+	ruleSpec := []string{"-p", "icmp", "-d", globalIP, "-j", "DNAT", "--to", cniIfaceIP}
+
+	if addRules {
+		klog.V(log.DEBUG).Infof("Installing iptable ingress rules for %s: %s", resourceName, strings.Join(ruleSpec, " "))
+
+		if err := i.ipt.AppendUnique("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
+			return fmt.Errorf("error appending iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
+		}
+	} else {
+		klog.V(log.DEBUG).Infof("Deleting iptable ingress rules for %s : %s", resourceName, strings.Join(ruleSpec, " "))
+		if err := i.ipt.Delete("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
+			return fmt.Errorf("error deleting iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
+		}
+	}
+
+	return nil
+}
