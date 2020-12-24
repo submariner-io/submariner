@@ -63,6 +63,13 @@ func NewGatewayMonitor(spec *SubmarinerIpamControllerSpecification, cfg *rest.Co
 	gatewayMonitor.submarinerClientSet = submarinerClient
 	gatewayMonitor.endpointsSynced = EndpointInformer.Informer().HasSynced
 
+	nodeName, ok := os.LookupEnv("NODE_NAME")
+	if !ok {
+		klog.Fatal("error reading the NODE_NAME from the environment")
+	}
+
+	gatewayMonitor.nodeName = nodeName
+
 	EndpointInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			gatewayMonitor.enqueueEndpoint(obj)
@@ -185,7 +192,7 @@ func (i *GatewayMonitor) processNextEndpoint() bool {
 			i.syncMutex.Lock()
 			if !i.isGatewayNode {
 				i.isGatewayNode = true
-				i.initializeIpamController(i.ipamSpec.GlobalCIDR[0])
+				i.initializeIpamController(i.ipamSpec.GlobalCIDR[0], i.nodeName)
 			}
 			i.syncMutex.Unlock()
 		} else {
@@ -264,7 +271,7 @@ func (i *GatewayMonitor) handleRemovedEndpoint(obj interface{}) {
 	}
 }
 
-func (i *GatewayMonitor) initializeIpamController(globalCIDR string) {
+func (i *GatewayMonitor) initializeIpamController(globalCIDR, gwNodeName string) {
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(i.kubeClientSet, defaultResync)
 
 	informerConfig := InformerConfigStruct{
@@ -276,7 +283,7 @@ func (i *GatewayMonitor) initializeIpamController(globalCIDR string) {
 
 	klog.V(log.DEBUG).Infof("On Gateway Node, initializing ipamController.")
 
-	ipamController, err := NewController(i.ipamSpec, &informerConfig, globalCIDR)
+	ipamController, err := NewController(i.ipamSpec, &informerConfig, globalCIDR, gwNodeName)
 	if err != nil {
 		klog.Fatalf("Error creating controller: %s", err.Error())
 	}

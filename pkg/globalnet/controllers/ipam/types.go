@@ -34,6 +34,7 @@ type Controller struct {
 	podsSynced       cache.InformerSynced
 	nodeWorkqueue    workqueue.RateLimitingInterface
 	nodesSynced      cache.InformerSynced
+	gwNodeName       string
 
 	excludeNamespaces map[string]bool
 	pool              *IpPool
@@ -51,5 +52,6 @@ type GatewayMonitor struct {
 	ipt                 *iptables.IPTables
 	stopProcessing      chan struct{}
 	isGatewayNode       bool
+	nodeName            string
 	syncMutex           *sync.Mutex
 }
