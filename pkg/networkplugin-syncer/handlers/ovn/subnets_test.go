@@ -3,9 +3,9 @@ package ovn
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/stringset"
 
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/util"
 )
 
 const cluster1Net1 = "10.0.0.0/24"
@@ -21,14 +21,14 @@ const unknownNet1 = "30.0.0.0/10"
 var _ = Describe("Remote subnet handling", func() {
 	var (
 		ovn           *SyncHandler
-		remoteSubnets *util.StringSet
-		localSubnets  *util.StringSet
+		remoteSubnets stringset.Interface
+		localSubnets  stringset.Interface
 	)
 
 	BeforeEach(func() {
 		ovn = createHandlerWithTestEndpoints()
-		remoteSubnets = util.NewStringSet(cluster1Net1, cluster1Net2, cluster2Net1, cluster2Net2)
-		localSubnets = util.NewStringSet(localNet1, localNet2)
+		remoteSubnets = stringset.New(cluster1Net1, cluster1Net2, cluster2Net1, cluster2Net2)
+		localSubnets = stringset.New(localNet1, localNet2)
 	})
 
 	When("Handling remote endpoints", func() {
@@ -39,7 +39,7 @@ var _ = Describe("Remote subnet handling", func() {
 		})
 
 		It("should return missing elements to add", func() {
-			remoteSubnets.Delete(cluster1Net2)
+			remoteSubnets.Remove(cluster1Net2)
 			toAdd, toRemove := ovn.getNorthSubnetsToAddAndRemove(remoteSubnets)
 			Expect(toAdd).To(Equal([]string{cluster1Net2}))
 			Expect(toRemove).To(BeEmpty())
@@ -61,7 +61,7 @@ var _ = Describe("Remote subnet handling", func() {
 		})
 
 		It("should return missing elements to add", func() {
-			localSubnets.Delete(localNet1)
+			localSubnets.Remove(localNet1)
 			toAdd, toRemove := ovn.getSouthSubnetsToAddAndRemove(localSubnets)
 			Expect(toAdd).To(Equal([]string{localNet1}))
 			Expect(toRemove).To(BeEmpty())

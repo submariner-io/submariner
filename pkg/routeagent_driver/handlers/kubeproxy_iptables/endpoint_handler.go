@@ -109,9 +109,7 @@ func (kp *SyncHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	kp.syncHandlerMutex.Lock()
 	defer kp.syncHandlerMutex.Unlock()
 	for _, inputCidrBlock := range endpoint.Spec.Subnets {
-		if !kp.remoteSubnets.Contains(inputCidrBlock) {
-			kp.remoteSubnets.Delete(inputCidrBlock)
-		}
+		kp.remoteSubnets.Remove(inputCidrBlock)
 	}
 	// TODO: Handle a remote endpoint removal use-case
 	//         - remove related iptable rules
