@@ -32,7 +32,53 @@ var _ = Describe("[redundancy] Gateway fail-over tests", func() {
 			testGatewayFailOverScenario(f)
 		})
 	})
+
+	When("a Route-agent pod is restarted on the Gateway node", func() {
+		It("should start a new submariner engine pod, and be able to connect from another cluster", func() {
+			testRouteAgentFailOverScenario(f)
+		})
+	})
+
 })
+
+// TODO : WIP flow: get route agent, delete , check connectivity
+func testRouteAgentFailOverScenario(f *subFramework.Framework) {
+	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
+	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
+
+	gatewayNodes := f.FindNodesByGatewayLabel(framework.ClusterA, true)
+	Expect(gatewayNodes).To(HaveLen(1), fmt.Sprintf("Expected only one gateway node on %q", clusterAName))
+	By(fmt.Sprintf("Found gateway on node %q on %q", gatewayNodes[0].Name, clusterAName))
+
+	routeAgentPod := f.AwaitRouteAgentPod(framework.ClusterA)
+	By(fmt.Sprintf("Found submariner route angine pod %q on %q", routeAgentPod.Name, clusterAName))
+
+	By(fmt.Sprintf("Deleting submariner route agent pod %q", routeAgentPod.Name))
+	f.DeletePod(framework.ClusterA, routeAgentPod.Name, framework.TestContext.SubmarinerNamespace)
+
+	NewRouteAgentPod := f.AwaitRouteAgentPod(framework.ClusterA)
+	By(fmt.Sprintf("Found submariner route angine pod %q on %q", NewRouteAgentPod.Name, clusterAName))
+
+	By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
+	tcp.RunConnectivityTest(tcp.ConnectivityTestParams{
+		Framework:             f.Framework,
+		FromCluster:           framework.ClusterB,
+		FromClusterScheduling: framework.GatewayNode,
+		ToCluster:             framework.ClusterA,
+		ToClusterScheduling:   framework.GatewayNode,
+		ToEndpointType:        defaultEndpointType(),
+	})
+
+	By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
+	tcp.RunConnectivityTest(tcp.ConnectivityTestParams{
+		Framework:             f.Framework,
+		FromCluster:           framework.ClusterB,
+		FromClusterScheduling: framework.NonGatewayNode,
+		ToCluster:             framework.ClusterA,
+		ToClusterScheduling:   framework.NonGatewayNode,
+		ToEndpointType:        defaultEndpointType(),
+	})
+}
 
 func testEnginePodRestartScenario(f *subFramework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
