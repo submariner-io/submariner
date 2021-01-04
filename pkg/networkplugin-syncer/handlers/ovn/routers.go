@@ -1,14 +1,28 @@
+/*
+© 2021 Red Hat, Inc. and others
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package ovn
 
 import (
 	goovn "github.com/ebay/go-ovn"
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/stringset"
 	"k8s.io/klog"
-
-	"github.com/submariner-io/submariner/pkg/util"
 )
 
-func (ovn *SyncHandler) getExistingSubmarinerRouterRoutesToPort(lrp string) (*util.StringSet, error) {
+func (ovn *SyncHandler) getExistingSubmarinerRouterRoutesToPort(lrp string) (stringset.Interface, error) {
 	subnetRouteObjs, err := ovn.nbdb.LRSRList(submarinerLogicalRouter)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error reading existing routes from %q going via port %q", submarinerLogicalRouter, lrp)
@@ -19,8 +33,8 @@ func (ovn *SyncHandler) getExistingSubmarinerRouterRoutesToPort(lrp string) (*ut
 	return existingRoutes, nil
 }
 
-func filterRouteSubnetsViaPort(subnetRouteObjs []*goovn.LogicalRouterStaticRoute, lrp string) *util.StringSet {
-	routeSubnets := util.NewStringSet()
+func filterRouteSubnetsViaPort(subnetRouteObjs []*goovn.LogicalRouterStaticRoute, lrp string) stringset.Interface {
+	routeSubnets := stringset.New()
 
 	for _, route := range subnetRouteObjs {
 		if route.OutputPort != nil && *route.OutputPort == lrp {

@@ -1,5 +1,5 @@
 /*
-© 2020 Red Hat, Inc. and others.
+© 2021 Red Hat, Inc. and others.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -151,7 +151,7 @@ func RecordConnection(cableDriverName string, localEndpoint, remoteEndpoint *sub
 	}
 
 	labels[connectionsStatusLabel] = status
-	connectionsGauge.With(labels).Inc()
+	connectionsGauge.With(labels).Set(1)
 }
 
 func RecordDisconnected(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec) {
@@ -161,6 +161,7 @@ func RecordDisconnected(cableDriverName string, localEndpoint, remoteEndpoint *s
 	connectionEstablishedTimestampGauge.Delete(labels)
 	rxGauge.Delete(labels)
 	txGauge.Delete(labels)
+	connectionsGauge.Delete(labels)
 }
 
 func RecordNoConnections() {

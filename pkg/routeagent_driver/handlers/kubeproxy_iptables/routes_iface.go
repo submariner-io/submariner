@@ -1,3 +1,18 @@
+/*
+© 2021 Red Hat, Inc. and others
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package kubeproxy_iptables
 
 import (
@@ -20,7 +35,7 @@ import (
 
 func (kp *SyncHandler) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks []string, operation Operation) {
 	if operation == Flush {
-		kp.routeCacheGWNode.DeleteAll()
+		kp.routeCacheGWNode.RemoveAll()
 		// The conversion doesn't introduce a security problem
 		// #nosec G204
 		cmd := exec.Command("/sbin/ip", "r", "flush", "table", strconv.Itoa(constants.RouteAgentHostNetworkTableID))
@@ -38,7 +53,7 @@ func (kp *SyncHandler) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks [
 			for _, inputCidrBlock := range inputCidrBlocks {
 				if kp.routeCacheGWNode.Add(inputCidrBlock) {
 					if err := kp.configureRoute(inputCidrBlock, operation); err != nil {
-						kp.routeCacheGWNode.Delete(inputCidrBlock)
+						kp.routeCacheGWNode.Remove(inputCidrBlock)
 						klog.Errorf("Failed to add route %q for HostNetwork support on the Gateway node: %v",
 							inputCidrBlock, err)
 					}
@@ -46,7 +61,7 @@ func (kp *SyncHandler) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks [
 			}
 		case Delete:
 			for _, inputCidrBlock := range inputCidrBlocks {
-				if kp.routeCacheGWNode.Delete(inputCidrBlock) {
+				if kp.routeCacheGWNode.Remove(inputCidrBlock) {
 					if err := kp.configureRoute(inputCidrBlock, operation); err != nil {
 						klog.Errorf("Failed to delete route %q for HostNetwork support on the Gateway node. %v",
 							inputCidrBlock, err)
