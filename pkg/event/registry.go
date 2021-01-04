@@ -2,6 +2,7 @@ package event
 
 import (
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/stringset"
 
 	k8sV1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/util/errors"
@@ -10,7 +11,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/util"
 )
 
 type Registry struct {
@@ -35,7 +35,7 @@ func (er *Registry) GetName() string {
 }
 
 func (er *Registry) addHandler(eventHandler Handler) error {
-	evNetworkPlugins := util.NewStringSet()
+	evNetworkPlugins := stringset.New()
 
 	for _, np := range eventHandler.GetNetworkPlugins() {
 		evNetworkPlugins.Add(np)

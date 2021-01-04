@@ -50,7 +50,7 @@ func (kp *SyncHandler) populateRemoteVtepIps(vtepIP string, operation Operation)
 	if operation == Add && !kp.remoteVTEPs.Contains(vtepIP) {
 		kp.remoteVTEPs.Add(vtepIP)
 	} else if operation == Delete {
-		kp.remoteVTEPs.Delete(vtepIP)
+		kp.remoteVTEPs.Remove(vtepIP)
 	}
 
 	klog.V(log.DEBUG).Infof("populateRemoteVtepIps is called with vtepIP %s, isGatewayNode %t",
