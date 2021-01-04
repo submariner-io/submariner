@@ -17,37 +17,45 @@ package datastoresyncer
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/submariner-io/admiral/pkg/federate"
 	resourceSyncer "github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
-	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/submariner-io/submariner/pkg/util"
+	"github.com/submariner-io/admiral/pkg/watcher"
+	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog"
+
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/types"
+	"github.com/submariner-io/submariner/pkg/util"
 )
 
 type NewSyncer func(*broker.SyncerConfig) (*broker.Syncer, error)
 
 type DatastoreSyncer struct {
-	colorCodes    []string
-	localCluster  types.SubmarinerCluster
-	localEndpoint types.SubmarinerEndpoint
-	syncerConfig  broker.SyncerConfig
-	newSyncer     NewSyncer
+	colorCodes     []string
+	localCluster   types.SubmarinerCluster
+	localEndpoint  types.SubmarinerEndpoint
+	localNodeName  string
+	syncerConfig   broker.SyncerConfig
+	newSyncer      NewSyncer
+	localFederator federate.Federator
 }
 
 func New(restConfig *rest.Config, namespace string, localCluster types.SubmarinerCluster,
 	localEndpoint types.SubmarinerEndpoint, colorcodes []string) *DatastoreSyncer {
 	return &DatastoreSyncer{
-		colorCodes:    colorcodes,
-		localCluster:  localCluster,
-		localEndpoint: localEndpoint,
+		colorCodes:     colorcodes,
+		localCluster:   localCluster,
+		localEndpoint:  localEndpoint,
+		localFederator: nil,
 		syncerConfig: broker.SyncerConfig{
 			LocalRestConfig: restConfig,
 			LocalNamespace:  namespace,
@@ -103,6 +111,41 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 		return err
 	}
 
+	if len(d.localCluster.Spec.GlobalCIDR) > 0 {
+		nodeName, ok := os.LookupEnv("NODE_NAME")
+		if !ok {
+			// Healthcheck in globalnet deployments will not work because of missing NODE_NAME.
+			klog.Error("Error reading the NODE_NAME from the env, healthChecker functionality will not work.")
+		} else {
+			d.localNodeName = nodeName
+			d.localFederator = syncer.GetLocalFederator()
+			resourceWatcher, err := watcher.New(&watcher.Config{
+				Scheme:     scheme.Scheme,
+				RestConfig: d.syncerConfig.LocalRestConfig,
+				ResourceConfigs: []watcher.ResourceConfig{
+					{
+						Name:                "Node watcher for datastoresyncer",
+						ResourceType:        &k8sv1.Node{},
+						ResourcesEquivalent: d.isNodeEquivalent,
+						Handler: watcher.EventHandlerFuncs{
+							OnCreateFunc: d.handleCreateOrUpdateNode,
+							OnUpdateFunc: d.handleCreateOrUpdateNode,
+							OnDeleteFunc: nil,
+						},
+					},
+				},
+			})
+			if err != nil {
+				return fmt.Errorf("error creating resource watcher %v", err)
+			}
+
+			err = resourceWatcher.Start(stopCh)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	if err := d.ensureExclusiveEndpoint(syncer); err != nil {
 		return fmt.Errorf("could not ensure exclusive submariner Endpoint: %v", err)
 	}
@@ -111,7 +154,7 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 		return fmt.Errorf("error creating the local submariner Cluster: %v", err)
 	}
 
-	if err := d.createLocalEndpoint(syncer.GetLocalFederator()); err != nil {
+	if err := d.createOrUpdateLocalEndpoint(syncer.GetLocalFederator()); err != nil {
 		return fmt.Errorf("error creating the local submariner Endpoint: %v", err)
 	}
 
@@ -191,7 +234,7 @@ func (d *DatastoreSyncer) createLocalCluster(federator federate.Federator) error
 	return federator.Distribute(cluster)
 }
 
-func (d *DatastoreSyncer) createLocalEndpoint(federator federate.Federator) error {
+func (d *DatastoreSyncer) createOrUpdateLocalEndpoint(federator federate.Federator) error {
 	klog.Infof("Creating local submariner Endpoint: %#v ", d.localEndpoint)
 
 	endpointName, err := util.GetEndpointCRDName(&d.localEndpoint)

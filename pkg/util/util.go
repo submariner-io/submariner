@@ -100,7 +100,7 @@ func FlattenColors(colorCodes []string) string {
 	return flattenedColors
 }
 
-func GetLocalEndpoint(clusterID, backend string, backendConfig map[string]string, natEnabled bool,
+func GetLocalEndpoint(clusterID, backend string, backendConfig map[string]string, globalnetEnabled, natEnabled bool,
 	subnets []string, privateIP string, clusterCIDR []string) (types.SubmarinerEndpoint, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -133,10 +133,15 @@ func GetLocalEndpoint(clusterID, backend string, backendConfig map[string]string
 		endpoint.Spec.PublicIP = publicIP
 	}
 
-	endpoint.Spec.HealthCheckIP, err = getCNIInterfaceIPAddress(clusterCIDR)
-
-	if err != nil {
-		return types.SubmarinerEndpoint{}, fmt.Errorf("Error getting CNI Interface IP address: %v", err)
+	if !globalnetEnabled {
+		// When globalnet is enabled, HealthCheckIP will be the globalIP assigned to the Active GatewayNode.
+		// In a fresh deployment, globalIP annotation for the node might take few seconds. So we listen on NodeEvents
+		// and update the endpoint HealthCheckIP (to globalIP) in datastoreSyncer at a later stage. This will trigger
+		// the HealthCheck between the clusters.
+		endpoint.Spec.HealthCheckIP, err = getCNIInterfaceIPAddress(clusterCIDR)
+		if err != nil {
+			return types.SubmarinerEndpoint{}, fmt.Errorf("Error getting CNI Interface IP address: %v", err)
+		}
 	}
 
 	return endpoint, nil
