@@ -43,6 +43,8 @@ func NewIpPool(cidr string) (*IpPool, error) {
 		pool.available[ip] = true
 	}
 
+	RecordAvailability(cidr, size)
+
 	return pool, nil
 }
 
@@ -70,6 +72,7 @@ func (p *IpPool) Allocate(key string) (string, error) {
 		for k := range p.available {
 			p.allocated[key] = k
 			delete(p.available, k)
+			RecordAllocateGlobalIP(p.cidr)
 
 			return k, nil
 		}
@@ -86,6 +89,7 @@ func (p *IpPool) Release(key string) string {
 	if ip != "" {
 		p.available[ip] = true
 		delete(p.allocated, key)
+		RecordDeallocateGlobalIP(p.cidr)
 	}
 	p.Unlock()
 
@@ -117,6 +121,7 @@ func (p *IpPool) RequestIp(key, ip string) (string, error) {
 		p.Lock()
 		p.allocated[key] = ip
 		delete(p.available, ip)
+		RecordAllocateGlobalIP(p.cidr)
 		p.Unlock()
 
 		return ip, nil
