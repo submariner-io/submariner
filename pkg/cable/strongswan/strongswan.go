@@ -308,77 +308,81 @@ func (i *strongSwan) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) e
 	return nil
 }
 
-func (i *strongSwan) GetActiveConnections(clusterID string) ([]string, error) {
+func (i *strongSwan) GetActiveConnections(clusterID string) ([]subv1.Connection, error) {
 	client, err := getClient()
 	if err != nil {
 		return nil, err
 	}
 	defer client.Close()
 
-	var connections []string
-
 	prefix := fmt.Sprintf("submariner-cable-%s-", clusterID)
 
-	conns, err := client.ListConns("")
+	ssConnMapList, err := client.ListConns("")
 	if err != nil {
 		return nil, err
 	}
 
-	for _, conn := range conns {
-		for cableID := range conn {
+	connections, err := i.GetConnections()
+	if err != nil {
+		return nil, err
+	}
+
+	connMap := map[string]*subv1.Connection{}
+
+	for i := range connections {
+		c := &connections[i]
+		connMap[c.Endpoint.CableName] = c
+	}
+
+	retConnections := []subv1.Connection{}
+
+	for _, ssConnMap := range ssConnMapList {
+		for cableID := range ssConnMap {
 			if !strings.HasPrefix(cableID, prefix) {
 				continue
 			}
 
-			removed, err := i.removeStaleCable(client, cableID)
+			conn := connMap[cableID]
+			if conn == nil {
+				klog.Warningf("No Connection found for active Endpoint cable name %q", cableID)
+				continue
+			}
+
+			removed, err := i.removeStaleCable(conn)
 			if err != nil {
 				return nil, fmt.Errorf("error removing stale cable %q: %v", cableID, err)
 			}
 
 			if !removed {
 				klog.V(log.TRACE).Infof("Found existing connection %q", cableID)
-				connections = append(connections, cableID)
+
+				retConnections = append(retConnections, *conn)
 			}
 		}
 	}
 
-	return connections, nil
+	return retConnections, nil
 }
 
 // removeStaleCable removes cables that have no active SAS and returns a
 // boolean indicating removal of the cable. The status of the error is nil
 // in case of no errors, otherwise the returns values are false and the
 // error.
-func (i *strongSwan) removeStaleCable(client *goStrongswanVici.ClientConn, cableID string) (bool, error) {
-	sas, err := client.ListSas("", "")
-	if err != nil {
-		return false, fmt.Errorf("error while retrieving active IKE_SAs: %v", err)
+func (i *strongSwan) removeStaleCable(conn *subv1.Connection) (bool, error) {
+	if conn.Status == subv1.Connected || conn.Status == subv1.Connecting {
+		// Cable with an active SA and thus not stale
+		return false, nil
 	}
 
-	for _, samap := range sas {
-		klog.V(log.TRACE).Infof("Found SA %v", samap)
-		sa, exists := samap[cableID]
-		if exists && (sa.State == "ESTABLISHED" || sa.State == "CONNECTING") {
-			// Cable with an active SA and thus not stale
-			return false, nil
-		}
-	}
+	cableID := conn.Endpoint.CableName
 
 	klog.V(log.DEBUG).Infof("Removing stale cable: %s", cableID)
 
-	// Creating this stub Endpoint is not ideal but to avoid a refactor
-	// TODO(mpeterson): refactor code to make this not a requirement
-	err = i.DisconnectFromEndpoint(types.SubmarinerEndpoint{
+	return true, i.DisconnectFromEndpoint(types.SubmarinerEndpoint{
 		Spec: subv1.EndpointSpec{
 			CableName: cableID,
 		},
 	})
-
-	if err != nil {
-		return false, err
-	}
-
-	return true, nil
 }
 
 func (i *strongSwan) loadSharedKey(endpoint types.SubmarinerEndpoint, client *goStrongswanVici.ClientConn) error {

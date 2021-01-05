@@ -329,9 +329,9 @@ func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoi
 	return nil
 }
 
-func (w *wireguard) GetActiveConnections(clusterID string) ([]string, error) {
+func (w *wireguard) GetActiveConnections(clusterID string) ([]v1.Connection, error) {
 	// force caller to skip duplicate handling
-	return make([]string, 0), nil
+	return make([]v1.Connection, 0), nil
 }
 
 // Create new wg link and assign addr from local subnets
