@@ -21,6 +21,7 @@ import (
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/submariner-io/admiral/pkg/log"
+
 	"github.com/submariner-io/submariner/pkg/globalnet/cleanup"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 
@@ -36,7 +37,8 @@ import (
 	"k8s.io/klog"
 )
 
-func NewController(spec *SubmarinerIpamControllerSpecification, config *InformerConfigStruct, globalCIDR string) (*Controller, error) {
+func NewController(spec *SubmarinerIpamControllerSpecification, config *InformerConfigStruct,
+	globalCIDR, gwNodeName string) (*Controller, error) {
 	exclusionMap := make(map[string]bool)
 	for _, v := range spec.ExcludeNS {
 		exclusionMap[v] = true
@@ -61,6 +63,7 @@ func NewController(spec *SubmarinerIpamControllerSpecification, config *Informer
 		podsSynced:       config.PodInformer.Informer().HasSynced,
 		nodeWorkqueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Nodes"),
 		nodesSynced:      config.NodeInformer.Informer().HasSynced,
+		gwNodeName:       gwNodeName,
 
 		excludeNamespaces: exclusionMap,
 		pool:              pool,
@@ -466,46 +469,6 @@ func (i *Controller) handleRemovedPod(obj interface{}) {
 	}
 }
 
-func (i *Controller) handleRemovedNode(obj interface{}) {
-	// TODO: further minimize duplication between this and handleRemovedPod
-	var node *k8sv1.Node
-	var ok bool
-	var key string
-	var err error
-	if node, ok = obj.(*k8sv1.Node); !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			klog.Errorf("Could not convert object %v to Node", obj)
-			return
-		}
-
-		node, ok = tombstone.Obj.(*k8sv1.Node)
-		if !ok {
-			klog.Errorf("Could not convert object tombstone %v to Node", tombstone.Obj)
-			return
-		}
-	}
-
-	globalIp := node.Annotations[submarinerIpamGlobalIp]
-	cniIfaceIp := node.Annotations[constants.CniInterfaceIP]
-	if globalIp != "" && cniIfaceIp != "" {
-		if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
-			utilruntime.HandleError(err)
-			return
-		}
-
-		i.pool.Release(key)
-		klog.V(log.DEBUG).Infof("Released ip %s for Node %s", globalIp, key)
-
-		err = i.syncNodeRules(cniIfaceIp, globalIp, DeleteRules)
-		if err != nil {
-			klog.Errorf("Error while cleaning up HostNetwork egress rules. %v", err)
-		}
-	} else {
-		klog.V(log.DEBUG).Infof("handleRemovedNode called for %q, that has globalIp %s and cniIfaceIp %s", key, globalIp, cniIfaceIp)
-	}
-}
-
 func (i *Controller) annotateGlobalIp(key, globalIp string) (string, error) {
 	var ip string
 	var err error
@@ -637,57 +600,6 @@ func (i *Controller) podUpdater(obj runtime.Object, key string) error {
 		err = i.syncPodRules(pod.Status.PodIP, existingGlobalIp, AddRules)
 		if err != nil {
 			logAndRequeue(key, i.podWorkqueue)
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (i *Controller) nodeUpdater(obj runtime.Object, key string) error {
-	node := obj.(*k8sv1.Node)
-	cniIfaceIP := node.GetAnnotations()[constants.CniInterfaceIP]
-	existingGlobalIp := node.GetAnnotations()[submarinerIpamGlobalIp]
-	allocatedIp, err := i.annotateGlobalIp(key, existingGlobalIp)
-	if err != nil { // failed to get globalIp or failed to update, we want to retry
-		logAndRequeue(key, i.nodeWorkqueue)
-		return fmt.Errorf("failed to annotate globalIp to node %q: %+v", key, err)
-	}
-
-	// This case is hit in one of the two situations
-	// 1. when the Worker Node does not have the globalIp annotation and a new globalIp is allocated
-	// 2. when the current globalIp annotation on the Node does not match with the info maintained by ipPool
-	if allocatedIp != "" {
-		klog.V(log.DEBUG).Infof("Allocating globalIp %s to Node %q ", allocatedIp, key)
-		err = i.syncNodeRules(cniIfaceIP, allocatedIp, AddRules)
-		if err != nil {
-			logAndRequeue(key, i.nodeWorkqueue)
-			return err
-		}
-
-		annotations := node.GetAnnotations()
-		if annotations == nil {
-			annotations = map[string]string{}
-		}
-
-		annotations[submarinerIpamGlobalIp] = allocatedIp
-
-		node.SetAnnotations(annotations)
-
-		_, err := i.kubeClientSet.CoreV1().Nodes().Update(node)
-		if err != nil {
-			logAndRequeue(key, i.nodeWorkqueue)
-			return err
-		}
-	} else if existingGlobalIp != "" {
-		klog.V(log.DEBUG).Infof("Node %q already has globalIp %s annotation, syncing rules", key, existingGlobalIp)
-		// When Globalnet Controller is migrated, we get notification for all the existing Nodes.
-		// For Worker Nodes that already have the annotation, we update the local ipPool cache and sync
-		// the iptable rules on the new GatewayNode.
-		// Note: This case will also be hit when Globalnet Pod is restarted
-		err = i.syncNodeRules(cniIfaceIP, existingGlobalIp, AddRules)
-		if err != nil {
-			logAndRequeue(key, i.nodeWorkqueue)
 			return err
 		}
 	}
