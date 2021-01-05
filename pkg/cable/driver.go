@@ -32,7 +32,7 @@ type Driver interface {
 	Init() error
 
 	// GetActiveConnections returns an array of all the active connections for the given cluster.
-	GetActiveConnections(clusterID string) ([]string, error)
+	GetActiveConnections(clusterID string) ([]v1.Connection, error)
 
 	// GetConnections() returns an array of the existing connections, including status and endpoint info
 	GetConnections() ([]v1.Connection, error)
