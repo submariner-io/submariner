@@ -3,7 +3,7 @@ FROM fedora:33
 WORKDIR /var/submariner
 
 RUN dnf -y install --nodocs --setopt=install_weak_deps=0 \
-           ovn && \
+           https://kojipkgs.fedoraproject.org//packages/ovn/20.06.2/4.fc33/x86_64/ovn-20.06.2-4.fc33.x86_64.rpm && \
     dnf -y clean all
 
 # install the networkpluginc-sync

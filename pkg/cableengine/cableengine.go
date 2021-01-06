@@ -1,3 +1,18 @@
+/*
+© 2021 Red Hat, Inc. and others
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package cableengine
 
 import (
@@ -33,7 +48,7 @@ type Engine interface {
 	// remote Pods and Service may not be accessible any more.
 	RemoveCable(remote types.SubmarinerEndpoint) error
 	// ListCableConnections returns a list of cable connection, and the related status
-	ListCableConnections() (*[]v1.Connection, error)
+	ListCableConnections() ([]v1.Connection, error)
 	// GetLocalEndpoint returns the local endpoint for this cable engine
 	GetLocalEndpoint() *types.SubmarinerEndpoint
 	// GetHAStatus returns the HA status for this cable engine
@@ -108,7 +123,7 @@ func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 		return err
 	}
 
-	var connections *[]v1.Connection
+	var connections []v1.Connection
 	if len(activeConnections) > 0 {
 		connections, err = i.driver.GetConnections()
 		if err != nil {
@@ -157,8 +172,8 @@ func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 	return nil
 }
 
-func (i *engine) getEndpointInfo(cableName string, connections *[]v1.Connection) *v1.EndpointSpec {
-	for _, conn := range *connections {
+func (i *engine) getEndpointInfo(cableName string, connections []v1.Connection) *v1.EndpointSpec {
+	for _, conn := range connections {
 		if conn.Endpoint.CableName == cableName {
 			return &conn.Endpoint
 		}
@@ -202,7 +217,7 @@ func (i *engine) GetHAStatus() v1.HAStatus {
 	}
 }
 
-func (i *engine) ListCableConnections() (*[]v1.Connection, error) {
+func (i *engine) ListCableConnections() ([]v1.Connection, error) {
 	i.Lock()
 	defer i.Unlock()
 
@@ -210,5 +225,5 @@ func (i *engine) ListCableConnections() (*[]v1.Connection, error) {
 		return i.driver.GetConnections()
 	}
 	// if no driver, we can safely report that no connections exist
-	return &[]v1.Connection{}, nil
+	return []v1.Connection{}, nil
 }

@@ -1,3 +1,18 @@
+/*
+© 2021 Red Hat, Inc. and others
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package ipam
 
 import (
@@ -62,6 +77,13 @@ func NewGatewayMonitor(spec *SubmarinerIpamControllerSpecification, cfg *rest.Co
 	gatewayMonitor.kubeClientSet = clientSet
 	gatewayMonitor.submarinerClientSet = submarinerClient
 	gatewayMonitor.endpointsSynced = EndpointInformer.Informer().HasSynced
+
+	nodeName, ok := os.LookupEnv("NODE_NAME")
+	if !ok {
+		klog.Fatal("error reading the NODE_NAME from the environment")
+	}
+
+	gatewayMonitor.nodeName = nodeName
 
 	EndpointInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -185,7 +207,7 @@ func (i *GatewayMonitor) processNextEndpoint() bool {
 			i.syncMutex.Lock()
 			if !i.isGatewayNode {
 				i.isGatewayNode = true
-				i.initializeIpamController(i.ipamSpec.GlobalCIDR[0])
+				i.initializeIpamController(i.ipamSpec.GlobalCIDR[0], i.nodeName)
 			}
 			i.syncMutex.Unlock()
 		} else {
@@ -264,7 +286,7 @@ func (i *GatewayMonitor) handleRemovedEndpoint(obj interface{}) {
 	}
 }
 
-func (i *GatewayMonitor) initializeIpamController(globalCIDR string) {
+func (i *GatewayMonitor) initializeIpamController(globalCIDR, gwNodeName string) {
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(i.kubeClientSet, defaultResync)
 
 	informerConfig := InformerConfigStruct{
@@ -276,7 +298,7 @@ func (i *GatewayMonitor) initializeIpamController(globalCIDR string) {
 
 	klog.V(log.DEBUG).Infof("On Gateway Node, initializing ipamController.")
 
-	ipamController, err := NewController(i.ipamSpec, &informerConfig, globalCIDR)
+	ipamController, err := NewController(i.ipamSpec, &informerConfig, globalCIDR, gwNodeName)
 	if err != nil {
 		klog.Fatalf("Error creating controller: %s", err.Error())
 	}

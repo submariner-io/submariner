@@ -1,3 +1,18 @@
+/*
+© 2021 Red Hat, Inc. and others
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package syncer
 
 import (
@@ -189,7 +204,7 @@ func (i *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 
 	gateway.Status.HAStatus = i.engine.GetHAStatus()
 
-	var connections *[]v1.Connection
+	var connections []v1.Connection
 
 	if i.statusError != nil {
 		gateway.Status.StatusFailure = i.statusError.Error()
@@ -203,35 +218,35 @@ func (i *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 		}
 	}
 
-	if connections != nil {
-		if i.healthCheck != nil {
-			for index := range *connections {
-				connection := &(*connections)[index]
-				latencyInfo := i.healthCheck.GetLatencyInfo(&connection.Endpoint)
-				if latencyInfo != nil {
-					connection.LatencyRTT = latencyInfo.Spec
-					if connection.Status == v1.Connected {
-						lastRTT, _ := time.ParseDuration(latencyInfo.Spec.Last)
-						cable.RecordConnectionLatency(localEndpoint.Spec.Backend, &localEndpoint.Spec, &connection.Endpoint, lastRTT.Seconds())
+	if connections == nil {
+		connections = []v1.Connection{}
+	}
 
-						if latencyInfo.ConnectionStatus == healthchecker.ConnectionError {
-							connection.Status = v1.ConnectionError
-							connection.StatusMessage = latencyInfo.ConnectionError
-						} else if latencyInfo.ConnectionStatus == healthchecker.ConnectionUnknown {
-							connection.StatusMessage = latencyInfo.ConnectionError
-						}
-					} else if connection.Status == v1.ConnectionError && latencyInfo.ConnectionStatus == healthchecker.Connected {
-						connection.Status = v1.Connected
-						connection.StatusMessage = ""
+	if i.healthCheck != nil {
+		for index := range connections {
+			connection := &(connections)[index]
+			latencyInfo := i.healthCheck.GetLatencyInfo(&connection.Endpoint)
+			if latencyInfo != nil {
+				connection.LatencyRTT = latencyInfo.Spec
+				if connection.Status == v1.Connected {
+					lastRTT, _ := time.ParseDuration(latencyInfo.Spec.Last)
+					cable.RecordConnectionLatency(localEndpoint.Spec.Backend, &localEndpoint.Spec, &connection.Endpoint, lastRTT.Seconds())
+
+					if latencyInfo.ConnectionStatus == healthchecker.ConnectionError {
+						connection.Status = v1.ConnectionError
+						connection.StatusMessage = latencyInfo.ConnectionError
+					} else if latencyInfo.ConnectionStatus == healthchecker.ConnectionUnknown {
+						connection.StatusMessage = latencyInfo.ConnectionError
 					}
+				} else if connection.Status == v1.ConnectionError && latencyInfo.ConnectionStatus == healthchecker.Connected {
+					connection.Status = v1.Connected
+					connection.StatusMessage = ""
 				}
 			}
 		}
-
-		gateway.Status.Connections = *connections
-	} else {
-		gateway.Status.Connections = []v1.Connection{}
 	}
+
+	gateway.Status.Connections = connections
 
 	klog.V(log.TRACE).Infof("Generated Gateway object: %+v", gateway)
 
