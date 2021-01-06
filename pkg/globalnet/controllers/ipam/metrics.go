@@ -35,7 +35,7 @@ var (
 	globalIPsAllocatedGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "global_IP_allocated",
-			Help: "Count of global IPs allocated for Pod/Servoce per CIDR",
+			Help: "Count of global IPs allocated for Pods/Services per CIDR",
 		},
 		[]string{
 			cidrLabel,
