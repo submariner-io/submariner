@@ -79,7 +79,7 @@ func (e *Engine) GetLocalEndpoint() *types.SubmarinerEndpoint {
 	return e.LocalEndPoint
 }
 
-func (e *Engine) ListCableConnections() (*[]v1.Connection, error) {
+func (e *Engine) ListCableConnections() ([]v1.Connection, error) {
 	e.Lock()
 	defer e.Unlock()
 
@@ -87,11 +87,7 @@ func (e *Engine) ListCableConnections() (*[]v1.Connection, error) {
 		return nil, e.ListCableConnectionsError
 	}
 
-	if e.Connections == nil {
-		return nil, nil
-	}
-
-	return &e.Connections, nil
+	return e.Connections, nil
 }
 
 func (e *Engine) GetHAStatus() v1.HAStatus {

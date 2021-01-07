@@ -133,7 +133,7 @@ func (st *strongswanConnectionsTest) addSA(cableID string, ikeSA goStrongswanVic
 	st.saList = append(st.saList, entry)
 }
 
-func (st *strongswanConnectionsTest) getConnections() *[]v1.Connection {
+func (st *strongswanConnectionsTest) getConnections() []v1.Connection {
 	connections, err := st.ss.getSAListConnections(st.saList)
 	Expect(err).ShouldNot(HaveOccurred())
 	Expect(connections).ToNot(BeNil())
@@ -144,7 +144,7 @@ func (st *strongswanConnectionsTest) getConnections() *[]v1.Connection {
 func (st *strongswanConnectionsTest) expectConnectionStatus(cableID string, status v1.ConnectionStatus) {
 	connections := st.getConnections()
 	foundCable := false
-	for _, connection := range *connections {
+	for _, connection := range connections {
 		if connection.Endpoint.CableName == cableID {
 			Expect(foundCable).To(BeFalse())
 			Expect(connection.Status).Should(Equal(status))
@@ -158,5 +158,5 @@ func (st *strongswanConnectionsTest) expectConnectionStatus(cableID string, stat
 
 func (st *strongswanConnectionsTest) expectConnectionsLen(length int) {
 	connections := st.getConnections()
-	Expect(*connections).To(HaveLen(length))
+	Expect(connections).To(HaveLen(length))
 }

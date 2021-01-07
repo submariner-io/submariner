@@ -88,9 +88,17 @@ func (ovn *SyncHandler) findChassisByHostname(hostname string) (*goovn.Chassis, 
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get chassis list from OVN")
 	}
+	// Attempt matching by the exact hostname
 	for _, chassis := range chassisList {
-		if chassis.Hostname == hostname || strings.HasPrefix(chassis.Hostname, hostname) ||
-			strings.HasPrefix(hostname, chassis.Hostname) {
+		if chassis.Hostname == hostname {
+			return chassis, nil
+		}
+	}
+
+	// In a second round try to match expecting a higher level domain after the hostname
+	for _, chassis := range chassisList {
+		if strings.HasPrefix(chassis.Hostname, hostname+".") ||
+			strings.HasPrefix(hostname, chassis.Hostname+".") {
 			return chassis, nil
 		}
 	}

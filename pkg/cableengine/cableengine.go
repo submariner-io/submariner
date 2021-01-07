@@ -48,7 +48,7 @@ type Engine interface {
 	// remote Pods and Service may not be accessible any more.
 	RemoveCable(remote types.SubmarinerEndpoint) error
 	// ListCableConnections returns a list of cable connection, and the related status
-	ListCableConnections() (*[]v1.Connection, error)
+	ListCableConnections() ([]v1.Connection, error)
 	// GetLocalEndpoint returns the local endpoint for this cable engine
 	GetLocalEndpoint() *types.SubmarinerEndpoint
 	// GetHAStatus returns the HA status for this cable engine
@@ -123,39 +123,26 @@ func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 		return err
 	}
 
-	var connections *[]v1.Connection
-	if len(activeConnections) > 0 {
-		connections, err = i.driver.GetConnections()
-		if err != nil {
-			return err
-		}
-	}
-
 	for _, active := range activeConnections {
-		klog.V(log.TRACE).Infof("Analyzing currently active connection %q", active)
+		klog.V(log.TRACE).Infof("Analyzing currently active connection %q", active.Endpoint.CableName)
 
-		activeEndpointInfo := i.getEndpointInfo(active, connections)
-		if activeEndpointInfo == nil {
-			klog.Warningf("No Connection found for active Endpoint cable name %q", active)
-			continue
-		}
-
-		if active == endpoint.Spec.CableName {
+		if active.Endpoint.CableName == endpoint.Spec.CableName {
 			// There could be scenarios where the cableName would be the same but the
 			// PublicIP of the active GatewayNode changes.
-			if activeEndpointInfo.PublicIP == endpoint.Spec.PublicIP {
-				klog.V(log.DEBUG).Infof("Cable %q is already installed - not installing again", active)
+			if active.Endpoint.PublicIP == endpoint.Spec.PublicIP {
+				klog.V(log.DEBUG).Infof("Cable %q is already installed - not installing again", active.Endpoint.CableName)
 				return nil
 			} else {
-				klog.V(log.DEBUG).Infof("Cable %q is already installed - but PublicIP changed", active)
-				err = i.driver.DisconnectFromEndpoint(types.SubmarinerEndpoint{Spec: *activeEndpointInfo})
+				klog.V(log.DEBUG).Infof("Cable %q is already installed - but PublicIP changed", active.Endpoint.CableName)
+				err = i.driver.DisconnectFromEndpoint(types.SubmarinerEndpoint{Spec: active.Endpoint})
 				if err != nil {
 					return err
 				}
 			}
-		} else if util.GetClusterIDFromCableName(active) == endpoint.Spec.ClusterID {
-			klog.V(log.DEBUG).Infof("Found a pre-existing cable %q that belongs to this cluster %s", active, endpoint.Spec.ClusterID)
-			err = i.driver.DisconnectFromEndpoint(types.SubmarinerEndpoint{Spec: *activeEndpointInfo})
+		} else if util.GetClusterIDFromCableName(active.Endpoint.CableName) == endpoint.Spec.ClusterID {
+			klog.V(log.DEBUG).Infof("Found a pre-existing cable %q that belongs to this cluster %s",
+				active.Endpoint.CableName, endpoint.Spec.ClusterID)
+			err = i.driver.DisconnectFromEndpoint(types.SubmarinerEndpoint{Spec: active.Endpoint})
 			if err != nil {
 				return err
 			}
@@ -172,17 +159,12 @@ func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 	return nil
 }
 
-func (i *engine) getEndpointInfo(cableName string, connections *[]v1.Connection) *v1.EndpointSpec {
-	for _, conn := range *connections {
-		if conn.Endpoint.CableName == cableName {
-			return &conn.Endpoint
-		}
+func (i *engine) RemoveCable(endpoint types.SubmarinerEndpoint) error {
+	if endpoint.Spec.ClusterID == i.localCluster.ID {
+		klog.V(log.DEBUG).Infof("Cables are not added/removed for the local cluster, skipping removal")
+		return nil
 	}
 
-	return nil
-}
-
-func (i *engine) RemoveCable(endpoint types.SubmarinerEndpoint) error {
 	klog.Infof("Removing Endpoint cable %q", endpoint.Spec.CableName)
 
 	i.Lock()
@@ -212,7 +194,7 @@ func (i *engine) GetHAStatus() v1.HAStatus {
 	}
 }
 
-func (i *engine) ListCableConnections() (*[]v1.Connection, error) {
+func (i *engine) ListCableConnections() ([]v1.Connection, error) {
 	i.Lock()
 	defer i.Unlock()
 
@@ -220,5 +202,5 @@ func (i *engine) ListCableConnections() (*[]v1.Connection, error) {
 		return i.driver.GetConnections()
 	}
 	// if no driver, we can safely report that no connections exist
-	return &[]v1.Connection{}, nil
+	return []v1.Connection{}, nil
 }
