@@ -216,24 +216,17 @@ func (i *libreswan) refreshConnectionStatus() error {
 }
 
 // GetActiveConnections returns an array of all the active connections for the given cluster.
-func (i *libreswan) GetActiveConnections(clusterID string) ([]string, error) {
-	connections := []string{}
-	for j := range i.connections {
-		connections = append(connections, i.connections[j].Endpoint.CableName)
-	}
-
-	klog.Infof("Active connections: %v", connections)
-
-	return connections, nil
+func (i *libreswan) GetActiveConnections(clusterID string) ([]subv1.Connection, error) {
+	return i.connections, nil
 }
 
 // GetConnections() returns an array of the existing connections, including status and endpoint info
-func (i *libreswan) GetConnections() (*[]subv1.Connection, error) {
+func (i *libreswan) GetConnections() ([]subv1.Connection, error) {
 	if err := i.refreshConnectionStatus(); err != nil {
-		return &[]subv1.Connection{}, err
+		return []subv1.Connection{}, err
 	}
 
-	return &i.connections, nil
+	return i.connections, nil
 }
 
 func extractEndpointIP(endpoint subv1.EndpointSpec) string {

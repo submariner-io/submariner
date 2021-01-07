@@ -27,7 +27,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/cable"
 )
 
-func (w *wireguard) GetConnections() (*[]v1.Connection, error) {
+func (w *wireguard) GetConnections() ([]v1.Connection, error) {
 	d, err := w.client.Device(DefaultDeviceName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find device %s: %v", DefaultDeviceName, err)
@@ -55,7 +55,7 @@ func (w *wireguard) GetConnections() (*[]v1.Connection, error) {
 		connections = append(connections, *connection.DeepCopy())
 	}
 
-	return &connections, nil
+	return connections, nil
 }
 
 func (w *wireguard) connectionByKey(key *wgtypes.Key) (*v1.Connection, error) {
