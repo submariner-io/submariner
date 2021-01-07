@@ -228,12 +228,12 @@ func (i *libreswan) GetActiveConnections(clusterID string) ([]string, error) {
 }
 
 // GetConnections() returns an array of the existing connections, including status and endpoint info
-func (i *libreswan) GetConnections() (*[]subv1.Connection, error) {
+func (i *libreswan) GetConnections() ([]subv1.Connection, error) {
 	if err := i.refreshConnectionStatus(); err != nil {
-		return &[]subv1.Connection{}, err
+		return []subv1.Connection{}, err
 	}
 
-	return &i.connections, nil
+	return i.connections, nil
 }
 
 func extractEndpointIP(endpoint subv1.EndpointSpec) string {
