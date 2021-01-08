@@ -21,8 +21,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coreos/go-iptables/iptables"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/submariner/pkg/iptables"
 
 	"github.com/submariner-io/submariner/pkg/globalnet/cleanup"
 	"github.com/submariner-io/submariner/pkg/util"

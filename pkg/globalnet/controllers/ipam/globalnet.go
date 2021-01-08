@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/coreos/go-iptables/iptables"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/submariner/pkg/iptables"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 
@@ -165,7 +165,7 @@ func (i *Controller) evaluateNode(node *k8sv1.Node) Operation {
 	return Process
 }
 
-func CreateGlobalNetMarkingChain(ipt *iptables.IPTables) error {
+func CreateGlobalNetMarkingChain(ipt iptables.Interface) error {
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetMarkChain)
 
 	if err := util.CreateChainIfNotExists(ipt, "nat", constants.SmGlobalnetMarkChain); err != nil {

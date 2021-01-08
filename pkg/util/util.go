@@ -23,10 +23,10 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/coreos/go-iptables/iptables"
 	"github.com/rdegges/go-ipify"
 	level "github.com/submariner-io/admiral/pkg/log"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/iptables"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/vishvananda/netlink"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -264,7 +264,7 @@ func GetDefaultGatewayInterface() (*net.Interface, error) {
 	return nil, fmt.Errorf("unable to find default route")
 }
 
-func CreateChainIfNotExists(ipt *iptables.IPTables, table, chain string) error {
+func CreateChainIfNotExists(ipt iptables.Interface, table, chain string) error {
 	existingChains, err := ipt.ListChains(table)
 	if err != nil {
 		return err
@@ -280,7 +280,7 @@ func CreateChainIfNotExists(ipt *iptables.IPTables, table, chain string) error {
 	return ipt.NewChain(table, chain)
 }
 
-func PrependUnique(ipt *iptables.IPTables, table, chain string, ruleSpec []string) error {
+func PrependUnique(ipt iptables.Interface, table, chain string, ruleSpec []string) error {
 	rules, err := ipt.List(table, chain)
 	if err != nil {
 		return fmt.Errorf("error listing the rules in %s chain: %v", chain, err)
