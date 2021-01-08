@@ -18,7 +18,7 @@ package ipam
 import (
 	"sync"
 
-	"github.com/coreos/go-iptables/iptables"
+	"github.com/submariner-io/submariner/pkg/iptables"
 	kubeInformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -54,7 +54,7 @@ type Controller struct {
 	excludeNamespaces map[string]bool
 	pool              *IpPool
 
-	ipt *iptables.IPTables
+	ipt iptables.Interface
 }
 
 type GatewayMonitor struct {
@@ -64,7 +64,7 @@ type GatewayMonitor struct {
 	endpointWorkqueue   workqueue.RateLimitingInterface
 	endpointsSynced     cache.InformerSynced
 	ipamSpec            *SubmarinerIpamControllerSpecification
-	ipt                 *iptables.IPTables
+	ipt                 iptables.Interface
 	stopProcessing      chan struct{}
 	isGatewayNode       bool
 	nodeName            string

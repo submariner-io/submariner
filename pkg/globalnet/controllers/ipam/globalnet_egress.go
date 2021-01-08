@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/coreos/go-iptables/iptables"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/submariner/pkg/iptables"
 	"k8s.io/klog"
 
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
@@ -45,7 +45,7 @@ func (i *Controller) updateEgressRulesForResource(resourceName, sourceIP, global
 	return nil
 }
 
-func MarkRemoteClusterTraffic(ipt *iptables.IPTables, remoteCidr string, addRules bool) {
+func MarkRemoteClusterTraffic(ipt iptables.Interface, remoteCidr string, addRules bool) {
 	ruleSpec := []string{"-d", remoteCidr, "-j", "MARK", "--set-mark", globalNetIPTableMark}
 
 	if addRules {

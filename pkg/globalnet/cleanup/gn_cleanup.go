@@ -18,7 +18,7 @@ package cleanup
 import (
 	"fmt"
 
-	"github.com/coreos/go-iptables/iptables"
+	"github.com/submariner-io/submariner/pkg/iptables"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
