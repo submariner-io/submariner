@@ -52,10 +52,9 @@ type DatastoreSyncer struct {
 func New(restConfig *rest.Config, namespace string, localCluster types.SubmarinerCluster,
 	localEndpoint types.SubmarinerEndpoint, colorcodes []string) *DatastoreSyncer {
 	return &DatastoreSyncer{
-		colorCodes:     colorcodes,
-		localCluster:   localCluster,
-		localEndpoint:  localEndpoint,
-		localFederator: nil,
+		colorCodes:    colorcodes,
+		localCluster:  localCluster,
+		localEndpoint: localEndpoint,
 		syncerConfig: broker.SyncerConfig{
 			LocalRestConfig: restConfig,
 			LocalNamespace:  namespace,
@@ -111,38 +110,11 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 		return err
 	}
 
-	if len(d.localCluster.Spec.GlobalCIDR) > 0 {
-		nodeName, ok := os.LookupEnv("NODE_NAME")
-		if !ok {
-			// Healthcheck in globalnet deployments will not work because of missing NODE_NAME.
-			klog.Error("Error reading the NODE_NAME from the env, healthChecker functionality will not work.")
-		} else {
-			d.localNodeName = nodeName
-			d.localFederator = syncer.GetLocalFederator()
-			resourceWatcher, err := watcher.New(&watcher.Config{
-				Scheme:     scheme.Scheme,
-				RestConfig: d.syncerConfig.LocalRestConfig,
-				ResourceConfigs: []watcher.ResourceConfig{
-					{
-						Name:                "Node watcher for datastoresyncer",
-						ResourceType:        &k8sv1.Node{},
-						ResourcesEquivalent: d.isNodeEquivalent,
-						Handler: watcher.EventHandlerFuncs{
-							OnCreateFunc: d.handleCreateOrUpdateNode,
-							OnUpdateFunc: d.handleCreateOrUpdateNode,
-							OnDeleteFunc: nil,
-						},
-					},
-				},
-			})
-			if err != nil {
-				return fmt.Errorf("error creating resource watcher %v", err)
-			}
+	d.localFederator = syncer.GetLocalFederator()
 
-			err = resourceWatcher.Start(stopCh)
-			if err != nil {
-				return err
-			}
+	if len(d.localCluster.Spec.GlobalCIDR) > 0 {
+		if err := d.startNodeWatcher(stopCh); err != nil {
+			return fmt.Errorf("startNodeWatcher returned error: %v", err)
 		}
 	}
 
@@ -150,11 +122,11 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 		return fmt.Errorf("could not ensure exclusive submariner Endpoint: %v", err)
 	}
 
-	if err := d.createLocalCluster(syncer.GetLocalFederator()); err != nil {
+	if err := d.createLocalCluster(); err != nil {
 		return fmt.Errorf("error creating the local submariner Cluster: %v", err)
 	}
 
-	if err := d.createOrUpdateLocalEndpoint(syncer.GetLocalFederator()); err != nil {
+	if err := d.createOrUpdateLocalEndpoint(); err != nil {
 		return fmt.Errorf("error creating the local submariner Endpoint: %v", err)
 	}
 
@@ -221,7 +193,43 @@ func (d *DatastoreSyncer) ensureExclusiveEndpoint(syncer *broker.Syncer) error {
 	return nil
 }
 
-func (d *DatastoreSyncer) createLocalCluster(federator federate.Federator) error {
+func (d *DatastoreSyncer) startNodeWatcher(stopCh <-chan struct{}) error {
+	nodeName, ok := os.LookupEnv("NODE_NAME")
+	if !ok {
+		// Healthcheck in globalnet deployments will not work because of missing NODE_NAME.
+		klog.Error("Error reading the NODE_NAME from the env, healthChecker functionality will not work.")
+	} else {
+		d.localNodeName = nodeName
+		resourceWatcher, err := watcher.New(&watcher.Config{
+			Scheme:     scheme.Scheme,
+			RestConfig: d.syncerConfig.LocalRestConfig,
+			ResourceConfigs: []watcher.ResourceConfig{
+				{
+					Name:                "Node watcher for datastoresyncer",
+					ResourceType:        &k8sv1.Node{},
+					ResourcesEquivalent: d.isNodeEquivalent,
+					Handler: watcher.EventHandlerFuncs{
+						OnCreateFunc: d.handleCreateOrUpdateNode,
+						OnUpdateFunc: d.handleCreateOrUpdateNode,
+						OnDeleteFunc: nil,
+					},
+				},
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("error creating resource watcher for Nodes %v", err)
+		}
+
+		err = resourceWatcher.Start(stopCh)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (d *DatastoreSyncer) createLocalCluster() error {
 	klog.Infof("Creating local submariner Cluster: %#v ", d.localCluster)
 
 	cluster := &submarinerv1.Cluster{
@@ -231,10 +239,10 @@ func (d *DatastoreSyncer) createLocalCluster(federator federate.Federator) error
 		Spec: d.localCluster.Spec,
 	}
 
-	return federator.Distribute(cluster)
+	return d.localFederator.Distribute(cluster)
 }
 
-func (d *DatastoreSyncer) createOrUpdateLocalEndpoint(federator federate.Federator) error {
+func (d *DatastoreSyncer) createOrUpdateLocalEndpoint() error {
 	klog.Infof("Creating local submariner Endpoint: %#v ", d.localEndpoint)
 
 	endpointName, err := util.GetEndpointCRDName(&d.localEndpoint)
@@ -249,5 +257,5 @@ func (d *DatastoreSyncer) createOrUpdateLocalEndpoint(federator federate.Federat
 		Spec: d.localEndpoint.Spec,
 	}
 
-	return federator.Distribute(endpoint)
+	return d.localFederator.Distribute(endpoint)
 }

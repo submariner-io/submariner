@@ -1,3 +1,18 @@
+/*
+© 2021 Red Hat, Inc. and others
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package datastoresyncer
 
 import (
@@ -16,9 +31,9 @@ func (d *DatastoreSyncer) handleCreateOrUpdateNode(obj runtime.Object) bool {
 		return false
 	}
 
-	globalIpOfNode := node.GetAnnotations()[constants.SubmarinerIpamGlobalIp]
+	globalIPOfNode := node.GetAnnotations()[constants.SmGlobalIP]
 
-	return d.updateLocalEndpointIfNecessary(globalIpOfNode)
+	return d.updateLocalEndpointIfNecessary(globalIPOfNode)
 }
 
 func (d *DatastoreSyncer) isNodeEquivalent(obj1, obj2 *unstructured.Unstructured) bool {
@@ -27,25 +42,22 @@ func (d *DatastoreSyncer) isNodeEquivalent(obj1, obj2 *unstructured.Unstructured
 		return true
 	}
 
-	existingGlobalIP := obj1.GetAnnotations()[constants.SubmarinerIpamGlobalIp]
-	newGlobalIP := obj2.GetAnnotations()[constants.SubmarinerIpamGlobalIp]
+	existingGlobalIP := obj1.GetAnnotations()[constants.SmGlobalIP]
+	newGlobalIP := obj2.GetAnnotations()[constants.SmGlobalIP]
 
-	if existingGlobalIP == newGlobalIP {
-		klog.V(log.DEBUG).Infof("isNodeEquivalent called for %q, existingGlobalIP %q, newGlobalIP %q",
-			obj1.GetName(), existingGlobalIP, newGlobalIP)
-		return true
-	}
+	klog.V(log.DEBUG).Infof("isNodeEquivalent called for %q, existingGlobalIP %q, newGlobalIP %q",
+		obj1.GetName(), existingGlobalIP, newGlobalIP)
 
-	return false
+	return existingGlobalIP == newGlobalIP
 }
 
-func (d *DatastoreSyncer) updateLocalEndpointIfNecessary(globalIpOfNode string) bool {
-	if globalIpOfNode != "" && d.localFederator != nil && d.localEndpoint.Spec.HealthCheckIP != globalIpOfNode {
-		klog.Infof("Updating the endpoint HealthCheckIP to globalIP %q", globalIpOfNode)
+func (d *DatastoreSyncer) updateLocalEndpointIfNecessary(globalIPOfNode string) bool {
+	if globalIPOfNode != "" && d.localEndpoint.Spec.HealthCheckIP != globalIPOfNode {
+		klog.Infof("Updating the endpoint HealthCheckIP to globalIP %q", globalIPOfNode)
 
-		d.localEndpoint.Spec.HealthCheckIP = globalIpOfNode
-		if err := d.createOrUpdateLocalEndpoint(d.localFederator); err != nil {
-			klog.Warningf("error updating the local submariner Endpoint with HealthcheckIP: %v", err)
+		d.localEndpoint.Spec.HealthCheckIP = globalIPOfNode
+		if err := d.createOrUpdateLocalEndpoint(); err != nil {
+			klog.Warningf("Error updating the local submariner Endpoint with HealthcheckIP: %v", err)
 			return true
 		}
 	}

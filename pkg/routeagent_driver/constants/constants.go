@@ -39,7 +39,7 @@ const (
 	CniInterfaceIP = "submariner.io/cniIfaceIp"
 
 	// TODO (revisit): Unify this constant across different components
-	SubmarinerIpamGlobalIp = "submariner.io/globalIp"
+	SmGlobalIP = "submariner.io/globalIp"
 
 	RouteAgentInterClusterNetworkTableID = 149
 
