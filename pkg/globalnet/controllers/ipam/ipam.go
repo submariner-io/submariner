@@ -22,7 +22,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/iptables"
 
-	"github.com/submariner-io/submariner/pkg/globalnet/cleanup"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 
 	k8sv1 "k8s.io/api/core/v1"
@@ -102,10 +101,7 @@ func NewController(spec *SubmarinerIpamControllerSpecification, config *Informer
 	return ipamController, nil
 }
 
-func (i *Controller) Run(stopCh <-chan struct{}) error {
-	defer utilruntime.HandleCrash()
-	defer cleanup.ClearGlobalnetChains()
-
+func (i *Controller) Start(stopCh <-chan struct{}) error {
 	// Start the informer factories to begin populating the informer caches
 	klog.Info("Starting IPAM Controller")
 
@@ -131,8 +127,6 @@ func (i *Controller) Run(stopCh <-chan struct{}) error {
 	go wait.Until(i.runServiceWorker, time.Second, stopCh)
 	go wait.Until(i.runPodWorker, time.Second, stopCh)
 	go wait.Until(i.runNodeWorker, time.Second, stopCh)
-	<-stopCh
-	klog.Info("Shutting down workers")
 
 	return nil
 }

@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions"
 )
 
 type SubmarinerIpamControllerSpecification struct {
@@ -58,15 +59,16 @@ type Controller struct {
 }
 
 type GatewayMonitor struct {
-	clusterID           string
-	kubeClientSet       kubernetes.Interface
-	submarinerClientSet clientset.Interface
-	endpointWorkqueue   workqueue.RateLimitingInterface
-	endpointsSynced     cache.InformerSynced
-	ipamSpec            *SubmarinerIpamControllerSpecification
-	ipt                 iptables.Interface
-	stopProcessing      chan struct{}
-	isGatewayNode       bool
-	nodeName            string
-	syncMutex           *sync.Mutex
+	clusterID                 string
+	kubeClientSet             kubernetes.Interface
+	submarinerClientSet       clientset.Interface
+	submarinerInformerFactory submarinerInformers.SharedInformerFactory
+	endpointWorkqueue         workqueue.RateLimitingInterface
+	endpointsSynced           cache.InformerSynced
+	ipamSpec                  *SubmarinerIpamControllerSpecification
+	ipt                       iptables.Interface
+	stopProcessing            chan struct{}
+	isGatewayNode             bool
+	nodeName                  string
+	syncMutex                 sync.Mutex
 }
