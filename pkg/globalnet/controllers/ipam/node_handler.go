@@ -31,7 +31,7 @@ import (
 func (i *Controller) nodeUpdater(obj runtime.Object, key string) error {
 	node := obj.(*k8sv1.Node)
 	cniIfaceIP := node.GetAnnotations()[constants.CniInterfaceIP]
-	existingGlobalIp := node.GetAnnotations()[submarinerIpamGlobalIp]
+	existingGlobalIp := node.GetAnnotations()[SubmarinerIpamGlobalIp]
 	allocatedIp, err := i.annotateGlobalIp(key, existingGlobalIp)
 	if err != nil { // failed to get globalIp or failed to update, we want to retry
 		logAndRequeue(key, i.nodeWorkqueue)
@@ -54,7 +54,7 @@ func (i *Controller) nodeUpdater(obj runtime.Object, key string) error {
 			annotations = map[string]string{}
 		}
 
-		annotations[submarinerIpamGlobalIp] = allocatedIp
+		annotations[SubmarinerIpamGlobalIp] = allocatedIp
 
 		node.SetAnnotations(annotations)
 
@@ -99,7 +99,7 @@ func (i *Controller) handleRemovedNode(obj interface{}) {
 		}
 	}
 
-	globalIp := node.Annotations[submarinerIpamGlobalIp]
+	globalIp := node.Annotations[SubmarinerIpamGlobalIp]
 	cniIfaceIp := node.Annotations[constants.CniInterfaceIP]
 	if globalIp != "" && cniIfaceIp != "" {
 		if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
