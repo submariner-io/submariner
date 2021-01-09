@@ -366,8 +366,8 @@ func (i *Controller) handleUpdateNode(old, newObj interface{}) {
 
 	oldCniIfaceIpOnNode := old.(*k8sv1.Node).GetAnnotations()[constants.CniInterfaceIP]
 	newCniIfaceIpOnNode := newObj.(*k8sv1.Node).GetAnnotations()[constants.CniInterfaceIP]
-	if oldCniIfaceIpOnNode == "" && newCniIfaceIpOnNode == "" {
-		klog.V(log.DEBUG).Infof("In handleUpdateNode, node %q is not yet annotated with cniIfaceIP, enqueing", newObj.(*k8sv1.Node).Name)
+	if oldCniIfaceIpOnNode == "" && newCniIfaceIpOnNode != "" {
+		klog.V(log.DEBUG).Infof("In handleUpdateNode, node %q is now annotated with cniIfaceIP, enqueing", newObj.(*k8sv1.Node).Name)
 		i.enqueueObject(newObj, i.nodeWorkqueue)
 
 		return
