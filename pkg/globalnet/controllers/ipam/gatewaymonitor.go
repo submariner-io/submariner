@@ -18,13 +18,13 @@ package ipam
 import (
 	"fmt"
 	"os"
-	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/submariner/pkg/globalnet/cleanup"
 	"github.com/submariner-io/submariner/pkg/iptables"
 
-	"github.com/submariner-io/submariner/pkg/globalnet/cleanup"
 	"github.com/submariner-io/submariner/pkg/util"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
@@ -44,29 +43,20 @@ import (
 
 const defaultResync = 60 * time.Second
 
-func NewGatewayMonitor(spec *SubmarinerIpamControllerSpecification, cfg *rest.Config, stopCh <-chan struct{}) (*GatewayMonitor, error) {
+func NewGatewayMonitor(spec *SubmarinerIpamControllerSpecification,
+	submarinerClient submarinerClientset.Interface, clientSet kubernetes.Interface) (*GatewayMonitor, error) {
 	gatewayMonitor := &GatewayMonitor{
 		clusterID:         spec.ClusterID,
 		endpointWorkqueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Endpoints"),
-		ipamSpec:          spec,
-		stopProcessing:    nil,
-		isGatewayNode:     false,
-		syncMutex:         &sync.Mutex{},
+		submarinerInformerFactory: submarinerInformers.NewSharedInformerFactoryWithOptions(submarinerClient,
+			time.Second*30, submarinerInformers.WithNamespace(spec.Namespace)),
+		submarinerClientSet: submarinerClient,
+		kubeClientSet:       clientSet,
+		ipamSpec:            spec,
+		isGatewayNode:       false,
 	}
 
-	clientSet, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("error building k8s clientset: %s", err.Error())
-	}
-
-	submarinerClient, err := submarinerClientset.NewForConfig(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("error building submariner clientset: %s", err.Error())
-	}
-
-	submarinerInformerFactory := submarinerInformers.NewSharedInformerFactoryWithOptions(submarinerClient,
-		time.Second*30, submarinerInformers.WithNamespace(spec.Namespace))
-	EndpointInformer := submarinerInformerFactory.Submariner().V1().Endpoints()
+	endpointInformer := gatewayMonitor.submarinerInformerFactory.Submariner().V1().Endpoints()
 
 	iptableHandler, err := iptables.New()
 	if err != nil {
@@ -74,18 +64,16 @@ func NewGatewayMonitor(spec *SubmarinerIpamControllerSpecification, cfg *rest.Co
 	}
 
 	gatewayMonitor.ipt = iptableHandler
-	gatewayMonitor.kubeClientSet = clientSet
-	gatewayMonitor.submarinerClientSet = submarinerClient
-	gatewayMonitor.endpointsSynced = EndpointInformer.Informer().HasSynced
+	gatewayMonitor.endpointsSynced = endpointInformer.Informer().HasSynced
 
 	nodeName, ok := os.LookupEnv("NODE_NAME")
 	if !ok {
-		klog.Fatal("error reading the NODE_NAME from the environment")
+		return nil, errors.New("error reading the NODE_NAME from the environment")
 	}
 
 	gatewayMonitor.nodeName = nodeName
 
-	EndpointInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
+	endpointInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			gatewayMonitor.enqueueEndpoint(obj)
 		},
@@ -95,16 +83,13 @@ func NewGatewayMonitor(spec *SubmarinerIpamControllerSpecification, cfg *rest.Co
 		DeleteFunc: gatewayMonitor.handleRemovedEndpoint,
 	}, handlerResync)
 
-	submarinerInformerFactory.Start(stopCh)
-
 	return gatewayMonitor, nil
 }
 
-func (i *GatewayMonitor) Run(stopCh <-chan struct{}) error {
-	defer utilruntime.HandleCrash()
-	defer cleanup.ClearGlobalnetChains()
-
+func (i *GatewayMonitor) Start(stopCh <-chan struct{}) error {
 	klog.Info("Starting GatewayMonitor to monitor the active Gateway node in the cluster.")
+
+	i.submarinerInformerFactory.Start(stopCh)
 
 	klog.Info("Waiting for informer caches to sync")
 
@@ -116,13 +101,18 @@ func (i *GatewayMonitor) Run(stopCh <-chan struct{}) error {
 		return fmt.Errorf("error while calling createGlobalNetMarkingChain: %v", err)
 	}
 
-	klog.Info("Starting endpoint worker.")
+	klog.Info("Starting endpoint worker")
 
 	go wait.Until(i.runEndpointWorker, time.Second, stopCh)
-	<-stopCh
-	klog.Info("Shutting down endpoint worker.")
 
 	return nil
+}
+func (i *GatewayMonitor) Stop() {
+	klog.Info("GatewayMonitor stopping")
+
+	i.syncMutex.Lock()
+	i.stopIpamController()
+	i.syncMutex.Unlock()
 }
 
 func (r *GatewayMonitor) runEndpointWorker() {
@@ -305,22 +295,21 @@ func (i *GatewayMonitor) initializeIpamController(globalCIDR, gwNodeName string)
 
 	i.stopProcessing = make(chan struct{})
 
-	go func() {
-		if err = ipamController.Run(i.stopProcessing); err != nil {
-			klog.Fatalf("Error running ipamController: %s", err.Error())
-		}
-	}()
-
 	informerFactory.Start(i.stopProcessing)
-	klog.V(log.DEBUG).Infof("Successfully initialized ipamController.")
+
+	if err = ipamController.Start(i.stopProcessing); err != nil {
+		klog.Fatalf("Error running ipamController: %s", err.Error())
+	}
+
+	klog.V(log.DEBUG).Infof("Successfully started the ipamController")
 }
 
 func (i *GatewayMonitor) stopIpamController() {
 	if i.stopProcessing != nil {
-		klog.V(log.DEBUG).Infof("Submariner GatewayEngine migrated to a new node, stopping ipamController.")
+		klog.V(log.DEBUG).Infof("Stopping ipamController")
 		close(i.stopProcessing)
 		i.stopProcessing = nil
-	}
 
-	klog.V(log.DEBUG).Infof("Notified ipamController to stop processing.")
+		cleanup.ClearGlobalnetChains(i.ipt)
+	}
 }
