@@ -112,12 +112,6 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 
 	d.localFederator = syncer.GetLocalFederator()
 
-	if len(d.localCluster.Spec.GlobalCIDR) > 0 {
-		if err := d.startNodeWatcher(stopCh); err != nil {
-			return fmt.Errorf("startNodeWatcher returned error: %v", err)
-		}
-	}
-
 	if err := d.ensureExclusiveEndpoint(syncer); err != nil {
 		return fmt.Errorf("could not ensure exclusive submariner Endpoint: %v", err)
 	}
@@ -128,6 +122,12 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 
 	if err := d.createOrUpdateLocalEndpoint(); err != nil {
 		return fmt.Errorf("error creating the local submariner Endpoint: %v", err)
+	}
+
+	if len(d.localCluster.Spec.GlobalCIDR) > 0 {
+		if err := d.startNodeWatcher(stopCh); err != nil {
+			return fmt.Errorf("startNodeWatcher returned error: %v", err)
+		}
 	}
 
 	klog.Info("Datastore syncer started")

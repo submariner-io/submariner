@@ -55,9 +55,13 @@ func (d *DatastoreSyncer) updateLocalEndpointIfNecessary(globalIPOfNode string) 
 	if globalIPOfNode != "" && d.localEndpoint.Spec.HealthCheckIP != globalIPOfNode {
 		klog.Infof("Updating the endpoint HealthCheckIP to globalIP %q", globalIPOfNode)
 
+		prevHealthCheckIP := d.localEndpoint.Spec.HealthCheckIP
 		d.localEndpoint.Spec.HealthCheckIP = globalIPOfNode
 		if err := d.createOrUpdateLocalEndpoint(); err != nil {
 			klog.Warningf("Error updating the local submariner Endpoint with HealthcheckIP: %v", err)
+
+			d.localEndpoint.Spec.HealthCheckIP = prevHealthCheckIP
+
 			return true
 		}
 	}
