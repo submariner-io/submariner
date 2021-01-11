@@ -105,21 +105,9 @@ func main() {
 		klog.Fatalf("Error creating submariner clientset: %s", err.Error())
 	}
 
-	var localSubnets []string
-
 	klog.Info("Creating the cable engine")
 
 	localCluster := submarinerClusterFrom(&submSpec)
-
-	globalnetEnabled := false
-
-	if len(submSpec.GlobalCidr) > 0 {
-		localSubnets = submSpec.GlobalCidr
-		globalnetEnabled = true
-	} else {
-		localSubnets = append(localSubnets, submSpec.ServiceCidr...)
-		localSubnets = append(localSubnets, submSpec.ClusterCidr...)
-	}
 
 	if submSpec.CableDriver == "" {
 		submSpec.CableDriver = cable.GetDefaultCableDriver()
@@ -127,8 +115,7 @@ func main() {
 
 	submSpec.CableDriver = strings.ToLower(submSpec.CableDriver)
 
-	localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterID, submSpec.CableDriver, nil,
-		globalnetEnabled, submSpec.NatEnabled, localSubnets, util.GetLocalIP(), submSpec.ClusterCidr)
+	localEndpoint, err := util.GetLocalEndpoint(submSpec, nil, util.GetLocalIP())
 
 	if err != nil {
 		klog.Fatalf("Error creating local endpoint object from %#v: %v", submSpec, err)

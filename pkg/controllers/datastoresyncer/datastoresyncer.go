@@ -200,30 +200,36 @@ func (d *DatastoreSyncer) startNodeWatcher(stopCh <-chan struct{}) error {
 		klog.Error("Error reading the NODE_NAME from the env, healthChecker functionality will not work.")
 	} else {
 		d.localNodeName = nodeName
-		resourceWatcher, err := watcher.New(&watcher.Config{
-			Scheme:     scheme.Scheme,
-			RestConfig: d.syncerConfig.LocalRestConfig,
-			ResourceConfigs: []watcher.ResourceConfig{
-				{
-					Name:                "Node watcher for datastoresyncer",
-					ResourceType:        &k8sv1.Node{},
-					ResourcesEquivalent: d.isNodeEquivalent,
-					Handler: watcher.EventHandlerFuncs{
-						OnCreateFunc: d.handleCreateOrUpdateNode,
-						OnUpdateFunc: d.handleCreateOrUpdateNode,
-						OnDeleteFunc: nil,
-					},
+		return d.createNodeWatcher(stopCh)
+	}
+
+	return nil
+}
+
+func (d *DatastoreSyncer) createNodeWatcher(stopCh <-chan struct{}) error {
+	resourceWatcher, err := watcher.New(&watcher.Config{
+		Scheme:     scheme.Scheme,
+		RestConfig: d.syncerConfig.LocalRestConfig,
+		ResourceConfigs: []watcher.ResourceConfig{
+			{
+				Name:                "Node watcher for datastoresyncer",
+				ResourceType:        &k8sv1.Node{},
+				ResourcesEquivalent: d.isNodeEquivalent,
+				Handler: watcher.EventHandlerFuncs{
+					OnCreateFunc: d.handleCreateOrUpdateNode,
+					OnUpdateFunc: d.handleCreateOrUpdateNode,
+					OnDeleteFunc: nil,
 				},
 			},
-		})
-		if err != nil {
-			return fmt.Errorf("error creating resource watcher for Nodes %v", err)
-		}
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("error creating resource watcher for Nodes %v", err)
+	}
 
-		err = resourceWatcher.Start(stopCh)
-		if err != nil {
-			return err
-		}
+	err = resourceWatcher.Start(stopCh)
+	if err != nil {
+		return err
 	}
 
 	return nil
