@@ -38,6 +38,9 @@ const (
 	// [#] interface on the node that has an IPAddress from the clusterCIDR
 	CniInterfaceIP = "submariner.io/cniIfaceIp"
 
+	// TODO (revisit): Unify this constant across different components
+	SmGlobalIP = "submariner.io/globalIp"
+
 	RouteAgentInterClusterNetworkTableID = 149
 
 	// To support connectivity for Pods with HostNetworking on the GatewayNode, we program

@@ -85,7 +85,12 @@ func testGetLocalEndpoint() {
 	It("should return a valid SubmarinerEndpoint object", func() {
 		subnets := []string{"127.0.0.1/16"}
 		privateIP := "127.0.0.1"
-		endpoint, err := util.GetLocalEndpoint("east", "backend", map[string]string{}, false, subnets, privateIP, subnets)
+		submSpec := types.SubmarinerSpecification{
+			ClusterID:   "east",
+			ClusterCidr: subnets,
+			CableDriver: "backend",
+		}
+		endpoint, err := util.GetLocalEndpoint(submSpec, map[string]string{}, privateIP)
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(endpoint.Spec.ClusterID).To(Equal("east"))

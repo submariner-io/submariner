@@ -105,18 +105,9 @@ func main() {
 		klog.Fatalf("Error creating submariner clientset: %s", err.Error())
 	}
 
-	var localSubnets []string
-
 	klog.Info("Creating the cable engine")
 
 	localCluster := submarinerClusterFrom(&submSpec)
-
-	if len(submSpec.GlobalCidr) > 0 {
-		localSubnets = submSpec.GlobalCidr
-	} else {
-		localSubnets = append(localSubnets, submSpec.ServiceCidr...)
-		localSubnets = append(localSubnets, submSpec.ClusterCidr...)
-	}
 
 	if submSpec.CableDriver == "" {
 		submSpec.CableDriver = cable.GetDefaultCableDriver()
@@ -124,8 +115,7 @@ func main() {
 
 	submSpec.CableDriver = strings.ToLower(submSpec.CableDriver)
 
-	localEndpoint, err := util.GetLocalEndpoint(submSpec.ClusterID, submSpec.CableDriver, nil, submSpec.NatEnabled,
-		localSubnets, util.GetLocalIP(), submSpec.ClusterCidr)
+	localEndpoint, err := util.GetLocalEndpoint(submSpec, nil, util.GetLocalIP())
 
 	if err != nil {
 		klog.Fatalf("Error creating local endpoint object from %#v: %v", submSpec, err)
@@ -142,8 +132,6 @@ func main() {
 
 	if !submSpec.HealthCheckEnabled {
 		klog.Info("The CableEngine HealthChecker is disabled")
-	} else if len(submSpec.GlobalCidr) > 0 {
-		klog.Info("Globalnet is enabled - not running the CableEngine HealthChecker")
 	} else {
 		cableHealthchecker, err = healthchecker.New(&healthchecker.Config{
 			WatcherConfig:      &watcher.Config{RestConfig: cfg},
