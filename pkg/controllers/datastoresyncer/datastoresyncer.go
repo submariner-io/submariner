@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
 	"k8s.io/klog"
 
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -37,44 +36,24 @@ import (
 	"github.com/submariner-io/submariner/pkg/util"
 )
 
-type NewSyncer func(*broker.SyncerConfig) (*broker.Syncer, error)
-
 type DatastoreSyncer struct {
 	colorCodes     []string
 	localCluster   types.SubmarinerCluster
 	localEndpoint  types.SubmarinerEndpoint
 	localNodeName  string
 	syncerConfig   broker.SyncerConfig
-	newSyncer      NewSyncer
 	localFederator federate.Federator
 }
 
-func New(restConfig *rest.Config, namespace string, localCluster types.SubmarinerCluster,
+func New(syncerConfig broker.SyncerConfig, localCluster types.SubmarinerCluster,
 	localEndpoint types.SubmarinerEndpoint, colorcodes []string) *DatastoreSyncer {
-	return &DatastoreSyncer{
-		colorCodes:    colorcodes,
-		localCluster:  localCluster,
-		localEndpoint: localEndpoint,
-		syncerConfig: broker.SyncerConfig{
-			LocalRestConfig: restConfig,
-			LocalNamespace:  namespace,
-			LocalClusterID:  localCluster.Spec.ClusterID,
-		},
-		newSyncer: func(config *broker.SyncerConfig) (*broker.Syncer, error) {
-			return broker.NewSyncer(*config)
-		},
-	}
-}
+	syncerConfig.LocalClusterID = localCluster.Spec.ClusterID
 
-// Intended for unit tests.
-func NewWithDetail(thisClusterID, namespace string, localCluster types.SubmarinerCluster,
-	localEndpoint types.SubmarinerEndpoint, colorcodes []string, syncerConfig broker.SyncerConfig, newSyncer NewSyncer) *DatastoreSyncer {
 	return &DatastoreSyncer{
 		colorCodes:    colorcodes,
 		localCluster:  localCluster,
 		localEndpoint: localEndpoint,
 		syncerConfig:  syncerConfig,
-		newSyncer:     newSyncer,
 	}
 }
 
@@ -98,7 +77,7 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 		},
 	}
 
-	syncer, err := d.newSyncer(&d.syncerConfig)
+	syncer, err := broker.NewSyncer(d.syncerConfig)
 	if err != nil {
 		return err
 	}
@@ -138,7 +117,7 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (d *DatastoreSyncer) shouldSyncEndpoint(obj runtime.Object, op resourceSyncer.Operation) (runtime.Object, bool) {
+func (d *DatastoreSyncer) shouldSyncEndpoint(obj runtime.Object, numRequeues int, op resourceSyncer.Operation) (runtime.Object, bool) {
 	// Ensure we don't try to sync a remote endpoint to the broker. While the syncer handles this normally using a
 	// label, on upgrade to 0.8.0 where the syncer was introduced, the label won't exist so check the ClusterID field here.
 	endpoint := obj.(*submarinerv1.Endpoint)
@@ -149,7 +128,7 @@ func (d *DatastoreSyncer) shouldSyncEndpoint(obj runtime.Object, op resourceSync
 	return nil, false
 }
 
-func (d *DatastoreSyncer) shouldSyncCluster(obj runtime.Object, op resourceSyncer.Operation) (runtime.Object, bool) {
+func (d *DatastoreSyncer) shouldSyncCluster(obj runtime.Object, numRequeues int, op resourceSyncer.Operation) (runtime.Object, bool) {
 	cluster := obj.(*submarinerv1.Cluster)
 	if cluster.Spec.ClusterID == d.localCluster.Spec.ClusterID {
 		return obj, false

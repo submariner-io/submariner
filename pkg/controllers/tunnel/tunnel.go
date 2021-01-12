@@ -60,7 +60,7 @@ func StartController(engine cableengine.Engine, namespace string, config *watche
 	return nil
 }
 
-func (c *controller) handleCreatedOrUpdatedEndpoint(obj runtime.Object) bool {
+func (c *controller) handleCreatedOrUpdatedEndpoint(obj runtime.Object, numRequeues int) bool {
 	endpoint := obj.(*v1.Endpoint)
 
 	klog.V(log.DEBUG).Infof("Tunnel controller processing added or updated submariner Endpoint object: %#v", endpoint)
@@ -80,7 +80,7 @@ func (c *controller) handleCreatedOrUpdatedEndpoint(obj runtime.Object) bool {
 	return false
 }
 
-func (c *controller) handleRemovedEndpoint(obj runtime.Object) bool {
+func (c *controller) handleRemovedEndpoint(obj runtime.Object, numRequeues int) bool {
 	endpoint := obj.(*v1.Endpoint)
 
 	klog.V(log.DEBUG).Infof("Tunnel controller processing removed submariner Endpoint object: %#v", endpoint)

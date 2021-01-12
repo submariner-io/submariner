@@ -108,7 +108,7 @@ func (h *controller) Start(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (h *controller) endpointCreatedorUpdated(obj runtime.Object) bool {
+func (h *controller) endpointCreatedorUpdated(obj runtime.Object, numRequeues int) bool {
 	klog.V(log.TRACE).Infof("Endpoint created: %#v", obj)
 	endpointCreated := obj.(*submarinerv1.Endpoint)
 	if endpointCreated.Spec.ClusterID == h.config.ClusterID {
@@ -158,7 +158,7 @@ func (h *controller) endpointCreatedorUpdated(obj runtime.Object) bool {
 	return false
 }
 
-func (h *controller) endpointDeleted(obj runtime.Object) bool {
+func (h *controller) endpointDeleted(obj runtime.Object, numRequeues int) bool {
 	endpointDeleted := obj.(*submarinerv1.Endpoint)
 	if obj, found := h.pingers.Load(endpointDeleted.Spec.CableName); found {
 		pinger := obj.(PingerInterface)

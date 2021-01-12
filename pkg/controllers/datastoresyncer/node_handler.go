@@ -25,7 +25,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 )
 
-func (d *DatastoreSyncer) handleCreateOrUpdateNode(obj runtime.Object) bool {
+func (d *DatastoreSyncer) handleCreateOrUpdateNode(obj runtime.Object, numRequeues int) bool {
 	node := obj.(*k8sv1.Node)
 	if node.Name != d.localNodeName {
 		return false
