@@ -66,7 +66,6 @@ func (gn *cleanupGlobalnetRules) GatewayToNonGatewayTransition() error {
 	}
 
 	if gn.globalnetStatus == GN_Enabled {
-		klog.Info("Globalnet is enabled and active gateway migrated, flushing Globalnet chains.")
 		ClearGlobalnetChains()
 	}
 
@@ -74,6 +73,8 @@ func (gn *cleanupGlobalnetRules) GatewayToNonGatewayTransition() error {
 }
 
 func ClearGlobalnetChains() {
+	klog.Info("Globalnet is enabled and active gateway migrated, flushing Globalnet chains.")
+
 	ipt, err := iptables.New()
 	if err != nil {
 		klog.Errorf("error initializing iptables: %v", err)
