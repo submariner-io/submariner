@@ -22,7 +22,7 @@ import (
 	smv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 )
 
-func (c *Controller) handleCreatedEndpoint(obj runtime.Object) bool {
+func (c *Controller) handleCreatedEndpoint(obj runtime.Object, numRequeues int) bool {
 	var err error
 
 	endpoint := obj.(*smv1.Endpoint)

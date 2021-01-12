@@ -28,6 +28,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
@@ -161,7 +162,10 @@ func main() {
 	becameLeader := func(context.Context) {
 		klog.Info("Creating the datastore syncer")
 
-		dsSyncer := datastoresyncer.New(cfg, submSpec.Namespace, localCluster, localEndpoint, submSpec.ColorCodes)
+		dsSyncer := datastoresyncer.New(broker.SyncerConfig{
+			LocalRestConfig: cfg,
+			LocalNamespace:  submSpec.Namespace,
+		}, localCluster, localEndpoint, submSpec.ColorCodes)
 
 		if err = cableEngine.StartEngine(); err != nil {
 			fatal(cableEngineSyncer, "Error starting the cable engine: %v", err)
