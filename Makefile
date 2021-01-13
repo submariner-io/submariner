@@ -9,7 +9,13 @@ include $(SHIPYARD_DIR)/Makefile.inc
 
 TARGETS := $(shell ls -p scripts | grep -v -e / -e reload-images)
 override BUILD_ARGS += $(shell source ${SCRIPTS_DIR}/lib/version; echo --ldflags \'-X main.VERSION=$${VERSION}\')
+
+ifneq (,$(filter ovn,$(_using)))
+override CLUSTERS_ARGS += --cluster_settings $(DAPPER_SOURCE)/scripts/cluster_settings.ovn
+else
 override CLUSTERS_ARGS += --cluster_settings $(DAPPER_SOURCE)/scripts/cluster_settings
+endif
+
 override E2E_ARGS += --focus $(focus) cluster2 cluster3 cluster1
 override UNIT_TEST_ARGS += test/e2e
 override VALIDATE_ARGS += --skip-dirs pkg/client
