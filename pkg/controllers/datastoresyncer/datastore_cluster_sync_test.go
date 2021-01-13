@@ -52,11 +52,11 @@ func testClusterSyncing() {
 
 		When("creation of the local Cluster fails", func() {
 			BeforeEach(func() {
-				t.expectedRunErr = errors.New("mock Create error")
-				t.localClusters.FailOnCreate = t.expectedRunErr
+				t.expectedStartErr = errors.New("mock Create error")
+				t.localClusters.FailOnCreate = t.expectedStartErr
 			})
 
-			It("Run should return an error", func() {
+			It("Start should return an error", func() {
 			})
 		})
 	})

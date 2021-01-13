@@ -57,7 +57,7 @@ func New(syncerConfig broker.SyncerConfig, localCluster types.SubmarinerCluster,
 	}
 }
 
-func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
+func (d *DatastoreSyncer) Start(stopCh <-chan struct{}) error {
 	defer utilruntime.HandleCrash()
 
 	klog.Info("Starting the datastore syncer")
@@ -110,9 +110,6 @@ func (d *DatastoreSyncer) Run(stopCh <-chan struct{}) error {
 	}
 
 	klog.Info("Datastore syncer started")
-
-	<-stopCh
-	klog.Info("Datastore syncer stopping")
 
 	return nil
 }
@@ -189,11 +186,13 @@ func (d *DatastoreSyncer) createNodeWatcher(stopCh <-chan struct{}) error {
 	resourceWatcher, err := watcher.New(&watcher.Config{
 		Scheme:     scheme.Scheme,
 		RestConfig: d.syncerConfig.LocalRestConfig,
+		RestMapper: d.syncerConfig.RestMapper,
+		Client:     d.syncerConfig.LocalClient,
 		ResourceConfigs: []watcher.ResourceConfig{
 			{
 				Name:                "Node watcher for datastoresyncer",
 				ResourceType:        &k8sv1.Node{},
-				ResourcesEquivalent: d.isNodeEquivalent,
+				ResourcesEquivalent: d.areNodesEquivalent,
 				Handler: watcher.EventHandlerFuncs{
 					OnCreateFunc: d.handleCreateOrUpdateNode,
 					OnUpdateFunc: d.handleCreateOrUpdateNode,
