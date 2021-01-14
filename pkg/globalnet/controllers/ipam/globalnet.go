@@ -79,8 +79,17 @@ func (i *Controller) syncPodRules(podIP, globalIP string, addRules bool) error {
 }
 
 func (i *Controller) syncServiceRules(service *k8sv1.Service, globalIP string, addRules bool) error {
-	chainName := i.kubeProxyClusterIpServiceChainName(service)
-	err := i.updateIngressRulesForService(globalIP, chainName, addRules)
+	chainName, chainExists, err := i.kubeProxyClusterIPServiceChainName(service)
+	if err != nil {
+		return err
+	}
+
+	if !chainExists {
+		// This shouldn't happen here as we check for this earlier.
+		return nil
+	}
+
+	err = i.updateIngressRulesForService(globalIP, chainName, addRules)
 	if err != nil {
 		return fmt.Errorf("error updating ingress rules for service %#v: %v", service, err)
 	}
@@ -126,13 +135,19 @@ func (i *Controller) evaluateService(service *k8sv1.Service) Operation {
 		return Ignore
 	}
 
-	chainName := i.kubeProxyClusterIpServiceChainName(service)
-	if chainExists, _ := i.doesIPTablesChainExist("nat", chainName); !chainExists {
+	serviceName := service.GetNamespace() + "/" + service.GetName()
+
+	chainName, chainExists, err := i.kubeProxyClusterIPServiceChainName(service)
+	if err != nil {
+		klog.Errorf("Error checking for kube-proxy chain for service %q", serviceName)
 		return Requeue
 	}
 
-	serviceName := service.GetNamespace() + "/" + service.GetName()
-	klog.V(log.DEBUG).Infof("kube-proxy chain %q for service %q now exists.", chainName, serviceName)
+	if !chainExists {
+		return Requeue
+	}
+
+	klog.V(log.DEBUG).Infof("kube-proxy chain %q for service %q exists.", chainName, serviceName)
 
 	return Process
 }
