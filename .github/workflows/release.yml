@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - release-*
 
 jobs:
   e2e:
@@ -49,5 +50,5 @@ jobs:
         env:
           QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
           QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}
-          RELEASE_ARGS: submariner submariner-route-agent submariner-globalnet submariner-networkplugin-syncer
+          RELEASE_ARGS: submariner submariner-route-agent submariner-globalnet submariner-networkplugin-syncer --tag "${GITHUB_REF##*/}"
         run: make release
