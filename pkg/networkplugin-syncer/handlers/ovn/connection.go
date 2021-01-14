@@ -8,6 +8,7 @@ import (
 
 	goovn "github.com/ebay/go-ovn"
 	"github.com/pkg/errors"
+	"k8s.io/klog"
 
 	"github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn/nbctl"
 	"github.com/submariner-io/submariner/pkg/util/cluster_files"
@@ -16,7 +17,9 @@ import (
 func (ovn *SyncHandler) initClients() error {
 	var tlsConfig *tls.Config
 
-	if strings.HasPrefix(getOVNNBDBAddress(), "ssl://") || strings.HasPrefix(getOVNSBDBAddress(), "ssl://") {
+	if strings.HasPrefix(getOVNNBDBAddress(), "ssl:") || strings.HasPrefix(getOVNSBDBAddress(), "ssl:") {
+		klog.Infof("OVN connection using SSL, loading certificates")
+
 		certFile, err := cluster_files.Get(ovn.k8sClientset, getOVNCertPath())
 		if err != nil {
 			return err
@@ -39,6 +42,8 @@ func (ovn *SyncHandler) initClients() error {
 
 		ovn.nbctl = nbctl.New(getOVNNBDBAddress(), pkFile, certFile, caFile)
 	} else {
+		klog.Infof("OVN connection using plaintext TCP")
+
 		ovn.nbctl = nbctl.New(getOVNNBDBAddress(), "", "", "")
 	}
 
