@@ -62,6 +62,7 @@ jobs:
         with:
           config-file: ".markdownlinkcheck.json"
           check-modified-files-only: "yes"
+          base-branch: "release-0.8"
 
   markdownlint:
     name: Markdown
