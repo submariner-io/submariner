@@ -1,12 +1,30 @@
+/*
+© 2021 Red Hat, Inc. and others
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package main
 
 import (
+	"context"
 	"flag"
+	"net/http"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers/ipam"
 
@@ -37,6 +55,8 @@ func main() {
 
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
+
+	httpServer := startHttpServer()
 
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
 	if err != nil {
@@ -90,10 +110,28 @@ func main() {
 
 	wg.Wait()
 	klog.Infof("All controllers stopped or exited. Stopping main loop")
+
+	if err := httpServer.Shutdown(context.TODO()); err != nil {
+		klog.Errorf("Error shutting down metrics HTTP server: %v", err)
+	}
 }
 
 func init() {
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&masterURL, "master", "",
 		"The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+}
+
+func startHttpServer() *http.Server {
+	srv := &http.Server{Addr: ":8081"}
+
+	http.Handle("/metrics", promhttp.Handler())
+
+	go func() {
+		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+			klog.Errorf("Error starting metrics server: %v", err)
+		}
+	}()
+
+	return srv
 }

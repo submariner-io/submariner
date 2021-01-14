@@ -1,3 +1,18 @@
+/*
+© 2021 Red Hat, Inc. and others
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package ipam
 
 import (
@@ -73,10 +88,19 @@ func (i *Controller) syncServiceRules(service *k8sv1.Service, globalIP string, a
 	return nil
 }
 
-func (i *Controller) syncNodeRules(cniIfaceIP, globalIP string, addRules bool) error {
+func (i *Controller) syncNodeRules(nodeName, cniIfaceIP, globalIP string, addRules bool) error {
 	err := i.updateEgressRulesForResource("Node", cniIfaceIP, globalIP, addRules)
 	if err != nil {
 		return fmt.Errorf("error updating egress rules for Node %s: %v", cniIfaceIP, err)
+	}
+
+	// On the active Gateway Node where this code gets executed, we program icmp ingress rules
+	// to support health-check use-case.
+	if i.gwNodeName == nodeName {
+		err = i.updateIngressRulesForHealthCheck("Node", cniIfaceIP, globalIP, addRules)
+		if err != nil {
+			return fmt.Errorf("error updating healthcheck ingress rules for Node %q: %v", nodeName, err)
+		}
 	}
 
 	return nil

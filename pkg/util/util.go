@@ -1,3 +1,18 @@
+/*
+© 2021 Red Hat, Inc. and others
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package util
 
 import (
@@ -85,8 +100,8 @@ func FlattenColors(colorCodes []string) string {
 	return flattenedColors
 }
 
-func GetLocalEndpoint(clusterID, backend string, backendConfig map[string]string, natEnabled bool,
-	subnets []string, privateIP string, clusterCIDR []string) (types.SubmarinerEndpoint, error) {
+func GetLocalEndpoint(submSpec types.SubmarinerSpecification, backendConfig map[string]string,
+	privateIP string) (types.SubmarinerEndpoint, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return types.SubmarinerEndpoint{}, fmt.Errorf("Error getting hostname: %v", err)
@@ -96,20 +111,32 @@ func GetLocalEndpoint(clusterID, backend string, backendConfig map[string]string
 		backendConfig = make(map[string]string)
 	}
 
+	var localSubnets []string
+
+	globalnetEnabled := false
+
+	if len(submSpec.GlobalCidr) > 0 {
+		localSubnets = submSpec.GlobalCidr
+		globalnetEnabled = true
+	} else {
+		localSubnets = append(localSubnets, submSpec.ServiceCidr...)
+		localSubnets = append(localSubnets, submSpec.ClusterCidr...)
+	}
+
 	endpoint := types.SubmarinerEndpoint{
 		Spec: subv1.EndpointSpec{
-			CableName:     fmt.Sprintf("submariner-cable-%s-%s", clusterID, strings.ReplaceAll(privateIP, ".", "-")),
-			ClusterID:     clusterID,
+			CableName:     fmt.Sprintf("submariner-cable-%s-%s", submSpec.ClusterID, strings.ReplaceAll(privateIP, ".", "-")),
+			ClusterID:     submSpec.ClusterID,
 			Hostname:      hostname,
 			PrivateIP:     privateIP,
-			NATEnabled:    natEnabled,
-			Subnets:       subnets,
-			Backend:       backend,
+			NATEnabled:    submSpec.NatEnabled,
+			Subnets:       localSubnets,
+			Backend:       submSpec.CableDriver,
 			BackendConfig: backendConfig,
 		},
 	}
 
-	if natEnabled {
+	if submSpec.NatEnabled {
 		publicIP, err := ipify.GetIp()
 		if err != nil {
 			return types.SubmarinerEndpoint{}, fmt.Errorf("Could not determine public IP: %v", err)
@@ -118,10 +145,15 @@ func GetLocalEndpoint(clusterID, backend string, backendConfig map[string]string
 		endpoint.Spec.PublicIP = publicIP
 	}
 
-	endpoint.Spec.HealthCheckIP, err = getCNIInterfaceIPAddress(clusterCIDR)
-
-	if err != nil {
-		return types.SubmarinerEndpoint{}, fmt.Errorf("Error getting CNI Interface IP address: %v", err)
+	if !globalnetEnabled {
+		// When globalnet is enabled, HealthCheckIP will be the globalIP assigned to the Active GatewayNode.
+		// In a fresh deployment, globalIP annotation for the node might take few seconds. So we listen on NodeEvents
+		// and update the endpoint HealthCheckIP (to globalIP) in datastoreSyncer at a later stage. This will trigger
+		// the HealthCheck between the clusters.
+		endpoint.Spec.HealthCheckIP, err = getCNIInterfaceIPAddress(submSpec.ClusterCidr)
+		if err != nil {
+			return types.SubmarinerEndpoint{}, fmt.Errorf("Error getting CNI Interface IP address: %v", err)
+		}
 	}
 
 	return endpoint, nil

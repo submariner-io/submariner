@@ -1,3 +1,18 @@
+/*
+© 2021 Red Hat, Inc. and others
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package ipam
 
 import (
@@ -43,6 +58,8 @@ func NewIpPool(cidr string) (*IpPool, error) {
 		pool.available[ip] = true
 	}
 
+	RecordAvailability(cidr, size)
+
 	return pool, nil
 }
 
@@ -70,6 +87,7 @@ func (p *IpPool) Allocate(key string) (string, error) {
 		for k := range p.available {
 			p.allocated[key] = k
 			delete(p.available, k)
+			RecordAllocateGlobalIP(p.cidr)
 
 			return k, nil
 		}
@@ -86,6 +104,7 @@ func (p *IpPool) Release(key string) string {
 	if ip != "" {
 		p.available[ip] = true
 		delete(p.allocated, key)
+		RecordDeallocateGlobalIP(p.cidr)
 	}
 	p.Unlock()
 
@@ -117,6 +136,7 @@ func (p *IpPool) RequestIp(key, ip string) (string, error) {
 		p.Lock()
 		p.allocated[key] = ip
 		delete(p.available, ip)
+		RecordAllocateGlobalIP(p.cidr)
 		p.Unlock()
 
 		return ip, nil
