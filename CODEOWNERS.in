@@ -3,4 +3,4 @@
 @skitt *
 @tpantelis *
 @mkolesnik /.github/workflows/ /scripts/ Makefile* Dockerfile.dapper /package/*
-@sridhargaddam /pkg/globalnet/* /pkg/routeagent_driver/* /pkg/cable/strongswan/*
+@sridhargaddam /pkg/globalnet/* /pkg/routeagent_driver/*

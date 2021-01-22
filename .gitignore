@@ -5,7 +5,6 @@
 dist
 output
 /vendor
-package/strongswan-*
 .project
 .settings
 *.coverprofile
