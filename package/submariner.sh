@@ -18,8 +18,6 @@ mkdir -p /etc/ipsec
 
 sysctl -w net.ipv4.conf.all.send_redirects=0
 
-export PATH=$PATH:/usr/libexec/strongswan
-
 function find_iptables_on_host() {
     chroot /host test -x /usr/sbin/$1 && { echo "/usr/sbin"; return; }
     chroot /host test -x /sbin/$1 && { echo "/sbin"; return; }

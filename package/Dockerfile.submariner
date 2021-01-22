@@ -3,10 +3,10 @@ FROM fedora:33
 WORKDIR /var/submariner
 
 # iproute and iptables are used internally
-# libreswan or strongswan provide IKE
+# libreswan provides IKE
 # procps-ng is needed for sysctl
 RUN dnf -y install --nodocs --setopt=install_weak_deps=0 \
-           iproute iptables libreswan strongswan procps-ng && \
+           iproute iptables libreswan procps-ng && \
     dnf -y clean all
 
 COPY package/submariner.sh package/pluto bin/submariner-engine /usr/local/bin/

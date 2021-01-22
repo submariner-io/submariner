@@ -16,7 +16,6 @@ limitations under the License.
 package cleanup
 
 import (
-	"github.com/submariner-io/submariner/pkg/cable/strongswan"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cleanup"
 )
 
@@ -26,7 +25,6 @@ import (
 
 func GetCleanupHandlers() []cleanup.Handler {
 	return []cleanup.Handler{
-		NewRoutingTableCleanup(strongswan.DefaultRoutingTable),
 		NewXFRMCleanupHandler(),
 	}
 }
