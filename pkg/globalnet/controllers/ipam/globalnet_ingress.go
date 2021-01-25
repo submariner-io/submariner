@@ -48,16 +48,36 @@ func (i *Controller) updateIngressRulesForService(globalIP, chainName string, ad
 	return nil
 }
 
-func (i *Controller) kubeProxyClusterIpServiceChainName(service *k8sv1.Service) string {
+func (i *Controller) kubeProxyClusterIPServiceChainName(service *k8sv1.Service) (string, bool, error) {
 	// CNIs that use kube-proxy with iptables for loadbalancing create an iptables chain for each service
 	// and incoming traffic to the clusterIP Service is directed into the respective chain.
 	// Reference: https://bit.ly/2OPhlwk
-	serviceName := service.GetNamespace() + "/" + service.GetName() + ":" + service.Spec.Ports[0].Name
-	protocol := strings.ToLower(string(service.Spec.Ports[0].Protocol))
-	hash := sha256.Sum256([]byte(serviceName + protocol))
-	encoded := base32.StdEncoding.EncodeToString(hash[:])
+	prefix := service.GetNamespace() + "/" + service.GetName()
+	serviceNames := []string{prefix + ":" + service.Spec.Ports[0].Name}
 
-	return kubeProxyServiceChainPrefix + encoded[:16]
+	if service.Spec.Ports[0].Name == "" {
+		// In newer k8s versions (v1.19+), they omit the ":" if the port name is empty so we need to handle both formats (see
+		// https://github.com/kubernetes/kubernetes/pull/90031).
+		serviceNames = append(serviceNames, prefix)
+	}
+
+	for _, serviceName := range serviceNames {
+		protocol := strings.ToLower(string(service.Spec.Ports[0].Protocol))
+		hash := sha256.Sum256([]byte(serviceName + protocol))
+		encoded := base32.StdEncoding.EncodeToString(hash[:])
+		chainName := kubeProxyServiceChainPrefix + encoded[:16]
+
+		chainExists, err := i.doesIPTablesChainExist("nat", chainName)
+		if err != nil {
+			return "", false, err
+		}
+
+		if chainExists {
+			return chainName, true, nil
+		}
+	}
+
+	return "", false, nil
 }
 
 func (i *Controller) doesIPTablesChainExist(table, chain string) (bool, error) {
