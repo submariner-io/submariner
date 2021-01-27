@@ -3,7 +3,6 @@ module github.com/submariner-io/submariner
 go 1.13
 
 require (
-	github.com/bronze1man/goStrongswanVici v0.0.0-20201105010758-936f38b697fd
 	github.com/cenk/hub v1.0.1 // indirect
 	github.com/coreos/go-iptables v0.5.0
 	github.com/ebay/go-ovn v0.1.1-0.20201007164241-da67e9744ec0
