@@ -1,6 +1,3 @@
-# Specific settings for the submariner E2E
-cluster_nodes['cluster1']="control-plane worker"
-cluster_nodes['cluster2']="control-plane worker worker"
-cluster_nodes['cluster3']="control-plane worker worker"
+# Specific settings for the submariner E2E with OVN CNI
 
 cluster_cni=( ['cluster1']="ovn" ['cluster2']="ovn" ['cluster3']="ovn" )
