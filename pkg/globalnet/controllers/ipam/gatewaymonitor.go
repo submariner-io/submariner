@@ -22,8 +22,12 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"k8s.io/client-go/dynamic"
+
 	"github.com/submariner-io/submariner/pkg/globalnet/cleanup"
 	"github.com/submariner-io/submariner/pkg/iptables"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 
 	"github.com/submariner-io/submariner/pkg/util"
 
@@ -44,7 +48,8 @@ import (
 const defaultResync = 60 * time.Second
 
 func NewGatewayMonitor(spec *SubmarinerIpamControllerSpecification,
-	submarinerClient submarinerClientset.Interface, clientSet kubernetes.Interface) (*GatewayMonitor, error) {
+	submarinerClient submarinerClientset.Interface, clientSet kubernetes.Interface,
+	dynamicClient dynamic.Interface) (*GatewayMonitor, error) {
 	gatewayMonitor := &GatewayMonitor{
 		clusterID:         spec.ClusterID,
 		endpointWorkqueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Endpoints"),
@@ -52,6 +57,7 @@ func NewGatewayMonitor(spec *SubmarinerIpamControllerSpecification,
 			time.Second*30, submarinerInformers.WithNamespace(spec.Namespace)),
 		submarinerClientSet: submarinerClient,
 		kubeClientSet:       clientSet,
+		dynamicClientSet:    dynamicClient,
 		ipamSpec:            spec,
 		isGatewayNode:       false,
 	}
@@ -279,12 +285,17 @@ func (gm *GatewayMonitor) handleRemovedEndpoint(obj interface{}) {
 
 func (gm *GatewayMonitor) initializeIpamController(globalCIDR, gwNodeName string) {
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(gm.kubeClientSet, defaultResync)
+	dynInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(gm.dynamicClientSet, defaultResync)
+	svcExGvr, _ := schema.ParseResourceArg("serviceexports.v1alpha1.multicluster.x-k8s.io")
 
 	informerConfig := InformerConfigStruct{
-		KubeClientSet:   gm.kubeClientSet,
-		ServiceInformer: informerFactory.Core().V1().Services(),
-		PodInformer:     informerFactory.Core().V1().Pods(),
-		NodeInformer:    informerFactory.Core().V1().Nodes(),
+		KubeClientSet:    gm.kubeClientSet,
+		DynamicClientSet: gm.dynamicClientSet,
+		ServiceInformer:  informerFactory.Core().V1().Services(),
+		PodInformer:      informerFactory.Core().V1().Pods(),
+		NodeInformer:     informerFactory.Core().V1().Nodes(),
+		SvcExInformer:    dynInformerFactory.ForResource(*svcExGvr),
+		SvcExGvr:         *svcExGvr,
 	}
 
 	klog.V(log.DEBUG).Infof("On Gateway Node, initializing ipamController.")
@@ -297,6 +308,7 @@ func (gm *GatewayMonitor) initializeIpamController(globalCIDR, gwNodeName string
 	gm.stopProcessing = make(chan struct{})
 
 	informerFactory.Start(gm.stopProcessing)
+	dynInformerFactory.Start(gm.stopProcessing)
 
 	if err = ipamController.Start(gm.stopProcessing); err != nil {
 		klog.Fatalf("Error running ipamController: %s", err.Error())

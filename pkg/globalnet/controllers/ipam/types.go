@@ -19,6 +19,9 @@ import (
 	"sync"
 
 	"github.com/submariner-io/submariner/pkg/iptables"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/informers"
 	kubeInformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -36,20 +39,27 @@ type SubmarinerIpamControllerSpecification struct {
 }
 
 type InformerConfigStruct struct {
-	KubeClientSet   kubernetes.Interface
-	ServiceInformer kubeInformers.ServiceInformer
-	PodInformer     kubeInformers.PodInformer
-	NodeInformer    kubeInformers.NodeInformer
+	KubeClientSet    kubernetes.Interface
+	ServiceInformer  kubeInformers.ServiceInformer
+	PodInformer      kubeInformers.PodInformer
+	NodeInformer     kubeInformers.NodeInformer
+	SvcExInformer    informers.GenericInformer
+	DynamicClientSet dynamic.Interface
+	SvcExGvr         schema.GroupVersionResource
 }
 
 type Controller struct {
 	kubeClientSet    kubernetes.Interface
+	dynClientSet     dynamic.Interface
 	serviceWorkqueue workqueue.RateLimitingInterface
 	servicesSynced   cache.InformerSynced
 	podWorkqueue     workqueue.RateLimitingInterface
 	podsSynced       cache.InformerSynced
 	nodeWorkqueue    workqueue.RateLimitingInterface
 	nodesSynced      cache.InformerSynced
+	svcExWorkqueue   workqueue.RateLimitingInterface
+	svcExSynced      bool
+	svcExGvr         schema.GroupVersionResource
 	gwNodeName       string
 
 	excludeNamespaces map[string]bool
@@ -65,6 +75,7 @@ type GatewayMonitor struct {
 	submarinerInformerFactory submarinerInformers.SharedInformerFactory
 	endpointWorkqueue         workqueue.RateLimitingInterface
 	endpointsSynced           cache.InformerSynced
+	dynamicClientSet          dynamic.Interface
 	ipamSpec                  *SubmarinerIpamControllerSpecification
 	ipt                       iptables.Interface
 	stopProcessing            chan struct{}
