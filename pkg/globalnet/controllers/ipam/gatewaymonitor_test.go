@@ -37,9 +37,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	fakeDynClient "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes"
 	fakeK8sClientset "k8s.io/client-go/kubernetes/fake"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 const (
@@ -52,6 +57,7 @@ const (
 	nodeName        = "raiders"
 	oldIP           = "169.254.1.10"
 	newIP           = "169.254.1.20"
+	globalIPSubstr  = "169.254.1"
 )
 
 var _ = Describe("Endpoint monitoring", func() {
@@ -60,6 +66,7 @@ var _ = Describe("Endpoint monitoring", func() {
 	When("a local Endpoint is created then removed", func() {
 		It("should update the appropriate IP table chains and start/stop monitoring resources", func() {
 			service := t.createService(newService("nginx"))
+			t.createSvcExport(service)
 			endpointName := t.createEndpoint(newEndpointSpec(clusterID, t.hostName, localCIDR))
 
 			t.ipt.AwaitChain("nat", constants.SmGlobalnetIngressChain)
@@ -67,7 +74,7 @@ var _ = Describe("Endpoint monitoring", func() {
 			t.ipt.AwaitChain("nat", constants.SmPostRoutingChain)
 			t.ipt.AwaitChain("nat", constants.SmGlobalnetMarkChain)
 
-			t.awaitServiceGlobalIP(service.Name, localCIDR)
+			t.awaitServiceGlobalIP(service.Name)
 
 			Expect(t.submarinerClient.SubmarinerV1().Endpoints(namespace).Delete(endpointName, nil)).To(Succeed())
 
@@ -107,73 +114,108 @@ var _ = Describe("Service monitoring", func() {
 		service = newService("nginx")
 	})
 
-	JustBeforeEach(func() {
-		service = t.createService(service)
-		t.createEndpoint(newEndpointSpec(clusterID, t.hostName, localCIDR))
-	})
-
 	When("a Service without a global IP is created", func() {
-		It("should assign a global IP and add an appropriate IP tables rule", func() {
-			t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain,
-				ContainSubstring(t.awaitServiceGlobalIP(service.Name, localCIDR)))
+		JustBeforeEach(func() {
+			t.createEndpoint(newEndpointSpec(clusterID, t.hostName, localCIDR))
+		})
+
+		When("the Service was already exported", func() {
+			It("should assign a global IP and add an appropriate IP tables rule after service creation", func() {
+				t.createSvcExport(service)
+				t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(globalIPSubstr))
+
+				t.createService(service)
+				globalIP := t.awaitServiceGlobalIP(service.Name)
+				t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(globalIP))
+			})
+		})
+
+		When("the Service is subsequently exported", func() {
+			It("should eventually assign a global IP and add an appropriate IP tables rule", func() {
+				service = t.createService(service)
+				t.awaitNoServiceGlobalIP(service)
+				t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(globalIPSubstr))
+
+				t.createSvcExport(service)
+				globalIP := t.awaitServiceGlobalIP(service.Name)
+				t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(globalIP))
+			})
 		})
 	})
 
-	When("a Service's global IP is updated", func() {
-		BeforeEach(func() {
-			service.Annotations[ipam.SubmarinerIpamGlobalIP] = oldIP
+	Context("", func() {
+		JustBeforeEach(func() {
+			service = t.createService(service)
+			t.createSvcExport(service)
+			t.createEndpoint(newEndpointSpec(clusterID, t.hostName, localCIDR))
 		})
 
-		It("should update the appropriate IP tables rule", func() {
-			t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain,
-				ContainSubstring(service.Annotations[ipam.SubmarinerIpamGlobalIP]))
+		When("a Service's global IP is updated", func() {
+			BeforeEach(func() {
+				service.Annotations[ipam.SubmarinerIpamGlobalIP] = oldIP
+			})
 
-			service.Annotations[ipam.SubmarinerIpamGlobalIP] = newIP
-			_, err := t.k8sClient.CoreV1().Services(namespace).Update(service)
-			Expect(err).To(Succeed())
-			t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain,
-				ContainSubstring(service.Annotations[ipam.SubmarinerIpamGlobalIP]))
-		})
-	})
+			It("should update the appropriate IP tables rule", func() {
+				t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain,
+					ContainSubstring(service.Annotations[ipam.SubmarinerIpamGlobalIP]))
 
-	When("a Service with a global IP is removed", func() {
-		It("should remove the appropriate IP tables rule", func() {
-			globalIP := t.awaitServiceGlobalIP(service.Name, localCIDR)
-			t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(globalIP))
-
-			Expect(t.k8sClient.CoreV1().Services(namespace).Delete(service.Name, nil)).To(Succeed())
-			t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(globalIP))
-		})
-	})
-
-	When("a Service in an excluded namespace is created", func() {
-		BeforeEach(func() {
-			service.Namespace = excludedNS
-			t.spec.ExcludeNS = []string{excludedNS}
+				service.Annotations[ipam.SubmarinerIpamGlobalIP] = newIP
+				_, err := t.k8sClient.CoreV1().Services(namespace).Update(service)
+				Expect(err).To(Succeed())
+				t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain,
+					ContainSubstring(service.Annotations[ipam.SubmarinerIpamGlobalIP]))
+			})
 		})
 
-		It("should not assign a global IP", func() {
-			t.awaitNoServiceGlobalIP(service)
-		})
-	})
+		When("a Service with a global IP is unexported", func() {
+			It("should unassign its global IP and remove the appropriate IP tables rule", func() {
+				globalIP := t.awaitServiceGlobalIP(service.Name)
+				t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(globalIP))
 
-	When("a non-ClusterIP Service is created", func() {
-		BeforeEach(func() {
-			service.Spec.Type = corev1.ServiceTypeNodePort
-		})
-
-		It("should not assign a global IP", func() {
-			t.awaitNoServiceGlobalIP(service)
-		})
-	})
-
-	When("a Service with no associated kube-proxy IP tables chain is created", func() {
-		BeforeEach(func() {
-			service.Spec.Ports[0].Name = ""
+				Expect(t.dynClient.Resource(*t.svcExGvr).Namespace(service.Namespace).Delete(service.Name, nil)).To(Succeed())
+				t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(globalIPSubstr))
+			})
 		})
 
-		It("should not assign a global IP", func() {
-			t.awaitNoServiceGlobalIP(service)
+		When("a Service with a global IP is removed", func() {
+			It("should remove the appropriate IP tables rule", func() {
+				globalIP := t.awaitServiceGlobalIP(service.Name)
+				t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(globalIP))
+
+				Expect(t.k8sClient.CoreV1().Services(namespace).Delete(service.Name, nil)).To(Succeed())
+				t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(globalIP))
+			})
+		})
+
+		When("a Service in an excluded namespace is created", func() {
+			BeforeEach(func() {
+				service.Namespace = excludedNS
+				t.spec.ExcludeNS = []string{excludedNS}
+			})
+
+			It("should not assign a global IP", func() {
+				t.awaitNoServiceGlobalIP(service)
+			})
+		})
+
+		When("a non-ClusterIP Service is created", func() {
+			BeforeEach(func() {
+				service.Spec.Type = corev1.ServiceTypeNodePort
+			})
+
+			It("should not assign a global IP", func() {
+				t.awaitNoServiceGlobalIP(service)
+			})
+		})
+
+		When("a Service with no associated kube-proxy IP tables chain is created", func() {
+			BeforeEach(func() {
+				service.Spec.Ports[0].Name = ""
+			})
+
+			It("should not assign a global IP", func() {
+				t.awaitNoServiceGlobalIP(service)
+			})
 		})
 	})
 })
@@ -361,13 +403,16 @@ type testDriver struct {
 	gatewayMonitor   *ipam.GatewayMonitor
 	submarinerClient submarinerClientset.Interface
 	k8sClient        kubernetes.Interface
+	dynClient        dynamic.Interface
 	ipt              *fakeIPT.IPTables
 	hostName         string
 	stopCh           chan struct{}
+	svcExGvr         *schema.GroupVersionResource
 }
 
 func newTestDriver() *testDriver {
 	t := &testDriver{}
+	t.svcExGvr, _ = schema.ParseResourceArg("serviceexports.v1alpha1.multicluster.x-k8s.io")
 
 	BeforeEach(func() {
 		t.spec = &ipam.SubmarinerIpamControllerSpecification{
@@ -386,6 +431,9 @@ func newTestDriver() *testDriver {
 
 		t.submarinerClient = fakeSubmClientset.NewSimpleClientset()
 		t.k8sClient = fakeK8sClientset.NewSimpleClientset()
+		scheme := runtime.NewScheme()
+		Expect(mcsv1a1.AddToScheme(scheme)).To(Succeed())
+		t.dynClient = fakeDynClient.NewSimpleDynamicClient(scheme)
 	})
 
 	JustBeforeEach(func() {
@@ -411,7 +459,7 @@ func (t *testDriver) start() {
 
 	t.stopCh = make(chan struct{})
 
-	t.gatewayMonitor, err = ipam.NewGatewayMonitor(t.spec, t.submarinerClient, t.k8sClient)
+	t.gatewayMonitor, err = ipam.NewGatewayMonitor(t.spec, t.submarinerClient, t.k8sClient, t.dynClient)
 
 	Expect(err).To(Succeed())
 
@@ -449,8 +497,16 @@ func (t *testDriver) createService(s *corev1.Service) *corev1.Service {
 	return service
 }
 
-func (t *testDriver) awaitServiceGlobalIP(name, cidr string) string {
-	return t.awaitGlobalIP(name, cidr, func(string) (runtime.Object, error) {
+func (t *testDriver) createSvcExport(s *corev1.Service) *unstructured.Unstructured {
+	svcEx := newServiceExport(s.GetNamespace(), s.GetName())
+	result, err := t.dynClient.Resource(*t.svcExGvr).Namespace(svcEx.GetNamespace()).Create(svcEx, metav1.CreateOptions{})
+	Expect(err).To(Succeed())
+
+	return result
+}
+
+func (t *testDriver) awaitServiceGlobalIP(name string) string {
+	return t.awaitGlobalIP(name, localCIDR, func(string) (runtime.Object, error) {
 		return t.k8sClient.CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
 	})
 }
@@ -557,6 +613,16 @@ func newEndpointSpec(clusterID, hostname, subnet string) *submarinerv1.EndpointS
 		Hostname:  hostname,
 		Subnets:   []string{subnet},
 	}
+}
+
+func newServiceExport(namespace, name string) *unstructured.Unstructured {
+	resourceServiceExport := &unstructured.Unstructured{}
+	resourceServiceExport.SetName(name)
+	resourceServiceExport.SetNamespace(nsOrDefault(namespace))
+	resourceServiceExport.SetKind("ServiceExport")
+	resourceServiceExport.SetAPIVersion("multicluster.x-k8s.io/v1alpha1")
+
+	return resourceServiceExport
 }
 
 func isValidIPForCIDR(cidr, ip string) bool {

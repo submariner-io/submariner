@@ -22,6 +22,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/iptables"
 	k8sv1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog"
 
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
@@ -133,6 +134,14 @@ func (i *Controller) isServiceSupported(service *k8sv1.Service) bool {
 func (i *Controller) evaluateService(service *k8sv1.Service) Operation {
 	if !i.isServiceSupported(service) {
 		return Ignore
+	}
+
+	_, err := i.svcExGetter(service.Namespace, service.Name)
+	if errors.IsNotFound(err) {
+		return Ignore
+	} else if err != nil {
+		klog.Errorf("Failed to get ServiceExport for %#v due to %v", service, err)
+		return Requeue
 	}
 
 	serviceName := service.GetNamespace() + "/" + service.GetName()

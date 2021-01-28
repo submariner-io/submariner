@@ -21,6 +21,7 @@ import (
 
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/iptables"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 
@@ -56,12 +57,16 @@ func NewController(spec *SubmarinerIpamControllerSpecification, config *Informer
 
 	ipamController := &Controller{
 		kubeClientSet:    config.KubeClientSet,
+		dynClientSet:     config.DynamicClientSet,
 		serviceWorkqueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Services"),
 		servicesSynced:   config.ServiceInformer.Informer().HasSynced,
 		podWorkqueue:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Pods"),
 		podsSynced:       config.PodInformer.Informer().HasSynced,
 		nodeWorkqueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Nodes"),
 		nodesSynced:      config.NodeInformer.Informer().HasSynced,
+		svcExWorkqueue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ServiceExports"),
+		svcExSynced:      config.SvcExInformer.Informer().HasSynced(),
+		svcExGvr:         config.SvcExGvr,
 		gwNodeName:       gwNodeName,
 
 		excludeNamespaces: exclusionMap,
@@ -97,6 +102,12 @@ func NewController(spec *SubmarinerIpamControllerSpecification, config *Informer
 		},
 		DeleteFunc: ipamController.handleRemovedNode,
 	}, handlerResync)
+	config.SvcExInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			ipamController.enqueueObject(obj, ipamController.svcExWorkqueue)
+		},
+		DeleteFunc: ipamController.handleRemovedSvcEx,
+	}, handlerResync)
 
 	return ipamController, nil
 }
@@ -127,6 +138,7 @@ func (i *Controller) Start(stopCh <-chan struct{}) error {
 	go wait.Until(i.runServiceWorker, time.Second, stopCh)
 	go wait.Until(i.runPodWorker, time.Second, stopCh)
 	go wait.Until(i.runNodeWorker, time.Second, stopCh)
+	go wait.Until(i.runSvcExWorker, time.Second, stopCh)
 
 	return nil
 }
@@ -143,6 +155,11 @@ func (i *Controller) runPodWorker() {
 
 func (i *Controller) runNodeWorker() {
 	for i.processNextObject(i.nodeWorkqueue, i.nodeGetter, i.nodeUpdater) {
+	}
+}
+
+func (i *Controller) runSvcExWorker() {
+	for i.processNextObject(i.svcExWorkqueue, i.svcExGetter, i.svcExUpdater) {
 	}
 }
 
@@ -220,6 +237,8 @@ func (i *Controller) processNextObject(objWorkqueue workqueue.RateLimitingInterf
 					objWorkqueue.AddRateLimited(obj)
 					return fmt.Errorf("node %s requeued %d times", key, objWorkqueue.NumRequeues(obj))
 				}
+			case *unstructured.Unstructured:
+				// Let Updater extract relevant type and handle it
 			}
 
 			return objUpdater(runtimeObj, key)
@@ -463,6 +482,54 @@ func (i *Controller) handleRemovedPod(obj interface{}) {
 	}
 }
 
+func (i *Controller) handleRemovedSvcEx(obj interface{}) {
+	var key, name, namespace string
+	var err error
+
+	if key, err = cache.DeletionHandlingMetaNamespaceKeyFunc(obj); err != nil {
+		utilruntime.HandleError(err)
+		return
+	}
+
+	if namespace, name, err = cache.SplitMetaNamespaceKey(key); err != nil {
+		utilruntime.HandleError(err)
+		return
+	}
+
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		svcObj, err := i.serviceGetter(namespace, name)
+		if errors.IsNotFound(err) {
+			return nil
+		} else if err != nil {
+			return fmt.Errorf("failed to get service %s", key)
+		}
+
+		svc := svcObj.(*k8sv1.Service)
+		annotations := svc.GetAnnotations()
+
+		if globalIP, ok := annotations[SubmarinerIpamGlobalIP]; ok {
+			err = i.syncServiceRules(svc, globalIP, DeleteRules)
+			if err != nil {
+				return fmt.Errorf("error while cleaning up Service %q ingress rules. %v", key, err)
+			}
+
+			i.pool.Release(key)
+			klog.V(log.DEBUG).Infof("Released ip %s for service %s", globalIP, key)
+
+			delete(annotations, SubmarinerIpamGlobalIP)
+			svc.SetAnnotations(annotations)
+
+			_, err = i.kubeClientSet.CoreV1().Services(svc.Namespace).Update(svc)
+			return err
+		}
+		return nil
+	})
+
+	if retryErr != nil {
+		klog.Errorf("Error processing ServiceExport delete: %v", retryErr)
+	}
+}
+
 func (i *Controller) annotateGlobalIP(key, globalIP string) (string, error) {
 	var ip string
 	var err error
@@ -500,6 +567,10 @@ func (i *Controller) podGetter(namespace, name string) (runtime.Object, error) {
 
 func (i *Controller) nodeGetter(namespace, name string) (runtime.Object, error) {
 	return i.kubeClientSet.CoreV1().Nodes().Get(name, metav1.GetOptions{})
+}
+
+func (i *Controller) svcExGetter(namespace, name string) (runtime.Object, error) {
+	return i.dynClientSet.Resource(i.svcExGvr).Namespace(namespace).Get(name, metav1.GetOptions{})
 }
 
 func (i *Controller) serviceUpdater(obj runtime.Object, key string) error {
@@ -597,6 +668,19 @@ func (i *Controller) podUpdater(obj runtime.Object, key string) error {
 			return err
 		}
 	}
+
+	return nil
+}
+
+func (i *Controller) svcExUpdater(obj runtime.Object, key string) error {
+	unstructObj := obj.(*unstructured.Unstructured)
+	svc, err := i.serviceGetter(unstructObj.GetNamespace(), unstructObj.GetName())
+	if err != nil && !errors.IsNotFound(err) {
+		klog.Errorf("Failed to get service %s", key)
+		return nil
+	}
+
+	i.enqueueObject(svc, i.serviceWorkqueue)
 
 	return nil
 }

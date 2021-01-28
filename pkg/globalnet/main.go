@@ -26,7 +26,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers/ipam"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
@@ -73,6 +76,16 @@ func main() {
 		klog.Fatalf("Error building k8s clientset: %s", err.Error())
 	}
 
+	dynClientSet, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		klog.Fatalf("Error building dynamic clientset: %s", err.Error())
+	}
+
+	err = mcsv1a1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		klog.Fatalf("Error adding Multicluster v1alpha1 to the scheme: %v", err)
+	}
+
 	var localCluster *submarinerv1.Cluster
 	// During installation, sometimes creation of clusterCRD by submariner-gateway-pod would take few secs.
 	for i := 0; i < 100; i++ {
@@ -96,7 +109,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	gatewayMonitor, err := ipam.NewGatewayMonitor(&ipamSpec, submarinerClient, clientSet)
+	gatewayMonitor, err := ipam.NewGatewayMonitor(&ipamSpec, submarinerClient, clientSet, dynClientSet)
 	if err != nil {
 		klog.Fatalf("Error creating gatewayMonitor: %s", err.Error())
 	}
