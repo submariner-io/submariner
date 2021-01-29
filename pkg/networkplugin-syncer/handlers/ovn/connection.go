@@ -107,5 +107,6 @@ func getOVNTLSConfig(pkFile, certFile, caFile string) (*tls.Config, error) {
 		Certificates: []tls.Certificate{cert},
 		RootCAs:      rootCAs,
 		ServerName:   "ovn",
+		MinVersion:   tls.VersionTLS12,
 	}, nil
 }
