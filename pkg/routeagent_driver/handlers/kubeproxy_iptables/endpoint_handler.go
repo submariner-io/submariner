@@ -102,6 +102,9 @@ func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 		if !kp.remoteSubnets.Contains(inputCidrBlock) {
 			kp.remoteSubnets.Add(inputCidrBlock)
 		}
+
+		gwIP := endpoint.GatewayIP()
+		kp.remoteSubnetGw[inputCidrBlock] = gwIP
 	}
 
 	if err := kp.updateRoutingRulesForInterClusterSupport(endpoint.Spec.Subnets, Add); err != nil {
@@ -125,6 +128,7 @@ func (kp *SyncHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	defer kp.syncHandlerMutex.Unlock()
 	for _, inputCidrBlock := range endpoint.Spec.Subnets {
 		kp.remoteSubnets.Remove(inputCidrBlock)
+		delete(kp.remoteSubnetGw, inputCidrBlock)
 	}
 	// TODO: Handle a remote endpoint removal use-case
 	//         - remove related iptable rules
