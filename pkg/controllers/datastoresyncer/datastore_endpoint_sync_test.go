@@ -24,7 +24,10 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -42,11 +45,11 @@ func testEndpointSyncing() {
 
 		When("creation of the local Endpoint fails", func() {
 			BeforeEach(func() {
-				t.expectedRunErr = errors.New("mock Create error")
-				t.localEndpoints.FailOnCreate = t.expectedRunErr
+				t.expectedStartErr = errors.New("mock Create error")
+				t.localEndpoints.FailOnCreate = t.expectedStartErr
 			})
 
-			It("Run should return an error", func() {
+			It("Start should return an error", func() {
 			})
 		})
 	})
@@ -90,6 +93,30 @@ func testEndpointSyncing() {
 			test.AwaitNoResource(t.brokerEndpoints, name)
 		})
 	})
+
+	When("the local Node's global IP is updated", func() {
+		It("should update the local Endpoint's HealthCheckIP", func() {
+			awaitEndpoint(t.localEndpoints, &t.localEndpoint.Spec)
+
+			node := &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        nodeName,
+					Annotations: map[string]string{constants.SmGlobalIP: "10.20.30.40"},
+				},
+			}
+
+			t.localEndpoint.Spec.HealthCheckIP = node.Annotations[constants.SmGlobalIP]
+
+			test.CreateResource(t.localNodes, node)
+			awaitEndpoint(t.localEndpoints, &t.localEndpoint.Spec)
+
+			node.Annotations[constants.SmGlobalIP] = "11.21.31.41"
+			t.localEndpoint.Spec.HealthCheckIP = node.Annotations[constants.SmGlobalIP]
+
+			test.UpdateResource(t.localNodes, node)
+			awaitEndpoint(t.localEndpoints, &t.localEndpoint.Spec)
+		})
+	})
 }
 
 func testEndpointExclusivity() {
@@ -116,11 +143,11 @@ func testEndpointExclusivity() {
 
 		When("deletion of the Endpoint from the local datastore fails", func() {
 			BeforeEach(func() {
-				t.expectedRunErr = errors.New("mock Delete error")
-				t.localEndpoints.FailOnDelete = t.expectedRunErr
+				t.expectedStartErr = errors.New("mock Delete error")
+				t.localEndpoints.FailOnDelete = t.expectedStartErr
 			})
 
-			It("Run should return an error", func() {
+			It("Start should return an error", func() {
 			})
 		})
 
