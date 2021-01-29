@@ -23,6 +23,7 @@ type SyncHandler struct {
 	localServiceCidr []string
 
 	remoteSubnets    *util.StringSet
+	remoteSubnetGw   map[string]net.IP
 	remoteVTEPs      *util.StringSet
 	routeCacheGWNode *util.StringSet
 
@@ -46,6 +47,7 @@ func NewSyncHandler(localClusterCidr, localServiceCidr []string, smClientSet cli
 		localServiceCidr:     localServiceCidr,
 		localCableDriver:     "",
 		remoteSubnets:        util.NewStringSet(),
+		remoteSubnetGw:       map[string]net.IP{},
 		remoteVTEPs:          util.NewStringSet(),
 		routeCacheGWNode:     util.NewStringSet(),
 		isGatewayNode:        false,
