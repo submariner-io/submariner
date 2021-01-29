@@ -186,12 +186,13 @@ func main() {
 		go func() {
 			defer wg.Done()
 
-			if err = dsSyncer.Run(stopCh); err != nil {
+			if err = dsSyncer.Start(stopCh); err != nil {
 				fatal(cableEngineSyncer, "Error running the datastore syncer: %v", err)
 			}
 		}()
 
 		wg.Wait()
+		<-stopCh
 	}
 
 	leClient, err := kubernetes.NewForConfig(rest.AddUserAgent(cfg, "leader-election"))

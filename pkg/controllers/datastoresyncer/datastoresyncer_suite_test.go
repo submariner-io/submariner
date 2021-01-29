@@ -17,6 +17,7 @@ package datastoresyncer_test
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -32,6 +33,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/controllers/datastoresyncer"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -46,6 +48,7 @@ const (
 	otherClusterID  = "west"
 	localNamespace  = "submariner"
 	brokerNamespace = "submariner-broker"
+	nodeName        = "raiders"
 )
 
 func TestDatastoresyncer(t *testing.T) {
@@ -63,20 +66,21 @@ func init() {
 }
 
 type testDriver struct {
-	syncer          *datastoresyncer.DatastoreSyncer
-	localCluster    *types.SubmarinerCluster
-	localEndpoint   *types.SubmarinerEndpoint
-	localClient     dynamic.Interface
-	brokerClient    dynamic.Interface
-	localClusters   *fake.DynamicResourceClient
-	brokerClusters  dynamic.ResourceInterface
-	localEndpoints  *fake.DynamicResourceClient
-	brokerEndpoints dynamic.ResourceInterface
-	syncerScheme    *runtime.Scheme
-	restMapper      meta.RESTMapper
-	stopCh          chan struct{}
-	runCompleted    chan error
-	expectedRunErr  error
+	syncer           *datastoresyncer.DatastoreSyncer
+	localCluster     *types.SubmarinerCluster
+	localEndpoint    *types.SubmarinerEndpoint
+	localClient      dynamic.Interface
+	brokerClient     dynamic.Interface
+	localClusters    *fake.DynamicResourceClient
+	brokerClusters   dynamic.ResourceInterface
+	localEndpoints   *fake.DynamicResourceClient
+	localNodes       dynamic.ResourceInterface
+	brokerEndpoints  dynamic.ResourceInterface
+	syncerScheme     *runtime.Scheme
+	restMapper       meta.RESTMapper
+	stopCh           chan struct{}
+	startCompleted   chan error
+	expectedStartErr error
 }
 
 func newTestDriver() *testDriver {
@@ -87,6 +91,7 @@ func newTestDriver() *testDriver {
 				ClusterID:   clusterID,
 				ServiceCIDR: []string{"100.0.0.0/16"},
 				ClusterCIDR: []string{"10.0.0.0/14"},
+				GlobalCIDR:  []string{"200.0.0.0/16"},
 			},
 		},
 		localEndpoint: &types.SubmarinerEndpoint{
@@ -102,7 +107,7 @@ func newTestDriver() *testDriver {
 	}
 
 	BeforeEach(func() {
-		t.expectedRunErr = nil
+		t.expectedStartErr = nil
 
 		t.syncerScheme = runtime.NewScheme()
 		Expect(submarinerv1.AddToScheme(t.syncerScheme)).To(Succeed())
@@ -110,7 +115,7 @@ func newTestDriver() *testDriver {
 		t.localClient = fake.NewDynamicClient(t.syncerScheme)
 		t.brokerClient = fake.NewDynamicClient(t.syncerScheme)
 
-		t.restMapper = test.GetRESTMapperFor(&submarinerv1.Cluster{}, &submarinerv1.Endpoint{})
+		t.restMapper = test.GetRESTMapperFor(&submarinerv1.Cluster{}, &submarinerv1.Endpoint{}, &corev1.Node{})
 
 		clusterGVR := test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.Cluster{})
 		t.localClusters = t.localClient.Resource(*clusterGVR).Namespace(localNamespace).(*fake.DynamicResourceClient)
@@ -119,6 +124,8 @@ func newTestDriver() *testDriver {
 		endpointGVR := test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.Endpoint{})
 		t.localEndpoints = t.localClient.Resource(*endpointGVR).Namespace(localNamespace).(*fake.DynamicResourceClient)
 		t.brokerEndpoints = t.brokerClient.Resource(*endpointGVR).Namespace(brokerNamespace)
+
+		t.localNodes = t.localClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &corev1.Node{})).Namespace("")
 	})
 
 	JustBeforeEach(func() {
@@ -133,8 +140,10 @@ func newTestDriver() *testDriver {
 }
 
 func (t *testDriver) run() {
+	os.Setenv("NODE_NAME", nodeName)
+
 	t.stopCh = make(chan struct{})
-	t.runCompleted = make(chan error, 1)
+	t.startCompleted = make(chan error, 1)
 
 	t.syncer = datastoresyncer.New(broker.SyncerConfig{
 		LocalClient:     t.localClient,
@@ -147,34 +156,27 @@ func (t *testDriver) run() {
 	}, *t.localCluster, *t.localEndpoint, []string{})
 
 	go func() {
-		t.runCompleted <- t.syncer.Run(t.stopCh)
+		t.startCompleted <- t.syncer.Start(t.stopCh)
 	}()
 }
 
 func (t *testDriver) stop() {
-	if t.stopCh == nil {
-		return
-	}
-
-	if t.expectedRunErr == nil {
-		close(t.stopCh)
-	}
-
 	err := func() error {
 		timeout := 5 * time.Second
 		select {
-		case err := <-t.runCompleted:
-			return errors.WithMessage(err, "Run returned an error")
+		case err := <-t.startCompleted:
+			return errors.WithMessage(err, "Start returned an error")
 		case <-time.After(timeout):
-			return fmt.Errorf("Run did not complete after %v", timeout)
+			return fmt.Errorf("Start did not complete after %v", timeout)
 		}
 	}()
 
-	t.stopCh = nil
-	if t.expectedRunErr == nil {
+	close(t.stopCh)
+
+	if t.expectedStartErr == nil {
 		Expect(err).To(Succeed())
 	} else {
-		Expect(err).To(ContainErrorSubstring(t.expectedRunErr))
+		Expect(err).To(ContainErrorSubstring(t.expectedStartErr))
 	}
 }
 

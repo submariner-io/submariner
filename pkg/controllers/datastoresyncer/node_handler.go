@@ -36,7 +36,7 @@ func (d *DatastoreSyncer) handleCreateOrUpdateNode(obj runtime.Object, numRequeu
 	return d.updateLocalEndpointIfNecessary(globalIPOfNode)
 }
 
-func (d *DatastoreSyncer) isNodeEquivalent(obj1, obj2 *unstructured.Unstructured) bool {
+func (d *DatastoreSyncer) areNodesEquivalent(obj1, obj2 *unstructured.Unstructured) bool {
 	if obj1.GetName() != d.localNodeName {
 		// Ignore this event. We are only interested in active GatewayNode events.
 		return true
@@ -45,7 +45,7 @@ func (d *DatastoreSyncer) isNodeEquivalent(obj1, obj2 *unstructured.Unstructured
 	existingGlobalIP := obj1.GetAnnotations()[constants.SmGlobalIP]
 	newGlobalIP := obj2.GetAnnotations()[constants.SmGlobalIP]
 
-	klog.V(log.DEBUG).Infof("isNodeEquivalent called for %q, existingGlobalIP %q, newGlobalIP %q",
+	klog.V(log.DEBUG).Infof("areNodesEquivalent called for %q, existingGlobalIP %q, newGlobalIP %q",
 		obj1.GetName(), existingGlobalIP, newGlobalIP)
 
 	return existingGlobalIP == newGlobalIP
