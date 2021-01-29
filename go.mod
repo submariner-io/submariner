@@ -3,7 +3,6 @@ module github.com/submariner-io/submariner
 go 1.13
 
 require (
-	github.com/bronze1man/goStrongswanVici v0.0.0-20201105010758-936f38b697fd
 	github.com/cenk/hub v1.0.1 // indirect
 	github.com/coreos/go-iptables v0.5.0
 	github.com/ebay/go-ovn v0.1.1-0.20201007164241-da67e9744ec0
@@ -16,7 +15,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.9.0
 	github.com/rdegges/go-ipify v0.0.0-20150526035502-2d94a6a86c40
-	github.com/submariner-io/admiral v0.8.1-0.20201218153659-b6de92b83dd5
+	github.com/submariner-io/admiral v0.8.1-0.20210122001228-9ed549948915
 	github.com/submariner-io/shipyard v0.8.0
 	github.com/vishvananda/netlink v1.1.0
 	go.uber.org/zap v1.15.0 // indirect

@@ -2,7 +2,6 @@
 * @mangelajo @Oats87 @skitt @tpantelis
 /.github/workflows/ @mangelajo @mkolesnik @Oats87 @skitt @tpantelis
 /package/* @mangelajo @mkolesnik @Oats87 @skitt @tpantelis
-/pkg/cable/strongswan/* @mangelajo @Oats87 @skitt @sridhargaddam @tpantelis
 /pkg/globalnet/* @mangelajo @Oats87 @skitt @sridhargaddam @tpantelis
 /pkg/routeagent_driver/* @mangelajo @Oats87 @skitt @sridhargaddam @tpantelis
 /scripts/ @mangelajo @mkolesnik @Oats87 @skitt @tpantelis
