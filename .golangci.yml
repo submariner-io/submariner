@@ -21,6 +21,7 @@ linters:
     - bodyclose
     - deadcode
     - depguard
+    - dogsled
     # - dupl
     - errcheck
     - exportloopref
@@ -41,6 +42,7 @@ linters:
     - maligned
     - misspell
     - nakedret
+    - prealloc
     - staticcheck
     - structcheck
     # - stylecheck
