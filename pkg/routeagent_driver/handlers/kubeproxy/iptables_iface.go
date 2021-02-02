@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package kubeproxy_iptables
+package kubeproxy
 
 import (
 	"fmt"
@@ -47,7 +47,7 @@ func (kp *SyncHandler) createIPTableChains() error {
 
 	forwardToSubInputRuleSpec := []string{"-p", "udp", "-m", "udp", "-j", "SUBMARINER-INPUT"}
 	if err = ipt.AppendUnique("filter", "INPUT", forwardToSubInputRuleSpec...); err != nil {
-		return fmt.Errorf("unable to append iptables rule %q: %v\n", strings.Join(forwardToSubInputRuleSpec, " "), err)
+		return fmt.Errorf("unable to append iptables rule %q: %v", strings.Join(forwardToSubInputRuleSpec, " "), err)
 	}
 
 	klog.V(log.DEBUG).Infof("Allow VxLAN incoming traffic in SUBMARINER-INPUT Chain")
@@ -55,7 +55,7 @@ func (kp *SyncHandler) createIPTableChains() error {
 	ruleSpec := []string{"-p", "udp", "-m", "udp", "--dport", strconv.Itoa(VxLANPort), "-j", "ACCEPT"}
 
 	if err = ipt.AppendUnique("filter", "SUBMARINER-INPUT", ruleSpec...); err != nil {
-		return fmt.Errorf("unable to append iptables rule %q: %v\n", strings.Join(ruleSpec, " "), err)
+		return fmt.Errorf("unable to append iptables rule %q: %v", strings.Join(ruleSpec, " "), err)
 	}
 
 	klog.V(log.DEBUG).Infof("Insert rule to allow traffic over %s interface in FORWARDing Chain", VxLANIface)
@@ -73,7 +73,7 @@ func (kp *SyncHandler) createIPTableChains() error {
 		klog.V(log.DEBUG).Infof("Installing rule for host network to remote cluster communication: %s", strings.Join(ruleSpec, " "))
 
 		if err = ipt.AppendUnique("nat", constants.SmPostRoutingChain, ruleSpec...); err != nil {
-			return fmt.Errorf("error appending iptables rule %q: %v\n", strings.Join(ruleSpec, " "), err)
+			return fmt.Errorf("error appending iptables rule %q: %v", strings.Join(ruleSpec, " "), err)
 		}
 	}
 
@@ -105,7 +105,7 @@ func (kp *SyncHandler) programIptableRulesForInterClusterTraffic(remoteCidrBlock
 		klog.V(log.DEBUG).Infof("Installing iptables rule for outgoing traffic: %s", strings.Join(ruleSpec, " "))
 
 		if err = ipt.AppendUnique("nat", constants.SmPostRoutingChain, ruleSpec...); err != nil {
-			return fmt.Errorf("error appending iptables rule %q: %v\n", strings.Join(ruleSpec, " "), err)
+			return fmt.Errorf("error appending iptables rule %q: %v", strings.Join(ruleSpec, " "), err)
 		}
 
 		// TODO: revisit, we only have to program rules to allow traffic from the podCidr
@@ -113,7 +113,7 @@ func (kp *SyncHandler) programIptableRulesForInterClusterTraffic(remoteCidrBlock
 		klog.V(log.DEBUG).Infof("Installing iptables rule for incoming traffic: %s", strings.Join(ruleSpec, " "))
 
 		if err = ipt.AppendUnique("nat", constants.SmPostRoutingChain, ruleSpec...); err != nil {
-			return fmt.Errorf("error appending iptables rule %q: %v\n", strings.Join(ruleSpec, " "), err)
+			return fmt.Errorf("error appending iptables rule %q: %v", strings.Join(ruleSpec, " "), err)
 		}
 	}
 

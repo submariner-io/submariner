@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package kubeproxy_iptables
+package kubeproxy
 
 import (
 	"fmt"
@@ -161,7 +161,7 @@ func (kp *SyncHandler) overlappingSubnets(remoteSubnets []string) error {
 		}
 
 		if overlap {
-			return fmt.Errorf("Local Service CIDR %q, overlaps with remote cluster subnets %s",
+			return fmt.Errorf("local Service CIDR %q, overlaps with remote cluster subnets %s",
 				serviceCidr, remoteSubnets)
 		}
 	}
@@ -173,7 +173,7 @@ func (kp *SyncHandler) overlappingSubnets(remoteSubnets []string) error {
 		}
 
 		if overlap {
-			return fmt.Errorf("Local Pod CIDR %q, overlaps with remote cluster subnets %s",
+			return fmt.Errorf("local Pod CIDR %q, overlaps with remote cluster subnets %s",
 				podCidr, remoteSubnets)
 		}
 	}

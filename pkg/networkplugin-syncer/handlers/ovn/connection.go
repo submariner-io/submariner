@@ -26,7 +26,7 @@ import (
 	"k8s.io/klog"
 
 	"github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn/nbctl"
-	"github.com/submariner-io/submariner/pkg/util/cluster_files"
+	"github.com/submariner-io/submariner/pkg/util/clusterfiles"
 )
 
 func (ovn *SyncHandler) initClients() error {
@@ -35,17 +35,17 @@ func (ovn *SyncHandler) initClients() error {
 	if strings.HasPrefix(getOVNNBDBAddress(), "ssl:") || strings.HasPrefix(getOVNSBDBAddress(), "ssl:") {
 		klog.Infof("OVN connection using SSL, loading certificates")
 
-		certFile, err := cluster_files.Get(ovn.k8sClientset, getOVNCertPath())
+		certFile, err := clusterfiles.Get(ovn.k8sClientset, getOVNCertPath())
 		if err != nil {
 			return err
 		}
 
-		pkFile, err := cluster_files.Get(ovn.k8sClientset, getOVNPrivKeyPath())
+		pkFile, err := clusterfiles.Get(ovn.k8sClientset, getOVNPrivKeyPath())
 		if err != nil {
 			return err
 		}
 
-		caFile, err := cluster_files.Get(ovn.k8sClientset, getOVNCaBundlePath())
+		caFile, err := clusterfiles.Get(ovn.k8sClientset, getOVNCaBundlePath())
 		if err != nil {
 			return err
 		}

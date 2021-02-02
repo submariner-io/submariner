@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package kubeproxy_iptables
+package kubeproxy
 
 import (
 	"net"
@@ -28,7 +28,7 @@ import (
 	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cleanup"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni_interface"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/util"
 )
 
@@ -50,7 +50,7 @@ type SyncHandler struct {
 	vxlanDevice      *vxLanIface
 	vxlanGwIP        *net.IP
 	hostname         string
-	cniIface         *cni_interface.Interface
+	cniIface         *cni.Interface
 	defaultHostIface *net.Interface
 
 	smClientSet     clientset.Interface
@@ -94,11 +94,11 @@ func (kp *SyncHandler) Init() error {
 		return errors.Wrapf(err, "Unable to find the default interface on host: %s", kp.hostname)
 	}
 
-	cniIface, err := cni_interface.Discover(kp.localClusterCidr[0])
+	cniIface, err := cni.Discover(kp.localClusterCidr[0])
 	if err == nil {
 		// Configure CNI Specific changes
 		kp.cniIface = cniIface
-		err := cni_interface.ConfigureRpFilter(kp.cniIface.Name)
+		err := cni.ConfigureRpFilter(kp.cniIface.Name)
 		if err != nil {
 			return errors.Wrapf(err, "ConfigureRpFilter returned error")
 		}

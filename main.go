@@ -88,7 +88,7 @@ func main() {
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
 
-	httpServer := startHttpServer()
+	httpServer := startHTTPServer()
 
 	var submSpec types.SubmarinerSpecification
 	err := envconfig.Process("submariner", &submSpec)
@@ -236,7 +236,7 @@ func submarinerClusterFrom(submSpec *types.SubmarinerSpecification) types.Submar
 	}
 }
 
-func startHttpServer() *http.Server {
+func startHTTPServer() *http.Server {
 	srv := &http.Server{Addr: ":8080"}
 
 	http.Handle("/metrics", promhttp.Handler())
@@ -256,7 +256,7 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder res
 
 	err := envconfig.Process(leadershipConfigEnvPrefix, &gwLeadershipConfig)
 	if err != nil {
-		return fmt.Errorf("Error processing environment config for %s: %v", leadershipConfigEnvPrefix, err)
+		return fmt.Errorf("error processing environment config for %s: %v", leadershipConfigEnvPrefix, err)
 	}
 
 	// Use default values when GatewayLeadership environment variables are not configured
@@ -276,7 +276,7 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder res
 
 	id, err := os.Hostname()
 	if err != nil {
-		return fmt.Errorf("Error getting hostname: %v", err)
+		return fmt.Errorf("error getting hostname: %v", err)
 	}
 
 	kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(

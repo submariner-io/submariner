@@ -31,9 +31,9 @@ import (
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/controller"
 	"github.com/submariner-io/submariner/pkg/event/logger"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni_interface"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
-	kp_iptables "github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy_iptables"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
 )
 
@@ -78,7 +78,7 @@ func main() {
 	registry := event.NewRegistry("routeagent_driver", np)
 	if err := registry.AddHandlers(
 		logger.NewHandler(),
-		kp_iptables.NewSyncHandler(env.ClusterCidr, env.ServiceCidr, smClientset),
+		kubeproxy.NewSyncHandler(env.ClusterCidr, env.ServiceCidr, smClientset),
 		ovn.NewHandler(env, smClientset),
 	); err != nil {
 		klog.Fatalf("Error registering the handlers: %s", err.Error())
@@ -118,10 +118,10 @@ func annotateNode(clusterCidr []string, cfg *restclient.Config) error {
 
 	nodeName, ok := os.LookupEnv("NODE_NAME")
 	if !ok {
-		return fmt.Errorf("Error reading the NODE_NAME from the environment")
+		return fmt.Errorf("error reading the NODE_NAME from the environment")
 	}
 
-	err = cni_interface.AnnotateNodeWithCNIInterfaceIP(nodeName, k8sClientSet, clusterCidr)
+	err = cni.AnnotateNodeWithCNIInterfaceIP(nodeName, k8sClientSet, clusterCidr)
 	if err != nil {
 		return fmt.Errorf("AnnotateNodeWithCNIInterfaceIP returned error %v", err)
 	}

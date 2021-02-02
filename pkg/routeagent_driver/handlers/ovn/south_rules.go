@@ -46,7 +46,7 @@ func (ovn *Handler) handleSubnets(subnets []string, ruleFunc func(rule *netlink.
 	return nil
 }
 
-func (ovn *Handler) programRule(dest, src string, tableId int) (*netlink.Rule, error) {
+func (ovn *Handler) programRule(dest, src string, tableID int) (*netlink.Rule, error) {
 	rule := netlink.NewRule()
 
 	if dest != "" {
@@ -67,8 +67,8 @@ func (ovn *Handler) programRule(dest, src string, tableId int) (*netlink.Rule, e
 		rule.Src = srcCIDR
 	}
 
-	rule.Table = tableId
-	rule.Priority = tableId
+	rule.Table = tableID
+	rule.Priority = tableID
 
 	return rule, nil
 }

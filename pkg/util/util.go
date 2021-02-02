@@ -37,7 +37,7 @@ const tokenLength = 64
 
 func getAPIIdentifier(token string) (string, error) {
 	if len(token) != tokenLength {
-		return "", fmt.Errorf("Token %s length was not %d", token, tokenLength)
+		return "", fmt.Errorf("token %s length was not %d", token, tokenLength)
 	}
 
 	clusterID := token[0 : tokenLength/2]
@@ -47,7 +47,7 @@ func getAPIIdentifier(token string) (string, error) {
 
 func getConnectSecret(token string) (string, error) {
 	if len(token) != tokenLength {
-		return "", fmt.Errorf("Token %s length was not %d", token, tokenLength)
+		return "", fmt.Errorf("token %s length was not %d", token, tokenLength)
 	}
 
 	connectSecret := token[tokenLength/2 : tokenLength]
@@ -104,7 +104,7 @@ func GetLocalEndpoint(submSpec types.SubmarinerSpecification, backendConfig map[
 	privateIP string) (types.SubmarinerEndpoint, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
-		return types.SubmarinerEndpoint{}, fmt.Errorf("Error getting hostname: %v", err)
+		return types.SubmarinerEndpoint{}, fmt.Errorf("error getting hostname: %v", err)
 	}
 
 	if backendConfig == nil {
@@ -139,7 +139,7 @@ func GetLocalEndpoint(submSpec types.SubmarinerSpecification, backendConfig map[
 	if submSpec.NatEnabled {
 		publicIP, err := ipify.GetIp()
 		if err != nil {
-			return types.SubmarinerEndpoint{}, fmt.Errorf("Could not determine public IP: %v", err)
+			return types.SubmarinerEndpoint{}, fmt.Errorf("could not determine public IP: %v", err)
 		}
 
 		endpoint.Spec.PublicIP = publicIP
@@ -152,7 +152,7 @@ func GetLocalEndpoint(submSpec types.SubmarinerSpecification, backendConfig map[
 		// the HealthCheck between the clusters.
 		endpoint.Spec.HealthCheckIP, err = getCNIInterfaceIPAddress(submSpec.ClusterCidr)
 		if err != nil {
-			return types.SubmarinerEndpoint{}, fmt.Errorf("Error getting CNI Interface IP address: %v", err)
+			return types.SubmarinerEndpoint{}, fmt.Errorf("error getting CNI Interface IP address: %v", err)
 		}
 	}
 

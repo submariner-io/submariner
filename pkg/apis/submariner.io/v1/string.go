@@ -21,10 +21,10 @@ import (
 )
 
 // String method returns a string representation, for human readability.
-func (e *Endpoint) String() string {
-	bytes, err := json.Marshal(e)
+func (ep *Endpoint) String() string {
+	bytes, err := json.Marshal(ep)
 	if err != nil {
-		return fmt.Sprintf("%#v", e)
+		return fmt.Sprintf("%#v", ep)
 	}
 
 	return string(bytes)

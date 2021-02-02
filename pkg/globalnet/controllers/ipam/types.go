@@ -53,7 +53,7 @@ type Controller struct {
 	gwNodeName       string
 
 	excludeNamespaces map[string]bool
-	pool              *IpPool
+	pool              *IPPool
 
 	ipt iptables.Interface
 }

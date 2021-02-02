@@ -27,10 +27,10 @@ const (
 	cableDriverLabel       = "cable_driver"
 	localClusterLabel      = "local_cluster"
 	localHostnameLabel     = "local_hostname"
-	localEndpointIpLabel   = "local_endpoint_ip"
+	localEndpointIPLabel   = "local_endpoint_ip"
 	remoteClusterLabel     = "remote_cluster"
 	remoteHostnameLabel    = "remote_hostname"
-	remoteEndpointIpLabel  = "remote_endpoint_ip"
+	remoteEndpointIPLabel  = "remote_endpoint_ip"
 	connectionsStatusLabel = "status"
 )
 
@@ -46,10 +46,10 @@ var (
 			cableDriverLabel,
 			localClusterLabel,
 			localHostnameLabel,
-			localEndpointIpLabel,
+			localEndpointIPLabel,
 			remoteClusterLabel,
 			remoteHostnameLabel,
-			remoteEndpointIpLabel,
+			remoteEndpointIPLabel,
 		},
 	)
 	txGauge = prometheus.NewGaugeVec(
@@ -61,10 +61,10 @@ var (
 			cableDriverLabel,
 			localClusterLabel,
 			localHostnameLabel,
-			localEndpointIpLabel,
+			localEndpointIPLabel,
 			remoteClusterLabel,
 			remoteHostnameLabel,
-			remoteEndpointIpLabel,
+			remoteEndpointIPLabel,
 		},
 	)
 	connectionsGauge = prometheus.NewGaugeVec(
@@ -76,10 +76,10 @@ var (
 			cableDriverLabel,
 			localClusterLabel,
 			localHostnameLabel,
-			localEndpointIpLabel,
+			localEndpointIPLabel,
 			remoteClusterLabel,
 			remoteHostnameLabel,
-			remoteEndpointIpLabel,
+			remoteEndpointIPLabel,
 			connectionsStatusLabel,
 		},
 	)
@@ -92,10 +92,10 @@ var (
 			cableDriverLabel,
 			localClusterLabel,
 			localHostnameLabel,
-			localEndpointIpLabel,
+			localEndpointIPLabel,
 			remoteClusterLabel,
 			remoteHostnameLabel,
-			remoteEndpointIpLabel,
+			remoteEndpointIPLabel,
 		},
 	)
 	connectionLatencySecondsGauge = prometheus.NewGaugeVec(
@@ -107,10 +107,10 @@ var (
 			cableDriverLabel,
 			localClusterLabel,
 			localHostnameLabel,
-			localEndpointIpLabel,
+			localEndpointIPLabel,
 			remoteClusterLabel,
 			remoteHostnameLabel,
-			remoteEndpointIpLabel,
+			remoteEndpointIPLabel,
 		},
 	)
 )
@@ -124,10 +124,10 @@ func getLabels(cableDriverName string, localEndpoint, remoteEndpoint *submv1.End
 		cableDriverLabel:      cableDriverName,
 		localClusterLabel:     localEndpoint.ClusterID,
 		localHostnameLabel:    localEndpoint.Hostname,
-		localEndpointIpLabel:  localEndpoint.PublicIP,
+		localEndpointIPLabel:  localEndpoint.PublicIP,
 		remoteClusterLabel:    remoteEndpoint.ClusterID,
 		remoteHostnameLabel:   remoteEndpoint.Hostname,
-		remoteEndpointIpLabel: remoteEndpoint.PublicIP,
+		remoteEndpointIPLabel: remoteEndpoint.PublicIP,
 	}
 }
 
