@@ -56,7 +56,7 @@ func main() {
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
 
-	httpServer := startHttpServer()
+	httpServer := startHTTPServer()
 
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
 	if err != nil {
@@ -121,7 +121,7 @@ func init() {
 		"The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 }
 
-func startHttpServer() *http.Server {
+func startHTTPServer() *http.Server {
 	srv := &http.Server{Addr: ":8081"}
 
 	http.Handle("/metrics", promhttp.Handler())

@@ -29,15 +29,15 @@ func (ovn *SyncHandler) ensureServiceLoadBalancersFrom(logicalSwitch string) err
 		return err
 	}
 
-	submarinerRouterId, err := ovn.getSubmarinerRouterId()
+	submarinerRouterID, err := ovn.getSubmarinerRouterID()
 	if err != nil {
 		return err
 	}
 
-	return ovn.nbctl.LrSetLoadBalancers(submarinerRouterId, lbIds)
+	return ovn.nbctl.LrSetLoadBalancers(submarinerRouterID, lbIds)
 }
 
-func (ovn *SyncHandler) getSubmarinerRouterId() (string, error) {
+func (ovn *SyncHandler) getSubmarinerRouterID() (string, error) {
 	submarinerRouter, err := ovn.nbdb.LRGet(submarinerLogicalRouter)
 
 	if err != nil {
@@ -45,7 +45,7 @@ func (ovn *SyncHandler) getSubmarinerRouterId() (string, error) {
 	}
 
 	if len(submarinerRouter) != 1 {
-		return "", fmt.Errorf("Only one %q router expected, but found %#v", submarinerLogicalRouter, submarinerRouter)
+		return "", fmt.Errorf("only one %q router expected, but found %#v", submarinerLogicalRouter, submarinerRouter)
 	}
 
 	return submarinerRouter[0].UUID, nil
@@ -62,13 +62,13 @@ func (ovn *SyncHandler) getK8sLoadBalancerIDsFor(logicalSwitch string) ([]string
 
 	for _, lb := range loadBalancers {
 		for key := range lb.ExternalID {
-			externalId, ok := key.(string)
+			externalID, ok := key.(string)
 			if !ok {
 				klog.Warningf("Unable to extract key from load-balancer %q external ids %#v", lb.UUID, key)
 				continue
 			}
 
-			if strings.Contains(externalId, "k8s-cluster-lb") {
+			if strings.Contains(externalID, "k8s-cluster-lb") {
 				lbIds = append(lbIds, lb.UUID)
 			}
 		}

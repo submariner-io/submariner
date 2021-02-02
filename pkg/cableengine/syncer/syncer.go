@@ -70,56 +70,56 @@ func NewGatewaySyncer(engine cableengine.Engine, client v1typed.GatewayInterface
 	}
 }
 
-func (s *GatewaySyncer) Run(stopCh <-chan struct{}) {
+func (gs *GatewaySyncer) Run(stopCh <-chan struct{}) {
 	go func() {
-		wait.Until(s.syncGatewayStatus, GatewayUpdateInterval, stopCh)
-		s.CleanupGatewayEntry()
+		wait.Until(gs.syncGatewayStatus, GatewayUpdateInterval, stopCh)
+		gs.CleanupGatewayEntry()
 	}()
 
 	klog.Info("CableEngine syncer started")
 }
 
-func (i *GatewaySyncer) syncGatewayStatus() {
-	i.Lock()
-	defer i.Unlock()
+func (gs *GatewaySyncer) syncGatewayStatus() {
+	gs.Lock()
+	defer gs.Unlock()
 
-	i.syncGatewayStatusSafe()
+	gs.syncGatewayStatusSafe()
 }
 
-func (i *GatewaySyncer) SetGatewayStatusError(err error) {
-	i.Lock()
-	defer i.Unlock()
+func (gs *GatewaySyncer) SetGatewayStatusError(err error) {
+	gs.Lock()
+	defer gs.Unlock()
 
-	i.statusError = err
-	i.syncGatewayStatusSafe()
+	gs.statusError = err
+	gs.syncGatewayStatusSafe()
 }
 
-func (i *GatewaySyncer) syncGatewayStatusSafe() {
+func (gs *GatewaySyncer) syncGatewayStatusSafe() {
 	klog.V(log.TRACE).Info("Running Gateway status sync")
 	gatewaySyncIterations.Inc()
 
-	gatewayObj := i.generateGatewayObject()
+	gatewayObj := gs.generateGatewayObject()
 
-	existingGw, err := i.getLastSyncedGateway(gatewayObj.Name)
+	existingGw, err := gs.getLastSyncedGateway(gatewayObj.Name)
 
 	if errors.IsNotFound(err) {
 		klog.V(log.TRACE).Infof("Gateway does not exist - creating: %+v", gatewayObj)
-		_, err = i.client.Create(gatewayObj)
+		_, err = gs.client.Create(gatewayObj)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Error creating Gateway object %+v: %s", gatewayObj, err))
+			utilruntime.HandleError(fmt.Errorf("error creating Gateway object %+v: %s", gatewayObj, err))
 			return
 		}
 	} else if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Error getting existing Gateway: %s", err))
+		utilruntime.HandleError(fmt.Errorf("error getting existing Gateway: %s", err))
 		return
 	} else if !reflect.DeepEqual(gatewayObj.Status, existingGw.Status) {
 		klog.V(log.TRACE).Infof("Gateway already exists - updating %+v", gatewayObj)
 		existingGw.Status = gatewayObj.Status
 		existingGw.Annotations = gatewayObj.Annotations
 
-		_, err := i.client.Update(existingGw)
+		_, err := gs.client.Update(existingGw)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Error updating Gateway object %+v: %s", gatewayObj, err))
+			utilruntime.HandleError(fmt.Errorf("error updating Gateway object %+v: %s", gatewayObj, err))
 			return
 		}
 	} else {
@@ -127,15 +127,15 @@ func (i *GatewaySyncer) syncGatewayStatusSafe() {
 	}
 
 	if gatewayObj.Status.HAStatus == v1.HAStatusActive {
-		err := i.cleanupStaleGatewayEntries(gatewayObj.Name)
+		err := gs.cleanupStaleGatewayEntries(gatewayObj.Name)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Error cleaning up stale gateway entries: %s", err))
+			utilruntime.HandleError(fmt.Errorf("error cleaning up stale gateway entries: %s", err))
 		}
 	}
 }
 
-func (i *GatewaySyncer) cleanupStaleGatewayEntries(localGatewayName string) error {
-	gateways, err := i.client.List(metav1.ListOptions{})
+func (gs *GatewaySyncer) cleanupStaleGatewayEntries(localGatewayName string) error {
+	gateways, err := gs.client.List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -148,14 +148,14 @@ func (i *GatewaySyncer) cleanupStaleGatewayEntries(localGatewayName string) erro
 		stale, err := isGatewayStale(gw)
 		if err != nil {
 			// In this case we don't want to stop the cleanup loop and just log it
-			utilruntime.HandleError(fmt.Errorf("Error processing stale Gateway %+v: %s", gw, err))
+			utilruntime.HandleError(fmt.Errorf("error processing stale Gateway %+v: %s", gw, err))
 		}
 
 		if stale {
-			err := i.client.Delete(gw.Name, &metav1.DeleteOptions{})
+			err := gs.client.Delete(gw.Name, &metav1.DeleteOptions{})
 			if err != nil {
 				// In this case we don't want to stop the cleanup loop and just log it
-				utilruntime.HandleError(fmt.Errorf("Error deleting stale Gateway %+v: %s", gw, err))
+				utilruntime.HandleError(fmt.Errorf("error deleting stale Gateway %+v: %s", gw, err))
 			} else {
 				klog.Warningf("Deleted stale gateway: %s, didn't report for %s",
 					gw.Name, GatewayStaleTimeout)
@@ -182,19 +182,19 @@ func isGatewayStale(gateway v1.Gateway) (bool, error) {
 	return now >= (timestampInt + int64(GatewayStaleTimeout.Seconds())), nil
 }
 
-func (i *GatewaySyncer) getLastSyncedGateway(name string) (*v1.Gateway, error) {
-	existingGw, err := i.client.Get(name, metav1.GetOptions{})
+func (gs *GatewaySyncer) getLastSyncedGateway(name string) (*v1.Gateway, error) {
+	existingGw, err := gs.client.Get(name, metav1.GetOptions{})
 	klog.V(log.TRACE).Infof("Last synced Gateway: %+v", existingGw)
 
 	return existingGw, err
 }
 
-func (i *GatewaySyncer) generateGatewayObject() *v1.Gateway {
-	localEndpoint := i.engine.GetLocalEndpoint()
+func (gs *GatewaySyncer) generateGatewayObject() *v1.Gateway {
+	localEndpoint := gs.engine.GetLocalEndpoint()
 
 	gateway := v1.Gateway{
 		Status: v1.GatewayStatus{
-			Version:       i.version,
+			Version:       gs.version,
 			LocalEndpoint: localEndpoint.Spec,
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -202,15 +202,15 @@ func (i *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 			Annotations: map[string]string{updateTimestampAnnotation: strconv.FormatInt(time.Now().UTC().Unix(), 10)}},
 	}
 
-	gateway.Status.HAStatus = i.engine.GetHAStatus()
+	gateway.Status.HAStatus = gs.engine.GetHAStatus()
 
 	var connections []v1.Connection
 
-	if i.statusError != nil {
-		gateway.Status.StatusFailure = i.statusError.Error()
+	if gs.statusError != nil {
+		gateway.Status.StatusFailure = gs.statusError.Error()
 	} else {
 		var err error
-		connections, err = i.engine.ListCableConnections()
+		connections, err = gs.engine.ListCableConnections()
 		if err != nil {
 			msg := fmt.Sprintf("Error retrieving driver connections: %s", err)
 			klog.Errorf(msg)
@@ -222,10 +222,10 @@ func (i *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 		connections = []v1.Connection{}
 	}
 
-	if i.healthCheck != nil {
+	if gs.healthCheck != nil {
 		for index := range connections {
 			connection := &(connections)[index]
-			latencyInfo := i.healthCheck.GetLatencyInfo(&connection.Endpoint)
+			latencyInfo := gs.healthCheck.GetLatencyInfo(&connection.Endpoint)
 			if latencyInfo != nil {
 				connection.LatencyRTT = latencyInfo.Spec
 				if connection.Status == v1.Connected {
@@ -255,9 +255,9 @@ func (i *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 
 // CleanupGatewayEntry removes this Gateway entry from the k8s API, it does not
 // propagate error up because it's a termination function that we also provide externally
-func (s *GatewaySyncer) CleanupGatewayEntry() {
-	hostName := s.engine.GetLocalEndpoint().Spec.Hostname
-	err := s.client.Delete(hostName, &metav1.DeleteOptions{})
+func (gs *GatewaySyncer) CleanupGatewayEntry() {
+	hostName := gs.engine.GetLocalEndpoint().Spec.Hostname
+	err := gs.client.Delete(hostName, &metav1.DeleteOptions{})
 	if err != nil {
 		klog.Errorf("Error while trying to delete own Gateway %q : %s", hostName, err)
 		return

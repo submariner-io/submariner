@@ -86,67 +86,68 @@ func NewGatewayMonitor(spec *SubmarinerIpamControllerSpecification,
 	return gatewayMonitor, nil
 }
 
-func (i *GatewayMonitor) Start(stopCh <-chan struct{}) error {
+func (gm *GatewayMonitor) Start(stopCh <-chan struct{}) error {
 	klog.Info("Starting GatewayMonitor to monitor the active Gateway node in the cluster.")
 
-	i.submarinerInformerFactory.Start(stopCh)
+	gm.submarinerInformerFactory.Start(stopCh)
 
 	klog.Info("Waiting for informer caches to sync")
 
-	if ok := cache.WaitForCacheSync(stopCh, i.endpointsSynced); !ok {
+	if ok := cache.WaitForCacheSync(stopCh, gm.endpointsSynced); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
 
-	if err := CreateGlobalNetMarkingChain(i.ipt); err != nil {
+	if err := CreateGlobalNetMarkingChain(gm.ipt); err != nil {
 		return fmt.Errorf("error while calling createGlobalNetMarkingChain: %v", err)
 	}
 
 	klog.Info("Starting endpoint worker")
 
-	go wait.Until(i.runEndpointWorker, time.Second, stopCh)
+	go wait.Until(gm.runEndpointWorker, time.Second, stopCh)
 
 	return nil
 }
-func (i *GatewayMonitor) Stop() {
+
+func (gm *GatewayMonitor) Stop() {
 	klog.Info("GatewayMonitor stopping")
 
-	i.syncMutex.Lock()
-	i.stopIpamController()
-	i.syncMutex.Unlock()
+	gm.syncMutex.Lock()
+	gm.stopIpamController()
+	gm.syncMutex.Unlock()
 }
 
-func (r *GatewayMonitor) runEndpointWorker() {
-	for r.processNextEndpoint() {
+func (gm *GatewayMonitor) runEndpointWorker() {
+	for gm.processNextEndpoint() {
 	}
 }
 
-func (i *GatewayMonitor) processNextEndpoint() bool {
-	obj, shutdown := i.endpointWorkqueue.Get()
+func (gm *GatewayMonitor) processNextEndpoint() bool {
+	obj, shutdown := gm.endpointWorkqueue.Get()
 	if shutdown {
 		return false
 	}
 
 	err := func() error {
-		defer i.endpointWorkqueue.Done(obj)
+		defer gm.endpointWorkqueue.Done(obj)
 		key := obj.(string)
 		ns, name, err := cache.SplitMetaNamespaceKey(key)
 		if err != nil {
-			i.endpointWorkqueue.Forget(obj)
+			gm.endpointWorkqueue.Forget(obj)
 			return fmt.Errorf("error while splitting meta namespace key %s: %v", key, err)
 		}
 
-		endpoint, err := i.submarinerClientSet.SubmarinerV1().Endpoints(ns).Get(name, metav1.GetOptions{})
+		endpoint, err := gm.submarinerClientSet.SubmarinerV1().Endpoints(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
-			i.endpointWorkqueue.Forget(obj)
+			gm.endpointWorkqueue.Forget(obj)
 			return fmt.Errorf("error retrieving submariner endpoint object %s: %v", name, err)
 		}
 
 		klog.V(log.DEBUG).Infof("In processNextEndpoint, endpoint info: %+v", endpoint)
 
-		if endpoint.Spec.ClusterID != i.clusterID {
+		if endpoint.Spec.ClusterID != gm.clusterID {
 			klog.V(log.DEBUG).Infof("Endpoint %s belongs to a remote cluster", endpoint.Spec.Hostname)
 
-			overlap, err := util.IsOverlappingCIDR(endpoint.Spec.Subnets, i.ipamSpec.GlobalCIDR[0])
+			overlap, err := util.IsOverlappingCIDR(endpoint.Spec.Subnets, gm.ipamSpec.GlobalCIDR[0])
 			if err != nil {
 				// Ideally this case will never hit, as the subnets are valid CIDRs
 				klog.Warningf("unable to validate overlapping Service CIDR: %s", err)
@@ -156,31 +157,31 @@ func (i *GatewayMonitor) processNextEndpoint() bool {
 				// When GlobalNet is used, globalCIDRs allocated to the clusters should not overlap.
 				// If they overlap, skip the endpoint as its an invalid configuration which is not supported.
 				klog.Errorf("GlobalCIDR %q of local cluster %q overlaps with remote cluster %s",
-					i.ipamSpec.GlobalCIDR[0], i.ipamSpec.ClusterID, endpoint.Spec.ClusterID)
-				i.endpointWorkqueue.Forget(obj)
+					gm.ipamSpec.GlobalCIDR[0], gm.ipamSpec.ClusterID, endpoint.Spec.ClusterID)
+				gm.endpointWorkqueue.Forget(obj)
 
 				return nil
 			}
 
 			for _, remoteSubnet := range endpoint.Spec.Subnets {
-				MarkRemoteClusterTraffic(i.ipt, remoteSubnet, AddRules)
+				MarkRemoteClusterTraffic(gm.ipt, remoteSubnet, AddRules)
 			}
 
-			i.endpointWorkqueue.Forget(obj)
+			gm.endpointWorkqueue.Forget(obj)
 
 			return nil
 		}
 
-		endpoints, err := i.submarinerClientSet.SubmarinerV1().Endpoints(ns).List(metav1.ListOptions{})
+		endpoints, err := gm.submarinerClientSet.SubmarinerV1().Endpoints(ns).List(metav1.ListOptions{})
 		if err != nil {
-			i.endpointWorkqueue.Forget(obj)
+			gm.endpointWorkqueue.Forget(obj)
 			return fmt.Errorf("error retrieving submariner endpoint list %v", err)
 		}
 
 		for _, endpoint := range endpoints.Items {
-			if endpoint.Spec.ClusterID != i.clusterID {
+			if endpoint.Spec.ClusterID != gm.clusterID {
 				for _, remoteSubnet := range endpoint.Spec.Subnets {
-					MarkRemoteClusterTraffic(i.ipt, remoteSubnet, AddRules)
+					MarkRemoteClusterTraffic(gm.ipt, remoteSubnet, AddRules)
 				}
 			}
 		}
@@ -194,23 +195,23 @@ func (i *GatewayMonitor) processNextEndpoint() bool {
 		if endpoint.Spec.Hostname == hostname {
 			klog.V(log.DEBUG).Infof("We are now on GatewayNode %s", endpoint.Spec.PrivateIP)
 
-			i.syncMutex.Lock()
-			if !i.isGatewayNode {
-				i.isGatewayNode = true
-				i.initializeIpamController(i.ipamSpec.GlobalCIDR[0], i.nodeName)
+			gm.syncMutex.Lock()
+			if !gm.isGatewayNode {
+				gm.isGatewayNode = true
+				gm.initializeIpamController(gm.ipamSpec.GlobalCIDR[0], gm.nodeName)
 			}
-			i.syncMutex.Unlock()
+			gm.syncMutex.Unlock()
 		} else {
 			klog.V(log.DEBUG).Infof("We are on non-gatewayNode. GatewayNode ip is %s", endpoint.Spec.PrivateIP)
-			i.syncMutex.Lock()
-			if i.isGatewayNode {
-				i.stopIpamController()
-				i.isGatewayNode = false
+			gm.syncMutex.Lock()
+			if gm.isGatewayNode {
+				gm.stopIpamController()
+				gm.isGatewayNode = false
 			}
-			i.syncMutex.Unlock()
+			gm.syncMutex.Unlock()
 		}
 
-		i.endpointWorkqueue.Forget(obj)
+		gm.endpointWorkqueue.Forget(obj)
 
 		return nil
 	}()
@@ -223,7 +224,7 @@ func (i *GatewayMonitor) processNextEndpoint() bool {
 	return true
 }
 
-func (i *GatewayMonitor) enqueueEndpoint(obj interface{}) {
+func (gm *GatewayMonitor) enqueueEndpoint(obj interface{}) {
 	var key string
 	var err error
 	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
@@ -232,10 +233,10 @@ func (i *GatewayMonitor) enqueueEndpoint(obj interface{}) {
 	}
 
 	klog.V(log.TRACE).Infof("Enqueueing endpoint in gatewayMonitor %v", obj)
-	i.endpointWorkqueue.AddRateLimited(key)
+	gm.endpointWorkqueue.AddRateLimited(key)
 }
 
-func (i *GatewayMonitor) handleRemovedEndpoint(obj interface{}) {
+func (gm *GatewayMonitor) handleRemovedEndpoint(obj interface{}) {
 	var object *v1.Endpoint
 	var ok bool
 	if object, ok = obj.(*v1.Endpoint); !ok {
@@ -261,26 +262,26 @@ func (i *GatewayMonitor) handleRemovedEndpoint(obj interface{}) {
 		klog.Fatalf("Could not retrieve hostname: %v", err)
 	}
 
-	if object.Spec.Hostname == hostname && object.Spec.ClusterID == i.clusterID {
-		i.syncMutex.Lock()
-		if i.isGatewayNode {
-			i.stopIpamController()
-			i.isGatewayNode = false
+	if object.Spec.Hostname == hostname && object.Spec.ClusterID == gm.clusterID {
+		gm.syncMutex.Lock()
+		if gm.isGatewayNode {
+			gm.stopIpamController()
+			gm.isGatewayNode = false
 		}
-		i.syncMutex.Unlock()
-	} else if object.Spec.ClusterID != i.clusterID {
+		gm.syncMutex.Unlock()
+	} else if object.Spec.ClusterID != gm.clusterID {
 		// Endpoint associated with remote cluster is removed, delete the associated flows.
 		for _, remoteSubnet := range object.Spec.Subnets {
-			MarkRemoteClusterTraffic(i.ipt, remoteSubnet, DeleteRules)
+			MarkRemoteClusterTraffic(gm.ipt, remoteSubnet, DeleteRules)
 		}
 	}
 }
 
-func (i *GatewayMonitor) initializeIpamController(globalCIDR, gwNodeName string) {
-	informerFactory := informers.NewSharedInformerFactoryWithOptions(i.kubeClientSet, defaultResync)
+func (gm *GatewayMonitor) initializeIpamController(globalCIDR, gwNodeName string) {
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(gm.kubeClientSet, defaultResync)
 
 	informerConfig := InformerConfigStruct{
-		KubeClientSet:   i.kubeClientSet,
+		KubeClientSet:   gm.kubeClientSet,
 		ServiceInformer: informerFactory.Core().V1().Services(),
 		PodInformer:     informerFactory.Core().V1().Pods(),
 		NodeInformer:    informerFactory.Core().V1().Nodes(),
@@ -288,28 +289,28 @@ func (i *GatewayMonitor) initializeIpamController(globalCIDR, gwNodeName string)
 
 	klog.V(log.DEBUG).Infof("On Gateway Node, initializing ipamController.")
 
-	ipamController, err := NewController(i.ipamSpec, &informerConfig, globalCIDR, gwNodeName)
+	ipamController, err := NewController(gm.ipamSpec, &informerConfig, globalCIDR, gwNodeName)
 	if err != nil {
 		klog.Fatalf("Error creating controller: %s", err.Error())
 	}
 
-	i.stopProcessing = make(chan struct{})
+	gm.stopProcessing = make(chan struct{})
 
-	informerFactory.Start(i.stopProcessing)
+	informerFactory.Start(gm.stopProcessing)
 
-	if err = ipamController.Start(i.stopProcessing); err != nil {
+	if err = ipamController.Start(gm.stopProcessing); err != nil {
 		klog.Fatalf("Error running ipamController: %s", err.Error())
 	}
 
 	klog.V(log.DEBUG).Infof("Successfully started the ipamController")
 }
 
-func (i *GatewayMonitor) stopIpamController() {
-	if i.stopProcessing != nil {
+func (gm *GatewayMonitor) stopIpamController() {
+	if gm.stopProcessing != nil {
 		klog.V(log.DEBUG).Infof("Stopping ipamController")
-		close(i.stopProcessing)
-		i.stopProcessing = nil
+		close(gm.stopProcessing)
+		gm.stopProcessing = nil
 
-		cleanup.ClearGlobalnetChains(i.ipt)
+		cleanup.ClearGlobalnetChains(gm.ipt)
 	}
 }

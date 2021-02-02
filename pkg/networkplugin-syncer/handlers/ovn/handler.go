@@ -27,8 +27,8 @@ import (
 	"github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn/nbctl"
 )
 
-var WaitingForLocalEndpoint = errors.New("Waiting for the local endpoint details before we can " +
-	"setup any remote endpoint related information, this will be retried.")
+var ErrWaitingForLocalEndpoint = errors.New("waiting for the local endpoint details before we can " +
+	"setup any remote endpoint related information, this will be retried")
 
 type SyncHandler struct {
 	event.HandlerBase
@@ -137,7 +137,7 @@ func (ovn *SyncHandler) updateRemoteEndpointsInfra() error {
 		// If we don't have information on the localEndpoint chances are that we are not detecting
 		// the local endpoint yet (right CLUSTER_ID set), with the risk of setting up local routes as
 		// remote routes and breaking the cluster.
-		return WaitingForLocalEndpoint // this will be retried eventually
+		return ErrWaitingForLocalEndpoint // this will be retried eventually
 	}
 
 	// Synchronize the policy rules inserted by submariner in the ovn_cluster_router, those point to submariner_router
