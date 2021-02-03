@@ -50,5 +50,6 @@ jobs:
         env:
           QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
           QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}
-          RELEASE_ARGS: submariner submariner-route-agent submariner-globalnet submariner-networkplugin-syncer --tag "${GITHUB_REF##*/}"
-        run: make release
+          IMAGES: submariner submariner-route-agent submariner-globalnet submariner-networkplugin-syncer
+        # Pass RELEASE_ARGS on the call, since GITHUB_REF set in the `env` directive doesn't get properly expanded
+        run: make release RELEASE_ARGS="$IMAGES --tag '${GITHUB_REF##*/}'"
