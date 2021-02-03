@@ -26,26 +26,13 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v2
 
-      - name: Install WireGuard kernel module (only in WireGuard jobs)
-        if: matrix.cable_driver == 'wireguard'
-        run: |
-          sudo apt install -y linux-headers-$(uname -r) wireguard
-          sudo modprobe wireguard
-
-      - name: Reclaim free space
-        run: |
-          sudo swapoff -a
-          sudo rm -f /swapfile
-          df -h
-          free -h
-
       - name: Run E2E deployment and tests
-        run: |
-          make e2e using="${{ matrix.globalnet }} ${{ matrix.deploytool }} ${{ matrix.cable_driver }}"
+        uses: submariner-io/shipyard/gh-actions/e2e@master
+        with:
+          cabledriver: ${{ matrix.cable_driver }}
+          deploytool: ${{ matrix.deploytool }}
+          globalnet: ${{ matrix.globalnet }}
 
       - name: Post mortem
         if: failure()
-        run: |
-          df -h
-          free -h
-          make post-mortem
+        uses: submariner-io/shipyard/gh-actions/post-mortem@master
