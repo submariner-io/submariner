@@ -20,13 +20,13 @@ import (
 	"flag"
 	"net/http"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers/ipam"
+	"k8s.io/client-go/kubernetes"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
@@ -68,6 +68,11 @@ func main() {
 		klog.Fatalf("error building submariner clientset: %s", err.Error())
 	}
 
+	clientSet, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		klog.Fatalf("Error building k8s clientset: %s", err.Error())
+	}
+
 	var localCluster *submarinerv1.Cluster
 	// During installation, sometimes creation of clusterCRD by submariner-gateway-pod would take few secs.
 	for i := 0; i < 100; i++ {
@@ -91,24 +96,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	gatewayMonitor, err := ipam.NewGatewayMonitor(&ipamSpec, cfg, stopCh)
+	gatewayMonitor, err := ipam.NewGatewayMonitor(&ipamSpec, submarinerClient, clientSet)
 	if err != nil {
 		klog.Fatalf("Error creating gatewayMonitor: %s", err.Error())
 	}
 
-	var wg sync.WaitGroup
+	if err = gatewayMonitor.Start(stopCh); err != nil {
+		klog.Fatalf("Error running gatewayMonitor: %s", err.Error())
+	}
 
-	wg.Add(1)
+	<-stopCh
+	gatewayMonitor.Stop()
 
-	go func() {
-		defer wg.Done()
-
-		if err = gatewayMonitor.Run(stopCh); err != nil {
-			klog.Fatalf("Error running gatewayMonitor: %s", err.Error())
-		}
-	}()
-
-	wg.Wait()
 	klog.Infof("All controllers stopped or exited. Stopping main loop")
 
 	if err := httpServer.Shutdown(context.TODO()); err != nil {
