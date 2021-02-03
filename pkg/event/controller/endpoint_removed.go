@@ -22,7 +22,7 @@ import (
 	smv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 )
 
-func (c *Controller) handleRemovedEndpoint(obj runtime.Object) bool {
+func (c *Controller) handleRemovedEndpoint(obj runtime.Object, numRequeues int) bool {
 	endpoint := obj.(*smv1.Endpoint)
 
 	var err error

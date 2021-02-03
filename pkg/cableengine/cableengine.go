@@ -29,7 +29,6 @@ import (
 
 	// Add supported drivers
 	_ "github.com/submariner-io/submariner/pkg/cable/libreswan"
-	_ "github.com/submariner-io/submariner/pkg/cable/strongswan"
 	_ "github.com/submariner-io/submariner/pkg/cable/wireguard"
 )
 

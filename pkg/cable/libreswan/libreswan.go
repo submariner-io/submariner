@@ -414,6 +414,10 @@ func (i *libreswan) runPluto() error {
 
 	args := []string{}
 
+	if i.debug {
+		args = append(args, "--stderrlog")
+	}
+
 	cmd := exec.Command("/usr/local/bin/pluto", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -459,6 +463,12 @@ func (i *libreswan) runPluto() error {
 		}
 
 		time.Sleep(1 * time.Second)
+	}
+
+	if i.debug {
+		if err := whack("--debug", "base"); err != nil {
+			return err
+		}
 	}
 
 	return nil
