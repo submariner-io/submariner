@@ -15,8 +15,8 @@ jobs:
       - uses: actions/checkout@master
 
       - name: Install an old cluster, upgrade it and check it
-        uses: submariner-io/shipyard/gh-actions/upgrade-e2e@master
+        uses: submariner-io/shipyard/gh-actions/upgrade-e2e@devel
 
       - name: Post Mortem
         if: failure()
-        uses: submariner-io/shipyard/gh-actions/post-mortem@master
+        uses: submariner-io/shipyard/gh-actions/post-mortem@devel
