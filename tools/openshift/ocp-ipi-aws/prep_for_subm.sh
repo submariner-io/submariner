@@ -16,7 +16,7 @@ if (( $# > 1 )) ; then
 fi
 
 # Set Github parameters
-GITHUB_BRANCH="${GITHUB_BRANCH:-master}"
+GITHUB_BRANCH="${GITHUB_BRANCH:-devel}"
 GITHUB_USERFORK="${GITHUB_USERFORK:-submariner-io}"
 GITHUB_ARCHIVE="https://github.com/$GITHUB_USERFORK/submariner/archive/$GITHUB_BRANCH.tar.gz"
 

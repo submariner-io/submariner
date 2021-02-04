@@ -13,7 +13,7 @@ You can use the `prep_for_subm.sh` script on your OpenShift install directory wi
 
 ```bash
 cd my-cluster-openshift-install-dir
-curl https://raw.githubusercontent.com/submariner-io/submariner/master/tools/openshift/ocp-ipi-aws/prep_for_subm.sh -L -O
+curl https://raw.githubusercontent.com/submariner-io/submariner/devel/tools/openshift/ocp-ipi-aws/prep_for_subm.sh -L -O
 chmod a+x ./prep_for_subm.sh
 ./prep_for_subm.sh
 ```
