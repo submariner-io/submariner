@@ -18,13 +18,14 @@ package ipam
 import (
 	"sync"
 
-	"github.com/coreos/go-iptables/iptables"
+	"github.com/submariner-io/submariner/pkg/iptables"
 	kubeInformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
 	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions"
 )
 
 type SubmarinerIpamControllerSpecification struct {
@@ -54,19 +55,20 @@ type Controller struct {
 	excludeNamespaces map[string]bool
 	pool              *IpPool
 
-	ipt *iptables.IPTables
+	ipt iptables.Interface
 }
 
 type GatewayMonitor struct {
-	clusterID           string
-	kubeClientSet       kubernetes.Interface
-	submarinerClientSet clientset.Interface
-	endpointWorkqueue   workqueue.RateLimitingInterface
-	endpointsSynced     cache.InformerSynced
-	ipamSpec            *SubmarinerIpamControllerSpecification
-	ipt                 *iptables.IPTables
-	stopProcessing      chan struct{}
-	isGatewayNode       bool
-	nodeName            string
-	syncMutex           *sync.Mutex
+	clusterID                 string
+	kubeClientSet             kubernetes.Interface
+	submarinerClientSet       clientset.Interface
+	submarinerInformerFactory submarinerInformers.SharedInformerFactory
+	endpointWorkqueue         workqueue.RateLimitingInterface
+	endpointsSynced           cache.InformerSynced
+	ipamSpec                  *SubmarinerIpamControllerSpecification
+	ipt                       iptables.Interface
+	stopProcessing            chan struct{}
+	isGatewayNode             bool
+	nodeName                  string
+	syncMutex                 sync.Mutex
 }

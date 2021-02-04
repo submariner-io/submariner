@@ -16,17 +16,12 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v2
 
-      - name: Reclaim free space
-        run: |
-          sudo swapoff -a
-          sudo rm -f /swapfile
-
       - name: Run E2E deployment and tests
-        run: make e2e
+        uses: submariner-io/shipyard/gh-actions/e2e@master
 
       - name: Post mortem
         if: failure()
-        run: make post-mortem
+        uses: submariner-io/shipyard/gh-actions/post-mortem@master
 
       - name: Clean up E2E deployment
         run: make cleanup
@@ -50,5 +45,6 @@ jobs:
         env:
           QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
           QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}
-          RELEASE_ARGS: submariner submariner-route-agent submariner-globalnet submariner-networkplugin-syncer --tag "${GITHUB_REF##*/}"
-        run: make release
+          IMAGES: submariner submariner-route-agent submariner-globalnet submariner-networkplugin-syncer
+        # Pass RELEASE_ARGS on the call, since GITHUB_REF set in the `env` directive doesn't get properly expanded
+        run: make release RELEASE_ARGS="$IMAGES --tag '${GITHUB_REF##*/}'"

@@ -17,7 +17,6 @@ package ipam
 
 import (
 	"net"
-	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -317,9 +316,4 @@ func testIpRelease() {
 			Expect(len(pool.allocated)).Should(Equal(allocated))
 		})
 	})
-}
-
-func TestIpPool(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Globalnet/IPAM/IpPool Suite")
 }
