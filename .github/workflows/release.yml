@@ -17,11 +17,11 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Run E2E deployment and tests
-        uses: submariner-io/shipyard/gh-actions/e2e@master
+        uses: submariner-io/shipyard/gh-actions/e2e@devel
 
       - name: Post mortem
         if: failure()
-        uses: submariner-io/shipyard/gh-actions/post-mortem@master
+        uses: submariner-io/shipyard/gh-actions/post-mortem@devel
 
       - name: Clean up E2E deployment
         run: make cleanup
