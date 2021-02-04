@@ -14,20 +14,9 @@ jobs:
     steps:
       - uses: actions/checkout@master
 
-      - name: Reclaim free space!
-        run: |
-          sudo swapoff -a
-          sudo rm -f /swapfile
-          df -h
-          free -h
-
       - name: Install an old cluster, upgrade it and check it
-        run: |
-          make upgrade-e2e
+        uses: submariner-io/shipyard/gh-actions/upgrade-e2e@master
 
       - name: Post Mortem
         if: failure()
-        run: |
-          df -h
-          free -h
-          make post-mortem
+        uses: submariner-io/shipyard/gh-actions/post-mortem@master
