@@ -5,6 +5,9 @@ ifneq (,$(DAPPER_HOST_ARCH))
 
 # Running in Dapper
 
+IMAGES ?= submariner submariner-route-agent submariner-globalnet submariner-networkplugin-syncer
+images: build
+
 include $(SHIPYARD_DIR)/Makefile.inc
 
 TARGETS := $(shell ls -p scripts | grep -v -e / -e reload-images)
@@ -71,9 +74,6 @@ IMAGES_ARGS = --platform $(subst $(space),$(comma),$(foreach arch,$(subst $(comm
 build: $(foreach arch,$(subst $(comma),$(space),$(ARCHES)),$(foreach binary,$(BINARIES),bin/linux/$(call gotodockerarch,$(arch))/$(binary)))
 
 ci: validate unit build images
-
-images: build package/.image.submariner package/.image.submariner-route-agent package/.image.submariner-globalnet \
-		package/.image.submariner-networkplugin-syncer
 
 $(TARGETS): vendor/modules.txt
 	./scripts/$@

@@ -36,15 +36,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Build new images
-        env:
-          IMAGES_ARGS: --nocache
-        run: make images
-
-      - name: Release the images
-        env:
-          QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
-          QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}
-          IMAGES: submariner submariner-route-agent submariner-globalnet submariner-networkplugin-syncer
-        # Pass RELEASE_ARGS on the call, since GITHUB_REF set in the `env` directive doesn't get properly expanded
-        run: make release RELEASE_ARGS="$IMAGES --tag '${GITHUB_REF##*/}'"
+      - name: Build and release new images
+        uses: submariner-io/shipyard/gh-actions/release-images@devel
+        with:
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_PASSWORD }}
