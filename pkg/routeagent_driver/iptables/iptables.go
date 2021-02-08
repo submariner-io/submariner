@@ -16,16 +16,16 @@ limitations under the License.
 package iptables
 
 import (
-	"github.com/coreos/go-iptables/iptables"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/submariner/pkg/iptables"
 	"k8s.io/klog"
 
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/util"
 )
 
-func InitSubmarinerPostRoutingChain(ipt *iptables.IPTables) error {
+func InitSubmarinerPostRoutingChain(ipt iptables.Interface) error {
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmPostRoutingChain)
 
 	if err := util.CreateChainIfNotExists(ipt, "nat", constants.SmPostRoutingChain); err != nil {

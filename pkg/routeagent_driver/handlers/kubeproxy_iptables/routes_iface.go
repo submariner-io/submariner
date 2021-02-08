@@ -48,21 +48,33 @@ func (kp *SyncHandler) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks [
 	} else if kp.isGatewayNode && kp.cniIface != nil {
 		// These routing rules are required ONLY on the Gateway Node.
 		// On the non-Gateway nodes, we use iptable rules to support this use-case.
-		switch operation {
-		case Add:
-			for _, inputCidrBlock := range inputCidrBlocks {
+		for _, inputCidrBlock := range inputCidrBlocks {
+			var viaGW *net.IP
+			if kp.isGatewayInRemoteCIDR(inputCidrBlock) {
+				gwIP := kp.remoteSubnetGw[inputCidrBlock]
+				routes, err := netlink.RouteGet(gwIP)
+				if err != nil {
+					klog.Errorf("Failed to find route to remote gateway IP %s for cidr %s", gwIP.String(), inputCidrBlock)
+				}
+
+				viaGW = &routes[0].Gw
+			}
+
+			switch operation {
+			case Add:
+
 				if kp.routeCacheGWNode.Add(inputCidrBlock) {
-					if err := kp.configureRoute(inputCidrBlock, operation); err != nil {
+					if err := kp.configureRoute(inputCidrBlock, operation, viaGW); err != nil {
 						kp.routeCacheGWNode.Remove(inputCidrBlock)
 						klog.Errorf("Failed to add route %q for HostNetwork support on the Gateway node: %v",
 							inputCidrBlock, err)
 					}
 				}
-			}
-		case Delete:
-			for _, inputCidrBlock := range inputCidrBlocks {
+
+			case Delete:
+
 				if kp.routeCacheGWNode.Remove(inputCidrBlock) {
-					if err := kp.configureRoute(inputCidrBlock, operation); err != nil {
+					if err := kp.configureRoute(inputCidrBlock, operation, viaGW); err != nil {
 						klog.Errorf("Failed to delete route %q for HostNetwork support on the Gateway node. %v",
 							inputCidrBlock, err)
 					}
@@ -72,7 +84,17 @@ func (kp *SyncHandler) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks [
 	}
 }
 
-func (kp *SyncHandler) configureRoute(remoteSubnet string, operation Operation) error {
+func (kp *SyncHandler) isGatewayInRemoteCIDR(remoteCIDR string) bool {
+	gwIP, ok := kp.remoteSubnetGw[remoteCIDR]
+	if ok {
+		_, ipnet, _ := net.ParseCIDR(remoteCIDR)
+		return ipnet.Contains(gwIP)
+	}
+
+	return false
+}
+
+func (kp *SyncHandler) configureRoute(remoteSubnet string, operation Operation, viaGw *net.IP) error {
 	src := net.ParseIP(kp.cniIface.IPAddress)
 	_, dst, err := net.ParseCIDR(remoteSubnet)
 	if err != nil {
@@ -92,10 +114,17 @@ func (kp *SyncHandler) configureRoute(remoteSubnet string, operation Operation) 
 	route := netlink.Route{
 		Dst:       dst,
 		Src:       src,
-		Scope:     unix.RT_SCOPE_LINK,
 		LinkIndex: ifaceIndex,
 		Protocol:  4,
 		Table:     constants.RouteAgentHostNetworkTableID,
+	}
+
+	// in some cases we need to specify the next hop (for example when the remote ipsec endpoint
+	// belongs in the remote cluster CIDR of the rule) ( see issue #1106 )
+	if viaGw != nil {
+		route.Gw = *viaGw
+	} else {
+		route.Scope = unix.RT_SCOPE_LINK
 	}
 
 	switch operation {
