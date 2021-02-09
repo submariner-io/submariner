@@ -427,7 +427,7 @@ func (i *libreswan) runPluto() error {
 	if i.logFile != "" {
 		out, err := os.OpenFile(i.logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 		if err != nil {
-			return fmt.Errorf("Failed to open log file %s: %v", i.logFile, err)
+			return fmt.Errorf("failed to open log file %s: %v", i.logFile, err)
 		}
 
 		cmd.Stdout = out

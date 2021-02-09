@@ -29,9 +29,9 @@ import (
 )
 
 const (
-	GN_Status_Not_Verified = iota
-	GN_Enabled
-	GN_Disabled
+	GNStatusNotVerified = iota
+	GNEnabled
+	GNDisabled
 )
 
 type GlobalnetStatus int
@@ -60,7 +60,7 @@ func newCleanupGlobalnetRules(clusterID, objectNamespace string, submarinerClien
 		clusterID:       clusterID,
 		objectNamespace: objectNamespace,
 		clientSet:       submarinerClientSet,
-		globalnetStatus: GN_Status_Not_Verified,
+		globalnetStatus: GNStatusNotVerified,
 		ipt:             ipt,
 	}
 }
@@ -74,20 +74,20 @@ func (gn *cleanupGlobalnetRules) NonGatewayCleanup() error {
 }
 
 func (gn *cleanupGlobalnetRules) GatewayToNonGatewayTransition() error {
-	if gn.globalnetStatus == GN_Status_Not_Verified {
+	if gn.globalnetStatus == GNStatusNotVerified {
 		localCluster, err := gn.clientSet.SubmarinerV1().Clusters(gn.objectNamespace).Get(gn.clusterID, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("error while retrieving the local ClusterInfo: %v", err)
 		}
 
 		if len(localCluster.Spec.GlobalCIDR) > 0 {
-			gn.globalnetStatus = GN_Enabled
+			gn.globalnetStatus = GNEnabled
 		} else {
-			gn.globalnetStatus = GN_Disabled
+			gn.globalnetStatus = GNDisabled
 		}
 	}
 
-	if gn.globalnetStatus == GN_Enabled && gn.ipt != nil {
+	if gn.globalnetStatus == GNEnabled && gn.ipt != nil {
 		ClearGlobalnetChains(gn.ipt)
 	}
 

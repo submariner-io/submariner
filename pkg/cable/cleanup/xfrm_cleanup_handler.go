@@ -40,7 +40,7 @@ func (xc *XFRMCleanupHandler) NonGatewayCleanup() error {
 	currentXfrmPolicyList, err := netlink.XfrmPolicyList(syscall.AF_INET)
 
 	if err != nil {
-		return fmt.Errorf("Error retrieving current xfrm policies: %v", err)
+		return fmt.Errorf("error retrieving current xfrm policies: %v", err)
 	}
 
 	if len(currentXfrmPolicyList) > 0 {
@@ -51,7 +51,7 @@ func (xc *XFRMCleanupHandler) NonGatewayCleanup() error {
 		klog.V(log.DEBUG).Infof("Deleting XFRM policy %s", currentXfrmPolicyList[i])
 
 		if err = netlink.XfrmPolicyDel(&currentXfrmPolicyList[i]); err != nil {
-			return fmt.Errorf("Error Deleting XFRM policy %s: %v", currentXfrmPolicyList[i], err)
+			return fmt.Errorf("error Deleting XFRM policy %s: %v", currentXfrmPolicyList[i], err)
 		}
 	}
 

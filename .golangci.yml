@@ -21,6 +21,7 @@ linters:
     - bodyclose
     - deadcode
     - depguard
+    - dogsled
     # - dupl
     - errcheck
     - exportloopref
@@ -31,7 +32,6 @@ linters:
     - gocyclo
     - gofmt
     - goimports
-    # - golint
     - gosec
     - gosimple
     - govet
@@ -41,9 +41,10 @@ linters:
     - maligned
     - misspell
     - nakedret
+    - prealloc
     - staticcheck
     - structcheck
-    # - stylecheck
+    - stylecheck # instead of golint
     # - testpackage
     - typecheck
     - unconvert
@@ -70,3 +71,14 @@ issues:
     - linters:
         - wsl
       text: "only one cuddle assignment allowed before range statement"
+
+    # Allow dot imports for `fake` directory and e2e tests
+    - linters:
+        - stylecheck
+      text: "ST1001: "
+      path: /fake
+
+    - linters:
+        - stylecheck
+      text: "ST1001: "
+      path: test/e2e

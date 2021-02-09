@@ -23,7 +23,7 @@ import (
 	"sync"
 )
 
-type IpPool struct {
+type IPPool struct {
 	cidr      string
 	net       *net.IPNet
 	size      int
@@ -32,7 +32,7 @@ type IpPool struct {
 	sync.RWMutex
 }
 
-func NewIpPool(cidr string) (*IpPool, error) {
+func NewIPPool(cidr string) (*IPPool, error) {
 	_, network, err := net.ParseCIDR(cidr)
 	if err != nil {
 		return nil, err
@@ -41,20 +41,20 @@ func NewIpPool(cidr string) (*IpPool, error) {
 	ones, totalbits := network.Mask.Size()
 	size := int(math.Exp2(float64(totalbits-ones))) - 2 // don't count net and broadcast
 	if size < 2 {
-		return nil, errors.New("Invalid CIDR Prefix")
+		return nil, errors.New("invalid CIDR Prefix")
 	}
 
-	pool := &IpPool{
+	pool := &IPPool{
 		cidr:      cidr,
 		net:       network,
 		size:      size,
 		available: make(map[string]bool),
 		allocated: make(map[string]string),
 	}
-	startingIp := ipToInt(pool.net.IP) + 1
+	startingIP := ipToInt(pool.net.IP) + 1
 
 	for i := 0; i < pool.size; i++ {
-		ip := intToIP(startingIp + i).String()
+		ip := intToIP(startingIP + i).String()
 		pool.available[ip] = true
 	}
 
@@ -64,26 +64,26 @@ func NewIpPool(cidr string) (*IpPool, error) {
 }
 
 func ipToInt(ip net.IP) int {
-	intIp := ip
+	intIP := ip
 	if len(ip) == 16 {
-		intIp = ip[12:16]
+		intIP = ip[12:16]
 	}
 
-	return int(binary.BigEndian.Uint32(intIp))
+	return int(binary.BigEndian.Uint32(intIP))
 }
 
 func intToIP(ip int) net.IP {
-	netIp := make(net.IP, 4)
-	binary.BigEndian.PutUint32(netIp, uint32(ip))
+	netIP := make(net.IP, 4)
+	binary.BigEndian.PutUint32(netIP, uint32(ip))
 
-	return netIp
+	return netIP
 }
 
-func (p *IpPool) Allocate(key string) (string, error) {
+func (p *IPPool) Allocate(key string) (string, error) {
 	p.Lock()
 	defer p.Unlock()
-	allocatedIp := p.allocated[key]
-	if allocatedIp == "" {
+	allocatedIP := p.allocated[key]
+	if allocatedIP == "" {
 		for k := range p.available {
 			p.allocated[key] = k
 			delete(p.available, k)
@@ -95,10 +95,10 @@ func (p *IpPool) Allocate(key string) (string, error) {
 		return "", errors.New("IPAM: No IP available for allocation")
 	}
 
-	return allocatedIp, nil
+	return allocatedIP, nil
 }
 
-func (p *IpPool) Release(key string) string {
+func (p *IPPool) Release(key string) string {
 	p.Lock()
 	ip := p.allocated[key]
 	if ip != "" {
@@ -111,7 +111,7 @@ func (p *IpPool) Release(key string) string {
 	return ip
 }
 
-func (p *IpPool) IsAvailable(ip string) bool {
+func (p *IPPool) IsAvailable(ip string) bool {
 	p.RLock()
 	result := p.available[ip]
 	p.RUnlock()
@@ -119,7 +119,7 @@ func (p *IpPool) IsAvailable(ip string) bool {
 	return result
 }
 
-func (p *IpPool) GetAllocatedIp(key string) string {
+func (p *IPPool) GetAllocatedIP(key string) string {
 	p.RLock()
 	ip := p.allocated[key]
 	p.RUnlock()
@@ -127,8 +127,8 @@ func (p *IpPool) GetAllocatedIp(key string) string {
 	return ip
 }
 
-func (p *IpPool) RequestIp(key, ip string) (string, error) {
-	if p.GetAllocatedIp(key) == ip {
+func (p *IPPool) RequestIP(key, ip string) (string, error) {
+	if p.GetAllocatedIP(key) == ip {
 		return ip, nil
 	}
 

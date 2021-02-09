@@ -92,7 +92,7 @@ func (ovn *Handler) updateGatewayDataplane() error {
 		return errors.Wrap(err, "error adding submariner default")
 	}
 
-	if err = ovn.updateNoMasqueradeIpTables(); err != nil {
+	if err = ovn.updateNoMasqueradeIPTables(); err != nil {
 		return errors.Wrap(err, "error handling no-masquerade rules")
 	}
 
@@ -145,7 +145,7 @@ func (ovn *Handler) setupForwardingIptables() error {
 	return nil
 }
 
-func (ovn *Handler) updateNoMasqueradeIpTables() error {
+func (ovn *Handler) updateNoMasqueradeIPTables() error {
 	ipt, err := iptables.New()
 	if err != nil {
 		return errors.Wrap(err, "error initializing iptables")

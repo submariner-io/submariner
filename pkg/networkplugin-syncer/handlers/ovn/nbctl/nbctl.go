@@ -103,9 +103,9 @@ func (n *NbCtl) GetGatewayChassis(lrp, chassis string) (string, error) {
 	return output, err
 }
 
-func (n *NbCtl) LrSetLoadBalancers(lrId string, lbIDs []string) error {
+func (n *NbCtl) LrSetLoadBalancers(lrID string, lbIDs []string) error {
 	loadBalancerSet := fmt.Sprintf("load_balancer=[%s]", strings.Join(lbIDs, ","))
-	_, err := n.nbctl("set", "Logical_Router", lrId, loadBalancerSet)
+	_, err := n.nbctl("set", "Logical_Router", lrID, loadBalancerSet)
 
 	return err
 }
@@ -122,16 +122,16 @@ func (n *NbCtl) LrPolicyDel(logicalRouter string, prio int, filter string) error
 	return err
 }
 
-func (n *NbCtl) LrPolicyGetSubnets(logicalRouter, rerouteIp string) (stringset.Interface, error) {
+func (n *NbCtl) LrPolicyGetSubnets(logicalRouter, rerouteIP string) (stringset.Interface, error) {
 	output, err := n.nbctl("lr-policy-list", logicalRouter)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error getting existing routing policies for router %q", logicalRouter)
 	}
 
-	return parseLrPolicyGetOutput(output, rerouteIp), nil
+	return parseLrPolicyGetOutput(output, rerouteIP), nil
 }
 
-func parseLrPolicyGetOutput(output, rerouteIp string) stringset.Interface {
+func parseLrPolicyGetOutput(output, rerouteIP string) stringset.Interface {
 	// Example output:
 	// $ ovn-nbctl lr-policy-list submariner_router
 	// Routing Policies
@@ -140,7 +140,7 @@ func parseLrPolicyGetOutput(output, rerouteIp string) stringset.Interface {
 	//
 	subnets := stringset.New()
 	//TODO: make this regex more generic in a global variable, so we avoid re-compiling the regex on each call
-	r := regexp.MustCompile("ip4\\.dst == ([0-9\\.]+/[0-9]+)[\\s\\t]+reroute[\\s\\t]+" + rerouteIp)
+	r := regexp.MustCompile("ip4\\.dst == ([0-9\\.]+/[0-9]+)[\\s\\t]+reroute[\\s\\t]+" + rerouteIP)
 	for _, match := range r.FindAllStringSubmatch(output, -1) {
 		if len(match) == 2 {
 			subnets.Add(match[1])

@@ -33,12 +33,12 @@ func (i *Controller) updateEgressRulesForResource(resourceName, sourceIP, global
 		klog.V(log.DEBUG).Infof("Installing iptable egress rules for %s: %s", resourceName, strings.Join(ruleSpec, " "))
 
 		if err := i.ipt.AppendUnique("nat", constants.SmGlobalnetEgressChain, ruleSpec...); err != nil {
-			return fmt.Errorf("error appending iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
+			return fmt.Errorf("error appending iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
 		}
 	} else {
 		klog.V(log.DEBUG).Infof("Deleting iptable egress rules for %s : %s", resourceName, strings.Join(ruleSpec, " "))
 		if err := i.ipt.Delete("nat", constants.SmGlobalnetEgressChain, ruleSpec...); err != nil {
-			return fmt.Errorf("error deleting iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
+			return fmt.Errorf("error deleting iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
 		}
 	}
 

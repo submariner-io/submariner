@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package cluster_files
+package clusterfiles
 
 import (
 	"io/ioutil"
@@ -35,13 +35,13 @@ import (
 // a local path to the file
 func Get(k8sClient kubernetes.Interface, urlAddress string) (pathStr string, err error) {
 	klog.V(log.DEBUG).Infof("reading cluster_file: %s", urlAddress)
-	parsedUrl, err := url.Parse(urlAddress)
+	parsedURL, err := url.Parse(urlAddress)
 	if err != nil {
 		return "", errors.Wrapf(err, "error parsing cluster file URL %q", urlAddress)
 	}
 
-	namespace := parsedUrl.Host
-	pathContainerObject, pathFile := path.Split(parsedUrl.Path)
+	namespace := parsedURL.Host
+	pathContainerObject, pathFile := path.Split(parsedURL.Path)
 	pathContainerObject = strings.Trim(pathContainerObject, "/")
 
 	if pathContainerObject == "" || pathFile == "" {
@@ -50,9 +50,9 @@ func Get(k8sClient kubernetes.Interface, urlAddress string) (pathStr string, err
 
 	var data []byte
 
-	switch parsedUrl.Scheme {
+	switch parsedURL.Scheme {
 	case "file":
-		return parsedUrl.Path, nil
+		return parsedURL.Path, nil
 
 	case "secret":
 		secret, err := k8sClient.CoreV1().Secrets(namespace).Get(pathContainerObject, metav1.GetOptions{})
@@ -82,19 +82,19 @@ func Get(k8sClient kubernetes.Interface, urlAddress string) (pathStr string, err
 		}
 
 	default:
-		return "", errors.Errorf("the scheme %q in cluster file URL %q is not supported ", parsedUrl.Scheme, urlAddress)
+		return "", errors.Errorf("the scheme %q in cluster file URL %q is not supported ", parsedURL.Scheme, urlAddress)
 	}
 
-	return storeToDisk(pathContainerObject, parsedUrl, data)
+	return storeToDisk(pathContainerObject, parsedURL, data)
 }
 
-func storeToDisk(pathContainerObject string, parsedUrl *url.URL, data []byte) (string, error) {
+func storeToDisk(pathContainerObject string, parsedURL *url.URL, data []byte) (string, error) {
 	storageDirectory, err := ioutil.TempDir("", "cluster_files")
 	if err != nil {
 		return "", errors.Wrap(err, "error creating cluster_files directory")
 	}
 
-	diskFilePath := path.Join(storageDirectory, parsedUrl.Path)
+	diskFilePath := path.Join(storageDirectory, parsedURL.Path)
 	dir := path.Join(storageDirectory, pathContainerObject)
 	err = os.MkdirAll(dir, 0700)
 	if err != nil {

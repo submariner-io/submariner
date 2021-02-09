@@ -31,19 +31,19 @@ import (
 func (i *Controller) nodeUpdater(obj runtime.Object, key string) error {
 	node := obj.(*k8sv1.Node)
 	cniIfaceIP := node.GetAnnotations()[constants.CniInterfaceIP]
-	existingGlobalIp := node.GetAnnotations()[SubmarinerIpamGlobalIp]
-	allocatedIp, err := i.annotateGlobalIp(key, existingGlobalIp)
-	if err != nil { // failed to get globalIp or failed to update, we want to retry
+	existingGlobalIP := node.GetAnnotations()[SubmarinerIpamGlobalIP]
+	allocatedIP, err := i.annotateGlobalIP(key, existingGlobalIP)
+	if err != nil { // failed to get globalIP or failed to update, we want to retry
 		logAndRequeue(key, i.nodeWorkqueue)
-		return fmt.Errorf("failed to annotate globalIp to node %q: %+v", key, err)
+		return fmt.Errorf("failed to annotate globalIP to node %q: %+v", key, err)
 	}
 
 	// This case is hit in one of the two situations
-	// 1. when the Worker Node does not have the globalIp annotation and a new globalIp is allocated
-	// 2. when the current globalIp annotation on the Node does not match with the info maintained by ipPool
-	if allocatedIp != "" {
-		klog.V(log.DEBUG).Infof("Allocating globalIp %s to Node %q ", allocatedIp, key)
-		err = i.syncNodeRules(node.Name, cniIfaceIP, allocatedIp, AddRules)
+	// 1. when the Worker Node does not have the globalIP annotation and a new globalIP is allocated
+	// 2. when the current globalIP annotation on the Node does not match with the info maintained by ipPool
+	if allocatedIP != "" {
+		klog.V(log.DEBUG).Infof("Allocating globalIP %s to Node %q ", allocatedIP, key)
+		err = i.syncNodeRules(node.Name, cniIfaceIP, allocatedIP, AddRules)
 		if err != nil {
 			logAndRequeue(key, i.nodeWorkqueue)
 			return err
@@ -54,7 +54,7 @@ func (i *Controller) nodeUpdater(obj runtime.Object, key string) error {
 			annotations = map[string]string{}
 		}
 
-		annotations[SubmarinerIpamGlobalIp] = allocatedIp
+		annotations[SubmarinerIpamGlobalIP] = allocatedIP
 
 		node.SetAnnotations(annotations)
 
@@ -63,13 +63,13 @@ func (i *Controller) nodeUpdater(obj runtime.Object, key string) error {
 			logAndRequeue(key, i.nodeWorkqueue)
 			return err
 		}
-	} else if existingGlobalIp != "" {
-		klog.V(log.DEBUG).Infof("Node %q already has globalIp %s annotation, syncing rules", key, existingGlobalIp)
+	} else if existingGlobalIP != "" {
+		klog.V(log.DEBUG).Infof("Node %q already has globalIP %s annotation, syncing rules", key, existingGlobalIP)
 		// When Globalnet Controller is migrated, we get notification for all the existing Nodes.
 		// For Worker Nodes that already have the annotation, we update the local ipPool cache and sync
 		// the iptable rules on the new GatewayNode.
 		// Note: This case will also be hit when Globalnet Pod is restarted
-		err = i.syncNodeRules(node.Name, cniIfaceIP, existingGlobalIp, AddRules)
+		err = i.syncNodeRules(node.Name, cniIfaceIP, existingGlobalIP, AddRules)
 		if err != nil {
 			logAndRequeue(key, i.nodeWorkqueue)
 			return err
@@ -99,22 +99,22 @@ func (i *Controller) handleRemovedNode(obj interface{}) {
 		}
 	}
 
-	globalIp := node.Annotations[SubmarinerIpamGlobalIp]
-	cniIfaceIp := node.Annotations[constants.CniInterfaceIP]
-	if globalIp != "" && cniIfaceIp != "" {
+	globalIP := node.Annotations[SubmarinerIpamGlobalIP]
+	cniIfaceIP := node.Annotations[constants.CniInterfaceIP]
+	if globalIP != "" && cniIfaceIP != "" {
 		if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
 			utilruntime.HandleError(err)
 			return
 		}
 
 		i.pool.Release(key)
-		klog.V(log.DEBUG).Infof("Released ip %s for Node %s", globalIp, key)
+		klog.V(log.DEBUG).Infof("Released ip %s for Node %s", globalIP, key)
 
-		err = i.syncNodeRules(node.Name, cniIfaceIp, globalIp, DeleteRules)
+		err = i.syncNodeRules(node.Name, cniIfaceIP, globalIP, DeleteRules)
 		if err != nil {
 			klog.Errorf("Error while cleaning up HostNetwork egress rules. %v", err)
 		}
 	} else {
-		klog.V(log.DEBUG).Infof("handleRemovedNode called for %q, that has globalIp %s and cniIfaceIp %s", key, globalIp, cniIfaceIp)
+		klog.V(log.DEBUG).Infof("handleRemovedNode called for %q, that has globalIP %s and cniIfaceIP %s", key, globalIP, cniIfaceIP)
 	}
 }

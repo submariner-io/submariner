@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package cni_interface
+package cni
 
 import (
 	"fmt"
@@ -79,7 +79,7 @@ func ConfigureRpFilter(iface string) error {
 	// #nosec G306
 	err := ioutil.WriteFile("/proc/sys/net/ipv4/conf/"+iface+"/rp_filter", []byte("2"), 0644)
 	if err != nil {
-		return fmt.Errorf("unable to update rp_filter for cni_interface %q, err: %s", iface, err)
+		return fmt.Errorf("unable to update rp_filter for cni interface %q, err: %s", iface, err)
 	}
 
 	klog.V(log.DEBUG).Infof("Successfully configured rp_filter to loose mode(2) on cniInterface %q", iface)

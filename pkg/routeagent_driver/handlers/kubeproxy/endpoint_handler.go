@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package kubeproxy_iptables
+package kubeproxy
 
 import (
 	"fmt"
@@ -102,6 +102,9 @@ func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 		if !kp.remoteSubnets.Contains(inputCidrBlock) {
 			kp.remoteSubnets.Add(inputCidrBlock)
 		}
+
+		gwIP := endpoint.GatewayIP()
+		kp.remoteSubnetGw[inputCidrBlock] = gwIP
 	}
 
 	if err := kp.updateRoutingRulesForInterClusterSupport(endpoint.Spec.Subnets, Add); err != nil {
@@ -125,6 +128,7 @@ func (kp *SyncHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	defer kp.syncHandlerMutex.Unlock()
 	for _, inputCidrBlock := range endpoint.Spec.Subnets {
 		kp.remoteSubnets.Remove(inputCidrBlock)
+		delete(kp.remoteSubnetGw, inputCidrBlock)
 	}
 	// TODO: Handle a remote endpoint removal use-case
 	//         - remove related iptable rules
@@ -157,7 +161,7 @@ func (kp *SyncHandler) overlappingSubnets(remoteSubnets []string) error {
 		}
 
 		if overlap {
-			return fmt.Errorf("Local Service CIDR %q, overlaps with remote cluster subnets %s",
+			return fmt.Errorf("local Service CIDR %q, overlaps with remote cluster subnets %s",
 				serviceCidr, remoteSubnets)
 		}
 	}
@@ -169,7 +173,7 @@ func (kp *SyncHandler) overlappingSubnets(remoteSubnets []string) error {
 		}
 
 		if overlap {
-			return fmt.Errorf("Local Pod CIDR %q, overlaps with remote cluster subnets %s",
+			return fmt.Errorf("local Pod CIDR %q, overlaps with remote cluster subnets %s",
 				podCidr, remoteSubnets)
 		}
 	}

@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package cluster_files_test
+package clusterfiles_test
 
 import (
 	"io/ioutil"
@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/submariner-io/submariner/pkg/util/cluster_files"
+	"github.com/submariner-io/submariner/pkg/util/clusterfiles"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -61,39 +61,39 @@ var _ = Describe("Cluster Files Get", func() {
 
 	When("The scheme is unknown", func() {
 		It("should return an error", func() {
-			_, err := cluster_files.Get(client, "randomschema://ns1/my-secret-noo/data1")
+			_, err := clusterfiles.Get(client, "randomschema://ns1/my-secret-noo/data1")
 			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	When("a file source does not exist", func() {
 		It("should return an error", func() {
-			_, err := cluster_files.Get(client, "secret://ns1/my-secret-noo/data1")
+			_, err := clusterfiles.Get(client, "secret://ns1/my-secret-noo/data1")
 			Expect(err).To(HaveOccurred())
-			_, err = cluster_files.Get(client, "configmap://ns1/my-configmap-noo/data1")
+			_, err = clusterfiles.Get(client, "configmap://ns1/my-configmap-noo/data1")
 			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	When("the content inside the file does not exist", func() {
 		It("should return an error", func() {
-			_, err := cluster_files.Get(client, "secret://ns1/my-secret/data1-does-not-exist")
+			_, err := clusterfiles.Get(client, "secret://ns1/my-secret/data1-does-not-exist")
 			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	When("the URL is malformed", func() {
 		It("should return an error", func() {
-			_, err := cluster_files.Get(client, "secret://ns1/")
+			_, err := clusterfiles.Get(client, "secret://ns1/")
 			Expect(err).To(HaveOccurred())
-			_, err = cluster_files.Get(client, "secret://ns1/secret-with-no-content-detail")
+			_, err = clusterfiles.Get(client, "secret://ns1/secret-with-no-content-detail")
 			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	When("the source secret exist", func() {
 		It("should return the data in a tmp file", func() {
-			file, err := cluster_files.Get(client, "secret://ns1/my-secret/data1")
+			file, err := clusterfiles.Get(client, "secret://ns1/my-secret/data1")
 			Expect(err).NotTo(HaveOccurred())
 			fileContent, err := ioutil.ReadFile(file)
 			Expect(err).NotTo(HaveOccurred())
@@ -103,7 +103,7 @@ var _ = Describe("Cluster Files Get", func() {
 
 	When("the source configmap exist", func() {
 		It("should return the data in a tmp file", func() {
-			file, err := cluster_files.Get(client, "configmap://ns1/my-configmap/data1")
+			file, err := clusterfiles.Get(client, "configmap://ns1/my-configmap/data1")
 			Expect(err).NotTo(HaveOccurred())
 			fileContent, err := ioutil.ReadFile(file)
 			Expect(err).NotTo(HaveOccurred())
@@ -113,7 +113,7 @@ var _ = Describe("Cluster Files Get", func() {
 
 	When("the source configmap exist and has binary data", func() {
 		It("should return the data in a tmp file", func() {
-			file, err := cluster_files.Get(client, "configmap://ns1/my-configmap-binary/data1")
+			file, err := clusterfiles.Get(client, "configmap://ns1/my-configmap-binary/data1")
 			Expect(err).NotTo(HaveOccurred())
 			fileContent, err := ioutil.ReadFile(file)
 			Expect(err).NotTo(HaveOccurred())
@@ -124,7 +124,7 @@ var _ = Describe("Cluster Files Get", func() {
 
 	When("the source is a file", func() {
 		It("should return the original path for the file:/// scheme", func() {
-			file, err := cluster_files.Get(nil, "file:///dir/file")
+			file, err := clusterfiles.Get(nil, "file:///dir/file")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(file).To(Equal("/dir/file"))
 		})

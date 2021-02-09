@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package kubeproxy_iptables
+package kubeproxy
 
 import (
 	"fmt"
@@ -31,7 +31,7 @@ import (
 
 type vxLanAttributes struct {
 	name     string
-	vxlanId  int
+	vxlanID  int
 	group    net.IP
 	srcAddr  net.IP
 	vtepPort int
@@ -50,7 +50,7 @@ func newVxlanIface(attrs *vxLanAttributes, activeEndPoint string) (*vxLanIface, 
 			MTU:   attrs.mtu,
 			Flags: net.FlagUp,
 		},
-		VxlanId: attrs.vxlanId,
+		VxlanId: attrs.vxlanID,
 		SrcAddr: attrs.srcAddr,
 		Group:   attrs.group,
 		Port:    attrs.vtepPort,
@@ -237,7 +237,7 @@ func (kp *SyncHandler) createVxLANInterface(activeEndPoint string, ifaceType int
 	if ifaceType == VxInterfaceGateway {
 		attrs := &vxLanAttributes{
 			name:     VxLANIface,
-			vxlanId:  100,
+			vxlanID:  100,
 			group:    nil,
 			srcAddr:  nil,
 			vtepPort: VxLANPort,
@@ -269,7 +269,7 @@ func (kp *SyncHandler) createVxLANInterface(activeEndPoint string, ifaceType int
 		// non-Gateway/Worker Node
 		attrs := &vxLanAttributes{
 			name:     VxLANIface,
-			vxlanId:  100,
+			vxlanID:  100,
 			group:    gatewayNodeIP,
 			srcAddr:  nil,
 			vtepPort: VxLANPort,

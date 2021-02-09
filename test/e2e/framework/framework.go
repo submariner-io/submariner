@@ -76,7 +76,7 @@ func (f *Framework) AwaitGatewayWithStatus(cluster framework.ClusterIndex,
 			}
 			gw := result.(*submarinerv1.Gateway)
 			if gw.Status.HAStatus != status {
-				return false, "", fmt.Errorf("Gateway %q exists but has wrong status %q, expected %q",
+				return false, "", fmt.Errorf("gateway %q exists but has wrong status %q, expected %q",
 					gw.Name, gw.Status.HAStatus, status)
 			}
 			return true, "", nil
