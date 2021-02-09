@@ -51,7 +51,7 @@ func (xc *XFRMCleanupHandler) NonGatewayCleanup() error {
 		klog.V(log.DEBUG).Infof("Deleting XFRM policy %s", currentXfrmPolicyList[i])
 
 		if err = netlink.XfrmPolicyDel(&currentXfrmPolicyList[i]); err != nil {
-			return fmt.Errorf("error Deleting XFRM policy %s: %v", currentXfrmPolicyList[i], err)
+			return fmt.Errorf("error deleting XFRM policy %s: %v", currentXfrmPolicyList[i], err)
 		}
 	}
 
