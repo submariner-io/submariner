@@ -28,6 +28,7 @@ linters:
     # - funlen
     # - gochecknoglobals
     # - gochecknoinits
+    - goconst
     - gocritic
     - gocyclo
     - gofmt

@@ -50,6 +50,8 @@ const (
 	localCIDR       = "169.254.1.0/24"
 	remoteCIDR      = "169.254.2.0/24"
 	nodeName        = "raiders"
+	oldIP           = "169.254.1.10"
+	newIP           = "169.254.1.20"
 )
 
 var _ = Describe("Endpoint monitoring", func() {
@@ -119,14 +121,14 @@ var _ = Describe("Service monitoring", func() {
 
 	When("a Service's global IP is updated", func() {
 		BeforeEach(func() {
-			service.Annotations[ipam.SubmarinerIpamGlobalIP] = "169.254.1.10"
+			service.Annotations[ipam.SubmarinerIpamGlobalIP] = oldIP
 		})
 
 		It("should update the appropriate IP tables rule", func() {
 			t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain,
 				ContainSubstring(service.Annotations[ipam.SubmarinerIpamGlobalIP]))
 
-			service.Annotations[ipam.SubmarinerIpamGlobalIP] = "169.254.1.20"
+			service.Annotations[ipam.SubmarinerIpamGlobalIP] = newIP
 			_, err := t.k8sClient.CoreV1().Services(namespace).Update(service)
 			Expect(err).To(Succeed())
 			t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain,
@@ -208,13 +210,13 @@ var _ = Describe("Pod monitoring", func() {
 
 	When("a Pod's global IP is updated", func() {
 		BeforeEach(func() {
-			pod.Annotations[ipam.SubmarinerIpamGlobalIP] = "169.254.1.10"
+			pod.Annotations[ipam.SubmarinerIpamGlobalIP] = oldIP
 		})
 
 		It("should update the appropriate IP tables rule", func() {
 			t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChain, ContainSubstring(pod.Annotations[ipam.SubmarinerIpamGlobalIP]))
 
-			pod.Annotations[ipam.SubmarinerIpamGlobalIP] = "169.254.1.20"
+			pod.Annotations[ipam.SubmarinerIpamGlobalIP] = newIP
 			_, err := t.k8sClient.CoreV1().Pods(namespace).Update(pod)
 			Expect(err).To(Succeed())
 			t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChain, ContainSubstring(pod.Annotations[ipam.SubmarinerIpamGlobalIP]))
@@ -314,13 +316,13 @@ var _ = Describe("Node monitoring", func() {
 
 	When("a Node's global IP is updated", func() {
 		BeforeEach(func() {
-			node.Annotations[ipam.SubmarinerIpamGlobalIP] = "169.254.1.10"
+			node.Annotations[ipam.SubmarinerIpamGlobalIP] = oldIP
 		})
 
 		It("should update the appropriate IP tables rule", func() {
 			t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChain, ContainSubstring(node.Annotations[ipam.SubmarinerIpamGlobalIP]))
 
-			node.Annotations[ipam.SubmarinerIpamGlobalIP] = "169.254.1.20"
+			node.Annotations[ipam.SubmarinerIpamGlobalIP] = newIP
 			_, err := t.k8sClient.CoreV1().Nodes().Update(node)
 			Expect(err).To(Succeed())
 			t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChain, ContainSubstring(node.Annotations[ipam.SubmarinerIpamGlobalIP]))
