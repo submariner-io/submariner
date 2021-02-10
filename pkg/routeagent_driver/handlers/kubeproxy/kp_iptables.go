@@ -114,7 +114,7 @@ func (kp *SyncHandler) Init() error {
 	}
 
 	// For now we get all the cleanups
-	kp.installCleanupHandlers(cableCleanup.GetCleanupHandlers())
+	kp.InstallCleanupHandlers(cableCleanup.GetCleanupHandlers()...)
 
 	return nil
 }

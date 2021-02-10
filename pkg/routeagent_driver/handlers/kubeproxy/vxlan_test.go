@@ -17,7 +17,6 @@ package kubeproxy
 
 import (
 	"strconv"
-	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -40,8 +39,3 @@ var _ = Describe("Function getVxlanVtepIPAddress tests", func() {
 		})
 	})
 })
-
-func TestKubeProxyIPTables(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Kubeproxy IP Tables Suite")
-}
