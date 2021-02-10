@@ -20,16 +20,18 @@ import (
 	"syscall"
 
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/vishvananda/netlink"
+	"github.com/submariner-io/submariner/pkg/netlink"
 	"k8s.io/klog"
 
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cleanup"
 )
 
-type XFRMCleanupHandler struct{}
+type XFRMCleanupHandler struct {
+	netLink netlink.Interface
+}
 
 func NewXFRMCleanupHandler() cleanup.Handler {
-	return &XFRMCleanupHandler{}
+	return &XFRMCleanupHandler{netLink: netlink.New()}
 }
 
 func (xc *XFRMCleanupHandler) GetName() string {
@@ -37,7 +39,7 @@ func (xc *XFRMCleanupHandler) GetName() string {
 }
 
 func (xc *XFRMCleanupHandler) NonGatewayCleanup() error {
-	currentXfrmPolicyList, err := netlink.XfrmPolicyList(syscall.AF_INET)
+	currentXfrmPolicyList, err := xc.netLink.XfrmPolicyList(syscall.AF_INET)
 
 	if err != nil {
 		return fmt.Errorf("error retrieving current xfrm policies: %v", err)
@@ -50,7 +52,7 @@ func (xc *XFRMCleanupHandler) NonGatewayCleanup() error {
 	for i := range currentXfrmPolicyList {
 		klog.V(log.DEBUG).Infof("Deleting XFRM policy %s", currentXfrmPolicyList[i])
 
-		if err = netlink.XfrmPolicyDel(&currentXfrmPolicyList[i]); err != nil {
+		if err = xc.netLink.XfrmPolicyDel(&currentXfrmPolicyList[i]); err != nil {
 			return fmt.Errorf("error deleting XFRM policy %s: %v", currentXfrmPolicyList[i], err)
 		}
 	}

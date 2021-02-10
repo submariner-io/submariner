@@ -19,8 +19,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
-	"strconv"
 	"syscall"
 
 	"github.com/vishvananda/netlink"
@@ -36,14 +34,12 @@ import (
 func (kp *SyncHandler) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks []string, operation Operation) {
 	if operation == Flush {
 		kp.routeCacheGWNode.RemoveAll()
-		// The conversion doesn't introduce a security problem
-		// #nosec G204
-		cmd := exec.Command("/sbin/ip", "r", "flush", "table", strconv.Itoa(constants.RouteAgentHostNetworkTableID))
-		if err := cmd.Run(); err != nil {
+
+		err := kp.netLink.FlushRouteTable(constants.RouteAgentHostNetworkTableID)
+		if err != nil {
 			// We can safely ignore this error, as this table will exist only on GW nodes
 			klog.V(log.TRACE).Infof("Flushing routing table %d returned error. Can be ignored on non-Gw node: %v",
 				constants.RouteAgentHostNetworkTableID, err)
-			return
 		}
 	} else if kp.isGatewayNode && kp.cniIface != nil {
 		// These routing rules are required ONLY on the Gateway Node.
@@ -52,7 +48,7 @@ func (kp *SyncHandler) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks [
 			var viaGW *net.IP
 			if kp.isGatewayInRemoteCIDR(inputCidrBlock) {
 				gwIP := kp.remoteSubnetGw[inputCidrBlock]
-				routes, err := netlink.RouteGet(gwIP)
+				routes, err := kp.netLink.RouteGet(gwIP)
 				if err != nil {
 					klog.Errorf("Failed to find route to remote gateway IP %s for cidr %s", gwIP.String(), inputCidrBlock)
 				}
@@ -129,12 +125,12 @@ func (kp *SyncHandler) configureRoute(remoteSubnet string, operation Operation, 
 
 	switch operation {
 	case Add:
-		err = netlink.RouteAdd(&route)
+		err = kp.netLink.RouteAdd(&route)
 		if err != nil && !os.IsExist(err) {
 			return fmt.Errorf("error adding the route %s: %v", route, err)
 		}
 	case Delete:
-		err = netlink.RouteDel(&route)
+		err = kp.netLink.RouteDel(&route)
 		if err != nil {
 			return fmt.Errorf("error deleting the route %s: %v", route, err)
 		}
@@ -144,7 +140,7 @@ func (kp *SyncHandler) configureRoute(remoteSubnet string, operation Operation, 
 }
 
 func (kp *SyncHandler) cleanVxSubmarinerRoutes() {
-	link, err := netlink.LinkByName(VxLANIface)
+	link, err := kp.netLink.LinkByName(VxLANIface)
 	if err != nil {
 		if _, ok := err.(netlink.LinkNotFoundError); !ok {
 			klog.Errorf("Error retrieving link by name %q: %v", VxLANIface, err)
@@ -152,7 +148,7 @@ func (kp *SyncHandler) cleanVxSubmarinerRoutes() {
 		}
 	}
 
-	currentRouteList, err := netlink.RouteList(link, syscall.AF_INET)
+	currentRouteList, err := kp.netLink.RouteList(link, syscall.AF_INET)
 	if err != nil {
 		klog.Errorf("Unable to cleanup routes, error retrieving routes on the link %s: %v", VxLANIface, err)
 		return
@@ -165,7 +161,7 @@ func (kp *SyncHandler) cleanVxSubmarinerRoutes() {
 			klog.V(log.DEBUG).Infof("Found nil gw or dst")
 		} else if kp.remoteSubnets.Contains(currentRouteList[i].Dst.String()) {
 			klog.V(log.DEBUG).Infof("Removing route %s", currentRouteList[i])
-			if err = netlink.RouteDel(&currentRouteList[i]); err != nil {
+			if err = kp.netLink.RouteDel(&currentRouteList[i]); err != nil {
 				klog.Errorf("Error removing route %s: %v", currentRouteList[i], err)
 			}
 		}
@@ -176,12 +172,12 @@ func (kp *SyncHandler) cleanVxSubmarinerRoutes() {
 func (kp *SyncHandler) reconcileRoutes(vxlanGw net.IP) error {
 	klog.V(log.DEBUG).Infof("Reconciling routes to gw: %s", vxlanGw.String())
 
-	link, err := netlink.LinkByName(VxLANIface)
+	link, err := kp.netLink.LinkByName(VxLANIface)
 	if err != nil {
 		return fmt.Errorf("error retrieving link by name %s: %v", VxLANIface, err)
 	}
 
-	currentRouteList, err := netlink.RouteList(link, syscall.AF_INET)
+	currentRouteList, err := kp.netLink.RouteList(link, syscall.AF_INET)
 
 	if err != nil {
 		return fmt.Errorf("error retrieving routes for link %s: %v", VxLANIface, err)
@@ -199,14 +195,14 @@ func (kp *SyncHandler) reconcileRoutes(vxlanGw net.IP) error {
 				klog.V(log.DEBUG).Infof("Found route %s with gw %s already installed", currentRouteList[i], currentRouteList[i].Gw)
 			} else {
 				klog.V(log.DEBUG).Infof("Removing route %s", currentRouteList[i])
-				if err = netlink.RouteDel(&currentRouteList[i]); err != nil {
+				if err = kp.netLink.RouteDel(&currentRouteList[i]); err != nil {
 					klog.Errorf("Error removing route %s: %v", currentRouteList[i], err)
 				}
 			}
 		}
 	}
 
-	currentRouteList, err = netlink.RouteList(link, syscall.AF_INET)
+	currentRouteList, err = kp.netLink.RouteList(link, syscall.AF_INET)
 
 	if err != nil {
 		return fmt.Errorf("error retrieving routes for link %s: %v", VxLANIface, err)
@@ -238,7 +234,7 @@ func (kp *SyncHandler) reconcileRoutes(vxlanGw net.IP) error {
 		}
 
 		if !found {
-			err = netlink.RouteAdd(&route)
+			err = kp.netLink.RouteAdd(&route)
 			if err != nil {
 				klog.Errorf("Error adding route %s: %v", route, err)
 			}
@@ -256,7 +252,7 @@ func (kp *SyncHandler) updateRoutingRulesForInterClusterSupport(remoteCIDRs []st
 	}
 
 	if kp.vxlanDevice != nil && kp.vxlanGwIP != nil {
-		link, err := netlink.LinkByName(VxLANIface)
+		link, err := kp.netLink.LinkByName(VxLANIface)
 		if err != nil {
 			return fmt.Errorf("error retrieving link by name %s: %v", VxLANIface, err)
 		}
@@ -276,12 +272,12 @@ func (kp *SyncHandler) updateRoutingRulesForInterClusterSupport(remoteCIDRs []st
 			}
 
 			if operation == Add {
-				err = netlink.RouteAdd(&route)
+				err = kp.netLink.RouteAdd(&route)
 				if err != nil {
 					return fmt.Errorf("error adding route %s: %v", route, err)
 				}
 			} else if operation == Delete {
-				err = netlink.RouteDel(&route)
+				err = kp.netLink.RouteDel(&route)
 				if err != nil {
 					return fmt.Errorf("error deleting route %s: %v", route, err)
 				}
@@ -300,12 +296,12 @@ func (kp *SyncHandler) configureIPRule(operation Operation) error {
 
 		switch operation {
 		case Add:
-			err := netlink.RuleAdd(rule)
+			err := kp.netLink.RuleAdd(rule)
 			if err != nil && !os.IsExist(err) {
 				return fmt.Errorf("failed to add ip rule %s: %v", rule, err)
 			}
 		case Delete:
-			err := netlink.RuleDel(rule)
+			err := kp.netLink.RuleDel(rule)
 			if err != nil && !os.IsNotExist(err) {
 				return fmt.Errorf("failed to delete ip rule %s: %v", rule, err)
 			}
