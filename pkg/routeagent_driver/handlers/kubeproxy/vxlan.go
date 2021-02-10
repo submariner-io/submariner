@@ -17,13 +17,13 @@ package kubeproxy
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"strconv"
 	"strings"
 	"syscall"
 
 	"github.com/submariner-io/admiral/pkg/log"
+	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	"k8s.io/klog"
@@ -39,11 +39,12 @@ type vxLanAttributes struct {
 }
 
 type vxLanIface struct {
+	netLink                netlinkAPI.Interface
 	link                   *netlink.Vxlan
 	activeEndpointHostname string
 }
 
-func newVxlanIface(attrs *vxLanAttributes, activeEndPoint string) (*vxLanIface, error) {
+func (kp *SyncHandler) newVxlanIface(attrs *vxLanAttributes, activeEndPoint string) (*vxLanIface, error) {
 	iface := &netlink.Vxlan{
 		LinkAttrs: netlink.LinkAttrs{
 			Name:  attrs.name,
@@ -57,22 +58,23 @@ func newVxlanIface(attrs *vxLanAttributes, activeEndPoint string) (*vxLanIface, 
 	}
 
 	vxLANIface := &vxLanIface{
+		netLink:                kp.netLink,
 		link:                   iface,
 		activeEndpointHostname: activeEndPoint,
 	}
 
-	if err := createVxLanIface(vxLANIface); err != nil {
+	if err := kp.createVxLanIface(vxLANIface); err != nil {
 		return nil, err
 	}
 
 	return vxLANIface, nil
 }
 
-func createVxLanIface(iface *vxLanIface) error {
-	err := netlink.LinkAdd(iface.link)
+func (kp *SyncHandler) createVxLanIface(iface *vxLanIface) error {
+	err := kp.netLink.LinkAdd(iface.link)
 	if err == syscall.EEXIST {
 		// Get the properties of existing vxlan interface
-		existing, err := netlink.LinkByName(iface.link.Name)
+		existing, err := kp.netLink.LinkByName(iface.link.Name)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve link info: %v", err)
 		}
@@ -86,11 +88,11 @@ func createVxLanIface(iface *vxLanIface) error {
 		}
 
 		// Config does not match, delete the existing interface and re-create it.
-		if err = netlink.LinkDel(existing); err != nil {
+		if err = kp.netLink.LinkDel(existing); err != nil {
 			return fmt.Errorf("failed to delete the existing vxlan interface: %v", err)
 		}
 
-		if err = netlink.LinkAdd(iface.link); err != nil {
+		if err = kp.netLink.LinkAdd(iface.link); err != nil {
 			return fmt.Errorf("failed to re-create the the vxlan interface: %v", err)
 		}
 	} else if err != nil {
@@ -101,7 +103,7 @@ func createVxLanIface(iface *vxLanIface) error {
 }
 
 func (iface *vxLanIface) deleteVxLanIface() error {
-	err := netlink.LinkDel(iface.link)
+	err := iface.netLink.LinkDel(iface.link)
 	if err != nil {
 		return fmt.Errorf("failed to delete the the vxlan interface: %v", err)
 	}
@@ -142,7 +144,7 @@ func (iface *vxLanIface) configureIPAddress(ipAddress net.IP, mask net.IPMask) e
 		Mask: mask,
 	}}
 
-	err := netlink.AddrAdd(iface.link, ipConfig)
+	err := iface.netLink.AddrAdd(iface.link, ipConfig)
 	if err == syscall.EEXIST {
 		return nil
 	} else if err != nil {
@@ -172,7 +174,7 @@ func (iface *vxLanIface) AddFDB(ipAddress net.IP, hwAddr string) error {
 		HardwareAddr: macAddr,
 	}
 
-	err = netlink.NeighAppend(neigh)
+	err = iface.netLink.NeighAppend(neigh)
 	if err != nil {
 		return fmt.Errorf("unable to add the bridge fdb entry %v, err: %s", neigh, err)
 	} else {
@@ -198,7 +200,7 @@ func (iface *vxLanIface) DelFDB(ipAddress net.IP, hwAddr string) error {
 		HardwareAddr: macAddr,
 	}
 
-	err = netlink.NeighDel(neigh)
+	err = iface.netLink.NeighDel(neigh)
 	if err != nil {
 		return fmt.Errorf("unable to delete the bridge fdb entry %v, err: %s", neigh, err)
 	} else {
@@ -244,7 +246,7 @@ func (kp *SyncHandler) createVxLANInterface(activeEndPoint string, ifaceType int
 			mtu:      vxlanMtu,
 		}
 
-		kp.vxlanDevice, err = newVxlanIface(attrs, activeEndPoint)
+		kp.vxlanDevice, err = kp.newVxlanIface(attrs, activeEndPoint)
 		if err != nil {
 			return fmt.Errorf("failed to create vxlan interface on Gateway Node: %v", err)
 		}
@@ -256,15 +258,12 @@ func (kp *SyncHandler) createVxLANInterface(activeEndPoint string, ifaceType int
 			}
 		}
 
-		// Enable loose mode (rp_filter=2) reverse path filtering on the vxlan interface.
-		// We won't ever create rp_filter, and its permissions are 644
-		// #nosec G306
-		err = ioutil.WriteFile("/proc/sys/net/ipv4/conf/"+VxLANIface+"/rp_filter", []byte("2"), 0644)
+		err = kp.netLink.EnableLooseModeReversePathFilter(VxLANIface)
 		if err != nil {
-			return fmt.Errorf("unable to update vxlan rp_filter proc entry, err: %s", err)
-		} else {
-			klog.V(log.DEBUG).Infof("Successfully configured rp_filter to loose mode(2) on %s", VxLANIface)
+			return err
 		}
+
+		klog.V(log.DEBUG).Infof("Successfully configured reverse path filter to loose mode on %q", VxLANIface)
 	} else if ifaceType == VxInterfaceWorker {
 		// non-Gateway/Worker Node
 		attrs := &vxLanAttributes{
@@ -276,7 +275,7 @@ func (kp *SyncHandler) createVxLANInterface(activeEndPoint string, ifaceType int
 			mtu:      vxlanMtu,
 		}
 
-		kp.vxlanDevice, err = newVxlanIface(attrs, activeEndPoint)
+		kp.vxlanDevice, err = kp.newVxlanIface(attrs, activeEndPoint)
 		if err != nil {
 			return fmt.Errorf("failed to create vxlan interface on non-Gateway Node: %v", err)
 		}

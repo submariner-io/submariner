@@ -17,7 +17,6 @@ package cni
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 
 	"github.com/pkg/errors"
@@ -72,19 +71,6 @@ func Discover(clusterCIDR string) (*Interface, error) {
 	}
 
 	return nil, fmt.Errorf("unable to find CNI Interface on the host which has IP from %q", clusterCIDR)
-}
-
-func ConfigureRpFilter(iface string) error {
-	// We won't ever create rp_filter, and its permissions are 644
-	// #nosec G306
-	err := ioutil.WriteFile("/proc/sys/net/ipv4/conf/"+iface+"/rp_filter", []byte("2"), 0644)
-	if err != nil {
-		return fmt.Errorf("unable to update rp_filter for cni interface %q, err: %s", iface, err)
-	}
-
-	klog.V(log.DEBUG).Infof("Successfully configured rp_filter to loose mode(2) on cniInterface %q", iface)
-
-	return nil
 }
 
 func AnnotateNodeWithCNIInterfaceIP(nodeName string, clientSet kubernetes.Interface, clusterCidr []string) error {
