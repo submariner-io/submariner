@@ -23,7 +23,7 @@ import (
 	"k8s.io/klog"
 )
 
-func (kp *SyncHandler) installCleanupHandlers(handlers []cleanup.Handler) {
+func (kp *SyncHandler) InstallCleanupHandlers(handlers ...cleanup.Handler) {
 	kp.cleanupHandlers = append(kp.cleanupHandlers, handlers...)
 }
 
