@@ -35,7 +35,18 @@ type Interface struct {
 	IPAddress string
 }
 
+// DiscoverFunc is a hook for unit tests
+var DiscoverFunc func(clusterCIDR string) (*Interface, error)
+
 func Discover(clusterCIDR string) (*Interface, error) {
+	if DiscoverFunc != nil {
+		return DiscoverFunc(clusterCIDR)
+	}
+
+	return discover(clusterCIDR)
+}
+
+func discover(clusterCIDR string) (*Interface, error) {
 	_, clusterNetwork, err := net.ParseCIDR(clusterCIDR)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to ParseCIDR %q", clusterCIDR)
