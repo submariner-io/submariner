@@ -25,7 +25,7 @@ const (
 var (
 	globalIPsAvailabilityGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "global_IP_availability",
+			Name: "submariner_global_IP_availability",
 			Help: "Count of available global IPs per CIDR",
 		},
 		[]string{
@@ -34,7 +34,7 @@ var (
 	)
 	globalIPsAllocatedGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "global_IP_allocated",
+			Name: "submariner_global_IP_allocated",
 			Help: "Count of global IPs allocated for Pods/Services per CIDR",
 		},
 		[]string{
