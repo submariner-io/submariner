@@ -18,3 +18,4 @@ updates:
       - dependency-name: sigs.k8s.io/controller-runtime
         versions:
           - "> 0.3.0"
+      - dependency-name: github.com/submariner-io/*
