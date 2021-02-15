@@ -94,6 +94,10 @@ fi
 export KUBECONFIG=$OCP_INS_DIR/auth/kubeconfig
 echo ""
 echo "Applying machineset changes to deploy gateway node:"
-echo "oc --context=admin apply -f $MACHINESET"
-oc --context=admin apply -f $MACHINESET || echo "applying $MACHINESET failed, please try manually with oc"
+echo "oc apply -f $MACHINESET"
+oc apply -f $MACHINESET || ( 
+ RC=$? 
+ echo "applying $MACHINESET failed, please make sure kubeconfig current context with a privileged user" >&2 
+ exit $RC 
+)
 
