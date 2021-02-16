@@ -17,6 +17,7 @@ package ipam
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"time"
 
@@ -88,6 +89,8 @@ func NewGatewayMonitor(spec *SubmarinerIpamControllerSpecification,
 		},
 		DeleteFunc: gatewayMonitor.handleRemovedEndpoint,
 	}, handlerResync)
+
+	gatewayMonitor.ReadTcpMTUConfigurationOnNode()
 
 	return gatewayMonitor, nil
 }
@@ -201,6 +204,10 @@ func (gm *GatewayMonitor) processNextEndpoint() bool {
 		if endpoint.Spec.Hostname == hostname {
 			klog.V(log.DEBUG).Infof("We are now on GatewayNode %s", endpoint.Spec.PrivateIP)
 
+			if gm.mtuConfig.successfullyRead {
+				ConfigureTcpMTUProbeValue([]byte("1"), []byte("1024"))
+			}
+
 			gm.syncMutex.Lock()
 			if !gm.isGatewayNode {
 				gm.isGatewayNode = true
@@ -209,6 +216,10 @@ func (gm *GatewayMonitor) processNextEndpoint() bool {
 			gm.syncMutex.Unlock()
 		} else {
 			klog.V(log.DEBUG).Infof("We are on non-gatewayNode. GatewayNode ip is %s", endpoint.Spec.PrivateIP)
+			if gm.mtuConfig.successfullyRead {
+				ConfigureTcpMTUProbeValue(gm.mtuConfig.default_mtu_probing, gm.mtuConfig.default_tcp_base_mss)
+			}
+
 			gm.syncMutex.Lock()
 			if gm.isGatewayNode {
 				gm.stopIpamController()
@@ -325,4 +336,42 @@ func (gm *GatewayMonitor) stopIpamController() {
 
 		cleanup.ClearGlobalnetChains(gm.ipt)
 	}
+}
+
+func ConfigureTcpMTUProbeValue(mtuProbe, mssValue []byte) {
+	// If we are unable to update the values, just log a warning, Globalnet functionality works fine except
+	// for one use-case where Pod with HostNetworking on Gateway node has mtu issues connecting to remoteServices.
+	if err := ioutil.WriteFile(tcpMtuProbingProcEntry, mtuProbe, 0644); err == nil {
+		err = ioutil.WriteFile(tcpBaseMssProcEntry, mssValue, 0644)
+		if err != nil {
+			klog.Warningf("unable to update value of tcp_base_mss to %s, err: %s", mssValue, err)
+		}
+	} else {
+		klog.Warningf("unable to update value of tcp_mtu_probing to %s, err: %s", mtuProbe, err)
+	}
+}
+
+func (gm *GatewayMonitor)ReadTcpMTUConfigurationOnNode() {
+	var err error
+
+	// If we are unable to read the values, just log a warning, Globalnet functionality works fine except
+	// for one use-case where Pod with HostNetworking on Gateway node has mtu issues connecting to remoteServices.
+	if gm.mtuConfig.default_mtu_probing, err = ioutil.ReadFile(tcpMtuProbingProcEntry); err == nil {
+		gm.mtuConfig.default_tcp_base_mss, err = ioutil.ReadFile(tcpBaseMssProcEntry)
+		if err != nil {
+			klog.Warningf("unable to read default value of tcp_base_mss, err: %s", err)
+		}
+	} else {
+		klog.Warningf("unable to read default value of tcp_mtu_probing, err: %s", err)
+	}
+
+	if err != nil {
+		gm.mtuConfig.successfullyRead = false
+		return
+	}
+
+	klog.Infof("Default_mtu_probing is %s and tcp_base_mss is %s", gm.mtuConfig.default_mtu_probing,
+		gm.mtuConfig.default_tcp_base_mss)
+	gm.mtuConfig.successfullyRead = true
+	return
 }

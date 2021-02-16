@@ -37,6 +37,9 @@ const (
 	kubeProxyServiceChainPrefix = "KUBE-SVC-"
 	kubeProxyServiceChainName   = "KUBE-SERVICES"
 
+	tcpMtuProbingProcEntry = "/proc/sys/net/ipv4/tcp_mtu_probing"
+	tcpBaseMssProcEntry    = "/proc/sys/net/ipv4/tcp_base_mss"
+
 	maxServiceRequeues = 20
 
 	AddRules    = true
