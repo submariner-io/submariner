@@ -82,24 +82,49 @@ func testFlattenColors() {
 }
 
 func testGetLocalEndpoint() {
-	It("should return a valid SubmarinerEndpoint object", func() {
-		subnets := []string{"127.0.0.1/16"}
-		privateIP := "127.0.0.1"
+	const (
+		testPrivateIP = "127.0.0.1"
+		testPublicIP  = "127.0.0.2"
+	)
+
+	var testSubnets = []string{"127.0.0.1/16"}
+
+	It("should return a valid SubmarinerEndpoint object for no-nat", func() {
 		submSpec := types.SubmarinerSpecification{
 			ClusterID:   "east",
-			ClusterCidr: subnets,
+			ClusterCidr: testSubnets,
 			CableDriver: "backend",
 		}
-		endpoint, err := util.GetLocalEndpoint(submSpec, map[string]string{}, privateIP)
+		endpoint, err := util.GetLocalEndpoint(submSpec, map[string]string{}, testPrivateIP, "")
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(endpoint.Spec.ClusterID).To(Equal("east"))
 		Expect(endpoint.Spec.CableName).To(HavePrefix("submariner-cable-east-"))
 		Expect(endpoint.Spec.Hostname).NotTo(Equal(""))
-		Expect(endpoint.Spec.PrivateIP).To(Equal(privateIP))
+		Expect(endpoint.Spec.PrivateIP).To(Equal(testPrivateIP))
 		Expect(endpoint.Spec.Backend).To(Equal("backend"))
-		Expect(endpoint.Spec.Subnets).To(Equal(subnets))
+		Expect(endpoint.Spec.Subnets).To(Equal(testSubnets))
 		Expect(endpoint.Spec.NATEnabled).To(Equal(false))
+	})
+
+	It("should return a valid SubmarinerEndpoint object for nat", func() {
+		submSpec := types.SubmarinerSpecification{
+			ClusterID:   "east",
+			ClusterCidr: testSubnets,
+			CableDriver: "backend",
+			NatEnabled:  true,
+		}
+		endpoint, err := util.GetLocalEndpoint(submSpec, map[string]string{}, testPrivateIP, testPublicIP)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(endpoint.Spec.ClusterID).To(Equal("east"))
+		Expect(endpoint.Spec.CableName).To(HavePrefix("submariner-cable-east-"))
+		Expect(endpoint.Spec.Hostname).NotTo(Equal(""))
+		Expect(endpoint.Spec.PrivateIP).To(Equal(testPrivateIP))
+		Expect(endpoint.Spec.PublicIP).To(Equal(testPublicIP))
+		Expect(endpoint.Spec.Backend).To(Equal("backend"))
+		Expect(endpoint.Spec.Subnets).To(Equal(testSubnets))
+		Expect(endpoint.Spec.NATEnabled).To(Equal(true))
 	})
 }
 

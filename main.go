@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
@@ -116,7 +117,9 @@ func main() {
 
 	submSpec.CableDriver = strings.ToLower(submSpec.CableDriver)
 
-	localEndpoint, err := util.GetLocalEndpoint(submSpec, nil, util.GetLocalIP())
+	publicIP, err := getPublicIPFromNodeLabel(cfg)
+
+	localEndpoint, err := util.GetLocalEndpoint(submSpec, nil, util.GetLocalIP(), publicIP)
 
 	if err != nil {
 		klog.Fatalf("Error creating local endpoint object from %#v: %v", submSpec, err)
@@ -323,4 +326,25 @@ func fatal(gwSyncer *syncer.GatewaySyncer, format string, args ...interface{}) {
 	err := fmt.Errorf(format, args...)
 	gwSyncer.SetGatewayStatusError(err)
 	klog.Fatal(err.Error())
+}
+
+func getPublicIPFromNodeLabel(cfg *rest.Config) (string, error) {
+	nodeName, ok := os.LookupEnv("NODE_NAME")
+	if !ok {
+		return "", errors.New("error reading the NODE_NAME from the environment")
+	}
+
+	clientset, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		return "", errors.Wrapf(err, "creating Kubernetes clientset")
+	}
+
+	node, err := clientset.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	if err != nil {
+		return "", errors.Wrapf(err, "unable to find own node %q", nodeName)
+	}
+
+	ip := node.Labels["submariner.io/public-ip"]
+
+	return ip, nil
 }

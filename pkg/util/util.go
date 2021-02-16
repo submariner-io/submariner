@@ -101,7 +101,7 @@ func FlattenColors(colorCodes []string) string {
 }
 
 func GetLocalEndpoint(submSpec types.SubmarinerSpecification, backendConfig map[string]string,
-	privateIP string) (types.SubmarinerEndpoint, error) {
+	privateIP, publicIP string) (types.SubmarinerEndpoint, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return types.SubmarinerEndpoint{}, fmt.Errorf("error getting hostname: %v", err)
@@ -137,9 +137,11 @@ func GetLocalEndpoint(submSpec types.SubmarinerSpecification, backendConfig map[
 	}
 
 	if submSpec.NatEnabled {
-		publicIP, err := ipify.GetIp()
-		if err != nil {
-			return types.SubmarinerEndpoint{}, fmt.Errorf("could not determine public IP: %v", err)
+		if publicIP == "" {
+			publicIP, err = ipify.GetIp()
+			if err != nil {
+				return types.SubmarinerEndpoint{}, fmt.Errorf("could not determine public IP: %v", err)
+			}
 		}
 
 		endpoint.Spec.PublicIP = publicIP
