@@ -42,6 +42,12 @@ type Controller struct {
 	ipt *iptables.IPTables
 }
 
+type MTUConfig struct {
+	successfullyRead          bool
+	default_mtu_probing       []byte
+	default_tcp_base_mss      []byte
+}
+
 type GatewayMonitor struct {
 	clusterID           string
 	kubeClientSet       kubernetes.Interface
