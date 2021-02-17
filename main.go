@@ -19,6 +19,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -117,7 +118,7 @@ func main() {
 
 	submSpec.CableDriver = strings.ToLower(submSpec.CableDriver)
 
-	publicIP, err := getPublicIPFromNodeLabel(cfg)
+	publicIP, err := getPublicIPFromNodeLabel(cfg, submSpec.Namespace)
 
 	localEndpoint, err := util.GetLocalEndpoint(submSpec, nil, util.GetLocalIP(), publicIP)
 
@@ -328,7 +329,8 @@ func fatal(gwSyncer *syncer.GatewaySyncer, format string, args ...interface{}) {
 	klog.Fatal(err.Error())
 }
 
-func getPublicIPFromNodeLabel(cfg *rest.Config) (string, error) {
+func getPublicIPFromNodeLabel(cfg *rest.Config, namespace string) (string, error) {
+	klog.Info("getPublicIPFromNodeLabel")
 	nodeName, ok := os.LookupEnv("NODE_NAME")
 	if !ok {
 		return "", errors.New("error reading the NODE_NAME from the environment")
@@ -344,7 +346,45 @@ func getPublicIPFromNodeLabel(cfg *rest.Config) (string, error) {
 		return "", errors.Wrapf(err, "unable to find own node %q", nodeName)
 	}
 
-	ip := node.Labels["submariner.io/public-ip"]
+	if ip := node.Labels["submariner.io/public-ip"]; ip != "" {
 
-	return ip, nil
+		klog.Infof("Public IP from node label %s", ip)
+
+		return ip, nil
+	}
+
+	if lb := node.Labels["submariner.io/public-lb"]; lb != "" {
+		ip, err := getIpFromLoadBalancer(clientset, namespace, lb)
+		if ip != "" {
+			klog.Infof("Public IP from loadbalancer %q found: %s", lb, ip)
+		}
+		return ip, err
+	}
+	return "", nil
+}
+
+func getIpFromLoadBalancer(client kubernetes.Interface, namespace, lb string) (string, error) {
+	service, err := client.CoreV1().Services(namespace).Get(lb, metav1.GetOptions{})
+	if err != nil {
+		return "", errors.Wrapf(err, "Error getting service %q for the public IP address", lb)
+	}
+
+	if len(service.Status.LoadBalancer.Ingress) < 1 {
+		return "", errors.Errorf("Error, service %q didn't contain any ladBalancer ingress")
+	}
+
+	ingress := service.Status.LoadBalancer.Ingress[0]
+	if ingress.IP != "" {
+		return ingress.IP, nil
+	}
+
+	if ingress.Hostname != "" {
+		ips, err := net.LookupIP(ingress.Hostname)
+		if err != nil {
+			return "", errors.Wrapf(err, "Error resolving LoadBalancer %q ingress hostname %q for public IP", lb, ingress.Hostname)
+		}
+		return ips[0].String(), nil
+	}
+
+	return "", nil
 }
