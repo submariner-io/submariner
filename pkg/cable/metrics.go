@@ -39,7 +39,7 @@ var (
 	// RX/TX metrics
 	rxGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "gateway_rx_bytes",
+			Name: "submariner_gateway_rx_bytes",
 			Help: "Count of bytes received (by cable driver and cable)",
 		},
 		[]string{
@@ -54,7 +54,7 @@ var (
 	)
 	txGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "gateway_tx_bytes",
+			Name: "submariner_gateway_tx_bytes",
 			Help: "Count of bytes transmitted (by cable driver and cable)",
 		},
 		[]string{
@@ -69,7 +69,7 @@ var (
 	)
 	connectionsGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "connections",
+			Name: "submariner_connections",
 			Help: "Number of connections and corresponding status (by cable driver and cable)",
 		},
 		[]string{
@@ -85,7 +85,7 @@ var (
 	)
 	connectionEstablishedTimestampGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "connection_established_timestamp",
+			Name: "submariner_connection_established_timestamp",
 			Help: "Timestamp of last successful connection established (by cable driver and cable)",
 		},
 		[]string{
@@ -100,7 +100,7 @@ var (
 	)
 	connectionLatencySecondsGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "connection_latency_seconds",
+			Name: "submariner_connection_latency_seconds",
 			Help: "Connection latency in seconds (last RTT, by cable driver and cable)",
 		},
 		[]string{

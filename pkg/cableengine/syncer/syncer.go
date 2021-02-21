@@ -49,7 +49,7 @@ var GatewayUpdateInterval = 5 * time.Second
 var GatewayStaleTimeout = GatewayUpdateInterval * 3
 
 var gatewaySyncIterations = prometheus.NewCounter(prometheus.CounterOpts{
-	Name: "gateway_sync_iterations",
+	Name: "submariner_gateway_sync_iterations",
 	Help: "Gateway synchronization iterations",
 })
 
