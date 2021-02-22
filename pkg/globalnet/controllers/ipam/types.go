@@ -68,12 +68,6 @@ type Controller struct {
 	ipt iptables.Interface
 }
 
-type MTUConfig struct {
-	successfullyRead          bool
-	default_mtu_probing       []byte
-	default_tcp_base_mss      []byte
-}
-
 type GatewayMonitor struct {
 	clusterID                 string
 	kubeClientSet             kubernetes.Interface
@@ -87,6 +81,5 @@ type GatewayMonitor struct {
 	stopProcessing            chan struct{}
 	isGatewayNode             bool
 	nodeName                  string
-	mtuConfig                 MTUConfig
 	syncMutex                 sync.Mutex
 }
