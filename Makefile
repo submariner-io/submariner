@@ -5,7 +5,7 @@ ifneq (,$(DAPPER_HOST_ARCH))
 
 # Running in Dapper
 
-IMAGES ?= submariner submariner-route-agent submariner-globalnet submariner-networkplugin-syncer
+IMAGES ?= submariner submariner-gateway submariner-route-agent submariner-globalnet submariner-networkplugin-syncer
 images: build
 
 include $(SHIPYARD_DIR)/Makefile.inc
