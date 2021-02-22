@@ -1,18 +1,1 @@
-FROM fedora:33
-ARG TARGETPLATFORM
-
-WORKDIR /var/submariner
-
-# iproute and iptables are used internally
-# libreswan provides IKE
-# procps-ng is needed for sysctl
-RUN dnf -y install --nodocs --setopt=install_weak_deps=0 \
-           iproute iptables libreswan procps-ng && \
-    dnf -y clean all
-
-COPY package/submariner.sh package/pluto bin/${TARGETPLATFORM}/submariner-engine /usr/local/bin/
-
-# Wrapper scripts to use iptables from the host when that's available
-COPY package/iptables-wrapper.in /usr/sbin/
-
-ENTRYPOINT submariner.sh
+Dockerfile.submariner-gateway
