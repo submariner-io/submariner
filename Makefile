@@ -11,7 +11,7 @@ images: build
 include $(SHIPYARD_DIR)/Makefile.inc
 
 TARGETS := $(shell ls -p scripts | grep -v -e / -e reload-images)
-override BUILD_ARGS += $(shell source ${SCRIPTS_DIR}/lib/version; echo --ldflags \'-X main.VERSION=$${VERSION}\')
+override BUILD_ARGS += --ldflags '-X main.VERSION=$(VERSION)'
 
 ifneq (,$(filter ovn,$(_using)))
 override CLUSTER_SETTINGS_FLAG = --cluster_settings $(DAPPER_SOURCE)/scripts/cluster_settings.ovn
