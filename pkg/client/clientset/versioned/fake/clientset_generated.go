@@ -22,6 +22,8 @@ import (
 	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
 	fakesubmarinerv1 "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1/fake"
+	submarinerv1alpha1 "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1alpha1"
+	fakesubmarinerv1alpha1 "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1alpha1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -79,4 +81,9 @@ var _ clientset.Interface = &Clientset{}
 // SubmarinerV1 retrieves the SubmarinerV1Client
 func (c *Clientset) SubmarinerV1() submarinerv1.SubmarinerV1Interface {
 	return &fakesubmarinerv1.FakeSubmarinerV1{Fake: &c.Fake}
+}
+
+// SubmarinerV1alpha1 retrieves the SubmarinerV1alpha1Client
+func (c *Clientset) SubmarinerV1alpha1() submarinerv1alpha1.SubmarinerV1alpha1Interface {
+	return &fakesubmarinerv1alpha1.FakeSubmarinerV1alpha1{Fake: &c.Fake}
 }

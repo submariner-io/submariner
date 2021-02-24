@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	submarinerv1 "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
+	submarinerv1alpha1 "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1alpha1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
@@ -30,18 +31,25 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	SubmarinerV1() submarinerv1.SubmarinerV1Interface
+	SubmarinerV1alpha1() submarinerv1alpha1.SubmarinerV1alpha1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	submarinerV1 *submarinerv1.SubmarinerV1Client
+	submarinerV1       *submarinerv1.SubmarinerV1Client
+	submarinerV1alpha1 *submarinerv1alpha1.SubmarinerV1alpha1Client
 }
 
 // SubmarinerV1 retrieves the SubmarinerV1Client
 func (c *Clientset) SubmarinerV1() submarinerv1.SubmarinerV1Interface {
 	return c.submarinerV1
+}
+
+// SubmarinerV1alpha1 retrieves the SubmarinerV1alpha1Client
+func (c *Clientset) SubmarinerV1alpha1() submarinerv1alpha1.SubmarinerV1alpha1Interface {
+	return c.submarinerV1alpha1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -69,6 +77,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.submarinerV1alpha1, err = submarinerv1alpha1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
@@ -82,6 +94,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
 	cs.submarinerV1 = submarinerv1.NewForConfigOrDie(c)
+	cs.submarinerV1alpha1 = submarinerv1alpha1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -91,6 +104,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.submarinerV1 = submarinerv1.New(c)
+	cs.submarinerV1alpha1 = submarinerv1alpha1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

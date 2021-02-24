@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	v1alpha1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1alpha1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -59,6 +60,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Submariner().V1().Endpoints().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("gateways"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Submariner().V1().Gateways().Informer()}, nil
+
+		// Group=submariner.io, Version=v1alpha1
+	case v1alpha1.SchemeGroupVersion.WithResource("globalnetegressips"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Submariner().V1alpha1().GlobalnetEgressIPs().Informer()}, nil
 
 	}
 
