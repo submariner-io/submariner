@@ -86,7 +86,7 @@ When running in OpenShift, Submariner needs to grant the appropriate security co
 
    ```shell
    oc adm policy add-scc-to-user privileged system:serviceaccount:submariner:submariner-routeagent
-   oc adm policy add-scc-to-user privileged system:serviceaccount:submariner:submariner-engine
+   oc adm policy add-scc-to-user privileged system:serviceaccount:submariner:submariner-gateway
    ```
 
 ## Contributing
