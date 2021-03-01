@@ -59,7 +59,7 @@ func testEnginePodRestartScenario(f *subFramework.Framework) {
 	Expect(gatewayNodes).To(HaveLen(1), fmt.Sprintf("Expected only one gateway node on %q", clusterAName))
 	By(fmt.Sprintf("Found gateway on node %q on %q", gatewayNodes[0].Name, clusterAName))
 
-	enginePod := f.AwaitSubmarinerEnginePod(framework.ClusterA)
+	enginePod := f.AwaitSubmarinerGatewayPod(framework.ClusterA)
 	By(fmt.Sprintf("Found submariner engine pod %q on %q", enginePod.Name, clusterAName))
 
 	By(fmt.Sprintf("Ensuring that the gateway reports as active on %q", clusterAName))
@@ -98,7 +98,7 @@ func testEnginePodRestartScenario(f *subFramework.Framework) {
 
 func AwaitNewSubmarinerEnginePod(f *subFramework.Framework, cluster framework.ClusterIndex, prevPodUID types.UID) *v1.Pod {
 	return framework.AwaitUntil("await new submariner engine pod", func() (interface{}, error) {
-		pod := f.AwaitSubmarinerEnginePod(cluster)
+		pod := f.AwaitSubmarinerGatewayPod(cluster)
 		return pod, nil
 	}, func(result interface{}) (bool, string, error) {
 		pod := result.(*v1.Pod)
@@ -134,7 +134,7 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 	initialNonGatewayNode := nonGatewayNodes[0]
 	By(fmt.Sprintf("Found non-gateway node %q on %q", initialNonGatewayNode.Name, clusterAName))
 
-	enginePod := f.AwaitSubmarinerEnginePod(framework.ClusterA)
+	enginePod := f.AwaitSubmarinerGatewayPod(framework.ClusterA)
 	By(fmt.Sprintf("Found submariner engine pod %q on %q", enginePod.Name, clusterAName))
 
 	submEndpoint := f.AwaitSubmarinerEndpoint(framework.ClusterA, subFramework.NoopCheckEndpoint)
@@ -168,7 +168,7 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 	// a chance to react to stop the process/container etc.
 	var newEnginePod *v1.Pod
 	for retries := 1; retries < 10; retries++ {
-		newEnginePod = f.AwaitSubmarinerEnginePod(framework.ClusterA)
+		newEnginePod = f.AwaitSubmarinerGatewayPod(framework.ClusterA)
 		if newEnginePod.Spec.NodeName == initialGatewayNode.Name {
 			time.Sleep(5 * time.Second)
 		} else {

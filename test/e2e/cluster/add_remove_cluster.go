@@ -61,7 +61,7 @@ var _ = PDescribe("[expansion] Test expanding/shrinking an existing cluster flee
 		By(fmt.Sprintf("Adding cluster %q by setting the gateway label on node %q", clusterCName, nonGatewayNode))
 		f.SetGatewayLabelOnNode(framework.ClusterC, nonGatewayNode, true)
 
-		enginePod := f.AwaitSubmarinerEnginePod(framework.ClusterC)
+		enginePod := f.AwaitSubmarinerGatewayPod(framework.ClusterC)
 		By(fmt.Sprintf("Found submariner engine pod %q on %q", enginePod.Name, clusterCName))
 
 		By("Checking connectivity between clusters")
