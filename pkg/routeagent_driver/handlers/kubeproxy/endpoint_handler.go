@@ -46,7 +46,7 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 
 		kp.isGatewayNode = false
 		localClusterGwNodeIP := net.ParseIP(endpoint.Spec.PrivateIP)
-		remoteVtepIP, err := kp.getVxlanVtepIPAddress(localClusterGwNodeIP.String())
+		remoteVtepIP, err := getVxlanVtepIPAddress(localClusterGwNodeIP.String())
 		if err != nil {
 			return fmt.Errorf("failed to derive the remoteVtepIP %v", err)
 		}

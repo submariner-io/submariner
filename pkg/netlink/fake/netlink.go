@@ -20,6 +20,7 @@ import (
 	"os"
 	"reflect"
 	"sync"
+	"syscall"
 
 	. "github.com/onsi/gomega"
 	"github.com/vishvananda/netlink"
@@ -56,7 +57,7 @@ func (n *NetLink) LinkAdd(link netlink.Link) error {
 	defer n.Unlock()
 
 	if _, found := n.links[link.Attrs().Name]; found {
-		return nil
+		return syscall.EEXIST
 	}
 
 	link.Attrs().Index = n.linkIndices[link.Attrs().Name]
