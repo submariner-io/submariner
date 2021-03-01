@@ -210,7 +210,7 @@ func (iface *vxLanIface) DelFDB(ipAddress net.IP, hwAddr string) error {
 	return nil
 }
 
-func (kp *SyncHandler) getVxlanVtepIPAddress(ipAddr string) (net.IP, error) {
+func getVxlanVtepIPAddress(ipAddr string) (net.IP, error) {
 	ipSlice := strings.Split(ipAddr, ".")
 	if len(ipSlice) < 4 {
 		return nil, fmt.Errorf("invalid ipAddr [%s]", ipAddr)
@@ -228,7 +228,7 @@ func (kp *SyncHandler) createVxLANInterface(activeEndPoint string, ifaceType int
 		return fmt.Errorf("unable to retrieve the IPv4 address on the Host %v", err)
 	}
 
-	vtepIP, err := kp.getVxlanVtepIPAddress(ipAddr.String())
+	vtepIP, err := getVxlanVtepIPAddress(ipAddr.String())
 	if err != nil {
 		return fmt.Errorf("failed to derive the vxlan vtepIP for %s, %v", ipAddr, err)
 	}
