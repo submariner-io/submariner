@@ -175,3 +175,95 @@ func (c *Connection) SetStatus(status ConnectionStatus, messageFormat string, a 
 	c.Status = status
 	c.StatusMessage = fmt.Sprintf(messageFormat, a...)
 }
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// GlobalEgressIP defines a policy for allocating GlobalIPs for selected pods in the namespace of the GlobalEgressIP object.
+type GlobalEgressIP struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec is the specification of the desired behavior.
+	Spec GlobalEgressIPSpec `json:"spec"`
+
+	// The most recently observed status. Read-only.
+	// +optional
+	Status GlobalEgressIPStatus `json:"status,omitempty"`
+}
+
+type GlobalEgressIPSpec struct {
+	// The requested number of contiguous GlobalIPs to allocate from the Globalnet CIDR assigned to the cluster.
+	// If not specified, defaults to 1.
+	// +optional
+	NumGlobalIPs *int `json:"numGlobalIPs,omitempty"`
+
+	// Selects specific pods in the namespace of this GlobalEgressIP to which this GlobalEgressIP applies. If not specified,
+	// all pods in the namespace are selected.
+	// If a pod matches multiple GlobalEgressIP objects, there is no guarantee from which GlobalEgressIP its
+	// GlobalIP will be assigned.
+	// +optional
+	PodSelector *metav1.LabelSelector `json:"podSelector,omitempty"`
+}
+
+type GlobalEgressIPConditionType string
+
+const (
+	GlobalEgressIPAllocated GlobalEgressIPConditionType = "Allocated"
+	GlobalEgressIPConflict  GlobalEgressIPConditionType = "Conflict"
+)
+
+type GlobalEgressIPStatus struct {
+	// +optional
+	// +patchStrategy=merge
+	// +patchMergeKey=type
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+
+	// The list of allocated GlobalIPs.
+	// +optional
+	GlobalIPs []string `json:"globalIPs"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type GlobalEgressIPList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []GlobalEgressIP `json:"items"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ClusterGlobalEgressIP defines a policy for allocating GlobalIPs at the cluster level to be used when no GlobalEgressIP
+// applies.
+type ClusterGlobalEgressIP struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec is the specification of desired behavior.
+	Spec ClusterGlobalEgressIPSpec `json:"spec"`
+
+	// The most recently observed status. Read-only.
+	// +optional
+	Status GlobalEgressIPStatus `json:"status,omitempty"`
+}
+
+type ClusterGlobalEgressIPSpec struct {
+	// The requested number of contiguous GlobalIPs to allocate from the Globalnet CIDR assigned to the cluster.
+	// If not specified, defaults to 1.
+	// +optional
+	NumGlobalIPs *int `json:"numGlobalIPs,omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type ClusterGlobalEgressIPList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []ClusterGlobalEgressIP `json:"items"`
+}

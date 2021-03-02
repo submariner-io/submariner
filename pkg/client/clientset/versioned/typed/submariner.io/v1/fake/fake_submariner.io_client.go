@@ -32,12 +32,20 @@ func (c *FakeSubmarinerV1) Clusters(namespace string) v1.ClusterInterface {
 	return &FakeClusters{c, namespace}
 }
 
+func (c *FakeSubmarinerV1) ClusterGlobalEgressIPs(namespace string) v1.ClusterGlobalEgressIPInterface {
+	return &FakeClusterGlobalEgressIPs{c, namespace}
+}
+
 func (c *FakeSubmarinerV1) Endpoints(namespace string) v1.EndpointInterface {
 	return &FakeEndpoints{c, namespace}
 }
 
 func (c *FakeSubmarinerV1) Gateways(namespace string) v1.GatewayInterface {
 	return &FakeGateways{c, namespace}
+}
+
+func (c *FakeSubmarinerV1) GlobalEgressIPs(namespace string) v1.GlobalEgressIPInterface {
+	return &FakeGlobalEgressIPs{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

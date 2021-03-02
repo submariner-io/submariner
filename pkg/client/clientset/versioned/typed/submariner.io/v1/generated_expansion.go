@@ -20,6 +20,10 @@ package v1
 
 type ClusterExpansion interface{}
 
+type ClusterGlobalEgressIPExpansion interface{}
+
 type EndpointExpansion interface{}
 
 type GatewayExpansion interface{}
+
+type GlobalEgressIPExpansion interface{}
