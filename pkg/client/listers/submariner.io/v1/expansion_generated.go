@@ -26,6 +26,14 @@ type ClusterListerExpansion interface{}
 // ClusterNamespaceLister.
 type ClusterNamespaceListerExpansion interface{}
 
+// ClusterGlobalEgressIPListerExpansion allows custom methods to be added to
+// ClusterGlobalEgressIPLister.
+type ClusterGlobalEgressIPListerExpansion interface{}
+
+// ClusterGlobalEgressIPNamespaceListerExpansion allows custom methods to be added to
+// ClusterGlobalEgressIPNamespaceLister.
+type ClusterGlobalEgressIPNamespaceListerExpansion interface{}
+
 // EndpointListerExpansion allows custom methods to be added to
 // EndpointLister.
 type EndpointListerExpansion interface{}
@@ -41,3 +49,11 @@ type GatewayListerExpansion interface{}
 // GatewayNamespaceListerExpansion allows custom methods to be added to
 // GatewayNamespaceLister.
 type GatewayNamespaceListerExpansion interface{}
+
+// GlobalEgressIPListerExpansion allows custom methods to be added to
+// GlobalEgressIPLister.
+type GlobalEgressIPListerExpansion interface{}
+
+// GlobalEgressIPNamespaceListerExpansion allows custom methods to be added to
+// GlobalEgressIPNamespaceLister.
+type GlobalEgressIPNamespaceListerExpansion interface{}

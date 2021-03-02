@@ -55,10 +55,14 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	// Group=submariner.io, Version=v1
 	case v1.SchemeGroupVersion.WithResource("clusters"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Submariner().V1().Clusters().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("clusterglobalegressips"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Submariner().V1().ClusterGlobalEgressIPs().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("endpoints"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Submariner().V1().Endpoints().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("gateways"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Submariner().V1().Gateways().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("globalegressips"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Submariner().V1().GlobalEgressIPs().Informer()}, nil
 
 	}
 

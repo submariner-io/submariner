@@ -26,10 +26,14 @@ import (
 type Interface interface {
 	// Clusters returns a ClusterInformer.
 	Clusters() ClusterInformer
+	// ClusterGlobalEgressIPs returns a ClusterGlobalEgressIPInformer.
+	ClusterGlobalEgressIPs() ClusterGlobalEgressIPInformer
 	// Endpoints returns a EndpointInformer.
 	Endpoints() EndpointInformer
 	// Gateways returns a GatewayInformer.
 	Gateways() GatewayInformer
+	// GlobalEgressIPs returns a GlobalEgressIPInformer.
+	GlobalEgressIPs() GlobalEgressIPInformer
 }
 
 type version struct {
@@ -48,6 +52,11 @@ func (v *version) Clusters() ClusterInformer {
 	return &clusterInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
+// ClusterGlobalEgressIPs returns a ClusterGlobalEgressIPInformer.
+func (v *version) ClusterGlobalEgressIPs() ClusterGlobalEgressIPInformer {
+	return &clusterGlobalEgressIPInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
 // Endpoints returns a EndpointInformer.
 func (v *version) Endpoints() EndpointInformer {
 	return &endpointInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
@@ -56,4 +65,9 @@ func (v *version) Endpoints() EndpointInformer {
 // Gateways returns a GatewayInformer.
 func (v *version) Gateways() GatewayInformer {
 	return &gatewayInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// GlobalEgressIPs returns a GlobalEgressIPInformer.
+func (v *version) GlobalEgressIPs() GlobalEgressIPInformer {
+	return &globalEgressIPInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
