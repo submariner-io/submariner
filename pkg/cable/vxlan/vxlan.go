@@ -17,7 +17,6 @@ package vxlan
 
 import (
 	"fmt"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"io/ioutil"
 	"net"
 	"strconv"
@@ -29,6 +28,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
 	"github.com/vishvananda/netlink"
