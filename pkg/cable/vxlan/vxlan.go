@@ -17,6 +17,7 @@ package vxlan
 
 import (
 	"fmt"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"io/ioutil"
 	"net"
 	"strconv"
@@ -31,6 +32,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
 	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
 	"k8s.io/klog"
 )
 
@@ -245,4 +247,254 @@ func (v *vxLan) getVxlanVtepIPAddress(ipAddr string) (net.IP, error) {
 	vxlanIP := net.ParseIP(strings.Join(ipSlice, "."))
 
 	return vxlanIP, nil
+}
+
+func (v *vxLan) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (string, error) {
+	if v.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
+		klog.V(log.DEBUG).Infof("Will not connect to self")
+		return "", nil
+	}
+
+	ip := endpointIP(&remoteEndpoint)
+	remoteIP := net.ParseIP(ip)
+	if remoteIP == nil {
+		return "", fmt.Errorf("failed to parse remote IP %s", ip)
+	}
+
+	allowedIPs := parseSubnets(remoteEndpoint.Spec.Subnets)
+
+	klog.V(log.DEBUG).Infof("Connecting cluster %s endpoint %s",
+		remoteEndpoint.Spec.ClusterID, remoteIP)
+	v.mutex.Lock()
+	defer v.mutex.Unlock()
+
+	v.connections = append(v.connections, v1.Connection{Endpoint: remoteEndpoint.Spec, Status: v1.Connected})
+
+	cable.RecordConnection(CableDriverName, &v.localEndpoint.Spec, &remoteEndpoint.Spec, string(v1.Connected), true)
+
+	remoteVtepIP, err := v.getVxlanVtepIPAddress(ip)
+
+	if err != nil {
+		return ip, fmt.Errorf("failed to derive the vxlan vtepIP for %s, %v", ip, err)
+	}
+
+	err = v.vxLanIface.AddFDB(remoteIP, "00:00:00:00:00:00")
+
+	if err != nil {
+		return ip, fmt.Errorf("failed to add remoteIP %q to the forwarding database", remoteIP)
+	}
+
+	err = v.vxLanIface.AddRoute(allowedIPs, remoteVtepIP, v.vxLanIface.vtepIP)
+
+	if err != nil {
+		return ip, fmt.Errorf("failed to add route for the CIDR %q with remoteVtepIP %q and vxlanInterfaceIP %q",
+			allowedIPs, remoteVtepIP, v.vxLanIface.vtepIP)
+	}
+
+	klog.V(log.DEBUG).Infof("Done adding endpoint for cluster %s", remoteEndpoint.Spec.ClusterID)
+
+	return ip, nil
+}
+
+func (v *vxLan) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoint) error {
+	klog.V(log.DEBUG).Infof("Removing endpoint %#v", remoteEndpoint)
+
+	if v.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
+		klog.V(log.DEBUG).Infof("Will not disconnect self")
+		return nil
+	}
+
+	v.mutex.Lock()
+	defer v.mutex.Unlock()
+
+	// parse remote addresses and allowed IPs
+	ip := endpointIP(&remoteEndpoint)
+
+	remoteIP := net.ParseIP(ip)
+
+	if remoteIP == nil {
+		return fmt.Errorf("failed to parse remote IP %s", ip)
+	}
+
+	allowedIPs := parseSubnets(remoteEndpoint.Spec.Subnets)
+
+	err := v.vxLanIface.DelFDB(remoteIP, "00:00:00:00:00:00")
+
+	if err != nil {
+		return fmt.Errorf("failed to delete remoteIP %q from the forwarding database", remoteIP)
+	}
+
+	err = v.vxLanIface.DelRoute(allowedIPs)
+
+	if err != nil {
+		return fmt.Errorf("failed to remove route for the CIDR %q",
+			allowedIPs)
+	}
+
+	v.connections = removeConnectionForEndpoint(v.connections, remoteEndpoint)
+	cable.RecordDisconnected(CableDriverName, &v.localEndpoint.Spec, &remoteEndpoint.Spec)
+
+	klog.V(log.DEBUG).Infof("Done removing endpoint for cluster %s", remoteEndpoint.Spec.ClusterID)
+
+	return nil
+}
+
+func removeConnectionForEndpoint(connections []v1.Connection, endpoint types.SubmarinerEndpoint) []v1.Connection {
+	for j := range connections {
+		if connections[j].Endpoint.CableName == endpoint.Spec.CableName {
+			copy(connections[j:], connections[j+1:])
+			return connections[:len(connections)-1]
+		}
+	}
+
+	return connections
+}
+
+func (v *vxLan) GetConnections() ([]v1.Connection, error) {
+	return v.connections, nil
+}
+
+func (v *vxLan) GetActiveConnections(clusterID string) ([]v1.Connection, error) {
+	return v.connections, nil
+}
+
+func (iface *vxLanIface) AddFDB(ipAddress net.IP, hwAddr string) error {
+	macAddr, err := net.ParseMAC(hwAddr)
+
+	if err != nil {
+		return fmt.Errorf("invalid MAC Address (%s) supplied. %v", hwAddr, err)
+	}
+
+	if ipAddress == nil {
+		return fmt.Errorf("invalid ipAddress (%v) supplied", ipAddress)
+	}
+
+	neigh := &netlink.Neigh{
+		LinkIndex:    iface.link.Index,
+		Family:       unix.AF_BRIDGE,
+		Flags:        netlink.NTF_SELF,
+		Type:         netlink.NDA_DST,
+		IP:           ipAddress,
+		State:        netlink.NUD_PERMANENT | netlink.NUD_NOARP,
+		HardwareAddr: macAddr,
+	}
+
+	err = netlink.NeighAppend(neigh)
+	if err != nil {
+		return fmt.Errorf("unable to add the bridge fdb entry %v, err: %s", neigh, err)
+	} else {
+		klog.V(log.DEBUG).Infof("Successfully added the bridge fdb entry %v", neigh)
+	}
+
+	return nil
+}
+
+func (iface *vxLanIface) DelFDB(ipAddress net.IP, hwAddr string) error {
+	macAddr, err := net.ParseMAC(hwAddr)
+	if err != nil {
+		return fmt.Errorf("invalid MAC Address (%s) supplied. %v", hwAddr, err)
+	}
+
+	neigh := &netlink.Neigh{
+		LinkIndex:    iface.link.Index,
+		Family:       unix.AF_BRIDGE,
+		Flags:        netlink.NTF_SELF,
+		Type:         netlink.NDA_DST,
+		IP:           ipAddress,
+		State:        netlink.NUD_PERMANENT | netlink.NUD_NOARP,
+		HardwareAddr: macAddr,
+	}
+
+	err = netlink.NeighDel(neigh)
+	if err != nil {
+		return fmt.Errorf("unable to delete the bridge fdb entry %v, err: %s", neigh, err)
+	} else {
+		klog.V(log.DEBUG).Infof("Successfully deleted the bridge fdb entry %v", neigh)
+	}
+
+	return nil
+}
+
+func (iface *vxLanIface) AddRoute(ipAddressList []net.IPNet, gwIP, ips net.IP) error {
+	for i := range ipAddressList {
+		route := &netlink.Route{
+			LinkIndex: iface.link.Index,
+			Src:       ips,
+			Dst:       &ipAddressList[i],
+			Gw:        gwIP,
+			Type:      netlink.NDA_DST,
+			Flags:     netlink.NTF_SELF,
+			Priority:  100,
+			Table:     constants.RouteAgentHostNetworkTableID,
+		}
+		err := netlink.RouteAdd(route)
+
+		if err == syscall.EEXIST {
+			err = netlink.RouteReplace(route)
+		}
+
+		if err != nil {
+			return fmt.Errorf("unable to add the route entry %v, err: %s", route, err)
+		} else {
+			klog.V(log.DEBUG).Infof("Successfully added the route entry %v and gw ip %v", route, gwIP)
+		}
+	}
+
+	return nil
+}
+
+func (iface *vxLanIface) DelRoute(ipAddressList []net.IPNet) error {
+	for i := range ipAddressList {
+		route := &netlink.Route{
+			LinkIndex: iface.link.Index,
+			Dst:       &ipAddressList[i],
+			Gw:        nil,
+			Type:      netlink.NDA_DST,
+			Flags:     netlink.NTF_SELF,
+			Priority:  100,
+			Table:     constants.RouteAgentHostNetworkTableID,
+		}
+		err := netlink.RouteDel(route)
+		if err != nil {
+			return fmt.Errorf("unable to add the route entry %v, err: %s", route, err)
+		} else {
+			klog.V(log.DEBUG).Infof("Successfully deleted the route entry %v", route)
+		}
+	}
+
+	return nil
+}
+
+func (v *vxLan) Init() error {
+	return nil
+}
+
+func (v *vxLan) GetName() string {
+	return CableDriverName
+}
+
+func endpointIP(ep *types.SubmarinerEndpoint) string {
+	if ep.Spec.NATEnabled {
+		return ep.Spec.PublicIP
+	}
+
+	return ep.Spec.PrivateIP
+}
+
+// parse CIDR string and skip errors
+func parseSubnets(subnets []string) []net.IPNet {
+	nets := make([]net.IPNet, 0, len(subnets))
+
+	for _, sn := range subnets {
+		_, cidr, err := net.ParseCIDR(sn)
+		if err != nil {
+			// this should not happen. Log and continue
+			klog.Errorf("failed to parse subnet %s: %v", sn, err)
+			continue
+		}
+
+		nets = append(nets, *cidr)
+	}
+
+	return nets
 }
