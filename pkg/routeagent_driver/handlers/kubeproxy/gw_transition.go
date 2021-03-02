@@ -18,6 +18,7 @@ limitations under the License.
 package kubeproxy
 
 import (
+	"github.com/submariner-io/submariner/pkg/cable/vxlan"
 	"k8s.io/klog"
 
 	"github.com/submariner-io/admiral/pkg/log"
@@ -66,7 +67,9 @@ func (kp *SyncHandler) TransitionToGateway() error {
 	}
 
 	// Add routes to the new endpoint on the GatewayNode.
-	kp.updateRoutingRulesForHostNetworkSupport(kp.remoteSubnets.Elements(), Add)
+	if kp.localCableDriver != vxlan.VxLANIface {
+		kp.updateRoutingRulesForHostNetworkSupport(kp.remoteSubnets.Elements(), Add)
+	}
 
 	return nil
 }
