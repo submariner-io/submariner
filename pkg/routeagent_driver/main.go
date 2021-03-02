@@ -87,6 +87,7 @@ func main() {
 		kubeproxy.NewSyncHandler(env.ClusterCidr, env.ServiceCidr),
 		ovn.NewHandler(env, smClientset),
 		cabledriver.NewXRFMCleanupHandler(),
+		cabledriver.NewVXLANCleanup(),
 	); err != nil {
 		klog.Fatalf("Error registering the handlers: %s", err.Error())
 	}
