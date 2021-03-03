@@ -675,9 +675,12 @@ func (i *Controller) podUpdater(obj runtime.Object, key string) error {
 func (i *Controller) svcExUpdater(obj runtime.Object, key string) error {
 	unstructObj := obj.(*unstructured.Unstructured)
 	svc, err := i.serviceGetter(unstructObj.GetNamespace(), unstructObj.GetName())
-	if err != nil && !errors.IsNotFound(err) {
-		klog.Errorf("Failed to get service %s", key)
-		return nil
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+
+		return fmt.Errorf("failed to get service %q: %v", key, err)
 	}
 
 	i.enqueueObject(svc, i.serviceWorkqueue)
