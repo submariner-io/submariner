@@ -189,10 +189,9 @@ func (i *GatewayMonitor) processNextEndpoint() bool {
 		// If the endpoint hostname matches with our hostname, it implies we are on gateway node
 		if endpoint.Spec.Hostname == hostname {
 			klog.V(log.DEBUG).Infof("We are now on GatewayNode %s", endpoint.Spec.PrivateIP)
-
-			// mtuProbe value of 1 enables PLPMTUD when an ICMP blackhole is detected.
-			// RFC4821 recommends using base mss value of 1024
-			ConfigureTCPMTUProbeValue([]byte("1"), []byte("1024"))
+			// An mtuProbe value of 2 enables PLPMTUD. Along with this change, we also configure
+			// base mss to 1024 as per RFC4821 recommendation.
+			ConfigureTCPMTUProbeValue([]byte("2"), []byte("1024"))
 
 			i.syncMutex.Lock()
 			if !i.isGatewayNode {
