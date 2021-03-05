@@ -1,0 +1,17 @@
+# Base Submariner image for containers using iptables
+
+FROM fedora:33
+ARG TARGETPLATFORM
+
+WORKDIR /var/submariner
+
+# iproute and iptables are used internally
+# procps-ng is needed for sysctl
+RUN dnf -y install --nodocs --setopt=install_weak_deps=0 \
+           iproute iptables iptables-nft procps-ng
+# Child containers are expected to add packages, so we don’t clean here
+
+# Wrapper scripts to choose the appropriate iptables
+# https://github.com/kubernetes-sigs/iptables-wrappers
+COPY package/iptables-wrapper-installer.sh /usr/sbin/
+RUN /usr/sbin/iptables-wrapper-installer.sh
