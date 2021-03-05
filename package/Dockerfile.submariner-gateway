@@ -7,12 +7,14 @@ WORKDIR /var/submariner
 # libreswan provides IKE
 # procps-ng is needed for sysctl
 RUN dnf -y install --nodocs --setopt=install_weak_deps=0 \
-           iproute iptables libreswan procps-ng && \
+           iproute iptables iptables-nft libreswan procps-ng && \
     dnf -y clean all
 
 COPY package/submariner.sh package/pluto bin/${TARGETPLATFORM}/submariner-engine /usr/local/bin/
 
-# Wrapper scripts to use iptables from the host when that's available
-COPY package/iptables-wrapper.in /usr/sbin/
+# Wrapper scripts to choose the appropriate iptables
+# https://github.com/kubernetes-sigs/iptables-wrappers
+COPY package/iptables-wrapper-installer.sh /usr/sbin/
+RUN /usr/sbin/iptables-wrapper-installer.sh
 
 ENTRYPOINT submariner.sh
