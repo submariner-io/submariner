@@ -22,7 +22,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/stringset"
-	"github.com/submariner-io/submariner/pkg/netlink"
 	"k8s.io/klog"
 
 	cableCleanup "github.com/submariner-io/submariner/pkg/cable/cleanup"
@@ -47,7 +46,6 @@ type SyncHandler struct {
 	isGatewayNode        bool
 	wasGatewayPreviously bool
 
-	netLink          netlink.Interface
 	vxlanDevice      *vxLanIface
 	vxlanGwIP        *net.IP
 	hostname         string
@@ -68,7 +66,8 @@ func NewSyncHandler(localClusterCidr, localServiceCidr []string) *SyncHandler {
 		routeCacheGWNode:     stringset.NewSynchronized(),
 		isGatewayNode:        false,
 		wasGatewayPreviously: false,
-		netLink:              netlink.New(),
+		vxlanDevice:          nil,
+		vxlanGwIP:            nil,
 	}
 }
 
@@ -96,10 +95,9 @@ func (kp *SyncHandler) Init() error {
 	if err == nil {
 		// Configure CNI Specific changes
 		kp.cniIface = cniIface
-
-		err := kp.netLink.EnableLooseModeReversePathFilter(kp.cniIface.Name)
+		err := cni.ConfigureRpFilter(kp.cniIface.Name)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "ConfigureRpFilter returned error")
 		}
 	} else {
 		// This is not a fatal error. Hostnetworking to remote cluster support will be broken
