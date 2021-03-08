@@ -1,0 +1,73 @@
+/*
+© 2021 Red Hat, Inc. and others
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+
+syntax = "proto3";
+option go_package = "github.com/submariner-io/submariner/pkg/natdiscovery/proto";
+
+message SubmarinerNatDiscoveryMessage {
+  int32 version = 1;
+
+  oneof message {
+    SubmarinerNatDiscoveryRequest request = 2;
+    SubmarinerNatDiscoveryResponse response = 3;
+  }
+}
+
+message SubmarinerNatDiscoveryRequest {
+  uint64 request_number = 1;
+
+  EndpointDetails sender = 2;
+  EndpointDetails receiver = 3;
+
+  // The following information would allow the receiver to identify
+  // and log if any form of NAT traversal is happening on the path
+  IPPortPair using_src = 4;
+  IPPortPair using_dst = 5;
+}
+
+enum ResponseType {
+  OK = 0;
+  SRC_MODIFIED = 1;
+  UNKNOWN_DST_CLUSTER = 2;
+  UNKNOWN_DST_ENDPOINT = 3;
+  UNKNOWN_SRC_CLUSTER = 4;
+  UNKNOWN_SRC_ENDPOINT = 5;
+  MALFORMED = 6;
+}
+
+message SubmarinerNatDiscoveryResponse {
+  uint64 request_number = 1;
+
+  ResponseType response = 2;
+  EndpointDetails sender = 3;
+  EndpointDetails receiver = 4;
+
+  // The received SRC IP / SRC port is reported, which will be useful for
+  // diagnosing corner cases
+  IPPortPair received_src = 5;
+}
+
+message IPPortPair {
+  string IP = 1;
+  uint32 port = 2;
+}
+
+message EndpointDetails {
+  // should we hash this for privacy? a hash can be checked against a known list, but can't be decoded
+  string cluster_id = 1;
+  string endpoint_id = 2;
+}

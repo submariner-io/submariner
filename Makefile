@@ -50,7 +50,10 @@ deploy: images
 reload-images: build images
 	./scripts/$@ --restart $(restart)
 
-bin/%/submariner-gateway: vendor/modules.txt main.go $(shell find pkg -not \( -path 'pkg/globalnet*' -o -path 'pkg/routeagent*' \))
+%.pb.go: %.proto
+	protoc --go_out=/go/src $<
+
+bin/%/submariner-gateway: vendor/modules.txt main.go $(shell find pkg -not \( -path 'pkg/globalnet*' -o -path 'pkg/routeagent*' \)) pkg/natdiscovery/proto/natdiscovery.pb.go
 	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ main.go $(BUILD_ARGS)
 
 bin/%/submariner-route-agent: vendor/modules.txt $(shell find pkg/routeagent_driver)
