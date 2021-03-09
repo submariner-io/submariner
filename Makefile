@@ -1,6 +1,7 @@
 restart ?= all
 focus ?= .\*
 BASE_BRANCH ?= devel
+export BASE_BRANCH
 
 ifneq (,$(DAPPER_HOST_ARCH))
 
