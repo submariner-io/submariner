@@ -50,7 +50,7 @@ limitPerRun: 30
 # only: issues
 
 pulls:
-  daysUntilStale: 30
+  daysUntilStale: 14
   markComment: >
     This pull request has been automatically marked as stale because it has not had
     recent activity. It will be closed if no further activity occurs. Thank you
