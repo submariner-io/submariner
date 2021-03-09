@@ -82,7 +82,7 @@ func (n *netlinkType) AddrAdd(link netlink.Link, addr *netlink.Addr) error {
 }
 
 func (n *netlinkType) NeighAppend(neigh *netlink.Neigh) error {
-	return netlink.NeighAdd(neigh)
+	return netlink.NeighAppend(neigh)
 }
 
 func (n *netlinkType) NeighDel(neigh *netlink.Neigh) error {
