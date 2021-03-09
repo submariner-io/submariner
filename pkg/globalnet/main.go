@@ -47,7 +47,7 @@ var (
 func main() {
 	klog.InitFlags(nil)
 	flag.Parse()
-	var ipamSpec ipam.SubmarinerIpamControllerSpecification
+	var ipamSpec ipam.SubmarinerIPAMControllerSpecification
 
 	err := envconfig.Process("submariner", &ipamSpec)
 	if err != nil {
