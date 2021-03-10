@@ -152,18 +152,18 @@ var _ = Describe("Service monitoring", func() {
 
 		When("a Service's global IP is updated", func() {
 			BeforeEach(func() {
-				service.Annotations[ipam.SubmarinerIpamGlobalIP] = oldIP
+				service.Annotations[ipam.SubmarinerIPAMGlobalIP] = oldIP
 			})
 
 			It("should update the appropriate IP tables rule", func() {
 				t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain,
-					ContainSubstring(service.Annotations[ipam.SubmarinerIpamGlobalIP]))
+					ContainSubstring(service.Annotations[ipam.SubmarinerIPAMGlobalIP]))
 
-				service.Annotations[ipam.SubmarinerIpamGlobalIP] = newIP
+				service.Annotations[ipam.SubmarinerIPAMGlobalIP] = newIP
 				_, err := t.k8sClient.CoreV1().Services(namespace).Update(service)
 				Expect(err).To(Succeed())
 				t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain,
-					ContainSubstring(service.Annotations[ipam.SubmarinerIpamGlobalIP]))
+					ContainSubstring(service.Annotations[ipam.SubmarinerIPAMGlobalIP]))
 			})
 		})
 
@@ -252,16 +252,16 @@ var _ = Describe("Pod monitoring", func() {
 
 	When("a Pod's global IP is updated", func() {
 		BeforeEach(func() {
-			pod.Annotations[ipam.SubmarinerIpamGlobalIP] = oldIP
+			pod.Annotations[ipam.SubmarinerIPAMGlobalIP] = oldIP
 		})
 
 		It("should update the appropriate IP tables rule", func() {
-			t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChain, ContainSubstring(pod.Annotations[ipam.SubmarinerIpamGlobalIP]))
+			t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChain, ContainSubstring(pod.Annotations[ipam.SubmarinerIPAMGlobalIP]))
 
-			pod.Annotations[ipam.SubmarinerIpamGlobalIP] = newIP
+			pod.Annotations[ipam.SubmarinerIPAMGlobalIP] = newIP
 			_, err := t.k8sClient.CoreV1().Pods(namespace).Update(pod)
 			Expect(err).To(Succeed())
-			t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChain, ContainSubstring(pod.Annotations[ipam.SubmarinerIpamGlobalIP]))
+			t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChain, ContainSubstring(pod.Annotations[ipam.SubmarinerIPAMGlobalIP]))
 		})
 	})
 
@@ -333,7 +333,7 @@ var _ = Describe("Node monitoring", func() {
 		node = &corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        nodeName,
-				Annotations: map[string]string{constants.CniInterfaceIP: "10.20.30.40"},
+				Annotations: map[string]string{constants.CNIInterfaceIP: "10.20.30.40"},
 			},
 		}
 	})
@@ -346,7 +346,7 @@ var _ = Describe("Node monitoring", func() {
 	When("a Node without a global IP is created", func() {
 		It("should assign a global IP and add an appropriate IP tables rule", func() {
 			t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChain,
-				And(ContainSubstring(t.awaitNodeGlobalIP(node.Name)), ContainSubstring(node.Annotations[constants.CniInterfaceIP])))
+				And(ContainSubstring(t.awaitNodeGlobalIP(node.Name)), ContainSubstring(node.Annotations[constants.CNIInterfaceIP])))
 		})
 
 		When("it's also the local node", func() {
@@ -358,16 +358,16 @@ var _ = Describe("Node monitoring", func() {
 
 	When("a Node's global IP is updated", func() {
 		BeforeEach(func() {
-			node.Annotations[ipam.SubmarinerIpamGlobalIP] = oldIP
+			node.Annotations[ipam.SubmarinerIPAMGlobalIP] = oldIP
 		})
 
 		It("should update the appropriate IP tables rule", func() {
-			t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChain, ContainSubstring(node.Annotations[ipam.SubmarinerIpamGlobalIP]))
+			t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChain, ContainSubstring(node.Annotations[ipam.SubmarinerIPAMGlobalIP]))
 
-			node.Annotations[ipam.SubmarinerIpamGlobalIP] = newIP
+			node.Annotations[ipam.SubmarinerIPAMGlobalIP] = newIP
 			_, err := t.k8sClient.CoreV1().Nodes().Update(node)
 			Expect(err).To(Succeed())
-			t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChain, ContainSubstring(node.Annotations[ipam.SubmarinerIpamGlobalIP]))
+			t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChain, ContainSubstring(node.Annotations[ipam.SubmarinerIPAMGlobalIP]))
 		})
 	})
 
@@ -382,15 +382,15 @@ var _ = Describe("Node monitoring", func() {
 	})
 
 	When(fmt.Sprintf("a Node is initially created without the %q annotation then is subsequently set",
-		constants.CniInterfaceIP), func() {
+		constants.CNIInterfaceIP), func() {
 		BeforeEach(func() {
-			delete(node.Annotations, constants.CniInterfaceIP)
+			delete(node.Annotations, constants.CNIInterfaceIP)
 		})
 
 		It("should eventually assign a global IP", func() {
 			t.awaitNoNodeGlobalIP(node)
 
-			node.Annotations[constants.CniInterfaceIP] = "10.20.30.40"
+			node.Annotations[constants.CNIInterfaceIP] = "10.20.30.40"
 			_, err := t.k8sClient.CoreV1().Nodes().Update(node)
 			Expect(err).To(Succeed())
 			t.awaitNodeGlobalIP(node.Name)
@@ -399,7 +399,7 @@ var _ = Describe("Node monitoring", func() {
 })
 
 type testDriver struct {
-	spec             *ipam.SubmarinerIpamControllerSpecification
+	spec             *ipam.SubmarinerIPAMControllerSpecification
 	gatewayMonitor   *ipam.GatewayMonitor
 	submarinerClient submarinerClientset.Interface
 	k8sClient        kubernetes.Interface
@@ -415,7 +415,7 @@ func newTestDriver() *testDriver {
 	t.svcExGvr, _ = schema.ParseResourceArg("serviceexports.v1alpha1.multicluster.x-k8s.io")
 
 	BeforeEach(func() {
-		t.spec = &ipam.SubmarinerIpamControllerSpecification{
+		t.spec = &ipam.SubmarinerIPAMControllerSpecification{
 			ClusterID:  clusterID,
 			Namespace:  namespace,
 			GlobalCIDR: []string{localCIDR},
@@ -527,7 +527,7 @@ func (t *testDriver) awaitGlobalIP(name, cidr string, getter func(string) (runti
 		metaObj, err := meta.Accessor(obj)
 		Expect(err).To(Succeed())
 
-		globalIP = metaObj.GetAnnotations()[ipam.SubmarinerIpamGlobalIP]
+		globalIP = metaObj.GetAnnotations()[ipam.SubmarinerIPAMGlobalIP]
 		return globalIP
 	}, 5).ShouldNot(BeEmpty())
 
@@ -544,7 +544,7 @@ func (t *testDriver) awaitNoGlobalIP(name string, getter func(string) (runtime.O
 		metaObj, err := meta.Accessor(obj)
 		Expect(err).To(Succeed())
 
-		return metaObj.GetAnnotations()[ipam.SubmarinerIpamGlobalIP]
+		return metaObj.GetAnnotations()[ipam.SubmarinerIPAMGlobalIP]
 	}, 500*time.Millisecond).Should(BeEmpty())
 }
 

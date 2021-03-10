@@ -31,7 +31,7 @@ import (
 	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions"
 )
 
-type SubmarinerIpamControllerSpecification struct {
+type SubmarinerIPAMControllerSpecification struct {
 	ClusterID  string
 	ExcludeNS  []string
 	Namespace  string
@@ -76,7 +76,7 @@ type GatewayMonitor struct {
 	endpointWorkqueue         workqueue.RateLimitingInterface
 	endpointsSynced           cache.InformerSynced
 	dynamicClientSet          dynamic.Interface
-	ipamSpec                  *SubmarinerIpamControllerSpecification
+	ipamSpec                  *SubmarinerIPAMControllerSpecification
 	ipt                       iptables.Interface
 	stopProcessing            chan struct{}
 	isGatewayNode             bool
