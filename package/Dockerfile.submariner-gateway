@@ -10,7 +10,7 @@ RUN dnf -y install --nodocs --setopt=install_weak_deps=0 \
            iproute iptables iptables-nft libreswan procps-ng && \
     dnf -y clean all
 
-COPY package/submariner.sh package/pluto bin/${TARGETPLATFORM}/submariner-engine /usr/local/bin/
+COPY package/submariner.sh package/pluto bin/${TARGETPLATFORM}/submariner-gateway /usr/local/bin/
 
 # Wrapper scripts to choose the appropriate iptables
 # https://github.com/kubernetes-sigs/iptables-wrappers

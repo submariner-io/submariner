@@ -36,7 +36,7 @@ const (
 	// part of route-agent and this will subsequently be used in globalnet controller for
 	// supporting connectivity from HostNetwork to remoteClusters.
 	// [#] interface on the node that has an IPAddress from the clusterCIDR
-	CniInterfaceIP = "submariner.io/cniIfaceIp"
+	CNIInterfaceIP = "submariner.io/cniIfaceIp"
 
 	// TODO (revisit): Unify this constant across different components
 	SmGlobalIP = "submariner.io/globalIp"

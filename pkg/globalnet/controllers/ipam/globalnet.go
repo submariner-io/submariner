@@ -162,7 +162,7 @@ func (i *Controller) evaluateService(service *k8sv1.Service) Operation {
 }
 
 func (i *Controller) evaluateNode(node *k8sv1.Node) Operation {
-	cniIfaceIP := node.GetAnnotations()[constants.CniInterfaceIP]
+	cniIfaceIP := node.GetAnnotations()[constants.CNIInterfaceIP]
 	if cniIfaceIP == "" {
 		// To support connectivity from HostNetwork to remoteCluster, globalnet requires the
 		// cniIfaceIP of the respective node. Route-agent running on the node annotates the

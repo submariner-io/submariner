@@ -48,7 +48,7 @@ deploy: images
 reload-images: build images
 	./scripts/$@ --restart $(restart)
 
-bin/%/submariner-engine: vendor/modules.txt main.go $(shell find pkg -not \( -path 'pkg/globalnet*' -o -path 'pkg/routeagent*' \))
+bin/%/submariner-gateway: vendor/modules.txt main.go $(shell find pkg -not \( -path 'pkg/globalnet*' -o -path 'pkg/routeagent*' \))
 	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ main.go $(BUILD_ARGS)
 
 bin/%/submariner-route-agent: vendor/modules.txt $(shell find pkg/routeagent_driver)
@@ -68,7 +68,7 @@ comma := ,
 # This can be overridden to build for other supported architectures; the reference is the Go architecture,
 # so "make images ARCHES=arm" will build a linux/arm/v7 image
 ARCHES ?= amd64
-BINARIES = submariner-engine submariner-route-agent submariner-globalnet submariner-networkplugin-syncer
+BINARIES = submariner-gateway submariner-route-agent submariner-globalnet submariner-networkplugin-syncer
 IMAGES_ARGS = --platform $(subst $(space),$(comma),$(foreach arch,$(subst $(comma),$(space),$(ARCHES)),linux/$(call gotodockerarch,$(arch))))
 
 build: $(foreach arch,$(subst $(comma),$(space),$(ARCHES)),$(foreach binary,$(BINARIES),bin/linux/$(call gotodockerarch,$(arch))/$(binary)))
