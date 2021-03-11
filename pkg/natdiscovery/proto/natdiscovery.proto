@@ -44,9 +44,8 @@ enum ResponseType {
   SRC_MODIFIED = 1;
   UNKNOWN_DST_CLUSTER = 2;
   UNKNOWN_DST_ENDPOINT = 3;
-  UNKNOWN_SRC_CLUSTER = 4;
-  UNKNOWN_SRC_ENDPOINT = 5;
-  MALFORMED = 6;
+  UNKNOWN_SRC_ENDPOINT = 4;
+  MALFORMED = 5;
 }
 
 message SubmarinerNatDiscoveryResponse {
