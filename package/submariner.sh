@@ -18,4 +18,4 @@ mkdir -p /etc/ipsec
 
 sysctl -w net.ipv4.conf.all.send_redirects=0
 
-exec submariner-engine ${DEBUG} -alsologtostderr
+exec submariner-gateway ${DEBUG} -alsologtostderr
