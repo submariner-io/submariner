@@ -217,6 +217,11 @@ func (in *EndpointSpec) DeepCopyInto(out *EndpointSpec) {
 			(*out)[key] = val
 		}
 	}
+	if in.NATDiscoveryPort != nil {
+		in, out := &in.NATDiscoveryPort, &out.NATDiscoveryPort
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 

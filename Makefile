@@ -47,6 +47,10 @@ dockertogoarch = $(patsubst arm/v7,arm,$(1))
 
 deploy: images
 
+golangci-lint: pkg/natdiscovery/proto/natdiscovery.pb.go
+
+unit: pkg/natdiscovery/proto/natdiscovery.pb.go
+
 reload-images: build images
 	./scripts/$@ --restart $(restart)
 
