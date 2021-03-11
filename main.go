@@ -296,11 +296,11 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder res
 	rl := resourcelock.ConfigMapLock{
 		ConfigMapMeta: metav1.ObjectMeta{
 			Namespace: namespace,
-			Name:      "submariner-engine-lock",
+			Name:      "submariner-gateway-lock",
 		},
 		Client: leaderElectionClient.CoreV1(),
 		LockConfig: resourcelock.ResourceLockConfig{
-			Identity:      id + "-submariner-engine",
+			Identity:      id + "-submariner-gateway",
 			EventRecorder: recorder,
 		},
 	}

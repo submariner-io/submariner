@@ -48,7 +48,7 @@ import (
 
 const defaultResync = 60 * time.Second
 
-func NewGatewayMonitor(spec *SubmarinerIpamControllerSpecification,
+func NewGatewayMonitor(spec *SubmarinerIPAMControllerSpecification,
 	submarinerClient submarinerClientset.Interface, clientSet kubernetes.Interface,
 	dynamicClient dynamic.Interface) (*GatewayMonitor, error) {
 	gatewayMonitor := &GatewayMonitor{
@@ -119,7 +119,7 @@ func (gm *GatewayMonitor) Stop() {
 	klog.Info("GatewayMonitor stopping")
 
 	gm.syncMutex.Lock()
-	gm.stopIpamController()
+	gm.stopIPAMController()
 	gm.syncMutex.Unlock()
 }
 
@@ -208,7 +208,7 @@ func (gm *GatewayMonitor) processNextEndpoint() bool {
 			gm.syncMutex.Lock()
 			if !gm.isGatewayNode {
 				gm.isGatewayNode = true
-				gm.initializeIpamController(gm.ipamSpec.GlobalCIDR[0], gm.nodeName)
+				gm.initializeIPAMController(gm.ipamSpec.GlobalCIDR[0], gm.nodeName)
 			}
 			gm.syncMutex.Unlock()
 		} else {
@@ -216,7 +216,7 @@ func (gm *GatewayMonitor) processNextEndpoint() bool {
 
 			gm.syncMutex.Lock()
 			if gm.isGatewayNode {
-				gm.stopIpamController()
+				gm.stopIPAMController()
 				gm.isGatewayNode = false
 			}
 			gm.syncMutex.Unlock()
@@ -276,7 +276,7 @@ func (gm *GatewayMonitor) handleRemovedEndpoint(obj interface{}) {
 	if object.Spec.Hostname == hostname && object.Spec.ClusterID == gm.clusterID {
 		gm.syncMutex.Lock()
 		if gm.isGatewayNode {
-			gm.stopIpamController()
+			gm.stopIPAMController()
 			gm.isGatewayNode = false
 		}
 		gm.syncMutex.Unlock()
@@ -288,7 +288,7 @@ func (gm *GatewayMonitor) handleRemovedEndpoint(obj interface{}) {
 	}
 }
 
-func (gm *GatewayMonitor) initializeIpamController(globalCIDR, gwNodeName string) {
+func (gm *GatewayMonitor) initializeIPAMController(globalCIDR, gwNodeName string) {
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(gm.kubeClientSet, defaultResync)
 	dynInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(gm.dynamicClientSet, defaultResync)
 	svcExGvr, _ := schema.ParseResourceArg("serviceexports.v1alpha1.multicluster.x-k8s.io")
@@ -322,7 +322,7 @@ func (gm *GatewayMonitor) initializeIpamController(globalCIDR, gwNodeName string
 	klog.V(log.DEBUG).Infof("Successfully started the ipamController")
 }
 
-func (gm *GatewayMonitor) stopIpamController() {
+func (gm *GatewayMonitor) stopIPAMController() {
 	if gm.stopProcessing != nil {
 		klog.V(log.DEBUG).Infof("Stopping ipamController")
 		close(gm.stopProcessing)
