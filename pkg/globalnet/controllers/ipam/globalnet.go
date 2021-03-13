@@ -22,7 +22,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/iptables"
 	k8sv1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog"
 
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
@@ -129,49 +128,6 @@ func (i *Controller) isServiceSupported(service *k8sv1.Service) bool {
 	}
 
 	return true
-}
-
-func (i *Controller) evaluateService(service *k8sv1.Service) Operation {
-	if !i.isServiceSupported(service) {
-		return Ignore
-	}
-
-	_, err := i.svcExGetter(service.Namespace, service.Name)
-	if errors.IsNotFound(err) {
-		return Ignore
-	} else if err != nil {
-		klog.Errorf("Failed to get ServiceExport for %#v due to %v", service, err)
-		return Requeue
-	}
-
-	serviceName := service.GetNamespace() + "/" + service.GetName()
-
-	chainName, chainExists, err := i.kubeProxyClusterIPServiceChainName(service)
-	if err != nil {
-		klog.Errorf("Error checking for kube-proxy chain for service %q", serviceName)
-		return Requeue
-	}
-
-	if !chainExists {
-		return Requeue
-	}
-
-	klog.V(log.DEBUG).Infof("kube-proxy chain %q for service %q exists.", chainName, serviceName)
-
-	return Process
-}
-
-func (i *Controller) evaluateNode(node *k8sv1.Node) Operation {
-	cniIfaceIP := node.GetAnnotations()[constants.CNIInterfaceIP]
-	if cniIfaceIP == "" {
-		// To support connectivity from HostNetwork to remoteCluster, globalnet requires the
-		// cniIfaceIP of the respective node. Route-agent running on the node annotates the
-		// respective node with the cniIfaceIP. In this API, we check for the presence of this
-		// annotation and process the node event only when the annotation exists.
-		return Requeue
-	}
-
-	return Process
 }
 
 func CreateGlobalNetMarkingChain(ipt iptables.Interface) error {

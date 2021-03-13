@@ -24,10 +24,9 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers/ipam"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 
@@ -71,19 +70,14 @@ func main() {
 		klog.Fatalf("error building submariner clientset: %s", err.Error())
 	}
 
-	clientSet, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		klog.Fatalf("Error building k8s clientset: %s", err.Error())
-	}
-
-	dynClientSet, err := dynamic.NewForConfig(cfg)
-	if err != nil {
-		klog.Fatalf("Error building dynamic clientset: %s", err.Error())
-	}
-
 	err = mcsv1a1.AddToScheme(scheme.Scheme)
 	if err != nil {
 		klog.Fatalf("Error adding Multicluster v1alpha1 to the scheme: %v", err)
+	}
+
+	err = submarinerv1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		klog.Fatalf("Error adding submariner to the scheme: %v", err)
 	}
 
 	var localCluster *submarinerv1.Cluster
@@ -110,7 +104,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	gatewayMonitor, err := ipam.NewGatewayMonitor(&ipamSpec, submarinerClient, clientSet, dynClientSet)
+	gatewayMonitor, err := ipam.NewGatewayMonitor(&ipamSpec, watcher.Config{RestConfig: cfg})
+
 	if err != nil {
 		klog.Fatalf("Error creating gatewayMonitor: %s", err.Error())
 	}
