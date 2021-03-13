@@ -15,12 +15,9 @@ limitations under the License.
 */
 package ipam
 
-import "time"
-
 type Operation string
 
 const (
-	handlerResync          = time.Hour * 24
 	SubmarinerIPAMGlobalIP = "submariner.io/globalIp"
 
 	// Globalnet uses MARK target to mark traffic destined to remote clusters.
@@ -41,8 +38,4 @@ const (
 
 	AddRules    = true
 	DeleteRules = false
-
-	Process = "Process"
-	Ignore  = "Ignore"
-	Requeue = "Requeue"
 )
