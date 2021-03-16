@@ -1,5 +1,7 @@
 restart ?= all
-focus ?= .\*
+FOCUS ?=
+SKIP ?= "\[external-dataplane\]"
+PLUGIN ?=
 BASE_BRANCH ?= devel
 export BASE_BRANCH
 
@@ -23,7 +25,8 @@ endif
 
 override CLUSTERS_ARGS += $(CLUSTER_SETTINGS_FLAG)
 override DEPLOY_ARGS += $(CLUSTER_SETTINGS_FLAG)
-override E2E_ARGS += --focus $(focus) cluster2 cluster3 cluster1
+
+override E2E_ARGS += cluster2 cluster3 cluster1
 override UNIT_TEST_ARGS += test/e2e
 override VALIDATE_ARGS += --skip-dirs pkg/client
 
