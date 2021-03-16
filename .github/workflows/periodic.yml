@@ -8,6 +8,7 @@ on:
 jobs:
   markdown-link-check-periodic:
     name: Markdown Links (all files)
+    if: github.repository_owner == 'submariner-io'
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
