@@ -50,6 +50,8 @@ type Interface interface {
 	XfrmPolicyList(family int) ([]netlink.XfrmPolicy, error)
 
 	EnableLooseModeReversePathFilter(interfaceName string) error
+
+	ConfigureTCPMTUProbe(mtuProbe, baseMss string) error
 }
 
 var NewFunc func() Interface
@@ -143,6 +145,23 @@ func (n *netlinkType) FlushRouteTable(tableID int) error {
 	cmd := exec.Command("/sbin/ip", "r", "flush", "table", strconv.Itoa(tableID))
 	if err := cmd.Run(); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (n *netlinkType) ConfigureTCPMTUProbe(mtuProbe, baseMss string) error {
+	// We won't ever create tcpMtuProbingProcEntry/tcpBaseMssProcEntry, and its permissions are 644
+	// #nosec G306
+	err := ioutil.WriteFile("/proc/sys/net/ipv4/tcp_mtu_probing", []byte(mtuProbe), 0644)
+	if err != nil {
+		return errors.WithMessagef(err, "unable to update value of tcp_mtu_probing to %s", mtuProbe)
+	}
+
+	// #nosec G306
+	err = ioutil.WriteFile("/proc/sys/net/ipv4/tcp_base_mss", []byte(baseMss), 0644)
+	if err != nil {
+		return errors.WithMessagef(err, "unable to update value of tcp_base_mss to %ss", baseMss)
 	}
 
 	return nil
