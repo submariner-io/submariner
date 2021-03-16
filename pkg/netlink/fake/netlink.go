@@ -224,6 +224,10 @@ func (n *NetLink) EnableLooseModeReversePathFilter(interfaceName string) error {
 	return nil
 }
 
+func (n *NetLink) ConfigureTCPMTUProbe(mtuProbe, baseMss string) error {
+	return nil
+}
+
 func (n *NetLink) AwaitLink(name string) (link netlink.Link) {
 	Eventually(func() netlink.Link {
 		link, _ = n.LinkByName(name)

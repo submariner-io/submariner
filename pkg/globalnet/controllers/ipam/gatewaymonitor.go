@@ -17,7 +17,6 @@ package ipam
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"time"
 
@@ -27,6 +26,7 @@ import (
 
 	"github.com/submariner-io/submariner/pkg/globalnet/cleanup"
 	"github.com/submariner-io/submariner/pkg/iptables"
+	"github.com/submariner-io/submariner/pkg/netlink"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 
@@ -201,9 +201,8 @@ func (gm *GatewayMonitor) processNextEndpoint() bool {
 		// If the endpoint hostname matches with our hostname, it implies we are on gateway node
 		if endpoint.Spec.Hostname == hostname {
 			klog.V(log.DEBUG).Infof("We are now on GatewayNode %s", endpoint.Spec.PrivateIP)
-			// An mtuProbe value of 2 enables PLPMTUD. Along with this change, we also configure
-			// base mss to 1024 as per RFC4821 recommendation.
-			ConfigureTCPMTUProbeValue([]byte("2"), []byte("1024"))
+
+			configureTCPMTUProbe()
 
 			gm.syncMutex.Lock()
 			if !gm.isGatewayNode {
@@ -332,19 +331,17 @@ func (gm *GatewayMonitor) stopIPAMController() {
 	}
 }
 
-func ConfigureTCPMTUProbeValue(mtuProbe, mssValue []byte) {
+func configureTCPMTUProbe() {
+	// An mtuProbe value of 2 enables PLPMTUD. Along with this change, we also configure
+	// base mss to 1024 as per RFC4821 recommendation.
+	mtuProbe := "2"
+	baseMss := "1024"
+
 	// If we are unable to update the values, just log a warning. Most of the Globalnet
 	// functionality works fine except for one use-case where Pod with HostNetworking
 	// on Gateway node has mtu issues connecting to remoteServices.
-	// We won't ever create tcpMtuProbingProcEntry/tcpBaseMssProcEntry, and its permissions are 644
-	// #nosec G306
-	if err := ioutil.WriteFile(tcpMtuProbingProcEntry, mtuProbe, 0644); err == nil {
-		// #nosec G306
-		err = ioutil.WriteFile(tcpBaseMssProcEntry, mssValue, 0644)
-		if err != nil {
-			klog.Warningf("unable to update value of tcp_base_mss to %s, err: %s", mssValue, err)
-		}
-	} else {
-		klog.Warningf("unable to update value of tcp_mtu_probing to %s, err: %s", mtuProbe, err)
+	err := netlink.New().ConfigureTCPMTUProbe(mtuProbe, baseMss)
+	if err != nil {
+		klog.Warningf(err.Error())
 	}
 }
