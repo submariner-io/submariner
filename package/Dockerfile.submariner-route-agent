@@ -1,15 +1,17 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal
+FROM fedora:33
 ARG TARGETPLATFORM
 
 WORKDIR /var/submariner
 
-# These are all available in the UBI8 base OS repository
-RUN microdnf -y install --nodocs iproute iptables && \
-    microdnf clean all
+RUN dnf -y install --nodocs --setopt=install_weak_deps=0 \
+           iproute iptables iptables-nft && \
+    dnf -y clean all
 
 COPY package/submariner-route-agent.sh bin/${TARGETPLATFORM}/submariner-route-agent /usr/local/bin/
 
-# Wrapper scripts to use iptables from the host when that's available
-COPY package/iptables-wrapper.in /usr/sbin/
+# Wrapper scripts to choose the appropriate iptables
+# https://github.com/kubernetes-sigs/iptables-wrappers
+COPY package/iptables-wrapper-installer.sh /usr/sbin/
+RUN /usr/sbin/iptables-wrapper-installer.sh
 
 ENTRYPOINT submariner-route-agent.sh
