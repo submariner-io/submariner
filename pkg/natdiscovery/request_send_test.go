@@ -20,54 +20,90 @@ import (
 	. "github.com/onsi/gomega"
 
 	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
+	"github.com/submariner-io/submariner/pkg/types"
 )
 
-var _ = Describe("natdiscovery requests", func() {
-
-	var ndInstance *natDiscovery
-	var udpSent chan []byte
+var _ = When("a request is sent", func() {
+	var (
+		request        *natproto.SubmarinerNatDiscoveryRequest
+		remoteEndpoint types.SubmarinerEndpoint
+		udpSent        chan []byte
+		ndInstance     *natDiscovery
+	)
 
 	localEndpoint := createTestLocalEndpoint()
-	remoteEndpoint := createTestRemoteEndpoint()
 
 	BeforeEach(func() {
-		ndInstance, udpSent = createTestListener(&localEndpoint)
-		ndInstance.AddEndpoint(&remoteEndpoint)
+		remoteEndpoint = createTestRemoteEndpoint()
+		remoteEndpoint.Spec.PublicIP = ""
+		remoteEndpoint.Spec.PrivateIP = ""
 	})
 
-	makeRequestToRemote := func() *natproto.SubmarinerNatDiscoveryRequest {
-		err := ndInstance.sendCheckRequestByRemoteID(testRemoteEndpointName)
-		Expect(err).NotTo(HaveOccurred())
-		return parseProtocolRequest(<-udpSent)
-	}
+	JustBeforeEach(func() {
+		ndInstance, udpSent = createTestListener(&localEndpoint)
+		ndInstance.findSrcIP = func(_ string) (string, error) { return testLocalPrivateIP, nil }
 
-	When("sending a request", func() {
-		It("should fill up the sender fields correctly", func() {
-			request := makeRequestToRemote()
+		err := ndInstance.sendCheckRequest(newRemoteEndpointNAT(&types.SubmarinerEndpoint{Spec: remoteEndpoint.Spec}))
+		Expect(err).NotTo(HaveOccurred())
+
+		request = parseProtocolRequest(awaitChan(udpSent))
+	})
+
+	testRequest := func(srcIP string) {
+		It("should set the sender fields correctly", func() {
 			Expect(request.Sender).NotTo(BeNil())
 			Expect(request.Sender.ClusterId).To(Equal(testLocalClusterID))
 			Expect(request.Sender.EndpointId).To(Equal(testLocalEndpointName))
 		})
 
-		It("should fill up the receiver fields correctly", func() {
-			request := makeRequestToRemote()
+		It("should set the receiver fields correctly", func() {
 			Expect(request.Receiver).NotTo(BeNil())
 			Expect(request.Receiver.ClusterId).To(Equal(testRemoteClusterID))
 			Expect(request.Receiver.EndpointId).To(Equal(testRemoteEndpointName))
 		})
 
-		It("should fill up the using-src fields correctly", func() {
-			request := makeRequestToRemote()
+		It("should set the using source fields correctly", func() {
 			Expect(request.UsingSrc).NotTo(BeNil())
+			Expect(request.UsingSrc.IP).To(Equal(testLocalPrivateIP))
 			Expect(request.UsingSrc.Port).To(Equal(uint32(testLocalNATPort)))
 		})
 
-		It("should fill up the using-dst fields correctly", func() {
-			request := makeRequestToRemote()
+		It("should set the using destination fields correctly", func() {
 			Expect(request.UsingDst).NotTo(BeNil())
 			Expect(request.UsingDst.Port).To(Equal(uint32(testRemoteNATPort)))
-			Expect(request.UsingDst.IP).To(Equal(testRemotePrivateIP))
+			Expect(request.UsingDst.IP).To(Equal(srcIP))
 		})
 
+		It("should not send another request", func() {
+			Consistently(udpSent).ShouldNot(Receive())
+		})
+	}
+
+	Context("with the private IP set", func() {
+		BeforeEach(func() {
+			remoteEndpoint.Spec.PrivateIP = testRemotePrivateIP
+		})
+
+		testRequest(testRemotePrivateIP)
+
+		Context("and the public IP set", func() {
+			BeforeEach(func() {
+				remoteEndpoint.Spec.PublicIP = testRemotePublicIP
+			})
+
+			JustBeforeEach(func() {
+				request = parseProtocolRequest(awaitChan(udpSent))
+			})
+
+			testRequest(testRemotePublicIP)
+		})
+	})
+
+	Context("with the public IP set", func() {
+		BeforeEach(func() {
+			remoteEndpoint.Spec.PublicIP = testRemotePublicIP
+		})
+
+		testRequest(testRemotePublicIP)
 	})
 })

@@ -20,94 +20,107 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/submariner/pkg/types"
 	"google.golang.org/protobuf/proto"
 
 	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 )
 
-var _ = Describe("natdiscovery listener", func() {
+var _ = Describe("Request handling", func() {
 
 	var localListener *natDiscovery
 	var localUDPSent chan []byte
 	var remoteListener *natDiscovery
 	var remoteUDPSent chan []byte
+	var localEndpoint types.SubmarinerEndpoint
+	var remoteEndpoint types.SubmarinerEndpoint
 
-	localEndpoint := createTestLocalEndpoint()
-	remoteEndpoint := createTestRemoteEndpoint()
-	remoteUnknownEndpoint := createTestUnknownRemoteEndpoint()
-
-	remoteUDPAddr := net.UDPAddr{
-		IP:   net.ParseIP(testRemotePrivateIP),
-		Port: int(testRemoteNATPort),
-	}
+	var remoteUDPAddr net.UDPAddr
 
 	BeforeEach(func() {
+		localEndpoint = createTestLocalEndpoint()
+		remoteEndpoint = createTestRemoteEndpoint()
+
 		localListener, localUDPSent = createTestListener(&localEndpoint)
 		localListener.findSrcIP = func(_ string) (string, error) { return testLocalPrivateIP, nil }
 		remoteListener, remoteUDPSent = createTestListener(&remoteEndpoint)
 		remoteListener.findSrcIP = func(_ string) (string, error) { return testRemotePrivateIP, nil }
+
+		remoteUDPAddr = net.UDPAddr{
+			IP:   net.ParseIP(testRemotePrivateIP),
+			Port: int(testRemoteNATPort),
+		}
 	})
 
 	parseResponseInLocalListener := func(udpPacket []byte, remoteAddr *net.UDPAddr) *natproto.SubmarinerNatDiscoveryResponse {
 		err := localListener.parseAndHandleMessageFromAddress(udpPacket, remoteAddr)
 		Expect(err).NotTo(HaveOccurred())
-		return parseProtocolResponse(<-localUDPSent)
+		return parseProtocolResponse(awaitChan(localUDPSent))
 	}
+
 	requestResponseFromRemoteToLocal := func(remoteAddr *net.UDPAddr) []*natproto.SubmarinerNatDiscoveryResponse {
-		err := remoteListener.sendCheckRequestByRemoteID(testLocalEndpointName)
+		err := remoteListener.sendCheckRequest(newRemoteEndpointNAT(&types.SubmarinerEndpoint{Spec: localEndpoint.Spec}))
 		Expect(err).NotTo(HaveOccurred())
 		return []*natproto.SubmarinerNatDiscoveryResponse{
-			parseResponseInLocalListener(<-remoteUDPSent, remoteAddr), /* Private IP request */
-			parseResponseInLocalListener(<-remoteUDPSent, remoteAddr), /* Public IP request */
+			parseResponseInLocalListener(awaitChan(remoteUDPSent), remoteAddr), /* Private IP request */
+			parseResponseInLocalListener(awaitChan(remoteUDPSent), remoteAddr), /* Public IP request */
 		}
 	}
 
-	When("receiving a request from an unknown endpoint on a known cluster", func() {
-		It("it should respond unknown endpoint", func() {
-			remoteListener.AddEndpoint(&localEndpoint)
-			localListener.AddEndpoint(&remoteUnknownEndpoint)
+	When("receiving a request with an unknown sender endpoint", func() {
+		It("should respond with UNKNOWN_SRC_ENDPOINT", func() {
 			response := requestResponseFromRemoteToLocal(&remoteUDPAddr)
 			Expect(response[0].Response).To(Equal(natproto.ResponseType_UNKNOWN_SRC_ENDPOINT))
 		})
 	})
 
-	When("receiving a request from an known cluster", func() {
-		It("it should respond OK", func() {
-			remoteListener.AddEndpoint(&localEndpoint)
+	When("receiving a request with a known sender endpoint", func() {
+		It("should respond with OK", func() {
 			localListener.AddEndpoint(&remoteEndpoint)
 			response := requestResponseFromRemoteToLocal(&remoteUDPAddr)
 			Expect(response[0].Response).To(Equal(natproto.ResponseType_OK))
+			Expect(response[1].Response).To(Equal(natproto.ResponseType_OK))
+		})
+
+		Context("with a modified IP", func() {
+			It("should respond with SRC_MODIFIED", func() {
+				remoteUDPAddr.IP = net.ParseIP(testRemotePublicIP)
+				localListener.AddEndpoint(&remoteEndpoint)
+				response := requestResponseFromRemoteToLocal(&remoteUDPAddr)
+				Expect(response[0].Response).To(Equal(natproto.ResponseType_SRC_MODIFIED))
+			})
+		})
+
+		Context("with a modified port", func() {
+			It("should respond with SRC_MODIFIED", func() {
+				remoteUDPAddr.Port = int(testRemoteNATPort + 1)
+				localListener.AddEndpoint(&remoteEndpoint)
+				response := requestResponseFromRemoteToLocal(&remoteUDPAddr)
+				Expect(response[0].Response).To(Equal(natproto.ResponseType_SRC_MODIFIED))
+			})
 		})
 	})
 
-	When("receiving a request from an known cluster, but IP is modified", func() {
-		It("it should respond OK", func() {
-			remoteUDPAddrOtherIP := net.UDPAddr{
-				IP:   net.ParseIP(testRemotePublicIP),
-				Port: int(testRemoteNATPort),
-			}
-			remoteListener.AddEndpoint(&localEndpoint)
+	When("receiving a request with an unknown receiver endpoint ID", func() {
+		It("should respond with UNKNOWN_DST_ENDPOINT", func() {
 			localListener.AddEndpoint(&remoteEndpoint)
-			response := requestResponseFromRemoteToLocal(&remoteUDPAddrOtherIP)
-			Expect(response[0].Response).To(Equal(natproto.ResponseType_SRC_MODIFIED))
+			localEndpoint.Spec.CableName = "invalid"
+			response := requestResponseFromRemoteToLocal(&remoteUDPAddr)
+			Expect(response[0].Response).To(Equal(natproto.ResponseType_UNKNOWN_DST_ENDPOINT))
 		})
 	})
 
-	When("receiving a request from an known cluster, but port is modified", func() {
-		It("it should respond OK", func() {
-			remoteUDPAddrOtherPort := net.UDPAddr{
-				IP:   net.ParseIP(testRemotePrivateIP),
-				Port: int(testRemoteNATPort + 1),
-			}
-			remoteListener.AddEndpoint(&localEndpoint)
+	When("receiving a request with an unknown receiver cluster ID", func() {
+		It("should respond with UNKNOWN_DST_CLUSTER", func() {
 			localListener.AddEndpoint(&remoteEndpoint)
-			response := requestResponseFromRemoteToLocal(&remoteUDPAddrOtherPort)
-			Expect(response[0].Response).To(Equal(natproto.ResponseType_SRC_MODIFIED))
+			localEndpoint.Spec.ClusterID = "invalid"
+			response := requestResponseFromRemoteToLocal(&remoteUDPAddr)
+			Expect(response[0].Response).To(Equal(natproto.ResponseType_UNKNOWN_DST_CLUSTER))
 		})
 	})
 
-	When("receiving a malformed request", func() {
-		It("it should respond MALFORMED for a missing Sender", func() {
+	When("receiving a request with a missing Sender", func() {
+		It("should respond with MALFORMED", func() {
 			request := createMalformedRequest(func(msg *natproto.SubmarinerNatDiscoveryMessage) {
 				msg.GetRequest().Sender = nil
 			})
@@ -116,8 +129,8 @@ var _ = Describe("natdiscovery listener", func() {
 		})
 	})
 
-	When("receiving a malformed request", func() {
-		It("it should respond MALFORMED for a missing Receiver", func() {
+	When("receiving a malformed request with a missing Receiver", func() {
+		It("should respond with MALFORMED", func() {
 			request := createMalformedRequest(func(msg *natproto.SubmarinerNatDiscoveryMessage) {
 				msg.GetRequest().Receiver = nil
 			})
@@ -126,8 +139,8 @@ var _ = Describe("natdiscovery listener", func() {
 		})
 	})
 
-	When("receiving a malformed request", func() {
-		It("it should respond MALFORMED for a missing UsingDst", func() {
+	When("receiving a malformed request with a missing UsingDst", func() {
+		It("should respond with MALFORMED", func() {
 			request := createMalformedRequest(func(msg *natproto.SubmarinerNatDiscoveryMessage) {
 				msg.GetRequest().UsingDst = nil
 			})
@@ -136,8 +149,8 @@ var _ = Describe("natdiscovery listener", func() {
 		})
 	})
 
-	When("receiving a malformed request", func() {
-		It("it should respond MALFORMED for a missing UsingSrc", func() {
+	When("receiving a malformed request with a missing UsingSrc", func() {
+		It("should respond with MALFORMED", func() {
 			request := createMalformedRequest(func(msg *natproto.SubmarinerNatDiscoveryMessage) {
 				msg.GetRequest().UsingSrc = nil
 			})
