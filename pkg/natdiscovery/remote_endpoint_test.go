@@ -47,7 +47,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 
 	When("the total timeout has elapsed", func() {
 		It("should report as timed out", func() {
-			rnat.started = time.Now().Add(-totalTimeout)
+			rnat.started = time.Now().Add(-toDuration(&totalTimeout))
 			Expect(rnat.hasTimedOut()).To(BeTrue())
 		})
 	})
@@ -176,7 +176,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 				rnat.checkSent()
 				err := rnat.transitionToPublicIP(testRemoteEndpointName, true)
 				Expect(err).NotTo(HaveOccurred())
-				rnat.lastTransition = rnat.lastTransition.Add(-publicToPrivateFailoverTimeout)
+				rnat.lastTransition = rnat.lastTransition.Add(-time.Duration(publicToPrivateFailoverTimeout))
 				err = rnat.transitionToPrivateIP(testRemoteEndpointName, false)
 				Expect(err).To(HaveOccurred())
 				Expect(rnat.state).To(Equal(selectedPublicIP))

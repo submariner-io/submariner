@@ -20,6 +20,7 @@ import (
 
 	"github.com/google/gopacket/routing"
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
 	"google.golang.org/protobuf/proto"
 	"k8s.io/klog"
 
@@ -62,7 +63,7 @@ func (nd *natDiscovery) sendCheckRequest(remoteNAT *remoteEndpointNAT) error {
 }
 
 func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT, targetIP string) (uint64, error) {
-	targetPort, err := extractNATDiscoveryPort(remoteNAT.endpoint)
+	targetPort, err := extractNATDiscoveryPort(&remoteNAT.endpoint)
 
 	if err != nil {
 		return 0, err
@@ -114,6 +115,9 @@ func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT,
 		IP:   net.ParseIP(targetIP),
 		Port: int(targetPort),
 	}
+
+	klog.V(log.TRACE).Infof("Sending request - REQUEST_NUMBER: %v, SENDER: %#v, RECEIVER: %#v, USING_SRC: %#v, USING_DST: %#v",
+		request.RequestNumber, request.Sender, request.Receiver, request.UsingSrc, request.UsingDst)
 
 	if length, err := nd.serverUDPWrite(buf, &addr); err != nil {
 		return request.RequestNumber, errors.Wrapf(err, "error sending request packet %#v", request)

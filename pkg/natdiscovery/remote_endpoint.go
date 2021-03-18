@@ -16,6 +16,7 @@ limitations under the License.
 package natdiscovery
 
 import (
+	"sync/atomic"
 	"time"
 
 	"github.com/pkg/errors"
@@ -31,13 +32,16 @@ const (
 	waitingForResponse
 	selectedPublicIP
 	selectedPrivateIP
-	recheckTime                    = 2 * time.Second
-	totalTimeout                   = 60 * time.Second
-	publicToPrivateFailoverTimeout = 1 * time.Second
+)
+
+var (
+	recheckTime                    = (2 * time.Second).Nanoseconds()
+	totalTimeout                   = (60 * time.Second).Nanoseconds()
+	publicToPrivateFailoverTimeout = time.Second.Nanoseconds()
 )
 
 type remoteEndpointNAT struct {
-	endpoint               *types.SubmarinerEndpoint
+	endpoint               types.SubmarinerEndpoint
 	state                  endpointState
 	lastCheck              time.Time
 	lastTransition         time.Time
@@ -64,7 +68,7 @@ func (rn *remoteEndpointNAT) toNATEndpointInfo() *NATEndpointInfo {
 
 func newRemoteEndpointNAT(endpoint *types.SubmarinerEndpoint) *remoteEndpointNAT {
 	return &remoteEndpointNAT{
-		endpoint:       endpoint,
+		endpoint:       *endpoint,
 		state:          testingPrivateAndPublicIPs,
 		started:        time.Now(),
 		lastTransition: time.Now(),
@@ -81,7 +85,7 @@ func (rn *remoteEndpointNAT) sinceLastTransition() time.Duration {
 }
 
 func (rn *remoteEndpointNAT) hasTimedOut() bool {
-	return time.Since(rn.started) > totalTimeout
+	return time.Since(rn.started) > toDuration(&totalTimeout)
 }
 
 func (rn *remoteEndpointNAT) useLegacyNATSettings() {
@@ -100,7 +104,7 @@ func (rn *remoteEndpointNAT) shouldCheck() bool {
 	case testingPrivateAndPublicIPs:
 		return true
 	case waitingForResponse:
-		return time.Since(rn.lastCheck) > recheckTime
+		return time.Since(rn.lastCheck) > toDuration(&recheckTime)
 	default:
 		return false
 	}
@@ -136,7 +140,7 @@ func (rn *remoteEndpointNAT) transitionToPrivateIP(remoteEndpointID string, useN
 	case selectedPublicIP:
 		// If a PublicIP was selected, we still allow some time for the privateIP response to arrive, and we always
 		// prefer PrivateIP with no NAT connection, as it will be more likely to work, and more efficient
-		if rn.sinceLastTransition() > publicToPrivateFailoverTimeout {
+		if rn.sinceLastTransition() > toDuration(&publicToPrivateFailoverTimeout) {
 			return errors.Errorf("response on private address received too late after response on public address for endpoint %q",
 				remoteEndpointID)
 		}
@@ -150,4 +154,8 @@ func (rn *remoteEndpointNAT) transitionToPrivateIP(remoteEndpointID string, useN
 	}
 
 	return nil
+}
+
+func toDuration(v *int64) time.Duration {
+	return time.Duration(atomic.LoadInt64(v))
 }
