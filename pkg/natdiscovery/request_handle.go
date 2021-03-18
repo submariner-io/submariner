@@ -123,6 +123,9 @@ func (nd *natDiscovery) sendResponseToAddress(response *proto.SubmarinerNatDisco
 		return errors.Wrapf(err, "error marshaling response %#v", response)
 	}
 
+	klog.V(log.TRACE).Infof("Sending response - REQUEST_NUMBER: %v, RESPONSE: %v, SENDER: %#v, RECEIVER: %#v",
+		response.RequestNumber, response.Response, response.Sender, response.Receiver)
+
 	if length, err := nd.serverUDPWrite(buf, addr); err != nil {
 		return errors.Wrapf(err, "error sending response packet %#v", response)
 	} else if length != len(buf) {

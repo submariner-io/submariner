@@ -49,6 +49,7 @@ const (
 	testRemoteClusterID    = "cluster-b"
 	testRemotePublicIP     = "10.3.3.3"
 	testRemotePrivateIP    = "4.4.4.4"
+	testRemotePrivateIP2   = "5.5.5.5"
 )
 
 var (
@@ -80,11 +81,13 @@ func parseProtocolResponse(buf []byte) *natproto.SubmarinerNatDiscoveryResponse 
 	return response
 }
 
-func createTestListener(endpoint *types.SubmarinerEndpoint) (*natDiscovery, chan []byte) {
+func createTestListener(endpoint *types.SubmarinerEndpoint) (*natDiscovery, chan []byte, chan *NATEndpointInfo) {
 	listener, err := newNatDiscovery(&types.SubmarinerEndpoint{Spec: endpoint.Spec})
+	Expect(err).To(Succeed())
+
 	readyChannel := make(chan *NATEndpointInfo, 100)
 	listener.SetReadyChannel(readyChannel)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).To(Succeed())
 
 	udpSentChannel := make(chan []byte, 10)
 	listener.serverUDPWrite = func(b []byte, addr *net.UDPAddr) (int, error) {
@@ -92,8 +95,31 @@ func createTestListener(endpoint *types.SubmarinerEndpoint) (*natDiscovery, chan
 		return len(b), nil
 	}
 
-	return listener, udpSentChannel
+	return listener, udpSentChannel, readyChannel
 }
+
+func forwardFromUDPChan(from chan []byte, addr *net.UDPAddr, to *natDiscovery, howMany int) {
+	if howMany == 0 {
+		return
+	}
+
+	count := 0
+
+	go func() {
+		for p := range from {
+			err := to.parseAndHandleMessageFromAddress(p, addr)
+			if err != nil {
+				klog.Errorf("Error handling message: %s", err)
+			}
+
+			count++
+			if howMany > 0 && count >= howMany {
+				break
+			}
+		}
+	}()
+}
+
 func createTestLocalEndpoint() types.SubmarinerEndpoint {
 	return types.SubmarinerEndpoint{
 		Spec: submarinerv1.EndpointSpec{
@@ -101,6 +127,7 @@ func createTestLocalEndpoint() types.SubmarinerEndpoint {
 			ClusterID:        testLocalClusterID,
 			PublicIP:         testLocalPublicIP,
 			PrivateIP:        testLocalPrivateIP,
+			NATEnabled:       true,
 			NATDiscoveryPort: &testLocalNATPort,
 		},
 	}
@@ -113,6 +140,7 @@ func createTestRemoteEndpoint() types.SubmarinerEndpoint {
 			ClusterID:        testRemoteClusterID,
 			PublicIP:         testRemotePublicIP,
 			PrivateIP:        testRemotePrivateIP,
+			NATEnabled:       true,
 			NATDiscoveryPort: &testRemoteNATPort,
 		},
 	}
