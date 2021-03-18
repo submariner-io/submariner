@@ -18,6 +18,7 @@ package natdiscovery
 import (
 	"net"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -44,11 +45,10 @@ const (
 	testLocalPublicIP     = "10.1.1.1"
 	testLocalPrivateIP    = "2.2.2.2"
 
-	testRemoteEndpointName        = "cluster-b-ep-1"
-	testRemoteUnknownEndpointName = "cluster-b-ep-unknown"
-	testRemoteClusterID           = "cluster-b"
-	testRemotePublicIP            = "10.3.3.3"
-	testRemotePrivateIP           = "4.4.4.4"
+	testRemoteEndpointName = "cluster-b-ep-1"
+	testRemoteClusterID    = "cluster-b"
+	testRemotePublicIP     = "10.3.3.3"
+	testRemotePrivateIP    = "4.4.4.4"
 )
 
 var (
@@ -81,7 +81,7 @@ func parseProtocolResponse(buf []byte) *natproto.SubmarinerNatDiscoveryResponse 
 }
 
 func createTestListener(endpoint *types.SubmarinerEndpoint) (*natDiscovery, chan []byte) {
-	listener, err := newNatDiscovery(endpoint)
+	listener, err := newNatDiscovery(&types.SubmarinerEndpoint{Spec: endpoint.Spec})
 	readyChannel := make(chan *NATEndpointInfo, 100)
 	listener.SetReadyChannel(readyChannel)
 	Expect(err).NotTo(HaveOccurred())
@@ -118,14 +118,12 @@ func createTestRemoteEndpoint() types.SubmarinerEndpoint {
 	}
 }
 
-func createTestUnknownRemoteEndpoint() types.SubmarinerEndpoint {
-	return types.SubmarinerEndpoint{
-		Spec: submarinerv1.EndpointSpec{
-			CableName:        testRemoteUnknownEndpointName,
-			ClusterID:        testRemoteClusterID,
-			PublicIP:         testRemotePublicIP,
-			PrivateIP:        testRemotePrivateIP,
-			NATDiscoveryPort: &testRemoteNATPort,
-		},
+func awaitChan(from chan []byte) []byte {
+	select {
+	case res := <-from:
+		return res
+	case <-time.After(3 * time.Second):
+		Fail("Nothing received from the channel")
+		return nil
 	}
 }

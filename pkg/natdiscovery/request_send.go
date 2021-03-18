@@ -26,11 +26,6 @@ import (
 	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 )
 
-func (nd *natDiscovery) sendCheckRequestByRemoteID(id string) error {
-	remoteNAT := nd.remoteEndpoints[id]
-	return nd.sendCheckRequest(remoteNAT)
-}
-
 func (nd *natDiscovery) sendCheckRequest(remoteNAT *remoteEndpointNAT) error {
 	var errPrivate, errPublic error
 	var reqID uint64
