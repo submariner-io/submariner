@@ -4,6 +4,7 @@ locals {
   ipsec_natt_port = 4500
   ipsec_ike_port = 500
   gw_instance_type = "m5n.large"
+  enable_ha = false
 }
 
 provider "aws" {
@@ -17,4 +18,5 @@ module "ocp-ipi-aws-prep" {
   ipsec_natt_port = local.ipsec_natt_port
   ipsec_ike_port = local.ipsec_ike_port
   gw_instance_type = local.gw_instance_type
+  enable_ha = local.enable_ha
 }
