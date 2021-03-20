@@ -50,6 +50,9 @@ func (kp *SyncHandler) NodeUpdated(node *k8sV1.Node) error {
 func (kp *SyncHandler) NodeRemoved(node *k8sV1.Node) error {
 	klog.V(log.DEBUG).Infof("A Node with name %q has been removed", node.Name)
 
+	kp.syncHandlerMutex.Lock()
+	defer kp.syncHandlerMutex.Unlock()
+
 	for i, addr := range node.Status.Addresses {
 		if addr.Type == k8sV1.NodeInternalIP {
 			kp.populateRemoteVtepIps(node.Status.Addresses[i].Address, Delete)
