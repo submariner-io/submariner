@@ -41,9 +41,9 @@ var _ = Describe("Request handling", func() {
 		localEndpoint = createTestLocalEndpoint()
 		remoteEndpoint = createTestRemoteEndpoint()
 
-		localListener, localUDPSent = createTestListener(&localEndpoint)
+		localListener, localUDPSent, _ = createTestListener(&localEndpoint)
 		localListener.findSrcIP = func(_ string) (string, error) { return testLocalPrivateIP, nil }
-		remoteListener, remoteUDPSent = createTestListener(&remoteEndpoint)
+		remoteListener, remoteUDPSent, _ = createTestListener(&remoteEndpoint)
 		remoteListener.findSrcIP = func(_ string) (string, error) { return testRemotePrivateIP, nil }
 
 		remoteUDPAddr = net.UDPAddr{

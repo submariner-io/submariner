@@ -25,10 +25,9 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/submariner/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
-
-	"github.com/submariner-io/submariner/pkg/types"
 )
 
 type Interface interface {
@@ -129,6 +128,7 @@ func (nd *natDiscovery) AddEndpoint(endpoint *types.SubmarinerEndpoint) {
 	// support a remote cluster endpoint which still hasn't implemented this protocol
 	if _, err := extractNATDiscoveryPort(endpoint); err == errorNoNatDiscoveryPort {
 		remoteNAT.useLegacyNATSettings()
+		nd.readyChannel <- remoteNAT.toNATEndpointInfo()
 	}
 
 	nd.remoteEndpoints[endpoint.Spec.CableName] = remoteNAT
@@ -148,6 +148,7 @@ func (nd *natDiscovery) checkEndpointList() {
 		if endpointNAT.shouldCheck() {
 			if endpointNAT.hasTimedOut() {
 				endpointNAT.useLegacyNATSettings()
+				nd.readyChannel <- endpointNAT.toNATEndpointInfo()
 			} else if err := nd.sendCheckRequest(endpointNAT); err != nil {
 				klog.Errorf("Error sending check request to %q: %s", endpointNAT.endpoint.Spec.CableName, err)
 			}

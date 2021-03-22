@@ -21,12 +21,16 @@ import (
 	"net"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
 	"k8s.io/klog"
 
 	"github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 )
 
 func (nd *natDiscovery) handleResponseFromAddress(req *proto.SubmarinerNatDiscoveryResponse, addr *net.UDPAddr) error {
+	klog.V(log.TRACE).Infof("Received response from %#v - REQUEST_NUMBER: %v, RESPONSE: %v, SENDER: %#v, RECEIVER: %#v",
+		addr, req.RequestNumber, req.Response, req.Sender, req.Receiver)
+
 	if req.GetSender() == nil || req.GetReceiver() == nil || req.GetReceivedSrc() == nil {
 		return errors.Errorf("received malformed response %#v", req)
 	}
@@ -82,7 +86,10 @@ func (nd *natDiscovery) handleResponseFromAddress(req *proto.SubmarinerNatDiscov
 		}
 
 		nd.readyChannel <- remoteNat.toNATEndpointInfo()
+
+		return nil
 	}
 
-	return errors.Errorf("received response for unknown request id %d", req.RequestNumber)
+	return errors.Errorf("received response for unknown request id %d, lastPublicIPRequestID: %d, lastPrivateIPRequestID: %d",
+		req.RequestNumber, remoteNat.lastPublicIPRequestID, remoteNat.lastPrivateIPRequestID)
 }
