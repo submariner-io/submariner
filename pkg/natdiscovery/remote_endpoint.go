@@ -33,12 +33,16 @@ const (
 	waitingForResponse
 	selectedPublicIP
 	selectedPrivateIP
+	selectPublicIPPending
 )
 
 var (
-	recheckTime                    = (2 * time.Second).Nanoseconds()
-	totalTimeout                   = (60 * time.Second).Nanoseconds()
-	publicToPrivateFailoverTimeout = time.Second.Nanoseconds()
+	recheckTime  = (2 * time.Second).Nanoseconds()
+	totalTimeout = (60 * time.Second).Nanoseconds()
+
+	// If a public IP was selected, we still allow some time for the private IP response to arrive - we always
+	// prefer the private IP with no NAT connection as it will be more likely to work and more efficiently.
+	publicToPrivateGracePeriod = time.Second.Nanoseconds()
 )
 
 type remoteEndpointNAT struct {
@@ -51,6 +55,7 @@ type remoteEndpointNAT struct {
 	useIP                  string
 	lastPublicIPRequestID  uint64
 	lastPrivateIPRequestID uint64
+	readyChannel           chan *NATEndpointInfo
 }
 
 type NATEndpointInfo struct {
@@ -67,18 +72,27 @@ func (rn *remoteEndpointNAT) toNATEndpointInfo() *NATEndpointInfo {
 	}
 }
 
-func newRemoteEndpointNAT(endpoint *types.SubmarinerEndpoint) *remoteEndpointNAT {
+func newRemoteEndpointNAT(endpoint *types.SubmarinerEndpoint, readyChannel chan *NATEndpointInfo) *remoteEndpointNAT {
 	return &remoteEndpointNAT{
 		endpoint:       *endpoint,
 		state:          testingPrivateAndPublicIPs,
 		started:        time.Now(),
 		lastTransition: time.Now(),
+		readyChannel:   readyChannel,
 	}
 }
 
 func (rn *remoteEndpointNAT) transitionToState(newState endpointState) {
+	if rn.state == newState {
+		return
+	}
+
 	rn.lastTransition = time.Now()
 	rn.state = newState
+
+	if rn.state == selectedPublicIP || rn.state == selectedPrivateIP {
+		rn.sendReady()
+	}
 }
 
 func (rn *remoteEndpointNAT) sinceLastTransition() time.Duration {
@@ -106,6 +120,14 @@ func (rn *remoteEndpointNAT) shouldCheck() bool {
 		return true
 	case waitingForResponse:
 		return time.Since(rn.lastCheck) > toDuration(&recheckTime)
+	case selectPublicIPPending:
+		if rn.sinceLastTransition() > toDuration(&publicToPrivateGracePeriod) {
+			klog.V(log.DEBUG).Infof("Response for private IP received within grace period after public IP response for endpoint %q",
+				rn.endpoint.Spec.CableName)
+			rn.transitionToState(selectedPublicIP)
+		}
+
+		return false
 	default:
 		return false
 	}
@@ -124,7 +146,12 @@ func (rn *remoteEndpointNAT) transitionToPublicIP(remoteEndpointID string, useNA
 	case waitingForResponse:
 		rn.useIP = rn.endpoint.Spec.PublicIP
 		rn.useNAT = useNAT
-		rn.transitionToState(selectedPublicIP)
+
+		if rn.endpoint.Spec.PrivateIP == "" {
+			rn.transitionToState(selectedPublicIP)
+		} else {
+			rn.transitionToState(selectPublicIPPending)
+		}
 
 		return true
 	case selectedPrivateIP:
@@ -137,32 +164,43 @@ func (rn *remoteEndpointNAT) transitionToPublicIP(remoteEndpointID string, useNA
 
 func (rn *remoteEndpointNAT) transitionToPrivateIP(remoteEndpointID string, useNAT bool) bool {
 	switch rn.state {
-	case waitingForResponse:
+	case waitingForResponse, selectPublicIPPending:
 		rn.useIP = rn.endpoint.Spec.PrivateIP
 		rn.useNAT = useNAT
 		rn.transitionToState(selectedPrivateIP)
 
 		return true
 	case selectedPublicIP:
-		// If a PublicIP was selected, we still allow some time for the privateIP response to arrive, and we always
-		// prefer PrivateIP with no NAT connection, as it will be more likely to work, and more efficient
-		if rn.sinceLastTransition() > toDuration(&publicToPrivateFailoverTimeout) {
-			klog.V(log.DEBUG).Infof("Response on private IP received too late after response on public IP for endpoint %q",
-				remoteEndpointID)
-			return false
-		}
-
-		rn.useIP = rn.endpoint.Spec.PrivateIP
-		rn.useNAT = useNAT
-		rn.transitionToState(selectedPrivateIP)
-
-		return true
+		return false
 	default:
 		klog.Errorf("Received unexpected transition from %v to private IP for endpoint %q", rn.state, remoteEndpointID)
 		return false
 	}
 }
 
+func (rn *remoteEndpointNAT) sendReady() {
+	if rn.readyChannel != nil {
+		rn.readyChannel <- rn.toNATEndpointInfo()
+	}
+}
+
 func toDuration(v *int64) time.Duration {
 	return time.Duration(atomic.LoadInt64(v))
+}
+
+func (e endpointState) String() string {
+	switch e {
+	case testingPrivateAndPublicIPs:
+		return "testingPrivateAndPublicIPs"
+	case waitingForResponse:
+		return "waitingForResponse"
+	case selectedPublicIP:
+		return "selectedPublicIP"
+	case selectedPrivateIP:
+		return "selectedPrivateIP"
+	case selectPublicIPPending:
+		return "selectPublicIPPending"
+	default:
+		return "unknown"
+	}
 }

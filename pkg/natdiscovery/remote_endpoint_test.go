@@ -26,11 +26,32 @@ import (
 var _ = Describe("remoteEndpointNAT", func() {
 
 	var rnat *remoteEndpointNAT
+	var readyChannel chan *NATEndpointInfo
 
 	BeforeEach(func() {
+		readyChannel = make(chan *NATEndpointInfo, 10)
 		remoteEndpoint := createTestRemoteEndpoint()
-		rnat = newRemoteEndpointNAT(&remoteEndpoint)
+		rnat = newRemoteEndpointNAT(&remoteEndpoint, readyChannel)
 	})
+
+	verifyReady := func() {
+		It("should notify ready", func() {
+			Expect(readyChannel).To(Receive(Equal(&NATEndpointInfo{
+				Endpoint: rnat.endpoint.Spec,
+				UseIP:    rnat.useIP,
+				UseNAT:   rnat.useNAT,
+			})))
+
+			rnat.transitionToState(rnat.state)
+			Expect(readyChannel).ToNot(Receive())
+		})
+	}
+
+	verifyNotReady := func() {
+		It("should not notify ready", func() {
+			Expect(readyChannel).ToNot(Receive())
+		})
+	}
 
 	When("first created", func() {
 		It("shouldCheck should return true", func() {
@@ -53,52 +74,72 @@ var _ = Describe("remoteEndpointNAT", func() {
 	})
 
 	When("using legacy settings", func() {
+		JustBeforeEach(func() {
+			rnat.useLegacyNATSettings()
+		})
+
 		Context("and NAT is not enabled", func() {
-			It("should select the private IP", func() {
+			BeforeEach(func() {
 				rnat.endpoint.Spec.NATEnabled = false
-				rnat.useLegacyNATSettings()
+			})
+
+			It("should select the private IP", func() {
 				Expect(rnat.state).To(Equal(selectedPrivateIP))
 				Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.PrivateIP))
 			})
 		})
+
 		Context("and NAT is enabled", func() {
-			It("should select the public IP", func() {
+			BeforeEach(func() {
 				rnat.endpoint.Spec.NATEnabled = true
-				rnat.useLegacyNATSettings()
+			})
+
+			It("should select the public IP", func() {
 				Expect(rnat.state).To(Equal(selectedPublicIP))
 				Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.PublicIP))
 			})
 		})
+
+		verifyReady()
 	})
 
-	When("the public IP is selected but no check was sent", func() {
-		It("it should not transition the state", func() {
+	When("transition to the public IP but no check was sent", func() {
+		It("should not transition the state", func() {
 			oldState := rnat.state
 			Expect(rnat.transitionToPublicIP(testRemoteEndpointName, false)).To(BeFalse())
 			Expect(rnat.state).To(Equal(oldState))
 			Expect(rnat.useIP).To(Equal(""))
 		})
+
+		verifyNotReady()
 	})
 
-	When("the private IP is selected but no check was sent", func() {
-		It("it should not transition the state", func() {
+	When("transition to the private IP but no check was sent", func() {
+		It("should not transition the state", func() {
 			oldState := rnat.state
 			Expect(rnat.transitionToPrivateIP(testRemoteEndpointName, false)).To(BeFalse())
 			Expect(rnat.state).To(Equal(oldState))
 			Expect(rnat.useIP).To(Equal(""))
 		})
+
+		verifyNotReady()
 	})
 
-	When("the private IP is selected", func() {
+	When("transition to the private IP", func() {
 		var useNAT bool
+		var result bool
 
 		JustBeforeEach(func() {
 			rnat.checkSent()
-			Expect(rnat.transitionToPrivateIP(testRemoteEndpointName, useNAT)).To(BeTrue())
-			Expect(rnat.state).To(Equal(selectedPrivateIP))
+			result = rnat.transitionToPrivateIP(testRemoteEndpointName, useNAT)
+			rnat.checkSent()
 		})
 
-		It("should use the private IP", func() {
+		verifyReady()
+
+		It("should select the private IP", func() {
+			Expect(result).To(BeTrue())
+			Expect(rnat.state).To(Equal(selectedPrivateIP))
 			Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.PrivateIP))
 		})
 
@@ -121,15 +162,60 @@ var _ = Describe("remoteEndpointNAT", func() {
 				Expect(rnat.useNAT).To(BeFalse())
 			})
 		})
+
+		Context("with no NAT discovered", func() {
+			BeforeEach(func() {
+				useNAT = false
+			})
+
+			It("should set useNAT to false", func() {
+				Expect(rnat.useNAT).To(BeFalse())
+			})
+		})
+
+		Context("after the public IP was selected", func() {
+			BeforeEach(func() {
+				rnat.state = selectedPublicIP
+			})
+
+			It("should not transition the state", func() {
+				Expect(result).To(BeFalse())
+				Expect(rnat.state).To(Equal(selectedPublicIP))
+			})
+
+			verifyNotReady()
+		})
 	})
 
-	When("the public IP is selected", func() {
+	When("transition to the public IP", func() {
 		var useNAT bool
+		var result bool
 
 		JustBeforeEach(func() {
 			rnat.checkSent()
-			Expect(rnat.transitionToPublicIP(testRemoteEndpointName, useNAT)).To(BeTrue())
-			Expect(rnat.state).To(Equal(selectedPublicIP))
+			result = rnat.transitionToPublicIP(testRemoteEndpointName, useNAT)
+		})
+
+		Context("with no private IP", func() {
+			BeforeEach(func() {
+				rnat.endpoint.Spec.PrivateIP = ""
+			})
+
+			It("should select the public IP", func() {
+				Expect(result).To(BeTrue())
+				Expect(rnat.state).To(Equal(selectedPublicIP))
+			})
+
+			verifyReady()
+		})
+
+		Context("with a private IP", func() {
+			It("should transition to public IP pending", func() {
+				Expect(result).To(BeTrue())
+				Expect(rnat.state).To(Equal(selectPublicIPPending))
+			})
+
+			verifyNotReady()
 		})
 
 		It("should use the public IP", func() {
@@ -155,30 +241,55 @@ var _ = Describe("remoteEndpointNAT", func() {
 				Expect(rnat.useNAT).To(BeFalse())
 			})
 		})
+
+		Context("after the private IP was selected", func() {
+			BeforeEach(func() {
+				rnat.state = selectedPrivateIP
+			})
+
+			It("should not transition the state", func() {
+				Expect(result).To(BeFalse())
+				Expect(rnat.state).To(Equal(selectedPrivateIP))
+			})
+
+			verifyNotReady()
+		})
 	})
 
-	When("private IP is selected right after publicIP ", func() {
+	When("transition to the private IP after the public IP is pending", func() {
+		JustBeforeEach(func() {
+			rnat.checkSent()
+			Expect(rnat.transitionToPublicIP(testRemoteEndpointName, true)).To(BeTrue())
+		})
+
 		Context("and the grace period has not elapsed", func() {
-			It("should use the private IP", func() {
-				rnat.checkSent()
-				Expect(rnat.transitionToPublicIP(testRemoteEndpointName, true)).To(BeTrue())
+			JustBeforeEach(func() {
 				Expect(rnat.transitionToPrivateIP(testRemoteEndpointName, false)).To(BeTrue())
+			})
+
+			It("should select the private IP", func() {
 				Expect(rnat.state).To(Equal(selectedPrivateIP))
 				Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.PrivateIP))
 				Expect(rnat.useNAT).To(BeFalse())
 			})
+
+			verifyReady()
 		})
 
 		Context("and the grace period has elapsed", func() {
-			It("should still use the public IP", func() {
-				rnat.checkSent()
-				Expect(rnat.transitionToPublicIP(testRemoteEndpointName, true)).To(BeTrue())
-				rnat.lastTransition = rnat.lastTransition.Add(-time.Duration(publicToPrivateFailoverTimeout))
+			JustBeforeEach(func() {
+				rnat.lastTransition = rnat.lastTransition.Add(-time.Duration(publicToPrivateGracePeriod))
+				Expect(rnat.shouldCheck()).To(BeFalse())
 				Expect(rnat.transitionToPrivateIP(testRemoteEndpointName, false)).To(BeFalse())
+			})
+
+			It("should select the public IP", func() {
 				Expect(rnat.state).To(Equal(selectedPublicIP))
 				Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.PublicIP))
 				Expect(rnat.useNAT).To(BeTrue())
 			})
+
+			verifyReady()
 		})
 	})
 })

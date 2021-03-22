@@ -123,7 +123,7 @@ func (nd *natDiscovery) AddEndpoint(endpoint *types.SubmarinerEndpoint) {
 		}
 	}
 
-	remoteNAT := newRemoteEndpointNAT(endpoint)
+	remoteNAT := newRemoteEndpointNAT(endpoint, nd.readyChannel)
 
 	// support a remote cluster endpoint which still hasn't implemented this protocol
 	if _, err := extractNATDiscoveryPort(endpoint); err == errorNoNatDiscoveryPort {

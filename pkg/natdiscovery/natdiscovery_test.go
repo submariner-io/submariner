@@ -33,7 +33,7 @@ var _ = When("a remote Endpoint is added", func() {
 	BeforeEach(func() {
 		atomic.StoreInt64(&recheckTime, 0)
 		atomic.StoreInt64(&totalTimeout, time.Hour.Nanoseconds())
-		atomic.StoreInt64(&publicToPrivateFailoverTimeout, time.Hour.Nanoseconds())
+		atomic.StoreInt64(&publicToPrivateGracePeriod, time.Hour.Nanoseconds())
 		forwardHowManyFromLocal = 1
 		t.remoteEndpoint.Spec.PublicIP = ""
 	})
@@ -76,11 +76,7 @@ var _ = When("a remote Endpoint is added", func() {
 			It("should notify with the private IP NATEndpointInfo settings", func() {
 				Expect(t.remoteND.parseAndHandleMessageFromAddress(publicIPReq, t.localUDPAddr))
 
-				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
-					Endpoint: t.remoteEndpoint.Spec,
-					UseNAT:   false,
-					UseIP:    t.remoteEndpoint.Spec.PublicIP,
-				})))
+				Consistently(t.readyChannel).ShouldNot(Receive())
 
 				Expect(t.remoteND.parseAndHandleMessageFromAddress(privateIPReq, t.localUDPAddr))
 
@@ -94,9 +90,12 @@ var _ = When("a remote Endpoint is added", func() {
 
 		Context("and the private IP responds after the public IP but after the grace period has elapsed", func() {
 			It("should notify with the public IP NATEndpointInfo settings", func() {
-				atomic.StoreInt64(&publicToPrivateFailoverTimeout, 0)
+				atomic.StoreInt64(&publicToPrivateGracePeriod, 0)
 
 				Expect(t.remoteND.parseAndHandleMessageFromAddress(publicIPReq, t.localUDPAddr))
+				Consistently(t.readyChannel).ShouldNot(Receive())
+
+				t.localND.checkEndpointList()
 
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 					Endpoint: t.remoteEndpoint.Spec,
@@ -268,7 +267,7 @@ func newDiscoveryTestDriver() *discoveryTestDriver {
 	BeforeEach(func() {
 		t.oldRecheckTime = atomic.LoadInt64(&recheckTime)
 		t.oldTotalTimeout = atomic.LoadInt64(&totalTimeout)
-		t.oldPublicToPrivateFailoverTimeout = atomic.LoadInt64(&publicToPrivateFailoverTimeout)
+		t.oldPublicToPrivateFailoverTimeout = atomic.LoadInt64(&publicToPrivateGracePeriod)
 
 		t.localUDPAddr = &net.UDPAddr{
 			IP:   net.ParseIP(testLocalPrivateIP),
@@ -298,7 +297,7 @@ func newDiscoveryTestDriver() *discoveryTestDriver {
 
 		atomic.StoreInt64(&recheckTime, t.oldRecheckTime)
 		atomic.StoreInt64(&totalTimeout, t.oldTotalTimeout)
-		atomic.StoreInt64(&publicToPrivateFailoverTimeout, t.oldPublicToPrivateFailoverTimeout)
+		atomic.StoreInt64(&publicToPrivateGracePeriod, t.oldPublicToPrivateFailoverTimeout)
 	})
 
 	return t

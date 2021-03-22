@@ -57,11 +57,7 @@ func (nd *natDiscovery) handleResponseFromAddress(req *proto.SubmarinerNatDiscov
 	// response to a PublicIP request
 	if remoteNat.lastPublicIPRequestID == req.RequestNumber {
 		useNAT := req.Response == proto.ResponseType_SRC_MODIFIED
-		if !remoteNat.transitionToPublicIP(req.GetSender().EndpointId, useNAT) {
-			return nil
-		}
-
-		nd.readyChannel <- remoteNat.toNATEndpointInfo()
+		remoteNat.transitionToPublicIP(req.GetSender().EndpointId, useNAT)
 
 		return nil
 	}
@@ -80,12 +76,7 @@ func (nd *natDiscovery) handleResponseFromAddress(req *proto.SubmarinerNatDiscov
 		}
 
 		useNAT := req.Response == proto.ResponseType_SRC_MODIFIED
-
-		if !remoteNat.transitionToPrivateIP(req.GetSender().EndpointId, useNAT) {
-			return nil
-		}
-
-		nd.readyChannel <- remoteNat.toNATEndpointInfo()
+		_ = remoteNat.transitionToPrivateIP(req.GetSender().EndpointId, useNAT)
 
 		return nil
 	}

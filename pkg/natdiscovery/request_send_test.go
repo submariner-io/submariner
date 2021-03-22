@@ -43,7 +43,7 @@ var _ = When("a request is sent", func() {
 		ndInstance, udpSent, _ = createTestListener(&localEndpoint)
 		ndInstance.findSrcIP = func(_ string) (string, error) { return testLocalPrivateIP, nil }
 
-		err := ndInstance.sendCheckRequest(newRemoteEndpointNAT(&types.SubmarinerEndpoint{Spec: remoteEndpoint.Spec}))
+		err := ndInstance.sendCheckRequest(newRemoteEndpointNAT(&types.SubmarinerEndpoint{Spec: remoteEndpoint.Spec}, nil))
 		Expect(err).NotTo(HaveOccurred())
 
 		request = parseProtocolRequest(awaitChan(udpSent))

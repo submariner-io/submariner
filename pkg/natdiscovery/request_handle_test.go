@@ -59,7 +59,7 @@ var _ = Describe("Request handling", func() {
 	}
 
 	requestResponseFromRemoteToLocal := func(remoteAddr *net.UDPAddr) []*natproto.SubmarinerNatDiscoveryResponse {
-		err := remoteListener.sendCheckRequest(newRemoteEndpointNAT(&types.SubmarinerEndpoint{Spec: localEndpoint.Spec}))
+		err := remoteListener.sendCheckRequest(newRemoteEndpointNAT(&types.SubmarinerEndpoint{Spec: localEndpoint.Spec}, nil))
 		Expect(err).NotTo(HaveOccurred())
 		return []*natproto.SubmarinerNatDiscoveryResponse{
 			parseResponseInLocalListener(awaitChan(remoteUDPSent), remoteAddr), /* Private IP request */
