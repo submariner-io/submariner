@@ -77,7 +77,7 @@ var _ = When("a remote Endpoint is added", func() {
 				Expect(t.remoteND.parseAndHandleMessageFromAddress(publicIPReq, t.localUDPAddr))
 
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
-					Endpoint: t.remoteEndpoint.Spec,
+					Endpoint: t.remoteEndpoint,
 					UseNAT:   false,
 					UseIP:    t.remoteEndpoint.Spec.PublicIP,
 				})))
@@ -85,7 +85,7 @@ var _ = When("a remote Endpoint is added", func() {
 				Expect(t.remoteND.parseAndHandleMessageFromAddress(privateIPReq, t.localUDPAddr))
 
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
-					Endpoint: t.remoteEndpoint.Spec,
+					Endpoint: t.remoteEndpoint,
 					UseNAT:   false,
 					UseIP:    t.remoteEndpoint.Spec.PrivateIP,
 				})))
@@ -99,7 +99,7 @@ var _ = When("a remote Endpoint is added", func() {
 				Expect(t.remoteND.parseAndHandleMessageFromAddress(publicIPReq, t.localUDPAddr))
 
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
-					Endpoint: t.remoteEndpoint.Spec,
+					Endpoint: t.remoteEndpoint,
 					UseNAT:   false,
 					UseIP:    t.remoteEndpoint.Spec.PublicIP,
 				})))
@@ -115,7 +115,7 @@ var _ = When("a remote Endpoint is added", func() {
 				Expect(t.remoteND.parseAndHandleMessageFromAddress(privateIPReq, t.localUDPAddr))
 
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
-					Endpoint: t.remoteEndpoint.Spec,
+					Endpoint: t.remoteEndpoint,
 					UseNAT:   false,
 					UseIP:    t.remoteEndpoint.Spec.PrivateIP,
 				})))
@@ -144,7 +144,7 @@ var _ = When("a remote Endpoint is added", func() {
 			t.localND.checkEndpointList()
 
 			Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
-				Endpoint: t.remoteEndpoint.Spec,
+				Endpoint: t.remoteEndpoint,
 				UseNAT:   false,
 				UseIP:    t.remoteEndpoint.Spec.PrivateIP,
 			})))
@@ -182,7 +182,7 @@ var _ = When("a remote Endpoint is added", func() {
 
 			It("should notify with new NATEndpointInfo settings", func() {
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
-					Endpoint: newRemoteEndpoint.Spec,
+					Endpoint: newRemoteEndpoint,
 					UseNAT:   false,
 					UseIP:    newRemoteEndpoint.Spec.PrivateIP,
 				})))
@@ -215,7 +215,7 @@ var _ = When("a remote Endpoint is added", func() {
 
 		It("should notify with the legacy NATEndpointInfo settings", func() {
 			Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
-				Endpoint: t.remoteEndpoint.Spec,
+				Endpoint: t.remoteEndpoint,
 				UseNAT:   true,
 				UseIP:    t.remoteEndpoint.Spec.PublicIP,
 			})))
@@ -239,7 +239,7 @@ var _ = When("a remote Endpoint is added", func() {
 			Expect(t.localUDPSent).ToNot(Receive())
 
 			Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
-				Endpoint: t.remoteEndpoint.Spec,
+				Endpoint: t.remoteEndpoint,
 				UseNAT:   true,
 				UseIP:    t.remoteEndpoint.Spec.PublicIP,
 			})))
@@ -284,10 +284,10 @@ func newDiscoveryTestDriver() *discoveryTestDriver {
 		t.localEndpoint = createTestLocalEndpoint()
 
 		t.localND, t.localUDPSent, t.readyChannel = createTestListener(&t.localEndpoint)
-		t.localND.findSrcIP = func(_ string) (string, error) { return testLocalPrivateIP, nil }
+		t.localND.findSrcIP = func(_ string) string { return testLocalPrivateIP }
 
 		t.remoteND, t.remoteUDPSent, _ = createTestListener(&t.remoteEndpoint)
-		t.remoteND.findSrcIP = func(_ string) (string, error) { return testRemotePrivateIP, nil }
+		t.remoteND.findSrcIP = func(_ string) string { return testRemotePrivateIP }
 
 		forwardFromUDPChan(t.remoteUDPSent, t.remoteUDPAddr, t.localND, -1)
 	})
@@ -311,7 +311,7 @@ func (t *discoveryTestDriver) testRemoteEndpointAdded(expIP string) {
 
 	It("should notify with the correct NATEndpointInfo settings and stop the discovery", func() {
 		Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
-			Endpoint: t.remoteEndpoint.Spec,
+			Endpoint: t.remoteEndpoint,
 			UseNAT:   false,
 			UseIP:    expIP,
 		})))

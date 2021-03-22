@@ -18,7 +18,6 @@ package natdiscovery
 import (
 	"net"
 
-	"github.com/google/gopacket/routing"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"google.golang.org/protobuf/proto"
@@ -30,6 +29,7 @@ import (
 func (nd *natDiscovery) sendCheckRequest(remoteNAT *remoteEndpointNAT) error {
 	var errPrivate, errPublic error
 	var reqID uint64
+
 	if remoteNAT.endpoint.Spec.PrivateIP != "" {
 		reqID, errPrivate = nd.sendCheckRequestToTargetIP(remoteNAT, remoteNAT.endpoint.Spec.PrivateIP)
 		if errPrivate == nil {
@@ -69,14 +69,11 @@ func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT,
 		return 0, err
 	}
 
-	sourceIP, err := nd.findSrcIP(targetIP)
-	if err != nil {
-		klog.Warningf("unable to determine source IP while preparing NAT discovery request to endpoint %q: %s",
-			remoteNAT.endpoint.Spec.CableName, err)
-	}
+	sourceIP := nd.findSrcIP(targetIP)
 
 	nd.requestCounter++
 
+	serverPort := *nd.serverPort
 	request := &natproto.SubmarinerNatDiscoveryRequest{
 		RequestNumber: nd.requestCounter,
 		Sender: &natproto.EndpointDetails{
@@ -89,7 +86,7 @@ func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT,
 		},
 		UsingSrc: &natproto.IPPortPair{
 			IP:   sourceIP,
-			Port: uint32(nd.serverPort),
+			Port: uint32(serverPort),
 		},
 		UsingDst: &natproto.IPPortPair{
 			IP:   targetIP,
@@ -116,8 +113,9 @@ func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT,
 		Port: int(targetPort),
 	}
 
-	klog.V(log.TRACE).Infof("Sending request - REQUEST_NUMBER: %v, SENDER: %#v, RECEIVER: %#v, USING_SRC: %#v, USING_DST: %#v",
-		request.RequestNumber, request.Sender, request.Receiver, request.UsingSrc, request.UsingDst)
+	klog.V(log.DEBUG).Infof("Sending request - REQUEST_NUMBER: 0x%x, SENDER: %q, RECEIVER: %q, USING_SRC: %s:%d, USING_DST: %s:%d",
+		request.RequestNumber, request.Sender.EndpointId, request.Receiver.EndpointId, request.UsingSrc.IP, request.UsingSrc.Port,
+		request.UsingDst.IP, request.UsingDst.Port)
 
 	if length, err := nd.serverUDPWrite(buf, &addr); err != nil {
 		return request.RequestNumber, errors.Wrapf(err, "error sending request packet %#v", request)
@@ -129,23 +127,4 @@ func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT,
 	remoteNAT.checkSent()
 
 	return request.RequestNumber, nil
-}
-
-func findPreferredSourceIP(destinationIP string) (string, error) {
-	var ip net.IP
-	if ip = net.ParseIP(destinationIP); ip == nil {
-		return "", errors.Errorf("error parsing destination IP %q while trying to figure out preferred source IP", destinationIP)
-	}
-
-	router, err := routing.New()
-	if err != nil {
-		return "", errors.Wrap(err, "error while creating gopacket routing object")
-	}
-
-	_, _, preferredSourceIP, err := router.Route(ip)
-	if err != nil {
-		return "", errors.Wrapf(err, "error finding src IP in route to IP %q", ip.String())
-	}
-
-	return preferredSourceIP.String(), nil
 }

@@ -38,6 +38,7 @@ import (
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/controllers/datastoresyncer"
 	"github.com/submariner-io/submariner/pkg/controllers/tunnel"
+	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
 	corev1 "k8s.io/api/core/v1"
@@ -123,6 +124,16 @@ func main() {
 	}
 
 	cableEngine := cableengine.NewEngine(localCluster, localEndpoint)
+	natDiscovery, err := natdiscovery.New(&localEndpoint)
+	if err != nil {
+		klog.Fatalf("Error creating the NAT discovery handler %s", err)
+	}
+
+	cableEngine.SetupNATDiscovery(natDiscovery)
+
+	if err := natDiscovery.Run(stopCh); err != nil {
+		klog.Fatalf("Error starting NAT discovery server")
+	}
 
 	err = subv1.AddToScheme(scheme.Scheme)
 	if err != nil {

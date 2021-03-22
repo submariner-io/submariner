@@ -73,7 +73,11 @@ func ParseSecure(token string) (types.Secure, error) {
 }
 
 func GetLocalIP() string {
-	conn, err := net.Dial("udp", "8.8.8.8:53")
+	return GetLocalIPForDestination("8.8.8.8")
+}
+
+func GetLocalIPForDestination(dst string) string {
+	conn, err := net.Dial("udp", dst+":53")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -125,25 +129,26 @@ func GetLocalEndpoint(submSpec types.SubmarinerSpecification, backendConfig map[
 
 	endpoint := types.SubmarinerEndpoint{
 		Spec: subv1.EndpointSpec{
-			CableName:     fmt.Sprintf("submariner-cable-%s-%s", submSpec.ClusterID, strings.ReplaceAll(privateIP, ".", "-")),
-			ClusterID:     submSpec.ClusterID,
-			Hostname:      hostname,
-			PrivateIP:     privateIP,
-			NATEnabled:    submSpec.NatEnabled,
-			Subnets:       localSubnets,
-			Backend:       submSpec.CableDriver,
-			BackendConfig: backendConfig,
+			CableName:        fmt.Sprintf("submariner-cable-%s-%s", submSpec.ClusterID, strings.ReplaceAll(privateIP, ".", "-")),
+			ClusterID:        submSpec.ClusterID,
+			Hostname:         hostname,
+			PrivateIP:        privateIP,
+			NATEnabled:       submSpec.NatEnabled,
+			Subnets:          localSubnets,
+			Backend:          submSpec.CableDriver,
+			BackendConfig:    backendConfig,
+			NATDiscoveryPort: nil,
+			//TODO: NATDiscoveryPort is disabled by default as it doesn't work inside kind e2e yet, which then relies
+			//      on the timeout. In the following patches we will allow setting the port number via a label in the node
 		},
 	}
 
-	if submSpec.NatEnabled {
-		publicIP, err := ipify.GetIp()
-		if err != nil {
-			return types.SubmarinerEndpoint{}, fmt.Errorf("could not determine public IP: %v", err)
-		}
-
-		endpoint.Spec.PublicIP = publicIP
+	publicIP, err := ipify.GetIp()
+	if err != nil {
+		return types.SubmarinerEndpoint{}, fmt.Errorf("could not determine public IP: %v", err)
 	}
+
+	endpoint.Spec.PublicIP = publicIP
 
 	if !globalnetEnabled {
 		// When globalnet is enabled, HealthCheckIP will be the globalIP assigned to the Active GatewayNode.

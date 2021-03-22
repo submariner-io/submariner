@@ -27,6 +27,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/cable/fake"
 	"github.com/submariner-io/submariner/pkg/cableengine"
+	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
 	"k8s.io/klog"
 )
@@ -83,6 +84,9 @@ var _ = Describe("Cable Engine", func() {
 				ClusterID: localClusterID,
 			},
 		}, *localEndpoint)
+
+		engine.SetupNATDiscovery(&fakeNatDiscovery{})
+
 	})
 
 	JustBeforeEach(func() {
@@ -116,7 +120,8 @@ var _ = Describe("Cable Engine", func() {
 				Expect(engine.InstallCable(*remoteEndpoint)).To(Succeed())
 				fakeDriver.AwaitConnectToEndpoint(remoteEndpoint)
 
-				fakeDriver.ActiveConnections[remoteClusterID] = []subv1.Connection{{Endpoint: remoteEndpoint.Spec}}
+				fakeDriver.ActiveConnections[remoteClusterID] = []subv1.Connection{
+					{Endpoint: remoteEndpoint.Spec, UsingIP: remoteEndpoint.Spec.PublicIP, UsingNAT: true}}
 			})
 
 			When("it's a different endpoint", func() {
@@ -146,51 +151,6 @@ var _ = Describe("Cable Engine", func() {
 					fakeDriver.AwaitDisconnectFromEndpoint(&prevEndpoint)
 					fakeDriver.AwaitConnectToEndpoint(remoteEndpoint)
 				})
-
-				When("the driver fails to disconnect from the endpoint", func() {
-					JustBeforeEach(func() {
-						fakeDriver.ErrOnDisconnectFromEndpoint = errors.New("fake disconnect error")
-					})
-
-					It("should return an error", func() {
-						remoteEndpoint.Spec.PublicIP = "3.3.3.3"
-
-						Expect(engine.InstallCable(*remoteEndpoint)).To(ContainErrorSubstring(fakeDriver.ErrOnDisconnectFromEndpoint))
-						fakeDriver.AwaitNoConnectToEndpoint()
-					})
-				})
-			})
-
-			When("retrieval of the driver's active connections fails", func() {
-				JustBeforeEach(func() {
-					fakeDriver.ActiveConnections[remoteClusterID] = errors.New("fake active connections error")
-				})
-
-				It("should return an error", func() {
-					Expect(engine.InstallCable(*remoteEndpoint)).To(ContainErrorSubstring(
-						fakeDriver.ActiveConnections[remoteClusterID].(error)))
-				})
-			})
-		})
-
-		When("the driver fails to connect to the endpoint", func() {
-			JustBeforeEach(func() {
-				fakeDriver.ErrOnConnectToEndpoint = errors.New("fake connect error")
-			})
-
-			It("should return an error", func() {
-				Expect(engine.InstallCable(*remoteEndpoint)).To(ContainErrorSubstring(fakeDriver.ErrOnConnectToEndpoint))
-			})
-		})
-
-		When("retrieval of the driver's active connections fails", func() {
-			JustBeforeEach(func() {
-				fakeDriver.ActiveConnections[remoteClusterID] = errors.New("fake active connections error")
-			})
-
-			It("should return an error", func() {
-				Expect(engine.InstallCable(*remoteEndpoint)).To(ContainErrorSubstring(
-					fakeDriver.ActiveConnections[remoteClusterID].(error)))
 			})
 		})
 	})
@@ -294,4 +254,27 @@ var _ = Describe("Cable Engine", func() {
 func TestCableEngine(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Cable Engine Suite")
+}
+
+type fakeNatDiscovery struct {
+	readyChannel chan *natdiscovery.NATEndpointInfo
+}
+
+func (n *fakeNatDiscovery) Run(stopCh <-chan struct{}) error {
+	return nil
+}
+
+func (n *fakeNatDiscovery) AddEndpoint(endpoint *types.SubmarinerEndpoint) {
+	n.readyChannel <- &natdiscovery.NATEndpointInfo{
+		UseIP:    endpoint.Spec.PublicIP,
+		UseNAT:   true,
+		Endpoint: *endpoint,
+	}
+}
+
+func (n *fakeNatDiscovery) RemoveEndpoint(endpointName string) {
+}
+
+func (n *fakeNatDiscovery) SetReadyChannel(readyChannel chan *natdiscovery.NATEndpointInfo) {
+	n.readyChannel = readyChannel
 }

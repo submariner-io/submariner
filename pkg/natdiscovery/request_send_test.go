@@ -41,7 +41,7 @@ var _ = When("a request is sent", func() {
 
 	JustBeforeEach(func() {
 		ndInstance, udpSent, _ = createTestListener(&localEndpoint)
-		ndInstance.findSrcIP = func(_ string) (string, error) { return testLocalPrivateIP, nil }
+		ndInstance.findSrcIP = func(_ string) string { return testLocalPrivateIP }
 
 		err := ndInstance.sendCheckRequest(newRemoteEndpointNAT(&types.SubmarinerEndpoint{Spec: remoteEndpoint.Spec}))
 		Expect(err).NotTo(HaveOccurred())

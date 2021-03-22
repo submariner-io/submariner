@@ -17,27 +17,26 @@ limitations under the License.
 package natdiscovery
 
 import (
+	"encoding/hex"
 	"net"
 	"strconv"
-	"time"
 
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 
 	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 )
 
 func (nd *natDiscovery) runListener(stopCh <-chan struct{}) error {
-	serverAddress, err := net.ResolveUDPAddr("udp4", ":"+strconv.Itoa(natproto.DefaultPort))
-	if err != nil {
-		return errors.Wrap(err, "Error resolving UDP address")
+	if nd.localEndpoint.Spec.NATDiscoveryPort == nil {
+		klog.Infof("NAT discovery protocol port not set for this gateway")
+		return nil
 	}
 
-	serverConnection, err := net.ListenUDP("udp", serverAddress)
+	serverConnection, err := createServerConnection(int(*nd.localEndpoint.Spec.NATDiscoveryPort))
 	if err != nil {
-		return errors.Wrapf(err, "Error listening on udp port %d", natproto.DefaultPort)
+		return err
 	}
 
 	// Instead of storing the server connection I save the reference to the WriteToUDP
@@ -45,16 +44,44 @@ func (nd *natDiscovery) runListener(stopCh <-chan struct{}) error {
 	// later too.
 	nd.serverUDPWrite = serverConnection.WriteToUDP
 
-	go wait.Until(func() {
-		buf := make([]byte, 2048)
-		if _, addr, err := serverConnection.ReadFromUDP(buf); err != nil {
-			klog.Errorf("Error receiving from udp: %s", err)
-		} else if err := nd.parseAndHandleMessageFromAddress(buf, addr); err != nil {
-			klog.Errorf("Error handling message from address %#v: %s", addr, err)
-		}
-	}, time.Second, stopCh)
+	go func() {
+		<-stopCh
+		serverConnection.Close()
+	}()
+
+	go nd.listenerLoop(serverConnection)
 
 	return nil
+}
+
+func createServerConnection(port int) (*net.UDPConn, error) {
+	serverAddress, err := net.ResolveUDPAddr("udp4", ":"+strconv.Itoa(port))
+	if err != nil {
+		return nil, errors.Wrap(err, "Error resolving UDP address")
+	}
+
+	serverConnection, err := net.ListenUDP("udp4", serverAddress)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Error listening on udp port %d", port)
+	}
+
+	return serverConnection, nil
+}
+
+func (nd *natDiscovery) listenerLoop(serverConnection *net.UDPConn) {
+	buf := make([]byte, 2048)
+
+	for {
+		length, addr, err := serverConnection.ReadFromUDP(buf)
+		if length == 0 {
+			klog.Info("Stopping NAT listener")
+			return
+		} else if err != nil {
+			klog.Errorf("Error receiving from udp: %s", err)
+		} else if err := nd.parseAndHandleMessageFromAddress(buf[:length], addr); err != nil {
+			klog.Errorf("Error handling message from address %s: %s:\n%s", addr.String(), err, hex.Dump(buf[:length]))
+		}
+	}
 }
 
 func (nd *natDiscovery) parseAndHandleMessageFromAddress(buf []byte, addr *net.UDPAddr) error {

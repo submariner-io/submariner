@@ -21,6 +21,7 @@ import (
 	. "github.com/onsi/gomega"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cableengine"
+	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
 )
 
@@ -104,4 +105,8 @@ func (e *Engine) VerifyInstallCable(expected *v1.EndpointSpec) {
 
 func (e *Engine) VerifyRemoveCable(expected *v1.EndpointSpec) {
 	Eventually(e.removeCable, 5).Should(Receive(Equal(expected)), "RemoveCable was not invoked")
+}
+
+func (e *Engine) SetupNATDiscovery(natDiscovery natdiscovery.Interface) {
+
 }

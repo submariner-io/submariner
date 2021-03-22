@@ -25,7 +25,10 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/types"
+	"github.com/submariner-io/submariner/pkg/util"
+
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 )
@@ -38,7 +41,7 @@ type Interface interface {
 }
 
 type udpWriteFunction func(b []byte, addr *net.UDPAddr) (int, error)
-type findSrcIPFunction func(destinationIP string) (string, error)
+type findSrcIPFunction func(destinationIP string) string
 
 type natDiscovery struct {
 	sync.Mutex
@@ -47,7 +50,7 @@ type natDiscovery struct {
 	requestCounter  uint64
 	serverUDPWrite  udpWriteFunction
 	findSrcIP       findSrcIPFunction
-	serverPort      int32
+	serverPort      *int32
 	readyChannel    chan *NATEndpointInfo
 }
 
@@ -60,11 +63,6 @@ func New(localEndpoint *types.SubmarinerEndpoint) (Interface, error) {
 }
 
 func newNatDiscovery(localEndpoint *types.SubmarinerEndpoint) (*natDiscovery, error) {
-	port, err := extractNATDiscoveryPort(localEndpoint)
-	if err != nil {
-		return nil, err
-	}
-
 	requestCounter, err := randomRequestCounter()
 	if err != nil {
 		return nil, err
@@ -72,15 +70,17 @@ func newNatDiscovery(localEndpoint *types.SubmarinerEndpoint) (*natDiscovery, er
 
 	return &natDiscovery{
 		localEndpoint:   localEndpoint,
-		serverPort:      port,
+		serverPort:      localEndpoint.Spec.NATDiscoveryPort,
 		remoteEndpoints: map[string]*remoteEndpointNAT{},
-		findSrcIP:       findPreferredSourceIP,
+		findSrcIP:       util.GetLocalIPForDestination,
 		requestCounter:  requestCounter,
 	}, nil
 }
 
 func randomRequestCounter() (uint64, error) {
-	n, err := rand.Int(rand.Reader, big.NewInt(1000))
+	max := new(big.Int)
+	max.Exp(big.NewInt(2), big.NewInt(64), nil).Sub(max, big.NewInt(1))
+	n, err := rand.Int(rand.Reader, max)
 	if err != nil {
 		return 0, errors.Wrapf(err, "generating random request counter")
 	}
@@ -99,12 +99,14 @@ func extractNATDiscoveryPort(endpoint *types.SubmarinerEndpoint) (int32, error) 
 }
 
 func (nd *natDiscovery) Run(stopCh <-chan struct{}) error {
-	err := nd.runListener(stopCh)
-	if err != nil {
+	klog.V(log.DEBUG).Info("NAT starting listener")
+
+	if err := nd.runListener(stopCh); err != nil {
 		return err
 	}
 
 	go wait.Until(func() {
+		klog.V(log.TRACE).Info("NAT checking endpoint list")
 		nd.checkEndpointList()
 	}, time.Second, stopCh)
 
@@ -119,14 +121,15 @@ func (nd *natDiscovery) AddEndpoint(endpoint *types.SubmarinerEndpoint) {
 		if reflect.DeepEqual(ep.endpoint.Spec, endpoint.Spec) {
 			return
 		} else {
+			klog.V(log.DEBUG).Infof("NAT discovery updated endpoint %q", endpoint.Spec.CableName)
 			delete(nd.remoteEndpoints, endpoint.Spec.CableName)
 		}
 	}
 
 	remoteNAT := newRemoteEndpointNAT(endpoint)
 
-	// support a remote cluster endpoint which still hasn't implemented this protocol
-	if _, err := extractNATDiscoveryPort(endpoint); err == errorNoNatDiscoveryPort {
+	// support nat discovery disabled or a remote cluster endpoint which still hasn't implemented this protocol
+	if _, err := extractNATDiscoveryPort(endpoint); err == errorNoNatDiscoveryPort || nd.serverPort == nil {
 		remoteNAT.useLegacyNATSettings()
 		nd.readyChannel <- remoteNAT.toNATEndpointInfo()
 	}
@@ -145,13 +148,19 @@ func (nd *natDiscovery) checkEndpointList() {
 	defer nd.Unlock()
 
 	for _, endpointNAT := range nd.remoteEndpoints {
+		name := endpointNAT.endpoint.Spec.CableName
+		klog.V(log.TRACE).Infof("NAT processing remote endpoint %q", name)
+
 		if endpointNAT.shouldCheck() {
 			if endpointNAT.hasTimedOut() {
+				klog.Warningf("NAT discovery for endpoint %q has timed out", name)
 				endpointNAT.useLegacyNATSettings()
 				nd.readyChannel <- endpointNAT.toNATEndpointInfo()
 			} else if err := nd.sendCheckRequest(endpointNAT); err != nil {
-				klog.Errorf("Error sending check request to %q: %s", endpointNAT.endpoint.Spec.CableName, err)
+				klog.Errorf("Error sending check request to endpoint %q: %s", name, err)
 			}
+		} else {
+			klog.V(log.TRACE).Infof("NAT shouldCheck() == false for  %q", name)
 		}
 	}
 }
