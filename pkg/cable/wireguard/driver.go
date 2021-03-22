@@ -193,14 +193,13 @@ func (w *wireguard) GetName() string {
 	return cableDriverName
 }
 
-func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (string, error) {
+func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint, ip string, useNAT bool) (string, error) {
 	if w.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
 		klog.V(log.DEBUG).Infof("Will not connect to self")
 		return "", nil
 	}
 
 	// parse remote addresses and allowed IPs
-	ip := endpointIP(&remoteEndpoint)
 	remoteIP := net.ParseIP(ip)
 	if remoteIP == nil {
 		return "", fmt.Errorf("failed to parse remote IP %s", ip)
@@ -238,7 +237,7 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (
 	}
 
 	// create connection, overwrite existing connection
-	connection := v1.NewConnection(remoteEndpoint.Spec)
+	connection := v1.NewConnection(remoteEndpoint.Spec, ip, useNAT)
 	connection.SetStatus(v1.Connecting, "Connection has been created but not yet started")
 	klog.V(log.DEBUG).Infof("Adding connection for cluster %s, %v", remoteEndpoint.Spec.ClusterID, connection)
 	w.connections[remoteEndpoint.Spec.ClusterID] = connection
@@ -435,14 +434,6 @@ func (w *wireguard) keyMismatch(cid string, key *wgtypes.Key) bool {
 	}
 
 	return false
-}
-
-func endpointIP(ep *types.SubmarinerEndpoint) string {
-	if ep.Spec.NATEnabled {
-		return ep.Spec.PublicIP
-	}
-
-	return ep.Spec.PrivateIP
 }
 
 func genPsk(psk string) (wgtypes.Key, error) {

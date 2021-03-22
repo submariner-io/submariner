@@ -28,6 +28,7 @@ import (
 )
 
 func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNatDiscoveryRequest, addr *net.UDPAddr) error {
+
 	response := proto.SubmarinerNatDiscoveryResponse{
 		RequestNumber: req.RequestNumber,
 		Sender: &proto.EndpointDetails{
@@ -48,6 +49,9 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNatDiscove
 
 		return nd.sendResponseToAddress(&response, addr)
 	}
+
+	klog.V(log.DEBUG).Infof("Received request from %s - REQUEST_NUMBER: 0x%x, SENDER: %q, RECEIVER: %q",
+		addr.IP.String(), req.RequestNumber, req.Sender.EndpointId, req.Receiver.EndpointId)
 
 	if req.Receiver.GetClusterId() != nd.localEndpoint.Spec.ClusterID {
 		klog.Warningf("Received NAT discovery packet for cluster %q, but we are cluster %q", req.Receiver.GetClusterId(),
@@ -123,8 +127,8 @@ func (nd *natDiscovery) sendResponseToAddress(response *proto.SubmarinerNatDisco
 		return errors.Wrapf(err, "error marshaling response %#v", response)
 	}
 
-	klog.V(log.TRACE).Infof("Sending response - REQUEST_NUMBER: %v, RESPONSE: %v, SENDER: %#v, RECEIVER: %#v",
-		response.RequestNumber, response.Response, response.Sender, response.Receiver)
+	klog.V(log.DEBUG).Infof("Sending response to %s - REQUEST_NUMBER: 0x%x, RESPONSE: %v, SENDER: %q, RECEIVER: %q",
+		addr.IP.String(), response.RequestNumber, response.Response, response.Sender.EndpointId, response.Receiver.EndpointId)
 
 	if length, err := nd.serverUDPWrite(buf, addr); err != nil {
 		return errors.Wrapf(err, "error sending response packet %#v", response)

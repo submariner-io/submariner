@@ -137,6 +137,8 @@ type Connection struct {
 	Status        ConnectionStatus `json:"status"`
 	StatusMessage string           `json:"statusMessage"`
 	Endpoint      EndpointSpec     `json:"endpoint"`
+	UsedIP        string           `json:"usedIP"`
+	NAT           bool             `json:"nat"`
 	// +optional
 	LatencyRTT *LatencyRTTSpec `json:"latencyRTT,omitempty"`
 }
@@ -149,8 +151,8 @@ const (
 	ConnectionError ConnectionStatus = "error"
 )
 
-func NewConnection(endpointSpec EndpointSpec) *Connection {
-	return &Connection{Endpoint: endpointSpec}
+func NewConnection(endpointSpec EndpointSpec, usedIP string, nat bool) *Connection {
+	return &Connection{Endpoint: endpointSpec, UsedIP: usedIP, NAT: nat}
 }
 
 func (c *Connection) SetStatus(status ConnectionStatus, messageFormat string, a ...interface{}) {

@@ -20,8 +20,9 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
+	"k8s.io/klog"
 
-	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
 )
 
@@ -36,7 +37,7 @@ const (
 
 var (
 	recheckTime                    = (2 * time.Second).Nanoseconds()
-	totalTimeout                   = (60 * time.Second).Nanoseconds()
+	totalTimeout                   = (100000 * time.Second).Nanoseconds()
 	publicToPrivateFailoverTimeout = time.Second.Nanoseconds()
 )
 
@@ -53,14 +54,14 @@ type remoteEndpointNAT struct {
 }
 
 type NATEndpointInfo struct {
-	Endpoint subv1.EndpointSpec
+	Endpoint types.SubmarinerEndpoint
 	UseNAT   bool
 	UseIP    string
 }
 
 func (rn *remoteEndpointNAT) toNATEndpointInfo() *NATEndpointInfo {
 	return &NATEndpointInfo{
-		Endpoint: rn.endpoint.Spec,
+		Endpoint: rn.endpoint,
 		UseNAT:   rn.useNAT,
 		UseIP:    rn.useIP,
 	}
@@ -93,9 +94,13 @@ func (rn *remoteEndpointNAT) useLegacyNATSettings() {
 	if rn.endpoint.Spec.NATEnabled {
 		rn.useIP = rn.endpoint.Spec.PublicIP
 		rn.transitionToState(selectedPublicIP)
+		klog.V(log.DEBUG).Infof("using NAT legacy settings for endpoint %q, using public IP %q", rn.endpoint.Spec.CableName,
+			rn.useIP)
 	} else {
 		rn.useIP = rn.endpoint.Spec.PrivateIP
 		rn.transitionToState(selectedPrivateIP)
+		klog.V(log.DEBUG).Infof("using NAT legacy settings for endpoint %q, using private IP %q", rn.endpoint.Spec.CableName,
+			rn.useIP)
 	}
 }
 
@@ -123,6 +128,7 @@ func (rn *remoteEndpointNAT) transitionToPublicIP(remoteEndpointID string, useNA
 		rn.useIP = rn.endpoint.Spec.PublicIP
 		rn.useNAT = useNAT
 		rn.transitionToState(selectedPublicIP)
+		klog.V(log.DEBUG).Infof("selected public IP %q for endpoint %q", rn.useIP, rn.endpoint.Spec.CableName)
 	} else {
 		return errors.Errorf("received unexpected transition to public IP from endpoint %q", remoteEndpointID)
 	}
@@ -136,6 +142,7 @@ func (rn *remoteEndpointNAT) transitionToPrivateIP(remoteEndpointID string, useN
 		rn.useIP = rn.endpoint.Spec.PrivateIP
 		rn.useNAT = useNAT
 		rn.transitionToState(selectedPrivateIP)
+		klog.V(log.DEBUG).Infof("selected private IP %q for endpoint %q", rn.useIP, rn.endpoint.Spec.CableName)
 
 	case selectedPublicIP:
 		// If a PublicIP was selected, we still allow some time for the privateIP response to arrive, and we always
@@ -148,6 +155,7 @@ func (rn *remoteEndpointNAT) transitionToPrivateIP(remoteEndpointID string, useN
 		rn.useIP = rn.endpoint.Spec.PrivateIP
 		rn.useNAT = useNAT
 		rn.transitionToState(selectedPrivateIP)
+		klog.V(log.DEBUG).Infof("updated to private IP %q for endpoint %q", rn.useIP, rn.endpoint.Spec.CableName)
 
 	default:
 		return errors.Errorf("received unexpected transition to private IP from endpoint %q", remoteEndpointID)

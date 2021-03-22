@@ -17,27 +17,28 @@ limitations under the License.
 package natdiscovery
 
 import (
+	"encoding/hex"
 	"net"
+	"os"
 	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/proto"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 
 	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 )
 
 func (nd *natDiscovery) runListener(stopCh <-chan struct{}) error {
-	serverAddress, err := net.ResolveUDPAddr("udp4", ":"+strconv.Itoa(natproto.DefaultPort))
+	serverAddress, err := net.ResolveUDPAddr("udp4", ":"+strconv.Itoa(int(*nd.localEndpoint.Spec.NATDiscoveryPort)))
 	if err != nil {
 		return errors.Wrap(err, "Error resolving UDP address")
 	}
 
-	serverConnection, err := net.ListenUDP("udp", serverAddress)
+	serverConnection, err := net.ListenUDP("udp4", serverAddress)
 	if err != nil {
-		return errors.Wrapf(err, "Error listening on udp port %d", natproto.DefaultPort)
+		return errors.Wrapf(err, "Error listening on udp port %d", *nd.localEndpoint.Spec.NATDiscoveryPort)
 	}
 
 	// Instead of storing the server connection I save the reference to the WriteToUDP
@@ -45,14 +46,25 @@ func (nd *natDiscovery) runListener(stopCh <-chan struct{}) error {
 	// later too.
 	nd.serverUDPWrite = serverConnection.WriteToUDP
 
-	go wait.Until(func() {
-		buf := make([]byte, 2048)
-		if _, addr, err := serverConnection.ReadFromUDP(buf); err != nil {
-			klog.Errorf("Error receiving from udp: %s", err)
-		} else if err := nd.parseAndHandleMessageFromAddress(buf, addr); err != nil {
-			klog.Errorf("Error handling message from address %#v: %s", addr, err)
+	buf := make([]byte, 2048)
+	go func() {
+		for {
+			select {
+			case <-stopCh:
+				serverConnection.Close()
+				return
+			default:
+				serverConnection.SetReadDeadline(time.Now().Add(10 * time.Second))
+				if len, addr, err := serverConnection.ReadFromUDP(buf); err != nil {
+					if !errors.Is(err, os.ErrDeadlineExceeded) {
+						klog.Errorf("Error receiving from udp: %s", err)
+					}
+				} else if err := nd.parseAndHandleMessageFromAddress(buf[:len], addr); err != nil {
+					klog.Errorf("Error handling message from address %s: %s:\n%s", addr.String(), err, hex.Dump(buf[:len]))
+				}
+			}
 		}
-	}, time.Second, stopCh)
+	}()
 
 	return nil
 }

@@ -21,6 +21,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
 )
 
@@ -52,6 +53,10 @@ func (d *Driver) Init() error {
 	close(d.init)
 
 	return d.ErrOnInit
+}
+
+func (d *Driver) SetupNATDiscovery(natDiscovery natdiscovery.Interface) {
+
 }
 
 func (d *Driver) GetActiveConnections(clusterID string) ([]v1.Connection, error) {
