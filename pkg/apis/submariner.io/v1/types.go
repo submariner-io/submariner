@@ -70,14 +70,15 @@ type EndpointSpec struct {
 	ClusterID string `json:"cluster_id"`
 	CableName string `json:"cable_name"`
 	// +optional
-	HealthCheckIP string            `json:"healthCheckIP,omitempty"`
-	Hostname      string            `json:"hostname"`
-	Subnets       []string          `json:"subnets"`
-	PrivateIP     string            `json:"private_ip"`
-	PublicIP      string            `json:"public_ip"`
-	NATEnabled    bool              `json:"nat_enabled"`
-	Backend       string            `json:"backend"`
-	BackendConfig map[string]string `json:"backend_config,omitempty"`
+	HealthCheckIP    string            `json:"healthCheckIP,omitempty"`
+	Hostname         string            `json:"hostname"`
+	Subnets          []string          `json:"subnets"`
+	PrivateIP        string            `json:"private_ip"`
+	PublicIP         string            `json:"public_ip"`
+	NATEnabled       bool              `json:"nat_enabled"`
+	Backend          string            `json:"backend"`
+	BackendConfig    map[string]string `json:"backend_config,omitempty"`
+	NATDiscoveryPort *int32            `json:"natDiscoveryPort,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -7,7 +7,7 @@ ifneq (,$(DAPPER_HOST_ARCH))
 
 # Running in Dapper
 
-IMAGES ?= submariner submariner-gateway submariner-route-agent submariner-globalnet submariner-networkplugin-syncer
+IMAGES ?= submariner-gateway submariner-route-agent submariner-globalnet submariner-networkplugin-syncer
 images: build
 
 include $(SHIPYARD_DIR)/Makefile.inc
@@ -47,10 +47,17 @@ dockertogoarch = $(patsubst arm/v7,arm,$(1))
 
 deploy: images
 
+golangci-lint: pkg/natdiscovery/proto/natdiscovery.pb.go
+
+unit: pkg/natdiscovery/proto/natdiscovery.pb.go
+
 reload-images: build images
 	./scripts/$@ --restart $(restart)
 
-bin/%/submariner-gateway: vendor/modules.txt main.go $(shell find pkg -not \( -path 'pkg/globalnet*' -o -path 'pkg/routeagent*' \))
+%.pb.go: %.proto
+	protoc --go_out=/go/src $<
+
+bin/%/submariner-gateway: vendor/modules.txt main.go $(shell find pkg -not \( -path 'pkg/globalnet*' -o -path 'pkg/routeagent*' \)) pkg/natdiscovery/proto/natdiscovery.pb.go
 	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ main.go $(BUILD_ARGS)
 
 bin/%/submariner-route-agent: vendor/modules.txt $(shell find pkg/routeagent_driver)
