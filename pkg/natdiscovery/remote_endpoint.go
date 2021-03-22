@@ -22,7 +22,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"k8s.io/klog"
 
-	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
 )
 
@@ -54,14 +53,14 @@ type remoteEndpointNAT struct {
 }
 
 type NATEndpointInfo struct {
-	Endpoint subv1.EndpointSpec
+	Endpoint types.SubmarinerEndpoint
 	UseNAT   bool
 	UseIP    string
 }
 
 func (rn *remoteEndpointNAT) toNATEndpointInfo() *NATEndpointInfo {
 	return &NATEndpointInfo{
-		Endpoint: rn.endpoint.Spec,
+		Endpoint: rn.endpoint,
 		UseNAT:   rn.useNAT,
 		UseIP:    rn.useIP,
 	}
@@ -94,9 +93,13 @@ func (rn *remoteEndpointNAT) useLegacyNATSettings() {
 	if rn.endpoint.Spec.NATEnabled {
 		rn.useIP = rn.endpoint.Spec.PublicIP
 		rn.transitionToState(selectedPublicIP)
+		klog.V(log.DEBUG).Infof("using NAT legacy settings for endpoint %q, using public IP %q", rn.endpoint.Spec.CableName,
+			rn.useIP)
 	} else {
 		rn.useIP = rn.endpoint.Spec.PrivateIP
 		rn.transitionToState(selectedPrivateIP)
+		klog.V(log.DEBUG).Infof("using NAT legacy settings for endpoint %q, using private IP %q", rn.endpoint.Spec.CableName,
+			rn.useIP)
 	}
 }
 
@@ -125,6 +128,7 @@ func (rn *remoteEndpointNAT) transitionToPublicIP(remoteEndpointID string, useNA
 		rn.useIP = rn.endpoint.Spec.PublicIP
 		rn.useNAT = useNAT
 		rn.transitionToState(selectedPublicIP)
+		klog.V(log.DEBUG).Infof("selected public IP %q for endpoint %q", rn.useIP, rn.endpoint.Spec.CableName)
 
 		return true
 	case selectedPrivateIP:
@@ -141,6 +145,7 @@ func (rn *remoteEndpointNAT) transitionToPrivateIP(remoteEndpointID string, useN
 		rn.useIP = rn.endpoint.Spec.PrivateIP
 		rn.useNAT = useNAT
 		rn.transitionToState(selectedPrivateIP)
+		klog.V(log.DEBUG).Infof("selected private IP %q for endpoint %q", rn.useIP, rn.endpoint.Spec.CableName)
 
 		return true
 	case selectedPublicIP:
@@ -155,6 +160,7 @@ func (rn *remoteEndpointNAT) transitionToPrivateIP(remoteEndpointID string, useN
 		rn.useIP = rn.endpoint.Spec.PrivateIP
 		rn.useNAT = useNAT
 		rn.transitionToState(selectedPrivateIP)
+		klog.V(log.DEBUG).Infof("updated to private IP %q for endpoint %q", rn.useIP, rn.endpoint.Spec.CableName)
 
 		return true
 	default:

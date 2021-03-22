@@ -24,6 +24,7 @@ import (
 
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
+	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
 
@@ -52,13 +53,17 @@ type Engine interface {
 	GetLocalEndpoint() *types.SubmarinerEndpoint
 	// GetHAStatus returns the HA status for this cable engine
 	GetHAStatus() v1.HAStatus
+	// SetupNATDiscovery configures the handler for nat discovery of the endpoints
+	SetupNATDiscovery(natDiscovery natdiscovery.Interface)
 }
 
 type engine struct {
 	sync.Mutex
-	driver        cable.Driver
-	localCluster  types.SubmarinerCluster
-	localEndpoint types.SubmarinerEndpoint
+	driver            cable.Driver
+	localCluster      types.SubmarinerCluster
+	localEndpoint     types.SubmarinerEndpoint
+	natDiscovery      natdiscovery.Interface
+	natEndpointInfoCh chan *natdiscovery.NATEndpointInfo
 }
 
 // NewEngine creates a new Engine for the local cluster
@@ -101,16 +106,24 @@ func (i *engine) startDriver() error {
 	return nil
 }
 
-func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
-	if endpoint.Spec.ClusterID == i.localCluster.ID {
-		klog.V(log.DEBUG).Infof("Not installing cable for local cluster")
-		return nil
-	}
+func (i *engine) SetupNATDiscovery(natDiscovery natdiscovery.Interface) {
+	i.natDiscovery = natDiscovery
+	i.natEndpointInfoCh = make(chan *natdiscovery.NATEndpointInfo, 100)
+	natDiscovery.SetReadyChannel(i.natEndpointInfoCh)
 
-	if reflect.DeepEqual(endpoint.Spec, i.localEndpoint.Spec) {
-		klog.V(log.DEBUG).Infof("Not installing cable for local endpoint")
-		return nil
-	}
+	go func() {
+		for natEndpointInfo := range i.natEndpointInfoCh {
+			err := i.installCableWithNATInfo(natEndpointInfo)
+			if err != nil {
+				// TODO: we need retries with a workqueue
+				klog.Errorf("an error happened installing endpoint: %#v", natEndpointInfo)
+			}
+		}
+	}()
+}
+
+func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) error {
+	endpoint := rnat.Endpoint
 
 	klog.Infof("Installing Endpoint cable %q", endpoint.Spec.CableName)
 
@@ -130,11 +143,11 @@ func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 		if active.Endpoint.CableName == endpoint.Spec.CableName {
 			// There could be scenarios where the cableName would be the same but the
 			// PublicIP of the active GatewayNode changes.
-			if active.Endpoint.PublicIP == endpoint.Spec.PublicIP {
+			if active.UsingIP == rnat.UseIP && active.UsingNAT == rnat.UseNAT {
 				klog.V(log.DEBUG).Infof("Cable %q is already installed - not installing again", active.Endpoint.CableName)
 				return nil
 			} else {
-				klog.V(log.DEBUG).Infof("Cable %q is already installed - but PublicIP changed", active.Endpoint.CableName)
+				klog.V(log.DEBUG).Infof("Cable %q is already installed - but connection details changed", active.Endpoint.CableName)
 				disconnect = true
 			}
 		} else if util.GetClusterIDFromCableName(active.Endpoint.CableName) == endpoint.Spec.ClusterID {
@@ -151,12 +164,29 @@ func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 		}
 	}
 
-	remoteEndpointIP, err := i.driver.ConnectToEndpoint(endpoint)
+	remoteEndpointIP, err := i.driver.ConnectToEndpoint(endpoint, rnat.UseIP, rnat.UseNAT)
 	if err != nil {
 		return err
 	}
 
 	klog.Infof("Successfully installed Endpoint cable %q with remote IP %s", endpoint.Spec.CableName, remoteEndpointIP)
+
+	return nil
+}
+
+func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
+	if endpoint.Spec.ClusterID == i.localCluster.ID {
+		klog.V(log.DEBUG).Infof("Not installing cable for local cluster")
+		return nil
+	}
+
+	if reflect.DeepEqual(endpoint.Spec, i.localEndpoint.Spec) {
+		klog.V(log.DEBUG).Infof("Not installing cable for local endpoint")
+		return nil
+	}
+
+	klog.Infof("Starting NAT discovery for cable: %q", endpoint.Spec.CableName)
+	i.natDiscovery.AddEndpoint(&endpoint)
 
 	return nil
 }

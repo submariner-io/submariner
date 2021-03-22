@@ -79,9 +79,9 @@ func (d *Driver) GetConnections() ([]v1.Connection, error) {
 	return d.Connections.([]v1.Connection), nil
 }
 
-func (d *Driver) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string, error) {
+func (d *Driver) ConnectToEndpoint(endpoint types.SubmarinerEndpoint, useIP string, useNAT bool) (string, error) {
 	d.connectToEndpoint <- &endpoint
-	return endpoint.Spec.PublicIP, d.ErrOnConnectToEndpoint
+	return useIP, d.ErrOnConnectToEndpoint
 }
 
 func (d *Driver) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) error {

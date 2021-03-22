@@ -39,7 +39,7 @@ type Driver interface {
 
 	// ConnectToEndpoint establishes a connection to the given endpoint and returns a string
 	// representation of the IP address of the target endpoint.
-	ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string, error)
+	ConnectToEndpoint(endpoint types.SubmarinerEndpoint, useIP string, useNAT bool) (string, error)
 
 	// DisconnectFromEndpoint disconnects from the connection to the given endpoint.
 	DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) error

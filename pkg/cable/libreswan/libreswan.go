@@ -229,14 +229,6 @@ func (i *libreswan) GetConnections() ([]subv1.Connection, error) {
 	return i.connections, nil
 }
 
-func extractEndpointIP(endpoint subv1.EndpointSpec) string {
-	if endpoint.NATEnabled {
-		return endpoint.PublicIP
-	} else {
-		return endpoint.PrivateIP
-	}
-}
-
 func extractSubnets(endpoint subv1.EndpointSpec) []string {
 	// Subnets
 	subnets := []string{endpoint.PrivateIP + "/32"}
@@ -277,14 +269,14 @@ func whack(args ...string) error {
 
 // ConnectToEndpoint establishes a connection to the given endpoint and returns a string
 // representation of the IP address of the target endpoint.
-func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string, error) {
+func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint, useIP string, useNAT bool) (string, error) {
 	// This is the local endpoint’s IP address, which is always the private IP
 	// (the IP needs to be assigned to a local interface; Libreswan uses that to determine
 	// the tunnel’s orientation)
 	localEndpointIP := i.localEndpoint.Spec.PrivateIP
 	// The remote endpoint IP is the address the local system needs to connect to; if NAT
 	// is involved, this will be the public IP, otherwise the private IP
-	remoteEndpointIP := extractEndpointIP(endpoint.Spec)
+	remoteEndpointIP := useIP
 	// Identifiers are used for authentication, they’re always the private IPs
 	localEndpointIdentifier := i.localEndpoint.Spec.PrivateIP
 	remoteEndpointIdentifier := endpoint.Spec.PrivateIP
@@ -306,7 +298,7 @@ func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string
 				args := []string{}
 
 				args = append(args, "--psk", "--encrypt")
-				if endpoint.Spec.NATEnabled {
+				if useNAT {
 					args = append(args, "--forceencaps")
 				}
 
@@ -316,7 +308,7 @@ func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string
 				args = append(args, "--id", localEndpointIdentifier)
 				args = append(args, "--host", localEndpointIP)
 				args = append(args, "--client", leftSubnets[lsi])
-				if endpoint.Spec.NATEnabled {
+				if useNAT {
 					args = append(args, "--ikeport", i.ipSecNATTPort)
 				} else {
 					args = append(args, "--ikeport", i.ipSecIKEPort)
@@ -328,7 +320,7 @@ func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string
 				args = append(args, "--id", remoteEndpointIdentifier)
 				args = append(args, "--host", remoteEndpointIP)
 				args = append(args, "--client", rightSubnets[rsi])
-				if endpoint.Spec.NATEnabled {
+				if useNAT {
 					args = append(args, "--ikeport", i.ipSecNATTPort)
 				} else {
 					args = append(args, "--ikeport", i.ipSecIKEPort)
@@ -351,7 +343,8 @@ func (i *libreswan) ConnectToEndpoint(endpoint types.SubmarinerEndpoint) (string
 		}
 	}
 
-	i.connections = append(i.connections, subv1.Connection{Endpoint: endpoint.Spec, Status: subv1.Connected})
+	i.connections = append(i.connections,
+		subv1.Connection{Endpoint: endpoint.Spec, Status: subv1.Connected, UsingIP: useIP, UsingNAT: useNAT})
 	cable.RecordConnection(cableDriverName, &i.localEndpoint.Spec, &endpoint.Spec, string(subv1.Connected), true)
 
 	return remoteEndpointIP, nil
