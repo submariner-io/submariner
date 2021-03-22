@@ -19,7 +19,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
+	"k8s.io/klog"
 
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
@@ -118,42 +119,48 @@ func (rn *remoteEndpointNAT) checkSent() {
 	rn.lastCheck = time.Now()
 }
 
-func (rn *remoteEndpointNAT) transitionToPublicIP(remoteEndpointID string, useNAT bool) error {
-	if rn.state == waitingForResponse {
+func (rn *remoteEndpointNAT) transitionToPublicIP(remoteEndpointID string, useNAT bool) bool {
+	switch rn.state {
+	case waitingForResponse:
 		rn.useIP = rn.endpoint.Spec.PublicIP
 		rn.useNAT = useNAT
 		rn.transitionToState(selectedPublicIP)
-	} else {
-		return errors.Errorf("received unexpected transition to public IP from endpoint %q", remoteEndpointID)
-	}
 
-	return nil
+		return true
+	case selectedPrivateIP:
+		return false
+	default:
+		klog.Errorf("Received unexpected transition from %v to public IP for endpoint %q", rn.state, remoteEndpointID)
+		return false
+	}
 }
 
-func (rn *remoteEndpointNAT) transitionToPrivateIP(remoteEndpointID string, useNAT bool) error {
+func (rn *remoteEndpointNAT) transitionToPrivateIP(remoteEndpointID string, useNAT bool) bool {
 	switch rn.state {
 	case waitingForResponse:
 		rn.useIP = rn.endpoint.Spec.PrivateIP
 		rn.useNAT = useNAT
 		rn.transitionToState(selectedPrivateIP)
 
+		return true
 	case selectedPublicIP:
 		// If a PublicIP was selected, we still allow some time for the privateIP response to arrive, and we always
 		// prefer PrivateIP with no NAT connection, as it will be more likely to work, and more efficient
 		if rn.sinceLastTransition() > toDuration(&publicToPrivateFailoverTimeout) {
-			return errors.Errorf("response on private address received too late after response on public address for endpoint %q",
+			klog.V(log.DEBUG).Infof("Response on private IP received too late after response on public IP for endpoint %q",
 				remoteEndpointID)
+			return false
 		}
 
 		rn.useIP = rn.endpoint.Spec.PrivateIP
 		rn.useNAT = useNAT
 		rn.transitionToState(selectedPrivateIP)
 
+		return true
 	default:
-		return errors.Errorf("received unexpected transition to private IP from endpoint %q", remoteEndpointID)
+		klog.Errorf("Received unexpected transition from %v to private IP for endpoint %q", rn.state, remoteEndpointID)
+		return false
 	}
-
-	return nil
 }
 
 func toDuration(v *int64) time.Duration {
