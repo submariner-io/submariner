@@ -22,14 +22,13 @@ import (
 	"net"
 	"reflect"
 	"sync"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
 
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 )
 
@@ -43,6 +42,12 @@ type Interface interface {
 type udpWriteFunction func(b []byte, addr *net.UDPAddr) (int, error)
 type findSrcIPFunction func(destinationIP string) string
 
+type udpMessage struct {
+	buf        []byte
+	addr       *net.UDPAddr
+	connection *net.UDPConn
+}
+
 type natDiscovery struct {
 	sync.Mutex
 	localEndpoint   *types.SubmarinerEndpoint
@@ -52,6 +57,7 @@ type natDiscovery struct {
 	findSrcIP       findSrcIPFunction
 	serverPort      int32
 	readyChannel    chan *NATEndpointInfo
+	peerMessages    chan udpMessage
 }
 
 func (nd *natDiscovery) SetReadyChannel(readyChannel chan *NATEndpointInfo) {
@@ -79,6 +85,7 @@ func newNatDiscovery(localEndpoint *types.SubmarinerEndpoint) (*natDiscovery, er
 		remoteEndpoints: map[string]*remoteEndpointNAT{},
 		findSrcIP:       util.GetLocalIPForDestination,
 		requestCounter:  requestCounter,
+		peerMessages:    make(chan udpMessage, 100),
 	}, nil
 }
 
@@ -110,11 +117,6 @@ func (nd *natDiscovery) Run(stopCh <-chan struct{}) error {
 		return err
 	}
 
-	go wait.Until(func() {
-		klog.V(log.TRACE).Info("NAT checking endpoint list")
-		nd.checkEndpointList()
-	}, time.Second, stopCh)
-
 	return nil
 }
 
@@ -131,7 +133,7 @@ func (nd *natDiscovery) AddEndpoint(endpoint *types.SubmarinerEndpoint) {
 		}
 	}
 
-	remoteNAT := newRemoteEndpointNAT(endpoint)
+	remoteNAT := newRemoteEndpointNAT(endpoint, nd.listenForPeerMessagesOnConnection)
 
 	// support a remote cluster endpoint which still hasn't implemented this protocol
 	if _, err := extractNATDiscoveryPort(endpoint); err == errorNoNatDiscoveryPort {
@@ -164,7 +166,9 @@ func (nd *natDiscovery) checkEndpointList() {
 				klog.Errorf("Error sending check request to %q: %s", name, err)
 			}
 		} else {
-			klog.V(log.DEBUG).Infof("NAT shouldCheck() == false for  %q", name)
+			if endpointNAT.hasTimedOut() {
+				endpointNAT.closeConnections()
+			}
 		}
 	}
 }

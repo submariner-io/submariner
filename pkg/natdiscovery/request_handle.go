@@ -27,7 +27,8 @@ import (
 	"github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 )
 
-func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNatDiscoveryRequest, addr *net.UDPAddr) error {
+func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNatDiscoveryRequest, addr *net.UDPAddr,
+	connection *net.UDPConn) error {
 
 	response := proto.SubmarinerNatDiscoveryResponse{
 		RequestNumber: req.RequestNumber,
@@ -47,7 +48,7 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNatDiscove
 
 		response.Response = proto.ResponseType_MALFORMED
 
-		return nd.sendResponseToAddress(&response, addr)
+		return nd.sendResponseToAddress(&response, addr, connection)
 	}
 
 	klog.V(log.DEBUG).Infof("Received request from %s - REQUEST_NUMBER: 0x%x, SENDER: %q, RECEIVER: %q",
@@ -59,7 +60,7 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNatDiscove
 
 		response.Response = proto.ResponseType_UNKNOWN_DST_CLUSTER
 
-		return nd.sendResponseToAddress(&response, addr)
+		return nd.sendResponseToAddress(&response, addr, connection)
 	}
 
 	if req.Receiver.GetEndpointId() != nd.localEndpoint.Spec.CableName {
@@ -69,7 +70,7 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNatDiscove
 
 		response.Response = proto.ResponseType_UNKNOWN_DST_ENDPOINT
 
-		return nd.sendResponseToAddress(&response, addr)
+		return nd.sendResponseToAddress(&response, addr, connection)
 	}
 
 	if !nd.isKnownEndpoint(req.Sender.GetEndpointId(), req.Sender.GetClusterId()) {
@@ -80,7 +81,7 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNatDiscove
 
 		response.Response = proto.ResponseType_UNKNOWN_SRC_ENDPOINT
 
-		return nd.sendResponseToAddress(&response, addr)
+		return nd.sendResponseToAddress(&response, addr, connection)
 	}
 
 	if req.UsingSrc.GetIP() != "" && req.UsingSrc.GetIP() != addr.IP.String() {
@@ -91,7 +92,7 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNatDiscove
 
 		response.Response = proto.ResponseType_SRC_MODIFIED
 
-		return nd.sendResponseToAddress(&response, addr)
+		return nd.sendResponseToAddress(&response, addr, connection)
 	}
 
 	if int(req.UsingSrc.Port) != addr.Port {
@@ -102,12 +103,12 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNatDiscove
 
 		response.Response = proto.ResponseType_SRC_MODIFIED
 
-		return nd.sendResponseToAddress(&response, addr)
+		return nd.sendResponseToAddress(&response, addr, connection)
 	}
 
 	response.Response = proto.ResponseType_OK
 
-	return nd.sendResponseToAddress(&response, addr)
+	return nd.sendResponseToAddress(&response, addr, connection)
 }
 
 func (nd *natDiscovery) isKnownEndpoint(endpointID, clusterID string) bool {
@@ -119,7 +120,8 @@ func (nd *natDiscovery) isKnownEndpoint(endpointID, clusterID string) bool {
 	return ok && ep.endpoint.Spec.ClusterID == clusterID
 }
 
-func (nd *natDiscovery) sendResponseToAddress(response *proto.SubmarinerNatDiscoveryResponse, addr *net.UDPAddr) error {
+func (nd *natDiscovery) sendResponseToAddress(response *proto.SubmarinerNatDiscoveryResponse, addr *net.UDPAddr,
+	connection *net.UDPConn) error {
 	msgResponse := proto.SubmarinerNatDiscoveryMessage_Response{Response: response}
 	message := proto.SubmarinerNatDiscoveryMessage{Message: &msgResponse}
 	buf, err := proto2.Marshal(&message)
@@ -130,11 +132,18 @@ func (nd *natDiscovery) sendResponseToAddress(response *proto.SubmarinerNatDisco
 	klog.V(log.DEBUG).Infof("Sending response to %s - REQUEST_NUMBER: 0x%x, RESPONSE: %v, SENDER: %q, RECEIVER: %q",
 		addr.IP.String(), response.RequestNumber, response.Response, response.Sender.EndpointId, response.Receiver.EndpointId)
 
-	if length, err := nd.serverUDPWrite(buf, addr); err != nil {
+	length, err := connection.WriteToUDP(buf, addr)
+
+	if err != nil {
+		klog.Errorf("REQUEST response ERROR: %s", err)
 		return errors.Wrapf(err, "error sending response packet %#v", response)
 	} else if length != len(buf) {
+		klog.Errorf("REQUEST the sent UDP packet was smaller than requested, sent=%d, expected=%d", length, len(buf))
 		return errors.Errorf("the sent UDP packet was smaller than requested, sent=%d, expected=%d", length, len(buf))
 	}
+
+	klog.V(log.DEBUG).Infof("Sent response to %s:%d, len=%d ver connection %#v", addr.IP.String(), addr.Port, length,
+		connection)
 
 	return nil
 }

@@ -33,15 +33,15 @@ func (nd *natDiscovery) sendCheckRequest(remoteNAT *remoteEndpointNAT) error {
 	klog.V(log.DEBUG).Infof("NAT sending check request to endpoint %q on ips: %q and %q", remoteNAT.endpoint.Spec.CableName,
 		remoteNAT.endpoint.Spec.PrivateIP, remoteNAT.endpoint.Spec.PublicIP)
 
-	if remoteNAT.endpoint.Spec.PrivateIP != "" {
-		reqID, errPrivate = nd.sendCheckRequestToTargetIP(remoteNAT, remoteNAT.endpoint.Spec.PrivateIP)
+	if remoteNAT.privateIPConnection != nil {
+		reqID, errPrivate = nd.sendCheckRequestToTargetIP(remoteNAT, remoteNAT.privateIPConnection)
 		if errPrivate == nil {
 			remoteNAT.lastPrivateIPRequestID = reqID
 		}
 	}
 
-	if remoteNAT.endpoint.Spec.PublicIP != "" {
-		reqID, errPublic = nd.sendCheckRequestToTargetIP(remoteNAT, remoteNAT.endpoint.Spec.PublicIP)
+	if remoteNAT.publicIPConnection != nil {
+		reqID, errPublic = nd.sendCheckRequestToTargetIP(remoteNAT, remoteNAT.publicIPConnection)
 		if errPublic == nil {
 			remoteNAT.lastPublicIPRequestID = reqID
 		}
@@ -65,14 +65,10 @@ func (nd *natDiscovery) sendCheckRequest(remoteNAT *remoteEndpointNAT) error {
 	return nil
 }
 
-func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT, targetIP string) (uint64, error) {
-	targetPort, err := extractNATDiscoveryPort(&remoteNAT.endpoint)
+func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT, connection *net.UDPConn) (uint64, error) {
 
-	if err != nil {
-		return 0, err
-	}
-
-	sourceIP := nd.findSrcIP(targetIP)
+	localAddr := connection.LocalAddr().(*net.UDPAddr)
+	remoteAddr := connection.RemoteAddr().(*net.UDPAddr)
 
 	nd.requestCounter++
 
@@ -87,12 +83,12 @@ func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT,
 			ClusterId:  remoteNAT.endpoint.Spec.ClusterID,
 		},
 		UsingSrc: &natproto.IPPortPair{
-			IP:   sourceIP,
-			Port: uint32(nd.serverPort),
+			IP:   localAddr.IP.String(),
+			Port: uint32(localAddr.Port),
 		},
 		UsingDst: &natproto.IPPortPair{
-			IP:   targetIP,
-			Port: uint32(targetPort),
+			IP:   remoteAddr.IP.String(),
+			Port: uint32(remoteAddr.Port),
 		},
 	}
 
@@ -110,15 +106,11 @@ func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT,
 		return request.RequestNumber, errors.Wrapf(err, "error marshaling request %#v", request)
 	}
 
-	addr := net.UDPAddr{
-		IP:   net.ParseIP(targetIP),
-		Port: int(targetPort),
-	}
-
 	klog.V(log.DEBUG).Infof("Sending request - REQUEST_NUMBER: 0x%x, SENDER: %q, RECEIVER: %q, USING_SRC: %s:%d, USING_DST: %s:%d",
 		request.RequestNumber, request.Sender.EndpointId, request.Receiver.EndpointId, request.UsingSrc.IP, request.UsingSrc.Port,
 		request.UsingDst.IP, request.UsingDst.Port)
-	if length, err := nd.serverUDPWrite(buf, &addr); err != nil {
+
+	if length, err := connection.Write(buf); err != nil {
 		return request.RequestNumber, errors.Wrapf(err, "error sending request packet %#v", request)
 	} else if length != len(buf) {
 		return request.RequestNumber, errors.Errorf("the sent UDP packet was smaller than requested, sent=%d, expected=%d", length,

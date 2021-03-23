@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
 	"google.golang.org/protobuf/proto"
 	"k8s.io/klog"
 
@@ -46,21 +47,24 @@ func (nd *natDiscovery) runListener(stopCh <-chan struct{}) error {
 	// later too.
 	nd.serverUDPWrite = serverConnection.WriteToUDP
 
-	buf := make([]byte, 2048)
+	ticker := time.Tick(time.Second)
+
+	go nd.listenForPeerMessagesOnConnection(serverConnection)
+
 	go func() {
 		for {
 			select {
 			case <-stopCh:
 				serverConnection.Close()
 				return
-			default:
-				serverConnection.SetReadDeadline(time.Now().Add(10 * time.Second))
-				if len, addr, err := serverConnection.ReadFromUDP(buf); err != nil {
-					if !errors.Is(err, os.ErrDeadlineExceeded) {
-						klog.Errorf("Error receiving from udp: %s", err)
-					}
-				} else if err := nd.parseAndHandleMessageFromAddress(buf[:len], addr); err != nil {
-					klog.Errorf("Error handling message from address %s: %s:\n%s", addr.String(), err, hex.Dump(buf[:len]))
+			case <-ticker:
+				klog.V(log.DEBUG).Info("NAT checking endpoint list (1234)")
+				nd.checkEndpointList()
+
+			case message := <-nd.peerMessages:
+				if err := nd.parseAndHandleMessageFromAddress(message.buf, message.addr, message.connection); err != nil {
+					klog.Errorf("Error handling message from address %s: %s:\n%s", message.addr.String(), err,
+						hex.Dump(message.buf))
 				}
 			}
 		}
@@ -69,14 +73,34 @@ func (nd *natDiscovery) runListener(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (nd *natDiscovery) parseAndHandleMessageFromAddress(buf []byte, addr *net.UDPAddr) error {
+func (nd *natDiscovery) listenForPeerMessagesOnConnection(connection *net.UDPConn) {
+	var (
+		err  error
+		addr *net.UDPAddr
+		len  int
+	)
+
+	buf := make([]byte, 2048)
+
+	for err == nil {
+		if len, addr, err = connection.ReadFromUDP(buf); err != nil {
+			if !errors.Is(err, os.ErrDeadlineExceeded) {
+				klog.Errorf("Error receiving from udp: %s", err)
+			}
+		}
+		nd.peerMessages <- udpMessage{buf: buf[:len], addr: addr, connection: connection}
+	}
+	klog.Infof("UDP receiver finished with: %s", err)
+}
+
+func (nd *natDiscovery) parseAndHandleMessageFromAddress(buf []byte, addr *net.UDPAddr, connection *net.UDPConn) error {
 	msg := natproto.SubmarinerNatDiscoveryMessage{}
 	if err := proto.Unmarshal(buf, &msg); err != nil {
 		return errors.Wrapf(err, "Error unmarshaling message received on UDP port %d", natproto.DefaultPort)
 	}
 
 	if request := msg.GetRequest(); request != nil {
-		return nd.handleRequestFromAddress(request, addr)
+		return nd.handleRequestFromAddress(request, addr, connection)
 	} else if response := msg.GetResponse(); response != nil {
 		return nd.handleResponseFromAddress(response, addr)
 	}

@@ -16,6 +16,8 @@ limitations under the License.
 package natdiscovery
 
 import (
+	"fmt"
+	"net"
 	"sync/atomic"
 	"time"
 
@@ -51,6 +53,8 @@ type remoteEndpointNAT struct {
 	useIP                  string
 	lastPublicIPRequestID  uint64
 	lastPrivateIPRequestID uint64
+	privateIPConnection    *net.UDPConn
+	publicIPConnection     *net.UDPConn
 }
 
 type NATEndpointInfo struct {
@@ -67,12 +71,50 @@ func (rn *remoteEndpointNAT) toNATEndpointInfo() *NATEndpointInfo {
 	}
 }
 
-func newRemoteEndpointNAT(endpoint *types.SubmarinerEndpoint) *remoteEndpointNAT {
+type udpListenerFunction func(connection *net.UDPConn)
+
+func newRemoteEndpointNAT(endpoint *types.SubmarinerEndpoint, listenerFunc udpListenerFunction) *remoteEndpointNAT {
+	var (
+		privateUDPConnection *net.UDPConn
+		publicUDPConnection  *net.UDPConn
+	)
+
+	if endpoint.Spec.NATDiscoveryPort != nil {
+		if endpoint.Spec.PrivateIP != "" {
+			privAddr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("%s:%d", endpoint.Spec.PrivateIP,
+				int(*endpoint.Spec.NATDiscoveryPort)))
+			if err != nil {
+				klog.Errorf("Unable to resolve remote udp address for private IP %q on endpoint %q", endpoint.Spec.PrivateIP,
+					endpoint.Spec.CableName)
+			}
+			privateUDPConnection, err = net.DialUDP("udp4", nil, privAddr)
+			if err != nil {
+				klog.Warning("Unable to create UDP connection to private IP %q for endpoint %q", endpoint.Spec.PrivateIP,
+					endpoint.Spec.CableName)
+			}
+			go listenerFunc(privateUDPConnection)
+		}
+
+		if endpoint.Spec.PublicIP != "" {
+			publicAddr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("%s:%d", endpoint.Spec.PublicIP,
+				int(*endpoint.Spec.NATDiscoveryPort)))
+
+			publicUDPConnection, err = net.DialUDP("udp4", nil, publicAddr)
+			if err != nil {
+				klog.Warning("Unable to create UDP connection to public IP %q for endpoint %q", endpoint.Spec.PublicIP,
+					endpoint.Spec.CableName)
+			}
+			go listenerFunc(publicUDPConnection)
+		}
+	}
+
 	return &remoteEndpointNAT{
-		endpoint:       *endpoint,
-		state:          testingPrivateAndPublicIPs,
-		started:        time.Now(),
-		lastTransition: time.Now(),
+		endpoint:            *endpoint,
+		state:               testingPrivateAndPublicIPs,
+		started:             time.Now(),
+		lastTransition:      time.Now(),
+		publicIPConnection:  publicUDPConnection,
+		privateIPConnection: privateUDPConnection,
 	}
 }
 
@@ -89,6 +131,15 @@ func (rn *remoteEndpointNAT) hasTimedOut() bool {
 	return time.Since(rn.started) > toDuration(&totalTimeout)
 }
 
+func (rn *remoteEndpointNAT) closeConnections() {
+	if rn.publicIPConnection != nil {
+		rn.publicIPConnection.Close()
+	}
+	if rn.privateIPConnection != nil {
+		rn.privateIPConnection.Close()
+	}
+}
+
 func (rn *remoteEndpointNAT) useLegacyNATSettings() {
 	rn.useNAT = rn.endpoint.Spec.NATEnabled
 	if rn.endpoint.Spec.NATEnabled {
@@ -102,6 +153,7 @@ func (rn *remoteEndpointNAT) useLegacyNATSettings() {
 		klog.V(log.DEBUG).Infof("using NAT legacy settings for endpoint %q, using private IP %q", rn.endpoint.Spec.CableName,
 			rn.useIP)
 	}
+	rn.closeConnections()
 }
 
 func (rn *remoteEndpointNAT) shouldCheck() bool {
