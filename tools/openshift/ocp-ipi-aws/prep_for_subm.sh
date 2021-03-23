@@ -4,6 +4,7 @@ set -e
 IPSEC_IKE_PORT=${IPSEC_IKE_PORT:-500}
 IPSEC_NATT_PORT=${IPSEC_NATT_PORT:-4500}
 GW_INSTANCE_TYPE=${GW_INSTANCE_TYPE:-m5n.large}
+ENABLE_HA=${ENABLE_HA:-false}
 
 # Get OCP installer path, or use current directory
 OCP_INS_DIR="$(realpath -- ${1:-.})"
@@ -80,6 +81,7 @@ sed -r "s/(aws_region = ).*/\1\"$REGION\"/" -i main.tf
 sed -r "s/(ipsec_natt_port = ).*/\1$IPSEC_NATT_PORT/" -i main.tf
 sed -r "s/(ipsec_ike_port = ).*/\1$IPSEC_IKE_PORT/" -i main.tf
 sed -r "s/(gw_instance_type = ).*/\1\"$GW_INSTANCE_TYPE\"/" -i main.tf
+sed -r "s/(enable_ha = ).*/\1\"$ENABLE_HA\"/" -i main.tf
 
 terraform init
 terraform apply "${TERRAFORM_ARGS[@]}"
@@ -94,10 +96,13 @@ fi
 export KUBECONFIG=$OCP_INS_DIR/auth/kubeconfig
 echo ""
 echo "Applying machineset changes to deploy gateway node:"
-echo "oc apply -f $MACHINESET"
-oc apply -f $MACHINESET || ( 
- RC=$? 
- echo "applying $MACHINESET failed, please make sure kubeconfig current context with a privileged user" >&2 
- exit $RC 
-)
+for MACHINE in ${MACHINESET}; do
+  echo "oc apply -f $MACHINE"
+  oc apply -f $MACHINE || (
+   RC=$?
+   echo "applying $MACHINE failed, please make sure kubeconfig current context with a privileged user" >&2
+   exit $RC
+   )
+done
+
 

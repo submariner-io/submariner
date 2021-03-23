@@ -31,6 +31,11 @@ data "aws_subnet" "target_public_subnet" {
   id = tolist(data.aws_subnet_ids.env_vpc_public_subnets.ids)[0]
 }
 
+# Pick another public subnets for HA as a target for modification.
+data "aws_subnet" "target_public_subnet_ha" {
+  id = tolist(data.aws_subnet_ids.env_vpc_public_subnets.ids)[1]
+}
+
 # Add required tags to target subnet.
 resource "null_resource" "target_subnet_tags" {
   triggers = {
