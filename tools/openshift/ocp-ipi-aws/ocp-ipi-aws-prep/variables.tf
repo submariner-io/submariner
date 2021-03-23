@@ -17,3 +17,7 @@ variable "ipsec_natt_port" {
 variable "gw_instance_type" {
   description = "The gateway instance type, normally m5n.large"
 }
+
+variable "enable_ha" {
+  description = "If set to true gateway HA is enabled, disabled by default"
+}
