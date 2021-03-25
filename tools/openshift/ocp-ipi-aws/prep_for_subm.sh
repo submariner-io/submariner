@@ -3,6 +3,7 @@ set -e
 
 IPSEC_IKE_PORT=${IPSEC_IKE_PORT:-500}
 IPSEC_NATT_PORT=${IPSEC_NATT_PORT:-4500}
+NAT_DISCOVERY_PORT=${NAT_DISCOVERY_PORT:-4490}
 GW_INSTANCE_TYPE=${GW_INSTANCE_TYPE:-m5n.large}
 ENABLE_HA=${ENABLE_HA:-false}
 
@@ -80,6 +81,7 @@ sed -r "s/(cluster_id = ).*/\1\"$INFRA_ID\"/" -i main.tf
 sed -r "s/(aws_region = ).*/\1\"$REGION\"/" -i main.tf
 sed -r "s/(ipsec_natt_port = ).*/\1$IPSEC_NATT_PORT/" -i main.tf
 sed -r "s/(ipsec_ike_port = ).*/\1$IPSEC_IKE_PORT/" -i main.tf
+sed -r "s/(nat_discovery_port = ).*/\1$NAT_DISCOVERY_PORT/" -i main.tf
 sed -r "s/(gw_instance_type = ).*/\1\"$GW_INSTANCE_TYPE\"/" -i main.tf
 sed -r "s/(enable_ha = ).*/\1\"$ENABLE_HA\"/" -i main.tf
 
