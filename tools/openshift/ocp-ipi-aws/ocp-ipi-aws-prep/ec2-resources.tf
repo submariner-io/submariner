@@ -102,6 +102,13 @@ resource "aws_security_group" "submariner_gw_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  ingress {
+    from_port   = var.nat_discovery_port
+    protocol    = "UDP"
+    to_port     = var.nat_discovery_port
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   tags = merge(map(
     "Name", "${var.cluster_id}-submariner-gw-sg",
   ))
