@@ -12,15 +12,28 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        cable_driver: ['libreswan', 'wireguard']
         deploytool: ['operator']
         globalnet: ['', 'globalnet']
-        cable_driver: ['libreswan', 'wireguard']
+        k8s_version: ['1.17.17']
         ovn: ['', 'ovn']
         exclude:
           - ovn: 'ovn'
             globalnet: 'globalnet'
           - ovn: 'ovn'
             cable_driver: 'wireguard'
+        include:
+          # Recentness of K8s versions are limited by kindest/node image releases
+          - k8s_version: 1.18.15
+          - k8s_version: 1.19.7
+          - k8s_version: 1.20.2
+          # TODO: Remove these latest-K8s+major-feature jobs once default=latest K8s
+          - k8s_version: 1.20.2
+            cable_driver: 'wireguard'
+          - k8s_version: 1.20.2
+            globalnet: 'globalnet'
+          - k8s_version: 1.20.2
+            ovn: 'ovn'
     steps:
       - name: Check out the repository
         uses: actions/checkout@v2
@@ -28,6 +41,7 @@ jobs:
       - name: Run E2E deployment and tests
         uses: submariner-io/shipyard/gh-actions/e2e@devel
         with:
+          k8s_version: ${{ matrix.k8s_version }}
           using: ${{ matrix.cable_driver }} ${{ matrix.deploytool }} ${{ matrix.globalnet }} ${{ matrix.ovn }}
 
       - name: Post mortem
