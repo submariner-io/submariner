@@ -17,6 +17,7 @@ package natdiscovery
 
 import (
 	"net"
+	"strconv"
 	"testing"
 	"time"
 
@@ -123,12 +124,14 @@ func forwardFromUDPChan(from chan []byte, addr *net.UDPAddr, to *natDiscovery, h
 func createTestLocalEndpoint() types.SubmarinerEndpoint {
 	return types.SubmarinerEndpoint{
 		Spec: submarinerv1.EndpointSpec{
-			CableName:        testLocalEndpointName,
-			ClusterID:        testLocalClusterID,
-			PublicIP:         testLocalPublicIP,
-			PrivateIP:        testLocalPrivateIP,
-			NATEnabled:       true,
-			NATDiscoveryPort: &testLocalNATPort,
+			CableName:  testLocalEndpointName,
+			ClusterID:  testLocalClusterID,
+			PublicIP:   testLocalPublicIP,
+			PrivateIP:  testLocalPrivateIP,
+			NATEnabled: true,
+			BackendConfig: map[string]string{
+				submarinerv1.NATTDiscoveryPortConfig: strconv.Itoa(int(testLocalNATPort)),
+			},
 		},
 	}
 }
@@ -136,12 +139,14 @@ func createTestLocalEndpoint() types.SubmarinerEndpoint {
 func createTestRemoteEndpoint() types.SubmarinerEndpoint {
 	return types.SubmarinerEndpoint{
 		Spec: submarinerv1.EndpointSpec{
-			CableName:        testRemoteEndpointName,
-			ClusterID:        testRemoteClusterID,
-			PublicIP:         testRemotePublicIP,
-			PrivateIP:        testRemotePrivateIP,
-			NATEnabled:       true,
-			NATDiscoveryPort: &testRemoteNATPort,
+			CableName:  testRemoteEndpointName,
+			ClusterID:  testRemoteClusterID,
+			PublicIP:   testRemotePublicIP,
+			PrivateIP:  testRemotePrivateIP,
+			NATEnabled: true,
+			BackendConfig: map[string]string{
+				submarinerv1.NATTDiscoveryPortConfig: strconv.Itoa(int(testRemoteNATPort)),
+			},
 		},
 	}
 }

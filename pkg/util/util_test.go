@@ -18,6 +18,8 @@ package util_test
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
@@ -82,24 +84,53 @@ func testFlattenColors() {
 }
 
 func testGetLocalEndpoint() {
-	It("should return a valid SubmarinerEndpoint object", func() {
-		subnets := []string{"127.0.0.1/16"}
-		privateIP := "127.0.0.1"
-		submSpec := types.SubmarinerSpecification{
+	var submSpec types.SubmarinerSpecification
+	var node *v1.Node
+	const (
+		testPrivateIP       = "127.0.0.1"
+		testUDPPort         = "1111"
+		testUDPPortLabel    = "udp-port"
+		testNATTPortLabel   = "natt-discovery-port"
+		backendConfigPrefix = "gateway.submariner.io/"
+	)
+
+	subnets := []string{"127.0.0.1/16"}
+
+	BeforeEach(func() {
+		submSpec = types.SubmarinerSpecification{
 			ClusterID:   "east",
 			ClusterCidr: subnets,
 			CableDriver: "backend",
 		}
-		endpoint, err := util.GetLocalEndpoint(submSpec, map[string]string{}, privateIP)
+
+		node = &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					backendConfigPrefix + testNATTPortLabel: "1234",
+					backendConfigPrefix + testUDPPortLabel:  testUDPPort,
+				}}}
+	})
+
+	It("should return a valid SubmarinerEndpoint object", func() {
+		endpoint, err := util.GetLocalEndpoint(submSpec, testPrivateIP, node)
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(endpoint.Spec.ClusterID).To(Equal("east"))
 		Expect(endpoint.Spec.CableName).To(HavePrefix("submariner-cable-east-"))
 		Expect(endpoint.Spec.Hostname).NotTo(Equal(""))
-		Expect(endpoint.Spec.PrivateIP).To(Equal(privateIP))
+		Expect(endpoint.Spec.PrivateIP).To(Equal(testPrivateIP))
 		Expect(endpoint.Spec.Backend).To(Equal("backend"))
 		Expect(endpoint.Spec.Subnets).To(Equal(subnets))
 		Expect(endpoint.Spec.NATEnabled).To(Equal(false))
+		Expect(endpoint.Spec.BackendConfig[testUDPPortLabel]).To(Equal(testUDPPort))
+	})
+
+	When("no NAT discovery port label is set on the node", func() {
+		It("should return a valid SubmarinerEndpoint object", func() {
+			delete(node.Labels, testNATTPortLabel)
+			_, err := util.GetLocalEndpoint(submSpec, testPrivateIP, node)
+			Expect(err).ToNot(HaveOccurred())
+		})
 	})
 }
 
