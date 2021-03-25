@@ -73,7 +73,6 @@ func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT,
 
 	nd.requestCounter++
 
-	serverPort := *nd.serverPort
 	request := &natproto.SubmarinerNatDiscoveryRequest{
 		RequestNumber: nd.requestCounter,
 		Sender: &natproto.EndpointDetails{
@@ -86,7 +85,7 @@ func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT,
 		},
 		UsingSrc: &natproto.IPPortPair{
 			IP:   sourceIP,
-			Port: uint32(serverPort),
+			Port: uint32(nd.serverPort),
 		},
 		UsingDst: &natproto.IPPortPair{
 			IP:   targetIP,

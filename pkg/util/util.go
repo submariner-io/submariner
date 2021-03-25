@@ -23,14 +23,18 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/pkg/errors"
 	"github.com/rdegges/go-ipify"
 	level "github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/stringset"
+	"github.com/vishvananda/netlink"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/klog"
+
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/iptables"
 	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/vishvananda/netlink"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/klog"
 )
 
 const tokenLength = 64
@@ -104,15 +108,10 @@ func FlattenColors(colorCodes []string) string {
 	return flattenedColors
 }
 
-func GetLocalEndpoint(submSpec types.SubmarinerSpecification, backendConfig map[string]string,
-	privateIP string) (types.SubmarinerEndpoint, error) {
+func GetLocalEndpoint(submSpec types.SubmarinerSpecification, privateIP string, gwNode *v1.Node) (types.SubmarinerEndpoint, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return types.SubmarinerEndpoint{}, fmt.Errorf("error getting hostname: %v", err)
-	}
-
-	if backendConfig == nil {
-		backendConfig = make(map[string]string)
 	}
 
 	var localSubnets []string
@@ -127,19 +126,21 @@ func GetLocalEndpoint(submSpec types.SubmarinerSpecification, backendConfig map[
 		localSubnets = append(localSubnets, submSpec.ClusterCidr...)
 	}
 
+	backendConfig, err := getBackendConfig(gwNode)
+	if err != nil {
+		return types.SubmarinerEndpoint{}, err
+	}
+
 	endpoint := types.SubmarinerEndpoint{
 		Spec: subv1.EndpointSpec{
-			CableName:        fmt.Sprintf("submariner-cable-%s-%s", submSpec.ClusterID, strings.ReplaceAll(privateIP, ".", "-")),
-			ClusterID:        submSpec.ClusterID,
-			Hostname:         hostname,
-			PrivateIP:        privateIP,
-			NATEnabled:       submSpec.NatEnabled,
-			Subnets:          localSubnets,
-			Backend:          submSpec.CableDriver,
-			BackendConfig:    backendConfig,
-			NATDiscoveryPort: nil,
-			//TODO: NATDiscoveryPort is disabled by default as it doesn't work inside kind e2e yet, which then relies
-			//      on the timeout. In the following patches we will allow setting the port number via a label in the node
+			CableName:     fmt.Sprintf("submariner-cable-%s-%s", submSpec.ClusterID, strings.ReplaceAll(privateIP, ".", "-")),
+			ClusterID:     submSpec.ClusterID,
+			Hostname:      hostname,
+			PrivateIP:     privateIP,
+			NATEnabled:    submSpec.NatEnabled,
+			Subnets:       localSubnets,
+			Backend:       submSpec.CableDriver,
+			BackendConfig: backendConfig,
 		},
 	}
 
@@ -162,6 +163,24 @@ func GetLocalEndpoint(submSpec types.SubmarinerSpecification, backendConfig map[
 	}
 
 	return endpoint, nil
+}
+
+func getBackendConfig(nodeObj *v1.Node) (map[string]string, error) {
+	validConfigs := stringset.New(subv1.ValidGatewayNodeConfig...)
+	backendConfig := map[string]string{}
+
+	for label, value := range nodeObj.Labels {
+		if strings.HasPrefix(label, subv1.GatewayConfigLabelPrefix) {
+			config := label[len(subv1.GatewayConfigLabelPrefix):]
+			if !validConfigs.Contains(config) {
+				return backendConfig, errors.Errorf("unknown config label %q on node %q", nodeObj.Name, label)
+			}
+
+			backendConfig[config] = value
+		}
+	}
+
+	return backendConfig, nil
 }
 
 //TODO: to handle de-duplication of code/finding common parts with the route agent
