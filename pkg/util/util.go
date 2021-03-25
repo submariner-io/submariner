@@ -20,15 +20,19 @@ import (
 	"log"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"syscall"
 
+	"github.com/pkg/errors"
 	"github.com/rdegges/go-ipify"
 	level "github.com/submariner-io/admiral/pkg/log"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/iptables"
+	"github.com/submariner-io/submariner/pkg/node"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/vishvananda/netlink"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/klog"
 )
@@ -105,7 +109,7 @@ func FlattenColors(colorCodes []string) string {
 }
 
 func GetLocalEndpoint(submSpec types.SubmarinerSpecification, backendConfig map[string]string,
-	privateIP string) (types.SubmarinerEndpoint, error) {
+	privateIP string, gwNode *v1.Node) (types.SubmarinerEndpoint, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return types.SubmarinerEndpoint{}, fmt.Errorf("error getting hostname: %v", err)
@@ -127,6 +131,11 @@ func GetLocalEndpoint(submSpec types.SubmarinerSpecification, backendConfig map[
 		localSubnets = append(localSubnets, submSpec.ClusterCidr...)
 	}
 
+	natDiscoveryPort, err := getLabelPort(gwNode, node.NATDiscoveryPortLabel)
+	if err != nil {
+		return types.SubmarinerEndpoint{}, err
+	}
+
 	endpoint := types.SubmarinerEndpoint{
 		Spec: subv1.EndpointSpec{
 			CableName:        fmt.Sprintf("submariner-cable-%s-%s", submSpec.ClusterID, strings.ReplaceAll(privateIP, ".", "-")),
@@ -137,7 +146,7 @@ func GetLocalEndpoint(submSpec types.SubmarinerSpecification, backendConfig map[
 			Subnets:          localSubnets,
 			Backend:          submSpec.CableDriver,
 			BackendConfig:    backendConfig,
-			NATDiscoveryPort: nil,
+			NATDiscoveryPort: natDiscoveryPort,
 			//TODO: NATDiscoveryPort is disabled by default as it doesn't work inside kind e2e yet, which then relies
 			//      on the timeout. In the following patches we will allow setting the port number via a label in the node
 		},
@@ -162,6 +171,25 @@ func GetLocalEndpoint(submSpec types.SubmarinerSpecification, backendConfig map[
 	}
 
 	return endpoint, nil
+}
+
+func getLabelPort(gwNode *v1.Node, labelName string) (*int32, error) {
+	var natDiscoveryPort *int32
+
+	if portStr := gwNode.Labels[labelName]; portStr != "" {
+		if portInt, err := strconv.ParseUint(portStr, 10, 16); err != nil {
+			return nil, errors.Wrapf(err, "error parsing port label %s=%s on node %q", labelName, portStr, gwNode.Name)
+		} else if portInt < 1 {
+			return nil, errors.Errorf("port label %s=%s on node %q is < 1", labelName, portStr, gwNode.Name)
+		} else if portInt > 65535 {
+			return nil, errors.Errorf("port label %s=%s on node %q is > 65535", labelName, portStr, gwNode.Name)
+		} else {
+			port := int32(portInt)
+			natDiscoveryPort = &port
+		}
+	}
+
+	return natDiscoveryPort, nil
 }
 
 //TODO: to handle de-duplication of code/finding common parts with the route agent
