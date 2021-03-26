@@ -50,6 +50,7 @@ var _ = Describe("Cable Engine", func() {
 
 	var (
 		engine         cableengine.Engine
+		natDiscovery   *fakeNatDiscovery
 		localEndpoint  *types.SubmarinerEndpoint
 		remoteEndpoint *types.SubmarinerEndpoint
 		skipStart      bool
@@ -85,7 +86,8 @@ var _ = Describe("Cable Engine", func() {
 			},
 		}, *localEndpoint)
 
-		engine.SetupNATDiscovery(&fakeNatDiscovery{})
+		natDiscovery = &fakeNatDiscovery{removeEndpoint: make(chan string, 20)}
+		engine.SetupNATDiscovery(natDiscovery)
 
 	})
 
@@ -108,14 +110,14 @@ var _ = Describe("Cable Engine", func() {
 	})
 
 	When("install cable for a remote endpoint", func() {
-		When("no endpoint was previously installed for the cluster", func() {
+		Context("and no endpoint was previously installed for the cluster", func() {
 			It("should connect to the endpoint", func() {
 				Expect(engine.InstallCable(*remoteEndpoint)).To(Succeed())
 				fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(remoteEndpoint))
 			})
 		})
 
-		When("an endpoint was previously installed for the cluster", func() {
+		Context("and an endpoint was previously installed for the cluster", func() {
 			JustBeforeEach(func() {
 				Expect(engine.InstallCable(*remoteEndpoint)).To(Succeed())
 				fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(remoteEndpoint))
@@ -124,7 +126,7 @@ var _ = Describe("Cable Engine", func() {
 					{Endpoint: remoteEndpoint.Spec, UsingIP: remoteEndpoint.Spec.PublicIP, UsingNAT: true}}
 			})
 
-			When("it's a different endpoint", func() {
+			Context("and it's a different endpoint", func() {
 				It("should disconnect from the previous endpoint and connect to the new one", func() {
 					newEndpoint := *remoteEndpoint
 					newEndpoint.Spec.CableName = "new cable"
@@ -135,14 +137,14 @@ var _ = Describe("Cable Engine", func() {
 				})
 			})
 
-			When("it's the same endpoint", func() {
+			Context("and it's the same endpoint", func() {
 				It("should not connect to the endpoint again", func() {
 					Expect(engine.InstallCable(*remoteEndpoint)).To(Succeed())
 					fakeDriver.AwaitNoConnectToEndpoint()
 				})
 			})
 
-			When("it's the same endpoint but with a different public IP", func() {
+			Context("and it's the same endpoint but with a different public IP", func() {
 				It("should disconnect from the previous endpoint and connect to the new one", func() {
 					prevEndpoint := *remoteEndpoint
 					remoteEndpoint.Spec.PublicIP = "3.3.3.3"
@@ -151,6 +153,24 @@ var _ = Describe("Cable Engine", func() {
 					fakeDriver.AwaitDisconnectFromEndpoint(&prevEndpoint)
 					fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(remoteEndpoint))
 				})
+			})
+		})
+
+		Context("followed by remove cable before NAT discovery is complete", func() {
+			BeforeEach(func() {
+				natDiscovery.captureAddEndpoint = make(chan *types.SubmarinerEndpoint, 10)
+			})
+
+			It("should not connect to the endpoint", func() {
+				Expect(engine.InstallCable(*remoteEndpoint)).To(Succeed())
+				Eventually(natDiscovery.captureAddEndpoint).Should(Receive())
+
+				Expect(engine.RemoveCable(*remoteEndpoint)).To(Succeed())
+				Eventually(natDiscovery.removeEndpoint).Should(Receive(Equal(remoteEndpoint.Spec.CableName)))
+				fakeDriver.AwaitNoDisconnectFromEndpoint()
+
+				natDiscovery.notifyReady(remoteEndpoint)
+				fakeDriver.AwaitNoConnectToEndpoint()
 			})
 		})
 	})
@@ -171,9 +191,10 @@ var _ = Describe("Cable Engine", func() {
 		It("should disconnect from the endpoint", func() {
 			Expect(engine.RemoveCable(*remoteEndpoint)).To(Succeed())
 			fakeDriver.AwaitDisconnectFromEndpoint(remoteEndpoint)
+			Eventually(natDiscovery.removeEndpoint).Should(Receive(Equal(remoteEndpoint.Spec.CableName)))
 		})
 
-		When("the driver fails to disconnect from the endpoint", func() {
+		Context("and the driver fails to disconnect from the endpoint", func() {
 			JustBeforeEach(func() {
 				fakeDriver.ErrOnDisconnectFromEndpoint = errors.New("fake disconnect error")
 			})
@@ -193,6 +214,7 @@ var _ = Describe("Cable Engine", func() {
 		It("should not disconnect from the endpoint", func() {
 			Expect(engine.RemoveCable(*localEndpoint)).To(Succeed())
 			fakeDriver.AwaitNoDisconnectFromEndpoint()
+			Consistently(natDiscovery.removeEndpoint).ShouldNot(Receive())
 		})
 	})
 
@@ -205,7 +227,7 @@ var _ = Describe("Cable Engine", func() {
 			Expect(engine.ListCableConnections()).To(Equal(fakeDriver.Connections))
 		})
 
-		When("retrieval of the driver's connections fails", func() {
+		Context("and retrieval of the driver's connections fails", func() {
 			JustBeforeEach(func() {
 				fakeDriver.Connections = errors.New("fake connections error")
 			})
@@ -237,13 +259,13 @@ var _ = Describe("Cable Engine", func() {
 			skipStart = true
 		})
 
-		When("the HA status is queried", func() {
+		Context("and the HA status is queried", func() {
 			It("should return passive", func() {
 				Expect(engine.GetHAStatus()).To(Equal(subv1.HAStatusPassive))
 			})
 		})
 
-		When("list cable connections", func() {
+		Context("and list cable connections", func() {
 			It("should return non-nil", func() {
 				Expect(engine.ListCableConnections()).ToNot(BeNil())
 			})
@@ -257,7 +279,9 @@ func TestCableEngine(t *testing.T) {
 }
 
 type fakeNatDiscovery struct {
-	readyChannel chan *natdiscovery.NATEndpointInfo
+	removeEndpoint     chan string
+	captureAddEndpoint chan *types.SubmarinerEndpoint
+	readyChannel       chan *natdiscovery.NATEndpointInfo
 }
 
 func (n *fakeNatDiscovery) Run(stopCh <-chan struct{}) error {
@@ -265,14 +289,24 @@ func (n *fakeNatDiscovery) Run(stopCh <-chan struct{}) error {
 }
 
 func (n *fakeNatDiscovery) AddEndpoint(endpoint *types.SubmarinerEndpoint) {
-	n.readyChannel <- natEndpointInfoFor(endpoint)
+	if n.captureAddEndpoint != nil {
+		n.captureAddEndpoint <- endpoint
+		return
+	}
+
+	n.notifyReady(endpoint)
 }
 
 func (n *fakeNatDiscovery) RemoveEndpoint(endpointName string) {
+	n.removeEndpoint <- endpointName
 }
 
 func (n *fakeNatDiscovery) SetReadyChannel(readyChannel chan *natdiscovery.NATEndpointInfo) {
 	n.readyChannel = readyChannel
+}
+
+func (n *fakeNatDiscovery) notifyReady(endpoint *types.SubmarinerEndpoint) {
+	n.readyChannel <- natEndpointInfoFor(endpoint)
 }
 
 func natEndpointInfoFor(endpoint *types.SubmarinerEndpoint) *natdiscovery.NATEndpointInfo {

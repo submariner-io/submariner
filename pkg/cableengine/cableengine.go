@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/stringset"
 	"k8s.io/klog"
 
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -59,19 +60,22 @@ type Engine interface {
 
 type engine struct {
 	sync.Mutex
-	driver            cable.Driver
-	localCluster      types.SubmarinerCluster
-	localEndpoint     types.SubmarinerEndpoint
-	natDiscovery      natdiscovery.Interface
-	natEndpointInfoCh chan *natdiscovery.NATEndpointInfo
+	driver              cable.Driver
+	localCluster        types.SubmarinerCluster
+	localEndpoint       types.SubmarinerEndpoint
+	natDiscovery        natdiscovery.Interface
+	natEndpointInfoCh   chan *natdiscovery.NATEndpointInfo
+	natDiscoveryPending map[string]int
+	installedCables     stringset.Interface
 }
 
 // NewEngine creates a new Engine for the local cluster
 func NewEngine(localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) Engine {
 	return &engine{
-		localCluster:  localCluster,
-		localEndpoint: localEndpoint,
-		driver:        nil,
+		localCluster:        localCluster,
+		localEndpoint:       localEndpoint,
+		natDiscoveryPending: map[string]int{},
+		installedCables:     stringset.New(),
 	}
 }
 
@@ -130,6 +134,15 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 	i.Lock()
 	defer i.Unlock()
 
+	if _, ok := i.natDiscoveryPending[rnat.Endpoint.Spec.CableName]; !ok {
+		return nil
+	}
+
+	i.natDiscoveryPending[rnat.Endpoint.Spec.CableName]--
+	if i.natDiscoveryPending[rnat.Endpoint.Spec.CableName] == 0 {
+		delete(i.natDiscoveryPending, rnat.Endpoint.Spec.CableName)
+	}
+
 	activeConnections, err := i.driver.GetActiveConnections(endpoint.Spec.ClusterID)
 	if err != nil {
 		return err
@@ -171,6 +184,8 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 
 	klog.Infof("Successfully installed Endpoint cable %q with remote IP %s", endpoint.Spec.CableName, remoteEndpointIP)
 
+	i.installedCables.Add(rnat.Endpoint.Spec.CableName)
+
 	return nil
 }
 
@@ -185,7 +200,12 @@ func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 		return nil
 	}
 
+	i.Lock()
+	i.natDiscoveryPending[endpoint.Spec.CableName]++
+	i.Unlock()
+
 	klog.Infof("Starting NAT discovery for cable: %q", endpoint.Spec.CableName)
+
 	i.natDiscovery.AddEndpoint(&endpoint)
 
 	return nil
@@ -199,8 +219,16 @@ func (i *engine) RemoveCable(endpoint types.SubmarinerEndpoint) error {
 
 	klog.Infof("Removing Endpoint cable %q", endpoint.Spec.CableName)
 
+	i.natDiscovery.RemoveEndpoint(endpoint.Spec.CableName)
+
 	i.Lock()
 	defer i.Unlock()
+
+	delete(i.natDiscoveryPending, endpoint.Spec.CableName)
+
+	if !i.installedCables.Remove(endpoint.Spec.CableName) {
+		return nil
+	}
 
 	err := i.driver.DisconnectFromEndpoint(endpoint)
 	if err != nil {
