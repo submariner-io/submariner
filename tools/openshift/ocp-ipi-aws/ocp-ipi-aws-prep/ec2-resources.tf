@@ -109,6 +109,22 @@ resource "aws_security_group" "submariner_gw_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # ESP encapsulation protocol
+  ingress {
+    protocol    = 50
+    cidr_blocks = ["0.0.0.0/0"]
+    to_port     = 0
+    from_port   = 0
+  }
+
+  # AH protocol
+  ingress {
+    protocol    = 51
+    cidr_blocks = ["0.0.0.0/0"]
+    to_port     = 0
+    from_port   = 0
+  }
+
   tags = merge(map(
     "Name", "${var.cluster_id}-submariner-gw-sg",
   ))
