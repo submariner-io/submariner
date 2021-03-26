@@ -111,14 +111,14 @@ var _ = Describe("Cable Engine", func() {
 		When("no endpoint was previously installed for the cluster", func() {
 			It("should connect to the endpoint", func() {
 				Expect(engine.InstallCable(*remoteEndpoint)).To(Succeed())
-				fakeDriver.AwaitConnectToEndpoint(remoteEndpoint)
+				fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(remoteEndpoint))
 			})
 		})
 
 		When("an endpoint was previously installed for the cluster", func() {
 			JustBeforeEach(func() {
 				Expect(engine.InstallCable(*remoteEndpoint)).To(Succeed())
-				fakeDriver.AwaitConnectToEndpoint(remoteEndpoint)
+				fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(remoteEndpoint))
 
 				fakeDriver.ActiveConnections[remoteClusterID] = []subv1.Connection{
 					{Endpoint: remoteEndpoint.Spec, UsingIP: remoteEndpoint.Spec.PublicIP, UsingNAT: true}}
@@ -131,7 +131,7 @@ var _ = Describe("Cable Engine", func() {
 
 					Expect(engine.InstallCable(newEndpoint)).To(Succeed())
 					fakeDriver.AwaitDisconnectFromEndpoint(remoteEndpoint)
-					fakeDriver.AwaitConnectToEndpoint(&newEndpoint)
+					fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(&newEndpoint))
 				})
 			})
 
@@ -149,7 +149,7 @@ var _ = Describe("Cable Engine", func() {
 
 					Expect(engine.InstallCable(*remoteEndpoint)).To(Succeed())
 					fakeDriver.AwaitDisconnectFromEndpoint(&prevEndpoint)
-					fakeDriver.AwaitConnectToEndpoint(remoteEndpoint)
+					fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(remoteEndpoint))
 				})
 			})
 		})
@@ -165,7 +165,7 @@ var _ = Describe("Cable Engine", func() {
 	When("remove cable for a remote endpoint", func() {
 		JustBeforeEach(func() {
 			Expect(engine.InstallCable(*remoteEndpoint)).To(Succeed())
-			fakeDriver.AwaitConnectToEndpoint(remoteEndpoint)
+			fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(remoteEndpoint))
 		})
 
 		It("should disconnect from the endpoint", func() {
@@ -187,7 +187,7 @@ var _ = Describe("Cable Engine", func() {
 	When("remove cable for a local endpoint", func() {
 		JustBeforeEach(func() {
 			Expect(engine.InstallCable(*remoteEndpoint)).To(Succeed())
-			fakeDriver.AwaitConnectToEndpoint(remoteEndpoint)
+			fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(remoteEndpoint))
 		})
 
 		It("should not disconnect from the endpoint", func() {
@@ -265,11 +265,7 @@ func (n *fakeNatDiscovery) Run(stopCh <-chan struct{}) error {
 }
 
 func (n *fakeNatDiscovery) AddEndpoint(endpoint *types.SubmarinerEndpoint) {
-	n.readyChannel <- &natdiscovery.NATEndpointInfo{
-		UseIP:    endpoint.Spec.PublicIP,
-		UseNAT:   true,
-		Endpoint: *endpoint,
-	}
+	n.readyChannel <- natEndpointInfoFor(endpoint)
 }
 
 func (n *fakeNatDiscovery) RemoveEndpoint(endpointName string) {
@@ -277,4 +273,12 @@ func (n *fakeNatDiscovery) RemoveEndpoint(endpointName string) {
 
 func (n *fakeNatDiscovery) SetReadyChannel(readyChannel chan *natdiscovery.NATEndpointInfo) {
 	n.readyChannel = readyChannel
+}
+
+func natEndpointInfoFor(endpoint *types.SubmarinerEndpoint) *natdiscovery.NATEndpointInfo {
+	return &natdiscovery.NATEndpointInfo{
+		UseIP:    endpoint.Spec.PublicIP,
+		UseNAT:   true,
+		Endpoint: *endpoint,
+	}
 }
