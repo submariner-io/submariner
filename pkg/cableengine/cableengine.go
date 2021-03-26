@@ -164,7 +164,7 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 		}
 	}
 
-	remoteEndpointIP, err := i.driver.ConnectToEndpoint(endpoint, rnat.UseIP, rnat.UseNAT)
+	remoteEndpointIP, err := i.driver.ConnectToEndpoint(rnat)
 	if err != nil {
 		return err
 	}

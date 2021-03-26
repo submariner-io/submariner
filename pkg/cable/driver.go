@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/natdiscovery"
 
 	"github.com/submariner-io/submariner/pkg/types"
 	"k8s.io/klog"
@@ -39,7 +40,7 @@ type Driver interface {
 
 	// ConnectToEndpoint establishes a connection to the given endpoint and returns a string
 	// representation of the IP address of the target endpoint.
-	ConnectToEndpoint(endpoint types.SubmarinerEndpoint, useIP string, useNAT bool) (string, error)
+	ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error)
 
 	// DisconnectFromEndpoint disconnects from the connection to the given endpoint.
 	DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) error

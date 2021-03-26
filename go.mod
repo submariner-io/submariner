@@ -7,7 +7,6 @@ require (
 	github.com/coreos/go-iptables v0.5.0
 	github.com/ebay/go-ovn v0.1.1-0.20201007164241-da67e9744ec0
 	github.com/go-ping/ping v0.0.0-20201022122018-3977ed72668a
-	github.com/golang/protobuf v1.4.3 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/onsi/ginkgo v1.15.0
