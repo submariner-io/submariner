@@ -1,11 +1,13 @@
-FROM fedora:33
+ARG BASE_BRANCH
+FROM quay.io/submariner/submariner-buildenv:${BASE_BRANCH} AS build-env
 ARG TARGETPLATFORM
 
-WORKDIR /var/submariner
+FROM scratch
+ARG TARGETPLATFORM
 
-RUN dnf -y install --nodocs --setopt=install_weak_deps=0 \
-           iproute iptables iptables-nft ipset && \
-    dnf -y clean all
+COPY --from=build-env /output/globalnet /
+
+WORKDIR /var/submariner
 
 COPY package/submariner-globalnet.sh bin/${TARGETPLATFORM}/submariner-globalnet /usr/local/bin/
 

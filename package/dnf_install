@@ -1,0 +1,44 @@
+#!/bin/bash
+
+params="$(getopt -o kv:r: --name "$0" -- "$@")"
+eval set -- "$params"
+
+INSTALL_ROOT=/output/base
+
+while true
+do
+    case "$1" in
+	-k)
+	    KEEP_CACHE=true
+	    shift
+	    ;;
+	-v)
+	    FEDORA_VERSION="$2"
+	    shift 2
+	    ;;
+	-r)
+	    INSTALL_ROOT="$2"
+	    shift 2
+	    ;;
+	--)
+	    shift
+	    break
+	    ;;
+	*)
+	    echo "$0 doesn't support $1" >&2
+	    exit 1
+	    ;;
+    esac
+done
+
+[[ -z "${FEDORA_VERSION}" ]] && echo I need to know which version of Fedora to install, specify it with -v >&2 && exit 1
+
+if [[ "${INSTALL_ROOT}" != /output/base ]] && [[ ! -d "${INSTALL_ROOT}" ]]; then
+    cp -a /output/base "${INSTALL_ROOT}"
+fi
+
+dnf -y --setopt=install_weak_deps=0 --nodocs \
+    --installroot "${INSTALL_ROOT}" --releasever "${FEDORA_VERSION}" \
+    install "$@"
+
+[[ "${KEEP_CACHE}" == true ]] || dnf -y --installroot "${INSTALL_ROOT}" --releasever "${FEDORA_VERSION}" clean all

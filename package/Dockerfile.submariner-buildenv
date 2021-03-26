@@ -1,0 +1,33 @@
+ARG FEDORA_VERSION=33
+FROM fedora:${FEDORA_VERSION}
+ARG FEDORA_VERSION
+ARG TARGETPLATFORM
+
+COPY package/dnf_install /
+
+# dnf cache and base packages, shared across all build sub-directories
+RUN /dnf_install -k -v ${FEDORA_VERSION} \
+    glibc bash glibc-minimal-langpack coreutils-single
+
+# gateway
+
+# iproute and iptables are used internally
+# libreswan provides IKE
+# procps-ng is needed for libreswan (pidof)
+RUN /dnf_install -v ${FEDORA_VERSION} -r /output/gateway \
+    libcurl-minimal iproute iptables iptables-nft libreswan procps-ng
+
+# globalnet
+
+RUN /dnf_install -v ${FEDORA_VERSION} -r /output/globalnet \
+    iproute iptables iptables-nft ipset
+
+# networkplugin-syncer
+
+RUN /dnf_install -v ${FEDORA_VERSION} -r /output/networkplugin-syncer \
+    https://kojipkgs.fedoraproject.org//packages/ovn/20.06.2/4.fc33/x86_64/ovn-20.06.2-4.fc33.x86_64.rpm
+
+# route-agent
+
+RUN /dnf_install -v ${FEDORA_VERSION} -r /output/route-agent \
+    iproute iptables iptables-nft openvswitch procps-ng

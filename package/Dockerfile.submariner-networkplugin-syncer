@@ -1,11 +1,13 @@
-FROM fedora:33 
+ARG BASE_BRANCH
+FROM quay.io/submariner/submariner-buildenv:${BASE_BRANCH} AS build-env
 ARG TARGETPLATFORM
 
-WORKDIR /var/submariner
+FROM scratch
+ARG TARGETPLATFORM
 
-RUN dnf -y install --nodocs --setopt=install_weak_deps=0 \
-           https://kojipkgs.fedoraproject.org//packages/ovn/20.06.2/4.fc33/x86_64/ovn-20.06.2-4.fc33.x86_64.rpm && \
-    dnf -y clean all
+COPY --from=build-env /output/networkplugin-syncer /
+
+WORKDIR /var/submariner
 
 # install the networkpluginc-sync
 COPY package/submariner-networkplugin-syncer.sh bin/${TARGETPLATFORM}/submariner-networkplugin-syncer /usr/local/bin/
