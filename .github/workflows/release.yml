@@ -25,7 +25,7 @@ jobs:
         uses: submariner-io/shipyard/gh-actions/post-mortem@devel
 
       - name: Clean up E2E deployment
-        run: make cleanup
+        run: make clean-clusters
 
   release:
     name: Release Images
