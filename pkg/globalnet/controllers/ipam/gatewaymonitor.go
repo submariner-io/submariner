@@ -24,13 +24,13 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"k8s.io/client-go/dynamic"
 
-	"github.com/submariner-io/submariner/pkg/globalnet/cleanup"
-	"github.com/submariner-io/submariner/pkg/iptables"
-	"github.com/submariner-io/submariner/pkg/netlink"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 
-	"github.com/submariner-io/submariner/pkg/util"
+	"github.com/submariner-io/submariner/pkg/cidr"
+	"github.com/submariner-io/submariner/pkg/globalnet/cleanup"
+	"github.com/submariner-io/submariner/pkg/iptables"
+	"github.com/submariner-io/submariner/pkg/netlink"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -154,7 +154,7 @@ func (gm *GatewayMonitor) processNextEndpoint() bool {
 		if endpoint.Spec.ClusterID != gm.clusterID {
 			klog.V(log.DEBUG).Infof("Endpoint %s belongs to a remote cluster", endpoint.Spec.Hostname)
 
-			overlap, err := util.IsOverlappingCIDR(endpoint.Spec.Subnets, gm.ipamSpec.GlobalCIDR[0])
+			overlap, err := cidr.IsOverlapping(endpoint.Spec.Subnets, gm.ipamSpec.GlobalCIDR[0])
 			if err != nil {
 				// Ideally this case will never hit, as the subnets are valid CIDRs
 				klog.Warningf("unable to validate overlapping Service CIDR: %s", err)

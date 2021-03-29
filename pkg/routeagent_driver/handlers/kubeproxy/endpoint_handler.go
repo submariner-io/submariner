@@ -22,7 +22,7 @@ import (
 	"k8s.io/klog"
 
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/util"
+	"github.com/submariner-io/submariner/pkg/cidr"
 )
 
 func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
@@ -154,7 +154,7 @@ func (kp *SyncHandler) overlappingSubnets(remoteSubnets []string) error {
 	// Pod/Service CIDRs, whereas in a GlobalNet deployment, it will be a list of
 	// globalCIDRs allocated to the clusters.
 	for _, serviceCidr := range kp.localServiceCidr {
-		overlap, err := util.IsOverlappingCIDR(remoteSubnets, serviceCidr)
+		overlap, err := cidr.IsOverlapping(remoteSubnets, serviceCidr)
 		if err != nil {
 			// Ideally this case will never hit, as the subnets are valid CIDRs
 			klog.Warningf("unable to validate overlapping Service CIDR: %s", err)
@@ -167,7 +167,7 @@ func (kp *SyncHandler) overlappingSubnets(remoteSubnets []string) error {
 	}
 
 	for _, podCidr := range kp.localClusterCidr {
-		overlap, err := util.IsOverlappingCIDR(remoteSubnets, podCidr)
+		overlap, err := cidr.IsOverlapping(remoteSubnets, podCidr)
 		if err != nil {
 			klog.Warningf("unable to validate overlapping Pod CIDR: %s", err)
 		}
