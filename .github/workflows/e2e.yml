@@ -12,18 +12,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        deploytool: ['operator', 'helm']
+        deploytool: ['operator']
         globalnet: ['', 'globalnet']
         cable_driver: ['libreswan', 'wireguard']
         ovn: ['', 'ovn']
         exclude:
-          # Our Helm setup doesn’t know how to deploy other cable drivers
-          - deploytool: 'helm'
-            cable_driver: 'wireguard'
-          - deploytool: 'helm'
-            cable_driver: 'libreswan'
-          - ovn: 'ovn'
-            deploytool: 'helm'
           - ovn: 'ovn'
             globalnet: 'globalnet'
           - ovn: 'ovn'
