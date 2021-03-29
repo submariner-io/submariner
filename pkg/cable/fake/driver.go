@@ -21,6 +21,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
 )
 
@@ -31,7 +32,7 @@ type Driver struct {
 	ErrOnInit                   error
 	ActiveConnections           map[string]interface{}
 	Connections                 interface{}
-	connectToEndpoint           chan *types.SubmarinerEndpoint
+	connectToEndpoint           chan *natdiscovery.NATEndpointInfo
 	ErrOnConnectToEndpoint      error
 	disconnectFromEndpoint      chan *types.SubmarinerEndpoint
 	ErrOnDisconnectFromEndpoint error
@@ -41,7 +42,7 @@ func New() *Driver {
 	return &Driver{
 		init:                   make(chan struct{}),
 		ActiveConnections:      map[string]interface{}{},
-		connectToEndpoint:      make(chan *types.SubmarinerEndpoint, 50),
+		connectToEndpoint:      make(chan *natdiscovery.NATEndpointInfo, 50),
 		disconnectFromEndpoint: make(chan *types.SubmarinerEndpoint, 50),
 	}
 }
@@ -79,9 +80,9 @@ func (d *Driver) GetConnections() ([]v1.Connection, error) {
 	return d.Connections.([]v1.Connection), nil
 }
 
-func (d *Driver) ConnectToEndpoint(endpoint types.SubmarinerEndpoint, useIP string, useNAT bool) (string, error) {
-	d.connectToEndpoint <- &endpoint
-	return useIP, d.ErrOnConnectToEndpoint
+func (d *Driver) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
+	d.connectToEndpoint <- endpointInfo
+	return endpointInfo.UseIP, d.ErrOnConnectToEndpoint
 }
 
 func (d *Driver) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) error {
@@ -97,7 +98,7 @@ func (d *Driver) AwaitInit() {
 	Eventually(d.init, 5).Should(BeClosed(), "Init was not called")
 }
 
-func (d *Driver) AwaitConnectToEndpoint(expected *types.SubmarinerEndpoint) {
+func (d *Driver) AwaitConnectToEndpoint(expected *natdiscovery.NATEndpointInfo) {
 	Eventually(d.connectToEndpoint, 5).Should(Receive(Equal(expected)))
 }
 

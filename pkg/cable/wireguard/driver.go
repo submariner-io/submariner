@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/vishvananda/netlink"
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -193,7 +194,10 @@ func (w *wireguard) GetName() string {
 	return cableDriverName
 }
 
-func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint, ip string, useNAT bool) (string, error) {
+func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
+	remoteEndpoint := &endpointInfo.Endpoint
+	ip := endpointInfo.UseIP
+
 	if w.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
 		klog.V(log.DEBUG).Infof("Will not connect to self")
 		return "", nil
@@ -237,7 +241,7 @@ func (w *wireguard) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint, i
 	}
 
 	// create connection, overwrite existing connection
-	connection := v1.NewConnection(remoteEndpoint.Spec, ip, useNAT)
+	connection := v1.NewConnection(remoteEndpoint.Spec, ip, endpointInfo.UseNAT)
 	connection.SetStatus(v1.Connecting, "Connection has been created but not yet started")
 	klog.V(log.DEBUG).Infof("Adding connection for cluster %s, %v", remoteEndpoint.Spec.ClusterID, connection)
 	w.connections[remoteEndpoint.Spec.ClusterID] = connection
