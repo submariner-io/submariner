@@ -29,12 +29,12 @@ import (
 )
 
 func (nd *natDiscovery) runListener(stopCh <-chan struct{}) error {
-	if nd.localEndpoint.Spec.NATDiscoveryPort == nil {
+	if nd.serverPort == 0 {
 		klog.Infof("NAT discovery protocol port not set for this gateway")
 		return nil
 	}
 
-	serverConnection, err := createServerConnection(int(*nd.localEndpoint.Spec.NATDiscoveryPort))
+	serverConnection, err := createServerConnection(nd.serverPort)
 	if err != nil {
 		return err
 	}
@@ -54,8 +54,8 @@ func (nd *natDiscovery) runListener(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func createServerConnection(port int) (*net.UDPConn, error) {
-	serverAddress, err := net.ResolveUDPAddr("udp4", ":"+strconv.Itoa(port))
+func createServerConnection(port int32) (*net.UDPConn, error) {
+	serverAddress, err := net.ResolveUDPAddr("udp4", ":"+strconv.Itoa(int(port)))
 	if err != nil {
 		return nil, errors.Wrap(err, "Error resolving UDP address")
 	}

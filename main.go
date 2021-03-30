@@ -39,6 +39,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/controllers/datastoresyncer"
 	"github.com/submariner-io/submariner/pkg/controllers/tunnel"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
+	"github.com/submariner-io/submariner/pkg/node"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
 	corev1 "k8s.io/api/core/v1"
@@ -107,6 +108,11 @@ func main() {
 		klog.Fatalf("Error creating submariner clientset: %s", err.Error())
 	}
 
+	localNode, err := node.GetLocalNode(cfg)
+	if err != nil {
+		klog.Fatalf("Error getting information on the local node: %s", err.Error())
+	}
+
 	klog.Info("Creating the cable engine")
 
 	localCluster := submarinerClusterFrom(&submSpec)
@@ -117,7 +123,7 @@ func main() {
 
 	submSpec.CableDriver = strings.ToLower(submSpec.CableDriver)
 
-	localEndpoint, err := util.GetLocalEndpoint(submSpec, nil, util.GetLocalIP())
+	localEndpoint, err := util.GetLocalEndpoint(submSpec, util.GetLocalIP(), localNode)
 
 	if err != nil {
 		klog.Fatalf("Error creating local endpoint object from %#v: %v", submSpec, err)

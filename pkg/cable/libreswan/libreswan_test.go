@@ -31,30 +31,26 @@ var _ = Describe("Libreswan", func() {
 func testIPsecPortConfiguration() {
 	When("NewLibreswan is called with no port environment variables set", func() {
 		It("should set the port fields from the defaults in the specification definition", func() {
-			checkLibreswanPorts(defaultIKEPort, defaultNATTPort)
+			checkLibreswanPort(defaultNATTPort)
 		})
 	})
 
 	When("NewLibreswan is called with port environment variables set", func() {
 		const (
-			ikePort        = "555"
 			nattPort       = "4555"
-			ikePortEnvVar  = "CE_IPSEC_IKEPORT"
 			nattPortEnvVar = "CE_IPSEC_NATTPORT"
 		)
 
 		BeforeEach(func() {
-			os.Setenv(ikePortEnvVar, ikePort)
 			os.Setenv(nattPortEnvVar, nattPort)
 		})
 
 		AfterEach(func() {
-			os.Unsetenv(ikePortEnvVar)
 			os.Unsetenv(nattPortEnvVar)
 		})
 
 		It("should set the port fields from the environment variables", func() {
-			checkLibreswanPorts(ikePort, nattPort)
+			checkLibreswanPort(nattPort)
 		})
 	})
 }
@@ -66,8 +62,7 @@ func createLibreswan() *libreswan {
 	return ls.(*libreswan)
 }
 
-func checkLibreswanPorts(ikePort, nattPort string) {
+func checkLibreswanPort(nattPort string) {
 	ls := createLibreswan()
-	Expect(ls.ipSecIKEPort).To(Equal(ikePort))
 	Expect(ls.ipSecNATTPort).To(Equal(nattPort))
 }

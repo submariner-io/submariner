@@ -32,6 +32,7 @@ import (
 	"k8s.io/klog"
 
 	"github.com/submariner-io/admiral/pkg/log"
+
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/types"
@@ -47,29 +48,26 @@ func init() {
 }
 
 type libreswan struct {
-	secretKey string
-
-	debug   bool
-	logFile string
-
 	localEndpoint types.SubmarinerEndpoint
-
-	ipSecIKEPort  string
-	ipSecNATTPort string
-
 	// This tracks the requested connections
 	connections []subv1.Connection
+
+	secretKey string
+	logFile   string
+
+	ipSecNATTPort   string
+	defaultNATTPort int32
+
+	debug bool
 }
 
 type specification struct {
 	PSK      string
 	Debug    bool
 	LogFile  string
-	IKEPort  string `default:"500"`
 	NATTPort string `default:"4500"`
 }
 
-const defaultIKEPort = "500"
 const defaultNATTPort = "4500"
 const ipsecSpecEnvVarPrefix = "ce_ipsec"
 
@@ -82,14 +80,26 @@ func NewLibreswan(localEndpoint types.SubmarinerEndpoint, localCluster types.Sub
 		return nil, fmt.Errorf("error processing environment config for %s: %v", ipsecSpecEnvVarPrefix, err)
 	}
 
+	defaultNATTPort, err := strconv.ParseUint(ipSecSpec.NATTPort, 10, 16)
+	if err != nil {
+		return nil, errors.Errorf("error parsing CR_IPSEC_NATTPORT environment variable")
+	}
+
+	nattPort, err := localEndpoint.Spec.GetBackendPort(subv1.UDPPortConfig, int32(defaultNATTPort))
+	if err != nil {
+		return nil, errors.Wrapf(err, "error parsing %q from local endpoint", subv1.UDPPortConfig)
+	}
+
+	klog.Infof("Using NATT UDP port %d", nattPort)
+
 	return &libreswan{
-		secretKey:     ipSecSpec.PSK,
-		debug:         ipSecSpec.Debug,
-		logFile:       ipSecSpec.LogFile,
-		ipSecIKEPort:  ipSecSpec.IKEPort,
-		ipSecNATTPort: ipSecSpec.NATTPort,
-		localEndpoint: localEndpoint,
-		connections:   []subv1.Connection{},
+		secretKey:       ipSecSpec.PSK,
+		debug:           ipSecSpec.Debug,
+		logFile:         ipSecSpec.LogFile,
+		ipSecNATTPort:   strconv.Itoa(int(nattPort)),
+		defaultNATTPort: int32(defaultNATTPort),
+		localEndpoint:   localEndpoint,
+		connections:     []subv1.Connection{},
 	}, nil
 }
 
@@ -286,6 +296,12 @@ func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 	leftSubnets := extractSubnets(i.localEndpoint.Spec)
 	rightSubnets := extractSubnets(endpoint.Spec)
 
+	rightNATTPort, err := endpoint.Spec.GetBackendPort(subv1.UDPPortConfig, i.defaultNATTPort)
+	if err != nil {
+		klog.Warningf("Error parsing %q from remote endpoint %q - using port %d instead: %v", subv1.UDPPortConfig,
+			endpoint.Spec.CableName, i.defaultNATTPort, err)
+	}
+
 	// Ensure we’re listening
 	if err := whack("--listen"); err != nil {
 		return "", fmt.Errorf("error listening: %v", err)
@@ -311,11 +327,8 @@ func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 				args = append(args, "--id", localEndpointIdentifier)
 				args = append(args, "--host", localEndpointIP)
 				args = append(args, "--client", leftSubnets[lsi])
-				if endpointInfo.UseNAT {
-					args = append(args, "--ikeport", i.ipSecNATTPort)
-				} else {
-					args = append(args, "--ikeport", i.ipSecIKEPort)
-				}
+
+				args = append(args, "--ikeport", i.ipSecNATTPort)
 
 				args = append(args, "--to")
 
@@ -323,11 +336,8 @@ func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 				args = append(args, "--id", remoteEndpointIdentifier)
 				args = append(args, "--host", remoteEndpointIP)
 				args = append(args, "--client", rightSubnets[rsi])
-				if endpointInfo.UseNAT {
-					args = append(args, "--ikeport", i.ipSecNATTPort)
-				} else {
-					args = append(args, "--ikeport", i.ipSecIKEPort)
-				}
+
+				args = append(args, "--ikeport", strconv.Itoa(int(rightNATTPort)))
 
 				klog.Infof("Executing whack with args: %v", args)
 
