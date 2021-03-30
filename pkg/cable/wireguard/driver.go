@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/pkg/errors"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/vishvananda/netlink"
 	"golang.zx2c4.com/wireguard/wgctrl"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/klog"
 
 	"github.com/submariner-io/admiral/pkg/log"
+
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/types"
@@ -64,7 +66,7 @@ func init() {
 
 type specification struct {
 	PSK      string `default:"default psk"`
-	NATTPort int    `default:"5871"`
+	NATTPort int    `default:"4500"`
 }
 
 type wireguard struct {
@@ -131,12 +133,18 @@ func NewDriver(localEndpoint types.SubmarinerEndpoint, localCluster types.Submar
 
 	w.localEndpoint.Spec.BackendConfig[PublicKey] = pub.String()
 
+	port, err := localEndpoint.Spec.GetBackendPort(v1.UDPPortConfig, int32(w.spec.NATTPort))
+	if err != nil {
+		return nil, errors.Wrapf(err, "error parsing %q from local endpoint", v1.UDPPortConfig)
+	}
+
+	portInt := int(port)
 	// configure the device. still not up
-	port := w.spec.NATTPort
+
 	peerConfigs := make([]wgtypes.PeerConfig, 0)
 	cfg := wgtypes.Config{
 		PrivateKey:   &priv,
-		ListenPort:   &port,
+		ListenPort:   &portInt,
 		FirewallMark: nil,
 		ReplacePeers: true,
 		Peers:        peerConfigs,
@@ -246,6 +254,14 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 	klog.V(log.DEBUG).Infof("Adding connection for cluster %s, %v", remoteEndpoint.Spec.ClusterID, connection)
 	w.connections[remoteEndpoint.Spec.ClusterID] = connection
 
+	port, err := remoteEndpoint.Spec.GetBackendPort(v1.UDPPortConfig, int32(w.spec.NATTPort))
+	if err != nil {
+		klog.Warningf("Error parsing %q from remote endpoint %q - using port %dº instead: %v", v1.UDPPortConfig,
+			remoteEndpoint.Spec.CableName, w.spec.NATTPort, err)
+	}
+
+	remotePort := int(port)
+
 	// configure peer
 	ka := KeepAliveInterval
 	peerCfg := []wgtypes.PeerConfig{{
@@ -255,7 +271,7 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 		PresharedKey: w.psk,
 		Endpoint: &net.UDPAddr{
 			IP:   remoteIP,
-			Port: w.spec.NATTPort, // TODO move port to endpoint spec
+			Port: remotePort,
 		},
 		PersistentKeepaliveInterval: &ka,
 		ReplaceAllowedIPs:           true,

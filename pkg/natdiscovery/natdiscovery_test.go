@@ -22,6 +22,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
 )
 
@@ -210,7 +211,7 @@ var _ = When("a remote Endpoint is added", func() {
 		BeforeEach(func() {
 			t.remoteEndpoint.Spec.PublicIP = testRemotePublicIP
 			t.remoteEndpoint.Spec.PrivateIP = ""
-			t.remoteEndpoint.Spec.NATDiscoveryPort = nil
+			delete(t.remoteEndpoint.Spec.BackendConfig, submarinerv1.NATTDiscoveryPortConfig)
 		})
 
 		It("should notify with the legacy NATEndpointInfo settings", func() {
