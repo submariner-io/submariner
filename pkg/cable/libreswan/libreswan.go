@@ -130,7 +130,9 @@ func (i *libreswan) Init() error {
 }
 
 // Line format: 006 #3: "submariner-cable-cluster3-172-17-0-8-0-0", type=ESP, add_time=1590508783, inBytes=0, outBytes=0, id='172.17.0.8'
-var trafficStatusRE = regexp.MustCompile(`.* "([^"]+)", .*inBytes=(\d+), outBytes=(\d+).*`)
+//          or: 006 #2: "submariner-cable-cluster3-172-17-0-8-0-0"[1] 3.139.75.179, type=ESP, add_time=1617195756, inBytes=0, outBytes=0,
+//                        id='@10.0.63.203-0-0'"
+var trafficStatusRE = regexp.MustCompile(`.* "([^"]+)"[^,]*, .*inBytes=(\d+), outBytes=(\d+).*`)
 
 func (i *libreswan) refreshConnectionStatus() error {
 	// Retrieve active tunnels from the daemon
@@ -283,73 +285,39 @@ func whack(args ...string) error {
 func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
 	endpoint := &endpointInfo.Endpoint
 
-	// This is the local endpoint’s IP address, which is always the private IP
-	// (the IP needs to be assigned to a local interface; Libreswan uses that to determine
-	// the tunnel’s orientation)
-	localEndpointIP := i.localEndpoint.Spec.PrivateIP
-	// The remote endpoint IP is the address the local system needs to connect to; if NAT
-	// is involved, this will be the public IP, otherwise the private IP
-	remoteEndpointIP := endpointInfo.UseIP
-	// Identifiers are used for authentication, they’re always the private IPs
-	localEndpointIdentifier := i.localEndpoint.Spec.PrivateIP
-	remoteEndpointIdentifier := endpoint.Spec.PrivateIP
-	leftSubnets := extractSubnets(i.localEndpoint.Spec)
-	rightSubnets := extractSubnets(endpoint.Spec)
-
 	rightNATTPort, err := endpoint.Spec.GetBackendPort(subv1.UDPPortConfig, i.defaultNATTPort)
 	if err != nil {
 		klog.Warningf("Error parsing %q from remote endpoint %q - using port %d instead: %v", subv1.UDPPortConfig,
 			endpoint.Spec.CableName, i.defaultNATTPort, err)
 	}
 
+	leftSubnets := extractSubnets(i.localEndpoint.Spec)
+	rightSubnets := extractSubnets(endpoint.Spec)
+
 	// Ensure we’re listening
 	if err := whack("--listen"); err != nil {
 		return "", fmt.Errorf("error listening: %v", err)
 	}
 
-	klog.Infof("Creating connection(s) for %v", endpoint)
+	connectionMode := i.calculateOperationMode(endpoint)
+
+	klog.Infof("Creating connection(s) for %v in %s mode", endpoint, connectionMode)
 
 	if len(leftSubnets) > 0 && len(rightSubnets) > 0 {
-		for lsi := range leftSubnets {
-			for rsi := range rightSubnets {
+		for lsi, leftSubnet := range leftSubnets {
+			for rsi, rightSubnet := range rightSubnets {
 				connectionName := fmt.Sprintf("%s-%d-%d", endpoint.Spec.CableName, lsi, rsi)
 
-				args := []string{}
-
-				args = append(args, "--psk", "--encrypt")
-				if endpointInfo.UseNAT {
-					args = append(args, "--forceencaps")
+				switch connectionMode {
+				case operationModeBidirectional:
+					err = i.bidirectionalConnectToEndpoint(connectionName, endpointInfo, leftSubnet, rightSubnet, rightNATTPort)
+				case operationModeServer:
+					err = i.serverConnectToEndpoint(connectionName, endpointInfo, leftSubnet, rightSubnet, lsi, rsi)
+				case operationModeClient:
+					err = i.clientConnectToEndpoint(connectionName, endpointInfo, leftSubnet, rightSubnet, rightNATTPort, lsi, rsi)
 				}
 
-				args = append(args, "--name", connectionName)
-
-				// Left-hand side
-				args = append(args, "--id", localEndpointIdentifier)
-				args = append(args, "--host", localEndpointIP)
-				args = append(args, "--client", leftSubnets[lsi])
-
-				args = append(args, "--ikeport", i.ipSecNATTPort)
-
-				args = append(args, "--to")
-
-				// Right-hand side
-				args = append(args, "--id", remoteEndpointIdentifier)
-				args = append(args, "--host", remoteEndpointIP)
-				args = append(args, "--client", rightSubnets[rsi])
-
-				args = append(args, "--ikeport", strconv.Itoa(int(rightNATTPort)))
-
-				klog.Infof("Executing whack with args: %v", args)
-
-				if err := whack(args...); err != nil {
-					return "", err
-				}
-
-				if err := whack("--route", "--name", connectionName); err != nil {
-					return "", err
-				}
-
-				if err := whack("--initiate", "--asynchronous", "--name", connectionName); err != nil {
+				if err != nil {
 					return "", err
 				}
 			}
@@ -360,7 +328,140 @@ func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 		subv1.Connection{Endpoint: endpoint.Spec, Status: subv1.Connected, UsingIP: endpointInfo.UseIP, UsingNAT: endpointInfo.UseNAT})
 	cable.RecordConnection(cableDriverName, &i.localEndpoint.Spec, &endpoint.Spec, string(subv1.Connected), true)
 
-	return remoteEndpointIP, nil
+	return endpointInfo.UseIP, nil
+}
+
+func (i *libreswan) bidirectionalConnectToEndpoint(connectionName string, endpointInfo *natdiscovery.NATEndpointInfo,
+	leftSubnet, rightSubnet string, rightNATTPort int32) error {
+	// Identifiers are used for authentication, they’re always the private IPs
+	localEndpointIdentifier := i.localEndpoint.Spec.PrivateIP
+	remoteEndpointIdentifier := endpointInfo.Endpoint.Spec.PrivateIP
+
+	args := []string{}
+
+	args = append(args, "--psk", "--encrypt")
+	if endpointInfo.UseNAT {
+		args = append(args, "--forceencaps")
+	}
+
+	args = append(args, "--name", connectionName)
+
+	// Left-hand side
+	args = append(args, "--id", localEndpointIdentifier)
+	args = append(args, "--host", i.localEndpoint.Spec.PrivateIP)
+	args = append(args, "--client", leftSubnet)
+
+	args = append(args, "--ikeport", i.ipSecNATTPort)
+
+	args = append(args, "--to")
+
+	// Right-hand side
+	args = append(args, "--id", remoteEndpointIdentifier)
+	args = append(args, "--host", endpointInfo.UseIP)
+	args = append(args, "--client", rightSubnet)
+
+	args = append(args, "--ikeport", strconv.Itoa(int(rightNATTPort)))
+
+	klog.Infof("Executing whack with args: %v", args)
+
+	if err := whack(args...); err != nil {
+		return err
+	}
+
+	if err := whack("--route", "--name", connectionName); err != nil {
+		return err
+	}
+
+	if err := whack("--initiate", "--asynchronous", "--name", connectionName); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (i *libreswan) serverConnectToEndpoint(connectionName string, endpointInfo *natdiscovery.NATEndpointInfo,
+	leftSubnet, rightSubnet string, lsi, rsi int) error {
+	localEndpointIdentifier := fmt.Sprintf("@%s-%d-%d", i.localEndpoint.Spec.PrivateIP, lsi, rsi)
+	remoteEndpointIdentifier := fmt.Sprintf("@%s-%d-%d", endpointInfo.Endpoint.Spec.PrivateIP, rsi, lsi)
+
+	args := []string{}
+
+	args = append(args, "--psk", "--encrypt")
+	if endpointInfo.UseNAT {
+		args = append(args, "--forceencaps")
+	}
+
+	args = append(args, "--name", connectionName)
+
+	// Left-hand side
+	args = append(args, "--id", localEndpointIdentifier)
+	args = append(args, "--host", i.localEndpoint.Spec.PrivateIP)
+	args = append(args, "--client", leftSubnet)
+
+	args = append(args, "--ikeport", i.ipSecNATTPort)
+
+	args = append(args, "--to")
+
+	// Right-hand side
+	args = append(args, "--id", remoteEndpointIdentifier)
+	args = append(args, "--host", "%any")
+	args = append(args, "--client", rightSubnet)
+
+	klog.Infof("Executing whack with args: %v", args)
+
+	if err := whack(args...); err != nil {
+		return err
+	}
+
+	// NOTE: in this case we don't route or initiate connection, we simply wait for the client
+	// to connect from %any IP, using the right PSK & ID
+	return nil
+}
+
+func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo *natdiscovery.NATEndpointInfo,
+	leftSubnet, rightSubnet string, rightNATTPort int32, lsi, rsi int) error {
+	// Identifiers are used for authentication, they’re always the private IPs
+	localEndpointIdentifier := fmt.Sprintf("@%s-%d-%d", i.localEndpoint.Spec.PrivateIP, lsi, rsi)
+	remoteEndpointIdentifier := fmt.Sprintf("@%s-%d-%d", endpointInfo.Endpoint.Spec.PrivateIP, rsi, lsi)
+
+	args := []string{}
+
+	args = append(args, "--psk", "--encrypt")
+	if endpointInfo.UseNAT {
+		args = append(args, "--forceencaps")
+	}
+
+	args = append(args, "--name", connectionName)
+
+	// Left-hand side
+	args = append(args, "--id", localEndpointIdentifier)
+	args = append(args, "--host", i.localEndpoint.Spec.PrivateIP)
+	args = append(args, "--client", leftSubnet)
+
+	args = append(args, "--to")
+
+	// Right-hand side
+	args = append(args, "--id", remoteEndpointIdentifier)
+	args = append(args, "--host", endpointInfo.UseIP)
+	args = append(args, "--client", rightSubnet)
+
+	args = append(args, "--ikeport", strconv.Itoa(int(rightNATTPort)))
+
+	klog.Infof("Executing whack with args: %v", args)
+
+	if err := whack(args...); err != nil {
+		return err
+	}
+
+	if err := whack("--route", "--name", connectionName); err != nil {
+		return err
+	}
+
+	if err := whack("--initiate", "--asynchronous", "--name", connectionName); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // DisconnectFromEndpoint disconnects from the connection to the given endpoint.
