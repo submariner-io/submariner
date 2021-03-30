@@ -1,0 +1,14 @@
+---
+name: Branch Checks
+
+on:
+  pull_request:
+
+jobs:
+  target_devel:
+    name: PR targets devel
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check that the PR targets devel
+        if: ${{ github.base_ref != 'devel' }}
+        run: exit 1
