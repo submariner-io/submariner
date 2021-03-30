@@ -86,6 +86,11 @@ const (
 	NATTDiscoveryPortConfig  = "natt-discovery-port"
 )
 
+// BackendConfig entries which aren't configured via labels, but exposed from the endpoints
+const (
+	PreferredServerConfig = "preferred-server"
+)
+
 // ValidGatewayNodeConfig list should contain only keys that configure node specific settings via labels
 var ValidGatewayNodeConfig = []string{
 	UDPPortConfig,

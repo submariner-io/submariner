@@ -30,18 +30,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/watcher"
-	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/cable"
-	"github.com/submariner-io/submariner/pkg/cableengine"
-	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
-	"github.com/submariner-io/submariner/pkg/cableengine/syncer"
-	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
-	"github.com/submariner-io/submariner/pkg/controllers/datastoresyncer"
-	"github.com/submariner-io/submariner/pkg/controllers/tunnel"
-	"github.com/submariner-io/submariner/pkg/natdiscovery"
-	"github.com/submariner-io/submariner/pkg/node"
-	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/submariner-io/submariner/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -53,6 +41,20 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
+
+	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cable"
+	"github.com/submariner-io/submariner/pkg/cableengine"
+	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
+	"github.com/submariner-io/submariner/pkg/cableengine/syncer"
+	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	"github.com/submariner-io/submariner/pkg/controllers/datastoresyncer"
+	"github.com/submariner-io/submariner/pkg/controllers/tunnel"
+	"github.com/submariner-io/submariner/pkg/endpoint"
+	"github.com/submariner-io/submariner/pkg/natdiscovery"
+	"github.com/submariner-io/submariner/pkg/node"
+	"github.com/submariner-io/submariner/pkg/types"
+	"github.com/submariner-io/submariner/pkg/util"
 )
 
 var (
@@ -123,7 +125,7 @@ func main() {
 
 	submSpec.CableDriver = strings.ToLower(submSpec.CableDriver)
 
-	localEndpoint, err := util.GetLocalEndpoint(submSpec, util.GetLocalIP(), localNode)
+	localEndpoint, err := endpoint.GetLocal(submSpec, util.GetLocalIP(), localNode)
 
 	if err != nil {
 		klog.Fatalf("Error creating local endpoint object from %#v: %v", submSpec, err)
