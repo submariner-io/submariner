@@ -58,14 +58,16 @@ type libreswan struct {
 	ipSecNATTPort   string
 	defaultNATTPort int32
 
-	debug bool
+	debug                 bool
+	forceUDPEncapsulation bool
 }
 
 type specification struct {
-	PSK      string
-	Debug    bool
-	LogFile  string
-	NATTPort string `default:"4500"`
+	Debug       bool
+	ForceEncaps bool
+	PSK         string
+	LogFile     string
+	NATTPort    string `default:"4500"`
 }
 
 const defaultNATTPort = "4500"
@@ -93,13 +95,14 @@ func NewLibreswan(localEndpoint types.SubmarinerEndpoint, localCluster types.Sub
 	klog.Infof("Using NATT UDP port %d", nattPort)
 
 	return &libreswan{
-		secretKey:       ipSecSpec.PSK,
-		debug:           ipSecSpec.Debug,
-		logFile:         ipSecSpec.LogFile,
-		ipSecNATTPort:   strconv.Itoa(int(nattPort)),
-		defaultNATTPort: int32(defaultNATTPort),
-		localEndpoint:   localEndpoint,
-		connections:     []subv1.Connection{},
+		secretKey:             ipSecSpec.PSK,
+		debug:                 ipSecSpec.Debug,
+		logFile:               ipSecSpec.LogFile,
+		ipSecNATTPort:         strconv.Itoa(int(nattPort)),
+		defaultNATTPort:       int32(defaultNATTPort),
+		localEndpoint:         localEndpoint,
+		connections:           []subv1.Connection{},
+		forceUDPEncapsulation: ipSecSpec.ForceEncaps,
 	}, nil
 }
 
@@ -340,7 +343,7 @@ func (i *libreswan) bidirectionalConnectToEndpoint(connectionName string, endpoi
 	args := []string{}
 
 	args = append(args, "--psk", "--encrypt")
-	if endpointInfo.UseNAT {
+	if endpointInfo.UseNAT || i.forceUDPEncapsulation {
 		args = append(args, "--forceencaps")
 	}
 
@@ -387,7 +390,7 @@ func (i *libreswan) serverConnectToEndpoint(connectionName string, endpointInfo 
 	args := []string{}
 
 	args = append(args, "--psk", "--encrypt")
-	if endpointInfo.UseNAT {
+	if endpointInfo.UseNAT || i.forceUDPEncapsulation {
 		args = append(args, "--forceencaps")
 	}
 
@@ -427,7 +430,7 @@ func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo 
 	args := []string{}
 
 	args = append(args, "--psk", "--encrypt")
-	if endpointInfo.UseNAT {
+	if endpointInfo.UseNAT || i.forceUDPEncapsulation {
 		args = append(args, "--forceencaps")
 	}
 
