@@ -13,4 +13,3 @@ scripts/broker-info.subm*
 Dockerfile.dapper[0-9]*
 .shflags
 Makefile.dapper
-pkg/natdiscovery/proto/*.pb.go
