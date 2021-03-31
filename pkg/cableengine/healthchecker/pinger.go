@@ -58,6 +58,8 @@ func newPinger(ip string, pingInterval time.Duration, maxPacketLossCount uint) P
 }
 
 func (p *pingerInfo) Start() {
+	klog.Infof("Starting pinger for IP %q", p.ip)
+
 	go func() {
 		for {
 			select {
@@ -84,8 +86,6 @@ func (p *pingerInfo) Stop() {
 }
 
 func (p *pingerInfo) doPing() error {
-	klog.Infof("Starting pinger for IP %q", p.ip)
-
 	pinger, err := ping.NewPinger(p.ip)
 	if err != nil {
 		p.connectionStatus = ConnectionUnknown
@@ -138,8 +138,6 @@ func (p *pingerInfo) doPing() error {
 
 		return err
 	}
-
-	klog.Infof("Pinger for IP %q stopped", p.ip)
 
 	return nil
 }
