@@ -38,7 +38,7 @@ type Interface interface {
 	Run(stopCh <-chan struct{}) error
 	AddEndpoint(endpoint *types.SubmarinerEndpoint)
 	RemoveEndpoint(endpointName string)
-	SetReadyChannel(readyChannel chan *NATEndpointInfo)
+	GetReadyChannel() chan *NATEndpointInfo
 }
 
 type udpWriteFunction func(b []byte, addr *net.UDPAddr) (int, error)
@@ -53,10 +53,6 @@ type natDiscovery struct {
 	findSrcIP       findSrcIPFunction
 	serverPort      int32
 	readyChannel    chan *NATEndpointInfo
-}
-
-func (nd *natDiscovery) SetReadyChannel(readyChannel chan *NATEndpointInfo) {
-	nd.readyChannel = readyChannel
 }
 
 func New(localEndpoint *types.SubmarinerEndpoint) (Interface, error) {
@@ -80,6 +76,7 @@ func newNatDiscovery(localEndpoint *types.SubmarinerEndpoint) (*natDiscovery, er
 		remoteEndpoints: map[string]*remoteEndpointNAT{},
 		findSrcIP:       util.GetLocalIPForDestination,
 		requestCounter:  requestCounter,
+		readyChannel:    make(chan *NATEndpointInfo, 100),
 	}, nil
 }
 
@@ -107,6 +104,10 @@ func extractNATDiscoveryPort(endpoint *types.SubmarinerEndpoint) (int32, error) 
 	}
 
 	return natDiscoveryPort, nil
+}
+
+func (nd *natDiscovery) GetReadyChannel() chan *NATEndpointInfo {
+	return nd.readyChannel
 }
 
 func (nd *natDiscovery) Run(stopCh <-chan struct{}) error {

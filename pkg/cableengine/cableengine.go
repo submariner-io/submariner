@@ -112,8 +112,7 @@ func (i *engine) startDriver() error {
 
 func (i *engine) SetupNATDiscovery(natDiscovery natdiscovery.Interface) {
 	i.natDiscovery = natDiscovery
-	i.natEndpointInfoCh = make(chan *natdiscovery.NATEndpointInfo, 100)
-	natDiscovery.SetReadyChannel(i.natEndpointInfoCh)
+	i.natEndpointInfoCh = natDiscovery.GetReadyChannel()
 
 	go func() {
 		for natEndpointInfo := range i.natEndpointInfoCh {
