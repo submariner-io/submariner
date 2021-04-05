@@ -86,7 +86,7 @@ var _ = Describe("Cable Engine", func() {
 			},
 		}, *localEndpoint)
 
-		natDiscovery = &fakeNatDiscovery{removeEndpoint: make(chan string, 20)}
+		natDiscovery = &fakeNatDiscovery{removeEndpoint: make(chan string, 20), readyChannel: make(chan *natdiscovery.NATEndpointInfo, 100)}
 		engine.SetupNATDiscovery(natDiscovery)
 
 	})
@@ -301,8 +301,8 @@ func (n *fakeNatDiscovery) RemoveEndpoint(endpointName string) {
 	n.removeEndpoint <- endpointName
 }
 
-func (n *fakeNatDiscovery) SetReadyChannel(readyChannel chan *natdiscovery.NATEndpointInfo) {
-	n.readyChannel = readyChannel
+func (n *fakeNatDiscovery) GetReadyChannel() chan *natdiscovery.NATEndpointInfo {
+	return n.readyChannel
 }
 
 func (n *fakeNatDiscovery) notifyReady(endpoint *types.SubmarinerEndpoint) {

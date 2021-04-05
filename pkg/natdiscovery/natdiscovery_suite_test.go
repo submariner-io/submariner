@@ -86,9 +86,7 @@ func createTestListener(endpoint *types.SubmarinerEndpoint) (*natDiscovery, chan
 	listener, err := newNatDiscovery(&types.SubmarinerEndpoint{Spec: endpoint.Spec})
 	Expect(err).To(Succeed())
 
-	readyChannel := make(chan *NATEndpointInfo, 100)
-	listener.SetReadyChannel(readyChannel)
-	Expect(err).To(Succeed())
+	readyChannel := listener.GetReadyChannel()
 
 	udpSentChannel := make(chan []byte, 10)
 	listener.serverUDPWrite = func(b []byte, addr *net.UDPAddr) (int, error) {
