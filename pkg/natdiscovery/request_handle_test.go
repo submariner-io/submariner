@@ -67,13 +67,6 @@ var _ = Describe("Request handling", func() {
 		}
 	}
 
-	When("receiving a request with an unknown sender endpoint", func() {
-		It("should respond with UNKNOWN_SRC_ENDPOINT", func() {
-			response := requestResponseFromRemoteToLocal(&remoteUDPAddr)
-			Expect(response[0].Response).To(Equal(natproto.ResponseType_UNKNOWN_SRC_ENDPOINT))
-		})
-	})
-
 	When("receiving a request with a known sender endpoint", func() {
 		It("should respond with OK", func() {
 			localListener.AddEndpoint(&remoteEndpoint)
