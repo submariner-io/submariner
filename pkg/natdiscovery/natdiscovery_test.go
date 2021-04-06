@@ -129,21 +129,7 @@ var _ = When("a remote Endpoint is added", func() {
 	})
 
 	Context("and the local Endpoint is not initially known to the remote process", func() {
-		It("should eventually notify with the correct NATEndpointInfo settings", func() {
-			Consistently(t.readyChannel).ShouldNot(Receive())
-
-			t.remoteND.AddEndpoint(&t.localEndpoint)
-			forwardFromUDPChan(t.localUDPSent, t.localUDPAddr, t.remoteND, -1)
-
-			// Verify it doesn't send out the next request until the recheck time period has elapsed
-
-			atomic.StoreInt64(&recheckTime, time.Hour.Nanoseconds())
-			t.localND.checkEndpointList()
-			Expect(t.localUDPSent).ToNot(Receive())
-
-			atomic.StoreInt64(&recheckTime, 0)
-			t.localND.checkEndpointList()
-
+		It("should notify with the correct NATEndpointInfo settings", func() {
 			Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 				Endpoint: t.remoteEndpoint,
 				UseNAT:   false,

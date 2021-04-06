@@ -71,17 +71,6 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNatDiscove
 		return nd.sendResponseToAddress(&response, addr)
 	}
 
-	if !nd.isKnownEndpoint(req.Sender.GetEndpointId(), req.Sender.GetClusterId()) {
-		// This can be ok for some time, because one cluster could discover an endpoint earlier on the broker than the
-		// the other endpoint has discovered him
-		klog.V(log.DEBUG).Infof("Received a NAT discovery packet from an endpoint %q on cluster %q we don't know about yet",
-			req.Receiver.GetEndpointId(), req.Receiver.GetClusterId())
-
-		response.Response = proto.ResponseType_UNKNOWN_SRC_ENDPOINT
-
-		return nd.sendResponseToAddress(&response, addr)
-	}
-
 	if req.UsingSrc.GetIP() != "" && req.UsingSrc.GetIP() != addr.IP.String() {
 		klog.V(log.DEBUG).Infof("Received NAT packet from endpoint %q, cluster %q, where NAT has been detected, "+
 			"source IP changed",
@@ -107,15 +96,6 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNatDiscove
 	response.Response = proto.ResponseType_OK
 
 	return nd.sendResponseToAddress(&response, addr)
-}
-
-func (nd *natDiscovery) isKnownEndpoint(endpointID, clusterID string) bool {
-	nd.Lock()
-	defer nd.Unlock()
-
-	ep, ok := nd.remoteEndpoints[endpointID]
-
-	return ok && ep.endpoint.Spec.ClusterID == clusterID
 }
 
 func (nd *natDiscovery) sendResponseToAddress(response *proto.SubmarinerNatDiscoveryResponse, addr *net.UDPAddr) error {
