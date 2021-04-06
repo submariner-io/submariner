@@ -7,15 +7,14 @@ require (
 	github.com/coreos/go-iptables v0.5.0
 	github.com/ebay/go-ovn v0.1.1-0.20201007164241-da67e9744ec0
 	github.com/go-ping/ping v0.0.0-20201022122018-3977ed72668a
-	github.com/google/gopacket v1.1.19 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/onsi/ginkgo v1.15.0
-	github.com/onsi/gomega v1.10.5
+	github.com/onsi/ginkgo v1.15.2
+	github.com/onsi/gomega v1.11.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.9.0
 	github.com/rdegges/go-ipify v0.0.0-20150526035502-2d94a6a86c40
 	github.com/submariner-io/admiral v0.9.0-m1
-	github.com/submariner-io/shipyard v0.9.0-m1
+	github.com/submariner-io/shipyard v0.9.0-m2
 	github.com/vishvananda/netlink v1.1.0
 	golang.org/x/sys v0.0.0-20210112080510-489259a85091
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20200324154536-ceff61240acf
