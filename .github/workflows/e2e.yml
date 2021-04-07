@@ -12,19 +12,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        cable_driver: ['libreswan', 'wireguard']
         deploytool: ['operator']
         globalnet: ['', 'globalnet']
-        cable_driver: ['libreswan', 'wireguard']
-        ovn: ['', 'ovn']
         k8s_version: ['1.20.2']
-        exclude:
-          - ovn: 'ovn'
-            globalnet: 'globalnet'
-          - ovn: 'ovn'
-            cable_driver: 'wireguard'
+        ovn: ['']
         include:
           # This is the oldest K8s version we try to support
           - k8s_version: 1.17.17
+          - ovn: 'ovn'
+            k8s_version: 1.20.2
     steps:
       - name: Check out the repository
         uses: actions/checkout@v2
