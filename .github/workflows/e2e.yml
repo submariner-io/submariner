@@ -16,11 +16,15 @@ jobs:
         globalnet: ['', 'globalnet']
         cable_driver: ['libreswan', 'wireguard']
         ovn: ['', 'ovn']
+        k8s_version: ['1.20.2']
         exclude:
           - ovn: 'ovn'
             globalnet: 'globalnet'
           - ovn: 'ovn'
             cable_driver: 'wireguard'
+        include:
+          # This is the oldest K8s version we try to support
+          - k8s_version: 1.17.17
     steps:
       - name: Check out the repository
         uses: actions/checkout@v2
@@ -28,6 +32,7 @@ jobs:
       - name: Run E2E deployment and tests
         uses: submariner-io/shipyard/gh-actions/e2e@devel
         with:
+          k8s_version: ${{ matrix.k8s_version }}
           using: ${{ matrix.cable_driver }} ${{ matrix.deploytool }} ${{ matrix.globalnet }} ${{ matrix.ovn }}
 
       - name: Post mortem
