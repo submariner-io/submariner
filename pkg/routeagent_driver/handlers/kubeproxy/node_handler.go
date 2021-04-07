@@ -42,8 +42,6 @@ func (kp *SyncHandler) NodeCreated(node *k8sV1.Node) error {
 }
 
 func (kp *SyncHandler) NodeUpdated(node *k8sV1.Node) error {
-	klog.V(log.DEBUG).Infof("A Node with name %q and addresses %#v has been updated",
-		node.Name, node.Status.Addresses)
 	return nil
 }
 
