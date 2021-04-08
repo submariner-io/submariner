@@ -153,8 +153,8 @@ type Connection struct {
 	Status        ConnectionStatus `json:"status"`
 	StatusMessage string           `json:"statusMessage"`
 	Endpoint      EndpointSpec     `json:"endpoint"`
-	UsingIP       string           `json:"usingIP"`
-	UsingNAT      bool             `json:"usingNAT"`
+	UsingIP       string           `json:"usingIP,omitempty"`
+	UsingNAT      bool             `json:"usingNAT,omitempty"`
 	// +optional
 	LatencyRTT *LatencyRTTSpec `json:"latencyRTT,omitempty"`
 }
