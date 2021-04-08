@@ -16,6 +16,8 @@ limitations under the License.
 package tunnel
 
 import (
+	"time"
+
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -47,6 +49,10 @@ func StartController(engine cableengine.Engine, namespace string, config *watche
 		},
 	}
 
+	if config.ResyncPeriod == 0 {
+		config.ResyncPeriod = time.Second * 30
+	}
+
 	endpointWatcher, err := watcher.New(config)
 	if err != nil {
 		return err
@@ -74,8 +80,6 @@ func (c *controller) handleCreatedOrUpdatedEndpoint(obj runtime.Object, numReque
 		klog.Errorf("error installing cable for Endpoint %#v, %v", myEndpoint, err)
 		return true
 	}
-
-	klog.V(log.DEBUG).Infof("Tunnel controller successfully installed Endpoint cable %s in the engine", endpoint.Spec.CableName)
 
 	return false
 }

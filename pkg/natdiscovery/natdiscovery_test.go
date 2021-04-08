@@ -157,8 +157,12 @@ var _ = When("a remote Endpoint is added", func() {
 		})
 
 		Context("with no change to the Endpoint", func() {
-			It("should not restart discovery", func() {
-				Consistently(t.readyChannel).ShouldNot(Receive())
+			It("should notify with the original NATEndpointInfo settings", func() {
+				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
+					Endpoint: t.remoteEndpoint,
+					UseNAT:   false,
+					UseIP:    t.remoteEndpoint.Spec.PrivateIP,
+				})))
 			})
 		})
 
@@ -168,6 +172,46 @@ var _ = When("a remote Endpoint is added", func() {
 			})
 
 			It("should notify with new NATEndpointInfo settings", func() {
+				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
+					Endpoint: newRemoteEndpoint,
+					UseNAT:   false,
+					UseIP:    newRemoteEndpoint.Spec.PrivateIP,
+				})))
+			})
+		})
+	})
+
+	Context("and then re-added while discovery is in progress", func() {
+		var newRemoteEndpoint types.SubmarinerEndpoint
+
+		BeforeEach(func() {
+			forwardHowManyFromLocal = 0
+			t.remoteND.AddEndpoint(&t.localEndpoint)
+			newRemoteEndpoint = t.remoteEndpoint
+		})
+
+		JustBeforeEach(func() {
+			t.localND.AddEndpoint(&newRemoteEndpoint)
+		})
+
+		Context("with no change to the Endpoint", func() {
+			It("should not notify ready", func() {
+				Consistently(t.readyChannel).ShouldNot(Receive())
+			})
+		})
+
+		Context("with the Endpoint's private IP changed", func() {
+			BeforeEach(func() {
+				newRemoteEndpoint.Spec.PrivateIP = testRemotePrivateIP2
+			})
+
+			JustBeforeEach(func() {
+				t.remoteUDPAddr.IP = net.ParseIP(newRemoteEndpoint.Spec.PrivateIP)
+				forwardFromUDPChan(t.localUDPSent, t.localUDPAddr, t.remoteND, -1)
+				t.localND.checkEndpointList()
+			})
+
+			It("should notify with the correct NATEndpointInfo settings", func() {
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 					Endpoint: newRemoteEndpoint,
 					UseNAT:   false,

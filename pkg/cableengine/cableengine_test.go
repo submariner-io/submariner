@@ -200,7 +200,7 @@ var _ = Describe("Cable Engine", func() {
 			})
 
 			It("should return an error", func() {
-				Expect(engine.RemoveCable(*remoteEndpoint)).To(ContainErrorSubstring(fakeDriver.ErrOnDisconnectFromEndpoint))
+				Expect(engine.RemoveCable(*remoteEndpoint)).To(HaveOccurred())
 			})
 		})
 	})
