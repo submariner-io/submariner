@@ -163,12 +163,6 @@ func main() {
 		if err != nil {
 			klog.Errorf("Error creating healthChecker: %v", err)
 		}
-
-		err = cableHealthchecker.Start(stopCh)
-
-		if err != nil {
-			klog.Errorf("Error starting healthChecker: %v", err)
-		}
 	}
 
 	cableEngineSyncer := syncer.NewGatewaySyncer(
@@ -192,7 +186,7 @@ func main() {
 
 		var wg sync.WaitGroup
 
-		wg.Add(2)
+		wg.Add(3)
 
 		go func() {
 			defer wg.Done()
@@ -207,6 +201,14 @@ func main() {
 
 			if err = dsSyncer.Start(stopCh); err != nil {
 				fatal(cableEngineSyncer, "Error running the datastore syncer: %v", err)
+			}
+		}()
+
+		go func() {
+			defer wg.Done()
+
+			if err = cableHealthchecker.Start(stopCh); err != nil {
+				klog.Errorf("Error starting healthChecker: %v", err)
 			}
 		}()
 
