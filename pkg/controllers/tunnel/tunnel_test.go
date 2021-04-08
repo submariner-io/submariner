@@ -16,17 +16,21 @@ limitations under the License.
 package tunnel_test
 
 import (
-	"errors"
 	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	fakeEngine "github.com/submariner-io/submariner/pkg/cableengine/fake"
+	"github.com/submariner-io/submariner/pkg/cable"
+	"github.com/submariner-io/submariner/pkg/cable/fake"
+	"github.com/submariner-io/submariner/pkg/cableengine"
 	"github.com/submariner-io/submariner/pkg/controllers/tunnel"
+	"github.com/submariner-io/submariner/pkg/natdiscovery"
+	"github.com/submariner-io/submariner/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
@@ -43,17 +47,24 @@ func init() {
 	klog.InitFlags(nil)
 }
 
+var fakeDriver *fake.Driver
+
+var _ = BeforeSuite(func() {
+	cable.AddDriver(fake.DriverName, func(endpoint types.SubmarinerEndpoint, cluster types.SubmarinerCluster) (cable.Driver, error) {
+		return fakeDriver, nil
+	})
+})
+
 var _ = Describe("Managing tunnels", func() {
 	var (
-		engine    *fakeEngine.Engine
+		config    *watcher.Config
 		endpoints dynamic.ResourceInterface
-		clusters  dynamic.ResourceInterface
 		endpoint  *v1.Endpoint
 		stopCh    chan struct{}
 	)
 
 	BeforeEach(func() {
-		engine = fakeEngine.New()
+		fakeDriver = fake.New()
 
 		endpoint = &v1.Endpoint{
 			ObjectMeta: metav1.ObjectMeta{
@@ -66,10 +77,6 @@ var _ = Describe("Managing tunnels", func() {
 				Hostname:  "redsox",
 				PrivateIP: "192.68.1.2",
 			}}
-	})
-
-	JustBeforeEach(func() {
-		stopCh = make(chan struct{})
 
 		Expect(v1.AddToScheme(kubeScheme.Scheme)).To(Succeed())
 
@@ -83,76 +90,100 @@ var _ = Describe("Managing tunnels", func() {
 
 		endpoints = client.Resource(*gvr).Namespace(namespace)
 
-		clusters = client.Resource(*test.GetGroupVersionResourceFor(restMapper, &v1.Cluster{})).Namespace(namespace)
-
-		Expect(tunnel.StartController(engine, namespace, &watcher.Config{
+		config = &watcher.Config{
 			RestMapper: restMapper,
 			Client:     client,
 			Scheme:     scheme,
-		}, stopCh)).To(Succeed())
+		}
+	})
+
+	JustBeforeEach(func() {
+		engine := cableengine.NewEngine(types.SubmarinerCluster{}, types.SubmarinerEndpoint{
+			Spec: v1.EndpointSpec{
+				Backend: fake.DriverName,
+			},
+		})
+
+		nat, err := natdiscovery.New(&types.SubmarinerEndpoint{})
+		Expect(err).To(Succeed())
+
+		engine.SetupNATDiscovery(nat)
+
+		Expect(engine.StartEngine()).To(Succeed())
+
+		stopCh = make(chan struct{})
+
+		Expect(tunnel.StartController(engine, namespace, config, stopCh)).To(Succeed())
 	})
 
 	AfterEach(func() {
 		close(stopCh)
 	})
 
+	verifyConnectToEndpoint := func() {
+		fakeDriver.AwaitConnectToEndpoint(&natdiscovery.NATEndpointInfo{
+			UseIP:    endpoint.Spec.PrivateIP,
+			UseNAT:   false,
+			Endpoint: types.SubmarinerEndpoint{Spec: endpoint.Spec},
+		})
+	}
+
+	verifyDisconnectFromEndpoint := func() {
+		fakeDriver.AwaitDisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: endpoint.Spec})
+	}
+
 	When("an Endpoint is created", func() {
 		It("should install the cable", func() {
 			test.CreateResource(endpoints, endpoint)
-			engine.VerifyInstallCable(&endpoint.Spec)
-			test.CreateResource(clusters, &v1.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-cluster",
-				},
-			})
-			time.Sleep(1 * time.Second)
+			verifyConnectToEndpoint()
 		})
 	})
 
 	When("an Endpoint is updated", func() {
 		It("should install the cable", func() {
 			test.CreateResource(endpoints, endpoint)
-			engine.VerifyInstallCable(&endpoint.Spec)
+			verifyConnectToEndpoint()
 
 			endpoint.Spec.Subnets = []string{"100.0.0.0/16", "10.0.0.0/14"}
 			test.UpdateResource(endpoints, endpoint)
 
-			engine.VerifyInstallCable(&endpoint.Spec)
+			verifyConnectToEndpoint()
 		})
 	})
 
 	When("an Endpoint is deleted", func() {
 		It("should remove the cable", func() {
 			test.CreateResource(endpoints, endpoint)
-			engine.VerifyInstallCable(&endpoint.Spec)
+			verifyConnectToEndpoint()
 
 			Expect(endpoints.Delete(endpoint.Name, nil)).To(Succeed())
-			engine.VerifyRemoveCable(&endpoint.Spec)
+			verifyDisconnectFromEndpoint()
 		})
 	})
 
 	When("install cable initially fails", func() {
 		BeforeEach(func() {
-			engine.ErrOnInstallCable = errors.New("fake error")
+			config.ResyncPeriod = time.Millisecond * 500
+			fakeDriver.ErrOnConnectToEndpoint = errors.New("fake connect error")
 		})
 
 		It("should retry until it succeeds", func() {
 			test.CreateResource(endpoints, endpoint)
-			engine.VerifyInstallCable(&endpoint.Spec)
+			verifyConnectToEndpoint()
 		})
 	})
 
 	When("remove cable initially fails", func() {
 		BeforeEach(func() {
-			engine.ErrOnRemoveCable = errors.New("fake error")
+			fakeDriver.ErrOnDisconnectFromEndpoint = errors.New("fake disconnect error")
 		})
 
 		It("should retry until it succeeds", func() {
 			test.CreateResource(endpoints, endpoint)
-			engine.VerifyInstallCable(&endpoint.Spec)
+			verifyConnectToEndpoint()
 
 			Expect(endpoints.Delete(endpoint.Name, nil)).To(Succeed())
-			engine.VerifyRemoveCable(&endpoint.Spec)
+			verifyDisconnectFromEndpoint()
 		})
 	})
 })

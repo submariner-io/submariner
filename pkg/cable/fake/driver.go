@@ -16,6 +16,7 @@ limitations under the License.
 package fake
 
 import (
+	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -28,6 +29,7 @@ import (
 const DriverName = "fake-driver"
 
 type Driver struct {
+	sync.Mutex
 	init                        chan struct{}
 	ErrOnInit                   error
 	ActiveConnections           map[string]interface{}
@@ -81,13 +83,33 @@ func (d *Driver) GetConnections() ([]v1.Connection, error) {
 }
 
 func (d *Driver) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
+	d.Lock()
+	defer d.Unlock()
+
+	err := d.ErrOnConnectToEndpoint
+	if err != nil {
+		d.ErrOnConnectToEndpoint = nil
+		return "", err
+	}
+
 	d.connectToEndpoint <- endpointInfo
-	return endpointInfo.UseIP, d.ErrOnConnectToEndpoint
+
+	return endpointInfo.UseIP, nil
 }
 
 func (d *Driver) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) error {
+	d.Lock()
+	defer d.Unlock()
+
+	err := d.ErrOnDisconnectFromEndpoint
+	if err != nil {
+		d.ErrOnDisconnectFromEndpoint = nil
+		return err
+	}
+
 	d.disconnectFromEndpoint <- &endpoint
-	return d.ErrOnDisconnectFromEndpoint
+
+	return nil
 }
 
 func (d *Driver) GetName() string {

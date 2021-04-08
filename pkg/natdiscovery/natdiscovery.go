@@ -131,6 +131,10 @@ func (nd *natDiscovery) AddEndpoint(endpoint *types.SubmarinerEndpoint) {
 
 	if ep, exists := nd.remoteEndpoints[endpoint.Spec.CableName]; exists {
 		if reflect.DeepEqual(ep.endpoint.Spec, endpoint.Spec) {
+			if ep.isDiscoveryComplete() {
+				nd.readyChannel <- ep.toNATEndpointInfo()
+			}
+
 			return
 		} else {
 			klog.V(log.DEBUG).Infof("NAT discovery updated endpoint %q", endpoint.Spec.CableName)
@@ -148,6 +152,8 @@ func (nd *natDiscovery) AddEndpoint(endpoint *types.SubmarinerEndpoint) {
 
 		remoteNAT.useLegacyNATSettings()
 		nd.readyChannel <- remoteNAT.toNATEndpointInfo()
+	} else {
+		klog.Infof("Starting NAT discovery for endpoint %q", endpoint.Spec.CableName)
 	}
 
 	nd.remoteEndpoints[endpoint.Spec.CableName] = remoteNAT

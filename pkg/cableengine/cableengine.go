@@ -118,8 +118,7 @@ func (i *engine) SetupNATDiscovery(natDiscovery natdiscovery.Interface) {
 		for natEndpointInfo := range i.natEndpointInfoCh {
 			err := i.installCableWithNATInfo(natEndpointInfo)
 			if err != nil {
-				// TODO: we need retries with a workqueue
-				klog.Errorf("an error happened installing endpoint: %#v", natEndpointInfo)
+				klog.Errorf("Error installing cable for %#v: %v", natEndpointInfo, err)
 			}
 		}
 	}()
@@ -127,8 +126,6 @@ func (i *engine) SetupNATDiscovery(natDiscovery natdiscovery.Interface) {
 
 func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) error {
 	endpoint := rnat.Endpoint
-
-	klog.Infof("Installing Endpoint cable %q", endpoint.Spec.CableName)
 
 	i.Lock()
 	defer i.Unlock()
@@ -176,6 +173,8 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 		}
 	}
 
+	klog.Infof("Installing Endpoint cable %q", endpoint.Spec.CableName)
+
 	remoteEndpointIP, err := i.driver.ConnectToEndpoint(rnat)
 	if err != nil {
 		return err
@@ -203,8 +202,6 @@ func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 	i.natDiscoveryPending[endpoint.Spec.CableName]++
 	i.Unlock()
 
-	klog.Infof("Starting NAT discovery for cable: %q", endpoint.Spec.CableName)
-
 	i.natDiscovery.AddEndpoint(&endpoint)
 
 	return nil
@@ -225,7 +222,7 @@ func (i *engine) RemoveCable(endpoint types.SubmarinerEndpoint) error {
 
 	delete(i.natDiscoveryPending, endpoint.Spec.CableName)
 
-	if !i.installedCables.Remove(endpoint.Spec.CableName) {
+	if !i.installedCables.Contains(endpoint.Spec.CableName) {
 		return nil
 	}
 
@@ -233,6 +230,8 @@ func (i *engine) RemoveCable(endpoint types.SubmarinerEndpoint) error {
 	if err != nil {
 		return err
 	}
+
+	i.installedCables.Remove(endpoint.Spec.CableName)
 
 	klog.Infof("Successfully removed Endpoint cable %q", endpoint.Spec.CableName)
 

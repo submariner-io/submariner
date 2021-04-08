@@ -103,6 +103,10 @@ func (rn *remoteEndpointNAT) useLegacyNATSettings() {
 	}
 }
 
+func (rn *remoteEndpointNAT) isDiscoveryComplete() bool {
+	return rn.state == selectedPublicIP || rn.state == selectedPrivateIP
+}
+
 func (rn *remoteEndpointNAT) shouldCheck() bool {
 	switch rn.state {
 	case testingPrivateAndPublicIPs:
