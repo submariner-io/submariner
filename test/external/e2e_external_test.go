@@ -13,15 +13,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package e2e
+package external
 
 import (
 	"testing"
 
 	"github.com/submariner-io/shipyard/test/e2e"
-	_ "github.com/submariner-io/submariner/test/e2e/cluster"
-	_ "github.com/submariner-io/submariner/test/e2e/dataplane"
-	_ "github.com/submariner-io/submariner/test/e2e/redundancy"
+	_ "github.com/submariner-io/submariner/test/external/dataplane"
 )
 
 func TestE2E(t *testing.T) {

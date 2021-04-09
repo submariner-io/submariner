@@ -82,4 +82,4 @@ issues:
     - linters:
         - stylecheck
       text: "ST1001: "
-      path: test/e2e
+      path: test

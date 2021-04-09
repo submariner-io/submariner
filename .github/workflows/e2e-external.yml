@@ -17,5 +17,4 @@ jobs:
         uses: submariner-io/shipyard/gh-actions/e2e@devel
         with:
           plugin: '/go/src/github.com/submariner-io/submariner/scripts/e2e/external/hook'
-          focus: '\[external-dataplane\]'
-          skip: '\[dataplane\]'
+          testdir: 'test/external'

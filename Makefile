@@ -1,6 +1,6 @@
 restart ?= all
 FOCUS ?=
-SKIP ?= "\\[external-dataplane\\]"
+SKIP ?=
 PLUGIN ?=
 BASE_BRANCH ?= devel
 export BASE_BRANCH
@@ -27,7 +27,7 @@ override CLUSTERS_ARGS += $(CLUSTER_SETTINGS_FLAG)
 override DEPLOY_ARGS += $(CLUSTER_SETTINGS_FLAG)
 
 override E2E_ARGS += cluster2 cluster3 cluster1
-override UNIT_TEST_ARGS += test/e2e
+override UNIT_TEST_ARGS += test
 override VALIDATE_ARGS += --skip-dirs pkg/client
 
 # When cross-building, we need to map Go architectures and operating systems to Docker buildx platforms:
