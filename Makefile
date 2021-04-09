@@ -1,6 +1,6 @@
 restart ?= all
 FOCUS ?=
-SKIP ?= "\[external-dataplane\]"
+SKIP ?= "\\[external-dataplane\\]"
 PLUGIN ?=
 BASE_BRANCH ?= devel
 export BASE_BRANCH
