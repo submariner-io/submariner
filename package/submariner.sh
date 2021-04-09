@@ -14,8 +14,6 @@ else
     DEBUG="-v=${SUBMARINER_VERBOSITY}"
 fi
 
-mkdir -p /etc/ipsec
-
 sysctl -w net.ipv4.conf.all.send_redirects=0
 
 exec submariner-gateway ${DEBUG} -alsologtostderr
