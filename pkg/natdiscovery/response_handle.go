@@ -90,6 +90,6 @@ func (nd *natDiscovery) handleResponseFromAddress(req *proto.SubmarinerNatDiscov
 		return nil
 	}
 
-	return errors.Errorf("received response for unknown request id %d, lastPublicIPRequestID: %d, lastPrivateIPRequestID: %d",
+	return errors.Errorf("received response for unknown request id 0x%x, lastPublicIPRequestID: %d, lastPrivateIPRequestID: %d",
 		req.RequestNumber, remoteNat.lastPublicIPRequestID, remoteNat.lastPrivateIPRequestID)
 }
