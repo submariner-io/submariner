@@ -19,14 +19,14 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
-	"github.com/submariner-io/submariner/pkg/types"
 )
 
 var _ = When("a request is sent", func() {
 	var (
 		request        *natproto.SubmarinerNatDiscoveryRequest
-		remoteEndpoint types.SubmarinerEndpoint
+		remoteEndpoint submarinerv1.Endpoint
 		udpSent        chan []byte
 		ndInstance     *natDiscovery
 	)
@@ -43,7 +43,7 @@ var _ = When("a request is sent", func() {
 		ndInstance, udpSent, _ = createTestListener(&localEndpoint)
 		ndInstance.findSrcIP = func(_ string) string { return testLocalPrivateIP }
 
-		err := ndInstance.sendCheckRequest(newRemoteEndpointNAT(&types.SubmarinerEndpoint{Spec: remoteEndpoint.Spec}))
+		err := ndInstance.sendCheckRequest(newRemoteEndpointNAT(&remoteEndpoint))
 		Expect(err).NotTo(HaveOccurred())
 
 		request = parseProtocolRequest(awaitChan(udpSent))

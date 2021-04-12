@@ -82,7 +82,7 @@ func parseProtocolResponse(buf []byte) *natproto.SubmarinerNatDiscoveryResponse 
 	return response
 }
 
-func createTestListener(endpoint *types.SubmarinerEndpoint) (*natDiscovery, chan []byte, chan *NATEndpointInfo) {
+func createTestListener(endpoint *submarinerv1.Endpoint) (*natDiscovery, chan []byte, chan *NATEndpointInfo) {
 	listener, err := newNatDiscovery(&types.SubmarinerEndpoint{Spec: endpoint.Spec})
 	Expect(err).To(Succeed())
 
@@ -119,8 +119,8 @@ func forwardFromUDPChan(from chan []byte, addr *net.UDPAddr, to *natDiscovery, h
 	}()
 }
 
-func createTestLocalEndpoint() types.SubmarinerEndpoint {
-	return types.SubmarinerEndpoint{
+func createTestLocalEndpoint() submarinerv1.Endpoint {
+	return submarinerv1.Endpoint{
 		Spec: submarinerv1.EndpointSpec{
 			CableName:  testLocalEndpointName,
 			ClusterID:  testLocalClusterID,
@@ -134,8 +134,8 @@ func createTestLocalEndpoint() types.SubmarinerEndpoint {
 	}
 }
 
-func createTestRemoteEndpoint() types.SubmarinerEndpoint {
-	return types.SubmarinerEndpoint{
+func createTestRemoteEndpoint() submarinerv1.Endpoint {
+	return submarinerv1.Endpoint{
 		Spec: submarinerv1.EndpointSpec{
 			CableName:  testRemoteEndpointName,
 			ClusterID:  testRemoteClusterID,

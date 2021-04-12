@@ -36,7 +36,7 @@ import (
 
 type Interface interface {
 	Run(stopCh <-chan struct{}) error
-	AddEndpoint(endpoint *types.SubmarinerEndpoint)
+	AddEndpoint(endpoint *v1.Endpoint)
 	RemoveEndpoint(endpointName string)
 	GetReadyChannel() chan *NATEndpointInfo
 }
@@ -93,8 +93,8 @@ func randomRequestCounter() (uint64, error) {
 
 var errorNoNatDiscoveryPort = errors.New("natt discovery port missing in endpoint")
 
-func extractNATDiscoveryPort(endpoint *types.SubmarinerEndpoint) (int32, error) {
-	natDiscoveryPort, err := endpoint.Spec.GetBackendPort(v1.NATTDiscoveryPortConfig, 0)
+func extractNATDiscoveryPort(endpoint *v1.EndpointSpec) (int32, error) {
+	natDiscoveryPort, err := endpoint.GetBackendPort(v1.NATTDiscoveryPortConfig, 0)
 	if err != nil {
 		return natDiscoveryPort, err
 	}
@@ -125,7 +125,7 @@ func (nd *natDiscovery) Run(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (nd *natDiscovery) AddEndpoint(endpoint *types.SubmarinerEndpoint) {
+func (nd *natDiscovery) AddEndpoint(endpoint *v1.Endpoint) {
 	nd.Lock()
 	defer nd.Unlock()
 
@@ -145,7 +145,7 @@ func (nd *natDiscovery) AddEndpoint(endpoint *types.SubmarinerEndpoint) {
 	remoteNAT := newRemoteEndpointNAT(endpoint)
 
 	// support nat discovery disabled or a remote cluster endpoint which still hasn't implemented this protocol
-	if _, err := extractNATDiscoveryPort(endpoint); err != nil || nd.serverPort == 0 {
+	if _, err := extractNATDiscoveryPort(&endpoint.Spec); err != nil || nd.serverPort == 0 {
 		if err != errorNoNatDiscoveryPort {
 			klog.Errorf("Error extracting NATT discovery port from endpoint %q: %v", endpoint.Spec.CableName, err)
 		}

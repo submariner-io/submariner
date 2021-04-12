@@ -302,7 +302,7 @@ func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 		return "", fmt.Errorf("error listening: %v", err)
 	}
 
-	connectionMode := i.calculateOperationMode(endpoint)
+	connectionMode := i.calculateOperationMode(&endpoint.Spec)
 
 	klog.Infof("Creating connection(s) for %v in %s mode", endpoint, connectionMode)
 
