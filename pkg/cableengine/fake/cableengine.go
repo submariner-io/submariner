@@ -52,7 +52,7 @@ func (e *Engine) StartEngine() error {
 	return nil
 }
 
-func (e *Engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
+func (e *Engine) InstallCable(endpoint *v1.Endpoint) error {
 	err := e.ErrOnInstallCable
 	if err != nil {
 		e.ErrOnInstallCable = nil
@@ -64,7 +64,7 @@ func (e *Engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 	return nil
 }
 
-func (e *Engine) RemoveCable(endpoint types.SubmarinerEndpoint) error {
+func (e *Engine) RemoveCable(endpoint *v1.Endpoint) error {
 	err := e.ErrOnRemoveCable
 	if err != nil {
 		e.ErrOnRemoveCable = nil

@@ -22,7 +22,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/watcher"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cableengine"
-	"github.com/submariner-io/submariner/pkg/types"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog"
 )
@@ -71,13 +70,9 @@ func (c *controller) handleCreatedOrUpdatedEndpoint(obj runtime.Object, numReque
 
 	klog.V(log.DEBUG).Infof("Tunnel controller processing added or updated submariner Endpoint object: %#v", endpoint)
 
-	myEndpoint := types.SubmarinerEndpoint{
-		Spec: endpoint.Spec,
-	}
-
-	err := c.engine.InstallCable(myEndpoint)
+	err := c.engine.InstallCable(endpoint)
 	if err != nil {
-		klog.Errorf("error installing cable for Endpoint %#v, %v", myEndpoint, err)
+		klog.Errorf("error installing cable for Endpoint %#v, %v", endpoint, err)
 		return true
 	}
 
@@ -89,12 +84,8 @@ func (c *controller) handleRemovedEndpoint(obj runtime.Object, numRequeues int) 
 
 	klog.V(log.DEBUG).Infof("Tunnel controller processing removed submariner Endpoint object: %#v", endpoint)
 
-	myEndpoint := types.SubmarinerEndpoint{
-		Spec: endpoint.Spec,
-	}
-
-	if err := c.engine.RemoveCable(myEndpoint); err != nil {
-		klog.Errorf("Tunnel controller failed to remove Endpoint cable %#v from the engine: %v", myEndpoint, err)
+	if err := c.engine.RemoveCable(endpoint); err != nil {
+		klog.Errorf("Tunnel controller failed to remove Endpoint cable %#v from the engine: %v", endpoint, err)
 		return true
 	}
 

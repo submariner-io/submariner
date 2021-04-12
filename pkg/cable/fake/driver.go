@@ -128,8 +128,8 @@ func (d *Driver) AwaitNoConnectToEndpoint() {
 	Consistently(d.connectToEndpoint, 500*time.Millisecond).ShouldNot(Receive(), "ConnectToEndpoint was unexpectedly called")
 }
 
-func (d *Driver) AwaitDisconnectFromEndpoint(expected *types.SubmarinerEndpoint) {
-	Eventually(d.disconnectFromEndpoint, 5).Should(Receive(Equal(expected)))
+func (d *Driver) AwaitDisconnectFromEndpoint(expected *v1.EndpointSpec) {
+	Eventually(d.disconnectFromEndpoint, 5).Should(Receive(Equal(&types.SubmarinerEndpoint{Spec: *expected})))
 }
 
 func (d *Driver) AwaitNoDisconnectFromEndpoint() {

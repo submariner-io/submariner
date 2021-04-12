@@ -44,10 +44,10 @@ type Engine interface {
 	// InstallCable performs any set up work needed for connecting to given remote endpoint.
 	// Once InstallCable completes, it should be possible to connect to remote
 	// Pods or Services behind the given endpoint.
-	InstallCable(remote types.SubmarinerEndpoint) error
+	InstallCable(remote *v1.Endpoint) error
 	// RemoveCable disconnects the Engine from the given remote endpoint. Upon completion.
 	// remote Pods and Service may not be accessible any more.
-	RemoveCable(remote types.SubmarinerEndpoint) error
+	RemoveCable(remote *v1.Endpoint) error
 	// ListCableConnections returns a list of cable connection, and the related status
 	ListCableConnections() ([]v1.Connection, error)
 	// GetLocalEndpoint returns the local endpoint for this cable engine
@@ -187,7 +187,7 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 	return nil
 }
 
-func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
+func (i *engine) InstallCable(endpoint *v1.Endpoint) error {
 	if endpoint.Spec.ClusterID == i.localCluster.ID {
 		klog.V(log.DEBUG).Infof("Not installing cable for local cluster")
 		return nil
@@ -202,12 +202,12 @@ func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 	i.natDiscoveryPending[endpoint.Spec.CableName]++
 	i.Unlock()
 
-	i.natDiscovery.AddEndpoint(&endpoint)
+	i.natDiscovery.AddEndpoint(endpoint)
 
 	return nil
 }
 
-func (i *engine) RemoveCable(endpoint types.SubmarinerEndpoint) error {
+func (i *engine) RemoveCable(endpoint *v1.Endpoint) error {
 	if endpoint.Spec.ClusterID == i.localCluster.ID {
 		klog.V(log.DEBUG).Infof("Cables are not added/removed for the local cluster, skipping removal")
 		return nil
@@ -226,7 +226,7 @@ func (i *engine) RemoveCable(endpoint types.SubmarinerEndpoint) error {
 		return nil
 	}
 
-	err := i.driver.DisconnectFromEndpoint(endpoint)
+	err := i.driver.DisconnectFromEndpoint(types.SubmarinerEndpoint{Spec: endpoint.Spec})
 	if err != nil {
 		return err
 	}
