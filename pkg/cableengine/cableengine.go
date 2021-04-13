@@ -145,37 +145,41 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 	for _, active := range activeConnections {
 		klog.V(log.TRACE).Infof("Analyzing currently active connection %q", active.Endpoint.CableName)
 
-		disconnect := false
-
-		if active.Endpoint.CableName == endpoint.Spec.CableName {
-			// There could be scenarios where the cableName would be the same but the
-			// PublicIP of the active GatewayNode changes.
-			if active.UsingIP == rnat.UseIP && active.UsingNAT == rnat.UseNAT {
-				klog.V(log.DEBUG).Infof("Cable %q is already installed - not installing again", active.Endpoint.CableName)
-				return nil
-			} else {
-				klog.V(log.DEBUG).Infof("Cable %q is already installed - but connection details changed", active.Endpoint.CableName)
-				disconnect = true
-			}
-		} else if active.Endpoint.ClusterID == endpoint.Spec.ClusterID {
-			klog.V(log.DEBUG).Infof("Found a pre-existing cable %q that belongs to this cluster %s",
-				active.Endpoint.CableName, endpoint.Spec.ClusterID)
-
-			prevTimestamp := i.installedCables[active.Endpoint.CableName]
-			if prevTimestamp.Before(&endpoint.CreationTimestamp) {
-				disconnect = true
-			} else {
-				klog.V(log.DEBUG).Infof("New cable timestamp (%s) is older than the pre-existing one (%s) - not replacing",
-					endpoint.CreationTimestamp, prevTimestamp)
-				return nil
-			}
+		if active.Endpoint.ClusterID != endpoint.Spec.ClusterID {
+			continue
 		}
 
-		if disconnect {
-			err = i.driver.DisconnectFromEndpoint(types.SubmarinerEndpoint{Spec: active.Endpoint})
-			if err != nil {
-				return err
+		prevTimestamp := i.installedCables[active.Endpoint.CableName]
+
+		klog.V(log.DEBUG).Infof("Found a pre-existing cable %q with timestamp %q that belongs to this cluster %s",
+			active.Endpoint.CableName, prevTimestamp, endpoint.Spec.ClusterID)
+
+		if endpoint.CreationTimestamp.Before(&prevTimestamp) {
+			klog.Warningf("The timestamp (%s) for new cable %q is older than the timestamp (%s) of the pre-existing "+
+				"cable %q - not replacing", endpoint.CreationTimestamp, endpoint.Spec.CableName, prevTimestamp, active.Endpoint.CableName)
+			return nil
+		}
+
+		if endpoint.CreationTimestamp.Equal(&prevTimestamp) && active.Endpoint.CableName == endpoint.Spec.CableName {
+			// There could be scenarios where the cableName would be the same but the endpoint IP or specific driver
+			// config has changed.
+			if active.UsingIP == rnat.UseIP && active.UsingNAT == rnat.UseNAT &&
+				reflect.DeepEqual(active.Endpoint.BackendConfig, endpoint.Spec.BackendConfig) {
+				klog.V(log.DEBUG).Infof("Connection info (IP: %s, NAT: %v, BackendConfig: %v) for cable %q is unchanged"+
+					" - not re-installing", active.UsingIP, active.UsingNAT, active.Endpoint.BackendConfig, active.Endpoint.CableName)
+				return nil
 			}
+
+			klog.V(log.DEBUG).Infof("New connection info (IP: %s, NAT: %v, BackendConfig: %v) for cable %q differs from"+
+				" previous (IP: %s, NAT: %v, BackendConfig: %v) - re-installing", rnat.UseIP, rnat.UseNAT, active.Endpoint.BackendConfig,
+				active.Endpoint.CableName, active.UsingIP, active.UsingNAT, endpoint.Spec.BackendConfig)
+		}
+
+		klog.V(log.DEBUG).Infof("Disconnecting pre-existing cable %q", active.Endpoint.CableName)
+
+		err = i.driver.DisconnectFromEndpoint(types.SubmarinerEndpoint{Spec: active.Endpoint})
+		if err != nil {
+			return err
 		}
 	}
 

@@ -79,10 +79,11 @@ var _ = Describe("Cable Engine", func() {
 				CreationTimestamp: metav1.Now(),
 			},
 			Spec: subv1.EndpointSpec{
-				ClusterID: remoteClusterID,
-				CableName: fmt.Sprintf("submariner-cable-%s-1.1.1.1", remoteClusterID),
-				PrivateIP: "1.1.1.1",
-				PublicIP:  "2.2.2.2",
+				ClusterID:     remoteClusterID,
+				CableName:     fmt.Sprintf("submariner-cable-%s-1.1.1.1", remoteClusterID),
+				PrivateIP:     "1.1.1.1",
+				PublicIP:      "2.2.2.2",
+				BackendConfig: map[string]string{"port": "1234"},
 			},
 		}
 
@@ -142,12 +143,8 @@ var _ = Describe("Cable Engine", func() {
 				Expect(engine.InstallCable(newEndpoint)).To(Succeed())
 			})
 
-			Context("and it's a different endpoint", func() {
-				BeforeEach(func() {
-					newEndpoint.Spec.CableName = "new cable"
-				})
-
-				Context("with an older creation timestamp", func() {
+			testTimestamps := func() {
+				Context("and older creation timestamp", func() {
 					BeforeEach(func() {
 						time.Sleep(100 * time.Millisecond)
 						newEndpoint.CreationTimestamp = metav1.Now()
@@ -159,7 +156,7 @@ var _ = Describe("Cable Engine", func() {
 					})
 				})
 
-				Context("with a newer creation timestamp", func() {
+				Context("and newer creation timestamp", func() {
 					BeforeEach(func() {
 						newEndpoint.CreationTimestamp = metav1.Now()
 						time.Sleep(100 * time.Millisecond)
@@ -171,22 +168,46 @@ var _ = Describe("Cable Engine", func() {
 						fakeDriver.AwaitNoConnectToEndpoint()
 					})
 				})
-			})
+			}
 
-			Context("and it's the same endpoint", func() {
-				It("should not connect to the endpoint again", func() {
-					fakeDriver.AwaitNoConnectToEndpoint()
-				})
-			})
-
-			Context("and it's the same endpoint but with a different public IP", func() {
+			Context("with a different cable name", func() {
 				BeforeEach(func() {
-					newEndpoint.Spec.PublicIP = "3.3.3.3"
+					newEndpoint.Spec.CableName = "new cable"
 				})
 
-				It("should disconnect from the previous endpoint and connect to the new one", func() {
-					fakeDriver.AwaitDisconnectFromEndpoint(&prevEndpoint.Spec)
-					fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(newEndpoint))
+				testTimestamps()
+			})
+
+			Context("with the same cable name", func() {
+				testTimestamps()
+
+				Context("but different endpoint IP", func() {
+					BeforeEach(func() {
+						newEndpoint.Spec.PublicIP = "3.3.3.3"
+					})
+
+					It("should disconnect from the previous endpoint and connect to the new one", func() {
+						fakeDriver.AwaitDisconnectFromEndpoint(&prevEndpoint.Spec)
+						fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(newEndpoint))
+					})
+				})
+
+				Context("but different backend configuration", func() {
+					BeforeEach(func() {
+						newEndpoint.Spec.BackendConfig = map[string]string{"port": "6789"}
+					})
+
+					It("should disconnect from the previous endpoint and connect to the new one", func() {
+						fakeDriver.AwaitDisconnectFromEndpoint(&prevEndpoint.Spec)
+						fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(newEndpoint))
+					})
+				})
+
+				Context(" and connection info", func() {
+					It("should not disconnect from the previous endpoint nor connect to the new one", func() {
+						fakeDriver.AwaitNoDisconnectFromEndpoint()
+						fakeDriver.AwaitNoConnectToEndpoint()
+					})
 				})
 			})
 		})
@@ -196,8 +217,7 @@ var _ = Describe("Cable Engine", func() {
 				otherEndpoint := subv1.Endpoint{Spec: subv1.EndpointSpec{
 					ClusterID: "other",
 					CableName: "submariner-cable-other-1.1.1.1",
-				},
-				}
+				}}
 
 				Expect(engine.InstallCable(&otherEndpoint)).To(Succeed())
 				fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(&otherEndpoint))
