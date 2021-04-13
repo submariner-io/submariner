@@ -35,7 +35,7 @@ func (nd *natDiscovery) handleResponseFromAddress(req *proto.SubmarinerNatDiscov
 		return errors.Errorf("received malformed response %#v", req)
 	}
 
-	if req.Response != proto.ResponseType_OK && req.Response != proto.ResponseType_SRC_MODIFIED {
+	if req.Response != proto.ResponseType_OK && req.Response != proto.ResponseType_NAT_DETECTED {
 		var ok bool
 		var name string
 
@@ -56,7 +56,7 @@ func (nd *natDiscovery) handleResponseFromAddress(req *proto.SubmarinerNatDiscov
 
 	// response to a PublicIP request
 	if remoteNat.lastPublicIPRequestID == req.RequestNumber {
-		useNAT := req.Response == proto.ResponseType_SRC_MODIFIED
+		useNAT := req.Response == proto.ResponseType_NAT_DETECTED
 		if !remoteNat.transitionToPublicIP(req.GetSender().EndpointId, useNAT) {
 			return nil
 		}
@@ -74,12 +74,12 @@ func (nd *natDiscovery) handleResponseFromAddress(req *proto.SubmarinerNatDiscov
 				req.GetSender().EndpointId, remoteNat.endpoint.Spec.PrivateIP, addr.IP)
 		}
 
-		if req.Response == proto.ResponseType_SRC_MODIFIED {
+		if req.Response == proto.ResponseType_NAT_DETECTED {
 			klog.Warningf("response for NAT discovery on endpoint %q private IP %q says src was modified which is unexpected",
 				req.GetSender().EndpointId, remoteNat.endpoint.Spec.PrivateIP)
 		}
 
-		useNAT := req.Response == proto.ResponseType_SRC_MODIFIED
+		useNAT := req.Response == proto.ResponseType_NAT_DETECTED
 
 		if !remoteNat.transitionToPrivateIP(req.GetSender().EndpointId, useNAT) {
 			return nil

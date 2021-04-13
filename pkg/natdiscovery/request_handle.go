@@ -77,9 +77,7 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNatDiscove
 			req.Sender.GetEndpointId(), req.Sender.GetClusterId())
 		klog.V(log.DEBUG).Infof("Original src IP was %q, received src IP is %q", req.UsingSrc.IP, addr.IP.String())
 
-		response.Response = proto.ResponseType_SRC_MODIFIED
-
-		return nd.sendResponseToAddress(&response, addr)
+		response.SrcIpNatDetected = true
 	}
 
 	if int(req.UsingSrc.Port) != addr.Port {
@@ -88,12 +86,21 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNatDiscove
 			req.Sender.GetEndpointId(), req.Sender.GetClusterId())
 		klog.V(log.DEBUG).Infof("Original src IP was %q, received src IP is %q", req.UsingSrc.IP, addr.IP.String())
 
-		response.Response = proto.ResponseType_SRC_MODIFIED
-
-		return nd.sendResponseToAddress(&response, addr)
+		response.SrcPortNatDetected = true
 	}
 
-	response.Response = proto.ResponseType_OK
+	// Detect DST NAT with a naive implementation that assumes that we always receive on the PrivateIP,
+	// if we will listen at some point on multiple addresses we will need to implement the
+	// unix.IP_RECVORIGDSTADDR on the UDP socket, and the go recvmsg implementation instead of readfrom
+	if req.UsingDst.IP != nd.localEndpoint.Spec.PrivateIP {
+		response.DstIpNatDetected = true
+	}
+
+	if response.SrcPortNatDetected || response.SrcIpNatDetected || response.DstIpNatDetected {
+		response.Response = proto.ResponseType_NAT_DETECTED
+	} else {
+		response.Response = proto.ResponseType_OK
+	}
 
 	return nd.sendResponseToAddress(&response, addr)
 }
