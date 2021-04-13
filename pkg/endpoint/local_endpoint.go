@@ -21,6 +21,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rdegges/go-ipify"
@@ -103,12 +104,19 @@ func getBackendConfig(nodeObj *v1.Node) (map[string]string, error) {
 		preferredServerStr = "false"
 	}
 
-	_, err = strconv.ParseBool(preferredServerStr)
+	preferredServer, err := strconv.ParseBool(preferredServerStr)
 	if err != nil {
 		return backendConfig, errors.Wrapf(err, "error parsing CE_IPSEC_PREFERREDSERVER bool: %s", preferredServerStr)
 	}
 
 	backendConfig[submv1.PreferredServerConfig] = preferredServerStr
+
+	// When this Endpoint is in "preferred-server" mode a bogus timestamp is inserted in the BackendConfig,
+	// forcing the resynchronization of the object to the broker, which will indicate all clients that the
+	// server has been restarted, and that they must re-connect to the endpoint.
+	if preferredServer {
+		backendConfig[submv1.PreferredServerConfig+"-timestamp"] = strconv.FormatInt(time.Now().UTC().Unix(), 10)
+	}
 
 	return backendConfig, nil
 }
