@@ -32,7 +32,7 @@ type Driver struct {
 	sync.Mutex
 	init                        chan struct{}
 	ErrOnInit                   error
-	ActiveConnections           map[string]interface{}
+	activeConnections           map[string]v1.Connection
 	Connections                 interface{}
 	connectToEndpoint           chan *natdiscovery.NATEndpointInfo
 	ErrOnConnectToEndpoint      error
@@ -43,7 +43,7 @@ type Driver struct {
 func New() *Driver {
 	return &Driver{
 		init:                   make(chan struct{}),
-		ActiveConnections:      map[string]interface{}{},
+		activeConnections:      map[string]v1.Connection{},
 		connectToEndpoint:      make(chan *natdiscovery.NATEndpointInfo, 50),
 		disconnectFromEndpoint: make(chan *types.SubmarinerEndpoint, 50),
 	}
@@ -57,20 +57,16 @@ func (d *Driver) Init() error {
 	return d.ErrOnInit
 }
 
-func (d *Driver) GetActiveConnections(clusterID string) ([]v1.Connection, error) {
+func (d *Driver) GetActiveConnections() ([]v1.Connection, error) {
 	d.Lock()
 	defer d.Unlock()
 
-	value, ok := d.ActiveConnections[clusterID]
-	if ok {
-		if err, ok := value.(error); ok {
-			return nil, err
-		}
-
-		return value.([]v1.Connection), nil
+	ret := []v1.Connection{}
+	for _, c := range d.activeConnections {
+		ret = append(ret, c)
 	}
 
-	return nil, nil
+	return ret, nil
 }
 
 func (d *Driver) GetConnections() ([]v1.Connection, error) {
@@ -95,8 +91,8 @@ func (d *Driver) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (
 		return "", err
 	}
 
-	d.ActiveConnections[endpointInfo.Endpoint.Spec.ClusterID] = []v1.Connection{
-		{Endpoint: endpointInfo.Endpoint.Spec, UsingIP: endpointInfo.Endpoint.Spec.PublicIP, UsingNAT: true}}
+	d.activeConnections[endpointInfo.Endpoint.Spec.CableName] = v1.Connection{
+		Endpoint: endpointInfo.Endpoint.Spec, UsingIP: endpointInfo.Endpoint.Spec.PublicIP, UsingNAT: true}
 
 	d.connectToEndpoint <- endpointInfo
 
@@ -113,7 +109,7 @@ func (d *Driver) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) error
 		return err
 	}
 
-	delete(d.ActiveConnections, endpoint.Spec.ClusterID)
+	delete(d.activeConnections, endpoint.Spec.CableName)
 
 	d.disconnectFromEndpoint <- &endpoint
 
