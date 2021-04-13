@@ -25,6 +25,11 @@ import (
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 )
 
+const (
+	natExpected    = true
+	natNotExpected = false
+)
+
 var _ = When("a remote Endpoint is added", func() {
 	var forwardHowManyFromLocal int
 
@@ -45,7 +50,7 @@ var _ = When("a remote Endpoint is added", func() {
 	})
 
 	Context("with only the private IP set", func() {
-		t.testRemoteEndpointAdded(testRemotePrivateIP)
+		t.testRemoteEndpointAdded(testRemotePrivateIP, natNotExpected)
 	})
 
 	Context("with only the public IP set", func() {
@@ -54,7 +59,7 @@ var _ = When("a remote Endpoint is added", func() {
 			t.remoteEndpoint.Spec.PrivateIP = ""
 		})
 
-		t.testRemoteEndpointAdded(testRemotePublicIP)
+		t.testRemoteEndpointAdded(testRemotePublicIP, natExpected)
 	})
 
 	Context("with both the public IP and private IP set", func() {
@@ -78,7 +83,7 @@ var _ = When("a remote Endpoint is added", func() {
 
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 					Endpoint: t.remoteEndpoint,
-					UseNAT:   false,
+					UseNAT:   true,
 					UseIP:    t.remoteEndpoint.Spec.PublicIP,
 				})))
 
@@ -100,7 +105,7 @@ var _ = When("a remote Endpoint is added", func() {
 
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 					Endpoint: t.remoteEndpoint,
-					UseNAT:   false,
+					UseNAT:   true,
 					UseIP:    t.remoteEndpoint.Spec.PublicIP,
 				})))
 
@@ -168,6 +173,7 @@ var _ = When("a remote Endpoint is added", func() {
 		Context("with the Endpoint's private IP changed", func() {
 			BeforeEach(func() {
 				newRemoteEndpoint.Spec.PrivateIP = testRemotePrivateIP2
+				t.remoteND.localEndpoint.Spec.PrivateIP = testRemotePrivateIP2
 			})
 
 			It("should notify with new NATEndpointInfo settings", func() {
@@ -202,6 +208,7 @@ var _ = When("a remote Endpoint is added", func() {
 		Context("with the Endpoint's private IP changed", func() {
 			BeforeEach(func() {
 				newRemoteEndpoint.Spec.PrivateIP = testRemotePrivateIP2
+				t.remoteND.localEndpoint.Spec.PrivateIP = testRemotePrivateIP2
 			})
 
 			JustBeforeEach(func() {
@@ -334,7 +341,7 @@ func newDiscoveryTestDriver() *discoveryTestDriver {
 	return t
 }
 
-func (t *discoveryTestDriver) testRemoteEndpointAdded(expIP string) {
+func (t *discoveryTestDriver) testRemoteEndpointAdded(expIP string, expectNAT bool) {
 	BeforeEach(func() {
 		t.remoteND.AddEndpoint(&t.localEndpoint)
 	})
@@ -342,7 +349,7 @@ func (t *discoveryTestDriver) testRemoteEndpointAdded(expIP string) {
 	It("should notify with the correct NATEndpointInfo settings and stop the discovery", func() {
 		Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 			Endpoint: t.remoteEndpoint,
-			UseNAT:   false,
+			UseNAT:   expectNAT,
 			UseIP:    expIP,
 		})))
 

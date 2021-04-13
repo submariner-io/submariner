@@ -41,10 +41,10 @@ message SubmarinerNatDiscoveryRequest {
 
 enum ResponseType {
   OK = 0;
-  SRC_MODIFIED = 1;
+  NAT_DETECTED = 1;
   UNKNOWN_DST_CLUSTER = 2;
   UNKNOWN_DST_ENDPOINT = 3;
-  MALFORMED = 5;
+  MALFORMED = 4;
 }
 
 message SubmarinerNatDiscoveryResponse {
@@ -54,9 +54,13 @@ message SubmarinerNatDiscoveryResponse {
   EndpointDetails sender = 3;
   EndpointDetails receiver = 4;
 
+  bool src_ip_nat_detected = 5;
+  bool src_port_nat_detected = 6;
+  bool dst_ip_nat_detected = 7;
+
   // The received SRC IP / SRC port is reported, which will be useful for
   // diagnosing corner cases
-  IPPortPair received_src = 5;
+  IPPortPair received_src = 8;
 }
 
 message IPPortPair {

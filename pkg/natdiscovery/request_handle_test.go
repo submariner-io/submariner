@@ -72,24 +72,32 @@ var _ = Describe("Request handling", func() {
 			localListener.AddEndpoint(&remoteEndpoint)
 			response := requestResponseFromRemoteToLocal(&remoteUDPAddr)
 			Expect(response[0].Response).To(Equal(natproto.ResponseType_OK))
-			Expect(response[1].Response).To(Equal(natproto.ResponseType_OK))
+			Expect(response[1].Response).To(Equal(natproto.ResponseType_NAT_DETECTED))
+			Expect(response[1].DstIpNatDetected).To(BeTrue())
+			Expect(response[1].SrcIpNatDetected).To(BeFalse())
+			Expect(response[1].SrcPortNatDetected).To(BeFalse())
+
 		})
 
 		Context("with a modified IP", func() {
-			It("should respond with SRC_MODIFIED", func() {
+			It("should respond with NAT_DETECTED and SrcIpNatDetected", func() {
 				remoteUDPAddr.IP = net.ParseIP(testRemotePublicIP)
 				localListener.AddEndpoint(&remoteEndpoint)
 				response := requestResponseFromRemoteToLocal(&remoteUDPAddr)
-				Expect(response[0].Response).To(Equal(natproto.ResponseType_SRC_MODIFIED))
+				Expect(response[0].Response).To(Equal(natproto.ResponseType_NAT_DETECTED))
+				Expect(response[0].SrcIpNatDetected).To(BeTrue())
+				Expect(response[0].SrcPortNatDetected).To(BeFalse())
 			})
 		})
 
 		Context("with a modified port", func() {
-			It("should respond with SRC_MODIFIED", func() {
+			It("should respond with NAT_DETECTED and SrcPortNatDetected", func() {
 				remoteUDPAddr.Port = int(testRemoteNATPort + 1)
 				localListener.AddEndpoint(&remoteEndpoint)
 				response := requestResponseFromRemoteToLocal(&remoteUDPAddr)
-				Expect(response[0].Response).To(Equal(natproto.ResponseType_SRC_MODIFIED))
+				Expect(response[0].Response).To(Equal(natproto.ResponseType_NAT_DETECTED))
+				Expect(response[0].SrcIpNatDetected).To(BeFalse())
+				Expect(response[0].SrcPortNatDetected).To(BeTrue())
 			})
 		})
 	})
