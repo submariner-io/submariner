@@ -111,14 +111,14 @@ func (nd *natDiscovery) GetReadyChannel() chan *NATEndpointInfo {
 }
 
 func (nd *natDiscovery) Run(stopCh <-chan struct{}) error {
-	klog.V(log.DEBUG).Info("NAT starting listener")
+	klog.V(log.DEBUG).Infof("NAT discovery server starting on port %d", nd.serverPort)
 
 	if err := nd.runListener(stopCh); err != nil {
 		return err
 	}
 
 	go wait.Until(func() {
-		klog.V(log.TRACE).Info("NAT checking endpoint list")
+		klog.V(log.TRACE).Info("NAT discovery checking endpoint list")
 		nd.checkEndpointList()
 	}, time.Second, stopCh)
 
