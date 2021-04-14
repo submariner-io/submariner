@@ -436,7 +436,8 @@ func (i *Controller) handleRemovedService(obj interface{}) {
 				klog.Errorf("Error while cleaning up Service %q ingress rules. %v", key, err)
 			}
 		} else if i.isServiceSupported(service) {
-			klog.Errorf("Error: handleRemovedService called for %q, but globalIP annotation is missing.", key)
+			svcKey := service.Namespace + "/" + service.Name
+			klog.Warningf("HandleRemovedService called for %q, but globalIP annotation is missing.", svcKey)
 		}
 	}
 }
