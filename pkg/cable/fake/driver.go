@@ -92,9 +92,6 @@ func (d *Driver) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (
 		return "", err
 	}
 
-	d.ActiveConnections[endpointInfo.Endpoint.Spec.ClusterID] = []v1.Connection{
-		{Endpoint: endpointInfo.Endpoint.Spec, UsingIP: endpointInfo.Endpoint.Spec.PublicIP, UsingNAT: true}}
-
 	d.connectToEndpoint <- endpointInfo
 
 	return endpointInfo.UseIP, nil
@@ -109,8 +106,6 @@ func (d *Driver) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) error
 		d.ErrOnDisconnectFromEndpoint = nil
 		return err
 	}
-
-	delete(d.ActiveConnections, endpoint.Spec.ClusterID)
 
 	d.disconnectFromEndpoint <- &endpoint
 
