@@ -58,6 +58,9 @@ func (d *Driver) Init() error {
 }
 
 func (d *Driver) GetActiveConnections(clusterID string) ([]v1.Connection, error) {
+	d.Lock()
+	defer d.Unlock()
+
 	value, ok := d.ActiveConnections[clusterID]
 	if ok {
 		if err, ok := value.(error); ok {
