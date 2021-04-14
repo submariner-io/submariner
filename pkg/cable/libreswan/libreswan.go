@@ -246,11 +246,10 @@ func (i *libreswan) GetConnections() ([]subv1.Connection, error) {
 }
 
 func extractSubnets(endpoint subv1.EndpointSpec) []string {
-	// Subnets
-	subnets := []string{endpoint.PrivateIP + "/32"}
+	subnets := make([]string, 0, len(endpoint.Subnets))
 
 	for _, subnet := range endpoint.Subnets {
-		if !strings.HasPrefix(subnet, endpoint.PrivateIP) {
+		if !strings.HasPrefix(subnet, endpoint.PrivateIP+"/") {
 			subnets = append(subnets, subnet)
 		}
 	}
