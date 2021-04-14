@@ -28,8 +28,8 @@ import (
 )
 
 func (nd *natDiscovery) handleResponseFromAddress(req *proto.SubmarinerNatDiscoveryResponse, addr *net.UDPAddr) error {
-	klog.V(log.DEBUG).Infof("Received response from %s - REQUEST_NUMBER: 0x%x, RESPONSE: %v, SENDER: %q, RECEIVER: %q",
-		addr.IP.String(), req.RequestNumber, req.Response, req.Sender.EndpointId, req.Receiver.EndpointId)
+	klog.V(log.DEBUG).Infof("Received response from %s:%d - REQUEST_NUMBER: 0x%x, RESPONSE: %v, SENDER: %q, RECEIVER: %q",
+		addr.IP.String(), addr.Port, req.RequestNumber, req.Response, req.Sender.EndpointId, req.Receiver.EndpointId)
 
 	if req.GetSender() == nil || req.GetReceiver() == nil || req.GetReceivedSrc() == nil {
 		return errors.Errorf("received malformed response %#v", req)
