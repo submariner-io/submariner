@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/types"
 )
 
 var _ = When("a remote Endpoint is added", func() {
@@ -138,7 +139,7 @@ var _ = When("a remote Endpoint is added", func() {
 	})
 
 	Context("and then re-added after discovery is complete", func() {
-		var newRemoteEndpoint submarinerv1.Endpoint
+		var newRemoteEndpoint types.SubmarinerEndpoint
 
 		BeforeEach(func() {
 			t.remoteND.AddEndpoint(&t.localEndpoint)
@@ -181,7 +182,7 @@ var _ = When("a remote Endpoint is added", func() {
 	})
 
 	Context("and then re-added while discovery is in progress", func() {
-		var newRemoteEndpoint submarinerv1.Endpoint
+		var newRemoteEndpoint types.SubmarinerEndpoint
 
 		BeforeEach(func() {
 			forwardHowManyFromLocal = 0
@@ -280,11 +281,11 @@ var _ = When("a remote Endpoint is added", func() {
 type discoveryTestDriver struct {
 	localND                           *natDiscovery
 	localUDPSent                      chan []byte
-	localEndpoint                     submarinerv1.Endpoint
+	localEndpoint                     types.SubmarinerEndpoint
 	localUDPAddr                      *net.UDPAddr
 	remoteND                          *natDiscovery
 	remoteUDPSent                     chan []byte
-	remoteEndpoint                    submarinerv1.Endpoint
+	remoteEndpoint                    types.SubmarinerEndpoint
 	remoteUDPAddr                     *net.UDPAddr
 	readyChannel                      chan *NATEndpointInfo
 	oldRecheckTime                    int64

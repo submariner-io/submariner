@@ -20,8 +20,9 @@ import (
 	"time"
 
 	"github.com/submariner-io/admiral/pkg/log"
-	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"k8s.io/klog"
+
+	"github.com/submariner-io/submariner/pkg/types"
 )
 
 type endpointState int
@@ -40,7 +41,7 @@ var (
 )
 
 type remoteEndpointNAT struct {
-	endpoint               v1.Endpoint
+	endpoint               types.SubmarinerEndpoint
 	state                  endpointState
 	lastCheck              time.Time
 	lastTransition         time.Time
@@ -52,7 +53,7 @@ type remoteEndpointNAT struct {
 }
 
 type NATEndpointInfo struct {
-	Endpoint v1.Endpoint
+	Endpoint types.SubmarinerEndpoint
 	UseNAT   bool
 	UseIP    string
 }
@@ -65,7 +66,7 @@ func (rn *remoteEndpointNAT) toNATEndpointInfo() *NATEndpointInfo {
 	}
 }
 
-func newRemoteEndpointNAT(endpoint *v1.Endpoint) *remoteEndpointNAT {
+func newRemoteEndpointNAT(endpoint *types.SubmarinerEndpoint) *remoteEndpointNAT {
 	return &remoteEndpointNAT{
 		endpoint:       *endpoint,
 		state:          testingPrivateAndPublicIPs,
