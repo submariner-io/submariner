@@ -137,7 +137,7 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 		delete(i.natDiscoveryPending, rnat.Endpoint.Spec.CableName)
 	}
 
-	activeConnections, err := i.driver.GetActiveConnections(endpoint.Spec.ClusterID)
+	activeConnections, err := i.driver.GetActiveConnections()
 	if err != nil {
 		return err
 	}

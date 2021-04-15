@@ -231,8 +231,8 @@ func (i *libreswan) refreshConnectionStatus() error {
 	return nil
 }
 
-// GetActiveConnections returns an array of all the active connections for the given cluster.
-func (i *libreswan) GetActiveConnections(clusterID string) ([]subv1.Connection, error) {
+// GetActiveConnections returns an array of all the active connections
+func (i *libreswan) GetActiveConnections() ([]subv1.Connection, error) {
 	return i.connections, nil
 }
 
