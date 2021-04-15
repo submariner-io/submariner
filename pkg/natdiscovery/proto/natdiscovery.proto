@@ -18,16 +18,16 @@ limitations under the License.
 syntax = "proto3";
 option go_package = "github.com/submariner-io/submariner/pkg/natdiscovery/proto";
 
-message SubmarinerNatDiscoveryMessage {
+message SubmarinerNATDiscoveryMessage {
   int32 version = 1;
 
   oneof message {
-    SubmarinerNatDiscoveryRequest request = 2;
-    SubmarinerNatDiscoveryResponse response = 3;
+    SubmarinerNATDiscoveryRequest request = 2;
+    SubmarinerNATDiscoveryResponse response = 3;
   }
 }
 
-message SubmarinerNatDiscoveryRequest {
+message SubmarinerNATDiscoveryRequest {
   uint64 request_number = 1;
 
   EndpointDetails sender = 2;
@@ -47,7 +47,7 @@ enum ResponseType {
   MALFORMED = 4;
 }
 
-message SubmarinerNatDiscoveryResponse {
+message SubmarinerNATDiscoveryResponse {
   uint64 request_number = 1;
 
   ResponseType response = 2;

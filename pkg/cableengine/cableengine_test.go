@@ -52,7 +52,7 @@ var _ = Describe("Cable Engine", func() {
 
 	var (
 		engine         cableengine.Engine
-		natDiscovery   *fakeNatDiscovery
+		natDiscovery   *fakeNATDiscovery
 		localEndpoint  *subv1.Endpoint
 		remoteEndpoint *subv1.Endpoint
 		skipStart      bool
@@ -95,7 +95,7 @@ var _ = Describe("Cable Engine", func() {
 			},
 		}, types.SubmarinerEndpoint{Spec: localEndpoint.Spec})
 
-		natDiscovery = &fakeNatDiscovery{removeEndpoint: make(chan string, 20), readyChannel: make(chan *natdiscovery.NATEndpointInfo, 100)}
+		natDiscovery = &fakeNATDiscovery{removeEndpoint: make(chan string, 20), readyChannel: make(chan *natdiscovery.NATEndpointInfo, 100)}
 		engine.SetupNATDiscovery(natDiscovery)
 
 	})
@@ -350,17 +350,17 @@ func TestCableEngine(t *testing.T) {
 	RunSpecs(t, "Cable Engine Suite")
 }
 
-type fakeNatDiscovery struct {
+type fakeNATDiscovery struct {
 	removeEndpoint     chan string
 	captureAddEndpoint chan *subv1.Endpoint
 	readyChannel       chan *natdiscovery.NATEndpointInfo
 }
 
-func (n *fakeNatDiscovery) Run(stopCh <-chan struct{}) error {
+func (n *fakeNATDiscovery) Run(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (n *fakeNatDiscovery) AddEndpoint(endpoint *subv1.Endpoint) {
+func (n *fakeNATDiscovery) AddEndpoint(endpoint *subv1.Endpoint) {
 	if n.captureAddEndpoint != nil {
 		n.captureAddEndpoint <- endpoint
 		return
@@ -369,15 +369,15 @@ func (n *fakeNatDiscovery) AddEndpoint(endpoint *subv1.Endpoint) {
 	n.notifyReady(endpoint)
 }
 
-func (n *fakeNatDiscovery) RemoveEndpoint(endpointName string) {
+func (n *fakeNATDiscovery) RemoveEndpoint(endpointName string) {
 	n.removeEndpoint <- endpointName
 }
 
-func (n *fakeNatDiscovery) GetReadyChannel() chan *natdiscovery.NATEndpointInfo {
+func (n *fakeNATDiscovery) GetReadyChannel() chan *natdiscovery.NATEndpointInfo {
 	return n.readyChannel
 }
 
-func (n *fakeNatDiscovery) notifyReady(endpoint *subv1.Endpoint) {
+func (n *fakeNATDiscovery) notifyReady(endpoint *subv1.Endpoint) {
 	n.readyChannel <- natEndpointInfoFor(endpoint)
 }
 

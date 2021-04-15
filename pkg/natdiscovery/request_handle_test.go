@@ -52,16 +52,16 @@ var _ = Describe("Request handling", func() {
 		}
 	})
 
-	parseResponseInLocalListener := func(udpPacket []byte, remoteAddr *net.UDPAddr) *natproto.SubmarinerNatDiscoveryResponse {
+	parseResponseInLocalListener := func(udpPacket []byte, remoteAddr *net.UDPAddr) *natproto.SubmarinerNATDiscoveryResponse {
 		err := localListener.parseAndHandleMessageFromAddress(udpPacket, remoteAddr)
 		Expect(err).NotTo(HaveOccurred())
 		return parseProtocolResponse(awaitChan(localUDPSent))
 	}
 
-	requestResponseFromRemoteToLocal := func(remoteAddr *net.UDPAddr) []*natproto.SubmarinerNatDiscoveryResponse {
+	requestResponseFromRemoteToLocal := func(remoteAddr *net.UDPAddr) []*natproto.SubmarinerNATDiscoveryResponse {
 		err := remoteListener.sendCheckRequest(newRemoteEndpointNAT(&localEndpoint))
 		Expect(err).NotTo(HaveOccurred())
-		return []*natproto.SubmarinerNatDiscoveryResponse{
+		return []*natproto.SubmarinerNATDiscoveryResponse{
 			parseResponseInLocalListener(awaitChan(remoteUDPSent), remoteAddr), /* Private IP request */
 			parseResponseInLocalListener(awaitChan(remoteUDPSent), remoteAddr), /* Public IP request */
 		}
@@ -122,7 +122,7 @@ var _ = Describe("Request handling", func() {
 
 	When("receiving a request with a missing Sender", func() {
 		It("should respond with MALFORMED", func() {
-			request := createMalformedRequest(func(msg *natproto.SubmarinerNatDiscoveryMessage) {
+			request := createMalformedRequest(func(msg *natproto.SubmarinerNATDiscoveryMessage) {
 				msg.GetRequest().Sender = nil
 			})
 			response := parseResponseInLocalListener(request, &remoteUDPAddr)
@@ -132,7 +132,7 @@ var _ = Describe("Request handling", func() {
 
 	When("receiving a malformed request with a missing Receiver", func() {
 		It("should respond with MALFORMED", func() {
-			request := createMalformedRequest(func(msg *natproto.SubmarinerNatDiscoveryMessage) {
+			request := createMalformedRequest(func(msg *natproto.SubmarinerNATDiscoveryMessage) {
 				msg.GetRequest().Receiver = nil
 			})
 			response := parseResponseInLocalListener(request, &remoteUDPAddr)
@@ -142,7 +142,7 @@ var _ = Describe("Request handling", func() {
 
 	When("receiving a malformed request with a missing UsingDst", func() {
 		It("should respond with MALFORMED", func() {
-			request := createMalformedRequest(func(msg *natproto.SubmarinerNatDiscoveryMessage) {
+			request := createMalformedRequest(func(msg *natproto.SubmarinerNATDiscoveryMessage) {
 				msg.GetRequest().UsingDst = nil
 			})
 			response := parseResponseInLocalListener(request, &remoteUDPAddr)
@@ -152,7 +152,7 @@ var _ = Describe("Request handling", func() {
 
 	When("receiving a malformed request with a missing UsingSrc", func() {
 		It("should respond with MALFORMED", func() {
-			request := createMalformedRequest(func(msg *natproto.SubmarinerNatDiscoveryMessage) {
+			request := createMalformedRequest(func(msg *natproto.SubmarinerNATDiscoveryMessage) {
 				msg.GetRequest().UsingSrc = nil
 			})
 			response := parseResponseInLocalListener(request, &remoteUDPAddr)
@@ -161,8 +161,8 @@ var _ = Describe("Request handling", func() {
 	})
 })
 
-func createMalformedRequest(mangleFunction func(*natproto.SubmarinerNatDiscoveryMessage)) []byte {
-	request := natproto.SubmarinerNatDiscoveryRequest{
+func createMalformedRequest(mangleFunction func(*natproto.SubmarinerNATDiscoveryMessage)) []byte {
+	request := natproto.SubmarinerNATDiscoveryRequest{
 		RequestNumber: 1,
 		Sender: &natproto.EndpointDetails{
 			EndpointId: testRemoteEndpointName,
@@ -182,11 +182,11 @@ func createMalformedRequest(mangleFunction func(*natproto.SubmarinerNatDiscovery
 		},
 	}
 
-	msgRequest := &natproto.SubmarinerNatDiscoveryMessage_Request{
+	msgRequest := &natproto.SubmarinerNATDiscoveryMessage_Request{
 		Request: &request,
 	}
 
-	message := natproto.SubmarinerNatDiscoveryMessage{
+	message := natproto.SubmarinerNATDiscoveryMessage{
 		Version: natproto.Version,
 		Message: msgRequest,
 	}
