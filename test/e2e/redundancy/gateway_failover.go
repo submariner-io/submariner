@@ -93,6 +93,7 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 		ToCluster:             framework.ClusterA,
 		ToClusterScheduling:   framework.NonGatewayNode,
 		ToEndpointType:        defaultEndpointType(),
+		ConnectionAttempts:    30,
 	})
 }
 
@@ -208,5 +209,6 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 		ToCluster:             framework.ClusterA,
 		ToClusterScheduling:   framework.NonGatewayNode,
 		ToEndpointType:        defaultEndpointType(),
+		ConnectionAttempts:    30,
 	})
 }

@@ -76,5 +76,6 @@ func testRouteAgentRestart(f *subFramework.Framework, onGateway bool) {
 		ToCluster:             framework.ClusterA,
 		ToClusterScheduling:   framework.NonGatewayNode,
 		ToEndpointType:        defaultEndpointType(),
+		ConnectionAttempts:    30,
 	})
 }

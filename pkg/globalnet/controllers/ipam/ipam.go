@@ -351,6 +351,15 @@ func (i *Controller) handleUpdatePod(old, newObj interface{}) {
 		return
 	}
 
+	if newObj.(*k8sv1.Pod).Status.Phase == k8sv1.PodSucceeded || newObj.(*k8sv1.Pod).Status.Phase == k8sv1.PodFailed {
+		klog.V(log.DEBUG).Infof("Pod %q with ip %s finished its execution. State : %s", key,
+			newObj.(*k8sv1.Pod).Status.PodIP, newObj.(*k8sv1.Pod).Status.Phase)
+
+		i.handleRemovedPod(old)
+
+		return
+	}
+
 	newGlobalIP := newObj.(*k8sv1.Pod).GetAnnotations()[SubmarinerIPAMGlobalIP]
 	if newGlobalIP == "" {
 		// Pod events that are skipped during addEvent are handled here when they are assigned an ipaddress.
@@ -469,12 +478,17 @@ func (i *Controller) handleRemovedPod(obj interface{}) {
 				return
 			}
 
-			i.pool.Release(key)
-			klog.V(log.DEBUG).Infof("Released globalIP %s for pod %q", globalIP, key)
+			releasedIP := i.pool.Release(key)
+			if releasedIP != "" {
+				klog.V(log.DEBUG).Infof("Released globalIP %s for pod %q", globalIP, key)
 
-			err = i.syncPodRules(pod.Status.PodIP, globalIP, DeleteRules)
-			if err != nil {
-				klog.Errorf("Error while cleaning up Pod egress rules. %v", err)
+				err = i.syncPodRules(pod.Status.PodIP, globalIP, DeleteRules)
+				if err != nil {
+					klog.Errorf("Error while cleaning up Pod egress rules. %v", err)
+				}
+			} else {
+				podKey := pod.Namespace + "/" + pod.Name
+				klog.V(log.DEBUG).Infof("handleRemovedPod called for %q, but globalIP %q already released.", podKey, globalIP)
 			}
 		} else {
 			podKey := pod.Namespace + "/" + pod.Name
