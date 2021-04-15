@@ -34,8 +34,6 @@ jobs:
         with:
           k8s_version: ${{ matrix.k8s_version }}
           using: ${{ matrix.cable_driver }} ${{ matrix.deploytool }} ${{ matrix.globalnet }} ${{ matrix.ovn }}
-          focus: '\[.*\]'
-          skip: '\[external-dataplane\]'
 
       - name: Post mortem
         if: failure()

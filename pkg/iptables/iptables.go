@@ -35,5 +35,5 @@ func New() (Interface, error) {
 		return NewFunc()
 	}
 
-	return iptables.New()
+	return iptables.New(iptables.IPFamily(iptables.ProtocolIPv4), iptables.Timeout(5))
 }
