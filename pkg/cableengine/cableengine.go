@@ -20,14 +20,12 @@ import (
 	"sync"
 
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/admiral/pkg/stringset"
-	"k8s.io/klog"
-
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/submariner-io/submariner/pkg/util"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog"
 
 	// Add supported drivers
 	_ "github.com/submariner-io/submariner/pkg/cable/libreswan"
@@ -44,10 +42,10 @@ type Engine interface {
 	// InstallCable performs any set up work needed for connecting to given remote endpoint.
 	// Once InstallCable completes, it should be possible to connect to remote
 	// Pods or Services behind the given endpoint.
-	InstallCable(remote types.SubmarinerEndpoint) error
+	InstallCable(remote *v1.Endpoint) error
 	// RemoveCable disconnects the Engine from the given remote endpoint. Upon completion.
 	// remote Pods and Service may not be accessible any more.
-	RemoveCable(remote types.SubmarinerEndpoint) error
+	RemoveCable(remote *v1.Endpoint) error
 	// ListCableConnections returns a list of cable connection, and the related status
 	ListCableConnections() ([]v1.Connection, error)
 	// GetLocalEndpoint returns the local endpoint for this cable engine
@@ -66,7 +64,7 @@ type engine struct {
 	natDiscovery        natdiscovery.Interface
 	natEndpointInfoCh   chan *natdiscovery.NATEndpointInfo
 	natDiscoveryPending map[string]int
-	installedCables     stringset.Interface
+	installedCables     map[string]metav1.Time
 }
 
 // NewEngine creates a new Engine for the local cluster
@@ -75,7 +73,7 @@ func NewEngine(localCluster types.SubmarinerCluster, localEndpoint types.Submari
 		localCluster:        localCluster,
 		localEndpoint:       localEndpoint,
 		natDiscoveryPending: map[string]int{},
-		installedCables:     stringset.New(),
+		installedCables:     map[string]metav1.Time{},
 	}
 }
 
@@ -125,7 +123,7 @@ func (i *engine) SetupNATDiscovery(natDiscovery natdiscovery.Interface) {
 }
 
 func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) error {
-	endpoint := rnat.Endpoint
+	endpoint := &rnat.Endpoint
 
 	i.Lock()
 	defer i.Unlock()
@@ -147,29 +145,41 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 	for _, active := range activeConnections {
 		klog.V(log.TRACE).Infof("Analyzing currently active connection %q", active.Endpoint.CableName)
 
-		disconnect := false
-
-		if active.Endpoint.CableName == endpoint.Spec.CableName {
-			// There could be scenarios where the cableName would be the same but the
-			// PublicIP of the active GatewayNode changes.
-			if active.UsingIP == rnat.UseIP && active.UsingNAT == rnat.UseNAT {
-				klog.V(log.DEBUG).Infof("Cable %q is already installed - not installing again", active.Endpoint.CableName)
-				return nil
-			} else {
-				klog.V(log.DEBUG).Infof("Cable %q is already installed - but connection details changed", active.Endpoint.CableName)
-				disconnect = true
-			}
-		} else if util.GetClusterIDFromCableName(active.Endpoint.CableName) == endpoint.Spec.ClusterID {
-			klog.V(log.DEBUG).Infof("Found a pre-existing cable %q that belongs to this cluster %s",
-				active.Endpoint.CableName, endpoint.Spec.ClusterID)
-			disconnect = true
+		if active.Endpoint.ClusterID != endpoint.Spec.ClusterID {
+			continue
 		}
 
-		if disconnect {
-			err = i.driver.DisconnectFromEndpoint(types.SubmarinerEndpoint{Spec: active.Endpoint})
-			if err != nil {
-				return err
+		prevTimestamp := i.installedCables[active.Endpoint.CableName]
+
+		klog.V(log.DEBUG).Infof("Found a pre-existing cable %q with timestamp %q that belongs to this cluster %s",
+			active.Endpoint.CableName, prevTimestamp, endpoint.Spec.ClusterID)
+
+		if endpoint.CreationTimestamp.Before(&prevTimestamp) {
+			klog.Warningf("The timestamp (%s) for new cable %q is older than the timestamp (%s) of the pre-existing "+
+				"cable %q - not replacing", endpoint.CreationTimestamp, endpoint.Spec.CableName, prevTimestamp, active.Endpoint.CableName)
+			return nil
+		}
+
+		if endpoint.CreationTimestamp.Equal(&prevTimestamp) && active.Endpoint.CableName == endpoint.Spec.CableName {
+			// There could be scenarios where the cableName would be the same but the endpoint IP or specific driver
+			// config has changed.
+			if active.UsingIP == rnat.UseIP && active.UsingNAT == rnat.UseNAT &&
+				reflect.DeepEqual(active.Endpoint.BackendConfig, endpoint.Spec.BackendConfig) {
+				klog.V(log.DEBUG).Infof("Connection info (IP: %s, NAT: %v, BackendConfig: %v) for cable %q is unchanged"+
+					" - not re-installing", active.UsingIP, active.UsingNAT, active.Endpoint.BackendConfig, active.Endpoint.CableName)
+				return nil
 			}
+
+			klog.V(log.DEBUG).Infof("New connection info (IP: %s, NAT: %v, BackendConfig: %v) for cable %q differs from"+
+				" previous (IP: %s, NAT: %v, BackendConfig: %v) - re-installing", rnat.UseIP, rnat.UseNAT, active.Endpoint.BackendConfig,
+				active.Endpoint.CableName, active.UsingIP, active.UsingNAT, endpoint.Spec.BackendConfig)
+		}
+
+		klog.V(log.DEBUG).Infof("Disconnecting pre-existing cable %q", active.Endpoint.CableName)
+
+		err = i.driver.DisconnectFromEndpoint(types.SubmarinerEndpoint{Spec: active.Endpoint})
+		if err != nil {
+			return err
 		}
 	}
 
@@ -182,12 +192,12 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 
 	klog.Infof("Successfully installed Endpoint cable %q with remote IP %s", endpoint.Spec.CableName, remoteEndpointIP)
 
-	i.installedCables.Add(rnat.Endpoint.Spec.CableName)
+	i.installedCables[rnat.Endpoint.Spec.CableName] = endpoint.CreationTimestamp
 
 	return nil
 }
 
-func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
+func (i *engine) InstallCable(endpoint *v1.Endpoint) error {
 	if endpoint.Spec.ClusterID == i.localCluster.ID {
 		klog.V(log.DEBUG).Infof("Not installing cable for local cluster")
 		return nil
@@ -202,12 +212,12 @@ func (i *engine) InstallCable(endpoint types.SubmarinerEndpoint) error {
 	i.natDiscoveryPending[endpoint.Spec.CableName]++
 	i.Unlock()
 
-	i.natDiscovery.AddEndpoint(&endpoint)
+	i.natDiscovery.AddEndpoint(endpoint)
 
 	return nil
 }
 
-func (i *engine) RemoveCable(endpoint types.SubmarinerEndpoint) error {
+func (i *engine) RemoveCable(endpoint *v1.Endpoint) error {
 	if endpoint.Spec.ClusterID == i.localCluster.ID {
 		klog.V(log.DEBUG).Infof("Cables are not added/removed for the local cluster, skipping removal")
 		return nil
@@ -222,16 +232,16 @@ func (i *engine) RemoveCable(endpoint types.SubmarinerEndpoint) error {
 
 	delete(i.natDiscoveryPending, endpoint.Spec.CableName)
 
-	if !i.installedCables.Contains(endpoint.Spec.CableName) {
+	if _, ok := i.installedCables[endpoint.Spec.CableName]; !ok {
 		return nil
 	}
 
-	err := i.driver.DisconnectFromEndpoint(endpoint)
+	err := i.driver.DisconnectFromEndpoint(types.SubmarinerEndpoint{Spec: endpoint.Spec})
 	if err != nil {
 		return err
 	}
 
-	i.installedCables.Remove(endpoint.Spec.CableName)
+	delete(i.installedCables, endpoint.Spec.CableName)
 
 	klog.Infof("Successfully removed Endpoint cable %q", endpoint.Spec.CableName)
 

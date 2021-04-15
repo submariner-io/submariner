@@ -17,8 +17,6 @@ package libreswan
 
 import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/types"
-
 	"k8s.io/klog"
 )
 
@@ -30,16 +28,16 @@ const (
 	operationModeClient
 )
 
-func (i *libreswan) calculateOperationMode(remoteEndpoint *types.SubmarinerEndpoint) operationMode {
+func (i *libreswan) calculateOperationMode(remoteEndpoint *v1.EndpointSpec) operationMode {
 	defaultValue := false
 	leftPreferred, err := i.localEndpoint.Spec.GetBackendBool(v1.PreferredServerConfig, &defaultValue)
 	if err != nil {
 		klog.Errorf("Error parsing local endpoint config: %s", err)
 	}
 
-	rightPreferred, err := remoteEndpoint.Spec.GetBackendBool(v1.PreferredServerConfig, nil)
+	rightPreferred, err := remoteEndpoint.GetBackendBool(v1.PreferredServerConfig, nil)
 	if err != nil {
-		klog.Errorf("Error parsing remote endpoint config %q: %s", remoteEndpoint.Spec.CableName, err)
+		klog.Errorf("Error parsing remote endpoint config %q: %s", remoteEndpoint.CableName, err)
 	}
 
 	if rightPreferred == nil || !*leftPreferred && !*rightPreferred {
@@ -55,7 +53,7 @@ func (i *libreswan) calculateOperationMode(remoteEndpoint *types.SubmarinerEndpo
 	}
 
 	// At this point both would like to be server, so we decide based on the cable name
-	if i.localEndpoint.Spec.CableName > remoteEndpoint.Spec.CableName {
+	if i.localEndpoint.Spec.CableName > remoteEndpoint.CableName {
 		return operationModeServer
 	}
 

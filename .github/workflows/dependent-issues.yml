@@ -1,0 +1,38 @@
+---
+name: PR Dependencies
+
+on:
+  issues:
+    types:
+      - opened
+      - edited
+      - closed
+      - reopened
+      - synchronize
+  pull_request_target:
+    types:
+      - opened
+      - edited
+      - closed
+      - reopened
+      - synchronize
+  schedule:
+    - cron: '0 0/6 * * *' # every 6 hours
+
+jobs:
+  check:
+    name: Check Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: z0al/dependent-issues@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # The label to use to mark dependent issues
+          label: dependent
+
+          # Enable checking for dependencies in issues.
+          check_issues: on
+
+          # A comma-separated list of keywords to mark dependency.
+          keywords: depends on, Depends on

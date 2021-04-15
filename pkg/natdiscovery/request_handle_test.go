@@ -20,9 +20,9 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/submariner/pkg/types"
 	"google.golang.org/protobuf/proto"
 
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 )
 
@@ -32,8 +32,8 @@ var _ = Describe("Request handling", func() {
 	var localUDPSent chan []byte
 	var remoteListener *natDiscovery
 	var remoteUDPSent chan []byte
-	var localEndpoint types.SubmarinerEndpoint
-	var remoteEndpoint types.SubmarinerEndpoint
+	var localEndpoint submarinerv1.Endpoint
+	var remoteEndpoint submarinerv1.Endpoint
 
 	var remoteUDPAddr net.UDPAddr
 
@@ -59,7 +59,7 @@ var _ = Describe("Request handling", func() {
 	}
 
 	requestResponseFromRemoteToLocal := func(remoteAddr *net.UDPAddr) []*natproto.SubmarinerNatDiscoveryResponse {
-		err := remoteListener.sendCheckRequest(newRemoteEndpointNAT(&types.SubmarinerEndpoint{Spec: localEndpoint.Spec}))
+		err := remoteListener.sendCheckRequest(newRemoteEndpointNAT(&localEndpoint))
 		Expect(err).NotTo(HaveOccurred())
 		return []*natproto.SubmarinerNatDiscoveryResponse{
 			parseResponseInLocalListener(awaitChan(remoteUDPSent), remoteAddr), /* Private IP request */

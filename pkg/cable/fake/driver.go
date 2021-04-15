@@ -58,6 +58,9 @@ func (d *Driver) Init() error {
 }
 
 func (d *Driver) GetActiveConnections(clusterID string) ([]v1.Connection, error) {
+	d.Lock()
+	defer d.Unlock()
+
 	value, ok := d.ActiveConnections[clusterID]
 	if ok {
 		if err, ok := value.(error); ok {
@@ -92,6 +95,9 @@ func (d *Driver) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (
 		return "", err
 	}
 
+	d.ActiveConnections[endpointInfo.Endpoint.Spec.ClusterID] = []v1.Connection{
+		{Endpoint: endpointInfo.Endpoint.Spec, UsingIP: endpointInfo.Endpoint.Spec.PublicIP, UsingNAT: true}}
+
 	d.connectToEndpoint <- endpointInfo
 
 	return endpointInfo.UseIP, nil
@@ -106,6 +112,8 @@ func (d *Driver) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) error
 		d.ErrOnDisconnectFromEndpoint = nil
 		return err
 	}
+
+	delete(d.ActiveConnections, endpoint.Spec.ClusterID)
 
 	d.disconnectFromEndpoint <- &endpoint
 
@@ -128,8 +136,8 @@ func (d *Driver) AwaitNoConnectToEndpoint() {
 	Consistently(d.connectToEndpoint, 500*time.Millisecond).ShouldNot(Receive(), "ConnectToEndpoint was unexpectedly called")
 }
 
-func (d *Driver) AwaitDisconnectFromEndpoint(expected *types.SubmarinerEndpoint) {
-	Eventually(d.disconnectFromEndpoint, 5).Should(Receive(Equal(expected)))
+func (d *Driver) AwaitDisconnectFromEndpoint(expected *v1.EndpointSpec) {
+	Eventually(d.disconnectFromEndpoint, 5).Should(Receive(Equal(&types.SubmarinerEndpoint{Spec: *expected})))
 }
 
 func (d *Driver) AwaitNoDisconnectFromEndpoint() {

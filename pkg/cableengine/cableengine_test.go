@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -29,6 +30,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/cableengine"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
 )
 
@@ -51,15 +53,18 @@ var _ = Describe("Cable Engine", func() {
 	var (
 		engine         cableengine.Engine
 		natDiscovery   *fakeNatDiscovery
-		localEndpoint  *types.SubmarinerEndpoint
-		remoteEndpoint *types.SubmarinerEndpoint
+		localEndpoint  *subv1.Endpoint
+		remoteEndpoint *subv1.Endpoint
 		skipStart      bool
 	)
 
 	BeforeEach(func() {
 		skipStart = false
 
-		localEndpoint = &types.SubmarinerEndpoint{
+		localEndpoint = &subv1.Endpoint{
+			ObjectMeta: metav1.ObjectMeta{
+				CreationTimestamp: metav1.Now(),
+			},
 			Spec: subv1.EndpointSpec{
 				ClusterID: localClusterID,
 				CableName: fmt.Sprintf("submariner-cable-%s-1.1.1.1", localClusterID),
@@ -69,12 +74,16 @@ var _ = Describe("Cable Engine", func() {
 			},
 		}
 
-		remoteEndpoint = &types.SubmarinerEndpoint{
+		remoteEndpoint = &subv1.Endpoint{
+			ObjectMeta: metav1.ObjectMeta{
+				CreationTimestamp: metav1.Now(),
+			},
 			Spec: subv1.EndpointSpec{
-				ClusterID: remoteClusterID,
-				CableName: fmt.Sprintf("submariner-cable-%s-1.1.1.1", remoteClusterID),
-				PrivateIP: "1.1.1.1",
-				PublicIP:  "2.2.2.2",
+				ClusterID:     remoteClusterID,
+				CableName:     fmt.Sprintf("submariner-cable-%s-1.1.1.1", remoteClusterID),
+				PrivateIP:     "1.1.1.1",
+				PublicIP:      "2.2.2.2",
+				BackendConfig: map[string]string{"port": "1234"},
 			},
 		}
 
@@ -84,7 +93,7 @@ var _ = Describe("Cable Engine", func() {
 			Spec: subv1.ClusterSpec{
 				ClusterID: localClusterID,
 			},
-		}, *localEndpoint)
+		}, types.SubmarinerEndpoint{Spec: localEndpoint.Spec})
 
 		natDiscovery = &fakeNatDiscovery{removeEndpoint: make(chan string, 20), readyChannel: make(chan *natdiscovery.NATEndpointInfo, 100)}
 		engine.SetupNATDiscovery(natDiscovery)
@@ -106,66 +115,129 @@ var _ = Describe("Cable Engine", func() {
 	})
 
 	It("should return the local endpoint when queried", func() {
-		Expect(engine.GetLocalEndpoint()).To(Equal(localEndpoint))
+		Expect(engine.GetLocalEndpoint()).To(Equal(&types.SubmarinerEndpoint{Spec: localEndpoint.Spec}))
 	})
 
 	When("install cable for a remote endpoint", func() {
 		Context("and no endpoint was previously installed for the cluster", func() {
 			It("should connect to the endpoint", func() {
-				Expect(engine.InstallCable(*remoteEndpoint)).To(Succeed())
+				Expect(engine.InstallCable(remoteEndpoint)).To(Succeed())
 				fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(remoteEndpoint))
 			})
 		})
 
 		Context("and an endpoint was previously installed for the cluster", func() {
+			var prevEndpoint *subv1.Endpoint
+			var newEndpoint *subv1.Endpoint
+
+			BeforeEach(func() {
+				copy := *remoteEndpoint
+				newEndpoint = &copy
+				prevEndpoint = remoteEndpoint
+			})
+
 			JustBeforeEach(func() {
-				Expect(engine.InstallCable(*remoteEndpoint)).To(Succeed())
-				fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(remoteEndpoint))
+				Expect(engine.InstallCable(prevEndpoint)).To(Succeed())
+				fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(prevEndpoint))
 
-				fakeDriver.ActiveConnections[remoteClusterID] = []subv1.Connection{
-					{Endpoint: remoteEndpoint.Spec, UsingIP: remoteEndpoint.Spec.PublicIP, UsingNAT: true}}
+				Expect(engine.InstallCable(newEndpoint)).To(Succeed())
 			})
 
-			Context("and it's a different endpoint", func() {
-				It("should disconnect from the previous endpoint and connect to the new one", func() {
-					newEndpoint := *remoteEndpoint
+			testTimestamps := func() {
+				Context("and older creation timestamp", func() {
+					BeforeEach(func() {
+						time.Sleep(100 * time.Millisecond)
+						newEndpoint.CreationTimestamp = metav1.Now()
+					})
+
+					It("should disconnect from the previous endpoint and connect to the new one", func() {
+						fakeDriver.AwaitDisconnectFromEndpoint(&prevEndpoint.Spec)
+						fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(newEndpoint))
+					})
+				})
+
+				Context("and newer creation timestamp", func() {
+					BeforeEach(func() {
+						newEndpoint.CreationTimestamp = metav1.Now()
+						time.Sleep(100 * time.Millisecond)
+						prevEndpoint.CreationTimestamp = metav1.Now()
+					})
+
+					It("should not disconnect from the previous endpoint nor connect to the new one", func() {
+						fakeDriver.AwaitNoDisconnectFromEndpoint()
+						fakeDriver.AwaitNoConnectToEndpoint()
+					})
+				})
+			}
+
+			Context("with a different cable name", func() {
+				BeforeEach(func() {
 					newEndpoint.Spec.CableName = "new cable"
-
-					Expect(engine.InstallCable(newEndpoint)).To(Succeed())
-					fakeDriver.AwaitDisconnectFromEndpoint(remoteEndpoint)
-					fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(&newEndpoint))
 				})
+
+				testTimestamps()
 			})
 
-			Context("and it's the same endpoint", func() {
-				It("should not connect to the endpoint again", func() {
-					Expect(engine.InstallCable(*remoteEndpoint)).To(Succeed())
-					fakeDriver.AwaitNoConnectToEndpoint()
+			Context("with the same cable name", func() {
+				testTimestamps()
+
+				Context("but different endpoint IP", func() {
+					BeforeEach(func() {
+						newEndpoint.Spec.PublicIP = "3.3.3.3"
+					})
+
+					It("should disconnect from the previous endpoint and connect to the new one", func() {
+						fakeDriver.AwaitDisconnectFromEndpoint(&prevEndpoint.Spec)
+						fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(newEndpoint))
+					})
+				})
+
+				Context("but different backend configuration", func() {
+					BeforeEach(func() {
+						newEndpoint.Spec.BackendConfig = map[string]string{"port": "6789"}
+					})
+
+					It("should disconnect from the previous endpoint and connect to the new one", func() {
+						fakeDriver.AwaitDisconnectFromEndpoint(&prevEndpoint.Spec)
+						fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(newEndpoint))
+					})
+				})
+
+				Context(" and connection info", func() {
+					It("should not disconnect from the previous endpoint nor connect to the new one", func() {
+						fakeDriver.AwaitNoDisconnectFromEndpoint()
+						fakeDriver.AwaitNoConnectToEndpoint()
+					})
 				})
 			})
+		})
 
-			Context("and it's the same endpoint but with a different public IP", func() {
-				It("should disconnect from the previous endpoint and connect to the new one", func() {
-					prevEndpoint := *remoteEndpoint
-					remoteEndpoint.Spec.PublicIP = "3.3.3.3"
+		Context("and an endpoint was previously installed for another cluster", func() {
+			It("should connect to the new endpoint and not disconnect from the previous one", func() {
+				otherEndpoint := subv1.Endpoint{Spec: subv1.EndpointSpec{
+					ClusterID: "other",
+					CableName: "submariner-cable-other-1.1.1.1",
+				}}
 
-					Expect(engine.InstallCable(*remoteEndpoint)).To(Succeed())
-					fakeDriver.AwaitDisconnectFromEndpoint(&prevEndpoint)
-					fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(remoteEndpoint))
-				})
+				Expect(engine.InstallCable(&otherEndpoint)).To(Succeed())
+				fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(&otherEndpoint))
+
+				Expect(engine.InstallCable(remoteEndpoint)).To(Succeed())
+				fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(remoteEndpoint))
+				fakeDriver.AwaitNoDisconnectFromEndpoint()
 			})
 		})
 
 		Context("followed by remove cable before NAT discovery is complete", func() {
 			BeforeEach(func() {
-				natDiscovery.captureAddEndpoint = make(chan *types.SubmarinerEndpoint, 10)
+				natDiscovery.captureAddEndpoint = make(chan *subv1.Endpoint, 10)
 			})
 
 			It("should not connect to the endpoint", func() {
-				Expect(engine.InstallCable(*remoteEndpoint)).To(Succeed())
+				Expect(engine.InstallCable(remoteEndpoint)).To(Succeed())
 				Eventually(natDiscovery.captureAddEndpoint).Should(Receive())
 
-				Expect(engine.RemoveCable(*remoteEndpoint)).To(Succeed())
+				Expect(engine.RemoveCable(remoteEndpoint)).To(Succeed())
 				Eventually(natDiscovery.removeEndpoint).Should(Receive(Equal(remoteEndpoint.Spec.CableName)))
 				fakeDriver.AwaitNoDisconnectFromEndpoint()
 
@@ -177,20 +249,20 @@ var _ = Describe("Cable Engine", func() {
 
 	When("install cable for a local endpoint", func() {
 		It("should not connect to the endpoint", func() {
-			Expect(engine.InstallCable(*localEndpoint)).To(Succeed())
+			Expect(engine.InstallCable(localEndpoint)).To(Succeed())
 			fakeDriver.AwaitNoConnectToEndpoint()
 		})
 	})
 
 	When("remove cable for a remote endpoint", func() {
 		JustBeforeEach(func() {
-			Expect(engine.InstallCable(*remoteEndpoint)).To(Succeed())
+			Expect(engine.InstallCable(remoteEndpoint)).To(Succeed())
 			fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(remoteEndpoint))
 		})
 
 		It("should disconnect from the endpoint", func() {
-			Expect(engine.RemoveCable(*remoteEndpoint)).To(Succeed())
-			fakeDriver.AwaitDisconnectFromEndpoint(remoteEndpoint)
+			Expect(engine.RemoveCable(remoteEndpoint)).To(Succeed())
+			fakeDriver.AwaitDisconnectFromEndpoint(&remoteEndpoint.Spec)
 			Eventually(natDiscovery.removeEndpoint).Should(Receive(Equal(remoteEndpoint.Spec.CableName)))
 		})
 
@@ -200,19 +272,19 @@ var _ = Describe("Cable Engine", func() {
 			})
 
 			It("should return an error", func() {
-				Expect(engine.RemoveCable(*remoteEndpoint)).To(HaveOccurred())
+				Expect(engine.RemoveCable(remoteEndpoint)).To(HaveOccurred())
 			})
 		})
 	})
 
 	When("remove cable for a local endpoint", func() {
 		JustBeforeEach(func() {
-			Expect(engine.InstallCable(*remoteEndpoint)).To(Succeed())
+			Expect(engine.InstallCable(remoteEndpoint)).To(Succeed())
 			fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(remoteEndpoint))
 		})
 
 		It("should not disconnect from the endpoint", func() {
-			Expect(engine.RemoveCable(*localEndpoint)).To(Succeed())
+			Expect(engine.RemoveCable(localEndpoint)).To(Succeed())
 			fakeDriver.AwaitNoDisconnectFromEndpoint()
 			Consistently(natDiscovery.removeEndpoint).ShouldNot(Receive())
 		})
@@ -280,7 +352,7 @@ func TestCableEngine(t *testing.T) {
 
 type fakeNatDiscovery struct {
 	removeEndpoint     chan string
-	captureAddEndpoint chan *types.SubmarinerEndpoint
+	captureAddEndpoint chan *subv1.Endpoint
 	readyChannel       chan *natdiscovery.NATEndpointInfo
 }
 
@@ -288,7 +360,7 @@ func (n *fakeNatDiscovery) Run(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (n *fakeNatDiscovery) AddEndpoint(endpoint *types.SubmarinerEndpoint) {
+func (n *fakeNatDiscovery) AddEndpoint(endpoint *subv1.Endpoint) {
 	if n.captureAddEndpoint != nil {
 		n.captureAddEndpoint <- endpoint
 		return
@@ -305,11 +377,11 @@ func (n *fakeNatDiscovery) GetReadyChannel() chan *natdiscovery.NATEndpointInfo 
 	return n.readyChannel
 }
 
-func (n *fakeNatDiscovery) notifyReady(endpoint *types.SubmarinerEndpoint) {
+func (n *fakeNatDiscovery) notifyReady(endpoint *subv1.Endpoint) {
 	n.readyChannel <- natEndpointInfoFor(endpoint)
 }
 
-func natEndpointInfoFor(endpoint *types.SubmarinerEndpoint) *natdiscovery.NATEndpointInfo {
+func natEndpointInfoFor(endpoint *subv1.Endpoint) *natdiscovery.NATEndpointInfo {
 	return &natdiscovery.NATEndpointInfo{
 		UseIP:    endpoint.Spec.PublicIP,
 		UseNAT:   true,

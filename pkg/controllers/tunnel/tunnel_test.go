@@ -124,12 +124,12 @@ var _ = Describe("Managing tunnels", func() {
 		fakeDriver.AwaitConnectToEndpoint(&natdiscovery.NATEndpointInfo{
 			UseIP:    endpoint.Spec.PrivateIP,
 			UseNAT:   false,
-			Endpoint: types.SubmarinerEndpoint{Spec: endpoint.Spec},
+			Endpoint: *endpoint,
 		})
 	}
 
 	verifyDisconnectFromEndpoint := func() {
-		fakeDriver.AwaitDisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: endpoint.Spec})
+		fakeDriver.AwaitDisconnectFromEndpoint(&endpoint.Spec)
 	}
 
 	When("an Endpoint is created", func() {
