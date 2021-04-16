@@ -52,6 +52,24 @@ func testEndpointSyncing() {
 			It("Start should return an error", func() {
 			})
 		})
+
+		When("a stale remote Endpoint exists locally", func() {
+			var remoteEndpoint *submarinerv1.Endpoint
+
+			BeforeEach(func() {
+				remoteEndpoint = newEndpoint(&submarinerv1.EndpointSpec{
+					CableName: fmt.Sprintf("submariner-cable-%s-10-253-1-2", otherClusterID),
+					ClusterID: otherClusterID,
+				})
+
+				test.SetClusterIDLabel(remoteEndpoint, otherClusterID)
+				test.CreateResource(t.localEndpoints, remoteEndpoint)
+			})
+
+			It("it should delete the Endpoint", func() {
+				test.AwaitNoResource(t.localEndpoints, remoteEndpoint.GetName())
+			})
+		})
 	})
 
 	When("a remote Endpoint is created, updated and deleted on the broker", func() {
