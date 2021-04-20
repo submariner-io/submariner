@@ -13,7 +13,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.10.0
 	github.com/rdegges/go-ipify v0.0.0-20150526035502-2d94a6a86c40
-	github.com/submariner-io/admiral v0.9.0-m2.0.20210419083944-b1dcdc167179
+	github.com/submariner-io/admiral v0.9.0-rc0
 	github.com/submariner-io/shipyard v0.9.0-rc0
 	github.com/vishvananda/netlink v1.1.0
 	golang.org/x/sys v0.0.0-20210309074719-68d13333faf2
