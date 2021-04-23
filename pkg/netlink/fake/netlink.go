@@ -87,6 +87,10 @@ func (n *NetLink) LinkByName(name string) (netlink.Link, error) {
 	return link, nil
 }
 
+func (n *NetLink) LinkSetUp(link netlink.Link) error {
+	return nil
+}
+
 func (n *NetLink) AddrAdd(link netlink.Link, addr *netlink.Addr) error {
 	return nil
 }
