@@ -27,6 +27,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/cable/wireguard"
 	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/event"
+	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cleanup"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"github.com/submariner-io/submariner/pkg/util"
@@ -43,6 +44,7 @@ type Handler struct {
 	remoteEndpoints       map[string]*submV1.Endpoint
 	isGateway             bool
 	submarinerUpstreamIP  string
+	netlink               netlink.Interface
 }
 
 func NewHandler(env environment.Specification, smClientSet clientset.Interface) *Handler {
@@ -50,6 +52,7 @@ func NewHandler(env environment.Specification, smClientSet clientset.Interface) 
 		config:          &env,
 		smClient:        smClientSet,
 		remoteEndpoints: map[string]*submV1.Endpoint{},
+		netlink:         netlink.New(),
 	}
 }
 
@@ -65,7 +68,12 @@ func (ovn *Handler) Init() error {
 	// For now we get all the cleanups
 	ovn.cleanupHandlers = cableCleanup.GetCleanupHandlers()
 
-	return ovn.initIPtablesChains()
+	err := ovn.initIPtablesChains()
+	if err != nil {
+		return err
+	}
+
+	return ovn.ensureSubmarinerNodeBridge()
 }
 
 func (ovn *Handler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
