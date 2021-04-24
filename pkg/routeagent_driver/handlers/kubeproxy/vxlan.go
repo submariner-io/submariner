@@ -67,6 +67,11 @@ func (kp *SyncHandler) newVxlanIface(attrs *vxLanAttributes, activeEndPoint stri
 		return nil, err
 	}
 
+	// ip link set $vxLANIface up
+	if err := kp.netLink.LinkSetUp(vxLANIface.link); err != nil {
+		return nil, fmt.Errorf("failed to bring up VxLAN interface: %v", err)
+	}
+
 	return vxLANIface, nil
 }
 
