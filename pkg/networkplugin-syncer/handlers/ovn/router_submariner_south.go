@@ -52,20 +52,8 @@ func (ovn *SyncHandler) updateGatewayNode() error {
 
 	klog.V(log.DEBUG).Infof("Chassis for gw %q is %q, host: %q", gwHostname, chassis.Name, chassis.Hostname)
 
-	var submExternalPortSwitch string
-	if ovn.hasNodeLocalSwitch {
-		submExternalPortSwitch = nodeLocalSwitch
-	} else {
-		submExternalPortSwitch = "ext_" + chassis.Hostname
-	}
-
 	// Create/update the submariner external port associated to one of the external switches
-	if err := ovn.createOrUpdateSubmarinerExternalPort(submExternalPortSwitch); err != nil && !errors.Is(err, goovn.ErrorExist) {
-		return err
-	}
-
-	// Update ovn-kubernetes host management ACL to allow return of fragmentation ICMP for PMTU discovery
-	if err := ovn.changeMgmtAllowRelatedACL(chassis.Hostname); err != nil {
+	if err := ovn.createOrUpdateSubmarinerExternalPort(); err != nil && !errors.Is(err, goovn.ErrorExist) {
 		return err
 	}
 

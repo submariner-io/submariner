@@ -5,7 +5,7 @@ go 1.13
 require (
 	github.com/cenk/hub v1.0.1 // indirect
 	github.com/coreos/go-iptables v0.5.0
-	github.com/ebay/go-ovn v0.1.1-0.20201007164241-da67e9744ec0
+	github.com/ebay/go-ovn v0.1.1-0.20210414223409-7376ba97f8cd
 	github.com/go-ping/ping v0.0.0-20201022122018-3977ed72668a
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/onsi/ginkgo v1.16.1

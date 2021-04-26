@@ -27,6 +27,10 @@ const (
 )
 
 func (ovn *SyncHandler) ensureSubmarinerInfra() error {
+	if err := ovn.ensureSubmarinerGatewayLocalNetSwitch(); err != nil {
+		return err
+	}
+
 	if err := ovn.ensureSubmarinerJoinSwitch(); err != nil {
 		return err
 	}
@@ -42,21 +46,77 @@ func (ovn *SyncHandler) ensureSubmarinerInfra() error {
 	// At this point, we are missing the ovn_cluster_router policies and the
 	// local-to-remote & remote-to-local routes in submariner_router, that
 	// depends on endpoint details that we will receive via events
+	return nil
+}
+
+// ensureSubmarinerGatewayLocalNetSwitch creates the OVN submariner_join switch which
+// connects the ovn_cluster_router to the submariner_router
+func (ovn *SyncHandler) ensureSubmarinerJoinSwitch() error {
+	return ovn.ensureSwitch(submarinerDownstreamSwitch)
+}
+
+// ensureSubmarinerGatewayLocalNetSwitch creates the OVN submariner_gateway switch and
+// virtual ports necessary to make this switch connected to br-submariner on each worker
+// node. This switch is used by the submariner gateway to connect to gateway node and remote
+// clusters.
+func (ovn *SyncHandler) ensureSubmarinerGatewayLocalNetSwitch() error {
+	err := ovn.ensureSwitch(submarinerUpstreamSwitch)
+	if err != nil {
+		return err
+	}
+
+	lspCmd, err := ovn.nbdb.LSPAdd(submarinerUpstreamSwitch, submarinerUpstreamLocalnetPort)
+	if err == nil {
+		err = ovn.nbdb.Execute(lspCmd)
+	}
+
+	if err != nil && !errors.Is(err, goovn.ErrorExist) {
+		return errors.Wrapf(err, "error creating Submariner localnet port %q", submarinerUpstreamLocalnetPort)
+	}
+
+	lspTypeCmd, err := ovn.nbdb.LSPSetType(submarinerUpstreamLocalnetPort, "localnet")
+	if err == nil {
+		err = ovn.nbdb.Execute(lspTypeCmd)
+	}
+
+	if err != nil {
+		return errors.Wrapf(err, "error setting Submariner localnet port %q type", submarinerUpstreamLocalnetPort)
+	}
+
+	lspSetAddressesCmd, err := ovn.nbdb.LSPSetAddress(submarinerUpstreamLocalnetPort, "unknown")
+	if err == nil {
+		err = ovn.nbdb.Execute(lspSetAddressesCmd)
+	}
+
+	if err != nil {
+		return errors.Wrapf(err, "error setting Submariner localnet port %q address", submarinerUpstreamLocalnetPort)
+	}
+
+	lspSetOptionsCmd, err := ovn.nbdb.LSPSetOptions(
+		submarinerUpstreamLocalnetPort, map[string]string{"network_name": SubmarinerUpstreamLocalnet})
+
+	if err == nil {
+		err = ovn.nbdb.Execute(lspSetOptionsCmd)
+	}
+
+	if err != nil {
+		return errors.Wrapf(err, "error setting Submariner localnet port %q address", submarinerUpstreamLocalnetPort)
+	}
 
 	return nil
 }
 
-func (ovn *SyncHandler) ensureSubmarinerJoinSwitch() error {
-	klog.Infof("Ensuring %q switch", submarinerDownstreamSwitch)
-	lsCmd, err := ovn.nbdb.LSAdd(submarinerDownstreamSwitch)
+func (ovn *SyncHandler) ensureSwitch(switchName string) error {
+	klog.Infof("Ensuring %q switch", switchName)
+	lsCmd, err := ovn.nbdb.LSAdd(switchName)
 	if err == nil {
-		klog.Infof("Creating submariner join switch %q", submarinerDownstreamSwitch)
+		klog.Infof("Creating submariner switch %q", switchName)
 
 		err = ovn.nbdb.Execute(lsCmd)
 	}
 
 	if err != nil && !errors.Is(err, goovn.ErrorExist) {
-		return errors.Wrapf(err, "error creating submariner switch %q", submarinerDownstreamSwitch)
+		return errors.Wrapf(err, "error creating submariner switch %q", switchName)
 	}
 
 	return nil
