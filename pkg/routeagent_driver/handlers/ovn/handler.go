@@ -43,7 +43,6 @@ type Handler struct {
 	localEndpoint         *submV1.Endpoint
 	remoteEndpoints       map[string]*submV1.Endpoint
 	isGateway             bool
-	submarinerUpstreamIP  string
 	netlink               netlink.Interface
 }
 

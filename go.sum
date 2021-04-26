@@ -104,6 +104,8 @@ github.com/eapache/go-xerial-snappy v0.0.0-20180814174437-776d5712da21/go.mod h1
 github.com/eapache/queue v1.1.0/go.mod h1:6eCeP0CKFpHLu8blIFXhExK/dRa7WDZfr6jVFPTqq+I=
 github.com/ebay/go-ovn v0.1.1-0.20201007164241-da67e9744ec0 h1:hOdN57gZTKzY0uIVGvE8X+IVpAlI5eCqAHxTe4S3kRI=
 github.com/ebay/go-ovn v0.1.1-0.20201007164241-da67e9744ec0/go.mod h1:Du3Zt/R+DqyqtY5aNTd2gB9bg/igI1RR4fUj6AjmkjI=
+github.com/ebay/go-ovn v0.1.1-0.20210414223409-7376ba97f8cd h1:SzLMEkeuU1V/qL2XPiDw1cMiFoVxdWCPjPjeTAN6zi0=
+github.com/ebay/go-ovn v0.1.1-0.20210414223409-7376ba97f8cd/go.mod h1:Du3Zt/R+DqyqtY5aNTd2gB9bg/igI1RR4fUj6AjmkjI=
 github.com/ebay/libovsdb v0.0.0-20190718202342-e49b8c4e1142 h1:xMG/5rkkDv9rjzbSi/pCOZ5OyKW3MhJFQ9E118xWuYU=
 github.com/ebay/libovsdb v0.0.0-20190718202342-e49b8c4e1142/go.mod h1:TPIbkgdnu8IfDA510pGDS3zYGmnvrPttnge3uhBQf/0=
 github.com/edsrzf/mmap-go v1.0.0/go.mod h1:YO35OhQPt3KJa3ryjFM5Bs14WD66h8eGKpfaBNrHW5M=

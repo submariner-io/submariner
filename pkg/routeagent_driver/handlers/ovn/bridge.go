@@ -21,6 +21,7 @@ import (
 	"syscall"
 
 	"github.com/pkg/errors"
+	npSyncerOVN "github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn"
 	"github.com/vishvananda/netlink"
 
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn/vsctl"
@@ -50,7 +51,7 @@ func (ovn *Handler) ensureSubmarinerNodeBridge() error {
 		return errors.Wrapf(err, "error creating Submariner port %q on the node", ovnK8sSubmarinerInterface)
 	}
 
-	err = vsctl.AddOVNBridgeMapping(ovnK8sSubmarinerLocalNet, ovnK8sSubmarinerBridge)
+	err = vsctl.AddOVNBridgeMapping(npSyncerOVN.SubmarinerUpstreamLocalnet, ovnK8sSubmarinerBridge)
 	if err != nil {
 		return errors.Wrap(err, "error mapping Submariner bridge to OVN localnet")
 	}
@@ -68,9 +69,9 @@ func (ovn *Handler) configureSubmarinerInterface() error {
 		return errors.Wrapf(err, "error bringing up interface %q", ovnK8sSubmarinerInterface)
 	}
 
-	ipAddress, ipNet, err := net.ParseCIDR(ovnK8sSubmarinerInterfaceAddress)
+	ipAddress, ipNet, err := net.ParseCIDR(npSyncerOVN.HostUpstreamNET)
 	if err != nil {
-		return errors.Wrapf(err, "error parsing submariner interface address %q", ovnK8sSubmarinerInterfaceAddress)
+		return errors.Wrapf(err, "error parsing submariner interface address %q", npSyncerOVN.HostUpstreamNET)
 	}
 
 	ipConfig := &netlink.Addr{IPNet: &net.IPNet{

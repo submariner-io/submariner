@@ -24,20 +24,19 @@ import (
 
 const (
 	// The upstream port connects to the host on the GW, right before/after the encryption cable driver
-	submarinerUpstreamSwPort = "submariner_up_lsp"
-	submarinerUpstreamRPort  = "submariner_up_lrp"
-	submarinerUpstreamMAC    = "00:60:2f:10:01:01"
-	submarinerUpstreamNET    = SubmarinerUpstreamIP + "/24"
-	SubmarinerUpstreamIP     = "169.254.33.7" // public constant, used in the route-agent handler
-	hostUpstreamIP           = "169.254.33.1"
-	// the implementation IPs changed at some point
-	// https://github.com/ovn-org/ovn-kubernetes/blob/master/go-controller/pkg/types/const.go#L50
-	hostUpstreamIPv2        = "169.254.0.1"
-	submarinerUpstreamNETv2 = SubmarinerUpstreamIPv2 + "/20"
-	SubmarinerUpstreamIPv2  = "169.254.0.7"
+	submarinerUpstreamSwPort       = "submariner_up_lsp"
+	submarinerUpstreamRPort        = "submariner_up_lrp"
+	submarinerUpstreamMAC          = "00:60:2f:10:01:01"
+	submarinerUpstreamNET          = SubmarinerUpstreamIP + "/29"
+	SubmarinerUpstreamIP           = "169.254.254.9"  // public constant, used in the route-agent handler
+	HostUpstreamIP                 = "169.254.254.10" // we configure this one as ovn-k8s-sub0 interface on each worker node
+	HostUpstreamNET                = HostUpstreamIP + "/29"
+	SubmarinerUpstreamLocalnet     = "submariner_gateway"
+	submarinerUpstreamSwitch       = "submariner_gateway" // this switch is mapped as br-submariner on each worker node
+	submarinerUpstreamLocalnetPort = "submariner_localnet"
 )
 
-func (ovn *SyncHandler) createOrUpdateSubmarinerExternalPort(extLogicalSwitch string) error {
+func (ovn *SyncHandler) createOrUpdateSubmarinerExternalPort() error {
 	// TODO: Improve this so we don't need to delete/recreate everytime
 	delOldRouterPort, _ := ovn.nbdb.LRPDel(submarinerLogicalRouter, submarinerUpstreamRPort)
 	_ = ovn.nbdb.Execute(delOldRouterPort)
@@ -45,10 +44,10 @@ func (ovn *SyncHandler) createOrUpdateSubmarinerExternalPort(extLogicalSwitch st
 	_ = ovn.nbdb.Execute(delOldLSP)
 
 	linkCmd, err := ovn.nbdb.LinkSwitchToRouter(
-		extLogicalSwitch, submarinerUpstreamSwPort,
+		submarinerUpstreamSwitch, submarinerUpstreamSwPort,
 		submarinerLogicalRouter, submarinerUpstreamRPort,
 		submarinerUpstreamMAC,
-		[]string{ovn.submarinerUpstreamNet}, nil,
+		[]string{submarinerUpstreamNET}, nil,
 	)
 
 	if err == nil {
@@ -77,7 +76,7 @@ func (ovn *SyncHandler) updateSubmarinerRouterRemoteRoutes() error {
 
 	ovn.logRoutingChanges("north routes", submarinerLogicalRouter, toAdd, toRemove)
 
-	ovnCommands, err := ovn.addSubmRoutesToSubnets(toAdd, submarinerUpstreamRPort, ovn.hostUpstreamIP, []*goovn.OvnCommand{})
+	ovnCommands, err := ovn.addSubmRoutesToSubnets(toAdd, submarinerUpstreamRPort, HostUpstreamIP, []*goovn.OvnCommand{})
 	if err != nil {
 		return err
 	}

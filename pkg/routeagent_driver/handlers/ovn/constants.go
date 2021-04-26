@@ -16,10 +16,7 @@ limitations under the License.
 package ovn
 
 const (
-	ovnK8sGatewayInterface           = "ovn-k8s-gw0"
-	ovnK8sSubmarinerInterface        = "ovn-k8s-sub0"
-	ovnK8sSubmarinerBridge           = "br-submariner"
-	ovnK8sSubmarinerLocalNet         = "submariner"
-	ovnK8sSubmarinerInterfaceAddress = "169.254.254.9/29"
-	ovnK8sSubmarinerInterfaceMAC     = "0a:58:66:22:33:44"
+	ovnK8sSubmarinerInterface    = "ovn-k8s-sub0"
+	ovnK8sSubmarinerBridge       = "br-submariner"
+	ovnK8sSubmarinerInterfaceMAC = "0a:58:66:22:33:44"
 )
