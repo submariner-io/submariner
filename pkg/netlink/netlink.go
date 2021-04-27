@@ -29,6 +29,7 @@ type Interface interface {
 	LinkAdd(link netlink.Link) error
 	LinkDel(link netlink.Link) error
 	LinkByName(name string) (netlink.Link, error)
+	LinkSetUp(link netlink.Link) error
 
 	AddrAdd(link netlink.Link, addr *netlink.Addr) error
 
@@ -77,6 +78,10 @@ func (n *netlinkType) LinkDel(link netlink.Link) error {
 
 func (n *netlinkType) LinkByName(name string) (netlink.Link, error) {
 	return netlink.LinkByName(name)
+}
+
+func (n *netlinkType) LinkSetUp(link netlink.Link) error {
+	return netlink.LinkSetUp(link)
 }
 
 func (n *netlinkType) AddrAdd(link netlink.Link, addr *netlink.Addr) error {

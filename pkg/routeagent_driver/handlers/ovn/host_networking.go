@@ -114,6 +114,7 @@ func (ovn *Handler) getNextHopOnK8sMgmtIntf() (*net.IP, error) {
 	}
 
 	link, err := netlink.LinkByName(OVNK8sMgmntIntfName)
+
 	if err != nil {
 		if _, ok := err.(netlink.LinkNotFoundError); !ok {
 			return nil, errors.Wrapf(err, "error retrieving link by name %q", OVNK8sMgmntIntfName)

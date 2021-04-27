@@ -22,16 +22,18 @@ source ${DAPPER_SOURCE}/scripts/cluster_settings
 import_image quay.io/submariner/submariner-gateway
 import_image quay.io/submariner/submariner-route-agent
 import_image quay.io/submariner/submariner-globalnet
+import_image quay.io/submariner/submariner-networkplugin-syncer
 
 declare_kubeconfig
 
 case "${restart}" in
-	gateway|routeagent|globalnet)
+	gateway|routeagent|globalnet|networkplugin-syncer)
 		run_subm_clusters reload_pods daemonset submariner-${restart}
 		;;
 	all)
 		run_subm_clusters reload_pods daemonset submariner-gateway
 		run_subm_clusters reload_pods daemonset submariner-routeagent
+		run_subm_clusters reload_pods deployment submariner-networkplugin-syncer
 		run_subm_clusters reload_pods daemonset submariner-globalnet || true # globalnet is not always enabled
 		;;
 	none)
