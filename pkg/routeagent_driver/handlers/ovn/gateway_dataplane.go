@@ -24,10 +24,10 @@ import (
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/stringset"
+	npSyncerOvn "github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn"
 	"github.com/vishvananda/netlink"
 	"k8s.io/klog"
 
-	npSyncerOvn "github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	iptcommon "github.com/submariner-io/submariner/pkg/routeagent_driver/iptables"
 	"github.com/submariner-io/submariner/pkg/util"
@@ -113,12 +113,12 @@ func (ovn *Handler) getForwardingRuleSpecs() ([][]string, error) {
 	}
 
 	rules := [][]string{
-		{"-i", ovnK8sGatewayInterface, "-o", ovn.cableRoutingInterface.Name, "-j", "ACCEPT"},
-		{"-i", ovn.cableRoutingInterface.Name, "-o", ovnK8sGatewayInterface, "-j", "ACCEPT"}}
+		{"-i", ovnK8sSubmarinerInterface, "-o", ovn.cableRoutingInterface.Name, "-j", "ACCEPT"},
+		{"-i", ovn.cableRoutingInterface.Name, "-o", ovnK8sSubmarinerInterface, "-j", "ACCEPT"}}
 
 	// NOTE: This is a workaround for submariner issue https://github.com/submariner-io/submariner/issues/1022
 	for _, serviceCIDR := range ovn.config.ServiceCidr {
-		rules = append(rules, []string{"-o", ovnK8sGatewayInterface, "-d", serviceCIDR, "-p", "tcp",
+		rules = append(rules, []string{"-o", ovnK8sSubmarinerInterface, "-d", serviceCIDR, "-p", "tcp",
 			"--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", strconv.Itoa(MSSFor1500MTU)})
 	}
 
@@ -231,54 +231,10 @@ func (ovn *Handler) cleanupForwardingIptables() error {
 }
 
 func (ovn *Handler) getSubmDefaultRoute() *netlink.Route {
-	submarinerUpstreamIP, err := ovn.getSubmarinerUpstreamIP()
-
-	// This is a non-retriable error, if this happens we want a hard &
-	// visible error: the route-agent pod exiting with error
-	if err != nil {
-		klog.Fatal(err)
-	}
-
 	return &netlink.Route{
-		Gw:    net.ParseIP(submarinerUpstreamIP),
+		Gw:    net.ParseIP(npSyncerOvn.SubmarinerUpstreamIP),
 		Table: constants.RouteAgentInterClusterNetworkTableID,
 	}
-}
-
-func (ovn *Handler) getSubmarinerUpstreamIP() (string, error) {
-	if ovn.submarinerUpstreamIP != "" {
-		return ovn.submarinerUpstreamIP, nil
-	}
-
-	iface, err := net.InterfaceByName(ovnK8sGatewayInterface)
-	if err != nil {
-		return "", errors.Wrapf(err, "error looking for %q interface, trying to detect the submariner_router upstream IP",
-			ovnK8sGatewayInterface)
-	}
-
-	addresses, err := iface.Addrs()
-	if err != nil {
-		return "", errors.Wrapf(err, "error listing %q interface addresses while trying to detect the submariner_router upstream IP",
-			ovnK8sGatewayInterface)
-	}
-
-	for _, addr := range addresses {
-		switch {
-		case strings.HasPrefix(addr.String(), "169.254.0."):
-			ovn.submarinerUpstreamIP = npSyncerOvn.SubmarinerUpstreamIPv2
-		case strings.HasPrefix(addr.String(), "169.254.33."):
-			ovn.submarinerUpstreamIP = npSyncerOvn.SubmarinerUpstreamIP
-		}
-	}
-
-	if ovn.submarinerUpstreamIP == "" {
-		return "", errors.Errorf("Unable to figure out the submariner_router upstream IP address based on %q addresses %#v",
-			ovnK8sGatewayInterface, addresses)
-	}
-
-	klog.Infof("Submariner router upstream ip found to be: %q", ovn.submarinerUpstreamIP)
-
-	return ovn.submarinerUpstreamIP, nil
 }
 
 func (ovn *Handler) initIPtablesChains() error {
