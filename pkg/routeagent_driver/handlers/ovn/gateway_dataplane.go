@@ -117,8 +117,17 @@ func (ovn *Handler) getForwardingRuleSpecs() ([][]string, error) {
 		{"-i", ovn.cableRoutingInterface.Name, "-o", ovnK8sSubmarinerInterface, "-j", "ACCEPT"}}
 
 	// NOTE: This is a workaround for submariner issue https://github.com/submariner-io/submariner/issues/1022
+	// TODO: work with the core-ovn community to make sure that load balancers propagate ICMPs back to pods
 	for _, serviceCIDR := range ovn.config.ServiceCidr {
 		rules = append(rules, []string{"-o", ovnK8sSubmarinerInterface, "-d", serviceCIDR, "-p", "tcp",
+			"--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", strconv.Itoa(MSSFor1500MTU)})
+	}
+
+	// NOTE: This is a workaround for submariner issue https://github.com/submariner-io/submariner/issues/1278
+	// TODO: get the kernel to steer the ICMPs back to ovn-k8s-sub0 interface properly, or write a packet
+	//       reflector in the route agent for that type of packets
+	for _, remoteCIDR := range ovn.getRemoteSubnets().Elements() {
+		rules = append(rules, []string{"-d", remoteCIDR, "-p", "tcp",
 			"--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", strconv.Itoa(MSSFor1500MTU)})
 	}
 
