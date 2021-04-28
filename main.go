@@ -207,8 +207,10 @@ func main() {
 		go func() {
 			defer wg.Done()
 
-			if err = cableHealthchecker.Start(stopCh); err != nil {
-				klog.Errorf("Error starting healthChecker: %v", err)
+			if cableHealthchecker != nil {
+				if err = cableHealthchecker.Start(stopCh); err != nil {
+					klog.Errorf("Error starting healthChecker: %v", err)
+				}
 			}
 		}()
 
