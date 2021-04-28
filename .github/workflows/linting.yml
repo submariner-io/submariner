@@ -16,20 +16,6 @@ jobs:
       - name: Verify generated code matches committed code
         run: git add -A && git diff --staged --exit-code
 
-  dco:
-    name: DCO in Commit Message(s)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Get PR commits
-        id: 'get-pr-commits'
-        uses: tim-actions/get-pr-commits@master
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Run DCO check
-        uses: tim-actions/dco@master
-        with:
-          commits: ${{ steps.get-pr-commits.outputs.commits }}
-
   gitlint:
     name: Commit Message(s)
     runs-on: ubuntu-latest
