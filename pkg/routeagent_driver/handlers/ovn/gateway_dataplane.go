@@ -62,6 +62,10 @@ func (ovn *Handler) cleanupGatewayDataplane() error {
 		}
 	}
 
+	if err = ovn.cleanupOutputIptables(); err != nil {
+		return errors.Wrap(err, "error cleaning up output iptable rules")
+	}
+
 	return ovn.cleanupForwardingIptables()
 }
 
@@ -96,6 +100,10 @@ func (ovn *Handler) updateGatewayDataplane() error {
 		return errors.Wrap(err, "error handling no-masquerade rules")
 	}
 
+	if err = ovn.setupOutputIptables(); err != nil {
+		return errors.Wrap(err, "error setting up output iptable rules")
+	}
+
 	return ovn.setupForwardingIptables()
 }
 
@@ -126,28 +134,48 @@ func (ovn *Handler) getForwardingRuleSpecs() ([][]string, error) {
 	// NOTE: This is a workaround for submariner issue https://github.com/submariner-io/submariner/issues/1278
 	// TODO: get the kernel to steer the ICMPs back to ovn-k8s-sub0 interface properly, or write a packet
 	//       reflector in the route agent for that type of packets
+	rules = ovn.appendMSSClampingToRemoteCIRDs(rules)
+
+	return rules, nil
+}
+
+func (ovn *Handler) appendMSSClampingToRemoteCIRDs(rules [][]string) [][]string {
 	for _, remoteCIDR := range ovn.getRemoteSubnets().Elements() {
 		rules = append(rules, []string{"-d", remoteCIDR, "-p", "tcp",
 			"--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", strconv.Itoa(MSSFor1500MTU)})
 	}
 
-	return rules, nil
+	return rules
 }
 
+func (ovn *Handler) getOutputRuleSpec() ([][]string, error) {
+	return ovn.appendMSSClampingToRemoteCIRDs([][]string{}), nil
+}
+
+type forwardRuleSpecGenerator func() ([][]string, error)
+
 func (ovn *Handler) setupForwardingIptables() error {
+	return ovn.setupChainIptables("filter", "FORWARD", ovn.getForwardingRuleSpecs)
+}
+
+func (ovn *Handler) setupOutputIptables() error {
+	return ovn.setupChainIptables("filter", "OUTPUT", ovn.getOutputRuleSpec)
+}
+
+func (ovn *Handler) setupChainIptables(table, chain string, ruleGen forwardRuleSpecGenerator) error {
 	ipt, err := iptables.New()
 	if err != nil {
 		return errors.Wrap(err, "error initializing iptables")
 	}
 
-	ruleSpecs, err := ovn.getForwardingRuleSpecs()
+	ruleSpecs, err := ruleGen()
 	if err != nil {
 		return err
 	}
 
 	for _, ruleSpec := range ruleSpecs {
-		if err = util.PrependUnique(ipt, "filter", "FORWARD", ruleSpec); err != nil {
-			return errors.Wrap(err, "unable to insert iptable rule in filter table to forward submariner traffic")
+		if err = util.PrependUnique(ipt, table, chain, ruleSpec); err != nil {
+			return errors.Wrapf(err, "unable to insert iptable rule in %s table to %s chain", table, chain)
 		}
 	}
 
@@ -217,22 +245,30 @@ func (ovn *Handler) getNoMasqueradRuleSpecs() [][]string {
 }
 
 func (ovn *Handler) cleanupForwardingIptables() error {
+	return ovn.cleanupChainIptables("filter", "FORWARD", ovn.getForwardingRuleSpecs)
+}
+
+func (ovn *Handler) cleanupOutputIptables() error {
+	return ovn.cleanupChainIptables("filter", "OUTPUT", ovn.getOutputRuleSpec)
+}
+
+func (ovn *Handler) cleanupChainIptables(table, chain string, ruleGen forwardRuleSpecGenerator) error {
 	ipt, err := iptables.New()
 	if err != nil {
 		return errors.Wrap(err, "error initializing iptables")
 	}
 
-	ruleSpecs, err := ovn.getForwardingRuleSpecs()
+	ruleSpecs, err := ruleGen()
 	if err != nil {
 		return err
 	}
 
 	for _, ruleSpec := range ruleSpecs {
-		err = ipt.Delete("filter", "FORWARD", ruleSpec...)
+		err = ipt.Delete(table, chain, ruleSpec...)
 		if err != nil {
 			// We log, and don't return, because there could be some transient errors on delete if the
 			// rule didn't exist, we don't want to retry
-			klog.Errorf("error cleaning FORWARD tables: %s", err)
+			klog.Errorf("error cleaning %s chain from %s table on iptables: %s", chain, table, err)
 		}
 	}
 
