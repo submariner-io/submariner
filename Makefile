@@ -2,7 +2,7 @@ restart ?= all
 FOCUS ?=
 SKIP ?=
 PLUGIN ?=
-BASE_BRANCH ?= devel
+BASE_BRANCH ?= release-0.9
 export BASE_BRANCH
 
 ifneq (,$(DAPPER_HOST_ARCH))

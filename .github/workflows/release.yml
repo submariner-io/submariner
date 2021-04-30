@@ -4,7 +4,7 @@ name: Release Images
 on:
   push:
     branches:
-      - devel
+      - release-0.9
       - release-*
 
 jobs:
@@ -18,11 +18,11 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Run E2E deployment and tests
-        uses: submariner-io/shipyard/gh-actions/e2e@devel
+        uses: submariner-io/shipyard/gh-actions/e2e@release-0.9
 
       - name: Post mortem
         if: failure()
-        uses: submariner-io/shipyard/gh-actions/post-mortem@devel
+        uses: submariner-io/shipyard/gh-actions/post-mortem@release-0.9
 
       - name: Clean up E2E deployment
         run: make clean-clusters
@@ -38,7 +38,7 @@ jobs:
           fetch-depth: 0
 
       - name: Build and release new images
-        uses: submariner-io/shipyard/gh-actions/release-images@devel
+        uses: submariner-io/shipyard/gh-actions/release-images@release-0.9
         with:
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_PASSWORD }}
