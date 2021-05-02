@@ -1,6 +1,16 @@
 #!/bin/bash
 set -e
 
+cat << EOM
+This tool is deprecated since v0.9.0 and will be removed in the next release.
+
+You can now prepare your AWS cluster using 'subctl cloud prepare aws'.
+
+EOM
+
+read -p "Do you wish to continue? " input
+[[ "$input" =~ ^y(es)?$ ]] || exit
+
 IPSEC_IKE_PORT=${IPSEC_IKE_PORT:-500}
 IPSEC_NATT_PORT=${IPSEC_NATT_PORT:-4500}
 NAT_DISCOVERY_PORT=${NAT_DISCOVERY_PORT:-4490}
