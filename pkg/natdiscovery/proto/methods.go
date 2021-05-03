@@ -16,7 +16,7 @@ limitations under the License.
 
 package proto
 
-func (x *SubmarinerNatDiscoveryResponse) GetSenderEndpointID() string {
+func (x *SubmarinerNATDiscoveryResponse) GetSenderEndpointID() string {
 	if x != nil && x.Sender != nil {
 		return x.Sender.EndpointId
 	}
@@ -24,7 +24,7 @@ func (x *SubmarinerNatDiscoveryResponse) GetSenderEndpointID() string {
 	return ""
 }
 
-func (x *SubmarinerNatDiscoveryResponse) GetReceiverEndpointID() string {
+func (x *SubmarinerNATDiscoveryResponse) GetReceiverEndpointID() string {
 	if x != nil && x.Receiver != nil {
 		return x.Receiver.EndpointId
 	}

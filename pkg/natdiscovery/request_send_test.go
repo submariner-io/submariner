@@ -25,7 +25,7 @@ import (
 
 var _ = When("a request is sent", func() {
 	var (
-		request        *natproto.SubmarinerNatDiscoveryRequest
+		request        *natproto.SubmarinerNATDiscoveryRequest
 		remoteEndpoint submarinerv1.Endpoint
 		udpSent        chan []byte
 		ndInstance     *natDiscovery

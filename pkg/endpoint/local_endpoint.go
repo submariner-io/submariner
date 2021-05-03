@@ -63,7 +63,7 @@ func GetLocal(submSpec types.SubmarinerSpecification, privateIP string, gwNode *
 			ClusterID:     submSpec.ClusterID,
 			Hostname:      hostname,
 			PrivateIP:     privateIP,
-			NATEnabled:    submSpec.NatEnabled,
+			NATEnabled:    submSpec.NATEnabled,
 			Subnets:       localSubnets,
 			Backend:       submSpec.CableDriver,
 			BackendConfig: backendConfig,
