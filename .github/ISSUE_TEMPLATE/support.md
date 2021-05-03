@@ -6,7 +6,7 @@ labels: support
 ---
 
 <!--
-GitHub may not the right place for support requests.
+GitHub may not be the right place for support requests.
 
 You can also post your question on the [Submariner
 Slack](https://kubernetes.slack.com/archives/C010RJV694M) or the Submariner
