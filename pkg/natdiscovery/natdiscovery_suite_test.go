@@ -58,8 +58,8 @@ var (
 	testRemoteNATPort int32 = 4321
 )
 
-func parseProtocolRequest(buf []byte) *natproto.SubmarinerNatDiscoveryRequest {
-	msg := natproto.SubmarinerNatDiscoveryMessage{}
+func parseProtocolRequest(buf []byte) *natproto.SubmarinerNATDiscoveryRequest {
+	msg := natproto.SubmarinerNATDiscoveryMessage{}
 	if err := proto.Unmarshal(buf, &msg); err != nil {
 		klog.Errorf("error unmarshaling message received on UDP port %d: %s", natproto.DefaultPort, err)
 	}
@@ -70,8 +70,8 @@ func parseProtocolRequest(buf []byte) *natproto.SubmarinerNatDiscoveryRequest {
 	return request
 }
 
-func parseProtocolResponse(buf []byte) *natproto.SubmarinerNatDiscoveryResponse {
-	msg := natproto.SubmarinerNatDiscoveryMessage{}
+func parseProtocolResponse(buf []byte) *natproto.SubmarinerNATDiscoveryResponse {
+	msg := natproto.SubmarinerNATDiscoveryMessage{}
 	if err := proto.Unmarshal(buf, &msg); err != nil {
 		klog.Errorf("error unmarshaling message received on UDP port %d: %s", natproto.DefaultPort, err)
 	}
@@ -83,7 +83,7 @@ func parseProtocolResponse(buf []byte) *natproto.SubmarinerNatDiscoveryResponse 
 }
 
 func createTestListener(endpoint *submarinerv1.Endpoint) (*natDiscovery, chan []byte, chan *NATEndpointInfo) {
-	listener, err := newNatDiscovery(&types.SubmarinerEndpoint{Spec: endpoint.Spec})
+	listener, err := newNATDiscovery(&types.SubmarinerEndpoint{Spec: endpoint.Spec})
 	Expect(err).To(Succeed())
 
 	readyChannel := listener.GetReadyChannel()
