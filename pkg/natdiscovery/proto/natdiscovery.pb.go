@@ -91,20 +91,20 @@ func (ResponseType) EnumDescriptor() ([]byte, []int) {
 	return file_pkg_natdiscovery_proto_natdiscovery_proto_rawDescGZIP(), []int{0}
 }
 
-type SubmarinerNatDiscoveryMessage struct {
+type SubmarinerNATDiscoveryMessage struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
 	Version int32 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
 	// Types that are assignable to Message:
-	//	*SubmarinerNatDiscoveryMessage_Request
-	//	*SubmarinerNatDiscoveryMessage_Response
-	Message isSubmarinerNatDiscoveryMessage_Message `protobuf_oneof:"message"`
+	//	*SubmarinerNATDiscoveryMessage_Request
+	//	*SubmarinerNATDiscoveryMessage_Response
+	Message isSubmarinerNATDiscoveryMessage_Message `protobuf_oneof:"message"`
 }
 
-func (x *SubmarinerNatDiscoveryMessage) Reset() {
-	*x = SubmarinerNatDiscoveryMessage{}
+func (x *SubmarinerNATDiscoveryMessage) Reset() {
+	*x = SubmarinerNATDiscoveryMessage{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_pkg_natdiscovery_proto_natdiscovery_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -112,13 +112,13 @@ func (x *SubmarinerNatDiscoveryMessage) Reset() {
 	}
 }
 
-func (x *SubmarinerNatDiscoveryMessage) String() string {
+func (x *SubmarinerNATDiscoveryMessage) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*SubmarinerNatDiscoveryMessage) ProtoMessage() {}
+func (*SubmarinerNATDiscoveryMessage) ProtoMessage() {}
 
-func (x *SubmarinerNatDiscoveryMessage) ProtoReflect() protoreflect.Message {
+func (x *SubmarinerNATDiscoveryMessage) ProtoReflect() protoreflect.Message {
 	mi := &file_pkg_natdiscovery_proto_natdiscovery_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -130,56 +130,56 @@ func (x *SubmarinerNatDiscoveryMessage) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use SubmarinerNatDiscoveryMessage.ProtoReflect.Descriptor instead.
-func (*SubmarinerNatDiscoveryMessage) Descriptor() ([]byte, []int) {
+// Deprecated: Use SubmarinerNATDiscoveryMessage.ProtoReflect.Descriptor instead.
+func (*SubmarinerNATDiscoveryMessage) Descriptor() ([]byte, []int) {
 	return file_pkg_natdiscovery_proto_natdiscovery_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *SubmarinerNatDiscoveryMessage) GetVersion() int32 {
+func (x *SubmarinerNATDiscoveryMessage) GetVersion() int32 {
 	if x != nil {
 		return x.Version
 	}
 	return 0
 }
 
-func (m *SubmarinerNatDiscoveryMessage) GetMessage() isSubmarinerNatDiscoveryMessage_Message {
+func (m *SubmarinerNATDiscoveryMessage) GetMessage() isSubmarinerNATDiscoveryMessage_Message {
 	if m != nil {
 		return m.Message
 	}
 	return nil
 }
 
-func (x *SubmarinerNatDiscoveryMessage) GetRequest() *SubmarinerNatDiscoveryRequest {
-	if x, ok := x.GetMessage().(*SubmarinerNatDiscoveryMessage_Request); ok {
+func (x *SubmarinerNATDiscoveryMessage) GetRequest() *SubmarinerNATDiscoveryRequest {
+	if x, ok := x.GetMessage().(*SubmarinerNATDiscoveryMessage_Request); ok {
 		return x.Request
 	}
 	return nil
 }
 
-func (x *SubmarinerNatDiscoveryMessage) GetResponse() *SubmarinerNatDiscoveryResponse {
-	if x, ok := x.GetMessage().(*SubmarinerNatDiscoveryMessage_Response); ok {
+func (x *SubmarinerNATDiscoveryMessage) GetResponse() *SubmarinerNATDiscoveryResponse {
+	if x, ok := x.GetMessage().(*SubmarinerNATDiscoveryMessage_Response); ok {
 		return x.Response
 	}
 	return nil
 }
 
-type isSubmarinerNatDiscoveryMessage_Message interface {
-	isSubmarinerNatDiscoveryMessage_Message()
+type isSubmarinerNATDiscoveryMessage_Message interface {
+	isSubmarinerNATDiscoveryMessage_Message()
 }
 
-type SubmarinerNatDiscoveryMessage_Request struct {
-	Request *SubmarinerNatDiscoveryRequest `protobuf:"bytes,2,opt,name=request,proto3,oneof"`
+type SubmarinerNATDiscoveryMessage_Request struct {
+	Request *SubmarinerNATDiscoveryRequest `protobuf:"bytes,2,opt,name=request,proto3,oneof"`
 }
 
-type SubmarinerNatDiscoveryMessage_Response struct {
-	Response *SubmarinerNatDiscoveryResponse `protobuf:"bytes,3,opt,name=response,proto3,oneof"`
+type SubmarinerNATDiscoveryMessage_Response struct {
+	Response *SubmarinerNATDiscoveryResponse `protobuf:"bytes,3,opt,name=response,proto3,oneof"`
 }
 
-func (*SubmarinerNatDiscoveryMessage_Request) isSubmarinerNatDiscoveryMessage_Message() {}
+func (*SubmarinerNATDiscoveryMessage_Request) isSubmarinerNATDiscoveryMessage_Message() {}
 
-func (*SubmarinerNatDiscoveryMessage_Response) isSubmarinerNatDiscoveryMessage_Message() {}
+func (*SubmarinerNATDiscoveryMessage_Response) isSubmarinerNATDiscoveryMessage_Message() {}
 
-type SubmarinerNatDiscoveryRequest struct {
+type SubmarinerNATDiscoveryRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -193,8 +193,8 @@ type SubmarinerNatDiscoveryRequest struct {
 	UsingDst *IPPortPair `protobuf:"bytes,5,opt,name=using_dst,json=usingDst,proto3" json:"using_dst,omitempty"`
 }
 
-func (x *SubmarinerNatDiscoveryRequest) Reset() {
-	*x = SubmarinerNatDiscoveryRequest{}
+func (x *SubmarinerNATDiscoveryRequest) Reset() {
+	*x = SubmarinerNATDiscoveryRequest{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_pkg_natdiscovery_proto_natdiscovery_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -202,13 +202,13 @@ func (x *SubmarinerNatDiscoveryRequest) Reset() {
 	}
 }
 
-func (x *SubmarinerNatDiscoveryRequest) String() string {
+func (x *SubmarinerNATDiscoveryRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*SubmarinerNatDiscoveryRequest) ProtoMessage() {}
+func (*SubmarinerNATDiscoveryRequest) ProtoMessage() {}
 
-func (x *SubmarinerNatDiscoveryRequest) ProtoReflect() protoreflect.Message {
+func (x *SubmarinerNATDiscoveryRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_pkg_natdiscovery_proto_natdiscovery_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -220,47 +220,47 @@ func (x *SubmarinerNatDiscoveryRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use SubmarinerNatDiscoveryRequest.ProtoReflect.Descriptor instead.
-func (*SubmarinerNatDiscoveryRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use SubmarinerNATDiscoveryRequest.ProtoReflect.Descriptor instead.
+func (*SubmarinerNATDiscoveryRequest) Descriptor() ([]byte, []int) {
 	return file_pkg_natdiscovery_proto_natdiscovery_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *SubmarinerNatDiscoveryRequest) GetRequestNumber() uint64 {
+func (x *SubmarinerNATDiscoveryRequest) GetRequestNumber() uint64 {
 	if x != nil {
 		return x.RequestNumber
 	}
 	return 0
 }
 
-func (x *SubmarinerNatDiscoveryRequest) GetSender() *EndpointDetails {
+func (x *SubmarinerNATDiscoveryRequest) GetSender() *EndpointDetails {
 	if x != nil {
 		return x.Sender
 	}
 	return nil
 }
 
-func (x *SubmarinerNatDiscoveryRequest) GetReceiver() *EndpointDetails {
+func (x *SubmarinerNATDiscoveryRequest) GetReceiver() *EndpointDetails {
 	if x != nil {
 		return x.Receiver
 	}
 	return nil
 }
 
-func (x *SubmarinerNatDiscoveryRequest) GetUsingSrc() *IPPortPair {
+func (x *SubmarinerNATDiscoveryRequest) GetUsingSrc() *IPPortPair {
 	if x != nil {
 		return x.UsingSrc
 	}
 	return nil
 }
 
-func (x *SubmarinerNatDiscoveryRequest) GetUsingDst() *IPPortPair {
+func (x *SubmarinerNATDiscoveryRequest) GetUsingDst() *IPPortPair {
 	if x != nil {
 		return x.UsingDst
 	}
 	return nil
 }
 
-type SubmarinerNatDiscoveryResponse struct {
+type SubmarinerNATDiscoveryResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -277,8 +277,8 @@ type SubmarinerNatDiscoveryResponse struct {
 	ReceivedSrc *IPPortPair `protobuf:"bytes,8,opt,name=received_src,json=receivedSrc,proto3" json:"received_src,omitempty"`
 }
 
-func (x *SubmarinerNatDiscoveryResponse) Reset() {
-	*x = SubmarinerNatDiscoveryResponse{}
+func (x *SubmarinerNATDiscoveryResponse) Reset() {
+	*x = SubmarinerNATDiscoveryResponse{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_pkg_natdiscovery_proto_natdiscovery_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -286,13 +286,13 @@ func (x *SubmarinerNatDiscoveryResponse) Reset() {
 	}
 }
 
-func (x *SubmarinerNatDiscoveryResponse) String() string {
+func (x *SubmarinerNATDiscoveryResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*SubmarinerNatDiscoveryResponse) ProtoMessage() {}
+func (*SubmarinerNATDiscoveryResponse) ProtoMessage() {}
 
-func (x *SubmarinerNatDiscoveryResponse) ProtoReflect() protoreflect.Message {
+func (x *SubmarinerNATDiscoveryResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_pkg_natdiscovery_proto_natdiscovery_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -304,61 +304,61 @@ func (x *SubmarinerNatDiscoveryResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use SubmarinerNatDiscoveryResponse.ProtoReflect.Descriptor instead.
-func (*SubmarinerNatDiscoveryResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use SubmarinerNATDiscoveryResponse.ProtoReflect.Descriptor instead.
+func (*SubmarinerNATDiscoveryResponse) Descriptor() ([]byte, []int) {
 	return file_pkg_natdiscovery_proto_natdiscovery_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *SubmarinerNatDiscoveryResponse) GetRequestNumber() uint64 {
+func (x *SubmarinerNATDiscoveryResponse) GetRequestNumber() uint64 {
 	if x != nil {
 		return x.RequestNumber
 	}
 	return 0
 }
 
-func (x *SubmarinerNatDiscoveryResponse) GetResponse() ResponseType {
+func (x *SubmarinerNATDiscoveryResponse) GetResponse() ResponseType {
 	if x != nil {
 		return x.Response
 	}
 	return ResponseType_OK
 }
 
-func (x *SubmarinerNatDiscoveryResponse) GetSender() *EndpointDetails {
+func (x *SubmarinerNATDiscoveryResponse) GetSender() *EndpointDetails {
 	if x != nil {
 		return x.Sender
 	}
 	return nil
 }
 
-func (x *SubmarinerNatDiscoveryResponse) GetReceiver() *EndpointDetails {
+func (x *SubmarinerNATDiscoveryResponse) GetReceiver() *EndpointDetails {
 	if x != nil {
 		return x.Receiver
 	}
 	return nil
 }
 
-func (x *SubmarinerNatDiscoveryResponse) GetSrcIpNatDetected() bool {
+func (x *SubmarinerNATDiscoveryResponse) GetSrcIpNatDetected() bool {
 	if x != nil {
 		return x.SrcIpNatDetected
 	}
 	return false
 }
 
-func (x *SubmarinerNatDiscoveryResponse) GetSrcPortNatDetected() bool {
+func (x *SubmarinerNATDiscoveryResponse) GetSrcPortNatDetected() bool {
 	if x != nil {
 		return x.SrcPortNatDetected
 	}
 	return false
 }
 
-func (x *SubmarinerNatDiscoveryResponse) GetDstIpNatDetected() bool {
+func (x *SubmarinerNATDiscoveryResponse) GetDstIpNatDetected() bool {
 	if x != nil {
 		return x.DstIpNatDetected
 	}
 	return false
 }
 
-func (x *SubmarinerNatDiscoveryResponse) GetReceivedSrc() *IPPortPair {
+func (x *SubmarinerNATDiscoveryResponse) GetReceivedSrc() *IPPortPair {
 	if x != nil {
 		return x.ReceivedSrc
 	}
@@ -482,19 +482,19 @@ var file_pkg_natdiscovery_proto_natdiscovery_proto_rawDesc = []byte{
 	0x0a, 0x29, 0x70, 0x6b, 0x67, 0x2f, 0x6e, 0x61, 0x74, 0x64, 0x69, 0x73, 0x63, 0x6f, 0x76, 0x65,
 	0x72, 0x79, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x6e, 0x61, 0x74, 0x64, 0x69, 0x73, 0x63,
 	0x6f, 0x76, 0x65, 0x72, 0x79, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0xbf, 0x01, 0x0a, 0x1d,
-	0x53, 0x75, 0x62, 0x6d, 0x61, 0x72, 0x69, 0x6e, 0x65, 0x72, 0x4e, 0x61, 0x74, 0x44, 0x69, 0x73,
+	0x53, 0x75, 0x62, 0x6d, 0x61, 0x72, 0x69, 0x6e, 0x65, 0x72, 0x4e, 0x41, 0x54, 0x44, 0x69, 0x73,
 	0x63, 0x6f, 0x76, 0x65, 0x72, 0x79, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x12, 0x18, 0x0a,
 	0x07, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x01, 0x20, 0x01, 0x28, 0x05, 0x52, 0x07,
 	0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x12, 0x3a, 0x0a, 0x07, 0x72, 0x65, 0x71, 0x75, 0x65,
 	0x73, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1e, 0x2e, 0x53, 0x75, 0x62, 0x6d, 0x61,
-	0x72, 0x69, 0x6e, 0x65, 0x72, 0x4e, 0x61, 0x74, 0x44, 0x69, 0x73, 0x63, 0x6f, 0x76, 0x65, 0x72,
+	0x72, 0x69, 0x6e, 0x65, 0x72, 0x4e, 0x41, 0x54, 0x44, 0x69, 0x73, 0x63, 0x6f, 0x76, 0x65, 0x72,
 	0x79, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x48, 0x00, 0x52, 0x07, 0x72, 0x65, 0x71, 0x75,
 	0x65, 0x73, 0x74, 0x12, 0x3d, 0x0a, 0x08, 0x72, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x18,
 	0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1f, 0x2e, 0x53, 0x75, 0x62, 0x6d, 0x61, 0x72, 0x69, 0x6e,
-	0x65, 0x72, 0x4e, 0x61, 0x74, 0x44, 0x69, 0x73, 0x63, 0x6f, 0x76, 0x65, 0x72, 0x79, 0x52, 0x65,
+	0x65, 0x72, 0x4e, 0x41, 0x54, 0x44, 0x69, 0x73, 0x63, 0x6f, 0x76, 0x65, 0x72, 0x79, 0x52, 0x65,
 	0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x48, 0x00, 0x52, 0x08, 0x72, 0x65, 0x73, 0x70, 0x6f, 0x6e,
 	0x73, 0x65, 0x42, 0x09, 0x0a, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x22, 0xf2, 0x01,
-	0x0a, 0x1d, 0x53, 0x75, 0x62, 0x6d, 0x61, 0x72, 0x69, 0x6e, 0x65, 0x72, 0x4e, 0x61, 0x74, 0x44,
+	0x0a, 0x1d, 0x53, 0x75, 0x62, 0x6d, 0x61, 0x72, 0x69, 0x6e, 0x65, 0x72, 0x4e, 0x41, 0x54, 0x44,
 	0x69, 0x73, 0x63, 0x6f, 0x76, 0x65, 0x72, 0x79, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12,
 	0x25, 0x0a, 0x0e, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x5f, 0x6e, 0x75, 0x6d, 0x62, 0x65,
 	0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0d, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74,
@@ -510,7 +510,7 @@ var file_pkg_natdiscovery_proto_natdiscovery_proto_rawDesc = []byte{
 	0x67, 0x5f, 0x64, 0x73, 0x74, 0x18, 0x05, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0b, 0x2e, 0x49, 0x50,
 	0x50, 0x6f, 0x72, 0x74, 0x50, 0x61, 0x69, 0x72, 0x52, 0x08, 0x75, 0x73, 0x69, 0x6e, 0x67, 0x44,
 	0x73, 0x74, 0x22, 0x8b, 0x03, 0x0a, 0x1e, 0x53, 0x75, 0x62, 0x6d, 0x61, 0x72, 0x69, 0x6e, 0x65,
-	0x72, 0x4e, 0x61, 0x74, 0x44, 0x69, 0x73, 0x63, 0x6f, 0x76, 0x65, 0x72, 0x79, 0x52, 0x65, 0x73,
+	0x72, 0x4e, 0x41, 0x54, 0x44, 0x69, 0x73, 0x63, 0x6f, 0x76, 0x65, 0x72, 0x79, 0x52, 0x65, 0x73,
 	0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x25, 0x0a, 0x0e, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74,
 	0x5f, 0x6e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0d, 0x72,
 	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x4e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x12, 0x29, 0x0a, 0x08,
@@ -572,23 +572,23 @@ var file_pkg_natdiscovery_proto_natdiscovery_proto_enumTypes = make([]protoimpl.
 var file_pkg_natdiscovery_proto_natdiscovery_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_pkg_natdiscovery_proto_natdiscovery_proto_goTypes = []interface{}{
 	(ResponseType)(0),                      // 0: ResponseType
-	(*SubmarinerNatDiscoveryMessage)(nil),  // 1: SubmarinerNatDiscoveryMessage
-	(*SubmarinerNatDiscoveryRequest)(nil),  // 2: SubmarinerNatDiscoveryRequest
-	(*SubmarinerNatDiscoveryResponse)(nil), // 3: SubmarinerNatDiscoveryResponse
+	(*SubmarinerNATDiscoveryMessage)(nil),  // 1: SubmarinerNATDiscoveryMessage
+	(*SubmarinerNATDiscoveryRequest)(nil),  // 2: SubmarinerNATDiscoveryRequest
+	(*SubmarinerNATDiscoveryResponse)(nil), // 3: SubmarinerNATDiscoveryResponse
 	(*IPPortPair)(nil),                     // 4: IPPortPair
 	(*EndpointDetails)(nil),                // 5: EndpointDetails
 }
 var file_pkg_natdiscovery_proto_natdiscovery_proto_depIdxs = []int32{
-	2,  // 0: SubmarinerNatDiscoveryMessage.request:type_name -> SubmarinerNatDiscoveryRequest
-	3,  // 1: SubmarinerNatDiscoveryMessage.response:type_name -> SubmarinerNatDiscoveryResponse
-	5,  // 2: SubmarinerNatDiscoveryRequest.sender:type_name -> EndpointDetails
-	5,  // 3: SubmarinerNatDiscoveryRequest.receiver:type_name -> EndpointDetails
-	4,  // 4: SubmarinerNatDiscoveryRequest.using_src:type_name -> IPPortPair
-	4,  // 5: SubmarinerNatDiscoveryRequest.using_dst:type_name -> IPPortPair
-	0,  // 6: SubmarinerNatDiscoveryResponse.response:type_name -> ResponseType
-	5,  // 7: SubmarinerNatDiscoveryResponse.sender:type_name -> EndpointDetails
-	5,  // 8: SubmarinerNatDiscoveryResponse.receiver:type_name -> EndpointDetails
-	4,  // 9: SubmarinerNatDiscoveryResponse.received_src:type_name -> IPPortPair
+	2,  // 0: SubmarinerNATDiscoveryMessage.request:type_name -> SubmarinerNATDiscoveryRequest
+	3,  // 1: SubmarinerNATDiscoveryMessage.response:type_name -> SubmarinerNATDiscoveryResponse
+	5,  // 2: SubmarinerNATDiscoveryRequest.sender:type_name -> EndpointDetails
+	5,  // 3: SubmarinerNATDiscoveryRequest.receiver:type_name -> EndpointDetails
+	4,  // 4: SubmarinerNATDiscoveryRequest.using_src:type_name -> IPPortPair
+	4,  // 5: SubmarinerNATDiscoveryRequest.using_dst:type_name -> IPPortPair
+	0,  // 6: SubmarinerNATDiscoveryResponse.response:type_name -> ResponseType
+	5,  // 7: SubmarinerNATDiscoveryResponse.sender:type_name -> EndpointDetails
+	5,  // 8: SubmarinerNATDiscoveryResponse.receiver:type_name -> EndpointDetails
+	4,  // 9: SubmarinerNATDiscoveryResponse.received_src:type_name -> IPPortPair
 	10, // [10:10] is the sub-list for method output_type
 	10, // [10:10] is the sub-list for method input_type
 	10, // [10:10] is the sub-list for extension type_name
@@ -603,7 +603,7 @@ func file_pkg_natdiscovery_proto_natdiscovery_proto_init() {
 	}
 	if !protoimpl.UnsafeEnabled {
 		file_pkg_natdiscovery_proto_natdiscovery_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*SubmarinerNatDiscoveryMessage); i {
+			switch v := v.(*SubmarinerNATDiscoveryMessage); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -615,7 +615,7 @@ func file_pkg_natdiscovery_proto_natdiscovery_proto_init() {
 			}
 		}
 		file_pkg_natdiscovery_proto_natdiscovery_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*SubmarinerNatDiscoveryRequest); i {
+			switch v := v.(*SubmarinerNATDiscoveryRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -627,7 +627,7 @@ func file_pkg_natdiscovery_proto_natdiscovery_proto_init() {
 			}
 		}
 		file_pkg_natdiscovery_proto_natdiscovery_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*SubmarinerNatDiscoveryResponse); i {
+			switch v := v.(*SubmarinerNATDiscoveryResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -664,8 +664,8 @@ func file_pkg_natdiscovery_proto_natdiscovery_proto_init() {
 		}
 	}
 	file_pkg_natdiscovery_proto_natdiscovery_proto_msgTypes[0].OneofWrappers = []interface{}{
-		(*SubmarinerNatDiscoveryMessage_Request)(nil),
-		(*SubmarinerNatDiscoveryMessage_Response)(nil),
+		(*SubmarinerNATDiscoveryMessage_Request)(nil),
+		(*SubmarinerNATDiscoveryMessage_Response)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

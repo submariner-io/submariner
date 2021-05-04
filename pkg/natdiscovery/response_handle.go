@@ -27,7 +27,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 )
 
-func (nd *natDiscovery) handleResponseFromAddress(req *proto.SubmarinerNatDiscoveryResponse, addr *net.UDPAddr) error {
+func (nd *natDiscovery) handleResponseFromAddress(req *proto.SubmarinerNATDiscoveryResponse, addr *net.UDPAddr) error {
 	klog.V(log.DEBUG).Infof("Received response from %s:%d - REQUEST_NUMBER: 0x%x, RESPONSE: %v, SENDER: %q, RECEIVER: %q",
 		addr.IP.String(), addr.Port, req.RequestNumber, req.Response, req.Sender.EndpointId, req.Receiver.EndpointId)
 
@@ -47,7 +47,7 @@ func (nd *natDiscovery) handleResponseFromAddress(req *proto.SubmarinerNatDiscov
 	}
 
 	nd.Lock()
-	remoteNat, ok := nd.remoteEndpoints[req.GetSender().EndpointId]
+	remoteNAT, ok := nd.remoteEndpoints[req.GetSender().EndpointId]
 	defer nd.Unlock()
 
 	if !ok {
@@ -55,41 +55,41 @@ func (nd *natDiscovery) handleResponseFromAddress(req *proto.SubmarinerNatDiscov
 	}
 
 	// response to a PublicIP request
-	if remoteNat.lastPublicIPRequestID == req.RequestNumber {
+	if remoteNAT.lastPublicIPRequestID == req.RequestNumber {
 		useNAT := req.Response == proto.ResponseType_NAT_DETECTED
-		if !remoteNat.transitionToPublicIP(req.GetSender().EndpointId, useNAT) {
+		if !remoteNAT.transitionToPublicIP(req.GetSender().EndpointId, useNAT) {
 			return nil
 		}
 
-		nd.readyChannel <- remoteNat.toNATEndpointInfo()
+		nd.readyChannel <- remoteNAT.toNATEndpointInfo()
 
 		return nil
 	}
 
 	// response to a PrivateIP request
-	if remoteNat.lastPrivateIPRequestID == req.RequestNumber {
-		if addr.IP.String() != remoteNat.endpoint.Spec.PrivateIP {
+	if remoteNAT.lastPrivateIPRequestID == req.RequestNumber {
+		if addr.IP.String() != remoteNAT.endpoint.Spec.PrivateIP {
 			return errors.Errorf("response for NAT discovery on endpoint %q private IP %q comes from different IP %q, "+
 				"NAT on private IPs is unlikely and filtered for security reasons",
-				req.GetSender().EndpointId, remoteNat.endpoint.Spec.PrivateIP, addr.IP)
+				req.GetSender().EndpointId, remoteNAT.endpoint.Spec.PrivateIP, addr.IP)
 		}
 
 		if req.Response == proto.ResponseType_NAT_DETECTED {
 			klog.Warningf("response for NAT discovery on endpoint %q private IP %q says src was modified which is unexpected",
-				req.GetSender().EndpointId, remoteNat.endpoint.Spec.PrivateIP)
+				req.GetSender().EndpointId, remoteNAT.endpoint.Spec.PrivateIP)
 		}
 
 		useNAT := req.Response == proto.ResponseType_NAT_DETECTED
 
-		if !remoteNat.transitionToPrivateIP(req.GetSender().EndpointId, useNAT) {
+		if !remoteNAT.transitionToPrivateIP(req.GetSender().EndpointId, useNAT) {
 			return nil
 		}
 
-		nd.readyChannel <- remoteNat.toNATEndpointInfo()
+		nd.readyChannel <- remoteNAT.toNATEndpointInfo()
 
 		return nil
 	}
 
 	return errors.Errorf("received response for unknown request id 0x%x, lastPublicIPRequestID: %d, lastPrivateIPRequestID: %d",
-		req.RequestNumber, remoteNat.lastPublicIPRequestID, remoteNat.lastPrivateIPRequestID)
+		req.RequestNumber, remoteNAT.lastPublicIPRequestID, remoteNAT.lastPrivateIPRequestID)
 }

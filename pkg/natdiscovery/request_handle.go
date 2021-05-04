@@ -27,8 +27,8 @@ import (
 	"github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 )
 
-func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNatDiscoveryRequest, addr *net.UDPAddr) error {
-	response := proto.SubmarinerNatDiscoveryResponse{
+func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscoveryRequest, addr *net.UDPAddr) error {
+	response := proto.SubmarinerNATDiscoveryResponse{
 		RequestNumber: req.RequestNumber,
 		Sender: &proto.EndpointDetails{
 			ClusterId:  nd.localEndpoint.Spec.ClusterID,
@@ -105,9 +105,9 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNatDiscove
 	return nd.sendResponseToAddress(&response, addr)
 }
 
-func (nd *natDiscovery) sendResponseToAddress(response *proto.SubmarinerNatDiscoveryResponse, addr *net.UDPAddr) error {
-	msgResponse := proto.SubmarinerNatDiscoveryMessage_Response{Response: response}
-	message := proto.SubmarinerNatDiscoveryMessage{Message: &msgResponse}
+func (nd *natDiscovery) sendResponseToAddress(response *proto.SubmarinerNATDiscoveryResponse, addr *net.UDPAddr) error {
+	msgResponse := proto.SubmarinerNATDiscoveryMessage_Response{Response: response}
+	message := proto.SubmarinerNATDiscoveryMessage{Message: &msgResponse}
 	buf, err := proto2.Marshal(&message)
 	if err != nil {
 		return errors.Wrapf(err, "error marshaling response %#v", response)

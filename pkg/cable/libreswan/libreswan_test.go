@@ -56,20 +56,20 @@ func testIPsecPortConfiguration() {
 
 	When("NewLibreswan is called with port environment variables set", func() {
 		const (
-			nattPort       = "4555"
-			nattPortEnvVar = "CE_IPSEC_NATTPORT"
+			NATTPort       = "4555"
+			NATTPortEnvVar = "CE_IPSEC_NATTPORT"
 		)
 
 		BeforeEach(func() {
-			os.Setenv(nattPortEnvVar, nattPort)
+			os.Setenv(NATTPortEnvVar, NATTPort)
 		})
 
 		AfterEach(func() {
-			os.Unsetenv(nattPortEnvVar)
+			os.Unsetenv(NATTPortEnvVar)
 		})
 
 		It("should set the port fields from the environment variables", func() {
-			checkLibreswanPort(nattPort)
+			checkLibreswanPort(NATTPort)
 		})
 	})
 }
