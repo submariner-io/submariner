@@ -11,10 +11,11 @@ linters-settings:
       - unnamedResult
   gocyclo:
     min-complexity: 20
+  govet:
+    enable:
+      - fieldalignment
   lll:
     line-length: 140
-  maligned:
-    suggest-new: true
 linters:
   disable-all: true
   enable:
@@ -39,7 +40,6 @@ linters:
     - ineffassign
     - interfacer
     - lll
-    - maligned
     - misspell
     - nakedret
     - prealloc
@@ -83,3 +83,9 @@ issues:
         - stylecheck
       text: "ST1001: "
       path: test
+
+    # Ignore pointer bytes in struct alignment tests (this is a very
+    # minor optimisation)
+    - linters:
+        - govet
+      text: "pointer bytes could be"

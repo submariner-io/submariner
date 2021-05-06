@@ -57,7 +57,7 @@ func main() {
 	klog.Info("Starting submariner-globalnet", ipamSpec)
 
 	// set up signals so we handle the first shutdown signal gracefully
-	stopCh := signals.SetupSignalHandler()
+	stopCh := signals.SetupSignalHandler().Done()
 
 	httpServer := startHTTPServer()
 
@@ -89,7 +89,8 @@ func main() {
 	var localCluster *submarinerv1.Cluster
 	// During installation, sometimes creation of clusterCRD by submariner-gateway-pod would take few secs.
 	for i := 0; i < 100; i++ {
-		localCluster, err = submarinerClient.SubmarinerV1().Clusters(ipamSpec.Namespace).Get(ipamSpec.ClusterID, metav1.GetOptions{})
+		localCluster, err = submarinerClient.SubmarinerV1().Clusters(ipamSpec.Namespace).Get(context.TODO(), ipamSpec.ClusterID,
+			metav1.GetOptions{})
 		if err == nil {
 			break
 		}

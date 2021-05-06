@@ -16,6 +16,7 @@ limitations under the License.
 package ipam
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -520,7 +521,7 @@ func (i *Controller) handleRemovedSvcEx(obj interface{}) {
 			delete(annotations, SubmarinerIPAMGlobalIP)
 			svc.SetAnnotations(annotations)
 
-			_, err = i.kubeClientSet.CoreV1().Services(svc.Namespace).Update(svc)
+			_, err = i.kubeClientSet.CoreV1().Services(svc.Namespace).Update(context.TODO(), svc, metav1.UpdateOptions{})
 			return err
 		}
 		return nil
@@ -559,19 +560,19 @@ func (i *Controller) annotateGlobalIP(key, globalIP string) (string, error) {
 }
 
 func (i *Controller) serviceGetter(namespace, name string) (runtime.Object, error) {
-	return i.kubeClientSet.CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
+	return i.kubeClientSet.CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (i *Controller) podGetter(namespace, name string) (runtime.Object, error) {
-	return i.kubeClientSet.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+	return i.kubeClientSet.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (i *Controller) nodeGetter(namespace, name string) (runtime.Object, error) {
-	return i.kubeClientSet.CoreV1().Nodes().Get(name, metav1.GetOptions{})
+	return i.kubeClientSet.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (i *Controller) svcExGetter(namespace, name string) (runtime.Object, error) {
-	return i.dynClientSet.Resource(i.svcExGvr).Namespace(namespace).Get(name, metav1.GetOptions{})
+	return i.dynClientSet.Resource(i.svcExGvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (i *Controller) serviceUpdater(obj runtime.Object, key string) error {
@@ -602,7 +603,7 @@ func (i *Controller) serviceUpdater(obj runtime.Object, key string) error {
 		annotations[SubmarinerIPAMGlobalIP] = allocatedIP
 
 		service.SetAnnotations(annotations)
-		_, err := i.kubeClientSet.CoreV1().Services(service.Namespace).Update(service)
+		_, err := i.kubeClientSet.CoreV1().Services(service.Namespace).Update(context.TODO(), service, metav1.UpdateOptions{})
 		if err != nil {
 			logAndRequeue(key, i.serviceWorkqueue)
 			return err
@@ -652,7 +653,7 @@ func (i *Controller) podUpdater(obj runtime.Object, key string) error {
 		annotations[SubmarinerIPAMGlobalIP] = allocatedIP
 
 		pod.SetAnnotations(annotations)
-		_, err := i.kubeClientSet.CoreV1().Pods(pod.Namespace).Update(pod)
+		_, err := i.kubeClientSet.CoreV1().Pods(pod.Namespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
 		if err != nil {
 			logAndRequeue(key, i.podWorkqueue)
 			return err

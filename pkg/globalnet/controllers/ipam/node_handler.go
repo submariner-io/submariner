@@ -16,16 +16,17 @@ limitations under the License.
 package ipam
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	k8sv1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
-
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 )
 
 func (i *Controller) nodeUpdater(obj runtime.Object, key string) error {
@@ -58,7 +59,7 @@ func (i *Controller) nodeUpdater(obj runtime.Object, key string) error {
 
 		node.SetAnnotations(annotations)
 
-		_, err := i.kubeClientSet.CoreV1().Nodes().Update(node)
+		_, err := i.kubeClientSet.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
 		if err != nil {
 			logAndRequeue(key, i.nodeWorkqueue)
 			return err

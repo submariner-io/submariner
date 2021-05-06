@@ -43,7 +43,7 @@ func main() {
 
 	klog.Info("Starting submariner-networkplugin-syncer")
 	// set up signals so we handle the first shutdown signal gracefully
-	stopCh := signals.SetupSignalHandler()
+	stopCh := signals.SetupSignalHandler().Done()
 
 	networkPlugin := os.Getenv("SUBMARINER_NETWORKPLUGIN")
 

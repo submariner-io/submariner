@@ -16,6 +16,7 @@ limitations under the License.
 package cleanup
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/submariner-io/submariner/pkg/iptables"
@@ -75,7 +76,7 @@ func (gn *cleanupGlobalnetRules) NonGatewayCleanup() error {
 
 func (gn *cleanupGlobalnetRules) GatewayToNonGatewayTransition() error {
 	if gn.globalnetStatus == GNStatusNotVerified {
-		localCluster, err := gn.clientSet.SubmarinerV1().Clusters(gn.objectNamespace).Get(gn.clusterID, metav1.GetOptions{})
+		localCluster, err := gn.clientSet.SubmarinerV1().Clusters(gn.objectNamespace).Get(context.TODO(), gn.clusterID, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("error while retrieving the local ClusterInfo: %v", err)
 		}

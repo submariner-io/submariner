@@ -16,6 +16,7 @@ limitations under the License.
 package dataplane
 
 import (
+	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo"
@@ -48,7 +49,7 @@ var _ = Describe("[dataplane] Gateway status reporting", func() {
 				framework.TestContext.SubmarinerNamespace)
 			framework.AwaitUntil(fmt.Sprintf("await active connection on Gateway %q", name),
 				func() (interface{}, error) {
-					resGw, err := gwClient.Get(name, metav1.GetOptions{})
+					resGw, err := gwClient.Get(context.TODO(), name, metav1.GetOptions{})
 					if apierrors.IsNotFound(err) {
 						return nil, nil
 					}
