@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"os"
 
 	"github.com/pkg/errors"
@@ -37,7 +38,7 @@ func GetLocalNode(cfg *rest.Config) (*v1.Node, error) {
 		return nil, errors.Wrapf(err, "creating Kubernetes clientset")
 	}
 
-	node, err := clientset.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	node, err := clientset.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to find local node %q", nodeName)
 	}

@@ -16,6 +16,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"fmt"
 
 	. "github.com/onsi/gomega"
@@ -45,7 +46,8 @@ func (f *Framework) AwaitSubmarinerEndpoint(cluster framework.ClusterIndex, chec
 	var retEndpoint *submarinerv1.Endpoint
 
 	framework.AwaitUntil("find the submariner endpoint for "+framework.TestContext.ClusterIDs[cluster], func() (interface{}, error) {
-		return SubmarinerClients[cluster].SubmarinerV1().Endpoints(framework.TestContext.SubmarinerNamespace).List(metav1.ListOptions{})
+		return SubmarinerClients[cluster].SubmarinerV1().Endpoints(framework.TestContext.SubmarinerNamespace).List(
+			context.TODO(), metav1.ListOptions{})
 	}, func(result interface{}) (bool, string, error) {
 		endpoints := result.(*submarinerv1.EndpointList)
 		retEndpoint = nil
@@ -85,7 +87,7 @@ func (f *Framework) AwaitSubmarinerEndpointRemoved(cluster framework.ClusterInde
 		framework.TestContext.ClusterIDs[cluster]),
 		func() (interface{}, error) {
 			_, err := SubmarinerClients[cluster].SubmarinerV1().Endpoints(framework.TestContext.SubmarinerNamespace).Get(
-				endpointName, metav1.GetOptions{})
+				context.TODO(), endpointName, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				return true, nil
 			}

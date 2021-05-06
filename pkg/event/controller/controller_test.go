@@ -16,6 +16,7 @@ limitations under the License.
 package controller_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -109,7 +110,7 @@ var _ = Describe("Event controller", func() {
 				testing.TestEvent{Handler: testHandlerName, Name: testing.EvNodeUpdated, Parameter: node})))
 			Consistently(testEvents).ShouldNot(Receive())
 
-			Expect(nodes.Delete(node.GetName(), nil)).To(Succeed())
+			Expect(nodes.Delete(context.TODO(), node.GetName(), v1.DeleteOptions{})).To(Succeed())
 
 			Eventually(testEvents).Should(Receive(Equal(
 				testing.TestEvent{Handler: testHandlerName, Name: testing.EvNodeRemoved, Parameter: node})))
@@ -139,7 +140,7 @@ var _ = Describe("Event controller", func() {
 				testing.TestEvent{Handler: testHandlerName, Name: testing.EvLocalEndpointUpdated, Parameter: endpoint})))
 			Consistently(testEvents).ShouldNot(Receive())
 
-			Expect(endpoints.Delete(endpoint.GetName(), nil)).To(Succeed())
+			Expect(endpoints.Delete(context.TODO(), endpoint.GetName(), v1.DeleteOptions{})).To(Succeed())
 
 			Eventually(testEvents).Should(Receive(Equal(
 				testing.TestEvent{Handler: testHandlerName, Name: testing.EvLocalEndpointRemoved, Parameter: endpoint})))

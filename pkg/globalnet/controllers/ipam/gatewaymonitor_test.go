@@ -16,6 +16,7 @@ limitations under the License.
 package ipam_test
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
@@ -76,7 +77,8 @@ var _ = Describe("Endpoint monitoring", func() {
 
 			t.awaitServiceGlobalIP(service.Name)
 
-			Expect(t.submarinerClient.SubmarinerV1().Endpoints(namespace).Delete(endpointName, nil)).To(Succeed())
+			Expect(t.submarinerClient.SubmarinerV1().Endpoints(namespace).Delete(context.TODO(), endpointName,
+				metav1.DeleteOptions{})).To(Succeed())
 
 			t.ipt.AwaitNoChain("nat", constants.SmGlobalnetIngressChain)
 			t.ipt.AwaitNoChain("nat", constants.SmGlobalnetEgressChain)
@@ -91,7 +93,8 @@ var _ = Describe("Endpoint monitoring", func() {
 			endpointName := t.createEndpoint(newEndpointSpec(remoteClusterID, t.hostName, remoteCIDR))
 			t.ipt.AwaitRule("nat", constants.SmGlobalnetMarkChain, ContainSubstring(remoteCIDR))
 
-			Expect(t.submarinerClient.SubmarinerV1().Endpoints(namespace).Delete(endpointName, nil)).To(Succeed())
+			Expect(t.submarinerClient.SubmarinerV1().Endpoints(namespace).Delete(context.TODO(), endpointName,
+				metav1.DeleteOptions{})).To(Succeed())
 			t.ipt.AwaitNoRule("nat", constants.SmGlobalnetMarkChain, ContainSubstring(remoteCIDR))
 		})
 	})
@@ -160,7 +163,7 @@ var _ = Describe("Service monitoring", func() {
 					ContainSubstring(service.Annotations[ipam.SubmarinerIPAMGlobalIP]))
 
 				service.Annotations[ipam.SubmarinerIPAMGlobalIP] = newIP
-				_, err := t.k8sClient.CoreV1().Services(namespace).Update(service)
+				_, err := t.k8sClient.CoreV1().Services(namespace).Update(context.TODO(), service, metav1.UpdateOptions{})
 				Expect(err).To(Succeed())
 				t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain,
 					ContainSubstring(service.Annotations[ipam.SubmarinerIPAMGlobalIP]))
@@ -172,7 +175,8 @@ var _ = Describe("Service monitoring", func() {
 				globalIP := t.awaitServiceGlobalIP(service.Name)
 				t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(globalIP))
 
-				Expect(t.dynClient.Resource(*t.svcExGvr).Namespace(service.Namespace).Delete(service.Name, nil)).To(Succeed())
+				Expect(t.dynClient.Resource(*t.svcExGvr).Namespace(service.Namespace).Delete(context.TODO(), service.Name,
+					metav1.DeleteOptions{})).To(Succeed())
 				t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(globalIPSubstr))
 			})
 		})
@@ -182,7 +186,7 @@ var _ = Describe("Service monitoring", func() {
 				globalIP := t.awaitServiceGlobalIP(service.Name)
 				t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(globalIP))
 
-				Expect(t.k8sClient.CoreV1().Services(namespace).Delete(service.Name, nil)).To(Succeed())
+				Expect(t.k8sClient.CoreV1().Services(namespace).Delete(context.TODO(), service.Name, metav1.DeleteOptions{})).To(Succeed())
 				t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(globalIP))
 			})
 		})
@@ -259,7 +263,7 @@ var _ = Describe("Pod monitoring", func() {
 			t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChain, ContainSubstring(pod.Annotations[ipam.SubmarinerIPAMGlobalIP]))
 
 			pod.Annotations[ipam.SubmarinerIPAMGlobalIP] = newIP
-			_, err := t.k8sClient.CoreV1().Pods(namespace).Update(pod)
+			_, err := t.k8sClient.CoreV1().Pods(namespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
 			Expect(err).To(Succeed())
 			t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChain, ContainSubstring(pod.Annotations[ipam.SubmarinerIPAMGlobalIP]))
 		})
@@ -270,7 +274,7 @@ var _ = Describe("Pod monitoring", func() {
 			globalIP := t.awaitPodGlobalIP(pod.Name)
 			t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChain, ContainSubstring(globalIP))
 
-			Expect(t.k8sClient.CoreV1().Pods(namespace).Delete(pod.Name, nil)).To(Succeed())
+			Expect(t.k8sClient.CoreV1().Pods(namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})).To(Succeed())
 			t.ipt.AwaitNoRule("nat", constants.SmGlobalnetEgressChain, ContainSubstring(globalIP))
 		})
 	})
@@ -284,7 +288,7 @@ var _ = Describe("Pod monitoring", func() {
 			t.awaitNoPodGlobalIP(pod)
 
 			pod.Status.PodIP = "1.2.3.4"
-			_, err := t.k8sClient.CoreV1().Pods(namespace).Update(pod)
+			_, err := t.k8sClient.CoreV1().Pods(namespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
 			Expect(err).To(Succeed())
 			t.awaitPodGlobalIP(pod.Name)
 		})
@@ -296,7 +300,7 @@ var _ = Describe("Pod monitoring", func() {
 			t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChain, ContainSubstring(globalIP))
 
 			pod.Status.PodIP = ""
-			_, err := t.k8sClient.CoreV1().Pods(namespace).Update(pod)
+			_, err := t.k8sClient.CoreV1().Pods(namespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
 			Expect(err).To(Succeed())
 			t.ipt.AwaitNoRule("nat", constants.SmGlobalnetEgressChain, ContainSubstring(globalIP))
 		})
@@ -365,7 +369,7 @@ var _ = Describe("Node monitoring", func() {
 			t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChain, ContainSubstring(node.Annotations[ipam.SubmarinerIPAMGlobalIP]))
 
 			node.Annotations[ipam.SubmarinerIPAMGlobalIP] = newIP
-			_, err := t.k8sClient.CoreV1().Nodes().Update(node)
+			_, err := t.k8sClient.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
 			Expect(err).To(Succeed())
 			t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChain, ContainSubstring(node.Annotations[ipam.SubmarinerIPAMGlobalIP]))
 		})
@@ -376,7 +380,7 @@ var _ = Describe("Node monitoring", func() {
 			globalIP := t.awaitNodeGlobalIP(node.Name)
 			t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChain, ContainSubstring(globalIP))
 
-			Expect(t.k8sClient.CoreV1().Nodes().Delete(node.Name, nil)).To(Succeed())
+			Expect(t.k8sClient.CoreV1().Nodes().Delete(context.TODO(), node.Name, metav1.DeleteOptions{})).To(Succeed())
 			t.ipt.AwaitNoRule("nat", constants.SmGlobalnetEgressChain, ContainSubstring(globalIP))
 		})
 	})
@@ -391,7 +395,7 @@ var _ = Describe("Node monitoring", func() {
 			t.awaitNoNodeGlobalIP(node)
 
 			node.Annotations[constants.CNIInterfaceIP] = "10.20.30.40"
-			_, err := t.k8sClient.CoreV1().Nodes().Update(node)
+			_, err := t.k8sClient.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
 			Expect(err).To(Succeed())
 			t.awaitNodeGlobalIP(node.Name)
 		})
@@ -471,12 +475,12 @@ func (t *testDriver) createEndpoint(spec *submarinerv1.EndpointSpec) string {
 	endpointName, err := util.GetEndpointCRDNameFromParams(spec.ClusterID, spec.CableName)
 	Expect(err).To(Succeed())
 
-	_, err = t.submarinerClient.SubmarinerV1().Endpoints(namespace).Create(&submarinerv1.Endpoint{
+	_, err = t.submarinerClient.SubmarinerV1().Endpoints(namespace).Create(context.TODO(), &submarinerv1.Endpoint{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: endpointName,
 		},
 		Spec: *spec,
-	})
+	}, metav1.CreateOptions{})
 
 	Expect(err).To(Succeed())
 
@@ -484,7 +488,7 @@ func (t *testDriver) createEndpoint(spec *submarinerv1.EndpointSpec) string {
 }
 
 func (t *testDriver) createService(s *corev1.Service) *corev1.Service {
-	service, err := t.k8sClient.CoreV1().Services(nsOrDefault(s.Namespace)).Create(s)
+	service, err := t.k8sClient.CoreV1().Services(nsOrDefault(s.Namespace)).Create(context.TODO(), s, metav1.CreateOptions{})
 	Expect(err).To(Succeed())
 
 	if len(service.Spec.Ports[0].Name) > 0 {
@@ -499,7 +503,7 @@ func (t *testDriver) createService(s *corev1.Service) *corev1.Service {
 
 func (t *testDriver) createSvcExport(s *corev1.Service) *unstructured.Unstructured {
 	svcEx := newServiceExport(s.GetNamespace(), s.GetName())
-	result, err := t.dynClient.Resource(*t.svcExGvr).Namespace(svcEx.GetNamespace()).Create(svcEx, metav1.CreateOptions{})
+	result, err := t.dynClient.Resource(*t.svcExGvr).Namespace(svcEx.GetNamespace()).Create(context.TODO(), svcEx, metav1.CreateOptions{})
 	Expect(err).To(Succeed())
 
 	return result
@@ -507,13 +511,13 @@ func (t *testDriver) createSvcExport(s *corev1.Service) *unstructured.Unstructur
 
 func (t *testDriver) awaitServiceGlobalIP(name string) string {
 	return t.awaitGlobalIP(name, localCIDR, func(string) (runtime.Object, error) {
-		return t.k8sClient.CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
+		return t.k8sClient.CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	})
 }
 
 func (t *testDriver) awaitNoServiceGlobalIP(s *corev1.Service) {
 	t.awaitNoGlobalIP(s.Name, func(string) (runtime.Object, error) {
-		return t.k8sClient.CoreV1().Services(nsOrDefault(nsOrDefault(s.Namespace))).Get(s.Name, metav1.GetOptions{})
+		return t.k8sClient.CoreV1().Services(nsOrDefault(nsOrDefault(s.Namespace))).Get(context.TODO(), s.Name, metav1.GetOptions{})
 	})
 }
 
@@ -549,7 +553,7 @@ func (t *testDriver) awaitNoGlobalIP(name string, getter func(string) (runtime.O
 }
 
 func (t *testDriver) createPod(p *corev1.Pod) *corev1.Pod {
-	pod, err := t.k8sClient.CoreV1().Pods(nsOrDefault(p.Namespace)).Create(p)
+	pod, err := t.k8sClient.CoreV1().Pods(nsOrDefault(p.Namespace)).Create(context.TODO(), p, metav1.CreateOptions{})
 	Expect(err).To(Succeed())
 
 	return pod
@@ -557,18 +561,18 @@ func (t *testDriver) createPod(p *corev1.Pod) *corev1.Pod {
 
 func (t *testDriver) awaitPodGlobalIP(name string) string {
 	return t.awaitGlobalIP(name, localCIDR, func(string) (runtime.Object, error) {
-		return t.k8sClient.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+		return t.k8sClient.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	})
 }
 
 func (t *testDriver) awaitNoPodGlobalIP(pod *corev1.Pod) {
 	t.awaitNoGlobalIP(pod.Name, func(string) (runtime.Object, error) {
-		return t.k8sClient.CoreV1().Pods(nsOrDefault(pod.Namespace)).Get(pod.Name, metav1.GetOptions{})
+		return t.k8sClient.CoreV1().Pods(nsOrDefault(pod.Namespace)).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	})
 }
 
 func (t *testDriver) createNode(node *corev1.Node) *corev1.Node {
-	node, err := t.k8sClient.CoreV1().Nodes().Create(node)
+	node, err := t.k8sClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
 	Expect(err).To(Succeed())
 
 	return node
@@ -576,13 +580,13 @@ func (t *testDriver) createNode(node *corev1.Node) *corev1.Node {
 
 func (t *testDriver) awaitNodeGlobalIP(name string) string {
 	return t.awaitGlobalIP(name, localCIDR, func(string) (runtime.Object, error) {
-		return t.k8sClient.CoreV1().Nodes().Get(name, metav1.GetOptions{})
+		return t.k8sClient.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 	})
 }
 
 func (t *testDriver) awaitNoNodeGlobalIP(node *corev1.Node) {
 	t.awaitNoGlobalIP(node.Name, func(string) (runtime.Object, error) {
-		return t.k8sClient.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
+		return t.k8sClient.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
 	})
 }
 

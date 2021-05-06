@@ -16,6 +16,7 @@ limitations under the License.
 package syncer_test
 
 import (
+	"context"
 	"reflect"
 	"strconv"
 	"strings"
@@ -172,7 +173,7 @@ func testStaleGatewayCleanup() {
 
 		t.awaitGatewayUpdated(t.expectedGateway)
 
-		_, err := t.gateways.Create(staleGateway)
+		_, err := t.gateways.Create(context.TODO(), staleGateway, metav1.CreateOptions{})
 		Expect(err).To(Succeed())
 
 		t.awaitGatewayUpdated(staleGateway)

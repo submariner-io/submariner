@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -39,7 +41,7 @@ var endpointsResource = schema.GroupVersionResource{Group: "submariner.io", Vers
 var endpointsKind = schema.GroupVersionKind{Group: "submariner.io", Version: "v1", Kind: "Endpoint"}
 
 // Get takes name of the endpoint, and returns the corresponding endpoint object, and an error if there is any.
-func (c *FakeEndpoints) Get(name string, options v1.GetOptions) (result *submarineriov1.Endpoint, err error) {
+func (c *FakeEndpoints) Get(ctx context.Context, name string, options v1.GetOptions) (result *submarineriov1.Endpoint, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(endpointsResource, c.ns, name), &submarineriov1.Endpoint{})
 
@@ -50,7 +52,7 @@ func (c *FakeEndpoints) Get(name string, options v1.GetOptions) (result *submari
 }
 
 // List takes label and field selectors, and returns the list of Endpoints that match those selectors.
-func (c *FakeEndpoints) List(opts v1.ListOptions) (result *submarineriov1.EndpointList, err error) {
+func (c *FakeEndpoints) List(ctx context.Context, opts v1.ListOptions) (result *submarineriov1.EndpointList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(endpointsResource, endpointsKind, c.ns, opts), &submarineriov1.EndpointList{})
 
@@ -72,14 +74,14 @@ func (c *FakeEndpoints) List(opts v1.ListOptions) (result *submarineriov1.Endpoi
 }
 
 // Watch returns a watch.Interface that watches the requested endpoints.
-func (c *FakeEndpoints) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeEndpoints) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(endpointsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a endpoint and creates it.  Returns the server's representation of the endpoint, and an error, if there is any.
-func (c *FakeEndpoints) Create(endpoint *submarineriov1.Endpoint) (result *submarineriov1.Endpoint, err error) {
+func (c *FakeEndpoints) Create(ctx context.Context, endpoint *submarineriov1.Endpoint, opts v1.CreateOptions) (result *submarineriov1.Endpoint, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(endpointsResource, c.ns, endpoint), &submarineriov1.Endpoint{})
 
@@ -90,7 +92,7 @@ func (c *FakeEndpoints) Create(endpoint *submarineriov1.Endpoint) (result *subma
 }
 
 // Update takes the representation of a endpoint and updates it. Returns the server's representation of the endpoint, and an error, if there is any.
-func (c *FakeEndpoints) Update(endpoint *submarineriov1.Endpoint) (result *submarineriov1.Endpoint, err error) {
+func (c *FakeEndpoints) Update(ctx context.Context, endpoint *submarineriov1.Endpoint, opts v1.UpdateOptions) (result *submarineriov1.Endpoint, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(endpointsResource, c.ns, endpoint), &submarineriov1.Endpoint{})
 
@@ -101,7 +103,7 @@ func (c *FakeEndpoints) Update(endpoint *submarineriov1.Endpoint) (result *subma
 }
 
 // Delete takes name of the endpoint and deletes it. Returns an error if one occurs.
-func (c *FakeEndpoints) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeEndpoints) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(endpointsResource, c.ns, name), &submarineriov1.Endpoint{})
 
@@ -109,15 +111,15 @@ func (c *FakeEndpoints) Delete(name string, options *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeEndpoints) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(endpointsResource, c.ns, listOptions)
+func (c *FakeEndpoints) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(endpointsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &submarineriov1.EndpointList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched endpoint.
-func (c *FakeEndpoints) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *submarineriov1.Endpoint, err error) {
+func (c *FakeEndpoints) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *submarineriov1.Endpoint, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(endpointsResource, c.ns, name, pt, data, subresources...), &submarineriov1.Endpoint{})
 

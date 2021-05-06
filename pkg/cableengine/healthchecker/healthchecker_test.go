@@ -16,6 +16,7 @@ limitations under the License.
 package healthchecker_test
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -176,7 +177,7 @@ var _ = Describe("Controller", func() {
 			endpoint := createEndpoint(remoteClusterID1, healthCheckIP1)
 			pingerMap[healthCheckIP1].AwaitStart()
 
-			Expect(endpoints.Delete(endpoint.Name, nil)).To(Succeed())
+			Expect(endpoints.Delete(context.TODO(), endpoint.Name, metav1.DeleteOptions{})).To(Succeed())
 			pingerMap[healthCheckIP1].AwaitStop()
 			Eventually(healthChecker.GetLatencyInfo(&endpoint.Spec)).Should(BeNil())
 		})

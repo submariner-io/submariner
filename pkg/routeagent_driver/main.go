@@ -48,7 +48,7 @@ func main() {
 
 	klog.Info("Starting submariner-route-agent using the event framework")
 	// set up signals so we handle the first shutdown signal gracefully
-	stopCh := signals.SetupSignalHandler()
+	stopCh := signals.SetupSignalHandler().Done()
 
 	var env environment.Specification
 	err := envconfig.Process("submariner", &env)

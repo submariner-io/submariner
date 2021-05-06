@@ -5,7 +5,7 @@ source ${SCRIPTS_DIR}/lib/debug_functions
 K8S_IO_DIR="${GOPATH:-~/go}/src/k8s.io"
 CODEGEN_SCRIPT_DIR="${K8S_IO_DIR}/code-generator"
 CODEGEN_SCRIPT="${CODEGEN_SCRIPT_DIR}/generate-groups.sh"
-CODEGEN_RELEASE_TAG=kubernetes-1.17.0
+CODEGEN_RELEASE_TAG=kubernetes-1.19.10
 
 if [ ! -f "$CODEGEN_SCRIPT" ]; then
     echo "$CODEGEN_SCRIPT does not exist - downloading..."
