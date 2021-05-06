@@ -90,7 +90,7 @@ func main() {
 	klog.Info("Starting the submariner gateway engine")
 
 	// set up signals so we handle the first shutdown signal gracefully
-	stopCh := signals.SetupSignalHandler()
+	stopCh := signals.SetupSignalHandler().Done()
 
 	httpServer := startHTTPServer()
 

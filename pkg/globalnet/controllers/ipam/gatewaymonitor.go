@@ -16,6 +16,7 @@ limitations under the License.
 package ipam
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -143,7 +144,7 @@ func (gm *GatewayMonitor) processNextEndpoint() bool {
 			return fmt.Errorf("error while splitting meta namespace key %s: %v", key, err)
 		}
 
-		endpoint, err := gm.submarinerClientSet.SubmarinerV1().Endpoints(ns).Get(name, metav1.GetOptions{})
+		endpoint, err := gm.submarinerClientSet.SubmarinerV1().Endpoints(ns).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			gm.endpointWorkqueue.Forget(obj)
 			return fmt.Errorf("error retrieving submariner endpoint object %s: %v", name, err)
@@ -179,7 +180,7 @@ func (gm *GatewayMonitor) processNextEndpoint() bool {
 			return nil
 		}
 
-		endpoints, err := gm.submarinerClientSet.SubmarinerV1().Endpoints(ns).List(metav1.ListOptions{})
+		endpoints, err := gm.submarinerClientSet.SubmarinerV1().Endpoints(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			gm.endpointWorkqueue.Forget(obj)
 			return fmt.Errorf("error retrieving submariner endpoint list %v", err)

@@ -16,6 +16,7 @@ limitations under the License.
 package datastoresyncer_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -92,7 +93,7 @@ func testEndpointSyncing() {
 			test.UpdateResource(t.brokerEndpoints, endpoint)
 			awaitEndpoint(t.localEndpoints, &endpoint.Spec)
 
-			Expect(t.brokerEndpoints.Delete(endpoint.GetName(), nil)).To(Succeed())
+			Expect(t.brokerEndpoints.Delete(context.TODO(), endpoint.GetName(), metav1.DeleteOptions{})).To(Succeed())
 			test.AwaitNoResource(t.localEndpoints, endpoint.GetName())
 		})
 	})

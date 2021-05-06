@@ -16,6 +16,7 @@ limitations under the License.
 package cni
 
 import (
+	"context"
 	"fmt"
 	"net"
 
@@ -91,7 +92,7 @@ func AnnotateNodeWithCNIInterfaceIP(nodeName string, clientSet kubernetes.Interf
 	}
 
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		node, err := clientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		node, err := clientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("unable to get node info for node %v, err: %s", nodeName, err)
 		}
@@ -102,7 +103,7 @@ func AnnotateNodeWithCNIInterfaceIP(nodeName string, clientSet kubernetes.Interf
 		}
 		annotations[constants.CNIInterfaceIP] = cniIface.IPAddress
 		node.SetAnnotations(annotations)
-		_, updateErr := clientSet.CoreV1().Nodes().Update(node)
+		_, updateErr := clientSet.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
 		return updateErr
 	})
 

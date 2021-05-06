@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	time "time"
 
 	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -61,13 +62,13 @@ func NewFilteredClusterInformer(client versioned.Interface, namespace string, re
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.SubmarinerV1().Clusters(namespace).List(options)
+				return client.SubmarinerV1().Clusters(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.SubmarinerV1().Clusters(namespace).Watch(options)
+				return client.SubmarinerV1().Clusters(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&submarineriov1.Cluster{},
