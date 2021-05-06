@@ -16,6 +16,7 @@ limitations under the License.
 package tunnel_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -156,7 +157,7 @@ var _ = Describe("Managing tunnels", func() {
 			test.CreateResource(endpoints, endpoint)
 			verifyConnectToEndpoint()
 
-			Expect(endpoints.Delete(endpoint.Name, nil)).To(Succeed())
+			Expect(endpoints.Delete(context.TODO(), endpoint.Name, metav1.DeleteOptions{})).To(Succeed())
 			verifyDisconnectFromEndpoint()
 		})
 	})
@@ -182,7 +183,7 @@ var _ = Describe("Managing tunnels", func() {
 			test.CreateResource(endpoints, endpoint)
 			verifyConnectToEndpoint()
 
-			Expect(endpoints.Delete(endpoint.Name, nil)).To(Succeed())
+			Expect(endpoints.Delete(context.TODO(), endpoint.Name, metav1.DeleteOptions{})).To(Succeed())
 			verifyDisconnectFromEndpoint()
 		})
 	})

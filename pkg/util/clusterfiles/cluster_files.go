@@ -16,6 +16,7 @@ limitations under the License.
 package clusterfiles
 
 import (
+	"context"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -55,7 +56,7 @@ func Get(k8sClient kubernetes.Interface, urlAddress string) (pathStr string, err
 		return parsedURL.Path, nil
 
 	case "secret":
-		secret, err := k8sClient.CoreV1().Secrets(namespace).Get(pathContainerObject, metav1.GetOptions{})
+		secret, err := k8sClient.CoreV1().Secrets(namespace).Get(context.TODO(), pathContainerObject, metav1.GetOptions{})
 		if err != nil {
 			return "", errors.Wrapf(err, "error reading secret %q from namespace %q", pathContainerObject, namespace)
 		}
@@ -66,7 +67,7 @@ func Get(k8sClient kubernetes.Interface, urlAddress string) (pathStr string, err
 		}
 
 	case "configmap":
-		configMap, err := k8sClient.CoreV1().ConfigMaps(namespace).Get(pathContainerObject, metav1.GetOptions{})
+		configMap, err := k8sClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), pathContainerObject, metav1.GetOptions{})
 		if err != nil {
 			return "", errors.Wrapf(err, "error reading configmap %q from namespace %q", pathContainerObject, namespace)
 		}

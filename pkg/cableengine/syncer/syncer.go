@@ -16,6 +16,7 @@ limitations under the License.
 package syncer
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -104,7 +105,7 @@ func (gs *GatewaySyncer) syncGatewayStatusSafe() {
 
 	if errors.IsNotFound(err) {
 		klog.V(log.TRACE).Infof("Gateway does not exist - creating: %+v", gatewayObj)
-		_, err = gs.client.Create(gatewayObj)
+		_, err = gs.client.Create(context.TODO(), gatewayObj, metav1.CreateOptions{})
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("error creating Gateway object %+v: %s", gatewayObj, err))
 			return
@@ -117,7 +118,7 @@ func (gs *GatewaySyncer) syncGatewayStatusSafe() {
 		existingGw.Status = gatewayObj.Status
 		existingGw.Annotations = gatewayObj.Annotations
 
-		_, err := gs.client.Update(existingGw)
+		_, err := gs.client.Update(context.TODO(), existingGw, metav1.UpdateOptions{})
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("error updating Gateway object %+v: %s", gatewayObj, err))
 			return
@@ -135,7 +136,7 @@ func (gs *GatewaySyncer) syncGatewayStatusSafe() {
 }
 
 func (gs *GatewaySyncer) cleanupStaleGatewayEntries(localGatewayName string) error {
-	gateways, err := gs.client.List(metav1.ListOptions{})
+	gateways, err := gs.client.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -152,7 +153,7 @@ func (gs *GatewaySyncer) cleanupStaleGatewayEntries(localGatewayName string) err
 		}
 
 		if stale {
-			err := gs.client.Delete(gw.Name, &metav1.DeleteOptions{})
+			err := gs.client.Delete(context.TODO(), gw.Name, metav1.DeleteOptions{})
 			if err != nil {
 				// In this case we don't want to stop the cleanup loop and just log it
 				utilruntime.HandleError(fmt.Errorf("error deleting stale Gateway %+v: %s", gw, err))
@@ -183,7 +184,7 @@ func isGatewayStale(gateway v1.Gateway) (bool, error) {
 }
 
 func (gs *GatewaySyncer) getLastSyncedGateway(name string) (*v1.Gateway, error) {
-	existingGw, err := gs.client.Get(name, metav1.GetOptions{})
+	existingGw, err := gs.client.Get(context.TODO(), name, metav1.GetOptions{})
 	klog.V(log.TRACE).Infof("Last synced Gateway: %+v", existingGw)
 
 	return existingGw, err
@@ -261,7 +262,7 @@ func (gs *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 // propagate error up because it's a termination function that we also provide externally
 func (gs *GatewaySyncer) CleanupGatewayEntry() {
 	hostName := gs.engine.GetLocalEndpoint().Spec.Hostname
-	err := gs.client.Delete(hostName, &metav1.DeleteOptions{})
+	err := gs.client.Delete(context.TODO(), hostName, metav1.DeleteOptions{})
 	if err != nil {
 		klog.Errorf("Error while trying to delete own Gateway %q : %s", hostName, err)
 		return

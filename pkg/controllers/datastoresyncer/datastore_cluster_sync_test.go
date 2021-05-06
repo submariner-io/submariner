@@ -16,6 +16,7 @@ limitations under the License.
 package datastoresyncer_test
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -23,6 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var _ = Describe("Cluster syncing", testClusterSyncing)
@@ -66,7 +68,7 @@ func testClusterSyncing() {
 			awaitCluster(t.brokerClusters, &t.localCluster.Spec)
 
 			name := t.localCluster.Spec.ClusterID
-			Expect(t.localClusters.Delete(name, nil)).To(Succeed())
+			Expect(t.localClusters.Delete(context.TODO(), name, metav1.DeleteOptions{})).To(Succeed())
 			test.AwaitNoResource(t.brokerClusters, name)
 		})
 	})
@@ -88,7 +90,7 @@ func testClusterSyncing() {
 			test.UpdateResource(t.brokerClusters, cluster)
 			awaitCluster(t.localClusters, &cluster.Spec)
 
-			Expect(t.brokerClusters.Delete(cluster.GetName(), nil)).To(Succeed())
+			Expect(t.brokerClusters.Delete(context.TODO(), cluster.GetName(), metav1.DeleteOptions{})).To(Succeed())
 			test.AwaitNoResource(t.localClusters, cluster.GetName())
 		})
 	})

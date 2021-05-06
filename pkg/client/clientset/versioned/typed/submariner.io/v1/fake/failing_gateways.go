@@ -16,6 +16,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientsetv1 "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,42 +33,42 @@ type FailingGateways struct {
 	FailOnList   error
 }
 
-func (f *FailingGateways) Create(g *v1.Gateway) (*v1.Gateway, error) {
+func (f *FailingGateways) Create(ctx context.Context, g *v1.Gateway, options metav1.CreateOptions) (*v1.Gateway, error) {
 	if f.FailOnCreate != nil {
 		return nil, f.FailOnCreate
 	}
 
-	return f.GatewayInterface.Create(g)
+	return f.GatewayInterface.Create(ctx, g, options)
 }
 
-func (f *FailingGateways) Update(g *v1.Gateway) (*v1.Gateway, error) {
+func (f *FailingGateways) Update(ctx context.Context, g *v1.Gateway, options metav1.UpdateOptions) (*v1.Gateway, error) {
 	if f.FailOnUpdate != nil {
 		return nil, f.FailOnUpdate
 	}
 
-	return f.GatewayInterface.Update(g)
+	return f.GatewayInterface.Update(ctx, g, options)
 }
 
-func (f *FailingGateways) Delete(name string, options *metav1.DeleteOptions) error {
+func (f *FailingGateways) Delete(ctx context.Context, name string, options metav1.DeleteOptions) error {
 	if f.FailOnDelete != nil {
 		return f.FailOnDelete
 	}
 
-	return f.GatewayInterface.Delete(name, options)
+	return f.GatewayInterface.Delete(ctx, name, options)
 }
 
-func (f *FailingGateways) Get(name string, options metav1.GetOptions) (*v1.Gateway, error) {
+func (f *FailingGateways) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Gateway, error) {
 	if f.FailOnGet != nil {
 		return nil, f.FailOnGet
 	}
 
-	return f.GatewayInterface.Get(name, options)
+	return f.GatewayInterface.Get(ctx, name, options)
 }
 
-func (f *FailingGateways) List(opts metav1.ListOptions) (*v1.GatewayList, error) {
+func (f *FailingGateways) List(ctx context.Context, opts metav1.ListOptions) (*v1.GatewayList, error) {
 	if f.FailOnList != nil {
 		return nil, f.FailOnList
 	}
 
-	return f.GatewayInterface.List(opts)
+	return f.GatewayInterface.List(ctx, opts)
 }

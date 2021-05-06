@@ -16,6 +16,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientsetv1 "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,42 +33,42 @@ type FailingEndpoints struct {
 	FailOnList   error
 }
 
-func (f *FailingEndpoints) Create(e *v1.Endpoint) (*v1.Endpoint, error) {
+func (f *FailingEndpoints) Create(ctx context.Context, e *v1.Endpoint, options metav1.CreateOptions) (*v1.Endpoint, error) {
 	if f.FailOnCreate != nil {
 		return nil, f.FailOnCreate
 	}
 
-	return f.EndpointInterface.Create(e)
+	return f.EndpointInterface.Create(ctx, e, options)
 }
 
-func (f *FailingEndpoints) Update(e *v1.Endpoint) (*v1.Endpoint, error) {
+func (f *FailingEndpoints) Update(ctx context.Context, e *v1.Endpoint, options metav1.UpdateOptions) (*v1.Endpoint, error) {
 	if f.FailOnUpdate != nil {
 		return nil, f.FailOnUpdate
 	}
 
-	return f.EndpointInterface.Update(e)
+	return f.EndpointInterface.Update(ctx, e, options)
 }
 
-func (f *FailingEndpoints) Delete(name string, options *metav1.DeleteOptions) error {
+func (f *FailingEndpoints) Delete(ctx context.Context, name string, options metav1.DeleteOptions) error {
 	if f.FailOnDelete != nil {
 		return f.FailOnDelete
 	}
 
-	return f.EndpointInterface.Delete(name, options)
+	return f.EndpointInterface.Delete(ctx, name, options)
 }
 
-func (f *FailingEndpoints) Get(name string, options metav1.GetOptions) (*v1.Endpoint, error) {
+func (f *FailingEndpoints) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Endpoint, error) {
 	if f.FailOnGet != nil {
 		return nil, f.FailOnGet
 	}
 
-	return f.EndpointInterface.Get(name, options)
+	return f.EndpointInterface.Get(ctx, name, options)
 }
 
-func (f *FailingEndpoints) List(opts metav1.ListOptions) (*v1.EndpointList, error) {
+func (f *FailingEndpoints) List(ctx context.Context, opts metav1.ListOptions) (*v1.EndpointList, error) {
 	if f.FailOnList != nil {
 		return nil, f.FailOnList
 	}
 
-	return f.EndpointInterface.List(opts)
+	return f.EndpointInterface.List(ctx, opts)
 }
