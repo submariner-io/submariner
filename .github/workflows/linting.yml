@@ -46,6 +46,16 @@ jobs:
       - name: Check License Headers
         uses: kt3k/license_checker@v1.0.6
 
+  licenses:
+    name: Dependency Licenses
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v2
+
+      - name: Check the licenses
+        run: make licensecheck
+
   markdown-link-check:
     name: Markdown Links (modified files)
     runs-on: ubuntu-latest

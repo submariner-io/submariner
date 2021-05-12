@@ -1,0 +1,22 @@
+# Licenses other than Apache-2.0 are governed by
+# https://github.com/cncf/foundation/blob/master/allowed-third-party-license-policy.md#approved-licenses-for-allowlist
+# Note that Allowlist also requires that projects were created
+# on GitHub at least 12 months prior and have at least 10 stars
+# or 10 forks
+allow:
+  - "Apache-2.0"
+  - "BSD-2-Clause"
+  - "BSD-2-Clause-FreeBSD"
+  - "BSD-3-Clause"
+  - "MIT"
+  - "ISC"
+  - "Python-2.0"
+  - "PostgreSQL"
+  - "X11"
+  - "Zlib"
+
+# https://github.com/cncf/foundation/tree/master/license-exceptions
+exceptions:
+  licenseNotPermitted:
+    - path: "github.com/hashicorp/golang-lru"
+      licenses: ["MPL-2.0"]
