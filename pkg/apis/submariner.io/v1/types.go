@@ -86,6 +86,10 @@ const (
 	NATTDiscoveryPortConfig  = "natt-discovery-port"
 )
 
+const (
+	DefaultNATTDiscoveryPort = "4490"
+)
+
 // BackendConfig entries which aren't configured via labels, but exposed from the endpoints
 const (
 	PreferredServerConfig = "preferred-server"
