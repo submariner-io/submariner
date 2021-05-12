@@ -52,6 +52,7 @@ type pingerInfo struct {
 	sync.Mutex
 	ip                 string
 	pingInterval       time.Duration
+	pingTimeout        time.Duration
 	maxPacketLossCount uint
 	statistics         statistics
 	failureMsg         string
@@ -63,6 +64,7 @@ func newPinger(ip string, pingInterval time.Duration, maxPacketLossCount uint) P
 	return &pingerInfo{
 		ip:                 ip,
 		pingInterval:       pingInterval,
+		pingTimeout:        pingTimeout,
 		maxPacketLossCount: maxPacketLossCount,
 		statistics: statistics{
 			size:         size,
@@ -112,7 +114,7 @@ func (p *pingerInfo) doPing() error {
 	pinger.Interval = p.pingInterval
 	pinger.SetPrivileged(privileged)
 	pinger.RecordRtts = false
-	pinger.Timeout = pingTimeout
+	pinger.Timeout = p.pingTimeout
 
 	pinger.OnSend = func(packet *ping.Packet) {
 		select {
