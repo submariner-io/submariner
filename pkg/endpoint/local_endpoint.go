@@ -97,6 +97,11 @@ func getBackendConfig(nodeObj *v1.Node) (map[string]string, error) {
 		return backendConfig, err
 	}
 
+	// Enable and publish the natt-discovery-port by default
+	if _, ok := backendConfig[submv1.NATTDiscoveryPortConfig]; !ok {
+		backendConfig[submv1.NATTDiscoveryPortConfig] = submv1.DefaultNATTDiscoveryPort
+	}
+
 	//TODO: we should allow the cable drivers to capture and expose BackendConfig settings, instead of doing
 	//      it here.
 	preferredServerStr := os.Getenv("CE_IPSEC_PREFERREDSERVER")
