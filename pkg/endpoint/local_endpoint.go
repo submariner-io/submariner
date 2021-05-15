@@ -70,12 +70,17 @@ func GetLocal(submSpec types.SubmarinerSpecification, privateIP string, gwNode *
 		},
 	}
 
-	publicIP, err := ipify.GetIp()
-	if err != nil {
-		return types.SubmarinerEndpoint{}, fmt.Errorf("could not determine public IP: %v", err)
-	}
+	if _, ok := endpoint.Spec.BackendConfig[submv1.PublicIP]; ok {
+		klog.Info("Using Remote IP specified by node label")
 
-	endpoint.Spec.PublicIP = publicIP
+		endpoint.Spec.PublicIP = endpoint.Spec.BackendConfig[submv1.PublicIP]
+	} else {
+		publicIP, err := ipify.GetIp()
+		if err != nil {
+			return types.SubmarinerEndpoint{}, fmt.Errorf("could not determine public IP: %v", err)
+		}
+		endpoint.Spec.PublicIP = publicIP
+	}
 
 	if !globalnetEnabled {
 		// When globalnet is enabled, HealthCheckIP will be the globalIP assigned to the Active GatewayNode.

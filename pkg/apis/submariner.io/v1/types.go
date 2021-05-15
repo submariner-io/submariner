@@ -84,6 +84,7 @@ const (
 	GatewayConfigLabelPrefix = "gateway.submariner.io/"
 	UDPPortConfig            = "udp-port"
 	NATTDiscoveryPortConfig  = "natt-discovery-port"
+	PublicIP                 = "public-ip"
 )
 
 const (
@@ -97,6 +98,7 @@ const (
 
 // ValidGatewayNodeConfig list should contain only keys that configure node specific settings via labels
 var ValidGatewayNodeConfig = []string{
+	PublicIP,
 	UDPPortConfig,
 	NATTDiscoveryPortConfig,
 }
