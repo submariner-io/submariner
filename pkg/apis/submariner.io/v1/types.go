@@ -200,7 +200,7 @@ type GlobalEgressIPSpec struct {
 	// The requested number of contiguous GlobalIPs to allocate from the Globalnet CIDR assigned to the cluster.
 	// If not specified, defaults to 1.
 	// +optional
-	NumGlobalIPs *int `json:"numGlobalIPs,omitempty"`
+	NumberOfIPs *int `json:"numberOfIPs,omitempty"`
 
 	// Selects specific pods in the namespace of this GlobalEgressIP to which this GlobalEgressIP applies. If not specified,
 	// all pods in the namespace are selected.
@@ -227,7 +227,7 @@ type GlobalEgressIPStatus struct {
 
 	// The list of allocated GlobalIPs.
 	// +optional
-	GlobalIPs []string `json:"globalIPs"`
+	AllocatedIPs []string `json:"allocatedIPs"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -260,7 +260,7 @@ type ClusterGlobalEgressIPSpec struct {
 	// The requested number of contiguous GlobalIPs to allocate from the Globalnet CIDR assigned to the cluster.
 	// If not specified, defaults to 1.
 	// +optional
-	NumGlobalIPs *int `json:"numGlobalIPs,omitempty"`
+	NumberOfIPs *int `json:"numGlobalIPs,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
