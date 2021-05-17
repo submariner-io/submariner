@@ -44,7 +44,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Check License Headers
-        uses: nilp0inter/search-legal-headers@v0.1.0
+        uses: kt3k/license_checker@v1.0.6
 
   markdown-link-check:
     name: Markdown Links (modified files)
