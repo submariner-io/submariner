@@ -4,7 +4,7 @@ ARG TARGETPLATFORM
 WORKDIR /var/submariner
 
 RUN dnf -y install --nodocs --setopt=install_weak_deps=0 \
-           iproute iptables iptables-nft && \
+           iproute iptables iptables-nft ipset && \
     dnf -y clean all
 
 COPY package/submariner-globalnet.sh bin/${TARGETPLATFORM}/submariner-globalnet /usr/local/bin/
