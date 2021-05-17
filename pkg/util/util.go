@@ -184,11 +184,6 @@ func CreateChainIfNotExists(ipt iptables.Interface, table, chain string) error {
 }
 
 func PrependUnique(ipt iptables.Interface, table, chain string, ruleSpec []string) error {
-	rules, err := ipt.List(table, chain)
-	if err != nil {
-		return fmt.Errorf("error listing the rules in %s chain: %v", chain, err)
-	}
-
 	// Submariner requires certain iptable rules to be programmed at the beginning of an iptables Chain
 	// so that we can preserve the sourceIP for inter-cluster traffic and avoid K8s SDN making changes
 	// to the traffic.
@@ -199,6 +194,14 @@ func PrependUnique(ipt iptables.Interface, table, chain string, ruleSpec []strin
 	// not be the first rule to hit and Submariner behavior might get affected. So, we query the rules
 	// in the chain to see if the rule slipped its position, and if so, delete all such occurrences.
 	// We then re-program a new rule at the beginning of the chain as required.
+	return InsertUnique(ipt, table, chain, 1, ruleSpec)
+}
+
+func InsertUnique(ipt iptables.Interface, table, chain string, position int, ruleSpec []string) error {
+	rules, err := ipt.List(table, chain)
+	if err != nil {
+		return fmt.Errorf("error listing the rules in %s chain: %v", chain, err)
+	}
 
 	isPresentAtRequiredPosition := false
 	numOccurrences := 0
@@ -207,7 +210,7 @@ func PrependUnique(ipt iptables.Interface, table, chain string, ruleSpec []strin
 			klog.V(level.DEBUG).Infof("In %s table, iptables rule \"%s\", exists at index %d.", table, strings.Join(ruleSpec, " "), index)
 			numOccurrences++
 
-			if index == 1 {
+			if index == position {
 				isPresentAtRequiredPosition = true
 			}
 		}
@@ -227,7 +230,7 @@ func PrependUnique(ipt iptables.Interface, table, chain string, ruleSpec []strin
 	if numOccurrences == 1 && isPresentAtRequiredPosition {
 		klog.V(level.DEBUG).Infof("In %s table, iptables rule \"%s\", already exists.", table, strings.Join(ruleSpec, " "))
 		return nil
-	} else if err := ipt.Insert(table, chain, 1, ruleSpec...); err != nil {
+	} else if err := ipt.Insert(table, chain, position, ruleSpec...); err != nil {
 		return err
 	}
 
