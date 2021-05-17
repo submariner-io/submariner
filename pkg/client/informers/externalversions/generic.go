@@ -63,6 +63,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Submariner().V1().Gateways().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("globalegressips"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Submariner().V1().GlobalEgressIPs().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("globalingressips"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Submariner().V1().GlobalIngressIPs().Informer()}, nil
 
 	}
 
