@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -270,4 +271,61 @@ type ClusterGlobalEgressIPList struct {
 	metav1.ListMeta `json:"metadata"`
 
 	Items []ClusterGlobalEgressIP `json:"items"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type GlobalIngressIP struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec is the specification of desired behavior of GlobalIngressIP object.
+	Spec GlobalIngressIPSpec `json:"spec"`
+
+	// Observed status of GlobalIngressIP. Its a read-only field.
+	// +optional
+	Status GlobalIngressIPStatus `json:"status,omitempty"`
+}
+
+type GlobalIngressIPSpec struct {
+	// Specifies the type of the entity targeted by this object.
+	Target TargetType `json:"target"`
+
+	// The reference to a targeted Service, if applicable.
+	// +Optional
+	ServiceRef *corev1.LocalObjectReference `json:"serviceRef,omitempty"`
+
+	// The reference to a targeted Pod, if applicable.
+	// +Optional
+	PodRef *corev1.LocalObjectReference `json:"podRef,omitempty"`
+}
+
+type TargetType string
+
+const (
+	ClusterIPService   TargetType = "ClusterIPService"
+	HeadlessServicePod TargetType = "HeadlessServicePod"
+)
+
+type GlobalIngressIPStatus struct {
+	// +optional
+	// +patchStrategy=merge
+	// +patchMergeKey=type
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+
+	// The GlobalIP allocated to this object.
+	// +optional
+	AllocatedIP string `json:"allocatedIP"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type GlobalIngressIPList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []GlobalIngressIP `json:"items"`
 }

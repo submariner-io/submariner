@@ -57,3 +57,11 @@ type GlobalEgressIPListerExpansion interface{}
 // GlobalEgressIPNamespaceListerExpansion allows custom methods to be added to
 // GlobalEgressIPNamespaceLister.
 type GlobalEgressIPNamespaceListerExpansion interface{}
+
+// GlobalIngressIPListerExpansion allows custom methods to be added to
+// GlobalIngressIPLister.
+type GlobalIngressIPListerExpansion interface{}
+
+// GlobalIngressIPNamespaceListerExpansion allows custom methods to be added to
+// GlobalIngressIPNamespaceLister.
+type GlobalIngressIPNamespaceListerExpansion interface{}
