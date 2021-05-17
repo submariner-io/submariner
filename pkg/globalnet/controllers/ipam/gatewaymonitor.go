@@ -21,6 +21,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	admUtil "github.com/submariner-io/admiral/pkg/util"
@@ -42,6 +43,7 @@ func NewGatewayMonitor(spec *SubmarinerIPAMControllerSpecification, config watch
 		clusterID:     spec.ClusterID,
 		ipamSpec:      spec,
 		isGatewayNode: false,
+		remoteSubnets: stringset.NewSynchronized(),
 	}
 
 	iptableHandler, err := iptables.New()
@@ -151,6 +153,7 @@ func (gm *GatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, num
 		}
 
 		for _, remoteSubnet := range endpoint.Spec.Subnets {
+			gm.remoteSubnets.Add(remoteSubnet)
 			MarkRemoteClusterTraffic(gm.ipt, remoteSubnet, AddRules)
 		}
 
@@ -160,6 +163,10 @@ func (gm *GatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, num
 	hostname, err := os.Hostname()
 	if err != nil {
 		klog.Fatalf("Unable to determine hostname: %v", err)
+	}
+
+	for _, remoteSubnet := range gm.remoteSubnets.Elements() {
+		MarkRemoteClusterTraffic(gm.ipt, remoteSubnet, AddRules)
 	}
 
 	// If the endpoint hostname matches with our hostname, it implies we are on gateway node
@@ -208,6 +215,7 @@ func (gm *GatewayMonitor) handleRemovedEndpoint(obj runtime.Object, numRequeues 
 	} else if endpoint.Spec.ClusterID != gm.clusterID {
 		// Endpoint associated with remote cluster is removed, delete the associated flows.
 		for _, remoteSubnet := range endpoint.Spec.Subnets {
+			gm.remoteSubnets.Remove(remoteSubnet)
 			MarkRemoteClusterTraffic(gm.ipt, remoteSubnet, DeleteRules)
 		}
 	}
