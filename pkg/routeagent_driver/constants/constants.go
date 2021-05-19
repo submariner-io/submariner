@@ -20,6 +20,12 @@ const (
 	SmGlobalnetEgressChain  = "SUBMARINER-GN-EGRESS"
 	SmGlobalnetMarkChain    = "SUBMARINER-GN-MARK"
 
+	// The following chains are added as part of GN 2.0 implementation
+	SmGlobalnetEgressChainForPods            = "SM-GN-EGRESS-PODS"
+	SmGlobalnetEgressChainForHeadlessSvcPods = "SM-GN-EGRESS-HDLS-PODS"
+	SmGlobalnetEgressChainForNamespace       = "SM-GN-EGRESS-NS"
+	SmGlobalnetEgressChainForCluster         = "SM-GN-EGRESS-CLUSTER"
+
 	// IPTable chains used by RouteAgent
 	SmPostRoutingChain = "SUBMARINER-POSTROUTING"
 
