@@ -59,6 +59,16 @@ func RecordDeallocateGlobalIP(cidr string) {
 	globalIPsAvailabilityGauge.With(prometheus.Labels{cidrLabel: cidr}).Inc()
 }
 
+func RecordAllocateGlobalIPs(cidr string, count int) {
+	globalIPsAllocatedGauge.With(prometheus.Labels{cidrLabel: cidr}).Add(float64(count))
+	globalIPsAvailabilityGauge.With(prometheus.Labels{cidrLabel: cidr}).Sub(float64(count))
+}
+
+func RecordDeallocateGlobalIPs(cidr string, count int) {
+	globalIPsAllocatedGauge.With(prometheus.Labels{cidrLabel: cidr}).Sub(float64(count))
+	globalIPsAvailabilityGauge.With(prometheus.Labels{cidrLabel: cidr}).Add(float64(count))
+}
+
 func RecordAvailability(cidr string, count int) {
 	globalIPsAvailabilityGauge.With(prometheus.Labels{cidrLabel: cidr}).Set(float64(count))
 }
