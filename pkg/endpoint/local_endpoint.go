@@ -26,17 +26,26 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rdegges/go-ipify"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/stringset"
+	"github.com/submariner-io/submariner/pkg/node"
+	"github.com/submariner-io/submariner/pkg/util"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 
 	submv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
 )
 
-func GetLocal(submSpec types.SubmarinerSpecification, privateIP string, gwNode *v1.Node) (types.SubmarinerEndpoint, error) {
+func GetLocal(submSpec types.SubmarinerSpecification, k8sClient kubernetes.Interface) (types.SubmarinerEndpoint, error) {
+	privateIP := util.GetLocalIP()
+
+	gwNode, err := node.GetLocalNode(k8sClient)
+	if err != nil {
+		klog.Fatalf("Error getting information on the local node: %s", err.Error())
+	}
+
 	hostname, err := os.Hostname()
 	if err != nil {
 		return types.SubmarinerEndpoint{}, fmt.Errorf("error getting hostname: %v", err)
@@ -72,7 +81,7 @@ func GetLocal(submSpec types.SubmarinerSpecification, privateIP string, gwNode *
 		},
 	}
 
-	publicIP, err := ipify.GetIp()
+	publicIP, err := getPublicIP(submSpec, k8sClient, backendConfig)
 	if err != nil {
 		return types.SubmarinerEndpoint{}, fmt.Errorf("could not determine public IP: %v", err)
 	}

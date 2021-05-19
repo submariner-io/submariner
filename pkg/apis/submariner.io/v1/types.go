@@ -87,10 +87,19 @@ const (
 	GatewayConfigLabelPrefix = "gateway.submariner.io/"
 	UDPPortConfig            = "udp-port"
 	NATTDiscoveryPortConfig  = "natt-discovery-port"
+	PublicIP                 = "public-ip"
 )
 
 const (
 	DefaultNATTDiscoveryPort = "4490"
+)
+
+// Valid PublicIP resolvers.
+const (
+	IPv4         = "ipv4" // ipv4:1.2.3.4
+	LoadBalancer = "lb"   // lb:external-gw-lb
+	API          = "api"  // api:api.ipify.org
+	DNS          = "dns"  // dns:mygateway.dns.name.com
 )
 
 // BackendConfig entries which aren't configured via labels, but exposed from the endpoints
@@ -102,6 +111,7 @@ const (
 var ValidGatewayNodeConfig = []string{
 	UDPPortConfig,
 	NATTDiscoveryPortConfig,
+	PublicIP,
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

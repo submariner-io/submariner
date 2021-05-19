@@ -18,20 +18,30 @@ limitations under the License.
 package endpoint_test
 
 import (
+	"os"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	endpoint "github.com/submariner-io/submariner/pkg/endpoint"
+
+	"github.com/submariner-io/submariner/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 
-	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/types"
 )
 
+const testNodeName = "this-node"
+
 var _ = Describe("GetLocal", func() {
 	var submSpec types.SubmarinerSpecification
+	var client kubernetes.Interface
+	var testPrivateIP = util.GetLocalIP()
 	var node *v1.Node
+
 	const (
-		testPrivateIP       = "127.0.0.1"
 		testUDPPort         = "1111"
 		testUDPPortLabel    = "udp-port"
 		testNATTPortLabel   = "natt-discovery-port"
@@ -49,14 +59,19 @@ var _ = Describe("GetLocal", func() {
 
 		node = &v1.Node{
 			ObjectMeta: v1meta.ObjectMeta{
+				Name: testNodeName,
 				Labels: map[string]string{
 					backendConfigPrefix + testNATTPortLabel: "1234",
 					backendConfigPrefix + testUDPPortLabel:  testUDPPort,
 				}}}
+
+		client = fake.NewSimpleClientset(node)
+
+		os.Setenv("NODE_NAME", testNodeName)
 	})
 
 	It("should return a valid SubmarinerEndpoint object", func() {
-		endpoint, err := endpoint.GetLocal(submSpec, testPrivateIP, node)
+		endpoint, err := endpoint.GetLocal(submSpec, client)
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(endpoint.Spec.ClusterID).To(Equal("east"))
@@ -72,7 +87,7 @@ var _ = Describe("GetLocal", func() {
 	When("no NAT discovery port label is set on the node", func() {
 		It("should return a valid SubmarinerEndpoint object", func() {
 			delete(node.Labels, testNATTPortLabel)
-			_, err := endpoint.GetLocal(submSpec, testPrivateIP, node)
+			_, err := endpoint.GetLocal(submSpec, client)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
