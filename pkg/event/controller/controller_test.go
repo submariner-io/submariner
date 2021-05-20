@@ -58,8 +58,8 @@ var _ = Describe("Event controller", func() {
 	BeforeEach(func() {
 		stopCh = make(chan struct{})
 		testEvents = make(chan testing.TestEvent, 1000)
-		testHandler := testing.NewTestHandler(testHandlerName, event.AnyNetworkPlugin, testEvents)
-		registry = event.NewRegistry("test-registry", "test-plugin")
+		testHandler := testing.NewTestHandler(testHandlerName, event.AnyNetworkPlugin, testEvents, event.CNIDriver)
+		registry = event.NewRegistry("test-registry", "test-plugin", "")
 		Expect(registry.AddHandlers(testHandler)).To(Succeed())
 		hostname, _ = os.Hostname()
 		node = NewNode(hostname)

@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/cabledriver"
+
 	"github.com/kelseyhightower/envconfig"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -73,15 +75,22 @@ func main() {
 	}
 
 	np := os.Getenv("SUBMARINER_NETWORKPLUGIN")
+	cableDriver := os.Getenv("SUBMARINER_CABLEDRIVER")
+
 	if np == "" {
 		np = "generic"
 	}
 
-	registry := event.NewRegistry("routeagent_driver", np)
+	if cableDriver == "" {
+		cableDriver = "libreswan"
+	}
+
+	registry := event.NewRegistry("routeagent_driver", np, cableDriver)
 	if err := registry.AddHandlers(
 		logger.NewHandler(),
 		kubeproxy.NewSyncHandler(env.ClusterCidr, env.ServiceCidr),
 		ovn.NewHandler(env, smClientset),
+		cabledriver.NewXfrm(),
 	); err != nil {
 		klog.Fatalf("Error registering the handlers: %s", err.Error())
 	}

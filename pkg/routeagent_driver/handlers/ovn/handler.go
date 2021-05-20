@@ -25,12 +25,10 @@ import (
 	"k8s.io/klog"
 
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	cableCleanup "github.com/submariner-io/submariner/pkg/cable/cleanup"
 	"github.com/submariner-io/submariner/pkg/cable/wireguard"
 	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/netlink"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/cleanup"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"github.com/submariner-io/submariner/pkg/util"
 )
@@ -41,7 +39,6 @@ type Handler struct {
 	config                *environment.Specification
 	smClient              clientset.Interface
 	cableRoutingInterface *net.Interface
-	cleanupHandlers       []cleanup.Handler
 	localEndpoint         *submV1.Endpoint
 	remoteEndpoints       map[string]*submV1.Endpoint
 	isGateway             bool
@@ -61,14 +58,15 @@ func (ovn *Handler) GetName() string {
 	return "ovn-hostroutes-handler"
 }
 
-func (ovn *Handler) GetNetworkPlugins() []string {
+func (ovn *Handler) GetDrivers() []string {
 	return []string{"OVNKubernetes"}
 }
 
-func (ovn *Handler) Init() error {
-	// For now we get all the cleanups
-	ovn.cleanupHandlers = cableCleanup.GetCleanupHandlers()
+func (ovn *Handler) GetHandlerType() event.HandlerType {
+	return event.CNIDriver
+}
 
+func (ovn *Handler) Init() error {
 	err := ovn.initIPtablesChains()
 	if err != nil {
 		return err

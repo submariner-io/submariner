@@ -27,7 +27,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"k8s.io/klog"
 
-	cableCleanup "github.com/submariner-io/submariner/pkg/cable/cleanup"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cleanup"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
@@ -78,8 +77,12 @@ func (kp *SyncHandler) GetName() string {
 	return "kubeproxy-iptables-handler"
 }
 
-func (kp *SyncHandler) GetNetworkPlugins() []string {
+func (kp *SyncHandler) GetDrivers() []string {
 	return []string{"generic", "canal-flannel", "weave-net", "OpenShiftSDN"}
+}
+
+func (kp *SyncHandler) GetHandlerType() event.HandlerType {
+	return event.CNIDriver
 }
 
 func (kp *SyncHandler) Init() error {
@@ -114,9 +117,6 @@ func (kp *SyncHandler) Init() error {
 	if err != nil {
 		return errors.Wrapf(err, "createIPTableChains returned error")
 	}
-
-	// For now we get all the cleanups
-	kp.InstallCleanupHandlers(cableCleanup.GetCleanupHandlers()...)
 
 	return nil
 }

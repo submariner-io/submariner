@@ -37,14 +37,17 @@ type TestHandler struct {
 	FailOnEvent   error
 	Events        chan TestEvent
 	Initialized   bool
+	HandlerType   event.HandlerType
 }
 
-func NewTestHandler(name, networkPlugin string, events chan TestEvent) *TestHandler {
+func NewTestHandler(name, networkPlugin string, events chan TestEvent,
+	handlerType event.HandlerType) *TestHandler {
 	return &TestHandler{
 		Name:          name,
 		NetworkPlugin: networkPlugin,
 		Events:        events,
 		Initialized:   false,
+		HandlerType:   handlerType,
 	}
 }
 
@@ -69,8 +72,12 @@ func (t *TestHandler) GetName() string {
 	return t.Name
 }
 
-func (t *TestHandler) GetNetworkPlugins() []string {
+func (t *TestHandler) GetDrivers() []string {
 	return []string{t.NetworkPlugin}
+}
+
+func (t *TestHandler) GetHandlerType() event.HandlerType {
+	return t.HandlerType
 }
 
 const EvTransitionToNonGateway = "TransitionToNonGateway"
