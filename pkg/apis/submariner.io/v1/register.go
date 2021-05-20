@@ -54,6 +54,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&GlobalEgressIPList{},
 		&ClusterGlobalEgressIP{},
 		&ClusterGlobalEgressIPList{},
+		&GlobalIngressIP{},
+		&GlobalIngressIPList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 

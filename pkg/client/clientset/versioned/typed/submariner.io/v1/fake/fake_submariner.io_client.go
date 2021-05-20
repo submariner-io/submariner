@@ -48,6 +48,10 @@ func (c *FakeSubmarinerV1) GlobalEgressIPs(namespace string) v1.GlobalEgressIPIn
 	return &FakeGlobalEgressIPs{c, namespace}
 }
 
+func (c *FakeSubmarinerV1) GlobalIngressIPs(namespace string) v1.GlobalIngressIPInterface {
+	return &FakeGlobalIngressIPs{c, namespace}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeSubmarinerV1) RESTClient() rest.Interface {

@@ -34,6 +34,8 @@ type Interface interface {
 	Gateways() GatewayInformer
 	// GlobalEgressIPs returns a GlobalEgressIPInformer.
 	GlobalEgressIPs() GlobalEgressIPInformer
+	// GlobalIngressIPs returns a GlobalIngressIPInformer.
+	GlobalIngressIPs() GlobalIngressIPInformer
 }
 
 type version struct {
@@ -70,4 +72,9 @@ func (v *version) Gateways() GatewayInformer {
 // GlobalEgressIPs returns a GlobalEgressIPInformer.
 func (v *version) GlobalEgressIPs() GlobalEgressIPInformer {
 	return &globalEgressIPInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// GlobalIngressIPs returns a GlobalIngressIPInformer.
+func (v *version) GlobalIngressIPs() GlobalIngressIPInformer {
+	return &globalIngressIPInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
