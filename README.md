@@ -31,6 +31,8 @@ provider, as it utilizes off-the-shelf components to establish encrypted tunnels
 Note that Submariner is in the **pre-alpha** stage, and should not be used for production purposes. While we welcome usage and
 experimentation, it is quite possible that you could run into bugs.
 
+Submariner is a Cloud Native Computing Foundation sandbox project.
+
 ## Architecture
 
 See the [Architecture section on Submariner's website](https://submariner.io/getting-started/architecture/).
