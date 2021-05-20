@@ -27,5 +27,4 @@ jobs:
           using: ${{ matrix.cable_driver }} ${{ matrix.deploytool }} ${{ matrix.globalnet }}
 
       - name: Post mortem
-        if: failure()
         uses: submariner-io/shipyard/gh-actions/post-mortem@devel
