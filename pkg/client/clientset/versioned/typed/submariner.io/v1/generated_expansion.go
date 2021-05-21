@@ -27,3 +27,5 @@ type EndpointExpansion interface{}
 type GatewayExpansion interface{}
 
 type GlobalEgressIPExpansion interface{}
+
+type GlobalIngressIPExpansion interface{}
