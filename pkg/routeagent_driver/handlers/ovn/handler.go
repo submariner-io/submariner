@@ -58,12 +58,8 @@ func (ovn *Handler) GetName() string {
 	return "ovn-hostroutes-handler"
 }
 
-func (ovn *Handler) GetDrivers() []string {
+func (ovn *Handler) GetNetworkPlugins() []string {
 	return []string{"OVNKubernetes"}
-}
-
-func (ovn *Handler) GetHandlerType() event.HandlerType {
-	return event.CNIDriver
 }
 
 func (ovn *Handler) Init() error {

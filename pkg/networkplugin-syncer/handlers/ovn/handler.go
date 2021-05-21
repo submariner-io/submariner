@@ -47,7 +47,7 @@ func (ovn *SyncHandler) GetName() string {
 	return "ovn-sync-handler"
 }
 
-func (ovn *SyncHandler) GetDrivers() []string {
+func (ovn *SyncHandler) GetNetworkPlugins() []string {
 	return []string{"OVNKubernetes"}
 }
 
@@ -56,10 +56,6 @@ func NewSyncHandler(k8sClientset clientset.Interface) event.Handler {
 		remoteEndpoints: make(map[string]*submV1.Endpoint),
 		k8sClientset:    k8sClientset,
 	}
-}
-
-func (ovn *SyncHandler) GetHandlerType() event.HandlerType {
-	return event.CNIDriver
 }
 
 func (ovn *SyncHandler) Init() error {

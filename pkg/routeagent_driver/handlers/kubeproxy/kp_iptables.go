@@ -28,7 +28,6 @@ import (
 	"k8s.io/klog"
 
 	"github.com/submariner-io/submariner/pkg/event"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/cleanup"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/util"
 )
@@ -54,8 +53,6 @@ type SyncHandler struct {
 	hostname         string
 	cniIface         *cni.Interface
 	defaultHostIface *net.Interface
-
-	cleanupHandlers []cleanup.Handler
 }
 
 func NewSyncHandler(localClusterCidr, localServiceCidr []string) *SyncHandler {
@@ -77,12 +74,8 @@ func (kp *SyncHandler) GetName() string {
 	return "kubeproxy-iptables-handler"
 }
 
-func (kp *SyncHandler) GetDrivers() []string {
+func (kp *SyncHandler) GetNetworkPlugins() []string {
 	return []string{"generic", "canal-flannel", "weave-net", "OpenShiftSDN"}
-}
-
-func (kp *SyncHandler) GetHandlerType() event.HandlerType {
-	return event.CNIDriver
 }
 
 func (kp *SyncHandler) Init() error {

@@ -29,7 +29,6 @@ import (
 	fakeIPT "github.com/submariner-io/submariner/pkg/iptables/fake"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	fakeNetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
-	fakeCleanup "github.com/submariner-io/submariner/pkg/routeagent_driver/cleanup/fake"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
@@ -290,25 +289,6 @@ func testGatewayTransition() {
 			It("should remove host networking routing rules for the remote subnets", func() {
 				t.verifyNoHostNetworkingRoutes()
 			})
-
-			It("should invoke cleanup Handler.GatewayToNonGatewayTransition", func() {
-				t.cleanupHandler.AwaitGatewayToNonGatewayTransition()
-			})
-
-			It("should invoke cleanup Handler.NonGatewayCleanup", func() {
-				t.cleanupHandler.AwaitNonGatewayCleanup()
-			})
-
-			Context("and again", func() {
-				JustBeforeEach(func() {
-					t.cleanupHandler.AwaitGatewayToNonGatewayTransition()
-					Expect(t.handler.TransitionToNonGateway()).To(Succeed())
-				})
-
-				It("should not invoke cleanup Handler.GatewayToNonGatewayTransition", func() {
-					t.cleanupHandler.AwaitNoGatewayToNonGatewayTransition()
-				})
-			})
 		})
 	})
 }
@@ -358,7 +338,6 @@ type testDriver struct {
 	handler             *kubeproxy.SyncHandler
 	ipTables            *fakeIPT.IPTables
 	netLink             *fakeNetlink.NetLink
-	cleanupHandler      *fakeCleanup.Handler
 	localEndpoint       *submarinerv1.Endpoint
 	remoteEndpoint      *submarinerv1.Endpoint
 	hostInterfaceIndex  int
@@ -399,9 +378,6 @@ func newTestDriver() *testDriver {
 
 		t.handler = kubeproxy.NewSyncHandler([]string{localClusterCIDR}, []string{localServiceCIDR})
 		Expect(t.handler.Init()).To(Succeed())
-
-		t.cleanupHandler = fakeCleanup.New()
-		t.handler.InstallCleanupHandlers(t.cleanupHandler)
 	})
 
 	AfterEach(func() {

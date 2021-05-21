@@ -33,17 +33,15 @@ import (
 type Registry struct {
 	name          string
 	networkPlugin string
-	cableDriver   string
 	eventHandlers []Handler
 }
 
 // NewRegistry creates a new registry with the given name,  typically referencing the owner, to manage event
 // Handlers that match the given networkPlugin name.
-func NewRegistry(name, networkPlugin, cableDriver string) *Registry {
+func NewRegistry(name, networkPlugin string) *Registry {
 	return &Registry{
 		name:          name,
 		networkPlugin: networkPlugin,
-		cableDriver:   cableDriver,
 		eventHandlers: []Handler{},
 	}
 }
@@ -53,10 +51,10 @@ func (er *Registry) GetName() string {
 	return er.name
 }
 
-func (er *Registry) addCNIDriverHandler(eventHandler Handler) error {
+func (er *Registry) addHandler(eventHandler Handler) error {
 	evNetworkPlugins := stringset.New()
 
-	for _, np := range eventHandler.GetDrivers() {
+	for _, np := range eventHandler.GetNetworkPlugins() {
 		evNetworkPlugins.Add(np)
 	}
 
@@ -74,57 +72,13 @@ func (er *Registry) addCNIDriverHandler(eventHandler Handler) error {
 	return nil
 }
 
-func (er *Registry) addGenricHandler(eventHandler Handler) error {
-	if err := eventHandler.Init(); err != nil {
-		return errors.Wrapf(err, "Event handler %q failed to initialize", eventHandler.GetName())
-	}
-
-	er.eventHandlers = append(er.eventHandlers, eventHandler)
-	klog.Infof("Event handler %q added to registry %q.", eventHandler.GetName(), er.name)
-
-	return nil
-}
-
-func (er *Registry) addCableDriverHandler(eventHandler Handler) error {
-	evDrivers := stringset.New()
-
-	for _, np := range eventHandler.GetDrivers() {
-		evDrivers.Add(np)
-	}
-
-	if evDrivers.Contains(er.cableDriver) {
-		if err := eventHandler.Init(); err != nil {
-			return errors.Wrapf(err, "Event handler %q failed to initialize", eventHandler.GetName())
-		}
-
-		er.eventHandlers = append(er.eventHandlers, eventHandler)
-		klog.Infof("Event handler %q added to registry %q.", eventHandler.GetName(), er.name)
-	} else {
-		klog.V(log.DEBUG).Infof("Event handler %q ignored for registry %q.", eventHandler.GetName(), er.name)
-	}
-
-	return nil
-}
-
 // AddHandlers adds the given event Handlers whose associated network plugin matches the network plugin
 // associated with this registry. Non-matching Handlers are ignored. Handlers will be called in registration order.
 func (er *Registry) AddHandlers(eventHandlers ...Handler) error {
 	for _, eventHandler := range eventHandlers {
-		if eventHandler.GetHandlerType() == CNIDriver {
-			err := er.addCNIDriverHandler(eventHandler)
-			if err != nil {
-				return err
-			}
-		} else if eventHandler.GetHandlerType() == CableDriver {
-			err := er.addCableDriverHandler(eventHandler)
-			if err != nil {
-				return err
-			}
-		} else if eventHandler.GetHandlerType() == GenericHandler {
-			err := er.addGenricHandler(eventHandler)
-			if err != nil {
-				return err
-			}
+		err := er.addHandler(eventHandler)
+		if err != nil {
+			return err
 		}
 	}
 

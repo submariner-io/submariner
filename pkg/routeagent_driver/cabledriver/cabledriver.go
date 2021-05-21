@@ -33,24 +33,20 @@ type Handler struct {
 	netLink netlink.Interface
 }
 
-func NewXfrm() *Handler {
+func NewCableCleanupHandler() *Handler {
 	return &Handler{netLink: netlink.New()}
 }
 
-func (xfrm *Handler) GetHandlerType() event.HandlerType {
-	return event.CableDriver
-}
-
-func (xfrm *Handler) GetName() string {
+func (h *Handler) GetName() string {
 	return "xfrm"
 }
 
-func (xfrm *Handler) GetDrivers() []string {
-	return []string{"libreswan", "wireguard", "default"}
+func (h *Handler) GetNetworkPlugins() []string {
+	return []string{event.AnyNetworkPlugin}
 }
 
-func (xfrm *Handler) TransitionToNonGateway() error {
-	currentXfrmPolicyList, err := xfrm.netLink.XfrmPolicyList(syscall.AF_INET)
+func (h *Handler) TransitionToNonGateway() error {
+	currentXfrmPolicyList, err := h.netLink.XfrmPolicyList(syscall.AF_INET)
 
 	if err != nil {
 		return fmt.Errorf("error retrieving current xfrm policies: %v", err)
@@ -63,7 +59,7 @@ func (xfrm *Handler) TransitionToNonGateway() error {
 	for i := range currentXfrmPolicyList {
 		klog.V(log.DEBUG).Infof("Deleting XFRM policy %s", currentXfrmPolicyList[i])
 
-		if err = xfrm.netLink.XfrmPolicyDel(&currentXfrmPolicyList[i]); err != nil {
+		if err = h.netLink.XfrmPolicyDel(&currentXfrmPolicyList[i]); err != nil {
 			return fmt.Errorf("error deleting XFRM policy %s: %v", currentXfrmPolicyList[i], err)
 		}
 	}

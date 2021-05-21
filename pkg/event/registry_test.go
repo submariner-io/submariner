@@ -45,16 +45,16 @@ var _ = Describe("Event Registry", func() {
 
 		BeforeEach(func() {
 			allTestEvents = make(chan testing.TestEvent, 1000)
-			registry = event.NewRegistry("test-registry", npGenericKubeproxyIptables, "")
+			registry = event.NewRegistry("test-registry", npGenericKubeproxyIptables)
 
 			nonMatchingHandlers = []*testing.TestHandler{
-				testing.NewTestHandler("ovn-handler", npOVNKubernetes, allTestEvents, event.CNIDriver),
+				testing.NewTestHandler("ovn-handler", npOVNKubernetes, allTestEvents),
 			}
 
 			matchingHandlers = []*testing.TestHandler{
-				testing.NewTestHandler("kubeproxy-handler1", npGenericKubeproxyIptables, allTestEvents, event.CNIDriver),
-				testing.NewTestHandler("kubeproxy-handler2", npGenericKubeproxyIptables, allTestEvents, event.CNIDriver),
-				testing.NewTestHandler("wildcard-handler", event.AnyNetworkPlugin, allTestEvents, event.CNIDriver),
+				testing.NewTestHandler("kubeproxy-handler1", npGenericKubeproxyIptables, allTestEvents),
+				testing.NewTestHandler("kubeproxy-handler2", npGenericKubeproxyIptables, allTestEvents),
+				testing.NewTestHandler("wildcard-handler", event.AnyNetworkPlugin, allTestEvents),
 			}
 
 			err := registry.AddHandlers(logger.NewHandler(), matchingHandlers[0], nonMatchingHandlers[0], matchingHandlers[1],

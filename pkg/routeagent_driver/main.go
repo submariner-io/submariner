@@ -75,22 +75,17 @@ func main() {
 	}
 
 	np := os.Getenv("SUBMARINER_NETWORKPLUGIN")
-	cableDriver := os.Getenv("SUBMARINER_CABLEDRIVER")
 
 	if np == "" {
 		np = "generic"
 	}
 
-	if cableDriver == "" {
-		cableDriver = "libreswan"
-	}
-
-	registry := event.NewRegistry("routeagent_driver", np, cableDriver)
+	registry := event.NewRegistry("routeagent_driver", np)
 	if err := registry.AddHandlers(
 		logger.NewHandler(),
 		kubeproxy.NewSyncHandler(env.ClusterCidr, env.ServiceCidr),
 		ovn.NewHandler(env, smClientset),
-		cabledriver.NewXfrm(),
+		cabledriver.NewCableCleanupHandler(),
 	); err != nil {
 		klog.Fatalf("Error registering the handlers: %s", err.Error())
 	}

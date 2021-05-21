@@ -38,12 +38,8 @@ func (l *Handler) GetName() string {
 	return "logger"
 }
 
-func (l *Handler) GetDrivers() []string {
+func (l *Handler) GetNetworkPlugins() []string {
 	return []string{event.AnyNetworkPlugin}
-}
-
-func (l *Handler) GetHandlerType() event.HandlerType {
-	return event.GenericHandler
 }
 
 func (l *Handler) TransitionToNonGateway() error {

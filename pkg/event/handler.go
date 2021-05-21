@@ -25,27 +25,15 @@ import (
 
 const AnyNetworkPlugin = ""
 
-// ServiceImportType designates the type of a ServiceImport
-type HandlerType string
-
-const (
-	CableDriver    HandlerType = "CableDriver"
-	CNIDriver      HandlerType = "CNIDriver"
-	GenericHandler HandlerType = "Generic"
-)
-
 type Handler interface {
 	// Init is called once on startup to let the handler initialize any state it needs.
 	Init() error
 
 	// GetName returns the name of the event handler
-	GetHandlerType() HandlerType
-
-	// GetName returns the name of the event handler
 	GetName() string
 
-	// GetDrivers returns the kubernetes network drivers that this handler supports.
-	GetDrivers() []string
+	// GetNetworkPlugin returns the kubernetes network plugin that this handler supports.
+	GetNetworkPlugins() []string
 
 	// Stop is called once during shutdown to let the handler perform any cleanup. The uninstall flag indicates
 	// whether or not Submariner is being completely uninstalled from the system.
