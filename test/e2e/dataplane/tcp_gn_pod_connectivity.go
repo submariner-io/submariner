@@ -35,7 +35,7 @@ var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across over
 				return
 			}
 
-			tcp.RunConnectivityTest(tcp.ConnectivityTestParams{
+			VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
 				Framework:             f,
 				ToEndpointType:        toEndpointType,
 				Networking:            networking,
@@ -43,7 +43,7 @@ var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across over
 				FromClusterScheduling: fromClusterScheduling,
 				ToCluster:             framework.ClusterB,
 				ToClusterScheduling:   toClusterScheduling,
-			})
+			}, framework.TestContext.GlobalnetEnabled)
 		})
 	}
 
