@@ -81,10 +81,10 @@ type EndpointSpec struct {
 }
 
 const (
-	GatewayConfigLabelPrefix = "gateway.submariner.io/"
-	UDPPortConfig            = "udp-port"
-	NATTDiscoveryPortConfig  = "natt-discovery-port"
-	PublicIP                 = "public-ip"
+	GatewayConfigPrefix     = "gateway.submariner.io/"
+	UDPPortConfig           = "udp-port"
+	NATTDiscoveryPortConfig = "natt-discovery-port"
+	PublicIP                = "public-ip"
 )
 
 // Valid PublicIP resolvers.
