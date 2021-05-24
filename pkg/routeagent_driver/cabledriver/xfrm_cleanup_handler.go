@@ -28,24 +28,24 @@ import (
 	"k8s.io/klog"
 )
 
-type Handler struct {
+type xrfmCleanup struct {
 	event.HandlerBase
 	netLink netlink.Interface
 }
 
-func NewCableCleanupHandler() *Handler {
-	return &Handler{netLink: netlink.New()}
+func NewXRFMCleanupHandler() *xrfmCleanup {
+	return &xrfmCleanup{netLink: netlink.New()}
 }
 
-func (h *Handler) GetName() string {
+func (h *xrfmCleanup) GetName() string {
 	return "xfrm"
 }
 
-func (h *Handler) GetNetworkPlugins() []string {
+func (h *xrfmCleanup) GetNetworkPlugins() []string {
 	return []string{event.AnyNetworkPlugin}
 }
 
-func (h *Handler) TransitionToNonGateway() error {
+func (h *xrfmCleanup) TransitionToNonGateway() error {
 	currentXfrmPolicyList, err := h.netLink.XfrmPolicyList(syscall.AF_INET)
 
 	if err != nil {
