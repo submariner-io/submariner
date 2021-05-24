@@ -29,6 +29,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/event/controller"
 	"github.com/submariner-io/submariner/pkg/event/logger"
 	"github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
@@ -50,7 +51,7 @@ func main() {
 	networkPlugin := os.Getenv("SUBMARINER_NETWORKPLUGIN")
 
 	if networkPlugin == "" {
-		networkPlugin = "generic"
+		networkPlugin = constants.NetworkPluginGeneric
 	}
 
 	registry := event.NewRegistry("networkplugin-syncer", networkPlugin)

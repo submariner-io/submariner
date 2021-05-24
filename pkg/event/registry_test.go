@@ -29,9 +29,9 @@ import (
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/logger"
 	"github.com/submariner-io/submariner/pkg/event/testing"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 )
 
-const npOVNKubernetes = "OVNKubernetes"
 const npGenericKubeproxyIptables = "GenericKubeproxyIptables"
 
 var _ = Describe("Event Registry", func() {
@@ -48,7 +48,7 @@ var _ = Describe("Event Registry", func() {
 			registry = event.NewRegistry("test-registry", npGenericKubeproxyIptables)
 
 			nonMatchingHandlers = []*testing.TestHandler{
-				testing.NewTestHandler("ovn-handler", npOVNKubernetes, allTestEvents),
+				testing.NewTestHandler("ovn-handler", constants.NetworkPluginOVNKubernetes, allTestEvents),
 			}
 
 			matchingHandlers = []*testing.TestHandler{

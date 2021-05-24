@@ -27,6 +27,7 @@ import (
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn/nbctl"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 )
 
 var ErrWaitingForLocalEndpoint = errors.New("waiting for the local endpoint details before we can " +
@@ -48,7 +49,7 @@ func (ovn *SyncHandler) GetName() string {
 }
 
 func (ovn *SyncHandler) GetNetworkPlugins() []string {
-	return []string{"OVNKubernetes"}
+	return []string{constants.NetworkPluginOVNKubernetes}
 }
 
 func NewSyncHandler(k8sClientset clientset.Interface) event.Handler {
