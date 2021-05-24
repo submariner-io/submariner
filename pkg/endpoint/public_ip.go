@@ -56,12 +56,12 @@ func getPublicIP(submSpec types.SubmarinerSpecification, k8sClient kubernetes.In
 		resolver = strings.Trim(resolver, " ")
 		parts := strings.Split(resolver, ":")
 		if len(parts) != 2 {
-			return "", errors.Errorf("invalid format for %q label: %q", v1.GatewayConfigLabelPrefix+v1.PublicIP, config)
+			return "", errors.Errorf("invalid format for %q annotation: %q", v1.GatewayConfigPrefix+v1.PublicIP, config)
 		}
 
 		method, ok := publicIPMethods[parts[0]]
 		if !ok {
-			return "", errors.Errorf("unknown resolver %q in %q label: %q", parts[0], v1.GatewayConfigLabelPrefix+v1.PublicIP, config)
+			return "", errors.Errorf("unknown resolver %q in %q annotation: %q", parts[0], v1.GatewayConfigPrefix+v1.PublicIP, config)
 		}
 
 		ip, err := method(k8sClient, submSpec.Namespace, parts[1])

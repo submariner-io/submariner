@@ -103,7 +103,7 @@ func GetLocal(submSpec types.SubmarinerSpecification, k8sClient kubernetes.Inter
 }
 
 func getBackendConfig(nodeObj *v1.Node) (map[string]string, error) {
-	backendConfig, err := getLabelsBackendConfig(nodeObj, map[string]string{})
+	backendConfig, err := getNodeBackendConfig(nodeObj)
 	if err != nil {
 		return backendConfig, err
 	}
@@ -137,21 +137,39 @@ func getBackendConfig(nodeObj *v1.Node) (map[string]string, error) {
 	return backendConfig, nil
 }
 
-func getLabelsBackendConfig(nodeObj *v1.Node, backendConfig map[string]string) (map[string]string, error) {
+func getNodeBackendConfig(nodeObj *v1.Node) (map[string]string, error) {
+	backendConfig := map[string]string{}
+	if err := addConfigFrom(nodeObj.Name, nodeObj.Labels, backendConfig, ""); err != nil {
+		return backendConfig, err
+	}
+
+	if err := addConfigFrom(nodeObj.Name, nodeObj.Annotations, backendConfig,
+		"label %s=%s is overwritten by annotation with value %s"); err != nil {
+		return backendConfig, err
+	}
+
+	return backendConfig, nil
+}
+
+func addConfigFrom(nodeName string, configs, backendConfig map[string]string, warningDuplicate string) error {
 	validConfigs := stringset.New(submv1.ValidGatewayNodeConfig...)
 
-	for label, value := range nodeObj.Labels {
-		if strings.HasPrefix(label, submv1.GatewayConfigLabelPrefix) {
-			config := label[len(submv1.GatewayConfigLabelPrefix):]
+	for cfg, value := range configs {
+		if strings.HasPrefix(cfg, submv1.GatewayConfigPrefix) {
+			config := cfg[len(submv1.GatewayConfigPrefix):]
 			if !validConfigs.Contains(config) {
-				return backendConfig, errors.Errorf("unknown config label %q on node %q", nodeObj.Name, label)
+				return errors.Errorf("unknown config annotation %q on node %q", cfg, nodeName)
+			}
+
+			if oldValue, ok := backendConfig[config]; ok && warningDuplicate != "" {
+				klog.Warningf(warningDuplicate, cfg, oldValue, value)
 			}
 
 			backendConfig[config] = value
 		}
 	}
 
-	return backendConfig, nil
+	return nil
 }
 
 //TODO: to handle de-duplication of code/finding common parts with the route agent
