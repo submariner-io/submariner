@@ -81,16 +81,21 @@ comma := ,
 # so "make images ARCHES=arm" will build a linux/arm/v7 image
 ARCHES ?= amd64
 BINARIES = submariner-gateway submariner-route-agent submariner-globalnet submariner-networkplugin-syncer
+ARCH_BINARIES := $(foreach arch,$(subst $(comma),$(space),$(ARCHES)),$(foreach binary,$(BINARIES),bin/linux/$(call gotodockerarch,$(arch))/$(binary)))
 IMAGES_ARGS = --platform $(subst $(space),$(comma),$(foreach arch,$(subst $(comma),$(space),$(ARCHES)),linux/$(call gotodockerarch,$(arch))))
 
-build: $(foreach arch,$(subst $(comma),$(space),$(ARCHES)),$(foreach binary,$(BINARIES),bin/linux/$(call gotodockerarch,$(arch))/$(binary)))
+build: $(ARCH_BINARIES)
+
+licensecheck: BUILD_ARGS=--debug
+licensecheck: $(ARCH_BINARIES)
+	lichen -c .lichen.yaml $(ARCH_BINARIES)
 
 ci: validate unit build images
 
 $(TARGETS): vendor/modules.txt
 	./scripts/$@
 
-.PHONY: $(TARGETS) build ci images unit validate
+.PHONY: $(TARGETS) build ci images unit validate licensecheck
 
 else
 
