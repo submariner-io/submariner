@@ -33,7 +33,7 @@ type xrfmCleanup struct {
 	netLink netlink.Interface
 }
 
-func NewXRFMCleanupHandler() *xrfmCleanup {
+func NewXRFMCleanupHandler() event.Handler {
 	return &xrfmCleanup{netLink: netlink.New()}
 }
 

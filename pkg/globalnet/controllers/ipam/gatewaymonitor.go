@@ -269,7 +269,7 @@ func configureTCPMTUProbe() {
 }
 
 func clearGlobalnetChains(ipt iptables.Interface) {
-	klog.Info("Globalnet is enabled and active gateway migrated, flushing Globalnet chains.")
+	klog.Info("Active gateway migrated, flushing Globalnet chains.")
 
 	if err := ipt.ClearChain("nat", constants.SmGlobalnetIngressChain); err != nil {
 		klog.Errorf("Error while flushing rules in %s chain: %v", constants.SmGlobalnetIngressChain, err)
