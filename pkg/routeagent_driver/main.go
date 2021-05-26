@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/cabledriver"
+
 	"github.com/kelseyhightower/envconfig"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -74,6 +76,7 @@ func main() {
 	}
 
 	np := os.Getenv("SUBMARINER_NETWORKPLUGIN")
+
 	if np == "" {
 		np = constants.NetworkPluginGeneric
 	}
@@ -83,6 +86,7 @@ func main() {
 		logger.NewHandler(),
 		kubeproxy.NewSyncHandler(env.ClusterCidr, env.ServiceCidr),
 		ovn.NewHandler(env, smClientset),
+		cabledriver.NewXRFMCleanupHandler(),
 	); err != nil {
 		klog.Fatalf("Error registering the handlers: %s", err.Error())
 	}

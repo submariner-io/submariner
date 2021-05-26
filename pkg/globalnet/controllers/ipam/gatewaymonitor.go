@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/stringset"
@@ -30,7 +32,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/watcher"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cidr"
-	"github.com/submariner-io/submariner/pkg/globalnet/cleanup"
 	"github.com/submariner-io/submariner/pkg/iptables"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	corev1 "k8s.io/api/core/v1"
@@ -248,7 +249,7 @@ func (gm *GatewayMonitor) stopIPAMController() {
 		close(gm.stopProcessing)
 		gm.stopProcessing = nil
 
-		cleanup.ClearGlobalnetChains(gm.ipt)
+		clearGlobalnetChains(gm.ipt)
 	}
 }
 
@@ -264,5 +265,21 @@ func configureTCPMTUProbe() {
 	err := netlink.New().ConfigureTCPMTUProbe(mtuProbe, baseMss)
 	if err != nil {
 		klog.Warningf(err.Error())
+	}
+}
+
+func clearGlobalnetChains(ipt iptables.Interface) {
+	klog.Info("Active gateway migrated, flushing Globalnet chains.")
+
+	if err := ipt.ClearChain("nat", constants.SmGlobalnetIngressChain); err != nil {
+		klog.Errorf("Error while flushing rules in %s chain: %v", constants.SmGlobalnetIngressChain, err)
+	}
+
+	if err := ipt.ClearChain("nat", constants.SmGlobalnetEgressChain); err != nil {
+		klog.Errorf("Error while flushing rules in %s chain: %v", constants.SmGlobalnetEgressChain, err)
+	}
+
+	if err := ipt.ClearChain("nat", constants.SmGlobalnetMarkChain); err != nil {
+		klog.Errorf("Error while flushing rules in %s chain: %v", constants.SmGlobalnetMarkChain, err)
 	}
 }

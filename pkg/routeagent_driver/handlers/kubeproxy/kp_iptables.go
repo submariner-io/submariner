@@ -27,9 +27,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"k8s.io/klog"
 
-	cableCleanup "github.com/submariner-io/submariner/pkg/cable/cleanup"
 	"github.com/submariner-io/submariner/pkg/event"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/cleanup"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/util"
@@ -56,8 +54,6 @@ type SyncHandler struct {
 	hostname         string
 	cniIface         *cni.Interface
 	defaultHostIface *net.Interface
-
-	cleanupHandlers []cleanup.Handler
 }
 
 func NewSyncHandler(localClusterCidr, localServiceCidr []string) *SyncHandler {
@@ -116,9 +112,6 @@ func (kp *SyncHandler) Init() error {
 	if err != nil {
 		return errors.Wrapf(err, "createIPTableChains returned error")
 	}
-
-	// For now we get all the cleanups
-	kp.InstallCleanupHandlers(cableCleanup.GetCleanupHandlers()...)
 
 	return nil
 }

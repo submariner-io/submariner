@@ -26,7 +26,6 @@ import (
 const AnyNetworkPlugin = ""
 
 type Handler interface {
-
 	// Init is called once on startup to let the handler initialize any state it needs.
 	Init() error
 

@@ -51,19 +51,6 @@ func (ovn *Handler) cleanupGatewayDataplane() error {
 		return errors.Wrap(err, "error deleting submariner default route")
 	}
 
-	for _, handler := range ovn.cleanupHandlers {
-		// TODO: Make those handlers have a single cleanup on GatewayToNonGateway transition,
-		//       we can make them a normal event handler, instead of a cleanup handler, but
-		//       we need to make sure that TransitionToNonGateway is fired at least one for
-		//       a controller which is started once and no endpoint is received on for current
-		//       host.
-		if err := handler.NonGatewayCleanup(); err != nil {
-			return errors.Wrap(err, "NonGatewayCleanup")
-		} else if err := handler.GatewayToNonGatewayTransition(); err != nil {
-			return errors.Wrap(err, "GatewayToNonGatewayTransition")
-		}
-	}
-
 	if err = ovn.cleanupOutputIptables(); err != nil {
 		return errors.Wrap(err, "error cleaning up output iptable rules")
 	}
