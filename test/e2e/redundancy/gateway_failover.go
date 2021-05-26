@@ -25,7 +25,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
-	"github.com/submariner-io/submariner/test/e2e/dataplane"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -79,7 +78,7 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 	f.AwaitGatewayFullyConnected(framework.ClusterA, activeGateway.Name)
 
 	By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
-	dataplane.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
+	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
 		FromCluster:           framework.ClusterB,
 		FromClusterScheduling: framework.GatewayNode,
@@ -89,7 +88,7 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 	}, framework.TestContext.GlobalnetEnabled)
 
 	By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
-	dataplane.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
+	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
 		FromCluster:           framework.ClusterB,
 		FromClusterScheduling: framework.NonGatewayNode,
@@ -194,7 +193,7 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 	f.AwaitSubmarinerEndpointRemoved(framework.ClusterB, submEndpoint.Name)
 
 	By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
-	dataplane.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
+	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
 		FromCluster:           framework.ClusterB,
 		FromClusterScheduling: framework.GatewayNode,
@@ -204,7 +203,7 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 	}, framework.TestContext.GlobalnetEnabled)
 
 	By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
-	dataplane.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
+	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
 		FromCluster:           framework.ClusterB,
 		FromClusterScheduling: framework.NonGatewayNode,

@@ -23,8 +23,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
-	"github.com/submariner-io/submariner/test/e2e/dataplane"
-
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
 )
 
@@ -62,7 +60,7 @@ func testRouteAgentRestart(f *subFramework.Framework, onGateway bool) {
 	By(fmt.Sprintf("Found new route agent pod %q on node %q", newRouteAgentPod.Name, node.Name))
 
 	By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
-	dataplane.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
+	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
 		FromCluster:           framework.ClusterB,
 		FromClusterScheduling: framework.GatewayNode,
@@ -72,7 +70,7 @@ func testRouteAgentRestart(f *subFramework.Framework, onGateway bool) {
 	}, framework.TestContext.GlobalnetEnabled)
 
 	By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
-	dataplane.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
+	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
 		FromCluster:           framework.ClusterB,
 		FromClusterScheduling: framework.NonGatewayNode,
