@@ -55,4 +55,12 @@ const (
 	// certain routing rules in table 150. As part of these routes, we set the source-ip of
 	// the egress traffic to the corresponding CNIInterfaceIP on that host.
 	RouteAgentHostNetworkTableID = 150
+
+	// Network plugins supported
+	NetworkPluginGeneric       = "generic"
+	NetworkPluginCanalFlannel  = "canal-flannel"
+	NetworkPluginWeaveNet      = "weave-net"
+	NetworkPluginOpenShiftSDN  = "OpenShiftSDN"
+	NetworkPluginOVNKubernetes = "OVNKubernetes"
+	NetworkPluginCalico        = "calico"
 )

@@ -29,6 +29,7 @@ import (
 
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/util"
 )
 
@@ -75,7 +76,8 @@ func (kp *SyncHandler) GetName() string {
 }
 
 func (kp *SyncHandler) GetNetworkPlugins() []string {
-	return []string{"generic", "canal-flannel", "weave-net", "OpenShiftSDN"}
+	return []string{constants.NetworkPluginGeneric, constants.NetworkPluginCanalFlannel, constants.NetworkPluginWeaveNet,
+		constants.NetworkPluginOpenShiftSDN, constants.NetworkPluginCalico}
 }
 
 func (kp *SyncHandler) Init() error {
