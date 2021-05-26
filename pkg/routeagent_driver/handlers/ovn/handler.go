@@ -31,6 +31,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cleanup"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"github.com/submariner-io/submariner/pkg/util"
 )
@@ -62,7 +63,7 @@ func (ovn *Handler) GetName() string {
 }
 
 func (ovn *Handler) GetNetworkPlugins() []string {
-	return []string{"OVNKubernetes"}
+	return []string{constants.NetworkPluginOVNKubernetes}
 }
 
 func (ovn *Handler) Init() error {

@@ -34,6 +34,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/event/controller"
 	"github.com/submariner-io/submariner/pkg/event/logger"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
@@ -74,7 +75,7 @@ func main() {
 
 	np := os.Getenv("SUBMARINER_NETWORKPLUGIN")
 	if np == "" {
-		np = "generic"
+		np = constants.NetworkPluginGeneric
 	}
 
 	registry := event.NewRegistry("routeagent_driver", np)
