@@ -212,12 +212,7 @@ func awaitStatusConditions(client dynamic.ResourceInterface, name string, atInde
 	}
 }
 
-func newGlobalEgressIP(name string, numIPs int, podSelector *metav1.LabelSelector) *submarinerv1.GlobalEgressIP {
-	var numberOfIPs *int
-	if numIPs >= 0 {
-		numberOfIPs = &numIPs
-	}
-
+func newGlobalEgressIP(name string, numberOfIPs *int, podSelector *metav1.LabelSelector) *submarinerv1.GlobalEgressIP {
 	return &submarinerv1.GlobalEgressIP{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,

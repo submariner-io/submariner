@@ -27,23 +27,20 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers/ipam"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var _ = Describe("GlobalEgressIP controller", func() {
 	t := newGlobalEgressIPControllerTestDriver()
 
 	When("a GlobalEgressIP is created", func() {
-		var numberOfIPs int
+		var numberOfIPs *int
 
 		JustBeforeEach(func() {
 			t.createGlobalEgressIP(newGlobalEgressIP(globalEgressIPName, numberOfIPs, nil))
 		})
 
 		Context("with the NumberOfIPs unspecified", func() {
-			BeforeEach(func() {
-				numberOfIPs = -1
-			})
-
 			It("should successfully allocate one global IP", func() {
 				t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, 1)
 				// TODO - verify IP tables
@@ -52,12 +49,45 @@ var _ = Describe("GlobalEgressIP controller", func() {
 
 		Context("with the NumberOfIPs specified", func() {
 			BeforeEach(func() {
-				numberOfIPs = 10
+				n := 10
+				numberOfIPs = &n
 			})
 
 			It("should successfully allocate the specified number of global IPs", func() {
-				t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, numberOfIPs)
+				t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, *numberOfIPs)
 				// TODO - verify IP tables
+			})
+		})
+
+		Context("with NumberOfIPs negative", func() {
+			BeforeEach(func() {
+				n := -1
+				numberOfIPs = &n
+			})
+
+			It("should add an appropriate Status condition", func() {
+				awaitGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName, t.globalCIDR,
+					0, 0, metav1.Condition{
+						Type:   string(submarinerv1.GlobalEgressIPAllocated),
+						Status: metav1.ConditionFalse,
+						Reason: "InvalidInput",
+					})
+			})
+		})
+
+		Context("with NumberOfIPs zero", func() {
+			BeforeEach(func() {
+				n := 0
+				numberOfIPs = &n
+			})
+
+			It("should add an appropriate Status condition", func() {
+				awaitGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName, t.globalCIDR,
+					0, 0, metav1.Condition{
+						Type:   string(submarinerv1.GlobalEgressIPAllocated),
+						Status: metav1.ConditionFalse,
+						Reason: "ZeroInput",
+					})
 			})
 		})
 	})
@@ -66,7 +96,8 @@ var _ = Describe("GlobalEgressIP controller", func() {
 		var existing *submarinerv1.GlobalEgressIP
 
 		BeforeEach(func() {
-			existing = newGlobalEgressIP(globalEgressIPName, 3, nil)
+			n := 3
+			existing = newGlobalEgressIP(globalEgressIPName, &n, nil)
 			existing.Status.AllocatedIPs = []string{"169.254.1.100", "169.254.1.101", "169.254.1.102"}
 			t.createGlobalEgressIP(existing)
 		})
@@ -96,7 +127,7 @@ var _ = Describe("GlobalEgressIP controller", func() {
 		})
 
 		JustBeforeEach(func() {
-			t.createGlobalEgressIP(newGlobalEgressIP(globalEgressIPName, 1, nil))
+			t.createGlobalEgressIP(newGlobalEgressIP(globalEgressIPName, nil, nil))
 			t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, 1)
 
 			t.createPod(pod)

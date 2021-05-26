@@ -162,6 +162,26 @@ func allocateIPs(key string, numberOfIPs *int, pool *ipam.IPPool, status *submar
 		numberOfIPs = &one
 	}
 
+	if *numberOfIPs < 0 {
+		tryAppendStatusCondition(status, &metav1.Condition{
+			Type:    string(submarinerv1.GlobalEgressIPAllocated),
+			Status:  metav1.ConditionFalse,
+			Reason:  "InvalidInput",
+			Message: "The NumberOfIPs cannot be negative",
+		})
+
+		return false
+	}
+
+	if *numberOfIPs == 0 {
+		tryAppendStatusCondition(status, &metav1.Condition{
+			Type:    string(submarinerv1.GlobalEgressIPAllocated),
+			Status:  metav1.ConditionFalse,
+			Reason:  "ZeroInput",
+			Message: "No global IPs to allocate",
+		})
+	}
+
 	if *numberOfIPs == len(status.AllocatedIPs) {
 		return false
 	}
@@ -189,6 +209,10 @@ func allocateIPs(key string, numberOfIPs *int, pool *ipam.IPPool, status *submar
 	}
 
 	// TODO - remove IP table rules for previous allocated IPs
+
+	if *numberOfIPs == 0 {
+		return false
+	}
 
 	// TODO - add IP table rules for the allocated IPs
 
