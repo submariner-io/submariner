@@ -1,5 +1,7 @@
 /*
-© 2021 Red Hat, Inc. and others
+SPDX-License-Identifier: Apache-2.0
+
+Copyright Contributors to the Submariner project.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,7 +31,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
 	"github.com/vishvananda/netlink"
@@ -42,6 +45,15 @@ const (
 	VxLANOverhead          = 50
 	VxLANVTepNetworkPrefix = 241
 	CableDriverName        = "vxlan"
+	TableID                = 100
+)
+
+type Operation int
+
+const (
+	Add Operation = iota
+	Delete
+	Flush
 )
 
 type vxLan struct {
@@ -117,10 +129,15 @@ func (v *vxLan) createVxLANInterface(activeEndPoint string) error {
 	}
 
 	v.vxLanIface.vtepIP = vtepIP
+
+	err = v.addIPRule()
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("failed to add ip rule: %v", err)
+	}
+
 	// Enable loose mode (rp_filter=2) reverse path filtering on the vxlan interface.
 	// We won't ever create rp_filter, and its permissions are 644
 	// #nosec G306
-
 	err = ioutil.WriteFile("/proc/sys/net/ipv4/conf/"+VxLANIface+"/rp_filter", []byte("2"), 0600)
 	if err != nil {
 		return fmt.Errorf("unable to update vxlan rp_filter proc entry, err: %s", err)
@@ -249,16 +266,31 @@ func (v *vxLan) getVxlanVtepIPAddress(ipAddr string) (net.IP, error) {
 	return vxlanIP, nil
 }
 
-func (v *vxLan) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (string, error) {
+func (v *vxLan) addIPRule() error {
+	if v.vxLanIface != nil {
+		rule := netlink.NewRule()
+		rule.Table = TableID
+		rule.Priority = TableID
+
+		err := netlink.RuleAdd(rule)
+		if err != nil && !os.IsExist(err) {
+			return fmt.Errorf("failed to add ip rule %s: %v", rule, err)
+		}
+	}
+
+	return nil
+}
+
+func (v *vxLan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
+	remoteEndpoint := endpointInfo.Endpoint
 	if v.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
 		klog.V(log.DEBUG).Infof("Will not connect to self")
 		return "", nil
 	}
 
-	ip := endpointIP(&remoteEndpoint)
-	remoteIP := net.ParseIP(ip)
+	remoteIP := net.ParseIP(endpointInfo.UseIP)
 	if remoteIP == nil {
-		return "", fmt.Errorf("failed to parse remote IP %s", ip)
+		return "", fmt.Errorf("failed to parse remote IP %s", endpointInfo.UseIP)
 	}
 
 	allowedIPs := parseSubnets(remoteEndpoint.Spec.Subnets)
@@ -268,32 +300,33 @@ func (v *vxLan) ConnectToEndpoint(remoteEndpoint types.SubmarinerEndpoint) (stri
 	v.mutex.Lock()
 	defer v.mutex.Unlock()
 
-	v.connections = append(v.connections, v1.Connection{Endpoint: remoteEndpoint.Spec, Status: v1.Connected})
-
 	cable.RecordConnection(CableDriverName, &v.localEndpoint.Spec, &remoteEndpoint.Spec, string(v1.Connected), true)
 
-	remoteVtepIP, err := v.getVxlanVtepIPAddress(ip)
+	remoteVtepIP, err := v.getVxlanVtepIPAddress(endpointInfo.UseIP)
 
 	if err != nil {
-		return ip, fmt.Errorf("failed to derive the vxlan vtepIP for %s, %v", ip, err)
+		return endpointInfo.UseIP, fmt.Errorf("failed to derive the vxlan vtepIP for %s, %v", endpointInfo.UseIP, err)
 	}
 
 	err = v.vxLanIface.AddFDB(remoteIP, "00:00:00:00:00:00")
 
 	if err != nil {
-		return ip, fmt.Errorf("failed to add remoteIP %q to the forwarding database", remoteIP)
+		return endpointInfo.UseIP, fmt.Errorf("failed to add remoteIP %q to the forwarding database", remoteIP)
 	}
 
 	err = v.vxLanIface.AddRoute(allowedIPs, remoteVtepIP, v.vxLanIface.vtepIP)
 
 	if err != nil {
-		return ip, fmt.Errorf("failed to add route for the CIDR %q with remoteVtepIP %q and vxlanInterfaceIP %q",
+		return endpointInfo.UseIP, fmt.Errorf("failed to add route for the CIDR %q with remoteVtepIP %q and vxlanInterfaceIP %q",
 			allowedIPs, remoteVtepIP, v.vxLanIface.vtepIP)
 	}
 
+	v.connections = append(v.connections, v1.Connection{Endpoint: remoteEndpoint.Spec, Status: v1.Connected,
+		UsingIP: endpointInfo.UseIP, UsingNAT: endpointInfo.UseNAT})
+
 	klog.V(log.DEBUG).Infof("Done adding endpoint for cluster %s", remoteEndpoint.Spec.ClusterID)
 
-	return ip, nil
+	return endpointInfo.UseIP, nil
 }
 
 func (v *vxLan) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoint) error {
@@ -308,7 +341,7 @@ func (v *vxLan) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoint) 
 	defer v.mutex.Unlock()
 
 	// parse remote addresses and allowed IPs
-	ip := endpointIP(&remoteEndpoint)
+	ip := submarinerEndpointIP(&remoteEndpoint)
 
 	remoteIP := net.ParseIP(ip)
 
@@ -354,7 +387,7 @@ func (v *vxLan) GetConnections() ([]v1.Connection, error) {
 	return v.connections, nil
 }
 
-func (v *vxLan) GetActiveConnections(clusterID string) ([]v1.Connection, error) {
+func (v *vxLan) GetActiveConnections() ([]v1.Connection, error) {
 	return v.connections, nil
 }
 
@@ -425,7 +458,7 @@ func (iface *vxLanIface) AddRoute(ipAddressList []net.IPNet, gwIP, ips net.IP) e
 			Type:      netlink.NDA_DST,
 			Flags:     netlink.NTF_SELF,
 			Priority:  100,
-			Table:     constants.RouteAgentHostNetworkTableID,
+			Table:     TableID,
 		}
 		err := netlink.RouteAdd(route)
 
@@ -452,7 +485,7 @@ func (iface *vxLanIface) DelRoute(ipAddressList []net.IPNet) error {
 			Type:      netlink.NDA_DST,
 			Flags:     netlink.NTF_SELF,
 			Priority:  100,
-			Table:     constants.RouteAgentHostNetworkTableID,
+			Table:     TableID,
 		}
 		err := netlink.RouteDel(route)
 		if err != nil {
@@ -473,7 +506,7 @@ func (v *vxLan) GetName() string {
 	return CableDriverName
 }
 
-func endpointIP(ep *types.SubmarinerEndpoint) string {
+func submarinerEndpointIP(ep *types.SubmarinerEndpoint) string {
 	if ep.Spec.NATEnabled {
 		return ep.Spec.PublicIP
 	}

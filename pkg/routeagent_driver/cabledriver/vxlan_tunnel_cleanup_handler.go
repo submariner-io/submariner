@@ -1,5 +1,7 @@
 /*
-© 2021 Red Hat, Inc. and others
+SPDX-License-Identifier: Apache-2.0
+
+Copyright Contributors to the Submariner project.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,36 +15,37 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package cleanup
+package cabledriver
 
 import (
 	"fmt"
 	"syscall"
 
+	"github.com/submariner-io/submariner/pkg/event"
+
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/cable/vxlan"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/cleanup"
 	"github.com/vishvananda/netlink"
 	"k8s.io/klog"
 )
 
-func GetVXLANCleanupHandlers() []cleanup.Handler {
-	return []cleanup.Handler{
-		NewVXLANTunnelCleanupHandler(),
-	}
+type vxlanCleanup struct {
+	event.HandlerBase
 }
 
-type VXLANTunnelCleanupHandler struct{}
-
-func NewVXLANTunnelCleanupHandler() cleanup.Handler {
-	return &VXLANTunnelCleanupHandler{}
+func NewvxlanCleanup() event.Handler {
+	return &vxlanCleanup{}
 }
 
-func (xc *VXLANTunnelCleanupHandler) GetName() string {
+func (h *vxlanCleanup) GetNetworkPlugins() []string {
+	return []string{event.AnyNetworkPlugin}
+}
+
+func (h *vxlanCleanup) GetName() string {
 	return "VXLAN cleanup handler"
 }
 
-func (xc *VXLANTunnelCleanupHandler) NonGatewayCleanup() error {
+func (h *vxlanCleanup) NonGatewayCleanup() error {
 	klog.V(log.DEBUG).Infof("Cleaning up the routes")
 
 	link, err := netlink.LinkByName(vxlan.VxLANIface)
@@ -75,6 +78,6 @@ func (xc *VXLANTunnelCleanupHandler) NonGatewayCleanup() error {
 	return nil
 }
 
-func (xc *VXLANTunnelCleanupHandler) GatewayToNonGatewayTransition() error {
+func (h *vxlanCleanup) GatewayToNonGatewayTransition() error {
 	return nil
 }

@@ -24,7 +24,6 @@ import (
 	"k8s.io/klog"
 
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/cable/vxlan"
 	"github.com/submariner-io/submariner/pkg/cidr"
 )
 
@@ -115,12 +114,8 @@ func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 			endpoint, err)
 		return err
 	}
-
 	// Add routes to the new endpoint on the GatewayNode.
-	if kp.localCableDriver != vxlan.CableDriverName {
-		kp.updateRoutingRulesForHostNetworkSupport(endpoint.Spec.Subnets, Add)
-	}
-
+	kp.updateRoutingRulesForHostNetworkSupport(endpoint.Spec.Subnets, Add)
 	kp.updateIptableRulesForInterClusterTraffic(endpoint.Spec.Subnets, Add)
 
 	return nil
@@ -145,10 +140,7 @@ func (kp *SyncHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 		return err
 	}
 
-	if kp.localCableDriver != vxlan.CableDriverName {
-		kp.updateRoutingRulesForHostNetworkSupport(endpoint.Spec.Subnets, Delete)
-	}
-
+	kp.updateRoutingRulesForHostNetworkSupport(endpoint.Spec.Subnets, Delete)
 	kp.updateIptableRulesForInterClusterTraffic(endpoint.Spec.Subnets, Delete)
 
 	return nil
