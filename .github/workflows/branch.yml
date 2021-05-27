@@ -11,4 +11,4 @@ jobs:
     steps:
       - name: Check that the PR targets release-0.9
         if: ${{ github.base_ref != 'release-0.9' }}
-        run: exit 1
+        run: echo The PR targets ${{ github.base_ref }}; exit 1
