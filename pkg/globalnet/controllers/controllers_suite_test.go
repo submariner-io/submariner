@@ -64,20 +64,21 @@ func TestControllers(t *testing.T) {
 }
 
 type testDriverBase struct {
-	controller      controllers.Interface
-	restMapper      meta.RESTMapper
-	dynClient       dynamic.Interface
-	scheme          *runtime.Scheme
-	ipt             *fakeIPT.IPTables
-	globalCIDR      string
-	globalEgressIPs dynamic.ResourceInterface
-	pods            dynamic.NamespaceableResourceInterface
+	controller             controllers.Interface
+	restMapper             meta.RESTMapper
+	dynClient              dynamic.Interface
+	scheme                 *runtime.Scheme
+	ipt                    *fakeIPT.IPTables
+	globalCIDR             string
+	globalEgressIPs        dynamic.ResourceInterface
+	clusterGlobalEgressIPs dynamic.ResourceInterface
+	pods                   dynamic.NamespaceableResourceInterface
 }
 
 func newTestDriverBase() *testDriverBase {
 	t := &testDriverBase{
 		restMapper: test.GetRESTMapperFor(&submarinerv1.Endpoint{}, &corev1.Service{}, &corev1.Node{}, &corev1.Pod{},
-			&submarinerv1.GlobalEgressIP{}, &mcsv1a1.ServiceExport{}),
+			&submarinerv1.GlobalEgressIP{}, &submarinerv1.ClusterGlobalEgressIP{}, &mcsv1a1.ServiceExport{}),
 		scheme:     runtime.NewScheme(),
 		ipt:        fakeIPT.New(),
 		globalCIDR: localCIDR,
@@ -91,6 +92,8 @@ func newTestDriverBase() *testDriverBase {
 
 	t.globalEgressIPs = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.GlobalEgressIP{})).
 		Namespace(namespace)
+
+	t.clusterGlobalEgressIPs = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.ClusterGlobalEgressIP{}))
 
 	t.pods = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &corev1.Pod{}))
 
@@ -111,8 +114,16 @@ func (t *testDriverBase) createGlobalEgressIP(egressIP *submarinerv1.GlobalEgres
 	test.CreateResource(t.globalEgressIPs, egressIP)
 }
 
+func (t *testDriverBase) createClusterGlobalEgressIP(egressIP *submarinerv1.ClusterGlobalEgressIP) {
+	test.CreateResource(t.clusterGlobalEgressIPs, egressIP)
+}
+
 func (t *testDriverBase) awaitGlobalEgressIPStatusAllocated(name string, expNumIPS int) {
 	awaitStatusAllocated(t.globalEgressIPs, name, t.globalCIDR, expNumIPS)
+}
+
+func (t *testDriverBase) awaitClusterGlobalEgressIPStatusAllocated(name string, expNumIPS int) {
+	awaitStatusAllocated(t.clusterGlobalEgressIPs, name, t.globalCIDR, expNumIPS)
 }
 
 func (t *testDriverBase) createPod(p *corev1.Pod) *corev1.Pod {
@@ -134,6 +145,7 @@ func getGlobalEgressIPStatus(client dynamic.ResourceInterface, name string) *sub
 	return status
 }
 
+// nolint unparam - `atIndex` always receives `0` - remove once a caller passes non-zero
 func awaitGlobalEgressIPStatus(client dynamic.ResourceInterface, name, globalCIDR string, expNumIPS int, atIndex int,
 	expCond ...metav1.Condition) {
 	awaitStatusConditions(client, name, atIndex, expCond...)
@@ -220,6 +232,22 @@ func newGlobalEgressIP(name string, numberOfIPs *int, podSelector *metav1.LabelS
 		Spec: submarinerv1.GlobalEgressIPSpec{
 			NumberOfIPs: numberOfIPs,
 			PodSelector: podSelector,
+		},
+	}
+}
+
+func newClusterGlobalEgressIP(name string, numIPs int) *submarinerv1.ClusterGlobalEgressIP {
+	var numberOfIPs *int
+	if numIPs >= 0 {
+		numberOfIPs = &numIPs
+	}
+
+	return &submarinerv1.ClusterGlobalEgressIP{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: submarinerv1.ClusterGlobalEgressIPSpec{
+			NumberOfIPs: numberOfIPs,
 		},
 	}
 }

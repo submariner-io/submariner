@@ -25,6 +25,8 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers/ipam"
 )
 
+const ClusterGlobalEgressIPName = "cluster-egress.submariner.io"
+
 type Interface interface {
 	Start() error
 	Stop()
@@ -41,4 +43,10 @@ type globalEgressIPController struct {
 
 type podWatcher struct {
 	stopCh chan struct{}
+}
+
+type clusterGlobalEgressIPController struct {
+	pool           *ipam.IPPool
+	resourceSyncer syncer.Interface
+	stopCh         chan struct{}
 }
