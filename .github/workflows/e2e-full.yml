@@ -18,7 +18,7 @@ jobs:
         globalnet: ['', 'globalnet']
         cable_driver: ['libreswan', 'wireguard']
         ovn: ['', 'ovn']
-        k8s_version: ['1.20.2']
+        k8s_version: ['1.20']
         exclude:
           - ovn: 'ovn'
             globalnet: 'globalnet'
@@ -26,7 +26,7 @@ jobs:
             cable_driver: 'wireguard'
         include:
           # This is the oldest K8s version we try to support
-          - k8s_version: 1.17.17
+          - k8s_version: '1.17'
     steps:
       - name: Check out the repository
         uses: actions/checkout@v2
