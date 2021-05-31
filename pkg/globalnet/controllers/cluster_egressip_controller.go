@@ -63,8 +63,8 @@ func NewClusterGlobalEgressIPController(config syncer.ResourceSyncerConfig, pool
 	// TODO - reserve the allocated IPs in the IPPool cache.
 
 	controller := &clusterGlobalEgressIPController{
-		pool:   pool,
-		stopCh: make(chan struct{}),
+		baseController: newBaseController(),
+		pool:           pool,
 	}
 
 	controller.resourceSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
@@ -90,10 +90,6 @@ func (c *clusterGlobalEgressIPController) Start() error {
 	klog.Info("Starting ClusterGlobalEgressIP controller")
 
 	return c.resourceSyncer.Start(c.stopCh)
-}
-
-func (c *clusterGlobalEgressIPController) Stop() {
-	close(c.stopCh)
 }
 
 func (c *clusterGlobalEgressIPController) process(from runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
