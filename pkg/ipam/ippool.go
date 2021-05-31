@@ -30,9 +30,9 @@ import (
 
 type IPPool struct {
 	cidr      string
-	net       *net.IPNet
+	network   *net.IPNet
 	size      int
-	available *treemap.Map // IntIP is the key, StringIP is value
+	available *treemap.Map // int IP is the key, string IP is the value
 	sync.RWMutex
 }
 
@@ -50,11 +50,12 @@ func NewIPPool(cidr string) (*IPPool, error) {
 
 	pool := &IPPool{
 		cidr:      cidr,
-		net:       network,
+		network:   network,
 		size:      size,
 		available: treemap.NewWithIntComparator(),
 	}
-	startingIP := ipToInt(pool.net.IP) + 1
+
+	startingIP := ipToInt(pool.network.IP) + 1
 
 	for i := 0; i < pool.size; i++ {
 		intIP := startingIP + i
@@ -87,79 +88,88 @@ func StringIPToInt(stringIP string) int {
 	return ipToInt(net.ParseIP(stringIP))
 }
 
-func (p *IPPool) allocate() (string, error) {
+func (p *IPPool) allocateOne() ([]string, error) {
 	p.Lock()
 	defer p.Unlock()
 
 	iter := p.available.Iterator()
-	if !p.available.Empty() {
-		iter.Last()
-		ip := iter.Value().(string)
+	if iter.Last() {
 		p.available.Remove(iter.Key())
 		// TODO: RecordAllocateGlobalIP(p.cidr)
 
-		return ip, nil
+		return []string{iter.Value().(string)}, nil
 	}
 
-	return "", errors.New("insufficient IPs available for allocation")
+	return nil, errors.New("insufficient IPs available for allocation")
 }
 
 func (p *IPPool) Allocate(num int) ([]string, error) {
+	switch {
+	case num < 0:
+		return nil, errors.New("the number to allocate cannot be negative")
+	case num == 0:
+		return []string{}, nil
+	case num == 1:
+		return p.allocateOne()
+	}
+
 	if p.available.Size() < num {
-		return nil, errors.New("insufficient IPs available for allocation")
+		return nil, fmt.Errorf("insufficient IPs available (%d) to allocate %d", p.available.Size(), num)
 	}
 
-	ips := make([]string, num)
+	retIPs := make([]string, num)
 
-	if num == 1 {
-		ip, err := p.allocate()
-		if err != nil {
-			return nil, err
-		}
-
-		ips[0] = ip
-
-		return ips, nil
-	}
-
-	intIPs := make([]int, num)
-	prev, current := 0, 0
+	var prevIntIP, firstIntIP, current int
 
 	p.Lock()
 	defer p.Unlock()
 
 	iter := p.available.Iterator()
 	for iter.Next() {
-		if current == num {
-			return p.allocateBlock(intIPs), nil
-		}
-
 		intIP := iter.Key().(int)
-		intIPs[current] = intIP
-		if current == 0 {
-			current++
+		retIPs[current] = iter.Value().(string)
+
+		if current == 0 || prevIntIP+1 != intIP {
+			firstIntIP = intIP
+			prevIntIP = intIP
+			retIPs[0] = retIPs[current]
+			current = 1
+
 			continue
 		}
 
-		prevIntIP := intIPs[prev]
-		if prevIntIP+1 != intIP {
-			prev, current = 0, 0
-		} else {
-			prev = current
-			current++
+		prevIntIP = intIP
+		current++
+
+		if current == num {
+			for i := 0; i < num; i++ {
+				p.available.Remove(firstIntIP)
+				firstIntIP++
+			}
+
+			// TODO: RecordAllocateGlobalIPs(p.cidr, num)
+
+			return retIPs, nil
 		}
 	}
 
-	return nil, fmt.Errorf("unable to find contiguous block of %d IPs for allocation", num)
+	return nil, fmt.Errorf("unable to allocate a contiguous block of %d IPs - available pool size is %d",
+		num, p.available.Size())
 }
 
-func (p *IPPool) Release(ips ...string) {
+func (p *IPPool) Release(ips ...string) error {
 	p.Lock()
 	defer p.Unlock()
 
 	for _, ip := range ips {
+		if !p.network.Contains(net.ParseIP(ip)) {
+			return fmt.Errorf("released IP %s is not contained in CIDR %s", ip, p.cidr)
+		}
+
 		p.available.Put(StringIPToInt(ip), ip)
 	}
+
+	return nil
 }
 
 func (p *IPPool) Reserve(ips ...string) error {
@@ -173,7 +183,11 @@ func (p *IPPool) Reserve(ips ...string) error {
 		intIPs[i] = StringIPToInt(ips[i])
 		_, found := p.available.Get(intIPs[i])
 		if !found {
-			return fmt.Errorf("requested IP %s already allocated", ips[i])
+			if !p.network.Contains(net.ParseIP(ips[i])) {
+				return fmt.Errorf("the requested IP %s is not contained in CIDR %s", ips[i], p.cidr)
+			}
+
+			return fmt.Errorf("the requested IP %s is already allocated", ips[i])
 		}
 	}
 
@@ -184,27 +198,9 @@ func (p *IPPool) Reserve(ips ...string) error {
 	return nil
 }
 
-func (p *IPPool) IsAvailable(ip string) bool {
+func (p *IPPool) Size() int {
 	p.RLock()
-	_, result := p.available.Get(StringIPToInt(ip))
-	p.RUnlock()
+	defer p.RUnlock()
 
-	return result
-}
-
-// Make sure Lock is already taken before calling this
-func (p *IPPool) allocateBlock(intIPs []int) []string {
-	num := len(intIPs)
-	ips := make([]string, num)
-
-	for i := 0; i < num; i++ {
-		ip, _ := p.available.Get(intIPs[i])
-		ips[i] = ip.(string)
-
-		p.available.Remove(intIPs[i])
-	}
-
-	// TODO: RecordAllocateGlobalIPs(p.cidr, num)
-
-	return ips
+	return p.available.Size()
 }
