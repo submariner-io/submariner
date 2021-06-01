@@ -32,6 +32,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/watcher"
+	"github.com/submariner-io/submariner/pkg/pod"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -83,6 +84,7 @@ const (
 
 var VERSION = "not-compiled-properly"
 
+// nolint:gocyclo // the main function has a lot of error checking that increases cyclomatic complexity
 func main() {
 	klog.InitFlags(nil)
 	flag.Parse()
@@ -170,6 +172,16 @@ func main() {
 		submarinerClient.SubmarinerV1().Gateways(submSpec.Namespace),
 		VERSION, cableHealthchecker)
 
+	gwPod, err := pod.NewGatewayPod(k8sClient)
+	if err != nil {
+		klog.Fatalf("Error creating a handler to update the gateway pod: %v", err)
+	}
+
+	cleanup := cleanupHandler{
+		gatewayPod: gwPod,
+		gwSyncer:   cableEngineSyncer,
+	}
+
 	cableEngineSyncer.Run(stopCh)
 
 	becameLeader := func(context.Context) {
@@ -181,18 +193,26 @@ func main() {
 		}, localCluster, localEndpoint, submSpec.ColorCodes)
 
 		if err = cableEngine.StartEngine(); err != nil {
-			fatal(cableEngineSyncer, "Error starting the cable engine: %v", err)
+			cleanup.fatal("Error starting the cable engine: %v", err)
 		}
 
 		var wg sync.WaitGroup
 
-		wg.Add(3)
+		wg.Add(4)
+
+		go func() {
+			defer wg.Done()
+
+			if err := gwPod.SetHALabels(subv1.HAStatusActive); err != nil {
+				cleanup.fatal("Error updating pod label: %s", err)
+			}
+		}()
 
 		go func() {
 			defer wg.Done()
 
 			if err = tunnel.StartController(cableEngine, submSpec.Namespace, &watcher.Config{RestConfig: cfg}, stopCh); err != nil {
-				fatal(cableEngineSyncer, "Error running the tunnel controller: %v", err)
+				cleanup.fatal("Error running the tunnel controller: %v", err)
 			}
 		}()
 
@@ -200,7 +220,7 @@ func main() {
 			defer wg.Done()
 
 			if err = dsSyncer.Start(stopCh); err != nil {
-				fatal(cableEngineSyncer, "Error running the datastore syncer: %v", err)
+				cleanup.fatal("Error running the datastore syncer: %v", err)
 			}
 		}()
 
@@ -220,7 +240,7 @@ func main() {
 
 	leClient, err := kubernetes.NewForConfig(rest.AddUserAgent(cfg, "leader-election"))
 	if err != nil {
-		fatal(cableEngineSyncer, "Error creating leader election kubernetes clientset: %s", err)
+		cleanup.fatal("Error creating leader election kubernetes clientset: %s", err)
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
@@ -228,13 +248,17 @@ func main() {
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "submariner-controller"})
 
 	lostLeader := func() {
+		if err := gwPod.SetHALabels(subv1.HAStatusPassive); err != nil {
+			klog.Warningf("Error updating pod label: %s", err)
+		}
+
 		cableEngineSyncer.CleanupGatewayEntry()
 		klog.Fatalf("Leader election lost, shutting down")
 	}
 
 	go func() {
 		if err = startLeaderElection(leClient, recorder, becameLeader, lostLeader); err != nil {
-			fatal(cableEngineSyncer, "Error starting leader election: %v", err)
+			cleanup.fatal("Error starting leader election: %v", err)
 		}
 	}()
 
@@ -342,8 +366,18 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder res
 	return nil
 }
 
-func fatal(gwSyncer *syncer.GatewaySyncer, format string, args ...interface{}) {
+type cleanupHandler struct {
+	gatewayPod pod.GatewayPodInterface
+	gwSyncer   *syncer.GatewaySyncer
+}
+
+func (c *cleanupHandler) fatal(format string, args ...interface{}) {
 	err := fmt.Errorf(format, args...)
-	gwSyncer.SetGatewayStatusError(err)
+	c.gwSyncer.SetGatewayStatusError(err)
+
+	if err := c.gatewayPod.SetHALabels(subv1.HAStatusPassive); err != nil {
+		klog.Warningf("Error updating pod label: %s", err)
+	}
+
 	klog.Fatal(err.Error())
 }

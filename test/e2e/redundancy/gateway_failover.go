@@ -32,6 +32,13 @@ import (
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
 )
 
+const (
+	gatewayStatusLabel   = "gateway.submariner.io/status"
+	gatewayStatusActive  = "active"
+	gatewayStatusPassive = "passive"
+	gatewayNodeLabel     = "gateway.submariner.io/node"
+)
+
 var _ = Describe("[redundancy] Gateway fail-over tests", func() {
 	f := subFramework.NewFramework("gateway-redundancy")
 
@@ -62,7 +69,10 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 	By(fmt.Sprintf("Found gateway on node %q on %q", gatewayNodes[0].Name, clusterAName))
 
 	gatewayPod := f.AwaitSubmarinerGatewayPod(framework.ClusterA)
-	By(fmt.Sprintf("Found submariner gateway pod %q on %q", gatewayPod.Name, clusterAName))
+	By(fmt.Sprintf("Found submariner gateway pod %q on %q, checking node and HA status labels", gatewayPod.Name, clusterAName))
+
+	Expect(gatewayPod.Labels[gatewayStatusLabel]).To(Equal(gatewayStatusActive))
+	Expect(gatewayPod.Labels[gatewayNodeLabel]).To(Equal(gatewayNodes[0].Name))
 
 	By(fmt.Sprintf("Ensuring that the gateway reports as active on %q", clusterAName))
 
@@ -151,6 +161,18 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 	gwPassive := f.AwaitGatewayWithStatus(framework.ClusterA, initialNonGatewayNode.Name, subv1.HAStatusPassive)
 	Expect(gwPassive.Status.Connections).To(BeEmpty(), "The passive gateway must have no connections")
 
+	By("Checking the existing pods have updated HA state labels as active & passive")
+
+	gwPods := f.AwaitPodsByAppLabel(framework.ClusterA, framework.SubmarinerGateway, framework.TestContext.SubmarinerNamespace, 2)
+
+	for _, pod := range gwPods.Items {
+		if pod.Labels[gatewayNodeLabel] == initialGatewayNode.Name {
+			Expect(pod.Labels[gatewayStatusLabel]).To(Equal(gatewayStatusActive))
+		} else {
+			Expect(pod.Labels[gatewayStatusLabel]).To(Equal(gatewayStatusPassive))
+		}
+	}
+
 	// Start watching the API for Gateway deletions
 	gwInformer, stopInformer := f.GetGatewayInformer(framework.ClusterA)
 	defer close(stopInformer)
@@ -183,6 +205,11 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 
 	By(fmt.Sprintf("Waiting for the new pod %q to report as active and fully connected", newGatewayPod.Name))
 	f.AwaitGatewayFullyConnected(framework.ClusterA, newGatewayPod.Spec.NodeName)
+
+	By(fmt.Sprintf("Checking that gateway pod %q updated the HA status label", newGatewayPod.Name))
+
+	newGatewayPod = f.AwaitSubmarinerGatewayPod(framework.ClusterA)
+	Expect(newGatewayPod.Labels[gatewayStatusLabel]).To(Equal(gatewayStatusActive))
 
 	// Verify a new Endpoint instance is created by the new gateway instance. This is a bit whitebox but it's a sanity check
 	// and also gives it a bit more of a cushion to avoid premature timeout in the connectivity test.
