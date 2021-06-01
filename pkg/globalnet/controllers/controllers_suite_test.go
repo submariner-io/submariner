@@ -33,6 +33,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/iptables"
 	fakeIPT "github.com/submariner-io/submariner/pkg/iptables/fake"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -118,6 +119,7 @@ func (t *testDriverBase) createClusterGlobalEgressIP(egressIP *submarinerv1.Clus
 	test.CreateResource(t.clusterGlobalEgressIPs, egressIP)
 }
 
+// nolint unparam - `name` always receives `globalEgressIPName`
 func (t *testDriverBase) awaitGlobalEgressIPStatusAllocated(name string, expNumIPS int) {
 	awaitStatusAllocated(t.globalEgressIPs, name, t.globalCIDR, expNumIPS)
 }
@@ -138,11 +140,28 @@ func getGlobalEgressIPStatus(client dynamic.ResourceInterface, name string) *sub
 	obj, err := client.Get(context.TODO(), name, metav1.GetOptions{})
 	Expect(err).To(Succeed())
 
-	statusObj, _, _ := unstructured.NestedMap(obj.Object, "status")
+	statusObj, ok, err := unstructured.NestedMap(obj.Object, "status")
+	Expect(err).To(Succeed())
+
+	if !ok {
+		return nil
+	}
+
 	status := &submarinerv1.GlobalEgressIPStatus{}
 	Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(statusObj, status)).To(Succeed())
 
 	return status
+}
+
+func awaitNoAllocatedIPs(client dynamic.ResourceInterface, name string) {
+	Consistently(func() int {
+		status := getGlobalEgressIPStatus(client, name)
+		if status == nil {
+			return 0
+		}
+
+		return len(status.AllocatedIPs)
+	}, 200*time.Millisecond).Should(Equal(0))
 }
 
 // nolint unparam - `atIndex` always receives `0` - remove once a caller passes non-zero
@@ -168,9 +187,17 @@ func awaitStatusAllocated(client dynamic.ResourceInterface, name, globalCIDR str
 
 func awaitStatusConditions(client dynamic.ResourceInterface, name string, atIndex int, expCond ...metav1.Condition) {
 	var conditions []metav1.Condition
+	var notFound error
 
 	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
 		obj, err := client.Get(context.TODO(), name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			notFound = err
+			return false, nil
+		}
+
+		notFound = nil
+
 		if err != nil {
 			return false, err
 		}
@@ -198,6 +225,11 @@ func awaitStatusConditions(client dynamic.ResourceInterface, name string, atInde
 		return true, nil
 	})
 
+	if notFound != nil {
+		Fail(fmt.Sprintf("%#v", notFound))
+		return
+	}
+
 	if err == wait.ErrWaitTimeout {
 		if conditions == nil {
 			Fail("Status conditions not found")
@@ -224,6 +256,7 @@ func awaitStatusConditions(client dynamic.ResourceInterface, name string, atInde
 	}
 }
 
+// nolint unparam - `name` always receives `globalEgressIPName` (`"east-region")
 func newGlobalEgressIP(name string, numberOfIPs *int, podSelector *metav1.LabelSelector) *submarinerv1.GlobalEgressIP {
 	return &submarinerv1.GlobalEgressIP{
 		ObjectMeta: metav1.ObjectMeta{

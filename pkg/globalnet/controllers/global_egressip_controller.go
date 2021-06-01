@@ -43,14 +43,14 @@ func NewGlobalEgressIPController(config syncer.ResourceSyncerConfig, pool *ipam.
 	// TODO - get list of existing GlobalEgressIPs and prime the IPPool cache.
 
 	controller := &globalEgressIPController{
-		pool:        pool,
-		podWatchers: map[string]*podWatcher{},
+		baseController: newBaseController(),
+		pool:           pool,
+		podWatchers:    map[string]*podWatcher{},
 		watcherConfig: watcher.Config{
 			RestMapper: config.RestMapper,
 			Client:     config.SourceClient,
 			Scheme:     config.Scheme,
 		},
-		stopCh: make(chan struct{}),
 	}
 
 	controller.resourceSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
@@ -79,7 +79,7 @@ func (c *globalEgressIPController) Start() error {
 }
 
 func (c *globalEgressIPController) Stop() {
-	close(c.stopCh)
+	c.baseController.Stop()
 
 	c.Lock()
 	defer c.Unlock()
