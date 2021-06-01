@@ -50,6 +50,11 @@ func newVxlanIface(attrs *vxLanAttributes, activeEndPoint string) (*vxLanIface, 
 		return nil, err
 	}
 
+	// ip link set $vxLANIface up
+	if err := netlink.LinkSetUp(vxLANIface.link); err != nil {
+		return nil, fmt.Errorf("failed to bring up VxLAN interface: %v", err)
+	}
+
 	return vxLANIface, nil
 }
 
