@@ -40,8 +40,7 @@ import (
 )
 
 const (
-	VxLANIface             = "vxlan-tunnel"
-	VxLANPort              = 4800
+	VxLANIface             = "submariner"
 	VxLANOverhead          = 50
 	VxLANVTepNetworkPrefix = 241
 	CableDriverName        = "vxlan"
@@ -61,6 +60,7 @@ type vxLan struct {
 	connections   []v1.Connection
 	mutex         sync.Mutex
 	vxLanIface    *vxLanIface
+	NATTPort      int `default:"4500"`
 }
 
 type vxLanIface struct {
@@ -89,14 +89,19 @@ func NewDriver(localEndpoint types.SubmarinerEndpoint, localCluster types.Submar
 		localEndpoint: localEndpoint,
 	}
 
-	if err = v.createVxLANInterface(localEndpoint.Spec.Hostname); err != nil {
+	port, err := localEndpoint.Spec.GetBackendPort(v1.UDPPortConfig, int32(v.NATTPort))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get the UDP port configuration: %v", err)
+	}
+
+	if err = v.createVxLANInterface(localEndpoint.Spec.Hostname, int(port)); err != nil {
 		return nil, fmt.Errorf("failed to setup Vxlan link: %v", err)
 	}
 
 	return &v, nil
 }
 
-func (v *vxLan) createVxLANInterface(activeEndPoint string) error {
+func (v *vxLan) createVxLANInterface(activeEndPoint string, port int) error {
 	ipAddr := v.localEndpoint.Spec.PrivateIP
 
 	vtepIP, err := v.getVxlanVtepIPAddress(ipAddr)
@@ -119,7 +124,7 @@ func (v *vxLan) createVxLANInterface(activeEndPoint string) error {
 		vxlanID:  1000,
 		group:    nil,
 		srcAddr:  nil,
-		vtepPort: VxLANPort,
+		vtepPort: port,
 		mtu:      vxlanMtu,
 	}
 
@@ -216,22 +221,22 @@ func isVxlanConfigTheSame(newLink, currentLink netlink.Link) bool {
 	existing := currentLink.(*netlink.Vxlan)
 
 	if required.VxlanId != existing.VxlanId {
-		klog.Errorf("VxlanId of existing interface (%d) does not match with required VxlanId (%d)", existing.VxlanId, required.VxlanId)
+		klog.Warningf("VxlanId of existing interface (%d) does not match with required VxlanId (%d)", existing.VxlanId, required.VxlanId)
 		return false
 	}
 
 	if len(required.Group) > 0 && len(existing.Group) > 0 && !required.Group.Equal(existing.Group) {
-		klog.Errorf("Vxlan Group (%v) of existing interface does not match with required Group (%v)", existing.Group, required.Group)
+		klog.Warningf("Vxlan Group (%v) of existing interface does not match with required Group (%v)", existing.Group, required.Group)
 		return false
 	}
 
 	if len(required.SrcAddr) > 0 && len(existing.SrcAddr) > 0 && !required.SrcAddr.Equal(existing.SrcAddr) {
-		klog.Errorf("Vxlan SrcAddr (%v) of existing interface does not match with required SrcAddr (%v)", existing.SrcAddr, required.SrcAddr)
+		klog.Warningf("Vxlan SrcAddr (%v) of existing interface does not match with required SrcAddr (%v)", existing.SrcAddr, required.SrcAddr)
 		return false
 	}
 
 	if required.Port > 0 && existing.Port > 0 && required.Port != existing.Port {
-		klog.V(log.DEBUG).Infof("Vxlan Port (%d) of existing interface does not match with required Port (%d)", existing.Port, required.Port)
+		klog.Warningf("Vxlan Port (%d) of existing interface does not match with required Port (%d)", existing.Port, required.Port)
 		return false
 	}
 

@@ -21,10 +21,9 @@ import (
 	"fmt"
 	"syscall"
 
-	"github.com/submariner-io/submariner/pkg/event"
-
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/cable/vxlan"
+	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/vishvananda/netlink"
 	"k8s.io/klog"
 )
@@ -33,7 +32,7 @@ type vxlanCleanup struct {
 	event.HandlerBase
 }
 
-func NewvxlanCleanup() event.Handler {
+func NewVXLANCleanup() event.Handler {
 	return &vxlanCleanup{}
 }
 
@@ -45,28 +44,26 @@ func (h *vxlanCleanup) GetName() string {
 	return "VXLAN cleanup handler"
 }
 
-func (h *vxlanCleanup) NonGatewayCleanup() error {
-	klog.V(log.DEBUG).Infof("Cleaning up the routes")
+func (h *vxlanCleanup) TransitionToNonGateway() error {
+	klog.Infof("Cleaning up the routes")
 
 	link, err := netlink.LinkByName(vxlan.VxLANIface)
 
 	if err != nil {
-		klog.Errorf("Unable to cleanup routes, error retrieving the link %s: %v", vxlan.VxLANIface, err)
 		return nil
 	}
 
 	currentRouteList, err := netlink.RouteList(link, syscall.AF_INET)
 
 	if err != nil {
-		klog.Errorf("Unable to cleanup routes, error retrieving routes on the link %s: %v", vxlan.VxLANIface, err)
-		return nil
-	}
+		klog.Warningf("Unable to cleanup routes, error retrieving routes on the link %s: %v", vxlan.VxLANIface, err)
+	} else {
+		for i := range currentRouteList {
+			klog.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])
 
-	for i := range currentRouteList {
-		klog.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])
-
-		if err = netlink.RouteDel(&currentRouteList[i]); err != nil {
-			klog.Errorf("Error removing route %s: %v", currentRouteList[i], err)
+			if err = netlink.RouteDel(&currentRouteList[i]); err != nil {
+				klog.Errorf("Error removing route %s: %v", currentRouteList[i], err)
+			}
 		}
 	}
 
@@ -75,9 +72,5 @@ func (h *vxlanCleanup) NonGatewayCleanup() error {
 		return fmt.Errorf("failed to delete the the vxlan interface: %v", err)
 	}
 
-	return nil
-}
-
-func (h *vxlanCleanup) GatewayToNonGatewayTransition() error {
 	return nil
 }
