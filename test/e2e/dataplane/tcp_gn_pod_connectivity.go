@@ -21,6 +21,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
+	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
 )
 
 var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across overlapping clusters without discovery", func() {
@@ -35,7 +36,7 @@ var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across over
 				return
 			}
 
-			tcp.RunConnectivityTest(tcp.ConnectivityTestParams{
+			subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
 				Framework:             f,
 				ToEndpointType:        toEndpointType,
 				Networking:            networking,
@@ -43,7 +44,7 @@ var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across over
 				FromClusterScheduling: fromClusterScheduling,
 				ToCluster:             framework.ClusterB,
 				ToClusterScheduling:   toClusterScheduling,
-			})
+			}, framework.TestContext.GlobalnetEnabled)
 		})
 	}
 
