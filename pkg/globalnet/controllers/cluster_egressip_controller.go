@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
@@ -53,11 +54,13 @@ func NewClusterGlobalEgressIPController(config syncer.ResourceSyncerConfig, pool
 	client := config.SourceClient.Resource(*gvr)
 	_, err = client.Get(context.TODO(), ClusterGlobalEgressIPName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
+		klog.Infof("Creating ClusterGlobalEgressIP resource %q", defaultEgressIP.Name)
+
 		_, err = client.Create(context.TODO(), defaultEgressIPObj, metav1.CreateOptions{})
 	}
 
 	if err != nil {
-		return nil, err
+		return nil, errors.WithMessagef(err, "error creating ClusterGlobalEgressIP resource %q", defaultEgressIP.Name)
 	}
 
 	// TODO - reserve the allocated IPs in the IPPool cache.
@@ -73,7 +76,7 @@ func NewClusterGlobalEgressIPController(config syncer.ResourceSyncerConfig, pool
 		SourceClient:        config.SourceClient,
 		SourceNamespace:     corev1.NamespaceAll,
 		RestMapper:          config.RestMapper,
-		Federator:           federate.NewUpdateStatusFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll),
+		Federator:           federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll),
 		Scheme:              config.Scheme,
 		Transform:           controller.process,
 		ResourcesEquivalent: syncer.AreSpecsEquivalent,
