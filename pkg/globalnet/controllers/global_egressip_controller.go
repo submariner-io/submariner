@@ -59,7 +59,7 @@ func NewGlobalEgressIPController(config syncer.ResourceSyncerConfig, pool *ipam.
 		SourceClient:        config.SourceClient,
 		SourceNamespace:     corev1.NamespaceAll,
 		RestMapper:          config.RestMapper,
-		Federator:           federate.NewUpdateStatusFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll),
+		Federator:           federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll),
 		Scheme:              config.Scheme,
 		Transform:           controller.process,
 		ResourcesEquivalent: syncer.AreSpecsEquivalent,
@@ -219,6 +219,7 @@ func allocateIPs(key string, numberOfIPs *int, pool *ipam.IPPool, status *submar
 	tryAppendStatusCondition(status, &metav1.Condition{
 		Type:    string(submarinerv1.GlobalEgressIPAllocated),
 		Status:  metav1.ConditionTrue,
+		Reason:  "Success",
 		Message: fmt.Sprintf("Allocated %d global IP(s)", *numberOfIPs),
 	})
 

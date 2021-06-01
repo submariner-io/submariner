@@ -241,7 +241,7 @@ type GlobalEgressIPStatus struct {
 
 	// The list of allocated GlobalIPs.
 	// +optional
-	AllocatedIPs []string `json:"allocatedIPs"`
+	AllocatedIPs []string `json:"allocatedIPs,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

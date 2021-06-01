@@ -251,8 +251,13 @@ func awaitStatusConditions(client dynamic.ResourceInterface, name string, atInde
 		Expect(actual.Type).To(Equal(exp.Type))
 		Expect(actual.Status).To(Equal(exp.Status))
 		Expect(actual.LastTransitionTime).To(Not(BeNil()))
-		Expect(actual.Reason).To(Equal(exp.Reason))
 		Expect(actual.Message).To(Not(BeEmpty()))
+
+		if exp.Reason != "" {
+			Expect(actual.Reason).To(Equal(exp.Reason))
+		} else {
+			Expect(actual.Reason).To(Not(BeEmpty()))
+		}
 	}
 }
 
