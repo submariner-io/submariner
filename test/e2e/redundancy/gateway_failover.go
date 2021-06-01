@@ -78,24 +78,24 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 	f.AwaitGatewayFullyConnected(framework.ClusterA, activeGateway.Name)
 
 	By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
-	tcp.RunConnectivityTest(tcp.ConnectivityTestParams{
+	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
 		FromCluster:           framework.ClusterB,
 		FromClusterScheduling: framework.GatewayNode,
 		ToCluster:             framework.ClusterA,
 		ToClusterScheduling:   framework.GatewayNode,
 		ToEndpointType:        defaultEndpointType(),
-	})
+	}, framework.TestContext.GlobalnetEnabled)
 
 	By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
-	tcp.RunConnectivityTest(tcp.ConnectivityTestParams{
+	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
 		FromCluster:           framework.ClusterB,
 		FromClusterScheduling: framework.NonGatewayNode,
 		ToCluster:             framework.ClusterA,
 		ToClusterScheduling:   framework.NonGatewayNode,
 		ToEndpointType:        defaultEndpointType(),
-	})
+	}, framework.TestContext.GlobalnetEnabled)
 }
 
 func AwaitNewSubmarinerGatewayPod(f *subFramework.Framework, cluster framework.ClusterIndex, prevPodUID types.UID) *v1.Pod {
@@ -193,22 +193,22 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 	f.AwaitSubmarinerEndpointRemoved(framework.ClusterB, submEndpoint.Name)
 
 	By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
-	tcp.RunConnectivityTest(tcp.ConnectivityTestParams{
+	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
 		FromCluster:           framework.ClusterB,
 		FromClusterScheduling: framework.GatewayNode,
 		ToCluster:             framework.ClusterA,
 		ToClusterScheduling:   framework.GatewayNode,
 		ToEndpointType:        defaultEndpointType(),
-	})
+	}, framework.TestContext.GlobalnetEnabled)
 
 	By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
-	tcp.RunConnectivityTest(tcp.ConnectivityTestParams{
+	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
 		FromCluster:           framework.ClusterB,
 		FromClusterScheduling: framework.NonGatewayNode,
 		ToCluster:             framework.ClusterA,
 		ToClusterScheduling:   framework.NonGatewayNode,
 		ToEndpointType:        defaultEndpointType(),
-	})
+	}, framework.TestContext.GlobalnetEnabled)
 }
