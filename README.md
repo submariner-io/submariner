@@ -56,8 +56,9 @@ See the [Prerequisites docs on Submariner's website](https://submariner.io/getti
 
 ## Installation
 
-Submariner supports deployment via an Operator as well as Helm Charts. The Operator can be deployed directly or via the `subctl` CLI helper
-utility. `subctl` greatly simplifies the deployment of Submariner, and is therefore the recommended deployment method.
+Submariner is deployed and manged by its Operator. The Operator can be deployed directly, or by using Submariner's Helm Charts, or by using
+Submariner's `subctl` CLI helper utility. `subctl` is the recommended deployment method because in addition to easy deployment it also
+provides testing, debugging, and bug-reporting capabilities.
 
 ### Installation using Operator via subctl
 
