@@ -139,22 +139,13 @@ func (n *netlinkType) EnableLooseModeReversePathFilter(interfaceName string) err
 	// We won't ever create rp_filter, and its permissions are 644
 	// #nosec G306
 	err := ioutil.WriteFile("/proc/sys/net/ipv4/conf/"+interfaceName+"/rp_filter", []byte("2"), 0644)
-	if err != nil {
-		return errors.WithMessagef(err, "unable to update rp_filter proc entry for interface %q", interfaceName)
-	}
-
-	return nil
+	return errors.WithMessagef(err, "unable to update rp_filter proc entry for interface %q", interfaceName)
 }
 
 func (n *netlinkType) FlushRouteTable(tableID int) error {
 	// The conversion doesn't introduce a security problem
 	// #nosec G204
-	cmd := exec.Command("/sbin/ip", "r", "flush", "table", strconv.Itoa(tableID))
-	if err := cmd.Run(); err != nil {
-		return err
-	}
-
-	return nil
+	return exec.Command("/sbin/ip", "r", "flush", "table", strconv.Itoa(tableID)).Run()
 }
 
 func (n *netlinkType) ConfigureTCPMTUProbe(mtuProbe, baseMss string) error {
@@ -167,9 +158,6 @@ func (n *netlinkType) ConfigureTCPMTUProbe(mtuProbe, baseMss string) error {
 
 	// #nosec G306
 	err = ioutil.WriteFile("/proc/sys/net/ipv4/tcp_base_mss", []byte(baseMss), 0644)
-	if err != nil {
-		return errors.WithMessagef(err, "unable to update value of tcp_base_mss to %ss", baseMss)
-	}
 
-	return nil
+	return errors.WithMessagef(err, "unable to update value of tcp_base_mss to %ss", baseMss)
 }
