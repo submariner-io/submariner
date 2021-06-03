@@ -233,11 +233,7 @@ const (
 
 type GlobalEgressIPStatus struct {
 	// +optional
-	// +patchStrategy=merge
-	// +patchMergeKey=type
-	// +listType=map
-	// +listMapKey=type
-	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// The list of allocated GlobalIPs.
 	// +optional
@@ -324,11 +320,7 @@ const (
 
 type GlobalIngressIPStatus struct {
 	// +optional
-	// +patchStrategy=merge
-	// +patchMergeKey=type
-	// +listType=map
-	// +listMapKey=type
-	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// The GlobalIP allocated to this object.
 	// +optional
