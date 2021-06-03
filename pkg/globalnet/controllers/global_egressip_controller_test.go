@@ -25,7 +25,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
-	"github.com/submariner-io/submariner/pkg/globalnet/controllers/ipam"
+	"github.com/submariner-io/submariner/pkg/ipam"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -66,7 +66,7 @@ var _ = Describe("GlobalEgressIP controller", func() {
 			})
 
 			It("should add an appropriate Status condition", func() {
-				awaitGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName, t.globalCIDR,
+				t.awaitGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName, t.globalCIDR,
 					0, 0, metav1.Condition{
 						Type:   string(submarinerv1.GlobalEgressIPAllocated),
 						Status: metav1.ConditionFalse,
@@ -82,7 +82,7 @@ var _ = Describe("GlobalEgressIP controller", func() {
 			})
 
 			It("should add an appropriate Status condition", func() {
-				awaitGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName, t.globalCIDR,
+				t.awaitGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName, t.globalCIDR,
 					0, 0, metav1.Condition{
 						Type:   string(submarinerv1.GlobalEgressIPAllocated),
 						Status: metav1.ConditionFalse,
@@ -115,7 +115,7 @@ var _ = Describe("GlobalEgressIP controller", func() {
 		})
 
 		It("should reserve the previously allocated IPs", func() {
-			// TODO - verify
+			t.verifyIPsReservedInPool(getGlobalEgressIPStatus(t.globalEgressIPs, existing.Name).AllocatedIPs...)
 		})
 	})
 
@@ -182,14 +182,16 @@ func newGlobalEgressIPControllerTestDriver() *globalEgressIPControllerTestDriver
 }
 
 func (t *globalEgressIPControllerTestDriver) start() {
-	pool, err := ipam.NewIPPool(t.globalCIDR)
+	var err error
+
+	t.pool, err = ipam.NewIPPool(t.globalCIDR)
 	Expect(err).To(Succeed())
 
 	t.controller, err = controllers.NewGlobalEgressIPController(syncer.ResourceSyncerConfig{
 		SourceClient: t.dynClient,
 		RestMapper:   t.restMapper,
 		Scheme:       t.scheme,
-	}, pool)
+	}, t.pool)
 
 	Expect(err).To(Succeed())
 	Expect(t.controller.Start()).To(Succeed())
