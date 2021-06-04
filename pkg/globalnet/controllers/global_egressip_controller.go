@@ -18,6 +18,7 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/submariner-io/admiral/pkg/federate"
@@ -26,7 +27,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/util"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/globalnet/controllers/ipam"
+	"github.com/submariner-io/submariner/pkg/ipam"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,17 +41,34 @@ func NewGlobalEgressIPController(config syncer.ResourceSyncerConfig, pool *ipam.
 
 	klog.Info("Creating GlobalEgressIP controller")
 
-	// TODO - get list of existing GlobalEgressIPs and prime the IPPool cache.
-
 	controller := &globalEgressIPController{
-		baseController: newBaseController(),
-		pool:           pool,
-		podWatchers:    map[string]*podWatcher{},
+		baseIPAllocationController: newBaseIPAllocationController(pool),
+		podWatchers:                map[string]*podWatcher{},
 		watcherConfig: watcher.Config{
 			RestMapper: config.RestMapper,
 			Client:     config.SourceClient,
 			Scheme:     config.Scheme,
 		},
+	}
+
+	_, gvr, err := util.ToUnstructuredResource(&submarinerv1.GlobalEgressIP{}, config.RestMapper)
+	if err != nil {
+		return nil, err
+	}
+
+	client := config.SourceClient.Resource(*gvr).Namespace(corev1.NamespaceAll)
+	list, err := client.List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	federator := federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
+
+	for i := range list.Items {
+		err = controller.reserveAllocatedIPs(federator, &list.Items[i])
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	controller.resourceSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
@@ -59,7 +77,7 @@ func NewGlobalEgressIPController(config syncer.ResourceSyncerConfig, pool *ipam.
 		SourceClient:        config.SourceClient,
 		SourceNamespace:     corev1.NamespaceAll,
 		RestMapper:          config.RestMapper,
-		Federator:           federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll),
+		Federator:           federator,
 		Scheme:              config.Scheme,
 		Transform:           controller.process,
 		ResourcesEquivalent: syncer.AreSpecsEquivalent,
@@ -70,12 +88,6 @@ func NewGlobalEgressIPController(config syncer.ResourceSyncerConfig, pool *ipam.
 	}
 
 	return controller, nil
-}
-
-func (c *globalEgressIPController) Start() error {
-	klog.Info("Starting GlobalEgressIP controller")
-
-	return c.resourceSyncer.Start(c.stopCh)
 }
 
 func (c *globalEgressIPController) Stop() {
@@ -188,24 +200,19 @@ func allocateIPs(key string, numberOfIPs *int, pool *ipam.IPPool, status *submar
 
 	klog.Infof("Allocating %d global IP(s) for %q", *numberOfIPs, key)
 
-	status.AllocatedIPs = make([]string, 0, *numberOfIPs)
+	var err error
 
-	for i := 0; i < *numberOfIPs; i++ {
-		// TODO - use new IPPool API
-		ip, err := pool.Allocate(key)
-		if err != nil {
-			klog.Errorf("Error allocating IPs for %q: %v", key, err)
-			tryAppendStatusCondition(status, &metav1.Condition{
-				Type:    string(submarinerv1.GlobalEgressIPAllocated),
-				Status:  metav1.ConditionFalse,
-				Reason:  "IPPoolAllocationFailed",
-				Message: fmt.Sprintf("Error allocating %d global IP(s) from the pool: %v", numberOfIPs, err),
-			})
+	status.AllocatedIPs, err = pool.Allocate(*numberOfIPs)
+	if err != nil {
+		klog.Errorf("Error allocating IPs for %q: %v", key, err)
+		tryAppendStatusCondition(status, &metav1.Condition{
+			Type:    string(submarinerv1.GlobalEgressIPAllocated),
+			Status:  metav1.ConditionFalse,
+			Reason:  "IPPoolAllocationFailed",
+			Message: fmt.Sprintf("Error allocating %d global IP(s) from the pool: %v", numberOfIPs, err),
+		})
 
-			return true
-		}
-
-		status.AllocatedIPs = append(status.AllocatedIPs, ip)
+		return true
 	}
 
 	// TODO - remove IP table rules for previous allocated IPs

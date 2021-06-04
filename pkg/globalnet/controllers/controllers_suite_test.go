@@ -30,6 +30,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
+	"github.com/submariner-io/submariner/pkg/ipam"
 	"github.com/submariner-io/submariner/pkg/iptables"
 	fakeIPT "github.com/submariner-io/submariner/pkg/iptables/fake"
 	corev1 "k8s.io/api/core/v1"
@@ -70,6 +71,7 @@ type testDriverBase struct {
 	dynClient              dynamic.Interface
 	scheme                 *runtime.Scheme
 	ipt                    *fakeIPT.IPTables
+	pool                   *ipam.IPPool
 	globalCIDR             string
 	globalEgressIPs        dynamic.ResourceInterface
 	clusterGlobalEgressIPs dynamic.ResourceInterface
@@ -111,6 +113,16 @@ func (t *testDriverBase) afterEach() {
 	iptables.NewFunc = nil
 }
 
+func (t *testDriverBase) verifyIPsReservedInPool(ips ...string) {
+	if t.pool == nil {
+		return
+	}
+
+	for _, ip := range ips {
+		Expect(t.pool.Reserve(ip)).To(HaveOccurred(), "IP %s was not reserved", ip)
+	}
+}
+
 func (t *testDriverBase) createGlobalEgressIP(egressIP *submarinerv1.GlobalEgressIP) {
 	test.CreateResource(t.globalEgressIPs, egressIP)
 }
@@ -121,11 +133,11 @@ func (t *testDriverBase) createClusterGlobalEgressIP(egressIP *submarinerv1.Clus
 
 // nolint unparam - `name` always receives `globalEgressIPName`
 func (t *testDriverBase) awaitGlobalEgressIPStatusAllocated(name string, expNumIPS int) {
-	awaitStatusAllocated(t.globalEgressIPs, name, t.globalCIDR, expNumIPS)
+	t.awaitStatusAllocated(t.globalEgressIPs, name, t.globalCIDR, expNumIPS)
 }
 
 func (t *testDriverBase) awaitClusterGlobalEgressIPStatusAllocated(name string, expNumIPS int) {
-	awaitStatusAllocated(t.clusterGlobalEgressIPs, name, t.globalCIDR, expNumIPS)
+	t.awaitStatusAllocated(t.clusterGlobalEgressIPs, name, t.globalCIDR, expNumIPS)
 }
 
 func (t *testDriverBase) createPod(p *corev1.Pod) *corev1.Pod {
@@ -165,7 +177,7 @@ func awaitNoAllocatedIPs(client dynamic.ResourceInterface, name string) {
 }
 
 // nolint unparam - `atIndex` always receives `0` - remove once a caller passes non-zero
-func awaitGlobalEgressIPStatus(client dynamic.ResourceInterface, name, globalCIDR string, expNumIPS int, atIndex int,
+func (t *testDriverBase) awaitGlobalEgressIPStatus(client dynamic.ResourceInterface, name, globalCIDR string, expNumIPS int, atIndex int,
 	expCond ...metav1.Condition) {
 	awaitStatusConditions(client, name, atIndex, expCond...)
 
@@ -176,10 +188,12 @@ func awaitGlobalEgressIPStatus(client dynamic.ResourceInterface, name, globalCID
 	for _, ip := range status.AllocatedIPs {
 		Expect(isValidIPForCIDR(globalCIDR, ip)).To(BeTrue(), "Allocated global IP %q is not valid for CIDR %q", ip, globalCIDR)
 	}
+
+	t.verifyIPsReservedInPool(status.AllocatedIPs...)
 }
 
-func awaitStatusAllocated(client dynamic.ResourceInterface, name, globalCIDR string, expNumIPS int) {
-	awaitGlobalEgressIPStatus(client, name, globalCIDR, expNumIPS, 0, metav1.Condition{
+func (t *testDriverBase) awaitStatusAllocated(client dynamic.ResourceInterface, name, globalCIDR string, expNumIPS int) {
+	t.awaitGlobalEgressIPStatus(client, name, globalCIDR, expNumIPS, 0, metav1.Condition{
 		Type:   string(submarinerv1.GlobalEgressIPAllocated),
 		Status: metav1.ConditionTrue,
 	})

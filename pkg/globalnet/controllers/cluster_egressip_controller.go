@@ -26,7 +26,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/globalnet/controllers/ipam"
+	"github.com/submariner-io/submariner/pkg/ipam"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +40,12 @@ func NewClusterGlobalEgressIPController(config syncer.ResourceSyncerConfig, pool
 
 	klog.Info("Creating ClusterGlobalEgressIP controller")
 
+	controller := &clusterGlobalEgressIPController{
+		baseIPAllocationController: newBaseIPAllocationController(pool),
+	}
+
+	federator := federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
+
 	defaultEgressIP := &submarinerv1.ClusterGlobalEgressIP{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: ClusterGlobalEgressIPName,
@@ -52,22 +58,23 @@ func NewClusterGlobalEgressIPController(config syncer.ResourceSyncerConfig, pool
 	}
 
 	client := config.SourceClient.Resource(*gvr)
-	_, err = client.Get(context.TODO(), ClusterGlobalEgressIPName, metav1.GetOptions{})
+	obj, err := client.Get(context.TODO(), defaultEgressIP.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		klog.Infof("Creating ClusterGlobalEgressIP resource %q", defaultEgressIP.Name)
 
 		_, err = client.Create(context.TODO(), defaultEgressIPObj, metav1.CreateOptions{})
+		if err != nil {
+			return nil, errors.WithMessagef(err, "error creating ClusterGlobalEgressIP resource %q", defaultEgressIP.Name)
+		}
+	} else if err != nil {
+		return nil, errors.WithMessagef(err, "error retrieving ClusterGlobalEgressIP resource %q", defaultEgressIP.Name)
 	}
 
-	if err != nil {
-		return nil, errors.WithMessagef(err, "error creating ClusterGlobalEgressIP resource %q", defaultEgressIP.Name)
-	}
-
-	// TODO - reserve the allocated IPs in the IPPool cache.
-
-	controller := &clusterGlobalEgressIPController{
-		baseController: newBaseController(),
-		pool:           pool,
+	if obj != nil {
+		err = controller.reserveAllocatedIPs(federator, obj)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	controller.resourceSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
@@ -76,7 +83,7 @@ func NewClusterGlobalEgressIPController(config syncer.ResourceSyncerConfig, pool
 		SourceClient:        config.SourceClient,
 		SourceNamespace:     corev1.NamespaceAll,
 		RestMapper:          config.RestMapper,
-		Federator:           federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll),
+		Federator:           federator,
 		Scheme:              config.Scheme,
 		Transform:           controller.process,
 		ResourcesEquivalent: syncer.AreSpecsEquivalent,
@@ -87,12 +94,6 @@ func NewClusterGlobalEgressIPController(config syncer.ResourceSyncerConfig, pool
 	}
 
 	return controller, nil
-}
-
-func (c *clusterGlobalEgressIPController) Start() error {
-	klog.Info("Starting ClusterGlobalEgressIP controller")
-
-	return c.resourceSyncer.Start(c.stopCh)
 }
 
 func (c *clusterGlobalEgressIPController) process(from runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {

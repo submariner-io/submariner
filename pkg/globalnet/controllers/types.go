@@ -23,7 +23,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/watcher"
-	"github.com/submariner-io/submariner/pkg/globalnet/controllers/ipam"
+	"github.com/submariner-io/submariner/pkg/ipam"
 	"github.com/submariner-io/submariner/pkg/iptables"
 )
 
@@ -69,13 +69,17 @@ type gatewayMonitor struct {
 	controllers     []Interface
 }
 
-type globalEgressIPController struct {
+type baseIPAllocationController struct {
 	*baseController
-	sync.Mutex
 	pool           *ipam.IPPool
-	podWatchers    map[string]*podWatcher
-	watcherConfig  watcher.Config
 	resourceSyncer syncer.Interface
+}
+
+type globalEgressIPController struct {
+	*baseIPAllocationController
+	sync.Mutex
+	podWatchers   map[string]*podWatcher
+	watcherConfig watcher.Config
 }
 
 type podWatcher struct {
@@ -83,17 +87,5 @@ type podWatcher struct {
 }
 
 type clusterGlobalEgressIPController struct {
-	*baseController
-	pool           *ipam.IPPool
-	resourceSyncer syncer.Interface
-}
-
-func newBaseController() *baseController {
-	return &baseController{
-		stopCh: make(chan struct{}),
-	}
-}
-
-func (c *baseController) Stop() {
-	close(c.stopCh)
+	*baseIPAllocationController
 }
