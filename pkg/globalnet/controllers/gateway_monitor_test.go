@@ -143,9 +143,9 @@ func newGatewayMonitorTestDriver() *gatewayMonitorTestDriver {
 
 func (t *gatewayMonitorTestDriver) start() {
 	os.Setenv("NODE_NAME", nodeName)
-
 	var err error
 
+	localSubnets := []string{}
 	t.hostName, err = os.Hostname()
 	Expect(err).To(Succeed())
 
@@ -153,7 +153,7 @@ func (t *gatewayMonitorTestDriver) start() {
 		ClusterID:  clusterID,
 		Namespace:  namespace,
 		GlobalCIDR: []string{localCIDR},
-	}, watcher.Config{
+	}, localSubnets, watcher.Config{
 		RestMapper: t.restMapper,
 		Client:     t.dynClient,
 		Scheme:     t.scheme,
