@@ -14,6 +14,6 @@ else
     DEBUG="-v=${SUBMARINER_VERBOSITY}"
 fi
 
-sysctl -w net.ipv4.conf.all.send_redirects=0
+[[ "$(cat /proc/sys/net/ipv4/conf/all/send_redirects)" = 0 ]] || echo 0 > /proc/sys/net/ipv4/conf/all/send_redirects
 
 exec submariner-gateway ${DEBUG} -alsologtostderr
