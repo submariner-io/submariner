@@ -111,7 +111,7 @@ func (c *globalEgressIPController) process(from runtime.Object, numRequeues int,
 		prevStatus := globalEgressIP.Status
 		requeue := c.onCreate(globalEgressIP)
 
-		return checkGlobalEgressIPStatusChanged(&prevStatus, &globalEgressIP.Status, globalEgressIP), requeue
+		return checkStatusChanged(&prevStatus, &globalEgressIP.Status, globalEgressIP), requeue
 	case syncer.Update:
 		// TODO handle update
 	case syncer.Delete:
@@ -175,7 +175,7 @@ func allocateIPs(key string, numberOfIPs *int, pool *ipam.IPPool, status *submar
 	}
 
 	if *numberOfIPs < 0 {
-		tryAppendStatusCondition(status, &metav1.Condition{
+		tryAppendStatusCondition(&status.Conditions, &metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "InvalidInput",
@@ -186,7 +186,7 @@ func allocateIPs(key string, numberOfIPs *int, pool *ipam.IPPool, status *submar
 	}
 
 	if *numberOfIPs == 0 {
-		tryAppendStatusCondition(status, &metav1.Condition{
+		tryAppendStatusCondition(&status.Conditions, &metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "ZeroInput",
@@ -205,7 +205,7 @@ func allocateIPs(key string, numberOfIPs *int, pool *ipam.IPPool, status *submar
 	status.AllocatedIPs, err = pool.Allocate(*numberOfIPs)
 	if err != nil {
 		klog.Errorf("Error allocating IPs for %q: %v", key, err)
-		tryAppendStatusCondition(status, &metav1.Condition{
+		tryAppendStatusCondition(&status.Conditions, &metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "IPPoolAllocationFailed",
@@ -223,7 +223,7 @@ func allocateIPs(key string, numberOfIPs *int, pool *ipam.IPPool, status *submar
 
 	// TODO - add IP table rules for the allocated IPs
 
-	tryAppendStatusCondition(status, &metav1.Condition{
+	tryAppendStatusCondition(&status.Conditions, &metav1.Condition{
 		Type:    string(submarinerv1.GlobalEgressIPAllocated),
 		Status:  metav1.ConditionTrue,
 		Reason:  "Success",
@@ -233,21 +233,21 @@ func allocateIPs(key string, numberOfIPs *int, pool *ipam.IPPool, status *submar
 	return false
 }
 
-func tryAppendStatusCondition(status *submarinerv1.GlobalEgressIPStatus, newCond *metav1.Condition) {
-	updatedConditions := util.TryAppendCondition(status.Conditions, *newCond)
+func tryAppendStatusCondition(conditions *[]metav1.Condition, newCond *metav1.Condition) {
+	updatedConditions := util.TryAppendCondition(*conditions, *newCond)
 	if updatedConditions == nil {
 		return
 	}
 
-	status.Conditions = updatedConditions
+	*conditions = updatedConditions
 }
 
-func checkGlobalEgressIPStatusChanged(oldStatus, newStatus *submarinerv1.GlobalEgressIPStatus, retObj runtime.Object) runtime.Object {
+func checkStatusChanged(oldStatus, newStatus interface{}, retObj runtime.Object) runtime.Object {
 	if equality.Semantic.DeepEqual(oldStatus, newStatus) {
 		return nil
 	}
 
-	klog.V(log.DEBUG).Infof("Updated GlobalEgressIPStatus: %#v", newStatus)
+	klog.V(log.DEBUG).Infof("Updated: %#v", newStatus)
 
 	return retObj
 }
