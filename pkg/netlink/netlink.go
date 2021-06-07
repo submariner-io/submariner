@@ -18,6 +18,7 @@ limitations under the License.
 package netlink
 
 import (
+	"bytes"
 	"io/ioutil"
 	"net"
 	"os/exec"
@@ -136,9 +137,7 @@ func (n *netlinkType) XfrmPolicyList(family int) ([]netlink.XfrmPolicy, error) {
 
 func (n *netlinkType) EnableLooseModeReversePathFilter(interfaceName string) error {
 	// Enable loose mode (rp_filter=2) reverse path filtering on the vxlan interface.
-	// We won't ever create rp_filter, and its permissions are 644
-	// #nosec G306
-	err := ioutil.WriteFile("/proc/sys/net/ipv4/conf/"+interfaceName+"/rp_filter", []byte("2"), 0644)
+	err := setSysctl("/proc/sys/net/ipv4/conf/"+interfaceName+"/rp_filter", []byte("2"))
 	return errors.WithMessagef(err, "unable to update rp_filter proc entry for interface %q", interfaceName)
 }
 
@@ -149,15 +148,26 @@ func (n *netlinkType) FlushRouteTable(tableID int) error {
 }
 
 func (n *netlinkType) ConfigureTCPMTUProbe(mtuProbe, baseMss string) error {
-	// We won't ever create tcpMtuProbingProcEntry/tcpBaseMssProcEntry, and its permissions are 644
-	// #nosec G306
-	err := ioutil.WriteFile("/proc/sys/net/ipv4/tcp_mtu_probing", []byte(mtuProbe), 0644)
+	err := setSysctl("/proc/sys/net/ipv4/tcp_mtu_probing", []byte(mtuProbe))
 	if err != nil {
 		return errors.WithMessagef(err, "unable to update value of tcp_mtu_probing to %s", mtuProbe)
 	}
 
-	// #nosec G306
-	err = ioutil.WriteFile("/proc/sys/net/ipv4/tcp_base_mss", []byte(baseMss), 0644)
+	err = setSysctl("/proc/sys/net/ipv4/tcp_base_mss", []byte(baseMss))
 
 	return errors.WithMessagef(err, "unable to update value of tcp_base_mss to %ss", baseMss)
+}
+
+func setSysctl(path string, contents []byte) error {
+	existing, err := ioutil.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	if bytes.Equal(existing, contents) {
+		return nil
+	}
+	// Permissions are already 644, the files are never created
+	// #nosec G306
+	return ioutil.WriteFile(path, contents, 0644)
 }
