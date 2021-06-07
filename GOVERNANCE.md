@@ -35,8 +35,10 @@ This is not meant to define Submariner's governance, but instead to document it 
   * In short, by reviewing pull requests and receiving Committer/Owner approval.
     See the [Committer Requirements](https://submariner.io/community/contributor-roles/#committer-requirements) for details.
 * How are project committers removed?
-  * Project Owners and Committers can be removed by stepping down or by two thirds vote of Project Owners, per the Submariner
-    [Contributor Roles](https://submariner.io/community/contributor-roles).
+  * Committers can be removed by stepping down or by two thirds vote of Project Owners, per the Submariner [Committer Responsibilities and
+    Privileges](https://submariner.io/community/contributor-roles/#committer-responsibilities-and-privileges). Project Owner removals are
+    currently frozen except for stepping down or for Code of Conduct violations. See the [Owner Removal and Future Elected
+    Governance](https://submariner.io/community/contributor-roles/#owner-removal-and-future-elected-governance) documentation for details.
 * If the project raises funds, who decides how this money is spent?
   * Project Owners are responsible for deciding how funds are spent, per the Submariner
     [Owner Responsibilities and Privileges](https://submariner.io/community/contributor-roles/#owner-responsibilities-and-privileges).
