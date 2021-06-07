@@ -33,14 +33,20 @@ func (c *baseController) Stop() {
 	close(c.stopCh)
 }
 
-func newBaseIPAllocationController(pool *ipam.IPPool) *baseIPAllocationController {
-	return &baseIPAllocationController{
+func newBaseSyncerController() *baseSyncerController {
+	return &baseSyncerController{
 		baseController: newBaseController(),
-		pool:           pool,
 	}
 }
 
-func (c *baseIPAllocationController) Start() error {
+func newBaseIPAllocationController(pool *ipam.IPPool) *baseIPAllocationController {
+	return &baseIPAllocationController{
+		baseSyncerController: newBaseSyncerController(),
+		pool:                 pool,
+	}
+}
+
+func (c *baseSyncerController) Start() error {
 	return c.resourceSyncer.Start(c.stopCh)
 }
 
@@ -54,6 +60,15 @@ func (c *baseIPAllocationController) reserveAllocatedIPs(federator federate.Fede
 		if err != nil {
 			// TODO: null out the allocatedIPs
 			return err
+		}
+	} else {
+		ip, _, _ := unstructured.NestedString(obj.Object, "status", "allocatedIP")
+		if ip != "" {
+			err = c.pool.Reserve(ip)
+			if err != nil {
+				// TODO: null out the allocatedIP
+				return err
+			}
 		}
 	}
 

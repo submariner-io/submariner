@@ -106,7 +106,7 @@ func (c *clusterGlobalEgressIPController) process(from runtime.Object, numRequeu
 		prevStatus := clusterGlobalEgressIP.Status
 		requeue := c.onCreate(clusterGlobalEgressIP)
 
-		return checkGlobalEgressIPStatusChanged(&prevStatus, &clusterGlobalEgressIP.Status, clusterGlobalEgressIP), requeue
+		return checkStatusChanged(&prevStatus, &clusterGlobalEgressIP.Status, clusterGlobalEgressIP), requeue
 	case syncer.Update:
 		// TODO handle update
 	case syncer.Delete:
@@ -120,7 +120,7 @@ func (c *clusterGlobalEgressIPController) onCreate(egressIP *submarinerv1.Cluste
 	key, _ := cache.MetaNamespaceKeyFunc(egressIP)
 
 	if egressIP.Name != ClusterGlobalEgressIPName {
-		tryAppendStatusCondition(&egressIP.Status, &metav1.Condition{
+		tryAppendStatusCondition(&egressIP.Status.Conditions, &metav1.Condition{
 			Type:   string(submarinerv1.GlobalEgressIPAllocated),
 			Status: metav1.ConditionFalse,
 			Reason: "InvalidInstance",

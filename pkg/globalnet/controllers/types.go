@@ -25,6 +25,8 @@ import (
 	"github.com/submariner-io/admiral/pkg/watcher"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	"github.com/submariner-io/submariner/pkg/iptables"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
 )
 
 const (
@@ -69,10 +71,14 @@ type gatewayMonitor struct {
 	controllers     []Interface
 }
 
-type baseIPAllocationController struct {
+type baseSyncerController struct {
 	*baseController
-	pool           *ipam.IPPool
 	resourceSyncer syncer.Interface
+}
+
+type baseIPAllocationController struct {
+	*baseSyncerController
+	pool *ipam.IPPool
 }
 
 type globalEgressIPController struct {
@@ -88,4 +94,14 @@ type podWatcher struct {
 
 type clusterGlobalEgressIPController struct {
 	*baseIPAllocationController
+}
+
+type globalIngressIPController struct {
+	*baseIPAllocationController
+}
+
+type serviceExportController struct {
+	*baseSyncerController
+	services dynamic.NamespaceableResourceInterface
+	scheme   *runtime.Scheme
 }

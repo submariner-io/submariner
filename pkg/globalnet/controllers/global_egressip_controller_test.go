@@ -66,12 +66,11 @@ var _ = Describe("GlobalEgressIP controller", func() {
 			})
 
 			It("should add an appropriate Status condition", func() {
-				t.awaitGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName, t.globalCIDR,
-					0, 0, metav1.Condition{
-						Type:   string(submarinerv1.GlobalEgressIPAllocated),
-						Status: metav1.ConditionFalse,
-						Reason: "InvalidInput",
-					})
+				t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, 0, 0, metav1.Condition{
+					Type:   string(submarinerv1.GlobalEgressIPAllocated),
+					Status: metav1.ConditionFalse,
+					Reason: "InvalidInput",
+				})
 			})
 		})
 
@@ -82,12 +81,11 @@ var _ = Describe("GlobalEgressIP controller", func() {
 			})
 
 			It("should add an appropriate Status condition", func() {
-				t.awaitGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName, t.globalCIDR,
-					0, 0, metav1.Condition{
-						Type:   string(submarinerv1.GlobalEgressIPAllocated),
-						Status: metav1.ConditionFalse,
-						Reason: "ZeroInput",
-					})
+				t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, 0, 0, metav1.Condition{
+					Type:   string(submarinerv1.GlobalEgressIPAllocated),
+					Status: metav1.ConditionFalse,
+					Reason: "ZeroInput",
+				})
 			})
 		})
 	})
