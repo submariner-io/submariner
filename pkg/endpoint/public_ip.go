@@ -48,7 +48,11 @@ var IPv4RE = regexp.MustCompile(`(?:\d{1,3}\.){3}\d{1,3}`)
 func getPublicIP(submSpec types.SubmarinerSpecification, k8sClient kubernetes.Interface, backendConfig map[string]string) (string, error) {
 	config, ok := backendConfig[v1.PublicIP]
 	if !ok {
-		config = "api:api.ipify.org,api:api.my-ip.io/ip,api:ip4.seeip.org"
+		if submSpec.PublicIP != "" {
+			config = submSpec.PublicIP
+		} else {
+			config = "api:api.ipify.org,api:api.my-ip.io/ip,api:ip4.seeip.org"
+		}
 	}
 
 	resolvers := strings.Split(config, ",")

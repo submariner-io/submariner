@@ -64,6 +64,9 @@ var _ = Describe("Endpoint monitoring", func() {
 
 			t.createGlobalEgressIP(newGlobalEgressIP(globalEgressIPName, nil, nil))
 			t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, 1)
+
+			t.createServiceExport(t.createService(newClusterIPService()))
+			t.awaitIngressIPStatusAllocated(serviceName)
 		})
 
 		Context("and then removed", func() {
@@ -85,6 +88,9 @@ var _ = Describe("Endpoint monitoring", func() {
 				time.Sleep(300 * time.Millisecond)
 				t.createGlobalEgressIP(newGlobalEgressIP(globalEgressIPName, nil, nil))
 				awaitNoAllocatedIPs(t.globalEgressIPs, globalEgressIPName)
+
+				t.createServiceExport(t.createService(newClusterIPService()))
+				t.awaitNoGlobalIngressIP(serviceName)
 			})
 		})
 	})
