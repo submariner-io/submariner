@@ -68,7 +68,7 @@ func (h *vxlanCleanup) TransitionToNonGateway() error {
 		}
 	}
 
-	err = netlink.LinkDel(link)
+	//err = netlink.LinkDel(link)
 	if err != nil {
 		return fmt.Errorf("failed to delete the the vxlan interface: %v", err)
 	}
