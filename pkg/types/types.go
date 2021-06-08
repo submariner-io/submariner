@@ -39,6 +39,7 @@ type SubmarinerSpecification struct {
 	CableDriver                   string
 	ClusterID                     string
 	Namespace                     string
+	PublicIP                      string
 	Token                         string
 	Debug                         bool
 	NATEnabled                    bool
