@@ -40,9 +40,9 @@ import (
 )
 
 const (
-	VxLANIface             = "submariner"
-	VxLANOverhead          = 50
-	VxLANVTepNetworkPrefix = 241
+	VxlanIface             = "submariner"
+	VxlanOverhead          = 50
+	VxlanVTepNetworkPrefix = 241
 	CableDriverName        = "vxlan"
 	TableID                = 100
 )
@@ -55,21 +55,21 @@ const (
 	Flush
 )
 
-type vxLan struct {
+type vxlan struct {
 	localEndpoint types.SubmarinerEndpoint
 	connections   []v1.Connection
 	mutex         sync.Mutex
-	vxLanIface    *vxLanIface
-	NATTPort      int `default:"4500"`
+	vxlanIface    *vxlanIface
+	nattPort      int `default:"4500"`
 }
 
-type vxLanIface struct {
+type vxlanIface struct {
 	activeEndpointHostname string
 	link                   *netlink.Vxlan
 	vtepIP                 net.IP
 }
 
-type vxLanAttributes struct {
+type vxlanAttributes struct {
 	name     string
 	vxlanID  int
 	group    net.IP
@@ -85,23 +85,23 @@ func init() {
 func NewDriver(localEndpoint types.SubmarinerEndpoint, localCluster types.SubmarinerCluster) (cable.Driver, error) {
 	var err error
 
-	v := vxLan{
+	v := vxlan{
 		localEndpoint: localEndpoint,
 	}
 
-	port, err := localEndpoint.Spec.GetBackendPort(v1.UDPPortConfig, int32(v.NATTPort))
+	port, err := localEndpoint.Spec.GetBackendPort(v1.UDPPortConfig, int32(v.nattPort))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get the UDP port configuration: %v", err)
 	}
 
-	if err = v.createVxLANInterface(localEndpoint.Spec.Hostname, int(port)); err != nil {
+	if err = v.createVxlanInterface(localEndpoint.Spec.Hostname, int(port)); err != nil {
 		return nil, fmt.Errorf("failed to setup Vxlan link: %v", err)
 	}
 
 	return &v, nil
 }
 
-func (v *vxLan) createVxLANInterface(activeEndPoint string, port int) error {
+func (v *vxlan) createVxlanInterface(activeEndPoint string, port int) error {
 	ipAddr := v.localEndpoint.Spec.PrivateIP
 
 	vtepIP, err := v.getVxlanVtepIPAddress(ipAddr)
@@ -117,10 +117,10 @@ func (v *vxLan) createVxLANInterface(activeEndPoint string, port int) error {
 	}
 
 	// Derive the MTU based on the default outgoing interface
-	vxlanMtu := defaultHostIface.MTU - VxLANOverhead
+	vxlanMtu := defaultHostIface.MTU - VxlanOverhead
 
-	attrs := &vxLanAttributes{
-		name:     VxLANIface,
+	attrs := &vxlanAttributes{
+		name:     VxlanIface,
 		vxlanID:  1000,
 		group:    nil,
 		srcAddr:  nil,
@@ -128,12 +128,12 @@ func (v *vxLan) createVxLANInterface(activeEndPoint string, port int) error {
 		mtu:      vxlanMtu,
 	}
 
-	v.vxLanIface, err = newVxlanIface(attrs, activeEndPoint)
+	v.vxlanIface, err = newVxlanIface(attrs, activeEndPoint)
 	if err != nil {
 		return fmt.Errorf("failed to create vxlan interface on Gateway Node: %v", err)
 	}
 
-	v.vxLanIface.vtepIP = vtepIP
+	v.vxlanIface.vtepIP = vtepIP
 
 	err = v.addIPRule()
 	if err != nil && !os.IsExist(err) {
@@ -143,14 +143,14 @@ func (v *vxLan) createVxLANInterface(activeEndPoint string, port int) error {
 	// Enable loose mode (rp_filter=2) reverse path filtering on the vxlan interface.
 	// We won't ever create rp_filter, and its permissions are 644
 	// #nosec G306
-	err = ioutil.WriteFile("/proc/sys/net/ipv4/conf/"+VxLANIface+"/rp_filter", []byte("2"), 0600)
+	err = ioutil.WriteFile("/proc/sys/net/ipv4/conf/"+VxlanIface+"/rp_filter", []byte("2"), 0600)
 	if err != nil {
 		return fmt.Errorf("unable to update vxlan rp_filter proc entry, err: %s", err)
-	} else {
-		klog.V(log.DEBUG).Infof("Successfully configured rp_filter to loose mode(2) on %s", VxLANIface)
 	}
 
-	err = v.vxLanIface.configureIPAddress(vtepIP, net.CIDRMask(8, 32))
+	klog.V(log.DEBUG).Infof("Successfully configured rp_filter to loose mode(2) on %s", VxlanIface)
+
+	err = v.vxlanIface.configureIPAddress(vtepIP, net.CIDRMask(8, 32))
 	if err != nil {
 		return fmt.Errorf("failed to configure vxlan interface ipaddress on the Gateway Node %v", err)
 	}
@@ -158,7 +158,7 @@ func (v *vxLan) createVxLANInterface(activeEndPoint string, port int) error {
 	return nil
 }
 
-func newVxlanIface(attrs *vxLanAttributes, activeEndPoint string) (*vxLanIface, error) {
+func newVxlanIface(attrs *vxlanAttributes, activeEndPoint string) (*vxlanIface, error) {
 	iface := &netlink.Vxlan{
 		LinkAttrs: netlink.LinkAttrs{
 			Name:  attrs.name,
@@ -171,19 +171,19 @@ func newVxlanIface(attrs *vxLanAttributes, activeEndPoint string) (*vxLanIface, 
 		Port:    attrs.vtepPort,
 	}
 
-	vxLANIface := &vxLanIface{
+	vxlanIface := &vxlanIface{
 		link:                   iface,
 		activeEndpointHostname: activeEndPoint,
 	}
 
-	if err := createVxLanIface(vxLANIface); err != nil {
+	if err := createvxlanIface(vxlanIface); err != nil {
 		return nil, err
 	}
 
-	return vxLANIface, nil
+	return vxlanIface, nil
 }
 
-func createVxLanIface(iface *vxLanIface) error {
+func createvxlanIface(iface *vxlanIface) error {
 	err := netlink.LinkAdd(iface.link)
 	if err == syscall.EEXIST {
 		klog.Errorf("Got error: %v, %v", err, iface.link)
@@ -243,36 +243,20 @@ func isVxlanConfigTheSame(newLink, currentLink netlink.Link) bool {
 	return true
 }
 
-func (iface *vxLanIface) configureIPAddress(ipAddress net.IP, mask net.IPMask) error {
-	ipConfig := &netlink.Addr{IPNet: &net.IPNet{
-		IP:   ipAddress,
-		Mask: mask,
-	}}
-
-	err := netlink.AddrAdd(iface.link, ipConfig)
-	if err == syscall.EEXIST {
-		return nil
-	} else if err != nil {
-		return fmt.Errorf("unable to configure address (%s) on vxlan interface (%s). %v", ipAddress, iface.link.Name, err)
-	}
-
-	return nil
-}
-
-func (v *vxLan) getVxlanVtepIPAddress(ipAddr string) (net.IP, error) {
+func (v *vxlan) getVxlanVtepIPAddress(ipAddr string) (net.IP, error) {
 	ipSlice := strings.Split(ipAddr, ".")
 	if len(ipSlice) < 4 {
 		return nil, fmt.Errorf("invalid ipAddr [%s]", ipAddr)
 	}
 
-	ipSlice[0] = strconv.Itoa(VxLANVTepNetworkPrefix)
+	ipSlice[0] = strconv.Itoa(VxlanVTepNetworkPrefix)
 	vxlanIP := net.ParseIP(strings.Join(ipSlice, "."))
 
 	return vxlanIP, nil
 }
 
-func (v *vxLan) addIPRule() error {
-	if v.vxLanIface != nil {
+func (v *vxlan) addIPRule() error {
+	if v.vxlanIface != nil {
 		rule := netlink.NewRule()
 		rule.Table = TableID
 		rule.Priority = TableID
@@ -286,7 +270,7 @@ func (v *vxLan) addIPRule() error {
 	return nil
 }
 
-func (v *vxLan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
+func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
 	remoteEndpoint := endpointInfo.Endpoint
 	if v.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
 		klog.V(log.DEBUG).Infof("Will not connect to self")
@@ -313,17 +297,17 @@ func (v *vxLan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 		return endpointInfo.UseIP, fmt.Errorf("failed to derive the vxlan vtepIP for %s, %v", endpointInfo.UseIP, err)
 	}
 
-	err = v.vxLanIface.AddFDB(remoteIP, "00:00:00:00:00:00")
+	err = v.vxlanIface.AddFDB(remoteIP, "00:00:00:00:00:00")
 
 	if err != nil {
 		return endpointInfo.UseIP, fmt.Errorf("failed to add remoteIP %q to the forwarding database", remoteIP)
 	}
 
-	err = v.vxLanIface.AddRoute(allowedIPs, remoteVtepIP, v.vxLanIface.vtepIP)
+	err = v.vxlanIface.AddRoute(allowedIPs, remoteVtepIP, v.vxlanIface.vtepIP)
 
 	if err != nil {
 		return endpointInfo.UseIP, fmt.Errorf("failed to add route for the CIDR %q with remoteVtepIP %q and vxlanInterfaceIP %q",
-			allowedIPs, remoteVtepIP, v.vxLanIface.vtepIP)
+			allowedIPs, remoteVtepIP, v.vxlanIface.vtepIP)
 	}
 
 	v.connections = append(v.connections, v1.Connection{Endpoint: remoteEndpoint.Spec, Status: v1.Connected,
@@ -334,7 +318,7 @@ func (v *vxLan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 	return endpointInfo.UseIP, nil
 }
 
-func (v *vxLan) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoint) error {
+func (v *vxlan) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoint) error {
 	klog.V(log.DEBUG).Infof("Removing endpoint %#v", remoteEndpoint)
 
 	if v.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
@@ -356,13 +340,13 @@ func (v *vxLan) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoint) 
 
 	allowedIPs := parseSubnets(remoteEndpoint.Spec.Subnets)
 
-	err := v.vxLanIface.DelFDB(remoteIP, "00:00:00:00:00:00")
+	err := v.vxlanIface.DelFDB(remoteIP, "00:00:00:00:00:00")
 
 	if err != nil {
 		return fmt.Errorf("failed to delete remoteIP %q from the forwarding database", remoteIP)
 	}
 
-	err = v.vxLanIface.DelRoute(allowedIPs)
+	err = v.vxlanIface.DelRoute(allowedIPs)
 
 	if err != nil {
 		return fmt.Errorf("failed to remove route for the CIDR %q",
@@ -388,15 +372,31 @@ func removeConnectionForEndpoint(connections []v1.Connection, endpoint types.Sub
 	return connections
 }
 
-func (v *vxLan) GetConnections() ([]v1.Connection, error) {
+func (v *vxlan) GetConnections() ([]v1.Connection, error) {
 	return v.connections, nil
 }
 
-func (v *vxLan) GetActiveConnections() ([]v1.Connection, error) {
+func (v *vxlan) GetActiveConnections() ([]v1.Connection, error) {
 	return v.connections, nil
 }
 
-func (iface *vxLanIface) AddFDB(ipAddress net.IP, hwAddr string) error {
+func (v *vxlanIface) configureIPAddress(ipAddress net.IP, mask net.IPMask) error {
+	ipConfig := &netlink.Addr{IPNet: &net.IPNet{
+		IP:   ipAddress,
+		Mask: mask,
+	}}
+
+	err := netlink.AddrAdd(v.link, ipConfig)
+	if err == syscall.EEXIST {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("unable to configure address (%s) on vxlan interface (%s). %v", ipAddress, v.link.Name, err)
+	}
+
+	return nil
+}
+
+func (v *vxlanIface) AddFDB(ipAddress net.IP, hwAddr string) error {
 	macAddr, err := net.ParseMAC(hwAddr)
 
 	if err != nil {
@@ -408,7 +408,7 @@ func (iface *vxLanIface) AddFDB(ipAddress net.IP, hwAddr string) error {
 	}
 
 	neigh := &netlink.Neigh{
-		LinkIndex:    iface.link.Index,
+		LinkIndex:    v.link.Index,
 		Family:       unix.AF_BRIDGE,
 		Flags:        netlink.NTF_SELF,
 		Type:         netlink.NDA_DST,
@@ -420,21 +420,21 @@ func (iface *vxLanIface) AddFDB(ipAddress net.IP, hwAddr string) error {
 	err = netlink.NeighAppend(neigh)
 	if err != nil {
 		return fmt.Errorf("unable to add the bridge fdb entry %v, err: %s", neigh, err)
-	} else {
-		klog.V(log.DEBUG).Infof("Successfully added the bridge fdb entry %v", neigh)
 	}
+
+	klog.V(log.DEBUG).Infof("Successfully added the bridge fdb entry %v", neigh)
 
 	return nil
 }
 
-func (iface *vxLanIface) DelFDB(ipAddress net.IP, hwAddr string) error {
+func (v *vxlanIface) DelFDB(ipAddress net.IP, hwAddr string) error {
 	macAddr, err := net.ParseMAC(hwAddr)
 	if err != nil {
 		return fmt.Errorf("invalid MAC Address (%s) supplied. %v", hwAddr, err)
 	}
 
 	neigh := &netlink.Neigh{
-		LinkIndex:    iface.link.Index,
+		LinkIndex:    v.link.Index,
 		Family:       unix.AF_BRIDGE,
 		Flags:        netlink.NTF_SELF,
 		Type:         netlink.NDA_DST,
@@ -446,17 +446,17 @@ func (iface *vxLanIface) DelFDB(ipAddress net.IP, hwAddr string) error {
 	err = netlink.NeighDel(neigh)
 	if err != nil {
 		return fmt.Errorf("unable to delete the bridge fdb entry %v, err: %s", neigh, err)
-	} else {
-		klog.V(log.DEBUG).Infof("Successfully deleted the bridge fdb entry %v", neigh)
 	}
+
+	klog.V(log.DEBUG).Infof("Successfully deleted the bridge fdb entry %v", neigh)
 
 	return nil
 }
 
-func (iface *vxLanIface) AddRoute(ipAddressList []net.IPNet, gwIP, ips net.IP) error {
+func (v *vxlanIface) AddRoute(ipAddressList []net.IPNet, gwIP, ips net.IP) error {
 	for i := range ipAddressList {
 		route := &netlink.Route{
-			LinkIndex: iface.link.Index,
+			LinkIndex: v.link.Index,
 			Src:       ips,
 			Dst:       &ipAddressList[i],
 			Gw:        gwIP,
@@ -473,18 +473,18 @@ func (iface *vxLanIface) AddRoute(ipAddressList []net.IPNet, gwIP, ips net.IP) e
 
 		if err != nil {
 			return fmt.Errorf("unable to add the route entry %v, err: %s", route, err)
-		} else {
-			klog.V(log.DEBUG).Infof("Successfully added the route entry %v and gw ip %v", route, gwIP)
 		}
+
+		klog.V(log.DEBUG).Infof("Successfully added the route entry %v and gw ip %v", route, gwIP)
 	}
 
 	return nil
 }
 
-func (iface *vxLanIface) DelRoute(ipAddressList []net.IPNet) error {
+func (v *vxlanIface) DelRoute(ipAddressList []net.IPNet) error {
 	for i := range ipAddressList {
 		route := &netlink.Route{
-			LinkIndex: iface.link.Index,
+			LinkIndex: v.link.Index,
 			Dst:       &ipAddressList[i],
 			Gw:        nil,
 			Type:      netlink.NDA_DST,
@@ -495,19 +495,19 @@ func (iface *vxLanIface) DelRoute(ipAddressList []net.IPNet) error {
 		err := netlink.RouteDel(route)
 		if err != nil {
 			return fmt.Errorf("unable to add the route entry %v, err: %s", route, err)
-		} else {
-			klog.V(log.DEBUG).Infof("Successfully deleted the route entry %v", route)
 		}
+
+		klog.V(log.DEBUG).Infof("Successfully deleted the route entry %v", route)
 	}
 
 	return nil
 }
 
-func (v *vxLan) Init() error {
+func (v *vxlan) Init() error {
 	return nil
 }
 
-func (v *vxLan) GetName() string {
+func (v *vxlan) GetName() string {
 	return CableDriverName
 }
 

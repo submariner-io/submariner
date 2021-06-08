@@ -47,7 +47,7 @@ func (h *vxlanCleanup) GetName() string {
 func (h *vxlanCleanup) TransitionToNonGateway() error {
 	klog.Infof("Cleaning up the routes")
 
-	link, err := netlink.LinkByName(vxlan.VxLANIface)
+	link, err := netlink.LinkByName(vxlan.VxlanIface)
 
 	if err != nil {
 		return nil
@@ -56,13 +56,14 @@ func (h *vxlanCleanup) TransitionToNonGateway() error {
 	currentRouteList, err := netlink.RouteList(link, syscall.AF_INET)
 
 	if err != nil {
-		klog.Warningf("Unable to cleanup routes, error retrieving routes on the link %s: %v", vxlan.VxLANIface, err)
+		klog.Warningf("Unable to cleanup routes, error retrieving routes on the link %s: %v", vxlan.VxlanIface, err)
 	} else {
 		for i := range currentRouteList {
 			klog.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])
-
-			if err = netlink.RouteDel(&currentRouteList[i]); err != nil {
-				klog.Errorf("Error removing route %s: %v", currentRouteList[i], err)
+			if currentRouteList[i].Table == vxlan.TableID {
+				if err = netlink.RouteDel(&currentRouteList[i]); err != nil {
+					klog.Errorf("Error removing route %s: %v", currentRouteList[i], err)
+				}
 			}
 		}
 	}
