@@ -23,6 +23,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/watcher"
+	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iprules"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	"github.com/submariner-io/submariner/pkg/iptables"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -81,8 +82,13 @@ type baseIPAllocationController struct {
 	pool *ipam.IPPool
 }
 
-type globalEgressIPController struct {
+type baseEgressIPAllocationController struct {
 	*baseIPAllocationController
+	ipRuleIface iprules.Interface
+}
+
+type globalEgressIPController struct {
+	*baseEgressIPAllocationController
 	sync.Mutex
 	podWatchers   map[string]*podWatcher
 	watcherConfig watcher.Config
@@ -93,7 +99,7 @@ type podWatcher struct {
 }
 
 type clusterGlobalEgressIPController struct {
-	*baseIPAllocationController
+	*baseEgressIPAllocationController
 }
 
 type globalIngressIPController struct {

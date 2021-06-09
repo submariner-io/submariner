@@ -23,9 +23,11 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
+	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iprules"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -40,8 +42,13 @@ func NewClusterGlobalEgressIPController(config syncer.ResourceSyncerConfig, pool
 
 	klog.Info("Creating ClusterGlobalEgressIP controller")
 
+	ipr, err := iprules.ForClusterEgress(stringset.New())
+	if err != nil {
+		return nil, err
+	}
+
 	controller := &clusterGlobalEgressIPController{
-		baseIPAllocationController: newBaseIPAllocationController(pool),
+		baseEgressIPAllocationController: newBaseEgressIPAllocationController(pool, ipr),
 	}
 
 	federator := federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
@@ -131,7 +138,7 @@ func (c *clusterGlobalEgressIPController) onCreate(egressIP *submarinerv1.Cluste
 		return false
 	}
 
-	return allocateIPs(key, egressIP.Spec.NumberOfIPs, c.pool, &egressIP.Status)
+	return c.allocateIPs(key, egressIP.Spec.NumberOfIPs, &egressIP.Status)
 }
 
 func (c *clusterGlobalEgressIPController) onRemove(egressIP *submarinerv1.ClusterGlobalEgressIP) bool { // nolint unparam
