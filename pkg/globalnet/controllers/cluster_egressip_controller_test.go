@@ -71,12 +71,11 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 		})
 
 		It("should not allocate the global IP", func() {
-			t.awaitGlobalEgressIPStatus(t.clusterGlobalEgressIPs, "other name", t.globalCIDR,
-				0, 0, metav1.Condition{
-					Type:   string(submarinerv1.GlobalEgressIPAllocated),
-					Status: metav1.ConditionFalse,
-					Reason: "InvalidInstance",
-				})
+			t.awaitEgressIPStatus(t.clusterGlobalEgressIPs, "other name", 0, 0, metav1.Condition{
+				Type:   string(submarinerv1.GlobalEgressIPAllocated),
+				Status: metav1.ConditionFalse,
+				Reason: "InvalidInstance",
+			})
 		})
 	})
 })

@@ -48,9 +48,11 @@ import (
 )
 
 const (
-	namespace          = "submariner"
-	localCIDR          = "169.254.1.0/24"
-	globalEgressIPName = "east-region"
+	namespace           = "submariner"
+	localCIDR           = "169.254.1.0/24"
+	globalEgressIPName  = "east-region"
+	globalIngressIPName = "db-service-ingress-ip"
+	serviceName         = "nginx"
 )
 
 func init() {
@@ -75,13 +77,16 @@ type testDriverBase struct {
 	globalCIDR             string
 	globalEgressIPs        dynamic.ResourceInterface
 	clusterGlobalEgressIPs dynamic.ResourceInterface
+	globalIngressIPs       dynamic.ResourceInterface
+	services               dynamic.ResourceInterface
+	serviceExports         dynamic.ResourceInterface
 	pods                   dynamic.NamespaceableResourceInterface
 }
 
 func newTestDriverBase() *testDriverBase {
 	t := &testDriverBase{
 		restMapper: test.GetRESTMapperFor(&submarinerv1.Endpoint{}, &corev1.Service{}, &corev1.Node{}, &corev1.Pod{},
-			&submarinerv1.GlobalEgressIP{}, &submarinerv1.ClusterGlobalEgressIP{}, &mcsv1a1.ServiceExport{}),
+			&submarinerv1.GlobalEgressIP{}, &submarinerv1.ClusterGlobalEgressIP{}, &submarinerv1.GlobalIngressIP{}, &mcsv1a1.ServiceExport{}),
 		scheme:     runtime.NewScheme(),
 		ipt:        fakeIPT.New(),
 		globalCIDR: localCIDR,
@@ -96,9 +101,16 @@ func newTestDriverBase() *testDriverBase {
 	t.globalEgressIPs = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.GlobalEgressIP{})).
 		Namespace(namespace)
 
+	t.globalIngressIPs = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.GlobalIngressIP{})).
+		Namespace(namespace)
+
 	t.clusterGlobalEgressIPs = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.ClusterGlobalEgressIP{}))
 
 	t.pods = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &corev1.Pod{}))
+
+	t.services = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &corev1.Service{})).Namespace(namespace)
+
+	t.serviceExports = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &mcsv1a1.ServiceExport{})).Namespace(namespace)
 
 	iptables.NewFunc = func() (iptables.Interface, error) {
 		return t.ipt, nil
@@ -123,6 +135,12 @@ func (t *testDriverBase) verifyIPsReservedInPool(ips ...string) {
 	}
 }
 
+func (t *testDriverBase) awaitIPsReleasedFromPool(ips ...string) {
+	Eventually(func() error {
+		return t.pool.Reserve(ips...)
+	}, 3*time.Second).Should(Succeed())
+}
+
 func (t *testDriverBase) createGlobalEgressIP(egressIP *submarinerv1.GlobalEgressIP) {
 	test.CreateResource(t.globalEgressIPs, egressIP)
 }
@@ -131,13 +149,17 @@ func (t *testDriverBase) createClusterGlobalEgressIP(egressIP *submarinerv1.Clus
 	test.CreateResource(t.clusterGlobalEgressIPs, egressIP)
 }
 
+func (t *testDriverBase) createGlobalIngressIP(egressIP *submarinerv1.GlobalIngressIP) {
+	test.CreateResource(t.globalIngressIPs, egressIP)
+}
+
 // nolint unparam - `name` always receives `globalEgressIPName`
 func (t *testDriverBase) awaitGlobalEgressIPStatusAllocated(name string, expNumIPS int) {
-	t.awaitStatusAllocated(t.globalEgressIPs, name, t.globalCIDR, expNumIPS)
+	t.awaitEgressIPStatusAllocated(t.globalEgressIPs, name, expNumIPS)
 }
 
 func (t *testDriverBase) awaitClusterGlobalEgressIPStatusAllocated(name string, expNumIPS int) {
-	t.awaitStatusAllocated(t.clusterGlobalEgressIPs, name, t.globalCIDR, expNumIPS)
+	t.awaitEgressIPStatusAllocated(t.clusterGlobalEgressIPs, name, expNumIPS)
 }
 
 func (t *testDriverBase) createPod(p *corev1.Pod) *corev1.Pod {
@@ -148,7 +170,28 @@ func (t *testDriverBase) deletePod(p *corev1.Pod) {
 	Expect(t.pods.Namespace(p.Namespace).Delete(context.TODO(), p.Name, metav1.DeleteOptions{})).To(Succeed())
 }
 
-func getGlobalEgressIPStatus(client dynamic.ResourceInterface, name string) *submarinerv1.GlobalEgressIPStatus {
+func (t *testDriverBase) createService(service *corev1.Service) *corev1.Service {
+	test.CreateResource(t.services, service)
+	return service
+}
+
+func (t *testDriverBase) createServiceExport(s *corev1.Service) {
+	test.CreateResource(t.serviceExports, &mcsv1a1.ServiceExport{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      s.GetName(),
+			Namespace: s.GetNamespace(),
+		},
+	})
+}
+
+func (t *testDriverBase) getGlobalIngressIPStatus(name string) *submarinerv1.GlobalIngressIPStatus {
+	status := &submarinerv1.GlobalIngressIPStatus{}
+	getStatus(t.globalIngressIPs, name, status)
+
+	return status
+}
+
+func getStatus(client dynamic.ResourceInterface, name string, status interface{}) {
 	obj, err := client.Get(context.TODO(), name, metav1.GetOptions{})
 	Expect(err).To(Succeed())
 
@@ -156,11 +199,15 @@ func getGlobalEgressIPStatus(client dynamic.ResourceInterface, name string) *sub
 	Expect(err).To(Succeed())
 
 	if !ok {
-		return nil
+		return
 	}
 
-	status := &submarinerv1.GlobalEgressIPStatus{}
 	Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(statusObj, status)).To(Succeed())
+}
+
+func getGlobalEgressIPStatus(client dynamic.ResourceInterface, name string) *submarinerv1.GlobalEgressIPStatus {
+	status := &submarinerv1.GlobalEgressIPStatus{}
+	getStatus(client, name, status)
 
 	return status
 }
@@ -177,7 +224,7 @@ func awaitNoAllocatedIPs(client dynamic.ResourceInterface, name string) {
 }
 
 // nolint unparam - `atIndex` always receives `0` - remove once a caller passes non-zero
-func (t *testDriverBase) awaitGlobalEgressIPStatus(client dynamic.ResourceInterface, name, globalCIDR string, expNumIPS int, atIndex int,
+func (t *testDriverBase) awaitEgressIPStatus(client dynamic.ResourceInterface, name string, expNumIPS int, atIndex int,
 	expCond ...metav1.Condition) {
 	awaitStatusConditions(client, name, atIndex, expCond...)
 
@@ -186,17 +233,53 @@ func (t *testDriverBase) awaitGlobalEgressIPStatus(client dynamic.ResourceInterf
 	Expect(status.AllocatedIPs).To(HaveLen(expNumIPS))
 
 	for _, ip := range status.AllocatedIPs {
-		Expect(isValidIPForCIDR(globalCIDR, ip)).To(BeTrue(), "Allocated global IP %q is not valid for CIDR %q", ip, globalCIDR)
+		Expect(isValidIPForCIDR(t.globalCIDR, ip)).To(BeTrue(), "Allocated global IP %q is not valid for CIDR %q",
+			ip, t.globalCIDR)
 	}
 
 	t.verifyIPsReservedInPool(status.AllocatedIPs...)
 }
 
-func (t *testDriverBase) awaitStatusAllocated(client dynamic.ResourceInterface, name, globalCIDR string, expNumIPS int) {
-	t.awaitGlobalEgressIPStatus(client, name, globalCIDR, expNumIPS, 0, metav1.Condition{
+func (t *testDriverBase) awaitEgressIPStatusAllocated(client dynamic.ResourceInterface, name string, expNumIPS int) {
+	t.awaitEgressIPStatus(client, name, expNumIPS, 0, metav1.Condition{
 		Type:   string(submarinerv1.GlobalEgressIPAllocated),
 		Status: metav1.ConditionTrue,
 	})
+}
+
+// nolint unparam - `atIndex` always receives `0` - remove once a caller passes non-zero
+func (t *testDriverBase) awaitIngressIPStatus(name string, atIndex int, expCond ...metav1.Condition) {
+	awaitStatusConditions(t.globalIngressIPs, name, atIndex, expCond...)
+
+	status := t.getGlobalIngressIPStatus(name)
+
+	Expect(status.AllocatedIP).ToNot(BeEmpty())
+	Expect(isValidIPForCIDR(t.globalCIDR, status.AllocatedIP)).To(BeTrue(), "Allocated global IP %q is not valid for CIDR %q",
+		status.AllocatedIP, t.globalCIDR)
+
+	t.verifyIPsReservedInPool(status.AllocatedIP)
+}
+
+func (t *testDriverBase) awaitIngressIPStatusAllocated(name string) {
+	t.awaitIngressIPStatus(name, 0, metav1.Condition{
+		Type:   string(submarinerv1.GlobalEgressIPAllocated),
+		Status: metav1.ConditionTrue,
+	})
+}
+
+func (t *testDriverBase) awaitGlobalIngressIP(name string) *submarinerv1.GlobalIngressIP {
+	obj := test.AwaitResource(t.globalIngressIPs, name)
+
+	gip := &submarinerv1.GlobalIngressIP{}
+	Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, gip)).To(Succeed())
+
+	return gip
+}
+
+// nolint unparam - `name` always receives `serviceName` (`"nginx"`)
+func (t *testDriverBase) awaitNoGlobalIngressIP(name string) {
+	time.Sleep(300 * time.Millisecond)
+	test.AwaitNoResource(t.globalIngressIPs, name)
 }
 
 func awaitStatusConditions(client dynamic.ResourceInterface, name string, atIndex int, expCond ...metav1.Condition) {
@@ -312,6 +395,30 @@ func newPod(namespace string) *corev1.Pod {
 		},
 		Status: corev1.PodStatus{
 			PodIP: "1.2.3.4",
+		},
+	}
+}
+
+func newClusterIPService() *corev1.Service {
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: serviceName,
+		},
+		Spec: corev1.ServiceSpec{
+			ClusterIP: "1.2.3.4",
+			Type:      corev1.ServiceTypeClusterIP,
+		},
+	}
+}
+
+func newHeadlessService(name string) *corev1.Service {
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: corev1.ServiceSpec{
+			ClusterIP: corev1.ClusterIPNone,
+			Type:      corev1.ServiceTypeClusterIP,
 		},
 	}
 }
