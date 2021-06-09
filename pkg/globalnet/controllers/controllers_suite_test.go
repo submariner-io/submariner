@@ -89,9 +89,9 @@ func newTestDriverBase() *testDriverBase {
 	t := &testDriverBase{
 		restMapper: test.GetRESTMapperFor(&submarinerv1.Endpoint{}, &corev1.Service{}, &corev1.Node{}, &corev1.Pod{},
 			&submarinerv1.GlobalEgressIP{}, &submarinerv1.ClusterGlobalEgressIP{}, &submarinerv1.GlobalIngressIP{}, &mcsv1a1.ServiceExport{}),
-		scheme:     runtime.NewScheme(),
-		ipt:        fakeIPT.New(),
-		globalCIDR: localCIDR,
+		scheme:       runtime.NewScheme(),
+		ipt:          fakeIPT.New(),
+		globalCIDR:   localCIDR,
 		localSubnets: stringset.NewSynchronized(),
 	}
 

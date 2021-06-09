@@ -15,7 +15,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package iptablesdriver
+package iptables
 
 import (
 	"fmt"
@@ -33,24 +33,24 @@ type Interface interface {
 	RemoveClusterEgressRules(sourceIP, snatIP, globalNetIPTableMark string) error
 }
 
-type IPTableIface struct {
+type ipTables struct {
 	ipt iptables.Interface
 }
 
-func NewIPTableInterface() (*IPTableIface, error) {
+func New() (Interface, error) {
 	iptableHandler, err := iptables.New()
 	if err != nil {
 		return nil, err
 	}
 
-	iptableIface := &IPTableIface{
+	iptableIface := &ipTables{
 		ipt: iptableHandler,
 	}
 
 	return iptableIface, nil
 }
 
-func (i *IPTableIface) AddClusterEgressRules(sourceIP, snatIP, globalNetIPTableMark string) error {
+func (i *ipTables) AddClusterEgressRules(sourceIP, snatIP, globalNetIPTableMark string) error {
 	ruleSpec := []string{"-p", "all", "-s", sourceIP, "-m", "mark", "--mark", globalNetIPTableMark, "-j", "SNAT", "--to", snatIP}
 	klog.V(log.DEBUG).Infof("Installing iptable egress rules for Cluster: %s", strings.Join(ruleSpec, " "))
 
@@ -61,7 +61,7 @@ func (i *IPTableIface) AddClusterEgressRules(sourceIP, snatIP, globalNetIPTableM
 	return nil
 }
 
-func (i *IPTableIface) RemoveClusterEgressRules(sourceIP, snatIP, globalNetIPTableMark string) error {
+func (i *ipTables) RemoveClusterEgressRules(sourceIP, snatIP, globalNetIPTableMark string) error {
 	ruleSpec := []string{"-p", "all", "-s", sourceIP, "-m", "mark", "--mark", globalNetIPTableMark, "-j", "SNAT", "--to", snatIP}
 	klog.V(log.DEBUG).Infof("Deleting iptable egress rules for Cluster: %s", strings.Join(ruleSpec, " "))
 

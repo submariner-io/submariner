@@ -23,7 +23,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/watcher"
-	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptablesdriver"
+	iptiface "github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	"github.com/submariner-io/submariner/pkg/iptables"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -96,7 +96,7 @@ type podWatcher struct {
 
 type clusterGlobalEgressIPController struct {
 	*baseIPAllocationController
-	iptIface     iptablesdriver.Interface
+	iptIface     iptiface.Interface
 	localSubnets stringset.Interface
 }
 
