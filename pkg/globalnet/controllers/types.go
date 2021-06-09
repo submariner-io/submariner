@@ -68,7 +68,7 @@ type gatewayMonitor struct {
 	isGatewayNode   bool
 	nodeName        string
 	syncMutex       sync.Mutex
-	localSubnets    stringset.Interface
+	localSubnets    []string
 	remoteSubnets   stringset.Interface
 	controllers     []Interface
 }
@@ -97,7 +97,7 @@ type podWatcher struct {
 type clusterGlobalEgressIPController struct {
 	*baseIPAllocationController
 	iptIface     iptiface.Interface
-	localSubnets stringset.Interface
+	localSubnets []string
 }
 
 type globalIngressIPController struct {

@@ -60,7 +60,7 @@ var _ = Describe("Endpoint monitoring", func() {
 		})
 
 		It("should start the controllers", func() {
-			t.awaitClusterGlobalEgressIPStatusAllocated(controllers.ClusterGlobalEgressIPName, 1)
+			t.awaitClusterGlobalEgressIPStatusAllocated(1)
 
 			t.createGlobalEgressIP(newGlobalEgressIP(globalEgressIPName, nil, nil))
 			t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, 1)
@@ -71,7 +71,7 @@ var _ = Describe("Endpoint monitoring", func() {
 
 		Context("and then removed", func() {
 			JustBeforeEach(func() {
-				t.awaitClusterGlobalEgressIPStatusAllocated(controllers.ClusterGlobalEgressIPName, 1)
+				t.awaitClusterGlobalEgressIPStatusAllocated(1)
 
 				Expect(t.endpoints.Delete(context.TODO(), endpointName, metav1.DeleteOptions{})).To(Succeed())
 			})
