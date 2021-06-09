@@ -18,6 +18,7 @@ limitations under the License.
 package controllers_test
 
 import (
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -26,6 +27,7 @@ import (
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/ipam"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -35,7 +37,15 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 	When("the well-known ClusterGlobalEgressIP does not exist on startup", func() {
 		It("should create it and allocate the global IP", func() {
 			t.awaitClusterGlobalEgressIPStatusAllocated(controllers.ClusterGlobalEgressIPName, 1)
-			// TODO - verify IP tables
+			// Verify that IPtable rule is programmed in SM-GN-EGRESS-CLUSTER chain with allocatedIPs
+			t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChainForCluster,
+				ContainSubstring(getGlobalEgressIPStatus(t.clusterGlobalEgressIPs,
+					controllers.ClusterGlobalEgressIPName).AllocatedIPs[0]))
+
+			for _, localSubnet := range t.localSubnets.Elements() {
+				t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChainForCluster,
+					ContainSubstring(localSubnet))
+			}
 		})
 	})
 
@@ -61,7 +71,21 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 		})
 
 		It("should reserve the previously allocated IPs", func() {
+			Consistently(getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, existing.Name).AllocatedIPs, 200*time.Millisecond).ShouldNot(BeEmpty())
 			t.verifyIPsReservedInPool(getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, existing.Name).AllocatedIPs...)
+		})
+
+		It("should program the necessary IPTable rules for the allocated IPs", func() {
+			allocatedIPs := getGlobalEgressIPStatus(t.clusterGlobalEgressIPs,
+				controllers.ClusterGlobalEgressIPName).AllocatedIPs
+			targetSNATIP := fmt.Sprintf("%s-%s", allocatedIPs[0], allocatedIPs[len(allocatedIPs)-1])
+			t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChainForCluster,
+				ContainSubstring(targetSNATIP))
+
+			for _, localSubnet := range t.localSubnets.Elements() {
+				t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChainForCluster,
+					ContainSubstring(localSubnet))
+			}
 		})
 	})
 
@@ -105,6 +129,8 @@ func newClusterGlobalEgressIPControllerTestDriver() *clusterGlobalEgressIPContro
 func (t *clusterGlobalEgressIPControllerTestDriver) start() {
 	var err error
 
+	t.localSubnets.AddAll("10.0.0.0/16", "100.0.0.0/16")
+
 	t.pool, err = ipam.NewIPPool(t.globalCIDR)
 	Expect(err).To(Succeed())
 
@@ -112,7 +138,7 @@ func (t *clusterGlobalEgressIPControllerTestDriver) start() {
 		SourceClient: t.dynClient,
 		RestMapper:   t.restMapper,
 		Scheme:       t.scheme,
-	}, t.pool)
+	}, t.localSubnets, t.pool)
 
 	Expect(err).To(Succeed())
 	Expect(t.controller.Start()).To(Succeed())

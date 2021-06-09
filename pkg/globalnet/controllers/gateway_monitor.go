@@ -43,13 +43,16 @@ import (
 	"k8s.io/klog"
 )
 
-func NewGatewayMonitor(spec Specification, config watcher.Config) (Interface, error) {
+func NewGatewayMonitor(spec Specification, localCIDRs []string, config watcher.Config) (Interface, error) {
 	gatewayMonitor := &gatewayMonitor{
 		baseController: newBaseController(),
 		spec:           spec,
 		isGatewayNode:  false,
+		localSubnets:   stringset.NewSynchronized(),
 		remoteSubnets:  stringset.NewSynchronized(),
 	}
+
+	gatewayMonitor.localSubnets.AddAll(localCIDRs...)
 
 	var err error
 
@@ -142,7 +145,8 @@ func (g *gatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, numR
 	klog.V(log.DEBUG).Infof("In processNextEndpoint, endpoint info: %+v", endpoint)
 
 	if endpoint.Spec.ClusterID != g.spec.ClusterID {
-		klog.V(log.DEBUG).Infof("Endpoint %s belongs to a remote cluster", endpoint.Spec.Hostname)
+		klog.V(log.DEBUG).Infof("Endpoint %q, host: %q belongs to a remote cluster",
+			endpoint.Spec.ClusterID, endpoint.Spec.Hostname)
 
 		overlap, err := cidr.IsOverlapping(endpoint.Spec.Subnets, g.spec.GlobalCIDR[0])
 		if err != nil {
@@ -249,7 +253,7 @@ func (g *gatewayMonitor) startControllers() error {
 
 	g.controllers = nil
 
-	c, err := NewClusterGlobalEgressIPController(*g.syncerConfig, pool)
+	c, err := NewClusterGlobalEgressIPController(*g.syncerConfig, g.localSubnets, pool)
 	if err != nil {
 		return errors.WithMessage(err, "error creating the ClusterGlobalEgressIP controller")
 	}

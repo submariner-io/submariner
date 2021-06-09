@@ -247,7 +247,7 @@ func checkStatusChanged(oldStatus, newStatus interface{}, retObj runtime.Object)
 		return nil
 	}
 
-	klog.V(log.DEBUG).Infof("Updated: %#v", newStatus)
+	klog.V(log.TRACE).Infof("Updated: %#v", newStatus)
 
 	return retObj
 }

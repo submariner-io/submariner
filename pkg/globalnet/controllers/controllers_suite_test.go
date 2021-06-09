@@ -27,6 +27,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
+	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
@@ -74,6 +75,7 @@ type testDriverBase struct {
 	scheme                 *runtime.Scheme
 	ipt                    *fakeIPT.IPTables
 	pool                   *ipam.IPPool
+	localSubnets           stringset.Interface
 	globalCIDR             string
 	globalEgressIPs        dynamic.ResourceInterface
 	clusterGlobalEgressIPs dynamic.ResourceInterface
@@ -87,9 +89,10 @@ func newTestDriverBase() *testDriverBase {
 	t := &testDriverBase{
 		restMapper: test.GetRESTMapperFor(&submarinerv1.Endpoint{}, &corev1.Service{}, &corev1.Node{}, &corev1.Pod{},
 			&submarinerv1.GlobalEgressIP{}, &submarinerv1.ClusterGlobalEgressIP{}, &submarinerv1.GlobalIngressIP{}, &mcsv1a1.ServiceExport{}),
-		scheme:     runtime.NewScheme(),
-		ipt:        fakeIPT.New(),
-		globalCIDR: localCIDR,
+		scheme:       runtime.NewScheme(),
+		ipt:          fakeIPT.New(),
+		globalCIDR:   localCIDR,
+		localSubnets: stringset.NewSynchronized(),
 	}
 
 	Expect(mcsv1a1.AddToScheme(t.scheme)).To(Succeed())
