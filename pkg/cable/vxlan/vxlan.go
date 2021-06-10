@@ -45,7 +45,7 @@ const (
 	VxlanVTepNetworkPrefix = 241
 	CableDriverName        = "vxlan"
 	TableID                = 100
-	defaultNATTPort        = 4500
+	defaultPort            = 4500
 )
 
 type Operation int
@@ -91,7 +91,7 @@ func NewDriver(localEndpoint types.SubmarinerEndpoint, localCluster types.Submar
 		netLink:       netlinkAPI.New(),
 	}
 
-	port, err := localEndpoint.Spec.GetBackendPort(v1.UDPPortConfig, defaultNATTPort)
+	port, err := localEndpoint.Spec.GetBackendPort(v1.UDPPortConfig, defaultPort)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get the UDP port configuration: %v", err)
 	}
@@ -328,8 +328,17 @@ func (v *vxlan) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoint) 
 	v.mutex.Lock()
 	defer v.mutex.Unlock()
 
-	// parse remote addresses and allowed IPs
-	ip := submarinerEndpointIP(&remoteEndpoint)
+	var ip string
+
+	for _, connection := range v.connections {
+		if connection.Endpoint.CableName == remoteEndpoint.Spec.CableName {
+			ip = connection.UsingIP
+		}
+	}
+
+	if ip == "" {
+		return fmt.Errorf("failed to get remote IP %s", remoteEndpoint.Spec.CableName)
+	}
 
 	remoteIP := net.ParseIP(ip)
 
@@ -508,14 +517,6 @@ func (v *vxlan) Init() error {
 
 func (v *vxlan) GetName() string {
 	return CableDriverName
-}
-
-func submarinerEndpointIP(ep *types.SubmarinerEndpoint) string {
-	if ep.Spec.NATEnabled {
-		return ep.Spec.PublicIP
-	}
-
-	return ep.Spec.PrivateIP
 }
 
 // parse CIDR string and skip errors
