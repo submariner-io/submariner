@@ -48,11 +48,9 @@ func NewGatewayMonitor(spec Specification, localCIDRs []string, config watcher.C
 		baseController: newBaseController(),
 		spec:           spec,
 		isGatewayNode:  false,
-		localSubnets:   stringset.NewSynchronized(),
+		localSubnets:   stringset.New(localCIDRs...).Elements(),
 		remoteSubnets:  stringset.NewSynchronized(),
 	}
-
-	gatewayMonitor.localSubnets.AddAll(localCIDRs...)
 
 	var err error
 

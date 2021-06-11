@@ -22,7 +22,6 @@ import (
 	"fmt"
 
 	"github.com/submariner-io/admiral/pkg/federate"
-	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
 	"github.com/submariner-io/admiral/pkg/watcher"
@@ -247,7 +246,7 @@ func checkStatusChanged(oldStatus, newStatus interface{}, retObj runtime.Object)
 		return nil
 	}
 
-	klog.V(log.TRACE).Infof("Updated: %#v", newStatus)
+	klog.Infof("Updated: %#v", newStatus)
 
 	return retObj
 }
