@@ -337,7 +337,8 @@ func (v *vxlan) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoint) 
 	}
 
 	if ip == "" {
-		return fmt.Errorf("failed to get remote IP %s", remoteEndpoint.Spec.CableName)
+		klog.Errorf("Cannot disconnect remote endpoint %q - no prior connection entry found", remoteEndpoint.Spec.CableName)
+		return nil
 	}
 
 	remoteIP := net.ParseIP(ip)
