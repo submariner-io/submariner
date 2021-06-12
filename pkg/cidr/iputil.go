@@ -18,8 +18,48 @@ limitations under the License.
 package cidr
 
 import (
+	"fmt"
 	"net"
+
+	"k8s.io/klog"
 )
+
+func OverlappingSubnets(localServiceCIDRs, localPodCIDRs, remoteSubnets []string) error {
+	// If the remoteSubnets [*] overlap with local cluster Pod/Service CIDRs we
+	// should not update the IPTable rules on the host, as it will disrupt the
+	// functionality of the local cluster. So, lets validate that subnets do not
+	// overlap before we program any IPTable rules on the host for inter-cluster
+	// traffic.
+	// [*] Note: In a non-GlobalNet deployment, remoteSubnets will be a list of
+	// Pod/Service CIDRs, whereas in a GlobalNet deployment, it will be a list of
+	// globalCIDRs allocated to the clusters.
+	for _, serviceCidr := range localServiceCIDRs {
+		overlap, err := IsOverlapping(remoteSubnets, serviceCidr)
+		if err != nil {
+			// Ideally this case will never hit, as the subnets are valid CIDRs
+			klog.Warningf("unable to validate overlapping Service CIDR: %s", err)
+		}
+
+		if overlap {
+			return fmt.Errorf("local Service CIDR %q, overlaps with remote cluster subnets %s",
+				serviceCidr, remoteSubnets)
+		}
+	}
+
+	for _, podCidr := range localPodCIDRs {
+		overlap, err := IsOverlapping(remoteSubnets, podCidr)
+		if err != nil {
+			klog.Warningf("unable to validate overlapping Pod CIDR: %s", err)
+		}
+
+		if overlap {
+			return fmt.Errorf("local Pod CIDR %q, overlaps with remote cluster subnets %s",
+				podCidr, remoteSubnets)
+		}
+	}
+
+	return nil
+}
 
 func IsOverlapping(cidrList []string, cidr string) (bool, error) {
 	_, newNet, err := net.ParseCIDR(cidr)
