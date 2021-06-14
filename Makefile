@@ -3,6 +3,7 @@ FOCUS ?=
 SKIP ?=
 PLUGIN ?=
 BASE_BRANCH ?= devel
+PROTOC_VERSION=3.15.5
 export BASE_BRANCH
 
 ifneq (,$(DAPPER_HOST_ARCH))
@@ -57,8 +58,16 @@ unit: pkg/natdiscovery/proto/natdiscovery.pb.go
 reload-images: build images
 	./scripts/$@ --restart $(restart)
 
-%.pb.go: %.proto
-	protoc --go_out=/go/src $<
+%.pb.go: %.proto $(GOPATH)/bin/protoc-gen-go bin/protoc
+	bin/protoc --go_out=/go/src $<
+
+$(GOPATH)/bin/protoc-gen-go:
+	GO111MODULE=off go get google.golang.org/protobuf/cmd/protoc-gen-go
+
+bin/protoc:
+	curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v$(PROTOC_VERSION)/protoc-$(PROTOC_VERSION)-linux-x86_64.zip
+	unzip protoc-$(PROTOC_VERSION)-linux-x86_64.zip 'bin/*' 'include/*'
+	rm -f protoc-$(PROTOC_VERSION)-linux-x86_64.zip
 
 bin/%/submariner-gateway: vendor/modules.txt main.go $(shell find pkg -not \( -path 'pkg/globalnet*' -o -path 'pkg/routeagent*' \)) pkg/natdiscovery/proto/natdiscovery.pb.go
 	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ main.go $(BUILD_ARGS)
@@ -87,8 +96,12 @@ IMAGES_ARGS = --platform $(subst $(space),$(comma),$(foreach arch,$(subst $(comm
 build: $(ARCH_BINARIES)
 
 licensecheck: BUILD_ARGS=--debug
-licensecheck: $(ARCH_BINARIES)
-	lichen -c .lichen.yaml $(ARCH_BINARIES)
+licensecheck: $(ARCH_BINARIES) bin/lichen
+	bin/lichen -c .lichen.yaml $(ARCH_BINARIES)
+
+bin/lichen: vendor/modules.txt
+	mkdir -p $(@D)
+	go build -o $@ github.com/uw-labs/lichen
 
 ci: validate unit build images
 
