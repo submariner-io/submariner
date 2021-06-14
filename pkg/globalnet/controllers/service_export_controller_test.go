@@ -35,6 +35,7 @@ var _ = Describe("ServiceExport controller", func() {
 
 	When("an existing cluster IP Service is exported", func() {
 		BeforeEach(func() {
+			t.createIPTableChain("nat", kubeProxyIPTableChainName)
 			t.createServiceExport(t.createService(newClusterIPService()))
 		})
 
@@ -70,6 +71,7 @@ var _ = Describe("ServiceExport controller", func() {
 		BeforeEach(func() {
 			service = newClusterIPService()
 			t.createServiceExport(service)
+			t.createIPTableChain("nat", kubeProxyIPTableChainName)
 		})
 
 		It("should eventually create a GlobalIngressIP", func() {

@@ -113,7 +113,7 @@ func (c *serviceExportController) onCreate(serviceExport *mcsv1a1.ServiceExport)
 	}
 
 	if !chainExists {
-		klog.Errorf("Kubeproxy chain for service %q does not exist yet", key)
+		klog.Infof("Kubeproxy chain for service %q does not exist yet", key)
 		return nil, true
 	}
 

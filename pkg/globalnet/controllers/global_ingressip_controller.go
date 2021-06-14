@@ -146,7 +146,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 			return true
 		}
 
-		err = c.iptIface.UpdateIngressRulesForService(ips[0], chainName, AddRules)
+		err = c.iptIface.AddIngressRulesForService(ips[0], chainName)
 		if err != nil {
 			klog.Errorf("Error while programming Service %q ingress rules. %v", key, err)
 
@@ -184,7 +184,7 @@ func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngre
 			return nil, true
 		}
 
-		err := c.iptIface.UpdateIngressRulesForService(ingressIP.Status.AllocatedIP, chainName, DeleteRules)
+		err := c.iptIface.RemoveIngressRulesForService(ingressIP.Status.AllocatedIP, chainName)
 		if err != nil {
 			klog.Errorf("Error while deleting Service %q ingress rules. %v", key, err)
 			return nil, true
@@ -200,11 +200,8 @@ func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngre
 }
 
 func (c *globalIngressIPController) reserveAllocatedIPsAndSyncRules(obj *unstructured.Unstructured) error {
-	ingressIPName, _, _ := unstructured.NestedString(obj.Object, "metadata", "name")
-	namespace, _, _ := unstructured.NestedString(obj.Object, "metadata", "namespace")
-	key := fmt.Sprintf("%s/%s", namespace, ingressIPName)
-	annotations, _, _ := unstructured.NestedStringMap(obj.Object, "metadata", "annotations")
-	chainName := annotations[kubeProxyIPTableChainAnnotation]
+	key, _ := cache.MetaNamespaceKeyFunc(obj)
+	chainName := obj.GetAnnotations()[kubeProxyIPTableChainAnnotation]
 	if chainName == "" {
 		return fmt.Errorf("%q annotation is missing for %q", kubeProxyIPTableChainAnnotation, key)
 	}
@@ -219,7 +216,7 @@ func (c *globalIngressIPController) reserveAllocatedIPsAndSyncRules(obj *unstruc
 			return fmt.Errorf("error allocating IPs %v for %q: %v", allocatedIP, key, err)
 		}
 
-		err = c.iptIface.UpdateIngressRulesForService(allocatedIP, chainName, AddRules)
+		err = c.iptIface.AddIngressRulesForService(allocatedIP, chainName)
 		if err != nil {
 			klog.Errorf("Error while programming Service %q ingress rules. %v", key, err)
 

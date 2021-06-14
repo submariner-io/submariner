@@ -34,7 +34,8 @@ import (
 type Interface interface {
 	AddClusterEgressRules(sourceIP, snatIP, globalNetIPTableMark string) error
 	RemoveClusterEgressRules(sourceIP, snatIP, globalNetIPTableMark string) error
-	UpdateIngressRulesForService(globalIP, chainName string, addRules bool) error
+	AddIngressRulesForService(globalIP, chainName string) error
+	RemoveIngressRulesForService(globalIP, chainName string) error
 	GetkubeProxyClusterIPServiceChainName(service *corev1.Service, kubeProxyServiceChainPrefix string) (string, bool, error)
 }
 
@@ -93,25 +94,32 @@ func (i *ipTables) ipTableChainExists(table, chain string) (bool, error) {
 	return false, nil
 }
 
-func (i *ipTables) UpdateIngressRulesForService(globalIP, chainName string, addRules bool) error {
+func (i *ipTables) AddIngressRulesForService(globalIP, chainName string) error {
+	if globalIP == "" || chainName == "" {
+		return fmt.Errorf("globalIP %q or chainName %q cannot be empty", globalIP, chainName)
+	}
+
+	ruleSpec := []string{"-d", globalIP, "-j", chainName}
+	klog.V(log.DEBUG).Infof("Installing iptables rule for Service %s", strings.Join(ruleSpec, " "))
+
+	if err := i.ipt.AppendUnique("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
+		return fmt.Errorf("error appending iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
+	}
+
+	return nil
+}
+
+func (i *ipTables) RemoveIngressRulesForService(globalIP, chainName string) error {
 	if globalIP == "" || chainName == "" {
 		return fmt.Errorf("globalIP %q or chainName %q cannot be empty", globalIP, chainName)
 	}
 
 	ruleSpec := []string{"-d", globalIP, "-j", chainName}
 
-	if addRules {
-		klog.V(log.DEBUG).Infof("Installing iptables rule for Service %s", strings.Join(ruleSpec, " "))
+	klog.V(log.DEBUG).Infof("Deleting iptable ingress rule for Service: %s", strings.Join(ruleSpec, " "))
 
-		if err := i.ipt.AppendUnique("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
-			return fmt.Errorf("error appending iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
-		}
-	} else {
-		klog.V(log.DEBUG).Infof("Deleting iptable ingress rule for Service: %s", strings.Join(ruleSpec, " "))
-
-		if err := i.ipt.Delete("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
-			return fmt.Errorf("error deleting iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
-		}
+	if err := i.ipt.Delete("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
+		return fmt.Errorf("error deleting iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
 	}
 
 	return nil

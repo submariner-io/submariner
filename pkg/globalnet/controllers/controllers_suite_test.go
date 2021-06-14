@@ -39,6 +39,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	fakeDynClient "k8s.io/client-go/dynamic/fake"
@@ -48,11 +49,12 @@ import (
 )
 
 const (
-	namespace           = "submariner"
-	localCIDR           = "169.254.1.0/24"
-	globalEgressIPName  = "east-region"
-	globalIngressIPName = "db-service-ingress-ip"
-	serviceName         = "nginx"
+	namespace                 = "submariner"
+	localCIDR                 = "169.254.1.0/24"
+	globalEgressIPName        = "east-region"
+	globalIngressIPName       = "db-service-ingress-ip"
+	kubeProxyIPTableChainName = "KUBE-SVC-Y7DIXXI5PNAUV7FB"
+	serviceName               = "nginx"
 )
 
 func init() {
@@ -184,6 +186,10 @@ func (t *testDriverBase) createServiceExport(s *corev1.Service) {
 			Namespace: s.GetNamespace(),
 		},
 	})
+}
+
+func (t *testDriverBase) createIPTableChain(table, chain string) {
+	_ = t.ipt.NewChain(table, chain)
 }
 
 func (t *testDriverBase) getGlobalIngressIPStatus(name string) *submarinerv1.GlobalIngressIPStatus {
@@ -404,6 +410,12 @@ func newClusterIPService() *corev1.Service {
 		Spec: corev1.ServiceSpec{
 			ClusterIP: "1.2.3.4",
 			Type:      corev1.ServiceTypeClusterIP,
+			Ports: []corev1.ServicePort{{
+				Name:       serviceName,
+				Port:       int32(8080),
+				TargetPort: intstr.FromInt(8080),
+				Protocol:   corev1.ProtocolTCP,
+			}},
 		},
 	}
 }
