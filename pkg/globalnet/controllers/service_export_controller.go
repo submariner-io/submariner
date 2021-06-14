@@ -20,10 +20,12 @@ package controllers
 import (
 	"context"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,7 +57,7 @@ func NewServiceExportController(config syncer.ResourceSyncerConfig) (Interface, 
 		SourceClient:    config.SourceClient,
 		SourceNamespace: corev1.NamespaceAll,
 		RestMapper:      config.RestMapper,
-		Federator:       federate.NewCreateOrUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll, ""),
+		Federator:       federate.NewCreateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll),
 		Scheme:          config.Scheme,
 		Transform:       controller.process,
 	})
@@ -63,6 +65,13 @@ func NewServiceExportController(config syncer.ResourceSyncerConfig) (Interface, 
 	if err != nil {
 		return nil, err
 	}
+
+	iptIface, err := iptables.New()
+	if err != nil {
+		return nil, errors.WithMessage(err, "error creating the IPTablesInterface handler")
+	}
+
+	controller.iptIface = iptIface
 
 	return controller, nil
 }
@@ -97,10 +106,24 @@ func (c *serviceExportController) onCreate(serviceExport *mcsv1a1.ServiceExport)
 
 	klog.Infof("Processing ServiceExport %q", key)
 
+	chainName, chainExists, err := c.iptIface.GetkubeProxyClusterIPServiceChainName(service, kubeProxyServiceChainPrefix)
+	if err != nil {
+		klog.Errorf("Error checking for kube-proxy chain for service %q", key)
+		return nil, true
+	}
+
+	if !chainExists {
+		klog.Errorf("Kubeproxy chain for service %q does not exist yet", key)
+		return nil, true
+	}
+
 	ingressIP := &submarinerv1.GlobalIngressIP{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceExport.Name,
 			Namespace: serviceExport.Namespace,
+			Annotations: map[string]string{
+				kubeProxyIPTableChainAnnotation: chainName,
+			},
 		},
 	}
 
