@@ -39,6 +39,9 @@ var _ = Describe("GlobalIngressIP controller", func() {
 			t.createGlobalIngressIP(&submarinerv1.GlobalIngressIP{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: globalIngressIPName,
+					Annotations: map[string]string{
+						"submariner.io/kubeproxy-iptablechain": "KUBE-SVC-2ZZBI6IPYTEST",
+					},
 				},
 				Spec: submarinerv1.GlobalIngressIPSpec{
 					Target: submarinerv1.ClusterIPService,
@@ -94,6 +97,9 @@ var _ = Describe("GlobalIngressIP controller", func() {
 			existing = &submarinerv1.GlobalIngressIP{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: globalIngressIPName,
+					Annotations: map[string]string{
+						"submariner.io/kubeproxy-iptablechain": "KUBE-SVC-2ZZBI6IPYTEST",
+					},
 				},
 				Spec: submarinerv1.GlobalIngressIPSpec{
 					Target: submarinerv1.ClusterIPService,

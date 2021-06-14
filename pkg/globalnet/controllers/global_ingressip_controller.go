@@ -21,13 +21,17 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
+	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
@@ -47,20 +51,26 @@ func NewGlobalIngressIPController(config syncer.ResourceSyncerConfig, pool *ipam
 		return nil, err
 	}
 
+	iptIface, err := iptables.New()
+	if err != nil {
+		return nil, errors.WithMessage(err, "error creating the IPTablesInterface handler")
+	}
+
+	controller.iptIface = iptIface
+
 	client := config.SourceClient.Resource(*gvr).Namespace(corev1.NamespaceAll)
 	list, err := client.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	federator := federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
-
 	for i := range list.Items {
-		err = controller.reserveAllocatedIPs(federator, &list.Items[i])
-		if err != nil {
-			return nil, err
+		if err := controller.reserveAllocatedIPsAndSyncRules(&list.Items[i]); err != nil {
+			klog.Errorf("Error reserving allocated GlobalIPs: %v", err)
 		}
 	}
+
+	federator := federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
 
 	controller.resourceSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
 		Name:                "GlobalIngressIP syncer",
@@ -94,8 +104,6 @@ func (c *globalIngressIPController) process(from runtime.Object, numRequeues int
 		requeue := c.onCreate(ingressIP)
 
 		return checkStatusChanged(&prevStatus, &ingressIP.Status, ingressIP), requeue
-	case syncer.Update:
-		// TODO handle update
 	case syncer.Delete:
 		return c.onDelete(ingressIP)
 	}
@@ -104,6 +112,7 @@ func (c *globalIngressIPController) process(from runtime.Object, numRequeues int
 }
 
 func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngressIP) bool {
+	// If Ingress GlobalIP is already allocated, simply return.
 	if ingressIP.Status.AllocatedIP != "" {
 		return false
 	}
@@ -125,9 +134,29 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 		return true
 	}
 
-	// TODO - remove IP table rules for previous allocated IP
+	if ingressIP.Spec.Target == submarinerv1.ClusterIPService && ingressIP.Spec.ServiceRef != nil {
+		chainName := ingressIP.GetAnnotations()[kubeProxyIPTableChainAnnotation]
+		if chainName == "" {
+			klog.Warningf("%q annotation is missing on %q", kubeProxyIPTableChainAnnotation, key)
 
-	// TODO - add IP table rules for the new allocated IP
+			if err := c.pool.Release(ips...); err != nil {
+				klog.Errorf("Error while releasing the global IPs: %v", err)
+			}
+
+			return true
+		}
+
+		err = c.iptIface.UpdateIngressRulesForService(ips[0], chainName, AddRules)
+		if err != nil {
+			klog.Errorf("Error while programming Service %q ingress rules. %v", key, err)
+
+			if err := c.pool.Release(ips...); err != nil {
+				klog.Errorf("Sync rules failed and error while releasing the global IPs: %v", err)
+			}
+
+			return true
+		}
+	}
 
 	ingressIP.Status.AllocatedIP = ips[0]
 
@@ -148,12 +177,59 @@ func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngre
 
 	key, _ := cache.MetaNamespaceKeyFunc(ingressIP)
 
+	if ingressIP.Spec.ServiceRef != nil {
+		chainName := ingressIP.GetAnnotations()[kubeProxyIPTableChainAnnotation]
+		if chainName == "" {
+			klog.Warningf("%q annotation is missing on %q", kubeProxyIPTableChainAnnotation, key)
+			return nil, true
+		}
+
+		err := c.iptIface.UpdateIngressRulesForService(ingressIP.Status.AllocatedIP, chainName, DeleteRules)
+		if err != nil {
+			klog.Errorf("Error while deleting Service %q ingress rules. %v", key, err)
+			return nil, true
+		}
+	}
+
 	err := c.pool.Release(ingressIP.Status.AllocatedIP)
 	if err != nil {
 		klog.Errorf("Error releasing IP %s for GlobalIngressIP %q", ingressIP.Status.AllocatedIP, key)
 	}
 
-	// TODO - remove IP table rules for the allocated IP
+	return ingressIP, false
+}
 
-	return nil, false
+func (c *globalIngressIPController) reserveAllocatedIPsAndSyncRules(obj *unstructured.Unstructured) error {
+	ingressIPName, _, _ := unstructured.NestedString(obj.Object, "metadata", "name")
+	namespace, _, _ := unstructured.NestedString(obj.Object, "metadata", "namespace")
+	key := fmt.Sprintf("%s/%s", namespace, ingressIPName)
+	annotations, _, _ := unstructured.NestedStringMap(obj.Object, "metadata", "annotations")
+	chainName := annotations[kubeProxyIPTableChainAnnotation]
+	if chainName == "" {
+		return fmt.Errorf("%q annotation is missing for %q", kubeProxyIPTableChainAnnotation, key)
+	}
+
+	allocatedIP, _, _ := unstructured.NestedString(obj.Object, "status", "allocatedIP")
+	if allocatedIP != "" {
+		klog.V(log.DEBUG).Infof("Reserving allocatedIPs %v for %q", allocatedIP, key)
+
+		err := c.pool.Reserve(allocatedIP)
+		if err != nil {
+			// TODO: null out the allocatedIPs and update the status.Conditions in the object
+			return fmt.Errorf("error allocating IPs %v for %q: %v", allocatedIP, key, err)
+		}
+
+		err = c.iptIface.UpdateIngressRulesForService(allocatedIP, chainName, AddRules)
+		if err != nil {
+			klog.Errorf("Error while programming Service %q ingress rules. %v", key, err)
+
+			if err := c.pool.Release(allocatedIP); err != nil {
+				klog.Errorf("Error while releasing the global IPs: %v", err)
+			}
+			// TODO: null out the allocatedIPs and update the status.Conditions
+			return err
+		}
+	}
+
+	return nil
 }
