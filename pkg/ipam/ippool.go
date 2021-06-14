@@ -174,6 +174,10 @@ func (p *IPPool) Release(ips ...string) error {
 
 func (p *IPPool) Reserve(ips ...string) error {
 	num := len(ips)
+	if num == 0 {
+		return nil
+	}
+
 	intIPs := make([]int, num)
 
 	p.Lock()

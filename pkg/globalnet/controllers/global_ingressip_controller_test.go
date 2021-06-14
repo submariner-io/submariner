@@ -56,7 +56,7 @@ var _ = Describe("GlobalIngressIP controller", func() {
 		It("should successfully allocate a global IP", func() {
 			t.awaitIngressIPStatusAllocated(globalIngressIPName)
 			allocatedIP := t.getGlobalIngressIPStatus(globalIngressIPName).AllocatedIP
-			t.awaitIPTableRules(allocatedIP, kubeProxyIPTableChainName)
+			t.awaitIPTableRules(allocatedIP)
 		})
 
 		Context("with the IP pool exhausted", func() {
@@ -86,7 +86,7 @@ var _ = Describe("GlobalIngressIP controller", func() {
 
 			It("should release the allocated global IP", func() {
 				t.awaitIPsReleasedFromPool(allocatedIP)
-				t.awaitNoIPTableRules(allocatedIP, kubeProxyIPTableChainName)
+				t.awaitNoIPTableRules(allocatedIP)
 			})
 		})
 	})
@@ -134,7 +134,27 @@ var _ = Describe("GlobalIngressIP controller", func() {
 			})
 
 			It("should program the relevant iptable rules", func() {
-				t.awaitIPTableRules(existing.Status.AllocatedIP, kubeProxyIPTableChainName)
+				t.awaitIPTableRules(existing.Status.AllocatedIP)
+			})
+
+			Context("and it's already reserved", func() {
+				BeforeEach(func() {
+					Expect(t.pool.Reserve(existing.Status.AllocatedIP)).To(Succeed())
+				})
+
+				It("should reallocate the global IP", func() {
+					t.awaitIngressIPStatus(globalIngressIPName, 0,
+						metav1.Condition{
+							Type:   string(submarinerv1.GlobalEgressIPAllocated),
+							Status: metav1.ConditionFalse,
+							Reason: "ReserveAllocatedIPsFailed",
+						}, metav1.Condition{
+							Type:   string(submarinerv1.GlobalEgressIPAllocated),
+							Status: metav1.ConditionTrue,
+						})
+
+					t.awaitIPTableRules(t.getGlobalIngressIPStatus(globalIngressIPName).AllocatedIP)
+				})
 			})
 		})
 
@@ -145,7 +165,7 @@ var _ = Describe("GlobalIngressIP controller", func() {
 
 			It("should allocate it and program the relevant iptable rules", func() {
 				t.awaitIngressIPStatusAllocated(globalIngressIPName)
-				t.awaitIPTableRules(existing.Status.AllocatedIP, kubeProxyIPTableChainName)
+				t.awaitIPTableRules(existing.Status.AllocatedIP)
 			})
 		})
 	})
@@ -191,10 +211,10 @@ func (t *globalIngressIPControllerTestDriver) start() {
 	Expect(t.controller.Start()).To(Succeed())
 }
 
-func (t *globalIngressIPControllerTestDriver) awaitIPTableRules(ip, chainName string) {
-	t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain, And(ContainSubstring(ip), ContainSubstring(chainName)))
+func (t *globalIngressIPControllerTestDriver) awaitIPTableRules(ip string) {
+	t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain, And(ContainSubstring(ip), ContainSubstring(kubeProxyIPTableChainName)))
 }
 
-func (t *globalIngressIPControllerTestDriver) awaitNoIPTableRules(ip, chainName string) {
-	t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, Or(ContainSubstring(ip), ContainSubstring(chainName)))
+func (t *globalIngressIPControllerTestDriver) awaitNoIPTableRules(ip string) {
+	t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, Or(ContainSubstring(ip), ContainSubstring(kubeProxyIPTableChainName)))
 }

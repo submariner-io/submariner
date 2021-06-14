@@ -32,7 +32,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
@@ -82,11 +81,12 @@ func NewClusterGlobalEgressIPController(config syncer.ResourceSyncerConfig, loca
 	}
 
 	if obj != nil {
-		allocatedIPs, ok, _ := unstructured.NestedStringSlice(obj.Object, "status", "allocatedIPs")
-		if ok {
-			if err := controller.reserveAllocatedIPsAndSyncRules(defaultEgressIP.Name, allocatedIPs); err != nil {
-				klog.Errorf("Error reserving allocated GlobalIPs for %q: %v", defaultEgressIP.Name, err)
-			}
+		err := controller.reserveAllocatedIPs(federator, obj, func(reservedIPs []string) error {
+			return controller.programClusterGlobalEgressRules(reservedIPs)
+		})
+
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -174,26 +174,6 @@ func (c *clusterGlobalEgressIPController) validate(numberOfIPs int, egressIP *su
 	}
 
 	return true
-}
-
-func (c *clusterGlobalEgressIPController) reserveAllocatedIPsAndSyncRules(key string, allocatedIPs []string) error {
-	if len(allocatedIPs) > 0 {
-		klog.V(log.DEBUG).Infof("Reserving allocatedIPs %v for %q", allocatedIPs, key)
-
-		err := c.pool.Reserve(allocatedIPs...)
-		if err != nil {
-			// TODO: null out the allocatedIPs and update the status.Conditions
-			return fmt.Errorf("error allocating IPs %v for %q: %v", allocatedIPs, key, err)
-		}
-
-		if err := c.programClusterGlobalEgressRules(allocatedIPs); err != nil {
-			_ = c.pool.Release(allocatedIPs...)
-			// TODO: null out the allocatedIPs and update the status.Conditions
-			return fmt.Errorf("error syncing the IPTable rules on the node for %q: %v", key, err)
-		}
-	}
-
-	return nil
 }
 
 func (c *clusterGlobalEgressIPController) onCreateOrUpdate(key string, numberOfIPs int, status *submarinerv1.GlobalEgressIPStatus) bool {
