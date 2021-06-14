@@ -1,6 +1,7 @@
 .idea
 .dapper
 /bin
+/include
 /package/.image.*
 dist
 output
@@ -10,6 +11,6 @@ output
 *.coverprofile
 junit.xml
 scripts/broker-info.subm*
-Dockerfile.dapper[0-9]*
+Dockerfile.*
 .shflags
 Makefile.dapper
