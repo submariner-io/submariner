@@ -14,7 +14,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.11.0
 	github.com/submariner-io/admiral v0.10.0-m1.0.20210602113843-3b8dfd67945b
-	github.com/submariner-io/shipyard v0.10.0-m1
+	github.com/submariner-io/shipyard v0.10.0-m2
 	github.com/uw-labs/lichen v0.1.4
 	github.com/vishvananda/netlink v1.1.0
 	golang.org/x/sys v0.0.0-20210603081109-ebe580a85c40
