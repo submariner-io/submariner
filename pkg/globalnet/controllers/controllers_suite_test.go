@@ -231,7 +231,6 @@ func awaitNoAllocatedIPs(client dynamic.ResourceInterface, name string) {
 	}, 200*time.Millisecond).Should(Equal(0))
 }
 
-// nolint unparam - `atIndex` always receives `0` - remove once a caller passes non-zero
 func (t *testDriverBase) awaitEgressIPStatus(client dynamic.ResourceInterface, name string, expNumIPS int, atIndex int,
 	expCond ...metav1.Condition) {
 	awaitStatusConditions(client, name, atIndex, expCond...)
@@ -255,7 +254,6 @@ func (t *testDriverBase) awaitEgressIPStatusAllocated(client dynamic.ResourceInt
 	})
 }
 
-// nolint unparam - `atIndex` always receives `0` - remove once a caller passes non-zero
 func (t *testDriverBase) awaitIngressIPStatus(name string, atIndex int, expCond ...metav1.Condition) {
 	awaitStatusConditions(t.globalIngressIPs, name, atIndex, expCond...)
 
