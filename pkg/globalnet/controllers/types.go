@@ -109,3 +109,7 @@ type serviceExportController struct {
 	services dynamic.NamespaceableResourceInterface
 	scheme   *runtime.Scheme
 }
+
+type serviceController struct {
+	*baseSyncerController
+}
