@@ -27,6 +27,7 @@ import (
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/ipam"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -39,6 +40,9 @@ var _ = Describe("GlobalIngressIP controller", func() {
 			t.createGlobalIngressIP(&submarinerv1.GlobalIngressIP{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: globalIngressIPName,
+					Annotations: map[string]string{
+						"submariner.io/kubeproxy-iptablechain": kubeProxyIPTableChainName,
+					},
 				},
 				Spec: submarinerv1.GlobalIngressIPSpec{
 					Target: submarinerv1.ClusterIPService,
@@ -51,7 +55,8 @@ var _ = Describe("GlobalIngressIP controller", func() {
 
 		It("should successfully allocate a global IP", func() {
 			t.awaitIngressIPStatusAllocated(globalIngressIPName)
-			// TODO - verify IP tables
+			allocatedIP := t.getGlobalIngressIPStatus(globalIngressIPName).AllocatedIP
+			t.awaitIPTableRules(allocatedIP, kubeProxyIPTableChainName)
 		})
 
 		Context("with the IP pool exhausted", func() {
@@ -81,8 +86,7 @@ var _ = Describe("GlobalIngressIP controller", func() {
 
 			It("should release the allocated global IP", func() {
 				t.awaitIPsReleasedFromPool(allocatedIP)
-
-				// TODO - verify IP tables
+				t.awaitNoIPTableRules(allocatedIP, kubeProxyIPTableChainName)
 			})
 		})
 	})
@@ -94,6 +98,9 @@ var _ = Describe("GlobalIngressIP controller", func() {
 			existing = &submarinerv1.GlobalIngressIP{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: globalIngressIPName,
+					Annotations: map[string]string{
+						"submariner.io/kubeproxy-iptablechain": kubeProxyIPTableChainName,
+					},
 				},
 				Spec: submarinerv1.GlobalIngressIPSpec{
 					Target: submarinerv1.ClusterIPService,
@@ -125,6 +132,10 @@ var _ = Describe("GlobalIngressIP controller", func() {
 			It("should reserve the previously allocated IP", func() {
 				t.verifyIPsReservedInPool(t.getGlobalIngressIPStatus(existing.Name).AllocatedIP)
 			})
+
+			It("should program the relevant iptable rules", func() {
+				t.awaitIPTableRules(existing.Status.AllocatedIP, kubeProxyIPTableChainName)
+			})
 		})
 
 		Context("without an allocated IP", func() {
@@ -132,8 +143,9 @@ var _ = Describe("GlobalIngressIP controller", func() {
 				t.createGlobalIngressIP(existing)
 			})
 
-			It("should allocate it", func() {
+			It("should allocate it and program relevant rules", func() {
 				t.awaitIngressIPStatusAllocated(globalIngressIPName)
+				t.awaitIPTableRules(existing.Status.AllocatedIP, kubeProxyIPTableChainName)
 			})
 		})
 	})
@@ -177,4 +189,14 @@ func (t *globalIngressIPControllerTestDriver) start() {
 
 	Expect(err).To(Succeed())
 	Expect(t.controller.Start()).To(Succeed())
+}
+
+func (t *globalIngressIPControllerTestDriver) awaitIPTableRules(ip, chainName string) {
+	t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(ip))
+	t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(chainName))
+}
+
+func (t *globalIngressIPControllerTestDriver) awaitNoIPTableRules(ip, chainName string) {
+	t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(ip))
+	t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(chainName))
 }
