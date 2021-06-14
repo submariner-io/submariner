@@ -120,3 +120,7 @@ type serviceExportController struct {
 	scheme   *runtime.Scheme
 	iptIface iptiface.Interface
 }
+
+type serviceController struct {
+	*baseSyncerController
+}
