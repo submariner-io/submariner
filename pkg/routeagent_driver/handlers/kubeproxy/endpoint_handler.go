@@ -92,7 +92,7 @@ func (kp *SyncHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 }
 
 func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
-	if err := kp.overlappingSubnets(endpoint.Spec.Subnets); err != nil {
+	if err := cidr.OverlappingSubnets(kp.localServiceCidr, kp.localClusterCidr, endpoint.Spec.Subnets); err != nil {
 		// Skip processing the endpoint when CIDRs overlap and return nil to avoid re-queuing.
 		klog.Errorf("overlappingSubnets for new remote %#v returned error: %v", endpoint, err)
 		return nil
@@ -142,43 +142,6 @@ func (kp *SyncHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 
 	kp.updateRoutingRulesForHostNetworkSupport(endpoint.Spec.Subnets, Delete)
 	kp.updateIptableRulesForInterClusterTraffic(endpoint.Spec.Subnets, Delete)
-
-	return nil
-}
-
-func (kp *SyncHandler) overlappingSubnets(remoteSubnets []string) error {
-	// If the remoteSubnets [*] overlap with local cluster Pod/Service CIDRs we
-	// should not update the IPTable rules on the host, as it will disrupt the
-	// functionality of the local cluster. So, lets validate that subnets do not
-	// overlap before we program any IPTable rules on the host for inter-cluster
-	// traffic.
-	// [*] Note: In a non-GlobalNet deployment, remoteSubnets will be a list of
-	// Pod/Service CIDRs, whereas in a GlobalNet deployment, it will be a list of
-	// globalCIDRs allocated to the clusters.
-	for _, serviceCidr := range kp.localServiceCidr {
-		overlap, err := cidr.IsOverlapping(remoteSubnets, serviceCidr)
-		if err != nil {
-			// Ideally this case will never hit, as the subnets are valid CIDRs
-			klog.Warningf("unable to validate overlapping Service CIDR: %s", err)
-		}
-
-		if overlap {
-			return fmt.Errorf("local Service CIDR %q, overlaps with remote cluster subnets %s",
-				serviceCidr, remoteSubnets)
-		}
-	}
-
-	for _, podCidr := range kp.localClusterCidr {
-		overlap, err := cidr.IsOverlapping(remoteSubnets, podCidr)
-		if err != nil {
-			klog.Warningf("unable to validate overlapping Pod CIDR: %s", err)
-		}
-
-		if overlap {
-			return fmt.Errorf("local Pod CIDR %q, overlaps with remote cluster subnets %s",
-				podCidr, remoteSubnets)
-		}
-	}
 
 	return nil
 }

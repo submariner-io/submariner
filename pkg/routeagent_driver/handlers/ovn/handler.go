@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/submariner/pkg/cidr"
 	"k8s.io/klog"
 
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -118,6 +119,12 @@ func (ovn *Handler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 }
 
 func (ovn *Handler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
+	if err := cidr.OverlappingSubnets(ovn.config.ServiceCidr, ovn.config.ClusterCidr, endpoint.Spec.Subnets); err != nil {
+		// Skip processing the endpoint when CIDRs overlap and return nil to avoid re-queuing.
+		klog.Errorf("overlappingSubnets for new remote %#v returned error: %v", endpoint, err)
+		return nil
+	}
+
 	ovn.mutex.Lock()
 	defer ovn.mutex.Unlock()
 
@@ -136,6 +143,12 @@ func (ovn *Handler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 }
 
 func (ovn *Handler) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
+	if err := cidr.OverlappingSubnets(ovn.config.ServiceCidr, ovn.config.ClusterCidr, endpoint.Spec.Subnets); err != nil {
+		// Skip processing the endpoint when CIDRs overlap and return nil to avoid re-queuing.
+		klog.Errorf("overlappingSubnets for new remote %#v returned error: %v", endpoint, err)
+		return nil
+	}
+
 	ovn.mutex.Lock()
 	defer ovn.mutex.Unlock()
 

@@ -16,7 +16,7 @@ jobs:
       matrix:
         deploytool: ['operator']
         globalnet: ['', 'globalnet']
-        cable_driver: ['libreswan', 'wireguard']
+        cable_driver: ['libreswan', 'wireguard', 'vxlan']
         ovn: ['', 'ovn']
         k8s_version: ['1.20']
         exclude:

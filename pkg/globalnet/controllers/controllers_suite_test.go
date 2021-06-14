@@ -27,7 +27,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
-	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
@@ -75,7 +74,7 @@ type testDriverBase struct {
 	scheme                 *runtime.Scheme
 	ipt                    *fakeIPT.IPTables
 	pool                   *ipam.IPPool
-	localSubnets           stringset.Interface
+	localSubnets           []string
 	globalCIDR             string
 	globalEgressIPs        dynamic.ResourceInterface
 	clusterGlobalEgressIPs dynamic.ResourceInterface
@@ -92,7 +91,7 @@ func newTestDriverBase() *testDriverBase {
 		scheme:       runtime.NewScheme(),
 		ipt:          fakeIPT.New(),
 		globalCIDR:   localCIDR,
-		localSubnets: stringset.NewSynchronized(),
+		localSubnets: []string{},
 	}
 
 	Expect(mcsv1a1.AddToScheme(t.scheme)).To(Succeed())
@@ -161,8 +160,8 @@ func (t *testDriverBase) awaitGlobalEgressIPStatusAllocated(name string, expNumI
 	t.awaitEgressIPStatusAllocated(t.globalEgressIPs, name, expNumIPS)
 }
 
-func (t *testDriverBase) awaitClusterGlobalEgressIPStatusAllocated(name string, expNumIPS int) {
-	t.awaitEgressIPStatusAllocated(t.clusterGlobalEgressIPs, name, expNumIPS)
+func (t *testDriverBase) awaitClusterGlobalEgressIPStatusAllocated(expNumIPS int) {
+	t.awaitEgressIPStatusAllocated(t.clusterGlobalEgressIPs, controllers.ClusterGlobalEgressIPName, expNumIPS)
 }
 
 func (t *testDriverBase) createPod(p *corev1.Pod) *corev1.Pod {
@@ -375,17 +374,12 @@ func newGlobalEgressIP(name string, numberOfIPs *int, podSelector *metav1.LabelS
 }
 
 func newClusterGlobalEgressIP(name string, numIPs int) *submarinerv1.ClusterGlobalEgressIP {
-	var numberOfIPs *int
-	if numIPs >= 0 {
-		numberOfIPs = &numIPs
-	}
-
 	return &submarinerv1.ClusterGlobalEgressIP{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: submarinerv1.ClusterGlobalEgressIPSpec{
-			NumberOfIPs: numberOfIPs,
+			NumberOfIPs: &numIPs,
 		},
 	}
 }
