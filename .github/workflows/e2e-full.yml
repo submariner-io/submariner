@@ -15,22 +15,17 @@ jobs:
       fail-fast: false
       matrix:
         deploytool: ['operator']
-        globalnet: ['', 'globalnet']
-        cable_driver: ['libreswan', 'wireguard', 'vxlan']
-        ovn: ['', 'ovn']
+        globalnet: ['']
+        cable_driver: ['libreswan']
+        ovn: ['ovn']
         k8s_version: ['1.20']
-        exclude:
-          - ovn: 'ovn'
-            globalnet: 'globalnet'
-          - ovn: 'ovn'
-            cable_driver: 'wireguard'
-        include:
-          # This is the oldest K8s version we try to support
-          - k8s_version: '1.17'
     steps:
       - name: Check out the repository
         uses: actions/checkout@v2
-
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        with:
+          limit-access-to-actor: true
       - name: Run E2E deployment and tests
         uses: submariner-io/shipyard/gh-actions/e2e@devel
         with:
