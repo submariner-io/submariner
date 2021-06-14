@@ -3,7 +3,7 @@ FOCUS ?=
 SKIP ?=
 PLUGIN ?=
 BASE_BRANCH ?= devel
-PROTOC_VERSION=3.15.5
+PROTOC_VERSION=3.17.3
 export BASE_BRANCH
 
 ifneq (,$(DAPPER_HOST_ARCH))
@@ -66,6 +66,7 @@ $(GOPATH)/bin/protoc-gen-go:
 
 bin/protoc:
 	curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v$(PROTOC_VERSION)/protoc-$(PROTOC_VERSION)-linux-x86_64.zip
+	sha256sum -c scripts/protoc.sha256
 	unzip protoc-$(PROTOC_VERSION)-linux-x86_64.zip 'bin/*' 'include/*'
 	rm -f protoc-$(PROTOC_VERSION)-linux-x86_64.zip
 
