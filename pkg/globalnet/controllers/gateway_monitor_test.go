@@ -50,6 +50,7 @@ var _ = Describe("Endpoint monitoring", func() {
 	When("a local Endpoint is created", func() {
 		JustBeforeEach(func() {
 			endpointName = t.createEndpoint(newEndpointSpec(clusterID, t.hostName, localCIDR))
+			t.createIPTableChain("nat", kubeProxyIPTableChainName)
 		})
 
 		It("should add the appropriate IP table chains", func() {

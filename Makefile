@@ -27,7 +27,7 @@ endif
 override CLUSTERS_ARGS += $(CLUSTER_SETTINGS_FLAG)
 override DEPLOY_ARGS += $(CLUSTER_SETTINGS_FLAG)
 
-override E2E_ARGS += cluster2 cluster3 cluster1
+override E2E_ARGS += cluster2 cluster1
 override UNIT_TEST_ARGS += test
 override VALIDATE_ARGS += --skip-dirs pkg/client
 
