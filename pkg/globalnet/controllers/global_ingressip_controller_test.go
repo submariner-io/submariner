@@ -143,7 +143,7 @@ var _ = Describe("GlobalIngressIP controller", func() {
 				t.createGlobalIngressIP(existing)
 			})
 
-			It("should allocate it and program relevant rules", func() {
+			It("should allocate it and program the relevant iptable rules", func() {
 				t.awaitIngressIPStatusAllocated(globalIngressIPName)
 				t.awaitIPTableRules(existing.Status.AllocatedIP, kubeProxyIPTableChainName)
 			})
@@ -192,11 +192,9 @@ func (t *globalIngressIPControllerTestDriver) start() {
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitIPTableRules(ip, chainName string) {
-	t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(ip))
-	t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(chainName))
+	t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain, And(ContainSubstring(ip), ContainSubstring(chainName)))
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitNoIPTableRules(ip, chainName string) {
-	t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(ip))
-	t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(chainName))
+	t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, Or(ContainSubstring(ip), ContainSubstring(chainName)))
 }
