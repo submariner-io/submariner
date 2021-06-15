@@ -420,16 +420,11 @@ func newClusterIPService() *corev1.Service {
 	}
 }
 
-func newHeadlessService(name string) *corev1.Service {
-	return &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Spec: corev1.ServiceSpec{
-			ClusterIP: corev1.ClusterIPNone,
-			Type:      corev1.ServiceTypeClusterIP,
-		},
-	}
+func newHeadlessService() *corev1.Service {
+	s := newClusterIPService()
+	s.Spec.ClusterIP = corev1.ClusterIPNone
+
+	return s
 }
 
 func isValidIPForCIDR(cidr, ip string) bool {
