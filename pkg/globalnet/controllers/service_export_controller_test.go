@@ -57,7 +57,7 @@ var _ = Describe("ServiceExport controller", func() {
 
 	When("an existing headless Service is exported", func() {
 		BeforeEach(func() {
-			t.createServiceExport(t.createService(newHeadlessService(serviceName)))
+			t.createServiceExport(t.createService(newHeadlessService()))
 		})
 
 		It("should create an appropriate GlobalIngressIP", func() {
