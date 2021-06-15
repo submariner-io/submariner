@@ -36,7 +36,7 @@ type Interface interface {
 	RemoveClusterEgressRules(sourceIP, snatIP, globalNetIPTableMark string) error
 	AddIngressRulesForService(globalIP, chainName string) error
 	RemoveIngressRulesForService(globalIP, chainName string) error
-	GetkubeProxyClusterIPServiceChainName(service *corev1.Service, kubeProxyServiceChainPrefix string) (string, bool, error)
+	GetKubeProxyClusterIPServiceChainName(service *corev1.Service, kubeProxyServiceChainPrefix string) (string, bool, error)
 }
 
 type ipTables struct {
@@ -125,7 +125,7 @@ func (i *ipTables) RemoveIngressRulesForService(globalIP, chainName string) erro
 	return nil
 }
 
-func (i *ipTables) GetkubeProxyClusterIPServiceChainName(service *corev1.Service,
+func (i *ipTables) GetKubeProxyClusterIPServiceChainName(service *corev1.Service,
 	kubeProxyServiceChainPrefix string) (string, bool, error) {
 	// CNIs that use kube-proxy with iptables for loadbalancing create an iptables chain for each service
 	// and incoming traffic to the clusterIP Service is directed into the respective chain.

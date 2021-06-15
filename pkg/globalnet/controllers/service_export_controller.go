@@ -106,9 +106,9 @@ func (c *serviceExportController) onCreate(serviceExport *mcsv1a1.ServiceExport)
 
 	klog.Infof("Processing ServiceExport %q", key)
 
-	chainName, chainExists, err := c.iptIface.GetkubeProxyClusterIPServiceChainName(service, kubeProxyServiceChainPrefix)
+	chainName, chainExists, err := c.iptIface.GetKubeProxyClusterIPServiceChainName(service, kubeProxyServiceChainPrefix)
 	if err != nil {
-		klog.Errorf("Error checking for kube-proxy chain for service %q", key)
+		klog.Errorf("Error getting kube-proxy chain name for service %q", key)
 		return nil, true
 	}
 

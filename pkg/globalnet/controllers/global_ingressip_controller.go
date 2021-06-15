@@ -134,7 +134,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 		return true
 	}
 
-	if ingressIP.Spec.Target == submarinerv1.ClusterIPService && ingressIP.Spec.ServiceRef != nil {
+	if ingressIP.Spec.Target == submarinerv1.ClusterIPService {
 		chainName := ingressIP.GetAnnotations()[kubeProxyIPTableChainAnnotation]
 		if chainName == "" {
 			klog.Warningf("%q annotation is missing on %q", kubeProxyIPTableChainAnnotation, key)
@@ -177,17 +177,15 @@ func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngre
 
 	key, _ := cache.MetaNamespaceKeyFunc(ingressIP)
 
-	if ingressIP.Spec.ServiceRef != nil {
+	if ingressIP.Spec.Target == submarinerv1.ClusterIPService {
 		chainName := ingressIP.GetAnnotations()[kubeProxyIPTableChainAnnotation]
-		if chainName == "" {
+		if chainName != "" {
+			err := c.iptIface.RemoveIngressRulesForService(ingressIP.Status.AllocatedIP, chainName)
+			if err != nil {
+				klog.Errorf("Error while deleting Service %q ingress rules. %v", key, err)
+			}
+		} else {
 			klog.Warningf("%q annotation is missing on %q", kubeProxyIPTableChainAnnotation, key)
-			return nil, true
-		}
-
-		err := c.iptIface.RemoveIngressRulesForService(ingressIP.Status.AllocatedIP, chainName)
-		if err != nil {
-			klog.Errorf("Error while deleting Service %q ingress rules. %v", key, err)
-			return nil, true
 		}
 	}
 
