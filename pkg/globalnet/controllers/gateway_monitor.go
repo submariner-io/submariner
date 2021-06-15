@@ -272,6 +272,13 @@ func (g *gatewayMonitor) startControllers() error {
 
 	g.controllers = append(g.controllers, c)
 
+	c, err = NewServiceController(*g.syncerConfig)
+	if err != nil {
+		return errors.WithMessage(err, "error creating the Service controller")
+	}
+
+	g.controllers = append(g.controllers, c)
+
 	c, err = NewGlobalIngressIPController(*g.syncerConfig, pool)
 	if err != nil {
 		return errors.WithMessage(err, "error creating the GlobalIngressIP controller")
