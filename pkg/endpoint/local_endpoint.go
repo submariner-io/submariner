@@ -68,6 +68,10 @@ func GetLocal(submSpec types.SubmarinerSpecification, k8sClient kubernetes.Inter
 		return types.SubmarinerEndpoint{}, err
 	}
 
+	if strings.HasPrefix(submSpec.PublicIP, submv1.LoadBalancer+":") {
+		backendConfig[submv1.UsingLoadBalancer] = "true"
+	}
+
 	endpoint := types.SubmarinerEndpoint{
 		Spec: submv1.EndpointSpec{
 			CableName:     fmt.Sprintf("submariner-cable-%s-%s", submSpec.ClusterID, strings.ReplaceAll(privateIP, ".", "-")),
