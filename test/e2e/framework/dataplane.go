@@ -23,10 +23,9 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -64,9 +63,8 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams) {
 	service := listenerPod.CreateService()
 	p.Framework.CreateServiceExport(p.ToCluster, service.Name)
 
-	// Wait for the globalIP annotation on the service.
-	service = p.Framework.AwaitUntilAnnotationOnService(p.ToCluster, constants.SmGlobalIP, service.Name, service.Namespace)
-	remoteIP := service.GetAnnotations()[constants.SmGlobalIP]
+	remoteIP := p.Framework.AwaitGlobalIngressIP(p.ToCluster, service.Name, service.Namespace)
+	Expect(remoteIP).ToNot(Equal(""))
 
 	By(fmt.Sprintf("Creating a connector pod in cluster %q, which will attempt the specific UUID handshake over TCP",
 		framework.TestContext.ClusterIDs[p.FromCluster]))
@@ -99,24 +97,12 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams) {
 	Expect(listenerPod.TerminationMessage).To(ContainSubstring(connectorPod.Config.Data))
 	Expect(stdOut).To(ContainSubstring(listenerPod.Config.Data))
 
-	if p.Networking == framework.PodNetworking && p.ToEndpointType == tcp.GlobalIP {
-		// When Globalnet is enabled (i.e., remoteEndpoint is a globalIP) and POD uses PodNetworking,
-		// Globalnet Controller MASQUERADEs the source-ip of the POD to the corresponding global-ip
-		// that is assigned to the POD.
-		By("Verifying the output of listener pod which must contain the globalIP of the connector POD")
+	if p.ToEndpointType == tcp.GlobalIP {
+		By("Verifying the output of listener pod which must contain the globalIP assigned to the Cluster")
 
-		podGlobalIP := connectorPod.Pod.GetAnnotations()[constants.SmGlobalIP]
-
+		podGlobalIP := p.Framework.AwaitClusterGlobalEgressIPs(p.FromCluster, controllers.ClusterGlobalEgressIPName)
 		Expect(podGlobalIP).ToNot(Equal(""))
-		Expect(listenerPod.TerminationMessage).To(ContainSubstring(podGlobalIP))
-	} else if p.Networking == framework.HostNetworking {
-		// when a POD is using the HostNetwork, it does not get an IPAddress from the podCIDR
-		// but it uses the HostIP. Submariner, for such PODs, would MASQUERADE the sourceIP of
-		// the outbound traffic (destined to remoteCluster) to the corresponding CNI interface
-		// ip-address on that Host and globalIP will NOT be annotated on the POD.
-		By("Verifying that globalIP annotation does not exist on the connector POD")
-		podGlobalIP := connectorPod.Pod.GetAnnotations()[constants.SmGlobalIP]
-		Expect(podGlobalIP).To(Equal(""))
+		Expect(listenerPod.TerminationMessage).To(ContainSubstring(podGlobalIP[0]))
 	}
 
 	p.Framework.DeleteService(p.ToCluster, service.Name)
