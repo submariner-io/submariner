@@ -124,6 +124,29 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 					t.awaitIPTableRules(getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, controllers.ClusterGlobalEgressIPName).AllocatedIPs...)
 				})
 			})
+
+			Context("and programming the IP table rules fails", func() {
+				BeforeEach(func() {
+					t.createClusterGlobalEgressIP(existing)
+					t.ipt.AddFailOnAppendRuleMatcher(ContainSubstring(existing.Status.AllocatedIPs[0]))
+				})
+
+				It("should reallocate the global IPs", func() {
+					t.awaitEgressIPStatus(t.clusterGlobalEgressIPs, controllers.ClusterGlobalEgressIPName, *existing.Spec.NumberOfIPs, 0,
+						metav1.Condition{
+							Type:   string(submarinerv1.GlobalEgressIPAllocated),
+							Status: metav1.ConditionFalse,
+							Reason: "ReserveAllocatedIPsFailed",
+						}, metav1.Condition{
+							Type:   string(submarinerv1.GlobalEgressIPAllocated),
+							Status: metav1.ConditionTrue,
+						})
+
+					allocatedIPs := getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, controllers.ClusterGlobalEgressIPName).AllocatedIPs
+					t.awaitIPTableRules(allocatedIPs...)
+					t.awaitIPsReleasedFromPool(existing.Status.AllocatedIPs...)
+				})
+			})
 		})
 
 		Context("with the NumberOfIPs negative", func() {
@@ -198,6 +221,7 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 
 			It("should release the previously allocated IPs", func() {
 				t.awaitIPsReleasedFromPool(existing.Status.AllocatedIPs...)
+				t.awaitNoIPTableRules(existing.Status.AllocatedIPs...)
 			})
 		})
 
@@ -216,6 +240,54 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 
 			It("should release the previously allocated IPs", func() {
 				t.awaitIPsReleasedFromPool(existing.Status.AllocatedIPs...)
+				t.awaitNoIPTableRules(existing.Status.AllocatedIPs...)
+			})
+		})
+
+		Context("and IP tables cleanup of previously allocated IPs initially fails", func() {
+			BeforeEach(func() {
+				numberOfIPs = *existing.Spec.NumberOfIPs + 1
+				t.ipt.AddFailOnDeleteRuleMatcher(ContainSubstring(existing.Status.AllocatedIPs[0]))
+			})
+
+			It("should eventually cleanup the IP tables and reallocate", func() {
+				t.awaitNoIPTableRules(existing.Status.AllocatedIPs...)
+				t.awaitClusterGlobalEgressIPStatusAllocated(numberOfIPs)
+				t.awaitIPTableRules(getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, controllers.ClusterGlobalEgressIPName).AllocatedIPs...)
+			})
+		})
+
+		Context("and programming of IP tables initially fails", func() {
+			BeforeEach(func() {
+				numberOfIPs = *existing.Spec.NumberOfIPs + 1
+				t.ipt.AddFailOnAppendRuleMatcher(Not(ContainSubstring(existing.Status.AllocatedIPs[0])))
+			})
+
+			It("should eventually reallocate the global IPs", func() {
+				t.awaitNoIPTableRules(existing.Status.AllocatedIPs...)
+				t.awaitEgressIPStatus(t.clusterGlobalEgressIPs, controllers.ClusterGlobalEgressIPName, numberOfIPs, 0, metav1.Condition{
+					Type:   string(submarinerv1.GlobalEgressIPAllocated),
+					Status: metav1.ConditionFalse,
+					Reason: "ProgramIPTableRulesFailed",
+				}, metav1.Condition{
+					Type:   string(submarinerv1.GlobalEgressIPAllocated),
+					Status: metav1.ConditionTrue,
+				})
+				t.awaitIPTableRules(getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, controllers.ClusterGlobalEgressIPName).AllocatedIPs...)
+			})
+		})
+
+		Context("with the IP pool exhausted", func() {
+			BeforeEach(func() {
+				numberOfIPs = t.pool.Size() + 1
+			})
+
+			It("should add an appropriate Status condition", func() {
+				awaitStatusConditions(t.clusterGlobalEgressIPs, controllers.ClusterGlobalEgressIPName, 0, metav1.Condition{
+					Type:   string(submarinerv1.GlobalEgressIPAllocated),
+					Status: metav1.ConditionFalse,
+					Reason: "IPPoolAllocationFailed",
+				})
 			})
 		})
 	})
