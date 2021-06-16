@@ -23,14 +23,16 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 )
 
 var _ = Describe("remoteEndpointNAT", func() {
 
 	var rnat *remoteEndpointNAT
+	var remoteEndpoint submarinerv1.Endpoint
 
 	BeforeEach(func() {
-		remoteEndpoint := createTestRemoteEndpoint()
+		remoteEndpoint = createTestRemoteEndpoint()
 		rnat = newRemoteEndpointNAT(&remoteEndpoint)
 	})
 
@@ -47,10 +49,23 @@ var _ = Describe("remoteEndpointNAT", func() {
 		})
 	})
 
-	When("the total timeout has elapsed", func() {
-		It("should report as timed out", func() {
-			rnat.started = time.Now().Add(-toDuration(&totalTimeout))
-			Expect(rnat.hasTimedOut()).To(BeTrue())
+	Context("with the total timeout elapsed", func() {
+		When("not targeting a load balancer", func() {
+			It("should report as timed out only for the normal timeout", func() {
+				rnat.started = time.Now().Add(-toDuration(&totalTimeoutLoadBalancer))
+				Expect(rnat.hasTimedOut()).To(BeFalse())
+
+				rnat.started = time.Now().Add(-toDuration(&totalTimeout))
+				Expect(rnat.hasTimedOut()).To(BeTrue())
+			})
+		})
+		When("targeting a load balancer", func() {
+			It("should report as timed out earlier", func() {
+				remoteEndpoint.Spec.BackendConfig[submarinerv1.UsingLoadBalancer] = "true"
+				rnat = newRemoteEndpointNAT(&remoteEndpoint)
+				rnat.started = time.Now().Add(-toDuration(&totalTimeoutLoadBalancer))
+				Expect(rnat.hasTimedOut()).To(BeTrue())
+			})
 		})
 	})
 
@@ -69,6 +84,17 @@ var _ = Describe("remoteEndpointNAT", func() {
 				rnat.useLegacyNATSettings()
 				Expect(rnat.state).To(Equal(selectedPublicIP))
 				Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.PublicIP))
+			})
+		})
+		Context("and targeting a load balancer", func() {
+			It("should select the public IP and NAT", func() {
+				remoteEndpoint.Spec.BackendConfig[submarinerv1.UsingLoadBalancer] = "true"
+				rnat = newRemoteEndpointNAT(&remoteEndpoint)
+				rnat.endpoint.Spec.NATEnabled = false
+				rnat.useLegacyNATSettings()
+				Expect(rnat.state).To(Equal(selectedPublicIP))
+				Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.PublicIP))
+				Expect(rnat.useNAT).To(BeTrue())
 			})
 		})
 	})
