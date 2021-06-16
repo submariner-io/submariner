@@ -74,6 +74,25 @@ var _ = Describe("GlobalIngressIP controller", func() {
 			})
 		})
 
+		Context("and programming of IP tables initially fails", func() {
+			BeforeEach(func() {
+				t.ipt.AddFailOnAppendRuleMatcher(ContainSubstring(kubeProxyIPTableChainName))
+			})
+
+			It("should eventually allocate a global IP", func() {
+				awaitStatusConditions(t.globalIngressIPs, globalIngressIPName, 0, metav1.Condition{
+					Type:   string(submarinerv1.GlobalEgressIPAllocated),
+					Status: metav1.ConditionFalse,
+					Reason: "ProgramIPTableRulesFailed",
+				}, metav1.Condition{
+					Type:   string(submarinerv1.GlobalEgressIPAllocated),
+					Status: metav1.ConditionTrue,
+				})
+
+				t.awaitIPTableRules(t.getGlobalIngressIPStatus(globalIngressIPName).AllocatedIP)
+			})
+		})
+
 		Context("and then removed", func() {
 			var allocatedIP string
 
@@ -87,6 +106,17 @@ var _ = Describe("GlobalIngressIP controller", func() {
 			It("should release the allocated global IP", func() {
 				t.awaitIPsReleasedFromPool(allocatedIP)
 				t.awaitNoIPTableRules(allocatedIP)
+			})
+
+			Context("and cleanup of IP tables initially fails", func() {
+				BeforeEach(func() {
+					t.ipt.AddFailOnDeleteRuleMatcher(ContainSubstring(kubeProxyIPTableChainName))
+				})
+
+				It("should eventually cleanup the IP tables and reallocate", func() {
+					t.awaitIPsReleasedFromPool(allocatedIP)
+					t.awaitNoIPTableRules(allocatedIP)
+				})
 			})
 		})
 	})
@@ -133,7 +163,7 @@ var _ = Describe("GlobalIngressIP controller", func() {
 				t.verifyIPsReservedInPool(t.getGlobalIngressIPStatus(existing.Name).AllocatedIP)
 			})
 
-			It("should program the relevant iptable rules", func() {
+			It("should program the relevant IP table rules", func() {
 				t.awaitIPTableRules(existing.Status.AllocatedIP)
 			})
 
@@ -156,6 +186,28 @@ var _ = Describe("GlobalIngressIP controller", func() {
 					t.awaitIPTableRules(t.getGlobalIngressIPStatus(globalIngressIPName).AllocatedIP)
 				})
 			})
+
+			Context("and programming the IP table rules fails", func() {
+				BeforeEach(func() {
+					t.ipt.AddFailOnAppendRuleMatcher(ContainSubstring(existing.Status.AllocatedIP))
+				})
+
+				It("should reallocate the global IP", func() {
+					t.awaitIngressIPStatus(globalIngressIPName, 0,
+						metav1.Condition{
+							Type:   string(submarinerv1.GlobalEgressIPAllocated),
+							Status: metav1.ConditionFalse,
+							Reason: "ReserveAllocatedIPsFailed",
+						}, metav1.Condition{
+							Type:   string(submarinerv1.GlobalEgressIPAllocated),
+							Status: metav1.ConditionTrue,
+						})
+
+					allocatedIP := t.getGlobalIngressIPStatus(globalIngressIPName).AllocatedIP
+					t.awaitIPTableRules(allocatedIP)
+					t.awaitIPsReleasedFromPool(existing.Status.AllocatedIP)
+				})
+			})
 		})
 
 		Context("without an allocated IP", func() {
@@ -163,7 +215,7 @@ var _ = Describe("GlobalIngressIP controller", func() {
 				t.createGlobalIngressIP(existing)
 			})
 
-			It("should allocate it and program the relevant iptable rules", func() {
+			It("should allocate it and program the relevant IP table rules", func() {
 				t.awaitIngressIPStatusAllocated(globalIngressIPName)
 				t.awaitIPTableRules(existing.Status.AllocatedIP)
 			})

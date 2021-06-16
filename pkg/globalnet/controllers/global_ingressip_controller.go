@@ -112,7 +112,7 @@ func (c *globalIngressIPController) process(from runtime.Object, numRequeues int
 
 		return checkStatusChanged(&prevStatus, &ingressIP.Status, ingressIP), requeue
 	case syncer.Delete:
-		return c.onDelete(ingressIP)
+		return nil, c.onDelete(ingressIP, numRequeues)
 	}
 
 	return nil, false
@@ -144,22 +144,24 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 	if ingressIP.Spec.Target == submarinerv1.ClusterIPService {
 		chainName := ingressIP.GetAnnotations()[kubeProxyIPTableChainAnnotation]
 		if chainName == "" {
-			klog.Warningf("%q annotation is missing on %q", kubeProxyIPTableChainAnnotation, key)
+			_ = c.pool.Release(ips...)
 
-			if err := c.pool.Release(ips...); err != nil {
-				klog.Errorf("Error while releasing the global IPs: %v", err)
-			}
+			klog.Warningf("%q annotation is missing on %q", kubeProxyIPTableChainAnnotation, key)
 
 			return true
 		}
 
 		err = c.iptIface.AddIngressRulesForService(ips[0], chainName)
 		if err != nil {
-			klog.Errorf("Error while programming Service %q ingress rules. %v", key, err)
+			_ = c.pool.Release(ips...)
 
-			if err := c.pool.Release(ips...); err != nil {
-				klog.Errorf("Sync rules failed and error while releasing the global IPs: %v", err)
-			}
+			klog.Errorf("Error while programming Service %q ingress rules: %v", key, err)
+			tryAppendStatusCondition(&ingressIP.Status.Conditions, &metav1.Condition{
+				Type:    string(submarinerv1.GlobalEgressIPAllocated),
+				Status:  metav1.ConditionFalse,
+				Reason:  "ProgramIPTableRulesFailed",
+				Message: fmt.Sprintf("Error programming ingress rules: %v", err),
+			})
 
 			return true
 		}
@@ -177,29 +179,23 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 	return false
 }
 
-func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngressIP) (runtime.Object, bool) {
+func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngressIP, numRequeues int) bool {
 	if ingressIP.Status.AllocatedIP == "" {
-		return nil, false
+		return false
 	}
 
 	key, _ := cache.MetaNamespaceKeyFunc(ingressIP)
 
-	if ingressIP.Spec.Target == submarinerv1.ClusterIPService {
-		chainName := ingressIP.GetAnnotations()[kubeProxyIPTableChainAnnotation]
-		if chainName != "" {
-			err := c.iptIface.RemoveIngressRulesForService(ingressIP.Status.AllocatedIP, chainName)
-			if err != nil {
-				klog.Errorf("Error while deleting Service %q ingress rules. %v", key, err)
+	return c.flushRulesAndReleaseIPs(key, numRequeues, func(allocatedIPs []string) error {
+		if ingressIP.Spec.Target == submarinerv1.ClusterIPService {
+			chainName := ingressIP.GetAnnotations()[kubeProxyIPTableChainAnnotation]
+			if chainName != "" {
+				return c.iptIface.RemoveIngressRulesForService(ingressIP.Status.AllocatedIP, chainName)
+			} else {
+				klog.Warningf("%q annotation is missing on %q", kubeProxyIPTableChainAnnotation, key)
 			}
-		} else {
-			klog.Warningf("%q annotation is missing on %q", kubeProxyIPTableChainAnnotation, key)
 		}
-	}
 
-	err := c.pool.Release(ingressIP.Status.AllocatedIP)
-	if err != nil {
-		klog.Errorf("Error releasing IP %s for GlobalIngressIP %q", ingressIP.Status.AllocatedIP, key)
-	}
-
-	return ingressIP, false
+		return nil
+	}, ingressIP.Status.AllocatedIP)
 }
