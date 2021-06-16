@@ -28,7 +28,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/globalnet/controllers/ipam"
+	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"k8s.io/client-go/kubernetes/scheme"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 
@@ -48,14 +48,14 @@ var (
 func main() {
 	klog.InitFlags(nil)
 	flag.Parse()
-	var ipamSpec ipam.SubmarinerIPAMControllerSpecification
+	var spec controllers.Specification
 
-	err := envconfig.Process("submariner", &ipamSpec)
+	err := envconfig.Process("submariner", &spec)
 	if err != nil {
 		klog.Fatal(err)
 	}
 
-	klog.Info("Starting submariner-globalnet", ipamSpec)
+	klog.Info("Starting submariner-globalnet", spec)
 
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler().Done()
@@ -85,7 +85,7 @@ func main() {
 	var localCluster *submarinerv1.Cluster
 	// During installation, sometimes creation of clusterCRD by submariner-gateway-pod would take few secs.
 	for i := 0; i < 100; i++ {
-		localCluster, err = submarinerClient.SubmarinerV1().Clusters(ipamSpec.Namespace).Get(context.TODO(), ipamSpec.ClusterID,
+		localCluster, err = submarinerClient.SubmarinerV1().Clusters(spec.Namespace).Get(context.TODO(), spec.ClusterID,
 			metav1.GetOptions{})
 		if err == nil {
 			break
@@ -95,24 +95,25 @@ func main() {
 	}
 
 	if err != nil {
-		klog.Fatalf("error while retrieving the local cluster %q info even after waiting for 5 mins: %v", ipamSpec.ClusterID, err)
+		klog.Fatalf("error while retrieving the local cluster %q info even after waiting for 5 mins: %v", spec.ClusterID, err)
 	}
 
 	if localCluster.Spec.GlobalCIDR != nil && len(localCluster.Spec.GlobalCIDR) > 0 {
 		// TODO: Revisit when support for more than one globalCIDR is implemented.
-		ipamSpec.GlobalCIDR = localCluster.Spec.GlobalCIDR
+		spec.GlobalCIDR = localCluster.Spec.GlobalCIDR
 	} else {
-		klog.Errorf("Cluster %s is not configured to use globalCidr", ipamSpec.ClusterID)
+		klog.Errorf("Cluster %s is not configured to use globalCidr", spec.ClusterID)
 		os.Exit(1)
 	}
 
-	gatewayMonitor, err := ipam.NewGatewayMonitor(&ipamSpec, watcher.Config{RestConfig: cfg})
+	gatewayMonitor, err := controllers.NewGatewayMonitor(spec, append(localCluster.Spec.ClusterCIDR, localCluster.Spec.ServiceCIDR...),
+		watcher.Config{RestConfig: cfg})
 
 	if err != nil {
 		klog.Fatalf("Error creating gatewayMonitor: %s", err.Error())
 	}
 
-	if err = gatewayMonitor.Start(stopCh); err != nil {
+	if err = gatewayMonitor.Start(); err != nil {
 		klog.Fatalf("Error running gatewayMonitor: %s", err.Error())
 	}
 
