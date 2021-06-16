@@ -31,6 +31,8 @@ import (
 	"k8s.io/klog"
 )
 
+const maxRequeues = 20
+
 func newBaseController() *baseController {
 	return &baseController{
 		stopCh: make(chan struct{}),
@@ -116,6 +118,30 @@ func (c *baseIPAllocationController) reserveAllocatedIPs(federator federate.Fede
 	return nil
 }
 
+func (c *baseIPAllocationController) flushRulesAndReleaseIPs(key string, numRequeues int, flushRules func(allocatedIPs []string) error,
+	allocatedIPs ...string) bool {
+	if len(allocatedIPs) == 0 {
+		return false
+	}
+
+	klog.Infof("Releasing previously allocated IPs %v for %q", allocatedIPs, key)
+
+	err := flushRules(allocatedIPs)
+	if err != nil {
+		klog.Errorf("Error flushing the IP table rules for %q: %v", key, err)
+
+		if shouldRequeue(numRequeues) {
+			return true
+		}
+	}
+
+	if err := c.pool.Release(allocatedIPs...); err != nil {
+		klog.Errorf("Error while releasing the global IPs for %q: %v", key, err)
+	}
+
+	return false
+}
+
 func conditionsFromUnstructured(from *unstructured.Unstructured) []metav1.Condition {
 	rawConditions, _, _ := unstructured.NestedSlice(from.Object, "status", "conditions")
 
@@ -137,4 +163,8 @@ func conditionsToUnstructured(conditions []metav1.Condition, to *unstructured.Un
 	}
 
 	_ = unstructured.SetNestedSlice(to.Object, newConditions, "status", "conditions")
+}
+
+func shouldRequeue(numRequeues int) bool {
+	return numRequeues < maxRequeues
 }
