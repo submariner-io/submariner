@@ -64,7 +64,10 @@ func NewGlobalEgressIPController(config syncer.ResourceSyncerConfig, pool *ipam.
 	federator := federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
 
 	for i := range list.Items {
-		err = controller.reserveAllocatedIPs(federator, &list.Items[i])
+		err = controller.reserveAllocatedIPs(federator, &list.Items[i], func(reservedIPs []string) error {
+			return nil // TODO
+		})
+
 		if err != nil {
 			return nil, err
 		}

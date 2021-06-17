@@ -94,6 +94,36 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 					t.awaitNoIPTableRules(existing.Status.AllocatedIPs...)
 				})
 			})
+
+			Context("and they're already reserved", func() {
+				BeforeEach(func() {
+					existing.Status.Conditions = []metav1.Condition{
+						{
+							Type:    string(submarinerv1.GlobalEgressIPAllocated),
+							Status:  metav1.ConditionTrue,
+							Reason:  "Success",
+							Message: "Allocated global IPs",
+						},
+					}
+
+					t.createClusterGlobalEgressIP(existing)
+					Expect(t.pool.Reserve(existing.Status.AllocatedIPs...)).To(Succeed())
+				})
+
+				It("should reallocate the global IPs", func() {
+					t.awaitEgressIPStatus(t.clusterGlobalEgressIPs, controllers.ClusterGlobalEgressIPName, *existing.Spec.NumberOfIPs, 1,
+						metav1.Condition{
+							Type:   string(submarinerv1.GlobalEgressIPAllocated),
+							Status: metav1.ConditionFalse,
+							Reason: "ReserveAllocatedIPsFailed",
+						}, metav1.Condition{
+							Type:   string(submarinerv1.GlobalEgressIPAllocated),
+							Status: metav1.ConditionTrue,
+						})
+
+					t.awaitIPTableRules(getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, controllers.ClusterGlobalEgressIPName).AllocatedIPs...)
+				})
+			})
 		})
 
 		Context("with the NumberOfIPs negative", func() {
@@ -232,6 +262,11 @@ func newClusterGlobalEgressIPControllerTestDriver() *clusterGlobalEgressIPContro
 
 	BeforeEach(func() {
 		t.testDriverBase = newTestDriverBase()
+
+		var err error
+
+		t.pool, err = ipam.NewIPPool(t.globalCIDR)
+		Expect(err).To(Succeed())
 	})
 
 	JustBeforeEach(func() {
@@ -249,9 +284,6 @@ func (t *clusterGlobalEgressIPControllerTestDriver) start() {
 	var err error
 
 	t.localSubnets = []string{"10.0.0.0/16", "100.0.0.0/16"}
-
-	t.pool, err = ipam.NewIPPool(t.globalCIDR)
-	Expect(err).To(Succeed())
 
 	t.controller, err = controllers.NewClusterGlobalEgressIPController(syncer.ResourceSyncerConfig{
 		SourceClient: t.dynClient,

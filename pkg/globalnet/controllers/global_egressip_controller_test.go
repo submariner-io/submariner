@@ -166,6 +166,11 @@ func newGlobalEgressIPControllerTestDriver() *globalEgressIPControllerTestDriver
 
 	BeforeEach(func() {
 		t.testDriverBase = newTestDriverBase()
+
+		var err error
+
+		t.pool, err = ipam.NewIPPool(t.globalCIDR)
+		Expect(err).To(Succeed())
 	})
 
 	JustBeforeEach(func() {
@@ -181,9 +186,6 @@ func newGlobalEgressIPControllerTestDriver() *globalEgressIPControllerTestDriver
 
 func (t *globalEgressIPControllerTestDriver) start() {
 	var err error
-
-	t.pool, err = ipam.NewIPPool(t.globalCIDR)
-	Expect(err).To(Succeed())
 
 	t.controller, err = controllers.NewGlobalEgressIPController(syncer.ResourceSyncerConfig{
 		SourceClient: t.dynClient,

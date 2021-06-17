@@ -231,7 +231,6 @@ func awaitNoAllocatedIPs(client dynamic.ResourceInterface, name string) {
 	}, 200*time.Millisecond).Should(Equal(0))
 }
 
-// nolint unparam - `atIndex` always receives `0` - remove once a caller passes non-zero
 func (t *testDriverBase) awaitEgressIPStatus(client dynamic.ResourceInterface, name string, expNumIPS int, atIndex int,
 	expCond ...metav1.Condition) {
 	awaitStatusConditions(client, name, atIndex, expCond...)
@@ -255,7 +254,6 @@ func (t *testDriverBase) awaitEgressIPStatusAllocated(client dynamic.ResourceInt
 	})
 }
 
-// nolint unparam - `atIndex` always receives `0` - remove once a caller passes non-zero
 func (t *testDriverBase) awaitIngressIPStatus(name string, atIndex int, expCond ...metav1.Condition) {
 	awaitStatusConditions(t.globalIngressIPs, name, atIndex, expCond...)
 
@@ -420,16 +418,11 @@ func newClusterIPService() *corev1.Service {
 	}
 }
 
-func newHeadlessService(name string) *corev1.Service {
-	return &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Spec: corev1.ServiceSpec{
-			ClusterIP: corev1.ClusterIPNone,
-			Type:      corev1.ServiceTypeClusterIP,
-		},
-	}
+func newHeadlessService() *corev1.Service {
+	s := newClusterIPService()
+	s.Spec.ClusterIP = corev1.ClusterIPNone
+
+	return s
 }
 
 func isValidIPForCIDR(cidr, ip string) bool {
