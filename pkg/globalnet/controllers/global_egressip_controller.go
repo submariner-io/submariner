@@ -21,11 +21,13 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -40,8 +42,13 @@ func NewGlobalEgressIPController(config syncer.ResourceSyncerConfig, pool *ipam.
 
 	klog.Info("Creating GlobalEgressIP controller")
 
+	iptIface, err := iptables.New()
+	if err != nil {
+		return nil, errors.WithMessage(err, "error creating the IPTablesInterface handler")
+	}
+
 	controller := &globalEgressIPController{
-		baseIPAllocationController: newBaseIPAllocationController(pool),
+		baseIPAllocationController: newBaseIPAllocationController(pool, iptIface),
 		podWatchers:                map[string]*podWatcher{},
 		watcherConfig: watcher.Config{
 			RestMapper: config.RestMapper,
