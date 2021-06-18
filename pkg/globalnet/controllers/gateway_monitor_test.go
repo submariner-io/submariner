@@ -31,7 +31,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/util"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 )
@@ -46,21 +45,11 @@ const (
 var _ = Describe("Endpoint monitoring", func() {
 	t := newGatewayMonitorTestDriver()
 
-	var node *corev1.Node
 	var endpointName string
-
-	BeforeEach(func() {
-		node = &corev1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:        nodeName,
-				Annotations: map[string]string{constants.CNIInterfaceIP: "10.20.30.40"},
-			},
-		}
-	})
 
 	When("a local Endpoint is created", func() {
 		JustBeforeEach(func() {
-			node = t.createNode(node)
+			t.createNode(nodeName, "", "")
 			endpointName = t.createEndpoint(newEndpointSpec(clusterID, t.hostName, localCIDR))
 			t.createIPTableChain("nat", kubeProxyIPTableChainName)
 		})
@@ -129,7 +118,6 @@ var _ = Describe("Endpoint monitoring", func() {
 
 type gatewayMonitorTestDriver struct {
 	*testDriverBase
-	nodes     dynamic.NamespaceableResourceInterface
 	endpoints dynamic.ResourceInterface
 	hostName  string
 }
@@ -142,7 +130,6 @@ func newGatewayMonitorTestDriver() *gatewayMonitorTestDriver {
 
 		t.endpoints = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.Endpoint{})).
 			Namespace(namespace)
-		t.nodes = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &corev1.Node{}))
 	})
 
 	JustBeforeEach(func() {
@@ -192,10 +179,6 @@ func (t *gatewayMonitorTestDriver) createEndpoint(spec *submarinerv1.EndpointSpe
 	})
 
 	return endpointName
-}
-
-func (t *gatewayMonitorTestDriver) createNode(node *corev1.Node) *corev1.Node {
-	return fromUnstructured(test.CreateResource(t.nodes, node), &corev1.Node{}).(*corev1.Node)
 }
 
 func newEndpointSpec(clusterID, hostname, subnet string) *submarinerv1.EndpointSpec {

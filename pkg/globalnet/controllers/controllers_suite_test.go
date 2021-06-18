@@ -33,6 +33,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/ipam"
 	"github.com/submariner-io/submariner/pkg/iptables"
 	fakeIPT "github.com/submariner-io/submariner/pkg/iptables/fake"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -55,6 +56,7 @@ const (
 	globalIngressIPName       = "db-service-ingress-ip"
 	kubeProxyIPTableChainName = "KUBE-SVC-Y7DIXXI5PNAUV7FB"
 	serviceName               = "nginx"
+	cniInterfaceIP            = "10.20.30.40"
 )
 
 func init() {
@@ -84,6 +86,7 @@ type testDriverBase struct {
 	services               dynamic.ResourceInterface
 	serviceExports         dynamic.ResourceInterface
 	pods                   dynamic.NamespaceableResourceInterface
+	nodes                  dynamic.ResourceInterface
 }
 
 func newTestDriverBase() *testDriverBase {
@@ -115,6 +118,8 @@ func newTestDriverBase() *testDriverBase {
 	t.services = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &corev1.Service{})).Namespace(namespace)
 
 	t.serviceExports = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &mcsv1a1.ServiceExport{})).Namespace(namespace)
+
+	t.nodes = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &corev1.Node{}))
 
 	iptables.NewFunc = func() (iptables.Interface, error) {
 		return t.ipt, nil
@@ -197,6 +202,60 @@ func (t *testDriverBase) getGlobalIngressIPStatus(name string) *submarinerv1.Glo
 	getStatus(t.globalIngressIPs, name, status)
 
 	return status
+}
+
+func (t *testDriverBase) createNode(name, cniInterfaceIP, globalIP string) *corev1.Node {
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+
+	addAnnotation(node, constants.CNIInterfaceIP, cniInterfaceIP)
+	addAnnotation(node, constants.SmGlobalIP, globalIP)
+
+	return fromUnstructured(test.CreateResource(t.nodes, node), &corev1.Node{}).(*corev1.Node)
+}
+
+func (t *testDriverBase) awaitNodeGlobalIP(oldIP string) string {
+	var globalIP string
+
+	Eventually(func() string {
+		obj, err := t.nodes.Get(context.TODO(), nodeName, metav1.GetOptions{})
+		Expect(err).To(Succeed())
+
+		globalIP = obj.GetAnnotations()[constants.SmGlobalIP]
+		return globalIP
+	}, 5).ShouldNot(Or(BeEmpty(), Equal(oldIP)))
+
+	Expect(isValidIPForCIDR(t.globalCIDR, globalIP)).To(BeTrue(), "Allocated global IP %q is not valid for CIDR %q",
+		globalIP, t.globalCIDR)
+
+	t.verifyIPsReservedInPool(globalIP)
+
+	return globalIP
+}
+
+func (t *testDriverBase) awaitNoNodeGlobalIP() {
+	Consistently(func() string {
+		obj, err := t.nodes.Get(context.TODO(), nodeName, metav1.GetOptions{})
+		Expect(err).To(Succeed())
+
+		return obj.GetAnnotations()[constants.SmGlobalIP]
+	}, 500*time.Millisecond).Should(BeEmpty())
+}
+
+func addAnnotation(obj metav1.Object, key, value string) {
+	if value == "" {
+		return
+	}
+
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		obj.SetAnnotations(map[string]string{})
+	}
+
+	obj.GetAnnotations()[key] = value
 }
 
 func getStatus(client dynamic.ResourceInterface, name string, status interface{}) {
