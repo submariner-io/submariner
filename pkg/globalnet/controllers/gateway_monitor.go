@@ -251,7 +251,14 @@ func (g *gatewayMonitor) startControllers() error {
 
 	g.controllers = nil
 
-	c, err := NewClusterGlobalEgressIPController(*g.syncerConfig, g.localSubnets, pool)
+	c, err := NewNodeController(*g.syncerConfig, pool, g.nodeName)
+	if err != nil {
+		return errors.WithMessage(err, "error creating the Node controller")
+	}
+
+	g.controllers = append(g.controllers, c)
+
+	c, err = NewClusterGlobalEgressIPController(*g.syncerConfig, g.localSubnets, pool)
 	if err != nil {
 		return errors.WithMessage(err, "error creating the ClusterGlobalEgressIP controller")
 	}

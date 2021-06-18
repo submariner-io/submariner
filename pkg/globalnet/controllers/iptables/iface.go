@@ -37,6 +37,8 @@ type Interface interface {
 	AddIngressRulesForService(globalIP, chainName string) error
 	RemoveIngressRulesForService(globalIP, chainName string) error
 	GetKubeProxyClusterIPServiceChainName(service *corev1.Service, kubeProxyServiceChainPrefix string) (string, bool, error)
+	AddIngressRulesForHealthCheck(cniIfaceIP, globalIP string) error
+	RemoveIngressRulesForHealthCheck(cniIfaceIP, globalIP string) error
 }
 
 type ipTables struct {
@@ -156,4 +158,26 @@ func (i *ipTables) GetKubeProxyClusterIPServiceChainName(service *corev1.Service
 	}
 
 	return "", false, nil
+}
+
+func (i *ipTables) AddIngressRulesForHealthCheck(cniIfaceIP, globalIP string) error {
+	ruleSpec := []string{"-p", "icmp", "-d", globalIP, "-j", "DNAT", "--to", cniIfaceIP}
+	klog.V(log.DEBUG).Infof("Installing iptable ingress rules for Node: %s", strings.Join(ruleSpec, " "))
+
+	if err := i.ipt.AppendUnique("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
+		return fmt.Errorf("error appending iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
+	}
+
+	return nil
+}
+
+func (i *ipTables) RemoveIngressRulesForHealthCheck(cniIfaceIP, globalIP string) error {
+	ruleSpec := []string{"-p", "icmp", "-d", globalIP, "-j", "DNAT", "--to", cniIfaceIP}
+	klog.V(log.DEBUG).Infof("Deleting iptable ingress rules for Node: %s", strings.Join(ruleSpec, " "))
+
+	if err := i.ipt.Delete("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
+		return fmt.Errorf("error deleting iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
+	}
+
+	return nil
 }

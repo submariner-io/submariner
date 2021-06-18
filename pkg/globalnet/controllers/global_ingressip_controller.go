@@ -40,21 +40,19 @@ func NewGlobalIngressIPController(config syncer.ResourceSyncerConfig, pool *ipam
 
 	klog.Info("Creating GlobalIngressIP controller")
 
+	iptIface, err := iptables.New()
+	if err != nil {
+		return nil, errors.WithMessage(err, "error creating the IPTablesInterface handler")
+	}
+
 	controller := &globalIngressIPController{
-		baseIPAllocationController: newBaseIPAllocationController(pool),
+		baseIPAllocationController: newBaseIPAllocationController(pool, iptIface),
 	}
 
 	_, gvr, err := util.ToUnstructuredResource(&submarinerv1.GlobalIngressIP{}, config.RestMapper)
 	if err != nil {
 		return nil, err
 	}
-
-	iptIface, err := iptables.New()
-	if err != nil {
-		return nil, errors.WithMessage(err, "error creating the IPTablesInterface handler")
-	}
-
-	controller.iptIface = iptIface
 
 	federator := federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
 
