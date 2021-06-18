@@ -49,6 +49,8 @@ const (
 	// Reference: https://bit.ly/2OPhlwk
 	kubeProxyServiceChainPrefix = "KUBE-SVC-"
 
+	GlobalIPKey = "submariner.io/globalIp"
+
 	AddRules    = true
 	DeleteRules = false
 )
@@ -89,7 +91,8 @@ type baseSyncerController struct {
 
 type baseIPAllocationController struct {
 	*baseSyncerController
-	pool *ipam.IPPool
+	pool     *ipam.IPPool
+	iptIface iptiface.Interface
 }
 
 type globalEgressIPController struct {
@@ -105,13 +108,11 @@ type podWatcher struct {
 
 type clusterGlobalEgressIPController struct {
 	*baseIPAllocationController
-	iptIface     iptiface.Interface
 	localSubnets []string
 }
 
 type globalIngressIPController struct {
 	*baseIPAllocationController
-	iptIface iptiface.Interface
 }
 
 type serviceExportController struct {
@@ -123,4 +124,10 @@ type serviceExportController struct {
 
 type serviceController struct {
 	*baseSyncerController
+}
+
+type nodeController struct {
+	*baseIPAllocationController
+	nodeName string
+	nodes    dynamic.ResourceInterface
 }

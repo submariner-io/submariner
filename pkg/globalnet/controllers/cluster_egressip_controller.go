@@ -49,9 +49,8 @@ func NewClusterGlobalEgressIPController(config syncer.ResourceSyncerConfig, loca
 	}
 
 	controller := &clusterGlobalEgressIPController{
-		baseIPAllocationController: newBaseIPAllocationController(pool),
+		baseIPAllocationController: newBaseIPAllocationController(pool, iptIface),
 		localSubnets:               localSubnets,
-		iptIface:                   iptIface,
 	}
 
 	federator := federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
