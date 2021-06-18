@@ -49,7 +49,7 @@ const (
 	// Reference: https://bit.ly/2OPhlwk
 	kubeProxyServiceChainPrefix = "KUBE-SVC-"
 
-	SmGlobalIP = "submariner.io/globalIp"
+	GlobalIPKey = "submariner.io/globalIp"
 
 	AddRules    = true
 	DeleteRules = false

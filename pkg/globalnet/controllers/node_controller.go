@@ -46,16 +46,17 @@ func NewNodeController(config syncer.ResourceSyncerConfig, pool *ipam.IPPool, no
 
 	controller := &nodeController{
 		baseIPAllocationController: newBaseIPAllocationController(pool, iptIface),
+		nodeName:                   nodeName,
 	}
 
-	controller.nodeName = nodeName
+	federator := federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
 	controller.resourceSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
 		Name:                "Node syncer",
 		ResourceType:        &corev1.Node{},
 		SourceClient:        config.SourceClient,
 		SourceNamespace:     corev1.NamespaceAll,
 		RestMapper:          config.RestMapper,
-		Federator:           federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll),
+		Federator:           federator,
 		Scheme:              config.Scheme,
 		Transform:           controller.process,
 		ResourcesEquivalent: controller.onNodeUpdated,
@@ -70,17 +71,14 @@ func NewNodeController(config syncer.ResourceSyncerConfig, pool *ipam.IPPool, no
 		return nil, err
 	}
 
-	federator := federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
 	controller.nodes = config.SourceClient.Resource(*gvr)
 	localNodeInfo, err := controller.nodes.Get(context.TODO(), controller.nodeName, metav1.GetOptions{})
 	if err != nil {
-		return nil, errors.WithMessagef(err, "error retrieving localNodeInfo for %q", controller.nodeName)
+		return nil, errors.WithMessagef(err, "error retrieving local Node %q", controller.nodeName)
 	}
 
-	if localNodeInfo != nil {
-		if err := controller.reserveAllocatedIPs(federator, localNodeInfo); err != nil {
-			return nil, err
-		}
+	if err := controller.reserveAllocatedIP(federator, localNodeInfo); err != nil {
+		return nil, err
 	}
 
 	return controller, nil
@@ -91,7 +89,7 @@ func (n *nodeController) process(from runtime.Object, numRequeues int, op syncer
 
 	// If the event corresponds to a different node which has globalIP annotation, release the globalIP back to Pool.
 	if node.Name != n.nodeName {
-		if existingGlobalIP := node.GetAnnotations()[SmGlobalIP]; existingGlobalIP != "" {
+		if existingGlobalIP := node.GetAnnotations()[GlobalIPKey]; existingGlobalIP != "" {
 			if op == syncer.Delete {
 				_ = n.pool.Release(existingGlobalIP)
 				return nil, false
@@ -113,13 +111,13 @@ func (n *nodeController) process(from runtime.Object, numRequeues int, op syncer
 		return nil, false
 	}
 
+	klog.Infof("Processing %sd Node %q", op, node.Name)
+
 	return n.onCreateOrUpdate(node)
 }
 
 func (n *nodeController) onCreateOrUpdate(node *corev1.Node) (runtime.Object, bool) {
-	klog.Infof("Node %q is updated", node.Name)
-
-	existingGlobalIP := node.GetAnnotations()[SmGlobalIP]
+	existingGlobalIP := node.GetAnnotations()[GlobalIPKey]
 	if existingGlobalIP != "" {
 		return nil, false
 	}
@@ -142,8 +140,8 @@ func (n *nodeController) onCreateOrUpdate(node *corev1.Node) (runtime.Object, bo
 	return n.updateNodeAnnotation(node, globalIP[0])
 }
 
-func (n *nodeController) reserveAllocatedIPs(federator federate.Federator, obj *unstructured.Unstructured) error {
-	existingGlobalIP := obj.GetAnnotations()[SmGlobalIP]
+func (n *nodeController) reserveAllocatedIP(federator federate.Federator, obj *unstructured.Unstructured) error {
+	existingGlobalIP := obj.GetAnnotations()[GlobalIPKey]
 	if existingGlobalIP == "" {
 		return nil
 	}
@@ -159,19 +157,21 @@ func (n *nodeController) reserveAllocatedIPs(federator federate.Federator, obj *
 	}
 
 	err := n.pool.Reserve(existingGlobalIP)
-	if err != nil {
-		klog.Errorf("Error reserving the existing globalIP to node %q, will re-allocate new one.", existingGlobalIP)
+	if err == nil {
+		err = n.iptIface.AddIngressRulesForHealthCheck(cniIfaceIP, existingGlobalIP)
+		if err != nil {
+			_ = n.pool.Release(existingGlobalIP)
+		}
 	}
 
-	if err = n.iptIface.AddIngressRulesForHealthCheck(cniIfaceIP, existingGlobalIP); err != nil {
-		// Release the globalIP back to the pool and remove the annotation
-		_ = n.pool.Release(existingGlobalIP)
+	if err != nil {
+		klog.Warningf("Could not reserve allocated GlobalIP for Node %q: %v", obj.GetName(), err)
 		annotations := obj.GetAnnotations()
 		if annotations == nil {
 			annotations = map[string]string{}
 		}
 
-		delete(annotations, SmGlobalIP)
+		delete(annotations, GlobalIPKey)
 		obj.SetAnnotations(annotations)
 
 		return federator.Distribute(obj)
@@ -187,9 +187,9 @@ func (n *nodeController) updateNodeAnnotation(node *corev1.Node, globalIP string
 	}
 
 	if globalIP == "" {
-		delete(annotations, SmGlobalIP)
+		delete(annotations, GlobalIPKey)
 	} else {
-		annotations[SmGlobalIP] = globalIP
+		annotations[GlobalIPKey] = globalIP
 	}
 
 	node.SetAnnotations(annotations)
@@ -204,8 +204,8 @@ func (n *nodeController) onNodeUpdated(oldObj, newObj *unstructured.Unstructured
 
 	oldCNIIfaceIPOnNode := oldObj.GetAnnotations()[constants.CNIInterfaceIP]
 	newCNIIfaceIPOnNode := newObj.GetAnnotations()[constants.CNIInterfaceIP]
-	oldGlobalIPOnNode := oldObj.GetAnnotations()[SmGlobalIP]
-	newGlobalIPOnNode := newObj.GetAnnotations()[SmGlobalIP]
+	oldGlobalIPOnNode := oldObj.GetAnnotations()[GlobalIPKey]
+	newGlobalIPOnNode := newObj.GetAnnotations()[GlobalIPKey]
 
 	if oldGlobalIPOnNode != "" && newGlobalIPOnNode == "" {
 		_ = n.pool.Release(oldGlobalIPOnNode)
