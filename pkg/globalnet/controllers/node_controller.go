@@ -90,7 +90,7 @@ func (n *nodeController) process(from runtime.Object, numRequeues int, op syncer
 
 	// If the event corresponds to a different node which has globalIP annotation, release the globalIP back to Pool.
 	if node.Name != n.nodeName {
-		if existingGlobalIP := node.GetAnnotations()[GlobalIPKey]; existingGlobalIP != "" {
+		if existingGlobalIP := node.GetAnnotations()[constants.SmGlobalIP]; existingGlobalIP != "" {
 			if op == syncer.Delete {
 				_ = n.pool.Release(existingGlobalIP)
 				return nil, false
@@ -146,7 +146,7 @@ func (n *nodeController) onCreateOrUpdate(node *corev1.Node) (runtime.Object, bo
 }
 
 func (n *nodeController) reserveAllocatedIP(federator federate.Federator, obj *unstructured.Unstructured) error {
-	existingGlobalIP := obj.GetAnnotations()[GlobalIPKey]
+	existingGlobalIP := obj.GetAnnotations()[constants.SmGlobalIP]
 	if existingGlobalIP == "" {
 		return nil
 	}
@@ -204,8 +204,8 @@ func (n *nodeController) onNodeUpdated(oldObj, newObj *unstructured.Unstructured
 
 	oldCNIIfaceIPOnNode := oldObj.GetAnnotations()[constants.CNIInterfaceIP]
 	newCNIIfaceIPOnNode := newObj.GetAnnotations()[constants.CNIInterfaceIP]
-	oldGlobalIPOnNode := oldObj.GetAnnotations()[GlobalIPKey]
-	newGlobalIPOnNode := newObj.GetAnnotations()[GlobalIPKey]
+	oldGlobalIPOnNode := oldObj.GetAnnotations()[constants.SmGlobalIP]
+	newGlobalIPOnNode := newObj.GetAnnotations()[constants.SmGlobalIP]
 
 	if oldGlobalIPOnNode != "" && newGlobalIPOnNode == "" {
 		_ = n.pool.Release(oldGlobalIPOnNode)
