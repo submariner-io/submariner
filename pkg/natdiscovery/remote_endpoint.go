@@ -38,6 +38,7 @@ const (
 var (
 	recheckTime                    = (2 * time.Second).Nanoseconds()
 	totalTimeout                   = (60 * time.Second).Nanoseconds()
+	totalTimeoutLoadBalancer       = (6 * time.Second).Nanoseconds()
 	publicToPrivateFailoverTimeout = time.Second.Nanoseconds()
 )
 
@@ -47,10 +48,12 @@ type remoteEndpointNAT struct {
 	lastCheck              time.Time
 	lastTransition         time.Time
 	started                time.Time
-	useNAT                 bool
+	timeout                time.Duration
 	useIP                  string
 	lastPublicIPRequestID  uint64
 	lastPrivateIPRequestID uint64
+	useNAT                 bool
+	usingLoadBalancer      bool
 }
 
 type NATEndpointInfo struct {
@@ -68,12 +71,25 @@ func (rn *remoteEndpointNAT) toNATEndpointInfo() *NATEndpointInfo {
 }
 
 func newRemoteEndpointNAT(endpoint *v1.Endpoint) *remoteEndpointNAT {
-	return &remoteEndpointNAT{
+	rnat := &remoteEndpointNAT{
 		endpoint:       *endpoint,
 		state:          testingPrivateAndPublicIPs,
 		started:        time.Now(),
 		lastTransition: time.Now(),
 	}
+
+	// Due to a network load balancer issue in the AWS implementation https://github.com/submariner-io/submariner/issues/1410
+	// we want to try on the IPs, but not hold on connecting for a minute, because IPSEC will succeed in that case,
+	// and we want to verify if the private IP will accessible (because it's still better)
+	usingLoadBalancer, _ := endpoint.Spec.GetBackendBool(v1.UsingLoadBalancer, nil)
+	if usingLoadBalancer != nil && *usingLoadBalancer {
+		rnat.timeout = toDuration(&totalTimeoutLoadBalancer)
+		rnat.usingLoadBalancer = true
+	} else {
+		rnat.timeout = toDuration(&totalTimeout)
+	}
+
+	return rnat
 }
 
 func (rn *remoteEndpointNAT) transitionToState(newState endpointState) {
@@ -86,17 +102,27 @@ func (rn *remoteEndpointNAT) sinceLastTransition() time.Duration {
 }
 
 func (rn *remoteEndpointNAT) hasTimedOut() bool {
-	return time.Since(rn.started) > toDuration(&totalTimeout)
+	return time.Since(rn.started) > rn.timeout
 }
 
 func (rn *remoteEndpointNAT) useLegacyNATSettings() {
-	rn.useNAT = rn.endpoint.Spec.NATEnabled
-	if rn.endpoint.Spec.NATEnabled {
+	switch {
+	case rn.usingLoadBalancer:
+		rn.useNAT = true
+		rn.useIP = rn.endpoint.Spec.PublicIP
+		rn.transitionToState(selectedPublicIP)
+		klog.V(log.DEBUG).Infof("using NAT for the load balancer backed endpoint %q, using public IP %q", rn.endpoint.Spec.CableName,
+			rn.useIP)
+
+	case rn.endpoint.Spec.NATEnabled:
+		rn.useNAT = true
 		rn.useIP = rn.endpoint.Spec.PublicIP
 		rn.transitionToState(selectedPublicIP)
 		klog.V(log.DEBUG).Infof("using NAT legacy settings for endpoint %q, using public IP %q", rn.endpoint.Spec.CableName,
 			rn.useIP)
-	} else {
+
+	default:
+		rn.useNAT = false
 		rn.useIP = rn.endpoint.Spec.PrivateIP
 		rn.transitionToState(selectedPrivateIP)
 		klog.V(log.DEBUG).Infof("using NAT legacy settings for endpoint %q, using private IP %q", rn.endpoint.Spec.CableName,

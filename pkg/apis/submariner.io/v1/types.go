@@ -88,6 +88,7 @@ const (
 	UDPPortConfig           = "udp-port"
 	NATTDiscoveryPortConfig = "natt-discovery-port"
 	PublicIP                = "public-ip"
+	UsingLoadBalancer       = "using-loadbalancer"
 )
 
 const (
