@@ -28,6 +28,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/ipam"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -95,7 +96,7 @@ func (n *nodeController) process(from runtime.Object, numRequeues int, op syncer
 				return nil, false
 			} else {
 				_ = n.pool.Release(existingGlobalIP)
-				return n.updateNodeAnnotation(node, "")
+				return n.updateNodeAnnotation(node, ""), false
 			}
 		}
 
@@ -117,27 +118,31 @@ func (n *nodeController) process(from runtime.Object, numRequeues int, op syncer
 }
 
 func (n *nodeController) onCreateOrUpdate(node *corev1.Node) (runtime.Object, bool) {
-	existingGlobalIP := node.GetAnnotations()[GlobalIPKey]
+	existingGlobalIP := node.GetAnnotations()[constants.SmGlobalIP]
 	if existingGlobalIP != "" {
 		return nil, false
 	}
 
-	cniIfaceIP := node.GetAnnotations()[constants.CNIInterfaceIP]
-	globalIP, err := n.pool.Allocate(1)
+	ips, err := n.pool.Allocate(1)
 	if err != nil {
 		klog.Errorf("Error allocating IPs for node %q: %v", node.Name, err)
 		return nil, true
 	}
 
-	if err := n.iptIface.AddIngressRulesForHealthCheck(cniIfaceIP, globalIP[0]); err != nil {
+	globalIP := ips[0]
+
+	klog.Infof("Allocated global IP %s for Node %q", globalIP, node.Name)
+
+	cniIfaceIP := node.GetAnnotations()[constants.CNIInterfaceIP]
+	if err := n.iptIface.AddIngressRulesForHealthCheck(cniIfaceIP, globalIP); err != nil {
 		klog.Errorf("Error programming rules for Gateway healthcheck on node %q: %v", node.Name, err)
 
-		_ = n.pool.Release(globalIP[0])
+		_ = n.pool.Release(globalIP)
 
 		return nil, true
 	}
 
-	return n.updateNodeAnnotation(node, globalIP[0])
+	return n.updateNodeAnnotation(node, globalIP), false
 }
 
 func (n *nodeController) reserveAllocatedIP(federator federate.Federator, obj *unstructured.Unstructured) error {
@@ -166,35 +171,30 @@ func (n *nodeController) reserveAllocatedIP(federator federate.Federator, obj *u
 
 	if err != nil {
 		klog.Warningf("Could not reserve allocated GlobalIP for Node %q: %v", obj.GetName(), err)
-		annotations := obj.GetAnnotations()
-		if annotations == nil {
-			annotations = map[string]string{}
-		}
 
-		delete(annotations, GlobalIPKey)
-		obj.SetAnnotations(annotations)
-
-		return federator.Distribute(obj)
+		return federator.Distribute(n.updateNodeAnnotation(obj, ""))
 	}
 
 	return nil
 }
 
-func (n *nodeController) updateNodeAnnotation(node *corev1.Node, globalIP string) (runtime.Object, bool) {
-	annotations := node.GetAnnotations()
+func (n *nodeController) updateNodeAnnotation(node runtime.Object, globalIP string) runtime.Object {
+	objMeta, _ := meta.Accessor(node)
+
+	annotations := objMeta.GetAnnotations()
 	if annotations == nil {
 		annotations = map[string]string{}
 	}
 
 	if globalIP == "" {
-		delete(annotations, GlobalIPKey)
+		delete(annotations, constants.SmGlobalIP)
 	} else {
-		annotations[GlobalIPKey] = globalIP
+		annotations[constants.SmGlobalIP] = globalIP
 	}
 
-	node.SetAnnotations(annotations)
+	objMeta.SetAnnotations(annotations)
 
-	return node, false
+	return node
 }
 
 func (n *nodeController) onNodeUpdated(oldObj, newObj *unstructured.Unstructured) bool {
