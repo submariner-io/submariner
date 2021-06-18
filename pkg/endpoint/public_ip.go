@@ -25,12 +25,15 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
 )
 
@@ -108,30 +111,45 @@ func publicIP(clientset kubernetes.Interface, namespace, value string) (string, 
 }
 
 func publicLoadBalancerIP(clientset kubernetes.Interface, namespace, loadBalancerName string) (string, error) {
-	service, err := clientset.CoreV1().Services(namespace).Get(context.TODO(), loadBalancerName, metav1.GetOptions{})
-	if err != nil {
-		return "", errors.Wrapf(err, "error getting service %q for the public IP address", loadBalancerName)
+	ip := ""
+
+	retryConfig := wait.Backoff{
+		Cap:      2 * time.Minute,
+		Duration: 1 * time.Second,
+		Factor:   2,
+		Steps:    4,
 	}
 
-	if len(service.Status.LoadBalancer.Ingress) < 1 {
-		return "", errors.Errorf("service %q doesn't contain any LoadBalancer ingress", loadBalancerName)
-	}
-
-	ingress := service.Status.LoadBalancer.Ingress[0]
-	if ingress.IP != "" {
-		return ingress.IP, nil
-	}
-
-	if ingress.Hostname != "" {
-		ip, err := publicDNSIP(clientset, namespace, ingress.Hostname)
+	err := retry.OnError(retryConfig, func(err error) bool {
+		klog.Infof("Waiting for LoadBalancer to be ready: %s", err)
+		return true
+	}, func() error {
+		service, err := clientset.CoreV1().Services(namespace).Get(context.TODO(), loadBalancerName, metav1.GetOptions{})
 		if err != nil {
-			return "", errors.Wrapf(err, "error resolving LoadBalancer ingress HostName %q", ingress.Hostname)
+			return errors.Wrapf(err, "error getting service %q for the public IP address", loadBalancerName)
 		}
 
-		return ip, nil
-	}
+		if len(service.Status.LoadBalancer.Ingress) < 1 {
+			return errors.Errorf("service %q doesn't contain any LoadBalancer ingress yet", loadBalancerName)
+		}
 
-	return "", errors.Errorf("no IP or Hostname for service LoadBalancer %q Ingress", loadBalancerName)
+		ingress := service.Status.LoadBalancer.Ingress[0]
+
+		switch {
+		case ingress.IP != "":
+			ip = ingress.IP
+			return nil
+
+		case ingress.Hostname != "":
+			ip, err = publicDNSIP(clientset, namespace, ingress.Hostname)
+			return err
+
+		default:
+			return errors.Errorf("no IP or Hostname for service LoadBalancer %q Ingress", loadBalancerName)
+		}
+	})
+
+	return ip, err
 }
 
 func publicDNSIP(clientset kubernetes.Interface, namespace, fqdn string) (string, error) {
