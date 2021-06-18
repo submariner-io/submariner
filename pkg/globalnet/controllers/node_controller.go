@@ -103,6 +103,12 @@ func (n *nodeController) process(from runtime.Object, numRequeues int, op syncer
 		return nil, false
 	}
 
+	klog.Infof("Processing %sd Node %q", op, node.Name)
+
+	return n.allocateIP(node, op)
+}
+
+func (n *nodeController) allocateIP(node *corev1.Node, op syncer.Operation) (runtime.Object, bool) {
 	cniIfaceIP := node.GetAnnotations()[constants.CNIInterfaceIP]
 	if cniIfaceIP == "" {
 		// To support connectivity from HostNetwork to remoteCluster, globalnet requires the
@@ -112,28 +118,25 @@ func (n *nodeController) process(from runtime.Object, numRequeues int, op syncer
 		return nil, false
 	}
 
-	klog.Infof("Processing %sd Node %q", op, node.Name)
-
-	return n.onCreateOrUpdate(node)
-}
-
-func (n *nodeController) onCreateOrUpdate(node *corev1.Node) (runtime.Object, bool) {
-	existingGlobalIP := node.GetAnnotations()[constants.SmGlobalIP]
-	if existingGlobalIP != "" {
+	globalIP := node.GetAnnotations()[constants.SmGlobalIP]
+	if op == syncer.Create && globalIP != "" {
 		return nil, false
 	}
 
-	ips, err := n.pool.Allocate(1)
-	if err != nil {
-		klog.Errorf("Error allocating IPs for node %q: %v", node.Name, err)
-		return nil, true
+	if globalIP == "" {
+		ips, err := n.pool.Allocate(1)
+		if err != nil {
+			klog.Errorf("Error allocating IPs for node %q: %v", node.Name, err)
+			return nil, true
+		}
+
+		globalIP = ips[0]
+
+		klog.Infof("Allocated global IP %s for node %q", globalIP, node.Name)
 	}
 
-	globalIP := ips[0]
+	klog.Infof("Adding ingress rules for node %q with global IP %s, CNI IP %s", node.Name, globalIP, cniIfaceIP)
 
-	klog.Infof("Allocated global IP %s for Node %q", globalIP, node.Name)
-
-	cniIfaceIP := node.GetAnnotations()[constants.CNIInterfaceIP]
 	if err := n.iptIface.AddIngressRulesForHealthCheck(cniIfaceIP, globalIP); err != nil {
 		klog.Errorf("Error programming rules for Gateway healthcheck on node %q: %v", node.Name, err)
 
@@ -207,14 +210,17 @@ func (n *nodeController) onNodeUpdated(oldObj, newObj *unstructured.Unstructured
 	oldGlobalIPOnNode := oldObj.GetAnnotations()[constants.SmGlobalIP]
 	newGlobalIPOnNode := newObj.GetAnnotations()[constants.SmGlobalIP]
 
-	if oldGlobalIPOnNode != "" && newGlobalIPOnNode == "" {
-		_ = n.pool.Release(oldGlobalIPOnNode)
+	if oldGlobalIPOnNode != "" && newGlobalIPOnNode == "" || oldCNIIfaceIPOnNode != newCNIIfaceIPOnNode {
+		if newGlobalIPOnNode == "" {
+			_ = n.pool.Release(oldGlobalIPOnNode)
+		}
 
 		if err := n.iptIface.RemoveIngressRulesForHealthCheck(oldCNIIfaceIPOnNode, oldGlobalIPOnNode); err != nil {
 			klog.Errorf("Error deleting rules for Gateway healthcheck on node %q: %v", n.nodeName, err)
-			return false
 		}
+
+		return false
 	}
 
-	return oldCNIIfaceIPOnNode == newCNIIfaceIPOnNode && newGlobalIPOnNode != ""
+	return true
 }
