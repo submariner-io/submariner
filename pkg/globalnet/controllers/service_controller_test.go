@@ -73,11 +73,17 @@ func newServiceControllerTestDriver() *serviceControllerTestDriver {
 func (t *serviceControllerTestDriver) start() {
 	var err error
 
-	t.controller, err = controllers.NewServiceController(syncer.ResourceSyncerConfig{
+	svcExController, err := controllers.NewServiceExportController(syncer.ResourceSyncerConfig{
 		SourceClient: t.dynClient,
 		RestMapper:   t.restMapper,
 		Scheme:       t.scheme,
 	})
+	Expect(err).To(Succeed())
+	t.controller, err = controllers.NewServiceController(syncer.ResourceSyncerConfig{
+		SourceClient: t.dynClient,
+		RestMapper:   t.restMapper,
+		Scheme:       t.scheme,
+	}, svcExController)
 
 	Expect(err).To(Succeed())
 	Expect(t.controller.Start()).To(Succeed())

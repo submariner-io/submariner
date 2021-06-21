@@ -199,3 +199,14 @@ func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngre
 		return nil
 	}, ingressIP.Status.AllocatedIP)
 }
+
+func getIngressIPName(obj runtime.Object) string {
+	switch typedObj := obj.(type) {
+	case *corev1.Service:
+		return fmt.Sprintf("svc-%.59s", typedObj.Name)
+	case *corev1.Pod:
+		return fmt.Sprintf("pod-%.59s", typedObj.Name)
+	}
+
+	return ""
+}

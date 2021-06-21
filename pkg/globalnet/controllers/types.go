@@ -26,7 +26,6 @@ import (
 	iptiface "github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	"github.com/submariner-io/submariner/pkg/iptables"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 )
 
@@ -113,17 +112,27 @@ type globalIngressIPController struct {
 
 type serviceExportController struct {
 	*baseSyncerController
-	services dynamic.NamespaceableResourceInterface
-	scheme   *runtime.Scheme
-	iptIface iptiface.Interface
+	services       dynamic.NamespaceableResourceInterface
+	iptIface       iptiface.Interface
+	podControllers sync.Map
+	config         syncer.ResourceSyncerConfig
 }
 
 type serviceController struct {
 	*baseSyncerController
+	svcExController *serviceExportController
 }
 
 type nodeController struct {
 	*baseIPAllocationController
 	nodeName string
 	nodes    dynamic.ResourceInterface
+}
+
+type ingressPodController struct {
+	*baseSyncerController
+	ingressIPs   dynamic.NamespaceableResourceInterface
+	svcName      string
+	namespace    string
+	ingressIPMap stringset.Interface
 }
