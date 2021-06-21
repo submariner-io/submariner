@@ -280,7 +280,7 @@ func (g *gatewayMonitor) startControllers() error {
 
 	g.controllers = append(g.controllers, c)
 
-	c, err = NewServiceController(*g.syncerConfig)
+	c, err = NewServiceController(*g.syncerConfig, c)
 	if err != nil {
 		return errors.WithMessage(err, "error creating the Service controller")
 	}

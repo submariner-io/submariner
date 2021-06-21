@@ -48,7 +48,7 @@ func NewServiceExportController(config syncer.ResourceSyncerConfig) (Interface, 
 	controller := &serviceExportController{
 		baseSyncerController: newBaseSyncerController(),
 		services:             config.SourceClient.Resource(*gvr),
-		scheme:               config.Scheme,
+		config:               config,
 	}
 
 	controller.resourceSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
@@ -74,6 +74,16 @@ func NewServiceExportController(config syncer.ResourceSyncerConfig) (Interface, 
 	controller.iptIface = iptIface
 
 	return controller, nil
+}
+
+func (c *serviceExportController) Stop() {
+	c.baseController.Stop()
+
+	c.podControllers.Range(func(key interface{}, value interface{}) bool {
+		value.(*ingressPodController).Stop()
+		c.podControllers.Delete(key)
+		return true
+	})
 }
 
 func (c *serviceExportController) process(from runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
@@ -106,6 +116,12 @@ func (c *serviceExportController) onCreate(serviceExport *mcsv1a1.ServiceExport)
 
 	klog.Infof("Processing ServiceExport %q", key)
 
+	if service.Spec.ClusterIP == corev1.ClusterIPNone {
+		// Headless service
+		// TODO: kuberProxyServiceChain?
+		return c.onCreateHeadless(key, service)
+	}
+
 	chainName, chainExists, err := c.iptIface.GetKubeProxyClusterIPServiceChainName(service, kubeProxyServiceChainPrefix)
 	if err != nil {
 		klog.Errorf("Error getting kube-proxy chain name for service %q: %v", key, err)
@@ -125,17 +141,10 @@ func (c *serviceExportController) onCreate(serviceExport *mcsv1a1.ServiceExport)
 				kubeProxyIPTableChainAnnotation: chainName,
 			},
 		},
-	}
-
-	if service.Spec.ClusterIP == corev1.ClusterIPNone {
-		// Headless service
-		// TODO - implement
-		return nil, false
-	} else {
-		ingressIP.Spec = submarinerv1.GlobalIngressIPSpec{
+		Spec: submarinerv1.GlobalIngressIPSpec{
 			Target:     submarinerv1.ClusterIPService,
 			ServiceRef: &corev1.LocalObjectReference{Name: serviceExport.Name},
-		}
+		},
 	}
 
 	klog.Infof("Creating %#v", ingressIP)
@@ -147,6 +156,7 @@ func (c *serviceExportController) onDelete(serviceExport *mcsv1a1.ServiceExport)
 	key, _ := cache.MetaNamespaceKeyFunc(serviceExport)
 
 	klog.Infof("ServiceExport %q deleted", key)
+	c.cleanupPodController(key)
 
 	return &submarinerv1.GlobalIngressIP{
 		ObjectMeta: metav1.ObjectMeta{
@@ -168,11 +178,32 @@ func (c *serviceExportController) getService(name, namespace string) (*corev1.Se
 	}
 
 	service := &corev1.Service{}
-	err = c.scheme.Convert(obj, service, nil)
+	err = c.config.Scheme.Convert(obj, service, nil)
 	if err != nil {
 		klog.Errorf("Error converting %#v to Service: %v", obj, err)
 		return nil, false, err
 	}
 
 	return service, true, nil
+}
+
+func (c *serviceExportController) onCreateHeadless(key string, service *corev1.Service) (runtime.Object, bool) {
+	controller, err := startIngressPodController(service, c.config)
+	if err != nil {
+		klog.Errorf("Failed to create pod controller for service %q", key)
+		return nil, true
+	}
+
+	c.podControllers.Store(key, controller)
+
+	return nil, false
+}
+
+func (c *serviceExportController) cleanupPodController(key string) {
+	if obj, found := c.podControllers.Load(key); found {
+		controller := obj.(*ingressPodController)
+		controller.Stop()
+		controller.cleanupIngressIPs()
+		c.podControllers.Delete(key)
+	}
 }
