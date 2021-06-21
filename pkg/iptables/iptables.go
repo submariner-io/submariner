@@ -30,6 +30,10 @@ type Interface interface {
 	ClearChain(table, chain string) error
 }
 
+type iptablesWrapper struct {
+	*iptables.IPTables
+}
+
 var NewFunc func() (Interface, error)
 
 func New() (Interface, error) {
@@ -37,5 +41,21 @@ func New() (Interface, error) {
 		return NewFunc()
 	}
 
-	return iptables.New(iptables.IPFamily(iptables.ProtocolIPv4), iptables.Timeout(5))
+	ipt, err := iptables.New(iptables.IPFamily(iptables.ProtocolIPv4), iptables.Timeout(5))
+	if err != nil {
+		return nil, err
+	}
+
+	return &iptablesWrapper{IPTables: ipt}, nil
+}
+
+func (i *iptablesWrapper) Delete(table, chain string, rulespec ...string) error {
+	err := i.IPTables.Delete(table, chain, rulespec...)
+
+	iptError, ok := err.(*iptables.Error)
+	if ok && iptError.IsNotExist() {
+		return nil
+	}
+
+	return err
 }
