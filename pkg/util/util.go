@@ -23,6 +23,7 @@ import (
 	"net"
 	"strings"
 	"syscall"
+	"unicode"
 
 	level "github.com/submariner-io/admiral/pkg/log"
 	"github.com/vishvananda/netlink"
@@ -128,7 +129,7 @@ func GetEndpointCRDNameFromParams(clusterID, cableName string) (string, error) {
 		return "", fmt.Errorf("error, cluster ID or cable name was empty")
 	}
 
-	return fmt.Sprintf("%s-%s", clusterID, cableName), nil
+	return EnsureValidName(fmt.Sprintf("%s-%s", clusterID, cableName)), nil
 }
 
 func GetClusterCRDName(cluster *types.SubmarinerCluster) (string, error) {
@@ -237,4 +238,17 @@ func InsertUnique(ipt iptables.Interface, table, chain string, position int, rul
 	}
 
 	return nil
+}
+
+func EnsureValidName(name string) string {
+	// K8s only allows lower case alphanumeric characters, '-' or '.'. Regex used for validation is
+	// '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'
+	return strings.Map(func(c rune) rune {
+		c = unicode.ToLower(c)
+		if !unicode.IsDigit(c) && !unicode.IsLower(c) && c != '-' && c != '.' {
+			return '-'
+		}
+
+		return c
+	}, name)
 }
