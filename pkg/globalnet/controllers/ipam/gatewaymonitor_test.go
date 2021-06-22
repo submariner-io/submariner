@@ -32,10 +32,11 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers/ipam"
 	"github.com/submariner-io/submariner/pkg/iptables"
 	fakeIPT "github.com/submariner-io/submariner/pkg/iptables/fake"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -71,7 +72,7 @@ var _ = Describe("Endpoint monitoring", func() {
 
 			t.ipt.AwaitChain("nat", constants.SmGlobalnetIngressChain)
 			t.ipt.AwaitChain("nat", constants.SmGlobalnetEgressChain)
-			t.ipt.AwaitChain("nat", constants.SmPostRoutingChain)
+			t.ipt.AwaitChain("nat", routeAgent.SmPostRoutingChain)
 			t.ipt.AwaitChain("nat", constants.SmGlobalnetMarkChain)
 
 			t.awaitServiceGlobalIP(service.Name)
@@ -331,7 +332,7 @@ var _ = Describe("Node monitoring", func() {
 		node = &corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        nodeName,
-				Annotations: map[string]string{constants.CNIInterfaceIP: "10.20.30.40"},
+				Annotations: map[string]string{routeAgent.CNIInterfaceIP: "10.20.30.40"},
 			},
 		}
 	})
@@ -344,7 +345,7 @@ var _ = Describe("Node monitoring", func() {
 	When("a Node without a global IP is created", func() {
 		It("should assign a global IP and add an appropriate IP tables rule", func() {
 			t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChain,
-				And(ContainSubstring(t.awaitNodeGlobalIP(node.Name)), ContainSubstring(node.Annotations[constants.CNIInterfaceIP])))
+				And(ContainSubstring(t.awaitNodeGlobalIP(node.Name)), ContainSubstring(node.Annotations[routeAgent.CNIInterfaceIP])))
 		})
 
 		Context("and it's also the local node", func() {
@@ -379,15 +380,15 @@ var _ = Describe("Node monitoring", func() {
 	})
 
 	When(fmt.Sprintf("a Node is initially created without the %q annotation then is subsequently set",
-		constants.CNIInterfaceIP), func() {
+		routeAgent.CNIInterfaceIP), func() {
 		BeforeEach(func() {
-			delete(node.Annotations, constants.CNIInterfaceIP)
+			delete(node.Annotations, routeAgent.CNIInterfaceIP)
 		})
 
 		It("should eventually assign a global IP", func() {
 			t.awaitNoNodeGlobalIP(node)
 
-			node.SetAnnotations(map[string]string{constants.CNIInterfaceIP: "10.20.30.40"})
+			node.SetAnnotations(map[string]string{routeAgent.CNIInterfaceIP: "10.20.30.40"})
 			test.UpdateResource(t.nodes, node)
 			t.awaitNodeGlobalIP(node.Name)
 		})

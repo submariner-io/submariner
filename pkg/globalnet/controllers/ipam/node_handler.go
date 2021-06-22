@@ -26,12 +26,12 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
 
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 )
 
 func (i *Controller) onNodeUpdated(oldObj, newObj *unstructured.Unstructured) bool {
-	oldCNIIfaceIPOnNode := oldObj.GetAnnotations()[constants.CNIInterfaceIP]
-	newCNIIfaceIPOnNode := newObj.GetAnnotations()[constants.CNIInterfaceIP]
+	oldCNIIfaceIPOnNode := oldObj.GetAnnotations()[routeAgent.CNIInterfaceIP]
+	newCNIIfaceIPOnNode := newObj.GetAnnotations()[routeAgent.CNIInterfaceIP]
 
 	return oldCNIIfaceIPOnNode == newCNIIfaceIPOnNode && i.areGlobalIPsEquivalent(oldObj, newObj)
 }
@@ -44,7 +44,7 @@ func (i *Controller) processNode(from runtime.Object, numRequeues int, op syncer
 		return nil, false
 	}
 
-	cniIfaceIP := node.GetAnnotations()[constants.CNIInterfaceIP]
+	cniIfaceIP := node.GetAnnotations()[routeAgent.CNIInterfaceIP]
 	if cniIfaceIP == "" {
 		// To support connectivity from HostNetwork to remoteCluster, globalnet requires the
 		// cniIfaceIP of the respective node. Route-agent running on the node annotates the
@@ -58,7 +58,7 @@ func (i *Controller) processNode(from runtime.Object, numRequeues int, op syncer
 
 func (i *Controller) processRemovedNode(node *k8sv1.Node) {
 	globalIP := node.Annotations[SubmarinerIPAMGlobalIP]
-	cniIfaceIP := node.Annotations[constants.CNIInterfaceIP]
+	cniIfaceIP := node.Annotations[routeAgent.CNIInterfaceIP]
 	if globalIP != "" && cniIfaceIP != "" {
 		key, _ := cache.MetaNamespaceKeyFunc(node)
 
@@ -74,7 +74,7 @@ func (i *Controller) processRemovedNode(node *k8sv1.Node) {
 }
 
 func (i *Controller) updateNode(node *k8sv1.Node) (runtime.Object, bool) {
-	cniIfaceIP := node.GetAnnotations()[constants.CNIInterfaceIP]
+	cniIfaceIP := node.GetAnnotations()[routeAgent.CNIInterfaceIP]
 
 	return i.updateGlobalIP(node, func(globalIP string) error {
 		return i.syncNodeRules(node.Name, cniIfaceIP, globalIP, AddRules)

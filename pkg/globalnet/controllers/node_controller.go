@@ -24,9 +24,10 @@ import (
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	admUtil "github.com/submariner-io/admiral/pkg/util"
+	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
 	"github.com/submariner-io/submariner/pkg/ipam"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -109,7 +110,7 @@ func (n *nodeController) process(from runtime.Object, numRequeues int, op syncer
 }
 
 func (n *nodeController) allocateIP(node *corev1.Node, op syncer.Operation) (runtime.Object, bool) {
-	cniIfaceIP := node.GetAnnotations()[constants.CNIInterfaceIP]
+	cniIfaceIP := node.GetAnnotations()[routeAgent.CNIInterfaceIP]
 	if cniIfaceIP == "" {
 		// To support connectivity from HostNetwork to remoteCluster, globalnet requires the
 		// cniIfaceIP of the respective node. Route-agent running on the node annotates the
@@ -154,7 +155,7 @@ func (n *nodeController) reserveAllocatedIP(federator federate.Federator, obj *u
 		return nil
 	}
 
-	cniIfaceIP := obj.GetAnnotations()[constants.CNIInterfaceIP]
+	cniIfaceIP := obj.GetAnnotations()[routeAgent.CNIInterfaceIP]
 	if cniIfaceIP == "" {
 		// To support Gateway healthCheck, globalnet requires the cniIfaceIP of the respective node.
 		// Route-agent running on the node annotates the respective node with the cniIfaceIP.
@@ -205,8 +206,8 @@ func (n *nodeController) onNodeUpdated(oldObj, newObj *unstructured.Unstructured
 		return true
 	}
 
-	oldCNIIfaceIPOnNode := oldObj.GetAnnotations()[constants.CNIInterfaceIP]
-	newCNIIfaceIPOnNode := newObj.GetAnnotations()[constants.CNIInterfaceIP]
+	oldCNIIfaceIPOnNode := oldObj.GetAnnotations()[routeAgent.CNIInterfaceIP]
+	newCNIIfaceIPOnNode := newObj.GetAnnotations()[routeAgent.CNIInterfaceIP]
 	oldGlobalIPOnNode := oldObj.GetAnnotations()[constants.SmGlobalIP]
 	newGlobalIPOnNode := newObj.GetAnnotations()[constants.SmGlobalIP]
 

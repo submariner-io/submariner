@@ -26,7 +26,8 @@ import (
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	"github.com/submariner-io/submariner/pkg/globalnet/constants"
+	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/util"
 )
 
@@ -48,14 +49,14 @@ func (i *Controller) initIPTableChains() error {
 		return fmt.Errorf("error creating iptables chain %s: %v", constants.SmGlobalnetEgressChain, err)
 	}
 
-	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmPostRoutingChain)
+	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", routeAgent.SmPostRoutingChain)
 
-	if err := util.CreateChainIfNotExists(i.ipt, "nat", constants.SmPostRoutingChain); err != nil {
-		return fmt.Errorf("error creating iptables chain %s: %v", constants.SmPostRoutingChain, err)
+	if err := util.CreateChainIfNotExists(i.ipt, "nat", routeAgent.SmPostRoutingChain); err != nil {
+		return fmt.Errorf("error creating iptables chain %s: %v", routeAgent.SmPostRoutingChain, err)
 	}
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetEgressChain}
-	if err := util.PrependUnique(i.ipt, "nat", constants.SmPostRoutingChain, forwardToSubGlobalNetChain); err != nil {
+	if err := util.PrependUnique(i.ipt, "nat", routeAgent.SmPostRoutingChain, forwardToSubGlobalNetChain); err != nil {
 		klog.Errorf("error inserting iptables rule %q: %v\n", strings.Join(forwardToSubGlobalNetChain, " "), err)
 	}
 

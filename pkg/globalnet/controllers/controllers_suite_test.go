@@ -29,11 +29,12 @@ import (
 	"github.com/onsi/gomega/format"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	"github.com/submariner-io/submariner/pkg/iptables"
 	fakeIPT "github.com/submariner-io/submariner/pkg/iptables/fake"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -168,7 +169,7 @@ func (t *testDriverBase) awaitGlobalEgressIPStatusAllocated(name string, expNumI
 }
 
 func (t *testDriverBase) awaitClusterGlobalEgressIPStatusAllocated(expNumIPS int) {
-	t.awaitEgressIPStatusAllocated(t.clusterGlobalEgressIPs, controllers.ClusterGlobalEgressIPName, expNumIPS)
+	t.awaitEgressIPStatusAllocated(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, expNumIPS)
 }
 
 func (t *testDriverBase) createPod(p *corev1.Pod) *corev1.Pod {
@@ -211,7 +212,7 @@ func (t *testDriverBase) createNode(name, cniInterfaceIP, globalIP string) *core
 		},
 	}
 
-	addAnnotation(node, constants.CNIInterfaceIP, cniInterfaceIP)
+	addAnnotation(node, routeAgent.CNIInterfaceIP, cniInterfaceIP)
 	addAnnotation(node, constants.SmGlobalIP, globalIP)
 
 	return fromUnstructured(test.CreateResource(t.nodes, node), &corev1.Node{}).(*corev1.Node)
