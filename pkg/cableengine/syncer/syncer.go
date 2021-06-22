@@ -32,6 +32,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/cableengine"
 	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
 	v1typed "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/util"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -201,7 +202,7 @@ func (gs *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 			LocalEndpoint: localEndpoint.Spec,
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        localEndpoint.Spec.Hostname,
+			Name:        util.EnsureValidName(localEndpoint.Spec.Hostname),
 			Annotations: map[string]string{updateTimestampAnnotation: strconv.FormatInt(time.Now().UTC().Unix(), 10)}},
 	}
 
