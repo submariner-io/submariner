@@ -27,7 +27,7 @@ import (
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 )
 
 func (i *Controller) updateIngressRulesForService(globalIP, chainName string, addRules bool) error {

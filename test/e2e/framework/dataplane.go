@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
-	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
+	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -100,7 +100,7 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams) {
 	if p.ToEndpointType == tcp.GlobalIP {
 		By("Verifying the output of listener pod which must contain the globalIP assigned to the Cluster")
 
-		podGlobalIP := p.Framework.AwaitClusterGlobalEgressIPs(p.FromCluster, controllers.ClusterGlobalEgressIPName)
+		podGlobalIP := p.Framework.AwaitClusterGlobalEgressIPs(p.FromCluster, constants.ClusterGlobalEgressIPName)
 		Expect(podGlobalIP).ToNot(Equal(""))
 		Expect(listenerPod.TerminationMessage).To(ContainSubstring(podGlobalIP[0]))
 	}

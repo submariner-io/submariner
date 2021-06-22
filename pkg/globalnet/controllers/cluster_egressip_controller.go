@@ -27,6 +27,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	corev1 "k8s.io/api/core/v1"
@@ -57,7 +58,7 @@ func NewClusterGlobalEgressIPController(config syncer.ResourceSyncerConfig, loca
 
 	defaultEgressIP := &submarinerv1.ClusterGlobalEgressIP{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: ClusterGlobalEgressIPName,
+			Name: constants.ClusterGlobalEgressIPName,
 		},
 	}
 
@@ -140,13 +141,13 @@ func (c *clusterGlobalEgressIPController) process(from runtime.Object, numRequeu
 }
 
 func (c *clusterGlobalEgressIPController) validate(numberOfIPs int, egressIP *submarinerv1.ClusterGlobalEgressIP) bool {
-	if egressIP.Name != ClusterGlobalEgressIPName {
+	if egressIP.Name != constants.ClusterGlobalEgressIPName {
 		tryAppendStatusCondition(&egressIP.Status.Conditions, &metav1.Condition{
 			Type:   string(submarinerv1.GlobalEgressIPAllocated),
 			Status: metav1.ConditionFalse,
 			Reason: "InvalidInstance",
 			Message: fmt.Sprintf("Only the ClusterGlobalEgressIP instance with the well-known name %q is supported",
-				ClusterGlobalEgressIPName),
+				constants.ClusterGlobalEgressIPName),
 		})
 
 		return false

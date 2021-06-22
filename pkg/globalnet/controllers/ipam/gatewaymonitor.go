@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"

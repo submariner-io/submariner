@@ -31,8 +31,6 @@ import (
 )
 
 const (
-	ClusterGlobalEgressIPName = "cluster-egress.submariner.io"
-
 	// Globalnet uses MARK target to mark traffic destined to remote clusters.
 	// Some of the CNIs also use iptable MARK targets in the pipeline. This should not
 	// be a problem because Globalnet is only marking traffic destined to Submariner

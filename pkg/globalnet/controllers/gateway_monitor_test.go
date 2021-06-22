@@ -28,8 +28,9 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
@@ -57,7 +58,7 @@ var _ = Describe("Endpoint monitoring", func() {
 		It("should add the appropriate IP table chains", func() {
 			t.ipt.AwaitChain("nat", constants.SmGlobalnetIngressChain)
 			t.ipt.AwaitChain("nat", constants.SmGlobalnetEgressChain)
-			t.ipt.AwaitChain("nat", constants.SmPostRoutingChain)
+			t.ipt.AwaitChain("nat", routeAgent.SmPostRoutingChain)
 			t.ipt.AwaitChain("nat", constants.SmGlobalnetMarkChain)
 		})
 

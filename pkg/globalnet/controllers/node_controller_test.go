@@ -25,9 +25,10 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
+	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/ipam"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -107,7 +108,7 @@ var _ = Describe("Node controller", func() {
 			JustBeforeEach(func() {
 				t.awaitNoNodeGlobalIP()
 
-				addAnnotation(node, constants.CNIInterfaceIP, cniInterfaceIP)
+				addAnnotation(node, routeAgent.CNIInterfaceIP, cniInterfaceIP)
 				test.UpdateResource(t.nodes, node)
 			})
 
@@ -132,10 +133,10 @@ var _ = Describe("Node controller", func() {
 			})
 
 			It("re-program the iptable rules", func() {
-				oldCNIIfaceIP := node.GetAnnotations()[constants.CNIInterfaceIP]
+				oldCNIIfaceIP := node.GetAnnotations()[routeAgent.CNIInterfaceIP]
 
 				time.Sleep(time.Millisecond * 300)
-				addAnnotation(node, constants.CNIInterfaceIP, cniInterfaceIP)
+				addAnnotation(node, routeAgent.CNIInterfaceIP, cniInterfaceIP)
 				test.UpdateResource(t.nodes, node)
 
 				t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(oldCNIIfaceIP))

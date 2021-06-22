@@ -25,7 +25,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/iptables"
 	"k8s.io/klog"
 
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 )
 
 func (i *Controller) updateEgressRulesForResource(resourceName, sourceIP, globalIP string, addRules bool) error {
