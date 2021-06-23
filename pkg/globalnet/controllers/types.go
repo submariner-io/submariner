@@ -123,13 +123,12 @@ type clusterGlobalEgressIPController struct {
 
 type globalIngressIPController struct {
 	*baseIPAllocationController
-	pods   dynamic.NamespaceableResourceInterface
-	config syncer.ResourceSyncerConfig
 }
 
 type serviceExportController struct {
 	*baseSyncerController
 	services       dynamic.NamespaceableResourceInterface
+	ingressIPs     dynamic.ResourceInterface
 	iptIface       iptiface.Interface
 	podControllers *IngressPodControllers
 	scheme         *runtime.Scheme
@@ -137,6 +136,7 @@ type serviceExportController struct {
 
 type serviceController struct {
 	*baseSyncerController
+	ingressIPs     dynamic.ResourceInterface
 	podControllers *IngressPodControllers
 }
 

@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
@@ -74,12 +75,42 @@ func NewServiceExportController(config syncer.ResourceSyncerConfig, podControlle
 
 	controller.iptIface = iptIface
 
+	_, gvr, err = util.ToUnstructuredResource(&submarinerv1.GlobalIngressIP{}, config.RestMapper)
+	if err != nil {
+		return nil, err
+	}
+
+	controller.ingressIPs = config.SourceClient.Resource(*gvr).Namespace(corev1.NamespaceAll)
+
 	return controller, nil
 }
 
 func (c *serviceExportController) Stop() {
 	c.baseController.Stop()
 	c.podControllers.stopAll()
+}
+
+func (c *serviceExportController) Start() error {
+	err := c.baseSyncerController.Start()
+	if err != nil {
+		return err
+	}
+
+	c.reconcile(c.ingressIPs, func(obj *unstructured.Unstructured) runtime.Object {
+		name, exists, _ := unstructured.NestedString(obj.Object, "spec", "serviceRef", "name")
+		if exists {
+			return &mcsv1a1.ServiceExport{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: obj.GetNamespace(),
+				},
+			}
+		}
+
+		return nil
+	})
+
+	return nil
 }
 
 func (c *serviceExportController) process(from runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {

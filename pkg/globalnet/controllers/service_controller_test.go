@@ -25,6 +25,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -78,6 +79,49 @@ var _ = Describe("Service controller", func() {
 				list, _ := t.globalIngressIPs.List(context.TODO(), metav1.ListOptions{})
 				return list.Items
 			}, 5).Should(BeEmpty())
+		})
+	})
+
+	When("a GlobalIngressIP is stale on startup due to a missed delete event", func() {
+		Context("for a cluster IP Service", func() {
+			BeforeEach(func() {
+				t.createServiceExport(newClusterIPService())
+				t.createGlobalIngressIP(&submarinerv1.GlobalIngressIP{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: serviceName,
+					},
+					Spec: submarinerv1.GlobalIngressIPSpec{
+						Target:     submarinerv1.ClusterIPService,
+						ServiceRef: &corev1.LocalObjectReference{Name: serviceName},
+					},
+				})
+			})
+
+			It("should delete the GlobalIngressIP on reconciliation", func() {
+				t.awaitNoGlobalIngressIP(serviceName)
+			})
+		})
+
+		Context("for a headless Service", func() {
+			BeforeEach(func() {
+				t.createServiceExport(newHeadlessService())
+				t.createGlobalIngressIP(&submarinerv1.GlobalIngressIP{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod-one",
+						Labels: map[string]string{
+							controllers.ServiceRefLabel: serviceName,
+						},
+					},
+					Spec: submarinerv1.GlobalIngressIPSpec{
+						Target:     submarinerv1.HeadlessServicePod,
+						ServiceRef: &corev1.LocalObjectReference{Name: serviceName},
+					},
+				})
+			})
+
+			It("should delete the GlobalIngressIP on reconciliation", func() {
+				t.awaitNoGlobalIngressIP("pod-one")
+			})
 		})
 	})
 })

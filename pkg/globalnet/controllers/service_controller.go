@@ -20,9 +20,11 @@ package controllers
 import (
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/syncer"
+	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
@@ -53,7 +55,40 @@ func NewServiceController(config syncer.ResourceSyncerConfig, podControllers *In
 		return nil, err
 	}
 
+	_, gvr, err := util.ToUnstructuredResource(&submarinerv1.GlobalIngressIP{}, config.RestMapper)
+	if err != nil {
+		return nil, err
+	}
+
+	controller.ingressIPs = config.SourceClient.Resource(*gvr).Namespace(corev1.NamespaceAll)
+
 	return controller, nil
+}
+
+func (c *serviceController) Start() error {
+	err := c.baseSyncerController.Start()
+	if err != nil {
+		return err
+	}
+
+	c.reconcile(c.ingressIPs, func(obj *unstructured.Unstructured) runtime.Object {
+		name, exists, _ := unstructured.NestedString(obj.Object, "spec", "serviceRef", "name")
+		if exists {
+			return &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: obj.GetNamespace(),
+				},
+				Spec: corev1.ServiceSpec{
+					Type: corev1.ServiceTypeClusterIP,
+				},
+			}
+		}
+
+		return nil
+	})
+
+	return nil
 }
 
 func (c *serviceController) process(from runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
@@ -75,8 +110,9 @@ func (c *serviceController) onDelete(service *corev1.Service) (runtime.Object, b
 
 	klog.Infof("Service %q deleted", key)
 
+	c.podControllers.stopAndCleanup(service.Name, service.Namespace)
+
 	if service.Spec.ClusterIP == corev1.ClusterIPNone {
-		c.podControllers.stopAndCleanup(service.Name, service.Namespace)
 		return nil, false
 	}
 
