@@ -8,6 +8,7 @@ require (
 	github.com/ebay/go-ovn v0.1.1-0.20210414223409-7376ba97f8cd
 	github.com/emirpasic/gods v1.12.0
 	github.com/go-ping/ping v0.0.0-20210407214646-e4e642a95741
+	github.com/google/uuid v1.2.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.13.0

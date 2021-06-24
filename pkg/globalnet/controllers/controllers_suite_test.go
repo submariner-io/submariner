@@ -24,9 +24,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
+	fakeDynClient "github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
@@ -44,7 +46,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
-	fakeDynClient "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
@@ -104,7 +105,7 @@ func newTestDriverBase() *testDriverBase {
 	Expect(submarinerv1.AddToScheme(t.scheme)).To(Succeed())
 	Expect(corev1.AddToScheme(t.scheme)).To(Succeed())
 
-	t.dynClient = fakeDynClient.NewSimpleDynamicClient(t.scheme)
+	t.dynClient = fakeDynClient.NewDynamicClient(t.scheme)
 
 	t.globalEgressIPs = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.GlobalEgressIP{})).
 		Namespace(namespace)
@@ -342,10 +343,42 @@ func (t *testDriverBase) awaitGlobalIngressIP(name string) *submarinerv1.GlobalI
 	return gip
 }
 
+func (t *testDriverBase) awaitHeadlessGlobalIngressIP(svcName, podName string) *submarinerv1.GlobalIngressIP {
+	var ingressIP *submarinerv1.GlobalIngressIP
+
+	Eventually(func() bool {
+		list, _ := t.globalIngressIPs.List(context.TODO(), metav1.ListOptions{})
+		for i := range list.Items {
+			gip := &submarinerv1.GlobalIngressIP{}
+			Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(list.Items[i].Object, gip)).To(Succeed())
+
+			if gip.Spec.PodRef != nil && gip.Spec.PodRef.Name == podName {
+				ingressIP = gip
+				return true
+			}
+		}
+
+		return false
+	}, 5).Should(BeTrue(), "GlobalIngressIP not found")
+
+	Expect(ingressIP.Spec.Target).To(Equal(submarinerv1.HeadlessServicePod))
+	Expect(ingressIP.Spec.ServiceRef).ToNot(BeNil())
+	Expect(ingressIP.Spec.ServiceRef.Name).To(Equal(svcName))
+
+	return ingressIP
+}
+
 // nolint unparam - `name` always receives `serviceName` (`"nginx"`)
 func (t *testDriverBase) awaitNoGlobalIngressIP(name string) {
 	time.Sleep(300 * time.Millisecond)
 	test.AwaitNoResource(t.globalIngressIPs, name)
+}
+
+func (t *testDriverBase) awaitNoGlobalIngressIPs() {
+	Consistently(func() []unstructured.Unstructured {
+		list, _ := t.globalIngressIPs.List(context.TODO(), metav1.ListOptions{})
+		return list.Items
+	}, time.Millisecond*300).Should(BeEmpty())
 }
 
 func awaitStatusConditions(client dynamic.ResourceInterface, name string, atIndex int, expCond ...metav1.Condition) {
@@ -481,8 +514,23 @@ func newClusterIPService() *corev1.Service {
 func newHeadlessService() *corev1.Service {
 	s := newClusterIPService()
 	s.Spec.ClusterIP = corev1.ClusterIPNone
+	s.Spec.Selector = map[string]string{"pod": s.Name}
 
 	return s
+}
+
+func newHeadlessServicePod(svcName string) *corev1.Pod {
+	return &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      uuid.New().String(),
+			Namespace: namespace,
+			Labels:    map[string]string{"pod": svcName},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+			PodIP: "172.45.4.3",
+		},
+	}
 }
 
 func isValidIPForCIDR(cidr, ip string) bool {
