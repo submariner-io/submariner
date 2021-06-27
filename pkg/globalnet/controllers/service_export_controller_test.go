@@ -161,7 +161,7 @@ func testHeadlessService() {
 			otherPod = t.createPod(newPod(namespace))
 		})
 
-		It("should delete the GlobalIngressIP objects associated to the backend Pods", func() {
+		It("should delete the GlobalIngressIP objects associated with the backend Pods", func() {
 			ingressIP1 := t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
 			ingressIP2 := t.awaitHeadlessGlobalIngressIP(service.Name, backendPod2.Name)
 
@@ -170,6 +170,10 @@ func testHeadlessService() {
 			t.awaitNoGlobalIngressIP(ingressIP2.Name)
 
 			test.GetResource(t.pods.Namespace(namespace), otherPod)
+
+			// Ensure GlobalIngressIPs are no longer created for the service.
+			t.createPod(newHeadlessServicePod(service.Name))
+			t.awaitNoGlobalIngressIPs()
 		})
 	})
 
@@ -212,11 +216,16 @@ func (t *serviceExportControllerTestDriver) start() {
 	t.pool, err = ipam.NewIPPool(t.globalCIDR)
 	Expect(err).To(Succeed())
 
-	t.controller, err = controllers.NewServiceExportController(syncer.ResourceSyncerConfig{
+	config := &syncer.ResourceSyncerConfig{
 		SourceClient: t.dynClient,
 		RestMapper:   t.restMapper,
 		Scheme:       t.scheme,
-	})
+	}
+
+	podControllers, err := controllers.NewIngressPodControllers(*config)
+	Expect(err).To(Succeed())
+
+	t.controller, err = controllers.NewServiceExportController(*config, podControllers)
 
 	Expect(err).To(Succeed())
 	Expect(t.controller.Start()).To(Succeed())

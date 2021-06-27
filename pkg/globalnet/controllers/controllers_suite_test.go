@@ -520,7 +520,10 @@ func newClusterIPService() *corev1.Service {
 }
 
 func newHeadlessService() *corev1.Service {
-	s := newClusterIPService()
+	return toHeadlessService(newClusterIPService())
+}
+
+func toHeadlessService(s *corev1.Service) *corev1.Service {
 	s.Spec.ClusterIP = corev1.ClusterIPNone
 	s.Spec.Selector = map[string]string{"pod": s.Name}
 

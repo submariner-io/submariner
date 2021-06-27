@@ -18,15 +18,11 @@ limitations under the License.
 package controllers
 
 import (
-	"context"
-
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/admiral/pkg/syncer"
-	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -35,19 +31,11 @@ import (
 	"k8s.io/klog"
 )
 
-const labelServiceRef = "submariner.io/serviceRef"
-
 func startIngressPodController(svc *corev1.Service, config syncer.ResourceSyncerConfig) (*ingressPodController, error) {
 	var err error
 
-	_, gvr, err := util.ToUnstructuredResource(&submarinerv1.GlobalIngressIP{}, config.RestMapper)
-	if err != nil {
-		return nil, err
-	}
-
 	controller := &ingressPodController{
 		baseSyncerController: newBaseSyncerController(),
-		ingressIPs:           config.SourceClient.Resource(*gvr),
 		svcName:              svc.Name,
 		namespace:            svc.Namespace,
 		ingressIPMap:         stringset.NewSynchronized(),
@@ -90,7 +78,7 @@ func (c *ingressPodController) process(from runtime.Object, numRequeues int, op 
 			Name:      getIngressIPName(pod),
 			Namespace: pod.Namespace,
 			Labels: map[string]string{
-				labelServiceRef: c.svcName,
+				ServiceRefLabel: c.svcName,
 			},
 		},
 	}
@@ -119,16 +107,6 @@ func (c *ingressPodController) process(from runtime.Object, numRequeues int, op 
 	c.ingressIPMap.Add(ingressIP.Name)
 
 	return ingressIP, false
-}
-
-func (c *ingressPodController) cleanupIngressIPs() {
-	svcSelector := labels.SelectorFromSet(map[string]string{labelServiceRef: c.svcName}).String()
-	err := c.ingressIPs.Namespace(c.namespace).DeleteCollection(context.TODO(), metav1.DeleteOptions{},
-		metav1.ListOptions{LabelSelector: svcSelector})
-
-	if err != nil && !errors.IsNotFound(err) {
-		klog.Errorf("error deleting GlobalIngressIPs for service %s/%s: %v", c.namespace, c.svcName, err)
-	}
 }
 
 func arePodsEqual(obj1, obj2 *unstructured.Unstructured) bool {
