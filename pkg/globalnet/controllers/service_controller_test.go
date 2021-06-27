@@ -26,12 +26,13 @@ import (
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 var _ = Describe("Service controller", func() {
 	t := newServiceControllerTestDriver()
 
-	When("an exported Service is deleted", func() {
+	When("an exported cluster IP Service is deleted", func() {
 		BeforeEach(func() {
 			t.createServiceExport(t.createService(newClusterIPService()))
 			t.createGlobalIngressIP(&submarinerv1.GlobalIngressIP{
@@ -44,6 +45,39 @@ var _ = Describe("Service controller", func() {
 		It("should delete the GlobalIngressIP", func() {
 			Expect(t.services.Delete(context.TODO(), serviceName, metav1.DeleteOptions{})).To(Succeed())
 			t.awaitNoGlobalIngressIP(serviceName)
+		})
+	})
+
+	When("an exported headless Service is deleted", func() {
+		BeforeEach(func() {
+			t.createServiceExport(t.createService(newHeadlessService()))
+
+			t.createGlobalIngressIP(&submarinerv1.GlobalIngressIP{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod-1",
+					Labels: map[string]string{
+						controllers.ServiceRefLabel: serviceName,
+					},
+				},
+			})
+
+			t.createGlobalIngressIP(&submarinerv1.GlobalIngressIP{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod-2",
+					Labels: map[string]string{
+						controllers.ServiceRefLabel: serviceName,
+					},
+				},
+			})
+		})
+
+		It("should delete the GlobalIngressIP objects associated with the backend Pods", func() {
+			Expect(t.services.Delete(context.TODO(), serviceName, metav1.DeleteOptions{})).To(Succeed())
+
+			Eventually(func() []unstructured.Unstructured {
+				list, _ := t.globalIngressIPs.List(context.TODO(), metav1.ListOptions{})
+				return list.Items
+			}, 5).Should(BeEmpty())
 		})
 	})
 })
@@ -73,17 +107,16 @@ func newServiceControllerTestDriver() *serviceControllerTestDriver {
 func (t *serviceControllerTestDriver) start() {
 	var err error
 
-	svcExController, err := controllers.NewServiceExportController(syncer.ResourceSyncerConfig{
+	config := &syncer.ResourceSyncerConfig{
 		SourceClient: t.dynClient,
 		RestMapper:   t.restMapper,
 		Scheme:       t.scheme,
-	})
+	}
+
+	podControllers, err := controllers.NewIngressPodControllers(*config)
 	Expect(err).To(Succeed())
-	t.controller, err = controllers.NewServiceController(syncer.ResourceSyncerConfig{
-		SourceClient: t.dynClient,
-		RestMapper:   t.restMapper,
-		Scheme:       t.scheme,
-	}, svcExController)
+
+	t.controller, err = controllers.NewServiceController(*config, podControllers)
 
 	Expect(err).To(Succeed())
 	Expect(t.controller.Start()).To(Succeed())

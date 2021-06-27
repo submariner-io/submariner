@@ -35,7 +35,7 @@ import (
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-func NewServiceExportController(config syncer.ResourceSyncerConfig) (Interface, error) {
+func NewServiceExportController(config syncer.ResourceSyncerConfig, podControllers *IngressPodControllers) (Interface, error) {
 	var err error
 
 	klog.Info("Creating ServiceExport controller")
@@ -48,7 +48,8 @@ func NewServiceExportController(config syncer.ResourceSyncerConfig) (Interface, 
 	controller := &serviceExportController{
 		baseSyncerController: newBaseSyncerController(),
 		services:             config.SourceClient.Resource(*gvr),
-		config:               config,
+		podControllers:       podControllers,
+		scheme:               config.Scheme,
 	}
 
 	controller.resourceSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
@@ -78,12 +79,7 @@ func NewServiceExportController(config syncer.ResourceSyncerConfig) (Interface, 
 
 func (c *serviceExportController) Stop() {
 	c.baseController.Stop()
-
-	c.podControllers.Range(func(key interface{}, value interface{}) bool {
-		value.(*ingressPodController).Stop()
-		c.podControllers.Delete(key)
-		return true
-	})
+	c.podControllers.stopAll()
 }
 
 func (c *serviceExportController) process(from runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
@@ -156,7 +152,8 @@ func (c *serviceExportController) onDelete(serviceExport *mcsv1a1.ServiceExport)
 	key, _ := cache.MetaNamespaceKeyFunc(serviceExport)
 
 	klog.Infof("ServiceExport %q deleted", key)
-	c.cleanupPodController(key)
+
+	c.podControllers.stopAndCleanup(serviceExport.Name, serviceExport.Namespace)
 
 	return &submarinerv1.GlobalIngressIP{
 		ObjectMeta: metav1.ObjectMeta{
@@ -178,7 +175,7 @@ func (c *serviceExportController) getService(name, namespace string) (*corev1.Se
 	}
 
 	service := &corev1.Service{}
-	err = c.config.Scheme.Convert(obj, service, nil)
+	err = c.scheme.Convert(obj, service, nil)
 	if err != nil {
 		klog.Errorf("Error converting %#v to Service: %v", obj, err)
 		return nil, false, err
@@ -188,22 +185,11 @@ func (c *serviceExportController) getService(name, namespace string) (*corev1.Se
 }
 
 func (c *serviceExportController) onCreateHeadless(key string, service *corev1.Service) (runtime.Object, bool) {
-	controller, err := startIngressPodController(service, c.config)
+	err := c.podControllers.start(service)
 	if err != nil {
 		klog.Errorf("Failed to create pod controller for service %q", key)
 		return nil, true
 	}
 
-	c.podControllers.Store(key, controller)
-
 	return nil, false
-}
-
-func (c *serviceExportController) cleanupPodController(key string) {
-	if obj, found := c.podControllers.Load(key); found {
-		controller := obj.(*ingressPodController)
-		controller.Stop()
-		controller.cleanupIngressIPs()
-		c.podControllers.Delete(key)
-	}
 }

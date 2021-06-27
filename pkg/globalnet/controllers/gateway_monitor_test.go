@@ -70,6 +70,14 @@ var _ = Describe("Endpoint monitoring", func() {
 
 			t.createServiceExport(t.createService(newClusterIPService()))
 			t.awaitIngressIPStatusAllocated(serviceName)
+
+			service := newClusterIPService()
+			service.Name = "headless-nginx"
+			service = toHeadlessService(service)
+			backendPod := newHeadlessServicePod(service.Name)
+			t.createPod(backendPod)
+			t.createServiceExport(t.createService(service))
+			t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
 		})
 
 		Context("and then removed", func() {

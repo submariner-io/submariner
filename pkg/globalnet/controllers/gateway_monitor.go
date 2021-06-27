@@ -273,14 +273,19 @@ func (g *gatewayMonitor) startControllers() error {
 
 	g.controllers = append(g.controllers, c)
 
-	c, err = NewServiceExportController(*g.syncerConfig)
+	podControllers, err := NewIngressPodControllers(*g.syncerConfig)
+	if err != nil {
+		return errors.WithMessage(err, "error creating the IngressPodControllers")
+	}
+
+	c, err = NewServiceExportController(*g.syncerConfig, podControllers)
 	if err != nil {
 		return errors.WithMessage(err, "error creating the ServiceExport controller")
 	}
 
 	g.controllers = append(g.controllers, c)
 
-	c, err = NewServiceController(*g.syncerConfig, c)
+	c, err = NewServiceController(*g.syncerConfig, podControllers)
 	if err != nil {
 		return errors.WithMessage(err, "error creating the Service controller")
 	}
