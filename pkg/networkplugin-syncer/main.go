@@ -21,6 +21,8 @@ import (
 	"flag"
 	"os"
 
+	"github.com/kelseyhightower/envconfig"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -48,6 +50,12 @@ func main() {
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler().Done()
 
+	var env environment.Specification
+	err := envconfig.Process("submariner", &env)
+	if err != nil {
+		klog.Fatalf("Error reading the environment variables: %s", err.Error())
+	}
+
 	networkPlugin := os.Getenv("SUBMARINER_NETWORKPLUGIN")
 
 	if networkPlugin == "" {
@@ -55,7 +63,7 @@ func main() {
 	}
 
 	registry := event.NewRegistry("networkplugin-syncer", networkPlugin)
-	if err := registry.AddHandlers(logger.NewHandler(), ovn.NewSyncHandler(getK8sClient())); err != nil {
+	if err := registry.AddHandlers(logger.NewHandler(), ovn.NewSyncHandler(getK8sClient(), env)); err != nil {
 		klog.Fatalf("Error registering the handlers: %s", err.Error())
 	}
 
