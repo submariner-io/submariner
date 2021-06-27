@@ -20,11 +20,15 @@ import (
 	"sync"
 
 	goovn "github.com/ebay/go-ovn"
+	"github.com/submariner-io/submariner/pkg/cidr"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	clientset "k8s.io/client-go/kubernetes"
 
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn/nbctl"
+
+	"k8s.io/klog"
 )
 
 var ErrWaitingForLocalEndpoint = errors.New("waiting for the local endpoint details before we can " +
@@ -32,13 +36,15 @@ var ErrWaitingForLocalEndpoint = errors.New("waiting for the local endpoint deta
 
 type SyncHandler struct {
 	event.HandlerBase
-	syncMutex       sync.Mutex
-	k8sClientset    clientset.Interface
-	nbctl           *nbctl.NbCtl
-	nbdb            goovn.Client
-	sbdb            goovn.Client
-	localEndpoint   *submV1.Endpoint
-	remoteEndpoints map[string]*submV1.Endpoint
+	syncMutex        sync.Mutex
+	k8sClientset     clientset.Interface
+	nbctl            *nbctl.NbCtl
+	nbdb             goovn.Client
+	sbdb             goovn.Client
+	localClusterCIDR []string
+	localServiceCIDR []string
+	localEndpoint    *submV1.Endpoint
+	remoteEndpoints  map[string]*submV1.Endpoint
 }
 
 func (ovn *SyncHandler) GetName() string {
@@ -49,10 +55,12 @@ func (ovn *SyncHandler) GetNetworkPlugins() []string {
 	return []string{"OVNKubernetes"}
 }
 
-func NewSyncHandler(k8sClientset clientset.Interface) event.Handler {
+func NewSyncHandler(k8sClientset clientset.Interface, env environment.Specification) event.Handler {
 	return &SyncHandler{
-		remoteEndpoints: make(map[string]*submV1.Endpoint),
-		k8sClientset:    k8sClientset,
+		remoteEndpoints:  make(map[string]*submV1.Endpoint),
+		k8sClientset:     k8sClientset,
+		localClusterCIDR: env.ClusterCidr,
+		localServiceCIDR: env.ServiceCidr,
 	}
 }
 
@@ -98,6 +106,12 @@ func (ovn *SyncHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 }
 
 func (ovn *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
+	if err := cidr.OverlappingSubnets(ovn.localServiceCIDR, ovn.localClusterCIDR, endpoint.Spec.Subnets); err != nil {
+		// Skip processing the endpoint when CIDRs overlap and return nil to avoid re-queuing.
+		klog.Errorf("overlappingSubnets for new remote %#v returned error: %v", endpoint, err)
+		return nil
+	}
+
 	ovn.syncMutex.Lock()
 	defer ovn.syncMutex.Unlock()
 
@@ -107,6 +121,12 @@ func (ovn *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 }
 
 func (ovn *SyncHandler) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
+	if err := cidr.OverlappingSubnets(ovn.localServiceCIDR, ovn.localClusterCIDR, endpoint.Spec.Subnets); err != nil {
+		// Skip processing the endpoint when CIDRs overlap and return nil to avoid re-queuing.
+		klog.Errorf("overlappingSubnets for new remote %#v returned error: %v", endpoint, err)
+		return nil
+	}
+
 	ovn.syncMutex.Lock()
 	defer ovn.syncMutex.Unlock()
 
