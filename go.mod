@@ -19,7 +19,7 @@ require (
 	github.com/vishvananda/netlink v1.1.0
 	golang.org/x/sys v0.0.0-20210603081109-ebe580a85c40
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20210427135350-f9ad6d392236
-	google.golang.org/protobuf v1.26.0
+	google.golang.org/protobuf v1.27.0
 	k8s.io/api v0.21.0
 	k8s.io/apimachinery v0.21.0
 	k8s.io/client-go v1.5.2
