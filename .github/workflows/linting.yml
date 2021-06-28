@@ -5,6 +5,24 @@ on:
   pull_request:
 
 jobs:
+  apply-suggestions-commits:
+    name: 'No "Apply suggestions from code review" Commits'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get PR commits
+        id: 'get-pr-commits'
+        uses: tim-actions/get-pr-commits@v1.1.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 'Verify no "Apply suggestions from code review" commits'
+        uses: tim-actions/commit-message-checker-with-regex@v0.3.1
+        with:
+          commits: ${{ steps.get-pr-commits.outputs.commits }}
+          pattern: '^(?!.*(apply suggestions from code review))'
+          flags: 'i'
+          error: 'Commits addressing code review feedback should typically be squashed into the commits under review'
+
   code-gen:
     name: Submariner K8s API Code Generation
     runs-on: ubuntu-latest
