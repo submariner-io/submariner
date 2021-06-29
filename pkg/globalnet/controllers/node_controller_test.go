@@ -155,8 +155,10 @@ var _ = Describe("Node controller", func() {
 
 		It("should release the global IP", func() {
 			t.awaitIPsReleasedFromPool(node.GetAnnotations()[constants.SmGlobalIP])
-			obj := test.GetResource(t.nodes, node)
-			Expect(obj.GetAnnotations()[constants.SmGlobalIP]).To(BeEmpty())
+			Eventually(func() string {
+				obj := test.GetResource(t.nodes, node)
+				return obj.GetAnnotations()[constants.SmGlobalIP]
+			}).Should(BeEmpty())
 		})
 	})
 })

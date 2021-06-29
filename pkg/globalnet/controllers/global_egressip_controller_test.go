@@ -120,14 +120,13 @@ var _ = Describe("GlobalEgressIP controller", func() {
 	When("a Pod is created", func() {
 		var pod *corev1.Pod
 
-		JustBeforeEach(func() {
+		BeforeEach(func() {
 			pod = newPod(namespace)
+			t.createGlobalEgressIP(newGlobalEgressIP(globalEgressIPName, nil, nil))
 		})
 
 		JustBeforeEach(func() {
-			t.createGlobalEgressIP(newGlobalEgressIP(globalEgressIPName, nil, nil))
 			t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, 1)
-
 			t.createPod(pod)
 		})
 

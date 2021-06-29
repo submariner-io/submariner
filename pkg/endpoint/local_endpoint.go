@@ -119,14 +119,20 @@ func getBackendConfig(nodeObj *v1.Node) (map[string]string, error) {
 
 	//TODO: we should allow the cable drivers to capture and expose BackendConfig settings, instead of doing
 	//      it here.
-	preferredServerStr := os.Getenv("CE_IPSEC_PREFERREDSERVER")
+	preferredServerStr := backendConfig[submv1.PreferredServerConfig]
+
+	if preferredServerStr == "" {
+		preferredServerStr = os.Getenv("CE_IPSEC_PREFERREDSERVER")
+	}
+
 	if preferredServerStr == "" {
 		preferredServerStr = "false"
 	}
 
 	preferredServer, err := strconv.ParseBool(preferredServerStr)
 	if err != nil {
-		return backendConfig, errors.Wrapf(err, "error parsing CE_IPSEC_PREFERREDSERVER bool: %s", preferredServerStr)
+		return backendConfig, errors.Wrapf(err, "error parsing CE_IPSEC_PREFERREDSERVER or node gateway.submariner."+
+			"io/preferred-server annotation bool: %s", preferredServerStr)
 	}
 
 	backendConfig[submv1.PreferredServerConfig] = preferredServerStr
