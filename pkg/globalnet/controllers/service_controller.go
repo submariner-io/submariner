@@ -28,13 +28,14 @@ import (
 	"k8s.io/klog"
 )
 
-func NewServiceController(config syncer.ResourceSyncerConfig) (Interface, error) {
+func NewServiceController(config syncer.ResourceSyncerConfig, svcExController interface{}) (Interface, error) {
 	var err error
 
 	klog.Info("Creating Service controller")
 
 	controller := &serviceController{
 		baseSyncerController: newBaseSyncerController(),
+		svcExController:      svcExController.(*serviceExportController),
 	}
 
 	controller.resourceSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
@@ -69,6 +70,10 @@ func (c *serviceController) onDelete(service *corev1.Service) (runtime.Object, b
 	key, _ := cache.MetaNamespaceKeyFunc(service)
 
 	klog.Infof("Service %q deleted", key)
+
+	if _, exists, _ := c.svcExController.resourceSyncer.GetResource(service.Name, service.Namespace); exists {
+		c.svcExController.cleanupPodController(key)
+	}
 
 	return &submarinerv1.GlobalIngressIP{
 		ObjectMeta: metav1.ObjectMeta{

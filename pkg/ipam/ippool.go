@@ -113,6 +113,9 @@ func (p *IPPool) Allocate(num int) ([]string, error) {
 		return p.allocateOne()
 	}
 
+	p.Lock()
+	defer p.Unlock()
+
 	if p.available.Size() < num {
 		return nil, fmt.Errorf("insufficient IPs available (%d) to allocate %d", p.available.Size(), num)
 	}
@@ -120,9 +123,6 @@ func (p *IPPool) Allocate(num int) ([]string, error) {
 	retIPs := make([]string, num)
 
 	var prevIntIP, firstIntIP, current int
-
-	p.Lock()
-	defer p.Unlock()
 
 	iter := p.available.Iterator()
 	for iter.Next() {

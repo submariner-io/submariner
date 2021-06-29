@@ -290,10 +290,11 @@ func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 
 	cable.RecordConnection(CableDriverName, &v.localEndpoint.Spec, &remoteEndpoint.Spec, string(v1.Connected), true)
 
-	remoteVtepIP, err := v.getVxlanVtepIPAddress(endpointInfo.UseIP)
+	privateIP := endpointInfo.Endpoint.Spec.PrivateIP
+	remoteVtepIP, err := v.getVxlanVtepIPAddress(privateIP)
 
 	if err != nil {
-		return endpointInfo.UseIP, fmt.Errorf("failed to derive the vxlan vtepIP for %s, %v", endpointInfo.UseIP, err)
+		return endpointInfo.UseIP, fmt.Errorf("failed to derive the vxlan vtepIP for %s, %v", privateIP, err)
 	}
 
 	err = v.vxlanIface.AddFDB(remoteIP, "00:00:00:00:00:00")

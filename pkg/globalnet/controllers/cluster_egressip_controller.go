@@ -27,6 +27,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	corev1 "k8s.io/api/core/v1"
@@ -49,16 +50,15 @@ func NewClusterGlobalEgressIPController(config syncer.ResourceSyncerConfig, loca
 	}
 
 	controller := &clusterGlobalEgressIPController{
-		baseIPAllocationController: newBaseIPAllocationController(pool),
+		baseIPAllocationController: newBaseIPAllocationController(pool, iptIface),
 		localSubnets:               localSubnets,
-		iptIface:                   iptIface,
 	}
 
 	federator := federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
 
 	defaultEgressIP := &submarinerv1.ClusterGlobalEgressIP{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: ClusterGlobalEgressIPName,
+			Name: constants.ClusterGlobalEgressIPName,
 		},
 	}
 
@@ -130,24 +130,24 @@ func (c *clusterGlobalEgressIPController) process(from runtime.Object, numRequeu
 			return checkStatusChanged(&prevStatus, &clusterGlobalEgressIP.Status, clusterGlobalEgressIP), false
 		}
 
-		requeue := c.onCreateOrUpdate(key, numberOfIPs, &clusterGlobalEgressIP.Status)
+		requeue := c.onCreateOrUpdate(key, numberOfIPs, &clusterGlobalEgressIP.Status, numRequeues)
 
 		return checkStatusChanged(&prevStatus, &clusterGlobalEgressIP.Status, clusterGlobalEgressIP), requeue
 	case syncer.Delete:
-		return nil, c.onRemove(clusterGlobalEgressIP)
+		return nil, c.onDelete(key, &clusterGlobalEgressIP.Status, numRequeues)
 	}
 
 	return nil, false
 }
 
 func (c *clusterGlobalEgressIPController) validate(numberOfIPs int, egressIP *submarinerv1.ClusterGlobalEgressIP) bool {
-	if egressIP.Name != ClusterGlobalEgressIPName {
+	if egressIP.Name != constants.ClusterGlobalEgressIPName {
 		tryAppendStatusCondition(&egressIP.Status.Conditions, &metav1.Condition{
 			Type:   string(submarinerv1.GlobalEgressIPAllocated),
 			Status: metav1.ConditionFalse,
 			Reason: "InvalidInstance",
 			Message: fmt.Sprintf("Only the ClusterGlobalEgressIP instance with the well-known name %q is supported",
-				ClusterGlobalEgressIPName),
+				constants.ClusterGlobalEgressIPName),
 		})
 
 		return false
@@ -176,48 +176,36 @@ func (c *clusterGlobalEgressIPController) validate(numberOfIPs int, egressIP *su
 	return true
 }
 
-func (c *clusterGlobalEgressIPController) onCreateOrUpdate(key string, numberOfIPs int, status *submarinerv1.GlobalEgressIPStatus) bool {
+func (c *clusterGlobalEgressIPController) onCreateOrUpdate(key string, numberOfIPs int, status *submarinerv1.GlobalEgressIPStatus,
+	numRequeues int) bool {
 	if numberOfIPs == len(status.AllocatedIPs) {
 		klog.V(log.DEBUG).Infof("Update called for %q, but numberOfIPs %d are already allocated", key, numberOfIPs)
 		return false
 	}
 
-	// If numGlobalIPs is modified, delete the existing allocation.
-	if len(status.AllocatedIPs) > 0 {
-		klog.Infof("Releasing previously allocated IPs %v", status.AllocatedIPs)
-
-		c.flushClusterGlobalEgressRules(status)
-
-		if err := c.pool.Release(status.AllocatedIPs...); err != nil {
-			klog.Errorf("Error while releasing the global IPs: %v", err)
-		}
+	if requeue := c.flushRulesAndReleaseIPs(key, numRequeues, c.flushClusterGlobalEgressRules, status.AllocatedIPs...); requeue {
+		return true
 	}
 
 	return c.allocateGlobalIPs(key, numberOfIPs, status)
 }
 
-func (c *clusterGlobalEgressIPController) onRemove(egressIP *submarinerv1.ClusterGlobalEgressIP) bool {
-	if len(egressIP.Status.AllocatedIPs) > 0 {
-		c.flushClusterGlobalEgressRules(&egressIP.Status)
-
-		if err := c.pool.Release(egressIP.Status.AllocatedIPs...); err != nil {
-			klog.Errorf("Error while releasing the global IPs: %v", err)
-		}
-	}
-
-	return false
+func (c *clusterGlobalEgressIPController) onDelete(key string, status *submarinerv1.GlobalEgressIPStatus, numRequeues int) bool {
+	return c.flushRulesAndReleaseIPs(key, numRequeues, c.flushClusterGlobalEgressRules, status.AllocatedIPs...)
 }
 
-func (c *clusterGlobalEgressIPController) flushClusterGlobalEgressRules(status *submarinerv1.GlobalEgressIPStatus) {
-	c.deleteClusterGlobalEgressRules(c.localSubnets, c.getTargetSNATIPaddress(status.AllocatedIPs))
+func (c *clusterGlobalEgressIPController) flushClusterGlobalEgressRules(allocatedIPs []string) error {
+	return c.deleteClusterGlobalEgressRules(c.localSubnets, c.getTargetSNATIPaddress(allocatedIPs))
 }
 
-func (c *clusterGlobalEgressIPController) deleteClusterGlobalEgressRules(srcIPList []string, snatIP string) {
+func (c *clusterGlobalEgressIPController) deleteClusterGlobalEgressRules(srcIPList []string, snatIP string) error {
 	for _, srcIP := range srcIPList {
 		if err := c.iptIface.RemoveClusterEgressRules(srcIP, snatIP, globalNetIPTableMark); err != nil {
-			klog.Errorf("Error while cleaning up ClusterEgressIPs: %v", err)
+			return err
 		}
 	}
+
+	return nil
 }
 
 func (c *clusterGlobalEgressIPController) programClusterGlobalEgressRules(allocatedIPs []string) error {
@@ -226,7 +214,7 @@ func (c *clusterGlobalEgressIPController) programClusterGlobalEgressRules(alloca
 
 	for _, srcIP := range c.localSubnets {
 		if err := c.iptIface.AddClusterEgressRules(srcIP, snatIP, globalNetIPTableMark); err != nil {
-			c.deleteClusterGlobalEgressRules(egressRulesProgrammed, snatIP)
+			_ = c.deleteClusterGlobalEgressRules(egressRulesProgrammed, snatIP)
 
 			return err
 		}
@@ -276,6 +264,12 @@ func (c *clusterGlobalEgressIPController) allocateGlobalIPs(key string, numberOf
 	err = c.programClusterGlobalEgressRules(allocatedIPs)
 	if err != nil {
 		klog.Errorf("Error programming egress IP table rules for %q: %v", key, err)
+		tryAppendStatusCondition(&status.Conditions, &metav1.Condition{
+			Type:    string(submarinerv1.GlobalEgressIPAllocated),
+			Status:  metav1.ConditionFalse,
+			Reason:  "ProgramIPTableRulesFailed",
+			Message: fmt.Sprintf("Error programming egress rules: %v", err),
+		})
 
 		_ = c.pool.Release(allocatedIPs...)
 

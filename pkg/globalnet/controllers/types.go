@@ -26,13 +26,10 @@ import (
 	iptiface "github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	"github.com/submariner-io/submariner/pkg/iptables"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 )
 
 const (
-	ClusterGlobalEgressIPName = "cluster-egress.submariner.io"
-
 	// Globalnet uses MARK target to mark traffic destined to remote clusters.
 	// Some of the CNIs also use iptable MARK targets in the pipeline. This should not
 	// be a problem because Globalnet is only marking traffic destined to Submariner
@@ -89,7 +86,8 @@ type baseSyncerController struct {
 
 type baseIPAllocationController struct {
 	*baseSyncerController
-	pool *ipam.IPPool
+	pool     *ipam.IPPool
+	iptIface iptiface.Interface
 }
 
 type globalEgressIPController struct {
@@ -105,22 +103,36 @@ type podWatcher struct {
 
 type clusterGlobalEgressIPController struct {
 	*baseIPAllocationController
-	iptIface     iptiface.Interface
 	localSubnets []string
 }
 
 type globalIngressIPController struct {
 	*baseIPAllocationController
-	iptIface iptiface.Interface
 }
 
 type serviceExportController struct {
 	*baseSyncerController
-	services dynamic.NamespaceableResourceInterface
-	scheme   *runtime.Scheme
-	iptIface iptiface.Interface
+	services       dynamic.NamespaceableResourceInterface
+	iptIface       iptiface.Interface
+	podControllers sync.Map
+	config         syncer.ResourceSyncerConfig
 }
 
 type serviceController struct {
 	*baseSyncerController
+	svcExController *serviceExportController
+}
+
+type nodeController struct {
+	*baseIPAllocationController
+	nodeName string
+	nodes    dynamic.ResourceInterface
+}
+
+type ingressPodController struct {
+	*baseSyncerController
+	ingressIPs   dynamic.NamespaceableResourceInterface
+	svcName      string
+	namespace    string
+	ingressIPMap stringset.Interface
 }

@@ -220,7 +220,7 @@ func (d *DatastoreSyncer) createLocalCluster() error {
 
 	cluster := &submarinerv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: d.localCluster.Spec.ClusterID,
+			Name: util.EnsureValidName(d.localCluster.Spec.ClusterID),
 		},
 		Spec: d.localCluster.Spec,
 	}

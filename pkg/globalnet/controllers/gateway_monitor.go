@@ -31,10 +31,11 @@ import (
 	"github.com/submariner-io/admiral/pkg/watcher"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cidr"
+	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	"github.com/submariner-io/submariner/pkg/iptables"
 	"github.com/submariner-io/submariner/pkg/netlink"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -251,7 +252,14 @@ func (g *gatewayMonitor) startControllers() error {
 
 	g.controllers = nil
 
-	c, err := NewClusterGlobalEgressIPController(*g.syncerConfig, g.localSubnets, pool)
+	c, err := NewNodeController(*g.syncerConfig, pool, g.nodeName)
+	if err != nil {
+		return errors.WithMessage(err, "error creating the Node controller")
+	}
+
+	g.controllers = append(g.controllers, c)
+
+	c, err = NewClusterGlobalEgressIPController(*g.syncerConfig, g.localSubnets, pool)
 	if err != nil {
 		return errors.WithMessage(err, "error creating the ClusterGlobalEgressIP controller")
 	}
@@ -272,7 +280,7 @@ func (g *gatewayMonitor) startControllers() error {
 
 	g.controllers = append(g.controllers, c)
 
-	c, err = NewServiceController(*g.syncerConfig)
+	c, err = NewServiceController(*g.syncerConfig, c)
 	if err != nil {
 		return errors.WithMessage(err, "error creating the Service controller")
 	}
@@ -336,14 +344,14 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 		return fmt.Errorf("error creating iptables chain %s: %v", constants.SmGlobalnetEgressChain, err)
 	}
 
-	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmPostRoutingChain)
+	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", routeAgent.SmPostRoutingChain)
 
-	if err := util.CreateChainIfNotExists(g.ipt, "nat", constants.SmPostRoutingChain); err != nil {
-		return fmt.Errorf("error creating iptables chain %s: %v", constants.SmPostRoutingChain, err)
+	if err := util.CreateChainIfNotExists(g.ipt, "nat", routeAgent.SmPostRoutingChain); err != nil {
+		return fmt.Errorf("error creating iptables chain %s: %v", routeAgent.SmPostRoutingChain, err)
 	}
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetEgressChain}
-	if err := util.PrependUnique(g.ipt, "nat", constants.SmPostRoutingChain, forwardToSubGlobalNetChain); err != nil {
+	if err := util.PrependUnique(g.ipt, "nat", routeAgent.SmPostRoutingChain, forwardToSubGlobalNetChain); err != nil {
 		klog.Errorf("error inserting iptables rule %q: %v\n", strings.Join(forwardToSubGlobalNetChain, " "), err)
 	}
 
