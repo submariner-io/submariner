@@ -58,11 +58,12 @@ unit: pkg/natdiscovery/proto/natdiscovery.pb.go
 reload-images: build images
 	./scripts/$@ --restart $(restart)
 
-%.pb.go: %.proto $(GOPATH)/bin/protoc-gen-go bin/protoc
-	bin/protoc --go_out=/go/src $<
+%.pb.go: %.proto bin/protoc-gen-go bin/protoc
+	PATH="$(CURDIR)/bin:$$PATH" protoc --go_out=$$(go env GOPATH)/src $<
 
-$(GOPATH)/bin/protoc-gen-go:
-	GO111MODULE=off go get google.golang.org/protobuf/cmd/protoc-gen-go
+bin/protoc-gen-go: vendor/modules.txt
+	mkdir -p $(@D)
+	GOFLAGS="" GOBIN="$(CURDIR)/bin" go install google.golang.org/protobuf/cmd/protoc-gen-go@$(shell awk '/google.golang.org\/protobuf/ {print $$2}' go.mod)
 
 bin/protoc:
 	curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v$(PROTOC_VERSION)/protoc-$(PROTOC_VERSION)-linux-x86_64.zip
