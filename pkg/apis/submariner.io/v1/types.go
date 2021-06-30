@@ -87,6 +87,7 @@ const (
 	GatewayConfigPrefix     = "gateway.submariner.io/"
 	UDPPortConfig           = "udp-port"
 	NATTDiscoveryPortConfig = "natt-discovery-port"
+	PreferredServerConfig   = "preferred-server"
 	PublicIP                = "public-ip"
 	UsingLoadBalancer       = "using-loadbalancer"
 )
@@ -103,16 +104,12 @@ const (
 	DNS          = "dns"  // dns:mygateway.dns.name.com
 )
 
-// BackendConfig entries which aren't configured via labels, but exposed from the endpoints
-const (
-	PreferredServerConfig = "preferred-server"
-)
-
 // ValidGatewayNodeConfig list should contain only keys that configure node specific settings via labels
 var ValidGatewayNodeConfig = []string{
 	UDPPortConfig,
 	NATTDiscoveryPortConfig,
 	PublicIP,
+	PreferredServerConfig,
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

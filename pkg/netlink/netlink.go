@@ -164,6 +164,9 @@ func setSysctl(path string, contents []byte) error {
 		return err
 	}
 
+	// Ignore leading and terminating newlines
+	existing = bytes.Trim(existing, "\n")
+
 	if bytes.Equal(existing, contents) {
 		return nil
 	}
