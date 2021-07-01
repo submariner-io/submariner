@@ -29,14 +29,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
-	utilexec "k8s.io/utils/exec"
 )
 
-func startPodWatcher(name, namespace, ipsetName string, config watcher.Config, podSelector *metav1.LabelSelector) (*podWatcher, error) {
+func startPodWatcher(name, namespace string, namedIPSet ipset.Named, config watcher.Config,
+	podSelector *metav1.LabelSelector) (*podWatcher, error) {
 	pw := &podWatcher{
 		stopCh:     make(chan struct{}),
-		ipSetName:  ipsetName,
-		ipSetIface: ipset.New(utilexec.New()),
+		namedIPSet: namedIPSet,
 	}
 
 	sel, err := metav1.LabelSelectorAsSelector(podSelector)
@@ -118,12 +117,7 @@ func (w *podWatcher) onRemove(obj runtime.Object, numRequeues int) bool {
 }
 
 func (w *podWatcher) addIPSetEntry(ipAddress string) error {
-	set := &ipset.IPSet{
-		Name:    w.ipSetName,
-		SetType: ipset.HashIP,
-	}
-
-	err := w.ipSetIface.AddEntry(ipAddress, set, true)
+	err := w.namedIPSet.AddEntry(ipAddress, true)
 	if err != nil {
 		return err
 	}
@@ -132,5 +126,5 @@ func (w *podWatcher) addIPSetEntry(ipAddress string) error {
 }
 
 func (w *podWatcher) deleteIPSetEntry(ipAddress string) error {
-	return w.ipSetIface.DelEntry(ipAddress, w.ipSetName)
+	return w.namedIPSet.DelEntry(ipAddress)
 }
