@@ -22,14 +22,29 @@ import (
 
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/watcher"
+	"github.com/submariner-io/submariner/pkg/ipset"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
+	utilexec "k8s.io/utils/exec"
 )
 
-func startPodWatcher(name, namespace string, config watcher.Config) (*podWatcher, error) {
-	pw := &podWatcher{stopCh: make(chan struct{})}
+func startPodWatcher(name, namespace, ipsetName string, config watcher.Config, podSelector *metav1.LabelSelector) (*podWatcher, error) {
+	pw := &podWatcher{
+		stopCh:     make(chan struct{}),
+		ipSetName:  ipsetName,
+		ipSetIface: ipset.New(utilexec.New()),
+	}
+
+	sel, err := metav1.LabelSelectorAsSelector(podSelector)
+	if err != nil {
+		return nil, err
+	}
+
+	labelSelector := sel.String()
 
 	w, err := watcher.New(&watcher.Config{
 		RestMapper: config.RestMapper,
@@ -46,6 +61,7 @@ func startPodWatcher(name, namespace string, config watcher.Config) (*podWatcher
 				},
 				ResourcesEquivalent: pw.arePodsEquivalent,
 				SourceNamespace:     namespace,
+				SourceLabelSelector: labelSelector,
 			},
 		},
 	})
@@ -66,41 +82,55 @@ func (w *podWatcher) arePodsEquivalent(oldObj, newObj *unstructured.Unstructured
 	oldPodIP, _, _ := unstructured.NestedString(oldObj.Object, "status", "podIP")
 	newPodIP, _, _ := unstructured.NestedString(newObj.Object, "status", "podIP")
 
-	// TODO - perhaps we should store the oldPodIP and let the normal update handle it.
-	// When a pod is being terminated, sometimes we get pod update event with podIP removed.
-	if oldPodIP != "" && newPodIP == "" {
-		klog.V(log.DEBUG).Infof("Pod %q with IP %s is being terminated", newObj.GetName(), oldPodIP)
-		w.processRemoved(newObj.GetName(), oldPodIP)
-
-		return true
-	}
-
 	return oldPodIP == newPodIP
 }
 
 func (w *podWatcher) onCreateOrUpdate(obj runtime.Object, numRequeues int) bool {
 	pod := obj.(*corev1.Pod)
+	key, _ := cache.MetaNamespaceKeyFunc(pod)
 
 	if pod.Status.PodIP == "" {
 		return false
 	}
 
-	klog.V(log.DEBUG).Infof("Pod %q with IP %s created/updated", pod.Name, pod.Status.PodIP)
+	klog.V(log.DEBUG).Infof("Pod %q with IP %s created/updated", key, pod.Status.PodIP)
 
-	// TODO - IP table magic
+	if err := w.addIPSetEntry(pod.Status.PodIP); err != nil {
+		klog.Errorf("Error adding ipAddress %q to the ipSet chain %q: %v", pod.Status.PodIP, w.ipSetName, err)
+		return true
+	}
 
 	return false
 }
 
 func (w *podWatcher) onRemove(obj runtime.Object, numRequeues int) bool {
 	pod := obj.(*corev1.Pod)
+	key, _ := cache.MetaNamespaceKeyFunc(pod)
 
-	klog.V(log.DEBUG).Infof("Pod %q removed", pod.Name)
+	klog.V(log.DEBUG).Infof("Pod %q removed", key)
 
-	return w.processRemoved(pod.Name, pod.Status.PodIP)
+	if err := w.deleteIPSetEntry(pod.Status.PodIP); err != nil {
+		klog.Errorf("Error deleting ipAddress %q from the ipSet chain %q: %v", pod.Status.PodIP, w.ipSetName, err)
+		return true
+	}
+
+	return false
 }
 
-func (w *podWatcher) processRemoved(name, podIP string) bool {
-	// TODO - IP table magic
-	return false
+func (w *podWatcher) addIPSetEntry(ipAddress string) error {
+	set := &ipset.IPSet{
+		Name:    w.ipSetName,
+		SetType: ipset.HashIP,
+	}
+
+	err := w.ipSetIface.AddEntry(ipAddress, set, true)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (w *podWatcher) deleteIPSetEntry(ipAddress string) error {
+	return w.ipSetIface.DelEntry(ipAddress, w.ipSetName)
 }

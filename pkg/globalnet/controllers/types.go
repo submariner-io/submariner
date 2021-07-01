@@ -25,7 +25,9 @@ import (
 	"github.com/submariner-io/admiral/pkg/watcher"
 	iptiface "github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
 	"github.com/submariner-io/submariner/pkg/ipam"
+	"github.com/submariner-io/submariner/pkg/ipset"
 	"github.com/submariner-io/submariner/pkg/iptables"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 )
 
@@ -45,6 +47,9 @@ const (
 	// of kube-proxy changes, globalnet needs to be modified accordingly.
 	// Reference: https://bit.ly/2OPhlwk
 	kubeProxyServiceChainPrefix = "KUBE-SVC-"
+
+	// The prefix used for the ipset chains created by Globalnet pod.
+	IPSetPrefix = "SM-GN-"
 
 	AddRules    = true
 	DeleteRules = false
@@ -94,11 +99,15 @@ type globalEgressIPController struct {
 	*baseIPAllocationController
 	sync.Mutex
 	podWatchers   map[string]*podWatcher
+	ipSetIface    ipset.Interface
 	watcherConfig watcher.Config
 }
 
 type podWatcher struct {
-	stopCh chan struct{}
+	stopCh      chan struct{}
+	ipSetName   string
+	ipSetIface  ipset.Interface
+	podSelector *metav1.LabelSelector
 }
 
 type clusterGlobalEgressIPController struct {

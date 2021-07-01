@@ -34,6 +34,8 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/ipam"
+	"github.com/submariner-io/submariner/pkg/ipset"
+	fakeIPSet "github.com/submariner-io/submariner/pkg/ipset/fake"
 	"github.com/submariner-io/submariner/pkg/iptables"
 	fakeIPT "github.com/submariner-io/submariner/pkg/iptables/fake"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
@@ -79,6 +81,7 @@ type testDriverBase struct {
 	dynClient              dynamic.Interface
 	scheme                 *runtime.Scheme
 	ipt                    *fakeIPT.IPTables
+	ipSet                  *fakeIPSet.IPSet
 	pool                   *ipam.IPPool
 	localSubnets           []string
 	globalCIDR             string
@@ -97,6 +100,7 @@ func newTestDriverBase() *testDriverBase {
 			&submarinerv1.GlobalEgressIP{}, &submarinerv1.ClusterGlobalEgressIP{}, &submarinerv1.GlobalIngressIP{}, &mcsv1a1.ServiceExport{}),
 		scheme:       runtime.NewScheme(),
 		ipt:          fakeIPT.New(),
+		ipSet:        fakeIPSet.New(),
 		globalCIDR:   localCIDR,
 		localSubnets: []string{},
 	}
@@ -125,6 +129,10 @@ func newTestDriverBase() *testDriverBase {
 
 	iptables.NewFunc = func() (iptables.Interface, error) {
 		return t.ipt, nil
+	}
+
+	ipset.NewFunc = func() ipset.Interface {
+		return t.ipSet
 	}
 
 	return t
