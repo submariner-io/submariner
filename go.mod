@@ -7,7 +7,7 @@ require (
 	github.com/coreos/go-iptables v0.6.0
 	github.com/ebay/go-ovn v0.1.1-0.20210414223409-7376ba97f8cd
 	github.com/emirpasic/gods v1.12.0
-	github.com/go-ping/ping v0.0.0-20210407214646-e4e642a95741
+	github.com/go-ping/ping v0.0.0-20210506233800-ff8be3320020
 	github.com/google/uuid v1.2.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/onsi/ginkgo v1.16.4
@@ -18,7 +18,8 @@ require (
 	github.com/submariner-io/shipyard v0.10.0-m2.0.20210615173434-f15404d75718
 	github.com/uw-labs/lichen v0.1.4
 	github.com/vishvananda/netlink v1.1.0
-	golang.org/x/sys v0.0.0-20210603081109-ebe580a85c40
+	golang.org/x/net v0.0.0-20210614182718-04defd469f4e // indirect
+	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20210427135350-f9ad6d392236
 	google.golang.org/protobuf v1.27.1
 	k8s.io/api v0.21.0
