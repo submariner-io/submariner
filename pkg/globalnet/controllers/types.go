@@ -106,7 +106,7 @@ type globalEgressIPController struct {
 type podWatcher struct {
 	stopCh      chan struct{}
 	ipSetName   string
-	ipSetIface  ipset.Interface
+	namedIPSet  ipset.Named
 	podSelector *metav1.LabelSelector
 }
 
