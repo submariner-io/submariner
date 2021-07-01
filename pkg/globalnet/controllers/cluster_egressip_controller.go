@@ -195,7 +195,7 @@ func (c *clusterGlobalEgressIPController) onDelete(key string, status *submarine
 }
 
 func (c *clusterGlobalEgressIPController) flushClusterGlobalEgressRules(allocatedIPs []string) error {
-	return c.deleteClusterGlobalEgressRules(c.localSubnets, c.getTargetSNATIPaddress(allocatedIPs))
+	return c.deleteClusterGlobalEgressRules(c.localSubnets, getTargetSNATIPaddress(allocatedIPs))
 }
 
 func (c *clusterGlobalEgressIPController) deleteClusterGlobalEgressRules(srcIPList []string, snatIP string) error {
@@ -209,7 +209,7 @@ func (c *clusterGlobalEgressIPController) deleteClusterGlobalEgressRules(srcIPLi
 }
 
 func (c *clusterGlobalEgressIPController) programClusterGlobalEgressRules(allocatedIPs []string) error {
-	snatIP := c.getTargetSNATIPaddress(allocatedIPs)
+	snatIP := getTargetSNATIPaddress(allocatedIPs)
 	egressRulesProgrammed := []string{}
 
 	for _, srcIP := range c.localSubnets {
@@ -223,20 +223,6 @@ func (c *clusterGlobalEgressIPController) programClusterGlobalEgressRules(alloca
 	}
 
 	return nil
-}
-
-func (c *clusterGlobalEgressIPController) getTargetSNATIPaddress(allocIPs []string) string {
-	var snatIP string
-
-	allocatedIPs := len(allocIPs)
-
-	if allocatedIPs == 1 {
-		snatIP = allocIPs[0]
-	} else {
-		snatIP = fmt.Sprintf("%s-%s", allocIPs[0], allocIPs[len(allocIPs)-1])
-	}
-
-	return snatIP
 }
 
 func (c *clusterGlobalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int, status *submarinerv1.GlobalEgressIPStatus) bool {

@@ -168,3 +168,17 @@ func conditionsToUnstructured(conditions []metav1.Condition, to *unstructured.Un
 func shouldRequeue(numRequeues int) bool {
 	return numRequeues < maxRequeues
 }
+
+func getTargetSNATIPaddress(allocIPs []string) string {
+	var snatIP string
+
+	allocatedIPs := len(allocIPs)
+
+	if allocatedIPs == 1 {
+		snatIP = allocIPs[0]
+	} else {
+		snatIP = fmt.Sprintf("%s-%s", allocIPs[0], allocIPs[len(allocIPs)-1])
+	}
+
+	return snatIP
+}
