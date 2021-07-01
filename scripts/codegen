@@ -2,7 +2,10 @@
 
 source ${SCRIPTS_DIR}/lib/debug_functions
 
-K8S_IO_DIR="${GOPATH:-~/go}/src/k8s.io"
+# The generators assume GOPATH is set
+export GOPATH="$(go env GOPATH)"
+
+K8S_IO_DIR="${GOPATH:-$HOME/go}/src/k8s.io"
 CODEGEN_SCRIPT_DIR="${K8S_IO_DIR}/code-generator"
 CODEGEN_SCRIPT="${CODEGEN_SCRIPT_DIR}/generate-groups.sh"
 CODEGEN_RELEASE_TAG=kubernetes-1.19.10
