@@ -46,6 +46,11 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'ready-to-test')
     timeout-minutes: 30
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        external_net: ['external-net']
+        globalnet: ['', 'globalnet']
     steps:
       - name: Check out the repository
         uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7042f
@@ -53,4 +58,4 @@ jobs:
       - name: Run E2E deployment and tests
         uses: submariner-io/shipyard/gh-actions/e2e@devel
         with:
-          using: 'external-net'
+          using: ${{ matrix.external_net }} ${{ matrix.globalnet }}
