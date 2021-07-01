@@ -283,6 +283,7 @@ type ClusterGlobalEgressIPList struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:shortName="giip"
+// +kubebuilder:printcolumn:JSONPath=".status.allocatedIP",name="IP",description="Global IP Allocated",type="string"
 
 type GlobalIngressIP struct {
 	metav1.TypeMeta   `json:",inline"`
