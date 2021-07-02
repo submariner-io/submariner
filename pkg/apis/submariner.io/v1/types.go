@@ -211,6 +211,8 @@ type GlobalEgressIP struct {
 type GlobalEgressIPSpec struct {
 	// The requested number of contiguous GlobalIPs to allocate from the Globalnet CIDR assigned to the cluster.
 	// If not specified, defaults to 1.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=20
 	// +optional
 	NumberOfIPs *int `json:"numberOfIPs,omitempty"`
 
@@ -267,6 +269,8 @@ type ClusterGlobalEgressIP struct {
 type ClusterGlobalEgressIPSpec struct {
 	// The requested number of contiguous GlobalIPs to allocate from the Globalnet CIDR assigned to the cluster.
 	// If not specified, defaults to 1.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=20
 	// +optional
 	NumberOfIPs *int `json:"numGlobalIPs,omitempty"`
 }
