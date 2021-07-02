@@ -88,6 +88,6 @@ func (i *IPSet) DelEntryWithOptions(set, entry string, options ...string) error 
 	return nil
 }
 
-func (i *IPSet) SaveAllSets() ([]byte, error) {
-	return nil, nil
+func (i *IPSet) ListAllSetInfo() (string, error) {
+	return "", nil
 }
