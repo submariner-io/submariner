@@ -82,7 +82,7 @@ func NewGlobalEgressIPController(config syncer.ResourceSyncerConfig, pool *ipam.
 			specObj := util.GetSpec(&list.Items[i])
 			spec := &submarinerv1.GlobalEgressIPSpec{}
 			_ = runtime.DefaultUnstructuredConverter.FromUnstructured(specObj.(map[string]interface{}), spec)
-			key, _ := cache.MetaNamespaceKeyFunc(list.Items[i])
+			key, _ := cache.MetaNamespaceKeyFunc(&list.Items[i])
 			return controller.programGlobalEgressRules(key, reservedIPs, spec.PodSelector, controller.newNamedIPSet(key))
 		})
 
@@ -175,15 +175,14 @@ func (c *globalEgressIPController) programGlobalEgressRules(key string, allocate
 	}
 
 	snatIP := getTargetSNATIPaddress(allocatedIPs)
-	ipSetName := c.getIPSetName(key)
 	if podSelector != nil {
-		if err := c.iptIface.AddEgressRulesForPods(key, ipSetName, snatIP, globalNetIPTableMark); err != nil {
-			_ = c.iptIface.RemoveEgressRulesForPods(key, ipSetName, snatIP, globalNetIPTableMark)
+		if err := c.iptIface.AddEgressRulesForPods(key, namedIPSet.Name(), snatIP, globalNetIPTableMark); err != nil {
+			_ = c.iptIface.RemoveEgressRulesForPods(key, namedIPSet.Name(), snatIP, globalNetIPTableMark)
 			return err
 		}
 	} else {
-		if err := c.iptIface.AddEgressRulesForNamespace(key, ipSetName, snatIP, globalNetIPTableMark); err != nil {
-			_ = c.iptIface.RemoveEgressRulesForNamespace(key, ipSetName, snatIP, globalNetIPTableMark)
+		if err := c.iptIface.AddEgressRulesForNamespace(key, namedIPSet.Name(), snatIP, globalNetIPTableMark); err != nil {
+			_ = c.iptIface.RemoveEgressRulesForNamespace(key, namedIPSet.Name(), snatIP, globalNetIPTableMark)
 			return err
 		}
 	}
