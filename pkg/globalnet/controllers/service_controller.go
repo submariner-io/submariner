@@ -28,14 +28,14 @@ import (
 	"k8s.io/klog"
 )
 
-func NewServiceController(config syncer.ResourceSyncerConfig, svcExController interface{}) (Interface, error) {
+func NewServiceController(config syncer.ResourceSyncerConfig, podControllers *IngressPodControllers) (Interface, error) {
 	var err error
 
 	klog.Info("Creating Service controller")
 
 	controller := &serviceController{
 		baseSyncerController: newBaseSyncerController(),
-		svcExController:      svcExController.(*serviceExportController),
+		podControllers:       podControllers,
 	}
 
 	controller.resourceSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
@@ -59,6 +59,10 @@ func NewServiceController(config syncer.ResourceSyncerConfig, svcExController in
 func (c *serviceController) process(from runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
 	service := from.(*corev1.Service)
 
+	if service.Spec.Type != corev1.ServiceTypeClusterIP {
+		return nil, false
+	}
+
 	if op == syncer.Delete {
 		return c.onDelete(service)
 	}
@@ -71,8 +75,9 @@ func (c *serviceController) onDelete(service *corev1.Service) (runtime.Object, b
 
 	klog.Infof("Service %q deleted", key)
 
-	if _, exists, _ := c.svcExController.resourceSyncer.GetResource(service.Name, service.Namespace); exists {
-		c.svcExController.cleanupPodController(key)
+	if service.Spec.ClusterIP == corev1.ClusterIPNone {
+		c.podControllers.stopAndCleanup(service.Name, service.Namespace)
+		return nil, false
 	}
 
 	return &submarinerv1.GlobalIngressIP{

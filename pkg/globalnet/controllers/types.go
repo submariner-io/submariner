@@ -28,6 +28,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/ipset"
 	"github.com/submariner-io/submariner/pkg/iptables"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 )
 
@@ -50,6 +51,8 @@ const (
 	// of kube-proxy changes, globalnet needs to be modified accordingly.
 	// Reference: https://bit.ly/2OPhlwk
 	kubeProxyServiceChainPrefix = "KUBE-SVC-"
+
+	ServiceRefLabel = "submariner.io/serviceRef"
 
 	// The prefix used for the ipset chains created by Globalnet pod.
 	IPSetPrefix = "SM-GN-"
@@ -128,13 +131,13 @@ type serviceExportController struct {
 	*baseSyncerController
 	services       dynamic.NamespaceableResourceInterface
 	iptIface       iptiface.Interface
-	podControllers sync.Map
-	config         syncer.ResourceSyncerConfig
+	podControllers *IngressPodControllers
+	scheme         *runtime.Scheme
 }
 
 type serviceController struct {
 	*baseSyncerController
-	svcExController *serviceExportController
+	podControllers *IngressPodControllers
 }
 
 type nodeController struct {
@@ -145,8 +148,14 @@ type nodeController struct {
 
 type ingressPodController struct {
 	*baseSyncerController
-	ingressIPs   dynamic.NamespaceableResourceInterface
 	svcName      string
 	namespace    string
 	ingressIPMap stringset.Interface
+}
+
+type IngressPodControllers struct {
+	sync.Mutex
+	controllers map[string]*ingressPodController
+	config      syncer.ResourceSyncerConfig
+	ingressIPs  dynamic.NamespaceableResourceInterface
 }
