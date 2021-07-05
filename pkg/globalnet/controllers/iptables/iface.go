@@ -36,6 +36,8 @@ type Interface interface {
 	RemoveClusterEgressRules(sourceIP, snatIP, globalNetIPTableMark string) error
 	AddIngressRulesForService(globalIP, chainName string) error
 	RemoveIngressRulesForService(globalIP, chainName string) error
+	AddIngressRulesForHeadlessSvcPod(globalIP, podIP string) error
+	RemoveIngressRulesForHeadlessSvcPod(globalIP, podIP string) error
 	GetKubeProxyClusterIPServiceChainName(service *corev1.Service, kubeProxyServiceChainPrefix string) (string, bool, error)
 	AddIngressRulesForHealthCheck(cniIfaceIP, globalIP string) error
 	RemoveIngressRulesForHealthCheck(cniIfaceIP, globalIP string) error
@@ -123,6 +125,37 @@ func (i *ipTables) RemoveIngressRulesForService(globalIP, chainName string) erro
 	ruleSpec := []string{"-d", globalIP, "-j", chainName}
 
 	klog.V(log.DEBUG).Infof("Deleting iptable ingress rule for Service: %s", strings.Join(ruleSpec, " "))
+
+	if err := i.ipt.Delete("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
+		return fmt.Errorf("error deleting iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
+	}
+
+	return nil
+}
+
+func (i *ipTables) AddIngressRulesForHeadlessSvcPod(globalIP, podIP string) error {
+	if globalIP == "" || podIP == "" {
+		return fmt.Errorf("globalIP %q or podIP %q cannot be empty", globalIP, podIP)
+	}
+
+	ruleSpec := []string{"-d", globalIP, "-j", "DNAT", "--to", podIP}
+	klog.V(log.DEBUG).Infof("Installing iptables rule for Headless SVC Pod %s", strings.Join(ruleSpec, " "))
+
+	if err := i.ipt.AppendUnique("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
+		return fmt.Errorf("error appending iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
+	}
+
+	return nil
+}
+
+func (i *ipTables) RemoveIngressRulesForHeadlessSvcPod(globalIP, podIP string) error {
+	if globalIP == "" || podIP == "" {
+		return fmt.Errorf("globalIP %q or podIP %q cannot be empty", globalIP, podIP)
+	}
+
+	ruleSpec := []string{"-d", globalIP, "-j", "DNAT", "--to", podIP}
+
+	klog.V(log.DEBUG).Infof("Deleting iptables rule for Headless SVC Pod %s", strings.Join(ruleSpec, " "))
 
 	if err := i.ipt.Delete("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
 		return fmt.Errorf("error deleting iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
