@@ -98,6 +98,10 @@ func (c *ingressPodController) process(from runtime.Object, numRequeues int, op 
 
 	klog.Infof("%q ingress Pod %s for service %s", op, key, c.svcName)
 
+	ingressIP.ObjectMeta.Annotations = map[string]string{
+		headlessSvcPodIP: pod.Status.PodIP,
+	}
+
 	ingressIP.Spec = submarinerv1.GlobalIngressIPSpec{
 		Target:     submarinerv1.HeadlessServicePod,
 		ServiceRef: &corev1.LocalObjectReference{Name: c.svcName},

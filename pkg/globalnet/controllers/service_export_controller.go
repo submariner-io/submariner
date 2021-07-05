@@ -114,7 +114,6 @@ func (c *serviceExportController) onCreate(serviceExport *mcsv1a1.ServiceExport)
 
 	if service.Spec.ClusterIP == corev1.ClusterIPNone {
 		// Headless service
-		// TODO: kuberProxyServiceChain?
 		return c.onCreateHeadless(key, service)
 	}
 

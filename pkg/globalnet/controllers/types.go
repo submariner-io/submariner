@@ -43,6 +43,9 @@ const (
 	// This is an internal annotation used between service export controller and global-ingress controller.
 	kubeProxyIPTableChainAnnotation = "submariner.io/kubeproxy-iptablechain"
 
+	// This is an internal annotation used between ingress pod controller and global-ingress controller.
+	headlessSvcPodIP = "submariner.io/headless-svc-pod-ip"
+
 	// Currently Submariner Globalnet implementation (for services) works with kube-proxy
 	// and uses iptable chain-names programmed by kube-proxy. If the internal implementation
 	// of kube-proxy changes, globalnet needs to be modified accordingly.
@@ -120,6 +123,8 @@ type clusterGlobalEgressIPController struct {
 
 type globalIngressIPController struct {
 	*baseIPAllocationController
+	pods   dynamic.NamespaceableResourceInterface
+	config syncer.ResourceSyncerConfig
 }
 
 type serviceExportController struct {

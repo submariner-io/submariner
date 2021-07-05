@@ -29,8 +29,11 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
 )
@@ -45,33 +48,65 @@ func NewGlobalIngressIPController(config syncer.ResourceSyncerConfig, pool *ipam
 		return nil, errors.WithMessage(err, "error creating the IPTablesInterface handler")
 	}
 
-	controller := &globalIngressIPController{
-		baseIPAllocationController: newBaseIPAllocationController(pool, iptIface),
+	_, gvr, err := util.ToUnstructuredResource(&corev1.Pod{}, config.RestMapper)
+	if err != nil {
+		return nil, err
 	}
 
-	_, gvr, err := util.ToUnstructuredResource(&submarinerv1.GlobalIngressIP{}, config.RestMapper)
+	controller := &globalIngressIPController{
+		baseIPAllocationController: newBaseIPAllocationController(pool, iptIface),
+		pods:                       config.SourceClient.Resource(*gvr),
+		config:                     config,
+	}
+
+	_, gvr, err = util.ToUnstructuredResource(&submarinerv1.GlobalIngressIP{}, config.RestMapper)
 	if err != nil {
 		return nil, err
 	}
 
 	federator := federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
 
-	client := config.SourceClient.Resource(*gvr).Namespace(corev1.NamespaceAll)
-	list, err := client.List(context.TODO(), metav1.ListOptions{})
+	client := config.SourceClient.Resource(*gvr)
+	list, err := client.Namespace(corev1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 
 	for i := range list.Items {
 		obj := &list.Items[i]
-
-		chainName := obj.GetAnnotations()[kubeProxyIPTableChainAnnotation]
-		if chainName == "" {
-			continue
+		gip := &submarinerv1.GlobalIngressIP{}
+		_ = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, gip)
+		var target string
+		if gip.Spec.Target == submarinerv1.ClusterIPService {
+			target = obj.GetAnnotations()[kubeProxyIPTableChainAnnotation]
+			if target == "" {
+				continue
+			}
+		} else if gip.Spec.Target == submarinerv1.HeadlessServicePod {
+			target = obj.GetAnnotations()[headlessSvcPodIP]
+			if target == "" {
+				continue
+			}
 		}
 
 		err = controller.reserveAllocatedIPs(federator, obj, func(reservedIPs []string) error {
-			return controller.iptIface.AddIngressRulesForService(reservedIPs[0], chainName)
+			if gip.Spec.Target == submarinerv1.ClusterIPService {
+				// TODO handle the following case.
+				// Observations: If serviceexport is deleted while the GN pod was down, we are still programing rules
+				// However, if service is deleted, the chain will be missing and rules will not be programmed.
+				return controller.iptIface.AddIngressRulesForService(reservedIPs[0], target)
+			} else if gip.Spec.Target == submarinerv1.HeadlessServicePod {
+				_, exists, err := controller.getPod(gip.Spec.PodRef.Name, obj.GetNamespace())
+				if err != nil || !exists {
+					klog.Infof("Headless Service Pod %s/%s does not exist, deleting the corresponding Ingress object",
+						obj.GetNamespace(), gip.Spec.PodRef.Name)
+					_ = controller.deleteIngressObject(obj, client)
+					return nil
+				}
+
+				return controller.iptIface.AddIngressRulesForHeadlessSvcPod(reservedIPs[0], target)
+			}
+			return nil
 		})
 
 		if err != nil {
@@ -165,6 +200,30 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 
 			return true
 		}
+	} else if ingressIP.Spec.Target == submarinerv1.HeadlessServicePod {
+		podIP := ingressIP.GetAnnotations()[headlessSvcPodIP]
+		if podIP == "" {
+			_ = c.pool.Release(ips...)
+
+			klog.Warningf("%q annotation is missing on %q", headlessSvcPodIP, key)
+
+			return true
+		}
+
+		err = c.iptIface.AddIngressRulesForHeadlessSvcPod(ips[0], podIP)
+		if err != nil {
+			_ = c.pool.Release(ips...)
+
+			klog.Errorf("Error while programming Service %q ingress rules for Pod: %v", key, err)
+			tryAppendStatusCondition(&ingressIP.Status.Conditions, &metav1.Condition{
+				Type:    string(submarinerv1.GlobalEgressIPAllocated),
+				Status:  metav1.ConditionFalse,
+				Reason:  "ProgramIPTableRulesFailed",
+				Message: fmt.Sprintf("Error programming ingress rules: %v", err),
+			})
+
+			return true
+		}
 	}
 
 	ingressIP.Status.AllocatedIP = ips[0]
@@ -194,6 +253,13 @@ func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngre
 			} else {
 				klog.Warningf("%q annotation is missing on %q", kubeProxyIPTableChainAnnotation, key)
 			}
+		} else if ingressIP.Spec.Target == submarinerv1.HeadlessServicePod {
+			podIP := ingressIP.GetAnnotations()[headlessSvcPodIP]
+			if podIP != "" {
+				return c.iptIface.RemoveIngressRulesForHeadlessSvcPod(ingressIP.Status.AllocatedIP, podIP)
+			} else {
+				klog.Warningf("%q annotation is missing on pod %q", headlessSvcPodIP, key)
+			}
 		}
 
 		return nil
@@ -209,4 +275,40 @@ func getIngressIPName(obj runtime.Object) string {
 	}
 
 	return ""
+}
+
+func (c *globalIngressIPController) getPod(name, namespace string) (*corev1.Pod, bool, error) {
+	obj, err := c.pods.Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil, false, nil
+	}
+
+	if err != nil {
+		klog.Errorf("Error retrieving Pod %s/%s: %v", namespace, name, err)
+		return nil, false, err
+	}
+
+	pod := &corev1.Pod{}
+	err = c.config.Scheme.Convert(obj, pod, nil)
+	if err != nil {
+		klog.Errorf("Error converting %#v to Pod: %v", obj, err)
+		return nil, false, err
+	}
+
+	return pod, true, nil
+}
+
+func (c *globalIngressIPController) deleteIngressObject(obj *unstructured.Unstructured,
+	client dynamic.NamespaceableResourceInterface) error {
+	gip := &submarinerv1.GlobalIngressIP{}
+	_ = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, gip)
+
+	c.onDelete(gip, 0)
+	err := client.Namespace(gip.Namespace).Delete(context.TODO(), gip.Name, metav1.DeleteOptions{})
+	if err != nil {
+		klog.Errorf("Error deleting the IngressIP %q/%q object: err: %v", gip.Namespace, gip.Name, err)
+		return err
+	}
+
+	return nil
 }
