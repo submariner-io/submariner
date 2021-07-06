@@ -130,8 +130,8 @@ func (c *globalEgressIPController) process(from runtime.Object, numRequeues int,
 
 	key, _ := cache.MetaNamespaceKeyFunc(globalEgressIP)
 
-	klog.Infof("Processing %sd GlobalEgressIP %q, Spec.NumberOfIPs: %d, Status: %#v", op, key,
-		numberOfIPs, globalEgressIP.Status)
+	klog.Infof("Processing %sd GlobalEgressIP %q, NumberOfIPs: %d, PodSelector: %#v, Status: %#v", op, key,
+		numberOfIPs, globalEgressIP.Spec.PodSelector, globalEgressIP.Status)
 
 	switch op {
 	case syncer.Create, syncer.Update:
@@ -144,7 +144,7 @@ func (c *globalEgressIPController) process(from runtime.Object, numRequeues int,
 
 		return checkStatusChanged(&prevStatus, &globalEgressIP.Status, globalEgressIP), requeue
 	case syncer.Delete:
-		return nil, c.onRemove(numRequeues, globalEgressIP)
+		return nil, c.onDelete(numRequeues, globalEgressIP)
 	}
 
 	return nil, false
@@ -269,7 +269,7 @@ func (c *globalEgressIPController) validate(numberOfIPs int, egressIP *submarine
 	return true
 }
 
-func (c *globalEgressIPController) onRemove(numRequeues int, globalEgressIP *submarinerv1.GlobalEgressIP) bool { // nolint unparam
+func (c *globalEgressIPController) onDelete(numRequeues int, globalEgressIP *submarinerv1.GlobalEgressIP) bool { // nolint unparam
 	key, _ := cache.MetaNamespaceKeyFunc(globalEgressIP)
 
 	c.Lock()
@@ -356,7 +356,7 @@ func (c *globalEgressIPController) createPodWatcher(key string, globalEgressIP *
 
 func (c *globalEgressIPController) flushGlobalEgressRulesAndReleaseIPs(key, ipSetName string, numRequeues int,
 	globalEgressIP *submarinerv1.GlobalEgressIP) bool {
-	if requeue := c.flushRulesAndReleaseIPs(key, numRequeues, func(allocatedIPs []string) error {
+	return c.flushRulesAndReleaseIPs(key, numRequeues, func(allocatedIPs []string) error {
 		if globalEgressIP.Spec.PodSelector != nil {
 			return c.iptIface.RemoveEgressRulesForPods(key, ipSetName,
 				getTargetSNATIPaddress(allocatedIPs), globalNetIPTableMark)
@@ -364,11 +364,7 @@ func (c *globalEgressIPController) flushGlobalEgressRulesAndReleaseIPs(key, ipSe
 			return c.iptIface.RemoveEgressRulesForNamespace(key, ipSetName,
 				getTargetSNATIPaddress(allocatedIPs), globalNetIPTableMark)
 		}
-	}, globalEgressIP.Status.AllocatedIPs...); requeue {
-		return true
-	}
-
-	return false
+	}, globalEgressIP.Status.AllocatedIPs...)
 }
 
 func (c *globalEgressIPController) newNamedIPSet(key string) ipset.Named {
