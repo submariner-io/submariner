@@ -158,13 +158,12 @@ func (c *globalEgressIPController) onCreateOrUpdate(key string, numberOfIPs int,
 		return true
 	}
 
-	if numberOfIPs == len(globalEgressIP.Status.AllocatedIPs) {
-		klog.V(log.DEBUG).Infof("Update called for %q, but numberOfIPs %d are already allocated", key, numberOfIPs)
-		return false
+	requeue := false
+	if numberOfIPs != len(globalEgressIP.Status.AllocatedIPs) {
+		requeue = c.flushGlobalEgressRulesAndReleaseIPs(key, namedIPSet.Name(), numRequeues, globalEgressIP)
 	}
 
-	return c.flushGlobalEgressRulesAndReleaseIPs(key, namedIPSet.Name(), numRequeues, globalEgressIP) ||
-		c.allocateGlobalIPs(key, numberOfIPs, globalEgressIP, namedIPSet)
+	return requeue || c.allocateGlobalIPs(key, numberOfIPs, globalEgressIP, namedIPSet)
 }
 
 func (c *globalEgressIPController) programGlobalEgressRules(key string, allocatedIPs []string, podSelector *metav1.LabelSelector,
@@ -194,11 +193,23 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 	globalEgressIP *submarinerv1.GlobalEgressIP, namedIPSet ipset.Named) bool {
 	klog.Infof("Allocating %d global IP(s) for %q", numberOfIPs, key)
 
-	globalEgressIP.Status.AllocatedIPs = nil
-
 	if numberOfIPs == 0 {
+		globalEgressIP.Status.AllocatedIPs = nil
+		tryAppendStatusCondition(&globalEgressIP.Status.Conditions, &metav1.Condition{
+			Type:    string(submarinerv1.GlobalEgressIPAllocated),
+			Status:  metav1.ConditionFalse,
+			Reason:  "ZeroInput",
+			Message: "The specified NumberOfIPs is 0",
+		})
+
 		return false
 	}
+
+	if numberOfIPs == len(globalEgressIP.Status.AllocatedIPs) {
+		return false
+	}
+
+	globalEgressIP.Status.AllocatedIPs = nil
 
 	allocatedIPs, err := c.pool.Allocate(numberOfIPs)
 	if err != nil {
@@ -249,17 +260,6 @@ func (c *globalEgressIPController) validate(numberOfIPs int, egressIP *submarine
 			Status:  metav1.ConditionFalse,
 			Reason:  "InvalidInput",
 			Message: "The NumberOfIPs cannot be negative",
-		})
-
-		return false
-	}
-
-	if numberOfIPs == 0 {
-		tryAppendStatusCondition(&egressIP.Status.Conditions, &metav1.Condition{
-			Type:    string(submarinerv1.GlobalEgressIPAllocated),
-			Status:  metav1.ConditionFalse,
-			Reason:  "ZeroInput",
-			Message: "The specified NumberOfIPs is 0",
 		})
 
 		return false
