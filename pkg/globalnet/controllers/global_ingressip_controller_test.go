@@ -221,6 +221,81 @@ var _ = Describe("GlobalIngressIP controller", func() {
 			})
 		})
 	})
+
+	When("a GlobalIngressIP for Headless Service is created", func() {
+		podIP := "10.1.2.3"
+		JustBeforeEach(func() {
+			t.createGlobalIngressIP(&submarinerv1.GlobalIngressIP{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: globalIngressIPName,
+					Annotations: map[string]string{
+						"submariner.io/headless-svc-pod-ip": podIP,
+					},
+				},
+				Spec: submarinerv1.GlobalIngressIPSpec{
+					Target: submarinerv1.HeadlessServicePod,
+					ServiceRef: &corev1.LocalObjectReference{
+						Name: "db-service",
+					},
+					PodRef: &corev1.LocalObjectReference{
+						Name: "pod-1",
+					},
+				},
+			})
+		})
+
+		It("should successfully allocate a global IP", func() {
+			t.awaitIngressIPStatusAllocated(globalIngressIPName)
+			allocatedIP := t.getGlobalIngressIPStatus(globalIngressIPName).AllocatedIP
+			t.awaitEgressIPTableRules(podIP, allocatedIP)
+		})
+
+		Context("and programming of IP tables initially fails", func() {
+			BeforeEach(func() {
+				t.ipt.AddFailOnAppendRuleMatcher(ContainSubstring(podIP))
+			})
+
+			It("should eventually allocate a global IP", func() {
+				awaitStatusConditions(t.globalIngressIPs, globalIngressIPName, 0, metav1.Condition{
+					Type:   string(submarinerv1.GlobalEgressIPAllocated),
+					Status: metav1.ConditionFalse,
+					Reason: "ProgramIPTableRulesFailed",
+				}, metav1.Condition{
+					Type:   string(submarinerv1.GlobalEgressIPAllocated),
+					Status: metav1.ConditionTrue,
+				})
+
+				t.awaitEgressIPTableRules(podIP, t.getGlobalIngressIPStatus(globalIngressIPName).AllocatedIP)
+			})
+		})
+
+		Context("and then removed", func() {
+			var allocatedIP string
+
+			JustBeforeEach(func() {
+				t.awaitIngressIPStatusAllocated(globalIngressIPName)
+				allocatedIP = t.getGlobalIngressIPStatus(globalIngressIPName).AllocatedIP
+
+				Expect(t.globalIngressIPs.Delete(context.TODO(), globalIngressIPName, metav1.DeleteOptions{})).To(Succeed())
+			})
+
+			It("should release the allocated global IP", func() {
+				t.awaitIPsReleasedFromPool(allocatedIP)
+				t.awaitNoEgressIPTableRules(podIP, allocatedIP)
+			})
+
+			Context("and cleanup of IP tables initially fails", func() {
+				BeforeEach(func() {
+					t.ipt.AddFailOnDeleteRuleMatcher(ContainSubstring(podIP))
+				})
+
+				It("should eventually cleanup the IP tables", func() {
+					t.awaitIPsReleasedFromPool(allocatedIP)
+					t.awaitNoEgressIPTableRules(podIP, allocatedIP)
+				})
+			})
+		})
+	})
 })
 
 type globalIngressIPControllerTestDriver struct {
@@ -269,4 +344,12 @@ func (t *globalIngressIPControllerTestDriver) awaitIPTableRules(ip string) {
 
 func (t *globalIngressIPControllerTestDriver) awaitNoIPTableRules(ip string) {
 	t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, Or(ContainSubstring(ip), ContainSubstring(kubeProxyIPTableChainName)))
+}
+
+func (t *globalIngressIPControllerTestDriver) awaitEgressIPTableRules(podIP, snatIP string) {
+	t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChainForHeadlessSvcPods, And(ContainSubstring(podIP), ContainSubstring(snatIP)))
+}
+
+func (t *globalIngressIPControllerTestDriver) awaitNoEgressIPTableRules(podIP, snatIP string) {
+	t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, Or(ContainSubstring(podIP), ContainSubstring(snatIP)))
 }
