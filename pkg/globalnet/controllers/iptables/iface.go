@@ -41,6 +41,8 @@ type Interface interface {
 	GetKubeProxyClusterIPServiceChainName(service *corev1.Service, kubeProxyServiceChainPrefix string) (string, bool, error)
 	AddIngressRulesForHealthCheck(cniIfaceIP, globalIP string) error
 	RemoveIngressRulesForHealthCheck(cniIfaceIP, globalIP string) error
+	AddEgressRulesForHeadlessSVCPods(key, sourceIP, snatIP, globalNetIPTableMark string) error
+	RemoveEgressRulesForHeadlessSVCPods(key, sourceIP, snatIP, globalNetIPTableMark string) error
 	AddEgressRulesForPods(namespace, ipSetName, snatIP, globalNetIPTableMark string) error
 	RemoveEgressRulesForPods(namespace, ipSetName, snatIP, globalNetIPTableMark string) error
 	AddEgressRulesForNamespace(namespace, ipSetName, snatIP, globalNetIPTableMark string) error
@@ -64,8 +66,8 @@ func New() (Interface, error) {
 	return iptableIface, nil
 }
 
-func (i *ipTables) AddClusterEgressRules(sourceIP, snatIP, globalNetIPTableMark string) error {
-	ruleSpec := []string{"-p", "all", "-s", sourceIP, "-m", "mark", "--mark", globalNetIPTableMark, "-j", "SNAT", "--to", snatIP}
+func (i *ipTables) AddClusterEgressRules(subnet, snatIP, globalNetIPTableMark string) error {
+	ruleSpec := []string{"-p", "all", "-s", subnet, "-m", "mark", "--mark", globalNetIPTableMark, "-j", "SNAT", "--to", snatIP}
 	klog.V(log.DEBUG).Infof("Installing iptable egress rules for Cluster: %s", strings.Join(ruleSpec, " "))
 
 	if err := i.ipt.AppendUnique("nat", constants.SmGlobalnetEgressChainForCluster, ruleSpec...); err != nil {
@@ -75,8 +77,8 @@ func (i *ipTables) AddClusterEgressRules(sourceIP, snatIP, globalNetIPTableMark 
 	return nil
 }
 
-func (i *ipTables) RemoveClusterEgressRules(sourceIP, snatIP, globalNetIPTableMark string) error {
-	ruleSpec := []string{"-p", "all", "-s", sourceIP, "-m", "mark", "--mark", globalNetIPTableMark, "-j", "SNAT", "--to", snatIP}
+func (i *ipTables) RemoveClusterEgressRules(subnet, snatIP, globalNetIPTableMark string) error {
+	ruleSpec := []string{"-p", "all", "-s", subnet, "-m", "mark", "--mark", globalNetIPTableMark, "-j", "SNAT", "--to", snatIP}
 	klog.V(log.DEBUG).Infof("Deleting iptable egress rules for Cluster: %s", strings.Join(ruleSpec, " "))
 
 	if err := i.ipt.Delete("nat", constants.SmGlobalnetEgressChainForCluster, ruleSpec...); err != nil {
@@ -213,6 +215,28 @@ func (i *ipTables) RemoveIngressRulesForHealthCheck(cniIfaceIP, globalIP string)
 	klog.V(log.DEBUG).Infof("Deleting iptable ingress rules for Node: %s", strings.Join(ruleSpec, " "))
 
 	if err := i.ipt.Delete("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
+		return fmt.Errorf("error deleting iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
+	}
+
+	return nil
+}
+
+func (i *ipTables) AddEgressRulesForHeadlessSVCPods(key, sourceIP, snatIP, globalNetIPTableMark string) error {
+	ruleSpec := []string{"-p", "all", "-s", sourceIP, "-m", "mark", "--mark", globalNetIPTableMark, "-j", "SNAT", "--to", snatIP}
+	klog.V(log.DEBUG).Infof("Installing iptable egress rules for HDLS SVC Pod %q: %s", key, strings.Join(ruleSpec, " "))
+
+	if err := i.ipt.AppendUnique("nat", constants.SmGlobalnetEgressChainForHeadlessSvcPods, ruleSpec...); err != nil {
+		return fmt.Errorf("error appending iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
+	}
+
+	return nil
+}
+
+func (i *ipTables) RemoveEgressRulesForHeadlessSVCPods(key, sourceIP, snatIP, globalNetIPTableMark string) error {
+	ruleSpec := []string{"-p", "all", "-s", sourceIP, "-m", "mark", "--mark", globalNetIPTableMark, "-j", "SNAT", "--to", snatIP}
+	klog.V(log.DEBUG).Infof("Deleting iptable egress rules for HDLS SVC Pod %q: %s", key, strings.Join(ruleSpec, " "))
+
+	if err := i.ipt.Delete("nat", constants.SmGlobalnetEgressChainForHeadlessSvcPods, ruleSpec...); err != nil {
 		return fmt.Errorf("error deleting iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
 	}
 
