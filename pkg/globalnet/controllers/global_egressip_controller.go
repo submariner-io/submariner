@@ -54,7 +54,7 @@ func NewGlobalEgressIPController(config syncer.ResourceSyncerConfig, pool *ipam.
 
 	controller := &globalEgressIPController{
 		baseIPAllocationController: newBaseIPAllocationController(pool, iptIface),
-		podWatchers:                map[string]*podWatcher{},
+		podWatchers:                map[string]*egressPodWatcher{},
 		watcherConfig: watcher.Config{
 			RestMapper: config.RestMapper,
 			Client:     config.SourceClient,
@@ -348,7 +348,7 @@ func (c *globalEgressIPController) createPodWatcher(key string, globalEgressIP *
 
 	namedIPSet := c.newNamedIPSet(key)
 
-	podWatcher, err := startPodWatcher(key, globalEgressIP.Namespace, namedIPSet, c.watcherConfig, globalEgressIP.Spec.PodSelector)
+	podWatcher, err := startEgressPodWatcher(key, globalEgressIP.Namespace, namedIPSet, c.watcherConfig, globalEgressIP.Spec.PodSelector)
 	if err != nil {
 		klog.Errorf("Error starting pod watcher for %q: %v", key, err)
 		return nil, false
