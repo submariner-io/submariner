@@ -25,7 +25,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
-	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
 	"github.com/submariner-io/admiral/pkg/watcher"
@@ -195,7 +194,7 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 
 	if numberOfIPs == 0 {
 		globalEgressIP.Status.AllocatedIPs = nil
-		tryAppendStatusCondition(&globalEgressIP.Status.Conditions, &metav1.Condition{
+		globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "ZeroInput",
@@ -214,7 +213,8 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 	allocatedIPs, err := c.pool.Allocate(numberOfIPs)
 	if err != nil {
 		klog.Errorf("Error allocating IPs for %q: %v", key, err)
-		tryAppendStatusCondition(&globalEgressIP.Status.Conditions, &metav1.Condition{
+
+		globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "IPPoolAllocationFailed",
@@ -227,7 +227,8 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 	err = c.programGlobalEgressRules(key, allocatedIPs, globalEgressIP.Spec.PodSelector, namedIPSet)
 	if err != nil {
 		klog.Errorf("Error programming egress IP table rules for %q: %v", key, err)
-		tryAppendStatusCondition(&globalEgressIP.Status.Conditions, &metav1.Condition{
+
+		globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "ProgramIPTableRulesFailed",
@@ -239,7 +240,7 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 		return true
 	}
 
-	tryAppendStatusCondition(&globalEgressIP.Status.Conditions, &metav1.Condition{
+	globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, metav1.Condition{
 		Type:    string(submarinerv1.GlobalEgressIPAllocated),
 		Status:  metav1.ConditionTrue,
 		Reason:  "Success",
@@ -255,7 +256,7 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 
 func (c *globalEgressIPController) validate(numberOfIPs int, egressIP *submarinerv1.GlobalEgressIP) bool {
 	if numberOfIPs < 0 {
-		tryAppendStatusCondition(&egressIP.Status.Conditions, &metav1.Condition{
+		egressIP.Status.Conditions = util.TryAppendCondition(egressIP.Status.Conditions, metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "InvalidInput",
@@ -300,15 +301,6 @@ func (c *globalEgressIPController) onRemove(numRequeues int, globalEgressIP *sub
 	return false
 }
 
-func tryAppendStatusCondition(conditions *[]metav1.Condition, newCond *metav1.Condition) {
-	updatedConditions := util.TryAppendCondition(*conditions, *newCond)
-	if updatedConditions == nil {
-		return
-	}
-
-	*conditions = updatedConditions
-}
-
 func checkStatusChanged(oldStatus, newStatus interface{}, retObj runtime.Object) runtime.Object {
 	if equality.Semantic.DeepEqual(oldStatus, newStatus) {
 		return nil
@@ -334,7 +326,8 @@ func (c *globalEgressIPController) createPodWatcher(key string, globalEgressIP *
 	if found {
 		if !equality.Semantic.DeepEqual(prevPodWatcher.podSelector, globalEgressIP.Spec.PodSelector) {
 			klog.Errorf("PodSelector for %q cannot be updated after creation", key)
-			tryAppendStatusCondition(&globalEgressIP.Status.Conditions, &metav1.Condition{
+
+			globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, metav1.Condition{
 				Type:    string(submarinerv1.GlobalEgressIPAllocated),
 				Status:  metav1.ConditionFalse,
 				Reason:  "PodSelectorUpdateNotSupported",
