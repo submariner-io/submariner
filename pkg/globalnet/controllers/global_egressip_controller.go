@@ -152,17 +152,15 @@ func (c *globalEgressIPController) process(from runtime.Object, numRequeues int,
 
 func (c *globalEgressIPController) onCreateOrUpdate(key string, numberOfIPs int, globalEgressIP *submarinerv1.GlobalEgressIP,
 	numRequeues int) bool {
-	namedIPSet, ok := c.createPodWatcher(key, globalEgressIP)
-	if !ok {
-		return true
-	}
+	namedIPSet := c.newNamedIPSet(key)
 
 	requeue := false
 	if numberOfIPs != len(globalEgressIP.Status.AllocatedIPs) {
 		requeue = c.flushGlobalEgressRulesAndReleaseIPs(key, namedIPSet.Name(), numRequeues, globalEgressIP)
 	}
 
-	return requeue || c.allocateGlobalIPs(key, numberOfIPs, globalEgressIP, namedIPSet)
+	return requeue || c.allocateGlobalIPs(key, numberOfIPs, globalEgressIP, namedIPSet) ||
+		!c.createPodWatcher(key, namedIPSet, numberOfIPs, globalEgressIP)
 }
 
 func (c *globalEgressIPController) programGlobalEgressRules(key string, allocatedIPs []string, podSelector *metav1.LabelSelector,
@@ -318,7 +316,8 @@ func (c *globalEgressIPController) getIPSetName(key string) string {
 	return IPSetPrefix + encoded[:25]
 }
 
-func (c *globalEgressIPController) createPodWatcher(key string, globalEgressIP *submarinerv1.GlobalEgressIP) (ipset.Named, bool) {
+func (c *globalEgressIPController) createPodWatcher(key string, namedIPSet ipset.Named, numberOfIPs int,
+	globalEgressIP *submarinerv1.GlobalEgressIP) bool {
 	c.Lock()
 	defer c.Unlock()
 
@@ -335,15 +334,17 @@ func (c *globalEgressIPController) createPodWatcher(key string, globalEgressIP *
 			})
 		}
 
-		return prevPodWatcher.namedIPSet, true
+		return true
 	}
 
-	namedIPSet := c.newNamedIPSet(key)
+	if numberOfIPs == 0 {
+		return true
+	}
 
 	podWatcher, err := startEgressPodWatcher(key, globalEgressIP.Namespace, namedIPSet, c.watcherConfig, globalEgressIP.Spec.PodSelector)
 	if err != nil {
 		klog.Errorf("Error starting pod watcher for %q: %v", key, err)
-		return nil, false
+		return false
 	}
 
 	c.podWatchers[key] = podWatcher
@@ -351,7 +352,7 @@ func (c *globalEgressIPController) createPodWatcher(key string, globalEgressIP *
 
 	klog.Infof("Started pod watcher for %q", key)
 
-	return namedIPSet, true
+	return true
 }
 
 func (c *globalEgressIPController) flushGlobalEgressRulesAndReleaseIPs(key, ipSetName string, numRequeues int,
