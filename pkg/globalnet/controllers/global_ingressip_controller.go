@@ -194,32 +194,23 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 
 		err = c.iptIface.AddIngressRulesForHeadlessSvcPod(ips[0], podIP)
 		if err != nil {
-			_ = c.pool.Release(ips...)
-
 			klog.Errorf("Error while programming Service %q ingress rules for Pod: %v", key, err)
-			tryAppendStatusCondition(&ingressIP.Status.Conditions, &metav1.Condition{
-				Type:    string(submarinerv1.GlobalEgressIPAllocated),
-				Status:  metav1.ConditionFalse,
-				Reason:  "ProgramIPTableRulesFailed",
-				Message: fmt.Sprintf("Error programming ingress rules: %v", err),
-			})
-
-			return true
+			err = errors.WithMessage(err, "Error programming ingress rules")
+		} else {
+			err = c.iptIface.AddEgressRulesForHeadlessSVCPods(key, podIP, ips[0], globalNetIPTableMark)
+			if err != nil {
+				_ = c.iptIface.RemoveIngressRulesForHeadlessSvcPod(ips[0], podIP)
+				err = errors.WithMessage(err, "Error programming egress rules")
+			}
 		}
 
-		err = c.iptIface.AddEgressRulesForHeadlessSVCPods(key, podIP, ips[0], globalNetIPTableMark)
 		if err != nil {
 			_ = c.pool.Release(ips...)
-			if err1 := c.iptIface.RemoveIngressRulesForHeadlessSvcPod(ips[0], podIP); err1 != nil {
-				klog.Errorf("Error resetting ingress rules for Headless Service Pod %q: %v", key, err)
-			}
-
-			klog.Errorf("Error while programming egress rules for Headless Service Pod %q: %v", key, err)
 			tryAppendStatusCondition(&ingressIP.Status.Conditions, &metav1.Condition{
 				Type:    string(submarinerv1.GlobalEgressIPAllocated),
 				Status:  metav1.ConditionFalse,
 				Reason:  "ProgramIPTableRulesFailed",
-				Message: fmt.Sprintf("Error programming egress rules: %v", err),
+				Message: err.Error(),
 			})
 
 			return true
@@ -250,8 +241,6 @@ func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngre
 			chainName := ingressIP.GetAnnotations()[kubeProxyIPTableChainAnnotation]
 			if chainName != "" {
 				return c.iptIface.RemoveIngressRulesForService(ingressIP.Status.AllocatedIP, chainName)
-			} else {
-				klog.Warningf("%q annotation is missing on %q", kubeProxyIPTableChainAnnotation, key)
 			}
 		} else if ingressIP.Spec.Target == submarinerv1.HeadlessServicePod {
 			podIP := ingressIP.GetAnnotations()[headlessSvcPodIP]
@@ -261,22 +250,9 @@ func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngre
 				}
 
 				return c.iptIface.RemoveEgressRulesForHeadlessSVCPods(key, podIP, ingressIP.Status.AllocatedIP, globalNetIPTableMark)
-			} else {
-				klog.Warningf("%q annotation is missing on pod %q", headlessSvcPodIP, key)
 			}
 		}
 
 		return nil
 	}, ingressIP.Status.AllocatedIP)
-}
-
-func getIngressIPName(obj runtime.Object) string {
-	switch typedObj := obj.(type) {
-	case *corev1.Service:
-		return fmt.Sprintf("svc-%.59s", typedObj.Name)
-	case *corev1.Pod:
-		return fmt.Sprintf("pod-%.59s", typedObj.Name)
-	}
-
-	return ""
 }
