@@ -82,7 +82,13 @@ func NewGlobalIngressIPController(config syncer.ResourceSyncerConfig, pool *ipam
 			if gip.Spec.Target == submarinerv1.ClusterIPService {
 				return controller.iptIface.AddIngressRulesForService(reservedIPs[0], target)
 			} else if gip.Spec.Target == submarinerv1.HeadlessServicePod {
-				return controller.iptIface.AddIngressRulesForHeadlessSvcPod(reservedIPs[0], target)
+				err := controller.iptIface.AddIngressRulesForHeadlessSvcPod(reservedIPs[0], target)
+				if err != nil {
+					return err
+				}
+
+				key, _ := cache.MetaNamespaceKeyFunc(obj)
+				return controller.iptIface.AddEgressRulesForHeadlessSVCPods(key, target, reservedIPs[0], globalNetIPTableMark)
 			}
 			return nil
 		})
