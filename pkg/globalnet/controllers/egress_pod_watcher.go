@@ -31,9 +31,9 @@ import (
 	"k8s.io/klog"
 )
 
-func startPodWatcher(name, namespace string, namedIPSet ipset.Named, config watcher.Config,
-	podSelector *metav1.LabelSelector) (*podWatcher, error) {
-	pw := &podWatcher{
+func startEgressPodWatcher(name, namespace string, namedIPSet ipset.Named, config watcher.Config,
+	podSelector *metav1.LabelSelector) (*egressPodWatcher, error) {
+	pw := &egressPodWatcher{
 		stopCh:     make(chan struct{}),
 		namedIPSet: namedIPSet,
 	}
@@ -56,7 +56,7 @@ func startPodWatcher(name, namespace string, namedIPSet ipset.Named, config watc
 				Handler: watcher.EventHandlerFuncs{
 					OnCreateFunc: pw.onCreateOrUpdate,
 					OnUpdateFunc: pw.onCreateOrUpdate,
-					OnDeleteFunc: pw.onRemove,
+					OnDeleteFunc: pw.onDelete,
 				},
 				ResourcesEquivalent: pw.arePodsEquivalent,
 				SourceNamespace:     namespace,
@@ -77,14 +77,14 @@ func startPodWatcher(name, namespace string, namedIPSet ipset.Named, config watc
 	return pw, nil
 }
 
-func (w *podWatcher) arePodsEquivalent(oldObj, newObj *unstructured.Unstructured) bool {
+func (w *egressPodWatcher) arePodsEquivalent(oldObj, newObj *unstructured.Unstructured) bool {
 	oldPodIP, _, _ := unstructured.NestedString(oldObj.Object, "status", "podIP")
 	newPodIP, _, _ := unstructured.NestedString(newObj.Object, "status", "podIP")
 
 	return oldPodIP == newPodIP
 }
 
-func (w *podWatcher) onCreateOrUpdate(obj runtime.Object, numRequeues int) bool {
+func (w *egressPodWatcher) onCreateOrUpdate(obj runtime.Object, numRequeues int) bool {
 	pod := obj.(*corev1.Pod)
 	key, _ := cache.MetaNamespaceKeyFunc(pod)
 
@@ -94,37 +94,24 @@ func (w *podWatcher) onCreateOrUpdate(obj runtime.Object, numRequeues int) bool 
 
 	klog.V(log.DEBUG).Infof("Pod %q with IP %s created/updated", key, pod.Status.PodIP)
 
-	if err := w.addIPSetEntry(pod.Status.PodIP); err != nil {
-		klog.Errorf("Error adding ipAddress %q to the ipSet chain %q: %v", pod.Status.PodIP, w.ipSetName, err)
+	if err := w.namedIPSet.AddEntry(pod.Status.PodIP, true); err != nil {
+		klog.Errorf("Error adding pod IP %q to IP set %q: %v", pod.Status.PodIP, w.ipSetName, err)
 		return true
 	}
 
 	return false
 }
 
-func (w *podWatcher) onRemove(obj runtime.Object, numRequeues int) bool {
+func (w *egressPodWatcher) onDelete(obj runtime.Object, numRequeues int) bool {
 	pod := obj.(*corev1.Pod)
 	key, _ := cache.MetaNamespaceKeyFunc(pod)
 
 	klog.V(log.DEBUG).Infof("Pod %q removed", key)
 
-	if err := w.deleteIPSetEntry(pod.Status.PodIP); err != nil {
-		klog.Errorf("Error deleting ipAddress %q from the ipSet chain %q: %v", pod.Status.PodIP, w.ipSetName, err)
+	if err := w.namedIPSet.DelEntry(pod.Status.PodIP); err != nil {
+		klog.Errorf("Error deleting pod IP %q from IP set %q: %v", pod.Status.PodIP, w.ipSetName, err)
 		return true
 	}
 
 	return false
-}
-
-func (w *podWatcher) addIPSetEntry(ipAddress string) error {
-	err := w.namedIPSet.AddEntry(ipAddress, true)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (w *podWatcher) deleteIPSetEntry(ipAddress string) error {
-	return w.namedIPSet.DelEntry(ipAddress)
 }

@@ -104,12 +104,12 @@ type baseIPAllocationController struct {
 type globalEgressIPController struct {
 	*baseIPAllocationController
 	sync.Mutex
-	podWatchers   map[string]*podWatcher
+	podWatchers   map[string]*egressPodWatcher
 	ipSetIface    ipset.Interface
 	watcherConfig watcher.Config
 }
 
-type podWatcher struct {
+type egressPodWatcher struct {
 	stopCh      chan struct{}
 	ipSetName   string
 	namedIPSet  ipset.Named
