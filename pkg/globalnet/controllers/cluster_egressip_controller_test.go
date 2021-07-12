@@ -368,12 +368,7 @@ func (t *clusterGlobalEgressIPControllerTestDriver) start() {
 }
 
 func (t *clusterGlobalEgressIPControllerTestDriver) awaitIPTableRules(ips ...string) {
-	targetSNATIP := ips[0]
-	if len(ips) > 1 {
-		targetSNATIP += "-" + ips[len(ips)-1]
-	}
-
-	t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChainForCluster, ContainSubstring(targetSNATIP))
+	t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChainForCluster, ContainSubstring(getSNATAddress(ips...)))
 
 	for _, localSubnet := range t.localSubnets {
 		t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChainForCluster, ContainSubstring(localSubnet))
@@ -381,10 +376,5 @@ func (t *clusterGlobalEgressIPControllerTestDriver) awaitIPTableRules(ips ...str
 }
 
 func (t *clusterGlobalEgressIPControllerTestDriver) awaitNoIPTableRules(ips ...string) {
-	targetSNATIP := ips[0]
-	if len(ips) > 1 {
-		targetSNATIP += "-" + ips[len(ips)-1]
-	}
-
-	t.ipt.AwaitNoRule("nat", constants.SmGlobalnetEgressChainForCluster, ContainSubstring(targetSNATIP))
+	t.ipt.AwaitNoRule("nat", constants.SmGlobalnetEgressChainForCluster, ContainSubstring(getSNATAddress(ips...)))
 }
