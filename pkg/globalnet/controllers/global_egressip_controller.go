@@ -327,10 +327,10 @@ func (c *globalEgressIPController) createPodWatcher(key string, namedIPSet ipset
 			klog.Errorf("PodSelector for %q cannot be updated after creation", key)
 
 			globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, metav1.Condition{
-				Type:    string(submarinerv1.GlobalEgressIPAllocated),
+				Type:    string(submarinerv1.GlobalEgressIPUpdated),
 				Status:  metav1.ConditionFalse,
 				Reason:  "PodSelectorUpdateNotSupported",
-				Message: "PodSelector cannot be updated after creation",
+				Message: "The PodSelector cannot be updated after creation",
 			})
 		}
 

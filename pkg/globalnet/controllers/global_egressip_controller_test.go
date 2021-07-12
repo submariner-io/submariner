@@ -436,7 +436,7 @@ func testGlobalEgressIPUpdated(t *globalEgressIPControllerTestDriver, podSelecto
 
 		It("should update the status appropriately", func() {
 			t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, numberOfIPs, 0, metav1.Condition{
-				Type:   string(submarinerv1.GlobalEgressIPAllocated),
+				Type:   string(submarinerv1.GlobalEgressIPUpdated),
 				Status: metav1.ConditionFalse,
 				Reason: "PodSelectorUpdateNotSupported",
 			})
