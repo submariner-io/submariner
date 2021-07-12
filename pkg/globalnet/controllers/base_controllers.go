@@ -18,6 +18,7 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/submariner-io/admiral/pkg/federate"
@@ -27,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
 )
@@ -59,6 +61,27 @@ func newBaseIPAllocationController(pool *ipam.IPPool, iptIface iptiface.Interfac
 
 func (c *baseSyncerController) Start() error {
 	return c.resourceSyncer.Start(c.stopCh)
+}
+
+func (c *baseSyncerController) reconcile(client dynamic.ResourceInterface, transform func(obj *unstructured.Unstructured) runtime.Object) {
+	c.resourceSyncer.Reconcile(func() []runtime.Object {
+		objList, err := client.List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			klog.Errorf("Error listing resources for reconciliation: %v", err)
+			return nil
+		}
+
+		retList := make([]runtime.Object, 0, len(objList.Items))
+
+		for i := range objList.Items {
+			obj := transform(&objList.Items[i])
+			if obj != nil {
+				retList = append(retList, obj)
+			}
+		}
+
+		return retList
+	})
 }
 
 func (c *baseIPAllocationController) reserveAllocatedIPs(federator federate.Federator, obj *unstructured.Unstructured,

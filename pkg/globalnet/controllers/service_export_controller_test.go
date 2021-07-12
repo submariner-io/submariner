@@ -19,6 +19,7 @@ package controllers_test
 
 import (
 	"context"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -29,6 +30,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/ipam"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 var _ = Describe("ServiceExport controller", func() {
@@ -87,6 +89,23 @@ func testClusterIPService() {
 
 		It("should not create a GlobalIngressIP", func() {
 			t.awaitNoGlobalIngressIP(service.Name)
+		})
+	})
+
+	When("a GlobalIngressIP is stale on startup due to a missed ServiceExport delete event", func() {
+		BeforeEach(func() {
+			t.createServiceExport(t.createService(service))
+		})
+
+		It("should delete the GlobalIngressIP on reconciliation", func() {
+			t.awaitGlobalIngressIP(serviceName)
+
+			t.controller.Stop()
+			time.Sleep(500 * time.Millisecond)
+			Expect(t.serviceExports.Delete(context.TODO(), serviceName, metav1.DeleteOptions{})).To(Succeed())
+
+			t.start()
+			t.awaitNoGlobalIngressIP(serviceName)
 		})
 	})
 }
@@ -184,6 +203,51 @@ func testHeadlessService() {
 
 		It("should not create a GlobalIngressIP", func() {
 			t.awaitNoGlobalIngressIPs()
+		})
+	})
+
+	When("backend Pod GlobalIngressIPs are stale on startup due to a missed ServiceExport delete event", func() {
+		var backendPod2 *corev1.Pod
+
+		BeforeEach(func() {
+			t.createPod(backendPod)
+			backendPod2 = t.createPod(newHeadlessServicePod(service.Name))
+		})
+
+		It("should delete the GlobalIngressIPs on reconciliation", func() {
+			t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
+			t.awaitHeadlessGlobalIngressIP(service.Name, backendPod2.Name)
+
+			t.controller.Stop()
+			time.Sleep(500 * time.Millisecond)
+			Expect(t.serviceExports.Delete(context.TODO(), serviceName, metav1.DeleteOptions{})).To(Succeed())
+
+			t.start()
+
+			Eventually(func() []unstructured.Unstructured {
+				list, _ := t.globalIngressIPs.List(context.TODO(), metav1.ListOptions{})
+				return list.Items
+			}, time.Second*3).Should(BeEmpty())
+		})
+	})
+
+	When("a backend Pod GlobalIngressIP is stale on startup due to a missed Pod delete event", func() {
+		BeforeEach(func() {
+			t.createPod(backendPod)
+		})
+
+		It("should delete the GlobalIngressIPs on reconciliation", func() {
+			t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
+
+			t.controller.Stop()
+			time.Sleep(500 * time.Millisecond)
+			Expect(t.pods.Namespace(backendPod.Namespace).Delete(context.TODO(), backendPod.Name, metav1.DeleteOptions{})).To(Succeed())
+
+			t.start()
+			Eventually(func() []unstructured.Unstructured {
+				list, _ := t.globalIngressIPs.List(context.TODO(), metav1.ListOptions{})
+				return list.Items
+			}, time.Second*3).Should(BeEmpty())
 		})
 	})
 }
