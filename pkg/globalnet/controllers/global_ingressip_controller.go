@@ -148,7 +148,8 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 	ips, err := c.pool.Allocate(1)
 	if err != nil {
 		klog.Errorf("Error allocating IP for %q: %v", key, err)
-		tryAppendStatusCondition(&ingressIP.Status.Conditions, &metav1.Condition{
+
+		ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "IPPoolAllocationFailed",
@@ -170,10 +171,11 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 
 		err = c.iptIface.AddIngressRulesForService(ips[0], chainName)
 		if err != nil {
+			klog.Errorf("Error while programming Service %q ingress rules: %v", key, err)
+
 			_ = c.pool.Release(ips...)
 
-			klog.Errorf("Error while programming Service %q ingress rules: %v", key, err)
-			tryAppendStatusCondition(&ingressIP.Status.Conditions, &metav1.Condition{
+			ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, metav1.Condition{
 				Type:    string(submarinerv1.GlobalEgressIPAllocated),
 				Status:  metav1.ConditionFalse,
 				Reason:  "ProgramIPTableRulesFailed",
@@ -206,7 +208,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 
 		if err != nil {
 			_ = c.pool.Release(ips...)
-			tryAppendStatusCondition(&ingressIP.Status.Conditions, &metav1.Condition{
+			ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, metav1.Condition{
 				Type:    string(submarinerv1.GlobalEgressIPAllocated),
 				Status:  metav1.ConditionFalse,
 				Reason:  "ProgramIPTableRulesFailed",
@@ -219,7 +221,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 
 	ingressIP.Status.AllocatedIP = ips[0]
 
-	tryAppendStatusCondition(&ingressIP.Status.Conditions, &metav1.Condition{
+	ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, metav1.Condition{
 		Type:    string(submarinerv1.GlobalEgressIPAllocated),
 		Status:  metav1.ConditionTrue,
 		Reason:  "Success",
