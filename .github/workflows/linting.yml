@@ -108,6 +108,15 @@ jobs:
       - name: Run markdownlint
         run: make markdownlint
 
+  packagedoc-lint:
+    name: Package Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v2
+      - name: Run packagedoc-lint
+        run: make packagedoc-lint
+
   yaml-lint:
     name: YAML
     runs-on: ubuntu-latest
