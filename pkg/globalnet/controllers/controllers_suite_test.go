@@ -92,6 +92,7 @@ type testDriverBase struct {
 	serviceExports         dynamic.ResourceInterface
 	pods                   dynamic.NamespaceableResourceInterface
 	nodes                  dynamic.ResourceInterface
+	watches                *fakeDynClient.WatchReactor
 }
 
 func newTestDriverBase() *testDriverBase {
@@ -109,7 +110,10 @@ func newTestDriverBase() *testDriverBase {
 	Expect(submarinerv1.AddToScheme(t.scheme)).To(Succeed())
 	Expect(corev1.AddToScheme(t.scheme)).To(Succeed())
 
-	t.dynClient = fakeDynClient.NewDynamicClient(t.scheme)
+	fakeClient := fakeDynClient.NewDynamicClient(t.scheme)
+	t.dynClient = fakeClient
+
+	t.watches = fakeDynClient.NewWatchReactor(&fakeClient.Fake)
 
 	t.globalEgressIPs = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.GlobalEgressIP{})).
 		Namespace(namespace)
@@ -556,4 +560,13 @@ func fromUnstructured(from *unstructured.Unstructured, to runtime.Object) runtim
 	Expect(err).To(Succeed())
 
 	return to
+}
+
+func getSNATAddress(ips ...string) string {
+	targetSNATIP := ips[0]
+	if len(ips) > 1 {
+		targetSNATIP += "-" + ips[len(ips)-1]
+	}
+
+	return targetSNATIP
 }

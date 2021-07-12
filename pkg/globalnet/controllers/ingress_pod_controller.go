@@ -18,6 +18,8 @@ limitations under the License.
 package controllers
 
 import (
+	"fmt"
+
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/admiral/pkg/syncer"
@@ -96,7 +98,7 @@ func (c *ingressPodController) process(from runtime.Object, numRequeues int, op 
 
 	ingressIP := &submarinerv1.GlobalIngressIP{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      getIngressIPName(pod),
+			Name:      fmt.Sprintf("pod-%.59s", pod.Name),
 			Namespace: pod.Namespace,
 			Labels: map[string]string{
 				ServiceRefLabel: c.svcName,

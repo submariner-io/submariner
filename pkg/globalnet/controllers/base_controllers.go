@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"github.com/submariner-io/admiral/pkg/federate"
+	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	iptiface "github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
 	"github.com/submariner-io/submariner/pkg/ipam"
@@ -124,7 +125,7 @@ func (c *baseIPAllocationController) reserveAllocatedIPs(federator federate.Fede
 
 		conditions := conditionsFromUnstructured(obj)
 
-		tryAppendStatusCondition(&conditions, &metav1.Condition{
+		conditions = util.TryAppendCondition(conditions, metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "ReserveAllocatedIPsFailed",

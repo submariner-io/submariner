@@ -91,7 +91,7 @@ type Interface interface {
 
 	DelEntryWithOptions(set, entry string, options ...string) error
 
-	SaveAllSets() ([]byte, error)
+	ListAllSetInfo() (string, error)
 }
 
 // IPSetCmd represents the ipset util.  We use ipset command for ipset execute.
@@ -347,6 +347,22 @@ func New(exec utilexec.Interface) Interface {
 	}
 }
 
+func (runner *runner) runWithOutput(args []string, errFormat string, a ...interface{}) (string, error) {
+	glog.V(log.DEBUG).Infof("Running ipset %v", args)
+
+	out, err := runner.exec.Command(IPSetCmd, args...).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("%s: %v (%s)", fmt.Sprintf(errFormat, a...), err, out)
+	}
+
+	return string(out), nil
+}
+
+func (runner *runner) run(args []string, errFormat string, a ...interface{}) error {
+	_, err := runner.runWithOutput(args, errFormat, a...)
+	return err
+}
+
 // CreateSet creates a new set,  it will ignore error when the set already exists if ignoreExistErr=true.
 func (runner *runner) CreateSet(set *IPSet, ignoreExistErr bool) error {
 	// Setting default values if not present
@@ -401,13 +417,7 @@ func (runner *runner) createSet(set *IPSet, ignoreExistErr bool) error {
 		args = append(args, "-exist")
 	}
 
-	glog.V(log.DEBUG).Infof("running ipset %v", args)
-
-	if _, err := runner.exec.Command(IPSetCmd, args...).CombinedOutput(); err != nil {
-		return fmt.Errorf("error creating ipset %s, error: %v", set.Name, err)
-	}
-
-	return nil
+	return runner.run(args, "error creating set %q", set.Name)
 }
 
 // AddEntry adds a new entry to the named set.
@@ -419,11 +429,7 @@ func (runner *runner) AddEntry(entry string, set *IPSet, ignoreExistErr bool) er
 		args = append(args, "-exist")
 	}
 
-	if _, err := runner.exec.Command(IPSetCmd, args...).CombinedOutput(); err != nil {
-		return fmt.Errorf("error adding entry %s, error: %v", entry, err)
-	}
-
-	return nil
+	return runner.run(args, "error adding entry %q to set %q", entry, set.Name)
 }
 
 func (runner *runner) AddEntryWithOptions(entry *Entry, set *IPSet, ignoreExistErr bool) error {
@@ -434,100 +440,92 @@ func (runner *runner) AddEntryWithOptions(entry *Entry, set *IPSet, ignoreExistE
 
 	args = append(args, set.Name, entry.String())
 	args = append(args, entry.Options...)
-	glog.V(log.DEBUG).Infof("running ipset %v", args)
 
-	if _, err := runner.exec.Command(IPSetCmd, args...).CombinedOutput(); err != nil {
-		return fmt.Errorf("error adding entry %s, error: %v", entry, err)
-	}
-
-	return nil
+	return runner.run(args, "error adding entry %q to set %q", entry, set.Name)
 }
 
 // DelEntry is used to delete the specified entry from the set.
 func (runner *runner) DelEntry(entry, set string) error {
-	if _, err := runner.exec.Command(IPSetCmd, "del", set, entry).CombinedOutput(); err != nil {
-		return fmt.Errorf("error deleting entry %s: from set: %s, error: %v", entry, set, err)
+	err := runner.run([]string{"del", set, entry}, "error deleting entry %q from set %q", entry, set)
+	if IsNotFoundError(err) {
+		return nil
 	}
 
-	return nil
+	return err
 }
 
 func (runner *runner) DelEntryWithOptions(set, entry string, options ...string) error {
 	// ipset del should not add options
-	if _, err := runner.exec.Command(IPSetCmd, "del", set, entry).CombinedOutput(); err != nil {
-		return fmt.Errorf("error deleting entry %s: from set: %s, error: %v", entry, set, err)
+	err := runner.run([]string{"del", set, entry}, "error deleting entry %q from set %q", entry, set)
+	if IsNotFoundError(err) {
+		return nil
 	}
 
-	return nil
+	return err
 }
 
 // TestEntry is used to check whether the specified entry is in the set or not.
 func (runner *runner) TestEntry(entry, set string) (bool, error) {
-	if out, err := runner.exec.Command(IPSetCmd, "test", set, entry).CombinedOutput(); err == nil {
-		reg := regexp.MustCompile("NOT")
-		if reg.MatchString(string(out)) {
+	err := runner.run([]string{"test", set, entry}, "error testing entry %q in set %q", entry, set)
+	if err != nil {
+		if strings.Contains(err.Error(), "is NOT in set") {
 			return false, nil
 		}
 
-		return true, nil
-	} else {
-		return false, fmt.Errorf("error testing entry %s: %v (%s)", entry, err, out)
+		return false, err
 	}
+
+	return true, nil
 }
 
 // FlushSet deletes all entries from a named set.
 func (runner *runner) FlushSet(set string) error {
-	if _, err := runner.exec.Command(IPSetCmd, "flush", set).CombinedOutput(); err != nil {
-		return fmt.Errorf("error flushing set: %s, error: %v", set, err)
+	err := runner.run([]string{"flush", set}, "error flushing set %q", set)
+	if IsNotFoundError(err) {
+		return nil
 	}
 
-	return nil
+	return err
 }
 
 // DestroySet is used to destroy a named set.
 func (runner *runner) DestroySet(set string) error {
-	glog.V(log.DEBUG).Infof("running ipset destroy %s", set)
-
-	if out, err := runner.exec.Command(IPSetCmd, "destroy", set).CombinedOutput(); err != nil {
-		return fmt.Errorf("error destroying set %s, error: %v(%s)", set, err, out)
+	err := runner.run([]string{"destroy", set}, "error destroying set %q", set)
+	if IsNotFoundError(err) {
+		return nil
 	}
 
-	return nil
+	return err
 }
 
 // DestroyAllSets is used to destroy all sets.
 func (runner *runner) DestroyAllSets() error {
-	if _, err := runner.exec.Command(IPSetCmd, "destroy").CombinedOutput(); err != nil {
-		return fmt.Errorf("error destroying all sets, error: %v", err)
-	}
-
-	return nil
+	return runner.run([]string{"destroy"}, "error destroying all sets")
 }
 
 // ListSets list all set names from kernel
 func (runner *runner) ListSets() ([]string, error) {
-	out, err := runner.exec.Command(IPSetCmd, "list", "-n").CombinedOutput()
+	out, err := runner.runWithOutput([]string{"list", "-n"}, "error listing all sets")
 	if err != nil {
-		return nil, fmt.Errorf("error listing all sets, error: %v", err)
+		return nil, err
 	}
 
-	return strings.Split(string(out), "\n"), nil
+	return strings.Split(out, "\n"), nil
 }
 
 // ListEntries lists all the entries from a named set.
 func (runner *runner) ListEntries(set string) ([]string, error) {
 	if set == "" {
-		return nil, fmt.Errorf("set name can't be nil")
+		return nil, fmt.Errorf("set name can't be empty")
 	}
 
-	out, err := runner.exec.Command(IPSetCmd, "list", set).CombinedOutput()
-
+	out, err := runner.runWithOutput([]string{"list", set}, "error listing set %q", set)
 	if err != nil {
-		return nil, fmt.Errorf("error listing set: %s, error: %v", set, err)
+		return nil, err
 	}
 
 	memberMatcher := regexp.MustCompile(EntryMemberPattern)
-	list := memberMatcher.ReplaceAllString(string(out), "")
+	list := memberMatcher.ReplaceAllString(out, "")
 	strs := strings.Split(list, "\n")
 	results := make([]string, 0)
 
@@ -538,6 +536,10 @@ func (runner *runner) ListEntries(set string) ([]string, error) {
 	}
 
 	return results, nil
+}
+
+func (runner *runner) ListAllSetInfo() (string, error) {
+	return runner.runWithOutput([]string{"list"}, "error listing sets")
 }
 
 // GetVersion returns the version string.
@@ -618,6 +620,10 @@ func validateHashFamily(family string) bool {
 // the error string looking for known values, which is imperfect but works in
 // practice.
 func IsNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+
 	es := err.Error()
 
 	if strings.Contains(es, "does not exist") {
@@ -630,6 +636,12 @@ func IsNotFoundError(err error) bool {
 		// entry is missing from the set
 		// xref: https://github.com/Olipro/ipset/blob/master/lib/parse.c#L1904
 		// https://github.com/Olipro/ipset/blob/master/lib/parse.c#L1925
+		return true
+	}
+
+	if strings.Contains(es, "cannot be deleted") && strings.Contains(es, "it's not added") {
+		// Element cannot be deleted from the set: it's not added
+		// xref: https://github.com/Olipro/ipset/blob/master/lib/errcode.c#L88
 		return true
 	}
 
@@ -686,14 +698,4 @@ func parsePortRange(portRange string) (beginPort, endPort int, err error) {
 	}
 
 	return beginPort, endPort, nil
-}
-
-// SaveAllSets list all set names from kernel
-func (runner *runner) SaveAllSets() ([]byte, error) {
-	out, err := runner.exec.Command(IPSetCmd, "list").CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("error saving all sets, error: %v", err)
-	}
-
-	return out, nil
 }
