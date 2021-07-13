@@ -135,6 +135,10 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 				Reason: "ZeroInput",
 			})
 		})
+
+		It("should not start a Pod watcher", func() {
+			t.watches.AwaitNoWatchStarted("pods")
+		})
 	})
 
 	Context("and programming the IP table rules initially fails", func() {
@@ -180,6 +184,8 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 				Status: metav1.ConditionFalse,
 				Reason: "IPPoolAllocationFailed",
 			})
+
+			t.watches.AwaitNoWatchStarted("pods")
 
 			_ = t.pool.Release(ips...)
 
@@ -266,6 +272,10 @@ func testExistingGlobalEgressIP(t *globalEgressIPControllerTestDriver, podSelect
 		It("should program the necessary IP table rules for the allocated IPs", func() {
 			t.awaitIPTableRules(egressChain, existing.Status.AllocatedIPs...)
 		})
+
+		It("should start a Pod watcher", func() {
+			t.watches.AwaitWatchStarted("pods")
+		})
 	})
 
 	Context("and the NumberOfIPs changed", func() {
@@ -283,6 +293,10 @@ func testExistingGlobalEgressIP(t *globalEgressIPControllerTestDriver, podSelect
 		It("should release the previously allocated IPs", func() {
 			t.awaitIPsReleasedFromPool(existing.Status.AllocatedIPs...)
 			t.awaitNoIPTableRules(egressChain, existing.Status.AllocatedIPs...)
+		})
+
+		It("should start a Pod watcher", func() {
+			t.watches.AwaitWatchStarted("pods")
 		})
 	})
 
@@ -368,20 +382,22 @@ func testGlobalEgressIPUpdated(t *globalEgressIPControllerTestDriver, podSelecto
 		test.UpdateResource(t.globalEgressIPs, existing)
 	})
 
+	testReallocated := func() {
+		t.awaitIPsReleasedFromPool(existing.Status.AllocatedIPs...)
+		t.awaitNoIPTableRules(egressChain, existing.Status.AllocatedIPs...)
+
+		t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, *existing.Spec.NumberOfIPs)
+		t.awaitIPTableRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
+
+		t.watches.AwaitNoWatchStopped("pods")
+	}
+
 	Context("with the NumberOfIPs greater", func() {
 		BeforeEach(func() {
 			numberOfIPs++
 		})
 
-		It("should reallocate the global IPs", func() {
-			t.awaitIPsReleasedFromPool(existing.Status.AllocatedIPs...)
-			t.awaitNoIPTableRules(egressChain, existing.Status.AllocatedIPs...)
-
-			t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, *existing.Spec.NumberOfIPs)
-			t.awaitIPTableRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
-
-			t.watches.AwaitNoWatchStopped("pods")
-		})
+		It("should reallocate the global IPs", testReallocated)
 	})
 
 	Context("with the NumberOfIPs less", func() {
@@ -389,13 +405,7 @@ func testGlobalEgressIPUpdated(t *globalEgressIPControllerTestDriver, podSelecto
 			numberOfIPs--
 		})
 
-		It("should reallocate the global IPs", func() {
-			t.awaitIPsReleasedFromPool(existing.Status.AllocatedIPs...)
-			t.awaitNoIPTableRules(egressChain, existing.Status.AllocatedIPs...)
-
-			t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, *existing.Spec.NumberOfIPs)
-			t.awaitIPTableRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
-		})
+		It("should reallocate the global IPs", testReallocated)
 	})
 
 	Context("with the NumberOfIPs zero", func() {
