@@ -104,12 +104,12 @@ type baseIPAllocationController struct {
 type globalEgressIPController struct {
 	*baseIPAllocationController
 	sync.Mutex
-	podWatchers   map[string]*podWatcher
+	podWatchers   map[string]*egressPodWatcher
 	ipSetIface    ipset.Interface
 	watcherConfig watcher.Config
 }
 
-type podWatcher struct {
+type egressPodWatcher struct {
 	stopCh      chan struct{}
 	ipSetName   string
 	namedIPSet  ipset.Named
@@ -123,13 +123,12 @@ type clusterGlobalEgressIPController struct {
 
 type globalIngressIPController struct {
 	*baseIPAllocationController
-	pods   dynamic.NamespaceableResourceInterface
-	config syncer.ResourceSyncerConfig
 }
 
 type serviceExportController struct {
 	*baseSyncerController
 	services       dynamic.NamespaceableResourceInterface
+	ingressIPs     dynamic.ResourceInterface
 	iptIface       iptiface.Interface
 	podControllers *IngressPodControllers
 	scheme         *runtime.Scheme
@@ -137,6 +136,7 @@ type serviceExportController struct {
 
 type serviceController struct {
 	*baseSyncerController
+	ingressIPs     dynamic.ResourceInterface
 	podControllers *IngressPodControllers
 }
 

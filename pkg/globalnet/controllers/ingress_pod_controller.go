@@ -18,9 +18,12 @@ limitations under the License.
 package controllers
 
 import (
+	"fmt"
+
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/admiral/pkg/syncer"
+	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,6 +36,11 @@ import (
 
 func startIngressPodController(svc *corev1.Service, config syncer.ResourceSyncerConfig) (*ingressPodController, error) {
 	var err error
+
+	_, gvr, err := util.ToUnstructuredResource(&submarinerv1.GlobalIngressIP{}, config.RestMapper)
+	if err != nil {
+		return nil, err
+	}
 
 	controller := &ingressPodController{
 		baseSyncerController: newBaseSyncerController(),
@@ -64,6 +72,21 @@ func startIngressPodController(svc *corev1.Service, config syncer.ResourceSyncer
 		return nil, err
 	}
 
+	ingressIPs := config.SourceClient.Resource(*gvr).Namespace(corev1.NamespaceAll)
+	controller.reconcile(ingressIPs, func(obj *unstructured.Unstructured) runtime.Object {
+		podName, exists, _ := unstructured.NestedString(obj.Object, "spec", "podRef", "name")
+		if exists {
+			return &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      podName,
+					Namespace: obj.GetNamespace(),
+				},
+			}
+		}
+
+		return nil
+	})
+
 	klog.Infof("Created Pod controller for (%s/%s) with selector %q", svc.Namespace, svc.Name, labelSelector)
 
 	return controller, nil
@@ -75,7 +98,7 @@ func (c *ingressPodController) process(from runtime.Object, numRequeues int, op 
 
 	ingressIP := &submarinerv1.GlobalIngressIP{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      getIngressIPName(pod),
+			Name:      fmt.Sprintf("pod-%.59s", pod.Name),
 			Namespace: pod.Namespace,
 			Labels: map[string]string{
 				ServiceRefLabel: c.svcName,
