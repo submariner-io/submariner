@@ -51,7 +51,7 @@ var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across over
 
 	When("a pod connects via TCP to the globalIP of a remote service", func() {
 		BeforeEach(func() {
-			toEndpointType = tcp.GlobalIP
+			toEndpointType = tcp.GlobalServiceIP
 			networking = framework.PodNetworking
 		})
 
@@ -74,7 +74,7 @@ var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across over
 
 	When("a pod with HostNetworking connects via TCP to the globalIP of a remote service", func() {
 		BeforeEach(func() {
-			toEndpointType = tcp.GlobalIP
+			toEndpointType = tcp.GlobalServiceIP
 			networking = framework.HostNetworking
 		})
 
@@ -86,4 +86,20 @@ var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across over
 			verifyInteraction(framework.GatewayNode, framework.NonGatewayNode)
 		})
 	})
+
+	When("a pod connects via TCP to the globalIP of a remote headless service", func() {
+		BeforeEach(func() {
+			toEndpointType = tcp.GlobalPodIP
+			networking = framework.PodNetworking
+		})
+
+		When("the pod is not on a gateway and the remote service is not on a gateway", func() {
+			verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode)
+		})
+
+		When("the pod is on a gateway and the remote service is on a gateway", func() {
+			verifyInteraction(framework.GatewayNode, framework.GatewayNode)
+		})
+	})
+
 })
