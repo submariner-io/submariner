@@ -28,6 +28,11 @@ import (
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
+)
+
+const (
+	testAppLabel = "test-app"
 )
 
 func VerifyDatapathConnectivity(p tcp.ConnectivityTestParams, globalnetEnabled bool) {
@@ -39,6 +44,8 @@ func VerifyDatapathConnectivity(p tcp.ConnectivityTestParams, globalnetEnabled b
 }
 
 func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams) {
+	Expect(p.ToEndpointType).To(BeElementOf([]tcp.EndpointType{tcp.GlobalServiceIP, tcp.GlobalPodIP}))
+
 	if p.ConnectionTimeout == 0 {
 		p.ConnectionTimeout = framework.TestContext.ConnectionTimeout
 	}
@@ -61,10 +68,17 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams) {
 	By(fmt.Sprintf("Pointing a ClusterIP service to the listener pod in cluster %q",
 		framework.TestContext.ClusterIDs[p.ToCluster]))
 
-	service := listenerPod.CreateService()
+	var service *v1.Service
+	if p.ToEndpointType == tcp.GlobalServiceIP {
+		service = listenerPod.CreateService()
+	} else if p.ToEndpointType == tcp.GlobalPodIP {
+		service = p.Framework.CreateHeadlessTCPService(listenerPod.Config.Cluster, listenerPod.Pod.Labels[testAppLabel],
+			listenerPod.Config.Port)
+	}
+
 	p.Framework.CreateServiceExport(p.ToCluster, service.Name)
 
-	remoteIP := p.Framework.AwaitGlobalIngressIP(p.ToCluster, service.Name, service.Namespace)
+	remoteIP := getGlobalIngressIP(p, service)
 	Expect(remoteIP).ToNot(Equal(""))
 
 	By(fmt.Sprintf("Creating a connector pod in cluster %q, which will attempt the specific UUID handshake over TCP",
@@ -98,13 +112,11 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams) {
 	Expect(listenerPod.TerminationMessage).To(ContainSubstring(connectorPod.Config.Data))
 	Expect(stdOut).To(ContainSubstring(listenerPod.Config.Data))
 
-	if p.ToEndpointType == tcp.GlobalIP {
-		By("Verifying the output of listener pod which must contain the globalIP assigned to the Cluster")
+	By("Verifying the output of listener pod which must contain the globalIP assigned to the Cluster")
 
-		podGlobalIP := p.Framework.AwaitClusterGlobalEgressIPs(p.FromCluster, constants.ClusterGlobalEgressIPName)
-		Expect(podGlobalIP).ToNot(Equal(""))
-		Expect(listenerPod.TerminationMessage).To(ContainSubstring(podGlobalIP[0]))
-	}
+	podGlobalIP := p.Framework.AwaitClusterGlobalEgressIPs(p.FromCluster, constants.ClusterGlobalEgressIPName)
+	Expect(podGlobalIP).ToNot(Equal(""))
+	Expect(listenerPod.TerminationMessage).To(ContainSubstring(podGlobalIP[0]))
 
 	p.Framework.DeleteService(p.ToCluster, service.Name)
 	p.Framework.DeleteServiceExport(p.ToCluster, service.Name)
@@ -125,4 +137,17 @@ func execCmdInBash(p tcp.ConnectivityTestParams, cmd []string, pod *v1.Pod) (str
 	}
 
 	return p.Framework.ExecWithOptions(execOptions, p.FromCluster)
+}
+
+func getGlobalIngressIP(p tcp.ConnectivityTestParams, service *v1.Service) string {
+	if p.ToEndpointType == tcp.GlobalServiceIP {
+		return p.Framework.AwaitGlobalIngressIP(p.ToCluster, service.Name, service.Namespace)
+	} else if p.ToEndpointType == tcp.GlobalPodIP {
+		podList := p.Framework.AwaitPodsByLabelSelector(p.ToCluster, labels.Set(service.Spec.Selector).AsSelector().String(),
+			service.Namespace, 1)
+		ingressIPName := fmt.Sprintf("pod-%s", podList.Items[0].Name)
+		return p.Framework.AwaitGlobalIngressIP(p.ToCluster, ingressIPName, service.Namespace)
+	}
+
+	return ""
 }
