@@ -20,6 +20,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	kp_iptables "github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy_iptables"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/mtu"
 )
 
 var (
@@ -65,6 +66,7 @@ func main() {
 		logger.NewHandler(),
 		kp_iptables.NewSyncHandler(env.ClusterCidr, env.ServiceCidr, smClientset),
 		ovn.NewHandler(env, smClientset),
+		mtu.NewMTUHandler(),
 	); err != nil {
 		klog.Fatalf("Error registering the handlers: %s", err.Error())
 	}
