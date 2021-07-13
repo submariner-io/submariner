@@ -8,7 +8,6 @@ require (
 	github.com/ebay/go-ovn v0.1.1-0.20210414223409-7376ba97f8cd
 	github.com/emirpasic/gods v1.12.0
 	github.com/go-ping/ping v0.0.0-20210506233800-ff8be3320020
-	github.com/google/uuid v1.2.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/mdlayher/netlink v1.4.1 // indirect
 	github.com/mdlayher/socket v0.0.0-20210624160740-9dbe287ded84 // indirect
