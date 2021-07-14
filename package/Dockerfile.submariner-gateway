@@ -3,17 +3,12 @@ ARG TARGETPLATFORM
 
 WORKDIR /var/submariner
 
-# iproute and iptables are used internally
+# iproute is used internally
 # libreswan provides IKE
 RUN dnf -y install --nodocs --setopt=install_weak_deps=0 \
-           iproute iptables iptables-nft libreswan && \
+           iproute libreswan && \
     dnf -y clean all
 
 COPY package/submariner.sh package/pluto bin/${TARGETPLATFORM}/submariner-gateway /usr/local/bin/
-
-# Wrapper scripts to choose the appropriate iptables
-# https://github.com/kubernetes-sigs/iptables-wrappers
-COPY package/iptables-wrapper-installer.sh /usr/sbin/
-RUN /usr/sbin/iptables-wrapper-installer.sh
 
 ENTRYPOINT submariner.sh

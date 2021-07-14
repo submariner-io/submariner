@@ -24,7 +24,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
@@ -46,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -537,7 +537,7 @@ func toHeadlessService(s *corev1.Service) *corev1.Service {
 func newHeadlessServicePod(svcName string) *corev1.Pod {
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      uuid.New().String(),
+			Name:      string(uuid.NewUUID()),
 			Namespace: namespace,
 			Labels:    map[string]string{"pod": svcName},
 		},
