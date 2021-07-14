@@ -19,7 +19,7 @@ jobs:
         cable_driver: ['libreswan', 'wireguard']
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@25a956c84d5dd820d28caab9f86b8d183aeeff3d
 
       - name: Run E2E deployment and tests
         uses: submariner-io/shipyard/gh-actions/e2e@devel

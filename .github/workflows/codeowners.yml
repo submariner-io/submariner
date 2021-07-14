@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@25a956c84d5dd820d28caab9f86b8d183aeeff3d
       - name: Delete current CODEOWNERS file
         run: rm CODEOWNERS
       - name: Run gen-codeowners to rebuild CODEOWNERS file
