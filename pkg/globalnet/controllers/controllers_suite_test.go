@@ -24,7 +24,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
@@ -46,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -92,6 +92,7 @@ type testDriverBase struct {
 	serviceExports         dynamic.ResourceInterface
 	pods                   dynamic.NamespaceableResourceInterface
 	nodes                  dynamic.ResourceInterface
+	watches                *fakeDynClient.WatchReactor
 }
 
 func newTestDriverBase() *testDriverBase {
@@ -109,7 +110,10 @@ func newTestDriverBase() *testDriverBase {
 	Expect(submarinerv1.AddToScheme(t.scheme)).To(Succeed())
 	Expect(corev1.AddToScheme(t.scheme)).To(Succeed())
 
-	t.dynClient = fakeDynClient.NewDynamicClient(t.scheme)
+	fakeClient := fakeDynClient.NewDynamicClient(t.scheme)
+	t.dynClient = fakeClient
+
+	t.watches = fakeDynClient.NewWatchReactor(&fakeClient.Fake)
 
 	t.globalEgressIPs = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.GlobalEgressIP{})).
 		Namespace(namespace)
@@ -533,7 +537,7 @@ func toHeadlessService(s *corev1.Service) *corev1.Service {
 func newHeadlessServicePod(svcName string) *corev1.Pod {
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      uuid.New().String(),
+			Name:      string(uuid.NewUUID()),
 			Namespace: namespace,
 			Labels:    map[string]string{"pod": svcName},
 		},
@@ -556,4 +560,13 @@ func fromUnstructured(from *unstructured.Unstructured, to runtime.Object) runtim
 	Expect(err).To(Succeed())
 
 	return to
+}
+
+func getSNATAddress(ips ...string) string {
+	targetSNATIP := ips[0]
+	if len(ips) > 1 {
+		targetSNATIP += "-" + ips[len(ips)-1]
+	}
+
+	return targetSNATIP
 }

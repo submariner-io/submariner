@@ -1,7 +1,4 @@
 restart ?= all
-FOCUS ?=
-SKIP ?=
-PLUGIN ?=
 BASE_BRANCH ?= devel
 PROTOC_VERSION=3.17.3
 export BASE_BRANCH
@@ -22,6 +19,12 @@ ifneq (,$(filter ovn,$(_using)))
 override CLUSTER_SETTINGS_FLAG = --cluster_settings $(DAPPER_SOURCE)/scripts/cluster_settings.ovn
 else
 override CLUSTER_SETTINGS_FLAG = --cluster_settings $(DAPPER_SOURCE)/scripts/cluster_settings
+endif
+
+ifneq (,$(filter external-net,$(_using)))
+override E2E_ARGS += --testdir test/external
+override DEPLOY_ARGS += --plugin scripts/e2e/external/hook
+override CLEANUP_ARGS += --plugin scripts/e2e/external/hook
 endif
 
 override CLUSTERS_ARGS += $(CLUSTER_SETTINGS_FLAG)

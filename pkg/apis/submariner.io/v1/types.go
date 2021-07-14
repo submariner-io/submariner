@@ -228,7 +228,7 @@ type GlobalEgressIPConditionType string
 
 const (
 	GlobalEgressIPAllocated GlobalEgressIPConditionType = "Allocated"
-	GlobalEgressIPConflict  GlobalEgressIPConditionType = "Conflict"
+	GlobalEgressIPUpdated   GlobalEgressIPConditionType = "Updated"
 )
 
 type GlobalEgressIPStatus struct {
