@@ -24,6 +24,11 @@ import (
 	"github.com/submariner-io/submariner/pkg/netlink"
 )
 
+const (
+	mtuProbe = "2"
+	baseMss  = "1024"
+)
+
 type mtuHandler struct {
 	event.HandlerBase
 }
@@ -48,9 +53,6 @@ func (h *mtuHandler) Init() error {
 }
 
 func configureTCPMTUProbe() {
-	mtuProbe := "2"
-	baseMss := "1024"
-
 	err := netlink.New().ConfigureTCPMTUProbe(mtuProbe, baseMss)
 	if err != nil {
 		klog.Warningf(err.Error())
