@@ -29,7 +29,7 @@ func init() {
 	klog.InitFlags(nil)
 }
 
-func TestKubeProxyIPTables(t *testing.T) {
+func TestMTU(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "MTU Handler Suite")
 }

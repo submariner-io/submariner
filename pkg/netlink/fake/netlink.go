@@ -238,6 +238,9 @@ func (n *NetLink) ConfigureTCPMTUProbe(mtuProbe, baseMss string) error {
 		return fmt.Errorf("invalid arguments passed")
 	}
 
+	n.Lock()
+	defer n.Unlock()
+
 	n.mtuProbe = mtuProbe
 	n.baseMss = baseMss
 
@@ -353,10 +356,12 @@ func (n *NetLink) AwaitNoRule(table int) {
 	}, 5).Should(BeNil(), "Rule for %v exists", table)
 }
 
-func (n *NetLink) VerifyMtuProbe(mtuProbe string) {
-	Expect(mtuProbe).To(Equal(n.mtuProbe))
-}
+func (n *NetLink) VerifyTCPMTUProbe(mtuProbe, baseMss string) {
+	format := "MTU probe: %s, Base MSS: %s"
+	Eventually(func() string {
+		n.Lock()
+		defer n.Unlock()
 
-func (n *NetLink) VerifyBaseMss(baseMss string) {
-	Expect(baseMss).To(Equal(n.baseMss))
+		return fmt.Sprintf(format, n.mtuProbe, n.baseMss)
+	}, 5).Should(Equal(fmt.Sprintf(format, mtuProbe, baseMss)))
 }

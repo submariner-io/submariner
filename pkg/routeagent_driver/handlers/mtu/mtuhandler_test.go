@@ -21,48 +21,33 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/submariner/pkg/event"
-	"github.com/submariner-io/submariner/pkg/iptables"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	fakeNetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 )
 
-type testDriver struct {
-	netLink *fakeNetlink.NetLink
-	handler event.Handler
-}
-
 var _ = Describe("MTUHandler", func() {
-	Describe("Init", testInit)
-})
-
-func newTestDriver() *testDriver {
-	t := &testDriver{}
+	var (
+		netLink *fakeNetlink.NetLink
+		handler event.Handler
+	)
 
 	BeforeEach(func() {
-		t.netLink = fakeNetlink.New()
+		netLink = fakeNetlink.New()
 		netlinkAPI.NewFunc = func() netlinkAPI.Interface {
-			return t.netLink
+			return netLink
 		}
-		t.handler = NewMTUHandler()
-		Expect(t.handler.Init()).To(Succeed())
+
+		handler = NewMTUHandler()
 	})
 
 	AfterEach(func() {
-		iptables.NewFunc = nil
-		cni.DiscoverFunc = nil
+		netlinkAPI.NewFunc = nil
 	})
 
-	return t
-}
-
-func testInit() {
-	t := newTestDriver()
-
-	When("MTUHandler is initialized", func() {
-		It("Expect the mtuProbe and baseMss to be configured", func() {
-			t.netLink.VerifyMtuProbe(mtuProbe)
-			t.netLink.VerifyBaseMss(baseMss)
+	When("initialized", func() {
+		It("should configure the MTU Probe correctly", func() {
+			Expect(handler.Init()).To(Succeed())
+			netLink.VerifyTCPMTUProbe(mtuProbe, baseMss)
 		})
 	})
-}
+})

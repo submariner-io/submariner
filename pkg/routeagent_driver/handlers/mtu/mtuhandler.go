@@ -25,6 +25,8 @@ import (
 )
 
 const (
+	// An mtuProbe value of 2 enables PLPMTUD. Along with this change, we also configure
+	// base mss to 1024 as per RFC4821 recommendation.
 	mtuProbe = "2"
 	baseMss  = "1024"
 )
