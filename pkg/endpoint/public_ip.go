@@ -110,17 +110,17 @@ func publicIP(clientset kubernetes.Interface, namespace, value string) (string, 
 	return firstIPv4InString(value)
 }
 
+var loadBalancerRetryConfig = wait.Backoff{
+	Cap:      6 * time.Minute,
+	Duration: 5 * time.Second,
+	Factor:   1.2,
+	Steps:    24,
+}
+
 func publicLoadBalancerIP(clientset kubernetes.Interface, namespace, loadBalancerName string) (string, error) {
 	ip := ""
 
-	retryConfig := wait.Backoff{
-		Cap:      2 * time.Minute,
-		Duration: 1 * time.Second,
-		Factor:   2,
-		Steps:    4,
-	}
-
-	err := retry.OnError(retryConfig, func(err error) bool {
+	err := retry.OnError(loadBalancerRetryConfig, func(err error) bool {
 		klog.Infof("Waiting for LoadBalancer to be ready: %s", err)
 		return true
 	}, func() error {
