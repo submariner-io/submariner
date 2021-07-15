@@ -28,7 +28,6 @@ import (
 
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	iptcommon "github.com/submariner-io/submariner/pkg/routeagent_driver/iptables"
-	"github.com/submariner-io/submariner/pkg/util"
 )
 
 func (kp *SyncHandler) createIPTableChains() error {
@@ -43,7 +42,7 @@ func (kp *SyncHandler) createIPTableChains() error {
 
 	klog.V(log.DEBUG).Infof("Install/ensure SUBMARINER-INPUT chain exists")
 
-	if err = util.CreateChainIfNotExists(ipt, "filter", "SUBMARINER-INPUT"); err != nil {
+	if err = iptables.CreateChainIfNotExists(ipt, "filter", "SUBMARINER-INPUT"); err != nil {
 		return fmt.Errorf("unable to create SUBMARINER-INPUT chain in iptables: %v", err)
 	}
 
@@ -64,7 +63,7 @@ func (kp *SyncHandler) createIPTableChains() error {
 
 	ruleSpec = []string{"-o", VxLANIface, "-j", "ACCEPT"}
 
-	if err = util.PrependUnique(ipt, "filter", "FORWARD", ruleSpec); err != nil {
+	if err = iptables.PrependUnique(ipt, "filter", "FORWARD", ruleSpec); err != nil {
 		return fmt.Errorf("unable to insert iptable rule in filter table to allow vxlan traffic: %v", err)
 	}
 

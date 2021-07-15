@@ -30,9 +30,9 @@ import (
 	"github.com/vishvananda/netlink"
 	"k8s.io/klog"
 
+	submiptables "github.com/submariner-io/submariner/pkg/iptables"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	iptcommon "github.com/submariner-io/submariner/pkg/routeagent_driver/iptables"
-	"github.com/submariner-io/submariner/pkg/util"
 )
 
 func (ovn *Handler) cleanupGatewayDataplane() error {
@@ -163,7 +163,7 @@ func (ovn *Handler) setupChainIptables(table, chain string, ruleGen forwardRuleS
 	}
 
 	for _, ruleSpec := range ruleSpecs {
-		if err = util.PrependUnique(ipt, table, chain, ruleSpec); err != nil {
+		if err = submiptables.PrependUnique(ipt, table, chain, ruleSpec); err != nil {
 			return errors.Wrapf(err, "unable to insert iptable rule in %s table to %s chain", table, chain)
 		}
 	}

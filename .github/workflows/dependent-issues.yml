@@ -24,7 +24,7 @@ jobs:
     name: Check Dependencies
     runs-on: ubuntu-latest
     steps:
-      - uses: z0al/dependent-issues@v1
+      - uses: z0al/dependent-issues@70a1b2d4ee1cdc743af33498bd0204123953a887
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:

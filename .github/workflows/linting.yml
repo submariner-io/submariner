@@ -11,12 +11,12 @@ jobs:
     steps:
       - name: Get PR commits
         id: 'get-pr-commits'
-        uses: tim-actions/get-pr-commits@v1.1.0
+        uses: tim-actions/get-pr-commits@55b867b9b28954e6f5c1a0fe2f729dc926c306d0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 'Verify no "Apply suggestions from code review" commits'
-        uses: tim-actions/commit-message-checker-with-regex@v0.3.1
+        uses: tim-actions/commit-message-checker-with-regex@c95e211a5e27371e177b2e95082d6ce628d65566
         with:
           commits: ${{ steps.get-pr-commits.outputs.commits }}
           pattern: '^(?!.*(apply suggestions from code review))'
@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@25a956c84d5dd820d28caab9f86b8d183aeeff3d
       - name: Run codegen
         run: make codegen
       - name: Verify generated code matches committed code
@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@25a956c84d5dd820d28caab9f86b8d183aeeff3d
       - name: Recreate Protobuf files
         run: find pkg -name '*.pb.go' -delete -exec make {} \;
       - name: Verify generated code matches committed code
@@ -50,7 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@25a956c84d5dd820d28caab9f86b8d183aeeff3d
         with:
           fetch-depth: 0
       - name: Run gitlint
@@ -61,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@25a956c84d5dd820d28caab9f86b8d183aeeff3d
       - name: Run golangci-lint
         run: make golangci-lint
 
@@ -70,17 +70,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@25a956c84d5dd820d28caab9f86b8d183aeeff3d
 
       - name: Check License Headers
-        uses: kt3k/license_checker@v1.0.6
+        uses: kt3k/license_checker@aecb960f66b92856c6888e1fae528798c787be18
 
   licenses:
     name: Dependency Licenses
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@25a956c84d5dd820d28caab9f86b8d183aeeff3d
 
       - name: Check the licenses
         run: make licensecheck
@@ -90,10 +90,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@25a956c84d5dd820d28caab9f86b8d183aeeff3d
 
       - name: Run markdown-link-check
-        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        uses: gaurav-nelson/github-action-markdown-link-check@9710f0fec812ce0a3b98bef4c9d842fc1f39d976
         with:
           config-file: ".markdownlinkcheck.json"
           check-modified-files-only: "yes"
@@ -104,7 +104,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@25a956c84d5dd820d28caab9f86b8d183aeeff3d
       - name: Run markdownlint
         run: make markdownlint
 
@@ -113,6 +113,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@25a956c84d5dd820d28caab9f86b8d183aeeff3d
       - name: Run yamllint
         run: make yamllint
