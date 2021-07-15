@@ -212,13 +212,16 @@ func (n *nodeController) onNodeUpdated(oldObj, newObj *unstructured.Unstructured
 	oldGlobalIPOnNode := oldObj.GetAnnotations()[constants.SmGlobalIP]
 	newGlobalIPOnNode := newObj.GetAnnotations()[constants.SmGlobalIP]
 
-	if oldGlobalIPOnNode != "" && newGlobalIPOnNode == "" || oldCNIIfaceIPOnNode != newCNIIfaceIPOnNode {
-		if newGlobalIPOnNode == "" {
+	globalIPCleared := oldGlobalIPOnNode != "" && newGlobalIPOnNode == ""
+	if globalIPCleared || oldCNIIfaceIPOnNode != newCNIIfaceIPOnNode {
+		if globalIPCleared {
 			_ = n.pool.Release(oldGlobalIPOnNode)
 		}
 
-		if err := n.iptIface.RemoveIngressRulesForHealthCheck(oldCNIIfaceIPOnNode, oldGlobalIPOnNode); err != nil {
-			klog.Errorf("Error deleting rules for Gateway healthcheck on node %q: %v", n.nodeName, err)
+		if oldCNIIfaceIPOnNode != "" && oldGlobalIPOnNode != "" {
+			if err := n.iptIface.RemoveIngressRulesForHealthCheck(oldCNIIfaceIPOnNode, oldGlobalIPOnNode); err != nil {
+				klog.Errorf("Error deleting rules for Gateway healthcheck on node %q: %v", n.nodeName, err)
+			}
 		}
 
 		return false
