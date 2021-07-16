@@ -19,6 +19,7 @@ limitations under the License.
 package fake
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"reflect"
@@ -36,6 +37,8 @@ type NetLink struct {
 	routes      map[int][]netlink.Route
 	neighbors   map[int][]netlink.Neigh
 	rules       map[int]netlink.Rule
+	mtuProbe    string
+	baseMss     string
 }
 
 func New() *NetLink {
@@ -232,6 +235,16 @@ func (n *NetLink) EnableLooseModeReversePathFilter(interfaceName string) error {
 }
 
 func (n *NetLink) ConfigureTCPMTUProbe(mtuProbe, baseMss string) error {
+	if mtuProbe == "" || baseMss == "" {
+		return fmt.Errorf("invalid arguments passed")
+	}
+
+	n.Lock()
+	defer n.Unlock()
+
+	n.mtuProbe = mtuProbe
+	n.baseMss = baseMss
+
 	return nil
 }
 
@@ -342,4 +355,14 @@ func (n *NetLink) AwaitNoRule(table int) {
 	Eventually(func() *netlink.Rule {
 		return n.getRule(table)
 	}, 5).Should(BeNil(), "Rule for %v exists", table)
+}
+
+func (n *NetLink) VerifyTCPMTUProbe(mtuProbe, baseMss string) {
+	format := "MTU probe: %s, Base MSS: %s"
+	Eventually(func() string {
+		n.Lock()
+		defer n.Unlock()
+
+		return fmt.Sprintf(format, n.mtuProbe, n.baseMss)
+	}, 5).Should(Equal(fmt.Sprintf(format, mtuProbe, baseMss)))
 }
