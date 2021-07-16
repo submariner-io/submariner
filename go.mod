@@ -15,7 +15,7 @@ require (
 	github.com/onsi/gomega v1.14.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.11.0
-	github.com/submariner-io/admiral v0.10.0-rc0
+	github.com/submariner-io/admiral v0.10.0-rc0.0.20210716074658-80e46214671b
 	github.com/submariner-io/shipyard v0.10.0-rc0.0.20210719115546-4e6aefed5ecd
 	github.com/uw-labs/lichen v0.1.4
 	github.com/vishvananda/netlink v1.1.0
