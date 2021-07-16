@@ -114,10 +114,10 @@ func publicLoadBalancerIP(clientset kubernetes.Interface, namespace, loadBalance
 	ip := ""
 
 	retryConfig := wait.Backoff{
-		Cap:      2 * time.Minute,
-		Duration: 1 * time.Second,
-		Factor:   2,
-		Steps:    4,
+		Cap:      6 * time.Minute,
+		Duration: 5 * time.Second,
+		Factor:   1.2,
+		Steps:    24,
 	}
 
 	err := retry.OnError(retryConfig, func(err error) bool {
