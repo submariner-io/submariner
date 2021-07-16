@@ -114,16 +114,16 @@ func (ovn *Handler) getMSSClampingRuleSpecs() ([][]string, error) {
 	// TODO: get the kernel to steer the ICMPs back to ovn-k8s-sub0 interface properly, or write a packet
 	//       reflector in the route agent for that type of packets
 	for _, remoteCIDR := range ovn.getRemoteSubnets().Elements() {
-		rules = append(rules, []string{"-d", remoteCIDR, "-p", "tcp",
+		rules = append(rules, []string{"-d", remoteCIDR, "-p", "tcp", "-m", "tcp",
 			"--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", strconv.Itoa(MSSFor1500MTU)})
-		rules = append(rules, []string{"-s", remoteCIDR, "-p", "tcp",
+		rules = append(rules, []string{"-s", remoteCIDR, "-p", "tcp", "-m", "tcp",
 			"--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", strconv.Itoa(MSSFor1500MTU)})
 	}
 
 	// NOTE: This is a workaround for submariner issue https://github.com/submariner-io/submariner/issues/1022
 	// TODO: work with the core-ovn community to make sure that load balancers propagate ICMPs back to pods
 	for _, serviceCIDR := range ovn.config.ServiceCidr {
-		rules = append(rules, []string{"-o", ovnK8sSubmarinerInterface, "-d", serviceCIDR, "-p", "tcp",
+		rules = append(rules, []string{"-o", ovnK8sSubmarinerInterface, "-d", serviceCIDR, "-p", "tcp", "-m", "tcp",
 			"--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", strconv.Itoa(MSSFor1500MTU)})
 	}
 
