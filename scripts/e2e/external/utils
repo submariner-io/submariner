@@ -72,15 +72,22 @@ function setup_external() {
 	subm_gw_node_name="${extcluster}-worker"
 	subm_gw_ip=$(get_ip_on_container_network ${subm_gw_node_name} ${EXTERNAL_NET})
 
-	# Add route for cluster CIDRs to go via subm_gw_ip
-	for subnet in ${cluster_CIDRs[@]};do
-		docker exec -i ${EXTERNAL_APP} ip r add ${subnet} via ${subm_gw_ip}
-	done
+	if [[ $globalnet != "true" ]];then
+		# Add route for cluster CIDRs to go via subm_gw_ip
+		for subnet in ${cluster_CIDRs[@]};do
+			docker exec -i ${EXTERNAL_APP} ip r add ${subnet} via ${subm_gw_ip}
+		done
 
-	# Add route for service CIDR to go via subm_gw_ip
-	for subnet in ${service_CIDRs[@]};do
-		docker exec -i ${EXTERNAL_APP} ip r add ${subnet} via ${subm_gw_ip}
-	done
+		# Add route for service CIDR to go via subm_gw_ip
+		for subnet in ${service_CIDRs[@]};do
+			docker exec -i ${EXTERNAL_APP} ip r add ${subnet} via ${subm_gw_ip}
+		done
+	else
+		# Add route for global CIDR to go via subm_gw_ip
+		for subnet in ${global_CIDRs[@]};do
+			docker exec -i ${EXTERNAL_APP} ip r add ${subnet} via ${subm_gw_ip}
+		done
+	fi
 }
 
 function add_external_cidrs() {
