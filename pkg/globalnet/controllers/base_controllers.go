@@ -27,6 +27,7 @@ import (
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	iptiface "github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
 	"github.com/submariner-io/submariner/pkg/ipam"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -124,7 +125,7 @@ func (c *baseIPAllocationController) reserveAllocatedIPs(federator federate.Fede
 
 		clearAllocatedIPs()
 
-		conditions := conditionsFromUnstructured(obj)
+		conditions := util.ConditionsFromUnstructured(obj, "status", "conditions")
 
 		conditions = util.TryAppendCondition(conditions, metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
@@ -133,7 +134,7 @@ func (c *baseIPAllocationController) reserveAllocatedIPs(federator federate.Fede
 			Message: fmt.Sprintf("Error reserving the allocated global IP(s) from the pool: %v", err),
 		})
 
-		conditionsToUnstructured(conditions, obj)
+		util.ConditionsToUnstructured(conditions, obj, "status", "conditions")
 
 		klog.Infof("Updating %q: %#v", key, obj)
 
@@ -167,29 +168,6 @@ func (c *baseIPAllocationController) flushRulesAndReleaseIPs(key string, numRequ
 	return false
 }
 
-func conditionsFromUnstructured(from *unstructured.Unstructured) []metav1.Condition {
-	rawConditions, _, _ := unstructured.NestedSlice(from.Object, "status", "conditions")
-
-	conditions := make([]metav1.Condition, len(rawConditions))
-
-	for i := range rawConditions {
-		c := &metav1.Condition{}
-		_ = runtime.DefaultUnstructuredConverter.FromUnstructured(rawConditions[i].(map[string]interface{}), c)
-		conditions[i] = *c
-	}
-
-	return conditions
-}
-
-func conditionsToUnstructured(conditions []metav1.Condition, to *unstructured.Unstructured) {
-	newConditions := make([]interface{}, len(conditions))
-	for i := range conditions {
-		newConditions[i], _ = runtime.DefaultUnstructuredConverter.ToUnstructured(&conditions[i])
-	}
-
-	_ = unstructured.SetNestedSlice(to.Object, newConditions, "status", "conditions")
-}
-
 func shouldRequeue(numRequeues int) bool {
 	return numRequeues < maxRequeues
 }
@@ -206,4 +184,14 @@ func getTargetSNATIPaddress(allocIPs []string) string {
 	}
 
 	return snatIP
+}
+
+func checkStatusChanged(oldStatus, newStatus interface{}, retObj runtime.Object) runtime.Object {
+	if equality.Semantic.DeepEqual(oldStatus, newStatus) {
+		return nil
+	}
+
+	klog.Infof("Updated: %#v", newStatus)
+
+	return retObj
 }
