@@ -22,11 +22,9 @@ import (
 	"net"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/pkg/errors"
-	"github.com/submariner-io/admiral/pkg/stringset"
 	npSyncerOvn "github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn"
 	"github.com/vishvananda/netlink"
 	"k8s.io/klog"
@@ -173,53 +171,14 @@ func (ovn *Handler) setupChainIptables(table, chain string, ruleGen forwardRuleS
 }
 
 func (ovn *Handler) updateNoMasqueradeIPTables() error {
-	ipt, err := iptables.New()
+	rules := ovn.getNoMasqueradRuleSpecs()
+
+	ipt, err := submiptables.New()
 	if err != nil {
 		return errors.Wrap(err, "error initializing iptables")
 	}
 
-	rules, err := ipt.List("nat", constants.SmPostRoutingChain)
-	if err != nil {
-		return errors.Wrapf(err, "error listing the rules in %s chain", constants.SmPostRoutingChain)
-	}
-
-	ruleStrings := stringset.New()
-
-	for _, rule := range rules {
-		ruleSpec := strings.Split(rule, " ")
-		if ruleSpec[0] == "-A" {
-			ruleSpec = ruleSpec[2:] // remove "-A", "SUBMARINER-POSTROUTING"
-			ruleStrings.Add(strings.Trim(strings.Join(ruleSpec, " "), " "))
-		}
-	}
-
-	for _, ruleSpec := range ovn.getNoMasqueradRuleSpecs() {
-		ruleString := strings.Join(ruleSpec, " ")
-		if ruleStrings.Contains(ruleString) {
-			ruleStrings.Remove(ruleString)
-		} else {
-			klog.Infof("Adding iptables rule in %q: %v", constants.SmPostRoutingChain, ruleSpec)
-
-			if err := ipt.Append("nat", constants.SmPostRoutingChain, ruleSpec...); err != nil {
-				return errors.Wrapf(err, "error adding remote cluster rule to %v to %q", ruleSpec, constants.SmPostRoutingChain)
-			}
-		}
-	}
-
-	// remaining elements should not be there, remove them
-	for _, rule := range ruleStrings.Elements() {
-		klog.Infof("Deleting stale iptables rule in %q: %q", constants.SmPostRoutingChain, rule)
-		ruleSpec := strings.Split(rule, " ")
-
-		if err := ipt.Delete("nat", constants.SmPostRoutingChain, ruleSpec...); err != nil {
-			// Log and let go, as this is not a fatal error, or something that will make real harm,
-			// it's more harmful to keep retrying. At this point on next update deletion of stale rules
-			// will happen again
-			klog.Warningf("Unable to delete iptables entry from %q: %q", constants.SmPostRoutingChain, rule)
-		}
-	}
-
-	return nil
+	return submiptables.UpdateChainRules(ipt, "nat", constants.SmPostRoutingChain, rules)
 }
 
 func (ovn *Handler) getNoMasqueradRuleSpecs() [][]string {
