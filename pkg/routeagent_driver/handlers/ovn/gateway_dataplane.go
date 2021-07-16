@@ -110,12 +110,14 @@ func (ovn *Handler) getMSSClampingRuleSpecs() ([][]string, error) {
 
 	// NOTE: This is a workaround for submariner issues:
 	//   * https://github.com/submariner-io/submariner/issues/1278
+	//   * https://github.com/submariner-io/submariner/issues/1488
 	// TODO: get the kernel to steer the ICMPs back to ovn-k8s-sub0 interface properly, or write a packet
 	//       reflector in the route agent for that type of packets
 	for _, remoteCIDR := range ovn.getRemoteSubnets().Elements() {
 		rules = append(rules, []string{"-d", remoteCIDR, "-p", "tcp",
 			"--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", strconv.Itoa(MSSFor1500MTU)})
-
+		rules = append(rules, []string{"-s", remoteCIDR, "-p", "tcp",
+			"--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", strconv.Itoa(MSSFor1500MTU)})
 	}
 
 	// NOTE: This is a workaround for submariner issue https://github.com/submariner-io/submariner/issues/1022
