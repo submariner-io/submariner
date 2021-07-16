@@ -23,6 +23,8 @@ import (
 	"strings"
 
 	"github.com/coreos/go-iptables/iptables"
+	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/stringset"
 	"k8s.io/klog"
 
 	level "github.com/submariner-io/admiral/pkg/log"
@@ -134,6 +136,54 @@ func InsertUnique(ipt Interface, table, chain string, position int, ruleSpec []s
 		return nil
 	} else if err := ipt.Insert(table, chain, position, ruleSpec...); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+// UpdateChainRules ensures that the rules in the list are the ones in rules, without any preference for the order,
+// any stale rules will be removed from the chain, and any missing rules will be added.
+func UpdateChainRules(ipt Interface, table, chain string, rules [][]string) error {
+	existingRules, err := ipt.List(table, chain)
+	if err != nil {
+		return errors.Wrapf(err, "error listing the rules in table %q, chain %q", table, chain)
+	}
+
+	ruleStrings := stringset.New()
+
+	for _, existingRule := range existingRules {
+		ruleSpec := strings.Split(existingRule, " ")
+		if ruleSpec[0] == "-A" {
+			ruleSpec = ruleSpec[2:] // remove "-A", "$chain"
+			ruleStrings.Add(strings.Trim(strings.Join(ruleSpec, " "), " "))
+		}
+	}
+
+	for _, ruleSpec := range rules {
+		ruleString := strings.Join(ruleSpec, " ")
+
+		if ruleStrings.Contains(ruleString) {
+			ruleStrings.Remove(ruleString)
+		} else {
+			klog.V(level.DEBUG).Infof("Adding iptables rule in %q, %q: %q", table, chain, ruleSpec)
+
+			if err := ipt.Append(table, chain, ruleSpec...); err != nil {
+				return errors.Wrapf(err, "error adding rule to %v to %q, %q", ruleSpec, table, chain)
+			}
+		}
+	}
+
+	// remaining elements should not be there, remove them
+	for _, rule := range ruleStrings.Elements() {
+		klog.V(level.DEBUG).Infof("Deleting stale iptables rule in %q, %q: %q", table, chain, rule)
+		ruleSpec := strings.Split(rule, " ")
+
+		if err := ipt.Delete(table, chain, ruleSpec...); err != nil {
+			// Log and let go, as this is not a fatal error, or something that will make real harm,
+			// it's more harmful to keep retrying. At this point on next update deletion of stale rules
+			// will happen again
+			klog.Warningf("Unable to delete iptables entry from table %q, chain %q: %q", table, chain, rule)
+		}
 	}
 
 	return nil
