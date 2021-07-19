@@ -60,6 +60,8 @@ const (
 
 	AddRules    = true
 	DeleteRules = false
+
+	DefaultNumberOfClusterEgressIPs = 8
 )
 
 type Interface interface {
