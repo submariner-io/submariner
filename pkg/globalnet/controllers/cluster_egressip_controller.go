@@ -57,9 +57,13 @@ func NewClusterGlobalEgressIPController(config syncer.ResourceSyncerConfig, loca
 
 	federator := federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
 
+	numberOfIPs := DefaultNumberOfClusterEgressIPs
 	defaultEgressIP := &submarinerv1.ClusterGlobalEgressIP{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: constants.ClusterGlobalEgressIPName,
+		},
+		Spec: submarinerv1.ClusterGlobalEgressIPSpec{
+			NumberOfIPs: &numberOfIPs,
 		},
 	}
 

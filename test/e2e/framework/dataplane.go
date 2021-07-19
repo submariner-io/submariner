@@ -47,6 +47,19 @@ const (
 	PodSelector
 )
 
+func (t GlobalEgressIPType) String() string {
+	switch t {
+	case ClusterSelector:
+		return "cluster-scoped"
+	case NameSpaceSelector:
+		return "namespace-scoped"
+	case PodSelector:
+		return "pod-scoped"
+	}
+
+	return "unknown"
+}
+
 type GlobalnetTestParams struct {
 	GlobalnetEnabled bool
 	GlobalEgressIP   GlobalEgressIPType
@@ -60,7 +73,7 @@ func VerifyDatapathConnectivity(p tcp.ConnectivityTestParams, gn GlobalnetTestPa
 	}
 }
 
-func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams, globalEgressIP GlobalEgressIPType) {
+func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams, egressIPType GlobalEgressIPType) {
 	Expect(p.ToEndpointType).To(BeElementOf([]tcp.EndpointType{tcp.GlobalServiceIP, tcp.GlobalPodIP}))
 
 	if p.ConnectionTimeout == 0 {
@@ -101,11 +114,11 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams, globalEgr
 	By(fmt.Sprintf("Creating a connector pod in cluster %q, which will attempt the specific UUID handshake over TCP",
 		framework.TestContext.ClusterIDs[p.FromCluster]))
 
-	var connectorPodGlobalIP []string
+	var connectorPodGlobalIPs []string
 
-	switch globalEgressIP {
+	switch egressIPType {
 	case ClusterSelector:
-		connectorPodGlobalIP = p.Framework.AwaitClusterGlobalEgressIPs(p.FromCluster, constants.ClusterGlobalEgressIPName)
+		connectorPodGlobalIPs = p.Framework.AwaitClusterGlobalEgressIPs(p.FromCluster, constants.ClusterGlobalEgressIPName)
 	case NameSpaceSelector:
 		geipObject, err := newGlobalEgressIPObj(listenerPod.Pod.Namespace, nil)
 		Expect(err).To(Succeed())
@@ -113,7 +126,7 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams, globalEgr
 		err = framework.CreateGlobalEgressIP(p.FromCluster, geipObject)
 		Expect(err).To(Succeed())
 
-		connectorPodGlobalIP = framework.AwaitGlobalEgressIPs(p.FromCluster, geipObject.GetName(), listenerPod.Pod.Namespace)
+		connectorPodGlobalIPs = framework.AwaitGlobalEgressIPs(p.FromCluster, geipObject.GetName(), listenerPod.Pod.Namespace)
 	case PodSelector:
 		podSelector := &metav1.LabelSelector{MatchLabels: map[string]string{"test-app": "custom"}}
 		geipObject, err := newGlobalEgressIPObj(listenerPod.Pod.Namespace, podSelector)
@@ -122,10 +135,10 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams, globalEgr
 		err = framework.CreateGlobalEgressIP(p.FromCluster, geipObject)
 		Expect(err).To(Succeed())
 
-		connectorPodGlobalIP = framework.AwaitGlobalEgressIPs(p.FromCluster, geipObject.GetName(), listenerPod.Pod.Namespace)
+		connectorPodGlobalIPs = framework.AwaitGlobalEgressIPs(p.FromCluster, geipObject.GetName(), listenerPod.Pod.Namespace)
 	}
 
-	Expect(connectorPodGlobalIP).ToNot(BeEmpty())
+	Expect(connectorPodGlobalIPs).ToNot(BeEmpty())
 
 	connectorPod := p.Framework.NewNetworkPod(&framework.NetworkPodConfig{
 		Type:          framework.CustomPod,
@@ -155,11 +168,15 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams, globalEgr
 	Expect(listenerPod.TerminationMessage).To(ContainSubstring(connectorPod.Config.Data))
 	Expect(stdOut).To(ContainSubstring(listenerPod.Config.Data))
 
-	By(fmt.Sprintf("Verifying the output of listener pod which must contain the globalIP %q of the connector Pod", connectorPodGlobalIP[0]))
+	By(fmt.Sprintf("Verifying the output of the listener pod contains a %s global IP %v of the connector Pod",
+		egressIPType, connectorPodGlobalIPs))
 
-	podGlobalIP := p.Framework.AwaitClusterGlobalEgressIPs(p.FromCluster, constants.ClusterGlobalEgressIPName)
-	Expect(podGlobalIP).ToNot(Equal(""))
-	Expect(listenerPod.TerminationMessage).To(ContainSubstring(podGlobalIP[0]))
+	matchIP := ContainSubstring(connectorPodGlobalIPs[0])
+	for i := 1; i < len(connectorPodGlobalIPs); i++ {
+		matchIP = Or(matchIP, ContainSubstring(connectorPodGlobalIPs[i]))
+	}
+
+	Expect(listenerPod.TerminationMessage).To(matchIP)
 
 	p.Framework.DeleteService(p.ToCluster, service.Name)
 	p.Framework.DeleteServiceExport(p.ToCluster, service.Name)
