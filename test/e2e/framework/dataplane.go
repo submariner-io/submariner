@@ -24,10 +24,14 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	resourceUtil "github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -35,15 +39,28 @@ const (
 	testAppLabel = "test-app"
 )
 
-func VerifyDatapathConnectivity(p tcp.ConnectivityTestParams, globalnetEnabled bool) {
-	if globalnetEnabled {
-		verifyGlobalnetDatapathConnectivity(p)
+type GlobalEgressIPType int
+
+const (
+	ClusterSelector GlobalEgressIPType = iota
+	NameSpaceSelector
+	PodSelector
+)
+
+type GlobalnetTestParams struct {
+	GlobalnetEnabled bool
+	GlobalEgressIP   GlobalEgressIPType
+}
+
+func VerifyDatapathConnectivity(p tcp.ConnectivityTestParams, gn GlobalnetTestParams) {
+	if gn.GlobalnetEnabled {
+		verifyGlobalnetDatapathConnectivity(p, gn.GlobalEgressIP)
 	} else {
 		tcp.RunConnectivityTest(p)
 	}
 }
 
-func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams) {
+func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams, globalEgressIP GlobalEgressIPType) {
 	Expect(p.ToEndpointType).To(BeElementOf([]tcp.EndpointType{tcp.GlobalServiceIP, tcp.GlobalPodIP}))
 
 	if p.ConnectionTimeout == 0 {
@@ -84,6 +101,32 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams) {
 	By(fmt.Sprintf("Creating a connector pod in cluster %q, which will attempt the specific UUID handshake over TCP",
 		framework.TestContext.ClusterIDs[p.FromCluster]))
 
+	var connectorPodGlobalIP []string
+
+	switch globalEgressIP {
+	case ClusterSelector:
+		connectorPodGlobalIP = p.Framework.AwaitClusterGlobalEgressIPs(p.FromCluster, constants.ClusterGlobalEgressIPName)
+	case NameSpaceSelector:
+		geipObject, err := newGlobalEgressIPObj(listenerPod.Pod.Namespace, nil)
+		Expect(err).To(Succeed())
+
+		err = framework.CreateGlobalEgressIP(p.FromCluster, geipObject)
+		Expect(err).To(Succeed())
+
+		connectorPodGlobalIP = framework.AwaitGlobalEgressIPs(p.FromCluster, geipObject.GetName(), listenerPod.Pod.Namespace)
+	case PodSelector:
+		podSelector := &metav1.LabelSelector{MatchLabels: map[string]string{"test-app": "custom"}}
+		geipObject, err := newGlobalEgressIPObj(listenerPod.Pod.Namespace, podSelector)
+		Expect(err).To(Succeed())
+
+		err = framework.CreateGlobalEgressIP(p.FromCluster, geipObject)
+		Expect(err).To(Succeed())
+
+		connectorPodGlobalIP = framework.AwaitGlobalEgressIPs(p.FromCluster, geipObject.GetName(), listenerPod.Pod.Namespace)
+	}
+
+	Expect(connectorPodGlobalIP).ToNot(BeEmpty())
+
 	connectorPod := p.Framework.NewNetworkPod(&framework.NetworkPodConfig{
 		Type:          framework.CustomPod,
 		Cluster:       p.FromCluster,
@@ -112,7 +155,7 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams) {
 	Expect(listenerPod.TerminationMessage).To(ContainSubstring(connectorPod.Config.Data))
 	Expect(stdOut).To(ContainSubstring(listenerPod.Config.Data))
 
-	By("Verifying the output of listener pod which must contain the globalIP assigned to the Cluster")
+	By(fmt.Sprintf("Verifying the output of listener pod which must contain the globalIP %q of the connector Pod", connectorPodGlobalIP[0]))
 
 	podGlobalIP := p.Framework.AwaitClusterGlobalEgressIPs(p.FromCluster, constants.ClusterGlobalEgressIPName)
 	Expect(podGlobalIP).ToNot(Equal(""))
@@ -150,4 +193,34 @@ func getGlobalIngressIP(p tcp.ConnectivityTestParams, service *v1.Service) strin
 	}
 
 	return ""
+}
+
+func newGlobalEgressIPObj(namespace string, selector *metav1.LabelSelector) (*unstructured.Unstructured, error) {
+	geipName := fmt.Sprintf("test-e2e-egressip-%s", namespace)
+	egressIPSpec := &submarinerv1.GlobalEgressIP{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      geipName,
+			Namespace: namespace,
+		},
+	}
+
+	if selector != nil {
+		egressIPSpec.Spec = submarinerv1.GlobalEgressIPSpec{
+			PodSelector: selector,
+		}
+	}
+
+	unstructuredEgressIPSpec, err := resourceUtil.ToUnstructured(egressIPSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	return unstructuredEgressIPSpec, nil
+}
+
+func GetGlobalnetEgressParams(egressIP GlobalEgressIPType) GlobalnetTestParams {
+	return GlobalnetTestParams{
+		GlobalnetEnabled: framework.TestContext.GlobalnetEnabled,
+		GlobalEgressIP:   egressIP,
+	}
 }

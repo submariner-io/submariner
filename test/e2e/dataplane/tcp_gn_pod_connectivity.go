@@ -29,8 +29,10 @@ var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across over
 	f := framework.NewFramework("dataplane-gn-conn-nd")
 	var toEndpointType tcp.EndpointType
 	var networking framework.NetworkingType
+	var egressIP subFramework.GlobalEgressIPType
 
-	verifyInteraction := func(fromClusterScheduling, toClusterScheduling framework.NetworkPodScheduling) {
+	verifyInteraction := func(fromClusterScheduling, toClusterScheduling framework.NetworkPodScheduling,
+		egressIPType subFramework.GlobalEgressIPType) {
 		It("should have sent the expected data from the pod to the other pod", func() {
 			if !framework.TestContext.GlobalnetEnabled {
 				framework.Skipf("Globalnet is not enabled, skipping the test...")
@@ -45,7 +47,7 @@ var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across over
 				FromClusterScheduling: fromClusterScheduling,
 				ToCluster:             framework.ClusterB,
 				ToClusterScheduling:   toClusterScheduling,
-			}, framework.TestContext.GlobalnetEnabled)
+			}, subFramework.GetGlobalnetEgressParams(egressIPType))
 		})
 	}
 
@@ -53,22 +55,51 @@ var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across over
 		BeforeEach(func() {
 			toEndpointType = tcp.GlobalServiceIP
 			networking = framework.PodNetworking
+			egressIP = subFramework.ClusterSelector
 		})
 
 		When("the pod is not on a gateway and the remote service is not on a gateway", func() {
-			verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode)
-		})
-
-		When("the pod is not on a gateway and the remote service is on a gateway", func() {
-			verifyInteraction(framework.NonGatewayNode, framework.GatewayNode)
+			verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode, egressIP)
 		})
 
 		When("the pod is on a gateway and the remote service is not on a gateway", func() {
-			verifyInteraction(framework.GatewayNode, framework.NonGatewayNode)
+			verifyInteraction(framework.GatewayNode, framework.NonGatewayNode, egressIP)
 		})
 
 		When("the pod is on a gateway and the remote service is on a gateway", func() {
-			verifyInteraction(framework.GatewayNode, framework.GatewayNode)
+			verifyInteraction(framework.GatewayNode, framework.GatewayNode, egressIP)
+		})
+	})
+
+	When("a pod matching an egress IP namespace selector connects via TCP to the globalIP of a remote service", func() {
+		BeforeEach(func() {
+			toEndpointType = tcp.GlobalServiceIP
+			networking = framework.PodNetworking
+			egressIP = subFramework.NameSpaceSelector
+		})
+
+		When("the pod is not on a gateway and the remote service is not on a gateway", func() {
+			verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode, egressIP)
+		})
+
+		When("the pod is on a gateway and the remote service is on a gateway", func() {
+			verifyInteraction(framework.GatewayNode, framework.GatewayNode, egressIP)
+		})
+	})
+
+	When("a pod matching an egress IP pod selector connects via TCP to the globalIP of a remote service", func() {
+		BeforeEach(func() {
+			toEndpointType = tcp.GlobalServiceIP
+			networking = framework.PodNetworking
+			egressIP = subFramework.PodSelector
+		})
+
+		When("the pod is not on a gateway and the remote service is not on a gateway", func() {
+			verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode, egressIP)
+		})
+
+		When("the pod is on a gateway and the remote service is on a gateway", func() {
+			verifyInteraction(framework.GatewayNode, framework.GatewayNode, egressIP)
 		})
 	})
 
@@ -76,14 +107,15 @@ var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across over
 		BeforeEach(func() {
 			toEndpointType = tcp.GlobalServiceIP
 			networking = framework.HostNetworking
+			egressIP = subFramework.ClusterSelector
 		})
 
 		When("the pod is not on a gateway and the remote service is not on a gateway", func() {
-			verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode)
+			verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode, egressIP)
 		})
 
 		When("the pod is on a gateway and the remote service is not on a gateway", func() {
-			verifyInteraction(framework.GatewayNode, framework.NonGatewayNode)
+			verifyInteraction(framework.GatewayNode, framework.NonGatewayNode, egressIP)
 		})
 	})
 
@@ -91,14 +123,15 @@ var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across over
 		BeforeEach(func() {
 			toEndpointType = tcp.GlobalPodIP
 			networking = framework.PodNetworking
+			egressIP = subFramework.ClusterSelector
 		})
 
 		When("the pod is not on a gateway and the remote service is not on a gateway", func() {
-			verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode)
+			verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode, egressIP)
 		})
 
 		When("the pod is on a gateway and the remote service is on a gateway", func() {
-			verifyInteraction(framework.GatewayNode, framework.GatewayNode)
+			verifyInteraction(framework.GatewayNode, framework.GatewayNode, egressIP)
 		})
 	})
 
