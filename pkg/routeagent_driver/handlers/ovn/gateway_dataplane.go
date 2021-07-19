@@ -23,7 +23,6 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/coreos/go-iptables/iptables"
 	"github.com/pkg/errors"
 	submiptables "github.com/submariner-io/submariner/pkg/iptables"
 	npSyncerOvn "github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn"
@@ -136,27 +135,17 @@ const forwardingSubmarinerMSSClampChain = "SUBMARINER-FWD-MSSCLAMP"
 const forwardingSubmarinerFWDChain = "SUBMARINER-FORWARD"
 
 func (ovn *Handler) setupForwardingIptables() error {
-	ipt, err := submiptables.New()
-	if err != nil {
+	if err := ovn.updateIPtableChains("filter", forwardingSubmarinerMSSClampChain, ovn.getMSSClampingRuleSpecs); err != nil {
 		return err
 	}
 
-	if err := ovn.updateIPtableChains(ipt, "filter", forwardingSubmarinerMSSClampChain, ovn.getMSSClampingRuleSpecs); err != nil {
-		return err
-	}
-
-	return ovn.updateIPtableChains(ipt, "filter", forwardingSubmarinerFWDChain, ovn.getForwardingRuleSpecs)
+	return ovn.updateIPtableChains("filter", forwardingSubmarinerFWDChain, ovn.getForwardingRuleSpecs)
 }
 
 func (ovn *Handler) updateNoMasqueradeIPTables() error {
 	rules := ovn.getNoMasqueradRuleSpecs()
 
-	ipt, err := submiptables.New()
-	if err != nil {
-		return errors.Wrap(err, "error initializing iptables")
-	}
-
-	return submiptables.UpdateChainRules(ipt, "nat", constants.SmPostRoutingChain, rules)
+	return submiptables.UpdateChainRules(ovn.ipt, "nat", constants.SmPostRoutingChain, rules)
 }
 
 func (ovn *Handler) getNoMasqueradRuleSpecs() [][]string {
@@ -172,16 +161,11 @@ func (ovn *Handler) getNoMasqueradRuleSpecs() [][]string {
 }
 
 func (ovn *Handler) cleanupForwardingIptables() error {
-	ipt, err := submiptables.New()
-	if err != nil {
-		return errors.Wrap(err, "error initializing iptables")
-	}
-
-	if err := ipt.ClearChain("filter", forwardingSubmarinerMSSClampChain); err != nil {
+	if err := ovn.ipt.ClearChain("filter", forwardingSubmarinerMSSClampChain); err != nil {
 		return err
 	}
 
-	return ipt.ClearChain("filter", forwardingSubmarinerFWDChain)
+	return ovn.ipt.ClearChain("filter", forwardingSubmarinerFWDChain)
 }
 
 func (ovn *Handler) getSubmDefaultRoute() *netlink.Route {
@@ -192,37 +176,32 @@ func (ovn *Handler) getSubmDefaultRoute() *netlink.Route {
 }
 
 func (ovn *Handler) initIPtablesChains() error {
-	ipt, err := iptables.New()
-	if err != nil {
-		return errors.Wrapf(err, "error initializing iptables")
-	}
-
-	if err := iptcommon.InitSubmarinerPostRoutingChain(ipt); err != nil {
+	if err := iptcommon.InitSubmarinerPostRoutingChain(ovn.ipt); err != nil {
 		return err
 	}
 
-	if err := ovn.ensureForwardChains(ipt); err != nil {
+	if err := ovn.ensureForwardChains(); err != nil {
 		return errors.Wrap(err, "ensuring FORWARD sub-chain entries")
 	}
 
 	return nil
 }
 
-func (ovn *Handler) ensureForwardChains(ipt submiptables.Interface) error {
-	if err := submiptables.CreateChainIfNotExists(ipt, "filter", forwardingSubmarinerMSSClampChain); err != nil {
+func (ovn *Handler) ensureForwardChains() error {
+	if err := submiptables.CreateChainIfNotExists(ovn.ipt, "filter", forwardingSubmarinerMSSClampChain); err != nil {
 		return err
 	}
 
-	if err := submiptables.InsertUnique(ipt, "filter", "FORWARD", 1,
+	if err := submiptables.InsertUnique(ovn.ipt, "filter", "FORWARD", 1,
 		[]string{"-j", forwardingSubmarinerMSSClampChain}); err != nil {
 		return err
 	}
 
-	if err := submiptables.CreateChainIfNotExists(ipt, "filter", forwardingSubmarinerFWDChain); err != nil {
+	if err := submiptables.CreateChainIfNotExists(ovn.ipt, "filter", forwardingSubmarinerFWDChain); err != nil {
 		return err
 	}
 
-	if err := submiptables.InsertUnique(ipt, "filter", "FORWARD", 2,
+	if err := submiptables.InsertUnique(ovn.ipt, "filter", "FORWARD", 2,
 		[]string{"-j", forwardingSubmarinerFWDChain}); err != nil {
 		return err
 	}
@@ -230,11 +209,11 @@ func (ovn *Handler) ensureForwardChains(ipt submiptables.Interface) error {
 	return nil
 }
 
-func (ovn *Handler) updateIPtableChains(ipt submiptables.Interface, table, chain string, ruleGen forwardRuleSpecGenerator) error {
+func (ovn *Handler) updateIPtableChains(table, chain string, ruleGen forwardRuleSpecGenerator) error {
 	ruleSpecs, err := ruleGen()
 	if err != nil {
 		return err
 	}
 
-	return submiptables.UpdateChainRules(ipt, table, chain, ruleSpecs)
+	return submiptables.UpdateChainRules(ovn.ipt, table, chain, ruleSpecs)
 }
