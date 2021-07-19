@@ -16,7 +16,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.11.0
 	github.com/submariner-io/admiral v0.10.0-rc0
-	github.com/submariner-io/shipyard v0.10.0-rc0.0.20210716111649-643fec17cb5f
+	github.com/submariner-io/shipyard v0.10.0-rc0.0.20210719115546-4e6aefed5ecd
 	github.com/uw-labs/lichen v0.1.4
 	github.com/vishvananda/netlink v1.1.0
 	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e // indirect
