@@ -33,6 +33,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
 	"github.com/vishvananda/netlink"
@@ -59,6 +60,7 @@ const (
 
 type vxlan struct {
 	localEndpoint types.SubmarinerEndpoint
+	localCluster  types.SubmarinerCluster
 	connections   []v1.Connection
 	mutex         sync.Mutex
 	vxlanIface    *vxlanIface
@@ -90,6 +92,7 @@ func NewDriver(localEndpoint types.SubmarinerEndpoint, localCluster types.Submar
 	v := vxlan{
 		localEndpoint: localEndpoint,
 		netLink:       netlinkAPI.New(),
+		localCluster:  localCluster,
 	}
 
 	port, err := localEndpoint.Spec.GetBackendPort(v1.UDPPortConfig, defaultPort)
@@ -304,7 +307,14 @@ func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 		return endpointInfo.UseIP, fmt.Errorf("failed to add remoteIP %q to the forwarding database", remoteIP)
 	}
 
-	err = v.vxlanIface.AddRoute(allowedIPs, remoteVtepIP, v.vxlanIface.vtepIP)
+	cniIface, err := cni.Discover(v.localCluster.Spec.ClusterCIDR[0])
+
+	if err != nil {
+		return endpointInfo.UseIP, fmt.Errorf("failed to get the CNI interface IP for cluster CIDR %q",
+			v.localCluster.Spec.ClusterCIDR[0])
+	}
+
+	err = v.vxlanIface.AddRoute(allowedIPs, remoteVtepIP, net.ParseIP(cniIface.IPAddress))
 
 	if err != nil {
 		return endpointInfo.UseIP, fmt.Errorf("failed to add route for the CIDR %q with remoteVtepIP %q and vxlanInterfaceIP %q",
