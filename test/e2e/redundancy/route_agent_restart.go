@@ -68,7 +68,7 @@ func testRouteAgentRestart(f *subFramework.Framework, onGateway bool) {
 		ToCluster:             framework.ClusterA,
 		ToClusterScheduling:   framework.GatewayNode,
 		ToEndpointType:        defaultEndpointType(),
-	}, framework.TestContext.GlobalnetEnabled)
+	}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
 
 	By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
 	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
@@ -78,5 +78,5 @@ func testRouteAgentRestart(f *subFramework.Framework, onGateway bool) {
 		ToCluster:             framework.ClusterA,
 		ToClusterScheduling:   framework.NonGatewayNode,
 		ToEndpointType:        defaultEndpointType(),
-	}, framework.TestContext.GlobalnetEnabled)
+	}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
 }
