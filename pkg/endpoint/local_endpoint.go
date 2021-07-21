@@ -93,14 +93,15 @@ func GetLocal(submSpec types.SubmarinerSpecification, k8sClient kubernetes.Inter
 
 	endpoint.Spec.PublicIP = publicIP
 
-	if !globalnetEnabled {
+	if submSpec.HealthCheckEnabled && !globalnetEnabled {
 		// When globalnet is enabled, HealthCheckIP will be the globalIP assigned to the Active GatewayNode.
 		// In a fresh deployment, globalIP annotation for the node might take few seconds. So we listen on NodeEvents
 		// and update the endpoint HealthCheckIP (to globalIP) in datastoreSyncer at a later stage. This will trigger
 		// the HealthCheck between the clusters.
 		endpoint.Spec.HealthCheckIP, err = getCNIInterfaceIPAddress(submSpec.ClusterCidr)
 		if err != nil {
-			return types.SubmarinerEndpoint{}, fmt.Errorf("error getting CNI Interface IP address: %v", err)
+			return types.SubmarinerEndpoint{}, fmt.Errorf("error getting CNI Interface IP address: %v."+
+				"Please disable the health check if your CNI does not expose a pod IP on the nodes", err)
 		}
 	}
 
