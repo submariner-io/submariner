@@ -300,16 +300,6 @@ func (c *globalEgressIPController) onDelete(numRequeues int, globalEgressIP *sub
 	return false
 }
 
-func checkStatusChanged(oldStatus, newStatus interface{}, retObj runtime.Object) runtime.Object {
-	if equality.Semantic.DeepEqual(oldStatus, newStatus) {
-		return nil
-	}
-
-	klog.Infof("Updated: %#v", newStatus)
-
-	return retObj
-}
-
 func (c *globalEgressIPController) getIPSetName(key string) string {
 	hash := sha256.Sum256([]byte(key))
 	encoded := base32.StdEncoding.EncodeToString(hash[:])
