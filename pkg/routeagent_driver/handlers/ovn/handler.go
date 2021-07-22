@@ -24,6 +24,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/submariner/pkg/cidr"
+	"github.com/submariner-io/submariner/pkg/iptables"
 	"k8s.io/klog"
 
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -46,14 +47,21 @@ type Handler struct {
 	remoteEndpoints       map[string]*submV1.Endpoint
 	isGateway             bool
 	netlink               netlink.Interface
+	ipt                   iptables.Interface
 }
 
 func NewHandler(env environment.Specification, smClientSet clientset.Interface) *Handler {
+	ipt, err := iptables.New()
+	if err != nil {
+		klog.Fatalf("Error initializing iptables in OVN routeagent handler: %s", err)
+	}
+
 	return &Handler{
 		config:          &env,
 		smClient:        smClientSet,
 		remoteEndpoints: map[string]*submV1.Endpoint{},
 		netlink:         netlink.New(),
+		ipt:             ipt,
 	}
 }
 

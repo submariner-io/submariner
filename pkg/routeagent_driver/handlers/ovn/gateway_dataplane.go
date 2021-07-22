@@ -22,18 +22,13 @@ import (
 	"net"
 	"os"
 	"strconv"
-	"strings"
 
-	"github.com/coreos/go-iptables/iptables"
 	"github.com/pkg/errors"
-	"github.com/submariner-io/admiral/pkg/stringset"
-	npSyncerOvn "github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn"
-	"github.com/vishvananda/netlink"
-	"k8s.io/klog"
-
 	submiptables "github.com/submariner-io/submariner/pkg/iptables"
+	npSyncerOvn "github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	iptcommon "github.com/submariner-io/submariner/pkg/routeagent_driver/iptables"
+	"github.com/vishvananda/netlink"
 )
 
 func (ovn *Handler) cleanupGatewayDataplane() error {
@@ -50,10 +45,6 @@ func (ovn *Handler) cleanupGatewayDataplane() error {
 	err = netlink.RouteDel(ovn.getSubmDefaultRoute())
 	if err != nil && !os.IsNotExist(err) {
 		return errors.Wrap(err, "error deleting submariner default route")
-	}
-
-	if err = ovn.cleanupOutputIptables(); err != nil {
-		return errors.Wrap(err, "error cleaning up output iptable rules")
 	}
 
 	return ovn.cleanupForwardingIptables()
@@ -90,10 +81,6 @@ func (ovn *Handler) updateGatewayDataplane() error {
 		return errors.Wrap(err, "error handling no-masquerade rules")
 	}
 
-	if err = ovn.setupOutputIptables(); err != nil {
-		return errors.Wrap(err, "error setting up output iptable rules")
-	}
-
 	return ovn.setupForwardingIptables()
 }
 
@@ -114,112 +101,51 @@ func (ovn *Handler) getForwardingRuleSpecs() ([][]string, error) {
 		{"-i", ovnK8sSubmarinerInterface, "-o", ovn.cableRoutingInterface.Name, "-j", "ACCEPT"},
 		{"-i", ovn.cableRoutingInterface.Name, "-o", ovnK8sSubmarinerInterface, "-j", "ACCEPT"}}
 
-	// NOTE: This is a workaround for submariner issue https://github.com/submariner-io/submariner/issues/1022
-	// TODO: work with the core-ovn community to make sure that load balancers propagate ICMPs back to pods
-	for _, serviceCIDR := range ovn.config.ServiceCidr {
-		rules = append(rules, []string{"-o", ovnK8sSubmarinerInterface, "-d", serviceCIDR, "-p", "tcp",
+	return rules, nil
+}
+
+func (ovn *Handler) getMSSClampingRuleSpecs() ([][]string, error) {
+	rules := [][]string{}
+
+	// NOTE: This is a workaround for submariner issues:
+	//   * https://github.com/submariner-io/submariner/issues/1278
+	//   * https://github.com/submariner-io/submariner/issues/1488
+	// TODO: get the kernel to steer the ICMPs back to ovn-k8s-sub0 interface properly, or write a packet
+	//       reflector in the route agent for that type of packets
+	for _, remoteCIDR := range ovn.getRemoteSubnets().Elements() {
+		rules = append(rules, []string{"-d", remoteCIDR, "-p", "tcp", "-m", "tcp",
+			"--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", strconv.Itoa(MSSFor1500MTU)})
+		rules = append(rules, []string{"-s", remoteCIDR, "-p", "tcp", "-m", "tcp",
 			"--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", strconv.Itoa(MSSFor1500MTU)})
 	}
 
-	// NOTE: This is a workaround for submariner issue https://github.com/submariner-io/submariner/issues/1278
-	// TODO: get the kernel to steer the ICMPs back to ovn-k8s-sub0 interface properly, or write a packet
-	//       reflector in the route agent for that type of packets
-	rules = ovn.appendMSSClampingToRemoteCIRDs(rules)
+	// NOTE: This is a workaround for submariner issue https://github.com/submariner-io/submariner/issues/1022
+	// TODO: work with the core-ovn community to make sure that load balancers propagate ICMPs back to pods
+	for _, serviceCIDR := range ovn.config.ServiceCidr {
+		rules = append(rules, []string{"-o", ovnK8sSubmarinerInterface, "-d", serviceCIDR, "-p", "tcp", "-m", "tcp",
+			"--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", strconv.Itoa(MSSFor1500MTU)})
+	}
 
 	return rules, nil
 }
 
-func (ovn *Handler) appendMSSClampingToRemoteCIRDs(rules [][]string) [][]string {
-	for _, remoteCIDR := range ovn.getRemoteSubnets().Elements() {
-		rules = append(rules, []string{"-d", remoteCIDR, "-p", "tcp",
-			"--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", strconv.Itoa(MSSFor1500MTU)})
-	}
-
-	return rules
-}
-
-func (ovn *Handler) getOutputRuleSpec() ([][]string, error) {
-	return ovn.appendMSSClampingToRemoteCIRDs([][]string{}), nil
-}
-
 type forwardRuleSpecGenerator func() ([][]string, error)
 
+const forwardingSubmarinerMSSClampChain = "SUBMARINER-FWD-MSSCLAMP"
+const forwardingSubmarinerFWDChain = "SUBMARINER-FORWARD"
+
 func (ovn *Handler) setupForwardingIptables() error {
-	return ovn.setupChainIptables("filter", "FORWARD", ovn.getForwardingRuleSpecs)
-}
-
-func (ovn *Handler) setupOutputIptables() error {
-	return ovn.setupChainIptables("filter", "OUTPUT", ovn.getOutputRuleSpec)
-}
-
-func (ovn *Handler) setupChainIptables(table, chain string, ruleGen forwardRuleSpecGenerator) error {
-	ipt, err := iptables.New()
-	if err != nil {
-		return errors.Wrap(err, "error initializing iptables")
-	}
-
-	ruleSpecs, err := ruleGen()
-	if err != nil {
+	if err := ovn.updateIPtableChains("filter", forwardingSubmarinerMSSClampChain, ovn.getMSSClampingRuleSpecs); err != nil {
 		return err
 	}
 
-	for _, ruleSpec := range ruleSpecs {
-		if err = submiptables.PrependUnique(ipt, table, chain, ruleSpec); err != nil {
-			return errors.Wrapf(err, "unable to insert iptable rule in %s table to %s chain", table, chain)
-		}
-	}
-
-	return nil
+	return ovn.updateIPtableChains("filter", forwardingSubmarinerFWDChain, ovn.getForwardingRuleSpecs)
 }
 
 func (ovn *Handler) updateNoMasqueradeIPTables() error {
-	ipt, err := iptables.New()
-	if err != nil {
-		return errors.Wrap(err, "error initializing iptables")
-	}
+	rules := ovn.getNoMasqueradRuleSpecs()
 
-	rules, err := ipt.List("nat", constants.SmPostRoutingChain)
-	if err != nil {
-		return errors.Wrapf(err, "error listing the rules in %s chain", constants.SmPostRoutingChain)
-	}
-
-	ruleStrings := stringset.New()
-
-	for _, rule := range rules {
-		ruleSpec := strings.Split(rule, " ")
-		if ruleSpec[0] == "-A" {
-			ruleSpec = ruleSpec[2:] // remove "-A", "SUBMARINER-POSTROUTING"
-			ruleStrings.Add(strings.Trim(strings.Join(ruleSpec, " "), " "))
-		}
-	}
-
-	for _, ruleSpec := range ovn.getNoMasqueradRuleSpecs() {
-		ruleString := strings.Join(ruleSpec, " ")
-		if ruleStrings.Contains(ruleString) {
-			ruleStrings.Remove(ruleString)
-		} else {
-			klog.Infof("Adding iptables rule in %q: %v", constants.SmPostRoutingChain, ruleSpec)
-
-			if err := ipt.Append("nat", constants.SmPostRoutingChain, ruleSpec...); err != nil {
-				return errors.Wrapf(err, "error adding remote cluster rule to %v to %q", ruleSpec, constants.SmPostRoutingChain)
-			}
-		}
-	}
-
-	// remaining elements should not be there, remove them
-	for _, rule := range ruleStrings.Elements() {
-		klog.Infof("Deleting stale iptables rule in %q: %q", constants.SmPostRoutingChain, rule)
-		ruleSpec := strings.Split(rule, " ")
-
-		if err := ipt.Delete("nat", constants.SmPostRoutingChain, ruleSpec...); err != nil {
-			// Log and let go, as this is not a fatal error, or something that will make real harm,
-			// it's more harmful to keep retrying. At this point on next update deletion of stale rules
-			// will happen again
-			klog.Warningf("Unable to delete iptables entry from %q: %q", constants.SmPostRoutingChain, rule)
-		}
-	}
-
-	return nil
+	return submiptables.UpdateChainRules(ovn.ipt, "nat", constants.SmPostRoutingChain, rules)
 }
 
 func (ovn *Handler) getNoMasqueradRuleSpecs() [][]string {
@@ -235,34 +161,11 @@ func (ovn *Handler) getNoMasqueradRuleSpecs() [][]string {
 }
 
 func (ovn *Handler) cleanupForwardingIptables() error {
-	return ovn.cleanupChainIptables("filter", "FORWARD", ovn.getForwardingRuleSpecs)
-}
-
-func (ovn *Handler) cleanupOutputIptables() error {
-	return ovn.cleanupChainIptables("filter", "OUTPUT", ovn.getOutputRuleSpec)
-}
-
-func (ovn *Handler) cleanupChainIptables(table, chain string, ruleGen forwardRuleSpecGenerator) error {
-	ipt, err := iptables.New()
-	if err != nil {
-		return errors.Wrap(err, "error initializing iptables")
-	}
-
-	ruleSpecs, err := ruleGen()
-	if err != nil {
+	if err := ovn.ipt.ClearChain("filter", forwardingSubmarinerMSSClampChain); err != nil {
 		return err
 	}
 
-	for _, ruleSpec := range ruleSpecs {
-		err = ipt.Delete(table, chain, ruleSpec...)
-		if err != nil {
-			// We log, and don't return, because there could be some transient errors on delete if the
-			// rule didn't exist, we don't want to retry
-			klog.Errorf("error cleaning %s chain from %s table on iptables: %s", chain, table, err)
-		}
-	}
-
-	return nil
+	return ovn.ipt.ClearChain("filter", forwardingSubmarinerFWDChain)
 }
 
 func (ovn *Handler) getSubmDefaultRoute() *netlink.Route {
@@ -273,14 +176,44 @@ func (ovn *Handler) getSubmDefaultRoute() *netlink.Route {
 }
 
 func (ovn *Handler) initIPtablesChains() error {
-	ipt, err := iptables.New()
-	if err != nil {
-		return errors.Wrapf(err, "error initializing iptables")
+	if err := iptcommon.InitSubmarinerPostRoutingChain(ovn.ipt); err != nil {
+		return err
 	}
 
-	if err := iptcommon.InitSubmarinerPostRoutingChain(ipt); err != nil {
+	if err := ovn.ensureForwardChains(); err != nil {
+		return errors.Wrap(err, "ensuring FORWARD sub-chain entries")
+	}
+
+	return nil
+}
+
+func (ovn *Handler) ensureForwardChains() error {
+	if err := submiptables.CreateChainIfNotExists(ovn.ipt, "filter", forwardingSubmarinerMSSClampChain); err != nil {
+		return err
+	}
+
+	if err := submiptables.InsertUnique(ovn.ipt, "filter", "FORWARD", 1,
+		[]string{"-j", forwardingSubmarinerMSSClampChain}); err != nil {
+		return err
+	}
+
+	if err := submiptables.CreateChainIfNotExists(ovn.ipt, "filter", forwardingSubmarinerFWDChain); err != nil {
+		return err
+	}
+
+	if err := submiptables.InsertUnique(ovn.ipt, "filter", "FORWARD", 2,
+		[]string{"-j", forwardingSubmarinerFWDChain}); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (ovn *Handler) updateIPtableChains(table, chain string, ruleGen forwardRuleSpecGenerator) error {
+	ruleSpecs, err := ruleGen()
+	if err != nil {
+		return err
+	}
+
+	return submiptables.UpdateChainRules(ovn.ipt, table, chain, ruleSpecs)
 }
