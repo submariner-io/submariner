@@ -15,6 +15,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package redundancy
 
 import (
@@ -95,7 +96,7 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 		ToCluster:             framework.ClusterA,
 		ToClusterScheduling:   framework.GatewayNode,
 		ToEndpointType:        defaultEndpointType(),
-	}, framework.TestContext.GlobalnetEnabled)
+	}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
 
 	By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
 	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
@@ -105,7 +106,7 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 		ToCluster:             framework.ClusterA,
 		ToClusterScheduling:   framework.NonGatewayNode,
 		ToEndpointType:        defaultEndpointType(),
-	}, framework.TestContext.GlobalnetEnabled)
+	}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
 }
 
 func AwaitNewSubmarinerGatewayPod(f *subFramework.Framework, cluster framework.ClusterIndex, prevPodUID types.UID) *v1.Pod {
@@ -227,7 +228,7 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 		ToCluster:             framework.ClusterA,
 		ToClusterScheduling:   framework.GatewayNode,
 		ToEndpointType:        defaultEndpointType(),
-	}, framework.TestContext.GlobalnetEnabled)
+	}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
 
 	By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
 	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
@@ -237,5 +238,5 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 		ToCluster:             framework.ClusterA,
 		ToClusterScheduling:   framework.NonGatewayNode,
 		ToEndpointType:        defaultEndpointType(),
-	}, framework.TestContext.GlobalnetEnabled)
+	}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
 }

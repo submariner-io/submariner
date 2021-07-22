@@ -15,6 +15,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package controllers_test
 
 import (
@@ -36,8 +37,8 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 	t := newClusterGlobalEgressIPControllerTestDriver()
 
 	When("the well-known ClusterGlobalEgressIP does not exist on startup", func() {
-		It("should create it and allocate the global IP", func() {
-			t.awaitClusterGlobalEgressIPStatusAllocated(1)
+		It("should create it and allocate the default number of global IPs", func() {
+			t.awaitClusterGlobalEgressIPStatusAllocated(controllers.DefaultNumberOfClusterEgressIPs)
 			t.awaitIPTableRules(getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName).AllocatedIPs...)
 		})
 	})

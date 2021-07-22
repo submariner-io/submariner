@@ -15,12 +15,15 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package framework
 
 import (
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
@@ -45,6 +48,9 @@ func NewFramework(baseName string) *Framework {
 
 func beforeSuite() {
 	framework.By("Creating submariner clients")
+
+	err := submarinerv1.AddToScheme(scheme.Scheme)
+	Expect(err).To(BeNil())
 
 	for _, restConfig := range framework.RestConfigs {
 		SubmarinerClients = append(SubmarinerClients, createSubmarinerClient(restConfig))

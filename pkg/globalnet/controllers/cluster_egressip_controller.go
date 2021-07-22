@@ -15,6 +15,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package controllers
 
 import (
@@ -56,9 +57,13 @@ func NewClusterGlobalEgressIPController(config syncer.ResourceSyncerConfig, loca
 
 	federator := federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
 
+	numberOfIPs := DefaultNumberOfClusterEgressIPs
 	defaultEgressIP := &submarinerv1.ClusterGlobalEgressIP{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: constants.ClusterGlobalEgressIPName,
+		},
+		Spec: submarinerv1.ClusterGlobalEgressIPSpec{
+			NumberOfIPs: &numberOfIPs,
 		},
 	}
 

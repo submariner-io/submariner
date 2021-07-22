@@ -15,6 +15,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package controllers
 
 import (
@@ -297,16 +298,6 @@ func (c *globalEgressIPController) onDelete(numRequeues int, globalEgressIP *sub
 	klog.Errorf("Successfully deleted all the iptables/ipset rules for %q ", key)
 
 	return false
-}
-
-func checkStatusChanged(oldStatus, newStatus interface{}, retObj runtime.Object) runtime.Object {
-	if equality.Semantic.DeepEqual(oldStatus, newStatus) {
-		return nil
-	}
-
-	klog.Infof("Updated: %#v", newStatus)
-
-	return retObj
 }
 
 func (c *globalEgressIPController) getIPSetName(key string) string {
