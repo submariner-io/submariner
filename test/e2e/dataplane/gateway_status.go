@@ -84,7 +84,7 @@ func verifyGateway(gw *submarinerv1.Gateway, otherCluster string) (bool, string,
 				conn.Endpoint.ClusterID, conn.Status, conn.StatusMessage), nil
 		}
 
-		if !framework.TestContext.GlobalnetEnabled {
+		if gw.Status.LocalEndpoint.HealthCheckIP != "" {
 			if conn.LatencyRTT == nil {
 				return false, fmt.Sprintf("Connection for cluster %q has no LatencyRTT information", otherCluster), nil
 			}
