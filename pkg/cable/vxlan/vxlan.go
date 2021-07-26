@@ -308,13 +308,16 @@ func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 	}
 
 	cniIface, err := cni.Discover(v.localCluster.Spec.ClusterCIDR[0])
-
-	if err != nil {
-		return endpointInfo.UseIP, fmt.Errorf("failed to get the CNI interface IP for cluster CIDR %q",
+	var ipAddress net.IP
+	if err == nil {
+		ipAddress = net.ParseIP(cniIface.IPAddress)
+	} else {
+		klog.Errorf("Failed to get the CNI interface IP for cluster CIDR %q, host-networking use-cases may not work",
 			v.localCluster.Spec.ClusterCIDR[0])
+		ipAddress = nil
 	}
 
-	err = v.vxlanIface.AddRoute(allowedIPs, remoteVtepIP, net.ParseIP(cniIface.IPAddress))
+	err = v.vxlanIface.AddRoute(allowedIPs, remoteVtepIP, ipAddress)
 
 	if err != nil {
 		return endpointInfo.UseIP, fmt.Errorf("failed to add route for the CIDR %q with remoteVtepIP %q and vxlanInterfaceIP %q",
@@ -474,11 +477,11 @@ func (v *vxlanIface) DelFDB(ipAddress net.IP, hwAddr string) error {
 	return nil
 }
 
-func (v *vxlanIface) AddRoute(ipAddressList []net.IPNet, gwIP, ips net.IP) error {
+func (v *vxlanIface) AddRoute(ipAddressList []net.IPNet, gwIP, ip net.IP) error {
 	for i := range ipAddressList {
 		route := &netlink.Route{
 			LinkIndex: v.link.Index,
-			Src:       ips,
+			Src:       ip,
 			Dst:       &ipAddressList[i],
 			Gw:        gwIP,
 			Type:      netlink.NDA_DST,
