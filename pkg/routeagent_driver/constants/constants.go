@@ -21,6 +21,10 @@ package constants
 const (
 	// IPTable chains used by RouteAgent
 	SmPostRoutingChain = "SUBMARINER-POSTROUTING"
+	PostRoutingChain   = "POSTROUTING"
+	MangleTable        = "mangle"
+	RemoteCIDRIPSet    = "remoteCIDRs"
+	LocalCIDRIPSet     = "localCIDRs"
 
 	// In order to support connectivity from HostNetwork to remoteCluster, route-agent tries
 	// to discover the CNIInterface[#] on the respective node and does SNAT of outgoing

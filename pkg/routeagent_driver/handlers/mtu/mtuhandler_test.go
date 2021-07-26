@@ -22,21 +22,28 @@ import (
 	. "github.com/onsi/gomega"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event"
+	"github.com/submariner-io/submariner/pkg/ipset"
+	fakeSet "github.com/submariner-io/submariner/pkg/ipset/fake"
 	"github.com/submariner-io/submariner/pkg/iptables"
 	fakeIPT "github.com/submariner-io/submariner/pkg/iptables/fake"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 )
 
 var _ = Describe("MTUHandler", func() {
 	var (
 		ipt     *fakeIPT.IPTables
+		ipSet   *fakeSet.IPSet
 		handler event.Handler
 	)
 
 	BeforeEach(func() {
-
 		ipt = fakeIPT.New()
 		iptables.NewFunc = func() (iptables.Interface, error) {
 			return ipt, nil
+		}
+		ipSet = fakeSet.New()
+		ipset.NewFunc = func() ipset.Interface {
+			return ipSet
 		}
 		handler = NewMTUHandler()
 	})
@@ -49,25 +56,38 @@ var _ = Describe("MTUHandler", func() {
 	When("When endpoint is added and removed", func() {
 		It("Should add and remove iptable rules", func() {
 			Expect(handler.Init()).To(Succeed())
-			submEndpoint := newSubmEndpoint()
-			Expect(handler.RemoteEndpointCreated(submEndpoint)).To(Succeed())
-			for _, subnet := range submEndpoint.Spec.Subnets {
-				ipt.AwaitRule(mangleTable, subMarinerPostRoutingChain, ContainSubstring("-s "+subnet))
-				ipt.AwaitRule(mangleTable, subMarinerPostRoutingChain, ContainSubstring("-d "+subnet))
+			ipt.AwaitRule(constants.MangleTable, constants.SmPostRoutingChain, ContainSubstring(constants.RemoteCIDRIPSet+" src"))
+			ipt.AwaitRule(constants.MangleTable, constants.SmPostRoutingChain, ContainSubstring(constants.RemoteCIDRIPSet+" dst"))
+			ipt.AwaitRule(constants.MangleTable, constants.SmPostRoutingChain, ContainSubstring(constants.LocalCIDRIPSet+" src"))
+			ipt.AwaitRule(constants.MangleTable, constants.SmPostRoutingChain, ContainSubstring(constants.LocalCIDRIPSet+" dst"))
+
+			localEndpoint := newSubmEndpoint([]string{"10.1.0.0/24", "172.1.0.0/24"})
+			Expect(handler.LocalEndpointCreated(localEndpoint)).To(Succeed())
+			for _, subnet := range localEndpoint.Spec.Subnets {
+				ipSet.AwaitEntry(constants.LocalCIDRIPSet, subnet)
 			}
-			Expect(handler.RemoteEndpointRemoved(submEndpoint)).To(Succeed())
-			for _, subnet := range submEndpoint.Spec.Subnets {
-				ipt.AwaitNoRule(mangleTable, subMarinerPostRoutingChain, ContainSubstring("-s "+subnet))
-				ipt.AwaitNoRule(mangleTable, subMarinerPostRoutingChain, ContainSubstring("-d "+subnet))
+			Expect(handler.LocalEndpointRemoved(localEndpoint)).To(Succeed())
+			for _, subnet := range localEndpoint.Spec.Subnets {
+				ipSet.AwaitNoEntry(constants.LocalCIDRIPSet, subnet)
+			}
+
+			remoteEndpoint := newSubmEndpoint([]string{"10.0.0.0/24", "172.0.0.0/24"})
+			Expect(handler.RemoteEndpointCreated(remoteEndpoint)).To(Succeed())
+			for _, subnet := range remoteEndpoint.Spec.Subnets {
+				ipSet.AwaitEntry(constants.RemoteCIDRIPSet, subnet)
+			}
+			Expect(handler.RemoteEndpointRemoved(remoteEndpoint)).To(Succeed())
+			for _, subnet := range remoteEndpoint.Spec.Subnets {
+				ipSet.AwaitNoEntry(constants.RemoteCIDRIPSet, subnet)
 			}
 		})
 	})
 })
 
-func newSubmEndpoint() *submV1.Endpoint {
+func newSubmEndpoint(subnets []string) *submV1.Endpoint {
 	return &submV1.Endpoint{
 		Spec: submV1.EndpointSpec{
-			Subnets: []string{"10.0.0.0/24", "172.0.0.0/24"},
+			Subnets: subnets,
 		},
 	}
 }

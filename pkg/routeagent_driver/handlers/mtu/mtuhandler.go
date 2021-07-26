@@ -22,20 +22,21 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/submariner-io/submariner/pkg/ipset"
+	"k8s.io/klog"
+
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/iptables"
-)
-
-const (
-	postRoutingChain           = "POSTROUTING"
-	subMarinerPostRoutingChain = "SUBMARINER-POSTROUTING"
-	mangleTable                = "mangle"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	utilexec "k8s.io/utils/exec"
 )
 
 type mtuHandler struct {
 	event.HandlerBase
-	ipt iptables.Interface
+	ipt         iptables.Interface
+	remoteIPSet ipset.Named
+	localIPSet  ipset.Named
 }
 
 func NewMTUHandler() event.Handler {
@@ -53,19 +54,69 @@ func (h *mtuHandler) GetName() string {
 func (h *mtuHandler) Init() error {
 	var err error
 	h.ipt, err = iptables.New()
+	ipSetIface := ipset.New(utilexec.New())
 	if err != nil {
 		return fmt.Errorf("error initializing iptables: %v", err)
 	}
 
-	if err := iptables.CreateChainIfNotExists(h.ipt, mangleTable, subMarinerPostRoutingChain); err != nil {
-		return fmt.Errorf("error creating iptables chain %s: %v", subMarinerPostRoutingChain, err)
+	if err := iptables.CreateChainIfNotExists(h.ipt, constants.MangleTable, constants.SmPostRoutingChain); err != nil {
+		return fmt.Errorf("error creating iptables chain %s: %v", constants.SmPostRoutingChain, err)
 	}
 
-	forwardToSubMarinerPostRoutingChain := []string{"-j", subMarinerPostRoutingChain}
+	forwardToSubMarinerPostRoutingChain := []string{"-j", constants.SmPostRoutingChain}
+	h.remoteIPSet = h.newNamedIPSet(constants.RemoteCIDRIPSet, ipSetIface)
+	if err := h.remoteIPSet.Create(true); err != nil {
+		return fmt.Errorf("error creating ipset %q: %v", constants.RemoteCIDRIPSet, err)
+	}
 
-	if err := iptables.PrependUnique(h.ipt, mangleTable, postRoutingChain, forwardToSubMarinerPostRoutingChain); err != nil {
+	h.localIPSet = h.newNamedIPSet(constants.LocalCIDRIPSet, ipSetIface)
+	if err := h.localIPSet.Create(true); err != nil {
+		return fmt.Errorf("error creating ipset %q: %v", constants.LocalCIDRIPSet, err)
+	}
+
+	ruleSpecSource := []string{"-m", "set", "--match-set", constants.LocalCIDRIPSet, "src", "-m", "set", "--match-set",
+		constants.RemoteCIDRIPSet, "dst", "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS",
+		"--clamp-mss-to-pmtu"}
+	ruleSpecDest := []string{"-m", "set", "--match-set", constants.RemoteCIDRIPSet, "src", "-m", "set", "--match-set",
+		constants.LocalCIDRIPSet, "dst", "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS",
+		"--clamp-mss-to-pmtu"}
+
+	if err := iptables.PrependUnique(h.ipt, constants.MangleTable, constants.PostRoutingChain,
+		forwardToSubMarinerPostRoutingChain); err != nil {
 		return fmt.Errorf("error inserting iptables rule %q: %v",
 			strings.Join(forwardToSubMarinerPostRoutingChain, " "), err)
+	}
+
+	if err := h.ipt.AppendUnique(constants.MangleTable, constants.SmPostRoutingChain, ruleSpecSource...); err != nil {
+		return fmt.Errorf("error appending iptables rule \"%s\": %v", strings.Join(ruleSpecSource, " "), err)
+	}
+
+	if err := h.ipt.AppendUnique(constants.MangleTable, constants.SmPostRoutingChain, ruleSpecDest...); err != nil {
+		return fmt.Errorf("error appending iptables rule \"%s\": %v", strings.Join(ruleSpecSource, " "), err)
+	}
+
+	return nil
+}
+
+func (h *mtuHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
+	subnets := extractSubnets(endpoint.Spec)
+	for _, subnet := range subnets {
+		err := h.localIPSet.AddEntry(subnet, true)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (h *mtuHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
+	subnets := extractSubnets(endpoint.Spec)
+	for _, subnet := range subnets {
+		err := h.localIPSet.DelEntry(subnet)
+		if err != nil {
+			klog.Errorf("Error deleting the subnet %q from the local IPSet: %v", subnet, err)
+		}
 	}
 
 	return nil
@@ -74,8 +125,7 @@ func (h *mtuHandler) Init() error {
 func (h *mtuHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	subnets := extractSubnets(endpoint.Spec)
 	for _, subnet := range subnets {
-		err := h.addClampMssToPathMTU(subnet)
-
+		err := h.remoteIPSet.AddEntry(subnet, true)
 		if err != nil {
 			return err
 		}
@@ -87,45 +137,10 @@ func (h *mtuHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 func (h *mtuHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	subnets := extractSubnets(endpoint.Spec)
 	for _, subnet := range subnets {
-		err := h.removeClampMssToPathMTU(subnet)
-
+		err := h.remoteIPSet.DelEntry(subnet)
 		if err != nil {
-			return err
+			klog.Errorf("Error deleting the subnet %q from the remote IPSet: %v", subnet, err)
 		}
-	}
-
-	return nil
-}
-
-func (h *mtuHandler) addClampMssToPathMTU(subnets string) error {
-	ruleSpecSource := []string{"-s", subnets, "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j",
-		"TCPMSS", "--clamp-mss-to-pmtu"}
-	ruleSpecDest := []string{"-d", subnets, "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j",
-		"TCPMSS", "--clamp-mss-to-pmtu"}
-
-	if err := h.ipt.AppendUnique(mangleTable, subMarinerPostRoutingChain, ruleSpecSource...); err != nil {
-		return fmt.Errorf("error appending iptables rule \"%s\": %v", strings.Join(ruleSpecSource, " "), err)
-	}
-
-	if err := h.ipt.AppendUnique(mangleTable, subMarinerPostRoutingChain, ruleSpecDest...); err != nil {
-		return fmt.Errorf("error appending iptables rule \"%s\": %v", strings.Join(ruleSpecDest, " "), err)
-	}
-
-	return nil
-}
-
-func (h *mtuHandler) removeClampMssToPathMTU(subnets string) error {
-	ruleSpecSource := []string{"-s", subnets, "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j",
-		"TCPMSS", "--clamp-mss-to-pmtu"}
-	ruleSpecDest := []string{"-d", subnets, "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j",
-		"TCPMSS", "--clamp-mss-to-pmtu"}
-
-	if err := h.ipt.Delete(mangleTable, subMarinerPostRoutingChain, ruleSpecSource...); err != nil {
-		return fmt.Errorf("error deleting iptables rule \"%s\": %v", strings.Join(ruleSpecSource, " "), err)
-	}
-
-	if err := h.ipt.Delete(mangleTable, subMarinerPostRoutingChain, ruleSpecDest...); err != nil {
-		return fmt.Errorf("error deleting iptables rule \"%s\": %v", strings.Join(ruleSpecDest, " "), err)
 	}
 
 	return nil
@@ -141,4 +156,11 @@ func extractSubnets(endpoint submV1.EndpointSpec) []string {
 	}
 
 	return subnets
+}
+
+func (h *mtuHandler) newNamedIPSet(key string, ipSetIface ipset.Interface) ipset.Named {
+	return ipset.NewNamed(ipset.IPSet{
+		Name:    key,
+		SetType: ipset.HashNet,
+	}, ipSetIface)
 }
