@@ -20,6 +20,7 @@ package endpoint
 
 import (
 	"net"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -97,6 +98,7 @@ var _ = Describe("public ip resolvers", func() {
 
 	When("a LoadBalancer with no ingress is specified", func() {
 		It("should return error", func() {
+			loadBalancerRetryConfig.Cap = 1 * time.Second
 			backendConfig[publicIPConfig] = "lb:" + testServiceName
 			client := fake.NewSimpleClientset(serviceWithIngress())
 			_, err := getPublicIP(submSpec, client, backendConfig)
