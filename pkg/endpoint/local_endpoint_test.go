@@ -23,7 +23,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	endpoint "github.com/submariner-io/submariner/pkg/endpoint"
+	"github.com/submariner-io/submariner/pkg/endpoint"
 
 	"github.com/submariner-io/submariner/pkg/util"
 	v1 "k8s.io/api/core/v1"
@@ -44,6 +44,7 @@ var _ = Describe("GetLocal", func() {
 
 	const (
 		testUDPPort         = "1111"
+		testClusterUDPPort  = "2222"
 		testUDPPortLabel    = "udp-port"
 		testNATTPortLabel   = "natt-discovery-port"
 		backendConfigPrefix = "gateway.submariner.io/"
@@ -83,6 +84,27 @@ var _ = Describe("GetLocal", func() {
 		Expect(endpoint.Spec.Subnets).To(Equal(subnets))
 		Expect(endpoint.Spec.NATEnabled).To(Equal(false))
 		Expect(endpoint.Spec.BackendConfig[testUDPPortLabel]).To(Equal(testUDPPort))
+	})
+
+	When("gateway node is not annotated with udp port", func() {
+		It("should return the udp-port backend config of the cluster", func() {
+			delete(node.Labels, backendConfigPrefix+testUDPPortLabel)
+			client = fake.NewSimpleClientset(node)
+			os.Setenv("CE_IPSEC_NATTPORT", testClusterUDPPort)
+
+			endpoint, err := endpoint.GetLocal(submSpec, client)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(endpoint.Spec.BackendConfig[testUDPPortLabel]).To(Equal(testClusterUDPPort))
+		})
+	})
+
+	When("gateway node is annotated with udp port", func() {
+		It("should return the udp-port backend from the annotation", func() {
+			os.Setenv("CE_IPSEC_NATTPORT", testClusterUDPPort)
+			endpoint, err := endpoint.GetLocal(submSpec, client)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(endpoint.Spec.BackendConfig[testUDPPortLabel]).To(Equal(testUDPPort))
+		})
 	})
 
 	When("no NAT discovery port label is set on the node", func() {
