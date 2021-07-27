@@ -34,6 +34,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/mtu"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
 )
 
@@ -80,6 +81,7 @@ func main() {
 		logger.NewHandler(),
 		kubeproxy.NewSyncHandler(env.ClusterCidr, env.ServiceCidr),
 		ovn.NewHandler(env, smClientset),
+		mtu.NewMTUHandler(),
 	); err != nil {
 		klog.Fatalf("Error registering the handlers: %s", err.Error())
 	}
