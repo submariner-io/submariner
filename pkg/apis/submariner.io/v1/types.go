@@ -85,6 +85,7 @@ const (
 	UDPPortConfig           = "udp-port"
 	NATTDiscoveryPortConfig = "natt-discovery-port"
 	PublicIP                = "public-ip"
+	DefaultUDPPort          = "4500"
 )
 
 // Valid PublicIP resolvers.
