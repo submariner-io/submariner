@@ -23,8 +23,8 @@ const (
 	SmPostRoutingChain = "SUBMARINER-POSTROUTING"
 	PostRoutingChain   = "POSTROUTING"
 	MangleTable        = "mangle"
-	RemoteCIDRIPSet    = "remoteCIDRs"
-	LocalCIDRIPSet     = "localCIDRs"
+	RemoteCIDRIPSet    = "SUBMARINER-REMOTECIDRS"
+	LocalCIDRIPSet     = "SUBMARINER-LOCALCIDRS"
 
 	// In order to support connectivity from HostNetwork to remoteCluster, route-agent tries
 	// to discover the CNIInterface[#] on the respective node and does SNAT of outgoing
