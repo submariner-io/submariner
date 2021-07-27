@@ -95,6 +95,7 @@ const (
 
 const (
 	DefaultNATTDiscoveryPort = "4490"
+	DefaultUDPPort           = "4500"
 )
 
 // Valid PublicIP resolvers.
