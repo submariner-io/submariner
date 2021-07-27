@@ -1,5 +1,7 @@
 /*
-© 2021 Red Hat, Inc. and others
+SPDX-License-Identifier: Apache-2.0
+
+Copyright Contributors to the Submariner project.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,9 +15,11 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package fake
 
 import (
+	"errors"
 	"strings"
 	"sync"
 
@@ -25,8 +29,10 @@ import (
 
 type IPTables struct {
 	sync.Mutex
-	chainRules  map[string]stringset.Interface
-	tableChains map[string]stringset.Interface
+	chainRules               map[string]stringset.Interface
+	tableChains              map[string]stringset.Interface
+	failOnAppendRuleMatchers []interface{}
+	failOnDeleteRuleMatchers []interface{}
 }
 
 func New() *IPTables {
@@ -39,23 +45,25 @@ func New() *IPTables {
 }
 
 func (i *IPTables) Append(table, chain string, rulespec ...string) error {
-	i.addRule(table, chain, rulespec...)
-	return nil
+	return i.addRule(table, chain, rulespec...)
 }
 
 func (i *IPTables) AppendUnique(table, chain string, rulespec ...string) error {
-	i.addRule(table, chain, rulespec...)
-	return nil
+	return i.addRule(table, chain, rulespec...)
 }
 
 func (i *IPTables) Insert(table, chain string, pos int, rulespec ...string) error {
-	i.addRule(table, chain, rulespec...)
-	return nil
+	return i.addRule(table, chain, rulespec...)
 }
 
 func (i *IPTables) Delete(table, chain string, rulespec ...string) error {
 	i.Lock()
 	defer i.Unlock()
+
+	err := matchRuleForError(&i.failOnDeleteRuleMatchers, rulespec...)
+	if err != nil {
+		return err
+	}
 
 	ruleSet := i.chainRules[table+"/"+chain]
 	if ruleSet != nil {
@@ -65,9 +73,14 @@ func (i *IPTables) Delete(table, chain string, rulespec ...string) error {
 	return nil
 }
 
-func (i *IPTables) addRule(table, chain string, rulespec ...string) {
+func (i *IPTables) addRule(table, chain string, rulespec ...string) error {
 	i.Lock()
 	defer i.Unlock()
+
+	err := matchRuleForError(&i.failOnAppendRuleMatchers, rulespec...)
+	if err != nil {
+		return err
+	}
 
 	ruleSet := i.chainRules[table+"/"+chain]
 	if ruleSet == nil {
@@ -76,6 +89,22 @@ func (i *IPTables) addRule(table, chain string, rulespec ...string) {
 	}
 
 	ruleSet.Add(strings.Join(rulespec, " "))
+
+	return nil
+}
+
+func matchRuleForError(matchers *[]interface{}, rulespec ...string) error {
+	for i, m := range *matchers {
+		matches, err := ContainElement(m).Match([]string{strings.Join(rulespec, " ")})
+		Expect(err).To(Succeed())
+
+		if matches {
+			*matchers = (*matchers)[i+1:]
+			return errors.New("mock IP table rule error")
+		}
+	}
+
+	return nil
 }
 
 func (i *IPTables) List(table, chain string) ([]string, error) {
@@ -162,4 +191,18 @@ func (i *IPTables) AwaitNoRule(table, chain string, stringOrMatcher interface{})
 	Eventually(func() []string {
 		return i.listRules(table, chain)
 	}, 5).ShouldNot(ContainElement(stringOrMatcher), "Rules for IP table %q, chain %q", table, chain)
+}
+
+func (i *IPTables) AddFailOnAppendRuleMatcher(stringOrMatcher interface{}) {
+	i.Lock()
+	defer i.Unlock()
+
+	i.failOnAppendRuleMatchers = append(i.failOnAppendRuleMatchers, stringOrMatcher)
+}
+
+func (i *IPTables) AddFailOnDeleteRuleMatcher(stringOrMatcher interface{}) {
+	i.Lock()
+	defer i.Unlock()
+
+	i.failOnDeleteRuleMatchers = append(i.failOnDeleteRuleMatchers, stringOrMatcher)
 }
