@@ -6,7 +6,7 @@ WORKDIR /var/submariner
 # iproute is used internally
 # libreswan provides IKE
 RUN dnf -y install --nodocs --setopt=install_weak_deps=0 \
-           iproute libreswan && \
+           iproute libreswan procps-ng && \
     dnf -y clean all
 
 COPY package/submariner.sh package/pluto bin/${TARGETPLATFORM}/submariner-gateway /usr/local/bin/
