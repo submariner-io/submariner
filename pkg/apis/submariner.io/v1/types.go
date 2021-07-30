@@ -37,6 +37,8 @@ type Cluster struct {
 }
 
 type ClusterSpec struct {
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:MinLength=1
 	ClusterID   string   `json:"cluster_id"` // perhaps this could just be a hash of the name...?
 	ColorCodes  []string `json:"color_codes"`
 	ServiceCIDR []string `json:"service_cidr"`
@@ -71,6 +73,8 @@ func (ep *Endpoint) GatewayIP() net.IP {
 }
 
 type EndpointSpec struct {
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:MinLength=1
 	ClusterID string `json:"cluster_id"`
 	CableName string `json:"cable_name"`
 	// +optional
