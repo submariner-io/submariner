@@ -19,11 +19,16 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
+
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -56,12 +61,19 @@ func NewServiceController(config syncer.ResourceSyncerConfig, podControllers *In
 		return nil, err
 	}
 
+	iptIface, err := iptables.New()
+	if err != nil {
+		return nil, errors.WithMessage(err, "error creating the IPTablesInterface handler")
+	}
+
+	controller.iptIface = iptIface
+
 	_, gvr, err := util.ToUnstructuredResource(&submarinerv1.GlobalIngressIP{}, config.RestMapper)
 	if err != nil {
 		return nil, err
 	}
 
-	controller.ingressIPs = config.SourceClient.Resource(*gvr).Namespace(corev1.NamespaceAll)
+	controller.ingressIPs = config.SourceClient.Resource(*gvr)
 
 	return controller, nil
 }
@@ -72,7 +84,7 @@ func (c *serviceController) Start() error {
 		return err
 	}
 
-	c.reconcile(c.ingressIPs, func(obj *unstructured.Unstructured) runtime.Object {
+	c.reconcile(c.ingressIPs.Namespace(corev1.NamespaceAll), func(obj *unstructured.Unstructured) runtime.Object {
 		name, exists, _ := unstructured.NestedString(obj.Object, "spec", "serviceRef", "name")
 		if exists {
 			return &corev1.Service{
@@ -115,6 +127,40 @@ func (c *serviceController) onDelete(service *corev1.Service) (runtime.Object, b
 
 	if service.Spec.ClusterIP == corev1.ClusterIPNone {
 		return nil, false
+	}
+
+	ingressIP, err := c.ingressIPs.Namespace(service.Namespace).Get(context.TODO(), service.Name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil, false
+	}
+
+	if err != nil {
+		klog.Warningf("Error retrieving the GlobalIngressObject for service %q: %v", key, err)
+		return nil, false
+	}
+
+	globalIP, ok, _ := unstructured.NestedString(ingressIP.Object, "status", "allocatedIP")
+	if ok && globalIP != "" {
+		return nil, false
+	}
+
+	// In the current implementation Globalnet relies on the iptables-chain created by kube-proxy for
+	// supporting services. So, when a service is deleted, the sooner we delete any references to the
+	// iptable-chain its better, otherwise we might be blocking kubeproxy from deleting the respective
+	// service chain. Usually in such situations, kubeproxy will log an error message and continue to
+	// retry until all references are deleted. Here, we are trying to delete the respective ingress rules
+	// as soon as service is deleted to avoid such situations. This approach can be modified once the
+	// following issue is addressed - https://github.com/submariner-io/submariner/issues/1166
+	chainName := ingressIP.GetAnnotations()[kubeProxyIPTableChainAnnotation]
+	if chainName != "" {
+		// Ignore any errors, it will again be retried when the globalIngressIP object is deleted.
+		_ = c.iptIface.RemoveIngressRulesForService(globalIP, chainName)
+	}
+
+	podIP := ingressIP.GetAnnotations()[headlessSvcPodIP]
+	if podIP != "" {
+		// Ignore any errors, it will again be retried when the globalIngressIP object is deleted.
+		_ = c.iptIface.RemoveIngressRulesForHeadlessSvcPod(globalIP, podIP)
 	}
 
 	return &submarinerv1.GlobalIngressIP{
