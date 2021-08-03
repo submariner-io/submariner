@@ -178,8 +178,8 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams, egressIPT
 
 	Expect(listenerPod.TerminationMessage).To(matchIP)
 
-	p.Framework.DeleteService(p.ToCluster, service.Name)
 	p.Framework.DeleteServiceExport(p.ToCluster, service.Name)
+	p.Framework.DeleteService(p.ToCluster, service.Name)
 	p.Framework.DeletePod(p.ToCluster, listenerPod.Pod.Name, listenerPod.Pod.Namespace)
 	p.Framework.DeletePod(p.FromCluster, connectorPod.Pod.Name, connectorPod.Pod.Namespace)
 }
