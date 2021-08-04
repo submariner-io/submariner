@@ -295,7 +295,7 @@ func (c *globalEgressIPController) onDelete(numRequeues int, globalEgressIP *sub
 		}
 	}
 
-	klog.Errorf("Successfully deleted all the iptables/ipset rules for %q ", key)
+	klog.Infof("Successfully deleted all the iptables/ipset rules for %q ", key)
 
 	return false
 }
