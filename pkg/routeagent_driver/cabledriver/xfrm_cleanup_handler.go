@@ -22,9 +22,9 @@ import (
 	"fmt"
 	"syscall"
 
+	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/event"
 
-	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"k8s.io/klog"
 )
@@ -58,6 +58,13 @@ func (h *xrfmCleanup) TransitionToNonGateway() error {
 	}
 
 	for i := range currentXfrmPolicyList {
+		// These xfrm rules are not programmed by Submariner, skip them.
+		if currentXfrmPolicyList[i].Dst.String() == "0.0.0.0/0" &&
+			currentXfrmPolicyList[i].Src.String() == "0.0.0.0/0" && currentXfrmPolicyList[i].Proto == 0 {
+			klog.V(log.DEBUG).Infof("Skipping deletion of XFRM policy %s", currentXfrmPolicyList[i])
+			continue
+		}
+
 		klog.V(log.DEBUG).Infof("Deleting XFRM policy %s", currentXfrmPolicyList[i])
 
 		if err = h.netLink.XfrmPolicyDel(&currentXfrmPolicyList[i]); err != nil {
