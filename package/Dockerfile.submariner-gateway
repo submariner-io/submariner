@@ -1,4 +1,4 @@
-FROM fedora:33
+FROM fedora:34
 ARG TARGETPLATFORM
 
 WORKDIR /var/submariner
@@ -6,7 +6,7 @@ WORKDIR /var/submariner
 # iproute is used internally
 # libreswan provides IKE
 RUN dnf -y install --nodocs --setopt=install_weak_deps=0 \
-           iproute libreswan procps-ng && \
+           iproute libreswan && \
     dnf -y clean all
 
 COPY package/submariner.sh package/pluto bin/${TARGETPLATFORM}/submariner-gateway /usr/local/bin/
