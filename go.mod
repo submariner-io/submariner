@@ -12,11 +12,11 @@ require (
 	github.com/mdlayher/netlink v1.4.1 // indirect
 	github.com/mdlayher/socket v0.0.0-20210624160740-9dbe287ded84 // indirect
 	github.com/onsi/ginkgo v1.16.4
-	github.com/onsi/gomega v1.14.0
+	github.com/onsi/gomega v1.15.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.11.0
 	github.com/submariner-io/admiral v0.10.0-rc1
-	github.com/submariner-io/shipyard v0.10.0-rc1
+	github.com/submariner-io/shipyard v0.10.0
 	github.com/uw-labs/lichen v0.1.4
 	github.com/vishvananda/netlink v1.1.0
 	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e // indirect
