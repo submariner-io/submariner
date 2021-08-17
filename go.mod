@@ -17,7 +17,7 @@ require (
 	github.com/prometheus/client_golang v1.11.0
 	github.com/submariner-io/admiral v0.10.0-rc1
 	github.com/submariner-io/shipyard v0.10.0
-	github.com/submariner-io/submariner/pkg/apis v0.0.0
+	github.com/submariner-io/submariner/pkg/apis v0.0.0-20210816112556-6e4bb78fab88
 	github.com/uw-labs/lichen v0.1.4
 	github.com/vishvananda/netlink v1.1.0
 	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e // indirect
