@@ -44,7 +44,7 @@ linters:
     - prealloc
     - staticcheck
     - structcheck
-    - stylecheck # instead of golint
+    - stylecheck  # instead of golint
     # - testpackage
     - typecheck
     - unconvert

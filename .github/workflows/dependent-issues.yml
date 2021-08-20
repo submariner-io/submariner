@@ -17,7 +17,7 @@ on:
       - reopened
       - synchronize
   schedule:
-    - cron: '0 0/6 * * *' # every 6 hours
+    - cron: '0 0/6 * * *'  # every 6 hours
 
 jobs:
   check:
