@@ -12,7 +12,8 @@ jobs:
     strategy:
       fail-fast: false
     steps:
-      - uses: actions/checkout@25a956c84d5dd820d28caab9f86b8d183aeeff3d
+      - name: Check out the repository
+        uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7042f
 
       - name: Install an old cluster, upgrade it and check it
         uses: submariner-io/shipyard/gh-actions/upgrade-e2e@devel
