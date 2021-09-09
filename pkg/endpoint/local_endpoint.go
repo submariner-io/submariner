@@ -114,6 +114,16 @@ func getBackendConfig(nodeObj *v1.Node) (map[string]string, error) {
 		return backendConfig, err
 	}
 
+	// If the node has no specific UDP port assigned for dataplane, expose the cluster default one
+	if _, ok := backendConfig[submv1.UDPPortConfig]; !ok {
+		udpPort := os.Getenv("CE_IPSEC_NATTPORT")
+		if udpPort == "" {
+			udpPort = submv1.DefaultUDPPort
+		}
+
+		backendConfig[submv1.UDPPortConfig] = udpPort
+	}
+
 	// Enable and publish the natt-discovery-port by default
 	if _, ok := backendConfig[submv1.NATTDiscoveryPortConfig]; !ok {
 		backendConfig[submv1.NATTDiscoveryPortConfig] = submv1.DefaultNATTDiscoveryPort

@@ -23,12 +23,8 @@ Submariner Owners: https://github.com/orgs/submariner-io/teams/submariner-core
 **Anything else we need to know?**:
 
 **Environment**:
-- Submariner version (use `subctl version`):
-- Kubernetes version (use `kubectl version`):
 - Diagnose information (use `subctl diagnose all`):
-- Gather information (use `subctl gather`)
+- Gather information (use `subctl gather`):
 - Cloud provider or hardware configuration:
-- OS (e.g `cat /etc/os-release`):
-- Kernel (e.g `uname -a`):
 - Install tools:
 - Others:

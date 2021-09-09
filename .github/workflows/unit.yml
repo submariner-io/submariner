@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@25a956c84d5dd820d28caab9f86b8d183aeeff3d
+        uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7042f
 
       - name: Create artifacts directory
         run: mkdir artifacts
@@ -28,7 +28,7 @@ jobs:
           done
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@11e311c8b504ea40cbed20583a64d75b4735cff3
+        uses: actions/upload-artifact@27121b0bdffd731efa15d66772be8dc71245d074
         with:
           name: Unit test artifacts
           path: artifacts

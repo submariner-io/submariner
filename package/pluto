@@ -8,7 +8,6 @@ set -e
 /usr/libexec/ipsec/addconn --config /etc/ipsec.conf --checkconfig
 /usr/libexec/ipsec/_stackmanager start
 /usr/sbin/ipsec --checknss
-/usr/sbin/ipsec --checknflog
 
 # Start the daemon itself with any additional arguments passed in
 exec /usr/libexec/ipsec/pluto --leak-detective --config /etc/ipsec.conf --nofork  "$@"

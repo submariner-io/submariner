@@ -17,14 +17,15 @@ on:
       - reopened
       - synchronize
   schedule:
-    - cron: '0 0/6 * * *' # every 6 hours
+    - cron: '0 0/6 * * *'  # every 6 hours
 
 jobs:
   check:
     name: Check Dependencies
+    if: github.repository_owner == 'submariner-io'
     runs-on: ubuntu-latest
     steps:
-      - uses: z0al/dependent-issues@70a1b2d4ee1cdc743af33498bd0204123953a887
+      - uses: z0al/dependent-issues@1208b4dd978973b14de5b0b227a2871dbbf34ffb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
