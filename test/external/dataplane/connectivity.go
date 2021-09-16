@@ -132,8 +132,7 @@ func testGlobalNetExternalConnectivity(f *framework.Framework) {
 	Expect(extIngressGlobalIP).ToNot(Equal(""))
 
 	extEgressGlobalIPs := f.AwaitClusterGlobalEgressIPs(extClusterIdx, constants.ClusterGlobalEgressIPName)
-	Expect(len(extEgressGlobalIPs)).ToNot(BeZero())
-	extEgressGlobalIP := extEgressGlobalIPs[0]
+	Expect(extEgressGlobalIPs).ToNot(BeEmpty())
 
 	for idx := range framework.KubeClients {
 		clusterName := framework.TestContext.ClusterIDs[idx]
@@ -158,8 +157,7 @@ func testGlobalNetExternalConnectivity(f *framework.Framework) {
 		Expect(remoteIP).ToNot(Equal(""))
 
 		podGlobalIPs := f.AwaitClusterGlobalEgressIPs(np.Config.Cluster, constants.ClusterGlobalEgressIPName)
-		Expect(len(podGlobalIPs)).ToNot(BeZero())
-		podGlobalIP := podGlobalIPs[0]
+		Expect(podGlobalIPs).ToNot(BeEmpty())
 
 		By(fmt.Sprintf("Sending an http request from external app %q to the service %q in the cluster %q",
 			dockerIP, remoteIP, clusterName))
@@ -167,7 +165,7 @@ func testGlobalNetExternalConnectivity(f *framework.Framework) {
 		command := []string{"curl", "-m", "10", fmt.Sprintf("%s:%d/%s%s", remoteIP, 80, f.Namespace, clusterName)}
 		_, _ = docker.RunCommand(command...)
 
-		By("Verifying the pod received the request")
+		By(fmt.Sprintf("Verifying the pod received the request from one of egressGlobalIPs %v", extEgressGlobalIPs))
 
 		podLog := np.GetLog()
 		if framework.ClusterIndex(idx) == extClusterIdx {
@@ -175,18 +173,22 @@ func testGlobalNetExternalConnectivity(f *framework.Framework) {
 			// external network is the gateway IP of the pod network. Consider if it can be consistent.
 			Expect(podLog).To(MatchRegexp(".*GET /%s%s .*", f.Namespace, clusterName))
 		} else {
-			Expect(podLog).To(MatchRegexp("%s .*GET /%s%s .*", extEgressGlobalIP, f.Namespace, clusterName))
+			matchRegexp := MatchRegexp("%s .*GET /%s%s .*", extEgressGlobalIPs[0], f.Namespace, clusterName)
+			for i := 1; i < len(extEgressGlobalIPs); i++ {
+				matchRegexp = Or(matchRegexp, MatchRegexp("%s .*GET /%s%s .*", extEgressGlobalIPs[i], f.Namespace, clusterName))
+			}
+			Expect(podLog).To(matchRegexp)
 		}
 
 		framework.Logf("%s", podLog)
 
-		By(fmt.Sprintf("Sending an http request from the test pod %q %q in cluster %q to the external app's ingressGlobalIP %q",
-			np.Pod.Name, podGlobalIP, clusterName, extIngressGlobalIP))
+		By(fmt.Sprintf("Sending an http request from the test pod %q in cluster %q to the external app's ingressGlobalIP %q",
+			np.Pod.Name, clusterName, extIngressGlobalIP))
 
 		cmd := []string{"curl", "-m", "10", fmt.Sprintf("%s:%d/%s%s", extIngressGlobalIP, 80, f.Namespace, clusterName)}
 		_, _ = np.RunCommand(cmd)
 
-		By(fmt.Sprintf("Verifying that external app received request from egressGlobalIP %q", podGlobalIP))
+		By(fmt.Sprintf("Verifying that external app received request from one of podGlobalIPs %v", podGlobalIPs))
 
 		_, dockerLog := docker.GetLog()
 
@@ -195,7 +197,11 @@ func testGlobalNetExternalConnectivity(f *framework.Framework) {
 			// external network to external pod is not egressGlobalIP. Consider if it can be consistent.
 			Expect(dockerLog).To(MatchRegexp(".*GET /%s%s .*", f.Namespace, clusterName))
 		} else {
-			Expect(dockerLog).To(MatchRegexp("%s .*GET /%s%s .*", podGlobalIP, f.Namespace, clusterName))
+			matchRegexp := MatchRegexp("%s .*GET /%s%s .*", podGlobalIPs[0], f.Namespace, clusterName)
+			for i := 1; i < len(podGlobalIPs); i++ {
+				matchRegexp = Or(matchRegexp, MatchRegexp("%s .*GET /%s%s .*", podGlobalIPs[i], f.Namespace, clusterName))
+			}
+			Expect(dockerLog).To(matchRegexp)
 		}
 
 		framework.Logf("%s", dockerLog)
