@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
+	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 )
 
 const (
@@ -43,7 +44,11 @@ var _ = Describe("[external-dataplane] Connectivity", func() {
 	f := framework.NewFramework("ext-dataplane")
 
 	It("should be able to connect from an external app to a pod in a cluster", func() {
-		testExternalConnectivity(f)
+		if framework.TestContext.GlobalnetEnabled {
+			testGlobalNetExternalConnectivity(f)
+		} else {
+			testExternalConnectivity(f)
+		}
 	})
 })
 
@@ -77,34 +82,123 @@ func testExternalConnectivity(f *framework.Framework) {
 		By(fmt.Sprintf("Sending an http request from external app %q to the service %q in the cluster %q",
 			dockerIP, svcIP, clusterName))
 
-		command := []string{"curl", "-m", "10", fmt.Sprintf("%s:%d", svcIP, 80)}
+		command := []string{"curl", "-m", "10", fmt.Sprintf("%s:%d/%s%s", svcIP, 80, f.Namespace, clusterName)}
 		_, _ = docker.RunCommand(command...)
 
 		By("Verifying the pod received the request")
 
 		podLog := np.GetLog()
 
-		// TODO: also verify cluster that is directly connected to external app
-		// (source IP is not dockerIP in the case, so need to be checked by the other way).
-		if clusterName != externalClusterName {
-			Expect(podLog).To(ContainSubstring(dockerIP))
+		if clusterName == externalClusterName {
+			Expect(podLog).To(MatchRegexp(".*GET /%s%s .*", f.Namespace, clusterName))
+		} else {
+			Expect(podLog).To(MatchRegexp("%s .*GET /%s%s .*", dockerIP, f.Namespace, clusterName))
 		}
 
 		By(fmt.Sprintf("Sending an http request from the test pod %q %q in cluster %q to the external app %q",
 			np.Pod.Name, podIP, clusterName, dockerIP))
 
-		cmd := []string{"curl", "-m", "10", fmt.Sprintf("%s:%d", dockerIP, 80)}
+		cmd := []string{"curl", "-m", "10", fmt.Sprintf("%s:%d/%s%s", dockerIP, 80, f.Namespace, clusterName)}
 		_, _ = np.RunCommand(cmd)
 
 		By("Verifying that external app received request")
 		// Only check stderr
 		_, dockerLog := docker.GetLog()
 
-		// TODO: also verify cluster that is directly connected to external app
-		// (source IP is not podIP in the case, so need to be checked by the other way).
-		if clusterName != externalClusterName {
-			Expect(dockerLog).To(ContainSubstring(podIP))
+		if clusterName == externalClusterName {
+			Expect(dockerLog).To(MatchRegexp(".*GET /%s%s .*", f.Namespace, clusterName))
+		} else {
+			Expect(dockerLog).To(MatchRegexp("%s .*GET /%s%s .*", podIP, f.Namespace, clusterName))
 		}
+	}
+}
+
+func testGlobalNetExternalConnectivity(f *framework.Framework) {
+	externalClusterName := getExternalClusterName(framework.TestContext.ClusterIDs)
+	extClusterIdx := getExternalClusterIndex(framework.TestContext.ClusterIDs)
+
+	By(fmt.Sprintf("Creating a service without selector and endpoints in cluster %q", externalClusterName))
+	// Get handle for existing docker
+	docker := framework.New(extAppName)
+	dockerIP := docker.GetIP(extNetName)
+
+	// Create service without selector and endpoints for dockerIP, and export the service
+	extSvc := f.CreateTCPServiceWithoutSelector(extClusterIdx, "extsvc", "http", 80)
+	f.CreateTCPEndpoints(extClusterIdx, extSvc.Name, "http", dockerIP, 80)
+	f.CreateServiceExport(extClusterIdx, extSvc.Name)
+
+	// Get globalIPs for the extApp to use later
+	extIngressGlobalIP := f.AwaitGlobalIngressIP(extClusterIdx, extSvc.Name, extSvc.Namespace)
+	Expect(extIngressGlobalIP).ToNot(Equal(""))
+
+	extEgressGlobalIPs := f.AwaitClusterGlobalEgressIPs(extClusterIdx, constants.ClusterGlobalEgressIPName)
+	Expect(len(extEgressGlobalIPs)).ToNot(BeZero())
+	extEgressGlobalIP := extEgressGlobalIPs[0]
+
+	for idx := range framework.KubeClients {
+		clusterName := framework.TestContext.ClusterIDs[idx]
+
+		By(fmt.Sprintf("Creating a pod and a service in cluster %q", clusterName))
+
+		np := f.NewNetworkPod(&framework.NetworkPodConfig{
+			Type:    framework.CustomPod,
+			Port:    80,
+			Cluster: framework.ClusterIndex(idx),
+			// Also test NonGatewayNode
+			Scheduling:    framework.GatewayNode,
+			ContainerName: testContainerName,
+			ImageName:     testImage,
+			Command:       simpleHTTPServerCommand,
+		})
+		svc := np.CreateService()
+		f.CreateServiceExport(np.Config.Cluster, svc.Name)
+
+		// Get globalIPs for the network pod to use later
+		remoteIP := f.AwaitGlobalIngressIP(np.Config.Cluster, svc.Name, svc.Namespace)
+		Expect(remoteIP).ToNot(Equal(""))
+
+		podGlobalIPs := f.AwaitClusterGlobalEgressIPs(np.Config.Cluster, constants.ClusterGlobalEgressIPName)
+		Expect(len(podGlobalIPs)).ToNot(BeZero())
+		podGlobalIP := podGlobalIPs[0]
+
+		By(fmt.Sprintf("Sending an http request from external app %q to the service %q in the cluster %q",
+			dockerIP, remoteIP, clusterName))
+
+		command := []string{"curl", "-m", "10", fmt.Sprintf("%s:%d/%s%s", remoteIP, 80, f.Namespace, clusterName)}
+		_, _ = docker.RunCommand(command...)
+
+		By("Verifying the pod received the request")
+
+		podLog := np.GetLog()
+		if framework.ClusterIndex(idx) == extClusterIdx {
+			// TODO: current behavior is that source IP from external app to the pod in the cluster that directly connected to
+			// external network is the gateway IP of the pod network. Consider if it can be consistent.
+			Expect(podLog).To(MatchRegexp(".*GET /%s%s .*", f.Namespace, clusterName))
+		} else {
+			Expect(podLog).To(MatchRegexp("%s .*GET /%s%s .*", extEgressGlobalIP, f.Namespace, clusterName))
+		}
+
+		framework.Logf("%s", podLog)
+
+		By(fmt.Sprintf("Sending an http request from the test pod %q %q in cluster %q to the external app's ingressGlobalIP %q",
+			np.Pod.Name, podGlobalIP, clusterName, extIngressGlobalIP))
+
+		cmd := []string{"curl", "-m", "10", fmt.Sprintf("%s:%d/%s%s", extIngressGlobalIP, 80, f.Namespace, clusterName)}
+		_, _ = np.RunCommand(cmd)
+
+		By(fmt.Sprintf("Verifying that external app received request from egressGlobalIP %q", podGlobalIP))
+
+		_, dockerLog := docker.GetLog()
+
+		if framework.ClusterIndex(idx) == extClusterIdx {
+			// TODO: current behavior is that source IP from the pod in the cluster that directly connected to
+			// external network to external pod is not egressGlobalIP. Consider if it can be consistent.
+			Expect(dockerLog).To(MatchRegexp(".*GET /%s%s .*", f.Namespace, clusterName))
+		} else {
+			Expect(dockerLog).To(MatchRegexp("%s .*GET /%s%s .*", podGlobalIP, f.Namespace, clusterName))
+		}
+
+		framework.Logf("%s", dockerLog)
 	}
 }
 
@@ -120,4 +214,17 @@ func getExternalClusterName(names []string) string {
 	sort.Strings(sortedNames)
 
 	return sortedNames[0]
+}
+
+func getExternalClusterIndex(names []string) framework.ClusterIndex {
+	clusterName := getExternalClusterName(names)
+
+	for idx, cid := range names {
+		if cid == clusterName {
+			return framework.ClusterIndex(idx)
+		}
+	}
+
+	// TODO: consider right error handling
+	return framework.ClusterIndex(0)
 }

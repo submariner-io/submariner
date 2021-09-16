@@ -9,4 +9,4 @@ rules:
     ignore: '.github/workflows/*.yml'
 
 ignore: |
-  /vendor
+  **/vendor
