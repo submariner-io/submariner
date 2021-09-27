@@ -188,7 +188,7 @@ func newVxlanIface(attrs *vxlanAttributes, activeEndPoint string) (*vxlanIface, 
 
 func createvxlanIface(iface *vxlanIface) error {
 	err := netlink.LinkAdd(iface.link)
-	if err == syscall.EEXIST {
+	if errors.Is(err, syscall.EEXIST) {
 		klog.Errorf("Got error: %v, %v", err, iface.link)
 		// Get the properties of existing vxlan interface
 		existing, err := netlink.LinkByName(iface.link.Name)
@@ -411,7 +411,7 @@ func (v *vxlanIface) configureIPAddress(ipAddress net.IP, mask net.IPMask) error
 	}}
 
 	err := netlink.AddrAdd(v.link, ipConfig)
-	if err == syscall.EEXIST {
+	if errors.Is(err, syscall.EEXIST) {
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("unable to configure address (%s) on vxlan interface (%s). %v", ipAddress, v.link.Name, err)
@@ -491,7 +491,7 @@ func (v *vxlanIface) AddRoute(ipAddressList []net.IPNet, gwIP, ip net.IP) error 
 		}
 		err := netlink.RouteAdd(route)
 
-		if err == syscall.EEXIST {
+		if errors.Is(err, syscall.EEXIST) {
 			err = netlink.RouteReplace(route)
 		}
 

@@ -20,6 +20,7 @@ package controllers_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"testing"
@@ -439,7 +440,7 @@ func awaitStatusConditions(client dynamic.ResourceInterface, name string, atInde
 		return
 	}
 
-	if err == wait.ErrWaitTimeout {
+	if errors.Is(err, wait.ErrWaitTimeout) {
 		if conditions == nil {
 			Fail("Status conditions not found")
 		}

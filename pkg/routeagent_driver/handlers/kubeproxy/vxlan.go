@@ -19,6 +19,7 @@ limitations under the License.
 package kubeproxy
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -80,7 +81,7 @@ func (kp *SyncHandler) newVxlanIface(attrs *vxLanAttributes, activeEndPoint stri
 
 func (kp *SyncHandler) createVxLanIface(iface *vxLanIface) error {
 	err := kp.netLink.LinkAdd(iface.link)
-	if err == syscall.EEXIST {
+	if errors.Is(err, syscall.EEXIST) {
 		// Get the properties of existing vxlan interface
 		existing, err := kp.netLink.LinkByName(iface.link.Name)
 		if err != nil {
@@ -153,7 +154,7 @@ func (iface *vxLanIface) configureIPAddress(ipAddress net.IP, mask net.IPMask) e
 	}}
 
 	err := iface.netLink.AddrAdd(iface.link, ipConfig)
-	if err == syscall.EEXIST {
+	if errors.Is(err, syscall.EEXIST) {
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("unable to configure address (%s) on vxlan interface (%s). %v", ipAddress, iface.link.Name, err)
