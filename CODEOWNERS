@@ -1,9 +1,7 @@
 # Auto-generated, do not edit; see CODEOWNERS.in
-* @mangelajo @Oats87 @skitt @tpantelis
-/.github/workflows/ @mangelajo @mkolesnik @Oats87 @skitt @tpantelis
-/package/ @mangelajo @mkolesnik @Oats87 @skitt @tpantelis
-/pkg/globalnet/ @mangelajo @Oats87 @skitt @sridhargaddam @tpantelis
-/pkg/routeagent_driver/ @mangelajo @Oats87 @skitt @sridhargaddam @tpantelis
-/scripts/ @mangelajo @mkolesnik @Oats87 @skitt @tpantelis
-Dockerfile.dapper @mangelajo @mkolesnik @Oats87 @skitt @tpantelis
-Makefile* @mangelajo @mkolesnik @Oats87 @skitt @tpantelis
+* @mangelajo @Oats87 @skitt @sridhargaddam @tpantelis
+/.github/workflows/ @mangelajo @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis
+/package/ @mangelajo @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis
+/scripts/ @mangelajo @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis
+Dockerfile.dapper @mangelajo @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis
+Makefile* @mangelajo @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis
