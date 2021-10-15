@@ -35,7 +35,7 @@ import (
 	"k8s.io/klog"
 )
 
-func startIngressPodController(svc *corev1.Service, config syncer.ResourceSyncerConfig) (*ingressPodController, error) {
+func startIngressPodController(svc *corev1.Service, config *syncer.ResourceSyncerConfig) (*ingressPodController, error) {
 	var err error
 
 	_, gvr, err := util.ToUnstructuredResource(&submarinerv1.GlobalIngressIP{}, config.RestMapper)

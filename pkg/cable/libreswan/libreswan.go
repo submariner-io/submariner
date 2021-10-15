@@ -77,7 +77,8 @@ const defaultNATTPort = "4500"
 const ipsecSpecEnvVarPrefix = "ce_ipsec"
 
 // NewLibreswan starts an IKE daemon using Libreswan and configures it to manage Submariner's endpoints
-func NewLibreswan(localEndpoint types.SubmarinerEndpoint, localCluster types.SubmarinerCluster) (cable.Driver, error) {
+func NewLibreswan(localEndpoint *types.SubmarinerEndpoint, localCluster *types.SubmarinerCluster) (cable.Driver, error) {
+	// We'll panic if localEndpoint or localCluster are nil, this is intentional
 	ipSecSpec := specification{}
 
 	err := envconfig.Process(ipsecSpecEnvVarPrefix, &ipSecSpec)
@@ -103,7 +104,7 @@ func NewLibreswan(localEndpoint types.SubmarinerEndpoint, localCluster types.Sub
 		logFile:               ipSecSpec.LogFile,
 		ipSecNATTPort:         strconv.Itoa(int(nattPort)),
 		defaultNATTPort:       int32(defaultNATTPort),
-		localEndpoint:         localEndpoint,
+		localEndpoint:         *localEndpoint,
 		connections:           []subv1.Connection{},
 		forceUDPEncapsulation: ipSecSpec.ForceEncaps,
 	}, nil
@@ -194,12 +195,12 @@ func (i *libreswan) refreshConnectionStatus() error {
 
 	cable.RecordNoConnections()
 
-	localSubnets := extractSubnets(i.localEndpoint.Spec)
+	localSubnets := extractSubnets(&i.localEndpoint.Spec)
 
 	for j := range i.connections {
 		isConnected := false
 
-		remoteSubnets := extractSubnets(i.connections[j].Endpoint)
+		remoteSubnets := extractSubnets(&i.connections[j].Endpoint)
 		rx, tx := 0, 0
 		for lsi := range localSubnets {
 			for rsi := range remoteSubnets {
@@ -248,7 +249,7 @@ func (i *libreswan) GetConnections() ([]subv1.Connection, error) {
 	return i.connections, nil
 }
 
-func extractSubnets(endpoint subv1.EndpointSpec) []string {
+func extractSubnets(endpoint *subv1.EndpointSpec) []string {
 	subnets := make([]string, 0, len(endpoint.Subnets))
 
 	for _, subnet := range endpoint.Subnets {
@@ -288,6 +289,7 @@ func whack(args ...string) error {
 // ConnectToEndpoint establishes a connection to the given endpoint and returns a string
 // representation of the IP address of the target endpoint.
 func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
+	// We'll panic if endpointInfo is nil, this is intentional
 	endpoint := &endpointInfo.Endpoint
 
 	rightNATTPort, err := endpoint.Spec.GetBackendPort(subv1.UDPPortConfig, i.defaultNATTPort)
@@ -296,8 +298,8 @@ func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 			endpoint.Spec.CableName, i.defaultNATTPort, err)
 	}
 
-	leftSubnets := extractSubnets(i.localEndpoint.Spec)
-	rightSubnets := extractSubnets(endpoint.Spec)
+	leftSubnets := extractSubnets(&i.localEndpoint.Spec)
+	rightSubnets := extractSubnets(&endpoint.Spec)
 
 	// Ensure we’re listening
 	if err := whack("--listen"); err != nil {
@@ -470,9 +472,10 @@ func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo 
 }
 
 // DisconnectFromEndpoint disconnects from the connection to the given endpoint.
-func (i *libreswan) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) error {
-	leftSubnets := extractSubnets(i.localEndpoint.Spec)
-	rightSubnets := extractSubnets(endpoint.Spec)
+func (i *libreswan) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint) error {
+	// We'll panic if endpoint is nil, this is intentional
+	leftSubnets := extractSubnets(&i.localEndpoint.Spec)
+	rightSubnets := extractSubnets(&endpoint.Spec)
 
 	klog.Infof("Deleting connection to %v", endpoint)
 
@@ -510,7 +513,7 @@ func (i *libreswan) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) er
 	return nil
 }
 
-func removeConnectionForEndpoint(connections []subv1.Connection, endpoint types.SubmarinerEndpoint) []subv1.Connection {
+func removeConnectionForEndpoint(connections []subv1.Connection, endpoint *types.SubmarinerEndpoint) []subv1.Connection {
 	for j := range connections {
 		if connections[j].Endpoint.CableName == endpoint.Spec.CableName {
 			copy(connections[j:], connections[j+1:])

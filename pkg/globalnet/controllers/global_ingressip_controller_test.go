@@ -292,7 +292,7 @@ func newGlobalIngressIPControllerDriver() *globalIngressIPControllerTestDriver {
 func (t *globalIngressIPControllerTestDriver) start() {
 	var err error
 
-	t.controller, err = controllers.NewGlobalIngressIPController(syncer.ResourceSyncerConfig{
+	t.controller, err = controllers.NewGlobalIngressIPController(&syncer.ResourceSyncerConfig{
 		SourceClient: t.dynClient,
 		RestMapper:   t.restMapper,
 		Scheme:       t.scheme,

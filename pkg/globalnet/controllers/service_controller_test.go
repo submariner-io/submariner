@@ -158,10 +158,10 @@ func (t *serviceControllerTestDriver) start() {
 		Scheme:       t.scheme,
 	}
 
-	podControllers, err := controllers.NewIngressPodControllers(*config)
+	podControllers, err := controllers.NewIngressPodControllers(config)
 	Expect(err).To(Succeed())
 
-	t.controller, err = controllers.NewServiceController(*config, podControllers)
+	t.controller, err = controllers.NewServiceController(config, podControllers)
 
 	Expect(err).To(Succeed())
 	Expect(t.controller.Start()).To(Succeed())

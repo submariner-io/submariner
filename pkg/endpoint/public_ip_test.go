@@ -58,7 +58,7 @@ const (
 )
 
 var _ = Describe("public ip resolvers", func() {
-	var submSpec types.SubmarinerSpecification
+	var submSpec *types.SubmarinerSpecification
 	var backendConfig map[string]string
 
 	const (
@@ -68,7 +68,7 @@ var _ = Describe("public ip resolvers", func() {
 	)
 
 	BeforeEach(func() {
-		submSpec = types.SubmarinerSpecification{
+		submSpec = &types.SubmarinerSpecification{
 			Namespace: testNamespace,
 		}
 

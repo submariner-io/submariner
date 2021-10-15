@@ -39,7 +39,9 @@ import (
 	"github.com/submariner-io/submariner/pkg/types"
 )
 
-func GetLocal(submSpec types.SubmarinerSpecification, k8sClient kubernetes.Interface) (types.SubmarinerEndpoint, error) {
+func GetLocal(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface) (*types.SubmarinerEndpoint, error) {
+	// We'll panic if submSpec is nil, this is intentional
+
 	privateIP := util.GetLocalIP()
 
 	gwNode, err := node.GetLocalNode(k8sClient)
@@ -49,7 +51,7 @@ func GetLocal(submSpec types.SubmarinerSpecification, k8sClient kubernetes.Inter
 
 	hostname, err := os.Hostname()
 	if err != nil {
-		return types.SubmarinerEndpoint{}, fmt.Errorf("error getting hostname: %v", err)
+		return nil, fmt.Errorf("error getting hostname: %v", err)
 	}
 
 	var localSubnets []string
@@ -66,14 +68,14 @@ func GetLocal(submSpec types.SubmarinerSpecification, k8sClient kubernetes.Inter
 
 	backendConfig, err := getBackendConfig(gwNode)
 	if err != nil {
-		return types.SubmarinerEndpoint{}, err
+		return nil, err
 	}
 
 	if strings.HasPrefix(submSpec.PublicIP, submv1.LoadBalancer+":") {
 		backendConfig[submv1.UsingLoadBalancer] = "true"
 	}
 
-	endpoint := types.SubmarinerEndpoint{
+	endpoint := &types.SubmarinerEndpoint{
 		Spec: submv1.EndpointSpec{
 			CableName:     fmt.Sprintf("submariner-cable-%s-%s", submSpec.ClusterID, strings.ReplaceAll(privateIP, ".", "-")),
 			ClusterID:     submSpec.ClusterID,
@@ -88,7 +90,7 @@ func GetLocal(submSpec types.SubmarinerSpecification, k8sClient kubernetes.Inter
 
 	publicIP, err := getPublicIP(submSpec, k8sClient, backendConfig)
 	if err != nil {
-		return types.SubmarinerEndpoint{}, fmt.Errorf("could not determine public IP: %v", err)
+		return nil, fmt.Errorf("could not determine public IP: %v", err)
 	}
 
 	endpoint.Spec.PublicIP = publicIP
@@ -100,7 +102,7 @@ func GetLocal(submSpec types.SubmarinerSpecification, k8sClient kubernetes.Inter
 		// the HealthCheck between the clusters.
 		endpoint.Spec.HealthCheckIP, err = getCNIInterfaceIPAddress(submSpec.ClusterCidr)
 		if err != nil {
-			return types.SubmarinerEndpoint{}, fmt.Errorf("error getting CNI Interface IP address: %v."+
+			return nil, fmt.Errorf("error getting CNI Interface IP address: %v."+
 				"Please disable the health check if your CNI does not expose a pod IP on the nodes", err)
 		}
 	}

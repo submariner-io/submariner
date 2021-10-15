@@ -145,7 +145,8 @@ func (gs *GatewaySyncer) cleanupStaleGatewayEntries(localGatewayName string) err
 		return err
 	}
 
-	for _, gw := range gateways.Items {
+	for i := range gateways.Items {
+		gw := &gateways.Items[i]
 		if gw.Name == localGatewayName {
 			continue
 		}
@@ -171,7 +172,7 @@ func (gs *GatewaySyncer) cleanupStaleGatewayEntries(localGatewayName string) err
 	return nil
 }
 
-func isGatewayStale(gateway v1.Gateway) (bool, error) {
+func isGatewayStale(gateway *v1.Gateway) (bool, error) {
 	timestamp, ok := gateway.ObjectMeta.Annotations[updateTimestampAnnotation]
 	if !ok {
 		return true, fmt.Errorf("%q annotation not found", updateTimestampAnnotation)

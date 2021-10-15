@@ -31,7 +31,9 @@ import (
 	"k8s.io/klog"
 )
 
-func NewServiceController(config syncer.ResourceSyncerConfig, podControllers *IngressPodControllers) (Interface, error) {
+func NewServiceController(config *syncer.ResourceSyncerConfig, podControllers *IngressPodControllers) (Interface, error) {
+	// We'll panic if config is nil, this is intentional
+
 	var err error
 
 	klog.Info("Creating Service controller")

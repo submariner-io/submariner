@@ -99,7 +99,7 @@ func (h *mtuHandler) Init() error {
 }
 
 func (h *mtuHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
-	subnets := extractSubnets(endpoint.Spec)
+	subnets := extractSubnets(&endpoint.Spec)
 	for _, subnet := range subnets {
 		err := h.localIPSet.AddEntry(subnet, true)
 		if err != nil {
@@ -111,7 +111,7 @@ func (h *mtuHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 }
 
 func (h *mtuHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
-	subnets := extractSubnets(endpoint.Spec)
+	subnets := extractSubnets(&endpoint.Spec)
 	for _, subnet := range subnets {
 		err := h.localIPSet.DelEntry(subnet)
 		if err != nil {
@@ -123,7 +123,7 @@ func (h *mtuHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 }
 
 func (h *mtuHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
-	subnets := extractSubnets(endpoint.Spec)
+	subnets := extractSubnets(&endpoint.Spec)
 	for _, subnet := range subnets {
 		err := h.remoteIPSet.AddEntry(subnet, true)
 		if err != nil {
@@ -135,7 +135,7 @@ func (h *mtuHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 }
 
 func (h *mtuHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
-	subnets := extractSubnets(endpoint.Spec)
+	subnets := extractSubnets(&endpoint.Spec)
 	for _, subnet := range subnets {
 		err := h.remoteIPSet.DelEntry(subnet)
 		if err != nil {
@@ -146,7 +146,7 @@ func (h *mtuHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	return nil
 }
 
-func extractSubnets(endpoint submV1.EndpointSpec) []string {
+func extractSubnets(endpoint *submV1.EndpointSpec) []string {
 	subnets := make([]string, 0, len(endpoint.Subnets))
 
 	for _, subnet := range endpoint.Subnets {
@@ -159,7 +159,7 @@ func extractSubnets(endpoint submV1.EndpointSpec) []string {
 }
 
 func (h *mtuHandler) newNamedIPSet(key string, ipSetIface ipset.Interface) ipset.Named {
-	return ipset.NewNamed(ipset.IPSet{
+	return ipset.NewNamed(&ipset.IPSet{
 		Name:    key,
 		SetType: ipset.HashNet,
 	}, ipSetIface)

@@ -54,7 +54,7 @@ func init() {
 var fakeDriver *fake.Driver
 
 var _ = BeforeSuite(func() {
-	cable.AddDriver(fake.DriverName, func(endpoint types.SubmarinerEndpoint, cluster types.SubmarinerCluster) (cable.Driver, error) {
+	cable.AddDriver(fake.DriverName, func(endpoint *types.SubmarinerEndpoint, cluster *types.SubmarinerCluster) (cable.Driver, error) {
 		return fakeDriver, nil
 	})
 })
@@ -102,7 +102,7 @@ var _ = Describe("Managing tunnels", func() {
 	})
 
 	JustBeforeEach(func() {
-		engine := cableengine.NewEngine(types.SubmarinerCluster{}, types.SubmarinerEndpoint{
+		engine := cableengine.NewEngine(&types.SubmarinerCluster{}, &types.SubmarinerEndpoint{
 			Spec: v1.EndpointSpec{
 				Backend: fake.DriverName,
 			},

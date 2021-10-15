@@ -44,7 +44,7 @@ func init() {
 var fakeDriver *fake.Driver
 
 var _ = BeforeSuite(func() {
-	cable.AddDriver(fake.DriverName, func(endpoint types.SubmarinerEndpoint, cluster types.SubmarinerCluster) (cable.Driver, error) {
+	cable.AddDriver(fake.DriverName, func(endpoint *types.SubmarinerEndpoint, cluster *types.SubmarinerCluster) (cable.Driver, error) {
 		return fakeDriver, nil
 	})
 })
@@ -91,12 +91,12 @@ var _ = Describe("Cable Engine", func() {
 		}
 
 		fakeDriver = fake.New()
-		engine = cableengine.NewEngine(types.SubmarinerCluster{
+		engine = cableengine.NewEngine(&types.SubmarinerCluster{
 			ID: localClusterID,
 			Spec: subv1.ClusterSpec{
 				ClusterID: localClusterID,
 			},
-		}, types.SubmarinerEndpoint{Spec: localEndpoint.Spec})
+		}, &types.SubmarinerEndpoint{Spec: localEndpoint.Spec})
 
 		natDiscovery = &fakeNATDiscovery{removeEndpoint: make(chan string, 20), readyChannel: make(chan *natdiscovery.NATEndpointInfo, 100)}
 		engine.SetupNATDiscovery(natDiscovery)

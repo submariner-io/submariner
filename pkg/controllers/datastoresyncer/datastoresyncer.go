@@ -48,15 +48,16 @@ type DatastoreSyncer struct {
 	localFederator federate.Federator
 }
 
-func New(syncerConfig broker.SyncerConfig, localCluster types.SubmarinerCluster,
-	localEndpoint types.SubmarinerEndpoint, colorcodes []string) *DatastoreSyncer {
+func New(syncerConfig *broker.SyncerConfig, localCluster *types.SubmarinerCluster,
+	localEndpoint *types.SubmarinerEndpoint, colorcodes []string) *DatastoreSyncer {
+	// We'll panic if syncerConfig, localCluster or localEndpoint are nil, this is intentional
 	syncerConfig.LocalClusterID = localCluster.Spec.ClusterID
 
 	return &DatastoreSyncer{
 		colorCodes:    colorcodes,
-		localCluster:  localCluster,
-		localEndpoint: localEndpoint,
-		syncerConfig:  syncerConfig,
+		localCluster:  *localCluster,
+		localEndpoint: *localEndpoint,
+		syncerConfig:  *syncerConfig,
 	}
 }
 
@@ -151,7 +152,7 @@ func (d *DatastoreSyncer) ensureExclusiveEndpoint(syncer *broker.Syncer) error {
 			continue
 		}
 
-		if util.CompareEndpointSpec(endpoint.Spec, d.localEndpoint.Spec) {
+		if util.CompareEndpointSpec(&endpoint.Spec, &d.localEndpoint.Spec) {
 			continue
 		}
 

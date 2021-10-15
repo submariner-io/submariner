@@ -31,7 +31,9 @@ import (
 	"k8s.io/klog"
 )
 
-func NewIngressPodControllers(config syncer.ResourceSyncerConfig) (*IngressPodControllers, error) {
+func NewIngressPodControllers(config *syncer.ResourceSyncerConfig) (*IngressPodControllers, error) {
+	// We'll panic if config is nil, this is intentional
+
 	_, gvr, err := util.ToUnstructuredResource(&submarinerv1.GlobalIngressIP{}, config.RestMapper)
 	if err != nil {
 		return nil, err
@@ -39,7 +41,7 @@ func NewIngressPodControllers(config syncer.ResourceSyncerConfig) (*IngressPodCo
 
 	return &IngressPodControllers{
 		controllers: map[string]*ingressPodController{},
-		config:      config,
+		config:      *config,
 		ingressIPs:  config.SourceClient.Resource(*gvr),
 	}, nil
 }
@@ -53,7 +55,7 @@ func (c *IngressPodControllers) start(service *corev1.Service) error {
 		return nil
 	}
 
-	controller, err := startIngressPodController(service, c.config)
+	controller, err := startIngressPodController(service, &c.config)
 	if err != nil {
 		return err
 	}

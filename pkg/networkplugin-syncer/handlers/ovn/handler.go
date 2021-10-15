@@ -59,7 +59,9 @@ func (ovn *SyncHandler) GetNetworkPlugins() []string {
 	return []string{constants.NetworkPluginOVNKubernetes}
 }
 
-func NewSyncHandler(k8sClientset clientset.Interface, env environment.Specification) event.Handler {
+func NewSyncHandler(k8sClientset clientset.Interface, env *environment.Specification) event.Handler {
+	// We'll panic if env is nil, this is intentional
+
 	return &SyncHandler{
 		remoteEndpoints:  make(map[string]*submV1.Endpoint),
 		k8sClientset:     k8sClientset,

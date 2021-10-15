@@ -39,8 +39,10 @@ import (
 	"k8s.io/klog"
 )
 
-func NewClusterGlobalEgressIPController(config syncer.ResourceSyncerConfig, localSubnets []string,
+func NewClusterGlobalEgressIPController(config *syncer.ResourceSyncerConfig, localSubnets []string,
 	pool *ipam.IPPool) (Interface, error) {
+	// We'll panic if config is nil, this is intentional
+
 	var err error
 
 	klog.Info("Creating ClusterGlobalEgressIP controller")

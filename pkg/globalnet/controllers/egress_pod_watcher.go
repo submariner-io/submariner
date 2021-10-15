@@ -32,7 +32,7 @@ import (
 	"k8s.io/klog"
 )
 
-func startEgressPodWatcher(name, namespace string, namedIPSet ipset.Named, config watcher.Config,
+func startEgressPodWatcher(name, namespace string, namedIPSet ipset.Named, config *watcher.Config,
 	podSelector *metav1.LabelSelector) (*egressPodWatcher, error) {
 	pw := &egressPodWatcher{
 		stopCh:     make(chan struct{}),

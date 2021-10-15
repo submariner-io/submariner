@@ -86,13 +86,14 @@ func init() {
 	cable.AddDriver(CableDriverName, NewDriver)
 }
 
-func NewDriver(localEndpoint types.SubmarinerEndpoint, localCluster types.SubmarinerCluster) (cable.Driver, error) {
+func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.SubmarinerCluster) (cable.Driver, error) {
+	// We'll panic if localEndpoint or localCluster are nil, this is intentional
 	var err error
 
 	v := vxlan{
-		localEndpoint: localEndpoint,
+		localEndpoint: *localEndpoint,
 		netLink:       netlinkAPI.New(),
-		localCluster:  localCluster,
+		localCluster:  *localCluster,
 	}
 
 	port, err := localEndpoint.Spec.GetBackendPort(v1.UDPPortConfig, defaultPort)
@@ -274,6 +275,7 @@ func (v *vxlan) addIPRule() error {
 }
 
 func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
+	// We'll panic if endpointInfo is nil, this is intentional
 	remoteEndpoint := endpointInfo.Endpoint
 	if v.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
 		klog.V(log.DEBUG).Infof("Will not connect to self")
@@ -332,7 +334,8 @@ func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 	return endpointInfo.UseIP, nil
 }
 
-func (v *vxlan) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoint) error {
+func (v *vxlan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint) error {
+	// We'll panic if remoteEndpoint is nil, this is intentional
 	klog.V(log.DEBUG).Infof("Removing endpoint %#v", remoteEndpoint)
 
 	if v.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
@@ -385,7 +388,7 @@ func (v *vxlan) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoint) 
 	return nil
 }
 
-func removeConnectionForEndpoint(connections []v1.Connection, endpoint types.SubmarinerEndpoint) []v1.Connection {
+func removeConnectionForEndpoint(connections []v1.Connection, endpoint *types.SubmarinerEndpoint) []v1.Connection {
 	for j := range connections {
 		if connections[j].Endpoint.CableName == endpoint.Spec.CableName {
 			copy(connections[j:], connections[j+1:])

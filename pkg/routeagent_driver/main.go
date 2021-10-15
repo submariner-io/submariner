@@ -87,7 +87,7 @@ func main() {
 	if err := registry.AddHandlers(
 		logger.NewHandler(),
 		kubeproxy.NewSyncHandler(env.ClusterCidr, env.ServiceCidr),
-		ovn.NewHandler(env, smClientset),
+		ovn.NewHandler(&env, smClientset),
 		cabledriver.NewXRFMCleanupHandler(),
 		cabledriver.NewVXLANCleanup(),
 		mtu.NewMTUHandler(),

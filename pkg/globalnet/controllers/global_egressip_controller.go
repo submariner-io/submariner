@@ -42,7 +42,9 @@ import (
 	utilexec "k8s.io/utils/exec"
 )
 
-func NewGlobalEgressIPController(config syncer.ResourceSyncerConfig, pool *ipam.IPPool) (Interface, error) {
+func NewGlobalEgressIPController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool) (Interface, error) {
+	// We'll panic if config is nil, this is intentional
+
 	var err error
 
 	klog.Info("Creating GlobalEgressIP controller")
@@ -332,7 +334,7 @@ func (c *globalEgressIPController) createPodWatcher(key string, namedIPSet ipset
 		return true
 	}
 
-	podWatcher, err := startEgressPodWatcher(key, globalEgressIP.Namespace, namedIPSet, c.watcherConfig, globalEgressIP.Spec.PodSelector)
+	podWatcher, err := startEgressPodWatcher(key, globalEgressIP.Namespace, namedIPSet, &c.watcherConfig, globalEgressIP.Spec.PodSelector)
 	if err != nil {
 		klog.Errorf("Error starting pod watcher for %q: %v", key, err)
 		return false
@@ -360,7 +362,7 @@ func (c *globalEgressIPController) flushGlobalEgressRulesAndReleaseIPs(key, ipSe
 }
 
 func (c *globalEgressIPController) newNamedIPSet(key string) ipset.Named {
-	return ipset.NewNamed(ipset.IPSet{
+	return ipset.NewNamed(&ipset.IPSet{
 		Name:    c.getIPSetName(key),
 		SetType: ipset.HashIP,
 	}, c.ipSetIface)
