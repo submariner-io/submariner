@@ -165,7 +165,7 @@ func (t *gatewayMonitorTestDriver) start() {
 		ClusterID:  clusterID,
 		Namespace:  namespace,
 		GlobalCIDR: []string{localCIDR},
-	}, localSubnets, watcher.Config{
+	}, localSubnets, &watcher.Config{
 		RestMapper: t.restMapper,
 		Client:     t.dynClient,
 		Scheme:     t.scheme,

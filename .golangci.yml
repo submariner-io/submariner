@@ -6,6 +6,8 @@ linters-settings:
       - opinionated
       # - performance
       - style
+    enabled-checks:
+      - hugeParam
     disabled-checks:
       - ifElseChain
       - unnamedResult

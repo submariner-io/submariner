@@ -44,7 +44,9 @@ import (
 	"k8s.io/klog"
 )
 
-func NewGatewayMonitor(spec Specification, localCIDRs []string, config watcher.Config) (Interface, error) {
+func NewGatewayMonitor(spec Specification, localCIDRs []string, config *watcher.Config) (Interface, error) {
+	// We'll panic if config is nil, this is intentional
+
 	gatewayMonitor := &gatewayMonitor{
 		baseController: newBaseController(),
 		spec:           spec,
@@ -89,7 +91,7 @@ func NewGatewayMonitor(spec Specification, localCIDRs []string, config watcher.C
 		},
 	}
 
-	gatewayMonitor.endpointWatcher, err = watcher.New(&config)
+	gatewayMonitor.endpointWatcher, err = watcher.New(config)
 	if err != nil {
 		return nil, err
 	}
@@ -252,21 +254,21 @@ func (g *gatewayMonitor) startControllers() error {
 
 	g.controllers = nil
 
-	c, err := NewNodeController(*g.syncerConfig, pool, g.nodeName)
+	c, err := NewNodeController(g.syncerConfig, pool, g.nodeName)
 	if err != nil {
 		return errors.WithMessage(err, "error creating the Node controller")
 	}
 
 	g.controllers = append(g.controllers, c)
 
-	c, err = NewClusterGlobalEgressIPController(*g.syncerConfig, g.localSubnets, pool)
+	c, err = NewClusterGlobalEgressIPController(g.syncerConfig, g.localSubnets, pool)
 	if err != nil {
 		return errors.WithMessage(err, "error creating the ClusterGlobalEgressIP controller")
 	}
 
 	g.controllers = append(g.controllers, c)
 
-	c, err = NewGlobalEgressIPController(*g.syncerConfig, pool)
+	c, err = NewGlobalEgressIPController(g.syncerConfig, pool)
 	if err != nil {
 		return errors.WithMessage(err, "error creating the GlobalEgressIP controller")
 	}
@@ -275,26 +277,26 @@ func (g *gatewayMonitor) startControllers() error {
 
 	// The GlobalIngressIP controller needs to be started before the ServiceExport and Service controllers to ensure
 	// reconciliation works properly.
-	c, err = NewGlobalIngressIPController(*g.syncerConfig, pool)
+	c, err = NewGlobalIngressIPController(g.syncerConfig, pool)
 	if err != nil {
 		return errors.WithMessage(err, "error creating the GlobalIngressIP controller")
 	}
 
 	g.controllers = append(g.controllers, c)
 
-	podControllers, err := NewIngressPodControllers(*g.syncerConfig)
+	podControllers, err := NewIngressPodControllers(g.syncerConfig)
 	if err != nil {
 		return errors.WithMessage(err, "error creating the IngressPodControllers")
 	}
 
-	c, err = NewServiceExportController(*g.syncerConfig, podControllers)
+	c, err = NewServiceExportController(g.syncerConfig, podControllers)
 	if err != nil {
 		return errors.WithMessage(err, "error creating the ServiceExport controller")
 	}
 
 	g.controllers = append(g.controllers, c)
 
-	c, err = NewServiceController(*g.syncerConfig, podControllers)
+	c, err = NewServiceController(g.syncerConfig, podControllers)
 	if err != nil {
 		return errors.WithMessage(err, "error creating the Service controller")
 	}

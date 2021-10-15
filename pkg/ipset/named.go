@@ -34,10 +34,11 @@ type namedType struct {
 	set   IPSet
 }
 
-func NewNamed(set IPSet, iface Interface) Named {
+func NewNamed(set *IPSet, iface Interface) Named {
+	// We'll panic if set is nil, this is intentional
 	return &namedType{
 		iface: iface,
-		set:   set,
+		set:   *set,
 	}
 }
 

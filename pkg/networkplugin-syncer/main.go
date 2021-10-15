@@ -64,7 +64,7 @@ func main() {
 	}
 
 	registry := event.NewRegistry("networkplugin-syncer", networkPlugin)
-	if err := registry.AddHandlers(logger.NewHandler(), ovn.NewSyncHandler(getK8sClient(), env)); err != nil {
+	if err := registry.AddHandlers(logger.NewHandler(), ovn.NewSyncHandler(getK8sClient(), &env)); err != nil {
 		klog.Fatalf("Error registering the handlers: %s", err.Error())
 	}
 

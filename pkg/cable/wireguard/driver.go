@@ -83,12 +83,13 @@ type wireguard struct {
 }
 
 // NewDriver creates a new WireGuard driver
-func NewDriver(localEndpoint types.SubmarinerEndpoint, localCluster types.SubmarinerCluster) (cable.Driver, error) {
+func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.SubmarinerCluster) (cable.Driver, error) {
+	// We'll panic if localEndpoint or localCluster are nil, this is intentional
 	var err error
 
 	w := wireguard{
 		connections:   make(map[string]*v1.Connection),
-		localEndpoint: localEndpoint,
+		localEndpoint: *localEndpoint,
 		spec:          new(specification),
 	}
 
@@ -206,6 +207,7 @@ func (w *wireguard) GetName() string {
 }
 
 func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
+	// We'll panic if endpointInfo is nil, this is intentional
 	remoteEndpoint := &endpointInfo.Endpoint
 	ip := endpointInfo.UseIP
 
@@ -317,7 +319,8 @@ func keyFromSpec(ep *v1.EndpointSpec) (*wgtypes.Key, error) {
 	return &key, nil
 }
 
-func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoint) error {
+func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint) error {
+	// We'll panic if remoteEndpoint is nil, this is intentional
 	klog.V(log.DEBUG).Infof("Removing endpoint %v+", remoteEndpoint)
 
 	if w.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {

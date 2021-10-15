@@ -46,14 +46,14 @@ type Driver interface {
 	ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error)
 
 	// DisconnectFromEndpoint disconnects from the connection to the given endpoint.
-	DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) error
+	DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint) error
 
 	// GetName returns driver's name
 	GetName() string
 }
 
 // Function prototype to create a new driver
-type DriverCreateFunc func(localEndpoint types.SubmarinerEndpoint, localCluster types.SubmarinerCluster) (Driver, error)
+type DriverCreateFunc func(localEndpoint *types.SubmarinerEndpoint, localCluster *types.SubmarinerCluster) (Driver, error)
 
 // Static map of supported drivers
 var drivers = map[string]DriverCreateFunc{}
@@ -71,7 +71,8 @@ func AddDriver(name string, driverCreate DriverCreateFunc) {
 }
 
 // Returns a new driver according the required Backend
-func NewDriver(localEndpoint types.SubmarinerEndpoint, localCluster types.SubmarinerCluster) (Driver, error) {
+func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.SubmarinerCluster) (Driver, error) {
+	// We'll panic if localEndpoint or localCluster are nil, this is intentional
 	driverCreate, ok := drivers[localEndpoint.Spec.Backend]
 	if !ok {
 		var driverList strings.Builder

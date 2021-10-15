@@ -72,10 +72,12 @@ type engine struct {
 }
 
 // NewEngine creates a new Engine for the local cluster
-func NewEngine(localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) Engine {
+func NewEngine(localCluster *types.SubmarinerCluster, localEndpoint *types.SubmarinerEndpoint) Engine {
+	// We'll panic if localCluster or localEndpoint are nil, this is intentional
+
 	return &engine{
-		localCluster:        localCluster,
-		localEndpoint:       localEndpoint,
+		localCluster:        *localCluster,
+		localEndpoint:       *localEndpoint,
 		natDiscoveryPending: map[string]int{},
 		installedCables:     map[string]metav1.Time{},
 	}
@@ -101,7 +103,7 @@ func (i *engine) StartEngine() error {
 func (i *engine) startDriver() error {
 	var err error
 
-	if i.driver, err = cable.NewDriver(i.localEndpoint, i.localCluster); err != nil {
+	if i.driver, err = cable.NewDriver(&i.localEndpoint, &i.localCluster); err != nil {
 		return err
 	}
 
@@ -181,7 +183,7 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 
 		klog.V(log.DEBUG).Infof("Disconnecting pre-existing cable %q", active.Endpoint.CableName)
 
-		err = i.driver.DisconnectFromEndpoint(types.SubmarinerEndpoint{Spec: active.Endpoint})
+		err = i.driver.DisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: active.Endpoint})
 		if err != nil {
 			return err
 		}
@@ -240,7 +242,7 @@ func (i *engine) RemoveCable(endpoint *v1.Endpoint) error {
 		return nil
 	}
 
-	err := i.driver.DisconnectFromEndpoint(types.SubmarinerEndpoint{Spec: endpoint.Spec})
+	err := i.driver.DisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: endpoint.Spec})
 	if err != nil {
 		return err
 	}

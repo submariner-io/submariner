@@ -128,14 +128,14 @@ func main() {
 
 	submSpec.CableDriver = strings.ToLower(submSpec.CableDriver)
 
-	localEndpoint, err := endpoint.GetLocal(submSpec, k8sClient)
+	localEndpoint, err := endpoint.GetLocal(&submSpec, k8sClient)
 
 	if err != nil {
 		klog.Fatalf("Error creating local endpoint object from %#v: %v", submSpec, err)
 	}
 
 	cableEngine := cableengine.NewEngine(localCluster, localEndpoint)
-	natDiscovery, err := natdiscovery.New(&localEndpoint)
+	natDiscovery, err := natdiscovery.New(localEndpoint)
 	if err != nil {
 		klog.Fatalf("Error creating the NAT discovery handler %s", err)
 	}
@@ -188,7 +188,7 @@ func main() {
 	becameLeader := func(context.Context) {
 		klog.Info("Creating the datastore syncer")
 
-		dsSyncer := datastoresyncer.New(broker.SyncerConfig{
+		dsSyncer := datastoresyncer.New(&broker.SyncerConfig{
 			LocalRestConfig: cfg,
 			LocalNamespace:  submSpec.Namespace,
 		}, localCluster, localEndpoint, submSpec.ColorCodes)
@@ -271,8 +271,8 @@ func main() {
 	}
 }
 
-func submarinerClusterFrom(submSpec *types.SubmarinerSpecification) types.SubmarinerCluster {
-	return types.SubmarinerCluster{
+func submarinerClusterFrom(submSpec *types.SubmarinerSpecification) *types.SubmarinerCluster {
+	return &types.SubmarinerCluster{
 		ID: submSpec.ClusterID,
 		Spec: subv1.ClusterSpec{
 			ClusterID:   submSpec.ClusterID,

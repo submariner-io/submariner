@@ -37,7 +37,7 @@ import (
 const testNodeName = "this-node"
 
 var _ = Describe("GetLocal", func() {
-	var submSpec types.SubmarinerSpecification
+	var submSpec *types.SubmarinerSpecification
 	var client kubernetes.Interface
 	var testPrivateIP = util.GetLocalIP()
 	var node *v1.Node
@@ -53,7 +53,7 @@ var _ = Describe("GetLocal", func() {
 	subnets := []string{"127.0.0.1/16"}
 
 	BeforeEach(func() {
-		submSpec = types.SubmarinerSpecification{
+		submSpec = &types.SubmarinerSpecification{
 			ClusterID:   "east",
 			ClusterCidr: subnets,
 			CableDriver: "backend",

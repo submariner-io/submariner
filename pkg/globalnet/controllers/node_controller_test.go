@@ -194,7 +194,7 @@ func newNodeControllerTestDriver() *nodeControllerTestDriver {
 func (t *nodeControllerTestDriver) start() {
 	var err error
 
-	t.controller, err = controllers.NewNodeController(syncer.ResourceSyncerConfig{
+	t.controller, err = controllers.NewNodeController(&syncer.ResourceSyncerConfig{
 		SourceClient: t.dynClient,
 		RestMapper:   t.restMapper,
 		Scheme:       t.scheme,

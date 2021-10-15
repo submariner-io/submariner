@@ -50,14 +50,16 @@ type Handler struct {
 	ipt                   iptables.Interface
 }
 
-func NewHandler(env environment.Specification, smClientSet clientset.Interface) *Handler {
+func NewHandler(env *environment.Specification, smClientSet clientset.Interface) *Handler {
+	// We'll panic if env is nil, this is intentional
+
 	ipt, err := iptables.New()
 	if err != nil {
 		klog.Fatalf("Error initializing iptables in OVN routeagent handler: %s", err)
 	}
 
 	return &Handler{
-		config:          &env,
+		config:          env,
 		smClient:        smClientSet,
 		remoteEndpoints: map[string]*submV1.Endpoint{},
 		netlink:         netlink.New(),

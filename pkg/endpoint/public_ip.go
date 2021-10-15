@@ -48,7 +48,7 @@ var publicIPMethods = map[string]publicIPResolverFunction{
 
 var IPv4RE = regexp.MustCompile(`(?:\d{1,3}\.){3}\d{1,3}`)
 
-func getPublicIP(submSpec types.SubmarinerSpecification, k8sClient kubernetes.Interface, backendConfig map[string]string) (string, error) {
+func getPublicIP(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface, backendConfig map[string]string) (string, error) {
 	config, ok := backendConfig[v1.PublicIP]
 	if !ok {
 		if submSpec.PublicIP != "" {

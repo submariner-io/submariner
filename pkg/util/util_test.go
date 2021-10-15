@@ -164,13 +164,13 @@ func testCompareEndpointSpec() {
 	Context("with equal input", func() {
 		It("should return true", func() {
 			Expect(util.CompareEndpointSpec(
-				subv1.EndpointSpec{
+				&subv1.EndpointSpec{
 					ClusterID: "east",
 					CableName: "submariner-cable-east-172-16-32-5",
 					Hostname:  "my-host",
 					Backend:   "libreswan",
 				},
-				subv1.EndpointSpec{
+				&subv1.EndpointSpec{
 					ClusterID: "east",
 					CableName: "submariner-cable-east-172-16-32-5",
 					Hostname:  "my-host",
@@ -182,14 +182,14 @@ func testCompareEndpointSpec() {
 	Context("with equal input (include backend map)", func() {
 		It("should return true", func() {
 			Expect(util.CompareEndpointSpec(
-				subv1.EndpointSpec{
+				&subv1.EndpointSpec{
 					ClusterID:     "east",
 					CableName:     "submariner-cable-east-172-16-32-5",
 					Hostname:      "my-host",
 					Backend:       "libreswan",
 					BackendConfig: map[string]string{"key": "aaa"},
 				},
-				subv1.EndpointSpec{
+				&subv1.EndpointSpec{
 					ClusterID:     "east",
 					CableName:     "submariner-cable-east-172-16-32-5",
 					Hostname:      "my-host",
@@ -200,14 +200,14 @@ func testCompareEndpointSpec() {
 
 		It("should return true", func() {
 			Expect(util.CompareEndpointSpec(
-				subv1.EndpointSpec{
+				&subv1.EndpointSpec{
 					ClusterID:     "east",
 					CableName:     "submariner-cable-east-172-16-32-5",
 					Hostname:      "my-host",
 					Backend:       "libreswan",
 					BackendConfig: map[string]string{},
 				},
-				subv1.EndpointSpec{
+				&subv1.EndpointSpec{
 					ClusterID: "east",
 					CableName: "submariner-cable-east-172-16-32-5",
 					Hostname:  "my-host",
@@ -219,13 +219,13 @@ func testCompareEndpointSpec() {
 	Context("with different cluster IDs", func() {
 		It("should return false", func() {
 			Expect(util.CompareEndpointSpec(
-				subv1.EndpointSpec{
+				&subv1.EndpointSpec{
 					ClusterID: "east",
 					CableName: "submariner-cable-east-172-16-32-5",
 					Hostname:  "my-host",
 					Backend:   "libreswan",
 				},
-				subv1.EndpointSpec{
+				&subv1.EndpointSpec{
 					ClusterID: "west",
 					CableName: "submariner-cable-east-172-16-32-5",
 					Hostname:  "my-host",
@@ -237,13 +237,13 @@ func testCompareEndpointSpec() {
 	Context("with different cable names", func() {
 		It("should return false", func() {
 			Expect(util.CompareEndpointSpec(
-				subv1.EndpointSpec{
+				&subv1.EndpointSpec{
 					ClusterID: "east",
 					CableName: "submariner-cable-east-1-2-3-4",
 					Hostname:  "my-host",
 					Backend:   "libreswan",
 				},
-				subv1.EndpointSpec{
+				&subv1.EndpointSpec{
 					ClusterID: "east",
 					CableName: "submariner-cable-east-5-6-7-8",
 					Hostname:  "my-host",
@@ -255,13 +255,13 @@ func testCompareEndpointSpec() {
 	Context("with different host names", func() {
 		It("should return false", func() {
 			Expect(util.CompareEndpointSpec(
-				subv1.EndpointSpec{
+				&subv1.EndpointSpec{
 					ClusterID: "east",
 					CableName: "submariner-cable-east-172-16-32-5",
 					Hostname:  "host1",
 					Backend:   "libreswan",
 				},
-				subv1.EndpointSpec{
+				&subv1.EndpointSpec{
 					ClusterID: "east",
 					CableName: "submariner-cable-east-172-16-32-5",
 					Hostname:  "host2",
@@ -273,13 +273,13 @@ func testCompareEndpointSpec() {
 	Context("with different backend names", func() {
 		It("should return false", func() {
 			Expect(util.CompareEndpointSpec(
-				subv1.EndpointSpec{
+				&subv1.EndpointSpec{
 					ClusterID: "east",
 					CableName: "submariner-cable-east-172-16-32-5",
 					Hostname:  "host1",
 					Backend:   "libreswan",
 				},
-				subv1.EndpointSpec{
+				&subv1.EndpointSpec{
 					ClusterID: "east",
 					CableName: "submariner-cable-east-172-16-32-5",
 					Hostname:  "host1",
@@ -291,14 +291,14 @@ func testCompareEndpointSpec() {
 	Context("with different backend parameters", func() {
 		It("should return false", func() {
 			Expect(util.CompareEndpointSpec(
-				subv1.EndpointSpec{
+				&subv1.EndpointSpec{
 					ClusterID:     "east",
 					CableName:     "submariner-cable-east-172-16-32-5",
 					Hostname:      "host1",
 					Backend:       "libreswan",
 					BackendConfig: map[string]string{"key": "aaa"},
 				},
-				subv1.EndpointSpec{
+				&subv1.EndpointSpec{
 					ClusterID:     "east",
 					CableName:     "submariner-cable-east-172-16-32-5",
 					Hostname:      "host1",

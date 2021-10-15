@@ -85,6 +85,7 @@ func (d *Driver) GetConnections() ([]v1.Connection, error) {
 }
 
 func (d *Driver) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
+	// We'll panic if endpointInfo is nil, this is intentional
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
@@ -102,7 +103,8 @@ func (d *Driver) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (
 	return endpointInfo.UseIP, nil
 }
 
-func (d *Driver) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) error {
+func (d *Driver) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint) error {
+	// We'll panic if endpoint is nil, this is intentional
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
@@ -114,7 +116,7 @@ func (d *Driver) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) error
 
 	delete(d.activeConnections, endpoint.Spec.CableName)
 
-	d.disconnectFromEndpoint <- &endpoint
+	d.disconnectFromEndpoint <- endpoint
 
 	return nil
 }
