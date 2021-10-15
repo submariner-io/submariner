@@ -20,7 +20,6 @@ package cni
 
 import (
 	"context"
-	"fmt"
 	"net"
 
 	"github.com/pkg/errors"
@@ -89,13 +88,13 @@ func discover(clusterCIDR string) (*Interface, error) {
 func AnnotateNodeWithCNIInterfaceIP(nodeName string, clientSet kubernetes.Interface, clusterCidr []string) error {
 	cniIface, err := Discover(clusterCidr[0])
 	if err != nil {
-		return fmt.Errorf("Discover returned error %w", err)
+		return errors.Wrap(err, "Discover returned error")
 	}
 
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		node, err := clientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
-			return errors.Wrapf(err, "unable to get node info for node %v", nodeName)
+			return errors.Wrapf(err, "unable to get node info for node %q", nodeName)
 		}
 
 		annotations := node.GetAnnotations()
@@ -109,7 +108,7 @@ func AnnotateNodeWithCNIInterfaceIP(nodeName string, clientSet kubernetes.Interf
 	})
 
 	if retryErr != nil {
-		return errors.Wrapf(err, "error updatating node %q", nodeName)
+		return errors.Wrapf(retryErr, "error updatating node %q", nodeName)
 	}
 
 	klog.Infof("Successfully annotated node %q with cniIfaceIP %q", nodeName, cniIface.IPAddress)
