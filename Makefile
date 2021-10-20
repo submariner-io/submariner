@@ -1,5 +1,5 @@
 restart ?= all
-BASE_BRANCH ?= devel
+BASE_BRANCH ?= release-0.11
 PROTOC_VERSION=3.17.3
 export BASE_BRANCH
 

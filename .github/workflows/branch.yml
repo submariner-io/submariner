@@ -6,9 +6,9 @@ on:
 
 jobs:
   target_devel:
-    name: PR targets devel
+    name: PR targets release-0.11
     runs-on: ubuntu-latest
     steps:
-      - name: Check that the PR targets devel
-        if: ${{ github.base_ref != 'devel' }}
+      - name: Check that the PR targets release-0.11
+        if: ${{ github.base_ref != 'release-0.11' }}
         run: exit 1
