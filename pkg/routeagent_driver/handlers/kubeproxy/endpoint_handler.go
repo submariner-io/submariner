@@ -19,9 +19,9 @@ limitations under the License.
 package kubeproxy
 
 import (
-	"fmt"
 	"net"
 
+	"github.com/pkg/errors"
 	"k8s.io/klog"
 
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -40,8 +40,8 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 		if kp.vxlanDevice != nil && kp.vxlanDevice.activeEndpointHostname != endpoint.Spec.Hostname {
 			err := kp.vxlanDevice.deleteVxLanIface()
 			if err != nil {
-				return fmt.Errorf("failed to delete the the vxlan interface that points to old endpoint %s : %v",
-					kp.vxlanDevice.activeEndpointHostname, err)
+				return errors.Wrapf(err, "failed to delete the the vxlan interface that points to old endpoint %s",
+					kp.vxlanDevice.activeEndpointHostname)
 			}
 
 			kp.vxlanDevice = nil
@@ -51,7 +51,7 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 		localClusterGwNodeIP := net.ParseIP(endpoint.Spec.PrivateIP)
 		remoteVtepIP, err := getVxlanVtepIPAddress(localClusterGwNodeIP.String())
 		if err != nil {
-			return fmt.Errorf("failed to derive the remoteVtepIP %v", err)
+			return errors.Wrap(err, "failed to derive the remoteVtepIP")
 		}
 
 		klog.Infof("Creating the vxlan interface %s with gateway node IP %s", VxLANIface, localClusterGwNodeIP)
@@ -63,7 +63,7 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 		kp.vxlanGwIP = &remoteVtepIP
 		err = kp.reconcileRoutes(remoteVtepIP)
 		if err != nil {
-			return fmt.Errorf("error while reconciling routes %v", err)
+			return errors.Wrap(err, "error while reconciling routes")
 		}
 	}
 
@@ -85,7 +85,7 @@ func (kp *SyncHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 		kp.vxlanDevice = nil
 		kp.vxlanGwIP = nil
 		if err != nil {
-			return fmt.Errorf("failed to delete the the vxlan interface on Endpoint removal: %v", err)
+			return errors.Wrap(err, "failed to delete the the vxlan interface on Endpoint removal")
 		}
 	}
 

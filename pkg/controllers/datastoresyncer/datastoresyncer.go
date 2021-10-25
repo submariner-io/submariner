@@ -19,15 +19,15 @@ limitations under the License.
 package datastoresyncer
 
 import (
-	"fmt"
 	"os"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
 	resourceSyncer "github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	k8sv1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -96,20 +96,20 @@ func (d *DatastoreSyncer) Start(stopCh <-chan struct{}) error {
 	d.localFederator = syncer.GetLocalFederator()
 
 	if err := d.ensureExclusiveEndpoint(syncer); err != nil {
-		return fmt.Errorf("could not ensure exclusive submariner Endpoint: %v", err)
+		return errors.WithMessage(err, "could not ensure exclusive submariner Endpoint")
 	}
 
 	if err := d.createLocalCluster(); err != nil {
-		return fmt.Errorf("error creating the local submariner Cluster: %v", err)
+		return errors.WithMessage(err, "error creating the local submariner Cluster")
 	}
 
 	if err := d.createOrUpdateLocalEndpoint(); err != nil {
-		return fmt.Errorf("error creating the local submariner Endpoint: %v", err)
+		return errors.WithMessage(err, "error creating the local submariner Endpoint")
 	}
 
 	if len(d.localCluster.Spec.GlobalCIDR) > 0 {
 		if err := d.startNodeWatcher(stopCh); err != nil {
-			return fmt.Errorf("startNodeWatcher returned error: %v", err)
+			return errors.WithMessage(err, "startNodeWatcher returned error")
 		}
 	}
 
@@ -143,7 +143,7 @@ func (d *DatastoreSyncer) ensureExclusiveEndpoint(syncer *broker.Syncer) error {
 
 	endpoints, err := syncer.ListLocalResources(&submarinerv1.Endpoint{})
 	if err != nil {
-		return fmt.Errorf("error retrieving submariner Endpoints: %v", err)
+		return errors.Wrap(err, "error retrieving submariner Endpoints")
 	}
 
 	for i := range endpoints {
@@ -163,8 +163,8 @@ func (d *DatastoreSyncer) ensureExclusiveEndpoint(syncer *broker.Syncer) error {
 		}
 
 		err = syncer.GetLocalFederator().Delete(endpoint)
-		if err != nil && !errors.IsNotFound(err) {
-			return fmt.Errorf("error deleting submariner Endpoint %q from the local datastore: %v", endpointName, err)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return errors.Wrapf(err, "error deleting submariner Endpoint %q from the local datastore", endpointName)
 		}
 
 		klog.Infof("Successfully deleted existing submariner Endpoint %q", endpointName)
@@ -206,7 +206,7 @@ func (d *DatastoreSyncer) createNodeWatcher(stopCh <-chan struct{}) error {
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("error creating resource watcher for Nodes %v", err)
+		return errors.Wrap(err, "error creating resource watcher for Nodes")
 	}
 
 	err = resourceWatcher.Start(stopCh)
@@ -235,7 +235,7 @@ func (d *DatastoreSyncer) createOrUpdateLocalEndpoint() error {
 
 	endpointName, err := util.GetEndpointCRDName(&d.localEndpoint)
 	if err != nil {
-		return fmt.Errorf("error extracting the submariner Endpoint name from %#v: %v", d.localEndpoint, err)
+		return errors.Wrapf(err, "error extracting the submariner Endpoint name from %#v", d.localEndpoint)
 	}
 
 	endpoint := &submarinerv1.Endpoint{

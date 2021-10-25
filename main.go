@@ -20,6 +20,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -29,6 +30,7 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	extErrors "github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
@@ -290,7 +292,7 @@ func startHTTPServer() *http.Server {
 	http.Handle("/metrics", promhttp.Handler())
 
 	go func() {
-		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			klog.Errorf("Error starting metrics server: %v", err)
 		}
 	}()
@@ -304,7 +306,7 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder res
 
 	err := envconfig.Process(leadershipConfigEnvPrefix, &gwLeadershipConfig)
 	if err != nil {
-		return fmt.Errorf("error processing environment config for %s: %v", leadershipConfigEnvPrefix, err)
+		return extErrors.Wrapf(err, "error processing environment config for %s", leadershipConfigEnvPrefix)
 	}
 
 	// Use default values when GatewayLeadership environment variables are not configured
@@ -324,7 +326,7 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder res
 
 	id, err := os.Hostname()
 	if err != nil {
-		return fmt.Errorf("error getting hostname: %v", err)
+		return extErrors.Wrap(err, "error getting hostname")
 	}
 
 	kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(

@@ -111,11 +111,11 @@ func (gs *GatewaySyncer) syncGatewayStatusSafe() {
 		klog.V(log.TRACE).Infof("Gateway does not exist - creating: %+v", gatewayObj)
 		_, err = gs.client.Create(context.TODO(), gatewayObj, metav1.CreateOptions{})
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("error creating Gateway object %+v: %s", gatewayObj, err))
+			utilruntime.HandleError(fmt.Errorf("error creating Gateway object %+v: %w", gatewayObj, err))
 			return
 		}
 	} else if err != nil {
-		utilruntime.HandleError(fmt.Errorf("error getting existing Gateway: %s", err))
+		utilruntime.HandleError(fmt.Errorf("error getting existing Gateway: %w", err))
 		return
 	} else if !reflect.DeepEqual(gatewayObj.Status, existingGw.Status) {
 		klog.V(log.TRACE).Infof("Gateway already exists - updating %+v", gatewayObj)
@@ -124,7 +124,7 @@ func (gs *GatewaySyncer) syncGatewayStatusSafe() {
 
 		_, err := gs.client.Update(context.TODO(), existingGw, metav1.UpdateOptions{})
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("error updating Gateway object %+v: %s", gatewayObj, err))
+			utilruntime.HandleError(fmt.Errorf("error updating Gateway object %+v: %w", gatewayObj, err))
 			return
 		}
 	} else {
@@ -134,7 +134,7 @@ func (gs *GatewaySyncer) syncGatewayStatusSafe() {
 	if gatewayObj.Status.HAStatus == v1.HAStatusActive {
 		err := gs.cleanupStaleGatewayEntries(gatewayObj.Name)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("error cleaning up stale gateway entries: %s", err))
+			utilruntime.HandleError(fmt.Errorf("error cleaning up stale gateway entries: %w", err))
 		}
 	}
 }
@@ -154,14 +154,14 @@ func (gs *GatewaySyncer) cleanupStaleGatewayEntries(localGatewayName string) err
 		stale, err := isGatewayStale(gw)
 		if err != nil {
 			// In this case we don't want to stop the cleanup loop and just log it
-			utilruntime.HandleError(fmt.Errorf("error processing stale Gateway %+v: %s", gw, err))
+			utilruntime.HandleError(fmt.Errorf("error processing stale Gateway %+v: %w", gw, err))
 		}
 
 		if stale {
 			err := gs.client.Delete(context.TODO(), gw.Name, metav1.DeleteOptions{})
 			if err != nil {
 				// In this case we don't want to stop the cleanup loop and just log it
-				utilruntime.HandleError(fmt.Errorf("error deleting stale Gateway %+v: %s", gw, err))
+				utilruntime.HandleError(fmt.Errorf("error deleting stale Gateway %+v: %w", gw, err))
 			} else {
 				klog.Warningf("Deleted stale gateway: %s, didn't report for %s",
 					gw.Name, GatewayStaleTimeout)
@@ -180,7 +180,7 @@ func isGatewayStale(gateway *v1.Gateway) (bool, error) {
 
 	timestampInt, err := strconv.ParseInt(timestamp, 10, 64)
 	if err != nil {
-		return true, fmt.Errorf("error parsing update-timestamp: %s", err)
+		return true, fmt.Errorf("error parsing update-timestamp: %w", err)
 	}
 
 	now := time.Now().UTC().Unix()

@@ -148,7 +148,7 @@ func (nd *natDiscovery) AddEndpoint(endpoint *v1.Endpoint) {
 
 	// support nat discovery disabled or a remote cluster endpoint which still hasn't implemented this protocol
 	if _, err := extractNATDiscoveryPort(&endpoint.Spec); err != nil || nd.serverPort == 0 {
-		if err != errorNoNATDiscoveryPort {
+		if !errors.Is(err, errorNoNATDiscoveryPort) {
 			klog.Errorf("Error extracting NATT discovery port from endpoint %q: %v", endpoint.Spec.CableName, err)
 		}
 

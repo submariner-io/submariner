@@ -169,7 +169,7 @@ func (c *globalEgressIPController) programGlobalEgressRules(key string, allocate
 	namedIPSet ipset.Named) error {
 	err := namedIPSet.Create(true)
 	if err != nil {
-		return fmt.Errorf("error creating the IP set chain %q: %v", namedIPSet.Name(), err)
+		return errors.Wrapf(err, "error creating the IP set chain %q", namedIPSet.Name())
 	}
 
 	snatIP := getTargetSNATIPaddress(allocatedIPs)

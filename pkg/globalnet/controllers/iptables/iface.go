@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/iptables"
@@ -72,7 +73,7 @@ func (i *ipTables) AddClusterEgressRules(subnet, snatIP, globalNetIPTableMark st
 	klog.V(log.DEBUG).Infof("Installing iptable egress rules for Cluster: %s", strings.Join(ruleSpec, " "))
 
 	if err := i.ipt.AppendUnique("nat", constants.SmGlobalnetEgressChainForCluster, ruleSpec...); err != nil {
-		return fmt.Errorf("error appending iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
+		return errors.Wrapf(err, "error appending iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
@@ -83,7 +84,7 @@ func (i *ipTables) RemoveClusterEgressRules(subnet, snatIP, globalNetIPTableMark
 	klog.V(log.DEBUG).Infof("Deleting iptable egress rules for Cluster: %s", strings.Join(ruleSpec, " "))
 
 	if err := i.ipt.Delete("nat", constants.SmGlobalnetEgressChainForCluster, ruleSpec...); err != nil {
-		return fmt.Errorf("error deleting iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
+		return errors.Wrapf(err, "error deleting iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
@@ -114,7 +115,7 @@ func (i *ipTables) AddIngressRulesForService(globalIP, chainName string) error {
 	klog.V(log.DEBUG).Infof("Installing iptables rule for Service %s", strings.Join(ruleSpec, " "))
 
 	if err := i.ipt.AppendUnique("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
-		return fmt.Errorf("error appending iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
+		return errors.Wrapf(err, "error appending iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
@@ -130,7 +131,7 @@ func (i *ipTables) RemoveIngressRulesForService(globalIP, chainName string) erro
 	klog.V(log.DEBUG).Infof("Deleting iptable ingress rule for Service: %s", strings.Join(ruleSpec, " "))
 
 	if err := i.ipt.Delete("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
-		return fmt.Errorf("error deleting iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
+		return errors.Wrapf(err, "error deleting iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
@@ -145,7 +146,7 @@ func (i *ipTables) AddIngressRulesForHeadlessSvcPod(globalIP, podIP string) erro
 	klog.V(log.DEBUG).Infof("Installing iptables rule for Headless SVC Pod %s", strings.Join(ruleSpec, " "))
 
 	if err := i.ipt.AppendUnique("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
-		return fmt.Errorf("error appending iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
+		return errors.Wrapf(err, "error appending iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
@@ -161,7 +162,7 @@ func (i *ipTables) RemoveIngressRulesForHeadlessSvcPod(globalIP, podIP string) e
 	klog.V(log.DEBUG).Infof("Deleting iptables rule for Headless SVC Pod %s", strings.Join(ruleSpec, " "))
 
 	if err := i.ipt.Delete("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
-		return fmt.Errorf("error deleting iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
+		return errors.Wrapf(err, "error deleting iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
@@ -205,7 +206,7 @@ func (i *ipTables) AddIngressRulesForHealthCheck(cniIfaceIP, globalIP string) er
 	klog.V(log.DEBUG).Infof("Installing iptable ingress rules for Node: %s", strings.Join(ruleSpec, " "))
 
 	if err := i.ipt.AppendUnique("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
-		return fmt.Errorf("error appending iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
+		return errors.Wrapf(err, "error appending iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
@@ -216,7 +217,7 @@ func (i *ipTables) RemoveIngressRulesForHealthCheck(cniIfaceIP, globalIP string)
 	klog.V(log.DEBUG).Infof("Deleting iptable ingress rules for Node: %s", strings.Join(ruleSpec, " "))
 
 	if err := i.ipt.Delete("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
-		return fmt.Errorf("error deleting iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
+		return errors.Wrapf(err, "error deleting iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
@@ -227,7 +228,7 @@ func (i *ipTables) AddEgressRulesForHeadlessSVCPods(key, sourceIP, snatIP, globa
 	klog.V(log.DEBUG).Infof("Installing iptable egress rules for HDLS SVC Pod %q: %s", key, strings.Join(ruleSpec, " "))
 
 	if err := i.ipt.AppendUnique("nat", constants.SmGlobalnetEgressChainForHeadlessSvcPods, ruleSpec...); err != nil {
-		return fmt.Errorf("error appending iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
+		return errors.Wrapf(err, "error appending iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
@@ -238,7 +239,7 @@ func (i *ipTables) RemoveEgressRulesForHeadlessSVCPods(key, sourceIP, snatIP, gl
 	klog.V(log.DEBUG).Infof("Deleting iptable egress rules for HDLS SVC Pod %q: %s", key, strings.Join(ruleSpec, " "))
 
 	if err := i.ipt.Delete("nat", constants.SmGlobalnetEgressChainForHeadlessSvcPods, ruleSpec...); err != nil {
-		return fmt.Errorf("error deleting iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
+		return errors.Wrapf(err, "error deleting iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
@@ -250,7 +251,7 @@ func (i *ipTables) AddEgressRulesForPods(key, ipSetName, snatIP, globalNetIPTabl
 	klog.V(log.DEBUG).Infof("Installing iptable egress rules for Pods %q: %s", key, strings.Join(ruleSpec, " "))
 
 	if err := i.ipt.AppendUnique("nat", constants.SmGlobalnetEgressChainForPods, ruleSpec...); err != nil {
-		return fmt.Errorf("error appending iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
+		return errors.Wrapf(err, "error appending iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
@@ -262,7 +263,7 @@ func (i *ipTables) RemoveEgressRulesForPods(key, ipSetName, snatIP, globalNetIPT
 	klog.V(log.DEBUG).Infof("Deleting iptable egress rules for Pods %q: %s", key, strings.Join(ruleSpec, " "))
 
 	if err := i.ipt.Delete("nat", constants.SmGlobalnetEgressChainForPods, ruleSpec...); err != nil {
-		return fmt.Errorf("error deleting iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
+		return errors.Wrapf(err, "error deleting iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
@@ -274,7 +275,7 @@ func (i *ipTables) AddEgressRulesForNamespace(namespace, ipSetName, snatIP, glob
 	klog.V(log.DEBUG).Infof("Installing iptable egress rules for Namespace %q: %s", namespace, strings.Join(ruleSpec, " "))
 
 	if err := i.ipt.AppendUnique("nat", constants.SmGlobalnetEgressChainForNamespace, ruleSpec...); err != nil {
-		return fmt.Errorf("error appending iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
+		return errors.Wrapf(err, "error appending iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
@@ -286,7 +287,7 @@ func (i *ipTables) RemoveEgressRulesForNamespace(namespace, ipSetName, snatIP, g
 	klog.V(log.DEBUG).Infof("Deleting iptable egress rules for Namespace %q: %s", namespace, strings.Join(ruleSpec, " "))
 
 	if err := i.ipt.Delete("nat", constants.SmGlobalnetEgressChainForNamespace, ruleSpec...); err != nil {
-		return fmt.Errorf("error deleting iptables rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
+		return errors.Wrapf(err, "error deleting iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil

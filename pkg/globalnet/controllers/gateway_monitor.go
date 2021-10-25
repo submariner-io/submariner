@@ -19,7 +19,6 @@ limitations under the License.
 package controllers
 
 import (
-	"fmt"
 	"os"
 	"strings"
 
@@ -69,7 +68,7 @@ func NewGatewayMonitor(spec Specification, localCIDRs []string, config *watcher.
 
 	if config.Client == nil {
 		if config.Client, err = dynamic.NewForConfig(config.RestConfig); err != nil {
-			return nil, fmt.Errorf("error creating dynamic client: %v", err)
+			return nil, errors.Wrap(err, "error creating dynamic client")
 		}
 	}
 
@@ -123,7 +122,7 @@ func (g *gatewayMonitor) Start() error {
 	}
 
 	if err := g.createGlobalNetMarkingChain(); err != nil {
-		return fmt.Errorf("error while calling createGlobalNetMarkingChain: %v", err)
+		return errors.Wrap(err, "error while calling createGlobalNetMarkingChain")
 	}
 
 	return nil
@@ -328,7 +327,7 @@ func (g *gatewayMonitor) createGlobalNetMarkingChain() error {
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetMarkChain)
 
 	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", constants.SmGlobalnetMarkChain); err != nil {
-		return fmt.Errorf("error creating iptables chain %s: %v", constants.SmGlobalnetMarkChain, err)
+		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetMarkChain)
 	}
 
 	return nil
@@ -338,7 +337,7 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetIngressChain)
 
 	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", constants.SmGlobalnetIngressChain); err != nil {
-		return fmt.Errorf("error creating iptables chain %s: %v", constants.SmGlobalnetIngressChain, err)
+		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetIngressChain)
 	}
 
 	forwardToSubGlobalNetChain := []string{"-j", constants.SmGlobalnetIngressChain}
@@ -349,13 +348,13 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChain)
 
 	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", constants.SmGlobalnetEgressChain); err != nil {
-		return fmt.Errorf("error creating iptables chain %s: %v", constants.SmGlobalnetEgressChain, err)
+		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChain)
 	}
 
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", routeAgent.SmPostRoutingChain)
 
 	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", routeAgent.SmPostRoutingChain); err != nil {
-		return fmt.Errorf("error creating iptables chain %s: %v", routeAgent.SmPostRoutingChain, err)
+		return errors.Wrapf(err, "error creating iptables chain %s", routeAgent.SmPostRoutingChain)
 	}
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetEgressChain}
@@ -375,25 +374,25 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForPods)
 
 	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", constants.SmGlobalnetEgressChainForPods); err != nil {
-		return fmt.Errorf("error creating iptables chain %s: %v", constants.SmGlobalnetEgressChainForPods, err)
+		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChainForPods)
 	}
 
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForHeadlessSvcPods)
 
 	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", constants.SmGlobalnetEgressChainForHeadlessSvcPods); err != nil {
-		return fmt.Errorf("error creating iptables chain %s: %v", constants.SmGlobalnetEgressChainForHeadlessSvcPods, err)
+		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChainForHeadlessSvcPods)
 	}
 
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForNamespace)
 
 	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", constants.SmGlobalnetEgressChainForNamespace); err != nil {
-		return fmt.Errorf("error creating iptables chain %s: %v", constants.SmGlobalnetEgressChainForNamespace, err)
+		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChainForNamespace)
 	}
 
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForCluster)
 
 	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", constants.SmGlobalnetEgressChainForCluster); err != nil {
-		return fmt.Errorf("error creating iptables chain %s: %v", constants.SmGlobalnetEgressChainForCluster, err)
+		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChainForCluster)
 	}
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetEgressChainForPods}

@@ -75,7 +75,7 @@ type Config struct {
 func New(config *Config) (*Controller, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
-		return nil, fmt.Errorf("unable to read hostname: %v", err)
+		return nil, errors.Wrapf(err, "unable to read hostname")
 	}
 
 	ctl := Controller{
@@ -91,14 +91,14 @@ func New(config *Config) (*Controller, error) {
 
 	err = subv1.AddToScheme(scheme.Scheme)
 	if err != nil {
-		return nil, fmt.Errorf("error adding submariner types to the scheme: %v", err)
+		return nil, errors.Wrap(err, "error adding submariner types to the scheme")
 	}
 
 	var cfg *restclient.Config
 	if config.Client == nil {
 		cfg, err = clientcmd.BuildConfigFromFlags(config.MasterURL, config.MasterURL)
 		if err != nil {
-			return nil, fmt.Errorf("error building config from flags %v", err.Error())
+			return nil, errors.Wrap(err, "error building config from flags")
 		}
 	}
 
@@ -131,7 +131,7 @@ func New(config *Config) (*Controller, error) {
 	})
 
 	if err != nil {
-		return nil, errors.Wrapf(err, "Error creating resource watcher")
+		return nil, errors.Wrap(err, "error creating resource watcher")
 	}
 
 	return &ctl, nil

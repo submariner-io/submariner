@@ -50,7 +50,7 @@ func GetLocal(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Inte
 
 	hostname, err := os.Hostname()
 	if err != nil {
-		return nil, fmt.Errorf("error getting hostname: %v", err)
+		return nil, errors.Wrap(err, "error getting hostname")
 	}
 
 	var localSubnets []string
@@ -89,7 +89,7 @@ func GetLocal(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Inte
 
 	publicIP, err := getPublicIP(submSpec, k8sClient, backendConfig)
 	if err != nil {
-		return nil, fmt.Errorf("could not determine public IP: %v", err)
+		return nil, errors.Wrap(err, "could not determine public IP")
 	}
 
 	endpoint.Spec.PublicIP = publicIP
@@ -101,7 +101,7 @@ func GetLocal(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Inte
 		// the HealthCheck between the clusters.
 		endpoint.Spec.HealthCheckIP, err = getCNIInterfaceIPAddress(submSpec.ClusterCidr)
 		if err != nil {
-			return nil, fmt.Errorf("error getting CNI Interface IP address: %v."+
+			return nil, fmt.Errorf("error getting CNI Interface IP address: %w."+
 				"Please disable the health check if your CNI does not expose a pod IP on the nodes", err)
 		}
 	}
@@ -200,18 +200,18 @@ func getCNIInterfaceIPAddress(clusterCIDRs []string) (string, error) {
 	for _, clusterCIDR := range clusterCIDRs {
 		_, clusterNetwork, err := net.ParseCIDR(clusterCIDR)
 		if err != nil {
-			return "", fmt.Errorf("unable to ParseCIDR %q : %v", clusterCIDR, err)
+			return "", errors.Wrapf(err, "unable to ParseCIDR %q", clusterCIDR)
 		}
 
 		hostInterfaces, err := net.Interfaces()
 		if err != nil {
-			return "", fmt.Errorf("net.Interfaces() returned error : %v", err)
+			return "", errors.Wrap(err, "net.Interfaces() returned error")
 		}
 
 		for _, iface := range hostInterfaces {
 			addrs, err := iface.Addrs()
 			if err != nil {
-				return "", fmt.Errorf("for interface %q, iface.Addrs returned error: %v", iface.Name, err)
+				return "", errors.Wrapf(err, "for interface %q, iface.Addrs returned error", iface.Name)
 			}
 
 			for i := range addrs {
@@ -233,5 +233,5 @@ func getCNIInterfaceIPAddress(clusterCIDRs []string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("unable to find CNI Interface on the host which has IP from %q", clusterCIDRs)
+	return "", errors.Errorf("unable to find CNI Interface on the host which has IP from %q", clusterCIDRs)
 }

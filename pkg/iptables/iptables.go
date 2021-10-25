@@ -19,7 +19,6 @@ limitations under the License.
 package iptables
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/coreos/go-iptables/iptables"
@@ -63,7 +62,8 @@ func New() (Interface, error) {
 func (i *iptablesWrapper) Delete(table, chain string, rulespec ...string) error {
 	err := i.IPTables.Delete(table, chain, rulespec...)
 
-	iptError, ok := err.(*iptables.Error)
+	var iptError *iptables.Error
+	ok := errors.As(err, &iptError)
 	if ok && iptError.IsNotExist() {
 		return nil
 	}
@@ -104,7 +104,7 @@ func PrependUnique(ipt Interface, table, chain string, ruleSpec []string) error 
 func InsertUnique(ipt Interface, table, chain string, position int, ruleSpec []string) error {
 	rules, err := ipt.List(table, chain)
 	if err != nil {
-		return fmt.Errorf("error listing the rules in %s chain: %v", chain, err)
+		return errors.Wrapf(err, "error listing the rules in %s chain", chain)
 	}
 
 	isPresentAtRequiredPosition := false
@@ -125,7 +125,7 @@ func InsertUnique(ipt Interface, table, chain string, position int, ruleSpec []s
 	if numOccurrences > 1 || !isPresentAtRequiredPosition {
 		for i := 0; i < numOccurrences; i++ {
 			if err = ipt.Delete(table, chain, ruleSpec...); err != nil {
-				return fmt.Errorf("error deleting stale iptable rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
+				return errors.Wrapf(err, "error deleting stale iptable rule \"%s\"", strings.Join(ruleSpec, " "))
 			}
 		}
 	}
