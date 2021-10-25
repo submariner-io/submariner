@@ -26,6 +26,7 @@ import (
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 )
 
+//nolint:dupl // Some line blocks are very similar but not exactly duplicated, either way not worth refactoring.
 var _ = Describe("remoteEndpointNAT", func() {
 
 	var rnat *remoteEndpointNAT
