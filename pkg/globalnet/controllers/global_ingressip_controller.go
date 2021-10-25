@@ -132,6 +132,7 @@ func (c *globalIngressIPController) process(from runtime.Object, numRequeues int
 		return checkStatusChanged(&prevStatus, &ingressIP.Status, ingressIP), requeue
 	case syncer.Delete:
 		return nil, c.onDelete(ingressIP, numRequeues)
+	case syncer.Update:
 	}
 
 	return nil, false

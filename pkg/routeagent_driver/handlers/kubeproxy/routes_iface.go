@@ -78,6 +78,7 @@ func (kp *SyncHandler) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks [
 							inputCidrBlock, err)
 					}
 				}
+			case Flush:
 			}
 		}
 	}
@@ -137,6 +138,7 @@ func (kp *SyncHandler) configureRoute(remoteSubnet string, operation Operation, 
 		if err != nil {
 			return errors.Wrapf(err, "error deleting the route %s", route)
 		}
+	case Flush:
 	}
 
 	return nil
@@ -306,6 +308,7 @@ func (kp *SyncHandler) configureIPRule(operation Operation) error {
 			if err != nil && !os.IsNotExist(err) {
 				return errors.Wrapf(err, "failed to delete ip rule %s", rule)
 			}
+		case Flush:
 		}
 	}
 

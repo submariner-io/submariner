@@ -26,6 +26,7 @@ linters:
     - dupl
     - errcheck
     - errorlint
+    - exhaustive
     - exportloopref
     # - funlen
     # - gochecknoglobals
