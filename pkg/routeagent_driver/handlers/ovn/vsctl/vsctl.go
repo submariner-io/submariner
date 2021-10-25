@@ -24,6 +24,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"k8s.io/klog"
 )
@@ -73,7 +74,7 @@ func AddOVNBridgeMapping(netName, bridgeName string) error {
 	stdout, err := vsctlCmd("--if-exists", "get", "Open_vSwitch", ".",
 		"external_ids:ovn-bridge-mappings")
 	if err != nil {
-		return fmt.Errorf("failed to get ovn-bridge-mappings: %s", err)
+		return errors.Wrap(err, "failed to get ovn-bridge-mappings")
 	}
 
 	// cleanup the ovs-vsctl output, and remove quotes
@@ -92,7 +93,7 @@ func AddOVNBridgeMapping(netName, bridgeName string) error {
 
 	if _, err = vsctlCmd("set", "Open_vSwitch", ".",
 		fmt.Sprintf("external_ids:ovn-bridge-mappings=%s", bridgeMappings)); err != nil {
-		return fmt.Errorf("failed to set ovn-bridge-mappings: %s", err)
+		return errors.Wrap(err, "failed to set ovn-bridge-mappings")
 	}
 
 	return nil

@@ -83,12 +83,12 @@ func NewLibreswan(localEndpoint *types.SubmarinerEndpoint, localCluster *types.S
 
 	err := envconfig.Process(ipsecSpecEnvVarPrefix, &ipSecSpec)
 	if err != nil {
-		return nil, fmt.Errorf("error processing environment config for %s: %v", ipsecSpecEnvVarPrefix, err)
+		return nil, errors.Wrapf(err, "error processing environment config for %s", ipsecSpecEnvVarPrefix)
 	}
 
 	defaultNATTPort, err := strconv.ParseUint(ipSecSpec.NATTPort, 10, 16)
 	if err != nil {
-		return nil, errors.Errorf("error parsing CR_IPSEC_NATTPORT environment variable")
+		return nil, errors.Wrap(err, "error parsing CR_IPSEC_NATTPORT environment variable")
 	}
 
 	nattPort, err := localEndpoint.Spec.GetBackendPort(subv1.UDPPortConfig, int32(defaultNATTPort))
@@ -122,7 +122,7 @@ func (i *libreswan) Init() error {
 	// TODO Check whether the file already exists
 	file, err := os.Create("/etc/ipsec.d/submariner.secrets")
 	if err != nil {
-		return fmt.Errorf("error creating the secrets file: %v", err)
+		return errors.Wrap(err, "error creating the secrets file")
 	}
 	defer file.Close()
 
@@ -130,7 +130,7 @@ func (i *libreswan) Init() error {
 
 	// Ensure Pluto is started
 	if err := i.runPluto(); err != nil {
-		return fmt.Errorf("error starting Pluto: %v", err)
+		return errors.Wrap(err, "error starting Pluto")
 	}
 
 	return nil
@@ -280,7 +280,7 @@ func whack(args ...string) error {
 	}
 
 	if err != nil {
-		return fmt.Errorf("error whacking with args %v: %v", args, err)
+		return errors.Wrapf(err, "error whacking with args %v", args)
 	}
 
 	return nil
@@ -303,7 +303,7 @@ func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 
 	// Ensure we’re listening
 	if err := whack("--listen"); err != nil {
-		return "", fmt.Errorf("error listening: %v", err)
+		return "", errors.Wrap(err, "error listening")
 	}
 
 	connectionMode := i.calculateOperationMode(&endpoint.Spec)
@@ -496,11 +496,11 @@ func (i *libreswan) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint) e
 				cmd.Stderr = os.Stderr
 
 				if err := cmd.Run(); err != nil {
-					switch err := err.(type) {
-					case *exec.ExitError:
-						klog.Errorf("error deleting a connection with args %v; got exit code %d: %v", args, err.ExitCode(), err)
-					default:
-						return fmt.Errorf("error deleting a connection with args %v: %v", args, err)
+					var exitError *exec.ExitError
+					if errors.As(err, &exitError) {
+						klog.Errorf("error deleting a connection with args %v; got exit code %d: %v", args, exitError.ExitCode(), err)
+					} else {
+						return errors.Wrapf(err, "error deleting a connection with args %v", args)
 					}
 				}
 			}
@@ -542,7 +542,7 @@ func (i *libreswan) runPluto() error {
 	if i.logFile != "" {
 		out, err := os.OpenFile(i.logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o666)
 		if err != nil {
-			return fmt.Errorf("failed to open log file %s: %v", i.logFile, err)
+			return errors.Wrapf(err, "failed to open log file %s", i.logFile)
 		}
 
 		cmd.Stdout = out
@@ -557,7 +557,7 @@ func (i *libreswan) runPluto() error {
 	if err := cmd.Start(); err != nil {
 		// Note - Close handles nil receiver
 		outputFile.Close()
-		return fmt.Errorf("error starting the Pluto process with args %v: %v", args, err)
+		return errors.Wrapf(err, "error starting the Pluto process with args %v", args)
 	}
 
 	go func() {

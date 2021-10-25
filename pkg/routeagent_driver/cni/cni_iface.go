@@ -85,19 +85,19 @@ func discover(clusterCIDR string) (*Interface, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("unable to find CNI Interface on the host which has IP from %q", clusterCIDR)
+	return nil, errors.Errorf("unable to find CNI Interface on the host which has IP from %q", clusterCIDR)
 }
 
 func AnnotateNodeWithCNIInterfaceIP(nodeName string, clientSet kubernetes.Interface, clusterCidr []string) error {
 	cniIface, err := Discover(clusterCidr[0])
 	if err != nil {
-		return fmt.Errorf("DiscoverCNIInterface returned error %v", err)
+		return fmt.Errorf("Discover returned error %w", err)
 	}
 
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		node, err := clientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
-			return fmt.Errorf("unable to get node info for node %v, err: %s", nodeName, err)
+			return errors.Wrapf(err, "unable to get node info for node %v", nodeName)
 		}
 
 		annotations := node.GetAnnotations()
@@ -111,7 +111,7 @@ func AnnotateNodeWithCNIInterfaceIP(nodeName string, clientSet kubernetes.Interf
 	})
 
 	if retryErr != nil {
-		return fmt.Errorf("error updatating node %q, err: %s", nodeName, retryErr)
+		return errors.Wrapf(err, "error updatating node %q", nodeName)
 	}
 
 	klog.Infof("Successfully annotated node %q with cniIfaceIP %q", nodeName, cniIface.IPAddress)

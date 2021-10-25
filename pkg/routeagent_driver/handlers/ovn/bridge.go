@@ -81,7 +81,7 @@ func (ovn *Handler) configureSubmarinerInterface() error {
 		Mask: ipNet.Mask,
 	}}
 
-	if err := ovn.netlink.AddrAdd(ovnLink, ipConfig); err != nil && err != syscall.EEXIST {
+	if err := ovn.netlink.AddrAdd(ovnLink, ipConfig); err != nil && !errors.Is(err, syscall.EEXIST) {
 		return errors.Wrapf(err, "unable to configure address %q on Submariner interface %q", ipAddress, ovnK8sSubmarinerInterface)
 	}
 

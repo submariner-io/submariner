@@ -19,9 +19,9 @@ limitations under the License.
 package cabledriver
 
 import (
-	"fmt"
 	"syscall"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/cable/vxlan"
 	"github.com/submariner-io/submariner/pkg/event"
@@ -71,7 +71,7 @@ func (h *vxlanCleanup) TransitionToNonGateway() error {
 
 	err = netlink.LinkDel(link)
 	if err != nil {
-		return fmt.Errorf("failed to delete the the vxlan interface: %v", err)
+		return errors.Wrapf(err, "failed to delete the the vxlan interface")
 	}
 
 	return nil

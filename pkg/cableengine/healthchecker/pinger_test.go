@@ -19,6 +19,7 @@ limitations under the License.
 package healthchecker
 
 import (
+	"errors"
 	"net"
 	"os"
 	"syscall"
@@ -58,9 +59,12 @@ var _ = Describe("Pinger", func() {
 			return p.Run()
 		}()
 
-		if opErr, ok := err.(*net.OpError); ok {
-			if sysCallErr, ok := opErr.Unwrap().(*os.SyscallError); ok {
-				if errNo, ok := sysCallErr.Unwrap().(syscall.Errno); ok {
+		var opErr *net.OpError
+		if errors.As(err, &opErr) {
+			var sysCallErr *os.SyscallError
+			if errors.As(err, &sysCallErr) {
+				var errNo syscall.Errno
+				if errors.As(err, &errNo) {
 					// errNo 1 is "operation not permitted".
 					return !(opErr.Op == "listen" && sysCallErr.Syscall == "socket" && errNo == 1)
 				}

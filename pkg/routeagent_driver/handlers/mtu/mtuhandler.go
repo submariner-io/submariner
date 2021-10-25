@@ -19,9 +19,9 @@ limitations under the License.
 package mtu
 
 import (
-	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/submariner/pkg/ipset"
 	"k8s.io/klog"
 
@@ -56,22 +56,22 @@ func (h *mtuHandler) Init() error {
 	h.ipt, err = iptables.New()
 	ipSetIface := ipset.New(utilexec.New())
 	if err != nil {
-		return fmt.Errorf("error initializing iptables: %v", err)
+		return errors.Wrap(err, "error initializing iptables")
 	}
 
 	if err := iptables.CreateChainIfNotExists(h.ipt, constants.MangleTable, constants.SmPostRoutingChain); err != nil {
-		return fmt.Errorf("error creating iptables chain %s: %v", constants.SmPostRoutingChain, err)
+		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmPostRoutingChain)
 	}
 
 	forwardToSubMarinerPostRoutingChain := []string{"-j", constants.SmPostRoutingChain}
 	h.remoteIPSet = h.newNamedIPSet(constants.RemoteCIDRIPSet, ipSetIface)
 	if err := h.remoteIPSet.Create(true); err != nil {
-		return fmt.Errorf("error creating ipset %q: %v", constants.RemoteCIDRIPSet, err)
+		return errors.Wrapf(err, "error creating ipset %q", constants.RemoteCIDRIPSet)
 	}
 
 	h.localIPSet = h.newNamedIPSet(constants.LocalCIDRIPSet, ipSetIface)
 	if err := h.localIPSet.Create(true); err != nil {
-		return fmt.Errorf("error creating ipset %q: %v", constants.LocalCIDRIPSet, err)
+		return errors.Wrapf(err, "error creating ipset %q", constants.LocalCIDRIPSet)
 	}
 
 	ruleSpecSource := []string{"-m", "set", "--match-set", constants.LocalCIDRIPSet, "src", "-m", "set", "--match-set",
@@ -83,16 +83,16 @@ func (h *mtuHandler) Init() error {
 
 	if err := iptables.PrependUnique(h.ipt, constants.MangleTable, constants.PostRoutingChain,
 		forwardToSubMarinerPostRoutingChain); err != nil {
-		return fmt.Errorf("error inserting iptables rule %q: %v",
-			strings.Join(forwardToSubMarinerPostRoutingChain, " "), err)
+		return errors.Wrapf(err, "error inserting iptables rule %q",
+			strings.Join(forwardToSubMarinerPostRoutingChain, " "))
 	}
 
 	if err := h.ipt.AppendUnique(constants.MangleTable, constants.SmPostRoutingChain, ruleSpecSource...); err != nil {
-		return fmt.Errorf("error appending iptables rule \"%s\": %v", strings.Join(ruleSpecSource, " "), err)
+		return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(ruleSpecSource, " "))
 	}
 
 	if err := h.ipt.AppendUnique(constants.MangleTable, constants.SmPostRoutingChain, ruleSpecDest...); err != nil {
-		return fmt.Errorf("error appending iptables rule \"%s\": %v", strings.Join(ruleSpecSource, " "), err)
+		return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(ruleSpecSource, " "))
 	}
 
 	return nil

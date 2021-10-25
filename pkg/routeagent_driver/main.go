@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cabledriver"
 
 	"github.com/kelseyhightower/envconfig"
@@ -134,7 +135,7 @@ func annotateNode(clusterCidr []string, cfg *restclient.Config) error {
 
 	err = cni.AnnotateNodeWithCNIInterfaceIP(nodeName, k8sClientSet, clusterCidr)
 	if err != nil {
-		return fmt.Errorf("AnnotateNodeWithCNIInterfaceIP returned error %v", err)
+		return errors.Wrap(err, "error annotating node with CNI interface IP")
 	}
 
 	return nil

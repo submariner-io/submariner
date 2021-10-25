@@ -352,7 +352,7 @@ func (runner *runner) runWithOutput(args []string, errFormat string, a ...interf
 
 	out, err := runner.exec.Command(IPSetCmd, args...).CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("%s: %v (%s)", fmt.Sprintf(errFormat, a...), err, out)
+		return "", fmt.Errorf("%s: %w (%s)", fmt.Sprintf(errFormat, a...), err, out)
 	}
 
 	return string(out), nil

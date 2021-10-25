@@ -25,6 +25,7 @@ linters:
     - dogsled
     - dupl
     - errcheck
+    - errorlint
     - exportloopref
     # - funlen
     # - gochecknoglobals

@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/pkg/errors"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"k8s.io/klog"
 
@@ -33,7 +34,7 @@ import (
 func (w *wireguard) GetConnections() ([]v1.Connection, error) {
 	d, err := w.client.Device(DefaultDeviceName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find device %s: %v", DefaultDeviceName, err)
+		return nil, errors.Wrapf(err, "failed to find device %s", DefaultDeviceName)
 	}
 
 	connections := make([]v1.Connection, 0)
