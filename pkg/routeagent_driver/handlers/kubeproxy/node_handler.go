@@ -85,6 +85,7 @@ func (kp *SyncHandler) populateRemoteVtepIps(vtepIP string, operation Operation)
 			if err := kp.vxlanDevice.DelFDB(net.ParseIP(vtepIP), "00:00:00:00:00:00"); err != nil {
 				klog.Errorf("Failed to delete FDB entry on the Gateway Node vxlan iface %v", err)
 			}
+		case Flush:
 		}
 	}
 }

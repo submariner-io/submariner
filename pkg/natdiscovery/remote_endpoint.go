@@ -141,9 +141,11 @@ func (rn *remoteEndpointNAT) shouldCheck() bool {
 		return true
 	case waitingForResponse:
 		return time.Since(rn.lastCheck) > toDuration(&recheckTime)
-	default:
-		return false
+	case selectedPublicIP:
+	case selectedPrivateIP:
 	}
+
+	return false
 }
 
 func (rn *remoteEndpointNAT) checkSent() {
@@ -165,10 +167,13 @@ func (rn *remoteEndpointNAT) transitionToPublicIP(remoteEndpointID string, useNA
 		return true
 	case selectedPrivateIP:
 		return false
-	default:
-		klog.Errorf("Received unexpected transition from %v to public IP for endpoint %q", rn.state, remoteEndpointID)
-		return false
+	case testingPrivateAndPublicIPs:
+	case selectedPublicIP:
 	}
+
+	klog.Errorf("Received unexpected transition from %v to public IP for endpoint %q", rn.state, remoteEndpointID)
+
+	return false
 }
 
 func (rn *remoteEndpointNAT) transitionToPrivateIP(remoteEndpointID string, useNAT bool) bool {
@@ -195,10 +200,13 @@ func (rn *remoteEndpointNAT) transitionToPrivateIP(remoteEndpointID string, useN
 		klog.V(log.DEBUG).Infof("updated to private IP %q for endpoint %q", rn.useIP, rn.endpoint.Spec.CableName)
 
 		return true
-	default:
-		klog.Errorf("Received unexpected transition from %v to private IP for endpoint %q", rn.state, remoteEndpointID)
-		return false
+	case testingPrivateAndPublicIPs:
+	case selectedPrivateIP:
 	}
+
+	klog.Errorf("Received unexpected transition from %v to private IP for endpoint %q", rn.state, remoteEndpointID)
+
+	return false
 }
 
 func toDuration(v *int64) time.Duration {
