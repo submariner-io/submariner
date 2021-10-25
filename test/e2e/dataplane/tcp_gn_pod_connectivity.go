@@ -38,6 +38,11 @@ var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across over
 				return
 			}
 
+			if subFramework.IsSingleNodeDeployment(fromClusterScheduling, toClusterScheduling, framework.ClusterA,
+				framework.ClusterB) {
+				return
+			}
+
 			subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
 				Framework:             f,
 				ToEndpointType:        toEndpointType,

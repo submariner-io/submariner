@@ -22,6 +22,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
+	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
 )
 
 var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters without discovery", func() {
@@ -35,6 +36,12 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 				framework.Skipf("Globalnet enabled, skipping the test...")
 				return
 			}
+
+			if subFramework.IsSingleNodeDeployment(fromClusterScheduling, toClusterScheduling, framework.ClusterA,
+				framework.ClusterB) {
+				return
+			}
+
 			tcp.RunConnectivityTest(tcp.ConnectivityTestParams{
 				Framework:             f,
 				ToEndpointType:        toEndpointType,
