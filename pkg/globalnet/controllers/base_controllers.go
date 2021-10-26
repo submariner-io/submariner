@@ -127,7 +127,7 @@ func (c *baseIPAllocationController) reserveAllocatedIPs(federator federate.Fede
 
 		conditions := util.ConditionsFromUnstructured(obj, "status", "conditions")
 
-		conditions = util.TryAppendCondition(conditions, metav1.Condition{
+		conditions = util.TryAppendCondition(conditions, &metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "ReserveAllocatedIPsFailed",

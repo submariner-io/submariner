@@ -147,7 +147,7 @@ func (c *clusterGlobalEgressIPController) process(from runtime.Object, numRequeu
 
 func (c *clusterGlobalEgressIPController) validate(numberOfIPs int, egressIP *submarinerv1.ClusterGlobalEgressIP) bool {
 	if egressIP.Name != constants.ClusterGlobalEgressIPName {
-		egressIP.Status.Conditions = util.TryAppendCondition(egressIP.Status.Conditions, metav1.Condition{
+		egressIP.Status.Conditions = util.TryAppendCondition(egressIP.Status.Conditions, &metav1.Condition{
 			Type:   string(submarinerv1.GlobalEgressIPAllocated),
 			Status: metav1.ConditionFalse,
 			Reason: "InvalidInstance",
@@ -159,7 +159,7 @@ func (c *clusterGlobalEgressIPController) validate(numberOfIPs int, egressIP *su
 	}
 
 	if numberOfIPs < 0 {
-		egressIP.Status.Conditions = util.TryAppendCondition(egressIP.Status.Conditions, metav1.Condition{
+		egressIP.Status.Conditions = util.TryAppendCondition(egressIP.Status.Conditions, &metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "InvalidInput",
@@ -170,7 +170,7 @@ func (c *clusterGlobalEgressIPController) validate(numberOfIPs int, egressIP *su
 	}
 
 	if numberOfIPs == 0 {
-		egressIP.Status.Conditions = util.TryAppendCondition(egressIP.Status.Conditions, metav1.Condition{
+		egressIP.Status.Conditions = util.TryAppendCondition(egressIP.Status.Conditions, &metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "ZeroInput",
@@ -243,7 +243,7 @@ func (c *clusterGlobalEgressIPController) allocateGlobalIPs(key string, numberOf
 	if err != nil {
 		klog.Errorf("Error allocating IPs for %q: %v", key, err)
 
-		status.Conditions = util.TryAppendCondition(status.Conditions, metav1.Condition{
+		status.Conditions = util.TryAppendCondition(status.Conditions, &metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "IPPoolAllocationFailed",
@@ -257,7 +257,7 @@ func (c *clusterGlobalEgressIPController) allocateGlobalIPs(key string, numberOf
 	if err != nil {
 		klog.Errorf("Error programming egress IP table rules for %q: %v", key, err)
 
-		status.Conditions = util.TryAppendCondition(status.Conditions, metav1.Condition{
+		status.Conditions = util.TryAppendCondition(status.Conditions, &metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "ProgramIPTableRulesFailed",
@@ -269,7 +269,7 @@ func (c *clusterGlobalEgressIPController) allocateGlobalIPs(key string, numberOf
 		return true
 	}
 
-	status.Conditions = util.TryAppendCondition(status.Conditions, metav1.Condition{
+	status.Conditions = util.TryAppendCondition(status.Conditions, &metav1.Condition{
 		Type:    string(submarinerv1.GlobalEgressIPAllocated),
 		Status:  metav1.ConditionTrue,
 		Reason:  "Success",

@@ -193,7 +193,7 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 
 	if numberOfIPs == 0 {
 		globalEgressIP.Status.AllocatedIPs = nil
-		globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, metav1.Condition{
+		globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, &metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "ZeroInput",
@@ -213,7 +213,7 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 	if err != nil {
 		klog.Errorf("Error allocating IPs for %q: %v", key, err)
 
-		globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, metav1.Condition{
+		globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, &metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "IPPoolAllocationFailed",
@@ -227,7 +227,7 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 	if err != nil {
 		klog.Errorf("Error programming egress IP table rules for %q: %v", key, err)
 
-		globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, metav1.Condition{
+		globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, &metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "ProgramIPTableRulesFailed",
@@ -239,7 +239,7 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 		return true
 	}
 
-	globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, metav1.Condition{
+	globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, &metav1.Condition{
 		Type:    string(submarinerv1.GlobalEgressIPAllocated),
 		Status:  metav1.ConditionTrue,
 		Reason:  "Success",
@@ -255,7 +255,7 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 
 func (c *globalEgressIPController) validate(numberOfIPs int, egressIP *submarinerv1.GlobalEgressIP) bool {
 	if numberOfIPs < 0 {
-		egressIP.Status.Conditions = util.TryAppendCondition(egressIP.Status.Conditions, metav1.Condition{
+		egressIP.Status.Conditions = util.TryAppendCondition(egressIP.Status.Conditions, &metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "InvalidInput",
@@ -317,7 +317,7 @@ func (c *globalEgressIPController) createPodWatcher(key string, namedIPSet ipset
 		if !equality.Semantic.DeepEqual(prevPodWatcher.podSelector, globalEgressIP.Spec.PodSelector) {
 			klog.Errorf("PodSelector for %q cannot be updated after creation", key)
 
-			globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, metav1.Condition{
+			globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, &metav1.Condition{
 				Type:    string(submarinerv1.GlobalEgressIPUpdated),
 				Status:  metav1.ConditionFalse,
 				Reason:  "PodSelectorUpdateNotSupported",
