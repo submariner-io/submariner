@@ -150,7 +150,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 	if err != nil {
 		klog.Errorf("Error allocating IP for %q: %v", key, err)
 
-		ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, metav1.Condition{
+		ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, &metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "IPPoolAllocationFailed",
@@ -176,7 +176,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 
 			_ = c.pool.Release(ips...)
 
-			ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, metav1.Condition{
+			ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, &metav1.Condition{
 				Type:    string(submarinerv1.GlobalEgressIPAllocated),
 				Status:  metav1.ConditionFalse,
 				Reason:  "ProgramIPTableRulesFailed",
@@ -209,7 +209,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 
 		if err != nil {
 			_ = c.pool.Release(ips...)
-			ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, metav1.Condition{
+			ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, &metav1.Condition{
 				Type:    string(submarinerv1.GlobalEgressIPAllocated),
 				Status:  metav1.ConditionFalse,
 				Reason:  "ProgramIPTableRulesFailed",
@@ -222,7 +222,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 
 	ingressIP.Status.AllocatedIP = ips[0]
 
-	ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, metav1.Condition{
+	ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, &metav1.Condition{
 		Type:    string(submarinerv1.GlobalEgressIPAllocated),
 		Status:  metav1.ConditionTrue,
 		Reason:  "Success",
