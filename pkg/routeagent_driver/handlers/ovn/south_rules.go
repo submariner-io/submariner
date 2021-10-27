@@ -83,9 +83,9 @@ func (ovn *Handler) getExistingIPv4RuleSubnets() (stringset.Interface, error) {
 		return nil, err
 	}
 
-	for _, rule := range rules {
-		if rule.Table == constants.RouteAgentInterClusterNetworkTableID && rule.Src != nil {
-			currentRuleRemotes.Add(rule.Src.String())
+	for i := range rules {
+		if rules[i].Table == constants.RouteAgentInterClusterNetworkTableID && rules[i].Src != nil {
+			currentRuleRemotes.Add(rules[i].Src.String())
 		}
 	}
 

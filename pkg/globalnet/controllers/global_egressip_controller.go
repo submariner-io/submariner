@@ -44,7 +44,6 @@ import (
 
 func NewGlobalEgressIPController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool) (Interface, error) {
 	// We'll panic if config is nil, this is intentional
-
 	var err error
 
 	klog.Info("Creating GlobalEgressIP controller")

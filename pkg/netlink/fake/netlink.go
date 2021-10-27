@@ -154,9 +154,9 @@ func (n *NetLink) FlushRouteTable(table int) error {
 	for index, routes := range n.routes {
 		newRoutes := []netlink.Route{}
 
-		for _, r := range routes {
-			if r.Table != table {
-				newRoutes = append(newRoutes, r)
+		for i := range routes {
+			if routes[i].Table != table {
+				newRoutes = append(newRoutes, routes[i])
 			}
 		}
 
@@ -171,10 +171,10 @@ func (n *NetLink) RouteGet(destination net.IP) ([]netlink.Route, error) {
 	defer n.mutex.Unlock()
 
 	routes := []netlink.Route{}
-	for _, rts := range n.routes {
-		for _, r := range rts {
-			if r.Dst != nil && reflect.DeepEqual(r.Dst.IP, destination) {
-				routes = append(routes, r)
+	for i := range n.routes {
+		for j := range n.routes[i] {
+			if n.routes[i][j].Dst != nil && reflect.DeepEqual(n.routes[i][j].Dst.IP, destination) {
+				routes = append(routes, n.routes[i][j])
 			}
 		}
 	}
@@ -259,9 +259,9 @@ func (n *NetLink) routeDestList(linkIndex int) []net.IPNet {
 		},
 	}, 0)
 
-	for _, r := range routes {
-		if r.Dst != nil {
-			dests = append(dests, *r.Dst)
+	for i := range routes {
+		if routes[i].Dst != nil {
+			dests = append(dests, *routes[i].Dst)
 		}
 	}
 
@@ -293,8 +293,8 @@ func (n *NetLink) neighborIPList(linkIndex int) []net.IP {
 	defer n.mutex.Unlock()
 
 	ips := []net.IP{}
-	for _, neigh := range n.neighbors[linkIndex] {
-		ips = append(ips, neigh.IP)
+	for i := range n.neighbors[linkIndex] {
+		ips = append(ips, n.neighbors[linkIndex][i].IP)
 	}
 
 	return ips

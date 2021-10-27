@@ -39,7 +39,6 @@ import (
 
 func NewNodeController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool, nodeName string) (Interface, error) {
 	// We'll panic if config is nil, this is intentional
-
 	var err error
 
 	klog.Info("Creating Node controller")

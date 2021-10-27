@@ -227,10 +227,10 @@ func (kp *SyncHandler) reconcileRoutes(vxlanGw net.IP) error {
 			Protocol:  4,
 		}
 		found := false
-		for _, curRoute := range currentRouteList {
-			if curRoute.Gw == nil || curRoute.Dst == nil {
+		for i := range currentRouteList {
+			if currentRouteList[i].Gw == nil || currentRouteList[i].Dst == nil {
 
-			} else if curRoute.Gw.Equal(route.Gw) && curRoute.Dst.String() == route.Dst.String() {
+			} else if currentRouteList[i].Gw.Equal(route.Gw) && currentRouteList[i].Dst.String() == route.Dst.String() {
 				klog.V(log.DEBUG).Infof("Found equivalent route, not adding")
 				found = true
 			}

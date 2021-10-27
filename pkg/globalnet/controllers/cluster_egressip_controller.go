@@ -42,7 +42,6 @@ import (
 func NewClusterGlobalEgressIPController(config *syncer.ResourceSyncerConfig, localSubnets []string,
 	pool *ipam.IPPool) (Interface, error) {
 	// We'll panic if config is nil, this is intentional
-
 	var err error
 
 	klog.Info("Creating ClusterGlobalEgressIP controller")
@@ -91,7 +90,6 @@ func NewClusterGlobalEgressIPController(config *syncer.ResourceSyncerConfig, loc
 		err := controller.reserveAllocatedIPs(federator, obj, func(reservedIPs []string) error {
 			return controller.programClusterGlobalEgressRules(reservedIPs)
 		})
-
 		if err != nil {
 			return nil, err
 		}

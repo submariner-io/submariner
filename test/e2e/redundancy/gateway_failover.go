@@ -166,11 +166,11 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 
 	gwPods := f.AwaitPodsByAppLabel(framework.ClusterA, framework.SubmarinerGateway, framework.TestContext.SubmarinerNamespace, 2)
 
-	for _, pod := range gwPods.Items {
-		if pod.Labels[gatewayNodeLabel] == initialGatewayNode.Name {
-			Expect(pod.Labels[gatewayStatusLabel]).To(Equal(gatewayStatusActive))
+	for i := range gwPods.Items {
+		if gwPods.Items[i].Labels[gatewayNodeLabel] == initialGatewayNode.Name {
+			Expect(gwPods.Items[i].Labels[gatewayStatusLabel]).To(Equal(gatewayStatusActive))
 		} else {
-			Expect(pod.Labels[gatewayStatusLabel]).To(Equal(gatewayStatusPassive))
+			Expect(gwPods.Items[i].Labels[gatewayStatusLabel]).To(Equal(gatewayStatusPassive))
 		}
 	}
 

@@ -348,9 +348,9 @@ func (v *vxlan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint)
 
 	var ip string
 
-	for _, connection := range v.connections {
-		if connection.Endpoint.CableName == remoteEndpoint.Spec.CableName {
-			ip = connection.UsingIP
+	for i := range v.connections {
+		if v.connections[i].Endpoint.CableName == remoteEndpoint.Spec.CableName {
+			ip = v.connections[i].UsingIP
 		}
 	}
 

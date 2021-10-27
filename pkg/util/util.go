@@ -160,13 +160,13 @@ func GetDefaultGatewayInterface() (*net.Interface, error) {
 		return nil, err
 	}
 
-	for _, route := range routes {
-		if route.Dst == nil || route.Dst.String() == "0.0.0.0/0" {
-			if route.LinkIndex == 0 {
+	for i := range routes {
+		if routes[i].Dst == nil || routes[i].Dst.String() == "0.0.0.0/0" {
+			if routes[i].LinkIndex == 0 {
 				return nil, fmt.Errorf("default gateway interface could not be determined")
 			}
 
-			iface, err := net.InterfaceByIndex(route.LinkIndex)
+			iface, err := net.InterfaceByIndex(routes[i].LinkIndex)
 			if err != nil {
 				return nil, err
 			}
