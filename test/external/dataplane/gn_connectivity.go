@@ -23,11 +23,52 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	resourceUtil "github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 )
+
+type globalnetTestParams struct {
+	ClusterEgressIPType subFramework.GlobalEgressIPType
+}
+
+/*
+   - Test environment for external network w/ globalnet is as follows:
+
+                  [ext-app]  [gateway-cluster]  [non-gateway-cluster]
+                     |            |       |        |
+    pseudo-ext *-----+------------+--*    |        |
+                                          |        |
+    kind                            *-----+--------+-------*
+
+
+   - For globalnet environment, expected behaviors of connectivity and source IPs are:
+
+       from / to       |    ext-app    |  gateway-cluster  |  non-gateway-cluster  |
+   ------------------- | ------------- | ----------------- | --------------------- |
+   ext-app             |    N/A        |       R(*2)(*4)   |        S(*3)          |
+   gateway-cluster     |    R(*2)(*4)  |       N/A         |        S(*1)          |
+   non-gateway-cluster |    S(*3)      |       S(*1)       |        N/A            |
+
+   Legend: N: Not reachable, R: Reachable (source IP isn't globalIP),
+           S: Source IP is global IP (and reachable)
+
+   (*1) Not covered in this test, but covered in normal connectivity tests.
+   (*2) Pod w/ hostnetwork isn't reachable.
+   (*3) Pod w/ hostnetwork isn't reachable when pod isn't on a gateway node.
+   (*4) Pod isn't reachable, when pod isn't on a gateway node
+
+   Note that the current expected use cases are:
+   (a) From ext-app to non-gateway-cluster
+   (b) From non-gateway-cluster to ext-app
+*/
 
 var _ = Describe("[external-dataplane-globalnet] Connectivity", func() {
 	f := framework.NewFramework("ext-dataplane-gn")
@@ -36,67 +77,204 @@ var _ = Describe("[external-dataplane-globalnet] Connectivity", func() {
 	var networking framework.NetworkingType
 	var cluster framework.ClusterIndex
 	var egressIPType subFramework.GlobalEgressIPType
+	var err error
 
-	verifyInteraction := func(clusterScheduling framework.NetworkPodScheduling, egressIPType subFramework.GlobalEgressIPType) {
-		It("should be able to connect from an external app to a pod in a cluster", func() {
+	verifyInteraction := func(clusterScheduling framework.NetworkPodScheduling) {
+		It("should be able to connect from/to an external app to/from a pod in a cluster", func() {
 			if !framework.TestContext.GlobalnetEnabled {
 				framework.Skipf("Globalnet is not enabled, skipping the test...")
 				return
 			}
 
-			testGlobalNetExternalConnectivity(testParams{
-				Framework:         f,
-				ToEndpointType:    toEndpointType,
-				Networking:        networking,
-				Cluster:           cluster,
-				ClusterScheduling: clusterScheduling,
-			}, egressIPType)
+			testGlobalNetExternalConnectivity(
+				testParams{
+					Framework:         f,
+					ToEndpointType:    toEndpointType,
+					Networking:        networking,
+					Cluster:           cluster,
+					ClusterScheduling: clusterScheduling,
+				},
+				globalnetTestParams{
+					ClusterEgressIPType: egressIPType,
+				})
 		})
 	}
 
-	When("a pod on an external-app-connected cluster connects via TCP to the globalIP of a remote service", func() {
+	When("connected from a gateway-cluster", func() {
 		BeforeEach(func() {
-			toEndpointType = tcp.GlobalServiceIP
-			networking = framework.PodNetworking
-			cluster = getExternalClusterIndex(framework.TestContext.ClusterIDs)
-			egressIPType = subFramework.ClusterSelector
+			cluster, err = getGatewayClusterIndex(framework.TestContext.ClusterIDs)
+			Expect(err).NotTo(HaveOccurred())
 		})
 
-		When("the pod is not on a gateway", func() {
-			// TODO: Confirm that not allowing this use case is OK.
-			It("should be able to connect from an external app to a pod in a cluster", func() {
-				framework.Skipf("Skipping this test for cluster directly connected to external network will be all-in-one cluster")
+		When("a pod connects via TCP to/from the globalIP of a remote service", func() {
+			BeforeEach(func() {
+				toEndpointType = tcp.GlobalServiceIP
+				networking = framework.PodNetworking
+				egressIPType = subFramework.ClusterSelector
+			})
+
+			// Access from a pod on NonGatewayNodes to external apps is not supported for a gateway-cluster (*4)
+			PWhen("the pod is not on a gateway", func() {
+				verifyInteraction(framework.NonGatewayNode)
+			})
+
+			When("the pod is on a gateway", func() {
+				verifyInteraction(framework.GatewayNode)
 			})
 		})
 
-		When("the pod is on a gateway", func() {
-			verifyInteraction(framework.GatewayNode, egressIPType)
+		When("a pod matching an egress IP namespace selector connects via TCP to/from the globalIP of a remote service", func() {
+			BeforeEach(func() {
+				toEndpointType = tcp.GlobalServiceIP
+				networking = framework.PodNetworking
+				egressIPType = subFramework.NameSpaceSelector
+			})
+
+			// Access from a pod on NonGatewayNodes to external apps is not supported for a gateway-cluster (*4)
+			PWhen("the pod is not on a gateway", func() {
+				verifyInteraction(framework.NonGatewayNode)
+			})
+
+			When("the pod is on a gateway", func() {
+				verifyInteraction(framework.GatewayNode)
+			})
+		})
+
+		When("a pod matching an egress IP pod selector connects via TCP to/from the globalIP of a remote service", func() {
+			BeforeEach(func() {
+				toEndpointType = tcp.GlobalServiceIP
+				networking = framework.PodNetworking
+				egressIPType = subFramework.PodSelector
+			})
+
+			// Access from a pod on NonGatewayNodes to external apps is not supported for a gateway-cluster (*4)
+			PWhen("the pod is not on a gateway", func() {
+				verifyInteraction(framework.NonGatewayNode)
+			})
+
+			When("the pod is on a gateway", func() {
+				verifyInteraction(framework.GatewayNode)
+			})
+		})
+
+		// Access from a HostNetworking pod to external apps is not supported (*2)
+		PWhen("a pod with HostNetworking connects via TCP to/from the globalIP of a remote service", func() {
+		})
+
+		When("a pod connects via TCP to the globalIP of a remote headless service", func() {
+			BeforeEach(func() {
+				toEndpointType = tcp.GlobalPodIP
+				networking = framework.PodNetworking
+				egressIPType = subFramework.ClusterSelector
+			})
+
+			// Access from a pod on NonGatewayNodes to external apps is not supported for a gateway-cluster (*4)
+			PWhen("the pod is not on a gateway", func() {
+				verifyInteraction(framework.NonGatewayNode)
+			})
+
+			When("the pod is on a gateway", func() {
+				verifyInteraction(framework.GatewayNode)
+			})
 		})
 	})
 
-	When("a pod on a non-external-app-connected cluster connects via TCP to the globalIP of a remote service", func() {
+	When("connected from a non-gateway-cluster", func() {
 		BeforeEach(func() {
-			toEndpointType = tcp.GlobalServiceIP
-			networking = framework.PodNetworking
-			cluster = getNonExternalClusterIndex(framework.TestContext.ClusterIDs)
-			egressIPType = subFramework.ClusterSelector
+			cluster, err = getNonGatewayClusterIndex(framework.TestContext.ClusterIDs)
+			Expect(err).NotTo(HaveOccurred())
 		})
 
-		When("the pod is not on a gateway", func() {
-			verifyInteraction(framework.NonGatewayNode, egressIPType)
+		When("a pod connects via TCP to/from the globalIP of a remote service", func() {
+			BeforeEach(func() {
+				toEndpointType = tcp.GlobalServiceIP
+				networking = framework.PodNetworking
+				egressIPType = subFramework.ClusterSelector
+			})
+
+			When("the pod is not on a gateway", func() {
+				verifyInteraction(framework.NonGatewayNode)
+			})
+
+			When("the pod is on a gateway", func() {
+				verifyInteraction(framework.GatewayNode)
+			})
 		})
 
-		When("the pod is on a gateway", func() {
-			verifyInteraction(framework.GatewayNode, egressIPType)
+		When("a pod matching an egress IP namespace selector connects via TCP to/from the globalIP of a remote service", func() {
+			BeforeEach(func() {
+				toEndpointType = tcp.GlobalServiceIP
+				networking = framework.PodNetworking
+				egressIPType = subFramework.NameSpaceSelector
+			})
+
+			When("the pod is not on a gateway", func() {
+				verifyInteraction(framework.NonGatewayNode)
+			})
+
+			When("the pod is on a gateway", func() {
+				verifyInteraction(framework.GatewayNode)
+			})
+		})
+
+		When("a pod matching an egress IP pod selector connects via TCP to/from the globalIP of a remote service", func() {
+			BeforeEach(func() {
+				toEndpointType = tcp.GlobalServiceIP
+				networking = framework.PodNetworking
+				egressIPType = subFramework.PodSelector
+			})
+
+			When("the pod is not on a gateway", func() {
+				verifyInteraction(framework.NonGatewayNode)
+			})
+
+			When("the pod is on a gateway", func() {
+				verifyInteraction(framework.GatewayNode)
+			})
+		})
+
+		When("a pod with HostNetworking connects via TCP to/from the globalIP of a remote service", func() {
+			BeforeEach(func() {
+				toEndpointType = tcp.GlobalServiceIP
+				networking = framework.HostNetworking
+				egressIPType = subFramework.ClusterSelector
+			})
+
+			// Access from a pod with HostNetworking fails if a pod is not on NonGateway nodes (*3)
+			// TODO: it needs to be documented?
+			PWhen("the pod is not on a gateway", func() {
+				verifyInteraction(framework.NonGatewayNode)
+			})
+
+			When("the pod is on a gateway", func() {
+				verifyInteraction(framework.GatewayNode)
+			})
+		})
+
+		When("a pod connects via TCP to/from the globalIP of a remote headless service", func() {
+			BeforeEach(func() {
+				toEndpointType = tcp.GlobalPodIP
+				networking = framework.PodNetworking
+				egressIPType = subFramework.ClusterSelector
+			})
+
+			When("the pod is not on a gateway", func() {
+				verifyInteraction(framework.NonGatewayNode)
+			})
+
+			When("the pod is on a gateway", func() {
+				verifyInteraction(framework.GatewayNode)
+			})
 		})
 	})
 })
 
-func testGlobalNetExternalConnectivity(p testParams, egressIPType subFramework.GlobalEgressIPType) {
-	externalClusterName := getExternalClusterName(framework.TestContext.ClusterIDs)
-	extClusterIdx := getExternalClusterIndex(framework.TestContext.ClusterIDs)
+func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
+	gatewayCluster := getGatewayClusterName(framework.TestContext.ClusterIDs)
+	extClusterIdx, err := getGatewayClusterIndex(framework.TestContext.ClusterIDs)
+	Expect(err).NotTo(HaveOccurred())
 
-	By(fmt.Sprintf("Creating a service without selector and endpoints in cluster %q", externalClusterName))
+	By(fmt.Sprintf("Creating a service without selector and endpoints in cluster %q", gatewayCluster))
 	// Get handle for existing docker
 	docker := framework.New(extAppName)
 	dockerIP := docker.GetIP(extNetName)
@@ -127,14 +305,14 @@ func testGlobalNetExternalConnectivity(p testParams, egressIPType subFramework.G
 		ImageName:     testImage,
 		Command:       simpleHTTPServerCommand,
 	})
-	svc := np.CreateService()
+	svc := createSvc(p, np)
 	p.Framework.CreateServiceExport(np.Config.Cluster, svc.Name)
 
 	// Get globalIPs for the network pod to use later
-	remoteIP := p.Framework.AwaitGlobalIngressIP(np.Config.Cluster, svc.Name, svc.Namespace)
+	remoteIP := getGlobalIngressIP(p, svc)
 	Expect(remoteIP).ToNot(Equal(""))
 
-	podGlobalIPs := p.Framework.AwaitClusterGlobalEgressIPs(np.Config.Cluster, constants.ClusterGlobalEgressIPName)
+	podGlobalIPs := getPodGlobalIPs(p, g, np)
 	Expect(podGlobalIPs).ToNot(BeEmpty())
 
 	By(fmt.Sprintf("Sending an http request from external app %q to the service %q in the cluster %q",
@@ -171,16 +349,110 @@ func testGlobalNetExternalConnectivity(p testParams, egressIPType subFramework.G
 
 	cmd := []string{"curl", "-m", "10", fmt.Sprintf("%s:%d/%s%s", extIngressGlobalIP, 80, p.Framework.Namespace, clusterName)}
 	_, _ = np.RunCommand(cmd)
-
-	By(fmt.Sprintf("Verifying that external app received request from one of egressGlobalIPs %v", podGlobalIPs))
-
 	_, dockerLog := docker.GetLog()
 
-	matchRegexp := MatchRegexp("%s .*GET /%s%s .*", podGlobalIPs[0], p.Framework.Namespace, clusterName)
-	for i := 1; i < len(podGlobalIPs); i++ {
-		matchRegexp = Or(matchRegexp, MatchRegexp("%s .*GET /%s%s .*", podGlobalIPs[i], p.Framework.Namespace, clusterName))
+	//nolint // golangci/golangci-lint#1372
+	switch p.ToEndpointType {
+	default:
+		fallthrough
+	case tcp.PodIP, tcp.ServiceIP:
+		framework.Failf("Unsupported ToEndpointType %v was passed", p.ToEndpointType)
+	case tcp.GlobalServiceIP:
+		By(fmt.Sprintf("Verifying that external app received request from one of podGlobalIPs %v", podGlobalIPs))
+		matchRegexp := MatchRegexp("%s .*GET /%s%s .*", podGlobalIPs[0], p.Framework.Namespace, clusterName)
+		for i := 1; i < len(podGlobalIPs); i++ {
+			matchRegexp = Or(matchRegexp, MatchRegexp("%s .*GET /%s%s .*", podGlobalIPs[i], p.Framework.Namespace, clusterName))
+		}
+		Expect(dockerLog).To(matchRegexp)
+	case tcp.GlobalPodIP:
+		// For access from headless service, source IP is the globalIngressIP of the pod, which is set to remoteIP
+		By(fmt.Sprintf("Verifying that external app received request from globalIngressIP of the pod %v", remoteIP))
+		Expect(dockerLog).To(MatchRegexp("%s .*GET /%s%s .*", remoteIP, p.Framework.Namespace, clusterName))
 	}
-	Expect(dockerLog).To(matchRegexp)
 
 	framework.Logf("%s", dockerLog)
+}
+
+func newGlobalEgressIPObj(namespace string, selector *metav1.LabelSelector) (*unstructured.Unstructured, error) {
+	geipName := fmt.Sprintf("test-e2e-egressip-%s", namespace)
+	egressIPSpec := &submarinerv1.GlobalEgressIP{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      geipName,
+			Namespace: namespace,
+		},
+	}
+
+	if selector != nil {
+		egressIPSpec.Spec = submarinerv1.GlobalEgressIPSpec{
+			PodSelector: selector,
+		}
+	}
+
+	unstructuredEgressIPSpec, err := resourceUtil.ToUnstructured(egressIPSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	return unstructuredEgressIPSpec, nil
+}
+
+func createSvc(p testParams, np *framework.NetworkPod) *v1.Service {
+	//nolint // golangci/golangci-lint#1372
+	switch p.ToEndpointType {
+	case tcp.GlobalServiceIP, tcp.PodIP, tcp.ServiceIP:
+		return np.CreateService()
+	case tcp.GlobalPodIP:
+		return p.Framework.CreateHeadlessTCPService(np.Config.Cluster, np.Pod.Labels["test-app"],
+			np.Config.Port)
+	default:
+		framework.Failf("Unsupported ToEndpointType %v was passed", p.ToEndpointType)
+	}
+
+	return nil
+}
+
+func getGlobalIngressIP(p testParams, service *v1.Service) string {
+	//nolint // golangci/golangci-lint#1372
+	switch p.ToEndpointType {
+	default:
+		fallthrough
+	case tcp.PodIP, tcp.ServiceIP:
+		framework.Failf("Unsupported ToEndpointType %v was passed", p.ToEndpointType)
+	case tcp.GlobalServiceIP:
+		return p.Framework.AwaitGlobalIngressIP(p.Cluster, service.Name, service.Namespace)
+	case tcp.GlobalPodIP:
+		podList := p.Framework.AwaitPodsByLabelSelector(p.Cluster, labels.Set(service.Spec.Selector).AsSelector().String(),
+			service.Namespace, 1)
+		ingressIPName := fmt.Sprintf("pod-%s", podList.Items[0].Name)
+
+		return p.Framework.AwaitGlobalIngressIP(p.Cluster, ingressIPName, service.Namespace)
+	}
+
+	return ""
+}
+
+func getPodGlobalIPs(p testParams, g globalnetTestParams, np *framework.NetworkPod) []string {
+	switch g.ClusterEgressIPType {
+	case subFramework.ClusterSelector:
+		return p.Framework.AwaitClusterGlobalEgressIPs(p.Cluster, constants.ClusterGlobalEgressIPName)
+	case subFramework.NameSpaceSelector:
+		geipObject, err := newGlobalEgressIPObj(np.Pod.Namespace, nil)
+		Expect(err).To(Succeed())
+
+		err = framework.CreateGlobalEgressIP(p.Cluster, geipObject)
+		Expect(err).To(Succeed())
+
+		return framework.AwaitGlobalEgressIPs(p.Cluster, geipObject.GetName(), np.Pod.Namespace)
+	case subFramework.PodSelector:
+		podSelector := &metav1.LabelSelector{MatchLabels: map[string]string{"test-app": "custom"}}
+		geipObject, err := newGlobalEgressIPObj(np.Pod.Namespace, podSelector)
+		Expect(err).To(Succeed())
+
+		err = framework.CreateGlobalEgressIP(p.Cluster, geipObject)
+		Expect(err).To(Succeed())
+
+		return framework.AwaitGlobalEgressIPs(p.Cluster, geipObject.GetName(), np.Pod.Namespace)
+	}
+
+	return []string{}
 }
