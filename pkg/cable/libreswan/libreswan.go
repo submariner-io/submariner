@@ -351,23 +351,23 @@ func (i *libreswan) bidirectionalConnectToEndpoint(connectionName string, endpoi
 		args = append(args, "--forceencaps")
 	}
 
-	args = append(args, "--name", connectionName)
+	args = append(args, "--name", connectionName,
 
-	// Left-hand side
-	args = append(args, "--id", localEndpointIdentifier)
-	args = append(args, "--host", i.localEndpoint.Spec.PrivateIP)
-	args = append(args, "--client", leftSubnet)
+		// Left-hand side
+		"--id", localEndpointIdentifier,
+		"--host", i.localEndpoint.Spec.PrivateIP,
+		"--client", leftSubnet,
 
-	args = append(args, "--ikeport", i.ipSecNATTPort)
+		"--ikeport", i.ipSecNATTPort,
 
-	args = append(args, "--to")
+		"--to",
 
-	// Right-hand side
-	args = append(args, "--id", remoteEndpointIdentifier)
-	args = append(args, "--host", endpointInfo.UseIP)
-	args = append(args, "--client", rightSubnet)
+		// Right-hand side
+		"--id", remoteEndpointIdentifier,
+		"--host", endpointInfo.UseIP,
+		"--client", rightSubnet,
 
-	args = append(args, "--ikeport", strconv.Itoa(int(rightNATTPort)))
+		"--ikeport", strconv.Itoa(int(rightNATTPort)))
 
 	klog.Infof("Executing whack with args: %v", args)
 
@@ -398,21 +398,21 @@ func (i *libreswan) serverConnectToEndpoint(connectionName string, endpointInfo 
 		args = append(args, "--forceencaps")
 	}
 
-	args = append(args, "--name", connectionName)
+	args = append(args, "--name", connectionName,
 
-	// Left-hand side
-	args = append(args, "--id", localEndpointIdentifier)
-	args = append(args, "--host", i.localEndpoint.Spec.PrivateIP)
-	args = append(args, "--client", leftSubnet)
+		// Left-hand side
+		"--id", localEndpointIdentifier,
+		"--host", i.localEndpoint.Spec.PrivateIP,
+		"--client", leftSubnet,
 
-	args = append(args, "--ikeport", i.ipSecNATTPort)
+		"--ikeport", i.ipSecNATTPort,
 
-	args = append(args, "--to")
+		"--to",
 
-	// Right-hand side
-	args = append(args, "--id", remoteEndpointIdentifier)
-	args = append(args, "--host", "%any")
-	args = append(args, "--client", rightSubnet)
+		// Right-hand side
+		"--id", remoteEndpointIdentifier,
+		"--host", "%any",
+		"--client", rightSubnet)
 
 	klog.Infof("Executing whack with args: %v", args)
 
@@ -438,21 +438,21 @@ func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo 
 		args = append(args, "--forceencaps")
 	}
 
-	args = append(args, "--name", connectionName)
+	args = append(args, "--name", connectionName,
 
-	// Left-hand side
-	args = append(args, "--id", localEndpointIdentifier)
-	args = append(args, "--host", i.localEndpoint.Spec.PrivateIP)
-	args = append(args, "--client", leftSubnet)
+		// Left-hand side
+		"--id", localEndpointIdentifier,
+		"--host", i.localEndpoint.Spec.PrivateIP,
+		"--client", leftSubnet,
 
-	args = append(args, "--to")
+		"--to",
 
-	// Right-hand side
-	args = append(args, "--id", remoteEndpointIdentifier)
-	args = append(args, "--host", endpointInfo.UseIP)
-	args = append(args, "--client", rightSubnet)
+		// Right-hand side
+		"--id", remoteEndpointIdentifier,
+		"--host", endpointInfo.UseIP,
+		"--client", rightSubnet,
 
-	args = append(args, "--ikeport", strconv.Itoa(int(rightNATTPort)))
+		"--ikeport", strconv.Itoa(int(rightNATTPort)))
 
 	klog.Infof("Executing whack with args: %v", args)
 
@@ -486,8 +486,8 @@ func (i *libreswan) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint) e
 
 				args := []string{}
 
-				args = append(args, "--delete")
-				args = append(args, "--name", connectionName)
+				args = append(args, "--delete",
+					"--name", connectionName)
 
 				klog.Infof("Whacking with %v", args)
 

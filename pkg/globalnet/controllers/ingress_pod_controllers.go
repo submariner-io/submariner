@@ -33,7 +33,6 @@ import (
 
 func NewIngressPodControllers(config *syncer.ResourceSyncerConfig) (*IngressPodControllers, error) {
 	// We'll panic if config is nil, this is intentional
-
 	_, gvr, err := util.ToUnstructuredResource(&submarinerv1.GlobalIngressIP{}, config.RestMapper)
 	if err != nil {
 		return nil, err

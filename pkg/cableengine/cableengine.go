@@ -74,7 +74,6 @@ type engine struct {
 // NewEngine creates a new Engine for the local cluster
 func NewEngine(localCluster *types.SubmarinerCluster, localEndpoint *types.SubmarinerEndpoint) Engine {
 	// We'll panic if localCluster or localEndpoint are nil, this is intentional
-
 	return &engine{
 		localCluster:        *localCluster,
 		localEndpoint:       *localEndpoint,
@@ -148,7 +147,8 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 		return err
 	}
 
-	for _, active := range activeConnections {
+	for j := range activeConnections {
+		active := &activeConnections[j]
 		klog.V(log.TRACE).Infof("Analyzing currently active connection %q", active.Endpoint.CableName)
 
 		if active.Endpoint.ClusterID != endpoint.Spec.ClusterID {

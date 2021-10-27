@@ -431,9 +431,9 @@ func (w *wireguard) peerByKey(key *wgtypes.Key) (*wgtypes.Peer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to find device %s: %v", DefaultDeviceName, err)
 	}
-	for _, p := range d.Peers {
-		if p.PublicKey.String() == key.String() {
-			return &p, nil
+	for i := range d.Peers {
+		if d.Peers[i].PublicKey.String() == key.String() {
+			return &d.Peers[i], nil
 		}
 	}
 

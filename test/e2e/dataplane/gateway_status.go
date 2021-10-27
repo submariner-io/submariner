@@ -74,38 +74,38 @@ func verifyGateway(gw *submarinerv1.Gateway, otherCluster string) (bool, string,
 		return false, "Gateway has no connections", nil
 	}
 
-	for _, conn := range gw.Status.Connections {
-		if conn.Endpoint.ClusterID != otherCluster {
+	for i := range gw.Status.Connections {
+		if gw.Status.Connections[i].Endpoint.ClusterID != otherCluster {
 			continue
 		}
 
-		if conn.Status != submarinerv1.Connected {
+		if gw.Status.Connections[i].Status != submarinerv1.Connected {
 			return false, fmt.Sprintf("Cluster %q is not connected: Status: %q, Message: %q",
-				conn.Endpoint.ClusterID, conn.Status, conn.StatusMessage), nil
+				gw.Status.Connections[i].Endpoint.ClusterID, gw.Status.Connections[i].Status, gw.Status.Connections[i].StatusMessage), nil
 		}
 
-		if gw.Status.LocalEndpoint.HealthCheckIP != "" && conn.Endpoint.HealthCheckIP != "" {
-			if conn.LatencyRTT == nil {
+		if gw.Status.LocalEndpoint.HealthCheckIP != "" && gw.Status.Connections[i].Endpoint.HealthCheckIP != "" {
+			if gw.Status.Connections[i].LatencyRTT == nil {
 				return false, fmt.Sprintf("Connection for cluster %q has no LatencyRTT information", otherCluster), nil
 			}
 
-			if conn.LatencyRTT.Average == "" {
+			if gw.Status.Connections[i].LatencyRTT.Average == "" {
 				return false, fmt.Sprintf("Connection for cluster %q is missing Average RTT data", otherCluster), nil
 			}
 
-			if conn.LatencyRTT.Last == "" {
+			if gw.Status.Connections[i].LatencyRTT.Last == "" {
 				return false, fmt.Sprintf("Connection for cluster %q is missing Last RTT data", otherCluster), nil
 			}
 
-			if conn.LatencyRTT.Min == "" {
+			if gw.Status.Connections[i].LatencyRTT.Min == "" {
 				return false, fmt.Sprintf("Connection for cluster %q is missing Min RTT data", otherCluster), nil
 			}
 
-			if conn.LatencyRTT.Max == "" {
+			if gw.Status.Connections[i].LatencyRTT.Max == "" {
 				return false, fmt.Sprintf("Connection for cluster %q is missing Max RTT data", otherCluster), nil
 			}
 
-			if conn.LatencyRTT.StdDev == "" {
+			if gw.Status.Connections[i].LatencyRTT.StdDev == "" {
 				return false, fmt.Sprintf("Connection for cluster %q is missing StdDev RTT data", otherCluster), nil
 			}
 		}

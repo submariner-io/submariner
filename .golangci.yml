@@ -4,10 +4,8 @@ linters-settings:
     enabled-tags:
       - diagnostic
       - opinionated
-      # - performance
+      - performance
       - style
-    enabled-checks:
-      - hugeParam
     disabled-checks:
       - ifElseChain
       - unnamedResult

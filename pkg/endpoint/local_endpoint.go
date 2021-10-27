@@ -41,7 +41,6 @@ import (
 
 func GetLocal(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface) (*types.SubmarinerEndpoint, error) {
 	// We'll panic if submSpec is nil, this is intentional
-
 	privateIP := util.GetLocalIP()
 
 	gwNode, err := node.GetLocalNode(k8sClient)
@@ -131,7 +130,7 @@ func getBackendConfig(nodeObj *v1.Node) (map[string]string, error) {
 		backendConfig[submv1.NATTDiscoveryPortConfig] = submv1.DefaultNATTDiscoveryPort
 	}
 
-	//TODO: we should allow the cable drivers to capture and expose BackendConfig settings, instead of doing
+	// TODO: we should allow the cable drivers to capture and expose BackendConfig settings, instead of doing
 	//      it here.
 	preferredServerStr := backendConfig[submv1.PreferredServerConfig]
 
@@ -196,7 +195,7 @@ func addConfigFrom(nodeName string, configs, backendConfig map[string]string, wa
 	return nil
 }
 
-//TODO: to handle de-duplication of code/finding common parts with the route agent
+// TODO: to handle de-duplication of code/finding common parts with the route agent
 func getCNIInterfaceIPAddress(clusterCIDRs []string) (string, error) {
 	for _, clusterCIDR := range clusterCIDRs {
 		_, clusterNetwork, err := net.ParseCIDR(clusterCIDR)

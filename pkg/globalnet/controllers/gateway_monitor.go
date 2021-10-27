@@ -46,7 +46,6 @@ import (
 
 func NewGatewayMonitor(spec Specification, localCIDRs []string, config *watcher.Config) (Interface, error) {
 	// We'll panic if config is nil, this is intentional
-
 	gatewayMonitor := &gatewayMonitor{
 		baseController: newBaseController(),
 		spec:           spec,

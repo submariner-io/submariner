@@ -52,7 +52,6 @@ type Handler struct {
 
 func NewHandler(env *environment.Specification, smClientSet clientset.Interface) *Handler {
 	// We'll panic if env is nil, this is intentional
-
 	ipt, err := iptables.New()
 	if err != nil {
 		klog.Fatalf("Error initializing iptables in OVN routeagent handler: %s", err)
@@ -90,7 +89,7 @@ func (ovn *Handler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 
 	// TODO: this logic belongs to the cabledrivers instead
 	if endpoint.Spec.Backend == "wireguard" {
-		//NOTE: This assumes that LocalEndpointCreated happens before than TransitionToGatewayNode
+		// NOTE: This assumes that LocalEndpointCreated happens before than TransitionToGatewayNode
 		if routingInterface, err = net.InterfaceByName(wireguard.DefaultDeviceName); err != nil {
 			return errors.Wrapf(err, "Wireguard interface %s not found on the node.", wireguard.DefaultDeviceName)
 		}

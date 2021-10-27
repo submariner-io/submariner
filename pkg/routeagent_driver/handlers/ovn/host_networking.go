@@ -85,9 +85,9 @@ func (ovn *Handler) getExistingIPv4HostNetworkRoutes() (stringset.Interface, err
 		return nil, err
 	}
 
-	for _, rule := range rules {
-		if rule.Table == constants.RouteAgentHostNetworkTableID && rule.Dst != nil {
-			currentRuleRemotes.Add(rule.Dst.String())
+	for i := range rules {
+		if rules[i].Table == constants.RouteAgentHostNetworkTableID && rules[i].Dst != nil {
+			currentRuleRemotes.Add(rules[i].Dst.String())
 		}
 	}
 
