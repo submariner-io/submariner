@@ -26,11 +26,10 @@ import (
 	"syscall"
 	"unicode"
 
-	"github.com/vishvananda/netlink"
-	"k8s.io/apimachinery/pkg/api/equality"
-
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
+	"github.com/vishvananda/netlink"
+	"k8s.io/apimachinery/pkg/api/equality"
 )
 
 const tokenLength = 64

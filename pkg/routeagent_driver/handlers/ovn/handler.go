@@ -23,18 +23,17 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/submariner-io/submariner/pkg/cidr"
-	"github.com/submariner-io/submariner/pkg/iptables"
-	"k8s.io/klog"
-
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable/wireguard"
+	"github.com/submariner-io/submariner/pkg/cidr"
 	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/event"
+	"github.com/submariner-io/submariner/pkg/iptables"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"github.com/submariner-io/submariner/pkg/util"
+	"k8s.io/klog"
 )
 
 type Handler struct {

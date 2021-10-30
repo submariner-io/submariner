@@ -19,11 +19,9 @@ limitations under the License.
 package kubeproxy
 
 import (
-	"k8s.io/klog"
-
 	"github.com/submariner-io/admiral/pkg/log"
-
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	"k8s.io/klog"
 )
 
 func (kp *SyncHandler) TransitionToNonGateway() error {

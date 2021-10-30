@@ -23,17 +23,15 @@ import (
 	"os"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/controller"
 	"github.com/submariner-io/submariner/pkg/event/logger"
 	"github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
-
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )

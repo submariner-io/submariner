@@ -19,10 +19,9 @@ limitations under the License.
 package controller
 
 import (
+	smv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog"
-
-	smv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 )
 
 func (c *Controller) handleRemovedEndpoint(obj runtime.Object, numRequeues int) bool {

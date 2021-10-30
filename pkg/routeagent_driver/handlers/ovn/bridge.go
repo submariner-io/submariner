@@ -24,9 +24,8 @@ import (
 
 	"github.com/pkg/errors"
 	npSyncerOVN "github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn"
-	"github.com/vishvananda/netlink"
-
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn/vsctl"
+	"github.com/vishvananda/netlink"
 )
 
 func (ovn *Handler) getMTU() (int, error) {

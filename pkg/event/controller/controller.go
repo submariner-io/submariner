@@ -23,8 +23,11 @@ import (
 	"os"
 	"sync"
 
+	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/watcher"
+	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/event"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/dynamic"
@@ -32,11 +35,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
-
-	"github.com/kelseyhightower/envconfig"
-
-	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/event"
 )
 
 type specification struct {

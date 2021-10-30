@@ -26,10 +26,9 @@ import (
 
 	goovn "github.com/ebay/go-ovn"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
-
 	"github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn/nbctl"
 	"github.com/submariner-io/submariner/pkg/util/clusterfiles"
+	"k8s.io/klog"
 )
 
 func (ovn *SyncHandler) initClients() error {

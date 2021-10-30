@@ -20,15 +20,12 @@ package event
 
 import (
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/stringset"
-
+	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	k8sV1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog"
-
-	"github.com/submariner-io/admiral/pkg/log"
-
-	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 )
 
 type Registry struct {

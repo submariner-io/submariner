@@ -24,7 +24,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/event"
-
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"k8s.io/klog"
 )

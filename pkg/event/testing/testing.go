@@ -19,10 +19,9 @@ limitations under the License.
 package testing
 
 import (
-	v12 "k8s.io/api/core/v1"
-
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event"
+	v12 "k8s.io/api/core/v1"
 )
 
 type TestEvent struct {

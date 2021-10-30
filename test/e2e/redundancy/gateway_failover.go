@@ -26,11 +26,10 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 const (

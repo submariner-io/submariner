@@ -23,9 +23,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/stringset"
-	"github.com/vishvananda/netlink"
-
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	"github.com/vishvananda/netlink"
 )
 
 // handleSubnets builds ip rules, and passes them to the specified netlink function

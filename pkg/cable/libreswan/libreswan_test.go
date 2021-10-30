@@ -23,7 +23,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
 	"github.com/submariner-io/submariner/pkg/types"
 )
 

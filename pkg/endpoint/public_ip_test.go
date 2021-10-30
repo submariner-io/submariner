@@ -24,11 +24,10 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/submariner/pkg/types"
 	v1 "k8s.io/api/core/v1"
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
-
-	"github.com/submariner-io/submariner/pkg/types"
 )
 
 var _ = Describe("firstIPv4InString", func() {

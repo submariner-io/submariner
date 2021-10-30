@@ -24,14 +24,12 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/submariner-io/admiral/pkg/log"
-	"k8s.io/klog"
-
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/stringset"
-	"github.com/vishvananda/netlink"
-
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	"github.com/vishvananda/netlink"
+	"k8s.io/klog"
 )
 
 const (

@@ -24,14 +24,12 @@ import (
 	"syscall"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/submariner/pkg/cable/wireguard"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	"k8s.io/klog"
-
-	"github.com/submariner-io/admiral/pkg/log"
-
-	"github.com/submariner-io/submariner/pkg/cable/wireguard"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 )
 
 func (kp *SyncHandler) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks []string, operation Operation) {

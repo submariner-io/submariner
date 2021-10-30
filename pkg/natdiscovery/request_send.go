@@ -23,10 +23,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 	"google.golang.org/protobuf/proto"
 	"k8s.io/klog"
-
-	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 )
 
 func (nd *natDiscovery) sendCheckRequest(remoteNAT *remoteEndpointNAT) error {
