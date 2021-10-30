@@ -25,10 +25,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/iptables"
-	"k8s.io/klog"
-
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	iptcommon "github.com/submariner-io/submariner/pkg/routeagent_driver/iptables"
+	"k8s.io/klog"
 )
 
 func (kp *SyncHandler) createIPTableChains() error {

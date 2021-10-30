@@ -20,12 +20,11 @@ package datastoresyncer
 
 import (
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog"
-
-	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 )
 
 func (d *DatastoreSyncer) handleCreateOrUpdateNode(obj runtime.Object, numRequeues int) bool {

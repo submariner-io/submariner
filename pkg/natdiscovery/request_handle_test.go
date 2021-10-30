@@ -23,10 +23,9 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"google.golang.org/protobuf/proto"
-
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 var _ = Describe("Request handling", func() {

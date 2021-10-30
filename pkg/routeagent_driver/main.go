@@ -23,26 +23,24 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/pkg/errors"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/cabledriver"
-
 	"github.com/kelseyhightower/envconfig"
-	"k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog"
-	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
-
+	"github.com/pkg/errors"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/controller"
 	"github.com/submariner-io/submariner/pkg/event/logger"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/cabledriver"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/mtu"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
+	"k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog"
+	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
 
 var (

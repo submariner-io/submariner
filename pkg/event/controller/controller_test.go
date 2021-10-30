@@ -27,16 +27,15 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
+	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/event"
+	"github.com/submariner-io/submariner/pkg/event/controller"
+	"github.com/submariner-io/submariner/pkg/event/testing"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
-
-	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/event"
-	"github.com/submariner-io/submariner/pkg/event/controller"
-	"github.com/submariner-io/submariner/pkg/event/testing"
 )
 
 const testNamespace = "test-namespace"

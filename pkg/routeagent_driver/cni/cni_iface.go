@@ -24,14 +24,12 @@ import (
 	"net"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
-
-	"github.com/submariner-io/admiral/pkg/log"
-
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 )
 
 type Interface struct {

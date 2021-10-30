@@ -26,12 +26,11 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"google.golang.org/protobuf/proto"
-	"k8s.io/klog"
-
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 	"github.com/submariner-io/submariner/pkg/types"
+	"google.golang.org/protobuf/proto"
+	"k8s.io/klog"
 )
 
 func init() {

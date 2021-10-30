@@ -23,10 +23,9 @@ import (
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/pkg/errors"
+	level "github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/stringset"
 	"k8s.io/klog"
-
-	level "github.com/submariner-io/admiral/pkg/log"
 )
 
 type Interface interface {

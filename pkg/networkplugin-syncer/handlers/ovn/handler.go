@@ -23,15 +23,13 @@ import (
 	"sync"
 
 	goovn "github.com/ebay/go-ovn"
-	"github.com/submariner-io/submariner/pkg/cidr"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
-	clientset "k8s.io/client-go/kubernetes"
-
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cidr"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn/nbctl"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
-
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 )
 

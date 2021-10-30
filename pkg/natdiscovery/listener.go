@@ -24,10 +24,9 @@ import (
 	"strconv"
 
 	"github.com/pkg/errors"
+	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 	"google.golang.org/protobuf/proto"
 	"k8s.io/klog"
-
-	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 )
 
 func (nd *natDiscovery) runListener(stopCh <-chan struct{}) error {

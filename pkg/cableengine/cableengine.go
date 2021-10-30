@@ -18,6 +18,7 @@ limitations under the License.
 
 package cableengine
 
+//nolint:gci // The supported driver imports are kept separate.
 import (
 	"reflect"
 	"sync"

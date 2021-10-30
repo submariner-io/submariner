@@ -22,7 +22,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/stringset"
-
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 )
 

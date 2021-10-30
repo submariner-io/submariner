@@ -22,13 +22,12 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/submariner-io/submariner/pkg/ipset"
-	"k8s.io/klog"
-
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event"
+	"github.com/submariner-io/submariner/pkg/ipset"
 	"github.com/submariner-io/submariner/pkg/iptables"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	"k8s.io/klog"
 	utilexec "k8s.io/utils/exec"
 )
 

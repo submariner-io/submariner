@@ -24,11 +24,10 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
-	"k8s.io/klog"
-
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	"k8s.io/klog"
 )
 
 func (w *wireguard) GetConnections() ([]v1.Connection, error) {

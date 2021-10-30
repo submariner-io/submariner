@@ -21,10 +21,9 @@ package kubeproxy
 import (
 	"net"
 
-	"k8s.io/klog"
-
 	"github.com/submariner-io/admiral/pkg/log"
 	k8sV1 "k8s.io/api/core/v1"
+	"k8s.io/klog"
 )
 
 func (kp *SyncHandler) NodeCreated(node *k8sV1.Node) error {
