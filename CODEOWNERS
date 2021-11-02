@@ -1,7 +1,7 @@
 # Auto-generated, do not edit; see CODEOWNERS.in
-* @mangelajo @Oats87 @skitt @sridhargaddam @tpantelis
-/.github/workflows/ @mangelajo @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis
-/package/ @mangelajo @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis
-/scripts/ @mangelajo @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis
-Dockerfile.dapper @mangelajo @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis
-Makefile* @mangelajo @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis
+* @Oats87 @skitt @sridhargaddam @tpantelis
+/.github/workflows/ @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis
+/package/ @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis
+/scripts/ @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis
+Dockerfile.dapper @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis
+Makefile* @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis
