@@ -139,16 +139,16 @@ func (i *libreswan) Init() error {
 //                        id='@10.0.63.203-0-0'"
 var trafficStatusRE = regexp.MustCompile(`.* "([^"]+)"[^,]*, .*inBytes=(\d+), outBytes=(\d+).*`)
 
-func (i *libreswan) refreshConnectionStatus() error {
+func retrieveActiveConnectionStats() (map[string]int, map[string]int, error) {
 	// Retrieve active tunnels from the daemon
 	cmd := exec.Command("/usr/libexec/ipsec/whack", "--trafficstatus")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return errors.WithMessage(err, "error retrieving whack's stdout")
+		return nil, nil, errors.WithMessage(err, "error retrieving whack's stdout")
 	}
 
 	if err := cmd.Start(); err != nil {
-		return errors.WithMessage(err, "error starting whack")
+		return nil, nil, errors.WithMessage(err, "error starting whack")
 	}
 
 	scanner := bufio.NewScanner(stdout)
@@ -187,8 +187,13 @@ func (i *libreswan) refreshConnectionStatus() error {
 		}
 	}
 
-	if err := cmd.Wait(); err != nil {
-		return errors.WithMessage(err, "error waiting for whack")
+	return activeConnectionsRx, activeConnectionsTx, nil
+}
+
+func (i *libreswan) refreshConnectionStatus() error {
+	activeConnectionsRx, activeConnectionsTx, err := retrieveActiveConnectionStats()
+	if err != nil {
+		return err
 	}
 
 	cable.RecordNoConnections()

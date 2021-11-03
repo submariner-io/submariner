@@ -29,6 +29,7 @@ linters:
     - exhaustive
     - exportloopref
     - gci
+    - gocognit
     - goconst
     - gocritic
     - gocyclo

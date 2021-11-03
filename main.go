@@ -99,25 +99,16 @@ func main() {
 	httpServer := startHTTPServer()
 
 	var submSpec types.SubmarinerSpecification
-	err := envconfig.Process("submariner", &submSpec)
-	if err != nil {
-		klog.Fatal(err)
-	}
+	fatalOnErr(envconfig.Process("submariner", &submSpec), "Error processing env vars")
 
 	cfg, err := clientcmd.BuildConfigFromFlags(localMasterURL, localKubeconfig)
-	if err != nil {
-		klog.Fatalf("Error building kubeconfig: %s", err.Error())
-	}
+	fatalOnErr(err, "Error building kubeconfig")
 
 	submarinerClient, err := submarinerClientset.NewForConfig(cfg)
-	if err != nil {
-		klog.Fatalf("Error creating submariner clientset: %s", err.Error())
-	}
+	fatalOnErr(err, "Error creating submariner clientset")
 
 	k8sClient, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		klog.Fatalf("Error creating Kubernetes clientset: %s", err.Error())
-	}
+	fatalOnErr(err, "Error creating Kubernetes clientset")
 
 	klog.Info("Creating the cable engine")
 
@@ -130,27 +121,17 @@ func main() {
 	submSpec.CableDriver = strings.ToLower(submSpec.CableDriver)
 
 	localEndpoint, err := endpoint.GetLocal(&submSpec, k8sClient)
-
-	if err != nil {
-		klog.Fatalf("Error creating local endpoint object from %#v: %v", submSpec, err)
-	}
+	fatalOnErr(err, "Error creating local endpoint object")
 
 	cableEngine := cableengine.NewEngine(localCluster, localEndpoint)
 	natDiscovery, err := natdiscovery.New(localEndpoint)
-	if err != nil {
-		klog.Fatalf("Error creating the NAT discovery handler %s", err)
-	}
+	fatalOnErr(err, "Error creating the NAT discovery handler")
 
 	cableEngine.SetupNATDiscovery(natDiscovery)
 
-	if err := natDiscovery.Run(stopCh); err != nil {
-		klog.Fatalf("Error starting NAT discovery server")
-	}
+	fatalOnErr(natDiscovery.Run(stopCh), "Error starting NAT discovery server")
 
-	err = subv1.AddToScheme(scheme.Scheme)
-	if err != nil {
-		klog.Errorf("Error adding submariner types to the scheme: %v", err)
-	}
+	fatalOnErr(subv1.AddToScheme(scheme.Scheme), "Error adding submariner types to the scheme")
 
 	var cableHealthchecker healthchecker.Interface
 
@@ -175,9 +156,7 @@ func main() {
 		VERSION, cableHealthchecker)
 
 	gwPod, err := pod.NewGatewayPod(k8sClient)
-	if err != nil {
-		klog.Fatalf("Error creating a handler to update the gateway pod: %v", err)
-	}
+	fatalOnErr(err, "Error creating a handler to update the gateway pod")
 
 	cleanup := cleanupHandler{
 		gatewayPod: gwPod,
@@ -270,6 +249,14 @@ func main() {
 	if err := httpServer.Shutdown(context.TODO()); err != nil {
 		klog.Errorf("Error shutting down metrics HTTP server: %v", err)
 	}
+}
+
+func fatalOnErr(err error, msg string) {
+	if err == nil {
+		return
+	}
+
+	klog.Fatalf("%s: %+v", msg, err)
 }
 
 func submarinerClusterFrom(submSpec *types.SubmarinerSpecification) *types.SubmarinerCluster {
