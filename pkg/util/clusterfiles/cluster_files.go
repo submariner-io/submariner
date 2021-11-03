@@ -100,12 +100,12 @@ func storeToDisk(pathContainerObject string, parsedURL *url.URL, data []byte) (s
 
 	diskFilePath := path.Join(storageDirectory, parsedURL.Path)
 	dir := path.Join(storageDirectory, pathContainerObject)
-	err = os.MkdirAll(dir, 0700)
+	err = os.MkdirAll(dir, 0o700)
 	if err != nil {
 		return "", errors.Wrapf(err, "error creating %s directory to store %s", dir, diskFilePath)
 	}
 
-	err = os.WriteFile(diskFilePath, data, 0400)
+	err = os.WriteFile(diskFilePath, data, 0o400)
 	if err != nil {
 		klog.Error(err)
 		return "", errors.Wrapf(err, "error writing cluster file to  %q", diskFilePath)
