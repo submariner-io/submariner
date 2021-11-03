@@ -20,8 +20,8 @@ package netlink
 
 import (
 	"bytes"
-	"io/ioutil"
 	"net"
+	"os"
 	"os/exec"
 	"strconv"
 
@@ -160,7 +160,7 @@ func (n *netlinkType) ConfigureTCPMTUProbe(mtuProbe, baseMss string) error {
 }
 
 func setSysctl(path string, contents []byte) error {
-	existing, err := ioutil.ReadFile(path)
+	existing, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
@@ -173,5 +173,5 @@ func setSysctl(path string, contents []byte) error {
 	}
 	// Permissions are already 644, the files are never created
 	// #nosec G306
-	return ioutil.WriteFile(path, contents, 0644)
+	return os.WriteFile(path, contents, 0644)
 }
