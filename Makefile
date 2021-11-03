@@ -16,9 +16,9 @@ TARGETS := $(shell ls -p scripts | grep -v -e / -e reload-images)
 override BUILD_ARGS += --ldflags '-X main.VERSION=$(VERSION)'
 
 ifneq (,$(filter ovn,$(_using)))
-override CLUSTER_SETTINGS_FLAG = --cluster_settings $(DAPPER_SOURCE)/scripts/cluster_settings.ovn
+override CLUSTER_SETTINGS_FLAG = --settings $(DAPPER_SOURCE)/.shipyard.e2e.ovn.yml
 else
-override CLUSTER_SETTINGS_FLAG = --cluster_settings $(DAPPER_SOURCE)/scripts/cluster_settings
+override CLUSTER_SETTINGS_FLAG = --settings $(DAPPER_SOURCE)/.shipyard.e2e.yml
 endif
 
 ifneq (,$(filter external-net,$(_using)))
