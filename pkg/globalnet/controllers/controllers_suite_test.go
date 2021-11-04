@@ -178,7 +178,7 @@ func (t *testDriverBase) createGlobalIngressIP(egressIP *submarinerv1.GlobalIngr
 	test.CreateResource(t.globalIngressIPs, egressIP)
 }
 
-// nolint unparam - `name` always receives `globalEgressIPName`
+//nolint:unparam // `name` always receives `globalEgressIPName`
 func (t *testDriverBase) awaitGlobalEgressIPStatusAllocated(name string, expNumIPS int) {
 	t.awaitEgressIPStatusAllocated(t.globalEgressIPs, name, expNumIPS)
 }
@@ -382,7 +382,6 @@ func (t *testDriverBase) awaitHeadlessGlobalIngressIP(svcName, podName string) *
 	return ingressIP
 }
 
-// nolint unparam - `name` always receives `serviceName` (`"nginx"`)
 func (t *testDriverBase) awaitNoGlobalIngressIP(name string) {
 	time.Sleep(300 * time.Millisecond)
 	test.AwaitNoResource(t.globalIngressIPs, name)
@@ -471,7 +470,7 @@ func awaitStatusConditions(client dynamic.ResourceInterface, name string, atInde
 	}
 }
 
-// nolint unparam - `name` always receives `globalEgressIPName` (`"east-region")
+//nolint:unparam // `name` always receives `globalEgressIPName` (`"east-region")
 func newGlobalEgressIP(name string, numberOfIPs *int, podSelector *metav1.LabelSelector) *submarinerv1.GlobalEgressIP {
 	return &submarinerv1.GlobalEgressIP{
 		ObjectMeta: metav1.ObjectMeta{

@@ -269,7 +269,7 @@ func (c *globalEgressIPController) validate(numberOfIPs int, egressIP *submarine
 	return true
 }
 
-func (c *globalEgressIPController) onDelete(numRequeues int, globalEgressIP *submarinerv1.GlobalEgressIP) bool { // nolint unparam
+func (c *globalEgressIPController) onDelete(numRequeues int, globalEgressIP *submarinerv1.GlobalEgressIP) bool {
 	key, _ := cache.MetaNamespaceKeyFunc(globalEgressIP)
 
 	c.Lock()
