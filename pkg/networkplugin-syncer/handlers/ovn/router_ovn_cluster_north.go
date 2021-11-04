@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	// The ovn_cluster_router submariner port connects to the submariner router
+	// The ovn_cluster_router submariner port connects to the submariner router.
 	ovnClusterSubmarinerRPort  = "ovn_cluster_subm_lrp"
 	ovnClusterSubmarinerSwPort = "ovn_cluster_subm_lsp"
 	ovnClusterSubmarinerMAC    = "00:60:2f:10:01:02"

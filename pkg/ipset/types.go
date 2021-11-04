@@ -49,7 +49,7 @@ limitations under the License.
 
 package ipset
 
-// Type represents the ipset type
+// Type represents the ipset type.
 type Type string
 
 const (

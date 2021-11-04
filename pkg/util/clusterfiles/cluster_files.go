@@ -36,7 +36,7 @@ import (
 // Get retrieves a config from a secret, configmap or file within the k8s cluster
 // using an url schema that supports configmap://<namespace>/<configmap-name>/<data-file>
 // secret://<namespace>/<secret-name>/<data-file> and file:///<path> returning
-// a local path to the file
+// a local path to the file.
 func Get(k8sClient kubernetes.Interface, urlAddress string) (pathStr string, err error) {
 	klog.V(log.DEBUG).Infof("reading cluster_file: %s", urlAddress)
 	parsedURL, err := url.Parse(urlAddress)

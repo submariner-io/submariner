@@ -64,7 +64,7 @@ func init() {
 	prometheus.MustRegister(gatewaySyncIterations)
 }
 
-// NewEngine creates a new Engine for the local cluster
+// NewEngine creates a new Engine for the local cluster.
 func NewGatewaySyncer(engine cableengine.Engine, client v1typed.GatewayInterface,
 	version string, healthCheck healthchecker.Interface) *GatewaySyncer {
 	return &GatewaySyncer{
@@ -160,7 +160,7 @@ func (gs *GatewaySyncer) cleanupStaleGatewayEntries(localGatewayName string) err
 		if stale {
 			err := gs.client.Delete(context.TODO(), gw.Name, metav1.DeleteOptions{})
 			if err != nil {
-				// In this case we don't want to stop the cleanup loop and just log it
+				// In this case we don't want to stop the cleanup loop and just log it.
 				utilruntime.HandleError(fmt.Errorf("error deleting stale Gateway %+v: %w", gw, err))
 			} else {
 				klog.Warningf("Deleted stale gateway: %s, didn't report for %s",
@@ -264,7 +264,7 @@ func (gs *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 }
 
 // CleanupGatewayEntry removes this Gateway entry from the k8s API, it does not
-// propagate error up because it's a termination function that we also provide externally
+// propagate error up because it's a termination function that we also provide externally.
 func (gs *GatewaySyncer) CleanupGatewayEntry() {
 	hostName := gs.engine.GetLocalEndpoint().Spec.Hostname
 	err := gs.client.Delete(context.TODO(), hostName, metav1.DeleteOptions{})

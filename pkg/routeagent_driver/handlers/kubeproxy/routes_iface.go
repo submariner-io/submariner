@@ -179,7 +179,7 @@ func (kp *SyncHandler) cleanVxSubmarinerRoutes() {
 	}
 }
 
-// Reconcile the routes installed on this device using rtnetlink
+// Reconcile the routes installed on this device using rtnetlink.
 func (kp *SyncHandler) reconcileRoutes(vxlanGw net.IP) error {
 	klog.V(log.DEBUG).Infof("Reconciling routes to gw: %s", vxlanGw.String())
 
@@ -194,7 +194,7 @@ func (kp *SyncHandler) reconcileRoutes(vxlanGw net.IP) error {
 		return errors.Wrapf(err, "error retrieving routes for link %s", VxLANIface)
 	}
 
-	// First lets delete all of the routes that don't match
+	// First lets delete all of the routes that don't match.
 	kp.removeUnknownRoutes(vxlanGw, currentRouteList)
 
 	currentRouteList, err = kp.netLink.RouteList(link, syscall.AF_INET)
@@ -203,7 +203,7 @@ func (kp *SyncHandler) reconcileRoutes(vxlanGw net.IP) error {
 		return errors.Wrapf(err, "error retrieving routes for link %s", VxLANIface)
 	}
 
-	// let's now add the routes that are missing
+	// Let's now add the routes that are missing.
 	for _, cidrBlock := range kp.remoteSubnets.Elements() {
 		_, dst, err := net.ParseCIDR(cidrBlock)
 		if err != nil {
@@ -241,7 +241,7 @@ func (kp *SyncHandler) reconcileRoutes(vxlanGw net.IP) error {
 
 func (kp *SyncHandler) removeUnknownRoutes(vxlanGw net.IP, currentRouteList []netlink.Route) {
 	for i := range currentRouteList {
-		// contains(endpoint destinations, route destination string, and the route gateway is our actual destination
+		// Contains(endpoint destinations, route destination string, and the route gateway is our actual destination.
 		klog.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])
 
 		if currentRouteList[i].Dst == nil || currentRouteList[i].Gw == nil {

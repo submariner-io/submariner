@@ -37,8 +37,7 @@ const (
 )
 
 var (
-	// The following metrics are gauges because we want to set the absolute value
-	// RX/TX metrics
+	// The following metrics are gauges because we want to set the absolute value  RX/TX metrics.
 	rxGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "submariner_gateway_rx_bytes",

@@ -48,12 +48,12 @@ func (ovn *SyncHandler) ensureSubmarinerInfra() error {
 
 	// At this point, we are missing the ovn_cluster_router policies and the
 	// local-to-remote & remote-to-local routes in submariner_router, that
-	// depends on endpoint details that we will receive via events
+	// depends on endpoint details that we will receive via events.
 	return nil
 }
 
 // ensureSubmarinerGatewayLocalNetSwitch creates the OVN submariner_join switch which
-// connects the ovn_cluster_router to the submariner_router
+// connects the ovn_cluster_router to the submariner_router.
 func (ovn *SyncHandler) ensureSubmarinerJoinSwitch() error {
 	return ovn.ensureSwitch(submarinerDownstreamSwitch)
 }

@@ -71,10 +71,10 @@ func testExternalConnectivity(f *framework.Framework) {
 		})
 		svc := np.CreateService()
 
-		// Get handle for existing docker
+		// Get handle for existing docker.
 		docker := framework.New(extAppName)
 
-		// Get IPs to use later
+		// Get IPs to use later.
 		podIP := np.Pod.Status.PodIP
 		svcIP := svc.Spec.ClusterIP
 		dockerIP := docker.GetIP(extNetName)
@@ -102,7 +102,8 @@ func testExternalConnectivity(f *framework.Framework) {
 		_, _ = np.RunCommand(cmd)
 
 		By("Verifying that external app received request")
-		// Only check stderr
+
+		// Only check stderr.
 		_, dockerLog := docker.GetLog()
 
 		if clusterName == externalClusterName {
@@ -118,16 +119,17 @@ func testGlobalNetExternalConnectivity(f *framework.Framework) {
 	extClusterIdx := getExternalClusterIndex(framework.TestContext.ClusterIDs)
 
 	By(fmt.Sprintf("Creating a service without selector and endpoints in cluster %q", externalClusterName))
-	// Get handle for existing docker
+
+	// Get handle for existing docker.
 	docker := framework.New(extAppName)
 	dockerIP := docker.GetIP(extNetName)
 
-	// Create service without selector and endpoints for dockerIP, and export the service
+	// Create service without selector and endpoints for dockerIP, and export the service.
 	extSvc := f.CreateTCPServiceWithoutSelector(extClusterIdx, "extsvc", "http", 80)
 	f.CreateTCPEndpoints(extClusterIdx, extSvc.Name, "http", dockerIP, 80)
 	f.CreateServiceExport(extClusterIdx, extSvc.Name)
 
-	// Get globalIPs for the extApp to use later
+	// Get globalIPs for the extApp to use later.
 	extIngressGlobalIP := f.AwaitGlobalIngressIP(extClusterIdx, extSvc.Name, extSvc.Namespace)
 	Expect(extIngressGlobalIP).ToNot(Equal(""))
 
@@ -152,7 +154,7 @@ func testGlobalNetExternalConnectivity(f *framework.Framework) {
 		svc := np.CreateService()
 		f.CreateServiceExport(np.Config.Cluster, svc.Name)
 
-		// Get globalIPs for the network pod to use later
+		// Get globalIPs for the network pod to use later.
 		remoteIP := f.AwaitGlobalIngressIP(np.Config.Cluster, svc.Name, svc.Namespace)
 		Expect(remoteIP).ToNot(Equal(""))
 
@@ -208,8 +210,8 @@ func testGlobalNetExternalConnectivity(f *framework.Framework) {
 	}
 }
 
-// The first cluster is chosen as the one connected to external application
-// See scripts/e2e/external/utils
+// The first cluster is chosen as the one connected to external application.
+// See scripts/e2e/external/utils.
 func getExternalClusterName(names []string) string {
 	if len(names) == 0 {
 		return ""
@@ -231,6 +233,6 @@ func getExternalClusterIndex(names []string) framework.ClusterIndex {
 		}
 	}
 
-	// TODO: consider right error handling
+	// TODO: consider right error handling.
 	return framework.ClusterIndex(0)
 }
