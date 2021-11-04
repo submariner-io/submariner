@@ -114,7 +114,7 @@ func getBackendConfig(nodeObj *v1.Node) (map[string]string, error) {
 		return backendConfig, err
 	}
 
-	// If the node has no specific UDP port assigned for dataplane, expose the cluster default one
+	// If the node has no specific UDP port assigned for dataplane, expose the cluster default one.
 	if _, ok := backendConfig[submv1.UDPPortConfig]; !ok {
 		udpPort := os.Getenv("CE_IPSEC_NATTPORT")
 		if udpPort == "" {
@@ -124,7 +124,7 @@ func getBackendConfig(nodeObj *v1.Node) (map[string]string, error) {
 		backendConfig[submv1.UDPPortConfig] = udpPort
 	}
 
-	// Enable and publish the natt-discovery-port by default
+	// Enable and publish the natt-discovery-port by default.
 	if _, ok := backendConfig[submv1.NATTDiscoveryPortConfig]; !ok {
 		backendConfig[submv1.NATTDiscoveryPortConfig] = submv1.DefaultNATTDiscoveryPort
 	}
@@ -194,7 +194,7 @@ func addConfigFrom(nodeName string, configs, backendConfig map[string]string, wa
 	return nil
 }
 
-// TODO: to handle de-duplication of code/finding common parts with the route agent
+// TODO: to handle de-duplication of code/finding common parts with the route agent.
 func getCNIInterfaceIPAddress(clusterCIDRs []string) (string, error) {
 	for _, clusterCIDR := range clusterCIDRs {
 		_, clusterNetwork, err := net.ParseCIDR(clusterCIDR)
@@ -221,7 +221,7 @@ func getCNIInterfaceIPAddress(clusterCIDRs []string) (string, error) {
 					klog.V(log.DEBUG).Infof("Interface %q has %q address", iface.Name, ipAddr)
 					address := net.ParseIP(ipAddr.String())
 
-					// Verify that interface has an address from cluster CIDR
+					// Verify that interface has an address from cluster CIDR.
 					if clusterNetwork.Contains(address) {
 						klog.V(log.DEBUG).Infof("Found CNI Interface %q that has IP %q from ClusterCIDR %q",
 							iface.Name, ipAddr.String(), clusterCIDR)

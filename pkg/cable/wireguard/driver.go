@@ -40,16 +40,16 @@ import (
 )
 
 const (
-	// DefaultDeviceName specifies name of WireGuard network device
+	// DefaultDeviceName specifies name of WireGuard network device.
 	DefaultDeviceName = "submariner"
 
-	// PublicKey is name (key) of publicKey entry in back-end map
+	// PublicKey is name (key) of publicKey entry in back-end map.
 	PublicKey = "publicKey"
 
-	// KeepAliveInterval to use for wg peers
+	// KeepAliveInterval to use for wg peers.
 	KeepAliveInterval = 10 * time.Second
 
-	// handshakeTimeout is maximal time from handshake a connections is still considered connected
+	// handshakeTimeout is maximal time from handshake a connections is still considered connected.
 	handshakeTimeout = 2*time.Minute + 10*time.Second
 
 	cableDriverName = "wireguard"
@@ -57,7 +57,7 @@ const (
 	transmitBytes   = "TransmitBytes" // for peer connection status
 	lastChecked     = "LastChecked"   // for connection peer status
 
-	// TODO use submariner prefix
+	// TODO use submariner prefix.
 	specEnvPrefix = "ce_ipsec"
 )
 
@@ -80,7 +80,7 @@ type wireguard struct {
 	psk           *wgtypes.Key
 }
 
-// NewDriver creates a new WireGuard driver
+// NewDriver creates a new WireGuard driver.
 func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.SubmarinerCluster) (cable.Driver, error) {
 	// We'll panic if localEndpoint or localCluster are nil, this is intentional
 	var err error
@@ -99,7 +99,7 @@ func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.Subm
 		return nil, errors.Wrap(err, "failed to setup WireGuard link")
 	}
 
-	// create controller
+	// Create the controller.
 	if w.client, err = wgctrl.New(); err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("wgctrl is not available on this system")
@@ -118,7 +118,7 @@ func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.Subm
 		}
 	}()
 
-	// generate local keys and set public key in BackendConfig
+	// Generate local keys and set public key in BackendConfig.
 	var priv, pub, psk wgtypes.Key
 
 	if psk, err = genPsk(w.spec.PSK); err != nil {
@@ -141,8 +141,8 @@ func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.Subm
 	}
 
 	portInt := int(port)
-	// configure the device. still not up
 
+	// Configure the device - still not up.
 	peerConfigs := make([]wgtypes.PeerConfig, 0)
 	cfg := wgtypes.Config{
 		PrivateKey:   &priv,
@@ -189,7 +189,7 @@ func (w *wireguard) Init() error {
 		return fmt.Errorf("endpoint public key %s is different from device key %s", k, d.PublicKey)
 	}
 
-	// ip link set $DefaultDeviceName up
+	// IP link set $DefaultDeviceName up.
 	if err := netlink.LinkSetUp(w.link); err != nil {
 		return errors.Wrap(err, "failed to bring up WireGuard device")
 	}
@@ -214,7 +214,7 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 		return "", nil
 	}
 
-	// parse remote addresses and allowed IPs
+	// Parse remote addresses and allowed IPs.
 	remoteIP := net.ParseIP(ip)
 	if remoteIP == nil {
 		return "", fmt.Errorf("failed to parse remote IP %s", ip)
@@ -222,7 +222,7 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 
 	allowedIPs := parseSubnets(remoteEndpoint.Spec.Subnets)
 
-	// parse remote public key
+	// Parse remote public key.
 	remoteKey, err := keyFromSpec(&remoteEndpoint.Spec)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to parse peer public key")
@@ -233,12 +233,12 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 
-	// delete or update old peers for ClusterID
+	// Delete or update old peers for ClusterID.
 	oldCon, found := w.connections[remoteEndpoint.Spec.ClusterID]
 	if found {
 		if oldKey, err := keyFromSpec(&oldCon.Endpoint); err == nil {
 			if oldKey.String() == remoteKey.String() {
-				// existing connection, update status and skip
+				// Existing connection, update status and skip.
 				w.updatePeerStatus(oldCon, oldKey)
 				klog.V(log.DEBUG).Infof("Skipping connect for existing peer key %s", oldKey)
 
@@ -357,7 +357,7 @@ func (w *wireguard) GetActiveConnections() ([]v1.Connection, error) {
 	return make([]v1.Connection, 0), nil
 }
 
-// Create new wg link and assign addr from local subnets
+// Create new wg link and assign addr from local subnets.
 func (w *wireguard) setWGLink() error {
 	// delete existing wg device if needed
 	if link, err := netlink.LinkByName(DefaultDeviceName); err == nil {
@@ -367,7 +367,7 @@ func (w *wireguard) setWGLink() error {
 		}
 	}
 
-	// create the wg device (ip link add dev $DefaultDeviceName type wireguard)
+	// Create the wg device (ip link add dev $DefaultDeviceName type wireguard).
 	la := netlink.NewLinkAttrs()
 	la.Name = DefaultDeviceName
 	link := &netlink.GenericLink{
@@ -383,14 +383,14 @@ func (w *wireguard) setWGLink() error {
 	return nil
 }
 
-// parse CIDR string and skip errors
+// Parse CIDR string and skip errors.
 func parseSubnets(subnets []string) []net.IPNet {
 	nets := make([]net.IPNet, 0, len(subnets))
 
 	for _, sn := range subnets {
 		_, cidr, err := net.ParseCIDR(sn)
 		if err != nil {
-			// this should not happen. Log and continue
+			// This should not happen. Log and continue.
 			klog.Errorf("failed to parse subnet %s: %v", sn, err)
 			continue
 		}
@@ -438,7 +438,7 @@ func (w *wireguard) peerByKey(key *wgtypes.Key) (*wgtypes.Peer, error) {
 	return nil, fmt.Errorf("peer not found for key %s", key)
 }
 
-// find if key matches connection spec (from spec clusterID)
+// Find if key matches connection spec (from spec clusterID).
 func (w *wireguard) keyMismatch(cid string, key *wgtypes.Key) bool {
 	c, found := w.connections[cid]
 	if !found {
@@ -461,7 +461,7 @@ func (w *wireguard) keyMismatch(cid string, key *wgtypes.Key) bool {
 }
 
 func genPsk(psk string) (wgtypes.Key, error) {
-	// Convert spec PSK string to right length byte array, using sha256.Size == wgtypes.KeyLen
+	// Convert spec PSK string to right length byte array, using sha256.Size == wgtypes.KeyLen.
 	pskBytes := sha256.Sum256([]byte(psk))
 	return wgtypes.NewKey(pskBytes[:])
 }

@@ -51,16 +51,16 @@ type Driver interface {
 	GetName() string
 }
 
-// Function prototype to create a new driver
+// Function prototype to create a new driver.
 type DriverCreateFunc func(localEndpoint *types.SubmarinerEndpoint, localCluster *types.SubmarinerCluster) (Driver, error)
 
-// Static map of supported drivers
+// Static map of supported drivers.
 var drivers = map[string]DriverCreateFunc{}
 
-// Default name of the cable driver
+// Default name of the cable driver.
 var defaultCableDriver string
 
-// Adds a supported driver, prints a fatal error in the case of double registration
+// Adds a supported driver, prints a fatal error in the case of double registration.
 func AddDriver(name string, driverCreate DriverCreateFunc) {
 	if drivers[name] != nil {
 		klog.Fatalf("Multiple cable engine drivers attempting to register with name %q", name)
@@ -69,7 +69,7 @@ func AddDriver(name string, driverCreate DriverCreateFunc) {
 	drivers[name] = driverCreate
 }
 
-// Returns a new driver according the required Backend
+// Returns a new driver according the required Backend.
 func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.SubmarinerCluster) (Driver, error) {
 	// We'll panic if localEndpoint or localCluster are nil, this is intentional
 	driverCreate, ok := drivers[localEndpoint.Spec.Backend]
@@ -95,7 +95,7 @@ func SetDefaultCableDriver(driver string) {
 	defaultCableDriver = driver
 }
 
-// Returns the default cable driver name
+// Returns the default cable driver name.
 func GetDefaultCableDriver() string {
 	return defaultCableDriver
 }

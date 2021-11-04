@@ -37,7 +37,7 @@ type Interface struct {
 	IPAddress string
 }
 
-// DiscoverFunc is a hook for unit tests
+// DiscoverFunc is a hook for unit tests.
 var DiscoverFunc func(clusterCIDR string) (*Interface, error)
 
 func Discover(clusterCIDR string) (*Interface, error) {

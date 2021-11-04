@@ -35,7 +35,7 @@ func (ovn *SyncHandler) getNorthSubnetsToAddAndRemove(existingSubnets stringset.
 }
 
 // remoteEndpointSubnetSet iterates over all known remote endpoints and subnets constructing a StringSet with
-// all the remote subnets
+// all the remote subnets.
 func (ovn *SyncHandler) remoteEndpointSubnetSet() stringset.Interface {
 	remoteSubnets := stringset.New()
 
@@ -61,7 +61,7 @@ func (ovn *SyncHandler) getSouthSubnetsToAddAndRemove(existingSubnets stringset.
 }
 
 // remoteEndpointSubnetSet returns an stringset with all the local subnets for this cluster based on the local endpoint
-// information
+// information.
 func (ovn *SyncHandler) localEndpointSubnetSet() stringset.Interface {
 	localSubnets := stringset.New()
 

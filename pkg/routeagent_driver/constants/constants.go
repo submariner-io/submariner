@@ -19,7 +19,7 @@ limitations under the License.
 package constants
 
 const (
-	// IPTable chains used by RouteAgent
+	// IPTable chains used by RouteAgent.
 	SmPostRoutingChain = "SUBMARINER-POSTROUTING"
 	PostRoutingChain   = "POSTROUTING"
 	MangleTable        = "mangle"
@@ -38,7 +38,7 @@ const (
 	// CNIInterfaceIP for each of the nodes, we annotate the node with CNIInterfaceIPInfo as
 	// part of route-agent and this will subsequently be used in globalnet controller for
 	// supporting connectivity from HostNetwork to remoteClusters.
-	// [#] interface on the node that has an IPAddress from the clusterCIDR
+	// [#] interface on the node that has an IPAddress from the clusterCIDR.
 	CNIInterfaceIP = "submariner.io/cniIfaceIp"
 
 	RouteAgentInterClusterNetworkTableID = 149
@@ -48,7 +48,7 @@ const (
 	// the egress traffic to the corresponding CNIInterfaceIP on that host.
 	RouteAgentHostNetworkTableID = 150
 
-	// Network plugins supported
+	// Network plugins supported.
 	NetworkPluginGeneric       = "generic"
 	NetworkPluginCanalFlannel  = "canal-flannel"
 	NetworkPluginWeaveNet      = "weave-net"

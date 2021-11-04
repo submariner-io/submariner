@@ -31,7 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
 
-	// Add supported drivers
+	// Add supported drivers.
 	_ "github.com/submariner-io/submariner/pkg/cable/libreswan"
 	_ "github.com/submariner-io/submariner/pkg/cable/vxlan"
 	_ "github.com/submariner-io/submariner/pkg/cable/wireguard"
@@ -49,15 +49,15 @@ type Engine interface {
 	// Pods or Services behind the given endpoint.
 	InstallCable(remote *v1.Endpoint) error
 	// RemoveCable disconnects the Engine from the given remote endpoint. Upon completion.
-	// remote Pods and Service may not be accessible any more.
+	// remote Pods and Service may not be accessible anymore.
 	RemoveCable(remote *v1.Endpoint) error
-	// ListCableConnections returns a list of cable connection, and the related status
+	// ListCableConnections returns a list of cable connection, and the related status.
 	ListCableConnections() ([]v1.Connection, error)
-	// GetLocalEndpoint returns the local endpoint for this cable engine
+	// GetLocalEndpoint returns the local endpoint for this cable engine.
 	GetLocalEndpoint() *types.SubmarinerEndpoint
-	// GetHAStatus returns the HA status for this cable engine
+	// GetHAStatus returns the HA status for this cable engine.
 	GetHAStatus() v1.HAStatus
-	// SetupNATDiscovery configures the handler for nat discovery of the endpoints
+	// SetupNATDiscovery configures the handler for nat discovery of the endpoints.
 	SetupNATDiscovery(natDiscovery natdiscovery.Interface)
 }
 
@@ -72,7 +72,7 @@ type engine struct {
 	installedCables     map[string]metav1.Time
 }
 
-// NewEngine creates a new Engine for the local cluster
+// NewEngine creates a new Engine for the local cluster.
 func NewEngine(localCluster *types.SubmarinerCluster, localEndpoint *types.SubmarinerEndpoint) Engine {
 	// We'll panic if localCluster or localEndpoint are nil, this is intentional
 	return &engine{
@@ -276,6 +276,6 @@ func (i *engine) ListCableConnections() ([]v1.Connection, error) {
 	if i.driver != nil {
 		return i.driver.GetConnections()
 	}
-	// if no driver, we can safely report that no connections exist
+	// if no driver, we can safely report that no connections exist.
 	return []v1.Connection{}, nil
 }

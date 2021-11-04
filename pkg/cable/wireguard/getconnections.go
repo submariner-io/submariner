@@ -75,9 +75,7 @@ func (w *wireguard) connectionByKey(key *wgtypes.Key) (*v1.Connection, error) {
 	return nil, fmt.Errorf("connection not found for key %s", key)
 }
 
-// update logic, based on delta from last check
-// good state requires a handshake and traffic
-// if no handshake or stale handshake
+// Update logic, based on delta from last check good state requires a handshake and traffic if no handshake or stale handshake.
 func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Connection) {
 	now := int64(time.Nanosecond) * time.Now().UnixNano() / int64(time.Millisecond)
 	keepAliveMS := KeepAliveInterval.Milliseconds() + 2 // +2 for rounding
@@ -89,13 +87,13 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 		return
 	}
 
-	// longer than keep-alive interval, expect bytes>0
+	// Longer than keep-alive interval, expect bytes>0.
 	tx := peerTrafficDelta(connection, transmitBytes, p.TransmitBytes)
 	rx := peerTrafficDelta(connection, receiveBytes, p.ReceiveBytes)
 
 	if p.LastHandshakeTime.IsZero() {
 		if lc > handshakeTimeout.Milliseconds() {
-			// no initial handshake for too long
+			// No initial handshake for too long.
 			connection.SetStatus(v1.ConnectionError, "no initial handshake for %.1f seconds", lcSec)
 			cable.RecordConnection(cableDriverName, &w.localEndpoint.Spec, &connection.Endpoint, string(connection.Status), false)
 
@@ -103,7 +101,7 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 		}
 
 		if tx > 0 || rx > 0 {
-			// no handshake, but at least some communication in progress
+			// No handshake, but at least some communication in progress.
 			connection.SetStatus(v1.Connecting, "no initial handshake yet")
 			cable.RecordConnection(cableDriverName, &w.localEndpoint.Spec, &connection.Endpoint, string(connection.Status), false)
 
@@ -112,7 +110,7 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 	}
 
 	if tx > 0 || rx > 0 {
-		// all is good
+		// All is good.
 		connection.SetStatus(v1.Connected, "Rx=%d Bytes, Tx=%d Bytes", p.ReceiveBytes, p.TransmitBytes)
 		cable.RecordConnection(cableDriverName, &w.localEndpoint.Spec, &connection.Endpoint, string(connection.Status), false)
 		saveAndRecordPeerTraffic(&w.localEndpoint.Spec, &connection.Endpoint, now, p.TransmitBytes, p.ReceiveBytes)
@@ -123,7 +121,7 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 	handshakeDelta := time.Since(p.LastHandshakeTime)
 
 	if handshakeDelta > handshakeTimeout {
-		// hard error, really long time since handshake
+		// Hard error, really long time since handshake.
 		connection.SetStatus(v1.ConnectionError, "no handshake for %.1f seconds",
 			handshakeDelta.Seconds())
 		cable.RecordConnection(cableDriverName, &w.localEndpoint.Spec, &connection.Endpoint, string(connection.Status), false)
@@ -132,12 +130,12 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 	}
 
 	if lc < 2*keepAliveMS {
-		// grace period, leave status unchanged
+		// Grace period, leave status unchanged.
 		klog.Warningf("No traffic for %.1f seconds; handshake was %.1f seconds ago: %v", lcSec,
 			handshakeDelta.Seconds(), connection)
 		return
 	}
-	// soft error, no traffic, stale handshake
+	// Soft error, no traffic, stale handshake.
 	connection.SetStatus(v1.ConnectionError, "no bytes sent or received for %.1f seconds",
 		lcSec)
 	cable.RecordConnection(cableDriverName, &w.localEndpoint.Spec, &connection.Endpoint, string(connection.Status), false)
@@ -155,8 +153,8 @@ func (w *wireguard) updatePeerStatus(c *v1.Connection, key *wgtypes.Key) {
 	w.updateConnectionForPeer(p, c)
 }
 
-// Compare backendConfig[key] or initialize entry
-// Return delta from previous value or 0 if no previous value
+// Compare backendConfig[key] or initialize entry.
+// Return delta from previous value or 0 if no previous value.
 func peerTrafficDelta(c *v1.Connection, key string, newVal int64) int64 {
 	s, found := c.Endpoint.BackendConfig[key]
 	if found {
@@ -170,7 +168,7 @@ func peerTrafficDelta(c *v1.Connection, key string, newVal int64) int64 {
 	return 0
 }
 
-// Save backendConfig[key] and export the metrics to prometheus
+// Save backendConfig[key] and export the metrics to prometheus.
 func saveAndRecordPeerTraffic(localEndpoint, remoteEndpoint *v1.EndpointSpec, lc, tx, rx int64) {
 	remoteEndpoint.BackendConfig[lastChecked] = strconv.FormatInt(lc, 10)
 	remoteEndpoint.BackendConfig[transmitBytes] = strconv.FormatInt(tx, 10)
