@@ -86,7 +86,6 @@ const (
 
 var VERSION = "not-compiled-properly"
 
-// nolint:gocyclo // the main function has a lot of error checking that increases cyclomatic complexity
 func main() {
 	klog.InitFlags(nil)
 	flag.Parse()

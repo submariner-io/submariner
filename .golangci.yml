@@ -45,6 +45,7 @@ linters:
     - misspell
     - nakedret
     - nilerr
+    - nolintlint
     - prealloc
     - staticcheck
     - structcheck
