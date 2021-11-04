@@ -28,7 +28,6 @@ import (
 
 //nolint:dupl // Some line blocks are very similar but not exactly duplicated, either way not worth refactoring.
 var _ = Describe("remoteEndpointNAT", func() {
-
 	var rnat *remoteEndpointNAT
 	var remoteEndpoint submarinerv1.Endpoint
 

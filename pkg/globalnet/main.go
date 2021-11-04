@@ -108,7 +108,6 @@ func main() {
 
 	gatewayMonitor, err := controllers.NewGatewayMonitor(spec, append(localCluster.Spec.ClusterCIDR, localCluster.Spec.ServiceCIDR...),
 		&watcher.Config{RestConfig: cfg})
-
 	if err != nil {
 		klog.Fatalf("Error creating gatewayMonitor: %s", err.Error())
 	}

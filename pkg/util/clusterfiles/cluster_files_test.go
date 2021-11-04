@@ -57,7 +57,6 @@ var _ = Describe("Cluster Files Get", func() {
 					"data1": theDataStr,
 				},
 			})
-
 	})
 
 	When("The scheme is unknown", func() {
@@ -120,7 +119,6 @@ var _ = Describe("Cluster Files Get", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(fileContent).To(Equal(theData))
 		})
-
 	})
 
 	When("the source is a file", func() {

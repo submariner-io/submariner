@@ -24,8 +24,10 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var portA = "port-a"
-var portB = "port-b"
+var (
+	portA = "port-a"
+	portB = "port-b"
+)
 
 var _ = Describe("Route functions", func() {
 	It("should filter routes via specific output port correctly", func() {

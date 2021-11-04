@@ -120,6 +120,7 @@ func (n *NbCtl) LrPolicyAdd(logicalRouter string, prio int, filter string, actio
 
 	return err
 }
+
 func (n *NbCtl) LrPolicyDel(logicalRouter string, prio int, filter string) error {
 	_, err := n.nbctl("lr-policy-del", logicalRouter, strconv.Itoa(prio), filter)
 	return err
@@ -142,7 +143,7 @@ func parseLrPolicyGetOutput(output, rerouteIP string) stringset.Interface {
 	//        10                                 ip.src==1.1.1.2/32         reroute              169.254.34.1
 	//
 	subnets := stringset.New()
-	//TODO: make this regex more generic in a global variable, so we avoid re-compiling the regex on each call
+	// TODO: make this regex more generic in a global variable, so we avoid re-compiling the regex on each call
 	r := regexp.MustCompile("ip4\\.dst == ([0-9\\.]+/[0-9]+)[\\s\\t]+reroute[\\s\\t]+" + rerouteIP)
 	for _, match := range r.FindAllStringSubmatch(output, -1) {
 		if len(match) == 2 {
@@ -170,7 +171,6 @@ func expandConnectionStringIPsDetail(db string, resolver func(host string) ([]ne
 	host := parts[1]
 	port := parts[2]
 	ips, err := resolver(host)
-
 	if err != nil {
 		return "", errors.Wrapf(err, "error resolving %q", host)
 	}

@@ -42,8 +42,10 @@ type Interface interface {
 	GetReadyChannel() chan *NATEndpointInfo
 }
 
-type udpWriteFunction func(b []byte, addr *net.UDPAddr) (int, error)
-type findSrcIPFunction func(destinationIP string) string
+type (
+	udpWriteFunction  func(b []byte, addr *net.UDPAddr) (int, error)
+	findSrcIPFunction func(destinationIP string) string
+)
 
 type natDiscovery struct {
 	sync.Mutex

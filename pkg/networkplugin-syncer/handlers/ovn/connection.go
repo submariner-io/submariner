@@ -70,7 +70,8 @@ func (ovn *SyncHandler) initClients() error {
 		Addr:      getOVNNBDBAddress(),
 		Reconnect: true,
 		TLSConfig: tlsConfig,
-		Db:        goovn.DBNB})
+		Db:        goovn.DBNB,
+	})
 
 	if err != nil {
 		return errors.Wrap(err, "error creating NBDB connection")
@@ -80,7 +81,8 @@ func (ovn *SyncHandler) initClients() error {
 		Addr:      getOVNSBDBAddress(),
 		Reconnect: true,
 		TLSConfig: tlsConfig,
-		Db:        goovn.DBSB})
+		Db:        goovn.DBSB,
+	})
 
 	if err != nil {
 		return errors.Wrap(err, "error creating SBDB connection")
@@ -98,7 +100,6 @@ func getOVNTLSConfig(pkFile, certFile, caFile string) (*tls.Config, error) {
 	rootCAs := x509.NewCertPool()
 
 	data, err := os.ReadFile(caFile)
-
 	if err != nil {
 		return nil, errors.Wrap(err, "failure loading OVNDB ca bundle")
 	}

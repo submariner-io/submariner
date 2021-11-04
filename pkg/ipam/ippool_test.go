@@ -29,11 +29,13 @@ import (
 
 const cidrWithSize2 = "169.254.1.0/30"
 
-var _ = Describe("IP Pool creation", testPoolCreation)
-var _ = Describe("IP Pool allocation", testPoolAllocation)
-var _ = Describe("IP Pool release", testPoolRelease)
-var _ = Describe("IP Pool reserve", testPoolReserve)
-var _ = Describe("isContiguous", testIsContiguous)
+var (
+	_ = Describe("IP Pool creation", testPoolCreation)
+	_ = Describe("IP Pool allocation", testPoolAllocation)
+	_ = Describe("IP Pool release", testPoolRelease)
+	_ = Describe("IP Pool reserve", testPoolReserve)
+	_ = Describe("isContiguous", testIsContiguous)
+)
 
 func testPoolCreation() {
 	When("the CIDR is missing the prefix", func() {

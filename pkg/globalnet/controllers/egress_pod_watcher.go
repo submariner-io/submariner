@@ -65,7 +65,6 @@ func startEgressPodWatcher(name, namespace string, namedIPSet ipset.Named, confi
 			},
 		},
 	})
-
 	if err != nil {
 		return nil, err
 	}

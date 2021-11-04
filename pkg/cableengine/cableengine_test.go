@@ -100,7 +100,6 @@ var _ = Describe("Cable Engine", func() {
 
 		natDiscovery = &fakeNATDiscovery{removeEndpoint: make(chan string, 20), readyChannel: make(chan *natdiscovery.NATEndpointInfo, 100)}
 		engine.SetupNATDiscovery(natDiscovery)
-
 	})
 
 	JustBeforeEach(func() {

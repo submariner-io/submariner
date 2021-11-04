@@ -156,7 +156,7 @@ func testGatewaySyncing() {
 func testStaleGatewayCleanup() {
 	var t *testDriver
 	var staleGateway *submarinerv1.Gateway
-	var expectedErr = errors.New("fake error")
+	expectedErr := errors.New("fake error")
 
 	BeforeEach(func() {
 		t = newTestDriver()

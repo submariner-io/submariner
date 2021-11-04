@@ -49,7 +49,6 @@ func (h *vxlanCleanup) TransitionToNonGateway() error {
 	klog.Infof("Cleaning up the routes")
 
 	link, err := netlink.LinkByName(vxlan.VxlanIface)
-
 	if err != nil {
 		return nil
 	}

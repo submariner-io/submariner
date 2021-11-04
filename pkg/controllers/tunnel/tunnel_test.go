@@ -80,7 +80,8 @@ var _ = Describe("Managing tunnels", func() {
 				ClusterID: "east",
 				Hostname:  "redsox",
 				PrivateIP: "192.68.1.2",
-			}}
+			},
+		}
 
 		Expect(v1.AddToScheme(kubeScheme.Scheme)).To(Succeed())
 

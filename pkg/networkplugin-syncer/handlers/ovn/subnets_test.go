@@ -25,15 +25,15 @@ import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 )
 
-const cluster1Net1 = "10.0.0.0/24"
-const cluster1Net2 = "10.0.1.0/24"
-const cluster2Net1 = "20.0.0.0/24"
-const cluster2Net2 = "20.0.1.0/24"
-
-const localNet1 = "1.0.0.0/16"
-const localNet2 = "1.1.0.0/16"
-
-const unknownNet1 = "30.0.0.0/10"
+const (
+	cluster1Net1 = "10.0.0.0/24"
+	cluster1Net2 = "10.0.1.0/24"
+	cluster2Net1 = "20.0.0.0/24"
+	cluster2Net2 = "20.0.1.0/24"
+	localNet1    = "1.0.0.0/16"
+	localNet2    = "1.1.0.0/16"
+	unknownNet1  = "30.0.0.0/10"
+)
 
 var _ = Describe("Remote subnet handling", func() {
 	var (
@@ -107,7 +107,8 @@ func createHandlerWithTestEndpoints() *SyncHandler {
 				ClusterID: "cluster-2",
 				Subnets: []string{
 					cluster2Net1,
-					cluster2Net2},
+					cluster2Net2,
+				},
 			}},
 		},
 		localEndpoint: &v1.Endpoint{

@@ -29,7 +29,6 @@ import (
 )
 
 var _ = Describe("Request handling", func() {
-
 	var localListener *natDiscovery
 	var localUDPSent chan []byte
 	var remoteListener *natDiscovery
@@ -78,7 +77,6 @@ var _ = Describe("Request handling", func() {
 			Expect(response[1].DstIpNatDetected).To(BeTrue())
 			Expect(response[1].SrcIpNatDetected).To(BeFalse())
 			Expect(response[1].SrcPortNatDetected).To(BeFalse())
-
 		})
 
 		Context("with a modified IP", func() {

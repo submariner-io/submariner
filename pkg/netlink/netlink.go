@@ -61,8 +61,7 @@ type Interface interface {
 
 var NewFunc func() Interface
 
-type netlinkType struct {
-}
+type netlinkType struct{}
 
 func New() Interface {
 	if NewFunc != nil {

@@ -97,8 +97,8 @@ func main() {
 	ctl, err := controller.New(&controller.Config{
 		Registry:   registry,
 		MasterURL:  masterURL,
-		Kubeconfig: kubeconfig})
-
+		Kubeconfig: kubeconfig,
+	})
 	if err != nil {
 		klog.Fatalf("Error creating controller for event handling %v", err)
 	}

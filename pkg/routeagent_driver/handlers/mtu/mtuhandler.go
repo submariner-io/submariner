@@ -73,12 +73,16 @@ func (h *mtuHandler) Init() error {
 		return errors.Wrapf(err, "error creating ipset %q", constants.LocalCIDRIPSet)
 	}
 
-	ruleSpecSource := []string{"-m", "set", "--match-set", constants.LocalCIDRIPSet, "src", "-m", "set", "--match-set",
+	ruleSpecSource := []string{
+		"-m", "set", "--match-set", constants.LocalCIDRIPSet, "src", "-m", "set", "--match-set",
 		constants.RemoteCIDRIPSet, "dst", "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS",
-		"--clamp-mss-to-pmtu"}
-	ruleSpecDest := []string{"-m", "set", "--match-set", constants.RemoteCIDRIPSet, "src", "-m", "set", "--match-set",
+		"--clamp-mss-to-pmtu",
+	}
+	ruleSpecDest := []string{
+		"-m", "set", "--match-set", constants.RemoteCIDRIPSet, "src", "-m", "set", "--match-set",
 		constants.LocalCIDRIPSet, "dst", "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS",
-		"--clamp-mss-to-pmtu"}
+		"--clamp-mss-to-pmtu",
+	}
 
 	if err := iptables.PrependUnique(h.ipt, constants.MangleTable, constants.PostRoutingChain,
 		forwardToSubMarinerPostRoutingChain); err != nil {
