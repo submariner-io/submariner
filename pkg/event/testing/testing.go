@@ -59,6 +59,7 @@ func (t *TestHandler) addEvent(eventName string, param interface{}) error {
 
 	return t.FailOnEvent
 }
+
 func (t *TestHandler) Init() error {
 	t.Initialized = true
 
@@ -73,18 +74,20 @@ func (t *TestHandler) GetNetworkPlugins() []string {
 	return []string{t.NetworkPlugin}
 }
 
-const EvTransitionToNonGateway = "TransitionToNonGateway"
-const EvTransitionToGateway = "TransitionToGateway"
-const EvLocalEndpointCreated = "LocalEndpointCreated"
-const EvLocalEndpointUpdated = "LocalEndpointUpdated"
-const EvLocalEndpointRemoved = "LocalEndpointRemoved"
-const EvRemoteEndpointCreated = "RemoteEndpointCreated"
-const EvRemoteEndpointUpdated = "RemoteEndpointUpdated"
-const EvRemoteEndpointRemoved = "RemoteEndpointRemoved"
-const EvNodeCreated = "NodeCreated"
-const EvNodeUpdated = "NodeUpdated"
-const EvNodeRemoved = "NodeRemoved"
-const EvStop = "Stop"
+const (
+	EvTransitionToNonGateway = "TransitionToNonGateway"
+	EvTransitionToGateway    = "TransitionToGateway"
+	EvLocalEndpointCreated   = "LocalEndpointCreated"
+	EvLocalEndpointUpdated   = "LocalEndpointUpdated"
+	EvLocalEndpointRemoved   = "LocalEndpointRemoved"
+	EvRemoteEndpointCreated  = "RemoteEndpointCreated"
+	EvRemoteEndpointUpdated  = "RemoteEndpointUpdated"
+	EvRemoteEndpointRemoved  = "RemoteEndpointRemoved"
+	EvNodeCreated            = "NodeCreated"
+	EvNodeUpdated            = "NodeUpdated"
+	EvNodeRemoved            = "NodeRemoved"
+	EvStop                   = "Stop"
+)
 
 func (t *TestHandler) Stop(uninstall bool) error {
 	return t.addEvent(EvStop, uninstall)

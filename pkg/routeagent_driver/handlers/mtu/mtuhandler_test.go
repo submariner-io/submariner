@@ -50,7 +50,6 @@ var _ = Describe("MTUHandler", func() {
 
 	AfterEach(func() {
 		iptables.NewFunc = nil
-
 	})
 
 	When("When endpoint is added and removed", func() {

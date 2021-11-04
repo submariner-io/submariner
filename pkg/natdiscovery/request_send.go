@@ -66,7 +66,6 @@ func (nd *natDiscovery) sendCheckRequest(remoteNAT *remoteEndpointNAT) error {
 
 func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT, targetIP string) (uint64, error) {
 	targetPort, err := extractNATDiscoveryPort(&remoteNAT.endpoint.Spec)
-
 	if err != nil {
 		return 0, err
 	}

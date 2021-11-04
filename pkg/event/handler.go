@@ -74,8 +74,7 @@ type Handler interface {
 }
 
 // Base structure for event handlers that stubs out methods considered to be optional.
-type HandlerBase struct {
-}
+type HandlerBase struct{}
 
 func (ev *HandlerBase) Init() error {
 	return nil

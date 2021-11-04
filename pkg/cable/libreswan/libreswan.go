@@ -71,8 +71,10 @@ type specification struct {
 	NATTPort    string `default:"4500"`
 }
 
-const defaultNATTPort = "4500"
-const ipsecSpecEnvVarPrefix = "ce_ipsec"
+const (
+	defaultNATTPort       = "4500"
+	ipsecSpecEnvVarPrefix = "ce_ipsec"
+)
 
 // NewLibreswan starts an IKE daemon using Libreswan and configures it to manage Submariner's endpoints.
 func NewLibreswan(localEndpoint *types.SubmarinerEndpoint, localCluster *types.SubmarinerCluster) (cable.Driver, error) {

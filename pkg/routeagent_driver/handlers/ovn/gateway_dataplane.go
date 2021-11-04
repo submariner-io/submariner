@@ -87,9 +87,11 @@ func (ovn *Handler) updateGatewayDataplane() error {
 // TODO: if the #1022 workaround needs to be sustained for some time, instead of this we should be calculating
 //       the PMTU with a tool like tracepath between the gateway endpoints, reporting back so we can use such
 //		 information here.
-const IPTCPOverHead = 40
-const ExpectedIPSECOverhead = 62
-const MSSFor1500MTU = 1500 - IPTCPOverHead - ExpectedIPSECOverhead
+const (
+	IPTCPOverHead         = 40
+	ExpectedIPSECOverhead = 62
+	MSSFor1500MTU         = 1500 - IPTCPOverHead - ExpectedIPSECOverhead
+)
 
 func (ovn *Handler) getForwardingRuleSpecs() ([][]string, error) {
 	if ovn.cableRoutingInterface == nil {
@@ -99,7 +101,8 @@ func (ovn *Handler) getForwardingRuleSpecs() ([][]string, error) {
 
 	rules := [][]string{
 		{"-i", ovnK8sSubmarinerInterface, "-o", ovn.cableRoutingInterface.Name, "-j", "ACCEPT"},
-		{"-i", ovn.cableRoutingInterface.Name, "-o", ovnK8sSubmarinerInterface, "-j", "ACCEPT"}}
+		{"-i", ovn.cableRoutingInterface.Name, "-o", ovnK8sSubmarinerInterface, "-j", "ACCEPT"},
+	}
 
 	return rules, nil
 }
@@ -114,17 +117,23 @@ func (ovn *Handler) getMSSClampingRuleSpecs() ([][]string, error) {
 	//       reflector in the route agent for that type of packets
 	for _, remoteCIDR := range ovn.getRemoteSubnets().Elements() {
 		rules = append(rules,
-			[]string{"-d", remoteCIDR, "-p", "tcp", "-m", "tcp",
-				"--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", strconv.Itoa(MSSFor1500MTU)},
-			[]string{"-s", remoteCIDR, "-p", "tcp", "-m", "tcp",
-				"--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", strconv.Itoa(MSSFor1500MTU)})
+			[]string{
+				"-d", remoteCIDR, "-p", "tcp", "-m", "tcp",
+				"--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", strconv.Itoa(MSSFor1500MTU),
+			},
+			[]string{
+				"-s", remoteCIDR, "-p", "tcp", "-m", "tcp",
+				"--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", strconv.Itoa(MSSFor1500MTU),
+			})
 	}
 
 	// NOTE: This is a workaround for submariner issue https://github.com/submariner-io/submariner/issues/1022
 	// TODO: work with the core-ovn community to make sure that load balancers propagate ICMPs back to pods
 	for _, serviceCIDR := range ovn.config.ServiceCidr {
-		rules = append(rules, []string{"-o", ovnK8sSubmarinerInterface, "-d", serviceCIDR, "-p", "tcp", "-m", "tcp",
-			"--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", strconv.Itoa(MSSFor1500MTU)})
+		rules = append(rules, []string{
+			"-o", ovnK8sSubmarinerInterface, "-d", serviceCIDR, "-p", "tcp", "-m", "tcp",
+			"--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", strconv.Itoa(MSSFor1500MTU),
+		})
 	}
 
 	return rules, nil
@@ -132,8 +141,10 @@ func (ovn *Handler) getMSSClampingRuleSpecs() ([][]string, error) {
 
 type forwardRuleSpecGenerator func() ([][]string, error)
 
-const forwardingSubmarinerMSSClampChain = "SUBMARINER-FWD-MSSCLAMP"
-const forwardingSubmarinerFWDChain = "SUBMARINER-FORWARD"
+const (
+	forwardingSubmarinerMSSClampChain = "SUBMARINER-FWD-MSSCLAMP"
+	forwardingSubmarinerFWDChain      = "SUBMARINER-FORWARD"
+)
 
 func (ovn *Handler) setupForwardingIptables() error {
 	if err := ovn.updateIPtableChains("filter", forwardingSubmarinerMSSClampChain, ovn.getMSSClampingRuleSpecs); err != nil {

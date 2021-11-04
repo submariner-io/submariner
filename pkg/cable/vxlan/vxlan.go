@@ -117,7 +117,6 @@ func (v *vxlan) createVxlanInterface(activeEndPoint string, port int) error {
 	}
 
 	defaultHostIface, err := util.GetDefaultGatewayInterface()
-
 	if err != nil {
 		return errors.Wrapf(err, "Unable to find the default interface on host: %s",
 			v.localEndpoint.Spec.Hostname)
@@ -298,7 +297,6 @@ func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 
 	privateIP := endpointInfo.Endpoint.Spec.PrivateIP
 	remoteVtepIP, err := v.getVxlanVtepIPAddress(privateIP)
-
 	if err != nil {
 		return endpointInfo.UseIP, fmt.Errorf("failed to derive the vxlan vtepIP for %s: %w", privateIP, err)
 	}
@@ -326,8 +324,10 @@ func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 			allowedIPs, remoteVtepIP, v.vxlanIface.vtepIP, err)
 	}
 
-	v.connections = append(v.connections, v1.Connection{Endpoint: remoteEndpoint.Spec, Status: v1.Connected,
-		UsingIP: endpointInfo.UseIP, UsingNAT: endpointInfo.UseNAT})
+	v.connections = append(v.connections, v1.Connection{
+		Endpoint: remoteEndpoint.Spec, Status: v1.Connected,
+		UsingIP: endpointInfo.UseIP, UsingNAT: endpointInfo.UseNAT,
+	})
 
 	klog.V(log.DEBUG).Infof("Done adding endpoint for cluster %s", remoteEndpoint.Spec.ClusterID)
 
@@ -368,7 +368,6 @@ func (v *vxlan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint)
 	allowedIPs := parseSubnets(remoteEndpoint.Spec.Subnets)
 
 	err := v.vxlanIface.DelFDB(remoteIP, "00:00:00:00:00:00")
-
 	if err != nil {
 		return fmt.Errorf("failed to delete remoteIP %q from the forwarding database: %w", remoteIP, err)
 	}
@@ -424,7 +423,6 @@ func (v *vxlanIface) configureIPAddress(ipAddress net.IP, mask net.IPMask) error
 
 func (v *vxlanIface) AddFDB(ipAddress net.IP, hwAddr string) error {
 	macAddr, err := net.ParseMAC(hwAddr)
-
 	if err != nil {
 		return errors.Wrapf(err, "invalid MAC Address (%s) supplied", hwAddr)
 	}

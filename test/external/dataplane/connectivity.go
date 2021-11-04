@@ -36,9 +36,7 @@ const (
 	testContainerName = "ext-test-container"
 )
 
-var (
-	simpleHTTPServerCommand = []string{"python", "-m", "SimpleHTTPServer", "80"}
-)
+var simpleHTTPServerCommand = []string{"python", "-m", "SimpleHTTPServer", "80"}
 
 var _ = Describe("[external-dataplane] Connectivity", func() {
 	f := framework.NewFramework("ext-dataplane")

@@ -50,8 +50,10 @@ type GatewaySyncer struct {
 	healthCheck healthchecker.Interface
 }
 
-var GatewayUpdateInterval = 5 * time.Second
-var GatewayStaleTimeout = GatewayUpdateInterval * 3
+var (
+	GatewayUpdateInterval = 5 * time.Second
+	GatewayStaleTimeout   = GatewayUpdateInterval * 3
+)
 
 var gatewaySyncIterations = prometheus.NewCounter(prometheus.CounterOpts{
 	Name: "submariner_gateway_sync_iterations",
@@ -205,7 +207,8 @@ func (gs *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        util.EnsureValidName(localEndpoint.Spec.Hostname),
-			Annotations: map[string]string{updateTimestampAnnotation: strconv.FormatInt(time.Now().UTC().Unix(), 10)}},
+			Annotations: map[string]string{updateTimestampAnnotation: strconv.FormatInt(time.Now().UTC().Unix(), 10)},
+		},
 	}
 
 	gateway.Status.HAStatus = gs.engine.GetHAStatus()

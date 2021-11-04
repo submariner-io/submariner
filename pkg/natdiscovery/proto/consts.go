@@ -18,5 +18,7 @@ limitations under the License.
 
 package proto
 
-const DefaultPort = 4490
-const Version = 1
+const (
+	DefaultPort = 4490
+	Version     = 1
+)

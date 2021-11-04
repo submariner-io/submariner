@@ -41,8 +41,10 @@ var defaultPingInterval = 1 * time.Second
 
 // Even though we set up the pinger to run continuously, we still have to give it a non-zero timeout else it will
 // fail so set a really long one.
-var defaultPingTimeout = 87600 * time.Hour
-var pingTimeout = defaultPingTimeout
+var (
+	defaultPingTimeout = 87600 * time.Hour
+	pingTimeout        = defaultPingTimeout
+)
 
 type PingerInterface interface {
 	Start()

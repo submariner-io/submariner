@@ -166,7 +166,7 @@ func RecordDisconnected(cableDriverName string, localEndpoint, remoteEndpoint *s
 }
 
 func RecordNoConnections() {
-	//TODO: assuming only 1 cable driver is active at a time, calling Reset() will work.
+	// TODO: assuming only 1 cable driver is active at a time, calling Reset() will work.
 	// once this is changed, there is a need to be updated accordingly
 	connectionsGauge.Reset()
 }

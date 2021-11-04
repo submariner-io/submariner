@@ -47,7 +47,6 @@ func (h *xrfmCleanup) GetNetworkPlugins() []string {
 
 func (h *xrfmCleanup) TransitionToNonGateway() error {
 	currentXfrmPolicyList, err := h.netLink.XfrmPolicyList(syscall.AF_INET)
-
 	if err != nil {
 		return errors.Wrap(err, "error retrieving current xfrm policies")
 	}

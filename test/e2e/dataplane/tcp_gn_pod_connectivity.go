@@ -133,5 +133,4 @@ var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across over
 			verifyInteraction(framework.GatewayNode, framework.GatewayNode)
 		})
 	})
-
 })

@@ -42,7 +42,6 @@ func (ovn *SyncHandler) ensureServiceLoadBalancersFrom(logicalSwitch string) err
 
 func (ovn *SyncHandler) getSubmarinerRouterID() (string, error) {
 	submarinerRouter, err := ovn.nbdb.LRGet(submarinerLogicalRouter)
-
 	if err != nil {
 		return "", errors.Wrapf(err, "error getting %q router ID", submarinerLogicalRouter)
 	}
@@ -56,7 +55,6 @@ func (ovn *SyncHandler) getSubmarinerRouterID() (string, error) {
 
 func (ovn *SyncHandler) getK8sLoadBalancerIDsFor(logicalSwitch string) ([]string, error) {
 	loadBalancers, err := ovn.nbdb.LSLBList(logicalSwitch)
-
 	if err != nil {
 		return nil, errors.Wrapf(err, "error listing load balancers for logical switch %q", logicalSwitch)
 	}

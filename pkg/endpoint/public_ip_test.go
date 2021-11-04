@@ -87,8 +87,10 @@ var _ = Describe("public ip resolvers", func() {
 	When("a LoadBalancer with Ingress hostname is specified", func() {
 		It("should return the IP", func() {
 			backendConfig[publicIPConfig] = "lb:" + testServiceName
-			client := fake.NewSimpleClientset(serviceWithIngress(v1.LoadBalancerIngress{Hostname: testIPDNS + ".nip.io",
-				IP: ""}))
+			client := fake.NewSimpleClientset(serviceWithIngress(v1.LoadBalancerIngress{
+				Hostname: testIPDNS + ".nip.io",
+				IP:       "",
+			}))
 			ip, err := getPublicIP(submSpec, client, backendConfig)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ip).To(Equal(testIPDNS))

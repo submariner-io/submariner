@@ -35,8 +35,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-var _ = Describe("Endpoint syncing", testEndpointSyncing)
-var _ = Describe("Endpoint exclusivity", testEndpointExclusivity)
+var (
+	_ = Describe("Endpoint syncing", testEndpointSyncing)
+	_ = Describe("Endpoint exclusivity", testEndpointExclusivity)
+)
 
 func testEndpointSyncing() {
 	t := newTestDriver()

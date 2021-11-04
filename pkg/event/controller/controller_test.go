@@ -38,9 +38,11 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
-const testNamespace = "test-namespace"
-const testHandlerName = "test-handler"
-const testLocalClusterID = "local-cluster"
+const (
+	testNamespace      = "test-namespace"
+	testHandlerName    = "test-handler"
+	testLocalClusterID = "local-cluster"
+)
 
 var _ = Describe("Event controller", func() {
 	var (

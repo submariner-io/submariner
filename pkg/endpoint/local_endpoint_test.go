@@ -37,7 +37,7 @@ const testNodeName = "this-node"
 var _ = Describe("GetLocal", func() {
 	var submSpec *types.SubmarinerSpecification
 	var client kubernetes.Interface
-	var testPrivateIP = util.GetLocalIP()
+	testPrivateIP := util.GetLocalIP()
 	var node *v1.Node
 
 	const (
@@ -63,7 +63,9 @@ var _ = Describe("GetLocal", func() {
 				Labels: map[string]string{
 					backendConfigPrefix + testNATTPortLabel: "1234",
 					backendConfigPrefix + testUDPPortLabel:  testUDPPort,
-				}}}
+				},
+			},
+		}
 
 		client = fake.NewSimpleClientset(node)
 
