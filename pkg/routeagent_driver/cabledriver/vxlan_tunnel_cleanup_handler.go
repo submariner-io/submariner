@@ -50,6 +50,10 @@ func (h *vxlanCleanup) TransitionToNonGateway() error {
 
 	link, err := netlink.LinkByName(vxlan.VxlanIface)
 	if err != nil {
+		if !errors.Is(err, netlink.LinkNotFoundError{}) {
+			klog.Warningf("Failed to retrieve the vxlan-tunnel interface during transition to non-gateway: %v", err)
+		}
+
 		return nil
 	}
 
@@ -70,7 +74,7 @@ func (h *vxlanCleanup) TransitionToNonGateway() error {
 
 	err = netlink.LinkDel(link)
 	if err != nil {
-		return errors.Wrapf(err, "failed to delete the the vxlan interface")
+		return errors.Wrapf(err, "failed to delete the vxlan interface")
 	}
 
 	return nil
