@@ -133,8 +133,8 @@ var _ = Describe("Cable Engine", func() {
 			var newEndpoint *subv1.Endpoint
 
 			BeforeEach(func() {
-				copy := *remoteEndpoint
-				newEndpoint = &copy
+				c := *remoteEndpoint
+				newEndpoint = &c
 				prevEndpoint = remoteEndpoint
 			})
 
