@@ -97,10 +97,10 @@ func (n *nodeController) process(from runtime.Object, numRequeues int, op syncer
 			if op == syncer.Delete {
 				_ = n.pool.Release(existingGlobalIP)
 				return nil, false
-			} else {
-				_ = n.pool.Release(existingGlobalIP)
-				return n.updateNodeAnnotation(node, ""), false
 			}
+
+			_ = n.pool.Release(existingGlobalIP)
+			return n.updateNodeAnnotation(node, ""), false
 		}
 
 		return nil, false

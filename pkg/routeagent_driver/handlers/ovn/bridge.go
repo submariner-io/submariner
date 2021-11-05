@@ -29,11 +29,12 @@ import (
 )
 
 func (ovn *Handler) getMTU() (int, error) {
-	if link, err := ovn.netlink.LinkByName(OVNK8sMgmntIntfName); err != nil {
+	link, err := ovn.netlink.LinkByName(OVNK8sMgmntIntfName)
+	if err != nil {
 		return 0, errors.Wrapf(err, "error retrieving link by name %q", OVNK8sMgmntIntfName)
-	} else {
-		return link.Attrs().MTU, nil
 	}
+
+	return link.Attrs().MTU, nil
 }
 
 func (ovn *Handler) ensureSubmarinerNodeBridge() error {

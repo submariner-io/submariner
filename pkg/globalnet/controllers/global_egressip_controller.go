@@ -353,10 +353,9 @@ func (c *globalEgressIPController) flushGlobalEgressRulesAndReleaseIPs(key, ipSe
 		if globalEgressIP.Spec.PodSelector != nil {
 			return c.iptIface.RemoveEgressRulesForPods(key, ipSetName,
 				getTargetSNATIPaddress(allocatedIPs), globalNetIPTableMark)
-		} else {
-			return c.iptIface.RemoveEgressRulesForNamespace(key, ipSetName,
-				getTargetSNATIPaddress(allocatedIPs), globalNetIPTableMark)
 		}
+
+		return c.iptIface.RemoveEgressRulesForNamespace(key, ipSetName, getTargetSNATIPaddress(allocatedIPs), globalNetIPTableMark)
 	}, globalEgressIP.Status.AllocatedIPs...)
 }
 

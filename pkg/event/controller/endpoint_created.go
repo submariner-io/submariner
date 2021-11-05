@@ -65,9 +65,5 @@ func (c *Controller) handleCreatedLocalEndpoint(endpoint *smv1.Endpoint) error {
 }
 
 func (c *Controller) handleCreatedRemoteEndpoint(endpoint *smv1.Endpoint) error {
-	if err := c.handlers.RemoteEndpointCreated(endpoint); err != nil {
-		return err
-	}
-
-	return nil
+	return c.handlers.RemoteEndpointCreated(endpoint)
 }
