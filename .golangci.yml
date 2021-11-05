@@ -47,6 +47,7 @@ linters:
     - nilerr
     - nolintlint
     - prealloc
+    - predeclared
     - staticcheck
     - structcheck
     - stylecheck  # instead of golint
