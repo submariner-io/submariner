@@ -107,11 +107,7 @@ func (i *engine) startDriver() error {
 		return err
 	}
 
-	if err := i.driver.Init(); err != nil {
-		return err
-	}
-
-	return nil
+	return i.driver.Init()
 }
 
 func (i *engine) SetupNATDiscovery(natDiscovery natdiscovery.Interface) {
@@ -261,12 +257,12 @@ func (i *engine) GetHAStatus() v1.HAStatus {
 
 	if i.driver == nil {
 		return v1.HAStatusPassive
-	} else {
-		// we may want to add a call to the driver in the future, for situations where
-		// the driver is running from the start, but could be in passive status, or
-		// in active/active.
-		return v1.HAStatusActive
 	}
+
+	// we may want to add a call to the driver in the future, for situations where
+	// the driver is running from the start, but could be in passive status, or
+	// in active/active.
+	return v1.HAStatusActive
 }
 
 func (i *engine) ListCableConnections() ([]v1.Connection, error) {

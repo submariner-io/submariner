@@ -384,11 +384,7 @@ func (i *libreswan) bidirectionalConnectToEndpoint(connectionName string, endpoi
 		return err
 	}
 
-	if err := whack("--initiate", "--asynchronous", "--name", connectionName); err != nil {
-		return err
-	}
-
-	return nil
+	return whack("--initiate", "--asynchronous", "--name", connectionName)
 }
 
 func (i *libreswan) serverConnectToEndpoint(connectionName string, endpointInfo *natdiscovery.NATEndpointInfo,
@@ -469,11 +465,7 @@ func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo 
 		return err
 	}
 
-	if err := whack("--initiate", "--asynchronous", "--name", connectionName); err != nil {
-		return err
-	}
-
-	return nil
+	return whack("--initiate", "--asynchronous", "--name", connectionName)
 }
 
 // DisconnectFromEndpoint disconnects from the connection to the given endpoint.

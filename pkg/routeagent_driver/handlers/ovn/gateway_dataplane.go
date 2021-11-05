@@ -213,12 +213,7 @@ func (ovn *Handler) ensureForwardChains() error {
 		return err
 	}
 
-	if err := submiptables.InsertUnique(ovn.ipt, "filter", "FORWARD", 2,
-		[]string{"-j", forwardingSubmarinerFWDChain}); err != nil {
-		return err
-	}
-
-	return nil
+	return submiptables.InsertUnique(ovn.ipt, "filter", "FORWARD", 2, []string{"-j", forwardingSubmarinerFWDChain})
 }
 
 func (ovn *Handler) updateIPtableChains(table, chain string, ruleGen forwardRuleSpecGenerator) error {

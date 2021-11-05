@@ -88,7 +88,7 @@ var _ = Describe("Event Registry", func() {
 
 		When("one handler returns an error", func() {
 			It("should invoke subsequent matching handlers", func() {
-				matchingHandlers[0].FailOnEvent = errors.New("I shall fail!")
+				matchingHandlers[0].FailOnEvent = errors.New("mock handler error")
 
 				for ev, f := range allEvents(registry) {
 					err := f()

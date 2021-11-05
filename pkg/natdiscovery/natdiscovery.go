@@ -139,10 +139,10 @@ func (nd *natDiscovery) AddEndpoint(endpoint *v1.Endpoint) {
 			}
 
 			return
-		} else {
-			klog.V(log.DEBUG).Infof("NAT discovery updated endpoint %q", endpoint.Spec.CableName)
-			delete(nd.remoteEndpoints, endpoint.Spec.CableName)
 		}
+
+		klog.V(log.DEBUG).Infof("NAT discovery updated endpoint %q", endpoint.Spec.CableName)
+		delete(nd.remoteEndpoints, endpoint.Spec.CableName)
 	}
 
 	remoteNAT := newRemoteEndpointNAT(endpoint)
