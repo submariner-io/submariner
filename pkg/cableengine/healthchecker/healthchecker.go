@@ -55,7 +55,7 @@ type Config struct {
 	ClusterID          string
 	PingInterval       uint
 	MaxPacketLossCount uint
-	NewPinger          func(string, time.Duration, uint) PingerInterface
+	NewPinger          func(PingerConfig) PingerInterface
 }
 
 type controller struct {
@@ -135,23 +135,21 @@ func (h *controller) endpointCreatedorUpdated(obj runtime.Object, numRequeues in
 		h.pingers.Delete(endpointCreated.Spec.CableName)
 	}
 
-	pingInterval := defaultPingInterval
-	if h.config.PingInterval != 0 {
-		pingInterval = time.Second * time.Duration(h.config.PingInterval)
+	pingerConfig := PingerConfig{
+		IP:                 endpointCreated.Spec.HealthCheckIP,
+		MaxPacketLossCount: h.config.MaxPacketLossCount,
 	}
 
-	maxPacketLossCount := defaultMaxPacketLossCount
-
-	if h.config.MaxPacketLossCount != 0 {
-		maxPacketLossCount = h.config.MaxPacketLossCount
+	if h.config.PingInterval != 0 {
+		pingerConfig.Interval = time.Second * time.Duration(h.config.PingInterval)
 	}
 
 	newPingerFunc := h.config.NewPinger
 	if newPingerFunc == nil {
-		newPingerFunc = newPinger
+		newPingerFunc = NewPinger
 	}
 
-	pinger := newPingerFunc(endpointCreated.Spec.HealthCheckIP, pingInterval, maxPacketLossCount)
+	pinger := newPingerFunc(pingerConfig)
 	h.pingers.Store(endpointCreated.Spec.CableName, pinger)
 	pinger.Start()
 
