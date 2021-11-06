@@ -85,12 +85,12 @@ var _ = Describe("Controller", func() {
 			MaxPacketLossCount: 4,
 		}
 
-		config.NewPinger = func(ip string, i time.Duration, m uint) healthchecker.PingerInterface {
+		config.NewPinger = func(pingerCfg healthchecker.PingerConfig) healthchecker.PingerInterface {
 			defer GinkgoRecover()
-			Expect(i).To(Equal(time.Second * time.Duration(config.PingInterval)))
-			Expect(m).To(Equal(config.MaxPacketLossCount))
+			Expect(pingerCfg.Interval).To(Equal(time.Second * time.Duration(config.PingInterval)))
+			Expect(pingerCfg.MaxPacketLossCount).To(Equal(config.MaxPacketLossCount))
 
-			p, ok := pingerMap[ip]
+			p, ok := pingerMap[pingerCfg.IP]
 			Expect(ok).To(BeTrue())
 			return p
 		}

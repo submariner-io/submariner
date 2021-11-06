@@ -15,7 +15,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package mtu
+package mtu_test
 
 import (
 	. "github.com/onsi/ginkgo"
@@ -27,6 +27,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/iptables"
 	fakeIPT "github.com/submariner-io/submariner/pkg/iptables/fake"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/mtu"
 )
 
 var _ = Describe("MTUHandler", func() {
@@ -45,7 +46,7 @@ var _ = Describe("MTUHandler", func() {
 		ipset.NewFunc = func() ipset.Interface {
 			return ipSet
 		}
-		handler = NewMTUHandler()
+		handler = mtu.NewMTUHandler()
 	})
 
 	AfterEach(func() {

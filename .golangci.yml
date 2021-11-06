@@ -51,8 +51,8 @@ linters:
     - revive
     - staticcheck
     - structcheck
-    - stylecheck  # instead of golint
-    # - testpackage
+    - stylecheck
+    - testpackage
     - typecheck
     - unconvert
     - unparam
