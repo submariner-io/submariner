@@ -20,7 +20,7 @@ package endpoint
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"regexp"
@@ -98,7 +98,7 @@ func publicAPI(clientset kubernetes.Interface, namespace, value string) (string,
 
 	defer response.Body.Close()
 
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return "", errors.Wrapf(err, "reading API response from %s", url)
 	}

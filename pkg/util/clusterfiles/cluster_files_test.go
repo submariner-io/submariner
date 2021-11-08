@@ -19,7 +19,7 @@ limitations under the License.
 package clusterfiles_test
 
 import (
-	"io/ioutil"
+	"os"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -98,7 +98,7 @@ var _ = Describe("Cluster Files Get", func() {
 		It("should return the data in a tmp file", func() {
 			file, err := clusterfiles.Get(client, "secret://ns1/my-secret/data1")
 			Expect(err).NotTo(HaveOccurred())
-			fileContent, err := ioutil.ReadFile(file)
+			fileContent, err := os.ReadFile(file)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(fileContent).To(Equal(theData))
 		})
@@ -108,7 +108,7 @@ var _ = Describe("Cluster Files Get", func() {
 		It("should return the data in a tmp file", func() {
 			file, err := clusterfiles.Get(client, "configmap://ns1/my-configmap/data1")
 			Expect(err).NotTo(HaveOccurred())
-			fileContent, err := ioutil.ReadFile(file)
+			fileContent, err := os.ReadFile(file)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(fileContent).To(Equal(theData))
 		})
@@ -118,7 +118,7 @@ var _ = Describe("Cluster Files Get", func() {
 		It("should return the data in a tmp file", func() {
 			file, err := clusterfiles.Get(client, "configmap://ns1/my-configmap-binary/data1")
 			Expect(err).NotTo(HaveOccurred())
-			fileContent, err := ioutil.ReadFile(file)
+			fileContent, err := os.ReadFile(file)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(fileContent).To(Equal(theData))
 		})

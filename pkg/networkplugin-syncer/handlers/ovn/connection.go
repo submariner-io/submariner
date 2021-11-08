@@ -21,7 +21,7 @@ package ovn
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"io/ioutil"
+	"os"
 	"strings"
 
 	goovn "github.com/ebay/go-ovn"
@@ -98,7 +98,7 @@ func getOVNTLSConfig(pkFile, certFile, caFile string) (*tls.Config, error) {
 
 	rootCAs := x509.NewCertPool()
 
-	data, err := ioutil.ReadFile(caFile)
+	data, err := os.ReadFile(caFile)
 
 	if err != nil {
 		return nil, errors.Wrap(err, "failure loading OVNDB ca bundle")

@@ -105,7 +105,7 @@ func storeToDisk(pathContainerObject string, parsedURL *url.URL, data []byte) (s
 		return "", errors.Wrapf(err, "error creating %s directory to store %s", dir, diskFilePath)
 	}
 
-	err = ioutil.WriteFile(diskFilePath, data, 0400)
+	err = os.WriteFile(diskFilePath, data, 0400)
 	if err != nil {
 		klog.Error(err)
 		return "", errors.Wrapf(err, "error writing cluster file to  %q", diskFilePath)
