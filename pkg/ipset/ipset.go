@@ -552,12 +552,14 @@ func (runner *runner) GetVersion() (string, error) {
 func getIPSetVersionString(exec utilexec.Interface) (string, error) {
 	cmd := exec.Command(IPSetCmd, "--version")
 	cmd.SetStdin(bytes.NewReader([]byte{}))
+
 	cmdBytes, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", errors.Wrap(err, "error executing ipset command")
 	}
 
 	versionMatcher := regexp.MustCompile(VersionPattern)
+
 	match := versionMatcher.FindStringSubmatch(string(cmdBytes))
 	if match == nil {
 		return "", fmt.Errorf("no ipset version found in string: %s", cmdBytes)

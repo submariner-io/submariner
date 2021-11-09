@@ -43,6 +43,7 @@ func (w *wireguard) GetConnections() ([]v1.Connection, error) {
 
 	for i := range d.Peers {
 		key := d.Peers[i].PublicKey
+
 		connection, err := w.connectionByKey(&key)
 		if err != nil {
 			klog.Warningf("Found unknown peer with key %s, removing", key)
@@ -81,7 +82,6 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 	keepAliveMS := KeepAliveInterval.Milliseconds() + 2 // +2 for rounding
 
 	lc := peerTrafficDelta(connection, lastChecked, now)
-	lcSec := time.Duration(int64(time.Millisecond) * lc).Seconds()
 	if lc < keepAliveMS {
 		// too fast to see any change, leave status as is
 		return
@@ -90,6 +90,7 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 	// Longer than keep-alive interval, expect bytes>0.
 	tx := peerTrafficDelta(connection, transmitBytes, p.TransmitBytes)
 	rx := peerTrafficDelta(connection, receiveBytes, p.ReceiveBytes)
+	lcSec := time.Duration(int64(time.Millisecond) * lc).Seconds()
 
 	if p.LastHandshakeTime.IsZero() {
 		if lc > handshakeTimeout.Milliseconds() {

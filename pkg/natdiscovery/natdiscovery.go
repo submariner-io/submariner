@@ -86,6 +86,7 @@ func newNATDiscovery(localEndpoint *types.SubmarinerEndpoint) (*natDiscovery, er
 func randomRequestCounter() (uint64, error) {
 	max := new(big.Int)
 	max.Exp(big.NewInt(2), big.NewInt(64), nil).Sub(max, big.NewInt(1))
+
 	n, err := rand.Int(rand.Reader, max)
 	if err != nil {
 		return 0, errors.Wrapf(err, "generating random request counter")

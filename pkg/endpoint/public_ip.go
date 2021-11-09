@@ -61,6 +61,7 @@ func getPublicIP(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.I
 	resolvers := strings.Split(config, ",")
 	for _, resolver := range resolvers {
 		resolver = strings.Trim(resolver, " ")
+
 		parts := strings.Split(resolver, ":")
 		if len(parts) != 2 {
 			return "", errors.Errorf("invalid format for %q annotation: %q", v1.GatewayConfigPrefix+v1.PublicIP, config)

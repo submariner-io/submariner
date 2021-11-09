@@ -84,6 +84,7 @@ func (kp *SyncHandler) GetNetworkPlugins() []string {
 
 func (kp *SyncHandler) Init() error {
 	var err error
+
 	kp.hostname, err = os.Hostname()
 	if err != nil {
 		return errors.Wrapf(err, "unable to determine hostname")

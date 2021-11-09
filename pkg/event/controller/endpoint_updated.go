@@ -26,6 +26,7 @@ import (
 
 func (c *Controller) handleUpdatedEndpoint(obj runtime.Object, numRequeues int) bool {
 	endpoint := obj.(*smv1.Endpoint)
+
 	var err error
 	if endpoint.Spec.ClusterID != c.env.ClusterID {
 		err = c.handleUpdatedRemoteEndpoint(endpoint)

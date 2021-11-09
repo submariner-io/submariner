@@ -71,6 +71,7 @@ func NewGlobalEgressIPController(config *syncer.ResourceSyncerConfig, pool *ipam
 	}
 
 	client := config.SourceClient.Resource(*gvr).Namespace(corev1.NamespaceAll)
+
 	list, err := client.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "error listing the resources")

@@ -33,6 +33,7 @@ func (kp *SyncHandler) TransitionToNonGateway() error {
 	kp.cleanVxSubmarinerRoutes()
 	// If the active Gateway transitions to a new node, we flush the HostNetwork routing table.
 	kp.updateRoutingRulesForHostNetworkSupport(nil, Flush)
+
 	err := kp.configureIPRule(Delete)
 	if err != nil {
 		klog.Errorf("Unable to delete ip rule to table %d on non-Gateway node %s: %v",

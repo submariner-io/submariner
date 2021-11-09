@@ -59,8 +59,10 @@ func (kp *SyncHandler) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks [
 
 func (kp *SyncHandler) updateRoutingRulesForCIDRBlock(inputCidrBlock string, operation Operation) {
 	var viaGW *net.IP
+
 	if kp.isGatewayInRemoteCIDR(inputCidrBlock) {
 		gwIP := kp.remoteSubnetGw[inputCidrBlock]
+
 		routes, err := kp.netLink.RouteGet(gwIP)
 		if err != nil {
 			klog.Errorf("Failed to find route to remote gateway IP %s for cidr %s", gwIP.String(), inputCidrBlock)
@@ -71,7 +73,6 @@ func (kp *SyncHandler) updateRoutingRulesForCIDRBlock(inputCidrBlock string, ope
 
 	switch operation {
 	case Add:
-
 		if kp.routeCacheGWNode.Add(inputCidrBlock) {
 			if err := kp.configureRoute(inputCidrBlock, operation, viaGW); err != nil {
 				kp.routeCacheGWNode.Remove(inputCidrBlock)
@@ -81,7 +82,6 @@ func (kp *SyncHandler) updateRoutingRulesForCIDRBlock(inputCidrBlock string, ope
 		}
 
 	case Delete:
-
 		if kp.routeCacheGWNode.Remove(inputCidrBlock) {
 			if err := kp.configureRoute(inputCidrBlock, operation, viaGW); err != nil {
 				klog.Errorf("Failed to delete route %q for HostNetwork support on the Gateway node. %v",
@@ -104,6 +104,7 @@ func (kp *SyncHandler) isGatewayInRemoteCIDR(remoteCIDR string) bool {
 
 func (kp *SyncHandler) configureRoute(remoteSubnet string, operation Operation, viaGw *net.IP) error {
 	src := net.ParseIP(kp.cniIface.IPAddress)
+
 	_, dst, err := net.ParseCIDR(remoteSubnet)
 	if err != nil {
 		return errors.Wrapf(err, "error parsing cidr block %s", remoteSubnet)
@@ -217,7 +218,9 @@ func (kp *SyncHandler) reconcileRoutes(vxlanGw net.IP) error {
 			LinkIndex: link.Attrs().Index,
 			Protocol:  4,
 		}
+
 		found := false
+
 		for i := range currentRouteList {
 			if currentRouteList[i].Gw == nil || currentRouteList[i].Dst == nil {
 			} else if currentRouteList[i].Gw.Equal(route.Gw) && currentRouteList[i].Dst.String() == route.Dst.String() {

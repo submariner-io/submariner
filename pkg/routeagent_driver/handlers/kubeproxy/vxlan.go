@@ -189,6 +189,7 @@ func (iface *vxLanIface) AddFDB(ipAddress net.IP, hwAddr string) error {
 	}
 
 	klog.V(log.DEBUG).Infof("Successfully added the bridge fdb entry %v", neigh)
+
 	return nil
 }
 
@@ -214,6 +215,7 @@ func (iface *vxLanIface) DelFDB(ipAddress net.IP, hwAddr string) error {
 	}
 
 	klog.V(log.DEBUG).Infof("Successfully deleted the bridge fdb entry %v", neigh)
+
 	return nil
 }
 

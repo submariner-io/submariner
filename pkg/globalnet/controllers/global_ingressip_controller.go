@@ -59,6 +59,7 @@ func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipa
 	federator := federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
 
 	client := config.SourceClient.Resource(*gvr)
+
 	list, err := client.Namespace(corev1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "error listing the resources")

@@ -44,6 +44,7 @@ func NewIPPool(cidr string) (*IPPool, error) {
 	}
 
 	ones, totalbits := network.Mask.Size()
+
 	size := int(math.Exp2(float64(totalbits-ones))) - 2 // don't count net and broadcast
 	if size < 2 {
 		return nil, fmt.Errorf("invalid prefix for CIDR %q", cidr)
@@ -186,6 +187,7 @@ func (p *IPPool) Reserve(ips ...string) error {
 
 	for i := 0; i < num; i++ {
 		intIPs[i] = StringIPToInt(ips[i])
+
 		_, found := p.available.Get(intIPs[i])
 		if !found {
 			if !p.network.Contains(net.ParseIP(ips[i])) {

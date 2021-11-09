@@ -78,6 +78,7 @@ func (ovn *Handler) updateHostNetworkDataplane() error {
 
 func (ovn *Handler) getExistingIPv4HostNetworkRoutes() (stringset.Interface, error) {
 	currentRuleRemotes := stringset.New()
+
 	rules, err := netlink.RuleList(netlink.FAMILY_V4)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error listing rules")

@@ -114,6 +114,7 @@ func (h *controller) Start(stopCh <-chan struct{}) error {
 
 func (h *controller) endpointCreatedorUpdated(obj runtime.Object, numRequeues int) bool {
 	klog.V(log.TRACE).Infof("Endpoint created: %#v", obj)
+
 	endpointCreated := obj.(*submarinerv1.Endpoint)
 	if endpointCreated.Spec.ClusterID == h.config.ClusterID {
 		return false

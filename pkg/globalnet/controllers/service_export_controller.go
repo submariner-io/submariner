@@ -210,6 +210,7 @@ func (c *serviceExportController) getService(name, namespace string) (*corev1.Se
 
 	service := &corev1.Service{}
 	err = c.scheme.Convert(obj, service, nil)
+
 	if err != nil {
 		klog.Errorf("Error converting %#v to Service: %v", obj, err)
 		return nil, false, err

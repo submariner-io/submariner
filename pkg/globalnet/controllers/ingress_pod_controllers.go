@@ -81,6 +81,7 @@ func (c *IngressPodControllers) stopAndCleanup(serviceName, serviceNamespace str
 	defer c.mutex.Unlock()
 
 	key := c.key(serviceName, serviceNamespace)
+
 	controller, exists := c.controllers[key]
 	if exists {
 		controller.Stop()
