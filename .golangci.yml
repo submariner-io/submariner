@@ -23,7 +23,9 @@ linters:
   disable-all: true
   enable:
     - asciicheck
+    - bidichk
     - bodyclose
+    - contextcheck
     # - cyclop # This is equivalent to gocyclo
     - deadcode
     - depguard
@@ -65,6 +67,8 @@ linters:
     # - ifshort # This is a style preference and doesn't seem compelling
     - importas
     - ineffassign
+    # - ireturn # The argument to always "Return Concrete Types" doesn't seem compelling. It is perfectly valid to return
+    #             an interface to avoid exposing the entire underlying struct
     # - interfacer # Deprecated since v1.38.0
     - lll
     - makezero
@@ -89,6 +93,7 @@ linters:
     - structcheck
     - stylecheck
     # - tagliatelle # Inconsistent with stylecheck and not as good
+    # - tenv # Not relevant for our Ginkgo UTs
     - testpackage
     # - thelper # Not relevant for our Ginkgo UTs
     # - tparallel # Not relevant for our Ginkgo UTs
@@ -97,6 +102,7 @@ linters:
     - unparam
     - unused
     - varcheck
+    # - varnamelen # It doesn't seem necessary to enforce a minimum variable name length
     - wastedassign
     - whitespace
     - wrapcheck
