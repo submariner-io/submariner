@@ -31,7 +31,7 @@ import (
 )
 
 type IPSet struct {
-	sync.Mutex
+	mutex                    sync.Mutex
 	sets                     map[string]stringset.Interface
 	failOnDestroySetMatchers []interface{}
 	failOnCreateSetMatchers  []interface{}
@@ -48,8 +48,8 @@ func New() *IPSet {
 }
 
 func (i *IPSet) CreateSet(set *ipset.IPSet, ignoreExistErr bool) error {
-	i.Lock()
-	defer i.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	err := matchForError(&i.failOnCreateSetMatchers, set.Name)
 	if err != nil {
@@ -70,8 +70,8 @@ func (i *IPSet) CreateSet(set *ipset.IPSet, ignoreExistErr bool) error {
 }
 
 func (i *IPSet) FlushSet(set string) error {
-	i.Lock()
-	defer i.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	entries := i.sets[set]
 	if entries == nil {
@@ -84,8 +84,8 @@ func (i *IPSet) FlushSet(set string) error {
 }
 
 func (i *IPSet) DestroySet(set string) error {
-	i.Lock()
-	defer i.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	err := matchForError(&i.failOnDestroySetMatchers, set)
 	if err != nil {
@@ -102,8 +102,8 @@ func (i *IPSet) DestroySet(set string) error {
 }
 
 func (i *IPSet) DestroyAllSets() error {
-	i.Lock()
-	defer i.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	i.sets = map[string]stringset.Interface{}
 
@@ -111,8 +111,8 @@ func (i *IPSet) DestroyAllSets() error {
 }
 
 func (i *IPSet) AddEntry(entry string, set *ipset.IPSet, ignoreExistErr bool) error {
-	i.Lock()
-	defer i.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	err := matchForError(&i.failOnAddEntryMatchers, entry)
 	if err != nil {
@@ -132,8 +132,8 @@ func (i *IPSet) AddEntry(entry string, set *ipset.IPSet, ignoreExistErr bool) er
 }
 
 func (i *IPSet) DelEntry(entry, set string) error {
-	i.Lock()
-	defer i.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	err := matchForError(&i.failOnDelEntryMatchers, entry)
 	if err != nil {
@@ -151,8 +151,8 @@ func (i *IPSet) DelEntry(entry, set string) error {
 }
 
 func (i *IPSet) TestEntry(entry, set string) (bool, error) {
-	i.Lock()
-	defer i.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	entries := i.sets[set]
 	if entries == nil {
@@ -163,8 +163,8 @@ func (i *IPSet) TestEntry(entry, set string) (bool, error) {
 }
 
 func (i *IPSet) ListEntries(set string) ([]string, error) {
-	i.Lock()
-	defer i.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	entries := i.sets[set]
 	if entries == nil {
@@ -175,8 +175,8 @@ func (i *IPSet) ListEntries(set string) ([]string, error) {
 }
 
 func (i *IPSet) ListSets() ([]string, error) {
-	i.Lock()
-	defer i.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	sets := []string{}
 
@@ -192,8 +192,8 @@ func (i *IPSet) GetVersion() (string, error) {
 }
 
 func (i *IPSet) AddEntryWithOptions(entry *ipset.Entry, set *ipset.IPSet, ignoreExistErr bool) error {
-	i.Lock()
-	defer i.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	entries := i.sets[set.Name]
 	if entries == nil {
@@ -260,29 +260,29 @@ func (i *IPSet) AwaitNoEntry(set string, stringOrMatcher interface{}) {
 }
 
 func (i *IPSet) AddFailOnDestroySetMatchers(stringOrMatcher interface{}) {
-	i.Lock()
-	defer i.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	i.failOnDestroySetMatchers = append(i.failOnDestroySetMatchers, stringOrMatcher)
 }
 
 func (i *IPSet) AddFailOnCreateSetMatchers(stringOrMatcher interface{}) {
-	i.Lock()
-	defer i.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	i.failOnCreateSetMatchers = append(i.failOnCreateSetMatchers, stringOrMatcher)
 }
 
 func (i *IPSet) AddFailOnAddEntryMatchers(stringOrMatcher interface{}) {
-	i.Lock()
-	defer i.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	i.failOnAddEntryMatchers = append(i.failOnAddEntryMatchers, stringOrMatcher)
 }
 
 func (i *IPSet) AddFailOnDelEntryMatchers(stringOrMatcher interface{}) {
-	i.Lock()
-	defer i.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	i.failOnDelEntryMatchers = append(i.failOnDelEntryMatchers, stringOrMatcher)
 }
