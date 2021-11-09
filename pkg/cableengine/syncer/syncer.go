@@ -56,6 +56,8 @@ var (
 	GatewayStaleTimeout   = GatewayUpdateInterval * 3
 )
 
+// nolint:promlinter // Error: "counter metrics should have "_total"". This is already a documented public API and
+// this doesn't seem a compelling enough reason to change it.
 var gatewaySyncIterations = prometheus.NewCounter(prometheus.CounterOpts{
 	Name: "submariner_gateway_sync_iterations",
 	Help: "Gateway synchronization iterations",
