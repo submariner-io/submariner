@@ -30,7 +30,7 @@ import (
 )
 
 type NetLink struct {
-	sync.Mutex
+	mutex       sync.Mutex
 	linkIndices map[string]int
 	links       map[string]netlink.Link
 	routes      map[int][]netlink.Route
@@ -49,15 +49,15 @@ func New() *NetLink {
 }
 
 func (n *NetLink) SetLinkIndex(name string, index int) {
-	n.Lock()
-	defer n.Unlock()
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
 
 	n.linkIndices[name] = index
 }
 
 func (n *NetLink) LinkAdd(link netlink.Link) error {
-	n.Lock()
-	defer n.Unlock()
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
 
 	if _, found := n.links[link.Attrs().Name]; found {
 		return syscall.EEXIST
@@ -70,8 +70,8 @@ func (n *NetLink) LinkAdd(link netlink.Link) error {
 }
 
 func (n *NetLink) LinkDel(link netlink.Link) error {
-	n.Lock()
-	defer n.Unlock()
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
 
 	delete(n.links, link.Attrs().Name)
 
@@ -79,8 +79,8 @@ func (n *NetLink) LinkDel(link netlink.Link) error {
 }
 
 func (n *NetLink) LinkByName(name string) (netlink.Link, error) {
-	n.Lock()
-	defer n.Unlock()
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
 
 	link, found := n.links[name]
 	if !found {
@@ -99,8 +99,8 @@ func (n *NetLink) AddrAdd(link netlink.Link, addr *netlink.Addr) error {
 }
 
 func (n *NetLink) NeighAppend(neigh *netlink.Neigh) error {
-	n.Lock()
-	defer n.Unlock()
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
 
 	n.neighbors[neigh.LinkIndex] = append(n.neighbors[neigh.LinkIndex], *neigh)
 
@@ -108,8 +108,8 @@ func (n *NetLink) NeighAppend(neigh *netlink.Neigh) error {
 }
 
 func (n *NetLink) NeighDel(neigh *netlink.Neigh) error {
-	n.Lock()
-	defer n.Unlock()
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
 
 	neighbors := n.neighbors[neigh.LinkIndex]
 	for i := range neighbors {
@@ -123,8 +123,8 @@ func (n *NetLink) NeighDel(neigh *netlink.Neigh) error {
 }
 
 func (n *NetLink) RouteAdd(route *netlink.Route) error {
-	n.Lock()
-	defer n.Unlock()
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
 
 	n.routes[route.LinkIndex] = append(n.routes[route.LinkIndex], *route)
 
@@ -132,8 +132,8 @@ func (n *NetLink) RouteAdd(route *netlink.Route) error {
 }
 
 func (n *NetLink) RouteDel(route *netlink.Route) error {
-	n.Lock()
-	defer n.Unlock()
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
 
 	routes := n.routes[route.LinkIndex]
 
@@ -148,8 +148,8 @@ func (n *NetLink) RouteDel(route *netlink.Route) error {
 }
 
 func (n *NetLink) FlushRouteTable(table int) error {
-	n.Lock()
-	defer n.Unlock()
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
 
 	for index, routes := range n.routes {
 		newRoutes := []netlink.Route{}
@@ -167,8 +167,8 @@ func (n *NetLink) FlushRouteTable(table int) error {
 }
 
 func (n *NetLink) RouteGet(destination net.IP) ([]netlink.Route, error) {
-	n.Lock()
-	defer n.Unlock()
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
 
 	routes := []netlink.Route{}
 	for _, rts := range n.routes {
@@ -183,15 +183,15 @@ func (n *NetLink) RouteGet(destination net.IP) ([]netlink.Route, error) {
 }
 
 func (n *NetLink) RouteList(link netlink.Link, family int) ([]netlink.Route, error) {
-	n.Lock()
-	defer n.Unlock()
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
 
 	return n.routes[link.Attrs().Index], nil
 }
 
 func (n *NetLink) RuleAdd(rule *netlink.Rule) error {
-	n.Lock()
-	defer n.Unlock()
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
 
 	if _, found := n.rules[rule.Table]; found {
 		return os.ErrExist
@@ -203,8 +203,8 @@ func (n *NetLink) RuleAdd(rule *netlink.Rule) error {
 }
 
 func (n *NetLink) RuleDel(rule *netlink.Rule) error {
-	n.Lock()
-	defer n.Unlock()
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
 
 	if _, found := n.rules[rule.Table]; !found {
 		return os.ErrNotExist
@@ -289,8 +289,8 @@ func (n *NetLink) AwaitNoRoutes(linkIndex int, destCIDRs ...string) {
 }
 
 func (n *NetLink) neighborIPList(linkIndex int) []net.IP {
-	n.Lock()
-	defer n.Unlock()
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
 
 	ips := []net.IP{}
 	for _, neigh := range n.neighbors[linkIndex] {
@@ -321,8 +321,8 @@ func (n *NetLink) AwaitNoNeighbors(linkIndex int, expIPs ...string) {
 }
 
 func (n *NetLink) getRule(table int) *netlink.Rule {
-	n.Lock()
-	defer n.Unlock()
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
 
 	r, found := n.rules[table]
 	if !found {
