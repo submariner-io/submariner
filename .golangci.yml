@@ -22,64 +22,115 @@ linters-settings:
 linters:
   disable-all: true
   enable:
+    - asciicheck
     - bodyclose
+    # - cyclop # This is equivalent to gocyclo
     - deadcode
     - depguard
     - dogsled
     - dupl
+    - durationcheck
     - errcheck
     - errorlint
     - exhaustive
+    # - exhaustivestruct # Not recommended for general use - meant to be used only for special cases
     - exportloopref
+    # - forbidigo # We don't forbid any statements
+    # - forcetypeassert # There are many unchecked type assertions that would be the result of a programming error so the
+    #                     reasonable recourse would be to panic anyway if checked so this doesn't seem useful
+    # - funlen # gocyclo is enabled which is generally a better metric than simply LOC.
     - gci
+    # - gochecknoglobals # We don't want to forbid global variable constants
+    # - gochecknoinits # We use init functions for valid reasons
     - gocognit
     - goconst
     - gocritic
     - gocyclo
+    - goerr113
     - godot
+    # - godox #  Let's not forbid inline TODOs, FIXMEs et al
     - gofmt
     - gofumpt
+    # - goheader # We do license header linting another way
     - goimports
+    # - golint # Deprecated since v1.41.0
+    # - gomnd # It doesn't seem useful in general to enforce constants for all numeric values
+    # - gomoddirectives # We don't want to forbid the 'replace' directive
+    # - gomodguard # We don't block any modules
+    # - goprintffuncname # This doesn't seem useful at all
     - gosec
     - gosimple
     - govet
+    # - ifshort # This is a style preference and doesn't seem compelling
+    - importas
     - ineffassign
+    # - interfacer # Deprecated since v1.38.0
     - lll
+    - makezero
+    # - maligned # Deprecated since v1.38.0
     - misspell
     - nakedret
+    # - nestif # This calculates cognitive complexity but we're doing that elsewhere
     - nilerr
+    # - nlreturn # This is reasonable with a block-size of 2 but setting it above isn't honored
+    # - noctx # We don't send HTTP requests
     - nolintlint
+    # - paralleltest # Not relevant for Ginkgo UTs
     - prealloc
     - predeclared
     - promlinter
     - revive
+    # - rowserrcheck # We don't use SQL
+    # - scopelint # Deprecated since v1.39.0
+    # - sqlclosecheck # We don't use SQL
     - staticcheck
     - structcheck
     - stylecheck
+    # - tagliatelle # Inconsistent with stylecheck and not as good
     - testpackage
+    # - thelper # Not relevant for our Ginkgo UTs
+    # - tparallel # Not relevant for our Ginkgo UTs
     - typecheck
     - unconvert
     - unparam
     - unused
     - varcheck
+    - wastedassign
     - whitespace
     - wrapcheck
     - wsl
 issues:
   exclude-rules:
-    # Allow dot imports for `fake` directory and e2e tests
+    # Allow dot-imports for Gomega BDD directives per idiomatic Gomega
     - linters:
+        - revive
         - stylecheck
-      text: "ST1001: "
-      path: /fake
+      text: "dot imports"
+      source: "gomega"
 
+    # Allow dot-imports for Ginkgo BDD directives per idiomatic Ginkgo
     - linters:
+        - revive
         - stylecheck
-      text: "ST1001: "
-      path: test
+      text: "dot imports"
+      source: "ginkgo"
 
     # Ignore pointer bytes in struct alignment tests (this is a very
     # minor optimisation)
     - linters:
         - govet
       text: "pointer bytes could be"
+
+    # Full text of the error is "do not define dynamic errors, use wrapped static errors instead". See
+    # https://github.com/Djarvur/go-err113/issues/10 for an interesting discussion of this error. While there are cases
+    # where wrapped sentinel errors are useful, it seems a bit pedantic to force that pattern in all cases.
+    - linters:
+        - goerr113
+      text: "do not define dynamic errors"
+
+    # Ignore certain linters for test files
+    - path: _test\.go|test/|fake/
+      linters:
+        - gochecknoinits
+        - goerr113
+        - wrapcheck
