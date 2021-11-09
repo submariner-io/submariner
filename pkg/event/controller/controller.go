@@ -84,7 +84,7 @@ func New(config *Config) (*Controller, error) {
 
 	err = envconfig.Process("submariner", &ctl.env)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error processing env vars")
 	}
 
 	err = subv1.AddToScheme(scheme.Scheme)
@@ -141,7 +141,7 @@ func (c *Controller) Start(stopCh <-chan struct{}) error {
 
 	err := c.resourceWatcher.Start(stopCh)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error starting the resource watcher")
 	}
 
 	klog.Info("Event controller started")

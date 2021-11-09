@@ -149,7 +149,7 @@ func (kp *SyncHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 func (kp *SyncHandler) getHostIfaceIPAddress() (net.IP, error) {
 	addrs, err := kp.defaultHostIface.Addrs()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error getting default host addresses")
 	}
 
 	if len(addrs) > 0 {

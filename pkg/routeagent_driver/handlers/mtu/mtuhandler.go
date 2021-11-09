@@ -106,7 +106,7 @@ func (h *mtuHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 	for _, subnet := range subnets {
 		err := h.localIPSet.AddEntry(subnet, true)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "error adding local IP set entry")
 		}
 	}
 
@@ -130,7 +130,7 @@ func (h *mtuHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	for _, subnet := range subnets {
 		err := h.remoteIPSet.AddEntry(subnet, true)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "error adding remote IP set entry")
 		}
 	}
 

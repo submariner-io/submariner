@@ -41,9 +41,9 @@ func (c *Controller) handleUpdatedEndpoint(obj runtime.Object, numRequeues int) 
 }
 
 func (c *Controller) handleUpdatedLocalEndpoint(endpoint *smv1.Endpoint) error {
-	return c.handlers.LocalEndpointUpdated(endpoint)
+	return c.handlers.LocalEndpointUpdated(endpoint) // nolint:wrapcheck  // Let the caller wrap it
 }
 
 func (c *Controller) handleUpdatedRemoteEndpoint(endpoint *smv1.Endpoint) error {
-	return c.handlers.RemoteEndpointUpdated(endpoint)
+	return c.handlers.RemoteEndpointUpdated(endpoint) // nolint:wrapcheck  // Let the caller wrap it
 }

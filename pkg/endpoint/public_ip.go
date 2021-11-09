@@ -149,7 +149,7 @@ func publicLoadBalancerIP(clientset kubernetes.Interface, namespace, loadBalance
 		}
 	})
 
-	return ip, err
+	return ip, err // nolint:wrapcheck  // No need to wrap here
 }
 
 func publicDNSIP(clientset kubernetes.Interface, namespace, fqdn string) (string, error) {

@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -34,7 +35,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
 	v1typed "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/util"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -109,7 +110,7 @@ func (gs *GatewaySyncer) syncGatewayStatusSafe() {
 
 	existingGw, err := gs.getLastSyncedGateway(gatewayObj.Name)
 
-	if errors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		klog.V(log.TRACE).Infof("Gateway does not exist - creating: %+v", gatewayObj)
 		_, err = gs.client.Create(context.TODO(), gatewayObj, metav1.CreateOptions{})
 		if err != nil {
@@ -144,7 +145,7 @@ func (gs *GatewaySyncer) syncGatewayStatusSafe() {
 func (gs *GatewaySyncer) cleanupStaleGatewayEntries(localGatewayName string) error {
 	gateways, err := gs.client.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error listing Gateways")
 	}
 
 	for i := range gateways.Items {
@@ -194,7 +195,7 @@ func (gs *GatewaySyncer) getLastSyncedGateway(name string) (*v1.Gateway, error) 
 	existingGw, err := gs.client.Get(context.TODO(), name, metav1.GetOptions{})
 	klog.V(log.TRACE).Infof("Last synced Gateway: %+v", existingGw)
 
-	return existingGw, err
+	return existingGw, err // nolint:wrapcheck // Let the caller wrap it
 }
 
 func (gs *GatewaySyncer) generateGatewayObject() *v1.Gateway {

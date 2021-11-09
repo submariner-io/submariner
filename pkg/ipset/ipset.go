@@ -57,6 +57,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	glog "k8s.io/klog"
 	utilexec "k8s.io/utils/exec"
@@ -553,7 +554,7 @@ func getIPSetVersionString(exec utilexec.Interface) (string, error) {
 	cmd.SetStdin(bytes.NewReader([]byte{}))
 	cmdBytes, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, "error executing ipset command")
 	}
 
 	versionMatcher := regexp.MustCompile(VersionPattern)
@@ -675,7 +676,7 @@ func parsePortRange(portRange string) (beginPort, endPort int, err error) {
 		num, err := strconv.Atoi(strs[i])
 		if err != nil {
 			// port number -1 indicates invalid
-			return -1, -1, err
+			return -1, -1, errors.Wrapf(err, "error converting %s to int", strs[i])
 		}
 
 		if num < 0 {

@@ -19,13 +19,13 @@ limitations under the License.
 package kubeproxy
 
 import (
-	"errors"
+	goerrors "errors"
 	"net"
 	"strconv"
 	"strings"
 	"syscall"
 
-	extErrors "github.com/pkg/errors"
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/vishvananda/netlink"
@@ -73,7 +73,7 @@ func (kp *SyncHandler) newVxlanIface(attrs *vxLanAttributes, activeEndPoint stri
 
 	// ip link set $vxLANIface up
 	if err := kp.netLink.LinkSetUp(vxLANIface.link); err != nil {
-		return nil, extErrors.Wrap(err, "failed to bring up VxLAN interface")
+		return nil, errors.Wrap(err, "failed to bring up VxLAN interface")
 	}
 
 	return vxLANIface, nil
@@ -81,11 +81,11 @@ func (kp *SyncHandler) newVxlanIface(attrs *vxLanAttributes, activeEndPoint stri
 
 func (kp *SyncHandler) createVxLanIface(iface *vxLanIface) error {
 	err := kp.netLink.LinkAdd(iface.link)
-	if errors.Is(err, syscall.EEXIST) {
+	if goerrors.Is(err, syscall.EEXIST) {
 		// Get the properties of existing vxlan interface
 		existing, err := kp.netLink.LinkByName(iface.link.Name)
 		if err != nil {
-			return extErrors.Wrap(err, "failed to retrieve link info")
+			return errors.Wrap(err, "failed to retrieve link info")
 		}
 
 		if isVxlanConfigTheSame(iface.link, existing) {
@@ -98,14 +98,14 @@ func (kp *SyncHandler) createVxLanIface(iface *vxLanIface) error {
 
 		// Config does not match, delete the existing interface and re-create it.
 		if err = kp.netLink.LinkDel(existing); err != nil {
-			return extErrors.Wrap(err, "failed to delete the existing vxlan interface")
+			return errors.Wrap(err, "failed to delete the existing vxlan interface")
 		}
 
 		if err = kp.netLink.LinkAdd(iface.link); err != nil {
-			return extErrors.Wrap(err, "failed to re-create the the vxlan interface")
+			return errors.Wrap(err, "failed to re-create the the vxlan interface")
 		}
 	} else if err != nil {
-		return extErrors.Wrap(err, "failed to create the the vxlan interface")
+		return errors.Wrap(err, "failed to create the the vxlan interface")
 	}
 
 	return nil
@@ -114,7 +114,7 @@ func (kp *SyncHandler) createVxLanIface(iface *vxLanIface) error {
 func (iface *vxLanIface) deleteVxLanIface() error {
 	err := iface.netLink.LinkDel(iface.link)
 	if err != nil {
-		return extErrors.Wrap(err, "failed to delete the the vxlan interface")
+		return errors.Wrap(err, "failed to delete the the vxlan interface")
 	}
 
 	return nil
@@ -154,10 +154,10 @@ func (iface *vxLanIface) configureIPAddress(ipAddress net.IP, mask net.IPMask) e
 	}}
 
 	err := iface.netLink.AddrAdd(iface.link, ipConfig)
-	if errors.Is(err, syscall.EEXIST) {
+	if goerrors.Is(err, syscall.EEXIST) {
 		return nil
 	} else if err != nil {
-		return extErrors.Wrapf(err, "unable to configure address (%s) on vxlan interface (%s)", ipAddress, iface.link.Name)
+		return errors.Wrapf(err, "unable to configure address (%s) on vxlan interface (%s)", ipAddress, iface.link.Name)
 	}
 
 	return nil
@@ -166,11 +166,11 @@ func (iface *vxLanIface) configureIPAddress(ipAddress net.IP, mask net.IPMask) e
 func (iface *vxLanIface) AddFDB(ipAddress net.IP, hwAddr string) error {
 	macAddr, err := net.ParseMAC(hwAddr)
 	if err != nil {
-		return extErrors.Wrapf(err, "invalid MAC Address (%s) supplied", hwAddr)
+		return errors.Wrapf(err, "invalid MAC Address (%s) supplied", hwAddr)
 	}
 
 	if ipAddress == nil {
-		return extErrors.Errorf("invalid ipAddress (%v) supplied", ipAddress)
+		return errors.Errorf("invalid ipAddress (%v) supplied", ipAddress)
 	}
 
 	neigh := &netlink.Neigh{
@@ -185,7 +185,7 @@ func (iface *vxLanIface) AddFDB(ipAddress net.IP, hwAddr string) error {
 
 	err = iface.netLink.NeighAppend(neigh)
 	if err != nil {
-		return extErrors.Wrapf(err, "unable to add the bridge fdb entry %v", neigh)
+		return errors.Wrapf(err, "unable to add the bridge fdb entry %v", neigh)
 	}
 
 	klog.V(log.DEBUG).Infof("Successfully added the bridge fdb entry %v", neigh)
@@ -195,7 +195,7 @@ func (iface *vxLanIface) AddFDB(ipAddress net.IP, hwAddr string) error {
 func (iface *vxLanIface) DelFDB(ipAddress net.IP, hwAddr string) error {
 	macAddr, err := net.ParseMAC(hwAddr)
 	if err != nil {
-		return extErrors.Wrapf(err, "invalid MAC Address (%s) supplied", hwAddr)
+		return errors.Wrapf(err, "invalid MAC Address (%s) supplied", hwAddr)
 	}
 
 	neigh := &netlink.Neigh{
@@ -210,7 +210,7 @@ func (iface *vxLanIface) DelFDB(ipAddress net.IP, hwAddr string) error {
 
 	err = iface.netLink.NeighDel(neigh)
 	if err != nil {
-		return extErrors.Wrapf(err, "unable to delete the bridge fdb entry %v", neigh)
+		return errors.Wrapf(err, "unable to delete the bridge fdb entry %v", neigh)
 	}
 
 	klog.V(log.DEBUG).Infof("Successfully deleted the bridge fdb entry %v", neigh)
@@ -220,7 +220,7 @@ func (iface *vxLanIface) DelFDB(ipAddress net.IP, hwAddr string) error {
 func getVxlanVtepIPAddress(ipAddr string) (net.IP, error) {
 	ipSlice := strings.Split(ipAddr, ".")
 	if len(ipSlice) < 4 {
-		return nil, extErrors.Errorf("invalid ipAddr [%s]", ipAddr)
+		return nil, errors.Errorf("invalid ipAddr [%s]", ipAddr)
 	}
 
 	ipSlice[0] = strconv.Itoa(VxLANVTepNetworkPrefix)
@@ -232,12 +232,12 @@ func getVxlanVtepIPAddress(ipAddr string) (net.IP, error) {
 func (kp *SyncHandler) createVxLANInterface(activeEndPoint string, ifaceType int, gatewayNodeIP net.IP) error {
 	ipAddr, err := kp.getHostIfaceIPAddress()
 	if err != nil {
-		return extErrors.Wrap(err, "unable to retrieve the IPv4 address on the Host")
+		return errors.Wrap(err, "unable to retrieve the IPv4 address on the Host")
 	}
 
 	vtepIP, err := getVxlanVtepIPAddress(ipAddr.String())
 	if err != nil {
-		return extErrors.Wrapf(err, "failed to derive the vxlan vtepIP for %s", ipAddr)
+		return errors.Wrapf(err, "failed to derive the vxlan vtepIP for %s", ipAddr)
 	}
 
 	// Derive the MTU based on the default outgoing interface
@@ -255,19 +255,19 @@ func (kp *SyncHandler) createVxLANInterface(activeEndPoint string, ifaceType int
 
 		kp.vxlanDevice, err = kp.newVxlanIface(attrs, activeEndPoint)
 		if err != nil {
-			return extErrors.Wrap(err, "failed to create vxlan interface on Gateway Node")
+			return errors.Wrap(err, "failed to create vxlan interface on Gateway Node")
 		}
 
 		for _, fdbAddress := range kp.remoteVTEPs.Elements() {
 			err = kp.vxlanDevice.AddFDB(net.ParseIP(fdbAddress), "00:00:00:00:00:00")
 			if err != nil {
-				return extErrors.Wrap(err, "failed to add FDB entry on the Gateway Node vxlan iface")
+				return errors.Wrap(err, "failed to add FDB entry on the Gateway Node vxlan iface")
 			}
 		}
 
 		err = kp.netLink.EnableLooseModeReversePathFilter(VxLANIface)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "error enabling loose mode")
 		}
 
 		klog.V(log.DEBUG).Infof("Successfully configured reverse path filter to loose mode on %q", VxLANIface)
@@ -284,13 +284,13 @@ func (kp *SyncHandler) createVxLANInterface(activeEndPoint string, ifaceType int
 
 		kp.vxlanDevice, err = kp.newVxlanIface(attrs, activeEndPoint)
 		if err != nil {
-			return extErrors.Wrap(err, "failed to create vxlan interface on non-Gateway Node")
+			return errors.Wrap(err, "failed to create vxlan interface on non-Gateway Node")
 		}
 	}
 
 	err = kp.vxlanDevice.configureIPAddress(vtepIP, net.CIDRMask(8, 32))
 	if err != nil {
-		return extErrors.Wrap(err, "failed to configure vxlan interface ipaddress on the Gateway Node")
+		return errors.Wrap(err, "failed to configure vxlan interface ipaddress on the Gateway Node")
 	}
 
 	return nil

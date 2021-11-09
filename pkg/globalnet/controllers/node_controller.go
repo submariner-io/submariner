@@ -45,7 +45,7 @@ func NewNodeController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool, n
 
 	iptIface, err := iptables.New()
 	if err != nil {
-		return nil, errors.WithMessage(err, "error creating the IPTablesInterface handler")
+		return nil, errors.Wrap(err, "error creating the IPTablesInterface handler")
 	}
 
 	controller := &nodeController{
@@ -67,18 +67,18 @@ func NewNodeController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool, n
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error creating the federator")
 	}
 
 	_, gvr, err := admUtil.ToUnstructuredResource(&corev1.Node{}, config.RestMapper)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error converting resource")
 	}
 
 	controller.nodes = config.SourceClient.Resource(*gvr)
 	localNodeInfo, err := controller.nodes.Get(context.TODO(), controller.nodeName, metav1.GetOptions{})
 	if err != nil {
-		return nil, errors.WithMessagef(err, "error retrieving local Node %q", controller.nodeName)
+		return nil, errors.Wrapf(err, "error retrieving local Node %q", controller.nodeName)
 	}
 
 	if err := controller.reserveAllocatedIP(federator, localNodeInfo); err != nil {
@@ -178,7 +178,7 @@ func (n *nodeController) reserveAllocatedIP(federator federate.Federator, obj *u
 	if err != nil {
 		klog.Warningf("Could not reserve allocated GlobalIP for Node %q: %v", obj.GetName(), err)
 
-		return federator.Distribute(n.updateNodeAnnotation(obj, ""))
+		return errors.Wrap(federator.Distribute(n.updateNodeAnnotation(obj, "")), "error updating the Node global IP annotation")
 	}
 
 	return nil

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/go-ping/ping"
+	"github.com/pkg/errors"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"k8s.io/klog"
 )
@@ -133,7 +134,7 @@ func (p *pingerInfo) doPing() error {
 		p.connectionStatus = ConnectionUnknown
 		p.failureMsg = fmt.Sprintf("Failed to create the pinger for the remote endpoint IP %q: %v", p.ip, err)
 
-		return err
+		return errors.Wrapf(err, "error creating the pinger")
 	}
 
 	pinger.Interval = p.pingInterval
@@ -178,7 +179,7 @@ func (p *pingerInfo) doPing() error {
 		p.connectionStatus = ConnectionUnknown
 		p.failureMsg = fmt.Sprintf("Failed to run the pinger for the remote endpoint IP %q: %v", p.ip, err)
 
-		return err
+		return errors.Wrapf(err, "error running the pinger")
 	}
 
 	return nil

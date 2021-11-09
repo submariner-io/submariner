@@ -64,7 +64,7 @@ func (ovn *SyncHandler) connectOvnClusterRouterToSubm() error {
 }
 
 func (ovn *SyncHandler) associateSubmarinerRouterToChassis(chassis *goovn.Chassis) error {
-	return ovn.nbctl.SetRouterChassis(submarinerLogicalRouter, chassis.Name)
+	return ovn.nbctl.SetRouterChassis(submarinerLogicalRouter, chassis.Name) // nolint:wrapcheck  // No need to wrap this error
 }
 
 func (ovn *SyncHandler) setupOvnClusterRouterRemoteRules() error {

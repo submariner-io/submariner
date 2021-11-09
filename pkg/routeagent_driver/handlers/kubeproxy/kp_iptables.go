@@ -101,7 +101,7 @@ func (kp *SyncHandler) Init() error {
 
 		err := kp.netLink.EnableLooseModeReversePathFilter(kp.cniIface.Name)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "error enabling loose mode")
 		}
 	} else {
 		// This is not a fatal error. Hostnetworking to remote cluster support will be broken

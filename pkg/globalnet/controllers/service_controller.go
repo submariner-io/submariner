@@ -19,6 +19,7 @@ limitations under the License.
 package controllers
 
 import (
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
@@ -54,12 +55,12 @@ func NewServiceController(config *syncer.ResourceSyncerConfig, podControllers *I
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error creating the syncer")
 	}
 
 	_, gvr, err := util.ToUnstructuredResource(&submarinerv1.GlobalIngressIP{}, config.RestMapper)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error converting resource")
 	}
 
 	controller.ingressIPs = config.SourceClient.Resource(*gvr).Namespace(corev1.NamespaceAll)

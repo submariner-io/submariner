@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
@@ -104,10 +105,10 @@ func (i *engine) startDriver() error {
 	var err error
 
 	if i.driver, err = cable.NewDriver(&i.localEndpoint, &i.localCluster); err != nil {
-		return err
+		return errors.Wrap(err, "error creating the cable driver")
 	}
 
-	return i.driver.Init()
+	return errors.Wrap(i.driver.Init(), "error initializing the cable driver")
 }
 
 func (i *engine) SetupNATDiscovery(natDiscovery natdiscovery.Interface) {
@@ -141,7 +142,7 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 
 	activeConnections, err := i.driver.GetActiveConnections()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error getting the active connections")
 	}
 
 	for j := range activeConnections {
@@ -182,7 +183,7 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 
 		err = i.driver.DisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: active.Endpoint})
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "error disconnecting previous Endpoint cable %#v", active.Endpoint)
 		}
 	}
 
@@ -190,7 +191,7 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 
 	remoteEndpointIP, err := i.driver.ConnectToEndpoint(rnat)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "error installing Endpoint cable %q", endpoint.Spec.CableName)
 	}
 
 	klog.Infof("Successfully installed Endpoint cable %q with remote IP %s", endpoint.Spec.CableName, remoteEndpointIP)
@@ -241,7 +242,7 @@ func (i *engine) RemoveCable(endpoint *v1.Endpoint) error {
 
 	err := i.driver.DisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: endpoint.Spec})
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "error disconnecting Endpoint cable %q", endpoint.Spec.CableName)
 	}
 
 	delete(i.installedCables, endpoint.Spec.CableName)
@@ -270,7 +271,7 @@ func (i *engine) ListCableConnections() ([]v1.Connection, error) {
 	defer i.Unlock()
 
 	if i.driver != nil {
-		return i.driver.GetConnections()
+		return i.driver.GetConnections() // nolint:wrapcheck  // Let the caller wrap it
 	}
 	// if no driver, we can safely report that no connections exist.
 	return []v1.Connection{}, nil

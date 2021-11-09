@@ -57,7 +57,7 @@ type ipTables struct {
 func New() (Interface, error) {
 	iptableHandler, err := iptables.New()
 	if err != nil {
-		return nil, err
+		return nil, err // nolint:wrapcheck  // Let the caller wrap it
 	}
 
 	iptableIface := &ipTables{
@@ -92,8 +92,7 @@ func (i *ipTables) RemoveClusterEgressRules(subnet, snatIP, globalNetIPTableMark
 func (i *ipTables) ipTableChainExists(table, chain string) (bool, error) {
 	existingChains, err := i.ipt.ListChains(table)
 	if err != nil {
-		klog.V(log.DEBUG).Infof("Error listing iptables chains in %s table: %s", table, err)
-		return false, err
+		return false, errors.Wrapf(err, "error listing chains in IP table %q", table)
 	}
 
 	for _, val := range existingChains {

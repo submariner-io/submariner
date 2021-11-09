@@ -50,10 +50,10 @@ func vsctlCmd(parameters ...string) (output string, err error) {
 		stdErrOut := stderr.String()
 		klog.Errorf("Error running ovs-vsctl %+v, output:\n%s", err, stdErrOut)
 
-		return stdErrOut, err
+		return stdErrOut, errors.Wrap(err, "error running ovs-vsctl")
 	}
 
-	return stdout, err
+	return stdout, nil
 }
 
 func AddBridge(bridgeName string) error {

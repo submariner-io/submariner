@@ -59,7 +59,7 @@ linters:
     - unused
     - varcheck
     - whitespace
-    - wsl
+    - wrapcheck
 issues:
   exclude-rules:
     # Separating explicit var declarations by blank lines seems excessive.

@@ -39,22 +39,22 @@ func (ovn *SyncHandler) initClients() error {
 
 		certFile, err := clusterfiles.Get(ovn.k8sClientset, getOVNCertPath())
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "error getting config for %q", getOVNCertPath())
 		}
 
 		pkFile, err := clusterfiles.Get(ovn.k8sClientset, getOVNPrivKeyPath())
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "error getting config for %q", getOVNPrivKeyPath())
 		}
 
 		caFile, err := clusterfiles.Get(ovn.k8sClientset, getOVNCaBundlePath())
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "error getting config for %q", getOVNCaBundlePath())
 		}
 
 		tlsConfig, err = getOVNTLSConfig(pkFile, certFile, caFile)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "error getting OVN TLS config")
 		}
 
 		ovn.nbctl = nbctl.New(getOVNNBDBAddress(), pkFile, certFile, caFile)
