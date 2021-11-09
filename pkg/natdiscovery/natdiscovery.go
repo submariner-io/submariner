@@ -99,7 +99,7 @@ var errorNoNATDiscoveryPort = errors.New("NATT discovery port missing in endpoin
 func extractNATDiscoveryPort(endpoint *v1.EndpointSpec) (int32, error) {
 	natDiscoveryPort, err := endpoint.GetBackendPort(v1.NATTDiscoveryPortConfig, 0)
 	if err != nil {
-		return natDiscoveryPort, err
+		return natDiscoveryPort, err // nolint:wrapcheck  // No need to wrap this error
 	}
 
 	if natDiscoveryPort == 0 {

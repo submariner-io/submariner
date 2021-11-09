@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -86,7 +87,7 @@ func New(config *Config) (Interface, error) {
 
 	controller.endpointWatcher, err = watcher.New(config.WatcherConfig)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "error creating watcher")
 	}
 
 	return controller, nil
@@ -102,7 +103,7 @@ func (h *controller) GetLatencyInfo(endpoint *submarinerv1.EndpointSpec) *Latenc
 
 func (h *controller) Start(stopCh <-chan struct{}) error {
 	if err := h.endpointWatcher.Start(stopCh); err != nil {
-		return err
+		return errors.Wrapf(err, "error starting watcher")
 	}
 
 	klog.Infof("CableEngine HealthChecker started with PingInterval: %v, MaxPacketLossCount: %v", h.config.PingInterval,

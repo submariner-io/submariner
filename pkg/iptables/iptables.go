@@ -52,7 +52,7 @@ func New() (Interface, error) {
 
 	ipt, err := iptables.New(iptables.IPFamily(iptables.ProtocolIPv4), iptables.Timeout(5))
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error creating IP tables")
 	}
 
 	return &iptablesWrapper{IPTables: ipt}, nil
@@ -67,13 +67,13 @@ func (i *iptablesWrapper) Delete(table, chain string, rulespec ...string) error 
 		return nil
 	}
 
-	return err
+	return errors.Wrap(err, "error deleting IP table rule")
 }
 
 func CreateChainIfNotExists(ipt Interface, table, chain string) error {
 	existingChains, err := ipt.ListChains(table)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error listing IP table chains")
 	}
 
 	for _, val := range existingChains {
@@ -83,7 +83,7 @@ func CreateChainIfNotExists(ipt Interface, table, chain string) error {
 		}
 	}
 
-	return ipt.NewChain(table, chain)
+	return errors.Wrap(ipt.NewChain(table, chain), "error creating IP table chain")
 }
 
 func PrependUnique(ipt Interface, table, chain string, ruleSpec []string) error {
@@ -124,7 +124,7 @@ func InsertUnique(ipt Interface, table, chain string, position int, ruleSpec []s
 	if numOccurrences > 1 || !isPresentAtRequiredPosition {
 		for i := 0; i < numOccurrences; i++ {
 			if err = ipt.Delete(table, chain, ruleSpec...); err != nil {
-				return errors.Wrapf(err, "error deleting stale iptable rule \"%s\"", strings.Join(ruleSpec, " "))
+				return errors.Wrapf(err, "error deleting stale IP table rule %q", strings.Join(ruleSpec, " "))
 			}
 		}
 	}
@@ -134,7 +134,7 @@ func InsertUnique(ipt Interface, table, chain string, position int, ruleSpec []s
 		klog.V(level.DEBUG).Infof("In %s table, iptables rule \"%s\", already exists.", table, strings.Join(ruleSpec, " "))
 		return nil
 	} else if err := ipt.Insert(table, chain, position, ruleSpec...); err != nil {
-		return err
+		return errors.Wrapf(err, "error inserting IP table rule %q", strings.Join(ruleSpec, " "))
 	}
 
 	return nil

@@ -37,7 +37,7 @@ func (ovn *SyncHandler) ensureServiceLoadBalancersFrom(logicalSwitch string) err
 		return err
 	}
 
-	return ovn.nbctl.LrSetLoadBalancers(submarinerRouterID, lbIds)
+	return ovn.nbctl.LrSetLoadBalancers(submarinerRouterID, lbIds) // nolint:wrapcheck  // No need to wrap this error
 }
 
 func (ovn *SyncHandler) getSubmarinerRouterID() (string, error) {

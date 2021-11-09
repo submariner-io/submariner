@@ -21,6 +21,7 @@ package tunnel
 import (
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -57,12 +58,12 @@ func StartController(engine cableengine.Engine, namespace string, config *watche
 
 	endpointWatcher, err := watcher.New(config)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error creating the Endpoint watcher")
 	}
 
 	err = endpointWatcher.Start(stopCh)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error starting the Endpoint watcher")
 	}
 
 	return nil

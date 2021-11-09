@@ -410,13 +410,13 @@ func (w *wireguard) removePeer(key *wgtypes.Key) error {
 			Remove:    true,
 		},
 	}
+
 	err := w.client.ConfigureDevice(DefaultDeviceName, wgtypes.Config{
 		ReplacePeers: false,
 		Peers:        peerCfg,
 	})
 	if err != nil {
-		klog.Errorf("Failed to remove WireGuard peer with key %s: %v", key, err)
-		return err
+		return errors.Wrapf(err, "failed to remove WireGuard peer with key %s", key)
 	}
 
 	klog.V(log.DEBUG).Infof("Done removing WireGuard peer with key %s", key)
@@ -427,7 +427,7 @@ func (w *wireguard) removePeer(key *wgtypes.Key) error {
 func (w *wireguard) peerByKey(key *wgtypes.Key) (*wgtypes.Peer, error) {
 	d, err := w.client.Device(DefaultDeviceName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find device %s: %w", DefaultDeviceName, err)
+		return nil, errors.Wrapf(err, "failed to find device %s", DefaultDeviceName)
 	}
 	for i := range d.Peers {
 		if d.Peers[i].PublicKey.String() == key.String() {
@@ -463,5 +463,5 @@ func (w *wireguard) keyMismatch(cid string, key *wgtypes.Key) bool {
 func genPsk(psk string) (wgtypes.Key, error) {
 	// Convert spec PSK string to right length byte array, using sha256.Size == wgtypes.KeyLen.
 	pskBytes := sha256.Sum256([]byte(psk))
-	return wgtypes.NewKey(pskBytes[:])
+	return wgtypes.NewKey(pskBytes[:]) // nolint:wrapcheck // Let the caller wrap it
 }

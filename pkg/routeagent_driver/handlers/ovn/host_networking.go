@@ -80,7 +80,7 @@ func (ovn *Handler) getExistingIPv4HostNetworkRoutes() (stringset.Interface, err
 	currentRuleRemotes := stringset.New()
 	rules, err := netlink.RuleList(netlink.FAMILY_V4)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "error listing rules")
 	}
 
 	for i := range rules {

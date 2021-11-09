@@ -80,10 +80,10 @@ func (n *NbCtl) nbctl(parameters ...string) (output string, err error) {
 
 	if err != nil {
 		klog.Errorf("error running ovn-nbctl %+v, output:\n%s", err, strOut)
-		return strOut, err
+		return strOut, errors.Wrap(err, "error running ovn-nbctl")
 	}
 
-	return strOut, err
+	return strOut, nil
 }
 
 func (n *NbCtl) SetRouterChassis(router, chassis string) error {

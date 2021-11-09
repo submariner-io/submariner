@@ -16,6 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// nolint:wrapcheck // Most of the functions are simple wrappers so we'll let the caller wrap errors.
 package netlink
 
 import (
@@ -138,7 +139,7 @@ func (n *netlinkType) XfrmPolicyList(family int) ([]netlink.XfrmPolicy, error) {
 func (n *netlinkType) EnableLooseModeReversePathFilter(interfaceName string) error {
 	// Enable loose mode (rp_filter=2) reverse path filtering on the vxlan interface.
 	err := setSysctl("/proc/sys/net/ipv4/conf/"+interfaceName+"/rp_filter", []byte("2"))
-	return errors.WithMessagef(err, "unable to update rp_filter proc entry for interface %q", interfaceName)
+	return errors.Wrapf(err, "unable to update rp_filter proc entry for interface %q", interfaceName)
 }
 
 func (n *netlinkType) FlushRouteTable(tableID int) error {
@@ -150,12 +151,12 @@ func (n *netlinkType) FlushRouteTable(tableID int) error {
 func (n *netlinkType) ConfigureTCPMTUProbe(mtuProbe, baseMss string) error {
 	err := setSysctl("/proc/sys/net/ipv4/tcp_mtu_probing", []byte(mtuProbe))
 	if err != nil {
-		return errors.WithMessagef(err, "unable to update value of tcp_mtu_probing to %s", mtuProbe)
+		return errors.Wrapf(err, "unable to update value of tcp_mtu_probing to %s", mtuProbe)
 	}
 
 	err = setSysctl("/proc/sys/net/ipv4/tcp_base_mss", []byte(baseMss))
 
-	return errors.WithMessagef(err, "unable to update value of tcp_base_mss to %ss", baseMss)
+	return errors.Wrapf(err, "unable to update value of tcp_base_mss to %ss", baseMss)
 }
 
 func setSysctl(path string, contents []byte) error {

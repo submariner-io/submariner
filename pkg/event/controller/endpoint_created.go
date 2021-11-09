@@ -44,7 +44,7 @@ func (c *Controller) handleCreatedEndpoint(obj runtime.Object, numRequeues int) 
 
 func (c *Controller) handleCreatedLocalEndpoint(endpoint *smv1.Endpoint) error {
 	if err := c.handlers.LocalEndpointCreated(endpoint); err != nil {
-		return err
+		return err // nolint:wrapcheck  // Let the caller wrap it
 	}
 
 	if endpoint.Spec.Hostname == c.hostname {
@@ -54,7 +54,7 @@ func (c *Controller) handleCreatedLocalEndpoint(endpoint *smv1.Endpoint) error {
 		// Verify if this node was a GatewayNode already. If not, it just transitioned to Gateway Node.
 		if !c.isGatewayNode {
 			if err := c.handlers.TransitionToGateway(); err != nil {
-				return err
+				return err // nolint:wrapcheck  // Let the caller wrap it
 			}
 		}
 
@@ -65,5 +65,5 @@ func (c *Controller) handleCreatedLocalEndpoint(endpoint *smv1.Endpoint) error {
 }
 
 func (c *Controller) handleCreatedRemoteEndpoint(endpoint *smv1.Endpoint) error {
-	return c.handlers.RemoteEndpointCreated(endpoint)
+	return c.handlers.RemoteEndpointCreated(endpoint) // nolint:wrapcheck  // Let the caller wrap it
 }

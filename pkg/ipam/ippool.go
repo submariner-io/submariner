@@ -20,13 +20,13 @@ package ipam
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"math"
 	"net"
 	"sync"
 
 	"github.com/emirpasic/gods/maps/treemap"
+	"github.com/pkg/errors"
 )
 
 type IPPool struct {
@@ -40,7 +40,7 @@ type IPPool struct {
 func NewIPPool(cidr string) (*IPPool, error) {
 	_, network, err := net.ParseCIDR(cidr)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "error parsing CIDR %q", cidr)
 	}
 
 	ones, totalbits := network.Mask.Size()

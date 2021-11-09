@@ -82,14 +82,14 @@ func (d *DatastoreSyncer) Start(stopCh <-chan struct{}) error {
 
 	syncer, err := broker.NewSyncer(d.syncerConfig)
 	if err != nil {
-		return err
+		return errors.WithMessage(err, "error creating the syncer")
 	}
 
 	klog.Info("Starting the broker syncer")
 
 	err = syncer.Start(stopCh)
 	if err != nil {
-		return err
+		return errors.WithMessage(err, "error starting the syncer")
 	}
 
 	d.localFederator = syncer.GetLocalFederator()
@@ -210,7 +210,7 @@ func (d *DatastoreSyncer) createNodeWatcher(stopCh <-chan struct{}) error {
 
 	err = resourceWatcher.Start(stopCh)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error starting the resource watcher")
 	}
 
 	return nil
@@ -226,7 +226,7 @@ func (d *DatastoreSyncer) createLocalCluster() error {
 		Spec: d.localCluster.Spec,
 	}
 
-	return d.localFederator.Distribute(cluster)
+	return d.localFederator.Distribute(cluster) // nolint:wrapcheck  // Let the caller wrap it
 }
 
 func (d *DatastoreSyncer) createOrUpdateLocalEndpoint() error {
@@ -244,5 +244,5 @@ func (d *DatastoreSyncer) createOrUpdateLocalEndpoint() error {
 		Spec: d.localEndpoint.Spec,
 	}
 
-	return d.localFederator.Distribute(endpoint)
+	return d.localFederator.Distribute(endpoint) // nolint:wrapcheck  // Let the caller wrap it
 }

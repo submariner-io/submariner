@@ -57,12 +57,12 @@ func NewGatewayMonitor(spec Specification, localCIDRs []string, config *watcher.
 
 	gatewayMonitor.ipt, err = iptables.New()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error creating IP tables")
 	}
 
 	if config.RestMapper == nil {
 		if config.RestMapper, err = admUtil.BuildRestMapper(config.RestConfig); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "error creating the RestMapper")
 		}
 	}
 
@@ -91,7 +91,7 @@ func NewGatewayMonitor(spec Specification, localCIDRs []string, config *watcher.
 
 	gatewayMonitor.endpointWatcher, err = watcher.New(config)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error creating the Endpoint watcher")
 	}
 
 	nodeName, ok := os.LookupEnv("NODE_NAME")
@@ -118,7 +118,7 @@ func (g *gatewayMonitor) Start() error {
 
 	err := g.endpointWatcher.Start(g.stopCh)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error starting the Endpoint watcher")
 	}
 
 	if err := g.createGlobalNetMarkingChain(); err != nil {
@@ -247,28 +247,28 @@ func (g *gatewayMonitor) startControllers() error {
 
 	pool, err := ipam.NewIPPool(g.spec.GlobalCIDR[0])
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error creating the IP pool")
 	}
 
 	g.controllers = nil
 
 	c, err := NewNodeController(g.syncerConfig, pool, g.nodeName)
 	if err != nil {
-		return errors.WithMessage(err, "error creating the Node controller")
+		return errors.Wrap(err, "error creating the Node controller")
 	}
 
 	g.controllers = append(g.controllers, c)
 
 	c, err = NewClusterGlobalEgressIPController(g.syncerConfig, g.localSubnets, pool)
 	if err != nil {
-		return errors.WithMessage(err, "error creating the ClusterGlobalEgressIP controller")
+		return errors.Wrap(err, "error creating the ClusterGlobalEgressIP controller")
 	}
 
 	g.controllers = append(g.controllers, c)
 
 	c, err = NewGlobalEgressIPController(g.syncerConfig, pool)
 	if err != nil {
-		return errors.WithMessage(err, "error creating the GlobalEgressIP controller")
+		return errors.Wrap(err, "error creating the GlobalEgressIP controller")
 	}
 
 	g.controllers = append(g.controllers, c)
@@ -277,26 +277,26 @@ func (g *gatewayMonitor) startControllers() error {
 	// reconciliation works properly.
 	c, err = NewGlobalIngressIPController(g.syncerConfig, pool)
 	if err != nil {
-		return errors.WithMessage(err, "error creating the GlobalIngressIP controller")
+		return errors.Wrap(err, "error creating the GlobalIngressIP controller")
 	}
 
 	g.controllers = append(g.controllers, c)
 
 	podControllers, err := NewIngressPodControllers(g.syncerConfig)
 	if err != nil {
-		return errors.WithMessage(err, "error creating the IngressPodControllers")
+		return errors.Wrap(err, "error creating the IngressPodControllers")
 	}
 
 	c, err = NewServiceExportController(g.syncerConfig, podControllers)
 	if err != nil {
-		return errors.WithMessage(err, "error creating the ServiceExport controller")
+		return errors.Wrap(err, "error creating the ServiceExport controller")
 	}
 
 	g.controllers = append(g.controllers, c)
 
 	c, err = NewServiceController(g.syncerConfig, podControllers)
 	if err != nil {
-		return errors.WithMessage(err, "error creating the Service controller")
+		return errors.Wrap(err, "error creating the Service controller")
 	}
 
 	g.controllers = append(g.controllers, c)
@@ -304,7 +304,7 @@ func (g *gatewayMonitor) startControllers() error {
 	for _, c := range g.controllers {
 		err = c.Start()
 		if err != nil {
-			return err
+			return err // nolint:wrapcheck  // Let the caller wrap it
 		}
 	}
 

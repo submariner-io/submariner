@@ -63,7 +63,7 @@ func newBaseIPAllocationController(pool *ipam.IPPool, iptIface iptiface.Interfac
 }
 
 func (c *baseSyncerController) Start() error {
-	return c.resourceSyncer.Start(c.stopCh)
+	return c.resourceSyncer.Start(c.stopCh) // nolint:wrapcheck  // Let the caller wrap it
 }
 
 func (c *baseSyncerController) reconcile(client dynamic.ResourceInterface, transform func(obj *unstructured.Unstructured) runtime.Object) {
@@ -138,7 +138,7 @@ func (c *baseIPAllocationController) reserveAllocatedIPs(federator federate.Fede
 
 		klog.Infof("Updating %q: %#v", key, obj)
 
-		return federator.Distribute(obj)
+		return federator.Distribute(obj) // nolint:wrapcheck  // Let the caller wrap it
 	}
 
 	return nil

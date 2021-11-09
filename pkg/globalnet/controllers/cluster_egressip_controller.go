@@ -70,7 +70,7 @@ func NewClusterGlobalEgressIPController(config *syncer.ResourceSyncerConfig, loc
 
 	defaultEgressIPObj, gvr, err := util.ToUnstructuredResource(defaultEgressIP, config.RestMapper)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error converting resource")
 	}
 
 	client := config.SourceClient.Resource(*gvr)
@@ -80,10 +80,10 @@ func NewClusterGlobalEgressIPController(config *syncer.ResourceSyncerConfig, loc
 
 		_, err = client.Create(context.TODO(), defaultEgressIPObj, metav1.CreateOptions{})
 		if err != nil {
-			return nil, errors.WithMessagef(err, "error creating ClusterGlobalEgressIP resource %q", defaultEgressIP.Name)
+			return nil, errors.Wrapf(err, "error creating ClusterGlobalEgressIP resource %q", defaultEgressIP.Name)
 		}
 	} else if err != nil {
-		return nil, errors.WithMessagef(err, "error retrieving ClusterGlobalEgressIP resource %q", defaultEgressIP.Name)
+		return nil, errors.Wrapf(err, "error retrieving ClusterGlobalEgressIP resource %q", defaultEgressIP.Name)
 	}
 
 	if obj != nil {
@@ -108,7 +108,7 @@ func NewClusterGlobalEgressIPController(config *syncer.ResourceSyncerConfig, loc
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error creating resource syncer")
 	}
 
 	return controller, nil
@@ -206,7 +206,7 @@ func (c *clusterGlobalEgressIPController) flushClusterGlobalEgressRules(allocate
 func (c *clusterGlobalEgressIPController) deleteClusterGlobalEgressRules(srcIPList []string, snatIP string) error {
 	for _, srcIP := range srcIPList {
 		if err := c.iptIface.RemoveClusterEgressRules(srcIP, snatIP, globalNetIPTableMark); err != nil {
-			return err
+			return err // nolint:wrapcheck  // Let the caller wrap it
 		}
 	}
 
@@ -221,7 +221,7 @@ func (c *clusterGlobalEgressIPController) programClusterGlobalEgressRules(alloca
 		if err := c.iptIface.AddClusterEgressRules(srcIP, snatIP, globalNetIPTableMark); err != nil {
 			_ = c.deleteClusterGlobalEgressRules(egressRulesProgrammed, snatIP)
 
-			return err
+			return err // nolint:wrapcheck  // Let the caller wrap it
 		}
 
 		egressRulesProgrammed = append(egressRulesProgrammed, srcIP)

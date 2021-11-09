@@ -153,6 +153,7 @@ func CompareEndpointSpec(left, right *subv1.EndpointSpec) bool {
 		left.Backend == right.Backend && equality.Semantic.DeepEqual(left.BackendConfig, right.BackendConfig)
 }
 
+// nolint:wrapcheck // Let the caller wrap external errors
 func GetDefaultGatewayInterface() (*net.Interface, error) {
 	routes, err := netlink.RouteList(nil, syscall.AF_INET)
 	if err != nil {

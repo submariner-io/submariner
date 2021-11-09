@@ -37,7 +37,7 @@ func (kp *SyncHandler) createIPTableChains() error {
 	}
 
 	if err := iptcommon.InitSubmarinerPostRoutingChain(ipt); err != nil {
-		return err
+		return errors.Wrap(err, "error initializing POST routing chain")
 	}
 
 	klog.V(log.DEBUG).Infof("Install/ensure SUBMARINER-INPUT chain exists")
