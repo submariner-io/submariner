@@ -62,6 +62,7 @@ func (i *iptablesWrapper) Delete(table, chain string, rulespec ...string) error 
 	err := i.IPTables.Delete(table, chain, rulespec...)
 
 	var iptError *iptables.Error
+
 	ok := errors.As(err, &iptError)
 	if ok && iptError.IsNotExist() {
 		return nil
@@ -108,6 +109,7 @@ func InsertUnique(ipt Interface, table, chain string, position int, ruleSpec []s
 
 	isPresentAtRequiredPosition := false
 	numOccurrences := 0
+
 	for index, rule := range rules {
 		if strings.Contains(rule, strings.Join(ruleSpec, " ")) {
 			klog.V(level.DEBUG).Infof("In %s table, iptables rule \"%s\", exists at index %d.", table, strings.Join(ruleSpec, " "), index)

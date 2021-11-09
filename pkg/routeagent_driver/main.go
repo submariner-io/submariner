@@ -57,6 +57,7 @@ func main() {
 	stopCh := signals.SetupSignalHandler().Done()
 
 	var env environment.Specification
+
 	err := envconfig.Process("submariner", &env)
 	if err != nil {
 		klog.Fatalf("Error reading the environment variables: %s", err.Error())

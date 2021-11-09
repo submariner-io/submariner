@@ -170,6 +170,7 @@ func expandConnectionStringIPsDetail(db string, resolver func(host string) ([]ne
 	protocol := parts[0]
 	host := parts[1]
 	port := parts[2]
+
 	ips, err := resolver(host)
 	if err != nil {
 		return "", errors.Wrapf(err, "error resolving %q", host)

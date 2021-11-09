@@ -50,6 +50,7 @@ func main() {
 	stopCh := signals.SetupSignalHandler().Done()
 
 	var env environment.Specification
+
 	err := envconfig.Process("submariner", &env)
 	if err != nil {
 		klog.Fatalf("Error reading the environment variables: %s", err.Error())
@@ -89,6 +90,7 @@ func main() {
 func getK8sClient() kubernetes.Interface {
 	var cfg *rest.Config
 	var err error
+
 	if masterURL == "" && kubeconfig == "" {
 		cfg, err = rest.InClusterConfig()
 		if err != nil {

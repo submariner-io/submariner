@@ -111,6 +111,7 @@ func (ovn *SyncHandler) ensureSubmarinerGatewayLocalNetSwitch() error {
 
 func (ovn *SyncHandler) ensureSwitch(switchName string) error {
 	klog.Infof("Ensuring %q switch", switchName)
+
 	lsCmd, err := ovn.nbdb.LSAdd(switchName)
 	if err == nil {
 		klog.Infof("Creating submariner switch %q", switchName)
@@ -127,6 +128,7 @@ func (ovn *SyncHandler) ensureSwitch(switchName string) error {
 
 func (ovn *SyncHandler) ensureSubmarinerRouter() error {
 	klog.Infof("Ensuring %q", submarinerLogicalRouter)
+
 	lrCmd, err := ovn.nbdb.LRAdd(submarinerLogicalRouter, nil)
 	if err == nil {
 		klog.Infof("Creating submariner router %q", submarinerLogicalRouter)

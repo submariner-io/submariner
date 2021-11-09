@@ -52,17 +52,20 @@ func (h *mtuHandler) GetName() string {
 
 func (h *mtuHandler) Init() error {
 	var err error
+
 	h.ipt, err = iptables.New()
-	ipSetIface := ipset.New(utilexec.New())
 	if err != nil {
 		return errors.Wrap(err, "error initializing iptables")
 	}
+
+	ipSetIface := ipset.New(utilexec.New())
 
 	if err := iptables.CreateChainIfNotExists(h.ipt, constants.MangleTable, constants.SmPostRoutingChain); err != nil {
 		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmPostRoutingChain)
 	}
 
 	forwardToSubMarinerPostRoutingChain := []string{"-j", constants.SmPostRoutingChain}
+
 	h.remoteIPSet = h.newNamedIPSet(constants.RemoteCIDRIPSet, ipSetIface)
 	if err := h.remoteIPSet.Create(true); err != nil {
 		return errors.Wrapf(err, "error creating ipset %q", constants.RemoteCIDRIPSet)

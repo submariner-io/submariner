@@ -39,6 +39,7 @@ import (
 // a local path to the file.
 func Get(k8sClient kubernetes.Interface, urlAddress string) (pathStr string, err error) {
 	klog.V(log.DEBUG).Infof("reading cluster_file: %s", urlAddress)
+
 	parsedURL, err := url.Parse(urlAddress)
 	if err != nil {
 		return "", errors.Wrapf(err, "error parsing cluster file URL %q", urlAddress)
@@ -63,7 +64,9 @@ func Get(k8sClient kubernetes.Interface, urlAddress string) (pathStr string, err
 		if err != nil {
 			return "", errors.Wrapf(err, "error reading secret %q from namespace %q", pathContainerObject, namespace)
 		}
+
 		var ok bool
+
 		data, ok = secret.Data[pathFile]
 		if !ok {
 			return "", errors.Errorf("cluster file data %q not found in secret %s", pathFile, secret.Name)
@@ -74,7 +77,9 @@ func Get(k8sClient kubernetes.Interface, urlAddress string) (pathStr string, err
 		if err != nil {
 			return "", errors.Wrapf(err, "error reading configmap %q from namespace %q", pathContainerObject, namespace)
 		}
+
 		var ok bool
+
 		data, ok = configMap.BinaryData[pathFile]
 		if !ok {
 			dataStr, ok := configMap.Data[pathFile]
@@ -100,6 +105,7 @@ func storeToDisk(pathContainerObject string, parsedURL *url.URL, data []byte) (s
 
 	diskFilePath := path.Join(storageDirectory, parsedURL.Path)
 	dir := path.Join(storageDirectory, pathContainerObject)
+
 	err = os.MkdirAll(dir, 0o700)
 	if err != nil {
 		return "", errors.Wrapf(err, "error creating %s directory to store %s", dir, diskFilePath)

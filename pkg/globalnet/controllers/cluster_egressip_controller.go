@@ -74,6 +74,7 @@ func NewClusterGlobalEgressIPController(config *syncer.ResourceSyncerConfig, loc
 	}
 
 	client := config.SourceClient.Resource(*gvr)
+
 	obj, err := client.Get(context.TODO(), defaultEgressIP.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		klog.Infof("Creating ClusterGlobalEgressIP resource %q", defaultEgressIP.Name)

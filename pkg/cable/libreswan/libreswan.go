@@ -144,6 +144,7 @@ var trafficStatusRE = regexp.MustCompile(`.* "([^"]+)"[^,]*, .*inBytes=(\d+), ou
 func retrieveActiveConnectionStats() (map[string]int, map[string]int, error) {
 	// Retrieve active tunnels from the daemon
 	cmd := exec.Command("/usr/libexec/ipsec/whack", "--trafficstatus")
+
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, nil, errors.WithMessage(err, "error retrieving whack's stdout")
@@ -159,6 +160,7 @@ func retrieveActiveConnectionStats() (map[string]int, map[string]int, error) {
 
 	for scanner.Scan() {
 		line := scanner.Text()
+
 		matches := trafficStatusRE.FindStringSubmatch(line)
 		if matches != nil {
 			_, ok := activeConnectionsRx[matches[1]]
@@ -207,11 +209,13 @@ func (i *libreswan) refreshConnectionStatus() error {
 
 		remoteSubnets := extractSubnets(&i.connections[j].Endpoint)
 		rx, tx := 0, 0
+
 		for lsi := range localSubnets {
 			for rsi := range remoteSubnets {
 				connectionName := fmt.Sprintf("%s-%d-%d", i.connections[j].Endpoint.CableName, lsi, rsi)
 				subRx, okRx := activeConnectionsRx[connectionName]
 				subTx, okTx := activeConnectionsTx[connectionName]
+
 				if okRx || okTx {
 					i.connections[j].Status = subv1.Connected
 					isConnected = true

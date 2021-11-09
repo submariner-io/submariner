@@ -98,6 +98,7 @@ func main() {
 	httpServer := startHTTPServer()
 
 	var submSpec types.SubmarinerSpecification
+
 	fatalOnErr(envconfig.Process("submariner", &submSpec), "Error processing env vars")
 
 	cfg, err := clientcmd.BuildConfigFromFlags(localMasterURL, localKubeconfig)
@@ -318,6 +319,7 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder res
 		clientcmd.NewDefaultClientConfigLoadingRules(),
 		&clientcmd.ConfigOverrides{},
 	)
+
 	namespace, _, err := kubeconfig.Namespace()
 	if err != nil {
 		namespace = "submariner"

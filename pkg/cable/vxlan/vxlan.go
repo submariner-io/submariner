@@ -296,6 +296,7 @@ func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 	cable.RecordConnection(CableDriverName, &v.localEndpoint.Spec, &remoteEndpoint.Spec, string(v1.Connected), true)
 
 	privateIP := endpointInfo.Endpoint.Spec.PrivateIP
+
 	remoteVtepIP, err := v.getVxlanVtepIPAddress(privateIP)
 	if err != nil {
 		return endpointInfo.UseIP, fmt.Errorf("failed to derive the vxlan vtepIP for %s: %w", privateIP, err)
@@ -307,8 +308,9 @@ func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 		return endpointInfo.UseIP, fmt.Errorf("failed to add remoteIP %q to the forwarding database", remoteIP)
 	}
 
-	cniIface, err := cni.Discover(v.localCluster.Spec.ClusterCIDR[0])
 	var ipAddress net.IP
+
+	cniIface, err := cni.Discover(v.localCluster.Spec.ClusterCIDR[0])
 	if err == nil {
 		ipAddress = net.ParseIP(cniIface.IPAddress)
 	} else {
@@ -516,6 +518,7 @@ func (v *vxlanIface) DelRoute(ipAddressList []net.IPNet) error {
 			Priority:  100,
 			Table:     TableID,
 		}
+
 		err := netlink.RouteDel(route)
 		if err != nil {
 			return errors.Wrapf(err, "unable to add the route entry %v", route)

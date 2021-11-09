@@ -77,6 +77,7 @@ func (ovn *Handler) programRule(dest, src string, tableID int) (*netlink.Rule, e
 
 func (ovn *Handler) getExistingIPv4RuleSubnets() (stringset.Interface, error) {
 	currentRuleRemotes := stringset.New()
+
 	rules, err := netlink.RuleList(netlink.FAMILY_V4)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error listing rules")

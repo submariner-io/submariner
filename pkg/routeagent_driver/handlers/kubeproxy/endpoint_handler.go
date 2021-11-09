@@ -48,18 +48,21 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 
 		kp.isGatewayNode = false
 		localClusterGwNodeIP := net.ParseIP(endpoint.Spec.PrivateIP)
+
 		remoteVtepIP, err := getVxlanVtepIPAddress(localClusterGwNodeIP.String())
 		if err != nil {
 			return errors.Wrap(err, "failed to derive the remoteVtepIP")
 		}
 
 		klog.Infof("Creating the vxlan interface %s with gateway node IP %s", VxLANIface, localClusterGwNodeIP)
+
 		err = kp.createVxLANInterface(endpoint.Spec.Hostname, VxInterfaceWorker, localClusterGwNodeIP)
 		if err != nil {
 			klog.Fatalf("Unable to create VxLAN interface on non-GatewayNode (%s): %v", endpoint.Spec.Hostname, err)
 		}
 
 		kp.vxlanGwIP = &remoteVtepIP
+
 		err = kp.reconcileRoutes(remoteVtepIP)
 		if err != nil {
 			return errors.Wrap(err, "error while reconciling routes")
@@ -83,6 +86,7 @@ func (kp *SyncHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 		err := kp.vxlanDevice.deleteVxLanIface()
 		kp.vxlanDevice = nil
 		kp.vxlanGwIP = nil
+
 		if err != nil {
 			return errors.Wrap(err, "failed to delete the the vxlan interface on Endpoint removal")
 		}
@@ -100,6 +104,7 @@ func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 
 	kp.syncHandlerMutex.Lock()
 	defer kp.syncHandlerMutex.Unlock()
+
 	for _, inputCidrBlock := range endpoint.Spec.Subnets {
 		if !kp.remoteSubnets.Contains(inputCidrBlock) {
 			kp.remoteSubnets.Add(inputCidrBlock)
@@ -114,6 +119,7 @@ func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 			endpoint, err)
 		return err
 	}
+
 	// Add routes to the new endpoint on the GatewayNode.
 	kp.updateRoutingRulesForHostNetworkSupport(endpoint.Spec.Subnets, Add)
 	kp.updateIptableRulesForInterClusterTraffic(endpoint.Spec.Subnets, Add)
@@ -128,6 +134,7 @@ func (kp *SyncHandler) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
 func (kp *SyncHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	kp.syncHandlerMutex.Lock()
 	defer kp.syncHandlerMutex.Unlock()
+
 	for _, inputCidrBlock := range endpoint.Spec.Subnets {
 		kp.remoteSubnets.Remove(inputCidrBlock)
 		delete(kp.remoteSubnetGw, inputCidrBlock)
