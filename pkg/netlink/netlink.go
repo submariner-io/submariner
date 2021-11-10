@@ -173,5 +173,5 @@ func setSysctl(path string, contents []byte) error {
 	}
 	// Permissions are already 644, the files are never created
 	// #nosec G306
-	return os.WriteFile(path, contents, 0644)
+	return os.WriteFile(path, contents, 0o644)
 }
