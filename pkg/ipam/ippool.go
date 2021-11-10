@@ -34,7 +34,7 @@ type IPPool struct {
 	network   *net.IPNet
 	size      int
 	available *treemap.Map // int IP is the key, string IP is the value
-	sync.RWMutex
+	mutex     sync.RWMutex
 }
 
 func NewIPPool(cidr string) (*IPPool, error) {
@@ -90,8 +90,8 @@ func StringIPToInt(stringIP string) int {
 }
 
 func (p *IPPool) allocateOne() ([]string, error) {
-	p.Lock()
-	defer p.Unlock()
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 
 	iter := p.available.Iterator()
 	if iter.Last() {
@@ -114,8 +114,8 @@ func (p *IPPool) Allocate(num int) ([]string, error) {
 		return p.allocateOne()
 	}
 
-	p.Lock()
-	defer p.Unlock()
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 
 	if p.available.Size() < num {
 		return nil, fmt.Errorf("insufficient IPs available (%d) to allocate %d", p.available.Size(), num)
@@ -159,8 +159,8 @@ func (p *IPPool) Allocate(num int) ([]string, error) {
 }
 
 func (p *IPPool) Release(ips ...string) error {
-	p.Lock()
-	defer p.Unlock()
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 
 	for _, ip := range ips {
 		if !p.network.Contains(net.ParseIP(ip)) {
@@ -181,8 +181,8 @@ func (p *IPPool) Reserve(ips ...string) error {
 
 	intIPs := make([]int, num)
 
-	p.Lock()
-	defer p.Unlock()
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 
 	for i := 0; i < num; i++ {
 		intIPs[i] = StringIPToInt(ips[i])
@@ -204,8 +204,8 @@ func (p *IPPool) Reserve(ips ...string) error {
 }
 
 func (p *IPPool) Size() int {
-	p.RLock()
-	defer p.RUnlock()
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
 
 	return p.available.Size()
 }
