@@ -42,7 +42,7 @@ import (
 )
 
 type GatewaySyncer struct {
-	sync.Mutex
+	mutex       sync.Mutex
 	client      v1typed.GatewayInterface
 	engine      cableengine.Engine
 	version     string
@@ -85,15 +85,15 @@ func (gs *GatewaySyncer) Run(stopCh <-chan struct{}) {
 }
 
 func (gs *GatewaySyncer) syncGatewayStatus() {
-	gs.Lock()
-	defer gs.Unlock()
+	gs.mutex.Lock()
+	defer gs.mutex.Unlock()
 
 	gs.syncGatewayStatusSafe()
 }
 
 func (gs *GatewaySyncer) SetGatewayStatusError(err error) {
-	gs.Lock()
-	defer gs.Unlock()
+	gs.mutex.Lock()
+	defer gs.mutex.Unlock()
 
 	gs.statusError = err
 	gs.syncGatewayStatusSafe()

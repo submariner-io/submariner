@@ -32,7 +32,7 @@ import (
 const DriverName = "fake-driver"
 
 type Driver struct {
-	sync.Mutex
+	mutex                       sync.Mutex
 	init                        chan struct{}
 	ErrOnInit                   error
 	activeConnections           map[string]v1.Connection
@@ -61,8 +61,8 @@ func (d *Driver) Init() error {
 }
 
 func (d *Driver) GetActiveConnections() ([]v1.Connection, error) {
-	d.Lock()
-	defer d.Unlock()
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
 
 	ret := []v1.Connection{}
 	for _, c := range d.activeConnections {
@@ -85,8 +85,8 @@ func (d *Driver) GetConnections() ([]v1.Connection, error) {
 }
 
 func (d *Driver) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
-	d.Lock()
-	defer d.Unlock()
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
 
 	err := d.ErrOnConnectToEndpoint
 	if err != nil {
@@ -103,8 +103,8 @@ func (d *Driver) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (
 }
 
 func (d *Driver) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) error {
-	d.Lock()
-	defer d.Unlock()
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
 
 	err := d.ErrOnDisconnectFromEndpoint
 	if err != nil {
