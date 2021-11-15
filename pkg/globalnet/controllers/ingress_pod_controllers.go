@@ -45,8 +45,8 @@ func NewIngressPodControllers(config syncer.ResourceSyncerConfig) (*IngressPodCo
 }
 
 func (c *IngressPodControllers) start(service *corev1.Service) error {
-	c.Lock()
-	defer c.Unlock()
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 
 	key := c.key(service.Name, service.Namespace)
 	if _, exists := c.controllers[key]; exists {
@@ -64,8 +64,8 @@ func (c *IngressPodControllers) start(service *corev1.Service) error {
 }
 
 func (c *IngressPodControllers) stopAll() {
-	c.Lock()
-	defer c.Unlock()
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 
 	for _, controller := range c.controllers {
 		controller.Stop()
@@ -75,8 +75,8 @@ func (c *IngressPodControllers) stopAll() {
 }
 
 func (c *IngressPodControllers) stopAndCleanup(serviceName, serviceNamespace string) {
-	c.Lock()
-	defer c.Unlock()
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 
 	key := c.key(serviceName, serviceNamespace)
 	controller, exists := c.controllers[key]
