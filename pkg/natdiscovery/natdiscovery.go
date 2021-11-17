@@ -95,7 +95,7 @@ func randomRequestCounter() (uint64, error) {
 	return n.Uint64(), nil
 }
 
-var errorNoNATDiscoveryPort = errors.New("NATT discovery port missing in endpoint")
+var errNoNATDiscoveryPort = errors.New("NATT discovery port missing in endpoint")
 
 func extractNATDiscoveryPort(endpoint *v1.EndpointSpec) (int32, error) {
 	natDiscoveryPort, err := endpoint.GetBackendPort(v1.NATTDiscoveryPortConfig, 0)
@@ -104,7 +104,7 @@ func extractNATDiscoveryPort(endpoint *v1.EndpointSpec) (int32, error) {
 	}
 
 	if natDiscoveryPort == 0 {
-		return natDiscoveryPort, errorNoNATDiscoveryPort
+		return natDiscoveryPort, errNoNATDiscoveryPort
 	}
 
 	return natDiscoveryPort, nil
@@ -150,7 +150,7 @@ func (nd *natDiscovery) AddEndpoint(endpoint *v1.Endpoint) {
 
 	// support nat discovery disabled or a remote cluster endpoint which still hasn't implemented this protocol
 	if _, err := extractNATDiscoveryPort(&endpoint.Spec); err != nil || nd.serverPort == 0 {
-		if !errors.Is(err, errorNoNATDiscoveryPort) {
+		if !errors.Is(err, errNoNATDiscoveryPort) {
 			klog.Errorf("Error extracting NATT discovery port from endpoint %q: %v", endpoint.Spec.CableName, err)
 		}
 
