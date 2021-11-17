@@ -32,6 +32,7 @@ linters:
     - durationcheck
     - errcheck
     - errorlint
+    - errname
     - exhaustive
     # - exhaustivestruct # Not recommended for general use - meant to be used only for special cases
     - exportloopref
