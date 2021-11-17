@@ -54,7 +54,7 @@ var _ = Describe("[dataplane] Gateway status reporting", func() {
 				func() (interface{}, error) {
 					resGw, err := gwClient.Get(context.TODO(), name, metav1.GetOptions{})
 					if apierrors.IsNotFound(err) {
-						return nil, nil
+						return nil, nil // nolint:nilnil // Returning nil value is intentional
 					}
 					return resGw, err
 				},
