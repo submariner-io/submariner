@@ -139,7 +139,10 @@ func (n *netlinkType) XfrmPolicyList(family int) ([]netlink.XfrmPolicy, error) {
 func (n *netlinkType) EnableLooseModeReversePathFilter(interfaceName string) error {
 	// Enable loose mode (rp_filter=2) reverse path filtering on the vxlan interface.
 	err := setSysctl("/proc/sys/net/ipv4/conf/"+interfaceName+"/rp_filter", []byte("2"))
-	return errors.WithMessagef(err, "unable to update rp_filter proc entry for interface %q", interfaceName)
+	if err != nil {
+		return errors.WithMessagef(err, "unable to update rp_filter proc entry for interface %q", interfaceName)
+	}
+	return nil
 }
 
 func (n *netlinkType) FlushRouteTable(tableID int) error {
@@ -155,8 +158,10 @@ func (n *netlinkType) ConfigureTCPMTUProbe(mtuProbe, baseMss string) error {
 	}
 
 	err = setSysctl("/proc/sys/net/ipv4/tcp_base_mss", []byte(baseMss))
-
-	return errors.WithMessagef(err, "unable to update value of tcp_base_mss to %ss", baseMss)
+	if err != nil {
+		return errors.WithMessagef(err, "unable to update value of tcp_base_mss to %ss", baseMss)
+	}
+	return nil
 }
 
 func setSysctl(path string, contents []byte) error {
