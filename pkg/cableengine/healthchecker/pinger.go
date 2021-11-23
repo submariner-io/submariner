@@ -24,31 +24,40 @@ import (
 	"time"
 
 	"github.com/go-ping/ping"
+	"github.com/pkg/errors"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"k8s.io/klog"
 )
 
-const privileged = true
+const Privileged = true
 
-var defaultMaxPacketLossCount uint = 5
+var (
+	defaultMaxPacketLossCount uint = 5
 
-// The RTT will be stored and will be used to calculate the statistics until
-// the size is reached. Once the size is reached the array will be reset and
-// the last elements will be added to the array for statistics.
-var size uint64 = 1000
+	defaultPingInterval = 1 * time.Second
 
-var defaultPingInterval = 1 * time.Second
+	// The RTT will be stored and will be used to calculate the statistics until
+	// the size is reached. Once the size is reached the array will be reset and
+	// the last elements will be added to the array for statistics.
+	size uint64 = 1000
 
-// Even though we set up the pinger to run continuously, we still have to give it a non-zero timeout else it will
-// fail so set a really long one.
-var defaultPingTimeout = 87600 * time.Hour
-var pingTimeout = defaultPingTimeout
+	// Even though we set up the pinger to run continuously, we still have to give it a non-zero timeout else it will
+	// fail so set a really long one.
+	defaultPingTimeout = 87600 * time.Hour
+)
 
 type PingerInterface interface {
 	Start()
 	Stop()
 	GetLatencyInfo() *LatencyInfo
 	GetIP() string
+}
+
+type PingerConfig struct {
+	IP                 string
+	Interval           time.Duration
+	Timeout            time.Duration
+	MaxPacketLossCount uint
 }
 
 type pingerInfo struct {
@@ -63,18 +72,32 @@ type pingerInfo struct {
 	stopCh             chan struct{}
 }
 
-func newPinger(ip string, pingInterval time.Duration, maxPacketLossCount uint) PingerInterface {
-	return &pingerInfo{
-		ip:                 ip,
-		pingInterval:       pingInterval,
-		pingTimeout:        pingTimeout,
-		maxPacketLossCount: maxPacketLossCount,
+func NewPinger(config PingerConfig) PingerInterface {
+	p := &pingerInfo{
+		ip:                 config.IP,
+		pingInterval:       config.Interval,
+		pingTimeout:        config.Timeout,
+		maxPacketLossCount: config.MaxPacketLossCount,
 		statistics: statistics{
 			size:         size,
 			previousRtts: make([]uint64, size),
 		},
 		stopCh: make(chan struct{}),
 	}
+
+	if p.maxPacketLossCount == 0 {
+		p.maxPacketLossCount = defaultMaxPacketLossCount
+	}
+
+	if p.pingInterval == 0 {
+		p.pingInterval = defaultPingInterval
+	}
+
+	if p.pingTimeout == 0 {
+		p.pingTimeout = defaultPingTimeout
+	}
+
+	return p
 }
 
 func (p *pingerInfo) Start() {
@@ -111,11 +134,11 @@ func (p *pingerInfo) doPing() error {
 		p.connectionStatus = ConnectionUnknown
 		p.failureMsg = fmt.Sprintf("Failed to create the pinger for the remote endpoint IP %q: %v", p.ip, err)
 
-		return err
+		return errors.Wrapf(err, "error creating the pinger")
 	}
 
 	pinger.Interval = p.pingInterval
-	pinger.SetPrivileged(privileged)
+	pinger.SetPrivileged(Privileged)
 	pinger.RecordRtts = false
 	pinger.Timeout = p.pingTimeout
 
@@ -156,7 +179,7 @@ func (p *pingerInfo) doPing() error {
 		p.connectionStatus = ConnectionUnknown
 		p.failureMsg = fmt.Sprintf("Failed to run the pinger for the remote endpoint IP %q: %v", p.ip, err)
 
-		return err
+		return errors.Wrapf(err, "error running the pinger")
 	}
 
 	return nil

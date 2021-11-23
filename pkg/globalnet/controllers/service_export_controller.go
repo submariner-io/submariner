@@ -37,14 +37,15 @@ import (
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-func NewServiceExportController(config syncer.ResourceSyncerConfig, podControllers *IngressPodControllers) (Interface, error) {
+func NewServiceExportController(config *syncer.ResourceSyncerConfig, podControllers *IngressPodControllers) (Interface, error) {
+	// We'll panic if config is nil, this is intentional
 	var err error
 
 	klog.Info("Creating ServiceExport controller")
 
 	_, gvr, err := util.ToUnstructuredResource(&corev1.Service{}, config.RestMapper)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error converting resource")
 	}
 
 	controller := &serviceExportController{
@@ -66,19 +67,19 @@ func NewServiceExportController(config syncer.ResourceSyncerConfig, podControlle
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error creating the syncer")
 	}
 
 	iptIface, err := iptables.New()
 	if err != nil {
-		return nil, errors.WithMessage(err, "error creating the IPTablesInterface handler")
+		return nil, errors.Wrap(err, "error creating the IPTablesInterface handler")
 	}
 
 	controller.iptIface = iptIface
 
 	_, gvr, err = util.ToUnstructuredResource(&submarinerv1.GlobalIngressIP{}, config.RestMapper)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error converting resource")
 	}
 
 	controller.ingressIPs = config.SourceClient.Resource(*gvr).Namespace(corev1.NamespaceAll)
@@ -122,6 +123,7 @@ func (c *serviceExportController) process(from runtime.Object, numRequeues int, 
 		return c.onCreate(serviceExport)
 	case syncer.Delete:
 		return c.onDelete(serviceExport)
+	case syncer.Update:
 	}
 
 	return nil, false
@@ -194,6 +196,7 @@ func (c *serviceExportController) onDelete(serviceExport *mcsv1a1.ServiceExport)
 	}, false
 }
 
+// nolint:wrapcheck  // No need to wrap errors.
 func (c *serviceExportController) getService(name, namespace string) (*corev1.Service, bool, error) {
 	obj, err := c.services.Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
@@ -207,6 +210,7 @@ func (c *serviceExportController) getService(name, namespace string) (*corev1.Se
 
 	service := &corev1.Service{}
 	err = c.scheme.Convert(obj, service, nil)
+
 	if err != nil {
 		klog.Errorf("Error converting %#v to Service: %v", obj, err)
 		return nil, false, err

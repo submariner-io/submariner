@@ -23,7 +23,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
 	"github.com/submariner-io/submariner/pkg/types"
 )
 
@@ -78,7 +77,7 @@ func testIPsecPortConfiguration() {
 }
 
 func createLibreswan() *libreswan {
-	ls, err := NewLibreswan(types.SubmarinerEndpoint{}, types.SubmarinerCluster{})
+	ls, err := NewLibreswan(&types.SubmarinerEndpoint{}, &types.SubmarinerCluster{})
 	Expect(err).NotTo(HaveOccurred())
 
 	return ls.(*libreswan)

@@ -31,14 +31,12 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
-	"github.com/submariner-io/submariner/pkg/natdiscovery"
-	"k8s.io/klog"
-
 	"github.com/submariner-io/admiral/pkg/log"
-
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
+	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
+	"k8s.io/klog"
 )
 
 const (
@@ -73,21 +71,24 @@ type specification struct {
 	NATTPort    string `default:"4500"`
 }
 
-const defaultNATTPort = "4500"
-const ipsecSpecEnvVarPrefix = "ce_ipsec"
+const (
+	defaultNATTPort       = "4500"
+	ipsecSpecEnvVarPrefix = "ce_ipsec"
+)
 
-// NewLibreswan starts an IKE daemon using Libreswan and configures it to manage Submariner's endpoints
-func NewLibreswan(localEndpoint types.SubmarinerEndpoint, localCluster types.SubmarinerCluster) (cable.Driver, error) {
+// NewLibreswan starts an IKE daemon using Libreswan and configures it to manage Submariner's endpoints.
+func NewLibreswan(localEndpoint *types.SubmarinerEndpoint, localCluster *types.SubmarinerCluster) (cable.Driver, error) {
+	// We'll panic if localEndpoint or localCluster are nil, this is intentional
 	ipSecSpec := specification{}
 
 	err := envconfig.Process(ipsecSpecEnvVarPrefix, &ipSecSpec)
 	if err != nil {
-		return nil, fmt.Errorf("error processing environment config for %s: %v", ipsecSpecEnvVarPrefix, err)
+		return nil, errors.Wrapf(err, "error processing environment config for %s", ipsecSpecEnvVarPrefix)
 	}
 
 	defaultNATTPort, err := strconv.ParseUint(ipSecSpec.NATTPort, 10, 16)
 	if err != nil {
-		return nil, errors.Errorf("error parsing CR_IPSEC_NATTPORT environment variable")
+		return nil, errors.Wrap(err, "error parsing CR_IPSEC_NATTPORT environment variable")
 	}
 
 	nattPort, err := localEndpoint.Spec.GetBackendPort(subv1.UDPPortConfig, int32(defaultNATTPort))
@@ -103,13 +104,13 @@ func NewLibreswan(localEndpoint types.SubmarinerEndpoint, localCluster types.Sub
 		logFile:               ipSecSpec.LogFile,
 		ipSecNATTPort:         strconv.Itoa(int(nattPort)),
 		defaultNATTPort:       int32(defaultNATTPort),
-		localEndpoint:         localEndpoint,
+		localEndpoint:         *localEndpoint,
 		connections:           []subv1.Connection{},
 		forceUDPEncapsulation: ipSecSpec.ForceEncaps,
 	}, nil
 }
 
-// GetName returns driver's name
+// GetName returns driver's name.
 func (i *libreswan) GetName() string {
 	return cableDriverName
 }
@@ -121,7 +122,7 @@ func (i *libreswan) Init() error {
 	// TODO Check whether the file already exists
 	file, err := os.Create("/etc/ipsec.d/submariner.secrets")
 	if err != nil {
-		return fmt.Errorf("error creating the secrets file: %v", err)
+		return errors.Wrap(err, "error creating the secrets file")
 	}
 	defer file.Close()
 
@@ -129,7 +130,7 @@ func (i *libreswan) Init() error {
 
 	// Ensure Pluto is started
 	if err := i.runPluto(); err != nil {
-		return fmt.Errorf("error starting Pluto: %v", err)
+		return errors.Wrap(err, "error starting Pluto")
 	}
 
 	return nil
@@ -140,16 +141,17 @@ func (i *libreswan) Init() error {
 //                        id='@10.0.63.203-0-0'"
 var trafficStatusRE = regexp.MustCompile(`.* "([^"]+)"[^,]*, .*inBytes=(\d+), outBytes=(\d+).*`)
 
-func (i *libreswan) refreshConnectionStatus() error {
+func retrieveActiveConnectionStats() (map[string]int, map[string]int, error) {
 	// Retrieve active tunnels from the daemon
 	cmd := exec.Command("/usr/libexec/ipsec/whack", "--trafficstatus")
+
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return errors.WithMessage(err, "error retrieving whack's stdout")
+		return nil, nil, errors.WithMessage(err, "error retrieving whack's stdout")
 	}
 
 	if err := cmd.Start(); err != nil {
-		return errors.WithMessage(err, "error starting whack")
+		return nil, nil, errors.WithMessage(err, "error starting whack")
 	}
 
 	scanner := bufio.NewScanner(stdout)
@@ -158,6 +160,7 @@ func (i *libreswan) refreshConnectionStatus() error {
 
 	for scanner.Scan() {
 		line := scanner.Text()
+
 		matches := trafficStatusRE.FindStringSubmatch(line)
 		if matches != nil {
 			_, ok := activeConnectionsRx[matches[1]]
@@ -188,24 +191,31 @@ func (i *libreswan) refreshConnectionStatus() error {
 		}
 	}
 
-	if err := cmd.Wait(); err != nil {
-		return errors.WithMessage(err, "error waiting for whack")
+	return activeConnectionsRx, activeConnectionsTx, nil
+}
+
+func (i *libreswan) refreshConnectionStatus() error {
+	activeConnectionsRx, activeConnectionsTx, err := retrieveActiveConnectionStats()
+	if err != nil {
+		return err
 	}
 
 	cable.RecordNoConnections()
 
-	localSubnets := extractSubnets(i.localEndpoint.Spec)
+	localSubnets := extractSubnets(&i.localEndpoint.Spec)
 
 	for j := range i.connections {
 		isConnected := false
 
-		remoteSubnets := extractSubnets(i.connections[j].Endpoint)
+		remoteSubnets := extractSubnets(&i.connections[j].Endpoint)
 		rx, tx := 0, 0
+
 		for lsi := range localSubnets {
 			for rsi := range remoteSubnets {
 				connectionName := fmt.Sprintf("%s-%d-%d", i.connections[j].Endpoint.CableName, lsi, rsi)
 				subRx, okRx := activeConnectionsRx[connectionName]
 				subTx, okTx := activeConnectionsTx[connectionName]
+
 				if okRx || okTx {
 					i.connections[j].Status = subv1.Connected
 					isConnected = true
@@ -234,12 +244,12 @@ func (i *libreswan) refreshConnectionStatus() error {
 	return nil
 }
 
-// GetActiveConnections returns an array of all the active connections
+// GetActiveConnections returns an array of all the active connections.
 func (i *libreswan) GetActiveConnections() ([]subv1.Connection, error) {
 	return i.connections, nil
 }
 
-// GetConnections() returns an array of the existing connections, including status and endpoint info
+// GetConnections() returns an array of the existing connections, including status and endpoint info.
 func (i *libreswan) GetConnections() ([]subv1.Connection, error) {
 	if err := i.refreshConnectionStatus(); err != nil {
 		return []subv1.Connection{}, err
@@ -248,7 +258,7 @@ func (i *libreswan) GetConnections() ([]subv1.Connection, error) {
 	return i.connections, nil
 }
 
-func extractSubnets(endpoint subv1.EndpointSpec) []string {
+func extractSubnets(endpoint *subv1.EndpointSpec) []string {
 	subnets := make([]string, 0, len(endpoint.Subnets))
 
 	for _, subnet := range endpoint.Subnets {
@@ -279,7 +289,7 @@ func whack(args ...string) error {
 	}
 
 	if err != nil {
-		return fmt.Errorf("error whacking with args %v: %v", args, err)
+		return errors.Wrapf(err, "error whacking with args %v", args)
 	}
 
 	return nil
@@ -288,6 +298,7 @@ func whack(args ...string) error {
 // ConnectToEndpoint establishes a connection to the given endpoint and returns a string
 // representation of the IP address of the target endpoint.
 func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
+	// We'll panic if endpointInfo is nil, this is intentional
 	endpoint := &endpointInfo.Endpoint
 
 	rightNATTPort, err := endpoint.Spec.GetBackendPort(subv1.UDPPortConfig, i.defaultNATTPort)
@@ -296,12 +307,12 @@ func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 			endpoint.Spec.CableName, i.defaultNATTPort, err)
 	}
 
-	leftSubnets := extractSubnets(i.localEndpoint.Spec)
-	rightSubnets := extractSubnets(endpoint.Spec)
+	leftSubnets := extractSubnets(&i.localEndpoint.Spec)
+	rightSubnets := extractSubnets(&endpoint.Spec)
 
 	// Ensure we’re listening
 	if err := whack("--listen"); err != nil {
-		return "", fmt.Errorf("error listening: %v", err)
+		return "", errors.Wrap(err, "error listening")
 	}
 
 	connectionMode := i.calculateOperationMode(&endpoint.Spec)
@@ -349,23 +360,23 @@ func (i *libreswan) bidirectionalConnectToEndpoint(connectionName string, endpoi
 		args = append(args, "--forceencaps")
 	}
 
-	args = append(args, "--name", connectionName)
+	args = append(args, "--name", connectionName,
 
-	// Left-hand side
-	args = append(args, "--id", localEndpointIdentifier)
-	args = append(args, "--host", i.localEndpoint.Spec.PrivateIP)
-	args = append(args, "--client", leftSubnet)
+		// Left-hand side
+		"--id", localEndpointIdentifier,
+		"--host", i.localEndpoint.Spec.PrivateIP,
+		"--client", leftSubnet,
 
-	args = append(args, "--ikeport", i.ipSecNATTPort)
+		"--ikeport", i.ipSecNATTPort,
 
-	args = append(args, "--to")
+		"--to",
 
-	// Right-hand side
-	args = append(args, "--id", remoteEndpointIdentifier)
-	args = append(args, "--host", endpointInfo.UseIP)
-	args = append(args, "--client", rightSubnet)
+		// Right-hand side
+		"--id", remoteEndpointIdentifier,
+		"--host", endpointInfo.UseIP,
+		"--client", rightSubnet,
 
-	args = append(args, "--ikeport", strconv.Itoa(int(rightNATTPort)))
+		"--ikeport", strconv.Itoa(int(rightNATTPort)))
 
 	klog.Infof("Executing whack with args: %v", args)
 
@@ -377,11 +388,7 @@ func (i *libreswan) bidirectionalConnectToEndpoint(connectionName string, endpoi
 		return err
 	}
 
-	if err := whack("--initiate", "--asynchronous", "--name", connectionName); err != nil {
-		return err
-	}
-
-	return nil
+	return whack("--initiate", "--asynchronous", "--name", connectionName)
 }
 
 func (i *libreswan) serverConnectToEndpoint(connectionName string, endpointInfo *natdiscovery.NATEndpointInfo,
@@ -396,21 +403,21 @@ func (i *libreswan) serverConnectToEndpoint(connectionName string, endpointInfo 
 		args = append(args, "--forceencaps")
 	}
 
-	args = append(args, "--name", connectionName)
+	args = append(args, "--name", connectionName,
 
-	// Left-hand side
-	args = append(args, "--id", localEndpointIdentifier)
-	args = append(args, "--host", i.localEndpoint.Spec.PrivateIP)
-	args = append(args, "--client", leftSubnet)
+		// Left-hand side.
+		"--id", localEndpointIdentifier,
+		"--host", i.localEndpoint.Spec.PrivateIP,
+		"--client", leftSubnet,
 
-	args = append(args, "--ikeport", i.ipSecNATTPort)
+		"--ikeport", i.ipSecNATTPort,
 
-	args = append(args, "--to")
+		"--to",
 
-	// Right-hand side
-	args = append(args, "--id", remoteEndpointIdentifier)
-	args = append(args, "--host", "%any")
-	args = append(args, "--client", rightSubnet)
+		// Right-hand side.
+		"--id", remoteEndpointIdentifier,
+		"--host", "%any",
+		"--client", rightSubnet)
 
 	klog.Infof("Executing whack with args: %v", args)
 
@@ -419,13 +426,13 @@ func (i *libreswan) serverConnectToEndpoint(connectionName string, endpointInfo 
 	}
 
 	// NOTE: in this case we don't route or initiate connection, we simply wait for the client
-	// to connect from %any IP, using the right PSK & ID
+	// to connect from %any IP, using the right PSK & ID.
 	return nil
 }
 
 func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo *natdiscovery.NATEndpointInfo,
 	leftSubnet, rightSubnet string, rightNATTPort int32, lsi, rsi int) error {
-	// Identifiers are used for authentication, they’re always the private IPs
+	// Identifiers are used for authentication, they’re always the private IPs.
 	localEndpointIdentifier := fmt.Sprintf("@%s-%d-%d", i.localEndpoint.Spec.PrivateIP, lsi, rsi)
 	remoteEndpointIdentifier := fmt.Sprintf("@%s-%d-%d", endpointInfo.Endpoint.Spec.PrivateIP, rsi, lsi)
 
@@ -436,21 +443,21 @@ func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo 
 		args = append(args, "--forceencaps")
 	}
 
-	args = append(args, "--name", connectionName)
+	args = append(args, "--name", connectionName,
 
-	// Left-hand side
-	args = append(args, "--id", localEndpointIdentifier)
-	args = append(args, "--host", i.localEndpoint.Spec.PrivateIP)
-	args = append(args, "--client", leftSubnet)
+		// Left-hand side
+		"--id", localEndpointIdentifier,
+		"--host", i.localEndpoint.Spec.PrivateIP,
+		"--client", leftSubnet,
 
-	args = append(args, "--to")
+		"--to",
 
-	// Right-hand side
-	args = append(args, "--id", remoteEndpointIdentifier)
-	args = append(args, "--host", endpointInfo.UseIP)
-	args = append(args, "--client", rightSubnet)
+		// Right-hand side
+		"--id", remoteEndpointIdentifier,
+		"--host", endpointInfo.UseIP,
+		"--client", rightSubnet,
 
-	args = append(args, "--ikeport", strconv.Itoa(int(rightNATTPort)))
+		"--ikeport", strconv.Itoa(int(rightNATTPort)))
 
 	klog.Infof("Executing whack with args: %v", args)
 
@@ -462,17 +469,14 @@ func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo 
 		return err
 	}
 
-	if err := whack("--initiate", "--asynchronous", "--name", connectionName); err != nil {
-		return err
-	}
-
-	return nil
+	return whack("--initiate", "--asynchronous", "--name", connectionName)
 }
 
 // DisconnectFromEndpoint disconnects from the connection to the given endpoint.
-func (i *libreswan) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) error {
-	leftSubnets := extractSubnets(i.localEndpoint.Spec)
-	rightSubnets := extractSubnets(endpoint.Spec)
+func (i *libreswan) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint) error {
+	// We'll panic if endpoint is nil, this is intentional
+	leftSubnets := extractSubnets(&i.localEndpoint.Spec)
+	rightSubnets := extractSubnets(&endpoint.Spec)
 
 	klog.Infof("Deleting connection to %v", endpoint)
 
@@ -483,8 +487,8 @@ func (i *libreswan) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) er
 
 				args := []string{}
 
-				args = append(args, "--delete")
-				args = append(args, "--name", connectionName)
+				args = append(args, "--delete",
+					"--name", connectionName)
 
 				klog.Infof("Whacking with %v", args)
 
@@ -493,11 +497,11 @@ func (i *libreswan) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) er
 				cmd.Stderr = os.Stderr
 
 				if err := cmd.Run(); err != nil {
-					switch err := err.(type) {
-					case *exec.ExitError:
-						klog.Errorf("error deleting a connection with args %v; got exit code %d: %v", args, err.ExitCode(), err)
-					default:
-						return fmt.Errorf("error deleting a connection with args %v: %v", args, err)
+					var exitError *exec.ExitError
+					if errors.As(err, &exitError) {
+						klog.Errorf("error deleting a connection with args %v; got exit code %d: %v", args, exitError.ExitCode(), err)
+					} else {
+						return errors.Wrapf(err, "error deleting a connection with args %v", args)
 					}
 				}
 			}
@@ -510,7 +514,7 @@ func (i *libreswan) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) er
 	return nil
 }
 
-func removeConnectionForEndpoint(connections []subv1.Connection, endpoint types.SubmarinerEndpoint) []subv1.Connection {
+func removeConnectionForEndpoint(connections []subv1.Connection, endpoint *types.SubmarinerEndpoint) []subv1.Connection {
 	for j := range connections {
 		if connections[j].Endpoint.CableName == endpoint.Spec.CableName {
 			copy(connections[j:], connections[j+1:])
@@ -537,9 +541,9 @@ func (i *libreswan) runPluto() error {
 	var outputFile *os.File
 
 	if i.logFile != "" {
-		out, err := os.OpenFile(i.logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		out, err := os.OpenFile(i.logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o666)
 		if err != nil {
-			return fmt.Errorf("failed to open log file %s: %v", i.logFile, err)
+			return errors.Wrapf(err, "failed to open log file %s", i.logFile)
 		}
 
 		cmd.Stdout = out
@@ -552,9 +556,9 @@ func (i *libreswan) runPluto() error {
 	}
 
 	if err := cmd.Start(); err != nil {
-		// Note - Close handles nil receiver
+		// Note - Close handles nil receiver.
 		outputFile.Close()
-		return fmt.Errorf("error starting the Pluto process with args %v: %v", args, err)
+		return errors.Wrapf(err, "error starting the Pluto process with args %v", args)
 	}
 
 	go func() {
@@ -562,7 +566,7 @@ func (i *libreswan) runPluto() error {
 		klog.Fatalf("Pluto exited: %v", cmd.Wait())
 	}()
 
-	// Wait up to 5s for the control socket
+	// Wait up to 5s for the control socket.
 	for i := 0; i < 5; i++ {
 		_, err := os.Stat("/run/pluto/pluto.ctl")
 		if err == nil {

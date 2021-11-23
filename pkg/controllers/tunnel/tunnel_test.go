@@ -54,7 +54,7 @@ func init() {
 var fakeDriver *fake.Driver
 
 var _ = BeforeSuite(func() {
-	cable.AddDriver(fake.DriverName, func(endpoint types.SubmarinerEndpoint, cluster types.SubmarinerCluster) (cable.Driver, error) {
+	cable.AddDriver(fake.DriverName, func(endpoint *types.SubmarinerEndpoint, cluster *types.SubmarinerCluster) (cable.Driver, error) {
 		return fakeDriver, nil
 	})
 })
@@ -80,7 +80,8 @@ var _ = Describe("Managing tunnels", func() {
 				ClusterID: "east",
 				Hostname:  "redsox",
 				PrivateIP: "192.68.1.2",
-			}}
+			},
+		}
 
 		Expect(v1.AddToScheme(kubeScheme.Scheme)).To(Succeed())
 
@@ -102,7 +103,7 @@ var _ = Describe("Managing tunnels", func() {
 	})
 
 	JustBeforeEach(func() {
-		engine := cableengine.NewEngine(types.SubmarinerCluster{}, types.SubmarinerEndpoint{
+		engine := cableengine.NewEngine(&types.SubmarinerCluster{}, &types.SubmarinerEndpoint{
 			Spec: v1.EndpointSpec{
 				Backend: fake.DriverName,
 			},

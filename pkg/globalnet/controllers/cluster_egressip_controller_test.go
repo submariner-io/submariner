@@ -358,7 +358,7 @@ func (t *clusterGlobalEgressIPControllerTestDriver) start() {
 
 	t.localSubnets = []string{"10.0.0.0/16", "100.0.0.0/16"}
 
-	t.controller, err = controllers.NewClusterGlobalEgressIPController(syncer.ResourceSyncerConfig{
+	t.controller, err = controllers.NewClusterGlobalEgressIPController(&syncer.ResourceSyncerConfig{
 		SourceClient: t.dynClient,
 		RestMapper:   t.restMapper,
 		Scheme:       t.scheme,

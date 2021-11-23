@@ -24,11 +24,10 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/submariner/pkg/types"
 	v1 "k8s.io/api/core/v1"
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
-
-	"github.com/submariner-io/submariner/pkg/types"
 )
 
 var _ = Describe("firstIPv4InString", func() {
@@ -58,7 +57,7 @@ const (
 )
 
 var _ = Describe("public ip resolvers", func() {
-	var submSpec types.SubmarinerSpecification
+	var submSpec *types.SubmarinerSpecification
 	var backendConfig map[string]string
 
 	const (
@@ -68,7 +67,7 @@ var _ = Describe("public ip resolvers", func() {
 	)
 
 	BeforeEach(func() {
-		submSpec = types.SubmarinerSpecification{
+		submSpec = &types.SubmarinerSpecification{
 			Namespace: testNamespace,
 		}
 
@@ -88,8 +87,10 @@ var _ = Describe("public ip resolvers", func() {
 	When("a LoadBalancer with Ingress hostname is specified", func() {
 		It("should return the IP", func() {
 			backendConfig[publicIPConfig] = "lb:" + testServiceName
-			client := fake.NewSimpleClientset(serviceWithIngress(v1.LoadBalancerIngress{Hostname: testIPDNS + ".nip.io",
-				IP: ""}))
+			client := fake.NewSimpleClientset(serviceWithIngress(v1.LoadBalancerIngress{
+				Hostname: testIPDNS + ".nip.io",
+				IP:       "",
+			}))
 			ip, err := getPublicIP(submSpec, client, backendConfig)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ip).To(Equal(testIPDNS))

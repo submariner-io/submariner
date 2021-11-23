@@ -28,7 +28,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/types"
 )
 
-type Engine struct {
+type Engine struct { // nolint:gocritic // This mutex is exposed but we tweak it in tests
 	sync.Mutex
 	Connections               []v1.Connection
 	ListCableConnectionsError error
@@ -111,5 +111,4 @@ func (e *Engine) VerifyRemoveCable(expected *v1.EndpointSpec) {
 }
 
 func (e *Engine) SetupNATDiscovery(natDiscovery natdiscovery.Interface) {
-
 }

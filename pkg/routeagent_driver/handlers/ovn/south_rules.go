@@ -23,9 +23,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/stringset"
-	"github.com/vishvananda/netlink"
-
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	"github.com/vishvananda/netlink"
 )
 
 // handleSubnets builds ip rules, and passes them to the specified netlink function
@@ -78,14 +77,15 @@ func (ovn *Handler) programRule(dest, src string, tableID int) (*netlink.Rule, e
 
 func (ovn *Handler) getExistingIPv4RuleSubnets() (stringset.Interface, error) {
 	currentRuleRemotes := stringset.New()
+
 	rules, err := netlink.RuleList(netlink.FAMILY_V4)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "error listing rules")
 	}
 
-	for _, rule := range rules {
-		if rule.Table == constants.RouteAgentInterClusterNetworkTableID && rule.Src != nil {
-			currentRuleRemotes.Add(rule.Src.String())
+	for i := range rules {
+		if rules[i].Table == constants.RouteAgentInterClusterNetworkTableID && rules[i].Src != nil {
+			currentRuleRemotes.Add(rules[i].Src.String())
 		}
 	}
 

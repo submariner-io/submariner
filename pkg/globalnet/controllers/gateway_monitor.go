@@ -19,7 +19,6 @@ limitations under the License.
 package controllers
 
 import (
-	"fmt"
 	"os"
 	"strings"
 
@@ -44,7 +43,8 @@ import (
 	"k8s.io/klog"
 )
 
-func NewGatewayMonitor(spec Specification, localCIDRs []string, config watcher.Config) (Interface, error) {
+func NewGatewayMonitor(spec Specification, localCIDRs []string, config *watcher.Config) (Interface, error) {
+	// We'll panic if config is nil, this is intentional
 	gatewayMonitor := &gatewayMonitor{
 		baseController: newBaseController(),
 		spec:           spec,
@@ -57,18 +57,18 @@ func NewGatewayMonitor(spec Specification, localCIDRs []string, config watcher.C
 
 	gatewayMonitor.ipt, err = iptables.New()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error creating IP tables")
 	}
 
 	if config.RestMapper == nil {
 		if config.RestMapper, err = admUtil.BuildRestMapper(config.RestConfig); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "error creating the RestMapper")
 		}
 	}
 
 	if config.Client == nil {
 		if config.Client, err = dynamic.NewForConfig(config.RestConfig); err != nil {
-			return nil, fmt.Errorf("error creating dynamic client: %v", err)
+			return nil, errors.Wrap(err, "error creating dynamic client")
 		}
 	}
 
@@ -89,9 +89,9 @@ func NewGatewayMonitor(spec Specification, localCIDRs []string, config watcher.C
 		},
 	}
 
-	gatewayMonitor.endpointWatcher, err = watcher.New(&config)
+	gatewayMonitor.endpointWatcher, err = watcher.New(config)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error creating the Endpoint watcher")
 	}
 
 	nodeName, ok := os.LookupEnv("NODE_NAME")
@@ -118,11 +118,11 @@ func (g *gatewayMonitor) Start() error {
 
 	err := g.endpointWatcher.Start(g.stopCh)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error starting the Endpoint watcher")
 	}
 
 	if err := g.createGlobalNetMarkingChain(); err != nil {
-		return fmt.Errorf("error while calling createGlobalNetMarkingChain: %v", err)
+		return errors.Wrap(err, "error while calling createGlobalNetMarkingChain")
 	}
 
 	return nil
@@ -247,56 +247,56 @@ func (g *gatewayMonitor) startControllers() error {
 
 	pool, err := ipam.NewIPPool(g.spec.GlobalCIDR[0])
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error creating the IP pool")
 	}
 
 	g.controllers = nil
 
-	c, err := NewNodeController(*g.syncerConfig, pool, g.nodeName)
+	c, err := NewNodeController(g.syncerConfig, pool, g.nodeName)
 	if err != nil {
-		return errors.WithMessage(err, "error creating the Node controller")
+		return errors.Wrap(err, "error creating the Node controller")
 	}
 
 	g.controllers = append(g.controllers, c)
 
-	c, err = NewClusterGlobalEgressIPController(*g.syncerConfig, g.localSubnets, pool)
+	c, err = NewClusterGlobalEgressIPController(g.syncerConfig, g.localSubnets, pool)
 	if err != nil {
-		return errors.WithMessage(err, "error creating the ClusterGlobalEgressIP controller")
+		return errors.Wrap(err, "error creating the ClusterGlobalEgressIP controller")
 	}
 
 	g.controllers = append(g.controllers, c)
 
-	c, err = NewGlobalEgressIPController(*g.syncerConfig, pool)
+	c, err = NewGlobalEgressIPController(g.syncerConfig, pool)
 	if err != nil {
-		return errors.WithMessage(err, "error creating the GlobalEgressIP controller")
+		return errors.Wrap(err, "error creating the GlobalEgressIP controller")
 	}
 
 	g.controllers = append(g.controllers, c)
 
 	// The GlobalIngressIP controller needs to be started before the ServiceExport and Service controllers to ensure
 	// reconciliation works properly.
-	c, err = NewGlobalIngressIPController(*g.syncerConfig, pool)
+	c, err = NewGlobalIngressIPController(g.syncerConfig, pool)
 	if err != nil {
-		return errors.WithMessage(err, "error creating the GlobalIngressIP controller")
+		return errors.Wrap(err, "error creating the GlobalIngressIP controller")
 	}
 
 	g.controllers = append(g.controllers, c)
 
-	podControllers, err := NewIngressPodControllers(*g.syncerConfig)
+	podControllers, err := NewIngressPodControllers(g.syncerConfig)
 	if err != nil {
-		return errors.WithMessage(err, "error creating the IngressPodControllers")
+		return errors.Wrap(err, "error creating the IngressPodControllers")
 	}
 
-	c, err = NewServiceExportController(*g.syncerConfig, podControllers)
+	c, err = NewServiceExportController(g.syncerConfig, podControllers)
 	if err != nil {
-		return errors.WithMessage(err, "error creating the ServiceExport controller")
+		return errors.Wrap(err, "error creating the ServiceExport controller")
 	}
 
 	g.controllers = append(g.controllers, c)
 
-	c, err = NewServiceController(*g.syncerConfig, podControllers)
+	c, err = NewServiceController(g.syncerConfig, podControllers)
 	if err != nil {
-		return errors.WithMessage(err, "error creating the Service controller")
+		return errors.Wrap(err, "error creating the Service controller")
 	}
 
 	g.controllers = append(g.controllers, c)
@@ -304,7 +304,7 @@ func (g *gatewayMonitor) startControllers() error {
 	for _, c := range g.controllers {
 		err = c.Start()
 		if err != nil {
-			return err
+			return err // nolint:wrapcheck  // Let the caller wrap it
 		}
 	}
 
@@ -327,17 +327,19 @@ func (g *gatewayMonitor) createGlobalNetMarkingChain() error {
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetMarkChain)
 
 	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", constants.SmGlobalnetMarkChain); err != nil {
-		return fmt.Errorf("error creating iptables chain %s: %v", constants.SmGlobalnetMarkChain, err)
+		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetMarkChain)
 	}
 
 	return nil
 }
 
+//nolint:gocyclo // This function simply has a lot of error checks which inflates the cyclomatic complexity but logically
+// it's not really complex so we can ignore the violation.
 func (g *gatewayMonitor) createGlobalnetChains() error {
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetIngressChain)
 
 	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", constants.SmGlobalnetIngressChain); err != nil {
-		return fmt.Errorf("error creating iptables chain %s: %v", constants.SmGlobalnetIngressChain, err)
+		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetIngressChain)
 	}
 
 	forwardToSubGlobalNetChain := []string{"-j", constants.SmGlobalnetIngressChain}
@@ -348,13 +350,13 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChain)
 
 	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", constants.SmGlobalnetEgressChain); err != nil {
-		return fmt.Errorf("error creating iptables chain %s: %v", constants.SmGlobalnetEgressChain, err)
+		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChain)
 	}
 
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", routeAgent.SmPostRoutingChain)
 
 	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", routeAgent.SmPostRoutingChain); err != nil {
-		return fmt.Errorf("error creating iptables chain %s: %v", routeAgent.SmPostRoutingChain, err)
+		return errors.Wrapf(err, "error creating iptables chain %s", routeAgent.SmPostRoutingChain)
 	}
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetEgressChain}
@@ -374,25 +376,25 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForPods)
 
 	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", constants.SmGlobalnetEgressChainForPods); err != nil {
-		return fmt.Errorf("error creating iptables chain %s: %v", constants.SmGlobalnetEgressChainForPods, err)
+		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChainForPods)
 	}
 
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForHeadlessSvcPods)
 
 	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", constants.SmGlobalnetEgressChainForHeadlessSvcPods); err != nil {
-		return fmt.Errorf("error creating iptables chain %s: %v", constants.SmGlobalnetEgressChainForHeadlessSvcPods, err)
+		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChainForHeadlessSvcPods)
 	}
 
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForNamespace)
 
 	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", constants.SmGlobalnetEgressChainForNamespace); err != nil {
-		return fmt.Errorf("error creating iptables chain %s: %v", constants.SmGlobalnetEgressChainForNamespace, err)
+		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChainForNamespace)
 	}
 
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForCluster)
 
 	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", constants.SmGlobalnetEgressChainForCluster); err != nil {
-		return fmt.Errorf("error creating iptables chain %s: %v", constants.SmGlobalnetEgressChainForCluster, err)
+		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChainForCluster)
 	}
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetEgressChainForPods}

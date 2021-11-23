@@ -23,25 +23,24 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/cabledriver"
-
 	"github.com/kelseyhightower/envconfig"
-	"k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog"
-	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
-
+	"github.com/pkg/errors"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/controller"
 	"github.com/submariner-io/submariner/pkg/event/logger"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/cabledriver"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/mtu"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
+	"k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog"
+	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
 
 var (
@@ -58,6 +57,7 @@ func main() {
 	stopCh := signals.SetupSignalHandler().Done()
 
 	var env environment.Specification
+
 	err := envconfig.Process("submariner", &env)
 	if err != nil {
 		klog.Fatalf("Error reading the environment variables: %s", err.Error())
@@ -87,7 +87,7 @@ func main() {
 	if err := registry.AddHandlers(
 		logger.NewHandler(),
 		kubeproxy.NewSyncHandler(env.ClusterCidr, env.ServiceCidr),
-		ovn.NewHandler(env, smClientset),
+		ovn.NewHandler(&env, smClientset),
 		cabledriver.NewXRFMCleanupHandler(),
 		cabledriver.NewVXLANCleanup(),
 		mtu.NewMTUHandler(),
@@ -98,8 +98,8 @@ func main() {
 	ctl, err := controller.New(&controller.Config{
 		Registry:   registry,
 		MasterURL:  masterURL,
-		Kubeconfig: kubeconfig})
-
+		Kubeconfig: kubeconfig,
+	})
 	if err != nil {
 		klog.Fatalf("Error creating controller for event handling %v", err)
 	}
@@ -134,7 +134,7 @@ func annotateNode(clusterCidr []string, cfg *restclient.Config) error {
 
 	err = cni.AnnotateNodeWithCNIInterfaceIP(nodeName, k8sClientSet, clusterCidr)
 	if err != nil {
-		return fmt.Errorf("AnnotateNodeWithCNIInterfaceIP returned error %v", err)
+		return errors.Wrap(err, "error annotating node with CNI interface IP")
 	}
 
 	return nil

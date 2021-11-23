@@ -19,12 +19,11 @@ limitations under the License.
 package logger
 
 import (
-	k8sV1 "k8s.io/api/core/v1"
-	"k8s.io/klog"
-
 	"github.com/submariner-io/admiral/pkg/log"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event"
+	k8sV1 "k8s.io/api/core/v1"
+	"k8s.io/klog"
 )
 
 type Handler struct {

@@ -21,39 +21,41 @@ package controllers
 import (
 	"context"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog"
 )
 
-func NewIngressPodControllers(config syncer.ResourceSyncerConfig) (*IngressPodControllers, error) {
+func NewIngressPodControllers(config *syncer.ResourceSyncerConfig) (*IngressPodControllers, error) {
+	// We'll panic if config is nil, this is intentional
 	_, gvr, err := util.ToUnstructuredResource(&submarinerv1.GlobalIngressIP{}, config.RestMapper)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error converting resource")
 	}
 
 	return &IngressPodControllers{
 		controllers: map[string]*ingressPodController{},
-		config:      config,
+		config:      *config,
 		ingressIPs:  config.SourceClient.Resource(*gvr),
 	}, nil
 }
 
 func (c *IngressPodControllers) start(service *corev1.Service) error {
-	c.Lock()
-	defer c.Unlock()
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 
 	key := c.key(service.Name, service.Namespace)
 	if _, exists := c.controllers[key]; exists {
 		return nil
 	}
 
-	controller, err := startIngressPodController(service, c.config)
+	controller, err := startIngressPodController(service, &c.config)
 	if err != nil {
 		return err
 	}
@@ -64,8 +66,8 @@ func (c *IngressPodControllers) start(service *corev1.Service) error {
 }
 
 func (c *IngressPodControllers) stopAll() {
-	c.Lock()
-	defer c.Unlock()
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 
 	for _, controller := range c.controllers {
 		controller.Stop()
@@ -75,10 +77,11 @@ func (c *IngressPodControllers) stopAll() {
 }
 
 func (c *IngressPodControllers) stopAndCleanup(serviceName, serviceNamespace string) {
-	c.Lock()
-	defer c.Unlock()
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 
 	key := c.key(serviceName, serviceNamespace)
+
 	controller, exists := c.controllers[key]
 	if exists {
 		controller.Stop()
@@ -89,7 +92,7 @@ func (c *IngressPodControllers) stopAndCleanup(serviceName, serviceNamespace str
 	err := c.ingressIPs.Namespace(serviceNamespace).DeleteCollection(context.TODO(), metav1.DeleteOptions{},
 		metav1.ListOptions{LabelSelector: svcSelector})
 
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		klog.Errorf("Error deleting GlobalIngressIPs for service %q: %v", key, err)
 	}
 }

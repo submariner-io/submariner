@@ -23,17 +23,15 @@ import (
 	"os"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/controller"
 	"github.com/submariner-io/submariner/pkg/event/logger"
 	"github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
-
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
@@ -52,6 +50,7 @@ func main() {
 	stopCh := signals.SetupSignalHandler().Done()
 
 	var env environment.Specification
+
 	err := envconfig.Process("submariner", &env)
 	if err != nil {
 		klog.Fatalf("Error reading the environment variables: %s", err.Error())
@@ -64,15 +63,15 @@ func main() {
 	}
 
 	registry := event.NewRegistry("networkplugin-syncer", networkPlugin)
-	if err := registry.AddHandlers(logger.NewHandler(), ovn.NewSyncHandler(getK8sClient(), env)); err != nil {
+	if err := registry.AddHandlers(logger.NewHandler(), ovn.NewSyncHandler(getK8sClient(), &env)); err != nil {
 		klog.Fatalf("Error registering the handlers: %s", err.Error())
 	}
 
 	ctl, err := controller.New(&controller.Config{
 		Registry:   registry,
 		MasterURL:  masterURL,
-		Kubeconfig: kubeconfig})
-
+		Kubeconfig: kubeconfig,
+	})
 	if err != nil {
 		klog.Fatalf("Error creating controller for event handling %v", err)
 	}
@@ -91,6 +90,7 @@ func main() {
 func getK8sClient() kubernetes.Interface {
 	var cfg *rest.Config
 	var err error
+
 	if masterURL == "" && kubeconfig == "" {
 		cfg, err = rest.InClusterConfig()
 		if err != nil {

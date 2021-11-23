@@ -16,12 +16,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// nolint:wrapcheck // Most of the functions are simple wrappers so we'll let the caller wrap errors.
 package netlink
 
 import (
 	"bytes"
-	"io/ioutil"
 	"net"
+	"os"
 	"os/exec"
 	"strconv"
 
@@ -61,8 +62,7 @@ type Interface interface {
 
 var NewFunc func() Interface
 
-type netlinkType struct {
-}
+type netlinkType struct{}
 
 func New() Interface {
 	if NewFunc != nil {
@@ -154,7 +154,7 @@ func (n *netlinkType) FlushRouteTable(tableID int) error {
 func (n *netlinkType) ConfigureTCPMTUProbe(mtuProbe, baseMss string) error {
 	err := setSysctl("/proc/sys/net/ipv4/tcp_mtu_probing", []byte(mtuProbe))
 	if err != nil {
-		return errors.WithMessagef(err, "unable to update value of tcp_mtu_probing to %s", mtuProbe)
+		return errors.Wrapf(err, "unable to update value of tcp_mtu_probing to %s", mtuProbe)
 	}
 
 	err = setSysctl("/proc/sys/net/ipv4/tcp_base_mss", []byte(baseMss))
@@ -165,7 +165,7 @@ func (n *netlinkType) ConfigureTCPMTUProbe(mtuProbe, baseMss string) error {
 }
 
 func setSysctl(path string, contents []byte) error {
-	existing, err := ioutil.ReadFile(path)
+	existing, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
@@ -178,5 +178,5 @@ func setSysctl(path string, contents []byte) error {
 	}
 	// Permissions are already 644, the files are never created
 	// #nosec G306
-	return ioutil.WriteFile(path, contents, 0644)
+	return os.WriteFile(path, contents, 0o644)
 }

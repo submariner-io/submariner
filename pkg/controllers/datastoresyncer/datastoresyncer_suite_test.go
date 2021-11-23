@@ -148,7 +148,7 @@ func (t *testDriver) run() {
 	t.stopCh = make(chan struct{})
 	t.startCompleted = make(chan error, 1)
 
-	t.syncer = datastoresyncer.New(broker.SyncerConfig{
+	t.syncer = datastoresyncer.New(&broker.SyncerConfig{
 		LocalClient:     t.localClient,
 		LocalNamespace:  localNamespace,
 		LocalClusterID:  clusterID,
@@ -156,7 +156,7 @@ func (t *testDriver) run() {
 		BrokerNamespace: brokerNamespace,
 		RestMapper:      t.restMapper,
 		Scheme:          t.syncerScheme,
-	}, *t.localCluster, *t.localEndpoint, []string{})
+	}, t.localCluster, t.localEndpoint, []string{})
 
 	go func() {
 		t.startCompleted <- t.syncer.Start(t.stopCh)

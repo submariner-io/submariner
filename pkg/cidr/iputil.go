@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/pkg/errors"
 	"k8s.io/klog"
 )
 
@@ -65,13 +66,13 @@ func OverlappingSubnets(localServiceCIDRs, localPodCIDRs, remoteSubnets []string
 func IsOverlapping(cidrList []string, cidr string) (bool, error) {
 	_, newNet, err := net.ParseCIDR(cidr)
 	if err != nil {
-		return false, err
+		return false, errors.Wrapf(err, "error parsing CIDR %q", cidr)
 	}
 
 	for _, v := range cidrList {
 		_, baseNet, err := net.ParseCIDR(v)
 		if err != nil {
-			return false, err
+			return false, errors.Wrapf(err, "error parsing CIDR %q", v)
 		}
 
 		if baseNet.Contains(newNet.IP) || newNet.Contains(baseNet.IP) {

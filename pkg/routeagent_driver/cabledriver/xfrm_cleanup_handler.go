@@ -19,12 +19,11 @@ limitations under the License.
 package cabledriver
 
 import (
-	"fmt"
 	"syscall"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/event"
-
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"k8s.io/klog"
 )
@@ -48,9 +47,8 @@ func (h *xrfmCleanup) GetNetworkPlugins() []string {
 
 func (h *xrfmCleanup) TransitionToNonGateway() error {
 	currentXfrmPolicyList, err := h.netLink.XfrmPolicyList(syscall.AF_INET)
-
 	if err != nil {
-		return fmt.Errorf("error retrieving current xfrm policies: %v", err)
+		return errors.Wrap(err, "error retrieving current xfrm policies")
 	}
 
 	if len(currentXfrmPolicyList) > 0 {
@@ -68,7 +66,7 @@ func (h *xrfmCleanup) TransitionToNonGateway() error {
 		klog.V(log.DEBUG).Infof("Deleting XFRM policy %s", currentXfrmPolicyList[i])
 
 		if err = h.netLink.XfrmPolicyDel(&currentXfrmPolicyList[i]); err != nil {
-			return fmt.Errorf("error deleting XFRM policy %s: %v", currentXfrmPolicyList[i], err)
+			return errors.Wrapf(err, "error deleting XFRM policy %s", currentXfrmPolicyList[i])
 		}
 	}
 

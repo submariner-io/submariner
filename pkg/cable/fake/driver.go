@@ -32,7 +32,7 @@ import (
 const DriverName = "fake-driver"
 
 type Driver struct {
-	sync.Mutex
+	mutex                       sync.Mutex
 	init                        chan struct{}
 	ErrOnInit                   error
 	activeConnections           map[string]v1.Connection
@@ -61,12 +61,12 @@ func (d *Driver) Init() error {
 }
 
 func (d *Driver) GetActiveConnections() ([]v1.Connection, error) {
-	d.Lock()
-	defer d.Unlock()
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
 
 	ret := []v1.Connection{}
-	for _, c := range d.activeConnections {
-		ret = append(ret, c)
+	for k := range d.activeConnections {
+		ret = append(ret, d.activeConnections[k])
 	}
 
 	return ret, nil
@@ -85,8 +85,9 @@ func (d *Driver) GetConnections() ([]v1.Connection, error) {
 }
 
 func (d *Driver) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
-	d.Lock()
-	defer d.Unlock()
+	// We'll panic if endpointInfo is nil, this is intentional
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
 
 	err := d.ErrOnConnectToEndpoint
 	if err != nil {
@@ -95,16 +96,18 @@ func (d *Driver) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (
 	}
 
 	d.activeConnections[endpointInfo.Endpoint.Spec.CableName] = v1.Connection{
-		Endpoint: endpointInfo.Endpoint.Spec, UsingIP: endpointInfo.Endpoint.Spec.PublicIP, UsingNAT: true}
+		Endpoint: endpointInfo.Endpoint.Spec, UsingIP: endpointInfo.Endpoint.Spec.PublicIP, UsingNAT: true,
+	}
 
 	d.connectToEndpoint <- endpointInfo
 
 	return endpointInfo.UseIP, nil
 }
 
-func (d *Driver) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) error {
-	d.Lock()
-	defer d.Unlock()
+func (d *Driver) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint) error {
+	// We'll panic if endpoint is nil, this is intentional
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
 
 	err := d.ErrOnDisconnectFromEndpoint
 	if err != nil {
@@ -114,7 +117,7 @@ func (d *Driver) DisconnectFromEndpoint(endpoint types.SubmarinerEndpoint) error
 
 	delete(d.activeConnections, endpoint.Spec.CableName)
 
-	d.disconnectFromEndpoint <- &endpoint
+	d.disconnectFromEndpoint <- endpoint
 
 	return nil
 }

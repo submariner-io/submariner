@@ -21,6 +21,7 @@ package controllers
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	"github.com/submariner-io/submariner/pkg/ipset"
@@ -32,7 +33,7 @@ import (
 	"k8s.io/klog"
 )
 
-func startEgressPodWatcher(name, namespace string, namedIPSet ipset.Named, config watcher.Config,
+func startEgressPodWatcher(name, namespace string, namedIPSet ipset.Named, config *watcher.Config,
 	podSelector *metav1.LabelSelector) (*egressPodWatcher, error) {
 	pw := &egressPodWatcher{
 		stopCh:     make(chan struct{}),
@@ -41,7 +42,7 @@ func startEgressPodWatcher(name, namespace string, namedIPSet ipset.Named, confi
 
 	sel, err := metav1.LabelSelectorAsSelector(podSelector)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error getting label selector")
 	}
 
 	labelSelector := sel.String()
@@ -65,14 +66,13 @@ func startEgressPodWatcher(name, namespace string, namedIPSet ipset.Named, confi
 			},
 		},
 	})
-
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error creating resource watcher")
 	}
 
 	err = w.Start(pw.stopCh)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error starting resource watcher")
 	}
 
 	return pw, nil

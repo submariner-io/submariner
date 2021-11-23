@@ -26,11 +26,10 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
@@ -166,11 +165,11 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 
 	gwPods := f.AwaitPodsByAppLabel(framework.ClusterA, framework.SubmarinerGateway, framework.TestContext.SubmarinerNamespace, 2)
 
-	for _, pod := range gwPods.Items {
-		if pod.Labels[gatewayNodeLabel] == initialGatewayNode.Name {
-			Expect(pod.Labels[gatewayStatusLabel]).To(Equal(gatewayStatusActive))
+	for i := range gwPods.Items {
+		if gwPods.Items[i].Labels[gatewayNodeLabel] == initialGatewayNode.Name {
+			Expect(gwPods.Items[i].Labels[gatewayStatusLabel]).To(Equal(gatewayStatusActive))
 		} else {
-			Expect(pod.Labels[gatewayStatusLabel]).To(Equal(gatewayStatusPassive))
+			Expect(gwPods.Items[i].Labels[gatewayStatusLabel]).To(Equal(gatewayStatusPassive))
 		}
 	}
 

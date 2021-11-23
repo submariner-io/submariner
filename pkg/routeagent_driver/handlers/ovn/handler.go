@@ -23,18 +23,17 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/submariner-io/submariner/pkg/cidr"
-	"github.com/submariner-io/submariner/pkg/iptables"
-	"k8s.io/klog"
-
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable/wireguard"
+	"github.com/submariner-io/submariner/pkg/cidr"
 	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/event"
+	"github.com/submariner-io/submariner/pkg/iptables"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"github.com/submariner-io/submariner/pkg/util"
+	"k8s.io/klog"
 )
 
 type Handler struct {
@@ -50,14 +49,15 @@ type Handler struct {
 	ipt                   iptables.Interface
 }
 
-func NewHandler(env environment.Specification, smClientSet clientset.Interface) *Handler {
+func NewHandler(env *environment.Specification, smClientSet clientset.Interface) *Handler {
+	// We'll panic if env is nil, this is intentional
 	ipt, err := iptables.New()
 	if err != nil {
 		klog.Fatalf("Error initializing iptables in OVN routeagent handler: %s", err)
 	}
 
 	return &Handler{
-		config:          &env,
+		config:          env,
 		smClient:        smClientSet,
 		remoteEndpoints: map[string]*submV1.Endpoint{},
 		netlink:         netlink.New(),
@@ -88,7 +88,7 @@ func (ovn *Handler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 
 	// TODO: this logic belongs to the cabledrivers instead
 	if endpoint.Spec.Backend == "wireguard" {
-		//NOTE: This assumes that LocalEndpointCreated happens before than TransitionToGatewayNode
+		// NOTE: This assumes that LocalEndpointCreated happens before than TransitionToGatewayNode
 		if routingInterface, err = net.InterfaceByName(wireguard.DefaultDeviceName); err != nil {
 			return errors.Wrapf(err, "Wireguard interface %s not found on the node.", wireguard.DefaultDeviceName)
 		}

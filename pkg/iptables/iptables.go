@@ -19,15 +19,13 @@ limitations under the License.
 package iptables
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/pkg/errors"
+	level "github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/stringset"
 	"k8s.io/klog"
-
-	level "github.com/submariner-io/admiral/pkg/log"
 )
 
 type Interface interface {
@@ -54,7 +52,7 @@ func New() (Interface, error) {
 
 	ipt, err := iptables.New(iptables.IPFamily(iptables.ProtocolIPv4), iptables.Timeout(5))
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error creating IP tables")
 	}
 
 	return &iptablesWrapper{IPTables: ipt}, nil
@@ -63,18 +61,20 @@ func New() (Interface, error) {
 func (i *iptablesWrapper) Delete(table, chain string, rulespec ...string) error {
 	err := i.IPTables.Delete(table, chain, rulespec...)
 
-	iptError, ok := err.(*iptables.Error)
+	var iptError *iptables.Error
+
+	ok := errors.As(err, &iptError)
 	if ok && iptError.IsNotExist() {
 		return nil
 	}
 
-	return err
+	return errors.Wrap(err, "error deleting IP table rule")
 }
 
 func CreateChainIfNotExists(ipt Interface, table, chain string) error {
 	existingChains, err := ipt.ListChains(table)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error listing IP table chains")
 	}
 
 	for _, val := range existingChains {
@@ -84,7 +84,7 @@ func CreateChainIfNotExists(ipt Interface, table, chain string) error {
 		}
 	}
 
-	return ipt.NewChain(table, chain)
+	return errors.Wrap(ipt.NewChain(table, chain), "error creating IP table chain")
 }
 
 func PrependUnique(ipt Interface, table, chain string, ruleSpec []string) error {
@@ -104,11 +104,12 @@ func PrependUnique(ipt Interface, table, chain string, ruleSpec []string) error 
 func InsertUnique(ipt Interface, table, chain string, position int, ruleSpec []string) error {
 	rules, err := ipt.List(table, chain)
 	if err != nil {
-		return fmt.Errorf("error listing the rules in %s chain: %v", chain, err)
+		return errors.Wrapf(err, "error listing the rules in %s chain", chain)
 	}
 
 	isPresentAtRequiredPosition := false
 	numOccurrences := 0
+
 	for index, rule := range rules {
 		if strings.Contains(rule, strings.Join(ruleSpec, " ")) {
 			klog.V(level.DEBUG).Infof("In %s table, iptables rule \"%s\", exists at index %d.", table, strings.Join(ruleSpec, " "), index)
@@ -125,7 +126,7 @@ func InsertUnique(ipt Interface, table, chain string, position int, ruleSpec []s
 	if numOccurrences > 1 || !isPresentAtRequiredPosition {
 		for i := 0; i < numOccurrences; i++ {
 			if err = ipt.Delete(table, chain, ruleSpec...); err != nil {
-				return fmt.Errorf("error deleting stale iptable rule \"%s\": %v", strings.Join(ruleSpec, " "), err)
+				return errors.Wrapf(err, "error deleting stale IP table rule %q", strings.Join(ruleSpec, " "))
 			}
 		}
 	}
@@ -135,7 +136,7 @@ func InsertUnique(ipt Interface, table, chain string, position int, ruleSpec []s
 		klog.V(level.DEBUG).Infof("In %s table, iptables rule \"%s\", already exists.", table, strings.Join(ruleSpec, " "))
 		return nil
 	} else if err := ipt.Insert(table, chain, position, ruleSpec...); err != nil {
-		return err
+		return errors.Wrapf(err, "error inserting IP table rule %q", strings.Join(ruleSpec, " "))
 	}
 
 	return nil

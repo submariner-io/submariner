@@ -36,14 +36,15 @@ import (
 	"k8s.io/klog"
 )
 
-func NewGlobalIngressIPController(config syncer.ResourceSyncerConfig, pool *ipam.IPPool) (Interface, error) {
+func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool) (Interface, error) {
+	// We'll panic if config is nil, this is intentional
 	var err error
 
 	klog.Info("Creating GlobalIngressIP controller")
 
 	iptIface, err := iptables.New()
 	if err != nil {
-		return nil, errors.WithMessage(err, "error creating the IPTablesInterface handler")
+		return nil, errors.Wrap(err, "error creating the IPTablesInterface handler")
 	}
 
 	controller := &globalIngressIPController{
@@ -52,15 +53,16 @@ func NewGlobalIngressIPController(config syncer.ResourceSyncerConfig, pool *ipam
 
 	_, gvr, err := util.ToUnstructuredResource(&submarinerv1.GlobalIngressIP{}, config.RestMapper)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error converting resource")
 	}
 
 	federator := federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
 
 	client := config.SourceClient.Resource(*gvr)
+
 	list, err := client.Namespace(corev1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error listing the resources")
 	}
 
 	for i := range list.Items {
@@ -79,6 +81,7 @@ func NewGlobalIngressIPController(config syncer.ResourceSyncerConfig, pool *ipam
 			continue
 		}
 
+		// nolint:wrapcheck  // No need to wrap these errors.
 		err = controller.reserveAllocatedIPs(federator, obj, func(reservedIPs []string) error {
 			if gip.Spec.Target == submarinerv1.ClusterIPService {
 				return controller.iptIface.AddIngressRulesForService(reservedIPs[0], target)
@@ -112,7 +115,7 @@ func NewGlobalIngressIPController(config syncer.ResourceSyncerConfig, pool *ipam
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error creating the syncer")
 	}
 
 	return controller, nil
@@ -131,6 +134,7 @@ func (c *globalIngressIPController) process(from runtime.Object, numRequeues int
 		return checkStatusChanged(&prevStatus, &ingressIP.Status, ingressIP), requeue
 	case syncer.Delete:
 		return nil, c.onDelete(ingressIP, numRequeues)
+	case syncer.Update:
 	}
 
 	return nil, false
@@ -150,7 +154,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 	if err != nil {
 		klog.Errorf("Error allocating IP for %q: %v", key, err)
 
-		ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, metav1.Condition{
+		ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, &metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "IPPoolAllocationFailed",
@@ -176,7 +180,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 
 			_ = c.pool.Release(ips...)
 
-			ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, metav1.Condition{
+			ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, &metav1.Condition{
 				Type:    string(submarinerv1.GlobalEgressIPAllocated),
 				Status:  metav1.ConditionFalse,
 				Reason:  "ProgramIPTableRulesFailed",
@@ -209,7 +213,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 
 		if err != nil {
 			_ = c.pool.Release(ips...)
-			ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, metav1.Condition{
+			ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, &metav1.Condition{
 				Type:    string(submarinerv1.GlobalEgressIPAllocated),
 				Status:  metav1.ConditionFalse,
 				Reason:  "ProgramIPTableRulesFailed",
@@ -222,7 +226,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 
 	ingressIP.Status.AllocatedIP = ips[0]
 
-	ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, metav1.Condition{
+	ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, &metav1.Condition{
 		Type:    string(submarinerv1.GlobalEgressIPAllocated),
 		Status:  metav1.ConditionTrue,
 		Reason:  "Success",
@@ -232,6 +236,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 	return false
 }
 
+// nolint:wrapcheck  // No need to wrap these errors.
 func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngressIP, numRequeues int) bool {
 	if ingressIP.Status.AllocatedIP == "" {
 		return false

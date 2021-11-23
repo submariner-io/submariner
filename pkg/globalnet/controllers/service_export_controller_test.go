@@ -287,10 +287,10 @@ func (t *serviceExportControllerTestDriver) start() {
 		Scheme:       t.scheme,
 	}
 
-	podControllers, err := controllers.NewIngressPodControllers(*config)
+	podControllers, err := controllers.NewIngressPodControllers(config)
 	Expect(err).To(Succeed())
 
-	t.controller, err = controllers.NewServiceExportController(*config, podControllers)
+	t.controller, err = controllers.NewServiceExportController(config, podControllers)
 
 	Expect(err).To(Succeed())
 	Expect(t.controller.Start()).To(Succeed())

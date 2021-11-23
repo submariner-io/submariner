@@ -22,12 +22,11 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	"github.com/submariner-io/submariner/pkg/client/informers/externalversions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
-
-	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
-	"github.com/submariner-io/submariner/pkg/client/informers/externalversions"
 )
 
 // Framework supports common operations used by e2e tests; it will keep a client & a namespace for you.

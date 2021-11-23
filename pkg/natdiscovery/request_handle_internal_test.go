@@ -23,14 +23,12 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"google.golang.org/protobuf/proto"
-
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 var _ = Describe("Request handling", func() {
-
 	var localListener *natDiscovery
 	var localUDPSent chan []byte
 	var remoteListener *natDiscovery
@@ -79,7 +77,6 @@ var _ = Describe("Request handling", func() {
 			Expect(response[1].DstIpNatDetected).To(BeTrue())
 			Expect(response[1].SrcIpNatDetected).To(BeFalse())
 			Expect(response[1].SrcPortNatDetected).To(BeFalse())
-
 		})
 
 		Context("with a modified IP", func() {

@@ -19,10 +19,9 @@ limitations under the License.
 package controller
 
 import (
+	smv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog"
-
-	smv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 )
 
 func (c *Controller) handleRemovedEndpoint(obj runtime.Object, numRequeues int) bool {
@@ -44,7 +43,7 @@ func (c *Controller) handleRemovedEndpoint(obj runtime.Object, numRequeues int) 
 
 func (c *Controller) handleRemovedLocalEndpoint(endpoint *smv1.Endpoint) error {
 	if err := c.handlers.LocalEndpointRemoved(endpoint); err != nil {
-		return err
+		return err // nolint:wrapcheck  // Let the caller wrap it
 	}
 
 	c.syncMutex.Lock()
@@ -52,7 +51,7 @@ func (c *Controller) handleRemovedLocalEndpoint(endpoint *smv1.Endpoint) error {
 
 	if c.isGatewayNode && endpoint.Spec.Hostname == c.hostname {
 		if err := c.handlers.TransitionToNonGateway(); err != nil {
-			return err
+			return err // nolint:wrapcheck  // Let the caller wrap it
 		}
 
 		c.isGatewayNode = false
@@ -62,5 +61,5 @@ func (c *Controller) handleRemovedLocalEndpoint(endpoint *smv1.Endpoint) error {
 }
 
 func (c *Controller) handleRemovedRemoteEndpoint(endpoint *smv1.Endpoint) error {
-	return c.handlers.RemoteEndpointRemoved(endpoint)
+	return c.handlers.RemoteEndpointRemoved(endpoint) // nolint:wrapcheck  // Let the caller wrap it
 }

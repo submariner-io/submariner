@@ -21,6 +21,7 @@ package controllers
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/admiral/pkg/syncer"
@@ -35,12 +36,12 @@ import (
 	"k8s.io/klog"
 )
 
-func startIngressPodController(svc *corev1.Service, config syncer.ResourceSyncerConfig) (*ingressPodController, error) {
+func startIngressPodController(svc *corev1.Service, config *syncer.ResourceSyncerConfig) (*ingressPodController, error) {
 	var err error
 
 	_, gvr, err := util.ToUnstructuredResource(&submarinerv1.GlobalIngressIP{}, config.RestMapper)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error converting resource")
 	}
 
 	controller := &ingressPodController{
@@ -66,11 +67,11 @@ func startIngressPodController(svc *corev1.Service, config syncer.ResourceSyncer
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error creating the syncer")
 	}
 
 	if err := controller.Start(); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error starting the syncer")
 	}
 
 	ingressIPs := config.SourceClient.Resource(*gvr).Namespace(corev1.NamespaceAll)

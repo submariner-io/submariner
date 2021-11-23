@@ -19,9 +19,9 @@ limitations under the License.
 package cabledriver
 
 import (
-	"fmt"
 	"syscall"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/cable/vxlan"
 	"github.com/submariner-io/submariner/pkg/event"
@@ -49,8 +49,11 @@ func (h *vxlanCleanup) TransitionToNonGateway() error {
 	klog.Infof("Cleaning up the routes")
 
 	link, err := netlink.LinkByName(vxlan.VxlanIface)
-
 	if err != nil {
+		if !errors.Is(err, netlink.LinkNotFoundError{}) {
+			klog.Warningf("Failed to retrieve the vxlan-tunnel interface during transition to non-gateway: %v", err)
+		}
+
 		return nil
 	}
 
@@ -71,7 +74,7 @@ func (h *vxlanCleanup) TransitionToNonGateway() error {
 
 	err = netlink.LinkDel(link)
 	if err != nil {
-		return fmt.Errorf("failed to delete the the vxlan interface: %v", err)
+		return errors.Wrapf(err, "failed to delete the vxlan interface")
 	}
 
 	return nil

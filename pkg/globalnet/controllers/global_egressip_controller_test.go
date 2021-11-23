@@ -587,7 +587,7 @@ func newGlobalEgressIPControllerTestDriver() *globalEgressIPControllerTestDriver
 func (t *globalEgressIPControllerTestDriver) start() {
 	var err error
 
-	t.controller, err = controllers.NewGlobalEgressIPController(syncer.ResourceSyncerConfig{
+	t.controller, err = controllers.NewGlobalEgressIPController(&syncer.ResourceSyncerConfig{
 		SourceClient: t.dynClient,
 		RestMapper:   t.restMapper,
 		Scheme:       t.scheme,

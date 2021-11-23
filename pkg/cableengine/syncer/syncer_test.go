@@ -156,7 +156,8 @@ func testGatewaySyncing() {
 func testStaleGatewayCleanup() {
 	var t *testDriver
 	var staleGateway *submarinerv1.Gateway
-	var expectedErr = errors.New("fake error")
+
+	expectedErr := errors.New("fake error")
 
 	BeforeEach(func() {
 		t = newTestDriver()
@@ -487,9 +488,9 @@ func (t *testDriver) run() {
 		},
 		EndpointNamespace: namespace,
 		ClusterID:         t.engine.LocalEndPoint.Spec.ClusterID,
-		NewPinger: func(ip string, i time.Duration, m uint) healthchecker.PingerInterface {
+		NewPinger: func(pingerCfg healthchecker.PingerConfig) healthchecker.PingerInterface {
 			defer GinkgoRecover()
-			Expect(ip).To(Equal(t.pinger.GetIP()))
+			Expect(pingerCfg.IP).To(Equal(t.pinger.GetIP()))
 			return t.pinger
 		},
 	})

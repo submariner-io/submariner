@@ -20,7 +20,7 @@ package endpoint
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"regexp"
@@ -48,7 +48,7 @@ var publicIPMethods = map[string]publicIPResolverFunction{
 
 var IPv4RE = regexp.MustCompile(`(?:\d{1,3}\.){3}\d{1,3}`)
 
-func getPublicIP(submSpec types.SubmarinerSpecification, k8sClient kubernetes.Interface, backendConfig map[string]string) (string, error) {
+func getPublicIP(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface, backendConfig map[string]string) (string, error) {
 	config, ok := backendConfig[v1.PublicIP]
 	if !ok {
 		if submSpec.PublicIP != "" {
@@ -61,6 +61,7 @@ func getPublicIP(submSpec types.SubmarinerSpecification, k8sClient kubernetes.In
 	resolvers := strings.Split(config, ",")
 	for _, resolver := range resolvers {
 		resolver = strings.Trim(resolver, " ")
+
 		parts := strings.Split(resolver, ":")
 		if len(parts) != 2 {
 			return "", errors.Errorf("invalid format for %q annotation: %q", v1.GatewayConfigPrefix+v1.PublicIP, config)
@@ -98,7 +99,7 @@ func publicAPI(clientset kubernetes.Interface, namespace, value string) (string,
 
 	defer response.Body.Close()
 
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return "", errors.Wrapf(err, "reading API response from %s", url)
 	}
@@ -149,7 +150,7 @@ func publicLoadBalancerIP(clientset kubernetes.Interface, namespace, loadBalance
 		}
 	})
 
-	return ip, err
+	return ip, err // nolint:wrapcheck  // No need to wrap here
 }
 
 func publicDNSIP(clientset kubernetes.Interface, namespace, fqdn string) (string, error) {

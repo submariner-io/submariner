@@ -16,6 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// nolint:wrapcheck // The functions are simple wrappers so we'll let the caller wrap errors.
 package ipset
 
 type Named interface {
@@ -34,10 +35,11 @@ type namedType struct {
 	set   IPSet
 }
 
-func NewNamed(set IPSet, iface Interface) Named {
+func NewNamed(set *IPSet, iface Interface) Named {
+	// We'll panic if set is nil, this is intentional
 	return &namedType{
 		iface: iface,
-		set:   set,
+		set:   *set,
 	}
 }
 

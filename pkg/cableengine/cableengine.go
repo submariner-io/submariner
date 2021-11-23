@@ -18,10 +18,12 @@ limitations under the License.
 
 package cableengine
 
+//nolint:gci // The supported driver imports are kept separate.
 import (
 	"reflect"
 	"sync"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
@@ -30,7 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
 
-	// Add supported drivers
+	// Add supported drivers.
 	_ "github.com/submariner-io/submariner/pkg/cable/libreswan"
 	_ "github.com/submariner-io/submariner/pkg/cable/vxlan"
 	_ "github.com/submariner-io/submariner/pkg/cable/wireguard"
@@ -48,15 +50,15 @@ type Engine interface {
 	// Pods or Services behind the given endpoint.
 	InstallCable(remote *v1.Endpoint) error
 	// RemoveCable disconnects the Engine from the given remote endpoint. Upon completion.
-	// remote Pods and Service may not be accessible any more.
+	// remote Pods and Service may not be accessible anymore.
 	RemoveCable(remote *v1.Endpoint) error
-	// ListCableConnections returns a list of cable connection, and the related status
+	// ListCableConnections returns a list of cable connection, and the related status.
 	ListCableConnections() ([]v1.Connection, error)
-	// GetLocalEndpoint returns the local endpoint for this cable engine
+	// GetLocalEndpoint returns the local endpoint for this cable engine.
 	GetLocalEndpoint() *types.SubmarinerEndpoint
-	// GetHAStatus returns the HA status for this cable engine
+	// GetHAStatus returns the HA status for this cable engine.
 	GetHAStatus() v1.HAStatus
-	// SetupNATDiscovery configures the handler for nat discovery of the endpoints
+	// SetupNATDiscovery configures the handler for nat discovery of the endpoints.
 	SetupNATDiscovery(natDiscovery natdiscovery.Interface)
 }
 
@@ -71,11 +73,12 @@ type engine struct {
 	installedCables     map[string]metav1.Time
 }
 
-// NewEngine creates a new Engine for the local cluster
-func NewEngine(localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) Engine {
+// NewEngine creates a new Engine for the local cluster.
+func NewEngine(localCluster *types.SubmarinerCluster, localEndpoint *types.SubmarinerEndpoint) Engine {
+	// We'll panic if localCluster or localEndpoint are nil, this is intentional
 	return &engine{
-		localCluster:        localCluster,
-		localEndpoint:       localEndpoint,
+		localCluster:        *localCluster,
+		localEndpoint:       *localEndpoint,
 		natDiscoveryPending: map[string]int{},
 		installedCables:     map[string]metav1.Time{},
 	}
@@ -101,15 +104,11 @@ func (i *engine) StartEngine() error {
 func (i *engine) startDriver() error {
 	var err error
 
-	if i.driver, err = cable.NewDriver(i.localEndpoint, i.localCluster); err != nil {
-		return err
+	if i.driver, err = cable.NewDriver(&i.localEndpoint, &i.localCluster); err != nil {
+		return errors.Wrap(err, "error creating the cable driver")
 	}
 
-	if err := i.driver.Init(); err != nil {
-		return err
-	}
-
-	return nil
+	return errors.Wrap(i.driver.Init(), "error initializing the cable driver")
 }
 
 func (i *engine) SetupNATDiscovery(natDiscovery natdiscovery.Interface) {
@@ -143,10 +142,11 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 
 	activeConnections, err := i.driver.GetActiveConnections()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error getting the active connections")
 	}
 
-	for _, active := range activeConnections {
+	for j := range activeConnections {
+		active := &activeConnections[j]
 		klog.V(log.TRACE).Infof("Analyzing currently active connection %q", active.Endpoint.CableName)
 
 		if active.Endpoint.ClusterID != endpoint.Spec.ClusterID {
@@ -181,9 +181,9 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 
 		klog.V(log.DEBUG).Infof("Disconnecting pre-existing cable %q", active.Endpoint.CableName)
 
-		err = i.driver.DisconnectFromEndpoint(types.SubmarinerEndpoint{Spec: active.Endpoint})
+		err = i.driver.DisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: active.Endpoint})
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "error disconnecting previous Endpoint cable %#v", active.Endpoint)
 		}
 	}
 
@@ -191,7 +191,7 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 
 	remoteEndpointIP, err := i.driver.ConnectToEndpoint(rnat)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "error installing Endpoint cable %q", endpoint.Spec.CableName)
 	}
 
 	klog.Infof("Successfully installed Endpoint cable %q with remote IP %s", endpoint.Spec.CableName, remoteEndpointIP)
@@ -240,9 +240,9 @@ func (i *engine) RemoveCable(endpoint *v1.Endpoint) error {
 		return nil
 	}
 
-	err := i.driver.DisconnectFromEndpoint(types.SubmarinerEndpoint{Spec: endpoint.Spec})
+	err := i.driver.DisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: endpoint.Spec})
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "error disconnecting Endpoint cable %q", endpoint.Spec.CableName)
 	}
 
 	delete(i.installedCables, endpoint.Spec.CableName)
@@ -258,12 +258,12 @@ func (i *engine) GetHAStatus() v1.HAStatus {
 
 	if i.driver == nil {
 		return v1.HAStatusPassive
-	} else {
-		// we may want to add a call to the driver in the future, for situations where
-		// the driver is running from the start, but could be in passive status, or
-		// in active/active.
-		return v1.HAStatusActive
 	}
+
+	// we may want to add a call to the driver in the future, for situations where
+	// the driver is running from the start, but could be in passive status, or
+	// in active/active.
+	return v1.HAStatusActive
 }
 
 func (i *engine) ListCableConnections() ([]v1.Connection, error) {
@@ -271,8 +271,8 @@ func (i *engine) ListCableConnections() ([]v1.Connection, error) {
 	defer i.Unlock()
 
 	if i.driver != nil {
-		return i.driver.GetConnections()
+		return i.driver.GetConnections() // nolint:wrapcheck  // Let the caller wrap it
 	}
-	// if no driver, we can safely report that no connections exist
+	// if no driver, we can safely report that no connections exist.
 	return []v1.Connection{}, nil
 }

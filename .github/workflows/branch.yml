@@ -5,8 +5,8 @@ on:
   pull_request:
 
 jobs:
-  target_devel:
-    name: PR targets devel
+  target_branch:
+    name: PR targets branch
     runs-on: ubuntu-latest
     steps:
       - name: Check that the PR targets devel

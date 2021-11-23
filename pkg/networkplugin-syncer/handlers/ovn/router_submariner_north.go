@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	// The upstream port connects to the host on the GW, right before/after the encryption cable driver
+	// The upstream port connects to the host on the GW, right before/after the encryption cable driver.
 	submarinerUpstreamSwPort       = "submariner_up_lsp"
 	submarinerUpstreamRPort        = "submariner_up_lrp"
 	submarinerUpstreamMAC          = "00:60:2f:10:01:01"

@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -55,7 +56,7 @@ type Config struct {
 	ClusterID          string
 	PingInterval       uint
 	MaxPacketLossCount uint
-	NewPinger          func(string, time.Duration, uint) PingerInterface
+	NewPinger          func(PingerConfig) PingerInterface
 }
 
 type controller struct {
@@ -86,7 +87,7 @@ func New(config *Config) (Interface, error) {
 
 	controller.endpointWatcher, err = watcher.New(config.WatcherConfig)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "error creating watcher")
 	}
 
 	return controller, nil
@@ -102,7 +103,7 @@ func (h *controller) GetLatencyInfo(endpoint *submarinerv1.EndpointSpec) *Latenc
 
 func (h *controller) Start(stopCh <-chan struct{}) error {
 	if err := h.endpointWatcher.Start(stopCh); err != nil {
-		return err
+		return errors.Wrapf(err, "error starting watcher")
 	}
 
 	klog.Infof("CableEngine HealthChecker started with PingInterval: %v, MaxPacketLossCount: %v", h.config.PingInterval,
@@ -113,6 +114,7 @@ func (h *controller) Start(stopCh <-chan struct{}) error {
 
 func (h *controller) endpointCreatedorUpdated(obj runtime.Object, numRequeues int) bool {
 	klog.V(log.TRACE).Infof("Endpoint created: %#v", obj)
+
 	endpointCreated := obj.(*submarinerv1.Endpoint)
 	if endpointCreated.Spec.ClusterID == h.config.ClusterID {
 		return false
@@ -135,23 +137,21 @@ func (h *controller) endpointCreatedorUpdated(obj runtime.Object, numRequeues in
 		h.pingers.Delete(endpointCreated.Spec.CableName)
 	}
 
-	pingInterval := defaultPingInterval
-	if h.config.PingInterval != 0 {
-		pingInterval = time.Second * time.Duration(h.config.PingInterval)
+	pingerConfig := PingerConfig{
+		IP:                 endpointCreated.Spec.HealthCheckIP,
+		MaxPacketLossCount: h.config.MaxPacketLossCount,
 	}
 
-	maxPacketLossCount := defaultMaxPacketLossCount
-
-	if h.config.MaxPacketLossCount != 0 {
-		maxPacketLossCount = h.config.MaxPacketLossCount
+	if h.config.PingInterval != 0 {
+		pingerConfig.Interval = time.Second * time.Duration(h.config.PingInterval)
 	}
 
 	newPingerFunc := h.config.NewPinger
 	if newPingerFunc == nil {
-		newPingerFunc = newPinger
+		newPingerFunc = NewPinger
 	}
 
-	pinger := newPingerFunc(endpointCreated.Spec.HealthCheckIP, pingInterval, maxPacketLossCount)
+	pinger := newPingerFunc(pingerConfig)
 	h.pingers.Store(endpointCreated.Spec.CableName, pinger)
 	pinger.Start()
 

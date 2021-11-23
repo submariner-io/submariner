@@ -21,15 +21,14 @@ package ovn
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"io/ioutil"
+	"os"
 	"strings"
 
 	goovn "github.com/ebay/go-ovn"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
-
 	"github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn/nbctl"
 	"github.com/submariner-io/submariner/pkg/util/clusterfiles"
+	"k8s.io/klog"
 )
 
 func (ovn *SyncHandler) initClients() error {
@@ -40,22 +39,22 @@ func (ovn *SyncHandler) initClients() error {
 
 		certFile, err := clusterfiles.Get(ovn.k8sClientset, getOVNCertPath())
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "error getting config for %q", getOVNCertPath())
 		}
 
 		pkFile, err := clusterfiles.Get(ovn.k8sClientset, getOVNPrivKeyPath())
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "error getting config for %q", getOVNPrivKeyPath())
 		}
 
 		caFile, err := clusterfiles.Get(ovn.k8sClientset, getOVNCaBundlePath())
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "error getting config for %q", getOVNCaBundlePath())
 		}
 
 		tlsConfig, err = getOVNTLSConfig(pkFile, certFile, caFile)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "error getting OVN TLS config")
 		}
 
 		ovn.nbctl = nbctl.New(getOVNNBDBAddress(), pkFile, certFile, caFile)
@@ -71,7 +70,8 @@ func (ovn *SyncHandler) initClients() error {
 		Addr:      getOVNNBDBAddress(),
 		Reconnect: true,
 		TLSConfig: tlsConfig,
-		Db:        goovn.DBNB})
+		Db:        goovn.DBNB,
+	})
 
 	if err != nil {
 		return errors.Wrap(err, "error creating NBDB connection")
@@ -81,7 +81,8 @@ func (ovn *SyncHandler) initClients() error {
 		Addr:      getOVNSBDBAddress(),
 		Reconnect: true,
 		TLSConfig: tlsConfig,
-		Db:        goovn.DBSB})
+		Db:        goovn.DBSB,
+	})
 
 	if err != nil {
 		return errors.Wrap(err, "error creating SBDB connection")
@@ -98,8 +99,7 @@ func getOVNTLSConfig(pkFile, certFile, caFile string) (*tls.Config, error) {
 
 	rootCAs := x509.NewCertPool()
 
-	data, err := ioutil.ReadFile(caFile)
-
+	data, err := os.ReadFile(caFile)
 	if err != nil {
 		return nil, errors.Wrap(err, "failure loading OVNDB ca bundle")
 	}

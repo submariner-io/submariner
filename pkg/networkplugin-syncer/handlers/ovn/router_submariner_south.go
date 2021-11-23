@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	// The downstream port connects to ovn_cluster_router, allowing connectivity to pods and services
+	// The downstream port connects to ovn_cluster_router, allowing connectivity to pods and services.
 	submarinerDownstreamSwitch = "submariner_join"
 	submarinerDownstreamRPort  = "submariner_j_lrp"
 	submarinerDownstreamSwPort = "submariner_j_lsp"
@@ -55,18 +55,18 @@ func (ovn *SyncHandler) updateGatewayNode() error {
 
 	klog.V(log.DEBUG).Infof("Chassis for gw %q is %q, host: %q", gwHostname, chassis.Name, chassis.Hostname)
 
-	// Create/update the submariner external port associated to one of the external switches
+	// Create/update the submariner external port associated to one of the external switches.
 	if err := ovn.createOrUpdateSubmarinerExternalPort(); err != nil && !errors.Is(err, goovn.ErrorExist) {
 		return err
 	}
 
 	// Associate the port to an specific chassis (=host) on OVN so the traffic flows out/in through that host
-	// the active submariner-gateway in our case
+	// the active submariner-gateway in our case.
 	if err := ovn.associateSubmarinerRouterToChassis(chassis); err != nil {
 		return err
 	}
 
-	// Associate the current chassis k8s load balancers to the submariner_router
+	// Associate the current chassis k8s load balancers to the submariner_router.
 	if err := ovn.ensureServiceLoadBalancersFrom(chassis.Hostname); err != nil {
 		return err
 	}
@@ -79,14 +79,14 @@ func (ovn *SyncHandler) findChassisByHostname(hostname string) (*goovn.Chassis, 
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get chassis list from OVN")
 	}
-	// Attempt matching by the exact hostname
+	// Attempt matching by the exact hostname.
 	for _, chassis := range chassisList {
 		if chassis.Hostname == hostname {
 			return chassis, nil
 		}
 	}
 
-	// In a second round try to match expecting a higher level domain after the hostname
+	// In a second round try to match expecting a higher level domain after the hostname.
 	for _, chassis := range chassisList {
 		if strings.HasPrefix(chassis.Hostname, hostname+".") ||
 			strings.HasPrefix(hostname, chassis.Hostname+".") {

@@ -26,19 +26,18 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
-	"k8s.io/client-go/kubernetes/scheme"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
-
-	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 var (
@@ -108,8 +107,7 @@ func main() {
 	}
 
 	gatewayMonitor, err := controllers.NewGatewayMonitor(spec, append(localCluster.Spec.ClusterCIDR, localCluster.Spec.ServiceCIDR...),
-		watcher.Config{RestConfig: cfg})
-
+		&watcher.Config{RestConfig: cfg})
 	if err != nil {
 		klog.Fatalf("Error creating gatewayMonitor: %s", err.Error())
 	}
@@ -140,7 +138,7 @@ func startHTTPServer() *http.Server {
 	http.Handle("/metrics", promhttp.Handler())
 
 	go func() {
-		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			klog.Errorf("Error starting metrics server: %v", err)
 		}
 	}()

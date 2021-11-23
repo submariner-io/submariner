@@ -16,9 +16,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package healthchecker
+package healthchecker_test
 
 import (
+	"errors"
 	"net"
 	"os"
 	"syscall"
@@ -27,6 +28,7 @@ import (
 	"github.com/go-ping/ping"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
 )
 
 /**
@@ -36,11 +38,11 @@ import (
 */
 var _ = Describe("Pinger", func() {
 	var (
-		pinger             PingerInterface
-		ip                 string
-		pingInterval       time.Duration
-		maxPacketLossCount uint
-		testsEnabled       bool
+		pinger       healthchecker.PingerInterface
+		ip           string
+		pingInterval time.Duration
+		pingTimeout  time.Duration
+		testsEnabled bool
 	)
 
 	testsEnabled = func() bool {
@@ -53,14 +55,17 @@ var _ = Describe("Pinger", func() {
 
 			p.Count = 1
 			p.Timeout = 50 * time.Millisecond
-			p.SetPrivileged(privileged)
+			p.SetPrivileged(healthchecker.Privileged)
 
 			return p.Run()
 		}()
 
-		if opErr, ok := err.(*net.OpError); ok {
-			if sysCallErr, ok := opErr.Unwrap().(*os.SyscallError); ok {
-				if errNo, ok := sysCallErr.Unwrap().(syscall.Errno); ok {
+		var opErr *net.OpError
+		if errors.As(err, &opErr) {
+			var sysCallErr *os.SyscallError
+			if errors.As(err, &sysCallErr) {
+				var errNo syscall.Errno
+				if errors.As(err, &errNo) {
 					// errNo 1 is "operation not permitted".
 					return !(opErr.Op == "listen" && sysCallErr.Syscall == "socket" && errNo == 1)
 				}
@@ -78,11 +83,14 @@ var _ = Describe("Pinger", func() {
 
 		ip = "127.0.0.1"
 		pingInterval = 300 * time.Millisecond
-		maxPacketLossCount = defaultMaxPacketLossCount
 	})
 
 	JustBeforeEach(func() {
-		pinger = newPinger(ip, pingInterval, maxPacketLossCount)
+		pinger = healthchecker.NewPinger(healthchecker.PingerConfig{
+			IP:       ip,
+			Interval: pingInterval,
+			Timeout:  pingTimeout,
+		})
 		pinger.Start()
 	})
 
@@ -91,12 +99,12 @@ var _ = Describe("Pinger", func() {
 	})
 
 	verifyPingStats := func(count int) {
-		last := &LatencyInfo{}
+		last := &healthchecker.LatencyInfo{}
 
 		for i := 0; i < count; i++ {
-			var current *LatencyInfo
+			var current *healthchecker.LatencyInfo
 
-			Eventually(func() *LatencyInfo {
+			Eventually(func() *healthchecker.LatencyInfo {
 				current = pinger.GetLatencyInfo()
 				return current
 			}, pingInterval*2).ShouldNot(Equal(last))
@@ -128,10 +136,6 @@ var _ = Describe("Pinger", func() {
 		BeforeEach(func() {
 			pingTimeout = 300
 			pingInterval = 2 * time.Second
-		})
-
-		AfterEach(func() {
-			pingTimeout = defaultPingTimeout
 		})
 
 		It("should continue to update the statistics", func() {

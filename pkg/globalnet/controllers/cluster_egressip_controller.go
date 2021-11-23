@@ -39,8 +39,9 @@ import (
 	"k8s.io/klog"
 )
 
-func NewClusterGlobalEgressIPController(config syncer.ResourceSyncerConfig, localSubnets []string,
+func NewClusterGlobalEgressIPController(config *syncer.ResourceSyncerConfig, localSubnets []string,
 	pool *ipam.IPPool) (Interface, error) {
+	// We'll panic if config is nil, this is intentional
 	var err error
 
 	klog.Info("Creating ClusterGlobalEgressIP controller")
@@ -69,27 +70,27 @@ func NewClusterGlobalEgressIPController(config syncer.ResourceSyncerConfig, loca
 
 	defaultEgressIPObj, gvr, err := util.ToUnstructuredResource(defaultEgressIP, config.RestMapper)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error converting resource")
 	}
 
 	client := config.SourceClient.Resource(*gvr)
+
 	obj, err := client.Get(context.TODO(), defaultEgressIP.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		klog.Infof("Creating ClusterGlobalEgressIP resource %q", defaultEgressIP.Name)
 
 		_, err = client.Create(context.TODO(), defaultEgressIPObj, metav1.CreateOptions{})
 		if err != nil {
-			return nil, errors.WithMessagef(err, "error creating ClusterGlobalEgressIP resource %q", defaultEgressIP.Name)
+			return nil, errors.Wrapf(err, "error creating ClusterGlobalEgressIP resource %q", defaultEgressIP.Name)
 		}
 	} else if err != nil {
-		return nil, errors.WithMessagef(err, "error retrieving ClusterGlobalEgressIP resource %q", defaultEgressIP.Name)
+		return nil, errors.Wrapf(err, "error retrieving ClusterGlobalEgressIP resource %q", defaultEgressIP.Name)
 	}
 
 	if obj != nil {
 		err := controller.reserveAllocatedIPs(federator, obj, func(reservedIPs []string) error {
 			return controller.programClusterGlobalEgressRules(reservedIPs)
 		})
-
 		if err != nil {
 			return nil, err
 		}
@@ -108,7 +109,7 @@ func NewClusterGlobalEgressIPController(config syncer.ResourceSyncerConfig, loca
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error creating resource syncer")
 	}
 
 	return controller, nil
@@ -147,7 +148,7 @@ func (c *clusterGlobalEgressIPController) process(from runtime.Object, numRequeu
 
 func (c *clusterGlobalEgressIPController) validate(numberOfIPs int, egressIP *submarinerv1.ClusterGlobalEgressIP) bool {
 	if egressIP.Name != constants.ClusterGlobalEgressIPName {
-		egressIP.Status.Conditions = util.TryAppendCondition(egressIP.Status.Conditions, metav1.Condition{
+		egressIP.Status.Conditions = util.TryAppendCondition(egressIP.Status.Conditions, &metav1.Condition{
 			Type:   string(submarinerv1.GlobalEgressIPAllocated),
 			Status: metav1.ConditionFalse,
 			Reason: "InvalidInstance",
@@ -159,7 +160,7 @@ func (c *clusterGlobalEgressIPController) validate(numberOfIPs int, egressIP *su
 	}
 
 	if numberOfIPs < 0 {
-		egressIP.Status.Conditions = util.TryAppendCondition(egressIP.Status.Conditions, metav1.Condition{
+		egressIP.Status.Conditions = util.TryAppendCondition(egressIP.Status.Conditions, &metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "InvalidInput",
@@ -170,7 +171,7 @@ func (c *clusterGlobalEgressIPController) validate(numberOfIPs int, egressIP *su
 	}
 
 	if numberOfIPs == 0 {
-		egressIP.Status.Conditions = util.TryAppendCondition(egressIP.Status.Conditions, metav1.Condition{
+		egressIP.Status.Conditions = util.TryAppendCondition(egressIP.Status.Conditions, &metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "ZeroInput",
@@ -206,7 +207,7 @@ func (c *clusterGlobalEgressIPController) flushClusterGlobalEgressRules(allocate
 func (c *clusterGlobalEgressIPController) deleteClusterGlobalEgressRules(srcIPList []string, snatIP string) error {
 	for _, srcIP := range srcIPList {
 		if err := c.iptIface.RemoveClusterEgressRules(srcIP, snatIP, globalNetIPTableMark); err != nil {
-			return err
+			return err // nolint:wrapcheck  // Let the caller wrap it
 		}
 	}
 
@@ -221,7 +222,7 @@ func (c *clusterGlobalEgressIPController) programClusterGlobalEgressRules(alloca
 		if err := c.iptIface.AddClusterEgressRules(srcIP, snatIP, globalNetIPTableMark); err != nil {
 			_ = c.deleteClusterGlobalEgressRules(egressRulesProgrammed, snatIP)
 
-			return err
+			return err // nolint:wrapcheck  // Let the caller wrap it
 		}
 
 		egressRulesProgrammed = append(egressRulesProgrammed, srcIP)
@@ -243,7 +244,7 @@ func (c *clusterGlobalEgressIPController) allocateGlobalIPs(key string, numberOf
 	if err != nil {
 		klog.Errorf("Error allocating IPs for %q: %v", key, err)
 
-		status.Conditions = util.TryAppendCondition(status.Conditions, metav1.Condition{
+		status.Conditions = util.TryAppendCondition(status.Conditions, &metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "IPPoolAllocationFailed",
@@ -257,7 +258,7 @@ func (c *clusterGlobalEgressIPController) allocateGlobalIPs(key string, numberOf
 	if err != nil {
 		klog.Errorf("Error programming egress IP table rules for %q: %v", key, err)
 
-		status.Conditions = util.TryAppendCondition(status.Conditions, metav1.Condition{
+		status.Conditions = util.TryAppendCondition(status.Conditions, &metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "ProgramIPTableRulesFailed",
@@ -269,7 +270,7 @@ func (c *clusterGlobalEgressIPController) allocateGlobalIPs(key string, numberOf
 		return true
 	}
 
-	status.Conditions = util.TryAppendCondition(status.Conditions, metav1.Condition{
+	status.Conditions = util.TryAppendCondition(status.Conditions, &metav1.Condition{
 		Type:    string(submarinerv1.GlobalEgressIPAllocated),
 		Status:  metav1.ConditionTrue,
 		Reason:  "Success",

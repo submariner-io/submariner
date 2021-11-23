@@ -25,13 +25,12 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/stringset"
-	"github.com/submariner-io/submariner/pkg/netlink"
-	"k8s.io/klog"
-
 	"github.com/submariner-io/submariner/pkg/event"
+	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/util"
+	"k8s.io/klog"
 )
 
 type SyncHandler struct {
@@ -77,12 +76,15 @@ func (kp *SyncHandler) GetName() string {
 }
 
 func (kp *SyncHandler) GetNetworkPlugins() []string {
-	return []string{constants.NetworkPluginGeneric, constants.NetworkPluginCanalFlannel, constants.NetworkPluginWeaveNet,
-		constants.NetworkPluginOpenShiftSDN, constants.NetworkPluginCalico}
+	return []string{
+		constants.NetworkPluginGeneric, constants.NetworkPluginCanalFlannel, constants.NetworkPluginWeaveNet,
+		constants.NetworkPluginOpenShiftSDN, constants.NetworkPluginCalico,
+	}
 }
 
 func (kp *SyncHandler) Init() error {
 	var err error
+
 	kp.hostname, err = os.Hostname()
 	if err != nil {
 		return errors.Wrapf(err, "unable to determine hostname")
@@ -100,7 +102,7 @@ func (kp *SyncHandler) Init() error {
 
 		err := kp.netLink.EnableLooseModeReversePathFilter(kp.cniIface.Name)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "error enabling loose mode")
 		}
 	} else {
 		// This is not a fatal error. Hostnetworking to remote cluster support will be broken

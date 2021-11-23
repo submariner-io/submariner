@@ -29,17 +29,17 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/stringset"
+	submv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/node"
+	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
-
-	submv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/types"
 )
 
-func GetLocal(submSpec types.SubmarinerSpecification, k8sClient kubernetes.Interface) (types.SubmarinerEndpoint, error) {
+func GetLocal(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface) (*types.SubmarinerEndpoint, error) {
+	// We'll panic if submSpec is nil, this is intentional
 	privateIP := util.GetLocalIP()
 
 	gwNode, err := node.GetLocalNode(k8sClient)
@@ -49,7 +49,7 @@ func GetLocal(submSpec types.SubmarinerSpecification, k8sClient kubernetes.Inter
 
 	hostname, err := os.Hostname()
 	if err != nil {
-		return types.SubmarinerEndpoint{}, fmt.Errorf("error getting hostname: %v", err)
+		return nil, errors.Wrap(err, "error getting hostname")
 	}
 
 	var localSubnets []string
@@ -66,14 +66,14 @@ func GetLocal(submSpec types.SubmarinerSpecification, k8sClient kubernetes.Inter
 
 	backendConfig, err := getBackendConfig(gwNode)
 	if err != nil {
-		return types.SubmarinerEndpoint{}, err
+		return nil, err
 	}
 
 	if strings.HasPrefix(submSpec.PublicIP, submv1.LoadBalancer+":") {
 		backendConfig[submv1.UsingLoadBalancer] = "true"
 	}
 
-	endpoint := types.SubmarinerEndpoint{
+	endpoint := &types.SubmarinerEndpoint{
 		Spec: submv1.EndpointSpec{
 			CableName:     fmt.Sprintf("submariner-cable-%s-%s", submSpec.ClusterID, strings.ReplaceAll(privateIP, ".", "-")),
 			ClusterID:     submSpec.ClusterID,
@@ -88,7 +88,7 @@ func GetLocal(submSpec types.SubmarinerSpecification, k8sClient kubernetes.Inter
 
 	publicIP, err := getPublicIP(submSpec, k8sClient, backendConfig)
 	if err != nil {
-		return types.SubmarinerEndpoint{}, fmt.Errorf("could not determine public IP: %v", err)
+		return nil, errors.Wrap(err, "could not determine public IP")
 	}
 
 	endpoint.Spec.PublicIP = publicIP
@@ -100,7 +100,7 @@ func GetLocal(submSpec types.SubmarinerSpecification, k8sClient kubernetes.Inter
 		// the HealthCheck between the clusters.
 		endpoint.Spec.HealthCheckIP, err = getCNIInterfaceIPAddress(submSpec.ClusterCidr)
 		if err != nil {
-			return types.SubmarinerEndpoint{}, fmt.Errorf("error getting CNI Interface IP address: %v."+
+			return nil, fmt.Errorf("error getting CNI Interface IP address: %w."+
 				"Please disable the health check if your CNI does not expose a pod IP on the nodes", err)
 		}
 	}
@@ -114,7 +114,7 @@ func getBackendConfig(nodeObj *v1.Node) (map[string]string, error) {
 		return backendConfig, err
 	}
 
-	// If the node has no specific UDP port assigned for dataplane, expose the cluster default one
+	// If the node has no specific UDP port assigned for dataplane, expose the cluster default one.
 	if _, ok := backendConfig[submv1.UDPPortConfig]; !ok {
 		udpPort := os.Getenv("CE_IPSEC_NATTPORT")
 		if udpPort == "" {
@@ -124,12 +124,12 @@ func getBackendConfig(nodeObj *v1.Node) (map[string]string, error) {
 		backendConfig[submv1.UDPPortConfig] = udpPort
 	}
 
-	// Enable and publish the natt-discovery-port by default
+	// Enable and publish the natt-discovery-port by default.
 	if _, ok := backendConfig[submv1.NATTDiscoveryPortConfig]; !ok {
 		backendConfig[submv1.NATTDiscoveryPortConfig] = submv1.DefaultNATTDiscoveryPort
 	}
 
-	//TODO: we should allow the cable drivers to capture and expose BackendConfig settings, instead of doing
+	// TODO: we should allow the cable drivers to capture and expose BackendConfig settings, instead of doing
 	//      it here.
 	preferredServerStr := backendConfig[submv1.PreferredServerConfig]
 
@@ -194,23 +194,23 @@ func addConfigFrom(nodeName string, configs, backendConfig map[string]string, wa
 	return nil
 }
 
-//TODO: to handle de-duplication of code/finding common parts with the route agent
+// TODO: to handle de-duplication of code/finding common parts with the route agent.
 func getCNIInterfaceIPAddress(clusterCIDRs []string) (string, error) {
 	for _, clusterCIDR := range clusterCIDRs {
 		_, clusterNetwork, err := net.ParseCIDR(clusterCIDR)
 		if err != nil {
-			return "", fmt.Errorf("unable to ParseCIDR %q : %v", clusterCIDR, err)
+			return "", errors.Wrapf(err, "unable to ParseCIDR %q", clusterCIDR)
 		}
 
 		hostInterfaces, err := net.Interfaces()
 		if err != nil {
-			return "", fmt.Errorf("net.Interfaces() returned error : %v", err)
+			return "", errors.Wrap(err, "net.Interfaces() returned error")
 		}
 
 		for _, iface := range hostInterfaces {
 			addrs, err := iface.Addrs()
 			if err != nil {
-				return "", fmt.Errorf("for interface %q, iface.Addrs returned error: %v", iface.Name, err)
+				return "", errors.Wrapf(err, "for interface %q, iface.Addrs returned error", iface.Name)
 			}
 
 			for i := range addrs {
@@ -221,7 +221,7 @@ func getCNIInterfaceIPAddress(clusterCIDRs []string) (string, error) {
 					klog.V(log.DEBUG).Infof("Interface %q has %q address", iface.Name, ipAddr)
 					address := net.ParseIP(ipAddr.String())
 
-					// Verify that interface has an address from cluster CIDR
+					// Verify that interface has an address from cluster CIDR.
 					if clusterNetwork.Contains(address) {
 						klog.V(log.DEBUG).Infof("Found CNI Interface %q that has IP %q from ClusterCIDR %q",
 							iface.Name, ipAddr.String(), clusterCIDR)
@@ -232,5 +232,5 @@ func getCNIInterfaceIPAddress(clusterCIDRs []string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("unable to find CNI Interface on the host which has IP from %q", clusterCIDRs)
+	return "", errors.Errorf("unable to find CNI Interface on the host which has IP from %q", clusterCIDRs)
 }

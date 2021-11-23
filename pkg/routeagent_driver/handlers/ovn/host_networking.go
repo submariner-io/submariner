@@ -24,14 +24,12 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/submariner-io/admiral/pkg/log"
-	"k8s.io/klog"
-
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/stringset"
-	"github.com/vishvananda/netlink"
-
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	"github.com/vishvananda/netlink"
+	"k8s.io/klog"
 )
 
 const (
@@ -80,14 +78,15 @@ func (ovn *Handler) updateHostNetworkDataplane() error {
 
 func (ovn *Handler) getExistingIPv4HostNetworkRoutes() (stringset.Interface, error) {
 	currentRuleRemotes := stringset.New()
+
 	rules, err := netlink.RuleList(netlink.FAMILY_V4)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "error listing rules")
 	}
 
-	for _, rule := range rules {
-		if rule.Table == constants.RouteAgentHostNetworkTableID && rule.Dst != nil {
-			currentRuleRemotes.Add(rule.Dst.String())
+	for i := range rules {
+		if rules[i].Table == constants.RouteAgentHostNetworkTableID && rules[i].Dst != nil {
+			currentRuleRemotes.Add(rules[i].Dst.String())
 		}
 	}
 
@@ -118,10 +117,8 @@ func (ovn *Handler) getNextHopOnK8sMgmtIntf() (*net.IP, error) {
 
 	link, err := netlink.LinkByName(OVNK8sMgmntIntfName)
 
-	if err != nil {
-		if _, ok := err.(netlink.LinkNotFoundError); !ok {
-			return nil, errors.Wrapf(err, "error retrieving link by name %q", OVNK8sMgmntIntfName)
-		}
+	if err != nil && !errors.Is(err, netlink.LinkNotFoundError{}) {
+		return nil, errors.Wrapf(err, "error retrieving link by name %q", OVNK8sMgmntIntfName)
 	}
 
 	currentRouteList, err := netlink.RouteList(link, syscall.AF_INET)

@@ -33,6 +33,7 @@ const (
 
 func (i *libreswan) calculateOperationMode(remoteEndpoint *v1.EndpointSpec) operationMode {
 	defaultValue := false
+
 	leftPreferred, err := i.localEndpoint.Spec.GetBackendBool(v1.PreferredServerConfig, &defaultValue)
 	if err != nil {
 		klog.Errorf("Error parsing local endpoint config: %s", err)

@@ -19,19 +19,17 @@ limitations under the License.
 package kubeproxy
 
 import (
-	"fmt"
 	"net"
 	"os"
 	"syscall"
 
+	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/submariner/pkg/cable/wireguard"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	"k8s.io/klog"
-
-	"github.com/submariner-io/admiral/pkg/log"
-
-	"github.com/submariner-io/submariner/pkg/cable/wireguard"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 )
 
 func (kp *SyncHandler) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks []string, operation Operation) {
@@ -44,42 +42,53 @@ func (kp *SyncHandler) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks [
 			klog.V(log.TRACE).Infof("Flushing routing table %d returned error. Can be ignored on non-Gw node: %v",
 				constants.RouteAgentHostNetworkTableID, err)
 		}
-	} else if kp.isGatewayNode && kp.cniIface != nil {
-		// These routing rules are required ONLY on the Gateway Node.
-		// On the non-Gateway nodes, we use iptable rules to support this use-case.
-		for _, inputCidrBlock := range inputCidrBlocks {
-			var viaGW *net.IP
-			if kp.isGatewayInRemoteCIDR(inputCidrBlock) {
-				gwIP := kp.remoteSubnetGw[inputCidrBlock]
-				routes, err := kp.netLink.RouteGet(gwIP)
-				if err != nil {
-					klog.Errorf("Failed to find route to remote gateway IP %s for cidr %s", gwIP.String(), inputCidrBlock)
-				}
 
-				viaGW = &routes[0].Gw
-			}
+		return
+	}
 
-			switch operation {
-			case Add:
+	if !kp.isGatewayNode || kp.cniIface == nil {
+		return
+	}
 
-				if kp.routeCacheGWNode.Add(inputCidrBlock) {
-					if err := kp.configureRoute(inputCidrBlock, operation, viaGW); err != nil {
-						kp.routeCacheGWNode.Remove(inputCidrBlock)
-						klog.Errorf("Failed to add route %q for HostNetwork support on the Gateway node: %v",
-							inputCidrBlock, err)
-					}
-				}
+	// These routing rules are required ONLY on the Gateway Node.
+	// On the non-Gateway nodes, we use iptable rules to support this use-case.
+	for _, inputCidrBlock := range inputCidrBlocks {
+		kp.updateRoutingRulesForCIDRBlock(inputCidrBlock, operation)
+	}
+}
 
-			case Delete:
+func (kp *SyncHandler) updateRoutingRulesForCIDRBlock(inputCidrBlock string, operation Operation) {
+	var viaGW *net.IP
 
-				if kp.routeCacheGWNode.Remove(inputCidrBlock) {
-					if err := kp.configureRoute(inputCidrBlock, operation, viaGW); err != nil {
-						klog.Errorf("Failed to delete route %q for HostNetwork support on the Gateway node. %v",
-							inputCidrBlock, err)
-					}
-				}
+	if kp.isGatewayInRemoteCIDR(inputCidrBlock) {
+		gwIP := kp.remoteSubnetGw[inputCidrBlock]
+
+		routes, err := kp.netLink.RouteGet(gwIP)
+		if err != nil {
+			klog.Errorf("Failed to find route to remote gateway IP %s for cidr %s", gwIP.String(), inputCidrBlock)
+		}
+
+		viaGW = &routes[0].Gw
+	}
+
+	switch operation {
+	case Add:
+		if kp.routeCacheGWNode.Add(inputCidrBlock) {
+			if err := kp.configureRoute(inputCidrBlock, operation, viaGW); err != nil {
+				kp.routeCacheGWNode.Remove(inputCidrBlock)
+				klog.Errorf("Failed to add route %q for HostNetwork support on the Gateway node: %v",
+					inputCidrBlock, err)
 			}
 		}
+
+	case Delete:
+		if kp.routeCacheGWNode.Remove(inputCidrBlock) {
+			if err := kp.configureRoute(inputCidrBlock, operation, viaGW); err != nil {
+				klog.Errorf("Failed to delete route %q for HostNetwork support on the Gateway node. %v",
+					inputCidrBlock, err)
+			}
+		}
+	case Flush:
 	}
 }
 
@@ -95,9 +104,10 @@ func (kp *SyncHandler) isGatewayInRemoteCIDR(remoteCIDR string) bool {
 
 func (kp *SyncHandler) configureRoute(remoteSubnet string, operation Operation, viaGw *net.IP) error {
 	src := net.ParseIP(kp.cniIface.IPAddress)
+
 	_, dst, err := net.ParseCIDR(remoteSubnet)
 	if err != nil {
-		return fmt.Errorf("error parsing cidr block %s: %v", remoteSubnet, err)
+		return errors.Wrapf(err, "error parsing cidr block %s", remoteSubnet)
 	}
 
 	ifaceIndex := kp.defaultHostIface.Index
@@ -130,13 +140,14 @@ func (kp *SyncHandler) configureRoute(remoteSubnet string, operation Operation, 
 	case Add:
 		err = kp.netLink.RouteAdd(&route)
 		if err != nil && !os.IsExist(err) {
-			return fmt.Errorf("error adding the route %s: %v", route, err)
+			return errors.Wrapf(err, "error adding the route %s", route)
 		}
 	case Delete:
 		err = kp.netLink.RouteDel(&route)
 		if err != nil {
-			return fmt.Errorf("error deleting the route %s: %v", route, err)
+			return errors.Wrapf(err, "error deleting the route %s", route)
 		}
+	case Flush:
 	}
 
 	return nil
@@ -144,11 +155,9 @@ func (kp *SyncHandler) configureRoute(remoteSubnet string, operation Operation, 
 
 func (kp *SyncHandler) cleanVxSubmarinerRoutes() {
 	link, err := kp.netLink.LinkByName(VxLANIface)
-	if err != nil {
-		if _, ok := err.(netlink.LinkNotFoundError); !ok {
-			klog.Errorf("Error retrieving link by name %q: %v", VxLANIface, err)
-			return
-		}
+	if err != nil && !errors.Is(err, netlink.LinkNotFoundError{}) {
+		klog.Errorf("Error retrieving link by name %q: %v", VxLANIface, err)
+		return
 	}
 
 	currentRouteList, err := kp.netLink.RouteList(link, syscall.AF_INET)
@@ -171,47 +180,30 @@ func (kp *SyncHandler) cleanVxSubmarinerRoutes() {
 	}
 }
 
-// Reconcile the routes installed on this device using rtnetlink
+// Reconcile the routes installed on this device using rtnetlink.
 func (kp *SyncHandler) reconcileRoutes(vxlanGw net.IP) error {
 	klog.V(log.DEBUG).Infof("Reconciling routes to gw: %s", vxlanGw.String())
 
 	link, err := kp.netLink.LinkByName(VxLANIface)
 	if err != nil {
-		return fmt.Errorf("error retrieving link by name %s: %v", VxLANIface, err)
+		return errors.Wrapf(err, "error retrieving link by name %s", VxLANIface)
 	}
 
 	currentRouteList, err := kp.netLink.RouteList(link, syscall.AF_INET)
-
 	if err != nil {
-		return fmt.Errorf("error retrieving routes for link %s: %v", VxLANIface, err)
+		return errors.Wrapf(err, "error retrieving routes for link %s", VxLANIface)
 	}
 
-	// First lets delete all of the routes that don't match
-	for i := range currentRouteList {
-		// contains(endpoint destinations, route destination string, and the route gateway is our actual destination
-		klog.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])
-
-		if currentRouteList[i].Dst == nil || currentRouteList[i].Gw == nil {
-			klog.V(log.DEBUG).Infof("Found nil gw or dst")
-		} else {
-			if kp.remoteSubnets.Contains(currentRouteList[i].Dst.String()) && currentRouteList[i].Gw.Equal(vxlanGw) {
-				klog.V(log.DEBUG).Infof("Found route %s with gw %s already installed", currentRouteList[i], currentRouteList[i].Gw)
-			} else {
-				klog.V(log.DEBUG).Infof("Removing route %s", currentRouteList[i])
-				if err = kp.netLink.RouteDel(&currentRouteList[i]); err != nil {
-					klog.Errorf("Error removing route %s: %v", currentRouteList[i], err)
-				}
-			}
-		}
-	}
+	// First lets delete all of the routes that don't match.
+	kp.removeUnknownRoutes(vxlanGw, currentRouteList)
 
 	currentRouteList, err = kp.netLink.RouteList(link, syscall.AF_INET)
 
 	if err != nil {
-		return fmt.Errorf("error retrieving routes for link %s: %v", VxLANIface, err)
+		return errors.Wrapf(err, "error retrieving routes for link %s", VxLANIface)
 	}
 
-	// let's now add the routes that are missing
+	// Let's now add the routes that are missing.
 	for _, cidrBlock := range kp.remoteSubnets.Elements() {
 		_, dst, err := net.ParseCIDR(cidrBlock)
 		if err != nil {
@@ -226,11 +218,12 @@ func (kp *SyncHandler) reconcileRoutes(vxlanGw net.IP) error {
 			LinkIndex: link.Attrs().Index,
 			Protocol:  4,
 		}
-		found := false
-		for _, curRoute := range currentRouteList {
-			if curRoute.Gw == nil || curRoute.Dst == nil {
 
-			} else if curRoute.Gw.Equal(route.Gw) && curRoute.Dst.String() == route.Dst.String() {
+		found := false
+
+		for i := range currentRouteList {
+			if currentRouteList[i].Gw == nil || currentRouteList[i].Dst == nil {
+			} else if currentRouteList[i].Gw.Equal(route.Gw) && currentRouteList[i].Dst.String() == route.Dst.String() {
 				klog.V(log.DEBUG).Infof("Found equivalent route, not adding")
 				found = true
 			}
@@ -247,6 +240,26 @@ func (kp *SyncHandler) reconcileRoutes(vxlanGw net.IP) error {
 	return nil
 }
 
+func (kp *SyncHandler) removeUnknownRoutes(vxlanGw net.IP, currentRouteList []netlink.Route) {
+	for i := range currentRouteList {
+		// Contains(endpoint destinations, route destination string, and the route gateway is our actual destination.
+		klog.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])
+
+		if currentRouteList[i].Dst == nil || currentRouteList[i].Gw == nil {
+			klog.V(log.DEBUG).Infof("Found nil gw or dst")
+		} else {
+			if kp.remoteSubnets.Contains(currentRouteList[i].Dst.String()) && currentRouteList[i].Gw.Equal(vxlanGw) {
+				klog.V(log.DEBUG).Infof("Found route %s with gw %s already installed", currentRouteList[i], currentRouteList[i].Gw)
+			} else {
+				klog.V(log.DEBUG).Infof("Removing route %s", currentRouteList[i])
+				if err := kp.netLink.RouteDel(&currentRouteList[i]); err != nil {
+					klog.Errorf("Error removing route %s: %v", currentRouteList[i], err)
+				}
+			}
+		}
+	}
+}
+
 func (kp *SyncHandler) updateRoutingRulesForInterClusterSupport(remoteCIDRs []string, operation Operation) error {
 	if kp.isGatewayNode {
 		klog.V(log.DEBUG).Info("On GWNode, in updateRoutingRulesForInterClusterSupport ignoring")
@@ -257,13 +270,13 @@ func (kp *SyncHandler) updateRoutingRulesForInterClusterSupport(remoteCIDRs []st
 	if kp.vxlanDevice != nil && kp.vxlanGwIP != nil {
 		link, err := kp.netLink.LinkByName(VxLANIface)
 		if err != nil {
-			return fmt.Errorf("error retrieving link by name %s: %v", VxLANIface, err)
+			return errors.Wrapf(err, "error retrieving link by name %s", VxLANIface)
 		}
 
 		for _, cidrBlock := range remoteCIDRs {
 			_, dst, err := net.ParseCIDR(cidrBlock)
 			if err != nil {
-				return fmt.Errorf("error parsing cidr block %s: %v", cidrBlock, err)
+				return errors.Wrapf(err, "error parsing cidr block %s", cidrBlock)
 			}
 
 			route := netlink.Route{
@@ -277,12 +290,12 @@ func (kp *SyncHandler) updateRoutingRulesForInterClusterSupport(remoteCIDRs []st
 			if operation == Add {
 				err = kp.netLink.RouteAdd(&route)
 				if err != nil {
-					return fmt.Errorf("error adding route %s: %v", route, err)
+					return errors.Wrapf(err, "error adding route %s", route)
 				}
 			} else if operation == Delete {
 				err = kp.netLink.RouteDel(&route)
 				if err != nil {
-					return fmt.Errorf("error deleting route %s: %v", route, err)
+					return errors.Wrapf(err, "error deleting route %s", route)
 				}
 			}
 		}
@@ -301,13 +314,14 @@ func (kp *SyncHandler) configureIPRule(operation Operation) error {
 		case Add:
 			err := kp.netLink.RuleAdd(rule)
 			if err != nil && !os.IsExist(err) {
-				return fmt.Errorf("failed to add ip rule %s: %v", rule, err)
+				return errors.Wrapf(err, "failed to add ip rule %s", rule)
 			}
 		case Delete:
 			err := kp.netLink.RuleDel(rule)
 			if err != nil && !os.IsNotExist(err) {
-				return fmt.Errorf("failed to delete ip rule %s: %v", rule, err)
+				return errors.Wrapf(err, "failed to delete ip rule %s", rule)
 			}
+		case Flush:
 		}
 	}
 

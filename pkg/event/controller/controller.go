@@ -23,8 +23,11 @@ import (
 	"os"
 	"sync"
 
+	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/watcher"
+	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/event"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/dynamic"
@@ -32,11 +35,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
-
-	"github.com/kelseyhightower/envconfig"
-
-	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/event"
 )
 
 type specification struct {
@@ -75,7 +73,7 @@ type Config struct {
 func New(config *Config) (*Controller, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
-		return nil, fmt.Errorf("unable to read hostname: %v", err)
+		return nil, errors.Wrapf(err, "unable to read hostname")
 	}
 
 	ctl := Controller{
@@ -86,19 +84,19 @@ func New(config *Config) (*Controller, error) {
 
 	err = envconfig.Process("submariner", &ctl.env)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error processing env vars")
 	}
 
 	err = subv1.AddToScheme(scheme.Scheme)
 	if err != nil {
-		return nil, fmt.Errorf("error adding submariner types to the scheme: %v", err)
+		return nil, errors.Wrap(err, "error adding submariner types to the scheme")
 	}
 
 	var cfg *restclient.Config
 	if config.Client == nil {
 		cfg, err = clientcmd.BuildConfigFromFlags(config.MasterURL, config.MasterURL)
 		if err != nil {
-			return nil, fmt.Errorf("error building config from flags %v", err.Error())
+			return nil, errors.Wrap(err, "error building config from flags")
 		}
 	}
 
@@ -131,7 +129,7 @@ func New(config *Config) (*Controller, error) {
 	})
 
 	if err != nil {
-		return nil, errors.Wrapf(err, "Error creating resource watcher")
+		return nil, errors.Wrap(err, "error creating resource watcher")
 	}
 
 	return &ctl, nil
@@ -143,7 +141,7 @@ func (c *Controller) Start(stopCh <-chan struct{}) error {
 
 	err := c.resourceWatcher.Start(stopCh)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error starting the resource watcher")
 	}
 
 	klog.Info("Event controller started")

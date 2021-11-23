@@ -23,15 +23,13 @@ import (
 	"sync"
 
 	goovn "github.com/ebay/go-ovn"
-	"github.com/submariner-io/submariner/pkg/cidr"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
-	clientset "k8s.io/client-go/kubernetes"
-
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cidr"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn/nbctl"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
-
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 )
 
@@ -59,7 +57,8 @@ func (ovn *SyncHandler) GetNetworkPlugins() []string {
 	return []string{constants.NetworkPluginOVNKubernetes}
 }
 
-func NewSyncHandler(k8sClientset clientset.Interface, env environment.Specification) event.Handler {
+func NewSyncHandler(k8sClientset clientset.Interface, env *environment.Specification) event.Handler {
+	// We'll panic if env is nil, this is intentional
 	return &SyncHandler{
 		remoteEndpoints:  make(map[string]*submV1.Endpoint),
 		k8sClientset:     k8sClientset,
@@ -73,11 +72,7 @@ func (ovn *SyncHandler) Init() error {
 		return err
 	}
 
-	if err := ovn.ensureSubmarinerInfra(); err != nil {
-		return err
-	}
-
-	return nil
+	return ovn.ensureSubmarinerInfra()
 }
 
 func (ovn *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {

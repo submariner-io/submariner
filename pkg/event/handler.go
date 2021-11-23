@@ -19,9 +19,8 @@ limitations under the License.
 package event
 
 import (
-	k8sV1 "k8s.io/api/core/v1"
-
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	k8sV1 "k8s.io/api/core/v1"
 )
 
 const AnyNetworkPlugin = ""
@@ -75,8 +74,7 @@ type Handler interface {
 }
 
 // Base structure for event handlers that stubs out methods considered to be optional.
-type HandlerBase struct {
-}
+type HandlerBase struct{}
 
 func (ev *HandlerBase) Init() error {
 	return nil

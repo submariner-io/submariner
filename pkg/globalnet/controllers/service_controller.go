@@ -19,6 +19,7 @@ limitations under the License.
 package controllers
 
 import (
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
@@ -31,7 +32,8 @@ import (
 	"k8s.io/klog"
 )
 
-func NewServiceController(config syncer.ResourceSyncerConfig, podControllers *IngressPodControllers) (Interface, error) {
+func NewServiceController(config *syncer.ResourceSyncerConfig, podControllers *IngressPodControllers) (Interface, error) {
+	// We'll panic if config is nil, this is intentional
 	var err error
 
 	klog.Info("Creating Service controller")
@@ -53,12 +55,12 @@ func NewServiceController(config syncer.ResourceSyncerConfig, podControllers *In
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error creating the syncer")
 	}
 
 	_, gvr, err := util.ToUnstructuredResource(&submarinerv1.GlobalIngressIP{}, config.RestMapper)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error converting resource")
 	}
 
 	controller.ingressIPs = config.SourceClient.Resource(*gvr).Namespace(corev1.NamespaceAll)

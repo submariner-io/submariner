@@ -157,7 +157,7 @@ type ingressPodController struct {
 }
 
 type IngressPodControllers struct {
-	sync.Mutex
+	mutex       sync.Mutex
 	controllers map[string]*ingressPodController
 	config      syncer.ResourceSyncerConfig
 	ingressIPs  dynamic.NamespaceableResourceInterface

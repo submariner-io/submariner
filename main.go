@@ -20,6 +20,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -29,11 +30,23 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	extErrors "github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/watcher"
+	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cable"
+	"github.com/submariner-io/submariner/pkg/cableengine"
+	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
+	"github.com/submariner-io/submariner/pkg/cableengine/syncer"
+	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	"github.com/submariner-io/submariner/pkg/controllers/datastoresyncer"
+	"github.com/submariner-io/submariner/pkg/controllers/tunnel"
+	"github.com/submariner-io/submariner/pkg/endpoint"
+	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/pod"
+	"github.com/submariner-io/submariner/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -45,18 +58,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
-
-	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/cable"
-	"github.com/submariner-io/submariner/pkg/cableengine"
-	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
-	"github.com/submariner-io/submariner/pkg/cableengine/syncer"
-	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
-	"github.com/submariner-io/submariner/pkg/controllers/datastoresyncer"
-	"github.com/submariner-io/submariner/pkg/controllers/tunnel"
-	"github.com/submariner-io/submariner/pkg/endpoint"
-	"github.com/submariner-io/submariner/pkg/natdiscovery"
-	"github.com/submariner-io/submariner/pkg/types"
 )
 
 var (
@@ -85,7 +86,6 @@ const (
 
 var VERSION = "not-compiled-properly"
 
-// nolint:gocyclo // the main function has a lot of error checking that increases cyclomatic complexity
 func main() {
 	klog.InitFlags(nil)
 	flag.Parse()
@@ -98,25 +98,17 @@ func main() {
 	httpServer := startHTTPServer()
 
 	var submSpec types.SubmarinerSpecification
-	err := envconfig.Process("submariner", &submSpec)
-	if err != nil {
-		klog.Fatal(err)
-	}
+
+	fatalOnErr(envconfig.Process("submariner", &submSpec), "Error processing env vars")
 
 	cfg, err := clientcmd.BuildConfigFromFlags(localMasterURL, localKubeconfig)
-	if err != nil {
-		klog.Fatalf("Error building kubeconfig: %s", err.Error())
-	}
+	fatalOnErr(err, "Error building kubeconfig")
 
 	submarinerClient, err := submarinerClientset.NewForConfig(cfg)
-	if err != nil {
-		klog.Fatalf("Error creating submariner clientset: %s", err.Error())
-	}
+	fatalOnErr(err, "Error creating submariner clientset")
 
 	k8sClient, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		klog.Fatalf("Error creating Kubernetes clientset: %s", err.Error())
-	}
+	fatalOnErr(err, "Error creating Kubernetes clientset")
 
 	klog.Info("Creating the cable engine")
 
@@ -128,28 +120,18 @@ func main() {
 
 	submSpec.CableDriver = strings.ToLower(submSpec.CableDriver)
 
-	localEndpoint, err := endpoint.GetLocal(submSpec, k8sClient)
-
-	if err != nil {
-		klog.Fatalf("Error creating local endpoint object from %#v: %v", submSpec, err)
-	}
+	localEndpoint, err := endpoint.GetLocal(&submSpec, k8sClient)
+	fatalOnErr(err, "Error creating local endpoint object")
 
 	cableEngine := cableengine.NewEngine(localCluster, localEndpoint)
-	natDiscovery, err := natdiscovery.New(&localEndpoint)
-	if err != nil {
-		klog.Fatalf("Error creating the NAT discovery handler %s", err)
-	}
+	natDiscovery, err := natdiscovery.New(localEndpoint)
+	fatalOnErr(err, "Error creating the NAT discovery handler")
 
 	cableEngine.SetupNATDiscovery(natDiscovery)
 
-	if err := natDiscovery.Run(stopCh); err != nil {
-		klog.Fatalf("Error starting NAT discovery server")
-	}
+	fatalOnErr(natDiscovery.Run(stopCh), "Error starting NAT discovery server")
 
-	err = subv1.AddToScheme(scheme.Scheme)
-	if err != nil {
-		klog.Errorf("Error adding submariner types to the scheme: %v", err)
-	}
+	fatalOnErr(subv1.AddToScheme(scheme.Scheme), "Error adding submariner types to the scheme")
 
 	var cableHealthchecker healthchecker.Interface
 
@@ -174,9 +156,7 @@ func main() {
 		VERSION, cableHealthchecker)
 
 	gwPod, err := pod.NewGatewayPod(k8sClient)
-	if err != nil {
-		klog.Fatalf("Error creating a handler to update the gateway pod: %v", err)
-	}
+	fatalOnErr(err, "Error creating a handler to update the gateway pod")
 
 	cleanup := cleanupHandler{
 		gatewayPod: gwPod,
@@ -188,7 +168,7 @@ func main() {
 	becameLeader := func(context.Context) {
 		klog.Info("Creating the datastore syncer")
 
-		dsSyncer := datastoresyncer.New(broker.SyncerConfig{
+		dsSyncer := datastoresyncer.New(&broker.SyncerConfig{
 			LocalRestConfig: cfg,
 			LocalNamespace:  submSpec.Namespace,
 		}, localCluster, localEndpoint, submSpec.ColorCodes)
@@ -271,8 +251,16 @@ func main() {
 	}
 }
 
-func submarinerClusterFrom(submSpec *types.SubmarinerSpecification) types.SubmarinerCluster {
-	return types.SubmarinerCluster{
+func fatalOnErr(err error, msg string) {
+	if err == nil {
+		return
+	}
+
+	klog.Fatalf("%s: %+v", msg, err)
+}
+
+func submarinerClusterFrom(submSpec *types.SubmarinerSpecification) *types.SubmarinerCluster {
+	return &types.SubmarinerCluster{
 		ID: submSpec.ClusterID,
 		Spec: subv1.ClusterSpec{
 			ClusterID:   submSpec.ClusterID,
@@ -290,7 +278,7 @@ func startHTTPServer() *http.Server {
 	http.Handle("/metrics", promhttp.Handler())
 
 	go func() {
-		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			klog.Errorf("Error starting metrics server: %v", err)
 		}
 	}()
@@ -304,7 +292,7 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder res
 
 	err := envconfig.Process(leadershipConfigEnvPrefix, &gwLeadershipConfig)
 	if err != nil {
-		return fmt.Errorf("error processing environment config for %s: %v", leadershipConfigEnvPrefix, err)
+		return extErrors.Wrapf(err, "error processing environment config for %s", leadershipConfigEnvPrefix)
 	}
 
 	// Use default values when GatewayLeadership environment variables are not configured
@@ -324,13 +312,14 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder res
 
 	id, err := os.Hostname()
 	if err != nil {
-		return fmt.Errorf("error getting hostname: %v", err)
+		return extErrors.Wrap(err, "error getting hostname")
 	}
 
 	kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		clientcmd.NewDefaultClientConfigLoadingRules(),
 		&clientcmd.ConfigOverrides{},
 	)
+
 	namespace, _, err := kubeconfig.Namespace()
 	if err != nil {
 		namespace = "submariner"

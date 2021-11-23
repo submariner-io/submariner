@@ -19,13 +19,12 @@ limitations under the License.
 package kubeproxy
 
 import (
-	"fmt"
 	"net"
 
-	"k8s.io/klog"
-
+	"github.com/pkg/errors"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cidr"
+	"k8s.io/klog"
 )
 
 func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
@@ -40,8 +39,8 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 		if kp.vxlanDevice != nil && kp.vxlanDevice.activeEndpointHostname != endpoint.Spec.Hostname {
 			err := kp.vxlanDevice.deleteVxLanIface()
 			if err != nil {
-				return fmt.Errorf("failed to delete the the vxlan interface that points to old endpoint %s : %v",
-					kp.vxlanDevice.activeEndpointHostname, err)
+				return errors.Wrapf(err, "failed to delete the the vxlan interface that points to old endpoint %s",
+					kp.vxlanDevice.activeEndpointHostname)
 			}
 
 			kp.vxlanDevice = nil
@@ -49,21 +48,24 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 
 		kp.isGatewayNode = false
 		localClusterGwNodeIP := net.ParseIP(endpoint.Spec.PrivateIP)
+
 		remoteVtepIP, err := getVxlanVtepIPAddress(localClusterGwNodeIP.String())
 		if err != nil {
-			return fmt.Errorf("failed to derive the remoteVtepIP %v", err)
+			return errors.Wrap(err, "failed to derive the remoteVtepIP")
 		}
 
 		klog.Infof("Creating the vxlan interface %s with gateway node IP %s", VxLANIface, localClusterGwNodeIP)
+
 		err = kp.createVxLANInterface(endpoint.Spec.Hostname, VxInterfaceWorker, localClusterGwNodeIP)
 		if err != nil {
 			klog.Fatalf("Unable to create VxLAN interface on non-GatewayNode (%s): %v", endpoint.Spec.Hostname, err)
 		}
 
 		kp.vxlanGwIP = &remoteVtepIP
+
 		err = kp.reconcileRoutes(remoteVtepIP)
 		if err != nil {
-			return fmt.Errorf("error while reconciling routes %v", err)
+			return errors.Wrap(err, "error while reconciling routes")
 		}
 	}
 
@@ -84,8 +86,9 @@ func (kp *SyncHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 		err := kp.vxlanDevice.deleteVxLanIface()
 		kp.vxlanDevice = nil
 		kp.vxlanGwIP = nil
+
 		if err != nil {
-			return fmt.Errorf("failed to delete the the vxlan interface on Endpoint removal: %v", err)
+			return errors.Wrap(err, "failed to delete the the vxlan interface on Endpoint removal")
 		}
 	}
 
@@ -101,6 +104,7 @@ func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 
 	kp.syncHandlerMutex.Lock()
 	defer kp.syncHandlerMutex.Unlock()
+
 	for _, inputCidrBlock := range endpoint.Spec.Subnets {
 		if !kp.remoteSubnets.Contains(inputCidrBlock) {
 			kp.remoteSubnets.Add(inputCidrBlock)
@@ -115,6 +119,7 @@ func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 			endpoint, err)
 		return err
 	}
+
 	// Add routes to the new endpoint on the GatewayNode.
 	kp.updateRoutingRulesForHostNetworkSupport(endpoint.Spec.Subnets, Add)
 	kp.updateIptableRulesForInterClusterTraffic(endpoint.Spec.Subnets, Add)
@@ -129,6 +134,7 @@ func (kp *SyncHandler) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
 func (kp *SyncHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	kp.syncHandlerMutex.Lock()
 	defer kp.syncHandlerMutex.Unlock()
+
 	for _, inputCidrBlock := range endpoint.Spec.Subnets {
 		kp.remoteSubnets.Remove(inputCidrBlock)
 		delete(kp.remoteSubnetGw, inputCidrBlock)
@@ -150,7 +156,7 @@ func (kp *SyncHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 func (kp *SyncHandler) getHostIfaceIPAddress() (net.IP, error) {
 	addrs, err := kp.defaultHostIface.Addrs()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error getting default host addresses")
 	}
 
 	if len(addrs) > 0 {

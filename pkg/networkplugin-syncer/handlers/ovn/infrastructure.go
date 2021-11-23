@@ -48,12 +48,12 @@ func (ovn *SyncHandler) ensureSubmarinerInfra() error {
 
 	// At this point, we are missing the ovn_cluster_router policies and the
 	// local-to-remote & remote-to-local routes in submariner_router, that
-	// depends on endpoint details that we will receive via events
+	// depends on endpoint details that we will receive via events.
 	return nil
 }
 
 // ensureSubmarinerGatewayLocalNetSwitch creates the OVN submariner_join switch which
-// connects the ovn_cluster_router to the submariner_router
+// connects the ovn_cluster_router to the submariner_router.
 func (ovn *SyncHandler) ensureSubmarinerJoinSwitch() error {
 	return ovn.ensureSwitch(submarinerDownstreamSwitch)
 }
@@ -111,6 +111,7 @@ func (ovn *SyncHandler) ensureSubmarinerGatewayLocalNetSwitch() error {
 
 func (ovn *SyncHandler) ensureSwitch(switchName string) error {
 	klog.Infof("Ensuring %q switch", switchName)
+
 	lsCmd, err := ovn.nbdb.LSAdd(switchName)
 	if err == nil {
 		klog.Infof("Creating submariner switch %q", switchName)
@@ -127,6 +128,7 @@ func (ovn *SyncHandler) ensureSwitch(switchName string) error {
 
 func (ovn *SyncHandler) ensureSubmarinerRouter() error {
 	klog.Infof("Ensuring %q", submarinerLogicalRouter)
+
 	lrCmd, err := ovn.nbdb.LRAdd(submarinerLogicalRouter, nil)
 	if err == nil {
 		klog.Infof("Creating submariner router %q", submarinerLogicalRouter)

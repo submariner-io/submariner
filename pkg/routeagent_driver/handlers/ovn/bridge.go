@@ -24,17 +24,17 @@ import (
 
 	"github.com/pkg/errors"
 	npSyncerOVN "github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn"
-	"github.com/vishvananda/netlink"
-
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn/vsctl"
+	"github.com/vishvananda/netlink"
 )
 
 func (ovn *Handler) getMTU() (int, error) {
-	if link, err := ovn.netlink.LinkByName(OVNK8sMgmntIntfName); err != nil {
+	link, err := ovn.netlink.LinkByName(OVNK8sMgmntIntfName)
+	if err != nil {
 		return 0, errors.Wrapf(err, "error retrieving link by name %q", OVNK8sMgmntIntfName)
-	} else {
-		return link.Attrs().MTU, nil
 	}
+
+	return link.Attrs().MTU, nil
 }
 
 func (ovn *Handler) ensureSubmarinerNodeBridge() error {
@@ -81,7 +81,7 @@ func (ovn *Handler) configureSubmarinerInterface() error {
 		Mask: ipNet.Mask,
 	}}
 
-	if err := ovn.netlink.AddrAdd(ovnLink, ipConfig); err != nil && err != syscall.EEXIST {
+	if err := ovn.netlink.AddrAdd(ovnLink, ipConfig); err != nil && !errors.Is(err, syscall.EEXIST) {
 		return errors.Wrapf(err, "unable to configure address %q on Submariner interface %q", ipAddress, ovnK8sSubmarinerInterface)
 	}
 

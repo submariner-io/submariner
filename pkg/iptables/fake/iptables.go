@@ -28,7 +28,7 @@ import (
 )
 
 type IPTables struct {
-	sync.Mutex
+	mutex                    sync.Mutex
 	chainRules               map[string]stringset.Interface
 	tableChains              map[string]stringset.Interface
 	failOnAppendRuleMatchers []interface{}
@@ -57,8 +57,8 @@ func (i *IPTables) Insert(table, chain string, pos int, rulespec ...string) erro
 }
 
 func (i *IPTables) Delete(table, chain string, rulespec ...string) error {
-	i.Lock()
-	defer i.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	err := matchRuleForError(&i.failOnDeleteRuleMatchers, rulespec...)
 	if err != nil {
@@ -74,8 +74,8 @@ func (i *IPTables) Delete(table, chain string, rulespec ...string) error {
 }
 
 func (i *IPTables) addRule(table, chain string, rulespec ...string) error {
-	i.Lock()
-	defer i.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	err := matchRuleForError(&i.failOnAppendRuleMatchers, rulespec...)
 	if err != nil {
@@ -112,8 +112,8 @@ func (i *IPTables) List(table, chain string) ([]string, error) {
 }
 
 func (i *IPTables) listRules(table, chain string) []string {
-	i.Lock()
-	defer i.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	rules := i.chainRules[table+"/"+chain]
 	if rules != nil {
@@ -128,8 +128,8 @@ func (i *IPTables) ListChains(table string) ([]string, error) {
 }
 
 func (i *IPTables) listChains(table string) []string {
-	i.Lock()
-	defer i.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	chains := i.tableChains[table]
 	if chains != nil {
@@ -145,8 +145,8 @@ func (i *IPTables) NewChain(table, chain string) error {
 }
 
 func (i *IPTables) ClearChain(table, chain string) error {
-	i.Lock()
-	defer i.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	chainSet := i.tableChains[table]
 	if chainSet != nil {
@@ -157,8 +157,8 @@ func (i *IPTables) ClearChain(table, chain string) error {
 }
 
 func (i *IPTables) AddChainsFor(table string, chains ...string) {
-	i.Lock()
-	defer i.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	chainSet := i.tableChains[table]
 	if chainSet == nil {
@@ -194,15 +194,15 @@ func (i *IPTables) AwaitNoRule(table, chain string, stringOrMatcher interface{})
 }
 
 func (i *IPTables) AddFailOnAppendRuleMatcher(stringOrMatcher interface{}) {
-	i.Lock()
-	defer i.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	i.failOnAppendRuleMatchers = append(i.failOnAppendRuleMatchers, stringOrMatcher)
 }
 
 func (i *IPTables) AddFailOnDeleteRuleMatcher(stringOrMatcher interface{}) {
-	i.Lock()
-	defer i.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	i.failOnDeleteRuleMatchers = append(i.failOnDeleteRuleMatchers, stringOrMatcher)
 }

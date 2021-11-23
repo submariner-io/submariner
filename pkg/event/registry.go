@@ -20,15 +20,12 @@ package event
 
 import (
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/stringset"
-
+	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	k8sV1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog"
-
-	"github.com/submariner-io/admiral/pkg/log"
-
-	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 )
 
 type Registry struct {
@@ -47,7 +44,7 @@ func NewRegistry(name, networkPlugin string) *Registry {
 	}
 }
 
-// GetName returns the name of the registry
+// GetName returns the name of the registry.
 func (er *Registry) GetName() string {
 	return er.name
 }
@@ -88,73 +85,73 @@ func (er *Registry) AddHandlers(eventHandlers ...Handler) error {
 
 func (er *Registry) StopHandlers(uninstall bool) error {
 	return er.invokeHandlers("Stop", func(h Handler) error {
-		return h.Stop(uninstall)
+		return h.Stop(uninstall) // nolint:wrapcheck  // Let the caller wrap it
 	})
 }
 
 func (er *Registry) TransitionToNonGateway() error {
 	return er.invokeHandlers("TransitionToNonGateway", func(h Handler) error {
-		return h.TransitionToNonGateway()
+		return h.TransitionToNonGateway() // nolint:wrapcheck  // Let the caller wrap it
 	})
 }
 
 func (er *Registry) TransitionToGateway() error {
 	return er.invokeHandlers("TransitionToGateway", func(h Handler) error {
-		return h.TransitionToGateway()
+		return h.TransitionToGateway() // nolint:wrapcheck  // Let the caller wrap it
 	})
 }
 
 func (er *Registry) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 	return er.invokeHandlers("LocalEndpointCreated", func(h Handler) error {
-		return h.LocalEndpointCreated(endpoint)
+		return h.LocalEndpointCreated(endpoint) // nolint:wrapcheck  // Let the caller wrap it
 	})
 }
 
 func (er *Registry) LocalEndpointUpdated(endpoint *submV1.Endpoint) error {
 	return er.invokeHandlers("LocalEndpointUpdated", func(h Handler) error {
-		return h.LocalEndpointUpdated(endpoint)
+		return h.LocalEndpointUpdated(endpoint) // nolint:wrapcheck  // Let the caller wrap it
 	})
 }
 
 func (er *Registry) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 	return er.invokeHandlers("LocalEndpointRemoved", func(h Handler) error {
-		return h.LocalEndpointRemoved(endpoint)
+		return h.LocalEndpointRemoved(endpoint) // nolint:wrapcheck  // Let the caller wrap it
 	})
 }
 
 func (er *Registry) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	return er.invokeHandlers("RemoteEndpointCreated", func(h Handler) error {
-		return h.RemoteEndpointCreated(endpoint)
+		return h.RemoteEndpointCreated(endpoint) // nolint:wrapcheck  // Let the caller wrap it
 	})
 }
 
 func (er *Registry) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
 	return er.invokeHandlers("RemoteEndpointUpdated", func(h Handler) error {
-		return h.RemoteEndpointUpdated(endpoint)
+		return h.RemoteEndpointUpdated(endpoint) // nolint:wrapcheck  // Let the caller wrap it
 	})
 }
 
 func (er *Registry) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	return er.invokeHandlers("RemoteEndpointRemoved", func(h Handler) error {
-		return h.RemoteEndpointRemoved(endpoint)
+		return h.RemoteEndpointRemoved(endpoint) // nolint:wrapcheck  // Let the caller wrap it
 	})
 }
 
 func (er *Registry) NodeCreated(node *k8sV1.Node) error {
 	return er.invokeHandlers("NodeCreated", func(h Handler) error {
-		return h.NodeCreated(node)
+		return h.NodeCreated(node) // nolint:wrapcheck  // Let the caller wrap it
 	})
 }
 
 func (er *Registry) NodeUpdated(node *k8sV1.Node) error {
 	return er.invokeHandlers("NodeUpdated", func(h Handler) error {
-		return h.NodeUpdated(node)
+		return h.NodeUpdated(node) // nolint:wrapcheck  // Let the caller wrap it
 	})
 }
 
 func (er *Registry) NodeRemoved(node *k8sV1.Node) error {
 	return er.invokeHandlers("NodeRemoved", func(h Handler) error {
-		return h.NodeRemoved(node)
+		return h.NodeRemoved(node) // nolint:wrapcheck  // Let the caller wrap it
 	})
 }
 

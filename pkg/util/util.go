@@ -26,11 +26,10 @@ import (
 	"syscall"
 	"unicode"
 
-	"github.com/vishvananda/netlink"
-	"k8s.io/apimachinery/pkg/api/equality"
-
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
+	"github.com/vishvananda/netlink"
+	"k8s.io/apimachinery/pkg/api/equality"
 )
 
 const tokenLength = 64
@@ -119,6 +118,7 @@ func GetClusterIDFromCableName(cableName string) string {
 }
 
 func GetEndpointCRDName(endpoint *types.SubmarinerEndpoint) (string, error) {
+	// We'll panic if endpoint is nil, this is intentional
 	return GetEndpointCRDNameFromParams(endpoint.Spec.ClusterID, endpoint.Spec.CableName)
 }
 
@@ -131,6 +131,7 @@ func GetEndpointCRDNameFromParams(clusterID, cableName string) (string, error) {
 }
 
 func GetClusterCRDName(cluster *types.SubmarinerCluster) (string, error) {
+	// We'll panic if cluster is nil, this is intentional
 	if cluster.Spec.ClusterID == "" {
 		return "", fmt.Errorf("ClusterID was empty")
 	}
@@ -138,25 +139,34 @@ func GetClusterCRDName(cluster *types.SubmarinerCluster) (string, error) {
 	return cluster.Spec.ClusterID, nil
 }
 
-func CompareEndpointSpec(left, right subv1.EndpointSpec) bool {
+func CompareEndpointSpec(left, right *subv1.EndpointSpec) bool {
+	if left == nil && right == nil {
+		return true
+	}
+
+	if left == nil || right == nil {
+		return false
+	}
+
 	// maybe we have to use just reflect.DeepEqual(left, right), but in this case the subnets order will influence.
 	return left.ClusterID == right.ClusterID && left.CableName == right.CableName && left.Hostname == right.Hostname &&
 		left.Backend == right.Backend && equality.Semantic.DeepEqual(left.BackendConfig, right.BackendConfig)
 }
 
+// nolint:wrapcheck // Let the caller wrap external errors
 func GetDefaultGatewayInterface() (*net.Interface, error) {
 	routes, err := netlink.RouteList(nil, syscall.AF_INET)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, route := range routes {
-		if route.Dst == nil || route.Dst.String() == "0.0.0.0/0" {
-			if route.LinkIndex == 0 {
+	for i := range routes {
+		if routes[i].Dst == nil || routes[i].Dst.String() == "0.0.0.0/0" {
+			if routes[i].LinkIndex == 0 {
 				return nil, fmt.Errorf("default gateway interface could not be determined")
 			}
 
-			iface, err := net.InterfaceByIndex(route.LinkIndex)
+			iface, err := net.InterfaceByIndex(routes[i].LinkIndex)
 			if err != nil {
 				return nil, err
 			}

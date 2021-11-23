@@ -23,10 +23,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 	proto2 "google.golang.org/protobuf/proto"
 	"k8s.io/klog"
-
-	"github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 )
 
 func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscoveryRequest, addr *net.UDPAddr) error {
@@ -110,6 +109,7 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscove
 func (nd *natDiscovery) sendResponseToAddress(response *proto.SubmarinerNATDiscoveryResponse, addr *net.UDPAddr) error {
 	msgResponse := proto.SubmarinerNATDiscoveryMessage_Response{Response: response}
 	message := proto.SubmarinerNATDiscoveryMessage{Message: &msgResponse}
+
 	buf, err := proto2.Marshal(&message)
 	if err != nil {
 		return errors.Wrapf(err, "error marshaling response %#v", response)

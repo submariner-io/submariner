@@ -24,22 +24,20 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/submariner/pkg/endpoint"
-
+	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-
-	"github.com/submariner-io/submariner/pkg/types"
 )
 
 const testNodeName = "this-node"
 
 var _ = Describe("GetLocal", func() {
-	var submSpec types.SubmarinerSpecification
+	var submSpec *types.SubmarinerSpecification
 	var client kubernetes.Interface
-	var testPrivateIP = util.GetLocalIP()
+	testPrivateIP := util.GetLocalIP()
 	var node *v1.Node
 
 	const (
@@ -53,7 +51,7 @@ var _ = Describe("GetLocal", func() {
 	subnets := []string{"127.0.0.1/16"}
 
 	BeforeEach(func() {
-		submSpec = types.SubmarinerSpecification{
+		submSpec = &types.SubmarinerSpecification{
 			ClusterID:   "east",
 			ClusterCidr: subnets,
 			CableDriver: "backend",
@@ -65,7 +63,9 @@ var _ = Describe("GetLocal", func() {
 				Labels: map[string]string{
 					backendConfigPrefix + testNATTPortLabel: "1234",
 					backendConfigPrefix + testUDPPortLabel:  testUDPPort,
-				}}}
+				},
+			},
+		}
 
 		client = fake.NewSimpleClientset(node)
 

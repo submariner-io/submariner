@@ -37,14 +37,15 @@ import (
 	"k8s.io/klog"
 )
 
-func NewNodeController(config syncer.ResourceSyncerConfig, pool *ipam.IPPool, nodeName string) (Interface, error) {
+func NewNodeController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool, nodeName string) (Interface, error) {
+	// We'll panic if config is nil, this is intentional
 	var err error
 
 	klog.Info("Creating Node controller")
 
 	iptIface, err := iptables.New()
 	if err != nil {
-		return nil, errors.WithMessage(err, "error creating the IPTablesInterface handler")
+		return nil, errors.Wrap(err, "error creating the IPTablesInterface handler")
 	}
 
 	controller := &nodeController{
@@ -66,18 +67,19 @@ func NewNodeController(config syncer.ResourceSyncerConfig, pool *ipam.IPPool, no
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error creating the federator")
 	}
 
 	_, gvr, err := admUtil.ToUnstructuredResource(&corev1.Node{}, config.RestMapper)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error converting resource")
 	}
 
 	controller.nodes = config.SourceClient.Resource(*gvr)
+
 	localNodeInfo, err := controller.nodes.Get(context.TODO(), controller.nodeName, metav1.GetOptions{})
 	if err != nil {
-		return nil, errors.WithMessagef(err, "error retrieving local Node %q", controller.nodeName)
+		return nil, errors.Wrapf(err, "error retrieving local Node %q", controller.nodeName)
 	}
 
 	if err := controller.reserveAllocatedIP(federator, localNodeInfo); err != nil {
@@ -96,10 +98,11 @@ func (n *nodeController) process(from runtime.Object, numRequeues int, op syncer
 			if op == syncer.Delete {
 				_ = n.pool.Release(existingGlobalIP)
 				return nil, false
-			} else {
-				_ = n.pool.Release(existingGlobalIP)
-				return n.updateNodeAnnotation(node, ""), false
 			}
+
+			_ = n.pool.Release(existingGlobalIP)
+
+			return n.updateNodeAnnotation(node, ""), false
 		}
 
 		return nil, false
@@ -177,7 +180,7 @@ func (n *nodeController) reserveAllocatedIP(federator federate.Federator, obj *u
 	if err != nil {
 		klog.Warningf("Could not reserve allocated GlobalIP for Node %q: %v", obj.GetName(), err)
 
-		return federator.Distribute(n.updateNodeAnnotation(obj, ""))
+		return errors.Wrap(federator.Distribute(n.updateNodeAnnotation(obj, "")), "error updating the Node global IP annotation")
 	}
 
 	return nil

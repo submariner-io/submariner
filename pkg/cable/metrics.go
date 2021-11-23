@@ -37,8 +37,7 @@ const (
 )
 
 var (
-	// The following metrics are gauges because we want to set the absolute value
-	// RX/TX metrics
+	// The following metrics are gauges because we want to set the absolute value  RX/TX metrics.
 	rxGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "submariner_gateway_rx_bytes",
@@ -167,7 +166,7 @@ func RecordDisconnected(cableDriverName string, localEndpoint, remoteEndpoint *s
 }
 
 func RecordNoConnections() {
-	//TODO: assuming only 1 cable driver is active at a time, calling Reset() will work.
+	// TODO: assuming only 1 cable driver is active at a time, calling Reset() will work.
 	// once this is changed, there is a need to be updated accordingly
 	connectionsGauge.Reset()
 }

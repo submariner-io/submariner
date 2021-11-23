@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	// The ovn_cluster_router submariner port connects to the submariner router
+	// The ovn_cluster_router submariner port connects to the submariner router.
 	ovnClusterSubmarinerRPort  = "ovn_cluster_subm_lrp"
 	ovnClusterSubmarinerSwPort = "ovn_cluster_subm_lsp"
 	ovnClusterSubmarinerMAC    = "00:60:2f:10:01:02"
@@ -64,7 +64,7 @@ func (ovn *SyncHandler) connectOvnClusterRouterToSubm() error {
 }
 
 func (ovn *SyncHandler) associateSubmarinerRouterToChassis(chassis *goovn.Chassis) error {
-	return ovn.nbctl.SetRouterChassis(submarinerLogicalRouter, chassis.Name)
+	return ovn.nbctl.SetRouterChassis(submarinerLogicalRouter, chassis.Name) // nolint:wrapcheck  // No need to wrap this error
 }
 
 func (ovn *SyncHandler) setupOvnClusterRouterRemoteRules() error {
