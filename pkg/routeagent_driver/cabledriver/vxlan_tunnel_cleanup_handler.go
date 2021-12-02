@@ -51,7 +51,9 @@ func (h *vxlanCleanup) TransitionToNonGateway() error {
 	link, err := netlink.LinkByName(vxlan.VxlanIface)
 
 	if err != nil {
-		return nil
+		if _, ok := err.(netlink.LinkNotFoundError); !ok {
+			klog.Warningf("error retrieving link by name %q", vxlan.VxlanIface)
+		}
 	}
 
 	currentRouteList, err := netlink.RouteList(link, syscall.AF_INET)
