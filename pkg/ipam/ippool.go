@@ -27,6 +27,7 @@ import (
 
 	"github.com/emirpasic/gods/maps/treemap"
 	"github.com/pkg/errors"
+	"github.com/submariner-io/submariner/pkg/globalnet/metrics"
 )
 
 type IPPool struct {
@@ -65,7 +66,7 @@ func NewIPPool(cidr string) (*IPPool, error) {
 		pool.available.Put(intIP, ip)
 	}
 
-	// TODO: RecordAvailability(cidr, size)
+	metrics.RecordAvailability(cidr, size)
 
 	return pool, nil
 }
@@ -97,7 +98,7 @@ func (p *IPPool) allocateOne() ([]string, error) {
 	iter := p.available.Iterator()
 	if iter.Last() {
 		p.available.Remove(iter.Key())
-		// TODO: RecordAllocateGlobalIP(p.cidr)
+		metrics.RecordAllocateGlobalIP(p.cidr)
 
 		return []string{iter.Value().(string)}, nil
 	}
@@ -149,7 +150,7 @@ func (p *IPPool) Allocate(num int) ([]string, error) {
 				firstIntIP++
 			}
 
-			// TODO: RecordAllocateGlobalIPs(p.cidr, num)
+			metrics.RecordAllocateGlobalIPs(p.cidr, num)
 
 			return retIPs, nil
 		}
@@ -169,6 +170,7 @@ func (p *IPPool) Release(ips ...string) error {
 		}
 
 		p.available.Put(StringIPToInt(ip), ip)
+		metrics.RecordDeallocateGlobalIP(p.cidr)
 	}
 
 	return nil
@@ -201,6 +203,7 @@ func (p *IPPool) Reserve(ips ...string) error {
 	for i := 0; i < num; i++ {
 		p.available.Remove(intIPs[i])
 	}
+	metrics.RecordAllocateGlobalIPs(p.cidr, num)
 
 	return nil
 }
