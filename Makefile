@@ -140,3 +140,5 @@ endif
 
 # Disable rebuilding Makefile
 Makefile Makefile.inc: ;
+
+print-%: ; @echo $* = $($*) 
