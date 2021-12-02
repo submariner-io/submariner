@@ -5,7 +5,7 @@ export BASE_BRANCH
 
 # Define LOCAL_BUILD to build directly on the host and not inside a Dapper container
 ifdef LOCAL_BUILD
-DAPPER_HOST_ARCH ?= $(shell go env GOHOSTARCH | cut -d= -f2 | tr -d '"')
+DAPPER_HOST_ARCH ?= $(shell go env GOHOSTARCH)
 SHIPYARD_DIR ?= ../shipyard
 SCRIPTS_DIR ?= $(SHIPYARD_DIR)/scripts/shared
 
@@ -140,5 +140,3 @@ endif
 
 # Disable rebuilding Makefile
 Makefile Makefile.inc: ;
-
-print-%: ; @echo $* = $($*) 
