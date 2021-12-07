@@ -12,15 +12,15 @@ updates:
       # K8s dependencies must be handled manually
       - dependency-name: k8s.io/api
         versions:
-          - "> 0.17.0"
+          - ">= 0.22.0"
       - dependency-name: k8s.io/apimachinery
         versions:
-          - "> 0.17.0"
+          - ">= 0.22.0"
       - dependency-name: k8s.io/client-go
         versions:
-          - "> 0.17.0"
+          - ">= 0.22.0"
       - dependency-name: sigs.k8s.io/controller-runtime
         versions:
-          - "> 0.3.0"
+          - ">= 0.8.0"
       # Our own dependencies are handled during releases
       - dependency-name: github.com/submariner-io/*
