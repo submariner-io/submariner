@@ -17,7 +17,6 @@ require (
 	github.com/prometheus/client_golang v1.11.0
 	github.com/submariner-io/admiral v0.12.0-m1
 	github.com/submariner-io/shipyard v0.12.0-m1
-	github.com/submariner-io/submariner/pkg/apis v0.0.0-20210816112556-6e4bb78fab88
 	github.com/uw-labs/lichen v0.1.4
 	github.com/vishvananda/netlink v1.1.0
 	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e // indirect
@@ -42,6 +41,3 @@ replace (
 	k8s.io/client-go => k8s.io/client-go v0.19.10
 	k8s.io/cloud-provider => k8s.io/cloud-provider v0.19.10
 )
-
-// Modules in this project
-replace github.com/submariner-io/submariner/pkg/apis => ./pkg/apis

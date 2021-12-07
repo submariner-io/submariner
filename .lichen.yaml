@@ -16,10 +16,6 @@ allow:
   - "X11"
   - "Zlib"
 
-override:
-  - path: "./pkg/apis"
-    licenses: ["Apache-2.0"]
-
 # https://github.com/cncf/foundation/tree/master/license-exceptions
 exceptions:
   licenseNotPermitted:

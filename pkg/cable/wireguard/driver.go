@@ -253,7 +253,7 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 	}
 
 	// create connection, overwrite existing connection
-	connection := v1.NewConnection(remoteEndpoint.Spec, ip, endpointInfo.UseNAT)
+	connection := v1.NewConnection(&remoteEndpoint.Spec, ip, endpointInfo.UseNAT)
 	connection.SetStatus(v1.Connecting, "Connection has been created but not yet started")
 	klog.V(log.DEBUG).Infof("Adding connection for cluster %s, %v", remoteEndpoint.Spec.ClusterID, connection)
 	w.connections[remoteEndpoint.Spec.ClusterID] = connection

@@ -42,7 +42,7 @@ override CLUSTERS_ARGS += $(CLUSTER_SETTINGS_FLAG)
 override DEPLOY_ARGS += $(CLUSTER_SETTINGS_FLAG)
 
 override E2E_ARGS += cluster2 cluster1
-override UNIT_TEST_ARGS += test pkg/apis
+override UNIT_TEST_ARGS += test
 override VALIDATE_ARGS += --skip-dirs pkg/client
 
 # When cross-building, we need to map Go architectures and operating systems to Docker buildx platforms:
