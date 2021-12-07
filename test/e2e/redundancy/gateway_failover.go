@@ -27,6 +27,7 @@ import (
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/util"
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -76,7 +77,7 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 
 	By(fmt.Sprintf("Ensuring that the gateway reports as active on %q", clusterAName))
 
-	activeGateway := f.AwaitGatewayFullyConnected(framework.ClusterA, gatewayNodes[0].Name)
+	activeGateway := f.AwaitGatewayFullyConnected(framework.ClusterA, util.EnsureValidName(gatewayNodes[0].Name))
 
 	By(fmt.Sprintf("Deleting submariner gateway pod %q", gatewayPod.Name))
 	f.DeletePod(framework.ClusterA, gatewayPod.Name, framework.TestContext.SubmarinerNamespace)
@@ -85,7 +86,7 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 	By(fmt.Sprintf("Found new submariner gateway pod %q", newGatewayPod.Name))
 
 	By(fmt.Sprintf("Waiting for the gateway to be up and connected %q", newGatewayPod.Name))
-	f.AwaitGatewayFullyConnected(framework.ClusterA, activeGateway.Name)
+	f.AwaitGatewayFullyConnected(framework.ClusterA, util.EnsureValidName(activeGateway.Name))
 
 	By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
 	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
@@ -157,7 +158,7 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 
 	By(fmt.Sprintf("Ensuring that two Gateways become available in cluster %q", clusterAName))
 
-	f.AwaitGatewayFullyConnected(framework.ClusterA, initialGatewayNode.Name)
+	f.AwaitGatewayFullyConnected(framework.ClusterA, util.EnsureValidName(initialGatewayNode.Name))
 	gwPassive := f.AwaitGatewayWithStatus(framework.ClusterA, initialNonGatewayNode.Name, subv1.HAStatusPassive)
 	Expect(gwPassive.Status.Connections).To(BeEmpty(), "The passive gateway must have no connections")
 
@@ -204,7 +205,7 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 	By(fmt.Sprintf("Found new submariner gateway pod %q", newGatewayPod.Name))
 
 	By(fmt.Sprintf("Waiting for the new pod %q to report as active and fully connected", newGatewayPod.Name))
-	f.AwaitGatewayFullyConnected(framework.ClusterA, newGatewayPod.Spec.NodeName)
+	f.AwaitGatewayFullyConnected(framework.ClusterA, util.EnsureValidName(newGatewayPod.Spec.NodeName))
 
 	By(fmt.Sprintf("Checking that gateway pod %q updated the HA status label", newGatewayPod.Name))
 
