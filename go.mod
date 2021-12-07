@@ -43,13 +43,5 @@ replace (
 	k8s.io/cloud-provider => k8s.io/cloud-provider v0.19.10
 )
 
-// Security fixes
-replace (
-	// CVE-2020-9283
-	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20210421170649-83a5a9bb288b
-	// CVE-2020-14040
-	golang.org/x/text => golang.org/x/text v0.3.6
-)
-
 // Modules in this project
 replace github.com/submariner-io/submariner/pkg/apis => ./pkg/apis
