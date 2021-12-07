@@ -3,6 +3,17 @@ BASE_BRANCH ?= devel
 PROTOC_VERSION=3.17.3
 export BASE_BRANCH
 
+# Define LOCAL_BUILD to build directly on the host and not inside a Dapper container
+ifdef LOCAL_BUILD
+DAPPER_HOST_ARCH ?= $(shell go env GOHOSTARCH)
+SHIPYARD_DIR ?= ../shipyard
+SCRIPTS_DIR ?= $(SHIPYARD_DIR)/scripts/shared
+
+export DAPPER_HOST_ARCH
+export SHIPYARD_DIR
+export SCRIPTS_DIR
+endif
+
 ifneq (,$(DAPPER_HOST_ARCH))
 
 # Running in Dapper
