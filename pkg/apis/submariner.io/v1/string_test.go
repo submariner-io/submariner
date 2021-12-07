@@ -16,13 +16,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v1_test
 
 import (
 	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 )
 
 const expectedString = `{"metadata":{"creationTimestamp":null},"spec":{"cluster_id":"cluster-id","cable_name":` +
@@ -32,9 +33,8 @@ const expectedString = `{"metadata":{"creationTimestamp":null},"spec":{"cluster_
 var _ = Describe("API v1", func() {
 	When("Endpoint String representation called", func() {
 		It("Should return a human readable string", func() {
-
-			endpoint := Endpoint{
-				Spec: EndpointSpec{
+			endpoint := v1.Endpoint{
+				Spec: v1.EndpointSpec{
 					ClusterID: "cluster-id",
 					Subnets:   []string{"10.0.0.0/24", "172.0.0.0/24"},
 					CableName: "cable-1",
