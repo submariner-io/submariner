@@ -15,7 +15,7 @@ require (
 	github.com/onsi/gomega v1.17.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.11.0
-	github.com/submariner-io/admiral v0.12.0-m0
+	github.com/submariner-io/admiral v0.12.0-m1
 	github.com/submariner-io/shipyard v0.12.0-m1
 	github.com/submariner-io/submariner/pkg/apis v0.0.0-20210816112556-6e4bb78fab88
 	github.com/uw-labs/lichen v0.1.4
@@ -41,14 +41,6 @@ replace (
 	k8s.io/apimachinery => k8s.io/apimachinery v0.19.10
 	k8s.io/client-go => k8s.io/client-go v0.19.10
 	k8s.io/cloud-provider => k8s.io/cloud-provider v0.19.10
-)
-
-// Security fixes
-replace (
-	// CVE-2020-9283
-	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20210421170649-83a5a9bb288b
-	// CVE-2020-14040
-	golang.org/x/text => golang.org/x/text v0.3.6
 )
 
 // Modules in this project
