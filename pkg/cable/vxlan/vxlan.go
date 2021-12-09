@@ -35,7 +35,6 @@ import (
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/submariner-io/submariner/pkg/util"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	"k8s.io/klog"
@@ -116,7 +115,7 @@ func (v *vxlan) createVxlanInterface(activeEndPoint string, port int) error {
 		return errors.Wrapf(err, "failed to derive the vxlan vtepIP for %s", ipAddr)
 	}
 
-	defaultHostIface, err := util.GetDefaultGatewayInterface()
+	defaultHostIface, err := netlinkAPI.GetDefaultGatewayInterface()
 	if err != nil {
 		return errors.Wrapf(err, "Unable to find the default interface on host: %s",
 			v.localEndpoint.Spec.Hostname)

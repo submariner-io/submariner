@@ -21,10 +21,12 @@ package netlink
 
 import (
 	"bytes"
+	"fmt"
 	"net"
 	"os"
 	"os/exec"
 	"strconv"
+	"syscall"
 
 	"github.com/pkg/errors"
 	"github.com/vishvananda/netlink"
@@ -174,4 +176,29 @@ func setSysctl(path string, contents []byte) error {
 	// Permissions are already 644, the files are never created
 	// #nosec G306
 	return os.WriteFile(path, contents, 0o644)
+}
+
+// nolint:wrapcheck // Let the caller wrap external errors
+func GetDefaultGatewayInterface() (*net.Interface, error) {
+	routes, err := netlink.RouteList(nil, syscall.AF_INET)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range routes {
+		if routes[i].Dst == nil || routes[i].Dst.String() == "0.0.0.0/0" {
+			if routes[i].LinkIndex == 0 {
+				return nil, fmt.Errorf("default gateway interface could not be determined")
+			}
+
+			iface, err := net.InterfaceByIndex(routes[i].LinkIndex)
+			if err != nil {
+				return nil, err
+			}
+
+			return iface, nil
+		}
+	}
+
+	return nil, fmt.Errorf("unable to find default route")
 }
