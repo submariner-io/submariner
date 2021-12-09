@@ -32,7 +32,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
-	"github.com/submariner-io/submariner/pkg/util"
 	"k8s.io/klog"
 )
 
@@ -93,7 +92,7 @@ func (ovn *Handler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 			return errors.Wrapf(err, "Wireguard interface %s not found on the node.", wireguard.DefaultDeviceName)
 		}
 	} else {
-		if routingInterface, err = util.GetDefaultGatewayInterface(); err != nil {
+		if routingInterface, err = netlink.GetDefaultGatewayInterface(); err != nil {
 			klog.Fatalf("Unable to find the default interface on host: %s", err.Error())
 		}
 	}

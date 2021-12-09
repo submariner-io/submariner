@@ -29,7 +29,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
-	"github.com/submariner-io/submariner/pkg/util"
 	"k8s.io/klog"
 )
 
@@ -90,7 +89,7 @@ func (kp *SyncHandler) Init() error {
 		return errors.Wrapf(err, "unable to determine hostname")
 	}
 
-	kp.defaultHostIface, err = util.GetDefaultGatewayInterface()
+	kp.defaultHostIface, err = netlink.GetDefaultGatewayInterface()
 	if err != nil {
 		return errors.Wrapf(err, "Unable to find the default interface on host: %s", kp.hostname)
 	}
