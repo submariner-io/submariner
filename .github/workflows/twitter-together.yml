@@ -1,0 +1,35 @@
+---
+name: Twitter
+
+on:
+  pull_request:
+  push:
+    branches:
+      - devel
+
+jobs:
+  preview:
+    name: Preview
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: gr2m/twitter-together@f72bdb719fed3f924ecd711086181d66af4eb72e
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  tweet:
+    name: Tweet
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7042f
+
+      - name: Tweet
+        uses: gr2m/twitter-together@f72bdb719fed3f924ecd711086181d66af4eb72e
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          TWITTER_ACCESS_TOKEN_SECRET: ${{ secrets.TWITTER_ACCESS_TOKEN_SECRET }}
+          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
+          TWITTER_API_SECRET_KEY: ${{ secrets.TWITTER_API_SECRET_KEY }}
