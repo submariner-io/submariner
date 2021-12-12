@@ -37,8 +37,8 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 				return
 			}
 
-			if subFramework.IsSingleNodeDeployment(fromClusterScheduling, toClusterScheduling, framework.ClusterA,
-				framework.ClusterB) {
+			if !subFramework.CanExecuteNonGatewayConnectivityTest(fromClusterScheduling, toClusterScheduling,
+				framework.ClusterA, framework.ClusterB) {
 				return
 			}
 

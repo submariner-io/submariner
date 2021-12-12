@@ -38,8 +38,8 @@ var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across over
 				return
 			}
 
-			if subFramework.IsSingleNodeDeployment(fromClusterScheduling, toClusterScheduling, framework.ClusterA,
-				framework.ClusterB) {
+			if !subFramework.CanExecuteNonGatewayConnectivityTest(fromClusterScheduling, toClusterScheduling,
+				framework.ClusterA, framework.ClusterB) {
 				return
 			}
 
