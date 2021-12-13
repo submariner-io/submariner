@@ -241,3 +241,22 @@ func GetGlobalnetEgressParams(egressIP GlobalEgressIPType) GlobalnetTestParams {
 		GlobalEgressIP:   egressIP,
 	}
 }
+
+func CanExecuteNonGatewayConnectivityTest(sourceNode, destNode framework.NetworkPodScheduling,
+	sourceCluster, destCluster framework.ClusterIndex) bool {
+	if sourceNode == framework.NonGatewayNode &&
+		framework.TestContext.NumNodesInCluster[sourceCluster] == 1 {
+		framework.Skipf("Skipping the test as cluster %q has only a single node...",
+			framework.TestContext.ClusterIDs[sourceCluster])
+		return false
+	}
+
+	if destNode == framework.NonGatewayNode &&
+		framework.TestContext.NumNodesInCluster[destCluster] == 1 {
+		framework.Skipf("Skipping the test as cluster %q has only a single node...",
+			framework.TestContext.ClusterIDs[destCluster])
+		return false
+	}
+
+	return true
+}
