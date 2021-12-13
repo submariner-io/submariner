@@ -1,5 +1,6 @@
 # Auto-generated, do not edit; see CODEOWNERS.in
 * @Oats87 @skitt @sridhargaddam @tpantelis
+*.md @dfarrell07 @Oats87 @skitt @sridhargaddam @tpantelis
 /.github/workflows/ @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis
 /package/ @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis
 /scripts/ @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis
