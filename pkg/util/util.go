@@ -23,12 +23,10 @@ import (
 	"log"
 	"net"
 	"strings"
-	"syscall"
 	"unicode"
 
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/vishvananda/netlink"
 	"k8s.io/apimachinery/pkg/api/equality"
 )
 
@@ -151,31 +149,6 @@ func CompareEndpointSpec(left, right *subv1.EndpointSpec) bool {
 	// maybe we have to use just reflect.DeepEqual(left, right), but in this case the subnets order will influence.
 	return left.ClusterID == right.ClusterID && left.CableName == right.CableName && left.Hostname == right.Hostname &&
 		left.Backend == right.Backend && equality.Semantic.DeepEqual(left.BackendConfig, right.BackendConfig)
-}
-
-// nolint:wrapcheck // Let the caller wrap external errors
-func GetDefaultGatewayInterface() (*net.Interface, error) {
-	routes, err := netlink.RouteList(nil, syscall.AF_INET)
-	if err != nil {
-		return nil, err
-	}
-
-	for i := range routes {
-		if routes[i].Dst == nil || routes[i].Dst.String() == "0.0.0.0/0" {
-			if routes[i].LinkIndex == 0 {
-				return nil, fmt.Errorf("default gateway interface could not be determined")
-			}
-
-			iface, err := net.InterfaceByIndex(routes[i].LinkIndex)
-			if err != nil {
-				return nil, err
-			}
-
-			return iface, nil
-		}
-	}
-
-	return nil, fmt.Errorf("unable to find default route")
 }
 
 func EnsureValidName(name string) string {

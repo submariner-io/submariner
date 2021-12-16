@@ -56,6 +56,8 @@ func beforeSuite() {
 	}
 
 	framework.DetectGlobalnet()
+	err = framework.InitNumClusterNodes()
+	Expect(err).To(BeNil())
 }
 
 func (f *Framework) GetGatewayInformer(cluster framework.ClusterIndex) (cache.SharedIndexInformer, chan struct{}) {

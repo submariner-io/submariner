@@ -1,5 +1,6 @@
+@dfarrell07 *.md
+@mkolesnik /.github/workflows/ /scripts/ Makefile* Dockerfile.dapper /package/
 @Oats87 *
 @skitt *
 @sridhargaddam *
 @tpantelis *
-@mkolesnik /.github/workflows/ /scripts/ Makefile* Dockerfile.dapper /package/

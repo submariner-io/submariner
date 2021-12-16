@@ -98,6 +98,11 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 		ToEndpointType:        defaultEndpointType(),
 	}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
 
+	if !subFramework.CanExecuteNonGatewayConnectivityTest(framework.NonGatewayNode, framework.NonGatewayNode,
+		framework.ClusterB, framework.ClusterA) {
+		return
+	}
+
 	By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
 	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
@@ -132,6 +137,12 @@ func defaultEndpointType() tcp.EndpointType {
 }
 
 func testGatewayFailOverScenario(f *subFramework.Framework) {
+	if framework.TestContext.NumNodesInCluster[framework.ClusterA] == 1 {
+		framework.Skipf("Skipping the test as cluster %q has only a single node...",
+			framework.TestContext.ClusterIDs[framework.ClusterA])
+		return
+	}
+
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
@@ -229,6 +240,11 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 		ToClusterScheduling:   framework.GatewayNode,
 		ToEndpointType:        defaultEndpointType(),
 	}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
+
+	if !subFramework.CanExecuteNonGatewayConnectivityTest(framework.NonGatewayNode, framework.NonGatewayNode,
+		framework.ClusterB, framework.ClusterA) {
+		return
+	}
 
 	By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
 	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{

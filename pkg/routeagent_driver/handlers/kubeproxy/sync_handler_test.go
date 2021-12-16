@@ -33,7 +33,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
-	"github.com/submariner-io/submariner/pkg/util"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	corev1 "k8s.io/api/core/v1"
@@ -349,7 +348,7 @@ func newTestDriver() *testDriver {
 	t := &testDriver{}
 
 	BeforeEach(func() {
-		defaultHostIface, err := util.GetDefaultGatewayInterface()
+		defaultHostIface, err := netlinkAPI.GetDefaultGatewayInterface()
 		Expect(err).To(Succeed())
 
 		t.hostInterfaceIndex = defaultHostIface.Index

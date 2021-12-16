@@ -26,5 +26,5 @@ e.g. submariner-operator/\* or submariner-operator/scripts/\*
 - (at)sponsor-2
 
 ### List of required reviews to Submariner project PRs
-- At least 20 PRs to the relevant codebase that you reviewed
-- At least 5 PRs to the relevant codebase for which you were the primary reviewer
+- At least 20 PRs to the relevant codebase that you reviewed, and at least 5 for which you were the primary reviewer
+  - `https://github.com/submariner-io/<repo>/pulls?q=is%3Apr+reviewed-by%3A<your-GH-handle>+-author%3A<your-GH-handle>`
