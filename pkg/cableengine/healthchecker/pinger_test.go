@@ -149,7 +149,9 @@ var _ = Describe("Pinger", func() {
 		})
 
 		It("should no longer update the statistics", func() {
-			verifyPingStats(3)
+			Eventually(func() string {
+				return pinger.GetLatencyInfo().Spec.Last
+			}, 3).ShouldNot(BeEmpty())
 
 			pinger.Stop()
 
