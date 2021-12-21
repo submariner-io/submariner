@@ -14,28 +14,27 @@
   - [Network Path](#network-path)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
-  - [Installation using Operator via subctl](#installation-using-operator-via-subctl)
+  - [Installation using subctl](#installation-using-subctl)
   - [Installation using Helm](#installation-using-helm)
   - [Validate Submariner is Working](#validate-submariner-is-working)
 - [Building and Testing](#building-and-testing)
-- [Known Issues/Notes](#known-issuesnotes)
-  - [OpenShift Notes](#openshift-notes)
+- [Known Issues](#known-issues)
 - [Contributing](#contributing)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 Submariner is a tool built to connect overlay networks of different Kubernetes clusters. While most testing is performed against Kubernetes
-clusters that have enabled Flannel/Calico/Canal/Weave/OpenShiftSDN, Submariner should be compatible with any CNI cluster network
-provider, as it utilizes off-the-shelf components to establish encrypted tunnels between each Kubernetes cluster.
+clusters that have enabled Flannel/Calico/Canal/Weave/OpenShiftSDN, Submariner should be compatible with most CNI cluster network
+providers, as it utilizes off-the-shelf components to establish encrypted tunnels between each Kubernetes cluster.
 
-Note that Submariner is in the **pre-alpha** stage, and should not be used for production purposes. While we welcome usage and
+Note that Submariner is in an early stage, and should not be used for production purposes. While we welcome usage and
 experimentation, it is quite possible that you could run into bugs.
 
 Submariner is a Cloud Native Computing Foundation sandbox project.
 
 ## Architecture
 
-See the [Architecture section on Submariner's website](https://submariner.io/getting-started/architecture/).
+See the [Architecture section](https://submariner.io/getting-started/architecture/) of Submariner's website.
 
 ### Network Path
 
@@ -52,7 +51,7 @@ node.
 
 ## Prerequisites
 
-See the [Prerequisites docs on Submariner's website](https://submariner.io/getting-started/#prerequisites).
+See the [Prerequisites docs](https://submariner.io/getting-started/#prerequisites) on Submariner's website.
 
 ## Installation
 
@@ -64,31 +63,25 @@ experience and additionally provides testing and bug-diagnosing capabilities.
 
 Submariner provides the `subctl` CLI utility to simplify the deployment and maintenance of Submariner across your clusters.
 
-See the [`subctl` docs on Submariner's website](https://submariner.io/operations/deployment/subctl/).
+See the [`subctl` Deployment docs](https://submariner.io/operations/deployment/subctl/) on Submariner's website.
 
 ### Installation using Helm
 
-See the [Helm](https://submariner.io/operations/deployment/helm/) section on Submariner's website.
+See the [Helm Deployment docs](https://submariner.io/operations/deployment/helm/) on Submariner's website.
 
 ### Validate Submariner is Working
 
-See the [`subctl verify` docs on Submariner's website](https://submariner.io/operations/deployment/subctl/#verify).
+See the [`subctl verify` docs](https://submariner.io/operations/deployment/subctl/#verify) and [Automated
+Troubleshooting docs](https://submariner.io/operations/troubleshooting/#automated-troubleshooting) on Submariner's website.
 
 ## Building and Testing
 
-See the [Building and Testing docs on Submariner's website](https://submariner.io/development/building-testing/).
+See the [Building and Testing docs](https://submariner.io/development/building-testing/) on Submariner's website.
 
-## Known Issues/Notes
+## Known Issues
 
-### OpenShift Notes
-
-When running in OpenShift, Submariner needs to grant the appropriate security context for the service accounts (SAs):
-
-   ```shell
-   oc adm policy add-scc-to-user privileged system:serviceaccount:submariner:submariner-routeagent
-   oc adm policy add-scc-to-user privileged system:serviceaccount:submariner:submariner-gateway
-   ```
+See the [Known Issues docs](https://submariner.io/operations/known-issues/) on Submariner's website.
 
 ## Contributing
 
-See the [For Developers section on Submariner's website](https://submariner.io/development/).
+See the [Development section](https://submariner.io/development/) of Submariner's website.
