@@ -66,9 +66,10 @@ func (c *baseSyncerController) Start() error {
 	return c.resourceSyncer.Start(c.stopCh) // nolint:wrapcheck  // Let the caller wrap it
 }
 
-func (c *baseSyncerController) reconcile(client dynamic.ResourceInterface, transform func(obj *unstructured.Unstructured) runtime.Object) {
+func (c *baseSyncerController) reconcile(client dynamic.ResourceInterface, labelSelector string,
+	transform func(obj *unstructured.Unstructured) runtime.Object) {
 	c.resourceSyncer.Reconcile(func() []runtime.Object {
-		objList, err := client.List(context.TODO(), metav1.ListOptions{})
+		objList, err := client.List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
 		if err != nil {
 			klog.Errorf("Error listing resources for reconciliation: %v", err)
 			return nil

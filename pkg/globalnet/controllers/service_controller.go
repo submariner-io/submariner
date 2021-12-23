@@ -74,7 +74,7 @@ func (c *serviceController) Start() error {
 		return err
 	}
 
-	c.reconcile(c.ingressIPs, func(obj *unstructured.Unstructured) runtime.Object {
+	c.reconcile(c.ingressIPs, "", func(obj *unstructured.Unstructured) runtime.Object {
 		name, exists, _ := unstructured.NestedString(obj.Object, "spec", "serviceRef", "name")
 		if exists {
 			return &corev1.Service{
