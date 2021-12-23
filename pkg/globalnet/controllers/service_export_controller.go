@@ -98,7 +98,7 @@ func (c *serviceExportController) Start() error {
 		return err
 	}
 
-	c.reconcile(c.ingressIPs, func(obj *unstructured.Unstructured) runtime.Object {
+	c.reconcile(c.ingressIPs, "", func(obj *unstructured.Unstructured) runtime.Object {
 		name, exists, _ := unstructured.NestedString(obj.Object, "spec", "serviceRef", "name")
 		if exists {
 			return &mcsv1a1.ServiceExport{
