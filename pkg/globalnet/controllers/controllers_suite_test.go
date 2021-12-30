@@ -59,10 +59,11 @@ const (
 	namespace                 = "submariner"
 	localCIDR                 = "169.254.1.0/24"
 	globalEgressIPName        = "east-region"
-	globalIngressIPName       = "db-service-ingress-ip"
+	globalIngressIPName       = "nginx-ingress-ip"
 	kubeProxyIPTableChainName = "KUBE-SVC-Y7DIXXI5PNAUV7FB"
 	serviceName               = "nginx"
 	cniInterfaceIP            = "10.20.30.40"
+	globalIP                  = "169.254.1.100"
 )
 
 func init() {
@@ -329,6 +330,7 @@ func (t *testDriverBase) awaitEgressIPStatusAllocated(client dynamic.ResourceInt
 	})
 }
 
+//nolint:unparam // `atIndex` always receives `0`
 func (t *testDriverBase) awaitIngressIPStatus(name string, atIndex int, expCond ...metav1.Condition) {
 	awaitStatusConditions(t.globalIngressIPs, name, atIndex, expCond...)
 
@@ -355,6 +357,20 @@ func (t *testDriverBase) awaitGlobalIngressIP(name string) *submarinerv1.GlobalI
 	Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, gip)).To(Succeed())
 
 	return gip
+}
+
+func (t *testDriverBase) awaitService(name string) *corev1.Service {
+	obj := test.AwaitResource(t.services, name)
+
+	svc := &corev1.Service{}
+	Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, svc)).To(Succeed())
+
+	return svc
+}
+
+func (t *testDriverBase) awaitNoService(name string) {
+	time.Sleep(300 * time.Millisecond)
+	test.AwaitNoResource(t.services, name)
 }
 
 func (t *testDriverBase) awaitHeadlessGlobalIngressIP(svcName, podName string) *submarinerv1.GlobalIngressIP {
@@ -514,6 +530,23 @@ func newClusterIPService() *corev1.Service {
 		Spec: corev1.ServiceSpec{
 			ClusterIP: "1.2.3.4",
 			Type:      corev1.ServiceTypeClusterIP,
+			Ports: []corev1.ServicePort{{
+				Name:       serviceName,
+				Port:       int32(8080),
+				TargetPort: intstr.FromInt(8080),
+				Protocol:   corev1.ProtocolTCP,
+			}},
+		},
+	}
+}
+
+func newGlobalnetInternalService(svcName string) *corev1.Service {
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: svcName,
+		},
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeClusterIP,
 			Ports: []corev1.ServicePort{{
 				Name:       serviceName,
 				Port:       int32(8080),

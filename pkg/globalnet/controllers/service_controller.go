@@ -119,6 +119,11 @@ func (c *serviceController) onDelete(service *corev1.Service) (runtime.Object, b
 		return nil, false
 	}
 
+	origService := service.GetLabels()[ServiceRefLabel]
+	if origService != "" {
+		service.Name = origService
+	}
+
 	return &submarinerv1.GlobalIngressIP{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      service.Name,

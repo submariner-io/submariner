@@ -41,17 +41,10 @@ const (
 	// steered in the pipeline. Normal traffic should not be affected because of this.
 	globalNetIPTableMark = "0xC0000/0xC0000"
 
-	// This is an internal annotation used between service export controller and global-ingress controller.
-	kubeProxyIPTableChainAnnotation = "submariner.io/kubeproxy-iptablechain"
-
 	// This is an internal annotation used between ingress pod controller and global-ingress controller.
 	headlessSvcPodIP = "submariner.io/headless-svc-pod-ip"
 
-	// Currently Submariner Globalnet implementation (for services) works with kube-proxy
-	// and uses iptable chain-names programmed by kube-proxy. If the internal implementation
-	// of kube-proxy changes, globalnet needs to be modified accordingly.
-	// Reference: https://bit.ly/2OPhlwk
-	kubeProxyServiceChainPrefix = "KUBE-SVC-"
+	globalnetInternalServicePrefix = "submariner-"
 
 	ServiceRefLabel = "submariner.io/serviceRef"
 
@@ -127,6 +120,8 @@ type clusterGlobalEgressIPController struct {
 
 type globalIngressIPController struct {
 	*baseIPAllocationController
+	services dynamic.NamespaceableResourceInterface
+	scheme   *runtime.Scheme
 }
 
 type serviceExportController struct {
