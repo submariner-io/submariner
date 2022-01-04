@@ -20,6 +20,7 @@ package libreswan
 
 import (
 	"bufio"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"os/exec"
@@ -67,6 +68,7 @@ type specification struct {
 	Debug       bool
 	ForceEncaps bool
 	PSK         string
+	PSKSecret   string
 	LogFile     string
 	NATTPort    string `default:"4500"`
 }
@@ -96,10 +98,29 @@ func NewLibreswan(localEndpoint *types.SubmarinerEndpoint, localCluster *types.S
 		return nil, errors.Wrapf(err, "error parsing %q from local endpoint", subv1.UDPPortConfig)
 	}
 
+	encodedPsk := ipSecSpec.PSK
+
+	if ipSecSpec.PSKSecret != "" {
+		pskBytes, err := os.ReadFile(fmt.Sprintf("/var/run/secrets/submariner.io/%s/psk", ipSecSpec.PSKSecret))
+		if err != nil {
+			return nil, errors.Wrapf(err, "error reading secret %s", ipSecSpec.PSKSecret)
+		}
+		var psk strings.Builder
+		encoder := base64.NewEncoder(base64.StdEncoding, &psk)
+
+		if _, err := encoder.Write(pskBytes); err != nil {
+			return nil, errors.Wrap(err, "error encoding secret")
+		}
+
+		encoder.Close()
+
+		encodedPsk = psk.String()
+	}
+
 	klog.Infof("Using NATT UDP port %d", nattPort)
 
 	return &libreswan{
-		secretKey:             ipSecSpec.PSK,
+		secretKey:             encodedPsk,
 		debug:                 ipSecSpec.Debug,
 		logFile:               ipSecSpec.LogFile,
 		ipSecNATTPort:         strconv.Itoa(int(nattPort)),

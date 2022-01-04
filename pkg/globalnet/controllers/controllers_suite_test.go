@@ -174,8 +174,8 @@ func (t *testDriverBase) createClusterGlobalEgressIP(egressIP *submarinerv1.Clus
 	test.CreateResource(t.clusterGlobalEgressIPs, egressIP)
 }
 
-func (t *testDriverBase) createGlobalIngressIP(egressIP *submarinerv1.GlobalIngressIP) {
-	test.CreateResource(t.globalIngressIPs, egressIP)
+func (t *testDriverBase) createGlobalIngressIP(ingressIP *submarinerv1.GlobalIngressIP) {
+	test.CreateResource(t.globalIngressIPs, ingressIP)
 }
 
 //nolint:unparam // `name` always receives `globalEgressIPName`
