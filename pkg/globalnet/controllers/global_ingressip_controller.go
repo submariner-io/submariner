@@ -167,8 +167,13 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 		service, exists, err := getService(serviceRef.Name, ingressIP.Namespace, c.services, c.scheme)
 		if err != nil || !exists {
 			_ = c.pool.Release(ips...)
+
 			key := fmt.Sprintf("%s/%s", ingressIP.Namespace, serviceRef.Name)
-			klog.Warningf("Exported Service %q does not exist yet - re-queueing", key)
+			if err != nil {
+				klog.Errorf("Error retrieving exported Service %q - re-queueing", key)
+			} else {
+				klog.Warningf("Exported Service %q does not exist yet - re-queueing", key)
+			}
 
 			return false
 		}
@@ -192,13 +197,12 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 		if err != nil {
 			_ = c.pool.Release(ips...)
 			key := fmt.Sprintf("%s/%s", internalService.Namespace, internalService.Name)
-			klog.Warningf("Failed to create the internal Service %q ", key)
+			klog.Errorf("Failed to create the internal Service %q ", key)
 
-			_ = c.pool.Release(ips...)
 			ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, &metav1.Condition{
 				Type:    string(submarinerv1.GlobalEgressIPAllocated),
 				Status:  metav1.ConditionFalse,
-				Reason:  "FailedToCreateInternalGlobalnetService",
+				Reason:  "InternalServiceCreationFailed",
 				Message: err.Error(),
 			})
 
