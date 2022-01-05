@@ -27,8 +27,8 @@ Submariner is a tool built to connect overlay networks of different Kubernetes c
 clusters that have enabled Flannel/Calico/Canal/Weave/OpenShiftSDN, Submariner should be compatible with most CNI cluster network
 providers, as it utilizes off-the-shelf components to establish encrypted tunnels between each Kubernetes cluster.
 
-Note that Submariner is in an early stage, and should not be used for production purposes. While we welcome usage and
-experimentation, it is quite possible that you could run into bugs.
+Note that Submariner is in an early stage, and while we welcome usage and experimentation, it is quite possible that you could run into
+bugs.
 
 Submariner is a Cloud Native Computing Foundation sandbox project.
 
