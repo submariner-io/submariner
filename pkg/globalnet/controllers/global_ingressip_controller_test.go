@@ -113,6 +113,10 @@ func testGlobalIngressIPCreatedClusterIPSvc(t *globalIngressIPControllerTestDriv
 		intSvc := t.awaitService(internalSvcName)
 		externalIP := intSvc.Spec.ExternalIPs[0]
 		Expect(externalIP).ToNot(BeEmpty())
+		finalizer := intSvc.GetFinalizers()[0]
+		Expect(finalizer).To(Equal(controllers.InternalServiceFinalizer))
+		gIP := intSvc.GetAnnotations()[controllers.GlobalIngressIP]
+		Expect(gIP).To(Equal(externalIP))
 	})
 
 	Context("with the IP pool exhausted", func() {
@@ -307,7 +311,7 @@ func testExistingGlobalIngressIPClusterIPSvc(t *globalIngressIPControllerTestDri
 			t.createGlobalIngressIP(existing)
 		})
 
-		It("should successfully create an internal submariner service", func() {
+		It("should successfully create an internal submariner service with valid configuration", func() {
 			internalSvcName := controllers.GetInternalSvcName(serviceName)
 			intSvc := t.awaitService(internalSvcName)
 			externalIP := intSvc.Spec.ExternalIPs[0]

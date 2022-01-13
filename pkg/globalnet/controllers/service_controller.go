@@ -105,6 +105,28 @@ func (c *serviceController) process(from runtime.Object, numRequeues int, op syn
 		return c.onDelete(service)
 	}
 
+	if op == syncer.Update {
+		return c.onUpdate(service)
+	}
+
+	return nil, false
+}
+
+func (c *serviceController) onUpdate(service *corev1.Service) (runtime.Object, bool) {
+	key, _ := cache.MetaNamespaceKeyFunc(service)
+
+	// Log an error if the external-ip of the Globalnet internal service is modified.
+	origService := service.GetLabels()[InternalServiceLabel]
+	if origService != "" {
+		if service.Spec.ExternalIPs[0] != "" {
+			globalIPFromAnnotation := service.GetAnnotations()[GlobalIngressIP]
+			if globalIPFromAnnotation != service.Spec.ExternalIPs[0] {
+				klog.Errorf("ExternalIP %q of Globalnet internal service %q does not match with allocated globalIP %q",
+					service.Spec.ExternalIPs[0], key, globalIPFromAnnotation)
+			}
+		}
+	}
+
 	return nil, false
 }
 
@@ -117,11 +139,6 @@ func (c *serviceController) onDelete(service *corev1.Service) (runtime.Object, b
 
 	if service.Spec.ClusterIP == corev1.ClusterIPNone {
 		return nil, false
-	}
-
-	origService := service.GetLabels()[ServiceRefLabel]
-	if origService != "" {
-		service.Name = origService
 	}
 
 	return &submarinerv1.GlobalIngressIP{

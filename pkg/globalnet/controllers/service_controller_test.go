@@ -50,28 +50,6 @@ var _ = Describe("Service controller", func() {
 		})
 	})
 
-	When("an internal Globalnet cluster IP Service is deleted", func() {
-		BeforeEach(func() {
-			t.createServiceExport(t.createService(newClusterIPService()))
-			internalSvc := newGlobalnetInternalService(controllers.GetInternalSvcName(serviceName))
-			internalSvc.Labels = map[string]string{
-				controllers.ServiceRefLabel: serviceName,
-			}
-			t.createService(internalSvc)
-			t.createGlobalIngressIP(&submarinerv1.GlobalIngressIP{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: serviceName,
-				},
-			})
-		})
-
-		It("should delete the GlobalIngressIP", func() {
-			Expect(t.services.Delete(context.TODO(), controllers.GetInternalSvcName(serviceName),
-				metav1.DeleteOptions{})).To(Succeed())
-			t.awaitNoGlobalIngressIP(serviceName)
-		})
-	})
-
 	When("an exported headless Service is deleted", func() {
 		BeforeEach(func() {
 			t.createServiceExport(t.createService(newHeadlessService()))

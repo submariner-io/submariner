@@ -24,6 +24,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
+	"github.com/submariner-io/admiral/pkg/finalizer"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -32,6 +34,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
 )
@@ -183,7 +186,11 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 				Name:      GetInternalSvcName(service.Name),
 				Namespace: service.Namespace,
 				Labels: map[string]string{
-					ServiceRefLabel: service.Name,
+					InternalServiceLabel: service.Name,
+				},
+				Finalizers: []string{InternalServiceFinalizer},
+				Annotations: map[string]string{
+					GlobalIngressIP: ips[0],
 				},
 			},
 		}
@@ -264,17 +271,30 @@ func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngre
 	key, _ := cache.MetaNamespaceKeyFunc(ingressIP)
 
 	if ingressIP.Spec.Target == submarinerv1.ClusterIPService {
-		intSvc := GetInternalSvcName(ingressIP.Spec.ServiceRef.Name)
-		klog.Infof("Deleting the internal service %q created by Globalnet controller", intSvc)
+		intSvcName := GetInternalSvcName(ingressIP.Spec.ServiceRef.Name)
+		klog.Infof("Deleting the internal service %q created by Globalnet controller", intSvcName)
 
-		err := deleteService(ingressIP.Namespace, intSvc, c.services)
+		intSvc, exists, err := getService(intSvcName, ingressIP.Namespace, c.services, c.scheme)
 		if err != nil {
-			if shouldRequeue(numRequeues) {
-				return true
+			klog.Errorf("Error retrieving the internal service created by Globalnet controller %q: %v", key, err)
+			return shouldRequeue(numRequeues)
+		}
+
+		if exists {
+			if err = finalizer.Remove(context.TODO(), ForService(c.services, ingressIP.Namespace), intSvc,
+				InternalServiceFinalizer); err != nil {
+				klog.Errorf("Error while removing the finalizer from service %q: %v", key, err)
+				return shouldRequeue(numRequeues)
+			}
+
+			err = deleteService(ingressIP.Namespace, intSvcName, c.services)
+			if err != nil {
+				klog.Errorf("Error while deleting the internal %q: %v", key, err)
+				return shouldRequeue(numRequeues)
 			}
 		}
 
-		if err := c.pool.Release(ingressIP.Status.AllocatedIP); err != nil {
+		if err = c.pool.Release(ingressIP.Status.AllocatedIP); err != nil {
 			klog.Errorf("Error while releasing the global IPs for %q: %v", key, err)
 		}
 
@@ -308,10 +328,47 @@ func (c *globalIngressIPController) ensureInternalServiceExists(ingressIP *subma
 	}
 
 	if service.Spec.ExternalIPs[0] != ingressIP.Status.AllocatedIP {
+		// A user is ideally not supposed to modify the external-ip of the Globalnet internal service, but
+		// in-case its done accidentally, as part of controller start/re-start scenario, this code will fix
+		// the issue by deleting and re-creating the internal service with valid configuration.
+		if err := finalizer.Remove(context.TODO(), ForService(c.services, ingressIP.Namespace), service,
+			InternalServiceFinalizer); err != nil {
+			return fmt.Errorf("error while removing the finalizer from globalnet internal service %q", key)
+		}
+
 		_ = deleteService(ingressIP.Namespace, internalSvc, c.services)
 
 		return fmt.Errorf("globalIP assigned to %q does not match with Internal Service ExternalIP", key)
 	}
 
 	return nil
+}
+
+func ForService(client dynamic.NamespaceableResourceInterface, namespace string) resource.Interface {
+	return &resource.InterfaceFuncs{
+		GetFunc: func(ctx context.Context, name string, options metav1.GetOptions) (runtime.Object, error) {
+			// nolint:wrapcheck  // Let the caller wrap it
+			return client.Namespace(namespace).Get(ctx, name, options)
+		},
+		CreateFunc: func(ctx context.Context, obj runtime.Object, options metav1.CreateOptions) (runtime.Object, error) {
+			svc, err := resource.ToUnstructured(obj)
+			if err != nil {
+				return nil, err // nolint:wrapcheck  // Let the caller wrap it
+			}
+			// nolint:wrapcheck  // Let the caller wrap it
+			return client.Namespace(namespace).Create(ctx, svc, options)
+		},
+		UpdateFunc: func(ctx context.Context, obj runtime.Object, options metav1.UpdateOptions) (runtime.Object, error) {
+			svc, err := resource.ToUnstructured(obj)
+			if err != nil {
+				return nil, err // nolint:wrapcheck  // Let the caller wrap it
+			}
+			// nolint:wrapcheck  // Let the caller wrap it
+			return client.Namespace(namespace).Update(ctx, svc, options)
+		},
+		DeleteFunc: func(ctx context.Context, name string, options metav1.DeleteOptions) error {
+			// nolint:wrapcheck  // Let the caller wrap it
+			return client.Namespace(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+		},
+	}
 }
