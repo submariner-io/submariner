@@ -85,22 +85,6 @@ func GetLocalIPForDestination(dst string) string {
 	return localAddr.IP.String()
 }
 
-func FlattenColors(colorCodes []string) string {
-	if len(colorCodes) == 0 {
-		return ""
-	}
-
-	flattenedColors := colorCodes[0]
-
-	for k, v := range colorCodes {
-		if k != 0 {
-			flattenedColors = flattenedColors + "," + v
-		}
-	}
-
-	return flattenedColors
-}
-
 func GetClusterIDFromCableName(cableName string) string {
 	// length is 11
 	// 0           1    2   3    4    5       6   7  8 9  10
