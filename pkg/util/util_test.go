@@ -29,8 +29,6 @@ import (
 var _ = Describe("Util", func() {
 	Describe("Function ParseSecure", testParseSecure)
 
-	Describe("Function FlattenColors", testFlattenColors)
-
 	Describe("Function GetClusterIDFromCableName", testGetClusterIDFromCableName)
 
 	Describe("Function GetEndpointCRDName", testGetEndpointCRDName)
@@ -58,26 +56,6 @@ func testParseSecure() {
 		It("should return an error", func() {
 			_, err := util.ParseSecure("InvalidToken")
 			Expect(err).To(HaveOccurred())
-		})
-	})
-}
-
-func testFlattenColors() {
-	Context("with a single element", func() {
-		It("should return the element", func() {
-			Expect(util.FlattenColors([]string{"blue"})).To(Equal("blue"))
-		})
-	})
-
-	Context("with multiple elements", func() {
-		It("should return a comma-separated string containing all the elements", func() {
-			Expect(util.FlattenColors([]string{"red", "white", "blue"})).To(Equal("red,white,blue"))
-		})
-	})
-
-	Context("with no elements", func() {
-		It("should return an empty string", func() {
-			Expect(util.FlattenColors([]string{})).To(Equal(""))
 		})
 	})
 }
