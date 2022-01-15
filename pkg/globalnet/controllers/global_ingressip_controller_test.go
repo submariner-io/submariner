@@ -113,8 +113,10 @@ func testGlobalIngressIPCreatedClusterIPSvc(t *globalIngressIPControllerTestDriv
 		intSvc := t.awaitService(internalSvcName)
 		externalIP := intSvc.Spec.ExternalIPs[0]
 		Expect(externalIP).ToNot(BeEmpty())
+
 		finalizer := intSvc.GetFinalizers()[0]
 		Expect(finalizer).To(Equal(controllers.InternalServiceFinalizer))
+
 		gIP := intSvc.GetAnnotations()[controllers.GlobalIngressIP]
 		Expect(gIP).To(Equal(externalIP))
 	})

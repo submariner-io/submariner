@@ -118,7 +118,9 @@ func (c *serviceController) onUpdate(service *corev1.Service) (runtime.Object, b
 	// Log an error if the external-ip of the Globalnet internal service is modified.
 	origService := service.GetLabels()[InternalServiceLabel]
 	if origService != "" {
-		if service.Spec.ExternalIPs[0] != "" {
+		if len(service.Spec.ExternalIPs) == 0 {
+			klog.Errorf("The ExternalIP for Globalnet internal service %q is missing", key)
+		} else {
 			globalIPFromAnnotation := service.GetAnnotations()[GlobalIngressIP]
 			if globalIPFromAnnotation != service.Spec.ExternalIPs[0] {
 				klog.Errorf("ExternalIP %q of Globalnet internal service %q does not match with allocated globalIP %q",

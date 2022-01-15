@@ -34,7 +34,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
 )
@@ -272,7 +271,7 @@ func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngre
 
 	if ingressIP.Spec.Target == submarinerv1.ClusterIPService {
 		intSvcName := GetInternalSvcName(ingressIP.Spec.ServiceRef.Name)
-		klog.Infof("Deleting the internal service %q created by Globalnet controller", intSvcName)
+		klog.Infof("Deleting the service %q/%q created by Globalnet controller", ingressIP.Namespace, intSvcName)
 
 		intSvc, exists, err := getService(intSvcName, ingressIP.Namespace, c.services, c.scheme)
 		if err != nil {
@@ -281,7 +280,7 @@ func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngre
 		}
 
 		if exists {
-			if err = finalizer.Remove(context.TODO(), ForService(c.services, ingressIP.Namespace), intSvc,
+			if err = finalizer.Remove(context.TODO(), resource.ForDynamic(c.services.Namespace(ingressIP.Namespace)), intSvc,
 				InternalServiceFinalizer); err != nil {
 				klog.Errorf("Error while removing the finalizer from service %q: %v", key, err)
 				return shouldRequeue(numRequeues)
@@ -331,7 +330,7 @@ func (c *globalIngressIPController) ensureInternalServiceExists(ingressIP *subma
 		// A user is ideally not supposed to modify the external-ip of the Globalnet internal service, but
 		// in-case its done accidentally, as part of controller start/re-start scenario, this code will fix
 		// the issue by deleting and re-creating the internal service with valid configuration.
-		if err := finalizer.Remove(context.TODO(), ForService(c.services, ingressIP.Namespace), service,
+		if err := finalizer.Remove(context.TODO(), resource.ForDynamic(c.services.Namespace(ingressIP.Namespace)), service,
 			InternalServiceFinalizer); err != nil {
 			return fmt.Errorf("error while removing the finalizer from globalnet internal service %q", key)
 		}
@@ -342,33 +341,4 @@ func (c *globalIngressIPController) ensureInternalServiceExists(ingressIP *subma
 	}
 
 	return nil
-}
-
-func ForService(client dynamic.NamespaceableResourceInterface, namespace string) resource.Interface {
-	return &resource.InterfaceFuncs{
-		GetFunc: func(ctx context.Context, name string, options metav1.GetOptions) (runtime.Object, error) {
-			// nolint:wrapcheck  // Let the caller wrap it
-			return client.Namespace(namespace).Get(ctx, name, options)
-		},
-		CreateFunc: func(ctx context.Context, obj runtime.Object, options metav1.CreateOptions) (runtime.Object, error) {
-			svc, err := resource.ToUnstructured(obj)
-			if err != nil {
-				return nil, err // nolint:wrapcheck  // Let the caller wrap it
-			}
-			// nolint:wrapcheck  // Let the caller wrap it
-			return client.Namespace(namespace).Create(ctx, svc, options)
-		},
-		UpdateFunc: func(ctx context.Context, obj runtime.Object, options metav1.UpdateOptions) (runtime.Object, error) {
-			svc, err := resource.ToUnstructured(obj)
-			if err != nil {
-				return nil, err // nolint:wrapcheck  // Let the caller wrap it
-			}
-			// nolint:wrapcheck  // Let the caller wrap it
-			return client.Namespace(namespace).Update(ctx, svc, options)
-		},
-		DeleteFunc: func(ctx context.Context, name string, options metav1.DeleteOptions) error {
-			// nolint:wrapcheck  // Let the caller wrap it
-			return client.Namespace(namespace).Delete(ctx, name, metav1.DeleteOptions{})
-		},
-	}
 }

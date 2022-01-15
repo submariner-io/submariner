@@ -244,11 +244,11 @@ func deleteService(namespace, name string,
 	client dynamic.NamespaceableResourceInterface) error {
 	err := client.Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if apierrors.IsNotFound(err) {
-		klog.Warningf("Could not find internal Service %s/%s: %v", namespace, name, err)
+		klog.Warningf("Could not find Service %s/%s to delete", namespace, name)
 		return nil
 	}
 
-	return errors.Wrapf(err, "error deleting the internal Service %s/%s", namespace, name)
+	return errors.Wrapf(err, "error deleting Service %s/%s", namespace, name)
 }
 
 func GetInternalSvcName(name string) string {
