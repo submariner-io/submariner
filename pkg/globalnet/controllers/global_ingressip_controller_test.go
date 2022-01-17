@@ -116,9 +116,6 @@ func testGlobalIngressIPCreatedClusterIPSvc(t *globalIngressIPControllerTestDriv
 
 		finalizer := intSvc.GetFinalizers()[0]
 		Expect(finalizer).To(Equal(controllers.InternalServiceFinalizer))
-
-		gIP := intSvc.GetAnnotations()[controllers.GlobalIngressIP]
-		Expect(gIP).To(Equal(externalIP))
 	})
 
 	Context("with the IP pool exhausted", func() {

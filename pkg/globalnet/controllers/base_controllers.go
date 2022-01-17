@@ -254,7 +254,7 @@ func deleteService(namespace, name string,
 func GetInternalSvcName(name string) string {
 	hash := sha256.Sum256([]byte(name))
 	encoded := base32.StdEncoding.EncodeToString(hash[:])
-	svcName := globalnetInternalServicePrefix + encoded[:32]
+	svcName := InternalServicePrefix + encoded[:32]
 
 	return strings.ToLower(svcName)
 }

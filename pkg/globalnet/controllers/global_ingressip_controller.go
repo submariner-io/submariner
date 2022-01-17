@@ -188,9 +188,6 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 					InternalServiceLabel: service.Name,
 				},
 				Finalizers: []string{InternalServiceFinalizer},
-				Annotations: map[string]string{
-					GlobalIngressIP: ips[0],
-				},
 			},
 		}
 
@@ -283,13 +280,13 @@ func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngre
 			if err = finalizer.Remove(context.TODO(), resource.ForDynamic(c.services.Namespace(ingressIP.Namespace)), intSvc,
 				InternalServiceFinalizer); err != nil {
 				klog.Errorf("Error while removing the finalizer from service %q: %v", key, err)
-				return shouldRequeue(numRequeues)
+				return true
 			}
 
 			err = deleteService(ingressIP.Namespace, intSvcName, c.services)
 			if err != nil {
 				klog.Errorf("Error while deleting the internal %q: %v", key, err)
-				return shouldRequeue(numRequeues)
+				return true
 			}
 		}
 
@@ -326,7 +323,7 @@ func (c *globalIngressIPController) ensureInternalServiceExists(ingressIP *subma
 		return fmt.Errorf("internal service created by Globalnet controller %q does not exist", key)
 	}
 
-	if service.Spec.ExternalIPs[0] != ingressIP.Status.AllocatedIP {
+	if len(service.Spec.ExternalIPs) == 0 || service.Spec.ExternalIPs[0] != ingressIP.Status.AllocatedIP {
 		// A user is ideally not supposed to modify the external-ip of the Globalnet internal service, but
 		// in-case its done accidentally, as part of controller start/re-start scenario, this code will fix
 		// the issue by deleting and re-creating the internal service with valid configuration.

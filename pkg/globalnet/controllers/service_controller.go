@@ -105,30 +105,6 @@ func (c *serviceController) process(from runtime.Object, numRequeues int, op syn
 		return c.onDelete(service)
 	}
 
-	if op == syncer.Update {
-		return c.onUpdate(service)
-	}
-
-	return nil, false
-}
-
-func (c *serviceController) onUpdate(service *corev1.Service) (runtime.Object, bool) {
-	key, _ := cache.MetaNamespaceKeyFunc(service)
-
-	// Log an error if the external-ip of the Globalnet internal service is modified.
-	origService := service.GetLabels()[InternalServiceLabel]
-	if origService != "" {
-		if len(service.Spec.ExternalIPs) == 0 {
-			klog.Errorf("The ExternalIP for Globalnet internal service %q is missing", key)
-		} else {
-			globalIPFromAnnotation := service.GetAnnotations()[GlobalIngressIP]
-			if globalIPFromAnnotation != service.Spec.ExternalIPs[0] {
-				klog.Errorf("ExternalIP %q of Globalnet internal service %q does not match with allocated globalIP %q",
-					service.Spec.ExternalIPs[0], key, globalIPFromAnnotation)
-			}
-		}
-	}
-
 	return nil, false
 }
 

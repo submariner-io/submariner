@@ -46,8 +46,8 @@ const (
 
 	ServiceRefLabel = "submariner.io/serviceRef"
 
-	// globalnetInternalServicePrefix is a prefix used for internal services.
-	globalnetInternalServicePrefix = "submariner-"
+	// InternalServicePrefix is a prefix used for internal services.
+	InternalServicePrefix = "submariner-"
 
 	// InternalServiceLabel is a label applied on the internal service created by Globalnet controller and
 	// it points to the exported service.
@@ -56,10 +56,6 @@ const (
 	// InternalServiceFinalizer is applied on the internal services created by Globalnet controller
 	// to protect them from accidental deletion.
 	InternalServiceFinalizer = "submariner.io/globalnet-internal-service"
-
-	// GlobalIngressIP is stored as an annotation on the internal service and it will be used
-	// to validate if user manually updates the external-ip of the service.
-	GlobalIngressIP = "submariner.io/globalip"
 
 	// The prefix used for the ipset chains created by Globalnet pod.
 	IPSetPrefix = "SM-GN-"
