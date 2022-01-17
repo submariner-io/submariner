@@ -155,7 +155,7 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 
 		prevTimestamp := i.installedCables[active.Endpoint.CableName]
 
-		klog.V(log.DEBUG).Infof("Found a pre-existing cable %q with timestamp %q that belongs to this cluster %s",
+		klog.V(log.TRACE).Infof("Found a pre-existing cable %q with timestamp %q that belongs to this cluster %s",
 			active.Endpoint.CableName, prevTimestamp, endpoint.Spec.ClusterID)
 
 		if endpoint.CreationTimestamp.Before(&prevTimestamp) {
@@ -169,7 +169,7 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 			// config has changed.
 			if active.UsingIP == rnat.UseIP && active.UsingNAT == rnat.UseNAT &&
 				reflect.DeepEqual(active.Endpoint.BackendConfig, endpoint.Spec.BackendConfig) {
-				klog.V(log.DEBUG).Infof("Connection info (IP: %s, NAT: %v, BackendConfig: %v) for cable %q is unchanged"+
+				klog.V(log.TRACE).Infof("Connection info (IP: %s, NAT: %v, BackendConfig: %v) for cable %q is unchanged"+
 					" - not re-installing", active.UsingIP, active.UsingNAT, active.Endpoint.BackendConfig, active.Endpoint.CableName)
 				return nil
 			}
@@ -203,7 +203,7 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 
 func (i *engine) InstallCable(endpoint *v1.Endpoint) error {
 	if endpoint.Spec.ClusterID == i.localCluster.ID {
-		klog.V(log.DEBUG).Infof("Not installing cable for local cluster")
+		klog.V(log.TRACE).Infof("Not installing cable for local cluster")
 		return nil
 	}
 
