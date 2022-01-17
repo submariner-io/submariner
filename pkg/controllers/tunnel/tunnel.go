@@ -72,7 +72,7 @@ func StartController(engine cableengine.Engine, namespace string, config *watche
 func (c *controller) handleCreatedOrUpdatedEndpoint(obj runtime.Object, numRequeues int) bool {
 	endpoint := obj.(*v1.Endpoint)
 
-	klog.V(log.DEBUG).Infof("Tunnel controller processing added or updated submariner Endpoint object: %#v", endpoint)
+	klog.V(log.TRACE).Infof("Tunnel controller processing added or updated submariner Endpoint object: %#v", endpoint)
 
 	err := c.engine.InstallCable(endpoint)
 	if err != nil {
