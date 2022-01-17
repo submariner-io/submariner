@@ -73,10 +73,6 @@ func main() {
 		klog.Fatalf("Error building submariner clientset: %s", err.Error())
 	}
 
-	if err = annotateNode(env.ClusterCidr, cfg); err != nil {
-		klog.Errorf("Error while annotating the node: %s", err.Error())
-	}
-
 	np := os.Getenv("SUBMARINER_NETWORKPLUGIN")
 
 	if np == "" {
@@ -93,6 +89,18 @@ func main() {
 		mtu.NewMTUHandler(),
 	); err != nil {
 		klog.Fatalf("Error registering the handlers: %s", err.Error())
+	}
+
+	if env.Uninstall {
+		if err := registry.StopHandlers(true); err != nil {
+			klog.Warningf("Error stopping handlers: %v", err)
+		}
+
+		return
+	}
+
+	if err = annotateNode(env.ClusterCidr, cfg); err != nil {
+		klog.Errorf("Error while annotating the node: %s", err.Error())
 	}
 
 	ctl, err := controller.New(&controller.Config{

@@ -73,6 +73,7 @@ type Specification struct {
 	ClusterID  string
 	Namespace  string
 	GlobalCIDR []string
+	Uninstall  bool
 }
 
 type baseController struct {

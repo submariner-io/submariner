@@ -44,6 +44,7 @@ type SubmarinerSpecification struct {
 	Debug                         bool
 	NATEnabled                    bool
 	HealthCheckEnabled            bool `default:"true"`
+	Uninstall                     bool
 	HealthCheckInterval           uint
 	HealthCheckMaxPacketLossCount uint
 }
