@@ -40,7 +40,7 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:MinLength=1
 	ClusterID   string   `json:"cluster_id"` // perhaps this could just be a hash of the name...?
-	ColorCodes  []string `json:"color_codes"`
+	ColorCodes  []string `json:"color_codes,omitempty"`
 	ServiceCIDR []string `json:"service_cidr"`
 	ClusterCIDR []string `json:"cluster_cidr"`
 	GlobalCIDR  []string `json:"global_cidr"`

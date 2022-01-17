@@ -39,7 +39,6 @@ import (
 )
 
 type DatastoreSyncer struct {
-	colorCodes     []string
 	localCluster   types.SubmarinerCluster
 	localEndpoint  types.SubmarinerEndpoint
 	localNodeName  string
@@ -48,12 +47,11 @@ type DatastoreSyncer struct {
 }
 
 func New(syncerConfig *broker.SyncerConfig, localCluster *types.SubmarinerCluster,
-	localEndpoint *types.SubmarinerEndpoint, colorcodes []string) *DatastoreSyncer {
+	localEndpoint *types.SubmarinerEndpoint) *DatastoreSyncer {
 	// We'll panic if syncerConfig, localCluster or localEndpoint are nil, this is intentional
 	syncerConfig.LocalClusterID = localCluster.Spec.ClusterID
 
 	return &DatastoreSyncer{
-		colorCodes:    colorcodes,
 		localCluster:  *localCluster,
 		localEndpoint: *localEndpoint,
 		syncerConfig:  *syncerConfig,

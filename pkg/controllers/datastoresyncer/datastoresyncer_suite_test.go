@@ -156,7 +156,7 @@ func (t *testDriver) run() {
 		BrokerNamespace: brokerNamespace,
 		RestMapper:      t.restMapper,
 		Scheme:          t.syncerScheme,
-	}, t.localCluster, t.localEndpoint, []string{})
+	}, t.localCluster, t.localEndpoint)
 
 	go func() {
 		t.startCompleted <- t.syncer.Start(t.stopCh)

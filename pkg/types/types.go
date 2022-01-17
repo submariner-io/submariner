@@ -33,7 +33,6 @@ type SubmarinerEndpoint struct {
 
 type SubmarinerSpecification struct {
 	ClusterCidr                   []string
-	ColorCodes                    []string
 	GlobalCidr                    []string
 	ServiceCidr                   []string
 	Broker                        string
