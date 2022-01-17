@@ -23,4 +23,5 @@ type Specification struct {
 	Namespace   string
 	ClusterCidr []string
 	ServiceCidr []string
+	Uninstall   bool
 }

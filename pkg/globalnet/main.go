@@ -55,6 +55,12 @@ func main() {
 		klog.Fatal(err)
 	}
 
+	if spec.Uninstall {
+		klog.Info("Uninstalling submariner-globalnet")
+		// TODO
+		return
+	}
+
 	klog.Info("Starting submariner-globalnet", spec)
 
 	// set up signals so we handle the first shutdown signal gracefully

@@ -67,6 +67,14 @@ func main() {
 		klog.Fatalf("Error registering the handlers: %s", err.Error())
 	}
 
+	if env.Uninstall {
+		if err := registry.StopHandlers(true); err != nil {
+			klog.Warningf("Error stopping handlers: %v", err)
+		}
+
+		return
+	}
+
 	ctl, err := controller.New(&controller.Config{
 		Registry:   registry,
 		MasterURL:  masterURL,
