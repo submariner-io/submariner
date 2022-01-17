@@ -212,7 +212,7 @@ func retrieveActiveConnectionStats() (map[string]int, map[string]int, error) {
 		}
 	}
 
-	return activeConnectionsRx, activeConnectionsTx, nil
+	return activeConnectionsRx, activeConnectionsTx, errors.Wrap(cmd.Wait(), "error waiting for whack to complete")
 }
 
 func (i *libreswan) refreshConnectionStatus() error {
