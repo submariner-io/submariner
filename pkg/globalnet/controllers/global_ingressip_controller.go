@@ -30,6 +30,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
+	"github.com/submariner-io/submariner/pkg/globalnet/metrics"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -94,7 +95,7 @@ func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipa
 				return controller.iptIface.AddEgressRulesForHeadlessSVCPods(key, target, reservedIPs[0], globalNetIPTableMark)
 			}
 			return nil
-		})
+		}, metrics.RecordAllocateGlobalIngressIPs)
 
 		if err != nil {
 			return nil, err
@@ -163,12 +164,15 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 		return true
 	}
 
+	metrics.RecordAllocateGlobalIngressIPs(c.pool.GetCider(), 1)
+
 	if ingressIP.Spec.Target == submarinerv1.ClusterIPService {
 		serviceRef := ingressIP.Spec.ServiceRef
 
 		service, exists, err := getService(serviceRef.Name, ingressIP.Namespace, c.services, c.scheme)
 		if err != nil || !exists {
 			_ = c.pool.Release(ips...)
+			metrics.RecordDeallocateGlobalIngressIPs(c.pool.GetCider(), 1)
 
 			key := fmt.Sprintf("%s/%s", ingressIP.Namespace, serviceRef.Name)
 			if err != nil {
@@ -201,6 +205,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 			_ = c.pool.Release(ips...)
 			key := fmt.Sprintf("%s/%s", internalService.Namespace, internalService.Name)
 			klog.Errorf("Failed to create the internal Service %q ", key)
+			metrics.RecordDeallocateGlobalIngressIPs(c.pool.GetCider(), 1)
 
 			ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, &metav1.Condition{
 				Type:    string(submarinerv1.GlobalEgressIPAllocated),
@@ -215,6 +220,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 		podIP := ingressIP.GetAnnotations()[headlessSvcPodIP]
 		if podIP == "" {
 			_ = c.pool.Release(ips...)
+			metrics.RecordDeallocateGlobalIngressIPs(c.pool.GetCider(), 1)
 
 			klog.Warningf("%q annotation is missing on %q", headlessSvcPodIP, key)
 
@@ -235,6 +241,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 
 		if err != nil {
 			_ = c.pool.Release(ips...)
+			metrics.RecordDeallocateGlobalIngressIPs(c.pool.GetCider(), 1)
 			ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, &metav1.Condition{
 				Type:    string(submarinerv1.GlobalEgressIPAllocated),
 				Status:  metav1.ConditionFalse,
@@ -310,7 +317,7 @@ func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngre
 		}
 
 		return nil
-	}, ingressIP.Status.AllocatedIP)
+	}, metrics.RecordAllocateGlobalIngressIPs)
 }
 
 func (c *globalIngressIPController) ensureInternalServiceExists(ingressIP *submarinerv1.GlobalIngressIP) error {
