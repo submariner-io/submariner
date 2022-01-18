@@ -30,6 +30,7 @@ import (
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
+	"github.com/submariner-io/submariner/pkg/globalnet/metrics"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -90,7 +91,7 @@ func NewClusterGlobalEgressIPController(config *syncer.ResourceSyncerConfig, loc
 	if obj != nil {
 		err := controller.reserveAllocatedIPs(federator, obj, func(reservedIPs []string) error {
 			return controller.programClusterGlobalEgressRules(reservedIPs)
-		})
+		}, metrics.RecordAllocateClusterGlobalEgressIPs)
 		if err != nil {
 			return nil, err
 		}
@@ -189,7 +190,8 @@ func (c *clusterGlobalEgressIPController) onCreateOrUpdate(key string, numberOfI
 		return false
 	}
 
-	if requeue := c.flushRulesAndReleaseIPs(key, numRequeues, c.flushClusterGlobalEgressRules, status.AllocatedIPs...); requeue {
+	if requeue := c.flushRulesAndReleaseIPs(key, numRequeues, c.flushClusterGlobalEgressRules, metrics.RecordDeallocateClusterGlobalEgressIPs,
+		status.AllocatedIPs...); requeue {
 		return true
 	}
 
@@ -197,7 +199,8 @@ func (c *clusterGlobalEgressIPController) onCreateOrUpdate(key string, numberOfI
 }
 
 func (c *clusterGlobalEgressIPController) onDelete(key string, status *submarinerv1.GlobalEgressIPStatus, numRequeues int) bool {
-	return c.flushRulesAndReleaseIPs(key, numRequeues, c.flushClusterGlobalEgressRules, status.AllocatedIPs...)
+	return c.flushRulesAndReleaseIPs(key, numRequeues, c.flushClusterGlobalEgressRules, metrics.RecordDeallocateClusterGlobalEgressIPs,
+		status.AllocatedIPs...)
 }
 
 func (c *clusterGlobalEgressIPController) flushClusterGlobalEgressRules(allocatedIPs []string) error {
@@ -254,6 +257,8 @@ func (c *clusterGlobalEgressIPController) allocateGlobalIPs(key string, numberOf
 		return true
 	}
 
+	metrics.RecordAllocateClusterGlobalEgressIPs(c.pool.GetCider(), numberOfIPs)
+
 	err = c.programClusterGlobalEgressRules(allocatedIPs)
 	if err != nil {
 		klog.Errorf("Error programming egress IP table rules for %q: %v", key, err)
@@ -266,6 +271,7 @@ func (c *clusterGlobalEgressIPController) allocateGlobalIPs(key string, numberOf
 		})
 
 		_ = c.pool.Release(allocatedIPs...)
+		metrics.RecordDeallocateClusterGlobalEgressIPs(c.pool.GetCider(), numberOfIPs)
 
 		return true
 	}

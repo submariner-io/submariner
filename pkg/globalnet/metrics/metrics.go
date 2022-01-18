@@ -43,10 +43,38 @@ var (
 			cidrLabel,
 		},
 	)
+	globalEgressIPsAllocatedGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "submariner_global_Egress_IP_allocated",
+			Help: "Count of global Egress IPs allocated for Pods/Services per CIDR",
+		},
+		[]string{
+			cidrLabel,
+		},
+	)
+	clusterGlobalEgressIPsAllocatedGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "submariner_cluster_global_Egress_IP_allocated",
+			Help: "Count of global Egress IPs allocated for clusters per CIDR",
+		},
+		[]string{
+			cidrLabel,
+		},
+	)
+	globalIngressIPsAllocatedGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "submariner_global_Ingress_IP_allocated",
+			Help: "Count of global Ingress IPs allocated for Pods/Services per CIDR",
+		},
+		[]string{
+			cidrLabel,
+		},
+	)
 )
 
 func init() {
-	prometheus.MustRegister(globalIPsAvailabilityGauge, globalIPsAllocatedGauge)
+	prometheus.MustRegister(globalIPsAvailabilityGauge, globalIPsAllocatedGauge, globalEgressIPsAllocatedGauge,
+		clusterGlobalEgressIPsAllocatedGauge, globalIngressIPsAllocatedGauge)
 }
 
 func RecordAllocateGlobalIP(cidr string) {
@@ -59,9 +87,32 @@ func RecordAllocateGlobalIPs(cidr string, count int) {
 	globalIPsAvailabilityGauge.With(prometheus.Labels{cidrLabel: cidr}).Sub(float64(count))
 }
 
+func RecordAllocateGlobalEgressIPs(cidr string, count int) {
+	globalEgressIPsAllocatedGauge.With(prometheus.Labels{cidrLabel: cidr}).Add(float64(count))
+}
+
+func RecordAllocateClusterGlobalEgressIPs(cidr string, count int) {
+	clusterGlobalEgressIPsAllocatedGauge.With(prometheus.Labels{cidrLabel: cidr}).Add(float64(count))
+}
+
+func RecordAllocateGlobalIngressIPs(cidr string, count int) {
+	globalIngressIPsAllocatedGauge.With(prometheus.Labels{cidrLabel: cidr}).Add(float64(count))
+}
+
 func RecordDeallocateGlobalIP(cidr string) {
 	globalIPsAllocatedGauge.With(prometheus.Labels{cidrLabel: cidr}).Dec()
-	globalIPsAvailabilityGauge.With(prometheus.Labels{cidrLabel: cidr}).Inc()
+}
+
+func RecordDeallocateGlobalEgressIPs(cidr string, count int) {
+	globalEgressIPsAllocatedGauge.With(prometheus.Labels{cidrLabel: cidr}).Sub(float64(count))
+}
+
+func RecordDeallocateClusterGlobalEgressIPs(cidr string, count int) {
+	clusterGlobalEgressIPsAllocatedGauge.With(prometheus.Labels{cidrLabel: cidr}).Sub(float64(count))
+}
+
+func RecordDeallocateGlobalIngressIPs(cidr string, count int) {
+	globalIngressIPsAllocatedGauge.With(prometheus.Labels{cidrLabel: cidr}).Sub(float64(count))
 }
 
 func RecordAvailability(cidr string, count int) {

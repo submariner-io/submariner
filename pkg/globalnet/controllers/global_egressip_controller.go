@@ -31,6 +31,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
+	"github.com/submariner-io/submariner/pkg/globalnet/metrics"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	"github.com/submariner-io/submariner/pkg/ipset"
 	corev1 "k8s.io/api/core/v1"
@@ -86,7 +87,7 @@ func NewGlobalEgressIPController(config *syncer.ResourceSyncerConfig, pool *ipam
 			_ = runtime.DefaultUnstructuredConverter.FromUnstructured(specObj.(map[string]interface{}), spec)
 			key, _ := cache.MetaNamespaceKeyFunc(&list.Items[i])
 			return controller.programGlobalEgressRules(key, reservedIPs, spec.PodSelector, controller.newNamedIPSet(key))
-		})
+		}, metrics.RecordAllocateGlobalEgressIPs)
 
 		if err != nil {
 			return nil, err
@@ -226,6 +227,8 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 		return true
 	}
 
+	metrics.RecordAllocateGlobalEgressIPs(c.pool.GetCider(), numberOfIPs)
+
 	err = c.programGlobalEgressRules(key, allocatedIPs, globalEgressIP.Spec.PodSelector, namedIPSet)
 	if err != nil {
 		klog.Errorf("Error programming egress IP table rules for %q: %v", key, err)
@@ -238,6 +241,7 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 		})
 
 		_ = c.pool.Release(allocatedIPs...)
+		metrics.RecordDeallocateGlobalEgressIPs(c.pool.GetCider(), numberOfIPs)
 
 		return true
 	}
@@ -359,7 +363,7 @@ func (c *globalEgressIPController) flushGlobalEgressRulesAndReleaseIPs(key, ipSe
 		}
 
 		return c.iptIface.RemoveEgressRulesForNamespace(key, ipSetName, getTargetSNATIPaddress(allocatedIPs), globalNetIPTableMark)
-	}, globalEgressIP.Status.AllocatedIPs...)
+	}, metrics.RecordDeallocateGlobalEgressIPs, globalEgressIP.Status.AllocatedIPs...)
 }
 
 func (c *globalEgressIPController) newNamedIPSet(key string) ipset.Named {
