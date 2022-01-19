@@ -19,6 +19,8 @@ limitations under the License.
 package event
 
 import (
+	"strings"
+
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/stringset"
@@ -53,10 +55,10 @@ func (er *Registry) addHandler(eventHandler Handler) error {
 	evNetworkPlugins := stringset.New()
 
 	for _, np := range eventHandler.GetNetworkPlugins() {
-		evNetworkPlugins.Add(np)
+		evNetworkPlugins.Add(strings.ToLower(np))
 	}
 
-	if evNetworkPlugins.Contains(AnyNetworkPlugin) || evNetworkPlugins.Contains(er.networkPlugin) {
+	if evNetworkPlugins.Contains(AnyNetworkPlugin) || evNetworkPlugins.Contains(strings.ToLower(er.networkPlugin)) {
 		if err := eventHandler.Init(); err != nil {
 			return errors.Wrapf(err, "Event handler %q failed to initialize", eventHandler.GetName())
 		}
