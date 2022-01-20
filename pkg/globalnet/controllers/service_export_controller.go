@@ -19,8 +19,6 @@ limitations under the License.
 package controllers
 
 import (
-	"context"
-
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/syncer"
@@ -28,7 +26,6 @@ import (
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -132,7 +129,7 @@ func (c *serviceExportController) process(from runtime.Object, numRequeues int, 
 func (c *serviceExportController) onCreate(serviceExport *mcsv1a1.ServiceExport) (runtime.Object, bool) {
 	key, _ := cache.MetaNamespaceKeyFunc(serviceExport)
 
-	service, exists, err := c.getService(serviceExport.Name, serviceExport.Namespace)
+	service, exists, err := getService(serviceExport.Name, serviceExport.Namespace, c.services, c.scheme)
 	if err != nil || !exists {
 		klog.Infof("Exported Service %q does not exist yet - re-queueing", key)
 		return nil, true
@@ -151,24 +148,10 @@ func (c *serviceExportController) onCreate(serviceExport *mcsv1a1.ServiceExport)
 		return c.onCreateHeadless(key, service)
 	}
 
-	chainName, chainExists, err := c.iptIface.GetKubeProxyClusterIPServiceChainName(service, kubeProxyServiceChainPrefix)
-	if err != nil {
-		klog.Errorf("Error getting kube-proxy chain name for service %q: %v", key, err)
-		return nil, true
-	}
-
-	if !chainExists {
-		klog.Infof("Kubeproxy chain for service %q does not exist yet", key)
-		return nil, true
-	}
-
 	ingressIP := &submarinerv1.GlobalIngressIP{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceExport.Name,
 			Namespace: serviceExport.Namespace,
-			Annotations: map[string]string{
-				kubeProxyIPTableChainAnnotation: chainName,
-			},
 		},
 		Spec: submarinerv1.GlobalIngressIPSpec{
 			Target:     submarinerv1.ClusterIPService,
@@ -194,29 +177,6 @@ func (c *serviceExportController) onDelete(serviceExport *mcsv1a1.ServiceExport)
 			Namespace: serviceExport.Namespace,
 		},
 	}, false
-}
-
-// nolint:wrapcheck  // No need to wrap errors.
-func (c *serviceExportController) getService(name, namespace string) (*corev1.Service, bool, error) {
-	obj, err := c.services.Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		return nil, false, nil
-	}
-
-	if err != nil {
-		klog.Errorf("Error retrieving Service %s/%s: %v", namespace, name, err)
-		return nil, false, err
-	}
-
-	service := &corev1.Service{}
-	err = c.scheme.Convert(obj, service, nil)
-
-	if err != nil {
-		klog.Errorf("Error converting %#v to Service: %v", obj, err)
-		return nil, false, err
-	}
-
-	return service, true, nil
 }
 
 func (c *serviceExportController) onCreateHeadless(key string, service *corev1.Service) (runtime.Object, bool) {
