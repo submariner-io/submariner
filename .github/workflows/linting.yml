@@ -23,6 +23,14 @@ jobs:
           flags: 'i'
           error: 'Commits addressing code review feedback should typically be squashed into the commits under review'
 
+      - name: 'Verify no "fixup!" commits'
+        uses: tim-actions/commit-message-checker-with-regex@d6d9770051dd6460679d1cab1dcaa8cffc5c2bbd
+        with:
+          commits: ${{ steps.get-pr-commits.outputs.commits }}
+          pattern: '^(?!fixup!)'
+          flags: 'i'
+          error: 'Fixup commits should be squashed into the commits under review'
+
   code-gen:
     name: Submariner K8s API Code Generation
     runs-on: ubuntu-latest
