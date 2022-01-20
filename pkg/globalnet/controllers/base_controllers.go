@@ -20,14 +20,21 @@ package controllers
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base32"
 	"fmt"
+	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
+	resourceUtil "github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	iptiface "github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
 	"github.com/submariner-io/submariner/pkg/ipam"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -195,4 +202,59 @@ func checkStatusChanged(oldStatus, newStatus interface{}, retObj runtime.Object)
 	klog.Infof("Updated: %#v", newStatus)
 
 	return retObj
+}
+
+func getService(name, namespace string,
+	client dynamic.NamespaceableResourceInterface, scheme *runtime.Scheme) (*corev1.Service, bool, error) {
+	obj, err := client.Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil, false, nil
+	}
+
+	if err != nil {
+		return nil, false, errors.Wrapf(err, "error retrieving Service %s/%s", namespace, name)
+	}
+
+	service := &corev1.Service{}
+	err = scheme.Convert(obj, service, nil)
+
+	if err != nil {
+		return nil, false, errors.Wrapf(err, "error converting %#v to Service", obj)
+	}
+
+	return service, true, nil
+}
+
+func createService(svc *corev1.Service,
+	client dynamic.NamespaceableResourceInterface) (*unstructured.Unstructured, error) {
+	gnService, err := resourceUtil.ToUnstructured(svc)
+	if err != nil {
+		return nil, err // nolint:wrapcheck  // Let the caller wrap it
+	}
+
+	obj, err := client.Namespace(gnService.GetNamespace()).Create(context.TODO(), gnService, metav1.CreateOptions{})
+	if apierrors.IsAlreadyExists(err) {
+		err = nil
+	}
+
+	return obj, errors.Wrapf(err, "error creating the internal Service %s/%s", svc.Namespace, svc.Name)
+}
+
+func deleteService(namespace, name string,
+	client dynamic.NamespaceableResourceInterface) error {
+	err := client.Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	if apierrors.IsNotFound(err) {
+		klog.Warningf("Could not find Service %s/%s to delete", namespace, name)
+		return nil
+	}
+
+	return errors.Wrapf(err, "error deleting Service %s/%s", namespace, name)
+}
+
+func GetInternalSvcName(name string) string {
+	hash := sha256.Sum256([]byte(name))
+	encoded := base32.StdEncoding.EncodeToString(hash[:])
+	svcName := InternalServicePrefix + encoded[:32]
+
+	return strings.ToLower(svcName)
 }
