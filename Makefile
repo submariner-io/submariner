@@ -27,8 +27,6 @@ else
 SETTINGS ?= $(DAPPER_SOURCE)/.shipyard.e2e.yml
 endif
 
-images: build
-
 include $(SHIPYARD_DIR)/Makefile.inc
 
 TARGETS := $(shell ls -p scripts | grep -v -e /)
