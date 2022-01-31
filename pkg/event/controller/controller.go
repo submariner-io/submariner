@@ -152,7 +152,6 @@ func (c *Controller) Start(stopCh <-chan struct{}) error {
 func (c *Controller) Stop() {
 	klog.Info("Event controller stopping")
 
-	// TODO: Detect if it's an uninstall and invoke StopHandlers with uninstall=true if it's the case
 	if err := c.handlers.StopHandlers(false); err != nil {
 		klog.Warningf("In Event Controller, StopHandlers returned error: %v", err)
 	}

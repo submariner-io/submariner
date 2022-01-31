@@ -24,6 +24,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
+	"github.com/submariner-io/admiral/pkg/finalizer"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -47,11 +49,18 @@ func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipa
 		return nil, errors.Wrap(err, "error creating the IPTablesInterface handler")
 	}
 
-	controller := &globalIngressIPController{
-		baseIPAllocationController: newBaseIPAllocationController(pool, iptIface),
+	_, gvr, err := util.ToUnstructuredResource(&corev1.Service{}, config.RestMapper)
+	if err != nil {
+		return nil, errors.Wrap(err, "error converting resource")
 	}
 
-	_, gvr, err := util.ToUnstructuredResource(&submarinerv1.GlobalIngressIP{}, config.RestMapper)
+	controller := &globalIngressIPController{
+		baseIPAllocationController: newBaseIPAllocationController(pool, iptIface),
+		services:                   config.SourceClient.Resource(*gvr),
+		scheme:                     config.Scheme,
+	}
+
+	_, gvr, err = util.ToUnstructuredResource(&submarinerv1.GlobalIngressIP{}, config.RestMapper)
 	if err != nil {
 		return nil, errors.Wrap(err, "error converting resource")
 	}
@@ -70,22 +79,12 @@ func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipa
 		gip := &submarinerv1.GlobalIngressIP{}
 		_ = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, gip)
 
-		var target string
-		if gip.Spec.Target == submarinerv1.ClusterIPService {
-			target = gip.GetAnnotations()[kubeProxyIPTableChainAnnotation]
-		} else if gip.Spec.Target == submarinerv1.HeadlessServicePod {
-			target = gip.GetAnnotations()[headlessSvcPodIP]
-		}
-
-		if target == "" {
-			continue
-		}
-
 		// nolint:wrapcheck  // No need to wrap these errors.
 		err = controller.reserveAllocatedIPs(federator, obj, func(reservedIPs []string) error {
 			if gip.Spec.Target == submarinerv1.ClusterIPService {
-				return controller.iptIface.AddIngressRulesForService(reservedIPs[0], target)
+				return controller.ensureInternalServiceExists(gip)
 			} else if gip.Spec.Target == submarinerv1.HeadlessServicePod {
+				target := gip.GetAnnotations()[headlessSvcPodIP]
 				err := controller.iptIface.AddIngressRulesForHeadlessSvcPod(reservedIPs[0], target)
 				if err != nil {
 					return err
@@ -165,29 +164,52 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 	}
 
 	if ingressIP.Spec.Target == submarinerv1.ClusterIPService {
-		chainName := ingressIP.GetAnnotations()[kubeProxyIPTableChainAnnotation]
-		if chainName == "" {
+		serviceRef := ingressIP.Spec.ServiceRef
+
+		service, exists, err := getService(serviceRef.Name, ingressIP.Namespace, c.services, c.scheme)
+		if err != nil || !exists {
 			_ = c.pool.Release(ips...)
 
-			klog.Warningf("%q annotation is missing on %q", kubeProxyIPTableChainAnnotation, key)
+			key := fmt.Sprintf("%s/%s", ingressIP.Namespace, serviceRef.Name)
+			if err != nil {
+				klog.Errorf("Error retrieving exported Service %q - re-queueing", key)
+			} else {
+				klog.Warningf("Exported Service %q does not exist yet - re-queueing", key)
+			}
 
-			return true
+			return false
 		}
 
-		err = c.iptIface.AddIngressRulesForService(ips[0], chainName)
-		if err != nil {
-			klog.Errorf("Error while programming Service %q ingress rules: %v", key, err)
+		internalService := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      GetInternalSvcName(service.Name),
+				Namespace: service.Namespace,
+				Labels: map[string]string{
+					InternalServiceLabel: service.Name,
+				},
+				Finalizers: []string{InternalServiceFinalizer},
+			},
+		}
 
+		extIPs := []string{ips[0]}
+		internalService.Spec.Ports = service.Spec.Ports
+		internalService.Spec.Selector = service.Spec.Selector
+		internalService.Spec.ExternalIPs = extIPs
+
+		_, err = createService(internalService, c.services)
+		if err != nil {
 			_ = c.pool.Release(ips...)
+			key := fmt.Sprintf("%s/%s", internalService.Namespace, internalService.Name)
+			klog.Errorf("Failed to create the internal Service %q ", key)
 
 			ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, &metav1.Condition{
 				Type:    string(submarinerv1.GlobalEgressIPAllocated),
 				Status:  metav1.ConditionFalse,
-				Reason:  "ProgramIPTableRulesFailed",
-				Message: fmt.Sprintf("Error programming ingress rules: %v", err),
+				Reason:  "InternalServiceCreationFailed",
+				Message: err.Error(),
 			})
 
-			return true
+			return false
 		}
 	} else if ingressIP.Spec.Target == submarinerv1.HeadlessServicePod {
 		podIP := ingressIP.GetAnnotations()[headlessSvcPodIP]
@@ -244,13 +266,39 @@ func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngre
 
 	key, _ := cache.MetaNamespaceKeyFunc(ingressIP)
 
-	return c.flushRulesAndReleaseIPs(key, numRequeues, func(allocatedIPs []string) error {
-		if ingressIP.Spec.Target == submarinerv1.ClusterIPService {
-			chainName := ingressIP.GetAnnotations()[kubeProxyIPTableChainAnnotation]
-			if chainName != "" {
-				return c.iptIface.RemoveIngressRulesForService(ingressIP.Status.AllocatedIP, chainName)
+	if ingressIP.Spec.Target == submarinerv1.ClusterIPService {
+		intSvcName := GetInternalSvcName(ingressIP.Spec.ServiceRef.Name)
+		klog.Infof("Deleting the service %q/%q created by Globalnet controller", ingressIP.Namespace, intSvcName)
+
+		intSvc, exists, err := getService(intSvcName, ingressIP.Namespace, c.services, c.scheme)
+		if err != nil {
+			klog.Errorf("Error retrieving the internal service created by Globalnet controller %q: %v", key, err)
+			return shouldRequeue(numRequeues)
+		}
+
+		if exists {
+			if err = finalizer.Remove(context.TODO(), resource.ForDynamic(c.services.Namespace(ingressIP.Namespace)), intSvc,
+				InternalServiceFinalizer); err != nil {
+				klog.Errorf("Error while removing the finalizer from service %q: %v", key, err)
+				return true
 			}
-		} else if ingressIP.Spec.Target == submarinerv1.HeadlessServicePod {
+
+			err = deleteService(ingressIP.Namespace, intSvcName, c.services)
+			if err != nil {
+				klog.Errorf("Error while deleting the internal %q: %v", key, err)
+				return true
+			}
+		}
+
+		if err = c.pool.Release(ingressIP.Status.AllocatedIP); err != nil {
+			klog.Errorf("Error while releasing the global IPs for %q: %v", key, err)
+		}
+
+		return false
+	}
+
+	return c.flushRulesAndReleaseIPs(key, numRequeues, func(allocatedIPs []string) error {
+		if ingressIP.Spec.Target == submarinerv1.HeadlessServicePod {
 			podIP := ingressIP.GetAnnotations()[headlessSvcPodIP]
 			if podIP != "" {
 				if err := c.iptIface.RemoveIngressRulesForHeadlessSvcPod(ingressIP.Status.AllocatedIP, podIP); err != nil {
@@ -263,4 +311,31 @@ func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngre
 
 		return nil
 	}, ingressIP.Status.AllocatedIP)
+}
+
+func (c *globalIngressIPController) ensureInternalServiceExists(ingressIP *submarinerv1.GlobalIngressIP) error {
+	serviceRef := ingressIP.Spec.ServiceRef
+	internalSvc := GetInternalSvcName(serviceRef.Name)
+	key := fmt.Sprintf("%s/%s", ingressIP.Namespace, internalSvc)
+
+	service, exists, err := getService(internalSvc, ingressIP.Namespace, c.services, c.scheme)
+	if err != nil || !exists {
+		return fmt.Errorf("internal service created by Globalnet controller %q does not exist", key)
+	}
+
+	if len(service.Spec.ExternalIPs) == 0 || service.Spec.ExternalIPs[0] != ingressIP.Status.AllocatedIP {
+		// A user is ideally not supposed to modify the external-ip of the Globalnet internal service, but
+		// in-case its done accidentally, as part of controller start/re-start scenario, this code will fix
+		// the issue by deleting and re-creating the internal service with valid configuration.
+		if err := finalizer.Remove(context.TODO(), resource.ForDynamic(c.services.Namespace(ingressIP.Namespace)), service,
+			InternalServiceFinalizer); err != nil {
+			return fmt.Errorf("error while removing the finalizer from globalnet internal service %q", key)
+		}
+
+		_ = deleteService(ingressIP.Namespace, internalSvc, c.services)
+
+		return fmt.Errorf("globalIP assigned to %q does not match with Internal Service ExternalIP", key)
+	}
+
+	return nil
 }

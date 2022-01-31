@@ -127,6 +127,12 @@ func main() {
 	natDiscovery, err := natdiscovery.New(localEndpoint)
 	fatalOnErr(err, "Error creating the NAT discovery handler")
 
+	if submSpec.Uninstall {
+		klog.Info("Uninstalling the submariner gateway engine")
+		// TODO
+		return
+	}
+
 	cableEngine.SetupNATDiscovery(natDiscovery)
 
 	fatalOnErr(natDiscovery.Run(stopCh), "Error starting NAT discovery server")
