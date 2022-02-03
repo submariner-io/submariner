@@ -56,3 +56,4 @@ jobs:
         uses: submariner-io/shipyard/gh-actions/e2e@devel
         with:
           using: ${{ matrix.external_net }} ${{ matrix.globalnet }}
+          skip: ""
