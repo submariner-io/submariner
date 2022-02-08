@@ -23,10 +23,10 @@ import (
 	"sync"
 
 	libovsdbclient "github.com/ovn-org/libovsdb/client"
+	"github.com/submariner-io/admiral/pkg/log"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cidr"
 	"github.com/submariner-io/submariner/pkg/event"
-	"github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn/nbctl"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	clientset "k8s.io/client-go/kubernetes"
@@ -38,10 +38,8 @@ var ErrWaitingForLocalEndpoint = errors.New("waiting for the local endpoint deta
 
 type SyncHandler struct {
 	event.HandlerBase
-	stopChan         chan struct{}
 	syncMutex        sync.Mutex
 	k8sClientset     clientset.Interface
-	nbctl            *nbctl.NbCtl
 	nbdb             libovsdbclient.Client
 	sbdb             libovsdbclient.Client
 	localClusterCIDR []string
@@ -153,7 +151,7 @@ func (ovn *SyncHandler) updateRemoteEndpointsInfra() error {
 	}
 
 	// Synchronize the policy rules inserted by submariner in the ovn_cluster_router, those point to submariner_router
-	err := ovn.setupOvnClusterRouterRemoteRules()
+	err := ovn.setupOvnClusterRouterLRPs()
 	if err != nil {
 		return err
 	}
@@ -166,4 +164,36 @@ func (ovn *SyncHandler) updateRemoteEndpointsInfra() error {
 	}
 
 	return nil
+}
+
+func (ovn *SyncHandler) updateGatewayNode() error {
+	if ovn.localEndpoint == nil {
+		klog.Warningf("No local endpoint, cannot update local endpoint information in OVN NBDB")
+		return nil
+	}
+
+	gwHostname := ovn.localEndpoint.Spec.Hostname
+
+	chassis, err := ovn.findChassisByHostname(gwHostname)
+	if errors.Is(err, libovsdbclient.ErrNotFound) {
+		klog.Fatalf("The OVN chassis for hostname %q could not be found", gwHostname)
+	} else if err != nil {
+		// Hopefully this error can be retried
+		return err
+	}
+
+	klog.V(log.DEBUG).Infof("Chassis for gw %q is %q, host: %q", gwHostname, chassis.Name, chassis.Hostname)
+
+	// Create/update the submariner external port associated to one of the external switches.
+	if err := ovn.createOrUpdateSubmarinerExternalPort(); err != nil {
+		return err
+	}
+
+	// Associate the port to an specific chassis (=host) on OVN so the traffic flows out/in through that host
+	// the active submariner-gateway in our case.
+	if err := ovn.associateSubmarinerRouterToChassis(chassis); err != nil {
+		return err
+	}
+
+	return ovn.updateSubmarinerRouterLocalRoutes()
 }
