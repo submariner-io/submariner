@@ -20,14 +20,6 @@ package ovn
 
 import "os"
 
-const (
-	ovnCert        = "secret://openshift-ovn-kubernetes/ovn-cert/tls.crt"
-	ovnPrivKey     = "secret://openshift-ovn-kubernetes/ovn-cert/tls.key"
-	ovnCABundle    = "configmap://openshift-ovn-kubernetes/ovn-ca/ca-bundle.crt"
-	defaultOVNNBDB = "ssl:ovnkube-db.openshift-ovn-kubernetes.svc.cluster.local:9641"
-	defaultOVNSBDB = "ssl:ovnkube-db.openshift-ovn-kubernetes.svc.cluster.local:9642"
-)
-
 func getOVNSBDBAddress() string {
 	addr := os.Getenv("OVN_SBDB")
 	if addr == "" {
