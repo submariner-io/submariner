@@ -84,6 +84,7 @@ type testDriver struct {
 	stopCh           chan struct{}
 	startCompleted   chan error
 	expectedStartErr error
+	doStart          bool
 }
 
 func newTestDriver() *testDriver {
@@ -111,6 +112,7 @@ func newTestDriver() *testDriver {
 
 	BeforeEach(func() {
 		t.expectedStartErr = nil
+		t.doStart = true
 
 		t.syncerScheme = runtime.NewScheme()
 		Expect(submarinerv1.AddToScheme(t.syncerScheme)).To(Succeed())
@@ -145,9 +147,6 @@ func newTestDriver() *testDriver {
 func (t *testDriver) run() {
 	os.Setenv("NODE_NAME", nodeName)
 
-	t.stopCh = make(chan struct{})
-	t.startCompleted = make(chan error, 1)
-
 	t.syncer = datastoresyncer.New(&broker.SyncerConfig{
 		LocalClient:     t.localClient,
 		LocalNamespace:  localNamespace,
@@ -158,12 +157,21 @@ func (t *testDriver) run() {
 		Scheme:          t.syncerScheme,
 	}, t.localCluster, t.localEndpoint)
 
-	go func() {
-		t.startCompleted <- t.syncer.Start(t.stopCh)
-	}()
+	if t.doStart {
+		t.stopCh = make(chan struct{})
+		t.startCompleted = make(chan error, 1)
+
+		go func() {
+			t.startCompleted <- t.syncer.Start(t.stopCh)
+		}()
+	}
 }
 
 func (t *testDriver) stop() {
+	if !t.doStart {
+		return
+	}
+
 	err := func() error {
 		timeout := 5 * time.Second
 		select {
