@@ -21,7 +21,7 @@ ifneq (,$(DAPPER_HOST_ARCH))
 IMAGES ?= submariner-gateway submariner-route-agent submariner-globalnet submariner-networkplugin-syncer
 PRELOAD_IMAGES = $(IMAGES) submariner-operator
 
-ifneq (,$(filter ovn,$(_using)))
+ifneq (,$(filter ovn,$(USING)))
 SETTINGS ?= $(DAPPER_SOURCE)/.shipyard.e2e.ovn.yml
 else
 SETTINGS ?= $(DAPPER_SOURCE)/.shipyard.e2e.yml
