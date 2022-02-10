@@ -127,9 +127,20 @@ func main() {
 	natDiscovery, err := natdiscovery.New(localEndpoint)
 	fatalOnErr(err, "Error creating the NAT discovery handler")
 
+	klog.Info("Creating the datastore syncer")
+
+	dsSyncer := datastoresyncer.New(&broker.SyncerConfig{
+		LocalRestConfig: cfg,
+		LocalNamespace:  submSpec.Namespace,
+	}, localCluster, localEndpoint)
+
 	if submSpec.Uninstall {
 		klog.Info("Uninstalling the submariner gateway engine")
-		// TODO
+
+		dsErr := dsSyncer.Cleanup()
+
+		fatalOnErr(dsErr, "Error cleaning up the datastore")
+
 		return
 	}
 
@@ -172,13 +183,6 @@ func main() {
 	cableEngineSyncer.Run(stopCh)
 
 	becameLeader := func(context.Context) {
-		klog.Info("Creating the datastore syncer")
-
-		dsSyncer := datastoresyncer.New(&broker.SyncerConfig{
-			LocalRestConfig: cfg,
-			LocalNamespace:  submSpec.Namespace,
-		}, localCluster, localEndpoint)
-
 		if err = cableEngine.StartEngine(); err != nil {
 			cleanup.fatal("Error starting the cable engine: %v", err)
 		}

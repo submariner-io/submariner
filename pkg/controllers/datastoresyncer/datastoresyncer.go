@@ -19,6 +19,7 @@ limitations under the License.
 package datastoresyncer
 
 import (
+	"context"
 	"os"
 
 	"github.com/pkg/errors"
@@ -32,8 +33,11 @@ import (
 	k8sv1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog"
 )
@@ -63,27 +67,10 @@ func (d *DatastoreSyncer) Start(stopCh <-chan struct{}) error {
 
 	klog.Info("Starting the datastore syncer")
 
-	d.syncerConfig.ResourceConfigs = []broker.ResourceConfig{
-		{
-			LocalSourceNamespace: d.syncerConfig.LocalNamespace,
-			LocalResourceType:    &submarinerv1.Cluster{},
-			LocalTransform:       d.shouldSyncCluster,
-			BrokerResourceType:   &submarinerv1.Cluster{},
-		},
-		{
-			LocalSourceNamespace: d.syncerConfig.LocalNamespace,
-			LocalResourceType:    &submarinerv1.Endpoint{},
-			LocalTransform:       d.shouldSyncEndpoint,
-			BrokerResourceType:   &submarinerv1.Endpoint{},
-		},
-	}
-
-	syncer, err := broker.NewSyncer(d.syncerConfig)
+	syncer, err := d.createSyncer()
 	if err != nil {
-		return errors.WithMessage(err, "error creating the syncer")
+		return err
 	}
-
-	klog.Info("Starting the broker syncer")
 
 	err = syncer.Start(stopCh)
 	if err != nil {
@@ -113,6 +100,94 @@ func (d *DatastoreSyncer) Start(stopCh <-chan struct{}) error {
 	klog.Info("Datastore syncer started")
 
 	return nil
+}
+
+func (d *DatastoreSyncer) Cleanup() error {
+	syncer, err := d.createSyncer()
+	if err != nil {
+		return err
+	}
+
+	localClient := d.syncerConfig.LocalClient
+	if localClient == nil {
+		localClient, err = dynamic.NewForConfig(d.syncerConfig.LocalRestConfig)
+		if err != nil {
+			return errors.Wrap(err, "error creating dynamic client")
+		}
+	}
+
+	err = d.cleanupResources(localClient.Resource(schema.GroupVersionResource{
+		Group:    submarinerv1.SchemeGroupVersion.Group,
+		Version:  submarinerv1.SchemeGroupVersion.Version,
+		Resource: "endpoints",
+	}), syncer)
+	if err != nil {
+		return err
+	}
+
+	err = d.cleanupResources(localClient.Resource(schema.GroupVersionResource{
+		Group:    submarinerv1.SchemeGroupVersion.Group,
+		Version:  submarinerv1.SchemeGroupVersion.Version,
+		Resource: "clusters",
+	}), syncer)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *DatastoreSyncer) cleanupResources(client dynamic.NamespaceableResourceInterface, syncer *broker.Syncer) error {
+	list, err := client.Namespace(d.syncerConfig.LocalNamespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return errors.Wrap(err, "error retrieving submariner resources")
+	}
+
+	for i := range list.Items {
+		obj := &list.Items[i]
+
+		err = syncer.GetLocalFederator().Delete(obj)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return errors.Wrapf(err, "error deleting submariner %s %q from the local datastore", obj.GetKind(), obj.GetName())
+		}
+
+		klog.Infof("Successfully deleted submariner %s %q from the local datastore", obj.GetKind(), obj.GetName())
+
+		clusterID, _, _ := unstructured.NestedString(obj.Object, "spec", "cluster_id")
+		if clusterID != d.localCluster.Spec.ClusterID {
+			continue
+		}
+
+		err = syncer.GetBrokerFederator().Delete(obj)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return errors.Wrapf(err, "error deleting submariner %s %q from the remote datastore", obj.GetKind(), obj.GetName())
+		}
+
+		klog.Infof("Successfully deleted local submariner %s %q from the remote datastore", obj.GetKind(), obj.GetName())
+	}
+
+	return nil
+}
+
+func (d *DatastoreSyncer) createSyncer() (*broker.Syncer, error) {
+	d.syncerConfig.ResourceConfigs = []broker.ResourceConfig{
+		{
+			LocalSourceNamespace: d.syncerConfig.LocalNamespace,
+			LocalResourceType:    &submarinerv1.Cluster{},
+			LocalTransform:       d.shouldSyncCluster,
+			BrokerResourceType:   &submarinerv1.Cluster{},
+		},
+		{
+			LocalSourceNamespace: d.syncerConfig.LocalNamespace,
+			LocalResourceType:    &submarinerv1.Endpoint{},
+			LocalTransform:       d.shouldSyncEndpoint,
+			BrokerResourceType:   &submarinerv1.Endpoint{},
+		},
+	}
+
+	syncer, err := broker.NewSyncer(d.syncerConfig)
+
+	return syncer, errors.Wrap(err, "error creating the syncer")
 }
 
 func (d *DatastoreSyncer) shouldSyncEndpoint(obj runtime.Object, numRequeues int, op resourceSyncer.Operation) (runtime.Object, bool) {

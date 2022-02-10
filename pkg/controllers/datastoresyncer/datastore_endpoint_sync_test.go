@@ -38,6 +38,7 @@ import (
 var (
 	_ = Describe("Endpoint syncing", testEndpointSyncing)
 	_ = Describe("Endpoint exclusivity", testEndpointExclusivity)
+	_ = Describe("Endpoint cleanup", testEndpointCleanup)
 )
 
 func testEndpointSyncing() {
@@ -211,5 +212,50 @@ func testEndpointExclusivity() {
 			time.Sleep(500 * time.Millisecond)
 			awaitEndpoint(t.localEndpoints, &t.localEndpoint.Spec)
 		})
+	})
+}
+
+func testEndpointCleanup() {
+	t := newTestDriver()
+
+	var (
+		existingLocalEndpoint  *submarinerv1.Endpoint
+		existingRemoteEndpoint *submarinerv1.Endpoint
+	)
+
+	BeforeEach(func() {
+		t.doStart = false
+
+		existingLocalEndpoint = newEndpoint(&submarinerv1.EndpointSpec{
+			CableName: "submariner-cable-east-1-2-3-4",
+			ClusterID: clusterID,
+		})
+
+		test.CreateResource(t.localEndpoints, existingLocalEndpoint)
+		test.CreateResource(t.brokerEndpoints, test.SetClusterIDLabel(existingLocalEndpoint, clusterID))
+
+		existingRemoteEndpoint = newEndpoint(&submarinerv1.EndpointSpec{
+			CableName: fmt.Sprintf("submariner-cable-%s-10-253-1-2", otherClusterID),
+			ClusterID: otherClusterID,
+		})
+
+		test.CreateResource(t.localEndpoints, test.SetClusterIDLabel(existingRemoteEndpoint, existingRemoteEndpoint.Spec.ClusterID))
+		test.CreateResource(t.brokerEndpoints, test.SetClusterIDLabel(existingRemoteEndpoint, existingRemoteEndpoint.Spec.ClusterID))
+	})
+
+	It("should remove local Endpoints from the remote datastore", func() {
+		Expect(t.syncer.Cleanup()).To(Succeed())
+
+		test.AwaitNoResource(t.brokerEndpoints, existingLocalEndpoint.GetName())
+
+		time.Sleep(500 * time.Millisecond)
+		test.AwaitResource(t.brokerEndpoints, existingRemoteEndpoint.GetName())
+	})
+
+	It("should remove all Endpoints from the local datastore", func() {
+		Expect(t.syncer.Cleanup()).To(Succeed())
+
+		test.AwaitNoResource(t.localEndpoints, existingLocalEndpoint.GetName())
+		test.AwaitNoResource(t.localEndpoints, existingRemoteEndpoint.GetName())
 	})
 }

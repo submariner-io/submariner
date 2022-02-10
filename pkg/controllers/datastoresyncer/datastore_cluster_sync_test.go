@@ -30,7 +30,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var _ = Describe("Cluster syncing", testClusterSyncing)
+var (
+	_ = Describe("Cluster syncing", testClusterSyncing)
+	_ = Describe("Cluster cleanup", testClusterCleanup)
+)
 
 func testClusterSyncing() {
 	t := newTestDriver()
@@ -110,5 +113,39 @@ func testClusterSyncing() {
 			time.Sleep(500 * time.Millisecond)
 			test.AwaitNoResource(t.brokerClusters, name)
 		})
+	})
+}
+
+func testClusterCleanup() {
+	t := newTestDriver()
+
+	BeforeEach(func() {
+		t.doStart = false
+
+		test.CreateResource(t.localClusters, newCluster(&t.localCluster.Spec))
+		test.CreateResource(t.brokerClusters, newCluster(&t.localCluster.Spec))
+
+		test.CreateResource(t.localClusters, newCluster(&submarinerv1.ClusterSpec{
+			ClusterID: otherClusterID,
+		}))
+		test.CreateResource(t.brokerClusters, newCluster(&submarinerv1.ClusterSpec{
+			ClusterID: otherClusterID,
+		}))
+	})
+
+	It("should remove local Clusters from the remote datastore", func() {
+		Expect(t.syncer.Cleanup()).To(Succeed())
+
+		test.AwaitNoResource(t.brokerClusters, clusterID)
+
+		time.Sleep(500 * time.Millisecond)
+		test.AwaitResource(t.brokerClusters, otherClusterID)
+	})
+
+	It("should remove all Clusters from the local datastore", func() {
+		Expect(t.syncer.Cleanup()).To(Succeed())
+
+		test.AwaitNoResource(t.localClusters, clusterID)
+		test.AwaitNoResource(t.localClusters, otherClusterID)
 	})
 }
