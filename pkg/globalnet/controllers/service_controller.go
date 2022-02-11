@@ -74,22 +74,23 @@ func (c *serviceController) Start() error {
 		return err
 	}
 
-	c.reconcile(c.ingressIPs, "", func(obj *unstructured.Unstructured) runtime.Object {
-		name, exists, _ := unstructured.NestedString(obj.Object, "spec", "serviceRef", "name")
-		if exists {
-			return &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      name,
-					Namespace: obj.GetNamespace(),
-				},
-				Spec: corev1.ServiceSpec{
-					Type: corev1.ServiceTypeClusterIP,
-				},
+	c.reconcile(c.ingressIPs, "" /* labelSelector */, "", /* fieldSelector */
+		func(obj *unstructured.Unstructured) runtime.Object {
+			name, exists, _ := unstructured.NestedString(obj.Object, "spec", "serviceRef", "name")
+			if exists {
+				return &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      name,
+						Namespace: obj.GetNamespace(),
+					},
+					Spec: corev1.ServiceSpec{
+						Type: corev1.ServiceTypeClusterIP,
+					},
+				}
 			}
-		}
 
-		return nil
-	})
+			return nil
+		})
 
 	return nil
 }
