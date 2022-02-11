@@ -20,6 +20,7 @@ package constants
 
 const (
 	ClusterGlobalEgressIPName = "cluster-egress.submariner.io"
+	EndpointClonedFrom        = "endpoints.submariner.io/cloned-from"
 
 	SmGlobalnetIngressChain = "SUBMARINER-GN-INGRESS"
 	SmGlobalnetEgressChain  = "SUBMARINER-GN-EGRESS"

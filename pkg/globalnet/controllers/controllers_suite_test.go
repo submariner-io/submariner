@@ -93,6 +93,7 @@ type testDriverBase struct {
 	globalIngressIPs       dynamic.ResourceInterface
 	services               dynamic.ResourceInterface
 	serviceExports         dynamic.ResourceInterface
+	endpoints              dynamic.ResourceInterface
 	pods                   dynamic.NamespaceableResourceInterface
 	nodes                  dynamic.ResourceInterface
 	watches                *fakeDynClient.WatchReactor
@@ -100,7 +101,7 @@ type testDriverBase struct {
 
 func newTestDriverBase() *testDriverBase {
 	t := &testDriverBase{
-		restMapper: test.GetRESTMapperFor(&submarinerv1.Endpoint{}, &corev1.Service{}, &corev1.Node{}, &corev1.Pod{},
+		restMapper: test.GetRESTMapperFor(&submarinerv1.Endpoint{}, &corev1.Service{}, &corev1.Node{}, &corev1.Pod{}, &corev1.Endpoints{},
 			&submarinerv1.GlobalEgressIP{}, &submarinerv1.ClusterGlobalEgressIP{}, &submarinerv1.GlobalIngressIP{}, &mcsv1a1.ServiceExport{}),
 		scheme:       runtime.NewScheme(),
 		ipt:          fakeIPT.New(),
@@ -127,6 +128,8 @@ func newTestDriverBase() *testDriverBase {
 	t.clusterGlobalEgressIPs = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.ClusterGlobalEgressIP{}))
 
 	t.pods = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &corev1.Pod{}))
+
+	t.endpoints = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &corev1.Endpoints{})).Namespace(namespace)
 
 	t.services = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &corev1.Service{})).Namespace(namespace)
 
@@ -194,6 +197,21 @@ func (t *testDriverBase) createPod(p *corev1.Pod) *corev1.Pod {
 
 func (t *testDriverBase) deletePod(p *corev1.Pod) {
 	Expect(t.pods.Namespace(p.Namespace).Delete(context.TODO(), p.Name, metav1.DeleteOptions{})).To(Succeed())
+}
+
+func (t *testDriverBase) createEndpoints(ep *corev1.Endpoints) *corev1.Endpoints {
+	test.CreateResource(t.endpoints, ep)
+	return ep
+}
+
+func (t *testDriverBase) deleteEndpoints(ep *corev1.Endpoints) {
+	err := t.endpoints.Delete(context.TODO(), ep.Name, metav1.DeleteOptions{})
+	Expect(err).To(Succeed())
+}
+
+func (t *testDriverBase) updateEndpoints(ep *corev1.Endpoints) *corev1.Endpoints {
+	test.UpdateResource(t.endpoints, ep)
+	return ep
 }
 
 func (t *testDriverBase) createService(service *corev1.Service) *corev1.Service {
@@ -371,6 +389,40 @@ func (t *testDriverBase) awaitService(name string) *corev1.Service {
 func (t *testDriverBase) awaitNoService(name string) {
 	time.Sleep(300 * time.Millisecond)
 	test.AwaitNoResource(t.services, name)
+}
+
+func (t *testDriverBase) awaitEndpoints(name string) *corev1.Endpoints {
+	obj := test.AwaitResource(t.endpoints, name)
+
+	ep := &corev1.Endpoints{}
+	Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, ep)).To(Succeed())
+
+	return ep
+}
+
+func (t *testDriverBase) awaitNoEndpoints(name string) {
+	time.Sleep(300 * time.Millisecond)
+	test.AwaitNoResource(t.endpoints, name)
+}
+
+func (t *testDriverBase) awaitEndpointsHasIP(name, ip string) {
+	Eventually(func() bool {
+		obj, err := t.endpoints.Get(context.TODO(), name, metav1.GetOptions{})
+		Expect(err).To(Succeed())
+
+		ep := &corev1.Endpoints{}
+		Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, ep)).To(Succeed())
+
+		for _, subset := range ep.Subsets {
+			for _, address := range subset.Addresses {
+				if address.IP == ip {
+					return true
+				}
+			}
+		}
+
+		return false
+	}, 5).Should(BeTrue())
 }
 
 func (t *testDriverBase) awaitHeadlessGlobalIngressIP(svcName, podName string) *submarinerv1.GlobalIngressIP {
@@ -578,6 +630,44 @@ func newHeadlessServicePod(svcName string) *corev1.Pod {
 		Status: corev1.PodStatus{
 			Phase: corev1.PodRunning,
 			PodIP: "172.45.4.3",
+		},
+	}
+}
+
+func newServiceWithoutSelector() *corev1.Service {
+	return toServiceWithoutSelector(newClusterIPService())
+}
+
+func toServiceWithoutSelector(s *corev1.Service) *corev1.Service {
+	s.Spec.Selector = map[string]string{}
+
+	return s
+}
+
+func newDefaultEndpoints(svcName string) *corev1.Endpoints {
+	return newEndpoints(svcName, "172.45.5.6", map[string]string{})
+}
+
+func newEndpoints(svcName, ip string, labels map[string]string) *corev1.Endpoints {
+	return &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      svcName,
+			Namespace: namespace,
+			Labels:    labels,
+		},
+		Subsets: []corev1.EndpointSubset{
+			{
+				Addresses: []corev1.EndpointAddress{
+					{IP: ip},
+				},
+				Ports: []corev1.EndpointPort{
+					{
+						Name:     "http",
+						Port:     int32(80),
+						Protocol: corev1.ProtocolTCP,
+					},
+				},
+			},
 		},
 	}
 }

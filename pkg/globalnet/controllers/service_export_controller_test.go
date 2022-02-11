@@ -37,6 +37,7 @@ import (
 var _ = Describe("ServiceExport controller", func() {
 	Describe("Cluster IP Service", testClusterIPService)
 	Describe("Headless Service", testHeadlessService)
+	Describe("Service without selector", testServiceWithoutSelector)
 })
 
 func testClusterIPService() {
@@ -253,6 +254,143 @@ func testHeadlessService() {
 	})
 }
 
+func testServiceWithoutSelector() {
+	t := newServiceExportControllerTestDriver()
+
+	var service *corev1.Service
+	var endpoints *corev1.Endpoints
+
+	BeforeEach(func() {
+		service = newServiceWithoutSelector()
+		endpoints = newDefaultEndpoints(service.Name)
+	})
+
+	When("Endpoints resource is created before service is exported", func() {
+		BeforeEach(func() {
+			t.createService(service)
+			endpoints = t.createEndpoints(endpoints)
+			t.awaitEndpoints(endpoints.Name)
+			t.createServiceExport(service)
+		})
+
+		It("should create an appropriate cloned Endpoints resource", func() {
+			t.awaitEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+		})
+
+		Context("and then original Endpoints resource is deleted", func() {
+			It("should delete the cloned endpoints", func() {
+				t.deleteEndpoints(endpoints)
+				t.awaitNoEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+			})
+		})
+
+		Context("and then original Endpoints resource is updated", func() {
+			It("should update the cloned endpoints", func() {
+				oldIP := "172.45.5.6" // defined in newEndpoints()
+				newIP := "172.45.5.7"
+
+				clonedEp := t.awaitEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+
+				// Confirm that both endpoints and clonedEP have oldIP
+				t.awaitEndpointsHasIP(endpoints.Name, oldIP)
+				t.awaitEndpointsHasIP(clonedEp.Name, oldIP)
+
+				// Update endpoints to have newIP
+				updatedEp := newEndpoints(endpoints.Name, newIP, endpoints.Labels)
+				updatedEp = t.updateEndpoints(updatedEp)
+
+				// Confirm that both endpoints and clonedEP have newIP
+				t.awaitEndpointsHasIP(updatedEp.Name, newIP)
+				t.awaitEndpointsHasIP(clonedEp.Name, newIP)
+			})
+		})
+	})
+
+	When("Endpoints resource is created after service is exported", func() {
+		BeforeEach(func() {
+			t.createService(service)
+			t.createServiceExport(service)
+			endpoints = t.createEndpoints(endpoints)
+			t.awaitEndpoints(endpoints.Name)
+		})
+
+		It("should create an appropriate cloned Endpoints resource", func() {
+			t.awaitEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+		})
+
+		Context("and then original endpoints is deleted", func() {
+			It("should delete the cloned endpoints", func() {
+				t.deleteEndpoints(endpoints)
+				t.awaitNoEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+			})
+		})
+
+		Context("and then original Endpoints resource is updated", func() {
+			It("should update the cloned Endpoints resource", func() {
+				oldIP := "172.45.5.6" // defined in newEndpoints()
+				newIP := "172.45.5.7"
+
+				clonedEp := t.awaitEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+
+				// Confirm that both endpoints and clonedEP have oldIP
+				t.awaitEndpointsHasIP(endpoints.Name, oldIP)
+				t.awaitEndpointsHasIP(clonedEp.Name, oldIP)
+
+				// Update endpoints to have newIP
+				updatedEp := newEndpoints(endpoints.Name, newIP, endpoints.Labels)
+				updatedEp = t.updateEndpoints(updatedEp)
+
+				// Confirm that both endpoints and clonedEP have newIP
+				t.awaitEndpointsHasIP(updatedEp.Name, newIP)
+				t.awaitEndpointsHasIP(clonedEp.Name, newIP)
+			})
+		})
+	})
+
+	When("cloned Endpoints resource is created", func() {
+		JustBeforeEach(func() {
+			t.createService(service)
+			t.createServiceExport(service)
+			endpoints = t.createEndpoints(endpoints)
+			t.awaitEndpoints(endpoints.Name)
+			t.awaitEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+		})
+
+		Context("and then controller is stopped", func() {
+			It("should keep the cloned Endpoints resource on controller restart if the original still exists", func() {
+				t.controller.Stop()
+
+				time.Sleep(50 * time.Millisecond)
+				t.awaitEndpoints(endpoints.Name)
+				t.awaitEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+
+				// Restart cotroller
+				t.start()
+
+				time.Sleep(50 * time.Millisecond)
+				t.awaitEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+			})
+
+			It("should delete the cloned Endpoints resource on controller restart if the original has been deleted", func() {
+				t.controller.Stop()
+
+				time.Sleep(50 * time.Millisecond)
+				t.awaitEndpoints(endpoints.Name)
+				t.awaitEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+
+				// Delete original endpoints before restart controller
+				t.deleteEndpoints(endpoints)
+				t.awaitNoEndpoints(endpoints.Name)
+
+				t.start()
+
+				time.Sleep(50 * time.Millisecond)
+				t.awaitNoEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+			})
+		})
+	})
+}
+
 type serviceExportControllerTestDriver struct {
 	*testDriverBase
 }
@@ -290,7 +428,10 @@ func (t *serviceExportControllerTestDriver) start() {
 	podControllers, err := controllers.NewIngressPodControllers(config)
 	Expect(err).To(Succeed())
 
-	t.controller, err = controllers.NewServiceExportController(config, podControllers)
+	endpointsControllers, err := controllers.NewServiceExportEndpointsControllers(config)
+	Expect(err).To(Succeed())
+
+	t.controller, err = controllers.NewServiceExportController(config, podControllers, endpointsControllers)
 
 	Expect(err).To(Succeed())
 	Expect(t.controller.Start()).To(Succeed())

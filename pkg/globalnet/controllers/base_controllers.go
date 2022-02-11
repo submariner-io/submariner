@@ -258,3 +258,14 @@ func GetInternalSvcName(name string) string {
 
 	return strings.ToLower(svcName)
 }
+
+func deleteEndpoints(namespace, name string,
+	client dynamic.NamespaceableResourceInterface) error {
+	err := client.Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	if apierrors.IsNotFound(err) {
+		klog.Warningf("Could not find Endpoints %s/%s to delete", namespace, name)
+		return nil
+	}
+
+	return errors.Wrapf(err, "error deleting Endpoints %s/%s", namespace, name)
+}
