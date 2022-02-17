@@ -207,7 +207,7 @@ func DeleteIfaceAndAssociatedRoutes(iface string, tableID int) error {
 	link, err := n.LinkByName(iface)
 	if err != nil {
 		if !errors.Is(err, netlink.LinkNotFoundError{}) {
-			klog.Warningf("Failed to retrieve the vxlan-tunnel interface: %v", err)
+			klog.Warningf("Failed to retrieve the %s interface: %v", iface, err)
 		}
 
 		return nil
@@ -230,7 +230,7 @@ func DeleteIfaceAndAssociatedRoutes(iface string, tableID int) error {
 
 	err = n.LinkDel(link)
 	if err != nil {
-		return errors.Wrapf(err, "failed to delete the vxlan interface")
+		return errors.Wrapf(err, "failed to delete the %s interface", iface)
 	}
 
 	return nil
