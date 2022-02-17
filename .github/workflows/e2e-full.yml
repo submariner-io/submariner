@@ -16,7 +16,7 @@ jobs:
       matrix:
         deploytool: ['operator']
         globalnet: ['', 'globalnet']
-        cable_driver: ['libreswan', 'wireguard', 'vxlan']
+        cable_driver: ['libreswan', 'wireguard', 'vxlan', 'iptun']
         ovn: ['', 'ovn']
         exclude:
           - ovn: 'ovn'
