@@ -182,6 +182,12 @@ func testGlobalNetExternalConnectivity(f *framework.Framework) {
 
 		framework.Logf("%s", podLog)
 
+		if framework.ClusterIndex(idx) == extClusterIdx {
+			// TODO: current behavior is that access from the pod in the cluster that is directly connected to
+			// external network is not reachable. Consider if it can be improved if there are use cases for it.
+			continue
+		}
+
 		By(fmt.Sprintf("Sending an http request from the test pod %q in cluster %q to the external app's ingressGlobalIP %q",
 			np.Pod.Name, clusterName, extIngressGlobalIP))
 
@@ -192,17 +198,11 @@ func testGlobalNetExternalConnectivity(f *framework.Framework) {
 
 		_, dockerLog := docker.GetLog()
 
-		if framework.ClusterIndex(idx) == extClusterIdx {
-			// TODO: current behavior is that source IP from the pod in the cluster that directly connected to
-			// external network to external pod is not egressGlobalIP. Consider if it can be consistent.
-			Expect(dockerLog).To(MatchRegexp(".*GET /%s%s .*", f.Namespace, clusterName))
-		} else {
-			matchRegexp := MatchRegexp("%s .*GET /%s%s .*", podGlobalIPs[0], f.Namespace, clusterName)
-			for i := 1; i < len(podGlobalIPs); i++ {
-				matchRegexp = Or(matchRegexp, MatchRegexp("%s .*GET /%s%s .*", podGlobalIPs[i], f.Namespace, clusterName))
-			}
-			Expect(dockerLog).To(matchRegexp)
+		matchRegexp := MatchRegexp("%s .*GET /%s%s .*", podGlobalIPs[0], f.Namespace, clusterName)
+		for i := 1; i < len(podGlobalIPs); i++ {
+			matchRegexp = Or(matchRegexp, MatchRegexp("%s .*GET /%s%s .*", podGlobalIPs[i], f.Namespace, clusterName))
 		}
+		Expect(dockerLog).To(matchRegexp)
 
 		framework.Logf("%s", dockerLog)
 	}
