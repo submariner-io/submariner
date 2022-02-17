@@ -64,6 +64,8 @@ dockertogoarch = $(patsubst arm/v7,arm,$(1))
 
 deploy: images
 
+e2e: vendor/modules.txt
+
 golangci-lint: pkg/natdiscovery/proto/natdiscovery.pb.go
 
 unit: pkg/natdiscovery/proto/natdiscovery.pb.go
