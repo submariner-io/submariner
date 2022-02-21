@@ -110,6 +110,8 @@ func main() {
 	k8sClient, err := kubernetes.NewForConfig(cfg)
 	fatalOnErr(err, "Error creating Kubernetes clientset")
 
+	fatalOnErr(subv1.AddToScheme(scheme.Scheme), "Error adding submariner types to the scheme")
+
 	klog.Info("Creating the cable engine")
 
 	localCluster := submarinerClusterFrom(&submSpec)
@@ -147,8 +149,6 @@ func main() {
 	cableEngine.SetupNATDiscovery(natDiscovery)
 
 	fatalOnErr(natDiscovery.Run(stopCh), "Error starting NAT discovery server")
-
-	fatalOnErr(subv1.AddToScheme(scheme.Scheme), "Error adding submariner types to the scheme")
 
 	var cableHealthchecker healthchecker.Interface
 
