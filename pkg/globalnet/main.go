@@ -55,19 +55,6 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	if spec.Uninstall {
-		klog.Info("Uninstalling submariner-globalnet")
-		// TODO
-		return
-	}
-
-	klog.Info("Starting submariner-globalnet", spec)
-
-	// set up signals so we handle the first shutdown signal gracefully
-	stopCh := signals.SetupSignalHandler().Done()
-
-	httpServer := startHTTPServer()
-
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
 	if err != nil {
 		klog.Fatalf("Error building kubeconfig: %s", err.Error())
@@ -77,6 +64,21 @@ func main() {
 	if err != nil {
 		klog.Fatalf("error building submariner clientset: %s", err.Error())
 	}
+
+	if spec.Uninstall {
+		klog.Info("Uninstalling submariner-globalnet")
+		controllers.UninstallDataPath()
+		controllers.DeleteGlobalnetObjects(submarinerClient, cfg)
+
+		return
+	}
+
+	klog.Info("Starting submariner-globalnet", spec)
+
+	// set up signals so we handle the first shutdown signal gracefully
+	stopCh := signals.SetupSignalHandler().Done()
+
+	httpServer := startHTTPServer()
 
 	err = mcsv1a1.AddToScheme(scheme.Scheme)
 	if err != nil {
