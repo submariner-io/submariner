@@ -206,3 +206,8 @@ func (i *IPTables) AddFailOnDeleteRuleMatcher(stringOrMatcher interface{}) {
 
 	i.failOnDeleteRuleMatchers = append(i.failOnDeleteRuleMatchers, stringOrMatcher)
 }
+
+func (i *IPTables) DeleteChain(table, chain string) error {
+	// TODO
+	return nil
+}

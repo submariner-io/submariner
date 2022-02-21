@@ -46,6 +46,9 @@ type Interface interface {
 	RemoveEgressRulesForPods(namespace, ipSetName, snatIP, globalNetIPTableMark string) error
 	AddEgressRulesForNamespace(namespace, ipSetName, snatIP, globalNetIPTableMark string) error
 	RemoveEgressRulesForNamespace(namespace, ipSetName, snatIP, globalNetIPTableMark string) error
+	FlushIPTableChain(table, chainName string) error
+	DeleteIPTableChain(table, chainName string) error
+	DeleteIPTableRule(table, chainName, jumpTarget string) error
 }
 
 type ipTables struct {
@@ -260,6 +263,35 @@ func (i *ipTables) RemoveEgressRulesForNamespace(namespace, ipSetName, snatIP, g
 	klog.V(log.DEBUG).Infof("Deleting iptable egress rules for Namespace %q: %s", namespace, strings.Join(ruleSpec, " "))
 
 	if err := i.ipt.Delete("nat", constants.SmGlobalnetEgressChainForNamespace, ruleSpec...); err != nil {
+		return errors.Wrapf(err, "error deleting iptables rule \"%s\"", strings.Join(ruleSpec, " "))
+	}
+
+	return nil
+}
+
+func (i *ipTables) FlushIPTableChain(table, chainName string) error {
+	klog.Infof("Flushing iptable rules in %q chain of table %q", chainName, table)
+
+	if err := i.ipt.ClearChain(table, chainName); err != nil {
+		return errors.Wrapf(err, "error flushing iptables rules in %q chain of table %q", chainName, table)
+	}
+
+	return nil
+}
+
+func (i *ipTables) DeleteIPTableChain(table, chainName string) error {
+	klog.Infof("Deleting iptable chain %q of table %q", chainName, table)
+
+	if err := i.ipt.DeleteChain(table, chainName); err != nil {
+		return errors.Wrapf(err, "error deleting iptable chain %q of table %q", chainName, table)
+	}
+
+	return nil
+}
+
+func (i *ipTables) DeleteIPTableRule(table, chainName, jumpTarget string) error {
+	ruleSpec := []string{"-j", jumpTarget}
+	if err := i.ipt.Delete(table, chainName, ruleSpec...); err != nil {
 		return errors.Wrapf(err, "error deleting iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 

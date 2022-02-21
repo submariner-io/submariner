@@ -37,6 +37,7 @@ type Interface interface {
 	ListChains(table string) ([]string, error)
 	NewChain(table, chain string) error
 	ClearChain(table, chain string) error
+	DeleteChain(table, chain string) error
 }
 
 type iptablesWrapper struct {

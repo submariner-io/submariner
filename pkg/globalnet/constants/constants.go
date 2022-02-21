@@ -32,5 +32,7 @@ const (
 	SmGlobalnetEgressChainForNamespace       = "SM-GN-EGRESS-NS"
 	SmGlobalnetEgressChainForCluster         = "SM-GN-EGRESS-CLUSTER"
 
+	NATTable = "nat"
+
 	SmGlobalIP = "submariner.io/globalIp"
 )
