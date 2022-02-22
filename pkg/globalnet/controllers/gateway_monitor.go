@@ -287,7 +287,12 @@ func (g *gatewayMonitor) startControllers() error {
 		return errors.Wrap(err, "error creating the IngressPodControllers")
 	}
 
-	c, err = NewServiceExportController(g.syncerConfig, podControllers)
+	endpointsControllers, err := NewServiceExportEndpointsControllers(g.syncerConfig)
+	if err != nil {
+		return errors.Wrap(err, "error creating the Endpoints controller")
+	}
+
+	c, err = NewServiceExportController(g.syncerConfig, podControllers, endpointsControllers)
 	if err != nil {
 		return errors.Wrap(err, "error creating the ServiceExport controller")
 	}

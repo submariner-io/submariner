@@ -55,9 +55,12 @@ See the [Prerequisites docs](https://submariner.io/getting-started/#prerequisite
 
 ## Installation
 
-Submariner is deployed and manged by its Operator. The Operator can be deployed directly, or by using Submariner's Helm Charts, or by using
-Submariner's `subctl` CLI helper utility. `subctl` is the recommended deployment method because it has the most refined deployment user
-experience and additionally provides testing and bug-diagnosing capabilities.
+Submariner is always deployed using a Go-based Kubernetes custom controller, called an
+[Operator](https://github.com/submariner-io/submariner-operator), that provides API-based installation and management. Deployment tools like
+the *`subctl`* command line utility and Helm charts wrap the Operator. The recommended deployment method is `subctl`, as it is currently the
+default in CI and provides diagnostic features.
+
+See the [Deplyment docs](https://submariner.io/operations/deployment/) on Submariner's website.
 
 ### Installation using subctl
 
