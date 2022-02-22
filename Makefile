@@ -1,7 +1,7 @@
-restart ?= all
 BASE_BRANCH ?= devel
 PROTOC_VERSION=3.17.3
 export BASE_BRANCH
+export restart ?= all
 
 # Define LOCAL_BUILD to build directly on the host and not inside a Dapper container
 ifdef LOCAL_BUILD
@@ -19,27 +19,26 @@ ifneq (,$(DAPPER_HOST_ARCH))
 # Running in Dapper
 
 IMAGES ?= submariner-gateway submariner-route-agent submariner-globalnet submariner-networkplugin-syncer
+PRELOAD_IMAGES = $(IMAGES) submariner-operator
+
+ifneq (,$(filter ovn,$(_using)))
+SETTINGS ?= $(DAPPER_SOURCE)/.shipyard.e2e.ovn.yml
+else
+SETTINGS ?= $(DAPPER_SOURCE)/.shipyard.e2e.yml
+endif
+
 images: build
 
 include $(SHIPYARD_DIR)/Makefile.inc
 
-TARGETS := $(shell ls -p scripts | grep -v -e / -e reload-images)
+TARGETS := $(shell ls -p scripts | grep -v -e /)
 override BUILD_ARGS += --ldflags '-X main.VERSION=$(VERSION)'
-
-ifneq (,$(filter ovn,$(_using)))
-override CLUSTER_SETTINGS_FLAG = --settings $(DAPPER_SOURCE)/.shipyard.e2e.ovn.yml
-else
-override CLUSTER_SETTINGS_FLAG = --settings $(DAPPER_SOURCE)/.shipyard.e2e.yml
-endif
 
 ifneq (,$(filter external-net,$(_using)))
 override E2E_ARGS += --testdir test/external
 override DEPLOY_ARGS += --plugin scripts/e2e/external/hook
 override CLEANUP_ARGS += --plugin scripts/e2e/external/hook
 endif
-
-override CLUSTERS_ARGS += $(CLUSTER_SETTINGS_FLAG)
-override DEPLOY_ARGS += $(CLUSTER_SETTINGS_FLAG)
 
 override E2E_ARGS += cluster2 cluster1
 override UNIT_TEST_ARGS += test
@@ -68,9 +67,6 @@ deploy: images
 golangci-lint: pkg/natdiscovery/proto/natdiscovery.pb.go
 
 unit: pkg/natdiscovery/proto/natdiscovery.pb.go
-
-reload-images: build images
-	./scripts/$@ --restart $(restart)
 
 %.pb.go: %.proto bin/protoc-gen-go bin/protoc
 	PATH="$(CURDIR)/bin:$$PATH" protoc --go_out=$$(go env GOPATH)/src $<
