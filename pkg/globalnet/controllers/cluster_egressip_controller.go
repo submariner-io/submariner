@@ -90,8 +90,9 @@ func NewClusterGlobalEgressIPController(config *syncer.ResourceSyncerConfig, loc
 
 	if obj != nil {
 		err := controller.reserveAllocatedIPs(federator, obj, func(reservedIPs []string) error {
+			metrics.RecordAllocateClusterGlobalEgressIPs(pool.GetCIDR(), len(reservedIPs))
 			return controller.programClusterGlobalEgressRules(reservedIPs)
-		}, metrics.RecordAllocateClusterGlobalEgressIPs)
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -190,7 +191,7 @@ func (c *clusterGlobalEgressIPController) onCreateOrUpdate(key string, numberOfI
 		return false
 	}
 
-	if requeue := c.flushRulesAndReleaseIPs(key, numRequeues, c.flushClusterGlobalEgressRules, metrics.RecordDeallocateClusterGlobalEgressIPs,
+	if requeue := c.flushRulesAndReleaseIPs(key, numRequeues, c.flushClusterGlobalEgressRules,
 		status.AllocatedIPs...); requeue {
 		return true
 	}
@@ -199,11 +200,12 @@ func (c *clusterGlobalEgressIPController) onCreateOrUpdate(key string, numberOfI
 }
 
 func (c *clusterGlobalEgressIPController) onDelete(key string, status *submarinerv1.GlobalEgressIPStatus, numRequeues int) bool {
-	return c.flushRulesAndReleaseIPs(key, numRequeues, c.flushClusterGlobalEgressRules, metrics.RecordDeallocateClusterGlobalEgressIPs,
+	return c.flushRulesAndReleaseIPs(key, numRequeues, c.flushClusterGlobalEgressRules,
 		status.AllocatedIPs...)
 }
 
 func (c *clusterGlobalEgressIPController) flushClusterGlobalEgressRules(allocatedIPs []string) error {
+	metrics.RecordDeallocateClusterGlobalEgressIPs(c.pool.GetCIDR(), len(allocatedIPs))
 	return c.deleteClusterGlobalEgressRules(c.localSubnets, getTargetSNATIPaddress(allocatedIPs))
 }
 
@@ -257,7 +259,7 @@ func (c *clusterGlobalEgressIPController) allocateGlobalIPs(key string, numberOf
 		return true
 	}
 
-	metrics.RecordAllocateClusterGlobalEgressIPs(c.pool.GetCider(), numberOfIPs)
+	metrics.RecordAllocateClusterGlobalEgressIPs(c.pool.GetCIDR(), numberOfIPs)
 
 	err = c.programClusterGlobalEgressRules(allocatedIPs)
 	if err != nil {
@@ -271,7 +273,7 @@ func (c *clusterGlobalEgressIPController) allocateGlobalIPs(key string, numberOf
 		})
 
 		_ = c.pool.Release(allocatedIPs...)
-		metrics.RecordDeallocateClusterGlobalEgressIPs(c.pool.GetCider(), numberOfIPs)
+		metrics.RecordDeallocateClusterGlobalEgressIPs(c.pool.GetCIDR(), numberOfIPs)
 
 		return true
 	}

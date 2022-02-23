@@ -96,7 +96,7 @@ func (c *baseSyncerController) reconcile(client dynamic.ResourceInterface, label
 }
 
 func (c *baseIPAllocationController) reserveAllocatedIPs(federator federate.Federator, obj *unstructured.Unstructured,
-	postReserve func(allocatedIPs []string) error, metricsAllocate func(string, int)) error {
+	postReserve func(allocatedIPs []string) error) error {
 	var reservedIPs []string
 
 	clearAllocatedIPs := func() {}
@@ -127,8 +127,6 @@ func (c *baseIPAllocationController) reserveAllocatedIPs(federator federate.Fede
 		}
 	}
 
-	metricsAllocate(c.pool.GetCider(), len(reservedIPs))
-
 	if err != nil {
 		key, _ := cache.MetaNamespaceKeyFunc(obj)
 
@@ -156,7 +154,7 @@ func (c *baseIPAllocationController) reserveAllocatedIPs(federator federate.Fede
 }
 
 func (c *baseIPAllocationController) flushRulesAndReleaseIPs(key string, numRequeues int, flushRules func(allocatedIPs []string) error,
-	metricsDeallocate func(string, int), allocatedIPs ...string) bool {
+	allocatedIPs ...string) bool {
 	if len(allocatedIPs) == 0 {
 		return false
 	}
@@ -175,8 +173,6 @@ func (c *baseIPAllocationController) flushRulesAndReleaseIPs(key string, numRequ
 	if err := c.pool.Release(allocatedIPs...); err != nil {
 		klog.Errorf("Error while releasing the global IPs for %q: %v", key, err)
 	}
-
-	metricsDeallocate(c.pool.GetCider(), len(allocatedIPs))
 
 	return false
 }

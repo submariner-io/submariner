@@ -45,7 +45,7 @@ var (
 	)
 	globalEgressIPsAllocatedGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "submariner_global_Egress_IP_allocated",
+			Name: "submariner_global_egress_IP_allocated",
 			Help: "Count of global Egress IPs allocated for Pods/Services per CIDR",
 		},
 		[]string{
@@ -54,7 +54,7 @@ var (
 	)
 	clusterGlobalEgressIPsAllocatedGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "submariner_cluster_global_Egress_IP_allocated",
+			Name: "submariner_cluster_global_egress_IP_allocated",
 			Help: "Count of global Egress IPs allocated for clusters per CIDR",
 		},
 		[]string{
@@ -63,7 +63,7 @@ var (
 	)
 	globalIngressIPsAllocatedGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "submariner_global_Ingress_IP_allocated",
+			Name: "submariner_global_ingress_IP_allocated",
 			Help: "Count of global Ingress IPs allocated for Pods/Services per CIDR",
 		},
 		[]string{
