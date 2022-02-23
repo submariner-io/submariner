@@ -19,7 +19,9 @@ ifneq (,$(DAPPER_HOST_ARCH))
 # Running in Dapper
 
 IMAGES ?= submariner-gateway submariner-route-agent submariner-globalnet submariner-networkplugin-syncer
+MULTIARCH_IMAGES ?= $(IMAGES)
 PRELOAD_IMAGES = $(IMAGES) submariner-operator
+PLATFORMS ?= linux/amd64,linux/arm64
 
 ifneq (,$(filter ovn,$(USING)))
 SETTINGS ?= $(DAPPER_SOURCE)/.shipyard.e2e.ovn.yml
@@ -45,13 +47,13 @@ override VALIDATE_ARGS += --skip-dirs pkg/client
 # When cross-building, we need to map Go architectures and operating systems to Docker buildx platforms:
 # Docker buildx platform | Fedora support? | Go
 # --------------------------------------------------
-# linux/amd64            | Yes (amd64)     | linux/amd64
-# linux/arm64            | Yes (arm64v8)   | linux/arm64
+# linux/amd64            | Yes (x86_64)    | linux/amd64
+# linux/arm64            | Yes (aarch64)   | linux/arm64
 # linux/riscv64          | No              | linux/riscv64
 # linux/ppc64le          | Yes (ppc64le)   | linux/ppc64le
 # linux/s390x            | Yes (s390x)     | linux/s390x
 # linux/386              | No              | linux/386
-# linux/arm/v7           | Yes (arm32v7)   | linux/arm
+# linux/arm/v7           | Yes (armv7hl)   | linux/arm
 # linux/arm/v6           | No              | N/A
 #
 # References: https://github.com/golang/go/blob/master/src/go/build/syslist.go
@@ -103,7 +105,6 @@ comma := ,
 ARCHES ?= amd64
 BINARIES = submariner-gateway submariner-route-agent submariner-globalnet submariner-networkplugin-syncer
 ARCH_BINARIES := $(foreach arch,$(subst $(comma),$(space),$(ARCHES)),$(foreach binary,$(BINARIES),bin/linux/$(call gotodockerarch,$(arch))/$(binary)))
-IMAGES_ARGS = --platform $(subst $(space),$(comma),$(foreach arch,$(subst $(comma),$(space),$(ARCHES)),linux/$(call gotodockerarch,$(arch))))
 
 build: $(ARCH_BINARIES)
 

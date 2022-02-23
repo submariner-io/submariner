@@ -1,8 +1,7 @@
 ARG BASE_BRANCH
 ARG SOURCE=/go/src/github.com/submariner-io/submariner
-ARG TARGETPLATFORM=linux/amd64
 
-FROM quay.io/submariner/shipyard-dapper-base:${BASE_BRANCH} AS builder
+FROM --platform=${BUILDPLATFORM} quay.io/submariner/shipyard-dapper-base:${BASE_BRANCH} AS builder
 ARG SOURCE
 ARG TARGETPLATFORM
 
@@ -10,14 +9,15 @@ COPY . ${SOURCE}
 
 RUN make -C ${SOURCE} LOCAL_BUILD=1 bin/${TARGETPLATFORM}/submariner-networkplugin-syncer
 
-FROM fedora:34
+FROM --platform=${TARGETPLATFORM} fedora:34
 ARG SOURCE
 ARG TARGETPLATFORM
 
 WORKDIR /var/submariner
 
-RUN dnf -y install --nodocs --setopt=install_weak_deps=0 \
-           https://kojipkgs.fedoraproject.org//packages/ovn/20.06.2/4.fc33/x86_64/ovn-20.06.2-4.fc33.x86_64.rpm && \
+RUN arch=${TARGETPLATFORM} && arch=${arch##*/} && case ${arch} in amd64) arch=x86_64;; arm64) arch=aarch64;; esac && \
+    dnf -y install --nodocs --setopt=install_weak_deps=0 \
+           https://kojipkgs.fedoraproject.org//packages/ovn/20.06.2/4.fc33/${arch}/ovn-20.06.2-4.fc33.${arch}.rpm && \
     dnf -y clean all
 
 # install the networkpluginc-sync
