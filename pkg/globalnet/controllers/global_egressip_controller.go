@@ -82,12 +82,13 @@ func NewGlobalEgressIPController(config *syncer.ResourceSyncerConfig, pool *ipam
 
 	for i := range list.Items {
 		err = controller.reserveAllocatedIPs(federator, &list.Items[i], func(reservedIPs []string) error {
+			metrics.RecordAllocateGlobalEgressIPs(pool.GetCIDR(), len(reservedIPs))
 			specObj := util.GetSpec(&list.Items[i])
 			spec := &submarinerv1.GlobalEgressIPSpec{}
 			_ = runtime.DefaultUnstructuredConverter.FromUnstructured(specObj.(map[string]interface{}), spec)
 			key, _ := cache.MetaNamespaceKeyFunc(&list.Items[i])
 			return controller.programGlobalEgressRules(key, reservedIPs, spec.PodSelector, controller.newNamedIPSet(key))
-		}, metrics.RecordAllocateGlobalEgressIPs)
+		})
 
 		if err != nil {
 			return nil, err
@@ -227,7 +228,7 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 		return true
 	}
 
-	metrics.RecordAllocateGlobalEgressIPs(c.pool.GetCider(), numberOfIPs)
+	metrics.RecordAllocateGlobalEgressIPs(c.pool.GetCIDR(), numberOfIPs)
 
 	err = c.programGlobalEgressRules(key, allocatedIPs, globalEgressIP.Spec.PodSelector, namedIPSet)
 	if err != nil {
@@ -241,7 +242,7 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 		})
 
 		_ = c.pool.Release(allocatedIPs...)
-		metrics.RecordDeallocateGlobalEgressIPs(c.pool.GetCider(), numberOfIPs)
+		metrics.RecordDeallocateGlobalEgressIPs(c.pool.GetCIDR(), numberOfIPs)
 
 		return true
 	}
@@ -357,13 +358,14 @@ func (c *globalEgressIPController) createPodWatcher(key string, namedIPSet ipset
 func (c *globalEgressIPController) flushGlobalEgressRulesAndReleaseIPs(key, ipSetName string, numRequeues int,
 	globalEgressIP *submarinerv1.GlobalEgressIP) bool {
 	return c.flushRulesAndReleaseIPs(key, numRequeues, func(allocatedIPs []string) error {
+		metrics.RecordDeallocateGlobalEgressIPs(c.pool.GetCIDR(), len(allocatedIPs))
 		if globalEgressIP.Spec.PodSelector != nil {
 			return c.iptIface.RemoveEgressRulesForPods(key, ipSetName,
 				getTargetSNATIPaddress(allocatedIPs), globalNetIPTableMark)
 		}
 
 		return c.iptIface.RemoveEgressRulesForNamespace(key, ipSetName, getTargetSNATIPaddress(allocatedIPs), globalNetIPTableMark)
-	}, metrics.RecordDeallocateGlobalEgressIPs, globalEgressIP.Status.AllocatedIPs...)
+	}, globalEgressIP.Status.AllocatedIPs...)
 }
 
 func (c *globalEgressIPController) newNamedIPSet(key string) ipset.Named {

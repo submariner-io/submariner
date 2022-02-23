@@ -215,6 +215,6 @@ func (p *IPPool) Size() int {
 	return p.available.Size()
 }
 
-func (p *IPPool) GetCider() string {
+func (p *IPPool) GetCIDR() string {
 	return p.cidr
 }
