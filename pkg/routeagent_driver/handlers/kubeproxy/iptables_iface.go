@@ -40,22 +40,22 @@ func (kp *SyncHandler) createIPTableChains() error {
 		return errors.Wrap(err, "error initializing POST routing chain")
 	}
 
-	klog.V(log.DEBUG).Infof("Install/ensure SUBMARINER-INPUT chain exists")
+	klog.V(log.DEBUG).Infof("Install/ensure %q chain exists", constants.SmInputChain)
 
-	if err = iptables.CreateChainIfNotExists(ipt, "filter", "SUBMARINER-INPUT"); err != nil {
+	if err = iptables.CreateChainIfNotExists(ipt, constants.FilterTable, constants.SmInputChain); err != nil {
 		return errors.Wrap(err, "unable to create SUBMARINER-INPUT chain in iptables")
 	}
 
-	forwardToSubInputRuleSpec := []string{"-p", "udp", "-m", "udp", "-j", "SUBMARINER-INPUT"}
-	if err = ipt.AppendUnique("filter", "INPUT", forwardToSubInputRuleSpec...); err != nil {
+	forwardToSubInputRuleSpec := []string{"-p", "udp", "-m", "udp", "-j", constants.SmInputChain}
+	if err = ipt.AppendUnique(constants.FilterTable, constants.InputChain, forwardToSubInputRuleSpec...); err != nil {
 		return errors.Wrapf(err, "unable to append iptables rule %q", strings.Join(forwardToSubInputRuleSpec, " "))
 	}
 
-	klog.V(log.DEBUG).Infof("Allow VxLAN incoming traffic in SUBMARINER-INPUT Chain")
+	klog.V(log.DEBUG).Infof("Allow VxLAN incoming traffic in %q Chain", constants.SmInputChain)
 
 	ruleSpec := []string{"-p", "udp", "-m", "udp", "--dport", strconv.Itoa(VxLANPort), "-j", "ACCEPT"}
 
-	if err = ipt.AppendUnique("filter", "SUBMARINER-INPUT", ruleSpec...); err != nil {
+	if err = ipt.AppendUnique(constants.FilterTable, constants.SmInputChain, ruleSpec...); err != nil {
 		return errors.Wrapf(err, "unable to append iptables rule %q", strings.Join(ruleSpec, " "))
 	}
 
@@ -63,7 +63,7 @@ func (kp *SyncHandler) createIPTableChains() error {
 
 	ruleSpec = []string{"-o", VxLANIface, "-j", "ACCEPT"}
 
-	if err = iptables.PrependUnique(ipt, "filter", "FORWARD", ruleSpec); err != nil {
+	if err = iptables.PrependUnique(ipt, constants.FilterTable, "FORWARD", ruleSpec); err != nil {
 		return errors.Wrap(err, "unable to insert iptable rule in filter table to allow vxlan traffic")
 	}
 
@@ -73,7 +73,7 @@ func (kp *SyncHandler) createIPTableChains() error {
 		ruleSpec = []string{"-s", sourceAddress, "-o", VxLANIface, "-j", "SNAT", "--to", kp.cniIface.IPAddress}
 		klog.V(log.DEBUG).Infof("Installing rule for host network to remote cluster communication: %s", strings.Join(ruleSpec, " "))
 
-		if err = ipt.AppendUnique("nat", constants.SmPostRoutingChain, ruleSpec...); err != nil {
+		if err = ipt.AppendUnique(constants.NATTable, constants.SmPostRoutingChain, ruleSpec...); err != nil {
 			return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(ruleSpec, " "))
 		}
 	}
@@ -105,7 +105,7 @@ func (kp *SyncHandler) programIptableRulesForInterClusterTraffic(remoteCidrBlock
 		ruleSpec := []string{"-s", localClusterCidr, "-d", remoteCidrBlock, "-j", "ACCEPT"}
 		klog.V(log.DEBUG).Infof("Installing iptables rule for outgoing traffic: %s", strings.Join(ruleSpec, " "))
 
-		if err = ipt.AppendUnique("nat", constants.SmPostRoutingChain, ruleSpec...); err != nil {
+		if err = ipt.AppendUnique(constants.NATTable, constants.SmPostRoutingChain, ruleSpec...); err != nil {
 			return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(ruleSpec, " "))
 		}
 
@@ -113,7 +113,7 @@ func (kp *SyncHandler) programIptableRulesForInterClusterTraffic(remoteCidrBlock
 		ruleSpec = []string{"-s", remoteCidrBlock, "-d", localClusterCidr, "-j", "ACCEPT"}
 		klog.V(log.DEBUG).Infof("Installing iptables rule for incoming traffic: %s", strings.Join(ruleSpec, " "))
 
-		if err = ipt.AppendUnique("nat", constants.SmPostRoutingChain, ruleSpec...); err != nil {
+		if err = ipt.AppendUnique(constants.NATTable, constants.SmPostRoutingChain, ruleSpec...); err != nil {
 			return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(ruleSpec, " "))
 		}
 	}

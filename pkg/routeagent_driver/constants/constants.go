@@ -21,7 +21,9 @@ package constants
 const (
 	// IPTable chains used by RouteAgent.
 	SmPostRoutingChain = "SUBMARINER-POSTROUTING"
+	SmInputChain       = "SUBMARINER-INPUT"
 	PostRoutingChain   = "POSTROUTING"
+	InputChain         = "INPUT"
 	MangleTable        = "mangle"
 	RemoteCIDRIPSet    = "SUBMARINER-REMOTECIDRS"
 	LocalCIDRIPSet     = "SUBMARINER-LOCALCIDRS"
@@ -55,4 +57,7 @@ const (
 	NetworkPluginOpenShiftSDN  = "OpenShiftSDN"
 	NetworkPluginOVNKubernetes = "OVNKubernetes"
 	NetworkPluginCalico        = "calico"
+
+	NATTable    = "nat"
+	FilterTable = "filter"
 )
