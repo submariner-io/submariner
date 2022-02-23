@@ -1,0 +1,19 @@
+---
+name: Multi-arch builds
+
+on:
+  pull_request:
+
+jobs:
+  apply-suggestions-commits:
+    name: Check the multi-arch builds
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
+      - name: Set up QEMU (to support building on non-native architectures)
+        uses: docker/setup-qemu-action@27d0a4f181a40b142cce983c5393082c365d1480
+      - name: Set up buildx
+        uses: docker/setup-buildx-action@f211e3e9ded2d9377c8cadc4489a4e38014bc4c9
+      - name: Build the multi-arch images
+        run: make LOCAL_BUILD=1 multiarch-images
