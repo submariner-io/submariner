@@ -1,8 +1,7 @@
 ARG BASE_BRANCH
 ARG SOURCE=/go/src/github.com/submariner-io/submariner
-ARG TARGETPLATFORM=linux/amd64
 
-FROM quay.io/submariner/shipyard-dapper-base:${BASE_BRANCH} AS builder
+FROM --platform=${BUILDPLATFORM} quay.io/submariner/shipyard-dapper-base:${BASE_BRANCH} AS builder
 ARG SOURCE
 ARG TARGETPLATFORM
 
@@ -10,7 +9,7 @@ COPY . ${SOURCE}
 
 RUN make -C ${SOURCE} LOCAL_BUILD=1 bin/${TARGETPLATFORM}/submariner-route-agent
 
-FROM fedora:34
+FROM --platform=${TARGETPLATFORM} fedora:34
 ARG SOURCE
 ARG TARGETPLATFORM
 
