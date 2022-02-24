@@ -46,7 +46,6 @@ const (
 
 type Interface interface {
 	Start(stopCh <-chan struct{}) error
-
 	GetLatencyInfo(endpoint *submarinerv1.EndpointSpec) *LatencyInfo
 }
 
