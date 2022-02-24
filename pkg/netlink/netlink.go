@@ -37,28 +37,20 @@ type Interface interface {
 	LinkDel(link netlink.Link) error
 	LinkByName(name string) (netlink.Link, error)
 	LinkSetUp(link netlink.Link) error
-
 	AddrAdd(link netlink.Link, addr *netlink.Addr) error
-
 	NeighAppend(neigh *netlink.Neigh) error
 	NeighDel(neigh *netlink.Neigh) error
-
 	RouteAdd(route *netlink.Route) error
 	RouteDel(route *netlink.Route) error
 	RouteGet(destination net.IP) ([]netlink.Route, error)
 	RouteList(link netlink.Link, family int) ([]netlink.Route, error)
-
 	FlushRouteTable(tableID int) error
-
 	RuleAdd(rule *netlink.Rule) error
 	RuleDel(rule *netlink.Rule) error
-
 	XfrmPolicyAdd(policy *netlink.XfrmPolicy) error
 	XfrmPolicyDel(policy *netlink.XfrmPolicy) error
 	XfrmPolicyList(family int) ([]netlink.XfrmPolicy, error)
-
 	EnableLooseModeReversePathFilter(interfaceName string) error
-
 	ConfigureTCPMTUProbe(mtuProbe, baseMss string) error
 }
 
