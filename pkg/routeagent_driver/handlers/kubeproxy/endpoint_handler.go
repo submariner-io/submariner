@@ -105,7 +105,7 @@ func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	kp.syncHandlerMutex.Lock()
 	defer kp.syncHandlerMutex.Unlock()
 
-	lastProcessedTime, ok := kp.remoteEndpointTimeStamp[endpoint.ClusterName]
+	lastProcessedTime, ok := kp.remoteEndpointTimeStamp[endpoint.Spec.ClusterID]
 
 	if ok && lastProcessedTime.After(endpoint.CreationTimestamp.Time) {
 		klog.Infof("Ignoring new remote %#v since a later endpoint was already"+
@@ -132,7 +132,7 @@ func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	kp.updateRoutingRulesForHostNetworkSupport(endpoint.Spec.Subnets, Add)
 	kp.updateIptableRulesForInterClusterTraffic(endpoint.Spec.Subnets, Add)
 
-	kp.remoteEndpointTimeStamp[endpoint.ClusterName] = endpoint.CreationTimestamp
+	kp.remoteEndpointTimeStamp[endpoint.Spec.ClusterID] = endpoint.CreationTimestamp
 
 	return nil
 }
@@ -145,7 +145,7 @@ func (kp *SyncHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	kp.syncHandlerMutex.Lock()
 	defer kp.syncHandlerMutex.Unlock()
 
-	lastProcessedTime, ok := kp.remoteEndpointTimeStamp[endpoint.ClusterName]
+	lastProcessedTime, ok := kp.remoteEndpointTimeStamp[endpoint.Spec.ClusterID]
 
 	if ok && lastProcessedTime.After(endpoint.CreationTimestamp.Time) {
 		klog.Infof("Ignoring deleted remote %#v since a later endpoint was already"+
@@ -153,7 +153,7 @@ func (kp *SyncHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 		return nil
 	}
 
-	delete(kp.remoteEndpointTimeStamp, endpoint.ClusterName)
+	delete(kp.remoteEndpointTimeStamp, endpoint.Spec.ClusterID)
 
 	for _, inputCidrBlock := range endpoint.Spec.Subnets {
 		kp.remoteSubnets.Remove(inputCidrBlock)
