@@ -469,3 +469,18 @@ func genPsk(psk string) (wgtypes.Key, error) {
 	pskBytes := sha256.Sum256([]byte(psk))
 	return wgtypes.NewKey(pskBytes[:]) // nolint:wrapcheck // Let the caller wrap it
 }
+
+func (w *wireguard) Cleanup() error {
+	klog.Info("Uninstalling the wireguard cable driver")
+
+	link, err := netlink.LinkByName(DefaultDeviceName)
+	if err != nil && !errors.Is(err, netlink.LinkNotFoundError{}) {
+		return errors.Wrapf(err, "error retrieving the wireguard interface %q", DefaultDeviceName)
+	}
+
+	if err := netlink.LinkDel(link); err != nil {
+		return errors.Wrapf(err, "failed to delete existing WireGuard device %q", DefaultDeviceName)
+	}
+
+	return nil
+}

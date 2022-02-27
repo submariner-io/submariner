@@ -136,20 +136,6 @@ func main() {
 		LocalNamespace:  submSpec.Namespace,
 	}, localCluster, localEndpoint)
 
-	if submSpec.Uninstall {
-		klog.Info("Uninstalling the submariner gateway engine")
-
-		dsErr := dsSyncer.Cleanup()
-
-		fatalOnErr(dsErr, "Error cleaning up the datastore")
-
-		return
-	}
-
-	cableEngine.SetupNATDiscovery(natDiscovery)
-
-	fatalOnErr(natDiscovery.Run(stopCh), "Error starting NAT discovery server")
-
 	var cableHealthchecker healthchecker.Interface
 
 	if !submSpec.HealthCheckEnabled {
@@ -171,6 +157,18 @@ func main() {
 		cableEngine,
 		submarinerClient.SubmarinerV1().Gateways(submSpec.Namespace),
 		VERSION, cableHealthchecker)
+
+	if submSpec.Uninstall {
+		klog.Info("Uninstalling the submariner gateway engine")
+
+		uninstallGateway(cableEngine, cableEngineSyncer, dsSyncer)
+
+		return
+	}
+
+	cableEngine.SetupNATDiscovery(natDiscovery)
+
+	fatalOnErr(natDiscovery.Run(stopCh), "Error starting NAT discovery server")
 
 	gwPod, err := pod.NewGatewayPod(k8sClient)
 	fatalOnErr(err, "Error creating a handler to update the gateway pod")
@@ -380,4 +378,25 @@ func (c *cleanupHandler) fatal(format string, args ...interface{}) {
 	}
 
 	klog.Fatal(err.Error())
+}
+
+func uninstallGateway(cableEngine cableengine.Engine, cableEngineSyncer *syncer.GatewaySyncer,
+	dsSyncer *datastoresyncer.DatastoreSyncer) {
+	err := cableEngine.StartEngine()
+	if err != nil {
+		// As we are in the process of cleaning up, ignore any initialization errors.
+		klog.Errorf("Error starting the cable driver: %v", err)
+	}
+
+	// The Gateway object has to be deleted before invoking the cableEngine.Cleanup
+	cableEngineSyncer.CleanupGatewayEntry()
+
+	err = cableEngine.Cleanup()
+	if err != nil {
+		klog.Errorf("Error while cleaning up of cable drivers: %v", err)
+	}
+
+	dsErr := dsSyncer.Cleanup()
+
+	fatalOnErr(dsErr, "Error cleaning up the datastore")
 }

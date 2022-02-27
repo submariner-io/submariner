@@ -48,6 +48,9 @@ type Driver interface {
 
 	// GetName returns driver's name
 	GetName() string
+
+	// Cleanup performs the necessary uninstallation.
+	Cleanup() error
 }
 
 // Function prototype to create a new driver.

@@ -19,13 +19,9 @@ limitations under the License.
 package cabledriver
 
 import (
-	"syscall"
-
-	"github.com/pkg/errors"
-	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/cable/vxlan"
 	"github.com/submariner-io/submariner/pkg/event"
-	"github.com/vishvananda/netlink"
+	"github.com/submariner-io/submariner/pkg/util"
 	"k8s.io/klog"
 )
 
@@ -48,34 +44,5 @@ func (h *vxlanCleanup) GetName() string {
 func (h *vxlanCleanup) TransitionToNonGateway() error {
 	klog.Infof("Cleaning up the routes")
 
-	link, err := netlink.LinkByName(vxlan.VxlanIface)
-	if err != nil {
-		if !errors.Is(err, netlink.LinkNotFoundError{}) {
-			klog.Warningf("Failed to retrieve the vxlan-tunnel interface during transition to non-gateway: %v", err)
-		}
-
-		return nil
-	}
-
-	currentRouteList, err := netlink.RouteList(link, syscall.AF_INET)
-
-	if err != nil {
-		klog.Warningf("Unable to cleanup routes, error retrieving routes on the link %s: %v", vxlan.VxlanIface, err)
-	} else {
-		for i := range currentRouteList {
-			klog.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])
-			if currentRouteList[i].Table == vxlan.TableID {
-				if err = netlink.RouteDel(&currentRouteList[i]); err != nil {
-					klog.Errorf("Error removing route %s: %v", currentRouteList[i], err)
-				}
-			}
-		}
-	}
-
-	err = netlink.LinkDel(link)
-	if err != nil {
-		return errors.Wrapf(err, "failed to delete the vxlan interface")
-	}
-
-	return nil
+	return util.DeleteVxLANIfaceAlongWithRoutes(vxlan.VxlanIface, vxlan.TableID) // nolint:wrapcheck  // No need to wrap this error
 }

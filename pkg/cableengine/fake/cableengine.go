@@ -112,3 +112,7 @@ func (e *Engine) VerifyRemoveCable(expected *v1.EndpointSpec) {
 
 func (e *Engine) SetupNATDiscovery(natDiscovery natdiscovery.Interface) {
 }
+
+func (e *Engine) Cleanup() error {
+	return nil
+}

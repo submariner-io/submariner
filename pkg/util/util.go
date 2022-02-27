@@ -20,14 +20,19 @@ package util
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"strings"
+	"syscall"
 	"unicode"
 
+	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/types"
+	nl "github.com/vishvananda/netlink"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/klog"
 )
 
 const tokenLength = 64
@@ -76,7 +81,7 @@ func GetLocalIP() string {
 func GetLocalIPForDestination(dst string) string {
 	conn, err := net.Dial("udp", dst+":53")
 	if err != nil {
-		log.Fatal(err)
+		klog.Fatal(err)
 	}
 	defer conn.Close()
 
@@ -146,4 +151,67 @@ func EnsureValidName(name string) string {
 
 		return c
 	}, name)
+}
+
+func DeleteXfrmRules() error {
+	netLink := netlink.New()
+
+	currentXfrmPolicyList, err := netLink.XfrmPolicyList(syscall.AF_INET)
+	if err != nil {
+		return errors.Wrap(err, "error retrieving current xfrm policies")
+	}
+
+	if len(currentXfrmPolicyList) > 0 {
+		klog.Infof("Cleaning up %d XFRM policies", len(currentXfrmPolicyList))
+	}
+
+	for i := range currentXfrmPolicyList {
+		// These xfrm rules are not programmed by Submariner, skip them.
+		if currentXfrmPolicyList[i].Dst.String() == "0.0.0.0/0" &&
+			currentXfrmPolicyList[i].Src.String() == "0.0.0.0/0" && currentXfrmPolicyList[i].Proto == 0 {
+			klog.V(log.DEBUG).Infof("Skipping deletion of XFRM policy %s", currentXfrmPolicyList[i])
+			continue
+		}
+
+		klog.V(log.DEBUG).Infof("Deleting XFRM policy %s", currentXfrmPolicyList[i])
+
+		if err = netLink.XfrmPolicyDel(&currentXfrmPolicyList[i]); err != nil {
+			return errors.Wrapf(err, "error deleting XFRM policy %s", currentXfrmPolicyList[i])
+		}
+	}
+
+	return nil
+}
+
+func DeleteVxLANIfaceAlongWithRoutes(iface string, tableID int) error {
+	link, err := nl.LinkByName(iface)
+	if err != nil {
+		if !errors.Is(err, nl.LinkNotFoundError{}) {
+			klog.Warningf("Failed to retrieve the vxlan-tunnel interface during transition to non-gateway: %v", err)
+		}
+
+		return nil
+	}
+
+	currentRouteList, err := nl.RouteList(link, syscall.AF_INET)
+
+	if err != nil {
+		klog.Warningf("Unable to cleanup routes, error retrieving routes on the link %s: %v", iface, err)
+	} else {
+		for i := range currentRouteList {
+			klog.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])
+			if currentRouteList[i].Table == tableID {
+				if err = nl.RouteDel(&currentRouteList[i]); err != nil {
+					klog.Errorf("Error removing route %s: %v", currentRouteList[i], err)
+				}
+			}
+		}
+	}
+
+	err = nl.LinkDel(link)
+	if err != nil {
+		return errors.Wrapf(err, "failed to delete the vxlan interface")
+	}
+
+	return nil
 }

@@ -19,22 +19,17 @@ limitations under the License.
 package cabledriver
 
 import (
-	"syscall"
-
-	"github.com/pkg/errors"
-	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/event"
-	"github.com/submariner-io/submariner/pkg/netlink"
+	"github.com/submariner-io/submariner/pkg/util"
 	"k8s.io/klog"
 )
 
 type xrfmCleanup struct {
 	event.HandlerBase
-	netLink netlink.Interface
 }
 
 func NewXRFMCleanupHandler() event.Handler {
-	return &xrfmCleanup{netLink: netlink.New()}
+	return &xrfmCleanup{}
 }
 
 func (h *xrfmCleanup) GetName() string {
@@ -46,29 +41,7 @@ func (h *xrfmCleanup) GetNetworkPlugins() []string {
 }
 
 func (h *xrfmCleanup) TransitionToNonGateway() error {
-	currentXfrmPolicyList, err := h.netLink.XfrmPolicyList(syscall.AF_INET)
-	if err != nil {
-		return errors.Wrap(err, "error retrieving current xfrm policies")
-	}
+	klog.Info("Transitioned to non-Gateway, cleaning up the IPsec xfrm rules")
 
-	if len(currentXfrmPolicyList) > 0 {
-		klog.Infof("Cleaning up %d XFRM policies", len(currentXfrmPolicyList))
-	}
-
-	for i := range currentXfrmPolicyList {
-		// These xfrm rules are not programmed by Submariner, skip them.
-		if currentXfrmPolicyList[i].Dst.String() == "0.0.0.0/0" &&
-			currentXfrmPolicyList[i].Src.String() == "0.0.0.0/0" && currentXfrmPolicyList[i].Proto == 0 {
-			klog.V(log.DEBUG).Infof("Skipping deletion of XFRM policy %s", currentXfrmPolicyList[i])
-			continue
-		}
-
-		klog.V(log.DEBUG).Infof("Deleting XFRM policy %s", currentXfrmPolicyList[i])
-
-		if err = h.netLink.XfrmPolicyDel(&currentXfrmPolicyList[i]); err != nil {
-			return errors.Wrapf(err, "error deleting XFRM policy %s", currentXfrmPolicyList[i])
-		}
-	}
-
-	return nil
+	return util.DeleteXfrmRules() // nolint:wrapcheck  // No need to wrap this error
 }
