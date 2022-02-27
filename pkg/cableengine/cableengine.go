@@ -60,6 +60,9 @@ type Engine interface {
 	GetHAStatus() v1.HAStatus
 	// SetupNATDiscovery configures the handler for nat discovery of the endpoints.
 	SetupNATDiscovery(natDiscovery natdiscovery.Interface)
+
+	// Cleanup performs the necessary steps to uninstall the cable driver.
+	Cleanup() error
 }
 
 type engine struct {
@@ -275,4 +278,12 @@ func (i *engine) ListCableConnections() ([]v1.Connection, error) {
 	}
 	// if no driver, we can safely report that no connections exist.
 	return []v1.Connection{}, nil
+}
+
+func (i *engine) Cleanup() error {
+	if i.driver != nil {
+		return i.driver.Cleanup() // nolint:wrapcheck  // No need to wrap this error
+	}
+
+	return nil
 }

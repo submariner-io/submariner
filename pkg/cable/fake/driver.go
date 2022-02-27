@@ -145,3 +145,7 @@ func (d *Driver) AwaitDisconnectFromEndpoint(expected *v1.EndpointSpec) {
 func (d *Driver) AwaitNoDisconnectFromEndpoint() {
 	Consistently(d.disconnectFromEndpoint, 500*time.Millisecond).ShouldNot(Receive(), "DisconnectFromEndpoint was unexpectedly called")
 }
+
+func (d *Driver) Cleanup() error {
+	return nil
+}

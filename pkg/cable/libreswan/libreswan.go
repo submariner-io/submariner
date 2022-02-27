@@ -37,6 +37,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
+	"github.com/submariner-io/submariner/pkg/util"
 	"k8s.io/klog"
 )
 
@@ -609,4 +610,10 @@ func (i *libreswan) runPluto() error {
 	}
 
 	return nil
+}
+
+func (i *libreswan) Cleanup() error {
+	klog.Info("Uninstalling the libreswan cable driver")
+
+	return util.DeleteXfrmRules() // nolint:wrapcheck  // No need to wrap this error
 }
