@@ -30,7 +30,6 @@ import (
 
 // Driver is used by the ipsec engine to actually connect the tunnels.
 type Driver interface {
-
 	// Init initializes the driver with any state it needs.
 	Init() error
 

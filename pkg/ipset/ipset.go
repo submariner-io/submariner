@@ -87,11 +87,8 @@ type Interface interface {
 	ListSets() ([]string, error)
 	// GetVersion returns the "X.Y" version string for ipset.
 	GetVersion() (string, error)
-
 	AddEntryWithOptions(entry *Entry, set *IPSet, ignoreExistErr bool) error
-
 	DelEntryWithOptions(set, entry string, options ...string) error
-
 	ListAllSetInfo() (string, error)
 }
 
