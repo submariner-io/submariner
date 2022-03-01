@@ -29,7 +29,9 @@ import (
 	"syscall"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/vishvananda/netlink"
+	"k8s.io/klog"
 )
 
 type Interface interface {
@@ -55,6 +57,10 @@ type Interface interface {
 }
 
 var NewFunc func() Interface
+
+const (
+	allZeroAddress = "0.0.0.0/0"
+)
 
 type netlinkType struct{}
 
@@ -178,7 +184,7 @@ func GetDefaultGatewayInterface() (*net.Interface, error) {
 	}
 
 	for i := range routes {
-		if routes[i].Dst == nil || routes[i].Dst.String() == "0.0.0.0/0" {
+		if routes[i].Dst == nil || routes[i].Dst.String() == allZeroAddress {
 			if routes[i].LinkIndex == 0 {
 				return nil, fmt.Errorf("default gateway interface could not be determined")
 			}
@@ -193,4 +199,69 @@ func GetDefaultGatewayInterface() (*net.Interface, error) {
 	}
 
 	return nil, fmt.Errorf("unable to find default route")
+}
+
+func DeleteIfaceAndAssociatedRoutes(iface string, tableID int) error {
+	n := New()
+
+	link, err := n.LinkByName(iface)
+	if err != nil {
+		if !errors.Is(err, netlink.LinkNotFoundError{}) {
+			klog.Warningf("Failed to retrieve the vxlan-tunnel interface: %v", err)
+		}
+
+		return nil
+	}
+
+	currentRouteList, err := n.RouteList(link, syscall.AF_INET)
+
+	if err != nil {
+		klog.Warningf("Unable to cleanup routes, error retrieving routes on the link %s: %v", iface, err)
+	} else {
+		for i := range currentRouteList {
+			klog.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])
+			if currentRouteList[i].Table == tableID {
+				if err = n.RouteDel(&currentRouteList[i]); err != nil {
+					klog.Errorf("Error removing route %s: %v", currentRouteList[i], err)
+				}
+			}
+		}
+	}
+
+	err = n.LinkDel(link)
+	if err != nil {
+		return errors.Wrapf(err, "failed to delete the vxlan interface")
+	}
+
+	return nil
+}
+
+func DeleteXfrmRules() error {
+	n := New()
+
+	currentXfrmPolicyList, err := n.XfrmPolicyList(syscall.AF_INET)
+	if err != nil {
+		return errors.Wrap(err, "error retrieving current xfrm policies")
+	}
+
+	if len(currentXfrmPolicyList) > 0 {
+		klog.Infof("Cleaning up %d XFRM policies", len(currentXfrmPolicyList))
+	}
+
+	for i := range currentXfrmPolicyList {
+		// These xfrm rules are not programmed by Submariner, skip them.
+		if currentXfrmPolicyList[i].Dst.String() == allZeroAddress &&
+			currentXfrmPolicyList[i].Src.String() == allZeroAddress && currentXfrmPolicyList[i].Proto == 0 {
+			klog.V(log.DEBUG).Infof("Skipping deletion of XFRM policy %s", currentXfrmPolicyList[i])
+			continue
+		}
+
+		klog.V(log.DEBUG).Infof("Deleting XFRM policy %s", currentXfrmPolicyList[i])
+
+		if err = n.XfrmPolicyDel(&currentXfrmPolicyList[i]); err != nil {
+			return errors.Wrapf(err, "error deleting XFRM policy %s", currentXfrmPolicyList[i])
+		}
+	}
+
+	return nil
 }

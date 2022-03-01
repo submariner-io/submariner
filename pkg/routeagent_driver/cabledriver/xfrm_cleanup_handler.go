@@ -20,7 +20,7 @@ package cabledriver
 
 import (
 	"github.com/submariner-io/submariner/pkg/event"
-	"github.com/submariner-io/submariner/pkg/util"
+	"github.com/submariner-io/submariner/pkg/netlink"
 	"k8s.io/klog"
 )
 
@@ -43,5 +43,5 @@ func (h *xrfmCleanup) GetNetworkPlugins() []string {
 func (h *xrfmCleanup) TransitionToNonGateway() error {
 	klog.Info("Transitioned to non-Gateway, cleaning up the IPsec xfrm rules")
 
-	return util.DeleteXfrmRules() // nolint:wrapcheck  // No need to wrap this error
+	return netlink.DeleteXfrmRules() // nolint:wrapcheck  // No need to wrap this error
 }
