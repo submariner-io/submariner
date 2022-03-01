@@ -121,7 +121,6 @@ func (c *baseIPAllocationController) reserveAllocatedIPs(federator federate.Fede
 
 	if err == nil && len(reservedIPs) > 0 {
 		err = postReserve(reservedIPs)
-
 		if err != nil {
 			_ = c.pool.Release(reservedIPs...)
 		}

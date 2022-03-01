@@ -228,8 +228,6 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 		return true
 	}
 
-	metrics.RecordAllocateGlobalEgressIPs(c.pool.GetCIDR(), numberOfIPs)
-
 	err = c.programGlobalEgressRules(key, allocatedIPs, globalEgressIP.Spec.PodSelector, namedIPSet)
 	if err != nil {
 		klog.Errorf("Error programming egress IP table rules for %q: %v", key, err)
@@ -242,10 +240,11 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 		})
 
 		_ = c.pool.Release(allocatedIPs...)
-		metrics.RecordDeallocateGlobalEgressIPs(c.pool.GetCIDR(), numberOfIPs)
 
 		return true
 	}
+
+	metrics.RecordAllocateGlobalEgressIPs(c.pool.GetCIDR(), numberOfIPs)
 
 	globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, &metav1.Condition{
 		Type:    string(submarinerv1.GlobalEgressIPAllocated),

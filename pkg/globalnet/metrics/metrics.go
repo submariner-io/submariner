@@ -101,6 +101,7 @@ func RecordAllocateGlobalIngressIPs(cidr string, count int) {
 
 func RecordDeallocateGlobalIP(cidr string) {
 	globalIPsAllocatedGauge.With(prometheus.Labels{cidrLabel: cidr}).Dec()
+	globalIPsAvailabilityGauge.With(prometheus.Labels{cidrLabel: cidr}).Inc()
 }
 
 func RecordDeallocateGlobalEgressIPs(cidr string, count int) {
