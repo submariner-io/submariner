@@ -1,7 +1,9 @@
 ARG BASE_BRANCH
+ARG FEDORA_VERSION=34
 ARG SOURCE=/go/src/github.com/submariner-io/submariner
 
 FROM --platform=${BUILDPLATFORM} quay.io/submariner/shipyard-dapper-base:${BASE_BRANCH} AS builder
+ARG FEDORA_VERSION
 ARG SOURCE
 ARG TARGETPLATFORM
 
@@ -9,18 +11,27 @@ COPY . ${SOURCE}
 
 RUN make -C ${SOURCE} LOCAL_BUILD=1 bin/${TARGETPLATFORM}/submariner-gateway
 
-FROM --platform=${TARGETPLATFORM} fedora:34
+FROM --platform=${BUILDPLATFORM} fedora:${FEDORA_VERSION} AS base
+ARG FEDORA_VERSION
+ARG SOURCE
+ARG TARGETPLATFORM
+
+COPY package/dnf_install /
+
+# iproute and iptables are used internally
+# libreswan provides IKE
+# kmod is required so that libreswan can load modules
+RUN /dnf_install -a ${TARGETPLATFORM} -v ${FEDORA_VERSION} -r /output/gateway \
+    glibc bash glibc-minimal-langpack coreutils-single \
+    libcurl-minimal iproute iptables iptables-nft libreswan kmod
+
+FROM --platform=${TARGETPLATFORM} scratch
 ARG SOURCE
 ARG TARGETPLATFORM
 
 WORKDIR /var/submariner
 
-# iproute is used internally
-# libreswan provides IKE
-# kmod is required so that libreswan can load modules
-RUN dnf -y install --nodocs --setopt=install_weak_deps=0 \
-           iproute libreswan kmod && \
-    dnf -y clean all
+COPY --from=base /output/gateway /
 
 COPY --from=builder ${SOURCE}/package/submariner.sh ${SOURCE}/package/pluto ${SOURCE}/bin/${TARGETPLATFORM}/submariner-gateway /usr/local/bin/
 

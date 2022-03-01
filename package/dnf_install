@@ -1,0 +1,69 @@
+#!/bin/bash
+
+# Installs packages using dnf to a named root:
+# -a arch - use arch instead of the native arch
+# -k      - keep the package cache
+# -r root - install to the named root instead of /output/base
+# -v ver  - use the given Fedora version (required)
+#
+# %arch in the package references will be replaced with the chosen arch
+
+params="$(getopt -o a:kr:v: --name "$0" -- "$@")"
+eval set -- "$params"
+
+INSTALL_ROOT=/output/base
+
+while true
+do
+    case "$1" in
+    -a)
+        ARCH="$2"
+        shift 2
+        ;;
+	-k)
+	    KEEP_CACHE=true
+	    shift
+	    ;;
+	-r)
+	    INSTALL_ROOT="$2"
+	    shift 2
+	    ;;
+	-v)
+	    FEDORA_VERSION="$2"
+	    shift 2
+	    ;;
+	--)
+	    shift
+	    break
+	    ;;
+	*)
+	    echo "$0 doesn't support $1" >&2
+	    exit 1
+	    ;;
+    esac
+done
+
+if [[ -n "${ARCH}" ]]; then
+    # Convert container arch to Fedora arch
+    ARCH="${ARCH##*/}"
+    case "${ARCH}" in
+        amd64) ARCH=x86_64;;
+        arm64) ARCH=aarch64;;
+    esac
+    arch_args="--forcearch ${ARCH}"
+else
+    # This will be used later, but we won't force
+    ARCH="$(rpm -q --qf "%{arch}" rpm)"
+fi
+
+[[ -z "${FEDORA_VERSION}" ]] && echo I need to know which version of Fedora to install, specify it with -v >&2 && exit 1
+
+if [[ "${INSTALL_ROOT}" != /output/base ]] && [[ ! -d "${INSTALL_ROOT}" ]] && [[ -d /output/base ]]; then
+    cp -a /output/base "${INSTALL_ROOT}"
+fi
+
+dnf -y --setopt=install_weak_deps=0 --nodocs ${arch_args} \
+    --installroot "${INSTALL_ROOT}" --releasever "${FEDORA_VERSION}" \
+    install "${@//\%arch/${ARCH}}"
+
+[[ "${KEEP_CACHE}" == true ]] || dnf -y ${arch_args} --installroot "${INSTALL_ROOT}" --releasever "${FEDORA_VERSION}" clean all
