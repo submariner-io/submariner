@@ -559,5 +559,5 @@ func parseSubnets(subnets []string) []net.IPNet {
 func (v *vxlan) Cleanup() error {
 	klog.Infof("Uninstalling the vxlan cable driver")
 
-	return util.DeleteVxLANIfaceAlongWithRoutes(VxlanIface, TableID) // nolint:wrapcheck  // No need to wrap this error
+	return util.DeleteIfaceAlongWithRoutes(VxlanIface, TableID) // nolint:wrapcheck  // No need to wrap this error
 }

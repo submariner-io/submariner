@@ -183,7 +183,7 @@ func DeleteXfrmRules() error {
 	return nil
 }
 
-func DeleteVxLANIfaceAlongWithRoutes(iface string, tableID int) error {
+func DeleteIfaceAlongWithRoutes(iface string, tableID int) error {
 	link, err := nl.LinkByName(iface)
 	if err != nil {
 		if !errors.Is(err, nl.LinkNotFoundError{}) {

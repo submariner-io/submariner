@@ -44,5 +44,5 @@ func (h *vxlanCleanup) GetName() string {
 func (h *vxlanCleanup) TransitionToNonGateway() error {
 	klog.Infof("Cleaning up the routes")
 
-	return util.DeleteVxLANIfaceAlongWithRoutes(vxlan.VxlanIface, vxlan.TableID) // nolint:wrapcheck  // No need to wrap this error
+	return util.DeleteIfaceAlongWithRoutes(vxlan.VxlanIface, vxlan.TableID) // nolint:wrapcheck  // No need to wrap this error
 }
