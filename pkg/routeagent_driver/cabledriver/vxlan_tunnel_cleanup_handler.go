@@ -21,7 +21,7 @@ package cabledriver
 import (
 	"github.com/submariner-io/submariner/pkg/cable/vxlan"
 	"github.com/submariner-io/submariner/pkg/event"
-	"github.com/submariner-io/submariner/pkg/util"
+	"github.com/submariner-io/submariner/pkg/netlink"
 	"k8s.io/klog"
 )
 
@@ -44,5 +44,5 @@ func (h *vxlanCleanup) GetName() string {
 func (h *vxlanCleanup) TransitionToNonGateway() error {
 	klog.Infof("Cleaning up the routes")
 
-	return util.DeleteIfaceAlongWithRoutes(vxlan.VxlanIface, vxlan.TableID) // nolint:wrapcheck  // No need to wrap this error
+	return netlink.DeleteIfaceAndAssociatedRoutes(vxlan.VxlanIface, vxlan.TableID) // nolint:wrapcheck  // No need to wrap this error
 }

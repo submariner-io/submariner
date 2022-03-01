@@ -35,7 +35,6 @@ import (
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/submariner-io/submariner/pkg/util"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	"k8s.io/klog"
@@ -559,5 +558,5 @@ func parseSubnets(subnets []string) []net.IPNet {
 func (v *vxlan) Cleanup() error {
 	klog.Infof("Uninstalling the vxlan cable driver")
 
-	return util.DeleteIfaceAlongWithRoutes(VxlanIface, TableID) // nolint:wrapcheck  // No need to wrap this error
+	return netlinkAPI.DeleteIfaceAndAssociatedRoutes(VxlanIface, TableID) // nolint:wrapcheck  // No need to wrap this error
 }
