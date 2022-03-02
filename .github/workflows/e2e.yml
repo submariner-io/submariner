@@ -14,8 +14,8 @@ jobs:
         uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7042f
 
       - name: Run E2E deployment and tests
-        uses: submariner-io/shipyard/gh-actions/e2e@devel
+        uses: submariner-io/shipyard/gh-actions/e2e@release-0.12
 
       - name: Post mortem
         if: failure()
-        uses: submariner-io/shipyard/gh-actions/post-mortem@devel
+        uses: submariner-io/shipyard/gh-actions/post-mortem@release-0.12
