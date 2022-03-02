@@ -57,6 +57,7 @@ const (
 	NetworkPluginOpenShiftSDN  = "OpenShiftSDN"
 	NetworkPluginOVNKubernetes = "OVNKubernetes"
 	NetworkPluginCalico        = "calico"
+	NetworkPluginKubeOVN       = "kubeovn"
 
 	NATTable    = "nat"
 	FilterTable = "filter"

@@ -80,7 +80,7 @@ func (kp *SyncHandler) GetName() string {
 func (kp *SyncHandler) GetNetworkPlugins() []string {
 	return []string{
 		constants.NetworkPluginGeneric, constants.NetworkPluginCanalFlannel, constants.NetworkPluginWeaveNet,
-		constants.NetworkPluginOpenShiftSDN, constants.NetworkPluginCalico,
+		constants.NetworkPluginOpenShiftSDN, constants.NetworkPluginCalico, constants.NetworkPluginKubeOVN,
 	}
 }
 
