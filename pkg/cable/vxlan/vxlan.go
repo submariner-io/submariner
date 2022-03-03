@@ -194,7 +194,7 @@ func createvxlanIface(iface *vxlanIface) error {
 			return errors.Wrap(err, "failed to retrieve link info")
 		}
 
-		if cableutils.IsIfaceConfigTheSame(iface.link, existing) {
+		if isVxlanConfigTheSame(iface.link, existing) {
 			klog.V(log.DEBUG).Infof("VxLAN interface already exists with same configuration.")
 
 			iface.link = existing.(*netlink.Vxlan)
@@ -215,6 +215,18 @@ func createvxlanIface(iface *vxlanIface) error {
 	}
 
 	return nil
+}
+
+func isVxlanConfigTheSame(newLink, currentLink netlink.Link) bool {
+	required := newLink.(*netlink.Vxlan)
+	existing := currentLink.(*netlink.Vxlan)
+
+	if required.VxlanId != existing.VxlanId {
+		klog.Warningf("VxlanId of existing interface (%d) does not match with required VxlanId (%d)", existing.VxlanId, required.VxlanId)
+		return false
+	}
+
+	return cableutils.IsIfaceConfigTheSame(newLink, currentLink)
 }
 
 func (v *vxlan) addIPRule() error {
@@ -411,7 +423,6 @@ func (v *vxlan) Init() error {
 func (v *vxlan) GetName() string {
 	return CableDriverName
 }
-
 
 func (v *vxlan) Cleanup() error {
 	klog.Infof("Uninstalling the vxlan cable driver")
