@@ -34,7 +34,7 @@ func (kp *SyncHandler) Stop(uninstall bool) error {
 		return nil
 	}
 
-	klog.Infof("Uinstalling Submariner changes from the node %q", kp.hostname)
+	klog.Infof("Uninstalling Submariner changes from the node %q", kp.hostname)
 	klog.Infof("Flushing route table %d entries", constants.RouteAgentHostNetworkTableID)
 
 	err := kp.netLink.FlushRouteTable(constants.RouteAgentHostNetworkTableID)
