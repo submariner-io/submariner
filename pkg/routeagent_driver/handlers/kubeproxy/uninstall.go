@@ -44,6 +44,16 @@ func (kp *SyncHandler) Stop(uninstall bool) error {
 			constants.RouteAgentHostNetworkTableID, err)
 	}
 
+	rule := netlink.NewRule()
+	rule.Table = constants.RouteAgentHostNetworkTableID
+	rule.Priority = constants.RouteAgentHostNetworkTableID
+
+	err = kp.netLink.ConfigureIPRule(netlinkAPI.Delete, constants.RouteAgentHostNetworkTableID)
+	if err != nil {
+		klog.V(log.TRACE).Infof("Deleting IP Rule pointing to %d table returned error: %v",
+			constants.RouteAgentHostNetworkTableID, err)
+	}
+
 	deleteVxLANInterface()
 	deleteIPTableChains()
 
