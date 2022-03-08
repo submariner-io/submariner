@@ -20,6 +20,7 @@ package kubeproxy
 
 import (
 	"github.com/submariner-io/admiral/pkg/log"
+	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"k8s.io/klog"
 )
@@ -34,7 +35,7 @@ func (kp *SyncHandler) TransitionToNonGateway() error {
 	// If the active Gateway transitions to a new node, we flush the HostNetwork routing table.
 	kp.updateRoutingRulesForHostNetworkSupport(nil, Flush)
 
-	err := kp.configureIPRule(Delete)
+	err := kp.netLink.ConfigureIPRule(netlinkAPI.Delete, constants.RouteAgentHostNetworkTableID)
 	if err != nil {
 		klog.Errorf("Unable to delete ip rule to table %d on non-Gateway node %s: %v",
 			constants.RouteAgentHostNetworkTableID, kp.hostname, err)
@@ -59,7 +60,7 @@ func (kp *SyncHandler) TransitionToGateway() error {
 		klog.Fatalf("Unable to create VxLAN interface on gateway node (%s): %v", kp.hostname, err)
 	}
 
-	err = kp.configureIPRule(Add)
+	err = kp.netLink.ConfigureIPRule(netlinkAPI.Add, constants.RouteAgentHostNetworkTableID)
 	if err != nil {
 		klog.Errorf("Unable to add ip rule to table %d on Gateway node %s: %v",
 			constants.RouteAgentHostNetworkTableID, kp.hostname, err)
