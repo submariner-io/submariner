@@ -32,10 +32,10 @@ type Adapter struct {
 	Basic
 }
 
-func (a *Adapter) RuleAddIfNotPresent(rule *netlink.Rule) error {
-	err := a.RuleAdd(rule)
+func (a *Adapter) RuleAddIfNotPresent(tableID int) error {
+	err := a.ConfigureIPRule(Add, tableID)
 	if err != nil && !os.IsExist(err) {
-		return errors.Wrapf(err, "failed to add rule %s", rule)
+		return errors.Wrapf(err, "failed to add rule %d", tableID)
 	}
 
 	return nil
