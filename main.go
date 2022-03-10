@@ -246,7 +246,7 @@ func main() {
 	}
 
 	go func() {
-		if err = startLeaderElection(leClient, recorder, becameLeader, lostLeader); err != nil {
+		if err = startLeaderElection(leClient, submSpec.MultiActiveGatewayEnabled, recorder, becameLeader, lostLeader); err != nil {
 			cleanup.fatal("Error starting leader election: %v", err)
 		}
 	}()
@@ -294,7 +294,7 @@ func startHTTPServer() *http.Server {
 	return srv
 }
 
-func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder resourcelock.EventRecorder,
+func startLeaderElection(leaderElectionClient kubernetes.Interface, multiActiveGateways bool, recorder resourcelock.EventRecorder,
 	run func(ctx context.Context), end func()) error {
 	gwLeadershipConfig := leaderConfig{}
 
@@ -338,14 +338,28 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder res
 	}
 
 	// Lock required for leader election
+	name := "submariner-gateway-lock"
+	identity := id + "-submariner-gateway"
+
+	if multiActiveGateways {
+		nodeName, ok := os.LookupEnv("NODE_NAME")
+		if ok {
+			name = nodeName + "-" + name
+			identity = nodeName + "-" + identity
+			klog.Infof("Multiple Active Gateways Enabled, creating unique reourcelock, name %q identity %q", name, identity)
+		} else {
+			klog.Warning("Error reading the NODE_NAME from the environment, not able to support Multiple Active Gateways")
+		}
+	}
+
 	rl := resourcelock.ConfigMapLock{
 		ConfigMapMeta: metav1.ObjectMeta{
 			Namespace: namespace,
-			Name:      "submariner-gateway-lock",
+			Name:      name,
 		},
 		Client: leaderElectionClient.CoreV1(),
 		LockConfig: resourcelock.ResourceLockConfig{
-			Identity:      id + "-submariner-gateway",
+			Identity:      identity,
 			EventRecorder: recorder,
 		},
 	}
