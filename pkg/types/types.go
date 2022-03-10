@@ -45,6 +45,7 @@ type SubmarinerSpecification struct {
 	NATEnabled                    bool
 	HealthCheckEnabled            bool `default:"true"`
 	Uninstall                     bool
+	MultiActiveGatewayEnabled     bool
 	HealthCheckInterval           uint
 	HealthCheckMaxPacketLossCount uint
 }
