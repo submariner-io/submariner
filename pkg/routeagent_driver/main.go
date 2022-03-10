@@ -96,6 +96,10 @@ func main() {
 			klog.Warningf("Error stopping handlers: %v", err)
 		}
 
+		if err = annotateNode([]string{}, cfg); err != nil {
+			klog.Warningf("Error removing %q annotation: %v", constants.CNIInterfaceIP, err)
+		}
+
 		return
 	}
 
