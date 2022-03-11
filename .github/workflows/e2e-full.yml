@@ -18,7 +18,6 @@ jobs:
         globalnet: ['', 'globalnet']
         cable_driver: ['libreswan', 'wireguard', 'vxlan']
         ovn: ['', 'ovn']
-        k8s_version: ['1.20']
         exclude:
           - ovn: 'ovn'
             globalnet: 'globalnet'
@@ -31,7 +30,6 @@ jobs:
       - name: Run E2E deployment and tests
         uses: submariner-io/shipyard/gh-actions/e2e@devel
         with:
-          k8s_version: ${{ matrix.k8s_version }}
           using: ${{ matrix.cable_driver }} ${{ matrix.deploytool }} ${{ matrix.globalnet }} ${{ matrix.ovn }}
 
       - name: Post mortem
