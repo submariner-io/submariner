@@ -96,7 +96,7 @@ func AnnotateNodeWithCNIInterfaceIP(nodeName string, clientSet kubernetes.Interf
 	if setAnnotation {
 		cniIface, err := Discover(clusterCidr[0])
 		if err != nil {
-			return errors.Wrap(err, "Discover returned error")
+			return errors.Wrapf(err, "Error retrieving the CNI interface for %s", clusterCidr[0])
 		}
 
 		cniIPAddress = cniIface.IPAddress
