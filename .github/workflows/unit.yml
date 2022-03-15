@@ -28,7 +28,7 @@ jobs:
           done
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@27121b0bdffd731efa15d66772be8dc71245d074
+        uses: actions/upload-artifact@6673cd052c4cd6fcf4b4e6e60ea986c889389535
         with:
           name: Unit test artifacts
           path: artifacts
