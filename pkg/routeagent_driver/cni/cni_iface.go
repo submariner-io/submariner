@@ -86,9 +86,20 @@ func discover(clusterCIDR string) (*Interface, error) {
 }
 
 func AnnotateNodeWithCNIInterfaceIP(nodeName string, clientSet kubernetes.Interface, clusterCidr []string) error {
-	cniIface, err := Discover(clusterCidr[0])
-	if err != nil {
-		return errors.Wrap(err, "Discover returned error")
+	cniIPAddress := ""
+	setAnnotation := true
+
+	if len(clusterCidr) == 0 {
+		setAnnotation = false
+	}
+
+	if setAnnotation {
+		cniIface, err := Discover(clusterCidr[0])
+		if err != nil {
+			return errors.Wrapf(err, "Error retrieving the CNI interface for %s", clusterCidr[0])
+		}
+
+		cniIPAddress = cniIface.IPAddress
 	}
 
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -101,7 +112,11 @@ func AnnotateNodeWithCNIInterfaceIP(nodeName string, clientSet kubernetes.Interf
 		if annotations == nil {
 			annotations = map[string]string{}
 		}
-		annotations[constants.CNIInterfaceIP] = cniIface.IPAddress
+		if setAnnotation {
+			annotations[constants.CNIInterfaceIP] = cniIPAddress
+		} else {
+			delete(annotations, constants.CNIInterfaceIP)
+		}
 		node.SetAnnotations(annotations)
 		_, updateErr := clientSet.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
 		return updateErr // nolint:wrapcheck // We wrap it below in the enclosing function
@@ -111,7 +126,11 @@ func AnnotateNodeWithCNIInterfaceIP(nodeName string, clientSet kubernetes.Interf
 		return errors.Wrapf(retryErr, "error updatating node %q", nodeName)
 	}
 
-	klog.Infof("Successfully annotated node %q with cniIfaceIP %q", nodeName, cniIface.IPAddress)
+	if setAnnotation {
+		klog.Infof("Successfully annotated node %q with cniIfaceIP %q", nodeName, cniIPAddress)
+	} else {
+		klog.Infof("Successfully removed %q from node %q annotation", constants.CNIInterfaceIP, nodeName)
+	}
 
 	return nil
 }
