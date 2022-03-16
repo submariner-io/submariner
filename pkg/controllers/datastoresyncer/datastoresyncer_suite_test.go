@@ -155,7 +155,7 @@ func (t *testDriver) run() {
 		BrokerNamespace: brokerNamespace,
 		RestMapper:      t.restMapper,
 		Scheme:          t.syncerScheme,
-	}, t.localCluster, t.localEndpoint)
+	}, t.localCluster, t.localEndpoint, false)
 
 	if t.doStart {
 		t.stopCh = make(chan struct{})
