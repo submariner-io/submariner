@@ -67,7 +67,7 @@ func (kp *SyncHandler) newVxlanIface(attrs *vxLanAttributes, activeEndPoint stri
 		activeEndpointHostname: activeEndPoint,
 	}
 
-	if err := kp.createVxLanIface(vxLANIface); err != nil {
+	if err := kp.createOrUpdateVxLanIface(vxLANIface); err != nil {
 		return nil, err
 	}
 
@@ -79,7 +79,7 @@ func (kp *SyncHandler) newVxlanIface(attrs *vxLanAttributes, activeEndPoint stri
 	return vxLANIface, nil
 }
 
-func (kp *SyncHandler) createVxLanIface(iface *vxLanIface) error {
+func (kp *SyncHandler) createOrUpdateVxLanIface(iface *vxLanIface) error {
 	err := kp.netLink.LinkAdd(iface.link)
 	if goerrors.Is(err, syscall.EEXIST) {
 		// Get the properties of existing vxlan interface
@@ -231,7 +231,7 @@ func getVxlanVtepIPAddress(ipAddr string) (net.IP, error) {
 	return vxlanIP, nil
 }
 
-func (kp *SyncHandler) createVxLANInterface(activeEndPoint string, ifaceType int, gatewayNodeIP net.IP) error {
+func (kp *SyncHandler) createVxLANInterface(activeEndPoint string, ifaceType int) error {
 	ipAddr, err := kp.getHostIfaceIPAddress()
 	if err != nil {
 		return errors.Wrap(err, "unable to retrieve the IPv4 address on the Host")
@@ -244,51 +244,48 @@ func (kp *SyncHandler) createVxLANInterface(activeEndPoint string, ifaceType int
 
 	// Derive the MTU based on the default outgoing interface
 	vxlanMtu := kp.defaultHostIface.MTU - VxLANOverhead
+	var tunnelRemotes []string
+	var subNode string
 
+	// add FDB entries for the ends of the tunnel, for GW nodes it's the remote cluster
+	// networks, for non-GW nodes it's all other GW node addresses
 	if ifaceType == VxInterfaceGateway {
-		attrs := &vxLanAttributes{
-			name:     VxLANIface,
-			vxlanID:  100,
-			group:    nil,
-			srcAddr:  nil,
-			vtepPort: VxLANPort,
-			mtu:      vxlanMtu,
-		}
-
-		kp.vxlanDevice, err = kp.newVxlanIface(attrs, activeEndPoint)
-		if err != nil {
-			return errors.Wrap(err, "failed to create vxlan interface on Gateway Node")
-		}
-
-		for _, fdbAddress := range kp.remoteVTEPs.Elements() {
-			err = kp.vxlanDevice.AddFDB(net.ParseIP(fdbAddress), "00:00:00:00:00:00")
-			if err != nil {
-				return errors.Wrap(err, "failed to add FDB entry on the Gateway Node vxlan iface")
-			}
-		}
-
-		err = kp.netLink.EnableLooseModeReversePathFilter(VxLANIface)
-		if err != nil {
-			return errors.Wrap(err, "error enabling loose mode")
-		}
-
-		klog.V(log.DEBUG).Infof("Successfully configured reverse path filter to loose mode on %q", VxLANIface)
+		tunnelRemotes = kp.remoteVTEPs.Elements()
+		subNode = "Gateway"
 	} else if ifaceType == VxInterfaceWorker {
-		// non-Gateway/Worker Node
-		attrs := &vxLanAttributes{
-			name:     VxLANIface,
-			vxlanID:  100,
-			group:    gatewayNodeIP,
-			srcAddr:  nil,
-			vtepPort: VxLANPort,
-			mtu:      vxlanMtu,
-		}
+		tunnelRemotes = kp.gwIPs.Elements()
+		subNode = "Non-Gateway"
+	}
 
-		kp.vxlanDevice, err = kp.newVxlanIface(attrs, activeEndPoint)
+	attrs := &vxLanAttributes{
+		name:     VxLANIface,
+		vxlanID:  100,
+		group:    nil,
+		srcAddr:  nil,
+		vtepPort: VxLANPort,
+		mtu:      vxlanMtu,
+	}
+
+	// Only create the actual interface if needed
+	kp.vxlanDevice, err = kp.newVxlanIface(attrs, activeEndPoint)
+	if err != nil {
+		return errors.Wrapf(err, "failed to create vxlan interface on %s Node", subNode)
+	}
+
+	klog.V(log.DEBUG).Infof("Adding FDBs %v on %q for a %s node", tunnelRemotes, VxLANIface, subNode)
+	for _, fdbAddress := range tunnelRemotes {
+		err = kp.vxlanDevice.AddFDB(net.ParseIP(fdbAddress), "00:00:00:00:00:00")
 		if err != nil {
-			return errors.Wrap(err, "failed to create vxlan interface on non-Gateway Node")
+			return errors.Wrapf(err, "failed to add FDB entry on the %s vxlan iface", subNode)
 		}
 	}
+
+	err = kp.netLink.EnableLooseModeReversePathFilter(VxLANIface)
+	if err != nil {
+		return errors.Wrap(err, "error enabling loose mode")
+	}
+
+	klog.V(log.DEBUG).Infof("Successfully configured reverse path filter to loose mode on %q", VxLANIface)
 
 	err = kp.vxlanDevice.configureIPAddress(vtepIP, net.CIDRMask(8, 32))
 	if err != nil {

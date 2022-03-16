@@ -49,21 +49,16 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 		kp.isGatewayNode = false
 		localClusterGwNodeIP := net.ParseIP(endpoint.Spec.PrivateIP)
 
-		remoteVtepIP, err := getVxlanVtepIPAddress(localClusterGwNodeIP.String())
-		if err != nil {
-			return errors.Wrap(err, "failed to derive the remoteVtepIP")
-		}
-
 		klog.Infof("Creating the vxlan interface %s with gateway node IP %s", VxLANIface, localClusterGwNodeIP)
 
-		err = kp.createVxLANInterface(endpoint.Spec.Hostname, VxInterfaceWorker, localClusterGwNodeIP)
+		kp.gwIPs.Add(localClusterGwNodeIP.String())
+
+		err := kp.createVxLANInterface(endpoint.Spec.Hostname, VxInterfaceWorker)
 		if err != nil {
 			klog.Fatalf("Unable to create VxLAN interface on non-GatewayNode (%s): %v", endpoint.Spec.Hostname, err)
 		}
 
-		kp.vxlanGwIP = &remoteVtepIP
-
-		err = kp.reconcileRoutes(remoteVtepIP)
+		err = kp.reconcileRoutes(localClusterGwNodeIP)
 		if err != nil {
 			return errors.Wrap(err, "error while reconciling routes")
 		}
@@ -81,15 +76,27 @@ func (kp *SyncHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 	defer kp.syncHandlerMutex.Unlock()
 	kp.isGatewayNode = false
 
-	// If the vxLAN device exists and it points to the same endpoint, delete it.
-	if kp.vxlanDevice != nil && kp.vxlanDevice.activeEndpointHostname == endpoint.Spec.Hostname {
-		err := kp.vxlanDevice.deleteVxLanIface()
-		kp.vxlanDevice = nil
-		kp.vxlanGwIP = nil
+	localClusterGwNodeIP := net.ParseIP(endpoint.Spec.PrivateIP)
 
-		if err != nil {
-			return errors.Wrap(err, "failed to delete the the vxlan interface on Endpoint removal")
+	// If a local gateway was removed, make sure we remove the FDB entry directing traffic to it
+	if kp.vxlanDevice != nil && kp.vxlanDevice.activeEndpointHostname == endpoint.Spec.Hostname {
+		kp.gwIPs.Remove(localClusterGwNodeIP.String())
+
+		// If a local gateway was removed, and there are no other gateways, cleanup the vxlan interface
+		if kp.gwIPs.Size() == 0 {
+			err := kp.vxlanDevice.deleteVxLanIface()
+			kp.vxlanDevice = nil
+			if err != nil {
+				return errors.Wrap(err, "failed to delete the the vxlan interface on Endpoint removal")
+			}
+			// exit early if device is gone
+			return nil
 		}
+
+		// Otherwise update cluster Local FDP entries for interface
+
+		kp.vxlanDevice.DelFDB(localClusterGwNodeIP, "00:00:00:00:00:00")
+
 	}
 
 	return nil

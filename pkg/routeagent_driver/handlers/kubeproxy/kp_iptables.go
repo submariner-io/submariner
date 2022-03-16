@@ -39,8 +39,9 @@ type SyncHandler struct {
 	localClusterCidr []string
 	localServiceCidr []string
 
-	remoteSubnets           stringset.Interface
-	remoteSubnetGw          map[string]net.IP
+	remoteSubnets  stringset.Interface
+	remoteSubnetGw map[string]net.IP
+	// Local Cluster Node IPs
 	remoteVTEPs             stringset.Interface
 	routeCacheGWNode        stringset.Interface
 	remoteEndpointTimeStamp map[string]v1.Time
@@ -49,9 +50,10 @@ type SyncHandler struct {
 	isGatewayNode        bool
 	wasGatewayPreviously bool
 
-	netLink          netlink.Interface
-	vxlanDevice      *vxLanIface
-	vxlanGwIP        *net.IP
+	netLink     netlink.Interface
+	vxlanDevice *vxLanIface
+	// with multiple active gateways a single tunnel can have multiple endpoints
+	gwIPs            stringset.Interface
 	hostname         string
 	cniIface         *cni.Interface
 	defaultHostIface *net.Interface
@@ -70,6 +72,7 @@ func NewSyncHandler(localClusterCidr, localServiceCidr []string) *SyncHandler {
 		isGatewayNode:           false,
 		wasGatewayPreviously:    false,
 		netLink:                 netlink.New(),
+		gwIPs:                   stringset.NewSynchronized(),
 	}
 }
 
