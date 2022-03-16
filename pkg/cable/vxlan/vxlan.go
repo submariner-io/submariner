@@ -107,6 +107,7 @@ func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.Subm
 	return &v, nil
 }
 
+// This setup up vx-lan interface between gateway nodes of clusters.
 func (v *vxlan) createVxlanInterface(activeEndPoint string, port int) error {
 	ipAddr := v.localEndpoint.Spec.PrivateIP
 

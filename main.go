@@ -134,7 +134,7 @@ func main() {
 	dsSyncer := datastoresyncer.New(&broker.SyncerConfig{
 		LocalRestConfig: cfg,
 		LocalNamespace:  submSpec.Namespace,
-	}, localCluster, localEndpoint)
+	}, localCluster, localEndpoint, submSpec.MultiActiveGatewayEnabled)
 
 	var cableHealthchecker healthchecker.Interface
 
@@ -316,7 +316,11 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, multiActiveG
 		gwLeadershipConfig.RetryPeriod = defaultRetryPeriod
 	}
 
-	klog.Infof("Gateway leader election config values: %#v", gwLeadershipConfig)
+	if !multiActiveGateways {
+		klog.Infof("Gateway leader election config values: %#v", gwLeadershipConfig)
+	} else {
+		klog.Info("Cluster is configured to use multiple active gateways")
+	}
 
 	id, err := os.Hostname()
 	if err != nil {
