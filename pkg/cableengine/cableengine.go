@@ -74,16 +74,19 @@ type engine struct {
 	natEndpointInfoCh   chan *natdiscovery.NATEndpointInfo
 	natDiscoveryPending map[string]int
 	installedCables     map[string]metav1.Time
+	// multiActiveGateways signals the gateway to allow multiple remote connections
+	multiActiveGateways bool
 }
 
 // NewEngine creates a new Engine for the local cluster.
-func NewEngine(localCluster *types.SubmarinerCluster, localEndpoint *types.SubmarinerEndpoint) Engine {
+func NewEngine(localCluster *types.SubmarinerCluster, localEndpoint *types.SubmarinerEndpoint, multiActivegw bool) Engine {
 	// We'll panic if localCluster or localEndpoint are nil, this is intentional
 	return &engine{
 		localCluster:        *localCluster,
 		localEndpoint:       *localEndpoint,
 		natDiscoveryPending: map[string]int{},
 		installedCables:     map[string]metav1.Time{},
+		multiActiveGateways: multiActivegw,
 	}
 }
 
@@ -182,11 +185,15 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 				active.Endpoint.CableName, active.UsingIP, active.UsingNAT, endpoint.Spec.BackendConfig)
 		}
 
-		klog.V(log.DEBUG).Infof("Disconnecting pre-existing cable %q", active.Endpoint.CableName)
+		if !i.multiActiveGateways {
+			klog.V(log.DEBUG).Infof("Disconnecting pre-existing cable %q", active.Endpoint.CableName)
 
-		err = i.driver.DisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: active.Endpoint})
-		if err != nil {
-			return errors.Wrapf(err, "error disconnecting previous Endpoint cable %#v", active.Endpoint)
+			err = i.driver.DisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: active.Endpoint})
+			if err != nil {
+				return errors.Wrapf(err, "error disconnecting previous Endpoint cable %#v", active.Endpoint)
+			}
+		} else {
+			klog.V(log.DEBUG).Infof("Multi Active Gateways enabled, Leaving pre-existing cable %q", active.Endpoint.CableName)
 		}
 	}
 

@@ -125,7 +125,7 @@ func main() {
 	localEndpoint, err := endpoint.GetLocal(&submSpec, k8sClient)
 	fatalOnErr(err, "Error creating local endpoint object")
 
-	cableEngine := cableengine.NewEngine(localCluster, localEndpoint)
+	cableEngine := cableengine.NewEngine(localCluster, localEndpoint, submSpec.MultiActiveGatewayEnabled)
 	natDiscovery, err := natdiscovery.New(localEndpoint)
 	fatalOnErr(err, "Error creating the NAT discovery handler")
 
@@ -134,7 +134,7 @@ func main() {
 	dsSyncer := datastoresyncer.New(&broker.SyncerConfig{
 		LocalRestConfig: cfg,
 		LocalNamespace:  submSpec.Namespace,
-	}, localCluster, localEndpoint)
+	}, localCluster, localEndpoint, submSpec.MultiActiveGatewayEnabled)
 
 	var cableHealthchecker healthchecker.Interface
 
@@ -316,7 +316,11 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, multiActiveG
 		gwLeadershipConfig.RetryPeriod = defaultRetryPeriod
 	}
 
-	klog.Infof("Gateway leader election config values: %#v", gwLeadershipConfig)
+	if !multiActiveGateways {
+		klog.Infof("Gateway leader election config values: %#v", gwLeadershipConfig)
+	} else {
+		klog.Info("Cluster is configured to use multiple active gateways")
+	}
 
 	id, err := os.Hostname()
 	if err != nil {

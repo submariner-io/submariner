@@ -48,18 +48,20 @@ type DatastoreSyncer struct {
 	localNodeName  string
 	syncerConfig   broker.SyncerConfig
 	localFederator federate.Federator
+	// multiActiveGateways signals the syncer to not prune duplicate endpoints within a cluster
+	multiActiveGateways bool
 }
 
 func New(syncerConfig *broker.SyncerConfig, localCluster *types.SubmarinerCluster,
-	localEndpoint *types.SubmarinerEndpoint,
-) *DatastoreSyncer {
+	localEndpoint *types.SubmarinerEndpoint, multiGwEnabled bool) *DatastoreSyncer {
 	// We'll panic if syncerConfig, localCluster or localEndpoint are nil, this is intentional
 	syncerConfig.LocalClusterID = localCluster.Spec.ClusterID
 
 	return &DatastoreSyncer{
-		localCluster:  *localCluster,
-		localEndpoint: *localEndpoint,
-		syncerConfig:  *syncerConfig,
+		localCluster:        *localCluster,
+		localEndpoint:       *localEndpoint,
+		syncerConfig:        *syncerConfig,
+		multiActiveGateways: multiGwEnabled,
 	}
 }
 
@@ -80,8 +82,11 @@ func (d *DatastoreSyncer) Start(stopCh <-chan struct{}) error {
 
 	d.localFederator = syncer.GetLocalFederator()
 
-	if err := d.ensureExclusiveEndpoint(syncer); err != nil {
-		return errors.WithMessage(err, "could not ensure exclusive submariner Endpoint")
+	if !d.multiActiveGateways {
+		klog.Info("Not ensuring one endpoint per cluster since Multiple Active Gateways is enabled")
+		if err := d.ensureExclusiveEndpoint(syncer); err != nil {
+			return errors.WithMessage(err, "could not ensure exclusive submariner Endpoint")
+		}
 	}
 
 	if err := d.createLocalCluster(); err != nil {
