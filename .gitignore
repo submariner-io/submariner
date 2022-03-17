@@ -11,6 +11,6 @@ output
 *.coverprofile
 junit.xml
 scripts/broker-info.subm*
-Dockerfile.*
+/Dockerfile.*
 .shflags
 Makefile.dapper
