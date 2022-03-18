@@ -125,7 +125,7 @@ func main() {
 	localEndpoint, err := endpoint.GetLocal(&submSpec, k8sClient)
 	fatalOnErr(err, "Error creating local endpoint object")
 
-	cableEngine := cableengine.NewEngine(localCluster, localEndpoint)
+	cableEngine := cableengine.NewEngine(localCluster, localEndpoint, submSpec.MultiActiveGatewayEnabled)
 	natDiscovery, err := natdiscovery.New(localEndpoint)
 	fatalOnErr(err, "Error creating the NAT discovery handler")
 

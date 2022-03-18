@@ -107,7 +107,7 @@ var _ = Describe("Managing tunnels", func() {
 			Spec: v1.EndpointSpec{
 				Backend: fake.DriverName,
 			},
-		})
+		}, false)
 
 		nat, err := natdiscovery.New(&types.SubmarinerEndpoint{})
 		Expect(err).To(Succeed())
