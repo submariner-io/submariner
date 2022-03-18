@@ -58,6 +58,7 @@ type Basic interface {
 
 type Interface interface {
 	Basic
+	RuleAddIfNotPresent(rule *netlink.Rule) error
 }
 
 var NewFunc func() Interface
