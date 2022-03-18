@@ -18,6 +18,22 @@ limitations under the License.
 
 package netlink
 
+import (
+	"os"
+
+	"github.com/pkg/errors"
+	"github.com/vishvananda/netlink"
+)
+
 type Adapter struct {
 	Basic
+}
+
+func (a *Adapter) RuleAddIfNotPresent(rule *netlink.Rule) error {
+	err := a.RuleAdd(rule)
+	if err != nil && !os.IsExist(err) {
+		return errors.Wrapf(err, "failed to add rule %s", rule)
+	}
+
+	return nil
 }
