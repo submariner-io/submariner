@@ -92,3 +92,12 @@ func (a *Adapter) DeleteDestinationRoutes(destIPs []net.IPNet, linkIndex, tableI
 
 	return nil
 }
+
+func (a *Adapter) AddrAddIfNotPresent(link netlink.Link, addr *netlink.Addr) error {
+	err := netlink.AddrAdd(link, addr)
+	if err != nil && !errors.Is(err, syscall.EEXIST) {
+		return nil
+	}
+
+	return err
+}
