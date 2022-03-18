@@ -58,6 +58,7 @@ type Basic interface {
 
 type Interface interface {
 	Basic
+	AddrAddIfNotPresent(link netlink.Link, addr *netlink.Addr) error
 	RuleAddIfNotPresent(rule *netlink.Rule) error
 	RouteAddOrReplace(route *netlink.Route) error
 	AddDestinationRoutes(destIPs []net.IPNet, gwIP, srcIP net.IP, linkIndex, tableID int) error
