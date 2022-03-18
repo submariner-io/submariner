@@ -27,41 +27,39 @@ import (
 	"k8s.io/klog"
 )
 
+// On any endpoint event the routes and FDB entries on vx-submarier should be
+// reconciled
 func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 	kp.syncHandlerMutex.Lock()
 	defer kp.syncHandlerMutex.Unlock()
+
+	localClusterGwNodeIP := net.ParseIP(endpoint.Spec.PrivateIP)
+	kp.gwIPs.Add(localClusterGwNodeIP.String())
+
+	// Try and let all handlers know we're a gateway as fast as possible
+	// Either an endpoint with our hostname is added or transitionToGw is called
+	if endpoint.Spec.Hostname == kp.hostname {
+		kp.isGatewayNode = true
+	}
+
 	kp.localCableDriver = endpoint.Spec.Backend
 
-	// We are on nonGateway node
-	if endpoint.Spec.Hostname != kp.hostname {
-		// If the node already has a vxLAN interface that points to an oldEndpoint
-		// (i.e., during gateway migration), delete it.
-		if kp.vxlanDevice != nil && kp.vxlanDevice.activeEndpointHostname != endpoint.Spec.Hostname {
-			err := kp.vxlanDevice.deleteVxLanIface()
-			if err != nil {
-				return errors.Wrapf(err, "failed to delete the the vxlan interface that points to old endpoint %s",
-					kp.vxlanDevice.activeEndpointHostname)
-			}
+	klog.Infof("Updating the vxlan interface %s and fdb entries", VxLANIface)
 
-			kp.vxlanDevice = nil
-		}
+	// creates or updates the physical interface and fdb entries
+	err := kp.updateVxLANInterface()
+	if err != nil {
+		klog.Fatalf("Unable to update VxLAN interface on non-GatewayNode (%s): %v", endpoint.Spec.Hostname, err)
+	}
 
-		kp.isGatewayNode = false
-		localClusterGwNodeIP := net.ParseIP(endpoint.Spec.PrivateIP)
+	remoteVtepIP, err := getVxlanVtepIPAddress(localClusterGwNodeIP.String())
+	if err != nil {
+		return errors.Wrap(err, "failed to derive the remoteVtepIP")
+	}
 
-		klog.Infof("Creating the vxlan interface %s with gateway node IP %s", VxLANIface, localClusterGwNodeIP)
-
-		kp.gwIPs.Add(localClusterGwNodeIP.String())
-
-		err := kp.createVxLANInterface(endpoint.Spec.Hostname, VxInterfaceWorker)
-		if err != nil {
-			klog.Fatalf("Unable to create VxLAN interface on non-GatewayNode (%s): %v", endpoint.Spec.Hostname, err)
-		}
-
-		err = kp.reconcileRoutes(localClusterGwNodeIP)
-		if err != nil {
-			return errors.Wrap(err, "error while reconciling routes")
-		}
+	err = kp.reconcileRoutes(remoteVtepIP)
+	if err != nil {
+		return errors.Wrap(err, "error while reconciling routes")
 	}
 
 	return nil
@@ -74,29 +72,16 @@ func (kp *SyncHandler) LocalEndpointUpdated(endpoint *submV1.Endpoint) error {
 func (kp *SyncHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 	kp.syncHandlerMutex.Lock()
 	defer kp.syncHandlerMutex.Unlock()
-	kp.isGatewayNode = false
-
 	localClusterGwNodeIP := net.ParseIP(endpoint.Spec.PrivateIP)
+	kp.gwIPs.Remove(localClusterGwNodeIP.String())
 
-	// If a local gateway was removed, make sure we remove the FDB entry directing traffic to it
-	if kp.vxlanDevice != nil && kp.vxlanDevice.activeEndpointHostname == endpoint.Spec.Hostname {
-		kp.gwIPs.Remove(localClusterGwNodeIP.String())
+	if endpoint.Spec.Hostname == kp.hostname {
+		kp.isGatewayNode = false
+	}
 
-		// If a local gateway was removed, and there are no other gateways, cleanup the vxlan interface
-		if kp.gwIPs.Size() == 0 {
-			err := kp.vxlanDevice.deleteVxLanIface()
-			kp.vxlanDevice = nil
-			if err != nil {
-				return errors.Wrap(err, "failed to delete the the vxlan interface on Endpoint removal")
-			}
-			// exit early if device is gone
-			return nil
-		}
-
-		// Otherwise update cluster Local FDP entries for interface
-
-		kp.vxlanDevice.DelFDB(localClusterGwNodeIP, "00:00:00:00:00:00")
-
+	err := kp.updateVxLANInterface()
+	if err != nil {
+		klog.Fatalf("Unable to update VxLAN interface on non-GatewayNode (%s): %v", endpoint.Spec.Hostname, err)
 	}
 
 	return nil

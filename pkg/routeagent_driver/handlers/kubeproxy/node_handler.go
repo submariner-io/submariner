@@ -19,8 +19,6 @@ limitations under the License.
 package kubeproxy
 
 import (
-	"net"
-
 	"github.com/submariner-io/admiral/pkg/log"
 	k8sV1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
@@ -35,7 +33,10 @@ func (kp *SyncHandler) NodeCreated(node *k8sV1.Node) error {
 
 	for i, addr := range node.Status.Addresses {
 		if addr.Type == k8sV1.NodeInternalIP {
-			kp.populateRemoteVtepIps(node.Status.Addresses[i].Address, Add)
+			// If the address is a GW node and this is already a GW node handler,
+			// shortcircut and don't add FDB policy
+			_, ok := node.Labels["submariner.io/gateway"]
+			kp.populateRemoteVtepIps(node.Status.Addresses[i].Address, Add, ok)
 			break
 		}
 	}
@@ -55,7 +56,8 @@ func (kp *SyncHandler) NodeRemoved(node *k8sV1.Node) error {
 
 	for i, addr := range node.Status.Addresses {
 		if addr.Type == k8sV1.NodeInternalIP {
-			kp.populateRemoteVtepIps(node.Status.Addresses[i].Address, Delete)
+			// always try and remove all addresses here
+			kp.populateRemoteVtepIps(node.Status.Addresses[i].Address, Delete, false)
 			break
 		}
 	}
@@ -63,28 +65,23 @@ func (kp *SyncHandler) NodeRemoved(node *k8sV1.Node) error {
 	return nil
 }
 
-func (kp *SyncHandler) populateRemoteVtepIps(vtepIP string, operation Operation) {
+func (kp *SyncHandler) populateRemoteVtepIps(vtepIP string, operation Operation, isGwAddr bool) {
 	// The remoteVTEP info is cached on all the routeAgent nodes and is used when there is a Gateway transition.
-	if operation == Add && !kp.remoteVTEPs.Contains(vtepIP) {
+	if operation == Add {
 		kp.remoteVTEPs.Add(vtepIP)
 	} else if operation == Delete {
 		kp.remoteVTEPs.Remove(vtepIP)
 	}
 
-	klog.V(log.DEBUG).Infof("populateRemoteVtepIps is called with vtepIP %s, isGatewayNode %t",
-		vtepIP, kp.isGatewayNode)
+	klog.V(log.DEBUG).Infof("populateRemoteVtepIps is called with vtepIP %s, isGatewayNodeAddress %t, isGatewayNode %t",
+		vtepIP, isGwAddr, kp.isGatewayNode)
 
-	if kp.isGatewayNode {
-		switch operation {
-		case Add:
-			if err := kp.vxlanDevice.AddFDB(net.ParseIP(vtepIP), "00:00:00:00:00:00"); err != nil {
-				klog.Errorf("Failed to add FDB entry on the Gateway Node vxlan iface %v", err)
-			}
-		case Delete:
-			if err := kp.vxlanDevice.DelFDB(net.ParseIP(vtepIP), "00:00:00:00:00:00"); err != nil {
-				klog.Errorf("Failed to delete FDB entry on the Gateway Node vxlan iface %v", err)
-			}
-		case Flush:
+	// Only update rules on GW nodes when newly added node is not a GW
+	if kp.isGatewayNode && !isGwAddr {
+		// creates or updates the physical interface and FDB Rules
+		err := kp.updateVxLANInterface()
+		if err != nil {
+			klog.Fatalf("Unable to update VxLAN interface on non-GatewayNode (%s): %v", kp.hostname, err)
 		}
 	}
 }

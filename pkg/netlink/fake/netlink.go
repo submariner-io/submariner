@@ -122,6 +122,13 @@ func (n *NetLink) NeighDel(neigh *netlink.Neigh) error {
 	return nil
 }
 
+func (n *NetLink) NeighList(linkIndex, family int) ([]netlink.Neigh, error) {
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
+
+	return n.neighbors[linkIndex], nil
+}
+
 func (n *NetLink) RouteAdd(route *netlink.Route) error {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()

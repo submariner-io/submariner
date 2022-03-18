@@ -41,7 +41,7 @@ type SyncHandler struct {
 
 	remoteSubnets  stringset.Interface
 	remoteSubnetGw map[string]net.IP
-	// Local Cluster Node IPs
+	// Non GW Node IPS
 	remoteVTEPs             stringset.Interface
 	routeCacheGWNode        stringset.Interface
 	remoteEndpointTimeStamp map[string]v1.Time
@@ -52,7 +52,8 @@ type SyncHandler struct {
 
 	netLink     netlink.Interface
 	vxlanDevice *vxLanIface
-	// with multiple active gateways a single tunnel can have multiple endpoints
+	// with multiple active gateways a single worker node
+	// tunnel can have multiple endpoints
 	gwIPs            stringset.Interface
 	hostname         string
 	cniIface         *cni.Interface

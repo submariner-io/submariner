@@ -67,9 +67,8 @@ type vxlan struct {
 }
 
 type vxlanIface struct {
-	activeEndpointHostname string
-	link                   *netlink.Vxlan
-	vtepIP                 net.IP
+	link   *netlink.Vxlan
+	vtepIP net.IP
 }
 
 type vxlanAttributes struct {
@@ -100,7 +99,7 @@ func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.Subm
 		return nil, errors.Wrap(err, "failed to get the UDP port configuration")
 	}
 
-	if err = v.createVxlanInterface(localEndpoint.Spec.Hostname, int(port)); err != nil {
+	if err = v.createVxlanInterface(int(port)); err != nil {
 		return nil, errors.Wrap(err, "failed to setup Vxlan link")
 	}
 
@@ -108,7 +107,7 @@ func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.Subm
 }
 
 // This setup up vx-lan interface between gateway nodes of clusters.
-func (v *vxlan) createVxlanInterface(activeEndPoint string, port int) error {
+func (v *vxlan) createVxlanInterface(port int) error {
 	ipAddr := v.localEndpoint.Spec.PrivateIP
 
 	vtepIP, err := v.getVxlanVtepIPAddress(ipAddr)
@@ -134,7 +133,7 @@ func (v *vxlan) createVxlanInterface(activeEndPoint string, port int) error {
 		mtu:      vxlanMtu,
 	}
 
-	v.vxlanIface, err = newVxlanIface(attrs, activeEndPoint)
+	v.vxlanIface, err = newVxlanIface(attrs)
 	if err != nil {
 		return errors.Wrap(err, "failed to create vxlan interface on Gateway Node")
 	}
@@ -161,7 +160,7 @@ func (v *vxlan) createVxlanInterface(activeEndPoint string, port int) error {
 	return nil
 }
 
-func newVxlanIface(attrs *vxlanAttributes, activeEndPoint string) (*vxlanIface, error) {
+func newVxlanIface(attrs *vxlanAttributes) (*vxlanIface, error) {
 	iface := &netlink.Vxlan{
 		LinkAttrs: netlink.LinkAttrs{
 			Name:  attrs.name,
@@ -175,8 +174,7 @@ func newVxlanIface(attrs *vxlanAttributes, activeEndPoint string) (*vxlanIface, 
 	}
 
 	vxlanIface := &vxlanIface{
-		link:                   iface,
-		activeEndpointHostname: activeEndPoint,
+		link: iface,
 	}
 
 	if err := createvxlanIface(vxlanIface); err != nil {
