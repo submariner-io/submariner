@@ -61,6 +61,7 @@ type Interface interface {
 	RuleAddIfNotPresent(rule *netlink.Rule) error
 	RouteAddOrReplace(route *netlink.Route) error
 	AddDestinationRoutes(destIPs []net.IPNet, gwIP, srcIP net.IP, linkIndex, tableID int) error
+	DeleteDestinationRoutes(destIPs []net.IPNet, linkIndex, tableID int) error
 }
 
 var NewFunc func() Interface
