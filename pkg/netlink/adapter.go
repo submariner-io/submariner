@@ -72,3 +72,23 @@ func (a *Adapter) AddDestinationRoutes(destIPs []net.IPNet, gwIP, srcIP net.IP, 
 
 	return nil
 }
+
+func (a *Adapter) DeleteDestinationRoutes(destIPs []net.IPNet, linkIndex, tableID int) error {
+	for i := range destIPs {
+		route := &netlink.Route{
+			LinkIndex: linkIndex,
+			Dst:       &destIPs[i],
+			Type:      netlink.NDA_DST,
+			Flags:     netlink.NTF_SELF,
+			Priority:  100,
+			Table:     tableID,
+		}
+
+		err := netlink.RouteDel(route)
+		if err != nil {
+			return errors.Wrapf(err, "unable to delete the route entry %#v", route)
+		}
+	}
+
+	return nil
+}
