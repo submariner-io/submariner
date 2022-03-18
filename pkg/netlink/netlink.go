@@ -34,7 +34,7 @@ import (
 	"k8s.io/klog"
 )
 
-type Interface interface {
+type Basic interface {
 	LinkAdd(link netlink.Link) error
 	LinkDel(link netlink.Link) error
 	LinkByName(name string) (netlink.Link, error)
@@ -56,6 +56,10 @@ type Interface interface {
 	ConfigureTCPMTUProbe(mtuProbe, baseMss string) error
 }
 
+type Interface interface {
+	Basic
+}
+
 var NewFunc func() Interface
 
 const (
@@ -69,7 +73,7 @@ func New() Interface {
 		return NewFunc()
 	}
 
-	return &netlinkType{}
+	return &Adapter{Basic: &netlinkType{}}
 }
 
 func (n *netlinkType) LinkAdd(link netlink.Link) error {
