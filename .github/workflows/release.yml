@@ -4,7 +4,7 @@ name: Release Images
 on:
   push:
     branches:
-      - devel
+      - feature-multi-active-gw
       - release-*
 
 jobs:
@@ -18,7 +18,7 @@ jobs:
           fetch-depth: 0
 
       - name: Build and release new images
-        uses: submariner-io/shipyard/gh-actions/release-images@devel
+        uses: submariner-io/shipyard/gh-actions/release-images@feature-multi-active-gw
         with:
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_PASSWORD }}
