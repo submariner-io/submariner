@@ -5,7 +5,7 @@ on:
   pull_request:
   push:
     branches:
-      - devel
+      - feature-multi-active-gw
 
 jobs:
   preview:

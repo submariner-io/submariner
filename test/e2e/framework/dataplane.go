@@ -146,7 +146,7 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams, egressIPT
 		Scheduling:    p.FromClusterScheduling,
 		Networking:    p.Networking,
 		ContainerName: "connector-pod",
-		ImageName:     "quay.io/submariner/nettest:devel",
+		ImageName:     "quay.io/submariner/nettest:feature-multi-active-gw",
 		Command:       []string{"sleep", "600"},
 	})
 
