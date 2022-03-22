@@ -66,12 +66,13 @@ var _ = Describe("Function createVxLanIface", func() {
 		}
 
 		handler = &SyncHandler{
-			netLink: netLink,
+			netLink:     netLink,
+			vxlanDevice: iface,
 		}
 	})
 
 	It("should create the interface", func() {
-		Expect(handler.createOrUpdateVxLanIface(iface)).To(Succeed())
+		Expect(handler.createOrUpdateVxLanIface()).To(Succeed())
 		Expect(netLink.LinkByName(iface.link.Name)).To(Equal(iface.link))
 	})
 
@@ -84,7 +85,7 @@ var _ = Describe("Function createVxLanIface", func() {
 
 		JustBeforeEach(func() {
 			Expect(netLink.LinkAdd(&existing)).To(Succeed())
-			Expect(handler.createOrUpdateVxLanIface(iface)).To(Succeed())
+			Expect(handler.createOrUpdateVxLanIface()).To(Succeed())
 		})
 
 		Context("and the new interface matches", func() {

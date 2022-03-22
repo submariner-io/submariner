@@ -65,31 +65,33 @@ func (kp *SyncHandler) newVxlanIface(attrs *vxLanAttributes) (*vxLanIface, error
 		link:    iface,
 	}
 
-	if err := kp.createOrUpdateVxLanIface(vxLANIface); err != nil {
+	kp.vxlanDevice = vxLANIface
+
+	if err := kp.createOrUpdateVxLanIface(); err != nil {
 		return nil, err
 	}
 
 	// ip link set $vxLANIface up
-	if err := kp.netLink.LinkSetUp(vxLANIface.link); err != nil {
+	if err := kp.netLink.LinkSetUp(kp.vxlanDevice.link); err != nil {
 		return nil, errors.Wrap(err, "failed to bring up VxLAN interface")
 	}
 
 	return vxLANIface, nil
 }
 
-func (kp *SyncHandler) createOrUpdateVxLanIface(iface *vxLanIface) error {
-	err := kp.netLink.LinkAdd(iface.link)
+func (kp *SyncHandler) createOrUpdateVxLanIface() error {
+	err := kp.netLink.LinkAdd(kp.vxlanDevice.link)
 	if goerrors.Is(err, syscall.EEXIST) {
 		// Get the properties of existing vxlan interface
-		existing, err := kp.netLink.LinkByName(iface.link.Name)
+		existing, err := kp.netLink.LinkByName(kp.vxlanDevice.link.Name)
 		if err != nil {
 			return errors.Wrap(err, "failed to retrieve link info")
 		}
 
-		if isVxlanConfigTheSame(iface.link, existing) {
+		if isVxlanConfigTheSame(kp.vxlanDevice.link, existing) {
 			klog.V(log.DEBUG).Infof("VxLAN interface already exists with same configuration.")
 
-			iface.link = existing.(*netlink.Vxlan)
+			kp.vxlanDevice.link = existing.(*netlink.Vxlan)
 
 			return nil
 		}
@@ -101,7 +103,7 @@ func (kp *SyncHandler) createOrUpdateVxLanIface(iface *vxLanIface) error {
 			return errors.Wrap(err, "failed to delete the existing vxlan interface")
 		}
 
-		if err = kp.netLink.LinkAdd(iface.link); err != nil {
+		if err = kp.netLink.LinkAdd(kp.vxlanDevice.link); err != nil {
 			return errors.Wrap(err, "failed to re-create the the vxlan interface")
 		}
 	} else if err != nil {
@@ -144,15 +146,15 @@ func (iface *vxLanIface) configureIPAddress(ipAddress net.IP, mask net.IPMask) e
 		Mask: mask,
 	}}
 
+	// Update the local cache with new srcIP
+	iface.link.SrcAddr = ipAddress
+
 	err := iface.netLink.AddrAdd(iface.link, ipConfig)
 	if goerrors.Is(err, syscall.EEXIST) {
 		return nil
 	} else if err != nil {
 		return errors.Wrapf(err, "unable to configure address (%s) on vxlan interface (%s)", ipAddress, iface.link.Name)
 	}
-
-	// Update the local cache with new srcIP
-	iface.link.SrcAddr = ipAddress
 
 	return nil
 }
@@ -244,8 +246,10 @@ func (kp *SyncHandler) updateVxLANInterface() error {
 		mtu:      vxlanMtu,
 	}
 
-	// Only make the submariner-vxlan interface a single time
+	// Only make the submariner-vxlan interface or update it in the in
+	// memory cache a single time
 	// on all nodes, then just reconcile the FDB entries on demand
+	// otherwise update our in cache of it
 	if kp.vxlanDevice == nil {
 		kp.vxlanDevice, err = kp.newVxlanIface(attrs)
 		if err != nil {
