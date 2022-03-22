@@ -170,3 +170,40 @@ func (h *mtuHandler) newNamedIPSet(key string, ipSetIface ipset.Interface) ipset
 		SetType: ipset.HashNet,
 	}, ipSetIface)
 }
+
+func (h *mtuHandler) Stop(uninstall bool) error {
+	if !uninstall {
+		return nil
+	}
+
+	klog.Infof("Flushing iptable entries in %q chain of %q table", constants.SmPostRoutingChain, constants.MangleTable)
+
+	if err := h.ipt.ClearChain(constants.MangleTable, constants.SmPostRoutingChain); err != nil {
+		klog.Errorf("Error flushing iptables chain %q of %q table: %v", constants.SmPostRoutingChain,
+			constants.MangleTable, err)
+	}
+
+	klog.Infof("Deleting iptable entry in %q chain of %q table", constants.PostRoutingChain, constants.MangleTable)
+
+	ruleSpec := []string{"-j", constants.SmPostRoutingChain}
+	if err := h.ipt.Delete(constants.MangleTable, constants.PostRoutingChain, ruleSpec...); err != nil {
+		klog.Errorf("Error deleting iptables rule from %q chain: %v", constants.PostRoutingChain, err)
+	}
+
+	klog.Infof("Deleting iptable %q chain of %q table", constants.SmPostRoutingChain, constants.MangleTable)
+
+	if err := h.ipt.DeleteChain(constants.MangleTable, constants.SmPostRoutingChain); err != nil {
+		klog.Errorf("Error deleting iptable chain %q of table %q: %v", constants.SmPostRoutingChain,
+			constants.MangleTable, err)
+	}
+
+	if err := h.localIPSet.Destroy(); err != nil {
+		klog.Errorf("Error deleting ipset %q: %v", constants.LocalCIDRIPSet, err)
+	}
+
+	if err := h.remoteIPSet.Destroy(); err != nil {
+		klog.Errorf("Error deleting ipset %q: %v", constants.RemoteCIDRIPSet, err)
+	}
+
+	return nil
+}

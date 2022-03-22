@@ -83,38 +83,47 @@ func (kp *SyncHandler) createIPTableChains() error {
 
 func (kp *SyncHandler) updateIptableRulesForInterClusterTraffic(inputCidrBlocks []string, operation Operation) {
 	for _, inputCidrBlock := range inputCidrBlocks {
-		if operation == Add {
-			err := kp.programIptableRulesForInterClusterTraffic(inputCidrBlock)
-			if err != nil {
-				klog.Errorf("Failed to program iptable rule. %v", err)
-			}
-		} else if operation == Delete {
-			// TODO: Handle this use-case
-			klog.Warning("Handle the delete use-case")
+		err := kp.programIptableRulesForInterClusterTraffic(inputCidrBlock, operation)
+		if err != nil {
+			klog.Errorf("Failed to program iptable rules. %v", err)
 		}
 	}
 }
 
-func (kp *SyncHandler) programIptableRulesForInterClusterTraffic(remoteCidrBlock string) error {
+func (kp *SyncHandler) programIptableRulesForInterClusterTraffic(remoteCidrBlock string, operation Operation) error {
 	ipt, err := iptables.New()
 	if err != nil {
 		return errors.Wrap(err, "error initializing iptables")
 	}
 
 	for _, localClusterCidr := range kp.localClusterCidr {
-		ruleSpec := []string{"-s", localClusterCidr, "-d", remoteCidrBlock, "-j", "ACCEPT"}
-		klog.V(log.DEBUG).Infof("Installing iptables rule for outgoing traffic: %s", strings.Join(ruleSpec, " "))
+		outboundRuleSpec := []string{"-s", localClusterCidr, "-d", remoteCidrBlock, "-j", "ACCEPT"}
+		incomingRuleSpec := []string{"-s", remoteCidrBlock, "-d", localClusterCidr, "-j", "ACCEPT"}
 
-		if err = ipt.AppendUnique(constants.NATTable, constants.SmPostRoutingChain, ruleSpec...); err != nil {
-			return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(ruleSpec, " "))
-		}
+		if operation == Add {
+			klog.V(log.DEBUG).Infof("Installing iptables rule for outgoing traffic: %s", strings.Join(outboundRuleSpec, " "))
 
-		// TODO: revisit, we only have to program rules to allow traffic from the podCidr
-		ruleSpec = []string{"-s", remoteCidrBlock, "-d", localClusterCidr, "-j", "ACCEPT"}
-		klog.V(log.DEBUG).Infof("Installing iptables rule for incoming traffic: %s", strings.Join(ruleSpec, " "))
+			if err = ipt.AppendUnique(constants.NATTable, constants.SmPostRoutingChain, outboundRuleSpec...); err != nil {
+				return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(outboundRuleSpec, " "))
+			}
 
-		if err = ipt.AppendUnique(constants.NATTable, constants.SmPostRoutingChain, ruleSpec...); err != nil {
-			return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(ruleSpec, " "))
+			klog.V(log.DEBUG).Infof("Installing iptables rule for incoming traffic: %s", strings.Join(incomingRuleSpec, " "))
+
+			if err = ipt.AppendUnique(constants.NATTable, constants.SmPostRoutingChain, incomingRuleSpec...); err != nil {
+				return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(incomingRuleSpec, " "))
+			}
+		} else if operation == Delete {
+			klog.V(log.DEBUG).Infof("Deleting iptables rule for outgoing traffic: %s", strings.Join(outboundRuleSpec, " "))
+
+			if err = ipt.Delete(constants.NATTable, constants.SmPostRoutingChain, outboundRuleSpec...); err != nil {
+				return errors.Wrapf(err, "error deleting iptables rule %q", strings.Join(outboundRuleSpec, " "))
+			}
+
+			klog.V(log.DEBUG).Infof("Deleting iptables rule for incoming traffic: %s", strings.Join(incomingRuleSpec, " "))
+
+			if err = ipt.Delete(constants.NATTable, constants.SmPostRoutingChain, incomingRuleSpec...); err != nil {
+				return errors.Wrapf(err, "error deleting iptables rule %q", strings.Join(incomingRuleSpec, " "))
+			}
 		}
 	}
 
