@@ -25,6 +25,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/submariner/pkg/cable/wireguard"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
@@ -153,161 +154,123 @@ func (kp *SyncHandler) configureRoute(remoteSubnet string, operation Operation, 
 	return nil
 }
 
-func (kp *SyncHandler) cleanVxSubmarinerRoutes() {
-	link, err := kp.netLink.LinkByName(VxLANIface)
-	if err != nil && !errors.Is(err, netlink.LinkNotFoundError{}) {
-		klog.Errorf("Error retrieving link by name %q: %v", VxLANIface, err)
-		return
-	}
-
-	currentRouteList, err := kp.netLink.RouteList(link, syscall.AF_INET)
-	if err != nil {
-		klog.Errorf("Unable to cleanup routes, error retrieving routes on the link %s: %v", VxLANIface, err)
-		return
-	}
-
-	for i := range currentRouteList {
-		klog.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])
-
-		if currentRouteList[i].Dst == nil || currentRouteList[i].Gw == nil {
-			klog.V(log.DEBUG).Infof("Found nil gw or dst")
-		} else if kp.remoteSubnets.Contains(currentRouteList[i].Dst.String()) {
-			klog.V(log.DEBUG).Infof("Removing route %s", currentRouteList[i])
-			if err = kp.netLink.RouteDel(&currentRouteList[i]); err != nil {
-				klog.Errorf("Error removing route %s: %v", currentRouteList[i], err)
-			}
-		}
-	}
+type SubRouteKey struct {
+	dst string
+	gws stringset.Interface
 }
 
-// Reconcile the routes installed on this device using rtnetlink.
-func (kp *SyncHandler) reconcileRoutes(vxlanGw net.IP) error {
-	klog.V(log.DEBUG).Infof("Reconciling routes to gw: %s", vxlanGw.String())
+func (kp *SyncHandler) listExistingRoutes() (map[SubRouteKey]netlink.Route, error) {
+	currentRoutes := map[SubRouteKey]netlink.Route{}
 
-	link, err := kp.netLink.LinkByName(VxLANIface)
+	currentRouteList, err := kp.netLink.RouteList(kp.vxlanDevice.link, syscall.AF_INET)
 	if err != nil {
-		return errors.Wrapf(err, "error retrieving link by name %s", VxLANIface)
+		return nil, errors.Wrapf(err, "error retrieving routes for link %s", VxLANIface)
 	}
 
-	currentRouteList, err := kp.netLink.RouteList(link, syscall.AF_INET)
-	if err != nil {
-		return errors.Wrapf(err, "error retrieving routes for link %s", VxLANIface)
+	for _, route := range currentRouteList {
+		gws := stringset.NewSynchronized()
+		for _, nextHop := range route.MultiPath {
+			gws.Add(nextHop.Gw.String())
+		}
+		key := SubRouteKey{dst: route.Dst.String(), gws: gws}
+		currentRoutes[key] = route
 	}
 
-	// First lets delete all of the routes that don't match.
-	kp.removeUnknownRoutes(vxlanGw, currentRouteList)
+	return currentRoutes, nil
+}
 
-	currentRouteList, err = kp.netLink.RouteList(link, syscall.AF_INET)
+// buildDesiredRoutes will make all routes needed for intra cluster communication within
+// submariner. Specifically it will route traffic originating on a worker node, destined
+// for another cluster, to an active GW
+func (kp *SyncHandler) buildDesiredRoutes() (map[SubRouteKey]netlink.Route, error) {
+	desiredRoutes := map[SubRouteKey]netlink.Route{}
 
-	if err != nil {
-		return errors.Wrapf(err, "error retrieving routes for link %s", VxLANIface)
+	nextHops := []*netlink.NexthopInfo{}
+
+	for _, gw := range kp.gwVTEPs.Elements() {
+		nextHops = append(nextHops, &netlink.NexthopInfo{
+			Gw:        net.ParseIP(gw),
+			LinkIndex: kp.vxlanDevice.link.Attrs().Index,
+		})
 	}
 
-	// Let's now add the routes that are missing.
-	for _, cidrBlock := range kp.remoteSubnets.Elements() {
-		_, dst, err := net.ParseCIDR(cidrBlock)
+	for _, remoteSubnet := range kp.remoteSubnets.Elements() {
+		key := SubRouteKey{dst: remoteSubnet, gws: kp.gwVTEPs}
+
+		_, dst, err := net.ParseCIDR(remoteSubnet)
 		if err != nil {
-			klog.Errorf("Error parsing cidr block %s: %v", cidrBlock, err)
-			break
+			return nil, errors.Errorf("Error parsing cidr block %s: %v", remoteSubnet, err)
 		}
 
 		route := netlink.Route{
 			Dst:       dst,
-			Gw:        vxlanGw,
+			MultiPath: nextHops,
 			Scope:     unix.RT_SCOPE_UNIVERSE,
-			LinkIndex: link.Attrs().Index,
+			LinkIndex: kp.vxlanDevice.link.Attrs().Index,
 			Protocol:  4,
 		}
 
-		found := false
-
-		for i := range currentRouteList {
-			if currentRouteList[i].Gw == nil || currentRouteList[i].Dst == nil {
-			} else if currentRouteList[i].Gw.Equal(route.Gw) && currentRouteList[i].Dst.String() == route.Dst.String() {
-				klog.V(log.DEBUG).Infof("Found equivalent route, not adding")
-				found = true
-			}
-		}
-
-		if !found {
-			err = kp.netLink.RouteAdd(&route)
-			if err != nil {
-				klog.Errorf("Error adding route %s: %v", route, err)
-			}
-		}
+		desiredRoutes[key] = route
 	}
 
-	return nil
+	return desiredRoutes, nil
 }
 
-func (kp *SyncHandler) removeUnknownRoutes(vxlanGw net.IP, currentRouteList []netlink.Route) {
-	for i := range currentRouteList {
-		// Contains(endpoint destinations, route destination string, and the route gateway is our actual destination.
-		klog.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])
-
-		if currentRouteList[i].Dst == nil || currentRouteList[i].Gw == nil {
-			klog.V(log.DEBUG).Infof("Found nil gw or dst")
-		} else {
-			if kp.remoteSubnets.Contains(currentRouteList[i].Dst.String()) && currentRouteList[i].Gw.Equal(vxlanGw) {
-				klog.V(log.DEBUG).Infof("Found route %s with gw %s already installed", currentRouteList[i], currentRouteList[i].Gw)
-			} else {
-				klog.V(log.DEBUG).Infof("Removing route %s", currentRouteList[i])
-				if err := kp.netLink.RouteDel(&currentRouteList[i]); err != nil {
-					klog.Errorf("Error removing route %s: %v", currentRouteList[i], err)
-				}
-			}
-		}
+// Reconcile the routes based on the GWIPs installed on this device using rtnetlink.
+func (kp *SyncHandler) reconcileIntraClusterRoutes() error {
+	currentRouteList, err := kp.listExistingRoutes()
+	if err != nil {
+		return errors.Wrapf(err, "error retrieving routes for link %s", VxLANIface)
 	}
-}
 
-func (kp *SyncHandler) updateRoutingRulesForInterClusterSupport(remoteCIDRs []string, operation Operation) error {
 	if kp.isGatewayNode {
-		klog.V(log.DEBUG).Info("On GWNode, in updateRoutingRulesForInterClusterSupport ignoring")
-		// These rules are required only on the nonGatewayNode.
+		klog.V(log.DEBUG).Infof("Node is a GW, delete all intra cluster Routes on %v", VxLANIface)
+		for _, route := range currentRouteList {
+			klog.V(log.DEBUG).Infof("Node is a GW Removing route %s", route.String())
+			if err = kp.netLink.RouteDel(&route); err != nil {
+				klog.Errorf("Error removing route %s: %v", route, err)
+			}
+		}
 		return nil
 	}
 
-	// Update internal Loadbalancing Groups
-	for _, gwIp := range kp.gwIPs.Elements() {
-		vxlanGwIP, err := getVxlanVtepIPAddress(gwIp)
-		if err != nil {
-			return errors.Wrap(err, "failed to derive the remoteVtepIP")
+	klog.V(log.DEBUG).Infof("Reconciling existing routes %v to gws %v on worker node", currentRouteList, kp.gwVTEPs.Elements())
+
+	desiredRouteList, err := kp.buildDesiredRoutes()
+	if err != nil {
+		return errors.Wrapf(err, "error retrieving desired routes for link %s", VxLANIface)
+	}
+
+	for key, route := range currentRouteList {
+		// route exists and is up to date keep it
+		if _, ok := desiredRouteList[key]; ok {
+			delete(desiredRouteList, key)
+			continue
 		}
 
-		if kp.vxlanDevice != nil && vxlanGwIP != nil {
-			link, err := kp.netLink.LinkByName(VxLANIface)
-			if err != nil {
-				return errors.Wrapf(err, "error retrieving link by name %s", VxLANIface)
-			}
+		// don't remove auto-generated route for vxlan-submariner
+		if kp.vxlanDevice != nil && route.Src.Equal(kp.vxlanDevice.link.SrcAddr) {
+			klog.V(log.DEBUG).Infof("Skipping removal of autogenerated route: %s", route)
+			continue
+		}
 
-			for _, cidrBlock := range remoteCIDRs {
-				_, dst, err := net.ParseCIDR(cidrBlock)
-				if err != nil {
-					return errors.Wrapf(err, "error parsing cidr block %s", cidrBlock)
-				}
-
-				route := netlink.Route{
-					Dst:       dst,
-					Gw:        vxlanGwIP,
-					Scope:     unix.RT_SCOPE_UNIVERSE,
-					LinkIndex: link.Attrs().Index,
-					Protocol:  4,
-				}
-
-				if operation == Add {
-					err = kp.netLink.RouteAdd(&route)
-					if err != nil {
-						return errors.Wrapf(err, "error adding route %s", route)
-					}
-				} else if operation == Delete {
-					err = kp.netLink.RouteDel(&route)
-					if err != nil {
-						return errors.Wrapf(err, "error deleting route %s", route)
-					}
-				}
-			}
+		// if not in list delete it
+		klog.V(log.DEBUG).Infof("Removing stale route %s", route)
+		if err = kp.netLink.RouteDel(&route); err != nil {
+			klog.Errorf("Error removing route %s: %v", route, err)
 		}
 	}
+
+	// Let's now add the routes that are missing.
+	for _, route := range desiredRouteList {
+		// if in desiredRoute list add it.
+		klog.V(log.DEBUG).Infof("Adding new route %s", route)
+		err = kp.netLink.RouteAdd(&route)
+		if err != nil {
+			klog.Errorf("Error adding route %s: %v", route, err)
+		}
+	}
+
 	return nil
 }
 

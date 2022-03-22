@@ -111,15 +111,6 @@ func (kp *SyncHandler) createOrUpdateVxLanIface(iface *vxLanIface) error {
 	return nil
 }
 
-func (iface *vxLanIface) deleteVxLanIface() error {
-	err := iface.netLink.LinkDel(iface.link)
-	if err != nil {
-		return errors.Wrap(err, "failed to delete the the vxlan interface")
-	}
-
-	return nil
-}
-
 func isVxlanConfigTheSame(newLink, currentLink netlink.Link) bool {
 	required := newLink.(*netlink.Vxlan)
 	existing := currentLink.(*netlink.Vxlan)
@@ -159,6 +150,9 @@ func (iface *vxLanIface) configureIPAddress(ipAddress net.IP, mask net.IPMask) e
 	} else if err != nil {
 		return errors.Wrapf(err, "unable to configure address (%s) on vxlan interface (%s)", ipAddress, iface.link.Name)
 	}
+
+	// Update the local cache with new srcIP
+	iface.link.SrcAddr = ipAddress
 
 	return nil
 }
@@ -234,7 +228,7 @@ func (kp *SyncHandler) updateVxLANInterface() error {
 	// networks, for non-GW nodes it's all other GW node addresses
 	if kp.isGatewayNode {
 		// We only want to setup FDP entries on Gateway nodes for non-GW nodes
-		tunnelRemotes = kp.gwIPs.Difference(kp.remoteVTEPs)
+		tunnelRemotes = kp.gwIPs.Difference(kp.allNodeIPs)
 		subNode = "Gateway"
 	} else {
 		tunnelRemotes = kp.gwIPs.Elements()
@@ -297,7 +291,7 @@ func (kp *SyncHandler) reconcileVxSubFdbEntries(destinations ...string) error {
 		delete(existingEntries, address)
 	}
 
-	// Delete stale entries, i.e whatever wasn't removed from existingEntties
+	// Delete stale entries, i.e whatever wasn't removed from existingEntities
 	for _, neighbor := range existingEntries {
 		err = kp.vxlanDevice.netLink.NeighDel(&neighbor)
 		if err != nil {

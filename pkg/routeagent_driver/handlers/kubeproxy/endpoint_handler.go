@@ -34,7 +34,7 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 	defer kp.syncHandlerMutex.Unlock()
 
 	localClusterGwNodeIP := net.ParseIP(endpoint.Spec.PrivateIP)
-	kp.gwIPs.Add(localClusterGwNodeIP.String())
+	kp.addGwIp(localClusterGwNodeIP.String())
 
 	// Try and let all handlers know we're a gateway as fast as possible
 	// Either an endpoint with our hostname is added or transitionToGw is called
@@ -52,12 +52,8 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 		klog.Fatalf("Unable to update VxLAN interface on non-GatewayNode (%s): %v", endpoint.Spec.Hostname, err)
 	}
 
-	remoteVtepIP, err := getVxlanVtepIPAddress(localClusterGwNodeIP.String())
-	if err != nil {
-		return errors.Wrap(err, "failed to derive the remoteVtepIP")
-	}
-
-	err = kp.reconcileRoutes(remoteVtepIP)
+	// In the routeagent we only need to reconcileRoutes on non-gateway nodes
+	err = kp.reconcileIntraClusterRoutes()
 	if err != nil {
 		return errors.Wrap(err, "error while reconciling routes")
 	}
@@ -73,7 +69,7 @@ func (kp *SyncHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 	kp.syncHandlerMutex.Lock()
 	defer kp.syncHandlerMutex.Unlock()
 	localClusterGwNodeIP := net.ParseIP(endpoint.Spec.PrivateIP)
-	kp.gwIPs.Remove(localClusterGwNodeIP.String())
+	kp.removeGwIp(localClusterGwNodeIP.String())
 
 	if endpoint.Spec.Hostname == kp.hostname {
 		kp.isGatewayNode = false
@@ -114,10 +110,9 @@ func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 		kp.remoteSubnetGw[inputCidrBlock] = gwIP
 	}
 
-	if err := kp.updateRoutingRulesForInterClusterSupport(endpoint.Spec.Subnets, Add); err != nil {
-		klog.Errorf("updateRoutingRulesForInterClusterSupport for new remote %#v returned error: %+v",
-			endpoint, err)
-		return err
+	err := kp.reconcileIntraClusterRoutes()
+	if err != nil {
+		return errors.Wrap(err, "error while reconciling routes")
 	}
 
 	// Add routes to the new endpoint on the GatewayNode.
@@ -153,10 +148,9 @@ func (kp *SyncHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	}
 	// TODO: Handle a remote endpoint removal use-case
 	//         - remove related iptable rules
-	if err := kp.updateRoutingRulesForInterClusterSupport(endpoint.Spec.Subnets, Delete); err != nil {
-		klog.Errorf("updateRoutingRulesForInterClusterSupport for removed remote %#v returned error: %+v",
-			err, endpoint)
-		return err
+	err := kp.reconcileIntraClusterRoutes()
+	if err != nil {
+		return errors.Wrap(err, "error while reconciling routes")
 	}
 
 	kp.updateRoutingRulesForHostNetworkSupport(endpoint.Spec.Subnets, Delete)

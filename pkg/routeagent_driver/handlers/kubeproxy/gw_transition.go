@@ -19,6 +19,7 @@ limitations under the License.
 package kubeproxy
 
 import (
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"k8s.io/klog"
@@ -37,8 +38,10 @@ func (kp *SyncHandler) TransitionToNonGateway() error {
 	}
 	kp.gwIPs.Remove(ipAddr.String())
 
-	kp.cleanVxSubmarinerRoutes()
-	// If the active Gateway transitions to a new node, we flush the HostNetwork routing table.
+	err = kp.reconcileIntraClusterRoutes()
+	if err != nil {
+		return errors.Wrap(err, "error while reconciling routes")
+	} // If the active Gateway transitions to a new node, we flush the HostNetwork routing table.
 	kp.updateRoutingRulesForHostNetworkSupport(nil, Flush)
 
 	err = kp.configureIPRule(Delete)
@@ -61,7 +64,10 @@ func (kp *SyncHandler) TransitionToNonGateway() error {
 // te fdb entries on vx-submariner.
 func (kp *SyncHandler) TransitionToGateway() error {
 	klog.V(log.DEBUG).Info("The current node has become a Gateway")
-	kp.cleanVxSubmarinerRoutes()
+	err := kp.reconcileIntraClusterRoutes()
+	if err != nil {
+		return errors.Wrap(err, "error while reconciling routes")
+	}
 
 	kp.syncHandlerMutex.Lock()
 	defer kp.syncHandlerMutex.Unlock()
