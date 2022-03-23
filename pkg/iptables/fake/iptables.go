@@ -20,6 +20,7 @@ package fake
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -137,6 +138,18 @@ func (i *IPTables) listChains(table string) []string {
 	}
 
 	return []string{}
+}
+
+func (i *IPTables) ChainExists(table, chain string) (bool, error) {
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
+
+	chainSet := i.tableChains[table]
+	if chainSet != nil {
+		return chainSet.Contains(chain), nil
+	}
+
+	return false, fmt.Errorf("mock IP table chain %q does not exist in table %q", chain, table)
 }
 
 func (i *IPTables) NewChain(table, chain string) error {

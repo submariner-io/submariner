@@ -116,13 +116,13 @@ func NewGatewayMonitor(spec Specification, localCIDRs []string, config *watcher.
 func (g *gatewayMonitor) Start() error {
 	klog.Info("Starting GatewayMonitor to monitor the active Gateway node in the cluster.")
 
+	if err := g.createGlobalNetMarkingChain(); err != nil {
+		return errors.Wrap(err, "error while calling createGlobalNetMarkingChain")
+	}
+
 	err := g.endpointWatcher.Start(g.stopCh)
 	if err != nil {
 		return errors.Wrap(err, "error starting the Endpoint watcher")
-	}
-
-	if err := g.createGlobalNetMarkingChain(); err != nil {
-		return errors.Wrap(err, "error while calling createGlobalNetMarkingChain")
 	}
 
 	return nil
@@ -333,6 +333,10 @@ func (g *gatewayMonitor) createGlobalNetMarkingChain() error {
 
 	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", constants.SmGlobalnetMarkChain); err != nil {
 		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetMarkChain)
+	}
+
+	if err := iptables.AwaitChain(g.ipt, "nat", constants.SmGlobalnetMarkChain); err != nil {
+		return errors.Wrap(err, "error looking for chain")
 	}
 
 	return nil

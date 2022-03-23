@@ -20,6 +20,7 @@ package iptables
 
 import (
 	"strings"
+	"time"
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/pkg/errors"
@@ -36,6 +37,7 @@ type Interface interface {
 	List(table, chain string) ([]string, error)
 	ListChains(table string) ([]string, error)
 	NewChain(table, chain string) error
+	ChainExists(table, chain string) (bool, error)
 	ClearChain(table, chain string) error
 	DeleteChain(table, chain string) error
 }
@@ -186,6 +188,29 @@ func UpdateChainRules(ipt Interface, table, chain string, rules [][]string) erro
 			// will happen again
 			klog.Warningf("Unable to delete iptables entry from table %q, chain %q: %q", table, chain, rule)
 		}
+	}
+
+	return nil
+}
+
+func AwaitChain(ipt Interface, table, chain string) error {
+	var err error
+	var exists bool
+
+	// On some platforms like OCP, it was seen that after creating the chain, its taking few milli-seconds for
+	// the chain to be actually synced.
+	for i := 0; i < 10; i++ {
+		exists, err = ipt.ChainExists(table, chain)
+		if err == nil && exists {
+			break
+		}
+
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	if err != nil {
+		return errors.Wrapf(err, "error while looking for chain %q in %q table even after waiting for two seconds",
+			chain, table)
 	}
 
 	return nil
