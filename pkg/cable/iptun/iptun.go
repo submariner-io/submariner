@@ -22,8 +22,11 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
+	"strconv"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
@@ -44,6 +47,8 @@ const (
 	IPTunNetworkPrefix = 242
 	CableDriverName    = "iptun"
 	TableID            = 100
+	IPTunRouteAdd      = true
+	IPTunRouteDel      = false
 )
 
 type Operation int
@@ -67,14 +72,13 @@ type ipTunIface struct {
 	activeEndpointHostname string
 	link                   *netlink.Iptun
 	iptunIP                net.IP
+	cniIPAddress           net.IP
 }
 
 type iptunAttributes struct {
-	name     string
-	pmtuDisc uint8
-	local    net.IP
-	remote   net.IP
-	mtu      int
+	name  string
+	local net.IP
+	mtu   int
 }
 
 func init() {
@@ -89,11 +93,14 @@ func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.Subm
 		localCluster:  *localCluster,
 	}
 
-	// Don't create an ipip-tunnel interface till you have the remote endpoint info.
+	if err := ipip.createIPTunInterface(localEndpoint.Spec.Hostname); err != nil {
+		return nil, errors.Wrap(err, "failed to setup iptun link")
+	}
+
 	return &ipip, nil
 }
 
-func (ipip *iptun) createIPTunInterface(remoteIP net.IP) error {
+func (ipip *iptun) createIPTunInterface(activeEndPoint string) error {
 	ipAddr := ipip.localEndpoint.Spec.PrivateIP
 
 	iptunIP, err := cableutils.GetTunnelEndPointIPAddress(ipAddr, IPTunNetworkPrefix)
@@ -111,14 +118,12 @@ func (ipip *iptun) createIPTunInterface(remoteIP net.IP) error {
 	iptunMtu := defaultHostIface.MTU - IPTunOverhead
 
 	attrs := &iptunAttributes{
-		name:     IPTunIface,
-		local:    net.ParseIP(ipAddr),
-		remote:   remoteIP,
-		mtu:      iptunMtu,
-		pmtuDisc: 1,
+		name:  IPTunIface,
+		local: net.ParseIP(ipAddr),
+		mtu:   iptunMtu,
 	}
 
-	ipip.ipTunIface, err = newIPTunIface(attrs, ipip.localEndpoint.Spec.Hostname)
+	ipip.ipTunIface, err = newIPTunIface(attrs, activeEndPoint)
 	if err != nil {
 		return errors.Wrap(err, "failed to create iptun interface on Gateway Node")
 	}
@@ -145,8 +150,7 @@ func newIPTunIface(attrs *iptunAttributes, activeEndPoint string) (*ipTunIface, 
 			MTU:   attrs.mtu,
 			Flags: net.FlagUp,
 		},
-		Local:  attrs.local,
-		Remote: attrs.remote,
+		Local: attrs.local,
 	}
 
 	ipTunIface := &ipTunIface{
@@ -239,10 +243,6 @@ func (ipip *iptun) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo)
 		return "", fmt.Errorf("failed to parse remote IP %s", endpointInfo.UseIP)
 	}
 
-	if err := ipip.createIPTunInterface(remoteIP); err != nil {
-		return "", errors.Wrap(err, "failed to setup iptun link")
-	}
-
 	allowedIPs := cableutils.ParseSubnets(remoteEndpoint.Spec.Subnets)
 
 	klog.V(log.DEBUG).Infof("Connecting cluster %s endpoint %s",
@@ -259,19 +259,16 @@ func (ipip *iptun) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo)
 		return endpointInfo.UseIP, fmt.Errorf("failed to derive the iptun iptunIP for %s: %w", privateIP, err)
 	}
 
-	var ipAddress net.IP
-
 	cniIface, err := cni.Discover(ipip.localCluster.Spec.ClusterCIDR[0])
 	if err == nil {
-		ipAddress = net.ParseIP(cniIface.IPAddress)
+		ipip.ipTunIface.cniIPAddress = net.ParseIP(cniIface.IPAddress)
 	} else {
 		klog.Errorf("Failed to get the CNI interface IP for cluster CIDR %q, host-networking use-cases may not work",
 			ipip.localCluster.Spec.ClusterCIDR[0])
-		ipAddress = nil
+		ipip.ipTunIface.cniIPAddress = nil
 	}
 
-	err = cableutils.AddRoute(allowedIPs, remoteIPTunIP, ipAddress, ipip.ipTunIface.link.Index, TableID)
-
+	err = addDelRouteEncap(IPTunRouteAdd, allowedIPs, remoteIPTunIP, remoteIP, ipip.ipTunIface.cniIPAddress, ipip, TableID)
 	if err != nil {
 		return endpointInfo.UseIP, fmt.Errorf("failed to add route for the CIDR %q with remoteIP %q and iptunInterfaceIP %q: %w",
 			allowedIPs, remoteIPTunIP, ipip.ipTunIface.iptunIP, err)
@@ -285,6 +282,95 @@ func (ipip *iptun) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo)
 	klog.V(log.DEBUG).Infof("Done adding endpoint for cluster %s", remoteEndpoint.Spec.ClusterID)
 
 	return endpointInfo.UseIP, nil
+}
+
+func addDelRouteEncap(add bool, ipAddressList []net.IPNet, remoteTunIP, remoteIP, cniIP net.IP, iface *iptun, tableID int) error {
+	link := iface.ipTunIface.link
+
+	for i := range ipAddressList {
+		exists, err := checkEncapRoute(ipAddressList[i], remoteTunIP)
+		if err != nil {
+			return errors.Wrap(err, "unable to check the route entry")
+		}
+
+		args := []string{}
+		args = append(args, "route")
+
+		if add {
+			switch exists {
+			case true:
+				args = append(args, "replace")
+			default:
+				args = append(args, "add")
+			}
+		} else {
+			switch exists {
+			case true:
+				args = append(args, "delete")
+			default:
+				return errors.Wrap(err, "unable to delete the route entry as it was not found")
+			}
+		}
+
+		args = append(args, ipAddressList[i].String(),
+			"encap", "ip", "id", "100",
+			"dst", remoteIP.String(),
+			"via", remoteTunIP.String(),
+			"dev", link.Attrs().Name,
+			"table", strconv.Itoa(tableID),
+			"metric", strconv.Itoa(100))
+
+		if cniIP != nil {
+			args = append(args, "src", cniIP.String())
+		}
+
+		if err := ipCommand(args...); err != nil {
+			klog.Errorf("error adding/deleting route encap with with args %v; got error: %v", args, err)
+			return errors.Wrap(err, "unable to add/delete the route entry")
+		}
+	}
+
+	return nil
+}
+
+func ipCommand(args ...string) error {
+	var err error
+
+	for i := 0; i < 3; i++ {
+		cmd := exec.Command("ip", args...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		if err = cmd.Run(); err == nil {
+			break
+		}
+
+		klog.Warningf("error %v error running the ip command with args: %v", err, args)
+		time.Sleep(1 * time.Second)
+	}
+
+	if err != nil {
+		return errors.Wrapf(err, "error running the ip command with args %v", args)
+	}
+
+	return nil
+}
+
+func checkEncapRoute(ip net.IPNet, remoteTunIP net.IP) (bool, error) {
+	routes, err := netlink.RouteGet(ip.IP)
+	if err != nil {
+		klog.Errorf("Unable to check routes, error retrieving routes for Addr %v: %v", ip.String(), err)
+		return false, errors.Wrapf(err, "Unable to check routes, error retrieving routes for Addr %v", ip.String())
+	}
+
+	for i := range routes {
+		if routes[i].Gw.Equal(remoteTunIP) {
+			// Found an IPinIP Tunnel end point route
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (ipip *iptun) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint) error {
@@ -320,7 +406,14 @@ func (ipip *iptun) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoi
 
 	allowedIPs := cableutils.ParseSubnets(remoteEndpoint.Spec.Subnets)
 
-	err := cableutils.DelRoute(allowedIPs, ipip.ipTunIface.link.Index, TableID)
+	privateIP := remoteEndpoint.Spec.PrivateIP
+
+	remoteIPTunIP, err := cableutils.GetTunnelEndPointIPAddress(privateIP, IPTunNetworkPrefix)
+	if err != nil {
+		return fmt.Errorf("failed to derive the iptun IP for %s: %w", privateIP, err)
+	}
+
+	err = addDelRouteEncap(IPTunRouteDel, allowedIPs, remoteIPTunIP, remoteIP, ipip.ipTunIface.cniIPAddress, ipip, TableID)
 	if err != nil {
 		return fmt.Errorf("failed to remove route for the CIDR %q: %w", allowedIPs, err)
 	}
