@@ -1,6 +1,13 @@
+# Core Submariner codeowners
 @dfarrell07 *.md
-@mkolesnik /.github/workflows/ /scripts/ Makefile* Dockerfile.dapper /package/
+@mkolesnik /.github/workflows/ /scripts/ Makefile* Dockerfile.dapper build/*
 @Oats87 *
 @skitt *
 @sridhargaddam *
 @tpantelis *
+
+# Feature branch codeowners
+@anfredette *
+@astoycos *
+@Billy99 *
+@nerdalert *
