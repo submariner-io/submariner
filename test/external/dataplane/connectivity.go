@@ -215,7 +215,6 @@ func testExternalConnectivity(p testParams) {
 
 	var targetIP string
 
-	//nolint // golangci/golangci-lint#1372
 	switch p.ToEndpointType {
 	default:
 		fallthrough
