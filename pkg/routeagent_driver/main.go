@@ -124,7 +124,7 @@ func main() {
 	<-stopCh
 	ctl.Stop()
 
-	klog.Info("All controllers stopped or exited. Stopping submariner-networkplugin-syncer")
+	klog.Info("All controllers stopped or exited. Stopping submariner-route-agent")
 }
 
 func init() {
