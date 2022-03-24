@@ -351,7 +351,6 @@ func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
 	_, _ = np.RunCommand(cmd)
 	_, dockerLog := docker.GetLog()
 
-	//nolint // golangci/golangci-lint#1372
 	switch p.ToEndpointType {
 	default:
 		fallthrough
@@ -360,6 +359,7 @@ func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
 	case tcp.GlobalServiceIP:
 		By(fmt.Sprintf("Verifying that external app received request from one of podGlobalIPs %v", podGlobalIPs))
 		matchRegexp := MatchRegexp("%s .*GET /%s%s .*", podGlobalIPs[0], p.Framework.Namespace, clusterName)
+
 		for i := 1; i < len(podGlobalIPs); i++ {
 			matchRegexp = Or(matchRegexp, MatchRegexp("%s .*GET /%s%s .*", podGlobalIPs[i], p.Framework.Namespace, clusterName))
 		}
@@ -397,7 +397,6 @@ func newGlobalEgressIPObj(namespace string, selector *metav1.LabelSelector) (*un
 }
 
 func createSvc(p testParams, np *framework.NetworkPod) *v1.Service {
-	//nolint // golangci/golangci-lint#1372
 	switch p.ToEndpointType {
 	case tcp.GlobalServiceIP, tcp.PodIP, tcp.ServiceIP:
 		return np.CreateService()
@@ -412,7 +411,6 @@ func createSvc(p testParams, np *framework.NetworkPod) *v1.Service {
 }
 
 func getGlobalIngressIP(p testParams, service *v1.Service) string {
-	//nolint // golangci/golangci-lint#1372
 	switch p.ToEndpointType {
 	default:
 		fallthrough
