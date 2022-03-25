@@ -82,3 +82,21 @@ func IsOverlapping(cidrList []string, cidr string) (bool, error) {
 
 	return false, nil
 }
+
+// Parse CIDR string and skip errors.
+func ParseSubnets(subnets []string) []net.IPNet {
+	nets := make([]net.IPNet, 0, len(subnets))
+
+	for _, sn := range subnets {
+		_, cidr, err := net.ParseCIDR(sn)
+		if err != nil {
+			// this should not happen. Log and continue
+			klog.Errorf("failed to parse subnet %s: %v", sn, err)
+			continue
+		}
+
+		nets = append(nets, *cidr)
+	}
+
+	return nets
+}

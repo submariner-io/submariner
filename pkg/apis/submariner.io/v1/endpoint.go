@@ -61,3 +61,14 @@ func parsePort(port string) (int32, error) {
 		return int32(portInt), nil
 	}
 }
+
+func RemoveConnectionForEndpoint(connections []Connection, cableName string) []Connection {
+	for j := range connections {
+		if connections[j].Endpoint.CableName == cableName {
+			copy(connections[j:], connections[j+1:])
+			return connections[:len(connections)-1]
+		}
+	}
+
+	return connections
+}

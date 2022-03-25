@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -32,7 +33,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
-	"github.com/submariner-io/submariner/pkg/cable/cableutils"
+	"github.com/submariner-io/submariner/pkg/cidr"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
@@ -51,31 +52,21 @@ const (
 	IPTunRouteDel      = false
 )
 
-type Operation int
-
-const (
-	Add Operation = iota
-	Delete
-	Flush
-)
-
-type iptun struct {
+type ipTun struct {
 	localEndpoint types.SubmarinerEndpoint
 	localCluster  types.SubmarinerCluster
 	connections   []v1.Connection
 	mutex         sync.Mutex
 	ipTunIface    *ipTunIface
 	netLink       netlinkAPI.Interface
+	cniIPAddress  net.IP
 }
 
 type ipTunIface struct {
-	activeEndpointHostname string
-	link                   *netlink.Iptun
-	iptunIP                net.IP
-	cniIPAddress           net.IP
+	link *netlink.Iptun
 }
 
-type iptunAttributes struct {
+type ipTunAttributes struct {
 	name  string
 	local net.IP
 	mtu   int
@@ -87,63 +78,83 @@ func init() {
 
 func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.SubmarinerCluster) (cable.Driver, error) {
 	// We'll panic if localEndpoint or localCluster are nil, this is intentional
-	ipip := iptun{
+	ipip := ipTun{
 		localEndpoint: *localEndpoint,
 		netLink:       netlinkAPI.New(),
 		localCluster:  *localCluster,
 	}
 
-	if err := ipip.createIPTunInterface(localEndpoint.Spec.Hostname); err != nil {
-		return nil, errors.Wrap(err, "failed to setup iptun link")
+	if err := ipip.createIPTunInterface(); err != nil {
+		return nil, errors.Wrap(err, "failed to setup ipTun link")
+	}
+
+	cniIface, err := cni.Discover(localCluster.Spec.ClusterCIDR[0])
+	if err == nil {
+		ipip.cniIPAddress = net.ParseIP(cniIface.IPAddress)
+	} else {
+		klog.V(log.DEBUG).Infof("Failed to get the CNI interface IP for cluster CIDR %q, host-networking use-cases may not work",
+			ipip.localCluster.Spec.ClusterCIDR[0])
+		ipip.cniIPAddress = nil
 	}
 
 	return &ipip, nil
 }
 
-func (ipip *iptun) createIPTunInterface(activeEndPoint string) error {
-	ipAddr := ipip.localEndpoint.Spec.PrivateIP
+func (i *ipTun) createIPTunInterface() error {
+	ipAddr := i.localEndpoint.Spec.PrivateIP
 
-	iptunIP, err := cableutils.GetTunnelEndPointIPAddress(ipAddr, IPTunNetworkPrefix)
+	ipTunIP, err := getTunnelEndPointIPAddress(ipAddr, IPTunNetworkPrefix)
 	if err != nil {
-		return errors.Wrapf(err, "failed to derive the iptun IP for %s", ipAddr)
+		return errors.Wrapf(err, "failed to derive the ipTun IP for %s", ipAddr)
 	}
 
 	defaultHostIface, err := netlinkAPI.GetDefaultGatewayInterface()
 	if err != nil {
 		return errors.Wrapf(err, "Unable to find the default interface on host: %s",
-			ipip.localEndpoint.Spec.Hostname)
+			i.localEndpoint.Spec.Hostname)
 	}
 
 	// Derive the MTU based on the default outgoing interface.
-	iptunMtu := defaultHostIface.MTU - IPTunOverhead
+	ipTunMtu := defaultHostIface.MTU - IPTunOverhead
 
-	attrs := &iptunAttributes{
+	attrs := &ipTunAttributes{
 		name:  IPTunIface,
 		local: net.ParseIP(ipAddr),
-		mtu:   iptunMtu,
+		mtu:   ipTunMtu,
 	}
 
-	ipip.ipTunIface, err = newIPTunIface(attrs, activeEndPoint)
+	i.ipTunIface, err = newIPTunIface(attrs)
 	if err != nil {
-		return errors.Wrap(err, "failed to create iptun interface on Gateway Node")
+		return errors.Wrap(err, "failed to create ipTun interface on Gateway Node")
 	}
 
-	ipip.ipTunIface.iptunIP = iptunIP
+	rule := netlink.NewRule()
+	rule.Table = TableID
+	rule.Priority = TableID
 
-	err = ipip.addIPRule()
-	if err != nil && !os.IsExist(err) {
+	err = i.netLink.RuleAddIfNotPresent(rule)
+	if err != nil {
 		return errors.Wrap(err, "failed to add ip rule")
 	}
 
-	err = cableutils.ConfigureIPAddress(iptunIP, net.CIDRMask(8, 32), ipip.ipTunIface.link, ipip.ipTunIface.link.Name)
+	ipConfig := &netlink.Addr{IPNet: &net.IPNet{
+		IP:   ipTunIP,
+		Mask: net.CIDRMask(8, 32),
+	}}
+
+	err = i.netLink.AddrAddIfNotPresent(i.ipTunIface.link, ipConfig)
 	if err != nil {
-		return errors.Wrap(err, "failed to configure iptun interface ipaddress on the Gateway Node")
+		if os.IsExist(err) {
+			klog.V(log.DEBUG).Infof("Requested ipTun interface ipaddress already configured on the Gateway Node")
+		} else {
+			return errors.Wrap(err, "Error configuring the ipTun interface IP address")
+		}
 	}
 
 	return nil
 }
 
-func newIPTunIface(attrs *iptunAttributes, activeEndPoint string) (*ipTunIface, error) {
+func newIPTunIface(attrs *ipTunAttributes) (*ipTunIface, error) {
 	iface := &netlink.Iptun{
 		LinkAttrs: netlink.LinkAttrs{
 			Name:  attrs.name,
@@ -154,8 +165,7 @@ func newIPTunIface(attrs *iptunAttributes, activeEndPoint string) (*ipTunIface, 
 	}
 
 	ipTunIface := &ipTunIface{
-		link:                   iface,
-		activeEndpointHostname: activeEndPoint,
+		link: iface,
 	}
 
 	if err := createIPTunIface(ipTunIface); err != nil {
@@ -168,17 +178,14 @@ func newIPTunIface(attrs *iptunAttributes, activeEndPoint string) (*ipTunIface, 
 func createIPTunIface(iface *ipTunIface) error {
 	err := netlink.LinkAdd(iface.link)
 	if errors.Is(err, syscall.EEXIST) {
-		klog.Errorf("Got error: %v, %v", err, iface.link)
-		// Get the properties of existing iptun interface.
+		// Get the properties of existing ipTun interface.
 		existing, err := netlink.LinkByName(iface.link.Name)
 		if err != nil {
-			klog.Errorf("FAILED TO RETRIEVE LINK INFO")
 			return errors.Wrap(err, "failed to retrieve link info")
 		}
 
 		if isIPtunIfaceConfigTheSame(iface.link, existing) {
-			klog.V(log.DEBUG).Infof("iptun interface already exists with same configuration.")
-			klog.Errorf("iptun interface already exists with same configuration.")
+			klog.V(log.DEBUG).Infof("ipTun interface already exists with same configuration. No need to recreate")
 
 			iface.link = existing.(*netlink.Iptun)
 
@@ -187,17 +194,19 @@ func createIPTunIface(iface *ipTunIface) error {
 
 		// Config does not match, delete the existing interface and re-create it.
 		if err = netlink.LinkDel(existing); err != nil {
-			return errors.Wrap(err, "failed to delete the existing iptun interface")
+			return errors.Wrap(err, "failed to delete the existing ipTun interface")
 		}
 
 		if err = netlink.LinkAdd(iface.link); err != nil {
-			return errors.Wrap(err, "failed to re-create the the iptun interface")
+			return errors.Wrap(err, "failed to re-create the the ipTun interface")
 		}
-	} else if err != nil {
-		return errors.Wrap(err, "failed to create the the iptun interface")
 	}
 
-	klog.Info("SUCCESSFULLY CREATED IP TUN DEVICE")
+	if err != nil {
+		return errors.Wrap(err, "failed to create the the ipTun interface")
+	}
+
+	klog.Info("Successfully created IP in IP interface")
 
 	return nil
 }
@@ -207,33 +216,22 @@ func isIPtunIfaceConfigTheSame(newLink, currentLink netlink.Link) bool {
 	existing := currentLink.(*netlink.Iptun)
 
 	if len(required.Local) > 0 && len(existing.Local) > 0 && !required.Local.Equal(existing.Local) {
-		klog.Warningf("iptun Local (%v) of existing interface does not match with required Group (%v)", existing.Local, required.Local)
+		klog.Warningf("ipTun Local (%v) of existing interface does not match with required Group (%v)", existing.Local, required.Local)
 		return false
 	}
 
 	if len(required.Remote) > 0 && len(existing.Remote) > 0 && !required.Remote.Equal(existing.Remote) {
-		klog.Warningf("iptun Remote (%v) of existing interface does not match with required Remote (%v)", existing.Remote, required.Remote)
+		klog.Warningf("ipTun Remote (%v) of existing interface does not match with required Remote (%v)", existing.Remote, required.Remote)
 		return false
 	}
 
 	return true
 }
 
-func (ipip *iptun) addIPRule() error {
-	if ipip.ipTunIface != nil {
-		err := cableutils.AddIPRule(TableID)
-		if err != nil {
-			return errors.Wrap(err, "failed to add ip rule")
-		}
-	}
-
-	return nil
-}
-
-func (ipip *iptun) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
+func (i *ipTun) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
 	// We'll panic if endpointInfo is nil, this is intentional
 	remoteEndpoint := endpointInfo.Endpoint
-	if ipip.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
+	if i.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
 		klog.V(log.DEBUG).Infof("Will not connect to self")
 		return "", nil
 	}
@@ -243,38 +241,29 @@ func (ipip *iptun) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo)
 		return "", fmt.Errorf("failed to parse remote IP %s", endpointInfo.UseIP)
 	}
 
-	allowedIPs := cableutils.ParseSubnets(remoteEndpoint.Spec.Subnets)
+	allowedIPs := cidr.ParseSubnets(remoteEndpoint.Spec.Subnets)
 
 	klog.V(log.DEBUG).Infof("Connecting cluster %s endpoint %s",
 		remoteEndpoint.Spec.ClusterID, remoteIP)
-	ipip.mutex.Lock()
-	defer ipip.mutex.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
-	cable.RecordConnection(CableDriverName, &ipip.localEndpoint.Spec, &remoteEndpoint.Spec, string(v1.Connected), true)
+	cable.RecordConnection(CableDriverName, &i.localEndpoint.Spec, &remoteEndpoint.Spec, string(v1.Connected), true)
 
 	privateIP := endpointInfo.Endpoint.Spec.PrivateIP
 
-	remoteIPTunIP, err := cableutils.GetTunnelEndPointIPAddress(privateIP, IPTunNetworkPrefix)
+	remoteIPTunIP, err := getTunnelEndPointIPAddress(privateIP, IPTunNetworkPrefix)
 	if err != nil {
-		return endpointInfo.UseIP, fmt.Errorf("failed to derive the iptun iptunIP for %s: %w", privateIP, err)
+		return "", errors.Wrapf(err, "failed to derive the ipTun IP for %s: ", privateIP)
 	}
 
-	cniIface, err := cni.Discover(ipip.localCluster.Spec.ClusterCIDR[0])
-	if err == nil {
-		ipip.ipTunIface.cniIPAddress = net.ParseIP(cniIface.IPAddress)
-	} else {
-		klog.Errorf("Failed to get the CNI interface IP for cluster CIDR %q, host-networking use-cases may not work",
-			ipip.localCluster.Spec.ClusterCIDR[0])
-		ipip.ipTunIface.cniIPAddress = nil
-	}
-
-	err = addDelRouteEncap(IPTunRouteAdd, allowedIPs, remoteIPTunIP, remoteIP, ipip.ipTunIface.cniIPAddress, ipip, TableID)
+	err = addDelRouteEncap(IPTunRouteAdd, allowedIPs, remoteIPTunIP, remoteIP, i)
 	if err != nil {
-		return endpointInfo.UseIP, fmt.Errorf("failed to add route for the CIDR %q with remoteIP %q and iptunInterfaceIP %q: %w",
-			allowedIPs, remoteIPTunIP, ipip.ipTunIface.iptunIP, err)
+		return "", errors.Wrapf(err, "failed to add route for the CIDR %q with remoteIP %q and ipTun Interface IP %q: ",
+			allowedIPs, remoteIPTunIP, i.ipTunIface.link.Local)
 	}
 
-	ipip.connections = append(ipip.connections, v1.Connection{
+	i.connections = append(i.connections, v1.Connection{
 		Endpoint: remoteEndpoint.Spec, Status: v1.Connected,
 		UsingIP: endpointInfo.UseIP, UsingNAT: endpointInfo.UseNAT,
 	})
@@ -284,7 +273,7 @@ func (ipip *iptun) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo)
 	return endpointInfo.UseIP, nil
 }
 
-func addDelRouteEncap(add bool, ipAddressList []net.IPNet, remoteTunIP, remoteIP, cniIP net.IP, iface *iptun, tableID int) error {
+func addDelRouteEncap(add bool, ipAddressList []net.IPNet, remoteTunIP, remoteIP net.IP, iface *ipTun) error {
 	link := iface.ipTunIface.link
 
 	for i := range ipAddressList {
@@ -317,16 +306,15 @@ func addDelRouteEncap(add bool, ipAddressList []net.IPNet, remoteTunIP, remoteIP
 			"dst", remoteIP.String(),
 			"via", remoteTunIP.String(),
 			"dev", link.Attrs().Name,
-			"table", strconv.Itoa(tableID),
+			"table", strconv.Itoa(TableID),
 			"metric", strconv.Itoa(100))
 
-		if cniIP != nil {
-			args = append(args, "src", cniIP.String())
+		if iface.cniIPAddress != nil {
+			args = append(args, "src", iface.cniIPAddress.String())
 		}
 
 		if err := ipCommand(args...); err != nil {
-			klog.Errorf("error adding/deleting route encap with with args %v; got error: %v", args, err)
-			return errors.Wrap(err, "unable to add/delete the route entry")
+			return errors.Wrapf(err, "error adding/deleting route encap with with args %v: ", args)
 		}
 	}
 
@@ -359,7 +347,6 @@ func ipCommand(args ...string) error {
 func checkEncapRoute(ip net.IPNet, remoteTunIP net.IP) (bool, error) {
 	routes, err := netlink.RouteGet(ip.IP)
 	if err != nil {
-		klog.Errorf("Unable to check routes, error retrieving routes for Addr %v: %v", ip.String(), err)
 		return false, errors.Wrapf(err, "Unable to check routes, error retrieving routes for Addr %v", ip.String())
 	}
 
@@ -373,23 +360,23 @@ func checkEncapRoute(ip net.IPNet, remoteTunIP net.IP) (bool, error) {
 	return false, nil
 }
 
-func (ipip *iptun) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint) error {
+func (i *ipTun) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint) error {
 	// We'll panic if remoteEndpoint is nil, this is intentional
 	klog.V(log.DEBUG).Infof("Removing endpoint %#v", remoteEndpoint)
 
-	if ipip.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
+	if i.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
 		klog.V(log.DEBUG).Infof("Will not disconnect self")
 		return nil
 	}
 
-	ipip.mutex.Lock()
-	defer ipip.mutex.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
 	var ip string
 
-	for i := range ipip.connections {
-		if ipip.connections[i].Endpoint.CableName == remoteEndpoint.Spec.CableName {
-			ip = ipip.connections[i].UsingIP
+	for j := range i.connections {
+		if i.connections[j].Endpoint.CableName == remoteEndpoint.Spec.CableName {
+			ip = i.connections[j].UsingIP
 		}
 	}
 
@@ -404,46 +391,58 @@ func (ipip *iptun) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoi
 		return fmt.Errorf("failed to parse remote IP %s", ip)
 	}
 
-	allowedIPs := cableutils.ParseSubnets(remoteEndpoint.Spec.Subnets)
+	allowedIPs := cidr.ParseSubnets(remoteEndpoint.Spec.Subnets)
 
 	privateIP := remoteEndpoint.Spec.PrivateIP
 
-	remoteIPTunIP, err := cableutils.GetTunnelEndPointIPAddress(privateIP, IPTunNetworkPrefix)
+	remoteIPTunIP, err := getTunnelEndPointIPAddress(privateIP, IPTunNetworkPrefix)
 	if err != nil {
-		return fmt.Errorf("failed to derive the iptun IP for %s: %w", privateIP, err)
+		return errors.Wrapf(err, "failed to derive the ipTun IP for %s: ", privateIP)
 	}
 
-	err = addDelRouteEncap(IPTunRouteDel, allowedIPs, remoteIPTunIP, remoteIP, ipip.ipTunIface.cniIPAddress, ipip, TableID)
+	err = addDelRouteEncap(IPTunRouteDel, allowedIPs, remoteIPTunIP, remoteIP, i)
 	if err != nil {
-		return fmt.Errorf("failed to remove route for the CIDR %q: %w", allowedIPs, err)
+		return errors.Wrapf(err, "failed to remove route for the CIDR %q: ", allowedIPs)
 	}
 
-	ipip.connections = cableutils.RemoveConnectionForEndpoint(ipip.connections, remoteEndpoint)
-	cable.RecordDisconnected(CableDriverName, &ipip.localEndpoint.Spec, &remoteEndpoint.Spec)
+	i.connections = v1.RemoveConnectionForEndpoint(i.connections, remoteEndpoint.Spec.CableName)
+	cable.RecordDisconnected(CableDriverName, &i.localEndpoint.Spec, &remoteEndpoint.Spec)
 
 	klog.V(log.DEBUG).Infof("Done removing endpoint for cluster %s", remoteEndpoint.Spec.ClusterID)
 
 	return nil
 }
 
-func (ipip *iptun) GetConnections() ([]v1.Connection, error) {
-	return ipip.connections, nil
+func getTunnelEndPointIPAddress(ipAddr string, prefix int) (net.IP, error) {
+	ipSlice := strings.Split(ipAddr, ".")
+	if len(ipSlice) < 4 {
+		return nil, fmt.Errorf("invalid ipAddr [%s]", ipAddr)
+	}
+
+	ipSlice[0] = strconv.Itoa(prefix)
+	tunnelIP := net.ParseIP(strings.Join(ipSlice, "."))
+
+	return tunnelIP, nil
 }
 
-func (ipip *iptun) GetActiveConnections() ([]v1.Connection, error) {
-	return ipip.connections, nil
+func (i *ipTun) GetConnections() ([]v1.Connection, error) {
+	return i.connections, nil
 }
 
-func (ipip *iptun) Init() error {
+func (i *ipTun) GetActiveConnections() ([]v1.Connection, error) {
+	return i.connections, nil
+}
+
+func (i *ipTun) Init() error {
 	return nil
 }
 
-func (ipip *iptun) GetName() string {
+func (i *ipTun) GetName() string {
 	return CableDriverName
 }
 
-func (ipip *iptun) Cleanup() error {
-	klog.Infof("Uninstalling the iptun cable driver")
+func (i *ipTun) Cleanup() error {
+	klog.Infof("Uninstalling the ipTun cable driver")
 
 	return netlinkAPI.DeleteIfaceAndAssociatedRoutes(IPTunIface, TableID) // nolint:wrapcheck  // No need to wrap this error
 }
