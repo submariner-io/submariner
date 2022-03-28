@@ -47,7 +47,9 @@ type Basic interface {
 	RouteGet(destination net.IP) ([]netlink.Route, error)
 	RouteList(link netlink.Link, family int) ([]netlink.Route, error)
 	FlushRouteTable(tableID int) error
-	ConfigureIPRule(operation Operation, tableID int) error
+	NewTableRule(tableID int) *netlink.Rule
+	RuleAdd(rule *netlink.Rule) error
+	RuleDel(rule *netlink.Rule) error
 	XfrmPolicyAdd(policy *netlink.XfrmPolicy) error
 	XfrmPolicyDel(policy *netlink.XfrmPolicy) error
 	XfrmPolicyList(family int) ([]netlink.XfrmPolicy, error)
@@ -58,7 +60,8 @@ type Basic interface {
 type Interface interface {
 	Basic
 	AddrAddIfNotPresent(link netlink.Link, addr *netlink.Addr) error
-	RuleAddIfNotPresent(tableID int) error
+	RuleAddIfNotPresent(rule *netlink.Rule) error
+	RuleDelIfPresent(rule *netlink.Rule) error
 	RouteAddOrReplace(route *netlink.Route) error
 	AddDestinationRoutes(destIPs []net.IPNet, gwIP, srcIP net.IP, linkIndex, tableID int) error
 	DeleteDestinationRoutes(destIPs []net.IPNet, linkIndex, tableID int) error
@@ -68,13 +71,6 @@ var NewFunc func() Interface
 
 const (
 	allZeroAddress = "0.0.0.0/0"
-)
-
-type Operation int
-
-const (
-	Add Operation = iota
-	Delete
 )
 
 type netlinkType struct{}
@@ -131,25 +127,20 @@ func (n *netlinkType) RouteList(link netlink.Link, family int) ([]netlink.Route,
 	return netlink.RouteList(link, family)
 }
 
-func (n *netlinkType) ConfigureIPRule(operation Operation, tableID int) error {
+func (n *netlinkType) NewTableRule(tableID int) *netlink.Rule {
 	rule := netlink.NewRule()
 	rule.Table = tableID
 	rule.Priority = tableID
 
-	switch operation {
-	case Add:
-		err := netlink.RuleAdd(rule)
-		if err != nil && !os.IsExist(err) {
-			return errors.Wrapf(err, "failed to add ip rule %s", rule)
-		}
-	case Delete:
-		err := netlink.RuleDel(rule)
-		if err != nil && !os.IsNotExist(err) {
-			return errors.Wrapf(err, "failed to delete ip rule %s", rule)
-		}
-	}
+	return rule
+}
 
-	return nil
+func (n *netlinkType) RuleAdd(rule *netlink.Rule) error {
+	return netlink.RuleAdd(rule)
+}
+
+func (n *netlinkType) RuleDel(rule *netlink.Rule) error {
+	return netlink.RuleDel(rule)
 }
 
 func (n *netlinkType) XfrmPolicyAdd(policy *netlink.XfrmPolicy) error {

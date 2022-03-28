@@ -202,7 +202,7 @@ func (n *basicType) RouteList(link netlink.Link, family int) ([]netlink.Route, e
 	return n.routes[link.Attrs().Index], nil
 }
 
-func (n *basicType) ConfigureIPRule(operation netlinkAPI.Operation, tableID int) error {
+func (n *basicType) NewTableRule(tableID int) *netlink.Rule {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
@@ -210,20 +210,31 @@ func (n *basicType) ConfigureIPRule(operation netlinkAPI.Operation, tableID int)
 	rule.Table = tableID
 	rule.Priority = tableID
 
-	switch operation {
-	case netlinkAPI.Add:
-		if _, found := n.rules[rule.Table]; found {
-			return os.ErrExist
-		}
+	return rule
+}
 
-		n.rules[rule.Table] = *rule
-	case netlinkAPI.Delete:
-		if _, found := n.rules[rule.Table]; !found {
-			return os.ErrNotExist
-		}
+func (n *basicType) RuleAdd(rule *netlink.Rule) error {
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
 
-		delete(n.rules, rule.Table)
+	if _, found := n.rules[rule.Table]; found {
+		return os.ErrExist
 	}
+
+	n.rules[rule.Table] = *rule
+
+	return nil
+}
+
+func (n *basicType) RuleDel(rule *netlink.Rule) error {
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
+
+	if _, found := n.rules[rule.Table]; !found {
+		return os.ErrNotExist
+	}
+
+	delete(n.rules, rule.Table)
 
 	return nil
 }

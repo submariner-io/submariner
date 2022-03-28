@@ -140,7 +140,7 @@ func (v *vxlan) createVxlanInterface(activeEndPoint string, port int) error {
 
 	v.vxlanIface.vtepIP = vtepIP
 
-	err = v.netLink.ConfigureIPRule(netlinkAPI.Add, TableID)
+	err = v.netLink.RuleAddIfNotPresent(v.netLink.NewTableRule(TableID))
 	if err != nil && !os.IsExist(err) {
 		return errors.Wrap(err, "failed to add ip rule")
 	}
@@ -548,7 +548,7 @@ func (v *vxlan) Cleanup() error {
 		klog.Errorf("unable to delete interface %s and associated routes from table %d", VxlanIface, TableID)
 	}
 
-	err = v.netLink.ConfigureIPRule(netlinkAPI.Delete, TableID)
+	err = v.netLink.RuleDelIfPresent(v.netLink.NewTableRule(TableID))
 	if err != nil {
 		return errors.Wrapf(err, "unable to delete IP rule pointing to %d table", TableID)
 	}
