@@ -44,7 +44,7 @@ func (a *Adapter) RuleAddIfNotPresent(rule *netlink.Rule) error {
 func (a *Adapter) RuleDelIfPresent(rule *netlink.Rule) error {
 	err := a.RuleDel(rule)
 	if err != nil && !os.IsNotExist(err) {
-		return errors.Wrapf(err, "failed to del rule %s", rule)
+		return errors.Wrapf(err, "failed to delete rule %s", rule)
 	}
 
 	return nil

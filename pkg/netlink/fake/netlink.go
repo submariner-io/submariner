@@ -202,17 +202,6 @@ func (n *basicType) RouteList(link netlink.Link, family int) ([]netlink.Route, e
 	return n.routes[link.Attrs().Index], nil
 }
 
-func (n *basicType) NewTableRule(tableID int) *netlink.Rule {
-	n.mutex.Lock()
-	defer n.mutex.Unlock()
-
-	rule := netlink.NewRule()
-	rule.Table = tableID
-	rule.Priority = tableID
-
-	return rule
-}
-
 func (n *basicType) RuleAdd(rule *netlink.Rule) error {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
