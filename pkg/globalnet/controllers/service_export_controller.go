@@ -171,7 +171,8 @@ func (c *serviceExportController) onCreate(serviceExport *mcsv1a1.ServiceExport)
 		},
 	}
 
-	klog.Infof("Creating %#v", ingressIP)
+	klog.Infof("Creating GlobalIngressIP object %s/%s, TargetRef: %q, %q ", serviceExport.Namespace,
+		serviceExport.Name, submarinerv1.ClusterIPService, serviceExport.Name)
 
 	return ingressIP, false
 }
