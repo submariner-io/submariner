@@ -47,7 +47,6 @@ type Basic interface {
 	RouteGet(destination net.IP) ([]netlink.Route, error)
 	RouteList(link netlink.Link, family int) ([]netlink.Route, error)
 	FlushRouteTable(tableID int) error
-	NewTableRule(tableID int) *netlink.Rule
 	RuleAdd(rule *netlink.Rule) error
 	RuleDel(rule *netlink.Rule) error
 	XfrmPolicyAdd(policy *netlink.XfrmPolicy) error
@@ -125,14 +124,6 @@ func (n *netlinkType) RouteGet(destination net.IP) ([]netlink.Route, error) {
 
 func (n *netlinkType) RouteList(link netlink.Link, family int) ([]netlink.Route, error) {
 	return netlink.RouteList(link, family)
-}
-
-func (n *netlinkType) NewTableRule(tableID int) *netlink.Rule {
-	rule := netlink.NewRule()
-	rule.Table = tableID
-	rule.Priority = tableID
-
-	return rule
 }
 
 func (n *netlinkType) RuleAdd(rule *netlink.Rule) error {
@@ -283,4 +274,12 @@ func DeleteXfrmRules() error {
 	}
 
 	return nil
+}
+
+func NewTableRule(tableID int) *netlink.Rule {
+	rule := netlink.NewRule()
+	rule.Table = tableID
+	rule.Priority = tableID
+
+	return rule
 }
