@@ -116,13 +116,13 @@ func NewGatewayMonitor(spec Specification, localCIDRs []string, config *watcher.
 func (g *gatewayMonitor) Start() error {
 	klog.Info("Starting GatewayMonitor to monitor the active Gateway node in the cluster.")
 
+	if err := g.createGlobalNetMarkingChain(); err != nil {
+		return errors.Wrap(err, "error while calling createGlobalNetMarkingChain")
+	}
+
 	err := g.endpointWatcher.Start(g.stopCh)
 	if err != nil {
 		return errors.Wrap(err, "error starting the Endpoint watcher")
-	}
-
-	if err := g.createGlobalNetMarkingChain(); err != nil {
-		return errors.Wrap(err, "error while calling createGlobalNetMarkingChain")
 	}
 
 	return nil
