@@ -86,6 +86,8 @@ type EndpointSpec struct {
 	NATEnabled    bool              `json:"nat_enabled"`
 	Backend       string            `json:"backend"`
 	BackendConfig map[string]string `json:"backend_config,omitempty"`
+	// The list of allocated ClusterGlobaEgresslIPs.
+	AllocatedIPs []string `json:"allocated_ips,omitempty"`
 }
 
 const (

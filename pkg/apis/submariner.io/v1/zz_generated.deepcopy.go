@@ -301,6 +301,11 @@ func (in *EndpointSpec) DeepCopyInto(out *EndpointSpec) {
 			(*out)[key] = val
 		}
 	}
+	if in.AllocatedIPs != nil {
+		in, out := &in.AllocatedIPs, &out.AllocatedIPs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
