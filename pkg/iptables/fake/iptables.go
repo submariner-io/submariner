@@ -156,6 +156,18 @@ func (i *IPTables) ClearChain(table, chain string) error {
 	return nil
 }
 
+func (i *IPTables) ChainExists(table, chain string) (bool, error) {
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
+
+	chainSet := i.tableChains[table]
+	if chainSet != nil {
+		return chainSet.Contains(chain), nil
+	}
+
+	return false, nil
+}
+
 func (i *IPTables) AddChainsFor(table string, chains ...string) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
