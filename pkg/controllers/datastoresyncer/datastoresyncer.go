@@ -53,7 +53,8 @@ type DatastoreSyncer struct {
 }
 
 func New(syncerConfig *broker.SyncerConfig, localCluster *types.SubmarinerCluster,
-	localEndpoint *types.SubmarinerEndpoint, multiGwEnabled bool) *DatastoreSyncer {
+	localEndpoint *types.SubmarinerEndpoint, multiGwEnabled bool,
+) *DatastoreSyncer {
 	// We'll panic if syncerConfig, localCluster or localEndpoint are nil, this is intentional
 	syncerConfig.LocalClusterID = localCluster.Spec.ClusterID
 
@@ -81,9 +82,10 @@ func (d *DatastoreSyncer) Start(stopCh <-chan struct{}) error {
 	}
 
 	d.localFederator = syncer.GetLocalFederator()
+	if !d.multiActiveGateways { // nolint // Bug in whitespace detector
 
-	if !d.multiActiveGateways {
 		klog.Info("Not ensuring one endpoint per cluster since Multiple Active Gateways is enabled")
+
 		if err := d.ensureExclusiveEndpoint(syncer); err != nil {
 			return errors.WithMessage(err, "could not ensure exclusive submariner Endpoint")
 		}
@@ -100,6 +102,10 @@ func (d *DatastoreSyncer) Start(stopCh <-chan struct{}) error {
 	if len(d.localCluster.Spec.GlobalCIDR) > 0 {
 		if err := d.startNodeWatcher(stopCh); err != nil {
 			return errors.WithMessage(err, "startNodeWatcher returned error")
+		}
+
+		if err := d.startClusterGlobalEgressIPWatcher(stopCh); err != nil {
+			return errors.WithMessage(err, "startClusterGlobalEgressIPWatcher returned error")
 		}
 	}
 
@@ -290,6 +296,40 @@ func (d *DatastoreSyncer) createNodeWatcher(stopCh <-chan struct{}) error {
 	err = resourceWatcher.Start(stopCh)
 	if err != nil {
 		return errors.Wrap(err, "error starting the resource watcher")
+	}
+
+	return nil
+}
+
+func (d *DatastoreSyncer) startClusterGlobalEgressIPWatcher(stopCh <-chan struct{}) error {
+	return d.createClusterGlobalEgressIPWatcher(stopCh)
+}
+
+func (d *DatastoreSyncer) createClusterGlobalEgressIPWatcher(stopCh <-chan struct{}) error {
+	resourceWatcher, err := watcher.New(&watcher.Config{
+		Scheme:     scheme.Scheme,
+		RestConfig: d.syncerConfig.LocalRestConfig,
+		RestMapper: d.syncerConfig.RestMapper,
+		Client:     d.syncerConfig.LocalClient,
+		ResourceConfigs: []watcher.ResourceConfig{
+			{
+				Name:         "ClusterGlobalEgressIP watcher for datastoresyncer",
+				ResourceType: &submarinerv1.ClusterGlobalEgressIP{},
+				Handler: watcher.EventHandlerFuncs{
+					OnCreateFunc: d.handleCreateOrUpdateClusterGlobalEgressIP,
+					OnUpdateFunc: d.handleCreateOrUpdateClusterGlobalEgressIP,
+					OnDeleteFunc: d.handleDeleteClusterGlobalEgressIP,
+				},
+			},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "error creating resource watcher for ClusterGlobalEgressIPs")
+	}
+
+	err = resourceWatcher.Start(stopCh)
+	if err != nil {
+		return errors.Wrap(err, "error starting the resource watcher for ClusterGlobalEgressIPs")
 	}
 
 	return nil
