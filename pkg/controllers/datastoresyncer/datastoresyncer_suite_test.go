@@ -120,7 +120,8 @@ func newTestDriver() *testDriver {
 		t.localClient = fake.NewDynamicClient(t.syncerScheme)
 		t.brokerClient = fake.NewDynamicClient(t.syncerScheme)
 
-		t.restMapper = test.GetRESTMapperFor(&submarinerv1.Cluster{}, &submarinerv1.Endpoint{}, &corev1.Node{})
+		t.restMapper = test.GetRESTMapperFor(&submarinerv1.Cluster{}, &submarinerv1.Endpoint{},
+			&corev1.Node{}, &submarinerv1.ClusterGlobalEgressIP{})
 
 		clusterGVR := test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.Cluster{})
 		t.localClusters = t.localClient.Resource(*clusterGVR).Namespace(localNamespace).(*fake.DynamicResourceClient)
