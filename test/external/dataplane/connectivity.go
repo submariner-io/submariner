@@ -229,8 +229,8 @@ func testExternalConnectivity(p testParams) {
 	By(fmt.Sprintf("Sending an http request from external app %q to %q in the cluster %q",
 		dockerIP, targetIP, clusterName))
 
-	command := []string{"curl", "-m", "10", fmt.Sprintf("%s:%d/%s%s", targetIP, 80, p.Framework.Namespace, clusterName)}
-	_, _ = docker.RunCommand(command...)
+	command := []string{"curl", "-m", "3", fmt.Sprintf("%s:%d/%s%s", targetIP, 80, p.Framework.Namespace, clusterName)}
+	_, _ = docker.RunCommandUntil(command...)
 
 	By("Verifying the pod received the request")
 
