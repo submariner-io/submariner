@@ -41,7 +41,6 @@ type SyncHandler struct {
 
 	remoteSubnets           stringset.Interface
 	remoteSubnetGw          map[string]net.IP
-	remoteVTEPs             stringset.Interface
 	routeCacheGWNode        stringset.Interface
 	remoteEndpointTimeStamp map[string]v1.Time
 
@@ -49,9 +48,14 @@ type SyncHandler struct {
 	isGatewayNode        bool
 	wasGatewayPreviously bool
 
-	netLink          netlink.Interface
-	vxlanDevice      *vxLanIface
-	vxlanGwIP        *net.IP
+	netLink     netlink.Interface
+	vxlanDevice *vxLanIface
+	// all Node IPs
+	allNodeIPs stringset.Interface
+	// Maintain gwIPs in order to reconcile FDB entries on worker nodes
+	gwIPs stringset.Interface
+	// Maintain gwVTEPs in order to reconcile Routes on Worker nodes
+	gwVTEPs          stringset.Interface
 	hostname         string
 	cniIface         *cni.Interface
 	defaultHostIface *net.Interface
@@ -65,11 +69,13 @@ func NewSyncHandler(localClusterCidr, localServiceCidr []string) *SyncHandler {
 		remoteSubnets:           stringset.NewSynchronized(),
 		remoteSubnetGw:          map[string]net.IP{},
 		remoteEndpointTimeStamp: map[string]v1.Time{},
-		remoteVTEPs:             stringset.NewSynchronized(),
+		allNodeIPs:              stringset.NewSynchronized(),
 		routeCacheGWNode:        stringset.NewSynchronized(),
 		isGatewayNode:           false,
 		wasGatewayPreviously:    false,
 		netLink:                 netlink.New(),
+		gwIPs:                   stringset.NewSynchronized(),
+		gwVTEPs:                 stringset.NewSynchronized(),
 	}
 }
 
@@ -82,6 +88,24 @@ func (kp *SyncHandler) GetNetworkPlugins() []string {
 		constants.NetworkPluginGeneric, constants.NetworkPluginCanalFlannel, constants.NetworkPluginWeaveNet,
 		constants.NetworkPluginOpenShiftSDN, constants.NetworkPluginCalico,
 	}
+}
+
+func (kp *SyncHandler) addGwIp(ip string) {
+	kp.gwIPs.Add(ip)
+	vtepIP, err := getVxlanVtepIPAddress(ip)
+	if err != nil {
+		klog.Errorf("failed to derive the vxlan vtepIP for %s: %v", ip, err)
+	}
+	kp.gwVTEPs.Add(vtepIP.String())
+}
+
+func (kp *SyncHandler) removeGwIp(ip string) {
+	kp.gwIPs.Remove(ip)
+	vtepIP, err := getVxlanVtepIPAddress(ip)
+	if err != nil {
+		klog.Errorf("failed to derive the vxlan vtepIP for %s: %v", ip, err)
+	}
+	kp.gwVTEPs.Remove(vtepIP.String())
 }
 
 func (kp *SyncHandler) Init() error {
