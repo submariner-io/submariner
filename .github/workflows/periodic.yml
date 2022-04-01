@@ -21,7 +21,7 @@ jobs:
 
       - name: Raise an Issue to report broken links
         if: ${{ failure() }}
-        uses: peter-evans/create-issue-from-file@97e6f902a416aac38834e23fa52e166aad0437d2
+        uses: peter-evans/create-issue-from-file@99b87c35610e986ad2034a7b0518a9b3ebea541b
         with:
           title: Broken link detected by periodic linting
           content-filepath: .github/ISSUE_TEMPLATE/broken-link.md
