@@ -64,7 +64,7 @@ func (s *statistics) update(rtt uint64) {
 		s.sum += rtt
 		oldMean := s.mean
 		s.mean = s.sum / (s.index + 1)
-		s.sqrDiff += uint64(((int64(rtt - oldMean)) * int64((rtt - s.mean))))
+		s.sqrDiff += uint64((int64(rtt - oldMean)) * int64(rtt - s.mean))
 		s.stdDev = uint64(math.Sqrt(float64(s.sqrDiff / (s.index + 1))))
 	} else {
 		s.sum = rtt
