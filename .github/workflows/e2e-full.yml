@@ -15,6 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         deploytool: ['operator']
+        external_net: ['']
         globalnet: ['', 'globalnet']
         cable_driver: ['libreswan', 'wireguard', 'vxlan']
         ovn: ['', 'ovn']
@@ -23,35 +24,27 @@ jobs:
             globalnet: 'globalnet'
           - ovn: 'ovn'
             cable_driver: 'wireguard'
+        include:
+          - external_net: 'external-net'
+          - external_net: 'external-net'
+            globalnet: 'globalnet'
     steps:
       - name: Check out the repository
         uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
 
       - name: Run E2E deployment and tests
+        if: matrix.external_net != 'external-net'
         uses: submariner-io/shipyard/gh-actions/e2e@devel
         with:
           using: ${{ matrix.cable_driver }} ${{ matrix.deploytool }} ${{ matrix.globalnet }} ${{ matrix.ovn }}
 
-      - name: Post mortem
-        if: failure()
-        uses: submariner-io/shipyard/gh-actions/post-mortem@devel
-
-  e2e-external:
-    name: External Network E2E
-    if: contains(github.event.pull_request.labels.*.name, 'ready-to-test')
-    timeout-minutes: 30
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        external_net: ['external-net']
-        globalnet: ['', 'globalnet']
-    steps:
-      - name: Check out the repository
-        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
-
-      - name: Run E2E deployment and tests
+      - name: Run External Network E2E deployment and tests
+        if: matrix.external_net == 'external-net'
         uses: submariner-io/shipyard/gh-actions/e2e@devel
         with:
           using: ${{ matrix.external_net }} ${{ matrix.globalnet }}
-          skip: ""
+          skip: ""  # Override skipping external network tests
+
+      - name: Post mortem
+        if: failure()
+        uses: submariner-io/shipyard/gh-actions/post-mortem@devel
