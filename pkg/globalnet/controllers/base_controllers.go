@@ -30,7 +30,6 @@ import (
 	resourceUtil "github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	iptiface "github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -61,11 +60,10 @@ func newBaseSyncerController() *baseSyncerController {
 	}
 }
 
-func newBaseIPAllocationController(pool *ipam.IPPool, iptIface iptiface.Interface) *baseIPAllocationController {
+func newBaseIPAllocationController(pool *ipam.IPPool) *baseIPAllocationController {
 	return &baseIPAllocationController{
 		baseSyncerController: newBaseSyncerController(),
 		pool:                 pool,
-		iptIface:             iptIface,
 	}
 }
 
@@ -154,47 +152,20 @@ func (c *baseIPAllocationController) reserveAllocatedIPs(federator federate.Fede
 	return nil
 }
 
-func (c *baseIPAllocationController) flushRulesAndReleaseIPs(key string, numRequeues int, flushRules func(allocatedIPs []string) error,
-	allocatedIPs ...string,
-) bool {
+func (c *baseIPAllocationController) releaseIPs(key string, allocatedIPs ...string) {
 	if len(allocatedIPs) == 0 {
-		return false
+		return
 	}
 
 	klog.Infof("Releasing previously allocated IPs %v for %q", allocatedIPs, key)
 
-	err := flushRules(allocatedIPs)
-	if err != nil {
-		klog.Errorf("Error flushing the IP table rules for %q: %v", key, err)
-
-		if shouldRequeue(numRequeues) {
-			return true
-		}
-	}
-
 	if err := c.pool.Release(allocatedIPs...); err != nil {
 		klog.Errorf("Error while releasing the global IPs for %q: %v", key, err)
 	}
-
-	return false
 }
 
 func shouldRequeue(numRequeues int) bool {
 	return numRequeues < maxRequeues
-}
-
-func getTargetSNATIPaddress(allocIPs []string) string {
-	var snatIP string
-
-	allocatedIPs := len(allocIPs)
-
-	if allocatedIPs == 1 {
-		snatIP = allocIPs[0]
-	} else {
-		snatIP = fmt.Sprintf("%s-%s", allocIPs[0], allocIPs[len(allocIPs)-1])
-	}
-
-	return snatIP
 }
 
 func checkStatusChanged(oldStatus, newStatus interface{}, retObj runtime.Object) runtime.Object {
@@ -239,7 +210,10 @@ func createService(svc *corev1.Service,
 
 	obj, err := client.Namespace(gnService.GetNamespace()).Create(context.TODO(), gnService, metav1.CreateOptions{})
 	if apierrors.IsAlreadyExists(err) {
-		err = nil
+		obj, err = client.Namespace(gnService.GetNamespace()).Update(context.TODO(), gnService, metav1.UpdateOptions{})
+		if err != nil {
+			return nil, errors.Wrapf(err, "error updating the internal Service %s/%s", svc.Namespace, svc.Name)
+		}
 	}
 
 	return obj, errors.Wrapf(err, "error creating the internal Service %s/%s", svc.Namespace, svc.Name)

@@ -198,7 +198,7 @@ func (t *nodeControllerTestDriver) start() {
 		SourceClient: t.dynClient,
 		RestMapper:   t.restMapper,
 		Scheme:       t.scheme,
-	}, t.pool, nodeName)
+	}, t.pool)
 
 	Expect(err).To(Succeed())
 	Expect(t.controller.Start()).To(Succeed())

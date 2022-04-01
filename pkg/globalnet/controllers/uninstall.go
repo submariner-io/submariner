@@ -21,16 +21,11 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/submariner-io/admiral/pkg/finalizer"
 	"github.com/submariner-io/admiral/pkg/resource"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	versioned "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
-	"github.com/submariner-io/submariner/pkg/globalnet/constants"
-	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
-	"github.com/submariner-io/submariner/pkg/ipset"
-	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,66 +34,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 	"k8s.io/klog"
-	utilexec "k8s.io/utils/exec"
 )
-
-func UninstallDataPath() {
-	ipt, err := iptables.New()
-	if err != nil {
-		klog.Fatal(err)
-	}
-
-	natTableChains := []string{
-		// The chains have to be deleted in a specific order.
-		constants.SmGlobalnetEgressChainForCluster,
-		constants.SmGlobalnetEgressChainForHeadlessSvcPods,
-		constants.SmGlobalnetEgressChainForNamespace,
-		constants.SmGlobalnetEgressChainForPods,
-		constants.SmGlobalnetIngressChain,
-		constants.SmGlobalnetMarkChain,
-		constants.SmGlobalnetEgressChain,
-	}
-
-	for _, chain := range natTableChains {
-		err = ipt.FlushIPTableChain(constants.NATTable, chain)
-		if err != nil {
-			// Just log an error as this is part of uninstallation.
-			klog.Errorf("Error flushing iptables chain %q: %v", chain, err)
-		}
-	}
-
-	err = ipt.FlushIPTableChain(constants.NATTable, routeAgent.SmPostRoutingChain)
-	if err != nil {
-		klog.Errorf("Error flushing iptables chain %q: %v", routeAgent.SmPostRoutingChain, err)
-	}
-
-	if err := ipt.DeleteIPTableRule(constants.NATTable, "PREROUTING", constants.SmGlobalnetIngressChain); err != nil {
-		klog.Errorf("Error deleting iptables rule for %q in PREROUTING chain: %v\n", constants.SmGlobalnetIngressChain, err)
-	}
-
-	for _, chain := range natTableChains {
-		err = ipt.DeleteIPTableChain(constants.NATTable, chain)
-		if err != nil {
-			klog.Errorf("Error deleting iptables chain %q: %v", chain, err)
-		}
-	}
-
-	ipsetIface := ipset.New(utilexec.New())
-
-	ipSetList, err := ipsetIface.ListSets()
-	if err != nil {
-		klog.Errorf("Error listing ipsets: %v", err)
-	}
-
-	for _, set := range ipSetList {
-		if strings.HasPrefix(set, IPSetPrefix) {
-			err = ipsetIface.DestroySet(set)
-			if err != nil {
-				klog.Errorf("Error destroying the ipset %q: %v", set, err)
-			}
-		}
-	}
-}
 
 func DeleteGlobalnetObjects(smClientSet *versioned.Clientset, cfg *rest.Config) {
 	err := smClientSet.SubmarinerV1().ClusterGlobalEgressIPs(metav1.NamespaceAll).DeleteCollection(context.TODO(), metav1.DeleteOptions{},

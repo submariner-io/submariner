@@ -67,7 +67,6 @@ func main() {
 
 	if spec.Uninstall {
 		klog.Info("Uninstalling submariner-globalnet")
-		controllers.UninstallDataPath()
 		controllers.DeleteGlobalnetObjects(submarinerClient, cfg)
 
 		return
