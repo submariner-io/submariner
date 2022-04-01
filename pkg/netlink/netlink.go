@@ -42,6 +42,7 @@ type Basic interface {
 	AddrAdd(link netlink.Link, addr *netlink.Addr) error
 	NeighAppend(neigh *netlink.Neigh) error
 	NeighDel(neigh *netlink.Neigh) error
+	NeighList(linkIndex, family int) ([]netlink.Neigh, error)
 	RouteAdd(route *netlink.Route) error
 	RouteDel(route *netlink.Route) error
 	RouteGet(destination net.IP) ([]netlink.Route, error)
@@ -108,6 +109,10 @@ func (n *netlinkType) NeighAppend(neigh *netlink.Neigh) error {
 
 func (n *netlinkType) NeighDel(neigh *netlink.Neigh) error {
 	return netlink.NeighDel(neigh)
+}
+
+func (n *netlinkType) NeighList(linkIndex, family int) ([]netlink.Neigh, error) {
+	return netlink.NeighList(linkIndex, family)
 }
 
 func (n *netlinkType) RouteAdd(route *netlink.Route) error {

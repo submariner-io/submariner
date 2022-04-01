@@ -135,6 +135,13 @@ func (n *basicType) NeighDel(neigh *netlink.Neigh) error {
 	return nil
 }
 
+func (n *basicType) NeighList(linkIndex, family int) ([]netlink.Neigh, error) {
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
+
+	return n.neighbors[linkIndex], nil
+}
+
 func (n *basicType) RouteAdd(route *netlink.Route) error {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
@@ -250,7 +257,7 @@ func (n *basicType) ConfigureTCPMTUProbe(mtuProbe, baseMss string) error {
 
 func (n *NetLink) AwaitLink(name string) (link netlink.Link) {
 	Eventually(func() netlink.Link {
-		link, _ = n.LinkByName(name)
+		link, _ = n.basic().LinkByName(name)
 		return link
 	}, 5).ShouldNot(BeNil(), "Link %q not found", name)
 
@@ -259,14 +266,14 @@ func (n *NetLink) AwaitLink(name string) (link netlink.Link) {
 
 func (n *NetLink) AwaitNoLink(name string) {
 	Eventually(func() error {
-		_, err := n.LinkByName(name)
+		_, err := n.basic().LinkByName(name)
 		return err
 	}, 5).Should(BeAssignableToTypeOf(&netlink.LinkNotFoundError{}), "Link %q exists", name)
 }
 
 func (n *NetLink) routeDestList(linkIndex int) []net.IPNet {
 	dests := []net.IPNet{}
-	routes, _ := n.RouteList(&netlink.GenericLink{
+	routes, _ := n.basic().RouteList(&netlink.GenericLink{
 		LinkAttrs: netlink.LinkAttrs{
 			Index: linkIndex,
 		},

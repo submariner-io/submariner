@@ -19,8 +19,10 @@ limitations under the License.
 package kubeproxy_test
 
 import (
+	"fmt"
 	"net"
-	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -37,6 +39,7 @@ import (
 	"golang.org/x/sys/unix"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog"
 )
 
 const (
@@ -45,11 +48,11 @@ const (
 	remoteSubnet1    = "170.250.1.0/24"
 	remoteSubnet2    = "171.250.1.0/24"
 	localNodeName1   = "local-node1"
-	localNodeName2   = "local-node2"
-	remoteNodeName   = "remote-node"
-	nodeAddress1     = "10.253.10.2"
-	nodeAddress2     = "10.253.10.3"
-	cniIPAddress     = "192.168.5.1"
+	// localNodeName2   = "local-node2".
+	remoteNodeName = "remote-node"
+	nodeAddress1   = "10.253.10.2"
+	nodeAddress2   = "10.253.10.3"
+	cniIPAddress   = "192.168.5.1"
 )
 
 var _ = Describe("SyncHandler", func() {
@@ -67,7 +70,7 @@ func testEndpoints() {
 		})
 
 		It("should add the VxLAN interface", func() {
-			Expect(toVxlan(t.netLink.AwaitLink(kubeproxy.VxLANIface)).Group.String()).To(Equal(t.localEndpoint.Spec.PrivateIP))
+			Expect(toVxlan(t.netLink.AwaitLink(kubeproxy.VxLANIface)).SrcAddr).To(Equal(getVxlanVtepIPAddress(t.hostInterfaceIP.String())))
 		})
 
 		Context("and old VxLAN routes are present", func() {
@@ -80,20 +83,6 @@ func testEndpoints() {
 			})
 		})
 
-		Context("and a VxLAN interface from a previous Endpoint exists", func() {
-			JustBeforeEach(func() {
-				t.netLink.AwaitLink(kubeproxy.VxLANIface)
-			})
-
-			It("should remove the previous VxLAN interface", func() {
-				t.netLink.SetLinkIndex(kubeproxy.VxLANIface, t.vxLanInterfaceIndex+1)
-				t.localEndpoint.Spec.Hostname = localNodeName2
-				Expect(t.handler.LocalEndpointCreated(t.localEndpoint)).To(Succeed())
-
-				Expect(t.netLink.AwaitLink(kubeproxy.VxLANIface).Attrs().Index).To(Equal(t.vxLanInterfaceIndex + 1))
-			})
-		})
-
 		Context("and remote subnets are present", func() {
 			BeforeEach(func() {
 				Expect(t.handler.RemoteEndpointCreated(t.remoteEndpoint)).To(Succeed())
@@ -102,6 +91,10 @@ func testEndpoints() {
 			It("should add VxLAN routes for the remote subnets", func() {
 				t.verifyVxLANRoutes()
 			})
+		})
+
+		It("should add an FDB entry on the VxLAN interface for the endpoint address", func() {
+			t.netLink.AwaitNeighbors(t.vxLanInterfaceIndex, t.localEndpoint.Spec.PrivateIP)
 		})
 	})
 
@@ -115,37 +108,14 @@ func testEndpoints() {
 			Expect(t.handler.LocalEndpointRemoved(t.localEndpoint)).To(Succeed())
 		})
 
-		Context("and its host name matches that associated with the existing VxLAN interface", func() {
-			It("should remove the existing VxLAN interface", func() {
-				t.netLink.AwaitNoLink(kubeproxy.VxLANIface)
-			})
-		})
-
-		Context("and its host name does not match that associated with the existing VxLAN interface", func() {
-			BeforeEach(func() {
-				t.localEndpoint.Spec.Hostname = localNodeName2
-			})
-
-			It("should not remove the existing VxLAN interface", func() {
-				t.netLink.AwaitLink(kubeproxy.VxLANIface)
-			})
-		})
-
-		Context("and is subsequently recreated", func() {
-			It("should recreate the VxLAN interface", func() {
-				t.netLink.AwaitNoLink(kubeproxy.VxLANIface)
-
-				Expect(t.handler.LocalEndpointCreated(t.localEndpoint)).To(Succeed())
-				t.netLink.AwaitLink(kubeproxy.VxLANIface)
-			})
+		It("should remove an FDB entry on the VxLAN interface for the endpoint address", func() {
+			t.netLink.AwaitNoNeighbors(t.vxLanInterfaceIndex, t.localEndpoint.Spec.PrivateIP)
 		})
 	})
 
 	When("a local Endpoint is created while on a gateway node", func() {
-		It("should not add the VxLAN interface", func() {
-			t.localEndpoint.Spec.Hostname = localHostName()
-			Expect(t.handler.LocalEndpointCreated(t.localEndpoint)).To(Succeed())
-			t.netLink.AwaitNoLink(kubeproxy.VxLANIface)
+		It("should not add an FDB entry for the local Endpoint", func() {
+			t.netLink.AwaitNoNeighbors(t.vxLanInterfaceIndex, t.localEndpoint.Spec.PrivateIP)
 		})
 	})
 
@@ -169,6 +139,10 @@ func testEndpoints() {
 
 			It("should not add routing rules for host networking", func() {
 				t.verifyNoHostNetworkingRoutes()
+			})
+
+			It("should not add an FDB entry for the remote Endpoint", func() {
+				t.netLink.AwaitNoNeighbors(t.vxLanInterfaceIndex, t.remoteEndpoint.Spec.PrivateIP)
 			})
 
 			Context("and is subsequently removed", func() {
@@ -201,6 +175,10 @@ func testEndpoints() {
 			It("should not add VxLAN routes for the remote subnets", func() {
 				t.verifyNoVxLANRoutes()
 			})
+
+			It("should not add an FDB entry for the remote Endpoint", func() {
+				t.netLink.AwaitNoNeighbors(t.vxLanInterfaceIndex, t.remoteEndpoint.Spec.PrivateIP)
+			})
 		})
 	})
 
@@ -220,6 +198,10 @@ func testEndpoints() {
 
 		It("should add routing rules for host networking", func() {
 			t.verifyHostNetworkingRoutes()
+		})
+
+		It("should remove an FDB entry on the VxLAN interface for the local endpoint address", func() {
+			t.netLink.AwaitNoNeighbors(t.vxLanInterfaceIndex, t.localEndpoint.Spec.PrivateIP)
 		})
 
 		Context("and is subsequently removed", func() {
@@ -255,6 +237,10 @@ func testGatewayTransition() {
 			t.verifyHostNetworkingRoutes()
 		})
 
+		It("should remove an FDB entry on the VxLAN interface for the local endpoint address", func() {
+			t.netLink.AwaitNoNeighbors(t.vxLanInterfaceIndex, t.localEndpoint.Spec.PrivateIP)
+		})
+
 		Context("and previous VxLAN routes are present", func() {
 			BeforeEach(func() {
 				t.addVxLANRoute(remoteSubnet1)
@@ -280,6 +266,7 @@ func testGatewayTransition() {
 		Context("and then to non-gateway", func() {
 			JustBeforeEach(func() {
 				Expect(t.handler.TransitionToNonGateway()).To(Succeed())
+				Expect(t.handler.LocalEndpointCreated(t.localEndpoint)).To(Succeed())
 			})
 
 			It("should remove the routing rule for the RouteAgentHostNetworkTableID", func() {
@@ -288,6 +275,10 @@ func testGatewayTransition() {
 
 			It("should remove host networking routing rules for the remote subnets", func() {
 				t.verifyNoHostNetworkingRoutes()
+			})
+
+			It("should add an FDB entry on the VxLAN interface for the local endpoint address", func() {
+				t.netLink.AwaitNeighbors(t.vxLanInterfaceIndex, t.localEndpoint.Spec.PrivateIP)
 			})
 		})
 	})
@@ -332,6 +323,21 @@ func testNodes() {
 			t.netLink.AwaitNoNeighbors(t.vxLanInterfaceIndex, nodeAddress1)
 		})
 	})
+
+	When("a GW Node is created on a non-gateway node", func() {
+		JustBeforeEach(func() {
+			node.Labels = map[string]string{"submariner.io/gateway": "true"}
+			// Now the localnode address is the endpoint private ip
+			t.localEndpoint.Spec.PrivateIP = nodeAddress1
+			Expect(t.handler.NodeCreated(node)).To(Succeed())
+			// An endpoint will be created once the GW node is added
+			Expect(t.handler.LocalEndpointCreated(t.localEndpoint)).To(Succeed())
+		})
+
+		It("should not add an FDB entry on the VxLAN interface for each Node address", func() {
+			t.netLink.AwaitNeighbors(t.vxLanInterfaceIndex, nodeAddress1)
+		})
+	})
 }
 
 type testDriver struct {
@@ -340,6 +346,7 @@ type testDriver struct {
 	netLink             *fakeNetlink.NetLink
 	localEndpoint       *submarinerv1.Endpoint
 	remoteEndpoint      *submarinerv1.Endpoint
+	hostInterfaceIP     net.IP
 	hostInterfaceIndex  int
 	vxLanInterfaceIndex int
 }
@@ -352,6 +359,14 @@ func newTestDriver() *testDriver {
 		Expect(err).To(Succeed())
 
 		t.hostInterfaceIndex = defaultHostIface.Index
+		addrs, err := defaultHostIface.Addrs()
+		Expect(err).To(Succeed())
+
+		t.hostInterfaceIP, _, err = net.ParseCIDR(addrs[0].String())
+		Expect(err).To(Succeed())
+
+		klog.Infof("Parsed host Interface IP %v", t.hostInterfaceIP)
+
 		t.vxLanInterfaceIndex = t.hostInterfaceIndex + 1
 
 		t.netLink = fakeNetlink.New()
@@ -360,6 +375,22 @@ func newTestDriver() *testDriver {
 		netlinkAPI.NewFunc = func() netlinkAPI.Interface {
 			return t.netLink
 		}
+
+		// // Configure Fake link to have node IP 		// nolint:gocritic // TODO MAG POC
+		// ipConfig := &netlink.Addr{IPNet: &net.IPNet{
+		// 	IP:   net.ParseIP(vetpNodeAddress1),
+		// 	Mask: net.CIDRMask(8, 32),
+		// }}
+
+		// link, err := netlink.LinkByName(kubeproxy.VxLANIface) // nolint:gocritic // TODO MAG POC
+
+		// Expect(err).To(Succeed()) // nolint:gocritic // TODO MAG POC
+		// err = t.netLink.AddrAdd(link, ipConfig)
+		// Expect(err).To(Succeed())
+
+		// netlinkAPI.NewFunc = func() netlinkAPI.Interface { // nolint:gocritic // TODO MAG POC
+		// 	return t.netLink
+		// }
 
 		t.ipTables = fakeIPT.New()
 		iptables.NewFunc = func() (iptables.Interface, error) {
@@ -435,7 +466,7 @@ func newLocalEndpoint() *submarinerv1.Endpoint {
 		Spec: submarinerv1.EndpointSpec{
 			CableName: "submariner-cable-local-192-68-1-2",
 			ClusterID: "local",
-			PrivateIP: "192.68.1.2",
+			PrivateIP: "192.68.1.3",
 			Hostname:  localNodeName1,
 			Backend:   "libreswan",
 		},
@@ -484,9 +515,14 @@ func toVxlan(link netlink.Link) *netlink.Vxlan {
 	return vxLan
 }
 
-func localHostName() string {
-	hostName, err := os.Hostname()
-	Expect(err).To(Succeed())
+func getVxlanVtepIPAddress(ipAddr string) net.IP {
+	ipSlice := strings.Split(ipAddr, ".")
+	if len(ipSlice) < 4 {
+		Fail(fmt.Sprintf("invalid ipAddr [%s]", ipAddr))
+	}
 
-	return hostName
+	ipSlice[0] = strconv.Itoa(kubeproxy.VxLANVTepNetworkPrefix)
+	vxlanIP := net.ParseIP(strings.Join(ipSlice, "."))
+
+	return vxlanIP
 }

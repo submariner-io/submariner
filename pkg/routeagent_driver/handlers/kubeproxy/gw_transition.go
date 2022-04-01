@@ -19,43 +19,78 @@ limitations under the License.
 package kubeproxy
 
 import (
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"k8s.io/klog"
 )
 
+// TransitionToNonGateway reconciles routes, and adds GW node IPs to
+// the fdb entries on vx-submariner.
 func (kp *SyncHandler) TransitionToNonGateway() error {
 	klog.V(log.DEBUG).Info("The current node is no longer a Gateway")
 	kp.syncHandlerMutex.Lock()
 	defer kp.syncHandlerMutex.Unlock()
 	kp.isGatewayNode = false
+	ipAddr, err := kp.getHostIfaceIPAddress()
+	if err != nil {
+		klog.Errorf("unable to retrieve the IPv4 address on the Host: %v", err)
+	}
+	kp.gwIPs.Remove(ipAddr.String())
 
-	kp.cleanVxSubmarinerRoutes()
 	// If the active Gateway transitions to a new node, we flush the HostNetwork routing table.
 	kp.updateRoutingRulesForHostNetworkSupport(nil, Flush)
 
-	err := kp.netLink.RuleDelIfPresent(netlinkAPI.NewTableRule(constants.RouteAgentHostNetworkTableID))
+	err = kp.netLink.RuleDelIfPresent(netlinkAPI.NewTableRule(constants.RouteAgentHostNetworkTableID))
 	if err != nil {
 		klog.Errorf("Unable to delete ip rule to table %d on non-Gateway node %s: %v",
 			constants.RouteAgentHostNetworkTableID, kp.hostname, err)
 	}
 
+	klog.Infof("Updating fdb entries on the vxlan interface: %s to include GW node IPs.", VxLANIface)
+
+	err = kp.updateVxLANInterface()
+	if err != nil {
+		klog.Fatalf("Unable to create VxLAN interface on gateway node (%s): %v", kp.hostname, err)
+	}
+
+	if kp.vxlanDevice != nil {
+		err = kp.reconcileIntraClusterRoutes()
+		if err != nil {
+			return errors.Wrap(err, "error while reconciling routes")
+		}
+	}
+
 	return nil
 }
 
+// TransitionToGateway reconciles routes, and adds worker node IPs to
+// te fdb entries on vx-submariner.
 func (kp *SyncHandler) TransitionToGateway() error {
 	klog.V(log.DEBUG).Info("The current node has become a Gateway")
-	kp.cleanVxSubmarinerRoutes()
 
 	kp.syncHandlerMutex.Lock()
 	defer kp.syncHandlerMutex.Unlock()
 	kp.isGatewayNode = true
 	kp.wasGatewayPreviously = true
 
-	klog.Infof("Creating the vxlan interface: %s on the gateway node", VxLANIface)
+	if kp.vxlanDevice != nil {
+		err := kp.reconcileIntraClusterRoutes()
+		if err != nil {
+			return errors.Wrap(err, "error while reconciling routes")
+		}
+	}
 
-	err := kp.createVxLANInterface(kp.hostname, VxInterfaceGateway, nil)
+	ipAddr, err := kp.getHostIfaceIPAddress()
+	if err != nil {
+		klog.Errorf("unable to retrieve the IPv4 address on the Host: %v", err)
+	}
+	kp.gwIPs.Add(ipAddr.String())
+
+	klog.Infof("Updating FDB entries on the vxlan interface: %s to include worker node IPs.", VxLANIface)
+
+	err = kp.updateVxLANInterface()
 	if err != nil {
 		klog.Fatalf("Unable to create VxLAN interface on gateway node (%s): %v", kp.hostname, err)
 	}
