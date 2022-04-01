@@ -29,7 +29,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
 	"github.com/submariner-io/submariner/pkg/globalnet/metrics"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	corev1 "k8s.io/api/core/v1"
@@ -45,18 +44,13 @@ func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipa
 
 	klog.Info("Creating GlobalIngressIP controller")
 
-	iptIface, err := iptables.New()
-	if err != nil {
-		return nil, errors.Wrap(err, "error creating the IPTablesInterface handler")
-	}
-
 	_, gvr, err := util.ToUnstructuredResource(&corev1.Service{}, config.RestMapper)
 	if err != nil {
 		return nil, errors.Wrap(err, "error converting resource")
 	}
 
 	controller := &globalIngressIPController{
-		baseIPAllocationController: newBaseIPAllocationController(pool, iptIface),
+		baseIPAllocationController: newBaseIPAllocationController(pool),
 		services:                   config.SourceClient.Resource(*gvr),
 		scheme:                     config.Scheme,
 	}
@@ -80,20 +74,10 @@ func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipa
 		gip := &submarinerv1.GlobalIngressIP{}
 		_ = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, gip)
 
-		// nolint:wrapcheck  // No need to wrap these errors.
 		err = controller.reserveAllocatedIPs(federator, obj, func(reservedIPs []string) error {
 			metrics.RecordAllocateGlobalIngressIPs(pool.GetCIDR(), len(reservedIPs))
 			if gip.Spec.Target == submarinerv1.ClusterIPService {
 				return controller.ensureInternalServiceExists(gip)
-			} else if gip.Spec.Target == submarinerv1.HeadlessServicePod {
-				target := gip.GetAnnotations()[headlessSvcPodIP]
-				err := controller.iptIface.AddIngressRulesForHeadlessSvcPod(reservedIPs[0], target)
-				if err != nil {
-					return err
-				}
-
-				key, _ := cache.MetaNamespaceKeyFunc(obj)
-				return controller.iptIface.AddEgressRulesForHeadlessSVCPods(key, target, reservedIPs[0], globalNetIPTableMark)
 			}
 			return nil
 		})
@@ -223,30 +207,6 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 
 			return true
 		}
-
-		err = c.iptIface.AddIngressRulesForHeadlessSvcPod(ips[0], podIP)
-		if err != nil {
-			klog.Errorf("Error while programming Service %q ingress rules for Pod: %v", key, err)
-			err = errors.WithMessage(err, "Error programming ingress rules")
-		} else {
-			err = c.iptIface.AddEgressRulesForHeadlessSVCPods(key, podIP, ips[0], globalNetIPTableMark)
-			if err != nil {
-				_ = c.iptIface.RemoveIngressRulesForHeadlessSvcPod(ips[0], podIP)
-				err = errors.WithMessage(err, "Error programming egress rules")
-			}
-		}
-
-		if err != nil {
-			_ = c.pool.Release(ips...)
-			ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, &metav1.Condition{
-				Type:    string(submarinerv1.GlobalEgressIPAllocated),
-				Status:  metav1.ConditionFalse,
-				Reason:  "ProgramIPTableRulesFailed",
-				Message: err.Error(),
-			})
-
-			return true
-		}
 	}
 
 	metrics.RecordAllocateGlobalIngressIPs(c.pool.GetCIDR(), 1)
@@ -263,7 +223,6 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 	return false
 }
 
-// nolint:wrapcheck  // No need to wrap these errors.
 func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngressIP, numRequeues int) bool {
 	if ingressIP.Status.AllocatedIP == "" {
 		return false
@@ -302,21 +261,10 @@ func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngre
 		return false
 	}
 
-	return c.flushRulesAndReleaseIPs(key, numRequeues, func(allocatedIPs []string) error {
-		metrics.RecordDeallocateGlobalIngressIPs(c.pool.GetCIDR(), len(allocatedIPs))
-		if ingressIP.Spec.Target == submarinerv1.HeadlessServicePod {
-			podIP := ingressIP.GetAnnotations()[headlessSvcPodIP]
-			if podIP != "" {
-				if err := c.iptIface.RemoveIngressRulesForHeadlessSvcPod(ingressIP.Status.AllocatedIP, podIP); err != nil {
-					return err
-				}
+	c.releaseIPs(key, ingressIP.Status.AllocatedIP)
+	metrics.RecordDeallocateGlobalIngressIPs(c.pool.GetCIDR(), len(ingressIP.Status.AllocatedIP))
 
-				return c.iptIface.RemoveEgressRulesForHeadlessSVCPods(key, podIP, ingressIP.Status.AllocatedIP, globalNetIPTableMark)
-			}
-		}
-
-		return nil
-	}, ingressIP.Status.AllocatedIP)
+	return false
 }
 
 func (c *globalIngressIPController) ensureInternalServiceExists(ingressIP *submarinerv1.GlobalIngressIP) error {

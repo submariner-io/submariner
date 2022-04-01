@@ -24,9 +24,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/watcher"
-	iptiface "github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
 	"github.com/submariner-io/submariner/pkg/ipam"
-	"github.com/submariner-io/submariner/pkg/ipset"
 	"github.com/submariner-io/submariner/pkg/iptables"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,13 +32,6 @@ import (
 )
 
 const (
-	// Globalnet uses MARK target to mark traffic destined to remote clusters.
-	// Some of the CNIs also use iptable MARK targets in the pipeline. This should not
-	// be a problem because Globalnet is only marking traffic destined to Submariner
-	// connected clusters where Submariner takes full control on how the traffic is
-	// steered in the pipeline. Normal traffic should not be affected because of this.
-	globalNetIPTableMark = "0xC0000/0xC0000"
-
 	// This is an internal annotation used between ingress pod controller and global-ingress controller.
 	headlessSvcPodIP = "submariner.io/headless-svc-pod-ip"
 
@@ -88,8 +79,6 @@ type gatewayMonitor struct {
 	endpointWatcher watcher.Interface
 	spec            Specification
 	ipt             iptables.Interface
-	isGatewayNode   bool
-	nodeName        string
 	syncMutex       sync.Mutex
 	localSubnets    []string
 	remoteSubnets   stringset.Interface
@@ -103,22 +92,21 @@ type baseSyncerController struct {
 
 type baseIPAllocationController struct {
 	*baseSyncerController
-	pool     *ipam.IPPool
-	iptIface iptiface.Interface
+	pool *ipam.IPPool
 }
 
 type globalEgressIPController struct {
 	*baseIPAllocationController
 	sync.Mutex
-	podWatchers   map[string]*egressPodWatcher
-	ipSetIface    ipset.Interface
+	podWatchers map[string]*egressPodWatcher
+	// ipSetIface    ipset.Interface
 	watcherConfig watcher.Config
 }
 
 type egressPodWatcher struct {
-	stopCh      chan struct{}
-	ipSetName   string
-	namedIPSet  ipset.Named
+	stopCh chan struct{}
+	// ipSetName   string
+	// namedIPSet  ipset.Named
 	podSelector *metav1.LabelSelector
 }
 
@@ -137,7 +125,6 @@ type serviceExportController struct {
 	*baseSyncerController
 	services             dynamic.NamespaceableResourceInterface
 	ingressIPs           dynamic.ResourceInterface
-	iptIface             iptiface.Interface
 	podControllers       *IngressPodControllers
 	endpointsControllers *ServiceExportEndpointsControllers
 	scheme               *runtime.Scheme
@@ -151,8 +138,7 @@ type serviceController struct {
 
 type nodeController struct {
 	*baseIPAllocationController
-	nodeName string
-	nodes    dynamic.ResourceInterface
+	nodes dynamic.ResourceInterface
 }
 
 type ingressPodController struct {

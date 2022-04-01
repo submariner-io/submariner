@@ -26,7 +26,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	admUtil "github.com/submariner-io/admiral/pkg/util"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
-	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
@@ -37,23 +36,18 @@ import (
 	"k8s.io/klog"
 )
 
-func NewNodeController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool, nodeName string) (Interface, error) {
+func NewNodeController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool) (Interface, error) {
 	// We'll panic if config is nil, this is intentional
 	var err error
 
 	klog.Info("Creating Node controller")
 
-	iptIface, err := iptables.New()
-	if err != nil {
-		return nil, errors.Wrap(err, "error creating the IPTablesInterface handler")
-	}
-
 	controller := &nodeController{
-		baseIPAllocationController: newBaseIPAllocationController(pool, iptIface),
-		nodeName:                   nodeName,
+		baseIPAllocationController: newBaseIPAllocationController(pool),
 	}
 
 	federator := federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
+	// Setup resource syncer for only GW nodes
 	controller.resourceSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
 		Name:                "Node syncer",
 		ResourceType:        &corev1.Node{},
@@ -64,6 +58,7 @@ func NewNodeController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool, n
 		Scheme:              config.Scheme,
 		Transform:           controller.process,
 		ResourcesEquivalent: controller.onNodeUpdated,
+		SourceLabelSelector: "submariner.io/gateway",
 	})
 
 	if err != nil {
@@ -77,12 +72,13 @@ func NewNodeController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool, n
 
 	controller.nodes = config.SourceClient.Resource(*gvr)
 
-	localNodeInfo, err := controller.nodes.Get(context.TODO(), controller.nodeName, metav1.GetOptions{})
+	gatewayNodes, err := controller.nodes.List(context.TODO(), metav1.ListOptions{LabelSelector: "submariner.io/gateway"})
 	if err != nil {
-		return nil, errors.Wrapf(err, "error retrieving local Node %q", controller.nodeName)
+		return nil, errors.Wrap(err, "error retrieving gateway nodes")
 	}
 
-	if err := controller.reserveAllocatedIP(federator, localNodeInfo); err != nil {
+	// Reserve allocated IPs for GW nodes
+	if err := controller.reserveAllocatedIP(federator, gatewayNodes); err != nil {
 		return nil, err
 	}
 
@@ -92,24 +88,17 @@ func NewNodeController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool, n
 func (n *nodeController) process(from runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
 	node := from.(*corev1.Node)
 
-	// If the event corresponds to a different node which has globalIP annotation, release the globalIP back to Pool.
-	if node.Name != n.nodeName {
-		if existingGlobalIP := node.GetAnnotations()[constants.SmGlobalIP]; existingGlobalIP != "" {
-			if op == syncer.Delete {
-				_ = n.pool.Release(existingGlobalIP)
-				return nil, false
-			}
-
+	// If there's an existing Global IP and the gw node is getting deleted un-allocate it
+	if existingGlobalIP := node.GetAnnotations()[constants.SmGlobalIP]; existingGlobalIP != "" {
+		if op == syncer.Delete {
 			_ = n.pool.Release(existingGlobalIP)
-
-			return n.updateNodeAnnotation(node, ""), false
+			return nil, false
 		}
-
-		return nil, false
 	}
 
 	klog.Infof("Processing %sd Node %q", op, node.Name)
 
+	// Alocate IP if needed
 	return n.allocateIP(node, op)
 }
 
@@ -140,47 +129,32 @@ func (n *nodeController) allocateIP(node *corev1.Node, op syncer.Operation) (run
 		klog.Infof("Allocated global IP %s for node %q", globalIP, node.Name)
 	}
 
-	klog.Infof("Adding ingress rules for node %q with global IP %s, CNI IP %s", node.Name, globalIP, cniIfaceIP)
-
-	if err := n.iptIface.AddIngressRulesForHealthCheck(cniIfaceIP, globalIP); err != nil {
-		klog.Errorf("Error programming rules for Gateway healthcheck on node %q: %v", node.Name, err)
-
-		_ = n.pool.Release(globalIP)
-
-		return nil, true
-	}
-
 	return n.updateNodeAnnotation(node, globalIP), false
 }
 
-func (n *nodeController) reserveAllocatedIP(federator federate.Federator, obj *unstructured.Unstructured) error {
-	existingGlobalIP := obj.GetAnnotations()[constants.SmGlobalIP]
-	if existingGlobalIP == "" {
-		return nil
-	}
-
-	cniIfaceIP := obj.GetAnnotations()[routeAgent.CNIInterfaceIP]
-	if cniIfaceIP == "" {
-		// To support Gateway healthCheck, globalnet requires the cniIfaceIP of the respective node.
-		// Route-agent running on the node annotates the respective node with the cniIfaceIP.
-		// In this API, we check for the presence of this annotation and process the node only
-		// when the annotation exists.
-		klog.Infof("cniIfaceIP annotation on node %q is currently missing", n.nodeName)
-		return nil
-	}
-
-	err := n.pool.Reserve(existingGlobalIP)
-	if err == nil {
-		err = n.iptIface.AddIngressRulesForHealthCheck(cniIfaceIP, existingGlobalIP)
-		if err != nil {
-			_ = n.pool.Release(existingGlobalIP)
+func (n *nodeController) reserveAllocatedIP(federator federate.Federator, objs *unstructured.UnstructuredList) error {
+	for _, obj := range objs.Items {
+		existingGlobalIP := obj.GetAnnotations()[constants.SmGlobalIP]
+		if existingGlobalIP == "" {
+			return nil
 		}
-	}
 
-	if err != nil {
-		klog.Warningf("Could not reserve allocated GlobalIP for Node %q: %v", obj.GetName(), err)
+		cniIfaceIP := obj.GetAnnotations()[routeAgent.CNIInterfaceIP]
+		if cniIfaceIP == "" {
+			// To support Gateway healthCheck, globalnet requires the cniIfaceIP of the respective node.
+			// Route-agent running on the node annotates the respective node with the cniIfaceIP.
+			// In this API, we check for the presence of this annotation and process the node only
+			// when the annotation exists.
+			klog.Infof("cniIfaceIP annotation on node %q is currently missing", obj.GetName())
+			return nil
+		}
 
-		return errors.Wrap(federator.Distribute(n.updateNodeAnnotation(obj, "")), "error updating the Node global IP annotation")
+		err := n.pool.Reserve(existingGlobalIP)
+		if err != nil {
+			klog.Warningf("Could not reserve allocated GlobalIP for Node %q: %v", obj.GetName(), err)
+
+			return errors.Wrap(federator.Distribute(n.updateNodeAnnotation(&obj, "")), "error updating the Node global IP annotation") // nolint // TODO MAG POC
+		}
 	}
 
 	return nil
@@ -205,11 +179,8 @@ func (n *nodeController) updateNodeAnnotation(node runtime.Object, globalIP stri
 	return node
 }
 
+// Events for all GW nodes.
 func (n *nodeController) onNodeUpdated(oldObj, newObj *unstructured.Unstructured) bool {
-	if oldObj.GetName() != n.nodeName {
-		return true
-	}
-
 	oldCNIIfaceIPOnNode := oldObj.GetAnnotations()[routeAgent.CNIInterfaceIP]
 	newCNIIfaceIPOnNode := newObj.GetAnnotations()[routeAgent.CNIInterfaceIP]
 	oldGlobalIPOnNode := oldObj.GetAnnotations()[constants.SmGlobalIP]
@@ -219,12 +190,6 @@ func (n *nodeController) onNodeUpdated(oldObj, newObj *unstructured.Unstructured
 	if globalIPCleared || oldCNIIfaceIPOnNode != newCNIIfaceIPOnNode {
 		if globalIPCleared {
 			_ = n.pool.Release(oldGlobalIPOnNode)
-		}
-
-		if oldCNIIfaceIPOnNode != "" && oldGlobalIPOnNode != "" {
-			if err := n.iptIface.RemoveIngressRulesForHealthCheck(oldCNIIfaceIPOnNode, oldGlobalIPOnNode); err != nil {
-				klog.Errorf("Error deleting rules for Gateway healthcheck on node %q: %v", n.nodeName, err)
-			}
 		}
 
 		return false
