@@ -60,6 +60,7 @@ type Interface interface {
 	Basic
 	AddrAddIfNotPresent(link netlink.Link, addr *netlink.Addr) error
 	RuleAddIfNotPresent(rule *netlink.Rule) error
+	RuleDelIfPresent(rule *netlink.Rule) error
 	RouteAddOrReplace(route *netlink.Route) error
 	AddDestinationRoutes(destIPs []net.IPNet, gwIP, srcIP net.IP, linkIndex, tableID int) error
 	DeleteDestinationRoutes(destIPs []net.IPNet, linkIndex, tableID int) error
@@ -273,4 +274,12 @@ func DeleteXfrmRules() error {
 	}
 
 	return nil
+}
+
+func NewTableRule(tableID int) *netlink.Rule {
+	rule := netlink.NewRule()
+	rule.Table = tableID
+	rule.Priority = tableID
+
+	return rule
 }
