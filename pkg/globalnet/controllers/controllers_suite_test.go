@@ -495,7 +495,7 @@ func awaitStatusConditions(client dynamic.ResourceInterface, name string, atInde
 			conditions[i] = *c
 		}
 
-		if (atIndex + len(expCond)) != len(conditions) {
+		if atIndex+len(expCond) != len(conditions) {
 			return false, nil
 		}
 

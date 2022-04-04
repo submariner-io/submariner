@@ -192,7 +192,7 @@ func isGatewayStale(gateway *v1.Gateway) (bool, error) {
 
 	now := time.Now().UTC().Unix()
 
-	return now >= (timestampInt + int64(GatewayStaleTimeout.Seconds())), nil
+	return now >= timestampInt+int64(GatewayStaleTimeout.Seconds()), nil
 }
 
 func (gs *GatewaySyncer) getLastSyncedGateway(name string) (*v1.Gateway, error) {
@@ -238,7 +238,7 @@ func (gs *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 
 	if gs.healthCheck != nil {
 		for index := range connections {
-			connection := &(connections)[index]
+			connection := &connections[index]
 
 			latencyInfo := gs.healthCheck.GetLatencyInfo(&connection.Endpoint)
 			if latencyInfo != nil {
