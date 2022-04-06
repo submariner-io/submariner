@@ -19,16 +19,22 @@ limitations under the License.
 package ovn
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"os"
 	"strings"
+	"time"
 
-	goovn "github.com/ebay/go-ovn"
+	"github.com/cenkalti/backoff/v4"
+	libovsdbclient "github.com/ovn-org/libovsdb/client"
+	"github.com/ovn-org/libovsdb/model"
+	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/nbdb"
+	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/sbdb"
 	"github.com/pkg/errors"
-	"github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn/nbctl"
 	"github.com/submariner-io/submariner/pkg/util/clusterfiles"
 	"k8s.io/klog"
+	"k8s.io/klog/v2/klogr"
 )
 
 func (ovn *SyncHandler) initClients() error {
@@ -56,34 +62,28 @@ func (ovn *SyncHandler) initClients() error {
 		if err != nil {
 			return errors.Wrap(err, "error getting OVN TLS config")
 		}
-
-		ovn.nbctl = nbctl.New(getOVNNBDBAddress(), pkFile, certFile, caFile)
 	} else {
 		klog.Infof("OVN connection using plaintext TCP")
-
-		ovn.nbctl = nbctl.New(getOVNNBDBAddress(), "", "", "")
 	}
 
-	var err error
+	// Create nbdb client
+	nbdbModel, err := nbdb.FullDatabaseModel()
+	if err != nil {
+		return errors.Wrap(err, "error getting OVN NBDB database model")
+	}
 
-	ovn.nbdb, err = goovn.NewClient(&goovn.Config{
-		Addr:      getOVNNBDBAddress(),
-		Reconnect: true,
-		TLSConfig: tlsConfig,
-		Db:        goovn.DBNB,
-	})
-
+	ovn.nbdb, err = createLibovsdbClient(getOVNNBDBAddress(), tlsConfig, nbdbModel)
 	if err != nil {
 		return errors.Wrap(err, "error creating NBDB connection")
 	}
 
-	ovn.sbdb, err = goovn.NewClient(&goovn.Config{
-		Addr:      getOVNSBDBAddress(),
-		Reconnect: true,
-		TLSConfig: tlsConfig,
-		Db:        goovn.DBSB,
-	})
+	// create sbdb client
+	sbdbModel, err := sbdb.FullDatabaseModel()
+	if err != nil {
+		return errors.Wrap(err, "error getting OVN NBDB database model")
+	}
 
+	ovn.sbdb, err = createLibovsdbClient(getOVNSBDBAddress(), tlsConfig, sbdbModel)
 	if err != nil {
 		return errors.Wrap(err, "error creating SBDB connection")
 	}
@@ -112,4 +112,58 @@ func getOVNTLSConfig(pkFile, certFile, caFile string) (*tls.Config, error) {
 		ServerName:   "ovn",
 		MinVersion:   tls.VersionTLS12,
 	}, nil
+}
+
+func createLibovsdbClient(dbAddress string, tlsConfig *tls.Config, dbModel model.ClientDBModel) (libovsdbclient.Client, error) {
+	// following the same connection timeout ovn-k uses
+	const connectTimeout time.Duration = 20 * time.Second
+	logger := klogr.New()
+
+	options := []libovsdbclient.Option{
+		// Reading and parsing the DB after reconnect at scale can (unsurprisingly)
+		// take longer than a normal ovsdb operation. Give it a bit more time so
+		// we don't time out and enter a reconnect loop.
+		libovsdbclient.WithReconnect(connectTimeout, &backoff.ZeroBackOff{}),
+		libovsdbclient.WithLeaderOnly(true),
+		libovsdbclient.WithLogger(&logger),
+		libovsdbclient.WithEndpoint(dbAddress),
+	}
+
+	if tlsConfig != nil {
+		options = append(options, libovsdbclient.WithTLSConfig(tlsConfig))
+	}
+
+	client, err := libovsdbclient.NewOVSDBClient(dbModel, options...)
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating ovsdbClient")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), connectTimeout)
+	defer cancel()
+
+	err = client.Connect(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "error connecting to ovsdb")
+	}
+
+	if dbModel.Name() == "OVN_Northbound" {
+		_, err = client.MonitorAll(ctx)
+		if err != nil {
+			client.Close()
+			return nil, errors.Wrap(err, "error setting OVN NBDB client to monitor-all")
+		}
+	} else {
+		// Only Monitor Required SBDB tables to reduce memory overhead
+		_, err = client.Monitor(ctx,
+			client.NewMonitor(
+				libovsdbclient.WithTable(&sbdb.Chassis{}),
+			),
+		)
+		if err != nil {
+			client.Close()
+			return nil, errors.Wrap(err, "error monitoring chassis table in OVN SBDB")
+		}
+	}
+
+	return client, nil
 }

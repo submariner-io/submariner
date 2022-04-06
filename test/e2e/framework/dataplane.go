@@ -185,7 +185,7 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams, egressIPT
 }
 
 func execCmdInBash(p tcp.ConnectivityTestParams, cmd []string, pod *v1.Pod) (string, string, error) {
-	execOptions := &framework.ExecOptions{
+	execOptions := framework.ExecOptions{
 		Command:            cmd,
 		Namespace:          pod.Namespace,
 		PodName:            pod.Name,
