@@ -22,7 +22,7 @@ import (
 	"errors"
 	"sync"
 
-	goovn "github.com/ebay/go-ovn"
+	libovsdbclient "github.com/ovn-org/libovsdb/client"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cidr"
 	"github.com/submariner-io/submariner/pkg/event"
@@ -38,11 +38,12 @@ var ErrWaitingForLocalEndpoint = errors.New("waiting for the local endpoint deta
 
 type SyncHandler struct {
 	event.HandlerBase
+	stopChan         chan struct{}
 	syncMutex        sync.Mutex
 	k8sClientset     clientset.Interface
 	nbctl            *nbctl.NbCtl
-	nbdb             goovn.Client
-	sbdb             goovn.Client
+	nbdb             libovsdbclient.Client
+	sbdb             libovsdbclient.Client
 	localClusterCIDR []string
 	localServiceCIDR []string
 	localEndpoint    *submV1.Endpoint
