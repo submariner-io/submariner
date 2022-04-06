@@ -53,8 +53,8 @@ var _ = Describe("MTUHandler", func() {
 		iptables.NewFunc = nil
 	})
 
-	When("When endpoint is added and removed", func() {
-		It("Should add and remove iptable rules", func() {
+	When("endpoint is added and removed", func() {
+		It("should add and remove iptable rules", func() {
 			Expect(handler.Init()).To(Succeed())
 			ipt.AwaitRule(constants.MangleTable, constants.SmPostRoutingChain, ContainSubstring(constants.RemoteCIDRIPSet+" src"))
 			ipt.AwaitRule(constants.MangleTable, constants.SmPostRoutingChain, ContainSubstring(constants.RemoteCIDRIPSet+" dst"))
