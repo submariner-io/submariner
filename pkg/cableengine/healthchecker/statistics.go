@@ -47,11 +47,11 @@ func (s *statistics) update(rtt uint64) {
 		s.previousRtts[1] = s.previousRtts[s.size-1]
 		s.sum = s.previousRtts[0] + s.previousRtts[1]
 		s.mean = s.sum / 2
-		s.sqrDiff = uint64((int64(s.previousRtts[0]-s.mean))*(int64(s.previousRtts[0]-s.mean)) +
-			(int64(s.previousRtts[1]-s.mean))*(int64(s.previousRtts[1]-s.mean)))
+		s.sqrDiff = uint64(int64(s.previousRtts[0]-s.mean)*int64(s.previousRtts[0]-s.mean) +
+			int64(s.previousRtts[1]-s.mean)*int64(s.previousRtts[1]-s.mean))
 	}
 
-	if (s.index + 1) > 1 {
+	if s.index+1 > 1 {
 		s.previousRtts[s.index] = rtt
 		if s.minRtt == 0 || s.minRtt > rtt {
 			s.minRtt = rtt
@@ -64,7 +64,7 @@ func (s *statistics) update(rtt uint64) {
 		s.sum += rtt
 		oldMean := s.mean
 		s.mean = s.sum / (s.index + 1)
-		s.sqrDiff += uint64(((int64(rtt - oldMean)) * int64((rtt - s.mean))))
+		s.sqrDiff += uint64(int64(rtt-oldMean) * int64(rtt-s.mean))
 		s.stdDev = uint64(math.Sqrt(float64(s.sqrDiff / (s.index + 1))))
 	} else {
 		s.sum = rtt
