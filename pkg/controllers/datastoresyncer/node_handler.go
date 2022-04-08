@@ -19,6 +19,8 @@ limitations under the License.
 package datastoresyncer
 
 import (
+	"net"
+
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	k8sv1 "k8s.io/api/core/v1"
@@ -35,7 +37,21 @@ func (d *DatastoreSyncer) handleCreateOrUpdateNode(obj runtime.Object, numRequeu
 
 	globalIPOfNode := node.GetAnnotations()[constants.SmGlobalIP]
 
-	return d.updateLocalEndpointIfNecessary(globalIPOfNode)
+	// Validate that globalIPOfNode falls in the globalCIDR allocated to the cluster.
+	if globalIPOfNode != "" {
+		_, ipnet, err := net.ParseCIDR(d.localCluster.Spec.GlobalCIDR[0])
+		if err != nil {
+			// Ideally this will not happen as globalCIDR is expected to be a valid CIDR.
+			klog.Errorf("Error parsing the GlobalCIDR %q: %v", d.localCluster.Spec.GlobalCIDR, err)
+			return false
+		}
+
+		if ipnet.Contains(net.ParseIP(globalIPOfNode)) {
+			return d.updateLocalEndpointIfNecessary(globalIPOfNode)
+		}
+	}
+
+	return false
 }
 
 func (d *DatastoreSyncer) areNodesEquivalent(obj1, obj2 *unstructured.Unstructured) bool {
@@ -54,7 +70,7 @@ func (d *DatastoreSyncer) areNodesEquivalent(obj1, obj2 *unstructured.Unstructur
 }
 
 func (d *DatastoreSyncer) updateLocalEndpointIfNecessary(globalIPOfNode string) bool {
-	if globalIPOfNode != "" && d.localEndpoint.Spec.HealthCheckIP != globalIPOfNode {
+	if d.localEndpoint.Spec.HealthCheckIP != globalIPOfNode {
 		klog.Infof("Updating the endpoint HealthCheckIP to globalIP %q", globalIPOfNode)
 
 		prevHealthCheckIP := d.localEndpoint.Spec.HealthCheckIP
