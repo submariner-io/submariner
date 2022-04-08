@@ -155,7 +155,8 @@ func testGlobalIngressIPCreatedClusterIPSvc(t *globalIngressIPControllerTestDriv
 }
 
 func testGlobalIngressIPCreatedHeadlessSvc(t *globalIngressIPControllerTestDriver, ingressIP *submarinerv1.GlobalIngressIP,
-	awaitIPTableRules, awaitNoIPTableRules func(string), ruleMatch string) {
+	awaitIPTableRules, awaitNoIPTableRules func(string), ruleMatch string,
+) {
 	JustBeforeEach(func() {
 		service := newClusterIPService()
 		t.createService(service)
@@ -345,7 +346,8 @@ func testExistingGlobalIngressIPClusterIPSvc(t *globalIngressIPControllerTestDri
 }
 
 func testExistingGlobalIngressIPHeadlessSvc(t *globalIngressIPControllerTestDriver, ingressIP *submarinerv1.GlobalIngressIP,
-	awaitIPTableRules func(string)) {
+	awaitIPTableRules func(string),
+) {
 	var existing *submarinerv1.GlobalIngressIP
 
 	BeforeEach(func() {

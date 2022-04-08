@@ -35,7 +35,8 @@ import (
 )
 
 func NewServiceExportController(config *syncer.ResourceSyncerConfig, podControllers *IngressPodControllers,
-	endpointsControllers *ServiceExportEndpointsControllers) (Interface, error) {
+	endpointsControllers *ServiceExportEndpointsControllers,
+) (Interface, error) {
 	// We'll panic if config is nil, this is intentional
 	var err error
 

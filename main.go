@@ -295,7 +295,8 @@ func startHTTPServer() *http.Server {
 }
 
 func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder resourcelock.EventRecorder,
-	run func(ctx context.Context), end func()) error {
+	run func(ctx context.Context), end func(),
+) error {
 	gwLeadershipConfig := leaderConfig{}
 
 	err := envconfig.Process(leadershipConfigEnvPrefix, &gwLeadershipConfig)
@@ -381,7 +382,8 @@ func (c *cleanupHandler) fatal(format string, args ...interface{}) {
 }
 
 func uninstallGateway(cableEngine cableengine.Engine, cableEngineSyncer *syncer.GatewaySyncer,
-	dsSyncer *datastoresyncer.DatastoreSyncer) {
+	dsSyncer *datastoresyncer.DatastoreSyncer,
+) {
 	err := cableEngine.StartEngine()
 	if err != nil {
 		// As we are in the process of cleaning up, ignore any initialization errors.

@@ -98,7 +98,8 @@ func (ovn *SyncHandler) updateSubmarinerRouterRemoteRoutes() error {
 }
 
 func (ovn *SyncHandler) removeRoutesToSubnets(toRemove []string, viaPort string, ovnCommands []*goovn.OvnCommand) ([]*goovn.OvnCommand,
-	error) {
+	error,
+) {
 	for _, subnet := range toRemove {
 		delCmd, err := ovn.nbdb.LRSRDel(submarinerLogicalRouter, subnet, nil, &viaPort, nil)
 		if err != nil {

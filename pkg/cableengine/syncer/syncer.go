@@ -71,7 +71,8 @@ func init() {
 
 // NewEngine creates a new Engine for the local cluster.
 func NewGatewaySyncer(engine cableengine.Engine, client v1typed.GatewayInterface,
-	version string, healthCheck healthchecker.Interface) *GatewaySyncer {
+	version string, healthCheck healthchecker.Interface,
+) *GatewaySyncer {
 	return &GatewaySyncer{
 		client:      client,
 		engine:      engine,
