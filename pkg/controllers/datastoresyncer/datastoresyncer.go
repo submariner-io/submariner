@@ -51,7 +51,8 @@ type DatastoreSyncer struct {
 }
 
 func New(syncerConfig *broker.SyncerConfig, localCluster *types.SubmarinerCluster,
-	localEndpoint *types.SubmarinerEndpoint) *DatastoreSyncer {
+	localEndpoint *types.SubmarinerEndpoint,
+) *DatastoreSyncer {
 	// We'll panic if syncerConfig, localCluster or localEndpoint are nil, this is intentional
 	syncerConfig.LocalClusterID = localCluster.Spec.ClusterID
 

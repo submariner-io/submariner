@@ -137,7 +137,8 @@ func (i *ipTables) RemoveIngressRulesForHeadlessSvcPod(globalIP, podIP string) e
 }
 
 func (i *ipTables) GetKubeProxyClusterIPServiceChainName(service *corev1.Service,
-	kubeProxyServiceChainPrefix string) (string, bool, error) {
+	kubeProxyServiceChainPrefix string,
+) (string, bool, error) {
 	// CNIs that use kube-proxy with iptables for loadbalancing create an iptables chain for each service
 	// and incoming traffic to the clusterIP Service is directed into the respective chain.
 	// Reference: https://bit.ly/2OPhlwk

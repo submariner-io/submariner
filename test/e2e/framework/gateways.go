@@ -27,7 +27,8 @@ import (
 )
 
 func (f *Framework) AwaitGatewayWithStatus(cluster framework.ClusterIndex, name string,
-	status submarinerv1.HAStatus) *submarinerv1.Gateway {
+	status submarinerv1.HAStatus,
+) *submarinerv1.Gateway {
 	return toGateway(f.Framework.AwaitGatewayWithStatus(cluster, name, string(status)))
 }
 
