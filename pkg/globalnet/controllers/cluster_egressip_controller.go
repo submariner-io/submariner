@@ -41,7 +41,8 @@ import (
 )
 
 func NewClusterGlobalEgressIPController(config *syncer.ResourceSyncerConfig, localSubnets []string,
-	pool *ipam.IPPool) (Interface, error) {
+	pool *ipam.IPPool,
+) (Interface, error) {
 	// We'll panic if config is nil, this is intentional
 	var err error
 
@@ -185,7 +186,8 @@ func (c *clusterGlobalEgressIPController) validate(numberOfIPs int, egressIP *su
 }
 
 func (c *clusterGlobalEgressIPController) onCreateOrUpdate(key string, numberOfIPs int, status *submarinerv1.GlobalEgressIPStatus,
-	numRequeues int) bool {
+	numRequeues int,
+) bool {
 	if numberOfIPs == len(status.AllocatedIPs) {
 		klog.V(log.DEBUG).Infof("Update called for %q, but numberOfIPs %d are already allocated", key, numberOfIPs)
 		return false
