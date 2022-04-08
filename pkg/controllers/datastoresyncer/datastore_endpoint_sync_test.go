@@ -126,7 +126,7 @@ func testEndpointSyncing() {
 			node := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        nodeName,
-					Annotations: map[string]string{constants.SmGlobalIP: "10.20.30.40"},
+					Annotations: map[string]string{constants.SmGlobalIP: "200.0.0.40"},
 				},
 			}
 
@@ -135,7 +135,7 @@ func testEndpointSyncing() {
 			test.CreateResource(t.localNodes, node)
 			awaitEndpoint(t.localEndpoints, &t.localEndpoint.Spec)
 
-			node.Annotations[constants.SmGlobalIP] = "11.21.31.41"
+			node.Annotations[constants.SmGlobalIP] = "200.0.0.100"
 			t.localEndpoint.Spec.HealthCheckIP = node.Annotations[constants.SmGlobalIP]
 
 			test.UpdateResource(t.localNodes, node)
