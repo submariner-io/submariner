@@ -156,7 +156,8 @@ func (c *globalEgressIPController) process(from runtime.Object, numRequeues int,
 }
 
 func (c *globalEgressIPController) onCreateOrUpdate(key string, numberOfIPs int, globalEgressIP *submarinerv1.GlobalEgressIP,
-	numRequeues int) bool {
+	numRequeues int,
+) bool {
 	namedIPSet := c.newNamedIPSet(key)
 
 	requeue := false
@@ -170,7 +171,8 @@ func (c *globalEgressIPController) onCreateOrUpdate(key string, numberOfIPs int,
 
 // nolint:wrapcheck  // No need to wrap these errors.
 func (c *globalEgressIPController) programGlobalEgressRules(key string, allocatedIPs []string, podSelector *metav1.LabelSelector,
-	namedIPSet ipset.Named) error {
+	namedIPSet ipset.Named,
+) error {
 	err := namedIPSet.Create(true)
 	if err != nil {
 		return errors.Wrapf(err, "error creating the IP set chain %q", namedIPSet.Name())
@@ -193,7 +195,8 @@ func (c *globalEgressIPController) programGlobalEgressRules(key string, allocate
 }
 
 func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int,
-	globalEgressIP *submarinerv1.GlobalEgressIP, namedIPSet ipset.Named) bool {
+	globalEgressIP *submarinerv1.GlobalEgressIP, namedIPSet ipset.Named,
+) bool {
 	klog.Infof("Allocating %d global IP(s) for %q", numberOfIPs, key)
 
 	if numberOfIPs == 0 {
@@ -315,7 +318,8 @@ func (c *globalEgressIPController) getIPSetName(key string) string {
 }
 
 func (c *globalEgressIPController) createPodWatcher(key string, namedIPSet ipset.Named, numberOfIPs int,
-	globalEgressIP *submarinerv1.GlobalEgressIP) bool {
+	globalEgressIP *submarinerv1.GlobalEgressIP,
+) bool {
 	c.Lock()
 	defer c.Unlock()
 
@@ -355,7 +359,8 @@ func (c *globalEgressIPController) createPodWatcher(key string, namedIPSet ipset
 
 // nolint:wrapcheck  // No need to wrap these errors.
 func (c *globalEgressIPController) flushGlobalEgressRulesAndReleaseIPs(key, ipSetName string, numRequeues int,
-	globalEgressIP *submarinerv1.GlobalEgressIP) bool {
+	globalEgressIP *submarinerv1.GlobalEgressIP,
+) bool {
 	return c.flushRulesAndReleaseIPs(key, numRequeues, func(allocatedIPs []string) error {
 		metrics.RecordDeallocateGlobalEgressIPs(c.pool.GetCIDR(), len(allocatedIPs))
 		if globalEgressIP.Spec.PodSelector != nil {

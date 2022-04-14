@@ -71,7 +71,8 @@ func init() {
 
 // NewEngine creates a new Engine for the local cluster.
 func NewGatewaySyncer(engine cableengine.Engine, client v1typed.GatewayInterface,
-	version string, healthCheck healthchecker.Interface) *GatewaySyncer {
+	version string, healthCheck healthchecker.Interface,
+) *GatewaySyncer {
 	return &GatewaySyncer{
 		client:      client,
 		engine:      engine,
@@ -192,7 +193,7 @@ func isGatewayStale(gateway *v1.Gateway) (bool, error) {
 
 	now := time.Now().UTC().Unix()
 
-	return now >= (timestampInt + int64(GatewayStaleTimeout.Seconds())), nil
+	return now >= timestampInt+int64(GatewayStaleTimeout.Seconds()), nil
 }
 
 func (gs *GatewaySyncer) getLastSyncedGateway(name string) (*v1.Gateway, error) {
@@ -238,7 +239,7 @@ func (gs *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 
 	if gs.healthCheck != nil {
 		for index := range connections {
-			connection := &(connections)[index]
+			connection := &connections[index]
 
 			latencyInfo := gs.healthCheck.GetLatencyInfo(&connection.Endpoint)
 			if latencyInfo != nil {

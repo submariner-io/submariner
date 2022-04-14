@@ -370,7 +370,8 @@ func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 }
 
 func (i *libreswan) bidirectionalConnectToEndpoint(connectionName string, endpointInfo *natdiscovery.NATEndpointInfo,
-	leftSubnet, rightSubnet string, rightNATTPort int32) error {
+	leftSubnet, rightSubnet string, rightNATTPort int32,
+) error {
 	// Identifiers are used for authentication, they’re always the private IPs
 	localEndpointIdentifier := i.localEndpoint.Spec.PrivateIP
 	remoteEndpointIdentifier := endpointInfo.Endpoint.Spec.PrivateIP
@@ -414,7 +415,8 @@ func (i *libreswan) bidirectionalConnectToEndpoint(connectionName string, endpoi
 }
 
 func (i *libreswan) serverConnectToEndpoint(connectionName string, endpointInfo *natdiscovery.NATEndpointInfo,
-	leftSubnet, rightSubnet string, lsi, rsi int) error {
+	leftSubnet, rightSubnet string, lsi, rsi int,
+) error {
 	localEndpointIdentifier := fmt.Sprintf("@%s-%d-%d", i.localEndpoint.Spec.PrivateIP, lsi, rsi)
 	remoteEndpointIdentifier := fmt.Sprintf("@%s-%d-%d", endpointInfo.Endpoint.Spec.PrivateIP, rsi, lsi)
 
@@ -453,7 +455,8 @@ func (i *libreswan) serverConnectToEndpoint(connectionName string, endpointInfo 
 }
 
 func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo *natdiscovery.NATEndpointInfo,
-	leftSubnet, rightSubnet string, rightNATTPort int32, lsi, rsi int) error {
+	leftSubnet, rightSubnet string, rightNATTPort int32, lsi, rsi int,
+) error {
 	// Identifiers are used for authentication, they’re always the private IPs.
 	localEndpointIdentifier := fmt.Sprintf("@%s-%d-%d", i.localEndpoint.Spec.PrivateIP, lsi, rsi)
 	remoteEndpointIdentifier := fmt.Sprintf("@%s-%d-%d", endpointInfo.Endpoint.Spec.PrivateIP, rsi, lsi)
