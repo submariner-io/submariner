@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@a12a3943b4bdde767164f792f33f40b04645d846
+        uses: actions/checkout@dcd71f646680f2efd8db4afa5ad64fdcba30e748
       - name: Run codegen
         run: make codegen
       - name: Verify generated code matches committed code
@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@a12a3943b4bdde767164f792f33f40b04645d846
+        uses: actions/checkout@dcd71f646680f2efd8db4afa5ad64fdcba30e748
       - name: Recreate Protobuf files
         run: find pkg -name '*.pb.go' -delete -exec make {} \;
       - name: Verify generated code matches committed code
@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@a12a3943b4bdde767164f792f33f40b04645d846
+        uses: actions/checkout@dcd71f646680f2efd8db4afa5ad64fdcba30e748
         with:
           fetch-depth: 0
       - name: Run gitlint
@@ -69,7 +69,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@a12a3943b4bdde767164f792f33f40b04645d846
+        uses: actions/checkout@dcd71f646680f2efd8db4afa5ad64fdcba30e748
       - name: Run golangci-lint
         run: make golangci-lint
 
@@ -78,7 +78,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@a12a3943b4bdde767164f792f33f40b04645d846
+        uses: actions/checkout@dcd71f646680f2efd8db4afa5ad64fdcba30e748
 
       - name: Check License Headers
         uses: kt3k/license_checker@d12a6d90c58e30fefed09f2c4d03ba57f4c673a8
@@ -88,7 +88,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@a12a3943b4bdde767164f792f33f40b04645d846
+        uses: actions/checkout@dcd71f646680f2efd8db4afa5ad64fdcba30e748
 
       - name: Check the licenses
         run: make licensecheck
@@ -98,7 +98,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@a12a3943b4bdde767164f792f33f40b04645d846
+        uses: actions/checkout@dcd71f646680f2efd8db4afa5ad64fdcba30e748
 
       - name: Run markdown-link-check
         uses: gaurav-nelson/github-action-markdown-link-check@58f84fd654812d0d8da4e4d4a559eda087daf8ce
@@ -112,7 +112,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@a12a3943b4bdde767164f792f33f40b04645d846
+        uses: actions/checkout@dcd71f646680f2efd8db4afa5ad64fdcba30e748
       - name: Run markdownlint
         run: make markdownlint
 
@@ -121,7 +121,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@a12a3943b4bdde767164f792f33f40b04645d846
+        uses: actions/checkout@dcd71f646680f2efd8db4afa5ad64fdcba30e748
       - name: Run packagedoc-lint
         run: make packagedoc-lint
 
@@ -130,6 +130,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@a12a3943b4bdde767164f792f33f40b04645d846
+        uses: actions/checkout@dcd71f646680f2efd8db4afa5ad64fdcba30e748
       - name: Run yamllint
         run: make yamllint
