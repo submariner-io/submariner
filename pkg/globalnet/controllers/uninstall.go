@@ -200,8 +200,8 @@ func RemoveGlobalIPAnnotationOnNode(cfg *rest.Config) {
 		}
 
 		annotations := node.GetAnnotations()
-		if annotations == nil {
-			annotations = map[string]string{}
+		if annotations == nil || annotations[constants.SmGlobalIP] == "" {
+			return nil
 		}
 
 		delete(annotations, constants.SmGlobalIP)
