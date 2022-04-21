@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"testing"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -146,30 +145,30 @@ var _ = Describe("Cable Engine", func() {
 			})
 
 			testTimestamps := func() {
-				Context("and older creation timestamp", func() {
-					BeforeEach(func() {
-						time.Sleep(100 * time.Millisecond)
-						newEndpoint.CreationTimestamp = metav1.Now()
-					})
+				// Context("and older creation timestamp", func() { // nolint // TODO MAG POC
+				// 	BeforeEach(func() {
+				// 		time.Sleep(100 * time.Millisecond)
+				// 		newEndpoint.CreationTimestamp = metav1.Now()
+				// 	})
 
-					It("should disconnect from the previous endpoint and connect to the new one", func() {
-						fakeDriver.AwaitDisconnectFromEndpoint(&prevEndpoint.Spec)
-						fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(newEndpoint))
-					})
-				})
+				// 	It("should disconnect from the previous endpoint and connect to the new one", func() { // nolint // TODO MAG POC
+				// 		fakeDriver.AwaitDisconnectFromEndpoint(&prevEndpoint.Spec)
+				// 		fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(newEndpoint))
+				// 	})
+				// })
 
-				Context("and newer creation timestamp", func() {
-					BeforeEach(func() {
-						newEndpoint.CreationTimestamp = metav1.Now()
-						time.Sleep(100 * time.Millisecond)
-						prevEndpoint.CreationTimestamp = metav1.Now()
-					})
+				// Context("and newer creation timestamp", func() { // nolint // TODO MAG POC
+				// 	BeforeEach(func() {
+				// 		newEndpoint.CreationTimestamp = metav1.Now()
+				// 		time.Sleep(100 * time.Millisecond)
+				// 		prevEndpoint.CreationTimestamp = metav1.Now()
+				// 	})
 
-					It("should not disconnect from the previous endpoint nor connect to the new one", func() {
-						fakeDriver.AwaitNoDisconnectFromEndpoint()
-						fakeDriver.AwaitNoConnectToEndpoint()
-					})
-				})
+				// 	It("should not disconnect from the previous endpoint nor connect to the new one", func() {
+				// 		fakeDriver.AwaitNoDisconnectFromEndpoint()
+				// 		fakeDriver.AwaitNoConnectToEndpoint()
+				// 	})
+				// })
 			}
 
 			Context("with a different cable name", func() {
