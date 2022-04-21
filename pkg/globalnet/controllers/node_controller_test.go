@@ -45,8 +45,8 @@ var _ = Describe("Node controller", func() {
 				node = t.createNode(nodeName, cniInterfaceIP, "")
 			})
 
-			It("should allocate it and program the relevant iptable rules", func() {
-				t.awaitIPTableRules(t.awaitNodeGlobalIP(""))
+			It("should allocate it", func() {
+				t.awaitNodeGlobalIP("")
 			})
 
 			Context("and the IP pool is initially exhausted", func() {
@@ -79,10 +79,6 @@ var _ = Describe("Node controller", func() {
 				}, 200*time.Millisecond).Should(Equal(node.GetAnnotations()[constants.SmGlobalIP]))
 			})
 
-			It("should program the relevant iptable rules", func() {
-				t.awaitIPTableRules(node.GetAnnotations()[constants.SmGlobalIP])
-			})
-
 			It("should reserve the global IP", func() {
 				t.verifyIPsReservedInPool(node.GetAnnotations()[constants.SmGlobalIP])
 			})
@@ -93,8 +89,7 @@ var _ = Describe("Node controller", func() {
 				})
 
 				It("should reallocate the global IP", func() {
-					globalIP := t.awaitNodeGlobalIP(node.GetAnnotations()[constants.SmGlobalIP])
-					t.awaitIPTableRules(globalIP)
+					t.awaitNodeGlobalIP(node.GetAnnotations()[constants.SmGlobalIP])
 				})
 			})
 		})
@@ -113,36 +108,8 @@ var _ = Describe("Node controller", func() {
 				test.UpdateResource(t.nodes, node)
 			})
 
-			It("should allocate a global IP and program the relevant iptable rules", func() {
-				t.awaitIPTableRules(t.awaitNodeGlobalIP(""))
-			})
-
-			Context("and programming of IP tables initially fails", func() {
-				BeforeEach(func() {
-					t.ipt.AddFailOnAppendRuleMatcher(ContainSubstring(cniInterfaceIP))
-				})
-
-				It("should eventually allocate a global IP and program the relevant iptable rules", func() {
-					t.awaitIPTableRules(t.awaitNodeGlobalIP(""))
-				})
-			})
-		})
-
-		Context("with a global IP allocated", func() {
-			BeforeEach(func() {
-				node = t.createNode(nodeName, "50.60.70.80", "169.254.1.100")
-			})
-
-			It("re-program the iptable rules", func() {
-				oldCNIIfaceIP := node.GetAnnotations()[routeAgent.CNIInterfaceIP]
-
-				time.Sleep(time.Millisecond * 300)
-				addAnnotation(node, routeAgent.CNIInterfaceIP, cniInterfaceIP)
-				test.UpdateResource(t.nodes, node)
-
-				t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(oldCNIIfaceIP))
-				t.awaitIPTableRules(node.GetAnnotations()[constants.SmGlobalIP])
-				t.verifyIPsReservedInPool(node.GetAnnotations()[constants.SmGlobalIP])
+			It("should allocate a global IP", func() {
+				t.awaitNodeGlobalIP("")
 			})
 		})
 	})
@@ -154,12 +121,11 @@ var _ = Describe("Node controller", func() {
 			_ = t.pool.Reserve(node.GetAnnotations()[constants.SmGlobalIP])
 		})
 
-		It("should release the global IP", func() {
-			t.awaitIPsReleasedFromPool(node.GetAnnotations()[constants.SmGlobalIP])
+		It("should reallocate a new global IP", func() {
 			Eventually(func() string {
 				obj := test.GetResource(t.nodes, node)
 				return obj.GetAnnotations()[constants.SmGlobalIP]
-			}).Should(BeEmpty())
+			}).ShouldNot(BeEmpty())
 		})
 	})
 })
@@ -202,8 +168,4 @@ func (t *nodeControllerTestDriver) start() {
 
 	Expect(err).To(Succeed())
 	Expect(t.controller.Start()).To(Succeed())
-}
-
-func (t *nodeControllerTestDriver) awaitIPTableRules(globalIP string) {
-	t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain, And(ContainSubstring(globalIP), ContainSubstring(cniInterfaceIP)))
 }

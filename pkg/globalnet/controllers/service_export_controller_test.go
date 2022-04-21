@@ -47,7 +47,6 @@ func testClusterIPService() {
 
 	BeforeEach(func() {
 		service = newClusterIPService()
-		t.createIPTableChain("nat", kubeProxyIPTableChainName)
 	})
 
 	When("an existing Service is exported", func() {

@@ -35,10 +35,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/ipam"
-	"github.com/submariner-io/submariner/pkg/ipset"
-	fakeIPSet "github.com/submariner-io/submariner/pkg/ipset/fake"
-	"github.com/submariner-io/submariner/pkg/iptables"
-	fakeIPT "github.com/submariner-io/submariner/pkg/iptables/fake"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -56,14 +52,13 @@ import (
 )
 
 const (
-	namespace                 = "submariner"
-	localCIDR                 = "169.254.1.0/24"
-	globalEgressIPName        = "east-region"
-	globalIngressIPName       = "nginx-ingress-ip"
-	kubeProxyIPTableChainName = "KUBE-SVC-Y7DIXXI5PNAUV7FB"
-	serviceName               = "nginx"
-	cniInterfaceIP            = "10.20.30.40"
-	globalIP                  = "169.254.1.100"
+	namespace           = "submariner"
+	localCIDR           = "169.254.1.0/24"
+	globalEgressIPName  = "east-region"
+	globalIngressIPName = "nginx-ingress-ip"
+	serviceName         = "nginx"
+	cniInterfaceIP      = "10.20.30.40"
+	globalIP            = "169.254.1.100"
 )
 
 func init() {
@@ -83,8 +78,6 @@ type testDriverBase struct {
 	restMapper             meta.RESTMapper
 	dynClient              dynamic.Interface
 	scheme                 *runtime.Scheme
-	ipt                    *fakeIPT.IPTables
-	ipSet                  *fakeIPSet.IPSet
 	pool                   *ipam.IPPool
 	localSubnets           []string
 	globalCIDR             string
@@ -104,8 +97,6 @@ func newTestDriverBase() *testDriverBase {
 		restMapper: test.GetRESTMapperFor(&submarinerv1.Endpoint{}, &corev1.Service{}, &corev1.Node{}, &corev1.Pod{}, &corev1.Endpoints{},
 			&submarinerv1.GlobalEgressIP{}, &submarinerv1.ClusterGlobalEgressIP{}, &submarinerv1.GlobalIngressIP{}, &mcsv1a1.ServiceExport{}),
 		scheme:       runtime.NewScheme(),
-		ipt:          fakeIPT.New(),
-		ipSet:        fakeIPSet.New(),
 		globalCIDR:   localCIDR,
 		localSubnets: []string{},
 	}
@@ -137,21 +128,11 @@ func newTestDriverBase() *testDriverBase {
 
 	t.nodes = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &corev1.Node{}))
 
-	iptables.NewFunc = func() (iptables.Interface, error) {
-		return t.ipt, nil
-	}
-
-	ipset.NewFunc = func() ipset.Interface {
-		return t.ipSet
-	}
-
 	return t
 }
 
 func (t *testDriverBase) afterEach() {
 	t.controller.Stop()
-
-	iptables.NewFunc = nil
 }
 
 func (t *testDriverBase) verifyIPsReservedInPool(ips ...string) {
@@ -182,13 +163,20 @@ func (t *testDriverBase) createGlobalIngressIP(ingressIP *submarinerv1.GlobalIng
 	test.CreateResource(t.globalIngressIPs, ingressIP)
 }
 
-//nolint:unparam // `name` always receives `globalEgressIPName`
 func (t *testDriverBase) awaitGlobalEgressIPStatusAllocated(name string, expNumIPS int) {
 	t.awaitEgressIPStatusAllocated(t.globalEgressIPs, name, expNumIPS)
 }
 
-func (t *testDriverBase) awaitClusterGlobalEgressIPStatusAllocated(expNumIPS int) {
-	t.awaitEgressIPStatusAllocated(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, expNumIPS)
+func (t *testDriverBase) awaitClusterGlobalEgressIPStatusAllocated(expNumIPS int, nodeName string) {
+	var name string
+
+	if nodeName == "" {
+		name = constants.ClusterGlobalEgressIPName
+	} else {
+		name = fmt.Sprintf("%s-%s", nodeName, constants.ClusterGlobalEgressIPName)
+	}
+
+	t.awaitEgressIPStatusAllocated(t.clusterGlobalEgressIPs, name, expNumIPS)
 }
 
 func (t *testDriverBase) createPod(p *corev1.Pod) *corev1.Pod {
@@ -228,10 +216,6 @@ func (t *testDriverBase) createServiceExport(s *corev1.Service) {
 	})
 }
 
-func (t *testDriverBase) createIPTableChain(table, chain string) {
-	_ = t.ipt.NewChain(table, chain)
-}
-
 func (t *testDriverBase) getGlobalIngressIPStatus(name string) *submarinerv1.GlobalIngressIPStatus {
 	status := &submarinerv1.GlobalIngressIPStatus{}
 	getStatus(t.globalIngressIPs, name, status)
@@ -242,7 +226,8 @@ func (t *testDriverBase) getGlobalIngressIPStatus(name string) *submarinerv1.Glo
 func (t *testDriverBase) createNode(name, cniInterfaceIP, globalIP string) *corev1.Node {
 	node := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+			Name:   name,
+			Labels: map[string]string{"submariner.io/gateway": "true"},
 		},
 	}
 
@@ -252,7 +237,7 @@ func (t *testDriverBase) createNode(name, cniInterfaceIP, globalIP string) *core
 	return fromUnstructured(test.CreateResource(t.nodes, node), &corev1.Node{}).(*corev1.Node)
 }
 
-func (t *testDriverBase) awaitNodeGlobalIP(oldIP string) string {
+func (t *testDriverBase) awaitNodeGlobalIP(oldIP string) {
 	var globalIP string
 
 	Eventually(func() string {
@@ -267,8 +252,6 @@ func (t *testDriverBase) awaitNodeGlobalIP(oldIP string) string {
 		globalIP, t.globalCIDR)
 
 	t.verifyIPsReservedInPool(globalIP)
-
-	return globalIP
 }
 
 func (t *testDriverBase) awaitNoNodeGlobalIP() {
@@ -314,16 +297,16 @@ func getGlobalEgressIPStatus(client dynamic.ResourceInterface, name string) *sub
 	return status
 }
 
-func awaitNoAllocatedIPs(client dynamic.ResourceInterface, name string) {
-	Consistently(func() int {
-		status := getGlobalEgressIPStatus(client, name)
-		if status == nil {
-			return 0
-		}
+// func awaitNoAllocatedIPs(client dynamic.ResourceInterface, name string) {
+// 	Consistently(func() int {
+// 		status := getGlobalEgressIPStatus(client, name)
+// 		if status == nil {
+// 			return 0
+// 		}
 
-		return len(status.AllocatedIPs)
-	}, 200*time.Millisecond).Should(Equal(0))
-}
+// 		return len(status.AllocatedIPs)
+// 	}, 200*time.Millisecond).Should(Equal(0))
+// }
 
 func (t *testDriverBase) awaitEgressIPStatus(client dynamic.ResourceInterface, name string, expNumIPS int, atIndex int,
 	expCond ...metav1.Condition,
@@ -344,12 +327,12 @@ func (t *testDriverBase) awaitEgressIPStatus(client dynamic.ResourceInterface, n
 
 func (t *testDriverBase) awaitEgressIPStatusAllocated(client dynamic.ResourceInterface, name string, expNumIPS int) {
 	t.awaitEgressIPStatus(client, name, expNumIPS, 0, metav1.Condition{
-		Type:   string(submarinerv1.GlobalEgressIPAllocated),
-		Status: metav1.ConditionTrue,
+		Type:   "Allocated",
+		Status: metav1.ConditionFalse,
+		Reason: "NoDatapathRules",
 	})
 }
 
-//nolint:unparam // `atIndex` always receives `0`
 func (t *testDriverBase) awaitIngressIPStatus(name string, atIndex int, expCond ...metav1.Condition) {
 	awaitStatusConditions(t.globalIngressIPs, name, atIndex, expCond...)
 
@@ -539,7 +522,6 @@ func awaitStatusConditions(client dynamic.ResourceInterface, name string, atInde
 	}
 }
 
-//nolint:unparam // `name` always receives `globalEgressIPName` (`"east-region")
 func newGlobalEgressIP(name string, numberOfIPs *int, podSelector *metav1.LabelSelector) *submarinerv1.GlobalEgressIP {
 	return &submarinerv1.GlobalEgressIP{
 		ObjectMeta: metav1.ObjectMeta{
@@ -687,11 +669,11 @@ func fromUnstructured(from *unstructured.Unstructured, to runtime.Object) runtim
 	return to
 }
 
-func getSNATAddress(ips ...string) string {
-	targetSNATIP := ips[0]
-	if len(ips) > 1 {
-		targetSNATIP += "-" + ips[len(ips)-1]
-	}
+// func getSNATAddress(ips ...string) string {
+// 	targetSNATIP := ips[0]
+// 	if len(ips) > 1 {
+// 		targetSNATIP += "-" + ips[len(ips)-1]
+// 	}
 
-	return targetSNATIP
-}
+// 	return targetSNATIP
+// }
