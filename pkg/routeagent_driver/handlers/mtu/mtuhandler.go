@@ -197,8 +197,16 @@ func (h *mtuHandler) Stop(uninstall bool) error {
 			constants.MangleTable, err)
 	}
 
+	if err := h.localIPSet.Flush(); err != nil {
+		klog.Errorf("Error flushing ipset %q: %v", constants.LocalCIDRIPSet, err)
+	}
+
 	if err := h.localIPSet.Destroy(); err != nil {
 		klog.Errorf("Error deleting ipset %q: %v", constants.LocalCIDRIPSet, err)
+	}
+
+	if err := h.remoteIPSet.Flush(); err != nil {
+		klog.Errorf("Error flushing ipset %q: %v", constants.RemoteCIDRIPSet, err)
 	}
 
 	if err := h.remoteIPSet.Destroy(); err != nil {
