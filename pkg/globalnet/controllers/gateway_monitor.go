@@ -195,16 +195,18 @@ func (g *gatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, numR
 			}
 		}
 		g.syncMutex.Unlock()
-	} else {
-		klog.V(log.DEBUG).Infof("Transitioned to non-gateway node with endpoint private IP %s", endpoint.Spec.PrivateIP)
-
-		g.syncMutex.Lock()
-		if g.isGatewayNode {
-			g.stopControllers()
-			g.isGatewayNode = false
-		}
-		g.syncMutex.Unlock()
 	}
+	// Only stop controllers on endpoint deletion since we can have multiple gateways
+	// else {
+	// 	klog.V(log.DEBUG).Infof("Transitioned to non-gateway node with endpoint private IP %s", endpoint.Spec.PrivateIP)
+
+	// 	g.syncMutex.Lock()
+	// 	if g.isGatewayNode {
+	// 		g.stopControllers()
+	// 		g.isGatewayNode = false
+	// 	}
+	// 	g.syncMutex.Unlock()
+	// }
 
 	return false
 }

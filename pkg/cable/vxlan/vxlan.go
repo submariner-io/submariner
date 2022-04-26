@@ -29,6 +29,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/stringset"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
@@ -67,9 +68,8 @@ type vxlan struct {
 }
 
 type vxlanIface struct {
-	activeEndpointHostname string
-	link                   *netlink.Vxlan
-	vtepIP                 net.IP
+	link   *netlink.Vxlan
+	vtepIP net.IP
 }
 
 type vxlanAttributes struct {
@@ -100,7 +100,7 @@ func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.Subm
 		return nil, errors.Wrap(err, "failed to get the UDP port configuration")
 	}
 
-	if err = v.createVxlanInterface(localEndpoint.Spec.Hostname, int(port)); err != nil {
+	if err = v.createVxlanInterface(int(port)); err != nil {
 		return nil, errors.Wrap(err, "failed to setup Vxlan link")
 	}
 
@@ -108,7 +108,7 @@ func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.Subm
 }
 
 // This setup up vx-lan interface between gateway nodes of clusters.
-func (v *vxlan) createVxlanInterface(activeEndPoint string, port int) error {
+func (v *vxlan) createVxlanInterface(port int) error {
 	ipAddr := v.localEndpoint.Spec.PrivateIP
 
 	vtepIP, err := v.getVxlanVtepIPAddress(ipAddr)
@@ -134,7 +134,7 @@ func (v *vxlan) createVxlanInterface(activeEndPoint string, port int) error {
 		mtu:      vxlanMtu,
 	}
 
-	v.vxlanIface, err = newVxlanIface(attrs, activeEndPoint)
+	v.vxlanIface, err = newVxlanIface(attrs)
 	if err != nil {
 		return errors.Wrap(err, "failed to create vxlan interface on Gateway Node")
 	}
@@ -161,7 +161,7 @@ func (v *vxlan) createVxlanInterface(activeEndPoint string, port int) error {
 	return nil
 }
 
-func newVxlanIface(attrs *vxlanAttributes, activeEndPoint string) (*vxlanIface, error) {
+func newVxlanIface(attrs *vxlanAttributes) (*vxlanIface, error) {
 	iface := &netlink.Vxlan{
 		LinkAttrs: netlink.LinkAttrs{
 			Name:  attrs.name,
@@ -175,8 +175,7 @@ func newVxlanIface(attrs *vxlanAttributes, activeEndPoint string) (*vxlanIface, 
 	}
 
 	vxlanIface := &vxlanIface{
-		link:                   iface,
-		activeEndpointHostname: activeEndPoint,
+		link: iface,
 	}
 
 	if err := createvxlanIface(vxlanIface); err != nil {
@@ -258,7 +257,8 @@ func (v *vxlan) getVxlanVtepIPAddress(ipAddr string) (net.IP, error) {
 	return vxlanIP, nil
 }
 
-func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
+func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) { // nolint // Supposed to be complicated
+
 	// We'll panic if endpointInfo is nil, this is intentional
 	remoteEndpoint := endpointInfo.Endpoint
 	if v.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
@@ -280,11 +280,60 @@ func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 
 	cable.RecordConnection(CableDriverName, &v.localEndpoint.Spec, &remoteEndpoint.Spec, string(v1.Connected), true)
 
-	privateIP := endpointInfo.Endpoint.Spec.PrivateIP
+	// Build map to form the nexthops behind each remote endpoint
+	remoteSubnetToGWs := map[string]stringset.Interface{}
+	healthcheckMap := map[string]net.IP{}
 
-	remoteVtepIP, err := v.getVxlanVtepIPAddress(privateIP)
+	// add the Vtep IP of the new GW
+	remoteVtepIP, err := v.getVxlanVtepIPAddress(endpointInfo.Endpoint.Spec.PrivateIP)
 	if err != nil {
-		return endpointInfo.UseIP, fmt.Errorf("failed to derive the vxlan vtepIP for %s: %w", privateIP, err)
+		return endpointInfo.UseIP, fmt.Errorf("failed to derive the vxlan vtepIP for %s: %w", endpointInfo.Endpoint.Spec.PrivateIP, err)
+	}
+
+	for _, subnet := range remoteEndpoint.Spec.Subnets {
+		remoteSubnetToGWs[subnet] = stringset.NewSynchronized()
+		// These are the nexthops for each subnet
+		remoteSubnetToGWs[subnet].Add(remoteVtepIP.String())
+	}
+
+	// add the VTEP IP of existing GWs
+	for _, connection := range v.connections { // nolint:gocritic
+		// add the Vtep IP of the new GW
+		gwVtepIP, err := v.getVxlanVtepIPAddress(connection.Endpoint.PrivateIP)
+		if err != nil {
+			return "", fmt.Errorf("failed to derive the vxlan vtepIP for %s: %w", endpointInfo.Endpoint.Spec.PrivateIP, err)
+		}
+		// only add nexthops for correct subnets and skip the connection if it does
+		// not represent the desired remote subnet
+		skipConnection := func() bool {
+			for _, subnet := range connection.Endpoint.Subnets {
+				if _, ok := remoteSubnetToGWs[subnet]; ok {
+					klog.V(log.DEBUG).Infof("Adding gwVtepIP %s for subnet %s", gwVtepIP.String(), subnet)
+					remoteSubnetToGWs[subnet].Add(gwVtepIP.String())
+
+					continue
+				}
+
+				return true
+			}
+
+			return false
+		}
+
+		if skipConnection() {
+			klog.V(log.DEBUG).Infof("Skipping connection %s since it does not represent %v",
+				connection.Endpoint.CableName, remoteEndpoint.Spec.Subnets)
+			continue
+		}
+
+		if connection.Endpoint.HealthCheckIP != "" {
+			healthcheckMap[connection.Endpoint.HealthCheckIP] = gwVtepIP
+		}
+	}
+
+	// This will get pick up in later endpoint event if not assigned a globalIP yet from globalnet-controller
+	if endpointInfo.Endpoint.Spec.HealthCheckIP != "" {
+		healthcheckMap[endpointInfo.Endpoint.Spec.HealthCheckIP] = remoteVtepIP
 	}
 
 	err = v.vxlanIface.AddFDB(remoteIP, "00:00:00:00:00:00")
@@ -296,6 +345,7 @@ func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 	var ipAddress net.IP
 
 	cniIface, err := cni.Discover(v.localCluster.Spec.ClusterCIDR[0])
+
 	if err == nil {
 		ipAddress = net.ParseIP(cniIface.IPAddress)
 	} else {
@@ -304,11 +354,22 @@ func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 		ipAddress = nil
 	}
 
-	err = v.vxlanIface.AddRoute(allowedIPs, remoteVtepIP, ipAddress)
+	// here we need to add Multipath routing for each endpoint
+	klog.V(log.DEBUG).Infof("Reconciling Inter Cluster Routes for Remote GWs %#v", remoteSubnetToGWs)
 
+	err = v.vxlanIface.reconcileInterClusterRoutes(remoteSubnetToGWs, ipAddress)
 	if err != nil {
 		return endpointInfo.UseIP, fmt.Errorf("failed to add route for the CIDR %q with remoteVtepIP %q and vxlanInterfaceIP %q: %w",
 			allowedIPs, remoteVtepIP, v.vxlanIface.vtepIP, err)
+	}
+
+	klog.V(log.DEBUG).Infof("Reconciling Inter Cluster Routes for healthcheck IPs %#v", healthcheckMap)
+
+	// Add routes for the multiple GW healthcheck IPs
+	err = v.vxlanIface.addRoutesForHealthcheck(healthcheckMap)
+	if err != nil {
+		return "", fmt.Errorf("failed to create routes for healthcheckMap %v: %w",
+			healthcheckMap, err)
 	}
 
 	v.connections = append(v.connections, v1.Connection{
@@ -321,9 +382,16 @@ func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 	return endpointInfo.UseIP, nil
 }
 
+// TODO MAG POC: make sure we cleanup correctly here.
 func (v *vxlan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint) error {
 	// We'll panic if remoteEndpoint is nil, this is intentional
 	klog.V(log.DEBUG).Infof("Removing endpoint %#v", remoteEndpoint)
+
+	// add the Vtep IP of the new GW
+	gwVtepIP, err := v.getVxlanVtepIPAddress(remoteEndpoint.Spec.PrivateIP)
+	if err != nil {
+		return fmt.Errorf("failed to derive the vxlan vtepIP for %s: %w", remoteEndpoint.Spec.PrivateIP, err)
+	}
 
 	if v.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
 		klog.V(log.DEBUG).Infof("Will not disconnect self")
@@ -354,7 +422,7 @@ func (v *vxlan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint)
 
 	allowedIPs := parseSubnets(remoteEndpoint.Spec.Subnets)
 
-	err := v.vxlanIface.DelFDB(remoteIP, "00:00:00:00:00:00")
+	err = v.vxlanIface.DelFDB(remoteIP, "00:00:00:00:00:00")
 	if err != nil {
 		return fmt.Errorf("failed to delete remoteIP %q from the forwarding database: %w", remoteIP, err)
 	}
@@ -363,6 +431,12 @@ func (v *vxlan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint)
 
 	if err != nil {
 		return fmt.Errorf("failed to remove route for the CIDR %q: %w", allowedIPs, err)
+	}
+
+	err = v.vxlanIface.delRouteForHealthcheck(remoteEndpoint.Spec.HealthCheckIP, gwVtepIP)
+
+	if err != nil {
+		return fmt.Errorf("failed to remove route for the HealthcheckIP %q: %w", remoteEndpoint.Spec.HealthCheckIP, err)
 	}
 
 	v.connections = removeConnectionForEndpoint(v.connections, remoteEndpoint)
@@ -464,29 +538,66 @@ func (v *vxlanIface) DelFDB(ipAddress net.IP, hwAddr string) error {
 	return nil
 }
 
-func (v *vxlanIface) AddRoute(ipAddressList []net.IPNet, gwIP, ip net.IP) error {
-	for i := range ipAddressList {
+// buildDesiredRoutes will make all routes needed for inter cluster communication within
+// submariner. Specifically it will route traffic at a GW node, destined
+// for another cluster, to an active GW on the next cluster.
+func (v *vxlanIface) buildDesiredRoutes(remoteSubnetToGWs map[string]stringset.Interface, ip net.IP) ([]netlink.Route, error) {
+	desiredRoutes := []netlink.Route{}
+
+	for remoteSubnet, gwIPs := range remoteSubnetToGWs {
+		nextHops := []*netlink.NexthopInfo{}
+
+		// Build nexthops for a given globalnet subnet
+		for _, gw := range gwIPs.Elements() {
+			nextHops = append(nextHops, &netlink.NexthopInfo{
+				Gw:        net.ParseIP(gw),
+				LinkIndex: v.link.Attrs().Index,
+			})
+		}
+
+		_, remoteNet, err := net.ParseCIDR(remoteSubnet)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error parsing remote subnet %s", remoteSubnet)
+		}
+
 		route := &netlink.Route{
 			LinkIndex: v.link.Index,
 			Src:       ip,
-			Dst:       &ipAddressList[i],
-			Gw:        gwIP,
+			Dst:       remoteNet,
+			MultiPath: nextHops,
 			Type:      netlink.NDA_DST,
 			Flags:     netlink.NTF_SELF,
 			Priority:  100,
 			Table:     TableID,
 		}
-		err := netlink.RouteAdd(route)
+
+		desiredRoutes = append(desiredRoutes, *route)
+	}
+
+	return desiredRoutes, nil
+}
+
+// Reconcile the routes based on the GWIPs installed on this device using rtnetlink.
+// Eventually we should move this to a common library with the code from the RA routes_iface.go.
+func (v *vxlanIface) reconcileInterClusterRoutes(remoteSubnetToGWs map[string]stringset.Interface, ip net.IP) error {
+	desiredRouteList, err := v.buildDesiredRoutes(remoteSubnetToGWs, ip)
+	if err != nil {
+		return errors.Wrapf(err, "error retrieving desired routes for link %s", v.link.Name)
+	}
+
+	// Let's now add the routes that are missing.
+	for i := range desiredRouteList { // nolint:gocritic
+		err := netlink.RouteAdd(&desiredRouteList[i])
 
 		if errors.Is(err, syscall.EEXIST) {
-			err = netlink.RouteReplace(route)
+			err = netlink.RouteReplace(&desiredRouteList[i])
 		}
 
 		if err != nil {
-			return errors.Wrapf(err, "unable to add the route entry %v", route)
+			return errors.Wrapf(err, "unable to add the route entry %v", desiredRouteList[i])
 		}
 
-		klog.V(log.DEBUG).Infof("Successfully added the route entry %v and gw ip %v", route, gwIP)
+		klog.V(log.DEBUG).Infof("Successfully added the route entry %+v", desiredRouteList[i])
 	}
 
 	return nil
@@ -553,6 +664,50 @@ func (v *vxlan) Cleanup() error {
 	if err != nil {
 		return errors.Wrapf(err, "unable to delete IP rule pointing to %d table", TableID)
 	}
+
+	return nil
+}
+
+func (v *vxlanIface) addRoutesForHealthcheck(healthcheckMap map[string]net.IP) error {
+	for healthCheckIP, gwVtepIP := range healthcheckMap {
+		route := &netlink.Route{
+			LinkIndex: v.link.Index,
+			Dst:       netlink.NewIPNet(net.ParseIP(healthCheckIP)),
+			Gw:        gwVtepIP,
+			Priority:  99,
+			Table:     TableID,
+		}
+		err := netlink.RouteAdd(route)
+
+		if errors.Is(err, syscall.EEXIST) {
+			err = netlink.RouteReplace(route)
+		}
+
+		if err != nil {
+			return errors.Wrapf(err, "unable to add the route entry %v", route)
+		}
+
+		klog.V(log.DEBUG).Infof("Successfully added the route entry %v", route)
+	}
+
+	return nil
+}
+
+func (v *vxlanIface) delRouteForHealthcheck(healthcheckIP string, gwVtepIP net.IP) error {
+	route := &netlink.Route{
+		LinkIndex: v.link.Index,
+		Dst:       netlink.NewIPNet(net.ParseIP(healthcheckIP)),
+		Gw:        gwVtepIP,
+		Priority:  99,
+		Table:     TableID,
+	}
+
+	err := netlink.RouteDel(route)
+	if err != nil {
+		return errors.Wrapf(err, "unable to add the route entry %v", route)
+	}
+
+	klog.V(log.DEBUG).Infof("Successfully deleted the route entry %v", route)
 
 	return nil
 }
