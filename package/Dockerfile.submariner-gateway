@@ -7,7 +7,7 @@ WORKDIR /var/submariner
 # libreswan provides IKE
 # kmod is required so that libreswan can load modules
 RUN dnf -y install --nodocs --setopt=install_weak_deps=0 \
-           iproute libreswan kmod && \
+           iproute iptables iptables-nft ipset libreswan kmod && \
     dnf -y clean all
 
 COPY package/submariner.sh package/pluto bin/${TARGETPLATFORM}/submariner-gateway /usr/local/bin/

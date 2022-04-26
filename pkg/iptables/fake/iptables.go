@@ -25,6 +25,7 @@ import (
 
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/stringset"
+	corev1 "k8s.io/api/core/v1"
 )
 
 type IPTables struct {
@@ -220,6 +221,100 @@ func (i *IPTables) AddFailOnDeleteRuleMatcher(stringOrMatcher interface{}) {
 }
 
 func (i *IPTables) DeleteChain(table, chain string) error {
+	// TODO
+	return nil
+}
+
+// globalnet helper functions // Globalnet related functions
+
+func (i *IPTables) AddClusterEgressRules(subnet, snatIP, globalNetIPTableMark string) error {
+	// TODO
+	return nil
+}
+
+func (i *IPTables) RemoveClusterEgressRules(subnet, snatIP, globalNetIPTableMark string) error {
+	// TODO
+	return nil
+}
+
+func (i *IPTables) AddIngressRulesForHeadlessSvcPod(globalIP, podIP string) error {
+	// TODO
+	return nil
+}
+
+func (i *IPTables) RemoveIngressRulesForHeadlessSvcPod(globalIP, podIP string) error {
+	// TODO
+	return nil
+}
+
+func (i *IPTables) GetKubeProxyClusterIPServiceChainName(service *corev1.Service,
+	kubeProxyServiceChainPrefix string) (string, bool, error,
+) {
+	// TODO
+	return "", false, nil
+}
+
+func (i *IPTables) AddIngressRulesForHealthCheck(cniIfaceIP, globalIP string) error {
+	// TODO
+	return nil
+}
+
+func (i *IPTables) RemoveIngressRulesForHealthCheck(cniIfaceIP, globalIP string) error {
+	// TODO
+	return nil
+}
+
+func (i *IPTables) AddEgressRulesForHeadlessSVCPods(key, sourceIP, snatIP, globalNetIPTableMark string) error {
+	// TODO
+	return nil
+}
+
+func (i *IPTables) RemoveEgressRulesForHeadlessSVCPods(key, sourceIP, snatIP, globalNetIPTableMark string) error {
+	// TODO
+	return nil
+}
+
+func (i *IPTables) AddEgressRulesForPods(key, ipSetName, snatIP, globalNetIPTableMark string) error {
+	// TODO
+	return nil
+}
+
+func (i *IPTables) RemoveEgressRulesForPods(key, ipSetName, snatIP, globalNetIPTableMark string) error {
+	// TODO
+	return nil
+}
+
+func (i *IPTables) AddSnatRuleForIncomingTraffic(cniIfaceIP string) error {
+	// TODO
+	return nil
+}
+
+func (i *IPTables) RemoveSnatRuleForIncomingTraffic(cniIfaceIP string) error {
+	// TODO
+	return nil
+}
+
+func (i *IPTables) AddEgressRulesForNamespace(namespace, ipSetName, snatIP, globalNetIPTableMark string) error {
+	// TODO
+	return nil
+}
+
+func (i *IPTables) RemoveEgressRulesForNamespace(namespace, ipSetName, snatIP, globalNetIPTableMark string) error {
+	// TODO
+	return nil
+}
+
+func (i *IPTables) FlushIPTableChain(table, chainName string) error {
+	// TODO
+	return nil
+}
+
+func (i *IPTables) DeleteIPTableChain(table, chainName string) error {
+	// TODO
+	return nil
+}
+
+func (i *IPTables) DeleteIPTableRule(table, chainName, jumpTarget string) error {
 	// TODO
 	return nil
 }

@@ -283,6 +283,7 @@ func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 	// Build map to form the nexthops behind each remote endpoint
 	remoteSubnetToGWs := map[string]stringset.Interface{}
 	healthcheckMap := map[string]net.IP{}
+	returnRouteMap := map[string][]net.IP{}
 
 	// add the Vtep IP of the new GW
 	remoteVtepIP, err := v.getVxlanVtepIPAddress(endpointInfo.Endpoint.Spec.PrivateIP)
@@ -329,11 +330,32 @@ func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 		if connection.Endpoint.HealthCheckIP != "" {
 			healthcheckMap[connection.Endpoint.HealthCheckIP] = gwVtepIP
 		}
+
+		if len(connection.Endpoint.AllocatedIPs) != 0 {
+			allocatedIPs := []net.IP{}
+			for _, allocatedIP := range endpointInfo.Endpoint.Spec.AllocatedIPs {
+				allocatedIPs = append(allocatedIPs, net.ParseIP(allocatedIP))
+			}
+
+			returnRouteMap[gwVtepIP.String()] = allocatedIPs
+		}
 	}
 
 	// This will get pick up in later endpoint event if not assigned a globalIP yet from globalnet-controller
 	if endpointInfo.Endpoint.Spec.HealthCheckIP != "" {
 		healthcheckMap[endpointInfo.Endpoint.Spec.HealthCheckIP] = remoteVtepIP
+	}
+
+	// Add return routes for traffic based on SNAT IPs of remote gateways, if not yet set it will be picked up by latter
+	// update
+	if len(endpointInfo.Endpoint.Spec.AllocatedIPs) != 0 {
+		allocatedIPs := []net.IP{}
+
+		for _, allocatedIP := range endpointInfo.Endpoint.Spec.AllocatedIPs {
+			allocatedIPs = append(allocatedIPs, net.ParseIP(allocatedIP))
+		}
+
+		returnRouteMap[remoteVtepIP.String()] = allocatedIPs
 	}
 
 	err = v.vxlanIface.AddFDB(remoteIP, "00:00:00:00:00:00")
@@ -370,6 +392,14 @@ func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 	if err != nil {
 		return "", fmt.Errorf("failed to create routes for healthcheckMap %v: %w",
 			healthcheckMap, err)
+	}
+
+	klog.V(log.DEBUG).Infof("Reconciling Inter Cluster Routes for remote SNAT IPs %#v", returnRouteMap)
+
+	err = v.vxlanIface.addReturnRoutesForRemoteSnat(returnRouteMap)
+	if err != nil {
+		return "", fmt.Errorf("failed to create return routes for remote SNAT IPs %v: %w",
+			returnRouteMap, err)
 	}
 
 	v.connections = append(v.connections, v1.Connection{
@@ -424,11 +454,11 @@ func (v *vxlan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint)
 
 	err = v.vxlanIface.DelFDB(remoteIP, "00:00:00:00:00:00")
 	if err != nil {
-		return fmt.Errorf("failed to delete remoteIP %q from the forwarding database: %w", remoteIP, err)
+		// Don't exit here, someone already removed the route
+		klog.Errorf("failed to delete remoteIP %q from the forwarding database: %s", remoteIP, err.Error())
 	}
 
 	err = v.vxlanIface.DelRoute(allowedIPs)
-
 	if err != nil {
 		return fmt.Errorf("failed to remove route for the CIDR %q: %w", allowedIPs, err)
 	}
@@ -436,7 +466,8 @@ func (v *vxlan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint)
 	err = v.vxlanIface.delRouteForHealthcheck(remoteEndpoint.Spec.HealthCheckIP, gwVtepIP)
 
 	if err != nil {
-		return fmt.Errorf("failed to remove route for the HealthcheckIP %q: %w", remoteEndpoint.Spec.HealthCheckIP, err)
+		// Don't exit here, someone already removed the route
+		klog.Errorf("failed to remove route for the HealthcheckIP %q: %s", remoteEndpoint.Spec.HealthCheckIP, err.Error())
 	}
 
 	v.connections = removeConnectionForEndpoint(v.connections, remoteEndpoint)
@@ -708,6 +739,36 @@ func (v *vxlanIface) delRouteForHealthcheck(healthcheckIP string, gwVtepIP net.I
 	}
 
 	klog.V(log.DEBUG).Infof("Successfully deleted the route entry %v", route)
+
+	return nil
+}
+
+func (v *vxlanIface) addReturnRoutesForRemoteSnat(returnMap map[string][]net.IP) error {
+	for gwVtepIP, snatIPs := range returnMap {
+		for _, snatIP := range snatIPs {
+			route := &netlink.Route{
+				LinkIndex: v.link.Index,
+				Dst:       netlink.NewIPNet(snatIP),
+				Gw:        net.ParseIP(gwVtepIP),
+				Priority:  98,
+				Table:     TableID,
+			}
+
+			err := netlink.RouteAdd(route)
+
+			if errors.Is(err, syscall.EEXIST) {
+				klog.V(log.DEBUG).Info("Route entry exists, overriding")
+
+				err = netlink.RouteReplace(route)
+			}
+
+			if err != nil {
+				return errors.Wrapf(err, "unable to add the route entry %v", route)
+			}
+
+			klog.V(log.DEBUG).Infof("Successfully added the route entry %v", route)
+		}
+	}
 
 	return nil
 }
