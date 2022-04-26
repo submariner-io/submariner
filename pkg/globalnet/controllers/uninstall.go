@@ -21,8 +21,10 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/finalizer"
 	"github.com/submariner-io/admiral/pkg/resource"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -36,8 +38,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
 	utilexec "k8s.io/utils/exec"
 )
@@ -175,4 +179,42 @@ func deleteAllGlobalIngressIPObjs(smClientSet *versioned.Clientset) {
 	if err != nil && !apierrors.IsNotFound(err) {
 		klog.Errorf("Error deleting the globalIngressIPs: %v", err)
 	}
+}
+
+func RemoveGlobalIPAnnotationOnNode(cfg *rest.Config) {
+	nodeName, ok := os.LookupEnv("NODE_NAME")
+	if !ok {
+		klog.Errorf("Error reading the NODE_NAME from the environment")
+		return
+	}
+
+	k8sClientSet, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		klog.Fatalf("Error building clientset: %s", err.Error())
+	}
+
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		node, err := k8sClientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+		if err != nil {
+			return errors.Wrapf(err, "unable to get node info for node %q", nodeName)
+		}
+
+		annotations := node.GetAnnotations()
+		if annotations == nil || annotations[constants.SmGlobalIP] == "" {
+			return nil
+		}
+
+		delete(annotations, constants.SmGlobalIP)
+
+		node.SetAnnotations(annotations)
+		_, updateErr := k8sClientSet.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
+		return updateErr // nolint:wrapcheck // We wrap it below in the enclosing function
+	})
+
+	if retryErr != nil {
+		klog.Errorf("error updating node %q", nodeName)
+		return
+	}
+
+	klog.Infof("Successfully removed globalIP annotation from node %q", nodeName)
 }
