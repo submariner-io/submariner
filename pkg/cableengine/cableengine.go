@@ -131,7 +131,7 @@ func (i *engine) SetupNATDiscovery(natDiscovery natdiscovery.Interface) {
 	}()
 }
 
-func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) error {
+func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) error { // nolint:gocyclo // TODO MAG POC
 	endpoint := &rnat.Endpoint
 
 	i.Lock()
@@ -155,7 +155,7 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 		active := &activeConnections[j]
 		klog.V(log.TRACE).Infof("Analyzing currently active connection %q", active.Endpoint.CableName)
 
-		if active.Endpoint.ClusterID != endpoint.Spec.ClusterID {
+		if active.Endpoint.CableName != endpoint.Spec.CableName {
 			continue
 		}
 
@@ -164,7 +164,7 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 		klog.V(log.TRACE).Infof("Found a pre-existing cable %q with timestamp %q that belongs to this cluster %s",
 			active.Endpoint.CableName, prevTimestamp, endpoint.Spec.ClusterID)
 
-		if endpoint.CreationTimestamp.Before(&prevTimestamp) {
+		if endpoint.CreationTimestamp.Before(&prevTimestamp) && !i.multiActiveGateways {
 			klog.Warningf("The timestamp (%s) for new cable %q is older than the timestamp (%s) of the pre-existing "+
 				"cable %q - not replacing", endpoint.CreationTimestamp, endpoint.Spec.CableName, prevTimestamp, active.Endpoint.CableName)
 			return nil
@@ -174,15 +174,17 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 			// There could be scenarios where the cableName would be the same but the endpoint IP or specific driver
 			// config has changed.
 			if active.UsingIP == rnat.UseIP && active.UsingNAT == rnat.UseNAT &&
-				reflect.DeepEqual(active.Endpoint.BackendConfig, endpoint.Spec.BackendConfig) {
+				reflect.DeepEqual(active.Endpoint.BackendConfig, endpoint.Spec.BackendConfig) &&
+				reflect.DeepEqual(active.Endpoint.AllocatedIPs, endpoint.Spec.AllocatedIPs) {
 				klog.V(log.TRACE).Infof("Connection info (IP: %s, NAT: %v, BackendConfig: %v) for cable %q is unchanged"+
 					" - not re-installing", active.UsingIP, active.UsingNAT, active.Endpoint.BackendConfig, active.Endpoint.CableName)
 				return nil
 			}
 
-			klog.V(log.DEBUG).Infof("New connection info (IP: %s, NAT: %v, BackendConfig: %v) for cable %q differs from"+
-				" previous (IP: %s, NAT: %v, BackendConfig: %v) - re-installing", rnat.UseIP, rnat.UseNAT, active.Endpoint.BackendConfig,
-				active.Endpoint.CableName, active.UsingIP, active.UsingNAT, endpoint.Spec.BackendConfig)
+			klog.V(log.DEBUG).Infof("New connection info (IP: %s, NAT: %v, BackendConfig: %v, AllocatedIPs: %v) for cable %q differs from"+
+				" previous (IP: %s, NAT: %v, BackendConfig: %v, AllocatedIPs: %v) - re-installing",
+				rnat.UseIP, rnat.UseNAT, active.Endpoint.BackendConfig, active.Endpoint.AllocatedIPs,
+				active.Endpoint.CableName, active.UsingIP, active.UsingNAT, endpoint.Spec.BackendConfig, endpoint.Spec.AllocatedIPs)
 		}
 
 		if !i.multiActiveGateways {

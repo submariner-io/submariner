@@ -166,6 +166,8 @@ func (gs *GatewaySyncer) cleanupStaleGatewayEntries(localGatewayName string) err
 		}
 
 		if stale {
+			klog.Warningf("stale gateway: %s, didn't report for %s", gw.Name, GatewayStaleTimeout)
+
 			err := gs.client.Delete(context.TODO(), gw.Name, metav1.DeleteOptions{})
 			if err != nil {
 				// In this case we don't want to stop the cleanup loop and just log it.
