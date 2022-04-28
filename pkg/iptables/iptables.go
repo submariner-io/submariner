@@ -19,6 +19,8 @@ limitations under the License.
 package iptables
 
 import (
+	"bytes"
+	"os/exec"
 	"strings"
 
 	"github.com/coreos/go-iptables/iptables"
@@ -26,6 +28,12 @@ import (
 	level "github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/stringset"
 	"k8s.io/klog"
+)
+
+const (
+	iptablesCmd = "iptables"
+	versionCmd  = "--version"
+	nftSubstr   = "nf_tables"
 )
 
 type Interface interface {
@@ -187,4 +195,26 @@ func UpdateChainRules(ipt Interface, table, chain string, rules [][]string) erro
 	}
 
 	return nil
+}
+
+// iptables mode should be retrieved from iptables library (when supported )
+
+func IsNftMode(ipt Interface) bool {
+	path, err := exec.LookPath(iptablesCmd)
+	if err != nil {
+		klog.Warningf("Unable to find %s path: %q", iptablesCmd, err)
+		return false
+	}
+
+	cmd := exec.Command(path, versionCmd)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+
+	err = cmd.Run()
+	if err != nil {
+		klog.Warningf("Unable to run %s %s: %q", iptablesCmd, versionCmd, err)
+		return false
+	}
+
+	return strings.Contains(out.String(), nftSubstr)
 }

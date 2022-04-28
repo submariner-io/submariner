@@ -33,9 +33,10 @@ import (
 
 type mtuHandler struct {
 	event.HandlerBase
-	ipt         iptables.Interface
-	remoteIPSet ipset.Named
-	localIPSet  ipset.Named
+	ipt             iptables.Interface
+	remoteIPSet     ipset.Named
+	localIPSet      ipset.Named
+	iptablesNftMode bool
 }
 
 func NewMTUHandler() event.Handler {
@@ -58,34 +59,11 @@ func (h *mtuHandler) Init() error {
 		return errors.Wrap(err, "error initializing iptables")
 	}
 
-	ipSetIface := ipset.New(utilexec.New())
-
 	if err := iptables.CreateChainIfNotExists(h.ipt, constants.MangleTable, constants.SmPostRoutingChain); err != nil {
 		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmPostRoutingChain)
 	}
 
 	forwardToSubMarinerPostRoutingChain := []string{"-j", constants.SmPostRoutingChain}
-
-	h.remoteIPSet = h.newNamedIPSet(constants.RemoteCIDRIPSet, ipSetIface)
-	if err := h.remoteIPSet.Create(true); err != nil {
-		return errors.Wrapf(err, "error creating ipset %q", constants.RemoteCIDRIPSet)
-	}
-
-	h.localIPSet = h.newNamedIPSet(constants.LocalCIDRIPSet, ipSetIface)
-	if err := h.localIPSet.Create(true); err != nil {
-		return errors.Wrapf(err, "error creating ipset %q", constants.LocalCIDRIPSet)
-	}
-
-	ruleSpecSource := []string{
-		"-m", "set", "--match-set", constants.LocalCIDRIPSet, "src", "-m", "set", "--match-set",
-		constants.RemoteCIDRIPSet, "dst", "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS",
-		"--clamp-mss-to-pmtu",
-	}
-	ruleSpecDest := []string{
-		"-m", "set", "--match-set", constants.RemoteCIDRIPSet, "src", "-m", "set", "--match-set",
-		constants.LocalCIDRIPSet, "dst", "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS",
-		"--clamp-mss-to-pmtu",
-	}
 
 	if err := iptables.PrependUnique(h.ipt, constants.MangleTable, constants.PostRoutingChain,
 		forwardToSubMarinerPostRoutingChain); err != nil {
@@ -93,18 +71,50 @@ func (h *mtuHandler) Init() error {
 			strings.Join(forwardToSubMarinerPostRoutingChain, " "))
 	}
 
-	if err := h.ipt.AppendUnique(constants.MangleTable, constants.SmPostRoutingChain, ruleSpecSource...); err != nil {
-		return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(ruleSpecSource, " "))
-	}
+	h.iptablesNftMode = iptables.IsNftMode(h.ipt)
+	klog.Infof("iptablesNftMode: %v ", h.iptablesNftMode)
 
-	if err := h.ipt.AppendUnique(constants.MangleTable, constants.SmPostRoutingChain, ruleSpecDest...); err != nil {
-		return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(ruleSpecSource, " "))
+	if !h.iptablesNftMode {
+		ipSetIface := ipset.New(utilexec.New())
+
+		h.remoteIPSet = h.newNamedIPSet(constants.RemoteCIDRIPSet, ipSetIface)
+		if err := h.remoteIPSet.Create(true); err != nil {
+			return errors.Wrapf(err, "error creating ipset %q", constants.RemoteCIDRIPSet)
+		}
+
+		h.localIPSet = h.newNamedIPSet(constants.LocalCIDRIPSet, ipSetIface)
+		if err := h.localIPSet.Create(true); err != nil {
+			return errors.Wrapf(err, "error creating ipset %q", constants.LocalCIDRIPSet)
+		}
+
+		ruleSpecSource := []string{
+			"-m", "set", "--match-set", constants.LocalCIDRIPSet, "src", "-m", "set", "--match-set",
+			constants.RemoteCIDRIPSet, "dst", "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS",
+			"--clamp-mss-to-pmtu",
+		}
+		ruleSpecDest := []string{
+			"-m", "set", "--match-set", constants.RemoteCIDRIPSet, "src", "-m", "set", "--match-set",
+			constants.LocalCIDRIPSet, "dst", "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS",
+			"--clamp-mss-to-pmtu",
+		}
+
+		if err := h.ipt.AppendUnique(constants.MangleTable, constants.SmPostRoutingChain, ruleSpecSource...); err != nil {
+			return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(ruleSpecSource, " "))
+		}
+
+		if err := h.ipt.AppendUnique(constants.MangleTable, constants.SmPostRoutingChain, ruleSpecDest...); err != nil {
+			return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(ruleSpecSource, " "))
+		}
 	}
 
 	return nil
 }
 
 func (h *mtuHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
+	if h.iptablesNftMode {
+		return nil
+	}
+
 	subnets := extractSubnets(&endpoint.Spec)
 	for _, subnet := range subnets {
 		err := h.localIPSet.AddEntry(subnet, true)
@@ -117,6 +127,10 @@ func (h *mtuHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 }
 
 func (h *mtuHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
+	if h.iptablesNftMode {
+		return nil
+	}
+
 	subnets := extractSubnets(&endpoint.Spec)
 	for _, subnet := range subnets {
 		err := h.localIPSet.DelEntry(subnet)
@@ -131,9 +145,20 @@ func (h *mtuHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 func (h *mtuHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	subnets := extractSubnets(&endpoint.Spec)
 	for _, subnet := range subnets {
-		err := h.remoteIPSet.AddEntry(subnet, true)
-		if err != nil {
-			return errors.Wrap(err, "error adding remote IP set entry")
+		if h.iptablesNftMode {
+			ruleSpecDest := []string{
+				"-d", subnet, "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS",
+				"--clamp-mss-to-pmtu",
+			}
+
+			if err := h.ipt.AppendUnique(constants.MangleTable, constants.SmPostRoutingChain, ruleSpecDest...); err != nil {
+				return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(ruleSpecDest, " "))
+			}
+		} else {
+			err := h.remoteIPSet.AddEntry(subnet, true)
+			if err != nil {
+				return errors.Wrap(err, "error adding remote IP set entry")
+			}
 		}
 	}
 
@@ -143,9 +168,20 @@ func (h *mtuHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 func (h *mtuHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	subnets := extractSubnets(&endpoint.Spec)
 	for _, subnet := range subnets {
-		err := h.remoteIPSet.DelEntry(subnet)
-		if err != nil {
-			klog.Errorf("Error deleting the subnet %q from the remote IPSet: %v", subnet, err)
+		if h.iptablesNftMode {
+			ruleSpecDest := []string{
+				"-d", subnet, "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS",
+				"--clamp-mss-to-pmtu",
+			}
+
+			if err := h.ipt.Delete(constants.MangleTable, constants.PostRoutingChain, ruleSpecDest...); err != nil {
+				klog.Errorf("Error deleting iptables rule from %q chain: %v", constants.PostRoutingChain, err)
+			}
+		} else {
+			err := h.remoteIPSet.DelEntry(subnet)
+			if err != nil {
+				klog.Errorf("Error deleting the subnet %q from the remote IPSet: %v", subnet, err)
+			}
 		}
 	}
 
