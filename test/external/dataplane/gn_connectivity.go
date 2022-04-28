@@ -70,7 +70,7 @@ type globalnetTestParams struct {
    (b) From non-gateway-cluster to ext-app
 */
 
-var _ = Describe("[external-dataplane-globalnet] Connectivity", func() {
+var _ = PDescribe("[external-dataplane-globalnet] Connectivity", func() {
 	f := framework.NewFramework("ext-dataplane-gn")
 
 	var toEndpointType tcp.EndpointType
