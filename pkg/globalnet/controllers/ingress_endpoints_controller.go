@@ -115,11 +115,11 @@ func (c *ingressEndpointsController) onCreateOrUpdate(endpoints *corev1.Endpoint
 	klog.Infof("%q ingress Endpoints %s for service %s", op, key, c.svcName)
 
 	// Get list of current endpoint IPs
-	epIPs := map[string]bool{}
+	usedEpIPs := map[string]bool{}
 
 	for _, subset := range endpoints.Subsets {
 		for _, addr := range subset.Addresses {
-			epIPs[addr.IP] = true
+			usedEpIPs[addr.IP] = true
 		}
 	}
 
@@ -136,9 +136,9 @@ func (c *ingressEndpointsController) onCreateOrUpdate(endpoints *corev1.Endpoint
 		annotations := ingressIP.GetAnnotations()
 		if epIP, ok := annotations[headlessSvcEndpointsIP]; ok {
 			// ingressIP is still used
-			if _, used := epIPs[epIP]; used {
+			if _, used := usedEpIPs[epIP]; used {
 				// Delete from the hash to avoid recreating existing ingressIP
-				delete(epIPs, epIP)
+				delete(usedEpIPs, epIP)
 				// Skip deleting ingressIP
 				continue
 			}
@@ -151,7 +151,7 @@ func (c *ingressEndpointsController) onCreateOrUpdate(endpoints *corev1.Endpoint
 	}
 
 	// Create new ingressIPs
-	for epIP := range epIPs {
+	for epIP := range usedEpIPs {
 		ingressIP := newIngressIP(endpoints.Name, endpoints.Namespace, epIP)
 
 		ingressIP.ObjectMeta.Annotations = map[string]string{

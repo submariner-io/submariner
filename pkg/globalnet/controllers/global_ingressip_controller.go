@@ -225,31 +225,24 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 			return false
 		}
 	} else {
-		var target string
+		var annotationKey string
 		var tType iptables.TargetType
 
 		if ingressIP.Spec.Target == submarinerv1.HeadlessServicePod {
-			target = ingressIP.GetAnnotations()[headlessSvcPodIP]
-			if target == "" {
-				_ = c.pool.Release(ips...)
-
-				klog.Warningf("%q annotation is missing on %q", headlessSvcPodIP, key)
-
-				return true
-			}
-
+			annotationKey = headlessSvcPodIP
 			tType = iptables.PodTarget
 		} else if ingressIP.Spec.Target == submarinerv1.HeadlessServiceEndpoints {
-			target = ingressIP.GetAnnotations()[headlessSvcEndpointsIP]
-			if target == "" {
-				_ = c.pool.Release(ips...)
-
-				klog.Warningf("%q annotation is missing on %q", headlessSvcEndpointsIP, key)
-
-				return true
-			}
-
+			annotationKey = headlessSvcEndpointsIP
 			tType = iptables.EndpointsTarget
+		}
+
+		target := ingressIP.GetAnnotations()[annotationKey]
+		if target == "" {
+			_ = c.pool.Release(ips...)
+
+			klog.Warningf("%q annotation is missing on %q", annotationKey, key)
+
+			return true
 		}
 
 		err = c.iptIface.AddIngressRulesForHeadlessSvc(ips[0], target, tType)
