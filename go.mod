@@ -1,6 +1,6 @@
 module github.com/submariner-io/submariner
 
-go 1.13
+go 1.16
 
 require (
 	github.com/cenk/hub v1.0.1 // indirect
