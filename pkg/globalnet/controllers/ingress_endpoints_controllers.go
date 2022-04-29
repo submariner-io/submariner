@@ -9,14 +9,14 @@ You may obtain a copy of the License at
 
     http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+	Unless required by applicable law or agreed to in writing, software
+	distributed under the License is distributed on an "AS IS" BASIS,
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	See the License for the specific language governing permissions and
+	limitations under the License.
 */
 
-//nolint:dupl // same logic to ingress_endpoints_controllers, but for a different class
+//nolint:dupl // same logic to ingress_pod_controllers, but for a different class
 package controllers
 
 import (
@@ -33,21 +33,20 @@ import (
 	"k8s.io/klog"
 )
 
-func NewIngressPodControllers(config *syncer.ResourceSyncerConfig) (*IngressPodControllers, error) {
-	// We'll panic if config is nil, this is intentional
+func NewIngressEndpointsControllers(config *syncer.ResourceSyncerConfig) (*IngressEndpointsControllers, error) {
 	_, gvr, err := util.ToUnstructuredResource(&submarinerv1.GlobalIngressIP{}, config.RestMapper)
 	if err != nil {
 		return nil, errors.Wrap(err, "error converting resource")
 	}
 
-	return &IngressPodControllers{
-		controllers: map[string]*ingressPodController{},
+	return &IngressEndpointsControllers{
+		controllers: map[string]*ingressEndpointsController{},
 		config:      *config,
 		ingressIPs:  config.SourceClient.Resource(*gvr),
 	}, nil
 }
 
-func (c *IngressPodControllers) start(service *corev1.Service) error {
+func (c *IngressEndpointsControllers) start(service *corev1.Service) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -56,7 +55,7 @@ func (c *IngressPodControllers) start(service *corev1.Service) error {
 		return nil
 	}
 
-	controller, err := startIngressPodController(service, &c.config)
+	controller, err := startIngressEndpointsController(service, &c.config)
 	if err != nil {
 		return err
 	}
@@ -66,7 +65,7 @@ func (c *IngressPodControllers) start(service *corev1.Service) error {
 	return nil
 }
 
-func (c *IngressPodControllers) stopAll() {
+func (c *IngressEndpointsControllers) stopAll() {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -74,16 +73,16 @@ func (c *IngressPodControllers) stopAll() {
 		controller.Stop()
 	}
 
-	c.controllers = map[string]*ingressPodController{}
+	c.controllers = map[string]*ingressEndpointsController{}
 }
 
-func (c *IngressPodControllers) stopAndCleanup(serviceName, serviceNamespace string) {
+func (c *IngressEndpointsControllers) stopAndCleanup(serviceName, serviceNamespace string) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
 	key := c.key(serviceName, serviceNamespace)
-
 	controller, exists := c.controllers[key]
+
 	if exists {
 		controller.Stop()
 		delete(c.controllers, key)
@@ -98,6 +97,6 @@ func (c *IngressPodControllers) stopAndCleanup(serviceName, serviceNamespace str
 	}
 }
 
-func (c *IngressPodControllers) key(n, ns string) string {
+func (c *IngressEndpointsControllers) key(n, ns string) string {
 	return ns + "/" + n
 }
