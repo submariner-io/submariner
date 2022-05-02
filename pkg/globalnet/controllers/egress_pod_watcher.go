@@ -34,7 +34,8 @@ import (
 )
 
 func startEgressPodWatcher(name, namespace string, namedIPSet ipset.Named, config *watcher.Config,
-	podSelector *metav1.LabelSelector) (*egressPodWatcher, error) {
+	podSelector *metav1.LabelSelector,
+) (*egressPodWatcher, error) {
 	pw := &egressPodWatcher{
 		stopCh:     make(chan struct{}),
 		namedIPSet: namedIPSet,

@@ -323,8 +323,9 @@ type GlobalIngressIPSpec struct {
 type TargetType string
 
 const (
-	ClusterIPService   TargetType = "ClusterIPService"
-	HeadlessServicePod TargetType = "HeadlessServicePod"
+	ClusterIPService         TargetType = "ClusterIPService"
+	HeadlessServicePod       TargetType = "HeadlessServicePod"
+	HeadlessServiceEndpoints TargetType = "HeadlessServiceEndpoints"
 )
 
 type GlobalIngressIPStatus struct {
