@@ -28,13 +28,13 @@ import (
 )
 
 // On any endpoint event the routes and FDB entries on vx-submarier should be
-// reconciled
+// reconciled.
 func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 	kp.syncHandlerMutex.Lock()
 	defer kp.syncHandlerMutex.Unlock()
 
 	localClusterGwNodeIP := net.ParseIP(endpoint.Spec.PrivateIP)
-	kp.addGwIp(localClusterGwNodeIP.String())
+	kp.addGwIP(localClusterGwNodeIP.String())
 
 	// Try and let all handlers know we're a gateway as fast as possible
 	// Either an endpoint with our hostname is added or transitionToGw is called
@@ -68,8 +68,9 @@ func (kp *SyncHandler) LocalEndpointUpdated(endpoint *submV1.Endpoint) error {
 func (kp *SyncHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 	kp.syncHandlerMutex.Lock()
 	defer kp.syncHandlerMutex.Unlock()
+
 	localClusterGwNodeIP := net.ParseIP(endpoint.Spec.PrivateIP)
-	kp.removeGwIp(localClusterGwNodeIP.String())
+	kp.removeGwIP(localClusterGwNodeIP.String())
 
 	if endpoint.Spec.Hostname == kp.hostname {
 		kp.isGatewayNode = false
@@ -92,14 +93,6 @@ func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 
 	kp.syncHandlerMutex.Lock()
 	defer kp.syncHandlerMutex.Unlock()
-
-	//lastProcessedTime, ok := kp.remoteEndpointTimeStamp[endpoint.Spec.ClusterID]
-
-	// if ok && lastProcessedTime.After(endpoint.CreationTimestamp.Time) {
-	// 	klog.Infof("Ignoring new remote %#v since a later endpoint was already"+
-	// 		"processed", endpoint)
-	// 	return nil
-	// }
 
 	for _, inputCidrBlock := range endpoint.Spec.Subnets {
 		if !kp.remoteSubnets.Contains(inputCidrBlock) {

@@ -79,10 +79,14 @@ func main() {
 		np = constants.NetworkPluginGeneric
 	}
 
+	if env.MultiActiveGatewayEnabled {
+		klog.Info("Starting submariner-route-agent with MultiActiveGateways enabled")
+	}
+
 	registry := event.NewRegistry("routeagent_driver", np)
 	if err := registry.AddHandlers(
 		logger.NewHandler(),
-		kubeproxy.NewSyncHandler(env.ClusterCidr, env.ServiceCidr),
+		kubeproxy.NewSyncHandler(env.ClusterCidr, env.ServiceCidr, env.MultiActiveGatewayEnabled),
 		ovn.NewHandler(&env, smClientset),
 		cabledriver.NewXRFMCleanupHandler(),
 		cabledriver.NewVXLANCleanup(),

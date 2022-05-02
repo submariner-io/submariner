@@ -33,10 +33,12 @@ func (kp *SyncHandler) TransitionToNonGateway() error {
 	kp.syncHandlerMutex.Lock()
 	defer kp.syncHandlerMutex.Unlock()
 	kp.isGatewayNode = false
+
 	ipAddr, err := kp.getHostIfaceIPAddress()
 	if err != nil {
 		klog.Errorf("unable to retrieve the IPv4 address on the Host: %v", err)
 	}
+
 	kp.gwIPs.Remove(ipAddr.String())
 
 	// If the active Gateway transitions to a new node, we flush the HostNetwork routing table.
@@ -59,6 +61,14 @@ func (kp *SyncHandler) TransitionToNonGateway() error {
 		err = kp.reconcileIntraClusterRoutes()
 		if err != nil {
 			return errors.Wrap(err, "error while reconciling routes")
+		}
+	}
+
+	if kp.MultiActiveGatewayEnabled {
+		err = kp.updateMAGWRules(Delete)
+		if err != nil {
+			klog.Errorf("Unable to remove SNAT rule on Gateway node %s for MAG incoming service traffic: %v",
+				kp.hostname, err)
 		}
 	}
 
@@ -86,6 +96,7 @@ func (kp *SyncHandler) TransitionToGateway() error {
 	if err != nil {
 		klog.Errorf("unable to retrieve the IPv4 address on the Host: %v", err)
 	}
+
 	kp.gwIPs.Add(ipAddr.String())
 
 	klog.Infof("Updating FDB entries on the vxlan interface: %s to include worker node IPs.", VxLANIface)
@@ -103,6 +114,14 @@ func (kp *SyncHandler) TransitionToGateway() error {
 
 	// Add routes to the new endpoint on the GatewayNode.
 	kp.updateRoutingRulesForHostNetworkSupport(kp.remoteSubnets.Elements(), Add)
+
+	if kp.MultiActiveGatewayEnabled {
+		err = kp.updateMAGWRules(Add)
+		if err != nil {
+			klog.Errorf("Unable to add SNAT rule on Gateway node %s for MAG incoming service traffic: %v",
+				kp.hostname, err)
+		}
+	}
 
 	return nil
 }
