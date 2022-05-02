@@ -407,7 +407,7 @@ func newTestDriver() *testDriver {
 		t.localEndpoint = newLocalEndpoint()
 		t.remoteEndpoint = newRemoteEndpoint()
 
-		t.handler = kubeproxy.NewSyncHandler([]string{localClusterCIDR}, []string{localServiceCIDR})
+		t.handler = kubeproxy.NewSyncHandler([]string{localClusterCIDR}, []string{localServiceCIDR}, false)
 		Expect(t.handler.Init()).To(Succeed())
 	})
 

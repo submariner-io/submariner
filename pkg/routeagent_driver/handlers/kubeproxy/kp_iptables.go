@@ -47,6 +47,8 @@ type SyncHandler struct {
 	syncHandlerMutex     sync.Mutex
 	isGatewayNode        bool
 	wasGatewayPreviously bool
+	// if MAGW is not enabled do not make additional iptables rules
+	MultiActiveGatewayEnabled bool
 
 	netLink     netlink.Interface
 	vxlanDevice *vxLanIface
@@ -61,21 +63,22 @@ type SyncHandler struct {
 	defaultHostIface *net.Interface
 }
 
-func NewSyncHandler(localClusterCidr, localServiceCidr []string) *SyncHandler {
+func NewSyncHandler(localClusterCidr, localServiceCidr []string, multiActiveGatewayEnabled bool) *SyncHandler {
 	return &SyncHandler{
-		localClusterCidr:        localClusterCidr,
-		localServiceCidr:        localServiceCidr,
-		localCableDriver:        "",
-		remoteSubnets:           stringset.NewSynchronized(),
-		remoteSubnetGw:          map[string]net.IP{},
-		remoteEndpointTimeStamp: map[string]v1.Time{},
-		allNodeIPs:              stringset.NewSynchronized(),
-		routeCacheGWNode:        stringset.NewSynchronized(),
-		isGatewayNode:           false,
-		wasGatewayPreviously:    false,
-		netLink:                 netlink.New(),
-		gwIPs:                   stringset.NewSynchronized(),
-		gwVTEPs:                 stringset.NewSynchronized(),
+		localClusterCidr:          localClusterCidr,
+		localServiceCidr:          localServiceCidr,
+		localCableDriver:          "",
+		remoteSubnets:             stringset.NewSynchronized(),
+		remoteSubnetGw:            map[string]net.IP{},
+		remoteEndpointTimeStamp:   map[string]v1.Time{},
+		allNodeIPs:                stringset.NewSynchronized(),
+		routeCacheGWNode:          stringset.NewSynchronized(),
+		isGatewayNode:             false,
+		wasGatewayPreviously:      false,
+		netLink:                   netlink.New(),
+		gwIPs:                     stringset.NewSynchronized(),
+		gwVTEPs:                   stringset.NewSynchronized(),
+		MultiActiveGatewayEnabled: multiActiveGatewayEnabled,
 	}
 }
 
@@ -90,21 +93,25 @@ func (kp *SyncHandler) GetNetworkPlugins() []string {
 	}
 }
 
-func (kp *SyncHandler) addGwIp(ip string) {
+func (kp *SyncHandler) addGwIP(ip string) {
 	kp.gwIPs.Add(ip)
+
 	vtepIP, err := getVxlanVtepIPAddress(ip)
 	if err != nil {
 		klog.Errorf("failed to derive the vxlan vtepIP for %s: %v", ip, err)
 	}
+
 	kp.gwVTEPs.Add(vtepIP.String())
 }
 
-func (kp *SyncHandler) removeGwIp(ip string) {
+func (kp *SyncHandler) removeGwIP(ip string) {
 	kp.gwIPs.Remove(ip)
+
 	vtepIP, err := getVxlanVtepIPAddress(ip)
 	if err != nil {
 		klog.Errorf("failed to derive the vxlan vtepIP for %s: %v", ip, err)
 	}
+
 	kp.gwVTEPs.Remove(vtepIP.String())
 }
 

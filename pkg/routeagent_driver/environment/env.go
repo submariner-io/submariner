@@ -19,9 +19,10 @@ limitations under the License.
 package environment
 
 type Specification struct {
-	ClusterID   string
-	Namespace   string
-	ClusterCidr []string
-	ServiceCidr []string
-	Uninstall   bool
+	ClusterID                 string
+	Namespace                 string
+	ClusterCidr               []string
+	ServiceCidr               []string
+	Uninstall                 bool
+	MultiActiveGatewayEnabled bool
 }

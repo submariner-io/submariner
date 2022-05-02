@@ -129,3 +129,62 @@ func (kp *SyncHandler) programIptableRulesForInterClusterTraffic(remoteCidrBlock
 
 	return nil
 }
+
+func (kp *SyncHandler) updateMAGWRules(operation Operation) error {
+	ipt, err := iptables.New()
+	if err != nil {
+		return errors.Wrap(err, "error initializing iptables")
+	}
+
+	ruleSpecSnat := []string{
+		"-i", "vxlan-tunnel", "-o", kp.cniIface.Name, "-m", "conntrack", "--ctstate", "DNAT", "-j",
+		"SNAT", "--to-source", kp.cniIface.IPAddress,
+	}
+	ruleSpecNoTrack := []string{"-o", "vxlan-tunnel", "-j", "ACCEPT"}
+
+	if operation == Add {
+		klog.V(log.DEBUG).Infof("Installing iptables ingress SNAT for Node: %s", strings.Join(ruleSpecSnat, " "))
+
+		if err := iptables.PrependUnique(ipt, "nat", constants.SmPostRoutingChain, ruleSpecSnat); err != nil {
+			return errors.Wrapf(err, "error inserting iptables rule \"%s\"", strings.Join(ruleSpecSnat, " "))
+		}
+
+		klog.V(log.DEBUG).Info("Insert rule to allow untracked traffic into the 'vxlan-tunnel' interface in FORWARDing Chain")
+
+		if err = iptables.PrependUnique(ipt, constants.FilterTable, "FORWARD", ruleSpecNoTrack); err != nil {
+			return errors.Wrap(err, "unable to insert iptable rule in filter table to allow vxlan traffic")
+		}
+	} else if operation == Delete {
+		klog.V(log.DEBUG).Infof("Deleting iptables ingress SNAT for Node: %s", strings.Join(ruleSpecSnat, " "))
+
+		if err := ipt.Delete("nat", constants.SmPostRoutingChain, ruleSpecSnat...); err != nil {
+			return errors.Wrapf(err, "error deleting iptables rule \"%s\"", strings.Join(ruleSpecSnat, " "))
+		}
+
+		klog.V(log.DEBUG).Info("Deleting rule to allow untracked traffic into the 'vxlan-tunnel' interface in FORWARDing Chain")
+
+		if err := ipt.Delete("filter", "FORWARD", ruleSpecNoTrack...); err != nil {
+			return errors.Wrapf(err, "error deleting iptables rule \"%s\"", strings.Join(ruleSpecNoTrack, " "))
+		}
+	}
+
+	for _, localClusterCidr := range kp.localClusterCidr {
+		ruleSpec := []string{"-i", "vxlan-tunnel", "-d", localClusterCidr, "-j", "ACCEPT"}
+
+		if operation == Add {
+			klog.V(log.DEBUG).Info("Insert rule to allow untracked traffic from the 'vxlan-tunnel' interface in FORWARDing Chain")
+
+			if err = iptables.PrependUnique(ipt, constants.FilterTable, "FORWARD", ruleSpec); err != nil {
+				return errors.Wrap(err, "unable to insert iptable rule in filter table to allow vxlan traffic")
+			}
+		} else if operation == Delete {
+			klog.V(log.DEBUG).Info("Deleting rule to allow untracked traffic from the 'vxlan-tunnel' interface in FORWARDing Chain")
+
+			if err := ipt.Delete("filter", "FORWARD", ruleSpec...); err != nil {
+				return errors.Wrapf(err, "error deleting iptables rule \"%s\"", strings.Join(ruleSpecNoTrack, " "))
+			}
+		}
+	}
+
+	return nil
+}
