@@ -427,6 +427,39 @@ func (t *testDriverBase) awaitEndpointsHasIP(name, ip string) {
 }
 
 func (t *testDriverBase) awaitHeadlessGlobalIngressIP(svcName, podName string) *submarinerv1.GlobalIngressIP {
+	ingressIP := getGlobalIngressIP(t, podName, func(gip *submarinerv1.GlobalIngressIP, name string) bool {
+		if gip.Spec.PodRef != nil && gip.Spec.PodRef.Name == name {
+			return true
+		}
+		return false
+	})
+
+	Expect(ingressIP.Spec.Target).To(Equal(submarinerv1.HeadlessServicePod))
+	Expect(ingressIP.Spec.ServiceRef).ToNot(BeNil())
+	Expect(ingressIP.Spec.ServiceRef.Name).To(Equal(svcName))
+
+	return ingressIP
+}
+
+func (t *testDriverBase) awaitHeadlessGlobalIngressIPForEP(svcName, endpointsName string) *submarinerv1.GlobalIngressIP {
+	// Intentionally comparing ServiceRef.Name and endpointsName (they should be the same)
+	ingressIP := getGlobalIngressIP(t, endpointsName, func(gip *submarinerv1.GlobalIngressIP, name string) bool {
+		if gip.Spec.ServiceRef != nil && gip.Spec.ServiceRef.Name == name {
+			return true
+		}
+		return false
+	})
+
+	Expect(ingressIP.Spec.Target).To(Equal(submarinerv1.HeadlessServiceEndpoints))
+	Expect(ingressIP.Spec.ServiceRef).ToNot(BeNil())
+	Expect(ingressIP.Spec.ServiceRef.Name).To(Equal(svcName))
+
+	return ingressIP
+}
+
+func getGlobalIngressIP(t *testDriverBase, name string,
+	compFunc func(*submarinerv1.GlobalIngressIP, string) bool,
+) *submarinerv1.GlobalIngressIP {
 	var ingressIP *submarinerv1.GlobalIngressIP
 
 	Eventually(func() bool {
@@ -435,7 +468,7 @@ func (t *testDriverBase) awaitHeadlessGlobalIngressIP(svcName, podName string) *
 			gip := &submarinerv1.GlobalIngressIP{}
 			Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(list.Items[i].Object, gip)).To(Succeed())
 
-			if gip.Spec.PodRef != nil && gip.Spec.PodRef.Name == podName {
+			if compFunc(gip, name) {
 				ingressIP = gip
 				return true
 			}
@@ -443,10 +476,6 @@ func (t *testDriverBase) awaitHeadlessGlobalIngressIP(svcName, podName string) *
 
 		return false
 	}, 5).Should(BeTrue(), "GlobalIngressIP not found")
-
-	Expect(ingressIP.Spec.Target).To(Equal(submarinerv1.HeadlessServicePod))
-	Expect(ingressIP.Spec.ServiceRef).ToNot(BeNil())
-	Expect(ingressIP.Spec.ServiceRef.Name).To(Equal(svcName))
 
 	return ingressIP
 }
@@ -635,11 +664,45 @@ func newHeadlessServicePod(svcName string) *corev1.Pod {
 	}
 }
 
+func newHeadlessServiceEndpoints(svcName string) *corev1.Endpoints {
+	return &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      svcName,
+			Namespace: namespace,
+		},
+		Subsets: []corev1.EndpointSubset{
+			{
+				Addresses: []corev1.EndpointAddress{
+					{IP: "172.45.5.6"},
+				},
+				Ports: []corev1.EndpointPort{
+					{
+						Name:     "http",
+						Port:     int32(80),
+						Protocol: corev1.ProtocolTCP,
+					},
+				},
+			},
+		},
+	}
+}
+
 func newServiceWithoutSelector() *corev1.Service {
 	return toServiceWithoutSelector(newClusterIPService())
 }
 
 func toServiceWithoutSelector(s *corev1.Service) *corev1.Service {
+	s.Spec.Selector = map[string]string{}
+
+	return s
+}
+
+func newHeadlessServiceWithoutSelector() *corev1.Service {
+	return toHeadlessServiceWithoutSelector(newClusterIPService())
+}
+
+func toHeadlessServiceWithoutSelector(s *corev1.Service) *corev1.Service {
+	s.Spec.ClusterIP = corev1.ClusterIPNone
 	s.Spec.Selector = map[string]string{}
 
 	return s

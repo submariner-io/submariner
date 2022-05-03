@@ -44,6 +44,9 @@ const (
 	// This is an internal annotation used between ingress pod controller and global-ingress controller.
 	headlessSvcPodIP = "submariner.io/headless-svc-pod-ip"
 
+	// This is an internal annotation used between ingress endpoints controller and global-ingress controller.
+	headlessSvcEndpointsIP = "submariner.io/headless-svc-endpoints-ip"
+
 	ServiceRefLabel = "submariner.io/serviceRef"
 
 	// InternalServicePrefix is a prefix used for internal services.
@@ -135,12 +138,13 @@ type globalIngressIPController struct {
 
 type serviceExportController struct {
 	*baseSyncerController
-	services             dynamic.NamespaceableResourceInterface
-	ingressIPs           dynamic.ResourceInterface
-	iptIface             iptiface.Interface
-	podControllers       *IngressPodControllers
-	endpointsControllers *ServiceExportEndpointsControllers
-	scheme               *runtime.Scheme
+	services                    dynamic.NamespaceableResourceInterface
+	ingressIPs                  dynamic.ResourceInterface
+	iptIface                    iptiface.Interface
+	podControllers              *IngressPodControllers
+	endpointsControllers        *ServiceExportEndpointsControllers
+	ingressEndpointsControllers *IngressEndpointsControllers
+	scheme                      *runtime.Scheme
 }
 
 type serviceController struct {
@@ -180,4 +184,19 @@ type ServiceExportEndpointsControllers struct {
 	mutex       sync.Mutex
 	controllers map[string]*endpointsController
 	config      syncer.ResourceSyncerConfig
+}
+
+type ingressEndpointsController struct {
+	*baseSyncerController
+	svcName    string
+	namespace  string
+	config     syncer.ResourceSyncerConfig
+	ingressIPs dynamic.NamespaceableResourceInterface
+}
+
+type IngressEndpointsControllers struct {
+	mutex       sync.Mutex
+	controllers map[string]*ingressEndpointsController
+	config      syncer.ResourceSyncerConfig
+	ingressIPs  dynamic.NamespaceableResourceInterface
 }

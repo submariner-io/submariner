@@ -56,6 +56,7 @@ func UninstallDataPath() {
 		// The chains have to be deleted in a specific order.
 		constants.SmGlobalnetEgressChainForCluster,
 		constants.SmGlobalnetEgressChainForHeadlessSvcPods,
+		constants.SmGlobalnetEgressChainForHeadlessSvcEPs,
 		constants.SmGlobalnetEgressChainForNamespace,
 		constants.SmGlobalnetEgressChainForPods,
 		constants.SmGlobalnetIngressChain,

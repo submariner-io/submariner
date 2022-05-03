@@ -36,6 +36,7 @@ import (
 
 func NewServiceExportController(config *syncer.ResourceSyncerConfig, podControllers *IngressPodControllers,
 	endpointsControllers *ServiceExportEndpointsControllers,
+	ingressEndpointsControllers *IngressEndpointsControllers,
 ) (Interface, error) {
 	// We'll panic if config is nil, this is intentional
 	var err error
@@ -48,11 +49,12 @@ func NewServiceExportController(config *syncer.ResourceSyncerConfig, podControll
 	}
 
 	controller := &serviceExportController{
-		baseSyncerController: newBaseSyncerController(),
-		services:             config.SourceClient.Resource(*gvr),
-		podControllers:       podControllers,
-		endpointsControllers: endpointsControllers,
-		scheme:               config.Scheme,
+		baseSyncerController:        newBaseSyncerController(),
+		services:                    config.SourceClient.Resource(*gvr),
+		podControllers:              podControllers,
+		endpointsControllers:        endpointsControllers,
+		ingressEndpointsControllers: ingressEndpointsControllers,
+		scheme:                      config.Scheme,
 	}
 
 	controller.resourceSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
@@ -91,6 +93,7 @@ func (c *serviceExportController) Stop() {
 	c.baseController.Stop()
 	c.podControllers.stopAll()
 	c.endpointsControllers.stopAll()
+	c.ingressEndpointsControllers.stopAll()
 }
 
 func (c *serviceExportController) Start() error {
@@ -99,19 +102,20 @@ func (c *serviceExportController) Start() error {
 		return err
 	}
 
-	c.reconcile(c.ingressIPs, "", func(obj *unstructured.Unstructured) runtime.Object {
-		name, exists, _ := unstructured.NestedString(obj.Object, "spec", "serviceRef", "name")
-		if exists {
-			return &mcsv1a1.ServiceExport{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      name,
-					Namespace: obj.GetNamespace(),
-				},
+	c.reconcile(c.ingressIPs, "" /* labelSelector */, "", /* fieldSelector */
+		func(obj *unstructured.Unstructured) runtime.Object {
+			name, exists, _ := unstructured.NestedString(obj.Object, "spec", "serviceRef", "name")
+			if exists {
+				return &mcsv1a1.ServiceExport{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      name,
+						Namespace: obj.GetNamespace(),
+					},
+				}
 			}
-		}
 
-		return nil
-	})
+			return nil
+		})
 
 	return nil
 }
@@ -147,8 +151,8 @@ func (c *serviceExportController) onCreate(serviceExport *mcsv1a1.ServiceExport)
 
 	klog.Infof("Processing ServiceExport %q", key)
 
-	if len(service.Spec.Selector) == 0 {
-		// Service without selector
+	if len(service.Spec.Selector) == 0 && service.Spec.ClusterIP != corev1.ClusterIPNone {
+		// Service without selector and not headless service
 		err = c.endpointsControllers.start(serviceExport)
 		if err != nil {
 			klog.Errorf("Failed to create endpoints controller for serviceExport %q", key)
@@ -157,6 +161,10 @@ func (c *serviceExportController) onCreate(serviceExport *mcsv1a1.ServiceExport)
 	}
 
 	if service.Spec.ClusterIP == corev1.ClusterIPNone {
+		if len(service.Spec.Selector) == 0 {
+			// Headless service without selector
+			return c.onCreateHeadlessWithoutSelector(key, service)
+		}
 		// Headless service
 		return c.onCreateHeadless(key, service)
 	}
@@ -185,6 +193,7 @@ func (c *serviceExportController) onDelete(serviceExport *mcsv1a1.ServiceExport)
 
 	c.podControllers.stopAndCleanup(serviceExport.Name, serviceExport.Namespace)
 	c.endpointsControllers.stopAndCleanup(serviceExport.Name, serviceExport.Namespace)
+	c.ingressEndpointsControllers.stopAndCleanup(serviceExport.Name, serviceExport.Namespace)
 
 	return &submarinerv1.GlobalIngressIP{
 		ObjectMeta: metav1.ObjectMeta{
@@ -198,6 +207,16 @@ func (c *serviceExportController) onCreateHeadless(key string, service *corev1.S
 	err := c.podControllers.start(service)
 	if err != nil {
 		klog.Errorf("Failed to create pod controller for service %q", key)
+		return nil, true
+	}
+
+	return nil, false
+}
+
+func (c *serviceExportController) onCreateHeadlessWithoutSelector(key string, service *corev1.Service) (runtime.Object, bool) {
+	err := c.ingressEndpointsControllers.start(service)
+	if err != nil {
+		klog.Errorf("Failed to create endpoints controller for service %q", key)
 		return nil, true
 	}
 

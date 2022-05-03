@@ -1,4 +1,17 @@
+ARG BASE_BRANCH
+ARG SOURCE=/go/src/github.com/submariner-io/submariner
+ARG TARGETPLATFORM=linux/amd64
+
+FROM quay.io/submariner/shipyard-dapper-base:${BASE_BRANCH} AS builder
+ARG SOURCE
+ARG TARGETPLATFORM
+
+COPY . ${SOURCE}
+
+RUN make -C ${SOURCE} LOCAL_BUILD=1 bin/${TARGETPLATFORM}/submariner-gateway
+
 FROM fedora:34
+ARG SOURCE
 ARG TARGETPLATFORM
 
 WORKDIR /var/submariner
@@ -10,6 +23,6 @@ RUN dnf -y install --nodocs --setopt=install_weak_deps=0 \
            iproute libreswan kmod && \
     dnf -y clean all
 
-COPY package/submariner.sh package/pluto bin/${TARGETPLATFORM}/submariner-gateway /usr/local/bin/
+COPY --from=builder ${SOURCE}/package/submariner.sh ${SOURCE}/package/pluto ${SOURCE}/bin/${TARGETPLATFORM}/submariner-gateway /usr/local/bin/
 
 ENTRYPOINT submariner.sh

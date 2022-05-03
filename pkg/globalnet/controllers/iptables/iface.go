@@ -35,13 +35,13 @@ import (
 type Interface interface {
 	AddClusterEgressRules(sourceIP, snatIP, globalNetIPTableMark string) error
 	RemoveClusterEgressRules(sourceIP, snatIP, globalNetIPTableMark string) error
-	AddIngressRulesForHeadlessSvcPod(globalIP, podIP string) error
-	RemoveIngressRulesForHeadlessSvcPod(globalIP, podIP string) error
+	AddIngressRulesForHeadlessSvc(globalIP, podIP string, targetType TargetType) error
+	RemoveIngressRulesForHeadlessSvc(globalIP, podIP string, targetType TargetType) error
 	GetKubeProxyClusterIPServiceChainName(service *corev1.Service, kubeProxyServiceChainPrefix string) (string, bool, error)
 	AddIngressRulesForHealthCheck(cniIfaceIP, globalIP string) error
 	RemoveIngressRulesForHealthCheck(cniIfaceIP, globalIP string) error
-	AddEgressRulesForHeadlessSVCPods(key, sourceIP, snatIP, globalNetIPTableMark string) error
-	RemoveEgressRulesForHeadlessSVCPods(key, sourceIP, snatIP, globalNetIPTableMark string) error
+	AddEgressRulesForHeadlessSvc(key, sourceIP, snatIP, globalNetIPTableMark string, targetType TargetType) error
+	RemoveEgressRulesForHeadlessSvc(key, sourceIP, snatIP, globalNetIPTableMark string, targetType TargetType) error
 	AddEgressRulesForPods(namespace, ipSetName, snatIP, globalNetIPTableMark string) error
 	RemoveEgressRulesForPods(namespace, ipSetName, snatIP, globalNetIPTableMark string) error
 	AddEgressRulesForNamespace(namespace, ipSetName, snatIP, globalNetIPTableMark string) error
@@ -54,6 +54,13 @@ type Interface interface {
 type ipTables struct {
 	ipt iptables.Interface
 }
+
+type TargetType string
+
+const (
+	PodTarget       TargetType = "Pod"
+	EndpointsTarget TargetType = "Endpoints"
+)
 
 func New() (Interface, error) {
 	iptableHandler, err := iptables.New()
@@ -105,13 +112,13 @@ func (i *ipTables) ipTableChainExists(table, chain string) (bool, error) {
 	return false, nil
 }
 
-func (i *ipTables) AddIngressRulesForHeadlessSvcPod(globalIP, podIP string) error {
-	if globalIP == "" || podIP == "" {
-		return fmt.Errorf("globalIP %q or podIP %q cannot be empty", globalIP, podIP)
+func (i *ipTables) AddIngressRulesForHeadlessSvc(globalIP, ip string, targetType TargetType) error {
+	if globalIP == "" || ip == "" {
+		return fmt.Errorf("globalIP %q or %s IP %q cannot be empty", globalIP, targetType, ip)
 	}
 
-	ruleSpec := []string{"-d", globalIP, "-j", "DNAT", "--to", podIP}
-	klog.V(log.DEBUG).Infof("Installing iptables rule for Headless SVC Pod %s", strings.Join(ruleSpec, " "))
+	ruleSpec := []string{"-d", globalIP, "-j", "DNAT", "--to", ip}
+	klog.V(log.DEBUG).Infof("Installing iptables rule for Headless SVC %s for %s", strings.Join(ruleSpec, " "), targetType)
 
 	if err := i.ipt.AppendUnique("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
 		return errors.Wrapf(err, "error appending iptables rule \"%s\"", strings.Join(ruleSpec, " "))
@@ -120,14 +127,14 @@ func (i *ipTables) AddIngressRulesForHeadlessSvcPod(globalIP, podIP string) erro
 	return nil
 }
 
-func (i *ipTables) RemoveIngressRulesForHeadlessSvcPod(globalIP, podIP string) error {
-	if globalIP == "" || podIP == "" {
-		return fmt.Errorf("globalIP %q or podIP %q cannot be empty", globalIP, podIP)
+func (i *ipTables) RemoveIngressRulesForHeadlessSvc(globalIP, ip string, targetType TargetType) error {
+	if globalIP == "" || ip == "" {
+		return fmt.Errorf("globalIP %q or %s IP %q cannot be empty", globalIP, targetType, ip)
 	}
 
-	ruleSpec := []string{"-d", globalIP, "-j", "DNAT", "--to", podIP}
+	ruleSpec := []string{"-d", globalIP, "-j", "DNAT", "--to", ip}
 
-	klog.V(log.DEBUG).Infof("Deleting iptables rule for Headless SVC Pod %s", strings.Join(ruleSpec, " "))
+	klog.V(log.DEBUG).Infof("Deleting iptables rule for Headless SVC %s for %s", strings.Join(ruleSpec, " "), targetType)
 
 	if err := i.ipt.Delete("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
 		return errors.Wrapf(err, "error deleting iptables rule \"%s\"", strings.Join(ruleSpec, " "))
@@ -192,22 +199,38 @@ func (i *ipTables) RemoveIngressRulesForHealthCheck(cniIfaceIP, globalIP string)
 	return nil
 }
 
-func (i *ipTables) AddEgressRulesForHeadlessSVCPods(key, sourceIP, snatIP, globalNetIPTableMark string) error {
+func (i *ipTables) AddEgressRulesForHeadlessSvc(key, sourceIP, snatIP, globalNetIPTableMark string, targetType TargetType) error {
 	ruleSpec := []string{"-p", "all", "-s", sourceIP, "-m", "mark", "--mark", globalNetIPTableMark, "-j", "SNAT", "--to", snatIP}
-	klog.V(log.DEBUG).Infof("Installing iptable egress rules for HDLS SVC Pod %q: %s", key, strings.Join(ruleSpec, " "))
+	klog.V(log.DEBUG).Infof("Installing iptable egress rules for HDLS SVC %q for %s: %s", key, targetType, strings.Join(ruleSpec, " "))
 
-	if err := i.ipt.AppendUnique("nat", constants.SmGlobalnetEgressChainForHeadlessSvcPods, ruleSpec...); err != nil {
+	var chain string
+
+	if targetType == PodTarget {
+		chain = constants.SmGlobalnetEgressChainForHeadlessSvcPods
+	} else if targetType == EndpointsTarget {
+		chain = constants.SmGlobalnetEgressChainForHeadlessSvcEPs
+	}
+
+	if err := i.ipt.AppendUnique("nat", chain, ruleSpec...); err != nil {
 		return errors.Wrapf(err, "error appending iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
 }
 
-func (i *ipTables) RemoveEgressRulesForHeadlessSVCPods(key, sourceIP, snatIP, globalNetIPTableMark string) error {
+func (i *ipTables) RemoveEgressRulesForHeadlessSvc(key, sourceIP, snatIP, globalNetIPTableMark string, targetType TargetType) error {
 	ruleSpec := []string{"-p", "all", "-s", sourceIP, "-m", "mark", "--mark", globalNetIPTableMark, "-j", "SNAT", "--to", snatIP}
-	klog.V(log.DEBUG).Infof("Deleting iptable egress rules for HDLS SVC Pod %q: %s", key, strings.Join(ruleSpec, " "))
+	klog.V(log.DEBUG).Infof("Deleting iptable egress rules for HDLS SVC %q for %s: %s", key, targetType, strings.Join(ruleSpec, " "))
 
-	if err := i.ipt.Delete("nat", constants.SmGlobalnetEgressChainForHeadlessSvcPods, ruleSpec...); err != nil {
+	var chain string
+
+	if targetType == PodTarget {
+		chain = constants.SmGlobalnetEgressChainForHeadlessSvcPods
+	} else if targetType == EndpointsTarget {
+		chain = constants.SmGlobalnetEgressChainForHeadlessSvcEPs
+	}
+
+	if err := i.ipt.Delete("nat", chain, ruleSpec...); err != nil {
 		return errors.Wrapf(err, "error deleting iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 

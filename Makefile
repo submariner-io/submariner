@@ -27,8 +27,6 @@ else
 SETTINGS ?= $(DAPPER_SOURCE)/.shipyard.e2e.yml
 endif
 
-images: build
-
 include $(SHIPYARD_DIR)/Makefile.inc
 
 TARGETS := $(shell ls -p scripts | grep -v -e /)
@@ -63,6 +61,8 @@ dockertogoarch = $(patsubst arm/v7,arm,$(1))
 # Targets to make
 
 deploy: images
+
+e2e: vendor/modules.txt
 
 golangci-lint: pkg/natdiscovery/proto/natdiscovery.pb.go
 
