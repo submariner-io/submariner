@@ -78,6 +78,33 @@ var _ = Describe("GlobalIngressIP controller", func() {
 		t.awaitNoPodIngressRules(podIP, ip)
 	}
 
+	endpointsIP := "10.4.5.6"
+
+	headlessServiceWithoutSelectorIngress := &submarinerv1.GlobalIngressIP{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: globalIngressIPName,
+			Annotations: map[string]string{
+				"submariner.io/headless-svc-endpoints-ip": endpointsIP,
+			},
+		},
+		Spec: submarinerv1.GlobalIngressIPSpec{
+			Target: submarinerv1.HeadlessServiceEndpoints,
+			ServiceRef: &corev1.LocalObjectReference{
+				Name: "db-service",
+			},
+		},
+	}
+
+	awaitHeadlessServiceEndpointsRules := func(ip string) {
+		t.awaitEndpointsEgressRules(endpointsIP, ip)
+		t.awaitEndpointsIngressRules(endpointsIP, ip)
+	}
+
+	awaitNoHeadlessServiceEndpointsRules := func(ip string) {
+		t.awaitNoEndpointsEgressRules(endpointsIP, ip)
+		t.awaitNoEndpointsIngressRules(endpointsIP, ip)
+	}
+
 	When("a GlobalIngressIP for a cluster IP Service is created", func() {
 		testGlobalIngressIPCreatedClusterIPSvc(t, clusterIPServiceIngress)
 	})
@@ -92,6 +119,11 @@ var _ = Describe("GlobalIngressIP controller", func() {
 
 	When("a GlobalIngressIP for a headless Service exists on startup", func() {
 		testExistingGlobalIngressIPHeadlessSvc(t, headlessServiceIngress, awaitHeadlessServicePodRules)
+	})
+
+	When("a GlobalIngressIP for a headless Service without selector is created", func() {
+		testGlobalIngressIPCreatedHeadlessSvc(t, headlessServiceWithoutSelectorIngress, awaitHeadlessServiceEndpointsRules,
+			awaitNoHeadlessServiceEndpointsRules, endpointsIP)
 	})
 })
 
@@ -489,4 +521,20 @@ func (t *globalIngressIPControllerTestDriver) awaitPodIngressRules(podIP, snatIP
 
 func (t *globalIngressIPControllerTestDriver) awaitNoPodIngressRules(podIP, snatIP string) {
 	t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, Or(ContainSubstring(podIP), ContainSubstring(snatIP)))
+}
+
+func (t *globalIngressIPControllerTestDriver) awaitEndpointsEgressRules(endpointsIP, snatIP string) {
+	t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChainForHeadlessSvcEPs, And(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
+}
+
+func (t *globalIngressIPControllerTestDriver) awaitNoEndpointsEgressRules(endpointsIP, snatIP string) {
+	t.ipt.AwaitNoRule("nat", constants.SmGlobalnetEgressChainForHeadlessSvcEPs, Or(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
+}
+
+func (t *globalIngressIPControllerTestDriver) awaitEndpointsIngressRules(endpointsIP, snatIP string) {
+	t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain, And(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
+}
+
+func (t *globalIngressIPControllerTestDriver) awaitNoEndpointsIngressRules(endpointsIP, snatIP string) {
+	t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, Or(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
 }

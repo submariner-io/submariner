@@ -1,4 +1,17 @@
-FROM fedora:34 
+ARG BASE_BRANCH
+ARG SOURCE=/go/src/github.com/submariner-io/submariner
+ARG TARGETPLATFORM=linux/amd64
+
+FROM quay.io/submariner/shipyard-dapper-base:${BASE_BRANCH} AS builder
+ARG SOURCE
+ARG TARGETPLATFORM
+
+COPY . ${SOURCE}
+
+RUN make -C ${SOURCE} LOCAL_BUILD=1 bin/${TARGETPLATFORM}/submariner-networkplugin-syncer
+
+FROM fedora:34
+ARG SOURCE
 ARG TARGETPLATFORM
 
 WORKDIR /var/submariner
@@ -8,7 +21,7 @@ RUN dnf -y install --nodocs --setopt=install_weak_deps=0 \
     dnf -y clean all
 
 # install the networkpluginc-sync
-COPY package/submariner-networkplugin-syncer.sh bin/${TARGETPLATFORM}/submariner-networkplugin-syncer /usr/local/bin/
+COPY --from=builder ${SOURCE}/package/submariner-networkplugin-syncer.sh ${SOURCE}/bin/${TARGETPLATFORM}/submariner-networkplugin-syncer /usr/local/bin/
 
 ENTRYPOINT ["/usr/local/bin/submariner-networkplugin-syncer.sh"]
 
