@@ -49,7 +49,7 @@ func NewServiceController(config *syncer.ResourceSyncerConfig, podControllers *I
 		SourceClient:    config.SourceClient,
 		SourceNamespace: corev1.NamespaceAll,
 		RestMapper:      config.RestMapper,
-		Federator:       federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll),
+		Federator:       federate.NewUpdateStatusFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll),
 		Scheme:          config.Scheme,
 		Transform:       controller.process,
 	})

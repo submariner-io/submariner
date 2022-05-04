@@ -53,7 +53,11 @@ func NewNodeController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool, n
 		nodeName:                   nodeName,
 	}
 
-	federator := federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
+	federator := federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll,
+		func(oldObj *unstructured.Unstructured, newObj *unstructured.Unstructured) *unstructured.Unstructured {
+			return updateNodeAnnotation(oldObj, newObj.GetAnnotations()[constants.SmGlobalIP]).(*unstructured.Unstructured)
+		})
+
 	controller.resourceSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
 		Name:                "Node syncer",
 		ResourceType:        &corev1.Node{},
@@ -102,7 +106,7 @@ func (n *nodeController) process(from runtime.Object, numRequeues int, op syncer
 
 			_ = n.pool.Release(existingGlobalIP)
 
-			return n.updateNodeAnnotation(node, ""), false
+			return updateNodeAnnotation(node, ""), false
 		}
 
 		return nil, false
@@ -150,7 +154,7 @@ func (n *nodeController) allocateIP(node *corev1.Node, op syncer.Operation) (run
 		return nil, true
 	}
 
-	return n.updateNodeAnnotation(node, globalIP), false
+	return updateNodeAnnotation(node, globalIP), false
 }
 
 func (n *nodeController) reserveAllocatedIP(federator federate.Federator, obj *unstructured.Unstructured) error {
@@ -180,13 +184,13 @@ func (n *nodeController) reserveAllocatedIP(federator federate.Federator, obj *u
 	if err != nil {
 		klog.Warningf("Could not reserve allocated GlobalIP for Node %q: %v", obj.GetName(), err)
 
-		return errors.Wrap(federator.Distribute(n.updateNodeAnnotation(obj, "")), "error updating the Node global IP annotation")
+		return errors.Wrap(federator.Distribute(updateNodeAnnotation(obj, "")), "error updating the Node global IP annotation")
 	}
 
 	return nil
 }
 
-func (n *nodeController) updateNodeAnnotation(node runtime.Object, globalIP string) runtime.Object {
+func updateNodeAnnotation(node runtime.Object, globalIP string) runtime.Object {
 	objMeta, _ := meta.Accessor(node)
 
 	annotations := objMeta.GetAnnotations()

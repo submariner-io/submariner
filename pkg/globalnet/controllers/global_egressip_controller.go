@@ -78,7 +78,7 @@ func NewGlobalEgressIPController(config *syncer.ResourceSyncerConfig, pool *ipam
 		return nil, errors.Wrap(err, "error listing the resources")
 	}
 
-	federator := federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
+	federator := federate.NewUpdateStatusFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
 
 	for i := range list.Items {
 		err = controller.reserveAllocatedIPs(federator, &list.Items[i], func(reservedIPs []string) error {
