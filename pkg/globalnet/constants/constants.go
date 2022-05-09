@@ -29,6 +29,7 @@ const (
 	// The following chains are added as part of GN 2.0 implementation.
 	SmGlobalnetEgressChainForPods            = "SM-GN-EGRESS-PODS"
 	SmGlobalnetEgressChainForHeadlessSvcPods = "SM-GN-EGRESS-HDLS-PODS"
+	SmGlobalnetEgressChainForHeadlessSvcEPs  = "SM-GN-EGRESS-HDLS-EPS"
 	SmGlobalnetEgressChainForNamespace       = "SM-GN-EGRESS-NS"
 	SmGlobalnetEgressChainForCluster         = "SM-GN-EGRESS-CLUSTER"
 

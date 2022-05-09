@@ -80,7 +80,7 @@ func startIngressPodController(svc *corev1.Service, config *syncer.ResourceSynce
 
 	ingressIPSelector := labels.Set(selector).AsSelector().String()
 	ingressIPs := config.SourceClient.Resource(*gvr).Namespace(corev1.NamespaceAll)
-	controller.reconcile(ingressIPs, ingressIPSelector, func(obj *unstructured.Unstructured) runtime.Object {
+	controller.reconcile(ingressIPs, ingressIPSelector, "" /* fieldSelector*/, func(obj *unstructured.Unstructured) runtime.Object {
 		podName, exists, _ := unstructured.NestedString(obj.Object, "spec", "podRef", "name")
 		if exists {
 			return &corev1.Pod{
