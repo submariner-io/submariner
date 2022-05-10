@@ -36,6 +36,7 @@ type Interface interface {
 	List(table, chain string) ([]string, error)
 	ListChains(table string) ([]string, error)
 	NewChain(table, chain string) error
+	ChainExists(table, chain string) (bool, error)
 	ClearChain(table, chain string) error
 	DeleteChain(table, chain string) error
 }
@@ -73,16 +74,13 @@ func (i *iptablesWrapper) Delete(table, chain string, rulespec ...string) error 
 }
 
 func CreateChainIfNotExists(ipt Interface, table, chain string) error {
-	existingChains, err := ipt.ListChains(table)
-	if err != nil {
-		return errors.Wrap(err, "error listing IP table chains")
+	exists, err := ipt.ChainExists(table, chain)
+	if err == nil && exists {
+		return nil
 	}
 
-	for _, val := range existingChains {
-		if val == chain {
-			// Chain already exists
-			return nil
-		}
+	if err != nil {
+		return errors.Wrapf(err, "error finding IP table chain %q in table %q", chain, table)
 	}
 
 	return errors.Wrap(ipt.NewChain(table, chain), "error creating IP table chain")

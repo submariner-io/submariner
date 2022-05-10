@@ -69,6 +69,7 @@ func main() {
 		klog.Info("Uninstalling submariner-globalnet")
 		controllers.UninstallDataPath()
 		controllers.DeleteGlobalnetObjects(submarinerClient, cfg)
+		controllers.RemoveGlobalIPAnnotationOnNode(cfg)
 
 		return
 	}

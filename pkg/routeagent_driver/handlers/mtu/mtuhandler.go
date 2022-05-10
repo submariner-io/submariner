@@ -33,13 +33,16 @@ import (
 
 type mtuHandler struct {
 	event.HandlerBase
-	ipt         iptables.Interface
-	remoteIPSet ipset.Named
-	localIPSet  ipset.Named
+	localClusterCidr []string
+	ipt              iptables.Interface
+	remoteIPSet      ipset.Named
+	localIPSet       ipset.Named
 }
 
-func NewMTUHandler() event.Handler {
-	return &mtuHandler{}
+func NewMTUHandler(localClusterCidr []string) event.Handler {
+	return &mtuHandler{
+		localClusterCidr: localClusterCidr,
+	}
 }
 
 func (h *mtuHandler) GetNetworkPlugins() []string {
@@ -113,12 +116,26 @@ func (h *mtuHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 		}
 	}
 
+	for _, subnet := range h.localClusterCidr {
+		err := h.localIPSet.AddEntry(subnet, true)
+		if err != nil {
+			return errors.Wrap(err, "error adding localClusterCidr IP set entry")
+		}
+	}
+
 	return nil
 }
 
 func (h *mtuHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 	subnets := extractSubnets(&endpoint.Spec)
 	for _, subnet := range subnets {
+		err := h.localIPSet.DelEntry(subnet)
+		if err != nil {
+			klog.Errorf("Error deleting the subnet %q from the local IPSet: %v", subnet, err)
+		}
+	}
+
+	for _, subnet := range h.localClusterCidr {
 		err := h.localIPSet.DelEntry(subnet)
 		if err != nil {
 			klog.Errorf("Error deleting the subnet %q from the local IPSet: %v", subnet, err)
@@ -197,8 +214,16 @@ func (h *mtuHandler) Stop(uninstall bool) error {
 			constants.MangleTable, err)
 	}
 
+	if err := h.localIPSet.Flush(); err != nil {
+		klog.Errorf("Error flushing ipset %q: %v", constants.LocalCIDRIPSet, err)
+	}
+
 	if err := h.localIPSet.Destroy(); err != nil {
 		klog.Errorf("Error deleting ipset %q: %v", constants.LocalCIDRIPSet, err)
+	}
+
+	if err := h.remoteIPSet.Flush(); err != nil {
+		klog.Errorf("Error flushing ipset %q: %v", constants.RemoteCIDRIPSet, err)
 	}
 
 	if err := h.remoteIPSet.Destroy(); err != nil {

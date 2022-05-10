@@ -1,4 +1,17 @@
+ARG BASE_BRANCH
+ARG SOURCE=/go/src/github.com/submariner-io/submariner
+ARG TARGETPLATFORM=linux/amd64
+
+FROM quay.io/submariner/shipyard-dapper-base:${BASE_BRANCH} AS builder
+ARG SOURCE
+ARG TARGETPLATFORM
+
+COPY . ${SOURCE}
+
+RUN make -C ${SOURCE} LOCAL_BUILD=1 bin/${TARGETPLATFORM}/submariner-route-agent
+
 FROM fedora:34
+ARG SOURCE
 ARG TARGETPLATFORM
 
 WORKDIR /var/submariner
@@ -7,11 +20,11 @@ RUN dnf -y install --nodocs --setopt=install_weak_deps=0 \
            iproute iptables iptables-nft ipset openvswitch procps-ng && \
     dnf -y clean all
 
-COPY package/submariner-route-agent.sh bin/${TARGETPLATFORM}/submariner-route-agent /usr/local/bin/
+COPY --from=builder ${SOURCE}/package/submariner-route-agent.sh ${SOURCE}/bin/${TARGETPLATFORM}/submariner-route-agent /usr/local/bin/
 
 # Wrapper scripts to choose the appropriate iptables
 # https://github.com/kubernetes-sigs/iptables-wrappers
-COPY package/iptables-wrapper-installer.sh /usr/sbin/
+COPY --from=builder ${SOURCE}/package/iptables-wrapper-installer.sh /usr/sbin/
 RUN /usr/sbin/iptables-wrapper-installer.sh
 
 ENTRYPOINT submariner-route-agent.sh

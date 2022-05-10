@@ -49,7 +49,8 @@ func filterRouteSubnetsViaPort(subnetRouteObjs []*goovn.LogicalRouterStaticRoute
 }
 
 func (ovn *SyncHandler) addSubmRoutesToSubnets(toAdd []string, viaPort, nextHop string,
-	ovnCommands []*goovn.OvnCommand) ([]*goovn.OvnCommand, error) {
+	ovnCommands []*goovn.OvnCommand,
+) ([]*goovn.OvnCommand, error) {
 	for _, subnet := range toAdd {
 		addCmd, err := ovn.nbdb.LRSRAdd(submarinerLogicalRouter, subnet, nextHop, &viaPort, nil, nil)
 		if err != nil {

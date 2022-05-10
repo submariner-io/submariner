@@ -303,27 +303,3 @@ func (kp *SyncHandler) updateRoutingRulesForInterClusterSupport(remoteCIDRs []st
 
 	return nil
 }
-
-func (kp *SyncHandler) configureIPRule(operation Operation) error {
-	if kp.cniIface != nil {
-		rule := netlink.NewRule()
-		rule.Table = constants.RouteAgentHostNetworkTableID
-		rule.Priority = constants.RouteAgentHostNetworkTableID
-
-		switch operation {
-		case Add:
-			err := kp.netLink.RuleAdd(rule)
-			if err != nil && !os.IsExist(err) {
-				return errors.Wrapf(err, "failed to add ip rule %s", rule)
-			}
-		case Delete:
-			err := kp.netLink.RuleDel(rule)
-			if err != nil && !os.IsNotExist(err) {
-				return errors.Wrapf(err, "failed to delete ip rule %s", rule)
-			}
-		case Flush:
-		}
-	}
-
-	return nil
-}

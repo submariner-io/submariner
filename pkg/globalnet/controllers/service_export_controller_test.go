@@ -38,6 +38,7 @@ var _ = Describe("ServiceExport controller", func() {
 	Describe("Cluster IP Service", testClusterIPService)
 	Describe("Headless Service", testHeadlessService)
 	Describe("Service without selector", testServiceWithoutSelector)
+	Describe("Headless Service without selector", testHeadlessServiceWithoutSelector)
 })
 
 func testClusterIPService() {
@@ -391,6 +392,37 @@ func testServiceWithoutSelector() {
 	})
 }
 
+func testHeadlessServiceWithoutSelector() {
+	t := newServiceExportControllerTestDriver()
+
+	var service *corev1.Service
+	var endpoints *corev1.Endpoints
+
+	BeforeEach(func() {
+		service = newHeadlessServiceWithoutSelector()
+		endpoints = newHeadlessServiceEndpoints(service.Name)
+		t.createServiceExport(t.createService(service))
+	})
+
+	When("an endpoint for an exported Service is created", func() {
+		BeforeEach(func() {
+			t.createEndpoints(endpoints)
+		})
+
+		It("should create an appropriate GlobalIngressIP", func() {
+			t.awaitHeadlessGlobalIngressIPForEP(service.Name, endpoints.Name)
+		})
+
+		Context("and then deleted", func() {
+			It("should delete the GlobalIngressIP", func() {
+				ingressIP := t.awaitHeadlessGlobalIngressIPForEP(service.Name, endpoints.Name)
+				t.deleteEndpoints(endpoints)
+				t.awaitNoGlobalIngressIP(ingressIP.Name)
+			})
+		})
+	})
+}
+
 type serviceExportControllerTestDriver struct {
 	*testDriverBase
 }
@@ -431,7 +463,10 @@ func (t *serviceExportControllerTestDriver) start() {
 	endpointsControllers, err := controllers.NewServiceExportEndpointsControllers(config)
 	Expect(err).To(Succeed())
 
-	t.controller, err = controllers.NewServiceExportController(config, podControllers, endpointsControllers)
+	ingressEndpointsControllers, err := controllers.NewIngressEndpointsControllers(config)
+	Expect(err).To(Succeed())
+
+	t.controller, err = controllers.NewServiceExportController(config, podControllers, endpointsControllers, ingressEndpointsControllers)
 
 	Expect(err).To(Succeed())
 	Expect(t.controller.Start()).To(Succeed())

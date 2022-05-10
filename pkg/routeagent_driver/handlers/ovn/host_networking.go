@@ -94,7 +94,8 @@ func (ovn *Handler) getExistingIPv4HostNetworkRoutes() (stringset.Interface, err
 }
 
 func (ovn *Handler) programRulesForRemoteSubnets(subnets []string, ruleFunc func(rule *netlink.Rule) error,
-	ignoredErrorFunc func(error) bool) error {
+	ignoredErrorFunc func(error) bool,
+) error {
 	for _, remoteSubnet := range subnets {
 		rule, err := ovn.programRule(remoteSubnet, "", constants.RouteAgentHostNetworkTableID)
 		if err != nil {
