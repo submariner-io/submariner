@@ -116,6 +116,7 @@ func newTestDriver() *testDriver {
 
 		t.syncerScheme = runtime.NewScheme()
 		Expect(submarinerv1.AddToScheme(t.syncerScheme)).To(Succeed())
+		Expect(corev1.AddToScheme(t.syncerScheme)).To(Succeed())
 
 		t.localClient = fake.NewDynamicClient(t.syncerScheme)
 		t.brokerClient = fake.NewDynamicClient(t.syncerScheme)
