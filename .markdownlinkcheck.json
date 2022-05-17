@@ -1,6 +1,9 @@
 {
   "ignorePatterns": [
     {
+      "pattern": "^https://docs.github.com"
+    },
+    {
       "pattern": "^https://github.com/\\S+/\\S+/(issues|pull)/[0-9]+"
     },
     {
