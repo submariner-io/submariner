@@ -220,6 +220,6 @@ func (i *IPTables) AddFailOnDeleteRuleMatcher(stringOrMatcher interface{}) {
 }
 
 func (i *IPTables) DeleteChain(table, chain string) error {
-	// TODO
+	// TODO Implement chain deletion for testing
 	return nil
 }
