@@ -26,7 +26,7 @@ jobs:
             cable_driver: 'wireguard'
     steps:
       - name: Check out the repository
-        uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7042f
+        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
 
       - name: Run E2E deployment and tests
         uses: submariner-io/shipyard/gh-actions/e2e@release-0.12
@@ -50,7 +50,7 @@ jobs:
         globalnet: ['', 'globalnet']
     steps:
       - name: Check out the repository
-        uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7042f
+        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
 
       - name: Run E2E deployment and tests
         uses: submariner-io/shipyard/gh-actions/e2e@release-0.12
