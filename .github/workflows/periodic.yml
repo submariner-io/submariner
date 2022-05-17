@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7042f
 
       - name: Run markdown-link-check
-        uses: gaurav-nelson/github-action-markdown-link-check@9710f0fec812ce0a3b98bef4c9d842fc1f39d976
+        uses: gaurav-nelson/github-action-markdown-link-check@58f84fd654812d0d8da4e4d4a559eda087daf8ce
         with:
           config-file: ".markdownlinkcheck.json"
 
