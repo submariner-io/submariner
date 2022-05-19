@@ -24,4 +24,5 @@ type Specification struct {
 	ClusterCidr []string
 	ServiceCidr []string
 	Uninstall   bool
+	GlobalCidr  []string
 }

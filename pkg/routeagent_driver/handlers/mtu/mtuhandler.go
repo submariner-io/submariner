@@ -19,16 +19,32 @@ limitations under the License.
 package mtu
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cable/vxlan"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/ipset"
 	"github.com/submariner-io/submariner/pkg/iptables"
+	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"k8s.io/klog"
 	utilexec "k8s.io/utils/exec"
+)
+
+type forceMssSts int
+
+const (
+	notNeeded forceMssSts = iota
+	needed
+	configured
+)
+
+const (
+	// TCP MSS = Default_Iface_MTU - TCP_H(20)-IP_H(20)-max_IpsecOverhed(80).
+	maxIpsecOverhead = 120
 )
 
 type mtuHandler struct {
@@ -37,11 +53,18 @@ type mtuHandler struct {
 	ipt              iptables.Interface
 	remoteIPSet      ipset.Named
 	localIPSet       ipset.Named
+	forceMss         forceMssSts
 }
 
-func NewMTUHandler(localClusterCidr []string) event.Handler {
+func NewMTUHandler(localClusterCidr []string, isGlobalnet bool) event.Handler {
+	forceMss := notNeeded
+	if isGlobalnet {
+		forceMss = needed
+	}
+
 	return &mtuHandler{
 		localClusterCidr: localClusterCidr,
+		forceMss:         forceMss,
 	}
 }
 
@@ -79,6 +102,19 @@ func (h *mtuHandler) Init() error {
 		return errors.Wrapf(err, "error creating ipset %q", constants.LocalCIDRIPSet)
 	}
 
+	if err := iptables.PrependUnique(h.ipt, constants.MangleTable, constants.PostRoutingChain,
+		forwardToSubMarinerPostRoutingChain); err != nil {
+		return errors.Wrapf(err, "error inserting iptables rule %q",
+			strings.Join(forwardToSubMarinerPostRoutingChain, " "))
+	}
+
+	// iptable rules to clamp TCP MSS to a fixed value will be programmed when the local endpoint is created
+	if h.forceMss == needed {
+		return nil
+	}
+
+	klog.Info("Creating iptables clamp-mss-to-pmtu rules")
+
 	ruleSpecSource := []string{
 		"-m", "set", "--match-set", constants.LocalCIDRIPSet, "src", "-m", "set", "--match-set",
 		constants.RemoteCIDRIPSet, "dst", "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS",
@@ -88,12 +124,6 @@ func (h *mtuHandler) Init() error {
 		"-m", "set", "--match-set", constants.RemoteCIDRIPSet, "src", "-m", "set", "--match-set",
 		constants.LocalCIDRIPSet, "dst", "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS",
 		"--clamp-mss-to-pmtu",
-	}
-
-	if err := iptables.PrependUnique(h.ipt, constants.MangleTable, constants.PostRoutingChain,
-		forwardToSubMarinerPostRoutingChain); err != nil {
-		return errors.Wrapf(err, "error inserting iptables rule %q",
-			strings.Join(forwardToSubMarinerPostRoutingChain, " "))
 	}
 
 	if err := h.ipt.AppendUnique(constants.MangleTable, constants.SmPostRoutingChain, ruleSpecSource...); err != nil {
@@ -121,6 +151,17 @@ func (h *mtuHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 		if err != nil {
 			return errors.Wrap(err, "error adding localClusterCidr IP set entry")
 		}
+	}
+
+	if h.forceMss == needed {
+		klog.Info("Creating iptables set-mss rules")
+
+		err := h.forceMssClamping(endpoint)
+		if err != nil {
+			return errors.Wrap(err, "error forcing TCP MSS clamping")
+		}
+
+		h.forceMss = configured
 	}
 
 	return nil
@@ -228,6 +269,42 @@ func (h *mtuHandler) Stop(uninstall bool) error {
 
 	if err := h.remoteIPSet.Destroy(); err != nil {
 		klog.Errorf("Error deleting ipset %q: %v", constants.RemoteCIDRIPSet, err)
+	}
+
+	return nil
+}
+
+func (h *mtuHandler) forceMssClamping(endpoint *submV1.Endpoint) error {
+	defaultHostIface, err := netlinkAPI.GetDefaultGatewayInterface()
+	if err != nil {
+		return errors.Wrapf(err, "Unable to find the default interface on host")
+	}
+
+	overHeadSize := maxIpsecOverhead
+	if endpoint.Spec.Backend == vxlan.CableDriverName {
+		overHeadSize = vxlan.VxlanOverhead
+	}
+
+	klog.Infof("forceMssClamping to: IF_MTU(%d)-Overhead(%d)=%d",
+		defaultHostIface.MTU, overHeadSize, (defaultHostIface.MTU - overHeadSize))
+
+	ruleSpecSource := []string{
+		"-m", "set", "--match-set", constants.LocalCIDRIPSet, "src", "-m", "set", "--match-set",
+		constants.RemoteCIDRIPSet, "dst", "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS",
+		"--set-mss", strconv.Itoa(defaultHostIface.MTU - overHeadSize),
+	}
+	ruleSpecDest := []string{
+		"-m", "set", "--match-set", constants.RemoteCIDRIPSet, "src", "-m", "set", "--match-set",
+		constants.LocalCIDRIPSet, "dst", "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS",
+		"--set-mss", strconv.Itoa(defaultHostIface.MTU - overHeadSize),
+	}
+
+	if err := h.ipt.AppendUnique(constants.MangleTable, constants.SmPostRoutingChain, ruleSpecSource...); err != nil {
+		return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(ruleSpecSource, " "))
+	}
+
+	if err := h.ipt.AppendUnique(constants.MangleTable, constants.SmPostRoutingChain, ruleSpecDest...); err != nil {
+		return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(ruleSpecDest, " "))
 	}
 
 	return nil
