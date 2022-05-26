@@ -91,8 +91,11 @@ func getPublicIP(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.I
 func publicAPI(clientset kubernetes.Interface, namespace, value string) (string, error) {
 	url := "https://" + value
 
-	//nolint:gosec // we really need to get from a non-predefined const URL
-	response, err := http.Get(url)
+	httpClient := http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	response, err := httpClient.Get(url)
 	if err != nil {
 		return "", errors.Wrapf(err, "retrieving public IP from %s", url)
 	}

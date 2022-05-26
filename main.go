@@ -136,22 +136,7 @@ func main() {
 		LocalNamespace:  submSpec.Namespace,
 	}, localCluster, localEndpoint)
 
-	var cableHealthchecker healthchecker.Interface
-
-	if !submSpec.HealthCheckEnabled {
-		klog.Info("The CableEngine HealthChecker is disabled")
-	} else {
-		cableHealthchecker, err = healthchecker.New(&healthchecker.Config{
-			WatcherConfig:      &watcher.Config{RestConfig: cfg},
-			EndpointNamespace:  submSpec.Namespace,
-			ClusterID:          submSpec.ClusterID,
-			PingInterval:       submSpec.HealthCheckInterval,
-			MaxPacketLossCount: submSpec.HealthCheckMaxPacketLossCount,
-		})
-		if err != nil {
-			klog.Errorf("Error creating healthChecker: %v", err)
-		}
-	}
+	cableHealthchecker := getCableHealthChecker(cfg, &submSpec)
 
 	cableEngineSyncer := syncer.NewGatewaySyncer(
 		cableEngine,
@@ -180,6 +165,8 @@ func main() {
 
 	cableEngineSyncer.Run(stopCh)
 
+	publicIPWatcher := getPublicIPWatcher(&submSpec, k8sClient, submarinerClient, localEndpoint)
+
 	becameLeader := func(context.Context) {
 		if err = cableEngine.StartEngine(); err != nil {
 			cleanup.fatal("Error starting the cable engine: %v", err)
@@ -187,7 +174,7 @@ func main() {
 
 		var wg sync.WaitGroup
 
-		wg.Add(4)
+		wg.Add(5)
 
 		go func() {
 			defer wg.Done()
@@ -220,6 +207,14 @@ func main() {
 				if err = cableHealthchecker.Start(stopCh); err != nil {
 					klog.Errorf("Error starting healthChecker: %v", err)
 				}
+			}
+		}()
+
+		go func() {
+			defer wg.Done()
+
+			if publicIPWatcher != nil {
+				publicIPWatcher.Run(stopCh)
 			}
 		}()
 
@@ -257,6 +252,44 @@ func main() {
 	if err := httpServer.Shutdown(context.TODO()); err != nil {
 		klog.Errorf("Error shutting down metrics HTTP server: %v", err)
 	}
+}
+
+func getCableHealthChecker(cfg *rest.Config, submSpec *types.SubmarinerSpecification) healthchecker.Interface {
+	var cableHealthchecker healthchecker.Interface
+	var err error
+
+	if !submSpec.HealthCheckEnabled {
+		klog.Info("The CableEngine HealthChecker is disabled")
+	} else {
+		cableHealthchecker, err = healthchecker.New(&healthchecker.Config{
+			WatcherConfig:      &watcher.Config{RestConfig: cfg},
+			EndpointNamespace:  submSpec.Namespace,
+			ClusterID:          submSpec.ClusterID,
+			PingInterval:       submSpec.HealthCheckInterval,
+			MaxPacketLossCount: submSpec.HealthCheckMaxPacketLossCount,
+		})
+		if err != nil {
+			klog.Errorf("Error creating healthChecker: %v", err)
+		}
+	}
+
+	return cableHealthchecker
+}
+
+func getPublicIPWatcher(submSpec *types.SubmarinerSpecification,
+	k8sClient kubernetes.Interface, submarinerClient *submarinerClientset.Clientset,
+	localEndpoint *types.SubmarinerEndpoint,
+) *endpoint.PublicIPWatcher {
+	publicIPConfig := &endpoint.PublicIPWatcherConfig{
+		SubmSpec:      submSpec,
+		K8sClient:     k8sClient,
+		Endpoints:     submarinerClient.SubmarinerV1().Endpoints(submSpec.Namespace),
+		LocalEndpoint: *localEndpoint,
+	}
+
+	publicIPWatcher := endpoint.NewPublicIPWatcher(publicIPConfig)
+
+	return publicIPWatcher
 }
 
 func fatalOnErr(err error, msg string) {
