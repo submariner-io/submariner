@@ -132,7 +132,19 @@ func CompareEndpointSpec(left, right *subv1.EndpointSpec) bool {
 
 	// maybe we have to use just reflect.DeepEqual(left, right), but in this case the subnets order will influence.
 	return left.ClusterID == right.ClusterID && left.CableName == right.CableName && left.Hostname == right.Hostname &&
-		left.Backend == right.Backend && equality.Semantic.DeepEqual(left.BackendConfig, right.BackendConfig)
+		left.Backend == right.Backend && isBackendConfigSame(left, right)
+}
+
+func isBackendConfigSame(left, right *subv1.EndpointSpec) bool {
+	if left.BackendConfig[subv1.UsingLoadBalancer] == "true" &&
+		right.BackendConfig[subv1.UsingLoadBalancer] == "true" {
+		// When Gateway pod comes up with loadbalancer mode enabled, it inserts a preferred-server-timestamp in
+		// the BackendConfig when the Gateway pod comes up. So, in loadbalancer mode, we just have to compare
+		// the load-balancer status.
+		return true
+	}
+
+	return equality.Semantic.DeepEqual(left.BackendConfig, right.BackendConfig)
 }
 
 func EnsureValidName(name string) string {
