@@ -27,10 +27,10 @@ import (
 	"github.com/submariner-io/submariner/pkg/cable/wireguard"
 	"github.com/submariner-io/submariner/pkg/cidr"
 	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/iptables"
 	"github.com/submariner-io/submariner/pkg/netlink"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"k8s.io/klog"
 )
@@ -69,7 +69,7 @@ func (ovn *Handler) GetName() string {
 }
 
 func (ovn *Handler) GetNetworkPlugins() []string {
-	return []string{constants.NetworkPluginOVNKubernetes}
+	return []string{cni.OVNKubernetes}
 }
 
 func (ovn *Handler) Init() error {
