@@ -90,6 +90,10 @@ func GetClusterIDFromCableName(cableName string) string {
 	// 0           1    2   3    4    5       6   7  8 9  10
 	// submariner-cable-my-super-long_cluster-id-172-16-32-5
 	cableSplit := strings.Split(cableName, "-")
+	if len(cableSplit) < 3 {
+		klog.Error(fmt.Errorf("cableName:%s format is invalid", cableName))
+		return ""
+	}
 	clusterID := cableSplit[2]
 
 	for i := 3; i < len(cableSplit)-4; i++ {
