@@ -97,11 +97,6 @@ const (
 	UsingLoadBalancer       = "using-loadbalancer"
 )
 
-const (
-	DefaultNATTDiscoveryPort = "4490"
-	DefaultUDPPort           = "4500"
-)
-
 // Valid PublicIP resolvers.
 const (
 	IPv4         = "ipv4" // ipv4:1.2.3.4

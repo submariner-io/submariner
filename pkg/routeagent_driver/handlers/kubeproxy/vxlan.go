@@ -28,6 +28,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
+	"github.com/submariner-io/submariner/pkg/port"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	"k8s.io/klog"
@@ -251,7 +252,7 @@ func (kp *SyncHandler) createVxLANInterface(activeEndPoint string, ifaceType int
 			vxlanID:  100,
 			group:    nil,
 			srcAddr:  nil,
-			vtepPort: VxLANPort,
+			vtepPort: port.IntraClusterVxLAN,
 			mtu:      vxlanMtu,
 		}
 
@@ -280,7 +281,7 @@ func (kp *SyncHandler) createVxLANInterface(activeEndPoint string, ifaceType int
 			vxlanID:  100,
 			group:    gatewayNodeIP,
 			srcAddr:  nil,
-			vtepPort: VxLANPort,
+			vtepPort: port.IntraClusterVxLAN,
 			mtu:      vxlanMtu,
 		}
 

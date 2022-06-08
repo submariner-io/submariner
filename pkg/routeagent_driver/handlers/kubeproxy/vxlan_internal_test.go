@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	fakeNetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
+	"github.com/submariner-io/submariner/pkg/port"
 	"github.com/vishvananda/netlink"
 )
 
@@ -61,7 +62,7 @@ var _ = Describe("Function createVxLanIface", func() {
 				},
 				VxlanId: 100,
 				Group:   net.ParseIP("192.68.1.2"),
-				Port:    VxLANPort,
+				Port:    port.IntraClusterVxLAN,
 			},
 		}
 

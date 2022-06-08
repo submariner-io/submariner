@@ -50,14 +50,6 @@ const (
 	// the egress traffic to the corresponding CNIInterfaceIP on that host.
 	RouteAgentHostNetworkTableID = 150
 
-	// Network plugins supported.
-	NetworkPluginGeneric       = "generic"
-	NetworkPluginCanalFlannel  = "canal-flannel"
-	NetworkPluginWeaveNet      = "weave-net"
-	NetworkPluginOpenShiftSDN  = "OpenShiftSDN"
-	NetworkPluginOVNKubernetes = "OVNKubernetes"
-	NetworkPluginCalico        = "calico"
-
 	NATTable    = "nat"
 	FilterTable = "filter"
 )

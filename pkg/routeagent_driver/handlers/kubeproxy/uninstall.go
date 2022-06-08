@@ -24,6 +24,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/iptables"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
+	"github.com/submariner-io/submariner/pkg/port"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
 	"k8s.io/klog"
@@ -64,7 +65,7 @@ func deleteVxLANInterface() {
 		},
 		VxlanId: 100,
 		SrcAddr: nil,
-		Port:    VxLANPort,
+		Port:    port.IntraClusterVxLAN,
 	}
 
 	klog.Infof("Deleting the %q interface", VxLANIface)

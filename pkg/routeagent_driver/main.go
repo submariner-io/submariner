@@ -26,11 +26,12 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	cni "github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/controller"
 	"github.com/submariner-io/submariner/pkg/event/logger"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cabledriver"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
+	cniapi "github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
@@ -76,7 +77,7 @@ func main() {
 	np := os.Getenv("SUBMARINER_NETWORKPLUGIN")
 
 	if np == "" {
-		np = constants.NetworkPluginGeneric
+		np = cni.Generic
 	}
 
 	registry := event.NewRegistry("routeagent_driver", np)
@@ -144,7 +145,7 @@ func annotateNode(clusterCidr []string, cfg *restclient.Config) error {
 		return fmt.Errorf("error reading the NODE_NAME from the environment")
 	}
 
-	err = cni.AnnotateNodeWithCNIInterfaceIP(nodeName, k8sClientSet, clusterCidr)
+	err = cniapi.AnnotateNodeWithCNIInterfaceIP(nodeName, k8sClientSet, clusterCidr)
 	if err != nil {
 		return errors.Wrap(err, "error annotating node with CNI interface IP")
 	}
