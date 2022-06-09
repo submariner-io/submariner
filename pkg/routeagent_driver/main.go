@@ -87,7 +87,7 @@ func main() {
 		ovn.NewHandler(&env, smClientset),
 		cabledriver.NewXRFMCleanupHandler(),
 		cabledriver.NewVXLANCleanup(),
-		mtu.NewMTUHandler(env.ClusterCidr, (len(env.GlobalCidr) != 0)),
+		mtu.NewMTUHandler(env.ClusterCidr, len(env.GlobalCidr) != 0),
 	); err != nil {
 		klog.Fatalf("Error registering the handlers: %s", err.Error())
 	}
