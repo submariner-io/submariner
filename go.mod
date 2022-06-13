@@ -3,7 +3,7 @@ module github.com/submariner-io/submariner
 go 1.17
 
 require (
-	github.com/cenkalti/backoff/v4 v4.1.1
+	github.com/cenkalti/backoff/v4 v4.1.3
 	github.com/coreos/go-iptables v0.6.0
 	github.com/emirpasic/gods v1.18.1
 	github.com/go-ping/ping v0.0.0-20210506233800-ff8be3320020

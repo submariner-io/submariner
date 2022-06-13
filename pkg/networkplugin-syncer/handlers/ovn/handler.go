@@ -26,8 +26,8 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cidr"
+	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
@@ -53,7 +53,7 @@ func (ovn *SyncHandler) GetName() string {
 }
 
 func (ovn *SyncHandler) GetNetworkPlugins() []string {
-	return []string{constants.NetworkPluginOVNKubernetes}
+	return []string{cni.OVNKubernetes}
 }
 
 func NewSyncHandler(k8sClientset clientset.Interface, env *environment.Specification) event.Handler {

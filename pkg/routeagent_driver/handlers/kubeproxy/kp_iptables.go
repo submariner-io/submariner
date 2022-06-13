@@ -25,10 +25,10 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/stringset"
+	cni "github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/netlink"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	cniapi "github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
 )
@@ -53,7 +53,7 @@ type SyncHandler struct {
 	vxlanDevice      *vxLanIface
 	vxlanGwIP        *net.IP
 	hostname         string
-	cniIface         *cni.Interface
+	cniIface         *cniapi.Interface
 	defaultHostIface *net.Interface
 }
 
@@ -79,8 +79,8 @@ func (kp *SyncHandler) GetName() string {
 
 func (kp *SyncHandler) GetNetworkPlugins() []string {
 	return []string{
-		constants.NetworkPluginGeneric, constants.NetworkPluginCanalFlannel, constants.NetworkPluginWeaveNet,
-		constants.NetworkPluginOpenShiftSDN, constants.NetworkPluginCalico,
+		cni.Generic, cni.CanalFlannel, cni.WeaveNet,
+		cni.OpenShiftSDN, cni.Calico,
 	}
 }
 
@@ -97,7 +97,7 @@ func (kp *SyncHandler) Init() error {
 		return errors.Wrapf(err, "Unable to find the default interface on host: %s", kp.hostname)
 	}
 
-	cniIface, err := cni.Discover(kp.localClusterCidr[0])
+	cniIface, err := cniapi.Discover(kp.localClusterCidr[0])
 	if err == nil {
 		// Configure CNI Specific changes
 		kp.cniIface = cniIface

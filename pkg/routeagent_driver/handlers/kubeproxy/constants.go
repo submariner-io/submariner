@@ -22,7 +22,6 @@ const (
 	VxLANIface         = "vx-submariner"
 	VxInterfaceWorker  = 0
 	VxInterfaceGateway = 1
-	VxLANPort          = 4800
 	VxLANOverhead      = 50
 
 	// Why VxLANVTepNetworkPrefix is 240?
