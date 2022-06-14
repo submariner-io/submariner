@@ -95,6 +95,7 @@ const (
 	PreferredServerConfig   = "preferred-server"
 	PublicIP                = "public-ip"
 	UsingLoadBalancer       = "using-loadbalancer"
+	TCPMssValue             = "submariner.io/tcp-clamp-mss"
 )
 
 // Valid PublicIP resolvers.
