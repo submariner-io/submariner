@@ -46,7 +46,7 @@ var _ = Describe("MTUHandler", func() {
 		ipset.NewFunc = func() ipset.Interface {
 			return ipSet
 		}
-		handler = mtu.NewMTUHandler([]string{"10.1.0.0/24"}, false)
+		handler = mtu.NewMTUHandler([]string{"10.1.0.0/24"}, false, 0)
 	})
 
 	AfterEach(func() {

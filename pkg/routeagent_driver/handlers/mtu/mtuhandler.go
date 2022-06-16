@@ -54,9 +54,10 @@ type mtuHandler struct {
 	remoteIPSet      ipset.Named
 	localIPSet       ipset.Named
 	forceMss         forceMssSts
+	tcpMssValue      int
 }
 
-func NewMTUHandler(localClusterCidr []string, isGlobalnet bool) event.Handler {
+func NewMTUHandler(localClusterCidr []string, isGlobalnet bool, tcpMssValue int) event.Handler {
 	forceMss := notNeeded
 	if isGlobalnet {
 		forceMss = needed
@@ -65,6 +66,7 @@ func NewMTUHandler(localClusterCidr []string, isGlobalnet bool) event.Handler {
 	return &mtuHandler{
 		localClusterCidr: localClusterCidr,
 		forceMss:         forceMss,
+		tcpMssValue:      tcpMssValue,
 	}
 }
 
@@ -275,28 +277,55 @@ func (h *mtuHandler) Stop(uninstall bool) error {
 }
 
 func (h *mtuHandler) forceMssClamping(endpoint *submV1.Endpoint) error {
-	defaultHostIface, err := netlinkAPI.GetDefaultGatewayInterface()
-	if err != nil {
-		return errors.Wrapf(err, "Unable to find the default interface on host")
+	tcpMssSrc := "user"
+	tcpMssValue := h.tcpMssValue
+
+	if tcpMssValue == 0 {
+		defaultHostIface, err := netlinkAPI.GetDefaultGatewayInterface()
+		if err != nil {
+			return errors.Wrapf(err, "Unable to find the default interface on host")
+		}
+
+		overHeadSize := maxIpsecOverhead
+		if endpoint.Spec.Backend == vxlan.CableDriverName {
+			overHeadSize = vxlan.VxlanOverhead
+		}
+
+		tcpMssValue = defaultHostIface.MTU - overHeadSize
+		tcpMssSrc = "default"
 	}
 
-	overHeadSize := maxIpsecOverhead
-	if endpoint.Spec.Backend == vxlan.CableDriverName {
-		overHeadSize = vxlan.VxlanOverhead
-	}
-
-	klog.Infof("forceMssClamping to: IF_MTU(%d)-Overhead(%d)=%d",
-		defaultHostIface.MTU, overHeadSize, (defaultHostIface.MTU - overHeadSize))
-
+	klog.Infof("forceMssClamping to: %d (%s) ", tcpMssValue, tcpMssSrc)
 	ruleSpecSource := []string{
 		"-m", "set", "--match-set", constants.LocalCIDRIPSet, "src", "-m", "set", "--match-set",
 		constants.RemoteCIDRIPSet, "dst", "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS",
-		"--set-mss", strconv.Itoa(defaultHostIface.MTU - overHeadSize),
+		"--set-mss", strconv.Itoa(tcpMssValue),
 	}
 	ruleSpecDest := []string{
 		"-m", "set", "--match-set", constants.RemoteCIDRIPSet, "src", "-m", "set", "--match-set",
 		constants.LocalCIDRIPSet, "dst", "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS",
-		"--set-mss", strconv.Itoa(defaultHostIface.MTU - overHeadSize),
+		"--set-mss", strconv.Itoa(tcpMssValue),
+	}
+
+	rules, err := h.ipt.List(constants.MangleTable, constants.SmPostRoutingChain)
+	if err != nil {
+		return errors.Wrapf(err, "error listing the rules in %s chain", constants.SmPostRoutingChain)
+	}
+
+	isPresent := false
+
+	for _, rule := range rules {
+		if strings.Contains(rule, strings.Join(ruleSpecSource, " ")) || strings.Contains(rule, strings.Join(ruleSpecDest, " ")) {
+			isPresent = true
+			break
+		}
+	}
+
+	if len(rules) > 0 && !isPresent {
+		if err := h.ipt.ClearChain(constants.MangleTable, constants.SmPostRoutingChain); err != nil {
+			klog.Warningf("Error flushing iptables chain %q of %q table: %v", constants.SmPostRoutingChain,
+				constants.MangleTable, err)
+		}
 	}
 
 	if err := h.ipt.AppendUnique(constants.MangleTable, constants.SmPostRoutingChain, ruleSpecSource...); err != nil {
