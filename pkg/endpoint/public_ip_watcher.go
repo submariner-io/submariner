@@ -26,7 +26,6 @@ import (
 	submv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	v1 "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/submariner-io/submariner/pkg/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -88,7 +87,7 @@ func (p *PublicIPWatcher) syncPublicIP() {
 func (p *PublicIPWatcher) updateLocalEndpoint(publicIP string) error {
 	var ep *submv1.Endpoint
 
-	endpointName, err := util.GetEndpointCRDName(&p.config.LocalEndpoint)
+	endpointName, err := p.config.LocalEndpoint.Spec.GenerateName()
 	if err != nil {
 		return errors.Wrapf(err, "error extracting the submariner Endpoint name from %#v", p.config.LocalEndpoint)
 	}

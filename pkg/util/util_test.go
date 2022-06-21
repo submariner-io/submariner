@@ -27,52 +27,10 @@ import (
 )
 
 var _ = Describe("Util", func() {
-	Describe("Function GetEndpointCRDName", testGetEndpointCRDName)
-
 	Describe("Function GetClusterCRDName", testGetClusterCRDName)
 
 	Describe("Function CompareEndpointSpec", testCompareEndpointSpec)
 })
-
-func testGetEndpointCRDName() {
-	Context("with valid SubmarinerEndpoint input", func() {
-		It("should return <cluster ID>-<cable name>", func() {
-			name, err := util.GetEndpointCRDName(&types.SubmarinerEndpoint{
-				Spec: subv1.EndpointSpec{
-					ClusterID: "ClusterID",
-					CableName: "CableName",
-				},
-			})
-
-			Expect(err).ToNot(HaveOccurred())
-			Expect(name).To(Equal("clusterid-cablename"))
-		})
-	})
-
-	Context("with a nil cluster ID", func() {
-		It("should return an error", func() {
-			_, err := util.GetEndpointCRDName(&types.SubmarinerEndpoint{
-				Spec: subv1.EndpointSpec{
-					CableName: "CableName",
-				},
-			})
-
-			Expect(err).To(HaveOccurred())
-		})
-	})
-
-	Context("with a nil cable name", func() {
-		It("should return an error", func() {
-			_, err := util.GetEndpointCRDName(&types.SubmarinerEndpoint{
-				Spec: subv1.EndpointSpec{
-					ClusterID: "ClusterID",
-				},
-			})
-
-			Expect(err).To(HaveOccurred())
-		})
-	})
-}
 
 func testGetClusterCRDName() {
 	Context("with valid input", func() {
