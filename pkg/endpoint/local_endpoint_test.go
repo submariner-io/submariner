@@ -25,7 +25,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/submariner-io/submariner/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -37,7 +36,7 @@ const testNodeName = "this-node"
 var _ = Describe("GetLocal", func() {
 	var submSpec *types.SubmarinerSpecification
 	var client kubernetes.Interface
-	testPrivateIP := util.GetLocalIP()
+	testPrivateIP := endpoint.GetLocalIP()
 	var node *v1.Node
 
 	const (

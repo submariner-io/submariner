@@ -20,31 +20,13 @@ package util
 
 import (
 	"fmt"
-	"net"
 	"strings"
 	"unicode"
 
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/klog"
 )
-
-func GetLocalIP() string {
-	return GetLocalIPForDestination("8.8.8.8")
-}
-
-func GetLocalIPForDestination(dst string) string {
-	conn, err := net.Dial("udp", dst+":53")
-	if err != nil {
-		klog.Fatal(err)
-	}
-	defer conn.Close()
-
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
-
-	return localAddr.IP.String()
-}
 
 func GetClusterIDFromCableName(cableName string) string {
 	// length is 11
