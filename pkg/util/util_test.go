@@ -32,8 +32,6 @@ var _ = Describe("Util", func() {
 	Describe("Function GetClusterCRDName", testGetClusterCRDName)
 
 	Describe("Function CompareEndpointSpec", testCompareEndpointSpec)
-
-	Describe("Function EnsureValidName", testEnsureValidName)
 })
 
 func testGetEndpointCRDName() {
@@ -243,27 +241,6 @@ func testCompareEndpointSpec() {
 					Backend:       "libreswan",
 					BackendConfig: map[string]string{"key": "bbb"},
 				})).To(BeFalse())
-		})
-	})
-}
-
-func testEnsureValidName() {
-	When("the string is valid", func() {
-		It("should not convert it", func() {
-			Expect(util.EnsureValidName("digits-1234567890")).To(Equal("digits-1234567890"))
-			Expect(util.EnsureValidName("example.com")).To(Equal("example.com"))
-		})
-	})
-
-	When("the string has upper case letters", func() {
-		It("should convert to lower", func() {
-			Expect(util.EnsureValidName("No-UPPER-caSe-aLLoweD")).To(Equal("no-upper-case-allowed"))
-		})
-	})
-
-	When("the string has non-alphanumeric letters", func() {
-		It("should convert them approriately", func() {
-			Expect(util.EnsureValidName("no-!@*()#$-chars")).To(Equal("no---------chars"))
 		})
 	})
 }

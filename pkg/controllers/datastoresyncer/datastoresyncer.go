@@ -24,6 +24,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
+	"github.com/submariner-io/admiral/pkg/resource"
 	resourceSyncer "github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/watcher"
@@ -295,7 +296,7 @@ func (d *DatastoreSyncer) createLocalCluster() error {
 
 	cluster := &submarinerv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: util.EnsureValidName(d.localCluster.Spec.ClusterID),
+			Name: resource.EnsureValidName(d.localCluster.Spec.ClusterID),
 		},
 		Spec: d.localCluster.Spec,
 	}
