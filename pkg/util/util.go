@@ -30,45 +30,6 @@ import (
 	"k8s.io/klog"
 )
 
-const tokenLength = 64
-
-func getAPIIdentifier(token string) (string, error) {
-	if len(token) != tokenLength {
-		return "", fmt.Errorf("token %s length was not %d", token, tokenLength)
-	}
-
-	clusterID := token[0 : tokenLength/2]
-
-	return clusterID, nil
-}
-
-func getConnectSecret(token string) (string, error) {
-	if len(token) != tokenLength {
-		return "", fmt.Errorf("token %s length was not %d", token, tokenLength)
-	}
-
-	connectSecret := token[tokenLength/2 : tokenLength]
-
-	return connectSecret, nil
-}
-
-func ParseSecure(token string) (types.Secure, error) {
-	secretKey, err := getConnectSecret(token)
-	if err != nil {
-		return types.Secure{}, err
-	}
-
-	apiKey, err := getAPIIdentifier(token)
-	if err != nil {
-		return types.Secure{}, err
-	}
-
-	return types.Secure{
-		APIKey:    apiKey,
-		SecretKey: secretKey,
-	}, nil
-}
-
 func GetLocalIP() string {
 	return GetLocalIPForDestination("8.8.8.8")
 }
