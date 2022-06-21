@@ -27,8 +27,6 @@ import (
 )
 
 var _ = Describe("Util", func() {
-	Describe("Function ParseSecure", testParseSecure)
-
 	Describe("Function GetClusterIDFromCableName", testGetClusterIDFromCableName)
 
 	Describe("Function GetEndpointCRDName", testGetEndpointCRDName)
@@ -39,26 +37,6 @@ var _ = Describe("Util", func() {
 
 	Describe("Function EnsureValidName", testEnsureValidName)
 })
-
-func testParseSecure() {
-	Context("with a valid token input", func() {
-		It("should return a valid Secure object", func() {
-			apiKey := "AValidAPIKeyWithLengthThirtyTwo!"
-			secretKey := "AValidSecretKeyWithLength32Chars"
-			secure, err := util.ParseSecure(apiKey + secretKey)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(secure.APIKey).To(Equal(apiKey))
-			Expect(secure.SecretKey).To(Equal(secretKey))
-		})
-	})
-
-	Context("with an invalid token input", func() {
-		It("should return an error", func() {
-			_, err := util.ParseSecure("InvalidToken")
-			Expect(err).To(HaveOccurred())
-		})
-	})
-}
 
 func testGetClusterIDFromCableName() {
 	Context("with a simple embedded cluster ID", func() {

@@ -48,8 +48,3 @@ type SubmarinerSpecification struct {
 	HealthCheckInterval           uint
 	HealthCheckMaxPacketLossCount uint
 }
-
-type Secure struct {
-	APIKey    string
-	SecretKey string
-}
