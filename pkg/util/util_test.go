@@ -22,37 +22,12 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/util"
 )
 
 var _ = Describe("Util", func() {
-	Describe("Function GetClusterCRDName", testGetClusterCRDName)
-
 	Describe("Function CompareEndpointSpec", testCompareEndpointSpec)
 })
-
-func testGetClusterCRDName() {
-	Context("with valid input", func() {
-		It("should return the cluster ID", func() {
-			Expect(util.GetClusterCRDName(&types.SubmarinerCluster{
-				Spec: subv1.ClusterSpec{
-					ClusterID: "ClusterID",
-				},
-			})).To(Equal("ClusterID"))
-		})
-	})
-
-	Context("with a nil cluster ID", func() {
-		It("should return an error", func() {
-			_, err := util.GetClusterCRDName(&types.SubmarinerCluster{
-				Spec: subv1.ClusterSpec{},
-			})
-
-			Expect(err).To(HaveOccurred())
-		})
-	})
-}
 
 func testCompareEndpointSpec() {
 	Context("with equal input", func() {
