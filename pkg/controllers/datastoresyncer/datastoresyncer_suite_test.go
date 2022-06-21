@@ -35,7 +35,6 @@ import (
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/controllers/datastoresyncer"
 	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/submariner-io/submariner/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -211,7 +210,7 @@ func newCluster(spec *submarinerv1.ClusterSpec) *submarinerv1.Cluster {
 }
 
 func getEndpointName(from *submarinerv1.EndpointSpec) string {
-	endpointName, err := util.GetEndpointCRDNameFromParams(from.ClusterID, from.CableName)
+	endpointName, err := from.GenerateName()
 	Expect(err).To(Succeed())
 
 	return endpointName

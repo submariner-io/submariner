@@ -32,7 +32,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
-	"github.com/submariner-io/submariner/pkg/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 )
@@ -178,7 +177,7 @@ func (t *gatewayMonitorTestDriver) start() {
 }
 
 func (t *gatewayMonitorTestDriver) createEndpoint(spec *submarinerv1.EndpointSpec) string {
-	endpointName, err := util.GetEndpointCRDNameFromParams(spec.ClusterID, spec.CableName)
+	endpointName, err := spec.GenerateName()
 	Expect(err).To(Succeed())
 
 	test.CreateResource(t.endpoints, &submarinerv1.Endpoint{

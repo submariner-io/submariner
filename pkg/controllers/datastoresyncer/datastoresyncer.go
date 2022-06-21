@@ -230,7 +230,7 @@ func (d *DatastoreSyncer) ensureExclusiveEndpoint(syncer *broker.Syncer) error {
 			continue
 		}
 
-		endpointName, err := util.GetEndpointCRDNameFromParams(endpoint.Spec.ClusterID, endpoint.Spec.CableName)
+		endpointName, err := endpoint.Spec.GenerateName()
 		if err != nil {
 			klog.Errorf("Error extracting the submariner Endpoint name from %#v: %v", endpoint, err)
 			continue
@@ -307,7 +307,7 @@ func (d *DatastoreSyncer) createLocalCluster() error {
 func (d *DatastoreSyncer) createOrUpdateLocalEndpoint() error {
 	klog.Infof("Creating local submariner Endpoint: %#v ", d.localEndpoint)
 
-	endpointName, err := util.GetEndpointCRDName(&d.localEndpoint)
+	endpointName, err := d.localEndpoint.Spec.GenerateName()
 	if err != nil {
 		return errors.Wrapf(err, "error extracting the submariner Endpoint name from %#v", d.localEndpoint)
 	}

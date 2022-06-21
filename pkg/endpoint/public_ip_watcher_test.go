@@ -30,7 +30,6 @@ import (
 	submarinerClientsetv1 "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/submariner-io/submariner/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -58,7 +57,7 @@ var _ = Describe("public ip watcher", func() {
 		// Let's create a local endpoint with load-balancer set to true but without any public-ip
 		t.localEPSpec = newEndpointSpec(clusterID, cableName)
 
-		endpointName, err = util.GetEndpointCRDNameFromParams(t.localEPSpec.ClusterID, t.localEPSpec.CableName)
+		endpointName, err = t.localEPSpec.GenerateName()
 		Expect(err).To(Succeed())
 	})
 
@@ -126,7 +125,7 @@ func newPublicIPWatcherTestDriver() *publicIPWatcherTestDriver {
 }
 
 func (t *publicIPWatcherTestDriver) createEndpoint(spec *submarinerv1.EndpointSpec) *submarinerv1.Endpoint {
-	endpointName, err := util.GetEndpointCRDNameFromParams(spec.ClusterID, spec.CableName)
+	endpointName, err := spec.GenerateName()
 	Expect(err).To(Succeed())
 
 	ep := &submarinerv1.Endpoint{

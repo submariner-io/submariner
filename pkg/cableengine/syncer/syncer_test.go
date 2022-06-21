@@ -44,7 +44,6 @@ import (
 	submarinerClientsetv1 "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
 	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions"
 	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/submariner-io/submariner/pkg/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -340,7 +339,7 @@ func testGatewayLatencyInfo() {
 				HealthCheckIP: t.pinger.GetIP(),
 			}
 
-			endpointName, err := util.GetEndpointCRDNameFromParams(endpointSpec.ClusterID, endpointSpec.CableName)
+			endpointName, err := endpointSpec.GenerateName()
 			Expect(err).To(Succeed())
 
 			test.CreateResource(t.endpoints, &submarinerv1.Endpoint{
