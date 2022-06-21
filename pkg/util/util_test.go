@@ -27,8 +27,6 @@ import (
 )
 
 var _ = Describe("Util", func() {
-	Describe("Function GetClusterIDFromCableName", testGetClusterIDFromCableName)
-
 	Describe("Function GetEndpointCRDName", testGetEndpointCRDName)
 
 	Describe("Function GetClusterCRDName", testGetClusterCRDName)
@@ -37,21 +35,6 @@ var _ = Describe("Util", func() {
 
 	Describe("Function EnsureValidName", testEnsureValidName)
 })
-
-func testGetClusterIDFromCableName() {
-	Context("with a simple embedded cluster ID", func() {
-		It("should extract and return the cluster ID", func() {
-			Expect(util.GetClusterIDFromCableName("submariner-cable-east-172-16-32-5")).To(Equal("east"))
-		})
-	})
-
-	Context("with an embedded cluster ID containing dashes", func() {
-		It("should extract and return the cluster ID", func() {
-			Expect(util.GetClusterIDFromCableName("submariner-cable-my-super-long_cluster-id-172-16-32-5")).To(
-				Equal("my-super-long_cluster-id"))
-		})
-	})
-}
 
 func testGetEndpointCRDName() {
 	Context("with valid SubmarinerEndpoint input", func() {

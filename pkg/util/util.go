@@ -28,20 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 )
 
-func GetClusterIDFromCableName(cableName string) string {
-	// length is 11
-	// 0           1    2   3    4    5       6   7  8 9  10
-	// submariner-cable-my-super-long_cluster-id-172-16-32-5
-	cableSplit := strings.Split(cableName, "-")
-	clusterID := cableSplit[2]
-
-	for i := 3; i < len(cableSplit)-4; i++ {
-		clusterID = clusterID + "-" + cableSplit[i]
-	}
-
-	return clusterID
-}
-
 func GetEndpointCRDName(endpoint *types.SubmarinerEndpoint) (string, error) {
 	// We'll panic if endpoint is nil, this is intentional
 	return GetEndpointCRDNameFromParams(endpoint.Spec.ClusterID, endpoint.Spec.CableName)
