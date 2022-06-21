@@ -33,7 +33,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/node"
 	"github.com/submariner-io/submariner/pkg/port"
 	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/submariner-io/submariner/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
@@ -41,7 +40,7 @@ import (
 
 func GetLocal(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface) (*types.SubmarinerEndpoint, error) {
 	// We'll panic if submSpec is nil, this is intentional
-	privateIP := util.GetLocalIP()
+	privateIP := GetLocalIP()
 
 	gwNode, err := node.GetLocalNode(k8sClient)
 	if err != nil {
