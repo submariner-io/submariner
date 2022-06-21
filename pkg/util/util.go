@@ -19,21 +19,9 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
-
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/types"
 	"k8s.io/apimachinery/pkg/api/equality"
 )
-
-func GetClusterCRDName(cluster *types.SubmarinerCluster) (string, error) {
-	// We'll panic if cluster is nil, this is intentional
-	if cluster.Spec.ClusterID == "" {
-		return "", fmt.Errorf("ClusterID was empty")
-	}
-
-	return cluster.Spec.ClusterID, nil
-}
 
 func CompareEndpointSpec(left, right *subv1.EndpointSpec) bool {
 	if left == nil && right == nil {
