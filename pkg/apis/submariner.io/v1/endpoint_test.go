@@ -26,6 +26,7 @@ import (
 
 var _ = Describe("EndpointSpec", func() {
 	Context("GenerateName", testGenerateName)
+	Context("Equals", testEquals)
 })
 
 func testGenerateName() {
@@ -58,6 +59,82 @@ func testGenerateName() {
 			}).GenerateName()
 
 			Expect(err).To(HaveOccurred())
+		})
+	})
+}
+
+func testEquals() {
+	var spec *v1.EndpointSpec
+
+	BeforeEach(func() {
+		spec = &v1.EndpointSpec{
+			ClusterID: "east",
+			CableName: "submariner-cable-east-172-16-32-5",
+			Hostname:  "my-host",
+			Backend:   "libreswan",
+		}
+	})
+
+	Context("with equal scalar fields", func() {
+		Context("and nil BackendConfig maps", func() {
+			It("should return true", func() {
+				Expect(spec.Equals(spec.DeepCopy())).To(BeTrue())
+			})
+		})
+
+		Context("and equal BackendConfig maps", func() {
+			It("should return true", func() {
+				spec.BackendConfig = map[string]string{"key": "aaa"}
+				Expect(spec.Equals(spec.DeepCopy())).To(BeTrue())
+			})
+		})
+
+		Context("and empty BackendConfig maps", func() {
+			It("should return true", func() {
+				spec.BackendConfig = map[string]string{}
+				Expect(spec.Equals(spec.DeepCopy())).To(BeTrue())
+			})
+		})
+	})
+
+	Context("with differing ClusterID fields", func() {
+		It("should return false", func() {
+			other := spec.DeepCopy()
+			other.ClusterID = "west"
+			Expect(spec.Equals(other)).To(BeFalse())
+		})
+	})
+
+	Context("with differing CableName fields", func() {
+		It("should return false", func() {
+			other := spec.DeepCopy()
+			other.CableName = "submariner-cable-east-5-6-7-8"
+			Expect(spec.Equals(other)).To(BeFalse())
+		})
+	})
+
+	Context("with differing Hostname fields", func() {
+		It("should return false", func() {
+			other := spec.DeepCopy()
+			other.Hostname = "other-host"
+			Expect(spec.Equals(other)).To(BeFalse())
+		})
+	})
+
+	Context("with differing Backend fields", func() {
+		It("should return false", func() {
+			other := spec.DeepCopy()
+			other.Backend = "wireguard"
+			Expect(spec.Equals(other)).To(BeFalse())
+		})
+	})
+
+	Context("with differing BackendConfig maps", func() {
+		It("should return false", func() {
+			other := spec.DeepCopy()
+			other.BackendConfig = map[string]string{"key": "bbb"}
+			spec.BackendConfig = map[string]string{"key": "aaa"}
+			Expect(spec.Equals(other)).To(BeFalse())
 		})
 	})
 }
