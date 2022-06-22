@@ -24,6 +24,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/resource"
+	"k8s.io/apimachinery/pkg/api/equality"
 )
 
 func (ep *EndpointSpec) GetBackendPort(configName string, defaultValue int32) (int32, error) {
@@ -74,4 +75,29 @@ func (ep *EndpointSpec) GenerateName() (string, error) {
 	}
 
 	return resource.EnsureValidName(fmt.Sprintf("%s-%s", ep.ClusterID, ep.CableName)), nil
+}
+
+func (ep *EndpointSpec) Equals(other *EndpointSpec) bool {
+	if ep == nil && other == nil {
+		return true
+	}
+
+	if ep == nil || other == nil {
+		return false
+	}
+
+	return ep.ClusterID == other.ClusterID && ep.CableName == other.CableName && ep.Hostname == other.Hostname &&
+		ep.Backend == other.Backend && ep.hasSameBackendConfig(other)
+}
+
+func (ep *EndpointSpec) hasSameBackendConfig(other *EndpointSpec) bool {
+	if ep.BackendConfig[UsingLoadBalancer] == "true" &&
+		other.BackendConfig[UsingLoadBalancer] == "true" {
+		// When Gateway pod comes up with loadbalancer mode enabled, it inserts a preferred-server-timestamp in
+		// the BackendConfig when the Gateway pod comes up. So, in loadbalancer mode, we just have to compare
+		// the load-balancer status.
+		return true
+	}
+
+	return equality.Semantic.DeepEqual(ep.BackendConfig, other.BackendConfig)
 }
