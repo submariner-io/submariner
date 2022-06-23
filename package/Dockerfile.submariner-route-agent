@@ -1,10 +1,10 @@
-FROM fedora:34
+FROM fedora:36
 ARG TARGETPLATFORM
 
 WORKDIR /var/submariner
 
 RUN dnf -y install --nodocs --setopt=install_weak_deps=0 \
-           iproute iptables iptables-nft ipset openvswitch procps-ng grep && \
+           iproute iptables-legacy iptables-nft ipset openvswitch procps-ng grep && \
     dnf -y clean all
 
 COPY package/submariner-route-agent.sh bin/${TARGETPLATFORM}/submariner-route-agent /usr/local/bin/
