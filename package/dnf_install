@@ -8,40 +8,30 @@
 #
 # %arch in the package references will be replaced with the chosen arch
 
-params="$(getopt -o a:kr:v: --name "$0" -- "$@")"
-eval set -- "$params"
-
 INSTALL_ROOT=/output/base
 
-while true
+while getopts a:kr:v: o
 do
-    case "$1" in
-    -a)
-        ARCH="$2"
-        shift 2
+    case "$o" in
+    a)
+        ARCH="$OPTARG"
         ;;
-	-k)
-	    KEEP_CACHE=true
-	    shift
-	    ;;
-	-r)
-	    INSTALL_ROOT="$2"
-	    shift 2
-	    ;;
-	-v)
-	    FEDORA_VERSION="$2"
-	    shift 2
-	    ;;
-	--)
-	    shift
-	    break
-	    ;;
-	*)
-	    echo "$0 doesn't support $1" >&2
-	    exit 1
-	    ;;
+    k)
+        KEEP_CACHE=true
+        ;;
+    r)
+        INSTALL_ROOT="$OPTARG"
+        ;;
+    v)
+        FEDORA_VERSION="$OPTARG"
+        ;;
+    *)
+        echo "$0 doesn't support $o" >&2
+        exit 1
+        ;;
     esac
 done
+shift $((OPTIND - 1))
 
 if [[ -n "${ARCH}" ]]; then
     # Convert container arch to Fedora arch
