@@ -20,7 +20,7 @@ COPY package/dnf_install /
 
 RUN /dnf_install -a ${TARGETPLATFORM} -v ${FEDORA_VERSION} -r /output/route-agent \
     glibc bash glibc-minimal-langpack coreutils-single \
-    iproute iptables iptables-nft ipset openvswitch procps-ng
+    iproute iptables iptables-nft ipset openvswitch procps-ng grep
 
 FROM --platform=${TARGETPLATFORM} scratch
 ARG SOURCE

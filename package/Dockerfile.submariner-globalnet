@@ -20,7 +20,7 @@ COPY package/dnf_install /
 
 RUN /dnf_install -a ${TARGETPLATFORM} -v ${FEDORA_VERSION} -r /output/globalnet \
     glibc bash glibc-minimal-langpack coreutils-single \
-    iproute iptables iptables-nft ipset
+    iproute iptables iptables-nft ipset grep
 
 FROM --platform=${TARGETPLATFORM} scratch
 ARG SOURCE
