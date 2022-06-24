@@ -23,7 +23,7 @@ COPY package/dnf_install /
 # kmod is required so that libreswan can load modules
 RUN /dnf_install -a ${TARGETPLATFORM} -v ${FEDORA_VERSION} -r /output/gateway \
     glibc bash glibc-minimal-langpack coreutils-single \
-    libcurl-minimal iproute iptables iptables-nft libreswan kmod
+    libcurl-minimal iproute libreswan kmod
 
 FROM --platform=${TARGETPLATFORM} scratch
 ARG SOURCE
