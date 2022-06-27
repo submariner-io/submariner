@@ -124,6 +124,7 @@ func (n *nodeController) allocateIP(node *corev1.Node, op syncer.Operation) (run
 		// cniIfaceIP of the respective node. Route-agent running on the node annotates the
 		// respective node with the cniIfaceIP. In this API, we check for the presence of this
 		// annotation and process the node event only when the annotation exists.
+		klog.Warningf("%q annotation is missing on the node. Health-check functionality will not work.", routeAgent.CNIInterfaceIP)
 		return nil, false
 	}
 
