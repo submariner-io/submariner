@@ -107,8 +107,10 @@ func (kp *SyncHandler) Init() error {
 			return errors.Wrap(err, "error enabling loose mode")
 		}
 	} else {
-		// This is not a fatal error. Hostnetworking to remote cluster support will be broken
-		// but other use-cases can continue to work.
+		// This is not a fatal error. Connectivity and other datapath use-cases will continue
+		// to work, but the following use-cases may not work.
+		// 1. Hostnetworking to remote cluster support will be broken
+		// 2. Health-check verification between the Gateway nodes will be disabled
 		klog.Errorf("Error discovering the CNI interface %v", err)
 	}
 
