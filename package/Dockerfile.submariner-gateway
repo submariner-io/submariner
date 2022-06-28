@@ -1,5 +1,5 @@
 ARG BASE_BRANCH
-ARG FEDORA_VERSION=34
+ARG FEDORA_VERSION=36
 ARG SOURCE=/go/src/github.com/submariner-io/submariner
 
 FROM --platform=${BUILDPLATFORM} quay.io/submariner/shipyard-dapper-base:${BASE_BRANCH} AS builder
@@ -23,7 +23,7 @@ COPY package/dnf_install /
 # kmod is required so that libreswan can load modules
 RUN /dnf_install -a ${TARGETPLATFORM} -v ${FEDORA_VERSION} -r /output/gateway \
     glibc bash glibc-minimal-langpack coreutils-single \
-    libcurl-minimal iproute iptables iptables-nft libreswan kmod
+    libcurl-minimal iproute libreswan kmod
 
 FROM --platform=${TARGETPLATFORM} scratch
 ARG SOURCE

@@ -124,7 +124,6 @@ func createLibovsdbClient(dbAddress string, tlsConfig *tls.Config, dbModel model
 		// take longer than a normal ovsdb operation. Give it a bit more time so
 		// we don't time out and enter a reconnect loop.
 		libovsdbclient.WithReconnect(connectTimeout, &backoff.ZeroBackOff{}),
-		libovsdbclient.WithLeaderOnly(true),
 		libovsdbclient.WithLogger(&logger),
 		libovsdbclient.WithEndpoint(dbAddress),
 	}
