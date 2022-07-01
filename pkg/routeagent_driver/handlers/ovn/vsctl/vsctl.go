@@ -77,7 +77,7 @@ func AddInternalPort(bridgeName, portName, macAddress string, mtu int) error {
 }
 
 func DelInternalPort(bridgeName, portName string) error {
-	_, err := vsctlCmd("--may-exist", "del-port", bridgeName, portName)
+	_, err := vsctlCmd("--if-exists", "del-port", bridgeName, portName)
 
 	return err
 }

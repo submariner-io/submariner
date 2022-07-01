@@ -29,28 +29,28 @@ func (ovn *Handler) Stop(uninstall bool) error {
 		return nil
 	}
 
-	klog.Infof("Uninstalling Submariner changes from the node")
+	klog.Infof("Uninstalling OVN components from the node")
 
 	err := vsctl.DelInternalPort(ovnK8sSubmarinerBridge, ovnK8sSubmarinerInterface)
 	if err != nil {
-		klog.Errorf("error deleting Submariner port %q due to %v", ovnK8sSubmarinerInterface, err)
+		klog.Errorf("Error deleting Submariner port %q due to %v", ovnK8sSubmarinerInterface, err)
 	}
 
 	err = vsctl.DelBridge(ovnK8sSubmarinerBridge)
 	if err != nil {
-		klog.Errorf("error deleting Submariner bridge %q due to %v", ovnK8sSubmarinerBridge, err)
+		klog.Errorf("Error deleting Submariner bridge %q due to %v", ovnK8sSubmarinerBridge, err)
 	}
 
 	if ovn.isGateway {
 		err = ovn.cleanupGatewayDataplane()
 		if err != nil {
-			klog.Errorf("error cleaning the gateway routes to %v", err)
+			klog.Errorf("Error cleaning the gateway routes to %v", err)
 		}
 	}
 
 	err = ovn.netlink.FlushRouteTable(constants.RouteAgentHostNetworkTableID)
 	if err != nil {
-		klog.Errorf("flushing routing table %d returned error: %v",
+		klog.Errorf("Flushing routing table %d returned error: %v",
 			constants.RouteAgentHostNetworkTableID, err)
 	}
 
