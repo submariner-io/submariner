@@ -29,7 +29,10 @@ import (
 	"k8s.io/klog"
 )
 
-const Privileged = true
+const (
+	Privileged         = true
+	doPingRetryTimeout = 5
+)
 
 var (
 	defaultMaxPacketLossCount uint = 5
@@ -111,8 +114,8 @@ func (p *pingerInfo) Start() {
 			default:
 				err := p.doPing()
 				if err != nil {
-					klog.Errorf("Unable to start pinger for IP %q: %v", p.ip, err)
-					return
+					klog.Errorf("Unable to start pinger for IP %q: %v, retry in %d seconds", p.ip, err, doPingRetryTimeout)
+					time.Sleep(doPingRetryTimeout * time.Second)
 				}
 			}
 		}
