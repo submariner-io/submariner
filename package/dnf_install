@@ -10,6 +10,9 @@
 
 INSTALL_ROOT=/output/base
 
+# Limit the number of files so that dnf doesn't spend ages processing fds
+ulimit -n 1048576
+
 while getopts a:kr:v: o
 do
     case "$o" in
