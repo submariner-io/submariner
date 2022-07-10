@@ -124,7 +124,7 @@ func (gs *GatewaySyncer) syncGatewayStatusSafe() {
 	} else if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error getting existing Gateway: %w", err))
 		return
-	} else if !reflect.DeepEqual(gatewayObj.Status, existingGw.Status) {
+	} else if (gatewayObj.Status.HAStatus == v1.HAStatusPassive) || !reflect.DeepEqual(gatewayObj.Status, existingGw.Status) {
 		klog.V(log.TRACE).Infof("Gateway already exists - updating %+v", gatewayObj)
 
 		existingGw.Status = gatewayObj.Status
