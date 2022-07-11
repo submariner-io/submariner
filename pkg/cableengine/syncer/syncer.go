@@ -21,7 +21,6 @@ package syncer
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strconv"
 	"sync"
 	"time"
@@ -30,13 +29,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/resource"
+	"github.com/submariner-io/admiral/pkg/util"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/cableengine"
 	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
 	v1typed "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
@@ -63,7 +63,7 @@ var gatewaySyncIterations = prometheus.NewCounter(prometheus.CounterOpts{
 	Help: "Gateway synchronization iterations",
 })
 
-const updateTimestampAnnotation = "update-timestamp"
+const UpdateTimestampAnnotation = "update-timestamp"
 
 func init() {
 	prometheus.MustRegister(gatewaySyncIterations)
@@ -105,36 +105,47 @@ func (gs *GatewaySyncer) SetGatewayStatusError(err error) {
 	gs.syncGatewayStatusSafe()
 }
 
+func (gs *GatewaySyncer) gatewayResourceInterface() resource.Interface {
+	// nolint:wrapcheck // These functions are pass-through wrappers for the k8s APIs.
+	return &resource.InterfaceFuncs{
+		GetFunc: func(ctx context.Context, name string, options metav1.GetOptions) (runtime.Object, error) {
+			return gs.client.Get(ctx, name, options)
+		},
+		CreateFunc: func(ctx context.Context, obj runtime.Object, options metav1.CreateOptions) (runtime.Object, error) {
+			return gs.client.Create(ctx, obj.(*v1.Gateway), options)
+		},
+		UpdateFunc: func(ctx context.Context, obj runtime.Object, options metav1.UpdateOptions) (runtime.Object, error) {
+			return gs.client.Update(ctx, obj.(*v1.Gateway), options)
+		},
+		DeleteFunc: func(ctx context.Context, name string, options metav1.DeleteOptions) error {
+			return gs.client.Delete(ctx, name, options)
+		},
+	}
+}
+
 func (gs *GatewaySyncer) syncGatewayStatusSafe() {
 	klog.V(log.TRACE).Info("Running Gateway status sync")
 	gatewaySyncIterations.Inc()
 
 	gatewayObj := gs.generateGatewayObject()
 
-	existingGw, err := gs.getLastSyncedGateway(gatewayObj.Name)
+	result, err := util.CreateOrUpdate(context.TODO(), gs.gatewayResourceInterface(), gatewayObj,
+		func(existing runtime.Object) (runtime.Object, error) {
+			existingGw := existing.(*v1.Gateway)
+			existingGw.Status = gatewayObj.Status
+			existingGw.Annotations = gatewayObj.Annotations
 
-	if apierrors.IsNotFound(err) {
-		klog.V(log.TRACE).Infof("Gateway does not exist - creating: %+v", gatewayObj)
-
-		_, err = gs.client.Create(context.TODO(), gatewayObj, metav1.CreateOptions{})
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("error creating Gateway object %+v: %w", gatewayObj, err))
-			return
-		}
-	} else if err != nil {
-		utilruntime.HandleError(fmt.Errorf("error getting existing Gateway: %w", err))
+			return existingGw, nil
+		})
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("error creating/updating Gateway: %w", err))
 		return
-	} else if (gatewayObj.Status.HAStatus == v1.HAStatusPassive) || !reflect.DeepEqual(gatewayObj.Status, existingGw.Status) {
-		klog.V(log.TRACE).Infof("Gateway already exists - updating %+v", gatewayObj)
+	}
 
-		existingGw.Status = gatewayObj.Status
-		existingGw.Annotations = gatewayObj.Annotations
-
-		_, err := gs.client.Update(context.TODO(), existingGw, metav1.UpdateOptions{})
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("error updating Gateway object %+v: %w", gatewayObj, err))
-			return
-		}
+	if result == util.OperationResultCreated {
+		klog.V(log.TRACE).Infof("Gateway does not exist - created: %+v", gatewayObj)
+	} else if result == util.OperationResultUpdated {
+		klog.V(log.TRACE).Infof("Gateway already exists - updated %+v", gatewayObj)
 	} else {
 		klog.V(log.TRACE).Info("Gateway already exists but doesn't need updating")
 	}
@@ -181,9 +192,9 @@ func (gs *GatewaySyncer) cleanupStaleGatewayEntries(localGatewayName string) err
 }
 
 func isGatewayStale(gateway *v1.Gateway) (bool, error) {
-	timestamp, ok := gateway.ObjectMeta.Annotations[updateTimestampAnnotation]
+	timestamp, ok := gateway.ObjectMeta.Annotations[UpdateTimestampAnnotation]
 	if !ok {
-		return true, fmt.Errorf("%q annotation not found", updateTimestampAnnotation)
+		return true, fmt.Errorf("%q annotation not found", UpdateTimestampAnnotation)
 	}
 
 	timestampInt, err := strconv.ParseInt(timestamp, 10, 64)
@@ -196,13 +207,6 @@ func isGatewayStale(gateway *v1.Gateway) (bool, error) {
 	return now >= timestampInt+int64(GatewayStaleTimeout.Seconds()), nil
 }
 
-func (gs *GatewaySyncer) getLastSyncedGateway(name string) (*v1.Gateway, error) {
-	existingGw, err := gs.client.Get(context.TODO(), name, metav1.GetOptions{})
-	klog.V(log.TRACE).Infof("Last synced Gateway: %+v", existingGw)
-
-	return existingGw, err // nolint:wrapcheck // Let the caller wrap it
-}
-
 func (gs *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 	localEndpoint := gs.engine.GetLocalEndpoint()
 
@@ -213,7 +217,7 @@ func (gs *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        resource.EnsureValidName(localEndpoint.Spec.Hostname),
-			Annotations: map[string]string{updateTimestampAnnotation: strconv.FormatInt(time.Now().UTC().Unix(), 10)},
+			Annotations: map[string]string{UpdateTimestampAnnotation: strconv.FormatInt(time.Now().UTC().Unix(), 10)},
 		},
 	}
 
