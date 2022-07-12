@@ -48,7 +48,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/pod"
 	"github.com/submariner-io/submariner/pkg/types"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -377,20 +376,17 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder res
 	}
 
 	// Lock required for leader election
-	rl := resourcelock.ConfigMapLock{
-		ConfigMapMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      "submariner-gateway-lock",
-		},
-		Client: leaderElectionClient.CoreV1(),
-		LockConfig: resourcelock.ResourceLockConfig{
+	rl, err := resourcelock.New(resourcelock.ConfigMapsLeasesResourceLock, namespace, "submariner-gateway-lock",
+		leaderElectionClient.CoreV1(), leaderElectionClient.CoordinationV1(), resourcelock.ResourceLockConfig{
 			Identity:      id + "-submariner-gateway",
 			EventRecorder: recorder,
-		},
+		})
+	if err != nil {
+		return extErrors.Wrap(err, "error creating leader election resource lock")
 	}
 
 	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
-		Lock:          &rl,
+		Lock:          rl,
 		LeaseDuration: time.Duration(gwLeadershipConfig.LeaseDuration) * time.Second,
 		RenewDeadline: time.Duration(gwLeadershipConfig.RenewDeadline) * time.Second,
 		RetryPeriod:   time.Duration(gwLeadershipConfig.RetryPeriod) * time.Second,
