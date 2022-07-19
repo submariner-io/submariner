@@ -24,6 +24,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/iptables"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
+	"github.com/submariner-io/submariner/pkg/port"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
 	"k8s.io/klog"
@@ -44,6 +45,12 @@ func (kp *SyncHandler) Stop(uninstall bool) error {
 			constants.RouteAgentHostNetworkTableID, err)
 	}
 
+	err = kp.netLink.RuleDelIfPresent(netlinkAPI.NewTableRule(constants.RouteAgentHostNetworkTableID))
+	if err != nil {
+		klog.V(log.TRACE).Infof("Deleting IP Rule pointing to %d table returned error: %v",
+			constants.RouteAgentHostNetworkTableID, err)
+	}
+
 	deleteVxLANInterface()
 	deleteIPTableChains()
 
@@ -58,7 +65,7 @@ func deleteVxLANInterface() {
 		},
 		VxlanId: 100,
 		SrcAddr: nil,
-		Port:    VxLANPort,
+		Port:    port.IntraClusterVxLAN,
 	}
 
 	klog.Infof("Deleting the %q interface", VxLANIface)

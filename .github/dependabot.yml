@@ -1,6 +1,20 @@
 ---
 version: 2
 updates:
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: daily
+  - package-ecosystem: github-actions
+    directory: '/'
+    target-branch: "release-0.12"
+    schedule:
+      interval: daily
+  - package-ecosystem: github-actions
+    directory: '/'
+    target-branch: "release-0.13"
+    schedule:
+      interval: daily
   - package-ecosystem: gomod
     directory: "/"
     schedule:
@@ -10,17 +24,7 @@ updates:
       # protobuf must be handled manually
       - dependency-name: google.golang.org/protobuf
       # K8s dependencies must be handled manually
-      - dependency-name: k8s.io/api
-        versions:
-          - "> 0.17.0"
-      - dependency-name: k8s.io/apimachinery
-        versions:
-          - "> 0.17.0"
-      - dependency-name: k8s.io/client-go
-        versions:
-          - "> 0.17.0"
-      - dependency-name: sigs.k8s.io/controller-runtime
-        versions:
-          - "> 0.3.0"
+      - dependency-name: k8s.io/*
+      - dependency-name: sigs.k8s.io/*
       # Our own dependencies are handled during releases
       - dependency-name: github.com/submariner-io/*

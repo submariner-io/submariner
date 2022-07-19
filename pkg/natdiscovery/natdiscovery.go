@@ -29,8 +29,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/submariner-io/submariner/pkg/util"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 )
@@ -77,7 +77,7 @@ func newNATDiscovery(localEndpoint *types.SubmarinerEndpoint) (*natDiscovery, er
 		localEndpoint:   localEndpoint,
 		serverPort:      ndPort,
 		remoteEndpoints: map[string]*remoteEndpointNAT{},
-		findSrcIP:       util.GetLocalIPForDestination,
+		findSrcIP:       endpoint.GetLocalIPForDestination,
 		requestCounter:  requestCounter,
 		readyChannel:    make(chan *NATEndpointInfo, 100),
 	}, nil
@@ -97,8 +97,8 @@ func randomRequestCounter() (uint64, error) {
 
 var errNoNATDiscoveryPort = errors.New("NATT discovery port missing in endpoint")
 
-func extractNATDiscoveryPort(endpoint *v1.EndpointSpec) (int32, error) {
-	natDiscoveryPort, err := endpoint.GetBackendPort(v1.NATTDiscoveryPortConfig, 0)
+func extractNATDiscoveryPort(endPoint *v1.EndpointSpec) (int32, error) {
+	natDiscoveryPort, err := endPoint.GetBackendPort(v1.NATTDiscoveryPortConfig, 0)
 	if err != nil {
 		return natDiscoveryPort, err // nolint:wrapcheck  // No need to wrap this error
 	}
@@ -129,12 +129,12 @@ func (nd *natDiscovery) Run(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (nd *natDiscovery) AddEndpoint(endpoint *v1.Endpoint) {
+func (nd *natDiscovery) AddEndpoint(endPoint *v1.Endpoint) {
 	nd.Lock()
 	defer nd.Unlock()
 
-	if ep, exists := nd.remoteEndpoints[endpoint.Spec.CableName]; exists {
-		if reflect.DeepEqual(ep.endpoint.Spec, endpoint.Spec) {
+	if ep, exists := nd.remoteEndpoints[endPoint.Spec.CableName]; exists {
+		if reflect.DeepEqual(ep.endpoint.Spec, endPoint.Spec) {
 			if ep.isDiscoveryComplete() {
 				nd.readyChannel <- ep.toNATEndpointInfo()
 			}
@@ -142,25 +142,25 @@ func (nd *natDiscovery) AddEndpoint(endpoint *v1.Endpoint) {
 			return
 		}
 
-		klog.V(log.DEBUG).Infof("NAT discovery updated endpoint %q", endpoint.Spec.CableName)
-		delete(nd.remoteEndpoints, endpoint.Spec.CableName)
+		klog.V(log.DEBUG).Infof("NAT discovery updated endpoint %q", endPoint.Spec.CableName)
+		delete(nd.remoteEndpoints, endPoint.Spec.CableName)
 	}
 
-	remoteNAT := newRemoteEndpointNAT(endpoint)
+	remoteNAT := newRemoteEndpointNAT(endPoint)
 
 	// support nat discovery disabled or a remote cluster endpoint which still hasn't implemented this protocol
-	if _, err := extractNATDiscoveryPort(&endpoint.Spec); err != nil || nd.serverPort == 0 {
+	if _, err := extractNATDiscoveryPort(&endPoint.Spec); err != nil || nd.serverPort == 0 {
 		if !errors.Is(err, errNoNATDiscoveryPort) {
-			klog.Errorf("Error extracting NATT discovery port from endpoint %q: %v", endpoint.Spec.CableName, err)
+			klog.Errorf("Error extracting NATT discovery port from endpoint %q: %v", endPoint.Spec.CableName, err)
 		}
 
 		remoteNAT.useLegacyNATSettings()
 		nd.readyChannel <- remoteNAT.toNATEndpointInfo()
 	} else {
-		klog.Infof("Starting NAT discovery for endpoint %q", endpoint.Spec.CableName)
+		klog.Infof("Starting NAT discovery for endpoint %q", endPoint.Spec.CableName)
 	}
 
-	nd.remoteEndpoints[endpoint.Spec.CableName] = remoteNAT
+	nd.remoteEndpoints[endPoint.Spec.CableName] = remoteNAT
 }
 
 func (nd *natDiscovery) RemoveEndpoint(endpointName string) {

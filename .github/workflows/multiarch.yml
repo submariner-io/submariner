@@ -1,0 +1,19 @@
+---
+name: Multi-arch Builds
+
+on:
+  pull_request:
+
+jobs:
+  check-multiarch:
+    name: Check the multi-arch builds
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
+      - name: Set up QEMU (to support building on non-native architectures)
+        uses: docker/setup-qemu-action@8b122486cedac8393e77aa9734c3528886e4a1a8
+      - name: Build the multi-arch images
+        run: make multiarch-images
+      - name: Check that we actually build multi-arch images
+        run: bash -c '[ "$(echo package/*.tar)" != "package/*.tar" ]'

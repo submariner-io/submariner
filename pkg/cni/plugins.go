@@ -16,16 +16,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util_test
+package cni
 
-import (
-	"testing"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+// Supported network plugins.
+const (
+	Generic       = "generic"
+	CanalFlannel  = "canal-flannel"
+	WeaveNet      = "weave-net"
+	OpenShiftSDN  = "OpenShiftSDN"
+	OVNKubernetes = "OVNKubernetes"
+	Calico        = "calico"
 )
-
-func TestUtil(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Util Suite")
-}

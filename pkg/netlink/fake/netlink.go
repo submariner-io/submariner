@@ -26,10 +26,11 @@ import (
 	"syscall"
 
 	. "github.com/onsi/gomega"
+	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/vishvananda/netlink"
 )
 
-type NetLink struct {
+type basicType struct {
 	mutex       sync.Mutex
 	linkIndices map[string]int
 	links       map[string]netlink.Link
@@ -38,24 +39,36 @@ type NetLink struct {
 	rules       map[int]netlink.Rule
 }
 
+type NetLink struct {
+	netlinkAPI.Adapter
+}
+
+var _ netlinkAPI.Interface = &NetLink{}
+
 func New() *NetLink {
 	return &NetLink{
-		linkIndices: map[string]int{},
-		links:       map[string]netlink.Link{},
-		routes:      map[int][]netlink.Route{},
-		neighbors:   map[int][]netlink.Neigh{},
-		rules:       map[int]netlink.Rule{},
+		Adapter: netlinkAPI.Adapter{Basic: &basicType{
+			linkIndices: map[string]int{},
+			links:       map[string]netlink.Link{},
+			routes:      map[int][]netlink.Route{},
+			neighbors:   map[int][]netlink.Neigh{},
+			rules:       map[int]netlink.Rule{},
+		}},
 	}
 }
 
-func (n *NetLink) SetLinkIndex(name string, index int) {
-	n.mutex.Lock()
-	defer n.mutex.Unlock()
-
-	n.linkIndices[name] = index
+func (n *NetLink) basic() *basicType {
+	return n.Adapter.Basic.(*basicType)
 }
 
-func (n *NetLink) LinkAdd(link netlink.Link) error {
+func (n *NetLink) SetLinkIndex(name string, index int) {
+	n.basic().mutex.Lock()
+	defer n.basic().mutex.Unlock()
+
+	n.basic().linkIndices[name] = index
+}
+
+func (n *basicType) LinkAdd(link netlink.Link) error {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
@@ -69,7 +82,7 @@ func (n *NetLink) LinkAdd(link netlink.Link) error {
 	return nil
 }
 
-func (n *NetLink) LinkDel(link netlink.Link) error {
+func (n *basicType) LinkDel(link netlink.Link) error {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
@@ -78,7 +91,7 @@ func (n *NetLink) LinkDel(link netlink.Link) error {
 	return nil
 }
 
-func (n *NetLink) LinkByName(name string) (netlink.Link, error) {
+func (n *basicType) LinkByName(name string) (netlink.Link, error) {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
@@ -90,15 +103,15 @@ func (n *NetLink) LinkByName(name string) (netlink.Link, error) {
 	return link, nil
 }
 
-func (n *NetLink) LinkSetUp(link netlink.Link) error {
+func (n *basicType) LinkSetUp(link netlink.Link) error {
 	return nil
 }
 
-func (n *NetLink) AddrAdd(link netlink.Link, addr *netlink.Addr) error {
+func (n *basicType) AddrAdd(link netlink.Link, addr *netlink.Addr) error {
 	return nil
 }
 
-func (n *NetLink) NeighAppend(neigh *netlink.Neigh) error {
+func (n *basicType) NeighAppend(neigh *netlink.Neigh) error {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
@@ -107,7 +120,7 @@ func (n *NetLink) NeighAppend(neigh *netlink.Neigh) error {
 	return nil
 }
 
-func (n *NetLink) NeighDel(neigh *netlink.Neigh) error {
+func (n *basicType) NeighDel(neigh *netlink.Neigh) error {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
@@ -122,7 +135,7 @@ func (n *NetLink) NeighDel(neigh *netlink.Neigh) error {
 	return nil
 }
 
-func (n *NetLink) RouteAdd(route *netlink.Route) error {
+func (n *basicType) RouteAdd(route *netlink.Route) error {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
@@ -131,7 +144,7 @@ func (n *NetLink) RouteAdd(route *netlink.Route) error {
 	return nil
 }
 
-func (n *NetLink) RouteDel(route *netlink.Route) error {
+func (n *basicType) RouteDel(route *netlink.Route) error {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
@@ -147,7 +160,7 @@ func (n *NetLink) RouteDel(route *netlink.Route) error {
 	return nil
 }
 
-func (n *NetLink) FlushRouteTable(table int) error {
+func (n *basicType) FlushRouteTable(table int) error {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
@@ -166,7 +179,7 @@ func (n *NetLink) FlushRouteTable(table int) error {
 	return nil
 }
 
-func (n *NetLink) RouteGet(destination net.IP) ([]netlink.Route, error) {
+func (n *basicType) RouteGet(destination net.IP) ([]netlink.Route, error) {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
@@ -182,14 +195,14 @@ func (n *NetLink) RouteGet(destination net.IP) ([]netlink.Route, error) {
 	return routes, nil
 }
 
-func (n *NetLink) RouteList(link netlink.Link, family int) ([]netlink.Route, error) {
+func (n *basicType) RouteList(link netlink.Link, family int) ([]netlink.Route, error) {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
 	return n.routes[link.Attrs().Index], nil
 }
 
-func (n *NetLink) RuleAdd(rule *netlink.Rule) error {
+func (n *basicType) RuleAdd(rule *netlink.Rule) error {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
@@ -202,7 +215,7 @@ func (n *NetLink) RuleAdd(rule *netlink.Rule) error {
 	return nil
 }
 
-func (n *NetLink) RuleDel(rule *netlink.Rule) error {
+func (n *basicType) RuleDel(rule *netlink.Rule) error {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
@@ -215,23 +228,23 @@ func (n *NetLink) RuleDel(rule *netlink.Rule) error {
 	return nil
 }
 
-func (n *NetLink) XfrmPolicyAdd(policy *netlink.XfrmPolicy) error {
+func (n *basicType) XfrmPolicyAdd(policy *netlink.XfrmPolicy) error {
 	return nil
 }
 
-func (n *NetLink) XfrmPolicyDel(policy *netlink.XfrmPolicy) error {
+func (n *basicType) XfrmPolicyDel(policy *netlink.XfrmPolicy) error {
 	return nil
 }
 
-func (n *NetLink) XfrmPolicyList(family int) ([]netlink.XfrmPolicy, error) {
+func (n *basicType) XfrmPolicyList(family int) ([]netlink.XfrmPolicy, error) {
 	return []netlink.XfrmPolicy{}, nil
 }
 
-func (n *NetLink) EnableLooseModeReversePathFilter(interfaceName string) error {
+func (n *basicType) EnableLooseModeReversePathFilter(interfaceName string) error {
 	return nil
 }
 
-func (n *NetLink) ConfigureTCPMTUProbe(mtuProbe, baseMss string) error {
+func (n *basicType) ConfigureTCPMTUProbe(mtuProbe, baseMss string) error {
 	return nil
 }
 
@@ -289,12 +302,12 @@ func (n *NetLink) AwaitNoRoutes(linkIndex int, destCIDRs ...string) {
 }
 
 func (n *NetLink) neighborIPList(linkIndex int) []net.IP {
-	n.mutex.Lock()
-	defer n.mutex.Unlock()
+	n.basic().mutex.Lock()
+	defer n.basic().mutex.Unlock()
 
 	ips := []net.IP{}
-	for i := range n.neighbors[linkIndex] {
-		ips = append(ips, n.neighbors[linkIndex][i].IP)
+	for i := range n.basic().neighbors[linkIndex] {
+		ips = append(ips, n.basic().neighbors[linkIndex][i].IP)
 	}
 
 	return ips
@@ -321,10 +334,10 @@ func (n *NetLink) AwaitNoNeighbors(linkIndex int, expIPs ...string) {
 }
 
 func (n *NetLink) getRule(table int) *netlink.Rule {
-	n.mutex.Lock()
-	defer n.mutex.Unlock()
+	n.basic().mutex.Lock()
+	defer n.basic().mutex.Unlock()
 
-	r, found := n.rules[table]
+	r, found := n.basic().rules[table]
 	if !found {
 		return nil
 	}

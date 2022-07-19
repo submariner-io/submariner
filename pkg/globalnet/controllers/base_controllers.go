@@ -73,10 +73,14 @@ func (c *baseSyncerController) Start() error {
 	return c.resourceSyncer.Start(c.stopCh) // nolint:wrapcheck  // Let the caller wrap it
 }
 
-func (c *baseSyncerController) reconcile(client dynamic.ResourceInterface, labelSelector string,
-	transform func(obj *unstructured.Unstructured) runtime.Object) {
+func (c *baseSyncerController) reconcile(client dynamic.ResourceInterface, labelSelector, fieldSelector string,
+	transform func(obj *unstructured.Unstructured) runtime.Object,
+) {
 	c.resourceSyncer.Reconcile(func() []runtime.Object {
-		objList, err := client.List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
+		objList, err := client.List(context.TODO(), metav1.ListOptions{
+			LabelSelector: labelSelector,
+			FieldSelector: fieldSelector,
+		})
 		if err != nil {
 			klog.Errorf("Error listing resources for reconciliation: %v", err)
 			return nil
@@ -96,7 +100,8 @@ func (c *baseSyncerController) reconcile(client dynamic.ResourceInterface, label
 }
 
 func (c *baseIPAllocationController) reserveAllocatedIPs(federator federate.Federator, obj *unstructured.Unstructured,
-	postReserve func(allocatedIPs []string) error) error {
+	postReserve func(allocatedIPs []string) error,
+) error {
 	var reservedIPs []string
 
 	clearAllocatedIPs := func() {}
@@ -153,7 +158,8 @@ func (c *baseIPAllocationController) reserveAllocatedIPs(federator federate.Fede
 }
 
 func (c *baseIPAllocationController) flushRulesAndReleaseIPs(key string, numRequeues int, flushRules func(allocatedIPs []string) error,
-	allocatedIPs ...string) bool {
+	allocatedIPs ...string,
+) bool {
 	if len(allocatedIPs) == 0 {
 		return false
 	}
@@ -205,7 +211,8 @@ func checkStatusChanged(oldStatus, newStatus interface{}, retObj runtime.Object)
 }
 
 func getService(name, namespace string,
-	client dynamic.NamespaceableResourceInterface, scheme *runtime.Scheme) (*corev1.Service, bool, error) {
+	client dynamic.NamespaceableResourceInterface, scheme *runtime.Scheme,
+) (*corev1.Service, bool, error) {
 	obj, err := client.Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil, false, nil
@@ -226,7 +233,8 @@ func getService(name, namespace string,
 }
 
 func createService(svc *corev1.Service,
-	client dynamic.NamespaceableResourceInterface) (*unstructured.Unstructured, error) {
+	client dynamic.NamespaceableResourceInterface,
+) (*unstructured.Unstructured, error) {
 	gnService, err := resourceUtil.ToUnstructured(svc)
 	if err != nil {
 		return nil, err // nolint:wrapcheck  // Let the caller wrap it
@@ -241,7 +249,8 @@ func createService(svc *corev1.Service,
 }
 
 func deleteService(namespace, name string,
-	client dynamic.NamespaceableResourceInterface) error {
+	client dynamic.NamespaceableResourceInterface,
+) error {
 	err := client.Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if apierrors.IsNotFound(err) {
 		klog.Warningf("Could not find Service %s/%s to delete", namespace, name)
@@ -260,7 +269,8 @@ func GetInternalSvcName(name string) string {
 }
 
 func deleteEndpoints(namespace, name string,
-	client dynamic.NamespaceableResourceInterface) error {
+	client dynamic.NamespaceableResourceInterface,
+) error {
 	err := client.Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if apierrors.IsNotFound(err) {
 		klog.Warningf("Could not find Endpoints %s/%s to delete", namespace, name)

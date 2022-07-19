@@ -16,16 +16,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package nbctl_test
+package port
 
-import (
-	"testing"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+const (
+	NATTDiscovery     = 4490
+	ExternalTunnel    = 4500
+	IntraClusterVxLAN = 4800
 )
-
-func TestNbctl(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "NBCTL Test Suite")
-}

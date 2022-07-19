@@ -16,6 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//nolint:dupl // same logic to ingress_endpoints_controllers, but for a different class
 package controllers
 
 import (

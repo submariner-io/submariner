@@ -31,8 +31,8 @@ import (
 	"github.com/submariner-io/admiral/pkg/stringset"
 	submv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/node"
+	"github.com/submariner-io/submariner/pkg/port"
 	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/submariner-io/submariner/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
@@ -40,7 +40,7 @@ import (
 
 func GetLocal(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface) (*types.SubmarinerEndpoint, error) {
 	// We'll panic if submSpec is nil, this is intentional
-	privateIP := util.GetLocalIP()
+	privateIP := GetLocalIP()
 
 	gwNode, err := node.GetLocalNode(k8sClient)
 	if err != nil {
@@ -118,7 +118,7 @@ func getBackendConfig(nodeObj *v1.Node) (map[string]string, error) {
 	if _, ok := backendConfig[submv1.UDPPortConfig]; !ok {
 		udpPort := os.Getenv("CE_IPSEC_NATTPORT")
 		if udpPort == "" {
-			udpPort = submv1.DefaultUDPPort
+			udpPort = strconv.Itoa(port.ExternalTunnel)
 		}
 
 		backendConfig[submv1.UDPPortConfig] = udpPort
@@ -126,7 +126,7 @@ func getBackendConfig(nodeObj *v1.Node) (map[string]string, error) {
 
 	// Enable and publish the natt-discovery-port by default.
 	if _, ok := backendConfig[submv1.NATTDiscoveryPortConfig]; !ok {
-		backendConfig[submv1.NATTDiscoveryPortConfig] = submv1.DefaultNATTDiscoveryPort
+		backendConfig[submv1.NATTDiscoveryPortConfig] = strconv.Itoa(port.NATTDiscovery)
 	}
 
 	// TODO: we should allow the cable drivers to capture and expose BackendConfig settings, instead of doing

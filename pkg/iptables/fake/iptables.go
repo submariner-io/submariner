@@ -169,6 +169,18 @@ func (i *IPTables) ClearChain(table, chain string) error {
 	return nil
 }
 
+func (i *IPTables) ChainExists(table, chain string) (bool, error) {
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
+
+	chainSet := i.tableChains[table]
+	if chainSet != nil {
+		return chainSet.Contains(chain), nil
+	}
+
+	return false, nil
+}
+
 func (i *IPTables) AddChainsFor(table string, chains ...string) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
@@ -221,6 +233,6 @@ func (i *IPTables) AddFailOnDeleteRuleMatcher(stringOrMatcher interface{}) {
 }
 
 func (i *IPTables) DeleteChain(table, chain string) error {
-	// TODO
+	// TODO Implement chain deletion for testing
 	return nil
 }

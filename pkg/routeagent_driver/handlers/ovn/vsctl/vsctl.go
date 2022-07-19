@@ -62,10 +62,22 @@ func AddBridge(bridgeName string) error {
 	return err
 }
 
+func DelBridge(bridgeName string) error {
+	_, err := vsctlCmd("del-br", bridgeName)
+
+	return err
+}
+
 func AddInternalPort(bridgeName, portName, macAddress string, mtu int) error {
 	_, err := vsctlCmd("--may-exist", "add-port", bridgeName, portName, "--",
 		"set", "interface", portName, "type=internal", "mtu_request="+fmt.Sprintf("%d", mtu),
 		fmt.Sprintf("mac=%s", strings.ReplaceAll(macAddress, ":", "\\:")))
+
+	return err
+}
+
+func DelInternalPort(bridgeName, portName string) error {
+	_, err := vsctlCmd("--if-exists", "del-port", bridgeName, portName)
 
 	return err
 }

@@ -25,6 +25,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/iptables"
+	"github.com/submariner-io/submariner/pkg/port"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	iptcommon "github.com/submariner-io/submariner/pkg/routeagent_driver/iptables"
 	"k8s.io/klog"
@@ -53,7 +54,7 @@ func (kp *SyncHandler) createIPTableChains() error {
 
 	klog.V(log.DEBUG).Infof("Allow VxLAN incoming traffic in %q Chain", constants.SmInputChain)
 
-	ruleSpec := []string{"-p", "udp", "-m", "udp", "--dport", strconv.Itoa(VxLANPort), "-j", "ACCEPT"}
+	ruleSpec := []string{"-p", "udp", "-m", "udp", "--dport", strconv.Itoa(port.IntraClusterVxLAN), "-j", "ACCEPT"}
 
 	if err = ipt.AppendUnique(constants.FilterTable, constants.SmInputChain, ruleSpec...); err != nil {
 		return errors.Wrapf(err, "unable to append iptables rule %q", strings.Join(ruleSpec, " "))

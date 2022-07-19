@@ -44,7 +44,6 @@ import (
 	submarinerClientsetv1 "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
 	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions"
 	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/submariner-io/submariner/pkg/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -90,10 +89,52 @@ func testGatewaySyncing() {
 		t.stop()
 	})
 
-	When("the syncer is started", func() {
+	testPeriodicTimestampUpdate := func() {
+		It("should periodically update the Gateway resource timestamp", func() {
+			var lastTimestamp int64
+
+			for i := 0; i < 3; i++ {
+				var currentTimestamp int64
+
+				Eventually(func() int64 {
+					select {
+					case gw := <-t.gatewayUpdated:
+						timestamp, ok := gw.ObjectMeta.Annotations[syncer.UpdateTimestampAnnotation]
+						if !ok {
+							return 0
+						}
+
+						var err error
+
+						currentTimestamp, err = strconv.ParseInt(timestamp, 10, 64)
+						Expect(err).To(Succeed())
+
+						return currentTimestamp
+					default:
+						return lastTimestamp
+					}
+				}, 5).Should(BeNumerically(">", lastTimestamp))
+
+				lastTimestamp = currentTimestamp
+			}
+		})
+	}
+
+	Context("after syncer startup for an active gateway", func() {
+		BeforeEach(func() {
+			t.expectedGateway.Status.HAStatus = submarinerv1.HAStatusActive
+			t.engine.HAStatus = t.expectedGateway.Status.HAStatus
+		})
+
 		It("should create the Gateway resource with the correct information", func() {
 			t.awaitGatewayUpdated(t.expectedGateway)
 		})
+
+		testPeriodicTimestampUpdate()
+	})
+
+	Context("after syncer startup for a passive gateway", func() {
+		testPeriodicTimestampUpdate()
 	})
 
 	When("the cable engine info changes", func() {
@@ -136,12 +177,11 @@ func testGatewaySyncing() {
 			t.engine.Unlock()
 
 			t.awaitGatewayUpdated(t.expectedGateway)
-			t.awaitNoGatewayUpdated()
 		})
 	})
 
 	When("a specific status error is set", func() {
-		It("should create the Gateway resource with the correct StatusFailure", func() {
+		It("should update the Gateway resource with the correct StatusFailure", func() {
 			t.awaitGatewayUpdated(t.expectedGateway)
 
 			statusErr := errors.New("fake error")
@@ -340,7 +380,7 @@ func testGatewayLatencyInfo() {
 				HealthCheckIP: t.pinger.GetIP(),
 			}
 
-			endpointName, err := util.GetEndpointCRDNameFromParams(endpointSpec.ClusterID, endpointSpec.CableName)
+			endpointName, err := endpointSpec.GenerateName()
 			Expect(err).To(Succeed())
 
 			test.CreateResource(t.endpoints, &submarinerv1.Endpoint{
@@ -535,10 +575,6 @@ func (t *testDriver) stop() {
 
 func (t *testDriver) awaitGatewayUpdated(expected *submarinerv1.Gateway) {
 	t.awaitGateway(t.gatewayUpdated, expected)
-}
-
-func (t *testDriver) awaitNoGatewayUpdated() {
-	Consistently(t.gatewayUpdated, syncer.GatewayUpdateInterval+50).ShouldNot(Receive(), "Gateway was unexpectedly received")
 }
 
 func (t *testDriver) awaitGatewayDeleted(expected *submarinerv1.Gateway) {

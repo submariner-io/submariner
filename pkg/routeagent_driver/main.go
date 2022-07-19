@@ -22,22 +22,25 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
+	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	cni "github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/controller"
 	"github.com/submariner-io/submariner/pkg/event/logger"
+	"github.com/submariner-io/submariner/pkg/node"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cabledriver"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
+	cniapi "github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/mtu"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
 	"k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
@@ -68,6 +71,11 @@ func main() {
 		klog.Fatalf("Error building kubeconfig: %s", err.Error())
 	}
 
+	k8sClientSet, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		klog.Fatalf("Error building clientset: %s", err.Error())
+	}
+
 	smClientset, err := submarinerClientset.NewForConfig(cfg)
 	if err != nil {
 		klog.Fatalf("Error building submariner clientset: %s", err.Error())
@@ -76,7 +84,7 @@ func main() {
 	np := os.Getenv("SUBMARINER_NETWORKPLUGIN")
 
 	if np == "" {
-		np = constants.NetworkPluginGeneric
+		np = cni.Generic
 	}
 
 	registry := event.NewRegistry("routeagent_driver", np)
@@ -86,7 +94,7 @@ func main() {
 		ovn.NewHandler(&env, smClientset),
 		cabledriver.NewXRFMCleanupHandler(),
 		cabledriver.NewVXLANCleanup(),
-		mtu.NewMTUHandler(),
+		mtu.NewMTUHandler(env.ClusterCidr, len(env.GlobalCidr) != 0, getTCPMssValue(k8sClientSet)),
 	); err != nil {
 		klog.Fatalf("Error registering the handlers: %s", err.Error())
 	}
@@ -96,14 +104,14 @@ func main() {
 			klog.Warningf("Error stopping handlers: %v", err)
 		}
 
-		if err = annotateNode([]string{}, cfg); err != nil {
+		if err = annotateNode([]string{}, k8sClientSet); err != nil {
 			klog.Warningf("Error removing %q annotation: %v", constants.CNIInterfaceIP, err)
 		}
 
 		return
 	}
 
-	if err = annotateNode(env.ClusterCidr, cfg); err != nil {
+	if err = annotateNode(env.ClusterCidr, k8sClientSet); err != nil {
 		klog.Errorf("Error while annotating the node: %s", err.Error())
 	}
 
@@ -124,7 +132,7 @@ func main() {
 	<-stopCh
 	ctl.Stop()
 
-	klog.Info("All controllers stopped or exited. Stopping submariner-networkplugin-syncer")
+	klog.Info("All controllers stopped or exited. Stopping submariner-route-agent")
 }
 
 func init() {
@@ -133,21 +141,38 @@ func init() {
 		"The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 }
 
-func annotateNode(clusterCidr []string, cfg *restclient.Config) error {
-	k8sClientSet, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		klog.Fatalf("Error building clientset: %s", err.Error())
-	}
-
+func annotateNode(clusterCidr []string, k8sClientSet *kubernetes.Clientset) error {
 	nodeName, ok := os.LookupEnv("NODE_NAME")
 	if !ok {
 		return fmt.Errorf("error reading the NODE_NAME from the environment")
 	}
 
-	err = cni.AnnotateNodeWithCNIInterfaceIP(nodeName, k8sClientSet, clusterCidr)
+	err := cniapi.AnnotateNodeWithCNIInterfaceIP(nodeName, k8sClientSet, clusterCidr)
 	if err != nil {
 		return errors.Wrap(err, "error annotating node with CNI interface IP")
 	}
 
 	return nil
+}
+
+func getTCPMssValue(k8sClientSet *kubernetes.Clientset) int {
+	localNode, err := node.GetLocalNode(k8sClientSet)
+	if err != nil {
+		klog.Errorf("Error getting information on the local node: %s", err.Error())
+		return 0
+	}
+
+	tcpMssStr := localNode.GetAnnotations()[v1.TCPMssValue]
+
+	if tcpMssStr == "" {
+		return 0
+	}
+
+	tcpMssValue, err := strconv.Atoi(tcpMssStr)
+	if err != nil {
+		klog.Errorf("Error parsing %q annotation", v1.TCPMssValue)
+		return 0
+	}
+
+	return tcpMssValue
 }

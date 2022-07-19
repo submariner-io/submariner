@@ -24,12 +24,12 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
+	"github.com/submariner-io/admiral/pkg/resource"
 	resourceSyncer "github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/submariner-io/submariner/pkg/util"
 	k8sv1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,7 +51,8 @@ type DatastoreSyncer struct {
 }
 
 func New(syncerConfig *broker.SyncerConfig, localCluster *types.SubmarinerCluster,
-	localEndpoint *types.SubmarinerEndpoint) *DatastoreSyncer {
+	localEndpoint *types.SubmarinerEndpoint,
+) *DatastoreSyncer {
 	// We'll panic if syncerConfig, localCluster or localEndpoint are nil, this is intentional
 	syncerConfig.LocalClusterID = localCluster.Spec.ClusterID
 
@@ -224,11 +225,11 @@ func (d *DatastoreSyncer) ensureExclusiveEndpoint(syncer *broker.Syncer) error {
 			continue
 		}
 
-		if util.CompareEndpointSpec(&endpoint.Spec, &d.localEndpoint.Spec) {
+		if endpoint.Spec.Equals(&d.localEndpoint.Spec) {
 			continue
 		}
 
-		endpointName, err := util.GetEndpointCRDNameFromParams(endpoint.Spec.ClusterID, endpoint.Spec.CableName)
+		endpointName, err := endpoint.Spec.GenerateName()
 		if err != nil {
 			klog.Errorf("Error extracting the submariner Endpoint name from %#v: %v", endpoint, err)
 			continue
@@ -294,7 +295,7 @@ func (d *DatastoreSyncer) createLocalCluster() error {
 
 	cluster := &submarinerv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: util.EnsureValidName(d.localCluster.Spec.ClusterID),
+			Name: resource.EnsureValidName(d.localCluster.Spec.ClusterID),
 		},
 		Spec: d.localCluster.Spec,
 	}
@@ -305,7 +306,7 @@ func (d *DatastoreSyncer) createLocalCluster() error {
 func (d *DatastoreSyncer) createOrUpdateLocalEndpoint() error {
 	klog.Infof("Creating local submariner Endpoint: %#v ", d.localEndpoint)
 
-	endpointName, err := util.GetEndpointCRDName(&d.localEndpoint)
+	endpointName, err := d.localEndpoint.Spec.GenerateName()
 	if err != nil {
 		return errors.Wrapf(err, "error extracting the submariner Endpoint name from %#v", d.localEndpoint)
 	}

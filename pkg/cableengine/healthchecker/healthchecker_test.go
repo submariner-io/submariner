@@ -30,7 +30,6 @@ import (
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
 	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker/fake"
-	"github.com/submariner-io/submariner/pkg/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
@@ -112,7 +111,7 @@ var _ = Describe("Controller", func() {
 			HealthCheckIP: healthCheckIP,
 		}
 
-		endpointName, err := util.GetEndpointCRDNameFromParams(endpointSpec.ClusterID, endpointSpec.CableName)
+		endpointName, err := endpointSpec.GenerateName()
 		Expect(err).To(Succeed())
 
 		endpoint := &submarinerv1.Endpoint{

@@ -146,7 +146,7 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams, egressIPT
 		Scheduling:    p.FromClusterScheduling,
 		Networking:    p.Networking,
 		ContainerName: "connector-pod",
-		ImageName:     "quay.io/submariner/nettest:devel",
+		ImageName:     framework.TestContext.NettestImageURL,
 		Command:       []string{"sleep", "600"},
 	})
 
@@ -185,7 +185,7 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams, egressIPT
 }
 
 func execCmdInBash(p tcp.ConnectivityTestParams, cmd []string, pod *v1.Pod) (string, string, error) {
-	execOptions := &framework.ExecOptions{
+	execOptions := framework.ExecOptions{
 		Command:            cmd,
 		Namespace:          pod.Namespace,
 		PodName:            pod.Name,
@@ -196,7 +196,7 @@ func execCmdInBash(p tcp.ConnectivityTestParams, cmd []string, pod *v1.Pod) (str
 		PreserveWhitespace: true,
 	}
 
-	return p.Framework.ExecWithOptions(execOptions, p.FromCluster)
+	return p.Framework.ExecWithOptions(&execOptions, p.FromCluster)
 }
 
 func getGlobalIngressIP(p tcp.ConnectivityTestParams, service *v1.Service) string {
@@ -243,7 +243,8 @@ func GetGlobalnetEgressParams(egressIP GlobalEgressIPType) GlobalnetTestParams {
 }
 
 func CanExecuteNonGatewayConnectivityTest(sourceNode, destNode framework.NetworkPodScheduling,
-	sourceCluster, destCluster framework.ClusterIndex) bool {
+	sourceCluster, destCluster framework.ClusterIndex,
+) bool {
 	if sourceNode == framework.NonGatewayNode &&
 		framework.TestContext.NumNodesInCluster[sourceCluster] == 1 {
 		framework.Skipf("Skipping the test as cluster %q has only a single node...",

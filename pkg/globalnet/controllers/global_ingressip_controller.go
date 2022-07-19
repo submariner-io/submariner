@@ -66,7 +66,7 @@ func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipa
 		return nil, errors.Wrap(err, "error converting resource")
 	}
 
-	federator := federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
+	federator := federate.NewUpdateStatusFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
 
 	client := config.SourceClient.Resource(*gvr)
 
@@ -82,20 +82,30 @@ func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipa
 
 		// nolint:wrapcheck  // No need to wrap these errors.
 		err = controller.reserveAllocatedIPs(federator, obj, func(reservedIPs []string) error {
+			var target string
+			var tType iptables.TargetType
+
 			metrics.RecordAllocateGlobalIngressIPs(pool.GetCIDR(), len(reservedIPs))
+
 			if gip.Spec.Target == submarinerv1.ClusterIPService {
 				return controller.ensureInternalServiceExists(gip)
 			} else if gip.Spec.Target == submarinerv1.HeadlessServicePod {
-				target := gip.GetAnnotations()[headlessSvcPodIP]
-				err := controller.iptIface.AddIngressRulesForHeadlessSvcPod(reservedIPs[0], target)
-				if err != nil {
-					return err
-				}
-
-				key, _ := cache.MetaNamespaceKeyFunc(obj)
-				return controller.iptIface.AddEgressRulesForHeadlessSVCPods(key, target, reservedIPs[0], globalNetIPTableMark)
+				target = gip.GetAnnotations()[headlessSvcPodIP]
+				tType = iptables.PodTarget
+			} else if gip.Spec.Target == submarinerv1.HeadlessServiceEndpoints {
+				target = gip.GetAnnotations()[headlessSvcEndpointsIP]
+				tType = iptables.EndpointsTarget
+			} else {
+				return nil
 			}
-			return nil
+
+			err := controller.iptIface.AddIngressRulesForHeadlessSvc(reservedIPs[0], target, tType)
+			if err != nil {
+				return err
+			}
+
+			key, _ := cache.MetaNamespaceKeyFunc(obj)
+			return controller.iptIface.AddEgressRulesForHeadlessSvc(key, target, reservedIPs[0], globalNetIPTableMark, tType)
 		})
 
 		if err != nil {
@@ -125,7 +135,8 @@ func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipa
 func (c *globalIngressIPController) process(from runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
 	ingressIP := from.(*submarinerv1.GlobalIngressIP)
 
-	klog.Infof("Processing %sd %#v", op, ingressIP)
+	klog.Infof("Processing %sd %s/%s, TargetRef: %q, %q, Status: %#v", op, ingressIP.Namespace,
+		ingressIP.Name, ingressIP.Spec.Target, c.getTargetReference(ingressIP), ingressIP.Status)
 
 	switch op {
 	case syncer.Create:
@@ -149,8 +160,6 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 
 	key, _ := cache.MetaNamespaceKeyFunc(ingressIP)
 
-	klog.Infof("Allocating global IP for %q", key)
-
 	ips, err := c.pool.Allocate(1)
 	if err != nil {
 		klog.Errorf("Error allocating IP for %q: %v", key, err)
@@ -164,6 +173,8 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 
 		return true
 	}
+
+	klog.Infof("Allocated global IP %q for %q", ips, key)
 
 	if ingressIP.Spec.Target == submarinerv1.ClusterIPService {
 		serviceRef := ingressIP.Spec.ServiceRef
@@ -213,24 +224,35 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 
 			return false
 		}
-	} else if ingressIP.Spec.Target == submarinerv1.HeadlessServicePod {
-		podIP := ingressIP.GetAnnotations()[headlessSvcPodIP]
-		if podIP == "" {
+	} else {
+		var annotationKey string
+		var tType iptables.TargetType
+
+		if ingressIP.Spec.Target == submarinerv1.HeadlessServicePod {
+			annotationKey = headlessSvcPodIP
+			tType = iptables.PodTarget
+		} else if ingressIP.Spec.Target == submarinerv1.HeadlessServiceEndpoints {
+			annotationKey = headlessSvcEndpointsIP
+			tType = iptables.EndpointsTarget
+		}
+
+		target := ingressIP.GetAnnotations()[annotationKey]
+		if target == "" {
 			_ = c.pool.Release(ips...)
 
-			klog.Warningf("%q annotation is missing on %q", headlessSvcPodIP, key)
+			klog.Warningf("%q annotation is missing on %q", annotationKey, key)
 
 			return true
 		}
 
-		err = c.iptIface.AddIngressRulesForHeadlessSvcPod(ips[0], podIP)
+		err = c.iptIface.AddIngressRulesForHeadlessSvc(ips[0], target, tType)
 		if err != nil {
-			klog.Errorf("Error while programming Service %q ingress rules for Pod: %v", key, err)
+			klog.Errorf("Error while programming Service %q ingress rules for %v: %v", key, tType, err)
 			err = errors.WithMessage(err, "Error programming ingress rules")
 		} else {
-			err = c.iptIface.AddEgressRulesForHeadlessSVCPods(key, podIP, ips[0], globalNetIPTableMark)
+			err = c.iptIface.AddEgressRulesForHeadlessSvc(key, target, ips[0], globalNetIPTableMark, tType)
 			if err != nil {
-				_ = c.iptIface.RemoveIngressRulesForHeadlessSvcPod(ips[0], podIP)
+				_ = c.iptIface.RemoveIngressRulesForHeadlessSvc(ips[0], target, tType)
 				err = errors.WithMessage(err, "Error programming egress rules")
 			}
 		}
@@ -302,16 +324,25 @@ func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngre
 	}
 
 	return c.flushRulesAndReleaseIPs(key, numRequeues, func(allocatedIPs []string) error {
-		metrics.RecordDeallocateGlobalIngressIPs(c.pool.GetCIDR(), len(allocatedIPs))
-		if ingressIP.Spec.Target == submarinerv1.HeadlessServicePod {
-			podIP := ingressIP.GetAnnotations()[headlessSvcPodIP]
-			if podIP != "" {
-				if err := c.iptIface.RemoveIngressRulesForHeadlessSvcPod(ingressIP.Status.AllocatedIP, podIP); err != nil {
-					return err
-				}
+		var target string
+		var tType iptables.TargetType
 
-				return c.iptIface.RemoveEgressRulesForHeadlessSVCPods(key, podIP, ingressIP.Status.AllocatedIP, globalNetIPTableMark)
+		metrics.RecordDeallocateGlobalIngressIPs(c.pool.GetCIDR(), len(allocatedIPs))
+
+		if ingressIP.Spec.Target == submarinerv1.HeadlessServicePod {
+			target = ingressIP.GetAnnotations()[headlessSvcPodIP]
+			tType = iptables.PodTarget
+		} else if ingressIP.Spec.Target == submarinerv1.HeadlessServiceEndpoints {
+			target = ingressIP.GetAnnotations()[headlessSvcEndpointsIP]
+			tType = iptables.EndpointsTarget
+		}
+
+		if target != "" {
+			if err := c.iptIface.RemoveIngressRulesForHeadlessSvc(ingressIP.Status.AllocatedIP, target, tType); err != nil {
+				return err
 			}
+
+			return c.iptIface.RemoveEgressRulesForHeadlessSvc(key, target, ingressIP.Status.AllocatedIP, globalNetIPTableMark, tType)
 		}
 
 		return nil
@@ -339,8 +370,27 @@ func (c *globalIngressIPController) ensureInternalServiceExists(ingressIP *subma
 
 		_ = deleteService(ingressIP.Namespace, internalSvc, c.services)
 
-		return fmt.Errorf("globalIP assigned to %q does not match with Internal Service ExternalIP", key)
+		return fmt.Errorf("globalIP %q assigned to %q does not match with Internal Service ExternalIP %q",
+			c.getServiceExternalIP(service), key, ingressIP.Status.AllocatedIP)
 	}
 
 	return nil
+}
+
+func (c *globalIngressIPController) getServiceExternalIP(service *corev1.Service) string {
+	if len(service.Spec.ExternalIPs) == 0 {
+		return ""
+	}
+
+	return service.Spec.ExternalIPs[0]
+}
+
+func (c *globalIngressIPController) getTargetReference(giip *submarinerv1.GlobalIngressIP) string {
+	if giip.Spec.Target == submarinerv1.ClusterIPService {
+		return giip.Spec.ServiceRef.Name
+	} else if giip.Spec.Target == submarinerv1.HeadlessServicePod {
+		return giip.Spec.PodRef.Name
+	}
+
+	return ""
 }

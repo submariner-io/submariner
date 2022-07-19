@@ -95,11 +95,7 @@ const (
 	PreferredServerConfig   = "preferred-server"
 	PublicIP                = "public-ip"
 	UsingLoadBalancer       = "using-loadbalancer"
-)
-
-const (
-	DefaultNATTDiscoveryPort = "4490"
-	DefaultUDPPort           = "4500"
+	TCPMssValue             = "submariner.io/tcp-clamp-mss"
 )
 
 // Valid PublicIP resolvers.
@@ -323,8 +319,9 @@ type GlobalIngressIPSpec struct {
 type TargetType string
 
 const (
-	ClusterIPService   TargetType = "ClusterIPService"
-	HeadlessServicePod TargetType = "HeadlessServicePod"
+	ClusterIPService         TargetType = "ClusterIPService"
+	HeadlessServicePod       TargetType = "HeadlessServicePod"
+	HeadlessServiceEndpoints TargetType = "HeadlessServiceEndpoints"
 )
 
 type GlobalIngressIPStatus struct {

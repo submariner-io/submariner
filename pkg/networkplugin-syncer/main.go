@@ -23,11 +23,11 @@ import (
 	"os"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/controller"
 	"github.com/submariner-io/submariner/pkg/event/logger"
 	"github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -59,7 +59,7 @@ func main() {
 	networkPlugin := os.Getenv("SUBMARINER_NETWORKPLUGIN")
 
 	if networkPlugin == "" {
-		networkPlugin = constants.NetworkPluginGeneric
+		networkPlugin = cni.Generic
 	}
 
 	registry := event.NewRegistry("networkplugin-syncer", networkPlugin)

@@ -46,15 +46,15 @@ var _ = Describe("MTUHandler", func() {
 		ipset.NewFunc = func() ipset.Interface {
 			return ipSet
 		}
-		handler = mtu.NewMTUHandler()
+		handler = mtu.NewMTUHandler([]string{"10.1.0.0/24"}, false, 0)
 	})
 
 	AfterEach(func() {
 		iptables.NewFunc = nil
 	})
 
-	When("When endpoint is added and removed", func() {
-		It("Should add and remove iptable rules", func() {
+	When("endpoint is added and removed", func() {
+		It("should add and remove iptable rules", func() {
 			Expect(handler.Init()).To(Succeed())
 			ipt.AwaitRule(constants.MangleTable, constants.SmPostRoutingChain, ContainSubstring(constants.RemoteCIDRIPSet+" src"))
 			ipt.AwaitRule(constants.MangleTable, constants.SmPostRoutingChain, ContainSubstring(constants.RemoteCIDRIPSet+" dst"))
