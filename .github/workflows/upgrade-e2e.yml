@@ -3,6 +3,7 @@ name: Upgrade
 
 on:
   pull_request:
+    branches: [devel]
 
 jobs:
   upgrade-e2e:
