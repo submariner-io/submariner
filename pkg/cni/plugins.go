@@ -22,6 +22,7 @@ package cni
 const (
 	Generic       = "generic"
 	CanalFlannel  = "canal-flannel"
+	Flannel       = "flannel"
 	WeaveNet      = "weave-net"
 	OpenShiftSDN  = "OpenShiftSDN"
 	OVNKubernetes = "OVNKubernetes"
