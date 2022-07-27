@@ -53,10 +53,10 @@ Currently assuming Linux Kernel WireGuard (`wgtypes.LinuxKernel`).
 
   you probably did not install WireGuard on the Gateway node.
 
-- The e2e tests can be run with WireGuard by setting `DEPLOY_ARGS` before calling `make e2e`
+- The e2e tests can be run with WireGuard by calling `make e2e` with `using=wireguard`:
 
   ```shell
-  export DEPLOY_ARGS="--deploytool operator --deploytool_submariner_args '--cable-driver=wireguard'"
+  make e2e using=wireguard
   ```
 
 - No new `iptables` rules were added, although source NAT needs to be disabled for cross cluster communication. This is similar to disabling
