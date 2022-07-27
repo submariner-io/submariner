@@ -79,8 +79,8 @@ func (kp *SyncHandler) GetName() string {
 
 func (kp *SyncHandler) GetNetworkPlugins() []string {
 	return []string{
-		cni.Generic, cni.CanalFlannel, cni.WeaveNet,
-		cni.OpenShiftSDN, cni.Calico,
+		cni.Generic, cni.CanalFlannel, cni.Flannel,
+		cni.WeaveNet, cni.OpenShiftSDN, cni.Calico,
 	}
 }
 
