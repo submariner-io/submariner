@@ -142,7 +142,7 @@ func init() {
 }
 
 func startHTTPServer() *http.Server {
-	srv := &http.Server{Addr: ":8081"}
+	srv := &http.Server{Addr: ":8081", ReadHeaderTimeout: 60 * time.Second}
 
 	http.Handle("/metrics", promhttp.Handler())
 

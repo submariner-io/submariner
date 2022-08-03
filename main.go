@@ -318,7 +318,7 @@ func submarinerClusterFrom(submSpec *types.SubmarinerSpecification) *types.Subma
 }
 
 func startHTTPServer() *http.Server {
-	srv := &http.Server{Addr: ":8080"}
+	srv := &http.Server{Addr: ":8080", ReadHeaderTimeout: 60 * time.Second}
 
 	http.Handle("/metrics", promhttp.Handler())
 
