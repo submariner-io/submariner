@@ -28,7 +28,7 @@ import (
 )
 
 // Ensure the core submariner ovn topology is setup and current.
-// Creates the foolowing resources
+// Creates the following resources
 //
 // (localnetPort) - subGatewaySwitch
 //
@@ -173,7 +173,7 @@ func (ovn *SyncHandler) associateSubmarinerRouterToChassis(chassis *sbdb.Chassis
 }
 
 // createOrUpdateSubmarinerExternalPort ensures that the submariner external Port
-// can communicate with the node where the gaetway switch is located.
+// can communicate with the node where the gateway switch is located.
 func (ovn *SyncHandler) createOrUpdateSubmarinerExternalPort() error {
 	klog.Info("Ensuring connection between submariner router and submariner gateway switch")
 
