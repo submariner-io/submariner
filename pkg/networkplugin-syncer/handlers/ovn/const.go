@@ -50,8 +50,8 @@ const (
 	ovnClusterSubmarinerIP     = "169.254.254.2"
 	ovnRoutePoliciesPrio       = 20000
 
-	// default ovsdb timout used by ovn-k.
-	OVSDBTimeout   = 10 * time.Second
+	// default ovsdb timeout used by ovn-k.
+	OVSDBTimeout   = 20 * time.Second
 	ovnCert        = "secret://openshift-ovn-kubernetes/ovn-cert/tls.crt"
 	ovnPrivKey     = "secret://openshift-ovn-kubernetes/ovn-cert/tls.key"
 	ovnCABundle    = "configmap://openshift-ovn-kubernetes/ovn-ca/ca-bundle.crt"
