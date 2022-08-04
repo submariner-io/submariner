@@ -19,8 +19,10 @@ limitations under the License.
 package ovn
 
 import (
+	"github.com/pkg/errors"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn/vsctl"
+	"github.com/vishvananda/netlink"
 	"k8s.io/klog"
 )
 
@@ -41,17 +43,44 @@ func (ovn *Handler) Stop(uninstall bool) error {
 		klog.Errorf("Error deleting Submariner bridge %q due to %v", ovnK8sSubmarinerBridge, err)
 	}
 
-	if ovn.isGateway {
-		err = ovn.cleanupGatewayDataplane()
-		if err != nil {
-			klog.Errorf("Error cleaning the gateway routes to %v", err)
-		}
+	err = ovn.cleanupRoutes()
+	if err != nil {
+		klog.Errorf("Error cleaning the routes %v", err)
+	}
+
+	err = ovn.netlink.FlushRouteTable(constants.RouteAgentInterClusterNetworkTableID)
+	if err != nil {
+		klog.Errorf("Flushing routing table %d returned error: %v",
+			constants.RouteAgentInterClusterNetworkTableID, err)
 	}
 
 	err = ovn.netlink.FlushRouteTable(constants.RouteAgentHostNetworkTableID)
 	if err != nil {
 		klog.Errorf("Flushing routing table %d returned error: %v",
 			constants.RouteAgentHostNetworkTableID, err)
+	}
+
+	err = ovn.cleanupForwardingIptables()
+	if err != nil {
+		klog.Errorf("Error deleting iptable rules %v", err)
+	}
+
+	return nil
+}
+
+func (ovn *Handler) cleanupRoutes() error {
+	rules, err := netlink.RuleList(netlink.FAMILY_V4)
+	if err != nil {
+		return errors.Wrapf(err, "error listing rules")
+	}
+
+	for i := range rules {
+		if rules[i].Table == constants.RouteAgentInterClusterNetworkTableID || rules[i].Table == constants.RouteAgentHostNetworkTableID {
+			err = netlink.RuleDel(&rules[i])
+			if err != nil {
+				return errors.Wrapf(err, "error deleting the rule %v", rules[i])
+			}
+		}
 	}
 
 	return nil
