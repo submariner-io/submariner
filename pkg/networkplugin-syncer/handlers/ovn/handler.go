@@ -189,7 +189,7 @@ func (ovn *SyncHandler) updateGatewayNode() error {
 		return err
 	}
 
-	// Associate the port to an specific chassis (=host) on OVN so the traffic flows out/in through that host
+	// Associate the port to a specific chassis (=host) on OVN so the traffic flows out/in through that host
 	// the active submariner-gateway in our case.
 	if err := ovn.associateSubmarinerRouterToChassis(chassis); err != nil {
 		return err

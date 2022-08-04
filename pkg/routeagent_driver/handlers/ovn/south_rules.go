@@ -34,7 +34,7 @@ func (ovn *Handler) handleSubnets(subnets []string, ruleFunc func(rule *netlink.
 ) error {
 	for _, subnetToHandle := range subnets {
 		for _, localSubnet := range ovn.localEndpoint.Spec.Subnets {
-			rule, err := ovn.programRule(localSubnet, subnetToHandle, constants.RouteAgentInterClusterNetworkTableID)
+			rule, err := ovn.getRuleSpec(localSubnet, subnetToHandle, constants.RouteAgentInterClusterNetworkTableID)
 			if err != nil {
 				return errors.Wrapf(err, "error creating rule %#v", rule)
 			}
@@ -49,7 +49,7 @@ func (ovn *Handler) handleSubnets(subnets []string, ruleFunc func(rule *netlink.
 	return nil
 }
 
-func (ovn *Handler) programRule(dest, src string, tableID int) (*netlink.Rule, error) {
+func (ovn *Handler) getRuleSpec(dest, src string, tableID int) (*netlink.Rule, error) {
 	rule := netlink.NewRule()
 
 	if dest != "" {

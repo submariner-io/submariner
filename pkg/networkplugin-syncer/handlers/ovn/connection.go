@@ -24,7 +24,6 @@ import (
 	"crypto/x509"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/cenkalti/backoff/v4"
 	libovsdbclient "github.com/ovn-org/libovsdb/client"
@@ -115,15 +114,13 @@ func getOVNTLSConfig(pkFile, certFile, caFile string) (*tls.Config, error) {
 }
 
 func createLibovsdbClient(dbAddress string, tlsConfig *tls.Config, dbModel model.ClientDBModel) (libovsdbclient.Client, error) {
-	// following the same connection timeout ovn-k uses
-	const connectTimeout time.Duration = 20 * time.Second
 	logger := klogr.New()
 
 	options := []libovsdbclient.Option{
 		// Reading and parsing the DB after reconnect at scale can (unsurprisingly)
 		// take longer than a normal ovsdb operation. Give it a bit more time so
 		// we don't time out and enter a reconnect loop.
-		libovsdbclient.WithReconnect(connectTimeout, &backoff.ZeroBackOff{}),
+		libovsdbclient.WithReconnect(OVSDBTimeout, &backoff.ZeroBackOff{}),
 		libovsdbclient.WithLogger(&logger),
 		libovsdbclient.WithEndpoint(dbAddress),
 	}
@@ -137,7 +134,7 @@ func createLibovsdbClient(dbAddress string, tlsConfig *tls.Config, dbModel model
 		return nil, errors.Wrap(err, "error creating ovsdbClient")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), connectTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), OVSDBTimeout)
 	defer cancel()
 
 	err = client.Connect(ctx)
