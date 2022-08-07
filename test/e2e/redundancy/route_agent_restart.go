@@ -48,6 +48,11 @@ func testRouteAgentRestart(f *subFramework.Framework, onGateway bool) {
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
 	nodes := f.FindNodesByGatewayLabel(framework.ClusterA, onGateway)
+	if len(nodes) == 0 && !onGateway {
+		framework.Skipf("Skipping the test as cluster %q doesn't have any suitable non-gateway nodes...", clusterAName)
+		return
+	}
+
 	By(fmt.Sprintf("Found node %q on %q", nodes[0].Name, clusterAName))
 	node := nodes[0]
 
