@@ -137,23 +137,20 @@ func defaultEndpointType() tcp.EndpointType {
 }
 
 func testGatewayFailOverScenario(f *subFramework.Framework) {
-	if framework.TestContext.NumNodesInCluster[framework.ClusterA] == 1 {
-		framework.Skipf("Skipping the test as cluster %q has only a single node...",
-			framework.TestContext.ClusterIDs[framework.ClusterA])
-		return
-	}
-
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
+
+	nonGatewayNodes := f.FindNodesByGatewayLabel(framework.ClusterA, false)
+	if len(nonGatewayNodes) == 0 {
+		framework.Skipf("Skipping the test as cluster %q doesn't have any suitable non-gateway nodes...", clusterAName)
+		return
+	}
 
 	gatewayNodes := f.FindNodesByGatewayLabel(framework.ClusterA, true)
 	Expect(gatewayNodes).To(HaveLen(1), fmt.Sprintf("Expected only one gateway node on %q", clusterAName))
 
 	initialGatewayNode := gatewayNodes[0]
 	By(fmt.Sprintf("Found gateway node %q on %q", initialGatewayNode.Name, clusterAName))
-
-	nonGatewayNodes := f.FindNodesByGatewayLabel(framework.ClusterA, false)
-	Expect(len(nonGatewayNodes) > 0).To(BeTrue(), fmt.Sprintf("Expected at least one non-gateway node on %q", clusterAName))
 
 	initialNonGatewayNode := nonGatewayNodes[0]
 	By(fmt.Sprintf("Found non-gateway node %q on %q", initialNonGatewayNode.Name, clusterAName))
