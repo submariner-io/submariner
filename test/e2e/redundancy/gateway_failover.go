@@ -43,18 +43,23 @@ const (
 var _ = Describe("[redundancy] Gateway fail-over tests", func() {
 	f := subFramework.NewFramework("gateway-redundancy")
 
-	// After each test, we make sure that the system again has a single gateway, the active one
-	AfterEach(f.GatewayCleanup)
-
 	When("one gateway node is configured and the submariner gateway pod fails", func() {
 		It("should start a new submariner gateway pod and be able to connect from another cluster", func() {
 			testGatewayPodRestartScenario(f)
+		})
+
+		AfterEach(func() {
+			f.RestoreClustersGatewaysState()
 		})
 	})
 
 	When("a new node is labeled as a gateway node and the label on the existing gateway node is removed", func() {
 		It("should start a submariner gateway on the new gateway node and be able to connect from another cluster", func() {
 			testGatewayFailOverScenario(f)
+		})
+
+		AfterEach(func() {
+			f.RestoreClustersGatewaysState()
 		})
 	})
 })
