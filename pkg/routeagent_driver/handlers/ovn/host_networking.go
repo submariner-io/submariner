@@ -97,7 +97,7 @@ func (ovn *Handler) programRulesForRemoteSubnets(subnets []string, ruleFunc func
 	ignoredErrorFunc func(error) bool,
 ) error {
 	for _, remoteSubnet := range subnets {
-		rule, err := ovn.programRule(remoteSubnet, "", constants.RouteAgentHostNetworkTableID)
+		rule, err := ovn.getRuleSpec(remoteSubnet, "", constants.RouteAgentHostNetworkTableID)
 		if err != nil {
 			return errors.Wrapf(err, "error creating rule %#v", rule)
 		}

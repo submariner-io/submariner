@@ -32,17 +32,15 @@ endif
 include $(SHIPYARD_DIR)/Makefile.inc
 
 TARGETS := $(shell ls -p scripts | grep -v -e /)
-override BUILD_ARGS += --ldflags '-X main.VERSION=$(VERSION)'
+export LDFLAGS = -X main.VERSION=$(VERSION)
 
 ifneq (,$(filter external-net,$(_using)))
-override E2E_ARGS += --testdir test/external
-override DEPLOY_ARGS += --plugin scripts/e2e/external/hook
-override CLEANUP_ARGS += --plugin scripts/e2e/external/hook
+export TESTDIR = test/external
+export PLUGIN = scripts/e2e/external/hook
 endif
 
 override E2E_ARGS += cluster2 cluster1
 override UNIT_TEST_ARGS += test
-override VALIDATE_ARGS += --skip-dirs pkg/client
 
 # When cross-building, we need to map Go architectures and operating systems to Docker buildx platforms:
 # Docker buildx platform | Fedora support? | Go
@@ -84,16 +82,16 @@ bin/protoc:
 	rm -f protoc-$(PROTOC_VERSION)-linux-x86_64.zip
 
 bin/%/submariner-gateway: vendor/modules.txt main.go $(shell find pkg -not \( -path 'pkg/globalnet*' -o -path 'pkg/routeagent*' \)) pkg/natdiscovery/proto/natdiscovery.pb.go
-	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ . $(BUILD_ARGS)
+	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ .
 
 bin/%/submariner-route-agent: vendor/modules.txt $(shell find pkg/routeagent_driver)
-	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ ./pkg/routeagent_driver $(BUILD_ARGS)
+	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ ./pkg/routeagent_driver
 
 bin/%/submariner-globalnet: vendor/modules.txt $(shell find pkg/globalnet)
-	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ ./pkg/globalnet $(BUILD_ARGS)
+	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ ./pkg/globalnet
 
 bin/%/submariner-networkplugin-syncer: vendor/modules.txt $(shell find pkg/networkplugin-syncer)
-	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ ./pkg/networkplugin-syncer $(BUILD_ARGS)
+	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ ./pkg/networkplugin-syncer
 
 nullstring :=
 space := $(nullstring) # end of the line
@@ -108,7 +106,7 @@ ARCH_BINARIES := $(foreach arch,$(subst $(comma),$(space),$(ARCHES)),$(foreach b
 
 build: $(ARCH_BINARIES)
 
-licensecheck: BUILD_ARGS=--debug
+licensecheck: export BUILD_DEBUG = true
 licensecheck: $(ARCH_BINARIES) bin/lichen
 	bin/lichen -c .lichen.yaml $(ARCH_BINARIES)
 
