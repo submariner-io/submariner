@@ -1,0 +1,12 @@
+---
+ignore:
+  # False positive, CVE is actually about the C++ project protocolbuffers/protobuf
+  # https://github.com/anchore/grype/issues/558
+  - vulnerability: CVE-2015-5237
+    package:
+      name: google.golang.org/protobuf
+  # False positive, CVE is actually about the C++ project protocolbuffers/protobuf
+  # https://github.com/anchore/grype/issues/633
+  - vulnerability: CVE-2021-22570
+    package:
+      name: google.golang.org/protobuf
