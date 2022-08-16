@@ -14,7 +14,7 @@ require (
 	github.com/ovn-org/ovn-kubernetes/go-controller v0.0.0-20220511131059-ac1ce4691c0f
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.13.0
-	github.com/submariner-io/admiral v0.13.0-m2.0.20220621145413-4b6e038c745c
+	github.com/submariner-io/admiral v0.14.0-m0
 	github.com/submariner-io/shipyard v0.14.0-m0
 	github.com/uw-labs/lichen v0.1.7
 	github.com/vishvananda/netlink v1.1.1-0.20210518155637-4cb3795f2ccb
