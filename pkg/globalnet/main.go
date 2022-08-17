@@ -79,7 +79,7 @@ func main() {
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler().Done()
 
-	httpServer := startHTTPServer()
+	httpServer := startHTTPServer(spec)
 
 	err = mcsv1a1.AddToScheme(scheme.Scheme)
 	if err != nil {
@@ -141,8 +141,8 @@ func init() {
 		"The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 }
 
-func startHTTPServer() *http.Server {
-	srv := &http.Server{Addr: ":8081", ReadHeaderTimeout: 60 * time.Second}
+func startHTTPServer(spec controllers.Specification) *http.Server {
+	srv := &http.Server{Addr: ":" + spec.GnMetricsPort, ReadHeaderTimeout: 60 * time.Second}
 
 	http.Handle("/metrics", promhttp.Handler())
 
