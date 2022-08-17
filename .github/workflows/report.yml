@@ -1,0 +1,29 @@
+---
+name: Reporting
+
+on:
+  push:
+    branches:
+      - devel
+      - release-*
+
+jobs:
+  vulnerability-scan:
+    name: Vulnerability Scanning
+    if: github.repository_owner == 'submariner-io'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
+      - name: Run Anchore vulnerability scanner
+        uses: anchore/scan-action@516844f15d82b6cdd0765b87aab79ed3ac006225
+        id: scan
+        with:
+          path: "."
+          fail-build: false
+      - name: Show Anchore scan SARIF report
+        run: cat ${{ steps.scan.outputs.sarif }}
+      - name: Upload Anchore scan SARIF report
+        uses: github/codeql-action/upload-sarif@0c670bbf0414f39666df6ce8e718ec5662c21e03
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarif }}
