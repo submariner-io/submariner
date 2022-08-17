@@ -94,11 +94,12 @@ func main() {
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler().Done()
 
-	httpServer := startHTTPServer()
-
 	var submSpec types.SubmarinerSpecification
 
 	fatalOnErr(envconfig.Process("submariner", &submSpec), "Error processing env vars")
+
+	klog.Info("Parsed env variables", submSpec)
+	httpServer := startHTTPServer(&submSpec)
 
 	cfg, err := clientcmd.BuildConfigFromFlags(localMasterURL, localKubeconfig)
 	fatalOnErr(err, "Error building kubeconfig")
@@ -317,8 +318,8 @@ func submarinerClusterFrom(submSpec *types.SubmarinerSpecification) *types.Subma
 	}
 }
 
-func startHTTPServer() *http.Server {
-	srv := &http.Server{Addr: ":8080", ReadHeaderTimeout: 60 * time.Second}
+func startHTTPServer(spec *types.SubmarinerSpecification) *http.Server {
+	srv := &http.Server{Addr: ":" + spec.GwMetricsPort, ReadHeaderTimeout: 60 * time.Second}
 
 	http.Handle("/metrics", promhttp.Handler())
 
