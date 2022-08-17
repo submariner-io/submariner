@@ -47,4 +47,5 @@ type SubmarinerSpecification struct {
 	Uninstall                     bool
 	HealthCheckInterval           uint
 	HealthCheckMaxPacketLossCount uint
+	GwMetricsPort                 string `default:"8080"`
 }
