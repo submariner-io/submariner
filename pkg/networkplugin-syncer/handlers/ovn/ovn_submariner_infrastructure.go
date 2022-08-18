@@ -47,7 +47,7 @@ func (ovn *SyncHandler) ensureSubmarinerInfra() error {
 	}
 
 	if len(lbGroups) > 1 {
-		return errors.Wrap(err, "Found more than one ovn load balancer group")
+		return errors.New("found more than one ovn load balancer group")
 	}
 
 	ovnLogicalRouter := nbdb.LogicalRouter{
