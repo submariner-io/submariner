@@ -16,7 +16,7 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
       - name: Run Anchore vulnerability scanner
-        uses: anchore/scan-action@516844f15d82b6cdd0765b87aab79ed3ac006225
+        uses: anchore/scan-action@ecfd0e98932e57ea8f68f29c4f418fc41a8194db
         id: scan
         with:
           path: "."
