@@ -4,6 +4,8 @@ name: Unit Tests
 on:
   pull_request:
 
+permissions: {}
+
 jobs:
   unit-testing:
     name: Go Unit Tests

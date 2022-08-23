@@ -19,6 +19,11 @@ on:
   schedule:
     - cron: '0 0/6 * * *'  # every 6 hours
 
+permissions:
+  issues: write
+  pull-requests: write
+  statuses: write
+
 jobs:
   check:
     name: Check Dependencies

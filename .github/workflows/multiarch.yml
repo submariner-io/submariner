@@ -4,6 +4,8 @@ name: Multi-arch Builds
 on:
   pull_request:
 
+permissions: {}
+
 jobs:
   check-multiarch:
     name: Check the multi-arch builds

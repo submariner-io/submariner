@@ -4,6 +4,8 @@ name: Branch Checks
 on:
   pull_request:
 
+permissions: {}
+
 jobs:
   target_branch:
     name: PR targets branch
