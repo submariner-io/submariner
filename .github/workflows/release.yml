@@ -7,6 +7,8 @@ on:
       - devel
       - release-*
 
+permissions: {}
+
 jobs:
   release:
     name: Release Images

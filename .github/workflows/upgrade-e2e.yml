@@ -5,6 +5,8 @@ on:
   pull_request:
     branches: [devel]
 
+permissions: {}
+
 jobs:
   upgrade-e2e:
     name: Latest Release to Latest Version

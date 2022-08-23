@@ -7,11 +7,15 @@ on:
       - devel
       - release-*
 
+permissions: {}
+
 jobs:
   vulnerability-scan:
     name: Vulnerability Scanning
     if: github.repository_owner == 'submariner-io'
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
     steps:
       - name: Check out the repository
         uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b

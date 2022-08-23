@@ -5,6 +5,8 @@ on:
   schedule:
     - cron: "0 0 * * 0"
 
+permissions: {}
+
 jobs:
   markdown-link-check-periodic:
     name: Markdown Links (all files)

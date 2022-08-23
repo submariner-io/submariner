@@ -7,6 +7,8 @@ on:
     branches:
       - devel
 
+permissions: {}
+
 jobs:
   preview:
     name: Preview

@@ -7,6 +7,8 @@ on:
       - 'CODEOWNERS'
       - 'CODEOWNERS.in'
 
+permissions: {}
+
 jobs:
   updated:
     name: Up-to-date

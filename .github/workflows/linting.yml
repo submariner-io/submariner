@@ -4,6 +4,8 @@ name: Linting
 on:
   pull_request:
 
+permissions: {}
+
 jobs:
   apply-suggestions-commits:
     name: 'No "Apply suggestions from code review" Commits'

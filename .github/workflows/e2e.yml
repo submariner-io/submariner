@@ -4,6 +4,8 @@ name: End to End Default
 on:
   pull_request:
 
+permissions: {}
+
 jobs:
   e2e:
     name: E2E
