@@ -154,22 +154,16 @@ func (ovn *Handler) setupForwardingIptables() error {
 }
 
 func (ovn *Handler) updateNoMasqueradeIPTables() error {
-	rules := ovn.getNoMasqueradRuleSpecs()
-
-	return errors.Wrapf(ovn.ipt.UpdateChainRules("nat", constants.SmPostRoutingChain, rules),
-		"error updating %q rules", constants.SmPostRoutingChain)
-}
-
-func (ovn *Handler) getNoMasqueradRuleSpecs() [][]string {
-	var rules [][]string
-
 	for _, endpoint := range ovn.remoteEndpoints {
 		for _, subnet := range endpoint.Spec.Subnets {
-			rules = append(rules, []string{"-d", subnet, "-j", "ACCEPT"})
+			err := ovn.ipt.AppendUnique("nat", constants.SmPostRoutingChain, []string{"-d", subnet, "-j", "ACCEPT"}...)
+			if err != nil {
+				return errors.Wrapf(err, "error updating %q rules", constants.SmPostRoutingChain)
+			}
 		}
 	}
 
-	return rules
+	return nil
 }
 
 func (ovn *Handler) cleanupForwardingIptables() error {
