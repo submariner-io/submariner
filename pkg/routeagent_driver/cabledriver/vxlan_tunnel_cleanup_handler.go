@@ -22,7 +22,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/cable/vxlan"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/netlink"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type vxlanCleanup struct {

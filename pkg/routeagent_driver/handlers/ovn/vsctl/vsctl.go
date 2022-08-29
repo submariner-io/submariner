@@ -26,7 +26,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const ovsCommandTimeout = 15

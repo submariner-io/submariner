@@ -24,7 +24,7 @@ import (
 	"github.com/pkg/errors"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cidr"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {

@@ -24,7 +24,7 @@ import (
 
 	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type endpointState int

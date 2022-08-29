@@ -36,7 +36,7 @@ import (
 	"github.com/vishvananda/netlink"
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

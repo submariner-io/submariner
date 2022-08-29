@@ -29,7 +29,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func (kp *SyncHandler) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks []string, operation Operation) {

@@ -27,7 +27,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type LatencyInfo struct {

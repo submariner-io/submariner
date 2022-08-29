@@ -28,7 +28,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/port"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	iptcommon "github.com/submariner-io/submariner/pkg/routeagent_driver/iptables"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func (kp *SyncHandler) createIPTableChains() error {

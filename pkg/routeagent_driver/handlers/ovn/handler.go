@@ -32,7 +32,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/iptables"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type Handler struct {

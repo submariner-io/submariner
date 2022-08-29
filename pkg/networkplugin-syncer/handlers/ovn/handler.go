@@ -30,7 +30,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var ErrWaitingForLocalEndpoint = errors.New("waiting for the local endpoint details before we can " +

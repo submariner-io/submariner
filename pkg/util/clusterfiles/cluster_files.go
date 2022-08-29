@@ -30,7 +30,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // Get retrieves a config from a secret, configmap or file within the k8s cluster

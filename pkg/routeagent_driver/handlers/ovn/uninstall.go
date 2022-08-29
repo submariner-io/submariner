@@ -23,7 +23,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn/vsctl"
 	"github.com/vishvananda/netlink"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func (ovn *Handler) Stop(uninstall bool) error {

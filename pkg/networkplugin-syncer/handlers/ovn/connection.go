@@ -32,7 +32,7 @@ import (
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/sbdb"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/submariner/pkg/util/clusterfiles"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
 )
 

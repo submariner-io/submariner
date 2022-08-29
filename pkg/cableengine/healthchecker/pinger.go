@@ -26,7 +26,7 @@ import (
 	"github.com/go-ping/ping"
 	"github.com/pkg/errors"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

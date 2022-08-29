@@ -59,7 +59,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	glog "k8s.io/klog"
+	glog "k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 )
 

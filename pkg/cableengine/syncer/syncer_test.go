@@ -51,7 +51,7 @@ import (
 	fakeClient "k8s.io/client-go/dynamic/fake"
 	kubeScheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

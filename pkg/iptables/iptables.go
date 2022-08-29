@@ -25,7 +25,7 @@ import (
 	"github.com/pkg/errors"
 	level "github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/stringset"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type Interface interface {

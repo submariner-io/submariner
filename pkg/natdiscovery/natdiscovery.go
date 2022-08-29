@@ -32,7 +32,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type Interface interface {

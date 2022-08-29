@@ -29,7 +29,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

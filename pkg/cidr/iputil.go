@@ -23,7 +23,7 @@ import (
 	"net"
 
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func OverlappingSubnets(localServiceCIDRs, localPodCIDRs, remoteSubnets []string) error {
