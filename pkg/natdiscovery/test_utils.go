@@ -29,7 +29,7 @@ import (
 	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 	"github.com/submariner-io/submariner/pkg/types"
 	"google.golang.org/protobuf/proto"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

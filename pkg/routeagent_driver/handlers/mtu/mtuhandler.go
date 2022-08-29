@@ -30,7 +30,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/iptables"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 )
 

@@ -24,7 +24,7 @@ import (
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/sbdb"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // Ensure the core submariner ovn topology is setup and current.

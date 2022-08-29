@@ -25,7 +25,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/natdiscovery/proto"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func (nd *natDiscovery) handleResponseFromAddress(req *proto.SubmarinerNATDiscoveryResponse, addr *net.UDPAddr) error {

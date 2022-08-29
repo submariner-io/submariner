@@ -31,7 +31,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/vishvananda/netlink"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type Basic interface {

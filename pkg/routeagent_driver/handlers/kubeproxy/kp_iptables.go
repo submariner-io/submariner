@@ -30,7 +30,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/netlink"
 	cniapi "github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type SyncHandler struct {

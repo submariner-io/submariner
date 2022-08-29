@@ -27,7 +27,7 @@ import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cableengine"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type controller struct {

@@ -25,7 +25,7 @@ import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // Driver is used by the ipsec engine to actually connect the tunnels.

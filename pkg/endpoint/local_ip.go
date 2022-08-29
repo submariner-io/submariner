@@ -21,7 +21,7 @@ package endpoint
 import (
 	"net"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func GetLocalIPForDestination(dst string) string {

@@ -25,7 +25,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 	proto2 "google.golang.org/protobuf/proto"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscoveryRequest, addr *net.UDPAddr) error {

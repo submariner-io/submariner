@@ -38,7 +38,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/types"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

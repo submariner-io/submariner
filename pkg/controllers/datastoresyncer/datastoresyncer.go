@@ -39,7 +39,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type DatastoreSyncer struct {

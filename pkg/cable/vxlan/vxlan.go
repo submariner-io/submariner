@@ -37,7 +37,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

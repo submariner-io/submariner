@@ -23,7 +23,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/iptables"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func InitSubmarinerPostRoutingChain(ipt iptables.Interface) error {

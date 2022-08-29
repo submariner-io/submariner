@@ -31,7 +31,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/port"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type vxLanAttributes struct {

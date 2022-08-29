@@ -34,7 +34,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func init() {
