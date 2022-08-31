@@ -23,6 +23,7 @@ import (
 
 	"github.com/pkg/errors"
 	level "github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/stringset"
 	"k8s.io/klog/v2"
 )
 
@@ -96,4 +97,50 @@ func (a *Adapter) PrependUnique(table, chain string, ruleSpec []string) error {
 	// in the chain to see if the rule slipped its position, and if so, delete all such occurrences.
 	// We then re-program a new rule at the beginning of the chain as required.
 	return a.InsertUnique(table, chain, 1, ruleSpec)
+}
+
+func (a *Adapter) UpdateChainRules(table, chain string, rules [][]string) error {
+	existingRules, err := a.List(table, chain)
+	if err != nil {
+		return errors.Wrapf(err, "error listing the rules in table %q, chain %q", table, chain)
+	}
+
+	ruleStrings := stringset.New()
+
+	for _, existingRule := range existingRules {
+		ruleSpec := strings.Split(existingRule, " ")
+		if ruleSpec[0] == "-A" {
+			ruleSpec = ruleSpec[2:] // remove "-A", "$chain"
+			ruleStrings.Add(strings.Trim(strings.Join(ruleSpec, " "), " "))
+		}
+	}
+
+	for _, ruleSpec := range rules {
+		ruleString := strings.Join(ruleSpec, " ")
+
+		if ruleStrings.Contains(ruleString) {
+			ruleStrings.Remove(ruleString)
+		} else {
+			klog.V(level.DEBUG).Infof("Adding iptables rule in %q, %q: %q", table, chain, ruleSpec)
+
+			if err := a.Append(table, chain, ruleSpec...); err != nil {
+				return errors.Wrapf(err, "error adding rule to %v to %q, %q", ruleSpec, table, chain)
+			}
+		}
+	}
+
+	// remaining elements should not be there, remove them
+	for _, rule := range ruleStrings.Elements() {
+		klog.V(level.DEBUG).Infof("Deleting stale iptables rule in %q, %q: %q", table, chain, rule)
+		ruleSpec := strings.Split(rule, " ")
+
+		if err := a.Delete(table, chain, ruleSpec...); err != nil {
+			// Log and let go, as this is not a fatal error, or something that will make real harm,
+			// it's more harmful to keep retrying. At this point on next update deletion of stale rules
+			// will happen again
+			klog.Warningf("Unable to delete iptables entry from table %q, chain %q: %q", table, chain, rule)
+		}
+	}
+
+	return nil
 }

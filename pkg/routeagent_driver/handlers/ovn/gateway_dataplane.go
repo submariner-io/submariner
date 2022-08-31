@@ -24,7 +24,6 @@ import (
 	"strconv"
 
 	"github.com/pkg/errors"
-	submiptables "github.com/submariner-io/submariner/pkg/iptables"
 	npSyncerOvn "github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	iptcommon "github.com/submariner-io/submariner/pkg/routeagent_driver/iptables"
@@ -157,7 +156,7 @@ func (ovn *Handler) setupForwardingIptables() error {
 func (ovn *Handler) updateNoMasqueradeIPTables() error {
 	rules := ovn.getNoMasqueradRuleSpecs()
 
-	return errors.Wrapf(submiptables.UpdateChainRules(ovn.ipt, "nat", constants.SmPostRoutingChain, rules),
+	return errors.Wrapf(ovn.ipt.UpdateChainRules("nat", constants.SmPostRoutingChain, rules),
 		"error updating %q rules", constants.SmPostRoutingChain)
 }
 
@@ -225,5 +224,5 @@ func (ovn *Handler) updateIPtableChains(table, chain string, ruleGen forwardRule
 		return err
 	}
 
-	return errors.Wrap(submiptables.UpdateChainRules(ovn.ipt, table, chain, ruleSpecs), "error updating chain rules")
+	return errors.Wrap(ovn.ipt.UpdateChainRules(table, chain, ruleSpecs), "error updating chain rules")
 }
