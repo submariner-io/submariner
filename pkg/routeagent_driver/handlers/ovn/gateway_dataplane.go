@@ -206,7 +206,7 @@ func (ovn *Handler) ensureForwardChains() error {
 		return errors.Wrapf(err, "error creating chain %q", forwardingSubmarinerMSSClampChain)
 	}
 
-	if err := submiptables.InsertUnique(ovn.ipt, "filter", "FORWARD", 1,
+	if err := ovn.ipt.InsertUnique("filter", "FORWARD", 1,
 		[]string{"-j", forwardingSubmarinerMSSClampChain}); err != nil {
 		return errors.Wrapf(err, "error inserting rule for chain %q", forwardingSubmarinerMSSClampChain)
 	}
@@ -215,7 +215,7 @@ func (ovn *Handler) ensureForwardChains() error {
 		return errors.Wrapf(err, "error creating chain %q", forwardingSubmarinerFWDChain)
 	}
 
-	return errors.Wrapf(submiptables.InsertUnique(ovn.ipt, "filter", "FORWARD", 2, []string{"-j", forwardingSubmarinerFWDChain}),
+	return errors.Wrapf(ovn.ipt.InsertUnique("filter", "FORWARD", 2, []string{"-j", forwardingSubmarinerFWDChain}),
 		"error inserting rule for chain %q", forwardingSubmarinerFWDChain)
 }
 

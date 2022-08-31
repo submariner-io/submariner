@@ -44,6 +44,7 @@ type Basic interface {
 type Interface interface {
 	Basic
 	CreateChainIfNotExists(table, chain string) error
+	InsertUnique(table, chain string, position int, ruleSpec []string) error
 }
 
 type iptablesWrapper struct {
@@ -89,48 +90,7 @@ func PrependUnique(ipt Interface, table, chain string, ruleSpec []string) error 
 	// not be the first rule to hit and Submariner behavior might get affected. So, we query the rules
 	// in the chain to see if the rule slipped its position, and if so, delete all such occurrences.
 	// We then re-program a new rule at the beginning of the chain as required.
-	return InsertUnique(ipt, table, chain, 1, ruleSpec)
-}
-
-func InsertUnique(ipt Interface, table, chain string, position int, ruleSpec []string) error {
-	rules, err := ipt.List(table, chain)
-	if err != nil {
-		return errors.Wrapf(err, "error listing the rules in %s chain", chain)
-	}
-
-	isPresentAtRequiredPosition := false
-	numOccurrences := 0
-
-	for index, rule := range rules {
-		if strings.Contains(rule, strings.Join(ruleSpec, " ")) {
-			klog.V(level.DEBUG).Infof("In %s table, iptables rule \"%s\", exists at index %d.", table, strings.Join(ruleSpec, " "), index)
-			numOccurrences++
-
-			if index == position {
-				isPresentAtRequiredPosition = true
-			}
-		}
-	}
-
-	// The required rule is present in the Chain, but either there are multiple occurrences or its
-	// not at the desired location
-	if numOccurrences > 1 || !isPresentAtRequiredPosition {
-		for i := 0; i < numOccurrences; i++ {
-			if err = ipt.Delete(table, chain, ruleSpec...); err != nil {
-				return errors.Wrapf(err, "error deleting stale IP table rule %q", strings.Join(ruleSpec, " "))
-			}
-		}
-	}
-
-	// The required rule is present only once and is at the desired location
-	if numOccurrences == 1 && isPresentAtRequiredPosition {
-		klog.V(level.DEBUG).Infof("In %s table, iptables rule \"%s\", already exists.", table, strings.Join(ruleSpec, " "))
-		return nil
-	} else if err := ipt.Insert(table, chain, position, ruleSpec...); err != nil {
-		return errors.Wrapf(err, "error inserting IP table rule %q", strings.Join(ruleSpec, " "))
-	}
-
-	return nil
+	return ipt.InsertUnique(table, chain, 1, ruleSpec)
 }
 
 // UpdateChainRules ensures that the rules in the list are the ones in rules, without any preference for the order,

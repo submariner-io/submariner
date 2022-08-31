@@ -415,27 +415,27 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 	}
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetEgressChainForPods}
-	if err := iptables.InsertUnique(g.ipt, "nat", constants.SmGlobalnetEgressChain, 2, forwardToSubGlobalNetChain); err != nil {
+	if err := g.ipt.InsertUnique("nat", constants.SmGlobalnetEgressChain, 2, forwardToSubGlobalNetChain); err != nil {
 		klog.Errorf("error inserting iptables rule %q: %v\n", strings.Join(forwardToSubGlobalNetChain, " "), err)
 	}
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetEgressChainForHeadlessSvcPods}
-	if err := iptables.InsertUnique(g.ipt, "nat", constants.SmGlobalnetEgressChain, 3, forwardToSubGlobalNetChain); err != nil {
+	if err := g.ipt.InsertUnique("nat", constants.SmGlobalnetEgressChain, 3, forwardToSubGlobalNetChain); err != nil {
 		klog.Errorf("error inserting iptables rule %q: %v\n", strings.Join(forwardToSubGlobalNetChain, " "), err)
 	}
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetEgressChainForHeadlessSvcEPs}
-	if err := iptables.InsertUnique(g.ipt, "nat", constants.SmGlobalnetEgressChain, 4, forwardToSubGlobalNetChain); err != nil {
+	if err := g.ipt.InsertUnique("nat", constants.SmGlobalnetEgressChain, 4, forwardToSubGlobalNetChain); err != nil {
 		klog.Errorf("error inserting iptables rule %q: %v\n", strings.Join(forwardToSubGlobalNetChain, " "), err)
 	}
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetEgressChainForNamespace}
-	if err := iptables.InsertUnique(g.ipt, "nat", constants.SmGlobalnetEgressChain, 5, forwardToSubGlobalNetChain); err != nil {
+	if err := g.ipt.InsertUnique("nat", constants.SmGlobalnetEgressChain, 5, forwardToSubGlobalNetChain); err != nil {
 		klog.Errorf("error inserting iptables rule %q: %v\n", strings.Join(forwardToSubGlobalNetChain, " "), err)
 	}
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetEgressChainForCluster}
-	if err := iptables.InsertUnique(g.ipt, "nat", constants.SmGlobalnetEgressChain, 6, forwardToSubGlobalNetChain); err != nil {
+	if err := g.ipt.InsertUnique("nat", constants.SmGlobalnetEgressChain, 6, forwardToSubGlobalNetChain); err != nil {
 		klog.Errorf("error inserting iptables rule %q: %v\n", strings.Join(forwardToSubGlobalNetChain, " "), err)
 	}
 
