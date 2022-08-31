@@ -83,3 +83,17 @@ func (a *Adapter) InsertUnique(table, chain string, position int, ruleSpec []str
 
 	return nil
 }
+
+func (a *Adapter) PrependUnique(table, chain string, ruleSpec []string) error {
+	// Submariner requires certain iptable rules to be programmed at the beginning of an iptables Chain
+	// so that we can preserve the sourceIP for inter-cluster traffic and avoid K8s SDN making changes
+	// to the traffic.
+	// In this API, we check if the required iptable rule is present at the beginning of the chain.
+	// If the rule is already present and there are no stale[1] flows, we simply return. If not, we create one.
+	// [1] Sometimes after we program the rule at the beginning of the chain, K8s SDN might insert some
+	// new rules ahead of the rule that we programmed. In such cases, the rule that we programmed will
+	// not be the first rule to hit and Submariner behavior might get affected. So, we query the rules
+	// in the chain to see if the rule slipped its position, and if so, delete all such occurrences.
+	// We then re-program a new rule at the beginning of the chain as required.
+	return a.InsertUnique(table, chain, 1, ruleSpec)
+}

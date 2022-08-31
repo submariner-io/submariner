@@ -354,7 +354,7 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 	}
 
 	forwardToSubGlobalNetChain := []string{"-j", constants.SmGlobalnetIngressChain}
-	if err := iptables.PrependUnique(g.ipt, "nat", "PREROUTING", forwardToSubGlobalNetChain); err != nil {
+	if err := g.ipt.PrependUnique("nat", "PREROUTING", forwardToSubGlobalNetChain); err != nil {
 		klog.Errorf("error appending iptables rule %q: %v\n", strings.Join(forwardToSubGlobalNetChain, " "), err)
 	}
 
@@ -371,7 +371,7 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 	}
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetEgressChain}
-	if err := iptables.PrependUnique(g.ipt, "nat", routeAgent.SmPostRoutingChain, forwardToSubGlobalNetChain); err != nil {
+	if err := g.ipt.PrependUnique("nat", routeAgent.SmPostRoutingChain, forwardToSubGlobalNetChain); err != nil {
 		klog.Errorf("error inserting iptables rule %q: %v\n", strings.Join(forwardToSubGlobalNetChain, " "), err)
 	}
 
@@ -380,7 +380,7 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 	}
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetMarkChain}
-	if err := iptables.PrependUnique(g.ipt, "nat", constants.SmGlobalnetEgressChain, forwardToSubGlobalNetChain); err != nil {
+	if err := g.ipt.PrependUnique("nat", constants.SmGlobalnetEgressChain, forwardToSubGlobalNetChain); err != nil {
 		klog.Errorf("error inserting iptables rule %q: %v\n", strings.Join(forwardToSubGlobalNetChain, " "), err)
 	}
 
