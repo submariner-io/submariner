@@ -25,9 +25,10 @@ import (
 
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/stringset"
+	"github.com/submariner-io/submariner/pkg/iptables"
 )
 
-type IPTables struct {
+type basicType struct {
 	mutex                    sync.Mutex
 	chainRules               map[string]stringset.Interface
 	tableChains              map[string]stringset.Interface
@@ -35,28 +36,34 @@ type IPTables struct {
 	failOnDeleteRuleMatchers []interface{}
 }
 
+type IPTables struct {
+	iptables.Adapter
+}
+
 func New() *IPTables {
-	ipt := &IPTables{
-		chainRules:  map[string]stringset.Interface{},
-		tableChains: map[string]stringset.Interface{},
+	return &IPTables{
+		Adapter: iptables.Adapter{
+			Basic: &basicType{
+				chainRules:  map[string]stringset.Interface{},
+				tableChains: map[string]stringset.Interface{},
+			},
+		},
 	}
-
-	return ipt
 }
 
-func (i *IPTables) Append(table, chain string, rulespec ...string) error {
+func (i *basicType) Append(table, chain string, rulespec ...string) error {
 	return i.addRule(table, chain, rulespec...)
 }
 
-func (i *IPTables) AppendUnique(table, chain string, rulespec ...string) error {
+func (i *basicType) AppendUnique(table, chain string, rulespec ...string) error {
 	return i.addRule(table, chain, rulespec...)
 }
 
-func (i *IPTables) Insert(table, chain string, pos int, rulespec ...string) error {
+func (i *basicType) Insert(table, chain string, pos int, rulespec ...string) error {
 	return i.addRule(table, chain, rulespec...)
 }
 
-func (i *IPTables) Delete(table, chain string, rulespec ...string) error {
+func (i *basicType) Delete(table, chain string, rulespec ...string) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -73,7 +80,7 @@ func (i *IPTables) Delete(table, chain string, rulespec ...string) error {
 	return nil
 }
 
-func (i *IPTables) addRule(table, chain string, rulespec ...string) error {
+func (i *basicType) addRule(table, chain string, rulespec ...string) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -107,11 +114,11 @@ func matchRuleForError(matchers *[]interface{}, rulespec ...string) error {
 	return nil
 }
 
-func (i *IPTables) List(table, chain string) ([]string, error) {
+func (i *basicType) List(table, chain string) ([]string, error) {
 	return i.listRules(table, chain), nil
 }
 
-func (i *IPTables) listRules(table, chain string) []string {
+func (i *basicType) listRules(table, chain string) []string {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -123,11 +130,11 @@ func (i *IPTables) listRules(table, chain string) []string {
 	return []string{}
 }
 
-func (i *IPTables) ListChains(table string) ([]string, error) {
+func (i *basicType) ListChains(table string) ([]string, error) {
 	return i.listChains(table), nil
 }
 
-func (i *IPTables) listChains(table string) []string {
+func (i *basicType) listChains(table string) []string {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -139,12 +146,12 @@ func (i *IPTables) listChains(table string) []string {
 	return []string{}
 }
 
-func (i *IPTables) NewChain(table, chain string) error {
-	i.AddChainsFor(table, chain)
+func (i *basicType) NewChain(table, chain string) error {
+	i.addChainsFor(table, chain)
 	return nil
 }
 
-func (i *IPTables) ClearChain(table, chain string) error {
+func (i *basicType) ClearChain(table, chain string) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -156,7 +163,7 @@ func (i *IPTables) ClearChain(table, chain string) error {
 	return nil
 }
 
-func (i *IPTables) ChainExists(table, chain string) (bool, error) {
+func (i *basicType) ChainExists(table, chain string) (bool, error) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -168,7 +175,12 @@ func (i *IPTables) ChainExists(table, chain string) (bool, error) {
 	return false, nil
 }
 
-func (i *IPTables) AddChainsFor(table string, chains ...string) {
+func (i *basicType) DeleteChain(table, chain string) error {
+	// TODO Implement chain deletion for testing
+	return nil
+}
+
+func (i *basicType) addChainsFor(table string, chains ...string) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -183,43 +195,42 @@ func (i *IPTables) AddChainsFor(table string, chains ...string) {
 
 func (i *IPTables) AwaitChain(table string, stringOrMatcher interface{}) {
 	Eventually(func() []string {
-		return i.listChains(table)
+		return i.basic().listChains(table)
 	}, 5).Should(ContainElement(stringOrMatcher), "IP table %q chains", table)
 }
 
 func (i *IPTables) AwaitNoChain(table string, stringOrMatcher interface{}) {
 	Eventually(func() []string {
-		return i.listChains(table)
+		return i.basic().listChains(table)
 	}, 5).ShouldNot(ContainElement(stringOrMatcher), "IP table %q chains", table)
 }
 
 func (i *IPTables) AwaitRule(table, chain string, stringOrMatcher interface{}) {
 	Eventually(func() []string {
-		return i.listRules(table, chain)
+		return i.basic().listRules(table, chain)
 	}, 5).Should(ContainElement(stringOrMatcher), "Rules for IP table %q, chain %q", table, chain)
 }
 
 func (i *IPTables) AwaitNoRule(table, chain string, stringOrMatcher interface{}) {
 	Eventually(func() []string {
-		return i.listRules(table, chain)
+		return i.basic().listRules(table, chain)
 	}, 5).ShouldNot(ContainElement(stringOrMatcher), "Rules for IP table %q, chain %q", table, chain)
 }
 
 func (i *IPTables) AddFailOnAppendRuleMatcher(stringOrMatcher interface{}) {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
+	i.basic().mutex.Lock()
+	defer i.basic().mutex.Unlock()
 
-	i.failOnAppendRuleMatchers = append(i.failOnAppendRuleMatchers, stringOrMatcher)
+	i.basic().failOnAppendRuleMatchers = append(i.basic().failOnAppendRuleMatchers, stringOrMatcher)
 }
 
 func (i *IPTables) AddFailOnDeleteRuleMatcher(stringOrMatcher interface{}) {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
+	i.basic().mutex.Lock()
+	defer i.basic().mutex.Unlock()
 
-	i.failOnDeleteRuleMatchers = append(i.failOnDeleteRuleMatchers, stringOrMatcher)
+	i.basic().failOnDeleteRuleMatchers = append(i.basic().failOnDeleteRuleMatchers, stringOrMatcher)
 }
 
-func (i *IPTables) DeleteChain(table, chain string) error {
-	// TODO Implement chain deletion for testing
-	return nil
+func (i *IPTables) basic() *basicType {
+	return i.Adapter.Basic.(*basicType)
 }
