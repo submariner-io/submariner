@@ -28,7 +28,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-type Interface interface {
+type Basic interface {
 	Append(table, chain string, rulespec ...string) error
 	AppendUnique(table, chain string, rulespec ...string) error
 	Delete(table, chain string, rulespec ...string) error
@@ -39,6 +39,10 @@ type Interface interface {
 	ChainExists(table, chain string) (bool, error)
 	ClearChain(table, chain string) error
 	DeleteChain(table, chain string) error
+}
+
+type Interface interface {
+	Basic
 }
 
 type iptablesWrapper struct {
@@ -57,7 +61,7 @@ func New() (Interface, error) {
 		return nil, errors.Wrap(err, "error creating IP tables")
 	}
 
-	return &iptablesWrapper{IPTables: ipt}, nil
+	return &Adapter{Basic: &iptablesWrapper{IPTables: ipt}}, nil
 }
 
 func (i *iptablesWrapper) Delete(table, chain string, rulespec ...string) error {
