@@ -104,7 +104,7 @@ func (h *mtuHandler) Init() error {
 		return errors.Wrapf(err, "error creating ipset %q", constants.LocalCIDRIPSet)
 	}
 
-	if err := iptables.PrependUnique(h.ipt, constants.MangleTable, constants.PostRoutingChain,
+	if err := h.ipt.PrependUnique(constants.MangleTable, constants.PostRoutingChain,
 		forwardToSubMarinerPostRoutingChain); err != nil {
 		return errors.Wrapf(err, "error inserting iptables rule %q",
 			strings.Join(forwardToSubMarinerPostRoutingChain, " "))

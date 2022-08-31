@@ -37,7 +37,7 @@ func InitSubmarinerPostRoutingChain(ipt iptables.Interface) error {
 
 	forwardToSubPostroutingRuleSpec := []string{"-j", constants.SmPostRoutingChain}
 
-	if err := iptables.PrependUnique(ipt, "nat", "POSTROUTING", forwardToSubPostroutingRuleSpec); err != nil {
+	if err := ipt.PrependUnique("nat", "POSTROUTING", forwardToSubPostroutingRuleSpec); err != nil {
 		return errors.Wrapf(err, "unable to insert iptable rule in NAT table, POSTROUTING chain")
 	}
 

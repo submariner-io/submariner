@@ -64,7 +64,7 @@ func (kp *SyncHandler) createIPTableChains() error {
 
 	ruleSpec = []string{"-o", VxLANIface, "-j", "ACCEPT"}
 
-	if err = iptables.PrependUnique(ipt, constants.FilterTable, "FORWARD", ruleSpec); err != nil {
+	if err = ipt.PrependUnique(constants.FilterTable, "FORWARD", ruleSpec); err != nil {
 		return errors.Wrap(err, "unable to insert iptable rule in filter table to allow vxlan traffic")
 	}
 
