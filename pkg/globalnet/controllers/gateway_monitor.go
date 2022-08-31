@@ -337,7 +337,7 @@ func (g *gatewayMonitor) stopControllers() {
 func (g *gatewayMonitor) createGlobalNetMarkingChain() error {
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetMarkChain)
 
-	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", constants.SmGlobalnetMarkChain); err != nil {
+	if err := g.ipt.CreateChainIfNotExists("nat", constants.SmGlobalnetMarkChain); err != nil {
 		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetMarkChain)
 	}
 
@@ -349,7 +349,7 @@ func (g *gatewayMonitor) createGlobalNetMarkingChain() error {
 func (g *gatewayMonitor) createGlobalnetChains() error {
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetIngressChain)
 
-	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", constants.SmGlobalnetIngressChain); err != nil {
+	if err := g.ipt.CreateChainIfNotExists("nat", constants.SmGlobalnetIngressChain); err != nil {
 		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetIngressChain)
 	}
 
@@ -360,13 +360,13 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChain)
 
-	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", constants.SmGlobalnetEgressChain); err != nil {
+	if err := g.ipt.CreateChainIfNotExists("nat", constants.SmGlobalnetEgressChain); err != nil {
 		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChain)
 	}
 
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", routeAgent.SmPostRoutingChain)
 
-	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", routeAgent.SmPostRoutingChain); err != nil {
+	if err := g.ipt.CreateChainIfNotExists("nat", routeAgent.SmPostRoutingChain); err != nil {
 		return errors.Wrapf(err, "error creating iptables chain %s", routeAgent.SmPostRoutingChain)
 	}
 
@@ -386,31 +386,31 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForPods)
 
-	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", constants.SmGlobalnetEgressChainForPods); err != nil {
+	if err := g.ipt.CreateChainIfNotExists("nat", constants.SmGlobalnetEgressChainForPods); err != nil {
 		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChainForPods)
 	}
 
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForHeadlessSvcPods)
 
-	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", constants.SmGlobalnetEgressChainForHeadlessSvcPods); err != nil {
+	if err := g.ipt.CreateChainIfNotExists("nat", constants.SmGlobalnetEgressChainForHeadlessSvcPods); err != nil {
 		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChainForHeadlessSvcPods)
 	}
 
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForHeadlessSvcEPs)
 
-	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", constants.SmGlobalnetEgressChainForHeadlessSvcEPs); err != nil {
+	if err := g.ipt.CreateChainIfNotExists("nat", constants.SmGlobalnetEgressChainForHeadlessSvcEPs); err != nil {
 		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChainForHeadlessSvcEPs)
 	}
 
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForNamespace)
 
-	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", constants.SmGlobalnetEgressChainForNamespace); err != nil {
+	if err := g.ipt.CreateChainIfNotExists("nat", constants.SmGlobalnetEgressChainForNamespace); err != nil {
 		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChainForNamespace)
 	}
 
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForCluster)
 
-	if err := iptables.CreateChainIfNotExists(g.ipt, "nat", constants.SmGlobalnetEgressChainForCluster); err != nil {
+	if err := g.ipt.CreateChainIfNotExists("nat", constants.SmGlobalnetEgressChainForCluster); err != nil {
 		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChainForCluster)
 	}
 

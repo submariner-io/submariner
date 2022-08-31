@@ -202,7 +202,7 @@ func (ovn *Handler) initIPtablesChains() error {
 }
 
 func (ovn *Handler) ensureForwardChains() error {
-	if err := submiptables.CreateChainIfNotExists(ovn.ipt, "filter", forwardingSubmarinerMSSClampChain); err != nil {
+	if err := ovn.ipt.CreateChainIfNotExists("filter", forwardingSubmarinerMSSClampChain); err != nil {
 		return errors.Wrapf(err, "error creating chain %q", forwardingSubmarinerMSSClampChain)
 	}
 
@@ -211,7 +211,7 @@ func (ovn *Handler) ensureForwardChains() error {
 		return errors.Wrapf(err, "error inserting rule for chain %q", forwardingSubmarinerMSSClampChain)
 	}
 
-	if err := submiptables.CreateChainIfNotExists(ovn.ipt, "filter", forwardingSubmarinerFWDChain); err != nil {
+	if err := ovn.ipt.CreateChainIfNotExists("filter", forwardingSubmarinerFWDChain); err != nil {
 		return errors.Wrapf(err, "error creating chain %q", forwardingSubmarinerFWDChain)
 	}
 

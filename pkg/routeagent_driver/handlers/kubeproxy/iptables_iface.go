@@ -43,7 +43,7 @@ func (kp *SyncHandler) createIPTableChains() error {
 
 	klog.V(log.DEBUG).Infof("Install/ensure %q chain exists", constants.SmInputChain)
 
-	if err = iptables.CreateChainIfNotExists(ipt, constants.FilterTable, constants.SmInputChain); err != nil {
+	if err = ipt.CreateChainIfNotExists(constants.FilterTable, constants.SmInputChain); err != nil {
 		return errors.Wrap(err, "unable to create SUBMARINER-INPUT chain in iptables")
 	}
 

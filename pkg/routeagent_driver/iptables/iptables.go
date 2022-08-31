@@ -29,7 +29,7 @@ import (
 func InitSubmarinerPostRoutingChain(ipt iptables.Interface) error {
 	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmPostRoutingChain)
 
-	if err := iptables.CreateChainIfNotExists(ipt, "nat", constants.SmPostRoutingChain); err != nil {
+	if err := ipt.CreateChainIfNotExists("nat", constants.SmPostRoutingChain); err != nil {
 		return errors.Wrapf(err, "unable to create %q chain in iptables", constants.SmPostRoutingChain)
 	}
 

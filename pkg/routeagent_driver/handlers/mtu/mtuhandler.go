@@ -88,7 +88,7 @@ func (h *mtuHandler) Init() error {
 
 	ipSetIface := ipset.New(utilexec.New())
 
-	if err := iptables.CreateChainIfNotExists(h.ipt, constants.MangleTable, constants.SmPostRoutingChain); err != nil {
+	if err := h.ipt.CreateChainIfNotExists(constants.MangleTable, constants.SmPostRoutingChain); err != nil {
 		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmPostRoutingChain)
 	}
 
