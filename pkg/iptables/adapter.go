@@ -18,6 +18,21 @@ limitations under the License.
 
 package iptables
 
+import "github.com/pkg/errors"
+
 type Adapter struct {
 	Basic
+}
+
+func (a *Adapter) CreateChainIfNotExists(table, chain string) error {
+	exists, err := a.ChainExists(table, chain)
+	if err == nil && exists {
+		return nil
+	}
+
+	if err != nil {
+		return errors.Wrapf(err, "error finding IP table chain %q in table %q", chain, table)
+	}
+
+	return errors.Wrap(a.NewChain(table, chain), "error creating IP table chain")
 }

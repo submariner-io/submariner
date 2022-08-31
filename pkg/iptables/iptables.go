@@ -43,6 +43,7 @@ type Basic interface {
 
 type Interface interface {
 	Basic
+	CreateChainIfNotExists(table, chain string) error
 }
 
 type iptablesWrapper struct {
@@ -75,19 +76,6 @@ func (i *iptablesWrapper) Delete(table, chain string, rulespec ...string) error 
 	}
 
 	return errors.Wrap(err, "error deleting IP table rule")
-}
-
-func CreateChainIfNotExists(ipt Interface, table, chain string) error {
-	exists, err := ipt.ChainExists(table, chain)
-	if err == nil && exists {
-		return nil
-	}
-
-	if err != nil {
-		return errors.Wrapf(err, "error finding IP table chain %q in table %q", chain, table)
-	}
-
-	return errors.Wrap(ipt.NewChain(table, chain), "error creating IP table chain")
 }
 
 func PrependUnique(ipt Interface, table, chain string, ruleSpec []string) error {
