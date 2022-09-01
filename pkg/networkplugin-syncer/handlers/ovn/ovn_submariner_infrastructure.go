@@ -24,6 +24,7 @@ import (
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/sbdb"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/stringset"
 	"k8s.io/klog/v2"
 )
 
@@ -221,10 +222,12 @@ func (ovn *SyncHandler) updateSubmarinerRouterRemoteRoutes() error {
 }
 
 func (ovn *SyncHandler) updateSubmarinerRouterLocalRoutes() error {
-	localSubnets := ovn.localEndpointSubnetSet()
+	localSubnets := stringset.New(ovn.localClusterCIDR...)
 
-	klog.V(log.DEBUG).Infof("reconciling south static routes on %q for subnets %v", submarinerLogicalRouter,
+	klog.Infof("reconciling south static routes on %q for subnets %v", submarinerLogicalRouter,
 		localSubnets)
 
+	// For the incoming traffic from remote cluster destined to the local cluster CIDR, configure the next hop
+	// as the ovn_cluster_router port.
 	return ovn.reconcileSubOvnLogicalRouterStaticRoutes(submarinerDownstreamRPort, ovnClusterSubmarinerIP, localSubnets)
 }
