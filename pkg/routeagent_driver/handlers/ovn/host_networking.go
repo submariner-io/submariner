@@ -134,12 +134,16 @@ func (ovn *Handler) getNextHopOnK8sMgmtIntf() (*net.IP, error) {
 			continue
 		}
 
-		for _, subnet := range ovn.localEndpoint.Spec.Subnets {
+		// To support hostNetworking use-case the route-agent handler programs default route in table 150
+		// with nexthop matching the nexthop on the ovn-k8s-mp0 interface. Basically, we want the Submariner
+		// managed traffic to be forwarded to the ovn_cluster_router and pass through the CNI network so that
+		// it reaches the active gateway node in the cluster via the submariner pipeline.
+		for _, subnet := range ovn.config.ClusterCidr {
 			if currentRouteList[i].Dst.String() == subnet {
 				return &currentRouteList[i].Gw, nil
 			}
 		}
 	}
 
-	return nil, fmt.Errorf("could not find the route to %v via %q", ovn.localEndpoint.Spec.Subnets, OVNK8sMgmntIntfName)
+	return nil, fmt.Errorf("could not find the route to %v via %q", ovn.config.ClusterCidr, OVNK8sMgmntIntfName)
 }

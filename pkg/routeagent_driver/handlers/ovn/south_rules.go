@@ -29,10 +29,10 @@ import (
 
 // handleSubnets builds ip rules, and passes them to the specified netlink function
 //               for provided subnet list
-func (ovn *Handler) handleSubnets(subnets []string, ruleFunc func(rule *netlink.Rule) error,
+func (ovn *Handler) handleSubnets(remoteSubnets []string, ruleFunc func(rule *netlink.Rule) error,
 	ignoredErrorFunc func(error) bool,
 ) error {
-	for _, subnetToHandle := range subnets {
+	for _, subnetToHandle := range remoteSubnets {
 		for _, localSubnet := range ovn.localEndpoint.Spec.Subnets {
 			rule, err := ovn.getRuleSpec(localSubnet, subnetToHandle, constants.RouteAgentInterClusterNetworkTableID)
 			if err != nil {
