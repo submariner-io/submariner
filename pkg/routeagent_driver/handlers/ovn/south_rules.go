@@ -22,9 +22,11 @@ import (
 	"net"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
+	"k8s.io/klog/v2"
 )
 
 // handleSubnets builds ip rules, and passes them to the specified netlink function
@@ -32,12 +34,17 @@ import (
 func (ovn *Handler) handleSubnets(remoteSubnets []string, ruleFunc func(rule *netlink.Rule) error,
 	ignoredErrorFunc func(error) bool,
 ) error {
+	localCIDRs := stringset.New(ovn.config.ClusterCidr...)
+	localCIDRs.AddAll(ovn.config.ServiceCidr...)
+
 	for _, subnetToHandle := range remoteSubnets {
-		for _, localSubnet := range ovn.localEndpoint.Spec.Subnets {
+		for _, localSubnet := range localCIDRs.Elements() {
 			rule, err := ovn.getRuleSpec(localSubnet, subnetToHandle, constants.RouteAgentInterClusterNetworkTableID)
 			if err != nil {
 				return errors.Wrapf(err, "error creating rule %#v", rule)
 			}
+
+			klog.V(log.DEBUG).Infof("Adding routes in table 149: %v", rule)
 
 			err = ruleFunc(rule)
 			if err != nil && !ignoredErrorFunc(err) {
