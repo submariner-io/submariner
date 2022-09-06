@@ -151,12 +151,14 @@ func (ovn *Handler) setupForwardingIptables() error {
 
 func (ovn *Handler) addNoMasqueradeIPTables(subnet string) error {
 	return errors.Wrapf(ovn.ipt.AppendUnique("nat", constants.SmPostRoutingChain,
-		[]string{"-d", subnet, "-j", "ACCEPT"}...), "error updating %q rules", constants.SmPostRoutingChain)
+		[]string{"-d", subnet, "-j", "ACCEPT"}...), "error updating %q rules for subnet %q",
+		constants.SmPostRoutingChain, subnet)
 }
 
 func (ovn *Handler) removeNoMasqueradeIPTables(subnet string) error {
 	return errors.Wrapf(ovn.ipt.Delete("nat", constants.SmPostRoutingChain,
-		[]string{"-d", subnet, "-j", "ACCEPT"}...), "error updating %q rules", constants.SmPostRoutingChain)
+		[]string{"-d", subnet, "-j", "ACCEPT"}...), "error updating %q rules for subnet %q",
+		constants.SmPostRoutingChain, subnet)
 }
 
 func (ovn *Handler) cleanupForwardingIptables() error {

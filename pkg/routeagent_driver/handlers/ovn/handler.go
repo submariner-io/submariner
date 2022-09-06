@@ -146,7 +146,7 @@ func (ovn *Handler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	if ovn.isGateway {
 		for _, subnet := range endpoint.Spec.Subnets {
 			if err = ovn.addNoMasqueradeIPTables(subnet); err != nil {
-				return errors.Wrap(err, "error adding no-masquerade rules")
+				return errors.Wrapf(err, "error adding no-masquerade rules for subnet %q", subnet)
 			}
 		}
 
@@ -194,7 +194,7 @@ func (ovn *Handler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	if ovn.isGateway {
 		for _, subnet := range endpoint.Spec.Subnets {
 			if err = ovn.removeNoMasqueradeIPTables(subnet); err != nil {
-				return errors.Wrap(err, "error removing no-masquerade rules")
+				return errors.Wrapf(err, "error removing no-masquerade rules for subnet %q", subnet)
 			}
 		}
 
@@ -212,7 +212,7 @@ func (ovn *Handler) TransitionToNonGateway() error {
 	for _, endpoint := range ovn.remoteEndpoints {
 		for _, subnet := range endpoint.Spec.Subnets {
 			if err := ovn.removeNoMasqueradeIPTables(subnet); err != nil {
-				return errors.Wrap(err, "error removing no-masquerade rules")
+				return errors.Wrapf(err, "error removing no-masquerade rules for subnet %q", subnet)
 			}
 		}
 	}
@@ -229,7 +229,7 @@ func (ovn *Handler) TransitionToGateway() error {
 	for _, endpoint := range ovn.remoteEndpoints {
 		for _, subnet := range endpoint.Spec.Subnets {
 			if err := ovn.addNoMasqueradeIPTables(subnet); err != nil {
-				return errors.Wrap(err, "error adding no-masquerade rules")
+				return errors.Wrapf(err, "error adding no-masquerade rules for subnet %q", subnet)
 			}
 		}
 	}
