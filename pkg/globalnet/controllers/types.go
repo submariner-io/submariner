@@ -75,11 +75,11 @@ type Interface interface {
 }
 
 type Specification struct {
-	ClusterID     string
-	Namespace     string
-	GlobalCIDR    []string
-	GnMetricsPort string `default:"8081"`
-	Uninstall     bool
+	ClusterID   string
+	Namespace   string
+	GlobalCIDR  []string
+	MetricsPort string `default:"32781"`
+	Uninstall   bool
 }
 
 type baseController struct {
