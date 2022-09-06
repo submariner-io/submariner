@@ -15,15 +15,15 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.13.0
 	github.com/submariner-io/admiral v0.14.0-m0
-	github.com/submariner-io/shipyard v0.14.0-m0
+	github.com/submariner-io/shipyard v0.14.0-m1
 	github.com/uw-labs/lichen v0.1.7
 	github.com/vishvananda/netlink v1.1.1-0.20210518155637-4cb3795f2ccb
 	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20211215182854-7a385b3431de
 	google.golang.org/protobuf v1.28.1
-	k8s.io/api v0.24.2
-	k8s.io/apimachinery v0.24.2
-	k8s.io/client-go v0.24.2
+	k8s.io/api v0.24.3
+	k8s.io/apimachinery v0.24.3
+	k8s.io/client-go v0.24.3
 	k8s.io/klog/v2 v2.60.1
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
 	sigs.k8s.io/controller-runtime v0.12.1
