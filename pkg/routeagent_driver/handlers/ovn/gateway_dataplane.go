@@ -76,10 +76,6 @@ func (ovn *Handler) updateGatewayDataplane() error {
 		return errors.Wrap(err, "error adding submariner default")
 	}
 
-	if err = ovn.updateNoMasqueradeIPTables(); err != nil {
-		return errors.Wrap(err, "error handling no-masquerade rules")
-	}
-
 	return ovn.setupForwardingIptables()
 }
 
@@ -153,23 +149,16 @@ func (ovn *Handler) setupForwardingIptables() error {
 	return ovn.updateIPtableChains("filter", forwardingSubmarinerFWDChain, ovn.getForwardingRuleSpecs)
 }
 
-func (ovn *Handler) updateNoMasqueradeIPTables() error {
-	rules := ovn.getNoMasqueradRuleSpecs()
-
-	return errors.Wrapf(ovn.ipt.UpdateChainRules("nat", constants.SmPostRoutingChain, rules),
-		"error updating %q rules", constants.SmPostRoutingChain)
+func (ovn *Handler) addNoMasqueradeIPTables(subnet string) error {
+	return errors.Wrapf(ovn.ipt.AppendUnique("nat", constants.SmPostRoutingChain,
+		[]string{"-d", subnet, "-j", "ACCEPT"}...), "error updating %q rules for subnet %q",
+		constants.SmPostRoutingChain, subnet)
 }
 
-func (ovn *Handler) getNoMasqueradRuleSpecs() [][]string {
-	var rules [][]string
-
-	for _, endpoint := range ovn.remoteEndpoints {
-		for _, subnet := range endpoint.Spec.Subnets {
-			rules = append(rules, []string{"-d", subnet, "-j", "ACCEPT"})
-		}
-	}
-
-	return rules
+func (ovn *Handler) removeNoMasqueradeIPTables(subnet string) error {
+	return errors.Wrapf(ovn.ipt.Delete("nat", constants.SmPostRoutingChain,
+		[]string{"-d", subnet, "-j", "ACCEPT"}...), "error updating %q rules for subnet %q",
+		constants.SmPostRoutingChain, subnet)
 }
 
 func (ovn *Handler) cleanupForwardingIptables() error {
