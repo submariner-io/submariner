@@ -1,0 +1,2 @@
+# SC2154 is excluded to avoid false positives based on our use of global variables
+disable=SC2154

@@ -1,3 +1,5 @@
+# shellcheck shell=bash
+
 ### Constants ###
 readonly EXTERNAL_CIDRS="172.117.0.0/16"
 readonly EXTERNAL_NET="pseudo-ext"
@@ -5,94 +7,94 @@ readonly EXTERNAL_APP="ext-app"
 
 ### Functions ###
 function get_external_cluster() {
-	# Choose the first cluster as the one connected to external application
-	echo ${!cluster_subm[@]} | tr ' ' $'\n' | sort | head -n 1
+    # Choose the first cluster as the one connected to external application
+    echo "${!cluster_subm[@]}" | tr ' ' $'\n' | sort | head -n 1
 }
 
 function get_ip_on_container_network() {
-	container_name=$1
-	network_name=$2
-	docker inspect "${container_name}" -f '{{(index .NetworkSettings.Networks "'${network_name}'").IPAddress}}'
+    container_name=$1
+    network_name=$2
+    docker inspect "${container_name}" -f '{{(index .NetworkSettings.Networks "'"${network_name}"'").IPAddress}}'
 }
 
 function delete_container() {
-	name=$1
-	if [ $(docker ps -q --no-trunc -f name="^/${name}\$" | wc -l) -ne 0 ];then
-		docker stop ${name}
-		docker rm ${name}
-	fi
+    name=$1
+    if [[ $(docker ps -q --no-trunc -f name="^/${name}\$" | wc -l) -ne 0 ]]; then
+        docker stop "${name}"
+        docker rm "${name}"
+    fi
 }
 
 function delete_container_network() {
-	name=$1
-	if [ $(docker network ls --filter name="^${name}\$" --format="{{ .Name }}" | wc -l) -ne 0 ];then
-		docker network rm ${name}
-	fi
+    name=$1
+    if [[ $(docker network ls --filter name="^${name}\$" --format="{{ .Name }}" | wc -l) -ne 0 ]]; then
+        docker network rm "${name}"
+    fi
 }
 
 function setup_external() {
-	# Create pseudo-ext docker network
-	docker network create --driver=bridge --subnet=${EXTERNAL_CIDRS} ${EXTERNAL_NET}
+    # Create pseudo-ext docker network
+    docker network create --driver=bridge --subnet="${EXTERNAL_CIDRS}" "${EXTERNAL_NET}"
 
-	# Choose the first cluster as the one connected to external application
-	extcluster=$(get_external_cluster)
+    # Choose the first cluster as the one connected to external application
+    extcluster=$(get_external_cluster)
 
-	# Connect all nodes in the chosen cluster to pseudo-ext network
-	# Naming conventions of the nodes in kind are as described in
-	# https://github.com/kubernetes-sigs/kind/issues/1401#issuecomment-626108675
-	# (index starts from 1 and 1 is omitted).
-	num_control=1
-	num_worker=1
-	for node in ${cluster_nodes[${extcluster}]};do
-		if [ "${node}" = "control-plane" ];then
-			if [ ${num_control} -eq 1 ];then
-				docker network connect ${EXTERNAL_NET} ${extcluster}-${node}
-			else
-				docker network connect ${EXTERNAL_NET} ${extcluster}-${node}${num_control}
-			fi
-			num_control=$(( ${num_control} + 1))
-		elif [ "${node}" = "worker" ];then
-			if [ ${num_worker} -eq 1 ];then
-				docker network connect ${EXTERNAL_NET} ${extcluster}-${node}
-			else
-				docker network connect ${EXTERNAL_NET} ${extcluster}-${node}${num_worker}
-			fi
-			num_worker=$(( ${num_worker} + 1))
-		fi
-	done
+    # Connect all nodes in the chosen cluster to pseudo-ext network
+    # Naming conventions of the nodes in kind are as described in
+    # https://github.com/kubernetes-sigs/kind/issues/1401#issuecomment-626108675
+    # (index starts from 1 and 1 is omitted).
+    num_control=1
+    num_worker=1
+    for node in ${cluster_nodes["${extcluster}"]};do
+        if [ "${node}" = "control-plane" ];then
+            if [ "${num_control}" -eq 1 ];then
+                docker network connect "${EXTERNAL_NET}" "${extcluster}-${node}"
+            else
+                docker network connect "${EXTERNAL_NET}" "${extcluster}-${node}${num_control}"
+            fi
+            num_control=$(( num_control + 1))
+        elif [ "${node}" = "worker" ];then
+            if [ "${num_worker}" -eq 1 ];then
+                docker network connect "${EXTERNAL_NET}" "${extcluster}-${node}"
+            else
+                docker network connect "${EXTERNAL_NET}" "${extcluster}-${node}${num_worker}"
+            fi
+            num_worker=$(( num_worker + 1))
+        fi
+    done
 
-	# Create external test container on pseudo-ext network
-	docker run --cap-add=NET_ADMIN --name ${EXTERNAL_APP} --network ${EXTERNAL_NET} \
-		-d registry.access.redhat.com/ubi7/ubi python -m SimpleHTTPServer 80
+    # Create external test container on pseudo-ext network
+    docker run --cap-add=NET_ADMIN --name "${EXTERNAL_APP}" --network "${EXTERNAL_NET}" \
+        -d registry.access.redhat.com/ubi7/ubi python -m SimpleHTTPServer 80
 
-	# Add extra routing in external app
-	docker exec -i ${EXTERNAL_APP} yum install -y iproute
+    # Add extra routing in external app
+    docker exec -i "${EXTERNAL_APP}" yum install -y iproute
 
-	# Get IP address for submariner gateway IP on external network
-	subm_gw_node_name="${extcluster}-worker"
-	subm_gw_ip=$(get_ip_on_container_network ${subm_gw_node_name} ${EXTERNAL_NET})
+    # Get IP address for submariner gateway IP on external network
+    subm_gw_node_name="${extcluster}-worker"
+    subm_gw_ip=$(get_ip_on_container_network "${subm_gw_node_name}" "${EXTERNAL_NET}")
 
-	# Add route for global CIDR to go via subm_gw_ip
-	if [[ $GLOBALNET == "true" ]];then
-		for subnet in ${global_CIDRs[@]};do
-			docker exec -i ${EXTERNAL_APP} ip r add ${subnet} via ${subm_gw_ip}
-		done
+    # Add route for global CIDR to go via subm_gw_ip
+    if [[ $GLOBALNET == "true" ]];then
+        for subnet in "${global_CIDRs[@]}";do
+            docker exec -i "${EXTERNAL_APP}" ip r add "${subnet}" via "${subm_gw_ip}"
+        done
 
-		return 0
-	fi
+        return 0
+    fi
 
-	# Add route for cluster CIDRs to go via subm_gw_ip
-	for subnet in ${cluster_CIDRs[@]};do
-		docker exec -i ${EXTERNAL_APP} ip r add ${subnet} via ${subm_gw_ip}
-	done
+    # Add route for cluster CIDRs to go via subm_gw_ip
+    for subnet in "${cluster_CIDRs[@]}";do
+        docker exec -i "${EXTERNAL_APP}" ip r add "${subnet}" via "${subm_gw_ip}"
+    done
 
-	# Add route for service CIDR to go via subm_gw_ip
-	for subnet in ${service_CIDRs[@]};do
-		docker exec -i ${EXTERNAL_APP} ip r add ${subnet} via ${subm_gw_ip}
-	done
+    # Add route for service CIDR to go via subm_gw_ip
+    for subnet in "${service_CIDRs[@]}";do
+        docker exec -i "${EXTERNAL_APP}" ip r add "${subnet}" via "${subm_gw_ip}"
+    done
 }
 
 function add_external_cidrs() {
-	extcluster=$(get_external_cluster)
-	cluster_CIDRs[${extcluster}]="${cluster_CIDRs[${extcluster}]},${EXTERNAL_CIDRS}"
+    extcluster=$(get_external_cluster)
+    cluster_CIDRs["${extcluster}"]="${cluster_CIDRs[${extcluster}]},${EXTERNAL_CIDRS}"
 }
