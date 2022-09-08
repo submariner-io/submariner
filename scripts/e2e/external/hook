@@ -1,21 +1,24 @@
-source $(dirname ${BASH_SOURCE})/utils
+# shellcheck shell=bash
+# shellcheck source=scripts/e2e/external/hook
+source "${BASH_SOURCE%/*}"/utils
 
 ### Hook functions ###
 function pre_deploy() {
-	# Do external-specific setup for K8s cluster and external container
-	setup_external
+    # Do external-specific setup for K8s cluster and external container
+    setup_external
 
-	# Add external CIDRs to default CIDRs declared in declare_cidrs
-	add_external_cidrs
+    # Add external CIDRs to default CIDRs declared in declare_cidrs
+    add_external_cidrs
 
-	# Set flag to pass CIDR arguments on deploy
-	PASS_CIDR_ARGS=true
+    # Set flag to pass CIDR arguments on deploy
+    # shellcheck disable=SC2034
+    PASS_CIDR_ARGS=true
 }
 
 function post_cleanup() {
-	# Delete external test container on pseudo-ext network
-	delete_container ${EXTERNAL_APP}
+    # Delete external test container on pseudo-ext network
+    delete_container "${EXTERNAL_APP}"
 
-	# Delete pseudo-ext docker network
-	delete_container_network ${EXTERNAL_NET}
+    # Delete pseudo-ext docker network
+    delete_container_network "${EXTERNAL_NET}"
 }

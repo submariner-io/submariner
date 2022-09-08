@@ -1,9 +1,11 @@
 #!/bin/bash
 
-source ${SCRIPTS_DIR}/lib/debug_functions
+set -e
+source "${SCRIPTS_DIR}"/lib/debug_functions
 
 # The generators assume GOPATH is set
-export GOPATH="$(go env GOPATH)"
+export GOPATH
+GOPATH="$(go env GOPATH)"
 
 K8S_IO_DIR="${GOPATH:-$HOME/go}/src/k8s.io"
 CODEGEN_SCRIPT_DIR="${K8S_IO_DIR}/code-generator"
@@ -12,11 +14,12 @@ CODEGEN_RELEASE_TAG=kubernetes-1.19.10
 
 if [ ! -f "$CODEGEN_SCRIPT" ]; then
     echo "$CODEGEN_SCRIPT does not exist - downloading..."
-    git clone --branch $CODEGEN_RELEASE_TAG https://github.com/kubernetes/code-generator "${CODEGEN_SCRIPT_DIR}"
-    cd "${CODEGEN_SCRIPT_DIR}"
-    go mod vendor
-    cd -
-    echo "Successsfully checked out release tag $CODEGEN_RELEASE_TAG"
+    (
+        git clone --branch $CODEGEN_RELEASE_TAG https://github.com/kubernetes/code-generator "${CODEGEN_SCRIPT_DIR}"
+        cd "${CODEGEN_SCRIPT_DIR}"
+        go mod vendor
+        echo "Successsfully checked out release tag $CODEGEN_RELEASE_TAG"
+    )
 fi
 
 "${CODEGEN_SCRIPT}" all github.com/submariner-io/submariner/pkg/client github.com/submariner-io/submariner/pkg/apis submariner.io:v1
