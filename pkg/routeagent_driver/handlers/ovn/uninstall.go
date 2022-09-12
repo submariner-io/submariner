@@ -60,10 +60,8 @@ func (ovn *Handler) Stop(uninstall bool) error {
 			constants.RouteAgentHostNetworkTableID, err)
 	}
 
-	err = ovn.cleanupForwardingIptables()
-	if err != nil {
-		klog.Errorf("Error deleting iptable rules %v", err)
-	}
+	ovn.flushAndDeleteIPTableChains(constants.FilterTable, constants.ForwardChain, forwardingSubmarinerFWDChain)
+	ovn.flushAndDeleteIPTableChains(constants.NATTable, constants.PostRoutingChain, constants.SmPostRoutingChain)
 
 	return nil
 }
@@ -84,4 +82,27 @@ func (ovn *Handler) cleanupRoutes() error {
 	}
 
 	return nil
+}
+
+func (ovn *Handler) flushAndDeleteIPTableChains(table, tableChain, submarinerChain string) {
+	klog.Infof("Flushing iptable entries in %q chain of %q table", submarinerChain, table)
+
+	if err := ovn.ipt.ClearChain(table, submarinerChain); err != nil {
+		klog.Errorf("Error flushing iptables chain %q of %q table: %v", submarinerChain,
+			table, err)
+	}
+
+	klog.Infof("Deleting iptable entry in %q chain of %q table", tableChain, table)
+
+	ruleSpec := []string{"-j", submarinerChain}
+	if err := ovn.ipt.Delete(table, tableChain, ruleSpec...); err != nil {
+		klog.Errorf("Error deleting iptables rule from %q chain: %v", tableChain, err)
+	}
+
+	klog.Infof("Deleting iptable %q chain of %q table", submarinerChain, table)
+
+	if err := ovn.ipt.DeleteChain(table, submarinerChain); err != nil {
+		klog.Errorf("Error deleting iptable chain %q of table %q: %v", submarinerChain,
+			table, err)
+	}
 }
