@@ -48,9 +48,14 @@ func testRouteAgentRestart(f *subFramework.Framework, onGateway bool) {
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
 	nodes := f.FindNodesByGatewayLabel(framework.ClusterA, onGateway)
+	// Testing GatewayFailover test in "kind" env will require
+	// all nodes to serve as GW nodes due to resources limitation.
+	// It means that current test may fail as will not find non GW worker.
+	// In case required node will not be found, look for any non GW/worker
+	// node. And since the "route agent" pod runs on every node, it will work.
 	if len(nodes) == 0 && !onGateway {
-		framework.Skipf("Skipping the test as cluster %q doesn't have any suitable non-gateway nodes...", clusterAName)
-		return
+		By(fmt.Sprintf("No Non Gateway worker nodes found in %q. Looking for non worker nodes", clusterAName))
+		nodes = f.FindAnyNonGatewayRouteAgentPodNodes(framework.ClusterA)
 	}
 
 	By(fmt.Sprintf("Found node %q on %q", nodes[0].Name, clusterAName))
