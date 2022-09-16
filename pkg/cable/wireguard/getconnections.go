@@ -27,7 +27,6 @@ import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
-	"k8s.io/klog/v2"
 )
 
 func (w *wireguard) GetConnections() ([]v1.Connection, error) {
@@ -46,10 +45,10 @@ func (w *wireguard) GetConnections() ([]v1.Connection, error) {
 
 		connection, err := w.connectionByKey(&key)
 		if err != nil {
-			klog.Warningf("Found unknown peer with key %s, removing", key)
+			logger.Warningf("Found unknown peer with key %s, removing", key)
 
 			if err := w.removePeer(&key); err != nil {
-				klog.Errorf("Could not delete WireGuard peer with key %s, ignoring: %v", key, err)
+				logger.Errorf(err, "Could not delete WireGuard peer with key %s, ignoring", key)
 			}
 
 			continue
@@ -69,7 +68,7 @@ func (w *wireguard) connectionByKey(key *wgtypes.Key) (*v1.Connection, error) {
 				return con, nil
 			}
 		} else {
-			klog.Errorf("Could not compare key for cluster %s, skipping: %v", cid, err)
+			logger.Errorf(err, "Could not compare key for cluster %s, skipping", cid)
 		}
 	}
 
@@ -132,7 +131,7 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 
 	if lc < 2*keepAliveMS {
 		// Grace period, leave status unchanged.
-		klog.Warningf("No traffic for %.1f seconds; handshake was %.1f seconds ago: %v", lcSec,
+		logger.Warningf("No traffic for %.1f seconds; handshake was %.1f seconds ago: %v", lcSec,
 			handshakeDelta.Seconds(), connection)
 		return
 	}
