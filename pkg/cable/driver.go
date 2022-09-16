@@ -22,10 +22,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
-	"k8s.io/klog/v2"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // Driver is used by the ipsec engine to actually connect the tunnels.
@@ -62,10 +63,12 @@ var drivers = map[string]DriverCreateFunc{}
 // Default name of the cable driver.
 var defaultCableDriver string
 
+var logger = log.Logger{Logger: logf.Log.WithName("CableDriver")}
+
 // Adds a supported driver, prints a fatal error in the case of double registration.
 func AddDriver(name string, driverCreate DriverCreateFunc) {
 	if drivers[name] != nil {
-		klog.Fatalf("Multiple cable engine drivers attempting to register with name %q", name)
+		logger.Fatalf("Multiple cable engine drivers attempting to register with name %q", name)
 	}
 
 	drivers[name] = driverCreate

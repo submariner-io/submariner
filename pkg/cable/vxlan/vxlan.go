@@ -37,7 +37,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
-	"k8s.io/klog/v2"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -80,6 +80,8 @@ type vxlanAttributes struct {
 	vtepPort int
 	mtu      int
 }
+
+var logger = log.Logger{Logger: logf.Log.WithName("vxlan")}
 
 func init() {
 	cable.AddDriver(CableDriverName, NewDriver)
@@ -150,7 +152,7 @@ func (v *vxlan) createVxlanInterface(activeEndPoint string, port int) error {
 		return errors.Wrap(err, "unable to update vxlan rp_filter proc entry")
 	}
 
-	klog.V(log.DEBUG).Infof("Successfully configured rp_filter to loose mode(2) on %s", VxlanIface)
+	logger.V(log.DEBUG).Infof("Successfully configured rp_filter to loose mode(2) on %s", VxlanIface)
 
 	err = v.vxlanIface.configureIPAddress(vtepIP, net.CIDRMask(8, 32))
 	if err != nil {
@@ -188,7 +190,8 @@ func newVxlanIface(attrs *vxlanAttributes, activeEndPoint string) (*vxlanIface, 
 func createvxlanIface(iface *vxlanIface) error {
 	err := netlink.LinkAdd(iface.link)
 	if errors.Is(err, syscall.EEXIST) {
-		klog.Errorf("Got error: %v, %v", err, iface.link)
+		logger.Error(err, "Error adding link")
+
 		// Get the properties of existing vxlan interface.
 		existing, err := netlink.LinkByName(iface.link.Name)
 		if err != nil {
@@ -196,7 +199,7 @@ func createvxlanIface(iface *vxlanIface) error {
 		}
 
 		if isVxlanConfigTheSame(iface.link, existing) {
-			klog.V(log.DEBUG).Infof("VxLAN interface already exists with same configuration.")
+			logger.V(log.DEBUG).Infof("VxLAN interface already exists with same configuration.")
 
 			iface.link = existing.(*netlink.Vxlan)
 
@@ -223,22 +226,22 @@ func isVxlanConfigTheSame(newLink, currentLink netlink.Link) bool {
 	existing := currentLink.(*netlink.Vxlan)
 
 	if required.VxlanId != existing.VxlanId {
-		klog.Warningf("VxlanId of existing interface (%d) does not match with required VxlanId (%d)", existing.VxlanId, required.VxlanId)
+		logger.Warningf("VxlanId of existing interface (%d) does not match with required VxlanId (%d)", existing.VxlanId, required.VxlanId)
 		return false
 	}
 
 	if len(required.Group) > 0 && len(existing.Group) > 0 && !required.Group.Equal(existing.Group) {
-		klog.Warningf("Vxlan Group (%v) of existing interface does not match with required Group (%v)", existing.Group, required.Group)
+		logger.Warningf("Vxlan Group (%v) of existing interface does not match with required Group (%v)", existing.Group, required.Group)
 		return false
 	}
 
 	if len(required.SrcAddr) > 0 && len(existing.SrcAddr) > 0 && !required.SrcAddr.Equal(existing.SrcAddr) {
-		klog.Warningf("Vxlan SrcAddr (%v) of existing interface does not match with required SrcAddr (%v)", existing.SrcAddr, required.SrcAddr)
+		logger.Warningf("Vxlan SrcAddr (%v) of existing interface does not match with required SrcAddr (%v)", existing.SrcAddr, required.SrcAddr)
 		return false
 	}
 
 	if required.Port > 0 && existing.Port > 0 && required.Port != existing.Port {
-		klog.Warningf("Vxlan Port (%d) of existing interface does not match with required Port (%d)", existing.Port, required.Port)
+		logger.Warningf("Vxlan Port (%d) of existing interface does not match with required Port (%d)", existing.Port, required.Port)
 		return false
 	}
 
@@ -261,7 +264,7 @@ func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 	// We'll panic if endpointInfo is nil, this is intentional
 	remoteEndpoint := endpointInfo.Endpoint
 	if v.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
-		klog.V(log.DEBUG).Infof("Will not connect to self")
+		logger.V(log.DEBUG).Infof("Will not connect to self")
 		return "", nil
 	}
 
@@ -272,7 +275,7 @@ func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 
 	allowedIPs := parseSubnets(remoteEndpoint.Spec.Subnets)
 
-	klog.V(log.DEBUG).Infof("Connecting cluster %s endpoint %s",
+	logger.V(log.DEBUG).Infof("Connecting cluster %s endpoint %s",
 		remoteEndpoint.Spec.ClusterID, remoteIP)
 	v.mutex.Lock()
 	defer v.mutex.Unlock()
@@ -298,7 +301,7 @@ func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 	if err == nil {
 		ipAddress = net.ParseIP(cniIface.IPAddress)
 	} else {
-		klog.Errorf("Failed to get the CNI interface IP for cluster CIDR %q, host-networking use-cases may not work",
+		logger.Errorf(nil, "Failed to get the CNI interface IP for cluster CIDR %q, host-networking use-cases may not work",
 			v.localCluster.Spec.ClusterCIDR[0])
 		ipAddress = nil
 	}
@@ -315,17 +318,17 @@ func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 		UsingIP: endpointInfo.UseIP, UsingNAT: endpointInfo.UseNAT,
 	})
 
-	klog.V(log.DEBUG).Infof("Done adding endpoint for cluster %s", remoteEndpoint.Spec.ClusterID)
+	logger.V(log.DEBUG).Infof("Done adding endpoint for cluster %s", remoteEndpoint.Spec.ClusterID)
 
 	return endpointInfo.UseIP, nil
 }
 
 func (v *vxlan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint) error {
 	// We'll panic if remoteEndpoint is nil, this is intentional
-	klog.V(log.DEBUG).Infof("Removing endpoint %#v", remoteEndpoint)
+	logger.V(log.DEBUG).Infof("Removing endpoint %#v", remoteEndpoint)
 
 	if v.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
-		klog.V(log.DEBUG).Infof("Will not disconnect self")
+		logger.V(log.DEBUG).Infof("Will not disconnect self")
 		return nil
 	}
 
@@ -341,7 +344,7 @@ func (v *vxlan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint)
 	}
 
 	if ip == "" {
-		klog.Errorf("Cannot disconnect remote endpoint %q - no prior connection entry found", remoteEndpoint.Spec.CableName)
+		logger.Errorf(nil, "Cannot disconnect remote endpoint %q - no prior connection entry found", remoteEndpoint.Spec.CableName)
 		return nil
 	}
 
@@ -367,7 +370,7 @@ func (v *vxlan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint)
 	v.connections = removeConnectionForEndpoint(v.connections, remoteEndpoint)
 	cable.RecordDisconnected(CableDriverName, &v.localEndpoint.Spec, &remoteEndpoint.Spec)
 
-	klog.V(log.DEBUG).Infof("Done removing endpoint for cluster %s", remoteEndpoint.Spec.ClusterID)
+	logger.V(log.DEBUG).Infof("Done removing endpoint for cluster %s", remoteEndpoint.Spec.ClusterID)
 
 	return nil
 }
@@ -432,7 +435,7 @@ func (v *vxlanIface) AddFDB(ipAddress net.IP, hwAddr string) error {
 		return errors.Wrapf(err, "unable to add the bridge fdb entry %v", neigh)
 	}
 
-	klog.V(log.DEBUG).Infof("Successfully added the bridge fdb entry %v", neigh)
+	logger.V(log.DEBUG).Infof("Successfully added the bridge fdb entry %v", neigh)
 
 	return nil
 }
@@ -458,7 +461,7 @@ func (v *vxlanIface) DelFDB(ipAddress net.IP, hwAddr string) error {
 		return errors.Wrapf(err, "unable to delete the bridge fdb entry %v", neigh)
 	}
 
-	klog.V(log.DEBUG).Infof("Successfully deleted the bridge fdb entry %v", neigh)
+	logger.V(log.DEBUG).Infof("Successfully deleted the bridge fdb entry %v", neigh)
 
 	return nil
 }
@@ -485,7 +488,7 @@ func (v *vxlanIface) AddRoute(ipAddressList []net.IPNet, gwIP, ip net.IP) error 
 			return errors.Wrapf(err, "unable to add the route entry %v", route)
 		}
 
-		klog.V(log.DEBUG).Infof("Successfully added the route entry %v and gw ip %v", route, gwIP)
+		logger.V(log.DEBUG).Infof("Successfully added the route entry %v and gw ip %v", route, gwIP)
 	}
 
 	return nil
@@ -508,7 +511,7 @@ func (v *vxlanIface) DelRoute(ipAddressList []net.IPNet) error {
 			return errors.Wrapf(err, "unable to add the route entry %v", route)
 		}
 
-		klog.V(log.DEBUG).Infof("Successfully deleted the route entry %v", route)
+		logger.V(log.DEBUG).Infof("Successfully deleted the route entry %v", route)
 	}
 
 	return nil
@@ -530,7 +533,7 @@ func parseSubnets(subnets []string) []net.IPNet {
 		_, cidr, err := net.ParseCIDR(sn)
 		if err != nil {
 			// this should not happen. Log and continue
-			klog.Errorf("failed to parse subnet %s: %v", sn, err)
+			logger.Errorf(err, "Failed to parse subnet %s", sn)
 			continue
 		}
 
@@ -541,11 +544,11 @@ func parseSubnets(subnets []string) []net.IPNet {
 }
 
 func (v *vxlan) Cleanup() error {
-	klog.Infof("Uninstalling the vxlan cable driver")
+	logger.Infof("Uninstalling the vxlan cable driver")
 
 	err := netlinkAPI.DeleteIfaceAndAssociatedRoutes(VxlanIface, TableID)
 	if err != nil {
-		klog.Errorf("unable to delete interface %s and associated routes from table %d", VxlanIface, TableID)
+		logger.Errorf(nil, "Unable to delete interface %s and associated routes from table %d", VxlanIface, TableID)
 	}
 
 	err = v.netLink.RuleDelIfPresent(netlinkAPI.NewTableRule(TableID))

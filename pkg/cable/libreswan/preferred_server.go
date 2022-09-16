@@ -20,7 +20,6 @@ package libreswan
 
 import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"k8s.io/klog/v2"
 )
 
 type operationMode int
@@ -36,12 +35,12 @@ func (i *libreswan) calculateOperationMode(remoteEndpoint *v1.EndpointSpec) oper
 
 	leftPreferred, err := i.localEndpoint.Spec.GetBackendBool(v1.PreferredServerConfig, &defaultValue)
 	if err != nil {
-		klog.Errorf("Error parsing local endpoint config: %s", err)
+		logger.Errorf(err, "Error parsing local endpoint config")
 	}
 
 	rightPreferred, err := remoteEndpoint.GetBackendBool(v1.PreferredServerConfig, nil)
 	if err != nil {
-		klog.Errorf("Error parsing remote endpoint config %q: %s", remoteEndpoint.CableName, err)
+		logger.Errorf(err, "Error parsing remote endpoint config %q", remoteEndpoint.CableName)
 	}
 
 	if rightPreferred == nil || !*leftPreferred && !*rightPreferred {
