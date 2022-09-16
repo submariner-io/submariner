@@ -33,6 +33,7 @@ import (
 	extErrors "github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -55,7 +56,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/klog/v2"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
 
@@ -83,13 +84,17 @@ const (
 	defaultRetryPeriod        = 2  // In Seconds
 )
 
-var VERSION = "not-compiled-properly"
+var (
+	VERSION = "not-compiled-properly"
+	logger  = log.Logger{Logger: logf.Log.WithName("main")}
+)
 
 func main() {
-	klog.InitFlags(nil)
+	kzerolog.AddFlags(nil)
 	flag.Parse()
+	kzerolog.InitK8sLogging()
 
-	klog.Info("Starting the submariner gateway engine")
+	logger.Info("Starting the submariner gateway engine")
 
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler().Done()
@@ -98,7 +103,7 @@ func main() {
 
 	fatalOnErr(envconfig.Process("submariner", &submSpec), "Error processing env vars")
 
-	klog.Info("Parsed env variables", submSpec)
+	logger.Info("Parsed env variables", submSpec)
 	httpServer := startHTTPServer(&submSpec)
 
 	cfg, err := clientcmd.BuildConfigFromFlags(localMasterURL, localKubeconfig)
@@ -112,7 +117,7 @@ func main() {
 
 	fatalOnErr(subv1.AddToScheme(scheme.Scheme), "Error adding submariner types to the scheme")
 
-	klog.Info("Creating the cable engine")
+	logger.Info("Creating the cable engine")
 
 	localCluster := submarinerClusterFrom(&submSpec)
 
@@ -129,7 +134,7 @@ func main() {
 	natDiscovery, err := natdiscovery.New(localEndpoint)
 	fatalOnErr(err, "Error creating the NAT discovery handler")
 
-	klog.Info("Creating the datastore syncer")
+	logger.Info("Creating the datastore syncer")
 
 	dsSyncer := datastoresyncer.New(&broker.SyncerConfig{
 		LocalRestConfig: cfg,
@@ -144,7 +149,7 @@ func main() {
 		VERSION, cableHealthchecker)
 
 	if submSpec.Uninstall {
-		klog.Info("Uninstalling the submariner gateway engine")
+		logger.Info("Uninstalling the submariner gateway engine")
 
 		uninstallGateway(cableEngine, cableEngineSyncer, dsSyncer)
 
@@ -205,7 +210,7 @@ func main() {
 
 			if cableHealthchecker != nil {
 				if err = cableHealthchecker.Start(stopCh); err != nil {
-					klog.Errorf("Error starting healthChecker: %v", err)
+					logger.Errorf(err, "Error starting healthChecker")
 				}
 			}
 		}()
@@ -228,16 +233,16 @@ func main() {
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.V(log.DEBUG).Infof)
+	eventBroadcaster.StartLogging(logger.V(log.DEBUG).Infof)
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "submariner-controller"})
 
 	lostLeader := func() {
 		if err := gwPod.SetHALabels(subv1.HAStatusPassive); err != nil {
-			klog.Warningf("Error updating pod label: %s", err)
+			logger.Warningf("Error updating pod label: %s", err)
 		}
 
 		cableEngineSyncer.CleanupGatewayEntry()
-		klog.Fatalf("Leader election lost, shutting down")
+		logger.Fatalf("Leader election lost, shutting down")
 	}
 
 	go func() {
@@ -249,13 +254,13 @@ func main() {
 	<-stopCh
 
 	if err := cableEngine.Cleanup(); err != nil {
-		klog.Errorf("error cleaning up cableEngine resources before removing Gateway")
+		logger.Error(nil, "Error cleaning up cableEngine resources before removing Gateway")
 	}
 
-	klog.Info("All controllers stopped or exited. Stopping main loop")
+	logger.Info("All controllers stopped or exited. Stopping main loop")
 
 	if err := httpServer.Shutdown(context.TODO()); err != nil {
-		klog.Errorf("Error shutting down metrics HTTP server: %v", err)
+		logger.Errorf(err, "Error shutting down metrics HTTP server")
 	}
 }
 
@@ -264,7 +269,7 @@ func getCableHealthChecker(cfg *rest.Config, submSpec *types.SubmarinerSpecifica
 	var err error
 
 	if !submSpec.HealthCheckEnabled {
-		klog.Info("The CableEngine HealthChecker is disabled")
+		logger.Info("The CableEngine HealthChecker is disabled")
 	} else {
 		cableHealthchecker, err = healthchecker.New(&healthchecker.Config{
 			WatcherConfig:      &watcher.Config{RestConfig: cfg},
@@ -274,7 +279,7 @@ func getCableHealthChecker(cfg *rest.Config, submSpec *types.SubmarinerSpecifica
 			MaxPacketLossCount: submSpec.HealthCheckMaxPacketLossCount,
 		})
 		if err != nil {
-			klog.Errorf("Error creating healthChecker: %v", err)
+			logger.Errorf(err, "Error creating healthChecker")
 		}
 	}
 
@@ -302,7 +307,7 @@ func fatalOnErr(err error, msg string) {
 		return
 	}
 
-	klog.Fatalf("%s: %+v", msg, err)
+	logger.Fatalf("%s: %+v", msg, err)
 }
 
 func submarinerClusterFrom(submSpec *types.SubmarinerSpecification) *types.SubmarinerCluster {
@@ -325,7 +330,7 @@ func startHTTPServer(spec *types.SubmarinerSpecification) *http.Server {
 
 	go func() {
 		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			klog.Errorf("Error starting metrics server: %v", err)
+			logger.Errorf(err, "Error starting metrics server")
 		}
 	}()
 
@@ -355,7 +360,7 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder res
 		gwLeadershipConfig.RetryPeriod = defaultRetryPeriod
 	}
 
-	klog.Infof("Gateway leader election config values: %#v", gwLeadershipConfig)
+	logger.Infof("Gateway leader election config values: %#v", gwLeadershipConfig)
 
 	id, err := os.Hostname()
 	if err != nil {
@@ -370,10 +375,10 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder res
 	namespace, _, err := kubeconfig.Namespace()
 	if err != nil {
 		namespace = "submariner"
-		klog.Infof("Could not obtain a namespace to use for the leader election lock - the error was: %v. Using the default %q namespace.",
+		logger.Infof("Could not obtain a namespace to use for the leader election lock - the error was: %v. Using the default %q namespace.",
 			namespace, err)
 	} else {
-		klog.Infof("Using namespace %q for the leader election lock", namespace)
+		logger.Infof("Using namespace %q for the leader election lock", namespace)
 	}
 
 	// Lock required for leader election
@@ -410,10 +415,10 @@ func (c *cleanupHandler) fatal(format string, args ...interface{}) {
 	c.gwSyncer.SetGatewayStatusError(err)
 
 	if err := c.gatewayPod.SetHALabels(subv1.HAStatusPassive); err != nil {
-		klog.Warningf("Error updating pod label: %s", err)
+		logger.Warningf("Error updating pod label: %s", err)
 	}
 
-	klog.Fatal(err.Error())
+	logger.Fatal(err.Error())
 }
 
 func uninstallGateway(cableEngine cableengine.Engine, cableEngineSyncer *syncer.GatewaySyncer,
@@ -422,7 +427,7 @@ func uninstallGateway(cableEngine cableengine.Engine, cableEngineSyncer *syncer.
 	err := cableEngine.StartEngine()
 	if err != nil {
 		// As we are in the process of cleaning up, ignore any initialization errors.
-		klog.Errorf("Error starting the cable driver: %v", err)
+		logger.Errorf(err, "Error starting the cable driver")
 	}
 
 	// The Gateway object has to be deleted before invoking the cableEngine.Cleanup
@@ -430,7 +435,7 @@ func uninstallGateway(cableEngine cableengine.Engine, cableEngineSyncer *syncer.
 
 	err = cableEngine.Cleanup()
 	if err != nil {
-		klog.Errorf("Error while cleaning up of cable drivers: %v", err)
+		logger.Errorf(err, "Error while cleaning up of cable drivers")
 	}
 
 	dsErr := dsSyncer.Cleanup()
