@@ -27,7 +27,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog/v2"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type LatencyInfo struct {
@@ -63,6 +63,8 @@ type controller struct {
 	pingers         sync.Map
 	config          *Config
 }
+
+var logger = log.Logger{Logger: logf.Log.WithName("HealthChecker")}
 
 func New(config *Config) (Interface, error) {
 	controller := &controller{
@@ -105,14 +107,14 @@ func (h *controller) Start(stopCh <-chan struct{}) error {
 		return errors.Wrapf(err, "error starting watcher")
 	}
 
-	klog.Infof("CableEngine HealthChecker started with PingInterval: %v, MaxPacketLossCount: %v", h.config.PingInterval,
+	logger.Infof("CableEngine HealthChecker started with PingInterval: %v, MaxPacketLossCount: %v", h.config.PingInterval,
 		h.config.MaxPacketLossCount)
 
 	return nil
 }
 
 func (h *controller) endpointCreatedorUpdated(obj runtime.Object, numRequeues int) bool {
-	klog.V(log.TRACE).Infof("Endpoint created: %#v", obj)
+	logger.V(log.TRACE).Infof("Endpoint created: %#v", obj)
 
 	endpointCreated := obj.(*submarinerv1.Endpoint)
 	if endpointCreated.Spec.ClusterID == h.config.ClusterID {
@@ -120,7 +122,7 @@ func (h *controller) endpointCreatedorUpdated(obj runtime.Object, numRequeues in
 	}
 
 	if endpointCreated.Spec.HealthCheckIP == "" || endpointCreated.Spec.CableName == "" {
-		klog.Infof("HealthCheckIP (%q) and/or CableName (%q) for Endpoint %q empty - will not monitor endpoint health",
+		logger.Infof("HealthCheckIP (%q) and/or CableName (%q) for Endpoint %q empty - will not monitor endpoint health",
 			endpointCreated.Spec.HealthCheckIP, endpointCreated.Spec.CableName, endpointCreated.Name)
 		return false
 	}
@@ -131,7 +133,7 @@ func (h *controller) endpointCreatedorUpdated(obj runtime.Object, numRequeues in
 			return false
 		}
 
-		klog.V(log.DEBUG).Infof("HealthChecker is already running for %q - stopping", endpointCreated.Name)
+		logger.V(log.DEBUG).Infof("HealthChecker is already running for %q - stopping", endpointCreated.Name)
 		pinger.Stop()
 		h.pingers.Delete(endpointCreated.Spec.CableName)
 	}
@@ -154,7 +156,7 @@ func (h *controller) endpointCreatedorUpdated(obj runtime.Object, numRequeues in
 	h.pingers.Store(endpointCreated.Spec.CableName, pinger)
 	pinger.Start()
 
-	klog.Infof("CableEngine HealthChecker started pinger for CableName: %q with HealthCheckIP %q",
+	logger.Infof("CableEngine HealthChecker started pinger for CableName: %q with HealthCheckIP %q",
 		endpointCreated.Spec.CableName, endpointCreated.Spec.HealthCheckIP)
 
 	return false
