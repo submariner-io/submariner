@@ -33,6 +33,7 @@ import (
 	"github.com/pkg/errors"
 	fakeReactor "github.com/submariner-io/admiral/pkg/fake"
 	. "github.com/submariner-io/admiral/pkg/gomega"
+	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -51,7 +52,6 @@ import (
 	fakeClient "k8s.io/client-go/dynamic/fake"
 	kubeScheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -59,10 +59,11 @@ const (
 )
 
 func init() {
-	klog.InitFlags(nil)
+	kzerolog.AddFlags(nil)
 }
 
 var _ = BeforeSuite(func() {
+	kzerolog.InitK8sLogging()
 	syncer.GatewayUpdateInterval = 200 * time.Millisecond
 	syncer.GatewayStaleTimeout = 1 * time.Second
 })
