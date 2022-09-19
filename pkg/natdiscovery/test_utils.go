@@ -29,7 +29,6 @@ import (
 	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 	"github.com/submariner-io/submariner/pkg/types"
 	"google.golang.org/protobuf/proto"
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -53,7 +52,7 @@ var (
 func parseProtocolRequest(buf []byte) *natproto.SubmarinerNATDiscoveryRequest {
 	msg := natproto.SubmarinerNATDiscoveryMessage{}
 	if err := proto.Unmarshal(buf, &msg); err != nil {
-		klog.Errorf("error unmarshaling message received on UDP port %d: %s", natproto.DefaultPort, err)
+		logger.Errorf(err, "error unmarshaling message received on UDP port %d", natproto.DefaultPort)
 	}
 
 	request := msg.GetRequest()
@@ -65,7 +64,7 @@ func parseProtocolRequest(buf []byte) *natproto.SubmarinerNATDiscoveryRequest {
 func parseProtocolResponse(buf []byte) *natproto.SubmarinerNATDiscoveryResponse {
 	msg := natproto.SubmarinerNATDiscoveryMessage{}
 	if err := proto.Unmarshal(buf, &msg); err != nil {
-		klog.Errorf("error unmarshaling message received on UDP port %d: %s", natproto.DefaultPort, err)
+		logger.Errorf(err, "error unmarshaling message received on UDP port %d", natproto.DefaultPort)
 	}
 
 	response := msg.GetResponse()
@@ -100,7 +99,7 @@ func forwardFromUDPChan(from chan []byte, addr *net.UDPAddr, to *natDiscovery, h
 		for p := range from {
 			err := to.parseAndHandleMessageFromAddress(p, addr)
 			if err != nil {
-				klog.Errorf("Error handling message: %s", err)
+				logger.Errorf(err, "Error handling message")
 			}
 
 			count++

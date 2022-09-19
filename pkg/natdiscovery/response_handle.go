@@ -25,11 +25,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/natdiscovery/proto"
-	"k8s.io/klog/v2"
 )
 
 func (nd *natDiscovery) handleResponseFromAddress(req *proto.SubmarinerNATDiscoveryResponse, addr *net.UDPAddr) error {
-	klog.V(log.DEBUG).Infof("Received response from %s:%d - REQUEST_NUMBER: 0x%x, RESPONSE: %v, SENDER: %q, RECEIVER: %q",
+	logger.V(log.DEBUG).Infof("Received response from %s:%d - REQUEST_NUMBER: 0x%x, RESPONSE: %v, SENDER: %q, RECEIVER: %q",
 		addr.IP.String(), addr.Port, req.RequestNumber, req.Response, req.Sender.EndpointId, req.Receiver.EndpointId)
 
 	if req.GetSender() == nil || req.GetReceiver() == nil || req.GetReceivedSrc() == nil {
@@ -76,7 +75,7 @@ func (nd *natDiscovery) handleResponseFromAddress(req *proto.SubmarinerNATDiscov
 		}
 
 		if req.Response == proto.ResponseType_NAT_DETECTED {
-			klog.Warningf("response for NAT discovery on endpoint %q private IP %q says src was modified which is unexpected",
+			logger.Warningf("response for NAT discovery on endpoint %q private IP %q says src was modified which is unexpected",
 				req.GetSender().EndpointId, remoteNAT.endpoint.Spec.PrivateIP)
 		}
 
