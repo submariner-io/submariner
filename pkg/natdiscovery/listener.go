@@ -26,12 +26,11 @@ import (
 	"github.com/pkg/errors"
 	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 	"google.golang.org/protobuf/proto"
-	"k8s.io/klog/v2"
 )
 
 func (nd *natDiscovery) runListener(stopCh <-chan struct{}) error {
 	if nd.serverPort == 0 {
-		klog.Infof("NAT discovery protocol port not set for this gateway")
+		logger.Infof("NAT discovery protocol port not set for this gateway")
 		return nil
 	}
 
@@ -75,12 +74,12 @@ func (nd *natDiscovery) listenerLoop(serverConnection *net.UDPConn) {
 	for {
 		length, addr, err := serverConnection.ReadFromUDP(buf)
 		if length == 0 {
-			klog.Info("Stopping NAT listener")
+			logger.Info("Stopping NAT listener")
 			return
 		} else if err != nil {
-			klog.Errorf("Error receiving from udp: %s", err)
+			logger.Errorf(err, "Error receiving from udp")
 		} else if err := nd.parseAndHandleMessageFromAddress(buf[:length], addr); err != nil {
-			klog.Errorf("Error handling message from address %s: %s:\n%s", addr.String(), err, hex.Dump(buf[:length]))
+			logger.Errorf(err, "Error handling message from address %s:\n%s", addr.String(), hex.Dump(buf[:length]))
 		}
 	}
 }

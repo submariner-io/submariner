@@ -25,7 +25,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 	proto2 "google.golang.org/protobuf/proto"
-	"k8s.io/klog/v2"
 )
 
 func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscoveryRequest, addr *net.UDPAddr) error {
@@ -43,18 +42,18 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscove
 	}
 
 	if req.Receiver == nil || req.Sender == nil || req.UsingDst == nil || req.UsingSrc == nil {
-		klog.Warningf("Received NAT discovery packet %#v from %s which seems to be malformed ", req, addr.String())
+		logger.Warningf("Received NAT discovery packet %#v from %s which seems to be malformed ", req, addr.String())
 
 		response.Response = proto.ResponseType_MALFORMED
 
 		return nd.sendResponseToAddress(&response, addr)
 	}
 
-	klog.V(log.DEBUG).Infof("Received request from %s:%d - REQUEST_NUMBER: 0x%x, SENDER: %q, RECEIVER: %q",
+	logger.V(log.DEBUG).Infof("Received request from %s:%d - REQUEST_NUMBER: 0x%x, SENDER: %q, RECEIVER: %q",
 		addr.IP.String(), addr.Port, req.RequestNumber, req.Sender.EndpointId, req.Receiver.EndpointId)
 
 	if req.Receiver.GetClusterId() != nd.localEndpoint.Spec.ClusterID {
-		klog.Warningf("Received NAT discovery packet for cluster %q, but we are cluster %q", req.Receiver.GetClusterId(),
+		logger.Warningf("Received NAT discovery packet for cluster %q, but we are cluster %q", req.Receiver.GetClusterId(),
 			nd.localEndpoint.Spec.ClusterID)
 
 		response.Response = proto.ResponseType_UNKNOWN_DST_CLUSTER
@@ -63,7 +62,7 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscove
 	}
 
 	if req.Receiver.GetEndpointId() != nd.localEndpoint.Spec.CableName {
-		klog.Warningf("Received NAT discovery packet for endpoint %q, but we are endpoint %q "+
+		logger.Warningf("Received NAT discovery packet for endpoint %q, but we are endpoint %q "+
 			"if the port for NAT discovery has been mapped somewhere an error may exist", req.Receiver.GetEndpointId(),
 			nd.localEndpoint.Spec.CableName)
 
@@ -73,19 +72,19 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscove
 	}
 
 	if req.UsingSrc.GetIP() != "" && req.UsingSrc.GetIP() != addr.IP.String() {
-		klog.V(log.DEBUG).Infof("Received NAT packet from endpoint %q, cluster %q, where NAT has been detected, "+
+		logger.V(log.DEBUG).Infof("Received NAT packet from endpoint %q, cluster %q, where NAT has been detected, "+
 			"source IP changed",
 			req.Sender.GetEndpointId(), req.Sender.GetClusterId())
-		klog.V(log.DEBUG).Infof("Original src IP was %q, received src IP is %q", req.UsingSrc.IP, addr.IP.String())
+		logger.V(log.DEBUG).Infof("Original src IP was %q, received src IP is %q", req.UsingSrc.IP, addr.IP.String())
 
 		response.SrcIpNatDetected = true
 	}
 
 	if int(req.UsingSrc.Port) != addr.Port {
-		klog.V(log.DEBUG).Infof("Received NAT packet from endpoint %q, cluster %q, where NAT on the source has been detected, "+
+		logger.V(log.DEBUG).Infof("Received NAT packet from endpoint %q, cluster %q, where NAT on the source has been detected, "+
 			"src port changed",
 			req.Sender.GetEndpointId(), req.Sender.GetClusterId())
-		klog.V(log.DEBUG).Infof("Original src IP was %q, received src IP is %q", req.UsingSrc.IP, addr.IP.String())
+		logger.V(log.DEBUG).Infof("Original src IP was %q, received src IP is %q", req.UsingSrc.IP, addr.IP.String())
 
 		response.SrcPortNatDetected = true
 	}
@@ -115,7 +114,7 @@ func (nd *natDiscovery) sendResponseToAddress(response *proto.SubmarinerNATDisco
 		return errors.Wrapf(err, "error marshaling response %#v", response)
 	}
 
-	klog.V(log.DEBUG).Infof("Sending response to %s:%d - REQUEST_NUMBER: 0x%x, RESPONSE: %v, SENDER: %q, RECEIVER: %q",
+	logger.V(log.DEBUG).Infof("Sending response to %s:%d - REQUEST_NUMBER: 0x%x, RESPONSE: %v, SENDER: %q, RECEIVER: %q",
 		addr.IP.String(), addr.Port, response.RequestNumber, response.Response, response.GetSenderEndpointID(),
 		response.GetReceiverEndpointID())
 

@@ -25,7 +25,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 	"google.golang.org/protobuf/proto"
-	"k8s.io/klog/v2"
 )
 
 func (nd *natDiscovery) sendCheckRequest(remoteNAT *remoteEndpointNAT) error {
@@ -113,7 +112,7 @@ func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT,
 		Port: int(targetPort),
 	}
 
-	klog.V(log.DEBUG).Infof("Sending request - REQUEST_NUMBER: 0x%x, SENDER: %q, RECEIVER: %q, USING_SRC: %s:%d, USING_DST: %s:%d",
+	logger.V(log.DEBUG).Infof("Sending request - REQUEST_NUMBER: 0x%x, SENDER: %q, RECEIVER: %q, USING_SRC: %s:%d, USING_DST: %s:%d",
 		request.RequestNumber, request.Sender.EndpointId, request.Receiver.EndpointId, request.UsingSrc.IP, request.UsingSrc.Port,
 		request.UsingDst.IP, request.UsingDst.Port)
 
