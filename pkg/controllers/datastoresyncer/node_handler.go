@@ -26,7 +26,6 @@ import (
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog/v2"
 )
 
 func (d *DatastoreSyncer) handleCreateOrUpdateNode(obj runtime.Object, numRequeues int) bool {
@@ -42,7 +41,7 @@ func (d *DatastoreSyncer) handleCreateOrUpdateNode(obj runtime.Object, numRequeu
 		_, ipnet, err := net.ParseCIDR(d.localCluster.Spec.GlobalCIDR[0])
 		if err != nil {
 			// Ideally this will not happen as globalCIDR is expected to be a valid CIDR.
-			klog.Errorf("Error parsing the GlobalCIDR %q: %v", d.localCluster.Spec.GlobalCIDR, err)
+			logger.Errorf(err, "Error parsing the GlobalCIDR %q", d.localCluster.Spec.GlobalCIDR)
 			return false
 		}
 
@@ -63,7 +62,7 @@ func (d *DatastoreSyncer) areNodesEquivalent(obj1, obj2 *unstructured.Unstructur
 	existingGlobalIP := obj1.GetAnnotations()[constants.SmGlobalIP]
 	newGlobalIP := obj2.GetAnnotations()[constants.SmGlobalIP]
 
-	klog.V(log.DEBUG).Infof("areNodesEquivalent called for %q, existingGlobalIP %q, newGlobalIP %q",
+	logger.V(log.DEBUG).Infof("areNodesEquivalent called for %q, existingGlobalIP %q, newGlobalIP %q",
 		obj1.GetName(), existingGlobalIP, newGlobalIP)
 
 	return existingGlobalIP == newGlobalIP
@@ -71,13 +70,13 @@ func (d *DatastoreSyncer) areNodesEquivalent(obj1, obj2 *unstructured.Unstructur
 
 func (d *DatastoreSyncer) updateLocalEndpointIfNecessary(globalIPOfNode string) bool {
 	if d.localEndpoint.Spec.HealthCheckIP != globalIPOfNode {
-		klog.Infof("Updating the endpoint HealthCheckIP to globalIP %q", globalIPOfNode)
+		logger.Infof("Updating the endpoint HealthCheckIP to globalIP %q", globalIPOfNode)
 
 		prevHealthCheckIP := d.localEndpoint.Spec.HealthCheckIP
 		d.localEndpoint.Spec.HealthCheckIP = globalIPOfNode
 
 		if err := d.createOrUpdateLocalEndpoint(); err != nil {
-			klog.Warningf("Error updating the local submariner Endpoint with HealthcheckIP: %v", err)
+			logger.Warningf("Error updating the local submariner Endpoint with HealthcheckIP: %v", err)
 
 			d.localEndpoint.Spec.HealthCheckIP = prevHealthCheckIP
 

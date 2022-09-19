@@ -30,6 +30,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/fake"
 	. "github.com/submariner-io/admiral/pkg/gomega"
+	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -42,7 +43,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -59,13 +59,17 @@ func TestDatastoresyncer(t *testing.T) {
 }
 
 func init() {
-	klog.InitFlags(nil)
+	kzerolog.AddFlags(nil)
 
 	err := submarinerv1.AddToScheme(scheme.Scheme)
 	if err != nil {
 		panic(err)
 	}
 }
+
+var _ = BeforeSuite(func() {
+	kzerolog.InitK8sLogging()
+})
 
 type testDriver struct {
 	syncer           *datastoresyncer.DatastoreSyncer
