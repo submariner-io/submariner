@@ -26,6 +26,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -40,7 +41,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	fakeClient "k8s.io/client-go/dynamic/fake"
 	kubeScheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -48,12 +48,13 @@ const (
 )
 
 func init() {
-	klog.InitFlags(nil)
+	kzerolog.AddFlags(nil)
 }
 
 var fakeDriver *fake.Driver
 
 var _ = BeforeSuite(func() {
+	kzerolog.InitK8sLogging()
 	cable.AddDriver(fake.DriverName, func(endpoint *types.SubmarinerEndpoint, cluster *types.SubmarinerCluster) (cable.Driver, error) {
 		return fakeDriver, nil
 	})
