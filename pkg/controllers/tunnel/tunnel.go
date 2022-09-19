@@ -27,15 +27,17 @@ import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cableengine"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog/v2"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type controller struct {
 	engine cableengine.Engine
 }
 
+var logger = log.Logger{Logger: logf.Log.WithName("Tunnel")}
+
 func StartController(engine cableengine.Engine, namespace string, config *watcher.Config, stopCh <-chan struct{}) error {
-	klog.Info("Starting the tunnel controller")
+	logger.Info("Starting the tunnel controller")
 
 	c := &controller{engine: engine}
 
@@ -72,11 +74,11 @@ func StartController(engine cableengine.Engine, namespace string, config *watche
 func (c *controller) handleCreatedOrUpdatedEndpoint(obj runtime.Object, numRequeues int) bool {
 	endpoint := obj.(*v1.Endpoint)
 
-	klog.V(log.TRACE).Infof("Tunnel controller processing added or updated submariner Endpoint object: %#v", endpoint)
+	logger.V(log.TRACE).Infof("Tunnel controller processing added or updated submariner Endpoint object: %#v", endpoint)
 
 	err := c.engine.InstallCable(endpoint)
 	if err != nil {
-		klog.Errorf("error installing cable for Endpoint %#v, %v", endpoint, err)
+		logger.Errorf(err, "Error installing cable for Endpoint %#v", endpoint)
 		return true
 	}
 
@@ -86,14 +88,14 @@ func (c *controller) handleCreatedOrUpdatedEndpoint(obj runtime.Object, numReque
 func (c *controller) handleRemovedEndpoint(obj runtime.Object, numRequeues int) bool {
 	endpoint := obj.(*v1.Endpoint)
 
-	klog.V(log.DEBUG).Infof("Tunnel controller processing removed submariner Endpoint object: %#v", endpoint)
+	logger.V(log.DEBUG).Infof("Tunnel controller processing removed submariner Endpoint object: %#v", endpoint)
 
 	if err := c.engine.RemoveCable(endpoint); err != nil {
-		klog.Errorf("Tunnel controller failed to remove Endpoint cable %#v from the engine: %v", endpoint, err)
+		logger.Errorf(err, "Tunnel controller failed to remove Endpoint cable %#v from the engine", endpoint)
 		return true
 	}
 
-	klog.V(log.DEBUG).Infof("Tunnel controller successfully removed Endpoint cable %s from the engine", endpoint.Spec.CableName)
+	logger.V(log.DEBUG).Infof("Tunnel controller successfully removed Endpoint cable %s from the engine", endpoint.Spec.CableName)
 
 	return false
 }
