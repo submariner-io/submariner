@@ -158,6 +158,8 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams, egressIPT
 	stdOut, _, err := execCmdInBash(p, cmd, connectorPod.Pod)
 	Expect(err).To(BeNil())
 
+	By(fmt.Sprintf("Connector pod is scheduled on node %q", connectorPod.Pod.Spec.NodeName))
+
 	By(fmt.Sprintf("Waiting for the listener pod %q on node %q to exit, returning what listener sent",
 		listenerPod.Pod.Name, listenerPod.Pod.Spec.NodeName))
 	listenerPod.AwaitFinish()

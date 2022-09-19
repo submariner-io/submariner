@@ -20,7 +20,6 @@ ifneq (,$(DAPPER_HOST_ARCH))
 
 IMAGES ?= submariner-gateway submariner-route-agent submariner-globalnet submariner-networkplugin-syncer
 MULTIARCH_IMAGES ?= $(IMAGES)
-PRELOAD_IMAGES = $(IMAGES) submariner-operator
 PLATFORMS ?= linux/amd64,linux/arm64
 
 ifneq (,$(filter ovn,$(USING)))
