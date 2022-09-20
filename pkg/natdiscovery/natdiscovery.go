@@ -32,7 +32,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog/v2"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type Interface interface {
@@ -57,6 +57,8 @@ type natDiscovery struct {
 	serverPort      int32
 	readyChannel    chan *NATEndpointInfo
 }
+
+var logger = log.Logger{Logger: logf.Log.WithName("NAT")}
 
 func New(localEndpoint *types.SubmarinerEndpoint) (Interface, error) {
 	return newNATDiscovery(localEndpoint)
@@ -115,14 +117,14 @@ func (nd *natDiscovery) GetReadyChannel() chan *NATEndpointInfo {
 }
 
 func (nd *natDiscovery) Run(stopCh <-chan struct{}) error {
-	klog.V(log.DEBUG).Infof("NAT discovery server starting on port %d", nd.serverPort)
+	logger.V(log.DEBUG).Infof("NAT discovery server starting on port %d", nd.serverPort)
 
 	if err := nd.runListener(stopCh); err != nil {
 		return err
 	}
 
 	go wait.Until(func() {
-		klog.V(log.TRACE).Info("NAT discovery checking endpoint list")
+		logger.V(log.TRACE).Info("NAT discovery checking endpoint list")
 		nd.checkEndpointList()
 	}, time.Second, stopCh)
 
@@ -142,7 +144,7 @@ func (nd *natDiscovery) AddEndpoint(endPoint *v1.Endpoint) {
 			return
 		}
 
-		klog.V(log.DEBUG).Infof("NAT discovery updated endpoint %q", endPoint.Spec.CableName)
+		logger.V(log.DEBUG).Infof("NAT discovery updated endpoint %q", endPoint.Spec.CableName)
 		delete(nd.remoteEndpoints, endPoint.Spec.CableName)
 	}
 
@@ -151,13 +153,13 @@ func (nd *natDiscovery) AddEndpoint(endPoint *v1.Endpoint) {
 	// support nat discovery disabled or a remote cluster endpoint which still hasn't implemented this protocol
 	if _, err := extractNATDiscoveryPort(&endPoint.Spec); err != nil || nd.serverPort == 0 {
 		if !errors.Is(err, errNoNATDiscoveryPort) {
-			klog.Errorf("Error extracting NATT discovery port from endpoint %q: %v", endPoint.Spec.CableName, err)
+			logger.Errorf(err, "Error extracting NATT discovery port from endpoint %q", endPoint.Spec.CableName)
 		}
 
 		remoteNAT.useLegacyNATSettings()
 		nd.readyChannel <- remoteNAT.toNATEndpointInfo()
 	} else {
-		klog.Infof("Starting NAT discovery for endpoint %q", endPoint.Spec.CableName)
+		logger.Infof("Starting NAT discovery for endpoint %q", endPoint.Spec.CableName)
 	}
 
 	nd.remoteEndpoints[endPoint.Spec.CableName] = remoteNAT
@@ -175,18 +177,18 @@ func (nd *natDiscovery) checkEndpointList() {
 
 	for _, endpointNAT := range nd.remoteEndpoints {
 		name := endpointNAT.endpoint.Spec.CableName
-		klog.V(log.TRACE).Infof("NAT processing remote endpoint %q", name)
+		logger.V(log.TRACE).Infof("NAT processing remote endpoint %q", name)
 
 		if endpointNAT.shouldCheck() {
 			if endpointNAT.hasTimedOut() {
-				klog.Warningf("NAT discovery for endpoint %q has timed out", name)
+				logger.Warningf("NAT discovery for endpoint %q has timed out", name)
 				endpointNAT.useLegacyNATSettings()
 				nd.readyChannel <- endpointNAT.toNATEndpointInfo()
 			} else if err := nd.sendCheckRequest(endpointNAT); err != nil {
-				klog.Errorf("Error sending check request to endpoint %q: %s", name, err)
+				logger.Errorf(err, "Error sending check request to endpoint %q", name)
 			}
 		} else {
-			klog.V(log.TRACE).Infof("NAT shouldCheck() == false for  %q", name)
+			logger.V(log.TRACE).Infof("NAT shouldCheck() == false for  %q", name)
 		}
 	}
 }

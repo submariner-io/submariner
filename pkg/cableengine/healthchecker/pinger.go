@@ -26,7 +26,6 @@ import (
 	"github.com/go-ping/ping"
 	"github.com/pkg/errors"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -104,7 +103,7 @@ func NewPinger(config PingerConfig) PingerInterface {
 }
 
 func (p *pingerInfo) Start() {
-	klog.Infof("Starting pinger for IP %q", p.ip)
+	logger.Infof("Starting pinger for IP %q", p.ip)
 
 	go func() {
 		for {
@@ -114,7 +113,7 @@ func (p *pingerInfo) Start() {
 			default:
 				err := p.doPing()
 				if err != nil {
-					klog.Errorf("Unable to start pinger for IP %q: %v, retry in %d seconds", p.ip, err, doPingRetryTimeout)
+					logger.Errorf(err, "Unable to start pinger for IP %q - retry in %d seconds", p.ip, doPingRetryTimeout)
 					time.Sleep(doPingRetryTimeout * time.Second)
 				}
 			}

@@ -24,6 +24,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
+	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/resource"
 	resourceSyncer "github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
@@ -39,7 +40,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/klog/v2"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type DatastoreSyncer struct {
@@ -49,6 +50,8 @@ type DatastoreSyncer struct {
 	syncerConfig   broker.SyncerConfig
 	localFederator federate.Federator
 }
+
+var logger = log.Logger{Logger: logf.Log.WithName("DSSyncer")}
 
 func New(syncerConfig *broker.SyncerConfig, localCluster *types.SubmarinerCluster,
 	localEndpoint *types.SubmarinerEndpoint,
@@ -66,7 +69,7 @@ func New(syncerConfig *broker.SyncerConfig, localCluster *types.SubmarinerCluste
 func (d *DatastoreSyncer) Start(stopCh <-chan struct{}) error {
 	defer utilruntime.HandleCrash()
 
-	klog.Info("Starting the datastore syncer")
+	logger.Info("Starting the datastore syncer")
 
 	syncer, err := d.createSyncer()
 	if err != nil {
@@ -98,7 +101,7 @@ func (d *DatastoreSyncer) Start(stopCh <-chan struct{}) error {
 		}
 	}
 
-	klog.Info("Datastore syncer started")
+	logger.Info("Datastore syncer started")
 
 	return nil
 }
@@ -152,7 +155,7 @@ func (d *DatastoreSyncer) cleanupResources(client dynamic.NamespaceableResourceI
 			return errors.Wrapf(err, "error deleting submariner %s %q from the local datastore", obj.GetKind(), obj.GetName())
 		}
 
-		klog.Infof("Successfully deleted submariner %s %q from the local datastore", obj.GetKind(), obj.GetName())
+		logger.Infof("Successfully deleted submariner %s %q from the local datastore", obj.GetKind(), obj.GetName())
 
 		clusterID, _, _ := unstructured.NestedString(obj.Object, "spec", "cluster_id")
 		if clusterID != d.localCluster.Spec.ClusterID {
@@ -164,7 +167,7 @@ func (d *DatastoreSyncer) cleanupResources(client dynamic.NamespaceableResourceI
 			return errors.Wrapf(err, "error deleting submariner %s %q from the remote datastore", obj.GetKind(), obj.GetName())
 		}
 
-		klog.Infof("Successfully deleted local submariner %s %q from the remote datastore", obj.GetKind(), obj.GetName())
+		logger.Infof("Successfully deleted local submariner %s %q from the remote datastore", obj.GetKind(), obj.GetName())
 	}
 
 	return nil
@@ -212,7 +215,7 @@ func (d *DatastoreSyncer) shouldSyncCluster(obj runtime.Object, numRequeues int,
 }
 
 func (d *DatastoreSyncer) ensureExclusiveEndpoint(syncer *broker.Syncer) error {
-	klog.Info("Ensuring we are the only endpoint active for this cluster")
+	logger.Info("Ensuring we are the only endpoint active for this cluster")
 
 	endpoints, err := syncer.ListLocalResources(&submarinerv1.Endpoint{})
 	if err != nil {
@@ -231,7 +234,7 @@ func (d *DatastoreSyncer) ensureExclusiveEndpoint(syncer *broker.Syncer) error {
 
 		endpointName, err := endpoint.Spec.GenerateName()
 		if err != nil {
-			klog.Errorf("Error extracting the submariner Endpoint name from %#v: %v", endpoint, err)
+			logger.Errorf(err, "Error extracting the submariner Endpoint name from %#v", endpoint)
 			continue
 		}
 
@@ -240,7 +243,7 @@ func (d *DatastoreSyncer) ensureExclusiveEndpoint(syncer *broker.Syncer) error {
 			return errors.Wrapf(err, "error deleting submariner Endpoint %q from the local datastore", endpointName)
 		}
 
-		klog.Infof("Successfully deleted existing submariner Endpoint %q", endpointName)
+		logger.Infof("Successfully deleted existing submariner Endpoint %q", endpointName)
 	}
 
 	return nil
@@ -250,7 +253,7 @@ func (d *DatastoreSyncer) startNodeWatcher(stopCh <-chan struct{}) error {
 	nodeName, ok := os.LookupEnv("NODE_NAME")
 	if !ok {
 		// Healthcheck in globalnet deployments will not work because of missing NODE_NAME.
-		klog.Error("Error reading the NODE_NAME from the env, healthChecker functionality will not work.")
+		logger.Error(nil, "Error reading the NODE_NAME from the env, healthChecker functionality will not work.")
 	} else {
 		d.localNodeName = nodeName
 		return d.createNodeWatcher(stopCh)
@@ -291,7 +294,7 @@ func (d *DatastoreSyncer) createNodeWatcher(stopCh <-chan struct{}) error {
 }
 
 func (d *DatastoreSyncer) createLocalCluster() error {
-	klog.Infof("Creating local submariner Cluster: %#v ", d.localCluster)
+	logger.Infof("Creating local submariner Cluster: %#v ", d.localCluster)
 
 	cluster := &submarinerv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -304,7 +307,7 @@ func (d *DatastoreSyncer) createLocalCluster() error {
 }
 
 func (d *DatastoreSyncer) createOrUpdateLocalEndpoint() error {
-	klog.Infof("Creating local submariner Endpoint: %#v ", d.localEndpoint)
+	logger.Infof("Creating local submariner Endpoint: %#v ", d.localEndpoint)
 
 	endpointName, err := d.localEndpoint.Spec.GenerateName()
 	if err != nil {

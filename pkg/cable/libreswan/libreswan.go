@@ -38,12 +38,14 @@ import (
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/types"
-	"k8s.io/klog/v2"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
 	cableDriverName = "libreswan"
 )
+
+var logger = log.Logger{Logger: logf.Log.WithName("libreswan")}
 
 func init() {
 	cable.AddDriver(cableDriverName, NewLibreswan)
@@ -118,7 +120,7 @@ func NewLibreswan(localEndpoint *types.SubmarinerEndpoint, localCluster *types.S
 		encodedPsk = psk.String()
 	}
 
-	klog.Infof("Using NATT UDP port %d", nattPort)
+	logger.Infof("Using NATT UDP port %d", nattPort)
 
 	return &libreswan{
 		secretKey:             encodedPsk,
@@ -197,19 +199,19 @@ func retrieveActiveConnectionStats() (map[string]int, map[string]int, error) {
 
 			inBytes, err := strconv.Atoi(matches[2])
 			if err != nil {
-				klog.Warningf("Invalid inBytes in whack output line: %q", line)
+				logger.Warningf("Invalid inBytes in whack output line: %q", line)
 			} else {
 				activeConnectionsRx[matches[1]] += inBytes
 			}
 
 			outBytes, err := strconv.Atoi(matches[3])
 			if err != nil {
-				klog.Warningf("Invalid outBytes in whack output line: %q", line)
+				logger.Warningf("Invalid outBytes in whack output line: %q", line)
 			} else {
 				activeConnectionsTx[matches[1]] += outBytes
 			}
 		} else {
-			klog.V(log.DEBUG).Infof("Ignoring whack output line: %q", line)
+			logger.V(log.DEBUG).Infof("Ignoring whack output line: %q", line)
 		}
 	}
 
@@ -244,7 +246,7 @@ func (i *libreswan) refreshConnectionStatus() error {
 					rx += subRx
 					tx += subTx
 				} else {
-					klog.V(log.DEBUG).Infof("Connection %q not found in active connections obtained from whack: %v, %v",
+					logger.V(log.DEBUG).Infof("Connection %q not found in active connections obtained from whack: %v, %v",
 						connectionName, activeConnectionsRx, activeConnectionsTx)
 				}
 			}
@@ -258,7 +260,7 @@ func (i *libreswan) refreshConnectionStatus() error {
 			// Pluto should be connecting for us
 			i.connections[j].Status = subv1.Connecting
 			cable.RecordConnection(cableDriverName, &i.localEndpoint.Spec, &i.connections[j].Endpoint, string(i.connections[j].Status), false)
-			klog.V(log.DEBUG).Infof("Connection %q not found in active connections obtained from whack: %v, %v",
+			logger.V(log.DEBUG).Infof("Connection %q not found in active connections obtained from whack: %v, %v",
 				i.connections[j].Endpoint.CableName, activeConnectionsRx, activeConnectionsTx)
 		}
 	}
@@ -300,13 +302,13 @@ func whack(args ...string) error {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 
-		klog.V(log.TRACE).Infof("Whacking with %v", args)
+		logger.V(log.TRACE).Infof("Whacking with %v", args)
 
 		if err = cmd.Run(); err == nil {
 			break
 		}
 
-		klog.Warningf("error %v whacking with args: %v", err, args)
+		logger.Warningf("error %v whacking with args: %v", err, args)
 		time.Sleep(1 * time.Second)
 	}
 
@@ -325,7 +327,7 @@ func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 
 	rightNATTPort, err := endpoint.Spec.GetBackendPort(subv1.UDPPortConfig, i.defaultNATTPort)
 	if err != nil {
-		klog.Warningf("Error parsing %q from remote endpoint %q - using port %d instead: %v", subv1.UDPPortConfig,
+		logger.Warningf("Error parsing %q from remote endpoint %q - using port %d instead: %v", subv1.UDPPortConfig,
 			endpoint.Spec.CableName, i.defaultNATTPort, err)
 	}
 
@@ -339,7 +341,7 @@ func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 
 	connectionMode := i.calculateOperationMode(&endpoint.Spec)
 
-	klog.Infof("Creating connection(s) for %v in %s mode", endpoint, connectionMode)
+	logger.Infof("Creating connection(s) for %v in %s mode", endpoint, connectionMode)
 
 	if len(leftSubnets) > 0 && len(rightSubnets) > 0 {
 		for lsi, leftSubnet := range leftSubnets {
@@ -401,7 +403,7 @@ func (i *libreswan) bidirectionalConnectToEndpoint(connectionName string, endpoi
 
 		"--ikeport", strconv.Itoa(int(rightNATTPort)))
 
-	klog.Infof("Executing whack with args: %v", args)
+	logger.Infof("Executing whack with args: %v", args)
 
 	if err := whack(args...); err != nil {
 		return err
@@ -443,7 +445,7 @@ func (i *libreswan) serverConnectToEndpoint(connectionName string, endpointInfo 
 		"--host", "%any",
 		"--client", rightSubnet)
 
-	klog.Infof("Executing whack with args: %v", args)
+	logger.Infof("Executing whack with args: %v", args)
 
 	if err := whack(args...); err != nil {
 		return err
@@ -484,7 +486,7 @@ func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo 
 
 		"--ikeport", strconv.Itoa(int(rightNATTPort)))
 
-	klog.Infof("Executing whack with args: %v", args)
+	logger.Infof("Executing whack with args: %v", args)
 
 	if err := whack(args...); err != nil {
 		return err
@@ -503,7 +505,7 @@ func (i *libreswan) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint) e
 	leftSubnets := extractSubnets(&i.localEndpoint.Spec)
 	rightSubnets := extractSubnets(&endpoint.Spec)
 
-	klog.Infof("Deleting connection to %v", endpoint)
+	logger.Infof("Deleting connection to %v", endpoint)
 
 	if len(leftSubnets) > 0 && len(rightSubnets) > 0 {
 		for lsi := range leftSubnets {
@@ -515,7 +517,7 @@ func (i *libreswan) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint) e
 				args = append(args, "--delete",
 					"--name", connectionName)
 
-				klog.Infof("Whacking with %v", args)
+				logger.Infof("Whacking with %v", args)
 
 				cmd := exec.Command("/usr/libexec/ipsec/whack", args...)
 				cmd.Stdout = os.Stdout
@@ -524,7 +526,7 @@ func (i *libreswan) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint) e
 				if err := cmd.Run(); err != nil {
 					var exitError *exec.ExitError
 					if errors.As(err, &exitError) {
-						klog.Errorf("error deleting a connection with args %v; got exit code %d: %v", args, exitError.ExitCode(), err)
+						logger.Errorf(err, "Error deleting a connection with args %v; got exit code %d", args, exitError.ExitCode())
 					} else {
 						return errors.Wrapf(err, "error deleting a connection with args %v", args)
 					}
@@ -551,7 +553,7 @@ func removeConnectionForEndpoint(connections []subv1.Connection, endpoint *types
 }
 
 func (i *libreswan) runPluto() error {
-	klog.Info("Starting Pluto")
+	logger.Info("Starting Pluto")
 
 	args := []string{}
 
@@ -588,7 +590,7 @@ func (i *libreswan) runPluto() error {
 
 	go func() {
 		defer outputFile.Close()
-		klog.Fatalf("Pluto exited: %v", cmd.Wait())
+		logger.Fatalf("Pluto exited: %v", cmd.Wait())
 	}()
 
 	// Wait up to 5s for the control socket.
@@ -599,7 +601,7 @@ func (i *libreswan) runPluto() error {
 		}
 
 		if !os.IsNotExist(err) {
-			klog.Infof("Failed to stat the control socket: %v", err)
+			logger.Infof("Failed to stat the control socket: %v", err)
 			break
 		}
 
@@ -616,7 +618,7 @@ func (i *libreswan) runPluto() error {
 }
 
 func (i *libreswan) Cleanup() error {
-	klog.Info("Uninstalling the libreswan cable driver")
+	logger.Info("Uninstalling the libreswan cable driver")
 
 	return netlink.DeleteXfrmRules() // nolint:wrapcheck  // No need to wrap this error
 }
