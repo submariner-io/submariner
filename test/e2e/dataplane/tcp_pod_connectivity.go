@@ -29,6 +29,8 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 	f := framework.NewFramework("dataplane-conn-nd")
 	var toEndpointType tcp.EndpointType
 	var networking framework.NetworkingType
+	var fromCluster framework.ClusterIndex
+	var toCluster framework.ClusterIndex
 
 	verifyInteraction := func(fromClusterScheduling, toClusterScheduling framework.NetworkPodScheduling) {
 		It("should have sent the expected data from the pod to the other pod", func() {
@@ -46,9 +48,9 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 				Framework:             f,
 				ToEndpointType:        toEndpointType,
 				Networking:            networking,
-				FromCluster:           framework.ClusterA,
+				FromCluster:           fromCluster,
 				FromClusterScheduling: fromClusterScheduling,
-				ToCluster:             framework.ClusterB,
+				ToCluster:             toCluster,
 				ToClusterScheduling:   toClusterScheduling,
 			})
 		})
@@ -58,6 +60,8 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 		BeforeEach(func() {
 			toEndpointType = tcp.PodIP
 			networking = framework.PodNetworking
+			fromCluster = framework.ClusterA
+			toCluster = framework.ClusterB
 		})
 
 		When("the pod is not on a gateway and the remote pod is not on a gateway", func() {
@@ -81,6 +85,8 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 		BeforeEach(func() {
 			toEndpointType = tcp.ServiceIP
 			networking = framework.PodNetworking
+			fromCluster = framework.ClusterA
+			toCluster = framework.ClusterB
 		})
 
 		When("the pod is not on a gateway and the remote service is not on a gateway", func() {
@@ -104,6 +110,8 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 		BeforeEach(func() {
 			toEndpointType = tcp.PodIP
 			networking = framework.HostNetworking
+			fromCluster = framework.ClusterA
+			toCluster = framework.ClusterB
 		})
 
 		When("the pod is not on a gateway and the remote pod is not on a gateway", func() {
@@ -112,6 +120,19 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 
 		When("the pod is on a gateway and the remote pod is not on a gateway", func() {
 			verifyInteraction(framework.GatewayNode, framework.NonGatewayNode)
+		})
+	})
+
+	When("a pod connects via TCP to a remote pod in reverse direction", func() {
+		BeforeEach(func() {
+			toEndpointType = tcp.PodIP
+			networking = framework.PodNetworking
+			fromCluster = framework.ClusterB
+			toCluster = framework.ClusterA
+		})
+
+		When("the pod is not on a gateway and the remote pod is not on a gateway", func() {
+			verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode)
 		})
 	})
 })
