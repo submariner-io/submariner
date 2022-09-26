@@ -22,11 +22,10 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
-	"k8s.io/klog/v2"
 )
 
 func (kp *SyncHandler) TransitionToNonGateway() error {
-	klog.V(log.DEBUG).Info("The current node is no longer a Gateway")
+	logger.V(log.DEBUG).Info("The current node is no longer a Gateway")
 	kp.syncHandlerMutex.Lock()
 	defer kp.syncHandlerMutex.Unlock()
 	kp.isGatewayNode = false
@@ -37,15 +36,15 @@ func (kp *SyncHandler) TransitionToNonGateway() error {
 
 	err := kp.netLink.RuleDelIfPresent(netlinkAPI.NewTableRule(constants.RouteAgentHostNetworkTableID))
 	if err != nil {
-		klog.Errorf("Unable to delete ip rule to table %d on non-Gateway node %s: %v",
-			constants.RouteAgentHostNetworkTableID, kp.hostname, err)
+		logger.Errorf(err, "Unable to delete ip rule to table %d on non-Gateway node %s",
+			constants.RouteAgentHostNetworkTableID, kp.hostname)
 	}
 
 	return nil
 }
 
 func (kp *SyncHandler) TransitionToGateway() error {
-	klog.V(log.DEBUG).Info("The current node has become a Gateway")
+	logger.V(log.DEBUG).Info("The current node has become a Gateway")
 	kp.cleanVxSubmarinerRoutes()
 
 	kp.syncHandlerMutex.Lock()
@@ -53,17 +52,17 @@ func (kp *SyncHandler) TransitionToGateway() error {
 	kp.isGatewayNode = true
 	kp.wasGatewayPreviously = true
 
-	klog.Infof("Creating the vxlan interface: %s on the gateway node", VxLANIface)
+	logger.Infof("Creating the vxlan interface: %s on the gateway node", VxLANIface)
 
 	err := kp.createVxLANInterface(kp.hostname, VxInterfaceGateway, nil)
 	if err != nil {
-		klog.Fatalf("Unable to create VxLAN interface on gateway node (%s): %v", kp.hostname, err)
+		logger.Fatalf("Unable to create VxLAN interface on gateway node (%s): %v", kp.hostname, err)
 	}
 
 	err = kp.netLink.RuleAddIfNotPresent(netlinkAPI.NewTableRule(constants.RouteAgentHostNetworkTableID))
 	if err != nil {
-		klog.Errorf("Unable to add ip rule to table %d on Gateway node %s: %v",
-			constants.RouteAgentHostNetworkTableID, kp.hostname, err)
+		logger.Errorf(err, "Unable to add ip rule to table %d on Gateway node %s",
+			constants.RouteAgentHostNetworkTableID, kp.hostname)
 	}
 
 	// Add routes to the new endpoint on the GatewayNode.

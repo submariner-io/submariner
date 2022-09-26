@@ -26,12 +26,14 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	cni "github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/controller"
-	"github.com/submariner-io/submariner/pkg/event/logger"
+	eventlogger "github.com/submariner-io/submariner/pkg/event/logger"
 	"github.com/submariner-io/submariner/pkg/node"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cabledriver"
 	cniapi "github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
@@ -42,20 +44,22 @@ import (
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog/v2"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
 
 var (
 	masterURL  string
 	kubeconfig string
+	logger     = log.Logger{Logger: logf.Log.WithName("main")}
 )
 
 func main() {
-	klog.InitFlags(nil)
+	kzerolog.AddFlags(nil)
 	flag.Parse()
+	kzerolog.InitK8sLogging()
 
-	klog.Info("Starting submariner-route-agent using the event framework")
+	logger.Info("Starting submariner-route-agent using the event framework")
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler().Done()
 
@@ -63,22 +67,22 @@ func main() {
 
 	err := envconfig.Process("submariner", &env)
 	if err != nil {
-		klog.Fatalf("Error reading the environment variables: %s", err.Error())
+		logger.Fatalf("Error reading the environment variables: %s", err.Error())
 	}
 
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
 	if err != nil {
-		klog.Fatalf("Error building kubeconfig: %s", err.Error())
+		logger.Fatalf("Error building kubeconfig: %s", err.Error())
 	}
 
 	k8sClientSet, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
-		klog.Fatalf("Error building clientset: %s", err.Error())
+		logger.Fatalf("Error building clientset: %s", err.Error())
 	}
 
 	smClientset, err := submarinerClientset.NewForConfig(cfg)
 	if err != nil {
-		klog.Fatalf("Error building submariner clientset: %s", err.Error())
+		logger.Fatalf("Error building submariner clientset: %s", err.Error())
 	}
 
 	np := os.Getenv("SUBMARINER_NETWORKPLUGIN")
@@ -89,30 +93,30 @@ func main() {
 
 	registry := event.NewRegistry("routeagent_driver", np)
 	if err := registry.AddHandlers(
-		logger.NewHandler(),
+		eventlogger.NewHandler(),
 		kubeproxy.NewSyncHandler(env.ClusterCidr, env.ServiceCidr),
 		ovn.NewHandler(&env, smClientset),
 		cabledriver.NewXRFMCleanupHandler(),
 		cabledriver.NewVXLANCleanup(),
 		mtu.NewMTUHandler(env.ClusterCidr, len(env.GlobalCidr) != 0, getTCPMssValue(k8sClientSet)),
 	); err != nil {
-		klog.Fatalf("Error registering the handlers: %s", err.Error())
+		logger.Fatalf("Error registering the handlers: %s", err.Error())
 	}
 
 	if env.Uninstall {
 		if err := registry.StopHandlers(true); err != nil {
-			klog.Warningf("Error stopping handlers: %v", err)
+			logger.Warningf("Error stopping handlers: %v", err)
 		}
 
 		if err = annotateNode([]string{}, k8sClientSet); err != nil {
-			klog.Warningf("Error removing %q annotation: %v", constants.CNIInterfaceIP, err)
+			logger.Warningf("Error removing %q annotation: %v", constants.CNIInterfaceIP, err)
 		}
 
 		return
 	}
 
 	if err = annotateNode(env.ClusterCidr, k8sClientSet); err != nil {
-		klog.Errorf("Error while annotating the node: %s", err.Error())
+		logger.Errorf(err, "Error while annotating the node")
 	}
 
 	ctl, err := controller.New(&controller.Config{
@@ -121,18 +125,18 @@ func main() {
 		Kubeconfig: kubeconfig,
 	})
 	if err != nil {
-		klog.Fatalf("Error creating controller for event handling %v", err)
+		logger.Fatalf("Error creating controller for event handling %v", err)
 	}
 
 	err = ctl.Start(stopCh)
 	if err != nil {
-		klog.Fatalf("Error starting controller: %v", err)
+		logger.Fatalf("Error starting controller: %v", err)
 	}
 
 	<-stopCh
 	ctl.Stop()
 
-	klog.Info("All controllers stopped or exited. Stopping submariner-route-agent")
+	logger.Info("All controllers stopped or exited. Stopping submariner-route-agent")
 }
 
 func init() {
@@ -158,7 +162,7 @@ func annotateNode(clusterCidr []string, k8sClientSet *kubernetes.Clientset) erro
 func getTCPMssValue(k8sClientSet *kubernetes.Clientset) int {
 	localNode, err := node.GetLocalNode(k8sClientSet)
 	if err != nil {
-		klog.Errorf("Error getting information on the local node: %s", err.Error())
+		logger.Errorf(err, "Error getting information on the local node")
 		return 0
 	}
 
@@ -170,7 +174,7 @@ func getTCPMssValue(k8sClientSet *kubernetes.Clientset) int {
 
 	tcpMssValue, err := strconv.Atoi(tcpMssStr)
 	if err != nil {
-		klog.Errorf("Error parsing %q annotation", v1.TCPMssValue)
+		logger.Errorf(err, "Error parsing %q annotation", v1.TCPMssValue)
 		return 0
 	}
 

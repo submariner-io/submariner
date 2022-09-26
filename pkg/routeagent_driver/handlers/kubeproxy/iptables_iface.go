@@ -28,7 +28,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/port"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	iptcommon "github.com/submariner-io/submariner/pkg/routeagent_driver/iptables"
-	"k8s.io/klog/v2"
 )
 
 func (kp *SyncHandler) createIPTableChains() error {
@@ -41,7 +40,7 @@ func (kp *SyncHandler) createIPTableChains() error {
 		return errors.Wrap(err, "error initializing POST routing chain")
 	}
 
-	klog.V(log.DEBUG).Infof("Install/ensure %q chain exists", constants.SmInputChain)
+	logger.V(log.DEBUG).Infof("Install/ensure %q chain exists", constants.SmInputChain)
 
 	if err = ipt.CreateChainIfNotExists(constants.FilterTable, constants.SmInputChain); err != nil {
 		return errors.Wrap(err, "unable to create SUBMARINER-INPUT chain in iptables")
@@ -52,7 +51,7 @@ func (kp *SyncHandler) createIPTableChains() error {
 		return errors.Wrapf(err, "unable to append iptables rule %q", strings.Join(forwardToSubInputRuleSpec, " "))
 	}
 
-	klog.V(log.DEBUG).Infof("Allow VxLAN incoming traffic in %q Chain", constants.SmInputChain)
+	logger.V(log.DEBUG).Infof("Allow VxLAN incoming traffic in %q Chain", constants.SmInputChain)
 
 	ruleSpec := []string{"-p", "udp", "-m", "udp", "--dport", strconv.Itoa(port.IntraClusterVxLAN), "-j", "ACCEPT"}
 
@@ -60,7 +59,7 @@ func (kp *SyncHandler) createIPTableChains() error {
 		return errors.Wrapf(err, "unable to append iptables rule %q", strings.Join(ruleSpec, " "))
 	}
 
-	klog.V(log.DEBUG).Infof("Insert rule to allow traffic over %s interface in FORWARDing Chain", VxLANIface)
+	logger.V(log.DEBUG).Infof("Insert rule to allow traffic over %s interface in FORWARDing Chain", VxLANIface)
 
 	ruleSpec = []string{"-o", VxLANIface, "-j", "ACCEPT"}
 
@@ -72,7 +71,7 @@ func (kp *SyncHandler) createIPTableChains() error {
 		// Program rules to support communication from HostNetwork to remoteCluster
 		sourceAddress := strconv.Itoa(VxLANVTepNetworkPrefix) + ".0.0.0/8"
 		ruleSpec = []string{"-s", sourceAddress, "-o", VxLANIface, "-j", "SNAT", "--to", kp.cniIface.IPAddress}
-		klog.V(log.DEBUG).Infof("Installing rule for host network to remote cluster communication: %s", strings.Join(ruleSpec, " "))
+		logger.V(log.DEBUG).Infof("Installing rule for host network to remote cluster communication: %s", strings.Join(ruleSpec, " "))
 
 		if err = ipt.AppendUnique(constants.NATTable, constants.SmPostRoutingChain, ruleSpec...); err != nil {
 			return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(ruleSpec, " "))
@@ -86,7 +85,7 @@ func (kp *SyncHandler) updateIptableRulesForInterClusterTraffic(inputCidrBlocks 
 	for _, inputCidrBlock := range inputCidrBlocks {
 		err := kp.programIptableRulesForInterClusterTraffic(inputCidrBlock, operation)
 		if err != nil {
-			klog.Errorf("Failed to program iptable rules. %v", err)
+			logger.Errorf(err, "Failed to program iptable rules")
 		}
 	}
 }
@@ -102,25 +101,25 @@ func (kp *SyncHandler) programIptableRulesForInterClusterTraffic(remoteCidrBlock
 		incomingRuleSpec := []string{"-s", remoteCidrBlock, "-d", localClusterCidr, "-j", "ACCEPT"}
 
 		if operation == Add {
-			klog.V(log.DEBUG).Infof("Installing iptables rule for outgoing traffic: %s", strings.Join(outboundRuleSpec, " "))
+			logger.V(log.DEBUG).Infof("Installing iptables rule for outgoing traffic: %s", strings.Join(outboundRuleSpec, " "))
 
 			if err = ipt.AppendUnique(constants.NATTable, constants.SmPostRoutingChain, outboundRuleSpec...); err != nil {
 				return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(outboundRuleSpec, " "))
 			}
 
-			klog.V(log.DEBUG).Infof("Installing iptables rule for incoming traffic: %s", strings.Join(incomingRuleSpec, " "))
+			logger.V(log.DEBUG).Infof("Installing iptables rule for incoming traffic: %s", strings.Join(incomingRuleSpec, " "))
 
 			if err = ipt.AppendUnique(constants.NATTable, constants.SmPostRoutingChain, incomingRuleSpec...); err != nil {
 				return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(incomingRuleSpec, " "))
 			}
 		} else if operation == Delete {
-			klog.V(log.DEBUG).Infof("Deleting iptables rule for outgoing traffic: %s", strings.Join(outboundRuleSpec, " "))
+			logger.V(log.DEBUG).Infof("Deleting iptables rule for outgoing traffic: %s", strings.Join(outboundRuleSpec, " "))
 
 			if err = ipt.Delete(constants.NATTable, constants.SmPostRoutingChain, outboundRuleSpec...); err != nil {
 				return errors.Wrapf(err, "error deleting iptables rule %q", strings.Join(outboundRuleSpec, " "))
 			}
 
-			klog.V(log.DEBUG).Infof("Deleting iptables rule for incoming traffic: %s", strings.Join(incomingRuleSpec, " "))
+			logger.V(log.DEBUG).Infof("Deleting iptables rule for incoming traffic: %s", strings.Join(incomingRuleSpec, " "))
 
 			if err = ipt.Delete(constants.NATTable, constants.SmPostRoutingChain, incomingRuleSpec...); err != nil {
 				return errors.Wrapf(err, "error deleting iptables rule %q", strings.Join(incomingRuleSpec, " "))

@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable/vxlan"
 	"github.com/submariner-io/submariner/pkg/event"
@@ -30,8 +31,8 @@ import (
 	"github.com/submariner-io/submariner/pkg/iptables"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
-	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type forceMssSts int
@@ -56,6 +57,8 @@ type mtuHandler struct {
 	forceMss         forceMssSts
 	tcpMssValue      int
 }
+
+var logger = log.Logger{Logger: logf.Log.WithName("MTU")}
 
 func NewMTUHandler(localClusterCidr []string, isGlobalnet bool, tcpMssValue int) event.Handler {
 	forceMss := notNeeded
@@ -115,7 +118,7 @@ func (h *mtuHandler) Init() error {
 		return nil
 	}
 
-	klog.Info("Creating iptables clamp-mss-to-pmtu rules")
+	logger.Info("Creating iptables clamp-mss-to-pmtu rules")
 
 	ruleSpecSource := []string{
 		"-m", "set", "--match-set", constants.LocalCIDRIPSet, "src", "-m", "set", "--match-set",
@@ -156,7 +159,7 @@ func (h *mtuHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 	}
 
 	if h.forceMss == needed {
-		klog.Info("Creating iptables set-mss rules")
+		logger.Info("Creating iptables set-mss rules")
 
 		err := h.forceMssClamping(endpoint)
 		if err != nil {
@@ -174,14 +177,14 @@ func (h *mtuHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 	for _, subnet := range subnets {
 		err := h.localIPSet.DelEntry(subnet)
 		if err != nil {
-			klog.Errorf("Error deleting the subnet %q from the local IPSet: %v", subnet, err)
+			logger.Errorf(err, "Error deleting the subnet %q from the local IPSet", subnet)
 		}
 	}
 
 	for _, subnet := range h.localClusterCidr {
 		err := h.localIPSet.DelEntry(subnet)
 		if err != nil {
-			klog.Errorf("Error deleting the subnet %q from the local IPSet: %v", subnet, err)
+			logger.Errorf(err, "Error deleting the subnet %q from the local IPSet", subnet)
 		}
 	}
 
@@ -205,7 +208,7 @@ func (h *mtuHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	for _, subnet := range subnets {
 		err := h.remoteIPSet.DelEntry(subnet)
 		if err != nil {
-			klog.Errorf("Error deleting the subnet %q from the remote IPSet: %v", subnet, err)
+			logger.Errorf(err, "Error deleting the subnet %q from the remote IPSet", subnet)
 		}
 	}
 
@@ -236,41 +239,41 @@ func (h *mtuHandler) Stop(uninstall bool) error {
 		return nil
 	}
 
-	klog.Infof("Flushing iptable entries in %q chain of %q table", constants.SmPostRoutingChain, constants.MangleTable)
+	logger.Infof("Flushing iptable entries in %q chain of %q table", constants.SmPostRoutingChain, constants.MangleTable)
 
 	if err := h.ipt.ClearChain(constants.MangleTable, constants.SmPostRoutingChain); err != nil {
-		klog.Errorf("Error flushing iptables chain %q of %q table: %v", constants.SmPostRoutingChain,
-			constants.MangleTable, err)
+		logger.Errorf(err, "Error flushing iptables chain %q of %q table", constants.SmPostRoutingChain,
+			constants.MangleTable)
 	}
 
-	klog.Infof("Deleting iptable entry in %q chain of %q table", constants.PostRoutingChain, constants.MangleTable)
+	logger.Infof("Deleting iptable entry in %q chain of %q table", constants.PostRoutingChain, constants.MangleTable)
 
 	ruleSpec := []string{"-j", constants.SmPostRoutingChain}
 	if err := h.ipt.Delete(constants.MangleTable, constants.PostRoutingChain, ruleSpec...); err != nil {
-		klog.Errorf("Error deleting iptables rule from %q chain: %v", constants.PostRoutingChain, err)
+		logger.Errorf(err, "Error deleting iptables rule from %q chain", constants.PostRoutingChain)
 	}
 
-	klog.Infof("Deleting iptable %q chain of %q table", constants.SmPostRoutingChain, constants.MangleTable)
+	logger.Infof("Deleting iptable %q chain of %q table", constants.SmPostRoutingChain, constants.MangleTable)
 
 	if err := h.ipt.DeleteChain(constants.MangleTable, constants.SmPostRoutingChain); err != nil {
-		klog.Errorf("Error deleting iptable chain %q of table %q: %v", constants.SmPostRoutingChain,
-			constants.MangleTable, err)
+		logger.Errorf(err, "Error deleting iptable chain %q of table %q", constants.SmPostRoutingChain,
+			constants.MangleTable)
 	}
 
 	if err := h.localIPSet.Flush(); err != nil {
-		klog.Errorf("Error flushing ipset %q: %v", constants.LocalCIDRIPSet, err)
+		logger.Errorf(err, "Error flushing ipset %q", constants.LocalCIDRIPSet)
 	}
 
 	if err := h.localIPSet.Destroy(); err != nil {
-		klog.Errorf("Error deleting ipset %q: %v", constants.LocalCIDRIPSet, err)
+		logger.Errorf(err, "Error deleting ipset %q", constants.LocalCIDRIPSet)
 	}
 
 	if err := h.remoteIPSet.Flush(); err != nil {
-		klog.Errorf("Error flushing ipset %q: %v", constants.RemoteCIDRIPSet, err)
+		logger.Errorf(err, "Error flushing ipset %q", constants.RemoteCIDRIPSet)
 	}
 
 	if err := h.remoteIPSet.Destroy(); err != nil {
-		klog.Errorf("Error deleting ipset %q: %v", constants.RemoteCIDRIPSet, err)
+		logger.Errorf(err, "Error deleting ipset %q", constants.RemoteCIDRIPSet)
 	}
 
 	return nil
@@ -295,7 +298,7 @@ func (h *mtuHandler) forceMssClamping(endpoint *submV1.Endpoint) error {
 		tcpMssSrc = "default"
 	}
 
-	klog.Infof("forceMssClamping to: %d (%s) ", tcpMssValue, tcpMssSrc)
+	logger.Infof("forceMssClamping to: %d (%s) ", tcpMssValue, tcpMssSrc)
 	ruleSpecSource := []string{
 		"-m", "set", "--match-set", constants.LocalCIDRIPSet, "src", "-m", "set", "--match-set",
 		constants.RemoteCIDRIPSet, "dst", "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS",
@@ -323,7 +326,7 @@ func (h *mtuHandler) forceMssClamping(endpoint *submV1.Endpoint) error {
 
 	if len(rules) > 0 && !isPresent {
 		if err := h.ipt.ClearChain(constants.MangleTable, constants.SmPostRoutingChain); err != nil {
-			klog.Warningf("Error flushing iptables chain %q of %q table: %v", constants.SmPostRoutingChain,
+			logger.Warningf("Error flushing iptables chain %q of %q table: %v", constants.SmPostRoutingChain,
 				constants.MangleTable, err)
 		}
 	}

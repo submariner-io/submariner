@@ -24,13 +24,14 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/stringset"
 	cni "github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	cniapi "github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type SyncHandler struct {
@@ -56,6 +57,8 @@ type SyncHandler struct {
 	cniIface         *cniapi.Interface
 	defaultHostIface *net.Interface
 }
+
+var logger = log.Logger{Logger: logf.Log.WithName("KubeProxy")}
 
 func NewSyncHandler(localClusterCidr, localServiceCidr []string) *SyncHandler {
 	return &SyncHandler{
@@ -112,7 +115,7 @@ func (kp *SyncHandler) Init() error {
 		// to work, but the following use-cases may not work.
 		// 1. Hostnetworking to remote cluster support will be broken
 		// 2. Health-check verification between the Gateway nodes will be disabled
-		klog.Errorf("Error discovering the CNI interface %v", err)
+		logger.Errorf(err, "Error discovering the CNI interface")
 	}
 
 	// Create the necessary IPTable chains in the filter and nat tables.
