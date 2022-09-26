@@ -31,7 +31,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/port"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
-	"k8s.io/klog/v2"
 )
 
 type vxLanAttributes struct {
@@ -90,7 +89,7 @@ func (kp *SyncHandler) createVxLanIface(iface *vxLanIface) error {
 		}
 
 		if isVxlanConfigTheSame(iface.link, existing) {
-			klog.V(log.DEBUG).Infof("VxLAN interface already exists with same configuration.")
+			logger.V(log.DEBUG).Infof("VxLAN interface already exists with same configuration.")
 
 			iface.link = existing.(*netlink.Vxlan)
 
@@ -126,22 +125,26 @@ func isVxlanConfigTheSame(newLink, currentLink netlink.Link) bool {
 	existing := currentLink.(*netlink.Vxlan)
 
 	if required.VxlanId != existing.VxlanId {
-		klog.Errorf("VxlanId of existing interface (%d) does not match with required VxlanId (%d)", existing.VxlanId, required.VxlanId)
+		logger.Errorf(nil, "VxlanId of existing interface (%d) does not match with required VxlanId (%d)",
+			existing.VxlanId, required.VxlanId)
 		return false
 	}
 
 	if len(required.Group) > 0 && len(existing.Group) > 0 && !required.Group.Equal(existing.Group) {
-		klog.Errorf("Vxlan Group (%v) of existing interface does not match with required Group (%v)", existing.Group, required.Group)
+		logger.Errorf(nil, "Vxlan Group (%v) of existing interface does not match with required Group (%v)",
+			existing.Group, required.Group)
 		return false
 	}
 
 	if len(required.SrcAddr) > 0 && len(existing.SrcAddr) > 0 && !required.SrcAddr.Equal(existing.SrcAddr) {
-		klog.Errorf("Vxlan SrcAddr (%v) of existing interface does not match with required SrcAddr (%v)", existing.SrcAddr, required.SrcAddr)
+		logger.Errorf(nil, "Vxlan SrcAddr (%v) of existing interface does not match with required SrcAddr (%v)",
+			existing.SrcAddr, required.SrcAddr)
 		return false
 	}
 
 	if required.Port > 0 && existing.Port > 0 && required.Port != existing.Port {
-		klog.V(log.DEBUG).Infof("Vxlan Port (%d) of existing interface does not match with required Port (%d)", existing.Port, required.Port)
+		logger.V(log.DEBUG).Infof("Vxlan Port (%d) of existing interface does not match with required Port (%d)",
+			existing.Port, required.Port)
 		return false
 	}
 
@@ -189,7 +192,7 @@ func (iface *vxLanIface) AddFDB(ipAddress net.IP, hwAddr string) error {
 		return errors.Wrapf(err, "unable to add the bridge fdb entry %v", neigh)
 	}
 
-	klog.V(log.DEBUG).Infof("Successfully added the bridge fdb entry %v", neigh)
+	logger.V(log.DEBUG).Infof("Successfully added the bridge fdb entry %v", neigh)
 
 	return nil
 }
@@ -215,7 +218,7 @@ func (iface *vxLanIface) DelFDB(ipAddress net.IP, hwAddr string) error {
 		return errors.Wrapf(err, "unable to delete the bridge fdb entry %v", neigh)
 	}
 
-	klog.V(log.DEBUG).Infof("Successfully deleted the bridge fdb entry %v", neigh)
+	logger.V(log.DEBUG).Infof("Successfully deleted the bridge fdb entry %v", neigh)
 
 	return nil
 }
@@ -273,7 +276,7 @@ func (kp *SyncHandler) createVxLANInterface(activeEndPoint string, ifaceType int
 			return errors.Wrap(err, "error enabling loose mode")
 		}
 
-		klog.V(log.DEBUG).Infof("Successfully configured reverse path filter to loose mode on %q", VxLANIface)
+		logger.V(log.DEBUG).Infof("Successfully configured reverse path filter to loose mode on %q", VxLANIface)
 	} else if ifaceType == VxInterfaceWorker {
 		// non-Gateway/Worker Node
 		attrs := &vxLanAttributes{

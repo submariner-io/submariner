@@ -26,7 +26,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
-	"k8s.io/klog/v2"
 )
 
 // handleSubnets builds ip rules, and passes them to the specified netlink function
@@ -44,7 +43,7 @@ func (ovn *Handler) handleSubnets(remoteSubnets []string, ruleFunc func(rule *ne
 				return errors.Wrapf(err, "error creating rule %#v", rule)
 			}
 
-			klog.V(log.DEBUG).Infof("Adding routes in table 149: %v", rule)
+			logger.V(log.DEBUG).Infof("Adding routes in table 149: %v", rule)
 
 			err = ruleFunc(rule)
 			if err != nil && !ignoredErrorFunc(err) {

@@ -28,13 +28,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/klog/v2"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type Interface struct {
 	Name      string
 	IPAddress string
 }
+
+var logger = log.Logger{Logger: logf.Log.WithName("CNI")}
 
 // DiscoverFunc is a hook for unit tests.
 var DiscoverFunc func(clusterCIDR string) (*Interface, error)
@@ -67,14 +69,14 @@ func discover(clusterCIDR string) (*Interface, error) {
 		for i := range addrs {
 			ipAddr, _, err := net.ParseCIDR(addrs[i].String())
 			if err != nil {
-				klog.Errorf("Unable to ParseCIDR : %q", addrs[i].String())
+				logger.Errorf(err, "Unable to ParseCIDR : %q", addrs[i].String())
 			} else if ipAddr.To4() != nil {
-				klog.V(log.DEBUG).Infof("Interface %q has %q address", iface.Name, ipAddr)
+				logger.V(log.DEBUG).Infof("Interface %q has %q address", iface.Name, ipAddr)
 				address := net.ParseIP(ipAddr.String())
 
 				// Verify that interface has an address from cluster CIDR
 				if clusterNetwork.Contains(address) {
-					klog.V(log.DEBUG).Infof("Found CNI Interface %q that has IP %q from ClusterCIDR %q",
+					logger.V(log.DEBUG).Infof("Found CNI Interface %q that has IP %q from ClusterCIDR %q",
 						iface.Name, ipAddr, clusterCIDR)
 					return &Interface{IPAddress: ipAddr.String(), Name: iface.Name}, nil
 				}
@@ -127,9 +129,9 @@ func AnnotateNodeWithCNIInterfaceIP(nodeName string, clientSet kubernetes.Interf
 	}
 
 	if setAnnotation {
-		klog.Infof("Successfully annotated node %q with cniIfaceIP %q", nodeName, cniIPAddress)
+		logger.Infof("Successfully annotated node %q with cniIfaceIP %q", nodeName, cniIPAddress)
 	} else {
-		klog.Infof("Successfully removed %q from node %q annotation", constants.CNIInterfaceIP, nodeName)
+		logger.Infof("Successfully removed %q from node %q annotation", constants.CNIInterfaceIP, nodeName)
 	}
 
 	return nil

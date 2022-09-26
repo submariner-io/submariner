@@ -29,7 +29,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -128,7 +127,7 @@ func (ovn *Handler) getNextHopOnK8sMgmtIntf() (*net.IP, error) {
 	}
 
 	for i := range currentRouteList {
-		klog.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])
+		logger.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])
 
 		if currentRouteList[i].Dst == nil || currentRouteList[i].Gw == nil {
 			continue
