@@ -24,6 +24,7 @@ const (
 	CanalFlannel  = "canal-flannel"
 	Flannel       = "flannel"
 	WeaveNet      = "weave-net"
+	KindNet       = "kindnet"
 	OpenShiftSDN  = "OpenShiftSDN"
 	OVNKubernetes = "OVNKubernetes"
 	Calico        = "calico"
