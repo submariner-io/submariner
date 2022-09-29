@@ -130,6 +130,22 @@ jobs:
       - name: Run shellcheck
         run: make shellcheck
 
+  variant-analysis:
+    name: Variant Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@86f3159a697a097a813ad9bfa0002412d97690a4
+        with:
+          languages: go
+      - name: Run CodeQL variant analysis
+        uses: github/codeql-action/analyze@86f3159a697a097a813ad9bfa0002412d97690a4
+      - name: Show CodeQL scan SARIF report
+        if: always()
+        run: cat ../results/go.sarif
+
   vulnerability-scan:
     name: Vulnerability Scanning
     runs-on: ubuntu-latest
