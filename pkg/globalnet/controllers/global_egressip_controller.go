@@ -39,7 +39,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -47,7 +46,7 @@ func NewGlobalEgressIPController(config *syncer.ResourceSyncerConfig, pool *ipam
 	// We'll panic if config is nil, this is intentional
 	var err error
 
-	klog.Info("Creating GlobalEgressIP controller")
+	logger.Info("Creating GlobalEgressIP controller")
 
 	iptIface, err := iptables.New()
 	if err != nil {
@@ -135,7 +134,7 @@ func (c *globalEgressIPController) process(from runtime.Object, numRequeues int,
 
 	key, _ := cache.MetaNamespaceKeyFunc(globalEgressIP)
 
-	klog.Infof("Processing %sd GlobalEgressIP %q, NumberOfIPs: %d, PodSelector: %#v, Status: %#v", op, key,
+	logger.Infof("Processing %sd GlobalEgressIP %q, NumberOfIPs: %d, PodSelector: %#v, Status: %#v", op, key,
 		numberOfIPs, globalEgressIP.Spec.PodSelector, globalEgressIP.Status)
 
 	switch op {
@@ -197,7 +196,7 @@ func (c *globalEgressIPController) programGlobalEgressRules(key string, allocate
 func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int,
 	globalEgressIP *submarinerv1.GlobalEgressIP, namedIPSet ipset.Named,
 ) bool {
-	klog.Infof("Allocating %d global IP(s) for %q", numberOfIPs, key)
+	logger.Infof("Allocating %d global IP(s) for %q", numberOfIPs, key)
 
 	if numberOfIPs == 0 {
 		globalEgressIP.Status.AllocatedIPs = nil
@@ -219,7 +218,7 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 
 	allocatedIPs, err := c.pool.Allocate(numberOfIPs)
 	if err != nil {
-		klog.Errorf("Error allocating IPs for %q: %v", key, err)
+		logger.Errorf(err, "Error allocating IPs for %q", key)
 
 		globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, &metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
@@ -233,7 +232,7 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 
 	err = c.programGlobalEgressRules(key, allocatedIPs, globalEgressIP.Spec.PodSelector, namedIPSet)
 	if err != nil {
-		klog.Errorf("Error programming egress IP table rules for %q: %v", key, err)
+		logger.Errorf(err, "Error programming egress IP table rules for %q", key)
 
 		globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, &metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
@@ -258,7 +257,7 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 
 	globalEgressIP.Status.AllocatedIPs = allocatedIPs
 
-	klog.Infof("Allocated %v global IP(s) for %q", globalEgressIP.Status.AllocatedIPs, key)
+	logger.Infof("Allocated %v global IP(s) for %q", globalEgressIP.Status.AllocatedIPs, key)
 
 	return false
 }
@@ -298,14 +297,14 @@ func (c *globalEgressIPController) onDelete(numRequeues int, globalEgressIP *sub
 	}
 
 	if err := namedIPSet.Destroy(); err != nil {
-		klog.Errorf("Error destroying the ipSet %q for %q: %v", namedIPSet.Name(), key, err)
+		logger.Errorf(err, "Error destroying the ipSet %q for %q", namedIPSet.Name(), key)
 
 		if shouldRequeue(numRequeues) {
 			return true
 		}
 	}
 
-	klog.Infof("Successfully deleted all the iptables/ipset rules for %q ", key)
+	logger.Infof("Successfully deleted all the iptables/ipset rules for %q ", key)
 
 	return false
 }
@@ -326,7 +325,7 @@ func (c *globalEgressIPController) createPodWatcher(key string, namedIPSet ipset
 	prevPodWatcher, found := c.podWatchers[key]
 	if found {
 		if !equality.Semantic.DeepEqual(prevPodWatcher.podSelector, globalEgressIP.Spec.PodSelector) {
-			klog.Errorf("PodSelector for %q cannot be updated after creation", key)
+			logger.Errorf(nil, "PodSelector for %q cannot be updated after creation", key)
 
 			globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, &metav1.Condition{
 				Type:    string(submarinerv1.GlobalEgressIPUpdated),
@@ -345,14 +344,14 @@ func (c *globalEgressIPController) createPodWatcher(key string, namedIPSet ipset
 
 	podWatcher, err := startEgressPodWatcher(key, globalEgressIP.Namespace, namedIPSet, &c.watcherConfig, globalEgressIP.Spec.PodSelector)
 	if err != nil {
-		klog.Errorf("Error starting pod watcher for %q: %v", key, err)
+		logger.Errorf(err, "Error starting pod watcher for %q", key)
 		return false
 	}
 
 	c.podWatchers[key] = podWatcher
 	podWatcher.podSelector = globalEgressIP.Spec.PodSelector
 
-	klog.Infof("Started pod watcher for %q", key)
+	logger.Infof("Started pod watcher for %q", key)
 
 	return true
 }
