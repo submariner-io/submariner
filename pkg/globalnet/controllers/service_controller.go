@@ -29,14 +29,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
 )
 
 func NewServiceController(config *syncer.ResourceSyncerConfig, podControllers *IngressPodControllers) (Interface, error) {
 	// We'll panic if config is nil, this is intentional
 	var err error
 
-	klog.Info("Creating Service controller")
+	logger.Info("Creating Service controller")
 
 	controller := &serviceController{
 		baseSyncerController: newBaseSyncerController(),
@@ -112,7 +111,7 @@ func (c *serviceController) process(from runtime.Object, numRequeues int, op syn
 func (c *serviceController) onDelete(service *corev1.Service) (runtime.Object, bool) {
 	key, _ := cache.MetaNamespaceKeyFunc(service)
 
-	klog.Infof("Service %q deleted", key)
+	logger.Infof("Service %q deleted", key)
 
 	c.podControllers.stopAndCleanup(service.Name, service.Namespace)
 

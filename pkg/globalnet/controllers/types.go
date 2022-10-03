@@ -21,6 +21,7 @@ package controllers
 import (
 	"sync"
 
+	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/watcher"
@@ -31,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -201,3 +203,5 @@ type IngressEndpointsControllers struct {
 	config      syncer.ResourceSyncerConfig
 	ingressIPs  dynamic.NamespaceableResourceInterface
 }
+
+var logger = log.Logger{Logger: logf.Log.WithName("Globalnet")}
