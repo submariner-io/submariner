@@ -26,10 +26,12 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"k8s.io/klog/v2"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const ovsCommandTimeout = 15
+
+var logger = log.Logger{Logger: logf.Log.WithName("ovs-vsctl")}
 
 func vsctlCmd(parameters ...string) (output string, err error) {
 	allParameters := []string{fmt.Sprintf("--timeout=%d", ovsCommandTimeout)}
@@ -37,7 +39,7 @@ func vsctlCmd(parameters ...string) (output string, err error) {
 
 	cmd := exec.Command("/usr/bin/ovs-vsctl", allParameters...)
 
-	klog.V(log.TRACE).Infof("ovs-vsctl %v", allParameters)
+	logger.V(log.TRACE).Infof("Running ovs-vsctl %v", allParameters)
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -48,7 +50,7 @@ func vsctlCmd(parameters ...string) (output string, err error) {
 
 	if err != nil {
 		stdErrOut := stderr.String()
-		klog.Errorf("Error running ovs-vsctl %+v, output:\n%s", err, stdErrOut)
+		logger.Errorf(err, "Error running ovs-vsctl, output:\n%s", stdErrOut)
 
 		return stdErrOut, errors.Wrap(err, "error running ovs-vsctl")
 	}

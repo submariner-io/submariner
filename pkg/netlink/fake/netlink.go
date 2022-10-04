@@ -26,6 +26,7 @@ import (
 	"syscall"
 
 	. "github.com/onsi/gomega"
+	"github.com/pkg/errors"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/vishvananda/netlink"
 )
@@ -44,6 +45,18 @@ type NetLink struct {
 }
 
 var _ netlinkAPI.Interface = &NetLink{}
+
+type linkNotFoundError struct{}
+
+func (e linkNotFoundError) Error() string {
+	return "Link not found"
+}
+
+func (e linkNotFoundError) Is(err error) bool {
+	// nolint:errorlint // The given error should not be wrapped.
+	_, ok := err.(netlink.LinkNotFoundError)
+	return ok
+}
 
 func New() *NetLink {
 	return &NetLink{
@@ -97,7 +110,7 @@ func (n *basicType) LinkByName(name string) (netlink.Link, error) {
 
 	link, found := n.links[name]
 	if !found {
-		return nil, &netlink.LinkNotFoundError{}
+		return nil, linkNotFoundError{}
 	}
 
 	return link, nil
@@ -258,10 +271,10 @@ func (n *NetLink) AwaitLink(name string) (link netlink.Link) {
 }
 
 func (n *NetLink) AwaitNoLink(name string) {
-	Eventually(func() error {
+	Eventually(func() bool {
 		_, err := n.LinkByName(name)
-		return err
-	}, 5).Should(BeAssignableToTypeOf(&netlink.LinkNotFoundError{}), "Link %q exists", name)
+		return errors.Is(err, netlink.LinkNotFoundError{})
+	}, 5).Should(BeTrue(), "Link %q exists", name)
 }
 
 func (n *NetLink) routeDestList(linkIndex int) []net.IPNet {

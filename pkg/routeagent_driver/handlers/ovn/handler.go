@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable/wireguard"
 	"github.com/submariner-io/submariner/pkg/cidr"
@@ -32,7 +33,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/iptables"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
-	"k8s.io/klog/v2"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type Handler struct {
@@ -48,11 +49,13 @@ type Handler struct {
 	ipt                   iptables.Interface
 }
 
+var logger = log.Logger{Logger: logf.Log.WithName("OVN")}
+
 func NewHandler(env *environment.Specification, smClientSet clientset.Interface) *Handler {
 	// We'll panic if env is nil, this is intentional
 	ipt, err := iptables.New()
 	if err != nil {
-		klog.Fatalf("Error initializing iptables in OVN routeagent handler: %s", err)
+		logger.Fatalf("Error initializing iptables in OVN routeagent handler: %s", err)
 	}
 
 	return &Handler{
@@ -93,7 +96,7 @@ func (ovn *Handler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 		}
 	} else {
 		if routingInterface, err = netlink.GetDefaultGatewayInterface(); err != nil {
-			klog.Fatalf("Unable to find the default interface on host: %s", err.Error())
+			logger.Fatalf("Unable to find the default interface on host: %s", err.Error())
 		}
 	}
 
@@ -129,7 +132,7 @@ func (ovn *Handler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 func (ovn *Handler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	if err := cidr.OverlappingSubnets(ovn.config.ServiceCidr, ovn.config.ClusterCidr, endpoint.Spec.Subnets); err != nil {
 		// Skip processing the endpoint when CIDRs overlap and return nil to avoid re-queuing.
-		klog.Errorf("overlappingSubnets for new remote %#v returned error: %v", endpoint, err)
+		logger.Errorf(err, "overlappingSubnets for new remote %#v returned error", endpoint)
 		return nil
 	}
 
@@ -159,7 +162,7 @@ func (ovn *Handler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 func (ovn *Handler) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
 	if err := cidr.OverlappingSubnets(ovn.config.ServiceCidr, ovn.config.ClusterCidr, endpoint.Spec.Subnets); err != nil {
 		// Skip processing the endpoint when CIDRs overlap and return nil to avoid re-queuing.
-		klog.Errorf("overlappingSubnets for new remote %#v returned error: %v", endpoint, err)
+		logger.Errorf(err, "overlappingSubnets for new remote %#v returned error", endpoint)
 		return nil
 	}
 
