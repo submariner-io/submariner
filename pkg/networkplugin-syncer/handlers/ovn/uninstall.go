@@ -21,7 +21,6 @@ package ovn
 import (
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/libovsdbops"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/nbdb"
-	"k8s.io/klog/v2"
 )
 
 func (ovn *SyncHandler) Stop(uninstall bool) error {
@@ -29,7 +28,7 @@ func (ovn *SyncHandler) Stop(uninstall bool) error {
 		return nil
 	}
 
-	klog.Infof("Uninstalling OVN components")
+	logger.Infof("Uninstalling OVN components")
 
 	// Delete the submariner logical router, ports and flows
 	staleLRSRPred := func(item *nbdb.LogicalRouterStaticRoute) bool {
@@ -38,7 +37,7 @@ func (ovn *SyncHandler) Stop(uninstall bool) error {
 
 	err := libovsdbops.DeleteLogicalRouterStaticRoutesWithPredicate(ovn.nbdb, submarinerLogicalRouter, staleLRSRPred)
 	if err != nil {
-		klog.Errorf("Failed to delete ovn static routes for port: %s due to : %v", submarinerUpstreamRPort, err)
+		logger.Errorf(err, "Failed to delete ovn static routes for port %q", submarinerUpstreamRPort)
 	}
 
 	subLogicalRouter := nbdb.LogicalRouter{
@@ -53,12 +52,12 @@ func (ovn *SyncHandler) Stop(uninstall bool) error {
 
 	err = libovsdbops.DeleteLogicalRouterPorts(ovn.nbdb, &subLogicalRouter, &subRouterToJoinLrp)
 	if err != nil {
-		klog.Errorf("Failed to delete router ports from submariner logical router due to %v", err)
+		logger.Errorf(err, "Failed to delete router ports from submariner logical router")
 	}
 
 	err = libovsdbops.DeleteLogicalRouter(ovn.nbdb, &subLogicalRouter)
 	if err != nil {
-		klog.Errorf("Failed to delete submariner logical router %v", err)
+		logger.Errorf(err, "Failed to delete submariner logical router")
 	}
 
 	// Delete the logical router ports and policies
@@ -68,7 +67,7 @@ func (ovn *SyncHandler) Stop(uninstall bool) error {
 
 	err = libovsdbops.DeleteLogicalRouterPoliciesWithPredicate(ovn.nbdb, ovnClusterRouter, lrpStalePredicate)
 	if err != nil {
-		klog.Errorf("Failed to delete submariner logical route policies due to: %v", err)
+		logger.Errorf(err, "Failed to delete submariner logical route policies")
 	}
 
 	ovnLogicalRouter := nbdb.LogicalRouter{
@@ -83,7 +82,7 @@ func (ovn *SyncHandler) Stop(uninstall bool) error {
 
 	err = libovsdbops.DeleteLogicalRouterPorts(ovn.nbdb, &ovnLogicalRouter, &ovnRouterToJoinLrp)
 	if err != nil {
-		klog.Errorf("Failed to delete ports from ovn logical router due to %v", err)
+		logger.Errorf(err, "Failed to delete ports from ovn logical router")
 	}
 
 	// Delete submariner upstream switch and ports
@@ -102,12 +101,12 @@ func (ovn *SyncHandler) Stop(uninstall bool) error {
 
 	_, err = libovsdbops.DeleteLogicalSwitchPortsOps(ovn.nbdb, nil, &subGatewaySwitch, &subGatewayToLocalNetLsp)
 	if err != nil {
-		klog.Errorf("Failed to to delete logical gateway ports from submariner upstream switch: %v", err)
+		logger.Errorf(err, "Failed to to delete logical gateway ports from submariner upstream switch")
 	}
 
 	err = libovsdbops.DeleteLogicalSwitch(ovn.nbdb, submarinerUpstreamSwitch)
 	if err != nil {
-		klog.Errorf("Failed to to delete submariner upstream switch %v", err)
+		logger.Errorf(err, "Failed to to delete submariner upstream switch")
 	}
 
 	subGatewayToSubRouterLsp := nbdb.LogicalSwitchPort{
@@ -121,7 +120,7 @@ func (ovn *SyncHandler) Stop(uninstall bool) error {
 
 	_, err = libovsdbops.DeleteLogicalSwitchPortsOps(ovn.nbdb, nil, &subGatewaySwitch, &subGatewayToSubRouterLsp)
 	if err != nil {
-		klog.Errorf("Failed to delete submarinerUpstreamRPort from submariner upstream switch due to : %v", err)
+		logger.Errorf(err, "Failed to delete submarinerUpstreamRPort from submariner upstream switch")
 	}
 
 	// Delete submariner downstream switch and ports
@@ -150,12 +149,12 @@ func (ovn *SyncHandler) Stop(uninstall bool) error {
 	_, err = libovsdbops.DeleteLogicalSwitchPortsOps(ovn.nbdb, nil, &subJoinSwitch,
 		[]*nbdb.LogicalSwitchPort{&subJoinToSubRouterLsp, &subJointoOvnRouterLsp}...)
 	if err != nil {
-		klog.Errorf("Failed to delete ovnClusterSubmarinerSwPort from submariner downstream switch due to : %v", err)
+		logger.Errorf(err, "Failed to delete ovnClusterSubmarinerSwPort from submariner downstream switch")
 	}
 
 	err = libovsdbops.DeleteLogicalSwitch(ovn.nbdb, submarinerDownstreamSwitch)
 	if err != nil {
-		klog.Errorf("Failed to delete submariner downstream switch due to : %v", err)
+		logger.Errorf(err, "Failed to delete submariner downstream switch")
 	}
 
 	return nil

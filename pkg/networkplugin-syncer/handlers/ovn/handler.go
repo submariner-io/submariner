@@ -30,11 +30,13 @@ import (
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var ErrWaitingForLocalEndpoint = errors.New("waiting for the local endpoint details before we can " +
 	"setup any remote endpoint related information, this will be retried")
+
+var logger = log.Logger{Logger: logf.Log.WithName("OVN")}
 
 type SyncHandler struct {
 	event.HandlerBase
@@ -106,7 +108,7 @@ func (ovn *SyncHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 func (ovn *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	if err := cidr.OverlappingSubnets(ovn.localServiceCIDR, ovn.localClusterCIDR, endpoint.Spec.Subnets); err != nil {
 		// Skip processing the endpoint when CIDRs overlap and return nil to avoid re-queuing.
-		klog.Errorf("overlappingSubnets for new remote %#v returned error: %v", endpoint, err)
+		logger.Errorf(err, "overlappingSubnets for new remote %#v returned error", endpoint)
 		return nil
 	}
 
@@ -121,7 +123,7 @@ func (ovn *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 func (ovn *SyncHandler) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
 	if err := cidr.OverlappingSubnets(ovn.localServiceCIDR, ovn.localClusterCIDR, endpoint.Spec.Subnets); err != nil {
 		// Skip processing the endpoint when CIDRs overlap and return nil to avoid re-queuing.
-		klog.Errorf("overlappingSubnets for new remote %#v returned error: %v", endpoint, err)
+		logger.Errorf(err, "overlappingSubnets for new remote %#v returned error", endpoint)
 		return nil
 	}
 
@@ -168,7 +170,7 @@ func (ovn *SyncHandler) updateRemoteEndpointsInfra() error {
 
 func (ovn *SyncHandler) updateGatewayNode() error {
 	if ovn.localEndpoint == nil {
-		klog.Warningf("No local endpoint, cannot update local endpoint information in OVN NBDB")
+		logger.Warningf("No local endpoint, cannot update local endpoint information in OVN NBDB")
 		return nil
 	}
 
@@ -176,13 +178,13 @@ func (ovn *SyncHandler) updateGatewayNode() error {
 
 	chassis, err := ovn.findChassisByHostname(gwHostname)
 	if errors.Is(err, libovsdbclient.ErrNotFound) {
-		klog.Fatalf("The OVN chassis for hostname %q could not be found", gwHostname)
+		logger.Fatalf("The OVN chassis for hostname %q could not be found", gwHostname)
 	} else if err != nil {
 		// Hopefully this error can be retried
 		return err
 	}
 
-	klog.V(log.DEBUG).Infof("Chassis for gw %q is %q, host: %q", gwHostname, chassis.Name, chassis.Hostname)
+	logger.V(log.DEBUG).Infof("Chassis for gw %q is %q, host: %q", gwHostname, chassis.Name, chassis.Hostname)
 
 	// Create/update the submariner external port associated to one of the external switches.
 	if err := ovn.createOrUpdateSubmarinerExternalPort(); err != nil {
