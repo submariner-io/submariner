@@ -25,7 +25,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/stringset"
-	"k8s.io/klog/v2"
 )
 
 // Ensure the core submariner ovn topology is setup and current.
@@ -38,7 +37,7 @@ import (
 // subRouter 							 subJoinSwitch					 		ovnClusterRouter
 //     |(subRouter2JoinLRP)-(subJoin2RouterLSP)|(subClusterSwPort)-(subJoin2RouterLSP)|
 func (ovn *SyncHandler) ensureSubmarinerInfra() error {
-	klog.Info("Ensuring submariner ovn topology and connecting to ovn-cluster-router")
+	logger.Info("Ensuring submariner ovn topology and connecting to ovn-cluster-router")
 
 	lbGroups, err := libovsdbops.FindLoadBalancerGroupsWithPredicate(ovn.nbdb, func(item *nbdb.LoadBalancerGroup) bool {
 		return item.Name == ovnLBGroup
@@ -142,11 +141,11 @@ func (ovn *SyncHandler) setupOvnClusterRouterLRPs() error {
 	remoteSubnets := ovn.remoteEndpointSubnetSet()
 
 	if remoteSubnets.Size() == 0 {
-		klog.V(log.DEBUG).Info("No Remote Subnets to Process")
+		logger.V(log.DEBUG).Info("No Remote Subnets to Process")
 		return nil
 	}
 
-	klog.V(log.DEBUG).Infof("Reconciling these raw remote subnets %v to logical router policies", remoteSubnets.Elements())
+	logger.V(log.DEBUG).Infof("Reconciling these raw remote subnets %v to logical router policies", remoteSubnets.Elements())
 
 	return ovn.reconcileSubOvnLogicalRouterPolicies(remoteSubnets)
 }
@@ -176,7 +175,7 @@ func (ovn *SyncHandler) associateSubmarinerRouterToChassis(chassis *sbdb.Chassis
 // createOrUpdateSubmarinerExternalPort ensures that the submariner external Port
 // can communicate with the node where the gateway switch is located.
 func (ovn *SyncHandler) createOrUpdateSubmarinerExternalPort() error {
-	klog.Info("Ensuring connection between submariner router and submariner gateway switch")
+	logger.Info("Ensuring connection between submariner router and submariner gateway switch")
 
 	subGatewaySwitch := nbdb.LogicalSwitch{
 		Name: submarinerUpstreamSwitch,
@@ -215,7 +214,7 @@ func (ovn *SyncHandler) createOrUpdateSubmarinerExternalPort() error {
 func (ovn *SyncHandler) updateSubmarinerRouterRemoteRoutes() error {
 	remoteSubnets := ovn.remoteEndpointSubnetSet()
 
-	klog.V(log.DEBUG).Infof("reconciling north static routes on %q router for subnets %v", submarinerLogicalRouter,
+	logger.V(log.DEBUG).Infof("reconciling north static routes on %q router for subnets %v", submarinerLogicalRouter,
 		remoteSubnets.Elements())
 
 	return ovn.reconcileSubOvnLogicalRouterStaticRoutes(submarinerUpstreamRPort, HostUpstreamIP, remoteSubnets)
@@ -224,7 +223,7 @@ func (ovn *SyncHandler) updateSubmarinerRouterRemoteRoutes() error {
 func (ovn *SyncHandler) updateSubmarinerRouterLocalRoutes() error {
 	localSubnets := stringset.New(ovn.localClusterCIDR...)
 
-	klog.Infof("reconciling south static routes on %q for subnets %v", submarinerLogicalRouter,
+	logger.Infof("reconciling south static routes on %q for subnets %v", submarinerLogicalRouter,
 		localSubnets)
 
 	// For the incoming traffic from remote cluster destined to the local cluster CIDR, configure the next hop
