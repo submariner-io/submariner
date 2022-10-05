@@ -1,5 +1,4 @@
 ---
-cni: weave
 submariner: true
 nodes: control-plane worker
 clusters:
