@@ -23,38 +23,40 @@ import (
 	"os"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/controller"
-	"github.com/submariner-io/submariner/pkg/event/logger"
+	eventlogger "github.com/submariner-io/submariner/pkg/event/logger"
 	"github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog/v2"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
 
 var (
 	masterURL  string
 	kubeconfig string
+	logger     = log.Logger{Logger: logf.Log.WithName("main")}
 )
 
 func main() {
-	klog.InitFlags(nil)
+	kzerolog.AddFlags(nil)
 	flag.Parse()
+	kzerolog.InitK8sLogging()
 
-	klog.Info("Starting submariner-networkplugin-syncer")
+	logger.Info("Starting submariner-networkplugin-syncer")
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler().Done()
 
 	var env environment.Specification
 
 	err := envconfig.Process("submariner", &env)
-	if err != nil {
-		klog.Fatalf("Error reading the environment variables: %s", err.Error())
-	}
+	logger.FatalOnError(err, "Error processing env config")
 
 	networkPlugin := os.Getenv("SUBMARINER_NETWORKPLUGIN")
 
@@ -63,13 +65,12 @@ func main() {
 	}
 
 	registry := event.NewRegistry("networkplugin-syncer", networkPlugin)
-	if err := registry.AddHandlers(logger.NewHandler(), ovn.NewSyncHandler(getK8sClient(), &env)); err != nil {
-		klog.Fatalf("Error registering the handlers: %s", err.Error())
-	}
+	err = registry.AddHandlers(eventlogger.NewHandler(), ovn.NewSyncHandler(getK8sClient(), &env))
+	logger.FatalOnError(err, "Error registering the handlers")
 
 	if env.Uninstall {
 		if err := registry.StopHandlers(true); err != nil {
-			klog.Warningf("Error stopping handlers: %v", err)
+			logger.Warningf("Error stopping handlers: %v", err)
 		}
 
 		return
@@ -80,19 +81,15 @@ func main() {
 		MasterURL:  masterURL,
 		Kubeconfig: kubeconfig,
 	})
-	if err != nil {
-		klog.Fatalf("Error creating controller for event handling %v", err)
-	}
+	logger.FatalOnError(err, "Error creating controller for event handling")
 
 	err = ctl.Start(stopCh)
-	if err != nil {
-		klog.Fatalf("Error starting controller: %v", err)
-	}
+	logger.FatalOnError(err, "Error starting controller")
 
 	<-stopCh
 	ctl.Stop()
 
-	klog.Info("All controllers stopped or exited. Stopping submariner-networkplugin-syncer")
+	logger.Info("All controllers stopped or exited. Stopping submariner-networkplugin-syncer")
 }
 
 func getK8sClient() kubernetes.Interface {
@@ -101,20 +98,14 @@ func getK8sClient() kubernetes.Interface {
 
 	if masterURL == "" && kubeconfig == "" {
 		cfg, err = rest.InClusterConfig()
-		if err != nil {
-			klog.Fatalf("Error getting in-cluster-config, please set kubeconfig && master parameters")
-		}
+		logger.FatalOnError(err, "Error getting in-cluster-config, please set kubeconfig and master parameters")
 	} else {
 		cfg, err = clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
-		if err != nil {
-			klog.Fatalf("Error building kubeconfig: %s", err.Error())
-		}
+		logger.FatalOnError(err, "Error building kubeconfig")
 	}
 
 	clientSet, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		klog.Fatalf("Error building clientset: %s", err.Error())
-	}
+	logger.FatalOnError(err, "Error building clientset")
 
 	return clientSet
 }
