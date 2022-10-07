@@ -22,12 +22,13 @@ import (
 	"context"
 	"flag"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
@@ -35,7 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog/v2"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
@@ -43,30 +44,27 @@ import (
 var (
 	masterURL  string
 	kubeconfig string
+	logger     = log.Logger{Logger: logf.Log.WithName("main")}
 )
 
 func main() {
-	klog.InitFlags(nil)
+	kzerolog.AddFlags(nil)
 	flag.Parse()
+	kzerolog.InitK8sLogging()
+
 	var spec controllers.Specification
 
 	err := envconfig.Process("submariner", &spec)
-	if err != nil {
-		klog.Fatal(err)
-	}
+	logger.FatalOnError(err, "Error processing env config")
 
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
-	if err != nil {
-		klog.Fatalf("Error building kubeconfig: %s", err.Error())
-	}
+	logger.FatalOnError(err, "Error building kube config")
 
 	submarinerClient, err := submarinerClientset.NewForConfig(cfg)
-	if err != nil {
-		klog.Fatalf("error building submariner clientset: %s", err.Error())
-	}
+	logger.FatalOnError(err, "Error building submariner clientse")
 
 	if spec.Uninstall {
-		klog.Info("Uninstalling submariner-globalnet")
+		logger.Info("Uninstalling submariner-globalnet")
 		controllers.UninstallDataPath()
 		controllers.DeleteGlobalnetObjects(submarinerClient, cfg)
 		controllers.RemoveGlobalIPAnnotationOnNode(cfg)
@@ -74,7 +72,7 @@ func main() {
 		return
 	}
 
-	klog.Info("Starting submariner-globalnet", spec)
+	logger.Info("Starting submariner-globalnet", spec)
 
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler().Done()
@@ -82,14 +80,10 @@ func main() {
 	httpServer := startHTTPServer(spec)
 
 	err = mcsv1a1.AddToScheme(scheme.Scheme)
-	if err != nil {
-		klog.Fatalf("Error adding Multicluster v1alpha1 to the scheme: %v", err)
-	}
+	logger.FatalOnError(err, "Error adding Multicluster v1alpha1 to the scheme")
 
 	err = submarinerv1.AddToScheme(scheme.Scheme)
-	if err != nil {
-		klog.Fatalf("Error adding submariner to the scheme: %v", err)
-	}
+	logger.FatalOnError(err, "Error adding submariner to the scheme")
 
 	var localCluster *submarinerv1.Cluster
 	// During installation, sometimes creation of clusterCRD by submariner-gateway-pod would take few secs.
@@ -103,35 +97,29 @@ func main() {
 		time.Sleep(3 * time.Second)
 	}
 
-	if err != nil {
-		klog.Fatalf("error while retrieving the local cluster %q info even after waiting for 5 mins: %v", spec.ClusterID, err)
-	}
+	logger.FatalfOnError(err, "Error while retrieving the local cluster %q info even after waiting for 5 mins", spec.ClusterID)
 
 	if localCluster.Spec.GlobalCIDR != nil && len(localCluster.Spec.GlobalCIDR) > 0 {
 		// TODO: Revisit when support for more than one globalCIDR is implemented.
 		spec.GlobalCIDR = localCluster.Spec.GlobalCIDR
 	} else {
-		klog.Errorf("Cluster %s is not configured to use globalCidr", spec.ClusterID)
-		os.Exit(1)
+		logger.Fatalf("Cluster %s is not configured to use globalCidr", spec.ClusterID)
 	}
 
 	gatewayMonitor, err := controllers.NewGatewayMonitor(spec, append(localCluster.Spec.ClusterCIDR, localCluster.Spec.ServiceCIDR...),
 		&watcher.Config{RestConfig: cfg})
-	if err != nil {
-		klog.Fatalf("Error creating gatewayMonitor: %s", err.Error())
-	}
+	logger.FatalOnError(err, "Error creating gatewayMonitor")
 
-	if err = gatewayMonitor.Start(); err != nil {
-		klog.Fatalf("Error running gatewayMonitor: %s", err.Error())
-	}
+	err = gatewayMonitor.Start()
+	logger.FatalOnError(err, "Error starting the gatewayMonitor")
 
 	<-stopCh
 	gatewayMonitor.Stop()
 
-	klog.Infof("All controllers stopped or exited. Stopping main loop")
+	logger.Infof("All controllers stopped or exited. Stopping main loop")
 
 	if err := httpServer.Shutdown(context.TODO()); err != nil {
-		klog.Errorf("Error shutting down metrics HTTP server: %v", err)
+		logger.Errorf(err, "Error shutting down metrics HTTP server")
 	}
 }
 
@@ -148,7 +136,7 @@ func startHTTPServer(spec controllers.Specification) *http.Server {
 
 	go func() {
 		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			klog.Errorf("Error starting metrics server: %v", err)
+			logger.Errorf(err, "Error starting metrics server")
 		}
 	}()
 

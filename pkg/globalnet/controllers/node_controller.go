@@ -34,14 +34,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog/v2"
 )
 
 func NewNodeController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool, nodeName string) (Interface, error) {
 	// We'll panic if config is nil, this is intentional
 	var err error
 
-	klog.Info("Creating Node controller")
+	logger.Info("Creating Node controller")
 
 	iptIface, err := iptables.New()
 	if err != nil {
@@ -112,7 +111,7 @@ func (n *nodeController) process(from runtime.Object, numRequeues int, op syncer
 		return nil, false
 	}
 
-	klog.Infof("Processing %sd Node %q", op, node.Name)
+	logger.Infof("Processing %sd Node %q", op, node.Name)
 
 	return n.allocateIP(node, op)
 }
@@ -124,7 +123,7 @@ func (n *nodeController) allocateIP(node *corev1.Node, op syncer.Operation) (run
 		// cniIfaceIP of the respective node. Route-agent running on the node annotates the
 		// respective node with the cniIfaceIP. In this API, we check for the presence of this
 		// annotation and process the node event only when the annotation exists.
-		klog.Warningf("%q annotation is missing on the node. Health-check functionality will not work.", routeAgent.CNIInterfaceIP)
+		logger.Warningf("%q annotation is missing on the node. Health-check functionality will not work.", routeAgent.CNIInterfaceIP)
 		return nil, false
 	}
 
@@ -136,19 +135,19 @@ func (n *nodeController) allocateIP(node *corev1.Node, op syncer.Operation) (run
 	if globalIP == "" {
 		ips, err := n.pool.Allocate(1)
 		if err != nil {
-			klog.Errorf("Error allocating IPs for node %q: %v", node.Name, err)
+			logger.Errorf(err, "Error allocating IPs for node %q", node.Name)
 			return nil, true
 		}
 
 		globalIP = ips[0]
 
-		klog.Infof("Allocated global IP %s for node %q", globalIP, node.Name)
+		logger.Infof("Allocated global IP %s for node %q", globalIP, node.Name)
 	}
 
-	klog.Infof("Adding ingress rules for node %q with global IP %s, CNI IP %s", node.Name, globalIP, cniIfaceIP)
+	logger.Infof("Adding ingress rules for node %q with global IP %s, CNI IP %s", node.Name, globalIP, cniIfaceIP)
 
 	if err := n.iptIface.AddIngressRulesForHealthCheck(cniIfaceIP, globalIP); err != nil {
-		klog.Errorf("Error programming rules for Gateway healthcheck on node %q: %v", node.Name, err)
+		logger.Errorf(err, "Error programming rules for Gateway healthcheck on node %q", node.Name)
 
 		_ = n.pool.Release(globalIP)
 
@@ -170,7 +169,7 @@ func (n *nodeController) reserveAllocatedIP(federator federate.Federator, obj *u
 		// Route-agent running on the node annotates the respective node with the cniIfaceIP.
 		// In this API, we check for the presence of this annotation and process the node only
 		// when the annotation exists.
-		klog.Infof("cniIfaceIP annotation on node %q is currently missing", n.nodeName)
+		logger.Infof("cniIfaceIP annotation on node %q is currently missing", n.nodeName)
 		return nil
 	}
 
@@ -183,7 +182,7 @@ func (n *nodeController) reserveAllocatedIP(federator federate.Federator, obj *u
 	}
 
 	if err != nil {
-		klog.Warningf("Could not reserve allocated GlobalIP for Node %q: %v", obj.GetName(), err)
+		logger.Warningf("Could not reserve allocated GlobalIP for Node %q: %v", obj.GetName(), err)
 
 		return errors.Wrap(federator.Distribute(updateNodeAnnotation(obj, "")), "error updating the Node global IP annotation")
 	}
@@ -228,7 +227,7 @@ func (n *nodeController) onNodeUpdated(oldObj, newObj *unstructured.Unstructured
 
 		if oldCNIIfaceIPOnNode != "" && oldGlobalIPOnNode != "" {
 			if err := n.iptIface.RemoveIngressRulesForHealthCheck(oldCNIIfaceIPOnNode, oldGlobalIPOnNode); err != nil {
-				klog.Errorf("Error deleting rules for Gateway healthcheck on node %q: %v", n.nodeName, err)
+				logger.Errorf(err, "Error deleting rules for Gateway healthcheck on node %q", n.nodeName)
 			}
 		}
 

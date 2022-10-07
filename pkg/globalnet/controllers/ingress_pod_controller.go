@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
 )
 
 func startIngressPodController(svc *corev1.Service, config *syncer.ResourceSyncerConfig) (*ingressPodController, error) {
@@ -94,7 +93,7 @@ func startIngressPodController(svc *corev1.Service, config *syncer.ResourceSynce
 		return nil
 	})
 
-	klog.Infof("Created Pod controller for (%s/%s) with selector %q", svc.Namespace, svc.Name, labelSelector)
+	logger.Infof("Created Pod controller for (%s/%s) with selector %q", svc.Namespace, svc.Name, labelSelector)
 
 	return controller, nil
 }
@@ -115,7 +114,7 @@ func (c *ingressPodController) process(from runtime.Object, numRequeues int, op 
 
 	if op == syncer.Delete {
 		c.ingressIPMap.Remove(ingressIP.Name)
-		klog.Infof("ingress Pod %s for service %s deleted", key, c.svcName)
+		logger.Infof("ingress Pod %s for service %s deleted", key, c.svcName)
 
 		return ingressIP, false
 	}
@@ -126,7 +125,7 @@ func (c *ingressPodController) process(from runtime.Object, numRequeues int, op 
 		return nil, false
 	}
 
-	klog.Infof("%q ingress Pod %s for service %s", op, key, c.svcName)
+	logger.Infof("%q ingress Pod %s for service %s", op, key, c.svcName)
 
 	ingressIP.ObjectMeta.Annotations = map[string]string{
 		headlessSvcPodIP: pod.Status.PodIP,

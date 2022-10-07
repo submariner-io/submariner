@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -41,7 +40,7 @@ func NewServiceExportController(config *syncer.ResourceSyncerConfig, podControll
 	// We'll panic if config is nil, this is intentional
 	var err error
 
-	klog.Info("Creating ServiceExport controller")
+	logger.Info("Creating ServiceExport controller")
 
 	_, gvr, err := util.ToUnstructuredResource(&corev1.Service{}, config.RestMapper)
 	if err != nil {
@@ -139,23 +138,23 @@ func (c *serviceExportController) onCreate(serviceExport *mcsv1a1.ServiceExport)
 
 	service, exists, err := getService(serviceExport.Name, serviceExport.Namespace, c.services, c.scheme)
 	if err != nil || !exists {
-		klog.Infof("Exported Service %q does not exist yet - re-queueing", key)
+		logger.Infof("Exported Service %q does not exist yet - re-queueing", key)
 		return nil, true
 	}
 
 	if service.Spec.Type != corev1.ServiceTypeClusterIP {
-		klog.Infof("Exported Service %q with type %q is not supported", key, service.Spec.Type)
+		logger.Infof("Exported Service %q with type %q is not supported", key, service.Spec.Type)
 
 		return nil, false
 	}
 
-	klog.Infof("Processing ServiceExport %q", key)
+	logger.Infof("Processing ServiceExport %q", key)
 
 	if len(service.Spec.Selector) == 0 && service.Spec.ClusterIP != corev1.ClusterIPNone {
 		// Service without selector and not headless service
 		err = c.endpointsControllers.start(serviceExport)
 		if err != nil {
-			klog.Errorf("Failed to create endpoints controller for serviceExport %q", key)
+			logger.Errorf(err, "Failed to create endpoints controller for serviceExport %q", key)
 			return nil, true
 		}
 	}
@@ -180,7 +179,7 @@ func (c *serviceExportController) onCreate(serviceExport *mcsv1a1.ServiceExport)
 		},
 	}
 
-	klog.Infof("Creating GlobalIngressIP object %s/%s, TargetRef: %q, %q ", serviceExport.Namespace,
+	logger.Infof("Creating GlobalIngressIP object %s/%s, TargetRef: %q, %q ", serviceExport.Namespace,
 		serviceExport.Name, submarinerv1.ClusterIPService, serviceExport.Name)
 
 	return ingressIP, false
@@ -189,7 +188,7 @@ func (c *serviceExportController) onCreate(serviceExport *mcsv1a1.ServiceExport)
 func (c *serviceExportController) onDelete(serviceExport *mcsv1a1.ServiceExport) (runtime.Object, bool) {
 	key, _ := cache.MetaNamespaceKeyFunc(serviceExport)
 
-	klog.Infof("ServiceExport %q deleted", key)
+	logger.Infof("ServiceExport %q deleted", key)
 
 	c.podControllers.stopAndCleanup(serviceExport.Name, serviceExport.Namespace)
 	c.endpointsControllers.stopAndCleanup(serviceExport.Name, serviceExport.Namespace)
@@ -206,7 +205,7 @@ func (c *serviceExportController) onDelete(serviceExport *mcsv1a1.ServiceExport)
 func (c *serviceExportController) onCreateHeadless(key string, service *corev1.Service) (runtime.Object, bool) {
 	err := c.podControllers.start(service)
 	if err != nil {
-		klog.Errorf("Failed to create pod controller for service %q", key)
+		logger.Errorf(err, "Failed to create pod controller for service %q", key)
 		return nil, true
 	}
 
@@ -216,7 +215,7 @@ func (c *serviceExportController) onCreateHeadless(key string, service *corev1.S
 func (c *serviceExportController) onCreateHeadlessWithoutSelector(key string, service *corev1.Service) (runtime.Object, bool) {
 	err := c.ingressEndpointsControllers.start(service)
 	if err != nil {
-		klog.Errorf("Failed to create endpoints controller for service %q", key)
+		logger.Errorf(err, "Failed to create endpoints controller for service %q", key)
 		return nil, true
 	}
 

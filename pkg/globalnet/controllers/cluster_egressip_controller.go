@@ -37,7 +37,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
 )
 
 func NewClusterGlobalEgressIPController(config *syncer.ResourceSyncerConfig, localSubnets []string,
@@ -46,7 +45,7 @@ func NewClusterGlobalEgressIPController(config *syncer.ResourceSyncerConfig, loc
 	// We'll panic if config is nil, this is intentional
 	var err error
 
-	klog.Info("Creating ClusterGlobalEgressIP controller")
+	logger.Info("Creating ClusterGlobalEgressIP controller")
 
 	iptIface, err := iptables.New()
 	if err != nil {
@@ -79,7 +78,7 @@ func NewClusterGlobalEgressIPController(config *syncer.ResourceSyncerConfig, loc
 
 	obj, err := client.Get(context.TODO(), defaultEgressIP.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
-		klog.Infof("Creating ClusterGlobalEgressIP resource %q", defaultEgressIP.Name)
+		logger.Infof("Creating ClusterGlobalEgressIP resource %q", defaultEgressIP.Name)
 
 		_, err = client.Create(context.TODO(), defaultEgressIPObj, metav1.CreateOptions{})
 		if err != nil {
@@ -126,7 +125,7 @@ func (c *clusterGlobalEgressIPController) process(from runtime.Object, numRequeu
 		numberOfIPs = *clusterGlobalEgressIP.Spec.NumberOfIPs
 	}
 
-	klog.Infof("Processing %sd ClusterGlobalEgressIP %q, Spec.NumberOfIPs: %d, Status: %#v", op, clusterGlobalEgressIP.Name,
+	logger.Infof("Processing %sd ClusterGlobalEgressIP %q, Spec.NumberOfIPs: %d, Status: %#v", op, clusterGlobalEgressIP.Name,
 		numberOfIPs, clusterGlobalEgressIP.Status)
 
 	key, _ := cache.MetaNamespaceKeyFunc(clusterGlobalEgressIP)
@@ -189,7 +188,7 @@ func (c *clusterGlobalEgressIPController) onCreateOrUpdate(key string, numberOfI
 	numRequeues int,
 ) bool {
 	if numberOfIPs == len(status.AllocatedIPs) {
-		klog.V(log.DEBUG).Infof("Update called for %q, but numberOfIPs %d are already allocated", key, numberOfIPs)
+		logger.V(log.DEBUG).Infof("Update called for %q, but numberOfIPs %d are already allocated", key, numberOfIPs)
 		return false
 	}
 
@@ -239,7 +238,7 @@ func (c *clusterGlobalEgressIPController) programClusterGlobalEgressRules(alloca
 }
 
 func (c *clusterGlobalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int, status *submarinerv1.GlobalEgressIPStatus) bool {
-	klog.Infof("Allocating %d global IP(s) for %q", numberOfIPs, key)
+	logger.Infof("Allocating %d global IP(s) for %q", numberOfIPs, key)
 
 	status.AllocatedIPs = nil
 
@@ -249,7 +248,7 @@ func (c *clusterGlobalEgressIPController) allocateGlobalIPs(key string, numberOf
 
 	allocatedIPs, err := c.pool.Allocate(numberOfIPs)
 	if err != nil {
-		klog.Errorf("Error allocating IPs for %q: %v", key, err)
+		logger.Errorf(err, "Error allocating IPs for %q", key)
 
 		status.Conditions = util.TryAppendCondition(status.Conditions, &metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
@@ -263,7 +262,7 @@ func (c *clusterGlobalEgressIPController) allocateGlobalIPs(key string, numberOf
 
 	err = c.programClusterGlobalEgressRules(allocatedIPs)
 	if err != nil {
-		klog.Errorf("Error programming egress IP table rules for %q: %v", key, err)
+		logger.Errorf(err, "Error programming egress IP table rules for %q", key)
 
 		status.Conditions = util.TryAppendCondition(status.Conditions, &metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),

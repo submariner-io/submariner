@@ -40,7 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/klog/v2"
 )
 
 func NewGatewayMonitor(spec Specification, localCIDRs []string, config *watcher.Config) (Interface, error) {
@@ -114,7 +113,7 @@ func NewGatewayMonitor(spec Specification, localCIDRs []string, config *watcher.
 }
 
 func (g *gatewayMonitor) Start() error {
-	klog.Info("Starting GatewayMonitor to monitor the active Gateway node in the cluster.")
+	logger.Info("Starting GatewayMonitor to monitor the active Gateway node in the cluster.")
 
 	if err := g.createGlobalNetMarkingChain(); err != nil {
 		return errors.Wrap(err, "error while calling createGlobalNetMarkingChain")
@@ -129,7 +128,7 @@ func (g *gatewayMonitor) Start() error {
 }
 
 func (g *gatewayMonitor) Stop() {
-	klog.Info("GatewayMonitor stopping")
+	logger.Info("GatewayMonitor stopping")
 
 	g.baseController.Stop()
 
@@ -141,22 +140,22 @@ func (g *gatewayMonitor) Stop() {
 func (g *gatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, numRequeues int) bool {
 	endpoint := obj.(*v1.Endpoint)
 
-	klog.V(log.DEBUG).Infof("In processNextEndpoint, endpoint info: %+v", endpoint)
+	logger.V(log.DEBUG).Infof("In processNextEndpoint, endpoint info: %+v", endpoint)
 
 	if endpoint.Spec.ClusterID != g.spec.ClusterID {
-		klog.V(log.DEBUG).Infof("Endpoint %q, host: %q belongs to a remote cluster",
+		logger.V(log.DEBUG).Infof("Endpoint %q, host: %q belongs to a remote cluster",
 			endpoint.Spec.ClusterID, endpoint.Spec.Hostname)
 
 		overlap, err := cidr.IsOverlapping(endpoint.Spec.Subnets, g.spec.GlobalCIDR[0])
 		if err != nil {
 			// Ideally this case will never hit, as the subnets are valid CIDRs
-			klog.Warningf("unable to validate overlapping Service CIDR: %s", err)
+			logger.Warningf("unable to validate overlapping Service CIDR: %s", err)
 		}
 
 		if overlap {
 			// When GlobalNet is used, globalCIDRs allocated to the clusters should not overlap.
 			// If they overlap, skip the endpoint as its an invalid configuration which is not supported.
-			klog.Errorf("GlobalCIDR %q of local cluster %q overlaps with remote cluster %s",
+			logger.Errorf(nil, "GlobalCIDR %q of local cluster %q overlaps with remote cluster %s",
 				g.spec.GlobalCIDR[0], g.spec.ClusterID, endpoint.Spec.ClusterID)
 
 			return false
@@ -172,7 +171,7 @@ func (g *gatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, numR
 
 	hostname, err := os.Hostname()
 	if err != nil {
-		klog.Fatalf("Unable to determine hostname: %v", err)
+		logger.Fatalf("Unable to determine hostname: %v", err)
 	}
 
 	for _, remoteSubnet := range g.remoteSubnets.Elements() {
@@ -181,7 +180,7 @@ func (g *gatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, numR
 
 	// If the endpoint hostname matches with our hostname, it implies we are on gateway node
 	if endpoint.Spec.Hostname == hostname {
-		klog.V(log.DEBUG).Infof("Transitioned to gateway node with endpoint private IP %s", endpoint.Spec.PrivateIP)
+		logger.V(log.DEBUG).Infof("Transitioned to gateway node with endpoint private IP %s", endpoint.Spec.PrivateIP)
 
 		configureTCPMTUProbe()
 
@@ -191,12 +190,12 @@ func (g *gatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, numR
 
 			err := g.startControllers()
 			if err != nil {
-				klog.Fatalf("Error starting the controllers: %v", err)
+				logger.Fatalf("Error starting the controllers: %v", err)
 			}
 		}
 		g.syncMutex.Unlock()
 	} else {
-		klog.V(log.DEBUG).Infof("Transitioned to non-gateway node with endpoint private IP %s", endpoint.Spec.PrivateIP)
+		logger.V(log.DEBUG).Infof("Transitioned to non-gateway node with endpoint private IP %s", endpoint.Spec.PrivateIP)
 
 		g.syncMutex.Lock()
 		if g.isGatewayNode {
@@ -212,11 +211,11 @@ func (g *gatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, numR
 func (g *gatewayMonitor) handleRemovedEndpoint(obj runtime.Object, numRequeues int) bool {
 	endpoint := obj.(*v1.Endpoint)
 
-	klog.V(log.DEBUG).Infof("Informed of removed endpoint for gateway monitor: %v", endpoint)
+	logger.V(log.DEBUG).Infof("Informed of removed endpoint for gateway monitor: %v", endpoint)
 
 	hostname, err := os.Hostname()
 	if err != nil {
-		klog.Fatalf("Could not retrieve hostname: %v", err)
+		logger.Fatalf("Could not retrieve hostname: %v", err)
 	}
 
 	if endpoint.Spec.Hostname == hostname && endpoint.Spec.ClusterID == g.spec.ClusterID {
@@ -238,7 +237,7 @@ func (g *gatewayMonitor) handleRemovedEndpoint(obj runtime.Object, numRequeues i
 }
 
 func (g *gatewayMonitor) startControllers() error {
-	klog.Infof("On Gateway node - starting controllers")
+	logger.Infof("On Gateway node - starting controllers")
 
 	err := g.createGlobalnetChains()
 	if err != nil {
@@ -319,7 +318,7 @@ func (g *gatewayMonitor) startControllers() error {
 		}
 	}
 
-	klog.Infof("Successfully started the controllers")
+	logger.Infof("Successfully started the controllers")
 
 	return nil
 }
@@ -335,7 +334,7 @@ func (g *gatewayMonitor) stopControllers() {
 }
 
 func (g *gatewayMonitor) createGlobalNetMarkingChain() error {
-	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetMarkChain)
+	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetMarkChain)
 
 	if err := g.ipt.CreateChainIfNotExists("nat", constants.SmGlobalnetMarkChain); err != nil {
 		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetMarkChain)
@@ -347,7 +346,7 @@ func (g *gatewayMonitor) createGlobalNetMarkingChain() error {
 //nolint:gocyclo // This function simply has a lot of error checks which inflates the cyclomatic complexity but logically
 // it's not really complex so we can ignore the violation.
 func (g *gatewayMonitor) createGlobalnetChains() error {
-	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetIngressChain)
+	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetIngressChain)
 
 	if err := g.ipt.CreateChainIfNotExists("nat", constants.SmGlobalnetIngressChain); err != nil {
 		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetIngressChain)
@@ -355,16 +354,16 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 
 	forwardToSubGlobalNetChain := []string{"-j", constants.SmGlobalnetIngressChain}
 	if err := g.ipt.PrependUnique("nat", "PREROUTING", forwardToSubGlobalNetChain); err != nil {
-		klog.Errorf("error appending iptables rule %q: %v\n", strings.Join(forwardToSubGlobalNetChain, " "), err)
+		logger.Errorf(err, "Error appending iptables rule %q", strings.Join(forwardToSubGlobalNetChain, " "))
 	}
 
-	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChain)
+	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChain)
 
 	if err := g.ipt.CreateChainIfNotExists("nat", constants.SmGlobalnetEgressChain); err != nil {
 		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChain)
 	}
 
-	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", routeAgent.SmPostRoutingChain)
+	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", routeAgent.SmPostRoutingChain)
 
 	if err := g.ipt.CreateChainIfNotExists("nat", routeAgent.SmPostRoutingChain); err != nil {
 		return errors.Wrapf(err, "error creating iptables chain %s", routeAgent.SmPostRoutingChain)
@@ -372,7 +371,7 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetEgressChain}
 	if err := g.ipt.PrependUnique("nat", routeAgent.SmPostRoutingChain, forwardToSubGlobalNetChain); err != nil {
-		klog.Errorf("error inserting iptables rule %q: %v\n", strings.Join(forwardToSubGlobalNetChain, " "), err)
+		logger.Errorf(err, "Error inserting iptables rule %q", strings.Join(forwardToSubGlobalNetChain, " "))
 	}
 
 	if err := g.createGlobalNetMarkingChain(); err != nil {
@@ -381,34 +380,34 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetMarkChain}
 	if err := g.ipt.PrependUnique("nat", constants.SmGlobalnetEgressChain, forwardToSubGlobalNetChain); err != nil {
-		klog.Errorf("error inserting iptables rule %q: %v\n", strings.Join(forwardToSubGlobalNetChain, " "), err)
+		logger.Errorf(err, "Error inserting iptables rule %q", strings.Join(forwardToSubGlobalNetChain, " "))
 	}
 
-	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForPods)
+	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForPods)
 
 	if err := g.ipt.CreateChainIfNotExists("nat", constants.SmGlobalnetEgressChainForPods); err != nil {
 		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChainForPods)
 	}
 
-	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForHeadlessSvcPods)
+	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForHeadlessSvcPods)
 
 	if err := g.ipt.CreateChainIfNotExists("nat", constants.SmGlobalnetEgressChainForHeadlessSvcPods); err != nil {
 		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChainForHeadlessSvcPods)
 	}
 
-	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForHeadlessSvcEPs)
+	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForHeadlessSvcEPs)
 
 	if err := g.ipt.CreateChainIfNotExists("nat", constants.SmGlobalnetEgressChainForHeadlessSvcEPs); err != nil {
 		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChainForHeadlessSvcEPs)
 	}
 
-	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForNamespace)
+	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForNamespace)
 
 	if err := g.ipt.CreateChainIfNotExists("nat", constants.SmGlobalnetEgressChainForNamespace); err != nil {
 		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChainForNamespace)
 	}
 
-	klog.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForCluster)
+	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForCluster)
 
 	if err := g.ipt.CreateChainIfNotExists("nat", constants.SmGlobalnetEgressChainForCluster); err != nil {
 		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChainForCluster)
@@ -416,45 +415,45 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetEgressChainForPods}
 	if err := g.ipt.InsertUnique("nat", constants.SmGlobalnetEgressChain, 2, forwardToSubGlobalNetChain); err != nil {
-		klog.Errorf("error inserting iptables rule %q: %v\n", strings.Join(forwardToSubGlobalNetChain, " "), err)
+		logger.Errorf(err, "Error inserting iptables rule %q", strings.Join(forwardToSubGlobalNetChain, " "))
 	}
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetEgressChainForHeadlessSvcPods}
 	if err := g.ipt.InsertUnique("nat", constants.SmGlobalnetEgressChain, 3, forwardToSubGlobalNetChain); err != nil {
-		klog.Errorf("error inserting iptables rule %q: %v\n", strings.Join(forwardToSubGlobalNetChain, " "), err)
+		logger.Errorf(err, "Error inserting iptables rule %q", strings.Join(forwardToSubGlobalNetChain, " "))
 	}
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetEgressChainForHeadlessSvcEPs}
 	if err := g.ipt.InsertUnique("nat", constants.SmGlobalnetEgressChain, 4, forwardToSubGlobalNetChain); err != nil {
-		klog.Errorf("error inserting iptables rule %q: %v\n", strings.Join(forwardToSubGlobalNetChain, " "), err)
+		logger.Errorf(err, "Error inserting iptables rule %q", strings.Join(forwardToSubGlobalNetChain, " "))
 	}
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetEgressChainForNamespace}
 	if err := g.ipt.InsertUnique("nat", constants.SmGlobalnetEgressChain, 5, forwardToSubGlobalNetChain); err != nil {
-		klog.Errorf("error inserting iptables rule %q: %v\n", strings.Join(forwardToSubGlobalNetChain, " "), err)
+		logger.Errorf(err, "Error inserting iptables rule %q", strings.Join(forwardToSubGlobalNetChain, " "))
 	}
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetEgressChainForCluster}
 	if err := g.ipt.InsertUnique("nat", constants.SmGlobalnetEgressChain, 6, forwardToSubGlobalNetChain); err != nil {
-		klog.Errorf("error inserting iptables rule %q: %v\n", strings.Join(forwardToSubGlobalNetChain, " "), err)
+		logger.Errorf(err, "Error inserting iptables rule %q", strings.Join(forwardToSubGlobalNetChain, " "))
 	}
 
 	return nil
 }
 
 func (g *gatewayMonitor) clearGlobalnetChains() {
-	klog.Info("Active gateway migrated, flushing Globalnet chains.")
+	logger.Info("Active gateway migrated, flushing Globalnet chains.")
 
 	if err := g.ipt.ClearChain("nat", constants.SmGlobalnetIngressChain); err != nil {
-		klog.Errorf("Error while flushing rules in %s chain: %v", constants.SmGlobalnetIngressChain, err)
+		logger.Errorf(err, "Error while flushing rules in %s chain", constants.SmGlobalnetIngressChain)
 	}
 
 	if err := g.ipt.ClearChain("nat", constants.SmGlobalnetEgressChain); err != nil {
-		klog.Errorf("Error while flushing rules in %s chain: %v", constants.SmGlobalnetEgressChain, err)
+		logger.Errorf(err, "Error while flushing rules in %s chain", constants.SmGlobalnetEgressChain)
 	}
 
 	if err := g.ipt.ClearChain("nat", constants.SmGlobalnetMarkChain); err != nil {
-		klog.Errorf("Error while flushing rules in %s chain: %v", constants.SmGlobalnetMarkChain, err)
+		logger.Errorf(err, "Error while flushing rules in %s chain", constants.SmGlobalnetMarkChain)
 	}
 }
 
@@ -462,15 +461,15 @@ func (g *gatewayMonitor) markRemoteClusterTraffic(remoteCidr string, addRules bo
 	ruleSpec := []string{"-d", remoteCidr, "-j", "MARK", "--set-mark", globalNetIPTableMark}
 
 	if addRules {
-		klog.V(log.DEBUG).Infof("Marking traffic destined to remote cluster: %s", strings.Join(ruleSpec, " "))
+		logger.V(log.DEBUG).Infof("Marking traffic destined to remote cluster: %s", strings.Join(ruleSpec, " "))
 
 		if err := g.ipt.AppendUnique("nat", constants.SmGlobalnetMarkChain, ruleSpec...); err != nil {
-			klog.Errorf("error appending iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
+			logger.Errorf(err, "Error appending iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 		}
 	} else {
-		klog.V(log.DEBUG).Infof("Deleting rule that marks remote cluster traffic: %s", strings.Join(ruleSpec, " "))
+		logger.V(log.DEBUG).Infof("Deleting rule that marks remote cluster traffic: %s", strings.Join(ruleSpec, " "))
 		if err := g.ipt.Delete("nat", constants.SmGlobalnetMarkChain, ruleSpec...); err != nil {
-			klog.Errorf("error deleting iptables rule \"%s\": %v\n", strings.Join(ruleSpec, " "), err)
+			logger.Errorf(err, "Error deleting iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 		}
 	}
 }
@@ -486,6 +485,6 @@ func configureTCPMTUProbe() {
 	// on Gateway node has mtu issues connecting to remoteServices.
 	err := netlink.New().ConfigureTCPMTUProbe(mtuProbe, baseMss)
 	if err != nil {
-		klog.Warningf(err.Error())
+		logger.Warningf(err.Error())
 	}
 }

@@ -40,7 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
 )
 
 const maxRequeues = 20
@@ -82,7 +81,7 @@ func (c *baseSyncerController) reconcile(client dynamic.ResourceInterface, label
 			FieldSelector: fieldSelector,
 		})
 		if err != nil {
-			klog.Errorf("Error listing resources for reconciliation: %v", err)
+			logger.Errorf(err, "Error listing resources for reconciliation")
 			return nil
 		}
 
@@ -134,7 +133,7 @@ func (c *baseIPAllocationController) reserveAllocatedIPs(federator federate.Fede
 	if err != nil {
 		key, _ := cache.MetaNamespaceKeyFunc(obj)
 
-		klog.Warningf("Could not reserve allocated GlobalIPs for %q: %v", key, err)
+		logger.Warningf("Could not reserve allocated GlobalIPs for %q: %v", key, err)
 
 		clearAllocatedIPs()
 
@@ -149,7 +148,7 @@ func (c *baseIPAllocationController) reserveAllocatedIPs(federator federate.Fede
 
 		util.ConditionsToUnstructured(conditions, obj, "status", "conditions")
 
-		klog.Infof("Updating %q: %#v", key, obj)
+		logger.Infof("Updating %q: %#v", key, obj)
 
 		return federator.Distribute(obj) // nolint:wrapcheck  // Let the caller wrap it
 	}
@@ -164,11 +163,11 @@ func (c *baseIPAllocationController) flushRulesAndReleaseIPs(key string, numRequ
 		return false
 	}
 
-	klog.Infof("Releasing previously allocated IPs %v for %q", allocatedIPs, key)
+	logger.Infof("Releasing previously allocated IPs %v for %q", allocatedIPs, key)
 
 	err := flushRules(allocatedIPs)
 	if err != nil {
-		klog.Errorf("Error flushing the IP table rules for %q: %v", key, err)
+		logger.Errorf(err, "Error flushing the IP table rules for %q", key)
 
 		if shouldRequeue(numRequeues) {
 			return true
@@ -176,7 +175,7 @@ func (c *baseIPAllocationController) flushRulesAndReleaseIPs(key string, numRequ
 	}
 
 	if err := c.pool.Release(allocatedIPs...); err != nil {
-		klog.Errorf("Error while releasing the global IPs for %q: %v", key, err)
+		logger.Errorf(err, "Error while releasing the global IPs for %q", key)
 	}
 
 	return false
@@ -205,7 +204,7 @@ func checkStatusChanged(oldStatus, newStatus interface{}, retObj runtime.Object)
 		return nil
 	}
 
-	klog.Infof("Updated: %#v", newStatus)
+	logger.Infof("Updated: %#v", newStatus)
 
 	return retObj
 }
@@ -253,7 +252,7 @@ func deleteService(namespace, name string,
 ) error {
 	err := client.Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if apierrors.IsNotFound(err) {
-		klog.Warningf("Could not find Service %s/%s to delete", namespace, name)
+		logger.Warningf("Could not find Service %s/%s to delete", namespace, name)
 		return nil
 	}
 
@@ -273,7 +272,7 @@ func deleteEndpoints(namespace, name string,
 ) error {
 	err := client.Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if apierrors.IsNotFound(err) {
-		klog.Warningf("Could not find Endpoints %s/%s to delete", namespace, name)
+		logger.Warningf("Could not find Endpoints %s/%s to delete", namespace, name)
 		return nil
 	}
 
