@@ -127,7 +127,10 @@ func main() {
 
 	submSpec.CableDriver = strings.ToLower(submSpec.CableDriver)
 
-	localEndpoint, err := endpoint.GetLocal(&submSpec, k8sClient)
+	airGapped := isAirGappedDeployment()
+	logger.Infof("AIR_GAPPED_DEPLOYMENT is set to %t", airGapped)
+
+	localEndpoint, err := endpoint.GetLocal(&submSpec, k8sClient, airGapped)
 	fatalOnErr(err, "Error creating local endpoint object")
 
 	cableEngine := cableengine.NewEngine(localCluster, localEndpoint)
@@ -170,7 +173,7 @@ func main() {
 
 	cableEngineSyncer.Run(stopCh)
 
-	publicIPWatcher := getPublicIPWatcher(&submSpec, k8sClient, submarinerClient, localEndpoint)
+	publicIPWatcher := getPublicIPWatcher(&submSpec, k8sClient, submarinerClient, localEndpoint, airGapped)
 
 	becameLeader := func(context.Context) {
 		if err = cableEngine.StartEngine(); err != nil {
@@ -264,6 +267,10 @@ func main() {
 	}
 }
 
+func isAirGappedDeployment() bool {
+	return os.Getenv("AIR_GAPPED_DEPLOYMENT") == "true"
+}
+
 func getCableHealthChecker(cfg *rest.Config, submSpec *types.SubmarinerSpecification) healthchecker.Interface {
 	var cableHealthchecker healthchecker.Interface
 	var err error
@@ -288,8 +295,13 @@ func getCableHealthChecker(cfg *rest.Config, submSpec *types.SubmarinerSpecifica
 
 func getPublicIPWatcher(submSpec *types.SubmarinerSpecification,
 	k8sClient kubernetes.Interface, submarinerClient *submarinerClientset.Clientset,
-	localEndpoint *types.SubmarinerEndpoint,
+	localEndpoint *types.SubmarinerEndpoint, airGappedDeployment bool,
 ) *endpoint.PublicIPWatcher {
+	if airGappedDeployment {
+		// In an air gapped deployment, we do not run the periodic public-ip watcher
+		return nil
+	}
+
 	publicIPConfig := &endpoint.PublicIPWatcherConfig{
 		SubmSpec:      submSpec,
 		K8sClient:     k8sClient,

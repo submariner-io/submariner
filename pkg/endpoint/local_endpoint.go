@@ -38,7 +38,9 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func GetLocal(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface) (*types.SubmarinerEndpoint, error) {
+func GetLocal(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface,
+	airGappedDeployment bool,
+) (*types.SubmarinerEndpoint, error) {
 	// We'll panic if submSpec is nil, this is intentional
 	privateIP := GetLocalIP()
 
@@ -86,7 +88,7 @@ func GetLocal(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Inte
 		},
 	}
 
-	publicIP, err := getPublicIP(submSpec, k8sClient, backendConfig)
+	publicIP, err := getPublicIP(submSpec, k8sClient, backendConfig, airGappedDeployment)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not determine public IP")
 	}
