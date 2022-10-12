@@ -40,9 +40,12 @@ var _ = Describe("GetLocal", func() {
 	var node *v1.Node
 
 	const (
+		testIPv4Label       = "ipv4:"
+		testPublicIP        = "4.3.2.1"
 		testUDPPort         = "1111"
 		testClusterUDPPort  = "2222"
 		testUDPPortLabel    = "udp-port"
+		testPublicIPLabel   = "public-ip"
 		testNATTPortLabel   = "natt-discovery-port"
 		backendConfigPrefix = "gateway.submariner.io/"
 	)
@@ -72,7 +75,7 @@ var _ = Describe("GetLocal", func() {
 	})
 
 	It("should return a valid SubmarinerEndpoint object", func() {
-		endpoint, err := endpoint.GetLocal(submSpec, client)
+		endpoint, err := endpoint.GetLocal(submSpec, client, false)
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(endpoint.Spec.ClusterID).To(Equal("east"))
@@ -91,7 +94,7 @@ var _ = Describe("GetLocal", func() {
 			client = fake.NewSimpleClientset(node)
 			os.Setenv("CE_IPSEC_NATTPORT", testClusterUDPPort)
 
-			endpoint, err := endpoint.GetLocal(submSpec, client)
+			endpoint, err := endpoint.GetLocal(submSpec, client, false)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(endpoint.Spec.BackendConfig[testUDPPortLabel]).To(Equal(testClusterUDPPort))
 		})
@@ -100,7 +103,7 @@ var _ = Describe("GetLocal", func() {
 	When("gateway node is annotated with udp port", func() {
 		It("should return the udp-port backend from the annotation", func() {
 			os.Setenv("CE_IPSEC_NATTPORT", testClusterUDPPort)
-			endpoint, err := endpoint.GetLocal(submSpec, client)
+			endpoint, err := endpoint.GetLocal(submSpec, client, false)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(endpoint.Spec.BackendConfig[testUDPPortLabel]).To(Equal(testUDPPort))
 		})
@@ -109,8 +112,31 @@ var _ = Describe("GetLocal", func() {
 	When("no NAT discovery port label is set on the node", func() {
 		It("should return a valid SubmarinerEndpoint object", func() {
 			delete(node.Labels, testNATTPortLabel)
-			_, err := endpoint.GetLocal(submSpec, client)
+			_, err := endpoint.GetLocal(submSpec, client, false)
 			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	When("gateway node is not annotated with public-ip", func() {
+		It("should use empty public-ip in the endpoint object for air-gapped deployments", func() {
+			endpoint, err := endpoint.GetLocal(submSpec, client, true)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(endpoint.Spec.ClusterID).To(Equal("east"))
+			Expect(endpoint.Spec.PrivateIP).To(Equal(testPrivateIP))
+			Expect(endpoint.Spec.PublicIP).To(Equal(""))
+		})
+	})
+
+	When("gateway node is annotated with public-ip", func() {
+		It("should use the annotated public-ip for air-gapped deployments", func() {
+			node.Labels[backendConfigPrefix+testPublicIPLabel] = testIPv4Label + testPublicIP
+			client = fake.NewSimpleClientset(node)
+			endpoint, err := endpoint.GetLocal(submSpec, client, true)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(endpoint.Spec.PrivateIP).To(Equal(testPrivateIP))
+			Expect(endpoint.Spec.PublicIP).To(Equal(testPublicIP))
 		})
 	})
 })

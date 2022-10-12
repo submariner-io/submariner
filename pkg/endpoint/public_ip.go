@@ -48,7 +48,10 @@ var publicIPMethods = map[string]publicIPResolverFunction{
 
 var IPv4RE = regexp.MustCompile(`(?:\d{1,3}\.){3}\d{1,3}`)
 
-func getPublicIP(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface, backendConfig map[string]string) (string, error) {
+func getPublicIP(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface,
+	backendConfig map[string]string, airGapped bool,
+) (string, error) {
+	// If the node is annotated with a public-ip, the same is used as the public-ip of local endpoint.
 	config, ok := backendConfig[v1.PublicIP]
 	if !ok {
 		if submSpec.PublicIP != "" {
@@ -56,6 +59,16 @@ func getPublicIP(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.I
 		} else {
 			config = "api:api.ipify.org,api:api.my-ip.io/ip,api:ip4.seeip.org"
 		}
+	}
+
+	if airGapped {
+		ip, err := resolveIPInAirGappedDeployment(k8sClient, submSpec.Namespace, config)
+		if err != nil {
+			klog.Errorf("Error resolving public IP in an air-gapped deployment, using empty value: %s : %s", config, err.Error())
+			return "", nil
+		}
+
+		return ip, nil
 	}
 
 	resolvers := strings.Split(config, ",")
@@ -67,18 +80,13 @@ func getPublicIP(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.I
 			return "", errors.Errorf("invalid format for %q annotation: %q", v1.GatewayConfigPrefix+v1.PublicIP, config)
 		}
 
-		method, ok := publicIPMethods[parts[0]]
-		if !ok {
-			return "", errors.Errorf("unknown resolver %q in %q annotation: %q", parts[0], v1.GatewayConfigPrefix+v1.PublicIP, config)
-		}
-
-		ip, err := method(k8sClient, submSpec.Namespace, parts[1])
+		ip, err := resolvePublicIP(k8sClient, submSpec.Namespace, parts)
 		if err == nil {
 			return ip, nil
 		}
 
-		// If this resolved failed we log it, but we fall back to the next one
-		klog.Errorf("Error resolving public IP with resolver %s : %s", resolver, err.Error())
+		// If this resolver failed, we log it, but we fall back to the next one
+		klog.Errorf("Error resolving public IP with resolver %s, config: %s : %s", resolver, config, err.Error())
 	}
 
 	if len(resolvers) > 0 {
@@ -86,6 +94,36 @@ func getPublicIP(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.I
 	}
 
 	return "", nil
+}
+
+func resolveIPInAirGappedDeployment(k8sClient kubernetes.Interface, namespace, config string) (string, error) {
+	resolvers := strings.Split(config, ",")
+
+	for _, resolver := range resolvers {
+		resolver = strings.Trim(resolver, " ")
+
+		parts := strings.Split(resolver, ":")
+		if len(parts) != 2 {
+			return "", errors.Errorf("invalid format for %q annotation: %q", v1.GatewayConfigPrefix+v1.PublicIP, config)
+		}
+
+		if parts[0] != v1.IPv4 {
+			continue
+		}
+
+		return resolvePublicIP(k8sClient, namespace, parts)
+	}
+
+	return "", nil
+}
+
+func resolvePublicIP(k8sClient kubernetes.Interface, namespace string, parts []string) (string, error) {
+	method, ok := publicIPMethods[parts[0]]
+	if !ok {
+		return "", errors.Errorf("unknown resolver %q in %q annotation", parts[0], v1.GatewayConfigPrefix+v1.PublicIP)
+	}
+
+	return method(k8sClient, namespace, parts[1])
 }
 
 func publicAPI(clientset kubernetes.Interface, namespace, value string) (string, error) {
