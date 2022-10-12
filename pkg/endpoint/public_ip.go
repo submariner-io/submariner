@@ -62,7 +62,7 @@ func getPublicIP(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.I
 	}
 
 	if airGapped {
-		ip, err := resolveIPInAirGappedDeployment(k8sClient, submSpec.Namespace, config, airGapped)
+		ip, err := resolveIPInAirGappedDeployment(k8sClient, submSpec.Namespace, config)
 		if err != nil {
 			klog.Errorf("Error resolving public IP in an air-gapped deployment, using empty value: %s : %s", config, err.Error())
 			return "", nil
@@ -96,11 +96,7 @@ func getPublicIP(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.I
 	return "", nil
 }
 
-func resolveIPInAirGappedDeployment(k8sClient kubernetes.Interface, namespace, config string, airGapped bool) (string, error) {
-	if !airGapped {
-		return "", errors.Errorf("this function should be called only for air-gapped deployments")
-	}
-
+func resolveIPInAirGappedDeployment(k8sClient kubernetes.Interface, namespace, config string) (string, error) {
 	resolvers := strings.Split(config, ",")
 
 	for _, resolver := range resolvers {
@@ -115,9 +111,7 @@ func resolveIPInAirGappedDeployment(k8sClient kubernetes.Interface, namespace, c
 			continue
 		}
 
-		ip, err := resolvePublicIP(k8sClient, namespace, parts)
-
-		return ip, err
+		return resolvePublicIP(k8sClient, namespace, parts)
 	}
 
 	return "", nil
@@ -129,12 +123,7 @@ func resolvePublicIP(k8sClient kubernetes.Interface, namespace string, parts []s
 		return "", errors.Errorf("unknown resolver %q in %q annotation", parts[0], v1.GatewayConfigPrefix+v1.PublicIP)
 	}
 
-	ip, err := method(k8sClient, namespace, parts[1])
-	if err == nil {
-		return ip, nil
-	}
-
-	return "", err
+	return method(k8sClient, namespace, parts[1])
 }
 
 func publicAPI(clientset kubernetes.Interface, namespace, value string) (string, error) {
