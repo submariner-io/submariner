@@ -32,14 +32,13 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
 )
 
 func startEndpointsController(name, namespace string, config *syncer.ResourceSyncerConfig) (*endpointsController, error) {
 	// We'll panic if config is nil, this is intentional
 	var err error
 
-	klog.Infof("Creating Endpoints controller for %s/%s", namespace, name)
+	logger.Infof("Creating Endpoints controller for %s/%s", namespace, name)
 
 	_, gvr, err := util.ToUnstructuredResource(&corev1.Endpoints{}, config.RestMapper)
 	if err != nil {
@@ -107,11 +106,11 @@ func (c *endpointsController) process(from runtime.Object, numRequeues int, op s
 func (c *endpointsController) onCreateOrUpdate(ep *corev1.Endpoints) (runtime.Object, bool) {
 	key, _ := cache.MetaNamespaceKeyFunc(ep)
 
-	klog.Infof("Processing Endpoints %q", key)
+	logger.Infof("Processing Endpoints %q", key)
 
 	// Skip cloning already cloned Endpoints resource
 	if _, ok := ep.Labels[constants.EndpointClonedFrom]; ok {
-		klog.Infof("Skip cloning already cloned Endpoints %q", key)
+		logger.Infof("Skip cloning already cloned Endpoints %q", key)
 
 		return ep, false
 	}
@@ -128,7 +127,7 @@ func (c *endpointsController) onCreateOrUpdate(ep *corev1.Endpoints) (runtime.Ob
 func (c *endpointsController) onDelete(ep *corev1.Endpoints) (runtime.Object, bool) {
 	key, _ := cache.MetaNamespaceKeyFunc(ep)
 
-	klog.Infof("Endpoints %q deleted", key)
+	logger.Infof("Endpoints %q deleted", key)
 
 	return &corev1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{

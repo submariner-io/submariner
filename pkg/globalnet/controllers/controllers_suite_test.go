@@ -30,6 +30,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
 	fakeDynClient "github.com/submariner-io/admiral/pkg/fake"
+	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
@@ -52,7 +53,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/klog/v2"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -68,11 +68,15 @@ const (
 )
 
 func init() {
-	klog.InitFlags(nil)
+	kzerolog.AddFlags(nil)
 
 	_ = submarinerv1.AddToScheme(scheme.Scheme)
 	_ = mcsv1a1.AddToScheme(scheme.Scheme)
 }
+
+var _ = BeforeSuite(func() {
+	kzerolog.InitK8sLogging()
+})
 
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)

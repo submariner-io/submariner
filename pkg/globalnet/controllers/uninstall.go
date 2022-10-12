@@ -42,15 +42,12 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 )
 
 func UninstallDataPath() {
 	ipt, err := iptables.New()
-	if err != nil {
-		klog.Fatal(err)
-	}
+	logger.FatalOnError(err, "Error initializing IP tables")
 
 	natTableChains := []string{
 		// The chains have to be deleted in a specific order.
@@ -68,23 +65,23 @@ func UninstallDataPath() {
 		err = ipt.FlushIPTableChain(constants.NATTable, chain)
 		if err != nil {
 			// Just log an error as this is part of uninstallation.
-			klog.Errorf("Error flushing iptables chain %q: %v", chain, err)
+			logger.Errorf(err, "Error flushing iptables chain %q", chain)
 		}
 	}
 
 	err = ipt.FlushIPTableChain(constants.NATTable, routeAgent.SmPostRoutingChain)
 	if err != nil {
-		klog.Errorf("Error flushing iptables chain %q: %v", routeAgent.SmPostRoutingChain, err)
+		logger.Errorf(err, "Error flushing iptables chain %q", routeAgent.SmPostRoutingChain)
 	}
 
 	if err := ipt.DeleteIPTableRule(constants.NATTable, "PREROUTING", constants.SmGlobalnetIngressChain); err != nil {
-		klog.Errorf("Error deleting iptables rule for %q in PREROUTING chain: %v\n", constants.SmGlobalnetIngressChain, err)
+		logger.Errorf(err, "Error deleting iptables rule for %q in PREROUTING chain", constants.SmGlobalnetIngressChain)
 	}
 
 	for _, chain := range natTableChains {
 		err = ipt.DeleteIPTableChain(constants.NATTable, chain)
 		if err != nil {
-			klog.Errorf("Error deleting iptables chain %q: %v", chain, err)
+			logger.Errorf(err, "Error deleting iptables chain %q", chain)
 		}
 	}
 
@@ -92,14 +89,14 @@ func UninstallDataPath() {
 
 	ipSetList, err := ipsetIface.ListSets()
 	if err != nil {
-		klog.Errorf("Error listing ipsets: %v", err)
+		logger.Errorf(err, "Error listing ipsets")
 	}
 
 	for _, set := range ipSetList {
 		if strings.HasPrefix(set, IPSetPrefix) {
 			err = ipsetIface.DestroySet(set)
 			if err != nil {
-				klog.Errorf("Error destroying the ipset %q: %v", set, err)
+				logger.Errorf(err, "Error destroying the ipset %q", set)
 			}
 		}
 	}
@@ -109,13 +106,13 @@ func DeleteGlobalnetObjects(smClientSet *versioned.Clientset, cfg *rest.Config) 
 	err := smClientSet.SubmarinerV1().ClusterGlobalEgressIPs(metav1.NamespaceAll).DeleteCollection(context.TODO(), metav1.DeleteOptions{},
 		metav1.ListOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
-		klog.Errorf("Error deleting the clusterGlobalEgressIPs: %v", err)
+		logger.Errorf(err, "Error deleting the clusterGlobalEgressIPs")
 	}
 
 	err = smClientSet.SubmarinerV1().GlobalEgressIPs(metav1.NamespaceAll).DeleteCollection(context.TODO(), metav1.DeleteOptions{},
 		metav1.ListOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
-		klog.Errorf("Error deleting the globalEgressIPs: %v", err)
+		logger.Errorf(err, "Error deleting the globalEgressIPs")
 	}
 
 	deleteGlobalIngressIPs(smClientSet, cfg)
@@ -132,23 +129,23 @@ func deleteGlobalIngressIPs(smClientSet *versioned.Clientset, cfg *rest.Config) 
 
 	dynClient, err := dynamic.NewForConfig(cfg)
 	if err != nil {
-		klog.Errorf("Error creating dynamic client: %v", err)
+		logger.Errorf(err, "Error creating dynamic client")
 		return
 	}
 
 	giipList, err := smClientSet.SubmarinerV1().GlobalIngressIPs(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		klog.Errorf("Error listing the globalIngressIP objects: %v", err)
+		logger.Errorf(err, "Error listing the globalIngressIP objects")
 	}
 
 	services := dynClient.Resource(gvr)
 
 	for i := range giipList.Items {
-		klog.Infof("Deleting the globalnet internal service: %q", giipList.Items[i].Name)
+		logger.Infof("Deleting the globalnet internal service: %q", giipList.Items[i].Name)
 
 		err = deleteInternalService(&giipList.Items[i], services)
 		if err != nil && !apierrors.IsNotFound(err) {
-			klog.Errorf("Error deleting the internal service: %v", err)
+			logger.Errorf(err, "Error deleting the internal service")
 		}
 	}
 }
@@ -167,7 +164,7 @@ func deleteInternalService(ingressIP *submarinerv1.GlobalIngressIP, services dyn
 
 		err := deleteService(ingressIP.Namespace, internalSvc, services)
 		if err != nil && !apierrors.IsNotFound(err) {
-			klog.Errorf("Error deleting the service %q/%q: %v", ingressIP.Namespace, internalSvc, err)
+			logger.Errorf(err, "Error deleting the service %q/%q", ingressIP.Namespace, internalSvc)
 		}
 	}
 
@@ -178,20 +175,20 @@ func deleteAllGlobalIngressIPObjs(smClientSet *versioned.Clientset) {
 	err := smClientSet.SubmarinerV1().GlobalIngressIPs(metav1.NamespaceAll).DeleteCollection(context.TODO(), metav1.DeleteOptions{},
 		metav1.ListOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
-		klog.Errorf("Error deleting the globalIngressIPs: %v", err)
+		logger.Errorf(err, "Error deleting the globalIngressIPs")
 	}
 }
 
 func RemoveGlobalIPAnnotationOnNode(cfg *rest.Config) {
 	nodeName, ok := os.LookupEnv("NODE_NAME")
 	if !ok {
-		klog.Errorf("Error reading the NODE_NAME from the environment")
+		logger.Errorf(nil, "Error reading the NODE_NAME from the environment")
 		return
 	}
 
 	k8sClientSet, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
-		klog.Fatalf("Error building clientset: %s", err.Error())
+		logger.Fatalf("Error building clientset: %s", err.Error())
 	}
 
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -213,9 +210,9 @@ func RemoveGlobalIPAnnotationOnNode(cfg *rest.Config) {
 	})
 
 	if retryErr != nil {
-		klog.Errorf("error updating node %q", nodeName)
+		logger.Errorf(retryErr, "Error updating node %q", nodeName)
 		return
 	}
 
-	klog.Infof("Successfully removed globalIP annotation from node %q", nodeName)
+	logger.Infof("Successfully removed globalIP annotation from node %q", nodeName)
 }

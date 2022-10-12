@@ -30,7 +30,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/klog/v2"
 )
 
 func NewIngressEndpointsControllers(config *syncer.ResourceSyncerConfig) (*IngressEndpointsControllers, error) {
@@ -93,7 +92,7 @@ func (c *IngressEndpointsControllers) stopAndCleanup(serviceName, serviceNamespa
 		metav1.ListOptions{LabelSelector: svcSelector})
 
 	if err != nil && !apierrors.IsNotFound(err) {
-		klog.Errorf("Error deleting GlobalIngressIPs for service %q: %v", key, err)
+		logger.Errorf(err, "Error deleting GlobalIngressIPs for service %q", key)
 	}
 }
 

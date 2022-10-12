@@ -36,14 +36,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
 )
 
 func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool) (Interface, error) {
 	// We'll panic if config is nil, this is intentional
 	var err error
 
-	klog.Info("Creating GlobalIngressIP controller")
+	logger.Info("Creating GlobalIngressIP controller")
 
 	iptIface, err := iptables.New()
 	if err != nil {
@@ -135,7 +134,7 @@ func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipa
 func (c *globalIngressIPController) process(from runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
 	ingressIP := from.(*submarinerv1.GlobalIngressIP)
 
-	klog.Infof("Processing %sd %s/%s, TargetRef: %q, %q, Status: %#v", op, ingressIP.Namespace,
+	logger.Infof("Processing %sd %s/%s, TargetRef: %q, %q, Status: %#v", op, ingressIP.Namespace,
 		ingressIP.Name, ingressIP.Spec.Target, c.getTargetReference(ingressIP), ingressIP.Status)
 
 	switch op {
@@ -162,7 +161,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 
 	ips, err := c.pool.Allocate(1)
 	if err != nil {
-		klog.Errorf("Error allocating IP for %q: %v", key, err)
+		logger.Errorf(err, "Error allocating IP for %q", key)
 
 		ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, &metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
@@ -174,7 +173,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 		return true
 	}
 
-	klog.Infof("Allocated global IP %q for %q", ips, key)
+	logger.Infof("Allocated global IP %q for %q", ips, key)
 
 	if ingressIP.Spec.Target == submarinerv1.ClusterIPService {
 		serviceRef := ingressIP.Spec.ServiceRef
@@ -185,9 +184,9 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 
 			key := fmt.Sprintf("%s/%s", ingressIP.Namespace, serviceRef.Name)
 			if err != nil {
-				klog.Errorf("Error retrieving exported Service %q - re-queueing", key)
+				logger.Errorf(err, "Error retrieving exported Service %q - re-queueing", key)
 			} else {
-				klog.Warningf("Exported Service %q does not exist yet - re-queueing", key)
+				logger.Warningf("Exported Service %q does not exist yet - re-queueing", key)
 			}
 
 			return false
@@ -213,7 +212,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 		if err != nil {
 			_ = c.pool.Release(ips...)
 			key := fmt.Sprintf("%s/%s", internalService.Namespace, internalService.Name)
-			klog.Errorf("Failed to create the internal Service %q ", key)
+			logger.Errorf(err, "Failed to create the internal Service %q ", key)
 
 			ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, &metav1.Condition{
 				Type:    string(submarinerv1.GlobalEgressIPAllocated),
@@ -240,14 +239,14 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 		if target == "" {
 			_ = c.pool.Release(ips...)
 
-			klog.Warningf("%q annotation is missing on %q", annotationKey, key)
+			logger.Warningf("%q annotation is missing on %q", annotationKey, key)
 
 			return true
 		}
 
 		err = c.iptIface.AddIngressRulesForHeadlessSvc(ips[0], target, tType)
 		if err != nil {
-			klog.Errorf("Error while programming Service %q ingress rules for %v: %v", key, tType, err)
+			logger.Errorf(err, "Error while programming Service %q ingress rules for %v", key, tType)
 			err = errors.WithMessage(err, "Error programming ingress rules")
 		} else {
 			err = c.iptIface.AddEgressRulesForHeadlessSvc(key, target, ips[0], globalNetIPTableMark, tType)
@@ -294,30 +293,30 @@ func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngre
 
 	if ingressIP.Spec.Target == submarinerv1.ClusterIPService {
 		intSvcName := GetInternalSvcName(ingressIP.Spec.ServiceRef.Name)
-		klog.Infof("Deleting the service %q/%q created by Globalnet controller", ingressIP.Namespace, intSvcName)
+		logger.Infof("Deleting the service %q/%q created by Globalnet controller", ingressIP.Namespace, intSvcName)
 
 		intSvc, exists, err := getService(intSvcName, ingressIP.Namespace, c.services, c.scheme)
 		if err != nil {
-			klog.Errorf("Error retrieving the internal service created by Globalnet controller %q: %v", key, err)
+			logger.Errorf(err, "Error retrieving the internal service created by Globalnet controller %q", key)
 			return shouldRequeue(numRequeues)
 		}
 
 		if exists {
 			if err = finalizer.Remove(context.TODO(), resource.ForDynamic(c.services.Namespace(ingressIP.Namespace)), intSvc,
 				InternalServiceFinalizer); err != nil {
-				klog.Errorf("Error while removing the finalizer from service %q: %v", key, err)
+				logger.Errorf(err, "Error while removing the finalizer from service %q", key)
 				return true
 			}
 
 			err = deleteService(ingressIP.Namespace, intSvcName, c.services)
 			if err != nil {
-				klog.Errorf("Error while deleting the internal %q: %v", key, err)
+				logger.Errorf(err, "Error while deleting the internal %q", key)
 				return true
 			}
 		}
 
 		if err = c.pool.Release(ingressIP.Status.AllocatedIP); err != nil {
-			klog.Errorf("Error while releasing the global IPs for %q: %v", key, err)
+			logger.Errorf(err, "Error while releasing the global IPs for %q", key)
 		}
 
 		return false
