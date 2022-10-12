@@ -12,6 +12,8 @@ jobs:
     name: Markdown Links (all files)
     if: github.repository_owner == 'submariner-io'
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
     steps:
       - name: Check out the repository
         uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
@@ -24,8 +26,6 @@ jobs:
       - name: Raise an Issue to report broken links
         if: ${{ failure() }}
         uses: peter-evans/create-issue-from-file@99b87c35610e986ad2034a7b0518a9b3ebea541b
-        permissions:
-          issues: write
         with:
           title: Broken link detected by periodic linting
           content-filepath: .github/ISSUE_TEMPLATE/broken-link.md
