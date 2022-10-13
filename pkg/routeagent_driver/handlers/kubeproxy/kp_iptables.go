@@ -81,11 +81,16 @@ func (kp *SyncHandler) GetName() string {
 }
 
 func (kp *SyncHandler) GetNetworkPlugins() []string {
-	return []string{
-		cni.Generic, cni.CanalFlannel, cni.Flannel,
-		cni.WeaveNet, cni.OpenShiftSDN, cni.Calico,
-		cni.KindNet,
+	networkPlugins := []string{}
+
+	// This handles everything but OVN
+	for _, plugin := range cni.GetNetworkPlugins() {
+		if plugin != cni.OVNKubernetes {
+			networkPlugins = append(networkPlugins, plugin)
+		}
 	}
+
+	return networkPlugins
 }
 
 func (kp *SyncHandler) Init() error {
