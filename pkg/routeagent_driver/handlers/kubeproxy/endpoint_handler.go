@@ -24,7 +24,6 @@ import (
 	"github.com/pkg/errors"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cidr"
-	"k8s.io/klog/v2"
 )
 
 func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
@@ -54,11 +53,11 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 			return errors.Wrap(err, "failed to derive the remoteVtepIP")
 		}
 
-		klog.Infof("Creating the vxlan interface %s with gateway node IP %s", VxLANIface, localClusterGwNodeIP)
+		logger.Infof("Creating the vxlan interface %s with gateway node IP %s", VxLANIface, localClusterGwNodeIP)
 
 		err = kp.createVxLANInterface(endpoint.Spec.Hostname, VxInterfaceWorker, localClusterGwNodeIP)
 		if err != nil {
-			klog.Fatalf("Unable to create VxLAN interface on non-GatewayNode (%s): %v", endpoint.Spec.Hostname, err)
+			logger.Fatalf("Unable to create VxLAN interface on non-GatewayNode (%s): %v", endpoint.Spec.Hostname, err)
 		}
 
 		kp.vxlanGwIP = &remoteVtepIP
@@ -98,7 +97,7 @@ func (kp *SyncHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	if err := cidr.OverlappingSubnets(kp.localServiceCidr, kp.localClusterCidr, endpoint.Spec.Subnets); err != nil {
 		// Skip processing the endpoint when CIDRs overlap and return nil to avoid re-queuing.
-		klog.Errorf("overlappingSubnets for new remote %#v returned error: %v", endpoint, err)
+		logger.Errorf(err, "overlappingSubnets for new remote %#v returned error", endpoint)
 		return nil
 	}
 
@@ -108,7 +107,7 @@ func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	lastProcessedTime, ok := kp.remoteEndpointTimeStamp[endpoint.Spec.ClusterID]
 
 	if ok && lastProcessedTime.After(endpoint.CreationTimestamp.Time) {
-		klog.Infof("Ignoring new remote %#v since a later endpoint was already"+
+		logger.Infof("Ignoring new remote %#v since a later endpoint was already"+
 			"processed", endpoint)
 		return nil
 	}
@@ -123,8 +122,8 @@ func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	}
 
 	if err := kp.updateRoutingRulesForInterClusterSupport(endpoint.Spec.Subnets, Add); err != nil {
-		klog.Errorf("updateRoutingRulesForInterClusterSupport for new remote %#v returned error: %+v",
-			endpoint, err)
+		logger.Errorf(err, "updateRoutingRulesForInterClusterSupport for new remote %#v returned error",
+			endpoint)
 		return err
 	}
 
@@ -148,7 +147,7 @@ func (kp *SyncHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	lastProcessedTime, ok := kp.remoteEndpointTimeStamp[endpoint.Spec.ClusterID]
 
 	if ok && lastProcessedTime.After(endpoint.CreationTimestamp.Time) {
-		klog.Infof("Ignoring deleted remote %#v since a later endpoint was already"+
+		logger.Infof("Ignoring deleted remote %#v since a later endpoint was already"+
 			"processed", endpoint)
 		return nil
 	}
@@ -162,8 +161,8 @@ func (kp *SyncHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	// TODO: Handle a remote endpoint removal use-case
 	//         - remove related iptable rules
 	if err := kp.updateRoutingRulesForInterClusterSupport(endpoint.Spec.Subnets, Delete); err != nil {
-		klog.Errorf("updateRoutingRulesForInterClusterSupport for removed remote %#v returned error: %+v",
-			err, endpoint)
+		logger.Errorf(err, "updateRoutingRulesForInterClusterSupport for removed remote %#v returned error",
+			endpoint)
 		return err
 	}
 
@@ -183,7 +182,7 @@ func (kp *SyncHandler) getHostIfaceIPAddress() (net.IP, error) {
 		for i := range addrs {
 			ipAddr, _, err := net.ParseCIDR(addrs[i].String())
 			if err != nil {
-				klog.Errorf("Unable to ParseCIDR  %v: %v", addrs, err)
+				logger.Errorf(err, "Unable to ParseCIDR  %v", addrs)
 			}
 
 			if ipAddr.To4() != nil {

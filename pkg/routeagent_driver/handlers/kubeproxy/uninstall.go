@@ -27,7 +27,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/port"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
-	"k8s.io/klog/v2"
 )
 
 func (kp *SyncHandler) Stop(uninstall bool) error {
@@ -35,19 +34,19 @@ func (kp *SyncHandler) Stop(uninstall bool) error {
 		return nil
 	}
 
-	klog.Infof("Uninstalling Submariner changes from the node %q", kp.hostname)
-	klog.Infof("Flushing route table %d entries", constants.RouteAgentHostNetworkTableID)
+	logger.Infof("Uninstalling Submariner changes from the node %q", kp.hostname)
+	logger.Infof("Flushing route table %d entries", constants.RouteAgentHostNetworkTableID)
 
 	err := kp.netLink.FlushRouteTable(constants.RouteAgentHostNetworkTableID)
 	if err != nil {
 		// We can safely ignore this error, as this table will exist only on GW nodes
-		klog.V(log.TRACE).Infof("Flushing routing table %d returned error. Can be ignored on non-Gw node: %v",
+		logger.V(log.TRACE).Infof("Flushing routing table %d returned error. Can be ignored on non-Gw node: %v",
 			constants.RouteAgentHostNetworkTableID, err)
 	}
 
 	err = kp.netLink.RuleDelIfPresent(netlinkAPI.NewTableRule(constants.RouteAgentHostNetworkTableID))
 	if err != nil {
-		klog.V(log.TRACE).Infof("Deleting IP Rule pointing to %d table returned error: %v",
+		logger.V(log.TRACE).Infof("Deleting IP Rule pointing to %d table returned error: %v",
 			constants.RouteAgentHostNetworkTableID, err)
 	}
 
@@ -68,60 +67,60 @@ func deleteVxLANInterface() {
 		Port:    port.IntraClusterVxLAN,
 	}
 
-	klog.Infof("Deleting the %q interface", VxLANIface)
+	logger.Infof("Deleting the %q interface", VxLANIface)
 
 	err := netlinkAPI.New().LinkDel(iface)
 	if err != nil {
-		klog.Errorf("Failed to delete the the vxlan interface %q: %v", VxLANIface, err)
+		logger.Errorf(err, "Failed to delete the the vxlan interface %q", VxLANIface)
 	}
 }
 
 func deleteIPTableChains() {
 	ipt, err := iptables.New()
 	if err != nil {
-		klog.Errorf("Failed to initialize IPTable interface: %v", err)
+		logger.Errorf(err, "Failed to initialize IPTable interface")
 		return
 	}
 
-	klog.Infof("Flushing iptable entries in %q chain of %q table", constants.SmPostRoutingChain, constants.NATTable)
+	logger.Infof("Flushing iptable entries in %q chain of %q table", constants.SmPostRoutingChain, constants.NATTable)
 
 	if err := ipt.ClearChain(constants.NATTable, constants.SmPostRoutingChain); err != nil {
-		klog.Errorf("Error flushing iptables chain %q of %q table: %v", constants.SmPostRoutingChain,
-			constants.NATTable, err)
+		logger.Errorf(err, "Error flushing iptables chain %q of %q table", constants.SmPostRoutingChain,
+			constants.NATTable)
 	}
 
-	klog.Infof("Deleting iptable entry in %q chain of %q table", constants.PostRoutingChain, constants.NATTable)
+	logger.Infof("Deleting iptable entry in %q chain of %q table", constants.PostRoutingChain, constants.NATTable)
 
 	ruleSpec := []string{"-j", constants.SmPostRoutingChain}
 	if err := ipt.Delete(constants.NATTable, constants.PostRoutingChain, ruleSpec...); err != nil {
-		klog.Errorf("Error deleting iptables rule from %q chain: %v", constants.PostRoutingChain, err)
+		logger.Errorf(err, "Error deleting iptables rule from %q chain", constants.PostRoutingChain)
 	}
 
-	klog.Infof("Deleting iptable %q chain of %q table", constants.SmPostRoutingChain, constants.NATTable)
+	logger.Infof("Deleting iptable %q chain of %q table", constants.SmPostRoutingChain, constants.NATTable)
 
 	if err := ipt.DeleteChain(constants.NATTable, constants.SmPostRoutingChain); err != nil {
-		klog.Errorf("Error deleting iptable chain %q of table %q: %v", constants.SmPostRoutingChain,
-			constants.NATTable, err)
+		logger.Errorf(err, "Error deleting iptable chain %q of table %q", constants.SmPostRoutingChain,
+			constants.NATTable)
 	}
 
-	klog.Infof("Flushing iptable entries in %q chain of %q table", constants.SmInputChain, constants.FilterTable)
+	logger.Infof("Flushing iptable entries in %q chain of %q table", constants.SmInputChain, constants.FilterTable)
 
 	if err := ipt.ClearChain(constants.FilterTable, constants.SmInputChain); err != nil {
-		klog.Errorf("Error flushing iptables chain %q of %q table: %v", constants.SmInputChain,
-			constants.FilterTable, err)
+		logger.Errorf(err, "Error flushing iptables chain %q of %q table", constants.SmInputChain,
+			constants.FilterTable)
 	}
 
-	klog.Infof("Deleting iptable entry in %q chain of %q table", constants.InputChain, constants.FilterTable)
+	logger.Infof("Deleting iptable entry in %q chain of %q table", constants.InputChain, constants.FilterTable)
 
 	ruleSpec = []string{"-p", "udp", "-m", "udp", "-j", constants.SmInputChain}
 	if err := ipt.Delete(constants.FilterTable, constants.InputChain, ruleSpec...); err != nil {
-		klog.Errorf("Error deleting iptables rule from %q chain: %v", constants.InputChain, err)
+		logger.Errorf(err, "Error deleting iptables rule from %q chain", constants.InputChain)
 	}
 
-	klog.Infof("Deleting iptable %q chain of %q table", constants.SmInputChain, constants.FilterTable)
+	logger.Infof("Deleting iptable %q chain of %q table", constants.SmInputChain, constants.FilterTable)
 
 	if err := ipt.DeleteChain(constants.FilterTable, constants.SmInputChain); err != nil {
-		klog.Errorf("Error deleting iptable chain %q of table %q: %v", constants.SmInputChain,
-			constants.FilterTable, err)
+		logger.Errorf(err, "Error deleting iptable chain %q of table %q", constants.SmInputChain,
+			constants.FilterTable)
 	}
 }

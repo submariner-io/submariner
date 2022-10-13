@@ -23,11 +23,10 @@ import (
 
 	"github.com/submariner-io/admiral/pkg/log"
 	k8sV1 "k8s.io/api/core/v1"
-	"k8s.io/klog/v2"
 )
 
 func (kp *SyncHandler) NodeCreated(node *k8sV1.Node) error {
-	klog.V(log.DEBUG).Infof("A Node with name %q and addresses %#v has been added to the cluster",
+	logger.V(log.DEBUG).Infof("A Node with name %q and addresses %#v has been added to the cluster",
 		node.Name, node.Status.Addresses)
 
 	kp.syncHandlerMutex.Lock()
@@ -48,7 +47,7 @@ func (kp *SyncHandler) NodeUpdated(node *k8sV1.Node) error {
 }
 
 func (kp *SyncHandler) NodeRemoved(node *k8sV1.Node) error {
-	klog.V(log.DEBUG).Infof("A Node with name %q has been removed", node.Name)
+	logger.V(log.DEBUG).Infof("A Node with name %q has been removed", node.Name)
 
 	kp.syncHandlerMutex.Lock()
 	defer kp.syncHandlerMutex.Unlock()
@@ -71,18 +70,18 @@ func (kp *SyncHandler) populateRemoteVtepIps(vtepIP string, operation Operation)
 		kp.remoteVTEPs.Remove(vtepIP)
 	}
 
-	klog.V(log.DEBUG).Infof("populateRemoteVtepIps is called with vtepIP %s, isGatewayNode %t",
+	logger.V(log.DEBUG).Infof("populateRemoteVtepIps is called with vtepIP %s, isGatewayNode %t",
 		vtepIP, kp.isGatewayNode)
 
 	if kp.isGatewayNode {
 		switch operation {
 		case Add:
 			if err := kp.vxlanDevice.AddFDB(net.ParseIP(vtepIP), "00:00:00:00:00:00"); err != nil {
-				klog.Errorf("Failed to add FDB entry on the Gateway Node vxlan iface %v", err)
+				logger.Errorf(err, "Failed to add FDB entry on the Gateway Node vxlan iface")
 			}
 		case Delete:
 			if err := kp.vxlanDevice.DelFDB(net.ParseIP(vtepIP), "00:00:00:00:00:00"); err != nil {
-				klog.Errorf("Failed to delete FDB entry on the Gateway Node vxlan iface %v", err)
+				logger.Errorf(err, "Failed to delete FDB entry on the Gateway Node vxlan iface")
 			}
 		case Flush:
 		}

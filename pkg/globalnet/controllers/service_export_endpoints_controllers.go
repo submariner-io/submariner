@@ -28,7 +28,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/klog/v2"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -127,7 +126,7 @@ func ensureClonedHasOriginal(client dynamic.NamespaceableResourceInterface) erro
 		}
 
 		// Delete the cloned Endpoints that doesn't have original Endpoints.
-		klog.Infof("Deleting cloned Endpoints %s/%s that doesn't have original Endpoints %s/%s",
+		logger.Infof("Deleting cloned Endpoints %s/%s that doesn't have original Endpoints %s/%s",
 			obj1.GetNamespace(), obj1.GetName(), obj1.GetNamespace(), origEp)
 
 		err := deleteEndpoints(obj1.GetNamespace(), obj1.GetName(), client)

@@ -23,7 +23,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn/vsctl"
 	"github.com/vishvananda/netlink"
-	"k8s.io/klog/v2"
 )
 
 func (ovn *Handler) Stop(uninstall bool) error {
@@ -31,33 +30,33 @@ func (ovn *Handler) Stop(uninstall bool) error {
 		return nil
 	}
 
-	klog.Infof("Uninstalling OVN components from the node")
+	logger.Infof("Uninstalling OVN components from the node")
 
 	err := vsctl.DelInternalPort(ovnK8sSubmarinerBridge, ovnK8sSubmarinerInterface)
 	if err != nil {
-		klog.Errorf("Error deleting Submariner port %q due to %v", ovnK8sSubmarinerInterface, err)
+		logger.Errorf(err, "Error deleting Submariner port %q", ovnK8sSubmarinerInterface)
 	}
 
 	err = vsctl.DelBridge(ovnK8sSubmarinerBridge)
 	if err != nil {
-		klog.Errorf("Error deleting Submariner bridge %q due to %v", ovnK8sSubmarinerBridge, err)
+		logger.Errorf(err, "Error deleting Submariner bridge %q", ovnK8sSubmarinerBridge)
 	}
 
 	err = ovn.cleanupRoutes()
 	if err != nil {
-		klog.Errorf("Error cleaning the routes %v", err)
+		logger.Errorf(err, "Error cleaning the routes")
 	}
 
 	err = ovn.netlink.FlushRouteTable(constants.RouteAgentInterClusterNetworkTableID)
 	if err != nil {
-		klog.Errorf("Flushing routing table %d returned error: %v",
-			constants.RouteAgentInterClusterNetworkTableID, err)
+		logger.Errorf(err, "Flushing routing table %d returned error",
+			constants.RouteAgentInterClusterNetworkTableID)
 	}
 
 	err = ovn.netlink.FlushRouteTable(constants.RouteAgentHostNetworkTableID)
 	if err != nil {
-		klog.Errorf("Flushing routing table %d returned error: %v",
-			constants.RouteAgentHostNetworkTableID, err)
+		logger.Errorf(err, "Flushing routing table %d returned error",
+			constants.RouteAgentHostNetworkTableID)
 	}
 
 	ovn.flushAndDeleteIPTableChains(constants.FilterTable, constants.ForwardChain, forwardingSubmarinerFWDChain)
@@ -85,24 +84,22 @@ func (ovn *Handler) cleanupRoutes() error {
 }
 
 func (ovn *Handler) flushAndDeleteIPTableChains(table, tableChain, submarinerChain string) {
-	klog.Infof("Flushing iptable entries in %q chain of %q table", submarinerChain, table)
+	logger.Infof("Flushing iptable entries in %q chain of %q table", submarinerChain, table)
 
 	if err := ovn.ipt.ClearChain(table, submarinerChain); err != nil {
-		klog.Errorf("Error flushing iptables chain %q of %q table: %v", submarinerChain,
-			table, err)
+		logger.Errorf(err, "Error flushing iptables chain %q of %q table", submarinerChain, table)
 	}
 
-	klog.Infof("Deleting iptable entry in %q chain of %q table", tableChain, table)
+	logger.Infof("Deleting iptable entry in %q chain of %q table", tableChain, table)
 
 	ruleSpec := []string{"-j", submarinerChain}
 	if err := ovn.ipt.Delete(table, tableChain, ruleSpec...); err != nil {
-		klog.Errorf("Error deleting iptables rule from %q chain: %v", tableChain, err)
+		logger.Errorf(err, "Error deleting iptables rule from %q chain", tableChain)
 	}
 
-	klog.Infof("Deleting iptable %q chain of %q table", submarinerChain, table)
+	logger.Infof("Deleting iptable %q chain of %q table", submarinerChain, table)
 
 	if err := ovn.ipt.DeleteChain(table, submarinerChain); err != nil {
-		klog.Errorf("Error deleting iptable chain %q of table %q: %v", submarinerChain,
-			table, err)
+		logger.Errorf(err, "Error deleting iptable chain %q of table %q", submarinerChain, table)
 	}
 }

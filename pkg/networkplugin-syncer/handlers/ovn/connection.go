@@ -32,15 +32,13 @@ import (
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/sbdb"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/submariner/pkg/util/clusterfiles"
-	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/klogr"
 )
 
 func (ovn *SyncHandler) initClients() error {
 	var tlsConfig *tls.Config
 
 	if strings.HasPrefix(getOVNNBDBAddress(), "ssl:") || strings.HasPrefix(getOVNSBDBAddress(), "ssl:") {
-		klog.Infof("OVN connection using SSL, loading certificates")
+		logger.Infof("OVN connection using SSL, loading certificates")
 
 		certFile, err := clusterfiles.Get(ovn.k8sClientset, getOVNCertPath())
 		if err != nil {
@@ -62,7 +60,7 @@ func (ovn *SyncHandler) initClients() error {
 			return errors.Wrap(err, "error getting OVN TLS config")
 		}
 	} else {
-		klog.Infof("OVN connection using plaintext TCP")
+		logger.Infof("OVN connection using plaintext TCP")
 	}
 
 	// Create nbdb client
@@ -114,14 +112,12 @@ func getOVNTLSConfig(pkFile, certFile, caFile string) (*tls.Config, error) {
 }
 
 func createLibovsdbClient(dbAddress string, tlsConfig *tls.Config, dbModel model.ClientDBModel) (libovsdbclient.Client, error) {
-	logger := klogr.New()
-
 	options := []libovsdbclient.Option{
 		// Reading and parsing the DB after reconnect at scale can (unsurprisingly)
 		// take longer than a normal ovsdb operation. Give it a bit more time so
 		// we don't time out and enter a reconnect loop.
 		libovsdbclient.WithReconnect(OVSDBTimeout, &backoff.ZeroBackOff{}),
-		libovsdbclient.WithLogger(&logger),
+		libovsdbclient.WithLogger(&logger.Logger),
 		libovsdbclient.WithEndpoint(dbAddress),
 	}
 

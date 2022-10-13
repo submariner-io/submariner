@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
 )
 
 func startIngressEndpointsController(svc *corev1.Service, config *syncer.ResourceSyncerConfig) (*ingressEndpointsController, error) {
@@ -91,7 +90,7 @@ func startIngressEndpointsController(svc *corev1.Service, config *syncer.Resourc
 		return nil
 	})
 
-	klog.Infof("Created Endpoints controller for (%s/%s) with selector %q", svc.Namespace, svc.Name, fieldSelector)
+	logger.Infof("Created Endpoints controller for (%s/%s) with selector %q", svc.Namespace, svc.Name, fieldSelector)
 
 	return controller, nil
 }
@@ -112,7 +111,7 @@ func (c *ingressEndpointsController) process(from runtime.Object, numRequeues in
 func (c *ingressEndpointsController) onCreateOrUpdate(endpoints *corev1.Endpoints, op syncer.Operation) (runtime.Object, bool) {
 	key, _ := cache.MetaNamespaceKeyFunc(endpoints)
 
-	klog.Infof("%q ingress Endpoints %s for service %s", op, key, c.svcName)
+	logger.Infof("%q ingress Endpoints %s for service %s", op, key, c.svcName)
 
 	// Get list of current endpoint IPs
 	usedEpIPs := map[string]bool{}
@@ -188,7 +187,7 @@ func (c *ingressEndpointsController) onDelete(endpoints *corev1.Endpoints) (runt
 		return nil, true
 	}
 
-	klog.Infof("Ingress Endpoints %s for service %s deleted", key, c.svcName)
+	logger.Infof("Ingress Endpoints %s for service %s deleted", key, c.svcName)
 
 	return nil, false
 }

@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
 )
 
 func startEgressPodWatcher(name, namespace string, namedIPSet ipset.Named, config *watcher.Config,
@@ -94,10 +93,10 @@ func (w *egressPodWatcher) onCreateOrUpdate(obj runtime.Object, numRequeues int)
 		return false
 	}
 
-	klog.V(log.DEBUG).Infof("Pod %q with IP %s created/updated", key, pod.Status.PodIP)
+	logger.V(log.DEBUG).Infof("Pod %q with IP %s created/updated", key, pod.Status.PodIP)
 
 	if err := w.namedIPSet.AddEntry(pod.Status.PodIP, true); err != nil {
-		klog.Errorf("Error adding pod IP %q to IP set %q: %v", pod.Status.PodIP, w.ipSetName, err)
+		logger.Errorf(err, "Error adding pod IP %q to IP set %q", pod.Status.PodIP, w.ipSetName)
 		return true
 	}
 
@@ -108,10 +107,10 @@ func (w *egressPodWatcher) onDelete(obj runtime.Object, numRequeues int) bool {
 	pod := obj.(*corev1.Pod)
 	key, _ := cache.MetaNamespaceKeyFunc(pod)
 
-	klog.V(log.DEBUG).Infof("Pod %q removed", key)
+	logger.V(log.DEBUG).Infof("Pod %q removed", key)
 
 	if err := w.namedIPSet.DelEntry(pod.Status.PodIP); err != nil {
-		klog.Errorf("Error deleting pod IP %q from IP set %q: %v", pod.Status.PodIP, w.ipSetName, err)
+		logger.Errorf(err, "Error deleting pod IP %q from IP set %q", pod.Status.PodIP, w.ipSetName)
 		return true
 	}
 
