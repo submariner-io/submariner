@@ -77,6 +77,18 @@ type leaderConfig struct {
 	RetryPeriod   int64
 }
 
+type componentsType struct {
+	restConfig         *rest.Config
+	cableHealthChecker healthchecker.Interface
+	cableEngineSyncer  *syncer.GatewaySyncer
+	cableEngine        cableengine.Engine
+	publicIPWatcher    *endpoint.PublicIPWatcher
+	datastoreSyncer    *datastoresyncer.DatastoreSyncer
+	gatewayPod         *pod.GatewayPod
+	submSpec           types.SubmarinerSpecification
+	stopCh             <-chan struct{}
+}
+
 const (
 	leadershipConfigEnvPrefix = "leadership"
 	defaultLeaseDuration      = 10 // In Seconds
@@ -96,167 +108,102 @@ func main() {
 
 	logger.Info("Starting the submariner gateway engine")
 
-	// set up signals so we handle the first shutdown signal gracefully
-	stopCh := signals.SetupSignalHandler().Done()
+	components := &componentsType{
+		stopCh: signals.SetupSignalHandler().Done(),
+	}
 
-	var submSpec types.SubmarinerSpecification
+	logger.FatalOnError(envconfig.Process("submariner", &components.submSpec), "Error processing env vars")
 
-	fatalOnErr(envconfig.Process("submariner", &submSpec), "Error processing env vars")
+	logger.Info("Parsed env variables", components.submSpec)
+	httpServer := startHTTPServer(&components.submSpec)
 
-	logger.Info("Parsed env variables", submSpec)
-	httpServer := startHTTPServer(&submSpec)
+	var err error
 
-	cfg, err := clientcmd.BuildConfigFromFlags(localMasterURL, localKubeconfig)
-	fatalOnErr(err, "Error building kubeconfig")
+	components.restConfig, err = clientcmd.BuildConfigFromFlags(localMasterURL, localKubeconfig)
+	logger.FatalOnError(err, "Error building kubeconfig")
 
-	submarinerClient, err := submarinerClientset.NewForConfig(cfg)
-	fatalOnErr(err, "Error creating submariner clientset")
+	submarinerClient, err := submarinerClientset.NewForConfig(components.restConfig)
+	logger.FatalOnError(err, "Error creating submariner clientset")
 
-	k8sClient, err := kubernetes.NewForConfig(cfg)
-	fatalOnErr(err, "Error creating Kubernetes clientset")
+	k8sClient, err := kubernetes.NewForConfig(components.restConfig)
+	logger.FatalOnError(err, "Error creating Kubernetes clientset")
 
-	fatalOnErr(subv1.AddToScheme(scheme.Scheme), "Error adding submariner types to the scheme")
+	logger.FatalOnError(subv1.AddToScheme(scheme.Scheme), "Error adding submariner types to the scheme")
 
 	logger.Info("Creating the cable engine")
 
-	localCluster := submarinerClusterFrom(&submSpec)
+	localCluster := submarinerClusterFrom(&components.submSpec)
 
-	if submSpec.CableDriver == "" {
-		submSpec.CableDriver = cable.GetDefaultCableDriver()
+	if components.submSpec.CableDriver == "" {
+		components.submSpec.CableDriver = cable.GetDefaultCableDriver()
 	}
 
-	submSpec.CableDriver = strings.ToLower(submSpec.CableDriver)
+	components.submSpec.CableDriver = strings.ToLower(components.submSpec.CableDriver)
 
 	airGapped := isAirGappedDeployment()
 	logger.Infof("AIR_GAPPED_DEPLOYMENT is set to %t", airGapped)
 
-	localEndpoint, err := endpoint.GetLocal(&submSpec, k8sClient, airGapped)
-	fatalOnErr(err, "Error creating local endpoint object")
+	localEndpoint, err := endpoint.GetLocal(&components.submSpec, k8sClient, airGapped)
+	logger.FatalOnError(err, "Error creating local endpoint object")
 
-	cableEngine := cableengine.NewEngine(localCluster, localEndpoint)
+	components.cableEngine = cableengine.NewEngine(localCluster, localEndpoint)
+
 	natDiscovery, err := natdiscovery.New(localEndpoint)
-	fatalOnErr(err, "Error creating the NAT discovery handler")
+	logger.FatalOnError(err, "Error creating the NAT discovery handler")
 
 	logger.Info("Creating the datastore syncer")
 
-	dsSyncer := datastoresyncer.New(&broker.SyncerConfig{
-		LocalRestConfig: cfg,
-		LocalNamespace:  submSpec.Namespace,
+	components.datastoreSyncer = datastoresyncer.New(&broker.SyncerConfig{
+		LocalRestConfig: components.restConfig,
+		LocalNamespace:  components.submSpec.Namespace,
 	}, localCluster, localEndpoint)
 
-	cableHealthchecker := getCableHealthChecker(cfg, &submSpec)
+	components.initCableHealthChecker()
 
-	cableEngineSyncer := syncer.NewGatewaySyncer(
-		cableEngine,
-		submarinerClient.SubmarinerV1().Gateways(submSpec.Namespace),
-		VERSION, cableHealthchecker)
+	components.cableEngineSyncer = syncer.NewGatewaySyncer(
+		components.cableEngine,
+		submarinerClient.SubmarinerV1().Gateways(components.submSpec.Namespace),
+		VERSION, components.cableHealthChecker)
 
-	if submSpec.Uninstall {
+	if components.submSpec.Uninstall {
 		logger.Info("Uninstalling the submariner gateway engine")
 
-		uninstallGateway(cableEngine, cableEngineSyncer, dsSyncer)
+		components.uninstallGateway()
 
 		return
 	}
 
-	cableEngine.SetupNATDiscovery(natDiscovery)
+	components.cableEngine.SetupNATDiscovery(natDiscovery)
 
-	fatalOnErr(natDiscovery.Run(stopCh), "Error starting NAT discovery server")
+	logger.FatalOnError(natDiscovery.Run(components.stopCh), "Error starting NAT discovery server")
 
-	gwPod, err := pod.NewGatewayPod(k8sClient)
-	fatalOnErr(err, "Error creating a handler to update the gateway pod")
+	components.gatewayPod, err = pod.NewGatewayPod(k8sClient)
+	logger.FatalOnError(err, "Error creating a handler to update the gateway pod")
 
-	cleanup := cleanupHandler{
-		gatewayPod: gwPod,
-		gwSyncer:   cableEngineSyncer,
+	components.cableEngineSyncer.Run(components.stopCh)
+
+	if !airGapped {
+		components.initPublicIPWatcher(k8sClient, submarinerClient, localEndpoint)
 	}
 
-	cableEngineSyncer.Run(stopCh)
-
-	publicIPWatcher := getPublicIPWatcher(&submSpec, k8sClient, submarinerClient, localEndpoint, airGapped)
-
-	becameLeader := func(context.Context) {
-		if err = cableEngine.StartEngine(); err != nil {
-			cleanup.fatal("Error starting the cable engine: %v", err)
-		}
-
-		var wg sync.WaitGroup
-
-		wg.Add(5)
-
-		go func() {
-			defer wg.Done()
-
-			if err := gwPod.SetHALabels(subv1.HAStatusActive); err != nil {
-				cleanup.fatal("Error updating pod label: %s", err)
-			}
-		}()
-
-		go func() {
-			defer wg.Done()
-
-			if err = tunnel.StartController(cableEngine, submSpec.Namespace, &watcher.Config{RestConfig: cfg}, stopCh); err != nil {
-				cleanup.fatal("Error running the tunnel controller: %v", err)
-			}
-		}()
-
-		go func() {
-			defer wg.Done()
-
-			if err = dsSyncer.Start(stopCh); err != nil {
-				cleanup.fatal("Error running the datastore syncer: %v", err)
-			}
-		}()
-
-		go func() {
-			defer wg.Done()
-
-			if cableHealthchecker != nil {
-				if err = cableHealthchecker.Start(stopCh); err != nil {
-					logger.Errorf(err, "Error starting healthChecker")
-				}
-			}
-		}()
-
-		go func() {
-			defer wg.Done()
-
-			if publicIPWatcher != nil {
-				publicIPWatcher.Run(stopCh)
-			}
-		}()
-
-		wg.Wait()
-		<-stopCh
-	}
-
-	leClient, err := kubernetes.NewForConfig(rest.AddUserAgent(cfg, "leader-election"))
+	leClient, err := kubernetes.NewForConfig(rest.AddUserAgent(components.restConfig, "leader-election"))
 	if err != nil {
-		cleanup.fatal("Error creating leader election kubernetes clientset: %s", err)
+		components.fatal("Error creating leader election kubernetes clientset: %s", err)
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(logger.V(log.DEBUG).Infof)
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "submariner-controller"})
 
-	lostLeader := func() {
-		if err := gwPod.SetHALabels(subv1.HAStatusPassive); err != nil {
-			logger.Warningf("Error updating pod label: %s", err)
-		}
-
-		cableEngineSyncer.CleanupGatewayEntry()
-		logger.Fatalf("Leader election lost, shutting down")
-	}
-
 	go func() {
-		if err = startLeaderElection(leClient, recorder, becameLeader, lostLeader); err != nil {
-			cleanup.fatal("Error starting leader election: %v", err)
+		if err = startLeaderElection(leClient, recorder, components.becameLeader, components.lostLeader); err != nil {
+			components.fatal("Error starting leader election: %v", err)
 		}
 	}()
 
-	<-stopCh
+	<-components.stopCh
 
-	if err := cableEngine.Cleanup(); err != nil {
+	if err := components.cableEngine.Cleanup(); err != nil {
 		logger.Error(nil, "Error cleaning up cableEngine resources before removing Gateway")
 	}
 
@@ -271,55 +218,101 @@ func isAirGappedDeployment() bool {
 	return os.Getenv("AIR_GAPPED_DEPLOYMENT") == "true"
 }
 
-func getCableHealthChecker(cfg *rest.Config, submSpec *types.SubmarinerSpecification) healthchecker.Interface {
-	var cableHealthchecker healthchecker.Interface
+func (c *componentsType) becameLeader(context.Context) {
+	if err := c.cableEngine.StartEngine(); err != nil {
+		c.fatal("Error starting the cable engine: %v", err)
+	}
+
+	var wg sync.WaitGroup
+
+	wg.Add(5)
+
+	go func() {
+		defer wg.Done()
+
+		if err := c.gatewayPod.SetHALabels(subv1.HAStatusActive); err != nil {
+			c.fatal("Error updating pod label: %s", err)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+
+		watcherConfig := &watcher.Config{RestConfig: c.restConfig}
+		if err := tunnel.StartController(c.cableEngine, c.submSpec.Namespace, watcherConfig, c.stopCh); err != nil {
+			c.fatal("Error running the tunnel controller: %v", err)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+
+		if err := c.datastoreSyncer.Start(c.stopCh); err != nil {
+			c.fatal("Error running the datastore syncer: %v", err)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+
+		if c.cableHealthChecker != nil {
+			if err := c.cableHealthChecker.Start(c.stopCh); err != nil {
+				logger.Errorf(err, "Error starting healthChecker")
+			}
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+
+		if c.publicIPWatcher != nil {
+			c.publicIPWatcher.Run(c.stopCh)
+		}
+	}()
+
+	wg.Wait()
+	<-c.stopCh
+}
+
+func (c *componentsType) lostLeader() {
+	if err := c.gatewayPod.SetHALabels(subv1.HAStatusPassive); err != nil {
+		logger.Warningf("Error updating pod label: %s", err)
+	}
+
+	c.cableEngineSyncer.CleanupGatewayEntry()
+	logger.Fatalf("Leader election lost, shutting down")
+}
+
+func (c *componentsType) initCableHealthChecker() {
 	var err error
 
-	if !submSpec.HealthCheckEnabled {
+	if !c.submSpec.HealthCheckEnabled {
 		logger.Info("The CableEngine HealthChecker is disabled")
 	} else {
-		cableHealthchecker, err = healthchecker.New(&healthchecker.Config{
-			WatcherConfig:      &watcher.Config{RestConfig: cfg},
-			EndpointNamespace:  submSpec.Namespace,
-			ClusterID:          submSpec.ClusterID,
-			PingInterval:       submSpec.HealthCheckInterval,
-			MaxPacketLossCount: submSpec.HealthCheckMaxPacketLossCount,
+		c.cableHealthChecker, err = healthchecker.New(&healthchecker.Config{
+			WatcherConfig:      &watcher.Config{RestConfig: c.restConfig},
+			EndpointNamespace:  c.submSpec.Namespace,
+			ClusterID:          c.submSpec.ClusterID,
+			PingInterval:       c.submSpec.HealthCheckInterval,
+			MaxPacketLossCount: c.submSpec.HealthCheckMaxPacketLossCount,
 		})
 		if err != nil {
 			logger.Errorf(err, "Error creating healthChecker")
 		}
 	}
-
-	return cableHealthchecker
 }
 
-func getPublicIPWatcher(submSpec *types.SubmarinerSpecification,
-	k8sClient kubernetes.Interface, submarinerClient *submarinerClientset.Clientset,
-	localEndpoint *types.SubmarinerEndpoint, airGappedDeployment bool,
-) *endpoint.PublicIPWatcher {
-	if airGappedDeployment {
-		// In an air gapped deployment, we do not run the periodic public-ip watcher
-		return nil
-	}
-
+func (c *componentsType) initPublicIPWatcher(k8sClient kubernetes.Interface, submarinerClient *submarinerClientset.Clientset,
+	localEndpoint *types.SubmarinerEndpoint,
+) {
 	publicIPConfig := &endpoint.PublicIPWatcherConfig{
-		SubmSpec:      submSpec,
+		SubmSpec:      &c.submSpec,
 		K8sClient:     k8sClient,
-		Endpoints:     submarinerClient.SubmarinerV1().Endpoints(submSpec.Namespace),
+		Endpoints:     submarinerClient.SubmarinerV1().Endpoints(c.submSpec.Namespace),
 		LocalEndpoint: *localEndpoint,
 	}
 
-	publicIPWatcher := endpoint.NewPublicIPWatcher(publicIPConfig)
-
-	return publicIPWatcher
-}
-
-func fatalOnErr(err error, msg string) {
-	if err == nil {
-		return
-	}
-
-	logger.Fatalf("%s: %+v", msg, err)
+	c.publicIPWatcher = endpoint.NewPublicIPWatcher(publicIPConfig)
 }
 
 func submarinerClusterFrom(submSpec *types.SubmarinerSpecification) *types.SubmarinerCluster {
@@ -417,14 +410,9 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder res
 	return nil
 }
 
-type cleanupHandler struct {
-	gatewayPod pod.GatewayPodInterface
-	gwSyncer   *syncer.GatewaySyncer
-}
-
-func (c *cleanupHandler) fatal(format string, args ...interface{}) {
+func (c *componentsType) fatal(format string, args ...interface{}) {
 	err := fmt.Errorf(format, args...)
-	c.gwSyncer.SetGatewayStatusError(err)
+	c.cableEngineSyncer.SetGatewayStatusError(err)
 
 	if err := c.gatewayPod.SetHALabels(subv1.HAStatusPassive); err != nil {
 		logger.Warningf("Error updating pod label: %s", err)
@@ -433,24 +421,22 @@ func (c *cleanupHandler) fatal(format string, args ...interface{}) {
 	logger.Fatal(err.Error())
 }
 
-func uninstallGateway(cableEngine cableengine.Engine, cableEngineSyncer *syncer.GatewaySyncer,
-	dsSyncer *datastoresyncer.DatastoreSyncer,
-) {
-	err := cableEngine.StartEngine()
+func (c *componentsType) uninstallGateway() {
+	err := c.cableEngine.StartEngine()
 	if err != nil {
 		// As we are in the process of cleaning up, ignore any initialization errors.
 		logger.Errorf(err, "Error starting the cable driver")
 	}
 
 	// The Gateway object has to be deleted before invoking the cableEngine.Cleanup
-	cableEngineSyncer.CleanupGatewayEntry()
+	c.cableEngineSyncer.CleanupGatewayEntry()
 
-	err = cableEngine.Cleanup()
+	err = c.cableEngine.Cleanup()
 	if err != nil {
 		logger.Errorf(err, "Error while cleaning up of cable drivers")
 	}
 
-	dsErr := dsSyncer.Cleanup()
+	dsErr := c.datastoreSyncer.Cleanup()
 
-	fatalOnErr(dsErr, "Error cleaning up the datastore")
+	logger.FatalOnError(dsErr, "Error cleaning up the datastore")
 }
