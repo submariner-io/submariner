@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// nolint:wrapcheck // The functions are simple wrappers so we'll let the caller wrap errors.
+//nolint:wrapcheck // The functions are simple wrappers so we'll let the caller wrap errors.
 package ipset
 
 type Named interface {

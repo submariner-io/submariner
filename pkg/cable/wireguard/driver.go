@@ -469,7 +469,7 @@ func (w *wireguard) keyMismatch(cid string, key *wgtypes.Key) bool {
 func genPsk(psk string) (wgtypes.Key, error) {
 	// Convert spec PSK string to right length byte array, using sha256.Size == wgtypes.KeyLen.
 	pskBytes := sha256.Sum256([]byte(psk))
-	return wgtypes.NewKey(pskBytes[:]) // nolint:wrapcheck // Let the caller wrap it
+	return wgtypes.NewKey(pskBytes[:]) //nolint:wrapcheck // Let the caller wrap it
 }
 
 func (w *wireguard) Cleanup() error {

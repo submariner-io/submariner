@@ -121,7 +121,7 @@ func AnnotateNodeWithCNIInterfaceIP(nodeName string, clientSet kubernetes.Interf
 		}
 		node.SetAnnotations(annotations)
 		_, updateErr := clientSet.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
-		return updateErr // nolint:wrapcheck // We wrap it below in the enclosing function
+		return updateErr //nolint:wrapcheck // We wrap it below in the enclosing function
 	})
 
 	if retryErr != nil {

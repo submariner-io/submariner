@@ -79,7 +79,7 @@ func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipa
 		gip := &submarinerv1.GlobalIngressIP{}
 		_ = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, gip)
 
-		// nolint:wrapcheck  // No need to wrap these errors.
+		//nolint:wrapcheck  // No need to wrap these errors.
 		err = controller.reserveAllocatedIPs(federator, obj, func(reservedIPs []string) error {
 			var target string
 			var tType iptables.TargetType
@@ -283,7 +283,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 	return false
 }
 
-// nolint:wrapcheck  // No need to wrap these errors.
+//nolint:wrapcheck  // No need to wrap these errors.
 func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngressIP, numRequeues int) bool {
 	if ingressIP.Status.AllocatedIP == "" {
 		return false

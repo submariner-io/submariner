@@ -303,7 +303,7 @@ func (d *DatastoreSyncer) createLocalCluster() error {
 		Spec: d.localCluster.Spec,
 	}
 
-	return d.localFederator.Distribute(cluster) // nolint:wrapcheck  // Let the caller wrap it
+	return d.localFederator.Distribute(cluster) //nolint:wrapcheck  // Let the caller wrap it
 }
 
 func (d *DatastoreSyncer) createOrUpdateLocalEndpoint() error {
@@ -321,5 +321,5 @@ func (d *DatastoreSyncer) createOrUpdateLocalEndpoint() error {
 		Spec: d.localEndpoint.Spec,
 	}
 
-	return d.localFederator.Distribute(endpoint) // nolint:wrapcheck  // Let the caller wrap it
+	return d.localFederator.Distribute(endpoint) //nolint:wrapcheck  // Let the caller wrap it
 }

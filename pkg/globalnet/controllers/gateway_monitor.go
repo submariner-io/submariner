@@ -314,7 +314,7 @@ func (g *gatewayMonitor) startControllers() error {
 	for _, c := range g.controllers {
 		err = c.Start()
 		if err != nil {
-			return err // nolint:wrapcheck  // Let the caller wrap it
+			return err //nolint:wrapcheck  // Let the caller wrap it
 		}
 	}
 

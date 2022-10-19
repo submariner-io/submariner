@@ -168,7 +168,7 @@ func (c *globalEgressIPController) onCreateOrUpdate(key string, numberOfIPs int,
 		!c.createPodWatcher(key, namedIPSet, numberOfIPs, globalEgressIP)
 }
 
-// nolint:wrapcheck  // No need to wrap these errors.
+//nolint:wrapcheck  // No need to wrap these errors.
 func (c *globalEgressIPController) programGlobalEgressRules(key string, allocatedIPs []string, podSelector *metav1.LabelSelector,
 	namedIPSet ipset.Named,
 ) error {
@@ -356,7 +356,7 @@ func (c *globalEgressIPController) createPodWatcher(key string, namedIPSet ipset
 	return true
 }
 
-// nolint:wrapcheck  // No need to wrap these errors.
+//nolint:wrapcheck  // No need to wrap these errors.
 func (c *globalEgressIPController) flushGlobalEgressRulesAndReleaseIPs(key, ipSetName string, numRequeues int,
 	globalEgressIP *submarinerv1.GlobalEgressIP,
 ) bool {

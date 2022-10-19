@@ -67,7 +67,7 @@ var logger = log.Logger{Logger: logf.Log.WithName("IPTables")}
 func New() (Interface, error) {
 	iptableHandler, err := iptables.New()
 	if err != nil {
-		return nil, err // nolint:wrapcheck  // Let the caller wrap it
+		return nil, err //nolint:wrapcheck  // Let the caller wrap it
 	}
 
 	iptableIface := &ipTables{
