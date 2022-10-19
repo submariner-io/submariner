@@ -7,7 +7,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+        http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -343,8 +343,7 @@ func (g *gatewayMonitor) createGlobalNetMarkingChain() error {
 	return nil
 }
 
-//nolint:gocyclo // This function simply has a lot of error checks which inflates the cyclomatic complexity but logically
-// it's not really complex so we can ignore the violation.
+//nolint:gocyclo // This function is logically simple, cyclomatic complexity is caused by error checks.
 func (g *gatewayMonitor) createGlobalnetChains() error {
 	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetIngressChain)
 
