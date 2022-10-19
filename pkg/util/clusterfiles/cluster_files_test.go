@@ -24,6 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/submariner/pkg/util/clusterfiles"
 	v1 "k8s.io/api/core/v1"
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +35,14 @@ import (
 const theDataStr = "I'm the data"
 
 var theData = []byte(theDataStr)
+
+func init() {
+	kzerolog.AddFlags(nil)
+}
+
+var _ = BeforeSuite(func() {
+	kzerolog.InitK8sLogging()
+})
 
 var _ = Describe("Cluster Files Get", func() {
 	var client kubernetes.Interface

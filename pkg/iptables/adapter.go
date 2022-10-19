@@ -24,7 +24,6 @@ import (
 	"github.com/pkg/errors"
 	level "github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/stringset"
-	"k8s.io/klog/v2"
 )
 
 type Adapter struct {
@@ -55,7 +54,7 @@ func (a *Adapter) InsertUnique(table, chain string, position int, ruleSpec []str
 
 	for index, rule := range rules {
 		if strings.Contains(rule, strings.Join(ruleSpec, " ")) {
-			klog.V(level.DEBUG).Infof("In %s table, iptables rule \"%s\", exists at index %d.", table, strings.Join(ruleSpec, " "), index)
+			logger.V(level.DEBUG).Infof("In %s table, iptables rule \"%s\", exists at index %d.", table, strings.Join(ruleSpec, " "), index)
 			numOccurrences++
 
 			if index == position {
@@ -76,7 +75,7 @@ func (a *Adapter) InsertUnique(table, chain string, position int, ruleSpec []str
 
 	// The required rule is present only once and is at the desired location
 	if numOccurrences == 1 && isPresentAtRequiredPosition {
-		klog.V(level.DEBUG).Infof("In %s table, iptables rule \"%s\", already exists.", table, strings.Join(ruleSpec, " "))
+		logger.V(level.DEBUG).Infof("In %s table, iptables rule \"%s\", already exists.", table, strings.Join(ruleSpec, " "))
 		return nil
 	} else if err := a.Insert(table, chain, position, ruleSpec...); err != nil {
 		return errors.Wrapf(err, "error inserting IP table rule %q", strings.Join(ruleSpec, " "))
@@ -121,7 +120,7 @@ func (a *Adapter) UpdateChainRules(table, chain string, rules [][]string) error 
 		if ruleStrings.Contains(ruleString) {
 			ruleStrings.Remove(ruleString)
 		} else {
-			klog.V(level.DEBUG).Infof("Adding iptables rule in %q, %q: %q", table, chain, ruleSpec)
+			logger.V(level.DEBUG).Infof("Adding iptables rule in %q, %q: %q", table, chain, ruleSpec)
 
 			if err := a.Append(table, chain, ruleSpec...); err != nil {
 				return errors.Wrapf(err, "error adding rule to %v to %q, %q", ruleSpec, table, chain)
@@ -131,14 +130,14 @@ func (a *Adapter) UpdateChainRules(table, chain string, rules [][]string) error 
 
 	// remaining elements should not be there, remove them
 	for _, rule := range ruleStrings.Elements() {
-		klog.V(level.DEBUG).Infof("Deleting stale iptables rule in %q, %q: %q", table, chain, rule)
+		logger.V(level.DEBUG).Infof("Deleting stale iptables rule in %q, %q: %q", table, chain, rule)
 		ruleSpec := strings.Split(rule, " ")
 
 		if err := a.Delete(table, chain, ruleSpec...); err != nil {
 			// Log and let go, as this is not a fatal error, or something that will make real harm,
 			// it's more harmful to keep retrying. At this point on next update deletion of stale rules
 			// will happen again
-			klog.Warningf("Unable to delete iptables entry from table %q, chain %q: %q", table, chain, rule)
+			logger.Warningf("Unable to delete iptables entry from table %q, chain %q: %q", table, chain, rule)
 		}
 	}
 

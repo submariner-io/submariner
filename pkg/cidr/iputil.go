@@ -23,8 +23,11 @@ import (
 	"net"
 
 	"github.com/pkg/errors"
-	"k8s.io/klog/v2"
+	"github.com/submariner-io/admiral/pkg/log"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+var logger = log.Logger{Logger: logf.Log.WithName("CIDR")}
 
 func OverlappingSubnets(localServiceCIDRs, localPodCIDRs, remoteSubnets []string) error {
 	// If the remoteSubnets [*] overlap with local cluster Pod/Service CIDRs we
@@ -39,7 +42,7 @@ func OverlappingSubnets(localServiceCIDRs, localPodCIDRs, remoteSubnets []string
 		overlap, err := IsOverlapping(remoteSubnets, serviceCidr)
 		if err != nil {
 			// Ideally this case will never hit, as the subnets are valid CIDRs
-			klog.Warningf("unable to validate overlapping Service CIDR: %s", err)
+			logger.Warningf("Unable to validate overlapping Service CIDR: %s", err)
 		}
 
 		if overlap {
@@ -51,7 +54,7 @@ func OverlappingSubnets(localServiceCIDRs, localPodCIDRs, remoteSubnets []string
 	for _, podCidr := range localPodCIDRs {
 		overlap, err := IsOverlapping(remoteSubnets, podCidr)
 		if err != nil {
-			klog.Warningf("unable to validate overlapping Pod CIDR: %s", err)
+			logger.Warningf("Unable to validate overlapping Pod CIDR: %s", err)
 		}
 
 		if overlap {

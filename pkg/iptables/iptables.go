@@ -21,6 +21,8 @@ package iptables
 import (
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type Basic interface {
@@ -49,6 +51,8 @@ type Interface interface {
 type iptablesWrapper struct {
 	*iptables.IPTables
 }
+
+var logger = log.Logger{Logger: logf.Log.WithName("IPTables")}
 
 var NewFunc func() (Interface, error)
 

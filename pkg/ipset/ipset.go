@@ -59,8 +59,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	glog "k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var _ = Interface(&runner{})
@@ -130,6 +130,8 @@ type IPSet struct {
 	// TODO: add comment message for ipset
 }
 
+var logger = log.Logger{Logger: logf.Log.WithName("IPSet")}
+
 // #lizard forgives
 // Validate checks if a given ipset is valid or not.
 func (set *IPSet) Validate() bool {
@@ -159,7 +161,7 @@ func (set *IPSet) Validate() bool {
 
 	// check max elem value of ipset
 	if set.MaxElem <= 0 {
-		glog.Errorf("Invalid maxelem value %d, should be >0", set.MaxElem)
+		logger.Errorf(nil, "Invalid maxelem value %d, should be >0", set.MaxElem)
 		return false
 	}
 
@@ -190,7 +192,7 @@ type Entry struct {
 // Validate checks if a given ipset entry is valid or not.  The set parameter is the ipset that entry belongs to.
 func (e *Entry) Validate(set *IPSet) bool {
 	if e.Port < 0 {
-		glog.Errorf("Entry %v port number %d should be >=0 for ipset %v", e, e.Port, set)
+		logger.Errorf(nil, "Entry %v port number %d should be >=0 for ipset %v", e, e.Port, set)
 		return false
 	}
 
@@ -216,7 +218,7 @@ func (e *Entry) Validate(set *IPSet) bool {
 
 func (e *Entry) validateHashIP(set *IPSet) bool {
 	if net.ParseIP(e.IP) == nil {
-		glog.Errorf("Error parsing entry %v ip address %v for ipset %v", e, e.IP, set)
+		logger.Errorf(nil, "Error parsing entry %v ip address %v for ipset %v", e, e.IP, set)
 		return false
 	}
 
@@ -226,7 +228,7 @@ func (e *Entry) validateHashIP(set *IPSet) bool {
 func (e *Entry) validateHashNet(set *IPSet) bool {
 	// Net can not be empty for `hash:net,port` type ip set
 	if _, ipNet, _ := net.ParseCIDR(e.Net); ipNet == nil {
-		glog.Errorf("Error parsing entry %v ip net %v for ipset %v", e, e.Net, set)
+		logger.Errorf(nil, "Error parsing entry %v ip net %v for ipset %v", e, e.Net, set)
 		return false
 	}
 
@@ -247,7 +249,7 @@ func (e *Entry) validateHashIPPortIP(set *IPSet) bool {
 	}
 	// IP2 can not be empty for `hash:ip,port,ip` type ip set
 	if net.ParseIP(e.IP2) == nil {
-		glog.Errorf("Error parsing entry %v second ip address %v for ipset %v", e, e.IP2, set)
+		logger.Errorf(nil, "Error parsing entry %v second ip address %v for ipset %v", e, e.IP2, set)
 		return false
 	}
 
@@ -261,18 +263,18 @@ func (e *Entry) validateHashIPPortNet(set *IPSet) bool {
 func (e *Entry) validateBitmapPort(set *IPSet) bool {
 	// check if port number satisfies its ipset's requirement of port range
 	if set == nil {
-		glog.Errorf("Unable to reference ip set where the entry %v exists", e)
+		logger.Errorf(nil, "Unable to reference ip set where the entry %v exists", e)
 		return false
 	}
 
 	begin, end, err := parsePortRange(set.PortRange)
 	if err != nil {
-		glog.Errorf("Failed to parse set %v port range %s for ipset %v, error: %v", set, set.PortRange, set, err)
+		logger.Errorf(err, "Failed to parse set %v port range %s for ipset %v", set, set.PortRange, set)
 		return false
 	}
 
 	if e.Port < begin || e.Port > end {
-		glog.Errorf("Entry %v port number %d is not in the port range %s of its ipset %v", e, e.Port, set.PortRange, set)
+		logger.Errorf(nil, "Entry %v port number %d is not in the port range %s of its ipset %v", e, e.Port, set.PortRange, set)
 		return false
 	}
 
@@ -346,7 +348,7 @@ func New(exec utilexec.Interface) Interface {
 }
 
 func (runner *runner) runWithOutput(args []string, errFormat string, a ...interface{}) (string, error) {
-	glog.V(log.DEBUG).Infof("Running ipset %v", args)
+	logger.V(log.DEBUG).Infof("Running ipset %v", args)
 
 	out, err := runner.exec.Command(IPSetCmd, args...).CombinedOutput()
 	if err != nil {
@@ -571,19 +573,19 @@ func validatePortRange(portRange string) bool {
 	strs := strings.Split(portRange, "-")
 
 	if len(strs) != 2 {
-		glog.Errorf("port range should be in the format of `a-b`")
+		logger.Errorf(nil, "Port range should be in the format of `a-b`")
 		return false
 	}
 
 	for i := range strs {
 		num, err := strconv.Atoi(strs[i])
 		if err != nil {
-			glog.Errorf("Failed to parse %s, error: %v", strs[i], err)
+			logger.Errorf(err, "Failed to parse %s, error", strs[i])
 			return false
 		}
 
 		if num < 0 {
-			glog.Errorf("port number %d should be >=0", num)
+			logger.Errorf(nil, "Port number %d should be >=0", num)
 			return false
 		}
 	}
@@ -599,7 +601,7 @@ func validateIPSetType(set Type) bool {
 		}
 	}
 
-	glog.Errorf("Currently supported ipset types are: %v, %s is not supported", ValidIPSetTypes, set)
+	logger.Errorf(nil, "Currently supported ipset types are: %v, %s is not supported", ValidIPSetTypes, set)
 
 	return false
 }
@@ -610,7 +612,8 @@ func validateHashFamily(family string) bool {
 		return true
 	}
 
-	glog.Errorf("Currently supported ip set hash families are: [%s, %s], %s is not supported", ProtocolFamilyIPV4, ProtocolFamilyIPV6, family)
+	logger.Errorf(nil, "Currently supported ip set hash families are: [%s, %s], %s is not supported", ProtocolFamilyIPV4,
+		ProtocolFamilyIPV6, family)
 
 	return false
 }
@@ -653,7 +656,7 @@ func validateProtocol(protocol string) bool {
 		return true
 	}
 
-	glog.Errorf("Invalid entry's protocol: %s, supported protocols are [%s, %s]", protocol, ProtocolTCP, ProtocolUDP)
+	logger.Errorf(nil, "Invalid entry's protocol: %s, supported protocols are [%s, %s]", protocol, ProtocolTCP, ProtocolUDP)
 
 	return false
 }

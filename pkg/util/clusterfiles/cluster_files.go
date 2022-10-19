@@ -30,15 +30,17 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+var logger = log.Logger{Logger: logf.Log.WithName("ClusterFiles")}
 
 // Get retrieves a config from a secret, configmap or file within the k8s cluster
 // using an url schema that supports configmap://<namespace>/<configmap-name>/<data-file>
 // secret://<namespace>/<secret-name>/<data-file> and file:///<path> returning
 // a local path to the file.
 func Get(k8sClient kubernetes.Interface, urlAddress string) (pathStr string, err error) {
-	klog.V(log.DEBUG).Infof("reading cluster_file: %s", urlAddress)
+	logger.V(log.DEBUG).Infof("Reading cluster_file: %s", urlAddress)
 
 	parsedURL, err := url.Parse(urlAddress)
 	if err != nil {
@@ -113,7 +115,6 @@ func storeToDisk(pathContainerObject string, parsedURL *url.URL, data []byte) (s
 
 	err = os.WriteFile(diskFilePath, data, 0o400)
 	if err != nil {
-		klog.Error(err)
 		return "", errors.Wrapf(err, "error writing cluster file to  %q", diskFilePath)
 	}
 
