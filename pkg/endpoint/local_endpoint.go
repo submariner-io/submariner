@@ -35,8 +35,10 @@ import (
 	"github.com/submariner-io/submariner/pkg/types"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+var logger = log.Logger{Logger: logf.Log.WithName("Endpoint")}
 
 func GetLocal(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface,
 	airGappedDeployment bool,
@@ -45,9 +47,7 @@ func GetLocal(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Inte
 	privateIP := GetLocalIP()
 
 	gwNode, err := node.GetLocalNode(k8sClient)
-	if err != nil {
-		klog.Fatalf("Error getting information on the local node: %s", err.Error())
-	}
+	logger.FatalfOnError(err, "Error getting information on the local node")
 
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -186,7 +186,7 @@ func addConfigFrom(nodeName string, configs, backendConfig map[string]string, wa
 			}
 
 			if oldValue, ok := backendConfig[config]; ok && warningDuplicate != "" {
-				klog.Warningf(warningDuplicate, cfg, oldValue, value)
+				logger.Warningf(warningDuplicate, cfg, oldValue, value)
 			}
 
 			backendConfig[config] = value
@@ -218,14 +218,14 @@ func getCNIInterfaceIPAddress(clusterCIDRs []string) (string, error) {
 			for i := range addrs {
 				ipAddr, _, err := net.ParseCIDR(addrs[i].String())
 				if err != nil {
-					klog.Errorf("Unable to ParseCIDR : %q", addrs[i].String())
+					logger.Error(nil, "Unable to ParseCIDR : %q", addrs[i].String())
 				} else if ipAddr.To4() != nil {
-					klog.V(log.DEBUG).Infof("Interface %q has %q address", iface.Name, ipAddr)
+					logger.V(log.DEBUG).Infof("Interface %q has %q address", iface.Name, ipAddr)
 					address := net.ParseIP(ipAddr.String())
 
 					// Verify that interface has an address from cluster CIDR.
 					if clusterNetwork.Contains(address) {
-						klog.V(log.DEBUG).Infof("Found CNI Interface %q that has IP %q from ClusterCIDR %q",
+						logger.V(log.DEBUG).Infof("Found CNI Interface %q that has IP %q from ClusterCIDR %q",
 							iface.Name, ipAddr.String(), clusterCIDR)
 						return ipAddr.String(), nil
 					}
