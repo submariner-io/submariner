@@ -206,7 +206,7 @@ func RemoveGlobalIPAnnotationOnNode(cfg *rest.Config) {
 
 		node.SetAnnotations(annotations)
 		_, updateErr := k8sClientSet.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
-		return updateErr // nolint:wrapcheck // We wrap it below in the enclosing function
+		return updateErr //nolint:wrapcheck // We wrap it below in the enclosing function
 	})
 
 	if retryErr != nil {

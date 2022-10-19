@@ -34,4 +34,4 @@ A tweet including a poll must end with 2-4 options in the following format
 
 ## Questions?
 
-If you have any further questions or suggestions, please create an issue at https://github.com/gr2m/twitter-together/issues/new
+If you have any further questions or suggestions, please create an issue at https://github.com/twitter-together/action/issues/new

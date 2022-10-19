@@ -56,7 +56,7 @@ var (
 	GatewayStaleTimeout   = GatewayUpdateInterval * 3
 )
 
-// nolint:promlinter // Error: "counter metrics should have "_total"". This is already a documented public API and
+//nolint:promlinter // Error: "counter metrics should have "_total"". This is already a documented public API and
 // this doesn't seem a compelling enough reason to change it.
 var gatewaySyncIterations = prometheus.NewCounter(prometheus.CounterOpts{
 	Name: "submariner_gateway_sync_iterations",
@@ -108,7 +108,7 @@ func (gs *GatewaySyncer) SetGatewayStatusError(err error) {
 }
 
 func (gs *GatewaySyncer) gatewayResourceInterface() resource.Interface {
-	// nolint:wrapcheck // These functions are pass-through wrappers for the k8s APIs.
+	//nolint:wrapcheck // These functions are pass-through wrappers for the k8s APIs.
 	return &resource.InterfaceFuncs{
 		GetFunc: func(ctx context.Context, name string, options metav1.GetOptions) (runtime.Object, error) {
 			return gs.client.Get(ctx, name, options)

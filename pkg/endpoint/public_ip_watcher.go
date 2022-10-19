@@ -101,7 +101,7 @@ func (p *PublicIPWatcher) updateLocalEndpoint(publicIP string) error {
 		ep.Spec.PublicIP = publicIP
 
 		_, updateErr := p.config.Endpoints.Update(context.TODO(), ep, metav1.UpdateOptions{})
-		return updateErr // nolint:wrapcheck // We wrap it below in the enclosing function
+		return updateErr //nolint:wrapcheck // We wrap it below in the enclosing function
 	})
 
 	if retryErr != nil {

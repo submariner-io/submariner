@@ -620,5 +620,5 @@ func (i *libreswan) runPluto() error {
 func (i *libreswan) Cleanup() error {
 	logger.Info("Uninstalling the libreswan cable driver")
 
-	return netlink.DeleteXfrmRules() // nolint:wrapcheck  // No need to wrap this error
+	return netlink.DeleteXfrmRules() //nolint:wrapcheck  // No need to wrap this error
 }

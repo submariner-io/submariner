@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// nolint:wrapcheck // Most of the functions are simple wrappers so we'll let the caller wrap errors.
+//nolint:wrapcheck // Most of the functions are simple wrappers so we'll let the caller wrap errors.
 package netlink
 
 import (
