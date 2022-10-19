@@ -25,6 +25,7 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event"
@@ -34,7 +35,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog/v2"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type specification struct {
@@ -69,6 +70,8 @@ type Config struct {
 	// Client can be provided for unit testing. By default New will create its own dynamic client.
 	Client dynamic.Interface
 }
+
+var logger = log.Logger{Logger: logf.Log.WithName("EventController")}
 
 func New(config *Config) (*Controller, error) {
 	hostname, err := os.Hostname()
@@ -137,22 +140,22 @@ func New(config *Config) (*Controller, error) {
 
 // Start starts the controller.
 func (c *Controller) Start(stopCh <-chan struct{}) error {
-	klog.Info("Starting the Event controller...")
+	logger.Info("Starting the Event controller...")
 
 	err := c.resourceWatcher.Start(stopCh)
 	if err != nil {
 		return errors.Wrap(err, "error starting the resource watcher")
 	}
 
-	klog.Info("Event controller started")
+	logger.Info("Event controller started")
 
 	return nil
 }
 
 func (c *Controller) Stop() {
-	klog.Info("Event controller stopping")
+	logger.Info("Event controller stopping")
 
 	if err := c.handlers.StopHandlers(false); err != nil {
-		klog.Warningf("In Event Controller, StopHandlers returned error: %v", err)
+		logger.Warningf("In Event Controller, StopHandlers returned error: %v", err)
 	}
 }
