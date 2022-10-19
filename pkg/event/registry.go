@@ -25,7 +25,7 @@ import (
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	k8sV1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/klog/v2"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type Registry struct {
@@ -33,6 +33,8 @@ type Registry struct {
 	networkPlugin string
 	eventHandlers []Handler
 }
+
+var logger = log.Logger{Logger: logf.Log.WithName("EventRegistry")}
 
 // NewRegistry creates a new registry with the given name,  typically referencing the owner, to manage event
 // Handlers that match the given networkPlugin name.
@@ -62,9 +64,9 @@ func (er *Registry) addHandler(eventHandler Handler) error {
 		}
 
 		er.eventHandlers = append(er.eventHandlers, eventHandler)
-		klog.Infof("Event handler %q added to registry %q.", eventHandler.GetName(), er.name)
+		logger.Infof("Event handler %q added to registry %q.", eventHandler.GetName(), er.name)
 	} else {
-		klog.V(log.DEBUG).Infof("Event handler %q ignored for registry %q.", eventHandler.GetName(), er.name)
+		logger.V(log.DEBUG).Infof("Event handler %q ignored for registry %q.", eventHandler.GetName(), er.name)
 	}
 
 	return nil

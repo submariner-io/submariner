@@ -22,14 +22,13 @@ import (
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog/v2"
 )
 
 func (c *Controller) handleRemovedNode(obj runtime.Object, numRequeues int) bool {
 	node := obj.(*k8sv1.Node)
 
 	if err := c.handlers.NodeRemoved(node); err != nil {
-		klog.Errorf("Error handling removed Node: %v", err)
+		logger.Error(err, "Error handling removed Node")
 		return true
 	}
 
@@ -40,7 +39,7 @@ func (c *Controller) handleCreatedNode(obj runtime.Object, numRequeues int) bool
 	node := obj.(*k8sv1.Node)
 
 	if err := c.handlers.NodeCreated(node); err != nil {
-		klog.Errorf("Error handling created Node: %v", err)
+		logger.Error(err, "Error handling created Node")
 		return true
 	}
 
@@ -51,7 +50,7 @@ func (c *Controller) handleUpdatedNode(obj runtime.Object, numRequeues int) bool
 	node := obj.(*k8sv1.Node)
 
 	if err := c.handlers.NodeUpdated(node); err != nil {
-		klog.Errorf("Error handling updated Node: %v", err)
+		logger.Error(err, "Error handling updated Node")
 		return true
 	}
 

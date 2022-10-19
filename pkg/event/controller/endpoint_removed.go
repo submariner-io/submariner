@@ -21,7 +21,6 @@ package controller
 import (
 	smv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog/v2"
 )
 
 func (c *Controller) handleRemovedEndpoint(obj runtime.Object, numRequeues int) bool {
@@ -35,7 +34,7 @@ func (c *Controller) handleRemovedEndpoint(obj runtime.Object, numRequeues int) 
 	}
 
 	if err != nil {
-		klog.Errorf("Error handling removed endpoint %+v", err)
+		logger.Error(err, "Error handling removed endpoint")
 	}
 
 	return err != nil
