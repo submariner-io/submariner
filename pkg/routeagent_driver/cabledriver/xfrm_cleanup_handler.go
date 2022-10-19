@@ -42,5 +42,5 @@ func (h *xrfmCleanup) GetNetworkPlugins() []string {
 func (h *xrfmCleanup) TransitionToNonGateway() error {
 	logger.Info("Transitioned to non-Gateway, cleaning up the IPsec xfrm rules")
 
-	return netlink.DeleteXfrmRules() // nolint:wrapcheck  // No need to wrap this error
+	return netlink.DeleteXfrmRules() //nolint:wrapcheck  // No need to wrap this error
 }

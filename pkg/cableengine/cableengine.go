@@ -276,7 +276,7 @@ func (i *engine) ListCableConnections() ([]v1.Connection, error) {
 	defer i.Unlock()
 
 	if i.driver != nil {
-		return i.driver.GetConnections() // nolint:wrapcheck  // Let the caller wrap it
+		return i.driver.GetConnections() //nolint:wrapcheck  // Let the caller wrap it
 	}
 	// if no driver, we can safely report that no connections exist.
 	return []v1.Connection{}, nil
@@ -284,7 +284,7 @@ func (i *engine) ListCableConnections() ([]v1.Connection, error) {
 
 func (i *engine) Cleanup() error {
 	if i.driver != nil {
-		return i.driver.Cleanup() // nolint:wrapcheck  // No need to wrap this error
+		return i.driver.Cleanup() //nolint:wrapcheck  // No need to wrap this error
 	}
 
 	return nil

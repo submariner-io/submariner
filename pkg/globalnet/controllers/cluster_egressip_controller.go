@@ -213,7 +213,7 @@ func (c *clusterGlobalEgressIPController) flushClusterGlobalEgressRules(allocate
 func (c *clusterGlobalEgressIPController) deleteClusterGlobalEgressRules(srcIPList []string, snatIP string) error {
 	for _, srcIP := range srcIPList {
 		if err := c.iptIface.RemoveClusterEgressRules(srcIP, snatIP, globalNetIPTableMark); err != nil {
-			return err // nolint:wrapcheck  // Let the caller wrap it
+			return err //nolint:wrapcheck  // Let the caller wrap it
 		}
 	}
 
@@ -228,7 +228,7 @@ func (c *clusterGlobalEgressIPController) programClusterGlobalEgressRules(alloca
 		if err := c.iptIface.AddClusterEgressRules(srcIP, snatIP, globalNetIPTableMark); err != nil {
 			_ = c.deleteClusterGlobalEgressRules(egressRulesProgrammed, snatIP)
 
-			return err // nolint:wrapcheck  // Let the caller wrap it
+			return err //nolint:wrapcheck  // Let the caller wrap it
 		}
 
 		egressRulesProgrammed = append(egressRulesProgrammed, srcIP)

@@ -69,7 +69,7 @@ func newBaseIPAllocationController(pool *ipam.IPPool, iptIface iptiface.Interfac
 }
 
 func (c *baseSyncerController) Start() error {
-	return c.resourceSyncer.Start(c.stopCh) // nolint:wrapcheck  // Let the caller wrap it
+	return c.resourceSyncer.Start(c.stopCh) //nolint:wrapcheck  // Let the caller wrap it
 }
 
 func (c *baseSyncerController) reconcile(client dynamic.ResourceInterface, labelSelector, fieldSelector string,
@@ -150,7 +150,7 @@ func (c *baseIPAllocationController) reserveAllocatedIPs(federator federate.Fede
 
 		logger.Infof("Updating %q: %#v", key, obj)
 
-		return federator.Distribute(obj) // nolint:wrapcheck  // Let the caller wrap it
+		return federator.Distribute(obj) //nolint:wrapcheck  // Let the caller wrap it
 	}
 
 	return nil
@@ -236,7 +236,7 @@ func createService(svc *corev1.Service,
 ) (*unstructured.Unstructured, error) {
 	gnService, err := resourceUtil.ToUnstructured(svc)
 	if err != nil {
-		return nil, err // nolint:wrapcheck  // Let the caller wrap it
+		return nil, err //nolint:wrapcheck  // Let the caller wrap it
 	}
 
 	obj, err := client.Namespace(gnService.GetNamespace()).Create(context.TODO(), gnService, metav1.CreateOptions{})

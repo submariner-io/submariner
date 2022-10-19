@@ -47,5 +47,5 @@ func (h *vxlanCleanup) GetName() string {
 func (h *vxlanCleanup) TransitionToNonGateway() error {
 	logger.Infof("Cleaning up the routes")
 
-	return netlink.DeleteIfaceAndAssociatedRoutes(vxlan.VxlanIface, vxlan.TableID) // nolint:wrapcheck  // No need to wrap this error
+	return netlink.DeleteIfaceAndAssociatedRoutes(vxlan.VxlanIface, vxlan.TableID) //nolint:wrapcheck  // No need to wrap this error
 }

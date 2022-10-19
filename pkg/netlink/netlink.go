@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// nolint:wrapcheck // Most of the functions are simple wrappers so we'll let the caller wrap errors.
+//nolint:wrapcheck // Most of the functions are simple wrappers so we'll let the caller wrap errors.
 package netlink
 
 import (
@@ -186,7 +186,7 @@ func setSysctl(path string, contents []byte) error {
 	return os.WriteFile(path, contents, 0o644)
 }
 
-// nolint:wrapcheck // Let the caller wrap external errors
+//nolint:wrapcheck // Let the caller wrap external errors
 func GetDefaultGatewayInterface() (*net.Interface, error) {
 	routes, err := netlink.RouteList(nil, syscall.AF_INET)
 	if err != nil {
