@@ -24,11 +24,12 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type GatewayPodInterface interface {
@@ -41,6 +42,8 @@ type GatewayPod struct {
 	name      string
 	clientset kubernetes.Interface
 }
+
+var logger = log.Logger{Logger: logf.Log.WithName("Pod")}
 
 func NewGatewayPod(k8sClient kubernetes.Interface) (*GatewayPod, error) {
 	gp := &GatewayPod{
@@ -63,7 +66,7 @@ func NewGatewayPod(k8sClient kubernetes.Interface) (*GatewayPod, error) {
 	}
 
 	if err := gp.SetHALabels(submV1.HAStatusPassive); err != nil {
-		klog.Warningf("Error updating pod label: %s", err)
+		logger.Warningf("Error updating pod label: %s", err)
 	}
 
 	return gp, nil
