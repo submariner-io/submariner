@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/klog/v2"
 )
 
 type publicIPResolverFunction func(clientset kubernetes.Interface, namespace, value string) (string, error)
@@ -64,7 +63,7 @@ func getPublicIP(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.I
 	if airGapped {
 		ip, err := resolveIPInAirGappedDeployment(k8sClient, submSpec.Namespace, config)
 		if err != nil {
-			klog.Errorf("Error resolving public IP in an air-gapped deployment, using empty value: %s : %s", config, err.Error())
+			logger.Errorf(err, "Error resolving public IP in an air-gapped deployment, using empty value: %s", config)
 			return "", nil
 		}
 
@@ -86,7 +85,7 @@ func getPublicIP(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.I
 		}
 
 		// If this resolver failed, we log it, but we fall back to the next one
-		klog.Errorf("Error resolving public IP with resolver %s, config: %s : %s", resolver, config, err.Error())
+		logger.Errorf(err, "Error resolving public IP with resolver %s, config: %s", resolver, config)
 	}
 
 	if len(resolvers) > 0 {
@@ -163,7 +162,7 @@ func publicLoadBalancerIP(clientset kubernetes.Interface, namespace, loadBalance
 	ip := ""
 
 	err := retry.OnError(loadBalancerRetryConfig, func(err error) bool {
-		klog.Infof("Waiting for LoadBalancer to be ready: %s", err)
+		logger.Infof("Waiting for LoadBalancer to be ready: %s", err)
 		return true
 	}, func() error {
 		service, err := clientset.CoreV1().Services(namespace).Get(context.TODO(), loadBalancerName, metav1.GetOptions{})

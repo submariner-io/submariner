@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/klog/v2"
 )
 
 type PublicIPWatcherConfig struct {
@@ -60,7 +59,7 @@ func NewPublicIPWatcher(config *PublicIPWatcherConfig) *PublicIPWatcher {
 }
 
 func (p *PublicIPWatcher) Run(stopCh <-chan struct{}) {
-	klog.Info("Starting the public IP watcher.")
+	logger.Info("Starting the public IP watcher.")
 
 	go func() {
 		wait.Until(p.syncPublicIP, p.config.Interval, stopCh)
@@ -70,15 +69,15 @@ func (p *PublicIPWatcher) Run(stopCh <-chan struct{}) {
 func (p *PublicIPWatcher) syncPublicIP() {
 	publicIP, err := getPublicIP(p.config.SubmSpec, p.config.K8sClient, p.config.LocalEndpoint.Spec.BackendConfig, false)
 	if err != nil {
-		klog.Warningf("Could not determine public IP of the gateway node %q", p.config.LocalEndpoint.Spec.Hostname)
+		logger.Warningf("Could not determine public IP of the gateway node %q", p.config.LocalEndpoint.Spec.Hostname)
 		return
 	}
 
 	if p.config.LocalEndpoint.Spec.PublicIP != publicIP {
-		klog.Infof("Public IP changed for the Gateway, updating the local endpoint with publicIP %q", publicIP)
+		logger.Infof("Public IP changed for the Gateway, updating the local endpoint with publicIP %q", publicIP)
 
 		if err := p.updateLocalEndpoint(publicIP); err != nil {
-			klog.Errorf("Error updating the public IP for local endpoint: %v", err)
+			logger.Error(err, "Error updating the public IP for local endpoint")
 			return
 		}
 	}

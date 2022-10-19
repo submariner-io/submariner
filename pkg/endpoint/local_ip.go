@@ -20,15 +20,12 @@ package endpoint
 
 import (
 	"net"
-
-	"k8s.io/klog/v2"
 )
 
 func GetLocalIPForDestination(dst string) string {
 	conn, err := net.Dial("udp", dst+":53")
-	if err != nil {
-		klog.Fatal(err)
-	}
+	logger.FatalOnError(err, "Error getting local IP")
+
 	defer conn.Close()
 
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
