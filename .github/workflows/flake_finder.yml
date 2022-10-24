@@ -22,7 +22,6 @@ jobs:
         cable_driver: ['libreswan', 'wireguard']
         include:
           - external_net: 'external-net'
-          - external_net: 'external-net'
             globalnet: 'globalnet'
     steps:
       - name: Check out the repository
