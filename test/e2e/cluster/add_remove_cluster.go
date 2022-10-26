@@ -36,7 +36,7 @@ var _ = PDescribe("[expansion] Test expanding/shrinking an existing cluster flee
 		clusterCName := framework.TestContext.ClusterIDs[framework.ClusterC]
 
 		By(fmt.Sprintf("Verifying no GW nodes are present on cluster %q", clusterCName))
-		gatewayNode := f.FindNodesByGatewayLabel(framework.ClusterC, true)
+		gatewayNode := framework.FindGatewayNodes(framework.ClusterC)
 		Expect(gatewayNode).To(HaveLen(0), fmt.Sprintf("Expected no gateway node on %q", framework.ClusterC))
 
 		By(fmt.Sprintf("Verifying that a pod in cluster %q cannot connect to a pod in cluster %q", clusterAName, clusterCName))
@@ -58,7 +58,7 @@ var _ = PDescribe("[expansion] Test expanding/shrinking an existing cluster flee
 			ToClusterScheduling:   framework.NonGatewayNode,
 		})
 
-		nonGatewayNodes := f.FindNodesByGatewayLabel(framework.ClusterC, false)
+		nonGatewayNodes := framework.FindNonGatewayNodes(framework.ClusterC)
 		Expect(nonGatewayNodes).ToNot(HaveLen(0), fmt.Sprintf("No non-gateway nodes found on %q", clusterCName))
 		nonGatewayNode := nonGatewayNodes[0].Name
 		By(fmt.Sprintf("Adding cluster %q by setting the gateway label on node %q", clusterCName, nonGatewayNode))
