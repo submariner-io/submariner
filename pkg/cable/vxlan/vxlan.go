@@ -292,7 +292,7 @@ func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 	err = v.vxlanIface.AddFDB(remoteIP, "00:00:00:00:00:00")
 
 	if err != nil {
-		return endpointInfo.UseIP, fmt.Errorf("failed to add remoteIP %q to the forwarding database", remoteIP)
+		return endpointInfo.UseIP, fmt.Errorf("failed to add remoteIP %q to the forwarding database: %w", remoteIP, err)
 	}
 
 	var ipAddress net.IP
