@@ -65,7 +65,7 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 
 	By(fmt.Sprintf("Sanity check - ensuring there's only one gateway node on %q", clusterAName))
 
-	gatewayNodes := f.FindNodesByGatewayLabel(framework.ClusterA, true)
+	gatewayNodes := framework.FindGatewayNodes(framework.ClusterA)
 	Expect(gatewayNodes).To(HaveLen(1), fmt.Sprintf("Expected only one gateway node on %q", clusterAName))
 	By(fmt.Sprintf("Found gateway on node %q on %q", gatewayNodes[0].Name, clusterAName))
 
@@ -140,13 +140,13 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-	nonGatewayNodes := f.FindNodesByGatewayLabel(framework.ClusterA, false)
+	nonGatewayNodes := framework.FindNonGatewayNodes(framework.ClusterA)
 	if len(nonGatewayNodes) == 0 {
 		framework.Skipf("Skipping the test as cluster %q doesn't have any suitable non-gateway nodes...", clusterAName)
 		return
 	}
 
-	gatewayNodes := f.FindNodesByGatewayLabel(framework.ClusterA, true)
+	gatewayNodes := framework.FindGatewayNodes(framework.ClusterA)
 	Expect(gatewayNodes).To(HaveLen(1), fmt.Sprintf("Expected only one gateway node on %q", clusterAName))
 
 	initialGatewayNode := gatewayNodes[0]
