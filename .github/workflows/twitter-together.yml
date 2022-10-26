@@ -5,7 +5,7 @@ on:
   pull_request:
   push:
     branches:
-      - devel
+      - release-0.14
 
 permissions: {}
 
