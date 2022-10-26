@@ -25,6 +25,7 @@ import (
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
+	v1 "k8s.io/api/core/v1"
 )
 
 var _ = Describe("[redundancy] Route Agent restart tests", func() {
@@ -47,7 +48,13 @@ func testRouteAgentRestart(f *subFramework.Framework, onGateway bool) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-	nodes := f.FindNodesByGatewayLabel(framework.ClusterA, onGateway)
+	var nodes []v1.Node
+	if onGateway {
+		nodes = framework.FindGatewayNodes(framework.ClusterA)
+	} else {
+		nodes = framework.FindNonGatewayNodes(framework.ClusterA)
+	}
+
 	if len(nodes) == 0 && !onGateway {
 		framework.Skipf("Skipping the test as cluster %q doesn't have any suitable non-gateway nodes...", clusterAName)
 		return
