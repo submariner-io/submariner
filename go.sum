@@ -597,8 +597,8 @@ github.com/stretchr/testify v1.7.1 h1:5TQK59W5E3v0r2duFAb7P95B6hEeOyEnHRa8MjYSMT
 github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/submariner-io/admiral v0.14.0-m2 h1:STSW1R8D9XmwxzdO3UeVTdaNoL1ruleW3ClYrGd8NbQ=
 github.com/submariner-io/admiral v0.14.0-m2/go.mod h1:aGaCtUQBooh0w8/nAPy/GDdWC4mthaiT9YydzoJIJcM=
-github.com/submariner-io/shipyard v0.14.0-m2 h1:C5/Pi/fHPpFWcg7gpUWTaYL+x/ezBSWD5PDGsm0yauY=
-github.com/submariner-io/shipyard v0.14.0-m2/go.mod h1:W3Oufy60RlxZ6vEQK1obw/jM35a9kNZVj4ls5Pyi+K0=
+github.com/submariner-io/shipyard v0.14.0-m2.0.20221025113154-7449ae31e2de h1:wEs/gZU59gzEtlJwVuX4fPG/HXg3FCPFn1gNRAjPfEU=
+github.com/submariner-io/shipyard v0.14.0-m2.0.20221025113154-7449ae31e2de/go.mod h1:eTF/ewEDwFiyjpBS+ZD7OEK3l3WI3KG/DO8QiwYNI2k=
 github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635/go.mod h1:hkRG7XYTFWNJGYcbNJQlaLq0fg1yr4J4t/NcTQtrfww=
 github.com/tidwall/pretty v1.0.0/go.mod h1:XNkn88O1ChpSDQmQeStsy+sBenx6DDtFZJxhVysOjyk=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
