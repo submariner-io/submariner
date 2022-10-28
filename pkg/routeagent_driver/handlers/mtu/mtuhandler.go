@@ -62,7 +62,7 @@ var logger = log.Logger{Logger: logf.Log.WithName("MTU")}
 
 func NewMTUHandler(localClusterCidr []string, isGlobalnet bool, tcpMssValue int) event.Handler {
 	forceMss := notNeeded
-	if isGlobalnet {
+	if isGlobalnet || tcpMssValue != 0 {
 		forceMss = needed
 	}
 
