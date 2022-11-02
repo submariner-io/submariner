@@ -13,7 +13,7 @@ require (
 	github.com/ovn-org/libovsdb v0.6.1-0.20220427123326-d7b273399db4
 	github.com/ovn-org/ovn-kubernetes/go-controller v0.0.0-20220511131059-ac1ce4691c0f
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.13.0
+	github.com/prometheus/client_golang v1.13.1
 	github.com/submariner-io/admiral v0.14.0-m2
 	github.com/submariner-io/shipyard v0.14.0-m2.0.20221025113154-7449ae31e2de
 	github.com/uw-labs/lichen v0.1.7
