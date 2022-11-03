@@ -79,16 +79,6 @@ jobs:
       - name: Run golangci-lint
         run: make golangci-lint
 
-  headers:
-    name: License Headers
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out the repository
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
-
-      - name: Check License Headers
-        uses: kt3k/license_checker@d12a6d90c58e30fefed09f2c4d03ba57f4c673a8
-
   licenses:
     name: Dependency Licenses
     runs-on: ubuntu-latest
