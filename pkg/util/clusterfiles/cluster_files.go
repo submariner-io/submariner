@@ -20,7 +20,6 @@ package clusterfiles
 
 import (
 	"context"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"path"
@@ -100,7 +99,7 @@ func Get(k8sClient kubernetes.Interface, urlAddress string) (pathStr string, err
 }
 
 func storeToDisk(pathContainerObject string, parsedURL *url.URL, data []byte) (string, error) {
-	storageDirectory, err := ioutil.TempDir("", "cluster_files")
+	storageDirectory, err := os.MkdirTemp("", "cluster_files")
 	if err != nil {
 		return "", errors.Wrap(err, "error creating cluster_files directory")
 	}
