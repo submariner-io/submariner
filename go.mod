@@ -18,7 +18,7 @@ require (
 	github.com/submariner-io/shipyard v0.14.0-m2.0.20221025113154-7449ae31e2de
 	github.com/uw-labs/lichen v0.1.7
 	github.com/vishvananda/netlink v1.1.1-0.20210518155637-4cb3795f2ccb
-	golang.org/x/sys v0.1.0
+	golang.org/x/sys v0.2.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20220916014741-473347a5e6e3
 	google.golang.org/protobuf v1.28.1
 	k8s.io/api v0.24.3
