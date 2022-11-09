@@ -109,6 +109,7 @@ func main() {
 	logger.Info("Starting the submariner gateway engine")
 
 	components := &componentsType{
+		// set up signals so we handle the first shutdown signal gracefully
 		stopCh: signals.SetupSignalHandler().Done(),
 	}
 
