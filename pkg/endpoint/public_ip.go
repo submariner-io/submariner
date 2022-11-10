@@ -54,7 +54,7 @@ func getPublicIP(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.I
 		if submSpec.PublicIP != "" {
 			config = submSpec.PublicIP
 		} else {
-			config = "api:api.ipify.org,api:api.my-ip.io/ip,api:ip4.seeip.org"
+			config = "api:api.my-ip.io/ip,api:ip4.seeip.org,api:api.ipify.org"
 		}
 	}
 
