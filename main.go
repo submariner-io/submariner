@@ -382,7 +382,7 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder res
 	if err != nil {
 		namespace = "submariner"
 		logger.Infof("Could not obtain a namespace to use for the leader election lock - the error was: %v. Using the default %q namespace.",
-			namespace, err)
+			err, namespace)
 	} else {
 		logger.Infof("Using namespace %q for the leader election lock", namespace)
 	}
