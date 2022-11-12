@@ -1,4 +1,6 @@
 ---
+run:
+  go: '1.18'
 linters-settings:
   gocritic:
     enabled-tags:
@@ -44,7 +46,7 @@ linters:
     - bodyclose
     - contextcheck
     # - cyclop # This is equivalent to gocyclo
-    - deadcode
+    # - deadcode # replaced by unused
     - depguard
     - dogsled
     - dupl
@@ -107,7 +109,7 @@ linters:
     # - scopelint # Deprecated since v1.39.0
     # - sqlclosecheck # We don't use SQL
     - staticcheck
-    - structcheck
+    # - structcheck # replaced by unused
     - stylecheck
     # - tagliatelle # Inconsistent with stylecheck and not as good
     # - tenv # Not relevant for our Ginkgo UTs
@@ -118,9 +120,9 @@ linters:
     - unconvert
     - unparam
     - unused
-    - varcheck
+    # - varcheck # replaced by unused
     # - varnamelen # It doesn't seem necessary to enforce a minimum variable name length
-    - wastedassign
+    # - wastedassign  # is disabled because of generics
     - whitespace
     - wrapcheck
     - wsl
