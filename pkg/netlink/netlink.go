@@ -261,6 +261,12 @@ func DeleteXfrmRules() error {
 	}
 
 	for i := range currentXfrmPolicyList {
+		// Maybe some data is dirty,  skip them for avoiding golang panic.
+		if currentXfrmPolicyList[i].Dst == nil || currentXfrmPolicyList[i].Src == nil {
+			logger.V(log.DEBUG).Infof("dst:%v or src:%v is nil", currentXfrmPolicyList[i].Dst, currentXfrmPolicyList[i].Src)
+			continue
+		}
+
 		// These xfrm rules are not programmed by Submariner, skip them.
 		if currentXfrmPolicyList[i].Dst.String() == allZeroAddress &&
 			currentXfrmPolicyList[i].Src.String() == allZeroAddress && currentXfrmPolicyList[i].Proto == 0 {
