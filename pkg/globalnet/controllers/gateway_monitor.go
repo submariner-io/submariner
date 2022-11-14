@@ -343,8 +343,7 @@ func (g *gatewayMonitor) createGlobalNetMarkingChain() error {
 	return nil
 }
 
-//nolint:gocyclo // This function simply has a lot of error checks which inflates the cyclomatic complexity but logically
-// it's not really complex so we can ignore the violation.
+//nolint:gocyclo // Lots of error checks, but simple logic
 func (g *gatewayMonitor) createGlobalnetChains() error {
 	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetIngressChain)
 
