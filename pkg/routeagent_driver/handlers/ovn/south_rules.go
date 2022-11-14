@@ -29,7 +29,8 @@ import (
 )
 
 // handleSubnets builds ip rules, and passes them to the specified netlink function
-//               for provided subnet list
+//
+//	for provided subnet list
 func (ovn *Handler) handleSubnets(remoteSubnets []string, ruleFunc func(rule *netlink.Rule) error,
 	ignoredErrorFunc func(error) bool,
 ) error {

@@ -31,10 +31,10 @@ import (
 	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
 )
 
-/**
-  These tests send/receive real ICMP messages which requires root or certain privileges as described
-  at https://github.com/go-ping/ping. If running locally outside of the dapper image you may need to make tweaks
-  accordingly.
+/*
+These tests send/receive real ICMP messages which requires root or certain privileges as described
+at https://github.com/go-ping/ping. If running locally outside of the dapper image you may need to make tweaks
+accordingly.
 */
 var _ = Describe("Pinger", func() {
 	var (
