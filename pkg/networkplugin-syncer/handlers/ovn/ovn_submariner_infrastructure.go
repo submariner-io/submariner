@@ -32,10 +32,11 @@ import (
 //
 // (localnetPort) - subGatewaySwitch
 //
-//		&&&
+//	&&&
 //
 // subRouter 							 subJoinSwitch					 		ovnClusterRouter
-//     |(subRouter2JoinLRP)-(subJoin2RouterLSP)|(subClusterSwPort)-(subJoin2RouterLSP)|
+//
+//	|(subRouter2JoinLRP)-(subJoin2RouterLSP)|(subClusterSwPort)-(subJoin2RouterLSP)|
 func (ovn *SyncHandler) ensureSubmarinerInfra() error {
 	logger.Info("Ensuring submariner ovn topology and connecting to ovn-cluster-router")
 

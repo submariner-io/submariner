@@ -97,15 +97,16 @@ const IPSetCmd = "ipset"
 
 // EntryMemberPattern is the regular expression pattern of ipset member list.
 // The raw output of ipset command `ipset list {set}` is similar to:
-//   Name: foobar
-//   Type: hash:ip,port
-//   Revision: 2
-//   Header: family inet hashsize 1024 maxelem 65536
-//   Size in memory: 16592
-//   References: 0
-//   Members:
-//     192.168.1.2,tcp:8080
-//     192.168.1.1,udp:53
+//
+//	Name: foobar
+//	Type: hash:ip,port
+//	Revision: 2
+//	Header: family inet hashsize 1024 maxelem 65536
+//	Size in memory: 16592
+//	References: 0
+//	Members:
+//	  192.168.1.2,tcp:8080
+//	  192.168.1.1,udp:53
 var EntryMemberPattern = "(?m)^(.*\n)*Members:\n"
 
 // VersionPattern is the regular expression pattern of ipset version string.
