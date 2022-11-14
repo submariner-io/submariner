@@ -59,7 +59,8 @@ var _ = Describe("[redundancy] Gateway fail-over tests", func() {
 
 func testGatewayPodRestartScenario(f *subFramework.Framework) {
 	By(fmt.Sprintln("Sanity check - find a cluster with only one gateway node"))
-	var primaryCluster int = -1
+
+	primaryCluster := -1
 
 	for cluster := range framework.TestContext.ClusterIDs {
 		gatewayNodes := framework.FindGatewayNodes(framework.ClusterIndex(cluster))
