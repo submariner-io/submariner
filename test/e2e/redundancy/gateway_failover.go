@@ -7,7 +7,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -59,7 +59,8 @@ var _ = Describe("[redundancy] Gateway fail-over tests", func() {
 
 func testGatewayPodRestartScenario(f *subFramework.Framework) {
 	By(fmt.Sprintln("Sanity check - find a cluster with only one gateway node"))
-	var primaryCluster int = -1
+
+	primaryCluster := -1
 
 	for cluster := range framework.TestContext.ClusterIDs {
 		gatewayNodes := framework.FindGatewayNodes(framework.ClusterIndex(cluster))

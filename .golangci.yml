@@ -21,7 +21,7 @@ linters-settings:
       you may not use this file except in compliance with the License.
       You may obtain a copy of the License at
 
-          http://www.apache.org/licenses/LICENSE-2.0
+      http://www.apache.org/licenses/LICENSE-2.0
 
       Unless required by applicable law or agreed to in writing, software
       distributed under the License is distributed on an "AS IS" BASIS,
@@ -44,7 +44,6 @@ linters:
     - bodyclose
     - contextcheck
     # - cyclop # This is equivalent to gocyclo
-    - deadcode
     - depguard
     - dogsled
     - dupl
@@ -107,7 +106,6 @@ linters:
     # - scopelint # Deprecated since v1.39.0
     # - sqlclosecheck # We don't use SQL
     - staticcheck
-    - structcheck
     - stylecheck
     # - tagliatelle # Inconsistent with stylecheck and not as good
     # - tenv # Not relevant for our Ginkgo UTs
@@ -118,7 +116,6 @@ linters:
     - unconvert
     - unparam
     - unused
-    - varcheck
     # - varnamelen # It doesn't seem necessary to enforce a minimum variable name length
     - wastedassign
     - whitespace
@@ -159,3 +156,8 @@ issues:
         - gochecknoinits
         - goerr113
         - wrapcheck
+
+    # Ignore contextcheck on main for now
+    - path: main.go
+      linters:
+        - contextcheck

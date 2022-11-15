@@ -7,7 +7,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -56,8 +56,7 @@ var (
 	GatewayStaleTimeout   = GatewayUpdateInterval * 3
 )
 
-//nolint:promlinter // Error: "counter metrics should have "_total"". This is already a documented public API and
-// this doesn't seem a compelling enough reason to change it.
+//nolint:promlinter // Existing public API, we can't change it to include "_total"
 var gatewaySyncIterations = prometheus.NewCounter(prometheus.CounterOpts{
 	Name: "submariner_gateway_sync_iterations",
 	Help: "Gateway synchronization iterations",
