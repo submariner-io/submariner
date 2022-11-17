@@ -25,9 +25,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-ping/ping"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	probing "github.com/prometheus-community/pro-bing"
 	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
 )
 
@@ -48,7 +48,7 @@ var _ = Describe("Pinger", func() {
 	testsEnabled = func() bool {
 		// Run a pinger to check if listening on an ICMP socket is permitted.
 		err := func() error {
-			p, err := ping.NewPinger("127.0.0.1")
+			p, err := probing.NewPinger("127.0.0.1")
 			if err != nil {
 				return err
 			}

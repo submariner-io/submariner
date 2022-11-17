@@ -6,13 +6,13 @@ require (
 	github.com/cenkalti/backoff/v4 v4.1.3
 	github.com/coreos/go-iptables v0.6.0
 	github.com/emirpasic/gods v1.18.1
-	github.com/go-ping/ping v0.0.0-20210506233800-ff8be3320020
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.24.1
 	github.com/ovn-org/libovsdb v0.6.1-0.20220427123326-d7b273399db4
 	github.com/ovn-org/ovn-kubernetes/go-controller v0.0.0-20220511131059-ac1ce4691c0f
 	github.com/pkg/errors v0.9.1
+	github.com/prometheus-community/pro-bing v0.1.0
 	github.com/prometheus/client_golang v1.14.0
 	github.com/submariner-io/admiral v0.14.0-m2
 	github.com/submariner-io/shipyard v0.14.0-m2.0.20221025113154-7449ae31e2de
@@ -55,7 +55,7 @@ require (
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/licenseclassifier v0.0.0-20201113175434-78a70215ca36 // indirect
-	github.com/google/uuid v1.2.0 // indirect
+	github.com/google/uuid v1.3.0 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
