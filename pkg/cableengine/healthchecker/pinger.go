@@ -23,8 +23,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-ping/ping"
 	"github.com/pkg/errors"
+	probing "github.com/prometheus-community/pro-bing"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 )
 
@@ -131,7 +131,7 @@ func (p *pingerInfo) Stop() {
 }
 
 func (p *pingerInfo) doPing() error {
-	pinger, err := ping.NewPinger(p.ip)
+	pinger, err := probing.NewPinger(p.ip)
 	if err != nil {
 		p.connectionStatus = ConnectionUnknown
 		p.failureMsg = fmt.Sprintf("Failed to create the pinger for the remote endpoint IP %q: %v", p.ip, err)
@@ -144,7 +144,7 @@ func (p *pingerInfo) doPing() error {
 	pinger.RecordRtts = false
 	pinger.Timeout = p.pingTimeout
 
-	pinger.OnSend = func(packet *ping.Packet) {
+	pinger.OnSend = func(packet *probing.Packet) {
 		select {
 		case <-p.stopCh:
 			pinger.Stop()
@@ -164,7 +164,7 @@ func (p *pingerInfo) doPing() error {
 		}
 	}
 
-	pinger.OnRecv = func(packet *ping.Packet) {
+	pinger.OnRecv = func(packet *probing.Packet) {
 		p.Lock()
 		defer p.Unlock()
 
