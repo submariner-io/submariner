@@ -24,7 +24,7 @@ jobs:
         run: make unit
 
       - name: Run SonarScan, upload Go test results and coverage
-        uses: sonarsource/sonarcloud-github-action@156db6fef3e168e4972abb76de0b32bbce8ec77a
+        uses: sonarsource/sonarcloud-github-action@cb201f3b2d7a38231a8c042dfea4539c8bea180b
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
