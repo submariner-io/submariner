@@ -15,7 +15,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.2
 	github.com/submariner-io/admiral v0.13.1
-	github.com/submariner-io/shipyard v0.13.1
+	github.com/submariner-io/shipyard v0.13.2
 	github.com/uw-labs/lichen v0.1.7
 	github.com/vishvananda/netlink v1.1.1-0.20210518155637-4cb3795f2ccb
 	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9
@@ -26,7 +26,7 @@ require (
 	k8s.io/client-go v0.23.5
 	k8s.io/klog v1.0.0
 	k8s.io/klog/v2 v2.30.0
-	k8s.io/utils v0.0.0-20211116205334-6203023598ed
+	k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed
 	sigs.k8s.io/controller-runtime v0.11.2
 	sigs.k8s.io/mcs-api v0.1.0
 )
