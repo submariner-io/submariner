@@ -41,6 +41,8 @@ jobs:
         uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
       - name: Run codegen
         run: make codegen
+      - name: Ignore go.sum changes
+        run: git checkout go.sum
       - name: Verify generated code matches committed code
         run: git add -A && git diff --staged --exit-code
 
@@ -52,6 +54,8 @@ jobs:
         uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
       - name: Recreate Protobuf files
         run: find pkg -name '*.pb.go' -delete -exec make {} \;
+      - name: Ignore go.sum changes
+        run: git checkout go.sum
       - name: Verify generated code matches committed code
         run: git add -A && git diff --staged --exit-code
 
