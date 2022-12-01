@@ -23,8 +23,7 @@ updates:
   - package-ecosystem: gomod
     directory: "/"
     schedule:
-      interval: daily
-    open-pull-requests-limit: 10
+      interval: weekly
     ignore:
       # protobuf must be handled manually
       - dependency-name: google.golang.org/protobuf
