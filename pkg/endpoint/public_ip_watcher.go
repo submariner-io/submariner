@@ -44,7 +44,7 @@ type PublicIPWatcher struct {
 	config PublicIPWatcherConfig
 }
 
-const DefaultMonitorInterval = 20 * time.Second
+const DefaultMonitorInterval = 60 * time.Second
 
 func NewPublicIPWatcher(config *PublicIPWatcherConfig) *PublicIPWatcher {
 	controller := &PublicIPWatcher{
