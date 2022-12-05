@@ -8,6 +8,39 @@ on:
 permissions: {}
 
 jobs:
+  internal-integration:
+    name: Internal Integration
+    if: github.repository_owner == 'submariner-io'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c
+
+      - name: Update internal submariner-io/* dependencies to latest
+        run: |
+          for dep in $(awk '!/module/ && /github.com.submariner-io/ { print $1 }' go.mod)
+            do go get ${dep}@devel
+          done
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@2b011faafdcbc9ceb11414d64d0573f37c774b04
+        with:
+          title: Update submariner-io/* dependencies to latest
+          body: |
+            This checks the current status of this repository against the latest version of all the Submariner projects it depends on.
+            If something fails, the failure should be investigated and at least tracked as an issue blocking the next release.
+            Since some CI only runs periodically, if on-PR CI passes it's still good to merge this update for full integration coverage.
+          commit-message: |
+            Update submariner-io/* dependencies to latest
+
+            This checks the current status of this repository against the latest
+            version of all the Submariner projects it depends on.
+          signoff: true
+          labels: automated, dependencies
+
   markdown-link-check-periodic:
     name: Markdown Links (all files)
     if: github.repository_owner == 'submariner-io'
