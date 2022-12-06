@@ -15,7 +15,7 @@ require (
 	github.com/prometheus-community/pro-bing v0.1.0
 	github.com/prometheus/client_golang v1.14.0
 	github.com/submariner-io/admiral v0.14.0-m2.0.20221205165210-aed71a242c58
-	github.com/submariner-io/shipyard v0.14.0-m2.0.20221201085151-213fcc93e081
+	github.com/submariner-io/shipyard v0.14.0-m2.0.20221207155912-4c0a6086b8b1
 	github.com/uw-labs/lichen v0.1.7
 	github.com/vishvananda/netlink v1.1.1-0.20210518155637-4cb3795f2ccb
 	golang.org/x/sys v0.3.0
@@ -103,7 +103,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/klog v1.0.0 // indirect
-	k8s.io/klog/v2 v2.70.1 // indirect
+	k8s.io/klog/v2 v2.80.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20220803162953-67bda5d908f1 // indirect
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
