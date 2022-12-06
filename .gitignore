@@ -14,3 +14,5 @@ scripts/broker-info.subm*
 /Dockerfile.*
 .shflags
 Makefile.dapper
+# OSX trash
+.DS_Store
