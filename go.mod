@@ -1,6 +1,6 @@
 module github.com/submariner-io/submariner
 
-go 1.18
+go 1.19
 
 require (
 	github.com/cenkalti/backoff/v4 v4.2.0
@@ -14,8 +14,8 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus-community/pro-bing v0.1.0
 	github.com/prometheus/client_golang v1.14.0
-	github.com/submariner-io/admiral v0.14.0-m2
-	github.com/submariner-io/shipyard v0.14.0-m2.0.20221025113154-7449ae31e2de
+	github.com/submariner-io/admiral v0.14.0-m2.0.20221205165210-aed71a242c58
+	github.com/submariner-io/shipyard v0.14.0-m2.0.20221201085151-213fcc93e081
 	github.com/uw-labs/lichen v0.1.7
 	github.com/vishvananda/netlink v1.1.1-0.20210518155637-4cb3795f2ccb
 	golang.org/x/sys v0.3.0
@@ -95,7 +95,7 @@ require (
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
 	golang.org/x/term v0.2.0 // indirect
 	golang.org/x/text v0.4.0 // indirect
-	golang.org/x/time v0.0.0-20220609170525-579cf78fd858 // indirect
+	golang.org/x/time v0.2.0 // indirect
 	golang.zx2c4.com/wireguard v0.0.0-20220407013110-ef5c587f782d // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
