@@ -20,6 +20,7 @@ package endpoint
 
 import (
 	"fmt"
+	"math/rand"
 	"net"
 	"os"
 	"strconv"
@@ -87,6 +88,8 @@ func GetLocal(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Inte
 			BackendConfig: backendConfig,
 		},
 	}
+
+	rand.Seed(time.Now().UnixNano())
 
 	publicIP, err := getPublicIP(submSpec, k8sClient, backendConfig, airGappedDeployment)
 	if err != nil {
