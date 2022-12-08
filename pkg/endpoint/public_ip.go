@@ -21,6 +21,7 @@ package endpoint
 import (
 	"context"
 	"io"
+	"math/rand"
 	"net"
 	"net/http"
 	"regexp"
@@ -47,6 +48,18 @@ var publicIPMethods = map[string]publicIPResolverFunction{
 
 var IPv4RE = regexp.MustCompile(`(?:\d{1,3}\.){3}\d{1,3}`)
 
+func getPublicIPResolvers() string {
+	serverList := []string{
+		"api:ip4.seeip.org", "api:ipecho.net/plain", "api:ifconfig.me",
+		"api:ipinfo.io/ip", "api:4.ident.me", "api:checkip.amazonaws.com", "api:4.icanhazip.com",
+		"api:myexternalip.com/raw", "api:4.tnedi.me", "api:api.ipify.org",
+	}
+
+	rand.Shuffle(len(serverList), func(i, j int) { serverList[i], serverList[j] = serverList[j], serverList[i] })
+
+	return strings.Join(serverList, ",")
+}
+
 func getPublicIP(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface,
 	backendConfig map[string]string, airGapped bool,
 ) (string, error) {
@@ -56,7 +69,7 @@ func getPublicIP(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.I
 		if submSpec.PublicIP != "" {
 			config = submSpec.PublicIP
 		} else {
-			config = "api:api.my-ip.io/ip,api:ip4.seeip.org,api:api.ipify.org"
+			config = getPublicIPResolvers()
 		}
 	}
 
