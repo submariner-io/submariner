@@ -543,7 +543,7 @@ func (t *testDriver) run() {
 	informerFactory := submarinerInformers.NewSharedInformerFactory(t.client, 0)
 	informer := informerFactory.Submariner().V1().Gateways().Informer()
 
-	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			t.gatewayUpdated <- obj.(*submarinerv1.Gateway)
 		},
@@ -554,6 +554,7 @@ func (t *testDriver) run() {
 			t.gatewayDeleted <- obj.(*submarinerv1.Gateway)
 		},
 	})
+	Expect(err).To(Succeed())
 
 	go informer.Run(t.stopInformer)
 	Expect(cache.WaitForCacheSync(t.stopInformer, informer.HasSynced)).To(BeTrue())
