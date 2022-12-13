@@ -65,7 +65,7 @@ function setup_external() {
 
     # Create external test container on pseudo-ext network
     docker run --cap-add=NET_ADMIN --name "${EXTERNAL_APP}" --network "${EXTERNAL_NET}" \
-        -d registry.access.redhat.com/ubi7/ubi python -m SimpleHTTPServer 80
+        -d registry.access.redhat.com/ubi7/ubi python -m SimpleHTTPServer 1234
 
     # Add extra routing in external app
     docker exec -i "${EXTERNAL_APP}" yum install -y iproute
