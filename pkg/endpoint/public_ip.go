@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -93,8 +94,8 @@ func getPublicIP(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.I
 			return ip, nil
 		}
 
-		// If this resolved failed we log it, but we fall back to the next one
-		klog.Errorf("Error resolving public IP with resolver %s : %s", resolver, err.Error())
+		// If this resolver failed, we log it, but we fall back to the next one
+		klog.V(log.DEBUG).Infof("Error resolving public IP with resolver %s, config: %s: %v", resolver, config, err)
 	}
 
 	if len(resolvers) > 0 {
