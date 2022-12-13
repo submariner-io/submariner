@@ -139,7 +139,7 @@ var _ = Describe("public ip resolvers", func() {
 
 	When("an API entry specified", func() {
 		It("should return some IP", func() {
-			backendConfig[publicIPConfig] = "api:api.ipify.org"
+			backendConfig[publicIPConfig] = "api:4.icanhazip.com/"
 			client := fake.NewSimpleClientset()
 			ip, err := getPublicIP(submSpec, client, backendConfig, false)
 			Expect(err).ToNot(HaveOccurred())
