@@ -301,13 +301,13 @@ func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
 
 	switch g.ExtEndpointType {
 	case ClusterIP:
-		extSvc = p.Framework.CreateTCPServiceWithoutSelector(extClusterIdx, "extsvc", "http", 80)
+		extSvc = p.Framework.CreateTCPServiceWithoutSelector(extClusterIdx, "extsvc", "http", framework.TestPort)
 	case Headless:
 		// TODO: move this method to framework
-		extSvc = createHeadlessTCPServiceWithoutSelector(p.Framework, extClusterIdx, "extsvc", "http", 80)
+		extSvc = createHeadlessTCPServiceWithoutSelector(p.Framework, extClusterIdx, "extsvc", "http", framework.TestPort)
 	}
 
-	p.Framework.CreateTCPEndpoints(extClusterIdx, extSvc.Name, "http", dockerIP, 80)
+	p.Framework.CreateTCPEndpoints(extClusterIdx, extSvc.Name, "http", dockerIP, framework.TestPort)
 	p.Framework.CreateServiceExport(extClusterIdx, extSvc.Name)
 
 	// Get globalIPs for the extApp to use later
@@ -323,7 +323,7 @@ func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
 
 	np := p.Framework.NewNetworkPod(&framework.NetworkPodConfig{
 		Type:          framework.CustomPod,
-		Port:          80,
+		Port:          framework.TestPort,
 		Cluster:       p.Cluster,
 		Scheduling:    p.ClusterScheduling,
 		Networking:    p.Networking,
@@ -344,7 +344,7 @@ func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
 	By(fmt.Sprintf("Sending an http request from external app %q to the service %q in the cluster %q",
 		dockerIP, remoteIP, clusterName))
 
-	command := []string{"curl", "-m", "10", fmt.Sprintf("%s:%d/%s%s", remoteIP, 80, p.Framework.Namespace, clusterName)}
+	command := []string{"curl", "-m", "10", fmt.Sprintf("%s:%d/%s%s", remoteIP, framework.TestPort, p.Framework.Namespace, clusterName)}
 	_, _ = docker.RunCommand(command...)
 
 	podLog := np.GetLog()
@@ -381,7 +381,7 @@ func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
 	By(fmt.Sprintf("Sending an http request from the test pod %q in cluster %q to the external app's ingressGlobalIP %q",
 		np.Pod.Name, clusterName, extIngressGlobalIP))
 
-	cmd := []string{"curl", "-m", "10", fmt.Sprintf("%s:%d/%s%s", extIngressGlobalIP, 80, p.Framework.Namespace, clusterName)}
+	cmd := []string{"curl", "-m", "10", fmt.Sprintf("%s:%d/%s%s", extIngressGlobalIP, framework.TestPort, p.Framework.Namespace, clusterName)}
 	_, _ = np.RunCommand(cmd)
 	_, dockerLog := docker.GetLog()
 
