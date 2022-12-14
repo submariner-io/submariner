@@ -46,7 +46,7 @@ jobs:
         with:
           using: ${{ matrix.external_net }} ${{ matrix.globalnet }}
           skip: ""  # Override skipping external network tests
-          plugin: "scripts/e2e/external/hook"
+          plugin: scripts/e2e/external/hook
 
       - name: Post mortem
         if: failure()
