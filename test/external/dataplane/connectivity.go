@@ -19,6 +19,7 @@ limitations under the License.
 package dataplane
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strconv"
@@ -247,7 +248,7 @@ func testExternalConnectivity(p testParams) {
 		np.Pod.Name, podIP, clusterName, dockerIP))
 
 	cmd := []string{"curl", "-m", "10", fmt.Sprintf("%s:%d/%s%s", dockerIP, framework.TestPort, p.Framework.Namespace, clusterName)}
-	_, _ = np.RunCommand(cmd)
+	_, _ = np.RunCommand(context.TODO(), cmd)
 
 	By("Verifying that external app received request")
 	// Only check stderr

@@ -19,6 +19,7 @@ limitations under the License.
 package redundancy
 
 import (
+	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo"
@@ -180,7 +181,7 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 	By(fmt.Sprintf("Found submariner endpoint for %q: %#v", clusterAName, submEndpoint))
 
 	By("Performing fail-over to passive gateway")
-	f.DoFailover(framework.ClusterIndex(primaryCluster), initialGWPod.Spec.NodeName, initialGWPod.Name)
+	f.DoFailover(context.TODO(), framework.ClusterIndex(primaryCluster), initialGWPod.Spec.NodeName, initialGWPod.Name)
 
 	newGWPod := f.AwaitActiveGatewayPod(framework.ClusterIndex(primaryCluster), func(pod *v1.Pod) bool {
 		return pod.Spec.NodeName != initialGWPod.Spec.NodeName

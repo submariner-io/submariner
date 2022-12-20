@@ -19,6 +19,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
@@ -198,7 +199,7 @@ func execCmdInBash(p tcp.ConnectivityTestParams, cmd []string, pod *v1.Pod) (str
 		PreserveWhitespace: true,
 	}
 
-	return p.Framework.ExecWithOptions(&execOptions, p.FromCluster)
+	return p.Framework.ExecWithOptions(context.TODO(), &execOptions, p.FromCluster)
 }
 
 func getGlobalIngressIP(p tcp.ConnectivityTestParams, service *v1.Service) string {
