@@ -173,7 +173,9 @@ var _ = Describe("[external-dataplane] Connectivity", func() {
 				networking = framework.PodNetworking
 			})
 
-			When("the pod is not on a gateway", func() {
+			// TODO: It appears like we need some non Submariner changes for this test to pass
+			// https://github.com/submariner-io/submariner/issues/2215#issue-1504443842
+			PWhen("the pod is not on a gateway", func() {
 				verifyInteraction(framework.NonGatewayNode)
 			})
 
