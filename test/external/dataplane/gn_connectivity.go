@@ -19,6 +19,7 @@ limitations under the License.
 package dataplane
 
 import (
+	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo"
@@ -382,7 +383,7 @@ func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
 		np.Pod.Name, clusterName, extIngressGlobalIP))
 
 	cmd := []string{"curl", "-m", "10", fmt.Sprintf("%s:%d/%s%s", extIngressGlobalIP, framework.TestPort, p.Framework.Namespace, clusterName)}
-	_, _ = np.RunCommand(cmd)
+	_, _ = np.RunCommand(context.TODO(), cmd)
 	_, dockerLog := docker.GetLog()
 
 	switch p.ToEndpointType {
