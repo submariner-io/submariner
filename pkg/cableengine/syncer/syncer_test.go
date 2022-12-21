@@ -507,6 +507,7 @@ func newTestDriver() *testDriver {
 }
 
 func (t *testDriver) run() {
+	//nolint:reassign // Modifying ErrorHandlers *is* the API
 	utilruntime.ErrorHandlers = append(utilruntime.ErrorHandlers, func(err error) {
 		t.handledError <- err
 	})
@@ -572,6 +573,7 @@ func (t *testDriver) stop() {
 	}
 
 	close(t.stopInformer)
+	//nolint:reassign // Modifying ErrorHandlers *is* the API
 	utilruntime.ErrorHandlers = t.savedErrorHandlers
 }
 
