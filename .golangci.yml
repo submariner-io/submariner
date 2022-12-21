@@ -73,7 +73,6 @@ linters:
     - gofumpt
     - goheader
     - goimports
-    # - golint # Deprecated since v1.41.0
     # - gomnd # It doesn't seem useful in general to enforce constants for all numeric values
     # - gomoddirectives # We don't want to forbid the 'replace' directive
     # - gomodguard # We don't block any modules
@@ -81,15 +80,12 @@ linters:
     - gosec
     - gosimple
     - govet
-    # - ifshort # This is a style preference and doesn't seem compelling
     - importas
     - ineffassign
     # - ireturn # The argument to always "Return Concrete Types" doesn't seem compelling. It is perfectly valid to return
     #             an interface to avoid exposing the entire underlying struct
-    # - interfacer # Deprecated since v1.38.0
     - lll
     - makezero
-    # - maligned # Deprecated since v1.38.0
     - misspell
     - nakedret
     # - nestif # This calculates cognitive complexity but we're doing that elsewhere
@@ -105,7 +101,6 @@ linters:
     - reassign
     - revive
     # - rowserrcheck # We don't use SQL
-    # - scopelint # Deprecated since v1.39.0
     # - sqlclosecheck # We don't use SQL
     - staticcheck
     - stylecheck
