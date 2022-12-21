@@ -71,7 +71,7 @@ func deleteVxLANInterface() {
 
 	err := netlinkAPI.New().LinkDel(iface)
 	if err != nil {
-		logger.Errorf(err, "Failed to delete the the vxlan interface %q", VxLANIface)
+		logger.Errorf(err, "Failed to delete the vxlan interface %q", VxLANIface)
 	}
 }
 

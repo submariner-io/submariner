@@ -38,7 +38,7 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 		if kp.vxlanDevice != nil && kp.vxlanDevice.activeEndpointHostname != endpoint.Spec.Hostname {
 			err := kp.vxlanDevice.deleteVxLanIface()
 			if err != nil {
-				return errors.Wrapf(err, "failed to delete the the vxlan interface that points to old endpoint %s",
+				return errors.Wrapf(err, "failed to delete the vxlan interface that points to old endpoint %s",
 					kp.vxlanDevice.activeEndpointHostname)
 			}
 
@@ -87,7 +87,7 @@ func (kp *SyncHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 		kp.vxlanGwIP = nil
 
 		if err != nil {
-			return errors.Wrap(err, "failed to delete the the vxlan interface on Endpoint removal")
+			return errors.Wrap(err, "failed to delete the vxlan interface on Endpoint removal")
 		}
 	}
 

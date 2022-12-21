@@ -101,12 +101,12 @@ func (ovn *SyncHandler) Stop(uninstall bool) error {
 
 	_, err = libovsdbops.DeleteLogicalSwitchPortsOps(ovn.nbdb, nil, &subGatewaySwitch, &subGatewayToLocalNetLsp)
 	if err != nil {
-		logger.Errorf(err, "Failed to to delete logical gateway ports from submariner upstream switch")
+		logger.Errorf(err, "Failed to delete logical gateway ports from submariner upstream switch")
 	}
 
 	err = libovsdbops.DeleteLogicalSwitch(ovn.nbdb, submarinerUpstreamSwitch)
 	if err != nil {
-		logger.Errorf(err, "Failed to to delete submariner upstream switch")
+		logger.Errorf(err, "Failed to delete submariner upstream switch")
 	}
 
 	subGatewayToSubRouterLsp := nbdb.LogicalSwitchPort{
