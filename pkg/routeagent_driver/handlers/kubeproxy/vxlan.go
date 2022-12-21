@@ -102,10 +102,10 @@ func (kp *SyncHandler) createVxLanIface(iface *vxLanIface) error {
 		}
 
 		if err = kp.netLink.LinkAdd(iface.link); err != nil {
-			return errors.Wrap(err, "failed to re-create the the vxlan interface")
+			return errors.Wrap(err, "failed to re-create the vxlan interface")
 		}
 	} else if err != nil {
-		return errors.Wrap(err, "failed to create the the vxlan interface")
+		return errors.Wrap(err, "failed to create the vxlan interface")
 	}
 
 	return nil
@@ -114,7 +114,7 @@ func (kp *SyncHandler) createVxLanIface(iface *vxLanIface) error {
 func (iface *vxLanIface) deleteVxLanIface() error {
 	err := iface.netLink.LinkDel(iface.link)
 	if err != nil {
-		return errors.Wrap(err, "failed to delete the the vxlan interface")
+		return errors.Wrap(err, "failed to delete the vxlan interface")
 	}
 
 	return nil
