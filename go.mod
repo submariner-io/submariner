@@ -19,7 +19,7 @@ require (
 	github.com/uw-labs/lichen v0.1.7
 	github.com/vishvananda/netlink v1.1.1-0.20210518155637-4cb3795f2ccb
 	golang.org/x/sys v0.3.0
-	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20220916014741-473347a5e6e3
+	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20221104135756-97bc4ad4a1cb
 	google.golang.org/protobuf v1.28.1
 	k8s.io/api v0.26.0
 	k8s.io/apimachinery v0.26.0
@@ -66,7 +66,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2 // indirect
 	github.com/mdlayher/genetlink v1.2.0 // indirect
-	github.com/mdlayher/netlink v1.6.0 // indirect
+	github.com/mdlayher/netlink v1.6.2 // indirect
 	github.com/mdlayher/socket v0.2.3 // indirect
 	github.com/moby/spdystream v0.2.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
@@ -89,11 +89,11 @@ require (
 	golang.org/x/crypto v0.1.0 // indirect
 	golang.org/x/net v0.4.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b // indirect
-	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
+	golang.org/x/sync v0.1.0 // indirect
 	golang.org/x/term v0.3.0 // indirect
 	golang.org/x/text v0.5.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
-	golang.zx2c4.com/wireguard v0.0.0-20220407013110-ef5c587f782d // indirect
+	golang.zx2c4.com/wireguard v0.0.0-20220920152132-bb719d3a6e2c // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
