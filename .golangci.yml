@@ -39,21 +39,26 @@ linters-settings:
 linters:
   disable-all: true
   enable:
+    - asasalint
     - asciicheck
     - bidichk
     - bodyclose
+    - containedctx
     - contextcheck
     # - cyclop # This is equivalent to gocyclo
+    - decorder
     - depguard
     - dogsled
     - dupl
     - dupword
     - durationcheck
     - errcheck
+    - errchkjson
     - errorlint
     - errname
+    # - execinquery # No SQL
     - exhaustive
-    # - exhaustivestruct # Not recommended for general use - meant to be used only for special cases
+    # - exhauststruct # Not recommended for general use - meant to be used only for special cases
     - exportloopref
     # - forbidigo # We don't forbid any statements
     # - forcetypeassert # There are many unchecked type assertions that would be the result of a programming error so the
@@ -80,11 +85,15 @@ linters:
     - gosec
     - gosimple
     - govet
+    - grouper
     - importas
     - ineffassign
+    # - interfacebloat # We track complexity elsewhere
     # - ireturn # The argument to always "Return Concrete Types" doesn't seem compelling. It is perfectly valid to return
     #             an interface to avoid exposing the entire underlying struct
     - lll
+    - loggercheck
+    - maintidx
     - makezero
     - misspell
     - nakedret
@@ -94,6 +103,8 @@ linters:
     # - nlreturn # This is reasonable with a block-size of 2 but setting it above isn't honored
     # - noctx # We don't send HTTP requests
     - nolintlint
+    # - nonamedreturns # We don't forbid named returns
+    - nosprintfhostport
     # - paralleltest # Not relevant for Ginkgo UTs
     - prealloc
     - predeclared
@@ -106,6 +117,7 @@ linters:
     - stylecheck
     # - tagliatelle # Inconsistent with stylecheck and not as good
     # - tenv # Not relevant for our Ginkgo UTs
+    - testableexamples
     - testpackage
     # - thelper # Not relevant for our Ginkgo UTs
     # - tparallel # Not relevant for our Ginkgo UTs
@@ -113,6 +125,7 @@ linters:
     - unconvert
     - unparam
     - unused
+    - usestdlibvars
     # - varnamelen # It doesn't seem necessary to enforce a minimum variable name length
     - wastedassign
     - whitespace
