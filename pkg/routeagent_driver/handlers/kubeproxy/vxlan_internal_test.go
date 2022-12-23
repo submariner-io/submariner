@@ -22,7 +22,7 @@ import (
 	"net"
 	"strconv"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	fakeNetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
 	"github.com/submariner-io/submariner/pkg/port"
