@@ -21,7 +21,7 @@ package redundancy
 import (
 	"fmt"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
