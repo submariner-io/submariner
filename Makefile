@@ -35,7 +35,7 @@ export LDFLAGS = -X main.VERSION=$(VERSION)
 
 ifneq (,$(filter external-net,$(_using)))
 export TESTDIR = test/external
-export PLUGIN = scripts/e2e/external/hook
+override export PLUGIN = scripts/e2e/external/hook
 endif
 
 override E2E_ARGS += cluster2 cluster1
