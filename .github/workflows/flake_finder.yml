@@ -16,29 +16,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        deploytool: ['operator']
-        external_net: ['']
-        globalnet: ['', 'globalnet']
-        cable_driver: ['libreswan', 'wireguard']
+        cable-driver: ['libreswan', 'wireguard', 'vxlan']
+        extra-toggles: ['', 'globalnet', 'ovn']
+        exclude:
+          - cable-driver: wireguard
+            extra-toggles: ovn
         include:
-          - external_net: 'external-net'
-            globalnet: 'globalnet'
+          - extra-toggles: globalnet, ovn
+          - extra-toggles: external-net
+          - extra-toggles: external-net, globalnet
     steps:
       - name: Check out the repository
         uses: actions/checkout@755da8c3cf115ac066823e79a1e1788f8940201b
 
       - name: Run E2E deployment and tests
-        if: matrix.external_net != 'external-net'
         uses: submariner-io/shipyard/gh-actions/e2e@devel
         with:
-          using: ${{ matrix.cable_driver }} ${{ matrix.deploytool }} ${{ matrix.globalnet }}
-
-      - name: Run External Network E2E deployment and tests
-        if: matrix.external_net == 'external-net'
-        uses: submariner-io/shipyard/gh-actions/e2e@devel
-        with:
-          using: ${{ matrix.external_net }} ${{ matrix.globalnet }}
-          skip: ""  # Override skipping external network tests
+          using: ${{ matrix.cable-driver }} ${{ matrix.extra-toggles }}
 
       - name: Post mortem
         if: failure()
