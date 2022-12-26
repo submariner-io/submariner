@@ -17,15 +17,18 @@ function get_ip_on_container_network() {
     docker inspect "${container_name}" -f '{{(index .NetworkSettings.Networks "'"${network_name}"'").IPAddress}}'
 }
 
-function docker_network_connect() {
-    network_name=$1
-    container_name=$2
-    if docker inspect "${container_name}" -f '{{(index .NetworkSettings.Networks "'"${network_name}"'").IPAddress}}' >/dev/null 2>&1; then
-      echo "Docker container ${container_name} already has an interface on network ${network_name}"
-      return
-    fi
+function docker_exists() {
+    local type=$1
+    local name=$2
+    local format=$3
+    docker inspect --type="$type" -f "$format" "$name" > /dev/null 2>&1
+}
 
-    docker network connect "${network_name}" "${container_name}"
+function docker_network_connect() {
+    local container=$1
+
+    docker_exists container "$container" "{{(index .NetworkSettings.Networks \"${EXTERNAL_NET}\").IPAddress}}" || \
+            docker network connect "$EXTERNAL_NET" "$container"
 }
 
 function delete_container() {
@@ -43,30 +46,10 @@ function delete_container_network() {
     fi
 }
 
-function create_container_network() {
-    name=$1
-    external_cidrs=$2
-    if [[ $(docker network ls --filter name="^${name}\$" --format="{{ .Name }}" | wc -l) -eq 0 ]]; then
-        docker network create --driver=bridge --subnet="${external_cidrs}" "${name}"
-    else
-        echo "Docker network ${name} already exists, skipping its creation..."
-    fi
-}
-
-function docker_create_ext_container() {
-    external_app=$1
-    external_net=$2
-    if [[ $(docker ps --filter name="${external_app}" --format="{{ .Names }}" | wc -l) -eq 0 ]]; then
-        docker run --cap-add=NET_ADMIN --name "${external_app}" --network "${external_net}" \
-            -d registry.access.redhat.com/ubi7/ubi python -m SimpleHTTPServer 1234
-    else
-        echo "Docker container ${external_app} already exists, skipping its creation..."
-    fi
-}
-
 function setup_external() {
     # Create pseudo-ext docker network
-    create_container_network "${EXTERNAL_NET}" ${EXTERNAL_CIDRS}
+    docker_exists network "$EXTERNAL_NET" || \
+            docker network create --driver=bridge --subnet="$EXTERNAL_CIDRS" "$EXTERNAL_NET"
 
     # Choose the first cluster as the one connected to external application
     extcluster=$(get_external_cluster)
@@ -80,23 +63,25 @@ function setup_external() {
     for node in ${cluster_nodes["${extcluster}"]};do
         if [ "${node}" = "control-plane" ];then
             if [ "${num_control}" -eq 1 ];then
-                docker_network_connect "${EXTERNAL_NET}" "${extcluster}-${node}"
+                docker_network_connect "${extcluster}-${node}"
             else
-                docker_network_connect "${EXTERNAL_NET}" "${extcluster}-${node}${num_control}"
+                docker_network_connect "${extcluster}-${node}${num_control}"
             fi
             num_control=$(( num_control + 1))
         elif [ "${node}" = "worker" ];then
             if [ "${num_worker}" -eq 1 ];then
-                docker_network_connect "${EXTERNAL_NET}" "${extcluster}-${node}"
+                docker_network_connect "${extcluster}-${node}"
             else
-                docker_network_connect "${EXTERNAL_NET}" "${extcluster}-${node}${num_worker}"
+                docker_network_connect "${extcluster}-${node}${num_worker}"
             fi
             num_worker=$(( num_worker + 1))
         fi
     done
 
     # Create external test container on pseudo-ext network
-    docker_create_ext_container ${EXTERNAL_APP} ${EXTERNAL_NET}
+    docker_exists container "${EXTERNAL_APP}" || \
+            docker run --cap-add=NET_ADMIN --name "$EXTERNAL_APP" --network "$EXTERNAL_NET" \
+                -d registry.access.redhat.com/ubi7/ubi python -m SimpleHTTPServer 1234
 
     # Add extra routing in external app
     docker exec -i "${EXTERNAL_APP}" yum install -y iproute
