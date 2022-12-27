@@ -1,26 +1,13 @@
 BASE_BRANCH ?= devel
-PROTOC_VERSION=3.17.3
 export BASE_BRANCH
-export restart ?= all
-
-# Define LOCAL_BUILD to build directly on the host and not inside a Dapper container
-ifdef LOCAL_BUILD
-DAPPER_HOST_ARCH ?= $(shell go env GOHOSTARCH)
-SHIPYARD_DIR ?= ../shipyard
-SCRIPTS_DIR ?= $(SHIPYARD_DIR)/scripts/shared
-
-export DAPPER_HOST_ARCH
-export SHIPYARD_DIR
-export SCRIPTS_DIR
-endif
-
-ifneq (,$(DAPPER_HOST_ARCH))
+PROTOC_VERSION=3.17.3
 
 # Running in Dapper
-
+ifneq (,$(DAPPER_HOST_ARCH))
 IMAGES ?= submariner-gateway submariner-route-agent submariner-globalnet submariner-networkplugin-syncer
 MULTIARCH_IMAGES ?= $(IMAGES)
 PLATFORMS ?= linux/amd64,linux/arm64
+RESTART ?= all
 
 ifneq (,$(filter ovn,$(USING)))
 SETTINGS ?= $(DAPPER_SOURCE)/.shipyard.e2e.ovn.yml
@@ -37,9 +24,6 @@ ifneq (,$(filter external-net,$(_using)))
 export TESTDIR = test/external
 override export PLUGIN = scripts/e2e/external/hook
 endif
-
-override E2E_ARGS += cluster2 cluster1
-override UNIT_TEST_ARGS += test
 
 # When cross-building, we need to map Go architectures and operating systems to Docker buildx platforms:
 # Docker buildx platform | Fedora support? | Go
@@ -111,23 +95,18 @@ bin/lichen:
 	mkdir -p $(@D)
 	go build -o $@ github.com/uw-labs/lichen
 
-ci: validate unit build images
-
 $(TARGETS):
 	./scripts/$@
 
-.PHONY: $(TARGETS) build ci images unit validate licensecheck
-
-else
+.PHONY: $(TARGETS) build licensecheck
 
 # Not running in Dapper
-
+else
 Makefile.dapper:
 	@echo Downloading $@
 	@curl -sfLO https://raw.githubusercontent.com/submariner-io/shipyard/$(BASE_BRANCH)/$@
 
 include Makefile.dapper
-
 endif
 
 # Disable rebuilding Makefile
