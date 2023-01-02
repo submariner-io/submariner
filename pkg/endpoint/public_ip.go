@@ -19,12 +19,14 @@ limitations under the License.
 package endpoint
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"math/rand"
 	"net"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -211,6 +213,12 @@ func publicDNSIP(clientset kubernetes.Interface, namespace, fqdn string) (string
 	ips, err := net.LookupIP(fqdn)
 	if err != nil {
 		return "", errors.Wrapf(err, "error resolving DNS hostname %q for public IP", fqdn)
+	}
+
+	if len(ips) > 1 {
+		sort.Slice(ips, func(i, j int) bool {
+			return bytes.Compare(ips[i], ips[j]) < 0
+		})
 	}
 
 	return ips[0].String(), nil
