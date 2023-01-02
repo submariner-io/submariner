@@ -19,6 +19,7 @@ limitations under the License.
 package cluster
 
 import (
+	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo"
@@ -62,7 +63,7 @@ var _ = PDescribe("[expansion] Test expanding/shrinking an existing cluster flee
 		Expect(nonGatewayNodes).ToNot(HaveLen(0), fmt.Sprintf("No non-gateway nodes found on %q", clusterCName))
 		nonGatewayNode := nonGatewayNodes[0].Name
 		By(fmt.Sprintf("Adding cluster %q by setting the gateway label on node %q", clusterCName, nonGatewayNode))
-		f.SetGatewayLabelOnNode(framework.ClusterC, nonGatewayNode, true)
+		f.SetGatewayLabelOnNode(context.TODO(), framework.ClusterC, nonGatewayNode, true)
 
 		gatewayPod := f.AwaitSubmarinerGatewayPod(framework.ClusterC)
 		By(fmt.Sprintf("Found submariner gateway pod %q on %q", gatewayPod.Name, clusterCName))
@@ -87,7 +88,7 @@ var _ = PDescribe("[expansion] Test expanding/shrinking an existing cluster flee
 
 		By(fmt.Sprintf("Removing cluster %q by unsetting the gateway label and deleting submariner gateway pod %q",
 			clusterCName, gatewayPod.Name))
-		f.SetGatewayLabelOnNode(framework.ClusterC, nonGatewayNode, false)
+		f.SetGatewayLabelOnNode(context.TODO(), framework.ClusterC, nonGatewayNode, false)
 		f.DeletePod(framework.ClusterC, gatewayPod.Name, framework.TestContext.SubmarinerNamespace)
 
 		By(fmt.Sprintf("Verifying that a pod in cluster %q cannot connect to a service in cluster %q", clusterAName, clusterCName))
