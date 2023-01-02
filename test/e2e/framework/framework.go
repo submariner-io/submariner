@@ -24,7 +24,6 @@ import (
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/client/informers/externalversions"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 )
@@ -69,24 +68,4 @@ func (f *Framework) GetGatewayInformer(cluster framework.ClusterIndex) (cache.Sh
 	Expect(cache.WaitForCacheSync(stopCh, informer.HasSynced)).To(BeTrue())
 
 	return informer, stopCh
-}
-
-func GetDeletionChannel(informer cache.SharedIndexInformer) chan string {
-	deletionChannel := make(chan string, 100)
-
-	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		DeleteFunc: func(obj interface{}) {
-			if object, ok := obj.(metav1.Object); !ok {
-				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-				Expect(ok).To(BeTrue(), "tombstone extraction failed")
-				object, ok = tombstone.Obj.(metav1.Object)
-				Expect(ok).To(BeTrue(), "tombstone inner object extraction failed")
-				deletionChannel <- object.GetName()
-			} else {
-				deletionChannel <- object.GetName()
-			}
-		},
-	})
-
-	return deletionChannel
 }

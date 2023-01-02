@@ -19,8 +19,10 @@ limitations under the License.
 package dataplane
 
 import (
+	"context"
 	"fmt"
 	"sort"
+	"strconv"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -36,7 +38,7 @@ const (
 	testContainerName = "ext-test-container"
 )
 
-var simpleHTTPServerCommand = []string{"python", "-m", "SimpleHTTPServer", "80"}
+var simpleHTTPServerCommand = []string{"python", "-m", "SimpleHTTPServer", strconv.Itoa(framework.TestPort)}
 
 type testParams struct {
 	Framework         *framework.Framework
@@ -171,7 +173,9 @@ var _ = Describe("[external-dataplane] Connectivity", func() {
 				networking = framework.PodNetworking
 			})
 
-			When("the pod is not on a gateway", func() {
+			// TODO: It appears like we need some non Submariner changes for this test to pass
+			// https://github.com/submariner-io/submariner/issues/2215#issue-1504443842
+			PWhen("the pod is not on a gateway", func() {
 				verifyInteraction(framework.NonGatewayNode)
 			})
 
@@ -195,7 +199,7 @@ func testExternalConnectivity(p testParams) {
 
 	np := p.Framework.NewNetworkPod(&framework.NetworkPodConfig{
 		Type:          framework.CustomPod,
-		Port:          80,
+		Port:          framework.TestPort,
 		Cluster:       p.Cluster,
 		Scheduling:    p.ClusterScheduling,
 		Networking:    p.Networking,
@@ -229,7 +233,7 @@ func testExternalConnectivity(p testParams) {
 	By(fmt.Sprintf("Sending an http request from external app %q to %q in the cluster %q",
 		dockerIP, targetIP, clusterName))
 
-	command := []string{"curl", "-m", "3", fmt.Sprintf("%s:%d/%s%s", targetIP, 80, p.Framework.Namespace, clusterName)}
+	command := []string{"curl", "-m", "3", fmt.Sprintf("%s:%d/%s%s", targetIP, framework.TestPort, p.Framework.Namespace, clusterName)}
 	_, _ = docker.RunCommandUntil(command...)
 
 	By("Verifying the pod received the request")
@@ -245,8 +249,8 @@ func testExternalConnectivity(p testParams) {
 	By(fmt.Sprintf("Sending an http request from the test pod %q %q in cluster %q to the external app %q",
 		np.Pod.Name, podIP, clusterName, dockerIP))
 
-	cmd := []string{"curl", "-m", "10", fmt.Sprintf("%s:%d/%s%s", dockerIP, 80, p.Framework.Namespace, clusterName)}
-	_, _ = np.RunCommand(cmd)
+	cmd := []string{"curl", "-m", "10", fmt.Sprintf("%s:%d/%s%s", dockerIP, framework.TestPort, p.Framework.Namespace, clusterName)}
+	_, _ = np.RunCommand(context.TODO(), cmd)
 
 	By("Verifying that external app received request")
 	// Only check stderr
