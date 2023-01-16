@@ -61,8 +61,6 @@ dockertogoarch = $(patsubst arm/v7,arm,$(1))
 
 deploy: images
 
-e2e: vendor/modules.txt
-
 golangci-lint: pkg/natdiscovery/proto/natdiscovery.pb.go
 
 unit: pkg/natdiscovery/proto/natdiscovery.pb.go
@@ -70,7 +68,7 @@ unit: pkg/natdiscovery/proto/natdiscovery.pb.go
 %.pb.go: %.proto bin/protoc-gen-go bin/protoc
 	PATH="$(CURDIR)/bin:$$PATH" protoc --go_out=$$(go env GOPATH)/src $<
 
-bin/protoc-gen-go: vendor/modules.txt
+bin/protoc-gen-go:
 	mkdir -p $(@D)
 	GOFLAGS="" GOBIN="$(CURDIR)/bin" go install google.golang.org/protobuf/cmd/protoc-gen-go@$(shell awk '/google.golang.org\/protobuf/ {print $$2}' go.mod)
 
@@ -80,16 +78,16 @@ bin/protoc:
 	unzip protoc-$(PROTOC_VERSION)-linux-x86_64.zip 'bin/*' 'include/*'
 	rm -f protoc-$(PROTOC_VERSION)-linux-x86_64.zip
 
-bin/%/submariner-gateway: vendor/modules.txt main.go $(shell find pkg -not \( -path 'pkg/globalnet*' -o -path 'pkg/routeagent*' \)) pkg/natdiscovery/proto/natdiscovery.pb.go
+bin/%/submariner-gateway: main.go $(shell find pkg -not \( -path 'pkg/globalnet*' -o -path 'pkg/routeagent*' \)) pkg/natdiscovery/proto/natdiscovery.pb.go
 	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ .
 
-bin/%/submariner-route-agent: vendor/modules.txt $(shell find pkg/routeagent_driver)
+bin/%/submariner-route-agent: $(shell find pkg/routeagent_driver)
 	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ ./pkg/routeagent_driver
 
-bin/%/submariner-globalnet: vendor/modules.txt $(shell find pkg/globalnet)
+bin/%/submariner-globalnet: $(shell find pkg/globalnet)
 	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ ./pkg/globalnet
 
-bin/%/submariner-networkplugin-syncer: vendor/modules.txt $(shell find pkg/networkplugin-syncer)
+bin/%/submariner-networkplugin-syncer: $(shell find pkg/networkplugin-syncer)
 	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ ./pkg/networkplugin-syncer
 
 nullstring :=
@@ -109,13 +107,13 @@ licensecheck: export BUILD_DEBUG = true
 licensecheck: $(ARCH_BINARIES) bin/lichen
 	bin/lichen -c .lichen.yaml $(ARCH_BINARIES)
 
-bin/lichen: vendor/modules.txt
+bin/lichen:
 	mkdir -p $(@D)
 	go build -o $@ github.com/uw-labs/lichen
 
 ci: validate unit build images
 
-$(TARGETS): vendor/modules.txt
+$(TARGETS):
 	./scripts/$@
 
 .PHONY: $(TARGETS) build ci images unit validate licensecheck
