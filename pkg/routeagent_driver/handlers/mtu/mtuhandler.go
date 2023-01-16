@@ -32,6 +32,7 @@ import (
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	utilexec "k8s.io/utils/exec"
+	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -143,7 +144,7 @@ func (h *mtuHandler) Init() error {
 }
 
 func (h *mtuHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
-	subnets := extractSubnets(&endpoint.Spec)
+	subnets := extractIPv4Subnets(&endpoint.Spec)
 	for _, subnet := range subnets {
 		err := h.localIPSet.AddEntry(subnet, true)
 		if err != nil {
@@ -173,7 +174,7 @@ func (h *mtuHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 }
 
 func (h *mtuHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
-	subnets := extractSubnets(&endpoint.Spec)
+	subnets := extractIPv4Subnets(&endpoint.Spec)
 	for _, subnet := range subnets {
 		err := h.localIPSet.DelEntry(subnet)
 		if err != nil {
@@ -192,7 +193,7 @@ func (h *mtuHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 }
 
 func (h *mtuHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
-	subnets := extractSubnets(&endpoint.Spec)
+	subnets := extractIPv4Subnets(&endpoint.Spec)
 	for _, subnet := range subnets {
 		err := h.remoteIPSet.AddEntry(subnet, true)
 		if err != nil {
@@ -204,7 +205,7 @@ func (h *mtuHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 }
 
 func (h *mtuHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
-	subnets := extractSubnets(&endpoint.Spec)
+	subnets := extractIPv4Subnets(&endpoint.Spec)
 	for _, subnet := range subnets {
 		err := h.remoteIPSet.DelEntry(subnet)
 		if err != nil {
@@ -215,11 +216,12 @@ func (h *mtuHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	return nil
 }
 
-func extractSubnets(endpoint *submV1.EndpointSpec) []string {
+func extractIPv4Subnets(endpoint *submV1.EndpointSpec) []string {
 	subnets := make([]string, 0, len(endpoint.Subnets))
 
 	for _, subnet := range endpoint.Subnets {
-		if !strings.HasPrefix(subnet, endpoint.PrivateIP+"/") {
+		// Revisit when IPv6 support is added.
+		if k8snet.IsIPv4CIDRString(subnet) {
 			subnets = append(subnets, subnet)
 		}
 	}
@@ -229,8 +231,9 @@ func extractSubnets(endpoint *submV1.EndpointSpec) []string {
 
 func (h *mtuHandler) newNamedIPSet(key string, ipSetIface ipset.Interface) ipset.Named {
 	return ipset.NewNamed(&ipset.IPSet{
-		Name:    key,
-		SetType: ipset.HashNet,
+		Name:       key,
+		SetType:    ipset.HashNet,
+		HashFamily: ipset.ProtocolFamilyIPV4,
 	}, ipSetIface)
 }
 
