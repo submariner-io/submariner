@@ -23,6 +23,7 @@ import (
 
 	"github.com/submariner-io/admiral/pkg/log"
 	k8sV1 "k8s.io/api/core/v1"
+	k8snet "k8s.io/utils/net"
 )
 
 func (kp *SyncHandler) NodeCreated(node *k8sV1.Node) error {
@@ -33,7 +34,8 @@ func (kp *SyncHandler) NodeCreated(node *k8sV1.Node) error {
 	defer kp.syncHandlerMutex.Unlock()
 
 	for i, addr := range node.Status.Addresses {
-		if addr.Type == k8sV1.NodeInternalIP {
+		// Revisit when IPv6 support is added.
+		if addr.Type == k8sV1.NodeInternalIP && k8snet.IsIPv4String(node.Status.Addresses[i].Address) {
 			kp.populateRemoteVtepIps(node.Status.Addresses[i].Address, Add)
 			break
 		}
