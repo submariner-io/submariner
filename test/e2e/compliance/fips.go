@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dataplane
+package compliance
 
 import (
 	"fmt"
@@ -27,7 +27,7 @@ import (
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
 )
 
-var _ = Describe("[dataplane] FIPS", func() {
+var _ = Describe("[compliance] FIPS", func() {
 	f := subFramework.NewFramework("fips-gateway-status")
 
 	When("FIPS mode is enabled for the active gateway node", func() {
