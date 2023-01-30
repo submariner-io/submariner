@@ -4,22 +4,22 @@ updates:
   - package-ecosystem: github-actions
     directory: '/'
     schedule:
-      interval: weekly
+      interval: monthly
   - package-ecosystem: github-actions
     directory: '/'
     target-branch: "release-0.12"
     schedule:
-      interval: weekly
+      interval: monthly
   - package-ecosystem: github-actions
     directory: '/'
     target-branch: "release-0.13"
     schedule:
-      interval: weekly
+      interval: monthly
   - package-ecosystem: github-actions
     directory: '/'
     target-branch: "release-0.14"
     schedule:
-      interval: weekly
+      interval: monthly
   - package-ecosystem: gomod
     directory: "/"
     schedule:
