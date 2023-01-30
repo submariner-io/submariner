@@ -30,6 +30,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cidr"
 	"github.com/submariner-io/submariner/pkg/types"
 	k8sv1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -185,6 +186,7 @@ func (d *DatastoreSyncer) createSyncer() (*broker.Syncer, error) {
 			LocalSourceNamespace: d.syncerConfig.LocalNamespace,
 			LocalResourceType:    &submarinerv1.Endpoint{},
 			LocalTransform:       d.shouldSyncEndpoint,
+			BrokerTransform:      d.shouldSyncRemoteEndpoint,
 			BrokerResourceType:   &submarinerv1.Endpoint{},
 		},
 	}
@@ -212,6 +214,27 @@ func (d *DatastoreSyncer) shouldSyncCluster(obj runtime.Object, numRequeues int,
 	}
 
 	return nil, false
+}
+
+func (d *DatastoreSyncer) shouldSyncRemoteEndpoint(obj runtime.Object, numRequeues int,
+	op resourceSyncer.Operation,
+) (runtime.Object, bool) {
+	endpoint := obj.(*submarinerv1.Endpoint)
+
+	for _, localSubnet := range d.localEndpoint.Spec.Subnets {
+		overlap, err := cidr.IsOverlapping(endpoint.Spec.Subnets, localSubnet)
+		if err != nil {
+			logger.Errorf(err, "Unable to validate if remote CIDR overlaps with local CIDR")
+			return nil, false
+		}
+
+		if overlap {
+			logger.Errorf(nil, "Skip processing the remote endpoint %#v as subnets are overlapping", endpoint)
+			return nil, false
+		}
+	}
+
+	return obj, false
 }
 
 func (d *DatastoreSyncer) ensureExclusiveEndpoint(syncer *broker.Syncer) error {
