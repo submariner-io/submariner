@@ -349,9 +349,9 @@ func testExistingGlobalIngressIPClusterIPSvc(t *globalIngressIPControllerTestDri
 			externalIP := intSvc.Spec.ExternalIPs[0]
 			Expect(externalIP).ToNot(BeEmpty())
 
-			allocatedIP := t.getGlobalIngressIPStatus(globalIngressIPName).AllocatedIP
-			Expect(allocatedIP).ToNot(BeEmpty())
-			Expect(allocatedIP).To(Equal(externalIP))
+			Eventually(func() string {
+				return t.getGlobalIngressIPStatus(globalIngressIPName).AllocatedIP
+			}).Should(Equal(externalIP))
 		})
 	})
 
