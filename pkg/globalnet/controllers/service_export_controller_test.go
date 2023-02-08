@@ -280,6 +280,7 @@ func testServiceWithoutSelector() {
 
 		Context("and then original Endpoints resource is deleted", func() {
 			It("should delete the cloned endpoints", func() {
+				t.awaitEndpoints(controllers.GetInternalSvcName(endpoints.Name))
 				t.deleteEndpoints(endpoints)
 				t.awaitNoEndpoints(controllers.GetInternalSvcName(endpoints.Name))
 			})

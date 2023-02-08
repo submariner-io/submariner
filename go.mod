@@ -7,7 +7,7 @@ require (
 	github.com/coreos/go-iptables v0.6.0
 	github.com/emirpasic/gods v1.18.1
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/onsi/ginkgo/v2 v2.7.1
+	github.com/onsi/ginkgo/v2 v2.8.0
 	github.com/onsi/gomega v1.26.0
 	github.com/ovn-org/libovsdb v0.6.1-0.20220427123326-d7b273399db4
 	github.com/ovn-org/ovn-kubernetes/go-controller v0.0.0-20220511131059-ac1ce4691c0f
@@ -25,7 +25,7 @@ require (
 	k8s.io/apimachinery v0.26.1
 	k8s.io/client-go v0.26.1
 	k8s.io/utils v0.0.0-20221128185143-99ec85e7a448
-	sigs.k8s.io/controller-runtime v0.14.2
+	sigs.k8s.io/controller-runtime v0.14.4
 	sigs.k8s.io/mcs-api v0.1.0
 )
 

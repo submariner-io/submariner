@@ -272,6 +272,17 @@ func (g *gatewayMonitor) startControllers() error {
 
 	g.controllers = append(g.controllers, c)
 
+	// A user is not normally expected to delete the internal service created by the Globalnet controller.
+	// However, when it's accidentally done while the globalnet controller is down, the internal service
+	// remains until the finalizer is removed. We have seen that this intermediate state of
+	// the service can potentially create issues in some deployments. Hence, we identify such internal
+	// services and delete them when the Globalnet controller pod comes up.
+	err = RemoveStaleInternalServices(g.syncerConfig)
+	if err != nil {
+		// Just log an error message as it's non-fatal
+		logger.Errorf(err, "Error removing stale internal services created by Globalnet controller")
+	}
+
 	// The GlobalIngressIP controller needs to be started before the ServiceExport and Service controllers to ensure
 	// reconciliation works properly.
 	c, err = NewGlobalIngressIPController(g.syncerConfig, pool)
