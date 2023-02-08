@@ -27,6 +27,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/finalizer"
 	"github.com/submariner-io/admiral/pkg/resource"
+	"github.com/submariner-io/admiral/pkg/syncer"
+	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	versioned "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
@@ -215,4 +217,36 @@ func RemoveGlobalIPAnnotationOnNode(cfg *rest.Config) {
 	}
 
 	logger.Infof("Successfully removed globalIP annotation from node %q", nodeName)
+}
+
+func RemoveStaleInternalServices(config *syncer.ResourceSyncerConfig) error {
+	_, gvr, err := util.ToUnstructuredResource(&corev1.Service{}, config.RestMapper)
+	if err != nil {
+		return errors.Wrap(err, "error converting resource")
+	}
+
+	services := config.SourceClient.Resource(*gvr)
+
+	svcList, err := services.Namespace(corev1.NamespaceAll).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: InternalServiceLabel,
+	})
+	if err != nil {
+		return errors.Wrap(err, "error listing the services")
+	}
+
+	for i := range svcList.Items {
+		svc := &svcList.Items[i]
+		if !svc.GetDeletionTimestamp().IsZero() {
+			logger.Warningf("Globalnet internal service %s/%s has deletionTimestamp set", svc.GetNamespace(), svc.GetName())
+
+			err := finalizer.Remove(context.TODO(), resource.ForDynamic(services.Namespace(svc.GetNamespace())), svc,
+				InternalServiceFinalizer)
+			if err != nil {
+				return errors.Wrapf(err, "error while removing the finalizer from globalnet internal service %q/%q",
+					svc.GetNamespace(), svc.GetName())
+			}
+		}
+	}
+
+	return nil
 }

@@ -23,6 +23,7 @@ import (
 
 	"github.com/submariner-io/shipyard/test/e2e"
 	_ "github.com/submariner-io/submariner/test/e2e/cluster"
+	_ "github.com/submariner-io/submariner/test/e2e/compliance"
 	_ "github.com/submariner-io/submariner/test/e2e/dataplane"
 	_ "github.com/submariner-io/submariner/test/e2e/redundancy"
 )
