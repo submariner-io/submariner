@@ -36,8 +36,9 @@ jobs:
           commit-message: |
             Update submariner-io/* dependencies to latest
 
-            This checks the current status of this repository against the latest
-            version of all the Submariner projects it depends on.
+            This upgrades all our dependencies on other Submariner projects to their
+            latest development snapshots, ensuring the code in the projects remains
+            coherent and that tests of development images verify the latest code.
           signoff: true
           labels: automated, dependencies
 
