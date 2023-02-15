@@ -23,9 +23,9 @@
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
-Submariner is a tool built to connect overlay networks of different Kubernetes clusters. While most testing is performed against Kubernetes
-clusters that have enabled Flannel/Calico/Canal/Weave/OpenShiftSDN, Submariner should be compatible with most CNI cluster network
-providers, as it utilizes off-the-shelf components to establish encrypted tunnels between each Kubernetes cluster.
+Submariner is a tool built to connect overlay networks of different Kubernetes clusters.
+Submariner is designed to be network plugin (CNI) agnostic and supports both encrypted and
+non-encrypted tunnels between the connected clusters.
 
 Note that Submariner is in an early stage, and while we welcome usage and experimentation, it is quite possible that you could run into
 bugs.
@@ -39,12 +39,12 @@ See the [Architecture section](https://submariner.io/getting-started/architectur
 ### Network Path
 
 The network path of Submariner varies depending on the origin/destination of the IP traffic. In all cases, traffic between two clusters will
-transit between the leader elected (in each cluster) gateway nodes, through `ip xfrm` rules. Each gateway node has a running Charon daemon
-which will perform IPsec keying and policy management.
+transit between the leader elected (in each cluster) gateway nodes, through the configured cable driver.
 
 When the source Pod is on a worker node that is not the elected gateway node, the traffic destined for the remote cluster will transit
-through the submariner VXLAN tunnel (`vx-submariner`) to the local cluster gateway node. On the gateway node, traffic is encapsulated in an
-IPsec tunnel and forwarded to the remote cluster. Once the traffic reaches the destination gateway node, it is routed in one of two ways,
+through the submariner VXLAN tunnel (`vx-submariner`) to the local cluster gateway node.
+On the gateway node, traffic is forwarded to the remote cluster over the configured tunnel.
+Once the traffic reaches the destination gateway node, it is routed in one of two ways,
 depending on the destination CIDR. If the destination CIDR is a Pod network, the traffic is routed via CNI-programmed network. If the
 destination CIDR is a Service network, then traffic is routed through the facility configured via kube-proxy on the destination gateway
 node.
