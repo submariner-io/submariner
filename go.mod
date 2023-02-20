@@ -15,7 +15,7 @@ require (
 	github.com/prometheus-community/pro-bing v0.1.0
 	github.com/prometheus/client_golang v1.14.0
 	github.com/submariner-io/admiral v0.15.0-m2
-	github.com/submariner-io/shipyard v0.15.0-m2
+	github.com/submariner-io/shipyard v0.15.0-m3
 	github.com/uw-labs/lichen v0.1.7
 	github.com/vishvananda/netlink v1.1.1-0.20210518155637-4cb3795f2ccb
 	golang.org/x/sys v0.5.0
@@ -85,11 +85,11 @@ require (
 	github.com/urfave/cli/v2 v2.4.0 // indirect
 	github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae // indirect
 	golang.org/x/crypto v0.1.0 // indirect
-	golang.org/x/net v0.5.0 // indirect
+	golang.org/x/net v0.7.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b // indirect
 	golang.org/x/sync v0.1.0 // indirect
-	golang.org/x/term v0.4.0 // indirect
-	golang.org/x/text v0.6.0 // indirect
+	golang.org/x/term v0.5.0 // indirect
+	golang.org/x/text v0.7.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.zx2c4.com/wireguard v0.0.0-20220920152132-bb719d3a6e2c // indirect
 	google.golang.org/appengine v1.6.7 // indirect
@@ -97,7 +97,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/klog v1.0.0 // indirect
-	k8s.io/klog/v2 v2.80.1 // indirect
+	k8s.io/klog/v2 v2.90.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280 // indirect
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
