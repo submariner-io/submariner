@@ -31,6 +31,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/stringset"
 	submv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cidr"
 	"github.com/submariner-io/submariner/pkg/node"
 	"github.com/submariner-io/submariner/pkg/port"
 	"github.com/submariner-io/submariner/pkg/types"
@@ -63,8 +64,8 @@ func GetLocal(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Inte
 		localSubnets = submSpec.GlobalCidr
 		globalnetEnabled = true
 	} else {
-		localSubnets = append(localSubnets, submSpec.ServiceCidr...)
-		localSubnets = append(localSubnets, submSpec.ClusterCidr...)
+		localSubnets = append(localSubnets, cidr.GetIPv4Subnets(submSpec.ServiceCidr)...)
+		localSubnets = append(localSubnets, cidr.GetIPv4Subnets(submSpec.ClusterCidr)...)
 	}
 
 	backendConfig, err := getBackendConfig(gwNode)

@@ -41,6 +41,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/cableengine"
 	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
 	"github.com/submariner-io/submariner/pkg/cableengine/syncer"
+	"github.com/submariner-io/submariner/pkg/cidr"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/controllers/datastoresyncer"
 	"github.com/submariner-io/submariner/pkg/controllers/tunnel"
@@ -322,8 +323,8 @@ func submarinerClusterFrom(submSpec *types.SubmarinerSpecification) *types.Subma
 		Spec: subv1.ClusterSpec{
 			ClusterID:   submSpec.ClusterID,
 			ColorCodes:  []string{"blue"}, // This is a fake value, used only for upgrade purposes
-			ServiceCIDR: submSpec.ServiceCidr,
-			ClusterCIDR: submSpec.ClusterCidr,
+			ServiceCIDR: cidr.GetIPv4Subnets(submSpec.ServiceCidr),
+			ClusterCIDR: cidr.GetIPv4Subnets(submSpec.ClusterCidr),
 			GlobalCIDR:  submSpec.GlobalCidr,
 		},
 	}
