@@ -26,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/stringset"
+	"github.com/submariner-io/submariner/pkg/cidr"
 	cni "github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/netlink"
@@ -62,8 +63,8 @@ var logger = log.Logger{Logger: logf.Log.WithName("KubeProxy")}
 
 func NewSyncHandler(localClusterCidr, localServiceCidr []string) *SyncHandler {
 	return &SyncHandler{
-		localClusterCidr:        localClusterCidr,
-		localServiceCidr:        localServiceCidr,
+		localClusterCidr:        cidr.GetIPv4Subnets(localClusterCidr),
+		localServiceCidr:        cidr.GetIPv4Subnets(localServiceCidr),
 		localCableDriver:        "",
 		remoteSubnets:           stringset.NewSynchronized(),
 		remoteSubnetGw:          map[string]net.IP{},
