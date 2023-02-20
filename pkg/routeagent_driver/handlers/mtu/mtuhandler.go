@@ -26,6 +26,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable/vxlan"
+	"github.com/submariner-io/submariner/pkg/cidr"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/ipset"
 	"github.com/submariner-io/submariner/pkg/iptables"
@@ -68,7 +69,7 @@ func NewMTUHandler(localClusterCidr []string, isGlobalnet bool, tcpMssValue int)
 	}
 
 	return &mtuHandler{
-		localClusterCidr: localClusterCidr,
+		localClusterCidr: cidr.GetIPv4Subnets(localClusterCidr),
 		forceMss:         forceMss,
 		tcpMssValue:      tcpMssValue,
 	}
