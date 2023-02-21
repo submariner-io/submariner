@@ -40,6 +40,7 @@ jobs:
             latest development snapshots, ensuring the code in the projects remains
             coherent and that tests of development images verify the latest code.
           signoff: true
+          author: GitHub <noreply@github.com>
           labels: automated, dependencies
 
   markdown-link-check-periodic:
