@@ -87,7 +87,7 @@ func IsOverlapping(cidrList []string, cidr string) (bool, error) {
 	return false, nil
 }
 
-func GetIPv4Subnets(cidrList []string) []string {
+func ExtractIPv4Subnets(cidrList []string) []string {
 	var ipv4Cidrs []string
 
 	for _, subnet := range cidrList {
