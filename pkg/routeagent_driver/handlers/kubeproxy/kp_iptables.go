@@ -63,8 +63,8 @@ var logger = log.Logger{Logger: logf.Log.WithName("KubeProxy")}
 
 func NewSyncHandler(localClusterCidr, localServiceCidr []string) *SyncHandler {
 	return &SyncHandler{
-		localClusterCidr:        cidr.GetIPv4Subnets(localClusterCidr),
-		localServiceCidr:        cidr.GetIPv4Subnets(localServiceCidr),
+		localClusterCidr:        cidr.ExtractIPv4Subnets(localClusterCidr),
+		localServiceCidr:        cidr.ExtractIPv4Subnets(localServiceCidr),
 		localCableDriver:        "",
 		remoteSubnets:           stringset.NewSynchronized(),
 		remoteSubnetGw:          map[string]net.IP{},

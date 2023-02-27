@@ -323,8 +323,8 @@ func submarinerClusterFrom(submSpec *types.SubmarinerSpecification) *types.Subma
 		Spec: subv1.ClusterSpec{
 			ClusterID:   submSpec.ClusterID,
 			ColorCodes:  []string{"blue"}, // This is a fake value, used only for upgrade purposes
-			ServiceCIDR: cidr.GetIPv4Subnets(submSpec.ServiceCidr),
-			ClusterCIDR: cidr.GetIPv4Subnets(submSpec.ClusterCidr),
+			ServiceCIDR: cidr.ExtractIPv4Subnets(submSpec.ServiceCidr),
+			ClusterCIDR: cidr.ExtractIPv4Subnets(submSpec.ClusterCidr),
 			GlobalCIDR:  submSpec.GlobalCidr,
 		},
 	}

@@ -69,7 +69,7 @@ func NewMTUHandler(localClusterCidr []string, isGlobalnet bool, tcpMssValue int)
 	}
 
 	return &mtuHandler{
-		localClusterCidr: cidr.GetIPv4Subnets(localClusterCidr),
+		localClusterCidr: cidr.ExtractIPv4Subnets(localClusterCidr),
 		forceMss:         forceMss,
 		tcpMssValue:      tcpMssValue,
 	}

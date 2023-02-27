@@ -64,8 +64,8 @@ func GetLocal(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Inte
 		localSubnets = submSpec.GlobalCidr
 		globalnetEnabled = true
 	} else {
-		localSubnets = append(localSubnets, cidr.GetIPv4Subnets(submSpec.ServiceCidr)...)
-		localSubnets = append(localSubnets, cidr.GetIPv4Subnets(submSpec.ClusterCidr)...)
+		localSubnets = append(localSubnets, cidr.ExtractIPv4Subnets(submSpec.ServiceCidr)...)
+		localSubnets = append(localSubnets, cidr.ExtractIPv4Subnets(submSpec.ClusterCidr)...)
 	}
 
 	backendConfig, err := getBackendConfig(gwNode)
