@@ -29,13 +29,13 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/admiral/pkg/stringset"
 	submv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cidr"
 	"github.com/submariner-io/submariner/pkg/node"
 	"github.com/submariner-io/submariner/pkg/port"
 	"github.com/submariner-io/submariner/pkg/types"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -180,12 +180,12 @@ func getNodeBackendConfig(nodeObj *v1.Node) (map[string]string, error) {
 }
 
 func addConfigFrom(nodeName string, configs, backendConfig map[string]string, warningDuplicate string) error {
-	validConfigs := stringset.New(submv1.ValidGatewayNodeConfig...)
+	validConfigs := sets.New(submv1.ValidGatewayNodeConfig...)
 
 	for cfg, value := range configs {
 		if strings.HasPrefix(cfg, submv1.GatewayConfigPrefix) {
 			config := cfg[len(submv1.GatewayConfigPrefix):]
-			if !validConfigs.Contains(config) {
+			if !validConfigs.Has(config) {
 				return errors.Errorf("unknown config annotation %q on node %q", cfg, nodeName)
 			}
 

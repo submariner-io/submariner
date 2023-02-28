@@ -39,6 +39,7 @@ import (
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
 	k8snet "k8s.io/utils/net"
@@ -50,7 +51,7 @@ func NewGatewayMonitor(spec Specification, localCIDRs []string, config *watcher.
 		baseController: newBaseController(),
 		spec:           spec,
 		isGatewayNode:  atomic.Bool{},
-		localSubnets:   stringset.New(localCIDRs...).Elements(),
+		localSubnets:   sets.New(localCIDRs...).UnsortedList(),
 		remoteSubnets:  stringset.NewSynchronized(),
 	}
 

@@ -26,9 +26,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 const (
@@ -43,14 +43,14 @@ func (ovn *Handler) updateHostNetworkDataplane() error {
 
 	endpointSubnets := ovn.getRemoteSubnets()
 
-	toAdd := currentRuleRemotes.Difference(endpointSubnets)
+	toAdd := endpointSubnets.Difference(currentRuleRemotes).UnsortedList()
 
 	err = ovn.programRulesForRemoteSubnets(toAdd, netlink.RuleAdd, os.IsExist)
 	if err != nil {
 		return errors.Wrap(err, "error adding routing rule")
 	}
 
-	toRemove := endpointSubnets.Difference(currentRuleRemotes)
+	toRemove := currentRuleRemotes.Difference(endpointSubnets).UnsortedList()
 
 	err = ovn.programRulesForRemoteSubnets(toRemove, netlink.RuleDel, os.IsNotExist)
 	if err != nil {
@@ -75,8 +75,8 @@ func (ovn *Handler) updateHostNetworkDataplane() error {
 	return nil
 }
 
-func (ovn *Handler) getExistingIPv4HostNetworkRoutes() (stringset.Interface, error) {
-	currentRuleRemotes := stringset.New()
+func (ovn *Handler) getExistingIPv4HostNetworkRoutes() (sets.Set[string], error) {
+	currentRuleRemotes := sets.New[string]()
 
 	rules, err := netlink.RuleList(netlink.FAMILY_V4)
 	if err != nil {
@@ -85,7 +85,7 @@ func (ovn *Handler) getExistingIPv4HostNetworkRoutes() (stringset.Interface, err
 
 	for i := range rules {
 		if rules[i].Table == constants.RouteAgentHostNetworkTableID && rules[i].Dst != nil {
-			currentRuleRemotes.Add(rules[i].Dst.String())
+			currentRuleRemotes.Insert(rules[i].Dst.String())
 		}
 	}
 

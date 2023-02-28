@@ -26,13 +26,13 @@ import (
 	"time"
 
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/submariner/pkg/ipset"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type IPSet struct {
 	mutex                    sync.Mutex
-	sets                     map[string]stringset.Interface
+	sets                     map[string]sets.Set[string]
 	failOnDestroySetMatchers []interface{}
 	failOnCreateSetMatchers  []interface{}
 	failOnAddEntryMatchers   []interface{}
@@ -43,7 +43,7 @@ var _ = ipset.Interface(&IPSet{})
 
 func New() *IPSet {
 	return &IPSet{
-		sets: map[string]stringset.Interface{},
+		sets: map[string]sets.Set[string]{},
 	}
 }
 
@@ -64,7 +64,7 @@ func (i *IPSet) CreateSet(set *ipset.IPSet, ignoreExistErr bool) error {
 		return fmt.Errorf("IP set %q already exists", set.Name)
 	}
 
-	i.sets[set.Name] = stringset.New()
+	i.sets[set.Name] = sets.New[string]()
 
 	return nil
 }
@@ -78,7 +78,7 @@ func (i *IPSet) FlushSet(set string) error {
 		return nil
 	}
 
-	entries.RemoveAll()
+	entries.Delete(entries.UnsortedList()...)
 
 	return nil
 }
@@ -105,7 +105,7 @@ func (i *IPSet) DestroyAllSets() error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	i.sets = map[string]stringset.Interface{}
+	i.sets = map[string]sets.Set[string]{}
 
 	return nil
 }
@@ -124,9 +124,11 @@ func (i *IPSet) AddEntry(entry string, set *ipset.IPSet, ignoreExistErr bool) er
 		return fmt.Errorf("IP set %q does not exist", set.Name)
 	}
 
-	if !entries.Add(entry) && !ignoreExistErr {
+	if entries.Has(entry) && !ignoreExistErr {
 		return fmt.Errorf("entry %q already exists", entry)
 	}
+
+	entries.Insert(entry)
 
 	return nil
 }
@@ -145,7 +147,7 @@ func (i *IPSet) DelEntry(entry, set string) error {
 		return nil
 	}
 
-	entries.Remove(entry)
+	entries.Delete(entry)
 
 	return nil
 }
@@ -159,7 +161,7 @@ func (i *IPSet) TestEntry(entry, set string) (bool, error) {
 		return false, fmt.Errorf("IP set %q does not exist", set)
 	}
 
-	return entries.Contains(entry), nil
+	return entries.Has(entry), nil
 }
 
 func (i *IPSet) ListEntries(set string) ([]string, error) {
@@ -171,20 +173,20 @@ func (i *IPSet) ListEntries(set string) ([]string, error) {
 		return nil, fmt.Errorf("IP set %q does not exist", set)
 	}
 
-	return entries.Elements(), nil
+	return entries.UnsortedList(), nil
 }
 
 func (i *IPSet) ListSets() ([]string, error) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	sets := []string{}
+	names := []string{}
 
 	for name := range i.sets {
-		sets = append(sets, name)
+		names = append(names, name)
 	}
 
-	return sets, nil
+	return names, nil
 }
 
 func (i *IPSet) GetVersion() (string, error) {
@@ -200,7 +202,7 @@ func (i *IPSet) AddEntryWithOptions(entry *ipset.Entry, set *ipset.IPSet, ignore
 		return fmt.Errorf("IP set %q does not exist", set)
 	}
 
-	entries.Add(entry.String())
+	entries.Insert(entry.String())
 
 	return nil
 }

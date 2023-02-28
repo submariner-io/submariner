@@ -22,12 +22,12 @@ import (
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/libovsdbops"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/nbdb"
 	"github.com/pkg/errors"
-	"github.com/submariner-io/admiral/pkg/stringset"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-func (ovn *SyncHandler) reconcileSubOvnLogicalRouterStaticRoutes(port, nextHop string, remoteSubnets stringset.Interface) error {
+func (ovn *SyncHandler) reconcileSubOvnLogicalRouterStaticRoutes(port, nextHop string, remoteSubnets sets.Set[string]) error {
 	staleLRSRPred := func(item *nbdb.LogicalRouterStaticRoute) bool {
-		return item.OutputPort != nil && *item.OutputPort == port && !remoteSubnets.Contains(item.IPPrefix)
+		return item.OutputPort != nil && *item.OutputPort == port && !remoteSubnets.Has(item.IPPrefix)
 	}
 
 	err := libovsdbops.DeleteLogicalRouterStaticRoutesWithPredicate(ovn.nbdb, submarinerLogicalRouter, staleLRSRPred)
@@ -35,7 +35,7 @@ func (ovn *SyncHandler) reconcileSubOvnLogicalRouterStaticRoutes(port, nextHop s
 		return errors.Wrapf(err, "Failed to list existing ovn logical route static routes for port: %s", port)
 	}
 
-	lrsrToAdd := buildLRSRsFromSubnets(remoteSubnets.Elements(), port, nextHop)
+	lrsrToAdd := buildLRSRsFromSubnets(remoteSubnets.UnsortedList(), port, nextHop)
 
 	for _, lrsr := range lrsrToAdd {
 		LRSRPred := func(item *nbdb.LogicalRouterStaticRoute) bool {

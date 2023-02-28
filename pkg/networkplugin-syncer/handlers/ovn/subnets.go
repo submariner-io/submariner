@@ -19,29 +19,29 @@ limitations under the License.
 package ovn
 
 import (
-	"github.com/submariner-io/admiral/pkg/stringset"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // getNorthSubnetsToAddAndRemove receives the existing state for the north (other clusters) routes in the OVN
-// database as an StringSet, and based on the known remote endpoints it will return the elements that need
+// database, and based on the known remote endpoints it will return the elements that need
 // to be added and removed.
-func (ovn *SyncHandler) getNorthSubnetsToAddAndRemove(existingSubnets stringset.Interface) ([]string, []string) {
+func (ovn *SyncHandler) getNorthSubnetsToAddAndRemove(existingSubnets sets.Set[string]) ([]string, []string) {
 	newSubnets := ovn.remoteEndpointSubnetSet()
 
-	toAdd := existingSubnets.Difference(newSubnets)
-	toRemove := newSubnets.Difference(existingSubnets)
+	toRemove := existingSubnets.Difference(newSubnets).UnsortedList()
+	toAdd := newSubnets.Difference(existingSubnets).UnsortedList()
 
 	return toAdd, toRemove
 }
 
-// remoteEndpointSubnetSet iterates over all known remote endpoints and subnets constructing a StringSet with
+// remoteEndpointSubnetSet iterates over all known remote endpoints and subnets constructing a set of strings with
 // all the remote subnets.
-func (ovn *SyncHandler) remoteEndpointSubnetSet() stringset.Interface {
-	remoteSubnets := stringset.New()
+func (ovn *SyncHandler) remoteEndpointSubnetSet() sets.Set[string] {
+	remoteSubnets := sets.New[string]()
 
 	for _, endpoint := range ovn.remoteEndpoints {
 		for _, subnet := range endpoint.Spec.Subnets {
-			remoteSubnets.Add(subnet)
+			remoteSubnets.Insert(subnet)
 		}
 	}
 
@@ -49,25 +49,25 @@ func (ovn *SyncHandler) remoteEndpointSubnetSet() stringset.Interface {
 }
 
 // getSouthSubnetsToAddAndRemove receives the existing state for the south (our cluster) routes in the OVN
-// submariner_router as an StringSet, and based on the known remote endpoints it will return the elements that need
+// submariner_router, and based on the known remote endpoints it will return the elements that need
 // to be added and removed.
-func (ovn *SyncHandler) getSouthSubnetsToAddAndRemove(existingSubnets stringset.Interface) ([]string, []string) {
+func (ovn *SyncHandler) getSouthSubnetsToAddAndRemove(existingSubnets sets.Set[string]) ([]string, []string) {
 	newSubnets := ovn.localEndpointSubnetSet()
 
-	toAdd := existingSubnets.Difference(newSubnets)
-	toRemove := newSubnets.Difference(existingSubnets)
+	toRemove := existingSubnets.Difference(newSubnets).UnsortedList()
+	toAdd := newSubnets.Difference(existingSubnets).UnsortedList()
 
 	return toAdd, toRemove
 }
 
-// remoteEndpointSubnetSet returns an stringset with all the local subnets for this cluster based on the local endpoint
+// remoteEndpointSubnetSet returns a set of strings with all the local subnets for this cluster based on the local endpoint
 // information.
-func (ovn *SyncHandler) localEndpointSubnetSet() stringset.Interface {
-	localSubnets := stringset.New()
+func (ovn *SyncHandler) localEndpointSubnetSet() sets.Set[string] {
+	localSubnets := sets.New[string]()
 
 	if ovn.localEndpoint != nil {
 		for _, subnet := range ovn.localEndpoint.Spec.Subnets {
-			localSubnets.Add(subnet)
+			localSubnets.Insert(subnet)
 		}
 	}
 
