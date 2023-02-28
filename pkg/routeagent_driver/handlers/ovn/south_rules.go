@@ -23,9 +23,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // handleSubnets builds ip rules, and passes them to the specified netlink function
@@ -34,11 +34,11 @@ import (
 func (ovn *Handler) handleSubnets(remoteSubnets []string, ruleFunc func(rule *netlink.Rule) error,
 	ignoredErrorFunc func(error) bool,
 ) error {
-	localCIDRs := stringset.New(ovn.config.ClusterCidr...)
-	localCIDRs.AddAll(ovn.config.ServiceCidr...)
+	localCIDRs := sets.New(ovn.config.ClusterCidr...)
+	localCIDRs.Insert(ovn.config.ServiceCidr...)
 
 	for _, subnetToHandle := range remoteSubnets {
-		for _, localSubnet := range localCIDRs.Elements() {
+		for _, localSubnet := range localCIDRs.UnsortedList() {
 			rule, err := ovn.getRuleSpec(localSubnet, subnetToHandle, constants.RouteAgentInterClusterNetworkTableID)
 			if err != nil {
 				return errors.Wrapf(err, "error creating rule %#v", rule)
@@ -83,8 +83,8 @@ func (ovn *Handler) getRuleSpec(dest, src string, tableID int) (*netlink.Rule, e
 	return rule, nil
 }
 
-func (ovn *Handler) getExistingIPv4RuleSubnets() (stringset.Interface, error) {
-	currentRuleRemotes := stringset.New()
+func (ovn *Handler) getExistingIPv4RuleSubnets() (sets.Set[string], error) {
+	currentRuleRemotes := sets.New[string]()
 
 	rules, err := netlink.RuleList(netlink.FAMILY_V4)
 	if err != nil {
@@ -93,7 +93,7 @@ func (ovn *Handler) getExistingIPv4RuleSubnets() (stringset.Interface, error) {
 
 	for i := range rules {
 		if rules[i].Table == constants.RouteAgentInterClusterNetworkTableID && rules[i].Src != nil {
-			currentRuleRemotes.Add(rules[i].Src.String())
+			currentRuleRemotes.Insert(rules[i].Src.String())
 		}
 	}
 

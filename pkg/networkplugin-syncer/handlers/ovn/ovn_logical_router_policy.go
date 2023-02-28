@@ -24,15 +24,15 @@ import (
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/libovsdbops"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/nbdb"
 	"github.com/pkg/errors"
-	"github.com/submariner-io/admiral/pkg/stringset"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/pointer"
 )
 
-func (ovn *SyncHandler) reconcileSubOvnLogicalRouterPolicies(remoteSubnets stringset.Interface) error {
+func (ovn *SyncHandler) reconcileSubOvnLogicalRouterPolicies(remoteSubnets sets.Set[string]) error {
 	lrpStalePredicate := func(item *nbdb.LogicalRouterPolicy) bool {
 		subnet := strings.Split(item.Match, " ")[2]
 
-		return item.Priority == ovnRoutePoliciesPrio && !remoteSubnets.Contains(subnet)
+		return item.Priority == ovnRoutePoliciesPrio && !remoteSubnets.Has(subnet)
 	}
 
 	// Cleanup any existing lrps not representing the correct set of remote subnets
@@ -41,7 +41,7 @@ func (ovn *SyncHandler) reconcileSubOvnLogicalRouterPolicies(remoteSubnets strin
 		return errors.Wrapf(err, "failed to delete stale submariner logical route policies")
 	}
 
-	expectedLRPs := buildLRPsFromSubnets(remoteSubnets.Elements())
+	expectedLRPs := buildLRPsFromSubnets(remoteSubnets.UnsortedList())
 
 	for _, lrp := range expectedLRPs {
 		lrpSubPredicate := func(item *nbdb.LogicalRouterPolicy) bool {
@@ -61,7 +61,7 @@ func (ovn *SyncHandler) reconcileSubOvnLogicalRouterPolicies(remoteSubnets strin
 }
 
 // getNorthSubnetsToAddAndRemove receives the existing state for the north (other clusters) routes in the OVN
-// database as an StringSet, and based on the known remote endpoints it will return the elements that need
+// database, and based on the known remote endpoints it will return the elements that need
 // to be added and removed.
 func buildLRPsFromSubnets(subnetsToAdd []string) []*nbdb.LogicalRouterPolicy {
 	toAdd := []*nbdb.LogicalRouterPolicy{}

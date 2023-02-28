@@ -18,14 +18,14 @@ limitations under the License.
 
 package ovn
 
-import "github.com/submariner-io/admiral/pkg/stringset"
+import "k8s.io/apimachinery/pkg/util/sets"
 
-func (ovn *Handler) getRemoteSubnets() stringset.Interface {
-	endpointSubnets := stringset.New()
+func (ovn *Handler) getRemoteSubnets() sets.Set[string] {
+	endpointSubnets := sets.New[string]()
 
 	for _, endpoint := range ovn.remoteEndpoints {
 		for _, subnet := range endpoint.Spec.Subnets {
-			endpointSubnets.Add(subnet)
+			endpointSubnets.Insert(subnet)
 		}
 	}
 

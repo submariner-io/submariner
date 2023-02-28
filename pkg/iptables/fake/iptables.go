@@ -24,14 +24,14 @@ import (
 	"sync"
 
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/submariner/pkg/iptables"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type basicType struct {
 	mutex                    sync.Mutex
-	chainRules               map[string]stringset.Interface
-	tableChains              map[string]stringset.Interface
+	chainRules               map[string]sets.Set[string]
+	tableChains              map[string]sets.Set[string]
 	failOnAppendRuleMatchers []interface{}
 	failOnDeleteRuleMatchers []interface{}
 }
@@ -44,8 +44,8 @@ func New() *IPTables {
 	return &IPTables{
 		Adapter: iptables.Adapter{
 			Basic: &basicType{
-				chainRules:  map[string]stringset.Interface{},
-				tableChains: map[string]stringset.Interface{},
+				chainRules:  map[string]sets.Set[string]{},
+				tableChains: map[string]sets.Set[string]{},
 			},
 		},
 	}
@@ -74,7 +74,7 @@ func (i *basicType) Delete(table, chain string, rulespec ...string) error {
 
 	ruleSet := i.chainRules[table+"/"+chain]
 	if ruleSet != nil {
-		ruleSet.Remove(strings.Join(rulespec, " "))
+		ruleSet.Delete(strings.Join(rulespec, " "))
 	}
 
 	return nil
@@ -91,11 +91,11 @@ func (i *basicType) addRule(table, chain string, rulespec ...string) error {
 
 	ruleSet := i.chainRules[table+"/"+chain]
 	if ruleSet == nil {
-		ruleSet = stringset.New()
+		ruleSet = sets.New[string]()
 		i.chainRules[table+"/"+chain] = ruleSet
 	}
 
-	ruleSet.Add(strings.Join(rulespec, " "))
+	ruleSet.Insert(strings.Join(rulespec, " "))
 
 	return nil
 }
@@ -124,7 +124,7 @@ func (i *basicType) listRules(table, chain string) []string {
 
 	rules := i.chainRules[table+"/"+chain]
 	if rules != nil {
-		return rules.Elements()
+		return rules.UnsortedList()
 	}
 
 	return []string{}
@@ -140,7 +140,7 @@ func (i *basicType) listChains(table string) []string {
 
 	chains := i.tableChains[table]
 	if chains != nil {
-		return chains.Elements()
+		return chains.UnsortedList()
 	}
 
 	return []string{}
@@ -157,7 +157,7 @@ func (i *basicType) ClearChain(table, chain string) error {
 
 	chainSet := i.tableChains[table]
 	if chainSet != nil {
-		chainSet.Remove(chain)
+		chainSet.Delete(chain)
 	}
 
 	return nil
@@ -169,7 +169,7 @@ func (i *basicType) ChainExists(table, chain string) (bool, error) {
 
 	chainSet := i.tableChains[table]
 	if chainSet != nil {
-		return chainSet.Contains(chain), nil
+		return chainSet.Has(chain), nil
 	}
 
 	return false, nil
@@ -186,11 +186,11 @@ func (i *basicType) addChainsFor(table string, chains ...string) {
 
 	chainSet := i.tableChains[table]
 	if chainSet == nil {
-		chainSet = stringset.New()
+		chainSet = sets.New[string]()
 		i.tableChains[table] = chainSet
 	}
 
-	chainSet.AddAll(chains...)
+	chainSet.Insert(chains...)
 }
 
 func (i *IPTables) AwaitChain(table string, stringOrMatcher interface{}) {
