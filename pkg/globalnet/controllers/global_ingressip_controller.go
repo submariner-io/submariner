@@ -206,6 +206,8 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 		extIPs := []string{ips[0]}
 		internalService.Spec.Ports = service.Spec.Ports
 		internalService.Spec.Selector = service.Spec.Selector
+		ipFamilySingleStack := corev1.IPFamilyPolicySingleStack
+		internalService.Spec.IPFamilyPolicy = &ipFamilySingleStack
 		internalService.Spec.ExternalIPs = extIPs
 
 		_, err = createService(internalService, c.services)
