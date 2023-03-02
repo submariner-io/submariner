@@ -31,6 +31,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cidr"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -106,7 +107,8 @@ func main() {
 		logger.Fatalf("Cluster %s is not configured to use globalCidr", spec.ClusterID)
 	}
 
-	gatewayMonitor, err := controllers.NewGatewayMonitor(spec, append(localCluster.Spec.ClusterCIDR, localCluster.Spec.ServiceCIDR...),
+	gatewayMonitor, err := controllers.NewGatewayMonitor(spec, append(cidr.ExtractIPv4Subnets(localCluster.Spec.ClusterCIDR),
+		cidr.ExtractIPv4Subnets(localCluster.Spec.ServiceCIDR)...),
 		&watcher.Config{RestConfig: cfg})
 	logger.FatalOnError(err, "Error creating gatewayMonitor")
 

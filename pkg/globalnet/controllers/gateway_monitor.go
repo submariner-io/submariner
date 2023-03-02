@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
+	k8snet "k8s.io/utils/net"
 )
 
 func NewGatewayMonitor(spec Specification, localCIDRs []string, config *watcher.Config) (Interface, error) {
@@ -161,8 +162,10 @@ func (g *gatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, numR
 		}
 
 		for _, remoteSubnet := range endpoint.Spec.Subnets {
-			g.remoteSubnets.Add(remoteSubnet)
-			g.markRemoteClusterTraffic(remoteSubnet, AddRules)
+			if k8snet.IsIPv4CIDRString(remoteSubnet) {
+				g.remoteSubnets.Add(remoteSubnet)
+				g.markRemoteClusterTraffic(remoteSubnet, AddRules)
+			}
 		}
 
 		return false
@@ -217,8 +220,10 @@ func (g *gatewayMonitor) handleRemovedEndpoint(obj runtime.Object, numRequeues i
 	} else if endpoint.Spec.ClusterID != g.spec.ClusterID {
 		// Endpoint associated with remote cluster is removed, delete the associated flows.
 		for _, remoteSubnet := range endpoint.Spec.Subnets {
-			g.remoteSubnets.Remove(remoteSubnet)
-			g.markRemoteClusterTraffic(remoteSubnet, DeleteRules)
+			if k8snet.IsIPv4CIDRString(remoteSubnet) {
+				g.remoteSubnets.Remove(remoteSubnet)
+				g.markRemoteClusterTraffic(remoteSubnet, DeleteRules)
+			}
 		}
 	}
 
