@@ -25,13 +25,13 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/submariner/pkg/cidr"
 	cni "github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	cniapi "github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -41,10 +41,10 @@ type SyncHandler struct {
 	localClusterCidr []string
 	localServiceCidr []string
 
-	remoteSubnets           stringset.Interface
+	remoteSubnets           sets.Set[string]
 	remoteSubnetGw          map[string]net.IP
-	remoteVTEPs             stringset.Interface
-	routeCacheGWNode        stringset.Interface
+	remoteVTEPs             sets.Set[string]
+	routeCacheGWNode        sets.Set[string]
 	remoteEndpointTimeStamp map[string]v1.Time
 
 	syncHandlerMutex     sync.Mutex
@@ -66,11 +66,11 @@ func NewSyncHandler(localClusterCidr, localServiceCidr []string) *SyncHandler {
 		localClusterCidr:        cidr.ExtractIPv4Subnets(localClusterCidr),
 		localServiceCidr:        cidr.ExtractIPv4Subnets(localServiceCidr),
 		localCableDriver:        "",
-		remoteSubnets:           stringset.NewSynchronized(),
+		remoteSubnets:           sets.New[string](),
 		remoteSubnetGw:          map[string]net.IP{},
 		remoteEndpointTimeStamp: map[string]v1.Time{},
-		remoteVTEPs:             stringset.NewSynchronized(),
-		routeCacheGWNode:        stringset.NewSynchronized(),
+		remoteVTEPs:             sets.New[string](),
+		routeCacheGWNode:        sets.New[string](),
 		isGatewayNode:           false,
 		wasGatewayPreviously:    false,
 		netLink:                 netlink.New(),
