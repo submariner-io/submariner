@@ -45,10 +45,12 @@ func (kp *SyncHandler) TransitionToNonGateway() error {
 
 func (kp *SyncHandler) TransitionToGateway() error {
 	logger.V(log.DEBUG).Info("The current node has become a Gateway")
-	kp.cleanVxSubmarinerRoutes()
 
 	kp.syncHandlerMutex.Lock()
 	defer kp.syncHandlerMutex.Unlock()
+
+	kp.cleanVxSubmarinerRoutes()
+
 	kp.isGatewayNode = true
 	kp.wasGatewayPreviously = true
 
@@ -66,7 +68,7 @@ func (kp *SyncHandler) TransitionToGateway() error {
 	}
 
 	// Add routes to the new endpoint on the GatewayNode.
-	kp.updateRoutingRulesForHostNetworkSupport(kp.remoteSubnets.Elements(), Add)
+	kp.updateRoutingRulesForHostNetworkSupport(kp.remoteSubnets.UnsortedList(), Add)
 
 	return nil
 }

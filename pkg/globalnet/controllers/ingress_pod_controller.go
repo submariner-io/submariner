@@ -23,7 +23,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
-	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -32,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -47,7 +47,7 @@ func startIngressPodController(svc *corev1.Service, config *syncer.ResourceSynce
 		baseSyncerController: newBaseSyncerController(),
 		svcName:              svc.Name,
 		namespace:            svc.Namespace,
-		ingressIPMap:         stringset.NewSynchronized(),
+		ingressIPMap:         sets.New[string](),
 	}
 
 	labelSelector := labels.Set(svc.Spec.Selector).AsSelector().String()
@@ -113,14 +113,14 @@ func (c *ingressPodController) process(from runtime.Object, numRequeues int, op 
 	}
 
 	if op == syncer.Delete {
-		c.ingressIPMap.Remove(ingressIP.Name)
+		c.ingressIPMap.Delete(ingressIP.Name)
 		logger.Infof("ingress Pod %s for service %s deleted", key, c.svcName)
 
 		return ingressIP, false
 	}
 
 	// TODO: handle phase and podIP changes?
-	if c.ingressIPMap.Contains(ingressIP.Name) || pod.Status.Phase != corev1.PodRunning || pod.Status.PodIP == "" {
+	if c.ingressIPMap.Has(ingressIP.Name) || pod.Status.Phase != corev1.PodRunning || pod.Status.PodIP == "" {
 		// Avoid assigning ingressIPs to pods that are not ready with an endpoint IP
 		return nil, false
 	}
@@ -137,7 +137,7 @@ func (c *ingressPodController) process(from runtime.Object, numRequeues int, op 
 		PodRef:     &corev1.LocalObjectReference{Name: pod.Name},
 	}
 
-	c.ingressIPMap.Add(ingressIP.Name)
+	c.ingressIPMap.Insert(ingressIP.Name)
 
 	return ingressIP, false
 }
