@@ -21,6 +21,7 @@ package controllers
 import (
 	"os"
 	"strings"
+	"sync/atomic"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
@@ -47,7 +48,7 @@ func NewGatewayMonitor(spec Specification, localCIDRs []string, config *watcher.
 	gatewayMonitor := &gatewayMonitor{
 		baseController: newBaseController(),
 		spec:           spec,
-		isGatewayNode:  false,
+		isGatewayNode:  atomic.Bool{},
 		localSubnets:   stringset.New(localCIDRs...).Elements(),
 		remoteSubnets:  stringset.NewSynchronized(),
 	}
@@ -132,9 +133,7 @@ func (g *gatewayMonitor) Stop() {
 
 	g.baseController.Stop()
 
-	g.syncMutex.Lock()
 	g.stopControllers()
-	g.syncMutex.Unlock()
 }
 
 func (g *gatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, numRequeues int) bool {
@@ -184,25 +183,18 @@ func (g *gatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, numR
 
 		configureTCPMTUProbe()
 
-		g.syncMutex.Lock()
-		if !g.isGatewayNode {
-			g.isGatewayNode = true
-
+		if g.isGatewayNode.CompareAndSwap(false, true) {
 			err := g.startControllers()
 			if err != nil {
 				logger.Fatalf("Error starting the controllers: %v", err)
 			}
 		}
-		g.syncMutex.Unlock()
 	} else {
 		logger.V(log.DEBUG).Infof("Transitioned to non-gateway node with endpoint private IP %s", endpoint.Spec.PrivateIP)
 
-		g.syncMutex.Lock()
-		if g.isGatewayNode {
+		if g.isGatewayNode.CompareAndSwap(true, false) {
 			g.stopControllers()
-			g.isGatewayNode = false
 		}
-		g.syncMutex.Unlock()
 	}
 
 	return false
@@ -219,12 +211,9 @@ func (g *gatewayMonitor) handleRemovedEndpoint(obj runtime.Object, numRequeues i
 	}
 
 	if endpoint.Spec.Hostname == hostname && endpoint.Spec.ClusterID == g.spec.ClusterID {
-		g.syncMutex.Lock()
-		if g.isGatewayNode {
+		if g.isGatewayNode.CompareAndSwap(true, false) {
 			g.stopControllers()
-			g.isGatewayNode = false
 		}
-		g.syncMutex.Unlock()
 	} else if endpoint.Spec.ClusterID != g.spec.ClusterID {
 		// Endpoint associated with remote cluster is removed, delete the associated flows.
 		for _, remoteSubnet := range endpoint.Spec.Subnets {
@@ -237,6 +226,9 @@ func (g *gatewayMonitor) handleRemovedEndpoint(obj runtime.Object, numRequeues i
 }
 
 func (g *gatewayMonitor) startControllers() error {
+	g.controllersMutex.Lock()
+	defer g.controllersMutex.Unlock()
+
 	logger.Infof("On Gateway node - starting controllers")
 
 	err := g.createGlobalnetChains()
@@ -335,6 +327,9 @@ func (g *gatewayMonitor) startControllers() error {
 }
 
 func (g *gatewayMonitor) stopControllers() {
+	g.controllersMutex.Lock()
+	defer g.controllersMutex.Unlock()
+
 	for _, c := range g.controllers {
 		c.Stop()
 	}
