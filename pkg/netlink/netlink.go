@@ -218,7 +218,8 @@ func DeleteIfaceAndAssociatedRoutes(iface string, tableID int) error {
 
 	link, err := n.LinkByName(iface)
 	if err != nil {
-		if !errors.Is(err, netlink.LinkNotFoundError{}) {
+		//nolint:errorlint // netlink.LinkNotFoundError does not implement method Is(error) bool
+		if _, ok := err.(netlink.LinkNotFoundError); !ok {
 			logger.Warningf("Failed to retrieve the vxlan-tunnel interface: %v", err)
 		}
 
