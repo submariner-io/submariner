@@ -155,7 +155,8 @@ func (kp *SyncHandler) configureRoute(remoteSubnet string, operation Operation, 
 func (kp *SyncHandler) cleanVxSubmarinerRoutes() {
 	link, err := kp.netLink.LinkByName(VxLANIface)
 	if err != nil {
-		if !errors.Is(err, netlink.LinkNotFoundError{}) {
+		//nolint:errorlint // netlink.LinkNotFoundError does not implement method Is(error) bool
+		if _, ok := err.(netlink.LinkNotFoundError); !ok {
 			logger.Errorf(err, "Error retrieving link by name %q", VxLANIface)
 		}
 
