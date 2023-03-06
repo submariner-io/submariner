@@ -37,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/pointer"
 )
 
 func NewClusterGlobalEgressIPController(config *syncer.ResourceSyncerConfig, localSubnets []string,
@@ -59,13 +60,12 @@ func NewClusterGlobalEgressIPController(config *syncer.ResourceSyncerConfig, loc
 
 	federator := federate.NewUpdateStatusFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
 
-	numberOfIPs := DefaultNumberOfClusterEgressIPs
 	defaultEgressIP := &submarinerv1.ClusterGlobalEgressIP{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: constants.ClusterGlobalEgressIPName,
 		},
 		Spec: submarinerv1.ClusterGlobalEgressIPSpec{
-			NumberOfIPs: &numberOfIPs,
+			NumberOfIPs: pointer.Int(DefaultNumberOfClusterEgressIPs),
 		},
 	}
 
