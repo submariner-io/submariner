@@ -25,6 +25,7 @@ import (
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/nbdb"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/stringset"
+	"k8s.io/utils/pointer"
 )
 
 func (ovn *SyncHandler) reconcileSubOvnLogicalRouterPolicies(remoteSubnets stringset.Interface) error {
@@ -63,7 +64,6 @@ func (ovn *SyncHandler) reconcileSubOvnLogicalRouterPolicies(remoteSubnets strin
 // database as an StringSet, and based on the known remote endpoints it will return the elements that need
 // to be added and removed.
 func buildLRPsFromSubnets(subnetsToAdd []string) []*nbdb.LogicalRouterPolicy {
-	tmpDownstreamIP := submarinerDownstreamIP
 	toAdd := []*nbdb.LogicalRouterPolicy{}
 
 	for _, subnet := range subnetsToAdd {
@@ -71,7 +71,7 @@ func buildLRPsFromSubnets(subnetsToAdd []string) []*nbdb.LogicalRouterPolicy {
 			Priority: ovnRoutePoliciesPrio,
 			Action:   "reroute",
 			Match:    "ip4.dst == " + subnet,
-			Nexthop:  &tmpDownstreamIP,
+			Nexthop:  pointer.String(submarinerDownstreamIP),
 			ExternalIDs: map[string]string{
 				"submariner": "true",
 			},
