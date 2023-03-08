@@ -21,10 +21,10 @@ package event
 import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/admiral/pkg/stringset"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	k8sV1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -52,13 +52,13 @@ func (er *Registry) GetName() string {
 }
 
 func (er *Registry) addHandler(eventHandler Handler) error {
-	evNetworkPlugins := stringset.New()
+	evNetworkPlugins := sets.New[string]()
 
 	for _, np := range eventHandler.GetNetworkPlugins() {
-		evNetworkPlugins.Add(np)
+		evNetworkPlugins.Insert(np)
 	}
 
-	if evNetworkPlugins.Contains(AnyNetworkPlugin) || evNetworkPlugins.Contains(er.networkPlugin) {
+	if evNetworkPlugins.Has(AnyNetworkPlugin) || evNetworkPlugins.Has(er.networkPlugin) {
 		if err := eventHandler.Init(); err != nil {
 			return errors.Wrapf(err, "Event handler %q failed to initialize", eventHandler.GetName())
 		}

@@ -24,7 +24,7 @@ import (
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/sbdb"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/admiral/pkg/stringset"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // Ensure the core submariner ovn topology is setup and current.
@@ -141,12 +141,12 @@ func (ovn *SyncHandler) ensureSubmarinerInfra() error {
 func (ovn *SyncHandler) setupOvnClusterRouterLRPs() error {
 	remoteSubnets := ovn.remoteEndpointSubnetSet()
 
-	if remoteSubnets.Size() == 0 {
+	if remoteSubnets.Len() == 0 {
 		logger.V(log.DEBUG).Info("No Remote Subnets to Process")
 		return nil
 	}
 
-	logger.V(log.DEBUG).Infof("Reconciling these raw remote subnets %v to logical router policies", remoteSubnets.Elements())
+	logger.V(log.DEBUG).Infof("Reconciling these raw remote subnets %v to logical router policies", remoteSubnets.UnsortedList())
 
 	return ovn.reconcileSubOvnLogicalRouterPolicies(remoteSubnets)
 }
@@ -216,13 +216,13 @@ func (ovn *SyncHandler) updateSubmarinerRouterRemoteRoutes() error {
 	remoteSubnets := ovn.remoteEndpointSubnetSet()
 
 	logger.V(log.DEBUG).Infof("reconciling north static routes on %q router for subnets %v", submarinerLogicalRouter,
-		remoteSubnets.Elements())
+		remoteSubnets.UnsortedList())
 
 	return ovn.reconcileSubOvnLogicalRouterStaticRoutes(submarinerUpstreamRPort, HostUpstreamIP, remoteSubnets)
 }
 
 func (ovn *SyncHandler) updateSubmarinerRouterLocalRoutes() error {
-	localSubnets := stringset.New(ovn.localClusterCIDR...)
+	localSubnets := sets.New(ovn.localClusterCIDR...)
 
 	logger.Infof("reconciling south static routes on %q for subnets %v", submarinerLogicalRouter,
 		localSubnets)

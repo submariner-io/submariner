@@ -25,7 +25,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	admUtil "github.com/submariner-io/admiral/pkg/util"
@@ -39,6 +38,7 @@ import (
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
 	k8snet "k8s.io/utils/net"
@@ -50,8 +50,8 @@ func NewGatewayMonitor(spec Specification, localCIDRs []string, config *watcher.
 		baseController: newBaseController(),
 		spec:           spec,
 		isGatewayNode:  atomic.Bool{},
-		localSubnets:   stringset.New(localCIDRs...).Elements(),
-		remoteSubnets:  stringset.NewSynchronized(),
+		localSubnets:   sets.New(localCIDRs...).UnsortedList(),
+		remoteSubnets:  sets.New[string](),
 	}
 
 	var err error
@@ -163,7 +163,7 @@ func (g *gatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, numR
 
 		for _, remoteSubnet := range endpoint.Spec.Subnets {
 			if k8snet.IsIPv4CIDRString(remoteSubnet) {
-				g.remoteSubnets.Add(remoteSubnet)
+				g.remoteSubnets.Insert(remoteSubnet)
 				g.markRemoteClusterTraffic(remoteSubnet, AddRules)
 			}
 		}
@@ -176,7 +176,7 @@ func (g *gatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, numR
 		logger.Fatalf("Unable to determine hostname: %v", err)
 	}
 
-	for _, remoteSubnet := range g.remoteSubnets.Elements() {
+	for _, remoteSubnet := range g.remoteSubnets.UnsortedList() {
 		g.markRemoteClusterTraffic(remoteSubnet, AddRules)
 	}
 
@@ -221,7 +221,7 @@ func (g *gatewayMonitor) handleRemovedEndpoint(obj runtime.Object, numRequeues i
 		// Endpoint associated with remote cluster is removed, delete the associated flows.
 		for _, remoteSubnet := range endpoint.Spec.Subnets {
 			if k8snet.IsIPv4CIDRString(remoteSubnet) {
-				g.remoteSubnets.Remove(remoteSubnet)
+				g.remoteSubnets.Delete(remoteSubnet)
 				g.markRemoteClusterTraffic(remoteSubnet, DeleteRules)
 			}
 		}

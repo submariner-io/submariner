@@ -21,8 +21,8 @@ package ovn
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/admiral/pkg/stringset"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 const (
@@ -38,14 +38,14 @@ const (
 var _ = Describe("Remote subnet handling", func() {
 	var (
 		ovn           *SyncHandler
-		remoteSubnets stringset.Interface
-		localSubnets  stringset.Interface
+		remoteSubnets sets.Set[string]
+		localSubnets  sets.Set[string]
 	)
 
 	BeforeEach(func() {
 		ovn = createHandlerWithTestEndpoints()
-		remoteSubnets = stringset.New(cluster1Net1, cluster1Net2, cluster2Net1, cluster2Net2)
-		localSubnets = stringset.New(localNet1, localNet2)
+		remoteSubnets = sets.New(cluster1Net1, cluster1Net2, cluster2Net1, cluster2Net2)
+		localSubnets = sets.New(localNet1, localNet2)
 	})
 
 	When("Handling remote endpoints", func() {
@@ -56,14 +56,14 @@ var _ = Describe("Remote subnet handling", func() {
 		})
 
 		It("should return missing elements to add", func() {
-			remoteSubnets.Remove(cluster1Net2)
+			remoteSubnets.Delete(cluster1Net2)
 			toAdd, toRemove := ovn.getNorthSubnetsToAddAndRemove(remoteSubnets)
 			Expect(toAdd).To(Equal([]string{cluster1Net2}))
 			Expect(toRemove).To(BeEmpty())
 		})
 
 		It("should return unexpected elements to remove", func() {
-			remoteSubnets.Add(unknownNet1)
+			remoteSubnets.Insert(unknownNet1)
 			toAdd, toRemove := ovn.getNorthSubnetsToAddAndRemove(remoteSubnets)
 			Expect(toAdd).To(BeEmpty())
 			Expect(toRemove).To(Equal([]string{unknownNet1}))
@@ -78,14 +78,14 @@ var _ = Describe("Remote subnet handling", func() {
 		})
 
 		It("should return missing elements to add", func() {
-			localSubnets.Remove(localNet1)
+			localSubnets.Delete(localNet1)
 			toAdd, toRemove := ovn.getSouthSubnetsToAddAndRemove(localSubnets)
 			Expect(toAdd).To(Equal([]string{localNet1}))
 			Expect(toRemove).To(BeEmpty())
 		})
 
 		It("should return unexpected elements to remove", func() {
-			localSubnets.Add(unknownNet1)
+			localSubnets.Insert(unknownNet1)
 			toAdd, toRemove := ovn.getSouthSubnetsToAddAndRemove(localSubnets)
 			Expect(toAdd).To(BeEmpty())
 			Expect(toRemove).To(Equal([]string{unknownNet1}))

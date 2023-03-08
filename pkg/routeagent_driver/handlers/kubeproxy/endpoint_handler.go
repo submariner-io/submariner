@@ -113,8 +113,8 @@ func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	}
 
 	for _, inputCidrBlock := range endpoint.Spec.Subnets {
-		if !kp.remoteSubnets.Contains(inputCidrBlock) {
-			kp.remoteSubnets.Add(inputCidrBlock)
+		if !kp.remoteSubnets.Has(inputCidrBlock) {
+			kp.remoteSubnets.Insert(inputCidrBlock)
 		}
 
 		gwIP := endpoint.GatewayIP()
@@ -155,7 +155,7 @@ func (kp *SyncHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	delete(kp.remoteEndpointTimeStamp, endpoint.Spec.ClusterID)
 
 	for _, inputCidrBlock := range endpoint.Spec.Subnets {
-		kp.remoteSubnets.Remove(inputCidrBlock)
+		kp.remoteSubnets.Delete(inputCidrBlock)
 		delete(kp.remoteSubnetGw, inputCidrBlock)
 	}
 	// TODO: Handle a remote endpoint removal use-case

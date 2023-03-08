@@ -264,7 +264,7 @@ func (kp *SyncHandler) createVxLANInterface(activeEndPoint string, ifaceType int
 			return errors.Wrap(err, "failed to create vxlan interface on Gateway Node")
 		}
 
-		for _, fdbAddress := range kp.remoteVTEPs.Elements() {
+		for _, fdbAddress := range kp.remoteVTEPs.UnsortedList() {
 			err = kp.vxlanDevice.AddFDB(net.ParseIP(fdbAddress), "00:00:00:00:00:00")
 			if err != nil {
 				return errors.Wrap(err, "failed to add FDB entry on the Gateway Node vxlan iface")

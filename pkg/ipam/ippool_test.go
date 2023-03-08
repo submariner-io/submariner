@@ -23,8 +23,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/submariner/pkg/ipam"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 const cidrWithSize2 = "169.254.1.0/30"
@@ -145,10 +145,8 @@ func testPoolAllocation() {
 					}
 				}
 
-				set := stringset.New()
-				for _, ip := range ips {
-					Expect(set.Add(ip)).To(BeTrue())
-				}
+				set := sets.New[string](ips...)
+				Expect(set.Len()).To(Equal(len(ips)))
 			})
 		})
 
@@ -254,7 +252,7 @@ func testPoolRelease() {
 
 			ips, err := t.pool.Allocate(t.pool.Size())
 			Expect(err).To(Succeed())
-			Expect(stringset.New(ips...).Contains("169.253.1.1")).To(BeFalse())
+			Expect(sets.New(ips...).Has("169.253.1.1")).To(BeFalse())
 		})
 	})
 }

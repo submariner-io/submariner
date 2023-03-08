@@ -23,7 +23,7 @@ import (
 
 	"github.com/pkg/errors"
 	level "github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/admiral/pkg/stringset"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type Adapter struct {
@@ -104,21 +104,21 @@ func (a *Adapter) UpdateChainRules(table, chain string, rules [][]string) error 
 		return errors.Wrapf(err, "error listing the rules in table %q, chain %q", table, chain)
 	}
 
-	ruleStrings := stringset.New()
+	ruleStrings := sets.New[string]()
 
 	for _, existingRule := range existingRules {
 		ruleSpec := strings.Split(existingRule, " ")
 		if ruleSpec[0] == "-A" {
 			ruleSpec = ruleSpec[2:] // remove "-A", "$chain"
-			ruleStrings.Add(strings.Trim(strings.Join(ruleSpec, " "), " "))
+			ruleStrings.Insert(strings.Trim(strings.Join(ruleSpec, " "), " "))
 		}
 	}
 
 	for _, ruleSpec := range rules {
 		ruleString := strings.Join(ruleSpec, " ")
 
-		if ruleStrings.Contains(ruleString) {
-			ruleStrings.Remove(ruleString)
+		if ruleStrings.Has(ruleString) {
+			ruleStrings.Delete(ruleString)
 		} else {
 			logger.V(level.DEBUG).Infof("Adding iptables rule in %q, %q: %q", table, chain, ruleSpec)
 
@@ -129,7 +129,7 @@ func (a *Adapter) UpdateChainRules(table, chain string, rules [][]string) error 
 	}
 
 	// remaining elements should not be there, remove them
-	for _, rule := range ruleStrings.Elements() {
+	for _, rule := range ruleStrings.UnsortedList() {
 		logger.V(level.DEBUG).Infof("Deleting stale iptables rule in %q, %q: %q", table, chain, rule)
 		ruleSpec := strings.Split(rule, " ")
 
