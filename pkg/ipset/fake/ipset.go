@@ -78,7 +78,7 @@ func (i *IPSet) FlushSet(set string) error {
 		return nil
 	}
 
-	entries.Delete(entries.UnsortedList()...)
+	entries.Clear()
 
 	return nil
 }
