@@ -105,7 +105,7 @@ func (c *FakeEndpoints) Update(ctx context.Context, endpoint *submarineriov1.End
 // Delete takes name of the endpoint and deletes it. Returns an error if one occurs.
 func (c *FakeEndpoints) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(endpointsResource, c.ns, name), &submarineriov1.Endpoint{})
+		Invokes(testing.NewDeleteActionWithOptions(endpointsResource, c.ns, name, opts), &submarineriov1.Endpoint{})
 
 	return err
 }

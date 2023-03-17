@@ -117,7 +117,7 @@ func (c *FakeGlobalEgressIPs) UpdateStatus(ctx context.Context, globalEgressIP *
 // Delete takes name of the globalEgressIP and deletes it. Returns an error if one occurs.
 func (c *FakeGlobalEgressIPs) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(globalegressipsResource, c.ns, name), &submarineriov1.GlobalEgressIP{})
+		Invokes(testing.NewDeleteActionWithOptions(globalegressipsResource, c.ns, name, opts), &submarineriov1.GlobalEgressIP{})
 
 	return err
 }
