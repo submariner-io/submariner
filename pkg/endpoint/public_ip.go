@@ -51,6 +51,9 @@ var publicIPMethods = map[string]publicIPResolverFunction{
 
 var IPv4RE = regexp.MustCompile(`(?:\d{1,3}\.){3}\d{1,3}`)
 
+//nolint:gosec // This is only used to shuffle the list of resolvers
+var randgen = rand.New(rand.NewSource(time.Now().UnixNano()))
+
 func getPublicIPResolvers() string {
 	serverList := []string{
 		"api:ip4.seeip.org", "api:ipecho.net/plain", "api:ifconfig.me",
@@ -58,7 +61,7 @@ func getPublicIPResolvers() string {
 		"api:myexternalip.com/raw", "api:4.tnedi.me", "api:api.ipify.org",
 	}
 
-	rand.Shuffle(len(serverList), func(i, j int) { serverList[i], serverList[j] = serverList[j], serverList[i] })
+	randgen.Shuffle(len(serverList), func(i, j int) { serverList[i], serverList[j] = serverList[j], serverList[i] })
 
 	return strings.Join(serverList, ",")
 }
