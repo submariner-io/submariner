@@ -97,6 +97,10 @@ func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.Subm
 		localCluster:  *localCluster,
 	}
 
+	if strings.EqualFold(localEndpoint.Spec.CableName, CableDriverName) && localEndpoint.Spec.NATEnabled {
+		logger.Warning("VxLan cable-driver is supported only with no NAT deployments")
+	}
+
 	port, err := localEndpoint.Spec.GetBackendPort(v1.UDPPortConfig, defaultPort)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get the UDP port configuration")
