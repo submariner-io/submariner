@@ -13,7 +13,7 @@ jobs:
     steps:
       - name: Get PR commits
         id: 'get-pr-commits'
-        uses: tim-actions/get-pr-commits@c64db31d359214d244884dd68f971a110b29ab83
+        uses: tim-actions/get-pr-commits@8673d84c368f480628607dbe21c88545811ef23a
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
