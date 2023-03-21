@@ -18,7 +18,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 'Verify no "Apply suggestions from code review" commits'
-        uses: tim-actions/commit-message-checker-with-regex@d6d9770051dd6460679d1cab1dcaa8cffc5c2bbd
+        uses: tim-actions/commit-message-checker-with-regex@e16b08b1a7f5cafeb1f8167de05bf1d40239eb5d
         with:
           commits: ${{ steps.get-pr-commits.outputs.commits }}
           pattern: '^(?!.*(apply suggestions from code review))'
@@ -26,7 +26,7 @@ jobs:
           error: 'Commits addressing code review feedback should typically be squashed into the commits under review'
 
       - name: 'Verify no "fixup!" commits'
-        uses: tim-actions/commit-message-checker-with-regex@d6d9770051dd6460679d1cab1dcaa8cffc5c2bbd
+        uses: tim-actions/commit-message-checker-with-regex@e16b08b1a7f5cafeb1f8167de05bf1d40239eb5d
         with:
           commits: ${{ steps.get-pr-commits.outputs.commits }}
           pattern: '^(?!fixup!)'
