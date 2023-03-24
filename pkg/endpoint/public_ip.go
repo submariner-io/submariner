@@ -31,7 +31,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -89,7 +88,9 @@ func getPublicIP(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.I
 		return ip, nil
 	}
 
+	var wrappedErr error
 	resolvers := strings.Split(config, ",")
+
 	for _, resolver := range resolvers {
 		resolver = strings.Trim(resolver, " ")
 
@@ -104,11 +105,15 @@ func getPublicIP(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.I
 		}
 
 		// If this resolver failed, we log it, but we fall back to the next one
-		logger.V(log.DEBUG).Infof("Error resolving public IP with resolver %s, config: %s: %v", resolver, config, err)
+		if wrappedErr == nil {
+			wrappedErr = errors.Wrapf(err, "\nResolver[%q]", resolver)
+		} else {
+			wrappedErr = errors.Wrapf(wrappedErr, "\nResolver[%q]: %v", resolver, err.Error())
+		}
 	}
 
 	if len(resolvers) > 0 {
-		return "", errors.Errorf("Unable to resolve public IP by any of the resolver methods: %s", resolvers)
+		return "", errors.Errorf("Unable to resolve public IP by any of the resolver methods: %v", wrappedErr)
 	}
 
 	return "", nil
