@@ -105,7 +105,7 @@ func (c *FakeGateways) Update(ctx context.Context, gateway *submarineriov1.Gatew
 // Delete takes name of the gateway and deletes it. Returns an error if one occurs.
 func (c *FakeGateways) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(gatewaysResource, c.ns, name), &submarineriov1.Gateway{})
+		Invokes(testing.NewDeleteActionWithOptions(gatewaysResource, c.ns, name, opts), &submarineriov1.Gateway{})
 
 	return err
 }
