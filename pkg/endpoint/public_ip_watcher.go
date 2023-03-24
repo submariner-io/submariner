@@ -71,7 +71,7 @@ func (p *PublicIPWatcher) Run(stopCh <-chan struct{}) {
 func (p *PublicIPWatcher) syncPublicIP() {
 	publicIP, err := getPublicIP(p.config.SubmSpec, p.config.K8sClient, p.config.LocalEndpoint.Spec.BackendConfig)
 	if err != nil {
-		klog.Warningf("Could not determine public IP of the gateway node %q", p.config.LocalEndpoint.Spec.Hostname)
+		klog.Warningf("Could not determine public IP of the gateway node %q: %v", p.config.LocalEndpoint.Spec.Hostname, err)
 		return
 	}
 
