@@ -117,7 +117,7 @@ func (c *FakeGlobalIngressIPs) UpdateStatus(ctx context.Context, globalIngressIP
 // Delete takes name of the globalIngressIP and deletes it. Returns an error if one occurs.
 func (c *FakeGlobalIngressIPs) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(globalingressipsResource, c.ns, name), &submarineriov1.GlobalIngressIP{})
+		Invokes(testing.NewDeleteActionWithOptions(globalingressipsResource, c.ns, name, opts), &submarineriov1.GlobalIngressIP{})
 
 	return err
 }

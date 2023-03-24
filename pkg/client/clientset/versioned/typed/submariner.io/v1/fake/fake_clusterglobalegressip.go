@@ -117,7 +117,7 @@ func (c *FakeClusterGlobalEgressIPs) UpdateStatus(ctx context.Context, clusterGl
 // Delete takes name of the clusterGlobalEgressIP and deletes it. Returns an error if one occurs.
 func (c *FakeClusterGlobalEgressIPs) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(clusterglobalegressipsResource, c.ns, name), &submarineriov1.ClusterGlobalEgressIP{})
+		Invokes(testing.NewDeleteActionWithOptions(clusterglobalegressipsResource, c.ns, name, opts), &submarineriov1.ClusterGlobalEgressIP{})
 
 	return err
 }
