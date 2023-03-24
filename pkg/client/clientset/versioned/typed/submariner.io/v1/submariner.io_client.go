@@ -19,6 +19,8 @@ limitations under the License.
 package v1
 
 import (
+	"net/http"
+
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/client/clientset/versioned/scheme"
 	rest "k8s.io/client-go/rest"
@@ -64,12 +66,28 @@ func (c *SubmarinerV1Client) GlobalIngressIPs(namespace string) GlobalIngressIPI
 }
 
 // NewForConfig creates a new SubmarinerV1Client for the given config.
+// NewForConfig is equivalent to NewForConfigAndClient(c, httpClient),
+// where httpClient was generated with rest.HTTPClientFor(c).
 func NewForConfig(c *rest.Config) (*SubmarinerV1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := rest.RESTClientFor(&config)
+	httpClient, err := rest.HTTPClientFor(&config)
+	if err != nil {
+		return nil, err
+	}
+	return NewForConfigAndClient(&config, httpClient)
+}
+
+// NewForConfigAndClient creates a new SubmarinerV1Client for the given config and http client.
+// Note the http client provided takes precedence over the configured transport values.
+func NewForConfigAndClient(c *rest.Config, h *http.Client) (*SubmarinerV1Client, error) {
+	config := *c
+	if err := setConfigDefaults(&config); err != nil {
+		return nil, err
+	}
+	client, err := rest.RESTClientForConfigAndClient(&config, h)
 	if err != nil {
 		return nil, err
 	}
