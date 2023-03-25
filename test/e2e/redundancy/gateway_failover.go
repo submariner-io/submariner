@@ -104,7 +104,7 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 	By(fmt.Sprintf("Found new submariner gateway pod %q", newGatewayPod.Name))
 
 	By(fmt.Sprintf("Waiting for the gateway to be up and connected %q", newGatewayPod.Name))
-	f.AwaitGatewayFullyConnected(framework.ClusterIndex(primaryCluster), resource.EnsureValidName(activeGateway.Name))
+	AwaitNewSubmarinerGatewayFullyConnected(f, framework.ClusterIndex(primaryCluster), activeGateway.Name, activeGateway.UID)
 
 	By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", secondaryClusterName, primaryClusterName))
 	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
@@ -145,6 +145,21 @@ func AwaitNewSubmarinerGatewayPod(f *subFramework.Framework, cluster framework.C
 
 		return false, fmt.Sprintf("Expecting new gateway pod (UID %q matches previous instance)", prevPodUID), nil
 	}).(*v1.Pod)
+}
+
+func AwaitNewSubmarinerGatewayFullyConnected(f *subFramework.Framework, cluster framework.ClusterIndex, name string,
+	prevPodUID types.UID,
+) *subv1.Gateway {
+	return framework.AwaitUntil("await new submariner gateway", func() (interface{}, error) {
+		return f.AwaitGatewayFullyConnected(cluster, resource.EnsureValidName(name)), nil
+	}, func(result interface{}) (bool, string, error) {
+		gw := result.(*subv1.Gateway)
+		if gw.ObjectMeta.UID != prevPodUID {
+			return true, "", nil
+		}
+
+		return false, fmt.Sprintf("Expecting new gateway (UID %q matches previous instance)", prevPodUID), nil
+	}).(*subv1.Gateway)
 }
 
 func defaultEndpointType() tcp.EndpointType {

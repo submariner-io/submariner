@@ -560,7 +560,7 @@ func (t *testDriver) run() {
 	go informer.Run(t.stopInformer)
 	Expect(cache.WaitForCacheSync(t.stopInformer, informer.HasSynced)).To(BeTrue())
 
-	t.syncer.Run(t.stopSyncer)
+	go t.syncer.Run(t.stopSyncer)
 
 	Expect(t.healthChecker.Start(t.stopSyncer)).To(Succeed())
 }
