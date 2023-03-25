@@ -30,6 +30,9 @@ import (
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -51,7 +54,7 @@ var _ = Describe("[redundancy] Gateway fail-over tests", func() {
 		})
 	})
 
-	When("multiple gateway nodes are configured and fail-over is initiated", func() {
+	PWhen("multiple gateway nodes are configured and fail-over is initiated", func() {
 		It("should activate the passive gateway and be able to connect from another cluster", func() {
 			testGatewayFailOverScenario(f)
 		})
@@ -99,6 +102,16 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 
 	By(fmt.Sprintf("Deleting submariner gateway pod %q", gatewayPod.Name))
 	f.DeletePod(framework.ClusterIndex(primaryCluster), gatewayPod.Name, framework.TestContext.SubmarinerNamespace)
+
+	Eventually(func() bool {
+		_, err := framework.DynClients[primaryCluster].Resource(schema.GroupVersionResource{
+			Group:    "submariner.io",
+			Version:  "v1",
+			Resource: "gateways",
+		}).Namespace(framework.TestContext.SubmarinerNamespace).Get(context.TODO(), activeGateway.Name, metav1.GetOptions{})
+
+		return apierrors.IsNotFound(err)
+	}, 60).Should(BeTrue())
 
 	newGatewayPod := AwaitNewSubmarinerGatewayPod(f, framework.ClusterIndex(primaryCluster), gatewayPod.ObjectMeta.UID)
 	By(fmt.Sprintf("Found new submariner gateway pod %q", newGatewayPod.Name))

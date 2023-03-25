@@ -85,6 +85,7 @@ func NewGatewaySyncer(engine cableengine.Engine, client v1typed.GatewayInterface
 func (gs *GatewaySyncer) Run(stopCh <-chan struct{}) {
 	go func() {
 		wait.Until(gs.syncGatewayStatus, GatewayUpdateInterval, stopCh)
+		time.Sleep(15 * time.Second)
 		gs.CleanupGatewayEntry()
 	}()
 
