@@ -509,19 +509,9 @@ func (i *libreswan) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint) e
 		for lsi := range leftSubnets {
 			for rsi := range rightSubnets {
 				connectionName := fmt.Sprintf("%s-%d-%d", endpoint.Spec.CableName, lsi, rsi)
+				args := []string{"--delete", "--name", connectionName}
 
-				args := []string{}
-
-				args = append(args, "--delete",
-					"--name", connectionName)
-
-				klog.Infof("Whacking with %v", args)
-
-				cmd := exec.Command("/usr/libexec/ipsec/whack", args...)
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-
-				if err := cmd.Run(); err != nil {
+				if err := whack(args...); err != nil {
 					var exitError *exec.ExitError
 					if errors.As(err, &exitError) {
 						klog.Errorf("error deleting a connection with args %v; got exit code %d: %v", args, exitError.ExitCode(), err)
