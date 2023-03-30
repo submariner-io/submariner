@@ -22,6 +22,7 @@ import (
 	"context"
 	"flag"
 	"net/http"
+	"net/http/pprof"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
@@ -135,6 +136,7 @@ func startHTTPServer(spec controllers.Specification) *http.Server {
 	srv := &http.Server{Addr: ":" + spec.MetricsPort, ReadHeaderTimeout: 60 * time.Second}
 
 	http.Handle("/metrics", promhttp.Handler())
+	http.HandleFunc("/debug", pprof.Profile)
 
 	go func() {
 		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {

@@ -20,6 +20,7 @@ package libreswan
 
 import (
 	"bufio"
+	"context"
 	"encoding/base64"
 	"fmt"
 	"os"
@@ -43,6 +44,7 @@ import (
 
 const (
 	cableDriverName = "libreswan"
+	whackTimeout    = 5 * time.Second
 )
 
 var logger = log.Logger{Logger: logf.Log.WithName("libreswan")}
@@ -169,8 +171,11 @@ func (i *libreswan) Init() error {
 var trafficStatusRE = regexp.MustCompile(`.* "([^"]+)"[^,]*, .*inBytes=(\d+), outBytes=(\d+).*`)
 
 func retrieveActiveConnectionStats() (map[string]int, map[string]int, error) {
+	ctx, cancel := context.WithTimeout(context.TODO(), whackTimeout)
+	defer cancel()
+
 	// Retrieve active tunnels from the daemon
-	cmd := exec.Command("/usr/libexec/ipsec/whack", "--trafficstatus")
+	cmd := exec.CommandContext(ctx, "/usr/libexec/ipsec/whack", "--trafficstatus")
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -301,13 +306,20 @@ func whack(args ...string) error {
 	var err error
 
 	for i := 0; i < 3; i++ {
-		cmd := exec.Command("/usr/libexec/ipsec/whack", args...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
+		err := func() error {
+			ctx, cancel := context.WithTimeout(context.TODO(), whackTimeout)
+			defer cancel()
 
-		logger.V(log.TRACE).Infof("Whacking with %v", args)
+			cmd := exec.CommandContext(ctx, "/usr/libexec/ipsec/whack", args...)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
 
-		if err = cmd.Run(); err == nil {
+			logger.V(log.TRACE).Infof("Whacking with %v", args)
+
+			return cmd.Run() //nolint:wrapcheck // No need to wrap here
+		}()
+
+		if err == nil {
 			break
 		}
 
@@ -514,19 +526,9 @@ func (i *libreswan) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint) e
 		for lsi := range leftSubnets {
 			for rsi := range rightSubnets {
 				connectionName := fmt.Sprintf("%s-%d-%d", endpoint.Spec.CableName, lsi, rsi)
+				args := []string{"--delete", "--name", connectionName}
 
-				args := []string{}
-
-				args = append(args, "--delete",
-					"--name", connectionName)
-
-				logger.Infof("Whacking with %v", args)
-
-				cmd := exec.Command("/usr/libexec/ipsec/whack", args...)
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-
-				if err := cmd.Run(); err != nil {
+				if err := whack(args...); err != nil {
 					var exitError *exec.ExitError
 					if errors.As(err, &exitError) {
 						logger.Errorf(err, "Error deleting a connection with args %v; got exit code %d", args, exitError.ExitCode())
