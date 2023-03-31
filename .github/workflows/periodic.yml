@@ -22,7 +22,7 @@ jobs:
       - name: Update internal submariner-io/* dependencies to latest
         run: |
           for dep in $(awk '!/module/ && /github.com.submariner-io/ { print $1 }' go.mod)
-            do go get ${dep}@devel
+            do go get ${dep}@release-0.15
           done
 
       - name: Create Pull Request
