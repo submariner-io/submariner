@@ -1,14 +1,27 @@
 ---
-name: End to End Default
+name: End to End
 
 on:
   pull_request:
+    types: [labeled, opened, synchronize, reopened]
 
 permissions: {}
 
 jobs:
-  e2e:
+  images:
+    name: Images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3
+
+      - name: Build the images if necessary
+        uses: submariner-io/shipyard/gh-actions/cache-images@devel
+
+  # Both E2E jobs have the same name; the default job is un-suffixed, the full jobs are suffixed with their matrix combination
+  e2e-default:
     name: E2E
+    needs: images
     timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
@@ -17,6 +30,37 @@ jobs:
 
       - name: Run E2E deployment and tests
         uses: submariner-io/shipyard/gh-actions/e2e@devel
+
+      - name: Post mortem
+        if: failure()
+        uses: submariner-io/shipyard/gh-actions/post-mortem@devel
+
+  e2e-full:
+    name: E2E
+    needs: images
+    if: contains(github.event.pull_request.labels.*.name, 'ready-to-test')
+    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cable-driver: ['libreswan', 'wireguard', 'vxlan']
+        extra-toggles: ['', 'globalnet', 'ovn']
+        exclude:
+          - cable-driver: wireguard
+            extra-toggles: ovn
+        include:
+          - extra-toggles: globalnet, ovn
+          - extra-toggles: external-net
+          - extra-toggles: external-net, globalnet
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3
+
+      - name: Run E2E deployment and tests
+        uses: submariner-io/shipyard/gh-actions/e2e@devel
+        with:
+          using: ${{ matrix.cable-driver }} ${{ matrix.extra-toggles }}
 
       - name: Post mortem
         if: failure()
