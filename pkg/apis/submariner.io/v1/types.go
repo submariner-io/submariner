@@ -196,6 +196,7 @@ func (c *Connection) SetStatus(status ConnectionStatus, messageFormat string, a 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:shortName="geip"
+// +kubebuilder:subresource:status
 
 // GlobalEgressIP defines a policy for allocating GlobalIPs for selected pods in the namespace of the GlobalEgressIP object.
 type GlobalEgressIP struct {
@@ -254,6 +255,7 @@ type GlobalEgressIPList struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:scope="Cluster",shortName="cgeip"
+// +kubebuilder:subresource:status
 // ClusterGlobalEgressIP defines a policy for allocating GlobalIPs at the cluster level to be used when no GlobalEgressIP
 // applies.
 type ClusterGlobalEgressIP struct {
@@ -290,6 +292,7 @@ type ClusterGlobalEgressIPList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:shortName="giip"
 // +kubebuilder:printcolumn:JSONPath=".status.allocatedIP",name="IP",description="Global IP Allocated",type="string"
+// +kubebuilder:subresource:status
 
 type GlobalIngressIP struct {
 	metav1.TypeMeta   `json:",inline"`
