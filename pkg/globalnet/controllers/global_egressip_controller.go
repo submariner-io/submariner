@@ -291,6 +291,12 @@ func (c *globalEgressIPController) onDelete(numRequeues int, globalEgressIP *sub
 
 	namedIPSet := c.newNamedIPSet(key)
 
+	if len(globalEgressIP.Status.AllocatedIPs) == 0 && len(podWatcher.allocatedIPs) > 0 {
+		// Refer to issue for more details: https://github.com/submariner-io/submariner/issues/2388
+		logger.Warningf("Using the cached allocatedIPs %q to delete the iptables rules for key %q", podWatcher.allocatedIPs, key)
+		globalEgressIP.Status.AllocatedIPs = podWatcher.allocatedIPs
+	}
+
 	requeue := c.flushGlobalEgressRulesAndReleaseIPs(key, namedIPSet.Name(), numRequeues, globalEgressIP)
 	if requeue {
 		return requeue
@@ -304,7 +310,11 @@ func (c *globalEgressIPController) onDelete(numRequeues int, globalEgressIP *sub
 		}
 	}
 
-	logger.Infof("Successfully deleted all the iptables/ipset rules for %q ", key)
+	if numRequeues >= maxRequeues {
+		logger.Infof("Failed to delete all the iptables/ipset rules for %q even after %d retries", key, numRequeues)
+	} else {
+		logger.Infof("Successfully deleted all the iptables/ipset rules for %q ", key)
+	}
 
 	return false
 }
@@ -350,6 +360,7 @@ func (c *globalEgressIPController) createPodWatcher(key string, namedIPSet ipset
 
 	c.podWatchers[key] = podWatcher
 	podWatcher.podSelector = globalEgressIP.Spec.PodSelector
+	podWatcher.allocatedIPs = globalEgressIP.Status.AllocatedIPs
 
 	logger.Infof("Started pod watcher for %q", key)
 
