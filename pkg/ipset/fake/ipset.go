@@ -193,7 +193,7 @@ func (i *IPSet) GetVersion() (string, error) {
 	return "v7.6", nil
 }
 
-func (i *IPSet) AddEntryWithOptions(entry *ipset.Entry, set *ipset.IPSet, ignoreExistErr bool) error {
+func (i *IPSet) AddEntryWithOptions(entry *ipset.Entry, set *ipset.IPSet, _ bool) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -207,7 +207,7 @@ func (i *IPSet) AddEntryWithOptions(entry *ipset.Entry, set *ipset.IPSet, ignore
 	return nil
 }
 
-func (i *IPSet) DelEntryWithOptions(set, entry string, options ...string) error {
+func (i *IPSet) DelEntryWithOptions(set, entry string, _ ...string) error {
 	return i.DelEntry(set, entry)
 }
 

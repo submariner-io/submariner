@@ -80,7 +80,7 @@ func (ev *HandlerBase) Init() error {
 	return nil
 }
 
-func (ev *HandlerBase) Stop(uninstall bool) error {
+func (ev *HandlerBase) Stop(_ bool) error {
 	return nil
 }
 
@@ -92,38 +92,38 @@ func (ev *HandlerBase) TransitionToGateway() error {
 	return nil
 }
 
-func (ev *HandlerBase) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
+func (ev *HandlerBase) LocalEndpointCreated(_ *submV1.Endpoint) error {
 	return nil
 }
 
-func (ev *HandlerBase) LocalEndpointUpdated(endpoint *submV1.Endpoint) error {
+func (ev *HandlerBase) LocalEndpointUpdated(_ *submV1.Endpoint) error {
 	return nil
 }
 
-func (ev *HandlerBase) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
+func (ev *HandlerBase) LocalEndpointRemoved(_ *submV1.Endpoint) error {
 	return nil
 }
 
-func (ev *HandlerBase) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
+func (ev *HandlerBase) RemoteEndpointCreated(_ *submV1.Endpoint) error {
 	return nil
 }
 
-func (ev *HandlerBase) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
+func (ev *HandlerBase) RemoteEndpointUpdated(_ *submV1.Endpoint) error {
 	return nil
 }
 
-func (ev *HandlerBase) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
+func (ev *HandlerBase) RemoteEndpointRemoved(_ *submV1.Endpoint) error {
 	return nil
 }
 
-func (ev *HandlerBase) NodeCreated(node *k8sV1.Node) error {
+func (ev *HandlerBase) NodeCreated(_ *k8sV1.Node) error {
 	return nil
 }
 
-func (ev *HandlerBase) NodeUpdated(node *k8sV1.Node) error {
+func (ev *HandlerBase) NodeUpdated(_ *k8sV1.Node) error {
 	return nil
 }
 
-func (ev *HandlerBase) NodeRemoved(node *k8sV1.Node) error {
+func (ev *HandlerBase) NodeRemoved(_ *k8sV1.Node) error {
 	return nil
 }

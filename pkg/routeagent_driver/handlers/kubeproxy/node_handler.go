@@ -44,7 +44,7 @@ func (kp *SyncHandler) NodeCreated(node *k8sV1.Node) error {
 	return nil
 }
 
-func (kp *SyncHandler) NodeUpdated(node *k8sV1.Node) error {
+func (kp *SyncHandler) NodeUpdated(_ *k8sV1.Node) error {
 	return nil
 }
 

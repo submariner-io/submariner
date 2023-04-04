@@ -84,8 +84,8 @@ const (
 )
 
 // NewLibreswan starts an IKE daemon using Libreswan and configures it to manage Submariner's endpoints.
-func NewLibreswan(localEndpoint *types.SubmarinerEndpoint, localCluster *types.SubmarinerCluster) (cable.Driver, error) {
-	// We'll panic if localEndpoint or localCluster are nil, this is intentional
+func NewLibreswan(localEndpoint *types.SubmarinerEndpoint, _ *types.SubmarinerCluster) (cable.Driver, error) {
+	// We'll panic if localEndpoint is nil, this is intentional
 	ipSecSpec := specification{}
 
 	err := envconfig.Process(ipsecSpecEnvVarPrefix, &ipSecSpec)

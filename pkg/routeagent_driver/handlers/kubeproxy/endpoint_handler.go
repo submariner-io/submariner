@@ -71,7 +71,7 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 	return nil
 }
 
-func (kp *SyncHandler) LocalEndpointUpdated(endpoint *submV1.Endpoint) error {
+func (kp *SyncHandler) LocalEndpointUpdated(_ *submV1.Endpoint) error {
 	return nil
 }
 
@@ -136,7 +136,7 @@ func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	return nil
 }
 
-func (kp *SyncHandler) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
+func (kp *SyncHandler) RemoteEndpointUpdated(_ *submV1.Endpoint) error {
 	return nil
 }
 
