@@ -59,7 +59,7 @@ func (i *basicType) AppendUnique(table, chain string, rulespec ...string) error 
 	return i.addRule(table, chain, rulespec...)
 }
 
-func (i *basicType) Insert(table, chain string, pos int, rulespec ...string) error {
+func (i *basicType) Insert(table, chain string, _ int, rulespec ...string) error {
 	return i.addRule(table, chain, rulespec...)
 }
 

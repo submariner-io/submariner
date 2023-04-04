@@ -98,7 +98,7 @@ func startIngressPodController(svc *corev1.Service, config *syncer.ResourceSynce
 	return controller, nil
 }
 
-func (c *ingressPodController) process(from runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
+func (c *ingressPodController) process(from runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	pod := from.(*corev1.Pod)
 	key, _ := cache.MetaNamespaceKeyFunc(pod)
 
