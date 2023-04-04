@@ -230,9 +230,10 @@ func (kp *SyncHandler) reconcileRoutes(vxlanGw net.IP) error {
 		found := false
 
 		for i := range currentRouteList {
-			if currentRouteList[i].Gw == nil || currentRouteList[i].Dst == nil {
-			} else if currentRouteList[i].Gw.Equal(route.Gw) && currentRouteList[i].Dst.String() == route.Dst.String() {
+			if currentRouteList[i].Gw != nil && currentRouteList[i].Dst != nil &&
+				currentRouteList[i].Gw.Equal(route.Gw) && currentRouteList[i].Dst.String() == route.Dst.String() {
 				logger.V(log.DEBUG).Infof("Found equivalent route, not adding")
+
 				found = true
 			}
 		}
