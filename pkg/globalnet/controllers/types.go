@@ -123,10 +123,11 @@ type globalEgressIPController struct {
 }
 
 type egressPodWatcher struct {
-	stopCh      chan struct{}
-	ipSetName   string
-	namedIPSet  ipset.Named
-	podSelector *metav1.LabelSelector
+	stopCh       chan struct{}
+	ipSetName    string
+	namedIPSet   ipset.Named
+	podSelector  *metav1.LabelSelector
+	allocatedIPs []string
 }
 
 type clusterGlobalEgressIPController struct {
