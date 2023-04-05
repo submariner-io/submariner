@@ -455,7 +455,7 @@ func (runner *runner) DelEntry(entry, set string) error {
 	return err
 }
 
-func (runner *runner) DelEntryWithOptions(set, entry string, options ...string) error {
+func (runner *runner) DelEntryWithOptions(set, entry string, _ ...string) error {
 	// ipset del should not add options
 	err := runner.run([]string{"del", set, entry}, "error deleting entry %q from set %q", entry, set)
 	if IsNotFoundError(err) {

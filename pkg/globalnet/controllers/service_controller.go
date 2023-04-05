@@ -94,7 +94,7 @@ func (c *serviceController) Start() error {
 	return nil
 }
 
-func (c *serviceController) process(from runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
+func (c *serviceController) process(from runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	service := from.(*corev1.Service)
 
 	if service.Spec.Type != corev1.ServiceTypeClusterIP {

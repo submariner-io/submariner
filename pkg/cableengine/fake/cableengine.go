@@ -110,7 +110,7 @@ func (e *Engine) VerifyRemoveCable(expected *v1.EndpointSpec) {
 	Eventually(e.removeCable, 5).Should(Receive(Equal(expected)), "RemoveCable was not invoked")
 }
 
-func (e *Engine) SetupNATDiscovery(natDiscovery natdiscovery.Interface) {
+func (e *Engine) SetupNATDiscovery(_ natdiscovery.Interface) {
 }
 
 func (e *Engine) Cleanup() error {

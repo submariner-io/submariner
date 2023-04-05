@@ -113,7 +113,7 @@ func (h *controller) Start(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (h *controller) endpointCreatedorUpdated(obj runtime.Object, numRequeues int) bool {
+func (h *controller) endpointCreatedorUpdated(obj runtime.Object, _ int) bool {
 	logger.V(log.TRACE).Infof("Endpoint created: %#v", obj)
 
 	endpointCreated := obj.(*submarinerv1.Endpoint)
@@ -162,7 +162,7 @@ func (h *controller) endpointCreatedorUpdated(obj runtime.Object, numRequeues in
 	return false
 }
 
-func (h *controller) endpointDeleted(obj runtime.Object, numRequeues int) bool {
+func (h *controller) endpointDeleted(obj runtime.Object, _ int) bool {
 	endpointDeleted := obj.(*submarinerv1.Endpoint)
 	if obj, found := h.pingers.Load(endpointDeleted.Spec.CableName); found {
 		pinger := obj.(PingerInterface)

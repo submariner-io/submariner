@@ -146,7 +146,7 @@ func resolvePublicIP(k8sClient kubernetes.Interface, namespace string, parts []s
 	return method(k8sClient, namespace, parts[1])
 }
 
-func publicAPI(clientset kubernetes.Interface, namespace, value string) (string, error) {
+func publicAPI(_ kubernetes.Interface, _, value string) (string, error) {
 	url := "https://" + value
 
 	httpClient := http.Client{
@@ -168,7 +168,7 @@ func publicAPI(clientset kubernetes.Interface, namespace, value string) (string,
 	return firstIPv4InString(string(body))
 }
 
-func publicIP(clientset kubernetes.Interface, namespace, value string) (string, error) {
+func publicIP(_ kubernetes.Interface, _, value string) (string, error) {
 	return firstIPv4InString(value)
 }
 
@@ -214,7 +214,7 @@ func publicLoadBalancerIP(clientset kubernetes.Interface, namespace, loadBalance
 	return ip, err //nolint:wrapcheck  // No need to wrap here
 }
 
-func publicDNSIP(clientset kubernetes.Interface, namespace, fqdn string) (string, error) {
+func publicDNSIP(_ kubernetes.Interface, _, fqdn string) (string, error) {
 	ips, err := net.LookupIP(fqdn)
 	if err != nil {
 		return "", errors.Wrapf(err, "error resolving DNS hostname %q for public IP", fqdn)

@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func (d *DatastoreSyncer) handleCreateOrUpdateNode(obj runtime.Object, numRequeues int) bool {
+func (d *DatastoreSyncer) handleCreateOrUpdateNode(obj runtime.Object, _ int) bool {
 	node := obj.(*k8sv1.Node)
 	if node.Name != d.localNodeName {
 		return false

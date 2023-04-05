@@ -95,7 +95,7 @@ func startIngressEndpointsController(svc *corev1.Service, config *syncer.Resourc
 	return controller, nil
 }
 
-func (c *ingressEndpointsController) process(from runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
+func (c *ingressEndpointsController) process(from runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	endpoints := from.(*corev1.Endpoints)
 
 	switch op {
