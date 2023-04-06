@@ -80,11 +80,11 @@ var _ = Describe("GetLocal", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(endpoint.Spec.ClusterID).To(Equal("east"))
 		Expect(endpoint.Spec.CableName).To(HavePrefix("submariner-cable-east-"))
-		Expect(endpoint.Spec.Hostname).NotTo(Equal(""))
+		Expect(endpoint.Spec.Hostname).NotTo(BeEmpty())
 		Expect(endpoint.Spec.PrivateIP).To(Equal(testPrivateIP))
 		Expect(endpoint.Spec.Backend).To(Equal("backend"))
 		Expect(endpoint.Spec.Subnets).To(Equal(subnets))
-		Expect(endpoint.Spec.NATEnabled).To(Equal(false))
+		Expect(endpoint.Spec.NATEnabled).To(BeFalse())
 		Expect(endpoint.Spec.BackendConfig[testUDPPortLabel]).To(Equal(testUDPPort))
 	})
 

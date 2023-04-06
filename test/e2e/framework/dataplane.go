@@ -157,7 +157,7 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams, egressIPT
 		" then break; else sleep " + strconv.Itoa(int(p.ConnectionTimeout/2)) + "; fi; done"}
 
 	stdOut, _, err := execCmdInBash(p, cmd, connectorPod.Pod)
-	Expect(err).To(BeNil())
+	Expect(err).ToNot(HaveOccurred())
 
 	By(fmt.Sprintf("Connector pod is scheduled on node %q", connectorPod.Pod.Spec.NodeName))
 
