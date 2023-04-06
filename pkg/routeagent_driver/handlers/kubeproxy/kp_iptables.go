@@ -30,7 +30,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	cniapi "github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -44,7 +43,6 @@ type SyncHandler struct {
 	remoteSubnetGw          map[string]net.IP
 	remoteVTEPs             stringset.Interface
 	routeCacheGWNode        stringset.Interface
-	remoteEndpointTimeStamp map[string]v1.Time
 
 	syncHandlerMutex     sync.Mutex
 	isGatewayNode        bool
@@ -67,7 +65,6 @@ func NewSyncHandler(localClusterCidr, localServiceCidr []string) *SyncHandler {
 		localCableDriver:        "",
 		remoteSubnets:           stringset.NewSynchronized(),
 		remoteSubnetGw:          map[string]net.IP{},
-		remoteEndpointTimeStamp: map[string]v1.Time{},
 		remoteVTEPs:             stringset.NewSynchronized(),
 		routeCacheGWNode:        stringset.NewSynchronized(),
 		isGatewayNode:           false,
