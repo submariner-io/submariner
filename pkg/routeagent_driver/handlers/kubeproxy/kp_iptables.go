@@ -30,7 +30,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	cniapi "github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -41,11 +40,10 @@ type SyncHandler struct {
 	localClusterCidr []string
 	localServiceCidr []string
 
-	remoteSubnets           sets.Set[string]
-	remoteSubnetGw          map[string]net.IP
-	remoteVTEPs             sets.Set[string]
-	routeCacheGWNode        sets.Set[string]
-	remoteEndpointTimeStamp map[string]v1.Time
+	remoteSubnets    sets.Set[string]
+	remoteSubnetGw   map[string]net.IP
+	remoteVTEPs      sets.Set[string]
+	routeCacheGWNode sets.Set[string]
 
 	syncHandlerMutex     sync.Mutex
 	isGatewayNode        bool
@@ -63,17 +61,16 @@ var logger = log.Logger{Logger: logf.Log.WithName("KubeProxy")}
 
 func NewSyncHandler(localClusterCidr, localServiceCidr []string) *SyncHandler {
 	return &SyncHandler{
-		localClusterCidr:        cidr.ExtractIPv4Subnets(localClusterCidr),
-		localServiceCidr:        cidr.ExtractIPv4Subnets(localServiceCidr),
-		localCableDriver:        "",
-		remoteSubnets:           sets.New[string](),
-		remoteSubnetGw:          map[string]net.IP{},
-		remoteEndpointTimeStamp: map[string]v1.Time{},
-		remoteVTEPs:             sets.New[string](),
-		routeCacheGWNode:        sets.New[string](),
-		isGatewayNode:           false,
-		wasGatewayPreviously:    false,
-		netLink:                 netlink.New(),
+		localClusterCidr:     cidr.ExtractIPv4Subnets(localClusterCidr),
+		localServiceCidr:     cidr.ExtractIPv4Subnets(localServiceCidr),
+		localCableDriver:     "",
+		remoteSubnets:        sets.New[string](),
+		remoteSubnetGw:       map[string]net.IP{},
+		remoteVTEPs:          sets.New[string](),
+		routeCacheGWNode:     sets.New[string](),
+		isGatewayNode:        false,
+		wasGatewayPreviously: false,
+		netLink:              netlink.New(),
 	}
 }
 

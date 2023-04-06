@@ -23,15 +23,17 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	k8sV1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8serrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type Registry struct {
-	name          string
-	networkPlugin string
-	eventHandlers []Handler
+	name                    string
+	networkPlugin           string
+	eventHandlers           []Handler
+	remoteEndpointTimeStamp map[string]v1.Time
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("EventRegistry")}
@@ -40,9 +42,10 @@ var logger = log.Logger{Logger: logf.Log.WithName("EventRegistry")}
 // Handlers that match the given networkPlugin name.
 func NewRegistry(name, networkPlugin string) *Registry {
 	return &Registry{
-		name:          name,
-		networkPlugin: networkPlugin,
-		eventHandlers: []Handler{},
+		name:                    name,
+		networkPlugin:           networkPlugin,
+		eventHandlers:           []Handler{},
+		remoteEndpointTimeStamp: map[string]v1.Time{},
 	}
 }
 
@@ -122,9 +125,23 @@ func (er *Registry) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 }
 
 func (er *Registry) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
-	return er.invokeHandlers("RemoteEndpointCreated", func(h Handler) error {
+	lastProcessedTime, ok := er.remoteEndpointTimeStamp[endpoint.Spec.ClusterID]
+
+	if ok && lastProcessedTime.After(endpoint.CreationTimestamp.Time) {
+		logger.Infof("Ignoring new remote %#v since a later endpoint was already"+
+			"processed", endpoint)
+		return nil
+	}
+
+	err := er.invokeHandlers("RemoteEndpointCreated", func(h Handler) error {
 		return h.RemoteEndpointCreated(endpoint) //nolint:wrapcheck  // Let the caller wrap it
 	})
+
+	if err == nil {
+		er.remoteEndpointTimeStamp[endpoint.Spec.ClusterID] = endpoint.CreationTimestamp
+	}
+
+	return err
 }
 
 func (er *Registry) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
@@ -134,6 +151,16 @@ func (er *Registry) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
 }
 
 func (er *Registry) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
+	lastProcessedTime, ok := er.remoteEndpointTimeStamp[endpoint.Spec.ClusterID]
+
+	if ok && lastProcessedTime.After(endpoint.CreationTimestamp.Time) {
+		logger.Infof("Ignoring deleted remote %#v since a later endpoint was already"+
+			"processed", endpoint)
+		return nil
+	}
+
+	delete(er.remoteEndpointTimeStamp, endpoint.Spec.ClusterID)
+
 	return er.invokeHandlers("RemoteEndpointRemoved", func(h Handler) error {
 		return h.RemoteEndpointRemoved(endpoint) //nolint:wrapcheck  // Let the caller wrap it
 	})
