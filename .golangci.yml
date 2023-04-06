@@ -65,6 +65,7 @@ linters:
     #                     reasonable recourse would be to panic anyway if checked so this doesn't seem useful
     # - funlen # gocyclo is enabled which is generally a better metric than simply LOC.
     - gci
+    - ginkgolinter
     # - gochecknoglobals # We don't want to forbid global variable constants
     # - gochecknoinits # We use init functions for valid reasons
     - gocognit
