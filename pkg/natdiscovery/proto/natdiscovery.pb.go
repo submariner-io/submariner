@@ -99,6 +99,7 @@ type SubmarinerNATDiscoveryMessage struct {
 
 	Version int32 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
 	// Types that are assignable to Message:
+	//
 	//	*SubmarinerNATDiscoveryMessage_Request
 	//	*SubmarinerNATDiscoveryMessage_Response
 	Message isSubmarinerNATDiscoveryMessage_Message `protobuf_oneof:"message"`
