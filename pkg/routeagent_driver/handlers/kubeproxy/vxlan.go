@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
@@ -270,6 +271,9 @@ func (kp *SyncHandler) createVxLANInterface(activeEndPoint string, ifaceType int
 				return errors.Wrap(err, "failed to add FDB entry on the Gateway Node vxlan iface")
 			}
 		}
+
+		// TODO: Have to identify the root cause of the issue.
+		time.Sleep(2 * time.Second)
 
 		err = kp.netLink.EnableLooseModeReversePathFilter(VxLANIface)
 		if err != nil {
