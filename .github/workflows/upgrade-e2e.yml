@@ -4,6 +4,8 @@ name: Upgrade
 on:
   pull_request:
     branches: [devel]
+  merge_group:
+    branches: [devel]
 
 permissions: {}
 

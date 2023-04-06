@@ -4,6 +4,8 @@ name: End to End
 on:
   pull_request:
     types: [labeled, opened, synchronize, reopened]
+  merge_group:
+    types: [labeled, opened, synchronize, reopened]
 
 permissions: {}
 

@@ -3,12 +3,14 @@ name: Branch Checks
 
 on:
   pull_request:
+  merge_group:
 
 permissions: {}
 
 jobs:
   target_branch:
     name: PR targets branch
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Check that the PR targets devel

@@ -6,6 +6,10 @@ on:
     paths:
       - 'CODEOWNERS'
       - 'CODEOWNERS.in'
+  merge_group:
+    paths:
+      - 'CODEOWNERS'
+      - 'CODEOWNERS.in'
 
 permissions: {}
 

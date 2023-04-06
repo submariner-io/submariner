@@ -16,6 +16,13 @@ on:
       - closed
       - reopened
       - synchronize
+  merge_group:
+    types:
+      - opened
+      - edited
+      - closed
+      - reopened
+      - synchronize
   schedule:
     - cron: '0 0/6 * * *'  # every 6 hours
 
