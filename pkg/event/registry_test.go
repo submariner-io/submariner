@@ -20,6 +20,7 @@ package event_test
 
 import (
 	"errors"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -98,6 +99,41 @@ var _ = Describe("Event Registry", func() {
 						ev.Handler = h.Name
 						Expect(allTestEvents).To(Receive(Equal(ev)))
 					}
+				}
+			})
+		})
+
+		When("the RemoteEndpointCreated notification is fired out of order", func() {
+			It("should skip processing the stale event", func() {
+				now := time.Now()
+				aFewSecondsLater := now.Add(2 * time.Second)
+				staleEndpoint := &submV1.Endpoint{
+					ObjectMeta: v1meta.ObjectMeta{Name: "endpoint1", CreationTimestamp: v1meta.NewTime(now)},
+					Spec:       submV1.EndpointSpec{ClusterID: "eastCluster"},
+				}
+				latestEndpoint := &submV1.Endpoint{
+					ObjectMeta: v1meta.ObjectMeta{Name: "endpoint1", CreationTimestamp: v1meta.NewTime(aFewSecondsLater)},
+					Spec:       submV1.EndpointSpec{ClusterID: "eastCluster"},
+				}
+
+				event := testing.TestEvent{
+					Name:      testing.EvRemoteEndpointCreated,
+					Parameter: latestEndpoint,
+				}
+
+				err := registry.RemoteEndpointCreated(latestEndpoint)
+				Expect(err).To(Succeed())
+
+				for _, h := range matchingHandlers {
+					event.Handler = h.Name
+					Expect(allTestEvents).To(Receive(Equal(event)))
+				}
+
+				err = registry.RemoteEndpointCreated(staleEndpoint)
+				Expect(err).To(Succeed())
+
+				for range matchingHandlers {
+					Expect(allTestEvents).NotTo(Receive(Equal(event)))
 				}
 			})
 		})
