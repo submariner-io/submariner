@@ -177,17 +177,17 @@ func (d *DatastoreSyncer) cleanupResources(client dynamic.NamespaceableResourceI
 func (d *DatastoreSyncer) createSyncer() (*broker.Syncer, error) {
 	d.syncerConfig.ResourceConfigs = []broker.ResourceConfig{
 		{
-			LocalSourceNamespace: d.syncerConfig.LocalNamespace,
-			LocalResourceType:    &submarinerv1.Cluster{},
-			LocalTransform:       d.shouldSyncCluster,
-			BrokerResourceType:   &submarinerv1.Cluster{},
+			LocalSourceNamespace:   d.syncerConfig.LocalNamespace,
+			LocalResourceType:      &submarinerv1.Cluster{},
+			TransformLocalToBroker: d.shouldSyncCluster,
+			BrokerResourceType:     &submarinerv1.Cluster{},
 		},
 		{
-			LocalSourceNamespace: d.syncerConfig.LocalNamespace,
-			LocalResourceType:    &submarinerv1.Endpoint{},
-			LocalTransform:       d.shouldSyncEndpoint,
-			BrokerTransform:      d.shouldSyncRemoteEndpoint,
-			BrokerResourceType:   &submarinerv1.Endpoint{},
+			LocalSourceNamespace:   d.syncerConfig.LocalNamespace,
+			LocalResourceType:      &submarinerv1.Endpoint{},
+			TransformLocalToBroker: d.shouldSyncEndpoint,
+			TransformBrokerToLocal: d.shouldSyncRemoteEndpoint,
+			BrokerResourceType:     &submarinerv1.Endpoint{},
 		},
 	}
 
