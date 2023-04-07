@@ -59,7 +59,7 @@ func (i *basicType) AppendUnique(table, chain string, rulespec ...string) error 
 	return i.addRule(table, chain, rulespec...)
 }
 
-func (i *basicType) Insert(table, chain string, pos int, rulespec ...string) error {
+func (i *basicType) Insert(table, chain string, _ int, rulespec ...string) error {
 	return i.addRule(table, chain, rulespec...)
 }
 
@@ -176,7 +176,14 @@ func (i *basicType) ChainExists(table, chain string) (bool, error) {
 }
 
 func (i *basicType) DeleteChain(table, chain string) error {
-	// TODO Implement chain deletion for testing
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
+
+	chainSet := i.tableChains[table]
+	if chainSet != nil {
+		chainSet.Delete(chain)
+	}
+
 	return nil
 }
 

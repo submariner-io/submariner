@@ -116,11 +116,11 @@ func (n *basicType) LinkByName(name string) (netlink.Link, error) {
 	return link, nil
 }
 
-func (n *basicType) LinkSetUp(link netlink.Link) error {
+func (n *basicType) LinkSetUp(_ netlink.Link) error {
 	return nil
 }
 
-func (n *basicType) AddrAdd(link netlink.Link, addr *netlink.Addr) error {
+func (n *basicType) AddrAdd(_ netlink.Link, _ *netlink.Addr) error {
 	return nil
 }
 
@@ -208,7 +208,7 @@ func (n *basicType) RouteGet(destination net.IP) ([]netlink.Route, error) {
 	return routes, nil
 }
 
-func (n *basicType) RouteList(link netlink.Link, family int) ([]netlink.Route, error) {
+func (n *basicType) RouteList(link netlink.Link, _ int) ([]netlink.Route, error) {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
@@ -241,23 +241,23 @@ func (n *basicType) RuleDel(rule *netlink.Rule) error {
 	return nil
 }
 
-func (n *basicType) XfrmPolicyAdd(policy *netlink.XfrmPolicy) error {
+func (n *basicType) XfrmPolicyAdd(_ *netlink.XfrmPolicy) error {
 	return nil
 }
 
-func (n *basicType) XfrmPolicyDel(policy *netlink.XfrmPolicy) error {
+func (n *basicType) XfrmPolicyDel(_ *netlink.XfrmPolicy) error {
 	return nil
 }
 
-func (n *basicType) XfrmPolicyList(family int) ([]netlink.XfrmPolicy, error) {
+func (n *basicType) XfrmPolicyList(_ int) ([]netlink.XfrmPolicy, error) {
 	return []netlink.XfrmPolicy{}, nil
 }
 
-func (n *basicType) EnableLooseModeReversePathFilter(interfaceName string) error {
+func (n *basicType) EnableLooseModeReversePathFilter(_ string) error {
 	return nil
 }
 
-func (n *basicType) ConfigureTCPMTUProbe(mtuProbe, baseMss string) error {
+func (n *basicType) ConfigureTCPMTUProbe(_, _ string) error {
 	return nil
 }
 

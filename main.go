@@ -24,6 +24,7 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"strings"
 	"sync"
@@ -88,6 +89,7 @@ type componentsType struct {
 	gatewayPod         *pod.GatewayPod
 	submSpec           types.SubmarinerSpecification
 	stopCh             <-chan struct{}
+	waitGroup          sync.WaitGroup
 }
 
 const (
@@ -182,7 +184,7 @@ func main() {
 	components.gatewayPod, err = pod.NewGatewayPod(k8sClient)
 	logger.FatalOnError(err, "Error creating a handler to update the gateway pod")
 
-	components.cableEngineSyncer.Run(components.stopCh)
+	components.runAsync(components.cableEngineSyncer.Run)
 
 	if !airGapped {
 		components.initPublicIPWatcher(k8sClient, submarinerClient, localEndpoint)
@@ -214,6 +216,8 @@ func main() {
 	if err := httpServer.Shutdown(context.TODO()); err != nil {
 		logger.Errorf(err, "Error shutting down metrics HTTP server")
 	}
+
+	components.waitGroup.Wait()
 }
 
 func isAirGappedDeployment() bool {
@@ -317,6 +321,15 @@ func (c *componentsType) initPublicIPWatcher(k8sClient kubernetes.Interface, sub
 	c.publicIPWatcher = endpoint.NewPublicIPWatcher(publicIPConfig)
 }
 
+func (c *componentsType) runAsync(run func(<-chan struct{})) {
+	c.waitGroup.Add(1)
+
+	go func() {
+		defer c.waitGroup.Done()
+		run(c.stopCh)
+	}()
+}
+
 func submarinerClusterFrom(submSpec *types.SubmarinerSpecification) *types.SubmarinerCluster {
 	return &types.SubmarinerCluster{
 		ID: submSpec.ClusterID,
@@ -334,6 +347,7 @@ func startHTTPServer(spec *types.SubmarinerSpecification) *http.Server {
 	srv := &http.Server{Addr: ":" + spec.MetricsPort, ReadHeaderTimeout: 60 * time.Second}
 
 	http.Handle("/metrics", promhttp.Handler())
+	http.HandleFunc("/debug", pprof.Profile)
 
 	go func() {
 		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {

@@ -119,7 +119,7 @@ func (c *serviceExportController) Start() error {
 	return nil
 }
 
-func (c *serviceExportController) process(from runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
+func (c *serviceExportController) process(from runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	serviceExport := from.(*mcsv1a1.ServiceExport)
 
 	switch op {

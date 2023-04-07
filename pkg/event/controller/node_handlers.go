@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func (c *Controller) handleRemovedNode(obj runtime.Object, numRequeues int) bool {
+func (c *Controller) handleRemovedNode(obj runtime.Object, _ int) bool {
 	node := obj.(*k8sv1.Node)
 
 	if err := c.handlers.NodeRemoved(node); err != nil {
@@ -35,7 +35,7 @@ func (c *Controller) handleRemovedNode(obj runtime.Object, numRequeues int) bool
 	return false
 }
 
-func (c *Controller) handleCreatedNode(obj runtime.Object, numRequeues int) bool {
+func (c *Controller) handleCreatedNode(obj runtime.Object, _ int) bool {
 	node := obj.(*k8sv1.Node)
 
 	if err := c.handlers.NodeCreated(node); err != nil {
@@ -46,7 +46,7 @@ func (c *Controller) handleCreatedNode(obj runtime.Object, numRequeues int) bool
 	return false
 }
 
-func (c *Controller) handleUpdatedNode(obj runtime.Object, numRequeues int) bool {
+func (c *Controller) handleUpdatedNode(obj runtime.Object, _ int) bool {
 	node := obj.(*k8sv1.Node)
 
 	if err := c.handlers.NodeUpdated(node); err != nil {
@@ -57,7 +57,7 @@ func (c *Controller) handleUpdatedNode(obj runtime.Object, numRequeues int) bool
 	return false
 }
 
-func (c *Controller) isNodeEquivalent(obj1, obj2 *unstructured.Unstructured) bool {
+func (c *Controller) isNodeEquivalent(_, _ *unstructured.Unstructured) bool {
 	// TODO: filter on changes for labels, annotations, podcidr, podcidrs, addresses
 	return false
 }

@@ -137,7 +137,7 @@ func (g *gatewayMonitor) Stop() {
 	g.stopControllers()
 }
 
-func (g *gatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, numRequeues int) bool {
+func (g *gatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, _ int) bool {
 	endpoint := obj.(*v1.Endpoint)
 
 	logger.V(log.DEBUG).Infof("In processNextEndpoint, endpoint info: %+v", endpoint)
@@ -203,7 +203,7 @@ func (g *gatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, numR
 	return false
 }
 
-func (g *gatewayMonitor) handleRemovedEndpoint(obj runtime.Object, numRequeues int) bool {
+func (g *gatewayMonitor) handleRemovedEndpoint(obj runtime.Object, _ int) bool {
 	endpoint := obj.(*v1.Endpoint)
 
 	logger.V(log.DEBUG).Infof("Informed of removed endpoint for gateway monitor: %v", endpoint)

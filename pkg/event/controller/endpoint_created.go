@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func (c *Controller) handleCreatedEndpoint(obj runtime.Object, numRequeues int) bool {
+func (c *Controller) handleCreatedEndpoint(obj runtime.Object, _ int) bool {
 	var err error
 
 	endpoint := obj.(*smv1.Endpoint)

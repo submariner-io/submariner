@@ -84,8 +84,8 @@ type wireguard struct {
 }
 
 // NewDriver creates a new WireGuard driver.
-func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.SubmarinerCluster) (cable.Driver, error) {
-	// We'll panic if localEndpoint or localCluster are nil, this is intentional
+func NewDriver(localEndpoint *types.SubmarinerEndpoint, _ *types.SubmarinerCluster) (cable.Driver, error) {
+	// We'll panic if localEndpoint is nil, this is intentional
 	var err error
 
 	w := wireguard{
