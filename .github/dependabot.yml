@@ -20,6 +20,11 @@ updates:
     target-branch: "release-0.14"
     schedule:
       interval: monthly
+  - package-ecosystem: github-actions
+    directory: '/'
+    target-branch: "release-0.15"
+    schedule:
+      interval: monthly
   - package-ecosystem: gomod
     directory: "/"
     schedule:
