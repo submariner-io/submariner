@@ -176,8 +176,8 @@ github.com/go-logfmt/logfmt v0.5.1/go.mod h1:WYhtIu8zTZfxdn5+rREduYbwxfcBr/Vr6KE
 github.com/go-logr/logr v0.1.0/go.mod h1:ixOQHD9gLJUVQQ2ZOR7zLEifBX6tGkNJF4QyIY7sIas=
 github.com/go-logr/logr v1.2.0/go.mod h1:jdQByPbusPIv2/zmleS9BjJVeZ6kBagPoEUsqbVz/1A=
 github.com/go-logr/logr v1.2.2/go.mod h1:jdQByPbusPIv2/zmleS9BjJVeZ6kBagPoEUsqbVz/1A=
-github.com/go-logr/logr v1.2.3 h1:2DntVwHkVopvECVRSlL5PSo9eG+cAkDCuckLubN+rq0=
-github.com/go-logr/logr v1.2.3/go.mod h1:jdQByPbusPIv2/zmleS9BjJVeZ6kBagPoEUsqbVz/1A=
+github.com/go-logr/logr v1.2.4 h1:g01GSCwiDw2xSZfjJ2/T9M+S6pFdcNtFYsp+Y43HYDQ=
+github.com/go-logr/logr v1.2.4/go.mod h1:jdQByPbusPIv2/zmleS9BjJVeZ6kBagPoEUsqbVz/1A=
 github.com/go-logr/stdr v1.2.2 h1:hSWxHoqTgW2S2qGc0LTAI563KZ5YKYRhT3MFKZMbjag=
 github.com/go-logr/stdr v1.2.2/go.mod h1:mMo/vtBO5dYbehREoey6XUKy/eSumjCCveDpRre4VKE=
 github.com/go-logr/zapr v0.1.0/go.mod h1:tabnROwaDl0UNxkVeFRbY8bwB37GwRv0P8lg6aAiEnk=
@@ -569,8 +569,8 @@ github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.8.0 h1:pSgiaMZlXftHpm5L7V1+rVB+AZJydKsMxsQBIJw4PKk=
 github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
-github.com/submariner-io/admiral v0.15.0-m4.0.20230403140247-e439405cae51 h1:L1mYpXMq68ta3HQU3otNue+M4WYaPbs9HYDfj6lKEF0=
-github.com/submariner-io/admiral v0.15.0-m4.0.20230403140247-e439405cae51/go.mod h1:l74lNDxQIf8Ki2V2a9QIf/UFlHjGireey/zgV3V1j7E=
+github.com/submariner-io/admiral v0.15.0-m4.0.20230407150416-a578003622bf h1:2sv6KEoZDlOEtFt3rD4GMxUoCZYBJ8DOAxS3LavdY4w=
+github.com/submariner-io/admiral v0.15.0-m4.0.20230407150416-a578003622bf/go.mod h1:S3r+9PLoncr+daINO6vWW0zes7NHj29SBFmlBbplyhQ=
 github.com/submariner-io/shipyard v0.15.0-m4 h1:ji+WLE9yvOqUQJnKYhLm0Ajb5WTobkuxrDHSiIkGiEg=
 github.com/submariner-io/shipyard v0.15.0-m4/go.mod h1:txktXeFOmI8g5wOxmuvNgheyZLyRloXbdo4i5gQwGNY=
 github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635/go.mod h1:hkRG7XYTFWNJGYcbNJQlaLq0fg1yr4J4t/NcTQtrfww=
