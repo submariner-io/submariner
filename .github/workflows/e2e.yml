@@ -50,6 +50,8 @@ jobs:
           - cable-driver: wireguard
             extra-toggles: ovn
         include:
+          - extra-toggles: dual-stack
+          - extra-toggles: dual-stack, globalnet
           - extra-toggles: globalnet, ovn
           - extra-toggles: external-net
           - extra-toggles: external-net, globalnet
