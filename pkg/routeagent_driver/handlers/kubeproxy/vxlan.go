@@ -19,11 +19,14 @@ limitations under the License.
 package kubeproxy
 
 import (
+	"bytes"
 	goerrors "errors"
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
@@ -271,12 +274,12 @@ func (kp *SyncHandler) createVxLANInterface(activeEndPoint string, ifaceType int
 			}
 		}
 
-		err = kp.netLink.EnableLooseModeReversePathFilter(VxLANIface)
+		err = kp.ensureLooseModeIsConfigured(VxLANIface)
 		if err != nil {
-			return errors.Wrap(err, "error enabling loose mode")
+			return errors.Wrap(err, "error while validating loose mode")
 		}
 
-		logger.V(log.DEBUG).Infof("Successfully configured reverse path filter to loose mode on %q", VxLANIface)
+		logger.Infof("Successfully configured reverse path filter to loose mode on %q", VxLANIface)
 	} else if ifaceType == VxInterfaceWorker {
 		// non-Gateway/Worker Node
 		attrs := &vxLanAttributes{
@@ -300,4 +303,28 @@ func (kp *SyncHandler) createVxLANInterface(activeEndPoint string, ifaceType int
 	}
 
 	return nil
+}
+
+func (kp *SyncHandler) ensureLooseModeIsConfigured(iface string) error {
+	for i := 0; i < 10; i++ {
+		// Revisit: This is a temporary work-around to fix https://github.com/submariner-io/submariner/issues/2422
+		// Allow the vx-submariner interface to get initialized.
+		time.Sleep(100 * time.Millisecond)
+
+		rpFilterSetting, err := kp.netLink.GetReversePathFilter(iface)
+		if err == nil {
+			if bytes.Equal(rpFilterSetting, []byte("2")) {
+				return nil
+			}
+		} else {
+			logger.Warningf("Error retrieving reverse path filter for %q: %v", iface, err)
+		}
+
+		err = kp.netLink.EnableLooseModeReversePathFilter(iface)
+		if err != nil {
+			return errors.Wrapf(err, "error enabling loose mode on iface %q", iface)
+		}
+	}
+
+	return fmt.Errorf("loose mode not configured on iface %q", iface)
 }
