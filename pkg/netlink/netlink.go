@@ -53,6 +53,7 @@ type Basic interface {
 	XfrmPolicyDel(policy *netlink.XfrmPolicy) error
 	XfrmPolicyList(family int) ([]netlink.XfrmPolicy, error)
 	EnableLooseModeReversePathFilter(interfaceName string) error
+	GetReversePathFilter(interfaceName string) ([]byte, error)
 	ConfigureTCPMTUProbe(mtuProbe, baseMss string) error
 }
 
@@ -152,6 +153,20 @@ func (n *netlinkType) EnableLooseModeReversePathFilter(interfaceName string) err
 	// Enable loose mode (rp_filter=2) reverse path filtering on the vxlan interface.
 	err := setSysctl("/proc/sys/net/ipv4/conf/"+interfaceName+"/rp_filter", []byte("2"))
 	return errors.Wrapf(err, "unable to update rp_filter proc entry for interface %q", interfaceName)
+}
+
+func (n *netlinkType) GetReversePathFilter(interfaceName string) ([]byte, error) {
+	path := "/proc/sys/net/ipv4/conf/" + interfaceName + "/rp_filter"
+
+	existing, err := os.ReadFile(path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to read proc entry for interface %q", interfaceName)
+	}
+
+	// Ignore leading and terminating newlines
+	existing = bytes.Trim(existing, "\n")
+
+	return existing, nil
 }
 
 func (n *netlinkType) FlushRouteTable(tableID int) error {
