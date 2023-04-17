@@ -60,6 +60,7 @@ const (
 
 func init() {
 	kzerolog.AddFlags(nil)
+	utilruntime.Must(submarinerv1.AddToScheme(kubeScheme.Scheme))
 }
 
 var _ = BeforeSuite(func() {
@@ -511,8 +512,6 @@ func (t *testDriver) run() {
 	utilruntime.ErrorHandlers = append(utilruntime.ErrorHandlers, func(err error) {
 		t.handledError <- err
 	})
-
-	Expect(submarinerv1.AddToScheme(kubeScheme.Scheme)).To(Succeed())
 
 	scheme := runtime.NewScheme()
 	Expect(submarinerv1.AddToScheme(scheme)).To(Succeed())
