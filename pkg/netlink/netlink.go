@@ -27,6 +27,7 @@ import (
 	"os/exec"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
@@ -53,6 +54,7 @@ type Basic interface {
 	XfrmPolicyDel(policy *netlink.XfrmPolicy) error
 	XfrmPolicyList(family int) ([]netlink.XfrmPolicy, error)
 	EnableLooseModeReversePathFilter(interfaceName string) error
+	EnsureLooseModeIsConfigured(interfaceName string) error
 	GetReversePathFilter(interfaceName string) ([]byte, error)
 	ConfigureTCPMTUProbe(mtuProbe, baseMss string) error
 }
@@ -153,6 +155,30 @@ func (n *netlinkType) EnableLooseModeReversePathFilter(interfaceName string) err
 	// Enable loose mode (rp_filter=2) reverse path filtering on the vxlan interface.
 	err := setSysctl("/proc/sys/net/ipv4/conf/"+interfaceName+"/rp_filter", []byte("2"))
 	return errors.Wrapf(err, "unable to update rp_filter proc entry for interface %q", interfaceName)
+}
+
+func (n *netlinkType) EnsureLooseModeIsConfigured(interfaceName string) error {
+	for i := 0; i < 10; i++ {
+		// Revisit: This is a temporary work-around to fix https://github.com/submariner-io/submariner/issues/2422
+		// Allow the interface to get initialized.
+		time.Sleep(100 * time.Millisecond)
+
+		rpFilterSetting, err := n.GetReversePathFilter(interfaceName)
+		if err == nil {
+			if bytes.Equal(rpFilterSetting, []byte("2")) {
+				return nil
+			}
+		} else {
+			logger.Warningf("Error retrieving reverse path filter for %q: %v", interfaceName, err)
+		}
+
+		err = n.EnableLooseModeReversePathFilter(interfaceName)
+		if err != nil {
+			return errors.Wrapf(err, "error enabling loose mode on iface %q", interfaceName)
+		}
+	}
+
+	return fmt.Errorf("loose mode not configured on iface %q", interfaceName)
 }
 
 func (n *netlinkType) GetReversePathFilter(interfaceName string) ([]byte, error) {
