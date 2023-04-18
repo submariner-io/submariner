@@ -151,7 +151,8 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams, egressIPT
 		Command:       []string{"sleep", "600"},
 	})
 
-	cmd := []string{"sh", "-c", "for j in $(seq 50); do echo [dataplane] connector says " + connectorPod.Config.Data + "; done" +
+	cmd := []string{"sh", "-c", "for j in $(seq 1 " + strconv.Itoa(int(connectorPod.Config.NumOfDataBufs)) + "); do echo" +
+		" [dataplane] connector says " + connectorPod.Config.Data + "; done" +
 		" | for i in $(seq " + strconv.Itoa(int(p.ConnectionAttempts)) + ");" +
 		" do if nc -v " + remoteIP + " " + strconv.Itoa(connectorPod.Config.Port) + " -w " + strconv.Itoa(int(p.ConnectionTimeout)) + ";" +
 		" then break; else sleep " + strconv.Itoa(int(p.ConnectionTimeout/2)) + "; fi; done"}
