@@ -244,6 +244,10 @@ func (n *basicType) EnableLooseModeReversePathFilter(interfaceName string) error
 	return nil
 }
 
+func (n *basicType) EnsureLooseModeIsConfigured(_ string) error {
+	return nil
+}
+
 func (n *basicType) GetReversePathFilter(_ string) ([]byte, error) {
 	return []byte("2"), nil
 }
