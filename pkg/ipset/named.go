@@ -19,23 +19,25 @@ limitations under the License.
 //nolint:wrapcheck // The functions are simple wrappers so we'll let the caller wrap errors.
 package ipset
 
+import (
+	ipsetgo "github.com/lrh3321/ipset-go"
+)
+
 type Named interface {
 	Name() string
 	Flush() error
 	Destroy() error
 	Create(ignoreExistErr bool) error
-	AddEntry(entry string, ignoreExistErr bool) error
-	DelEntry(entry string) error
-	TestEntry(entry string) (bool, error)
-	ListEntries() ([]string, error)
+	AddEntry(entry *ipsetgo.Entry, ignoreExistErr bool) error
+	DelEntry(entry *ipsetgo.Entry) error
 }
 
 type namedType struct {
 	iface Interface
-	set   IPSet
+	set   ipsetgo.Sets
 }
 
-func NewNamed(set *IPSet, iface Interface) Named {
+func NewNamed(set *ipsetgo.Sets, iface Interface) Named {
 	// We'll panic if set is nil, this is intentional
 	return &namedType{
 		iface: iface,
@@ -44,33 +46,25 @@ func NewNamed(set *IPSet, iface Interface) Named {
 }
 
 func (n *namedType) Name() string {
-	return n.set.Name
+	return n.set.SetName
 }
 
 func (n *namedType) Flush() error {
-	return n.iface.FlushSet(n.set.Name)
+	return n.iface.FlushSet(n.set.SetName)
 }
 
 func (n *namedType) Destroy() error {
-	return n.iface.DestroySet(n.set.Name)
+	return n.iface.DestroySet(n.set.SetName)
 }
 
 func (n *namedType) Create(ignoreExistErr bool) error {
 	return n.iface.CreateSet(&n.set, ignoreExistErr)
 }
 
-func (n *namedType) AddEntry(entry string, ignoreExistErr bool) error {
+func (n *namedType) AddEntry(entry *ipsetgo.Entry, ignoreExistErr bool) error {
 	return n.iface.AddEntry(entry, &n.set, ignoreExistErr)
 }
 
-func (n *namedType) DelEntry(entry string) error {
-	return n.iface.DelEntry(entry, n.set.Name)
-}
-
-func (n *namedType) TestEntry(entry string) (bool, error) {
-	return n.iface.TestEntry(entry, n.set.Name)
-}
-
-func (n *namedType) ListEntries() ([]string, error) {
-	return n.iface.ListEntries(n.set.Name)
+func (n *namedType) DelEntry(entry *ipsetgo.Entry) error {
+	return n.iface.DelEntry(entry, n.set.SetName)
 }

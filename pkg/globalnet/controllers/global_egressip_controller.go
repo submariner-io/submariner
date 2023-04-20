@@ -24,6 +24,7 @@ import (
 	"encoding/base32"
 	"fmt"
 
+	ipsetgo "github.com/lrh3321/ipset-go"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/syncer"
@@ -39,7 +40,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
-	utilexec "k8s.io/utils/exec"
 )
 
 func NewGlobalEgressIPController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool) (Interface, error) {
@@ -63,7 +63,10 @@ func NewGlobalEgressIPController(config *syncer.ResourceSyncerConfig, pool *ipam
 		},
 	}
 
-	controller.ipSetIface = ipset.New(utilexec.New())
+	controller.ipSetIface, err = ipset.New()
+	if err != nil {
+		return nil, errors.WithMessage(err, "error creating the ipset handler")
+	}
 
 	_, gvr, err := util.ToUnstructuredResource(&submarinerv1.GlobalEgressIP{}, config.RestMapper)
 	if err != nil {
@@ -383,8 +386,8 @@ func (c *globalEgressIPController) flushGlobalEgressRulesAndReleaseIPs(key, ipSe
 }
 
 func (c *globalEgressIPController) newNamedIPSet(key string) ipset.Named {
-	return ipset.NewNamed(&ipset.IPSet{
-		Name:    c.getIPSetName(key),
-		SetType: ipset.HashIP,
+	return ipset.NewNamed(&ipsetgo.Sets{
+		SetName:  c.getIPSetName(key),
+		TypeName: ipsetgo.TypeHashIP,
 	}, c.ipSetIface)
 }

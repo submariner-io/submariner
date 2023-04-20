@@ -44,7 +44,6 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
-	utilexec "k8s.io/utils/exec"
 )
 
 func UninstallDataPath() {
@@ -87,7 +86,10 @@ func UninstallDataPath() {
 		}
 	}
 
-	ipsetIface := ipset.New(utilexec.New())
+	ipsetIface, err := ipset.New()
+	if err != nil {
+		logger.FatalOnError(err, "Error initializing ipsets")
+	}
 
 	ipSetList, err := ipsetIface.ListSets()
 	if err != nil {

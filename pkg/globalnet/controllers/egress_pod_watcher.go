@@ -20,7 +20,9 @@ package controllers
 
 import (
 	"fmt"
+	"net"
 
+	ipsetgo "github.com/lrh3321/ipset-go"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/watcher"
@@ -95,7 +97,7 @@ func (w *egressPodWatcher) onCreateOrUpdate(obj runtime.Object, _ int) bool {
 
 	logger.V(log.DEBUG).Infof("Pod %q with IP %s created/updated", key, pod.Status.PodIP)
 
-	if err := w.namedIPSet.AddEntry(pod.Status.PodIP, true); err != nil {
+	if err := w.namedIPSet.AddEntry(&ipsetgo.Entry{IP: net.ParseIP(pod.Status.PodIP)}, true); err != nil {
 		logger.Errorf(err, "Error adding pod IP %q to IP set %q", pod.Status.PodIP, w.ipSetName)
 		return true
 	}
@@ -109,7 +111,7 @@ func (w *egressPodWatcher) onDelete(obj runtime.Object, _ int) bool {
 
 	logger.V(log.DEBUG).Infof("Pod %q removed", key)
 
-	if err := w.namedIPSet.DelEntry(pod.Status.PodIP); err != nil {
+	if err := w.namedIPSet.DelEntry(&ipsetgo.Entry{IP: net.ParseIP(pod.Status.PodIP)}); err != nil {
 		logger.Errorf(err, "Error deleting pod IP %q from IP set %q", pod.Status.PodIP, w.ipSetName)
 		return true
 	}

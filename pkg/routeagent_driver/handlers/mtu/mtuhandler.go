@@ -19,9 +19,11 @@ limitations under the License.
 package mtu
 
 import (
+	"net"
 	"strconv"
 	"strings"
 
+	ipsetgo "github.com/lrh3321/ipset-go"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -32,7 +34,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/iptables"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
-	utilexec "k8s.io/utils/exec"
+	"github.com/vishvananda/netlink/nl"
 	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -91,7 +93,10 @@ func (h *mtuHandler) Init() error {
 		return errors.Wrap(err, "error initializing iptables")
 	}
 
-	ipSetIface := ipset.New(utilexec.New())
+	ipSetIface, err := ipset.New()
+	if err != nil {
+		return errors.Wrap(err, "error initializing ipset")
+	}
 
 	if err := h.ipt.CreateChainIfNotExists(constants.MangleTable, constants.SmPostRoutingChain); err != nil {
 		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmPostRoutingChain)
@@ -144,17 +149,38 @@ func (h *mtuHandler) Init() error {
 	return nil
 }
 
+func newIPv4SubnetEntry(subnet string) (*ipsetgo.Entry, error) {
+	ip, ipnet, err := net.ParseCIDR(subnet)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error parsing CIDR %s", subnet)
+	}
+
+	ones, _ := ipnet.Mask.Size()
+
+	return &ipsetgo.Entry{IP: ip, CIDR: uint8(ones)}, nil
+}
+
 func (h *mtuHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 	subnets := extractIPv4Subnets(&endpoint.Spec)
 	for _, subnet := range subnets {
-		err := h.localIPSet.AddEntry(subnet, true)
+		entry, err := newIPv4SubnetEntry(subnet)
+		if err != nil {
+			return errors.Wrapf(err, "error adding local IP set entry %s", subnet)
+		}
+
+		err = h.localIPSet.AddEntry(entry, true)
 		if err != nil {
 			return errors.Wrap(err, "error adding local IP set entry")
 		}
 	}
 
 	for _, subnet := range h.localClusterCidr {
-		err := h.localIPSet.AddEntry(subnet, true)
+		entry, err := newIPv4SubnetEntry(subnet)
+		if err != nil {
+			return errors.Wrapf(err, "error adding local IP set entry %s", subnet)
+		}
+
+		err = h.localIPSet.AddEntry(entry, true)
 		if err != nil {
 			return errors.Wrap(err, "error adding localClusterCidr IP set entry")
 		}
@@ -177,14 +203,24 @@ func (h *mtuHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 func (h *mtuHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 	subnets := extractIPv4Subnets(&endpoint.Spec)
 	for _, subnet := range subnets {
-		err := h.localIPSet.DelEntry(subnet)
+		entry, err := newIPv4SubnetEntry(subnet)
+		if err != nil {
+			logger.Errorf(err, "Error deleting local IP set entry %s", subnet)
+		}
+
+		err = h.localIPSet.DelEntry(entry)
 		if err != nil {
 			logger.Errorf(err, "Error deleting the subnet %q from the local IPSet", subnet)
 		}
 	}
 
 	for _, subnet := range h.localClusterCidr {
-		err := h.localIPSet.DelEntry(subnet)
+		entry, err := newIPv4SubnetEntry(subnet)
+		if err != nil {
+			logger.Errorf(err, "Error deleting local IP set entry %s", subnet)
+		}
+
+		err = h.localIPSet.DelEntry(entry)
 		if err != nil {
 			logger.Errorf(err, "Error deleting the subnet %q from the local IPSet", subnet)
 		}
@@ -196,7 +232,12 @@ func (h *mtuHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 func (h *mtuHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	subnets := extractIPv4Subnets(&endpoint.Spec)
 	for _, subnet := range subnets {
-		err := h.remoteIPSet.AddEntry(subnet, true)
+		entry, err := newIPv4SubnetEntry(subnet)
+		if err != nil {
+			return errors.Wrapf(err, "error adding remote IP set entry %s", subnet)
+		}
+
+		err = h.remoteIPSet.AddEntry(entry, true)
 		if err != nil {
 			return errors.Wrap(err, "error adding remote IP set entry")
 		}
@@ -208,7 +249,12 @@ func (h *mtuHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 func (h *mtuHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	subnets := extractIPv4Subnets(&endpoint.Spec)
 	for _, subnet := range subnets {
-		err := h.remoteIPSet.DelEntry(subnet)
+		entry, err := newIPv4SubnetEntry(subnet)
+		if err != nil {
+			return errors.Wrapf(err, "error deleting remote IP set entry %s", subnet)
+		}
+
+		err = h.remoteIPSet.DelEntry(entry)
 		if err != nil {
 			logger.Errorf(err, "Error deleting the subnet %q from the remote IPSet", subnet)
 		}
@@ -231,10 +277,10 @@ func extractIPv4Subnets(endpoint *submV1.EndpointSpec) []string {
 }
 
 func (h *mtuHandler) newNamedIPSet(key string, ipSetIface ipset.Interface) ipset.Named {
-	return ipset.NewNamed(&ipset.IPSet{
-		Name:       key,
-		SetType:    ipset.HashNet,
-		HashFamily: ipset.ProtocolFamilyIPV4,
+	return ipset.NewNamed(&ipsetgo.Sets{
+		SetName:  key,
+		TypeName: ipsetgo.TypeHashNet,
+		Family:   nl.FAMILY_V4,
 	}, ipSetIface)
 }
 

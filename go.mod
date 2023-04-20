@@ -7,6 +7,7 @@ require (
 	github.com/coreos/go-iptables v0.6.0
 	github.com/emirpasic/gods v1.18.1
 	github.com/kelseyhightower/envconfig v1.4.0
+	github.com/lrh3321/ipset-go v0.0.0-20230425010353-0d9880b1ecac
 	github.com/onsi/ginkgo/v2 v2.11.0
 	github.com/onsi/gomega v1.27.8
 	github.com/ovn-org/libovsdb v0.6.1-0.20220427123326-d7b273399db4
@@ -85,7 +86,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/testify v1.8.1 // indirect
 	github.com/urfave/cli/v2 v2.4.0 // indirect
-	github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae // indirect
+	github.com/vishvananda/netns v0.0.4 // indirect
 	golang.org/x/crypto v0.1.0 // indirect
 	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/oauth2 v0.5.0 // indirect
