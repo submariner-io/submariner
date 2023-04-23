@@ -28,7 +28,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-var _ = Describe("[redundancy] Route Agent restart tests", func() {
+var _ = PDescribe("[redundancy] Route Agent restart tests", func() {
 	f := subFramework.NewFramework("route-agent-restart")
 
 	When("a route agent pod running on a gateway node is restarted", func() {

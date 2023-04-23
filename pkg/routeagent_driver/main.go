@@ -19,10 +19,13 @@ limitations under the License.
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 	"strconv"
+	"strings"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
@@ -54,6 +57,33 @@ var (
 	logger     = log.Logger{Logger: logf.Log.WithName("main")}
 )
 
+func printOSFlavor() {
+	file, err := os.Open("/etc/os-release")
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	defer file.Close()
+
+	var osName string
+	var osVersion string
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if strings.HasPrefix(line, "NAME=") {
+			osName = strings.Trim(line[5:], `"`)
+		}
+
+		if strings.HasPrefix(line, "VERSION=") {
+			osVersion = strings.Trim(line[8:], `"`)
+		}
+	}
+
+	fmt.Printf("Operating System flavor: %s %s\n", osName, osVersion)
+}
+
 func main() {
 	kzerolog.AddFlags(nil)
 	flag.Parse()
@@ -64,6 +94,13 @@ func main() {
 	stopCh := signals.SetupSignalHandler().Done()
 
 	var env environment.Specification
+
+	fmt.Println("Operating System:\t", runtime.GOOS)
+	fmt.Println("Architecture:\t", runtime.GOARCH)
+	fmt.Println("Num CPUs:\t", runtime.NumCPU())
+	fmt.Println("Details: \t", runtime.Version())
+	fmt.Println("Num of Goroutines:\t", runtime.NumGoroutine())
+	printOSFlavor()
 
 	err := envconfig.Process("submariner", &env)
 	if err != nil {
