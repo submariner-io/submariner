@@ -314,7 +314,7 @@ func (kp *SyncHandler) ensureLooseModeIsConfigured(iface string) error {
 				return nil
 			}
 		} else {
-			logger.Warningf("Error retrieving reverse path filter for %q: %v", iface, err)
+			klog.Warningf("Error retrieving reverse path filter for %q: %v", iface, err)
 		}
 
 		err = kp.netLink.EnableLooseModeReversePathFilter(iface)
