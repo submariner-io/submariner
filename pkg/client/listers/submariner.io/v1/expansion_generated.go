@@ -50,6 +50,14 @@ type GatewayListerExpansion interface{}
 // GatewayNamespaceLister.
 type GatewayNamespaceListerExpansion interface{}
 
+// GatewayRouteListerExpansion allows custom methods to be added to
+// GatewayRouteLister.
+type GatewayRouteListerExpansion interface{}
+
+// GatewayRouteNamespaceListerExpansion allows custom methods to be added to
+// GatewayRouteNamespaceLister.
+type GatewayRouteNamespaceListerExpansion interface{}
+
 // GlobalEgressIPListerExpansion allows custom methods to be added to
 // GlobalEgressIPLister.
 type GlobalEgressIPListerExpansion interface{}
@@ -65,3 +73,11 @@ type GlobalIngressIPListerExpansion interface{}
 // GlobalIngressIPNamespaceListerExpansion allows custom methods to be added to
 // GlobalIngressIPNamespaceLister.
 type GlobalIngressIPNamespaceListerExpansion interface{}
+
+// NonGatewayRouteListerExpansion allows custom methods to be added to
+// NonGatewayRouteLister.
+type NonGatewayRouteListerExpansion interface{}
+
+// NonGatewayRouteNamespaceListerExpansion allows custom methods to be added to
+// NonGatewayRouteNamespaceLister.
+type NonGatewayRouteNamespaceListerExpansion interface{}
