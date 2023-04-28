@@ -44,12 +44,20 @@ func (c *FakeSubmarinerV1) Gateways(namespace string) v1.GatewayInterface {
 	return &FakeGateways{c, namespace}
 }
 
+func (c *FakeSubmarinerV1) GatewayRoutes(namespace string) v1.GatewayRouteInterface {
+	return &FakeGatewayRoutes{c, namespace}
+}
+
 func (c *FakeSubmarinerV1) GlobalEgressIPs(namespace string) v1.GlobalEgressIPInterface {
 	return &FakeGlobalEgressIPs{c, namespace}
 }
 
 func (c *FakeSubmarinerV1) GlobalIngressIPs(namespace string) v1.GlobalIngressIPInterface {
 	return &FakeGlobalIngressIPs{c, namespace}
+}
+
+func (c *FakeSubmarinerV1) NonGatewayRoutes(namespace string) v1.NonGatewayRouteInterface {
+	return &FakeNonGatewayRoutes{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
