@@ -14,8 +14,8 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus-community/pro-bing v0.1.0
 	github.com/prometheus/client_golang v1.15.0
-	github.com/submariner-io/admiral v0.15.0-m4.0.20230407150416-a578003622bf
-	github.com/submariner-io/shipyard v0.15.0-m4
+	github.com/submariner-io/admiral v0.15.0-m4.0.20230417223020-63055abba7b4
+	github.com/submariner-io/shipyard v0.15.0-m4.0.20230428150516-d1a2d7c7fc89
 	github.com/uw-labs/lichen v0.1.7
 	github.com/vishvananda/netlink v1.2.1-beta.2
 	golang.org/x/sys v0.7.0
@@ -80,7 +80,7 @@ require (
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/rivo/uniseg v0.4.3 // indirect
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
-	github.com/rs/zerolog v1.29.0 // indirect
+	github.com/rs/zerolog v1.29.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sergi/go-diff v1.0.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
