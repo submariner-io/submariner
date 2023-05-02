@@ -151,9 +151,9 @@ func (v *vxlan) createVxlanInterface(activeEndPoint string, port int) error {
 		return errors.Wrap(err, "failed to add ip rule")
 	}
 
-	err = v.netLink.EnableLooseModeReversePathFilter(VxlanIface)
+	err = v.netLink.EnsureLooseModeIsConfigured(VxlanIface)
 	if err != nil {
-		return errors.Wrap(err, "unable to update vxlan rp_filter proc entry")
+		return errors.Wrap(err, "error while validating loose mode")
 	}
 
 	logger.V(log.DEBUG).Infof("Successfully configured rp_filter to loose mode(2) on %s", VxlanIface)
