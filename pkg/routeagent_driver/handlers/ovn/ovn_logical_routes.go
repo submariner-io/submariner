@@ -52,7 +52,7 @@ func (c *ConnectionHandler) reconcileOvnLogicalRouterStaticRoutes(remoteSubnets 
 			return item.Nexthop == nextHop && item.IPPrefix == lrsr.IPPrefix
 		}
 
-		err = libovsdbops.CreateOrUpdateLogicalRouterStaticRoutesWithPredicate(c.nbdb, ovnClusterRouter, lrsr, LRSRPred)
+		_, err = libovsdbops.CreateOrUpdateLogicalRouterStaticRoutesWithPredicateOps(c.nbdb, nil, ovnClusterRouter, lrsr, LRSRPred)
 		if err != nil {
 			return errors.Wrap(err, "failed to create ovn lrsr and add it to the ovn submariner router")
 		}
