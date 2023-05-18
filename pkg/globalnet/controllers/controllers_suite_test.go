@@ -20,7 +20,6 @@ package controllers_test
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -43,7 +42,6 @@ import (
 	fakeIPT "github.com/submariner-io/submariner/pkg/iptables/fake"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -54,6 +52,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
+	k8stesting "k8s.io/client-go/testing"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -87,7 +86,7 @@ func TestControllers(t *testing.T) {
 type testDriverBase struct {
 	controller             controllers.Interface
 	restMapper             meta.RESTMapper
-	dynClient              dynamic.Interface
+	dynClient              *fakeDynClient.DynamicClient
 	scheme                 *runtime.Scheme
 	ipt                    *fakeIPT.IPTables
 	ipSet                  *fakeIPSet.IPSet
@@ -125,10 +124,9 @@ func newTestDriverBase() *testDriverBase {
 	t.scheme.AddKnownTypeWithName(schema.GroupVersionKind{Group: "fake-dynamic-client-group", Version: "v1", Kind: "List"},
 		&unstructured.UnstructuredList{})
 
-	fakeClient := fakeDynClient.NewDynamicClient(t.scheme)
-	t.dynClient = fakeClient
+	t.dynClient = fakeDynClient.NewDynamicClient(t.scheme)
 
-	t.watches = fakeDynClient.NewWatchReactor(&fakeClient.Fake)
+	t.watches = fakeDynClient.NewWatchReactor(&t.dynClient.Fake)
 
 	t.globalEgressIPs = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.GlobalEgressIP{})).
 		Namespace(namespace)
@@ -336,10 +334,8 @@ func awaitNoAllocatedIPs(client dynamic.ResourceInterface, name string) {
 	}, 200*time.Millisecond).Should(Equal(0))
 }
 
-func (t *testDriverBase) awaitEgressIPStatus(client dynamic.ResourceInterface, name string, expNumIPS int, atIndex int,
-	expCond ...metav1.Condition,
-) {
-	awaitStatusConditions(client, name, atIndex, expCond...)
+func (t *testDriverBase) awaitEgressIPStatus(client dynamic.ResourceInterface, name string, expNumIPS int, expCond ...metav1.Condition) {
+	t.awaitStatusConditions(client, name, expCond...)
 
 	status := getGlobalEgressIPStatus(client, name)
 
@@ -354,15 +350,14 @@ func (t *testDriverBase) awaitEgressIPStatus(client dynamic.ResourceInterface, n
 }
 
 func (t *testDriverBase) awaitEgressIPStatusAllocated(client dynamic.ResourceInterface, name string, expNumIPS int) {
-	t.awaitEgressIPStatus(client, name, expNumIPS, 0, metav1.Condition{
+	t.awaitEgressIPStatus(client, name, expNumIPS, metav1.Condition{
 		Type:   string(submarinerv1.GlobalEgressIPAllocated),
 		Status: metav1.ConditionTrue,
 	})
 }
 
-//nolint:unparam // `atIndex` always receives `0`
-func (t *testDriverBase) awaitIngressIPStatus(name string, atIndex int, expCond ...metav1.Condition) {
-	awaitStatusConditions(t.globalIngressIPs, name, atIndex, expCond...)
+func (t *testDriverBase) awaitIngressIPStatus(name string, expCond ...metav1.Condition) {
+	t.awaitStatusConditions(t.globalIngressIPs, name, expCond...)
 
 	status := t.getGlobalIngressIPStatus(name)
 
@@ -374,7 +369,7 @@ func (t *testDriverBase) awaitIngressIPStatus(name string, atIndex int, expCond 
 }
 
 func (t *testDriverBase) awaitIngressIPStatusAllocated(name string) {
-	t.awaitIngressIPStatus(name, 0, metav1.Condition{
+	t.awaitIngressIPStatus(name, metav1.Condition{
 		Type:   string(submarinerv1.GlobalEgressIPAllocated),
 		Status: metav1.ConditionTrue,
 	})
@@ -508,81 +503,103 @@ func (t *testDriverBase) ensureNoGlobalIngressIPs() {
 	}, time.Millisecond*300).Should(BeEmpty())
 }
 
-func awaitStatusConditions(client dynamic.ResourceInterface, name string, atIndex int, expCond ...metav1.Condition) {
+func (t *testDriverBase) awaitStatusConditions(client dynamic.ResourceInterface, name string, expCond ...metav1.Condition) {
+	if len(expCond) == 0 {
+		return
+	}
+
+	expType := expCond[0].Type
+	obj := test.AwaitResource(client, name)
+
+	mapping, err := t.restMapper.RESTMapping(obj.GetObjectKind().GroupVersionKind().GroupKind(),
+		obj.GetObjectKind().GroupVersionKind().Version)
+	Expect(err).To(Succeed())
+
 	var conditions []metav1.Condition
-	var notFound error
 
-	err := wait.PollUntilContextTimeout(context.Background(), 50*time.Millisecond, 5*time.Second, true,
-		func(ctx context.Context) (bool, error) {
-			obj, err := client.Get(ctx, name, metav1.GetOptions{})
-			if apierrors.IsNotFound(err) {
-				notFound = err
-				return false, nil
-			}
+	err = wait.PollUntilContextTimeout(context.Background(), 50*time.Millisecond, 5*time.Second, true,
+		func(_ context.Context) (bool, error) {
+			conditions = nil
 
-			notFound = nil
-
-			if err != nil {
-				return false, err
-			}
-
-			slice, ok, err := unstructured.NestedSlice(obj.Object, "status", "conditions")
-			if !ok || err != nil {
-				return false, err
-			}
-
-			conditions = make([]metav1.Condition, len(slice))
-			for i := range slice {
-				c := &metav1.Condition{}
-				err = runtime.DefaultUnstructuredConverter.FromUnstructured(slice[i].(map[string]interface{}), c)
-				if err != nil {
-					return false, err
+			actions := t.dynClient.Fake.Actions()
+			for i := range actions {
+				if actions[i].GetResource().Resource != mapping.Resource.Resource || actions[i].GetVerb() != "update" {
+					continue
 				}
 
-				conditions[i] = *c
+				update := actions[i].(k8stesting.UpdateAction)
+				objMeta := resource.MustToMeta(update.GetObject())
+
+				if objMeta.GetName() != name {
+					continue
+				}
+
+				conditions = append(conditions, extractConditions(update.GetObject().(*unstructured.Unstructured), expType)...)
 			}
 
-			if atIndex+len(expCond) != len(conditions) {
+			if len(conditions) != len(expCond) {
 				return false, nil
 			}
 
 			return true, nil
 		})
 
-	if notFound != nil {
-		Fail(fmt.Sprintf("%#v", notFound))
-		return
-	}
-
 	if wait.Interrupted(err) {
 		if conditions == nil {
 			Fail("Status conditions not found")
 		}
 
-		Fail(format.Message(conditions, fmt.Sprintf("to contain at index %d", atIndex), expCond))
+		Fail(format.Message(conditions, "condition history to contain", expCond))
 
 		return
 	}
 
 	Expect(err).To(Succeed())
 
-	j := atIndex
+	for i := range expCond {
+		verifyCondition(&conditions[i], &expCond[i])
+	}
 
-	for _, exp := range expCond {
-		actual := conditions[j]
-		j++
+	actual := extractConditions(test.AwaitResource(client, name), expType)
+	Expect(actual).To(HaveLen(1))
 
-		Expect(actual.Type).To(Equal(exp.Type))
-		Expect(actual.Status).To(Equal(exp.Status))
-		Expect(actual.LastTransitionTime).To(Not(BeNil()))
-		Expect(actual.Message).To(Not(BeEmpty()))
+	verifyCondition(&actual[0], &expCond[len(expCond)-1])
+}
 
-		if exp.Reason != "" {
-			Expect(actual.Reason).To(Equal(exp.Reason))
-		} else {
-			Expect(actual.Reason).To(Not(BeEmpty()))
+func verifyCondition(actual, exp *metav1.Condition) {
+	Expect(actual.Type).To(Equal(exp.Type))
+	Expect(actual.Status).To(Equal(exp.Status))
+	Expect(actual.LastTransitionTime).To(Not(BeNil()))
+	Expect(actual.Message).To(Not(BeEmpty()))
+
+	if exp.Reason != "" {
+		Expect(actual.Reason).To(Equal(exp.Reason))
+	} else {
+		Expect(actual.Reason).To(Not(BeEmpty()))
+	}
+}
+
+func extractConditions(from *unstructured.Unstructured, ofType string) []metav1.Condition {
+	conditions := []metav1.Condition{}
+
+	slice, ok, err := unstructured.NestedSlice(from.Object, "status", "conditions")
+	Expect(err).To(Succeed())
+
+	if !ok {
+		return conditions
+	}
+
+	for i := range slice {
+		c := &metav1.Condition{}
+		err = runtime.DefaultUnstructuredConverter.FromUnstructured(slice[i].(map[string]interface{}), c)
+		Expect(err).To(Succeed())
+
+		if c.Type == ofType {
+			conditions = append(conditions, *c)
 		}
 	}
+
+	return conditions
 }
 
 //nolint:unparam // `name` always receives `globalEgressIPName` (`"east-region")
