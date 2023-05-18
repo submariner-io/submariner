@@ -19,6 +19,8 @@ limitations under the License.
 package event
 
 import (
+	"strings"
+
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -43,7 +45,7 @@ var logger = log.Logger{Logger: logf.Log.WithName("EventRegistry")}
 func NewRegistry(name, networkPlugin string) *Registry {
 	return &Registry{
 		name:                    name,
-		networkPlugin:           networkPlugin,
+		networkPlugin:           strings.ToLower(networkPlugin),
 		eventHandlers:           []Handler{},
 		remoteEndpointTimeStamp: map[string]v1.Time{},
 	}
@@ -58,7 +60,7 @@ func (er *Registry) addHandler(eventHandler Handler) error {
 	evNetworkPlugins := sets.New[string]()
 
 	for _, np := range eventHandler.GetNetworkPlugins() {
-		evNetworkPlugins.Insert(np)
+		evNetworkPlugins.Insert(strings.ToLower(np))
 	}
 
 	if evNetworkPlugins.Has(AnyNetworkPlugin) || evNetworkPlugins.Has(er.networkPlugin) {
@@ -69,7 +71,8 @@ func (er *Registry) addHandler(eventHandler Handler) error {
 		er.eventHandlers = append(er.eventHandlers, eventHandler)
 		logger.Infof("Event handler %q added to registry %q.", eventHandler.GetName(), er.name)
 	} else {
-		logger.V(log.DEBUG).Infof("Event handler %q ignored for registry %q.", eventHandler.GetName(), er.name)
+		logger.V(log.DEBUG).Infof("Event handler %q ignored for registry %q as networkPlugin is %q.",
+			eventHandler.GetName(), er.name, er.networkPlugin)
 	}
 
 	return nil
