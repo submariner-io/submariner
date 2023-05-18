@@ -34,6 +34,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/ipam"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
@@ -134,6 +135,8 @@ func (c *clusterGlobalEgressIPController) process(from runtime.Object, numRequeu
 	case syncer.Create, syncer.Update:
 		prevStatus := clusterGlobalEgressIP.Status
 
+		trimAllocatedStatusCondition(&clusterGlobalEgressIP.Status.Conditions)
+
 		if !c.validate(numberOfIPs, clusterGlobalEgressIP) {
 			return checkStatusChanged(&prevStatus, &clusterGlobalEgressIP.Status, clusterGlobalEgressIP), false
 		}
@@ -150,7 +153,7 @@ func (c *clusterGlobalEgressIPController) process(from runtime.Object, numRequeu
 
 func (c *clusterGlobalEgressIPController) validate(numberOfIPs int, egressIP *submarinerv1.ClusterGlobalEgressIP) bool {
 	if egressIP.Name != constants.ClusterGlobalEgressIPName {
-		egressIP.Status.Conditions = util.TryAppendCondition(egressIP.Status.Conditions, &metav1.Condition{
+		meta.SetStatusCondition(&egressIP.Status.Conditions, metav1.Condition{
 			Type:   string(submarinerv1.GlobalEgressIPAllocated),
 			Status: metav1.ConditionFalse,
 			Reason: "InvalidInstance",
@@ -162,7 +165,7 @@ func (c *clusterGlobalEgressIPController) validate(numberOfIPs int, egressIP *su
 	}
 
 	if numberOfIPs < 0 {
-		egressIP.Status.Conditions = util.TryAppendCondition(egressIP.Status.Conditions, &metav1.Condition{
+		meta.SetStatusCondition(&egressIP.Status.Conditions, metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "InvalidInput",
@@ -173,7 +176,7 @@ func (c *clusterGlobalEgressIPController) validate(numberOfIPs int, egressIP *su
 	}
 
 	if numberOfIPs == 0 {
-		egressIP.Status.Conditions = util.TryAppendCondition(egressIP.Status.Conditions, &metav1.Condition{
+		meta.SetStatusCondition(&egressIP.Status.Conditions, metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "ZeroInput",
@@ -250,7 +253,7 @@ func (c *clusterGlobalEgressIPController) allocateGlobalIPs(key string, numberOf
 	if err != nil {
 		logger.Errorf(err, "Error allocating IPs for %q", key)
 
-		status.Conditions = util.TryAppendCondition(status.Conditions, &metav1.Condition{
+		meta.SetStatusCondition(&status.Conditions, metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "IPPoolAllocationFailed",
@@ -264,7 +267,7 @@ func (c *clusterGlobalEgressIPController) allocateGlobalIPs(key string, numberOf
 	if err != nil {
 		logger.Errorf(err, "Error programming egress IP table rules for %q", key)
 
-		status.Conditions = util.TryAppendCondition(status.Conditions, &metav1.Condition{
+		meta.SetStatusCondition(&status.Conditions, metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "ProgramIPTableRulesFailed",
@@ -278,7 +281,7 @@ func (c *clusterGlobalEgressIPController) allocateGlobalIPs(key string, numberOf
 
 	metrics.RecordAllocateClusterGlobalEgressIPs(c.pool.GetCIDR(), numberOfIPs)
 
-	status.Conditions = util.TryAppendCondition(status.Conditions, &metav1.Condition{
+	meta.SetStatusCondition(&status.Conditions, metav1.Condition{
 		Type:    string(submarinerv1.GlobalEgressIPAllocated),
 		Status:  metav1.ConditionTrue,
 		Reason:  "Success",
