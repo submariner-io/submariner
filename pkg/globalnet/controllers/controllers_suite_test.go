@@ -20,7 +20,6 @@ package controllers_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"testing"
@@ -506,48 +505,49 @@ func awaitStatusConditions(client dynamic.ResourceInterface, name string, atInde
 	var conditions []metav1.Condition
 	var notFound error
 
-	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
-		obj, err := client.Get(context.TODO(), name, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			notFound = err
-			return false, nil
-		}
+	err := wait.PollUntilContextTimeout(context.Background(), 50*time.Millisecond, 5*time.Second, true,
+		func(ctx context.Context) (bool, error) {
+			obj, err := client.Get(ctx, name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				notFound = err
+				return false, nil
+			}
 
-		notFound = nil
+			notFound = nil
 
-		if err != nil {
-			return false, err
-		}
-
-		slice, ok, err := unstructured.NestedSlice(obj.Object, "status", "conditions")
-		if !ok || err != nil {
-			return false, err
-		}
-
-		conditions = make([]metav1.Condition, len(slice))
-		for i := range slice {
-			c := &metav1.Condition{}
-			err = runtime.DefaultUnstructuredConverter.FromUnstructured(slice[i].(map[string]interface{}), c)
 			if err != nil {
 				return false, err
 			}
 
-			conditions[i] = *c
-		}
+			slice, ok, err := unstructured.NestedSlice(obj.Object, "status", "conditions")
+			if !ok || err != nil {
+				return false, err
+			}
 
-		if atIndex+len(expCond) != len(conditions) {
-			return false, nil
-		}
+			conditions = make([]metav1.Condition, len(slice))
+			for i := range slice {
+				c := &metav1.Condition{}
+				err = runtime.DefaultUnstructuredConverter.FromUnstructured(slice[i].(map[string]interface{}), c)
+				if err != nil {
+					return false, err
+				}
 
-		return true, nil
-	})
+				conditions[i] = *c
+			}
+
+			if atIndex+len(expCond) != len(conditions) {
+				return false, nil
+			}
+
+			return true, nil
+		})
 
 	if notFound != nil {
 		Fail(fmt.Sprintf("%#v", notFound))
 		return
 	}
 
-	if errors.Is(err, wait.ErrWaitTimeout) {
+	if wait.Interrupted(err) {
 		if conditions == nil {
 			Fail("Status conditions not found")
 		}
