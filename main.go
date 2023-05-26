@@ -207,10 +207,6 @@ func main() {
 
 	<-components.stopCh
 
-	if err := components.cableEngine.Cleanup(); err != nil {
-		logger.Error(nil, "Error cleaning up cableEngine resources before removing Gateway")
-	}
-
 	logger.Info("All controllers stopped or exited. Stopping main loop")
 
 	if err := httpServer.Shutdown(context.TODO()); err != nil {
