@@ -24,8 +24,10 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
+	testutil "github.com/submariner-io/admiral/pkg/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/ipam"
@@ -78,7 +80,7 @@ func testClusterIPService() {
 		})
 
 		It("should eventually create a GlobalIngressIP", func() {
-			t.awaitNoGlobalIngressIP(service.Name)
+			testutil.EnsureNoResource(resource.ForDynamic(t.globalIngressIPs), service.Name)
 			t.createService(service)
 			t.awaitGlobalIngressIP(service.Name)
 		})
