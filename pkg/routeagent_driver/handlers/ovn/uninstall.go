@@ -26,6 +26,8 @@ import (
 )
 
 func (ovn *Handler) Stop(uninstall bool) error {
+	close(ovn.stopCh)
+
 	if !uninstall {
 		return nil
 	}

@@ -47,6 +47,7 @@ type Handler struct {
 	isGateway             bool
 	netlink               netlink.Interface
 	ipt                   iptables.Interface
+	stopCh                chan struct{}
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("OVN")}
@@ -64,6 +65,7 @@ func NewHandler(env *environment.Specification, smClientSet clientset.Interface)
 		remoteEndpoints: map[string]*submV1.Endpoint{},
 		netlink:         netlink.New(),
 		ipt:             ipt,
+		stopCh:          make(chan struct{}),
 	}
 }
 
@@ -80,6 +82,8 @@ func (ovn *Handler) Init() error {
 	if err != nil {
 		return err
 	}
+
+	ovn.startRouteConfigSyncer(ovn.stopCh)
 
 	return ovn.ensureSubmarinerNodeBridge()
 }
