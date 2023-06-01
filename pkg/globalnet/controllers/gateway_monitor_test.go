@@ -101,7 +101,7 @@ var _ = Describe("Endpoint monitoring", func() {
 				awaitNoAllocatedIPs(t.globalEgressIPs, globalEgressIPName)
 
 				t.createServiceExport(t.createService(newClusterIPService()))
-				t.awaitNoGlobalIngressIP(serviceName)
+				t.ensureNoGlobalIngressIP(serviceName)
 			})
 		})
 	})

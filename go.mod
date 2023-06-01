@@ -14,7 +14,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus-community/pro-bing v0.1.0
 	github.com/prometheus/client_golang v1.15.1
-	github.com/submariner-io/admiral v0.16.0-m0
+	github.com/submariner-io/admiral v0.16.0-m0.0.20230602131053-613bd96ec5a2
 	github.com/submariner-io/shipyard v0.16.0-m0
 	github.com/uw-labs/lichen v0.1.7
 	github.com/vishvananda/netlink v1.2.1-beta.2
