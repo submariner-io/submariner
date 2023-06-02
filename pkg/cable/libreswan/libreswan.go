@@ -416,7 +416,8 @@ func (i *libreswan) bidirectionalConnectToEndpoint(connectionName string, endpoi
 		"--host", endpointInfo.UseIP,
 		"--client", rightSubnet,
 
-		"--ikeport", strconv.Itoa(int(rightNATTPort)))
+		"--ikeport", strconv.Itoa(int(rightNATTPort)),
+		"--dpdaction=hold")
 
 	logger.Infof("Executing whack with args: %v", args)
 
@@ -458,7 +459,8 @@ func (i *libreswan) serverConnectToEndpoint(connectionName string, endpointInfo 
 		// Right-hand side.
 		"--id", remoteEndpointIdentifier,
 		"--host", "%any",
-		"--client", rightSubnet)
+		"--client", rightSubnet,
+		"--dpdaction=hold")
 
 	logger.Infof("Executing whack with args: %v", args)
 
@@ -499,7 +501,8 @@ func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo 
 		"--host", endpointInfo.UseIP,
 		"--client", rightSubnet,
 
-		"--ikeport", strconv.Itoa(int(rightNATTPort)))
+		"--ikeport", strconv.Itoa(int(rightNATTPort)),
+		"--dpdaction=hold")
 
 	logger.Infof("Executing whack with args: %v", args)
 
