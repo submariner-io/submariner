@@ -21,12 +21,26 @@ package node
 import (
 	"context"
 	"os"
+	"time"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+var logger = log.Logger{Logger: logf.Log.WithName("Node")}
+
+var nodeRetry = wait.Backoff{
+	Steps:    5,
+	Duration: 5 * time.Second,
+	Factor:   1.2,
+	Jitter:   0.1,
+}
 
 func GetLocalNode(clientset kubernetes.Interface) (*v1.Node, error) {
 	nodeName, ok := os.LookupEnv("NODE_NAME")
@@ -34,10 +48,21 @@ func GetLocalNode(clientset kubernetes.Interface) (*v1.Node, error) {
 		return nil, errors.New("error reading the NODE_NAME from the environment")
 	}
 
-	node, err := clientset.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-	if err != nil {
-		return nil, errors.Wrapf(err, "unable to find local node %q", nodeName)
-	}
+	var node *v1.Node
 
-	return node, nil
+	err := retry.OnError(nodeRetry, func(err error) bool {
+		logger.Warningf("Error reading the local node - retrying: %v", err)
+		return true
+	}, func() error {
+		var err error
+
+		node, err = clientset.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+		if err != nil {
+			return errors.Wrapf(err, "unable to find local node %q", nodeName)
+		}
+
+		return nil
+	})
+
+	return node, errors.Wrapf(err, "failed to get local node %q", nodeName)
 }
