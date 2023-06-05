@@ -344,3 +344,51 @@ type GlobalIngressIPList struct {
 
 	Items []GlobalIngressIP `json:"items"`
 }
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:shortName="gwrt"
+
+type GatewayRoute struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	RoutePolicySpec RoutePolicySpec `json:"spec"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type GatewayRouteList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []GatewayRoute `json:"items"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:shortName="ngwrt"
+
+type NonGatewayRoute struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	RoutePolicySpec RoutePolicySpec `json:"spec"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type NonGatewayRouteList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []NonGatewayRoute `json:"items"`
+}
+
+type RoutePolicySpec struct {
+	// Specifies the next hops to reach the remote CIDRs
+	NextHops []string `json:"nextHops"`
+
+	// Specifies the remote CIDRs available via the next hop
+	RemoteCIDRs []string `json:"remoteCIDRs"`
+}
