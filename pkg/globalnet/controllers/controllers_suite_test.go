@@ -30,7 +30,9 @@ import (
 	"github.com/onsi/gomega/format"
 	fakeDynClient "github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
+	testutil "github.com/submariner-io/admiral/pkg/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
@@ -397,7 +399,6 @@ func (t *testDriverBase) awaitService(name string) *corev1.Service {
 }
 
 func (t *testDriverBase) awaitNoService(name string) {
-	time.Sleep(300 * time.Millisecond)
 	test.AwaitNoResource(t.services, name)
 }
 
@@ -411,8 +412,11 @@ func (t *testDriverBase) awaitEndpoints(name string) *corev1.Endpoints {
 }
 
 func (t *testDriverBase) awaitNoEndpoints(name string) {
-	time.Sleep(300 * time.Millisecond)
 	test.AwaitNoResource(t.endpoints, name)
+}
+
+func (t *testDriverBase) ensureNoEndpoints(name string) {
+	testutil.EnsureNoResource(resource.ForDynamic(t.endpoints), name)
 }
 
 func (t *testDriverBase) awaitEndpointsHasIP(name, ip string) {
@@ -490,11 +494,14 @@ func getGlobalIngressIP(t *testDriverBase, name string,
 }
 
 func (t *testDriverBase) awaitNoGlobalIngressIP(name string) {
-	time.Sleep(300 * time.Millisecond)
 	test.AwaitNoResource(t.globalIngressIPs, name)
 }
 
-func (t *testDriverBase) awaitNoGlobalIngressIPs() {
+func (t *testDriverBase) ensureNoGlobalIngressIP(name string) {
+	testutil.EnsureNoResource(resource.ForDynamic(t.globalIngressIPs), name)
+}
+
+func (t *testDriverBase) ensureNoGlobalIngressIPs() {
 	Consistently(func() []unstructured.Unstructured {
 		list, _ := t.globalIngressIPs.List(context.TODO(), metav1.ListOptions{})
 		return list.Items

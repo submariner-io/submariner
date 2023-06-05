@@ -24,10 +24,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
-	testutil "github.com/submariner-io/admiral/pkg/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/ipam"
@@ -80,7 +78,7 @@ func testClusterIPService() {
 		})
 
 		It("should eventually create a GlobalIngressIP", func() {
-			testutil.EnsureNoResource(resource.ForDynamic(t.globalIngressIPs), service.Name)
+			t.ensureNoGlobalIngressIP(service.Name)
 			t.createService(service)
 			t.awaitGlobalIngressIP(service.Name)
 		})
@@ -93,7 +91,7 @@ func testClusterIPService() {
 		})
 
 		It("should not create a GlobalIngressIP", func() {
-			t.awaitNoGlobalIngressIP(service.Name)
+			t.ensureNoGlobalIngressIP(service.Name)
 		})
 	})
 
@@ -152,7 +150,7 @@ func testHeadlessService() {
 		})
 
 		It("should eventually create a GlobalIngressIP", func() {
-			t.awaitNoGlobalIngressIPs()
+			t.ensureNoGlobalIngressIPs()
 
 			backendPod.Status.Phase = corev1.PodRunning
 			test.UpdateResource(t.pods.Namespace(namespace), backendPod)
@@ -167,7 +165,7 @@ func testHeadlessService() {
 		})
 
 		It("should eventually create a GlobalIngressIP", func() {
-			t.awaitNoGlobalIngressIPs()
+			t.ensureNoGlobalIngressIPs()
 
 			backendPod.Status.PodIP = "154.67.82.2"
 			test.UpdateResource(t.pods.Namespace(namespace), backendPod)
@@ -197,7 +195,7 @@ func testHeadlessService() {
 
 			// Ensure GlobalIngressIPs are no longer created for the service.
 			t.createPod(newHeadlessServicePod(service.Name))
-			t.awaitNoGlobalIngressIPs()
+			t.ensureNoGlobalIngressIPs()
 		})
 	})
 
@@ -207,7 +205,7 @@ func testHeadlessService() {
 		})
 
 		It("should not create a GlobalIngressIP", func() {
-			t.awaitNoGlobalIngressIPs()
+			t.ensureNoGlobalIngressIPs()
 		})
 	})
 
@@ -388,8 +386,7 @@ func testServiceWithoutSelector() {
 
 				t.start()
 
-				time.Sleep(50 * time.Millisecond)
-				t.awaitNoEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+				t.ensureNoEndpoints(controllers.GetInternalSvcName(endpoints.Name))
 			})
 		})
 	})
