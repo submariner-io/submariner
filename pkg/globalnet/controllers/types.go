@@ -91,16 +91,17 @@ type baseController struct {
 
 type gatewayMonitor struct {
 	*baseController
-	syncerConfig     *syncer.ResourceSyncerConfig
-	endpointWatcher  watcher.Interface
-	spec             Specification
-	ipt              iptables.Interface
-	isGatewayNode    atomic.Bool
-	nodeName         string
-	localSubnets     []string
-	remoteSubnets    sets.Set[string]
-	controllersMutex sync.Mutex // Protects controllers
-	controllers      []Interface
+	syncerConfig            *syncer.ResourceSyncerConfig
+	endpointWatcher         watcher.Interface
+	remoteEndpointTimeStamp map[string]metav1.Time
+	spec                    Specification
+	ipt                     iptables.Interface
+	isGatewayNode           atomic.Bool
+	nodeName                string
+	localSubnets            []string
+	remoteSubnets           sets.Set[string]
+	controllersMutex        sync.Mutex // Protects controllers
+	controllers             []Interface
 }
 
 type baseSyncerController struct {
