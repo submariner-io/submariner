@@ -20,7 +20,6 @@ package controllers_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"testing"
@@ -31,7 +30,9 @@ import (
 	"github.com/onsi/gomega/format"
 	fakeDynClient "github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
+	testutil "github.com/submariner-io/admiral/pkg/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
@@ -398,7 +399,6 @@ func (t *testDriverBase) awaitService(name string) *corev1.Service {
 }
 
 func (t *testDriverBase) awaitNoService(name string) {
-	time.Sleep(300 * time.Millisecond)
 	test.AwaitNoResource(t.services, name)
 }
 
@@ -412,8 +412,11 @@ func (t *testDriverBase) awaitEndpoints(name string) *corev1.Endpoints {
 }
 
 func (t *testDriverBase) awaitNoEndpoints(name string) {
-	time.Sleep(300 * time.Millisecond)
 	test.AwaitNoResource(t.endpoints, name)
+}
+
+func (t *testDriverBase) ensureNoEndpoints(name string) {
+	testutil.EnsureNoResource(resource.ForDynamic(t.endpoints), name)
 }
 
 func (t *testDriverBase) awaitEndpointsHasIP(name, ip string) {
@@ -491,11 +494,14 @@ func getGlobalIngressIP(t *testDriverBase, name string,
 }
 
 func (t *testDriverBase) awaitNoGlobalIngressIP(name string) {
-	time.Sleep(300 * time.Millisecond)
 	test.AwaitNoResource(t.globalIngressIPs, name)
 }
 
-func (t *testDriverBase) awaitNoGlobalIngressIPs() {
+func (t *testDriverBase) ensureNoGlobalIngressIP(name string) {
+	testutil.EnsureNoResource(resource.ForDynamic(t.globalIngressIPs), name)
+}
+
+func (t *testDriverBase) ensureNoGlobalIngressIPs() {
 	Consistently(func() []unstructured.Unstructured {
 		list, _ := t.globalIngressIPs.List(context.TODO(), metav1.ListOptions{})
 		return list.Items
@@ -506,48 +512,49 @@ func awaitStatusConditions(client dynamic.ResourceInterface, name string, atInde
 	var conditions []metav1.Condition
 	var notFound error
 
-	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
-		obj, err := client.Get(context.TODO(), name, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			notFound = err
-			return false, nil
-		}
+	err := wait.PollUntilContextTimeout(context.Background(), 50*time.Millisecond, 5*time.Second, true,
+		func(ctx context.Context) (bool, error) {
+			obj, err := client.Get(ctx, name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				notFound = err
+				return false, nil
+			}
 
-		notFound = nil
+			notFound = nil
 
-		if err != nil {
-			return false, err
-		}
-
-		slice, ok, err := unstructured.NestedSlice(obj.Object, "status", "conditions")
-		if !ok || err != nil {
-			return false, err
-		}
-
-		conditions = make([]metav1.Condition, len(slice))
-		for i := range slice {
-			c := &metav1.Condition{}
-			err = runtime.DefaultUnstructuredConverter.FromUnstructured(slice[i].(map[string]interface{}), c)
 			if err != nil {
 				return false, err
 			}
 
-			conditions[i] = *c
-		}
+			slice, ok, err := unstructured.NestedSlice(obj.Object, "status", "conditions")
+			if !ok || err != nil {
+				return false, err
+			}
 
-		if atIndex+len(expCond) != len(conditions) {
-			return false, nil
-		}
+			conditions = make([]metav1.Condition, len(slice))
+			for i := range slice {
+				c := &metav1.Condition{}
+				err = runtime.DefaultUnstructuredConverter.FromUnstructured(slice[i].(map[string]interface{}), c)
+				if err != nil {
+					return false, err
+				}
 
-		return true, nil
-	})
+				conditions[i] = *c
+			}
+
+			if atIndex+len(expCond) != len(conditions) {
+				return false, nil
+			}
+
+			return true, nil
+		})
 
 	if notFound != nil {
 		Fail(fmt.Sprintf("%#v", notFound))
 		return
 	}
 
-	if errors.Is(err, wait.ErrWaitTimeout) {
+	if wait.Interrupted(err) {
 		if conditions == nil {
 			Fail("Status conditions not found")
 		}

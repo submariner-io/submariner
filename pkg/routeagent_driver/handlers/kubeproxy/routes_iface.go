@@ -33,7 +33,7 @@ import (
 
 func (kp *SyncHandler) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks []string, operation Operation) {
 	if operation == Flush {
-		kp.routeCacheGWNode.Delete(kp.routeCacheGWNode.UnsortedList()...)
+		kp.routeCacheGWNode.Clear()
 
 		err := kp.netLink.FlushRouteTable(constants.RouteAgentHostNetworkTableID)
 		if err != nil {
