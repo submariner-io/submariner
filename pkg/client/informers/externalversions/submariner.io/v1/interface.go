@@ -32,10 +32,14 @@ type Interface interface {
 	Endpoints() EndpointInformer
 	// Gateways returns a GatewayInformer.
 	Gateways() GatewayInformer
+	// GatewayRoutes returns a GatewayRouteInformer.
+	GatewayRoutes() GatewayRouteInformer
 	// GlobalEgressIPs returns a GlobalEgressIPInformer.
 	GlobalEgressIPs() GlobalEgressIPInformer
 	// GlobalIngressIPs returns a GlobalIngressIPInformer.
 	GlobalIngressIPs() GlobalIngressIPInformer
+	// NonGatewayRoutes returns a NonGatewayRouteInformer.
+	NonGatewayRoutes() NonGatewayRouteInformer
 }
 
 type version struct {
@@ -69,6 +73,11 @@ func (v *version) Gateways() GatewayInformer {
 	return &gatewayInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
+// GatewayRoutes returns a GatewayRouteInformer.
+func (v *version) GatewayRoutes() GatewayRouteInformer {
+	return &gatewayRouteInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
 // GlobalEgressIPs returns a GlobalEgressIPInformer.
 func (v *version) GlobalEgressIPs() GlobalEgressIPInformer {
 	return &globalEgressIPInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
@@ -77,4 +86,9 @@ func (v *version) GlobalEgressIPs() GlobalEgressIPInformer {
 // GlobalIngressIPs returns a GlobalIngressIPInformer.
 func (v *version) GlobalIngressIPs() GlobalIngressIPInformer {
 	return &globalIngressIPInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// NonGatewayRoutes returns a NonGatewayRouteInformer.
+func (v *version) NonGatewayRoutes() NonGatewayRouteInformer {
+	return &nonGatewayRouteInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
