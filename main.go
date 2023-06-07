@@ -20,6 +20,7 @@ package main
 
 import (
 	"context"
+	"crypto/x509"
 	"errors"
 	"flag"
 	"fmt"
@@ -28,6 +29,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
@@ -35,6 +37,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -51,6 +54,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/pod"
 	"github.com/submariner-io/submariner/pkg/types"
 	corev1 "k8s.io/api/core/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -100,8 +104,9 @@ const (
 )
 
 var (
-	VERSION = "not-compiled-properly"
-	logger  = log.Logger{Logger: logf.Log.WithName("main")}
+	VERSION            = "not-compiled-properly"
+	logger             = log.Logger{Logger: logf.Log.WithName("main")}
+	lastBadCertificate atomic.Value
 )
 
 func main() {
@@ -122,6 +127,19 @@ func main() {
 	httpServer := startHTTPServer(&components.submSpec)
 
 	var err error
+
+	//nolint:reassign // We need to reassign ErrorHandlers to register our handler
+	utilruntime.ErrorHandlers = append(utilruntime.ErrorHandlers, func(err error) {
+		var unknownAuthorityError x509.UnknownAuthorityError
+		if errors.As(err, &unknownAuthorityError) && lastBadCertificate.Swap(unknownAuthorityError.Cert) != unknownAuthorityError.Cert {
+			logger.Errorf(err, "Certificate error: %s", resource.ToJSON(err))
+		}
+		var certificateInvalidError x509.CertificateInvalidError
+		if errors.As(err, &certificateInvalidError) && lastBadCertificate.Swap(certificateInvalidError.Cert) != certificateInvalidError.Cert {
+			logger.Errorf(err, "Certificate error: %s", resource.ToJSON(err))
+		}
+		// The generic handler has already logged the error, no need to repeat if we don't want extra detail
+	})
 
 	components.restConfig, err = clientcmd.BuildConfigFromFlags(localMasterURL, localKubeconfig)
 	logger.FatalOnError(err, "Error building kubeconfig")
