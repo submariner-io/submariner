@@ -67,6 +67,7 @@ type libreswan struct {
 
 	debug                 bool
 	forceUDPEncapsulation bool
+	plutoStarted          bool
 }
 
 type specification struct {
@@ -133,6 +134,7 @@ func NewLibreswan(localEndpoint *types.SubmarinerEndpoint, _ *types.SubmarinerCl
 		localEndpoint:         *localEndpoint,
 		connections:           []subv1.Connection{},
 		forceUDPEncapsulation: ipSecSpec.ForceEncaps,
+		plutoStarted:          false,
 	}, nil
 }
 
@@ -153,11 +155,6 @@ func (i *libreswan) Init() error {
 	defer file.Close()
 
 	fmt.Fprintf(file, "%%any %%any : PSK \"%s\"\n", i.secretKey)
-
-	// Ensure Pluto is started
-	if err := i.runPluto(); err != nil {
-		return errors.Wrap(err, "error starting Pluto")
-	}
 
 	return nil
 }
@@ -337,6 +334,15 @@ func whack(args ...string) error {
 // ConnectToEndpoint establishes a connection to the given endpoint and returns a string
 // representation of the IP address of the target endpoint.
 func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
+	if !i.plutoStarted {
+		// Ensure Pluto is started
+		if err := i.runPluto(); err != nil {
+			logger.FatalOnError(err, "Error running Pluto")
+		}
+
+		i.plutoStarted = true
+	}
+
 	// We'll panic if endpointInfo is nil, this is intentional
 	endpoint := &endpointInfo.Endpoint
 
@@ -602,7 +608,7 @@ func (i *libreswan) runPluto() error {
 	}()
 
 	// Wait up to 5s for the control socket.
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 250; i++ {
 		_, err := os.Stat("/run/pluto/pluto.ctl")
 		if err == nil {
 			break
@@ -613,7 +619,7 @@ func (i *libreswan) runPluto() error {
 			break
 		}
 
-		time.Sleep(1 * time.Second)
+		time.Sleep(20 * time.Millisecond)
 	}
 
 	if i.debug {
