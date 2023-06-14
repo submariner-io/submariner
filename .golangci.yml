@@ -47,7 +47,7 @@ linters:
     - contextcheck
     # - cyclop # This is equivalent to gocyclo
     - decorder
-    - depguard
+    # - depguard # depguard now denies by default, it should only be enabled if we actually use it
     - dogsled
     - dupl
     - dupword
