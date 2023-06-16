@@ -149,7 +149,8 @@ var _ = Describe("Controller", func() {
 
 			latencyInfo1 := newLatencyInfo()
 			pingerMap[healthCheckIP1].SetLatencyInfo(latencyInfo1)
-			Eventually(healthChecker.GetLatencyInfo(&endpoint1.Spec)).Should(Equal(latencyInfo1))
+			Eventually(func() *healthchecker.LatencyInfo { return healthChecker.GetLatencyInfo(&endpoint1.Spec) }).
+				Should(Equal(latencyInfo1))
 
 			latencyInfo2 := &healthchecker.LatencyInfo{
 				ConnectionStatus: healthchecker.ConnectionError,
@@ -163,7 +164,8 @@ var _ = Describe("Controller", func() {
 			}
 
 			pingerMap[healthCheckIP2].SetLatencyInfo(latencyInfo2)
-			Eventually(healthChecker.GetLatencyInfo(&endpoint2.Spec)).Should(Equal(latencyInfo2))
+			Eventually(func() *healthchecker.LatencyInfo { return healthChecker.GetLatencyInfo(&endpoint2.Spec) }).
+				Should(Equal(latencyInfo2))
 		})
 	})
 
@@ -181,7 +183,8 @@ var _ = Describe("Controller", func() {
 
 			Expect(endpoints.Delete(context.TODO(), endpoint.Name, metav1.DeleteOptions{})).To(Succeed())
 			pingerMap[healthCheckIP1].AwaitStop()
-			Eventually(healthChecker.GetLatencyInfo(&endpoint.Spec)).Should(BeNil())
+			Eventually(func() *healthchecker.LatencyInfo { return healthChecker.GetLatencyInfo(&endpoint.Spec) }).
+				Should(BeNil())
 		})
 	})
 
@@ -207,7 +210,8 @@ var _ = Describe("Controller", func() {
 
 				latencyInfo := newLatencyInfo()
 				pingerMap[healthCheckIP3].SetLatencyInfo(latencyInfo)
-				Eventually(healthChecker.GetLatencyInfo(&endpoint.Spec)).Should(Equal(latencyInfo))
+				Eventually(func() *healthchecker.LatencyInfo { return healthChecker.GetLatencyInfo(&endpoint.Spec) }).
+					Should(Equal(latencyInfo))
 			})
 		})
 
