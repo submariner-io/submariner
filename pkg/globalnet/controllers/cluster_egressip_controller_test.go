@@ -303,7 +303,8 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 		JustBeforeEach(func() {
 			t.awaitClusterGlobalEgressIPStatusAllocated(1)
 			allocatedIPs = getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName).AllocatedIPs
-			Expect(t.clusterGlobalEgressIPs.Delete(context.TODO(), constants.ClusterGlobalEgressIPName, metav1.DeleteOptions{}))
+			Expect(t.clusterGlobalEgressIPs.Delete(context.TODO(), constants.ClusterGlobalEgressIPName, metav1.DeleteOptions{})).
+				To(Succeed())
 		})
 
 		It("should release the previously allocated IPs", func() {
