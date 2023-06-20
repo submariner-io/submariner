@@ -7,7 +7,7 @@ require (
 	github.com/coreos/go-iptables v0.6.0
 	github.com/emirpasic/gods v1.18.1
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/onsi/ginkgo/v2 v2.10.0
+	github.com/onsi/ginkgo/v2 v2.11.0
 	github.com/onsi/gomega v1.27.8
 	github.com/ovn-org/libovsdb v0.6.1-0.20220427123326-d7b273399db4
 	github.com/ovn-org/ovn-kubernetes/go-controller v0.0.0-20220511131059-ac1ce4691c0f
@@ -15,15 +15,15 @@ require (
 	github.com/prometheus-community/pro-bing v0.2.0
 	github.com/prometheus/client_golang v1.15.1
 	github.com/submariner-io/admiral v0.16.0-m0.0.20230602131053-613bd96ec5a2
-	github.com/submariner-io/shipyard v0.16.0-m0
+	github.com/submariner-io/shipyard v0.16.0-m1
 	github.com/uw-labs/lichen v0.1.7
 	github.com/vishvananda/netlink v1.2.1-beta.2
-	golang.org/x/sys v0.8.0
+	golang.org/x/sys v0.9.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20221104135756-97bc4ad4a1cb
 	google.golang.org/protobuf v1.30.0
-	k8s.io/api v0.27.2
-	k8s.io/apimachinery v0.27.2
-	k8s.io/client-go v0.27.2
+	k8s.io/api v0.27.3
+	k8s.io/apimachinery v0.27.3
+	k8s.io/client-go v0.27.3
 	k8s.io/utils v0.0.0-20230209194617-a36077c30491
 	sigs.k8s.io/controller-runtime v0.15.0
 	sigs.k8s.io/mcs-api v0.1.0
