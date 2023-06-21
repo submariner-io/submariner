@@ -13,8 +13,8 @@ require (
 	github.com/ovn-org/ovn-kubernetes/go-controller v0.0.0-20220511131059-ac1ce4691c0f
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus-community/pro-bing v0.2.0
-	github.com/prometheus/client_golang v1.15.1
-	github.com/submariner-io/admiral v0.16.0-m0.0.20230602131053-613bd96ec5a2
+	github.com/prometheus/client_golang v1.16.0
+	github.com/submariner-io/admiral v0.16.0-m1
 	github.com/submariner-io/shipyard v0.16.0-m1
 	github.com/uw-labs/lichen v0.1.7
 	github.com/vishvananda/netlink v1.2.1-beta.2
@@ -77,7 +77,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.4.0 // indirect
 	github.com/prometheus/common v0.42.0 // indirect
-	github.com/prometheus/procfs v0.9.0 // indirect
+	github.com/prometheus/procfs v0.10.1 // indirect
 	github.com/rivo/uniseg v0.4.3 // indirect
 	github.com/rs/zerolog v1.29.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
