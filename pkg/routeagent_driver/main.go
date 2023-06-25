@@ -42,6 +42,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/mtu"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
+	"github.com/submariner-io/submariner/pkg/versions"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -58,6 +59,8 @@ func main() {
 	kzerolog.AddFlags(nil)
 	flag.Parse()
 	kzerolog.InitK8sLogging()
+
+	versions.Log(&logger)
 
 	logger.Info("Starting submariner-route-agent using the event framework")
 	// set up signals so we handle the first shutdown signal gracefully

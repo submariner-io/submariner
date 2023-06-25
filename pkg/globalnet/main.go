@@ -35,6 +35,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/cidr"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
+	"github.com/submariner-io/submariner/pkg/versions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
@@ -53,6 +54,8 @@ func main() {
 	kzerolog.AddFlags(nil)
 	flag.Parse()
 	kzerolog.InitK8sLogging()
+
+	versions.Log(&logger)
 
 	var spec controllers.Specification
 
