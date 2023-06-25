@@ -31,6 +31,7 @@ import (
 	eventlogger "github.com/submariner-io/submariner/pkg/event/logger"
 	"github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
+	"github.com/submariner-io/submariner/pkg/versions"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -48,6 +49,8 @@ func main() {
 	kzerolog.AddFlags(nil)
 	flag.Parse()
 	kzerolog.InitK8sLogging()
+
+	versions.Log(&logger)
 
 	logger.Info("Starting submariner-networkplugin-syncer")
 	// set up signals so we handle the first shutdown signal gracefully
