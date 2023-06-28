@@ -39,6 +39,7 @@ import (
 	cniapi "github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/calico"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/mtu"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
@@ -102,6 +103,7 @@ func main() {
 		cabledriver.NewXRFMCleanupHandler(),
 		cabledriver.NewVXLANCleanup(),
 		mtu.NewMTUHandler(env.ClusterCidr, len(env.GlobalCidr) != 0, getTCPMssValue(k8sClientSet)),
+		calico.NewCalicoIPPoolHandler(cfg),
 	); err != nil {
 		logger.Fatalf("Error registering the handlers: %s", err.Error())
 	}
