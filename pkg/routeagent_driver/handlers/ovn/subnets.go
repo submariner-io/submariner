@@ -18,10 +18,10 @@ limitations under the License.
 
 package ovn
 
-import "k8s.io/apimachinery/pkg/util/sets"
+import "k8s.io/utils/set"
 
-func (ovn *Handler) getRemoteSubnets() sets.Set[string] {
-	endpointSubnets := sets.New[string]()
+func (ovn *Handler) getRemoteSubnets() set.Set[string] {
+	endpointSubnets := set.New[string]()
 
 	for _, endpoint := range ovn.remoteEndpoints {
 		for _, subnet := range endpoint.Spec.Subnets {

@@ -31,8 +31,8 @@ import (
 	"github.com/submariner-io/submariner/pkg/iptables"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/utils/set"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -99,7 +99,7 @@ type gatewayMonitor struct {
 	isGatewayNode           atomic.Bool
 	nodeName                string
 	localSubnets            []string
-	remoteSubnets           sets.Set[string]
+	remoteSubnets           set.Set[string]
 	controllersMutex        sync.Mutex // Protects controllers
 	controllers             []Interface
 }
@@ -169,7 +169,7 @@ type ingressPodController struct {
 	*baseSyncerController
 	svcName      string
 	namespace    string
-	ingressIPMap sets.Set[string]
+	ingressIPMap set.Set[string]
 }
 
 type IngressPodControllers struct {

@@ -25,13 +25,13 @@ import (
 
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/submariner/pkg/iptables"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/set"
 )
 
 type basicType struct {
 	mutex                    sync.Mutex
-	chainRules               map[string]sets.Set[string]
-	tableChains              map[string]sets.Set[string]
+	chainRules               map[string]set.Set[string]
+	tableChains              map[string]set.Set[string]
 	failOnAppendRuleMatchers []interface{}
 	failOnDeleteRuleMatchers []interface{}
 }
@@ -44,8 +44,8 @@ func New() *IPTables {
 	return &IPTables{
 		Adapter: iptables.Adapter{
 			Basic: &basicType{
-				chainRules:  map[string]sets.Set[string]{},
-				tableChains: map[string]sets.Set[string]{},
+				chainRules:  map[string]set.Set[string]{},
+				tableChains: map[string]set.Set[string]{},
 			},
 		},
 	}
@@ -91,7 +91,7 @@ func (i *basicType) addRule(table, chain string, rulespec ...string) error {
 
 	ruleSet := i.chainRules[table+"/"+chain]
 	if ruleSet == nil {
-		ruleSet = sets.New[string]()
+		ruleSet = set.New[string]()
 		i.chainRules[table+"/"+chain] = ruleSet
 	}
 
@@ -193,7 +193,7 @@ func (i *basicType) addChainsFor(table string, chains ...string) {
 
 	chainSet := i.tableChains[table]
 	if chainSet == nil {
-		chainSet = sets.New[string]()
+		chainSet = set.New[string]()
 		i.tableChains[table] = chainSet
 	}
 

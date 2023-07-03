@@ -27,7 +27,7 @@ import (
 	k8sV1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8serrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/set"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -57,7 +57,7 @@ func (er *Registry) GetName() string {
 }
 
 func (er *Registry) addHandler(eventHandler Handler) error {
-	evNetworkPlugins := sets.New[string]()
+	evNetworkPlugins := set.New[string]()
 
 	for _, np := range eventHandler.GetNetworkPlugins() {
 		evNetworkPlugins.Insert(strings.ToLower(np))

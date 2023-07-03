@@ -24,11 +24,11 @@ import (
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/libovsdbops"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/nbdb"
 	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/set"
 )
 
-func (ovn *SyncHandler) reconcileSubOvnLogicalRouterPolicies(remoteSubnets sets.Set[string]) error {
+func (ovn *SyncHandler) reconcileSubOvnLogicalRouterPolicies(remoteSubnets set.Set[string]) error {
 	lrpStalePredicate := func(item *nbdb.LogicalRouterPolicy) bool {
 		subnet := strings.Split(item.Match, " ")[2]
 
