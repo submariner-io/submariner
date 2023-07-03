@@ -23,7 +23,7 @@ import (
 
 	"github.com/pkg/errors"
 	level "github.com/submariner-io/admiral/pkg/log"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/set"
 )
 
 type Adapter struct {
@@ -104,7 +104,7 @@ func (a *Adapter) UpdateChainRules(table, chain string, rules [][]string) error 
 		return errors.Wrapf(err, "error listing the rules in table %q, chain %q", table, chain)
 	}
 
-	ruleStrings := sets.New[string]()
+	ruleStrings := set.New[string]()
 
 	for _, existingRule := range existingRules {
 		ruleSpec := strings.Split(existingRule, " ")

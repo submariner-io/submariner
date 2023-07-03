@@ -24,7 +24,7 @@ import (
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/sbdb"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/set"
 )
 
 // Ensure the core submariner ovn topology is setup and current.
@@ -222,7 +222,7 @@ func (ovn *SyncHandler) updateSubmarinerRouterRemoteRoutes() error {
 }
 
 func (ovn *SyncHandler) updateSubmarinerRouterLocalRoutes() error {
-	localSubnets := sets.New(ovn.localClusterCIDR...)
+	localSubnets := set.New(ovn.localClusterCIDR...)
 
 	logger.Infof("reconciling south static routes on %q for subnets %v", submarinerLogicalRouter,
 		localSubnets)
