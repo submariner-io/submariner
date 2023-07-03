@@ -2,31 +2,31 @@
 version: 2
 updates:
   - package-ecosystem: github-actions
-    directory: '/'
+    directory: /
     schedule:
       interval: monthly
   - package-ecosystem: github-actions
-    directory: '/'
-    target-branch: "release-0.12"
+    directory: /
+    target-branch: release-0.12
     schedule:
       interval: monthly
   - package-ecosystem: github-actions
-    directory: '/'
-    target-branch: "release-0.13"
+    directory: /
+    target-branch: release-0.13
     schedule:
       interval: monthly
   - package-ecosystem: github-actions
-    directory: '/'
-    target-branch: "release-0.14"
+    directory: /
+    target-branch: release-0.14
     schedule:
       interval: monthly
   - package-ecosystem: github-actions
-    directory: '/'
-    target-branch: "release-0.15"
+    directory: /
+    target-branch: release-0.15
     schedule:
       interval: monthly
   - package-ecosystem: gomod
-    directory: "/"
+    directory: /
     schedule:
       interval: weekly
     ignore:
@@ -34,6 +34,16 @@ updates:
       - dependency-name: google.golang.org/protobuf
       # Our own dependencies are handled during releases
       - dependency-name: github.com/submariner-io/*
-      # These are included by k8s.io/client-go
+      # Managed in admiral
+      - dependency-name: github.com/kelseyhightower/envconfig
+      - dependency-name: github.com/onsi/ginkgo/v2
+      - dependency-name: github.com/onsi/gomega
+      - dependency-name: github.com/pkg/errors
+      - dependency-name: github.com/prometheus/client_golang
       - dependency-name: k8s.io/api
       - dependency-name: k8s.io/apimachinery
+      - dependency-name: k8s.io/client-go
+      - dependency-name: sigs.k8s.io/controller-runtime
+      # Managed in shipyard
+      - dependency-name: k8s.io/utils
+      - dependency-name: sigs.k8s.io/mcs-api

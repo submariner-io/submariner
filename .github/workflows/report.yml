@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab
+        uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9
         with:
           fetch-depth: 0
 
@@ -37,9 +37,9 @@ jobs:
       security-events: write
     steps:
       - name: Check out the repository
-        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab
+        uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9
       - name: Run Anchore vulnerability scanner
-        uses: anchore/scan-action@4be3c24559b430723e51858969965e163b196957
+        uses: anchore/scan-action@24fd7c9060f3c96848dd1929fac8d796fb5ae4b4
         id: scan
         with:
           path: "."
@@ -47,6 +47,6 @@ jobs:
       - name: Show Anchore scan SARIF report
         run: cat ${{ steps.scan.outputs.sarif }}
       - name: Upload Anchore scan SARIF report
-        uses: github/codeql-action/upload-sarif@83f0fe6c4988d98a455712a27f0255212bba9bd4
+        uses: github/codeql-action/upload-sarif@f6e388ebf0efc915c6c5b165b019ee61a6746a38
         with:
           sarif_file: ${{ steps.scan.outputs.sarif }}
