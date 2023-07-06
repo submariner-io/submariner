@@ -22,10 +22,10 @@ import (
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/libovsdbops"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/nbdb"
 	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/set"
 )
 
-func (ovn *SyncHandler) reconcileSubOvnLogicalRouterStaticRoutes(port, nextHop string, remoteSubnets sets.Set[string]) error {
+func (ovn *SyncHandler) reconcileSubOvnLogicalRouterStaticRoutes(port, nextHop string, remoteSubnets set.Set[string]) error {
 	staleLRSRPred := func(item *nbdb.LogicalRouterStaticRoute) bool {
 		return item.OutputPort != nil && *item.OutputPort == port && !remoteSubnets.Has(item.IPPrefix)
 	}

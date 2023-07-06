@@ -25,7 +25,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/set"
 )
 
 // handleSubnets builds ip rules, and passes them to the specified netlink function
@@ -34,7 +34,7 @@ import (
 func (ovn *Handler) handleSubnets(remoteSubnets []string, ruleFunc func(rule *netlink.Rule) error,
 	ignoredErrorFunc func(error) bool,
 ) error {
-	localCIDRs := sets.New(ovn.config.ClusterCidr...)
+	localCIDRs := set.New(ovn.config.ClusterCidr...)
 	localCIDRs.Insert(ovn.config.ServiceCidr...)
 
 	for _, subnetToHandle := range remoteSubnets {
@@ -83,8 +83,8 @@ func (ovn *Handler) getRuleSpec(dest, src string, tableID int) (*netlink.Rule, e
 	return rule, nil
 }
 
-func (ovn *Handler) getExistingIPv4RuleSubnets() (sets.Set[string], error) {
-	currentRuleRemotes := sets.New[string]()
+func (ovn *Handler) getExistingIPv4RuleSubnets() (set.Set[string], error) {
+	currentRuleRemotes := set.New[string]()
 
 	rules, err := netlink.RuleList(netlink.FAMILY_V4)
 	if err != nil {

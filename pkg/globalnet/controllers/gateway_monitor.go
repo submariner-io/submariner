@@ -39,10 +39,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
 	k8snet "k8s.io/utils/net"
+	"k8s.io/utils/set"
 )
 
 func NewGatewayMonitor(spec Specification, localCIDRs []string, config *watcher.Config) (Interface, error) {
@@ -51,8 +51,8 @@ func NewGatewayMonitor(spec Specification, localCIDRs []string, config *watcher.
 		baseController:          newBaseController(),
 		spec:                    spec,
 		isGatewayNode:           atomic.Bool{},
-		localSubnets:            sets.New(localCIDRs...).UnsortedList(),
-		remoteSubnets:           sets.New[string](),
+		localSubnets:            set.New(localCIDRs...).UnsortedList(),
+		remoteSubnets:           set.New[string](),
 		remoteEndpointTimeStamp: map[string]metav1.Time{},
 	}
 

@@ -22,7 +22,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/set"
 )
 
 const (
@@ -38,14 +38,14 @@ const (
 var _ = Describe("Remote subnet handling", func() {
 	var (
 		ovn           *SyncHandler
-		remoteSubnets sets.Set[string]
-		localSubnets  sets.Set[string]
+		remoteSubnets set.Set[string]
+		localSubnets  set.Set[string]
 	)
 
 	BeforeEach(func() {
 		ovn = createHandlerWithTestEndpoints()
-		remoteSubnets = sets.New(cluster1Net1, cluster1Net2, cluster2Net1, cluster2Net2)
-		localSubnets = sets.New(localNet1, localNet2)
+		remoteSubnets = set.New(cluster1Net1, cluster1Net2, cluster2Net1, cluster2Net2)
+		localSubnets = set.New(localNet1, localNet2)
 	})
 
 	When("Handling remote endpoints", func() {
