@@ -20,13 +20,13 @@ package ovn
 
 import (
 	"context"
-	"os"
 	"sync"
 
 	"github.com/pkg/errors"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/event"
+	nodeutil "github.com/submariner-io/submariner/pkg/node"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -56,14 +56,9 @@ func NewNonGatewayRouteHandler(smClientSet submarinerClientset.Interface, k8sCli
 func (nonGatewayRouteHandler *NonGatewayRouteHandler) Init() error {
 	logger.Infof("Starting NonGatewayRouteHandler")
 
-	nodeName, ok := os.LookupEnv("NODE_NAME")
-	if !ok {
-		return errors.New("error getting the Node name")
-	}
-
-	node, err := nonGatewayRouteHandler.k8sClientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+	node, err := nodeutil.GetLocalNode(nonGatewayRouteHandler.k8sClientSet)
 	if err != nil {
-		return errors.Wrapf(err, "error getting the g/w node: %q", nodeName)
+		return errors.Wrap(err, "error getting the g/w node")
 	}
 
 	annotations := node.GetAnnotations()
@@ -80,7 +75,7 @@ func (nonGatewayRouteHandler *NonGatewayRouteHandler) Init() error {
 }
 
 func (nonGatewayRouteHandler *NonGatewayRouteHandler) GetName() string {
-	return "submariner-gw-route-handler"
+	return "submariner-nongw-route-handler"
 }
 
 func (nonGatewayRouteHandler *NonGatewayRouteHandler) GetNetworkPlugins() []string {
@@ -102,21 +97,21 @@ func (nonGatewayRouteHandler *NonGatewayRouteHandler) RemoteEndpointCreated(endp
 	nonGatewayRouteHandler.mutex.Lock()
 	defer nonGatewayRouteHandler.mutex.Unlock()
 
-	if nonGatewayRouteHandler.isGateway && nonGatewayRouteHandler.transitSwitchIP != "" {
-		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			_, err := nonGatewayRouteHandler.smClient.SubmarinerV1().
-				NonGatewayRoutes(endpoint.Namespace).Create(context.TODO(),
-				nonGatewayRouteHandler.getNonGatewayRoute(endpoint), metav1.CreateOptions{})
-			if !apierrors.IsAlreadyExists(err) {
-				return errors.Wrapf(err, "error processing the remote endpoint create event for %q", endpoint.Name)
-			}
-			return nil
-		})
-
-		return errors.Wrapf(retryErr, "processing the remote endpoint event failed even after retry")
+	if !nonGatewayRouteHandler.isGateway || nonGatewayRouteHandler.transitSwitchIP == "" {
+		return nil
 	}
 
-	return nil
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		_, err := nonGatewayRouteHandler.smClient.SubmarinerV1().
+			NonGatewayRoutes(endpoint.Namespace).Create(context.TODO(),
+			nonGatewayRouteHandler.getNonGatewayRoute(endpoint), metav1.CreateOptions{})
+		if !apierrors.IsAlreadyExists(err) {
+			return errors.Wrapf(err, "error processing the remote endpoint create event for %q", endpoint.Name)
+		}
+		return nil
+	})
+
+	return errors.Wrapf(retryErr, "processing the remote endpoint event failed even after retry")
 }
 
 func (nonGatewayRouteHandler *NonGatewayRouteHandler) RemoteEndpointRemoved(endpoint *submarinerv1.Endpoint) error {
@@ -125,11 +120,13 @@ func (nonGatewayRouteHandler *NonGatewayRouteHandler) RemoteEndpointRemoved(endp
 
 	delete(nonGatewayRouteHandler.remoteEndpoints, endpoint.Name)
 
-	if nonGatewayRouteHandler.isGateway && nonGatewayRouteHandler.transitSwitchIP != "" {
-		if err := nonGatewayRouteHandler.smClient.SubmarinerV1().NonGatewayRoutes(endpoint.Namespace).Delete(context.TODO(),
-			endpoint.Name, metav1.DeleteOptions{}); err != nil {
-			return errors.Wrapf(err, "error deleting nonGatewayRoute %q", endpoint.Name)
-		}
+	if !nonGatewayRouteHandler.isGateway || nonGatewayRouteHandler.transitSwitchIP == "" {
+		return nil
+	}
+
+	if err := nonGatewayRouteHandler.smClient.SubmarinerV1().NonGatewayRoutes(endpoint.Namespace).Delete(context.TODO(),
+		endpoint.Name, metav1.DeleteOptions{}); err != nil {
+		return errors.Wrapf(err, "error deleting nonGatewayRoute %q", endpoint.Name)
 	}
 
 	return nil
@@ -140,14 +137,6 @@ func (nonGatewayRouteHandler *NonGatewayRouteHandler) TransitionToNonGateway() e
 	defer nonGatewayRouteHandler.mutex.Unlock()
 
 	nonGatewayRouteHandler.isGateway = false
-	if nonGatewayRouteHandler.transitSwitchIP != "" {
-		for _, endpoint := range nonGatewayRouteHandler.remoteEndpoints {
-			if err := nonGatewayRouteHandler.smClient.SubmarinerV1().NonGatewayRoutes(endpoint.Namespace).Delete(context.TODO(),
-				endpoint.Name, metav1.DeleteOptions{}); err != nil {
-				return errors.Wrapf(err, "error deleting nonGatewayRoute %q", endpoint.Name)
-			}
-		}
-	}
 
 	return nil
 }
@@ -159,9 +148,12 @@ func (nonGatewayRouteHandler *NonGatewayRouteHandler) TransitionToGateway() erro
 	nonGatewayRouteHandler.isGateway = true
 	if nonGatewayRouteHandler.transitSwitchIP != "" {
 		for _, endpoint := range nonGatewayRouteHandler.remoteEndpoints {
-			if _, err := nonGatewayRouteHandler.smClient.SubmarinerV1().NonGatewayRoutes(endpoint.Namespace).Create(context.TODO(),
-				nonGatewayRouteHandler.getNonGatewayRoute(endpoint), metav1.CreateOptions{}); err != nil {
+			if _, err := nonGatewayRouteHandler.smClient.SubmarinerV1().NonGatewayRoutes(endpoint.Namespace).Update(context.TODO(),
+				nonGatewayRouteHandler.getNonGatewayRoute(endpoint), metav1.UpdateOptions{}); err != nil {
 				if !apierrors.IsNotFound(err) {
+					_, err = nonGatewayRouteHandler.smClient.SubmarinerV1().NonGatewayRoutes(endpoint.Namespace).Create(context.TODO(),
+						nonGatewayRouteHandler.getNonGatewayRoute(endpoint), metav1.CreateOptions{})
+
 					return errors.Wrapf(err, "error deleting nonGatewayRoute %q", endpoint.Name)
 				}
 			}
