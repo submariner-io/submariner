@@ -31,8 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/set"
 )
 
 func startIngressPodController(svc *corev1.Service, config *syncer.ResourceSyncerConfig) (*ingressPodController, error) {
@@ -47,7 +47,7 @@ func startIngressPodController(svc *corev1.Service, config *syncer.ResourceSynce
 		baseSyncerController: newBaseSyncerController(),
 		svcName:              svc.Name,
 		namespace:            svc.Namespace,
-		ingressIPMap:         sets.New[string](),
+		ingressIPMap:         set.New[string](),
 	}
 
 	labelSelector := labels.Set(svc.Spec.Selector).AsSelector().String()

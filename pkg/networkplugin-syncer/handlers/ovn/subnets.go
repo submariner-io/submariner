@@ -19,13 +19,13 @@ limitations under the License.
 package ovn
 
 import (
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/set"
 )
 
 // getNorthSubnetsToAddAndRemove receives the existing state for the north (other clusters) routes in the OVN
 // database, and based on the known remote endpoints it will return the elements that need
 // to be added and removed.
-func (ovn *SyncHandler) getNorthSubnetsToAddAndRemove(existingSubnets sets.Set[string]) ([]string, []string) {
+func (ovn *SyncHandler) getNorthSubnetsToAddAndRemove(existingSubnets set.Set[string]) ([]string, []string) {
 	newSubnets := ovn.remoteEndpointSubnetSet()
 
 	toRemove := existingSubnets.Difference(newSubnets).UnsortedList()
@@ -36,8 +36,8 @@ func (ovn *SyncHandler) getNorthSubnetsToAddAndRemove(existingSubnets sets.Set[s
 
 // remoteEndpointSubnetSet iterates over all known remote endpoints and subnets constructing a set of strings with
 // all the remote subnets.
-func (ovn *SyncHandler) remoteEndpointSubnetSet() sets.Set[string] {
-	remoteSubnets := sets.New[string]()
+func (ovn *SyncHandler) remoteEndpointSubnetSet() set.Set[string] {
+	remoteSubnets := set.New[string]()
 
 	for _, endpoint := range ovn.remoteEndpoints {
 		for _, subnet := range endpoint.Spec.Subnets {
@@ -51,7 +51,7 @@ func (ovn *SyncHandler) remoteEndpointSubnetSet() sets.Set[string] {
 // getSouthSubnetsToAddAndRemove receives the existing state for the south (our cluster) routes in the OVN
 // submariner_router, and based on the known remote endpoints it will return the elements that need
 // to be added and removed.
-func (ovn *SyncHandler) getSouthSubnetsToAddAndRemove(existingSubnets sets.Set[string]) ([]string, []string) {
+func (ovn *SyncHandler) getSouthSubnetsToAddAndRemove(existingSubnets set.Set[string]) ([]string, []string) {
 	newSubnets := ovn.localEndpointSubnetSet()
 
 	toRemove := existingSubnets.Difference(newSubnets).UnsortedList()
@@ -62,8 +62,8 @@ func (ovn *SyncHandler) getSouthSubnetsToAddAndRemove(existingSubnets sets.Set[s
 
 // remoteEndpointSubnetSet returns a set of strings with all the local subnets for this cluster based on the local endpoint
 // information.
-func (ovn *SyncHandler) localEndpointSubnetSet() sets.Set[string] {
-	localSubnets := sets.New[string]()
+func (ovn *SyncHandler) localEndpointSubnetSet() set.Set[string] {
+	localSubnets := set.New[string]()
 
 	if ovn.localEndpoint != nil {
 		for _, subnet := range ovn.localEndpoint.Spec.Subnets {

@@ -28,7 +28,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/set"
 )
 
 const (
@@ -75,8 +75,8 @@ func (ovn *Handler) updateHostNetworkDataplane() error {
 	return nil
 }
 
-func (ovn *Handler) getExistingIPv4HostNetworkRoutes() (sets.Set[string], error) {
-	currentRuleRemotes := sets.New[string]()
+func (ovn *Handler) getExistingIPv4HostNetworkRoutes() (set.Set[string], error) {
+	currentRuleRemotes := set.New[string]()
 
 	rules, err := netlink.RuleList(netlink.FAMILY_V4)
 	if err != nil {
