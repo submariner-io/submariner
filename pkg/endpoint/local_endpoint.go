@@ -34,8 +34,8 @@ import (
 	"github.com/submariner-io/submariner/pkg/port"
 	"github.com/submariner-io/submariner/pkg/types"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/set"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -177,7 +177,7 @@ func getNodeBackendConfig(nodeObj *v1.Node) (map[string]string, error) {
 }
 
 func addConfigFrom(nodeName string, configs, backendConfig map[string]string, warningDuplicate string) error {
-	validConfigs := sets.New(submv1.ValidGatewayNodeConfig...)
+	validConfigs := set.New(submv1.ValidGatewayNodeConfig...)
 
 	for cfg, value := range configs {
 		if strings.HasPrefix(cfg, submv1.GatewayConfigPrefix) {
