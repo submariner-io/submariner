@@ -57,17 +57,46 @@ func (ovn *Handler) updateHostNetworkDataplane() error {
 		return errors.Wrapf(err, "error removing routing rule")
 	}
 
-	nextHop, err := ovn.getNextHopOnK8sMgmtIntf()
-	if err != nil {
-		return errors.Wrapf(err, "getNextHopOnK8sMgmtIntf returned error")
+	var route netlink.Route
+
+	if ovn.isGateway && ovn.localEndpoint.Spec.Backend == "nexodus" {
+		logger.V(log.DEBUG).Info("In updateHostNetworkDataplane on Gateway node")
+
+		var ifaceIndex int
+		if wg, err := net.InterfaceByName("wg0"); err == nil {
+			ifaceIndex = wg.Index
+		} else {
+			return errors.Wrapf(err, "nexodus interface wg0 not found on the node")
+		}
+
+		_, ipNet, err := net.ParseCIDR("0.0.0.0/0")
+		if err != nil {
+			return errors.Wrapf(err, "net.ParseCIDR returned error")
+		}
+
+		srcIP, err := ovn.getIPv4AddrOnK8sMgmtIntf()
+		if err != nil {
+			return errors.Wrapf(err, "getNextHopOnK8sMgmtIntf returned error")
+		}
+
+		route.Dst = ipNet
+		route.Src = *srcIP
+		route.LinkIndex = ifaceIndex
+		route.Protocol = 4
+		route.Table = constants.RouteAgentHostNetworkTableID
+	} else {
+		logger.V(log.DEBUG).Info("In updateHostNetworkDataplane on Gateway node")
+
+		nextHop, err := ovn.getNextHopOnK8sMgmtIntf()
+		if err != nil {
+			return errors.Wrapf(err, "getNextHopOnK8sMgmtIntf returned error")
+		}
+
+		route.Gw = *nextHop
+		route.Table = constants.RouteAgentHostNetworkTableID
 	}
 
-	route := &netlink.Route{
-		Gw:    *nextHop,
-		Table: constants.RouteAgentHostNetworkTableID,
-	}
-
-	err = netlink.RouteAdd(route)
+	err = netlink.RouteAdd(&route)
 	if err != nil && !os.IsExist(err) {
 		return errors.Wrap(err, "error adding submariner default")
 	}
@@ -145,4 +174,22 @@ func (ovn *Handler) getNextHopOnK8sMgmtIntf() (*net.IP, error) {
 	}
 
 	return nil, fmt.Errorf("could not find the route to %v via %q", ovn.config.ClusterCidr, OVNK8sMgmntIntfName)
+}
+
+func (ovn *Handler) getIPv4AddrOnK8sMgmtIntf() (*net.IP, error) {
+	link, err := netlink.LinkByName(OVNK8sMgmntIntfName)
+	if err != nil && !errors.Is(err, netlink.LinkNotFoundError{}) {
+		return nil, errors.Wrapf(err, "error retrieving link by name %q", OVNK8sMgmntIntfName)
+	}
+
+	addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get the IPv4 address list for interface %q", OVNK8sMgmntIntfName)
+	}
+
+	if len(addrs) > 0 {
+		return &addrs[0].IP, nil
+	}
+
+	return nil, fmt.Errorf("%q iface is not configured with an IPv4 address", OVNK8sMgmntIntfName)
 }

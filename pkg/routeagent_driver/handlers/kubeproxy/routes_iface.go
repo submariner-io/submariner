@@ -25,6 +25,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/submariner/pkg/cable/nexodus"
 	"github.com/submariner-io/submariner/pkg/cable/wireguard"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
@@ -114,12 +115,19 @@ func (kp *SyncHandler) configureRoute(remoteSubnet string, operation Operation, 
 	}
 
 	ifaceIndex := kp.defaultHostIface.Index
-	// TODO: Add support for this in the CableDrivers themselves.
-	if kp.localCableDriver == "wireguard" {
+
+	switch kp.localCableDriver {
+	case "wireguard":
 		if wg, err := net.InterfaceByName(wireguard.DefaultDeviceName); err == nil {
 			ifaceIndex = wg.Index
 		} else {
-			logger.Errorf(nil, "Wireguard interface %s not found on the node.", wireguard.DefaultDeviceName)
+			return errors.Wrapf(err, "wireguard interface %s not found on the node", wireguard.DefaultDeviceName)
+		}
+	case "nexodus":
+		if wg, err := net.InterfaceByName(nexodus.DefaultDeviceName); err == nil {
+			ifaceIndex = wg.Index
+		} else {
+			return errors.Wrapf(err, "nexodus interface %s not found on the node", nexodus.DefaultDeviceName)
 		}
 	}
 

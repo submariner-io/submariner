@@ -115,8 +115,7 @@ func main() {
 	kzerolog.InitK8sLogging()
 
 	versions.Log(&logger)
-
-	logger.Info("Starting the submariner gateway engine")
+	logger.Info("Starting the submariner gateway engine with custom nexodus cable driver (WIP)")
 
 	components := &componentsType{
 		// set up signals so we handle the first shutdown signal gracefully

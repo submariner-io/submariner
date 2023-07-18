@@ -62,8 +62,8 @@ func main() {
 	kzerolog.InitK8sLogging()
 
 	versions.Log(&logger)
+	logger.Info("Starting submariner-route-agent using the event framework with nexodus cable driver support for OVNK (WIP)")
 
-	logger.Info("Starting submariner-route-agent using the event framework")
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler().Done()
 
