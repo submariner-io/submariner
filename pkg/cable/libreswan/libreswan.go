@@ -280,6 +280,10 @@ func (i *libreswan) GetActiveConnections() ([]subv1.Connection, error) {
 
 // GetConnections() returns an array of the existing connections, including status and endpoint info.
 func (i *libreswan) GetConnections() ([]subv1.Connection, error) {
+	if !i.plutoStarted {
+		return []subv1.Connection{}, nil
+	}
+
 	if err := i.refreshConnectionStatus(); err != nil {
 		return []subv1.Connection{}, err
 	}
