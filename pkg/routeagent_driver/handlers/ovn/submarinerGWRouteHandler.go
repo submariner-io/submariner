@@ -53,6 +53,13 @@ func NewGatewayRouteHandler(env *environment.Specification, smClientSet submarin
 func (gatewayRouteHandler *GatewayRouteHandler) Init() error {
 	logger.Infof("Starting GatewayRouteHandler")
 
+	nextHopIP, err := getNextHopOnK8sMgmtIntf()
+	if err != nil || nextHopIP == "" {
+		return errors.Wrapf(err, "error getting the ovn kubernetes management interface IP")
+	}
+
+	gatewayRouteHandler.nextHopIP = nextHopIP
+
 	return nil
 }
 
@@ -66,24 +73,11 @@ func (gatewayRouteHandler *GatewayRouteHandler) GetNetworkPlugins() []string {
 	return []string{}
 }
 
-func (gatewayRouteHandler *GatewayRouteHandler) LocalEndpointCreated(*submarinerv1.Endpoint) error {
-	gatewayRouteHandler.mutex.Lock()
-	defer gatewayRouteHandler.mutex.Unlock()
-
-	nextHopIP, err := getNextHopOnK8sMgmtIntf(gatewayRouteHandler.config.ClusterCidr)
-
-	if err != nil || nextHopIP == nil {
-		return errors.Wrapf(err, "error getting the ovn kubernetes management interface IP")
-	}
-
-	gatewayRouteHandler.nextHopIP = nextHopIP.String()
-
-	return nil
-}
-
 func (gatewayRouteHandler *GatewayRouteHandler) RemoteEndpointCreated(endpoint *submarinerv1.Endpoint) error {
 	gatewayRouteHandler.mutex.Lock()
 	defer gatewayRouteHandler.mutex.Unlock()
+
+	gatewayRouteHandler.remoteEndpoints[endpoint.Name] = endpoint
 
 	if gatewayRouteHandler.isGateway {
 		_, err := gatewayRouteHandler.smClient.SubmarinerV1().GatewayRoutes(endpoint.Namespace).Create(context.TODO(),
@@ -133,7 +127,7 @@ func (gatewayRouteHandler *GatewayRouteHandler) TransitionToGateway() error {
 			if !apierrors.IsNotFound(err) {
 				_, err = gatewayRouteHandler.smClient.SubmarinerV1().GatewayRoutes(endpoint.Namespace).Create(context.TODO(),
 					gatewayRouteHandler.newGatewayRoute(endpoint), metav1.CreateOptions{})
-				return errors.Wrapf(err, "error deleting gatewayRoute %q", endpoint.Name)
+				return errors.Wrapf(err, "error updating gatewayRoute %q", endpoint.Name)
 			}
 		}
 	}
@@ -143,10 +137,6 @@ func (gatewayRouteHandler *GatewayRouteHandler) TransitionToGateway() error {
 
 func (gatewayRouteHandler *GatewayRouteHandler) newGatewayRoute(endpoint *submarinerv1.Endpoint) *submarinerv1.GatewayRoute {
 	return &submarinerv1.GatewayRoute{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "GatewayRoute",
-			APIVersion: "submariner.io/v1",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: endpoint.Name,
 		},

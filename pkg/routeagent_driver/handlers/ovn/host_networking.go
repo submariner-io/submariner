@@ -20,9 +20,12 @@ package ovn
 
 import (
 	"fmt"
+	"net"
 	"os"
+	"syscall"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
 	"k8s.io/utils/set"
@@ -54,11 +57,7 @@ func (ovn *Handler) updateHostNetworkDataplane() error {
 		return errors.Wrapf(err, "error removing routing rule")
 	}
 
-	if ovn.localEndpoint == nil {
-		return fmt.Errorf("missing localEndpoint info")
-	}
-
-	nextHop, err := getNextHopOnK8sMgmtIntf(ovn.config.ClusterCidr)
+	nextHop, err := ovn.getNextHopOnK8sMgmtIntf()
 	if err != nil {
 		return errors.Wrapf(err, "getNextHopOnK8sMgmtIntf returned error")
 	}
@@ -109,4 +108,41 @@ func (ovn *Handler) programRulesForRemoteSubnets(subnets []string, ruleFunc func
 	}
 
 	return nil
+}
+
+func (ovn *Handler) getNextHopOnK8sMgmtIntf() (*net.IP, error) {
+	if ovn.localEndpoint == nil {
+		return nil, fmt.Errorf("missing localEndpoint info")
+	}
+
+	link, err := netlink.LinkByName(OVNK8sMgmntIntfName)
+
+	if err != nil && !errors.Is(err, netlink.LinkNotFoundError{}) {
+		return nil, errors.Wrapf(err, "error retrieving link by name %q", OVNK8sMgmntIntfName)
+	}
+
+	currentRouteList, err := netlink.RouteList(link, syscall.AF_INET)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error retrieving routes on the link %s", OVNK8sMgmntIntfName)
+	}
+
+	for i := range currentRouteList {
+		logger.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])
+
+		if currentRouteList[i].Dst == nil || currentRouteList[i].Gw == nil {
+			continue
+		}
+
+		// To support hostNetworking use-case the route-agent handler programs default route in table 150
+		// with nexthop matching the nexthop on the ovn-k8s-mp0 interface. Basically, we want the Submariner
+		// managed traffic to be forwarded to the ovn_cluster_router and pass through the CNI network so that
+		// it reaches the active gateway node in the cluster via the submariner pipeline.
+		for _, subnet := range ovn.config.ClusterCidr {
+			if currentRouteList[i].Dst.String() == subnet {
+				return &currentRouteList[i].Gw, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("could not find the route to %v via %q", ovn.config.ClusterCidr, OVNK8sMgmntIntfName)
 }

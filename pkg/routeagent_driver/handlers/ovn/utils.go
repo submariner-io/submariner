@@ -19,43 +19,67 @@ limitations under the License.
 package ovn
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
-	"syscall"
 
 	"github.com/pkg/errors"
-	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/vishvananda/netlink"
 )
 
-func getNextHopOnK8sMgmtIntf(clusterCidr []string) (*net.IP, error) {
+func getNextHopOnK8sMgmtIntf() (string, error) {
 	link, err := netlink.LinkByName(OVNK8sMgmntIntfName)
-	if err != nil && !errors.Is(err, netlink.LinkNotFoundError{}) {
-		return nil, errors.Wrapf(err, "error retrieving link by name %q", OVNK8sMgmntIntfName)
-	}
-
-	currentRouteList, err := netlink.RouteList(link, syscall.AF_INET)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error retrieving routes on the link %s", OVNK8sMgmntIntfName)
+		return "", errors.Wrapf(err, "failed to retrieve link by name")
 	}
 
-	for i := range currentRouteList {
-		logger.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])
+	addrs, err := netlink.AddrList(link, 0)
+	if err != nil || len(addrs) == 0 {
+		return "", errors.Wrapf(err, "failed to retrieve addresses for link")
+	}
 
-		if currentRouteList[i].Dst == nil || currentRouteList[i].Gw == nil {
-			continue
-		}
-
-		// To support hostNetworking use-case the route-agent handler programs default route in table 150
-		// with nexthop matching the nexthop on the ovn-k8s-mp0 interface. Basically, we want the Submariner
-		// managed traffic to be forwarded to the ovn_cluster_router and pass through the CNI network so that
-		// it reaches the active gateway node in the cluster via the submariner pipeline.
-		for _, subnet := range clusterCidr {
-			if currentRouteList[i].Dst.String() == subnet {
-				return &currentRouteList[i].Gw, nil
+	for _, addr := range addrs {
+		if addr.IPNet != nil {
+			ok, err := isIPv4CIDR(addr.IPNet.String())
+			if err != nil {
+				return "", err
+			} else if ok {
+				return addr.IPNet.IP.String(), nil
 			}
 		}
 	}
 
-	return nil, fmt.Errorf("could not find the route to %v via %q", clusterCidr, OVNK8sMgmntIntfName)
+	return "", nil
+}
+
+func isIPv4CIDR(address string) (bool, error) {
+	_, iPnet, err := net.ParseCIDR(address)
+	if err != nil {
+		return false, errors.Wrapf(err, "Error parsing IP address %v", iPnet)
+	}
+
+	ip := iPnet.IP
+
+	return ip != nil && ip.To4() != nil, nil
+}
+
+func jsonToIP(jsonData string) (string, error) {
+	var data map[string]string
+
+	err := json.Unmarshal([]byte(jsonData), &data)
+	if err != nil {
+		return "", errors.Wrapf(err, "error marshalling the json ip")
+	}
+
+	ipStr, found := data["ipv4"]
+	if !found {
+		return "", fmt.Errorf("json data does not contain an 'ipv4' field")
+	}
+
+	ip, _, err := net.ParseCIDR(ipStr)
+	if err != nil {
+		return "", fmt.Errorf("invalid IP CIDR address: %s", ipStr)
+	}
+
+	return ip.String(), nil
 }

@@ -44,6 +44,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
 	"github.com/submariner-io/submariner/pkg/versions"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
@@ -83,6 +84,9 @@ func main() {
 		logger.Fatalf("Error building clientset: %s", err.Error())
 	}
 
+	err = v1.AddToScheme(scheme.Scheme)
+	logger.FatalOnError(err, "Error adding submariner to the scheme")
+
 	smClientset, err := submarinerClientset.NewForConfig(cfg)
 	if err != nil {
 		logger.Fatalf("Error building submariner clientset: %s", err.Error())
@@ -99,7 +103,6 @@ func main() {
 		eventlogger.NewHandler(),
 		kubeproxy.NewSyncHandler(env.ClusterCidr, env.ServiceCidr),
 		ovn.NewHandler(&env, smClientset),
-		ovn.NewNonGatewayRouteHandler(smClientset, k8sClientSet),
 		ovn.NewGatewayRouteHandler(&env, smClientset),
 		cabledriver.NewXRFMCleanupHandler(),
 		cabledriver.NewVXLANCleanup(),
