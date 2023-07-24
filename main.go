@@ -53,6 +53,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/pod"
 	"github.com/submariner-io/submariner/pkg/types"
+	"github.com/submariner-io/submariner/pkg/versions"
 	corev1 "k8s.io/api/core/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -104,7 +105,6 @@ const (
 )
 
 var (
-	VERSION            = "not-compiled-properly"
 	logger             = log.Logger{Logger: logf.Log.WithName("main")}
 	lastBadCertificate atomic.Value
 )
@@ -113,6 +113,8 @@ func main() {
 	kzerolog.AddFlags(nil)
 	flag.Parse()
 	kzerolog.InitK8sLogging()
+
+	versions.Log(&logger)
 
 	logger.Info("Starting the submariner gateway engine")
 
@@ -185,7 +187,7 @@ func main() {
 	components.cableEngineSyncer = syncer.NewGatewaySyncer(
 		components.cableEngine,
 		submarinerClient.SubmarinerV1().Gateways(components.submSpec.Namespace),
-		VERSION, components.cableHealthChecker)
+		versions.Submariner(), components.cableHealthChecker)
 
 	if components.submSpec.Uninstall {
 		logger.Info("Uninstalling the submariner gateway engine")

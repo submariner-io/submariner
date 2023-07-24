@@ -18,8 +18,12 @@ endif
 include $(SHIPYARD_DIR)/Makefile.inc
 
 TARGETS := $(shell ls -p scripts | grep -v -e /)
-export LDFLAGS = -X main.VERSION=$(VERSION)
-
+GIT_COMMIT_HASH := $(shell git show -s --format='format:%H')
+GIT_COMMIT_DATE := $(shell git show -s --format='format:%cI')
+VERSIONS_MODULE := github.com/submariner-io/submariner/pkg/versions
+export LDFLAGS = -X $(VERSIONS_MODULE).version=$(VERSION) \
+                 -X $(VERSIONS_MODULE).gitCommitHash=$(GIT_COMMIT_HASH) \
+                 -X $(VERSIONS_MODULE).gitCommitDate=$(GIT_COMMIT_DATE)
 ifneq (,$(filter external-net,$(_using)))
 export TESTDIR = test/external
 override export PLUGIN = scripts/e2e/external/hook
