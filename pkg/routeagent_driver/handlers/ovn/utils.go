@@ -24,43 +24,30 @@ import (
 	"net"
 
 	"github.com/pkg/errors"
+	subMNetLink "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/vishvananda/netlink"
 )
 
 func getNextHopOnK8sMgmtIntf() (string, error) {
-	link, err := netlink.LinkByName(OVNK8sMgmntIntfName)
+	netLink := subMNetLink.New()
+
+	link, err := netLink.LinkByName(OVNK8sMgmntIntfName)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to retrieve link by name")
 	}
 
-	addrs, err := netlink.AddrList(link, 0)
+	addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
 	if err != nil || len(addrs) == 0 {
 		return "", errors.Wrapf(err, "failed to retrieve addresses for link")
 	}
 
 	for _, addr := range addrs {
 		if addr.IPNet != nil {
-			ok, err := isIPv4CIDR(addr.IPNet.String())
-			if err != nil {
-				return "", err
-			} else if ok {
-				return addr.IPNet.IP.String(), nil
-			}
+			return addr.IPNet.IP.String(), nil
 		}
 	}
 
 	return "", nil
-}
-
-func isIPv4CIDR(address string) (bool, error) {
-	_, iPnet, err := net.ParseCIDR(address)
-	if err != nil {
-		return false, errors.Wrapf(err, "Error parsing IP address %v", iPnet)
-	}
-
-	ip := iPnet.IP
-
-	return ip != nil && ip.To4() != nil, nil
 }
 
 func jsonToIP(jsonData string) (string, error) {
@@ -68,7 +55,7 @@ func jsonToIP(jsonData string) (string, error) {
 
 	err := json.Unmarshal([]byte(jsonData), &data)
 	if err != nil {
-		return "", errors.Wrapf(err, "error marshalling the json ip")
+		return "", errors.Wrapf(err, "error unmarshalling the json ip")
 	}
 
 	ipStr, found := data["ipv4"]
