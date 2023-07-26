@@ -36,7 +36,7 @@ import (
 	"github.com/vishvananda/netlink"
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -147,7 +147,7 @@ func NewDriver(localEndpoint *types.SubmarinerEndpoint, _ *types.SubmarinerClust
 	peerConfigs := make([]wgtypes.PeerConfig, 0)
 	cfg := wgtypes.Config{
 		PrivateKey:   &priv,
-		ListenPort:   pointer.Int(int(port)),
+		ListenPort:   ptr.To(int(port)),
 		FirewallMark: nil,
 		ReplacePeers: true,
 		Peers:        peerConfigs,

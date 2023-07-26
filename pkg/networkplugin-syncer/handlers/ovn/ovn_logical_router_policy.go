@@ -24,7 +24,7 @@ import (
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/libovsdbops"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/nbdb"
 	"github.com/pkg/errors"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"k8s.io/utils/set"
 )
 
@@ -71,7 +71,7 @@ func buildLRPsFromSubnets(subnetsToAdd []string) []*nbdb.LogicalRouterPolicy {
 			Priority: ovnRoutePoliciesPrio,
 			Action:   "reroute",
 			Match:    "ip4.dst == " + subnet,
-			Nexthop:  pointer.String(submarinerDownstreamIP),
+			Nexthop:  ptr.To(submarinerDownstreamIP),
 			ExternalIDs: map[string]string{
 				"submariner": "true",
 			},
