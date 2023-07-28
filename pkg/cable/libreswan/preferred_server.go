@@ -20,7 +20,7 @@ package libreswan
 
 import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 type operationMode int
@@ -32,7 +32,7 @@ const (
 )
 
 func (i *libreswan) calculateOperationMode(remoteEndpoint *v1.EndpointSpec) operationMode {
-	leftPreferred, err := i.localEndpoint.Spec.GetBackendBool(v1.PreferredServerConfig, pointer.Bool(false))
+	leftPreferred, err := i.localEndpoint.Spec.GetBackendBool(v1.PreferredServerConfig, ptr.To(false))
 	if err != nil {
 		logger.Errorf(err, "Error parsing local endpoint config")
 	}
