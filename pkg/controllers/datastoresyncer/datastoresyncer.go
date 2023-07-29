@@ -240,11 +240,7 @@ func (d *DatastoreSyncer) shouldSyncRemoteEndpoint(obj runtime.Object, _ int,
 func (d *DatastoreSyncer) ensureExclusiveEndpoint(syncer *broker.Syncer) error {
 	logger.Info("Ensuring we are the only endpoint active for this cluster")
 
-	endpoints, err := syncer.ListLocalResources(&submarinerv1.Endpoint{})
-	if err != nil {
-		return errors.Wrap(err, "error retrieving submariner Endpoints")
-	}
-
+	endpoints := syncer.ListLocalResources(&submarinerv1.Endpoint{})
 	for i := range endpoints {
 		endpoint := endpoints[i].(*submarinerv1.Endpoint)
 		if endpoint.Spec.ClusterID != d.localCluster.Spec.ClusterID {
