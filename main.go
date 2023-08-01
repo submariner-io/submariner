@@ -37,8 +37,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
+	"github.com/submariner-io/admiral/pkg/names"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
+	admversion "github.com/submariner-io/admiral/pkg/version"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
@@ -70,12 +72,14 @@ import (
 var (
 	localMasterURL  string
 	localKubeconfig string
+	showVersion     = false
 )
 
 func init() {
 	flag.StringVar(&localKubeconfig, "kubeconfig", "", "Path to kubeconfig of local cluster. Only required if out-of-cluster.")
 	flag.StringVar(&localMasterURL, "master", "",
 		"The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+	flag.BoolVar(&showVersion, "version", showVersion, "Show version")
 }
 
 type leaderConfig struct {
@@ -112,6 +116,13 @@ var (
 func main() {
 	kzerolog.AddFlags(nil)
 	flag.Parse()
+
+	admversion.Print(names.GatewayComponent, versions.Submariner())
+
+	if showVersion {
+		return
+	}
+
 	kzerolog.InitK8sLogging()
 
 	versions.Log(&logger)
