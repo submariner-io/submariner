@@ -28,6 +28,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
 	nodeutil "github.com/submariner-io/submariner/pkg/node"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
@@ -82,9 +83,7 @@ func (h *NonGatewayRouteHandler) GetName() string {
 }
 
 func (h *NonGatewayRouteHandler) GetNetworkPlugins() []string {
-	// TODO enable when we switch to new implementation
-	// return []string{cni.OVNKubernetes}
-	return []string{}
+	return []string{cni.OVNKubernetes}
 }
 
 func (h *NonGatewayRouteHandler) RemoteEndpointCreated(endpoint *submarinerv1.Endpoint) error {
