@@ -31,7 +31,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func NewServiceController(config *syncer.ResourceSyncerConfig, podControllers *IngressPodControllers) (Interface, error) {
+func NewServiceController(config *syncer.ResourceSyncerConfig, podControllers *IngressPodControllers, serviceExportSyncer syncer.Interface,
+) (Interface, error) {
 	// We'll panic if config is nil, this is intentional
 	var err error
 
@@ -40,6 +41,7 @@ func NewServiceController(config *syncer.ResourceSyncerConfig, podControllers *I
 	controller := &serviceController{
 		baseSyncerController: newBaseSyncerController(),
 		podControllers:       podControllers,
+		serviceExportSyncer:  serviceExportSyncer,
 	}
 
 	controller.resourceSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
@@ -97,22 +99,24 @@ func (c *serviceController) Start() error {
 func (c *serviceController) process(from runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	service := from.(*corev1.Service)
 
-	if service.Spec.Type != corev1.ServiceTypeClusterIP {
+	if service.Spec.Type != corev1.ServiceTypeClusterIP || op == syncer.Update {
 		return nil, false
 	}
+
+	key, _ := cache.MetaNamespaceKeyFunc(service)
+	logger.Infof("Service %q %sd", key, op)
 
 	if op == syncer.Delete {
 		return c.onDelete(service)
 	}
 
+	// For Create, requeue the associated ServiceExport, if any, to re-create the GlobalIngressIP.
+	c.serviceExportSyncer.RequeueResource(service.Name, service.Namespace)
+
 	return nil, false
 }
 
 func (c *serviceController) onDelete(service *corev1.Service) (runtime.Object, bool) {
-	key, _ := cache.MetaNamespaceKeyFunc(service)
-
-	logger.Infof("Service %q deleted", key)
-
 	c.podControllers.stopAndCleanup(service.Name, service.Namespace)
 
 	if service.Spec.ClusterIP == corev1.ClusterIPNone {
