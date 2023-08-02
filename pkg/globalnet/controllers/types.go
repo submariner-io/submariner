@@ -155,8 +155,9 @@ type serviceExportController struct {
 
 type serviceController struct {
 	*baseSyncerController
-	ingressIPs     dynamic.ResourceInterface
-	podControllers *IngressPodControllers
+	ingressIPs          dynamic.ResourceInterface
+	podControllers      *IngressPodControllers
+	serviceExportSyncer syncer.Interface
 }
 
 type nodeController struct {
