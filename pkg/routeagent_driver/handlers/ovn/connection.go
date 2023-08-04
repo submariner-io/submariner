@@ -22,6 +22,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"os"
 	"strings"
 
@@ -31,6 +32,8 @@ import (
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/nbdb"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/sbdb"
 	"github.com/pkg/errors"
+	nodeutil "github.com/submariner-io/submariner/pkg/node"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/util/clusterfiles"
 	clientset "k8s.io/client-go/kubernetes"
 )
@@ -46,21 +49,21 @@ func NewConnectionHandler(k8sClientset clientset.Interface) *ConnectionHandler {
 	}
 }
 
-func (connectionHandler *ConnectionHandler) initClients() error {
+func (c *ConnectionHandler) initClients() error {
 	var tlsConfig *tls.Config
 
 	if strings.HasPrefix(getOVNNBDBAddress(), "ssl:") {
-		certFile, err := clusterfiles.Get(connectionHandler.k8sClientset, getOVNCertPath())
+		certFile, err := clusterfiles.Get(c.k8sClientset, getOVNCertPath())
 		if err != nil {
 			return errors.Wrapf(err, "error getting config for %q", getOVNCertPath())
 		}
 
-		pkFile, err := clusterfiles.Get(connectionHandler.k8sClientset, getOVNPrivKeyPath())
+		pkFile, err := clusterfiles.Get(c.k8sClientset, getOVNPrivKeyPath())
 		if err != nil {
 			return errors.Wrapf(err, "error getting config for %q", getOVNPrivKeyPath())
 		}
 
-		caFile, err := clusterfiles.Get(connectionHandler.k8sClientset, getOVNCaBundlePath())
+		caFile, err := clusterfiles.Get(c.k8sClientset, getOVNCaBundlePath())
 		if err != nil {
 			return errors.Wrapf(err, "error getting config for %q", getOVNCaBundlePath())
 		}
@@ -77,7 +80,7 @@ func (connectionHandler *ConnectionHandler) initClients() error {
 		return errors.Wrap(err, "error getting OVN NBDB database model")
 	}
 
-	connectionHandler.nbdb, err = createLibovsdbClient(getOVNNBDBAddress(), tlsConfig, nbdbModel)
+	c.nbdb, err = c.createLibovsdbClient(getOVNNBDBAddress(), tlsConfig, nbdbModel)
 	if err != nil {
 		return errors.Wrap(err, "error creating NBDB connection")
 	}
@@ -108,7 +111,9 @@ func getOVNTLSConfig(pkFile, certFile, caFile string) (*tls.Config, error) {
 	}, nil
 }
 
-func createLibovsdbClient(dbAddress string, tlsConfig *tls.Config, dbModel model.ClientDBModel) (libovsdbclient.Client, error) {
+func (c *ConnectionHandler) createLibovsdbClient(dbAddress string, tlsConfig *tls.Config,
+	dbModel model.ClientDBModel,
+) (libovsdbclient.Client, error) {
 	options := []libovsdbclient.Option{
 		// Reading and parsing the DB after reconnect at scale can (unsurprisingly)
 		// take longer than a normal ovsdb operation. Give it a bit more time so
@@ -117,7 +122,25 @@ func createLibovsdbClient(dbAddress string, tlsConfig *tls.Config, dbModel model
 		libovsdbclient.WithLogger(&logger.Logger),
 	}
 
-	options = append(options, libovsdbclient.WithEndpoint(dbAddress))
+	if strings.HasPrefix(dbAddress, "IC:") {
+		node, err := nodeutil.GetLocalNode(c.k8sClientset)
+		if err != nil {
+			return nil, errors.Wrap(err, "error getting the node")
+		}
+
+		annotations := node.GetAnnotations()
+
+		zoneName, ok := annotations[constants.OvnZoneAnnotation]
+		if !ok {
+			return nil, errors.Wrap(err, "error getting the zone name")
+		}
+
+		zoneDBAddress := getICDBAddress(dbAddress, zoneName)
+		options = append(options, libovsdbclient.WithEndpoint(zoneDBAddress))
+	} else {
+		options = append(options, libovsdbclient.WithEndpoint(dbAddress))
+	}
+
 	if tlsConfig != nil {
 		options = append(options, libovsdbclient.WithTLSConfig(tlsConfig))
 	}
@@ -154,7 +177,19 @@ func createLibovsdbClient(dbAddress string, tlsConfig *tls.Config, dbModel model
 		}
 	}
 
-	logger.Info("Client is %v", client)
-
 	return client, nil
+}
+
+func getICDBAddress(inputs, zoneName string) string {
+	entries := strings.Split(inputs, ",")
+	for _, entry := range entries {
+		if strings.Contains(entry, zoneName) {
+			parts := strings.Split(entry, ":")
+			if len(parts) >= 5 && strings.Contains(parts[1], zoneName) {
+				return fmt.Sprintf("%s:%s:%s", parts[2], parts[3], parts[4])
+			}
+		}
+	}
+
+	return ""
 }

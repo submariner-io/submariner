@@ -19,16 +19,14 @@ limitations under the License.
 package ovn
 
 import (
-	"context"
-	"os"
 	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	nodeutil "github.com/submariner-io/submariner/pkg/node"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
@@ -74,14 +72,9 @@ func NewNonGatewayRoute(config *syncer.ResourceSyncerConfig, connectionHandler *
 		return nil, errors.Wrap(err, "error creating resource syncer")
 	}
 
-	nodeName, ok := os.LookupEnv("NODE_NAME")
-	if !ok {
-		return nil, errors.New("error getting the Node name")
-	}
-
-	node, err := controller.k8sClientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+	node, err := nodeutil.GetLocalNode(k8sClientSet)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error getting the g/w node: %q", nodeName)
+		return nil, errors.Wrap(err, "error getting the node")
 	}
 
 	annotations := node.GetAnnotations()

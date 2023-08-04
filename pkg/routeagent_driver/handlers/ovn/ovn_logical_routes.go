@@ -33,14 +33,14 @@ const (
 	ovnRoutePoliciesPrio = 20000
 )
 
-func (connectionHandler *ConnectionHandler) ReconcileOvnLogicalRouterStaticRoutes(remoteSubnets sets.Set[string],
+func (c *ConnectionHandler) ReconcileOvnLogicalRouterStaticRoutes(remoteSubnets sets.Set[string],
 	nextHop string,
 ) error {
 	staleLRSRPred := func(item *nbdb.LogicalRouterStaticRoute) bool {
 		return item.Nexthop == nextHop && !remoteSubnets.Has(item.IPPrefix)
 	}
 
-	err := libovsdbops.DeleteLogicalRouterStaticRoutesWithPredicate(connectionHandler.nbdb, ovnClusterRouter, staleLRSRPred)
+	err := libovsdbops.DeleteLogicalRouterStaticRoutesWithPredicate(c.nbdb, ovnClusterRouter, staleLRSRPred)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to list existing ovn logical route static routes for nexthop: %s", nextHop)
 	}
@@ -52,7 +52,7 @@ func (connectionHandler *ConnectionHandler) ReconcileOvnLogicalRouterStaticRoute
 			return item.Nexthop == nextHop && item.IPPrefix == lrsr.IPPrefix
 		}
 
-		err = libovsdbops.CreateOrUpdateLogicalRouterStaticRoutesWithPredicate(connectionHandler.nbdb, ovnClusterRouter, lrsr, LRSRPred)
+		err = libovsdbops.CreateOrUpdateLogicalRouterStaticRoutesWithPredicate(c.nbdb, ovnClusterRouter, lrsr, LRSRPred)
 		if err != nil {
 			return errors.Wrap(err, "Failed to create ovn lrsr and add it to the ovn submariner router")
 		}
@@ -74,7 +74,7 @@ func buildLRSRsFromSubnets(subnetsToAdd []string, nextHop string) []*nbdb.Logica
 	return toAdd
 }
 
-func (connectionHandler *ConnectionHandler) ReconcileSubOvnLogicalRouterPolicies(remoteSubnets sets.Set[string], nextHop string) error {
+func (c *ConnectionHandler) ReconcileSubOvnLogicalRouterPolicies(remoteSubnets sets.Set[string], nextHop string) error {
 	lrpStalePredicate := func(item *nbdb.LogicalRouterPolicy) bool {
 		subnet := strings.Split(item.Match, " ")[2]
 
@@ -82,7 +82,7 @@ func (connectionHandler *ConnectionHandler) ReconcileSubOvnLogicalRouterPolicies
 	}
 
 	// Cleanup any existing lrps not representing the correct set of remote subnets
-	err := libovsdbops.DeleteLogicalRouterPoliciesWithPredicate(connectionHandler.nbdb, ovnClusterRouter, lrpStalePredicate)
+	err := libovsdbops.DeleteLogicalRouterPoliciesWithPredicate(c.nbdb, ovnClusterRouter, lrpStalePredicate)
 	if err != nil {
 		return errors.Wrapf(err, "failed to delete stale submariner logical route policies")
 	}
@@ -97,7 +97,7 @@ func (connectionHandler *ConnectionHandler) ReconcileSubOvnLogicalRouterPolicies
 			return item.Priority == ovnRoutePoliciesPrio && subnet1 == subnet2
 		}
 
-		if err := libovsdbops.CreateOrUpdateLogicalRouterPolicyWithPredicate(connectionHandler.nbdb,
+		if err := libovsdbops.CreateOrUpdateLogicalRouterPolicyWithPredicate(c.nbdb,
 			ovnClusterRouter, lrp, lrpSubPredicate); err != nil {
 			return errors.Wrapf(err, "failed to create submariner logical Router policy %v and add it to the ovn cluster router", lrp)
 		}
