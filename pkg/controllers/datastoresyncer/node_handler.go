@@ -62,7 +62,7 @@ func (d *DatastoreSyncer) areNodesEquivalent(obj1, obj2 *unstructured.Unstructur
 	existingGlobalIP := obj1.GetAnnotations()[constants.SmGlobalIP]
 	newGlobalIP := obj2.GetAnnotations()[constants.SmGlobalIP]
 
-	logger.V(log.DEBUG).Infof("areNodesEquivalent called for %q, existingGlobalIP %q, newGlobalIP %q",
+	logger.V(log.TRACE).Infof("areNodesEquivalent called for %q, existingGlobalIP %q, newGlobalIP %q",
 		obj1.GetName(), existingGlobalIP, newGlobalIP)
 
 	return existingGlobalIP == newGlobalIP
