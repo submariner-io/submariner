@@ -36,7 +36,6 @@ func Log(logger *log.Logger) {
 	logger.Info(fmt.Sprintf("Go Arch: %s", runtime.GOARCH))
 	logger.Info(fmt.Sprintf("Git Commit Hash: %s", gitCommitHash))
 	logger.Info(fmt.Sprintf("Git Commit Date: %s", gitCommitDate))
-	logger.Info(fmt.Sprintf("Submariner Version: %s", version))
 }
 
 // Submariner returns the version info of submariner.
