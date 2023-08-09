@@ -103,17 +103,12 @@ func (g *NonGatewayRouteController) nonGatewayRouteCreatedorUpdated(obj runtime.
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
-	submGWRoute := obj.(*submarinerv1.NonGatewayRoute)
-	if submGWRoute.RoutePolicySpec.NextHops != nil && submGWRoute.RoutePolicySpec.NextHops[0] != g.transitSwitchIP {
-		for _, subnet := range submGWRoute.RoutePolicySpec.RemoteCIDRs {
-			g.remoteSubnets.Insert(subnet)
-		}
+	submNonGWRoute := obj.(*submarinerv1.NonGatewayRoute)
 
-		err := g.connectionHandler.reconcileSubOvnLogicalRouterPolicies(g.remoteSubnets, submGWRoute.RoutePolicySpec.NextHops[0])
-		if err != nil {
-			logger.Errorf(err, "error reconciling router policies for remote subnet %q", g.remoteSubnets)
-			return true
-		}
+	err := g.reconcileRemoteSubnets(submNonGWRoute, true)
+	if err != nil {
+		logger.Errorf(err, "error creating or updating router policies for remote subnet %q", g.remoteSubnets)
+		return true
 	}
 
 	return false
@@ -123,20 +118,39 @@ func (g *NonGatewayRouteController) nonGatewayRouteDeleted(obj runtime.Object, _
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
-	submGWRoute := obj.(*submarinerv1.NonGatewayRoute)
-	if submGWRoute.RoutePolicySpec.NextHops != nil && submGWRoute.RoutePolicySpec.NextHops[0] != g.transitSwitchIP {
-		for _, subnet := range submGWRoute.RoutePolicySpec.RemoteCIDRs {
-			g.remoteSubnets.Delete(subnet)
-		}
+	submNonGWRoute := obj.(*submarinerv1.NonGatewayRoute)
 
-		err := g.connectionHandler.reconcileSubOvnLogicalRouterPolicies(g.remoteSubnets, submGWRoute.RoutePolicySpec.NextHops[0])
-		if err != nil {
-			logger.Errorf(err, "error reconciling router policies for remote subnet %q", g.remoteSubnets)
-			return true
-		}
+	err := g.reconcileRemoteSubnets(submNonGWRoute, false)
+	if err != nil {
+		logger.Errorf(err, "error deleting policies for remote subnet %q", g.remoteSubnets)
+		return true
 	}
 
 	return false
+}
+
+func (g *NonGatewayRouteController) reconcileRemoteSubnets(submNonGWRoute *submarinerv1.NonGatewayRoute, addSubnet bool) error {
+	if len(submNonGWRoute.RoutePolicySpec.NextHops) == 0 {
+		logger.Warningf("The NonGatewayRoute does not have next hop %v", submNonGWRoute)
+		return nil
+	}
+
+	if submNonGWRoute.RoutePolicySpec.NextHops[0] != g.transitSwitchIP {
+		for _, subnet := range submNonGWRoute.RoutePolicySpec.RemoteCIDRs {
+			if addSubnet {
+				g.remoteSubnets.Insert(subnet)
+			} else {
+				g.remoteSubnets.Delete(subnet)
+			}
+		}
+
+		err := g.connectionHandler.reconcileSubOvnLogicalRouterPolicies(g.remoteSubnets, submNonGWRoute.RoutePolicySpec.NextHops[0])
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (g *NonGatewayRouteController) stop() {

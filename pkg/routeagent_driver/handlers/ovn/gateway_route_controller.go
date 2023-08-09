@@ -88,23 +88,13 @@ func (g *GatewayRouteController) gatewayRouteCreatedorUpdated(obj runtime.Object
 	defer g.mutex.Unlock()
 
 	subMGWRoute := obj.(*submarinerv1.GatewayRoute)
-	if subMGWRoute.RoutePolicySpec.NextHops != nil && subMGWRoute.RoutePolicySpec.NextHops[0] == g.mgmtIP {
-		for _, subnet := range subMGWRoute.RoutePolicySpec.RemoteCIDRs {
-			g.remoteSubnets.Insert(subnet)
-		}
 
-		err := g.connectionHandler.reconcileSubOvnLogicalRouterPolicies(g.remoteSubnets, g.mgmtIP)
-		if err != nil {
-			logger.Errorf(err, "error reconciling router policies for remote subnet %q", g.remoteSubnets)
-			return true
-		}
-
-		err = g.connectionHandler.reconcileOvnLogicalRouterStaticRoutes(g.remoteSubnets, g.mgmtIP)
-		if err != nil {
-			logger.Errorf(err, "error reconciling static routes for remote subnet %q", g.remoteSubnets)
-			return true
-		}
+	err := g.reconcileRemoteSubnets(subMGWRoute, true)
+	if err != nil {
+		logger.Errorf(err, "error creating or updating router policies and static routes for remote subnet %q", g.remoteSubnets)
+		return true
 	}
+
 	return false
 }
 
@@ -113,25 +103,45 @@ func (g *GatewayRouteController) gatewayRouteDeleted(obj runtime.Object, _ int) 
 	defer g.mutex.Unlock()
 
 	subMGWRoute := obj.(*submarinerv1.GatewayRoute)
-	if subMGWRoute.RoutePolicySpec.NextHops != nil && subMGWRoute.RoutePolicySpec.NextHops[0] == g.mgmtIP {
-		for _, subnet := range subMGWRoute.RoutePolicySpec.RemoteCIDRs {
-			g.remoteSubnets.Delete(subnet)
-		}
 
-		err := g.connectionHandler.reconcileSubOvnLogicalRouterPolicies(g.remoteSubnets, g.mgmtIP)
-		if err != nil {
-			logger.Errorf(err, "error reconciling router policies for remote subnet %q", g.remoteSubnets)
-			return true
-		}
-
-		err = g.connectionHandler.reconcileOvnLogicalRouterStaticRoutes(g.remoteSubnets, g.mgmtIP)
-		if err != nil {
-			logger.Errorf(err, "error reconciling static routes for remote subnet %q", g.remoteSubnets)
-			return true
-		}
+	err := g.reconcileRemoteSubnets(subMGWRoute, false)
+	if err != nil {
+		logger.Errorf(err, "error deleting router policies and static routes for remote subnet %q", g.remoteSubnets)
+		return true
 	}
 
 	return false
+}
+
+func (g *GatewayRouteController) reconcileRemoteSubnets(subMGWRoute *submarinerv1.GatewayRoute, addSubnet bool) error {
+	if len(subMGWRoute.RoutePolicySpec.NextHops) == 0 {
+		logger.Warningf("The GatewayRoute does not have next hop %v", subMGWRoute)
+		return nil
+	}
+
+	if subMGWRoute.RoutePolicySpec.NextHops[0] != g.mgmtIP {
+		return nil
+	}
+
+	for _, subnet := range subMGWRoute.RoutePolicySpec.RemoteCIDRs {
+		if addSubnet {
+			g.remoteSubnets.Insert(subnet)
+		} else {
+			g.remoteSubnets.Delete(subnet)
+		}
+	}
+
+	err := g.connectionHandler.reconcileSubOvnLogicalRouterPolicies(g.remoteSubnets, g.mgmtIP)
+	if err != nil {
+		return err
+	}
+
+	err = g.connectionHandler.reconcileOvnLogicalRouterStaticRoutes(g.remoteSubnets, g.mgmtIP)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (g *GatewayRouteController) stop() {

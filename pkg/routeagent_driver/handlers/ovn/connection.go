@@ -155,6 +155,7 @@ func (c *ConnectionHandler) createLibovsdbClient(dbAddress string, tlsConfig *tl
 	defer cancel()
 
 	err = client.Connect(ctx)
+
 	err = errors.Wrap(err, "error connecting to ovsdb")
 	if err != nil {
 		if dbModel.Name() == "OVN_Northbound" {
@@ -170,6 +171,7 @@ func (c *ConnectionHandler) createLibovsdbClient(dbAddress string, tlsConfig *tl
 			err = errors.Wrap(err, "error monitoring chassis table in OVN SBDB")
 		}
 	}
+
 	if err != nil {
 		client.Close()
 		return nil, err

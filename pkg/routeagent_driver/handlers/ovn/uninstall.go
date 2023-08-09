@@ -21,13 +21,13 @@ package ovn
 import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn/vsctl"
 	"github.com/vishvananda/netlink"
 )
 
 func (ovn *Handler) Stop(uninstall bool) error {
 	ovn.gatewayRouteController.stop()
 	ovn.nonGatewayRouteController.stop()
-
 	close(ovn.stopCh)
 
 	if !uninstall {
@@ -95,5 +95,18 @@ func (ovn *Handler) flushAndDeleteIPTableChains(table, tableChain, submarinerCha
 
 	if err := ovn.ipt.DeleteChain(table, submarinerChain); err != nil {
 		logger.Errorf(err, "Error deleting iptable chain %q of table %q", submarinerChain, table)
+	}
+}
+
+// TODO need to be removed when the clusters are fully upgraded to new implementation.
+func (ovn *Handler) LegacyCleanup() {
+	err := vsctl.DelInternalPort(ovnK8sSubmarinerBridge, ovnK8sSubmarinerInterface)
+	if err != nil {
+		logger.Errorf(err, "Error deleting Submariner port %q", ovnK8sSubmarinerInterface)
+	}
+
+	err = vsctl.DelBridge(ovnK8sSubmarinerBridge)
+	if err != nil {
+		logger.Errorf(err, "Error deleting Submariner bridge %q", ovnK8sSubmarinerBridge)
 	}
 }
