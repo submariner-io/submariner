@@ -132,7 +132,8 @@ func (c *ConnectionHandler) createLibovsdbClient(dbAddress string, tlsConfig *tl
 
 		zoneName, ok := annotations[constants.OvnZoneAnnotation]
 		if !ok {
-			return nil, errors.Wrap(err, "error getting the zone name")
+			return nil, errors.Wrapf(err, "node %q is missing the %q "+
+				"annotation", node.Name, constants.OvnZoneAnnotation)
 		}
 
 		zoneDBAddress := getICDBAddress(dbAddress, zoneName)
@@ -154,27 +155,24 @@ func (c *ConnectionHandler) createLibovsdbClient(dbAddress string, tlsConfig *tl
 	defer cancel()
 
 	err = client.Connect(ctx)
+	err = errors.Wrap(err, "error connecting to ovsdb")
 	if err != nil {
-		return nil, errors.Wrap(err, "error connecting to ovsdb")
+		if dbModel.Name() == "OVN_Northbound" {
+			_, err = client.MonitorAll(ctx)
+			err = errors.Wrap(err, "error setting OVN NBDB client to monitor-all")
+		} else {
+			// Only Monitor Required SBDB tables to reduce memory overhead
+			_, err = client.Monitor(ctx,
+				client.NewMonitor(
+					libovsdbclient.WithTable(&sbdb.Chassis{}),
+				),
+			)
+			err = errors.Wrap(err, "error monitoring chassis table in OVN SBDB")
+		}
 	}
-
-	if dbModel.Name() == "OVN_Northbound" {
-		_, err = client.MonitorAll(ctx)
-		if err != nil {
-			client.Close()
-			return nil, errors.Wrap(err, "error setting OVN NBDB client to monitor-all")
-		}
-	} else {
-		// Only Monitor Required SBDB tables to reduce memory overhead
-		_, err = client.Monitor(ctx,
-			client.NewMonitor(
-				libovsdbclient.WithTable(&sbdb.Chassis{}),
-			),
-		)
-		if err != nil {
-			client.Close()
-			return nil, errors.Wrap(err, "error monitoring chassis table in OVN SBDB")
-		}
+	if err != nil {
+		client.Close()
+		return nil, err
 	}
 
 	return client, nil

@@ -33,7 +33,7 @@ const (
 	ovnRoutePoliciesPrio = 20000
 )
 
-func (c *ConnectionHandler) ReconcileOvnLogicalRouterStaticRoutes(remoteSubnets sets.Set[string],
+func (c *ConnectionHandler) reconcileOvnLogicalRouterStaticRoutes(remoteSubnets sets.Set[string],
 	nextHop string,
 ) error {
 	staleLRSRPred := func(item *nbdb.LogicalRouterStaticRoute) bool {
@@ -42,7 +42,7 @@ func (c *ConnectionHandler) ReconcileOvnLogicalRouterStaticRoutes(remoteSubnets 
 
 	err := libovsdbops.DeleteLogicalRouterStaticRoutesWithPredicate(c.nbdb, ovnClusterRouter, staleLRSRPred)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to list existing ovn logical route static routes for nexthop: %s", nextHop)
+		return errors.Wrapf(err, "failed to list existing ovn logical route static routes for nexthop: %s", nextHop)
 	}
 
 	lrsrToAdd := buildLRSRsFromSubnets(remoteSubnets.UnsortedList(), nextHop)
@@ -54,7 +54,7 @@ func (c *ConnectionHandler) ReconcileOvnLogicalRouterStaticRoutes(remoteSubnets 
 
 		err = libovsdbops.CreateOrUpdateLogicalRouterStaticRoutesWithPredicate(c.nbdb, ovnClusterRouter, lrsr, LRSRPred)
 		if err != nil {
-			return errors.Wrap(err, "Failed to create ovn lrsr and add it to the ovn submariner router")
+			return errors.Wrap(err, "failed to create ovn lrsr and add it to the ovn submariner router")
 		}
 	}
 
@@ -74,7 +74,7 @@ func buildLRSRsFromSubnets(subnetsToAdd []string, nextHop string) []*nbdb.Logica
 	return toAdd
 }
 
-func (c *ConnectionHandler) ReconcileSubOvnLogicalRouterPolicies(remoteSubnets sets.Set[string], nextHop string) error {
+func (c *ConnectionHandler) reconcileSubOvnLogicalRouterPolicies(remoteSubnets sets.Set[string], nextHop string) error {
 	lrpStalePredicate := func(item *nbdb.LogicalRouterPolicy) bool {
 		subnet := strings.Split(item.Match, " ")[2]
 

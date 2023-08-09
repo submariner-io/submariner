@@ -22,28 +22,26 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/submariner-io/admiral/pkg/federate"
-	"github.com/submariner-io/admiral/pkg/syncer"
+	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	nodeutil "github.com/submariner-io/submariner/pkg/node"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 )
 
 type NonGatewayRouteController struct {
-	resourceSyncer    syncer.Interface
-	connectionHandler *ConnectionHandler
-	mutex             sync.Mutex
-	remoteSubnets     sets.Set[string]
-	stopCh            chan struct{}
-	transitSwitchIP   string
-	k8sClientSet      clientset.Interface
+	nonGatewayRouteWatcher watcher.Interface
+	connectionHandler      *ConnectionHandler
+	mutex                  sync.Mutex
+	remoteSubnets          sets.Set[string]
+	stopCh                 chan struct{}
+	transitSwitchIP        string
+	k8sClientSet           clientset.Interface
 }
 
-func NewNonGatewayRoute(config *syncer.ResourceSyncerConfig, connectionHandler *ConnectionHandler,
-	k8sClientSet clientset.Interface,
+func NewNonGatewayRouteController(config *watcher.Config, connectionHandler *ConnectionHandler,
+	k8sClientSet clientset.Interface, namespace string,
 ) (*NonGatewayRouteController, error) {
 	// We'll panic if config is nil, this is intentional
 	var err error
@@ -54,22 +52,17 @@ func NewNonGatewayRoute(config *syncer.ResourceSyncerConfig, connectionHandler *
 		k8sClientSet:      k8sClientSet,
 	}
 
-	federator := federate.NewUpdateStatusFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
-
-	controller.resourceSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
-		Name:                "NonGatewayRoute syncer",
-		ResourceType:        &submarinerv1.NonGatewayRoute{},
-		SourceClient:        config.SourceClient,
-		SourceNamespace:     "submariner-operator",
-		RestMapper:          config.RestMapper,
-		Federator:           federator,
-		Scheme:              config.Scheme,
-		Transform:           controller.process,
-		ResourcesEquivalent: syncer.AreSpecsEquivalent,
-	})
-
-	if err != nil {
-		return nil, errors.Wrap(err, "error creating resource syncer")
+	config.ResourceConfigs = []watcher.ResourceConfig{
+		{
+			Name:         "NonGatewayRoute watcher",
+			ResourceType: &submarinerv1.NonGatewayRoute{},
+			Handler: watcher.EventHandlerFuncs{
+				OnCreateFunc: controller.nonGatewayRouteCreatedorUpdated,
+				OnUpdateFunc: controller.nonGatewayRouteCreatedorUpdated,
+				OnDeleteFunc: controller.nonGatewayRouteDeleted,
+			},
+			SourceNamespace: namespace,
+		},
 	}
 
 	node, err := nodeutil.GetLocalNode(k8sClientSet)
@@ -79,18 +72,24 @@ func NewNonGatewayRoute(config *syncer.ResourceSyncerConfig, connectionHandler *
 
 	annotations := node.GetAnnotations()
 
-	transitSwitchIP, ok := annotations["k8s.ovn.org/node-transit-switch-port-ifaddr"]
-	if !ok || transitSwitchIP == "" {
-		logger.Infof("No transit switch IP configured")
+	transitSwitchIP := annotations["k8s.ovn.org/node-transit-switch-port-ifaddr"]
+	if transitSwitchIP == "" {
+		logger.Infof("No transit switch IP configured on node %q", node.Name)
 		return controller, nil
 	}
 
 	controller.transitSwitchIP, err = jsonToIP(transitSwitchIP)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Error parsing transit switch IP")
+		return nil, errors.Wrapf(err, "error parsing transit switch IP")
 	}
 
-	err = controller.resourceSyncer.Start(controller.stopCh)
+	controller.nonGatewayRouteWatcher, err = watcher.New(config)
+
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating resource watcher")
+	}
+
+	err = controller.nonGatewayRouteWatcher.Start(controller.stopCh)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error starting non gateway route controller")
 	}
@@ -100,33 +99,47 @@ func NewNonGatewayRoute(config *syncer.ResourceSyncerConfig, connectionHandler *
 	return controller, nil
 }
 
-func (g *NonGatewayRouteController) process(from runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
+func (g *NonGatewayRouteController) nonGatewayRouteCreatedorUpdated(obj runtime.Object, _ int) bool {
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
-	submGWRoute := from.(*submarinerv1.NonGatewayRoute)
-	if submGWRoute.RoutePolicySpec.NextHops[0] != g.transitSwitchIP {
-		if op == syncer.Create || op == syncer.Update {
-			for _, subnet := range submGWRoute.RoutePolicySpec.RemoteCIDRs {
-				g.remoteSubnets.Insert(subnet)
-			}
-		} else if op == syncer.Delete {
-			for _, subnet := range submGWRoute.RoutePolicySpec.RemoteCIDRs {
-				g.remoteSubnets.Delete(subnet)
-			}
+	submGWRoute := obj.(*submarinerv1.NonGatewayRoute)
+	if submGWRoute.RoutePolicySpec.NextHops != nil && submGWRoute.RoutePolicySpec.NextHops[0] != g.transitSwitchIP {
+		for _, subnet := range submGWRoute.RoutePolicySpec.RemoteCIDRs {
+			g.remoteSubnets.Insert(subnet)
 		}
 
-		err := g.connectionHandler.ReconcileSubOvnLogicalRouterPolicies(g.remoteSubnets, submGWRoute.RoutePolicySpec.NextHops[0])
+		err := g.connectionHandler.reconcileSubOvnLogicalRouterPolicies(g.remoteSubnets, submGWRoute.RoutePolicySpec.NextHops[0])
 		if err != nil {
 			logger.Errorf(err, "error reconciling router policies for remote subnet %q", g.remoteSubnets)
-			return nil, true
+			return true
 		}
 	}
 
-	return nil, false
+	return false
 }
 
-func (g *NonGatewayRouteController) Stop() {
+func (g *NonGatewayRouteController) nonGatewayRouteDeleted(obj runtime.Object, _ int) bool {
+	g.mutex.Lock()
+	defer g.mutex.Unlock()
+
+	submGWRoute := obj.(*submarinerv1.NonGatewayRoute)
+	if submGWRoute.RoutePolicySpec.NextHops != nil && submGWRoute.RoutePolicySpec.NextHops[0] != g.transitSwitchIP {
+		for _, subnet := range submGWRoute.RoutePolicySpec.RemoteCIDRs {
+			g.remoteSubnets.Delete(subnet)
+		}
+
+		err := g.connectionHandler.reconcileSubOvnLogicalRouterPolicies(g.remoteSubnets, submGWRoute.RoutePolicySpec.NextHops[0])
+		if err != nil {
+			logger.Errorf(err, "error reconciling router policies for remote subnet %q", g.remoteSubnets)
+			return true
+		}
+	}
+
+	return false
+}
+
+func (g *NonGatewayRouteController) stop() {
 	if g.transitSwitchIP != "" {
 		close(g.stopCh)
 	}

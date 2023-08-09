@@ -33,37 +33,26 @@ const (
 )
 
 func getOVNNBDBAddress() string {
-	addr := os.Getenv("OVN_NBDB")
-	if addr == "" {
-		return defaultOVNNBDB
-	}
-
-	return addr
+	return getEnvOr("OVN_NBDB", defaultOVNNBDB)
 }
 
 func getOVNPrivKeyPath() string {
-	key := os.Getenv("OVN_PK")
-	if key == "" {
-		return ovnPrivKey
-	}
-
-	return key
+	return getEnvOr("OVN_PK", ovnPrivKey)
 }
 
 func getOVNCertPath() string {
-	cert := os.Getenv("OVN_CERT")
-	if cert == "" {
-		return ovnCert
-	}
-
-	return cert
+	return getEnvOr("OVN_CERT", ovnCert)
 }
 
 func getOVNCaBundlePath() string {
-	ca := os.Getenv("OVN_CA")
-	if ca == "" {
-		return ovnCABundle
+	return getEnvOr("OVN_CA", ovnCABundle)
+}
+
+func getEnvOr(key, defaultValue string) string {
+	s := os.Getenv(key)
+	if s == "" {
+		return defaultValue
 	}
 
-	return ca
+	return s
 }

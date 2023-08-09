@@ -24,8 +24,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/admiral/pkg/syncer"
-	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	admUtil "github.com/submariner-io/admiral/pkg/util"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -123,16 +121,7 @@ func (ovn *Handler) Init() error {
 		ovn.watcherConfig.Scheme = scheme.Scheme
 	}
 
-	syncerConfig := &syncer.ResourceSyncerConfig{
-		SourceClient:    ovn.watcherConfig.Client,
-		SourceNamespace: "submariner-operator",
-		Direction:       syncer.None,
-		RestMapper:      ovn.watcherConfig.RestMapper,
-		Federator:       broker.NewFederator(ovn.watcherConfig.Client, ovn.watcherConfig.RestMapper, "submariner-operator", ""),
-		Scheme:          ovn.watcherConfig.Scheme,
-	}
-
-	gatewayRouteController, err := NewGatewayRoute(syncerConfig, connectionHandler)
+	gatewayRouteController, err := NewGatewayRouteController(ovn.watcherConfig, connectionHandler, ovn.config.Namespace)
 	if err != nil {
 		return err
 	}
@@ -143,7 +132,8 @@ func (ovn *Handler) Init() error {
 		return err
 	}
 
-	nonGatewayRouteController, err := NewNonGatewayRoute(syncerConfig, connectionHandler, ovn.k8sClientset)
+	nonGatewayRouteController, err := NewNonGatewayRouteController(ovn.watcherConfig, connectionHandler, ovn.k8sClientset,
+		ovn.config.Namespace)
 	if err != nil {
 		return err
 	}

@@ -25,8 +25,8 @@ import (
 )
 
 func (ovn *Handler) Stop(uninstall bool) error {
-	ovn.gatewayRouteController.Stop()
-	ovn.nonGatewayRouteController.Stop()
+	ovn.gatewayRouteController.stop()
+	ovn.nonGatewayRouteController.stop()
 
 	close(ovn.stopCh)
 

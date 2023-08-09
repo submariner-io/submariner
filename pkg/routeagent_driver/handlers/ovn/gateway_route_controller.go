@@ -22,24 +22,23 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/submariner-io/admiral/pkg/federate"
-	"github.com/submariner-io/admiral/pkg/syncer"
+	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type GatewayRouteController struct {
-	resourceSyncer    syncer.Interface
-	connectionHandler *ConnectionHandler
-	mutex             sync.Mutex
-	remoteSubnets     sets.Set[string]
-	stopCh            chan struct{}
-	mgmtIP            string
+	gatewayRouteWatcher watcher.Interface
+	connectionHandler   *ConnectionHandler
+	mutex               sync.Mutex
+	remoteSubnets       sets.Set[string]
+	stopCh              chan struct{}
+	mgmtIP              string
 }
 
-func NewGatewayRoute(config *syncer.ResourceSyncerConfig, connectionHandler *ConnectionHandler,
+func NewGatewayRouteController(config *watcher.Config, connectionHandler *ConnectionHandler,
+	namespace string,
 ) (*GatewayRouteController, error) {
 	var err error
 
@@ -48,22 +47,23 @@ func NewGatewayRoute(config *syncer.ResourceSyncerConfig, connectionHandler *Con
 		remoteSubnets:     sets.New[string](),
 	}
 
-	federator := federate.NewUpdateStatusFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
+	config.ResourceConfigs = []watcher.ResourceConfig{
+		{
+			Name:         "GatewayRoute watcher",
+			ResourceType: &submarinerv1.GatewayRoute{},
+			Handler: watcher.EventHandlerFuncs{
+				OnCreateFunc: controller.gatewayRouteCreatedorUpdated,
+				OnUpdateFunc: controller.gatewayRouteCreatedorUpdated,
+				OnDeleteFunc: controller.gatewayRouteDeleted,
+			},
+			SourceNamespace: namespace,
+		},
+	}
 
-	controller.resourceSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
-		Name:                "GatewayRoute syncer",
-		ResourceType:        &submarinerv1.GatewayRoute{},
-		SourceClient:        config.SourceClient,
-		SourceNamespace:     "submariner-operator",
-		RestMapper:          config.RestMapper,
-		Federator:           federator,
-		Scheme:              config.Scheme,
-		Transform:           controller.process,
-		ResourcesEquivalent: syncer.AreSpecsEquivalent,
-	})
+	controller.gatewayRouteWatcher, err = watcher.New(config)
 
 	if err != nil {
-		return nil, errors.Wrap(err, "error creating resource syncer")
+		return nil, errors.Wrap(err, "error creating resource watcher")
 	}
 
 	mgmtIP, err := getNextHopOnK8sMgmtIntf()
@@ -73,9 +73,9 @@ func NewGatewayRoute(config *syncer.ResourceSyncerConfig, connectionHandler *Con
 
 	controller.mgmtIP = mgmtIP
 
-	err = controller.resourceSyncer.Start(controller.stopCh)
+	err = controller.gatewayRouteWatcher.Start(controller.stopCh)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error starting the resource syncer")
+		return nil, errors.Wrapf(err, "error starting the resource wather")
 	}
 
 	logger.Infof("Started GatewayRouteController")
@@ -83,38 +83,57 @@ func NewGatewayRoute(config *syncer.ResourceSyncerConfig, connectionHandler *Con
 	return controller, nil
 }
 
-func (g *GatewayRouteController) process(from runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
+func (g *GatewayRouteController) gatewayRouteCreatedorUpdated(obj runtime.Object, _ int) bool {
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
-	subMGWRoute := from.(*submarinerv1.GatewayRoute)
-	if subMGWRoute.RoutePolicySpec.NextHops[0] == g.mgmtIP {
-		if op == syncer.Create || op == syncer.Update {
-			for _, subnet := range subMGWRoute.RoutePolicySpec.RemoteCIDRs {
-				g.remoteSubnets.Insert(subnet)
-			}
-		} else {
-			for _, subnet := range subMGWRoute.RoutePolicySpec.RemoteCIDRs {
-				g.remoteSubnets.Delete(subnet)
-			}
+	subMGWRoute := obj.(*submarinerv1.GatewayRoute)
+	if subMGWRoute.RoutePolicySpec.NextHops != nil && subMGWRoute.RoutePolicySpec.NextHops[0] == g.mgmtIP {
+		for _, subnet := range subMGWRoute.RoutePolicySpec.RemoteCIDRs {
+			g.remoteSubnets.Insert(subnet)
 		}
 
-		err := g.connectionHandler.ReconcileSubOvnLogicalRouterPolicies(g.remoteSubnets, g.mgmtIP)
+		err := g.connectionHandler.reconcileSubOvnLogicalRouterPolicies(g.remoteSubnets, g.mgmtIP)
 		if err != nil {
 			logger.Errorf(err, "error reconciling router policies for remote subnet %q", g.remoteSubnets)
-			return nil, true
+			return true
 		}
 
-		err = g.connectionHandler.ReconcileOvnLogicalRouterStaticRoutes(g.remoteSubnets, g.mgmtIP)
+		err = g.connectionHandler.reconcileOvnLogicalRouterStaticRoutes(g.remoteSubnets, g.mgmtIP)
 		if err != nil {
 			logger.Errorf(err, "error reconciling static routes for remote subnet %q", g.remoteSubnets)
-			return nil, true
+			return true
+		}
+	}
+	return false
+}
+
+func (g *GatewayRouteController) gatewayRouteDeleted(obj runtime.Object, _ int) bool {
+	g.mutex.Lock()
+	defer g.mutex.Unlock()
+
+	subMGWRoute := obj.(*submarinerv1.GatewayRoute)
+	if subMGWRoute.RoutePolicySpec.NextHops != nil && subMGWRoute.RoutePolicySpec.NextHops[0] == g.mgmtIP {
+		for _, subnet := range subMGWRoute.RoutePolicySpec.RemoteCIDRs {
+			g.remoteSubnets.Delete(subnet)
+		}
+
+		err := g.connectionHandler.reconcileSubOvnLogicalRouterPolicies(g.remoteSubnets, g.mgmtIP)
+		if err != nil {
+			logger.Errorf(err, "error reconciling router policies for remote subnet %q", g.remoteSubnets)
+			return true
+		}
+
+		err = g.connectionHandler.reconcileOvnLogicalRouterStaticRoutes(g.remoteSubnets, g.mgmtIP)
+		if err != nil {
+			logger.Errorf(err, "error reconciling static routes for remote subnet %q", g.remoteSubnets)
+			return true
 		}
 	}
 
-	return nil, false
+	return false
 }
 
-func (g *GatewayRouteController) Stop() {
+func (g *GatewayRouteController) stop() {
 	close(g.stopCh)
 }
