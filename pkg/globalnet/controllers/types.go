@@ -168,9 +168,10 @@ type nodeController struct {
 
 type ingressPodController struct {
 	*baseSyncerController
-	svcName      string
-	namespace    string
-	ingressIPMap set.Set[string]
+	publishNotReadyAddresses bool
+	svcName                  string
+	namespace                string
+	ingressIPMap             set.Set[string]
 }
 
 type IngressPodControllers struct {

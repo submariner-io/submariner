@@ -44,10 +44,11 @@ func startIngressPodController(svc *corev1.Service, config *syncer.ResourceSynce
 	}
 
 	controller := &ingressPodController{
-		baseSyncerController: newBaseSyncerController(),
-		svcName:              svc.Name,
-		namespace:            svc.Namespace,
-		ingressIPMap:         set.New[string](),
+		baseSyncerController:     newBaseSyncerController(),
+		svcName:                  svc.Name,
+		namespace:                svc.Namespace,
+		publishNotReadyAddresses: svc.Spec.PublishNotReadyAddresses,
+		ingressIPMap:             set.New[string](),
 	}
 
 	labelSelector := labels.Set(svc.Spec.Selector).AsSelector().String()
@@ -120,7 +121,8 @@ func (c *ingressPodController) process(from runtime.Object, _ int, op syncer.Ope
 	}
 
 	// TODO: handle phase and podIP changes?
-	if c.ingressIPMap.Has(ingressIP.Name) || pod.Status.Phase != corev1.PodRunning || pod.Status.PodIP == "" {
+	if c.ingressIPMap.Has(ingressIP.Name) || pod.Status.PodIP == "" ||
+		(!c.publishNotReadyAddresses && pod.Status.Phase != corev1.PodRunning) {
 		// Avoid assigning ingressIPs to pods that are not ready with an endpoint IP
 		return nil, false
 	}
