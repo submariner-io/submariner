@@ -19,8 +19,6 @@ limitations under the License.
 package ovn
 
 import (
-	"sync"
-
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -33,14 +31,13 @@ import (
 type NonGatewayRouteController struct {
 	nonGatewayRouteWatcher watcher.Interface
 	connectionHandler      *ConnectionHandler
-	mutex                  sync.Mutex
 	remoteSubnets          sets.Set[string]
 	stopCh                 chan struct{}
 	transitSwitchIP        string
 	k8sClientSet           clientset.Interface
 }
 
-func NewNonGatewayRouteController(config *watcher.Config, connectionHandler *ConnectionHandler,
+func NewNonGatewayRouteController(config watcher.Config, connectionHandler *ConnectionHandler,
 	k8sClientSet clientset.Interface, namespace string,
 ) (*NonGatewayRouteController, error) {
 	// We'll panic if config is nil, this is intentional
@@ -57,8 +54,8 @@ func NewNonGatewayRouteController(config *watcher.Config, connectionHandler *Con
 			Name:         "NonGatewayRoute watcher",
 			ResourceType: &submarinerv1.NonGatewayRoute{},
 			Handler: watcher.EventHandlerFuncs{
-				OnCreateFunc: controller.nonGatewayRouteCreatedorUpdated,
-				OnUpdateFunc: controller.nonGatewayRouteCreatedorUpdated,
+				OnCreateFunc: controller.nonGatewayRouteCreatedOrUpdated,
+				OnUpdateFunc: controller.nonGatewayRouteCreatedOrUpdated,
 				OnDeleteFunc: controller.nonGatewayRouteDeleted,
 			},
 			SourceNamespace: namespace,
@@ -83,7 +80,7 @@ func NewNonGatewayRouteController(config *watcher.Config, connectionHandler *Con
 		return nil, errors.Wrapf(err, "error parsing transit switch IP")
 	}
 
-	controller.nonGatewayRouteWatcher, err = watcher.New(config)
+	controller.nonGatewayRouteWatcher, err = watcher.New(&config)
 
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating resource watcher")
@@ -99,15 +96,12 @@ func NewNonGatewayRouteController(config *watcher.Config, connectionHandler *Con
 	return controller, nil
 }
 
-func (g *NonGatewayRouteController) nonGatewayRouteCreatedorUpdated(obj runtime.Object, _ int) bool {
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
-
+func (g *NonGatewayRouteController) nonGatewayRouteCreatedOrUpdated(obj runtime.Object, _ int) bool {
 	submNonGWRoute := obj.(*submarinerv1.NonGatewayRoute)
 
 	err := g.reconcileRemoteSubnets(submNonGWRoute, true)
 	if err != nil {
-		logger.Errorf(err, "error creating or updating router policies for remote subnet %q", g.remoteSubnets)
+		logger.Errorf(err, "Error creating or updating router policies for remote subnet %q", g.remoteSubnets)
 		return true
 	}
 
@@ -115,14 +109,11 @@ func (g *NonGatewayRouteController) nonGatewayRouteCreatedorUpdated(obj runtime.
 }
 
 func (g *NonGatewayRouteController) nonGatewayRouteDeleted(obj runtime.Object, _ int) bool {
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
-
 	submNonGWRoute := obj.(*submarinerv1.NonGatewayRoute)
 
 	err := g.reconcileRemoteSubnets(submNonGWRoute, false)
 	if err != nil {
-		logger.Errorf(err, "error deleting policies for remote subnet %q", g.remoteSubnets)
+		logger.Errorf(err, "Error deleting policies for remote subnet %q", g.remoteSubnets)
 		return true
 	}
 

@@ -19,8 +19,6 @@ limitations under the License.
 package ovn
 
 import (
-	"sync"
-
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -31,13 +29,12 @@ import (
 type GatewayRouteController struct {
 	gatewayRouteWatcher watcher.Interface
 	connectionHandler   *ConnectionHandler
-	mutex               sync.Mutex
 	remoteSubnets       sets.Set[string]
 	stopCh              chan struct{}
 	mgmtIP              string
 }
 
-func NewGatewayRouteController(config *watcher.Config, connectionHandler *ConnectionHandler,
+func NewGatewayRouteController(config watcher.Config, connectionHandler *ConnectionHandler,
 	namespace string,
 ) (*GatewayRouteController, error) {
 	var err error
@@ -52,15 +49,15 @@ func NewGatewayRouteController(config *watcher.Config, connectionHandler *Connec
 			Name:         "GatewayRoute watcher",
 			ResourceType: &submarinerv1.GatewayRoute{},
 			Handler: watcher.EventHandlerFuncs{
-				OnCreateFunc: controller.gatewayRouteCreatedorUpdated,
-				OnUpdateFunc: controller.gatewayRouteCreatedorUpdated,
+				OnCreateFunc: controller.gatewayRouteCreatedOrUpdated,
+				OnUpdateFunc: controller.gatewayRouteCreatedOrUpdated,
 				OnDeleteFunc: controller.gatewayRouteDeleted,
 			},
 			SourceNamespace: namespace,
 		},
 	}
 
-	controller.gatewayRouteWatcher, err = watcher.New(config)
+	controller.gatewayRouteWatcher, err = watcher.New(&config)
 
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating resource watcher")
@@ -83,15 +80,12 @@ func NewGatewayRouteController(config *watcher.Config, connectionHandler *Connec
 	return controller, nil
 }
 
-func (g *GatewayRouteController) gatewayRouteCreatedorUpdated(obj runtime.Object, _ int) bool {
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
-
+func (g *GatewayRouteController) gatewayRouteCreatedOrUpdated(obj runtime.Object, _ int) bool {
 	subMGWRoute := obj.(*submarinerv1.GatewayRoute)
 
 	err := g.reconcileRemoteSubnets(subMGWRoute, true)
 	if err != nil {
-		logger.Errorf(err, "error creating or updating router policies and static routes for remote subnet %q", g.remoteSubnets)
+		logger.Errorf(err, "Error creating or updating router policies and static routes for remote subnet %q", g.remoteSubnets)
 		return true
 	}
 
@@ -99,14 +93,11 @@ func (g *GatewayRouteController) gatewayRouteCreatedorUpdated(obj runtime.Object
 }
 
 func (g *GatewayRouteController) gatewayRouteDeleted(obj runtime.Object, _ int) bool {
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
-
 	subMGWRoute := obj.(*submarinerv1.GatewayRoute)
 
 	err := g.reconcileRemoteSubnets(subMGWRoute, false)
 	if err != nil {
-		logger.Errorf(err, "error deleting router policies and static routes for remote subnet %q", g.remoteSubnets)
+		logger.Errorf(err, "Error deleting router policies and static routes for remote subnet %q", g.remoteSubnets)
 		return true
 	}
 

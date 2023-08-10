@@ -24,7 +24,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	admUtil "github.com/submariner-io/admiral/pkg/util"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable/wireguard"
@@ -35,9 +34,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/iptables"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -105,23 +102,7 @@ func (ovn *Handler) Init() error {
 		return errors.Wrapf(err, "error getting connection handler to connect to OvnDB")
 	}
 
-	if ovn.watcherConfig.RestMapper == nil {
-		if ovn.watcherConfig.RestMapper, err = admUtil.BuildRestMapper(ovn.watcherConfig.RestConfig); err != nil {
-			return errors.Wrap(err, "error creating the RestMapper")
-		}
-	}
-
-	if ovn.watcherConfig.Client == nil {
-		if ovn.watcherConfig.Client, err = dynamic.NewForConfig(ovn.watcherConfig.RestConfig); err != nil {
-			return errors.Wrap(err, "error creating dynamic client")
-		}
-	}
-
-	if ovn.watcherConfig.Scheme == nil {
-		ovn.watcherConfig.Scheme = scheme.Scheme
-	}
-
-	gatewayRouteController, err := NewGatewayRouteController(ovn.watcherConfig, connectionHandler, ovn.config.Namespace)
+	gatewayRouteController, err := NewGatewayRouteController(*ovn.watcherConfig, connectionHandler, ovn.config.Namespace)
 	if err != nil {
 		return err
 	}
@@ -132,7 +113,7 @@ func (ovn *Handler) Init() error {
 		return err
 	}
 
-	nonGatewayRouteController, err := NewNonGatewayRouteController(ovn.watcherConfig, connectionHandler, ovn.k8sClientset,
+	nonGatewayRouteController, err := NewNonGatewayRouteController(*ovn.watcherConfig, connectionHandler, ovn.k8sClientset,
 		ovn.config.Namespace)
 	if err != nil {
 		return err
