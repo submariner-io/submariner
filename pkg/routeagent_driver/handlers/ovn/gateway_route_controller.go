@@ -34,6 +34,7 @@ type GatewayRouteController struct {
 	mgmtIP              string
 }
 
+//nolint:gocritic // Ignore hugeParam
 func NewGatewayRouteController(config watcher.Config, connectionHandler *ConnectionHandler,
 	namespace string,
 ) (*GatewayRouteController, error) {
@@ -127,12 +128,7 @@ func (g *GatewayRouteController) reconcileRemoteSubnets(subMGWRoute *submarinerv
 		return err
 	}
 
-	err = g.connectionHandler.reconcileOvnLogicalRouterStaticRoutes(g.remoteSubnets, g.mgmtIP)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return g.connectionHandler.reconcileOvnLogicalRouterStaticRoutes(g.remoteSubnets, g.mgmtIP)
 }
 
 func (g *GatewayRouteController) stop() {

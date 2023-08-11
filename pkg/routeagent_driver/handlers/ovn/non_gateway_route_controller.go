@@ -34,9 +34,9 @@ type NonGatewayRouteController struct {
 	remoteSubnets          sets.Set[string]
 	stopCh                 chan struct{}
 	transitSwitchIP        string
-	k8sClientSet           clientset.Interface
 }
 
+//nolint:gocritic // Ignore hugeParam
 func NewNonGatewayRouteController(config watcher.Config, connectionHandler *ConnectionHandler,
 	k8sClientSet clientset.Interface, namespace string,
 ) (*NonGatewayRouteController, error) {
@@ -46,7 +46,6 @@ func NewNonGatewayRouteController(config watcher.Config, connectionHandler *Conn
 	controller := &NonGatewayRouteController{
 		connectionHandler: connectionHandler,
 		remoteSubnets:     sets.New[string](),
-		k8sClientSet:      k8sClientSet,
 	}
 
 	config.ResourceConfigs = []watcher.ResourceConfig{
@@ -135,10 +134,7 @@ func (g *NonGatewayRouteController) reconcileRemoteSubnets(submNonGWRoute *subma
 			}
 		}
 
-		err := g.connectionHandler.reconcileSubOvnLogicalRouterPolicies(g.remoteSubnets, submNonGWRoute.RoutePolicySpec.NextHops[0])
-		if err != nil {
-			return err
-		}
+		return g.connectionHandler.reconcileSubOvnLogicalRouterPolicies(g.remoteSubnets, submNonGWRoute.RoutePolicySpec.NextHops[0])
 	}
 
 	return nil
