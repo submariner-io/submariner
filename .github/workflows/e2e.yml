@@ -45,14 +45,17 @@ jobs:
       fail-fast: false
       matrix:
         cable-driver: ['libreswan', 'wireguard', 'vxlan']
-        extra-toggles: ['', 'globalnet', 'ovn']
+        extra-toggles: ['', 'globalnet', 'ovn', 'ovn-ic']
         exclude:
           - cable-driver: wireguard
             extra-toggles: ovn
+          - cable-driver: wireguard
+            extra-toggles: ovn-ic
         include:
           - extra-toggles: dual-stack
           - extra-toggles: dual-stack, globalnet
           - extra-toggles: globalnet, ovn
+          - extra-toggles: globalnet, ovn-ic
           - extra-toggles: external-net
           - extra-toggles: external-net, globalnet
     steps:
