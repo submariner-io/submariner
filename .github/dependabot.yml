@@ -7,11 +7,6 @@ updates:
       interval: monthly
   - package-ecosystem: github-actions
     directory: /
-    target-branch: release-0.12
-    schedule:
-      interval: monthly
-  - package-ecosystem: github-actions
-    directory: /
     target-branch: release-0.13
     schedule:
       interval: monthly

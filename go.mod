@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/cenkalti/backoff/v4 v4.2.1
-	github.com/coreos/go-iptables v0.6.0
+	github.com/coreos/go-iptables v0.7.0
 	github.com/emirpasic/gods v1.18.1
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/onsi/ginkgo/v2 v2.11.0
@@ -15,11 +15,11 @@ require (
 	github.com/projectcalico/api v0.0.0-20230602153125-fb7148692637
 	github.com/prometheus-community/pro-bing v0.3.0
 	github.com/prometheus/client_golang v1.16.0
-	github.com/submariner-io/admiral v0.16.0-m3
+	github.com/submariner-io/admiral v0.16.0-m3.0.20230807132642-3d805dda2f2c
 	github.com/submariner-io/shipyard v0.16.0-m3
 	github.com/uw-labs/lichen v0.1.7
 	github.com/vishvananda/netlink v1.2.1-beta.2
-	golang.org/x/sys v0.10.0
+	golang.org/x/sys v0.11.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20221104135756-97bc4ad4a1cb
 	google.golang.org/protobuf v1.30.0
 	k8s.io/api v0.27.4
