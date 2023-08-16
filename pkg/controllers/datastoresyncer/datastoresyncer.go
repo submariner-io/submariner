@@ -177,17 +177,17 @@ func (d *DatastoreSyncer) cleanupResources(client dynamic.NamespaceableResourceI
 func (d *DatastoreSyncer) createSyncer() (*broker.Syncer, error) {
 	d.syncerConfig.ResourceConfigs = []broker.ResourceConfig{
 		{
-			LocalSourceNamespace: d.syncerConfig.LocalNamespace,
-			LocalResourceType:    &submarinerv1.Cluster{},
-			LocalTransform:       d.shouldSyncCluster,
-			BrokerResourceType:   &submarinerv1.Cluster{},
+			LocalSourceNamespace:   d.syncerConfig.LocalNamespace,
+			LocalResourceType:      &submarinerv1.Cluster{},
+			TransformLocalToBroker: d.shouldSyncCluster,
+			BrokerResourceType:     &submarinerv1.Cluster{},
 		},
 		{
-			LocalSourceNamespace: d.syncerConfig.LocalNamespace,
-			LocalResourceType:    &submarinerv1.Endpoint{},
-			LocalTransform:       d.shouldSyncEndpoint,
-			BrokerTransform:      d.shouldSyncRemoteEndpoint,
-			BrokerResourceType:   &submarinerv1.Endpoint{},
+			LocalSourceNamespace:   d.syncerConfig.LocalNamespace,
+			LocalResourceType:      &submarinerv1.Endpoint{},
+			TransformLocalToBroker: d.shouldSyncEndpoint,
+			TransformBrokerToLocal: d.shouldSyncRemoteEndpoint,
+			BrokerResourceType:     &submarinerv1.Endpoint{},
 		},
 	}
 
@@ -196,7 +196,7 @@ func (d *DatastoreSyncer) createSyncer() (*broker.Syncer, error) {
 	return syncer, errors.Wrap(err, "error creating the syncer")
 }
 
-func (d *DatastoreSyncer) shouldSyncEndpoint(obj runtime.Object, numRequeues int, op resourceSyncer.Operation) (runtime.Object, bool) {
+func (d *DatastoreSyncer) shouldSyncEndpoint(obj runtime.Object, _ int, _ resourceSyncer.Operation) (runtime.Object, bool) {
 	// Ensure we don't try to sync a remote endpoint to the broker. While the syncer handles this normally using a
 	// label, on upgrade to 0.8.0 where the syncer was introduced, the label won't exist so check the ClusterID field here.
 	endpoint := obj.(*submarinerv1.Endpoint)
@@ -207,7 +207,7 @@ func (d *DatastoreSyncer) shouldSyncEndpoint(obj runtime.Object, numRequeues int
 	return nil, false
 }
 
-func (d *DatastoreSyncer) shouldSyncCluster(obj runtime.Object, numRequeues int, op resourceSyncer.Operation) (runtime.Object, bool) {
+func (d *DatastoreSyncer) shouldSyncCluster(obj runtime.Object, _ int, _ resourceSyncer.Operation) (runtime.Object, bool) {
 	cluster := obj.(*submarinerv1.Cluster)
 	if cluster.Spec.ClusterID == d.localCluster.Spec.ClusterID {
 		return obj, false
@@ -216,8 +216,8 @@ func (d *DatastoreSyncer) shouldSyncCluster(obj runtime.Object, numRequeues int,
 	return nil, false
 }
 
-func (d *DatastoreSyncer) shouldSyncRemoteEndpoint(obj runtime.Object, numRequeues int,
-	op resourceSyncer.Operation,
+func (d *DatastoreSyncer) shouldSyncRemoteEndpoint(obj runtime.Object, _ int,
+	_ resourceSyncer.Operation,
 ) (runtime.Object, bool) {
 	endpoint := obj.(*submarinerv1.Endpoint)
 
@@ -240,11 +240,7 @@ func (d *DatastoreSyncer) shouldSyncRemoteEndpoint(obj runtime.Object, numRequeu
 func (d *DatastoreSyncer) ensureExclusiveEndpoint(syncer *broker.Syncer) error {
 	logger.Info("Ensuring we are the only endpoint active for this cluster")
 
-	endpoints, err := syncer.ListLocalResources(&submarinerv1.Endpoint{})
-	if err != nil {
-		return errors.Wrap(err, "error retrieving submariner Endpoints")
-	}
-
+	endpoints := syncer.ListLocalResources(&submarinerv1.Endpoint{})
 	for i := range endpoints {
 		endpoint := endpoints[i].(*submarinerv1.Endpoint)
 		if endpoint.Spec.ClusterID != d.localCluster.Spec.ClusterID {

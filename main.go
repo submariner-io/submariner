@@ -20,13 +20,16 @@ package main
 
 import (
 	"context"
+	"crypto/x509"
 	"errors"
 	"flag"
 	"fmt"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
@@ -34,13 +37,17 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
+	"github.com/submariner-io/admiral/pkg/names"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
+	admversion "github.com/submariner-io/admiral/pkg/version"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/cableengine"
 	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
 	"github.com/submariner-io/submariner/pkg/cableengine/syncer"
+	"github.com/submariner-io/submariner/pkg/cidr"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/controllers/datastoresyncer"
 	"github.com/submariner-io/submariner/pkg/controllers/tunnel"
@@ -48,7 +55,9 @@ import (
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/pod"
 	"github.com/submariner-io/submariner/pkg/types"
+	"github.com/submariner-io/submariner/pkg/versions"
 	corev1 "k8s.io/api/core/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -63,12 +72,14 @@ import (
 var (
 	localMasterURL  string
 	localKubeconfig string
+	showVersion     = false
 )
 
 func init() {
 	flag.StringVar(&localKubeconfig, "kubeconfig", "", "Path to kubeconfig of local cluster. Only required if out-of-cluster.")
 	flag.StringVar(&localMasterURL, "master", "",
 		"The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+	flag.BoolVar(&showVersion, "version", showVersion, "Show version")
 }
 
 type leaderConfig struct {
@@ -87,6 +98,7 @@ type componentsType struct {
 	gatewayPod         *pod.GatewayPod
 	submSpec           types.SubmarinerSpecification
 	stopCh             <-chan struct{}
+	waitGroup          sync.WaitGroup
 }
 
 const (
@@ -97,14 +109,23 @@ const (
 )
 
 var (
-	VERSION = "not-compiled-properly"
-	logger  = log.Logger{Logger: logf.Log.WithName("main")}
+	logger             = log.Logger{Logger: logf.Log.WithName("main")}
+	lastBadCertificate atomic.Value
 )
 
 func main() {
 	kzerolog.AddFlags(nil)
 	flag.Parse()
+
+	admversion.Print(names.GatewayComponent, versions.Submariner())
+
+	if showVersion {
+		return
+	}
+
 	kzerolog.InitK8sLogging()
+
+	versions.Log(&logger)
 
 	logger.Info("Starting the submariner gateway engine")
 
@@ -119,6 +140,19 @@ func main() {
 	httpServer := startHTTPServer(&components.submSpec)
 
 	var err error
+
+	//nolint:reassign // We need to reassign ErrorHandlers to register our handler
+	utilruntime.ErrorHandlers = append(utilruntime.ErrorHandlers, func(err error) {
+		var unknownAuthorityError x509.UnknownAuthorityError
+		if errors.As(err, &unknownAuthorityError) && lastBadCertificate.Swap(unknownAuthorityError.Cert) != unknownAuthorityError.Cert {
+			logger.Errorf(err, "Certificate error: %s", resource.ToJSON(err))
+		}
+		var certificateInvalidError x509.CertificateInvalidError
+		if errors.As(err, &certificateInvalidError) && lastBadCertificate.Swap(certificateInvalidError.Cert) != certificateInvalidError.Cert {
+			logger.Errorf(err, "Certificate error: %s", resource.ToJSON(err))
+		}
+		// The generic handler has already logged the error, no need to repeat if we don't want extra detail
+	})
 
 	components.restConfig, err = clientcmd.BuildConfigFromFlags(localMasterURL, localKubeconfig)
 	logger.FatalOnError(err, "Error building kubeconfig")
@@ -164,7 +198,7 @@ func main() {
 	components.cableEngineSyncer = syncer.NewGatewaySyncer(
 		components.cableEngine,
 		submarinerClient.SubmarinerV1().Gateways(components.submSpec.Namespace),
-		VERSION, components.cableHealthChecker)
+		versions.Submariner(), components.cableHealthChecker)
 
 	if components.submSpec.Uninstall {
 		logger.Info("Uninstalling the submariner gateway engine")
@@ -181,7 +215,7 @@ func main() {
 	components.gatewayPod, err = pod.NewGatewayPod(k8sClient)
 	logger.FatalOnError(err, "Error creating a handler to update the gateway pod")
 
-	components.cableEngineSyncer.Run(components.stopCh)
+	components.runAsync(components.cableEngineSyncer.Run)
 
 	if !airGapped {
 		components.initPublicIPWatcher(k8sClient, submarinerClient, localEndpoint)
@@ -204,15 +238,13 @@ func main() {
 
 	<-components.stopCh
 
-	if err := components.cableEngine.Cleanup(); err != nil {
-		logger.Error(nil, "Error cleaning up cableEngine resources before removing Gateway")
-	}
-
 	logger.Info("All controllers stopped or exited. Stopping main loop")
 
 	if err := httpServer.Shutdown(context.TODO()); err != nil {
 		logger.Errorf(err, "Error shutting down metrics HTTP server")
 	}
+
+	components.waitGroup.Wait()
 }
 
 func isAirGappedDeployment() bool {
@@ -316,14 +348,23 @@ func (c *componentsType) initPublicIPWatcher(k8sClient kubernetes.Interface, sub
 	c.publicIPWatcher = endpoint.NewPublicIPWatcher(publicIPConfig)
 }
 
+func (c *componentsType) runAsync(run func(<-chan struct{})) {
+	c.waitGroup.Add(1)
+
+	go func() {
+		defer c.waitGroup.Done()
+		run(c.stopCh)
+	}()
+}
+
 func submarinerClusterFrom(submSpec *types.SubmarinerSpecification) *types.SubmarinerCluster {
 	return &types.SubmarinerCluster{
 		ID: submSpec.ClusterID,
 		Spec: subv1.ClusterSpec{
 			ClusterID:   submSpec.ClusterID,
 			ColorCodes:  []string{"blue"}, // This is a fake value, used only for upgrade purposes
-			ServiceCIDR: submSpec.ServiceCidr,
-			ClusterCIDR: submSpec.ClusterCidr,
+			ServiceCIDR: cidr.ExtractIPv4Subnets(submSpec.ServiceCidr),
+			ClusterCIDR: cidr.ExtractIPv4Subnets(submSpec.ClusterCidr),
 			GlobalCIDR:  submSpec.GlobalCidr,
 		},
 	}
@@ -333,6 +374,7 @@ func startHTTPServer(spec *types.SubmarinerSpecification) *http.Server {
 	srv := &http.Server{Addr: ":" + spec.MetricsPort, ReadHeaderTimeout: 60 * time.Second}
 
 	http.Handle("/metrics", promhttp.Handler())
+	http.HandleFunc("/debug", pprof.Profile)
 
 	go func() {
 		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {

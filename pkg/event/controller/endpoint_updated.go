@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func (c *Controller) handleUpdatedEndpoint(obj runtime.Object, numRequeues int) bool {
+func (c *Controller) handleUpdatedEndpoint(obj runtime.Object, _ int) bool {
 	endpoint := obj.(*smv1.Endpoint)
 
 	var err error

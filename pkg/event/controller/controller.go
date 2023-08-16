@@ -97,7 +97,7 @@ func New(config *Config) (*Controller, error) {
 
 	var cfg *restclient.Config
 	if config.Client == nil {
-		cfg, err = clientcmd.BuildConfigFromFlags(config.MasterURL, config.MasterURL)
+		cfg, err = clientcmd.BuildConfigFromFlags(config.MasterURL, config.Kubeconfig)
 		if err != nil {
 			return nil, errors.Wrap(err, "error building config from flags")
 		}

@@ -33,10 +33,11 @@ import (
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
+//nolint:revive // Ignore "unexported-return:... which can be annoying to use"; it's only used by unit tests.
 func NewServiceExportController(config *syncer.ResourceSyncerConfig, podControllers *IngressPodControllers,
 	endpointsControllers *ServiceExportEndpointsControllers,
 	ingressEndpointsControllers *IngressEndpointsControllers,
-) (Interface, error) {
+) (*serviceExportController, error) {
 	// We'll panic if config is nil, this is intentional
 	var err error
 
@@ -88,6 +89,10 @@ func NewServiceExportController(config *syncer.ResourceSyncerConfig, podControll
 	return controller, nil
 }
 
+func (c *serviceExportController) GetSyncer() syncer.Interface {
+	return c.resourceSyncer
+}
+
 func (c *serviceExportController) Stop() {
 	c.baseController.Stop()
 	c.podControllers.stopAll()
@@ -119,7 +124,7 @@ func (c *serviceExportController) Start() error {
 	return nil
 }
 
-func (c *serviceExportController) process(from runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
+func (c *serviceExportController) process(from runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	serviceExport := from.(*mcsv1a1.ServiceExport)
 
 	switch op {

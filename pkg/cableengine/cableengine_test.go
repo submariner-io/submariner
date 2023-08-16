@@ -359,7 +359,7 @@ type fakeNATDiscovery struct {
 	readyChannel       chan *natdiscovery.NATEndpointInfo
 }
 
-func (n *fakeNATDiscovery) Run(stopCh <-chan struct{}) error {
+func (n *fakeNATDiscovery) Run(_ <-chan struct{}) error {
 	return nil
 }
 

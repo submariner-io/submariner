@@ -10,7 +10,9 @@ GOPATH="$(go env GOPATH)"
 K8S_IO_DIR="${GOPATH:-$HOME/go}/src/k8s.io"
 CODEGEN_SCRIPT_DIR="${K8S_IO_DIR}/code-generator"
 CODEGEN_SCRIPT="${CODEGEN_SCRIPT_DIR}/generate-groups.sh"
-CODEGEN_RELEASE_TAG=kubernetes-1.19.10
+GENGO_BOILERPLATE_DIR="${K8S_IO_DIR}/gengo"
+GENGO_BOILERPLATE="${GENGO_BOILERPLATE_DIR}/boilerplate/boilerplate.go.txt"
+CODEGEN_RELEASE_TAG=kubernetes-1.26.2
 
 if [ ! -f "$CODEGEN_SCRIPT" ]; then
     echo "$CODEGEN_SCRIPT does not exist - downloading..."
@@ -18,8 +20,13 @@ if [ ! -f "$CODEGEN_SCRIPT" ]; then
         git clone --branch $CODEGEN_RELEASE_TAG https://github.com/kubernetes/code-generator "${CODEGEN_SCRIPT_DIR}"
         cd "${CODEGEN_SCRIPT_DIR}"
         go mod vendor
-        echo "Successsfully checked out release tag $CODEGEN_RELEASE_TAG"
+        echo "Successfully checked out release tag $CODEGEN_RELEASE_TAG"
     )
+fi
+
+if [ ! -f "$GENGO_BOILERPLATE" ]; then
+    echo "$GENGO_BOILERPLATE does not exist - downloading..."
+    git clone https://github.com/kubernetes/gengo "${GENGO_BOILERPLATE_DIR}"
 fi
 
 "${CODEGEN_SCRIPT}" all github.com/submariner-io/submariner/pkg/client github.com/submariner-io/submariner/pkg/apis submariner.io:v1

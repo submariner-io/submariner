@@ -22,6 +22,7 @@ import (
 	"context"
 	"flag"
 	"net/http"
+	"net/http/pprof"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
@@ -29,10 +30,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
+	"github.com/submariner-io/admiral/pkg/names"
+	admversion "github.com/submariner-io/admiral/pkg/version"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cidr"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
+	"github.com/submariner-io/submariner/pkg/versions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
@@ -42,15 +47,25 @@ import (
 )
 
 var (
-	masterURL  string
-	kubeconfig string
-	logger     = log.Logger{Logger: logf.Log.WithName("main")}
+	masterURL   string
+	kubeconfig  string
+	logger      = log.Logger{Logger: logf.Log.WithName("main")}
+	showVersion = false
 )
 
 func main() {
 	kzerolog.AddFlags(nil)
 	flag.Parse()
+
+	admversion.Print(names.GlobalnetComponent, versions.Submariner())
+
+	if showVersion {
+		return
+	}
+
 	kzerolog.InitK8sLogging()
+
+	versions.Log(&logger)
 
 	var spec controllers.Specification
 
@@ -106,7 +121,8 @@ func main() {
 		logger.Fatalf("Cluster %s is not configured to use globalCidr", spec.ClusterID)
 	}
 
-	gatewayMonitor, err := controllers.NewGatewayMonitor(spec, append(localCluster.Spec.ClusterCIDR, localCluster.Spec.ServiceCIDR...),
+	gatewayMonitor, err := controllers.NewGatewayMonitor(spec, append(cidr.ExtractIPv4Subnets(localCluster.Spec.ClusterCIDR),
+		cidr.ExtractIPv4Subnets(localCluster.Spec.ServiceCIDR)...),
 		&watcher.Config{RestConfig: cfg})
 	logger.FatalOnError(err, "Error creating gatewayMonitor")
 
@@ -127,12 +143,14 @@ func init() {
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&masterURL, "master", "",
 		"The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+	flag.BoolVar(&showVersion, "version", showVersion, "Show version")
 }
 
 func startHTTPServer(spec controllers.Specification) *http.Server {
 	srv := &http.Server{Addr: ":" + spec.MetricsPort, ReadHeaderTimeout: 60 * time.Second}
 
 	http.Handle("/metrics", promhttp.Handler())
+	http.HandleFunc("/debug", pprof.Profile)
 
 	go func() {
 		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {

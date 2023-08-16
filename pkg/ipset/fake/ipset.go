@@ -26,13 +26,13 @@ import (
 	"time"
 
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/submariner/pkg/ipset"
+	"k8s.io/utils/set"
 )
 
 type IPSet struct {
 	mutex                    sync.Mutex
-	sets                     map[string]stringset.Interface
+	sets                     map[string]set.Set[string]
 	failOnDestroySetMatchers []interface{}
 	failOnCreateSetMatchers  []interface{}
 	failOnAddEntryMatchers   []interface{}
@@ -43,60 +43,60 @@ var _ = ipset.Interface(&IPSet{})
 
 func New() *IPSet {
 	return &IPSet{
-		sets: map[string]stringset.Interface{},
+		sets: map[string]set.Set[string]{},
 	}
 }
 
-func (i *IPSet) CreateSet(set *ipset.IPSet, ignoreExistErr bool) error {
+func (i *IPSet) CreateSet(ipSet *ipset.IPSet, ignoreExistErr bool) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	err := matchForError(&i.failOnCreateSetMatchers, set.Name)
+	err := matchForError(&i.failOnCreateSetMatchers, ipSet.Name)
 	if err != nil {
 		return err
 	}
 
-	if i.sets[set.Name] != nil {
+	if i.sets[ipSet.Name] != nil {
 		if ignoreExistErr {
 			return nil
 		}
 
-		return fmt.Errorf("IP set %q already exists", set.Name)
+		return fmt.Errorf("IP set %q already exists", ipSet.Name)
 	}
 
-	i.sets[set.Name] = stringset.New()
+	i.sets[ipSet.Name] = set.New[string]()
 
 	return nil
 }
 
-func (i *IPSet) FlushSet(set string) error {
+func (i *IPSet) FlushSet(setName string) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	entries := i.sets[set]
+	entries := i.sets[setName]
 	if entries == nil {
 		return nil
 	}
 
-	entries.RemoveAll()
+	entries.Clear()
 
 	return nil
 }
 
-func (i *IPSet) DestroySet(set string) error {
+func (i *IPSet) DestroySet(setName string) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	err := matchForError(&i.failOnDestroySetMatchers, set)
+	err := matchForError(&i.failOnDestroySetMatchers, setName)
 	if err != nil {
 		return err
 	}
 
-	if i.sets[set] == nil {
+	if i.sets[setName] == nil {
 		return nil
 	}
 
-	delete(i.sets, set)
+	delete(i.sets, setName)
 
 	return nil
 }
@@ -105,12 +105,12 @@ func (i *IPSet) DestroyAllSets() error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	i.sets = map[string]stringset.Interface{}
+	i.sets = map[string]set.Set[string]{}
 
 	return nil
 }
 
-func (i *IPSet) AddEntry(entry string, set *ipset.IPSet, ignoreExistErr bool) error {
+func (i *IPSet) AddEntry(entry string, ipSet *ipset.IPSet, ignoreExistErr bool) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -119,19 +119,21 @@ func (i *IPSet) AddEntry(entry string, set *ipset.IPSet, ignoreExistErr bool) er
 		return err
 	}
 
-	entries := i.sets[set.Name]
+	entries := i.sets[ipSet.Name]
 	if entries == nil {
-		return fmt.Errorf("IP set %q does not exist", set.Name)
+		return fmt.Errorf("IP set %q does not exist", ipSet.Name)
 	}
 
-	if !entries.Add(entry) && !ignoreExistErr {
+	if entries.Has(entry) && !ignoreExistErr {
 		return fmt.Errorf("entry %q already exists", entry)
 	}
+
+	entries.Insert(entry)
 
 	return nil
 }
 
-func (i *IPSet) DelEntry(entry, set string) error {
+func (i *IPSet) DelEntry(entry, setName string) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -140,73 +142,73 @@ func (i *IPSet) DelEntry(entry, set string) error {
 		return err
 	}
 
-	entries := i.sets[set]
+	entries := i.sets[setName]
 	if entries == nil {
 		return nil
 	}
 
-	entries.Remove(entry)
+	entries.Delete(entry)
 
 	return nil
 }
 
-func (i *IPSet) TestEntry(entry, set string) (bool, error) {
+func (i *IPSet) TestEntry(entry, setName string) (bool, error) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	entries := i.sets[set]
+	entries := i.sets[setName]
 	if entries == nil {
-		return false, fmt.Errorf("IP set %q does not exist", set)
+		return false, fmt.Errorf("IP set %q does not exist", setName)
 	}
 
-	return entries.Contains(entry), nil
+	return entries.Has(entry), nil
 }
 
-func (i *IPSet) ListEntries(set string) ([]string, error) {
+func (i *IPSet) ListEntries(setName string) ([]string, error) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	entries := i.sets[set]
+	entries := i.sets[setName]
 	if entries == nil {
-		return nil, fmt.Errorf("IP set %q does not exist", set)
+		return nil, fmt.Errorf("IP set %q does not exist", setName)
 	}
 
-	return entries.Elements(), nil
+	return entries.UnsortedList(), nil
 }
 
 func (i *IPSet) ListSets() ([]string, error) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	sets := []string{}
+	names := []string{}
 
 	for name := range i.sets {
-		sets = append(sets, name)
+		names = append(names, name)
 	}
 
-	return sets, nil
+	return names, nil
 }
 
 func (i *IPSet) GetVersion() (string, error) {
 	return "v7.6", nil
 }
 
-func (i *IPSet) AddEntryWithOptions(entry *ipset.Entry, set *ipset.IPSet, ignoreExistErr bool) error {
+func (i *IPSet) AddEntryWithOptions(entry *ipset.Entry, ipSet *ipset.IPSet, _ bool) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	entries := i.sets[set.Name]
+	entries := i.sets[ipSet.Name]
 	if entries == nil {
-		return fmt.Errorf("IP set %q does not exist", set)
+		return fmt.Errorf("IP set %q does not exist", ipSet)
 	}
 
-	entries.Add(entry.String())
+	entries.Insert(entry.String())
 
 	return nil
 }
 
-func (i *IPSet) DelEntryWithOptions(set, entry string, options ...string) error {
-	return i.DelEntry(set, entry)
+func (i *IPSet) DelEntryWithOptions(setName, entry string, _ ...string) error {
+	return i.DelEntry(setName, entry)
 }
 
 func (i *IPSet) ListAllSetInfo() (string, error) {
@@ -231,30 +233,30 @@ func (i *IPSet) AwaitOneSet(stringOrMatcher interface{}) string {
 	return s[0]
 }
 
-func (i *IPSet) AwaitSetDeleted(set string) {
+func (i *IPSet) AwaitSetDeleted(setName string) {
 	Eventually(func() []string {
 		s, _ := i.ListSets()
 		return s
-	}, 5).ShouldNot(ContainElement(set))
+	}, 5).ShouldNot(ContainElement(setName))
 }
 
-func (i *IPSet) AwaitEntry(set string, stringOrMatcher interface{}) {
+func (i *IPSet) AwaitEntry(setName string, stringOrMatcher interface{}) {
 	Eventually(func() []string {
-		e, _ := i.ListEntries(set)
+		e, _ := i.ListEntries(setName)
 		return e
 	}, 5).Should(ContainElement(stringOrMatcher))
 }
 
-func (i *IPSet) AwaitEntryDeleted(set string, stringOrMatcher interface{}) {
+func (i *IPSet) AwaitEntryDeleted(setName string, stringOrMatcher interface{}) {
 	Eventually(func() []string {
-		e, _ := i.ListEntries(set)
+		e, _ := i.ListEntries(setName)
 		return e
 	}, 5).ShouldNot(ContainElement(stringOrMatcher))
 }
 
-func (i *IPSet) AwaitNoEntry(set string, stringOrMatcher interface{}) {
+func (i *IPSet) AwaitNoEntry(setName string, stringOrMatcher interface{}) {
 	Consistently(func() []string {
-		e, _ := i.ListEntries(set)
+		e, _ := i.ListEntries(setName)
 		return e
 	}, 300*time.Millisecond).ShouldNot(ContainElement(stringOrMatcher))
 }

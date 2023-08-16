@@ -48,7 +48,7 @@ func beforeSuite() {
 	framework.By("Creating submariner clients")
 
 	err := submarinerv1.AddToScheme(scheme.Scheme)
-	Expect(err).To(BeNil())
+	Expect(err).ToNot(HaveOccurred())
 
 	for _, restConfig := range framework.RestConfigs {
 		SubmarinerClients = append(SubmarinerClients, createSubmarinerClient(restConfig))
@@ -56,7 +56,7 @@ func beforeSuite() {
 
 	framework.DetectGlobalnet()
 	err = framework.InitNumClusterNodes()
-	Expect(err).To(BeNil())
+	Expect(err).ToNot(HaveOccurred())
 }
 
 func (f *Framework) GetGatewayInformer(cluster framework.ClusterIndex) (cache.SharedIndexInformer, chan struct{}) {

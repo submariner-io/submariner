@@ -78,7 +78,7 @@ func testClusterIPService() {
 		})
 
 		It("should eventually create a GlobalIngressIP", func() {
-			t.awaitNoGlobalIngressIP(service.Name)
+			t.ensureNoGlobalIngressIP(service.Name)
 			t.createService(service)
 			t.awaitGlobalIngressIP(service.Name)
 		})
@@ -91,7 +91,7 @@ func testClusterIPService() {
 		})
 
 		It("should not create a GlobalIngressIP", func() {
-			t.awaitNoGlobalIngressIP(service.Name)
+			t.ensureNoGlobalIngressIP(service.Name)
 		})
 	})
 
@@ -150,7 +150,7 @@ func testHeadlessService() {
 		})
 
 		It("should eventually create a GlobalIngressIP", func() {
-			t.awaitNoGlobalIngressIPs()
+			t.ensureNoGlobalIngressIPs()
 
 			backendPod.Status.Phase = corev1.PodRunning
 			test.UpdateResource(t.pods.Namespace(namespace), backendPod)
@@ -165,7 +165,7 @@ func testHeadlessService() {
 		})
 
 		It("should eventually create a GlobalIngressIP", func() {
-			t.awaitNoGlobalIngressIPs()
+			t.ensureNoGlobalIngressIPs()
 
 			backendPod.Status.PodIP = "154.67.82.2"
 			test.UpdateResource(t.pods.Namespace(namespace), backendPod)
@@ -195,7 +195,7 @@ func testHeadlessService() {
 
 			// Ensure GlobalIngressIPs are no longer created for the service.
 			t.createPod(newHeadlessServicePod(service.Name))
-			t.awaitNoGlobalIngressIPs()
+			t.ensureNoGlobalIngressIPs()
 		})
 	})
 
@@ -205,7 +205,7 @@ func testHeadlessService() {
 		})
 
 		It("should not create a GlobalIngressIP", func() {
-			t.awaitNoGlobalIngressIPs()
+			t.ensureNoGlobalIngressIPs()
 		})
 	})
 
@@ -322,6 +322,7 @@ func testServiceWithoutSelector() {
 
 		Context("and then original endpoints is deleted", func() {
 			It("should delete the cloned endpoints", func() {
+				t.awaitEndpoints(controllers.GetInternalSvcName(endpoints.Name))
 				t.deleteEndpoints(endpoints)
 				t.awaitNoEndpoints(controllers.GetInternalSvcName(endpoints.Name))
 			})
@@ -386,8 +387,7 @@ func testServiceWithoutSelector() {
 
 				t.start()
 
-				time.Sleep(50 * time.Millisecond)
-				t.awaitNoEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+				t.ensureNoEndpoints(controllers.GetInternalSvcName(endpoints.Name))
 			})
 		})
 	})
@@ -446,7 +446,7 @@ func newServiceExportControllerTestDriver() *serviceExportControllerTestDriver {
 	return t
 }
 
-func (t *serviceExportControllerTestDriver) start() {
+func (t *serviceExportControllerTestDriver) start() (*syncer.ResourceSyncerConfig, *controllers.IngressPodControllers, syncer.Interface) {
 	var err error
 
 	t.pool, err = ipam.NewIPPool(t.globalCIDR)
@@ -467,8 +467,11 @@ func (t *serviceExportControllerTestDriver) start() {
 	ingressEndpointsControllers, err := controllers.NewIngressEndpointsControllers(config)
 	Expect(err).To(Succeed())
 
-	t.controller, err = controllers.NewServiceExportController(config, podControllers, endpointsControllers, ingressEndpointsControllers)
+	controller, err := controllers.NewServiceExportController(config, podControllers, endpointsControllers, ingressEndpointsControllers)
+	t.controller = controller
 
 	Expect(err).To(Succeed())
 	Expect(t.controller.Start()).To(Succeed())
+
+	return config, podControllers, controller.GetSyncer()
 }

@@ -115,7 +115,7 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 		})
 
 		It("should add an appropriate Status condition", func() {
-			t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, 0, 0, metav1.Condition{
+			t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, 0, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionFalse,
 				Reason: "InvalidInput",
@@ -130,7 +130,7 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 		})
 
 		It("should add an appropriate Status condition", func() {
-			t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, 0, 0, metav1.Condition{
+			t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, 0, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionFalse,
 				Reason: "ZeroInput",
@@ -149,20 +149,14 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 		})
 
 		It("should eventually allocate the global IP and program the IP table rules", func() {
-			t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, 1, 0,
-				metav1.Condition{
-					Type:   string(submarinerv1.GlobalEgressIPAllocated),
-					Status: metav1.ConditionFalse,
-					Reason: "ProgramIPTableRulesFailed",
-				},
-				metav1.Condition{
-					Type:   string(submarinerv1.GlobalEgressIPAllocated),
-					Status: metav1.ConditionFalse,
-					Reason: "ProgramIPTableRulesFailed",
-				}, metav1.Condition{
-					Type:   string(submarinerv1.GlobalEgressIPAllocated),
-					Status: metav1.ConditionTrue,
-				})
+			t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, 1, metav1.Condition{
+				Type:   string(submarinerv1.GlobalEgressIPAllocated),
+				Status: metav1.ConditionFalse,
+				Reason: "ProgramIPTableRulesFailed",
+			}, metav1.Condition{
+				Type:   string(submarinerv1.GlobalEgressIPAllocated),
+				Status: metav1.ConditionTrue,
+			})
 
 			t.awaitIPTableRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
 			t.watches.AwaitWatchStarted("pods")
@@ -180,17 +174,18 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 		})
 
 		It("should eventually allocate the global IP", func() {
-			awaitStatusConditions(t.globalEgressIPs, globalEgressIPName, 0, metav1.Condition{
+			t.awaitStatusConditions(t.globalEgressIPs, globalEgressIPName, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionFalse,
 				Reason: "IPPoolAllocationFailed",
 			})
 
 			t.watches.AwaitNoWatchStarted("pods")
+			t.dynClient.Fake.ClearActions()
 
 			_ = t.pool.Release(ips...)
 
-			awaitStatusConditions(t.globalEgressIPs, globalEgressIPName, 1, metav1.Condition{
+			t.awaitStatusConditions(t.globalEgressIPs, globalEgressIPName, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionTrue,
 			})
@@ -317,15 +312,14 @@ func testExistingGlobalEgressIP(t *globalEgressIPControllerTestDriver, podSelect
 		})
 
 		It("should reallocate the global IPs", func() {
-			t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, *existing.Spec.NumberOfIPs, 1,
-				metav1.Condition{
-					Type:   string(submarinerv1.GlobalEgressIPAllocated),
-					Status: metav1.ConditionFalse,
-					Reason: "ReserveAllocatedIPsFailed",
-				}, metav1.Condition{
-					Type:   string(submarinerv1.GlobalEgressIPAllocated),
-					Status: metav1.ConditionTrue,
-				})
+			t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, *existing.Spec.NumberOfIPs, metav1.Condition{
+				Type:   string(submarinerv1.GlobalEgressIPAllocated),
+				Status: metav1.ConditionFalse,
+				Reason: "ReserveAllocatedIPsFailed",
+			}, metav1.Condition{
+				Type:   string(submarinerv1.GlobalEgressIPAllocated),
+				Status: metav1.ConditionTrue,
+			})
 
 			t.awaitIPTableRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
 		})
@@ -338,19 +332,46 @@ func testExistingGlobalEgressIP(t *globalEgressIPControllerTestDriver, podSelect
 		})
 
 		It("should reallocate the global IPs", func() {
-			t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, *existing.Spec.NumberOfIPs, 0,
-				metav1.Condition{
-					Type:   string(submarinerv1.GlobalEgressIPAllocated),
-					Status: metav1.ConditionFalse,
-					Reason: "ReserveAllocatedIPsFailed",
-				}, metav1.Condition{
-					Type:   string(submarinerv1.GlobalEgressIPAllocated),
-					Status: metav1.ConditionTrue,
-				})
+			t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, *existing.Spec.NumberOfIPs, metav1.Condition{
+				Type:   string(submarinerv1.GlobalEgressIPAllocated),
+				Status: metav1.ConditionFalse,
+				Reason: "ReserveAllocatedIPsFailed",
+			}, metav1.Condition{
+				Type:   string(submarinerv1.GlobalEgressIPAllocated),
+				Status: metav1.ConditionTrue,
+			})
 
 			allocatedIPs := getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs
 			t.awaitIPTableRules(egressChain, allocatedIPs...)
 			t.awaitIPsReleasedFromPool(existing.Status.AllocatedIPs...)
+		})
+	})
+
+	Context("with previously appended Status conditions", func() {
+		BeforeEach(func() {
+			existing.Status.Conditions = []metav1.Condition{
+				{
+					Type:    string(submarinerv1.GlobalEgressIPAllocated),
+					Status:  metav1.ConditionFalse,
+					Reason:  "AppendedCondition1",
+					Message: "Should be removed",
+				},
+				{
+					Type:    string(submarinerv1.GlobalEgressIPAllocated),
+					Status:  metav1.ConditionTrue,
+					Reason:  "Success",
+					Message: "Allocated global IPs",
+				},
+			}
+
+			t.createGlobalEgressIP(existing)
+		})
+
+		It("should trim the Status conditions", func() {
+			t.awaitStatusConditions(t.globalEgressIPs, existing.Name, metav1.Condition{
+				Type:   string(submarinerv1.GlobalEgressIPAllocated),
+				Status: metav1.ConditionTrue,
+			})
 		})
 	})
 }
@@ -418,7 +439,7 @@ func testGlobalEgressIPUpdated(t *globalEgressIPControllerTestDriver, podSelecto
 			t.awaitIPsReleasedFromPool(existing.Status.AllocatedIPs...)
 			t.awaitNoIPTableRules(egressChain, existing.Status.AllocatedIPs...)
 
-			t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, 0, 0, metav1.Condition{
+			t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, 0, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionFalse,
 				Reason: "ZeroInput",
@@ -436,7 +457,7 @@ func testGlobalEgressIPUpdated(t *globalEgressIPControllerTestDriver, podSelecto
 		})
 
 		It("should update the status appropriately", func() {
-			t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, numberOfIPs, 0, metav1.Condition{
+			t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, numberOfIPs, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPUpdated),
 				Status: metav1.ConditionFalse,
 				Reason: "PodSelectorUpdateNotSupported",

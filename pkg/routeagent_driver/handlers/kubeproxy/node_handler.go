@@ -44,7 +44,7 @@ func (kp *SyncHandler) NodeCreated(node *k8sV1.Node) error {
 	return nil
 }
 
-func (kp *SyncHandler) NodeUpdated(node *k8sV1.Node) error {
+func (kp *SyncHandler) NodeUpdated(_ *k8sV1.Node) error {
 	return nil
 }
 
@@ -66,10 +66,10 @@ func (kp *SyncHandler) NodeRemoved(node *k8sV1.Node) error {
 
 func (kp *SyncHandler) populateRemoteVtepIps(vtepIP string, operation Operation) {
 	// The remoteVTEP info is cached on all the routeAgent nodes and is used when there is a Gateway transition.
-	if operation == Add && !kp.remoteVTEPs.Contains(vtepIP) {
-		kp.remoteVTEPs.Add(vtepIP)
+	if operation == Add && !kp.remoteVTEPs.Has(vtepIP) {
+		kp.remoteVTEPs.Insert(vtepIP)
 	} else if operation == Delete {
-		kp.remoteVTEPs.Remove(vtepIP)
+		kp.remoteVTEPs.Delete(vtepIP)
 	}
 
 	logger.V(log.DEBUG).Infof("populateRemoteVtepIps is called with vtepIP %s, isGatewayNode %t",

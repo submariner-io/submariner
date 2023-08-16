@@ -74,7 +74,10 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
 
-var _ clientset.Interface = &Clientset{}
+var (
+	_ clientset.Interface = &Clientset{}
+	_ testing.FakeClient  = &Clientset{}
+)
 
 // SubmarinerV1 retrieves the SubmarinerV1Client
 func (c *Clientset) SubmarinerV1() submarinerv1.SubmarinerV1Interface {

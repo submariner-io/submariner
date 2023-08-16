@@ -60,6 +60,7 @@ const (
 
 func init() {
 	kzerolog.AddFlags(nil)
+	utilruntime.Must(submarinerv1.AddToScheme(kubeScheme.Scheme))
 }
 
 var _ = BeforeSuite(func() {
@@ -512,8 +513,6 @@ func (t *testDriver) run() {
 		t.handledError <- err
 	})
 
-	Expect(submarinerv1.AddToScheme(kubeScheme.Scheme)).To(Succeed())
-
 	scheme := runtime.NewScheme()
 	Expect(submarinerv1.AddToScheme(scheme)).To(Succeed())
 
@@ -560,7 +559,7 @@ func (t *testDriver) run() {
 	go informer.Run(t.stopInformer)
 	Expect(cache.WaitForCacheSync(t.stopInformer, informer.HasSynced)).To(BeTrue())
 
-	t.syncer.Run(t.stopSyncer)
+	go t.syncer.Run(t.stopSyncer)
 
 	Expect(t.healthChecker.Start(t.stopSyncer)).To(Succeed())
 }

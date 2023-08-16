@@ -20,9 +20,9 @@ package controllers
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	iptiface "github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/utils/set"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -90,16 +91,17 @@ type baseController struct {
 
 type gatewayMonitor struct {
 	*baseController
-	syncerConfig    *syncer.ResourceSyncerConfig
-	endpointWatcher watcher.Interface
-	spec            Specification
-	ipt             iptables.Interface
-	isGatewayNode   bool
-	nodeName        string
-	syncMutex       sync.Mutex
-	localSubnets    []string
-	remoteSubnets   stringset.Interface
-	controllers     []Interface
+	syncerConfig            *syncer.ResourceSyncerConfig
+	endpointWatcher         watcher.Interface
+	remoteEndpointTimeStamp map[string]metav1.Time
+	spec                    Specification
+	ipt                     iptables.Interface
+	isGatewayNode           atomic.Bool
+	nodeName                string
+	localSubnets            []string
+	remoteSubnets           set.Set[string]
+	controllersMutex        sync.Mutex // Protects controllers
+	controllers             []Interface
 }
 
 type baseSyncerController struct {
@@ -122,10 +124,11 @@ type globalEgressIPController struct {
 }
 
 type egressPodWatcher struct {
-	stopCh      chan struct{}
-	ipSetName   string
-	namedIPSet  ipset.Named
-	podSelector *metav1.LabelSelector
+	stopCh       chan struct{}
+	ipSetName    string
+	namedIPSet   ipset.Named
+	podSelector  *metav1.LabelSelector
+	allocatedIPs []string
 }
 
 type clusterGlobalEgressIPController struct {
@@ -152,8 +155,9 @@ type serviceExportController struct {
 
 type serviceController struct {
 	*baseSyncerController
-	ingressIPs     dynamic.ResourceInterface
-	podControllers *IngressPodControllers
+	ingressIPs          dynamic.ResourceInterface
+	podControllers      *IngressPodControllers
+	serviceExportSyncer syncer.Interface
 }
 
 type nodeController struct {
@@ -166,7 +170,7 @@ type ingressPodController struct {
 	*baseSyncerController
 	svcName      string
 	namespace    string
-	ingressIPMap stringset.Interface
+	ingressIPMap set.Set[string]
 }
 
 type IngressPodControllers struct {

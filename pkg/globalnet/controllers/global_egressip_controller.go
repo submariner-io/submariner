@@ -36,6 +36,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/ipset"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
@@ -141,6 +142,8 @@ func (c *globalEgressIPController) process(from runtime.Object, numRequeues int,
 	case syncer.Create, syncer.Update:
 		prevStatus := globalEgressIP.Status
 
+		trimAllocatedStatusCondition(&globalEgressIP.Status.Conditions)
+
 		requeue := false
 		if c.validate(numberOfIPs, globalEgressIP) {
 			requeue = c.onCreateOrUpdate(key, numberOfIPs, globalEgressIP, numRequeues)
@@ -200,7 +203,8 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 
 	if numberOfIPs == 0 {
 		globalEgressIP.Status.AllocatedIPs = nil
-		globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, &metav1.Condition{
+
+		meta.SetStatusCondition(&globalEgressIP.Status.Conditions, metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "ZeroInput",
@@ -220,7 +224,7 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 	if err != nil {
 		logger.Errorf(err, "Error allocating IPs for %q", key)
 
-		globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, &metav1.Condition{
+		meta.SetStatusCondition(&globalEgressIP.Status.Conditions, metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "IPPoolAllocationFailed",
@@ -234,7 +238,7 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 	if err != nil {
 		logger.Errorf(err, "Error programming egress IP table rules for %q", key)
 
-		globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, &metav1.Condition{
+		meta.SetStatusCondition(&globalEgressIP.Status.Conditions, metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "ProgramIPTableRulesFailed",
@@ -248,7 +252,7 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 
 	metrics.RecordAllocateGlobalEgressIPs(c.pool.GetCIDR(), numberOfIPs)
 
-	globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, &metav1.Condition{
+	meta.SetStatusCondition(&globalEgressIP.Status.Conditions, metav1.Condition{
 		Type:    string(submarinerv1.GlobalEgressIPAllocated),
 		Status:  metav1.ConditionTrue,
 		Reason:  "Success",
@@ -264,7 +268,7 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 
 func (c *globalEgressIPController) validate(numberOfIPs int, egressIP *submarinerv1.GlobalEgressIP) bool {
 	if numberOfIPs < 0 {
-		egressIP.Status.Conditions = util.TryAppendCondition(egressIP.Status.Conditions, &metav1.Condition{
+		meta.SetStatusCondition(&egressIP.Status.Conditions, metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "InvalidInput",
@@ -291,6 +295,12 @@ func (c *globalEgressIPController) onDelete(numRequeues int, globalEgressIP *sub
 
 	namedIPSet := c.newNamedIPSet(key)
 
+	if len(globalEgressIP.Status.AllocatedIPs) == 0 && len(podWatcher.allocatedIPs) > 0 {
+		// Refer to issue for more details: https://github.com/submariner-io/submariner/issues/2388
+		logger.Warningf("Using the cached allocatedIPs %q to delete the iptables rules for key %q", podWatcher.allocatedIPs, key)
+		globalEgressIP.Status.AllocatedIPs = podWatcher.allocatedIPs
+	}
+
 	requeue := c.flushGlobalEgressRulesAndReleaseIPs(key, namedIPSet.Name(), numRequeues, globalEgressIP)
 	if requeue {
 		return requeue
@@ -304,7 +314,11 @@ func (c *globalEgressIPController) onDelete(numRequeues int, globalEgressIP *sub
 		}
 	}
 
-	logger.Infof("Successfully deleted all the iptables/ipset rules for %q ", key)
+	if numRequeues >= maxRequeues {
+		logger.Infof("Failed to delete all the iptables/ipset rules for %q even after %d retries", key, numRequeues)
+	} else {
+		logger.Infof("Successfully deleted all the iptables/ipset rules for %q ", key)
+	}
 
 	return false
 }
@@ -327,7 +341,7 @@ func (c *globalEgressIPController) createPodWatcher(key string, namedIPSet ipset
 		if !equality.Semantic.DeepEqual(prevPodWatcher.podSelector, globalEgressIP.Spec.PodSelector) {
 			logger.Errorf(nil, "PodSelector for %q cannot be updated after creation", key)
 
-			globalEgressIP.Status.Conditions = util.TryAppendCondition(globalEgressIP.Status.Conditions, &metav1.Condition{
+			meta.SetStatusCondition(&globalEgressIP.Status.Conditions, metav1.Condition{
 				Type:    string(submarinerv1.GlobalEgressIPUpdated),
 				Status:  metav1.ConditionFalse,
 				Reason:  "PodSelectorUpdateNotSupported",
@@ -350,6 +364,7 @@ func (c *globalEgressIPController) createPodWatcher(key string, namedIPSet ipset
 
 	c.podWatchers[key] = podWatcher
 	podWatcher.podSelector = globalEgressIP.Spec.PodSelector
+	podWatcher.allocatedIPs = globalEgressIP.Status.AllocatedIPs
 
 	logger.Infof("Started pod watcher for %q", key)
 

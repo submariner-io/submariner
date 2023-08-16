@@ -33,7 +33,7 @@ import (
 
 func (kp *SyncHandler) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks []string, operation Operation) {
 	if operation == Flush {
-		kp.routeCacheGWNode.RemoveAll()
+		kp.routeCacheGWNode.Clear()
 
 		err := kp.netLink.FlushRouteTable(constants.RouteAgentHostNetworkTableID)
 		if err != nil {
@@ -57,6 +57,7 @@ func (kp *SyncHandler) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks [
 }
 
 func (kp *SyncHandler) updateRoutingRulesForCIDRBlock(inputCidrBlock string, operation Operation) {
+	// This must be called with kp.syncHandlerMutex held
 	var viaGW *net.IP
 
 	if kp.isGatewayInRemoteCIDR(inputCidrBlock) {
@@ -72,16 +73,19 @@ func (kp *SyncHandler) updateRoutingRulesForCIDRBlock(inputCidrBlock string, ope
 
 	switch operation {
 	case Add:
-		if kp.routeCacheGWNode.Add(inputCidrBlock) {
+		if !kp.routeCacheGWNode.Has(inputCidrBlock) {
+			kp.routeCacheGWNode.Insert(inputCidrBlock)
+
 			if err := kp.configureRoute(inputCidrBlock, operation, viaGW); err != nil {
-				kp.routeCacheGWNode.Remove(inputCidrBlock)
 				logger.Errorf(err, "Failed to add route %q for HostNetwork support on the Gateway node: %v",
 					inputCidrBlock, err)
 			}
 		}
 
 	case Delete:
-		if kp.routeCacheGWNode.Remove(inputCidrBlock) {
+		if kp.routeCacheGWNode.Has(inputCidrBlock) {
+			kp.routeCacheGWNode.Delete(inputCidrBlock)
+
 			if err := kp.configureRoute(inputCidrBlock, operation, viaGW); err != nil {
 				logger.Errorf(err, "Failed to delete route %q for HostNetwork support on the Gateway node",
 					inputCidrBlock)
@@ -153,9 +157,11 @@ func (kp *SyncHandler) configureRoute(remoteSubnet string, operation Operation, 
 }
 
 func (kp *SyncHandler) cleanVxSubmarinerRoutes() {
+	// This must be called with kp.syncHandlerMutex held
 	link, err := kp.netLink.LinkByName(VxLANIface)
 	if err != nil {
-		if !errors.Is(err, netlink.LinkNotFoundError{}) {
+		//nolint:errorlint // netlink.LinkNotFoundError does not implement method Is(error) bool
+		if _, ok := err.(netlink.LinkNotFoundError); !ok {
 			logger.Errorf(err, "Error retrieving link by name %q", VxLANIface)
 		}
 
@@ -173,7 +179,7 @@ func (kp *SyncHandler) cleanVxSubmarinerRoutes() {
 
 		if currentRouteList[i].Dst == nil || currentRouteList[i].Gw == nil {
 			logger.V(log.DEBUG).Infof("Found nil gw or dst")
-		} else if kp.remoteSubnets.Contains(currentRouteList[i].Dst.String()) {
+		} else if kp.remoteSubnets.Has(currentRouteList[i].Dst.String()) {
 			logger.V(log.DEBUG).Infof("Removing route %s", currentRouteList[i])
 			if err = kp.netLink.RouteDel(&currentRouteList[i]); err != nil {
 				logger.Errorf(err, "Error removing route %s", currentRouteList[i])
@@ -206,7 +212,7 @@ func (kp *SyncHandler) reconcileRoutes(vxlanGw net.IP) error {
 	}
 
 	// Let's now add the routes that are missing.
-	for _, cidrBlock := range kp.remoteSubnets.Elements() {
+	for _, cidrBlock := range kp.remoteSubnets.UnsortedList() {
 		_, dst, err := net.ParseCIDR(cidrBlock)
 		if err != nil {
 			logger.Errorf(err, "Error parsing cidr block %s", cidrBlock)
@@ -224,9 +230,10 @@ func (kp *SyncHandler) reconcileRoutes(vxlanGw net.IP) error {
 		found := false
 
 		for i := range currentRouteList {
-			if currentRouteList[i].Gw == nil || currentRouteList[i].Dst == nil {
-			} else if currentRouteList[i].Gw.Equal(route.Gw) && currentRouteList[i].Dst.String() == route.Dst.String() {
+			if currentRouteList[i].Gw != nil && currentRouteList[i].Dst != nil &&
+				currentRouteList[i].Gw.Equal(route.Gw) && currentRouteList[i].Dst.String() == route.Dst.String() {
 				logger.V(log.DEBUG).Infof("Found equivalent route, not adding")
+
 				found = true
 			}
 		}
@@ -250,7 +257,7 @@ func (kp *SyncHandler) removeUnknownRoutes(vxlanGw net.IP, currentRouteList []ne
 		if currentRouteList[i].Dst == nil || currentRouteList[i].Gw == nil {
 			logger.V(log.DEBUG).Infof("Found nil gw or dst")
 		} else {
-			if kp.remoteSubnets.Contains(currentRouteList[i].Dst.String()) && currentRouteList[i].Gw.Equal(vxlanGw) {
+			if kp.remoteSubnets.Has(currentRouteList[i].Dst.String()) && currentRouteList[i].Gw.Equal(vxlanGw) {
 				logger.V(log.DEBUG).Infof("Found route %s with gw %s already installed", currentRouteList[i], currentRouteList[i].Gw)
 			} else {
 				logger.V(log.DEBUG).Infof("Removing route %s", currentRouteList[i])

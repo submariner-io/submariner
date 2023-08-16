@@ -97,6 +97,10 @@ func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.Subm
 		localCluster:  *localCluster,
 	}
 
+	if strings.EqualFold(localEndpoint.Spec.CableName, CableDriverName) && localEndpoint.Spec.NATEnabled {
+		logger.Warning("VxLan cable-driver is supported only with no NAT deployments")
+	}
+
 	port, err := localEndpoint.Spec.GetBackendPort(v1.UDPPortConfig, defaultPort)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get the UDP port configuration")
@@ -147,9 +151,9 @@ func (v *vxlan) createVxlanInterface(activeEndPoint string, port int) error {
 		return errors.Wrap(err, "failed to add ip rule")
 	}
 
-	err = v.netLink.EnableLooseModeReversePathFilter(VxlanIface)
+	err = v.netLink.EnsureLooseModeIsConfigured(VxlanIface)
 	if err != nil {
-		return errors.Wrap(err, "unable to update vxlan rp_filter proc entry")
+		return errors.Wrap(err, "error while validating loose mode")
 	}
 
 	logger.V(log.DEBUG).Infof("Successfully configured rp_filter to loose mode(2) on %s", VxlanIface)

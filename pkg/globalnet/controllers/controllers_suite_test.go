@@ -20,8 +20,6 @@ package controllers_test
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -31,7 +29,9 @@ import (
 	"github.com/onsi/gomega/format"
 	fakeDynClient "github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
+	testutil "github.com/submariner-io/admiral/pkg/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
@@ -42,7 +42,6 @@ import (
 	fakeIPT "github.com/submariner-io/submariner/pkg/iptables/fake"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -53,6 +52,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
+	k8stesting "k8s.io/client-go/testing"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -86,7 +86,7 @@ func TestControllers(t *testing.T) {
 type testDriverBase struct {
 	controller             controllers.Interface
 	restMapper             meta.RESTMapper
-	dynClient              dynamic.Interface
+	dynClient              *fakeDynClient.DynamicClient
 	scheme                 *runtime.Scheme
 	ipt                    *fakeIPT.IPTables
 	ipSet                  *fakeIPSet.IPSet
@@ -124,10 +124,9 @@ func newTestDriverBase() *testDriverBase {
 	t.scheme.AddKnownTypeWithName(schema.GroupVersionKind{Group: "fake-dynamic-client-group", Version: "v1", Kind: "List"},
 		&unstructured.UnstructuredList{})
 
-	fakeClient := fakeDynClient.NewDynamicClient(t.scheme)
-	t.dynClient = fakeClient
+	t.dynClient = fakeDynClient.NewDynamicClient(t.scheme)
 
-	t.watches = fakeDynClient.NewWatchReactor(&fakeClient.Fake)
+	t.watches = fakeDynClient.NewWatchReactor(&t.dynClient.Fake)
 
 	t.globalEgressIPs = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.GlobalEgressIP{})).
 		Namespace(namespace)
@@ -335,10 +334,8 @@ func awaitNoAllocatedIPs(client dynamic.ResourceInterface, name string) {
 	}, 200*time.Millisecond).Should(Equal(0))
 }
 
-func (t *testDriverBase) awaitEgressIPStatus(client dynamic.ResourceInterface, name string, expNumIPS int, atIndex int,
-	expCond ...metav1.Condition,
-) {
-	awaitStatusConditions(client, name, atIndex, expCond...)
+func (t *testDriverBase) awaitEgressIPStatus(client dynamic.ResourceInterface, name string, expNumIPS int, expCond ...metav1.Condition) {
+	t.awaitStatusConditions(client, name, expCond...)
 
 	status := getGlobalEgressIPStatus(client, name)
 
@@ -353,15 +350,14 @@ func (t *testDriverBase) awaitEgressIPStatus(client dynamic.ResourceInterface, n
 }
 
 func (t *testDriverBase) awaitEgressIPStatusAllocated(client dynamic.ResourceInterface, name string, expNumIPS int) {
-	t.awaitEgressIPStatus(client, name, expNumIPS, 0, metav1.Condition{
+	t.awaitEgressIPStatus(client, name, expNumIPS, metav1.Condition{
 		Type:   string(submarinerv1.GlobalEgressIPAllocated),
 		Status: metav1.ConditionTrue,
 	})
 }
 
-//nolint:unparam // `atIndex` always receives `0`
-func (t *testDriverBase) awaitIngressIPStatus(name string, atIndex int, expCond ...metav1.Condition) {
-	awaitStatusConditions(t.globalIngressIPs, name, atIndex, expCond...)
+func (t *testDriverBase) awaitIngressIPStatus(name string, expCond ...metav1.Condition) {
+	t.awaitStatusConditions(t.globalIngressIPs, name, expCond...)
 
 	status := t.getGlobalIngressIPStatus(name)
 
@@ -373,7 +369,7 @@ func (t *testDriverBase) awaitIngressIPStatus(name string, atIndex int, expCond 
 }
 
 func (t *testDriverBase) awaitIngressIPStatusAllocated(name string) {
-	t.awaitIngressIPStatus(name, 0, metav1.Condition{
+	t.awaitIngressIPStatus(name, metav1.Condition{
 		Type:   string(submarinerv1.GlobalEgressIPAllocated),
 		Status: metav1.ConditionTrue,
 	})
@@ -398,7 +394,6 @@ func (t *testDriverBase) awaitService(name string) *corev1.Service {
 }
 
 func (t *testDriverBase) awaitNoService(name string) {
-	time.Sleep(300 * time.Millisecond)
 	test.AwaitNoResource(t.services, name)
 }
 
@@ -412,8 +407,11 @@ func (t *testDriverBase) awaitEndpoints(name string) *corev1.Endpoints {
 }
 
 func (t *testDriverBase) awaitNoEndpoints(name string) {
-	time.Sleep(300 * time.Millisecond)
 	test.AwaitNoResource(t.endpoints, name)
+}
+
+func (t *testDriverBase) ensureNoEndpoints(name string) {
+	testutil.EnsureNoResource(resource.ForDynamic(t.endpoints), name)
 }
 
 func (t *testDriverBase) awaitEndpointsHasIP(name, ip string) {
@@ -491,91 +489,117 @@ func getGlobalIngressIP(t *testDriverBase, name string,
 }
 
 func (t *testDriverBase) awaitNoGlobalIngressIP(name string) {
-	time.Sleep(300 * time.Millisecond)
 	test.AwaitNoResource(t.globalIngressIPs, name)
 }
 
-func (t *testDriverBase) awaitNoGlobalIngressIPs() {
+func (t *testDriverBase) ensureNoGlobalIngressIP(name string) {
+	testutil.EnsureNoResource(resource.ForDynamic(t.globalIngressIPs), name)
+}
+
+func (t *testDriverBase) ensureNoGlobalIngressIPs() {
 	Consistently(func() []unstructured.Unstructured {
 		list, _ := t.globalIngressIPs.List(context.TODO(), metav1.ListOptions{})
 		return list.Items
 	}, time.Millisecond*300).Should(BeEmpty())
 }
 
-func awaitStatusConditions(client dynamic.ResourceInterface, name string, atIndex int, expCond ...metav1.Condition) {
-	var conditions []metav1.Condition
-	var notFound error
-
-	err := wait.PollImmediate(50*time.Millisecond, 5*time.Second, func() (bool, error) {
-		obj, err := client.Get(context.TODO(), name, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			notFound = err
-			return false, nil
-		}
-
-		notFound = nil
-
-		if err != nil {
-			return false, err
-		}
-
-		slice, ok, err := unstructured.NestedSlice(obj.Object, "status", "conditions")
-		if !ok || err != nil {
-			return false, err
-		}
-
-		conditions = make([]metav1.Condition, len(slice))
-		for i := range slice {
-			c := &metav1.Condition{}
-			err = runtime.DefaultUnstructuredConverter.FromUnstructured(slice[i].(map[string]interface{}), c)
-			if err != nil {
-				return false, err
-			}
-
-			conditions[i] = *c
-		}
-
-		if atIndex+len(expCond) != len(conditions) {
-			return false, nil
-		}
-
-		return true, nil
-	})
-
-	if notFound != nil {
-		Fail(fmt.Sprintf("%#v", notFound))
+func (t *testDriverBase) awaitStatusConditions(client dynamic.ResourceInterface, name string, expCond ...metav1.Condition) {
+	if len(expCond) == 0 {
 		return
 	}
 
-	if errors.Is(err, wait.ErrWaitTimeout) {
+	expType := expCond[0].Type
+	obj := test.AwaitResource(client, name)
+
+	mapping, err := t.restMapper.RESTMapping(obj.GetObjectKind().GroupVersionKind().GroupKind(),
+		obj.GetObjectKind().GroupVersionKind().Version)
+	Expect(err).To(Succeed())
+
+	var conditions []metav1.Condition
+
+	err = wait.PollUntilContextTimeout(context.Background(), 50*time.Millisecond, 5*time.Second, true,
+		func(_ context.Context) (bool, error) {
+			conditions = nil
+
+			actions := t.dynClient.Fake.Actions()
+			for i := range actions {
+				if actions[i].GetResource().Resource != mapping.Resource.Resource || actions[i].GetVerb() != "update" {
+					continue
+				}
+
+				update := actions[i].(k8stesting.UpdateAction)
+				objMeta := resource.MustToMeta(update.GetObject())
+
+				if objMeta.GetName() != name {
+					continue
+				}
+
+				conditions = append(conditions, extractConditions(update.GetObject().(*unstructured.Unstructured), expType)...)
+			}
+
+			if len(conditions) != len(expCond) {
+				return false, nil
+			}
+
+			return true, nil
+		})
+
+	if wait.Interrupted(err) {
 		if conditions == nil {
 			Fail("Status conditions not found")
 		}
 
-		Fail(format.Message(conditions, fmt.Sprintf("to contain at index %d", atIndex), expCond))
+		Fail(format.Message(conditions, "condition history to contain", expCond))
 
 		return
 	}
 
 	Expect(err).To(Succeed())
 
-	j := atIndex
+	for i := range expCond {
+		verifyCondition(&conditions[i], &expCond[i])
+	}
 
-	for _, exp := range expCond {
-		actual := conditions[j]
-		j++
+	actual := extractConditions(test.AwaitResource(client, name), expType)
+	Expect(actual).To(HaveLen(1))
 
-		Expect(actual.Type).To(Equal(exp.Type))
-		Expect(actual.Status).To(Equal(exp.Status))
-		Expect(actual.LastTransitionTime).To(Not(BeNil()))
-		Expect(actual.Message).To(Not(BeEmpty()))
+	verifyCondition(&actual[0], &expCond[len(expCond)-1])
+}
 
-		if exp.Reason != "" {
-			Expect(actual.Reason).To(Equal(exp.Reason))
-		} else {
-			Expect(actual.Reason).To(Not(BeEmpty()))
+func verifyCondition(actual, exp *metav1.Condition) {
+	Expect(actual.Type).To(Equal(exp.Type))
+	Expect(actual.Status).To(Equal(exp.Status))
+	Expect(actual.LastTransitionTime).To(Not(BeNil()))
+	Expect(actual.Message).To(Not(BeEmpty()))
+
+	if exp.Reason != "" {
+		Expect(actual.Reason).To(Equal(exp.Reason))
+	} else {
+		Expect(actual.Reason).To(Not(BeEmpty()))
+	}
+}
+
+func extractConditions(from *unstructured.Unstructured, ofType string) []metav1.Condition {
+	conditions := []metav1.Condition{}
+
+	slice, ok, err := unstructured.NestedSlice(from.Object, "status", "conditions")
+	Expect(err).To(Succeed())
+
+	if !ok {
+		return conditions
+	}
+
+	for i := range slice {
+		c := &metav1.Condition{}
+		err = runtime.DefaultUnstructuredConverter.FromUnstructured(slice[i].(map[string]interface{}), c)
+		Expect(err).To(Succeed())
+
+		if c.Type == ofType {
+			conditions = append(conditions, *c)
 		}
 	}
+
+	return conditions
 }
 
 //nolint:unparam // `name` always receives `globalEgressIPName` (`"east-region")

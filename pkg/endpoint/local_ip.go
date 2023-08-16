@@ -23,7 +23,8 @@ import (
 )
 
 func GetLocalIPForDestination(dst string) string {
-	conn, err := net.Dial("udp", dst+":53")
+	// Revisit when IPv6 support is added.
+	conn, err := net.Dial("udp4", dst+":53")
 	logger.FatalOnError(err, "Error getting local IP")
 
 	defer conn.Close()

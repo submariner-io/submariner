@@ -82,7 +82,8 @@ var _ = When("a remote Endpoint is added", func() {
 
 		Context("and the private IP responds after the public IP within the grace period", func() {
 			It("should notify with the private IP NATEndpointInfo settings", func() {
-				Expect(t.remoteND.parseAndHandleMessageFromAddress(publicIPReq, t.localUDPAddr))
+				Expect(t.remoteND.parseAndHandleMessageFromAddress(publicIPReq, t.localUDPAddr)).
+					To(Succeed())
 
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 					Endpoint: t.remoteEndpoint,
@@ -90,7 +91,8 @@ var _ = When("a remote Endpoint is added", func() {
 					UseIP:    t.remoteEndpoint.Spec.PublicIP,
 				})))
 
-				Expect(t.remoteND.parseAndHandleMessageFromAddress(privateIPReq, t.localUDPAddr))
+				Expect(t.remoteND.parseAndHandleMessageFromAddress(privateIPReq, t.localUDPAddr)).
+					To(Succeed())
 
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 					Endpoint: t.remoteEndpoint,
@@ -104,7 +106,8 @@ var _ = When("a remote Endpoint is added", func() {
 			It("should notify with the public IP NATEndpointInfo settings", func() {
 				atomic.StoreInt64(&publicToPrivateFailoverTimeout, 0)
 
-				Expect(t.remoteND.parseAndHandleMessageFromAddress(publicIPReq, t.localUDPAddr))
+				Expect(t.remoteND.parseAndHandleMessageFromAddress(publicIPReq, t.localUDPAddr)).
+					To(Succeed())
 
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 					Endpoint: t.remoteEndpoint,
@@ -112,7 +115,8 @@ var _ = When("a remote Endpoint is added", func() {
 					UseIP:    t.remoteEndpoint.Spec.PublicIP,
 				})))
 
-				Expect(t.remoteND.parseAndHandleMessageFromAddress(privateIPReq, t.localUDPAddr))
+				Expect(t.remoteND.parseAndHandleMessageFromAddress(privateIPReq, t.localUDPAddr)).
+					To(Succeed())
 
 				Consistently(t.readyChannel).ShouldNot(Receive())
 			})
@@ -120,7 +124,8 @@ var _ = When("a remote Endpoint is added", func() {
 
 		Context("and the private IP responds first", func() {
 			It("should notify with the private IP NATEndpointInfo settings", func() {
-				Expect(t.remoteND.parseAndHandleMessageFromAddress(privateIPReq, t.localUDPAddr))
+				Expect(t.remoteND.parseAndHandleMessageFromAddress(privateIPReq, t.localUDPAddr)).
+					To(Succeed())
 
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 					Endpoint: t.remoteEndpoint,
@@ -128,7 +133,8 @@ var _ = When("a remote Endpoint is added", func() {
 					UseIP:    t.remoteEndpoint.Spec.PrivateIP,
 				})))
 
-				Expect(t.remoteND.parseAndHandleMessageFromAddress(publicIPReq, t.localUDPAddr))
+				Expect(t.remoteND.parseAndHandleMessageFromAddress(publicIPReq, t.localUDPAddr)).
+					To(Succeed())
 
 				Consistently(t.readyChannel).ShouldNot(Receive())
 			})

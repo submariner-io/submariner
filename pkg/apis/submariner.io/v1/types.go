@@ -196,6 +196,7 @@ func (c *Connection) SetStatus(status ConnectionStatus, messageFormat string, a 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:shortName="geip"
+// +kubebuilder:subresource:status
 
 // GlobalEgressIP defines a policy for allocating GlobalIPs for selected pods in the namespace of the GlobalEgressIP object.
 type GlobalEgressIP struct {
@@ -254,6 +255,7 @@ type GlobalEgressIPList struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:scope="Cluster",shortName="cgeip"
+// +kubebuilder:subresource:status
 // ClusterGlobalEgressIP defines a policy for allocating GlobalIPs at the cluster level to be used when no GlobalEgressIP
 // applies.
 type ClusterGlobalEgressIP struct {
@@ -290,6 +292,7 @@ type ClusterGlobalEgressIPList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:shortName="giip"
 // +kubebuilder:printcolumn:JSONPath=".status.allocatedIP",name="IP",description="Global IP Allocated",type="string"
+// +kubebuilder:subresource:status
 
 type GlobalIngressIP struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -340,4 +343,52 @@ type GlobalIngressIPList struct {
 	metav1.ListMeta `json:"metadata"`
 
 	Items []GlobalIngressIP `json:"items"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:shortName="gwrt"
+
+type GatewayRoute struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	RoutePolicySpec RoutePolicySpec `json:"spec"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type GatewayRouteList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []GatewayRoute `json:"items"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:shortName="ngwrt"
+
+type NonGatewayRoute struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	RoutePolicySpec RoutePolicySpec `json:"spec"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type NonGatewayRouteList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []NonGatewayRoute `json:"items"`
+}
+
+type RoutePolicySpec struct {
+	// Specifies the next hops to reach the remote CIDRs
+	NextHops []string `json:"nextHops"`
+
+	// Specifies the remote CIDRs available via the next hop
+	RemoteCIDRs []string `json:"remoteCIDRs"`
 }

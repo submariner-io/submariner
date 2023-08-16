@@ -30,7 +30,7 @@ jobs:
     if: github.repository_owner == 'submariner-io'
     runs-on: ubuntu-latest
     steps:
-      - uses: z0al/dependent-issues@0fae07162bc9e0d8e116a133bd03686eed6efa21
+      - uses: z0al/dependent-issues@950226e7ca8fc43dc209a7febf67c655af3bdb43
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:

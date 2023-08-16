@@ -28,6 +28,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
+	"github.com/submariner-io/admiral/pkg/names"
+	admversion "github.com/submariner-io/admiral/pkg/version"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	cni "github.com/submariner-io/submariner/pkg/cni"
@@ -39,25 +41,38 @@ import (
 	cniapi "github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/calico"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/mtu"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
+	"github.com/submariner-io/submariner/pkg/versions"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
 
 var (
-	masterURL  string
-	kubeconfig string
-	logger     = log.Logger{Logger: logf.Log.WithName("main")}
+	masterURL   string
+	kubeconfig  string
+	logger      = log.Logger{Logger: logf.Log.WithName("main")}
+	showVersion = false
 )
 
 func main() {
 	kzerolog.AddFlags(nil)
 	flag.Parse()
+
+	admversion.Print(names.RouteAgentComponent, versions.Submariner())
+
+	if showVersion {
+		return
+	}
+
 	kzerolog.InitK8sLogging()
+
+	versions.Log(&logger)
 
 	logger.Info("Starting submariner-route-agent using the event framework")
 	// set up signals so we handle the first shutdown signal gracefully
@@ -80,6 +95,9 @@ func main() {
 		logger.Fatalf("Error building clientset: %s", err.Error())
 	}
 
+	err = v1.AddToScheme(scheme.Scheme)
+	logger.FatalOnError(err, "Error adding submariner to the scheme")
+
 	smClientset, err := submarinerClientset.NewForConfig(cfg)
 	if err != nil {
 		logger.Fatalf("Error building submariner clientset: %s", err.Error())
@@ -96,9 +114,12 @@ func main() {
 		eventlogger.NewHandler(),
 		kubeproxy.NewSyncHandler(env.ClusterCidr, env.ServiceCidr),
 		ovn.NewHandler(&env, smClientset),
+		ovn.NewGatewayRouteHandler(&env, smClientset),
+		ovn.NewNonGatewayRouteHandler(smClientset, k8sClientSet),
 		cabledriver.NewXRFMCleanupHandler(),
 		cabledriver.NewVXLANCleanup(),
 		mtu.NewMTUHandler(env.ClusterCidr, len(env.GlobalCidr) != 0, getTCPMssValue(k8sClientSet)),
+		calico.NewCalicoIPPoolHandler(cfg),
 	); err != nil {
 		logger.Fatalf("Error registering the handlers: %s", err.Error())
 	}
@@ -143,6 +164,7 @@ func init() {
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&masterURL, "master", "",
 		"The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+	flag.BoolVar(&showVersion, "version", showVersion, "Show version")
 }
 
 func annotateNode(clusterCidr []string, k8sClientSet *kubernetes.Clientset) error {

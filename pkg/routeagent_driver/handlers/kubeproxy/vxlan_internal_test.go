@@ -40,7 +40,7 @@ var _ = Describe("Function getVxlanVtepIPAddress", func() {
 	When("an invalid IP address is provided", func() {
 		It("should return an error", func() {
 			_, err := getVxlanVtepIPAddress("10.0.0")
-			Expect(err).ShouldNot(Equal(nil))
+			Expect(err).To(HaveOccurred())
 		})
 	})
 })

@@ -41,7 +41,7 @@ func createSubmarinerClient(restConfig *rest.Config) *submarinerClientset.Client
 	return clientSet
 }
 
-func NoopCheckEndpoint(endpoint *submarinerv1.Endpoint) (bool, string, error) {
+func NoopCheckEndpoint(_ *submarinerv1.Endpoint) (bool, string, error) {
 	return true, "", nil
 }
 

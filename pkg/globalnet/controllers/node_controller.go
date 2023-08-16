@@ -92,7 +92,7 @@ func NewNodeController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool, n
 	return controller, nil
 }
 
-func (n *nodeController) process(from runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
+func (n *nodeController) process(from runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	node := from.(*corev1.Node)
 
 	// If the event corresponds to a different node which has globalIP annotation, release the globalIP back to Pool.

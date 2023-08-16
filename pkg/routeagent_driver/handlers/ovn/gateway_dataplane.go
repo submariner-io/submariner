@@ -36,7 +36,7 @@ func (ovn *Handler) cleanupGatewayDataplane() error {
 		return errors.Wrapf(err, "error reading ip rule list for IPv4")
 	}
 
-	err = ovn.handleSubnets(currentRemoteSubnets.Elements(), netlink.RuleDel, os.IsNotExist)
+	err = ovn.handleSubnets(currentRemoteSubnets.UnsortedList(), netlink.RuleDel, os.IsNotExist)
 	if err != nil {
 		return errors.Wrapf(err, "error removing routing rule")
 	}
@@ -57,14 +57,14 @@ func (ovn *Handler) updateGatewayDataplane() error {
 
 	endpointSubnets := ovn.getRemoteSubnets()
 
-	toAdd := currentRuleRemotes.Difference(endpointSubnets)
+	toAdd := endpointSubnets.Difference(currentRuleRemotes).UnsortedList()
 
 	err = ovn.handleSubnets(toAdd, netlink.RuleAdd, os.IsExist)
 	if err != nil {
 		return errors.Wrap(err, "error adding routing rule")
 	}
 
-	toRemove := endpointSubnets.Difference(currentRuleRemotes)
+	toRemove := currentRuleRemotes.Difference(endpointSubnets).UnsortedList()
 
 	err = ovn.handleSubnets(toRemove, netlink.RuleDel, os.IsNotExist)
 	if err != nil {
@@ -110,7 +110,7 @@ func (ovn *Handler) getMSSClampingRuleSpecs() ([][]string, error) {
 	//   * https://github.com/submariner-io/submariner/issues/1488
 	// TODO: get the kernel to steer the ICMPs back to ovn-k8s-sub0 interface properly, or write a packet
 	//       reflector in the route agent for that type of packets
-	for _, remoteCIDR := range ovn.getRemoteSubnets().Elements() {
+	for _, remoteCIDR := range ovn.getRemoteSubnets().UnsortedList() {
 		rules = append(rules,
 			[]string{
 				"-d", remoteCIDR, "-p", "tcp", "-m", "tcp",

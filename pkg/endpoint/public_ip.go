@@ -31,10 +31,10 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8serrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
@@ -51,6 +51,9 @@ var publicIPMethods = map[string]publicIPResolverFunction{
 
 var IPv4RE = regexp.MustCompile(`(?:\d{1,3}\.){3}\d{1,3}`)
 
+//nolint:gosec // This is only used to shuffle the list of resolvers
+var randgen = rand.New(rand.NewSource(time.Now().UnixNano()))
+
 func getPublicIPResolvers() string {
 	serverList := []string{
 		"api:ip4.seeip.org", "api:ipecho.net/plain", "api:ifconfig.me",
@@ -58,7 +61,7 @@ func getPublicIPResolvers() string {
 		"api:myexternalip.com/raw", "api:4.tnedi.me", "api:api.ipify.org",
 	}
 
-	rand.Shuffle(len(serverList), func(i, j int) { serverList[i], serverList[j] = serverList[j], serverList[i] })
+	randgen.Shuffle(len(serverList), func(i, j int) { serverList[i], serverList[j] = serverList[j], serverList[i] })
 
 	return strings.Join(serverList, ",")
 }
@@ -87,6 +90,8 @@ func getPublicIP(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.I
 	}
 
 	resolvers := strings.Split(config, ",")
+	errs := make([]error, 0, len(resolvers))
+
 	for _, resolver := range resolvers {
 		resolver = strings.Trim(resolver, " ")
 
@@ -101,11 +106,11 @@ func getPublicIP(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.I
 		}
 
 		// If this resolver failed, we log it, but we fall back to the next one
-		logger.V(log.DEBUG).Infof("Error resolving public IP with resolver %s, config: %s: %v", resolver, config, err)
+		errs = append(errs, errors.Wrapf(err, "\nResolver[%q]", resolver))
 	}
 
 	if len(resolvers) > 0 {
-		return "", errors.Errorf("Unable to resolve public IP by any of the resolver methods: %s", resolvers)
+		return "", errors.Wrapf(k8serrors.NewAggregate(errs), "Unable to resolve public IP by any of the resolver methods")
 	}
 
 	return "", nil
@@ -141,7 +146,7 @@ func resolvePublicIP(k8sClient kubernetes.Interface, namespace string, parts []s
 	return method(k8sClient, namespace, parts[1])
 }
 
-func publicAPI(clientset kubernetes.Interface, namespace, value string) (string, error) {
+func publicAPI(_ kubernetes.Interface, _, value string) (string, error) {
 	url := "https://" + value
 
 	httpClient := http.Client{
@@ -163,7 +168,7 @@ func publicAPI(clientset kubernetes.Interface, namespace, value string) (string,
 	return firstIPv4InString(string(body))
 }
 
-func publicIP(clientset kubernetes.Interface, namespace, value string) (string, error) {
+func publicIP(_ kubernetes.Interface, _, value string) (string, error) {
 	return firstIPv4InString(value)
 }
 
@@ -209,7 +214,7 @@ func publicLoadBalancerIP(clientset kubernetes.Interface, namespace, loadBalance
 	return ip, err //nolint:wrapcheck  // No need to wrap here
 }
 
-func publicDNSIP(clientset kubernetes.Interface, namespace, fqdn string) (string, error) {
+func publicDNSIP(_ kubernetes.Interface, _, fqdn string) (string, error) {
 	ips, err := net.LookupIP(fqdn)
 	if err != nil {
 		return "", errors.Wrapf(err, "error resolving DNS hostname %q for public IP", fqdn)

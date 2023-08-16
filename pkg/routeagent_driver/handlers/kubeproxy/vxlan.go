@@ -264,19 +264,19 @@ func (kp *SyncHandler) createVxLANInterface(activeEndPoint string, ifaceType int
 			return errors.Wrap(err, "failed to create vxlan interface on Gateway Node")
 		}
 
-		for _, fdbAddress := range kp.remoteVTEPs.Elements() {
+		for _, fdbAddress := range kp.remoteVTEPs.UnsortedList() {
 			err = kp.vxlanDevice.AddFDB(net.ParseIP(fdbAddress), "00:00:00:00:00:00")
 			if err != nil {
 				return errors.Wrap(err, "failed to add FDB entry on the Gateway Node vxlan iface")
 			}
 		}
 
-		err = kp.netLink.EnableLooseModeReversePathFilter(VxLANIface)
+		err = kp.netLink.EnsureLooseModeIsConfigured(VxLANIface)
 		if err != nil {
-			return errors.Wrap(err, "error enabling loose mode")
+			return errors.Wrap(err, "error while validating loose mode")
 		}
 
-		logger.V(log.DEBUG).Infof("Successfully configured reverse path filter to loose mode on %q", VxLANIface)
+		logger.Infof("Successfully configured reverse path filter to loose mode on %q", VxLANIface)
 	} else if ifaceType == VxInterfaceWorker {
 		// non-Gateway/Worker Node
 		attrs := &vxLanAttributes{

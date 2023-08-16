@@ -85,7 +85,7 @@ func (w *egressPodWatcher) arePodsEquivalent(oldObj, newObj *unstructured.Unstru
 	return oldPodIP == newPodIP
 }
 
-func (w *egressPodWatcher) onCreateOrUpdate(obj runtime.Object, numRequeues int) bool {
+func (w *egressPodWatcher) onCreateOrUpdate(obj runtime.Object, _ int) bool {
 	pod := obj.(*corev1.Pod)
 	key, _ := cache.MetaNamespaceKeyFunc(pod)
 
@@ -103,7 +103,7 @@ func (w *egressPodWatcher) onCreateOrUpdate(obj runtime.Object, numRequeues int)
 	return false
 }
 
-func (w *egressPodWatcher) onDelete(obj runtime.Object, numRequeues int) bool {
+func (w *egressPodWatcher) onDelete(obj runtime.Object, _ int) bool {
 	pod := obj.(*corev1.Pod)
 	key, _ := cache.MetaNamespaceKeyFunc(pod)
 

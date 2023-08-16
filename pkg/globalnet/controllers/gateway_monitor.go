@@ -21,10 +21,10 @@ package controllers
 import (
 	"os"
 	"strings"
+	"sync/atomic"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/admiral/pkg/stringset"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	admUtil "github.com/submariner-io/admiral/pkg/util"
@@ -37,19 +37,23 @@ import (
 	"github.com/submariner-io/submariner/pkg/netlink"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
+	k8snet "k8s.io/utils/net"
+	"k8s.io/utils/set"
 )
 
 func NewGatewayMonitor(spec Specification, localCIDRs []string, config *watcher.Config) (Interface, error) {
 	// We'll panic if config is nil, this is intentional
 	gatewayMonitor := &gatewayMonitor{
-		baseController: newBaseController(),
-		spec:           spec,
-		isGatewayNode:  false,
-		localSubnets:   stringset.New(localCIDRs...).Elements(),
-		remoteSubnets:  stringset.NewSynchronized(),
+		baseController:          newBaseController(),
+		spec:                    spec,
+		isGatewayNode:           atomic.Bool{},
+		localSubnets:            set.New(localCIDRs...).UnsortedList(),
+		remoteSubnets:           set.New[string](),
+		remoteEndpointTimeStamp: map[string]metav1.Time{},
 	}
 
 	var err error
@@ -132,17 +136,23 @@ func (g *gatewayMonitor) Stop() {
 
 	g.baseController.Stop()
 
-	g.syncMutex.Lock()
 	g.stopControllers()
-	g.syncMutex.Unlock()
 }
 
-func (g *gatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, numRequeues int) bool {
+func (g *gatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, _ int) bool {
 	endpoint := obj.(*v1.Endpoint)
 
 	logger.V(log.DEBUG).Infof("In processNextEndpoint, endpoint info: %+v", endpoint)
 
 	if endpoint.Spec.ClusterID != g.spec.ClusterID {
+		lastProcessedTime, ok := g.remoteEndpointTimeStamp[endpoint.Spec.ClusterID]
+
+		if ok && lastProcessedTime.After(endpoint.CreationTimestamp.Time) {
+			logger.Infof("Ignoring new remote %#v since a later endpoint was already"+
+				"processed", endpoint)
+			return false
+		}
+
 		logger.V(log.DEBUG).Infof("Endpoint %q, host: %q belongs to a remote cluster",
 			endpoint.Spec.ClusterID, endpoint.Spec.Hostname)
 
@@ -162,9 +172,13 @@ func (g *gatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, numR
 		}
 
 		for _, remoteSubnet := range endpoint.Spec.Subnets {
-			g.remoteSubnets.Add(remoteSubnet)
-			g.markRemoteClusterTraffic(remoteSubnet, AddRules)
+			if k8snet.IsIPv4CIDRString(remoteSubnet) {
+				g.remoteSubnets.Insert(remoteSubnet)
+				g.markRemoteClusterTraffic(remoteSubnet, AddRules)
+			}
 		}
+
+		g.remoteEndpointTimeStamp[endpoint.Spec.ClusterID] = endpoint.CreationTimestamp
 
 		return false
 	}
@@ -174,7 +188,7 @@ func (g *gatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, numR
 		logger.Fatalf("Unable to determine hostname: %v", err)
 	}
 
-	for _, remoteSubnet := range g.remoteSubnets.Elements() {
+	for _, remoteSubnet := range g.remoteSubnets.UnsortedList() {
 		g.markRemoteClusterTraffic(remoteSubnet, AddRules)
 	}
 
@@ -184,32 +198,35 @@ func (g *gatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, numR
 
 		configureTCPMTUProbe()
 
-		g.syncMutex.Lock()
-		if !g.isGatewayNode {
-			g.isGatewayNode = true
-
+		if g.isGatewayNode.CompareAndSwap(false, true) {
 			err := g.startControllers()
 			if err != nil {
 				logger.Fatalf("Error starting the controllers: %v", err)
 			}
 		}
-		g.syncMutex.Unlock()
 	} else {
 		logger.V(log.DEBUG).Infof("Transitioned to non-gateway node with endpoint private IP %s", endpoint.Spec.PrivateIP)
 
-		g.syncMutex.Lock()
-		if g.isGatewayNode {
+		if g.isGatewayNode.CompareAndSwap(true, false) {
 			g.stopControllers()
-			g.isGatewayNode = false
 		}
-		g.syncMutex.Unlock()
 	}
 
 	return false
 }
 
-func (g *gatewayMonitor) handleRemovedEndpoint(obj runtime.Object, numRequeues int) bool {
+func (g *gatewayMonitor) handleRemovedEndpoint(obj runtime.Object, _ int) bool {
 	endpoint := obj.(*v1.Endpoint)
+
+	lastProcessedTime, ok := g.remoteEndpointTimeStamp[endpoint.Spec.ClusterID]
+
+	if ok && lastProcessedTime.After(endpoint.CreationTimestamp.Time) {
+		logger.Infof("Ignoring deleted remote %#v since a later endpoint was already"+
+			"processed", endpoint)
+		return false
+	}
+
+	delete(g.remoteEndpointTimeStamp, endpoint.Spec.ClusterID)
 
 	logger.V(log.DEBUG).Infof("Informed of removed endpoint for gateway monitor: %v", endpoint)
 
@@ -219,17 +236,16 @@ func (g *gatewayMonitor) handleRemovedEndpoint(obj runtime.Object, numRequeues i
 	}
 
 	if endpoint.Spec.Hostname == hostname && endpoint.Spec.ClusterID == g.spec.ClusterID {
-		g.syncMutex.Lock()
-		if g.isGatewayNode {
+		if g.isGatewayNode.CompareAndSwap(true, false) {
 			g.stopControllers()
-			g.isGatewayNode = false
 		}
-		g.syncMutex.Unlock()
 	} else if endpoint.Spec.ClusterID != g.spec.ClusterID {
 		// Endpoint associated with remote cluster is removed, delete the associated flows.
 		for _, remoteSubnet := range endpoint.Spec.Subnets {
-			g.remoteSubnets.Remove(remoteSubnet)
-			g.markRemoteClusterTraffic(remoteSubnet, DeleteRules)
+			if k8snet.IsIPv4CIDRString(remoteSubnet) {
+				g.remoteSubnets.Delete(remoteSubnet)
+				g.markRemoteClusterTraffic(remoteSubnet, DeleteRules)
+			}
 		}
 	}
 
@@ -237,6 +253,9 @@ func (g *gatewayMonitor) handleRemovedEndpoint(obj runtime.Object, numRequeues i
 }
 
 func (g *gatewayMonitor) startControllers() error {
+	g.controllersMutex.Lock()
+	defer g.controllersMutex.Unlock()
+
 	logger.Infof("On Gateway node - starting controllers")
 
 	err := g.createGlobalnetChains()
@@ -307,15 +326,15 @@ func (g *gatewayMonitor) startControllers() error {
 		return errors.WithMessage(err, "error creating the IngressEndpointsControllers")
 	}
 
-	c, err = NewServiceExportController(g.syncerConfig, podControllers, endpointsControllers,
+	seController, err := NewServiceExportController(g.syncerConfig, podControllers, endpointsControllers,
 		ingressEndpointsControllers)
 	if err != nil {
 		return errors.Wrap(err, "error creating the ServiceExport controller")
 	}
 
-	g.controllers = append(g.controllers, c)
+	g.controllers = append(g.controllers, seController)
 
-	c, err = NewServiceController(g.syncerConfig, podControllers)
+	c, err = NewServiceController(g.syncerConfig, podControllers, seController.GetSyncer())
 	if err != nil {
 		return errors.Wrap(err, "error creating the Service controller")
 	}
@@ -335,6 +354,9 @@ func (g *gatewayMonitor) startControllers() error {
 }
 
 func (g *gatewayMonitor) stopControllers() {
+	g.controllersMutex.Lock()
+	defer g.controllersMutex.Unlock()
+
 	for _, c := range g.controllers {
 		c.Stop()
 	}

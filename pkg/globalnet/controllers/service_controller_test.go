@@ -23,7 +23,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/admiral/pkg/syncer"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	corev1 "k8s.io/api/core/v1"
@@ -34,72 +33,80 @@ import (
 var _ = Describe("Service controller", func() {
 	t := newServiceControllerTestDriver()
 
-	When("an exported cluster IP Service is deleted", func() {
+	var service *corev1.Service
+
+	When("an exported cluster IP Service is deleted and subsequently re-created", func() {
 		BeforeEach(func() {
-			t.createServiceExport(t.createService(newClusterIPService()))
-			t.createGlobalIngressIP(&submarinerv1.GlobalIngressIP{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: serviceName,
-				},
-			})
+			service = newClusterIPService()
+			t.createServiceExport(t.createService(service))
 		})
 
-		It("should delete the GlobalIngressIP", func() {
-			Expect(t.services.Delete(context.TODO(), serviceName, metav1.DeleteOptions{})).To(Succeed())
-			t.awaitNoGlobalIngressIP(serviceName)
+		JustBeforeEach(func() {
+			t.awaitGlobalIngressIP(service.Name)
+		})
+
+		It("should delete the GlobalIngressIP and then re-create it", func() {
+			By("Deleting the service")
+
+			Expect(t.services.Delete(context.TODO(), service.Name, metav1.DeleteOptions{})).To(Succeed())
+			t.awaitNoGlobalIngressIP(service.Name)
+
+			By("Re-creating the service")
+
+			t.createService(service)
+			t.awaitGlobalIngressIP(service.Name)
 		})
 	})
 
-	When("an exported headless Service is deleted", func() {
+	When("an exported headless Service is deleted and subsequently re-created", func() {
+		var backendPod *corev1.Pod
+
 		BeforeEach(func() {
-			t.createServiceExport(t.createService(newHeadlessService()))
-
-			t.createGlobalIngressIP(&submarinerv1.GlobalIngressIP{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pod-1",
-					Labels: map[string]string{
-						controllers.ServiceRefLabel: serviceName,
-					},
-				},
-			})
-
-			t.createGlobalIngressIP(&submarinerv1.GlobalIngressIP{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pod-2",
-					Labels: map[string]string{
-						controllers.ServiceRefLabel: serviceName,
-					},
-				},
-			})
+			service = newHeadlessService()
+			backendPod = newHeadlessServicePod(service.Name)
+			t.createServiceExport(t.createService(service))
 		})
 
-		It("should delete the GlobalIngressIP objects associated with the backend Pods", func() {
-			Expect(t.services.Delete(context.TODO(), serviceName, metav1.DeleteOptions{})).To(Succeed())
+		JustBeforeEach(func() {
+			t.createPod(backendPod)
+			t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
+		})
+
+		It("should delete the GlobalIngressIP objects associated with the backend Pods and then re-create them", func() {
+			By("Deleting the service")
+
+			Expect(t.services.Delete(context.TODO(), service.Name, metav1.DeleteOptions{})).To(Succeed())
 
 			Eventually(func() []unstructured.Unstructured {
 				list, _ := t.globalIngressIPs.List(context.TODO(), metav1.ListOptions{})
 				return list.Items
 			}, 5).Should(BeEmpty())
+
+			By("Re-creating the service")
+
+			t.createService(service)
+			t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
 		})
 	})
 
 	When("a GlobalIngressIP is stale on startup due to a missed delete event", func() {
 		Context("for a cluster IP Service", func() {
 			BeforeEach(func() {
-				t.createServiceExport(newClusterIPService())
+				service = newClusterIPService()
+				t.createServiceExport(service)
 				t.createGlobalIngressIP(&submarinerv1.GlobalIngressIP{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: serviceName,
+						Name: service.Name,
 					},
 					Spec: submarinerv1.GlobalIngressIPSpec{
 						Target:     submarinerv1.ClusterIPService,
-						ServiceRef: &corev1.LocalObjectReference{Name: serviceName},
+						ServiceRef: &corev1.LocalObjectReference{Name: service.Name},
 					},
 				})
 			})
 
 			It("should delete the GlobalIngressIP on reconciliation", func() {
-				t.awaitNoGlobalIngressIP(serviceName)
+				t.awaitNoGlobalIngressIP(service.Name)
 			})
 		})
 
@@ -110,12 +117,12 @@ var _ = Describe("Service controller", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "pod-one",
 						Labels: map[string]string{
-							controllers.ServiceRefLabel: serviceName,
+							controllers.ServiceRefLabel: service.Name,
 						},
 					},
 					Spec: submarinerv1.GlobalIngressIPSpec{
 						Target:     submarinerv1.HeadlessServicePod,
-						ServiceRef: &corev1.LocalObjectReference{Name: serviceName},
+						ServiceRef: &corev1.LocalObjectReference{Name: service.Name},
 					},
 				})
 			})
@@ -150,18 +157,13 @@ func newServiceControllerTestDriver() *serviceControllerTestDriver {
 }
 
 func (t *serviceControllerTestDriver) start() {
+	seTestDriver := &serviceExportControllerTestDriver{}
+	seTestDriver.testDriverBase = t.testDriverBase
+	config, podControllers, syncer := seTestDriver.start()
+
 	var err error
 
-	config := &syncer.ResourceSyncerConfig{
-		SourceClient: t.dynClient,
-		RestMapper:   t.restMapper,
-		Scheme:       t.scheme,
-	}
-
-	podControllers, err := controllers.NewIngressPodControllers(config)
-	Expect(err).To(Succeed())
-
-	t.controller, err = controllers.NewServiceController(config, podControllers)
+	t.controller, err = controllers.NewServiceController(config, podControllers, syncer)
 
 	Expect(err).To(Succeed())
 	Expect(t.controller.Start()).To(Succeed())

@@ -20,6 +20,7 @@ package libreswan
 
 import (
 	"bufio"
+	"context"
 	"encoding/base64"
 	"fmt"
 	"os"
@@ -43,6 +44,7 @@ import (
 
 const (
 	cableDriverName = "libreswan"
+	whackTimeout    = 5 * time.Second
 )
 
 var logger = log.Logger{Logger: logf.Log.WithName("libreswan")}
@@ -65,6 +67,7 @@ type libreswan struct {
 
 	debug                 bool
 	forceUDPEncapsulation bool
+	plutoStarted          bool
 }
 
 type specification struct {
@@ -82,8 +85,8 @@ const (
 )
 
 // NewLibreswan starts an IKE daemon using Libreswan and configures it to manage Submariner's endpoints.
-func NewLibreswan(localEndpoint *types.SubmarinerEndpoint, localCluster *types.SubmarinerCluster) (cable.Driver, error) {
-	// We'll panic if localEndpoint or localCluster are nil, this is intentional
+func NewLibreswan(localEndpoint *types.SubmarinerEndpoint, _ *types.SubmarinerCluster) (cable.Driver, error) {
+	// We'll panic if localEndpoint is nil, this is intentional
 	ipSecSpec := specification{}
 
 	err := envconfig.Process(ipsecSpecEnvVarPrefix, &ipSecSpec)
@@ -131,6 +134,7 @@ func NewLibreswan(localEndpoint *types.SubmarinerEndpoint, localCluster *types.S
 		localEndpoint:         *localEndpoint,
 		connections:           []subv1.Connection{},
 		forceUDPEncapsulation: ipSecSpec.ForceEncaps,
+		plutoStarted:          false,
 	}, nil
 }
 
@@ -152,11 +156,6 @@ func (i *libreswan) Init() error {
 
 	fmt.Fprintf(file, "%%any %%any : PSK \"%s\"\n", i.secretKey)
 
-	// Ensure Pluto is started
-	if err := i.runPluto(); err != nil {
-		return errors.Wrap(err, "error starting Pluto")
-	}
-
 	return nil
 }
 
@@ -169,8 +168,11 @@ func (i *libreswan) Init() error {
 var trafficStatusRE = regexp.MustCompile(`.* "([^"]+)"[^,]*, .*inBytes=(\d+), outBytes=(\d+).*`)
 
 func retrieveActiveConnectionStats() (map[string]int, map[string]int, error) {
+	ctx, cancel := context.WithTimeout(context.TODO(), whackTimeout)
+	defer cancel()
+
 	// Retrieve active tunnels from the daemon
-	cmd := exec.Command("/usr/libexec/ipsec/whack", "--trafficstatus")
+	cmd := exec.CommandContext(ctx, "/usr/libexec/ipsec/whack", "--trafficstatus")
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -278,6 +280,10 @@ func (i *libreswan) GetActiveConnections() ([]subv1.Connection, error) {
 
 // GetConnections() returns an array of the existing connections, including status and endpoint info.
 func (i *libreswan) GetConnections() ([]subv1.Connection, error) {
+	if !i.plutoStarted {
+		return []subv1.Connection{}, nil
+	}
+
 	if err := i.refreshConnectionStatus(); err != nil {
 		return []subv1.Connection{}, err
 	}
@@ -301,13 +307,20 @@ func whack(args ...string) error {
 	var err error
 
 	for i := 0; i < 3; i++ {
-		cmd := exec.Command("/usr/libexec/ipsec/whack", args...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
+		err := func() error {
+			ctx, cancel := context.WithTimeout(context.TODO(), whackTimeout)
+			defer cancel()
 
-		logger.V(log.TRACE).Infof("Whacking with %v", args)
+			cmd := exec.CommandContext(ctx, "/usr/libexec/ipsec/whack", args...)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
 
-		if err = cmd.Run(); err == nil {
+			logger.V(log.TRACE).Infof("Whacking with %v", args)
+
+			return cmd.Run() //nolint:wrapcheck // No need to wrap here
+		}()
+
+		if err == nil {
 			break
 		}
 
@@ -325,6 +338,15 @@ func whack(args ...string) error {
 // ConnectToEndpoint establishes a connection to the given endpoint and returns a string
 // representation of the IP address of the target endpoint.
 func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
+	if !i.plutoStarted {
+		// Ensure Pluto is started
+		if err := i.runPluto(); err != nil {
+			logger.FatalOnError(err, "Error running Pluto")
+		}
+
+		i.plutoStarted = true
+	}
+
 	// We'll panic if endpointInfo is nil, this is intentional
 	endpoint := &endpointInfo.Endpoint
 
@@ -404,7 +426,8 @@ func (i *libreswan) bidirectionalConnectToEndpoint(connectionName string, endpoi
 		"--host", endpointInfo.UseIP,
 		"--client", rightSubnet,
 
-		"--ikeport", strconv.Itoa(int(rightNATTPort)))
+		"--ikeport", strconv.Itoa(int(rightNATTPort)),
+		"--dpdaction=hold")
 
 	logger.Infof("Executing whack with args: %v", args)
 
@@ -446,7 +469,8 @@ func (i *libreswan) serverConnectToEndpoint(connectionName string, endpointInfo 
 		// Right-hand side.
 		"--id", remoteEndpointIdentifier,
 		"--host", "%any",
-		"--client", rightSubnet)
+		"--client", rightSubnet,
+		"--dpdaction=hold")
 
 	logger.Infof("Executing whack with args: %v", args)
 
@@ -487,7 +511,8 @@ func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo 
 		"--host", endpointInfo.UseIP,
 		"--client", rightSubnet,
 
-		"--ikeport", strconv.Itoa(int(rightNATTPort)))
+		"--ikeport", strconv.Itoa(int(rightNATTPort)),
+		"--dpdaction=hold")
 
 	logger.Infof("Executing whack with args: %v", args)
 
@@ -514,19 +539,9 @@ func (i *libreswan) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint) e
 		for lsi := range leftSubnets {
 			for rsi := range rightSubnets {
 				connectionName := fmt.Sprintf("%s-%d-%d", endpoint.Spec.CableName, lsi, rsi)
+				args := []string{"--delete", "--name", connectionName}
 
-				args := []string{}
-
-				args = append(args, "--delete",
-					"--name", connectionName)
-
-				logger.Infof("Whacking with %v", args)
-
-				cmd := exec.Command("/usr/libexec/ipsec/whack", args...)
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-
-				if err := cmd.Run(); err != nil {
+				if err := whack(args...); err != nil {
 					var exitError *exec.ExitError
 					if errors.As(err, &exitError) {
 						logger.Errorf(err, "Error deleting a connection with args %v; got exit code %d", args, exitError.ExitCode())
@@ -597,7 +612,7 @@ func (i *libreswan) runPluto() error {
 	}()
 
 	// Wait up to 5s for the control socket.
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 250; i++ {
 		_, err := os.Stat("/run/pluto/pluto.ctl")
 		if err == nil {
 			break
@@ -608,7 +623,7 @@ func (i *libreswan) runPluto() error {
 			break
 		}
 
-		time.Sleep(1 * time.Second)
+		time.Sleep(20 * time.Millisecond)
 	}
 
 	if i.debug {

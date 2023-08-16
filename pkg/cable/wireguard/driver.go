@@ -36,6 +36,7 @@ import (
 	"github.com/vishvananda/netlink"
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	"k8s.io/utils/ptr"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -83,8 +84,8 @@ type wireguard struct {
 }
 
 // NewDriver creates a new WireGuard driver.
-func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.SubmarinerCluster) (cable.Driver, error) {
-	// We'll panic if localEndpoint or localCluster are nil, this is intentional
+func NewDriver(localEndpoint *types.SubmarinerEndpoint, _ *types.SubmarinerCluster) (cable.Driver, error) {
+	// We'll panic if localEndpoint is nil, this is intentional
 	var err error
 
 	w := wireguard{
@@ -142,13 +143,11 @@ func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.Subm
 		return nil, errors.Wrapf(err, "error parsing %q from local endpoint", v1.UDPPortConfig)
 	}
 
-	portInt := int(port)
-
 	// Configure the device - still not up.
 	peerConfigs := make([]wgtypes.PeerConfig, 0)
 	cfg := wgtypes.Config{
 		PrivateKey:   &priv,
-		ListenPort:   &portInt,
+		ListenPort:   ptr.To(int(port)),
 		FirewallMark: nil,
 		ReplacePeers: true,
 		Peers:        peerConfigs,

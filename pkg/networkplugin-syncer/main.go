@@ -25,12 +25,15 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
+	"github.com/submariner-io/admiral/pkg/names"
+	admversion "github.com/submariner-io/admiral/pkg/version"
 	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/controller"
 	eventlogger "github.com/submariner-io/submariner/pkg/event/logger"
 	"github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
+	"github.com/submariner-io/submariner/pkg/versions"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -39,15 +42,25 @@ import (
 )
 
 var (
-	masterURL  string
-	kubeconfig string
-	logger     = log.Logger{Logger: logf.Log.WithName("main")}
+	masterURL   string
+	kubeconfig  string
+	logger      = log.Logger{Logger: logf.Log.WithName("main")}
+	showVersion = false
 )
 
 func main() {
 	kzerolog.AddFlags(nil)
 	flag.Parse()
+
+	admversion.Print(names.NetworkPluginSyncerComponent, versions.Submariner())
+
+	if showVersion {
+		return
+	}
+
 	kzerolog.InitK8sLogging()
+
+	versions.Log(&logger)
 
 	logger.Info("Starting submariner-networkplugin-syncer")
 	// set up signals so we handle the first shutdown signal gracefully
@@ -114,4 +127,5 @@ func init() {
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&masterURL, "master", "",
 		"The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+	flag.BoolVar(&showVersion, "version", showVersion, "Show version")
 }

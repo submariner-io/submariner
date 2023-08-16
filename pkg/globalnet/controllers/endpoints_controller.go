@@ -90,7 +90,7 @@ func (c *endpointsController) Start() error {
 	return nil
 }
 
-func (c *endpointsController) process(from runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
+func (c *endpointsController) process(from runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	ep := from.(*corev1.Endpoints)
 
 	switch op {

@@ -25,12 +25,12 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/admiral/pkg/stringset"
+	"github.com/submariner-io/submariner/pkg/cidr"
 	cni "github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	cniapi "github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/set"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -40,11 +40,10 @@ type SyncHandler struct {
 	localClusterCidr []string
 	localServiceCidr []string
 
-	remoteSubnets           stringset.Interface
-	remoteSubnetGw          map[string]net.IP
-	remoteVTEPs             stringset.Interface
-	routeCacheGWNode        stringset.Interface
-	remoteEndpointTimeStamp map[string]v1.Time
+	remoteSubnets    set.Set[string]
+	remoteSubnetGw   map[string]net.IP
+	remoteVTEPs      set.Set[string]
+	routeCacheGWNode set.Set[string]
 
 	syncHandlerMutex     sync.Mutex
 	isGatewayNode        bool
@@ -62,17 +61,16 @@ var logger = log.Logger{Logger: logf.Log.WithName("KubeProxy")}
 
 func NewSyncHandler(localClusterCidr, localServiceCidr []string) *SyncHandler {
 	return &SyncHandler{
-		localClusterCidr:        localClusterCidr,
-		localServiceCidr:        localServiceCidr,
-		localCableDriver:        "",
-		remoteSubnets:           stringset.NewSynchronized(),
-		remoteSubnetGw:          map[string]net.IP{},
-		remoteEndpointTimeStamp: map[string]v1.Time{},
-		remoteVTEPs:             stringset.NewSynchronized(),
-		routeCacheGWNode:        stringset.NewSynchronized(),
-		isGatewayNode:           false,
-		wasGatewayPreviously:    false,
-		netLink:                 netlink.New(),
+		localClusterCidr:     cidr.ExtractIPv4Subnets(localClusterCidr),
+		localServiceCidr:     cidr.ExtractIPv4Subnets(localServiceCidr),
+		localCableDriver:     "",
+		remoteSubnets:        set.New[string](),
+		remoteSubnetGw:       map[string]net.IP{},
+		remoteVTEPs:          set.New[string](),
+		routeCacheGWNode:     set.New[string](),
+		isGatewayNode:        false,
+		wasGatewayPreviously: false,
+		netLink:              netlink.New(),
 	}
 }
 

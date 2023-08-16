@@ -47,6 +47,7 @@ type Handler struct {
 	isGateway             bool
 	netlink               netlink.Interface
 	ipt                   iptables.Interface
+	stopCh                chan struct{}
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("OVN")}
@@ -64,6 +65,7 @@ func NewHandler(env *environment.Specification, smClientSet clientset.Interface)
 		remoteEndpoints: map[string]*submV1.Endpoint{},
 		netlink:         netlink.New(),
 		ipt:             ipt,
+		stopCh:          make(chan struct{}),
 	}
 }
 
@@ -80,6 +82,8 @@ func (ovn *Handler) Init() error {
 	if err != nil {
 		return err
 	}
+
+	ovn.startRouteConfigSyncer(ovn.stopCh)
 
 	return ovn.ensureSubmarinerNodeBridge()
 }
@@ -139,14 +143,6 @@ func (ovn *Handler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	ovn.mutex.Lock()
 	defer ovn.mutex.Unlock()
 
-	existingEndPoint, ok := ovn.remoteEndpoints[endpoint.Spec.ClusterID]
-
-	if ok && existingEndPoint.CreationTimestamp.After(endpoint.CreationTimestamp.Time) {
-		logger.Infof("Ignoring new remote %#v since a later endpoint was already"+
-			"processed", endpoint)
-		return nil
-	}
-
 	ovn.remoteEndpoints[endpoint.Name] = endpoint
 
 	err := ovn.updateHostNetworkDataplane()
@@ -194,14 +190,6 @@ func (ovn *Handler) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
 func (ovn *Handler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	ovn.mutex.Lock()
 	defer ovn.mutex.Unlock()
-
-	existingEndPoint, ok := ovn.remoteEndpoints[endpoint.Spec.ClusterID]
-
-	if ok && existingEndPoint.CreationTimestamp.After(endpoint.CreationTimestamp.Time) {
-		logger.Infof("Ignoring deleted remote %#v since a later endpoint was already"+
-			"processed", endpoint)
-		return nil
-	}
 
 	delete(ovn.remoteEndpoints, endpoint.Name)
 
