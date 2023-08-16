@@ -51,6 +51,7 @@ func getOVNCaBundlePath() string {
 func getEnvOr(key, defaultValue string) string {
 	s := os.Getenv(key)
 	if s == "" {
+		logger.Infof("Using default value %q for %q", defaultValue, key)
 		return defaultValue
 	}
 

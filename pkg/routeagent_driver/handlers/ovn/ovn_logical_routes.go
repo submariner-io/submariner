@@ -42,7 +42,7 @@ func (c *ConnectionHandler) reconcileOvnLogicalRouterStaticRoutes(remoteSubnets 
 
 	err := libovsdbops.DeleteLogicalRouterStaticRoutesWithPredicate(c.nbdb, ovnClusterRouter, staleLRSRPred)
 	if err != nil {
-		return errors.Wrapf(err, "failed to list existing ovn logical route static routes for nexthop: %s", nextHop)
+		return errors.Wrapf(err, "failed to delete existing ovn logical route static routes for nexthop: %s", nextHop)
 	}
 
 	lrsrToAdd := buildLRSRsFromSubnets(remoteSubnets.UnsortedList(), nextHop)

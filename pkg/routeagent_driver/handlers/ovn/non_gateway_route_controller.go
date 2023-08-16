@@ -63,13 +63,14 @@ func NewNonGatewayRouteController(config watcher.Config, connectionHandler *Conn
 
 	node, err := nodeutil.GetLocalNode(k8sClientSet)
 	if err != nil {
-		return nil, errors.Wrap(err, "error getting the node")
+		return nil, errors.Wrap(err, "error getting the local node info")
 	}
 
 	annotations := node.GetAnnotations()
 
 	transitSwitchIP := annotations["k8s.ovn.org/node-transit-switch-port-ifaddr"]
 	if transitSwitchIP == "" {
+		// This is a non-IC setup , so this controller will not be started.
 		logger.Infof("No transit switch IP configured on node %q", node.Name)
 		return controller, nil
 	}
@@ -90,7 +91,7 @@ func NewNonGatewayRouteController(config watcher.Config, connectionHandler *Conn
 		return nil, errors.Wrapf(err, "error starting non gateway route controller")
 	}
 
-	logger.Infof("Started NonGatewayRouteController")
+	logger.Info("Started NonGatewayRouteController")
 
 	return controller, nil
 }
@@ -100,7 +101,7 @@ func (g *NonGatewayRouteController) nonGatewayRouteCreatedOrUpdated(obj runtime.
 
 	err := g.reconcileRemoteSubnets(submNonGWRoute, true)
 	if err != nil {
-		logger.Errorf(err, "Error creating or updating router policies for remote subnet %q", g.remoteSubnets)
+		logger.Errorf(err, "Error creating or updating router policies for remote subnets %q", g.remoteSubnets)
 		return true
 	}
 
@@ -112,7 +113,7 @@ func (g *NonGatewayRouteController) nonGatewayRouteDeleted(obj runtime.Object, _
 
 	err := g.reconcileRemoteSubnets(submNonGWRoute, false)
 	if err != nil {
-		logger.Errorf(err, "Error deleting policies for remote subnet %q", g.remoteSubnets)
+		logger.Errorf(err, "Error deleting policies for remote subnets %q", g.remoteSubnets)
 		return true
 	}
 
@@ -121,10 +122,13 @@ func (g *NonGatewayRouteController) nonGatewayRouteDeleted(obj runtime.Object, _
 
 func (g *NonGatewayRouteController) reconcileRemoteSubnets(submNonGWRoute *submarinerv1.NonGatewayRoute, addSubnet bool) error {
 	if len(submNonGWRoute.RoutePolicySpec.NextHops) == 0 {
+		// This happens only when the RoutePolicySpec is not created correctly and added to prevent an invalid memory
+		// access.
 		logger.Warningf("The NonGatewayRoute does not have next hop %v", submNonGWRoute)
 		return nil
 	}
 
+	// If this node belongs to same zone as gateway node, ignore the event.
 	if submNonGWRoute.RoutePolicySpec.NextHops[0] != g.transitSwitchIP {
 		for _, subnet := range submNonGWRoute.RoutePolicySpec.RemoteCIDRs {
 			if addSubnet {

@@ -39,7 +39,7 @@ func (ovn *Handler) cleanupGatewayDataplane() error {
 		return errors.Wrapf(err, "error removing routing rule")
 	}
 
-	defaultRoute, err := ovn.getSubmDefaultRoute()
+	defaultRoute, err := ovn.getRouteToOVNDataPlane()
 	if err != nil {
 		return errors.Wrap(err, "error creating default route")
 	}
@@ -74,7 +74,7 @@ func (ovn *Handler) updateGatewayDataplane() error {
 		return errors.Wrapf(err, "error removing routing rule")
 	}
 
-	defaultRoute, err := ovn.getSubmDefaultRoute()
+	defaultRoute, err := ovn.getRouteToOVNDataPlane()
 	if err != nil {
 		return errors.Wrap(err, "error creating default route")
 	}
@@ -192,7 +192,7 @@ func (ovn *Handler) cleanupForwardingIptables() error {
 		"error clearing chain %q", forwardingSubmarinerFWDChain)
 }
 
-func (ovn *Handler) getSubmDefaultRoute() (*netlink.Route, error) {
+func (ovn *Handler) getRouteToOVNDataPlane() (*netlink.Route, error) {
 	nextHop, err := ovn.getNextHopOnK8sMgmtIntf()
 	if err != nil {
 		return nil, errors.Wrapf(err, "getNextHopOnK8sMgmtIntf returned error")

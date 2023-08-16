@@ -180,6 +180,10 @@ func (c *ConnectionHandler) createLibovsdbClient(dbAddress string, tlsConfig *tl
 	return client, nil
 }
 
+// Parses input and returns the DB address.
+//
+//		input: will be of the format IC:Zone1Endpoint:TCP:192.168.0.1:9641.
+//	    zoneName: will be Zone1 for the above input.
 func getICDBAddress(inputs, zoneName string) string {
 	entries := strings.Split(inputs, ",")
 	for _, entry := range entries {

@@ -27,7 +27,7 @@ import (
 var logger = log.Logger{Logger: logf.Log.WithName("main")}
 
 func main() {
-	logger.Info("Network Plugin Syncer is deprecated will be removed in future")
+	logger.Info("Network Plugin Syncer is deprecated and will be removed in future")
 
 	stopCh := signals.SetupSignalHandler().Done()
 	<-stopCh

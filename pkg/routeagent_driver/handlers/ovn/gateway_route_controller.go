@@ -73,10 +73,10 @@ func NewGatewayRouteController(config watcher.Config, connectionHandler *Connect
 
 	err = controller.gatewayRouteWatcher.Start(controller.stopCh)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error starting the resource wather")
+		return nil, errors.Wrapf(err, "error starting the resource watcher")
 	}
 
-	logger.Infof("Started GatewayRouteController")
+	logger.Info("Started GatewayRouteController")
 
 	return controller, nil
 }
@@ -86,7 +86,7 @@ func (g *GatewayRouteController) gatewayRouteCreatedOrUpdated(obj runtime.Object
 
 	err := g.reconcileRemoteSubnets(subMGWRoute, true)
 	if err != nil {
-		logger.Errorf(err, "Error creating or updating router policies and static routes for remote subnet %q", g.remoteSubnets)
+		logger.Errorf(err, "Error creating or updating router policies and static routes for remote subnets %q", g.remoteSubnets)
 		return true
 	}
 
@@ -107,11 +107,14 @@ func (g *GatewayRouteController) gatewayRouteDeleted(obj runtime.Object, _ int) 
 
 func (g *GatewayRouteController) reconcileRemoteSubnets(subMGWRoute *submarinerv1.GatewayRoute, addSubnet bool) error {
 	if len(subMGWRoute.RoutePolicySpec.NextHops) == 0 {
+		// This happens only when the RoutePolicySpec is not created correctly and added to prevent an invalid memory
+		// access.
 		logger.Warningf("The GatewayRoute does not have next hop %v", subMGWRoute)
 		return nil
 	}
 
 	if subMGWRoute.RoutePolicySpec.NextHops[0] != g.mgmtIP {
+		// The current node is not the gateway node and hence ignore the event
 		return nil
 	}
 
