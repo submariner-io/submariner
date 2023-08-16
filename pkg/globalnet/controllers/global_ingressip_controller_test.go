@@ -157,7 +157,7 @@ func testGlobalIngressIPCreatedClusterIPSvc(t *globalIngressIPControllerTestDriv
 		})
 
 		It("should add an appropriate Status condition", func() {
-			awaitStatusConditions(t.globalIngressIPs, globalIngressIPName, 0, metav1.Condition{
+			t.awaitStatusConditions(t.globalIngressIPs, globalIngressIPName, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionFalse,
 				Reason: "IPPoolAllocationFailed",
@@ -209,7 +209,7 @@ func testGlobalIngressIPCreatedHeadlessSvc(t *globalIngressIPControllerTestDrive
 		})
 
 		It("should add an appropriate Status condition", func() {
-			awaitStatusConditions(t.globalIngressIPs, globalIngressIPName, 0, metav1.Condition{
+			t.awaitStatusConditions(t.globalIngressIPs, globalIngressIPName, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionFalse,
 				Reason: "IPPoolAllocationFailed",
@@ -223,7 +223,7 @@ func testGlobalIngressIPCreatedHeadlessSvc(t *globalIngressIPControllerTestDrive
 		})
 
 		It("should eventually allocate a global IP", func() {
-			awaitStatusConditions(t.globalIngressIPs, globalIngressIPName, 0, metav1.Condition{
+			t.awaitStatusConditions(t.globalIngressIPs, globalIngressIPName, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionFalse,
 				Reason: "ProgramIPTableRulesFailed",
@@ -305,15 +305,14 @@ func testExistingGlobalIngressIPClusterIPSvc(t *globalIngressIPControllerTestDri
 			})
 
 			It("should reallocate the global IP", func() {
-				t.awaitIngressIPStatus(globalIngressIPName, 0,
-					metav1.Condition{
-						Type:   string(submarinerv1.GlobalEgressIPAllocated),
-						Status: metav1.ConditionFalse,
-						Reason: "ReserveAllocatedIPsFailed",
-					}, metav1.Condition{
-						Type:   string(submarinerv1.GlobalEgressIPAllocated),
-						Status: metav1.ConditionTrue,
-					})
+				t.awaitIngressIPStatus(globalIngressIPName, metav1.Condition{
+					Type:   string(submarinerv1.GlobalEgressIPAllocated),
+					Status: metav1.ConditionFalse,
+					Reason: "ReserveAllocatedIPsFailed",
+				}, metav1.Condition{
+					Type:   string(submarinerv1.GlobalEgressIPAllocated),
+					Status: metav1.ConditionTrue,
+				})
 			})
 		})
 	})
@@ -375,6 +374,34 @@ func testExistingGlobalIngressIPClusterIPSvc(t *globalIngressIPControllerTestDri
 			Expect(externalIP).ToNot(BeEmpty())
 		})
 	})
+
+	Context("with previously appended Status conditions", func() {
+		BeforeEach(func() {
+			existing.Status.Conditions = []metav1.Condition{
+				{
+					Type:    string(submarinerv1.GlobalEgressIPAllocated),
+					Status:  metav1.ConditionFalse,
+					Reason:  "AppendedCondition1",
+					Message: "Should be removed",
+				},
+				{
+					Type:    string(submarinerv1.GlobalEgressIPAllocated),
+					Status:  metav1.ConditionTrue,
+					Reason:  "Success",
+					Message: "Allocated global IPs",
+				},
+			}
+
+			t.createGlobalIngressIP(existing)
+		})
+
+		It("should trim the Status conditions", func() {
+			t.awaitStatusConditions(t.globalIngressIPs, existing.Name, metav1.Condition{
+				Type:   string(submarinerv1.GlobalEgressIPAllocated),
+				Status: metav1.ConditionTrue,
+			})
+		})
+	})
 }
 
 func testExistingGlobalIngressIPHeadlessSvc(t *globalIngressIPControllerTestDriver, ingressIP *submarinerv1.GlobalIngressIP,
@@ -418,15 +445,14 @@ func testExistingGlobalIngressIPHeadlessSvc(t *globalIngressIPControllerTestDriv
 			})
 
 			It("should reallocate the global IP", func() {
-				t.awaitIngressIPStatus(globalIngressIPName, 0,
-					metav1.Condition{
-						Type:   string(submarinerv1.GlobalEgressIPAllocated),
-						Status: metav1.ConditionFalse,
-						Reason: "ReserveAllocatedIPsFailed",
-					}, metav1.Condition{
-						Type:   string(submarinerv1.GlobalEgressIPAllocated),
-						Status: metav1.ConditionTrue,
-					})
+				t.awaitIngressIPStatus(globalIngressIPName, metav1.Condition{
+					Type:   string(submarinerv1.GlobalEgressIPAllocated),
+					Status: metav1.ConditionFalse,
+					Reason: "ReserveAllocatedIPsFailed",
+				}, metav1.Condition{
+					Type:   string(submarinerv1.GlobalEgressIPAllocated),
+					Status: metav1.ConditionTrue,
+				})
 
 				awaitIPTableRules(t.getGlobalIngressIPStatus(globalIngressIPName).AllocatedIP)
 			})
@@ -438,15 +464,14 @@ func testExistingGlobalIngressIPHeadlessSvc(t *globalIngressIPControllerTestDriv
 			})
 
 			It("should reallocate the global IP", func() {
-				t.awaitIngressIPStatus(globalIngressIPName, 0,
-					metav1.Condition{
-						Type:   string(submarinerv1.GlobalEgressIPAllocated),
-						Status: metav1.ConditionFalse,
-						Reason: "ReserveAllocatedIPsFailed",
-					}, metav1.Condition{
-						Type:   string(submarinerv1.GlobalEgressIPAllocated),
-						Status: metav1.ConditionTrue,
-					})
+				t.awaitIngressIPStatus(globalIngressIPName, metav1.Condition{
+					Type:   string(submarinerv1.GlobalEgressIPAllocated),
+					Status: metav1.ConditionFalse,
+					Reason: "ReserveAllocatedIPsFailed",
+				}, metav1.Condition{
+					Type:   string(submarinerv1.GlobalEgressIPAllocated),
+					Status: metav1.ConditionTrue,
+				})
 
 				allocatedIP := t.getGlobalIngressIPStatus(globalIngressIPName).AllocatedIP
 				awaitIPTableRules(allocatedIP)

@@ -35,6 +35,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -139,7 +140,7 @@ func (c *baseIPAllocationController) reserveAllocatedIPs(federator federate.Fede
 
 		conditions := util.ConditionsFromUnstructured(obj, "status", "conditions")
 
-		conditions = util.TryAppendCondition(conditions, &metav1.Condition{
+		meta.SetStatusCondition(&conditions, metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "ReserveAllocatedIPsFailed",
@@ -277,4 +278,23 @@ func deleteEndpoints(namespace, name string,
 	}
 
 	return errors.Wrapf(err, "error deleting Endpoints %s/%s", namespace, name)
+}
+
+func trimAllocatedStatusCondition(conditions *[]metav1.Condition) {
+	last := -1
+
+	for i := len(*conditions) - 1; i > 0; i-- {
+		if (*conditions)[i].Type == string(submarinerv1.GlobalEgressIPAllocated) {
+			last = i
+			break
+		}
+	}
+
+	for i := 0; i < last; i++ {
+		if (*conditions)[i].Type == string(submarinerv1.GlobalEgressIPAllocated) {
+			*conditions = append((*conditions)[:i], (*conditions)[i+1:]...)
+			i--
+			last--
+		}
+	}
 }

@@ -322,6 +322,7 @@ func testServiceWithoutSelector() {
 
 		Context("and then original endpoints is deleted", func() {
 			It("should delete the cloned endpoints", func() {
+				t.awaitEndpoints(controllers.GetInternalSvcName(endpoints.Name))
 				t.deleteEndpoints(endpoints)
 				t.awaitNoEndpoints(controllers.GetInternalSvcName(endpoints.Name))
 			})
@@ -445,7 +446,7 @@ func newServiceExportControllerTestDriver() *serviceExportControllerTestDriver {
 	return t
 }
 
-func (t *serviceExportControllerTestDriver) start() {
+func (t *serviceExportControllerTestDriver) start() (*syncer.ResourceSyncerConfig, *controllers.IngressPodControllers, syncer.Interface) {
 	var err error
 
 	t.pool, err = ipam.NewIPPool(t.globalCIDR)
@@ -466,8 +467,11 @@ func (t *serviceExportControllerTestDriver) start() {
 	ingressEndpointsControllers, err := controllers.NewIngressEndpointsControllers(config)
 	Expect(err).To(Succeed())
 
-	t.controller, err = controllers.NewServiceExportController(config, podControllers, endpointsControllers, ingressEndpointsControllers)
+	controller, err := controllers.NewServiceExportController(config, podControllers, endpointsControllers, ingressEndpointsControllers)
+	t.controller = controller
 
 	Expect(err).To(Succeed())
 	Expect(t.controller.Start()).To(Succeed())
+
+	return config, podControllers, controller.GetSyncer()
 }

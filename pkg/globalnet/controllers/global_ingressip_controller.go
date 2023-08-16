@@ -33,6 +33,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/metrics"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
@@ -140,6 +141,9 @@ func (c *globalIngressIPController) process(from runtime.Object, numRequeues int
 	switch op {
 	case syncer.Create:
 		prevStatus := ingressIP.Status
+
+		trimAllocatedStatusCondition(&ingressIP.Status.Conditions)
+
 		requeue := c.onCreate(ingressIP)
 
 		return checkStatusChanged(&prevStatus, &ingressIP.Status, ingressIP), requeue
@@ -163,7 +167,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 	if err != nil {
 		logger.Errorf(err, "Error allocating IP for %q", key)
 
-		ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, &metav1.Condition{
+		meta.SetStatusCondition(&ingressIP.Status.Conditions, metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
 			Reason:  "IPPoolAllocationFailed",
@@ -216,7 +220,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 			key := fmt.Sprintf("%s/%s", internalService.Namespace, internalService.Name)
 			logger.Errorf(err, "Failed to create the internal Service %q ", key)
 
-			ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, &metav1.Condition{
+			meta.SetStatusCondition(&ingressIP.Status.Conditions, metav1.Condition{
 				Type:    string(submarinerv1.GlobalEgressIPAllocated),
 				Status:  metav1.ConditionFalse,
 				Reason:  "InternalServiceCreationFailed",
@@ -260,7 +264,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 
 		if err != nil {
 			_ = c.pool.Release(ips...)
-			ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, &metav1.Condition{
+			meta.SetStatusCondition(&ingressIP.Status.Conditions, metav1.Condition{
 				Type:    string(submarinerv1.GlobalEgressIPAllocated),
 				Status:  metav1.ConditionFalse,
 				Reason:  "ProgramIPTableRulesFailed",
@@ -275,7 +279,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 
 	ingressIP.Status.AllocatedIP = ips[0]
 
-	ingressIP.Status.Conditions = util.TryAppendCondition(ingressIP.Status.Conditions, &metav1.Condition{
+	meta.SetStatusCondition(&ingressIP.Status.Conditions, metav1.Condition{
 		Type:    string(submarinerv1.GlobalEgressIPAllocated),
 		Status:  metav1.ConditionTrue,
 		Reason:  "Success",

@@ -112,15 +112,14 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 				})
 
 				It("should reallocate the global IPs", func() {
-					t.awaitEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, *existing.Spec.NumberOfIPs, 1,
-						metav1.Condition{
-							Type:   string(submarinerv1.GlobalEgressIPAllocated),
-							Status: metav1.ConditionFalse,
-							Reason: "ReserveAllocatedIPsFailed",
-						}, metav1.Condition{
-							Type:   string(submarinerv1.GlobalEgressIPAllocated),
-							Status: metav1.ConditionTrue,
-						})
+					t.awaitEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, *existing.Spec.NumberOfIPs, metav1.Condition{
+						Type:   string(submarinerv1.GlobalEgressIPAllocated),
+						Status: metav1.ConditionFalse,
+						Reason: "ReserveAllocatedIPsFailed",
+					}, metav1.Condition{
+						Type:   string(submarinerv1.GlobalEgressIPAllocated),
+						Status: metav1.ConditionTrue,
+					})
 
 					t.awaitIPTableRules(getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName).AllocatedIPs...)
 				})
@@ -133,15 +132,14 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 				})
 
 				It("should reallocate the global IPs", func() {
-					t.awaitEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, *existing.Spec.NumberOfIPs, 0,
-						metav1.Condition{
-							Type:   string(submarinerv1.GlobalEgressIPAllocated),
-							Status: metav1.ConditionFalse,
-							Reason: "ReserveAllocatedIPsFailed",
-						}, metav1.Condition{
-							Type:   string(submarinerv1.GlobalEgressIPAllocated),
-							Status: metav1.ConditionTrue,
-						})
+					t.awaitEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, *existing.Spec.NumberOfIPs, metav1.Condition{
+						Type:   string(submarinerv1.GlobalEgressIPAllocated),
+						Status: metav1.ConditionFalse,
+						Reason: "ReserveAllocatedIPsFailed",
+					}, metav1.Condition{
+						Type:   string(submarinerv1.GlobalEgressIPAllocated),
+						Status: metav1.ConditionTrue,
+					})
 
 					allocatedIPs := getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName).AllocatedIPs
 					t.awaitIPTableRules(allocatedIPs...)
@@ -156,7 +154,7 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 			})
 
 			It("should add an appropriate Status condition", func() {
-				t.awaitEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, 0, 0, metav1.Condition{
+				t.awaitEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, 0, metav1.Condition{
 					Type:   string(submarinerv1.GlobalEgressIPAllocated),
 					Status: metav1.ConditionFalse,
 					Reason: "InvalidInput",
@@ -170,11 +168,37 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 			})
 
 			It("should add an appropriate Status condition", func() {
-				t.awaitEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, 0, 0, metav1.Condition{
+				t.awaitEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, 0, metav1.Condition{
 					Type:   string(submarinerv1.GlobalEgressIPAllocated),
 					Status: metav1.ConditionFalse,
 					Reason: "ZeroInput",
 				})
+			})
+		})
+
+		Context("with previously appended Status conditions", func() {
+			BeforeEach(func() {
+				existing := newClusterGlobalEgressIP(constants.ClusterGlobalEgressIPName, 1)
+				existing.Status.Conditions = []metav1.Condition{
+					{
+						Type:    string(submarinerv1.GlobalEgressIPAllocated),
+						Status:  metav1.ConditionFalse,
+						Reason:  "AppendedCondition1",
+						Message: "Should be removed",
+					},
+					{
+						Type:    string(submarinerv1.GlobalEgressIPAllocated),
+						Status:  metav1.ConditionFalse,
+						Reason:  "AppendedCondition2",
+						Message: "Should be replaced",
+					},
+				}
+
+				t.createClusterGlobalEgressIP(existing)
+			})
+
+			It("should trim the Status conditions", func() {
+				t.awaitClusterGlobalEgressIPStatusAllocated(1)
 			})
 		})
 	})
@@ -232,7 +256,7 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 			})
 
 			It("should update the Status appropriately", func() {
-				t.awaitEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, 0, 0, metav1.Condition{
+				t.awaitEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, 0, metav1.Condition{
 					Type:   string(submarinerv1.GlobalEgressIPAllocated),
 					Status: metav1.ConditionFalse,
 					Reason: "ZeroInput",
@@ -266,7 +290,7 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 
 			It("should eventually reallocate the global IPs", func() {
 				t.awaitNoIPTableRules(existing.Status.AllocatedIPs...)
-				t.awaitEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, numberOfIPs, 0, metav1.Condition{
+				t.awaitEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, numberOfIPs, metav1.Condition{
 					Type:   string(submarinerv1.GlobalEgressIPAllocated),
 					Status: metav1.ConditionFalse,
 					Reason: "ProgramIPTableRulesFailed",
@@ -284,7 +308,7 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 			})
 
 			It("should add an appropriate Status condition", func() {
-				awaitStatusConditions(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, 0, metav1.Condition{
+				t.awaitStatusConditions(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, metav1.Condition{
 					Type:   string(submarinerv1.GlobalEgressIPAllocated),
 					Status: metav1.ConditionFalse,
 					Reason: "IPPoolAllocationFailed",
@@ -318,7 +342,7 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 		})
 
 		It("should not allocate the global IP", func() {
-			t.awaitEgressIPStatus(t.clusterGlobalEgressIPs, "other name", 0, 0, metav1.Condition{
+			t.awaitEgressIPStatus(t.clusterGlobalEgressIPs, "other name", 0, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionFalse,
 				Reason: "InvalidInstance",

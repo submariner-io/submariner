@@ -53,4 +53,6 @@ const (
 
 	NATTable    = "nat"
 	FilterTable = "filter"
+
+	OvnTransitSwitchIPAnnotation = "k8s.ovn.org/node-transit-switch-port-ifaddr"
 )
