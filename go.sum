@@ -510,6 +510,8 @@ github.com/submariner-io/admiral v0.16.0-m3.0.20230807132642-3d805dda2f2c h1:Poy
 github.com/submariner-io/admiral v0.16.0-m3.0.20230807132642-3d805dda2f2c/go.mod h1:wiU8hC/soJ6C3g634CFvaGq/Hptgy4D2Xpf8IlQ5y5A=
 github.com/submariner-io/shipyard v0.16.0-m3 h1:795gM5zCjszEjQ5UM9LY/7vRTldHt16PdETTzjY265A=
 github.com/submariner-io/shipyard v0.16.0-m3/go.mod h1:P6zHeYDcQMS24/8Z7NN2WP4Ydqdu4CB4HC+VRn3l2MA=
+github.com/submariner-io/shipyard v0.16.0-m3.0.20230816123333-4746bb547e5e h1:OK2NELLx/D4RqJLxyhyechLa3d6aV/l7QoLYpqdQcv8=
+github.com/submariner-io/shipyard v0.16.0-m3.0.20230816123333-4746bb547e5e/go.mod h1:5bIFKVp44YKvNJMp8vPzWDlyBTv8ycS9QhTkgbkMb/Q=
 github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635/go.mod h1:hkRG7XYTFWNJGYcbNJQlaLq0fg1yr4J4t/NcTQtrfww=
 github.com/tidwall/pretty v1.0.0/go.mod h1:XNkn88O1ChpSDQmQeStsy+sBenx6DDtFZJxhVysOjyk=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
