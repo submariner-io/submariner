@@ -55,6 +55,7 @@ type Basic interface {
 	XfrmPolicyList(family int) ([]netlink.XfrmPolicy, error)
 	EnableLooseModeReversePathFilter(interfaceName string) error
 	EnsureLooseModeIsConfigured(interfaceName string) error
+	EnableForwarding(interfaceName string) error
 	GetReversePathFilter(interfaceName string) ([]byte, error)
 	ConfigureTCPMTUProbe(mtuProbe, baseMss string) error
 }
@@ -179,6 +180,11 @@ func (n *netlinkType) EnsureLooseModeIsConfigured(interfaceName string) error {
 	}
 
 	return fmt.Errorf("loose mode not configured on iface %q", interfaceName)
+}
+
+func (n *netlinkType) EnableForwarding(interfaceName string) error {
+	err := setSysctl("/proc/sys/net/ipv4/conf/"+interfaceName+"/forwarding", []byte("1"))
+	return errors.Wrapf(err, "unable to update forwarding on interface %q", interfaceName)
 }
 
 func (n *netlinkType) GetReversePathFilter(interfaceName string) ([]byte, error) {
