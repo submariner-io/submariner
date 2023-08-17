@@ -26,6 +26,8 @@ import (
 )
 
 func (ovn *Handler) Stop(uninstall bool) error {
+	ovn.gatewayRouteController.stop()
+	ovn.nonGatewayRouteController.stop()
 	close(ovn.stopCh)
 
 	if !uninstall {
@@ -34,17 +36,7 @@ func (ovn *Handler) Stop(uninstall bool) error {
 
 	logger.Infof("Uninstalling OVN components from the node")
 
-	err := vsctl.DelInternalPort(ovnK8sSubmarinerBridge, ovnK8sSubmarinerInterface)
-	if err != nil {
-		logger.Errorf(err, "Error deleting Submariner port %q", ovnK8sSubmarinerInterface)
-	}
-
-	err = vsctl.DelBridge(ovnK8sSubmarinerBridge)
-	if err != nil {
-		logger.Errorf(err, "Error deleting Submariner bridge %q", ovnK8sSubmarinerBridge)
-	}
-
-	err = ovn.cleanupRoutes()
+	err := ovn.cleanupRoutes()
 	if err != nil {
 		logger.Errorf(err, "Error cleaning the routes")
 	}
@@ -103,5 +95,18 @@ func (ovn *Handler) flushAndDeleteIPTableChains(table, tableChain, submarinerCha
 
 	if err := ovn.ipt.DeleteChain(table, submarinerChain); err != nil {
 		logger.Errorf(err, "Error deleting iptable chain %q of table %q", submarinerChain, table)
+	}
+}
+
+// TODO need to be removed when the clusters are fully upgraded to new implementation.
+func (ovn *Handler) LegacyCleanup() {
+	err := vsctl.DelInternalPort(ovnK8sSubmarinerBridge, ovnK8sSubmarinerInterface)
+	if err != nil {
+		logger.Errorf(err, "Error deleting Submariner port %q", ovnK8sSubmarinerInterface)
+	}
+
+	err = vsctl.DelBridge(ovnK8sSubmarinerBridge)
+	if err != nil {
+		logger.Errorf(err, "Error deleting Submariner bridge %q", ovnK8sSubmarinerBridge)
 	}
 }
