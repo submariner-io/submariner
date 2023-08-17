@@ -163,6 +163,11 @@ func (v *vxlan) createVxlanInterface(activeEndPoint string, port int) error {
 		return errors.Wrap(err, "failed to configure vxlan interface ipaddress on the Gateway Node")
 	}
 
+	err = v.netLink.EnableForwarding(VxlanIface)
+	if err != nil {
+		return errors.Wrapf(err, "error enabling forwarding on the %q iface", VxlanIface)
+	}
+
 	return nil
 }
 
