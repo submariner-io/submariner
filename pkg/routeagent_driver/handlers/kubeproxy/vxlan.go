@@ -299,5 +299,10 @@ func (kp *SyncHandler) createVxLANInterface(activeEndPoint string, ifaceType int
 		return errors.Wrap(err, "failed to configure vxlan interface ipaddress on the Gateway Node")
 	}
 
+	err = kp.netLink.EnableForwarding(VxLANIface)
+	if err != nil {
+		return errors.Wrapf(err, "error enabling forwarding on the %q iface", VxLANIface)
+	}
+
 	return nil
 }
