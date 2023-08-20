@@ -122,6 +122,9 @@ func testHeadlessService() {
 	BeforeEach(func() {
 		service = newHeadlessService()
 		backendPod = newHeadlessServicePod(service.Name)
+	})
+
+	JustBeforeEach(func() {
 		t.createServiceExport(t.createService(service))
 	})
 
@@ -143,18 +146,28 @@ func testHeadlessService() {
 		})
 	})
 
-	When("a backend Pod for an exported Service isn't initially running", func() {
+	When("a backend Pod for an exported Service isn't running", func() {
 		BeforeEach(func() {
 			backendPod.Status.Phase = corev1.PodPending
 			t.createPod(backendPod)
 		})
 
-		It("should eventually create a GlobalIngressIP", func() {
+		It("should eventually create a GlobalIngressIP after the Pod transitions to running", func() {
 			t.ensureNoGlobalIngressIPs()
 
 			backendPod.Status.Phase = corev1.PodRunning
 			test.UpdateResource(t.pods.Namespace(namespace), backendPod)
 			t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
+		})
+
+		Context("and PublishNotReadyAddresses is set to true on the Service", func() {
+			BeforeEach(func() {
+				service.Spec.PublishNotReadyAddresses = true
+			})
+
+			It("should create a GlobalIngressIP", func() {
+				t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
+			})
 		})
 	})
 
