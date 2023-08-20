@@ -55,4 +55,5 @@ const (
 	FilterTable = "filter"
 
 	OvnTransitSwitchIPAnnotation = "k8s.ovn.org/node-transit-switch-port-ifaddr"
+	OvnZoneAnnotation            = "k8s.ovn.org/zone-name"
 )

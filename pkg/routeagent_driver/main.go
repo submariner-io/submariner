@@ -30,6 +30,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/names"
 	admversion "github.com/submariner-io/admiral/pkg/version"
+	"github.com/submariner-io/admiral/pkg/watcher"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	cni "github.com/submariner-io/submariner/pkg/cni"
@@ -109,11 +110,13 @@ func main() {
 		np = cni.Generic
 	}
 
+	config := &watcher.Config{RestConfig: cfg}
+
 	registry := event.NewRegistry("routeagent_driver", np)
 	if err := registry.AddHandlers(
 		eventlogger.NewHandler(),
 		kubeproxy.NewSyncHandler(env.ClusterCidr, env.ServiceCidr),
-		ovn.NewHandler(&env, smClientset),
+		ovn.NewHandler(&env, smClientset, k8sClientSet, config),
 		ovn.NewGatewayRouteHandler(&env, smClientset),
 		ovn.NewNonGatewayRouteHandler(smClientset, k8sClientSet),
 		cabledriver.NewXRFMCleanupHandler(),

@@ -45,6 +45,7 @@ import (
 const (
 	cableDriverName = "libreswan"
 	whackTimeout    = 5 * time.Second
+	dpdDelay        = 30 // seconds
 )
 
 var logger = log.Logger{Logger: logf.Log.WithName("libreswan")}
@@ -172,7 +173,7 @@ func retrieveActiveConnectionStats() (map[string]int, map[string]int, error) {
 	defer cancel()
 
 	// Retrieve active tunnels from the daemon
-	cmd := exec.CommandContext(ctx, "/usr/libexec/ipsec/whack", "--trafficstatus")
+	cmd := exec.CommandContext(ctx, "/usr/sbin/ipsec", "whack", "--trafficstatus")
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -311,7 +312,8 @@ func whack(args ...string) error {
 			ctx, cancel := context.WithTimeout(context.TODO(), whackTimeout)
 			defer cancel()
 
-			cmd := exec.CommandContext(ctx, "/usr/libexec/ipsec/whack", args...)
+			fullArgs := append([]string{"whack"}, args...)
+			cmd := exec.CommandContext(ctx, "/usr/sbin/ipsec", fullArgs...)
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 
@@ -427,7 +429,8 @@ func (i *libreswan) bidirectionalConnectToEndpoint(connectionName string, endpoi
 		"--client", rightSubnet,
 
 		"--ikeport", strconv.Itoa(int(rightNATTPort)),
-		"--dpdaction=hold")
+		"--dpdaction=hold",
+		"--dpddelay", strconv.Itoa(dpdDelay))
 
 	logger.Infof("Executing whack with args: %v", args)
 
@@ -470,7 +473,8 @@ func (i *libreswan) serverConnectToEndpoint(connectionName string, endpointInfo 
 		"--id", remoteEndpointIdentifier,
 		"--host", "%any",
 		"--client", rightSubnet,
-		"--dpdaction=hold")
+		"--dpdaction=hold",
+		"--dpddelay", strconv.Itoa(dpdDelay))
 
 	logger.Infof("Executing whack with args: %v", args)
 
@@ -512,7 +516,8 @@ func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo 
 		"--client", rightSubnet,
 
 		"--ikeport", strconv.Itoa(int(rightNATTPort)),
-		"--dpdaction=hold")
+		"--dpdaction=hold",
+		"--dpddelay", strconv.Itoa(dpdDelay))
 
 	logger.Infof("Executing whack with args: %v", args)
 
