@@ -46,6 +46,7 @@ func NewNonGatewayRouteController(config watcher.Config, connectionHandler *Conn
 	controller := &NonGatewayRouteController{
 		connectionHandler: connectionHandler,
 		remoteSubnets:     sets.New[string](),
+		stopCh:            make(chan struct{}),
 	}
 
 	config.ResourceConfigs = []watcher.ResourceConfig{
