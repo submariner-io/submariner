@@ -24,6 +24,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/watcher"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable/wireguard"
 	"github.com/submariner-io/submariner/pkg/cidr"
@@ -33,26 +34,33 @@ import (
 	"github.com/submariner-io/submariner/pkg/iptables"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
+	"k8s.io/client-go/kubernetes"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type Handler struct {
 	event.HandlerBase
-	mutex                 sync.Mutex
-	config                *environment.Specification
-	smClient              clientset.Interface
-	cableRoutingInterface *net.Interface
-	localEndpoint         *submV1.Endpoint
-	remoteEndpoints       map[string]*submV1.Endpoint
-	isGateway             bool
-	netlink               netlink.Interface
-	ipt                   iptables.Interface
-	stopCh                chan struct{}
+	mutex                     sync.Mutex
+	config                    *environment.Specification
+	smClient                  clientset.Interface
+	k8sClientset              *kubernetes.Clientset
+	watcherConfig             *watcher.Config
+	cableRoutingInterface     *net.Interface
+	localEndpoint             *submV1.Endpoint
+	remoteEndpoints           map[string]*submV1.Endpoint
+	isGateway                 bool
+	netlink                   netlink.Interface
+	ipt                       iptables.Interface
+	gatewayRouteController    *GatewayRouteController
+	nonGatewayRouteController *NonGatewayRouteController
+	stopCh                    chan struct{}
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("OVN")}
 
-func NewHandler(env *environment.Specification, smClientSet clientset.Interface) *Handler {
+func NewHandler(env *environment.Specification, smClientSet clientset.Interface, k8sClientset *kubernetes.Clientset,
+	watcherConfig *watcher.Config,
+) *Handler {
 	// We'll panic if env is nil, this is intentional
 	ipt, err := iptables.New()
 	if err != nil {
@@ -62,6 +70,8 @@ func NewHandler(env *environment.Specification, smClientSet clientset.Interface)
 	return &Handler{
 		config:          env,
 		smClient:        smClientSet,
+		k8sClientset:    k8sClientset,
+		watcherConfig:   watcherConfig,
 		remoteEndpoints: map[string]*submV1.Endpoint{},
 		netlink:         netlink.New(),
 		ipt:             ipt,
@@ -85,7 +95,33 @@ func (ovn *Handler) Init() error {
 
 	ovn.startRouteConfigSyncer(ovn.stopCh)
 
-	return ovn.ensureSubmarinerNodeBridge()
+	connectionHandler := NewConnectionHandler(ovn.k8sClientset)
+
+	err = connectionHandler.initClients()
+	if err != nil {
+		return errors.Wrapf(err, "error getting connection handler to connect to OvnDB")
+	}
+
+	gatewayRouteController, err := NewGatewayRouteController(*ovn.watcherConfig, connectionHandler, ovn.config.Namespace)
+	if err != nil {
+		return err
+	}
+
+	ovn.gatewayRouteController = gatewayRouteController
+
+	if err != nil {
+		return err
+	}
+
+	nonGatewayRouteController, err := NewNonGatewayRouteController(*ovn.watcherConfig, connectionHandler, ovn.k8sClientset,
+		ovn.config.Namespace)
+	if err != nil {
+		return err
+	}
+
+	ovn.nonGatewayRouteController = nonGatewayRouteController
+
+	return err
 }
 
 func (ovn *Handler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
@@ -134,7 +170,8 @@ func (ovn *Handler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 }
 
 func (ovn *Handler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
-	if err := cidr.OverlappingSubnets(ovn.config.ServiceCidr, ovn.config.ClusterCidr, endpoint.Spec.Subnets); err != nil {
+	if err := cidr.OverlappingSubnets(ovn.config.ServiceCidr, ovn.config.ClusterCidr,
+		endpoint.Spec.Subnets); err != nil {
 		// Skip processing the endpoint when CIDRs overlap and return nil to avoid re-queuing.
 		logger.Errorf(err, "overlappingSubnets for new remote %#v returned error", endpoint)
 		return nil
