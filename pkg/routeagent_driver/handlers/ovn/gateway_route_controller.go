@@ -43,6 +43,7 @@ func NewGatewayRouteController(config watcher.Config, connectionHandler *Connect
 	controller := &GatewayRouteController{
 		connectionHandler: connectionHandler,
 		remoteSubnets:     sets.New[string](),
+		stopCh:            make(chan struct{}),
 	}
 
 	config.ResourceConfigs = []watcher.ResourceConfig{
