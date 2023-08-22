@@ -88,6 +88,8 @@ func (ovn *Handler) GetNetworkPlugins() []string {
 }
 
 func (ovn *Handler) Init() error {
+	ovn.LegacyCleanup()
+
 	err := ovn.initIPtablesChains()
 	if err != nil {
 		return err
