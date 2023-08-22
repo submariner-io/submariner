@@ -65,7 +65,7 @@ func AddBridge(bridgeName string) error {
 }
 
 func DelBridge(bridgeName string) error {
-	_, err := vsctlCmd("del-br", bridgeName)
+	_, err := vsctlCmd("--if-exists", "del-br", bridgeName)
 
 	return err
 }
