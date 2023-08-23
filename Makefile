@@ -4,7 +4,7 @@ PROTOC_VERSION=3.17.3
 
 # Running in Dapper
 ifneq (,$(DAPPER_HOST_ARCH))
-IMAGES ?= submariner-gateway submariner-route-agent submariner-globalnet submariner-networkplugin-syncer
+IMAGES ?= submariner-gateway submariner-route-agent submariner-globalnet
 MULTIARCH_IMAGES ?= $(IMAGES)
 PLATFORMS ?= linux/amd64,linux/arm64
 RESTART ?= all
@@ -75,8 +75,6 @@ bin/%/submariner-route-agent: $(shell find pkg/routeagent_driver)
 bin/%/submariner-globalnet: $(shell find pkg/globalnet)
 	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ ./pkg/globalnet
 
-bin/%/submariner-networkplugin-syncer: $(shell find pkg/networkplugin-syncer)
-	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ ./pkg/networkplugin-syncer
 
 nullstring :=
 space := $(nullstring) # end of the line
@@ -86,7 +84,7 @@ comma := ,
 # This can be overridden to build for other supported architectures; the reference is the Go architecture,
 # so "make images ARCHES=arm" will build a linux/arm/v7 image
 ARCHES ?= amd64
-BINARIES = submariner-gateway submariner-route-agent submariner-globalnet submariner-networkplugin-syncer
+BINARIES = submariner-gateway submariner-route-agent submariner-globalnet
 ARCH_BINARIES := $(foreach arch,$(subst $(comma),$(space),$(ARCHES)),$(foreach binary,$(BINARIES),bin/linux/$(call gotodockerarch,$(arch))/$(binary)))
 
 build: $(ARCH_BINARIES)
