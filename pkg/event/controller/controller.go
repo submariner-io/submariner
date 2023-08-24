@@ -54,6 +54,10 @@ type Controller struct {
 	isGatewayNode bool
 }
 
+// If the handler cannot recover from a failure, even after retrying for maximum requeue attempts,
+// it's best to disregard the event. This prevents the logs from being flooded with repetitive errors.
+const maxRequeues = 20
+
 type Config struct {
 	// Registry is the event handler registry where controller events will be sent.
 	Registry *event.Registry

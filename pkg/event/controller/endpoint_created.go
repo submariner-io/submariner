@@ -23,10 +23,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func (c *Controller) handleCreatedEndpoint(obj runtime.Object, _ int) bool {
+func (c *Controller) handleCreatedEndpoint(obj runtime.Object, requeueCount int) bool {
 	var err error
 
 	endpoint := obj.(*smv1.Endpoint)
+
+	if requeueCount > maxRequeues {
+		logger.Errorf(nil, "Ignoring create event for endpoint %q, as its requeued for more than %d times",
+			endpoint.Spec.ClusterID, maxRequeues)
+		return false
+	}
 
 	if endpoint.Spec.ClusterID != c.env.ClusterID {
 		err = c.handleCreatedRemoteEndpoint(endpoint)

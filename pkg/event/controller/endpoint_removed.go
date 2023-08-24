@@ -23,8 +23,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func (c *Controller) handleRemovedEndpoint(obj runtime.Object, _ int) bool {
+func (c *Controller) handleRemovedEndpoint(obj runtime.Object, requeueCount int) bool {
 	endpoint := obj.(*smv1.Endpoint)
+
+	if requeueCount > maxRequeues {
+		logger.Errorf(nil, "Ignoring delete event for endpoint %q, as its requeued for more than %d times",
+			endpoint.Spec.ClusterID, maxRequeues)
+		return false
+	}
 
 	var err error
 	if endpoint.Spec.ClusterID != c.env.ClusterID {
