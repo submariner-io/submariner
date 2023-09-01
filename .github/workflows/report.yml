@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
         with:
           fetch-depth: 0
 
@@ -37,7 +37,7 @@ jobs:
       security-events: write
     steps:
       - name: Check out the repository
-        uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
       - name: Run Anchore vulnerability scanner
         uses: anchore/scan-action@24fd7c9060f3c96848dd1929fac8d796fb5ae4b4
         id: scan
