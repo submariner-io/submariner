@@ -31,4 +31,5 @@ const (
 	defaultOVNUnixSocket          = "unix:/var/run/openvswitch/ovnnb_db.sock"
 	defaultOVNOpenshiftUnixSocket = "unix:/var/run/ovn-ic/ovnnb_db.sock"
 	ovnNBDBDefaultPort            = 6641
+	defaultOpenshiftOVNNBDB       = "ssl:ovnkube-db.openshift-ovn-kubernetes.svc.cluster.local:9641"
 )
