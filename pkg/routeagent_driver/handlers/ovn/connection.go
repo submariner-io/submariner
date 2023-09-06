@@ -105,12 +105,8 @@ func (c *ConnectionHandler) createLibovsdbClient(dbModel model.ClientDBModel) (l
 	}
 
 	annotations := localNode.GetAnnotations()
-
-	zoneName, ok := annotations[constants.OvnZoneAnnotation]
-	if !ok {
-		return nil, errors.Wrapf(err, "node %q is missing the %q "+
-			"annotation", localNode.Name, constants.OvnZoneAnnotation)
-	}
+	// Will use empty zone if not found
+	zoneName := annotations[constants.OvnZoneAnnotation]
 
 	dbAddress, err := discoverOvnKubernetesNetwork(context.TODO(), c.k8sClientset, zoneName)
 	if err != nil {
@@ -186,45 +182,71 @@ func getTLSConfig(k8sClientset clientset.Interface) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
+/*
+   The discovery method is different for each kind of deployment.
+        kind non-ic: Get the db pod with label name=ovnkube-db, if present will get the protocol and other details from it
+
+        openshift non-ic: in this case there will be no pod with name=ovnkube-db but there will be a ovnkube-db service,
+        in this case we will return the default Openshift db path
+
+        kind ic with multiple node per zone: we parse every endpoint in the namespace ovn uses and find the one that has
+        same zone as the node in which route-agent runs. To get the ovn namespace we use pods running on app=ovnkube-node.
+
+        kind ic with one node per zone: we will have no endpoints matching hence we will return default kind socket path
+
+        openshift ic with one node per zone: we will have endpoints in the namespace ovn but none will match the zone as
+        these are not db endpoints. Here we will return default Openshift socket path
+*/
+
 func discoverOvnKubernetesNetwork(ctx context.Context, k8sClientset clientset.Interface, zoneName string) (string, error) {
 	ovnDBPod, err := FindPod(ctx, k8sClientset, "name=ovnkube-db")
 	if err != nil {
 		return "", err
 	}
 
-	var nbdbAddress string
-
-	if ovnDBPod != nil {
-		nbdbAddress, err = discoverOvnDBClusterNetwork(ctx, k8sClientset, ovnDBPod)
-	} else {
-		nbdbAddress, err = discoverOvnNodeClusterNetwork(ctx, k8sClientset, zoneName)
-	}
-
+	ovnPod, err := FindPod(ctx, k8sClientset, "app=ovnkube-node")
 	if err != nil {
 		return "", err
+	}
+
+	if ovnPod == nil {
+		return defaultOVNOpenshiftUnixSocket, nil
+	}
+
+	var nbdbAddress string
+	_, err = k8sClientset.CoreV1().Services(ovnPod.Namespace).Get(ctx, ovnKubeService, metav1.GetOptions{})
+
+	// Openshift deployments uses DB that are parts of the node pod and there will not be a separate db pod for non-ic.
+	if ovnDBPod == nil && err == nil {
+		return defaultOpenshiftOVNNBDB, nil
+	}
+	// Kind deployments will have a db pod and db service for non-ic.
+	if ovnDBPod != nil && err == nil {
+		// This is a Kind non-IC deployment
+		nbdbAddress = discoverOvnDBClusterNetwork(ovnDBPod)
+	} else {
+		if zoneName == "" {
+			return defaultOVNOpenshiftUnixSocket, nil
+		}
+
+		nbdbAddress, err = discoverOvnNodeClusterNetwork(ctx, k8sClientset, zoneName, ovnPod)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	return nbdbAddress, nil
 }
 
-func discoverOvnDBClusterNetwork(ctx context.Context, k8sClientset clientset.Interface, ovnDBPod *corev1.Pod) (string, error) {
-	_, err := k8sClientset.CoreV1().Services(ovnDBPod.Namespace).Get(ctx, ovnKubeService, metav1.GetOptions{})
-	if err != nil {
-		return "", fmt.Errorf("error finding %q service in %q namespace", ovnKubeService, ovnDBPod.Namespace)
-	}
-
+func discoverOvnDBClusterNetwork(ovnDBPod *corev1.Pod) string {
 	dbConnectionProtocol := findProtocol(ovnDBPod)
 
-	return fmt.Sprintf("%s:%s.%s:%d", dbConnectionProtocol, ovnKubeService, ovnDBPod.Namespace, ovnNBDBDefaultPort), nil
+	return fmt.Sprintf("%s:%s.%s:%d", dbConnectionProtocol, ovnKubeService, ovnDBPod.Namespace, ovnNBDBDefaultPort)
 }
 
-func discoverOvnNodeClusterNetwork(ctx context.Context, k8sClientset clientset.Interface, zoneName string) (string, error) {
-	// In OVN IC deployments, the ovn DB will be a part of ovnkube-node
-	ovnPod, err := FindPod(ctx, k8sClientset, "name=ovnkube-node")
-	if err != nil || ovnPod == nil {
-		return "", err
-	}
-
+func discoverOvnNodeClusterNetwork(ctx context.Context, k8sClientset clientset.Interface,
+	zoneName string, ovnPod *corev1.Pod,
+) (string, error) {
 	endpointList, err := findEndpoint(ctx, k8sClientset, ovnPod.Namespace)
 	if err != nil {
 		return "", errors.Wrapf(err, "error retrieving the endpoints from namespace %q", ovnPod.Namespace)
@@ -233,6 +255,7 @@ func discoverOvnNodeClusterNetwork(ctx context.Context, k8sClientset clientset.I
 	var nbdbAddress string
 
 	if endpointList == nil || len(endpointList.Items) == 0 {
+		// Kind setup will not have endpoints when using socket mode.
 		nbdbAddress = defaultOVNUnixSocket
 	} else {
 		nbdbAddress = createClusterNetworkWithEndpoints(endpointList.Items, zoneName)
@@ -255,6 +278,7 @@ func createClusterNetworkWithEndpoints(endPoints []corev1.Endpoints, zoneName st
 		}
 	}
 
+	// Openshift will have endpoints but not related to ovn DB when using IC.
 	return defaultOVNOpenshiftUnixSocket
 }
 
