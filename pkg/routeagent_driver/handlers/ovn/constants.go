@@ -18,8 +18,17 @@ limitations under the License.
 
 package ovn
 
+import "time"
+
 const (
-	ovnK8sSubmarinerInterface    = "ovn-k8s-sub0"
-	ovnK8sSubmarinerBridge       = "br-submariner"
-	ovnK8sSubmarinerInterfaceMAC = "0a:58:66:22:33:44"
+	ovnK8sSubmarinerInterface     = "ovn-k8s-sub0"
+	ovnK8sSubmarinerBridge        = "br-submariner"
+	ovsDBTimeout                  = 20 * time.Second
+	ovnCert                       = "secret://openshift-ovn-kubernetes/ovn-cert/tls.crt"
+	ovnPrivKey                    = "secret://openshift-ovn-kubernetes/ovn-cert/tls.key"
+	ovnCABundle                   = "configmap://openshift-ovn-kubernetes/ovn-ca/ca-bundle.crt"
+	ovnKubeService                = "ovnkube-db"
+	defaultOVNUnixSocket          = "unix:/var/run/openvswitch/ovnnb_db.sock"
+	defaultOVNOpenshiftUnixSocket = "unix:/var/run/ovn-ic/ovnnb_db.sock"
+	ovnNBDBDefaultPort            = 6641
 )
