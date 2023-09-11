@@ -3,7 +3,7 @@ name: Upgrade
 
 on:
   pull_request:
-    branches: [devel]
+    branches: [release-0.16]
 
 permissions: {}
 
@@ -19,8 +19,8 @@ jobs:
         uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
 
       - name: Install an old cluster, upgrade it and check it
-        uses: submariner-io/shipyard/gh-actions/upgrade-e2e@devel
+        uses: submariner-io/shipyard/gh-actions/upgrade-e2e@release-0.16
 
       - name: Post Mortem
         if: failure()
-        uses: submariner-io/shipyard/gh-actions/post-mortem@devel
+        uses: submariner-io/shipyard/gh-actions/post-mortem@release-0.16

@@ -4,7 +4,7 @@ name: Reporting
 on:
   push:
     branches:
-      - devel
+      - release-0.16
       - release-*
 
 permissions: {}
