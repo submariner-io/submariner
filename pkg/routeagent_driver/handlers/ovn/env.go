@@ -20,21 +20,7 @@ package ovn
 
 import (
 	"os"
-	"time"
 )
-
-// default OVSDB timeout used by ovn-k.
-const (
-	OVSDBTimeout   = 20 * time.Second
-	ovnCert        = "secret://openshift-ovn-kubernetes/ovn-cert/tls.crt"
-	ovnPrivKey     = "secret://openshift-ovn-kubernetes/ovn-cert/tls.key"
-	ovnCABundle    = "configmap://openshift-ovn-kubernetes/ovn-ca/ca-bundle.crt"
-	defaultOVNNBDB = "ssl:ovnkube-db.openshift-ovn-kubernetes.svc.cluster.local:9641"
-)
-
-func getOVNNBDBAddress() string {
-	return getEnvOr("OVN_NBDB", defaultOVNNBDB)
-}
 
 func getOVNPrivKeyPath() string {
 	return getEnvOr("OVN_PK", ovnPrivKey)

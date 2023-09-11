@@ -24,6 +24,7 @@ import (
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/libovsdbops"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/nbdb"
 	"github.com/pkg/errors"
+	"github.com/submariner-io/submariner/pkg/versions"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 )
@@ -37,7 +38,9 @@ func (c *ConnectionHandler) reconcileOvnLogicalRouterStaticRoutes(remoteSubnets 
 	nextHop string,
 ) error {
 	staleLRSRPred := func(item *nbdb.LogicalRouterStaticRoute) bool {
-		return item.Nexthop == nextHop && !remoteSubnets.Has(item.IPPrefix)
+		// Legacy routes will have same prefix but different nextHop
+		return (item.Nexthop == nextHop && !remoteSubnets.Has(item.IPPrefix)) ||
+			(item.Nexthop != nextHop && remoteSubnets.Has(item.IPPrefix))
 	}
 
 	err := libovsdbops.DeleteLogicalRouterStaticRoutesWithPredicate(c.nbdb, ovnClusterRouter, staleLRSRPred)
@@ -68,6 +71,9 @@ func buildLRSRsFromSubnets(subnetsToAdd []string, nextHop string) []*nbdb.Logica
 		toAdd = append(toAdd, &nbdb.LogicalRouterStaticRoute{
 			Nexthop:  nextHop,
 			IPPrefix: subnet,
+			ExternalIDs: map[string]string{
+				"submariner": versions.Submariner(),
+			},
 		})
 	}
 
@@ -119,7 +125,7 @@ func buildLRPsFromSubnets(subnetsToAdd []string, nextHop string) []*nbdb.Logical
 			Match:    "ip4.dst == " + subnet,
 			Nexthop:  ptr.To(nextHop),
 			ExternalIDs: map[string]string{
-				"submariner": "true",
+				"submariner": versions.Submariner(),
 			},
 		})
 	}

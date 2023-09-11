@@ -32,55 +32,40 @@ import (
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/nbdb"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/sbdb"
 	"github.com/pkg/errors"
-	nodeutil "github.com/submariner-io/submariner/pkg/node"
+	"github.com/submariner-io/submariner/pkg/node"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/util/clusterfiles"
+	corev1 "k8s.io/api/core/v1"
+	apiError "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/utils/net"
 )
 
 type ConnectionHandler struct {
-	k8sClientset clientset.Interface
-	nbdb         libovsdbclient.Client
+	k8sClientset  clientset.Interface
+	dynamicClient dynamic.Interface
+	nbdb          libovsdbclient.Client
 }
 
-func NewConnectionHandler(k8sClientset clientset.Interface) *ConnectionHandler {
+func NewConnectionHandler(k8sClientset clientset.Interface, dynamicClient dynamic.Interface) *ConnectionHandler {
 	return &ConnectionHandler{
-		k8sClientset: k8sClientset,
+		k8sClientset:  k8sClientset,
+		dynamicClient: dynamicClient,
 	}
 }
 
 func (c *ConnectionHandler) initClients() error {
-	var tlsConfig *tls.Config
-
-	if strings.HasPrefix(getOVNNBDBAddress(), "ssl:") {
-		certFile, err := clusterfiles.Get(c.k8sClientset, getOVNCertPath())
-		if err != nil {
-			return errors.Wrapf(err, "error getting config for %q", getOVNCertPath())
-		}
-
-		pkFile, err := clusterfiles.Get(c.k8sClientset, getOVNPrivKeyPath())
-		if err != nil {
-			return errors.Wrapf(err, "error getting config for %q", getOVNPrivKeyPath())
-		}
-
-		caFile, err := clusterfiles.Get(c.k8sClientset, getOVNCaBundlePath())
-		if err != nil {
-			return errors.Wrapf(err, "error getting config for %q", getOVNCaBundlePath())
-		}
-
-		tlsConfig, err = getOVNTLSConfig(pkFile, certFile, caFile)
-		if err != nil {
-			return errors.Wrap(err, "error getting OVN TLS config")
-		}
-	}
-
 	// Create nbdb client
 	nbdbModel, err := nbdb.FullDatabaseModel()
 	if err != nil {
 		return errors.Wrap(err, "error getting OVN NBDB database model")
 	}
 
-	c.nbdb, err = c.createLibovsdbClient(getOVNNBDBAddress(), tlsConfig, nbdbModel)
+	c.nbdb, err = c.createLibovsdbClient(nbdbModel)
 	if err != nil {
 		return errors.Wrap(err, "error creating NBDB connection")
 	}
@@ -111,38 +96,37 @@ func getOVNTLSConfig(pkFile, certFile, caFile string) (*tls.Config, error) {
 	}, nil
 }
 
-func (c *ConnectionHandler) createLibovsdbClient(dbAddress string, tlsConfig *tls.Config,
-	dbModel model.ClientDBModel,
-) (libovsdbclient.Client, error) {
+func (c *ConnectionHandler) createLibovsdbClient(dbModel model.ClientDBModel) (libovsdbclient.Client, error) {
 	options := []libovsdbclient.Option{
 		// Reading and parsing the DB after reconnect at scale can (unsurprisingly)
 		// take longer than a normal ovsdb operation. Give it a bit more time so
 		// we don't time out and enter a reconnect loop.
-		libovsdbclient.WithReconnect(OVSDBTimeout, &backoff.ZeroBackOff{}),
+		libovsdbclient.WithReconnect(ovsDBTimeout, &backoff.ZeroBackOff{}),
 		libovsdbclient.WithLogger(&logger.Logger),
 	}
 
-	if strings.HasPrefix(dbAddress, "IC:") {
-		node, err := nodeutil.GetLocalNode(c.k8sClientset)
-		if err != nil {
-			return nil, errors.Wrap(err, "error getting the node")
-		}
-
-		annotations := node.GetAnnotations()
-
-		zoneName, ok := annotations[constants.OvnZoneAnnotation]
-		if !ok {
-			return nil, errors.Wrapf(err, "node %q is missing the %q "+
-				"annotation", node.Name, constants.OvnZoneAnnotation)
-		}
-
-		zoneDBAddress := getICDBAddress(dbAddress, zoneName)
-		options = append(options, libovsdbclient.WithEndpoint(zoneDBAddress))
-	} else {
-		options = append(options, libovsdbclient.WithEndpoint(dbAddress))
+	localNode, err := node.GetLocalNode(c.k8sClientset)
+	if err != nil {
+		return nil, errors.Wrap(err, "error getting the node")
 	}
 
-	if tlsConfig != nil {
+	annotations := localNode.GetAnnotations()
+	// Will use empty zone if not found
+	zoneName := annotations[constants.OvnZoneAnnotation]
+
+	dbAddress, err := discoverOvnKubernetesNetwork(context.TODO(), c.k8sClientset, c.dynamicClient, zoneName)
+	if err != nil {
+		return nil, errors.Wrap(err, "error getting the OVN NBDB Address")
+	}
+
+	options = append(options, libovsdbclient.WithEndpoint(dbAddress))
+
+	if strings.HasPrefix(dbAddress, "ssl:") {
+		tlsConfig, err := getTLSConfig(c.k8sClientset)
+		if err != nil {
+			return nil, err
+		}
+
 		options = append(options, libovsdbclient.WithTLSConfig(tlsConfig))
 	}
 
@@ -151,7 +135,7 @@ func (c *ConnectionHandler) createLibovsdbClient(dbAddress string, tlsConfig *tl
 		return nil, errors.Wrap(err, "error creating ovsdbClient")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), OVSDBTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), ovsDBTimeout)
 	defer cancel()
 
 	err = client.Connect(ctx)
@@ -180,20 +164,196 @@ func (c *ConnectionHandler) createLibovsdbClient(dbAddress string, tlsConfig *tl
 	return client, nil
 }
 
-// Parses input and returns the DB address.
-//
-//		input: will be of the format IC:Zone1Endpoint:TCP:192.168.0.1:9641.
-//	    zoneName: will be Zone1 for the above input.
-func getICDBAddress(inputs, zoneName string) string {
-	entries := strings.Split(inputs, ",")
-	for _, entry := range entries {
-		if strings.Contains(entry, zoneName) {
-			parts := strings.Split(entry, ":")
-			if len(parts) >= 5 && strings.Contains(parts[1], zoneName) {
-				return fmt.Sprintf("%s:%s:%s", parts[2], parts[3], parts[4])
+func getTLSConfig(k8sClientset clientset.Interface) (*tls.Config, error) {
+	certFile, err := clusterfiles.Get(k8sClientset, getOVNCertPath())
+	if err != nil {
+		return nil, errors.Wrapf(err, "error getting config for %q", getOVNCertPath())
+	}
+
+	pkFile, err := clusterfiles.Get(k8sClientset, getOVNPrivKeyPath())
+	if err != nil {
+		return nil, errors.Wrapf(err, "error getting config for %q", getOVNPrivKeyPath())
+	}
+
+	caFile, err := clusterfiles.Get(k8sClientset, getOVNCaBundlePath())
+	if err != nil {
+		return nil, errors.Wrapf(err, "error getting config for %q", getOVNCaBundlePath())
+	}
+
+	tlsConfig, err := getOVNTLSConfig(pkFile, certFile, caFile)
+	if err != nil {
+		return nil, errors.Wrap(err, "error getting OVN TLS config")
+	}
+
+	return tlsConfig, nil
+}
+
+func discoverOvnKubernetesNetwork(ctx context.Context, k8sClientset clientset.Interface,
+	dynamicClient dynamic.Interface, zoneName string,
+) (string, error) {
+	openshiftNetwork, err := FindOpenshiftNetwork(ctx, dynamicClient)
+	if err != nil {
+		return "", err
+	}
+
+	if openshiftNetwork != nil {
+		return discoverOpenshiftOvnKubernetesNetwork(ctx, k8sClientset)
+	}
+
+	return discoverKindOvnKubernetesNetwork(ctx, k8sClientset, zoneName)
+}
+
+/*
+
+openshift non-ic: in this case there will get the "app=ovnkube-node" and check for ovnkube-db service,
+if present we will the default Openshift db path
+
+openshift ic with one node per zone: if above service is not present we will return default Openshift socket path
+*/
+
+func discoverOpenshiftOvnKubernetesNetwork(ctx context.Context, k8sClientSet clientset.Interface) (string, error) {
+	ovnPod, err := FindPod(ctx, k8sClientSet, "app=ovnkube-node")
+	if err != nil {
+		return "", errors.Wrap(err, "error finding a pod with label \"app=ovnkube-node\"")
+	}
+
+	_, err = k8sClientSet.CoreV1().Services(ovnPod.Namespace).Get(ctx, ovnKubeService, metav1.GetOptions{})
+	if err == nil {
+		return defaultOpenshiftOVNNBDB, nil
+	}
+
+	return defaultOVNOpenshiftUnixSocket, nil
+}
+
+/*
+   The discovery method is different for each kind of deployment.
+        kind non-ic: Get the db pod with label name=ovnkube-db, if present will get the protocol and other details from it
+
+        kind ic with multiple node per zone: we parse every endpoint in the namespace ovn uses and find the one that has
+        same zone as the node in which route-agent runs. To get the ovn namespace we use pods running on app=ovnkube-node.
+
+        kind ic with one node per zone: we will have no endpoints matching hence we will return default kind socket path
+*/
+
+func discoverKindOvnKubernetesNetwork(ctx context.Context, k8sClientSet clientset.Interface, zoneName string) (string, error) {
+	ovnDBPod, err := FindPod(ctx, k8sClientSet, "name=ovnkube-db")
+	if err != nil {
+		return "", err
+	}
+
+	if ovnDBPod != nil {
+		return discoverKindOvnDBClusterNetwork(ctx, ovnDBPod, k8sClientSet)
+	}
+
+	ovnPod, err := FindPod(ctx, k8sClientSet, "app=ovnkube-node")
+	if err != nil {
+		return "", err
+	}
+
+	return discoverKindOvnNodeClusterNetwork(ctx, k8sClientSet, zoneName, ovnPod)
+}
+
+func discoverKindOvnDBClusterNetwork(ctx context.Context, ovnDBPod *corev1.Pod, k8sClientSet clientset.Interface) (string, error) {
+	_, err := k8sClientSet.CoreV1().Services(ovnDBPod.Namespace).Get(ctx, ovnKubeService, metav1.GetOptions{})
+	if err != nil {
+		return "", errors.Wrap(err, "OVN DB service is not present but expected")
+	}
+
+	dbConnectionProtocol := findProtocol(ovnDBPod)
+
+	return fmt.Sprintf("%s:%s.%s:%d", dbConnectionProtocol, ovnKubeService, ovnDBPod.Namespace, ovnNBDBDefaultPort), nil
+}
+
+func discoverKindOvnNodeClusterNetwork(ctx context.Context, k8sClientset clientset.Interface,
+	zoneName string, ovnPod *corev1.Pod,
+) (string, error) {
+	endpointList, err := findEndpoint(ctx, k8sClientset, ovnPod.Namespace)
+	if err != nil {
+		return "", errors.Wrapf(err, "error retrieving the endpoints from namespace %q", ovnPod.Namespace)
+	}
+
+	var nbdbAddress string
+
+	if endpointList == nil || len(endpointList.Items) == 0 {
+		nbdbAddress = defaultOVNUnixSocket
+	} else {
+		nbdbAddress, err = createClusterNetworkWithEndpoints(endpointList.Items, zoneName)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	return nbdbAddress, nil
+}
+
+func createClusterNetworkWithEndpoints(endPoints []corev1.Endpoints, zoneName string) (string, error) {
+	for index := range endPoints {
+		for _, subset := range endPoints[index].Subsets {
+			if strings.Contains(endPoints[index].Name, zoneName) {
+				for _, port := range subset.Ports {
+					if strings.Contains(port.Name, "north") && net.IsIPv4String(subset.Addresses[0].IP) {
+						return fmt.Sprintf("%s:%s:%d",
+							port.Protocol, subset.Addresses[0].IP, ovnNBDBDefaultPort), nil
+					}
+				}
 			}
 		}
 	}
 
-	return ""
+	return "", fmt.Errorf("error finding an endpoint for the zone %q", zoneName)
+}
+
+func findEndpoint(ctx context.Context, k8sClientset clientset.Interface, endpointNameSpace string) (*corev1.EndpointsList, error) {
+	endpointsList, err := k8sClientset.CoreV1().Endpoints(endpointNameSpace).List(ctx, metav1.ListOptions{})
+
+	return endpointsList, errors.WithMessagef(err, "error listing endpoints in namespace %q", endpointNameSpace)
+}
+
+func findProtocol(pod *corev1.Pod) string {
+	dbConnectionProtocol := "tcp"
+
+	for i := range pod.Spec.Containers {
+		for _, envVar := range pod.Spec.Containers[i].Env {
+			if envVar.Name == "OVN_SSL_ENABLE" {
+				if !strings.EqualFold(envVar.Value, "NO") {
+					dbConnectionProtocol = "ssl"
+				}
+			}
+		}
+	}
+
+	return dbConnectionProtocol
+}
+
+//nolint:nilnil // Intentional as the purpose is to find.
+func FindPod(ctx context.Context, k8sClientset clientset.Interface, labelSelector string) (*corev1.Pod, error) {
+	podsList, err := k8sClientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+	if err != nil {
+		return nil, errors.WithMessagef(err, "error listing Pods by label selector %q", labelSelector)
+	}
+
+	if len(podsList.Items) == 0 {
+		return nil, nil
+	}
+
+	return &podsList.Items[0], nil
+}
+
+//nolint:nilnil // Intentional as the purpose is to find.
+func FindOpenshiftNetwork(ctx context.Context, dynamicClient dynamic.Interface) (*unstructured.Unstructured, error) {
+	networkClient := dynamicClient.Resource(
+		schema.GroupVersionResource{
+			Group:    "config.openshift.io",
+			Version:  "v1",
+			Resource: "networks",
+		},
+	)
+
+	networks, err := networkClient.Get(ctx, "cluster", metav1.GetOptions{})
+
+	if apiError.IsNotFound(err) {
+		return nil, nil
+	}
+
+	return networks, errors.Wrapf(err, "error finding the openshift network CR")
 }

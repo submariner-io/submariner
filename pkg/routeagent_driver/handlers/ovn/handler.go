@@ -34,6 +34,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/iptables"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -44,6 +45,7 @@ type Handler struct {
 	config                    *environment.Specification
 	smClient                  clientset.Interface
 	k8sClientset              *kubernetes.Clientset
+	dynamicClient             dynamic.Interface
 	watcherConfig             *watcher.Config
 	cableRoutingInterface     *net.Interface
 	localEndpoint             *submV1.Endpoint
@@ -59,7 +61,7 @@ type Handler struct {
 var logger = log.Logger{Logger: logf.Log.WithName("OVN")}
 
 func NewHandler(env *environment.Specification, smClientSet clientset.Interface, k8sClientset *kubernetes.Clientset,
-	watcherConfig *watcher.Config,
+	dynamicClient dynamic.Interface, watcherConfig *watcher.Config,
 ) *Handler {
 	// We'll panic if env is nil, this is intentional
 	ipt, err := iptables.New()
@@ -71,6 +73,7 @@ func NewHandler(env *environment.Specification, smClientSet clientset.Interface,
 		config:          env,
 		smClient:        smClientSet,
 		k8sClientset:    k8sClientset,
+		dynamicClient:   dynamicClient,
 		watcherConfig:   watcherConfig,
 		remoteEndpoints: map[string]*submV1.Endpoint{},
 		netlink:         netlink.New(),
@@ -97,7 +100,7 @@ func (ovn *Handler) Init() error {
 
 	ovn.startRouteConfigSyncer(ovn.stopCh)
 
-	connectionHandler := NewConnectionHandler(ovn.k8sClientset)
+	connectionHandler := NewConnectionHandler(ovn.k8sClientset, ovn.dynamicClient)
 
 	err = connectionHandler.initClients()
 	if err != nil {
