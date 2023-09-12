@@ -103,8 +103,8 @@ func (ovn *Handler) getForwardingRuleSpecs() ([][]string, error) {
 	}
 
 	rules := [][]string{
-		{"-i", ovnK8sSubmarinerInterface, "-o", ovn.cableRoutingInterface.Name, "-j", "ACCEPT"},
-		{"-i", ovn.cableRoutingInterface.Name, "-o", ovnK8sSubmarinerInterface, "-j", "ACCEPT"},
+		{"-i", OVNK8sMgmntIntfName, "-o", ovn.cableRoutingInterface.Name, "-j", "ACCEPT"},
+		{"-i", ovn.cableRoutingInterface.Name, "-o", OVNK8sMgmntIntfName, "-j", "ACCEPT"},
 	}
 
 	return rules, nil
