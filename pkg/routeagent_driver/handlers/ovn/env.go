@@ -16,16 +16,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package ovn_test
+package ovn
 
 import (
-	"testing"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"os"
 )
 
-func TestOvn(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "OVN Test Suite")
+func getOVNPrivKeyPath() string {
+	return getEnvOr("OVN_PK", ovnPrivKey)
+}
+
+func getOVNCertPath() string {
+	return getEnvOr("OVN_CERT", ovnCert)
+}
+
+func getOVNCaBundlePath() string {
+	return getEnvOr("OVN_CA", ovnCABundle)
+}
+
+func getEnvOr(key, defaultValue string) string {
+	s := os.Getenv(key)
+	if s == "" {
+		logger.Infof("Using default value %q for %q", defaultValue, key)
+		return defaultValue
+	}
+
+	return s
 }

@@ -63,7 +63,7 @@ func (w *wireguard) GetConnections() ([]v1.Connection, error) {
 
 func (w *wireguard) connectionByKey(key *wgtypes.Key) (*v1.Connection, error) {
 	for cid, con := range w.connections {
-		if k, err := keyFromSpec(&con.Endpoint); err == nil {
+		if k, err := keyFromSpec(&con.Endpoint); err == nil { //nolint:gosec // Implicit aliasing OK here
 			if key.String() == k.String() {
 				return con, nil
 			}

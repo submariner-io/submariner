@@ -19,12 +19,10 @@ limitations under the License.
 package ovn
 
 import (
-	"net"
 	"os"
 	"strconv"
 
 	"github.com/pkg/errors"
-	npSyncerOvn "github.com/submariner-io/submariner/pkg/networkplugin-syncer/handlers/ovn"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	iptcommon "github.com/submariner-io/submariner/pkg/routeagent_driver/iptables"
 	"github.com/vishvananda/netlink"
@@ -41,7 +39,12 @@ func (ovn *Handler) cleanupGatewayDataplane() error {
 		return errors.Wrapf(err, "error removing routing rule")
 	}
 
-	err = netlink.RouteDel(ovn.getSubmDefaultRoute())
+	defaultRoute, err := ovn.getRouteToOVNDataPlane()
+	if err != nil {
+		return errors.Wrap(err, "error creating default route")
+	}
+
+	err = netlink.RouteDel(defaultRoute)
 	if err != nil && !os.IsNotExist(err) {
 		return errors.Wrap(err, "error deleting submariner default route")
 	}
@@ -71,7 +74,12 @@ func (ovn *Handler) updateGatewayDataplane() error {
 		return errors.Wrapf(err, "error removing routing rule")
 	}
 
-	err = netlink.RouteAdd(ovn.getSubmDefaultRoute())
+	defaultRoute, err := ovn.getRouteToOVNDataPlane()
+	if err != nil {
+		return errors.Wrap(err, "error creating default route")
+	}
+
+	err = netlink.RouteAdd(defaultRoute)
 	if err != nil && !os.IsExist(err) {
 		return errors.Wrap(err, "error adding submariner default")
 	}
@@ -150,14 +158,28 @@ func (ovn *Handler) setupForwardingIptables() error {
 }
 
 func (ovn *Handler) addNoMasqueradeIPTables(subnet string) error {
-	return errors.Wrapf(ovn.ipt.AppendUnique("nat", constants.SmPostRoutingChain,
+	err := errors.Wrapf(ovn.ipt.AppendUnique("nat", constants.SmPostRoutingChain,
 		[]string{"-d", subnet, "-j", "ACCEPT"}...), "error updating %q rules for subnet %q",
+		constants.SmPostRoutingChain, subnet)
+	if err != nil {
+		return err
+	}
+
+	return errors.Wrapf(ovn.ipt.AppendUnique("nat", constants.SmPostRoutingChain,
+		[]string{"-s", subnet, "-j", "ACCEPT"}...), "error updating %q rules for subnet %q",
 		constants.SmPostRoutingChain, subnet)
 }
 
 func (ovn *Handler) removeNoMasqueradeIPTables(subnet string) error {
-	return errors.Wrapf(ovn.ipt.Delete("nat", constants.SmPostRoutingChain,
+	err := errors.Wrapf(ovn.ipt.Delete("nat", constants.SmPostRoutingChain,
 		[]string{"-d", subnet, "-j", "ACCEPT"}...), "error updating %q rules for subnet %q",
+		constants.SmPostRoutingChain, subnet)
+	if err != nil {
+		return err
+	}
+
+	return errors.Wrapf(ovn.ipt.Delete("nat", constants.SmPostRoutingChain,
+		[]string{"-s", subnet, "-j", "ACCEPT"}...), "error updating %q rules for subnet %q",
 		constants.SmPostRoutingChain, subnet)
 }
 
@@ -170,11 +192,16 @@ func (ovn *Handler) cleanupForwardingIptables() error {
 		"error clearing chain %q", forwardingSubmarinerFWDChain)
 }
 
-func (ovn *Handler) getSubmDefaultRoute() *netlink.Route {
-	return &netlink.Route{
-		Gw:    net.ParseIP(npSyncerOvn.SubmarinerUpstreamIP),
-		Table: constants.RouteAgentInterClusterNetworkTableID,
+func (ovn *Handler) getRouteToOVNDataPlane() (*netlink.Route, error) {
+	nextHop, err := ovn.getNextHopOnK8sMgmtIntf()
+	if err != nil {
+		return nil, errors.Wrapf(err, "getNextHopOnK8sMgmtIntf returned error")
 	}
+
+	return &netlink.Route{
+		Gw:    *nextHop,
+		Table: constants.RouteAgentInterClusterNetworkTableID,
+	}, nil
 }
 
 func (ovn *Handler) initIPtablesChains() error {

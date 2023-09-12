@@ -30,6 +30,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/names"
 	admversion "github.com/submariner-io/admiral/pkg/version"
+	"github.com/submariner-io/admiral/pkg/watcher"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	cni "github.com/submariner-io/submariner/pkg/cni"
@@ -46,6 +47,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/mtu"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
 	"github.com/submariner-io/submariner/pkg/versions"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
@@ -95,6 +97,11 @@ func main() {
 		logger.Fatalf("Error building clientset: %s", err.Error())
 	}
 
+	dynamicClientSet, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		logger.Fatalf("Error building dynamic client: %s", err.Error())
+	}
+
 	err = v1.AddToScheme(scheme.Scheme)
 	logger.FatalOnError(err, "Error adding submariner to the scheme")
 
@@ -109,11 +116,13 @@ func main() {
 		np = cni.Generic
 	}
 
+	config := &watcher.Config{RestConfig: cfg}
+
 	registry := event.NewRegistry("routeagent_driver", np)
 	if err := registry.AddHandlers(
 		eventlogger.NewHandler(),
 		kubeproxy.NewSyncHandler(env.ClusterCidr, env.ServiceCidr),
-		ovn.NewHandler(&env, smClientset),
+		ovn.NewHandler(&env, smClientset, k8sClientSet, dynamicClientSet, config),
 		ovn.NewGatewayRouteHandler(&env, smClientset),
 		ovn.NewNonGatewayRouteHandler(smClientset, k8sClientSet),
 		cabledriver.NewXRFMCleanupHandler(),

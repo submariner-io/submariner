@@ -430,7 +430,7 @@ func startLeaderElection(leaderElectionClient kubernetes.Interface, recorder res
 	}
 
 	// Lock required for leader election
-	rl, err := resourcelock.New(resourcelock.ConfigMapsLeasesResourceLock, namespace, "submariner-gateway-lock",
+	rl, err := resourcelock.New(resourcelock.LeasesResourceLock, namespace, "submariner-gateway-lock",
 		leaderElectionClient.CoreV1(), leaderElectionClient.CoordinationV1(), resourcelock.ResourceLockConfig{
 			Identity:      id + "-submariner-gateway",
 			EventRecorder: recorder,

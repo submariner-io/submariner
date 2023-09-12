@@ -53,7 +53,6 @@ func (e linkNotFoundError) Error() string {
 }
 
 func (e linkNotFoundError) Is(err error) bool {
-	//nolint:errorlint // The given error should not be wrapped.
 	_, ok := err.(netlink.LinkNotFoundError)
 	return ok
 }
@@ -258,6 +257,10 @@ func (n *basicType) EnableLooseModeReversePathFilter(_ string) error {
 }
 
 func (n *basicType) EnsureLooseModeIsConfigured(_ string) error {
+	return nil
+}
+
+func (n *basicType) EnableForwarding(_ string) error {
 	return nil
 }
 
