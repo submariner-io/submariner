@@ -204,17 +204,16 @@ func discoverOvnKubernetesNetwork(ctx context.Context, k8sClientset clientset.In
 }
 
 /*
-
-openshift non-ic: in this case there will get the "app=ovnkube-node" and check for ovnkube-db service,
-if present we will the default Openshift db path
-
-openshift ic with one node per zone: if above service is not present we will return default Openshift socket path
+	OpenShift non-ic: Identify pods labeled as "app=ovnkube-node" along with a corresponding service named ovnkube-db.
+	When we locate such pods and services, we use the defaultOpenshiftOVNNBDB path.
+	OpenShift with OVN-IC and one node per zone: If the ovnkube-db service does not exist, we use the
+	defaultOVNOpenshiftUnixSocket path.
 */
 
 func discoverOpenshiftOvnKubernetesNetwork(ctx context.Context, k8sClientSet clientset.Interface) (string, error) {
-	ovnPod, err := FindPod(ctx, k8sClientSet, "app=ovnkube-node")
+	ovnPod, err := FindPod(ctx, k8sClientSet, ovnPodLabel)
 	if err != nil {
-		return "", errors.Wrap(err, "error finding a pod with label \"app=ovnkube-node\"")
+		return "", errors.Wrapf(err, "error finding a pod with label %q", ovnPodLabel)
 	}
 
 	_, err = k8sClientSet.CoreV1().Services(ovnPod.Namespace).Get(ctx, ovnKubeService, metav1.GetOptions{})
@@ -226,13 +225,16 @@ func discoverOpenshiftOvnKubernetesNetwork(ctx context.Context, k8sClientSet cli
 }
 
 /*
-   The discovery method is different for each kind of deployment.
-        kind non-ic: Get the db pod with label name=ovnkube-db, if present will get the protocol and other details from it
+The discovery method varies based on the deployment type.
 
-        kind ic with multiple node per zone: we parse every endpoint in the namespace ovn uses and find the one that has
-        same zone as the node in which route-agent runs. To get the ovn namespace we use pods running on app=ovnkube-node.
+	kind non-ic: Search for the db pod with label "name=ovnkube-db" and if its present, use the protocol and other
+	details from the pod.
 
-        kind ic with one node per zone: we will have no endpoints matching hence we will return default kind socket path
+	kind ic with multiple nodes per zone: Parse every endpoint in the namespace where OVN pods are running and find the
+	one that has same zone as the node in which route-agent runs. To get the ovn namespace we use the namespace of the
+	pods with label app=ovnkube-node.
+
+	kind ic with one node per zone: we will have no endpoints matching hence we will return default kind socket path
 */
 
 func discoverKindOvnKubernetesNetwork(ctx context.Context, k8sClientSet clientset.Interface, zoneName string) (string, error) {
@@ -245,9 +247,13 @@ func discoverKindOvnKubernetesNetwork(ctx context.Context, k8sClientSet clientse
 		return discoverKindOvnDBClusterNetwork(ctx, ovnDBPod, k8sClientSet)
 	}
 
-	ovnPod, err := FindPod(ctx, k8sClientSet, "app=ovnkube-node")
+	ovnPod, err := FindPod(ctx, k8sClientSet, ovnPodLabel)
 	if err != nil {
 		return "", err
+	}
+
+	if ovnPod == nil {
+		return "", fmt.Errorf("error finding the pod with label %q", ovnPodLabel)
 	}
 
 	return discoverKindOvnNodeClusterNetwork(ctx, k8sClientSet, zoneName, ovnPod)
