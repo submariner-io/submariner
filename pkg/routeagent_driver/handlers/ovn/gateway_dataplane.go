@@ -102,9 +102,20 @@ func (ovn *Handler) getForwardingRuleSpecs() ([][]string, error) {
 			"this will be retried")
 	}
 
-	rules := [][]string{
-		{"-i", OVNK8sMgmntIntfName, "-o", ovn.cableRoutingInterface.Name, "-j", "ACCEPT"},
-		{"-i", ovn.cableRoutingInterface.Name, "-o", OVNK8sMgmntIntfName, "-j", "ACCEPT"},
+	// On the Gateway node, the incoming traffic first lands on the br-ex, which includes the physical interface.
+	// The OpenFlow rules on the br-ex subsequently direct Submariner traffic to the local networking stack.
+	// To reroute incoming traffic over the ovn-k8s-mp0 interface, we employ routes in table 149. Before the traffic
+	// hits ovn-k8s-mp0, firewall rules would be processed. Therefore, we include these firewall rules in the FORWARDing
+	// chain to allow such traffic. Similar thing happens for outbound traffic as well, and we use routes in table 150.
+	rules := [][]string{}
+	for _, remoteCIDR := range ovn.getRemoteSubnets().UnsortedList() {
+		rules = append(rules,
+			[]string{
+				"-d", remoteCIDR, "-i", OVNK8sMgmntIntfName, "-o", ovn.cableRoutingInterface.Name, "-j", "ACCEPT",
+			},
+			[]string{
+				"-s", remoteCIDR, "-i", ovn.cableRoutingInterface.Name, "-o", OVNK8sMgmntIntfName, "-j", "ACCEPT",
+			})
 	}
 
 	return rules, nil
