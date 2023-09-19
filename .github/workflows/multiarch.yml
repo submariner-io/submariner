@@ -14,7 +14,7 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac
       - name: Set up QEMU (to support building on non-native architectures)
-        uses: docker/setup-qemu-action@2b82ce82d56a2a04d2637cd93a637ae1b359c0a7
+        uses: docker/setup-qemu-action@68827325e0b33c7199eb31dd4e31fbe9023e06e3
       - name: Build the multi-arch images
         run: make multiarch-images
       - name: Check that we actually build multi-arch images
