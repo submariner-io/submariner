@@ -120,19 +120,21 @@ func testEndpointSyncing() {
 	})
 
 	When("the local Node's global IP is updated", func() {
-		It("should update the local Endpoint's HealthCheckIP", func() {
-			awaitEndpoint(t.localEndpoints, &t.localEndpoint.Spec)
+		var node *corev1.Node
 
-			node := &corev1.Node{
+		BeforeEach(func() {
+			node = &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        nodeName,
 					Annotations: map[string]string{constants.SmGlobalIP: "200.0.0.40"},
 				},
 			}
 
-			t.localEndpoint.Spec.HealthCheckIP = node.Annotations[constants.SmGlobalIP]
-
 			test.CreateResource(t.localNodes, node)
+		})
+
+		It("should update the local Endpoint's HealthCheckIP", func() {
+			t.localEndpoint.Spec.HealthCheckIP = node.Annotations[constants.SmGlobalIP]
 			awaitEndpoint(t.localEndpoints, &t.localEndpoint.Spec)
 
 			node.Annotations[constants.SmGlobalIP] = "200.0.0.100"
