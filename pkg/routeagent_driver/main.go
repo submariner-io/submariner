@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
@@ -47,10 +48,12 @@ import (
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/mtu"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
 	"github.com/submariner-io/submariner/pkg/versions"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
+	nodeutil "k8s.io/component-helpers/node/util"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
@@ -108,6 +111,12 @@ func main() {
 	smClientset, err := submarinerClientset.NewForConfig(cfg)
 	if err != nil {
 		logger.Fatalf("Error building submariner clientset: %s", err.Error())
+	}
+
+	if env.WaitForNode {
+		waitForNodeReady(k8sClientSet)
+
+		return
 	}
 
 	np := os.Getenv("SUBMARINER_NETWORKPLUGIN")
@@ -213,5 +222,26 @@ func uninstall(k8sClientSet *kubernetes.Clientset, registry *event.Registry) {
 
 	if err := annotateNode([]string{}, k8sClientSet); err != nil {
 		logger.Warningf("Error removing %q annotation: %v", constants.CNIInterfaceIP, err)
+	}
+}
+
+func waitForNodeReady(k8sClientSet *kubernetes.Clientset) {
+	// In most cases the node will already be ready; otherwise, wait for ever
+	for {
+		localNode, err := node.GetLocalNode(k8sClientSet)
+
+		if err != nil {
+			logger.Error(err, "Error retrieving local node")
+		} else if localNode != nil {
+			_, condition := nodeutil.GetNodeCondition(&localNode.Status, corev1.NodeReady)
+			if condition != nil && condition.Status == corev1.ConditionTrue {
+				logger.Info("Node ready")
+				return
+			}
+
+			logger.Infof("Node not ready, waiting: %v", localNode.Status)
+		}
+
+		time.Sleep(1 * time.Second)
 	}
 }
