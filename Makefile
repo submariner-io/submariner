@@ -75,6 +75,9 @@ bin/%/submariner-route-agent: $(shell find pkg/routeagent_driver)
 bin/%/submariner-globalnet: $(shell find pkg/globalnet)
 	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ ./pkg/globalnet
 
+bin/%/kubectl: tools/kubectl.go
+	cd tools && GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh ../$@ ./kubectl.go
+
 
 nullstring :=
 space := $(nullstring) # end of the line

@@ -9,7 +9,7 @@ ARG TARGETPLATFORM
 
 COPY . ${SOURCE}
 
-RUN make -C ${SOURCE} LOCAL_BUILD=1 bin/${TARGETPLATFORM}/submariner-route-agent
+RUN make -C ${SOURCE} LOCAL_BUILD=1 bin/${TARGETPLATFORM}/submariner-route-agent bin/${TARGETPLATFORM}/kubectl
 
 FROM --platform=${BUILDPLATFORM} fedora:${FEDORA_VERSION} AS base
 ARG FEDORA_VERSION
@@ -30,7 +30,7 @@ WORKDIR /var/submariner
 
 COPY --from=base /output/route-agent /
 
-COPY --from=builder ${SOURCE}/package/submariner-route-agent.sh ${SOURCE}/bin/${TARGETPLATFORM}/submariner-route-agent /usr/local/bin/
+COPY --from=builder ${SOURCE}/package/submariner-route-agent.sh ${SOURCE}/bin/${TARGETPLATFORM}/submariner-route-agent ${SOURCE}/bin/${TARGETPLATFORM}/kubectl /usr/local/bin/
 
 # Wrapper scripts to choose the appropriate iptables
 # https://github.com/kubernetes-sigs/iptables-wrappers
