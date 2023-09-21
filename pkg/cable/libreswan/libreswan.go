@@ -616,19 +616,9 @@ func (i *libreswan) runPluto() error {
 		logger.Fatalf("Pluto exited: %v", cmd.Wait())
 	}()
 
-	// Wait up to 5s for the control socket.
-	for i := 0; i < 250; i++ {
-		_, err := os.Stat("/run/pluto/pluto.ctl")
-		if err == nil {
-			break
-		}
-
-		if !os.IsNotExist(err) {
-			logger.Infof("Failed to stat the control socket: %v", err)
-			break
-		}
-
-		time.Sleep(20 * time.Millisecond)
+	err := i.waitForControlSocket()
+	if err != nil {
+		return err
 	}
 
 	if i.debug {
@@ -638,6 +628,29 @@ func (i *libreswan) runPluto() error {
 	}
 
 	return nil
+}
+
+func (i *libreswan) waitForControlSocket() error {
+	// Wait for upto a minute for the control socket to be created.
+	const maxAttempts = 600
+	const retryInterval = 100 * time.Millisecond
+	const controlSocketPath = "/run/pluto/pluto.ctl"
+
+	for i := 0; i < maxAttempts; i++ {
+		_, err := os.Stat(controlSocketPath)
+		if err == nil {
+			return nil
+		}
+
+		if !os.IsNotExist(err) {
+			logger.Infof("Failed to stat the control socket: %v", err)
+			break
+		}
+
+		time.Sleep(retryInterval)
+	}
+
+	return fmt.Errorf("timed out waiting for the control socket at %s", controlSocketPath)
 }
 
 func (i *libreswan) Cleanup() error {
