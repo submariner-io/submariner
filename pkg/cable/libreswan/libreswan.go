@@ -308,7 +308,7 @@ func whack(args ...string) error {
 	var err error
 
 	for i := 0; i < 3; i++ {
-		err := func() error {
+		err = func() error {
 			ctx, cancel := context.WithTimeout(context.TODO(), whackTimeout)
 			defer cancel()
 
