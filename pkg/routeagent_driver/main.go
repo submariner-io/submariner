@@ -134,13 +134,7 @@ func main() {
 	}
 
 	if env.Uninstall {
-		if err := registry.StopHandlers(true); err != nil {
-			logger.Warningf("Error stopping handlers: %v", err)
-		}
-
-		if err = annotateNode([]string{}, k8sClientSet); err != nil {
-			logger.Warningf("Error removing %q annotation: %v", constants.CNIInterfaceIP, err)
-		}
+		uninstall(k8sClientSet, registry)
 
 		return
 	}
@@ -210,4 +204,14 @@ func getTCPMssValue(k8sClientSet *kubernetes.Clientset) int {
 	}
 
 	return tcpMssValue
+}
+
+func uninstall(k8sClientSet *kubernetes.Clientset, registry *event.Registry) {
+	if err := registry.StopHandlers(true); err != nil {
+		logger.Warningf("Error stopping handlers: %v", err)
+	}
+
+	if err := annotateNode([]string{}, k8sClientSet); err != nil {
+		logger.Warningf("Error removing %q annotation: %v", constants.CNIInterfaceIP, err)
+	}
 }
