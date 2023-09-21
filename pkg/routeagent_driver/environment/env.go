@@ -23,6 +23,7 @@ type Specification struct {
 	Namespace   string
 	ClusterCidr []string
 	ServiceCidr []string
-	Uninstall   bool
 	GlobalCidr  []string
+	Uninstall   bool
+	WaitForNode bool
 }
