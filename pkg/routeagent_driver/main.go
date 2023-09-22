@@ -216,8 +216,12 @@ func getTCPMssValue(k8sClientSet *kubernetes.Clientset) int {
 }
 
 func uninstall(k8sClientSet *kubernetes.Clientset, registry *event.Registry) {
-	if err := registry.StopHandlers(true); err != nil {
+	if err := registry.StopHandlers(); err != nil {
 		logger.Warningf("Error stopping handlers: %v", err)
+	}
+
+	if err := registry.Uninstall(); err != nil {
+		logger.Warningf("Error uninstalling handlers: %v", err)
 	}
 
 	if err := annotateNode([]string{}, k8sClientSet); err != nil {

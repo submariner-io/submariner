@@ -35,9 +35,11 @@ type Handler interface {
 	// GetNetworkPlugin returns the kubernetes network plugin that this handler supports.
 	GetNetworkPlugins() []string
 
-	// Stop is called once during shutdown to let the handler perform any cleanup. The uninstall flag indicates
-	// whether or not Submariner is being completely uninstalled from the system.
-	Stop(uninstall bool) error
+	// Stop is called once during shutdown to let the handler perform any cleanup.
+	Stop() error
+
+	// Uninstall is called once after shutdown to let the handler process a Submariner uninstallation.
+	Uninstall() error
 
 	// TransitionToNonGateway is called once for each transition of the local node from Gateway to a non-Gateway.
 	TransitionToNonGateway() error
@@ -80,7 +82,11 @@ func (ev *HandlerBase) Init() error {
 	return nil
 }
 
-func (ev *HandlerBase) Stop(_ bool) error {
+func (ev *HandlerBase) Stop() error {
+	return nil
+}
+
+func (ev *HandlerBase) Uninstall() error {
 	return nil
 }
 

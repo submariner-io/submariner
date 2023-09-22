@@ -87,10 +87,15 @@ const (
 	EvNodeUpdated            = "NodeUpdated"
 	EvNodeRemoved            = "NodeRemoved"
 	EvStop                   = "Stop"
+	EvUninstall              = "Uninstall"
 )
 
-func (t *TestHandler) Stop(uninstall bool) error {
-	return t.addEvent(EvStop, uninstall)
+func (t *TestHandler) Stop() error {
+	return t.addEvent(EvStop, nil)
+}
+
+func (t *TestHandler) Uninstall() error {
+	return t.addEvent(EvUninstall, nil)
 }
 
 func (t *TestHandler) TransitionToNonGateway() error {

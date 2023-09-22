@@ -25,15 +25,15 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-func (ovn *Handler) Stop(uninstall bool) error {
+func (ovn *Handler) Stop() error {
 	ovn.gatewayRouteController.stop()
 	ovn.nonGatewayRouteController.stop()
 	close(ovn.stopCh)
 
-	if !uninstall {
-		return nil
-	}
+	return nil
+}
 
+func (ovn *Handler) Uninstall() error {
 	logger.Infof("Uninstalling OVN components from the node")
 
 	err := ovn.cleanupRoutes()

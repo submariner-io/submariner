@@ -91,9 +91,15 @@ func (er *Registry) AddHandlers(eventHandlers ...Handler) error {
 	return nil
 }
 
-func (er *Registry) StopHandlers(uninstall bool) error {
+func (er *Registry) StopHandlers() error {
 	return er.invokeHandlers("Stop", func(h Handler) error {
-		return h.Stop(uninstall) //nolint:wrapcheck  // Let the caller wrap it
+		return h.Stop() //nolint:wrapcheck  // Let the caller wrap it
+	})
+}
+
+func (er *Registry) Uninstall() error {
+	return er.invokeHandlers("Uninstall", func(h Handler) error {
+		return h.Uninstall() //nolint:wrapcheck  // Let the caller wrap it
 	})
 }
 

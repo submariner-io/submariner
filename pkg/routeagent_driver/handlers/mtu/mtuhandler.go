@@ -238,11 +238,7 @@ func (h *mtuHandler) newNamedIPSet(key string, ipSetIface ipset.Interface) ipset
 	}, ipSetIface)
 }
 
-func (h *mtuHandler) Stop(uninstall bool) error {
-	if !uninstall {
-		return nil
-	}
-
+func (h *mtuHandler) Uninstall() error {
 	logger.Infof("Flushing iptable entries in %q chain of %q table", constants.SmPostRoutingChain, constants.MangleTable)
 
 	if err := h.ipt.ClearChain(constants.MangleTable, constants.SmPostRoutingChain); err != nil {

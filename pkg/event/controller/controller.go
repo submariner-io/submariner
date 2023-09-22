@@ -159,7 +159,7 @@ func (c *Controller) Start(stopCh <-chan struct{}) error {
 func (c *Controller) Stop() {
 	logger.Info("Event controller stopping")
 
-	if err := c.handlers.StopHandlers(false); err != nil {
+	if err := c.handlers.StopHandlers(); err != nil {
 		logger.Warningf("In Event Controller, StopHandlers returned error: %v", err)
 	}
 }

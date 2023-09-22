@@ -29,11 +29,7 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-func (kp *SyncHandler) Stop(uninstall bool) error {
-	if !uninstall {
-		return nil
-	}
-
+func (kp *SyncHandler) Uninstall() error {
 	logger.Infof("Uninstalling Submariner changes from the node %q", kp.hostname)
 	logger.Infof("Flushing route table %d entries", constants.RouteAgentHostNetworkTableID)
 
