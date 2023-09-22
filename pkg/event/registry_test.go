@@ -145,7 +145,8 @@ func allEvents(registry *event.Registry) map[testing.TestEvent]func() error {
 	node := &k8sV1.Node{ObjectMeta: v1meta.ObjectMeta{Name: "node1"}}
 
 	return map[testing.TestEvent]func() error{
-		{Name: testing.EvStop, Parameter: false}:                     func() error { return registry.StopHandlers(false) },
+		{Name: testing.EvStop}:                                       func() error { return registry.StopHandlers() },
+		{Name: testing.EvUninstall}:                                  func() error { return registry.Uninstall() },
 		{Name: testing.EvTransitionToGateway}:                        registry.TransitionToGateway,
 		{Name: testing.EvTransitionToNonGateway}:                     registry.TransitionToNonGateway,
 		{Name: testing.EvNodeCreated, Parameter: node}:               func() error { return registry.NodeCreated(node) },

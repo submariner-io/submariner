@@ -128,8 +128,8 @@ func (h *calicoIPPoolHandler) TransitionToGateway() error {
 	return errorutils.NewAggregate(retErrors)
 }
 
-func (h *calicoIPPoolHandler) Stop(uninstall bool) error {
-	if !uninstall || !h.isGateway.Load() {
+func (h *calicoIPPoolHandler) Uninstall() error {
+	if !h.isGateway.Load() {
 		return nil
 	}
 
