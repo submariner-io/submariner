@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
         with:
           fetch-depth: 0
 
@@ -36,7 +36,7 @@ jobs:
       security-events: write
     steps:
       - name: Check out the repository
-        uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
       - name: Initialize CodeQL
         uses: github/codeql-action/init@ddccb873888234080b77e9bc2d4764d5ccaaccf9
         with:
@@ -55,7 +55,7 @@ jobs:
       security-events: write
     steps:
       - name: Check out the repository
-        uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
       - name: Run Anchore vulnerability scanner
         uses: anchore/scan-action@24fd7c9060f3c96848dd1929fac8d796fb5ae4b4
         id: scan
