@@ -216,7 +216,8 @@ func updateNodeAnnotation(node runtime.Object, globalIP string) runtime.Object {
 
 func (n *nodeController) onNodeUpdated(oldObj, newObj *unstructured.Unstructured) bool {
 	if oldObj.GetName() != n.nodeName {
-		return true
+		// We return false here as we want the event to be processed for any stale globalIPs
+		return false
 	}
 
 	oldCNIIfaceIPOnNode := oldObj.GetAnnotations()[routeAgent.CNIInterfaceIP]
