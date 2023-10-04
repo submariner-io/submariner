@@ -98,8 +98,11 @@ func (n *nodeController) process(from runtime.Object, _ int, op syncer.Operation
 	// If the event corresponds to a different node which has globalIP annotation, release the globalIP back to Pool.
 	if node.Name != n.nodeName {
 		if existingGlobalIP := node.GetAnnotations()[constants.SmGlobalIP]; existingGlobalIP != "" {
+			logger.Infof("Processing %sd non-gateway node %q - releasing GlobalIP %q", op, node.Name, existingGlobalIP)
+
 			if op == syncer.Delete {
 				_ = n.pool.Release(existingGlobalIP)
+
 				return nil, false
 			}
 
@@ -186,6 +189,8 @@ func (n *nodeController) reserveAllocatedIP(federator federate.Federator, obj *u
 
 		return errors.Wrap(federator.Distribute(updateNodeAnnotation(obj, "")), "error updating the Node global IP annotation")
 	}
+
+	logger.Infof("Successfully reserved allocated GlobalIP %q for node %q", existingGlobalIP, obj.GetName())
 
 	return nil
 }
