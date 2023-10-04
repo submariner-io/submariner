@@ -154,6 +154,9 @@ func (c *baseIPAllocationController) reserveAllocatedIPs(federator federate.Fede
 		return federator.Distribute(obj) //nolint:wrapcheck  // Let the caller wrap it
 	}
 
+	logger.Infof("Successfully reserved GlobalIPs %q for %s \"%s/%s\"", reservedIPs, obj.GetKind(),
+		obj.GetNamespace(), obj.GetName())
+
 	return nil
 }
 
