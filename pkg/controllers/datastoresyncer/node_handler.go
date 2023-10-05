@@ -21,7 +21,6 @@ package datastoresyncer
 import (
 	"net"
 
-	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -62,8 +61,9 @@ func (d *DatastoreSyncer) areNodesEquivalent(obj1, obj2 *unstructured.Unstructur
 	existingGlobalIP := obj1.GetAnnotations()[constants.SmGlobalIP]
 	newGlobalIP := obj2.GetAnnotations()[constants.SmGlobalIP]
 
-	logger.V(log.TRACE).Infof("areNodesEquivalent called for %q, existingGlobalIP %q, newGlobalIP %q",
-		obj1.GetName(), existingGlobalIP, newGlobalIP)
+	if existingGlobalIP != newGlobalIP {
+		logger.Infof("Global IP for node %q changed from %q to %q", obj1.GetName(), existingGlobalIP, newGlobalIP)
+	}
 
 	return existingGlobalIP == newGlobalIP
 }
