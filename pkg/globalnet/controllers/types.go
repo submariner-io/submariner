@@ -19,8 +19,10 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
@@ -32,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/set"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -70,6 +73,8 @@ const (
 	DeleteRules = false
 
 	DefaultNumberOfClusterEgressIPs = 8
+
+	LeaderElectionLockName = "submariner-globalnet-lock"
 )
 
 type Interface interface {
@@ -85,18 +90,41 @@ type Specification struct {
 	Uninstall   bool
 }
 
+type LeaderElectionConfig struct {
+	LeaseDuration time.Duration
+	RenewDeadline time.Duration
+	RetryPeriod   time.Duration
+}
+
+type GatewayMonitorConfig struct {
+	watcher.Config
+	LeaderElectionConfig
+	Spec       Specification
+	LocalCIDRs []string
+	KubeClient kubernetes.Interface
+}
+
 type baseController struct {
 	stopCh chan struct{}
 }
 
+type LeaderElectionInfo struct {
+	stopFunc context.CancelFunc
+	stopped  chan struct{}
+}
+
 type gatewayMonitor struct {
 	*baseController
+	LeaderElectionConfig
 	syncerConfig            *syncer.ResourceSyncerConfig
 	endpointWatcher         watcher.Interface
+	kubeClient              kubernetes.Interface
 	remoteEndpointTimeStamp map[string]metav1.Time
 	spec                    Specification
 	ipt                     iptables.Interface
 	isGatewayNode           atomic.Bool
+	shuttingDown            atomic.Bool
+	leaderElectionInfo      atomic.Pointer[LeaderElectionInfo]
 	nodeName                string
 	localSubnets            []string
 	remoteSubnets           set.Set[string]
