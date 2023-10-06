@@ -39,6 +39,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/versions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -121,9 +122,16 @@ func main() {
 		logger.Fatalf("Cluster %s is not configured to use globalCidr", spec.ClusterID)
 	}
 
-	gatewayMonitor, err := controllers.NewGatewayMonitor(spec, append(cidr.ExtractIPv4Subnets(localCluster.Spec.ClusterCIDR),
-		cidr.ExtractIPv4Subnets(localCluster.Spec.ServiceCIDR)...),
-		&watcher.Config{RestConfig: cfg})
+	k8sClient, err := kubernetes.NewForConfig(cfg)
+	logger.FatalOnError(err, "Error creating Kubernetes clientset")
+
+	gatewayMonitor, err := controllers.NewGatewayMonitor(&controllers.GatewayMonitorConfig{
+		Config: watcher.Config{RestConfig: cfg},
+		Spec:   spec,
+		LocalCIDRs: append(cidr.ExtractIPv4Subnets(localCluster.Spec.ClusterCIDR),
+			cidr.ExtractIPv4Subnets(localCluster.Spec.ServiceCIDR)...),
+		KubeClient: k8sClient,
+	})
 	logger.FatalOnError(err, "Error creating gatewayMonitor")
 
 	err = gatewayMonitor.Start()

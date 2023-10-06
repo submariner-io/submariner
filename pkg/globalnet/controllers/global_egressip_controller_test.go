@@ -24,6 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	fakeDynClient "github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -592,6 +593,8 @@ func newGlobalEgressIPControllerTestDriver() *globalEgressIPControllerTestDriver
 
 		t.pool, err = ipam.NewIPPool(t.globalCIDR)
 		Expect(err).To(Succeed())
+
+		t.watches = fakeDynClient.NewWatchReactor(&t.dynClient.Fake)
 	})
 
 	JustBeforeEach(func() {

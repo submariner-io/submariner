@@ -46,7 +46,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -119,14 +118,7 @@ func newTestDriverBase() *testDriverBase {
 	Expect(submarinerv1.AddToScheme(t.scheme)).To(Succeed())
 	Expect(corev1.AddToScheme(t.scheme)).To(Succeed())
 
-	// TODO: Remove this workaround for https://github.com/kubernetes/client-go/issues/949 once
-	// admiral has been updated
-	t.scheme.AddKnownTypeWithName(schema.GroupVersionKind{Group: "fake-dynamic-client-group", Version: "v1", Kind: "List"},
-		&unstructured.UnstructuredList{})
-
 	t.dynClient = fakeDynClient.NewDynamicClient(t.scheme)
-
-	t.watches = fakeDynClient.NewWatchReactor(&t.dynClient.Fake)
 
 	t.globalEgressIPs = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.GlobalEgressIP{})).
 		Namespace(namespace)
