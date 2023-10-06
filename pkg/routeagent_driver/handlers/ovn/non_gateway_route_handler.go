@@ -34,7 +34,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 )
 
@@ -170,20 +169,11 @@ func (h *NonGatewayRouteHandler) newNonGatewayRoute(endpoint *submarinerv1.Endpo
 	}
 }
 
-//nolint // These functions are pass-through wrappers for the k8s APIs.
-func (h *NonGatewayRouteHandler) nonGatewayResourceInterface(namespace string) resource.Interface {
-	return &resource.InterfaceFuncs{
-		GetFunc: func(ctx context.Context, name string, options metav1.GetOptions) (runtime.Object, error) {
-			return h.smClient.SubmarinerV1().NonGatewayRoutes(namespace).Get(ctx, name, options)
-		},
-		CreateFunc: func(ctx context.Context, obj runtime.Object, options metav1.CreateOptions) (runtime.Object, error) {
-			return h.smClient.SubmarinerV1().NonGatewayRoutes(namespace).Create(ctx, obj.(*submarinerv1.NonGatewayRoute), options)
-		},
-		UpdateFunc: func(ctx context.Context, obj runtime.Object, options metav1.UpdateOptions) (runtime.Object, error) {
-			return h.smClient.SubmarinerV1().NonGatewayRoutes(namespace).Update(ctx, obj.(*submarinerv1.NonGatewayRoute), options)
-		},
-		DeleteFunc: func(ctx context.Context, name string, options metav1.DeleteOptions) error {
-			return h.smClient.SubmarinerV1().NonGatewayRoutes(namespace).Delete(ctx, name, options)
-		},
+func (h *NonGatewayRouteHandler) nonGatewayResourceInterface(namespace string) resource.Interface[*submarinerv1.NonGatewayRoute] {
+	return &resource.InterfaceFuncs[*submarinerv1.NonGatewayRoute]{
+		GetFunc:    h.smClient.SubmarinerV1().NonGatewayRoutes(namespace).Get,
+		CreateFunc: h.smClient.SubmarinerV1().NonGatewayRoutes(namespace).Create,
+		UpdateFunc: h.smClient.SubmarinerV1().NonGatewayRoutes(namespace).Update,
+		DeleteFunc: h.smClient.SubmarinerV1().NonGatewayRoutes(namespace).Delete,
 	}
 }

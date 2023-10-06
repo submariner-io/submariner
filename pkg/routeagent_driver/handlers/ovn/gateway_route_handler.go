@@ -33,7 +33,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type GatewayRouteHandler struct {
@@ -151,21 +150,11 @@ func (h *GatewayRouteHandler) newGatewayRoute(endpoint *submarinerv1.Endpoint) *
 	}
 }
 
-//nolint // These functions are pass-through wrappers for the k8s APIs.
-func (h *GatewayRouteHandler) gatewayResourceInterface(namespace string) resource.Interface {
-
-	return &resource.InterfaceFuncs{
-		GetFunc: func(ctx context.Context, name string, options metav1.GetOptions) (runtime.Object, error) {
-			return h.smClient.SubmarinerV1().GatewayRoutes(namespace).Get(ctx, name, options)
-		},
-		CreateFunc: func(ctx context.Context, obj runtime.Object, options metav1.CreateOptions) (runtime.Object, error) {
-			return h.smClient.SubmarinerV1().GatewayRoutes(namespace).Create(ctx, obj.(*submarinerv1.GatewayRoute), options)
-		},
-		UpdateFunc: func(ctx context.Context, obj runtime.Object, options metav1.UpdateOptions) (runtime.Object, error) {
-			return h.smClient.SubmarinerV1().GatewayRoutes(namespace).Update(ctx, obj.(*submarinerv1.GatewayRoute), options)
-		},
-		DeleteFunc: func(ctx context.Context, name string, options metav1.DeleteOptions) error {
-			return h.smClient.SubmarinerV1().GatewayRoutes(namespace).Delete(ctx, name, options)
-		},
+func (h *GatewayRouteHandler) gatewayResourceInterface(namespace string) resource.Interface[*submarinerv1.GatewayRoute] {
+	return &resource.InterfaceFuncs[*submarinerv1.GatewayRoute]{
+		GetFunc:    h.smClient.SubmarinerV1().GatewayRoutes(namespace).Get,
+		CreateFunc: h.smClient.SubmarinerV1().GatewayRoutes(namespace).Create,
+		UpdateFunc: h.smClient.SubmarinerV1().GatewayRoutes(namespace).Update,
+		DeleteFunc: h.smClient.SubmarinerV1().GatewayRoutes(namespace).Delete,
 	}
 }

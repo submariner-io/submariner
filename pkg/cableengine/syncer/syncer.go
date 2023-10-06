@@ -36,7 +36,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
 	v1typed "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -104,21 +103,12 @@ func (gs *GatewaySyncer) SetGatewayStatusError(err error) {
 	gs.syncGatewayStatusSafe()
 }
 
-func (gs *GatewaySyncer) gatewayResourceInterface() resource.Interface {
-	//nolint:wrapcheck // These functions are pass-through wrappers for the k8s APIs.
-	return &resource.InterfaceFuncs{
-		GetFunc: func(ctx context.Context, name string, options metav1.GetOptions) (runtime.Object, error) {
-			return gs.client.Get(ctx, name, options)
-		},
-		CreateFunc: func(ctx context.Context, obj runtime.Object, options metav1.CreateOptions) (runtime.Object, error) {
-			return gs.client.Create(ctx, obj.(*v1.Gateway), options)
-		},
-		UpdateFunc: func(ctx context.Context, obj runtime.Object, options metav1.UpdateOptions) (runtime.Object, error) {
-			return gs.client.Update(ctx, obj.(*v1.Gateway), options)
-		},
-		DeleteFunc: func(ctx context.Context, name string, options metav1.DeleteOptions) error {
-			return gs.client.Delete(ctx, name, options)
-		},
+func (gs *GatewaySyncer) gatewayResourceInterface() resource.Interface[*v1.Gateway] {
+	return &resource.InterfaceFuncs[*v1.Gateway]{
+		GetFunc:    gs.client.Get,
+		CreateFunc: gs.client.Create,
+		UpdateFunc: gs.client.Update,
+		DeleteFunc: gs.client.Delete,
 	}
 }
 
@@ -129,12 +119,11 @@ func (gs *GatewaySyncer) syncGatewayStatusSafe() {
 	gatewayObj := gs.generateGatewayObject()
 
 	result, err := util.CreateOrUpdate(context.TODO(), gs.gatewayResourceInterface(), gatewayObj,
-		func(existing runtime.Object) (runtime.Object, error) {
-			existingGw := existing.(*v1.Gateway)
-			existingGw.Status = gatewayObj.Status
-			existingGw.Annotations = gatewayObj.Annotations
+		func(existing *v1.Gateway) (*v1.Gateway, error) {
+			existing.Status = gatewayObj.Status
+			existing.Annotations = gatewayObj.Annotations
 
-			return existingGw, nil
+			return existing, nil
 		})
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error creating/updating Gateway: %w", err))
