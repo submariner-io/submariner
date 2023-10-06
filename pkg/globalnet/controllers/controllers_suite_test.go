@@ -411,7 +411,7 @@ func (t *testDriverBase) awaitNoEndpoints(name string) {
 }
 
 func (t *testDriverBase) ensureNoEndpoints(name string) {
-	testutil.EnsureNoResource(resource.ForDynamic(t.endpoints), name)
+	testutil.EnsureNoResource[runtime.Object](resource.ForDynamic(t.endpoints), name)
 }
 
 func (t *testDriverBase) awaitEndpointsHasIP(name, ip string) {
@@ -493,7 +493,7 @@ func (t *testDriverBase) awaitNoGlobalIngressIP(name string) {
 }
 
 func (t *testDriverBase) ensureNoGlobalIngressIP(name string) {
-	testutil.EnsureNoResource(resource.ForDynamic(t.globalIngressIPs), name)
+	testutil.EnsureNoResource[runtime.Object](resource.ForDynamic(t.globalIngressIPs), name)
 }
 
 func (t *testDriverBase) ensureNoGlobalIngressIPs() {

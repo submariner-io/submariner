@@ -308,7 +308,7 @@ func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngre
 		}
 
 		if exists {
-			if err = finalizer.Remove(context.TODO(), resource.ForDynamic(c.services.Namespace(ingressIP.Namespace)), intSvc,
+			if err = finalizer.Remove[runtime.Object](context.TODO(), resource.ForDynamic(c.services.Namespace(ingressIP.Namespace)), intSvc,
 				InternalServiceFinalizer); err != nil {
 				logger.Errorf(err, "Error while removing the finalizer from service %q", key)
 				return true
@@ -368,7 +368,7 @@ func (c *globalIngressIPController) ensureInternalServiceExists(ingressIP *subma
 		// A user is ideally not supposed to modify the external-ip of the Globalnet internal service, but
 		// in-case its done accidentally, as part of controller start/re-start scenario, this code will fix
 		// the issue by deleting and re-creating the internal service with valid configuration.
-		if err := finalizer.Remove(context.TODO(), resource.ForDynamic(c.services.Namespace(ingressIP.Namespace)), service,
+		if err := finalizer.Remove[runtime.Object](context.TODO(), resource.ForDynamic(c.services.Namespace(ingressIP.Namespace)), service,
 			InternalServiceFinalizer); err != nil {
 			return fmt.Errorf("error while removing the finalizer from globalnet internal service %q", key)
 		}
