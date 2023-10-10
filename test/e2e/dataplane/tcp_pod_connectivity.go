@@ -25,7 +25,9 @@ import (
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
 )
 
-var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters without discovery", func() {
+const TestLabel = "dataplane"
+
+var _ = Describe("Basic TCP connectivity tests across clusters without discovery", Label(TestLabel), func() {
 	f := framework.NewFramework("dataplane-conn-nd")
 	var toEndpointType tcp.EndpointType
 	var networking framework.NetworkingType
@@ -64,7 +66,7 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 			toCluster = framework.ClusterB
 		})
 
-		When("the pod is not on a gateway and the remote pod is not on a gateway", func() {
+		When("the pod is not on a gateway and the remote pod is not on a gateway", Label(framework.BasicTestLabel), func() {
 			verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode)
 		})
 
@@ -76,7 +78,7 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 			verifyInteraction(framework.GatewayNode, framework.NonGatewayNode)
 		})
 
-		When("the pod is on a gateway and the remote pod is on a gateway", func() {
+		When("the pod is on a gateway and the remote pod is on a gateway", Label(framework.BasicTestLabel), func() {
 			verifyInteraction(framework.GatewayNode, framework.GatewayNode)
 		})
 	})
@@ -89,7 +91,7 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 			toCluster = framework.ClusterB
 		})
 
-		When("the pod is not on a gateway and the remote service is not on a gateway", func() {
+		When("the pod is not on a gateway and the remote service is not on a gateway", Label(framework.BasicTestLabel), func() {
 			verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode)
 		})
 
@@ -101,7 +103,7 @@ var _ = Describe("[dataplane] Basic TCP connectivity tests across clusters witho
 			verifyInteraction(framework.GatewayNode, framework.NonGatewayNode)
 		})
 
-		When("the pod is on a gateway and the remote service is on a gateway", func() {
+		When("the pod is on a gateway and the remote service is on a gateway", Label(framework.BasicTestLabel), func() {
 			verifyInteraction(framework.GatewayNode, framework.GatewayNode)
 		})
 	})

@@ -25,7 +25,7 @@ import (
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
 )
 
-var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across overlapping clusters without discovery", func() {
+var _ = Describe("Basic TCP connectivity tests across overlapping clusters without discovery", Label(TestLabel, "globalnet"), func() {
 	f := framework.NewFramework("dataplane-gn-conn-nd")
 	var toEndpointType tcp.EndpointType
 	var networking framework.NetworkingType
@@ -66,7 +66,7 @@ var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across over
 			toCluster = framework.ClusterB
 		})
 
-		When("the pod is not on a gateway and the remote service is not on a gateway", func() {
+		When("the pod is not on a gateway and the remote service is not on a gateway", Label(framework.BasicTestLabel), func() {
 			verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode)
 		})
 
@@ -74,7 +74,7 @@ var _ = Describe("[dataplane-globalnet] Basic TCP connectivity tests across over
 			verifyInteraction(framework.GatewayNode, framework.NonGatewayNode)
 		})
 
-		When("the pod is on a gateway and the remote service is on a gateway", func() {
+		When("the pod is on a gateway and the remote service is on a gateway", Label(framework.BasicTestLabel), func() {
 			verifyInteraction(framework.GatewayNode, framework.GatewayNode)
 		})
 	})

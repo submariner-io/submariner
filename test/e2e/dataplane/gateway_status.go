@@ -31,7 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var _ = Describe("[dataplane] Gateway status reporting", func() {
+var _ = Describe("Gateway status reporting", Label(TestLabel), func() {
 	f := subFramework.NewFramework("dataplane-gateway-status")
 
 	When("a gateway node is configured", func() {
