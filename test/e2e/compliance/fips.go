@@ -27,7 +27,9 @@ import (
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
 )
 
-var _ = Describe("[compliance] FIPS", func() {
+const TestLabel = "compliance"
+
+var _ = Describe("FIPS", Label(TestLabel), func() {
 	f := subFramework.NewFramework("fips-gateway-status")
 
 	When("FIPS mode is enabled for the active gateway node", func() {

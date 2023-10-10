@@ -37,9 +37,10 @@ const (
 	gatewayStatusLabel  = "gateway.submariner.io/status"
 	gatewayStatusActive = "active"
 	gatewayNodeLabel    = "gateway.submariner.io/node"
+	TestLabel           = "redundancy"
 )
 
-var _ = Describe("[redundancy] Gateway fail-over tests", func() {
+var _ = Describe("Gateway fail-over tests", Label(TestLabel), func() {
 	f := subFramework.NewFramework("gateway-redundancy")
 
 	// After each test, we make sure that the system again has a single gateway, the active one
