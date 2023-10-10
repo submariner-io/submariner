@@ -177,7 +177,7 @@ func (g *gatewayMonitor) Stop() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	g.stopControllers(ctx)
+	g.stopControllers(ctx, true)
 }
 
 func (g *gatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, _ int) bool {
@@ -245,7 +245,7 @@ func (g *gatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, _ in
 	} else if g.isGatewayNode.CompareAndSwap(true, false) {
 		logger.Infof("Transitioned to non-gateway node %q", endpoint.Spec.Hostname)
 
-		g.stopControllers(context.Background())
+		g.stopControllers(context.Background(), true)
 	}
 
 	return false
@@ -275,7 +275,7 @@ func (g *gatewayMonitor) handleRemovedEndpoint(obj runtime.Object, _ int) bool {
 		if g.isGatewayNode.CompareAndSwap(true, false) {
 			logger.Infof("Gateway node %q endpoint removed", hostname)
 
-			g.stopControllers(context.Background())
+			g.stopControllers(context.Background(), true)
 		}
 	} else if endpoint.Spec.ClusterID != g.spec.ClusterID {
 		// Endpoint associated with remote cluster is removed, delete the associated flows.
@@ -340,8 +340,14 @@ func (g *gatewayMonitor) startLeaderElection() {
 				close(leaderElectionInfo.stopped)
 
 				// We may have lost leadership due to failed renewal and not gateway node transition or shutdown, in which case we want to
-				// try to regain leadership.
-				g.startLeaderElection()
+				// try to regain leadership. We also stop the controllers in case there's a gateway transition during the time that
+				// leadership is lost and a new instance is able to contact the API server to acquire the lock. This avoids a potential
+				// window where both instances are running should this instance finally observe the gateway transition. Note that we don't
+				// clear the globalnet chains to avoid datapath disruption should leadership be regained.
+				if !g.shuttingDown.Load() && g.isGatewayNode.Load() {
+					g.stopControllers(context.Background(), false)
+					g.startLeaderElection()
+				}
 			},
 		},
 	})
@@ -455,7 +461,7 @@ func (g *gatewayMonitor) startControllers() error {
 	return nil
 }
 
-func (g *gatewayMonitor) stopControllers(ctx context.Context) {
+func (g *gatewayMonitor) stopControllers(ctx context.Context, clearGlobalnetChains bool) {
 	g.controllersMutex.Lock()
 
 	logger.Infof("Stopping %d controllers", len(g.controllers))
@@ -466,7 +472,9 @@ func (g *gatewayMonitor) stopControllers(ctx context.Context) {
 
 	g.controllers = nil
 
-	g.clearGlobalnetChains()
+	if clearGlobalnetChains {
+		g.clearGlobalnetChains()
+	}
 
 	leaderElectionInfo := g.leaderElectionInfo.Swap(&LeaderElectionInfo{})
 
