@@ -315,17 +315,6 @@ func getGlobalEgressIPStatus(client dynamic.ResourceInterface, name string) *sub
 	return status
 }
 
-func awaitNoAllocatedIPs(client dynamic.ResourceInterface, name string) {
-	Consistently(func() int {
-		status := getGlobalEgressIPStatus(client, name)
-		if status == nil {
-			return 0
-		}
-
-		return len(status.AllocatedIPs)
-	}, 200*time.Millisecond).Should(Equal(0))
-}
-
 func (t *testDriverBase) awaitEgressIPStatus(client dynamic.ResourceInterface, name string, expNumIPS int, expCond ...metav1.Condition) {
 	t.awaitStatusConditions(client, name, expCond...)
 

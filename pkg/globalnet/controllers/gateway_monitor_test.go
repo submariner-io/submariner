@@ -61,17 +61,8 @@ var _ = Describe("Endpoint monitoring", func() {
 			t.createIPTableChain("nat", kubeProxyIPTableChainName)
 		})
 
-		It("should add the appropriate IP table chains", func() {
-			t.ipt.AwaitChain("nat", constants.SmGlobalnetIngressChain)
-			t.ipt.AwaitChain("nat", constants.SmGlobalnetEgressChain)
-			t.ipt.AwaitChain("nat", routeAgent.SmPostRoutingChain)
-			t.ipt.AwaitChain("nat", constants.SmGlobalnetMarkChain)
-		})
-
 		It("should start the controllers", func() {
-			t.awaitLeaderLockAcquired()
-
-			t.awaitClusterGlobalEgressIPStatusAllocated(controllers.DefaultNumberOfClusterEgressIPs)
+			t.awaitControllersStarted()
 
 			t.createGlobalEgressIP(newGlobalEgressIP(globalEgressIPName, nil, nil))
 			t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, 1)
@@ -88,10 +79,9 @@ var _ = Describe("Endpoint monitoring", func() {
 			t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
 		})
 
-		Context("and then removed and recreated", func() {
+		Context("and then deleted and recreated", func() {
 			JustBeforeEach(func() {
-				t.awaitLeaderLockAcquired()
-				t.awaitClusterGlobalEgressIPStatusAllocated(controllers.DefaultNumberOfClusterEgressIPs)
+				t.awaitControllersStarted()
 
 				By("Deleting the Endpoint")
 
@@ -100,25 +90,17 @@ var _ = Describe("Endpoint monitoring", func() {
 
 			It("should stop and restart the controllers", func() {
 				t.awaitLeaderLockReleased()
-
-				t.ipt.AwaitNoChain("nat", constants.SmGlobalnetIngressChain)
-				t.ipt.AwaitNoChain("nat", constants.SmGlobalnetEgressChain)
-				t.ipt.AwaitNoChain("nat", constants.SmGlobalnetMarkChain)
-
-				time.Sleep(300 * time.Millisecond)
-				t.createGlobalEgressIP(newGlobalEgressIP(globalEgressIPName, nil, nil))
-				awaitNoAllocatedIPs(t.globalEgressIPs, globalEgressIPName)
-
-				t.createServiceExport(t.createService(newClusterIPService()))
-				t.ensureNoGlobalIngressIP(serviceName)
+				t.awaitNoGlobalnetChains()
+				t.ensureControllersStopped()
 
 				By("Recreating the Endpoint")
 
-				time.Sleep(300 * time.Millisecond)
+				time.Sleep(time.Millisecond * 300)
 				t.createEndpoint(newEndpointSpec(clusterID, t.hostName, localCIDR))
 
 				t.awaitLeaderLockAcquired()
-				t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, 1)
+				t.awaitGlobalnetChains()
+
 				t.awaitIngressIPStatusAllocated(serviceName)
 			})
 		})
@@ -131,8 +113,7 @@ var _ = Describe("Endpoint monitoring", func() {
 			})
 
 			JustBeforeEach(func() {
-				t.awaitLeaderLockAcquired()
-				t.awaitClusterGlobalEgressIPStatusAllocated(controllers.DefaultNumberOfClusterEgressIPs)
+				t.awaitControllersStarted()
 
 				// Since the RenewDeadline and RetryPeriod are set very high and the leader lock has been acquired, leader election should
 				// not try to renew the leader lock at this point, but we'll wait a bit more just in case to give it plenty of time. After
@@ -153,8 +134,7 @@ var _ = Describe("Endpoint monitoring", func() {
 
 		Context("and then a local gateway Endpoint corresponding to another host is created", func() {
 			JustBeforeEach(func() {
-				t.awaitLeaderLockAcquired()
-				t.ipt.AwaitChain("nat", constants.SmGlobalnetIngressChain)
+				t.awaitControllersStarted()
 
 				By("Creating other Endpoint")
 
@@ -163,8 +143,8 @@ var _ = Describe("Endpoint monitoring", func() {
 
 			It("should stop the controllers", func() {
 				t.awaitLeaderLockReleased()
-
-				t.ipt.AwaitNoChain("nat", constants.SmGlobalnetIngressChain)
+				t.awaitNoGlobalnetChains()
+				t.ensureControllersStopped()
 			})
 		})
 
@@ -180,23 +160,22 @@ var _ = Describe("Endpoint monitoring", func() {
 			})
 
 			JustBeforeEach(func() {
-				t.awaitLeaderLockAcquired()
-				t.awaitClusterGlobalEgressIPStatusAllocated(controllers.DefaultNumberOfClusterEgressIPs)
+				t.awaitControllersStarted()
 
 				By("Setting leases resource updates to fail")
 
 				leasesReactor.Fail(true)
-			})
 
-			It("should re-acquire the leader lock", func() {
 				// Wait enough time for the renewal deadline to be reached
 				time.Sleep(t.leaderElectionConfig.RenewDeadline + 100)
 
-				By("Ensuring controllers are still running")
+				By("Ensuring controllers are stopped and globalnet chains are not cleared")
 
-				t.createServiceExport(t.createService(newClusterIPService()))
-				t.awaitIngressIPStatusAllocated(serviceName)
+				t.ensureControllersStopped()
+				t.awaitGlobalnetChains()
+			})
 
+			It("should re-acquire the leader lock after the failure is cleared", func() {
 				now := metav1.NewTime(time.Now())
 
 				By("Setting leases resource updates to succeed")
@@ -208,6 +187,18 @@ var _ = Describe("Endpoint monitoring", func() {
 				Eventually(func() int64 {
 					return t.getLeaderElectionRecord().RenewTime.UnixNano()
 				}).Should(BeNumerically(">=", now.UnixNano()), "Lease was not renewed")
+
+				t.awaitIngressIPStatusAllocated(serviceName)
+			})
+
+			Context("and then the gateway Endpoint is deleted", func() {
+				It("should clear the globalnet chains", func() {
+					By("Deleting the Endpoint")
+
+					Expect(t.endpoints.Delete(context.TODO(), endpoint.Name, metav1.DeleteOptions{})).To(Succeed())
+
+					t.awaitNoGlobalnetChains()
+				})
 			})
 		})
 	})
@@ -365,6 +356,31 @@ func (t *gatewayMonitorTestDriver) awaitLeaderLockReleased() {
 
 		return le.HolderIdentity
 	}, 3).Should(BeEmpty(), "Leader lock was not released")
+}
+
+func (t *gatewayMonitorTestDriver) awaitControllersStarted() {
+	t.awaitLeaderLockAcquired()
+	t.awaitGlobalnetChains()
+	t.awaitClusterGlobalEgressIPStatusAllocated(controllers.DefaultNumberOfClusterEgressIPs)
+}
+
+func (t *gatewayMonitorTestDriver) ensureControllersStopped() {
+	time.Sleep(300 * time.Millisecond)
+	t.createServiceExport(t.createService(newClusterIPService()))
+	t.ensureNoGlobalIngressIP(serviceName)
+}
+
+func (t *gatewayMonitorTestDriver) awaitGlobalnetChains() {
+	t.ipt.AwaitChain("nat", constants.SmGlobalnetIngressChain)
+	t.ipt.AwaitChain("nat", constants.SmGlobalnetEgressChain)
+	t.ipt.AwaitChain("nat", routeAgent.SmPostRoutingChain)
+	t.ipt.AwaitChain("nat", constants.SmGlobalnetMarkChain)
+}
+
+func (t *gatewayMonitorTestDriver) awaitNoGlobalnetChains() {
+	t.ipt.AwaitNoChain("nat", constants.SmGlobalnetIngressChain)
+	t.ipt.AwaitNoChain("nat", constants.SmGlobalnetEgressChain)
+	t.ipt.AwaitNoChain("nat", constants.SmGlobalnetMarkChain)
 }
 
 func newEndpointSpec(clusterID, hostname, subnet string) *submarinerv1.EndpointSpec {
