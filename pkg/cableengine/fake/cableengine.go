@@ -38,6 +38,7 @@ type Engine struct { //nolint:gocritic // This mutex is exposed but we tweak it 
 	ErrOnInstallCable         error
 	removeCable               chan *v1.EndpointSpec
 	ErrOnRemoveCable          error
+	StartErr                  error
 }
 
 var _ cableengine.Engine = &Engine{}
@@ -52,7 +53,7 @@ func New() *Engine {
 }
 
 func (e *Engine) StartEngine() error {
-	return nil
+	return e.StartErr
 }
 
 func (e *Engine) InstallCable(endpoint *v1.Endpoint) error {
