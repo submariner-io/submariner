@@ -85,7 +85,7 @@ func (gs *GatewaySyncer) Run(stopCh <-chan struct{}) {
 	wait.Until(gs.syncGatewayStatus, GatewayUpdateInterval, stopCh)
 	gs.CleanupGatewayEntry()
 
-	logger.Info("CableEngine syncer started")
+	logger.Info("CableEngine syncer stopped")
 }
 
 func (gs *GatewaySyncer) syncGatewayStatus() {
