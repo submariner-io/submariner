@@ -21,6 +21,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/fs"
 	"os"
 	"strconv"
 	"time"
@@ -82,6 +83,9 @@ func main() {
 	logger.Info("Starting submariner-route-agent using the event framework")
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler().Done()
+
+	// Clean up "sockets" created as directories by previous versions
+	removeInvalidSockets()
 
 	var env environment.Specification
 
@@ -247,5 +251,20 @@ func waitForNodeReady(k8sClientSet *kubernetes.Clientset) {
 		}
 
 		time.Sleep(1 * time.Second)
+	}
+}
+
+func removeInvalidSockets() {
+	// This can be removed once we stop supporting upgrades from 0.16.0 or older
+	for _, dir := range []string{"/run/openvswitch/db.sock", "/var/run/openvswitch/ovnnb_db.sock", "/var/run/ovn-ic/ovnnb_db.sock"} {
+		info, err := os.Stat(dir)
+		if (err == nil || errors.Is(err, fs.ErrExist)) && info.IsDir() {
+			err := os.Remove(dir)
+			if err != nil {
+				logger.Errorf(err, "Failed to delete invalid socket %s", dir)
+			} else {
+				logger.Infof("Deleted invalid socket %s", dir)
+			}
+		}
 	}
 }
