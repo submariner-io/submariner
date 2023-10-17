@@ -59,7 +59,7 @@ var _ = Describe("Run", func() {
 	When("starting the Cable Engine fails", func() {
 		BeforeEach(func() {
 			t.expectedRunErr = errors.New("mock Cable Engine Start error")
-			t.cableEngine.StartErr = t.expectedRunErr
+			t.cableEngine.ErrOnStart = t.expectedRunErr
 		})
 
 		It("should return an error", func() {
@@ -86,6 +86,46 @@ var _ = Describe("Run", func() {
 			leasesReactor.Fail(true)
 		})
 	})
+
+	Context("on uninstall", func() {
+		BeforeEach(func() {
+			t.config.Spec.Uninstall = true
+
+			hostName, err := os.Hostname()
+			Expect(err).To(Succeed())
+
+			_, err = t.config.SubmarinerClient.SubmarinerV1().Gateways(t.config.Spec.Namespace).Create(context.Background(),
+				&submarinerv1.Gateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: hostName,
+					},
+				}, metav1.CreateOptions{})
+			Expect(err).To(Succeed())
+
+			test.CreateResource(t.endpoints.Namespace(t.config.Spec.Namespace), &submarinerv1.Endpoint{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "some-endpoint",
+				},
+			})
+		})
+
+		It("should perform cleanup", func() {
+			t.awaitNoEndpoint()
+			t.cableEngine.AwaitCleanup()
+		})
+
+		When("an error occurs", func() {
+			BeforeEach(func() {
+				t.expectedRunErr = errors.New("mock datastore syncer error")
+				fake.FailOnAction(&t.dynClient.Fake, "endpoints", "delete", t.expectedRunErr, false)
+
+				t.cableEngine.ErrOnCleanup = errors.New("mock Cable Engine Cleanup error")
+			})
+
+			It("should return the error", func() {
+			})
+		})
+	})
 })
 
 type testDriver struct {
@@ -96,6 +136,7 @@ type testDriver struct {
 	expectedRunErr error
 	cableEngine    *enginefake.Engine
 	kubeClient     *k8sfake.Clientset
+	dynClient      *dynamicfake.FakeDynamicClient
 }
 
 func newTestDriver() *testDriver {
@@ -106,7 +147,7 @@ func newTestDriver() *testDriver {
 
 		restMapper := test.GetRESTMapperFor(&submarinerv1.Endpoint{}, &submarinerv1.Cluster{}, &submarinerv1.Gateway{}, &corev1.Node{})
 
-		dynClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
+		t.dynClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
 		t.kubeClient = k8sfake.NewSimpleClientset()
 
 		t.cableEngine = enginefake.New()
@@ -122,14 +163,14 @@ func newTestDriver() *testDriver {
 				HealthCheckEnabled: true,
 			},
 			SyncerConfig: broker.SyncerConfig{
-				LocalClient:     dynClient,
-				BrokerClient:    dynClient,
+				LocalClient:     t.dynClient,
+				BrokerClient:    t.dynClient,
 				BrokerNamespace: "broker-ns",
 				RestMapper:      restMapper,
 			},
 			WatcherConfig: watcher.Config{
 				RestMapper: restMapper,
-				Client:     dynClient,
+				Client:     t.dynClient,
 			},
 			SubmarinerClient:     submfake.NewSimpleClientset(),
 			KubeClient:           t.kubeClient,
@@ -194,8 +235,11 @@ func newTestDriver() *testDriver {
 				t.awaitNoGateway()
 			} else {
 				Expect(err).To(ContainErrorSubstring(t.expectedRunErr))
-				t.awaitHAStatus(submarinerv1.HAStatusPassive)
-				t.awaitGatewayStatusError(t.expectedRunErr.Error())
+
+				if !t.config.Spec.Uninstall {
+					t.awaitHAStatus(submarinerv1.HAStatusPassive)
+					t.awaitGatewayStatusError(t.expectedRunErr.Error())
+				}
 			}
 		})
 
@@ -214,6 +258,15 @@ func (t *testDriver) awaitEndpoint() {
 
 		return len(l.Items)
 	}, 3).Should(Equal(1))
+}
+
+func (t *testDriver) awaitNoEndpoint() {
+	Eventually(func() int {
+		l, err := t.endpoints.Namespace(t.config.Spec.Namespace).List(context.Background(), metav1.ListOptions{})
+		Expect(err).To(Succeed())
+
+		return len(l.Items)
+	}, 3).Should(BeZero())
 }
 
 func (t *testDriver) awaitHAStatus(status submarinerv1.HAStatus) {
