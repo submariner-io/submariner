@@ -38,7 +38,9 @@ type Engine struct { //nolint:gocritic // This mutex is exposed but we tweak it 
 	ErrOnInstallCable         error
 	removeCable               chan *v1.EndpointSpec
 	ErrOnRemoveCable          error
-	StartErr                  error
+	ErrOnStart                error
+	ErrOnCleanup              error
+	onCleanup                 chan struct{}
 }
 
 var _ cableengine.Engine = &Engine{}
@@ -49,11 +51,12 @@ func New() *Engine {
 		Connections:  []v1.Connection{},
 		installCable: make(chan *v1.EndpointSpec, 100),
 		removeCable:  make(chan *v1.EndpointSpec, 100),
+		onCleanup:    make(chan struct{}, 1),
 	}
 }
 
 func (e *Engine) StartEngine() error {
-	return e.StartErr
+	return e.ErrOnStart
 }
 
 func (e *Engine) InstallCable(endpoint *v1.Endpoint) error {
@@ -115,5 +118,10 @@ func (e *Engine) SetupNATDiscovery(_ natdiscovery.Interface) {
 }
 
 func (e *Engine) Cleanup() error {
-	return nil
+	close(e.onCleanup)
+	return e.ErrOnCleanup
+}
+
+func (e *Engine) AwaitCleanup() {
+	Eventually(e.onCleanup, 5).Should(BeClosed(), "Cleanup was not invoked")
 }

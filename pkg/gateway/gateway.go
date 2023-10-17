@@ -176,9 +176,7 @@ func (g *gatewayType) Run(stopCh <-chan struct{}) error {
 	if g.Spec.Uninstall {
 		logger.Info("Uninstalling the submariner gateway engine")
 
-		g.uninstall()
-
-		return nil
+		return g.uninstall()
 	}
 
 	logger.Info("Starting the gateway engine")
@@ -337,7 +335,7 @@ func (g *gatewayType) initCableHealthChecker() {
 	}
 }
 
-func (g *gatewayType) uninstall() {
+func (g *gatewayType) uninstall() error {
 	err := g.cableEngine.StartEngine()
 	if err != nil {
 		// As we are in the process of cleaning up, ignore any initialization errors.
@@ -354,7 +352,7 @@ func (g *gatewayType) uninstall() {
 
 	dsErr := g.datastoreSyncer.Cleanup()
 
-	logger.FatalOnError(dsErr, "Error cleaning up the datastore")
+	return errors.Wrap(dsErr, "Error cleaning up the datastore")
 }
 
 func submarinerClusterFrom(submSpec *types.SubmarinerSpecification) *types.SubmarinerCluster {
