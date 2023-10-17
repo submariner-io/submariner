@@ -48,7 +48,9 @@ func GetLocal(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Inte
 	privateIP := GetLocalIP()
 
 	gwNode, err := node.GetLocalNode(k8sClient)
-	logger.FatalfOnError(err, "Error getting information on the local node")
+	if err != nil {
+		return nil, errors.Wrap(err, "getting information on the local node")
+	}
 
 	hostname, err := os.Hostname()
 	if err != nil {
