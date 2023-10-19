@@ -96,7 +96,7 @@ func (d *Driver) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (
 	}
 
 	d.activeConnections[endpointInfo.Endpoint.Spec.CableName] = v1.Connection{
-		Endpoint: endpointInfo.Endpoint.Spec, UsingIP: endpointInfo.Endpoint.Spec.PublicIP, UsingNAT: true,
+		Endpoint: endpointInfo.Endpoint.Spec, UsingIP: endpointInfo.UseIP, UsingNAT: endpointInfo.UseNAT,
 	}
 
 	d.connectToEndpoint <- endpointInfo

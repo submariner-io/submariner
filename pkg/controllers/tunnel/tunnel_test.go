@@ -150,7 +150,7 @@ var _ = Describe("Managing tunnels", func() {
 			test.CreateResource(endpoints, endpoint)
 			verifyConnectToEndpoint()
 
-			endpoint.Spec.Subnets = []string{"100.0.0.0/16", "10.0.0.0/14"}
+			endpoint.Spec.PrivateIP = "192.68.1.3"
 			test.UpdateResource(endpoints, endpoint)
 
 			verifyConnectToEndpoint()
