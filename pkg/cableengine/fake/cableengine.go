@@ -59,6 +59,9 @@ func (e *Engine) StartEngine() error {
 	return e.ErrOnStart
 }
 
+func (e *Engine) Stop() {
+}
+
 func (e *Engine) InstallCable(endpoint *v1.Endpoint) error {
 	err := e.ErrOnInstallCable
 	if err != nil {

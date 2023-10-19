@@ -340,9 +340,31 @@ var _ = Describe("Cable Engine", func() {
 			})
 		})
 
-		Context("and list cable connections", func() {
+		Context("and list of cable connections is queried", func() {
 			It("should return non-nil", func() {
 				Expect(engine.ListCableConnections()).ToNot(BeNil())
+			})
+		})
+	})
+
+	When("after Stop is called", func() {
+		BeforeEach(func() {
+			fakeDriver.Connections = []subv1.Connection{{Endpoint: remoteEndpoint.Spec}}
+		})
+
+		JustBeforeEach(func() {
+			engine.Stop()
+		})
+
+		Context("and the HA status is queried", func() {
+			It("should return passive", func() {
+				Expect(engine.GetHAStatus()).To(Equal(subv1.HAStatusPassive))
+			})
+		})
+
+		Context("and list of cable connections is queried", func() {
+			It("should return empty", func() {
+				Expect(engine.ListCableConnections()).To(BeEmpty())
 			})
 		})
 	})
