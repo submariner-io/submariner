@@ -45,6 +45,7 @@ import (
 type Engine interface {
 	// StartEngine performs any general set up work needed independent of any remote connections.
 	StartEngine() error
+	Stop()
 	// InstallCable performs any set up work needed for connecting to given remote endpoint.
 	// Once InstallCable completes, it should be possible to connect to remote
 	// Pods or Services behind the given endpoint.
@@ -68,6 +69,7 @@ type Engine interface {
 type engine struct {
 	sync.Mutex
 	driver              cable.Driver
+	running             bool
 	localCluster        types.SubmarinerCluster
 	localEndpoint       types.SubmarinerEndpoint
 	natDiscovery        natdiscovery.Interface
@@ -101,12 +103,27 @@ func (i *engine) StartEngine() error {
 		return err
 	}
 
-	logger.Infof("CableEngine controller started, driver: %q", i.driver.GetName())
+	i.running = true
+
+	logger.Infof("CableEngine started with driver %q", i.driver.GetName())
 
 	return nil
 }
 
+func (i *engine) Stop() {
+	i.Lock()
+	defer i.Unlock()
+
+	i.running = false
+
+	logger.Info("CableEngine stopped")
+}
+
 func (i *engine) startDriver() error {
+	if i.driver != nil {
+		return nil
+	}
+
 	var err error
 
 	if i.driver, err = cable.NewDriver(&i.localEndpoint, &i.localCluster); err != nil {
@@ -143,6 +160,10 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 	i.natDiscoveryPending[rnat.Endpoint.Spec.CableName]--
 	if i.natDiscoveryPending[rnat.Endpoint.Spec.CableName] == 0 {
 		delete(i.natDiscoveryPending, rnat.Endpoint.Spec.CableName)
+	}
+
+	if !i.running {
+		return nil
 	}
 
 	activeConnections, err := i.driver.GetActiveConnections()
@@ -261,7 +282,7 @@ func (i *engine) GetHAStatus() v1.HAStatus {
 	i.Lock()
 	defer i.Unlock()
 
-	if i.driver == nil {
+	if !i.running {
 		return v1.HAStatusPassive
 	}
 
@@ -275,10 +296,11 @@ func (i *engine) ListCableConnections() ([]v1.Connection, error) {
 	i.Lock()
 	defer i.Unlock()
 
-	if i.driver != nil {
+	if i.running {
 		return i.driver.GetConnections() //nolint:wrapcheck  // Let the caller wrap it
 	}
-	// if no driver, we can safely report that no connections exist.
+
+	// if not running, we can safely report that no connections exist.
 	return []v1.Connection{}, nil
 }
 
