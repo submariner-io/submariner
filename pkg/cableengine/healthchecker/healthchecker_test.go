@@ -166,6 +166,11 @@ var _ = Describe("Controller", func() {
 			pingerMap[healthCheckIP2].SetLatencyInfo(latencyInfo2)
 			Eventually(func() *healthchecker.LatencyInfo { return healthChecker.GetLatencyInfo(&endpoint2.Spec) }).
 				Should(Equal(latencyInfo2))
+
+			healthChecker.Stop()
+
+			Expect(healthChecker.GetLatencyInfo(&endpoint1.Spec)).To(BeNil())
+			Expect(healthChecker.GetLatencyInfo(&endpoint2.Spec)).To(BeNil())
 		})
 	})
 
@@ -225,7 +230,7 @@ var _ = Describe("Controller", func() {
 		})
 	})
 
-	When("a remote Endpoint is has no HealthCheckIP", func() {
+	When("a remote Endpoint has no HealthCheckIP", func() {
 		It("should not start a Pinger", func() {
 			createEndpoint(remoteClusterID1, "")
 			pingerMap[healthCheckIP1].AwaitNoStart()
