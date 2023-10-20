@@ -44,6 +44,17 @@ func (f *Framework) GetGatewaysWithHAStatus(cluster framework.ClusterIndex, stat
 	return toGateways(f.Framework.GetGatewaysWithHAStatus(cluster, string(status)))
 }
 
+func FindClusterWithSingleGateway() framework.ClusterIndex {
+	for cluster := range framework.TestContext.ClusterIDs {
+		gatewayNodes := framework.FindGatewayNodes(framework.ClusterIndex(cluster))
+		if len(gatewayNodes) == 1 {
+			return framework.ClusterIndex(cluster)
+		}
+	}
+
+	return -1
+}
+
 func toGateway(from *unstructured.Unstructured) *submarinerv1.Gateway {
 	to := &submarinerv1.Gateway{}
 	Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(from.Object, to)).To(Succeed())
