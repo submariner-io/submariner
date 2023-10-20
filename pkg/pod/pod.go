@@ -65,7 +65,7 @@ func NewGatewayPod(k8sClient kubernetes.Interface) (*GatewayPod, error) {
 		return nil, errors.New("POD_NAME environment variable missing")
 	}
 
-	if err := gp.SetHALabels(submV1.HAStatusPassive); err != nil {
+	if err := gp.SetHALabels(context.Background(), submV1.HAStatusPassive); err != nil {
 		logger.Warningf("Error updating pod label: %s", err)
 	}
 
@@ -74,11 +74,11 @@ func NewGatewayPod(k8sClient kubernetes.Interface) (*GatewayPod, error) {
 
 const patchFormat = `{"metadata": {"labels": {"gateway.submariner.io/node": "%s", "gateway.submariner.io/status": "%s"}}}`
 
-func (gp *GatewayPod) SetHALabels(status submV1.HAStatus) error {
+func (gp *GatewayPod) SetHALabels(ctx context.Context, status submV1.HAStatus) error {
 	podsInterface := gp.clientset.CoreV1().Pods(gp.namespace)
 	patch := fmt.Sprintf(patchFormat, gp.node, status)
 
-	_, err := podsInterface.Patch(context.TODO(), gp.name, types.MergePatchType, []byte(patch), v1.PatchOptions{})
+	_, err := podsInterface.Patch(ctx, gp.name, types.MergePatchType, []byte(patch), v1.PatchOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "Error patching own pod %q in namespace %q with %s", gp.name, gp.namespace, patch)
 	}
