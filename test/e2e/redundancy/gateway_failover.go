@@ -62,21 +62,12 @@ var _ = Describe("Gateway fail-over tests", Label(TestLabel), func() {
 func testGatewayPodRestartScenario(f *subFramework.Framework) {
 	By(fmt.Sprintln("Sanity check - find a cluster with only one gateway node"))
 
-	primaryCluster := -1
-
-	for cluster := range framework.TestContext.ClusterIDs {
-		gatewayNodes := framework.FindGatewayNodes(framework.ClusterIndex(cluster))
-		if len(gatewayNodes) == 1 {
-			primaryCluster = cluster
-			break
-		}
-	}
-
+	primaryCluster := subFramework.FindClusterWithSingleGateway()
 	if primaryCluster == -1 {
 		framework.Skipf("The test requires single gateway node in one of the test clusters...")
 	}
 
-	secondaryCluster := framework.FindOtherClusterIndex(primaryCluster)
+	secondaryCluster := framework.ClusterIndex(framework.FindOtherClusterIndex(int(primaryCluster)))
 
 	primaryClusterName := framework.TestContext.ClusterIDs[primaryCluster]
 	secondaryClusterName := framework.TestContext.ClusterIDs[secondaryCluster]
@@ -84,11 +75,11 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 	By(fmt.Sprintf("Detected primary cluster %q with single gateway node", primaryClusterName))
 	By(fmt.Sprintf("Detected secondary cluster %q", secondaryClusterName))
 
-	gatewayNodes := framework.FindGatewayNodes(framework.ClusterIndex(primaryCluster))
+	gatewayNodes := framework.FindGatewayNodes(primaryCluster)
 	Expect(gatewayNodes).To(HaveLen(1), fmt.Sprintf("Expected only one gateway node on %q", primaryClusterName))
 	By(fmt.Sprintf("Found gateway on node %q on %q", gatewayNodes[0].Name, primaryClusterName))
 
-	gatewayPod := f.AwaitSubmarinerGatewayPod(framework.ClusterIndex(primaryCluster))
+	gatewayPod := f.AwaitSubmarinerGatewayPod(primaryCluster)
 	By(fmt.Sprintf("Found submariner gateway pod %q on %q, checking node and HA status labels", gatewayPod.Name, primaryClusterName))
 
 	Expect(gatewayPod.Labels[gatewayStatusLabel]).To(Equal(gatewayStatusActive))
@@ -96,29 +87,29 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 
 	By(fmt.Sprintf("Ensuring that the gateway reports as active on %q", primaryClusterName))
 
-	activeGateway := f.AwaitGatewayFullyConnected(framework.ClusterIndex(primaryCluster), resource.EnsureValidName(gatewayNodes[0].Name))
+	activeGateway := f.AwaitGatewayFullyConnected(primaryCluster, resource.EnsureValidName(gatewayNodes[0].Name))
 
 	By(fmt.Sprintf("Deleting submariner gateway pod %q", gatewayPod.Name))
-	f.DeletePod(framework.ClusterIndex(primaryCluster), gatewayPod.Name, framework.TestContext.SubmarinerNamespace)
+	f.DeletePod(primaryCluster, gatewayPod.Name, framework.TestContext.SubmarinerNamespace)
 
-	newGatewayPod := AwaitNewSubmarinerGatewayPod(f, framework.ClusterIndex(primaryCluster), gatewayPod.ObjectMeta.UID)
+	newGatewayPod := AwaitNewSubmarinerGatewayPod(f, primaryCluster, gatewayPod.ObjectMeta.UID)
 	By(fmt.Sprintf("Found new submariner gateway pod %q", newGatewayPod.Name))
 
 	By(fmt.Sprintf("Waiting for the gateway to be up and connected %q", newGatewayPod.Name))
-	AwaitNewSubmarinerGatewayFullyConnected(f, framework.ClusterIndex(primaryCluster), activeGateway.Name, activeGateway.UID)
+	AwaitNewSubmarinerGatewayFullyConnected(f, primaryCluster, activeGateway.Name, activeGateway.UID)
 
 	By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", secondaryClusterName, primaryClusterName))
 	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
-		FromCluster:           framework.ClusterIndex(secondaryCluster),
+		FromCluster:           secondaryCluster,
 		FromClusterScheduling: framework.GatewayNode,
-		ToCluster:             framework.ClusterIndex(primaryCluster),
+		ToCluster:             primaryCluster,
 		ToClusterScheduling:   framework.GatewayNode,
 		ToEndpointType:        defaultEndpointType(),
 	}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
 
 	if !subFramework.CanExecuteNonGatewayConnectivityTest(framework.NonGatewayNode, framework.NonGatewayNode,
-		framework.ClusterIndex(secondaryCluster), framework.ClusterIndex(primaryCluster)) {
+		secondaryCluster, primaryCluster) {
 		return
 	}
 
@@ -126,9 +117,9 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 		secondaryClusterName, primaryClusterName))
 	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
-		FromCluster:           framework.ClusterIndex(secondaryCluster),
+		FromCluster:           secondaryCluster,
 		FromClusterScheduling: framework.NonGatewayNode,
-		ToCluster:             framework.ClusterIndex(primaryCluster),
+		ToCluster:             primaryCluster,
 		ToClusterScheduling:   framework.NonGatewayNode,
 		ToEndpointType:        defaultEndpointType(),
 	}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
