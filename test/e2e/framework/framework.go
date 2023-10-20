@@ -20,6 +20,7 @@ package framework
 
 import (
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
@@ -45,6 +46,8 @@ func NewFramework(baseName string) *Framework {
 }
 
 func beforeSuite() {
+	kzerolog.InitK8sLogging()
+
 	framework.By("Creating submariner clients")
 
 	err := submarinerv1.AddToScheme(scheme.Scheme)
