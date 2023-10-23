@@ -20,12 +20,10 @@ package main
 
 import (
 	"context"
-	"crypto/x509"
 	"errors"
 	"flag"
 	"net/http"
 	"net/http/pprof"
-	"sync/atomic"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
@@ -33,8 +31,8 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/names"
-	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
+	"github.com/submariner-io/admiral/pkg/util"
 	admversion "github.com/submariner-io/admiral/pkg/version"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -44,7 +42,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/versions"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -57,6 +54,7 @@ var (
 	localMasterURL  string
 	localKubeconfig string
 	showVersion     = false
+	logger          = log.Logger{Logger: logf.Log.WithName("main")}
 )
 
 func init() {
@@ -73,11 +71,6 @@ type leaderConfig struct {
 }
 
 const leadershipConfigEnvPrefix = "leadership"
-
-var (
-	logger             = log.Logger{Logger: logf.Log.WithName("main")}
-	lastBadCertificate atomic.Value
-)
 
 func main() {
 	kzerolog.AddFlags(nil)
@@ -100,23 +93,12 @@ func main() {
 	submSpec := types.SubmarinerSpecification{}
 	logger.FatalOnError(envconfig.Process("submariner", &submSpec), "Error processing env vars")
 
-	logger.Info("Parsed env variables", submSpec)
+	logger.Infof("Parsed env variables: %#v", submSpec)
 	httpServer := startHTTPServer(&submSpec)
 
 	var err error
 
-	//nolint:reassign // We need to reassign ErrorHandlers to register our handler
-	utilruntime.ErrorHandlers = append(utilruntime.ErrorHandlers, func(err error) {
-		var unknownAuthorityError x509.UnknownAuthorityError
-		if errors.As(err, &unknownAuthorityError) && lastBadCertificate.Swap(unknownAuthorityError.Cert) != unknownAuthorityError.Cert {
-			logger.Errorf(err, "Certificate error: %s", resource.ToJSON(err))
-		}
-		var certificateInvalidError x509.CertificateInvalidError
-		if errors.As(err, &certificateInvalidError) && lastBadCertificate.Swap(certificateInvalidError.Cert) != certificateInvalidError.Cert {
-			logger.Errorf(err, "Certificate error: %s", resource.ToJSON(err))
-		}
-		// The generic handler has already logged the error, no need to repeat if we don't want extra detail
-	})
+	util.AddCertificateErrorHandler(submSpec.HaltOnCertError)
 
 	restConfig, err := clientcmd.BuildConfigFromFlags(localMasterURL, localKubeconfig)
 	logger.FatalOnError(err, "Error building kubeconfig")
