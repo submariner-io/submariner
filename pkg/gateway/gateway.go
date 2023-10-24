@@ -55,8 +55,8 @@ import (
 )
 
 const (
-	defaultLeaseDuration = 10 * time.Second
-	defaultRenewDeadline = 5 * time.Second
+	defaultLeaseDuration = 15 * time.Second
+	defaultRenewDeadline = 10 * time.Second
 	defaultRetryPeriod   = 2 * time.Second
 
 	LeaderElectionLockName = "submariner-gateway-lock"
