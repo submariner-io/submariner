@@ -26,7 +26,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	testutil "github.com/submariner-io/admiral/pkg/test"
 	"github.com/submariner-io/admiral/pkg/watcher"
@@ -34,12 +33,10 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/tools/leaderelection/resourcelock"
 )
 
 const (
@@ -89,7 +86,7 @@ var _ = Describe("Endpoint monitoring", func() {
 			})
 
 			It("should stop and restart the controllers", func() {
-				t.awaitLeaderLockReleased()
+				t.leaderElection.AwaitLeaseReleased()
 				t.awaitNoGlobalnetChains()
 				t.ensureControllersStopped()
 
@@ -98,7 +95,7 @@ var _ = Describe("Endpoint monitoring", func() {
 				time.Sleep(time.Millisecond * 300)
 				t.createEndpoint(newEndpointSpec(clusterID, t.hostName, localCIDR))
 
-				t.awaitLeaderLockAcquired()
+				t.leaderElection.AwaitLeaseAcquired()
 				t.awaitGlobalnetChains()
 
 				t.awaitIngressIPStatusAllocated(serviceName)
@@ -142,21 +139,16 @@ var _ = Describe("Endpoint monitoring", func() {
 			})
 
 			It("should stop the controllers", func() {
-				t.awaitLeaderLockReleased()
+				t.leaderElection.AwaitLeaseReleased()
 				t.awaitNoGlobalnetChains()
 				t.ensureControllersStopped()
 			})
 		})
 
 		Context("and then renewal of the leader lock fails", func() {
-			var leasesReactor *fake.FailOnActionReactor
-
 			BeforeEach(func() {
 				t.leaderElectionConfig.RenewDeadline = time.Millisecond * 200
 				t.leaderElectionConfig.RetryPeriod = time.Millisecond * 20
-
-				leasesReactor = fake.FailOnAction(&t.kubeClient.Fake, "leases", "update", nil, false)
-				leasesReactor.Fail(false)
 			})
 
 			JustBeforeEach(func() {
@@ -164,10 +156,7 @@ var _ = Describe("Endpoint monitoring", func() {
 
 				By("Setting leases resource updates to fail")
 
-				leasesReactor.Fail(true)
-
-				// Wait enough time for the renewal deadline to be reached
-				time.Sleep(t.leaderElectionConfig.RenewDeadline + 100)
+				t.leaderElection.FailLease(t.leaderElectionConfig.RenewDeadline)
 
 				By("Ensuring controllers are stopped and globalnet chains are not cleared")
 
@@ -176,17 +165,13 @@ var _ = Describe("Endpoint monitoring", func() {
 			})
 
 			It("should re-acquire the leader lock after the failure is cleared", func() {
-				now := metav1.NewTime(time.Now())
-
 				By("Setting leases resource updates to succeed")
 
-				leasesReactor.Fail(false)
+				t.leaderElection.SucceedLease()
 
 				By("Ensuring lease was renewed")
 
-				Eventually(func() int64 {
-					return t.getLeaderElectionRecord().RenewTime.UnixNano()
-				}).Should(BeNumerically(">=", now.UnixNano()), "Lease was not renewed")
+				t.leaderElection.AwaitLeaseRenewed()
 
 				t.awaitIngressIPStatusAllocated(serviceName)
 			})
@@ -209,7 +194,7 @@ var _ = Describe("Endpoint monitoring", func() {
 		})
 
 		It("should not start the controllers", func() {
-			t.ensureLeaderLockNotAcquired()
+			t.leaderElection.EnsureLeaseNotAcquired()
 
 			t.createServiceExport(t.createService(newClusterIPService()))
 			t.ensureNoGlobalIngressIP(serviceName)
@@ -241,6 +226,7 @@ type gatewayMonitorTestDriver struct {
 	hostName             string
 	kubeClient           *k8sfake.Clientset
 	leaderElectionConfig controllers.LeaderElectionConfig
+	leaderElection       *testutil.LeaderElectionSupport
 }
 
 func newGatewayMonitorTestDriver() *gatewayMonitorTestDriver {
@@ -253,8 +239,8 @@ func newGatewayMonitorTestDriver() *gatewayMonitorTestDriver {
 			Namespace(namespace)
 
 		t.kubeClient = k8sfake.NewSimpleClientset()
-
 		t.leaderElectionConfig = controllers.LeaderElectionConfig{}
+		t.leaderElection = testutil.NewLeaderElectionSupport(t.kubeClient, namespace, controllers.LeaderElectionLockName)
 	})
 
 	JustBeforeEach(func() {
@@ -317,49 +303,8 @@ func (t *gatewayMonitorTestDriver) createEndpoint(spec *submarinerv1.EndpointSpe
 	return endpoint
 }
 
-func (t *gatewayMonitorTestDriver) getLeaderElectionRecord() *resourcelock.LeaderElectionRecord {
-	lock, err := resourcelock.New(resourcelock.LeasesResourceLock, namespace, controllers.LeaderElectionLockName,
-		t.kubeClient.CoreV1(), t.kubeClient.CoordinationV1(), resourcelock.ResourceLockConfig{})
-	Expect(err).To(Succeed())
-
-	le, _, err := lock.Get(context.Background())
-	if apierrors.IsNotFound(err) {
-		return nil
-	}
-
-	Expect(err).To(Succeed())
-
-	return le
-}
-
-func (t *gatewayMonitorTestDriver) awaitLeaderLockAcquired() {
-	Eventually(func() string {
-		le := t.getLeaderElectionRecord()
-		if le == nil {
-			return ""
-		}
-
-		return le.HolderIdentity
-	}, 3).ShouldNot(BeEmpty(), "Leader lock was not acquired")
-}
-
-func (t *gatewayMonitorTestDriver) ensureLeaderLockNotAcquired() {
-	Consistently(func() any {
-		return t.getLeaderElectionRecord()
-	}, 300*time.Millisecond).Should(BeNil(), "Leader lock was acquired")
-}
-
-func (t *gatewayMonitorTestDriver) awaitLeaderLockReleased() {
-	Eventually(func() string {
-		le := t.getLeaderElectionRecord()
-		Expect(le).ToNot(BeNil(), "LeaderElectionRecord not found")
-
-		return le.HolderIdentity
-	}, 3).Should(BeEmpty(), "Leader lock was not released")
-}
-
 func (t *gatewayMonitorTestDriver) awaitControllersStarted() {
-	t.awaitLeaderLockAcquired()
+	t.leaderElection.AwaitLeaseAcquired()
 	t.awaitGlobalnetChains()
 	t.awaitClusterGlobalEgressIPStatusAllocated(controllers.DefaultNumberOfClusterEgressIPs)
 }
