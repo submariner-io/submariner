@@ -129,7 +129,7 @@ func (h *calicoIPPoolHandler) TransitionToGateway() error {
 }
 
 func (h *calicoIPPoolHandler) Stop(uninstall bool) error {
-	if !uninstall || !h.isGateway.Load() {
+	if !uninstall {
 		return nil
 	}
 
