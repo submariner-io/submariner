@@ -154,7 +154,7 @@ func (n *netlinkType) XfrmPolicyList(family int) ([]netlink.XfrmPolicy, error) {
 
 func (n *netlinkType) EnableLooseModeReversePathFilter(interfaceName string) error {
 	// Enable loose mode (rp_filter=2) reverse path filtering on the vxlan interface.
-	err := setSysctl("/proc/sys/net/ipv4/conf/"+interfaceName+"/rp_filter", []byte("2"))
+	err := setSysctl(ipv4ConfPath(interfaceName)+"/rp_filter", []byte("2"))
 	return errors.Wrapf(err, "unable to update rp_filter proc entry for interface %q", interfaceName)
 }
 
@@ -183,12 +183,12 @@ func (n *netlinkType) EnsureLooseModeIsConfigured(interfaceName string) error {
 }
 
 func (n *netlinkType) EnableForwarding(interfaceName string) error {
-	err := setSysctl("/proc/sys/net/ipv4/conf/"+interfaceName+"/forwarding", []byte("1"))
+	err := setSysctl(ipv4ConfPath(interfaceName)+"/forwarding", []byte("1"))
 	return errors.Wrapf(err, "unable to update forwarding on interface %q", interfaceName)
 }
 
 func (n *netlinkType) GetReversePathFilter(interfaceName string) ([]byte, error) {
-	path := "/proc/sys/net/ipv4/conf/" + interfaceName + "/rp_filter"
+	path := ipv4ConfPath(interfaceName) + "/rp_filter"
 
 	existing, err := os.ReadFile(path)
 	if err != nil {
@@ -233,6 +233,10 @@ func setSysctl(path string, contents []byte) error {
 	// Permissions are already 644, the files are never created
 	// #nosec G306
 	return os.WriteFile(path, contents, 0o644)
+}
+
+func ipv4ConfPath(interfaceName string) string {
+	return "/proc/sys/net/ipv4/conf/" + interfaceName
 }
 
 //nolint:wrapcheck // Let the caller wrap external errors
