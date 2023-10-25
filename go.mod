@@ -8,15 +8,15 @@ require (
 	github.com/emirpasic/gods v1.18.1
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/onsi/ginkgo/v2 v2.13.0
-	github.com/onsi/gomega v1.28.0
+	github.com/onsi/gomega v1.28.1
 	github.com/ovn-org/libovsdb v0.6.1-0.20220427123326-d7b273399db4
 	github.com/ovn-org/ovn-kubernetes/go-controller v0.0.0-20220511131059-ac1ce4691c0f
 	github.com/pkg/errors v0.9.1
 	github.com/projectcalico/api v0.0.0-20230602153125-fb7148692637
 	github.com/prometheus-community/pro-bing v0.3.0
 	github.com/prometheus/client_golang v1.17.0
-	github.com/submariner-io/admiral v0.16.0-m4.0.20231024075740-7ca36d2067a5
-	github.com/submariner-io/shipyard v0.16.0-m4.0.20231017114407-11b7ad52c6a4
+	github.com/submariner-io/admiral v0.16.0-m4.0.20231025063845-545d89397595
+	github.com/submariner-io/shipyard v0.16.0-m4.0.20231023170048-494344a6cdec
 	github.com/uw-labs/lichen v0.1.7
 	github.com/vishvananda/netlink v1.2.1-beta.2
 	golang.org/x/sys v0.13.0
@@ -27,7 +27,7 @@ require (
 	k8s.io/client-go v0.28.3
 	k8s.io/component-helpers v0.28.3
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
-	sigs.k8s.io/controller-runtime v0.16.2
+	sigs.k8s.io/controller-runtime v0.16.3
 	sigs.k8s.io/mcs-api v0.1.0
 )
 
@@ -38,7 +38,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
+	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/go-logr/logr v1.2.4 // indirect
@@ -51,7 +51,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
-	github.com/google/go-cmp v0.5.9 // indirect
+	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/licenseclassifier v0.0.0-20201113175434-78a70215ca36 // indirect
 	github.com/google/pprof v0.0.0-20210720184732-4bb14d4b1be1 // indirect
