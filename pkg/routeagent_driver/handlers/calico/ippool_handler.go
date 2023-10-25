@@ -129,10 +129,6 @@ func (h *calicoIPPoolHandler) TransitionToGateway() error {
 }
 
 func (h *calicoIPPoolHandler) Uninstall() error {
-	if !h.isGateway.Load() {
-		return nil
-	}
-
 	logger.Info("Uninstalling Calico IPPools used for Submariner")
 
 	labelSelector := labels.SelectorFromSet(map[string]string{submarinerIPPool: "true"}).String()
