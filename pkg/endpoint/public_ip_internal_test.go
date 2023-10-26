@@ -64,6 +64,9 @@ var _ = Describe("public ip resolvers", func() {
 		publicIPConfig = "public-ip"
 		testIPDNS      = "4.3.2.1"
 		testIP         = "1.2.3.4"
+		dnsHost        = testIPDNS + ".nip.io"
+		ipv4PublicIP   = "ipv4:" + testIP
+		lbPublicIP     = "lb:" + testServiceName
 	)
 
 	BeforeEach(func() {
@@ -76,7 +79,7 @@ var _ = Describe("public ip resolvers", func() {
 
 	When("a LoadBalancer with Ingress IP is specified", func() {
 		It("should return the IP", func() {
-			backendConfig[publicIPConfig] = "lb:" + testServiceName
+			backendConfig[publicIPConfig] = lbPublicIP
 			client := fake.NewSimpleClientset(serviceWithIngress(v1.LoadBalancerIngress{Hostname: "", IP: testIP}))
 			ip, err := getPublicIP(submSpec, client, backendConfig, false)
 			Expect(err).ToNot(HaveOccurred())
@@ -86,9 +89,9 @@ var _ = Describe("public ip resolvers", func() {
 
 	When("a LoadBalancer with Ingress hostname is specified", func() {
 		It("should return the IP", func() {
-			backendConfig[publicIPConfig] = "lb:" + testServiceName
+			backendConfig[publicIPConfig] = lbPublicIP
 			client := fake.NewSimpleClientset(serviceWithIngress(v1.LoadBalancerIngress{
-				Hostname: testIPDNS + ".nip.io",
+				Hostname: dnsHost,
 				IP:       "",
 			}))
 			ip, err := getPublicIP(submSpec, client, backendConfig, false)
@@ -100,7 +103,7 @@ var _ = Describe("public ip resolvers", func() {
 	When("a LoadBalancer with no ingress is specified", func() {
 		It("should return error", func() {
 			loadBalancerRetryConfig.Cap = 1 * time.Second
-			backendConfig[publicIPConfig] = "lb:" + testServiceName
+			backendConfig[publicIPConfig] = lbPublicIP
 			client := fake.NewSimpleClientset(serviceWithIngress())
 			_, err := getPublicIP(submSpec, client, backendConfig, false)
 			Expect(err).To(HaveOccurred())
@@ -109,7 +112,7 @@ var _ = Describe("public ip resolvers", func() {
 
 	When("an IPv4 entry specified", func() {
 		It("should return the IP", func() {
-			backendConfig[publicIPConfig] = "ipv4:" + testIP
+			backendConfig[publicIPConfig] = ipv4PublicIP
 			client := fake.NewSimpleClientset()
 			ip, err := getPublicIP(submSpec, client, backendConfig, false)
 			Expect(err).ToNot(HaveOccurred())
@@ -119,7 +122,7 @@ var _ = Describe("public ip resolvers", func() {
 
 	When("an IPv4 entry specified in air-gapped deployment", func() {
 		It("should return the IP and not an empty value", func() {
-			backendConfig[publicIPConfig] = "ipv4:" + testIP
+			backendConfig[publicIPConfig] = ipv4PublicIP
 			client := fake.NewSimpleClientset()
 			ip, err := getPublicIP(submSpec, client, backendConfig, true)
 			Expect(err).ToNot(HaveOccurred())
@@ -129,7 +132,7 @@ var _ = Describe("public ip resolvers", func() {
 
 	When("a DNS entry specified", func() {
 		It("should return the IP", func() {
-			backendConfig[publicIPConfig] = "dns:" + testIPDNS + ".nip.io"
+			backendConfig[publicIPConfig] = "dns:" + dnsHost
 			client := fake.NewSimpleClientset()
 			ip, err := getPublicIP(submSpec, client, backendConfig, false)
 			Expect(err).ToNot(HaveOccurred())
@@ -149,7 +152,7 @@ var _ = Describe("public ip resolvers", func() {
 
 	When("multiple entries are specified", func() {
 		It("should return the first working one", func() {
-			backendConfig[publicIPConfig] = "ipv4:" + testIP + ",dns:" + testIPDNS + ".nip.io"
+			backendConfig[publicIPConfig] = ipv4PublicIP + ",dns:" + dnsHost
 			client := fake.NewSimpleClientset()
 			ip, err := getPublicIP(submSpec, client, backendConfig, false)
 			Expect(err).ToNot(HaveOccurred())

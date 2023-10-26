@@ -62,13 +62,13 @@ func (w *wireguard) GetConnections() ([]v1.Connection, error) {
 }
 
 func (w *wireguard) connectionByKey(key *wgtypes.Key) (*v1.Connection, error) {
-	for cid, con := range w.connections {
-		if k, err := keyFromSpec(&con.Endpoint); err == nil { //nolint:gosec // Implicit aliasing OK here
+	for i := range w.connections {
+		if k, err := keyFromSpec(&w.connections[i].Endpoint); err == nil {
 			if key.String() == k.String() {
-				return con, nil
+				return w.connections[i], nil
 			}
 		} else {
-			logger.Errorf(err, "Could not compare key for cluster %s, skipping", cid)
+			logger.Errorf(err, "Could not compare key for cluster %s, skipping", i)
 		}
 	}
 
