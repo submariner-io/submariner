@@ -25,6 +25,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cidr"
 	cni "github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
@@ -39,6 +40,7 @@ type SyncHandler struct {
 	localCableDriver string
 	localClusterCidr []string
 	localServiceCidr []string
+	localEndpoint    *submV1.Endpoint
 
 	remoteSubnets    set.Set[string]
 	remoteSubnetGw   map[string]net.IP

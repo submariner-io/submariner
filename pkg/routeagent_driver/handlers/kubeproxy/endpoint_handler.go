@@ -30,6 +30,7 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 	kp.syncHandlerMutex.Lock()
 	defer kp.syncHandlerMutex.Unlock()
 	kp.localCableDriver = endpoint.Spec.Backend
+	kp.localEndpoint = endpoint
 
 	// We are on nonGateway node
 	if endpoint.Spec.Hostname != kp.hostname {
@@ -71,7 +72,48 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 	return nil
 }
 
-func (kp *SyncHandler) LocalEndpointUpdated(_ *submV1.Endpoint) error {
+func (kp *SyncHandler) LocalEndpointUpdated(endpoint *submV1.Endpoint) error {
+	if kp.localEndpoint == nil || kp.localEndpoint.Name != endpoint.Name {
+		kp.localEndpoint = endpoint
+		if kp.vxlanDevice != nil && kp.vxlanDevice.activeEndpointHostname != endpoint.Spec.Hostname {
+			err := kp.vxlanDevice.deleteVxLanIface()
+			if err != nil {
+				return errors.Wrapf(err, "failed to delete the vxlan interface that points to old endpoint %s",
+					kp.vxlanDevice.activeEndpointHostname)
+			}
+
+			kp.vxlanDevice = nil
+		}
+
+		if endpoint.Spec.Hostname != kp.hostname {
+			err := kp.TransitionToNonGateway()
+			if err != nil {
+				return errors.Wrap(err, "failed to transition to non-gateway")
+			}
+
+			kp.isGatewayNode = false
+			localClusterGwNodeIP := net.ParseIP(endpoint.Spec.PrivateIP)
+
+			remoteVtepIP, err := getVxlanVtepIPAddress(localClusterGwNodeIP.String())
+			if err != nil {
+				return errors.Wrap(err, "failed to derive the remoteVtepIP")
+			}
+
+			logger.Infof("Creating the vxlan interface %s with gateway node IP %s", VxLANIface, localClusterGwNodeIP)
+
+			err = kp.createVxLANInterface(endpoint.Spec.Hostname, VxInterfaceWorker, localClusterGwNodeIP)
+			if err != nil {
+				logger.Fatalf("Unable to create VxLAN interface on non-GatewayNode (%s): %v", endpoint.Spec.Hostname, err)
+			}
+
+			kp.vxlanGwIP = &remoteVtepIP
+
+			return nil
+		}
+
+		return kp.TransitionToGateway()
+	}
+
 	return nil
 }
 
@@ -126,7 +168,55 @@ func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	return nil
 }
 
-func (kp *SyncHandler) RemoteEndpointUpdated(_ *submV1.Endpoint) error {
+func (kp *SyncHandler) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
+	if err := cidr.OverlappingSubnets(kp.localServiceCidr, kp.localClusterCidr, endpoint.Spec.Subnets); err != nil {
+		// Skip processing the endpoint when CIDRs overlap and return nil to avoid re-queuing.
+		logger.Errorf(err, "overlappingSubnets for new remote %#v returned error", endpoint)
+		return nil
+	}
+
+	kp.syncHandlerMutex.Lock()
+	defer kp.syncHandlerMutex.Unlock()
+
+	var subnetsToAdd []string
+	var subnetsToRemove []string
+
+	for _, inputCidrBlock := range endpoint.Spec.Subnets {
+		if !kp.remoteSubnets.Has(inputCidrBlock) {
+			kp.remoteSubnets.Insert(inputCidrBlock)
+		}
+
+		if kp.remoteSubnetGw[inputCidrBlock] == nil {
+			subnetsToAdd = append(subnetsToAdd, inputCidrBlock)
+		} else if kp.remoteSubnetGw[inputCidrBlock].String() != endpoint.GatewayIP().String() {
+			subnetsToAdd = append(subnetsToAdd, inputCidrBlock)
+			subnetsToRemove = append(subnetsToRemove, inputCidrBlock)
+			kp.remoteSubnetGw[inputCidrBlock] = endpoint.GatewayIP()
+		}
+	}
+
+	if len(subnetsToAdd) > 0 {
+		if err := kp.updateRoutingRulesForInterClusterSupport(subnetsToRemove, Delete); err != nil {
+			logger.Errorf(err, "updateRoutingRulesForInterClusterSupport for removed remote  %#v returned error",
+				endpoint)
+			return err
+		}
+
+		// Add routes to the new endpoint on the GatewayNode.
+		kp.updateRoutingRulesForHostNetworkSupport(subnetsToRemove, Delete)
+		kp.updateIptableRulesForInterClusterTraffic(subnetsToRemove, Delete)
+
+		if err := kp.updateRoutingRulesForInterClusterSupport(subnetsToAdd, Add); err != nil {
+			logger.Errorf(err, "updateRoutingRulesForInterClusterSupport for new remote %#v returned error",
+				endpoint)
+			return err
+		}
+
+		// Add routes to the new endpoint on the GatewayNode.
+		kp.updateRoutingRulesForHostNetworkSupport(subnetsToAdd, Add)
+		kp.updateIptableRulesForInterClusterTraffic(subnetsToAdd, Add)
+	}
+
 	return nil
 }
 

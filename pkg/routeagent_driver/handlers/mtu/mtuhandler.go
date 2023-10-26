@@ -174,6 +174,36 @@ func (h *mtuHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 	return nil
 }
 
+func (h *mtuHandler) LocalEndpointUpdated(endpoint *submV1.Endpoint) error {
+	subnets := extractIPv4Subnets(&endpoint.Spec)
+	for _, subnet := range subnets {
+		err := h.localIPSet.AddEntry(subnet, true)
+		if err != nil {
+			return errors.Wrap(err, "error adding local IP set entry")
+		}
+	}
+
+	for _, subnet := range h.localClusterCidr {
+		err := h.localIPSet.AddEntry(subnet, true)
+		if err != nil {
+			return errors.Wrap(err, "error adding localClusterCidr IP set entry")
+		}
+	}
+
+	if h.forceMss == needed {
+		logger.Info("Creating iptables set-mss rules")
+
+		err := h.forceMssClamping(endpoint)
+		if err != nil {
+			return errors.Wrap(err, "error forcing TCP MSS clamping")
+		}
+
+		h.forceMss = configured
+	}
+
+	return nil
+}
+
 func (h *mtuHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 	subnets := extractIPv4Subnets(&endpoint.Spec)
 	for _, subnet := range subnets {
