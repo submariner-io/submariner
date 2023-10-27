@@ -54,15 +54,16 @@ func (ep *EndpointSpec) GetBackendBool(configName string, defaultValue *bool) (*
 }
 
 func parsePort(port string) (int32, error) {
-	if portInt, err := strconv.ParseUint(port, 10, 16); err != nil {
+	portInt, err := strconv.ParseUint(port, 10, 16)
+	if err != nil {
 		return -1, errors.Wrapf(err, "error parsing port %s", port)
 	} else if portInt < 1 {
 		return -1, errors.Errorf("port %s is < 1", port)
 	} else if portInt > 65535 {
 		return -1, errors.Errorf("port %s is > 65535", port)
-	} else {
-		return int32(portInt), nil
 	}
+
+	return int32(portInt), nil
 }
 
 func (ep *EndpointSpec) GenerateName() (string, error) {
