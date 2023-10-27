@@ -42,6 +42,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/versions"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -112,6 +113,12 @@ func main() {
 	leClient, err := kubernetes.NewForConfig(rest.AddUserAgent(restConfig, "leader-election"))
 	logger.FatalOnError(err, "Error creating leader election kubernetes clientset")
 
+	dynClient, err := dynamic.NewForConfig(restConfig)
+	logger.FatalOnError(err, "Error creating dynamic client")
+
+	restMapper, err := util.BuildRestMapper(restConfig)
+	logger.FatalOnError(err, "Error building the REST mapper")
+
 	logger.FatalOnError(subv1.AddToScheme(scheme.Scheme), "Error adding submariner types to the scheme")
 
 	gw, err := gateway.New(&gateway.Config{
@@ -123,6 +130,8 @@ func main() {
 		Spec: submSpec,
 		SyncerConfig: broker.SyncerConfig{
 			LocalRestConfig: restConfig,
+			LocalClient:     dynClient,
+			RestMapper:      restMapper,
 		},
 		WatcherConfig: watcher.Config{
 			RestConfig: restConfig,
