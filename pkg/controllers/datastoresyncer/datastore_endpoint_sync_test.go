@@ -26,7 +26,9 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
+	testutil "github.com/submariner-io/admiral/pkg/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	corev1 "k8s.io/api/core/v1"
@@ -133,15 +135,29 @@ func testEndpointSyncing() {
 			test.CreateResource(t.localNodes, node)
 		})
 
-		It("should update the local Endpoint's HealthCheckIP", func() {
+		JustBeforeEach(func() {
 			t.localEndpoint.Spec.HealthCheckIP = node.Annotations[constants.SmGlobalIP]
 			awaitEndpoint(t.localEndpoints, &t.localEndpoint.Spec)
+		})
 
+		It("should update the local Endpoint's HealthCheckIP", func() {
 			node.Annotations[constants.SmGlobalIP] = "200.0.0.100"
 			t.localEndpoint.Spec.HealthCheckIP = node.Annotations[constants.SmGlobalIP]
 
 			test.UpdateResource(t.localNodes, node)
 			awaitEndpoint(t.localEndpoints, &t.localEndpoint.Spec)
+		})
+
+		Context("but the local Endpoint no longer exists", func() {
+			It("should not recreate the local Endpoint", func() {
+				Expect(t.localEndpoints.Delete(context.Background(), getEndpointName(&t.localEndpoint.Spec), metav1.DeleteOptions{})).
+					To(Succeed())
+
+				node.Annotations[constants.SmGlobalIP] = "200.0.0.100"
+				test.UpdateResource(t.localNodes, node)
+
+				testutil.EnsureNoResource(resource.ForDynamic(t.localEndpoints), getEndpointName(&t.localEndpoint.Spec))
+			})
 		})
 	})
 }
