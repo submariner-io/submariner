@@ -19,6 +19,7 @@ limitations under the License.
 package datastoresyncer_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"reflect"
@@ -84,7 +85,7 @@ type testDriver struct {
 	brokerEndpoints  dynamic.ResourceInterface
 	syncerScheme     *runtime.Scheme
 	restMapper       meta.RESTMapper
-	stopCh           chan struct{}
+	stopFn           context.CancelFunc
 	startCompleted   chan error
 	expectedStartErr error
 	doStart          bool
@@ -162,11 +163,13 @@ func (t *testDriver) run() {
 	}, t.localCluster, t.localEndpoint)
 
 	if t.doStart {
-		t.stopCh = make(chan struct{})
+		var ctx context.Context
+
+		ctx, t.stopFn = context.WithCancel(context.Background())
 		t.startCompleted = make(chan error, 1)
 
 		go func() {
-			t.startCompleted <- t.syncer.Start(t.stopCh)
+			t.startCompleted <- t.syncer.Start(ctx)
 		}()
 	}
 }
@@ -186,7 +189,7 @@ func (t *testDriver) stop() {
 		}
 	}()
 
-	close(t.stopCh)
+	t.stopFn()
 
 	if t.expectedStartErr == nil {
 		Expect(err).To(Succeed())
