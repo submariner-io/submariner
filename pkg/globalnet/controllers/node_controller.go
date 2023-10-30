@@ -187,7 +187,8 @@ func (n *nodeController) reserveAllocatedIP(federator federate.Federator, obj *u
 	if err != nil {
 		logger.Warningf("Could not reserve allocated GlobalIP for Node %q: %v", obj.GetName(), err)
 
-		return errors.Wrap(federator.Distribute(updateNodeAnnotation(obj, "")), "error updating the Node global IP annotation")
+		return errors.Wrap(federator.Distribute(context.TODO(), updateNodeAnnotation(obj, "")),
+			"error updating the Node global IP annotation")
 	}
 
 	logger.Infof("Successfully reserved allocated GlobalIP %q for node %q", existingGlobalIP, obj.GetName())

@@ -302,12 +302,12 @@ func newTestDriver() *testDriver {
 		gw, err := gateway.New(&t.config)
 		Expect(err).To(Succeed())
 
-		stopCh := make(chan struct{})
+		ctx, stop := context.WithCancel(context.Background())
 		runCompleted := make(chan error, 1)
 
 		DeferCleanup(func() {
 			if t.expectedRunErr == nil {
-				close(stopCh)
+				stop()
 			}
 
 			err := func() error {
@@ -334,7 +334,7 @@ func newTestDriver() *testDriver {
 		})
 
 		go func() {
-			runCompleted <- gw.Run(stopCh)
+			runCompleted <- gw.Run(ctx)
 		}()
 	})
 

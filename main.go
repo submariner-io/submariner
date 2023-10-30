@@ -144,9 +144,12 @@ func main() {
 	})
 	logger.FatalOnError(err, "Error creating gateway instance")
 
-	err = gw.Run(signals.SetupSignalHandler().Done())
+	err = gw.Run(signals.SetupSignalHandler())
 
-	if err := httpServer.Shutdown(context.Background()); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	if err := httpServer.Shutdown(ctx); err != nil {
 		logger.Errorf(err, "Error shutting down metrics HTTP server")
 	}
 

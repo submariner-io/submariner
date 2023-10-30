@@ -19,6 +19,7 @@ limitations under the License.
 package datastoresyncer
 
 import (
+	"context"
 	"net"
 
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
@@ -75,7 +76,7 @@ func (d *DatastoreSyncer) updateLocalEndpointIfNecessary(globalIPOfNode string) 
 		prevHealthCheckIP := d.localEndpoint.Spec.HealthCheckIP
 		d.localEndpoint.Spec.HealthCheckIP = globalIPOfNode
 
-		if err := d.createOrUpdateLocalEndpoint(d.updateFederator); err != nil {
+		if err := d.createOrUpdateLocalEndpoint(context.TODO(), d.updateFederator); err != nil {
 			logger.Warningf("Error updating the local submariner Endpoint with HealthcheckIP: %v", err)
 
 			d.localEndpoint.Spec.HealthCheckIP = prevHealthCheckIP

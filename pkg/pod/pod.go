@@ -45,7 +45,7 @@ type GatewayPod struct {
 
 var logger = log.Logger{Logger: logf.Log.WithName("Pod")}
 
-func NewGatewayPod(k8sClient kubernetes.Interface) (*GatewayPod, error) {
+func NewGatewayPod(ctx context.Context, k8sClient kubernetes.Interface) (*GatewayPod, error) {
 	gp := &GatewayPod{
 		namespace: os.Getenv("SUBMARINER_NAMESPACE"),
 		node:      os.Getenv("NODE_NAME"),
@@ -65,7 +65,7 @@ func NewGatewayPod(k8sClient kubernetes.Interface) (*GatewayPod, error) {
 		return nil, errors.New("POD_NAME environment variable missing")
 	}
 
-	if err := gp.SetHALabels(context.Background(), submV1.HAStatusPassive); err != nil {
+	if err := gp.SetHALabels(ctx, submV1.HAStatusPassive); err != nil {
 		logger.Warningf("Error updating pod label: %s", err)
 	}
 
