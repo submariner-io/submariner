@@ -134,7 +134,7 @@ func testClusterCleanup() {
 	})
 
 	It("should remove local Clusters from the remote datastore", func() {
-		Expect(t.syncer.Cleanup()).To(Succeed())
+		Expect(t.syncer.Cleanup(context.Background())).To(Succeed())
 
 		test.AwaitNoResource(t.brokerClusters, clusterID)
 
@@ -143,7 +143,7 @@ func testClusterCleanup() {
 	})
 
 	It("should remove all Clusters from the local datastore", func() {
-		Expect(t.syncer.Cleanup()).To(Succeed())
+		Expect(t.syncer.Cleanup(context.Background())).To(Succeed())
 
 		test.AwaitNoResource(t.localClusters, clusterID)
 		test.AwaitNoResource(t.localClusters, otherClusterID)

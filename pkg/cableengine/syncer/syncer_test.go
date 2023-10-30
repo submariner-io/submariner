@@ -189,7 +189,7 @@ func testGatewaySyncing() {
 			statusErr := errors.New("fake error")
 			t.expectedGateway.Status.StatusFailure = statusErr.Error()
 
-			t.syncer.SetGatewayStatusError(statusErr)
+			t.syncer.SetGatewayStatusError(context.Background(), statusErr)
 			t.awaitGatewayUpdated(t.expectedGateway)
 		})
 	})
