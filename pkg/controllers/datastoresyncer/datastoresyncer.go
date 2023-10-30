@@ -68,7 +68,7 @@ func New(syncerConfig *broker.SyncerConfig, localCluster *types.SubmarinerCluste
 	}
 }
 
-func (d *DatastoreSyncer) Start(stopCh <-chan struct{}) error {
+func (d *DatastoreSyncer) Start(ctx context.Context) error {
 	defer utilruntime.HandleCrash()
 
 	logger.Info("Starting the datastore syncer")
@@ -81,25 +81,25 @@ func (d *DatastoreSyncer) Start(stopCh <-chan struct{}) error {
 		return err
 	}
 
-	err = syncer.Start(stopCh)
+	err = syncer.Start(ctx.Done())
 	if err != nil {
 		return errors.WithMessage(err, "error starting the syncer")
 	}
 
-	if err := d.ensureExclusiveEndpoint(syncer); err != nil {
+	if err := d.ensureExclusiveEndpoint(ctx, syncer); err != nil {
 		return errors.WithMessage(err, "could not ensure exclusive submariner Endpoint")
 	}
 
-	if err := d.createLocalCluster(syncer.GetLocalFederator()); err != nil {
+	if err := d.createLocalCluster(ctx, syncer.GetLocalFederator()); err != nil {
 		return errors.WithMessage(err, "error creating the local submariner Cluster")
 	}
 
-	if err := d.createOrUpdateLocalEndpoint(syncer.GetLocalFederator()); err != nil {
+	if err := d.createOrUpdateLocalEndpoint(ctx, syncer.GetLocalFederator()); err != nil {
 		return errors.WithMessage(err, "error creating the local submariner Endpoint")
 	}
 
 	if len(d.localCluster.Spec.GlobalCIDR) > 0 {
-		if err := d.startNodeWatcher(stopCh); err != nil {
+		if err := d.startNodeWatcher(ctx.Done()); err != nil {
 			return errors.WithMessage(err, "startNodeWatcher returned error")
 		}
 	}
@@ -109,7 +109,7 @@ func (d *DatastoreSyncer) Start(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (d *DatastoreSyncer) Cleanup() error {
+func (d *DatastoreSyncer) Cleanup(ctx context.Context) error {
 	syncer, err := d.createSyncer()
 	if err != nil {
 		return err
@@ -123,7 +123,7 @@ func (d *DatastoreSyncer) Cleanup() error {
 		}
 	}
 
-	err = d.cleanupResources(localClient.Resource(schema.GroupVersionResource{
+	err = d.cleanupResources(ctx, localClient.Resource(schema.GroupVersionResource{
 		Group:    submarinerv1.SchemeGroupVersion.Group,
 		Version:  submarinerv1.SchemeGroupVersion.Version,
 		Resource: "endpoints",
@@ -132,7 +132,7 @@ func (d *DatastoreSyncer) Cleanup() error {
 		return err
 	}
 
-	err = d.cleanupResources(localClient.Resource(schema.GroupVersionResource{
+	err = d.cleanupResources(ctx, localClient.Resource(schema.GroupVersionResource{
 		Group:    submarinerv1.SchemeGroupVersion.Group,
 		Version:  submarinerv1.SchemeGroupVersion.Version,
 		Resource: "clusters",
@@ -144,8 +144,10 @@ func (d *DatastoreSyncer) Cleanup() error {
 	return nil
 }
 
-func (d *DatastoreSyncer) cleanupResources(client dynamic.NamespaceableResourceInterface, syncer *broker.Syncer) error {
-	list, err := client.Namespace(d.syncerConfig.LocalNamespace).List(context.TODO(), metav1.ListOptions{})
+func (d *DatastoreSyncer) cleanupResources(ctx context.Context, client dynamic.NamespaceableResourceInterface,
+	syncer *broker.Syncer,
+) error {
+	list, err := client.Namespace(d.syncerConfig.LocalNamespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "error retrieving submariner resources")
 	}
@@ -153,7 +155,7 @@ func (d *DatastoreSyncer) cleanupResources(client dynamic.NamespaceableResourceI
 	for i := range list.Items {
 		obj := &list.Items[i]
 
-		err = syncer.GetLocalFederator().Delete(obj)
+		err = syncer.GetLocalFederator().Delete(ctx, obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return errors.Wrapf(err, "error deleting submariner %s %q from the local datastore", obj.GetKind(), obj.GetName())
 		}
@@ -165,7 +167,7 @@ func (d *DatastoreSyncer) cleanupResources(client dynamic.NamespaceableResourceI
 			continue
 		}
 
-		err = syncer.GetBrokerFederator().Delete(obj)
+		err = syncer.GetBrokerFederator().Delete(ctx, obj)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return errors.Wrapf(err, "error deleting submariner %s %q from the remote datastore", obj.GetKind(), obj.GetName())
 		}
@@ -239,7 +241,7 @@ func (d *DatastoreSyncer) shouldSyncRemoteEndpoint(obj runtime.Object, _ int,
 	return obj, false
 }
 
-func (d *DatastoreSyncer) ensureExclusiveEndpoint(syncer *broker.Syncer) error {
+func (d *DatastoreSyncer) ensureExclusiveEndpoint(ctx context.Context, syncer *broker.Syncer) error {
 	logger.Info("Ensuring we are the only endpoint active for this cluster")
 
 	endpoints := syncer.ListLocalResources(&submarinerv1.Endpoint{})
@@ -259,7 +261,7 @@ func (d *DatastoreSyncer) ensureExclusiveEndpoint(syncer *broker.Syncer) error {
 			continue
 		}
 
-		err = syncer.GetLocalFederator().Delete(endpoint)
+		err = syncer.GetLocalFederator().Delete(ctx, endpoint)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return errors.Wrapf(err, "error deleting submariner Endpoint %q from the local datastore", endpointName)
 		}
@@ -314,7 +316,7 @@ func (d *DatastoreSyncer) createNodeWatcher(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (d *DatastoreSyncer) createLocalCluster(federator federate.Federator) error {
+func (d *DatastoreSyncer) createLocalCluster(ctx context.Context, federator federate.Federator) error {
 	logger.Infof("Creating local submariner Cluster: %#v ", d.localCluster)
 
 	cluster := &submarinerv1.Cluster{
@@ -324,10 +326,10 @@ func (d *DatastoreSyncer) createLocalCluster(federator federate.Federator) error
 		Spec: d.localCluster.Spec,
 	}
 
-	return federator.Distribute(cluster) //nolint:wrapcheck  // Let the caller wrap it
+	return federator.Distribute(ctx, cluster) //nolint:wrapcheck  // Let the caller wrap it
 }
 
-func (d *DatastoreSyncer) createOrUpdateLocalEndpoint(federator federate.Federator) error {
+func (d *DatastoreSyncer) createOrUpdateLocalEndpoint(ctx context.Context, federator federate.Federator) error {
 	logger.Infof("Creating local submariner Endpoint: %#v ", d.localEndpoint)
 
 	endpointName, err := d.localEndpoint.Spec.GenerateName()
@@ -342,5 +344,5 @@ func (d *DatastoreSyncer) createOrUpdateLocalEndpoint(federator federate.Federat
 		Spec: d.localEndpoint.Spec,
 	}
 
-	return federator.Distribute(endpoint) //nolint:wrapcheck  // Let the caller wrap it
+	return federator.Distribute(ctx, endpoint) //nolint:wrapcheck  // Let the caller wrap it
 }

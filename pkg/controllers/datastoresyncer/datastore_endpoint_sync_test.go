@@ -262,7 +262,7 @@ func testEndpointCleanup() {
 	})
 
 	It("should remove local Endpoints from the remote datastore", func() {
-		Expect(t.syncer.Cleanup()).To(Succeed())
+		Expect(t.syncer.Cleanup(context.Background())).To(Succeed())
 
 		test.AwaitNoResource(t.brokerEndpoints, existingLocalEndpoint.GetName())
 
@@ -271,7 +271,7 @@ func testEndpointCleanup() {
 	})
 
 	It("should remove all Endpoints from the local datastore", func() {
-		Expect(t.syncer.Cleanup()).To(Succeed())
+		Expect(t.syncer.Cleanup(context.Background())).To(Succeed())
 
 		test.AwaitNoResource(t.localEndpoints, existingLocalEndpoint.GetName())
 		test.AwaitNoResource(t.localEndpoints, existingRemoteEndpoint.GetName())

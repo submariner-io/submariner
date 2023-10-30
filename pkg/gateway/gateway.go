@@ -63,7 +63,7 @@ const (
 )
 
 type Interface interface {
-	Run(<-chan struct{}) error
+	Run(ctx context.Context) error
 }
 
 type LeaderElectionConfig struct {
@@ -96,7 +96,6 @@ type gatewayType struct {
 	gatewayPod              *pod.GatewayPod
 	hostName                string
 	localEndpoint           *types.SubmarinerEndpoint
-	stopCh                  <-chan struct{}
 	fatalError              chan error
 	leaderComponentsStarted *sync.WaitGroup
 	recorder                record.EventRecorder
@@ -176,25 +175,23 @@ func New(config *Config) (Interface, error) {
 	return g, nil
 }
 
-func (g *gatewayType) Run(stopCh <-chan struct{}) error {
+func (g *gatewayType) Run(ctx context.Context) error {
 	if g.Spec.Uninstall {
 		logger.Info("Uninstalling the submariner gateway engine")
 
-		return g.uninstall()
+		return g.uninstall(ctx)
 	}
 
 	logger.Info("Starting the gateway engine")
 
-	g.stopCh = stopCh
-
 	g.cableEngine.SetupNATDiscovery(g.natDiscovery)
 
-	err := g.natDiscovery.Run(g.stopCh)
+	err := g.natDiscovery.Run(ctx.Done())
 	if err != nil {
 		return errors.Wrap(err, "error starting NAT discovery server")
 	}
 
-	g.gatewayPod, err = pod.NewGatewayPod(g.KubeClient)
+	g.gatewayPod, err = pod.NewGatewayPod(ctx, g.KubeClient)
 	if err != nil {
 		return errors.Wrap(err, "error creating a handler to update the gateway pod")
 	}
@@ -202,24 +199,25 @@ func (g *gatewayType) Run(stopCh <-chan struct{}) error {
 	var waitGroup sync.WaitGroup
 
 	g.runAsync(&waitGroup, func() {
-		g.cableEngineSyncer.Run(g.stopCh)
+		//nolint:contextcheck // Intentionally not passing the context b/c it can't be used after cancellation.
+		g.cableEngineSyncer.Run(ctx.Done())
 	})
 
 	if !g.airGapped {
 		g.initPublicIPWatcher()
 	}
 
-	err = g.startLeaderElection()
+	err = g.startLeaderElection(ctx)
 	if err != nil {
 		return errors.Wrap(err, "error starting leader election")
 	}
 
 	select {
-	case <-g.stopCh:
+	case <-ctx.Done():
 	case fatalErr := <-g.fatalError:
-		g.cableEngineSyncer.SetGatewayStatusError(fatalErr)
+		g.cableEngineSyncer.SetGatewayStatusError(ctx, fatalErr)
 
-		if err := g.gatewayPod.SetHALabels(context.Background(), subv1.HAStatusPassive); err != nil {
+		if err := g.gatewayPod.SetHALabels(ctx, subv1.HAStatusPassive); err != nil {
 			logger.Warningf("Error updating pod label: %s", err)
 		}
 
@@ -242,7 +240,7 @@ func (g *gatewayType) runAsync(waitGroup *sync.WaitGroup, run func()) {
 	}()
 }
 
-func (g *gatewayType) startLeaderElection() error {
+func (g *gatewayType) startLeaderElection(ctx context.Context) error {
 	logger.Info("Starting leader election")
 
 	g.leaderComponentsStarted = &sync.WaitGroup{}
@@ -256,7 +254,7 @@ func (g *gatewayType) startLeaderElection() error {
 		return errors.Wrap(err, "error creating leader election resource lock")
 	}
 
-	go leaderelection.RunOrDie(context.Background(), leaderelection.LeaderElectionConfig{
+	go leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
 		Lock:          rl,
 		LeaseDuration: g.LeaseDuration,
 		RenewDeadline: g.RenewDeadline,
@@ -295,7 +293,12 @@ func (g *gatewayType) onStartedLeading(ctx context.Context) {
 	})
 
 	g.runAsync(g.leaderComponentsStarted, func() {
-		if err := g.datastoreSyncer.Start(ctx.Done()); err != nil {
+		err := g.datastoreSyncer.Start(ctx)
+		if errors.Is(err, context.Canceled) {
+			return
+		}
+
+		if err != nil {
 			g.fatalError <- errors.Wrap(err, "error running the datastore syncer")
 		}
 	})
@@ -338,7 +341,7 @@ func (g *gatewayType) onStoppedLeading() {
 		logger.Warningf("Error updating pod label to passive: %s", err)
 	}
 
-	err := g.startLeaderElection()
+	err := g.startLeaderElection(context.Background())
 	if err != nil {
 		g.fatalError <- errors.Wrap(err, "error restarting leader election")
 	}
@@ -375,7 +378,7 @@ func (g *gatewayType) initCableHealthChecker() {
 	}
 }
 
-func (g *gatewayType) uninstall() error {
+func (g *gatewayType) uninstall(ctx context.Context) error {
 	err := g.cableEngine.StartEngine()
 	if err != nil {
 		// As we are in the process of cleaning up, ignore any initialization errors.
@@ -383,14 +386,14 @@ func (g *gatewayType) uninstall() error {
 	}
 
 	// The Gateway object has to be deleted before invoking the cableEngine.Cleanup
-	g.cableEngineSyncer.CleanupGatewayEntry()
+	g.cableEngineSyncer.CleanupGatewayEntry(ctx)
 
 	err = g.cableEngine.Cleanup()
 	if err != nil {
 		logger.Errorf(err, "Error while cleaning up of cable drivers")
 	}
 
-	dsErr := g.datastoreSyncer.Cleanup()
+	dsErr := g.datastoreSyncer.Cleanup(ctx)
 
 	return errors.Wrap(dsErr, "Error cleaning up the datastore")
 }

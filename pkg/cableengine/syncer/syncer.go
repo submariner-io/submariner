@@ -84,7 +84,7 @@ func NewGatewaySyncer(engine cableengine.Engine, client v1typed.GatewayInterface
 
 func (gs *GatewaySyncer) Run(stopCh <-chan struct{}) {
 	wait.Until(gs.syncGatewayStatus, GatewayUpdateInterval, stopCh)
-	gs.CleanupGatewayEntry()
+	gs.CleanupGatewayEntry(context.Background())
 
 	logger.Info("CableEngine syncer stopped")
 }
@@ -93,15 +93,15 @@ func (gs *GatewaySyncer) syncGatewayStatus() {
 	gs.mutex.Lock()
 	defer gs.mutex.Unlock()
 
-	gs.syncGatewayStatusSafe()
+	gs.syncGatewayStatusSafe(context.Background())
 }
 
-func (gs *GatewaySyncer) SetGatewayStatusError(err error) {
+func (gs *GatewaySyncer) SetGatewayStatusError(ctx context.Context, err error) {
 	gs.mutex.Lock()
 	defer gs.mutex.Unlock()
 
 	gs.statusError = err
-	gs.syncGatewayStatusSafe()
+	gs.syncGatewayStatusSafe(ctx)
 }
 
 func (gs *GatewaySyncer) gatewayResourceInterface() resource.Interface {
@@ -122,13 +122,13 @@ func (gs *GatewaySyncer) gatewayResourceInterface() resource.Interface {
 	}
 }
 
-func (gs *GatewaySyncer) syncGatewayStatusSafe() {
+func (gs *GatewaySyncer) syncGatewayStatusSafe(ctx context.Context) {
 	logger.V(log.TRACE).Info("Running Gateway status sync")
 	gatewaySyncIterations.Inc()
 
 	gatewayObj := gs.generateGatewayObject()
 
-	result, err := util.CreateOrUpdate(context.TODO(), gs.gatewayResourceInterface(), gatewayObj,
+	result, err := util.CreateOrUpdate(ctx, gs.gatewayResourceInterface(), gatewayObj,
 		func(existing runtime.Object) (runtime.Object, error) {
 			existingGw := existing.(*v1.Gateway)
 			existingGw.Status = gatewayObj.Status
@@ -150,15 +150,15 @@ func (gs *GatewaySyncer) syncGatewayStatusSafe() {
 	}
 
 	if gatewayObj.Status.HAStatus == v1.HAStatusActive {
-		err := gs.cleanupStaleGatewayEntries(gatewayObj.Name)
+		err := gs.cleanupStaleGatewayEntries(ctx, gatewayObj.Name)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("error cleaning up stale gateway entries: %w", err))
 		}
 	}
 }
 
-func (gs *GatewaySyncer) cleanupStaleGatewayEntries(localGatewayName string) error {
-	gateways, err := gs.client.List(context.TODO(), metav1.ListOptions{})
+func (gs *GatewaySyncer) cleanupStaleGatewayEntries(ctx context.Context, localGatewayName string) error {
+	gateways, err := gs.client.List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "error listing Gateways")
 	}
@@ -176,7 +176,7 @@ func (gs *GatewaySyncer) cleanupStaleGatewayEntries(localGatewayName string) err
 		}
 
 		if stale {
-			err := gs.client.Delete(context.TODO(), gw.Name, metav1.DeleteOptions{})
+			err := gs.client.Delete(ctx, gw.Name, metav1.DeleteOptions{})
 			if err != nil {
 				// In this case we don't want to stop the cleanup loop and just log it.
 				utilruntime.HandleError(fmt.Errorf("error deleting stale Gateway %+v: %w", gw, err))
@@ -278,10 +278,10 @@ func (gs *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 
 // CleanupGatewayEntry removes this Gateway entry from the k8s API, it does not
 // propagate error up because it's a termination function that we also provide externally.
-func (gs *GatewaySyncer) CleanupGatewayEntry() {
+func (gs *GatewaySyncer) CleanupGatewayEntry(ctx context.Context) {
 	hostName := gs.engine.GetLocalEndpoint().Spec.Hostname
 
-	err := gs.client.Delete(context.TODO(), hostName, metav1.DeleteOptions{})
+	err := gs.client.Delete(ctx, hostName, metav1.DeleteOptions{})
 	if err != nil {
 		logger.Errorf(err, "Error while trying to delete own Gateway %q", hostName)
 		return
