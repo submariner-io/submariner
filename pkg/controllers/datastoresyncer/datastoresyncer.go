@@ -28,6 +28,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/resource"
 	resourceSyncer "github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
+	"github.com/submariner-io/admiral/pkg/util"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cidr"
@@ -45,11 +46,11 @@ import (
 )
 
 type DatastoreSyncer struct {
-	localCluster   types.SubmarinerCluster
-	localEndpoint  types.SubmarinerEndpoint
-	localNodeName  string
-	syncerConfig   broker.SyncerConfig
-	localFederator federate.Federator
+	localCluster    types.SubmarinerCluster
+	localEndpoint   types.SubmarinerEndpoint
+	localNodeName   string
+	syncerConfig    broker.SyncerConfig
+	updateFederator federate.Federator
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("DSSyncer")}
@@ -72,6 +73,9 @@ func (d *DatastoreSyncer) Start(stopCh <-chan struct{}) error {
 
 	logger.Info("Starting the datastore syncer")
 
+	d.updateFederator = federate.NewUpdateFederator(d.syncerConfig.LocalClient, d.syncerConfig.RestMapper, d.syncerConfig.LocalNamespace,
+		util.CopyImmutableMetadata)
+
 	syncer, err := d.createSyncer()
 	if err != nil {
 		return err
@@ -82,17 +86,15 @@ func (d *DatastoreSyncer) Start(stopCh <-chan struct{}) error {
 		return errors.WithMessage(err, "error starting the syncer")
 	}
 
-	d.localFederator = syncer.GetLocalFederator()
-
 	if err := d.ensureExclusiveEndpoint(syncer); err != nil {
 		return errors.WithMessage(err, "could not ensure exclusive submariner Endpoint")
 	}
 
-	if err := d.createLocalCluster(); err != nil {
+	if err := d.createLocalCluster(syncer.GetLocalFederator()); err != nil {
 		return errors.WithMessage(err, "error creating the local submariner Cluster")
 	}
 
-	if err := d.createOrUpdateLocalEndpoint(); err != nil {
+	if err := d.createOrUpdateLocalEndpoint(syncer.GetLocalFederator()); err != nil {
 		return errors.WithMessage(err, "error creating the local submariner Endpoint")
 	}
 
@@ -312,7 +314,7 @@ func (d *DatastoreSyncer) createNodeWatcher(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (d *DatastoreSyncer) createLocalCluster() error {
+func (d *DatastoreSyncer) createLocalCluster(federator federate.Federator) error {
 	logger.Infof("Creating local submariner Cluster: %#v ", d.localCluster)
 
 	cluster := &submarinerv1.Cluster{
@@ -322,10 +324,10 @@ func (d *DatastoreSyncer) createLocalCluster() error {
 		Spec: d.localCluster.Spec,
 	}
 
-	return d.localFederator.Distribute(cluster) //nolint:wrapcheck  // Let the caller wrap it
+	return federator.Distribute(cluster) //nolint:wrapcheck  // Let the caller wrap it
 }
 
-func (d *DatastoreSyncer) createOrUpdateLocalEndpoint() error {
+func (d *DatastoreSyncer) createOrUpdateLocalEndpoint(federator federate.Federator) error {
 	logger.Infof("Creating local submariner Endpoint: %#v ", d.localEndpoint)
 
 	endpointName, err := d.localEndpoint.Spec.GenerateName()
@@ -340,5 +342,5 @@ func (d *DatastoreSyncer) createOrUpdateLocalEndpoint() error {
 		Spec: d.localEndpoint.Spec,
 	}
 
-	return d.localFederator.Distribute(endpoint) //nolint:wrapcheck  // Let the caller wrap it
+	return federator.Distribute(endpoint) //nolint:wrapcheck  // Let the caller wrap it
 }
