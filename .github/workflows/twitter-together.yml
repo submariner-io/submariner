@@ -23,7 +23,7 @@ jobs:
     if: github.event_name == 'push'
     steps:
       - name: Check out the repository
-        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
 
       - name: Tweet
         uses: gr2m/twitter-together@5c4c327d1ad1ed8e1759e78a697b1cc93c1da692
