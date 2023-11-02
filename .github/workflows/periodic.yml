@@ -17,7 +17,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Check out the repository
-        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
 
       - name: Update internal submariner-io/* dependencies to latest
         run: |
@@ -51,7 +51,7 @@ jobs:
       issues: write
     steps:
       - name: Check out the repository
-        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
 
       - name: Run markdown-link-check
         uses: gaurav-nelson/github-action-markdown-link-check@d53a906aa6b22b8979d33bc86170567e619495ec
