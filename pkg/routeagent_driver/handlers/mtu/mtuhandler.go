@@ -310,33 +310,9 @@ func (h *mtuHandler) forceMssClamping(endpoint *submV1.Endpoint) error {
 		"--set-mss", strconv.Itoa(tcpMssValue),
 	}
 
-	rules, err := h.ipt.List(constants.MangleTable, constants.SmPostRoutingChain)
-	if err != nil {
-		return errors.Wrapf(err, "error listing the rules in %s chain", constants.SmPostRoutingChain)
-	}
-
-	isPresent := false
-
-	for _, rule := range rules {
-		if strings.Contains(rule, strings.Join(ruleSpecSource, " ")) || strings.Contains(rule, strings.Join(ruleSpecDest, " ")) {
-			isPresent = true
-			break
-		}
-	}
-
-	if len(rules) > 0 && !isPresent {
-		if err := h.ipt.ClearChain(constants.MangleTable, constants.SmPostRoutingChain); err != nil {
-			logger.Warningf("Error flushing iptables chain %q of %q table: %v", constants.SmPostRoutingChain,
-				constants.MangleTable, err)
-		}
-	}
-
-	if err := h.ipt.AppendUnique(constants.MangleTable, constants.SmPostRoutingChain, ruleSpecSource...); err != nil {
-		return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(ruleSpecSource, " "))
-	}
-
-	if err := h.ipt.AppendUnique(constants.MangleTable, constants.SmPostRoutingChain, ruleSpecDest...); err != nil {
-		return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(ruleSpecDest, " "))
+	if err := h.ipt.UpdateChainRules(constants.MangleTable, constants.SmPostRoutingChain,
+		[][]string{ruleSpecSource, ruleSpecDest}); err != nil {
+		return errors.Wrapf(err, "error updating chain %s table %s rules", constants.SmPostRoutingChain, constants.MangleTable)
 	}
 
 	return nil

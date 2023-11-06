@@ -99,21 +99,6 @@ func (i *ipTables) RemoveClusterEgressRules(subnet, snatIP, globalNetIPTableMark
 	return nil
 }
 
-func (i *ipTables) ipTableChainExists(table, chain string) (bool, error) {
-	existingChains, err := i.ipt.ListChains(table)
-	if err != nil {
-		return false, errors.Wrapf(err, "error listing chains in IP table %q", table)
-	}
-
-	for _, val := range existingChains {
-		if val == chain {
-			return true, nil
-		}
-	}
-
-	return false, nil
-}
-
 func (i *ipTables) AddIngressRulesForHeadlessSvc(globalIP, ip string, targetType TargetType) error {
 	if globalIP == "" || ip == "" {
 		return fmt.Errorf("globalIP %q or %s IP %q cannot be empty", globalIP, targetType, ip)
@@ -166,9 +151,9 @@ func (i *ipTables) GetKubeProxyClusterIPServiceChainName(service *corev1.Service
 		encoded := base32.StdEncoding.EncodeToString(hash[:])
 		chainName := kubeProxyServiceChainPrefix + encoded[:16]
 
-		chainExists, err := i.ipTableChainExists("nat", chainName)
+		chainExists, err := i.ipt.ChainExists("nat", chainName)
 		if err != nil {
-			return "", false, err
+			return "", false, errors.Wrapf(err, "error checking if chain %s exists", chainName)
 		}
 
 		if chainExists {
