@@ -18,7 +18,7 @@ require (
 	github.com/submariner-io/shipyard v0.14.7
 	github.com/uw-labs/lichen v0.1.7
 	github.com/vishvananda/netlink v1.1.1-0.20210518155637-4cb3795f2ccb
-	golang.org/x/sys v0.6.0
+	golang.org/x/sys v0.13.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20220916014741-473347a5e6e3
 	google.golang.org/protobuf v1.28.1
 	k8s.io/api v0.25.14
@@ -88,12 +88,12 @@ require (
 	github.com/stretchr/testify v1.8.0 // indirect
 	github.com/urfave/cli/v2 v2.4.0 // indirect
 	github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae // indirect
-	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4 // indirect
-	golang.org/x/net v0.8.0 // indirect
+	golang.org/x/crypto v0.14.0 // indirect
+	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b // indirect
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f // indirect
-	golang.org/x/term v0.6.0 // indirect
-	golang.org/x/text v0.8.0 // indirect
+	golang.org/x/term v0.13.0 // indirect
+	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect
 	golang.zx2c4.com/wireguard v0.0.0-20220407013110-ef5c587f782d // indirect
 	google.golang.org/appengine v1.6.7 // indirect
