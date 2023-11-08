@@ -15,6 +15,7 @@ allow:
   - "PostgreSQL"
   - "X11"
   - "Zlib"
+  - "ImageMagick"
 
 # https://github.com/cncf/foundation/tree/master/license-exceptions
 exceptions:
