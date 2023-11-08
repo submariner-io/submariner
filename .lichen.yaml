@@ -15,10 +15,7 @@ allow:
   - "PostgreSQL"
   - "X11"
   - "Zlib"
-  - "ImageMagick"
 
-# https://github.com/cncf/foundation/tree/master/license-exceptions
-exceptions:
-  licenseNotPermitted:
-    - path: "github.com/hashicorp/golang-lru"
-      licenses: ["MPL-2.0"]
+override:
+  - path: "sigs.k8s.io/yaml"
+    licenses: ["Apache-2.0", "MIT"]
