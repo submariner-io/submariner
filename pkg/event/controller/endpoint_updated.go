@@ -32,6 +32,9 @@ func (c *Controller) handleUpdatedEndpoint(obj runtime.Object, requeueCount int)
 		return false
 	}
 
+	c.syncMutex.Lock()
+	defer c.syncMutex.Unlock()
+
 	var err error
 	if endpoint.Spec.ClusterID != c.env.ClusterID {
 		err = c.handleUpdatedRemoteEndpoint(endpoint)

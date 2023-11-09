@@ -49,7 +49,7 @@ type Controller struct {
 
 	handlers *event.Registry
 
-	syncMutex     *sync.Mutex
+	syncMutex     sync.Mutex
 	hostname      string
 	isGatewayNode bool
 }
@@ -84,9 +84,8 @@ func New(config *Config) (*Controller, error) {
 	}
 
 	ctl := Controller{
-		handlers:  config.Registry,
-		syncMutex: &sync.Mutex{},
-		hostname:  hostname,
+		handlers: config.Registry,
+		hostname: hostname,
 	}
 
 	err = envconfig.Process("submariner", &ctl.env)

@@ -20,7 +20,6 @@ package ovn
 
 import (
 	"context"
-	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
@@ -39,7 +38,6 @@ import (
 
 type NonGatewayRouteHandler struct {
 	event.HandlerBase
-	mutex           sync.Mutex
 	smClient        submarinerClientset.Interface
 	remoteEndpoints map[string]*submarinerv1.Endpoint
 	k8sClientSet    clientset.Interface
@@ -86,9 +84,6 @@ func (h *NonGatewayRouteHandler) GetNetworkPlugins() []string {
 }
 
 func (h *NonGatewayRouteHandler) RemoteEndpointCreated(endpoint *submarinerv1.Endpoint) error {
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
-
 	h.remoteEndpoints[endpoint.Name] = endpoint
 
 	if !h.isGateway || h.transitSwitchIP == "" {
@@ -106,8 +101,6 @@ func (h *NonGatewayRouteHandler) RemoteEndpointCreated(endpoint *submarinerv1.En
 }
 
 func (h *NonGatewayRouteHandler) RemoteEndpointRemoved(endpoint *submarinerv1.Endpoint) error {
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
 	delete(h.remoteEndpoints, endpoint.Name)
 
 	if !h.isGateway || h.transitSwitchIP == "" {
@@ -123,18 +116,12 @@ func (h *NonGatewayRouteHandler) RemoteEndpointRemoved(endpoint *submarinerv1.En
 }
 
 func (h *NonGatewayRouteHandler) TransitionToNonGateway() error {
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
-
 	h.isGateway = false
 
 	return nil
 }
 
 func (h *NonGatewayRouteHandler) TransitionToGateway() error {
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
-
 	h.isGateway = true
 
 	if h.transitSwitchIP == "" {

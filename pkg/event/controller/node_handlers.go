@@ -27,6 +27,9 @@ import (
 func (c *Controller) handleRemovedNode(obj runtime.Object, _ int) bool {
 	node := obj.(*k8sv1.Node)
 
+	c.syncMutex.Lock()
+	defer c.syncMutex.Unlock()
+
 	if err := c.handlers.NodeRemoved(node); err != nil {
 		logger.Error(err, "Error handling removed Node")
 		return true
@@ -38,6 +41,9 @@ func (c *Controller) handleRemovedNode(obj runtime.Object, _ int) bool {
 func (c *Controller) handleCreatedNode(obj runtime.Object, _ int) bool {
 	node := obj.(*k8sv1.Node)
 
+	c.syncMutex.Lock()
+	defer c.syncMutex.Unlock()
+
 	if err := c.handlers.NodeCreated(node); err != nil {
 		logger.Error(err, "Error handling created Node")
 		return true
@@ -48,6 +54,9 @@ func (c *Controller) handleCreatedNode(obj runtime.Object, _ int) bool {
 
 func (c *Controller) handleUpdatedNode(obj runtime.Object, _ int) bool {
 	node := obj.(*k8sv1.Node)
+
+	c.syncMutex.Lock()
+	defer c.syncMutex.Unlock()
 
 	if err := c.handlers.NodeUpdated(node); err != nil {
 		logger.Error(err, "Error handling updated Node")
