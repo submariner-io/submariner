@@ -1,5 +1,5 @@
 ARG BASE_BRANCH
-ARG FEDORA_VERSION=38
+ARG FEDORA_VERSION=39
 ARG SOURCE=/go/src/github.com/submariner-io/submariner
 
 FROM --platform=${BUILDPLATFORM} quay.io/submariner/shipyard-dapper-base:${BASE_BRANCH} AS builder
