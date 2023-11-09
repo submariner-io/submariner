@@ -138,6 +138,26 @@ var _ = Describe("Event Registry", func() {
 			})
 		})
 	})
+
+	When("SetHandlerState is called on the registry", func() {
+		It("should invoke SetState on the handlers", func() {
+			h := testing.NewTestHandler("test", event.AnyNetworkPlugin, nil)
+			registry := event.NewRegistry("test-registry", event.AnyNetworkPlugin)
+			err := registry.AddHandlers(h)
+			Expect(err).NotTo(HaveOccurred())
+
+			registry.SetHandlerState(&testing.TestHandlerState{Gateway: true})
+			Expect(h.State().IsOnGateway()).To(BeTrue())
+		})
+	})
+
+	When("SetState has not been called for a handler", func() {
+		Specify("State should return a valid instance", func() {
+			h := testing.NewTestHandler("test", event.AnyNetworkPlugin, nil)
+			hc := h.State()
+			Expect(hc).ToNot(BeNil())
+		})
+	})
 })
 
 func allEvents(registry *event.Registry) map[testing.TestEvent]func() error {

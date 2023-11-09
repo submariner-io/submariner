@@ -91,6 +91,13 @@ func (er *Registry) AddHandlers(eventHandlers ...Handler) error {
 	return nil
 }
 
+func (er *Registry) SetHandlerState(handlerState HandlerState) {
+	_ = er.invokeHandlers("SetHandlerState", func(h Handler) error {
+		h.SetState(handlerState)
+		return nil
+	})
+}
+
 func (er *Registry) StopHandlers() error {
 	return er.invokeHandlers("Stop", func(h Handler) error {
 		return h.Stop() //nolint:wrapcheck  // Let the caller wrap it
