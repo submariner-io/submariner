@@ -20,7 +20,6 @@ package ovn
 
 import (
 	"context"
-	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
@@ -37,7 +36,6 @@ import (
 
 type GatewayRouteHandler struct {
 	event.HandlerBase
-	mutex           sync.Mutex
 	smClient        submarinerClientset.Interface
 	config          *environment.Specification
 	remoteEndpoints map[string]*submarinerv1.Endpoint
@@ -76,9 +74,6 @@ func (h *GatewayRouteHandler) GetNetworkPlugins() []string {
 }
 
 func (h *GatewayRouteHandler) RemoteEndpointCreated(endpoint *submarinerv1.Endpoint) error {
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
-
 	h.remoteEndpoints[endpoint.Name] = endpoint
 
 	if h.isGateway {
@@ -93,9 +88,6 @@ func (h *GatewayRouteHandler) RemoteEndpointCreated(endpoint *submarinerv1.Endpo
 }
 
 func (h *GatewayRouteHandler) RemoteEndpointRemoved(endpoint *submarinerv1.Endpoint) error {
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
-
 	delete(h.remoteEndpoints, endpoint.Name)
 
 	if h.isGateway {
@@ -109,18 +101,12 @@ func (h *GatewayRouteHandler) RemoteEndpointRemoved(endpoint *submarinerv1.Endpo
 }
 
 func (h *GatewayRouteHandler) TransitionToNonGateway() error {
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
-
 	h.isGateway = false
 
 	return nil
 }
 
 func (h *GatewayRouteHandler) TransitionToGateway() error {
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
-
 	h.isGateway = true
 
 	for _, endpoint := range h.remoteEndpoints {

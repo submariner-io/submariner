@@ -32,6 +32,9 @@ func (c *Controller) handleRemovedEndpoint(obj runtime.Object, requeueCount int)
 		return false
 	}
 
+	c.syncMutex.Lock()
+	defer c.syncMutex.Unlock()
+
 	var err error
 	if endpoint.Spec.ClusterID != c.env.ClusterID {
 		err = c.handleRemovedRemoteEndpoint(endpoint)
@@ -50,9 +53,6 @@ func (c *Controller) handleRemovedLocalEndpoint(endpoint *smv1.Endpoint) error {
 	if err := c.handlers.LocalEndpointRemoved(endpoint); err != nil {
 		return err //nolint:wrapcheck  // Let the caller wrap it
 	}
-
-	c.syncMutex.Lock()
-	defer c.syncMutex.Unlock()
 
 	if c.isGatewayNode && endpoint.Spec.Hostname == c.hostname {
 		if err := c.handlers.TransitionToNonGateway(); err != nil {

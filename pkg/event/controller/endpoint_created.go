@@ -34,6 +34,9 @@ func (c *Controller) handleCreatedEndpoint(obj runtime.Object, requeueCount int)
 		return false
 	}
 
+	c.syncMutex.Lock()
+	defer c.syncMutex.Unlock()
+
 	if endpoint.Spec.ClusterID != c.env.ClusterID {
 		err = c.handleCreatedRemoteEndpoint(endpoint)
 	} else {
@@ -53,9 +56,6 @@ func (c *Controller) handleCreatedLocalEndpoint(endpoint *smv1.Endpoint) error {
 	}
 
 	if endpoint.Spec.Hostname == c.hostname {
-		c.syncMutex.Lock()
-		defer c.syncMutex.Unlock()
-
 		// Verify if this node was a GatewayNode already. If not, it just transitioned to Gateway Node.
 		if !c.isGatewayNode {
 			if err := c.handlers.TransitionToGateway(); err != nil {
