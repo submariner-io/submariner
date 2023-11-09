@@ -30,6 +30,15 @@ type TestEvent struct {
 	Parameter interface{}
 }
 
+type TestHandlerState struct {
+	event.DefaultHandlerState
+	Gateway bool
+}
+
+func (c *TestHandlerState) IsOnGateway() bool {
+	return c.Gateway
+}
+
 type TestHandler struct {
 	event.HandlerBase
 	Name          string

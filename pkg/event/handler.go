@@ -25,9 +25,27 @@ import (
 
 const AnyNetworkPlugin = ""
 
+type HandlerState interface {
+	IsOnGateway() bool
+	GetRemoteEndpoints() []submV1.Endpoint
+}
+
+type DefaultHandlerState struct{}
+
+func (c *DefaultHandlerState) IsOnGateway() bool {
+	return false
+}
+
+func (c *DefaultHandlerState) GetRemoteEndpoints() []submV1.Endpoint {
+	return nil
+}
+
 type Handler interface {
 	// Init is called once on startup to let the handler initialize any state it needs.
 	Init() error
+
+	// SetHandlerState is called once on startup after Init with the HandlerState that can be used to access global data from event callbacks.
+	SetState(handlerCtx HandlerState)
 
 	// GetName returns the name of the event handler
 	GetName() string
@@ -76,10 +94,24 @@ type Handler interface {
 }
 
 // Base structure for event handlers that stubs out methods considered to be optional.
-type HandlerBase struct{}
+type HandlerBase struct {
+	handlerState HandlerState
+}
 
 func (ev *HandlerBase) Init() error {
 	return nil
+}
+
+func (ev *HandlerBase) SetState(handlerState HandlerState) {
+	ev.handlerState = handlerState
+}
+
+func (ev *HandlerBase) State() HandlerState {
+	if ev.handlerState == nil {
+		return &DefaultHandlerState{}
+	}
+
+	return ev.handlerState
 }
 
 func (ev *HandlerBase) Stop() error {
