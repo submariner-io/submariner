@@ -19,29 +19,17 @@ limitations under the License.
 package controller_test
 
 import (
-	"context"
-	"os"
 	"sync/atomic"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/admiral/pkg/syncer/test"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event"
-	"github.com/submariner-io/submariner/pkg/event/controller"
 	"github.com/submariner-io/submariner/pkg/event/testing"
-	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/client-go/dynamic"
-	dynamicfake "k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/kubernetes/scheme"
 )
 
 const (
-	testNamespace      = "test-namespace"
-	testHandlerName    = "test-handler"
-	testLocalClusterID = "local-cluster"
+	testHandlerName = "test-handler"
 )
 
 var _ = Describe("Event controller", func() {
@@ -49,23 +37,16 @@ var _ = Describe("Event controller", func() {
 
 	When("a Node is created, updated and deleted", func() {
 		It("should correctly notify the handler", func() {
-			node := &corev1.Node{
-				ObjectMeta: v1.ObjectMeta{
-					Name: t.hostname,
-				},
-			}
-
-			obj := test.CreateResource(t.nodes, node)
-			node.Namespace = obj.GetNamespace()
+			node := t.CreateNode(testing.NewNode(t.Hostname))
 
 			t.awaitEvent(testing.EvNodeCreated, node)
 
 			node.Labels = map[string]string{"labeled-i-am": "i-am"}
-			test.UpdateResource(t.nodes, node)
+			t.UpdateNode(node)
 
 			t.awaitEvent(testing.EvNodeUpdated, node)
 
-			Expect(t.nodes.Delete(context.TODO(), node.GetName(), v1.DeleteOptions{})).To(Succeed())
+			t.DeleteNode(node.GetName())
 
 			t.awaitEvent(testing.EvNodeRemoved, node)
 			t.ensureNoEvents()
@@ -97,22 +78,17 @@ var _ = Describe("Event controller", func() {
 })
 
 type testDriver struct {
-	endpoints       dynamic.ResourceInterface
-	nodes           dynamic.ResourceInterface
-	hostname        string
-	testEvents      chan testing.TestEvent
-	stopCh          chan struct{}
-	eventController *controller.Controller
-	handler         *TestHandler
+	*testing.ControllerSupport
+	testEvents chan testing.TestEvent
+	handler    *TestHandler
 }
 
 func newTestDriver() *testDriver {
-	t := &testDriver{}
-	t.hostname, _ = os.Hostname()
+	t := &testDriver{
+		ControllerSupport: testing.NewControllerSupport(),
+	}
 
 	BeforeEach(func() {
-		t.stopCh = make(chan struct{})
-
 		t.testEvents = make(chan testing.TestEvent, 1000)
 		t.handler = &TestHandler{
 			TestHandler: &testing.TestHandler{
@@ -124,54 +100,10 @@ func newTestDriver() *testDriver {
 	})
 
 	JustBeforeEach(func() {
-		_ = submV1.AddToScheme(scheme.Scheme)
-
-		registry := event.NewRegistry("test-registry", "test-plugin")
-		Expect(registry.AddHandlers(t.handler)).To(Succeed())
-
-		config := controller.Config{
-			RestMapper: test.GetRESTMapperFor(&corev1.Node{}, &submV1.Endpoint{}),
-			Client:     dynamicfake.NewSimpleDynamicClient(scheme.Scheme),
-			Registry:   registry,
-		}
-
-		os.Setenv("SUBMARINER_NAMESPACE", testNamespace)
-		os.Setenv("SUBMARINER_CLUSTERID", testLocalClusterID)
-
-		t.nodes = config.Client.Resource(*test.GetGroupVersionResourceFor(config.RestMapper, &corev1.Node{}))
-		t.endpoints = config.Client.Resource(*test.GetGroupVersionResourceFor(config.RestMapper,
-			&submV1.Endpoint{})).Namespace(testNamespace)
-
-		var err error
-
-		t.eventController, err = controller.New(&config)
-
-		Expect(err).To(Succeed())
-		Expect(t.eventController.Start(t.stopCh)).To(Succeed())
-	})
-
-	AfterEach(func() {
-		close(t.stopCh)
-		t.eventController.Stop()
+		t.Start(t.handler)
 	})
 
 	return t
-}
-
-func (t *testDriver) createEndpoint(clusterID string) *submV1.Endpoint {
-	endpoint := &submV1.Endpoint{
-		ObjectMeta: v1.ObjectMeta{
-			Name: string(uuid.NewUUID()),
-		},
-		Spec: submV1.EndpointSpec{
-			ClusterID: clusterID,
-			Hostname:  t.hostname,
-		},
-	}
-
-	Expect(scheme.Scheme.Convert(test.CreateResource(t.endpoints, endpoint), endpoint, nil)).To(Succeed())
-
-	return endpoint
 }
 
 func (t *testDriver) awaitEvent(name string, param interface{}) {
@@ -186,25 +118,25 @@ func (t *testDriver) ensureNoEvents() {
 func (t *testDriver) testLocalEndpoint() {
 	By("Create local Endpoint")
 
-	endpoint := t.createEndpoint(testLocalClusterID)
+	endpoint := t.CreateLocalHostEndpoint()
 
 	t.awaitEvent(testing.EvLocalEndpointCreated, endpoint)
 	t.awaitEvent(testing.EvTransitionToGateway, nil)
 
-	t.createEndpoint(testLocalClusterID)
+	t.CreateLocalHostEndpoint()
 	Consistently(t.testEvents).ShouldNot(Receive(Equal(
 		testing.TestEvent{Handler: testHandlerName, Name: testing.EvTransitionToGateway})))
 
 	By("Update local Endpoint")
 
 	endpoint.Labels = map[string]string{"labeled-i-am": "i-am"}
-	test.UpdateResource(t.endpoints, endpoint)
+	t.UpdateEndpoint(endpoint)
 
 	t.awaitEvent(testing.EvLocalEndpointUpdated, endpoint)
 
 	By("Delete local Endpoint")
 
-	Expect(t.endpoints.Delete(context.TODO(), endpoint.GetName(), v1.DeleteOptions{})).To(Succeed())
+	t.DeleteEndpoint(endpoint.GetName())
 
 	t.awaitEvent(testing.EvLocalEndpointRemoved, endpoint)
 	t.awaitEvent(testing.EvTransitionToNonGateway, nil)
@@ -214,14 +146,14 @@ func (t *testDriver) testLocalEndpoint() {
 func (t *testDriver) testRemoteEndpoints() {
 	By("Create first remote Endpoint")
 
-	endpoint1 := t.createEndpoint("remote-cluster1")
+	endpoint1 := t.CreateEndpoint(testing.NewEndpoint("remote-cluster1", "host"))
 
 	t.awaitEvent(testing.EvRemoteEndpointCreated, endpoint1)
 	Expect(t.handler.remoteEndpoints.Load()).To(Equal([]submV1.Endpoint{*endpoint1}))
 
 	By("Create second remote Endpoint")
 
-	endpoint2 := t.createEndpoint("remote-cluster2")
+	endpoint2 := t.CreateEndpoint(testing.NewEndpoint("remote-cluster2", "host"))
 
 	t.awaitEvent(testing.EvRemoteEndpointCreated, endpoint2)
 	Expect(t.handler.remoteEndpoints.Load()).To(ContainElements(*endpoint1, *endpoint2))
@@ -229,20 +161,20 @@ func (t *testDriver) testRemoteEndpoints() {
 	By("Update first remote Endpoint")
 
 	endpoint1.Labels = map[string]string{"labeled-i-am": "i-am"}
-	test.UpdateResource(t.endpoints, endpoint1)
+	t.UpdateEndpoint(endpoint1)
 
 	t.awaitEvent(testing.EvRemoteEndpointUpdated, endpoint1)
 
 	By("Delete second remote Endpoint")
 
-	Expect(t.endpoints.Delete(context.TODO(), endpoint2.GetName(), v1.DeleteOptions{})).To(Succeed())
+	t.DeleteEndpoint(endpoint2.GetName())
 
 	t.awaitEvent(testing.EvRemoteEndpointRemoved, endpoint2)
 	Expect(t.handler.remoteEndpoints.Load()).To(Equal([]submV1.Endpoint{*endpoint1}))
 
 	By("Delete first remote Endpoint")
 
-	Expect(t.endpoints.Delete(context.TODO(), endpoint1.GetName(), v1.DeleteOptions{})).To(Succeed())
+	t.DeleteEndpoint(endpoint1.GetName())
 
 	t.awaitEvent(testing.EvRemoteEndpointRemoved, endpoint1)
 	Expect(t.handler.remoteEndpoints.Load()).To(BeEmpty())
