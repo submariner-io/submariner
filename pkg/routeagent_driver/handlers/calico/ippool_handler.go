@@ -22,7 +22,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync/atomic"
 
 	"github.com/pkg/errors"
 	calicoapi "github.com/projectcalico/api/pkg/apis/projectcalico/v3"
@@ -41,23 +40,24 @@ import (
 )
 
 const (
-	submarinerIPPool = "submariner.io/ippool"
+	SubmarinerIPPool = "submariner.io/ippool"
 )
 
 type calicoIPPoolHandler struct {
 	event.HandlerBase
-	restConfig      *rest.Config
-	client          *calicocs.Clientset
-	remoteEndpoints map[string]*submV1.Endpoint
-	isGateway       atomic.Bool
+	restConfig *rest.Config
+	client     calicocs.Interface
+}
+
+var NewClient = func(restConfig *rest.Config) (calicocs.Interface, error) {
+	return calicocs.NewForConfig(restConfig) //nolint:wrapcheck // No need to wrap
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("CalicoIPPool")}
 
 func NewCalicoIPPoolHandler(restConfig *rest.Config) event.Handler {
 	return &calicoIPPoolHandler{
-		restConfig:      restConfig,
-		remoteEndpoints: map[string]*submV1.Endpoint{},
+		restConfig: restConfig,
 	}
 }
 
@@ -72,14 +72,13 @@ func (h *calicoIPPoolHandler) GetName() string {
 func (h *calicoIPPoolHandler) Init() error {
 	var err error
 
-	h.client, err = calicocs.NewForConfig(h.restConfig)
+	h.client, err = NewClient(h.restConfig)
 
 	return errors.Wrap(err, "error initializing Calico clientset")
 }
 
 func (h *calicoIPPoolHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
-	h.remoteEndpoints[endpoint.Name] = endpoint
-	if !h.isGateway.Load() {
+	if !h.State().IsOnGateway() {
 		logger.V(log.TRACE).Info("Ignore RemoteEndpointCreated event (node isn't Gateway)")
 		return nil
 	}
@@ -90,9 +89,7 @@ func (h *calicoIPPoolHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) e
 }
 
 func (h *calicoIPPoolHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
-	delete(h.remoteEndpoints, endpoint.Name)
-
-	if !h.isGateway.Load() {
+	if !h.State().IsOnGateway() {
 		logger.V(log.TRACE).Info("Ignore RemoteEndpointRemoved event (node isn't Gateway)")
 		return nil
 	}
@@ -102,26 +99,17 @@ func (h *calicoIPPoolHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) e
 	return errors.Wrap(err, "failed to handle RemoteEndpointRemoved event")
 }
 
-func (h *calicoIPPoolHandler) TransitionToNonGateway() error {
-	logger.Info("TransitionToNonGateway")
-
-	h.isGateway.Swap(false)
-
-	return nil
-}
-
 func (h *calicoIPPoolHandler) TransitionToGateway() error {
 	var retErrors []error
 	logger.Info("TransitionToGateway")
 
-	h.isGateway.Swap(true)
-
-	for _, endpoint := range h.remoteEndpoints {
-		err := h.createIPPool(endpoint)
+	endpoints := h.State().GetRemoteEndpoints()
+	for i := range endpoints {
+		err := h.createIPPool(&endpoints[i])
 		if err != nil {
-			logger.Warningf("Failed to create ippool %s", endpoint.GetName())
+			logger.Warningf("Failed to create ippool %s", endpoints[i].GetName())
 			retErrors = append(retErrors,
-				errors.Wrapf(err, "error creating Calico IPPool for endpoint %q ", endpoint.GetName()))
+				errors.Wrapf(err, "error creating Calico IPPool for endpoint %q ", endpoints[i].GetName()))
 		}
 	}
 
@@ -131,7 +119,7 @@ func (h *calicoIPPoolHandler) TransitionToGateway() error {
 func (h *calicoIPPoolHandler) Uninstall() error {
 	logger.Info("Uninstalling Calico IPPools used for Submariner")
 
-	labelSelector := labels.SelectorFromSet(map[string]string{submarinerIPPool: "true"}).String()
+	labelSelector := labels.SelectorFromSet(map[string]string{SubmarinerIPPool: "true"}).String()
 	err := h.client.ProjectcalicoV3().IPPools().DeleteCollection(context.TODO(), metav1.DeleteOptions{},
 		metav1.ListOptions{LabelSelector: labelSelector})
 
@@ -152,7 +140,7 @@ func (h *calicoIPPoolHandler) createIPPool(endpoint *submV1.Endpoint) error {
 		iPPoolObj := &calicoapi.IPPool{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   getEndpointSubnetIPPoolName(endpoint, subnet),
-				Labels: map[string]string{submarinerIPPool: "true"},
+				Labels: map[string]string{SubmarinerIPPool: "true"},
 			},
 			Spec: calicoapi.IPPoolSpec{
 				CIDR:        subnet,
