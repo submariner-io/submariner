@@ -19,7 +19,6 @@ limitations under the License.
 package event_test
 
 import (
-	"errors"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -89,14 +88,17 @@ var _ = Describe("Event Registry", func() {
 
 		When("one handler returns an error", func() {
 			It("should invoke subsequent matching handlers", func() {
-				matchingHandlers[0].FailOnEvent = errors.New("mock handler error")
+				events := allEvents(registry)
+				for ev := range events {
+					matchingHandlers[0].FailOnEvent(ev.Name)
+				}
 
-				for ev, f := range allEvents(registry) {
+				for ev, f := range events {
 					err := f()
 					Expect(err).To(HaveOccurred())
 
-					for _, h := range matchingHandlers {
-						ev.Handler = h.Name
+					for i := 1; i < len(matchingHandlers); i++ {
+						ev.Handler = matchingHandlers[i].Name
 						Expect(allTestEvents).To(Receive(Equal(ev)))
 					}
 				}

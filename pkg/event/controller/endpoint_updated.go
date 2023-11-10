@@ -54,5 +54,6 @@ func (c *Controller) handleUpdatedLocalEndpoint(endpoint *smv1.Endpoint) error {
 }
 
 func (c *Controller) handleUpdatedRemoteEndpoint(endpoint *smv1.Endpoint) error {
+	c.handlerState.remoteEndpoints.Store(endpoint.Name, endpoint)
 	return c.handlers.RemoteEndpointUpdated(endpoint) //nolint:wrapcheck  // Let the caller wrap it
 }
