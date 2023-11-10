@@ -50,21 +50,24 @@ func (c *Controller) handleRemovedEndpoint(obj runtime.Object, requeueCount int)
 }
 
 func (c *Controller) handleRemovedLocalEndpoint(endpoint *smv1.Endpoint) error {
-	if err := c.handlers.LocalEndpointRemoved(endpoint); err != nil {
-		return err //nolint:wrapcheck  // Let the caller wrap it
+	if endpoint.Spec.Hostname == c.hostname {
+		c.handlerState.setIsOnGateway(false)
 	}
 
-	if c.isGatewayNode && endpoint.Spec.Hostname == c.hostname {
-		if err := c.handlers.TransitionToNonGateway(); err != nil {
-			return err //nolint:wrapcheck  // Let the caller wrap it
-		}
+	err := c.handlers.LocalEndpointRemoved(endpoint)
 
-		c.isGatewayNode = false
+	if err == nil && c.handlerState.wasOnGateway && !c.handlerState.IsOnGateway() {
+		err = c.handlers.TransitionToNonGateway()
 	}
 
-	return nil
+	if err == nil {
+		c.handlerState.wasOnGateway = c.handlerState.IsOnGateway()
+	}
+
+	return err //nolint:wrapcheck  // Let the caller wrap it
 }
 
 func (c *Controller) handleRemovedRemoteEndpoint(endpoint *smv1.Endpoint) error {
+	c.handlerState.remoteEndpoints.Delete(endpoint.Name)
 	return c.handlers.RemoteEndpointRemoved(endpoint) //nolint:wrapcheck  // Let the caller wrap it
 }

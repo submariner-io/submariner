@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"sync/atomic"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
@@ -43,15 +44,40 @@ type specification struct {
 	Namespace string
 }
 
+type handlerStateImpl struct {
+	isOnGateway     atomic.Bool
+	wasOnGateway    bool
+	remoteEndpoints sync.Map
+}
+
+func (s *handlerStateImpl) setIsOnGateway(v bool) {
+	s.isOnGateway.Store(v)
+}
+
+func (s *handlerStateImpl) IsOnGateway() bool {
+	return s.isOnGateway.Load()
+}
+
+func (s *handlerStateImpl) GetRemoteEndpoints() []subv1.Endpoint {
+	var endpoints []subv1.Endpoint
+
+	s.remoteEndpoints.Range(func(_, value any) bool {
+		endpoints = append(endpoints, *value.(*subv1.Endpoint))
+		return true
+	})
+
+	return endpoints
+}
+
 type Controller struct {
 	env             specification
 	resourceWatcher watcher.Interface
 
-	handlers *event.Registry
+	handlers     *event.Registry
+	handlerState handlerStateImpl
 
-	syncMutex     sync.Mutex
-	hostname      string
-	isGatewayNode bool
+	syncMutex sync.Mutex
+	hostname  string
 }
 
 // If the handler cannot recover from a failure, even after retrying for maximum requeue attempts,
@@ -137,6 +163,8 @@ func New(config *Config) (*Controller, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating resource watcher")
 	}
+
+	ctl.handlers.SetHandlerState(&ctl.handlerState)
 
 	return &ctl, nil
 }

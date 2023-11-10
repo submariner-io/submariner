@@ -19,6 +19,9 @@ limitations under the License.
 package testing
 
 import (
+	"fmt"
+	"sync"
+
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event"
 	v12 "k8s.io/api/core/v1"
@@ -43,9 +46,9 @@ type TestHandler struct {
 	event.HandlerBase
 	Name          string
 	NetworkPlugin string
-	FailOnEvent   error
 	Events        chan TestEvent
 	Initialized   bool
+	failOnEvent   sync.Map
 }
 
 func NewTestHandler(name, networkPlugin string, events chan TestEvent) *TestHandler {
@@ -57,7 +60,18 @@ func NewTestHandler(name, networkPlugin string, events chan TestEvent) *TestHand
 	}
 }
 
+func (t *TestHandler) FailOnEvent(eventName ...string) {
+	for _, e := range eventName {
+		t.failOnEvent.Store(e, true)
+	}
+}
+
 func (t *TestHandler) addEvent(eventName string, param interface{}) error {
+	fail, ok := t.failOnEvent.LoadAndDelete(eventName)
+	if ok && fail.(bool) {
+		return fmt.Errorf("mock handler error for %q", eventName)
+	}
+
 	ev := TestEvent{
 		Name:      eventName,
 		Parameter: param,
@@ -66,7 +80,7 @@ func (t *TestHandler) addEvent(eventName string, param interface{}) error {
 
 	t.Events <- ev
 
-	return t.FailOnEvent
+	return nil
 }
 
 func (t *TestHandler) Init() error {
