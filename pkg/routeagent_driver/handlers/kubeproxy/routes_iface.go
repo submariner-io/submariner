@@ -45,7 +45,7 @@ func (kp *SyncHandler) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks [
 		return
 	}
 
-	if !kp.isGatewayNode || kp.cniIface == nil {
+	if !kp.State().IsOnGateway() || kp.cniIface == nil {
 		return
 	}
 
@@ -270,7 +270,7 @@ func (kp *SyncHandler) removeUnknownRoutes(vxlanGw net.IP, currentRouteList []ne
 }
 
 func (kp *SyncHandler) updateRoutingRulesForInterClusterSupport(remoteCIDRs []string, operation Operation) error {
-	if kp.isGatewayNode {
+	if kp.State().IsOnGateway() {
 		logger.V(log.DEBUG).Info("On GWNode, in updateRoutingRulesForInterClusterSupport ignoring")
 		// These rules are required only on the nonGatewayNode.
 		return nil

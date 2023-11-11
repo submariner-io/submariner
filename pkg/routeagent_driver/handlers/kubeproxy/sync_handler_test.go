@@ -20,12 +20,12 @@ package kubeproxy_test
 
 import (
 	"net"
-	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/event/testing"
 	"github.com/submariner-io/submariner/pkg/iptables"
 	fakeIPT "github.com/submariner-io/submariner/pkg/iptables/fake"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
@@ -37,6 +37,7 @@ import (
 	"golang.org/x/sys/unix"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 )
 
 const (
@@ -56,6 +57,7 @@ var _ = Describe("SyncHandler", func() {
 	Describe("Endpoints", testEndpoints)
 	Describe("Gateway transition", testGatewayTransition)
 	Describe("Nodes", testNodes)
+	Describe("Uninstall", testUninstall)
 })
 
 func testEndpoints() {
@@ -63,7 +65,7 @@ func testEndpoints() {
 
 	When("a local Endpoint is created while on a non-gateway node", func() {
 		JustBeforeEach(func() {
-			Expect(t.handler.LocalEndpointCreated(t.localEndpoint)).To(Succeed())
+			t.CreateEndpoint(t.localEndpoint)
 		})
 
 		It("should add the VxLAN interface", func() {
@@ -87,16 +89,17 @@ func testEndpoints() {
 
 			It("should remove the previous VxLAN interface", func() {
 				t.netLink.SetLinkIndex(kubeproxy.VxLANIface, t.vxLanInterfaceIndex+1)
-				t.localEndpoint.Spec.Hostname = localNodeName2
-				Expect(t.handler.LocalEndpointCreated(t.localEndpoint)).To(Succeed())
+				t.CreateEndpoint(newLocalEndpoint(localNodeName2))
 
-				Expect(t.netLink.AwaitLink(kubeproxy.VxLANIface).Attrs().Index).To(Equal(t.vxLanInterfaceIndex + 1))
+				Eventually(func() int {
+					return t.netLink.AwaitLink(kubeproxy.VxLANIface).Attrs().Index
+				}).Should(Equal(t.vxLanInterfaceIndex + 1))
 			})
 		})
 
 		Context("and remote subnets are present", func() {
 			BeforeEach(func() {
-				Expect(t.handler.RemoteEndpointCreated(t.remoteEndpoint)).To(Succeed())
+				t.CreateEndpoint(t.remoteEndpoint)
 			})
 
 			It("should add VxLAN routes for the remote subnets", func() {
@@ -107,12 +110,12 @@ func testEndpoints() {
 
 	When("a local Endpoint is removed while on a non-gateway node", func() {
 		BeforeEach(func() {
-			Expect(t.handler.LocalEndpointCreated(t.localEndpoint)).To(Succeed())
+			t.CreateEndpoint(t.localEndpoint)
 			t.netLink.AwaitLink(kubeproxy.VxLANIface)
 		})
 
 		JustBeforeEach(func() {
-			Expect(t.handler.LocalEndpointRemoved(t.localEndpoint)).To(Succeed())
+			t.DeleteEndpoint(t.localEndpoint.Name)
 		})
 
 		Context("and its host name matches that associated with the existing VxLAN interface", func() {
@@ -135,7 +138,7 @@ func testEndpoints() {
 			It("should recreate the VxLAN interface", func() {
 				t.netLink.AwaitNoLink(kubeproxy.VxLANIface)
 
-				Expect(t.handler.LocalEndpointCreated(t.localEndpoint)).To(Succeed())
+				t.CreateEndpoint(t.localEndpoint)
 				t.netLink.AwaitLink(kubeproxy.VxLANIface)
 			})
 		})
@@ -143,20 +146,20 @@ func testEndpoints() {
 
 	When("a local Endpoint is created while on a gateway node", func() {
 		It("should not add the VxLAN interface", func() {
-			t.localEndpoint.Spec.Hostname = localHostName()
-			Expect(t.handler.LocalEndpointCreated(t.localEndpoint)).To(Succeed())
+			t.localEndpoint.Spec.Hostname = t.Hostname
+			t.CreateEndpoint(t.localEndpoint)
 			t.netLink.AwaitNoLink(kubeproxy.VxLANIface)
 		})
 	})
 
 	When("a remote Endpoint is created while on a non-gateway node", func() {
 		JustBeforeEach(func() {
-			Expect(t.handler.RemoteEndpointCreated(t.remoteEndpoint)).To(Succeed())
+			t.CreateEndpoint(t.remoteEndpoint)
 		})
 
 		Context("after a local Endpoint was created", func() {
 			BeforeEach(func() {
-				Expect(t.handler.LocalEndpointCreated(t.localEndpoint)).To(Succeed())
+				t.CreateEndpoint(t.localEndpoint)
 			})
 
 			It("should add VxLAN routes for the remote subnets", func() {
@@ -173,7 +176,7 @@ func testEndpoints() {
 
 			Context("and is subsequently removed", func() {
 				JustBeforeEach(func() {
-					Expect(t.handler.RemoteEndpointRemoved(t.remoteEndpoint)).To(Succeed())
+					t.DeleteEndpoint(t.remoteEndpoint.Name)
 				})
 
 				It("should remove the VxLAN routes for the remote subnets", func() {
@@ -194,8 +197,8 @@ func testEndpoints() {
 
 		Context("and is subsequently removed followed by a local Endpoint created", func() {
 			JustBeforeEach(func() {
-				Expect(t.handler.RemoteEndpointRemoved(t.remoteEndpoint)).To(Succeed())
-				Expect(t.handler.LocalEndpointCreated(t.localEndpoint)).To(Succeed())
+				t.DeleteEndpoint(t.remoteEndpoint.Name)
+				t.CreateEndpoint(t.localEndpoint)
 			})
 
 			It("should not add VxLAN routes for the remote subnets", func() {
@@ -206,8 +209,8 @@ func testEndpoints() {
 
 	When("a remote Endpoint is created while on a gateway node", func() {
 		JustBeforeEach(func() {
-			Expect(t.handler.TransitionToGateway()).To(Succeed())
-			Expect(t.handler.RemoteEndpointCreated(t.remoteEndpoint)).To(Succeed())
+			t.CreateLocalHostEndpoint()
+			t.CreateEndpoint(t.remoteEndpoint)
 		})
 
 		It("should not add VxLAN routes for the remote subnets", func() {
@@ -224,7 +227,7 @@ func testEndpoints() {
 
 		Context("and is subsequently removed", func() {
 			JustBeforeEach(func() {
-				Expect(t.handler.RemoteEndpointRemoved(t.remoteEndpoint)).To(Succeed())
+				t.DeleteEndpoint(t.remoteEndpoint.Name)
 			})
 
 			It("should remove routing rules for host networking", func() {
@@ -238,9 +241,11 @@ func testGatewayTransition() {
 	t := newTestDriver()
 
 	When("transition to gateway", func() {
+		var localHostEP *submarinerv1.Endpoint
+
 		JustBeforeEach(func() {
-			Expect(t.handler.RemoteEndpointCreated(t.remoteEndpoint)).To(Succeed())
-			Expect(t.handler.TransitionToGateway()).To(Succeed())
+			t.CreateEndpoint(t.remoteEndpoint)
+			localHostEP = t.CreateLocalHostEndpoint()
 		})
 
 		It("should add the VxLAN interface", func() {
@@ -258,7 +263,7 @@ func testGatewayTransition() {
 		Context("and previous VxLAN routes are present", func() {
 			BeforeEach(func() {
 				t.addVxLANRoute(remoteSubnet1)
-				Expect(t.handler.LocalEndpointCreated(t.localEndpoint)).To(Succeed())
+				t.CreateEndpoint(t.localEndpoint)
 			})
 
 			It("should remove them", func() {
@@ -268,8 +273,8 @@ func testGatewayTransition() {
 
 		Context("and Node addresses are present", func() {
 			BeforeEach(func() {
-				Expect(t.handler.NodeCreated(newNode(nodeAddress1))).To(Succeed())
-				Expect(t.handler.NodeCreated(newNode(nodeAddress2))).To(Succeed())
+				t.CreateNode(newNode(nodeAddress1))
+				t.CreateNode(newNode(nodeAddress2))
 			})
 
 			It("should add an FDB entry on the VxLAN interface for each address", func() {
@@ -279,7 +284,8 @@ func testGatewayTransition() {
 
 		Context("and then to non-gateway", func() {
 			JustBeforeEach(func() {
-				Expect(t.handler.TransitionToNonGateway()).To(Succeed())
+				t.netLink.AwaitRule(constants.RouteAgentHostNetworkTableID)
+				t.DeleteEndpoint(localHostEP.Name)
 			})
 
 			It("should remove the routing rule for the RouteAgentHostNetworkTableID", func() {
@@ -302,30 +308,23 @@ func testNodes() {
 		node = newNode(nodeAddress1)
 	})
 
-	When("a Node is created on a gateway node", func() {
+	When("a Node is created and then deleted on a gateway node", func() {
 		JustBeforeEach(func() {
-			Expect(t.handler.TransitionToGateway()).To(Succeed())
-			Expect(t.handler.NodeCreated(node)).To(Succeed())
+			t.CreateLocalHostEndpoint()
+			t.CreateNode(node)
 		})
 
-		It("should add an FDB entry on the VxLAN interface for each Node address", func() {
+		It("should add/remove an FDB entry on the VxLAN interface for each Node address", func() {
 			t.netLink.AwaitNeighbors(t.vxLanInterfaceIndex, nodeAddress1)
-		})
 
-		Context("and then is removed", func() {
-			JustBeforeEach(func() {
-				Expect(t.handler.NodeRemoved(node)).To(Succeed())
-			})
-
-			It("should remove the FDB entry on the VxLAN interface for each Node address", func() {
-				t.netLink.AwaitNoNeighbors(t.vxLanInterfaceIndex, nodeAddress1)
-			})
+			t.DeleteNode(node.Name)
+			t.netLink.AwaitNoNeighbors(t.vxLanInterfaceIndex, nodeAddress1)
 		})
 	})
 
 	When("a Node is created on a non-gateway node", func() {
 		JustBeforeEach(func() {
-			Expect(t.handler.NodeCreated(node)).To(Succeed())
+			t.CreateNode(node)
 		})
 
 		It("should not add an FDB entry on the VxLAN interface for each Node address", func() {
@@ -334,7 +333,25 @@ func testNodes() {
 	})
 }
 
+func testUninstall() {
+	t := newTestDriver()
+
+	Context("on Uninstall", func() {
+		It("should clean up dataplane artifacts", func() {
+			t.CreateLocalHostEndpoint()
+			t.netLink.AwaitRule(constants.RouteAgentHostNetworkTableID)
+
+			Expect(t.handler.Uninstall()).To(Succeed())
+
+			t.netLink.AwaitNoRule(constants.RouteAgentHostNetworkTableID)
+			t.netLink.AwaitNoLink(kubeproxy.VxLANIface)
+			t.verifyNoHostNetworkingRoutes()
+		})
+	})
+}
+
 type testDriver struct {
+	*testing.ControllerSupport
 	handler             *kubeproxy.SyncHandler
 	ipTables            *fakeIPT.IPTables
 	netLink             *fakeNetlink.NetLink
@@ -345,7 +362,9 @@ type testDriver struct {
 }
 
 func newTestDriver() *testDriver {
-	t := &testDriver{}
+	t := &testDriver{
+		ControllerSupport: testing.NewControllerSupport(),
+	}
 
 	BeforeEach(func() {
 		defaultHostIface, err := netlinkAPI.GetDefaultGatewayInterface()
@@ -373,11 +392,12 @@ func newTestDriver() *testDriver {
 			}, nil
 		}
 
-		t.localEndpoint = newLocalEndpoint()
+		t.localEndpoint = newLocalEndpoint(localNodeName1)
 		t.remoteEndpoint = newRemoteEndpoint()
 
 		t.handler = kubeproxy.NewSyncHandler([]string{localClusterCIDR}, []string{localServiceCIDR})
-		Expect(t.handler.Init()).To(Succeed())
+
+		t.Start(t.handler)
 	})
 
 	AfterEach(func() {
@@ -427,16 +447,16 @@ func (t *testDriver) addVxLANRoute(cidr string) {
 	})
 }
 
-func newLocalEndpoint() *submarinerv1.Endpoint {
+func newLocalEndpoint(hostname string) *submarinerv1.Endpoint {
 	return &submarinerv1.Endpoint{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "cable-local",
+			Name: string(uuid.NewUUID()),
 		},
 		Spec: submarinerv1.EndpointSpec{
 			CableName: "submariner-cable-local-192-68-1-2",
-			ClusterID: "local",
+			ClusterID: testing.LocalClusterID,
 			PrivateIP: "192.68.1.2",
-			Hostname:  localNodeName1,
+			Hostname:  hostname,
 			Backend:   "libreswan",
 		},
 	}
@@ -445,7 +465,7 @@ func newLocalEndpoint() *submarinerv1.Endpoint {
 func newRemoteEndpoint() *submarinerv1.Endpoint {
 	return &submarinerv1.Endpoint{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "cable-remote",
+			Name: string(uuid.NewUUID()),
 		},
 		Spec: submarinerv1.EndpointSpec{
 			CableName: "submariner-cable-remote-192-68-1-2",
@@ -461,7 +481,7 @@ func newRemoteEndpoint() *submarinerv1.Endpoint {
 func newNode(addr string) *corev1.Node {
 	return &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "some-node",
+			Name: string(uuid.NewUUID()),
 		},
 		Status: corev1.NodeStatus{
 			Addresses: []corev1.NodeAddress{
@@ -482,11 +502,4 @@ func toVxlan(link netlink.Link) *netlink.Vxlan {
 	Expect(ok).To(BeTrue(), "Unexpected Link type: %T", link)
 
 	return vxLan
-}
-
-func localHostName() string {
-	hostName, err := os.Hostname()
-	Expect(err).To(Succeed())
-
-	return hostName
 }

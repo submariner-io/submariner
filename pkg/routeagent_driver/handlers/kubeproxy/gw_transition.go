@@ -26,9 +26,6 @@ import (
 
 func (kp *SyncHandler) TransitionToNonGateway() error {
 	logger.V(log.DEBUG).Info("The current node is no longer a Gateway")
-	kp.syncHandlerMutex.Lock()
-	defer kp.syncHandlerMutex.Unlock()
-	kp.isGatewayNode = false
 
 	kp.cleanVxSubmarinerRoutes()
 	// If the active Gateway transitions to a new node, we flush the HostNetwork routing table.
@@ -46,13 +43,7 @@ func (kp *SyncHandler) TransitionToNonGateway() error {
 func (kp *SyncHandler) TransitionToGateway() error {
 	logger.V(log.DEBUG).Info("The current node has become a Gateway")
 
-	kp.syncHandlerMutex.Lock()
-	defer kp.syncHandlerMutex.Unlock()
-
 	kp.cleanVxSubmarinerRoutes()
-
-	kp.isGatewayNode = true
-	kp.wasGatewayPreviously = true
 
 	logger.Infof("Creating the vxlan interface: %s on the gateway node", VxLANIface)
 

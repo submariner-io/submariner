@@ -27,12 +27,10 @@ import (
 )
 
 func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
-	kp.syncHandlerMutex.Lock()
-	defer kp.syncHandlerMutex.Unlock()
 	kp.localCableDriver = endpoint.Spec.Backend
 
 	// We are on nonGateway node
-	if endpoint.Spec.Hostname != kp.hostname {
+	if !kp.State().IsOnGateway() {
 		// If the node already has a vxLAN interface that points to an oldEndpoint
 		// (i.e., during gateway migration), delete it.
 		if kp.vxlanDevice != nil && kp.vxlanDevice.activeEndpointHostname != endpoint.Spec.Hostname {
@@ -45,7 +43,6 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 			kp.vxlanDevice = nil
 		}
 
-		kp.isGatewayNode = false
 		localClusterGwNodeIP := net.ParseIP(endpoint.Spec.PrivateIP)
 
 		remoteVtepIP, err := getVxlanVtepIPAddress(localClusterGwNodeIP.String())
@@ -71,15 +68,7 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 	return nil
 }
 
-func (kp *SyncHandler) LocalEndpointUpdated(_ *submV1.Endpoint) error {
-	return nil
-}
-
 func (kp *SyncHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
-	kp.syncHandlerMutex.Lock()
-	defer kp.syncHandlerMutex.Unlock()
-	kp.isGatewayNode = false
-
 	// If the vxLAN device exists and it points to the same endpoint, delete it.
 	if kp.vxlanDevice != nil && kp.vxlanDevice.activeEndpointHostname == endpoint.Spec.Hostname {
 		err := kp.vxlanDevice.deleteVxLanIface()
@@ -100,9 +89,6 @@ func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 		logger.Errorf(err, "overlappingSubnets for new remote %#v returned error", endpoint)
 		return nil
 	}
-
-	kp.syncHandlerMutex.Lock()
-	defer kp.syncHandlerMutex.Unlock()
 
 	for _, inputCidrBlock := range endpoint.Spec.Subnets {
 		if !kp.remoteSubnets.Has(inputCidrBlock) {
@@ -126,14 +112,7 @@ func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	return nil
 }
 
-func (kp *SyncHandler) RemoteEndpointUpdated(_ *submV1.Endpoint) error {
-	return nil
-}
-
 func (kp *SyncHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
-	kp.syncHandlerMutex.Lock()
-	defer kp.syncHandlerMutex.Unlock()
-
 	for _, inputCidrBlock := range endpoint.Spec.Subnets {
 		kp.remoteSubnets.Delete(inputCidrBlock)
 		delete(kp.remoteSubnetGw, inputCidrBlock)
