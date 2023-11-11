@@ -21,15 +21,16 @@ package kubeproxy
 import (
 	"net"
 	"os"
-	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/cidr"
 	cni "github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
+	"github.com/submariner-io/submariner/pkg/iptables"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	cniapi "github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/utils/set"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -45,10 +46,7 @@ type SyncHandler struct {
 	remoteVTEPs      set.Set[string]
 	routeCacheGWNode set.Set[string]
 
-	syncHandlerMutex     sync.Mutex
-	isGatewayNode        bool
-	wasGatewayPreviously bool
-
+	ipTables         iptables.Interface
 	netLink          netlink.Interface
 	vxlanDevice      *vxLanIface
 	vxlanGwIP        *net.IP
@@ -60,17 +58,19 @@ type SyncHandler struct {
 var logger = log.Logger{Logger: logf.Log.WithName("KubeProxy")}
 
 func NewSyncHandler(localClusterCidr, localServiceCidr []string) *SyncHandler {
+	ipTables, err := iptables.New()
+	utilruntime.Must(err)
+
 	return &SyncHandler{
-		localClusterCidr:     cidr.ExtractIPv4Subnets(localClusterCidr),
-		localServiceCidr:     cidr.ExtractIPv4Subnets(localServiceCidr),
-		localCableDriver:     "",
-		remoteSubnets:        set.New[string](),
-		remoteSubnetGw:       map[string]net.IP{},
-		remoteVTEPs:          set.New[string](),
-		routeCacheGWNode:     set.New[string](),
-		isGatewayNode:        false,
-		wasGatewayPreviously: false,
-		netLink:              netlink.New(),
+		localClusterCidr: cidr.ExtractIPv4Subnets(localClusterCidr),
+		localServiceCidr: cidr.ExtractIPv4Subnets(localServiceCidr),
+		localCableDriver: "",
+		remoteSubnets:    set.New[string](),
+		remoteSubnetGw:   map[string]net.IP{},
+		remoteVTEPs:      set.New[string](),
+		routeCacheGWNode: set.New[string](),
+		netLink:          netlink.New(),
+		ipTables:         ipTables,
 	}
 }
 

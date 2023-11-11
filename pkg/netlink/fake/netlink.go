@@ -211,7 +211,11 @@ func (n *basicType) RouteList(link netlink.Link, _ int) ([]netlink.Route, error)
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
-	return n.routes[link.Attrs().Index], nil
+	r := n.routes[link.Attrs().Index]
+	to := make([]netlink.Route, len(r))
+	copy(to, r)
+
+	return to, nil
 }
 
 func (n *basicType) RuleAdd(rule *netlink.Rule) error {

@@ -30,9 +30,6 @@ func (kp *SyncHandler) NodeCreated(node *k8sV1.Node) error {
 	logger.V(log.DEBUG).Infof("A Node with name %q and addresses %#v has been added to the cluster",
 		node.Name, node.Status.Addresses)
 
-	kp.syncHandlerMutex.Lock()
-	defer kp.syncHandlerMutex.Unlock()
-
 	for i, addr := range node.Status.Addresses {
 		// Revisit when IPv6 support is added.
 		if addr.Type == k8sV1.NodeInternalIP && k8snet.IsIPv4String(node.Status.Addresses[i].Address) {
@@ -44,15 +41,8 @@ func (kp *SyncHandler) NodeCreated(node *k8sV1.Node) error {
 	return nil
 }
 
-func (kp *SyncHandler) NodeUpdated(_ *k8sV1.Node) error {
-	return nil
-}
-
 func (kp *SyncHandler) NodeRemoved(node *k8sV1.Node) error {
 	logger.V(log.DEBUG).Infof("A Node with name %q has been removed", node.Name)
-
-	kp.syncHandlerMutex.Lock()
-	defer kp.syncHandlerMutex.Unlock()
 
 	for i, addr := range node.Status.Addresses {
 		if addr.Type == k8sV1.NodeInternalIP {
@@ -72,10 +62,11 @@ func (kp *SyncHandler) populateRemoteVtepIps(vtepIP string, operation Operation)
 		kp.remoteVTEPs.Delete(vtepIP)
 	}
 
-	logger.V(log.DEBUG).Infof("populateRemoteVtepIps is called with vtepIP %s, isGatewayNode %t",
-		vtepIP, kp.isGatewayNode)
+	isOnGateway := kp.State().IsOnGateway()
 
-	if kp.isGatewayNode {
+	logger.V(log.DEBUG).Infof("populateRemoteVtepIps is called with vtepIP %s, isGatewayNode %t", vtepIP, isOnGateway)
+
+	if isOnGateway {
 		switch operation {
 		case Add:
 			if err := kp.vxlanDevice.AddFDB(net.ParseIP(vtepIP), "00:00:00:00:00:00"); err != nil {
