@@ -23,21 +23,25 @@ import (
 	"os"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"syscall"
 
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/slices"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/vishvananda/netlink"
 )
 
 type basicType struct {
-	mutex       sync.Mutex
-	linkIndices map[string]int
-	links       map[string]netlink.Link
-	routes      map[int][]netlink.Route
-	neighbors   map[int][]netlink.Neigh
-	rules       map[int]netlink.Rule
+	mutex        sync.Mutex
+	linkIndices  map[string]int
+	links        map[string]netlink.Link
+	routes       map[int][]netlink.Route
+	neighbors    map[int][]netlink.Neigh
+	rules        map[int]netlink.Rule
+	addrs        map[int][]netlink.Addr
+	addrUpdateCh atomic.Value
 }
 
 type NetLink struct {
@@ -65,6 +69,7 @@ func New() *NetLink {
 			routes:      map[int][]netlink.Route{},
 			neighbors:   map[int][]netlink.Neigh{},
 			rules:       map[int]netlink.Rule{},
+			addrs:       map[int][]netlink.Addr{},
 		}},
 	}
 }
@@ -119,7 +124,72 @@ func (n *basicType) LinkSetUp(_ netlink.Link) error {
 	return nil
 }
 
-func (n *basicType) AddrAdd(_ netlink.Link, _ *netlink.Addr) error {
+func (n *basicType) sendAddrUpdate(linkIndex int, addr *netlink.Addr, added bool) {
+	updateCh := n.addrUpdateCh.Load()
+	if updateCh == nil {
+		return
+	}
+
+	updateCh.(chan netlink.AddrUpdate) <- netlink.AddrUpdate{
+		LinkAddress: *addr.IPNet,
+		LinkIndex:   linkIndex,
+		Flags:       addr.Flags,
+		Scope:       addr.Scope,
+		PreferedLft: addr.PreferedLft,
+		ValidLft:    addr.ValidLft,
+		NewAddr:     added,
+	}
+}
+
+func (n *basicType) AddrAdd(link netlink.Link, addr *netlink.Addr) error {
+	n.mutex.Lock()
+
+	var added bool
+
+	n.addrs[link.Attrs().Index], added = slices.AppendIfNotPresent(n.addrs[link.Attrs().Index], *addr, func(a netlink.Addr) string {
+		return a.IPNet.String()
+	})
+
+	n.mutex.Unlock()
+
+	if !added {
+		return syscall.EEXIST
+	}
+
+	n.sendAddrUpdate(link.Attrs().Index, addr, true)
+
+	return nil
+}
+
+func (n *basicType) AddrDel(link netlink.Link, addr *netlink.Addr) error {
+	n.mutex.Lock()
+
+	var removed bool
+
+	n.addrs[link.Attrs().Index], removed = slices.Remove(n.addrs[link.Attrs().Index], *addr, func(a netlink.Addr) string {
+		return a.IPNet.String()
+	})
+
+	n.mutex.Unlock()
+
+	if !removed {
+		return syscall.ENOENT
+	}
+
+	n.sendAddrUpdate(link.Attrs().Index, addr, false)
+
+	return nil
+}
+
+func (n *basicType) AddrList(link netlink.Link, _ int) ([]netlink.Addr, error) {
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
+
+	return n.addrs[link.Attrs().Index], nil
+}
+
+func (n *basicType) AddrSubscribe(updateCh chan netlink.AddrUpdate, _ chan struct{}) error {
+	n.addrUpdateCh.Store(updateCh)
 	return nil
 }
 

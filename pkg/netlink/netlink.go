@@ -41,6 +41,9 @@ type Basic interface {
 	LinkByName(name string) (netlink.Link, error)
 	LinkSetUp(link netlink.Link) error
 	AddrAdd(link netlink.Link, addr *netlink.Addr) error
+	AddrDel(link netlink.Link, addr *netlink.Addr) error
+	AddrList(link netlink.Link, family int) ([]netlink.Addr, error)
+	AddrSubscribe(addrCh chan netlink.AddrUpdate, doneCh chan struct{}) error
 	NeighAppend(neigh *netlink.Neigh) error
 	NeighDel(neigh *netlink.Neigh) error
 	RouteAdd(route *netlink.Route) error
@@ -106,6 +109,18 @@ func (n *netlinkType) LinkSetUp(link netlink.Link) error {
 
 func (n *netlinkType) AddrAdd(link netlink.Link, addr *netlink.Addr) error {
 	return netlink.AddrAdd(link, addr)
+}
+
+func (n *netlinkType) AddrDel(link netlink.Link, addr *netlink.Addr) error {
+	return netlink.AddrDel(link, addr)
+}
+
+func (n *netlinkType) AddrList(link netlink.Link, family int) ([]netlink.Addr, error) {
+	return netlink.AddrList(link, family)
+}
+
+func (n *netlinkType) AddrSubscribe(addrCh chan netlink.AddrUpdate, doneCh chan struct{}) error {
+	return netlink.AddrSubscribe(addrCh, doneCh)
 }
 
 func (n *netlinkType) NeighAppend(neigh *netlink.Neigh) error {
