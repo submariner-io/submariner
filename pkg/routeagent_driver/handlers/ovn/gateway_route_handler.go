@@ -29,26 +29,19 @@ import (
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type GatewayRouteHandler struct {
 	event.HandlerBase
-	smClient        submarinerClientset.Interface
-	config          *environment.Specification
-	remoteEndpoints map[string]*submarinerv1.Endpoint
-	isGateway       bool
-	nextHopIP       string
+	smClient  submarinerClientset.Interface
+	nextHopIP string
 }
 
-func NewGatewayRouteHandler(env *environment.Specification, smClientSet submarinerClientset.Interface) *GatewayRouteHandler {
-	// We'll panic if env is nil, this is intentional
+func NewGatewayRouteHandler(smClientSet submarinerClientset.Interface) *GatewayRouteHandler {
 	return &GatewayRouteHandler{
-		config:          env,
-		smClient:        smClientSet,
-		remoteEndpoints: map[string]*submarinerv1.Endpoint{},
+		smClient: smClientSet,
 	}
 }
 
@@ -74,9 +67,7 @@ func (h *GatewayRouteHandler) GetNetworkPlugins() []string {
 }
 
 func (h *GatewayRouteHandler) RemoteEndpointCreated(endpoint *submarinerv1.Endpoint) error {
-	h.remoteEndpoints[endpoint.Name] = endpoint
-
-	if h.isGateway {
+	if h.State().IsOnGateway() {
 		_, err := h.smClient.SubmarinerV1().GatewayRoutes(endpoint.Namespace).Create(context.TODO(),
 			h.newGatewayRoute(endpoint), metav1.CreateOptions{})
 		if err != nil && !apierrors.IsAlreadyExists(err) {
@@ -88,9 +79,7 @@ func (h *GatewayRouteHandler) RemoteEndpointCreated(endpoint *submarinerv1.Endpo
 }
 
 func (h *GatewayRouteHandler) RemoteEndpointRemoved(endpoint *submarinerv1.Endpoint) error {
-	delete(h.remoteEndpoints, endpoint.Name)
-
-	if h.isGateway {
+	if h.State().IsOnGateway() {
 		if err := h.smClient.SubmarinerV1().GatewayRoutes(endpoint.Namespace).Delete(context.TODO(),
 			endpoint.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 			return errors.Wrapf(err, "error deleting gatewayRoute %q", endpoint.Name)
@@ -100,19 +89,12 @@ func (h *GatewayRouteHandler) RemoteEndpointRemoved(endpoint *submarinerv1.Endpo
 	return nil
 }
 
-func (h *GatewayRouteHandler) TransitionToNonGateway() error {
-	h.isGateway = false
-
-	return nil
-}
-
 func (h *GatewayRouteHandler) TransitionToGateway() error {
-	h.isGateway = true
+	endpoints := h.State().GetRemoteEndpoints()
+	for i := range endpoints {
+		gwr := h.newGatewayRoute(&endpoints[i])
 
-	for _, endpoint := range h.remoteEndpoints {
-		gwr := h.newGatewayRoute(endpoint)
-
-		result, err := util.CreateOrUpdate(context.TODO(), h.gatewayResourceInterface(endpoint.Namespace),
+		result, err := util.CreateOrUpdate(context.TODO(), GatewayResourceInterface(h.smClient, endpoints[i].Namespace),
 			gwr, util.Replace(gwr))
 		if err != nil {
 			return errors.Wrapf(err, "error creating/updating GatewayRoute")
@@ -136,11 +118,11 @@ func (h *GatewayRouteHandler) newGatewayRoute(endpoint *submarinerv1.Endpoint) *
 	}
 }
 
-func (h *GatewayRouteHandler) gatewayResourceInterface(namespace string) resource.Interface[*submarinerv1.GatewayRoute] {
+func GatewayResourceInterface(smClient submarinerClientset.Interface, namespace string) resource.Interface[*submarinerv1.GatewayRoute] {
 	return &resource.InterfaceFuncs[*submarinerv1.GatewayRoute]{
-		GetFunc:    h.smClient.SubmarinerV1().GatewayRoutes(namespace).Get,
-		CreateFunc: h.smClient.SubmarinerV1().GatewayRoutes(namespace).Create,
-		UpdateFunc: h.smClient.SubmarinerV1().GatewayRoutes(namespace).Update,
-		DeleteFunc: h.smClient.SubmarinerV1().GatewayRoutes(namespace).Delete,
+		GetFunc:    smClient.SubmarinerV1().GatewayRoutes(namespace).Get,
+		CreateFunc: smClient.SubmarinerV1().GatewayRoutes(namespace).Create,
+		UpdateFunc: smClient.SubmarinerV1().GatewayRoutes(namespace).Update,
+		DeleteFunc: smClient.SubmarinerV1().GatewayRoutes(namespace).Delete,
 	}
 }

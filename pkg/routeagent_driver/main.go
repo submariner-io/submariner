@@ -136,7 +136,7 @@ func main() {
 		eventlogger.NewHandler(),
 		kubeproxy.NewSyncHandler(env.ClusterCidr, env.ServiceCidr),
 		ovn.NewHandler(&env, smClientset, k8sClientSet, dynamicClientSet, config),
-		ovn.NewGatewayRouteHandler(&env, smClientset),
+		ovn.NewGatewayRouteHandler(smClientset),
 		ovn.NewNonGatewayRouteHandler(smClientset, k8sClientSet),
 		cabledriver.NewXRFMCleanupHandler(),
 		cabledriver.NewVXLANCleanup(),
