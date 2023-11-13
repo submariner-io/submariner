@@ -39,24 +39,21 @@ import (
 type NonGatewayRouteHandler struct {
 	event.HandlerBase
 	smClient        submarinerClientset.Interface
-	remoteEndpoints map[string]*submarinerv1.Endpoint
-	k8sClientSet    clientset.Interface
-	isGateway       bool
+	k8sClient       clientset.Interface
 	transitSwitchIP string
 }
 
-func NewNonGatewayRouteHandler(smClientSet submarinerClientset.Interface, k8sClientset *clientset.Clientset) *NonGatewayRouteHandler {
+func NewNonGatewayRouteHandler(smClient submarinerClientset.Interface, k8sClient clientset.Interface) *NonGatewayRouteHandler {
 	return &NonGatewayRouteHandler{
-		smClient:        smClientSet,
-		remoteEndpoints: map[string]*submarinerv1.Endpoint{},
-		k8sClientSet:    k8sClientset,
+		smClient:  smClient,
+		k8sClient: k8sClient,
 	}
 }
 
 func (h *NonGatewayRouteHandler) Init() error {
 	logger.Info("Starting NonGatewayRouteHandler")
 
-	node, err := nodeutil.GetLocalNode(h.k8sClientSet)
+	node, err := nodeutil.GetLocalNode(h.k8sClient)
 	if err != nil {
 		return errors.Wrap(err, "error getting the g/w node")
 	}
@@ -84,9 +81,7 @@ func (h *NonGatewayRouteHandler) GetNetworkPlugins() []string {
 }
 
 func (h *NonGatewayRouteHandler) RemoteEndpointCreated(endpoint *submarinerv1.Endpoint) error {
-	h.remoteEndpoints[endpoint.Name] = endpoint
-
-	if !h.isGateway || h.transitSwitchIP == "" {
+	if !h.State().IsOnGateway() || h.transitSwitchIP == "" {
 		return nil
 	}
 
@@ -101,9 +96,7 @@ func (h *NonGatewayRouteHandler) RemoteEndpointCreated(endpoint *submarinerv1.En
 }
 
 func (h *NonGatewayRouteHandler) RemoteEndpointRemoved(endpoint *submarinerv1.Endpoint) error {
-	delete(h.remoteEndpoints, endpoint.Name)
-
-	if !h.isGateway || h.transitSwitchIP == "" {
+	if !h.State().IsOnGateway() || h.transitSwitchIP == "" {
 		return nil
 	}
 
@@ -115,23 +108,16 @@ func (h *NonGatewayRouteHandler) RemoteEndpointRemoved(endpoint *submarinerv1.En
 	return nil
 }
 
-func (h *NonGatewayRouteHandler) TransitionToNonGateway() error {
-	h.isGateway = false
-
-	return nil
-}
-
 func (h *NonGatewayRouteHandler) TransitionToGateway() error {
-	h.isGateway = true
-
 	if h.transitSwitchIP == "" {
 		return nil
 	}
 
-	for _, endpoint := range h.remoteEndpoints {
-		ngwr := h.newNonGatewayRoute(endpoint)
+	endpoints := h.State().GetRemoteEndpoints()
+	for i := range endpoints {
+		ngwr := h.newNonGatewayRoute(&endpoints[i])
 
-		result, err := util.CreateOrUpdate(context.TODO(), h.nonGatewayResourceInterface(endpoint.Namespace),
+		result, err := util.CreateOrUpdate(context.TODO(), NonGatewayResourceInterface(h.smClient, endpoints[i].Namespace),
 			ngwr, util.Replace(ngwr))
 		if err != nil {
 			return errors.Wrapf(err, "error creating/updating NonGatewayRoute")
@@ -156,11 +142,12 @@ func (h *NonGatewayRouteHandler) newNonGatewayRoute(endpoint *submarinerv1.Endpo
 	}
 }
 
-func (h *NonGatewayRouteHandler) nonGatewayResourceInterface(namespace string) resource.Interface[*submarinerv1.NonGatewayRoute] {
+func NonGatewayResourceInterface(smClient submarinerClientset.Interface, namespace string,
+) resource.Interface[*submarinerv1.NonGatewayRoute] {
 	return &resource.InterfaceFuncs[*submarinerv1.NonGatewayRoute]{
-		GetFunc:    h.smClient.SubmarinerV1().NonGatewayRoutes(namespace).Get,
-		CreateFunc: h.smClient.SubmarinerV1().NonGatewayRoutes(namespace).Create,
-		UpdateFunc: h.smClient.SubmarinerV1().NonGatewayRoutes(namespace).Update,
-		DeleteFunc: h.smClient.SubmarinerV1().NonGatewayRoutes(namespace).Delete,
+		GetFunc:    smClient.SubmarinerV1().NonGatewayRoutes(namespace).Get,
+		CreateFunc: smClient.SubmarinerV1().NonGatewayRoutes(namespace).Create,
+		UpdateFunc: smClient.SubmarinerV1().NonGatewayRoutes(namespace).Update,
+		DeleteFunc: smClient.SubmarinerV1().NonGatewayRoutes(namespace).Delete,
 	}
 }
