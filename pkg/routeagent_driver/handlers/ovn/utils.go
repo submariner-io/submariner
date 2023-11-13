@@ -36,7 +36,7 @@ func getNextHopOnK8sMgmtIntf() (string, error) {
 		return "", errors.Wrapf(err, "failed to retrieve link by name")
 	}
 
-	addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
+	addrs, err := netLink.AddrList(link, netlink.FAMILY_V4)
 	if err != nil || len(addrs) == 0 {
 		return "", errors.Wrapf(err, "failed to retrieve addresses for link")
 	}
