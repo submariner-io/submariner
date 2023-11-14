@@ -394,40 +394,78 @@ func (n *NetLink) AwaitNoLink(name string) {
 	}, 5).Should(BeTrue(), "Link %q exists", name)
 }
 
-func (n *NetLink) routeDestList(linkIndex int) []net.IPNet {
-	dests := []net.IPNet{}
+func routeList[T any](n *NetLink, linkIndex, table int, f func(r *netlink.Route) *T) []T {
 	routes, _ := n.RouteList(&netlink.GenericLink{
 		LinkAttrs: netlink.LinkAttrs{
 			Index: linkIndex,
 		},
 	}, 0)
 
+	result := []T{}
+
 	for i := range routes {
-		if routes[i].Dst != nil {
-			dests = append(dests, *routes[i].Dst)
+		if routes[i].Table != table {
+			continue
+		}
+
+		r := f(&routes[i])
+		if r != nil {
+			result = append(result, *r)
 		}
 	}
 
-	return dests
+	return result
 }
 
-func (n *NetLink) AwaitRoutes(linkIndex int, destCIDRs ...string) {
+func (n *NetLink) routeDestList(linkIndex, table int) []net.IPNet {
+	return routeList(n, linkIndex, table, func(r *netlink.Route) *net.IPNet {
+		if r.Dst != nil {
+			return r.Dst
+		}
+
+		return nil
+	})
+}
+
+func (n *NetLink) AwaitDstRoutes(linkIndex, table int, destCIDRs ...string) {
 	for _, destCIDR := range destCIDRs {
 		_, expDest, _ := net.ParseCIDR(destCIDR)
 
 		Eventually(func() []net.IPNet {
-			return n.routeDestList(linkIndex)
+			return n.routeDestList(linkIndex, table)
 		}, 5).Should(ContainElement(*expDest), "Route for %q not found", destCIDR)
 	}
 }
 
-func (n *NetLink) AwaitNoRoutes(linkIndex int, destCIDRs ...string) {
+func (n *NetLink) AwaitNoDstRoutes(linkIndex, table int, destCIDRs ...string) {
 	for _, destCIDR := range destCIDRs {
 		_, expDest, _ := net.ParseCIDR(destCIDR)
 
 		Eventually(func() []net.IPNet {
-			return n.routeDestList(linkIndex)
+			return n.routeDestList(linkIndex, table)
 		}, 5).ShouldNot(ContainElement(*expDest), "Route for %q exists", destCIDR)
+	}
+}
+
+func (n *NetLink) routeGwList(linkIndex, table int) []net.IP {
+	return routeList(n, linkIndex, table, func(r *netlink.Route) *net.IP {
+		return &r.Gw
+	})
+}
+
+func (n *NetLink) AwaitGwRoutes(linkIndex, table int, gwIPs ...string) {
+	for _, ip := range gwIPs {
+		Eventually(func() []net.IP {
+			return n.routeGwList(linkIndex, table)
+		}, 5).Should(ContainElement(net.ParseIP(ip)), "Route for %q not found", ip)
+	}
+}
+
+func (n *NetLink) AwaitNoGwRoutes(linkIndex, table int, gwIPs ...string) {
+	for _, ip := range gwIPs {
+		Eventually(func() []net.IP {
+			return n.routeGwList(linkIndex, table)
+		}, 5).ShouldNot(ContainElement(net.ParseIP(ip)), "Route for %q exists", ip)
 	}
 }
 

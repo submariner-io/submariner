@@ -78,7 +78,7 @@ func testEndpoints() {
 			})
 
 			It("should remove them", func() {
-				t.netLink.AwaitNoRoutes(t.vxLanInterfaceIndex, remoteSubnet1)
+				t.netLink.AwaitNoDstRoutes(t.vxLanInterfaceIndex, 0, remoteSubnet1)
 			})
 		})
 
@@ -267,7 +267,7 @@ func testGatewayTransition() {
 			})
 
 			It("should remove them", func() {
-				t.netLink.AwaitNoRoutes(t.vxLanInterfaceIndex, remoteSubnet1)
+				t.netLink.AwaitNoDstRoutes(t.vxLanInterfaceIndex, 0, remoteSubnet1)
 			})
 		})
 
@@ -410,21 +410,21 @@ func newTestDriver() *testDriver {
 }
 
 func (t *testDriver) verifyVxLANRoutes() {
-	t.netLink.AwaitRoutes(t.netLink.AwaitLink(kubeproxy.VxLANIface).Attrs().Index, t.remoteEndpoint.Spec.Subnets...)
+	t.netLink.AwaitDstRoutes(t.netLink.AwaitLink(kubeproxy.VxLANIface).Attrs().Index, 0, t.remoteEndpoint.Spec.Subnets...)
 }
 
 func (t *testDriver) verifyNoVxLANRoutes() {
 	time.Sleep(200 * time.Millisecond)
-	t.netLink.AwaitNoRoutes(t.vxLanInterfaceIndex, t.remoteEndpoint.Spec.Subnets...)
+	t.netLink.AwaitNoDstRoutes(t.vxLanInterfaceIndex, 0, t.remoteEndpoint.Spec.Subnets...)
 }
 
 func (t *testDriver) verifyHostNetworkingRoutes() {
-	t.netLink.AwaitRoutes(t.hostInterfaceIndex, t.remoteEndpoint.Spec.Subnets...)
+	t.netLink.AwaitDstRoutes(t.hostInterfaceIndex, constants.RouteAgentHostNetworkTableID, t.remoteEndpoint.Spec.Subnets...)
 }
 
 func (t *testDriver) verifyNoHostNetworkingRoutes() {
 	time.Sleep(200 * time.Millisecond)
-	t.netLink.AwaitNoRoutes(t.hostInterfaceIndex, t.remoteEndpoint.Spec.Subnets...)
+	t.netLink.AwaitNoDstRoutes(t.hostInterfaceIndex, constants.RouteAgentHostNetworkTableID, t.remoteEndpoint.Spec.Subnets...)
 }
 
 func (t *testDriver) verifyRemoteSubnetIPTableRules() {
