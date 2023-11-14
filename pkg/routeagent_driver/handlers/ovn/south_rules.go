@@ -34,8 +34,8 @@ import (
 func (ovn *Handler) handleSubnets(remoteSubnets []string, ruleFunc func(rule *netlink.Rule) error,
 	ignoredErrorFunc func(error) bool,
 ) error {
-	localCIDRs := set.New(ovn.config.ClusterCidr...)
-	localCIDRs.Insert(ovn.config.ServiceCidr...)
+	localCIDRs := set.New(ovn.ClusterCIDR...)
+	localCIDRs.Insert(ovn.ServiceCIDR...)
 
 	for _, subnetToHandle := range remoteSubnets {
 		for _, localSubnet := range localCIDRs.UnsortedList() {
