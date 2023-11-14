@@ -22,6 +22,8 @@ import (
 	"net"
 	"sync"
 
+	libovsdbclient "github.com/ovn-org/libovsdb/client"
+	"github.com/ovn-org/libovsdb/model"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/watcher"
@@ -33,20 +35,28 @@ import (
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/iptables"
 	"github.com/submariner-io/submariner/pkg/netlink"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+type NewOVSDBClientFn func(_ model.ClientDBModel, _ ...libovsdbclient.Option) (libovsdbclient.Client, error)
+
+type HandlerConfig struct {
+	Namespace      string
+	ClusterCIDR    []string
+	ServiceCIDR    []string
+	SubmClient     clientset.Interface
+	K8sClient      kubernetes.Interface
+	DynClient      dynamic.Interface
+	WatcherConfig  *watcher.Config
+	NewOVSDBClient NewOVSDBClientFn
+}
+
 type Handler struct {
 	event.HandlerBase
+	HandlerConfig
 	mutex                     sync.Mutex
-	config                    *environment.Specification
-	smClient                  clientset.Interface
-	k8sClientset              *kubernetes.Clientset
-	dynamicClient             dynamic.Interface
-	watcherConfig             *watcher.Config
 	cableRoutingInterface     *net.Interface
 	remoteEndpoints           map[string]*submV1.Endpoint
 	isGateway                 bool
@@ -59,26 +69,26 @@ type Handler struct {
 
 var logger = log.Logger{Logger: logf.Log.WithName("OVN")}
 
-func NewHandler(env *environment.Specification, smClientSet clientset.Interface, k8sClientset *kubernetes.Clientset,
-	dynamicClient dynamic.Interface, watcherConfig *watcher.Config,
-) *Handler {
+func NewHandler(config *HandlerConfig) *Handler {
 	// We'll panic if env is nil, this is intentional
 	ipt, err := iptables.New()
 	if err != nil {
 		logger.Fatalf("Error initializing iptables in OVN routeagent handler: %s", err)
 	}
 
-	return &Handler{
-		config:          env,
-		smClient:        smClientSet,
-		k8sClientset:    k8sClientset,
-		dynamicClient:   dynamicClient,
-		watcherConfig:   watcherConfig,
+	h := &Handler{
+		HandlerConfig:   *config,
 		remoteEndpoints: map[string]*submV1.Endpoint{},
 		netLink:         netlink.New(),
 		ipt:             ipt,
 		stopCh:          make(chan struct{}),
 	}
+
+	if h.NewOVSDBClient == nil {
+		h.NewOVSDBClient = libovsdbclient.NewOVSDBClient
+	}
+
+	return h
 }
 
 func (ovn *Handler) GetName() string {
@@ -99,14 +109,14 @@ func (ovn *Handler) Init() error {
 
 	ovn.startRouteConfigSyncer(ovn.stopCh)
 
-	connectionHandler := NewConnectionHandler(ovn.k8sClientset, ovn.dynamicClient)
+	connectionHandler := NewConnectionHandler(ovn.K8sClient, ovn.DynClient)
 
-	err = connectionHandler.initClients()
+	err = connectionHandler.initClients(ovn.NewOVSDBClient)
 	if err != nil {
 		return errors.Wrapf(err, "error getting connection handler to connect to OvnDB")
 	}
 
-	gatewayRouteController, err := NewGatewayRouteController(*ovn.watcherConfig, connectionHandler, ovn.config.Namespace)
+	gatewayRouteController, err := NewGatewayRouteController(*ovn.WatcherConfig, connectionHandler, ovn.Namespace)
 	if err != nil {
 		return err
 	}
@@ -117,8 +127,7 @@ func (ovn *Handler) Init() error {
 		return err
 	}
 
-	nonGatewayRouteController, err := NewNonGatewayRouteController(*ovn.watcherConfig, connectionHandler, ovn.k8sClientset,
-		ovn.config.Namespace)
+	nonGatewayRouteController, err := NewNonGatewayRouteController(*ovn.WatcherConfig, connectionHandler, ovn.K8sClient, ovn.Namespace)
 	if err != nil {
 		return err
 	}
@@ -153,7 +162,7 @@ func (ovn *Handler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 }
 
 func (ovn *Handler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
-	if err := cidr.OverlappingSubnets(ovn.config.ServiceCidr, ovn.config.ClusterCidr,
+	if err := cidr.OverlappingSubnets(ovn.ServiceCIDR, ovn.ClusterCIDR,
 		endpoint.Spec.Subnets); err != nil {
 		// Skip processing the endpoint when CIDRs overlap and return nil to avoid re-queuing.
 		logger.Errorf(err, "overlappingSubnets for new remote %#v returned error", endpoint)
@@ -184,7 +193,7 @@ func (ovn *Handler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 }
 
 func (ovn *Handler) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
-	if err := cidr.OverlappingSubnets(ovn.config.ServiceCidr, ovn.config.ClusterCidr, endpoint.Spec.Subnets); err != nil {
+	if err := cidr.OverlappingSubnets(ovn.ServiceCIDR, ovn.ClusterCIDR, endpoint.Spec.Subnets); err != nil {
 		// Skip processing the endpoint when CIDRs overlap and return nil to avoid re-queuing.
 		logger.Errorf(err, "overlappingSubnets for new remote %#v returned error", endpoint)
 		return nil

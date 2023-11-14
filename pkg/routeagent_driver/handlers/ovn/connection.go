@@ -58,14 +58,14 @@ func NewConnectionHandler(k8sClientset clientset.Interface, dynamicClient dynami
 	}
 }
 
-func (c *ConnectionHandler) initClients() error {
+func (c *ConnectionHandler) initClients(newOVSDBClient NewOVSDBClientFn) error {
 	// Create nbdb client
 	nbdbModel, err := nbdb.FullDatabaseModel()
 	if err != nil {
 		return errors.Wrap(err, "error getting OVN NBDB database model")
 	}
 
-	c.nbdb, err = c.createLibovsdbClient(nbdbModel)
+	c.nbdb, err = c.createLibovsdbClient(nbdbModel, newOVSDBClient)
 	if err != nil {
 		return errors.Wrap(err, "error creating NBDB connection")
 	}
@@ -96,7 +96,7 @@ func getOVNTLSConfig(pkFile, certFile, caFile string) (*tls.Config, error) {
 	}, nil
 }
 
-func (c *ConnectionHandler) createLibovsdbClient(dbModel model.ClientDBModel) (libovsdbclient.Client, error) {
+func (c *ConnectionHandler) createLibovsdbClient(dbModel model.ClientDBModel, newClient NewOVSDBClientFn) (libovsdbclient.Client, error) {
 	options := []libovsdbclient.Option{
 		// Reading and parsing the DB after reconnect at scale can (unsurprisingly)
 		// take longer than a normal ovsdb operation. Give it a bit more time so
@@ -130,7 +130,7 @@ func (c *ConnectionHandler) createLibovsdbClient(dbModel model.ClientDBModel) (l
 		options = append(options, libovsdbclient.WithTLSConfig(tlsConfig))
 	}
 
-	client, err := libovsdbclient.NewOVSDBClient(dbModel, options...)
+	client, err := newClient(dbModel, options...)
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating ovsdbClient")
 	}

@@ -135,7 +135,15 @@ func main() {
 	if err := registry.AddHandlers(
 		eventlogger.NewHandler(),
 		kubeproxy.NewSyncHandler(env.ClusterCidr, env.ServiceCidr),
-		ovn.NewHandler(&env, smClientset, k8sClientSet, dynamicClientSet, config),
+		ovn.NewHandler(&ovn.HandlerConfig{
+			Namespace:     env.Namespace,
+			ClusterCIDR:   env.ClusterCidr,
+			ServiceCIDR:   env.ServiceCidr,
+			SubmClient:    smClientset,
+			K8sClient:     k8sClientSet,
+			DynClient:     dynamicClientSet,
+			WatcherConfig: config,
+		}),
 		ovn.NewGatewayRouteHandler(smClientset),
 		ovn.NewNonGatewayRouteHandler(smClientset, k8sClientSet),
 		cabledriver.NewXRFMCleanupHandler(),
