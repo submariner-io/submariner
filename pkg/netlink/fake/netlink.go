@@ -39,7 +39,7 @@ type basicType struct {
 	links        map[string]netlink.Link
 	routes       map[int][]netlink.Route
 	neighbors    map[int][]netlink.Neigh
-	rules        map[int]netlink.Rule
+	rules        map[int][]netlink.Rule
 	addrs        map[int][]netlink.Addr
 	addrUpdateCh atomic.Value
 }
@@ -68,7 +68,7 @@ func New() *NetLink {
 			links:       map[string]netlink.Link{},
 			routes:      map[int][]netlink.Route{},
 			neighbors:   map[int][]netlink.Neigh{},
-			rules:       map[int]netlink.Rule{},
+			rules:       map[int][]netlink.Rule{},
 			addrs:       map[int][]netlink.Addr{},
 		}},
 	}
@@ -288,15 +288,30 @@ func (n *basicType) RouteList(link netlink.Link, _ int) ([]netlink.Route, error)
 	return to, nil
 }
 
+//nolint:gocritic // Ignore hugeParam.
+func ruleKey(r netlink.Rule) string {
+	k := ""
+	if r.Src != nil {
+		k = r.Src.String()
+	}
+
+	if r.Dst != nil {
+		k += r.Dst.String()
+	}
+
+	return k
+}
+
 func (n *basicType) RuleAdd(rule *netlink.Rule) error {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
-	if _, found := n.rules[rule.Table]; found {
+	var added bool
+
+	n.rules[rule.Table], added = slices.AppendIfNotPresent(n.rules[rule.Table], *rule, ruleKey)
+	if !added {
 		return os.ErrExist
 	}
-
-	n.rules[rule.Table] = *rule
 
 	return nil
 }
@@ -305,11 +320,12 @@ func (n *basicType) RuleDel(rule *netlink.Rule) error {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
-	if _, found := n.rules[rule.Table]; !found {
+	var removed bool
+
+	n.rules[rule.Table], removed = slices.Remove(n.rules[rule.Table], *rule, ruleKey)
+	if !removed {
 		return os.ErrNotExist
 	}
-
-	delete(n.rules, rule.Table)
 
 	return nil
 }
@@ -319,9 +335,11 @@ func (n *basicType) RuleList(family int) ([]netlink.Rule, error) {
 	defer n.mutex.Unlock()
 
 	var rules []netlink.Rule
-	for _, r := range n.rules { //nolint:gocritic // Ignore range value copy
-		if r.Family == family {
-			rules = append(rules, r)
+	for _, r := range n.rules {
+		for i := range r {
+			if r[i].Family == family {
+				rules = append(rules, r[i])
+			}
 		}
 	}
 
@@ -445,26 +463,41 @@ func (n *NetLink) AwaitNoNeighbors(linkIndex int, expIPs ...string) {
 	}
 }
 
-func (n *NetLink) getRule(table int) *netlink.Rule {
+func (n *NetLink) getRule(table int, src, dst string) *netlink.Rule {
 	n.basic().mutex.Lock()
 	defer n.basic().mutex.Unlock()
 
-	r, found := n.basic().rules[table]
-	if !found {
+	parse := func(s string) *net.IPNet {
+		if s == "" {
+			return nil
+		}
+
+		_, cidr, err := net.ParseCIDR(s)
+		Expect(err).To(Succeed())
+
+		return cidr
+	}
+
+	r := netlink.NewRule()
+	r.Src = parse(src)
+	r.Dst = parse(dst)
+
+	i := slices.IndexOf(n.basic().rules[table], ruleKey(*r), ruleKey)
+	if i < 0 {
 		return nil
 	}
 
-	return &r
+	return &n.basic().rules[table][i]
 }
 
-func (n *NetLink) AwaitRule(table int) {
+func (n *NetLink) AwaitRule(table int, src, dst string) {
 	Eventually(func() *netlink.Rule {
-		return n.getRule(table)
+		return n.getRule(table, src, dst)
 	}, 5).ShouldNot(BeNil(), "Rule for %v not found", table)
 }
 
-func (n *NetLink) AwaitNoRule(table int) {
+func (n *NetLink) AwaitNoRule(table int, src, dst string) {
 	Eventually(func() *netlink.Rule {
-		return n.getRule(table)
+		return n.getRule(table, src, dst)
 	}, 5).Should(BeNil(), "Rule for %v exists", table)
 }
