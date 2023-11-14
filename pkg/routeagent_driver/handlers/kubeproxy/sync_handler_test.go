@@ -253,7 +253,7 @@ func testGatewayTransition() {
 		})
 
 		It("should add a routing rule for the RouteAgentHostNetworkTableID", func() {
-			t.netLink.AwaitRule(constants.RouteAgentHostNetworkTableID)
+			t.netLink.AwaitRule(constants.RouteAgentHostNetworkTableID, "", "")
 		})
 
 		It("should add host networking routing rules for the remote subnets", func() {
@@ -284,12 +284,12 @@ func testGatewayTransition() {
 
 		Context("and then to non-gateway", func() {
 			JustBeforeEach(func() {
-				t.netLink.AwaitRule(constants.RouteAgentHostNetworkTableID)
+				t.netLink.AwaitRule(constants.RouteAgentHostNetworkTableID, "", "")
 				t.DeleteEndpoint(localHostEP.Name)
 			})
 
 			It("should remove the routing rule for the RouteAgentHostNetworkTableID", func() {
-				t.netLink.AwaitNoRule(constants.RouteAgentHostNetworkTableID)
+				t.netLink.AwaitNoRule(constants.RouteAgentHostNetworkTableID, "", "")
 			})
 
 			It("should remove host networking routing rules for the remote subnets", func() {
@@ -339,11 +339,11 @@ func testUninstall() {
 	Context("on Uninstall", func() {
 		It("should clean up dataplane artifacts", func() {
 			t.CreateLocalHostEndpoint()
-			t.netLink.AwaitRule(constants.RouteAgentHostNetworkTableID)
+			t.netLink.AwaitRule(constants.RouteAgentHostNetworkTableID, "", "")
 
 			Expect(t.handler.Uninstall()).To(Succeed())
 
-			t.netLink.AwaitNoRule(constants.RouteAgentHostNetworkTableID)
+			t.netLink.AwaitNoRule(constants.RouteAgentHostNetworkTableID, "", "")
 			t.netLink.AwaitNoLink(kubeproxy.VxLANIface)
 			t.verifyNoHostNetworkingRoutes()
 		})
