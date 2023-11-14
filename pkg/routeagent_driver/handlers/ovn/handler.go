@@ -48,7 +48,6 @@ type Handler struct {
 	dynamicClient             dynamic.Interface
 	watcherConfig             *watcher.Config
 	cableRoutingInterface     *net.Interface
-	localEndpoint             *submV1.Endpoint
 	remoteEndpoints           map[string]*submV1.Endpoint
 	isGateway                 bool
 	netlink                   netlink.Interface
@@ -148,28 +147,7 @@ func (ovn *Handler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 	ovn.mutex.Lock()
 	defer ovn.mutex.Unlock()
 
-	ovn.localEndpoint = endpoint
 	ovn.cableRoutingInterface = routingInterface
-
-	return nil
-}
-
-func (ovn *Handler) LocalEndpointUpdated(endpoint *submV1.Endpoint) error {
-	ovn.mutex.Lock()
-	defer ovn.mutex.Unlock()
-
-	ovn.localEndpoint = endpoint
-
-	return nil
-}
-
-func (ovn *Handler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
-	ovn.mutex.Lock()
-	defer ovn.mutex.Unlock()
-
-	if ovn.localEndpoint.Name == endpoint.Name {
-		ovn.localEndpoint = nil
-	}
 
 	return nil
 }
