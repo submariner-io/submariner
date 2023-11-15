@@ -41,13 +41,13 @@ func (ovn *Handler) Uninstall() error {
 		logger.Errorf(err, "Error cleaning the routes")
 	}
 
-	err = ovn.netlink.FlushRouteTable(constants.RouteAgentInterClusterNetworkTableID)
+	err = ovn.netLink.FlushRouteTable(constants.RouteAgentInterClusterNetworkTableID)
 	if err != nil {
 		logger.Errorf(err, "Flushing routing table %d returned error",
 			constants.RouteAgentInterClusterNetworkTableID)
 	}
 
-	err = ovn.netlink.FlushRouteTable(constants.RouteAgentHostNetworkTableID)
+	err = ovn.netLink.FlushRouteTable(constants.RouteAgentHostNetworkTableID)
 	if err != nil {
 		logger.Errorf(err, "Flushing routing table %d returned error",
 			constants.RouteAgentHostNetworkTableID)
@@ -60,14 +60,14 @@ func (ovn *Handler) Uninstall() error {
 }
 
 func (ovn *Handler) cleanupRoutes() error {
-	rules, err := netlink.RuleList(netlink.FAMILY_V4)
+	rules, err := ovn.netLink.RuleList(netlink.FAMILY_V4)
 	if err != nil {
 		return errors.Wrapf(err, "error listing rules")
 	}
 
 	for i := range rules {
 		if rules[i].Table == constants.RouteAgentInterClusterNetworkTableID || rules[i].Table == constants.RouteAgentHostNetworkTableID {
-			err = netlink.RuleDel(&rules[i])
+			err = ovn.netLink.RuleDel(&rules[i])
 			if err != nil {
 				return errors.Wrapf(err, "error deleting the rule %v", rules[i])
 			}

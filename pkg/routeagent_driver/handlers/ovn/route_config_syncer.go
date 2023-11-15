@@ -42,7 +42,7 @@ func (ovn *Handler) startRouteConfigSyncer(stop chan struct{}) {
 }
 
 func (ovn *Handler) monitorRoutingTable(stop chan struct{}) error {
-	iface, err := netlink.LinkByName(OVNK8sMgmntIntfName)
+	iface, err := ovn.netLink.LinkByName(OVNK8sMgmntIntfName)
 	if err != nil {
 		return errors.Wrapf(err, "failed to find interface: %q", OVNK8sMgmntIntfName)
 	}
@@ -50,7 +50,7 @@ func (ovn *Handler) monitorRoutingTable(stop chan struct{}) error {
 	addrCh := make(chan netlink.AddrUpdate)
 	doneCh := make(chan struct{})
 
-	err = netlink.AddrSubscribe(addrCh, doneCh)
+	err = ovn.netLink.AddrSubscribe(addrCh, doneCh)
 	if err != nil {
 		return errors.Wrapf(err, "failed to subscribe to address updates")
 	}
@@ -60,7 +60,7 @@ func (ovn *Handler) monitorRoutingTable(stop chan struct{}) error {
 	var prevIP net.IP
 
 	assignPrevIP := func() {
-		addrs, err := netlink.AddrList(iface, netlink.FAMILY_V4)
+		addrs, err := ovn.netLink.AddrList(iface, netlink.FAMILY_V4)
 		if err != nil {
 			logger.Warningf("Failed to get the IP4 address list for interface %q: %v", OVNK8sMgmntIntfName, err)
 		} else if len(addrs) > 0 {
@@ -79,7 +79,7 @@ func (ovn *Handler) monitorRoutingTable(stop chan struct{}) error {
 			return
 		}
 
-		addrs, err := netlink.AddrList(iface, netlink.FAMILY_V4)
+		addrs, err := ovn.netLink.AddrList(iface, netlink.FAMILY_V4)
 		if err != nil {
 			logger.Warningf("Failed to get the IP4 address list for interface %q: %v", OVNK8sMgmntIntfName, err)
 			return

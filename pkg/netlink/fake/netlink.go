@@ -314,6 +314,20 @@ func (n *basicType) RuleDel(rule *netlink.Rule) error {
 	return nil
 }
 
+func (n *basicType) RuleList(family int) ([]netlink.Rule, error) {
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
+
+	var rules []netlink.Rule
+	for _, r := range n.rules { //nolint:gocritic // Ignore range value copy
+		if r.Family == family {
+			rules = append(rules, r)
+		}
+	}
+
+	return rules, nil
+}
+
 func (n *basicType) XfrmPolicyAdd(_ *netlink.XfrmPolicy) error {
 	return nil
 }
