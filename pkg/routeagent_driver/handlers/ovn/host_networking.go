@@ -36,6 +36,9 @@ const (
 )
 
 func (ovn *Handler) updateHostNetworkDataplane() error {
+	ovn.mutex.Lock()
+	defer ovn.mutex.Unlock()
+
 	currentRuleRemotes, err := ovn.getExistingIPv4HostNetworkRoutes()
 	if err != nil {
 		return errors.Wrapf(err, "error reading ip rule list for IPv4")

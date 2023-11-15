@@ -58,8 +58,6 @@ type Handler struct {
 	HandlerConfig
 	mutex                     sync.Mutex
 	cableRoutingInterface     *net.Interface
-	remoteEndpoints           map[string]*submV1.Endpoint
-	isGateway                 bool
 	netLink                   netlink.Interface
 	ipt                       iptables.Interface
 	gatewayRouteController    *GatewayRouteController
@@ -77,11 +75,10 @@ func NewHandler(config *HandlerConfig) *Handler {
 	}
 
 	h := &Handler{
-		HandlerConfig:   *config,
-		remoteEndpoints: map[string]*submV1.Endpoint{},
-		netLink:         netlink.New(),
-		ipt:             ipt,
-		stopCh:          make(chan struct{}),
+		HandlerConfig: *config,
+		netLink:       netlink.New(),
+		ipt:           ipt,
+		stopCh:        make(chan struct{}),
 	}
 
 	if h.NewOVSDBClient == nil {
@@ -153,9 +150,6 @@ func (ovn *Handler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 		}
 	}
 
-	ovn.mutex.Lock()
-	defer ovn.mutex.Unlock()
-
 	ovn.cableRoutingInterface = routingInterface
 
 	return nil
@@ -169,17 +163,12 @@ func (ovn *Handler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 		return nil
 	}
 
-	ovn.mutex.Lock()
-	defer ovn.mutex.Unlock()
-
-	ovn.remoteEndpoints[endpoint.Name] = endpoint
-
 	err := ovn.updateHostNetworkDataplane()
 	if err != nil {
 		return errors.Wrapf(err, "updateHostNetworkDataplane returned error")
 	}
 
-	if ovn.isGateway {
+	if ovn.State().IsOnGateway() {
 		for _, subnet := range endpoint.Spec.Subnets {
 			if err = ovn.addNoMasqueradeIPTables(subnet); err != nil {
 				return errors.Wrapf(err, "error adding no-masquerade rules for subnet %q", subnet)
@@ -199,17 +188,12 @@ func (ovn *Handler) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
 		return nil
 	}
 
-	ovn.mutex.Lock()
-	defer ovn.mutex.Unlock()
-
-	ovn.remoteEndpoints[endpoint.Name] = endpoint
-
 	err := ovn.updateHostNetworkDataplane()
 	if err != nil {
 		return errors.Wrapf(err, "updateHostNetworkDataplane returned error")
 	}
 
-	if ovn.isGateway {
+	if ovn.State().IsOnGateway() {
 		return ovn.updateGatewayDataplane()
 	}
 
@@ -217,17 +201,12 @@ func (ovn *Handler) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
 }
 
 func (ovn *Handler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
-	ovn.mutex.Lock()
-	defer ovn.mutex.Unlock()
-
-	delete(ovn.remoteEndpoints, endpoint.Name)
-
 	err := ovn.updateHostNetworkDataplane()
 	if err != nil {
 		return errors.Wrapf(err, "updateHostNetworkDataplane returned error")
 	}
 
-	if ovn.isGateway {
+	if ovn.State().IsOnGateway() {
 		for _, subnet := range endpoint.Spec.Subnets {
 			if err = ovn.removeNoMasqueradeIPTables(subnet); err != nil {
 				return errors.Wrapf(err, "error removing no-masquerade rules for subnet %q", subnet)
@@ -241,12 +220,9 @@ func (ovn *Handler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 }
 
 func (ovn *Handler) TransitionToNonGateway() error {
-	ovn.mutex.Lock()
-	defer ovn.mutex.Unlock()
-
-	ovn.isGateway = false
-	for _, endpoint := range ovn.remoteEndpoints {
-		for _, subnet := range endpoint.Spec.Subnets {
+	endpoints := ovn.State().GetRemoteEndpoints()
+	for i := range endpoints {
+		for _, subnet := range endpoints[i].Spec.Subnets {
 			if err := ovn.removeNoMasqueradeIPTables(subnet); err != nil {
 				return errors.Wrapf(err, "error removing no-masquerade rules for subnet %q", subnet)
 			}
@@ -257,13 +233,9 @@ func (ovn *Handler) TransitionToNonGateway() error {
 }
 
 func (ovn *Handler) TransitionToGateway() error {
-	ovn.mutex.Lock()
-	defer ovn.mutex.Unlock()
-
-	ovn.isGateway = true
-
-	for _, endpoint := range ovn.remoteEndpoints {
-		for _, subnet := range endpoint.Spec.Subnets {
+	endpoints := ovn.State().GetRemoteEndpoints()
+	for i := range endpoints {
+		for _, subnet := range endpoints[i].Spec.Subnets {
 			if err := ovn.addNoMasqueradeIPTables(subnet); err != nil {
 				return errors.Wrapf(err, "error adding no-masquerade rules for subnet %q", subnet)
 			}
