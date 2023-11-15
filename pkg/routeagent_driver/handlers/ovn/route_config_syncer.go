@@ -131,9 +131,7 @@ func (ovn *Handler) handleInterfaceAddressChange() error {
 		logger.Infof("Waiting for interface %q to be ready: %v", OVNK8sMgmntIntfName, err)
 		return true
 	}, func() error {
-		ovn.mutex.Lock()
-		defer ovn.mutex.Unlock()
-		if ovn.isGateway {
+		if ovn.State().IsOnGateway() {
 			err = ovn.updateGatewayDataplane()
 			if err != nil {
 				return errors.Wrap(err, "error syncing gateway routes")

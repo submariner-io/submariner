@@ -23,8 +23,9 @@ import "k8s.io/utils/set"
 func (ovn *Handler) getRemoteSubnets() set.Set[string] {
 	endpointSubnets := set.New[string]()
 
-	for _, endpoint := range ovn.remoteEndpoints {
-		for _, subnet := range endpoint.Spec.Subnets {
+	endpoints := ovn.State().GetRemoteEndpoints()
+	for i := range endpoints {
+		for _, subnet := range endpoints[i].Spec.Subnets {
 			endpointSubnets.Insert(subnet)
 		}
 	}

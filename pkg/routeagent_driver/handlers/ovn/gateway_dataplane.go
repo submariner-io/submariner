@@ -53,6 +53,9 @@ func (ovn *Handler) cleanupGatewayDataplane() error {
 }
 
 func (ovn *Handler) updateGatewayDataplane() error {
+	ovn.mutex.Lock()
+	defer ovn.mutex.Unlock()
+
 	currentRuleRemotes, err := ovn.getExistingIPv4RuleSubnets()
 	if err != nil {
 		return errors.Wrapf(err, "error reading ip rule list for IPv4")
