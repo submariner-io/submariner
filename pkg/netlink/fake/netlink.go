@@ -306,9 +306,26 @@ func (n *basicType) RuleAdd(rule *netlink.Rule) error {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
+	family := func(ip net.IP) int {
+		if ip.To4() != nil {
+			return netlink.FAMILY_V4
+		} else if ip.To16() != nil {
+			return netlink.FAMILY_V6
+		}
+
+		return 0
+	}
+
+	r := *rule
+	if r.Src != nil {
+		r.Family = family(r.Src.IP)
+	} else if r.Dst != nil {
+		r.Family = family(r.Dst.IP)
+	}
+
 	var added bool
 
-	n.rules[rule.Table], added = slices.AppendIfNotPresent(n.rules[rule.Table], *rule, ruleKey)
+	n.rules[rule.Table], added = slices.AppendIfNotPresent(n.rules[rule.Table], r, ruleKey)
 	if !added {
 		return os.ErrExist
 	}
