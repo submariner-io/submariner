@@ -1,0 +1,32 @@
+---
+name: Stale
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+
+permissions: {}
+
+jobs:
+  stale:
+    name: Close Stale Issues and PRs
+    if: github.repository_owner == 'submariner-io'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/stale@b69b346013879cedbf50c69f572cd85439a41936
+        with:
+          days-before-issue-stale: 120
+          days-before-pr-stale: 14
+          exempt-issue-labels: 'confirmed,security'
+          exempt-pr-labels: 'confirmed,security'
+          stale-issue-label: 'stale'
+          stale-issue-message: |
+            This issue has been automatically marked as stale because it has not had recent activity. It will be closed if no further
+            activity occurs. Thank you for your contributions.
+          stale-pr-label: 'stale'
+          stale-pr-message: |
+            This pull request has been automatically marked as stale because it has not had recent activity. It will be closed if no further
+            activity occurs. Thank you for your contributions.
