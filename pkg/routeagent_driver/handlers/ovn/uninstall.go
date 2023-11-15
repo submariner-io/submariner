@@ -53,7 +53,7 @@ func (ovn *Handler) Uninstall() error {
 			constants.RouteAgentHostNetworkTableID)
 	}
 
-	ovn.flushAndDeleteIPTableChains(constants.FilterTable, constants.ForwardChain, forwardingSubmarinerFWDChain)
+	ovn.flushAndDeleteIPTableChains(constants.FilterTable, constants.ForwardChain, ForwardingSubmarinerFWDChain)
 	ovn.flushAndDeleteIPTableChains(constants.NATTable, constants.PostRoutingChain, constants.SmPostRoutingChain)
 
 	return nil
