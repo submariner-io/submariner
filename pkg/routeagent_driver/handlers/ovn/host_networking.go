@@ -45,14 +45,14 @@ func (ovn *Handler) updateHostNetworkDataplane() error {
 
 	toAdd := endpointSubnets.Difference(currentRuleRemotes).UnsortedList()
 
-	err = ovn.programRulesForRemoteSubnets(toAdd, netlink.RuleAdd, os.IsExist)
+	err = ovn.programRulesForRemoteSubnets(toAdd, ovn.netLink.RuleAdd, os.IsExist)
 	if err != nil {
 		return errors.Wrap(err, "error adding routing rule")
 	}
 
 	toRemove := currentRuleRemotes.Difference(endpointSubnets).UnsortedList()
 
-	err = ovn.programRulesForRemoteSubnets(toRemove, netlink.RuleDel, os.IsNotExist)
+	err = ovn.programRulesForRemoteSubnets(toRemove, ovn.netLink.RuleDel, os.IsNotExist)
 	if err != nil {
 		return errors.Wrapf(err, "error removing routing rule")
 	}
@@ -67,7 +67,7 @@ func (ovn *Handler) updateHostNetworkDataplane() error {
 		Table: constants.RouteAgentHostNetworkTableID,
 	}
 
-	err = netlink.RouteAdd(route)
+	err = ovn.netLink.RouteAdd(route)
 	if err != nil && !os.IsExist(err) {
 		return errors.Wrap(err, "error adding submariner default")
 	}
@@ -78,7 +78,7 @@ func (ovn *Handler) updateHostNetworkDataplane() error {
 func (ovn *Handler) getExistingIPv4HostNetworkRoutes() (set.Set[string], error) {
 	currentRuleRemotes := set.New[string]()
 
-	rules, err := netlink.RuleList(netlink.FAMILY_V4)
+	rules, err := ovn.netLink.RuleList(netlink.FAMILY_V4)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error listing rules")
 	}
@@ -111,13 +111,13 @@ func (ovn *Handler) programRulesForRemoteSubnets(subnets []string, ruleFunc func
 }
 
 func (ovn *Handler) getNextHopOnK8sMgmtIntf() (*net.IP, error) {
-	link, err := netlink.LinkByName(OVNK8sMgmntIntfName)
+	link, err := ovn.netLink.LinkByName(OVNK8sMgmntIntfName)
 
 	if err != nil && !errors.Is(err, netlink.LinkNotFoundError{}) {
 		return nil, errors.Wrapf(err, "error retrieving link by name %q", OVNK8sMgmntIntfName)
 	}
 
-	currentRouteList, err := netlink.RouteList(link, syscall.AF_INET)
+	currentRouteList, err := ovn.netLink.RouteList(link, syscall.AF_INET)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error retrieving routes on the link %s", OVNK8sMgmntIntfName)
 	}

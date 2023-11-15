@@ -50,7 +50,7 @@ type Handler struct {
 	cableRoutingInterface     *net.Interface
 	remoteEndpoints           map[string]*submV1.Endpoint
 	isGateway                 bool
-	netlink                   netlink.Interface
+	netLink                   netlink.Interface
 	ipt                       iptables.Interface
 	gatewayRouteController    *GatewayRouteController
 	nonGatewayRouteController *NonGatewayRouteController
@@ -75,7 +75,7 @@ func NewHandler(env *environment.Specification, smClientSet clientset.Interface,
 		dynamicClient:   dynamicClient,
 		watcherConfig:   watcherConfig,
 		remoteEndpoints: map[string]*submV1.Endpoint{},
-		netlink:         netlink.New(),
+		netLink:         netlink.New(),
 		ipt:             ipt,
 		stopCh:          make(chan struct{}),
 	}
