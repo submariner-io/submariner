@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	ovnClusterRouter     = "ovn_cluster_router"
+	OVNClusterRouter     = "ovn_cluster_router"
 	ovnRoutePoliciesPrio = 20000
 )
 
@@ -43,7 +43,7 @@ func (c *ConnectionHandler) reconcileOvnLogicalRouterStaticRoutes(remoteSubnets 
 			(item.Nexthop != nextHop && remoteSubnets.Has(item.IPPrefix))
 	}
 
-	err := libovsdbops.DeleteLogicalRouterStaticRoutesWithPredicate(c.nbdb, ovnClusterRouter, staleLRSRPred)
+	err := libovsdbops.DeleteLogicalRouterStaticRoutesWithPredicate(c.nbdb, OVNClusterRouter, staleLRSRPred)
 	if err != nil {
 		return errors.Wrapf(err, "failed to delete existing ovn logical route static routes for nexthop: %s", nextHop)
 	}
@@ -55,7 +55,7 @@ func (c *ConnectionHandler) reconcileOvnLogicalRouterStaticRoutes(remoteSubnets 
 			return item.Nexthop == nextHop && item.IPPrefix == lrsr.IPPrefix
 		}
 
-		err = libovsdbops.CreateOrUpdateLogicalRouterStaticRoutesWithPredicate(c.nbdb, ovnClusterRouter, lrsr, LRSRPred)
+		err = libovsdbops.CreateOrUpdateLogicalRouterStaticRoutesWithPredicate(c.nbdb, OVNClusterRouter, lrsr, LRSRPred)
 		if err != nil {
 			return errors.Wrap(err, "failed to create ovn lrsr and add it to the ovn submariner router")
 		}
@@ -88,7 +88,7 @@ func (c *ConnectionHandler) reconcileSubOvnLogicalRouterPolicies(remoteSubnets s
 	}
 
 	// Cleanup any existing lrps not representing the correct set of remote subnets
-	err := libovsdbops.DeleteLogicalRouterPoliciesWithPredicate(c.nbdb, ovnClusterRouter, lrpStalePredicate)
+	err := libovsdbops.DeleteLogicalRouterPoliciesWithPredicate(c.nbdb, OVNClusterRouter, lrpStalePredicate)
 	if err != nil {
 		return errors.Wrapf(err, "failed to delete stale submariner logical route policies")
 	}
@@ -104,7 +104,7 @@ func (c *ConnectionHandler) reconcileSubOvnLogicalRouterPolicies(remoteSubnets s
 		}
 
 		if err := libovsdbops.CreateOrUpdateLogicalRouterPolicyWithPredicate(c.nbdb,
-			ovnClusterRouter, lrp, lrpSubPredicate); err != nil {
+			OVNClusterRouter, lrp, lrpSubPredicate); err != nil {
 			return errors.Wrapf(err, "failed to create submariner logical Router policy %v and add it to the ovn cluster router", lrp)
 		}
 	}
