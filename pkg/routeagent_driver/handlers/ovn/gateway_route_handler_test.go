@@ -20,7 +20,6 @@ package ovn_test
 
 import (
 	"errors"
-	"net"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -29,41 +28,19 @@ import (
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event/testing"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
-	"github.com/vishvananda/netlink"
 )
 
 var _ = Describe("GatewayRouteHandler", func() {
 	t := newTestDriver()
 
-	var nextHopIP *net.IPNet
-
-	BeforeEach(func() {
-		nextHopIP = &net.IPNet{
-			IP: []byte{128, 1, 20, 2},
-		}
-	})
-
 	JustBeforeEach(func() {
-		link := &netlink.GenericLink{
-			LinkAttrs: netlink.LinkAttrs{
-				Index: 99,
-				Name:  ovn.OVNK8sMgmntIntfName,
-			},
-		}
-
-		t.netLink.SetLinkIndex(ovn.OVNK8sMgmntIntfName, link.Index)
-		Expect(t.netLink.LinkAdd(link)).To(Succeed())
-		Expect(t.netLink.AddrAdd(link, &netlink.Addr{
-			IPNet: nextHopIP,
-		})).To(Succeed())
-
 		t.Start(ovn.NewGatewayRouteHandler(t.submClient))
 	})
 
 	awaitGatewayRoute := func(ep *submarinerv1.Endpoint) {
 		gwRoute := test.AwaitResource(ovn.GatewayResourceInterface(t.submClient, testing.Namespace), ep.Name)
 		Expect(gwRoute.RoutePolicySpec.RemoteCIDRs).To(Equal(ep.Spec.Subnets))
-		Expect(gwRoute.RoutePolicySpec.NextHops).To(Equal([]string{nextHopIP.IP.String()}))
+		Expect(gwRoute.RoutePolicySpec.NextHops).To(Equal([]string{t.mgmntIntfIP}))
 	}
 
 	When("a remote Endpoint is created and deleted on the gateway", func() {
