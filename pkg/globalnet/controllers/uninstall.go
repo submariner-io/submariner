@@ -38,7 +38,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -160,8 +159,8 @@ func deleteInternalService(ingressIP *submarinerv1.GlobalIngressIP, services dyn
 
 	service, exists, _ := getService(internalSvc, ingressIP.Namespace, services, scheme.Scheme)
 	if exists {
-		if err := finalizer.Remove[runtime.Object](context.TODO(), resource.ForDynamic(services.Namespace(ingressIP.Namespace)), service,
-			InternalServiceFinalizer); err != nil {
+		if err := finalizer.Remove(context.TODO(), resource.ForDynamic(services.Namespace(ingressIP.Namespace)),
+			resource.MustToUnstructured(service), InternalServiceFinalizer); err != nil {
 			return fmt.Errorf("error while removing the finalizer from globalnet internal service %q", key)
 		}
 
@@ -240,8 +239,8 @@ func RemoveStaleInternalServices(config *syncer.ResourceSyncerConfig) error {
 		if !svc.GetDeletionTimestamp().IsZero() {
 			logger.Warningf("Globalnet internal service %s/%s has deletionTimestamp set", svc.GetNamespace(), svc.GetName())
 
-			err := finalizer.Remove[runtime.Object](context.TODO(), resource.ForDynamic(services.Namespace(svc.GetNamespace())), svc,
-				InternalServiceFinalizer)
+			err := finalizer.Remove(context.TODO(), resource.ForDynamic(services.Namespace(svc.GetNamespace())),
+				resource.MustToUnstructured(svc), InternalServiceFinalizer)
 			if err != nil {
 				return errors.Wrapf(err, "error while removing the finalizer from globalnet internal service %q/%q",
 					svc.GetNamespace(), svc.GetName())

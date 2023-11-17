@@ -25,6 +25,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,7 +62,7 @@ func testClusterSyncing() {
 		When("creation of the local Cluster fails", func() {
 			BeforeEach(func() {
 				t.expectedStartErr = errors.New("mock Create error")
-				t.localClusters.FailOnCreate = t.expectedStartErr
+				fake.FailOnAction(&t.localClient.Fake, "clusters", "create", t.expectedStartErr, false)
 			})
 
 			It("Start should return an error", func() {
