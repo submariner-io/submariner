@@ -50,6 +50,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	k8stesting "k8s.io/client-go/testing"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
@@ -85,7 +86,7 @@ func TestControllers(t *testing.T) {
 type testDriverBase struct {
 	controller             controllers.Interface
 	restMapper             meta.RESTMapper
-	dynClient              *fakeDynClient.DynamicClient
+	dynClient              *dynamicfake.FakeDynamicClient
 	scheme                 *runtime.Scheme
 	ipt                    *fakeIPT.IPTables
 	ipSet                  *fakeIPSet.IPSet
@@ -118,7 +119,8 @@ func newTestDriverBase() *testDriverBase {
 	Expect(submarinerv1.AddToScheme(t.scheme)).To(Succeed())
 	Expect(corev1.AddToScheme(t.scheme)).To(Succeed())
 
-	t.dynClient = fakeDynClient.NewDynamicClient(t.scheme)
+	t.dynClient = dynamicfake.NewSimpleDynamicClient(t.scheme)
+	fakeDynClient.AddBasicReactors(&t.dynClient.Fake)
 
 	t.globalEgressIPs = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.GlobalEgressIP{})).
 		Namespace(namespace)
@@ -193,7 +195,7 @@ func (t *testDriverBase) awaitClusterGlobalEgressIPStatusAllocated(expNumIPS int
 }
 
 func (t *testDriverBase) createPod(p *corev1.Pod) *corev1.Pod {
-	return fromUnstructured(test.CreateResource(t.pods.Namespace(p.Namespace), p), &corev1.Pod{}).(*corev1.Pod)
+	return test.CreateResource(t.pods.Namespace(p.Namespace), p)
 }
 
 func (t *testDriverBase) deletePod(p *corev1.Pod) {
@@ -250,7 +252,7 @@ func (t *testDriverBase) createNode(name, cniInterfaceIP, globalIP string) *core
 	addAnnotation(node, routeAgent.CNIInterfaceIP, cniInterfaceIP)
 	addAnnotation(node, constants.SmGlobalIP, globalIP)
 
-	return fromUnstructured(test.CreateResource(t.nodes, node), &corev1.Node{}).(*corev1.Node)
+	return test.CreateResource(t.nodes, node)
 }
 
 func (t *testDriverBase) awaitNodeGlobalIP(oldIP string) string {
@@ -392,7 +394,7 @@ func (t *testDriverBase) awaitNoEndpoints(name string) {
 }
 
 func (t *testDriverBase) ensureNoEndpoints(name string) {
-	testutil.EnsureNoResource[runtime.Object](resource.ForDynamic(t.endpoints), name)
+	testutil.EnsureNoResource(resource.ForDynamic(t.endpoints), name)
 }
 
 func (t *testDriverBase) awaitEndpointsHasIP(name, ip string) {
@@ -474,7 +476,7 @@ func (t *testDriverBase) awaitNoGlobalIngressIP(name string) {
 }
 
 func (t *testDriverBase) ensureNoGlobalIngressIP(name string) {
-	testutil.EnsureNoResource[runtime.Object](resource.ForDynamic(t.globalIngressIPs), name)
+	testutil.EnsureNoResource(resource.ForDynamic(t.globalIngressIPs), name)
 }
 
 func (t *testDriverBase) ensureNoGlobalIngressIPs() {
@@ -756,13 +758,6 @@ func isValidIPForCIDR(cidr, ip string) bool {
 	Expect(err).NotTo(HaveOccurred())
 
 	return ipnet.Contains(net.ParseIP(ip))
-}
-
-func fromUnstructured(from *unstructured.Unstructured, to runtime.Object) runtime.Object {
-	err := runtime.DefaultUnstructuredConverter.FromUnstructured(from.Object, to)
-	Expect(err).To(Succeed())
-
-	return to
 }
 
 func getSNATAddress(ips ...string) string {

@@ -25,7 +25,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event"
@@ -35,6 +34,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/dynamic"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -72,7 +72,7 @@ var _ = Describe("Event controller", func() {
 
 		config := controller.Config{
 			RestMapper: test.GetRESTMapperFor(&corev1.Node{}, &submV1.Endpoint{}),
-			Client:     fake.NewDynamicClient(scheme.Scheme),
+			Client:     dynamicfake.NewSimpleDynamicClient(scheme.Scheme),
 			Registry:   registry,
 		}
 		os.Setenv("SUBMARINER_NAMESPACE", testNamespace)

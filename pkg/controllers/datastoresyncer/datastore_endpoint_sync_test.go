@@ -26,6 +26,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	testutil "github.com/submariner-io/admiral/pkg/test"
@@ -34,7 +35,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -56,7 +56,7 @@ func testEndpointSyncing() {
 		When("creation of the local Endpoint fails", func() {
 			BeforeEach(func() {
 				t.expectedStartErr = errors.New("mock Create error")
-				t.localEndpoints.FailOnCreate = t.expectedStartErr
+				fake.FailOnAction(&t.localClient.Fake, "endpoints", "create", t.expectedStartErr, false)
 			})
 
 			It("Start should return an error", func() {
@@ -157,7 +157,7 @@ func testEndpointSyncing() {
 				node.Annotations[constants.SmGlobalIP] = "200.0.0.100"
 				test.UpdateResource(t.localNodes, node)
 
-				testutil.EnsureNoResource[runtime.Object](resource.ForDynamic(t.localEndpoints), getEndpointName(&t.localEndpoint.Spec))
+				testutil.EnsureNoResource(resource.ForDynamic(t.localEndpoints), getEndpointName(&t.localEndpoint.Spec))
 			})
 		})
 	})
@@ -188,7 +188,7 @@ func testEndpointExclusivity() {
 		When("deletion of the Endpoint from the local datastore fails", func() {
 			BeforeEach(func() {
 				t.expectedStartErr = errors.New("mock Delete error")
-				t.localEndpoints.FailOnDelete = t.expectedStartErr
+				fake.FailOnAction(&t.localClient.Fake, "endpoints", "delete", t.expectedStartErr, false)
 			})
 
 			It("Start should return an error", func() {
@@ -197,7 +197,8 @@ func testEndpointExclusivity() {
 
 		When("deletion of the Endpoint from the local datastore returns not found", func() {
 			BeforeEach(func() {
-				t.localEndpoints.FailOnDelete = apierrors.NewNotFound(schema.GroupResource{}, existingEndpoint.Spec.CableName)
+				fake.FailOnAction(&t.localClient.Fake, "endpoints", "delete",
+					apierrors.NewNotFound(schema.GroupResource{}, existingEndpoint.Spec.CableName), false)
 			})
 
 			It("should ignore it", func() {

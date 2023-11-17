@@ -34,7 +34,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 )
@@ -296,12 +295,7 @@ func (t *gatewayMonitorTestDriver) createEndpoint(spec *submarinerv1.EndpointSpe
 		Spec: *spec,
 	}
 
-	obj := test.CreateResource(t.endpoints, endpoint)
-
-	err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, endpoint)
-	Expect(err).To(Succeed())
-
-	return endpoint
+	return test.CreateResource(t.endpoints, endpoint)
 }
 
 func (t *gatewayMonitorTestDriver) awaitControllersStarted() {

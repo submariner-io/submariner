@@ -47,7 +47,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
@@ -402,7 +401,7 @@ func (t *testDriver) newRemoteEndpoint() *submarinerv1.Endpoint {
 }
 
 func (t *testDriver) createEndpoint(ns string, endpoint *submarinerv1.Endpoint) *submarinerv1.Endpoint {
-	return toEndpoint(test.CreateResource(t.endpoints.Namespace(ns), endpoint))
+	return test.CreateResource(t.endpoints.Namespace(ns), endpoint)
 }
 
 func (t *testDriver) createRemoteEndpointOnBroker() *submarinerv1.Endpoint {
@@ -414,7 +413,7 @@ func (t *testDriver) awaitRemoteEndpointSyncedLocal(endpoint *submarinerv1.Endpo
 }
 
 func (t *testDriver) ensureNoRemoteEndpointSyncedLocal(endpoint *submarinerv1.Endpoint) {
-	testutil.EnsureNoResource[runtime.Object](resource.ForDynamic(t.endpoints.Namespace(t.config.Spec.Namespace)), endpoint.Name)
+	testutil.EnsureNoResource(resource.ForDynamic(t.endpoints.Namespace(t.config.Spec.Namespace)), endpoint.Name)
 }
 
 func (t *testDriver) awaitHAStatus(status submarinerv1.HAStatus) {

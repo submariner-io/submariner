@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -76,11 +77,11 @@ type testDriver struct {
 	syncer           *datastoresyncer.DatastoreSyncer
 	localCluster     *types.SubmarinerCluster
 	localEndpoint    *types.SubmarinerEndpoint
-	localClient      dynamic.Interface
-	brokerClient     dynamic.Interface
-	localClusters    *fake.DynamicResourceClient
+	localClient      *dynamicfake.FakeDynamicClient
+	brokerClient     *dynamicfake.FakeDynamicClient
+	localClusters    dynamic.ResourceInterface
 	brokerClusters   dynamic.ResourceInterface
-	localEndpoints   *fake.DynamicResourceClient
+	localEndpoints   dynamic.ResourceInterface
 	localNodes       dynamic.ResourceInterface
 	brokerEndpoints  dynamic.ResourceInterface
 	syncerScheme     *runtime.Scheme
@@ -122,17 +123,20 @@ func newTestDriver() *testDriver {
 		Expect(submarinerv1.AddToScheme(t.syncerScheme)).To(Succeed())
 		Expect(corev1.AddToScheme(t.syncerScheme)).To(Succeed())
 
-		t.localClient = fake.NewDynamicClient(t.syncerScheme)
-		t.brokerClient = fake.NewDynamicClient(t.syncerScheme)
+		t.localClient = dynamicfake.NewSimpleDynamicClient(t.syncerScheme)
+		fake.AddBasicReactors(&t.localClient.Fake)
+
+		t.brokerClient = dynamicfake.NewSimpleDynamicClient(t.syncerScheme)
+		fake.AddBasicReactors(&t.brokerClient.Fake)
 
 		t.restMapper = test.GetRESTMapperFor(&submarinerv1.Cluster{}, &submarinerv1.Endpoint{}, &corev1.Node{})
 
 		clusterGVR := test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.Cluster{})
-		t.localClusters = t.localClient.Resource(*clusterGVR).Namespace(localNamespace).(*fake.DynamicResourceClient)
+		t.localClusters = t.localClient.Resource(*clusterGVR).Namespace(localNamespace)
 		t.brokerClusters = t.brokerClient.Resource(*clusterGVR).Namespace(brokerNamespace)
 
 		endpointGVR := test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.Endpoint{})
-		t.localEndpoints = t.localClient.Resource(*endpointGVR).Namespace(localNamespace).(*fake.DynamicResourceClient)
+		t.localEndpoints = t.localClient.Resource(*endpointGVR).Namespace(localNamespace)
 		t.brokerEndpoints = t.brokerClient.Resource(*endpointGVR).Namespace(brokerNamespace)
 
 		t.localNodes = t.localClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &corev1.Node{})).Namespace("")
