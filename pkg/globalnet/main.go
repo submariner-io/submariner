@@ -23,6 +23,7 @@ import (
 	"flag"
 	"net/http"
 	"net/http/pprof"
+	"os"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
@@ -125,12 +126,16 @@ func main() {
 	k8sClient, err := kubernetes.NewForConfig(cfg)
 	logger.FatalOnError(err, "Error creating Kubernetes clientset")
 
+	hostname, err := os.Hostname()
+	logger.FatalOnError(err, "Unable to determine hostname")
+
 	gatewayMonitor, err := controllers.NewGatewayMonitor(&controllers.GatewayMonitorConfig{
 		Config: watcher.Config{RestConfig: cfg},
 		Spec:   spec,
 		LocalCIDRs: append(cidr.ExtractIPv4Subnets(localCluster.Spec.ClusterCIDR),
 			cidr.ExtractIPv4Subnets(localCluster.Spec.ServiceCIDR)...),
 		KubeClient: k8sClient,
+		Hostname:   hostname,
 	})
 	logger.FatalOnError(err, "Error creating gatewayMonitor")
 

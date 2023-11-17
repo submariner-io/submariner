@@ -276,6 +276,7 @@ func (t *gatewayMonitorTestDriver) start() {
 		LocalCIDRs:           localSubnets,
 		KubeClient:           t.kubeClient,
 		LeaderElectionConfig: t.leaderElectionConfig,
+		Hostname:             t.hostName,
 	})
 
 	Expect(err).To(Succeed())

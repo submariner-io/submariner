@@ -102,6 +102,7 @@ type GatewayMonitorConfig struct {
 	Spec       Specification
 	LocalCIDRs []string
 	KubeClient kubernetes.Interface
+	Hostname   string
 }
 
 type baseController struct {
@@ -126,6 +127,7 @@ type gatewayMonitor struct {
 	shuttingDown            atomic.Bool
 	leaderElectionInfo      atomic.Pointer[LeaderElectionInfo]
 	nodeName                string
+	hostName                string
 	localSubnets            []string
 	remoteSubnets           set.Set[string]
 	controllersMutex        sync.Mutex // Protects controllers
