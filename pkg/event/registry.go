@@ -40,15 +40,25 @@ type Registry struct {
 
 var logger = log.Logger{Logger: logf.Log.WithName("EventRegistry")}
 
-// NewRegistry creates a new registry with the given name,  typically referencing the owner, to manage event
-// Handlers that match the given networkPlugin name.
-func NewRegistry(name, networkPlugin string) *Registry {
-	return &Registry{
+// NewRegistry creates a new registry with the given name, typically referencing the owner, to manage event
+// Handlers that match the given networkPlugin name. The given event Handlers whose associated network plugin matches the given
+// networkPlugin name are added. Non-matching Handlers are ignored. Handlers will be called in registration order.
+func NewRegistry(name, networkPlugin string, eventHandlers ...Handler) (*Registry, error) {
+	r := &Registry{
 		name:                    name,
 		networkPlugin:           strings.ToLower(networkPlugin),
 		eventHandlers:           []Handler{},
 		remoteEndpointTimeStamp: map[string]v1.Time{},
 	}
+
+	for _, eventHandler := range eventHandlers {
+		err := r.addHandler(eventHandler)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return r, nil
 }
 
 // GetName returns the name of the registry.
@@ -73,19 +83,6 @@ func (er *Registry) addHandler(eventHandler Handler) error {
 	} else {
 		logger.V(log.DEBUG).Infof("Event handler %q ignored for registry %q as networkPlugin is %q.",
 			eventHandler.GetName(), er.name, er.networkPlugin)
-	}
-
-	return nil
-}
-
-// AddHandlers adds the given event Handlers whose associated network plugin matches the network plugin
-// associated with this registry. Non-matching Handlers are ignored. Handlers will be called in registration order.
-func (er *Registry) AddHandlers(eventHandlers ...Handler) error {
-	for _, eventHandler := range eventHandlers {
-		err := er.addHandler(eventHandler)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil

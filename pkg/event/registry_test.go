@@ -45,7 +45,6 @@ var _ = Describe("Event Registry", func() {
 
 		BeforeEach(func() {
 			allTestEvents = make(chan testing.TestEvent, 1000)
-			registry = event.NewRegistry("test-registry", npGenericKubeproxyIptables)
 
 			nonMatchingHandlers = []*testing.TestHandler{
 				testing.NewTestHandler("ovn-handler", cni.OVNKubernetes, allTestEvents),
@@ -57,8 +56,10 @@ var _ = Describe("Event Registry", func() {
 				testing.NewTestHandler("wildcard-handler", event.AnyNetworkPlugin, allTestEvents),
 			}
 
-			err := registry.AddHandlers(logger.NewHandler(), matchingHandlers[0], nonMatchingHandlers[0], matchingHandlers[1],
-				matchingHandlers[2])
+			var err error
+
+			registry, err = event.NewRegistry("test-registry", npGenericKubeproxyIptables, logger.NewHandler(), matchingHandlers[0],
+				nonMatchingHandlers[0], matchingHandlers[1], matchingHandlers[2])
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -144,8 +145,7 @@ var _ = Describe("Event Registry", func() {
 	When("SetHandlerState is called on the registry", func() {
 		It("should invoke SetState on the handlers", func() {
 			h := testing.NewTestHandler("test", event.AnyNetworkPlugin, nil)
-			registry := event.NewRegistry("test-registry", event.AnyNetworkPlugin)
-			err := registry.AddHandlers(h)
+			registry, err := event.NewRegistry("test-registry", event.AnyNetworkPlugin, h)
 			Expect(err).NotTo(HaveOccurred())
 
 			registry.SetHandlerState(&testing.TestHandlerState{Gateway: true})

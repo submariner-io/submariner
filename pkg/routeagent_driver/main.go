@@ -90,32 +90,22 @@ func main() {
 	var env environment.Specification
 
 	err := envconfig.Process("submariner", &env)
-	if err != nil {
-		logger.Fatalf("Error reading the environment variables: %s", err.Error())
-	}
+	logger.FatalOnError(err, "Error reading the environment variables")
 
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
-	if err != nil {
-		logger.Fatalf("Error building kubeconfig: %s", err.Error())
-	}
+	logger.FatalOnError(err, "Error building kubeconfig")
 
 	k8sClientSet, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		logger.Fatalf("Error building clientset: %s", err.Error())
-	}
+	logger.FatalOnError(err, "Error building clientset")
 
 	dynamicClientSet, err := dynamic.NewForConfig(cfg)
-	if err != nil {
-		logger.Fatalf("Error building dynamic client: %s", err.Error())
-	}
+	logger.FatalOnError(err, "Error building dynamic clientr")
 
 	err = v1.AddToScheme(scheme.Scheme)
 	logger.FatalOnError(err, "Error adding submariner to the scheme")
 
 	smClientset, err := submarinerClientset.NewForConfig(cfg)
-	if err != nil {
-		logger.Fatalf("Error building submariner clientset: %s", err.Error())
-	}
+	logger.FatalOnError(err, "Error building submariner clientset")
 
 	if env.WaitForNode {
 		waitForNodeReady(k8sClientSet)
@@ -131,8 +121,7 @@ func main() {
 
 	config := &watcher.Config{RestConfig: cfg}
 
-	registry := event.NewRegistry("routeagent_driver", np)
-	if err := registry.AddHandlers(
+	registry, err := event.NewRegistry("routeagent_driver", np,
 		eventlogger.NewHandler(),
 		kubeproxy.NewSyncHandler(env.ClusterCidr, env.ServiceCidr),
 		ovn.NewHandler(&ovn.HandlerConfig{
@@ -149,10 +138,9 @@ func main() {
 		cabledriver.NewXRFMCleanupHandler(),
 		cabledriver.NewVXLANCleanup(),
 		mtu.NewMTUHandler(env.ClusterCidr, len(env.GlobalCidr) != 0, getTCPMssValue(k8sClientSet)),
-		calico.NewCalicoIPPoolHandler(cfg),
-	); err != nil {
-		logger.Fatalf("Error registering the handlers: %s", err.Error())
-	}
+		calico.NewCalicoIPPoolHandler(cfg))
+
+	logger.FatalOnError(err, "Error registering the handlers")
 
 	if env.Uninstall {
 		uninstall(k8sClientSet, registry)
@@ -169,14 +157,10 @@ func main() {
 		MasterURL:  masterURL,
 		Kubeconfig: kubeconfig,
 	})
-	if err != nil {
-		logger.Fatalf("Error creating controller for event handling %v", err)
-	}
+	logger.FatalOnError(err, "Error creating controller for event handling")
 
 	err = ctl.Start(stopCh)
-	if err != nil {
-		logger.Fatalf("Error starting controller: %v", err)
-	}
+	logger.FatalOnError(err, "Error starting controller")
 
 	<-stopCh
 	ctl.Stop()
