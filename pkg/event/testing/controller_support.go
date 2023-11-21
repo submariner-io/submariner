@@ -62,8 +62,8 @@ func NewControllerSupport() *ControllerSupport {
 func (c *ControllerSupport) Start(handler event.Handler) {
 	stopCh := make(chan struct{})
 
-	registry := event.NewRegistry("test-registry", handler.GetNetworkPlugins()[0])
-	Expect(registry.AddHandlers(handler)).To(Succeed())
+	registry, err := event.NewRegistry("test-registry", handler.GetNetworkPlugins()[0], handler)
+	Expect(err).To(Succeed())
 
 	config := controller.Config{
 		RestMapper: test.GetRESTMapperFor(&corev1.Node{}, &submV1.Endpoint{}),
