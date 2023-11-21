@@ -181,15 +181,13 @@ func (d *DatastoreSyncer) cleanupResources(ctx context.Context, client dynamic.N
 func (d *DatastoreSyncer) createSyncer() (*broker.Syncer, error) {
 	d.syncerConfig.ResourceConfigs = []broker.ResourceConfig{
 		{
-			LocalSourceNamespace:   d.syncerConfig.LocalNamespace,
-			LocalResourceType:      &submarinerv1.Cluster{},
-			TransformLocalToBroker: d.shouldSyncCluster,
-			BrokerResourceType:     &submarinerv1.Cluster{},
+			LocalSourceNamespace: d.syncerConfig.LocalNamespace,
+			LocalResourceType:    &submarinerv1.Cluster{},
+			BrokerResourceType:   &submarinerv1.Cluster{},
 		},
 		{
 			LocalSourceNamespace:   d.syncerConfig.LocalNamespace,
 			LocalResourceType:      &submarinerv1.Endpoint{},
-			TransformLocalToBroker: d.shouldSyncEndpoint,
 			TransformBrokerToLocal: d.shouldSyncRemoteEndpoint,
 			BrokerResourceType:     &submarinerv1.Endpoint{},
 		},
@@ -198,26 +196,6 @@ func (d *DatastoreSyncer) createSyncer() (*broker.Syncer, error) {
 	syncer, err := broker.NewSyncer(d.syncerConfig)
 
 	return syncer, errors.Wrap(err, "error creating the syncer")
-}
-
-func (d *DatastoreSyncer) shouldSyncEndpoint(obj runtime.Object, _ int, _ resourceSyncer.Operation) (runtime.Object, bool) {
-	// Ensure we don't try to sync a remote endpoint to the broker. While the syncer handles this normally using a
-	// label, on upgrade to 0.8.0 where the syncer was introduced, the label won't exist so check the ClusterID field here.
-	endpoint := obj.(*submarinerv1.Endpoint)
-	if endpoint.Spec.ClusterID == d.localCluster.Spec.ClusterID {
-		return obj, false
-	}
-
-	return nil, false
-}
-
-func (d *DatastoreSyncer) shouldSyncCluster(obj runtime.Object, _ int, _ resourceSyncer.Operation) (runtime.Object, bool) {
-	cluster := obj.(*submarinerv1.Cluster)
-	if cluster.Spec.ClusterID == d.localCluster.Spec.ClusterID {
-		return obj, false
-	}
-
-	return nil, false
 }
 
 func (d *DatastoreSyncer) shouldSyncRemoteEndpoint(obj runtime.Object, _ int,

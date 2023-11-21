@@ -63,6 +63,7 @@ func NewGatewayMonitor(config *GatewayMonitorConfig) (Interface, error) {
 		remoteEndpointTimeStamp: map[string]metav1.Time{},
 		leaderElectionInfo:      atomic.Pointer[LeaderElectionInfo]{},
 		LeaderElectionConfig:    config.LeaderElectionConfig,
+		hostName:                config.Hostname,
 	}
 
 	// When transitioning to a non-gateway or shutting down, the GatewayMonitor cancels leader election which causes it to release the lock,
@@ -224,21 +225,16 @@ func (g *gatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, _ in
 		return false
 	}
 
-	hostname, err := os.Hostname()
-	if err != nil {
-		logger.Fatalf("Unable to determine hostname: %v", err)
-	}
-
 	for _, remoteSubnet := range g.remoteSubnets.UnsortedList() {
 		g.markRemoteClusterTraffic(remoteSubnet, AddRules)
 	}
 
 	// If the endpoint hostname matches with our hostname, it implies we are on gateway node
-	if endpoint.Spec.Hostname == hostname {
+	if endpoint.Spec.Hostname == g.hostName {
 		configureTCPMTUProbe()
 
 		if g.isGatewayNode.CompareAndSwap(false, true) {
-			logger.Infof("Transitioned to gateway node %q with endpoint private IP %s", hostname, endpoint.Spec.PrivateIP)
+			logger.Infof("Transitioned to gateway node %q with endpoint private IP %s", g.hostName, endpoint.Spec.PrivateIP)
 
 			g.startLeaderElection()
 		}
@@ -266,14 +262,9 @@ func (g *gatewayMonitor) handleRemovedEndpoint(obj runtime.Object, _ int) bool {
 
 	logger.V(log.DEBUG).Infof("Gateway monitor informed of removed endpoint: %v", endpoint)
 
-	hostname, err := os.Hostname()
-	if err != nil {
-		logger.Fatalf("Could not retrieve hostname: %v", err)
-	}
-
-	if endpoint.Spec.Hostname == hostname && endpoint.Spec.ClusterID == g.spec.ClusterID {
+	if endpoint.Spec.Hostname == g.hostName && endpoint.Spec.ClusterID == g.spec.ClusterID {
 		if g.isGatewayNode.CompareAndSwap(true, false) {
-			logger.Infof("Gateway node %q endpoint removed", hostname)
+			logger.Infof("Gateway node %q endpoint removed", g.hostName)
 
 			g.stopControllers(context.Background(), true)
 		}
@@ -330,9 +321,7 @@ func (g *gatewayMonitor) startLeaderElection() {
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(_ context.Context) {
 				err := g.startControllers() //nolint:contextcheck // Intentional to not pass context
-				if err != nil {
-					logger.Fatalf("Error starting the controllers: %v", err)
-				}
+				logger.FatalOnError(err, "Error starting the controllers")
 			},
 			OnStoppedLeading: func() {
 				logger.Info("Leader election stopped")
