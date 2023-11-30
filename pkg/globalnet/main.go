@@ -32,14 +32,15 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/names"
+	"github.com/submariner-io/admiral/pkg/util"
 	admversion "github.com/submariner-io/admiral/pkg/version"
-	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cidr"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/versions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
@@ -129,9 +130,17 @@ func main() {
 	hostname, err := os.Hostname()
 	logger.FatalOnError(err, "Unable to determine hostname")
 
+	dynClient, err := dynamic.NewForConfig(cfg)
+	logger.FatalOnError(err, "Unable to create dynamic client")
+
+	restMapper, err := util.BuildRestMapper(cfg)
+	logger.FatalOnError(err, "Unable to build the REST mapper")
+
 	gatewayMonitor, err := controllers.NewGatewayMonitor(&controllers.GatewayMonitorConfig{
-		Config: watcher.Config{RestConfig: cfg},
-		Spec:   spec,
+		Client:     dynClient,
+		RestMapper: restMapper,
+		Scheme:     scheme.Scheme,
+		Spec:       spec,
 		LocalCIDRs: append(cidr.ExtractIPv4Subnets(localCluster.Spec.ClusterCIDR),
 			cidr.ExtractIPv4Subnets(localCluster.Spec.ServiceCIDR)...),
 		KubeClient: k8sClient,

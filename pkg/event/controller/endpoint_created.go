@@ -58,6 +58,8 @@ func (c *Controller) handleCreatedLocalEndpoint(endpoint *smv1.Endpoint) error {
 	err := c.handlers.LocalEndpointCreated(endpoint)
 
 	if err == nil && !c.handlerState.wasOnGateway && c.handlerState.IsOnGateway() {
+		logger.Infof("Transitioned to gateway node %q with endpoint private IP %s", c.hostname, endpoint.Spec.PrivateIP)
+
 		err = c.handlers.TransitionToGateway()
 	}
 

@@ -29,10 +29,10 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
-	admUtil "github.com/submariner-io/admiral/pkg/util"
-	"github.com/submariner-io/admiral/pkg/watcher"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cidr"
+	"github.com/submariner-io/submariner/pkg/event"
+	"github.com/submariner-io/submariner/pkg/event/controller"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	"github.com/submariner-io/submariner/pkg/iptables"
@@ -40,10 +40,7 @@ import (
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	k8snet "k8s.io/utils/net"
@@ -54,16 +51,10 @@ func NewGatewayMonitor(config *GatewayMonitorConfig) (Interface, error) {
 	// We'll panic if config is nil, this is intentional
 	gatewayMonitor := &gatewayMonitor{
 		baseController:          newBaseController(),
-		spec:                    config.Spec,
-		kubeClient:              config.KubeClient,
-		isGatewayNode:           atomic.Bool{},
+		GatewayMonitorConfig:    *config,
 		shuttingDown:            atomic.Bool{},
-		localSubnets:            set.New(config.LocalCIDRs...).UnsortedList(),
-		remoteSubnets:           set.New[string](),
 		remoteEndpointTimeStamp: map[string]metav1.Time{},
 		leaderElectionInfo:      atomic.Pointer[LeaderElectionInfo]{},
-		LeaderElectionConfig:    config.LeaderElectionConfig,
-		hostName:                config.Hostname,
 	}
 
 	// When transitioning to a non-gateway or shutting down, the GatewayMonitor cancels leader election which causes it to release the lock,
@@ -76,6 +67,8 @@ func NewGatewayMonitor(config *GatewayMonitorConfig) (Interface, error) {
 	// For our usage, we don't have instances concurrently vying for leadership, so we really don't need to keep renewing the lease. Ideally
 	// we would set the RenewDeadline very high to essentially disable it, but it needs to be less than the LeaseDuration setting which we
 	// don't want too high.
+
+	gatewayMonitor.LocalCIDRs = set.New(config.LocalCIDRs...).UnsortedList()
 
 	if gatewayMonitor.LeaseDuration == 0 {
 		gatewayMonitor.LeaseDuration = 20 * time.Second
@@ -98,40 +91,6 @@ func NewGatewayMonitor(config *GatewayMonitorConfig) (Interface, error) {
 		return nil, errors.Wrap(err, "error creating IP tables")
 	}
 
-	if config.RestMapper == nil {
-		if config.RestMapper, err = admUtil.BuildRestMapper(config.RestConfig); err != nil {
-			return nil, errors.Wrap(err, "error creating the RestMapper")
-		}
-	}
-
-	if config.Client == nil {
-		if config.Client, err = dynamic.NewForConfig(config.RestConfig); err != nil {
-			return nil, errors.Wrap(err, "error creating dynamic client")
-		}
-	}
-
-	if config.Scheme == nil {
-		config.Scheme = scheme.Scheme
-	}
-
-	config.ResourceConfigs = []watcher.ResourceConfig{
-		{
-			Name:         "IPAM GatewayMonitor",
-			ResourceType: &v1.Endpoint{},
-			Handler: watcher.EventHandlerFuncs{
-				OnCreateFunc: gatewayMonitor.handleCreatedOrUpdatedEndpoint,
-				OnUpdateFunc: gatewayMonitor.handleCreatedOrUpdatedEndpoint,
-				OnDeleteFunc: gatewayMonitor.handleRemovedEndpoint,
-			},
-			SourceNamespace: config.Spec.Namespace,
-		},
-	}
-
-	gatewayMonitor.endpointWatcher, err = watcher.New(&config.Config)
-	if err != nil {
-		return nil, errors.Wrap(err, "error creating the Endpoint watcher")
-	}
-
 	nodeName, ok := os.LookupEnv("NODE_NAME")
 	if !ok {
 		return nil, errors.New("error reading the NODE_NAME from the environment")
@@ -148,25 +107,51 @@ func NewGatewayMonitor(config *GatewayMonitorConfig) (Interface, error) {
 		Scheme:          config.Scheme,
 	}
 
-	return gatewayMonitor, nil
+	return &gatewayMonitorInterface{monitor: gatewayMonitor}, nil
 }
 
-func (g *gatewayMonitor) Start() error {
+func (g *gatewayMonitorInterface) Start() error {
 	logger.Info("Starting GatewayMonitor to monitor the active Gateway node in the cluster.")
 
-	if err := g.createGlobalNetMarkingChain(); err != nil {
-		return errors.Wrap(err, "error while calling createGlobalNetMarkingChain")
+	registry, err := event.NewRegistry("globalnet-registry", event.AnyNetworkPlugin, g.monitor)
+	if err != nil {
+		return errors.Wrap(err, "error creating event registry")
 	}
 
-	err := g.endpointWatcher.Start(g.stopCh)
+	eventController, err := controller.New(&controller.Config{
+		Registry:   registry,
+		RestMapper: g.monitor.RestMapper,
+		Client:     g.monitor.Client,
+		Scheme:     g.monitor.Scheme,
+	})
 	if err != nil {
-		return errors.Wrap(err, "error starting the Endpoint watcher")
+		return errors.Wrap(err, "error starting the event controller")
+	}
+
+	return eventController.Start(g.monitor.stopCh) //nolint // No need to wrap
+}
+
+func (g *gatewayMonitorInterface) Stop() {
+	_ = g.monitor.Stop()
+}
+
+func (g *gatewayMonitor) GetName() string {
+	return "GatewayMonitor"
+}
+
+func (g *gatewayMonitor) GetNetworkPlugins() []string {
+	return []string{event.AnyNetworkPlugin}
+}
+
+func (g *gatewayMonitor) Init() error {
+	if err := g.createGlobalNetMarkingChain(); err != nil {
+		return errors.Wrap(err, "error while calling createGlobalNetMarkingChain")
 	}
 
 	return nil
 }
 
-func (g *gatewayMonitor) Stop() {
+func (g *gatewayMonitor) Stop() error {
 	logger.Info("GatewayMonitor stopping")
 
 	g.shuttingDown.Store(true)
@@ -179,106 +164,83 @@ func (g *gatewayMonitor) Stop() {
 	defer cancel()
 
 	g.stopControllers(ctx, true)
+
+	return nil
 }
 
-func (g *gatewayMonitor) handleCreatedOrUpdatedEndpoint(obj runtime.Object, _ int) bool {
-	endpoint := obj.(*v1.Endpoint)
-
-	logger.V(log.DEBUG).Infof("Gateway monitor informed of create/updated endpoint: %v", endpoint)
-
-	if endpoint.Spec.ClusterID != g.spec.ClusterID {
-		lastProcessedTime, ok := g.remoteEndpointTimeStamp[endpoint.Spec.ClusterID]
-
-		if ok && lastProcessedTime.After(endpoint.CreationTimestamp.Time) {
-			logger.Infof("Ignoring new remote %#v since a later endpoint was already"+
-				"processed", endpoint)
-			return false
-		}
-
-		logger.V(log.DEBUG).Infof("Endpoint %q, host: %q belongs to a remote cluster",
-			endpoint.Spec.ClusterID, endpoint.Spec.Hostname)
-
-		overlap, err := cidr.IsOverlapping(endpoint.Spec.Subnets, g.spec.GlobalCIDR[0])
-		if err != nil {
-			// Ideally this case will never hit, as the subnets are valid CIDRs
-			logger.Warningf("unable to validate overlapping Service CIDR: %s", err)
-		}
-
-		if overlap {
-			// When GlobalNet is used, globalCIDRs allocated to the clusters should not overlap.
-			// If they overlap, skip the endpoint as its an invalid configuration which is not supported.
-			logger.Errorf(nil, "GlobalCIDR %q of local cluster %q overlaps with remote cluster %s",
-				g.spec.GlobalCIDR[0], g.spec.ClusterID, endpoint.Spec.ClusterID)
-
-			return false
-		}
-
-		for _, remoteSubnet := range endpoint.Spec.Subnets {
-			if k8snet.IsIPv4CIDRString(remoteSubnet) {
-				g.remoteSubnets.Insert(remoteSubnet)
-				g.markRemoteClusterTraffic(remoteSubnet, AddRules)
-			}
-		}
-
-		g.remoteEndpointTimeStamp[endpoint.Spec.ClusterID] = endpoint.CreationTimestamp
-
-		return false
+func (g *gatewayMonitor) TransitionToGateway() error {
+	remoteEndpoints := g.State().GetRemoteEndpoints()
+	for i := range remoteEndpoints {
+		g.markRemoteClusterTraffic(AddRules, remoteEndpoints[i].Spec.Subnets...)
 	}
 
-	for _, remoteSubnet := range g.remoteSubnets.UnsortedList() {
-		g.markRemoteClusterTraffic(remoteSubnet, AddRules)
-	}
+	configureTCPMTUProbe()
 
-	// If the endpoint hostname matches with our hostname, it implies we are on gateway node
-	if endpoint.Spec.Hostname == g.hostName {
-		configureTCPMTUProbe()
+	g.startLeaderElection()
 
-		if g.isGatewayNode.CompareAndSwap(false, true) {
-			logger.Infof("Transitioned to gateway node %q with endpoint private IP %s", g.hostName, endpoint.Spec.PrivateIP)
-
-			g.startLeaderElection()
-		}
-	} else if g.isGatewayNode.CompareAndSwap(true, false) {
-		logger.Infof("Transitioned to non-gateway node %q", endpoint.Spec.Hostname)
-
-		g.stopControllers(context.Background(), true)
-	}
-
-	return false
+	return nil
 }
 
-func (g *gatewayMonitor) handleRemovedEndpoint(obj runtime.Object, _ int) bool {
-	endpoint := obj.(*v1.Endpoint)
+func (g *gatewayMonitor) TransitionToNonGateway() error {
+	g.stopControllers(context.Background(), true)
+	return nil
+}
 
+func (g *gatewayMonitor) RemoteEndpointCreated(endpoint *v1.Endpoint) error {
 	lastProcessedTime, ok := g.remoteEndpointTimeStamp[endpoint.Spec.ClusterID]
 
 	if ok && lastProcessedTime.After(endpoint.CreationTimestamp.Time) {
-		logger.Infof("Ignoring deleted remote %#v since a later endpoint was already"+
-			"processed", endpoint)
-		return false
+		logger.Infof("Ignoring new remote %#v since a later endpoint was already processed", endpoint)
+		return nil
+	}
+
+	logger.V(log.DEBUG).Infof("Endpoint %q, host: %q belongs to a remote cluster",
+		endpoint.Spec.ClusterID, endpoint.Spec.Hostname)
+
+	globalCIDR := g.GatewayMonitorConfig.Spec.GlobalCIDR[0]
+
+	overlap, err := cidr.IsOverlapping(endpoint.Spec.Subnets, globalCIDR)
+	if err != nil {
+		// Ideally this case will never hit, as the subnets are valid CIDRs
+		logger.Warningf("unable to validate overlapping Service CIDR: %s", err)
+	}
+
+	if overlap {
+		// When GlobalNet is used, globalCIDRs allocated to the clusters should not overlap.
+		// If they overlap, skip the endpoint as its an invalid configuration which is not supported.
+		logger.Errorf(nil, "GlobalCIDR %q of local cluster %q overlaps with remote cluster %s",
+			globalCIDR, g.GatewayMonitorConfig.Spec.ClusterID, endpoint.Spec.ClusterID)
+
+		return nil
+	}
+
+	g.markRemoteClusterTraffic(AddRules, endpoint.Spec.Subnets...)
+
+	g.remoteEndpointTimeStamp[endpoint.Spec.ClusterID] = endpoint.CreationTimestamp
+
+	return nil
+}
+
+func (g *gatewayMonitor) RemoteEndpointUpdated(endpoint *v1.Endpoint) error {
+	return g.RemoteEndpointCreated(endpoint)
+}
+
+func (g *gatewayMonitor) RemoteEndpointRemoved(endpoint *v1.Endpoint) error {
+	lastProcessedTime, ok := g.remoteEndpointTimeStamp[endpoint.Spec.ClusterID]
+
+	if ok && lastProcessedTime.After(endpoint.CreationTimestamp.Time) {
+		logger.Infof("Ignoring deleted remote %#v since a later endpoint was already processed", endpoint)
+		return nil
 	}
 
 	delete(g.remoteEndpointTimeStamp, endpoint.Spec.ClusterID)
 
 	logger.V(log.DEBUG).Infof("Gateway monitor informed of removed endpoint: %v", endpoint)
 
-	if endpoint.Spec.Hostname == g.hostName && endpoint.Spec.ClusterID == g.spec.ClusterID {
-		if g.isGatewayNode.CompareAndSwap(true, false) {
-			logger.Infof("Gateway node %q endpoint removed", g.hostName)
+	// Endpoint associated with remote cluster is removed, delete the associated flows.
+	g.markRemoteClusterTraffic(DeleteRules, endpoint.Spec.Subnets...)
 
-			g.stopControllers(context.Background(), true)
-		}
-	} else if endpoint.Spec.ClusterID != g.spec.ClusterID {
-		// Endpoint associated with remote cluster is removed, delete the associated flows.
-		for _, remoteSubnet := range endpoint.Spec.Subnets {
-			if k8snet.IsIPv4CIDRString(remoteSubnet) {
-				g.remoteSubnets.Delete(remoteSubnet)
-				g.markRemoteClusterTraffic(remoteSubnet, DeleteRules)
-			}
-		}
-	}
-
-	return false
+	return nil
 }
 
 func (g *gatewayMonitor) startLeaderElection() {
@@ -291,7 +253,7 @@ func (g *gatewayMonitor) startLeaderElection() {
 
 	// Usually when leadership is lost it's due to transition to a non-gateway however if it's due to renewal failure then we try to regain
 	// leadership in which case we'll still be on the gateway. Hence the isGatewayNode check here.
-	if !g.isGatewayNode.Load() {
+	if !g.State().IsOnGateway() {
 		return
 	}
 
@@ -306,8 +268,8 @@ func (g *gatewayMonitor) startLeaderElection() {
 
 	logger.Info("On Gateway node - starting leader election")
 
-	lock, err := resourcelock.New(resourcelock.LeasesResourceLock, g.spec.Namespace, LeaderElectionLockName,
-		g.kubeClient.CoreV1(), g.kubeClient.CoordinationV1(), resourcelock.ResourceLockConfig{
+	lock, err := resourcelock.New(resourcelock.LeasesResourceLock, g.GatewayMonitorConfig.Spec.Namespace, LeaderElectionLockName,
+		g.KubeClient.CoreV1(), g.KubeClient.CoordinationV1(), resourcelock.ResourceLockConfig{
 			Identity: g.nodeName + "-submariner-gateway",
 		})
 	utilruntime.Must(err)
@@ -333,7 +295,7 @@ func (g *gatewayMonitor) startLeaderElection() {
 				// leadership is lost and a new instance is able to contact the API server to acquire the lock. This avoids a potential
 				// window where both instances are running should this instance finally observe the gateway transition. Note that we don't
 				// clear the globalnet chains to avoid datapath disruption should leadership be regained.
-				if !g.shuttingDown.Load() && g.isGatewayNode.Load() {
+				if !g.shuttingDown.Load() && g.State().IsOnGateway() {
 					g.stopControllers(context.Background(), false)
 					g.startLeaderElection()
 				}
@@ -349,7 +311,7 @@ func (g *gatewayMonitor) startControllers() error {
 
 	// Since this is called asynchronously when leadership is gained, check that we're still on the gateway node and that we're
 	// not shutting down. Also, we may have regained leadership so ensure the controllers weren't already started.
-	if g.shuttingDown.Load() || !g.isGatewayNode.Load() || len(g.controllers) > 0 {
+	if g.shuttingDown.Load() || !g.State().IsOnGateway() || len(g.controllers) > 0 {
 		return nil
 	}
 
@@ -360,7 +322,7 @@ func (g *gatewayMonitor) startControllers() error {
 		return err
 	}
 
-	pool, err := ipam.NewIPPool(g.spec.GlobalCIDR[0])
+	pool, err := ipam.NewIPPool(g.GatewayMonitorConfig.Spec.GlobalCIDR[0])
 	if err != nil {
 		return errors.Wrap(err, "error creating the IP pool")
 	}
@@ -374,7 +336,7 @@ func (g *gatewayMonitor) startControllers() error {
 
 	g.controllers = append(g.controllers, c)
 
-	c, err = NewClusterGlobalEgressIPController(g.syncerConfig, g.localSubnets, pool)
+	c, err = NewClusterGlobalEgressIPController(g.syncerConfig, g.LocalCIDRs, pool)
 	if err != nil {
 		return errors.Wrap(err, "error creating the ClusterGlobalEgressIP controller")
 	}
@@ -599,19 +561,25 @@ func (g *gatewayMonitor) clearGlobalnetChains() {
 	}
 }
 
-func (g *gatewayMonitor) markRemoteClusterTraffic(remoteCidr string, addRules bool) {
-	ruleSpec := []string{"-d", remoteCidr, "-j", "MARK", "--set-mark", globalNetIPTableMark}
-
-	if addRules {
-		logger.V(log.DEBUG).Infof("Marking traffic destined to remote cluster: %s", strings.Join(ruleSpec, " "))
-
-		if err := g.ipt.AppendUnique("nat", constants.SmGlobalnetMarkChain, ruleSpec...); err != nil {
-			logger.Errorf(err, "Error appending iptables rule \"%s\"", strings.Join(ruleSpec, " "))
+func (g *gatewayMonitor) markRemoteClusterTraffic(addRules bool, subnets ...string) {
+	for _, subnet := range subnets {
+		if !k8snet.IsIPv4CIDRString(subnet) {
+			continue
 		}
-	} else {
-		logger.V(log.DEBUG).Infof("Deleting rule that marks remote cluster traffic: %s", strings.Join(ruleSpec, " "))
-		if err := g.ipt.Delete("nat", constants.SmGlobalnetMarkChain, ruleSpec...); err != nil {
-			logger.Errorf(err, "Error deleting iptables rule \"%s\"", strings.Join(ruleSpec, " "))
+
+		ruleSpec := []string{"-d", subnet, "-j", "MARK", "--set-mark", globalNetIPTableMark}
+
+		if addRules {
+			logger.V(log.DEBUG).Infof("Marking traffic destined to remote cluster: %s", strings.Join(ruleSpec, " "))
+
+			if err := g.ipt.AppendUnique("nat", constants.SmGlobalnetMarkChain, ruleSpec...); err != nil {
+				logger.Errorf(err, "Error appending iptables rule \"%s\"", strings.Join(ruleSpec, " "))
+			}
+		} else {
+			logger.V(log.DEBUG).Infof("Deleting rule that marks remote cluster traffic: %s", strings.Join(ruleSpec, " "))
+			if err := g.ipt.Delete("nat", constants.SmGlobalnetMarkChain, ruleSpec...); err != nil {
+				logger.Errorf(err, "Error deleting iptables rule \"%s\"", strings.Join(ruleSpec, " "))
+			}
 		}
 	}
 }

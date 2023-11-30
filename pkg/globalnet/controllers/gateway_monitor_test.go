@@ -28,10 +28,11 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	testutil "github.com/submariner-io/admiral/pkg/test"
-	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
+	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
+	fakeNetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
@@ -125,22 +126,6 @@ var _ = Describe("Endpoint monitoring", func() {
 
 			It("should not try to re-acquire the leader lock", func() {
 				testutil.EnsureNoActionsForResource(&t.kubeClient.Fake, "leases", "update")
-			})
-		})
-
-		Context("and then a local gateway Endpoint corresponding to another host is created", func() {
-			JustBeforeEach(func() {
-				t.awaitControllersStarted()
-
-				By("Creating other Endpoint")
-
-				t.createEndpoint(newEndpointSpec(clusterID, t.hostName+"-other", localCIDR))
-			})
-
-			It("should stop the controllers", func() {
-				t.leaderElection.AwaitLeaseReleased()
-				t.awaitNoGlobalnetChains()
-				t.ensureControllersStopped()
 			})
 		})
 
@@ -240,6 +225,13 @@ func newGatewayMonitorTestDriver() *gatewayMonitorTestDriver {
 		t.kubeClient = k8sfake.NewSimpleClientset()
 		t.leaderElectionConfig = controllers.LeaderElectionConfig{}
 		t.leaderElection = testutil.NewLeaderElectionSupport(t.kubeClient, namespace, controllers.LeaderElectionLockName)
+
+		os.Setenv("SUBMARINER_NAMESPACE", namespace)
+		os.Setenv("SUBMARINER_CLUSTERID", clusterID)
+
+		netlinkAPI.NewFunc = func() netlinkAPI.Interface {
+			return fakeNetlink.New()
+		}
 	})
 
 	JustBeforeEach(func() {
@@ -262,11 +254,9 @@ func (t *gatewayMonitorTestDriver) start() {
 	Expect(err).To(Succeed())
 
 	t.controller, err = controllers.NewGatewayMonitor(&controllers.GatewayMonitorConfig{
-		Config: watcher.Config{
-			RestMapper: t.restMapper,
-			Client:     t.dynClient,
-			Scheme:     t.scheme,
-		},
+		RestMapper: t.restMapper,
+		Client:     t.dynClient,
+		Scheme:     t.scheme,
 		Spec: controllers.Specification{
 			ClusterID:  clusterID,
 			Namespace:  namespace,
