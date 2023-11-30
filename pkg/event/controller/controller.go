@@ -32,10 +32,10 @@ import (
 	"github.com/submariner-io/submariner/pkg/event"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
-	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/rest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -88,17 +88,16 @@ type Config struct {
 	// Registry is the event handler registry where controller events will be sent.
 	Registry *event.Registry
 
-	// MasterURL accepts the K8s API URL. By default the in-cluster-config will be used.
-	MasterURL string
-
-	// Kubeconfig accepts the kubeconfig with the cluster credentials. By default the in-cluster-config will be used.
-	Kubeconfig string
+	// RestConfig the REST config used to access the resources to watch.
+	RestConfig *rest.Config
 
 	// RestMapper can be provided for unit testing. By default New will create its own RestMapper.
 	RestMapper meta.RESTMapper
 
 	// Client can be provided for unit testing. By default New will create its own dynamic client.
 	Client dynamic.Interface
+
+	Scheme *runtime.Scheme
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("EventController")}
@@ -124,17 +123,9 @@ func New(config *Config) (*Controller, error) {
 		return nil, errors.Wrap(err, "error adding submariner types to the scheme")
 	}
 
-	var cfg *restclient.Config
-	if config.Client == nil {
-		cfg, err = clientcmd.BuildConfigFromFlags(config.MasterURL, config.Kubeconfig)
-		if err != nil {
-			return nil, errors.Wrap(err, "error building config from flags")
-		}
-	}
-
 	ctl.resourceWatcher, err = watcher.New(&watcher.Config{
-		Scheme:     scheme.Scheme,
-		RestConfig: cfg,
+		Scheme:     config.Scheme,
+		RestConfig: config.RestConfig,
 		ResourceConfigs: []watcher.ResourceConfig{
 			{
 				Name:            fmt.Sprintf("Endpoint watcher for %s registry", ctl.handlers.GetName()),

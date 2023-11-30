@@ -154,8 +154,7 @@ func main() {
 
 	ctl, err := controller.New(&controller.Config{
 		Registry:   registry,
-		MasterURL:  masterURL,
-		Kubeconfig: kubeconfig,
+		RestConfig: cfg,
 	})
 	logger.FatalOnError(err, "Error creating controller for event handling")
 
