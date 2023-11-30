@@ -27,10 +27,12 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/watcher"
+	"github.com/submariner-io/submariner/pkg/event"
 	iptiface "github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	"github.com/submariner-io/submariner/pkg/ipset"
 	"github.com/submariner-io/submariner/pkg/iptables"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
@@ -97,7 +99,9 @@ type LeaderElectionConfig struct {
 }
 
 type GatewayMonitorConfig struct {
-	watcher.Config
+	RestMapper meta.RESTMapper
+	Client     dynamic.Interface
+	Scheme     *runtime.Scheme
 	LeaderElectionConfig
 	Spec       Specification
 	LocalCIDRs []string
@@ -114,22 +118,20 @@ type LeaderElectionInfo struct {
 	stopped  chan struct{}
 }
 
+type gatewayMonitorInterface struct {
+	monitor *gatewayMonitor
+}
+
 type gatewayMonitor struct {
+	event.HandlerBase
 	*baseController
-	LeaderElectionConfig
+	GatewayMonitorConfig
 	syncerConfig            *syncer.ResourceSyncerConfig
-	endpointWatcher         watcher.Interface
-	kubeClient              kubernetes.Interface
 	remoteEndpointTimeStamp map[string]metav1.Time
-	spec                    Specification
 	ipt                     iptables.Interface
-	isGatewayNode           atomic.Bool
 	shuttingDown            atomic.Bool
 	leaderElectionInfo      atomic.Pointer[LeaderElectionInfo]
 	nodeName                string
-	hostName                string
-	localSubnets            []string
-	remoteSubnets           set.Set[string]
 	controllersMutex        sync.Mutex // Protects controllers
 	controllers             []Interface
 }
