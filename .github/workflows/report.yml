@@ -38,11 +38,11 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@74483a38d39275f33fcff5f35b679b5ca4a26a99
+        uses: github/codeql-action/init@407ffafae6a767df3e0230c3df91b6443ae8df75
         with:
           languages: go
       - name: Run CodeQL variant analysis
-        uses: github/codeql-action/analyze@74483a38d39275f33fcff5f35b679b5ca4a26a99
+        uses: github/codeql-action/analyze@407ffafae6a767df3e0230c3df91b6443ae8df75
       - name: Show CodeQL scan SARIF report
         if: always()
         run: cat ../results/go.sarif
@@ -65,6 +65,6 @@ jobs:
       - name: Show Anchore scan SARIF report
         run: cat ${{ steps.scan.outputs.sarif }}
       - name: Upload Anchore scan SARIF report
-        uses: github/codeql-action/upload-sarif@74483a38d39275f33fcff5f35b679b5ca4a26a99
+        uses: github/codeql-action/upload-sarif@407ffafae6a767df3e0230c3df91b6443ae8df75
         with:
           sarif_file: ${{ steps.scan.outputs.sarif }}
