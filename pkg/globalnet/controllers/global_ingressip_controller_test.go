@@ -128,23 +128,26 @@ var _ = Describe("GlobalIngressIP controller", func() {
 })
 
 func testGlobalIngressIPCreatedClusterIPSvc(t *globalIngressIPControllerTestDriver, ingressIP *submarinerv1.GlobalIngressIP) {
+	var service *corev1.Service
+
 	JustBeforeEach(func() {
-		service := newClusterIPService()
+		service = newClusterIPService()
 		t.createService(service)
 		t.createGlobalIngressIP(ingressIP)
 	})
 
-	It("should successfully allocate a global IP", func() {
+	It("should create an internal submariner service with an allocated global IP", func() {
 		t.awaitIngressIPStatusAllocated(globalIngressIPName)
 		allocatedIP := t.getGlobalIngressIPStatus(globalIngressIPName).AllocatedIP
 		Expect(allocatedIP).ToNot(BeEmpty())
-	})
 
-	It("should successfully create an internal submariner service", func() {
 		internalSvcName := controllers.GetInternalSvcName(serviceName)
 		intSvc := t.awaitService(internalSvcName)
 		externalIP := intSvc.Spec.ExternalIPs[0]
-		Expect(externalIP).ToNot(BeEmpty())
+		Expect(externalIP).To(Equal(allocatedIP))
+		Expect(intSvc.Spec.Ports).To(Equal(service.Spec.Ports))
+		Expect(intSvc.Spec.IPFamilyPolicy).ToNot(BeNil())
+		Expect(*intSvc.Spec.IPFamilyPolicy).To(Equal(corev1.IPFamilyPolicySingleStack))
 
 		finalizer := intSvc.GetFinalizers()[0]
 		Expect(finalizer).To(Equal(controllers.InternalServiceFinalizer))
@@ -519,17 +522,18 @@ func newGlobalIngressIPControllerDriver() *globalIngressIPControllerTestDriver {
 	return t
 }
 
-func (t *globalIngressIPControllerTestDriver) start() {
-	var err error
-
-	t.controller, err = controllers.NewGlobalIngressIPController(&syncer.ResourceSyncerConfig{
+func (t *globalIngressIPControllerTestDriver) start() syncer.Interface {
+	controller, err := controllers.NewGlobalIngressIPController(&syncer.ResourceSyncerConfig{
 		SourceClient: t.dynClient,
 		RestMapper:   t.restMapper,
 		Scheme:       t.scheme,
 	}, t.pool)
+	t.controller = controller
 
 	Expect(err).To(Succeed())
 	Expect(t.controller.Start()).To(Succeed())
+
+	return controller.GetSyncer()
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitPodEgressRules(podIP, snatIP string) {

@@ -20,14 +20,17 @@ package controllers_test
 
 import (
 	"context"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/syncer/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 var _ = Describe("Service controller", func() {
@@ -35,26 +38,54 @@ var _ = Describe("Service controller", func() {
 
 	var service *corev1.Service
 
-	When("an exported cluster IP Service is deleted and subsequently re-created", func() {
+	When("an exported cluster IP Service", func() {
 		BeforeEach(func() {
-			service = newClusterIPService()
-			t.createServiceExport(t.createService(service))
+			service = t.createService(newClusterIPService())
 		})
 
 		JustBeforeEach(func() {
+			time.Sleep(200 * time.Millisecond) // Wait a bit for the service update to occur first
+			t.createServiceExport(service)
 			t.awaitGlobalIngressIP(service.Name)
 		})
 
-		It("should delete the GlobalIngressIP and then re-create it", func() {
-			By("Deleting the service")
+		Context("is deleted and subsequently re-created", func() {
+			It("should delete the GlobalIngressIP and then re-create it", func() {
+				By("Deleting the service")
 
-			Expect(t.services.Delete(context.TODO(), service.Name, metav1.DeleteOptions{})).To(Succeed())
-			t.awaitNoGlobalIngressIP(service.Name)
+				Expect(t.services.Delete(context.TODO(), service.Name, metav1.DeleteOptions{})).To(Succeed())
+				t.awaitNoGlobalIngressIP(service.Name)
 
-			By("Re-creating the service")
+				By("Re-creating the service")
 
-			t.createService(service)
-			t.awaitGlobalIngressIP(service.Name)
+				t.createService(service)
+				t.awaitGlobalIngressIP(service.Name)
+			})
+		})
+
+		Context("ports are updated", func() {
+			It("should update the GlobalIngressIP internal service", func() {
+				internalSvcName := controllers.GetInternalSvcName(serviceName)
+
+				Eventually(func() []corev1.ServicePort {
+					return t.awaitService(internalSvcName).Spec.Ports
+				}, 3).Should(Equal(service.Spec.Ports))
+
+				By("Updating the service ports")
+
+				service.Spec.Ports = []corev1.ServicePort{{
+					Name:       serviceName,
+					Port:       int32(9090),
+					TargetPort: intstr.FromInt32(9191),
+					Protocol:   corev1.ProtocolSCTP,
+				}}
+
+				test.UpdateResource(t.services, service)
+
+				Eventually(func() []corev1.ServicePort {
+					return t.awaitService(internalSvcName).Spec.Ports
+				}, 3).Should(Equal(service.Spec.Ports))
+			})
 		})
 	})
 
@@ -112,7 +143,8 @@ var _ = Describe("Service controller", func() {
 
 		Context("for a headless Service", func() {
 			BeforeEach(func() {
-				t.createServiceExport(newHeadlessService())
+				service = newHeadlessService()
+				t.createServiceExport(service)
 				t.createGlobalIngressIP(&submarinerv1.GlobalIngressIP{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "pod-one",
@@ -123,6 +155,7 @@ var _ = Describe("Service controller", func() {
 					Spec: submarinerv1.GlobalIngressIPSpec{
 						Target:     submarinerv1.HeadlessServicePod,
 						ServiceRef: &corev1.LocalObjectReference{Name: service.Name},
+						PodRef:     &corev1.LocalObjectReference{Name: "pod-name"},
 					},
 				})
 			})
@@ -159,11 +192,15 @@ func newServiceControllerTestDriver() *serviceControllerTestDriver {
 func (t *serviceControllerTestDriver) start() {
 	seTestDriver := &serviceExportControllerTestDriver{}
 	seTestDriver.testDriverBase = t.testDriverBase
-	config, podControllers, syncer := seTestDriver.start()
+	config, podControllers, sesyncer := seTestDriver.start()
+
+	gipTestDriver := &globalIngressIPControllerTestDriver{}
+	gipTestDriver.testDriverBase = t.testDriverBase
+	gipSyncer := gipTestDriver.start()
 
 	var err error
 
-	t.controller, err = controllers.NewServiceController(config, podControllers, syncer)
+	t.controller, err = controllers.NewServiceController(config, podControllers, sesyncer, gipSyncer)
 
 	Expect(err).To(Succeed())
 	Expect(t.controller.Start()).To(Succeed())

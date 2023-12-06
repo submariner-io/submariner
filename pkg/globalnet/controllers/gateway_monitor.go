@@ -363,12 +363,12 @@ func (g *gatewayMonitor) startControllers() error {
 
 	// The GlobalIngressIP controller needs to be started before the ServiceExport and Service controllers to ensure
 	// reconciliation works properly.
-	c, err = NewGlobalIngressIPController(g.syncerConfig, pool)
+	gipController, err := NewGlobalIngressIPController(g.syncerConfig, pool)
 	if err != nil {
 		return errors.Wrap(err, "error creating the GlobalIngressIP controller")
 	}
 
-	g.controllers = append(g.controllers, c)
+	g.controllers = append(g.controllers, gipController)
 
 	podControllers, err := NewIngressPodControllers(g.syncerConfig)
 	if err != nil {
@@ -393,7 +393,7 @@ func (g *gatewayMonitor) startControllers() error {
 
 	g.controllers = append(g.controllers, seController)
 
-	c, err = NewServiceController(g.syncerConfig, podControllers, seController.GetSyncer())
+	c, err = NewServiceController(g.syncerConfig, podControllers, seController.GetSyncer(), gipController.GetSyncer())
 	if err != nil {
 		return errors.Wrap(err, "error creating the Service controller")
 	}

@@ -37,9 +37,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/ptr"
 )
 
-func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool) (Interface, error) {
+//nolint:revive // Ignore "unexported-return:... which can be annoying to use"; it's only used by unit tests.
+func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool) (*globalIngressIPController, error) {
 	// We'll panic if config is nil, this is intentional
 	var err error
 
@@ -132,6 +134,10 @@ func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipa
 	return controller, nil
 }
 
+func (c *globalIngressIPController) GetSyncer() syncer.Interface {
+	return c.resourceSyncer
+}
+
 func (c *globalIngressIPController) process(from runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
 	ingressIP := from.(*submarinerv1.GlobalIngressIP)
 
@@ -156,9 +162,10 @@ func (c *globalIngressIPController) process(from runtime.Object, numRequeues int
 }
 
 func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngressIP) bool {
-	// If Ingress GlobalIP is already allocated, simply return.
+	// If the Ingress GlobalIP is already allocated, we may have gotten here due to an underlying service update (eg ports changed) in
+	// which case we need to update the internal service for non-headless.
 	if ingressIP.Status.AllocatedIP != "" {
-		return false
+		return c.onUpdate(ingressIP)
 	}
 
 	key, _ := cache.MetaNamespaceKeyFunc(ingressIP)
@@ -196,29 +203,11 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 			return false
 		}
 
-		internalService := &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      GetInternalSvcName(service.Name),
-				Namespace: service.Namespace,
-				Labels: map[string]string{
-					InternalServiceLabel: service.Name,
-				},
-				Finalizers: []string{InternalServiceFinalizer},
-			},
-		}
-
-		extIPs := []string{ips[0]}
-		internalService.Spec.Ports = service.Spec.Ports
-		internalService.Spec.Selector = service.Spec.Selector
-		ipFamilySingleStack := corev1.IPFamilyPolicySingleStack
-		internalService.Spec.IPFamilyPolicy = &ipFamilySingleStack
-		internalService.Spec.ExternalIPs = extIPs
-
-		_, err = createService(internalService, c.services)
+		err = c.createOrUpdateInternalService(service, ips[0])
 		if err != nil {
 			_ = c.pool.Release(ips...)
-			key := fmt.Sprintf("%s/%s", internalService.Namespace, internalService.Name)
-			logger.Errorf(err, "Failed to create the internal Service %q ", key)
+
+			logger.Errorf(err, "Failed to create the internal Service for %q", key)
 
 			meta.SetStatusCondition(&ingressIP.Status.Conditions, metav1.Condition{
 				Type:    string(submarinerv1.GlobalEgressIPAllocated),
@@ -285,6 +274,60 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 		Reason:  "Success",
 		Message: "Allocated global IP",
 	})
+
+	return false
+}
+
+func (c *globalIngressIPController) createOrUpdateInternalService(from *corev1.Service, extIP string) error {
+	internalService := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: GetInternalSvcName(from.Name),
+			Labels: map[string]string{
+				InternalServiceLabel: from.Name,
+			},
+			Finalizers: []string{InternalServiceFinalizer},
+		},
+		Spec: corev1.ServiceSpec{
+			Ports:          from.Spec.Ports,
+			Selector:       from.Spec.Selector,
+			ExternalIPs:    []string{extIP},
+			IPFamilyPolicy: ptr.To(corev1.IPFamilyPolicySingleStack),
+		},
+	}
+
+	obj := resource.MustToUnstructured(internalService)
+	result, err := util.CreateOrUpdate(context.TODO(), resource.ForDynamic(c.services.Namespace(from.Namespace)), obj, util.Replace(obj))
+
+	if result == util.OperationResultCreated {
+		logger.Infof("Created internal service \"%s/%s\"", from.Namespace, internalService.Name)
+	} else if result == util.OperationResultUpdated {
+		logger.Infof("Updated internal service \"%s/%s\"", from.Namespace, internalService.Name)
+	}
+
+	return err //nolint:wrapcheck  // No need to wrap here
+}
+
+func (c *globalIngressIPController) onUpdate(ingressIP *submarinerv1.GlobalIngressIP) bool {
+	if ingressIP.Spec.Target != submarinerv1.ClusterIPService {
+		return false
+	}
+
+	service, exists, err := getService(ingressIP.Spec.ServiceRef.Name, ingressIP.Namespace, c.services, c.scheme)
+	if !exists {
+		return false
+	}
+
+	if err != nil {
+		logger.Errorf(err, "Error retrieving exported Service \"%s/%s\" - re-queueing", ingressIP.Namespace,
+			ingressIP.Spec.ServiceRef.Name)
+		return true
+	}
+
+	err = c.createOrUpdateInternalService(service, ingressIP.Status.AllocatedIP)
+	if err != nil {
+		logger.Errorf(err, "Failed to update the internal Service for \"%s/%s\"", ingressIP.Namespace, ingressIP.Name)
+		return true
+	}
 
 	return false
 }
