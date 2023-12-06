@@ -359,21 +359,11 @@ func (t *testDriverBase) awaitIngressIPStatusAllocated(name string) {
 }
 
 func (t *testDriverBase) awaitGlobalIngressIP(name string) *submarinerv1.GlobalIngressIP {
-	obj := test.AwaitResource(t.globalIngressIPs, name)
-
-	gip := &submarinerv1.GlobalIngressIP{}
-	Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, gip)).To(Succeed())
-
-	return gip
+	return resource.MustFromUnstructured(test.AwaitResource(t.globalIngressIPs, name), &submarinerv1.GlobalIngressIP{})
 }
 
 func (t *testDriverBase) awaitService(name string) *corev1.Service {
-	obj := test.AwaitResource(t.services, name)
-
-	svc := &corev1.Service{}
-	Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, svc)).To(Succeed())
-
-	return svc
+	return resource.MustFromUnstructured(test.AwaitResource(t.services, name), &corev1.Service{})
 }
 
 func (t *testDriverBase) awaitNoService(name string) {
@@ -381,12 +371,7 @@ func (t *testDriverBase) awaitNoService(name string) {
 }
 
 func (t *testDriverBase) awaitEndpoints(name string) *corev1.Endpoints {
-	obj := test.AwaitResource(t.endpoints, name)
-
-	ep := &corev1.Endpoints{}
-	Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, ep)).To(Succeed())
-
-	return ep
+	return resource.MustFromUnstructured(test.AwaitResource(t.endpoints, name), &corev1.Endpoints{})
 }
 
 func (t *testDriverBase) awaitNoEndpoints(name string) {
@@ -632,7 +617,7 @@ func newClusterIPService() *corev1.Service {
 			Ports: []corev1.ServicePort{{
 				Name:       serviceName,
 				Port:       int32(8080),
-				TargetPort: intstr.FromInt(8080),
+				TargetPort: intstr.FromInt32(8080),
 				Protocol:   corev1.ProtocolTCP,
 			}},
 		},

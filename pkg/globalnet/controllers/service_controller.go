@@ -32,6 +32,7 @@ import (
 )
 
 func NewServiceController(config *syncer.ResourceSyncerConfig, podControllers *IngressPodControllers, serviceExportSyncer syncer.Interface,
+	gipSyncer syncer.Interface,
 ) (Interface, error) {
 	// We'll panic if config is nil, this is intentional
 	var err error
@@ -42,6 +43,7 @@ func NewServiceController(config *syncer.ResourceSyncerConfig, podControllers *I
 		baseSyncerController: newBaseSyncerController(),
 		podControllers:       podControllers,
 		serviceExportSyncer:  serviceExportSyncer,
+		gipSyncer:            gipSyncer,
 	}
 
 	controller.resourceSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
@@ -99,19 +101,22 @@ func (c *serviceController) Start() error {
 func (c *serviceController) process(from runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	service := from.(*corev1.Service)
 
-	if service.Spec.Type != corev1.ServiceTypeClusterIP || op == syncer.Update {
+	if service.Spec.Type != corev1.ServiceTypeClusterIP {
 		return nil, false
 	}
 
 	key, _ := cache.MetaNamespaceKeyFunc(service)
 	logger.Infof("Service %q %sd", key, op)
 
-	if op == syncer.Delete {
+	switch op {
+	case syncer.Create:
+		// For Create, requeue the associated ServiceExport, if any, to re-create the GlobalIngressIP.
+		c.serviceExportSyncer.RequeueResource(service.Name, service.Namespace)
+	case syncer.Delete:
 		return c.onDelete(service)
+	case syncer.Update:
+		c.gipSyncer.RequeueResource(service.Name, service.Namespace)
 	}
-
-	// For Create, requeue the associated ServiceExport, if any, to re-create the GlobalIngressIP.
-	c.serviceExportSyncer.RequeueResource(service.Name, service.Namespace)
 
 	return nil, false
 }

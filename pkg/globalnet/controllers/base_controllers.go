@@ -27,7 +27,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
-	resourceUtil "github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	iptiface "github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
@@ -233,22 +232,6 @@ func getService(name, namespace string,
 	}
 
 	return service, true, nil
-}
-
-func createService(svc *corev1.Service,
-	client dynamic.NamespaceableResourceInterface,
-) (*unstructured.Unstructured, error) {
-	gnService, err := resourceUtil.ToUnstructured(svc)
-	if err != nil {
-		return nil, err //nolint:wrapcheck  // Let the caller wrap it
-	}
-
-	obj, err := client.Namespace(gnService.GetNamespace()).Create(context.TODO(), gnService, metav1.CreateOptions{})
-	if apierrors.IsAlreadyExists(err) {
-		err = nil
-	}
-
-	return obj, errors.Wrapf(err, "error creating the internal Service %s/%s", svc.Namespace, svc.Name)
 }
 
 func deleteService(namespace, name string,

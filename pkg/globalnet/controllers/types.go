@@ -190,6 +190,7 @@ type serviceController struct {
 	ingressIPs          dynamic.ResourceInterface
 	podControllers      *IngressPodControllers
 	serviceExportSyncer syncer.Interface
+	gipSyncer           syncer.Interface
 }
 
 type nodeController struct {
