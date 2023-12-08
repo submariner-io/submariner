@@ -29,6 +29,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/port"
+	"github.com/submariner-io/submariner/pkg/util"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 )
@@ -236,6 +237,7 @@ func getVxlanVtepIPAddress(ipAddr string) (net.IP, error) {
 }
 
 func (kp *SyncHandler) createVxLANInterface(activeEndPoint string, ifaceType int, gatewayNodeIP net.IP) error {
+	logger.Infof("In Kubeporxy  %q", VxLANIface)
 	ipAddr, err := kp.getHostIfaceIPAddress()
 	if err != nil {
 		return errors.Wrap(err, "unable to retrieve the IPv4 address on the Host")
@@ -275,6 +277,14 @@ func (kp *SyncHandler) createVxLANInterface(activeEndPoint string, ifaceType int
 		if err != nil {
 			return errors.Wrap(err, "error while validating loose mode")
 		}
+
+		logger.Infof("Starting monitor for  %q", VxLANIface)
+		kp.interfaceWatcher, err = util.NewInterfaceWatcher(VxLANIface)
+		if err != nil {
+			return errors.Wrap(err, "error creating interface watcher to monitor rp_filter setting")
+		}
+
+		kp.interfaceWatcher.Monitor()
 
 		logger.Infof("Successfully configured reverse path filter to loose mode on %q", VxLANIface)
 	} else if ifaceType == VxInterfaceWorker {
