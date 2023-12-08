@@ -31,6 +31,10 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 
 	// We are on nonGateway node
 	if !kp.State().IsOnGateway() {
+		if kp.interfaceWatcher != nil {
+			close(kp.interfaceWatcher.Done)
+		}
+
 		// If the node already has a vxLAN interface that points to an oldEndpoint
 		// (i.e., during gateway migration), delete it.
 		if kp.vxlanDevice != nil && kp.vxlanDevice.activeEndpointHostname != endpoint.Spec.Hostname {
@@ -71,6 +75,10 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 func (kp *SyncHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 	// If the vxLAN device exists and it points to the same endpoint, delete it.
 	if kp.vxlanDevice != nil && kp.vxlanDevice.activeEndpointHostname == endpoint.Spec.Hostname {
+		if kp.interfaceWatcher != nil {
+			close(kp.interfaceWatcher.Done)
+		}
+
 		err := kp.vxlanDevice.deleteVxLanIface()
 		kp.vxlanDevice = nil
 		kp.vxlanGwIP = nil

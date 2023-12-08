@@ -30,6 +30,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/iptables"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	cniapi "github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
+	"github.com/submariner-io/submariner/pkg/util"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/utils/set"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -53,6 +54,7 @@ type SyncHandler struct {
 	hostname         string
 	cniIface         *cniapi.Interface
 	defaultHostIface *net.Interface
+	interfaceWatcher *util.InterfaceWatcher
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("KubeProxy")}

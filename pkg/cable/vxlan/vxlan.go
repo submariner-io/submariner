@@ -35,6 +35,7 @@ import (
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/types"
+	"github.com/submariner-io/submariner/pkg/util"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -58,12 +59,13 @@ const (
 )
 
 type vxlan struct {
-	localEndpoint types.SubmarinerEndpoint
-	localCluster  types.SubmarinerCluster
-	connections   []v1.Connection
-	mutex         sync.Mutex
-	vxlanIface    *vxlanIface
-	netLink       netlinkAPI.Interface
+	localEndpoint    types.SubmarinerEndpoint
+	localCluster     types.SubmarinerCluster
+	connections      []v1.Connection
+	mutex            sync.Mutex
+	vxlanIface       *vxlanIface
+	netLink          netlinkAPI.Interface
+	interfaceWatcher *util.InterfaceWatcher
 }
 
 type vxlanIface struct {
@@ -155,6 +157,13 @@ func (v *vxlan) createVxlanInterface(activeEndPoint string, port int) error {
 	if err != nil {
 		return errors.Wrap(err, "error while validating loose mode")
 	}
+
+	v.interfaceWatcher, err = util.NewInterfaceWatcher(VxlanIface)
+	if err != nil {
+		return errors.Wrap(err, "error creating interface watcher to monitor rp_filter setting")
+	}
+
+	v.interfaceWatcher.Monitor()
 
 	logger.V(log.DEBUG).Infof("Successfully configured rp_filter to loose mode(2) on %s", VxlanIface)
 
@@ -554,6 +563,10 @@ func parseSubnets(subnets []string) []net.IPNet {
 
 func (v *vxlan) Cleanup() error {
 	logger.Infof("Uninstalling the vxlan cable driver")
+
+	if v.interfaceWatcher != nil {
+		close(v.interfaceWatcher.Done)
+	}
 
 	err := netlinkAPI.DeleteIfaceAndAssociatedRoutes(VxlanIface, TableID)
 	if err != nil {
