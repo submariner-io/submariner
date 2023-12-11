@@ -17,12 +17,11 @@ jobs:
       fail-fast: false
       matrix:
         cable-driver: ['libreswan', 'wireguard', 'vxlan']
-        extra-toggles: ['', 'globalnet', 'ovn']
+        extra-toggles: ['', 'ovn']
+        globalnet: ['', 'globalnet']
         exclude:
           - cable-driver: wireguard
             extra-toggles: ovn
-        include:
-          - extra-toggles: globalnet, ovn
     steps:
       - name: Check out the repository
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
