@@ -44,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        cable-driver: ['libreswan', 'wireguard', 'vxlan']
+        cable-driver: ['', 'wireguard', 'vxlan']
         extra-toggles: ['', 'ovn']
         globalnet: ['', 'globalnet']
         exclude:
