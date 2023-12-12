@@ -20,141 +20,123 @@ package util
 
 import (
 	"fmt"
-	"os"
-
-	"github.com/fsnotify/fsnotify"
 	"github.com/pkg/errors"
+	"os"
+	"time"
+
 	"github.com/submariner-io/admiral/pkg/log"
+	submnetlink "github.com/submariner-io/submariner/pkg/netlink"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-type InterfaceWatcher struct {
-	InterfaceName string
-	Watcher       *fsnotify.Watcher
-	Done          chan struct{}
-}
-
 var logger = log.Logger{Logger: logf.Log.WithName("InterfaceWatcher")}
 
-// NewInterfaceWatcher creates a new InterfaceWatcher for the given interface.
+// InterfaceWatcher represents the state for monitoring an interface
+type InterfaceWatcher struct {
+	InterfaceName string
+	Done          chan struct{}
+	netLink       submnetlink.Interface
+}
+
+// NewInterfaceWatcher creates a new InterfaceWatcher for the given interface
 func NewInterfaceWatcher(interfaceName string) (*InterfaceWatcher, error) {
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create watcher for %s", interfaceName)
-	}
-
-	// Add the file to the watcher
-	netPath := fmt.Sprintf("/proc/sys/net/ipv4/conf/%s/rp_filter", interfaceName)
-
-	err = watcher.Add(netPath)
-	if err != nil {
-		watcher.Close()
-		return nil, errors.Wrapf(err, "failed to add file to watcher for %s", interfaceName)
-	}
-
 	return &InterfaceWatcher{
 		InterfaceName: interfaceName,
-		Watcher:       watcher,
 		Done:          make(chan struct{}),
 	}, nil
 }
 
-// Monitor starts monitoring the rp_filter setting for the interface.
+// Monitor periodically checks the rp_filter setting for the interface
 func (iw *InterfaceWatcher) Monitor() {
-	logger.Infof("Starting RP filer monitor for %q", iw.InterfaceName)
-	defer close(iw.Done)
-
 	go func() {
+		logger.Infof("Starting for loop %s\n", iw.InterfaceName)
 		for {
 			select {
-			case event, ok := <-iw.Watcher.Events:
-				if !ok {
-					return
-				}
-
-				if event.Op&fsnotify.Write == fsnotify.Write {
-					logger.Infof("rp_filter setting has changed for %s\n", iw.InterfaceName)
-
-					// Check the current rp_filter setting
-					rpFilterValue, err := iw.GetCurrentRpFilterSetting()
-					if err != nil {
-						logger.Errorf(err, "Error getting rp_filter setting for %s\n", iw.InterfaceName)
-						continue
-					}
-
-					logger.Infof("Current rp_filter setting for %s: %d\n", iw.InterfaceName, rpFilterValue)
-
-					// Reset to 2 if the value is not
-					if rpFilterValue != 2 {
-						err := iw.SetRpFilterSetting(2)
-						if err != nil {
-							logger.Errorf(err, "Error setting rp_filter to 2 for %sc\n", iw.InterfaceName)
-						} else {
-							logger.Infof("rp_filter set to 2 for %s\n", iw.InterfaceName)
-						}
-					}
-				}
-
-			case err, ok := <-iw.Watcher.Errors:
-				if !ok {
-					return
-				}
-
-				logger.Errorf(err, "Error:")
-
 			case <-iw.Done:
+				// Done signal received
+				logger.Infof("Close received %s\n", iw.InterfaceName)
 				return
+			default:
+				logger.Infof("Periodic Monitor %s\n", iw.InterfaceName)
+				// Check and update the rp_filter setting
+				if err := iw.checkAndUpdateRpFilter(); err != nil {
+					logger.Errorf(err, "Error checking/updating rp_filter setting for %s: %v\n", iw.InterfaceName)
+				}
+
+				// Sleep for a specific interval before the next check
+				time.Sleep(5 * time.Second)
 			}
 		}
 	}()
 }
 
-func (iw *InterfaceWatcher) GetCurrentRpFilterSetting() (int, error) {
+func (iw *InterfaceWatcher) checkAndUpdateRpFilter() error {
+	// Get the current rp_filter setting for the interface
+	currentRpFilter, err := iw.getCurrentRpFilterSetting()
+	if err != nil {
+		return err
+	}
+
+	logger.Infof("Current rp_filter setting for %s: %d\n", iw.InterfaceName, currentRpFilter)
+
+	// If the current setting is not 2, update it to 2
+	if currentRpFilter != 2 {
+		if err := iw.setRpFilterSetting(2); err != nil {
+			return err
+		}
+		logger.Infof("rp_filter setting for %s updated to 2\n", iw.InterfaceName)
+	}
+
+	return nil
+}
+
+func (iw *InterfaceWatcher) getCurrentRpFilterSetting() (int, error) {
 	// Read the content of the rp_filter file directly
 	netPath := fmt.Sprintf("/proc/sys/net/ipv4/conf/%s/rp_filter", iw.InterfaceName)
-
 	content, err := ReadFile(netPath)
 	if err != nil {
-		return 0, errors.Wrapf(err, "failed to read rp_filter setting for %s", iw.InterfaceName)
+		return 0, errors.Wrapf(err, "failed to read rp_filter setting for %s: %v", iw.InterfaceName)
 	}
 
 	// Parse the rp_filter value
 	var rpFilterValue int
-
 	_, err = fmt.Sscanf(string(content), "%d", &rpFilterValue)
 	if err != nil {
-		return 0, errors.Wrapf(err, "failed to parse rp_filter setting for %s", iw.InterfaceName)
+		return 0, errors.Wrapf(err, "failed to parse rp_filter setting for %s: %v", iw.InterfaceName)
 	}
 
 	return rpFilterValue, nil
 }
 
-func (iw *InterfaceWatcher) SetRpFilterSetting(value int) error {
+func (iw *InterfaceWatcher) setRpFilterSetting(value int) error {
 	// Write the value to the rp_filter file directly
 	netPath := fmt.Sprintf("/proc/sys/net/ipv4/conf/%s/rp_filter", iw.InterfaceName)
-
-	err := WriteFile(netPath, fmt.Sprintf("%d", value))
+	err := WriteFile(netPath, fmt.Sprintf("%d", value), 0600)
 	if err != nil {
-		return errors.Wrapf(err, "failed to set rp_filter setting for %s", iw.InterfaceName)
+		return errors.Wrapf(err, "failed to set rp_filter setting for %s: %v", iw.InterfaceName)
 	}
 
 	return nil
 }
 
-func WriteFile(filename, content string) error {
-	err := os.WriteFile(filename, []byte(content), 0o600)
-	if err != nil {
-		return errors.Wrapf(err, "failed to write to file %s", filename)
-	}
-
-	return nil
-}
-
+// ReadFile reads the content of a file and returns it as a byte slice
 func ReadFile(filename string) ([]byte, error) {
 	content, err := os.ReadFile(filename)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read file %s", filename)
+		return nil, errors.Wrapf(err, "failed to read file %s: %v", filename)
+	}
+	return content, nil
+}
+
+// WriteFile writes content to a file with the specified permissions
+func WriteFile(filename string, content string, perm os.FileMode) error {
+	if perm > 0600 {
+		return fmt.Errorf("file permissions are too permissive, should be 0600 or less")
 	}
 
-	return content, nil
+	err := os.WriteFile(filename, []byte(content), perm)
+	if err != nil {
+		return errors.Wrapf(err, "failed to write to file %s: %v", filename)
+	}
+	return nil
 }
