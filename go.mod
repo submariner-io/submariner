@@ -7,7 +7,7 @@ require (
 	github.com/coreos/go-iptables v0.7.0
 	github.com/emirpasic/gods v1.18.1
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/onsi/ginkgo/v2 v2.13.1
+	github.com/onsi/ginkgo/v2 v2.13.2
 	github.com/onsi/gomega v1.30.0
 	github.com/ovn-org/libovsdb v0.6.1-0.20220427123326-d7b273399db4
 	github.com/ovn-org/ovn-kubernetes/go-controller v0.0.0-20220511131059-ac1ce4691c0f
@@ -15,8 +15,8 @@ require (
 	github.com/projectcalico/api v0.0.0-20230602153125-fb7148692637
 	github.com/prometheus-community/pro-bing v0.3.0
 	github.com/prometheus/client_golang v1.17.0
-	github.com/submariner-io/admiral v0.17.0-m1.0.20231208185836-b2ed2d19de6a
-	github.com/submariner-io/shipyard v0.17.0-m1
+	github.com/submariner-io/admiral v0.17.0-m2
+	github.com/submariner-io/shipyard v0.17.0-m2
 	github.com/uw-labs/lichen v0.1.7
 	github.com/vishvananda/netlink v1.2.1-beta.2
 	golang.org/x/sys v0.15.0
