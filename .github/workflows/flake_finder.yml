@@ -23,7 +23,6 @@ jobs:
             extra-toggles: ovn
         include:
           - extra-toggles: globalnet, ovn
-          - extra-toggles: external-net
     steps:
       - name: Check out the repository
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
