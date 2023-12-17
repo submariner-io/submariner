@@ -22,6 +22,7 @@ const (
 	// IPTable chains used by RouteAgent.
 	SmPostRoutingChain = "SUBMARINER-POSTROUTING"
 	SmInputChain       = "SUBMARINER-INPUT"
+	SmForwardChain     = "SUBMARINER-FORWARD"
 	PostRoutingChain   = "POSTROUTING"
 	InputChain         = "INPUT"
 	ForwardChain       = "FORWARD"

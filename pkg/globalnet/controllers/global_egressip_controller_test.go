@@ -31,6 +31,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/ipam"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -89,7 +90,7 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 	Context("with the NumberOfIPs unspecified", func() {
 		It("should allocate one global IP and program the necessary IP table rules", func() {
 			t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, 1)
-			t.awaitIPTableRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
+			t.awaitPacketFilterRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
 		})
 
 		It("should start a Pod watcher", func() {
@@ -105,7 +106,7 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 
 		It("should allocate the specified number of global IPs and program the necessary IP table rules", func() {
 			t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, *numberOfIPs)
-			t.awaitIPTableRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
+			t.awaitPacketFilterRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
 		})
 	})
 
@@ -145,7 +146,7 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 
 	Context("and programming the IP table rules initially fails", func() {
 		BeforeEach(func() {
-			t.ipt.AddFailOnAppendRuleMatcher(Not(BeEmpty()))
+			t.pFilter.AddFailOnAppendRuleMatcher(Not(BeEmpty()))
 			t.ipSet.AddFailOnCreateSetMatchers(Not(BeEmpty()))
 		})
 
@@ -159,7 +160,7 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 				Status: metav1.ConditionTrue,
 			})
 
-			t.awaitIPTableRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
+			t.awaitPacketFilterRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
 			t.watches.AwaitWatchStarted("pods")
 		})
 	})
@@ -202,20 +203,20 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 		JustBeforeEach(func() {
 			t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, 1)
 			allocatedIPs = getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs
-			ipSetName = t.awaitIPTableRules(egressChain, allocatedIPs...)
+			ipSetName = t.awaitPacketFilterRules(egressChain, allocatedIPs...)
 		})
 
 		It("should release the allocated global IPs and clean up the IP tables", func() {
 			Expect(t.globalEgressIPs.Delete(context.TODO(), globalEgressIPName, metav1.DeleteOptions{})).To(Succeed())
 			t.awaitIPsReleasedFromPool(allocatedIPs...)
 			t.ipSet.AwaitSetDeleted(ipSetName)
-			t.awaitNoIPTableRules(egressChain, allocatedIPs...)
+			t.awaitNoPacketFilterRules(egressChain, allocatedIPs...)
 			t.watches.AwaitWatchStopped("pods")
 		})
 
 		Context("and cleanup of the IP tables initially fails", func() {
 			JustBeforeEach(func() {
-				t.ipt.AddFailOnDeleteRuleMatcher(ContainSubstring(ipSetName))
+				t.pFilter.AddFailOnDeleteRuleMatcher(ContainSubstring(ipSetName))
 				t.ipSet.AddFailOnDestroySetMatchers(Equal(ipSetName))
 			})
 
@@ -223,7 +224,7 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 				Expect(t.globalEgressIPs.Delete(context.TODO(), globalEgressIPName, metav1.DeleteOptions{})).To(Succeed())
 				t.awaitIPsReleasedFromPool(allocatedIPs...)
 				t.ipSet.AwaitSetDeleted(ipSetName)
-				t.awaitNoIPTableRules(egressChain, allocatedIPs...)
+				t.awaitNoPacketFilterRules(egressChain, allocatedIPs...)
 			})
 		})
 	})
@@ -267,7 +268,7 @@ func testExistingGlobalEgressIP(t *globalEgressIPControllerTestDriver, podSelect
 		})
 
 		It("should program the necessary IP table rules for the allocated IPs", func() {
-			t.awaitIPTableRules(egressChain, existing.Status.AllocatedIPs...)
+			t.awaitPacketFilterRules(egressChain, existing.Status.AllocatedIPs...)
 		})
 
 		It("should start a Pod watcher", func() {
@@ -284,12 +285,12 @@ func testExistingGlobalEgressIP(t *globalEgressIPControllerTestDriver, podSelect
 
 		It("should reallocate the global IPs", func() {
 			t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, *existing.Spec.NumberOfIPs)
-			t.awaitIPTableRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
+			t.awaitPacketFilterRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
 		})
 
 		It("should release the previously allocated IPs", func() {
 			t.awaitIPsReleasedFromPool(existing.Status.AllocatedIPs...)
-			t.awaitNoIPTableRules(egressChain, existing.Status.AllocatedIPs...)
+			t.awaitNoPacketFilterRules(egressChain, existing.Status.AllocatedIPs...)
 		})
 
 		It("should start a Pod watcher", func() {
@@ -322,14 +323,14 @@ func testExistingGlobalEgressIP(t *globalEgressIPControllerTestDriver, podSelect
 				Status: metav1.ConditionTrue,
 			})
 
-			t.awaitIPTableRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
+			t.awaitPacketFilterRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
 		})
 	})
 
 	Context("and programming the IP table rules fails", func() {
 		BeforeEach(func() {
 			t.createGlobalEgressIP(existing)
-			t.ipt.AddFailOnAppendRuleMatcher(ContainSubstring(existing.Status.AllocatedIPs[0]))
+			t.pFilter.AddFailOnAppendRuleMatcher(ContainSubstring(existing.Status.AllocatedIPs[0]))
 		})
 
 		It("should reallocate the global IPs", func() {
@@ -343,7 +344,7 @@ func testExistingGlobalEgressIP(t *globalEgressIPControllerTestDriver, podSelect
 			})
 
 			allocatedIPs := getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs
-			t.awaitIPTableRules(egressChain, allocatedIPs...)
+			t.awaitPacketFilterRules(egressChain, allocatedIPs...)
 			t.awaitIPsReleasedFromPool(existing.Status.AllocatedIPs...)
 		})
 	})
@@ -407,10 +408,10 @@ func testGlobalEgressIPUpdated(t *globalEgressIPControllerTestDriver, podSelecto
 
 	testReallocated := func() {
 		t.awaitIPsReleasedFromPool(existing.Status.AllocatedIPs...)
-		t.awaitNoIPTableRules(egressChain, existing.Status.AllocatedIPs...)
+		t.awaitNoPacketFilterRules(egressChain, existing.Status.AllocatedIPs...)
 
 		t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, *existing.Spec.NumberOfIPs)
-		t.awaitIPTableRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
+		t.awaitPacketFilterRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
 
 		t.watches.AwaitNoWatchStopped("pods")
 	}
@@ -438,7 +439,7 @@ func testGlobalEgressIPUpdated(t *globalEgressIPControllerTestDriver, podSelecto
 
 		It("should release the previously allocated IPs and update the status", func() {
 			t.awaitIPsReleasedFromPool(existing.Status.AllocatedIPs...)
-			t.awaitNoIPTableRules(egressChain, existing.Status.AllocatedIPs...)
+			t.awaitNoPacketFilterRules(egressChain, existing.Status.AllocatedIPs...)
 
 			t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, 0, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
@@ -486,7 +487,7 @@ func testEgressPodEvents(t *globalEgressIPControllerTestDriver) {
 	JustBeforeEach(func() {
 		t.createGlobalEgressIP(egressIP)
 		t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, 1)
-		ipSet = t.awaitIPTableRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
+		ipSet = t.awaitPacketFilterRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
 		t.createPod(pod)
 	})
 
@@ -621,13 +622,13 @@ func (t *globalEgressIPControllerTestDriver) start() {
 	Expect(t.controller.Start()).To(Succeed())
 }
 
-func (t *globalEgressIPControllerTestDriver) awaitIPTableRules(chain string, ips ...string) string {
+func (t *globalEgressIPControllerTestDriver) awaitPacketFilterRules(chain string, ips ...string) string {
 	set := t.ipSet.AwaitOneSet(HavePrefix(controllers.IPSetPrefix))
-	t.ipt.AwaitRule("nat", chain, And(ContainSubstring(set), ContainSubstring(getSNATAddress(ips...))))
+	t.pFilter.AwaitRule(packetfilter.TableTypeNAT, chain, And(ContainSubstring(set), ContainSubstring(getSNATAddress(ips...))))
 
 	return set
 }
 
-func (t *globalEgressIPControllerTestDriver) awaitNoIPTableRules(chain string, ips ...string) {
-	t.ipt.AwaitNoRule("nat", chain, ContainSubstring(getSNATAddress(ips...)))
+func (t *globalEgressIPControllerTestDriver) awaitNoPacketFilterRules(chain string, ips ...string) {
+	t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, chain, ContainSubstring(getSNATAddress(ips...)))
 }

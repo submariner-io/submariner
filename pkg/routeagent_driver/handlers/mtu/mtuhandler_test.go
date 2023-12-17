@@ -18,30 +18,29 @@ limitations under the License.
 package mtu_test
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/ipset"
 	fakeSet "github.com/submariner-io/submariner/pkg/ipset/fake"
-	"github.com/submariner-io/submariner/pkg/iptables"
-	fakeIPT "github.com/submariner-io/submariner/pkg/iptables/fake"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
+	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/mtu"
 )
 
 var _ = Describe("MTUHandler", func() {
 	var (
-		ipt     *fakeIPT.IPTables
+		pFilter *fakePF.PacketFilter
 		ipSet   *fakeSet.IPSet
 		handler event.Handler
 	)
 
 	BeforeEach(func() {
-		ipt = fakeIPT.New()
-		iptables.NewFunc = func() (iptables.Interface, error) {
-			return ipt, nil
-		}
+		pFilter = fakePF.New()
 		ipSet = fakeSet.New()
 		ipset.NewFunc = func() ipset.Interface {
 			return ipSet
@@ -49,17 +48,17 @@ var _ = Describe("MTUHandler", func() {
 		handler = mtu.NewMTUHandler([]string{"10.1.0.0/24"}, false, 0)
 	})
 
-	AfterEach(func() {
-		iptables.NewFunc = nil
-	})
-
 	When("endpoint is added and removed", func() {
 		It("should add and remove iptable rules", func() {
 			Expect(handler.Init()).To(Succeed())
-			ipt.AwaitRule(constants.MangleTable, constants.SmPostRoutingChain, ContainSubstring(constants.RemoteCIDRIPSet+" src"))
-			ipt.AwaitRule(constants.MangleTable, constants.SmPostRoutingChain, ContainSubstring(constants.RemoteCIDRIPSet+" dst"))
-			ipt.AwaitRule(constants.MangleTable, constants.SmPostRoutingChain, ContainSubstring(constants.LocalCIDRIPSet+" src"))
-			ipt.AwaitRule(constants.MangleTable, constants.SmPostRoutingChain, ContainSubstring(constants.LocalCIDRIPSet+" dst"))
+			pFilter.AwaitRule(packetfilter.TableTypeRoute,
+				constants.SmPostRoutingChain, ContainSubstring(fmt.Sprintf("\"SrcSetName\":%q", constants.RemoteCIDRIPSet)))
+			pFilter.AwaitRule(packetfilter.TableTypeRoute,
+				constants.SmPostRoutingChain, ContainSubstring(fmt.Sprintf("\"DestSetName\":%q", constants.RemoteCIDRIPSet)))
+			pFilter.AwaitRule(packetfilter.TableTypeRoute,
+				constants.SmPostRoutingChain, ContainSubstring(fmt.Sprintf("\"SrcSetName\":%q", constants.LocalCIDRIPSet)))
+			pFilter.AwaitRule(packetfilter.TableTypeRoute,
+				constants.SmPostRoutingChain, ContainSubstring(fmt.Sprintf("\"DestSetName\":%q", constants.LocalCIDRIPSet)))
 
 			localEndpoint := newSubmEndpoint([]string{"10.1.0.0/24", "172.1.0.0/24"})
 			Expect(handler.LocalEndpointCreated(localEndpoint)).To(Succeed())

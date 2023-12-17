@@ -22,8 +22,8 @@ import (
 	"net"
 
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/submariner/pkg/iptables"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"github.com/submariner-io/submariner/pkg/port"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
@@ -72,51 +72,54 @@ func deleteVxLANInterface() {
 }
 
 func deleteIPTableChains() {
-	ipt, err := iptables.New()
+	pFilter, err := packetfilter.New()
 	if err != nil {
-		logger.Errorf(err, "Failed to initialize IPTable interface")
+		logger.Errorf(err, "Failed to initialize packetfilter interface")
 		return
 	}
 
-	logger.Infof("Flushing iptable entries in %q chain of %q table", constants.SmPostRoutingChain, constants.NATTable)
+	logger.Infof("Flushing packetfilter entries in %q chain of %q table", constants.SmPostRoutingChain, constants.NATTable)
 
-	if err := ipt.ClearChain(constants.NATTable, constants.SmPostRoutingChain); err != nil {
-		logger.Errorf(err, "Error flushing iptables chain %q of %q table", constants.SmPostRoutingChain,
+	if err := pFilter.ClearChain(packetfilter.TableTypeNAT, constants.SmPostRoutingChain); err != nil {
+		logger.Errorf(err, "Error flushing packetfilter chain %q of %q table", constants.SmPostRoutingChain,
 			constants.NATTable)
 	}
 
 	logger.Infof("Deleting iptable entry in %q chain of %q table", constants.PostRoutingChain, constants.NATTable)
 
-	ruleSpec := []string{"-j", constants.SmPostRoutingChain}
-	if err := ipt.Delete(constants.NATTable, constants.PostRoutingChain, ruleSpec...); err != nil {
-		logger.Errorf(err, "Error deleting iptables rule from %q chain", constants.PostRoutingChain)
+	chain := packetfilter.ChainIPHook{
+		Name:     constants.SmPostRoutingChain,
+		Type:     packetfilter.ChainTypeNAT,
+		Hook:     packetfilter.ChainHookPostrouting,
+		Priority: packetfilter.ChainPriorityFirst,
 	}
-
-	logger.Infof("Deleting iptable %q chain of %q table", constants.SmPostRoutingChain, constants.NATTable)
-
-	if err := ipt.DeleteChain(constants.NATTable, constants.SmPostRoutingChain); err != nil {
-		logger.Errorf(err, "Error deleting iptable chain %q of table %q", constants.SmPostRoutingChain,
+	if err := pFilter.DeleteIPHookChain(&chain); err != nil {
+		logger.Errorf(err, "Error deleting IPHook chain %q of %q table", constants.SmPostRoutingChain,
 			constants.NATTable)
 	}
 
 	logger.Infof("Flushing iptable entries in %q chain of %q table", constants.SmInputChain, constants.FilterTable)
 
-	if err := ipt.ClearChain(constants.FilterTable, constants.SmInputChain); err != nil {
-		logger.Errorf(err, "Error flushing iptables chain %q of %q table", constants.SmInputChain,
+	if err := pFilter.ClearChain(packetfilter.TableTypeFilter, constants.SmInputChain); err != nil {
+		logger.Errorf(err, "Error flushing packetfilter chain %q of %q table", constants.SmInputChain,
 			constants.FilterTable)
 	}
 
 	logger.Infof("Deleting iptable entry in %q chain of %q table", constants.InputChain, constants.FilterTable)
 
-	ruleSpec = []string{"-p", "udp", "-m", "udp", "-j", constants.SmInputChain}
-	if err := ipt.Delete(constants.FilterTable, constants.InputChain, ruleSpec...); err != nil {
-		logger.Errorf(err, "Error deleting iptables rule from %q chain", constants.InputChain)
+	chain = packetfilter.ChainIPHook{
+		Name:     constants.SmInputChain,
+		Type:     packetfilter.ChainTypeFilter,
+		Hook:     packetfilter.ChainHookInput,
+		Priority: packetfilter.ChainPriorityLast,
+		JumpRule: &packetfilter.Rule{
+			Proto:       packetfilter.RuleProtoUDP,
+			Action:      packetfilter.RuleActionJump,
+			TargetChain: constants.SmInputChain,
+		},
 	}
-
-	logger.Infof("Deleting iptable %q chain of %q table", constants.SmInputChain, constants.FilterTable)
-
-	if err := ipt.DeleteChain(constants.FilterTable, constants.SmInputChain); err != nil {
-		logger.Errorf(err, "Error deleting iptable chain %q of table %q", constants.SmInputChain,
+	if err := pFilter.DeleteIPHookChain(&chain); err != nil {
+		logger.Errorf(err, "Error deleting IPHook chain %q of %q table", constants.InputChain,
 			constants.FilterTable)
 	}
 }

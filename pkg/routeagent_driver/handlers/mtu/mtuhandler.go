@@ -20,7 +20,6 @@ package mtu
 
 import (
 	"strconv"
-	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
@@ -29,8 +28,8 @@ import (
 	"github.com/submariner-io/submariner/pkg/cidr"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/ipset"
-	"github.com/submariner-io/submariner/pkg/iptables"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	utilexec "k8s.io/utils/exec"
 	k8snet "k8s.io/utils/net"
@@ -53,7 +52,7 @@ const (
 type mtuHandler struct {
 	event.HandlerBase
 	localClusterCidr []string
-	ipt              iptables.Interface
+	pFilter          packetfilter.Interface
 	remoteIPSet      ipset.Named
 	localIPSet       ipset.Named
 	forceMss         forceMssSts
@@ -86,18 +85,21 @@ func (h *mtuHandler) GetName() string {
 func (h *mtuHandler) Init() error {
 	var err error
 
-	h.ipt, err = iptables.New()
+	h.pFilter, err = packetfilter.New()
 	if err != nil {
 		return errors.Wrap(err, "error initializing iptables")
 	}
 
 	ipSetIface := ipset.New(utilexec.New())
 
-	if err := h.ipt.CreateChainIfNotExists(constants.MangleTable, constants.SmPostRoutingChain); err != nil {
-		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmPostRoutingChain)
+	if err := h.pFilter.CreateIPHookChainIfNotExists(&packetfilter.ChainIPHook{
+		Name:     constants.SmPostRoutingChain,
+		Type:     packetfilter.ChainTypeRoute,
+		Hook:     packetfilter.ChainHookPostrouting,
+		Priority: packetfilter.ChainPriorityFirst,
+	}); err != nil {
+		return errors.Wrapf(err, "error creating IPHookChain chain %s", constants.SmPostRoutingChain)
 	}
-
-	forwardToSubMarinerPostRoutingChain := []string{"-j", constants.SmPostRoutingChain}
 
 	h.remoteIPSet = h.newNamedIPSet(constants.RemoteCIDRIPSet, ipSetIface)
 	if err := h.remoteIPSet.Create(true); err != nil {
@@ -109,36 +111,33 @@ func (h *mtuHandler) Init() error {
 		return errors.Wrapf(err, "error creating ipset %q", constants.LocalCIDRIPSet)
 	}
 
-	if err := h.ipt.PrependUnique(constants.MangleTable, constants.PostRoutingChain,
-		forwardToSubMarinerPostRoutingChain); err != nil {
-		return errors.Wrapf(err, "error inserting iptables rule %q",
-			strings.Join(forwardToSubMarinerPostRoutingChain, " "))
-	}
-
-	// iptable rules to clamp TCP MSS to a fixed value will be programmed when the local endpoint is created
+	// packetfilter rules to clamp TCP MSS to a fixed value will be programmed when the local endpoint is created
 	if h.forceMss == needed {
 		return nil
 	}
 
-	logger.Info("Creating iptables clamp-mss-to-pmtu rules")
+	logger.Info("Creating packetfilter clamp-mss-to-pmtu rules")
 
-	ruleSpecSource := []string{
-		"-m", "set", "--match-set", constants.LocalCIDRIPSet, "src", "-m", "set", "--match-set",
-		constants.RemoteCIDRIPSet, "dst", "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS",
-		"--clamp-mss-to-pmtu",
-	}
-	ruleSpecDest := []string{
-		"-m", "set", "--match-set", constants.RemoteCIDRIPSet, "src", "-m", "set", "--match-set",
-		constants.LocalCIDRIPSet, "dst", "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS",
-		"--clamp-mss-to-pmtu",
+	ruleSpecSource := &packetfilter.Rule{
+		SrcSetName:  constants.LocalCIDRIPSet,
+		DestSetName: constants.RemoteCIDRIPSet,
+		Action:      packetfilter.RuleActionMss,
+		ClampType:   packetfilter.ToPMTU,
 	}
 
-	if err := h.ipt.AppendUnique(constants.MangleTable, constants.SmPostRoutingChain, ruleSpecSource...); err != nil {
-		return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(ruleSpecSource, " "))
+	ruleSpecDest := &packetfilter.Rule{
+		SrcSetName:  constants.RemoteCIDRIPSet,
+		DestSetName: constants.LocalCIDRIPSet,
+		Action:      packetfilter.RuleActionMss,
+		ClampType:   packetfilter.ToPMTU,
 	}
 
-	if err := h.ipt.AppendUnique(constants.MangleTable, constants.SmPostRoutingChain, ruleSpecDest...); err != nil {
-		return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(ruleSpecSource, " "))
+	if err := h.pFilter.AppendUnique(packetfilter.TableTypeRoute, constants.SmPostRoutingChain, ruleSpecSource); err != nil {
+		return errors.Wrapf(err, "error appending packetfilter rule %q", ruleSpecSource)
+	}
+
+	if err := h.pFilter.AppendUnique(packetfilter.TableTypeRoute, constants.SmPostRoutingChain, ruleSpecDest); err != nil {
+		return errors.Wrapf(err, "error appending packetfilter rule %q", ruleSpecDest)
 	}
 
 	return nil
@@ -161,7 +160,7 @@ func (h *mtuHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 	}
 
 	if h.forceMss == needed {
-		logger.Info("Creating iptables set-mss rules")
+		logger.Info("Creating packetfilter set-mss rules")
 
 		err := h.forceMssClamping(endpoint)
 		if err != nil {
@@ -239,25 +238,21 @@ func (h *mtuHandler) newNamedIPSet(key string, ipSetIface ipset.Interface) ipset
 }
 
 func (h *mtuHandler) Uninstall() error {
-	logger.Infof("Flushing iptable entries in %q chain of %q table", constants.SmPostRoutingChain, constants.MangleTable)
+	logger.Infof("Flushing packetfilter entries in %q chain of table type Route", constants.SmPostRoutingChain)
 
-	if err := h.ipt.ClearChain(constants.MangleTable, constants.SmPostRoutingChain); err != nil {
-		logger.Errorf(err, "Error flushing iptables chain %q of %q table", constants.SmPostRoutingChain,
-			constants.MangleTable)
+	if err := h.pFilter.ClearChain(packetfilter.TableTypeRoute, constants.SmPostRoutingChain); err != nil {
+		logger.Errorf(err, "Error flushing chain %q of table type Route", constants.SmPostRoutingChain)
 	}
 
-	logger.Infof("Deleting iptable entry in %q chain of %q table", constants.PostRoutingChain, constants.MangleTable)
+	logger.Infof("Deleting IPHook chain %q of table type Route", constants.SmPostRoutingChain)
 
-	ruleSpec := []string{"-j", constants.SmPostRoutingChain}
-	if err := h.ipt.Delete(constants.MangleTable, constants.PostRoutingChain, ruleSpec...); err != nil {
-		logger.Errorf(err, "Error deleting iptables rule from %q chain", constants.PostRoutingChain)
-	}
-
-	logger.Infof("Deleting iptable %q chain of %q table", constants.SmPostRoutingChain, constants.MangleTable)
-
-	if err := h.ipt.DeleteChain(constants.MangleTable, constants.SmPostRoutingChain); err != nil {
-		logger.Errorf(err, "Error deleting iptable chain %q of table %q", constants.SmPostRoutingChain,
-			constants.MangleTable)
+	if err := h.pFilter.DeleteIPHookChain(&packetfilter.ChainIPHook{
+		Name:     constants.SmPostRoutingChain,
+		Type:     packetfilter.ChainTypeRoute,
+		Hook:     packetfilter.ChainHookPostrouting,
+		Priority: packetfilter.ChainPriorityFirst,
+	}); err != nil {
+		logger.Errorf(err, "Error deleting IP hook chain %q of table type Route", constants.SmPostRoutingChain)
 	}
 
 	if err := h.localIPSet.Flush(); err != nil {
@@ -299,20 +294,26 @@ func (h *mtuHandler) forceMssClamping(endpoint *submV1.Endpoint) error {
 	}
 
 	logger.Infof("forceMssClamping to: %d (%s) ", tcpMssValue, tcpMssSrc)
-	ruleSpecSource := []string{
-		"-m", "set", "--match-set", constants.LocalCIDRIPSet, "src", "-m", "set", "--match-set",
-		constants.RemoteCIDRIPSet, "dst", "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS",
-		"--set-mss", strconv.Itoa(tcpMssValue),
-	}
-	ruleSpecDest := []string{
-		"-m", "set", "--match-set", constants.RemoteCIDRIPSet, "src", "-m", "set", "--match-set",
-		constants.LocalCIDRIPSet, "dst", "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS",
-		"--set-mss", strconv.Itoa(tcpMssValue),
-	}
 
-	if err := h.ipt.UpdateChainRules(constants.MangleTable, constants.SmPostRoutingChain,
-		[][]string{ruleSpecSource, ruleSpecDest}); err != nil {
-		return errors.Wrapf(err, "error updating chain %s table %s rules", constants.SmPostRoutingChain, constants.MangleTable)
+	rules := []*packetfilter.Rule{}
+
+	rules = append(rules, &packetfilter.Rule{
+		SrcSetName:  constants.LocalCIDRIPSet,
+		DestSetName: constants.RemoteCIDRIPSet,
+		Action:      packetfilter.RuleActionMss,
+		ClampType:   packetfilter.ToValue,
+		MssValue:    strconv.Itoa(tcpMssValue),
+	}, &packetfilter.Rule{
+		DestSetName: constants.LocalCIDRIPSet,
+		SrcSetName:  constants.RemoteCIDRIPSet,
+		Action:      packetfilter.RuleActionMss,
+		ClampType:   packetfilter.ToValue,
+		MssValue:    strconv.Itoa(tcpMssValue),
+	},
+	)
+
+	if err := h.pFilter.UpdateChainRules(packetfilter.TableTypeRoute, constants.SmPostRoutingChain, rules); err != nil {
+		return errors.Wrapf(err, "error updating chain %s table type Route", constants.SmPostRoutingChain)
 	}
 
 	return nil

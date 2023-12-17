@@ -30,7 +30,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/util"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
+	"github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
 	"github.com/submariner-io/submariner/pkg/globalnet/metrics"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	"github.com/submariner-io/submariner/pkg/ipset"
@@ -49,13 +49,13 @@ func NewGlobalEgressIPController(config *syncer.ResourceSyncerConfig, pool *ipam
 
 	logger.Info("Creating GlobalEgressIP controller")
 
-	iptIface, err := iptables.New()
+	pfIface, err := packetfilter.New()
 	if err != nil {
-		return nil, errors.WithMessage(err, "error creating the IPTablesInterface handler")
+		return nil, errors.WithMessage(err, "error creating the packetfilter Interface handler")
 	}
 
 	controller := &globalEgressIPController{
-		baseIPAllocationController: newBaseIPAllocationController(pool, iptIface),
+		baseIPAllocationController: newBaseIPAllocationController(pool, pfIface),
 		podWatchers:                map[string]*egressPodWatcher{},
 		watcherConfig: watcher.Config{
 			RestMapper: config.RestMapper,
@@ -182,13 +182,13 @@ func (c *globalEgressIPController) programGlobalEgressRules(key string, allocate
 
 	snatIP := getTargetSNATIPaddress(allocatedIPs)
 	if podSelector != nil {
-		if err := c.iptIface.AddEgressRulesForPods(key, namedIPSet.Name(), snatIP, globalNetIPTableMark); err != nil {
-			_ = c.iptIface.RemoveEgressRulesForPods(key, namedIPSet.Name(), snatIP, globalNetIPTableMark)
+		if err := c.pfIface.AddEgressRulesForPods(key, namedIPSet.Name(), snatIP, globalNetIPTableMark); err != nil {
+			_ = c.pfIface.RemoveEgressRulesForPods(key, namedIPSet.Name(), snatIP, globalNetIPTableMark)
 			return err
 		}
 	} else {
-		if err := c.iptIface.AddEgressRulesForNamespace(key, namedIPSet.Name(), snatIP, globalNetIPTableMark); err != nil {
-			_ = c.iptIface.RemoveEgressRulesForNamespace(key, namedIPSet.Name(), snatIP, globalNetIPTableMark)
+		if err := c.pfIface.AddEgressRulesForNamespace(key, namedIPSet.Name(), snatIP, globalNetIPTableMark); err != nil {
+			_ = c.pfIface.RemoveEgressRulesForNamespace(key, namedIPSet.Name(), snatIP, globalNetIPTableMark)
 			return err
 		}
 	}
@@ -378,11 +378,11 @@ func (c *globalEgressIPController) flushGlobalEgressRulesAndReleaseIPs(key, ipSe
 	return c.flushRulesAndReleaseIPs(key, numRequeues, func(allocatedIPs []string) error {
 		metrics.RecordDeallocateGlobalEgressIPs(c.pool.GetCIDR(), len(allocatedIPs))
 		if globalEgressIP.Spec.PodSelector != nil {
-			return c.iptIface.RemoveEgressRulesForPods(key, ipSetName,
+			return c.pfIface.RemoveEgressRulesForPods(key, ipSetName,
 				getTargetSNATIPaddress(allocatedIPs), globalNetIPTableMark)
 		}
 
-		return c.iptIface.RemoveEgressRulesForNamespace(key, ipSetName, getTargetSNATIPaddress(allocatedIPs), globalNetIPTableMark)
+		return c.pfIface.RemoveEgressRulesForNamespace(key, ipSetName, getTargetSNATIPaddress(allocatedIPs), globalNetIPTableMark)
 	}, globalEgressIP.Status.AllocatedIPs...)
 }
 

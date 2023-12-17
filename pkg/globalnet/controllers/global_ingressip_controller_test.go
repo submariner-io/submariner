@@ -29,6 +29,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/ipam"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -190,7 +191,7 @@ func testGlobalIngressIPCreatedClusterIPSvc(t *globalIngressIPControllerTestDriv
 }
 
 func testGlobalIngressIPCreatedHeadlessSvc(t *globalIngressIPControllerTestDriver, ingressIP *submarinerv1.GlobalIngressIP,
-	awaitIPTableRules, awaitNoIPTableRules func(string), ruleMatch string,
+	awaitPacketFilterRules, awaitNoPacketFilterRules func(string), ruleMatch string,
 ) {
 	JustBeforeEach(func() {
 		service := newClusterIPService()
@@ -202,7 +203,7 @@ func testGlobalIngressIPCreatedHeadlessSvc(t *globalIngressIPControllerTestDrive
 		t.awaitIngressIPStatusAllocated(globalIngressIPName)
 		allocatedIP := t.getGlobalIngressIPStatus(globalIngressIPName).AllocatedIP
 		Expect(allocatedIP).ToNot(BeEmpty())
-		awaitIPTableRules(allocatedIP)
+		awaitPacketFilterRules(allocatedIP)
 	})
 
 	Context("with the IP pool exhausted", func() {
@@ -222,7 +223,7 @@ func testGlobalIngressIPCreatedHeadlessSvc(t *globalIngressIPControllerTestDrive
 
 	Context("and programming of IP tables initially fails", func() {
 		BeforeEach(func() {
-			t.ipt.AddFailOnAppendRuleMatcher(ContainSubstring(ruleMatch))
+			t.pFilter.AddFailOnAppendRuleMatcher(ContainSubstring(ruleMatch))
 		})
 
 		It("should eventually allocate a global IP", func() {
@@ -235,7 +236,7 @@ func testGlobalIngressIPCreatedHeadlessSvc(t *globalIngressIPControllerTestDrive
 				Status: metav1.ConditionTrue,
 			})
 
-			awaitIPTableRules(t.getGlobalIngressIPStatus(globalIngressIPName).AllocatedIP)
+			awaitPacketFilterRules(t.getGlobalIngressIPStatus(globalIngressIPName).AllocatedIP)
 		})
 	})
 
@@ -251,17 +252,17 @@ func testGlobalIngressIPCreatedHeadlessSvc(t *globalIngressIPControllerTestDrive
 
 		It("should release the allocated global IP", func() {
 			t.awaitIPsReleasedFromPool(allocatedIP)
-			awaitNoIPTableRules(allocatedIP)
+			awaitNoPacketFilterRules(allocatedIP)
 		})
 
 		Context("and cleanup of IP tables initially fails", func() {
 			BeforeEach(func() {
-				t.ipt.AddFailOnDeleteRuleMatcher(ContainSubstring(ruleMatch))
+				t.pFilter.AddFailOnDeleteRuleMatcher(ContainSubstring(ruleMatch))
 			})
 
 			It("should eventually cleanup the IP tables and reallocate", func() {
 				t.awaitIPsReleasedFromPool(allocatedIP)
-				awaitNoIPTableRules(allocatedIP)
+				awaitNoPacketFilterRules(allocatedIP)
 			})
 		})
 	})
@@ -408,7 +409,7 @@ func testExistingGlobalIngressIPClusterIPSvc(t *globalIngressIPControllerTestDri
 }
 
 func testExistingGlobalIngressIPHeadlessSvc(t *globalIngressIPControllerTestDriver, ingressIP *submarinerv1.GlobalIngressIP,
-	awaitIPTableRules func(string),
+	awaitPacketFilterRules func(string),
 ) {
 	var existing *submarinerv1.GlobalIngressIP
 
@@ -439,7 +440,7 @@ func testExistingGlobalIngressIPHeadlessSvc(t *globalIngressIPControllerTestDriv
 		})
 
 		It("should program the relevant IP table rules", func() {
-			awaitIPTableRules(existing.Status.AllocatedIP)
+			awaitPacketFilterRules(existing.Status.AllocatedIP)
 		})
 
 		Context("and it's already reserved", func() {
@@ -457,13 +458,13 @@ func testExistingGlobalIngressIPHeadlessSvc(t *globalIngressIPControllerTestDriv
 					Status: metav1.ConditionTrue,
 				})
 
-				awaitIPTableRules(t.getGlobalIngressIPStatus(globalIngressIPName).AllocatedIP)
+				awaitPacketFilterRules(t.getGlobalIngressIPStatus(globalIngressIPName).AllocatedIP)
 			})
 		})
 
 		Context("and programming the IP table rules fails", func() {
 			BeforeEach(func() {
-				t.ipt.AddFailOnAppendRuleMatcher(ContainSubstring(existing.Status.AllocatedIP))
+				t.pFilter.AddFailOnAppendRuleMatcher(ContainSubstring(existing.Status.AllocatedIP))
 			})
 
 			It("should reallocate the global IP", func() {
@@ -477,7 +478,7 @@ func testExistingGlobalIngressIPHeadlessSvc(t *globalIngressIPControllerTestDriv
 				})
 
 				allocatedIP := t.getGlobalIngressIPStatus(globalIngressIPName).AllocatedIP
-				awaitIPTableRules(allocatedIP)
+				awaitPacketFilterRules(allocatedIP)
 				t.awaitIPsReleasedFromPool(existing.Status.AllocatedIP)
 			})
 		})
@@ -490,7 +491,7 @@ func testExistingGlobalIngressIPHeadlessSvc(t *globalIngressIPControllerTestDriv
 
 		It("should allocate it and program the relevant IP table rules", func() {
 			t.awaitIngressIPStatusAllocated(globalIngressIPName)
-			awaitIPTableRules(existing.Status.AllocatedIP)
+			awaitPacketFilterRules(existing.Status.AllocatedIP)
 		})
 	})
 }
@@ -537,33 +538,39 @@ func (t *globalIngressIPControllerTestDriver) start() syncer.Interface {
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitPodEgressRules(podIP, snatIP string) {
-	t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChainForHeadlessSvcPods, And(ContainSubstring(podIP), ContainSubstring(snatIP)))
+	t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForHeadlessSvcPods, And(ContainSubstring(podIP),
+		ContainSubstring(snatIP)))
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitNoPodEgressRules(podIP, snatIP string) {
-	t.ipt.AwaitNoRule("nat", constants.SmGlobalnetEgressChainForHeadlessSvcPods, Or(ContainSubstring(podIP), ContainSubstring(snatIP)))
+	t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForHeadlessSvcPods, Or(ContainSubstring(podIP),
+		ContainSubstring(snatIP)))
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitPodIngressRules(podIP, snatIP string) {
-	t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain, And(ContainSubstring(podIP), ContainSubstring(snatIP)))
+	t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmGlobalnetIngressChain, And(ContainSubstring(podIP), ContainSubstring(snatIP)))
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitNoPodIngressRules(podIP, snatIP string) {
-	t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, Or(ContainSubstring(podIP), ContainSubstring(snatIP)))
+	t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, constants.SmGlobalnetIngressChain, Or(ContainSubstring(podIP), ContainSubstring(snatIP)))
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitEndpointsEgressRules(endpointsIP, snatIP string) {
-	t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChainForHeadlessSvcEPs, And(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
+	t.pFilter.AwaitRule(packetfilter.TableTypeNAT,
+		constants.SmGlobalnetEgressChainForHeadlessSvcEPs, And(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitNoEndpointsEgressRules(endpointsIP, snatIP string) {
-	t.ipt.AwaitNoRule("nat", constants.SmGlobalnetEgressChainForHeadlessSvcEPs, Or(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
+	t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT,
+		constants.SmGlobalnetEgressChainForHeadlessSvcEPs, Or(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitEndpointsIngressRules(endpointsIP, snatIP string) {
-	t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain, And(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
+	t.pFilter.AwaitRule(packetfilter.TableTypeNAT,
+		constants.SmGlobalnetIngressChain, And(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitNoEndpointsIngressRules(endpointsIP, snatIP string) {
-	t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, Or(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
+	t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT,
+		constants.SmGlobalnetIngressChain, Or(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
 }

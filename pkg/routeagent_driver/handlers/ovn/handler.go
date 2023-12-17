@@ -33,8 +33,8 @@ import (
 	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
-	"github.com/submariner-io/submariner/pkg/iptables"
 	"github.com/submariner-io/submariner/pkg/netlink"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -59,7 +59,7 @@ type Handler struct {
 	mutex                     sync.Mutex
 	cableRoutingInterface     *net.Interface
 	netLink                   netlink.Interface
-	ipt                       iptables.Interface
+	pFilter                   packetfilter.Interface
 	gatewayRouteController    *GatewayRouteController
 	nonGatewayRouteController *NonGatewayRouteController
 	stopCh                    chan struct{}
@@ -69,15 +69,15 @@ var logger = log.Logger{Logger: logf.Log.WithName("OVN")}
 
 func NewHandler(config *HandlerConfig) *Handler {
 	// We'll panic if env is nil, this is intentional
-	ipt, err := iptables.New()
+	pFilter, err := packetfilter.New()
 	if err != nil {
-		logger.Fatalf("Error initializing iptables in OVN routeagent handler: %s", err)
+		logger.Fatalf("Error initializing packetfilter in OVN routeagent handler: %s", err)
 	}
 
 	h := &Handler{
 		HandlerConfig: *config,
 		netLink:       netlink.New(),
-		ipt:           ipt,
+		pFilter:       pFilter,
 		stopCh:        make(chan struct{}),
 	}
 

@@ -32,10 +32,9 @@ import (
 	fakesubm "github.com/submariner-io/submariner/pkg/client/clientset/versioned/fake"
 	"github.com/submariner-io/submariner/pkg/event"
 	eventtesting "github.com/submariner-io/submariner/pkg/event/testing"
-	"github.com/submariner-io/submariner/pkg/iptables"
-	fakeIPT "github.com/submariner-io/submariner/pkg/iptables/fake"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	fakenetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
+	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
 	"github.com/vishvananda/netlink"
@@ -73,7 +72,7 @@ type testDriver struct {
 	k8sClient       *fakek8s.Clientset
 	dynClient       *fakedynamic.FakeDynamicClient
 	netLink         *fakenetlink.NetLink
-	ipTables        *fakeIPT.IPTables
+	pFilter         *fakePF.PacketFilter
 	handler         event.Handler
 	transitSwitchIP string
 	mgmntIntfIP     string
@@ -94,11 +93,7 @@ func newTestDriver() *testDriver {
 		netlinkAPI.NewFunc = func() netlinkAPI.Interface {
 			return t.netLink
 		}
-
-		t.ipTables = fakeIPT.New()
-		iptables.NewFunc = func() (iptables.Interface, error) {
-			return t.ipTables, nil
-		}
+		t.pFilter = fakePF.New()
 
 		link := &netlink.GenericLink{
 			LinkAttrs: netlink.LinkAttrs{

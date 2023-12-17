@@ -29,7 +29,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	iptiface "github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
+	pfiface "github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -60,11 +60,11 @@ func newBaseSyncerController() *baseSyncerController {
 	}
 }
 
-func newBaseIPAllocationController(pool *ipam.IPPool, iptIface iptiface.Interface) *baseIPAllocationController {
+func newBaseIPAllocationController(pool *ipam.IPPool, pfIface pfiface.Interface) *baseIPAllocationController {
 	return &baseIPAllocationController{
 		baseSyncerController: newBaseSyncerController(),
 		pool:                 pool,
-		iptIface:             iptIface,
+		pfIface:              pfIface,
 	}
 }
 

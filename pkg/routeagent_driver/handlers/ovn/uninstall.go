@@ -20,6 +20,7 @@ package ovn
 
 import (
 	"github.com/pkg/errors"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn/vsctl"
 	"github.com/vishvananda/netlink"
@@ -53,8 +54,33 @@ func (ovn *Handler) Uninstall() error {
 			constants.RouteAgentHostNetworkTableID)
 	}
 
-	ovn.flushAndDeleteIPTableChains(constants.FilterTable, constants.ForwardChain, ForwardingSubmarinerFWDChain)
-	ovn.flushAndDeleteIPTableChains(constants.NATTable, constants.PostRoutingChain, constants.SmPostRoutingChain)
+	if err := ovn.pFilter.ClearChain(packetfilter.TableTypeFilter, ForwardingSubmarinerFWDChain); err != nil {
+		logger.Errorf(err, "Error flushing packetfilter chain %q of %q table", ForwardingSubmarinerFWDChain, "Filter")
+	}
+
+	if err := ovn.pFilter.DeleteIPHookChain(&packetfilter.ChainIPHook{
+		Name:     ForwardingSubmarinerFWDChain,
+		Type:     packetfilter.ChainTypeFilter,
+		Hook:     packetfilter.ChainHookForward,
+		Priority: packetfilter.ChainPriorityFirst,
+	}); err != nil {
+		logger.Errorf(err, "DeleteIPHookChain %s returned error",
+			ForwardingSubmarinerFWDChain)
+	}
+
+	if err := ovn.pFilter.ClearChain(packetfilter.TableTypeNAT, constants.SmPostRoutingChain); err != nil {
+		logger.Errorf(err, "Error flushing packetfilter chain %q of %q table", constants.SmPostRoutingChain, "NAT")
+	}
+
+	if err := ovn.pFilter.DeleteIPHookChain(&packetfilter.ChainIPHook{
+		Name:     constants.SmPostRoutingChain,
+		Type:     packetfilter.ChainTypeNAT,
+		Hook:     packetfilter.ChainHookPostrouting,
+		Priority: packetfilter.ChainPriorityFirst,
+	}); err != nil {
+		logger.Errorf(err, "DeleteIPHookChain %s returned error",
+			constants.SmPostRoutingChain)
+	}
 
 	return nil
 }
@@ -75,27 +101,6 @@ func (ovn *Handler) cleanupRoutes() error {
 	}
 
 	return nil
-}
-
-func (ovn *Handler) flushAndDeleteIPTableChains(table, tableChain, submarinerChain string) {
-	logger.Infof("Flushing iptable entries in %q chain of %q table", submarinerChain, table)
-
-	if err := ovn.ipt.ClearChain(table, submarinerChain); err != nil {
-		logger.Errorf(err, "Error flushing iptables chain %q of %q table", submarinerChain, table)
-	}
-
-	logger.Infof("Deleting iptable entry in %q chain of %q table", tableChain, table)
-
-	ruleSpec := []string{"-j", submarinerChain}
-	if err := ovn.ipt.Delete(table, tableChain, ruleSpec...); err != nil {
-		logger.Errorf(err, "Error deleting iptables rule from %q chain", tableChain)
-	}
-
-	logger.Infof("Deleting iptable %q chain of %q table", submarinerChain, table)
-
-	if err := ovn.ipt.DeleteChain(table, submarinerChain); err != nil {
-		logger.Errorf(err, "Error deleting iptable chain %q of table %q", submarinerChain, table)
-	}
 }
 
 // TODO need to be removed when the clusters are fully upgraded to new implementation.
