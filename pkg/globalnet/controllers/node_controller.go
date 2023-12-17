@@ -26,7 +26,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	admUtil "github.com/submariner-io/admiral/pkg/util"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
-	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
+	packetfilter "github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
@@ -42,13 +42,13 @@ func NewNodeController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool, n
 
 	logger.Info("Creating Node controller")
 
-	iptIface, err := iptables.New()
+	pfIface, err := packetfilter.New()
 	if err != nil {
-		return nil, errors.Wrap(err, "error creating the IPTablesInterface handler")
+		return nil, errors.Wrap(err, "error creating the PacketFilter Interface handler")
 	}
 
 	controller := &nodeController{
-		baseIPAllocationController: newBaseIPAllocationController(pool, iptIface),
+		baseIPAllocationController: newBaseIPAllocationController(pool, pfIface),
 		nodeName:                   nodeName,
 	}
 
@@ -149,7 +149,7 @@ func (n *nodeController) allocateIP(node *corev1.Node, op syncer.Operation) (run
 
 	logger.Infof("Adding ingress rules for node %q with global IP %s, CNI IP %s", node.Name, globalIP, cniIfaceIP)
 
-	if err := n.iptIface.AddIngressRulesForHealthCheck(cniIfaceIP, globalIP); err != nil {
+	if err := n.pfIface.AddIngressRulesForHealthCheck(cniIfaceIP, globalIP); err != nil {
 		logger.Errorf(err, "Error programming rules for Gateway healthcheck on node %q", node.Name)
 
 		_ = n.pool.Release(globalIP)
@@ -178,7 +178,7 @@ func (n *nodeController) reserveAllocatedIP(federator federate.Federator, obj *u
 
 	err := n.pool.Reserve(existingGlobalIP)
 	if err == nil {
-		err = n.iptIface.AddIngressRulesForHealthCheck(cniIfaceIP, existingGlobalIP)
+		err = n.pfIface.AddIngressRulesForHealthCheck(cniIfaceIP, existingGlobalIP)
 		if err != nil {
 			_ = n.pool.Release(existingGlobalIP)
 		}
@@ -233,7 +233,7 @@ func (n *nodeController) onNodeUpdated(oldObj, newObj *unstructured.Unstructured
 		}
 
 		if oldCNIIfaceIPOnNode != "" && oldGlobalIPOnNode != "" {
-			if err := n.iptIface.RemoveIngressRulesForHealthCheck(oldCNIIfaceIPOnNode, oldGlobalIPOnNode); err != nil {
+			if err := n.pfIface.RemoveIngressRulesForHealthCheck(oldCNIIfaceIPOnNode, oldGlobalIPOnNode); err != nil {
 				logger.Errorf(err, "Error deleting rules for Gateway healthcheck on node %q", n.nodeName)
 			}
 		}

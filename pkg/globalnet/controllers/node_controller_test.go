@@ -29,6 +29,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/ipam"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,7 +47,7 @@ var _ = Describe("Node controller", func() {
 			})
 
 			It("should allocate it and program the relevant iptable rules", func() {
-				t.awaitIPTableRules(t.awaitNodeGlobalIP(""))
+				t.awaitPacketFilterRules(t.awaitNodeGlobalIP(""))
 			})
 
 			Context("and the IP pool is initially exhausted", func() {
@@ -80,7 +81,7 @@ var _ = Describe("Node controller", func() {
 			})
 
 			It("should program the relevant iptable rules", func() {
-				t.awaitIPTableRules(node.GetAnnotations()[constants.SmGlobalIP])
+				t.awaitPacketFilterRules(node.GetAnnotations()[constants.SmGlobalIP])
 			})
 
 			It("should reserve the global IP", func() {
@@ -94,7 +95,7 @@ var _ = Describe("Node controller", func() {
 
 				It("should reallocate the global IP", func() {
 					globalIP := t.awaitNodeGlobalIP(node.GetAnnotations()[constants.SmGlobalIP])
-					t.awaitIPTableRules(globalIP)
+					t.awaitPacketFilterRules(globalIP)
 				})
 			})
 		})
@@ -114,16 +115,16 @@ var _ = Describe("Node controller", func() {
 			})
 
 			It("should allocate a global IP and program the relevant iptable rules", func() {
-				t.awaitIPTableRules(t.awaitNodeGlobalIP(""))
+				t.awaitPacketFilterRules(t.awaitNodeGlobalIP(""))
 			})
 
 			Context("and programming of IP tables initially fails", func() {
 				BeforeEach(func() {
-					t.ipt.AddFailOnAppendRuleMatcher(ContainSubstring(cniInterfaceIP))
+					t.pFilter.AddFailOnAppendRuleMatcher(ContainSubstring(cniInterfaceIP))
 				})
 
 				It("should eventually allocate a global IP and program the relevant iptable rules", func() {
-					t.awaitIPTableRules(t.awaitNodeGlobalIP(""))
+					t.awaitPacketFilterRules(t.awaitNodeGlobalIP(""))
 				})
 			})
 		})
@@ -140,8 +141,8 @@ var _ = Describe("Node controller", func() {
 				addAnnotation(node, routeAgent.CNIInterfaceIP, cniInterfaceIP)
 				test.UpdateResource(t.nodes, node)
 
-				t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(oldCNIIfaceIP))
-				t.awaitIPTableRules(node.GetAnnotations()[constants.SmGlobalIP])
+				t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, constants.SmGlobalnetIngressChain, ContainSubstring(oldCNIIfaceIP))
+				t.awaitPacketFilterRules(node.GetAnnotations()[constants.SmGlobalIP])
 				t.verifyIPsReservedInPool(node.GetAnnotations()[constants.SmGlobalIP])
 			})
 		})
@@ -204,6 +205,7 @@ func (t *nodeControllerTestDriver) start() {
 	Expect(t.controller.Start()).To(Succeed())
 }
 
-func (t *nodeControllerTestDriver) awaitIPTableRules(globalIP string) {
-	t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain, And(ContainSubstring(globalIP), ContainSubstring(cniInterfaceIP)))
+func (t *nodeControllerTestDriver) awaitPacketFilterRules(globalIP string) {
+	t.pFilter.AwaitRule(packetfilter.TableTypeNAT,
+		constants.SmGlobalnetIngressChain, And(ContainSubstring(globalIP), ContainSubstring(cniInterfaceIP)))
 }

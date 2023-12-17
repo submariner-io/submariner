@@ -28,10 +28,10 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	"github.com/submariner-io/submariner/pkg/event"
-	iptiface "github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
+	pfIface "github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	"github.com/submariner-io/submariner/pkg/ipset"
-	"github.com/submariner-io/submariner/pkg/iptables"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -128,7 +128,7 @@ type gatewayMonitor struct {
 	GatewayMonitorConfig
 	syncerConfig            *syncer.ResourceSyncerConfig
 	remoteEndpointTimeStamp map[string]metav1.Time
-	ipt                     iptables.Interface
+	pFilter                 packetfilter.Interface
 	shuttingDown            atomic.Bool
 	leaderElectionInfo      atomic.Pointer[LeaderElectionInfo]
 	nodeName                string
@@ -143,8 +143,8 @@ type baseSyncerController struct {
 
 type baseIPAllocationController struct {
 	*baseSyncerController
-	pool     *ipam.IPPool
-	iptIface iptiface.Interface
+	pool    *ipam.IPPool
+	pfIface pfIface.Interface
 }
 
 type globalEgressIPController struct {
@@ -178,7 +178,7 @@ type serviceExportController struct {
 	*baseSyncerController
 	services                    dynamic.NamespaceableResourceInterface
 	ingressIPs                  dynamic.ResourceInterface
-	iptIface                    iptiface.Interface
+	pfIface                     pfIface.Interface
 	podControllers              *IngressPodControllers
 	endpointsControllers        *ServiceExportEndpointsControllers
 	ingressEndpointsControllers *IngressEndpointsControllers

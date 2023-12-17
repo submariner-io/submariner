@@ -33,6 +33,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	fakeNetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
@@ -55,7 +56,7 @@ var _ = Describe("Endpoint monitoring", func() {
 		JustBeforeEach(func() {
 			t.createNode(nodeName, "", "")
 			endpoint = t.createEndpoint(newEndpointSpec(clusterID, t.hostName, localCIDR))
-			t.createIPTableChain("nat", kubeProxyIPTableChainName)
+			t.createPFilterChain(packetfilter.TableTypeNAT, kubeProxyIPTableChainName)
 		})
 
 		It("should start the controllers", func() {
@@ -188,10 +189,10 @@ var _ = Describe("Endpoint monitoring", func() {
 	When("a remote Endpoint with non-overlapping CIDRs is created then removed", func() {
 		It("should add/remove appropriate IP table rule(s)", func() {
 			endpoint := t.createEndpoint(newEndpointSpec(remoteClusterID, t.hostName, remoteCIDR))
-			t.ipt.AwaitRule("nat", constants.SmGlobalnetMarkChain, ContainSubstring(remoteCIDR))
+			t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain, ContainSubstring(remoteCIDR))
 
 			Expect(t.endpoints.Delete(context.TODO(), endpoint.Name, metav1.DeleteOptions{})).To(Succeed())
-			t.ipt.AwaitNoRule("nat", constants.SmGlobalnetMarkChain, ContainSubstring(remoteCIDR))
+			t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain, ContainSubstring(remoteCIDR))
 		})
 	})
 
@@ -199,7 +200,7 @@ var _ = Describe("Endpoint monitoring", func() {
 		It("should not add expected IP table rule(s)", func() {
 			t.createEndpoint(newEndpointSpec(remoteClusterID, t.hostName, localCIDR))
 			time.Sleep(500 * time.Millisecond)
-			t.ipt.AwaitNoRule("nat", constants.SmGlobalnetMarkChain, ContainSubstring(localCIDR))
+			t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain, ContainSubstring(localCIDR))
 		})
 	})
 })
@@ -271,7 +272,7 @@ func (t *gatewayMonitorTestDriver) start() {
 	Expect(err).To(Succeed())
 	Expect(t.controller.Start()).To(Succeed())
 
-	t.ipt.AwaitChain("nat", constants.SmGlobalnetMarkChain)
+	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain)
 }
 
 func (t *gatewayMonitorTestDriver) createEndpoint(spec *submarinerv1.EndpointSpec) *submarinerv1.Endpoint {
@@ -301,16 +302,16 @@ func (t *gatewayMonitorTestDriver) ensureControllersStopped() {
 }
 
 func (t *gatewayMonitorTestDriver) awaitGlobalnetChains() {
-	t.ipt.AwaitChain("nat", constants.SmGlobalnetIngressChain)
-	t.ipt.AwaitChain("nat", constants.SmGlobalnetEgressChain)
-	t.ipt.AwaitChain("nat", routeAgent.SmPostRoutingChain)
-	t.ipt.AwaitChain("nat", constants.SmGlobalnetMarkChain)
+	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetIngressChain)
+	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChain)
+	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, routeAgent.SmPostRoutingChain)
+	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain)
 }
 
 func (t *gatewayMonitorTestDriver) awaitNoGlobalnetChains() {
-	t.ipt.AwaitNoChain("nat", constants.SmGlobalnetIngressChain)
-	t.ipt.AwaitNoChain("nat", constants.SmGlobalnetEgressChain)
-	t.ipt.AwaitNoChain("nat", constants.SmGlobalnetMarkChain)
+	t.pFilter.AwaitNoChain(packetfilter.TableTypeNAT, constants.SmGlobalnetIngressChain)
+	t.pFilter.AwaitNoChain(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChain)
+	t.pFilter.AwaitNoChain(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain)
 }
 
 func newEndpointSpec(clusterID, hostname, subnet string) *submarinerv1.EndpointSpec {

@@ -26,10 +26,10 @@ import (
 	. "github.com/onsi/gomega"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event/testing"
-	"github.com/submariner-io/submariner/pkg/iptables"
-	fakeIPT "github.com/submariner-io/submariner/pkg/iptables/fake"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	fakeNetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
+	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
@@ -353,7 +353,7 @@ func testUninstall() {
 type testDriver struct {
 	*testing.ControllerSupport
 	handler             *kubeproxy.SyncHandler
-	ipTables            *fakeIPT.IPTables
+	pFilter             *fakePF.PacketFilter
 	netLink             *fakeNetlink.NetLink
 	localEndpoint       *submarinerv1.Endpoint
 	remoteEndpoint      *submarinerv1.Endpoint
@@ -379,11 +379,7 @@ func newTestDriver() *testDriver {
 		netlinkAPI.NewFunc = func() netlinkAPI.Interface {
 			return t.netLink
 		}
-
-		t.ipTables = fakeIPT.New()
-		iptables.NewFunc = func() (iptables.Interface, error) {
-			return t.ipTables, nil
-		}
+		t.pFilter = fakePF.New()
 
 		cni.DiscoverFunc = func(clusterCIDR string) (*cni.Interface, error) {
 			return &cni.Interface{
@@ -401,7 +397,6 @@ func newTestDriver() *testDriver {
 	})
 
 	AfterEach(func() {
-		iptables.NewFunc = nil
 		netlinkAPI.NewFunc = nil
 		cni.DiscoverFunc = nil
 	})
@@ -429,7 +424,7 @@ func (t *testDriver) verifyNoHostNetworkingRoutes() {
 
 func (t *testDriver) verifyRemoteSubnetIPTableRules() {
 	for _, remoteCIDR := range t.remoteEndpoint.Spec.Subnets {
-		t.ipTables.AwaitRule("nat", constants.SmPostRoutingChain,
+		t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmPostRoutingChain,
 			And(ContainSubstring(localClusterCIDR), ContainSubstring(remoteCIDR)))
 	}
 }

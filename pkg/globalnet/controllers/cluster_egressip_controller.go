@@ -29,7 +29,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
-	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
+	"github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
 	"github.com/submariner-io/submariner/pkg/globalnet/metrics"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	corev1 "k8s.io/api/core/v1"
@@ -49,13 +49,13 @@ func NewClusterGlobalEgressIPController(config *syncer.ResourceSyncerConfig, loc
 
 	logger.Info("Creating ClusterGlobalEgressIP controller")
 
-	iptIface, err := iptables.New()
+	pfIface, err := packetfilter.New()
 	if err != nil {
 		return nil, errors.WithMessage(err, "error creating the IPTablesInterface handler")
 	}
 
 	controller := &clusterGlobalEgressIPController{
-		baseIPAllocationController: newBaseIPAllocationController(pool, iptIface),
+		baseIPAllocationController: newBaseIPAllocationController(pool, pfIface),
 		localSubnets:               localSubnets,
 	}
 
@@ -215,7 +215,7 @@ func (c *clusterGlobalEgressIPController) flushClusterGlobalEgressRules(allocate
 
 func (c *clusterGlobalEgressIPController) deleteClusterGlobalEgressRules(srcIPList []string, snatIP string) error {
 	for _, srcIP := range srcIPList {
-		if err := c.iptIface.RemoveClusterEgressRules(srcIP, snatIP, globalNetIPTableMark); err != nil {
+		if err := c.pfIface.RemoveClusterEgressRules(srcIP, snatIP, globalNetIPTableMark); err != nil {
 			return err //nolint:wrapcheck  // Let the caller wrap it
 		}
 	}
@@ -228,7 +228,7 @@ func (c *clusterGlobalEgressIPController) programClusterGlobalEgressRules(alloca
 	egressRulesProgrammed := []string{}
 
 	for _, srcIP := range c.localSubnets {
-		if err := c.iptIface.AddClusterEgressRules(srcIP, snatIP, globalNetIPTableMark); err != nil {
+		if err := c.pfIface.AddClusterEgressRules(srcIP, snatIP, globalNetIPTableMark); err != nil {
 			_ = c.deleteClusterGlobalEgressRules(egressRulesProgrammed, snatIP)
 
 			return err //nolint:wrapcheck  // Let the caller wrap it

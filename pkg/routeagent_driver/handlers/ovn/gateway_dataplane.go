@@ -23,8 +23,9 @@ import (
 	"strconv"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
-	iptcommon "github.com/submariner-io/submariner/pkg/routeagent_driver/iptables"
 	"github.com/vishvananda/netlink"
 )
 
@@ -99,9 +100,9 @@ const (
 	MSSFor1500MTU         = 1500 - IPTCPOverHead - ExpectedIPSECOverhead
 )
 
-func (ovn *Handler) getForwardingRuleSpecs() ([][]string, error) {
+func (ovn *Handler) getForwardingRuleSpecs() ([]*packetfilter.Rule, error) {
 	if ovn.cableRoutingInterface == nil {
-		return nil, errors.New("error setting up forwarding iptables, the cable interface isn't discovered yet, " +
+		return nil, errors.New("error setting up forwarding packetfilter config, the cable interface isn't discovered yet, " +
 			"this will be retried")
 	}
 
@@ -110,22 +111,28 @@ func (ovn *Handler) getForwardingRuleSpecs() ([][]string, error) {
 	// To reroute incoming traffic over the ovn-k8s-mp0 interface, we employ routes in table 149. Before the traffic
 	// hits ovn-k8s-mp0, firewall rules would be processed. Therefore, we include these firewall rules in the FORWARDing
 	// chain to allow such traffic. Similar thing happens for outbound traffic as well, and we use routes in table 150.
-	rules := [][]string{}
+	rules := []*packetfilter.Rule{}
 	for _, remoteCIDR := range ovn.getRemoteSubnets().UnsortedList() {
-		rules = append(rules,
-			[]string{
-				"-d", remoteCIDR, "-i", OVNK8sMgmntIntfName, "-o", ovn.cableRoutingInterface.Name, "-j", "ACCEPT",
+		rules = append(rules, &packetfilter.Rule{
+			DestCIDR:     remoteCIDR,
+			Action:       packetfilter.RuleActionAccept,
+			OutInterface: ovn.cableRoutingInterface.Name,
+			InInterface:  OVNK8sMgmntIntfName,
+		},
+			&packetfilter.Rule{
+				SrcCIDR:      remoteCIDR,
+				Action:       packetfilter.RuleActionAccept,
+				OutInterface: OVNK8sMgmntIntfName,
+				InInterface:  ovn.cableRoutingInterface.Name,
 			},
-			[]string{
-				"-s", remoteCIDR, "-i", ovn.cableRoutingInterface.Name, "-o", OVNK8sMgmntIntfName, "-j", "ACCEPT",
-			})
+		)
 	}
 
 	return rules, nil
 }
 
-func (ovn *Handler) getMSSClampingRuleSpecs() ([][]string, error) {
-	rules := [][]string{}
+func (ovn *Handler) getMSSClampingRuleSpecs() ([]*packetfilter.Rule, error) {
+	rules := []*packetfilter.Rule{}
 
 	// NOTE: This is a workaround for submariner issues:
 	//   * https://github.com/submariner-io/submariner/issues/1278
@@ -133,21 +140,24 @@ func (ovn *Handler) getMSSClampingRuleSpecs() ([][]string, error) {
 	// TODO: get the kernel to steer the ICMPs back to ovn-k8s-sub0 interface properly, or write a packet
 	//       reflector in the route agent for that type of packets
 	for _, remoteCIDR := range ovn.getRemoteSubnets().UnsortedList() {
-		rules = append(rules,
-			[]string{
-				"-d", remoteCIDR, "-p", "tcp", "-m", "tcp",
-				"--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", strconv.Itoa(MSSFor1500MTU),
-			},
-			[]string{
-				"-s", remoteCIDR, "-p", "tcp", "-m", "tcp",
-				"--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--set-mss", strconv.Itoa(MSSFor1500MTU),
-			})
+		rules = append(rules, &packetfilter.Rule{
+			DestCIDR:  remoteCIDR,
+			Action:    packetfilter.RuleActionMss,
+			ClampType: packetfilter.ToValue,
+			MssValue:  strconv.Itoa(MSSFor1500MTU),
+		}, &packetfilter.Rule{
+			SrcCIDR:   remoteCIDR,
+			Action:    packetfilter.RuleActionMss,
+			ClampType: packetfilter.ToValue,
+			MssValue:  strconv.Itoa(MSSFor1500MTU),
+		},
+		)
 	}
 
 	return rules, nil
 }
 
-type forwardRuleSpecGenerator func() ([][]string, error)
+type forwardRuleSpecGenerator func() ([]*packetfilter.Rule, error)
 
 const (
 	ForwardingSubmarinerMSSClampChain = "SUBMARINER-FWD-MSSCLAMP"
@@ -155,46 +165,68 @@ const (
 )
 
 func (ovn *Handler) setupForwardingIptables() error {
-	if err := ovn.updateIPtableChains(constants.FilterTable, ForwardingSubmarinerMSSClampChain, ovn.getMSSClampingRuleSpecs); err != nil {
+	if err := ovn.updateIPtableChains(packetfilter.TableTypeFilter, ForwardingSubmarinerMSSClampChain,
+		ovn.getMSSClampingRuleSpecs); err != nil {
 		return err
 	}
 
-	return ovn.updateIPtableChains(constants.FilterTable, ForwardingSubmarinerFWDChain, ovn.getForwardingRuleSpecs)
+	return ovn.updateIPtableChains(packetfilter.TableTypeFilter, ForwardingSubmarinerFWDChain, ovn.getForwardingRuleSpecs)
 }
 
 func (ovn *Handler) addNoMasqueradeIPTables(subnet string) error {
-	err := errors.Wrapf(ovn.ipt.AppendUnique(constants.NATTable, constants.SmPostRoutingChain,
-		[]string{"-d", subnet, "-j", "ACCEPT"}...), "error updating %q rules for subnet %q",
+	err := errors.Wrapf(ovn.pFilter.AppendUnique(packetfilter.TableTypeNAT, constants.SmPostRoutingChain,
+		&packetfilter.Rule{
+			DestCIDR: subnet,
+			Action:   packetfilter.RuleActionAccept,
+		}), "error updating %q rules for subnet %q",
 		constants.SmPostRoutingChain, subnet)
 	if err != nil {
 		return err
 	}
 
-	return errors.Wrapf(ovn.ipt.AppendUnique(constants.NATTable, constants.SmPostRoutingChain,
-		[]string{"-s", subnet, "-j", "ACCEPT"}...), "error updating %q rules for subnet %q",
+	return errors.Wrapf(ovn.pFilter.AppendUnique(packetfilter.TableTypeNAT, constants.SmPostRoutingChain,
+		&packetfilter.Rule{
+			SrcCIDR: subnet,
+			Action:  packetfilter.RuleActionAccept,
+		}), "error updating %q rules for subnet %q",
 		constants.SmPostRoutingChain, subnet)
 }
 
 func (ovn *Handler) removeNoMasqueradeIPTables(subnet string) error {
-	err := errors.Wrapf(ovn.ipt.Delete(constants.NATTable, constants.SmPostRoutingChain,
-		[]string{"-d", subnet, "-j", "ACCEPT"}...), "error updating %q rules for subnet %q",
+	err := errors.Wrapf(ovn.pFilter.Delete(packetfilter.TableTypeNAT, constants.SmPostRoutingChain,
+		&packetfilter.Rule{
+			DestCIDR: subnet,
+			Action:   packetfilter.RuleActionAccept,
+		}), "error updating %q rules for subnet %q",
 		constants.SmPostRoutingChain, subnet)
 	if err != nil {
 		return err
 	}
 
-	return errors.Wrapf(ovn.ipt.Delete(constants.NATTable, constants.SmPostRoutingChain,
-		[]string{"-s", subnet, "-j", "ACCEPT"}...), "error updating %q rules for subnet %q",
+	return errors.Wrapf(ovn.pFilter.Delete(packetfilter.TableTypeNAT, constants.SmPostRoutingChain,
+		&packetfilter.Rule{
+			SrcCIDR: subnet,
+			Action:  packetfilter.RuleActionAccept,
+		}), "error updating %q rules for subnet %q",
 		constants.SmPostRoutingChain, subnet)
 }
 
 func (ovn *Handler) cleanupForwardingIptables() error {
-	if err := ovn.ipt.ClearChain(constants.FilterTable, ForwardingSubmarinerMSSClampChain); err != nil {
+	if err := ovn.pFilter.DeleteIPHookChain(&packetfilter.ChainIPHook{
+		Name:     ForwardingSubmarinerMSSClampChain,
+		Type:     packetfilter.ChainTypeFilter,
+		Hook:     packetfilter.ChainHookForward,
+		Priority: packetfilter.ChainPriorityFirst,
+	}); err != nil {
 		return errors.Wrapf(err, "error clearing chain %q", ForwardingSubmarinerMSSClampChain)
 	}
 
-	return errors.Wrapf(ovn.ipt.ClearChain(constants.FilterTable, ForwardingSubmarinerFWDChain),
-		"error clearing chain %q", ForwardingSubmarinerFWDChain)
+	return errors.Wrapf(ovn.pFilter.DeleteIPHookChain(&packetfilter.ChainIPHook{
+		Name:     ForwardingSubmarinerFWDChain,
+		Type:     packetfilter.ChainTypeFilter,
+		Hook:     packetfilter.ChainHookForward,
+		Priority: packetfilter.ChainPriorityFirst,
+	}), "error clearing chain %q", ForwardingSubmarinerFWDChain)
 }
 
 func (ovn *Handler) getRouteToOVNDataPlane() (*netlink.Route, error) {
@@ -210,8 +242,15 @@ func (ovn *Handler) getRouteToOVNDataPlane() (*netlink.Route, error) {
 }
 
 func (ovn *Handler) initIPtablesChains() error {
-	if err := iptcommon.InitSubmarinerPostRoutingChain(ovn.ipt); err != nil {
-		return errors.Wrap(err, "error initializing POST routing chain")
+	logger.V(log.DEBUG).Infof("Install/ensure %q/%s IPHook chain exists", constants.SmPostRoutingChain, "NAT")
+
+	if err := ovn.pFilter.CreateIPHookChainIfNotExists(&packetfilter.ChainIPHook{
+		Name:     constants.SmPostRoutingChain,
+		Type:     packetfilter.ChainTypeNAT,
+		Hook:     packetfilter.ChainHookPostrouting,
+		Priority: packetfilter.ChainPriorityFirst,
+	}); err != nil {
+		return errors.Wrap(err, "error installing IPHook chain")
 	}
 
 	if err := ovn.ensureForwardChains(); err != nil {
@@ -222,28 +261,32 @@ func (ovn *Handler) initIPtablesChains() error {
 }
 
 func (ovn *Handler) ensureForwardChains() error {
-	if err := ovn.ipt.CreateChainIfNotExists(constants.FilterTable, ForwardingSubmarinerMSSClampChain); err != nil {
-		return errors.Wrapf(err, "error creating chain %q", ForwardingSubmarinerMSSClampChain)
+	if err := ovn.pFilter.CreateIPHookChainIfNotExists(&packetfilter.ChainIPHook{
+		Name:     ForwardingSubmarinerFWDChain,
+		Type:     packetfilter.ChainTypeFilter,
+		Hook:     packetfilter.ChainHookForward,
+		Priority: packetfilter.ChainPriorityFirst,
+	}); err != nil {
+		return errors.Wrap(err, "error installing IPHook chain")
 	}
 
-	if err := ovn.ipt.InsertUnique(constants.FilterTable, "FORWARD", 1,
-		[]string{"-j", ForwardingSubmarinerMSSClampChain}); err != nil {
-		return errors.Wrapf(err, "error inserting rule for chain %q", ForwardingSubmarinerMSSClampChain)
+	if err := ovn.pFilter.CreateIPHookChainIfNotExists(&packetfilter.ChainIPHook{
+		Name:     ForwardingSubmarinerMSSClampChain,
+		Type:     packetfilter.ChainTypeFilter,
+		Hook:     packetfilter.ChainHookForward,
+		Priority: packetfilter.ChainPriorityFirst,
+	}); err != nil {
+		return errors.Wrap(err, "error installing IPHook chain")
 	}
 
-	if err := ovn.ipt.CreateChainIfNotExists(constants.FilterTable, ForwardingSubmarinerFWDChain); err != nil {
-		return errors.Wrapf(err, "error creating chain %q", ForwardingSubmarinerFWDChain)
-	}
-
-	return errors.Wrapf(ovn.ipt.InsertUnique(constants.FilterTable, "FORWARD", 2, []string{"-j", ForwardingSubmarinerFWDChain}),
-		"error inserting rule for chain %q", ForwardingSubmarinerFWDChain)
+	return nil
 }
 
-func (ovn *Handler) updateIPtableChains(table, chain string, ruleGen forwardRuleSpecGenerator) error {
+func (ovn *Handler) updateIPtableChains(table packetfilter.TableType, chain string, ruleGen forwardRuleSpecGenerator) error {
 	ruleSpecs, err := ruleGen()
 	if err != nil {
 		return err
 	}
 
-	return errors.Wrap(ovn.ipt.UpdateChainRules(table, chain, ruleSpecs), "error updating chain rules")
+	return errors.Wrap(ovn.pFilter.UpdateChainRules(table, chain, ruleSpecs), "error updating chain rules")
 }

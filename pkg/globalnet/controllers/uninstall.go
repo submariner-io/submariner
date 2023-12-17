@@ -32,8 +32,9 @@ import (
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	versioned "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
-	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
+	pfiface "github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
 	"github.com/submariner-io/submariner/pkg/ipset"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -48,8 +49,11 @@ import (
 )
 
 func UninstallDataPath() {
-	ipt, err := iptables.New()
-	logger.FatalOnError(err, "Error initializing IP tables")
+	gnpFilter, err := pfiface.New()
+	logger.FatalOnError(err, "Error initializing GN PacketFilter")
+
+	pFilter, err := packetfilter.New()
+	logger.FatalOnError(err, "Error initializing PacketFilter")
 
 	natTableChains := []string{
 		// The chains have to be deleted in a specific order.
@@ -64,25 +68,35 @@ func UninstallDataPath() {
 	}
 
 	for _, chain := range natTableChains {
-		err = ipt.FlushIPTableChain(constants.NATTable, chain)
+		err = gnpFilter.FlushNatChain(chain)
 		if err != nil {
 			// Just log an error as this is part of uninstallation.
-			logger.Errorf(err, "Error flushing iptables chain %q", chain)
+			logger.Errorf(err, "Error flushing packetfilter chain %q", chain)
 		}
 	}
 
-	err = ipt.FlushIPTableChain(constants.NATTable, routeAgent.SmPostRoutingChain)
+	err = gnpFilter.FlushNatChain(routeAgent.SmPostRoutingChain)
 	if err != nil {
-		logger.Errorf(err, "Error flushing iptables chain %q", routeAgent.SmPostRoutingChain)
+		logger.Errorf(err, "Error flushing packetfilter chain %q", routeAgent.SmPostRoutingChain)
 	}
 
-	if err := ipt.DeleteIPTableRule(constants.NATTable, "PREROUTING", constants.SmGlobalnetIngressChain); err != nil {
-		logger.Errorf(err, "Error deleting iptables rule for %q in PREROUTING chain", constants.SmGlobalnetIngressChain)
+	chain := packetfilter.ChainIPHook{
+		Name:     constants.SmGlobalnetIngressChain,
+		Type:     packetfilter.ChainTypeNAT,
+		Hook:     packetfilter.ChainHookPrerouting,
+		Priority: packetfilter.ChainPriorityFirst,
+	}
+
+	if err := pFilter.DeleteIPHookChain(&chain); err != nil {
+		logger.Errorf(err, "error creating IPHook chain %s", constants.SmGlobalnetIngressChain)
 	}
 
 	for _, chain := range natTableChains {
-		err = ipt.DeleteIPTableChain(constants.NATTable, chain)
-		if err != nil {
+		if chain == constants.SmGlobalnetIngressChain {
+			continue
+		}
+
+		if err = gnpFilter.DeleteNatChain(chain); err != nil {
 			logger.Errorf(err, "Error deleting iptables chain %q", chain)
 		}
 	}

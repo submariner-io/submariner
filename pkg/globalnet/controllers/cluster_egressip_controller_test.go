@@ -30,6 +30,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/ipam"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -39,7 +40,7 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 	When("the well-known ClusterGlobalEgressIP does not exist on startup", func() {
 		It("should create it and allocate the default number of global IPs", func() {
 			t.awaitClusterGlobalEgressIPStatusAllocated(controllers.DefaultNumberOfClusterEgressIPs)
-			t.awaitIPTableRules(getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName).AllocatedIPs...)
+			t.awaitPacketFilterRules(getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName).AllocatedIPs...)
 		})
 	})
 
@@ -74,7 +75,7 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 				})
 
 				It("should program the necessary IP table rules for the allocated IPs", func() {
-					t.awaitIPTableRules(existing.Status.AllocatedIPs...)
+					t.awaitPacketFilterRules(existing.Status.AllocatedIPs...)
 				})
 			})
 
@@ -87,12 +88,12 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 
 				It("should reallocate the global IPs", func() {
 					t.awaitClusterGlobalEgressIPStatusAllocated(*existing.Spec.NumberOfIPs)
-					t.awaitIPTableRules(getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName).AllocatedIPs...)
+					t.awaitPacketFilterRules(getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName).AllocatedIPs...)
 				})
 
 				It("should release the previously allocated IPs", func() {
 					t.awaitIPsReleasedFromPool(existing.Status.AllocatedIPs...)
-					t.awaitNoIPTableRules(existing.Status.AllocatedIPs...)
+					t.awaitNoPacketFilterRules(existing.Status.AllocatedIPs...)
 				})
 			})
 
@@ -121,14 +122,14 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 						Status: metav1.ConditionTrue,
 					})
 
-					t.awaitIPTableRules(getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName).AllocatedIPs...)
+					t.awaitPacketFilterRules(getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName).AllocatedIPs...)
 				})
 			})
 
 			Context("and programming the IP table rules fails", func() {
 				BeforeEach(func() {
 					t.createClusterGlobalEgressIP(existing)
-					t.ipt.AddFailOnAppendRuleMatcher(ContainSubstring(existing.Status.AllocatedIPs[0]))
+					t.pFilter.AddFailOnAppendRuleMatcher(ContainSubstring(existing.Status.AllocatedIPs[0]))
 				})
 
 				It("should reallocate the global IPs", func() {
@@ -142,7 +143,7 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 					})
 
 					allocatedIPs := getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName).AllocatedIPs
-					t.awaitIPTableRules(allocatedIPs...)
+					t.awaitPacketFilterRules(allocatedIPs...)
 					t.awaitIPsReleasedFromPool(existing.Status.AllocatedIPs...)
 				})
 			})
@@ -225,12 +226,12 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 
 			It("should reallocate the global IPs", func() {
 				t.awaitClusterGlobalEgressIPStatusAllocated(numberOfIPs)
-				t.awaitIPTableRules(getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName).AllocatedIPs...)
+				t.awaitPacketFilterRules(getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName).AllocatedIPs...)
 			})
 
 			It("should release the previously allocated IPs", func() {
 				t.awaitIPsReleasedFromPool(existing.Status.AllocatedIPs...)
-				t.awaitNoIPTableRules(existing.Status.AllocatedIPs...)
+				t.awaitNoPacketFilterRules(existing.Status.AllocatedIPs...)
 			})
 		})
 
@@ -241,12 +242,12 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 
 			It("should reallocate the global IPs", func() {
 				t.awaitClusterGlobalEgressIPStatusAllocated(numberOfIPs)
-				t.awaitIPTableRules(getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName).AllocatedIPs...)
+				t.awaitPacketFilterRules(getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName).AllocatedIPs...)
 			})
 
 			It("should release the previously allocated IPs", func() {
 				t.awaitIPsReleasedFromPool(existing.Status.AllocatedIPs...)
-				t.awaitNoIPTableRules(existing.Status.AllocatedIPs...)
+				t.awaitNoPacketFilterRules(existing.Status.AllocatedIPs...)
 			})
 		})
 
@@ -265,31 +266,31 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 
 			It("should release the previously allocated IPs", func() {
 				t.awaitIPsReleasedFromPool(existing.Status.AllocatedIPs...)
-				t.awaitNoIPTableRules(existing.Status.AllocatedIPs...)
+				t.awaitNoPacketFilterRules(existing.Status.AllocatedIPs...)
 			})
 		})
 
 		Context("and IP tables cleanup of previously allocated IPs initially fails", func() {
 			BeforeEach(func() {
 				numberOfIPs = *existing.Spec.NumberOfIPs + 1
-				t.ipt.AddFailOnDeleteRuleMatcher(ContainSubstring(existing.Status.AllocatedIPs[0]))
+				t.pFilter.AddFailOnDeleteRuleMatcher(ContainSubstring(existing.Status.AllocatedIPs[0]))
 			})
 
 			It("should eventually cleanup the IP tables and reallocate", func() {
-				t.awaitNoIPTableRules(existing.Status.AllocatedIPs...)
+				t.awaitNoPacketFilterRules(existing.Status.AllocatedIPs...)
 				t.awaitClusterGlobalEgressIPStatusAllocated(numberOfIPs)
-				t.awaitIPTableRules(getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName).AllocatedIPs...)
+				t.awaitPacketFilterRules(getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName).AllocatedIPs...)
 			})
 		})
 
 		Context("and programming of IP tables initially fails", func() {
 			BeforeEach(func() {
 				numberOfIPs = *existing.Spec.NumberOfIPs + 1
-				t.ipt.AddFailOnAppendRuleMatcher(Not(ContainSubstring(existing.Status.AllocatedIPs[0])))
+				t.pFilter.AddFailOnAppendRuleMatcher(Not(ContainSubstring(existing.Status.AllocatedIPs[0])))
 			})
 
 			It("should eventually reallocate the global IPs", func() {
-				t.awaitNoIPTableRules(existing.Status.AllocatedIPs...)
+				t.awaitNoPacketFilterRules(existing.Status.AllocatedIPs...)
 				t.awaitEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, numberOfIPs, metav1.Condition{
 					Type:   string(submarinerv1.GlobalEgressIPAllocated),
 					Status: metav1.ConditionFalse,
@@ -298,7 +299,7 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 					Type:   string(submarinerv1.GlobalEgressIPAllocated),
 					Status: metav1.ConditionTrue,
 				})
-				t.awaitIPTableRules(getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName).AllocatedIPs...)
+				t.awaitPacketFilterRules(getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName).AllocatedIPs...)
 			})
 		})
 
@@ -393,14 +394,14 @@ func (t *clusterGlobalEgressIPControllerTestDriver) start() {
 	Expect(t.controller.Start()).To(Succeed())
 }
 
-func (t *clusterGlobalEgressIPControllerTestDriver) awaitIPTableRules(ips ...string) {
-	t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChainForCluster, ContainSubstring(getSNATAddress(ips...)))
+func (t *clusterGlobalEgressIPControllerTestDriver) awaitPacketFilterRules(ips ...string) {
+	t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForCluster, ContainSubstring(getSNATAddress(ips...)))
 
 	for _, localSubnet := range t.localSubnets {
-		t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChainForCluster, ContainSubstring(localSubnet))
+		t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForCluster, ContainSubstring(localSubnet))
 	}
 }
 
-func (t *clusterGlobalEgressIPControllerTestDriver) awaitNoIPTableRules(ips ...string) {
-	t.ipt.AwaitNoRule("nat", constants.SmGlobalnetEgressChainForCluster, ContainSubstring(getSNATAddress(ips...)))
+func (t *clusterGlobalEgressIPControllerTestDriver) awaitNoPacketFilterRules(ips ...string) {
+	t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForCluster, ContainSubstring(getSNATAddress(ips...)))
 }

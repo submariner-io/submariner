@@ -32,6 +32,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event/testing"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
 	fakeovn "github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn/fake"
@@ -313,8 +314,8 @@ var _ = Describe("Handler", func() {
 
 	Context("on Uninstall", func() {
 		It("should delete the table rules", func() {
-			Expect(t.ipTables.ChainExists(constants.FilterTable, ovn.ForwardingSubmarinerFWDChain)).To(BeTrue())
-			Expect(t.ipTables.ChainExists(constants.FilterTable, ovn.ForwardingSubmarinerMSSClampChain)).To(BeTrue())
+			Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain)).To(BeTrue())
+			Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerMSSClampChain)).To(BeTrue())
 
 			_ = t.netLink.RuleAdd(&netlink.Rule{
 				Table:  constants.RouteAgentHostNetworkTableID,
@@ -331,7 +332,7 @@ var _ = Describe("Handler", func() {
 			t.netLink.AwaitNoRule(constants.RouteAgentHostNetworkTableID, "", "")
 			t.netLink.AwaitNoRule(constants.RouteAgentInterClusterNetworkTableID, "", "")
 
-			Expect(t.ipTables.ChainExists(constants.FilterTable, ovn.ForwardingSubmarinerFWDChain)).To(BeFalse())
+			Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain)).To(BeFalse())
 		})
 	})
 })

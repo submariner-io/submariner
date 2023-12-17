@@ -23,8 +23,9 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
-	iptcommon "github.com/submariner-io/submariner/pkg/routeagent_driver/iptables"
 	"github.com/vishvananda/netlink"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -143,10 +144,16 @@ func (ovn *Handler) handleInterfaceAddressChange() error {
 			return errors.Wrap(err, "error syncing host network routes")
 		}
 
-		if err := iptcommon.InitSubmarinerPostRoutingChain(ovn.ipt); err != nil {
-			return errors.Wrapf(err, "error syncing IPtable %q chain", constants.PostRoutingChain)
-		}
+		logger.V(log.DEBUG).Infof("Install/ensure %q/%s IPHook chain exists", constants.SmPostRoutingChain, "NAT")
 
+		if err := ovn.pFilter.CreateIPHookChainIfNotExists(&packetfilter.ChainIPHook{
+			Name:     constants.SmPostRoutingChain,
+			Type:     packetfilter.ChainTypeNAT,
+			Hook:     packetfilter.ChainHookPostrouting,
+			Priority: packetfilter.ChainPriorityFirst,
+		}); err != nil {
+			return errors.Wrap(err, "error installing IPHook chain")
+		}
 		return nil
 	})
 
