@@ -24,6 +24,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // +genclient
@@ -391,4 +392,16 @@ type RoutePolicySpec struct {
 
 	// Specifies the remote CIDRs available via the next hop
 	RemoteCIDRs []string `json:"remoteCIDRs"`
+}
+
+var EndpointGVR = schema.GroupVersionResource{
+	Group:    SchemeGroupVersion.Group,
+	Version:  SchemeGroupVersion.Version,
+	Resource: "endpoints",
+}
+
+var ClusterGVR = schema.GroupVersionResource{
+	Group:    SchemeGroupVersion.Group,
+	Version:  SchemeGroupVersion.Version,
+	Resource: "clusters",
 }
