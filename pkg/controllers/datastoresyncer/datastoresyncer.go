@@ -38,7 +38,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -123,20 +122,12 @@ func (d *DatastoreSyncer) Cleanup(ctx context.Context) error {
 		}
 	}
 
-	err = d.cleanupResources(ctx, localClient.Resource(schema.GroupVersionResource{
-		Group:    submarinerv1.SchemeGroupVersion.Group,
-		Version:  submarinerv1.SchemeGroupVersion.Version,
-		Resource: "endpoints",
-	}), syncer)
+	err = d.cleanupResources(ctx, localClient.Resource(submarinerv1.EndpointGVR), syncer)
 	if err != nil {
 		return err
 	}
 
-	err = d.cleanupResources(ctx, localClient.Resource(schema.GroupVersionResource{
-		Group:    submarinerv1.SchemeGroupVersion.Group,
-		Version:  submarinerv1.SchemeGroupVersion.Version,
-		Resource: "clusters",
-	}), syncer)
+	err = d.cleanupResources(ctx, localClient.Resource(submarinerv1.ClusterGVR), syncer)
 	if err != nil {
 		return err
 	}
