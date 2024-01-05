@@ -38,7 +38,7 @@ var _ = Describe("NonGatewayRouteHandler", func() {
 	})
 
 	awaitNonGatewayRoute := func(ep *submarinerv1.Endpoint) {
-		nonGWRoute := test.AwaitResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace), ep.Name)
+		nonGWRoute := test.AwaitResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace), ep.Spec.ClusterID)
 		Expect(nonGWRoute.RoutePolicySpec.RemoteCIDRs).To(Equal(ep.Spec.Subnets))
 		Expect(nonGWRoute.RoutePolicySpec.NextHops).To(Equal([]string{t.transitSwitchIP}))
 	}
@@ -53,7 +53,7 @@ var _ = Describe("NonGatewayRouteHandler", func() {
 			awaitNonGatewayRoute(endpoint)
 
 			t.DeleteEndpoint(endpoint.Name)
-			test.AwaitNoResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace), endpoint.Name)
+			test.AwaitNoResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace), endpoint.Spec.ClusterID)
 		})
 
 		Context("and the NonGatewayRoute operations initially fail", func() {
@@ -69,7 +69,7 @@ var _ = Describe("NonGatewayRouteHandler", func() {
 				awaitNonGatewayRoute(endpoint)
 
 				t.DeleteEndpoint(endpoint.Name)
-				test.AwaitNoResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace), endpoint.Name)
+				test.AwaitNoResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace), endpoint.Spec.ClusterID)
 			})
 		})
 
@@ -80,7 +80,7 @@ var _ = Describe("NonGatewayRouteHandler", func() {
 
 			It("should not create a NonGatewayRoute", func() {
 				endpoint := t.CreateEndpoint(testing.NewEndpoint("remote-cluster", "host", "193.0.4.0/24"))
-				test.EnsureNoResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace), endpoint.Name)
+				test.EnsureNoResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace), endpoint.Spec.ClusterID)
 
 				t.submClient.Fake.ClearActions()
 				t.DeleteEndpoint(endpoint.Name)
@@ -92,7 +92,7 @@ var _ = Describe("NonGatewayRouteHandler", func() {
 	Context("on transition to gateway", func() {
 		It("should create NonGatewayRoutes for all remote Endpoints", func() {
 			endpoint := t.CreateEndpoint(testing.NewEndpoint("remote-cluster", "host", "193.0.4.0/24"))
-			test.EnsureNoResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace), endpoint.Name)
+			test.EnsureNoResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace), endpoint.Spec.ClusterID)
 
 			localEndpoint := t.CreateLocalHostEndpoint()
 			awaitNonGatewayRoute(endpoint)
@@ -112,7 +112,7 @@ var _ = Describe("NonGatewayRouteHandler", func() {
 			It("should not create any NonGatewayRoutes", func() {
 				endpoint := t.CreateEndpoint(testing.NewEndpoint("remote-cluster", "host", "193.0.4.0/24"))
 				t.CreateLocalHostEndpoint()
-				test.EnsureNoResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace), endpoint.Name)
+				test.EnsureNoResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace), endpoint.Spec.ClusterID)
 			})
 		})
 	})
