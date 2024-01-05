@@ -19,16 +19,21 @@ limitations under the License.
 package endpoint_test
 
 import (
+	"context"
 	"os"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/syncer/test"
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/types"
 	v1 "k8s.io/api/core/v1"
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 const testNodeName = "this-node"
@@ -138,5 +143,53 @@ var _ = Describe("GetLocalSpec", func() {
 			Expect(spec.PrivateIP).To(Equal(testPrivateIP))
 			Expect(spec.PublicIP).To(Equal(testPublicIP))
 		})
+	})
+})
+
+var _ = Describe("Local", func() {
+	var (
+		spec      *submarinerv1.EndpointSpec
+		local     *endpoint.Local
+		dynClient *dynamicfake.FakeDynamicClient
+	)
+
+	BeforeEach(func() {
+		spec = &submarinerv1.EndpointSpec{
+			CableName: "submariner-cable-192-68-1-2",
+			ClusterID: "east",
+			Hostname:  "redsox",
+			PrivateIP: "192.68.1.2",
+			PublicIP:  "1.2.3.4",
+			Subnets:   []string{"100.0.0.0/16", "10.0.0.0/14"},
+			Backend:   "ipsec",
+		}
+
+		dynClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
+	})
+
+	JustBeforeEach(func() {
+		local = endpoint.NewLocal(spec, dynClient, testNamespace)
+
+		test.CreateResource(dynClient.Resource(submarinerv1.EndpointGVR).Namespace(testNamespace), local.Resource())
+	})
+
+	Specify("Spec should return the correct data", func() {
+		Expect(*local.Spec()).To(Equal(*spec))
+	})
+
+	Specify("Update should successfully update the resource", func() {
+		spec.PublicIP = "11.22.33.44"
+
+		Expect(local.Update(context.Background(), func(existing *submarinerv1.EndpointSpec) {
+			existing.PublicIP = spec.PublicIP
+		})).To(Succeed())
+
+		Expect(*local.Spec()).To(Equal(*spec))
+
+		endpoint := test.GetResource(dynClient.Resource(submarinerv1.EndpointGVR).Namespace(testNamespace),
+			&submarinerv1.Endpoint{
+				ObjectMeta: v1meta.ObjectMeta{Name: local.Resource().Name},
+			})
+		Expect(endpoint.Spec).To(Equal(*spec))
 	})
 })

@@ -19,27 +19,92 @@ limitations under the License.
 package endpoint
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/resource"
+	"github.com/submariner-io/admiral/pkg/util"
 	submv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cidr"
 	"github.com/submariner-io/submariner/pkg/node"
 	"github.com/submariner-io/submariner/pkg/port"
 	"github.com/submariner-io/submariner/pkg/types"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/set"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var logger = log.Logger{Logger: logf.Log.WithName("Endpoint")}
+
+type Local struct {
+	spec      atomic.Value
+	endpoints dynamic.ResourceInterface
+}
+
+func NewLocal(spec *submv1.EndpointSpec, dynClient dynamic.Interface, namespace string) *Local {
+	l := &Local{
+		endpoints: dynClient.Resource(submv1.EndpointGVR).Namespace(namespace),
+	}
+
+	l.spec.Store(*spec)
+
+	return l
+}
+
+func (l *Local) Spec() *submv1.EndpointSpec {
+	spec := l.spec.Load().(submv1.EndpointSpec)
+	return &spec
+}
+
+func (l *Local) Resource() *submv1.Endpoint {
+	spec := l.spec.Load().(submv1.EndpointSpec)
+	return endpointFrom(&spec)
+}
+
+func endpointFrom(spec *submv1.EndpointSpec) *submv1.Endpoint {
+	endpointName, err := spec.GenerateName()
+	utilruntime.Must(err)
+
+	return &submv1.Endpoint{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: endpointName,
+		},
+		Spec: *spec,
+	}
+}
+
+func (l *Local) Update(ctx context.Context, mutate func(existing *submv1.EndpointSpec)) error {
+	toUpdate := resource.MustToUnstructured(l.Resource())
+
+	var newSpec *submv1.EndpointSpec
+
+	err := util.Update[*unstructured.Unstructured](ctx, resource.ForDynamic(l.endpoints), toUpdate,
+		func(existing *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+			ep := resource.MustFromUnstructured(existing, &submv1.Endpoint{})
+			mutate(&ep.Spec)
+			newSpec = &ep.Spec
+
+			return resource.MustToUnstructured(ep), nil
+		})
+	if err == nil && newSpec != nil {
+		l.spec.Store(*newSpec)
+	}
+
+	return err
+}
 
 func GetLocalSpec(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface,
 	airGappedDeployment bool,
