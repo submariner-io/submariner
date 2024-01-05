@@ -24,20 +24,16 @@ import (
 
 	"github.com/pkg/errors"
 	submv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	v1 "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/util/retry"
 )
 
 type PublicIPWatcherConfig struct {
 	SubmSpec      *types.SubmarinerSpecification
 	Interval      time.Duration
 	K8sClient     kubernetes.Interface
-	Endpoints     v1.EndpointInterface
-	LocalEndpoint types.SubmarinerEndpoint
+	LocalEndpoint *Local
 }
 
 type PublicIPWatcher struct {
@@ -67,13 +63,15 @@ func (p *PublicIPWatcher) Run(stopCh <-chan struct{}) {
 }
 
 func (p *PublicIPWatcher) syncPublicIP() {
-	publicIP, err := getPublicIP(p.config.SubmSpec, p.config.K8sClient, p.config.LocalEndpoint.Spec.BackendConfig, false)
+	localEndpointSpec := p.config.LocalEndpoint.Spec()
+
+	publicIP, err := getPublicIP(p.config.SubmSpec, p.config.K8sClient, localEndpointSpec.BackendConfig, false)
 	if err != nil {
-		logger.Warningf("Could not determine public IP of the gateway node %q: %v", p.config.LocalEndpoint.Spec.Hostname, err)
+		logger.Warningf("Could not determine public IP of the gateway node %q: %v", localEndpointSpec.Hostname, err)
 		return
 	}
 
-	if p.config.LocalEndpoint.Spec.PublicIP != publicIP {
+	if localEndpointSpec.PublicIP != publicIP {
 		logger.Infof("Public IP changed for the Gateway, updating the local endpoint with publicIP %q", publicIP)
 
 		if err := p.updateLocalEndpoint(publicIP); err != nil {
@@ -84,30 +82,9 @@ func (p *PublicIPWatcher) syncPublicIP() {
 }
 
 func (p *PublicIPWatcher) updateLocalEndpoint(publicIP string) error {
-	var ep *submv1.Endpoint
-
-	endpointName, err := p.config.LocalEndpoint.Spec.GenerateName()
-	if err != nil {
-		return errors.Wrapf(err, "error extracting the submariner Endpoint name from %#v", p.config.LocalEndpoint)
-	}
-
-	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		ep, err = p.config.Endpoints.Get(context.TODO(), endpointName, metav1.GetOptions{})
-		if err != nil {
-			return errors.Wrapf(err, "unable to get endpoint %q", endpointName)
-		}
-
-		ep.Spec.PublicIP = publicIP
-
-		_, updateErr := p.config.Endpoints.Update(context.TODO(), ep, metav1.UpdateOptions{})
-		return updateErr //nolint:wrapcheck // We wrap it below in the enclosing function
+	err := p.config.LocalEndpoint.Update(context.TODO(), func(existing *submv1.EndpointSpec) {
+		existing.PublicIP = publicIP
 	})
 
-	if retryErr != nil {
-		return errors.Wrapf(retryErr, "error updating the public IP of local endpoint %q", endpointName)
-	}
-
-	p.config.LocalEndpoint.Spec = ep.Spec
-
-	return nil
+	return errors.Wrap(err, "error updating the public IP of the local endpoint")
 }
