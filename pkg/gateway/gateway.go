@@ -143,7 +143,7 @@ func New(config *Config) (Interface, error) {
 	g.airGapped = os.Getenv("AIR_GAPPED_DEPLOYMENT") == "true"
 	logger.Infof("AIR_GAPPED_DEPLOYMENT is set to %t", g.airGapped)
 
-	g.localEndpoint, err = endpoint.GetLocal(&g.Spec, g.KubeClient, g.airGapped)
+	localEndpointSpec, err := endpoint.GetLocalSpec(&g.Spec, g.KubeClient, g.airGapped)
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating local endpoint object")
 	}

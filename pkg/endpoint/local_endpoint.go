@@ -41,9 +41,9 @@ import (
 
 var logger = log.Logger{Logger: logf.Log.WithName("Endpoint")}
 
-func GetLocal(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface,
+func GetLocalSpec(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface,
 	airGappedDeployment bool,
-) (*types.SubmarinerEndpoint, error) {
+) (*submv1.EndpointSpec, error) {
 	// We'll panic if submSpec is nil, this is intentional
 	privateIP := GetLocalIP()
 
@@ -78,17 +78,15 @@ func GetLocal(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Inte
 		backendConfig[submv1.UsingLoadBalancer] = "true"
 	}
 
-	endpoint := &types.SubmarinerEndpoint{
-		Spec: submv1.EndpointSpec{
-			CableName:     fmt.Sprintf("submariner-cable-%s-%s", submSpec.ClusterID, strings.ReplaceAll(privateIP, ".", "-")),
-			ClusterID:     submSpec.ClusterID,
-			Hostname:      hostname,
-			PrivateIP:     privateIP,
-			NATEnabled:    submSpec.NATEnabled,
-			Subnets:       localSubnets,
-			Backend:       submSpec.CableDriver,
-			BackendConfig: backendConfig,
-		},
+	endpointSpec := &submv1.EndpointSpec{
+		CableName:     fmt.Sprintf("submariner-cable-%s-%s", submSpec.ClusterID, strings.ReplaceAll(privateIP, ".", "-")),
+		ClusterID:     submSpec.ClusterID,
+		Hostname:      hostname,
+		PrivateIP:     privateIP,
+		NATEnabled:    submSpec.NATEnabled,
+		Subnets:       localSubnets,
+		Backend:       submSpec.CableDriver,
+		BackendConfig: backendConfig,
 	}
 
 	publicIP, err := getPublicIP(submSpec, k8sClient, backendConfig, airGappedDeployment)
@@ -96,21 +94,21 @@ func GetLocal(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Inte
 		return nil, errors.Wrap(err, "could not determine public IP")
 	}
 
-	endpoint.Spec.PublicIP = publicIP
+	endpointSpec.PublicIP = publicIP
 
 	if submSpec.HealthCheckEnabled && !globalnetEnabled {
 		// When globalnet is enabled, HealthCheckIP will be the globalIP assigned to the Active GatewayNode.
 		// In a fresh deployment, globalIP annotation for the node might take few seconds. So we listen on NodeEvents
 		// and update the endpoint HealthCheckIP (to globalIP) in datastoreSyncer at a later stage. This will trigger
 		// the HealthCheck between the clusters.
-		endpoint.Spec.HealthCheckIP, err = getCNIInterfaceIPAddress(submSpec.ClusterCidr)
+		endpointSpec.HealthCheckIP, err = getCNIInterfaceIPAddress(submSpec.ClusterCidr)
 		if err != nil {
 			return nil, fmt.Errorf("error getting CNI Interface IP address: %w."+
 				"Please disable the health check if your CNI does not expose a pod IP on the nodes", err)
 		}
 	}
 
-	return endpoint, nil
+	return endpointSpec, nil
 }
 
 func getBackendConfig(nodeObj *v1.Node) (map[string]string, error) {
