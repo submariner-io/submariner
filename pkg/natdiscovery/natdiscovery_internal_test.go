@@ -19,6 +19,7 @@ limitations under the License.
 package natdiscovery
 
 import (
+	"context"
 	"net"
 	"sync/atomic"
 	"time"
@@ -182,7 +183,9 @@ var _ = When("a remote Endpoint is added", func() {
 		Context("with the Endpoint's private IP changed", func() {
 			BeforeEach(func() {
 				newRemoteEndpoint.Spec.PrivateIP = testRemotePrivateIP2
-				t.remoteND.localEndpoint.Spec.PrivateIP = testRemotePrivateIP2
+				Expect(t.remoteND.localEndpoint.Update(context.Background(), func(existing *submarinerv1.EndpointSpec) {
+					existing.PrivateIP = testRemotePrivateIP2
+				})).To(Succeed())
 			})
 
 			It("should notify with new NATEndpointInfo settings", func() {
@@ -217,7 +220,9 @@ var _ = When("a remote Endpoint is added", func() {
 		Context("with the Endpoint's private IP changed", func() {
 			BeforeEach(func() {
 				newRemoteEndpoint.Spec.PrivateIP = testRemotePrivateIP2
-				t.remoteND.localEndpoint.Spec.PrivateIP = testRemotePrivateIP2
+				Expect(t.remoteND.localEndpoint.Update(context.Background(), func(existing *submarinerv1.EndpointSpec) {
+					existing.PrivateIP = testRemotePrivateIP2
+				})).To(Succeed())
 			})
 
 			JustBeforeEach(func() {
