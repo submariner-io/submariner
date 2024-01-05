@@ -36,6 +36,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/controllers/datastoresyncer"
+	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -76,7 +77,7 @@ var _ = BeforeSuite(func() {
 type testDriver struct {
 	syncer           *datastoresyncer.DatastoreSyncer
 	localCluster     *types.SubmarinerCluster
-	localEndpoint    *types.SubmarinerEndpoint
+	localEndpoint    *submarinerv1.EndpointSpec
 	localClient      *dynamicfake.FakeDynamicClient
 	brokerClient     *dynamicfake.FakeDynamicClient
 	localClusters    dynamic.ResourceInterface
@@ -103,15 +104,13 @@ func newTestDriver() *testDriver {
 				GlobalCIDR:  []string{"200.0.0.0/16"},
 			},
 		},
-		localEndpoint: &types.SubmarinerEndpoint{
-			Spec: submarinerv1.EndpointSpec{
-				CableName: fmt.Sprintf("submariner-cable-%s-192-68-1-2", clusterID),
-				ClusterID: clusterID,
-				Hostname:  "redsox",
-				PrivateIP: "192.68.1.2",
-				Subnets:   []string{"100.0.0.0/16", "10.0.0.0/14"},
-				Backend:   "ipsec",
-			},
+		localEndpoint: &submarinerv1.EndpointSpec{
+			CableName: fmt.Sprintf("submariner-cable-%s-192-68-1-2", clusterID),
+			ClusterID: clusterID,
+			Hostname:  "redsox",
+			PrivateIP: "192.68.1.2",
+			Subnets:   []string{"100.0.0.0/16", "10.0.0.0/14"},
+			Backend:   "ipsec",
 		},
 	}
 
@@ -164,7 +163,7 @@ func (t *testDriver) run() {
 		BrokerNamespace: brokerNamespace,
 		RestMapper:      t.restMapper,
 		Scheme:          t.syncerScheme,
-	}, t.localCluster, t.localEndpoint)
+	}, t.localCluster, endpoint.NewLocal(t.localEndpoint, t.localClient, localNamespace))
 
 	if t.doStart {
 		var ctx context.Context
