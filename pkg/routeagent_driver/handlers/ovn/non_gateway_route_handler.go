@@ -20,10 +20,8 @@ package ovn
 
 import (
 	"context"
-	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -34,32 +32,27 @@ import (
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 )
 
 type NonGatewayRouteHandler struct {
 	event.HandlerBase
-	mutex           sync.Mutex
 	smClient        submarinerClientset.Interface
-	remoteEndpoints map[string]*submarinerv1.Endpoint
-	k8sClientSet    clientset.Interface
-	isGateway       bool
+	k8sClient       clientset.Interface
 	transitSwitchIP string
 }
 
-func NewNonGatewayRouteHandler(smClientSet submarinerClientset.Interface, k8sClientset *clientset.Clientset) *NonGatewayRouteHandler {
+func NewNonGatewayRouteHandler(smClient submarinerClientset.Interface, k8sClient clientset.Interface) *NonGatewayRouteHandler {
 	return &NonGatewayRouteHandler{
-		smClient:        smClientSet,
-		remoteEndpoints: map[string]*submarinerv1.Endpoint{},
-		k8sClientSet:    k8sClientset,
+		smClient:  smClient,
+		k8sClient: k8sClient,
 	}
 }
 
 func (h *NonGatewayRouteHandler) Init() error {
 	logger.Info("Starting NonGatewayRouteHandler")
 
-	node, err := nodeutil.GetLocalNode(h.k8sClientSet)
+	node, err := nodeutil.GetLocalNode(h.k8sClient)
 	if err != nil {
 		return errors.Wrap(err, "error getting the g/w node")
 	}
@@ -87,71 +80,62 @@ func (h *NonGatewayRouteHandler) GetNetworkPlugins() []string {
 }
 
 func (h *NonGatewayRouteHandler) RemoteEndpointCreated(endpoint *submarinerv1.Endpoint) error {
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
-
-	h.remoteEndpoints[endpoint.Name] = endpoint
-
-	if !h.isGateway || h.transitSwitchIP == "" {
+	if !h.State().IsOnGateway() || h.transitSwitchIP == "" {
 		return nil
 	}
 
-	_, err := h.smClient.SubmarinerV1().
-		NonGatewayRoutes(endpoint.Namespace).Create(context.TODO(),
-		h.newNonGatewayRoute(endpoint), metav1.CreateOptions{})
-	if err != nil && !apierrors.IsAlreadyExists(err) {
+	ngwr := h.newNonGatewayRoute(endpoint)
+
+	result, err := util.CreateOrUpdate(context.TODO(), NonGatewayResourceInterface(h.smClient, endpoint.Namespace),
+		ngwr, util.Replace(ngwr))
+	if err != nil {
 		return errors.Wrapf(err, "error processing the remote endpoint create event for %q", endpoint.Name)
 	}
+
+	logger.Infof("NonGatewayRoute %s from remote endpoint %s: %s", result, endpoint.Name, resource.ToJSON(ngwr))
 
 	return nil
 }
 
 func (h *NonGatewayRouteHandler) RemoteEndpointRemoved(endpoint *submarinerv1.Endpoint) error {
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
-	delete(h.remoteEndpoints, endpoint.Name)
-
-	if !h.isGateway || h.transitSwitchIP == "" {
+	if !h.State().IsOnGateway() || h.transitSwitchIP == "" {
 		return nil
 	}
 
 	if err := h.smClient.SubmarinerV1().NonGatewayRoutes(endpoint.Namespace).Delete(context.TODO(),
-		endpoint.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		endpoint.Spec.ClusterID, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 		return errors.Wrapf(err, "error deleting nonGatewayRoute %q", endpoint.Name)
 	}
 
-	return nil
-}
-
-func (h *NonGatewayRouteHandler) TransitionToNonGateway() error {
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
-
-	h.isGateway = false
+	logger.Infof("NonGatewayRoute %s deleted for remote endpoint %s", endpoint.Spec.ClusterID, endpoint.Name)
 
 	return nil
 }
 
 func (h *NonGatewayRouteHandler) TransitionToGateway() error {
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
-
-	h.isGateway = true
-
 	if h.transitSwitchIP == "" {
 		return nil
 	}
 
-	for _, endpoint := range h.remoteEndpoints {
-		ngwr := h.newNonGatewayRoute(endpoint)
+	endpoints := h.State().GetRemoteEndpoints()
+	for i := range endpoints {
+		// This piece of code is designed to manage upgrades from a version lower than 0.16.3 to a higher version,
+		// where we utilize the endpoint name as the identifier for ngwr. It can be removed once we stop supporting
+		// the 0.16 version.
+		if err := h.smClient.SubmarinerV1().NonGatewayRoutes(endpoints[i].Namespace).Delete(context.TODO(),
+			endpoints[i].Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			return errors.Wrapf(err, "error deleting nonGatewayRoute %q", endpoints[i].Name)
+		}
 
-		result, err := util.CreateOrUpdate(context.TODO(), h.nonGatewayResourceInterface(endpoint.Namespace),
+		ngwr := h.newNonGatewayRoute(&endpoints[i])
+
+		result, err := util.CreateOrUpdate(context.TODO(), NonGatewayResourceInterface(h.smClient, endpoints[i].Namespace),
 			ngwr, util.Replace(ngwr))
 		if err != nil {
 			return errors.Wrapf(err, "error creating/updating NonGatewayRoute")
 		}
 
-		logger.V(log.TRACE).Infof("NonGatewayRoute %s: %#v", result, ngwr)
+		logger.Infof("NonGatewayRoute %s from remote endpoint %s: %s", result, endpoints[i].Name, resource.ToJSON(ngwr))
 	}
 
 	return nil
@@ -160,7 +144,7 @@ func (h *NonGatewayRouteHandler) TransitionToGateway() error {
 func (h *NonGatewayRouteHandler) newNonGatewayRoute(endpoint *submarinerv1.Endpoint) *submarinerv1.NonGatewayRoute {
 	return &submarinerv1.NonGatewayRoute{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      endpoint.Name,
+			Name:      endpoint.Spec.ClusterID,
 			Namespace: endpoint.Namespace,
 		},
 		RoutePolicySpec: submarinerv1.RoutePolicySpec{
@@ -170,20 +154,13 @@ func (h *NonGatewayRouteHandler) newNonGatewayRoute(endpoint *submarinerv1.Endpo
 	}
 }
 
-//nolint // These functions are pass-through wrappers for the k8s APIs.
-func (h *NonGatewayRouteHandler) nonGatewayResourceInterface(namespace string) resource.Interface {
-	return &resource.InterfaceFuncs{
-		GetFunc: func(ctx context.Context, name string, options metav1.GetOptions) (runtime.Object, error) {
-			return h.smClient.SubmarinerV1().NonGatewayRoutes(namespace).Get(ctx, name, options)
-		},
-		CreateFunc: func(ctx context.Context, obj runtime.Object, options metav1.CreateOptions) (runtime.Object, error) {
-			return h.smClient.SubmarinerV1().NonGatewayRoutes(namespace).Create(ctx, obj.(*submarinerv1.NonGatewayRoute), options)
-		},
-		UpdateFunc: func(ctx context.Context, obj runtime.Object, options metav1.UpdateOptions) (runtime.Object, error) {
-			return h.smClient.SubmarinerV1().NonGatewayRoutes(namespace).Update(ctx, obj.(*submarinerv1.NonGatewayRoute), options)
-		},
-		DeleteFunc: func(ctx context.Context, name string, options metav1.DeleteOptions) error {
-			return h.smClient.SubmarinerV1().NonGatewayRoutes(namespace).Delete(ctx, name, options)
-		},
+func NonGatewayResourceInterface(smClient submarinerClientset.Interface, namespace string,
+) resource.Interface[*submarinerv1.NonGatewayRoute] {
+	return &resource.InterfaceFuncs[*submarinerv1.NonGatewayRoute]{
+		GetFunc:    smClient.SubmarinerV1().NonGatewayRoutes(namespace).Get,
+		CreateFunc: smClient.SubmarinerV1().NonGatewayRoutes(namespace).Create,
+		UpdateFunc: smClient.SubmarinerV1().NonGatewayRoutes(namespace).Update,
+		DeleteFunc: smClient.SubmarinerV1().NonGatewayRoutes(namespace).Delete,
 	}
 }
+
