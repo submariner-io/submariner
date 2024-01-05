@@ -103,6 +103,8 @@ var _ = Describe("public ip resolvers", func() {
 	When("a LoadBalancer with no ingress is specified", func() {
 		It("should return error", func() {
 			loadBalancerRetryConfig.Cap = 1 * time.Second
+			loadBalancerRetryConfig.Duration = 50 * time.Millisecond
+			loadBalancerRetryConfig.Steps = 1
 			backendConfig[publicIPConfig] = lbPublicIP
 			client := fake.NewSimpleClientset(serviceWithIngress())
 			_, err := getPublicIP(submSpec, client, backendConfig, false)

@@ -25,14 +25,16 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/syncer/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	fakeClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned/fake"
-	submarinerClientsetv1 "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/types"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 const (
@@ -45,64 +47,51 @@ const (
 	testNamespace     = "namespace"
 )
 
-var _ = Describe("public ip watcher", func() {
-	var endpointName string
-	var err error
-
+var _ = Describe("PublicIPWatcher", func() {
 	t := newPublicIPWatcherTestDriver()
-
-	BeforeEach(func() {
-		cableName := fmt.Sprintf("submariner-cable-%s-192-68-10-2", clusterID)
-
-		// Let's create a local endpoint with load-balancer set to true but without any public-ip
-		t.localEPSpec = newEndpointSpec(clusterID, cableName)
-
-		endpointName, err = t.localEPSpec.GenerateName()
-		Expect(err).To(Succeed())
-	})
-
-	AfterEach(func() {
-		close(t.stopCh)
-	})
 
 	When("using the LoadBalancer mode and the Ingress IP is modified", func() {
 		It("should update the public IP of local endpoint accordingly", func() {
-			// Allow the public-ip watcher to resolve public-ip from the corresponding load-balancer service.
-			time.Sleep(2 * interval)
-
-			// Verify that local endpoint now has public-ip
-			obj := t.getLocalEndpoint(endpointName)
-			Expect(obj.Spec.PublicIP).To(Equal(initialIP))
+			Eventually(func() string {
+				return t.getLocalEndpoint().Spec.PublicIP
+			}, 5).Should(Equal(initialIP))
 
 			// Update the load-balancer ingress ip
 			t.updateLoadbalancerService(testServiceName, testNamespace, updatedIP)
-			time.Sleep(2 * interval)
 
-			// Verify that local endpoint now has the updated public-ip
-			obj = t.getLocalEndpoint(endpointName)
-			Expect(obj.Spec.PublicIP).To(Equal(updatedIP))
+			Eventually(func() string {
+				return t.getLocalEndpoint().Spec.PublicIP
+			}, 5).Should(Equal(updatedIP))
 		})
 	})
 })
 
 type publicIPWatcherTestDriver struct {
-	smEndpointClient submarinerClientsetv1.EndpointInterface
-	k8sClient        *fake.Clientset
-	localEPSpec      submarinerv1.EndpointSpec
-	stopCh           chan struct{}
+	dynClient      dynamic.Interface
+	endpointClient dynamic.ResourceInterface
+	localEndpoint  *endpoint.Local
+	k8sClient      *fake.Clientset
+	localEPSpec    submarinerv1.EndpointSpec
+	stopCh         chan struct{}
 }
 
 func newPublicIPWatcherTestDriver() *publicIPWatcherTestDriver {
 	t := &publicIPWatcherTestDriver{}
 
 	BeforeEach(func() {
+		// Let's create a local endpoint with load-balancer set to true but without any public-ip
+		cableName := fmt.Sprintf("submariner-cable-%s-192-68-10-2", clusterID)
+		t.localEPSpec = newEndpointSpec(clusterID, cableName)
+
 		t.stopCh = make(chan struct{})
 		t.k8sClient = fake.NewSimpleClientset(loadBalancerService(v1.LoadBalancerIngress{Hostname: "", IP: initialIP}))
-		t.smEndpointClient = fakeClientset.NewSimpleClientset().SubmarinerV1().Endpoints(testNamespace)
+		t.dynClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
+		t.endpointClient = t.dynClient.Resource(submarinerv1.EndpointGVR).Namespace(testNamespace)
+		t.localEndpoint = endpoint.NewLocal(&t.localEPSpec, t.dynClient, testNamespace)
 	})
 
 	JustBeforeEach(func() {
-		t.createEndpoint(&t.localEPSpec)
+		test.CreateResource(t.endpointClient, t.localEndpoint.Resource())
 
 		ipWatcher := endpoint.NewPublicIPWatcher(&endpoint.PublicIPWatcherConfig{
 			SubmSpec: &types.SubmarinerSpecification{
@@ -110,42 +99,23 @@ func newPublicIPWatcherTestDriver() *publicIPWatcherTestDriver {
 				Namespace: testNamespace,
 				PublicIP:  "lb:" + testServiceName,
 			},
-			Interval:  interval,
-			K8sClient: t.k8sClient,
-			Endpoints: t.smEndpointClient,
-			LocalEndpoint: types.SubmarinerEndpoint{
-				Spec: t.localEPSpec,
-			},
+			Interval:      interval,
+			K8sClient:     t.k8sClient,
+			LocalEndpoint: endpoint.NewLocal(&t.localEPSpec, t.dynClient, testNamespace),
 		})
 
 		ipWatcher.Run(t.stopCh)
 	})
 
+	AfterEach(func() {
+		close(t.stopCh)
+	})
+
 	return t
 }
 
-func (t *publicIPWatcherTestDriver) createEndpoint(spec *submarinerv1.EndpointSpec) *submarinerv1.Endpoint {
-	endpointName, err := spec.GenerateName()
-	Expect(err).To(Succeed())
-
-	ep := &submarinerv1.Endpoint{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: endpointName,
-		},
-		Spec: *spec,
-	}
-
-	obj, err := t.smEndpointClient.Create(context.TODO(), ep, metav1.CreateOptions{})
-	Expect(err).To(Succeed())
-
-	return obj
-}
-
-func (t *publicIPWatcherTestDriver) getLocalEndpoint(name string) *submarinerv1.Endpoint {
-	obj, err := t.smEndpointClient.Get(context.TODO(), name, metav1.GetOptions{})
-	Expect(err).To(Succeed())
-
-	return obj
+func (t *publicIPWatcherTestDriver) getLocalEndpoint() *submarinerv1.Endpoint {
+	return test.GetResource(t.endpointClient, t.localEndpoint.Resource())
 }
 
 func newEndpointSpec(clusterID, cableName string) submarinerv1.EndpointSpec {
