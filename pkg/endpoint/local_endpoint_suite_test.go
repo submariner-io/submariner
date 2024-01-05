@@ -24,10 +24,14 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 func init() {
 	kzerolog.AddFlags(nil)
+	utilruntime.Must(submarinerv1.AddToScheme(scheme.Scheme))
 }
 
 var _ = BeforeSuite(func() {
