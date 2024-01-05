@@ -23,7 +23,6 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -96,12 +95,15 @@ func (h *NonGatewayRouteHandler) RemoteEndpointCreated(endpoint *submarinerv1.En
 		return nil
 	}
 
-	_, err := h.smClient.SubmarinerV1().
-		NonGatewayRoutes(endpoint.Namespace).Create(context.TODO(),
-		h.newNonGatewayRoute(endpoint), metav1.CreateOptions{})
-	if err != nil && !apierrors.IsAlreadyExists(err) {
+	ngwr := h.newNonGatewayRoute(endpoint)
+
+	result, err := util.CreateOrUpdate(context.TODO(), h.nonGatewayResourceInterface(endpoint.Namespace),
+		ngwr, util.Replace(ngwr))
+	if err != nil {
 		return errors.Wrapf(err, "error processing the remote endpoint create event for %q", endpoint.Name)
 	}
+
+	logger.Infof("NonGatewayRoute %s from remote endpoint %s: %s", result, endpoint.Name, resource.ToJSON(ngwr))
 
 	return nil
 }
@@ -116,9 +118,11 @@ func (h *NonGatewayRouteHandler) RemoteEndpointRemoved(endpoint *submarinerv1.En
 	}
 
 	if err := h.smClient.SubmarinerV1().NonGatewayRoutes(endpoint.Namespace).Delete(context.TODO(),
-		endpoint.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		endpoint.Spec.ClusterID, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 		return errors.Wrapf(err, "error deleting nonGatewayRoute %q", endpoint.Name)
 	}
+
+	logger.Infof("NonGatewayRoute %s deleted for remote endpoint %s", endpoint.Spec.ClusterID, endpoint.Name)
 
 	return nil
 }
@@ -143,6 +147,14 @@ func (h *NonGatewayRouteHandler) TransitionToGateway() error {
 	}
 
 	for _, endpoint := range h.remoteEndpoints {
+		// This piece of code is designed to manage upgrades from a version lower than 0.16.3 to a higher version,
+		// where we utilize the endpoint name as the identifier for ngwr. It can be removed once we stop supporting
+		// the 0.16 version.
+		if err := h.smClient.SubmarinerV1().NonGatewayRoutes(endpoint.Namespace).Delete(context.TODO(),
+			endpoint.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			return errors.Wrapf(err, "error deleting nonGatewayRoute %q", endpoint.Name)
+		}
+
 		ngwr := h.newNonGatewayRoute(endpoint)
 
 		result, err := util.CreateOrUpdate(context.TODO(), h.nonGatewayResourceInterface(endpoint.Namespace),
@@ -151,7 +163,7 @@ func (h *NonGatewayRouteHandler) TransitionToGateway() error {
 			return errors.Wrapf(err, "error creating/updating NonGatewayRoute")
 		}
 
-		logger.V(log.TRACE).Infof("NonGatewayRoute %s: %#v", result, ngwr)
+		logger.Infof("NonGatewayRoute %s from remote endpoint %s: %s", result, endpoint.Name, resource.ToJSON(ngwr))
 	}
 
 	return nil
@@ -160,7 +172,7 @@ func (h *NonGatewayRouteHandler) TransitionToGateway() error {
 func (h *NonGatewayRouteHandler) newNonGatewayRoute(endpoint *submarinerv1.Endpoint) *submarinerv1.NonGatewayRoute {
 	return &submarinerv1.NonGatewayRoute{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      endpoint.Name,
+			Name:      endpoint.Spec.ClusterID,
 			Namespace: endpoint.Namespace,
 		},
 		RoutePolicySpec: submarinerv1.RoutePolicySpec{
