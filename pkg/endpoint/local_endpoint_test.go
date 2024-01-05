@@ -33,7 +33,7 @@ import (
 
 const testNodeName = "this-node"
 
-var _ = Describe("GetLocal", func() {
+var _ = Describe("GetLocalSpec", func() {
 	var submSpec *types.SubmarinerSpecification
 	var client kubernetes.Interface
 	testPrivateIP := endpoint.GetLocalIP()
@@ -74,18 +74,18 @@ var _ = Describe("GetLocal", func() {
 		os.Setenv("NODE_NAME", testNodeName)
 	})
 
-	It("should return a valid SubmarinerEndpoint object", func() {
-		endpoint, err := endpoint.GetLocal(submSpec, client, false)
+	It("should return a valid EndpointSpec object", func() {
+		spec, err := endpoint.GetLocalSpec(submSpec, client, false)
 
 		Expect(err).ToNot(HaveOccurred())
-		Expect(endpoint.Spec.ClusterID).To(Equal("east"))
-		Expect(endpoint.Spec.CableName).To(HavePrefix("submariner-cable-east-"))
-		Expect(endpoint.Spec.Hostname).NotTo(BeEmpty())
-		Expect(endpoint.Spec.PrivateIP).To(Equal(testPrivateIP))
-		Expect(endpoint.Spec.Backend).To(Equal("backend"))
-		Expect(endpoint.Spec.Subnets).To(Equal(subnets))
-		Expect(endpoint.Spec.NATEnabled).To(BeFalse())
-		Expect(endpoint.Spec.BackendConfig[testUDPPortLabel]).To(Equal(testUDPPort))
+		Expect(spec.ClusterID).To(Equal("east"))
+		Expect(spec.CableName).To(HavePrefix("submariner-cable-east-"))
+		Expect(spec.Hostname).NotTo(BeEmpty())
+		Expect(spec.PrivateIP).To(Equal(testPrivateIP))
+		Expect(spec.Backend).To(Equal("backend"))
+		Expect(spec.Subnets).To(Equal(subnets))
+		Expect(spec.NATEnabled).To(BeFalse())
+		Expect(spec.BackendConfig[testUDPPortLabel]).To(Equal(testUDPPort))
 	})
 
 	When("gateway node is not annotated with udp port", func() {
@@ -94,37 +94,37 @@ var _ = Describe("GetLocal", func() {
 			client = fake.NewSimpleClientset(node)
 			os.Setenv("CE_IPSEC_NATTPORT", testClusterUDPPort)
 
-			endpoint, err := endpoint.GetLocal(submSpec, client, false)
+			spec, err := endpoint.GetLocalSpec(submSpec, client, false)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(endpoint.Spec.BackendConfig[testUDPPortLabel]).To(Equal(testClusterUDPPort))
+			Expect(spec.BackendConfig[testUDPPortLabel]).To(Equal(testClusterUDPPort))
 		})
 	})
 
 	When("gateway node is annotated with udp port", func() {
 		It("should return the udp-port backend from the annotation", func() {
 			os.Setenv("CE_IPSEC_NATTPORT", testClusterUDPPort)
-			endpoint, err := endpoint.GetLocal(submSpec, client, false)
+			spec, err := endpoint.GetLocalSpec(submSpec, client, false)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(endpoint.Spec.BackendConfig[testUDPPortLabel]).To(Equal(testUDPPort))
+			Expect(spec.BackendConfig[testUDPPortLabel]).To(Equal(testUDPPort))
 		})
 	})
 
 	When("no NAT discovery port label is set on the node", func() {
-		It("should return a valid SubmarinerEndpoint object", func() {
+		It("should return a valid EndpointSpec object", func() {
 			delete(node.Labels, testNATTPortLabel)
-			_, err := endpoint.GetLocal(submSpec, client, false)
+			_, err := endpoint.GetLocalSpec(submSpec, client, false)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 
 	When("gateway node is not annotated with public-ip", func() {
 		It("should use empty public-ip in the endpoint object for air-gapped deployments", func() {
-			endpoint, err := endpoint.GetLocal(submSpec, client, true)
+			spec, err := endpoint.GetLocalSpec(submSpec, client, true)
 
 			Expect(err).ToNot(HaveOccurred())
-			Expect(endpoint.Spec.ClusterID).To(Equal("east"))
-			Expect(endpoint.Spec.PrivateIP).To(Equal(testPrivateIP))
-			Expect(endpoint.Spec.PublicIP).To(Equal(""))
+			Expect(spec.ClusterID).To(Equal("east"))
+			Expect(spec.PrivateIP).To(Equal(testPrivateIP))
+			Expect(spec.PublicIP).To(Equal(""))
 		})
 	})
 
@@ -132,11 +132,11 @@ var _ = Describe("GetLocal", func() {
 		It("should use the annotated public-ip for air-gapped deployments", func() {
 			node.Labels[backendConfigPrefix+testPublicIPLabel] = testIPv4Label + testPublicIP
 			client = fake.NewSimpleClientset(node)
-			endpoint, err := endpoint.GetLocal(submSpec, client, true)
+			spec, err := endpoint.GetLocalSpec(submSpec, client, true)
 
 			Expect(err).ToNot(HaveOccurred())
-			Expect(endpoint.Spec.PrivateIP).To(Equal(testPrivateIP))
-			Expect(endpoint.Spec.PublicIP).To(Equal(testPublicIP))
+			Expect(spec.PrivateIP).To(Equal(testPrivateIP))
+			Expect(spec.PublicIP).To(Equal(testPublicIP))
 		})
 	})
 })
