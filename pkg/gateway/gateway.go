@@ -80,8 +80,8 @@ type Config struct {
 	SubmarinerClient     submclientset.Interface
 	KubeClient           kubernetes.Interface
 	LeaderElectionClient kubernetes.Interface
-	NewCableEngine       func(localCluster *types.SubmarinerCluster, localEndpoint *types.SubmarinerEndpoint) cableengine.Engine
-	NewNATDiscovery      func(localEndpoint *types.SubmarinerEndpoint) (natdiscovery.Interface, error)
+	NewCableEngine       func(localCluster *types.SubmarinerCluster, localEndpoint *endpoint.Local) cableengine.Engine
+	NewNATDiscovery      func(localEndpoint *endpoint.Local) (natdiscovery.Interface, error)
 }
 
 type gatewayType struct {
@@ -95,7 +95,7 @@ type gatewayType struct {
 	natDiscovery            natdiscovery.Interface
 	gatewayPod              *pod.GatewayPod
 	hostName                string
-	localEndpoint           *types.SubmarinerEndpoint
+	localEndpoint           *endpoint.Local
 	fatalError              chan error
 	leaderComponentsStarted *sync.WaitGroup
 	recorder                record.EventRecorder
@@ -147,6 +147,8 @@ func New(config *Config) (Interface, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating local endpoint object")
 	}
+
+	g.localEndpoint = endpoint.NewLocal(localEndpointSpec, g.SyncerConfig.LocalClient, g.Spec.Namespace)
 
 	g.cableEngine = g.NewCableEngine(localCluster, g.localEndpoint)
 
@@ -351,8 +353,7 @@ func (g *gatewayType) initPublicIPWatcher() {
 	publicIPConfig := &endpoint.PublicIPWatcherConfig{
 		SubmSpec:      &g.Spec,
 		K8sClient:     g.KubeClient,
-		Endpoints:     g.SubmarinerClient.SubmarinerV1().Endpoints(g.Spec.Namespace),
-		LocalEndpoint: *g.localEndpoint,
+		LocalEndpoint: g.localEndpoint,
 	}
 
 	g.publicIPWatcher = endpoint.NewPublicIPWatcher(publicIPConfig)
