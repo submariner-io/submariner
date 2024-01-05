@@ -25,10 +25,13 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/syncer/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	submendpoint "github.com/submariner-io/submariner/pkg/endpoint"
 	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
-	"github.com/submariner-io/submariner/pkg/types"
 	"google.golang.org/protobuf/proto"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 const (
@@ -74,7 +77,12 @@ func parseProtocolResponse(buf []byte) *natproto.SubmarinerNATDiscoveryResponse 
 }
 
 func createTestListener(endpoint *submarinerv1.Endpoint) (*natDiscovery, chan []byte, chan *NATEndpointInfo) {
-	listener, err := newNATDiscovery(&types.SubmarinerEndpoint{Spec: endpoint.Spec})
+	dynClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
+	localEndpoint := submendpoint.NewLocal(&endpoint.Spec, dynClient, "")
+
+	test.CreateResource(dynClient.Resource(submarinerv1.EndpointGVR).Namespace(""), localEndpoint.Resource())
+
+	listener, err := newNATDiscovery(localEndpoint)
 	Expect(err).To(Succeed())
 
 	readyChannel := listener.GetReadyChannel()

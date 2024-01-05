@@ -73,11 +73,13 @@ func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT,
 
 	nd.requestCounter++
 
+	localEndpointSpec := nd.localEndpoint.Spec()
+
 	request := &natproto.SubmarinerNATDiscoveryRequest{
 		RequestNumber: nd.requestCounter,
 		Sender: &natproto.EndpointDetails{
-			EndpointId: nd.localEndpoint.Spec.CableName,
-			ClusterId:  nd.localEndpoint.Spec.ClusterID,
+			EndpointId: localEndpointSpec.CableName,
+			ClusterId:  localEndpointSpec.ClusterID,
 		},
 		Receiver: &natproto.EndpointDetails{
 			EndpointId: remoteNAT.endpoint.Spec.CableName,

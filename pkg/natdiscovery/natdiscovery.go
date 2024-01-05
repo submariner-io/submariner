@@ -30,7 +30,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/endpoint"
-	"github.com/submariner-io/submariner/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -49,7 +48,7 @@ type (
 
 type natDiscovery struct {
 	sync.Mutex
-	localEndpoint   *types.SubmarinerEndpoint
+	localEndpoint   *endpoint.Local
 	remoteEndpoints map[string]*remoteEndpointNAT
 	requestCounter  uint64
 	serverUDPWrite  udpWriteFunction
@@ -60,17 +59,17 @@ type natDiscovery struct {
 
 var logger = log.Logger{Logger: logf.Log.WithName("NAT")}
 
-func New(localEndpoint *types.SubmarinerEndpoint) (Interface, error) {
+func New(localEndpoint *endpoint.Local) (Interface, error) {
 	return newNATDiscovery(localEndpoint)
 }
 
-func newNATDiscovery(localEndpoint *types.SubmarinerEndpoint) (*natDiscovery, error) {
+func newNATDiscovery(localEndpoint *endpoint.Local) (*natDiscovery, error) {
 	requestCounter, err := randomRequestCounter()
 	if err != nil {
 		return nil, err
 	}
 
-	ndPort, err := localEndpoint.Spec.GetBackendPort(v1.NATTDiscoveryPortConfig, 0)
+	ndPort, err := localEndpoint.Spec().GetBackendPort(v1.NATTDiscoveryPortConfig, 0)
 	if err != nil {
 		return nil, errors.Wrap(err, "error parsing nat discovery port")
 	}

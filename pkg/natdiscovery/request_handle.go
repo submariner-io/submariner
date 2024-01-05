@@ -28,11 +28,13 @@ import (
 )
 
 func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscoveryRequest, addr *net.UDPAddr) error {
+	localEndpointSpec := nd.localEndpoint.Spec()
+
 	response := proto.SubmarinerNATDiscoveryResponse{
 		RequestNumber: req.RequestNumber,
 		Sender: &proto.EndpointDetails{
-			ClusterId:  nd.localEndpoint.Spec.ClusterID,
-			EndpointId: nd.localEndpoint.Spec.CableName,
+			ClusterId:  localEndpointSpec.ClusterID,
+			EndpointId: localEndpointSpec.CableName,
 		},
 		Receiver: req.Sender,
 		ReceivedSrc: &proto.IPPortPair{
@@ -52,19 +54,19 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscove
 	logger.V(log.DEBUG).Infof("Received request from %s:%d - REQUEST_NUMBER: 0x%x, SENDER: %q, RECEIVER: %q",
 		addr.IP.String(), addr.Port, req.RequestNumber, req.Sender.EndpointId, req.Receiver.EndpointId)
 
-	if req.Receiver.GetClusterId() != nd.localEndpoint.Spec.ClusterID {
+	if req.Receiver.GetClusterId() != localEndpointSpec.ClusterID {
 		logger.Warningf("Received NAT discovery packet for cluster %q, but we are cluster %q", req.Receiver.GetClusterId(),
-			nd.localEndpoint.Spec.ClusterID)
+			localEndpointSpec.ClusterID)
 
 		response.Response = proto.ResponseType_UNKNOWN_DST_CLUSTER
 
 		return nd.sendResponseToAddress(&response, addr)
 	}
 
-	if req.Receiver.GetEndpointId() != nd.localEndpoint.Spec.CableName {
+	if req.Receiver.GetEndpointId() != localEndpointSpec.CableName {
 		logger.Warningf("Received NAT discovery packet for endpoint %q, but we are endpoint %q "+
 			"if the port for NAT discovery has been mapped somewhere an error may exist", req.Receiver.GetEndpointId(),
-			nd.localEndpoint.Spec.CableName)
+			localEndpointSpec.CableName)
 
 		response.Response = proto.ResponseType_UNKNOWN_DST_ENDPOINT
 
@@ -92,7 +94,7 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscove
 	// Detect DST NAT with a naive implementation that assumes that we always receive on the PrivateIP,
 	// if we will listen at some point on multiple addresses we will need to implement the
 	// unix.IP_RECVORIGDSTADDR on the UDP socket, and the go recvmsg implementation instead of readfrom
-	if req.UsingDst.IP != nd.localEndpoint.Spec.PrivateIP {
+	if req.UsingDst.IP != localEndpointSpec.PrivateIP {
 		response.DstIpNatDetected = true
 	}
 
