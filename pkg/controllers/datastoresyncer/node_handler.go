@@ -22,6 +22,7 @@ import (
 	"context"
 	"net"
 
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -70,17 +71,15 @@ func (d *DatastoreSyncer) areNodesEquivalent(obj1, obj2 *unstructured.Unstructur
 }
 
 func (d *DatastoreSyncer) updateLocalEndpointIfNecessary(globalIPOfNode string) bool {
-	if d.localEndpoint.Spec.HealthCheckIP != globalIPOfNode {
+	spec := d.localEndpoint.Spec()
+	if spec.HealthCheckIP != globalIPOfNode {
 		logger.Infof("Updating the endpoint HealthCheckIP to globalIP %q", globalIPOfNode)
 
-		prevHealthCheckIP := d.localEndpoint.Spec.HealthCheckIP
-		d.localEndpoint.Spec.HealthCheckIP = globalIPOfNode
-
-		if err := d.createOrUpdateLocalEndpoint(context.TODO(), d.updateFederator); err != nil {
-			logger.Warningf("Error updating the local submariner Endpoint with HealthcheckIP: %v", err)
-
-			d.localEndpoint.Spec.HealthCheckIP = prevHealthCheckIP
-
+		err := d.localEndpoint.Update(context.TODO(), func(existing *submarinerv1.EndpointSpec) {
+			existing.HealthCheckIP = globalIPOfNode
+		})
+		if err != nil {
+			logger.Warningf("Error updating the local submariner Endpoint with HealthcheckIP %s: %v", globalIPOfNode, err)
 			return true
 		}
 	}
