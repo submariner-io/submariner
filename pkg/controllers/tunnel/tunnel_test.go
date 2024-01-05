@@ -34,6 +34,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/cable/fake"
 	"github.com/submariner-io/submariner/pkg/cableengine"
 	"github.com/submariner-io/submariner/pkg/controllers/tunnel"
+	submendpoint "github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -104,13 +105,13 @@ var _ = Describe("Managing tunnels", func() {
 	})
 
 	JustBeforeEach(func() {
-		engine := cableengine.NewEngine(&types.SubmarinerCluster{}, &types.SubmarinerEndpoint{
-			Spec: v1.EndpointSpec{
-				Backend: fake.DriverName,
-			},
-		})
+		localEp := submendpoint.NewLocal(&v1.EndpointSpec{
+			Backend: fake.DriverName,
+		}, fakeClient.NewSimpleDynamicClient(kubeScheme.Scheme), "")
 
-		nat, err := natdiscovery.New(&types.SubmarinerEndpoint{})
+		engine := cableengine.NewEngine(&types.SubmarinerCluster{}, localEp)
+
+		nat, err := natdiscovery.New(localEp)
 		Expect(err).To(Succeed())
 
 		engine.SetupNATDiscovery(nat)

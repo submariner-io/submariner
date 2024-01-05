@@ -32,9 +32,12 @@ import (
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/cable/fake"
 	"github.com/submariner-io/submariner/pkg/cableengine"
+	submendpoint "github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 func init() {
@@ -97,7 +100,7 @@ var _ = Describe("Cable Engine", func() {
 			Spec: subv1.ClusterSpec{
 				ClusterID: localClusterID,
 			},
-		}, &types.SubmarinerEndpoint{Spec: localEndpoint.Spec})
+		}, submendpoint.NewLocal(&localEndpoint.Spec, dynamicfake.NewSimpleDynamicClient(scheme.Scheme), ""))
 
 		natDiscovery = &fakeNATDiscovery{removeEndpoint: make(chan string, 20), readyChannel: make(chan *natdiscovery.NATEndpointInfo, 100)}
 		engine.SetupNATDiscovery(natDiscovery)
