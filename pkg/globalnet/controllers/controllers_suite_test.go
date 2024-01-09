@@ -140,9 +140,9 @@ func newTestDriverBase() *testDriverBase {
 
 	t.nodes = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &corev1.Node{}))
 
-	packetfilter.NewFunc = func() (packetfilter.Interface, error) {
+	packetfilter.SetNewDriverFn(func() (packetfilter.Driver, error) {
 		return t.pFilter, nil
-	}
+	})
 
 	ipset.NewFunc = func() ipset.Interface {
 		return t.ipSet
@@ -153,8 +153,6 @@ func newTestDriverBase() *testDriverBase {
 
 func (t *testDriverBase) afterEach() {
 	t.controller.Stop()
-
-	packetfilter.NewFunc = nil
 }
 
 func (t *testDriverBase) verifyIPsReservedInPool(ips ...string) {

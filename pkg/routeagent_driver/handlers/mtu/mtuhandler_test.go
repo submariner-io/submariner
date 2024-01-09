@@ -24,7 +24,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/ipset"
 	fakeSet "github.com/submariner-io/submariner/pkg/ipset/fake"
-	"github.com/submariner-io/submariner/pkg/packetfilter"
 	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/mtu"
@@ -39,18 +38,12 @@ var _ = Describe("MTUHandler", func() {
 
 	BeforeEach(func() {
 		pFilter = fakePF.New()
-		packetfilter.NewFunc = func() (packetfilter.Interface, error) {
-			return pFilter, nil
-		}
+
 		ipSet = fakeSet.New()
 		ipset.NewFunc = func() ipset.Interface {
 			return ipSet
 		}
 		handler = mtu.NewMTUHandler([]string{"10.1.0.0/24"}, false, 0)
-	})
-
-	AfterEach(func() {
-		packetfilter.NewFunc = nil
 	})
 
 	When("endpoint is added and removed", func() {

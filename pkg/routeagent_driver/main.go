@@ -40,6 +40,8 @@ import (
 	"github.com/submariner-io/submariner/pkg/event/controller"
 	eventlogger "github.com/submariner-io/submariner/pkg/event/logger"
 	"github.com/submariner-io/submariner/pkg/node"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
+	"github.com/submariner-io/submariner/pkg/packetfilter/iptables"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cabledriver"
 	cniapi "github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
@@ -106,6 +108,8 @@ func main() {
 
 	smClientset, err := submarinerClientset.NewForConfig(cfg)
 	logger.FatalOnError(err, "Error building submariner clientset")
+
+	packetfilter.SetNewDriverFn(iptables.New)
 
 	if env.WaitForNode {
 		waitForNodeReady(k8sClientSet)

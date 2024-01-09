@@ -27,7 +27,7 @@ import (
 )
 
 type Adapter struct {
-	Basic
+	Driver
 }
 
 func (a *Adapter) CreateChainIfNotExists(table, chain string) error {

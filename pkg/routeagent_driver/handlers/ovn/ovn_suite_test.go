@@ -34,7 +34,6 @@ import (
 	eventtesting "github.com/submariner-io/submariner/pkg/event/testing"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	fakenetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
-	"github.com/submariner-io/submariner/pkg/packetfilter"
 	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
@@ -96,9 +95,6 @@ func newTestDriver() *testDriver {
 		}
 
 		t.pFilter = fakePF.New()
-		packetfilter.NewFunc = func() (packetfilter.Interface, error) {
-			return t.pFilter, nil
-		}
 
 		link := &netlink.GenericLink{
 			LinkAttrs: netlink.LinkAttrs{

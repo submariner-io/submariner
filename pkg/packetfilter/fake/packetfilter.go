@@ -28,7 +28,7 @@ import (
 	"k8s.io/utils/set"
 )
 
-type basicType struct {
+type PacketFilter struct {
 	mutex                    sync.Mutex
 	chainRules               map[string]set.Set[string]
 	tableChains              map[string]set.Set[string]
@@ -36,34 +36,32 @@ type basicType struct {
 	failOnDeleteRuleMatchers []interface{}
 }
 
-type PacketFilter struct {
-	packetfilter.Adapter
-}
-
 func New() *PacketFilter {
-	return &PacketFilter{
-		Adapter: packetfilter.Adapter{
-			Basic: &basicType{
-				chainRules:  map[string]set.Set[string]{},
-				tableChains: map[string]set.Set[string]{},
-			},
-		},
+	pf := &PacketFilter{
+		chainRules:  map[string]set.Set[string]{},
+		tableChains: map[string]set.Set[string]{},
 	}
+
+	packetfilter.SetNewDriverFn(func() (packetfilter.Driver, error) {
+		return pf, nil
+	})
+
+	return pf
 }
 
-func (i *basicType) Append(table, chain string, rulespec ...string) error {
+func (i *PacketFilter) Append(table, chain string, rulespec ...string) error {
 	return i.addRule(table, chain, rulespec...)
 }
 
-func (i *basicType) AppendUnique(table, chain string, rulespec ...string) error {
+func (i *PacketFilter) AppendUnique(table, chain string, rulespec ...string) error {
 	return i.addRule(table, chain, rulespec...)
 }
 
-func (i *basicType) Insert(table, chain string, _ int, rulespec ...string) error {
+func (i *PacketFilter) Insert(table, chain string, _ int, rulespec ...string) error {
 	return i.addRule(table, chain, rulespec...)
 }
 
-func (i *basicType) Delete(table, chain string, rulespec ...string) error {
+func (i *PacketFilter) Delete(table, chain string, rulespec ...string) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -80,7 +78,7 @@ func (i *basicType) Delete(table, chain string, rulespec ...string) error {
 	return nil
 }
 
-func (i *basicType) addRule(table, chain string, rulespec ...string) error {
+func (i *PacketFilter) addRule(table, chain string, rulespec ...string) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -114,11 +112,11 @@ func matchRuleForError(matchers *[]interface{}, rulespec ...string) error {
 	return nil
 }
 
-func (i *basicType) List(table, chain string) ([]string, error) {
+func (i *PacketFilter) List(table, chain string) ([]string, error) {
 	return i.listRules(table, chain), nil
 }
 
-func (i *basicType) listRules(table, chain string) []string {
+func (i *PacketFilter) listRules(table, chain string) []string {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -130,11 +128,7 @@ func (i *basicType) listRules(table, chain string) []string {
 	return []string{}
 }
 
-func (i *basicType) ListChains(table string) ([]string, error) {
-	return i.listChains(table), nil
-}
-
-func (i *basicType) listChains(table string) []string {
+func (i *PacketFilter) listChains(table string) []string {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -146,12 +140,12 @@ func (i *basicType) listChains(table string) []string {
 	return []string{}
 }
 
-func (i *basicType) NewChain(table, chain string) error {
+func (i *PacketFilter) NewChain(table, chain string) error {
 	i.addChainsFor(table, chain)
 	return nil
 }
 
-func (i *basicType) ClearChain(table, chain string) error {
+func (i *PacketFilter) ClearChain(table, chain string) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -163,7 +157,7 @@ func (i *basicType) ClearChain(table, chain string) error {
 	return nil
 }
 
-func (i *basicType) ChainExists(table, chain string) (bool, error) {
+func (i *PacketFilter) ChainExists(table, chain string) (bool, error) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -175,7 +169,7 @@ func (i *basicType) ChainExists(table, chain string) (bool, error) {
 	return false, nil
 }
 
-func (i *basicType) DeleteChain(table, chain string) error {
+func (i *PacketFilter) DeleteChain(table, chain string) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -187,7 +181,7 @@ func (i *basicType) DeleteChain(table, chain string) error {
 	return nil
 }
 
-func (i *basicType) addChainsFor(table string, chains ...string) {
+func (i *PacketFilter) addChainsFor(table string, chains ...string) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -202,42 +196,38 @@ func (i *basicType) addChainsFor(table string, chains ...string) {
 
 func (i *PacketFilter) AwaitChain(table string, stringOrMatcher interface{}) {
 	Eventually(func() []string {
-		return i.basic().listChains(table)
+		return i.listChains(table)
 	}, 5).Should(ContainElement(stringOrMatcher), "IP table %q chains", table)
 }
 
 func (i *PacketFilter) AwaitNoChain(table string, stringOrMatcher interface{}) {
 	Eventually(func() []string {
-		return i.basic().listChains(table)
+		return i.listChains(table)
 	}, 5).ShouldNot(ContainElement(stringOrMatcher), "IP table %q chains", table)
 }
 
 func (i *PacketFilter) AwaitRule(table, chain string, stringOrMatcher interface{}) {
 	Eventually(func() []string {
-		return i.basic().listRules(table, chain)
+		return i.listRules(table, chain)
 	}, 5).Should(ContainElement(stringOrMatcher), "Rules for IP table %q, chain %q", table, chain)
 }
 
 func (i *PacketFilter) AwaitNoRule(table, chain string, stringOrMatcher interface{}) {
 	Eventually(func() []string {
-		return i.basic().listRules(table, chain)
+		return i.listRules(table, chain)
 	}, 5).ShouldNot(ContainElement(stringOrMatcher), "Rules for IP table %q, chain %q", table, chain)
 }
 
 func (i *PacketFilter) AddFailOnAppendRuleMatcher(stringOrMatcher interface{}) {
-	i.basic().mutex.Lock()
-	defer i.basic().mutex.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
-	i.basic().failOnAppendRuleMatchers = append(i.basic().failOnAppendRuleMatchers, stringOrMatcher)
+	i.failOnAppendRuleMatchers = append(i.failOnAppendRuleMatchers, stringOrMatcher)
 }
 
 func (i *PacketFilter) AddFailOnDeleteRuleMatcher(stringOrMatcher interface{}) {
-	i.basic().mutex.Lock()
-	defer i.basic().mutex.Unlock()
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
 
-	i.basic().failOnDeleteRuleMatchers = append(i.basic().failOnDeleteRuleMatchers, stringOrMatcher)
-}
-
-func (i *PacketFilter) basic() *basicType {
-	return i.Adapter.Basic.(*basicType)
+	i.failOnDeleteRuleMatchers = append(i.failOnDeleteRuleMatchers, stringOrMatcher)
 }

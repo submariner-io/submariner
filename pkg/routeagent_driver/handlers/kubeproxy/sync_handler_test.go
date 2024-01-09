@@ -28,7 +28,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/event/testing"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	fakeNetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
-	"github.com/submariner-io/submariner/pkg/packetfilter"
 	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
@@ -381,9 +380,6 @@ func newTestDriver() *testDriver {
 		}
 
 		t.pFilter = fakePF.New()
-		packetfilter.NewFunc = func() (packetfilter.Interface, error) {
-			return t.pFilter, nil
-		}
 
 		cni.DiscoverFunc = func(clusterCIDR string) (*cni.Interface, error) {
 			return &cni.Interface{
@@ -401,7 +397,6 @@ func newTestDriver() *testDriver {
 	})
 
 	AfterEach(func() {
-		packetfilter.NewFunc = nil
 		netlinkAPI.NewFunc = nil
 		cni.DiscoverFunc = nil
 	})

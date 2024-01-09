@@ -19,19 +19,17 @@ limitations under the License.
 package packetfilter
 
 import (
-	"github.com/coreos/go-iptables/iptables"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-type Basic interface {
+type Driver interface {
 	Append(table, chain string, rulespec ...string) error
 	AppendUnique(table, chain string, rulespec ...string) error
 	Delete(table, chain string, rulespec ...string) error
 	Insert(table, chain string, pos int, rulespec ...string) error
 	List(table, chain string) ([]string, error)
-	ListChains(table string) ([]string, error)
 	NewChain(table, chain string) error
 	ChainExists(table, chain string) (bool, error)
 	ClearChain(table, chain string) error
@@ -39,7 +37,7 @@ type Basic interface {
 }
 
 type Interface interface {
-	Basic
+	Driver
 	CreateChainIfNotExists(table, chain string) error
 	InsertUnique(table, chain string, position int, ruleSpec []string) error
 	PrependUnique(table, chain string, ruleSpec []string) error
@@ -48,36 +46,19 @@ type Interface interface {
 	UpdateChainRules(table, chain string, rules [][]string) error
 }
 
-type iptablesWrapper struct {
-	*iptables.IPTables
-}
-
 var logger = log.Logger{Logger: logf.Log.WithName("IPTables")}
 
-var NewFunc func() (Interface, error)
+var newDriverFn func() (Driver, error)
 
-func New() (Interface, error) {
-	if NewFunc != nil {
-		return NewFunc()
-	}
-
-	ipt, err := iptables.New(iptables.IPFamily(iptables.ProtocolIPv4), iptables.Timeout(5))
-	if err != nil {
-		return nil, errors.Wrap(err, "error creating IP tables")
-	}
-
-	return &Adapter{Basic: &iptablesWrapper{IPTables: ipt}}, nil
+func SetNewDriverFn(f func() (Driver, error)) {
+	newDriverFn = f
 }
 
-func (i *iptablesWrapper) Delete(table, chain string, rulespec ...string) error {
-	err := i.IPTables.Delete(table, chain, rulespec...)
-
-	var iptError *iptables.Error
-
-	ok := errors.As(err, &iptError)
-	if ok && iptError.IsNotExist() {
-		return nil
+func New() (Interface, error) {
+	driver, err := newDriverFn()
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating packet filter Driver")
 	}
 
-	return errors.Wrap(err, "error deleting IP table rule")
+	return &Adapter{Driver: driver}, nil
 }
