@@ -24,7 +24,7 @@ import (
 	"sync"
 
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/submariner/pkg/iptables"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"k8s.io/utils/set"
 )
 
@@ -36,13 +36,13 @@ type basicType struct {
 	failOnDeleteRuleMatchers []interface{}
 }
 
-type IPTables struct {
-	iptables.Adapter
+type PacketFilter struct {
+	packetfilter.Adapter
 }
 
-func New() *IPTables {
-	return &IPTables{
-		Adapter: iptables.Adapter{
+func New() *PacketFilter {
+	return &PacketFilter{
+		Adapter: packetfilter.Adapter{
 			Basic: &basicType{
 				chainRules:  map[string]set.Set[string]{},
 				tableChains: map[string]set.Set[string]{},
@@ -200,44 +200,44 @@ func (i *basicType) addChainsFor(table string, chains ...string) {
 	chainSet.Insert(chains...)
 }
 
-func (i *IPTables) AwaitChain(table string, stringOrMatcher interface{}) {
+func (i *PacketFilter) AwaitChain(table string, stringOrMatcher interface{}) {
 	Eventually(func() []string {
 		return i.basic().listChains(table)
 	}, 5).Should(ContainElement(stringOrMatcher), "IP table %q chains", table)
 }
 
-func (i *IPTables) AwaitNoChain(table string, stringOrMatcher interface{}) {
+func (i *PacketFilter) AwaitNoChain(table string, stringOrMatcher interface{}) {
 	Eventually(func() []string {
 		return i.basic().listChains(table)
 	}, 5).ShouldNot(ContainElement(stringOrMatcher), "IP table %q chains", table)
 }
 
-func (i *IPTables) AwaitRule(table, chain string, stringOrMatcher interface{}) {
+func (i *PacketFilter) AwaitRule(table, chain string, stringOrMatcher interface{}) {
 	Eventually(func() []string {
 		return i.basic().listRules(table, chain)
 	}, 5).Should(ContainElement(stringOrMatcher), "Rules for IP table %q, chain %q", table, chain)
 }
 
-func (i *IPTables) AwaitNoRule(table, chain string, stringOrMatcher interface{}) {
+func (i *PacketFilter) AwaitNoRule(table, chain string, stringOrMatcher interface{}) {
 	Eventually(func() []string {
 		return i.basic().listRules(table, chain)
 	}, 5).ShouldNot(ContainElement(stringOrMatcher), "Rules for IP table %q, chain %q", table, chain)
 }
 
-func (i *IPTables) AddFailOnAppendRuleMatcher(stringOrMatcher interface{}) {
+func (i *PacketFilter) AddFailOnAppendRuleMatcher(stringOrMatcher interface{}) {
 	i.basic().mutex.Lock()
 	defer i.basic().mutex.Unlock()
 
 	i.basic().failOnAppendRuleMatchers = append(i.basic().failOnAppendRuleMatchers, stringOrMatcher)
 }
 
-func (i *IPTables) AddFailOnDeleteRuleMatcher(stringOrMatcher interface{}) {
+func (i *PacketFilter) AddFailOnDeleteRuleMatcher(stringOrMatcher interface{}) {
 	i.basic().mutex.Lock()
 	defer i.basic().mutex.Unlock()
 
 	i.basic().failOnDeleteRuleMatchers = append(i.basic().failOnDeleteRuleMatchers, stringOrMatcher)
 }
 
-func (i *IPTables) basic() *basicType {
+func (i *PacketFilter) basic() *basicType {
 	return i.Adapter.Basic.(*basicType)
 }

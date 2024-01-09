@@ -27,7 +27,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
-	"github.com/submariner-io/submariner/pkg/iptables"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
 	corev1 "k8s.io/api/core/v1"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -51,8 +51,8 @@ type Interface interface {
 	DeleteIPTableRule(table, chainName, jumpTarget string) error
 }
 
-type ipTables struct {
-	ipt iptables.Interface
+type packetFilter struct {
+	pFilter packetfilter.Interface
 }
 
 type TargetType string
@@ -65,41 +65,39 @@ const (
 var logger = log.Logger{Logger: logf.Log.WithName("IPTables")}
 
 func New() (Interface, error) {
-	iptableHandler, err := iptables.New()
+	pFilter, err := packetfilter.New()
 	if err != nil {
 		return nil, err //nolint:wrapcheck  // Let the caller wrap it
 	}
 
-	iptableIface := &ipTables{
-		ipt: iptableHandler,
-	}
-
-	return iptableIface, nil
+	return &packetFilter{
+		pFilter: pFilter,
+	}, nil
 }
 
-func (i *ipTables) AddClusterEgressRules(subnet, snatIP, globalNetIPTableMark string) error {
+func (i *packetFilter) AddClusterEgressRules(subnet, snatIP, globalNetIPTableMark string) error {
 	ruleSpec := []string{"-p", "all", "-s", subnet, "-m", "mark", "--mark", globalNetIPTableMark, "-j", "SNAT", "--to", snatIP}
 	logger.V(log.DEBUG).Infof("Installing iptable egress rules for Cluster: %s", strings.Join(ruleSpec, " "))
 
-	if err := i.ipt.AppendUnique("nat", constants.SmGlobalnetEgressChainForCluster, ruleSpec...); err != nil {
+	if err := i.pFilter.AppendUnique("nat", constants.SmGlobalnetEgressChainForCluster, ruleSpec...); err != nil {
 		return errors.Wrapf(err, "error appending iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
 }
 
-func (i *ipTables) RemoveClusterEgressRules(subnet, snatIP, globalNetIPTableMark string) error {
+func (i *packetFilter) RemoveClusterEgressRules(subnet, snatIP, globalNetIPTableMark string) error {
 	ruleSpec := []string{"-p", "all", "-s", subnet, "-m", "mark", "--mark", globalNetIPTableMark, "-j", "SNAT", "--to", snatIP}
 	logger.V(log.DEBUG).Infof("Deleting iptable egress rules for Cluster: %s", strings.Join(ruleSpec, " "))
 
-	if err := i.ipt.Delete("nat", constants.SmGlobalnetEgressChainForCluster, ruleSpec...); err != nil {
+	if err := i.pFilter.Delete("nat", constants.SmGlobalnetEgressChainForCluster, ruleSpec...); err != nil {
 		return errors.Wrapf(err, "error deleting iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
 }
 
-func (i *ipTables) AddIngressRulesForHeadlessSvc(globalIP, ip string, targetType TargetType) error {
+func (i *packetFilter) AddIngressRulesForHeadlessSvc(globalIP, ip string, targetType TargetType) error {
 	if globalIP == "" || ip == "" {
 		return fmt.Errorf("globalIP %q or %s IP %q cannot be empty", globalIP, targetType, ip)
 	}
@@ -107,14 +105,14 @@ func (i *ipTables) AddIngressRulesForHeadlessSvc(globalIP, ip string, targetType
 	ruleSpec := []string{"-d", globalIP, "-j", "DNAT", "--to", ip}
 	logger.V(log.DEBUG).Infof("Installing iptables rule for Headless SVC %s for %s", strings.Join(ruleSpec, " "), targetType)
 
-	if err := i.ipt.AppendUnique("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
+	if err := i.pFilter.AppendUnique("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
 		return errors.Wrapf(err, "error appending iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
 }
 
-func (i *ipTables) RemoveIngressRulesForHeadlessSvc(globalIP, ip string, targetType TargetType) error {
+func (i *packetFilter) RemoveIngressRulesForHeadlessSvc(globalIP, ip string, targetType TargetType) error {
 	if globalIP == "" || ip == "" {
 		return fmt.Errorf("globalIP %q or %s IP %q cannot be empty", globalIP, targetType, ip)
 	}
@@ -123,14 +121,14 @@ func (i *ipTables) RemoveIngressRulesForHeadlessSvc(globalIP, ip string, targetT
 
 	logger.V(log.DEBUG).Infof("Deleting iptables rule for Headless SVC %s for %s", strings.Join(ruleSpec, " "), targetType)
 
-	if err := i.ipt.Delete("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
+	if err := i.pFilter.Delete("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
 		return errors.Wrapf(err, "error deleting iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
 }
 
-func (i *ipTables) GetKubeProxyClusterIPServiceChainName(service *corev1.Service,
+func (i *packetFilter) GetKubeProxyClusterIPServiceChainName(service *corev1.Service,
 	kubeProxyServiceChainPrefix string,
 ) (string, bool, error) {
 	// CNIs that use kube-proxy with iptables for loadbalancing create an iptables chain for each service
@@ -151,7 +149,7 @@ func (i *ipTables) GetKubeProxyClusterIPServiceChainName(service *corev1.Service
 		encoded := base32.StdEncoding.EncodeToString(hash[:])
 		chainName := kubeProxyServiceChainPrefix + encoded[:16]
 
-		chainExists, err := i.ipt.ChainExists("nat", chainName)
+		chainExists, err := i.pFilter.ChainExists("nat", chainName)
 		if err != nil {
 			return "", false, errors.Wrapf(err, "error checking if chain %s exists", chainName)
 		}
@@ -164,29 +162,29 @@ func (i *ipTables) GetKubeProxyClusterIPServiceChainName(service *corev1.Service
 	return "", false, nil
 }
 
-func (i *ipTables) AddIngressRulesForHealthCheck(cniIfaceIP, globalIP string) error {
+func (i *packetFilter) AddIngressRulesForHealthCheck(cniIfaceIP, globalIP string) error {
 	ruleSpec := []string{"-p", "icmp", "-d", globalIP, "-j", "DNAT", "--to", cniIfaceIP}
 	logger.V(log.DEBUG).Infof("Installing iptable ingress rules for Node: %s", strings.Join(ruleSpec, " "))
 
-	if err := i.ipt.AppendUnique("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
+	if err := i.pFilter.AppendUnique("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
 		return errors.Wrapf(err, "error appending iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
 }
 
-func (i *ipTables) RemoveIngressRulesForHealthCheck(cniIfaceIP, globalIP string) error {
+func (i *packetFilter) RemoveIngressRulesForHealthCheck(cniIfaceIP, globalIP string) error {
 	ruleSpec := []string{"-p", "icmp", "-d", globalIP, "-j", "DNAT", "--to", cniIfaceIP}
 	logger.V(log.DEBUG).Infof("Deleting iptable ingress rules for Node: %s", strings.Join(ruleSpec, " "))
 
-	if err := i.ipt.Delete("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
+	if err := i.pFilter.Delete("nat", constants.SmGlobalnetIngressChain, ruleSpec...); err != nil {
 		return errors.Wrapf(err, "error deleting iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
 }
 
-func (i *ipTables) AddEgressRulesForHeadlessSvc(key, sourceIP, snatIP, globalNetIPTableMark string, targetType TargetType) error {
+func (i *packetFilter) AddEgressRulesForHeadlessSvc(key, sourceIP, snatIP, globalNetIPTableMark string, targetType TargetType) error {
 	ruleSpec := []string{"-p", "all", "-s", sourceIP, "-m", "mark", "--mark", globalNetIPTableMark, "-j", "SNAT", "--to", snatIP}
 	logger.V(log.DEBUG).Infof("Installing iptable egress rules for HDLS SVC %q for %s: %s", key, targetType, strings.Join(ruleSpec, " "))
 
@@ -198,14 +196,14 @@ func (i *ipTables) AddEgressRulesForHeadlessSvc(key, sourceIP, snatIP, globalNet
 		chain = constants.SmGlobalnetEgressChainForHeadlessSvcEPs
 	}
 
-	if err := i.ipt.AppendUnique("nat", chain, ruleSpec...); err != nil {
+	if err := i.pFilter.AppendUnique("nat", chain, ruleSpec...); err != nil {
 		return errors.Wrapf(err, "error appending iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
 }
 
-func (i *ipTables) RemoveEgressRulesForHeadlessSvc(key, sourceIP, snatIP, globalNetIPTableMark string, targetType TargetType) error {
+func (i *packetFilter) RemoveEgressRulesForHeadlessSvc(key, sourceIP, snatIP, globalNetIPTableMark string, targetType TargetType) error {
 	ruleSpec := []string{"-p", "all", "-s", sourceIP, "-m", "mark", "--mark", globalNetIPTableMark, "-j", "SNAT", "--to", snatIP}
 	logger.V(log.DEBUG).Infof("Deleting iptable egress rules for HDLS SVC %q for %s: %s", key, targetType, strings.Join(ruleSpec, " "))
 
@@ -217,92 +215,92 @@ func (i *ipTables) RemoveEgressRulesForHeadlessSvc(key, sourceIP, snatIP, global
 		chain = constants.SmGlobalnetEgressChainForHeadlessSvcEPs
 	}
 
-	if err := i.ipt.Delete("nat", chain, ruleSpec...); err != nil {
+	if err := i.pFilter.Delete("nat", chain, ruleSpec...); err != nil {
 		return errors.Wrapf(err, "error deleting iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
 }
 
-func (i *ipTables) AddEgressRulesForPods(key, ipSetName, snatIP, globalNetIPTableMark string) error {
+func (i *packetFilter) AddEgressRulesForPods(key, ipSetName, snatIP, globalNetIPTableMark string) error {
 	ruleSpec := []string{
 		"-p", "all", "-m", "set", "--match-set", ipSetName, "src", "-m", "mark",
 		"--mark", globalNetIPTableMark, "-j", "SNAT", "--to", snatIP,
 	}
 	logger.V(log.DEBUG).Infof("Installing iptable egress rules for Pods %q: %s", key, strings.Join(ruleSpec, " "))
 
-	if err := i.ipt.AppendUnique("nat", constants.SmGlobalnetEgressChainForPods, ruleSpec...); err != nil {
+	if err := i.pFilter.AppendUnique("nat", constants.SmGlobalnetEgressChainForPods, ruleSpec...); err != nil {
 		return errors.Wrapf(err, "error appending iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
 }
 
-func (i *ipTables) RemoveEgressRulesForPods(key, ipSetName, snatIP, globalNetIPTableMark string) error {
+func (i *packetFilter) RemoveEgressRulesForPods(key, ipSetName, snatIP, globalNetIPTableMark string) error {
 	ruleSpec := []string{
 		"-p", "all", "-m", "set", "--match-set", ipSetName, "src", "-m", "mark",
 		"--mark", globalNetIPTableMark, "-j", "SNAT", "--to", snatIP,
 	}
 	logger.V(log.DEBUG).Infof("Deleting iptable egress rules for Pods %q: %s", key, strings.Join(ruleSpec, " "))
 
-	if err := i.ipt.Delete("nat", constants.SmGlobalnetEgressChainForPods, ruleSpec...); err != nil {
+	if err := i.pFilter.Delete("nat", constants.SmGlobalnetEgressChainForPods, ruleSpec...); err != nil {
 		return errors.Wrapf(err, "error deleting iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
 }
 
-func (i *ipTables) AddEgressRulesForNamespace(namespace, ipSetName, snatIP, globalNetIPTableMark string) error {
+func (i *packetFilter) AddEgressRulesForNamespace(namespace, ipSetName, snatIP, globalNetIPTableMark string) error {
 	ruleSpec := []string{
 		"-p", "all", "-m", "set", "--match-set", ipSetName, "src", "-m", "mark",
 		"--mark", globalNetIPTableMark, "-j", "SNAT", "--to", snatIP,
 	}
 	logger.V(log.DEBUG).Infof("Installing iptable egress rules for Namespace %q: %s", namespace, strings.Join(ruleSpec, " "))
 
-	if err := i.ipt.AppendUnique("nat", constants.SmGlobalnetEgressChainForNamespace, ruleSpec...); err != nil {
+	if err := i.pFilter.AppendUnique("nat", constants.SmGlobalnetEgressChainForNamespace, ruleSpec...); err != nil {
 		return errors.Wrapf(err, "error appending iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
 }
 
-func (i *ipTables) RemoveEgressRulesForNamespace(namespace, ipSetName, snatIP, globalNetIPTableMark string) error {
+func (i *packetFilter) RemoveEgressRulesForNamespace(namespace, ipSetName, snatIP, globalNetIPTableMark string) error {
 	ruleSpec := []string{
 		"-p", "all", "-m", "set", "--match-set", ipSetName, "src", "-m", "mark",
 		"--mark", globalNetIPTableMark, "-j", "SNAT", "--to", snatIP,
 	}
 	logger.V(log.DEBUG).Infof("Deleting iptable egress rules for Namespace %q: %s", namespace, strings.Join(ruleSpec, " "))
 
-	if err := i.ipt.Delete("nat", constants.SmGlobalnetEgressChainForNamespace, ruleSpec...); err != nil {
+	if err := i.pFilter.Delete("nat", constants.SmGlobalnetEgressChainForNamespace, ruleSpec...); err != nil {
 		return errors.Wrapf(err, "error deleting iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
 	return nil
 }
 
-func (i *ipTables) FlushIPTableChain(table, chainName string) error {
+func (i *packetFilter) FlushIPTableChain(table, chainName string) error {
 	logger.Infof("Flushing iptable rules in %q chain of table %q", chainName, table)
 
-	if err := i.ipt.ClearChain(table, chainName); err != nil {
+	if err := i.pFilter.ClearChain(table, chainName); err != nil {
 		return errors.Wrapf(err, "error flushing iptables rules in %q chain of table %q", chainName, table)
 	}
 
 	return nil
 }
 
-func (i *ipTables) DeleteIPTableChain(table, chainName string) error {
+func (i *packetFilter) DeleteIPTableChain(table, chainName string) error {
 	logger.Infof("Deleting iptable chain %q of table %q", chainName, table)
 
-	if err := i.ipt.DeleteChain(table, chainName); err != nil {
+	if err := i.pFilter.DeleteChain(table, chainName); err != nil {
 		return errors.Wrapf(err, "error deleting iptable chain %q of table %q", chainName, table)
 	}
 
 	return nil
 }
 
-func (i *ipTables) DeleteIPTableRule(table, chainName, jumpTarget string) error {
+func (i *packetFilter) DeleteIPTableRule(table, chainName, jumpTarget string) error {
 	ruleSpec := []string{"-j", jumpTarget}
-	if err := i.ipt.Delete(table, chainName, ruleSpec...); err != nil {
+	if err := i.pFilter.Delete(table, chainName, ruleSpec...); err != nil {
 		return errors.Wrapf(err, "error deleting iptables rule \"%s\"", strings.Join(ruleSpec, " "))
 	}
 
