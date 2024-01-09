@@ -145,7 +145,7 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 
 	Context("and programming the IP table rules initially fails", func() {
 		BeforeEach(func() {
-			t.ipt.AddFailOnAppendRuleMatcher(Not(BeEmpty()))
+			t.pFilter.AddFailOnAppendRuleMatcher(Not(BeEmpty()))
 			t.ipSet.AddFailOnCreateSetMatchers(Not(BeEmpty()))
 		})
 
@@ -215,7 +215,7 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 
 		Context("and cleanup of the IP tables initially fails", func() {
 			JustBeforeEach(func() {
-				t.ipt.AddFailOnDeleteRuleMatcher(ContainSubstring(ipSetName))
+				t.pFilter.AddFailOnDeleteRuleMatcher(ContainSubstring(ipSetName))
 				t.ipSet.AddFailOnDestroySetMatchers(Equal(ipSetName))
 			})
 
@@ -329,7 +329,7 @@ func testExistingGlobalEgressIP(t *globalEgressIPControllerTestDriver, podSelect
 	Context("and programming the IP table rules fails", func() {
 		BeforeEach(func() {
 			t.createGlobalEgressIP(existing)
-			t.ipt.AddFailOnAppendRuleMatcher(ContainSubstring(existing.Status.AllocatedIPs[0]))
+			t.pFilter.AddFailOnAppendRuleMatcher(ContainSubstring(existing.Status.AllocatedIPs[0]))
 		})
 
 		It("should reallocate the global IPs", func() {
@@ -623,11 +623,11 @@ func (t *globalEgressIPControllerTestDriver) start() {
 
 func (t *globalEgressIPControllerTestDriver) awaitIPTableRules(chain string, ips ...string) string {
 	set := t.ipSet.AwaitOneSet(HavePrefix(controllers.IPSetPrefix))
-	t.ipt.AwaitRule("nat", chain, And(ContainSubstring(set), ContainSubstring(getSNATAddress(ips...))))
+	t.pFilter.AwaitRule("nat", chain, And(ContainSubstring(set), ContainSubstring(getSNATAddress(ips...))))
 
 	return set
 }
 
 func (t *globalEgressIPControllerTestDriver) awaitNoIPTableRules(chain string, ips ...string) {
-	t.ipt.AwaitNoRule("nat", chain, ContainSubstring(getSNATAddress(ips...)))
+	t.pFilter.AwaitNoRule("nat", chain, ContainSubstring(getSNATAddress(ips...)))
 }

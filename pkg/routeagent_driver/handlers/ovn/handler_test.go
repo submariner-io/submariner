@@ -313,8 +313,8 @@ var _ = Describe("Handler", func() {
 
 	Context("on Uninstall", func() {
 		It("should delete the table rules", func() {
-			Expect(t.ipTables.ChainExists(constants.FilterTable, ovn.ForwardingSubmarinerFWDChain)).To(BeTrue())
-			Expect(t.ipTables.ChainExists(constants.FilterTable, ovn.ForwardingSubmarinerMSSClampChain)).To(BeTrue())
+			Expect(t.pFilter.ChainExists(constants.FilterTable, ovn.ForwardingSubmarinerFWDChain)).To(BeTrue())
+			Expect(t.pFilter.ChainExists(constants.FilterTable, ovn.ForwardingSubmarinerMSSClampChain)).To(BeTrue())
 
 			_ = t.netLink.RuleAdd(&netlink.Rule{
 				Table:  constants.RouteAgentHostNetworkTableID,
@@ -331,7 +331,7 @@ var _ = Describe("Handler", func() {
 			t.netLink.AwaitNoRule(constants.RouteAgentHostNetworkTableID, "", "")
 			t.netLink.AwaitNoRule(constants.RouteAgentInterClusterNetworkTableID, "", "")
 
-			Expect(t.ipTables.ChainExists(constants.FilterTable, ovn.ForwardingSubmarinerFWDChain)).To(BeFalse())
+			Expect(t.pFilter.ChainExists(constants.FilterTable, ovn.ForwardingSubmarinerFWDChain)).To(BeFalse())
 		})
 	})
 })

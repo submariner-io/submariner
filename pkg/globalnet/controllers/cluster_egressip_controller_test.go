@@ -128,7 +128,7 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 			Context("and programming the IP table rules fails", func() {
 				BeforeEach(func() {
 					t.createClusterGlobalEgressIP(existing)
-					t.ipt.AddFailOnAppendRuleMatcher(ContainSubstring(existing.Status.AllocatedIPs[0]))
+					t.pFilter.AddFailOnAppendRuleMatcher(ContainSubstring(existing.Status.AllocatedIPs[0]))
 				})
 
 				It("should reallocate the global IPs", func() {
@@ -272,7 +272,7 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 		Context("and IP tables cleanup of previously allocated IPs initially fails", func() {
 			BeforeEach(func() {
 				numberOfIPs = *existing.Spec.NumberOfIPs + 1
-				t.ipt.AddFailOnDeleteRuleMatcher(ContainSubstring(existing.Status.AllocatedIPs[0]))
+				t.pFilter.AddFailOnDeleteRuleMatcher(ContainSubstring(existing.Status.AllocatedIPs[0]))
 			})
 
 			It("should eventually cleanup the IP tables and reallocate", func() {
@@ -285,7 +285,7 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 		Context("and programming of IP tables initially fails", func() {
 			BeforeEach(func() {
 				numberOfIPs = *existing.Spec.NumberOfIPs + 1
-				t.ipt.AddFailOnAppendRuleMatcher(Not(ContainSubstring(existing.Status.AllocatedIPs[0])))
+				t.pFilter.AddFailOnAppendRuleMatcher(Not(ContainSubstring(existing.Status.AllocatedIPs[0])))
 			})
 
 			It("should eventually reallocate the global IPs", func() {
@@ -394,13 +394,13 @@ func (t *clusterGlobalEgressIPControllerTestDriver) start() {
 }
 
 func (t *clusterGlobalEgressIPControllerTestDriver) awaitIPTableRules(ips ...string) {
-	t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChainForCluster, ContainSubstring(getSNATAddress(ips...)))
+	t.pFilter.AwaitRule("nat", constants.SmGlobalnetEgressChainForCluster, ContainSubstring(getSNATAddress(ips...)))
 
 	for _, localSubnet := range t.localSubnets {
-		t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChainForCluster, ContainSubstring(localSubnet))
+		t.pFilter.AwaitRule("nat", constants.SmGlobalnetEgressChainForCluster, ContainSubstring(localSubnet))
 	}
 }
 
 func (t *clusterGlobalEgressIPControllerTestDriver) awaitNoIPTableRules(ips ...string) {
-	t.ipt.AwaitNoRule("nat", constants.SmGlobalnetEgressChainForCluster, ContainSubstring(getSNATAddress(ips...)))
+	t.pFilter.AwaitNoRule("nat", constants.SmGlobalnetEgressChainForCluster, ContainSubstring(getSNATAddress(ips...)))
 }

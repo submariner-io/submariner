@@ -32,7 +32,7 @@ import (
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	versioned "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
-	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
+	"github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
 	"github.com/submariner-io/submariner/pkg/ipset"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
@@ -48,7 +48,7 @@ import (
 )
 
 func UninstallDataPath() {
-	ipt, err := iptables.New()
+	ipt, err := packetfilter.New()
 	logger.FatalOnError(err, "Error initializing IP tables")
 
 	natTableChains := []string{
@@ -67,23 +67,23 @@ func UninstallDataPath() {
 		err = ipt.FlushIPTableChain(constants.NATTable, chain)
 		if err != nil {
 			// Just log an error as this is part of uninstallation.
-			logger.Errorf(err, "Error flushing iptables chain %q", chain)
+			logger.Errorf(err, "Error flushing packetfilter chain %q", chain)
 		}
 	}
 
 	err = ipt.FlushIPTableChain(constants.NATTable, routeAgent.SmPostRoutingChain)
 	if err != nil {
-		logger.Errorf(err, "Error flushing iptables chain %q", routeAgent.SmPostRoutingChain)
+		logger.Errorf(err, "Error flushing packetfilter chain %q", routeAgent.SmPostRoutingChain)
 	}
 
 	if err := ipt.DeleteIPTableRule(constants.NATTable, "PREROUTING", constants.SmGlobalnetIngressChain); err != nil {
-		logger.Errorf(err, "Error deleting iptables rule for %q in PREROUTING chain", constants.SmGlobalnetIngressChain)
+		logger.Errorf(err, "Error deleting packetfilter rule for %q in PREROUTING chain", constants.SmGlobalnetIngressChain)
 	}
 
 	for _, chain := range natTableChains {
 		err = ipt.DeleteIPTableChain(constants.NATTable, chain)
 		if err != nil {
-			logger.Errorf(err, "Error deleting iptables chain %q", chain)
+			logger.Errorf(err, "Error deleting packetfilter chain %q", chain)
 		}
 	}
 

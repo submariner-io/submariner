@@ -29,7 +29,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
+	"github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
 	"github.com/submariner-io/submariner/pkg/globalnet/metrics"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	corev1 "k8s.io/api/core/v1"
@@ -47,7 +47,7 @@ func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipa
 
 	logger.Info("Creating GlobalIngressIP controller")
 
-	iptIface, err := iptables.New()
+	iptIface, err := packetfilter.New()
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the IPTablesInterface handler")
 	}
@@ -85,7 +85,7 @@ func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipa
 		//nolint:wrapcheck  // No need to wrap these errors.
 		err = controller.reserveAllocatedIPs(federator, obj, func(reservedIPs []string) error {
 			var target string
-			var tType iptables.TargetType
+			var tType packetfilter.TargetType
 
 			metrics.RecordAllocateGlobalIngressIPs(pool.GetCIDR(), len(reservedIPs))
 
@@ -93,10 +93,10 @@ func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipa
 				return controller.ensureInternalServiceExists(gip)
 			} else if gip.Spec.Target == submarinerv1.HeadlessServicePod {
 				target = gip.GetAnnotations()[headlessSvcPodIP]
-				tType = iptables.PodTarget
+				tType = packetfilter.PodTarget
 			} else if gip.Spec.Target == submarinerv1.HeadlessServiceEndpoints {
 				target = gip.GetAnnotations()[headlessSvcEndpointsIP]
-				tType = iptables.EndpointsTarget
+				tType = packetfilter.EndpointsTarget
 			} else {
 				return nil
 			}
@@ -220,14 +220,14 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 		}
 	} else {
 		var annotationKey string
-		var tType iptables.TargetType
+		var tType packetfilter.TargetType
 
 		if ingressIP.Spec.Target == submarinerv1.HeadlessServicePod {
 			annotationKey = headlessSvcPodIP
-			tType = iptables.PodTarget
+			tType = packetfilter.PodTarget
 		} else if ingressIP.Spec.Target == submarinerv1.HeadlessServiceEndpoints {
 			annotationKey = headlessSvcEndpointsIP
-			tType = iptables.EndpointsTarget
+			tType = packetfilter.EndpointsTarget
 		}
 
 		target := ingressIP.GetAnnotations()[annotationKey]
@@ -373,16 +373,16 @@ func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngre
 
 	return c.flushRulesAndReleaseIPs(key, numRequeues, func(allocatedIPs []string) error {
 		var target string
-		var tType iptables.TargetType
+		var tType packetfilter.TargetType
 
 		metrics.RecordDeallocateGlobalIngressIPs(c.pool.GetCIDR(), len(allocatedIPs))
 
 		if ingressIP.Spec.Target == submarinerv1.HeadlessServicePod {
 			target = ingressIP.GetAnnotations()[headlessSvcPodIP]
-			tType = iptables.PodTarget
+			tType = packetfilter.PodTarget
 		} else if ingressIP.Spec.Target == submarinerv1.HeadlessServiceEndpoints {
 			target = ingressIP.GetAnnotations()[headlessSvcEndpointsIP]
-			tType = iptables.EndpointsTarget
+			tType = packetfilter.EndpointsTarget
 		}
 
 		if target != "" {

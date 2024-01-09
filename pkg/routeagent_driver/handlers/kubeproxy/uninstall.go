@@ -22,8 +22,8 @@ import (
 	"net"
 
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/submariner/pkg/iptables"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"github.com/submariner-io/submariner/pkg/port"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
@@ -72,7 +72,7 @@ func deleteVxLANInterface() {
 }
 
 func deleteIPTableChains() {
-	ipt, err := iptables.New()
+	pFilter, err := packetfilter.New()
 	if err != nil {
 		logger.Errorf(err, "Failed to initialize IPTable interface")
 		return
@@ -80,42 +80,42 @@ func deleteIPTableChains() {
 
 	logger.Infof("Flushing iptable entries in %q chain of %q table", constants.SmPostRoutingChain, constants.NATTable)
 
-	if err := ipt.ClearChain(constants.NATTable, constants.SmPostRoutingChain); err != nil {
-		logger.Errorf(err, "Error flushing iptables chain %q of %q table", constants.SmPostRoutingChain,
+	if err := pFilter.ClearChain(constants.NATTable, constants.SmPostRoutingChain); err != nil {
+		logger.Errorf(err, "Error flushing packetfilter chain %q of %q table", constants.SmPostRoutingChain,
 			constants.NATTable)
 	}
 
 	logger.Infof("Deleting iptable entry in %q chain of %q table", constants.PostRoutingChain, constants.NATTable)
 
 	ruleSpec := []string{"-j", constants.SmPostRoutingChain}
-	if err := ipt.Delete(constants.NATTable, constants.PostRoutingChain, ruleSpec...); err != nil {
-		logger.Errorf(err, "Error deleting iptables rule from %q chain", constants.PostRoutingChain)
+	if err := pFilter.Delete(constants.NATTable, constants.PostRoutingChain, ruleSpec...); err != nil {
+		logger.Errorf(err, "Error deleting packetfilter rule from %q chain", constants.PostRoutingChain)
 	}
 
 	logger.Infof("Deleting iptable %q chain of %q table", constants.SmPostRoutingChain, constants.NATTable)
 
-	if err := ipt.DeleteChain(constants.NATTable, constants.SmPostRoutingChain); err != nil {
+	if err := pFilter.DeleteChain(constants.NATTable, constants.SmPostRoutingChain); err != nil {
 		logger.Errorf(err, "Error deleting iptable chain %q of table %q", constants.SmPostRoutingChain,
 			constants.NATTable)
 	}
 
 	logger.Infof("Flushing iptable entries in %q chain of %q table", constants.SmInputChain, constants.FilterTable)
 
-	if err := ipt.ClearChain(constants.FilterTable, constants.SmInputChain); err != nil {
-		logger.Errorf(err, "Error flushing iptables chain %q of %q table", constants.SmInputChain,
+	if err := pFilter.ClearChain(constants.FilterTable, constants.SmInputChain); err != nil {
+		logger.Errorf(err, "Error flushing packetfilter chain %q of %q table", constants.SmInputChain,
 			constants.FilterTable)
 	}
 
 	logger.Infof("Deleting iptable entry in %q chain of %q table", constants.InputChain, constants.FilterTable)
 
 	ruleSpec = []string{"-p", "udp", "-m", "udp", "-j", constants.SmInputChain}
-	if err := ipt.Delete(constants.FilterTable, constants.InputChain, ruleSpec...); err != nil {
-		logger.Errorf(err, "Error deleting iptables rule from %q chain", constants.InputChain)
+	if err := pFilter.Delete(constants.FilterTable, constants.InputChain, ruleSpec...); err != nil {
+		logger.Errorf(err, "Error deleting packetfilter rule from %q chain", constants.InputChain)
 	}
 
 	logger.Infof("Deleting iptable %q chain of %q table", constants.SmInputChain, constants.FilterTable)
 
-	if err := ipt.DeleteChain(constants.FilterTable, constants.SmInputChain); err != nil {
+	if err := pFilter.DeleteChain(constants.FilterTable, constants.SmInputChain); err != nil {
 		logger.Errorf(err, "Error deleting iptable chain %q of table %q", constants.SmInputChain,
 			constants.FilterTable)
 	}

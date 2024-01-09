@@ -29,8 +29,8 @@ import (
 	"github.com/submariner-io/submariner/pkg/cidr"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/ipset"
-	"github.com/submariner-io/submariner/pkg/iptables"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	utilexec "k8s.io/utils/exec"
 	k8snet "k8s.io/utils/net"
@@ -53,7 +53,7 @@ const (
 type mtuHandler struct {
 	event.HandlerBase
 	localClusterCidr []string
-	ipt              iptables.Interface
+	pFilter          packetfilter.Interface
 	remoteIPSet      ipset.Named
 	localIPSet       ipset.Named
 	forceMss         forceMssSts
@@ -86,15 +86,15 @@ func (h *mtuHandler) GetName() string {
 func (h *mtuHandler) Init() error {
 	var err error
 
-	h.ipt, err = iptables.New()
+	h.pFilter, err = packetfilter.New()
 	if err != nil {
-		return errors.Wrap(err, "error initializing iptables")
+		return errors.Wrap(err, "error initializing packetfilter")
 	}
 
 	ipSetIface := ipset.New(utilexec.New())
 
-	if err := h.ipt.CreateChainIfNotExists(constants.MangleTable, constants.SmPostRoutingChain); err != nil {
-		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmPostRoutingChain)
+	if err := h.pFilter.CreateChainIfNotExists(constants.MangleTable, constants.SmPostRoutingChain); err != nil {
+		return errors.Wrapf(err, "error creating packetfilter chain %s", constants.SmPostRoutingChain)
 	}
 
 	forwardToSubMarinerPostRoutingChain := []string{"-j", constants.SmPostRoutingChain}
@@ -109,9 +109,9 @@ func (h *mtuHandler) Init() error {
 		return errors.Wrapf(err, "error creating ipset %q", constants.LocalCIDRIPSet)
 	}
 
-	if err := h.ipt.PrependUnique(constants.MangleTable, constants.PostRoutingChain,
+	if err := h.pFilter.PrependUnique(constants.MangleTable, constants.PostRoutingChain,
 		forwardToSubMarinerPostRoutingChain); err != nil {
-		return errors.Wrapf(err, "error inserting iptables rule %q",
+		return errors.Wrapf(err, "error inserting packetfilter rule %q",
 			strings.Join(forwardToSubMarinerPostRoutingChain, " "))
 	}
 
@@ -120,7 +120,7 @@ func (h *mtuHandler) Init() error {
 		return nil
 	}
 
-	logger.Info("Creating iptables clamp-mss-to-pmtu rules")
+	logger.Info("Creating packetfilter clamp-mss-to-pmtu rules")
 
 	ruleSpecSource := []string{
 		"-m", "set", "--match-set", constants.LocalCIDRIPSet, "src", "-m", "set", "--match-set",
@@ -133,12 +133,12 @@ func (h *mtuHandler) Init() error {
 		"--clamp-mss-to-pmtu",
 	}
 
-	if err := h.ipt.AppendUnique(constants.MangleTable, constants.SmPostRoutingChain, ruleSpecSource...); err != nil {
-		return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(ruleSpecSource, " "))
+	if err := h.pFilter.AppendUnique(constants.MangleTable, constants.SmPostRoutingChain, ruleSpecSource...); err != nil {
+		return errors.Wrapf(err, "error appending packetfilter rule %q", strings.Join(ruleSpecSource, " "))
 	}
 
-	if err := h.ipt.AppendUnique(constants.MangleTable, constants.SmPostRoutingChain, ruleSpecDest...); err != nil {
-		return errors.Wrapf(err, "error appending iptables rule %q", strings.Join(ruleSpecSource, " "))
+	if err := h.pFilter.AppendUnique(constants.MangleTable, constants.SmPostRoutingChain, ruleSpecDest...); err != nil {
+		return errors.Wrapf(err, "error appending packetfilter rule %q", strings.Join(ruleSpecSource, " "))
 	}
 
 	return nil
@@ -161,7 +161,7 @@ func (h *mtuHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 	}
 
 	if h.forceMss == needed {
-		logger.Info("Creating iptables set-mss rules")
+		logger.Info("Creating packetfilter set-mss rules")
 
 		err := h.forceMssClamping(endpoint)
 		if err != nil {
@@ -241,21 +241,21 @@ func (h *mtuHandler) newNamedIPSet(key string, ipSetIface ipset.Interface) ipset
 func (h *mtuHandler) Uninstall() error {
 	logger.Infof("Flushing iptable entries in %q chain of %q table", constants.SmPostRoutingChain, constants.MangleTable)
 
-	if err := h.ipt.ClearChain(constants.MangleTable, constants.SmPostRoutingChain); err != nil {
-		logger.Errorf(err, "Error flushing iptables chain %q of %q table", constants.SmPostRoutingChain,
+	if err := h.pFilter.ClearChain(constants.MangleTable, constants.SmPostRoutingChain); err != nil {
+		logger.Errorf(err, "Error flushing packetfilter chain %q of %q table", constants.SmPostRoutingChain,
 			constants.MangleTable)
 	}
 
 	logger.Infof("Deleting iptable entry in %q chain of %q table", constants.PostRoutingChain, constants.MangleTable)
 
 	ruleSpec := []string{"-j", constants.SmPostRoutingChain}
-	if err := h.ipt.Delete(constants.MangleTable, constants.PostRoutingChain, ruleSpec...); err != nil {
-		logger.Errorf(err, "Error deleting iptables rule from %q chain", constants.PostRoutingChain)
+	if err := h.pFilter.Delete(constants.MangleTable, constants.PostRoutingChain, ruleSpec...); err != nil {
+		logger.Errorf(err, "Error deleting packetfilter rule from %q chain", constants.PostRoutingChain)
 	}
 
 	logger.Infof("Deleting iptable %q chain of %q table", constants.SmPostRoutingChain, constants.MangleTable)
 
-	if err := h.ipt.DeleteChain(constants.MangleTable, constants.SmPostRoutingChain); err != nil {
+	if err := h.pFilter.DeleteChain(constants.MangleTable, constants.SmPostRoutingChain); err != nil {
 		logger.Errorf(err, "Error deleting iptable chain %q of table %q", constants.SmPostRoutingChain,
 			constants.MangleTable)
 	}
@@ -310,7 +310,7 @@ func (h *mtuHandler) forceMssClamping(endpoint *submV1.Endpoint) error {
 		"--set-mss", strconv.Itoa(tcpMssValue),
 	}
 
-	if err := h.ipt.UpdateChainRules(constants.MangleTable, constants.SmPostRoutingChain,
+	if err := h.pFilter.UpdateChainRules(constants.MangleTable, constants.SmPostRoutingChain,
 		[][]string{ruleSpecSource, ruleSpecDest}); err != nil {
 		return errors.Wrapf(err, "error updating chain %s table %s rules", constants.SmPostRoutingChain, constants.MangleTable)
 	}

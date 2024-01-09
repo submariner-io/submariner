@@ -27,8 +27,8 @@ import (
 	"github.com/submariner-io/submariner/pkg/cidr"
 	cni "github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
-	"github.com/submariner-io/submariner/pkg/iptables"
 	"github.com/submariner-io/submariner/pkg/netlink"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
 	cniapi "github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/utils/set"
@@ -46,7 +46,7 @@ type SyncHandler struct {
 	remoteVTEPs      set.Set[string]
 	routeCacheGWNode set.Set[string]
 
-	ipTables         iptables.Interface
+	ipTables         packetfilter.Interface
 	netLink          netlink.Interface
 	vxlanDevice      *vxLanIface
 	vxlanGwIP        *net.IP
@@ -58,7 +58,7 @@ type SyncHandler struct {
 var logger = log.Logger{Logger: logf.Log.WithName("KubeProxy")}
 
 func NewSyncHandler(localClusterCidr, localServiceCidr []string) *SyncHandler {
-	ipTables, err := iptables.New()
+	pFilter, err := packetfilter.New()
 	utilruntime.Must(err)
 
 	return &SyncHandler{
@@ -70,12 +70,12 @@ func NewSyncHandler(localClusterCidr, localServiceCidr []string) *SyncHandler {
 		remoteVTEPs:      set.New[string](),
 		routeCacheGWNode: set.New[string](),
 		netLink:          netlink.New(),
-		ipTables:         ipTables,
+		ipTables:         pFilter,
 	}
 }
 
 func (kp *SyncHandler) GetName() string {
-	return "kubeproxy-iptables-handler"
+	return "kubeproxy-packetfilter-handler"
 }
 
 func (kp *SyncHandler) GetNetworkPlugins() []string {

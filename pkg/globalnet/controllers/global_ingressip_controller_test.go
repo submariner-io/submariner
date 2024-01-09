@@ -222,7 +222,7 @@ func testGlobalIngressIPCreatedHeadlessSvc(t *globalIngressIPControllerTestDrive
 
 	Context("and programming of IP tables initially fails", func() {
 		BeforeEach(func() {
-			t.ipt.AddFailOnAppendRuleMatcher(ContainSubstring(ruleMatch))
+			t.pFilter.AddFailOnAppendRuleMatcher(ContainSubstring(ruleMatch))
 		})
 
 		It("should eventually allocate a global IP", func() {
@@ -256,7 +256,7 @@ func testGlobalIngressIPCreatedHeadlessSvc(t *globalIngressIPControllerTestDrive
 
 		Context("and cleanup of IP tables initially fails", func() {
 			BeforeEach(func() {
-				t.ipt.AddFailOnDeleteRuleMatcher(ContainSubstring(ruleMatch))
+				t.pFilter.AddFailOnDeleteRuleMatcher(ContainSubstring(ruleMatch))
 			})
 
 			It("should eventually cleanup the IP tables and reallocate", func() {
@@ -463,7 +463,7 @@ func testExistingGlobalIngressIPHeadlessSvc(t *globalIngressIPControllerTestDriv
 
 		Context("and programming the IP table rules fails", func() {
 			BeforeEach(func() {
-				t.ipt.AddFailOnAppendRuleMatcher(ContainSubstring(existing.Status.AllocatedIP))
+				t.pFilter.AddFailOnAppendRuleMatcher(ContainSubstring(existing.Status.AllocatedIP))
 			})
 
 			It("should reallocate the global IP", func() {
@@ -537,33 +537,34 @@ func (t *globalIngressIPControllerTestDriver) start() syncer.Interface {
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitPodEgressRules(podIP, snatIP string) {
-	t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChainForHeadlessSvcPods, And(ContainSubstring(podIP), ContainSubstring(snatIP)))
+	t.pFilter.AwaitRule("nat", constants.SmGlobalnetEgressChainForHeadlessSvcPods, And(ContainSubstring(podIP), ContainSubstring(snatIP)))
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitNoPodEgressRules(podIP, snatIP string) {
-	t.ipt.AwaitNoRule("nat", constants.SmGlobalnetEgressChainForHeadlessSvcPods, Or(ContainSubstring(podIP), ContainSubstring(snatIP)))
+	t.pFilter.AwaitNoRule("nat", constants.SmGlobalnetEgressChainForHeadlessSvcPods, Or(ContainSubstring(podIP), ContainSubstring(snatIP)))
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitPodIngressRules(podIP, snatIP string) {
-	t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain, And(ContainSubstring(podIP), ContainSubstring(snatIP)))
+	t.pFilter.AwaitRule("nat", constants.SmGlobalnetIngressChain, And(ContainSubstring(podIP), ContainSubstring(snatIP)))
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitNoPodIngressRules(podIP, snatIP string) {
-	t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, Or(ContainSubstring(podIP), ContainSubstring(snatIP)))
+	t.pFilter.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, Or(ContainSubstring(podIP), ContainSubstring(snatIP)))
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitEndpointsEgressRules(endpointsIP, snatIP string) {
-	t.ipt.AwaitRule("nat", constants.SmGlobalnetEgressChainForHeadlessSvcEPs, And(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
+	t.pFilter.AwaitRule("nat", constants.SmGlobalnetEgressChainForHeadlessSvcEPs, And(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitNoEndpointsEgressRules(endpointsIP, snatIP string) {
-	t.ipt.AwaitNoRule("nat", constants.SmGlobalnetEgressChainForHeadlessSvcEPs, Or(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
+	t.pFilter.AwaitNoRule("nat", constants.SmGlobalnetEgressChainForHeadlessSvcEPs, Or(ContainSubstring(endpointsIP),
+		ContainSubstring(snatIP)))
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitEndpointsIngressRules(endpointsIP, snatIP string) {
-	t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain, And(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
+	t.pFilter.AwaitRule("nat", constants.SmGlobalnetIngressChain, And(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitNoEndpointsIngressRules(endpointsIP, snatIP string) {
-	t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, Or(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
+	t.pFilter.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, Or(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
 }

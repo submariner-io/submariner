@@ -35,8 +35,8 @@ import (
 	"github.com/submariner-io/submariner/pkg/event/controller"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/ipam"
-	"github.com/submariner-io/submariner/pkg/iptables"
 	"github.com/submariner-io/submariner/pkg/netlink"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -86,7 +86,7 @@ func NewGatewayMonitor(config *GatewayMonitorConfig) (Interface, error) {
 
 	var err error
 
-	gatewayMonitor.ipt, err = iptables.New()
+	gatewayMonitor.pFilter, err = packetfilter.New()
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating IP tables")
 	}
@@ -441,8 +441,8 @@ func (g *gatewayMonitor) stopControllers(ctx context.Context, clearGlobalnetChai
 func (g *gatewayMonitor) createGlobalNetMarkingChain() error {
 	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetMarkChain)
 
-	if err := g.ipt.CreateChainIfNotExists("nat", constants.SmGlobalnetMarkChain); err != nil {
-		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetMarkChain)
+	if err := g.pFilter.CreateChainIfNotExists("nat", constants.SmGlobalnetMarkChain); err != nil {
+		return errors.Wrapf(err, "error creating packetfilter chain %s", constants.SmGlobalnetMarkChain)
 	}
 
 	return nil
@@ -452,30 +452,30 @@ func (g *gatewayMonitor) createGlobalNetMarkingChain() error {
 func (g *gatewayMonitor) createGlobalnetChains() error {
 	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetIngressChain)
 
-	if err := g.ipt.CreateChainIfNotExists("nat", constants.SmGlobalnetIngressChain); err != nil {
-		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetIngressChain)
+	if err := g.pFilter.CreateChainIfNotExists("nat", constants.SmGlobalnetIngressChain); err != nil {
+		return errors.Wrapf(err, "error creating packetfilter chain %s", constants.SmGlobalnetIngressChain)
 	}
 
 	forwardToSubGlobalNetChain := []string{"-j", constants.SmGlobalnetIngressChain}
-	if err := g.ipt.PrependUnique("nat", "PREROUTING", forwardToSubGlobalNetChain); err != nil {
-		logger.Errorf(err, "Error appending iptables rule %q", strings.Join(forwardToSubGlobalNetChain, " "))
+	if err := g.pFilter.PrependUnique("nat", "PREROUTING", forwardToSubGlobalNetChain); err != nil {
+		logger.Errorf(err, "Error appending packetfilter rule %q", strings.Join(forwardToSubGlobalNetChain, " "))
 	}
 
 	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChain)
 
-	if err := g.ipt.CreateChainIfNotExists("nat", constants.SmGlobalnetEgressChain); err != nil {
-		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChain)
+	if err := g.pFilter.CreateChainIfNotExists("nat", constants.SmGlobalnetEgressChain); err != nil {
+		return errors.Wrapf(err, "error creating packetfilter chain %s", constants.SmGlobalnetEgressChain)
 	}
 
 	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", routeAgent.SmPostRoutingChain)
 
-	if err := g.ipt.CreateChainIfNotExists("nat", routeAgent.SmPostRoutingChain); err != nil {
-		return errors.Wrapf(err, "error creating iptables chain %s", routeAgent.SmPostRoutingChain)
+	if err := g.pFilter.CreateChainIfNotExists("nat", routeAgent.SmPostRoutingChain); err != nil {
+		return errors.Wrapf(err, "error creating packetfilter chain %s", routeAgent.SmPostRoutingChain)
 	}
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetEgressChain}
-	if err := g.ipt.PrependUnique("nat", routeAgent.SmPostRoutingChain, forwardToSubGlobalNetChain); err != nil {
-		logger.Errorf(err, "Error inserting iptables rule %q", strings.Join(forwardToSubGlobalNetChain, " "))
+	if err := g.pFilter.PrependUnique("nat", routeAgent.SmPostRoutingChain, forwardToSubGlobalNetChain); err != nil {
+		logger.Errorf(err, "Error inserting packetfilter rule %q", strings.Join(forwardToSubGlobalNetChain, " "))
 	}
 
 	if err := g.createGlobalNetMarkingChain(); err != nil {
@@ -483,63 +483,63 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 	}
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetMarkChain}
-	if err := g.ipt.PrependUnique("nat", constants.SmGlobalnetEgressChain, forwardToSubGlobalNetChain); err != nil {
-		logger.Errorf(err, "Error inserting iptables rule %q", strings.Join(forwardToSubGlobalNetChain, " "))
+	if err := g.pFilter.PrependUnique("nat", constants.SmGlobalnetEgressChain, forwardToSubGlobalNetChain); err != nil {
+		logger.Errorf(err, "Error inserting packetfilter rule %q", strings.Join(forwardToSubGlobalNetChain, " "))
 	}
 
 	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForPods)
 
-	if err := g.ipt.CreateChainIfNotExists("nat", constants.SmGlobalnetEgressChainForPods); err != nil {
-		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChainForPods)
+	if err := g.pFilter.CreateChainIfNotExists("nat", constants.SmGlobalnetEgressChainForPods); err != nil {
+		return errors.Wrapf(err, "error creating packetfilter chain %s", constants.SmGlobalnetEgressChainForPods)
 	}
 
 	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForHeadlessSvcPods)
 
-	if err := g.ipt.CreateChainIfNotExists("nat", constants.SmGlobalnetEgressChainForHeadlessSvcPods); err != nil {
-		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChainForHeadlessSvcPods)
+	if err := g.pFilter.CreateChainIfNotExists("nat", constants.SmGlobalnetEgressChainForHeadlessSvcPods); err != nil {
+		return errors.Wrapf(err, "error creating packetfilter chain %s", constants.SmGlobalnetEgressChainForHeadlessSvcPods)
 	}
 
 	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForHeadlessSvcEPs)
 
-	if err := g.ipt.CreateChainIfNotExists("nat", constants.SmGlobalnetEgressChainForHeadlessSvcEPs); err != nil {
-		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChainForHeadlessSvcEPs)
+	if err := g.pFilter.CreateChainIfNotExists("nat", constants.SmGlobalnetEgressChainForHeadlessSvcEPs); err != nil {
+		return errors.Wrapf(err, "error creating packetfilter chain %s", constants.SmGlobalnetEgressChainForHeadlessSvcEPs)
 	}
 
 	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForNamespace)
 
-	if err := g.ipt.CreateChainIfNotExists("nat", constants.SmGlobalnetEgressChainForNamespace); err != nil {
-		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChainForNamespace)
+	if err := g.pFilter.CreateChainIfNotExists("nat", constants.SmGlobalnetEgressChainForNamespace); err != nil {
+		return errors.Wrapf(err, "error creating packetfilter chain %s", constants.SmGlobalnetEgressChainForNamespace)
 	}
 
 	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForCluster)
 
-	if err := g.ipt.CreateChainIfNotExists("nat", constants.SmGlobalnetEgressChainForCluster); err != nil {
-		return errors.Wrapf(err, "error creating iptables chain %s", constants.SmGlobalnetEgressChainForCluster)
+	if err := g.pFilter.CreateChainIfNotExists("nat", constants.SmGlobalnetEgressChainForCluster); err != nil {
+		return errors.Wrapf(err, "error creating packetfilter chain %s", constants.SmGlobalnetEgressChainForCluster)
 	}
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetEgressChainForPods}
-	if err := g.ipt.InsertUnique("nat", constants.SmGlobalnetEgressChain, 2, forwardToSubGlobalNetChain); err != nil {
-		logger.Errorf(err, "Error inserting iptables rule %q", strings.Join(forwardToSubGlobalNetChain, " "))
+	if err := g.pFilter.InsertUnique("nat", constants.SmGlobalnetEgressChain, 2, forwardToSubGlobalNetChain); err != nil {
+		logger.Errorf(err, "Error inserting packetfilter rule %q", strings.Join(forwardToSubGlobalNetChain, " "))
 	}
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetEgressChainForHeadlessSvcPods}
-	if err := g.ipt.InsertUnique("nat", constants.SmGlobalnetEgressChain, 3, forwardToSubGlobalNetChain); err != nil {
-		logger.Errorf(err, "Error inserting iptables rule %q", strings.Join(forwardToSubGlobalNetChain, " "))
+	if err := g.pFilter.InsertUnique("nat", constants.SmGlobalnetEgressChain, 3, forwardToSubGlobalNetChain); err != nil {
+		logger.Errorf(err, "Error inserting packetfilter rule %q", strings.Join(forwardToSubGlobalNetChain, " "))
 	}
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetEgressChainForHeadlessSvcEPs}
-	if err := g.ipt.InsertUnique("nat", constants.SmGlobalnetEgressChain, 4, forwardToSubGlobalNetChain); err != nil {
-		logger.Errorf(err, "Error inserting iptables rule %q", strings.Join(forwardToSubGlobalNetChain, " "))
+	if err := g.pFilter.InsertUnique("nat", constants.SmGlobalnetEgressChain, 4, forwardToSubGlobalNetChain); err != nil {
+		logger.Errorf(err, "Error inserting packetfilter rule %q", strings.Join(forwardToSubGlobalNetChain, " "))
 	}
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetEgressChainForNamespace}
-	if err := g.ipt.InsertUnique("nat", constants.SmGlobalnetEgressChain, 5, forwardToSubGlobalNetChain); err != nil {
-		logger.Errorf(err, "Error inserting iptables rule %q", strings.Join(forwardToSubGlobalNetChain, " "))
+	if err := g.pFilter.InsertUnique("nat", constants.SmGlobalnetEgressChain, 5, forwardToSubGlobalNetChain); err != nil {
+		logger.Errorf(err, "Error inserting packetfilter rule %q", strings.Join(forwardToSubGlobalNetChain, " "))
 	}
 
 	forwardToSubGlobalNetChain = []string{"-j", constants.SmGlobalnetEgressChainForCluster}
-	if err := g.ipt.InsertUnique("nat", constants.SmGlobalnetEgressChain, 6, forwardToSubGlobalNetChain); err != nil {
-		logger.Errorf(err, "Error inserting iptables rule %q", strings.Join(forwardToSubGlobalNetChain, " "))
+	if err := g.pFilter.InsertUnique("nat", constants.SmGlobalnetEgressChain, 6, forwardToSubGlobalNetChain); err != nil {
+		logger.Errorf(err, "Error inserting packetfilter rule %q", strings.Join(forwardToSubGlobalNetChain, " "))
 	}
 
 	return nil
@@ -548,15 +548,15 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 func (g *gatewayMonitor) clearGlobalnetChains() {
 	logger.Info("Active gateway migrated, flushing Globalnet chains.")
 
-	if err := g.ipt.ClearChain("nat", constants.SmGlobalnetIngressChain); err != nil {
+	if err := g.pFilter.ClearChain("nat", constants.SmGlobalnetIngressChain); err != nil {
 		logger.Errorf(err, "Error while flushing rules in %s chain", constants.SmGlobalnetIngressChain)
 	}
 
-	if err := g.ipt.ClearChain("nat", constants.SmGlobalnetEgressChain); err != nil {
+	if err := g.pFilter.ClearChain("nat", constants.SmGlobalnetEgressChain); err != nil {
 		logger.Errorf(err, "Error while flushing rules in %s chain", constants.SmGlobalnetEgressChain)
 	}
 
-	if err := g.ipt.ClearChain("nat", constants.SmGlobalnetMarkChain); err != nil {
+	if err := g.pFilter.ClearChain("nat", constants.SmGlobalnetMarkChain); err != nil {
 		logger.Errorf(err, "Error while flushing rules in %s chain", constants.SmGlobalnetMarkChain)
 	}
 }
@@ -572,13 +572,13 @@ func (g *gatewayMonitor) markRemoteClusterTraffic(addRules bool, subnets ...stri
 		if addRules {
 			logger.V(log.DEBUG).Infof("Marking traffic destined to remote cluster: %s", strings.Join(ruleSpec, " "))
 
-			if err := g.ipt.AppendUnique("nat", constants.SmGlobalnetMarkChain, ruleSpec...); err != nil {
-				logger.Errorf(err, "Error appending iptables rule \"%s\"", strings.Join(ruleSpec, " "))
+			if err := g.pFilter.AppendUnique("nat", constants.SmGlobalnetMarkChain, ruleSpec...); err != nil {
+				logger.Errorf(err, "Error appending packetfilter rule \"%s\"", strings.Join(ruleSpec, " "))
 			}
 		} else {
 			logger.V(log.DEBUG).Infof("Deleting rule that marks remote cluster traffic: %s", strings.Join(ruleSpec, " "))
-			if err := g.ipt.Delete("nat", constants.SmGlobalnetMarkChain, ruleSpec...); err != nil {
-				logger.Errorf(err, "Error deleting iptables rule \"%s\"", strings.Join(ruleSpec, " "))
+			if err := g.pFilter.Delete("nat", constants.SmGlobalnetMarkChain, ruleSpec...); err != nil {
+				logger.Errorf(err, "Error deleting packetfilter rule \"%s\"", strings.Join(ruleSpec, " "))
 			}
 		}
 	}

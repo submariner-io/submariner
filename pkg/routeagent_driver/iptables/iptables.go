@@ -21,18 +21,18 @@ package iptables
 import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/submariner/pkg/iptables"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var logger = log.Logger{Logger: logf.Log.WithName("IPTables")}
 
-func InitSubmarinerPostRoutingChain(ipt iptables.Interface) error {
+func InitSubmarinerPostRoutingChain(ipt packetfilter.Interface) error {
 	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmPostRoutingChain)
 
 	if err := ipt.CreateChainIfNotExists("nat", constants.SmPostRoutingChain); err != nil {
-		return errors.Wrapf(err, "unable to create %q chain in iptables", constants.SmPostRoutingChain)
+		return errors.Wrapf(err, "unable to create %q chain in packetfilter", constants.SmPostRoutingChain)
 	}
 
 	logger.V(log.DEBUG).Infof("Insert %s rule that has rules for inter-cluster traffic", constants.SmPostRoutingChain)

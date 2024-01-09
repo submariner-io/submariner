@@ -30,7 +30,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/util"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
+	"github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
 	"github.com/submariner-io/submariner/pkg/globalnet/metrics"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	"github.com/submariner-io/submariner/pkg/ipset"
@@ -49,7 +49,7 @@ func NewGlobalEgressIPController(config *syncer.ResourceSyncerConfig, pool *ipam
 
 	logger.Info("Creating GlobalEgressIP controller")
 
-	iptIface, err := iptables.New()
+	iptIface, err := packetfilter.New()
 	if err != nil {
 		return nil, errors.WithMessage(err, "error creating the IPTablesInterface handler")
 	}
@@ -297,7 +297,7 @@ func (c *globalEgressIPController) onDelete(numRequeues int, globalEgressIP *sub
 
 	if len(globalEgressIP.Status.AllocatedIPs) == 0 && len(podWatcher.allocatedIPs) > 0 {
 		// Refer to issue for more details: https://github.com/submariner-io/submariner/issues/2388
-		logger.Warningf("Using the cached allocatedIPs %q to delete the iptables rules for key %q", podWatcher.allocatedIPs, key)
+		logger.Warningf("Using the cached allocatedIPs %q to delete the packetfilter rules for key %q", podWatcher.allocatedIPs, key)
 		globalEgressIP.Status.AllocatedIPs = podWatcher.allocatedIPs
 	}
 
@@ -315,9 +315,9 @@ func (c *globalEgressIPController) onDelete(numRequeues int, globalEgressIP *sub
 	}
 
 	if numRequeues >= maxRequeues {
-		logger.Infof("Failed to delete all the iptables/ipset rules for %q even after %d retries", key, numRequeues)
+		logger.Infof("Failed to delete all the packetfilter/ipset rules for %q even after %d retries", key, numRequeues)
 	} else {
-		logger.Infof("Successfully deleted all the iptables/ipset rules for %q ", key)
+		logger.Infof("Successfully deleted all the packetfilter/ipset rules for %q ", key)
 	}
 
 	return false

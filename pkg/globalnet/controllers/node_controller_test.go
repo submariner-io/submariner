@@ -119,7 +119,7 @@ var _ = Describe("Node controller", func() {
 
 			Context("and programming of IP tables initially fails", func() {
 				BeforeEach(func() {
-					t.ipt.AddFailOnAppendRuleMatcher(ContainSubstring(cniInterfaceIP))
+					t.pFilter.AddFailOnAppendRuleMatcher(ContainSubstring(cniInterfaceIP))
 				})
 
 				It("should eventually allocate a global IP and program the relevant iptable rules", func() {
@@ -140,7 +140,7 @@ var _ = Describe("Node controller", func() {
 				addAnnotation(node, routeAgent.CNIInterfaceIP, cniInterfaceIP)
 				test.UpdateResource(t.nodes, node)
 
-				t.ipt.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(oldCNIIfaceIP))
+				t.pFilter.AwaitNoRule("nat", constants.SmGlobalnetIngressChain, ContainSubstring(oldCNIIfaceIP))
 				t.awaitIPTableRules(node.GetAnnotations()[constants.SmGlobalIP])
 				t.verifyIPsReservedInPool(node.GetAnnotations()[constants.SmGlobalIP])
 			})
@@ -205,5 +205,5 @@ func (t *nodeControllerTestDriver) start() {
 }
 
 func (t *nodeControllerTestDriver) awaitIPTableRules(globalIP string) {
-	t.ipt.AwaitRule("nat", constants.SmGlobalnetIngressChain, And(ContainSubstring(globalIP), ContainSubstring(cniInterfaceIP)))
+	t.pFilter.AwaitRule("nat", constants.SmGlobalnetIngressChain, And(ContainSubstring(globalIP), ContainSubstring(cniInterfaceIP)))
 }

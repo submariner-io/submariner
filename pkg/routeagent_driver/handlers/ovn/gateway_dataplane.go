@@ -101,7 +101,7 @@ const (
 
 func (ovn *Handler) getForwardingRuleSpecs() ([][]string, error) {
 	if ovn.cableRoutingInterface == nil {
-		return nil, errors.New("error setting up forwarding iptables, the cable interface isn't discovered yet, " +
+		return nil, errors.New("error setting up forwarding packetfilter, the cable interface isn't discovered yet, " +
 			"this will be retried")
 	}
 
@@ -163,37 +163,37 @@ func (ovn *Handler) setupForwardingIptables() error {
 }
 
 func (ovn *Handler) addNoMasqueradeIPTables(subnet string) error {
-	err := errors.Wrapf(ovn.ipt.AppendUnique(constants.NATTable, constants.SmPostRoutingChain,
+	err := errors.Wrapf(ovn.pFilter.AppendUnique(constants.NATTable, constants.SmPostRoutingChain,
 		[]string{"-d", subnet, "-j", "ACCEPT"}...), "error updating %q rules for subnet %q",
 		constants.SmPostRoutingChain, subnet)
 	if err != nil {
 		return err
 	}
 
-	return errors.Wrapf(ovn.ipt.AppendUnique(constants.NATTable, constants.SmPostRoutingChain,
+	return errors.Wrapf(ovn.pFilter.AppendUnique(constants.NATTable, constants.SmPostRoutingChain,
 		[]string{"-s", subnet, "-j", "ACCEPT"}...), "error updating %q rules for subnet %q",
 		constants.SmPostRoutingChain, subnet)
 }
 
 func (ovn *Handler) removeNoMasqueradeIPTables(subnet string) error {
-	err := errors.Wrapf(ovn.ipt.Delete(constants.NATTable, constants.SmPostRoutingChain,
+	err := errors.Wrapf(ovn.pFilter.Delete(constants.NATTable, constants.SmPostRoutingChain,
 		[]string{"-d", subnet, "-j", "ACCEPT"}...), "error updating %q rules for subnet %q",
 		constants.SmPostRoutingChain, subnet)
 	if err != nil {
 		return err
 	}
 
-	return errors.Wrapf(ovn.ipt.Delete(constants.NATTable, constants.SmPostRoutingChain,
+	return errors.Wrapf(ovn.pFilter.Delete(constants.NATTable, constants.SmPostRoutingChain,
 		[]string{"-s", subnet, "-j", "ACCEPT"}...), "error updating %q rules for subnet %q",
 		constants.SmPostRoutingChain, subnet)
 }
 
 func (ovn *Handler) cleanupForwardingIptables() error {
-	if err := ovn.ipt.ClearChain(constants.FilterTable, ForwardingSubmarinerMSSClampChain); err != nil {
+	if err := ovn.pFilter.ClearChain(constants.FilterTable, ForwardingSubmarinerMSSClampChain); err != nil {
 		return errors.Wrapf(err, "error clearing chain %q", ForwardingSubmarinerMSSClampChain)
 	}
 
-	return errors.Wrapf(ovn.ipt.ClearChain(constants.FilterTable, ForwardingSubmarinerFWDChain),
+	return errors.Wrapf(ovn.pFilter.ClearChain(constants.FilterTable, ForwardingSubmarinerFWDChain),
 		"error clearing chain %q", ForwardingSubmarinerFWDChain)
 }
 
@@ -210,7 +210,7 @@ func (ovn *Handler) getRouteToOVNDataPlane() (*netlink.Route, error) {
 }
 
 func (ovn *Handler) initIPtablesChains() error {
-	if err := iptcommon.InitSubmarinerPostRoutingChain(ovn.ipt); err != nil {
+	if err := iptcommon.InitSubmarinerPostRoutingChain(ovn.pFilter); err != nil {
 		return errors.Wrap(err, "error initializing POST routing chain")
 	}
 
@@ -222,20 +222,20 @@ func (ovn *Handler) initIPtablesChains() error {
 }
 
 func (ovn *Handler) ensureForwardChains() error {
-	if err := ovn.ipt.CreateChainIfNotExists(constants.FilterTable, ForwardingSubmarinerMSSClampChain); err != nil {
+	if err := ovn.pFilter.CreateChainIfNotExists(constants.FilterTable, ForwardingSubmarinerMSSClampChain); err != nil {
 		return errors.Wrapf(err, "error creating chain %q", ForwardingSubmarinerMSSClampChain)
 	}
 
-	if err := ovn.ipt.InsertUnique(constants.FilterTable, "FORWARD", 1,
+	if err := ovn.pFilter.InsertUnique(constants.FilterTable, "FORWARD", 1,
 		[]string{"-j", ForwardingSubmarinerMSSClampChain}); err != nil {
 		return errors.Wrapf(err, "error inserting rule for chain %q", ForwardingSubmarinerMSSClampChain)
 	}
 
-	if err := ovn.ipt.CreateChainIfNotExists(constants.FilterTable, ForwardingSubmarinerFWDChain); err != nil {
+	if err := ovn.pFilter.CreateChainIfNotExists(constants.FilterTable, ForwardingSubmarinerFWDChain); err != nil {
 		return errors.Wrapf(err, "error creating chain %q", ForwardingSubmarinerFWDChain)
 	}
 
-	return errors.Wrapf(ovn.ipt.InsertUnique(constants.FilterTable, "FORWARD", 2, []string{"-j", ForwardingSubmarinerFWDChain}),
+	return errors.Wrapf(ovn.pFilter.InsertUnique(constants.FilterTable, "FORWARD", 2, []string{"-j", ForwardingSubmarinerFWDChain}),
 		"error inserting rule for chain %q", ForwardingSubmarinerFWDChain)
 }
 
@@ -245,5 +245,5 @@ func (ovn *Handler) updateIPtableChains(table, chain string, ruleGen forwardRule
 		return err
 	}
 
-	return errors.Wrap(ovn.ipt.UpdateChainRules(table, chain, ruleSpecs), "error updating chain rules")
+	return errors.Wrap(ovn.pFilter.UpdateChainRules(table, chain, ruleSpecs), "error updating chain rules")
 }

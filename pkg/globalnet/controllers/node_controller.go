@@ -26,7 +26,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	admUtil "github.com/submariner-io/admiral/pkg/util"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
-	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
+	"github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
@@ -42,7 +42,7 @@ func NewNodeController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool, n
 
 	logger.Info("Creating Node controller")
 
-	iptIface, err := iptables.New()
+	iptIface, err := packetfilter.New()
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the IPTablesInterface handler")
 	}

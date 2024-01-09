@@ -38,8 +38,8 @@ import (
 	"github.com/submariner-io/submariner/pkg/ipam"
 	"github.com/submariner-io/submariner/pkg/ipset"
 	fakeIPSet "github.com/submariner-io/submariner/pkg/ipset/fake"
-	"github.com/submariner-io/submariner/pkg/iptables"
-	fakeIPT "github.com/submariner-io/submariner/pkg/iptables/fake"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
+	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -88,7 +88,7 @@ type testDriverBase struct {
 	restMapper             meta.RESTMapper
 	dynClient              *dynamicfake.FakeDynamicClient
 	scheme                 *runtime.Scheme
-	ipt                    *fakeIPT.IPTables
+	pFilter                *fakePF.PacketFilter
 	ipSet                  *fakeIPSet.IPSet
 	pool                   *ipam.IPPool
 	localSubnets           []string
@@ -109,7 +109,7 @@ func newTestDriverBase() *testDriverBase {
 		restMapper: test.GetRESTMapperFor(&submarinerv1.Endpoint{}, &corev1.Service{}, &corev1.Node{}, &corev1.Pod{}, &corev1.Endpoints{},
 			&submarinerv1.GlobalEgressIP{}, &submarinerv1.ClusterGlobalEgressIP{}, &submarinerv1.GlobalIngressIP{}, &mcsv1a1.ServiceExport{}),
 		scheme:       runtime.NewScheme(),
-		ipt:          fakeIPT.New(),
+		pFilter:      fakePF.New(),
 		ipSet:        fakeIPSet.New(),
 		globalCIDR:   localCIDR,
 		localSubnets: []string{},
@@ -140,8 +140,8 @@ func newTestDriverBase() *testDriverBase {
 
 	t.nodes = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &corev1.Node{}))
 
-	iptables.NewFunc = func() (iptables.Interface, error) {
-		return t.ipt, nil
+	packetfilter.NewFunc = func() (packetfilter.Interface, error) {
+		return t.pFilter, nil
 	}
 
 	ipset.NewFunc = func() ipset.Interface {
@@ -154,7 +154,7 @@ func newTestDriverBase() *testDriverBase {
 func (t *testDriverBase) afterEach() {
 	t.controller.Stop()
 
-	iptables.NewFunc = nil
+	packetfilter.NewFunc = nil
 }
 
 func (t *testDriverBase) verifyIPsReservedInPool(ips ...string) {
@@ -232,7 +232,7 @@ func (t *testDriverBase) createServiceExport(s *corev1.Service) {
 }
 
 func (t *testDriverBase) createIPTableChain(table, chain string) {
-	_ = t.ipt.NewChain(table, chain)
+	_ = t.pFilter.NewChain(table, chain)
 }
 
 func (t *testDriverBase) getGlobalIngressIPStatus(name string) *submarinerv1.GlobalIngressIPStatus {

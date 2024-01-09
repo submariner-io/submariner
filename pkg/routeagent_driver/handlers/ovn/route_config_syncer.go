@@ -143,7 +143,7 @@ func (ovn *Handler) handleInterfaceAddressChange() error {
 			return errors.Wrap(err, "error syncing host network routes")
 		}
 
-		if err := iptcommon.InitSubmarinerPostRoutingChain(ovn.ipt); err != nil {
+		if err := iptcommon.InitSubmarinerPostRoutingChain(ovn.pFilter); err != nil {
 			return errors.Wrapf(err, "error syncing IPtable %q chain", constants.PostRoutingChain)
 		}
 

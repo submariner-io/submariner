@@ -24,7 +24,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/globalnet/controllers/iptables"
+	"github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -72,7 +72,7 @@ func NewServiceExportController(config *syncer.ResourceSyncerConfig, podControll
 		return nil, errors.Wrap(err, "error creating the syncer")
 	}
 
-	iptIface, err := iptables.New()
+	iptIface, err := packetfilter.New()
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the IPTablesInterface handler")
 	}
