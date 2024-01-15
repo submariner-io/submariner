@@ -40,6 +40,8 @@ import (
 	"github.com/submariner-io/submariner/pkg/event/controller"
 	eventlogger "github.com/submariner-io/submariner/pkg/event/logger"
 	"github.com/submariner-io/submariner/pkg/node"
+	packetfilter "github.com/submariner-io/submariner/pkg/packetfilter"
+	iptables "github.com/submariner-io/submariner/pkg/packetfilter/iptables"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cabledriver"
 	cniapi "github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
@@ -112,6 +114,10 @@ func main() {
 
 		return
 	}
+
+	// set packetfilter driver to iptables
+	// TODO: check which driver is supported on platform
+	packetfilter.SetNewDriverFn(iptables.New)
 
 	np := os.Getenv("SUBMARINER_NETWORKPLUGIN")
 
