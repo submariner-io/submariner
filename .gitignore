@@ -14,3 +14,4 @@ scripts/broker-info.subm*
 /Dockerfile.*
 .shflags
 Makefile.dapper
+Makefile.shipyard
