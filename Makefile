@@ -95,7 +95,7 @@ licensecheck: $(ARCH_BINARIES) bin/lichen
 
 bin/lichen:
 	mkdir -p $(@D)
-	go build -o $@ github.com/uw-labs/lichen
+	cd tools && go build -o $(CURDIR)/$@ github.com/uw-labs/lichen
 
 $(TARGETS):
 	./scripts/$@

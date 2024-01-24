@@ -16,13 +16,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        cable-driver: ['libreswan', 'wireguard', 'vxlan']
-        extra-toggles: ['', 'globalnet', 'ovn']
+        cable-driver: ['', 'wireguard', 'vxlan']
+        extra-toggles: ['', 'ovn']
+        globalnet: ['', 'globalnet']
+        # Run most tests against the latest K8s version
+        k8s_version: ['1.28']
         exclude:
           - cable-driver: wireguard
             extra-toggles: ovn
         include:
-          - extra-toggles: globalnet, ovn
+          # Test top and bottom of supported K8s version range
+          - k8s_version: '1.26'
     steps:
       - name: Check out the repository
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11

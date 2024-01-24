@@ -5,30 +5,45 @@ updates:
     directory: /
     schedule:
       interval: monthly
-  - package-ecosystem: github-actions
-    directory: /
-    target-branch: release-0.13
-    schedule:
-      interval: monthly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
   - package-ecosystem: github-actions
     directory: /
     target-branch: release-0.14
     schedule:
       interval: monthly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
   - package-ecosystem: github-actions
     directory: /
     target-branch: release-0.15
     schedule:
       interval: monthly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
   - package-ecosystem: github-actions
     directory: /
     target-branch: release-0.16
     schedule:
       interval: monthly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
   - package-ecosystem: gomod
     directory: /
     schedule:
       interval: weekly
+    groups:
+      gomod:
+        patterns:
+          - "*"
     ignore:
       # protobuf must be handled manually
       - dependency-name: google.golang.org/protobuf

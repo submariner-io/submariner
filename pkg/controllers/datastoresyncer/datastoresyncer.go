@@ -28,17 +28,16 @@ import (
 	"github.com/submariner-io/admiral/pkg/resource"
 	resourceSyncer "github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
-	"github.com/submariner-io/admiral/pkg/util"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cidr"
+	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/types"
 	k8sv1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -46,24 +45,23 @@ import (
 )
 
 type DatastoreSyncer struct {
-	localCluster    types.SubmarinerCluster
-	localEndpoint   types.SubmarinerEndpoint
-	localNodeName   string
-	syncerConfig    broker.SyncerConfig
-	updateFederator federate.Federator
+	localCluster  types.SubmarinerCluster
+	localEndpoint *endpoint.Local
+	localNodeName string
+	syncerConfig  broker.SyncerConfig
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("DSSyncer")}
 
 func New(syncerConfig *broker.SyncerConfig, localCluster *types.SubmarinerCluster,
-	localEndpoint *types.SubmarinerEndpoint,
+	localEndpoint *endpoint.Local,
 ) *DatastoreSyncer {
 	// We'll panic if syncerConfig, localCluster or localEndpoint are nil, this is intentional
 	syncerConfig.LocalClusterID = localCluster.Spec.ClusterID
 
 	return &DatastoreSyncer{
 		localCluster:  *localCluster,
-		localEndpoint: *localEndpoint,
+		localEndpoint: localEndpoint,
 		syncerConfig:  *syncerConfig,
 	}
 }
@@ -72,9 +70,6 @@ func (d *DatastoreSyncer) Start(ctx context.Context) error {
 	defer utilruntime.HandleCrash()
 
 	logger.Info("Starting the datastore syncer")
-
-	d.updateFederator = federate.NewUpdateFederator(d.syncerConfig.LocalClient, d.syncerConfig.RestMapper, d.syncerConfig.LocalNamespace,
-		util.CopyImmutableMetadata)
 
 	syncer, err := d.createSyncer()
 	if err != nil {
@@ -123,20 +118,12 @@ func (d *DatastoreSyncer) Cleanup(ctx context.Context) error {
 		}
 	}
 
-	err = d.cleanupResources(ctx, localClient.Resource(schema.GroupVersionResource{
-		Group:    submarinerv1.SchemeGroupVersion.Group,
-		Version:  submarinerv1.SchemeGroupVersion.Version,
-		Resource: "endpoints",
-	}), syncer)
+	err = d.cleanupResources(ctx, localClient.Resource(submarinerv1.EndpointGVR), syncer)
 	if err != nil {
 		return err
 	}
 
-	err = d.cleanupResources(ctx, localClient.Resource(schema.GroupVersionResource{
-		Group:    submarinerv1.SchemeGroupVersion.Group,
-		Version:  submarinerv1.SchemeGroupVersion.Version,
-		Resource: "clusters",
-	}), syncer)
+	err = d.cleanupResources(ctx, localClient.Resource(submarinerv1.ClusterGVR), syncer)
 	if err != nil {
 		return err
 	}
@@ -201,17 +188,17 @@ func (d *DatastoreSyncer) createSyncer() (*broker.Syncer, error) {
 func (d *DatastoreSyncer) shouldSyncRemoteEndpoint(obj runtime.Object, _ int,
 	_ resourceSyncer.Operation,
 ) (runtime.Object, bool) {
-	endpoint := obj.(*submarinerv1.Endpoint)
+	remoteEndpoint := obj.(*submarinerv1.Endpoint)
 
-	for _, localSubnet := range d.localEndpoint.Spec.Subnets {
-		overlap, err := cidr.IsOverlapping(endpoint.Spec.Subnets, localSubnet)
+	for _, localSubnet := range d.localEndpoint.Spec().Subnets {
+		overlap, err := cidr.IsOverlapping(remoteEndpoint.Spec.Subnets, localSubnet)
 		if err != nil {
 			logger.Errorf(err, "Unable to validate if remote CIDR overlaps with local CIDR")
 			return nil, false
 		}
 
 		if overlap {
-			logger.Errorf(nil, "Skip processing the remote endpoint %#v as subnets are overlapping", endpoint)
+			logger.Errorf(nil, "Skip processing the remote endpoint %#v as subnets are overlapping", remoteEndpoint)
 			return nil, false
 		}
 	}
@@ -224,27 +211,21 @@ func (d *DatastoreSyncer) ensureExclusiveEndpoint(ctx context.Context, syncer *b
 
 	endpoints := syncer.ListLocalResources(&submarinerv1.Endpoint{})
 	for i := range endpoints {
-		endpoint := endpoints[i].(*submarinerv1.Endpoint)
-		if endpoint.Spec.ClusterID != d.localCluster.Spec.ClusterID {
+		existing := endpoints[i].(*submarinerv1.Endpoint)
+		if existing.Spec.ClusterID != d.localCluster.Spec.ClusterID {
 			continue
 		}
 
-		if endpoint.Spec.Equals(&d.localEndpoint.Spec) {
+		if existing.Spec.Equals(d.localEndpoint.Spec()) {
 			continue
 		}
 
-		endpointName, err := endpoint.Spec.GenerateName()
-		if err != nil {
-			logger.Errorf(err, "Error extracting the submariner Endpoint name from %#v", endpoint)
-			continue
-		}
-
-		err = syncer.GetLocalFederator().Delete(ctx, endpoint)
+		err := syncer.GetLocalFederator().Delete(ctx, existing)
 		if err != nil && !apierrors.IsNotFound(err) {
-			return errors.Wrapf(err, "error deleting submariner Endpoint %q from the local datastore", endpointName)
+			return errors.Wrapf(err, "error deleting submariner Endpoint %q from the local datastore", existing.Name)
 		}
 
-		logger.Infof("Successfully deleted existing submariner Endpoint %q", endpointName)
+		logger.Infof("Successfully deleted existing submariner Endpoint %q", existing.Name)
 	}
 
 	return nil
@@ -295,7 +276,7 @@ func (d *DatastoreSyncer) createNodeWatcher(stopCh <-chan struct{}) error {
 }
 
 func (d *DatastoreSyncer) createLocalCluster(ctx context.Context, federator federate.Federator) error {
-	logger.Infof("Creating local submariner Cluster: %#v ", d.localCluster)
+	logger.Infof("Creating local submariner Cluster: %s", resource.ToJSON(d.localCluster))
 
 	cluster := &submarinerv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -308,19 +289,9 @@ func (d *DatastoreSyncer) createLocalCluster(ctx context.Context, federator fede
 }
 
 func (d *DatastoreSyncer) createOrUpdateLocalEndpoint(ctx context.Context, federator federate.Federator) error {
-	logger.Infof("Creating local submariner Endpoint: %#v ", d.localEndpoint)
+	localEndpoint := d.localEndpoint.Resource()
 
-	endpointName, err := d.localEndpoint.Spec.GenerateName()
-	if err != nil {
-		return errors.Wrapf(err, "error extracting the submariner Endpoint name from %#v", d.localEndpoint)
-	}
+	logger.Infof("Creating local submariner Endpoint: %s", resource.ToJSON(localEndpoint))
 
-	endpoint := &submarinerv1.Endpoint{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: endpointName,
-		},
-		Spec: d.localEndpoint.Spec,
-	}
-
-	return federator.Distribute(ctx, endpoint) //nolint:wrapcheck  // Let the caller wrap it
+	return federator.Distribute(ctx, localEndpoint) //nolint:wrapcheck  // Let the caller wrap it
 }

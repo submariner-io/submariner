@@ -41,6 +41,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/cableengine"
 	enginefake "github.com/submariner-io/submariner/pkg/cableengine/fake"
 	submfake "github.com/submariner-io/submariner/pkg/client/clientset/versioned/fake"
+	submendpoint "github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/gateway"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
@@ -263,11 +264,11 @@ func newTestDriver() *testDriver {
 			SubmarinerClient:     submfake.NewSimpleClientset(),
 			KubeClient:           t.kubeClient,
 			LeaderElectionClient: t.kubeClient,
-			NewCableEngine: func(_ *types.SubmarinerCluster, ep *types.SubmarinerEndpoint) cableengine.Engine {
-				t.cableEngine.LocalEndPoint = ep
+			NewCableEngine: func(_ *types.SubmarinerCluster, lep *submendpoint.Local) cableengine.Engine {
+				t.cableEngine.LocalEndPoint = &types.SubmarinerEndpoint{Spec: *lep.Spec()}
 				return t.cableEngine
 			},
-			NewNATDiscovery: func(_ *types.SubmarinerEndpoint) (natdiscovery.Interface, error) {
+			NewNATDiscovery: func(_ *submendpoint.Local) (natdiscovery.Interface, error) {
 				return &fakeNATDiscovery{}, nil
 			},
 		}

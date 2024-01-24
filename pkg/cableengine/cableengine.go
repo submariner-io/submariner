@@ -27,6 +27,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
+	submendpoint "github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,7 +72,7 @@ type engine struct {
 	driver              cable.Driver
 	running             bool
 	localCluster        types.SubmarinerCluster
-	localEndpoint       types.SubmarinerEndpoint
+	localEndpoint       *submendpoint.Local
 	natDiscovery        natdiscovery.Interface
 	natEndpointInfoCh   chan *natdiscovery.NATEndpointInfo
 	natDiscoveryPending map[string]int
@@ -81,18 +82,20 @@ type engine struct {
 var logger = log.Logger{Logger: logf.Log.WithName("CableEngine")}
 
 // NewEngine creates a new Engine for the local cluster.
-func NewEngine(localCluster *types.SubmarinerCluster, localEndpoint *types.SubmarinerEndpoint) Engine {
+func NewEngine(localCluster *types.SubmarinerCluster, localEndpoint *submendpoint.Local) Engine {
 	// We'll panic if localCluster or localEndpoint are nil, this is intentional
 	return &engine{
 		localCluster:        *localCluster,
-		localEndpoint:       *localEndpoint,
+		localEndpoint:       localEndpoint,
 		natDiscoveryPending: map[string]int{},
 		installedCables:     map[string]metav1.Time{},
 	}
 }
 
 func (i *engine) GetLocalEndpoint() *types.SubmarinerEndpoint {
-	return &i.localEndpoint
+	return &types.SubmarinerEndpoint{
+		Spec: *i.localEndpoint.Spec(),
+	}
 }
 
 func (i *engine) StartEngine() error {
@@ -126,7 +129,7 @@ func (i *engine) startDriver() error {
 
 	var err error
 
-	if i.driver, err = cable.NewDriver(&i.localEndpoint, &i.localCluster); err != nil {
+	if i.driver, err = cable.NewDriver(i.GetLocalEndpoint(), &i.localCluster); err != nil {
 		return errors.Wrap(err, "error creating the cable driver")
 	}
 
@@ -233,7 +236,7 @@ func (i *engine) InstallCable(endpoint *v1.Endpoint) error {
 		return nil
 	}
 
-	if reflect.DeepEqual(endpoint.Spec, i.localEndpoint.Spec) {
+	if reflect.DeepEqual(endpoint.Spec, *i.localEndpoint.Spec()) {
 		logger.V(log.DEBUG).Infof("Not installing cable for local endpoint")
 		return nil
 	}
