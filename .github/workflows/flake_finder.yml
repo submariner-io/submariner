@@ -32,10 +32,10 @@ jobs:
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
 
       - name: Run E2E deployment and tests
-        uses: submariner-io/shipyard/gh-actions/e2e@devel
+        uses: submariner-io/shipyard/gh-actions/e2e@release-0.17
         with:
           using: ${{ matrix.cable-driver }} ${{ matrix.extra-toggles }}
 
       - name: Post mortem
         if: failure()
-        uses: submariner-io/shipyard/gh-actions/post-mortem@devel
+        uses: submariner-io/shipyard/gh-actions/post-mortem@release-0.17
