@@ -33,14 +33,12 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
 	"github.com/submariner-io/submariner/pkg/globalnet/metrics"
 	"github.com/submariner-io/submariner/pkg/ipam"
-	"github.com/submariner-io/submariner/pkg/ipset"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
-	utilexec "k8s.io/utils/exec"
 )
 
 func NewGlobalEgressIPController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool) (Interface, error) {
@@ -64,8 +62,6 @@ func NewGlobalEgressIPController(config *syncer.ResourceSyncerConfig, pool *ipam
 		},
 	}
 
-	controller.ipSetIface = ipset.New(utilexec.New())
-
 	_, gvr, err := util.ToUnstructuredResource(&submarinerv1.GlobalEgressIP{}, config.RestMapper)
 	if err != nil {
 		return nil, errors.Wrap(err, "error converting resource")
@@ -87,7 +83,7 @@ func NewGlobalEgressIPController(config *syncer.ResourceSyncerConfig, pool *ipam
 			spec := &submarinerv1.GlobalEgressIPSpec{}
 			_ = runtime.DefaultUnstructuredConverter.FromUnstructured(specObj.(map[string]interface{}), spec)
 			key, _ := cache.MetaNamespaceKeyFunc(&list.Items[i])
-			return controller.programGlobalEgressRules(key, reservedIPs, spec.PodSelector, controller.newNamedIPSet(key))
+			return controller.programGlobalEgressRules(key, reservedIPs, spec.PodSelector, controller.newNamedSet(key))
 		})
 
 		if err != nil {
@@ -160,35 +156,35 @@ func (c *globalEgressIPController) process(from runtime.Object, numRequeues int,
 func (c *globalEgressIPController) onCreateOrUpdate(key string, numberOfIPs int, globalEgressIP *submarinerv1.GlobalEgressIP,
 	numRequeues int,
 ) bool {
-	namedIPSet := c.newNamedIPSet(key)
+	namedSet := c.newNamedSet(key)
 
 	requeue := false
 	if numberOfIPs != len(globalEgressIP.Status.AllocatedIPs) {
-		requeue = c.flushGlobalEgressRulesAndReleaseIPs(key, namedIPSet.Name(), numRequeues, globalEgressIP)
+		requeue = c.flushGlobalEgressRulesAndReleaseIPs(key, namedSet.Name(), numRequeues, globalEgressIP)
 	}
 
-	return requeue || c.allocateGlobalIPs(key, numberOfIPs, globalEgressIP, namedIPSet) ||
-		!c.createPodWatcher(key, namedIPSet, numberOfIPs, globalEgressIP)
+	return requeue || c.allocateGlobalIPs(key, numberOfIPs, globalEgressIP, namedSet) ||
+		!c.createPodWatcher(key, namedSet, numberOfIPs, globalEgressIP)
 }
 
 //nolint:wrapcheck  // No need to wrap these errors.
 func (c *globalEgressIPController) programGlobalEgressRules(key string, allocatedIPs []string, podSelector *metav1.LabelSelector,
-	namedIPSet ipset.Named,
+	namedSet packetfilter.NamedSet,
 ) error {
-	err := namedIPSet.Create(true)
+	err := namedSet.Create(true)
 	if err != nil {
-		return errors.Wrapf(err, "error creating the IP set chain %q", namedIPSet.Name())
+		return errors.Wrapf(err, "error creating the IP set chain %q", namedSet.Name())
 	}
 
 	snatIP := getTargetSNATIPaddress(allocatedIPs)
 	if podSelector != nil {
-		if err := c.pfIface.AddEgressRulesForPods(key, namedIPSet.Name(), snatIP, globalNetIPTableMark); err != nil {
-			_ = c.pfIface.RemoveEgressRulesForPods(key, namedIPSet.Name(), snatIP, globalNetIPTableMark)
+		if err := c.pfIface.AddEgressRulesForPods(key, namedSet.Name(), snatIP, globalNetIPTableMark); err != nil {
+			_ = c.pfIface.RemoveEgressRulesForPods(key, namedSet.Name(), snatIP, globalNetIPTableMark)
 			return err
 		}
 	} else {
-		if err := c.pfIface.AddEgressRulesForNamespace(key, namedIPSet.Name(), snatIP, globalNetIPTableMark); err != nil {
-			_ = c.pfIface.RemoveEgressRulesForNamespace(key, namedIPSet.Name(), snatIP, globalNetIPTableMark)
+		if err := c.pfIface.AddEgressRulesForNamespace(key, namedSet.Name(), snatIP, globalNetIPTableMark); err != nil {
+			_ = c.pfIface.RemoveEgressRulesForNamespace(key, namedSet.Name(), snatIP, globalNetIPTableMark)
 			return err
 		}
 	}
@@ -197,7 +193,7 @@ func (c *globalEgressIPController) programGlobalEgressRules(key string, allocate
 }
 
 func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int,
-	globalEgressIP *submarinerv1.GlobalEgressIP, namedIPSet ipset.Named,
+	globalEgressIP *submarinerv1.GlobalEgressIP, namedSet packetfilter.NamedSet,
 ) bool {
 	logger.Infof("Allocating %d global IP(s) for %q", numberOfIPs, key)
 
@@ -234,7 +230,7 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 		return true
 	}
 
-	err = c.programGlobalEgressRules(key, allocatedIPs, globalEgressIP.Spec.PodSelector, namedIPSet)
+	err = c.programGlobalEgressRules(key, allocatedIPs, globalEgressIP.Spec.PodSelector, namedSet)
 	if err != nil {
 		logger.Errorf(err, "Error programming egress IP table rules for %q", key)
 
@@ -293,7 +289,7 @@ func (c *globalEgressIPController) onDelete(numRequeues int, globalEgressIP *sub
 		delete(c.podWatchers, key)
 	}
 
-	namedIPSet := c.newNamedIPSet(key)
+	namedSet := c.newNamedSet(key)
 
 	if len(globalEgressIP.Status.AllocatedIPs) == 0 && len(podWatcher.allocatedIPs) > 0 {
 		// Refer to issue for more details: https://github.com/submariner-io/submariner/issues/2388
@@ -301,13 +297,13 @@ func (c *globalEgressIPController) onDelete(numRequeues int, globalEgressIP *sub
 		globalEgressIP.Status.AllocatedIPs = podWatcher.allocatedIPs
 	}
 
-	requeue := c.flushGlobalEgressRulesAndReleaseIPs(key, namedIPSet.Name(), numRequeues, globalEgressIP)
+	requeue := c.flushGlobalEgressRulesAndReleaseIPs(key, namedSet.Name(), numRequeues, globalEgressIP)
 	if requeue {
 		return requeue
 	}
 
-	if err := namedIPSet.Destroy(); err != nil {
-		logger.Errorf(err, "Error destroying the ipSet %q for %q", namedIPSet.Name(), key)
+	if err := namedSet.Destroy(); err != nil {
+		logger.Errorf(err, "Error destroying the ipSet %q for %q", namedSet.Name(), key)
 
 		if shouldRequeue(numRequeues) {
 			return true
@@ -315,9 +311,9 @@ func (c *globalEgressIPController) onDelete(numRequeues int, globalEgressIP *sub
 	}
 
 	if numRequeues >= maxRequeues {
-		logger.Infof("Failed to delete all the iptables/ipset rules for %q even after %d retries", key, numRequeues)
+		logger.Infof("Failed to delete all the packetfilter/namedset rules for %q even after %d retries", key, numRequeues)
 	} else {
-		logger.Infof("Successfully deleted all the iptables/ipset rules for %q ", key)
+		logger.Infof("Successfully deleted all the packetfilter/namedset rules for %q ", key)
 	}
 
 	return false
@@ -330,7 +326,7 @@ func (c *globalEgressIPController) getIPSetName(key string) string {
 	return IPSetPrefix + encoded[:25]
 }
 
-func (c *globalEgressIPController) createPodWatcher(key string, namedIPSet ipset.Named, numberOfIPs int,
+func (c *globalEgressIPController) createPodWatcher(key string, namedSet packetfilter.NamedSet, numberOfIPs int,
 	globalEgressIP *submarinerv1.GlobalEgressIP,
 ) bool {
 	c.Lock()
@@ -356,7 +352,7 @@ func (c *globalEgressIPController) createPodWatcher(key string, namedIPSet ipset
 		return true
 	}
 
-	podWatcher, err := startEgressPodWatcher(key, globalEgressIP.Namespace, namedIPSet, &c.watcherConfig, globalEgressIP.Spec.PodSelector)
+	podWatcher, err := startEgressPodWatcher(key, globalEgressIP.Namespace, namedSet, &c.watcherConfig, globalEgressIP.Spec.PodSelector)
 	if err != nil {
 		logger.Errorf(err, "Error starting pod watcher for %q", key)
 		return false
@@ -372,23 +368,20 @@ func (c *globalEgressIPController) createPodWatcher(key string, namedIPSet ipset
 }
 
 //nolint:wrapcheck  // No need to wrap these errors.
-func (c *globalEgressIPController) flushGlobalEgressRulesAndReleaseIPs(key, ipSetName string, numRequeues int,
+func (c *globalEgressIPController) flushGlobalEgressRulesAndReleaseIPs(key, namedSetName string, numRequeues int,
 	globalEgressIP *submarinerv1.GlobalEgressIP,
 ) bool {
 	return c.flushRulesAndReleaseIPs(key, numRequeues, func(allocatedIPs []string) error {
 		metrics.RecordDeallocateGlobalEgressIPs(c.pool.GetCIDR(), len(allocatedIPs))
 		if globalEgressIP.Spec.PodSelector != nil {
-			return c.pfIface.RemoveEgressRulesForPods(key, ipSetName,
+			return c.pfIface.RemoveEgressRulesForPods(key, namedSetName,
 				getTargetSNATIPaddress(allocatedIPs), globalNetIPTableMark)
 		}
 
-		return c.pfIface.RemoveEgressRulesForNamespace(key, ipSetName, getTargetSNATIPaddress(allocatedIPs), globalNetIPTableMark)
+		return c.pfIface.RemoveEgressRulesForNamespace(key, namedSetName, getTargetSNATIPaddress(allocatedIPs), globalNetIPTableMark)
 	}, globalEgressIP.Status.AllocatedIPs...)
 }
 
-func (c *globalEgressIPController) newNamedIPSet(key string) ipset.Named {
-	return ipset.NewNamed(&ipset.IPSet{
-		Name:    c.getIPSetName(key),
-		SetType: ipset.HashIP,
-	}, c.ipSetIface)
+func (c *globalEgressIPController) newNamedSet(key string) packetfilter.NamedSet {
+	return c.pfIface.NewNamedSet(c.getIPSetName(key))
 }

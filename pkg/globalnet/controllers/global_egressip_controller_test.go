@@ -147,7 +147,7 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 	Context("and programming the IP table rules initially fails", func() {
 		BeforeEach(func() {
 			t.pFilter.AddFailOnAppendRuleMatcher(Not(BeEmpty()))
-			t.ipSet.AddFailOnCreateSetMatchers(Not(BeEmpty()))
+			t.pFilter.AddFailOnCreateSetMatchers(Not(BeEmpty()))
 		})
 
 		It("should eventually allocate the global IP and program the IP table rules", func() {
@@ -198,32 +198,32 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 
 	Context("and then deleted", func() {
 		var allocatedIPs []string
-		var ipSetName string
+		var namedSetName string
 
 		JustBeforeEach(func() {
 			t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, 1)
 			allocatedIPs = getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs
-			ipSetName = t.awaitPacketFilterRules(egressChain, allocatedIPs...)
+			namedSetName = t.awaitPacketFilterRules(egressChain, allocatedIPs...)
 		})
 
 		It("should release the allocated global IPs and clean up the IP tables", func() {
 			Expect(t.globalEgressIPs.Delete(context.TODO(), globalEgressIPName, metav1.DeleteOptions{})).To(Succeed())
 			t.awaitIPsReleasedFromPool(allocatedIPs...)
-			t.ipSet.AwaitSetDeleted(ipSetName)
+			t.pFilter.AwaitSetDeleted(namedSetName)
 			t.awaitNoPacketFilterRules(egressChain, allocatedIPs...)
 			t.watches.AwaitWatchStopped("pods")
 		})
 
 		Context("and cleanup of the IP tables initially fails", func() {
 			JustBeforeEach(func() {
-				t.pFilter.AddFailOnDeleteRuleMatcher(ContainSubstring(ipSetName))
-				t.ipSet.AddFailOnDestroySetMatchers(Equal(ipSetName))
+				t.pFilter.AddFailOnDeleteRuleMatcher(ContainSubstring(namedSetName))
+				t.pFilter.AddFailOnDestroySetMatchers(Equal(namedSetName))
 			})
 
 			It("should eventually release the allocated global IPs and clean up the IP tables", func() {
 				Expect(t.globalEgressIPs.Delete(context.TODO(), globalEgressIPName, metav1.DeleteOptions{})).To(Succeed())
 				t.awaitIPsReleasedFromPool(allocatedIPs...)
-				t.ipSet.AwaitSetDeleted(ipSetName)
+				t.pFilter.AwaitSetDeleted(namedSetName)
 				t.awaitNoPacketFilterRules(egressChain, allocatedIPs...)
 			})
 		})
@@ -494,7 +494,7 @@ func testEgressPodEvents(t *globalEgressIPControllerTestDriver) {
 	Context("in the same namespace as the GlobalEgressIP", func() {
 		Context("and the GlobalEgressIP has no Pod selector", func() {
 			It("should add the Pod IP to the IP set", func() {
-				t.ipSet.AwaitEntry(ipSet, pod.Status.PodIP)
+				t.pFilter.AwaitEntry(ipSet, pod.Status.PodIP)
 			})
 		})
 
@@ -510,34 +510,34 @@ func testEgressPodEvents(t *globalEgressIPControllerTestDriver) {
 				})
 
 				It("should add the Pod IP to the IP set", func() {
-					t.ipSet.AwaitEntry(ipSet, pod.Status.PodIP)
+					t.pFilter.AwaitEntry(ipSet, pod.Status.PodIP)
 				})
 			})
 
 			Context("and it does not match the Pod selector", func() {
 				It("should not add the Pod IP to the IP set", func() {
-					t.ipSet.AwaitNoEntry(ipSet, pod.Status.PodIP)
+					t.pFilter.AwaitNoEntry(ipSet, pod.Status.PodIP)
 				})
 			})
 		})
 
 		Context("and then deleted", func() {
 			JustBeforeEach(func() {
-				t.ipSet.AwaitEntry(ipSet, pod.Status.PodIP)
+				t.pFilter.AwaitEntry(ipSet, pod.Status.PodIP)
 				t.deletePod(pod)
 			})
 
 			It("should remove the Pod IP from the IP set", func() {
-				t.ipSet.AwaitEntryDeleted(ipSet, pod.Status.PodIP)
+				t.pFilter.AwaitEntryDeleted(ipSet, pod.Status.PodIP)
 			})
 
 			Context("and removal from the IP set initially fails", func() {
 				BeforeEach(func() {
-					t.ipSet.AddFailOnDelEntryMatchers(pod.Status.PodIP)
+					t.pFilter.AddFailOnDelEntryMatchers(pod.Status.PodIP)
 				})
 
 				It("should eventually remove the Pod IP from the IP set", func() {
-					t.ipSet.AwaitEntryDeleted(ipSet, pod.Status.PodIP)
+					t.pFilter.AwaitEntryDeleted(ipSet, pod.Status.PodIP)
 				})
 			})
 		})
@@ -548,23 +548,23 @@ func testEgressPodEvents(t *globalEgressIPControllerTestDriver) {
 			})
 
 			JustBeforeEach(func() {
-				t.ipSet.AwaitNoEntry(ipSet, "")
+				t.pFilter.AwaitNoEntry(ipSet, "")
 				pod.Status.PodIP = "1.2.3.4"
 				test.UpdateResource(t.pods.Namespace(pod.Namespace), pod)
 			})
 
 			It("should eventually add the Pod IP to the IP set", func() {
-				t.ipSet.AwaitEntry(ipSet, pod.Status.PodIP)
+				t.pFilter.AwaitEntry(ipSet, pod.Status.PodIP)
 			})
 		})
 
 		Context("and addition to the IP set initially fails", func() {
 			BeforeEach(func() {
-				t.ipSet.AddFailOnAddEntryMatchers(pod.Status.PodIP)
+				t.pFilter.AddFailOnAddEntryMatchers(pod.Status.PodIP)
 			})
 
 			It("should eventually add the Pod IP to the IP set", func() {
-				t.ipSet.AwaitEntry(ipSet, pod.Status.PodIP)
+				t.pFilter.AwaitEntry(ipSet, pod.Status.PodIP)
 			})
 		})
 	})
@@ -575,7 +575,7 @@ func testEgressPodEvents(t *globalEgressIPControllerTestDriver) {
 		})
 
 		It("should not add the Pod IP to the IP set", func() {
-			t.ipSet.AwaitNoEntry(ipSet, pod.Status.PodIP)
+			t.pFilter.AwaitNoEntry(ipSet, pod.Status.PodIP)
 		})
 	})
 }
@@ -623,7 +623,7 @@ func (t *globalEgressIPControllerTestDriver) start() {
 }
 
 func (t *globalEgressIPControllerTestDriver) awaitPacketFilterRules(chain string, ips ...string) string {
-	set := t.ipSet.AwaitOneSet(HavePrefix(controllers.IPSetPrefix))
+	set := t.pFilter.AwaitOneSet(HavePrefix(controllers.IPSetPrefix))
 	t.pFilter.AwaitRule(packetfilter.TableTypeNAT, chain, And(ContainSubstring(set), ContainSubstring(getSNATAddress(ips...))))
 
 	return set

@@ -36,8 +36,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/ipam"
-	"github.com/submariner-io/submariner/pkg/ipset"
-	fakeIPSet "github.com/submariner-io/submariner/pkg/ipset/fake"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
@@ -89,7 +87,6 @@ type testDriverBase struct {
 	dynClient              *dynamicfake.FakeDynamicClient
 	scheme                 *runtime.Scheme
 	pFilter                *fakePF.PacketFilter
-	ipSet                  *fakeIPSet.IPSet
 	pool                   *ipam.IPPool
 	localSubnets           []string
 	globalCIDR             string
@@ -110,7 +107,6 @@ func newTestDriverBase() *testDriverBase {
 			&submarinerv1.GlobalEgressIP{}, &submarinerv1.ClusterGlobalEgressIP{}, &submarinerv1.GlobalIngressIP{}, &mcsv1a1.ServiceExport{}),
 		scheme:       runtime.NewScheme(),
 		pFilter:      fakePF.New(),
-		ipSet:        fakeIPSet.New(),
 		globalCIDR:   localCIDR,
 		localSubnets: []string{},
 	}
@@ -138,10 +134,6 @@ func newTestDriverBase() *testDriverBase {
 	t.serviceExports = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &mcsv1a1.ServiceExport{})).Namespace(namespace)
 
 	t.nodes = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &corev1.Node{}))
-
-	ipset.NewFunc = func() ipset.Interface {
-		return t.ipSet
-	}
 
 	return t
 }

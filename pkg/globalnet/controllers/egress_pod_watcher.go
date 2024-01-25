@@ -24,7 +24,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/watcher"
-	"github.com/submariner-io/submariner/pkg/ipset"
+	"github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -32,12 +32,12 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func startEgressPodWatcher(name, namespace string, namedIPSet ipset.Named, config *watcher.Config,
+func startEgressPodWatcher(name, namespace string, namedSet packetfilter.NamedSet, config *watcher.Config,
 	podSelector *metav1.LabelSelector,
 ) (*egressPodWatcher, error) {
 	pw := &egressPodWatcher{
-		stopCh:     make(chan struct{}),
-		namedIPSet: namedIPSet,
+		stopCh:   make(chan struct{}),
+		namedSet: namedSet,
 	}
 
 	sel, err := metav1.LabelSelectorAsSelector(podSelector)
@@ -95,8 +95,8 @@ func (w *egressPodWatcher) onCreateOrUpdate(obj runtime.Object, _ int) bool {
 
 	logger.V(log.DEBUG).Infof("Pod %q with IP %s created/updated", key, pod.Status.PodIP)
 
-	if err := w.namedIPSet.AddEntry(pod.Status.PodIP, true); err != nil {
-		logger.Errorf(err, "Error adding pod IP %q to IP set %q", pod.Status.PodIP, w.ipSetName)
+	if err := w.namedSet.AddEntry(pod.Status.PodIP, true); err != nil {
+		logger.Errorf(err, "Error adding pod IP %q to IP set %q", pod.Status.PodIP, w.namedSetName)
 		return true
 	}
 
@@ -109,8 +109,8 @@ func (w *egressPodWatcher) onDelete(obj runtime.Object, _ int) bool {
 
 	logger.V(log.DEBUG).Infof("Pod %q removed", key)
 
-	if err := w.namedIPSet.DelEntry(pod.Status.PodIP); err != nil {
-		logger.Errorf(err, "Error deleting pod IP %q from IP set %q", pod.Status.PodIP, w.ipSetName)
+	if err := w.namedSet.DelEntry(pod.Status.PodIP); err != nil {
+		logger.Errorf(err, "Error deleting pod IP %q from IP set %q", pod.Status.PodIP, w.namedSetName)
 		return true
 	}
 
