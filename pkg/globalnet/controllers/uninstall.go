@@ -33,7 +33,6 @@ import (
 	versioned "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	pfiface "github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
-	"github.com/submariner-io/submariner/pkg/ipset"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
@@ -45,7 +44,6 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
-	utilexec "k8s.io/utils/exec"
 )
 
 func UninstallDataPath() {
@@ -101,20 +99,11 @@ func UninstallDataPath() {
 		}
 	}
 
-	ipsetIface := ipset.New(utilexec.New())
-
-	ipSetList, err := ipsetIface.ListSets()
+	err = pFilter.DestroySets(func(name string) bool {
+		return strings.HasPrefix(name, IPSetPrefix)
+	})
 	if err != nil {
-		logger.Errorf(err, "Error listing ipsets")
-	}
-
-	for _, set := range ipSetList {
-		if strings.HasPrefix(set, IPSetPrefix) {
-			err = ipsetIface.DestroySet(set)
-			if err != nil {
-				logger.Errorf(err, "Error destroying the ipset %q", set)
-			}
-		}
+		logger.Errorf(err, "Error destroying sets")
 	}
 }
 

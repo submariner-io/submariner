@@ -27,11 +27,9 @@ import (
 	"github.com/submariner-io/submariner/pkg/cable/vxlan"
 	"github.com/submariner-io/submariner/pkg/cidr"
 	"github.com/submariner-io/submariner/pkg/event"
-	"github.com/submariner-io/submariner/pkg/ipset"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
-	utilexec "k8s.io/utils/exec"
 	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -53,8 +51,8 @@ type mtuHandler struct {
 	event.HandlerBase
 	localClusterCidr []string
 	pFilter          packetfilter.Interface
-	remoteIPSet      ipset.Named
-	localIPSet       ipset.Named
+	remoteIPSet      packetfilter.NamedSet
+	localIPSet       packetfilter.NamedSet
 	forceMss         forceMssSts
 	tcpMssValue      int
 }
@@ -90,8 +88,6 @@ func (h *mtuHandler) Init() error {
 		return errors.Wrap(err, "error initializing iptables")
 	}
 
-	ipSetIface := ipset.New(utilexec.New())
-
 	if err := h.pFilter.CreateIPHookChainIfNotExists(&packetfilter.ChainIPHook{
 		Name:     constants.SmPostRoutingChain,
 		Type:     packetfilter.ChainTypeRoute,
@@ -101,12 +97,12 @@ func (h *mtuHandler) Init() error {
 		return errors.Wrapf(err, "error creating IPHookChain chain %s", constants.SmPostRoutingChain)
 	}
 
-	h.remoteIPSet = h.newNamedIPSet(constants.RemoteCIDRIPSet, ipSetIface)
+	h.remoteIPSet = h.newNamedSetSet(constants.RemoteCIDRIPSet)
 	if err := h.remoteIPSet.Create(true); err != nil {
 		return errors.Wrapf(err, "error creating ipset %q", constants.RemoteCIDRIPSet)
 	}
 
-	h.localIPSet = h.newNamedIPSet(constants.LocalCIDRIPSet, ipSetIface)
+	h.localIPSet = h.newNamedSetSet(constants.LocalCIDRIPSet)
 	if err := h.localIPSet.Create(true); err != nil {
 		return errors.Wrapf(err, "error creating ipset %q", constants.LocalCIDRIPSet)
 	}
@@ -229,12 +225,11 @@ func extractIPv4Subnets(endpoint *submV1.EndpointSpec) []string {
 	return subnets
 }
 
-func (h *mtuHandler) newNamedIPSet(key string, ipSetIface ipset.Interface) ipset.Named {
-	return ipset.NewNamed(&ipset.IPSet{
-		Name:       key,
-		SetType:    ipset.HashNet,
-		HashFamily: ipset.ProtocolFamilyIPV4,
-	}, ipSetIface)
+func (h *mtuHandler) newNamedSetSet(key string) packetfilter.NamedSet {
+	return h.pFilter.NewNamedSet(&packetfilter.SetInfo{
+		Name:   key,
+		Family: packetfilter.SetFamilyV4,
+	})
 }
 
 func (h *mtuHandler) Uninstall() error {

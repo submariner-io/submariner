@@ -28,6 +28,8 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+type NamedSet packetfilter.NamedSet
+
 type Interface interface {
 	AddClusterEgressRules(sourceIP, snatIP, globalNetIPTableMark string) error
 	RemoveClusterEgressRules(sourceIP, snatIP, globalNetIPTableMark string) error
@@ -38,12 +40,13 @@ type Interface interface {
 	AddEgressRulesForHeadlessSvc(key, sourceIP, snatIP, globalNetIPTableMark string, targetType TargetType) error
 	RemoveEgressRulesForHeadlessSvc(key, sourceIP, snatIP, globalNetIPTableMark string, targetType TargetType) error
 
-	AddEgressRulesForPods(key, ipSetName, snatIP, globalNetIPTableMark string) error
-	RemoveEgressRulesForPods(key, ipSetName, snatIP, globalNetIPTableMark string) error
-	AddEgressRulesForNamespace(namespace, ipSetName, snatIP, globalNetIPTableMark string) error
-	RemoveEgressRulesForNamespace(namespace, ipSetName, snatIP, globalNetIPTableMark string) error
+	AddEgressRulesForPods(key, namedSetName, snatIP, globalNetIPTableMark string) error
+	RemoveEgressRulesForPods(key, namedSetName, snatIP, globalNetIPTableMark string) error
+	AddEgressRulesForNamespace(namespace, namedSetName, snatIP, globalNetIPTableMark string) error
+	RemoveEgressRulesForNamespace(namespace, namedSetName, snatIP, globalNetIPTableMark string) error
 	FlushNatChain(chainName string) error
 	DeleteNatChain(chainName string) error
+	NewNamedSet(key string) NamedSet
 }
 
 type pfilter struct {
@@ -70,6 +73,13 @@ func New() (Interface, error) {
 	}
 
 	return pFilterIface, nil
+}
+
+func (i *pfilter) NewNamedSet(key string) NamedSet {
+	return i.pFilter.NewNamedSet(&packetfilter.SetInfo{
+		Name:   key,
+		Family: packetfilter.SetFamilyV4,
+	})
 }
 
 func (i *pfilter) AddClusterEgressRules(subnet, snatIP, globalNetIPTableMark string) error {
@@ -224,10 +234,10 @@ func (i *pfilter) RemoveEgressRulesForHeadlessSvc(key, sourceIP, snatIP, globalN
 	return nil
 }
 
-func (i *pfilter) AddEgressRulesForPods(key, ipSetName, snatIP, globalNetIPTableMark string) error {
+func (i *pfilter) AddEgressRulesForPods(key, namedSetName, snatIP, globalNetIPTableMark string) error {
 	ruleSpec := &packetfilter.Rule{
 		Proto:      packetfilter.RuleProtoAll,
-		SrcSetName: ipSetName,
+		SrcSetName: namedSetName,
 		SnatCIDR:   snatIP,
 		MarkValue:  globalNetIPTableMark,
 		Action:     packetfilter.RuleActionSNAT,
@@ -242,10 +252,10 @@ func (i *pfilter) AddEgressRulesForPods(key, ipSetName, snatIP, globalNetIPTable
 	return nil
 }
 
-func (i *pfilter) RemoveEgressRulesForPods(key, ipSetName, snatIP, globalNetIPTableMark string) error {
+func (i *pfilter) RemoveEgressRulesForPods(key, namedSetName, snatIP, globalNetIPTableMark string) error {
 	ruleSpec := &packetfilter.Rule{
 		Proto:      packetfilter.RuleProtoAll,
-		SrcSetName: ipSetName,
+		SrcSetName: namedSetName,
 		SnatCIDR:   snatIP,
 		MarkValue:  globalNetIPTableMark,
 		Action:     packetfilter.RuleActionSNAT,
@@ -260,10 +270,10 @@ func (i *pfilter) RemoveEgressRulesForPods(key, ipSetName, snatIP, globalNetIPTa
 	return nil
 }
 
-func (i *pfilter) AddEgressRulesForNamespace(namespace, ipSetName, snatIP, globalNetIPTableMark string) error {
+func (i *pfilter) AddEgressRulesForNamespace(namespace, namedSetName, snatIP, globalNetIPTableMark string) error {
 	ruleSpec := &packetfilter.Rule{
 		Proto:      packetfilter.RuleProtoAll,
-		SrcSetName: ipSetName,
+		SrcSetName: namedSetName,
 		SnatCIDR:   snatIP,
 		MarkValue:  globalNetIPTableMark,
 		Action:     packetfilter.RuleActionSNAT,
@@ -278,10 +288,10 @@ func (i *pfilter) AddEgressRulesForNamespace(namespace, ipSetName, snatIP, globa
 	return nil
 }
 
-func (i *pfilter) RemoveEgressRulesForNamespace(namespace, ipSetName, snatIP, globalNetIPTableMark string) error {
+func (i *pfilter) RemoveEgressRulesForNamespace(namespace, namedSetName, snatIP, globalNetIPTableMark string) error {
 	ruleSpec := &packetfilter.Rule{
 		Proto:      packetfilter.RuleProtoAll,
-		SrcSetName: ipSetName,
+		SrcSetName: namedSetName,
 		SnatCIDR:   snatIP,
 		MarkValue:  globalNetIPTableMark,
 		Action:     packetfilter.RuleActionSNAT,

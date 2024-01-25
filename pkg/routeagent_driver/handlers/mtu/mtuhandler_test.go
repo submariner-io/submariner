@@ -24,8 +24,6 @@ import (
 	. "github.com/onsi/gomega"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event"
-	"github.com/submariner-io/submariner/pkg/ipset"
-	fakeSet "github.com/submariner-io/submariner/pkg/ipset/fake"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
@@ -35,16 +33,11 @@ import (
 var _ = Describe("MTUHandler", func() {
 	var (
 		pFilter *fakePF.PacketFilter
-		ipSet   *fakeSet.IPSet
 		handler event.Handler
 	)
 
 	BeforeEach(func() {
 		pFilter = fakePF.New()
-		ipSet = fakeSet.New()
-		ipset.NewFunc = func() ipset.Interface {
-			return ipSet
-		}
 		handler = mtu.NewMTUHandler([]string{"10.1.0.0/24"}, false, 0)
 	})
 
@@ -63,21 +56,21 @@ var _ = Describe("MTUHandler", func() {
 			localEndpoint := newSubmEndpoint([]string{"10.1.0.0/24", "172.1.0.0/24"})
 			Expect(handler.LocalEndpointCreated(localEndpoint)).To(Succeed())
 			for _, subnet := range localEndpoint.Spec.Subnets {
-				ipSet.AwaitEntry(constants.LocalCIDRIPSet, subnet)
+				pFilter.AwaitEntry(constants.LocalCIDRIPSet, subnet)
 			}
 			Expect(handler.LocalEndpointRemoved(localEndpoint)).To(Succeed())
 			for _, subnet := range localEndpoint.Spec.Subnets {
-				ipSet.AwaitNoEntry(constants.LocalCIDRIPSet, subnet)
+				pFilter.AwaitNoEntry(constants.LocalCIDRIPSet, subnet)
 			}
 
 			remoteEndpoint := newSubmEndpoint([]string{"10.0.0.0/24", "172.0.0.0/24"})
 			Expect(handler.RemoteEndpointCreated(remoteEndpoint)).To(Succeed())
 			for _, subnet := range remoteEndpoint.Spec.Subnets {
-				ipSet.AwaitEntry(constants.RemoteCIDRIPSet, subnet)
+				pFilter.AwaitEntry(constants.RemoteCIDRIPSet, subnet)
 			}
 			Expect(handler.RemoteEndpointRemoved(remoteEndpoint)).To(Succeed())
 			for _, subnet := range remoteEndpoint.Spec.Subnets {
-				ipSet.AwaitNoEntry(constants.RemoteCIDRIPSet, subnet)
+				pFilter.AwaitNoEntry(constants.RemoteCIDRIPSet, subnet)
 			}
 		})
 	})

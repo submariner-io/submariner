@@ -30,7 +30,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/event"
 	pfIface "github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
 	"github.com/submariner-io/submariner/pkg/ipam"
-	"github.com/submariner-io/submariner/pkg/ipset"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -151,14 +150,13 @@ type globalEgressIPController struct {
 	*baseIPAllocationController
 	sync.Mutex
 	podWatchers   map[string]*egressPodWatcher
-	ipSetIface    ipset.Interface
 	watcherConfig watcher.Config
 }
 
 type egressPodWatcher struct {
 	stopCh       chan struct{}
-	ipSetName    string
-	namedIPSet   ipset.Named
+	namedSetName string
+	namedSet     packetfilter.NamedSet
 	podSelector  *metav1.LabelSelector
 	allocatedIPs []string
 }
