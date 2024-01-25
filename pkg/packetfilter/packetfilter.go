@@ -35,8 +35,6 @@ const (
 
 type TableType uint32
 
-type GlobalEgressHandle string
-
 type RuleAction uint32
 
 const (
@@ -138,6 +136,36 @@ type ChainIPHook struct {
 	JumpRule *Rule
 }
 
+type SetFamily uint32
+
+const (
+	SetFamilyV4 SetFamily = iota
+	SetFamilyV6
+)
+
+// named set.
+type SetInfo struct {
+	// Name is the set name.
+	Name string
+	// SetType specifies the named type.
+	SetType string
+	// nftables named set attached to tables.
+	Table TableType
+	// SetFamily specifies the protocol family of the IP addresses to be stored in the set.
+	// The default is IPv4.
+	Family SetFamily
+}
+
+type NamedSet interface {
+	Name() string
+	Flush() error
+	Destroy() error
+	Create(ignoreExistErr bool) error
+	AddEntry(entry string, ignoreExistErr bool) error
+	DelEntry(entry string) error
+	ListEntries() ([]string, error)
+}
+
 type Driver interface {
 	// Chains
 	ChainExists(table TableType, chain string) (bool, error)
@@ -153,6 +181,10 @@ type Driver interface {
 	List(table TableType, chain string) ([]*Rule, error)
 	Append(table TableType, chain string, rule *Rule) error
 	Insert(table TableType, chain string, pos int, rule *Rule) error
+
+	// named Sets.
+	NewNamedSet(set *SetInfo) NamedSet
+	DestroySets(nameFilter func(string) bool) error
 }
 
 type Interface interface {

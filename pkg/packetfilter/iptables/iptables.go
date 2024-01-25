@@ -24,7 +24,9 @@ import (
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/submariner/pkg/ipset"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
+	utilexec "k8s.io/utils/exec"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -52,7 +54,8 @@ var (
 )
 
 type PacketFilter struct {
-	ipt *iptables.IPTables
+	ipt        *iptables.IPTables
+	ipSetIface ipset.Interface
 }
 
 func New() (packetfilter.Driver, error) {
@@ -61,8 +64,11 @@ func New() (packetfilter.Driver, error) {
 		return nil, errors.Wrap(err, "error creating IP tables")
 	}
 
+	ipSetIface := ipset.New(utilexec.New())
+
 	return &PacketFilter{
-		ipt: ipt,
+		ipt:        ipt,
+		ipSetIface: ipSetIface,
 	}, nil
 }
 
