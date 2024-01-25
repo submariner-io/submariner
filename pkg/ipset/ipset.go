@@ -65,6 +65,7 @@ import (
 
 var _ = Interface(&runner{})
 
+// this is just a test
 // Interface is an injectable interface for running ipset commands.  Implementations must be goroutine-safe.
 type Interface interface {
 	// FlushSet deletes all entries from a named set.
