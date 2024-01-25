@@ -13,4 +13,5 @@ junit.xml
 scripts/broker-info.subm*
 /Dockerfile.*
 .shflags
+Makefile.shipyard
 Makefile.dapper
