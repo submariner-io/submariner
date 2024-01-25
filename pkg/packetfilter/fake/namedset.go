@@ -19,71 +19,51 @@ limitations under the License.
 package fake
 
 import (
-	"errors"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/submariner/pkg/ipset"
+	"github.com/pkg/errors"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"k8s.io/utils/set"
 )
 
-type IPSet struct {
-	mutex                    sync.Mutex
-	sets                     map[string]set.Set[string]
-	failOnDestroySetMatchers []interface{}
-	failOnCreateSetMatchers  []interface{}
-	failOnAddEntryMatchers   []interface{}
-	failOnDelEntryMatchers   []interface{}
+type namedSet struct {
+	setInfo *packetfilter.SetInfo
+	pfilter *PacketFilter
 }
 
-var _ = ipset.Interface(&IPSet{})
-
-func New() *IPSet {
-	return &IPSet{
-		sets: map[string]set.Set[string]{},
-	}
+func (n *namedSet) Name() string {
+	return n.setInfo.Name
 }
 
-func (i *IPSet) CreateSet(ipSet *ipset.IPSet, ignoreExistErr bool) error {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
-
-	err := matchForError(&i.failOnCreateSetMatchers, ipSet.Name)
-	if err != nil {
-		return err
-	}
-
-	if i.sets[ipSet.Name] != nil {
-		if ignoreExistErr {
-			return nil
-		}
-
-		return fmt.Errorf("IP set %q already exists", ipSet.Name)
-	}
-
-	i.sets[ipSet.Name] = set.New[string]()
-
+func (n *namedSet) Flush() error {
+	n.pfilter.flushSet(n.setInfo.Name)
 	return nil
 }
 
-func (i *IPSet) FlushSet(setName string) error {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
-
-	entries := i.sets[setName]
-	if entries == nil {
-		return nil
-	}
-
-	entries.Clear()
-
-	return nil
+func (n *namedSet) Destroy() error {
+	return n.pfilter.destroySet(n.setInfo.Name)
 }
 
-func (i *IPSet) DestroySet(setName string) error {
+func (n *namedSet) Create(ignoreExistErr bool) error {
+	return n.pfilter.createSet(n.setInfo, ignoreExistErr)
+}
+
+func (n *namedSet) AddEntry(entry string, ignoreExistErr bool) error {
+	return n.pfilter.addEntry(entry, n.setInfo, ignoreExistErr)
+}
+
+func (n *namedSet) DelEntry(entry string) error {
+	return n.pfilter.delEntry(entry, n.setInfo.Name)
+}
+
+func (n *namedSet) ListEntries() ([]string, error) {
+	return n.pfilter.listEntries(n.setInfo.Name)
+}
+
+func (i *PacketFilter) destroySet(setName string) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -92,25 +72,46 @@ func (i *IPSet) DestroySet(setName string) error {
 		return err
 	}
 
-	if i.sets[setName] == nil {
-		return nil
-	}
-
 	delete(i.sets, setName)
 
 	return nil
 }
 
-func (i *IPSet) DestroyAllSets() error {
+func (i *PacketFilter) flushSet(setName string) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	i.sets = map[string]set.Set[string]{}
+	entries := i.sets[setName]
+	if entries != nil {
+		entries.Clear()
+	}
+}
+
+// CreateSet creates a new set.  It will ignore error when the set already exists if ignoreExistErr=true.
+func (i *PacketFilter) createSet(nSet *packetfilter.SetInfo, ignoreExistErr bool) error {
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
+
+	err := matchForError(&i.failOnCreateSetMatchers, nSet.Name)
+	if err != nil {
+		return err
+	}
+
+	if i.sets[nSet.Name] != nil {
+		if ignoreExistErr {
+			return nil
+		}
+
+		return fmt.Errorf("named set %q already exists", nSet.Name)
+	}
+
+	i.sets[nSet.Name] = set.New[string]()
 
 	return nil
 }
 
-func (i *IPSet) AddEntry(entry string, ipSet *ipset.IPSet, ignoreExistErr bool) error {
+// AddEntry adds a new entry to the named set.  It will ignore error when the entry already exists if ignoreExistErr=true.
+func (i *PacketFilter) addEntry(entry string, nSet *packetfilter.SetInfo, ignoreExistErr bool) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -119,9 +120,9 @@ func (i *IPSet) AddEntry(entry string, ipSet *ipset.IPSet, ignoreExistErr bool) 
 		return err
 	}
 
-	entries := i.sets[ipSet.Name]
+	entries := i.sets[nSet.Name]
 	if entries == nil {
-		return fmt.Errorf("IP set %q does not exist", ipSet.Name)
+		return fmt.Errorf("named set %q does not exist", nSet.Name)
 	}
 
 	if entries.Has(entry) && !ignoreExistErr {
@@ -133,7 +134,8 @@ func (i *IPSet) AddEntry(entry string, ipSet *ipset.IPSet, ignoreExistErr bool) 
 	return nil
 }
 
-func (i *IPSet) DelEntry(entry, setName string) error {
+// DelEntry deletes one entry from the named set.
+func (i *PacketFilter) delEntry(entry, setName string) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -152,31 +154,20 @@ func (i *IPSet) DelEntry(entry, setName string) error {
 	return nil
 }
 
-func (i *IPSet) TestEntry(entry, setName string) (bool, error) {
+// ListEntries lists all the entries from a named set.
+func (i *PacketFilter) listEntries(setName string) ([]string, error) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
 	entries := i.sets[setName]
 	if entries == nil {
-		return false, fmt.Errorf("IP set %q does not exist", setName)
-	}
-
-	return entries.Has(entry), nil
-}
-
-func (i *IPSet) ListEntries(setName string) ([]string, error) {
-	i.mutex.Lock()
-	defer i.mutex.Unlock()
-
-	entries := i.sets[setName]
-	if entries == nil {
-		return nil, fmt.Errorf("IP set %q does not exist", setName)
+		return nil, fmt.Errorf("named set %q does not exist", setName)
 	}
 
 	return entries.UnsortedList(), nil
 }
 
-func (i *IPSet) ListSets() ([]string, error) {
+func (i *PacketFilter) listSets() []string {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -186,103 +177,108 @@ func (i *IPSet) ListSets() ([]string, error) {
 		names = append(names, name)
 	}
 
-	return names, nil
+	return names
 }
 
-func (i *IPSet) GetVersion() (string, error) {
-	return "v7.6", nil
-}
-
-func (i *IPSet) AddEntryWithOptions(entry *ipset.Entry, ipSet *ipset.IPSet, _ bool) error {
+func (i *PacketFilter) DestroySets(nameFilter func(string) bool) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	entries := i.sets[ipSet.Name]
-	if entries == nil {
-		return fmt.Errorf("IP set %q does not exist", ipSet)
+	names := []string{}
+
+	for name := range i.sets {
+		names = append(names, name)
 	}
 
-	entries.Insert(entry.String())
+	for _, setName := range names {
+		if nameFilter(setName) {
+			err := matchForError(&i.failOnDestroySetMatchers, setName)
+			if err != nil {
+				return err
+			}
+
+			delete(i.sets, setName)
+		}
+	}
 
 	return nil
 }
 
-func (i *IPSet) DelEntryWithOptions(setName, entry string, _ ...string) error {
-	return i.DelEntry(setName, entry)
+func (i *PacketFilter) NewNamedSet(setInfo *packetfilter.SetInfo) packetfilter.NamedSet {
+	return &namedSet{
+		setInfo: setInfo,
+		pfilter: i,
+	}
 }
 
-func (i *IPSet) ListAllSetInfo() (string, error) {
-	return "", nil
-}
-
-func (i *IPSet) AwaitSet(stringOrMatcher interface{}) {
+func (i *PacketFilter) AwaitSet(stringOrMatcher interface{}) {
 	Eventually(func() []string {
-		s, _ := i.ListSets()
+		s := i.listSets()
 		return s
 	}, 5).Should(ContainElement(stringOrMatcher))
 }
 
-func (i *IPSet) AwaitOneSet(stringOrMatcher interface{}) string {
+func (i *PacketFilter) AwaitOneSet(stringOrMatcher interface{}) string {
 	Eventually(func() []string {
-		s, _ := i.ListSets()
+		s := i.listSets()
 		return s
 	}, 5).Should(And(HaveLen(1), ContainElement(stringOrMatcher)))
 
-	s, _ := i.ListSets()
+	s := i.listSets()
 
 	return s[0]
 }
 
-func (i *IPSet) AwaitSetDeleted(setName string) {
+func (i *PacketFilter) AwaitSetDeleted(setName string) {
 	Eventually(func() []string {
-		s, _ := i.ListSets()
+		s := i.listSets()
 		return s
 	}, 5).ShouldNot(ContainElement(setName))
 }
 
-func (i *IPSet) AwaitEntry(setName string, stringOrMatcher interface{}) {
+func (i *PacketFilter) AwaitEntry(setName string, stringOrMatcher interface{}) {
 	Eventually(func() []string {
-		e, _ := i.ListEntries(setName)
+		e, _ := i.listEntries(setName)
 		return e
 	}, 5).Should(ContainElement(stringOrMatcher))
 }
 
-func (i *IPSet) AwaitEntryDeleted(setName string, stringOrMatcher interface{}) {
+func (i *PacketFilter) AwaitEntryDeleted(setName string, stringOrMatcher interface{}) {
 	Eventually(func() []string {
-		e, _ := i.ListEntries(setName)
+		e, _ := i.listEntries(setName)
 		return e
 	}, 5).ShouldNot(ContainElement(stringOrMatcher))
 }
 
-func (i *IPSet) AwaitNoEntry(setName string, stringOrMatcher interface{}) {
+func (i *PacketFilter) AwaitNoEntry(setName string, stringOrMatcher interface{}) {
 	Consistently(func() []string {
-		e, _ := i.ListEntries(setName)
+		e, _ := i.listEntries(setName)
 		return e
 	}, 300*time.Millisecond).ShouldNot(ContainElement(stringOrMatcher))
 }
 
-func (i *IPSet) AddFailOnDestroySetMatchers(stringOrMatcher interface{}) {
+func (i *PacketFilter) AddFailOnDestroySetMatchers(stringOrMatcher interface{}) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
 	i.failOnDestroySetMatchers = append(i.failOnDestroySetMatchers, stringOrMatcher)
 }
 
-func (i *IPSet) AddFailOnCreateSetMatchers(stringOrMatcher interface{}) {
+func (i *PacketFilter) AddFailOnCreateSetMatchers(stringOrMatcher interface{}) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
 	i.failOnCreateSetMatchers = append(i.failOnCreateSetMatchers, stringOrMatcher)
 }
 
-func (i *IPSet) AddFailOnAddEntryMatchers(stringOrMatcher interface{}) {
+func (i *PacketFilter) AddFailOnAddEntryMatchers(stringOrMatcher interface{}) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
 	i.failOnAddEntryMatchers = append(i.failOnAddEntryMatchers, stringOrMatcher)
 }
 
-func (i *IPSet) AddFailOnDelEntryMatchers(stringOrMatcher interface{}) {
+func (i *PacketFilter) AddFailOnDelEntryMatchers(stringOrMatcher interface{}) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -296,7 +292,7 @@ func matchForError(matchers *[]interface{}, rulespec ...string) error {
 
 		if matches {
 			*matchers = (*matchers)[i+1:]
-			return errors.New("mock IP set error")
+			return errors.New("mock NamedSet set error")
 		}
 	}
 

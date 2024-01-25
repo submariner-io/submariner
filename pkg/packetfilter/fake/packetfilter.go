@@ -35,6 +35,12 @@ type PacketFilter struct {
 	tableChains              map[packetfilter.TableType]set.Set[string]
 	failOnAppendRuleMatchers []interface{}
 	failOnDeleteRuleMatchers []interface{}
+
+	sets                     map[string]set.Set[string]
+	failOnDestroySetMatchers []interface{}
+	failOnCreateSetMatchers  []interface{}
+	failOnAddEntryMatchers   []interface{}
+	failOnDelEntryMatchers   []interface{}
 }
 
 var (
@@ -50,6 +56,7 @@ func New() *PacketFilter {
 	pf := &PacketFilter{
 		chainRules:  map[string]set.Set[string]{},
 		tableChains: map[packetfilter.TableType]set.Set[string]{},
+		sets:        map[string]set.Set[string]{},
 	}
 
 	packetfilter.SetNewDriverFn(func() (packetfilter.Driver, error) {
