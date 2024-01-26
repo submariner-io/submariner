@@ -38,8 +38,8 @@ import (
 	"github.com/submariner-io/submariner/pkg/cidr"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
-	packetfilter "github.com/submariner-io/submariner/pkg/packetfilter"
-	iptables "github.com/submariner-io/submariner/pkg/packetfilter/iptables"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
+	"github.com/submariner-io/submariner/pkg/packetfilter/iptables"
 	"github.com/submariner-io/submariner/pkg/versions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
@@ -83,6 +83,10 @@ func main() {
 	submarinerClient, err := submarinerClientset.NewForConfig(cfg)
 	logger.FatalOnError(err, "Error building submariner clientse")
 
+	// set packetfilter driver to iptables
+	// TODO: check which driver is supported on platform
+	packetfilter.SetNewDriverFn(iptables.New)
+
 	if spec.Uninstall {
 		logger.Info("Uninstalling submariner-globalnet")
 		controllers.UninstallDataPath()
@@ -93,10 +97,6 @@ func main() {
 	}
 
 	logger.Info("Starting submariner-globalnet", spec)
-
-	// set packetfilter driver to iptables
-	// TODO: check which driver is supported on platform
-	packetfilter.SetNewDriverFn(iptables.New)
 
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler().Done()
