@@ -19,15 +19,11 @@ limitations under the License.
 package main
 
 import (
-	"context"
-	"errors"
 	"flag"
-	"net/http"
-	"net/http/pprof"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/submariner-io/admiral/pkg/http"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/names"
@@ -95,7 +91,8 @@ func main() {
 	logger.FatalOnError(envconfig.Process("submariner", &submSpec), "Error processing env vars")
 
 	logger.Infof("Parsed env variables: %#v", submSpec)
-	httpServer := startHTTPServer(&submSpec)
+
+	defer http.StartServer(http.Metrics|http.Profile, submSpec.MetricsPort)()
 
 	var err error
 
@@ -146,27 +143,5 @@ func main() {
 
 	err = gw.Run(signals.SetupSignalHandler())
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-
-	if err := httpServer.Shutdown(ctx); err != nil {
-		logger.Errorf(err, "Error shutting down metrics HTTP server")
-	}
-
 	logger.FatalOnError(err, "Error running the gateway")
-}
-
-func startHTTPServer(spec *types.SubmarinerSpecification) *http.Server {
-	srv := &http.Server{Addr: ":" + spec.MetricsPort, ReadHeaderTimeout: 60 * time.Second}
-
-	http.Handle("/metrics", promhttp.Handler())
-	http.HandleFunc("/debug", pprof.Profile)
-
-	go func() {
-		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			logger.Errorf(err, "Error starting metrics server")
-		}
-	}()
-
-	return srv
 }
