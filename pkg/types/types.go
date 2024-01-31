@@ -48,5 +48,5 @@ type SubmarinerSpecification struct {
 	HaltOnCertError               bool `split_words:"true"`
 	HealthCheckInterval           uint
 	HealthCheckMaxPacketLossCount uint
-	MetricsPort                   string `default:"32780"`
+	MetricsPort                   int `default:"32780"`
 }
