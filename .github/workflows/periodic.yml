@@ -26,7 +26,7 @@ jobs:
           done
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@153407881ec5c347639a548ade7d8ad1d6740e38
+        uses: peter-evans/create-pull-request@b1ddad2c994a25fbc81a28b3ec0e368bb2021c50
         with:
           title: Update submariner-io/* dependencies to latest
           body: |
@@ -60,7 +60,7 @@ jobs:
 
       - name: Raise an Issue to report broken links
         if: ${{ failure() }}
-        uses: peter-evans/create-issue-from-file@433e51abf769039ee20ba1293a088ca19d573b7f
+        uses: peter-evans/create-issue-from-file@24452a72d85239eacf1468b0f1982a9f3fec4c94
         with:
           title: Broken link detected by periodic linting
           content-filepath: .github/ISSUE_TEMPLATE/broken-link.md
