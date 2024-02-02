@@ -27,7 +27,6 @@ import (
 	calicocs "github.com/projectcalico/api/pkg/client/clientset_generated/clientset"
 	calicocsfake "github.com/projectcalico/api/pkg/client/clientset_generated/clientset/fake"
 	"github.com/submariner-io/admiral/pkg/fake"
-	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/testing"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/calico"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,12 +34,9 @@ import (
 )
 
 var _ = Describe("IPPool Handler", func() {
-	t := testing.NewControllerSupport()
+	t := newTestDriver()
 
-	var (
-		calicoClient *calicocsfake.Clientset
-		handler      event.Handler
-	)
+	var calicoClient *calicocsfake.Clientset
 
 	BeforeEach(func() {
 		calicoClient = calicocsfake.NewSimpleClientset()
@@ -52,8 +48,7 @@ var _ = Describe("IPPool Handler", func() {
 	})
 
 	JustBeforeEach(func() {
-		handler = calico.NewCalicoIPPoolHandler(nil)
-		t.Start(handler)
+		t.Start(calico.NewCalicoIPPoolHandler(nil, "", t.k8sClient))
 	})
 
 	When("remote Endpoints are created and deleted", func() {
@@ -66,7 +61,7 @@ var _ = Describe("IPPool Handler", func() {
 			awaitIPPools(calicoClient, subnets1...)
 
 			// Ensure it handles existing IPPools.
-			Expect(handler.RemoteEndpointCreated(remoteEP1)).To(Succeed())
+			Expect(t.handler.RemoteEndpointCreated(remoteEP1)).To(Succeed())
 
 			subnets2 := []string{"192.0.4.0/24"}
 			remoteEP2 := t.CreateEndpoint(testing.NewEndpoint("remote-cluster1", "host", subnets2...))
@@ -100,7 +95,7 @@ var _ = Describe("IPPool Handler", func() {
 			}, metav1.CreateOptions{})
 			Expect(err).To(Succeed())
 
-			Expect(handler.Uninstall()).To(Succeed())
+			Expect(t.handler.Uninstall()).To(Succeed())
 
 			list, err := calicoClient.ProjectcalicoV3().IPPools().List(context.Background(), metav1.ListOptions{
 				LabelSelector: calico.SubmarinerIPPool + "=true",

@@ -25,8 +25,34 @@ import (
 	. "github.com/onsi/gomega"
 	calicoapi "github.com/projectcalico/api/pkg/apis/projectcalico/v3"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
+	"github.com/submariner-io/submariner/pkg/event"
+	eventtesting "github.com/submariner-io/submariner/pkg/event/testing"
+	fakek8s "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 )
+
+type testDriver struct {
+	*eventtesting.ControllerSupport
+	handler   event.Handler
+	k8sClient *fakek8s.Clientset
+}
+
+func newTestDriver() *testDriver {
+	t := &testDriver{
+		ControllerSupport: eventtesting.NewControllerSupport(),
+	}
+
+	BeforeEach(func() {
+		t.k8sClient = fakek8s.NewSimpleClientset()
+	})
+
+	return t
+}
+
+func (t *testDriver) Start(handler event.Handler) {
+	t.handler = handler
+	t.ControllerSupport.Start(handler)
+}
 
 var _ = BeforeSuite(func() {
 	kzerolog.InitK8sLogging()
