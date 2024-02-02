@@ -145,7 +145,7 @@ func main() {
 		cabledriver.NewXRFMCleanupHandler(),
 		cabledriver.NewVXLANCleanup(),
 		mtu.NewMTUHandler(env.ClusterCidr, len(env.GlobalCidr) != 0, getTCPMssValue(k8sClientSet)),
-		calico.NewCalicoIPPoolHandler(cfg))
+		calico.NewCalicoIPPoolHandler(cfg, env.Namespace, k8sClientSet))
 
 	logger.FatalOnError(err, "Error registering the handlers")
 
