@@ -21,14 +21,11 @@ package main
 import (
 	"context"
 	"flag"
-	"net/http"
-	"net/http/pprof"
 	"os"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/pkg/errors"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/submariner-io/admiral/pkg/http"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/names"
@@ -38,8 +35,8 @@ import (
 	"github.com/submariner-io/submariner/pkg/cidr"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
-	packetfilter "github.com/submariner-io/submariner/pkg/packetfilter"
-	iptables "github.com/submariner-io/submariner/pkg/packetfilter/iptables"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
+	"github.com/submariner-io/submariner/pkg/packetfilter/iptables"
 	"github.com/submariner-io/submariner/pkg/versions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
@@ -83,6 +80,10 @@ func main() {
 	submarinerClient, err := submarinerClientset.NewForConfig(cfg)
 	logger.FatalOnError(err, "Error building submariner clientse")
 
+	// set packetfilter driver to iptables
+	// TODO: check which driver is supported on platform
+	packetfilter.SetNewDriverFn(iptables.New)
+
 	if spec.Uninstall {
 		logger.Info("Uninstalling submariner-globalnet")
 		controllers.UninstallDataPath()
@@ -94,14 +95,10 @@ func main() {
 
 	logger.Info("Starting submariner-globalnet", spec)
 
-	// set packetfilter driver to iptables
-	// TODO: check which driver is supported on platform
-	packetfilter.SetNewDriverFn(iptables.New)
-
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler().Done()
 
-	httpServer := startHTTPServer(spec)
+	defer http.StartServer(http.Metrics|http.Profile, spec.MetricsPort)()
 
 	err = mcsv1a1.AddToScheme(scheme.Scheme)
 	logger.FatalOnError(err, "Error adding Multicluster v1alpha1 to the scheme")
@@ -161,10 +158,6 @@ func main() {
 	gatewayMonitor.Stop()
 
 	logger.Infof("All controllers stopped or exited. Stopping main loop")
-
-	if err := httpServer.Shutdown(context.TODO()); err != nil {
-		logger.Errorf(err, "Error shutting down metrics HTTP server")
-	}
 }
 
 func init() {
@@ -172,19 +165,4 @@ func init() {
 	flag.StringVar(&masterURL, "master", "",
 		"The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 	flag.BoolVar(&showVersion, "version", showVersion, "Show version")
-}
-
-func startHTTPServer(spec controllers.Specification) *http.Server {
-	srv := &http.Server{Addr: ":" + spec.MetricsPort, ReadHeaderTimeout: 60 * time.Second}
-
-	http.Handle("/metrics", promhttp.Handler())
-	http.HandleFunc("/debug", pprof.Profile)
-
-	go func() {
-		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			logger.Errorf(err, "Error starting metrics server")
-		}
-	}()
-
-	return srv
 }

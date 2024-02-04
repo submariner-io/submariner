@@ -28,6 +28,7 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/http"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/names"
@@ -153,6 +154,8 @@ func main() {
 
 		return
 	}
+
+	defer http.StartServer(http.Profile, env.ProfilePort)()
 
 	if err = annotateNode(env.ClusterCidr, k8sClientSet); err != nil {
 		logger.Errorf(err, "Error while annotating the node")
