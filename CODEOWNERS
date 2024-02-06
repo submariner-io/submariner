@@ -5,6 +5,6 @@
 /package/ @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis @vthapar
 /scripts/ @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis @vthapar
 Dockerfile.dapper @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis @vthapar
-go.mod @aswinsuryan @dfarrell07 @maayanf24 @Oats87 @skitt @sridhargaddam @tpantelis @vthapar
-go.sum @aswinsuryan @dfarrell07 @maayanf24 @Oats87 @skitt @sridhargaddam @tpantelis @vthapar
+go.mod @aswinsuryan @dfarrell07 @maayanf24 @Oats87 @skitt @sridhargaddam @tpantelis @vthapar @yboaron
+go.sum @aswinsuryan @dfarrell07 @maayanf24 @Oats87 @skitt @sridhargaddam @tpantelis @vthapar @yboaron
 Makefile* @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis @vthapar
