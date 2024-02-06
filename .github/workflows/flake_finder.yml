@@ -20,7 +20,7 @@ jobs:
         extra-toggles: ['', 'ovn']
         globalnet: ['', 'globalnet']
         # Run most tests against the latest K8s version
-        k8s_version: ['1.28']
+        k8s_version: ['1.29']
         exclude:
           - cable-driver: wireguard
             extra-toggles: ovn
