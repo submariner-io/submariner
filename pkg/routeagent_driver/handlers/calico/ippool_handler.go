@@ -44,9 +44,9 @@ import (
 
 const (
 	SubmarinerIPPool       = "submariner.io/ippool"
-	gwLBSvcName            = "submariner-gateway"
-	gwLBSvcROKSAnnotation  = "service.kubernetes.io/ibm-load-balancer-cloud-provider-ip-type"
-	defaultV4IPPoolName    = "default-ipv4-ippool"
+	GwLBSvcName            = "submariner-gateway"
+	GwLBSvcROKSAnnotation  = "service.kubernetes.io/ibm-load-balancer-cloud-provider-ip-type"
+	DefaultV4IPPoolName    = "default-ipv4-ippool"
 	submarinerManagedLabel = "submariner-managed"
 	submarinerPrevIPIPMode = "submariner-prev-ipipmode"
 )
@@ -214,7 +214,7 @@ func getEndpointSubnetIPPoolName(endpoint *submV1.Endpoint, subnet string) strin
 
 func (h *calicoIPPoolHandler) platformIsROKS() (bool, error) {
 	// Submariner GW is deployed on ROKS using LB service with specific annotations.
-	service, err := h.k8sClient.CoreV1().Services(h.namespace).Get(context.TODO(), gwLBSvcName, metav1.GetOptions{})
+	service, err := h.k8sClient.CoreV1().Services(h.namespace).Get(context.TODO(), GwLBSvcName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return false, nil
 	}
@@ -223,7 +223,7 @@ func (h *calicoIPPoolHandler) platformIsROKS() (bool, error) {
 		return false, errors.Wrap(err, "error reading gw lb service")
 	}
 
-	return service.GetAnnotations()[gwLBSvcROKSAnnotation] != "", nil
+	return service.GetAnnotations()[GwLBSvcROKSAnnotation] != "", nil
 }
 
 // workaround to address datapath issue with default Calico IPPool configuration for ROKS platform,
@@ -242,11 +242,11 @@ func (h *calicoIPPoolHandler) updateROKSCalicoCfg() error {
 
 	err = util.Update(context.TODO(), h.iPPoolResourceInterface(), &calicoapi.IPPool{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: defaultV4IPPoolName,
+			Name: DefaultV4IPPoolName,
 		},
 	}, func(existing *calicoapi.IPPool) (*calicoapi.IPPool, error) {
 		if existing.Spec.IPIPMode == calicoapi.IPIPModeAlways {
-			logger.Infof("IPIPMode of %s IPPool already set to Always", defaultV4IPPoolName)
+			logger.Infof("IPIPMode of %s IPPool already set to Always", DefaultV4IPPoolName)
 			return existing, nil // no need to update
 		}
 
@@ -262,7 +262,7 @@ func (h *calicoIPPoolHandler) updateROKSCalicoCfg() error {
 		existing.Labels[submarinerManagedLabel] = "true"
 		existing.Annotations[submarinerPrevIPIPMode] = string(existing.Spec.IPIPMode)
 		existing.Spec.IPIPMode = calicoapi.IPIPModeAlways
-		logger.Infof("Setting IPIPMode of %s IPPool to Always", defaultV4IPPoolName)
+		logger.Infof("Setting IPIPMode of %s IPPool to Always", DefaultV4IPPoolName)
 		return existing, nil
 	})
 
@@ -272,7 +272,7 @@ func (h *calicoIPPoolHandler) updateROKSCalicoCfg() error {
 func (h *calicoIPPoolHandler) restoreROKSCalicoCfg() error {
 	err := util.Update(context.TODO(), h.iPPoolResourceInterface(), &calicoapi.IPPool{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: defaultV4IPPoolName,
+			Name: DefaultV4IPPoolName,
 		},
 	}, func(existing *calicoapi.IPPool) (*calicoapi.IPPool, error) {
 		prevIPIPModeCfg := existing.Annotations[submarinerPrevIPIPMode]
