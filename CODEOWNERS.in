@@ -1,6 +1,10 @@
-@dfarrell07 *.md
+@aswinsuryan go.mod go.sum
+@dfarrell07 *.md go.mod go.sum
+@maayanf24 go.mod go.sum
 @mkolesnik /.github/workflows/ /scripts/ Makefile* Dockerfile.dapper /package/
 @Oats87 *
 @skitt *
 @sridhargaddam *
 @tpantelis *
+@vthapar *
+@yboaron go.mod go.sum
