@@ -66,7 +66,6 @@ func startIngressEndpointsController(svc *corev1.Service, config *syncer.Resourc
 		SourceFieldSelector: fieldSelector,
 		ResourcesEquivalent: areEndpointsEqual,
 	})
-
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the endpoints syncer")
 	}

@@ -60,7 +60,6 @@ func NewGatewayRouteController(config watcher.Config, connectionHandler *Connect
 	}
 
 	controller.gatewayRouteWatcher, err = watcher.New(&config)
-
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating resource watcher")
 	}

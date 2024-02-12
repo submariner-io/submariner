@@ -150,7 +150,6 @@ func New(config *Config) (*Controller, error) {
 		Client:     config.Client,
 		RestMapper: config.RestMapper,
 	})
-
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating resource watcher")
 	}

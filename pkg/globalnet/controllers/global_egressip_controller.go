@@ -85,7 +85,6 @@ func NewGlobalEgressIPController(config *syncer.ResourceSyncerConfig, pool *ipam
 			key, _ := cache.MetaNamespaceKeyFunc(&list.Items[i])
 			return controller.programGlobalEgressRules(key, reservedIPs, spec.PodSelector, controller.newNamedSet(key))
 		})
-
 		if err != nil {
 			return nil, err
 		}
@@ -102,7 +101,6 @@ func NewGlobalEgressIPController(config *syncer.ResourceSyncerConfig, pool *ipam
 		Transform:           controller.process,
 		ResourcesEquivalent: syncer.AreSpecsEquivalent,
 	})
-
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the syncer")
 	}
