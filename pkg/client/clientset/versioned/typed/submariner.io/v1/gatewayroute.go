@@ -20,9 +20,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
 	scheme "github.com/submariner-io/submariner/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -46,6 +49,7 @@ type GatewayRouteInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.GatewayRouteList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.GatewayRoute, err error)
+	Apply(ctx context.Context, gatewayRoute *submarineriov1.GatewayRouteApplyConfiguration, opts metav1.ApplyOptions) (result *v1.GatewayRoute, err error)
 	GatewayRouteExpansion
 }
 
@@ -171,6 +175,32 @@ func (c *gatewayRoutes) Patch(ctx context.Context, name string, pt types.PatchTy
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied gatewayRoute.
+func (c *gatewayRoutes) Apply(ctx context.Context, gatewayRoute *submarineriov1.GatewayRouteApplyConfiguration, opts metav1.ApplyOptions) (result *v1.GatewayRoute, err error) {
+	if gatewayRoute == nil {
+		return nil, fmt.Errorf("gatewayRoute provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(gatewayRoute)
+	if err != nil {
+		return nil, err
+	}
+	name := gatewayRoute.Name
+	if name == nil {
+		return nil, fmt.Errorf("gatewayRoute.Name must be provided to Apply")
+	}
+	result = &v1.GatewayRoute{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("gatewayroutes").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

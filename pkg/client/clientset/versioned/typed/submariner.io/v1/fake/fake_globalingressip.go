@@ -20,11 +20,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
-	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,25 +38,25 @@ type FakeGlobalIngressIPs struct {
 	ns   string
 }
 
-var globalingressipsResource = schema.GroupVersionResource{Group: "submariner.io", Version: "v1", Resource: "globalingressips"}
+var globalingressipsResource = v1.SchemeGroupVersion.WithResource("globalingressips")
 
-var globalingressipsKind = schema.GroupVersionKind{Group: "submariner.io", Version: "v1", Kind: "GlobalIngressIP"}
+var globalingressipsKind = v1.SchemeGroupVersion.WithKind("GlobalIngressIP")
 
 // Get takes name of the globalIngressIP, and returns the corresponding globalIngressIP object, and an error if there is any.
-func (c *FakeGlobalIngressIPs) Get(ctx context.Context, name string, options v1.GetOptions) (result *submarineriov1.GlobalIngressIP, err error) {
+func (c *FakeGlobalIngressIPs) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.GlobalIngressIP, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(globalingressipsResource, c.ns, name), &submarineriov1.GlobalIngressIP{})
+		Invokes(testing.NewGetAction(globalingressipsResource, c.ns, name), &v1.GlobalIngressIP{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*submarineriov1.GlobalIngressIP), err
+	return obj.(*v1.GlobalIngressIP), err
 }
 
 // List takes label and field selectors, and returns the list of GlobalIngressIPs that match those selectors.
-func (c *FakeGlobalIngressIPs) List(ctx context.Context, opts v1.ListOptions) (result *submarineriov1.GlobalIngressIPList, err error) {
+func (c *FakeGlobalIngressIPs) List(ctx context.Context, opts metav1.ListOptions) (result *v1.GlobalIngressIPList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(globalingressipsResource, globalingressipsKind, c.ns, opts), &submarineriov1.GlobalIngressIPList{})
+		Invokes(testing.NewListAction(globalingressipsResource, globalingressipsKind, c.ns, opts), &v1.GlobalIngressIPList{})
 
 	if obj == nil {
 		return nil, err
@@ -64,8 +66,8 @@ func (c *FakeGlobalIngressIPs) List(ctx context.Context, opts v1.ListOptions) (r
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &submarineriov1.GlobalIngressIPList{ListMeta: obj.(*submarineriov1.GlobalIngressIPList).ListMeta}
-	for _, item := range obj.(*submarineriov1.GlobalIngressIPList).Items {
+	list := &v1.GlobalIngressIPList{ListMeta: obj.(*v1.GlobalIngressIPList).ListMeta}
+	for _, item := range obj.(*v1.GlobalIngressIPList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -74,69 +76,114 @@ func (c *FakeGlobalIngressIPs) List(ctx context.Context, opts v1.ListOptions) (r
 }
 
 // Watch returns a watch.Interface that watches the requested globalIngressIPs.
-func (c *FakeGlobalIngressIPs) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeGlobalIngressIPs) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(globalingressipsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a globalIngressIP and creates it.  Returns the server's representation of the globalIngressIP, and an error, if there is any.
-func (c *FakeGlobalIngressIPs) Create(ctx context.Context, globalIngressIP *submarineriov1.GlobalIngressIP, opts v1.CreateOptions) (result *submarineriov1.GlobalIngressIP, err error) {
+func (c *FakeGlobalIngressIPs) Create(ctx context.Context, globalIngressIP *v1.GlobalIngressIP, opts metav1.CreateOptions) (result *v1.GlobalIngressIP, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(globalingressipsResource, c.ns, globalIngressIP), &submarineriov1.GlobalIngressIP{})
+		Invokes(testing.NewCreateAction(globalingressipsResource, c.ns, globalIngressIP), &v1.GlobalIngressIP{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*submarineriov1.GlobalIngressIP), err
+	return obj.(*v1.GlobalIngressIP), err
 }
 
 // Update takes the representation of a globalIngressIP and updates it. Returns the server's representation of the globalIngressIP, and an error, if there is any.
-func (c *FakeGlobalIngressIPs) Update(ctx context.Context, globalIngressIP *submarineriov1.GlobalIngressIP, opts v1.UpdateOptions) (result *submarineriov1.GlobalIngressIP, err error) {
+func (c *FakeGlobalIngressIPs) Update(ctx context.Context, globalIngressIP *v1.GlobalIngressIP, opts metav1.UpdateOptions) (result *v1.GlobalIngressIP, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(globalingressipsResource, c.ns, globalIngressIP), &submarineriov1.GlobalIngressIP{})
+		Invokes(testing.NewUpdateAction(globalingressipsResource, c.ns, globalIngressIP), &v1.GlobalIngressIP{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*submarineriov1.GlobalIngressIP), err
+	return obj.(*v1.GlobalIngressIP), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeGlobalIngressIPs) UpdateStatus(ctx context.Context, globalIngressIP *submarineriov1.GlobalIngressIP, opts v1.UpdateOptions) (*submarineriov1.GlobalIngressIP, error) {
+func (c *FakeGlobalIngressIPs) UpdateStatus(ctx context.Context, globalIngressIP *v1.GlobalIngressIP, opts metav1.UpdateOptions) (*v1.GlobalIngressIP, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(globalingressipsResource, "status", c.ns, globalIngressIP), &submarineriov1.GlobalIngressIP{})
+		Invokes(testing.NewUpdateSubresourceAction(globalingressipsResource, "status", c.ns, globalIngressIP), &v1.GlobalIngressIP{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*submarineriov1.GlobalIngressIP), err
+	return obj.(*v1.GlobalIngressIP), err
 }
 
 // Delete takes name of the globalIngressIP and deletes it. Returns an error if one occurs.
-func (c *FakeGlobalIngressIPs) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeGlobalIngressIPs) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(globalingressipsResource, c.ns, name, opts), &submarineriov1.GlobalIngressIP{})
+		Invokes(testing.NewDeleteActionWithOptions(globalingressipsResource, c.ns, name, opts), &v1.GlobalIngressIP{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeGlobalIngressIPs) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeGlobalIngressIPs) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(globalingressipsResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &submarineriov1.GlobalIngressIPList{})
+	_, err := c.Fake.Invokes(action, &v1.GlobalIngressIPList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched globalIngressIP.
-func (c *FakeGlobalIngressIPs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *submarineriov1.GlobalIngressIP, err error) {
+func (c *FakeGlobalIngressIPs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.GlobalIngressIP, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(globalingressipsResource, c.ns, name, pt, data, subresources...), &submarineriov1.GlobalIngressIP{})
+		Invokes(testing.NewPatchSubresourceAction(globalingressipsResource, c.ns, name, pt, data, subresources...), &v1.GlobalIngressIP{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*submarineriov1.GlobalIngressIP), err
+	return obj.(*v1.GlobalIngressIP), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied globalIngressIP.
+func (c *FakeGlobalIngressIPs) Apply(ctx context.Context, globalIngressIP *submarineriov1.GlobalIngressIPApplyConfiguration, opts metav1.ApplyOptions) (result *v1.GlobalIngressIP, err error) {
+	if globalIngressIP == nil {
+		return nil, fmt.Errorf("globalIngressIP provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(globalIngressIP)
+	if err != nil {
+		return nil, err
+	}
+	name := globalIngressIP.Name
+	if name == nil {
+		return nil, fmt.Errorf("globalIngressIP.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(globalingressipsResource, c.ns, *name, types.ApplyPatchType, data), &v1.GlobalIngressIP{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.GlobalIngressIP), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeGlobalIngressIPs) ApplyStatus(ctx context.Context, globalIngressIP *submarineriov1.GlobalIngressIPApplyConfiguration, opts metav1.ApplyOptions) (result *v1.GlobalIngressIP, err error) {
+	if globalIngressIP == nil {
+		return nil, fmt.Errorf("globalIngressIP provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(globalIngressIP)
+	if err != nil {
+		return nil, err
+	}
+	name := globalIngressIP.Name
+	if name == nil {
+		return nil, fmt.Errorf("globalIngressIP.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(globalingressipsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.GlobalIngressIP{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.GlobalIngressIP), err
 }

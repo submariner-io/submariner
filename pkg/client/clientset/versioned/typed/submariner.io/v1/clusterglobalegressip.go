@@ -20,9 +20,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
 	scheme "github.com/submariner-io/submariner/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -47,6 +50,8 @@ type ClusterGlobalEgressIPInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.ClusterGlobalEgressIPList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterGlobalEgressIP, err error)
+	Apply(ctx context.Context, clusterGlobalEgressIP *submarineriov1.ClusterGlobalEgressIPApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterGlobalEgressIP, err error)
+	ApplyStatus(ctx context.Context, clusterGlobalEgressIP *submarineriov1.ClusterGlobalEgressIPApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterGlobalEgressIP, err error)
 	ClusterGlobalEgressIPExpansion
 }
 
@@ -188,6 +193,62 @@ func (c *clusterGlobalEgressIPs) Patch(ctx context.Context, name string, pt type
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied clusterGlobalEgressIP.
+func (c *clusterGlobalEgressIPs) Apply(ctx context.Context, clusterGlobalEgressIP *submarineriov1.ClusterGlobalEgressIPApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterGlobalEgressIP, err error) {
+	if clusterGlobalEgressIP == nil {
+		return nil, fmt.Errorf("clusterGlobalEgressIP provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(clusterGlobalEgressIP)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterGlobalEgressIP.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterGlobalEgressIP.Name must be provided to Apply")
+	}
+	result = &v1.ClusterGlobalEgressIP{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("clusterglobalegressips").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *clusterGlobalEgressIPs) ApplyStatus(ctx context.Context, clusterGlobalEgressIP *submarineriov1.ClusterGlobalEgressIPApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterGlobalEgressIP, err error) {
+	if clusterGlobalEgressIP == nil {
+		return nil, fmt.Errorf("clusterGlobalEgressIP provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(clusterGlobalEgressIP)
+	if err != nil {
+		return nil, err
+	}
+
+	name := clusterGlobalEgressIP.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterGlobalEgressIP.Name must be provided to Apply")
+	}
+
+	result = &v1.ClusterGlobalEgressIP{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("clusterglobalegressips").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

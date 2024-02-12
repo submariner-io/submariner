@@ -20,9 +20,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
 	scheme "github.com/submariner-io/submariner/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -46,6 +49,7 @@ type NonGatewayRouteInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.NonGatewayRouteList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.NonGatewayRoute, err error)
+	Apply(ctx context.Context, nonGatewayRoute *submarineriov1.NonGatewayRouteApplyConfiguration, opts metav1.ApplyOptions) (result *v1.NonGatewayRoute, err error)
 	NonGatewayRouteExpansion
 }
 
@@ -171,6 +175,32 @@ func (c *nonGatewayRoutes) Patch(ctx context.Context, name string, pt types.Patc
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied nonGatewayRoute.
+func (c *nonGatewayRoutes) Apply(ctx context.Context, nonGatewayRoute *submarineriov1.NonGatewayRouteApplyConfiguration, opts metav1.ApplyOptions) (result *v1.NonGatewayRoute, err error) {
+	if nonGatewayRoute == nil {
+		return nil, fmt.Errorf("nonGatewayRoute provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(nonGatewayRoute)
+	if err != nil {
+		return nil, err
+	}
+	name := nonGatewayRoute.Name
+	if name == nil {
+		return nil, fmt.Errorf("nonGatewayRoute.Name must be provided to Apply")
+	}
+	result = &v1.NonGatewayRoute{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("nongatewayroutes").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
