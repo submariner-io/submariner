@@ -107,6 +107,7 @@ func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipa
 			}
 
 			key, _ := cache.MetaNamespaceKeyFunc(obj)
+
 			return controller.pfIface.AddEgressRulesForHeadlessSvc(key, target, reservedIPs[0], globalNetIPTableMark, tType)
 		})
 		if err != nil {
@@ -251,6 +252,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 
 		if err != nil {
 			_ = c.pool.Release(ips...)
+
 			meta.SetStatusCondition(&ingressIP.Status.Conditions, metav1.Condition{
 				Type:    string(submarinerv1.GlobalEgressIPAllocated),
 				Status:  metav1.ConditionFalse,

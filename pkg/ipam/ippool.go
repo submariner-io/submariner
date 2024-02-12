@@ -147,6 +147,7 @@ func (p *IPPool) Allocate(num int) ([]string, error) {
 		if current == num {
 			for i := 0; i < num; i++ {
 				p.available.Remove(firstIntIP)
+
 				firstIntIP++
 			}
 

@@ -117,6 +117,7 @@ func testEndpointSyncing() {
 			})
 
 			name := test.CreateResource(t.localEndpoints, test.SetClusterIDLabel(endpoint, endpoint.Spec.ClusterID)).GetName()
+
 			time.Sleep(500 * time.Millisecond)
 			test.AwaitNoResource(t.brokerEndpoints, name)
 		})

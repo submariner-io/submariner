@@ -54,6 +54,7 @@ func (f *Framework) AwaitSubmarinerEndpoint(cluster framework.ClusterIndex, chec
 	}, func(result interface{}) (bool, string, error) {
 		endpoints := result.(*submarinerv1.EndpointList)
 		retEndpoint = nil
+
 		for i := range endpoints.Items {
 			if endpoints.Items[i].Spec.ClusterID == framework.TestContext.ClusterIDs[cluster] {
 				if retEndpoint == nil {
@@ -94,6 +95,7 @@ func (f *Framework) AwaitSubmarinerEndpointRemoved(cluster framework.ClusterInde
 			if apierrors.IsNotFound(err) {
 				return true, nil
 			}
+
 			return false, err
 		},
 		func(result interface{}) (bool, string, error) {

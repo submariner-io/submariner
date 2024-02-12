@@ -75,6 +75,7 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 
 	BeforeEach(func() {
 		numberOfIPs = nil
+
 		if podSelector == nil {
 			egressChain = constants.SmGlobalnetEgressChainForNamespace
 		} else {
@@ -387,6 +388,7 @@ func testGlobalEgressIPUpdated(t *globalEgressIPControllerTestDriver, podSelecto
 
 	BeforeEach(func() {
 		numberOfIPs = 2
+
 		if podSelector == nil {
 			egressChain = constants.SmGlobalnetEgressChainForNamespace
 		} else {
@@ -401,6 +403,7 @@ func testGlobalEgressIPUpdated(t *globalEgressIPControllerTestDriver, podSelecto
 
 	JustBeforeEach(func() {
 		t.watches.AwaitWatchStarted("pods")
+
 		*existing.Spec.NumberOfIPs = numberOfIPs
 		existing.Spec.PodSelector = podSelector
 		test.UpdateResource(t.globalEgressIPs, existing)
@@ -549,6 +552,7 @@ func testEgressPodEvents(t *globalEgressIPControllerTestDriver) {
 
 			JustBeforeEach(func() {
 				t.pFilter.AwaitNoEntry(ipSet, "")
+
 				pod.Status.PodIP = "1.2.3.4"
 				test.UpdateResource(t.pods.Namespace(pod.Namespace), pod)
 			})

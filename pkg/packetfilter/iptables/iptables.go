@@ -427,6 +427,7 @@ func parseTCPSpec(spec []string, i int, rule *packetfilter.Rule) int {
 		} else if spec[i] == "--set-mss" {
 			rule.MssValue, i = parseNextTerm(spec, i, noopParse)
 			rule.ClampType = packetfilter.ToValue
+
 			break
 		} else if !strings.HasPrefix(spec[i], "--") && strings.HasPrefix(spec[i], "-") {
 			i--

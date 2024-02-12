@@ -360,6 +360,7 @@ func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
 		case ClusterIP:
 			By(fmt.Sprintf("Verifying the pod received the request from one of egressGlobalIPs %v", extEgressGlobalIPs))
 			matchRegexp := MatchRegexp("%s .*GET /%s%s .*", extEgressGlobalIPs[0], p.Framework.Namespace, clusterName)
+
 			for i := 1; i < len(extEgressGlobalIPs); i++ {
 				matchRegexp = Or(matchRegexp, MatchRegexp("%s .*GET /%s%s .*", extEgressGlobalIPs[i], p.Framework.Namespace, clusterName))
 			}

@@ -311,6 +311,7 @@ func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 	} else {
 		logger.Errorf(nil, "Failed to get the CNI interface IP for cluster CIDR %q, host-networking use-cases may not work",
 			v.localCluster.Spec.ClusterCIDR[0])
+
 		ipAddress = nil
 	}
 

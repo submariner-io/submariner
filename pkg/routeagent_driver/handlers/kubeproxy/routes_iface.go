@@ -181,6 +181,7 @@ func (kp *SyncHandler) cleanVxSubmarinerRoutes() {
 			logger.V(log.DEBUG).Infof("Found nil gw or dst")
 		} else if kp.remoteSubnets.Has(currentRouteList[i].Dst.String()) {
 			logger.V(log.DEBUG).Infof("Removing route %s", currentRouteList[i])
+
 			if err = kp.netLink.RouteDel(&currentRouteList[i]); err != nil {
 				logger.Errorf(err, "Error removing route %s", currentRouteList[i])
 			}
@@ -260,6 +261,7 @@ func (kp *SyncHandler) removeUnknownRoutes(vxlanGw net.IP, currentRouteList []ne
 				logger.V(log.DEBUG).Infof("Found route %s with gw %s already installed", currentRouteList[i], currentRouteList[i].Gw)
 			} else {
 				logger.V(log.DEBUG).Infof("Removing route %s", currentRouteList[i])
+
 				if err := kp.netLink.RouteDel(&currentRouteList[i]); err != nil {
 					logger.Errorf(err, "Error removing route %s", currentRouteList[i])
 				}
