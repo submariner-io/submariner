@@ -12,7 +12,7 @@ CODEGEN_SCRIPT_DIR="${K8S_IO_DIR}/code-generator"
 CODEGEN_SCRIPT="${CODEGEN_SCRIPT_DIR}/generate-groups.sh"
 GENGO_BOILERPLATE_DIR="${K8S_IO_DIR}/gengo"
 GENGO_BOILERPLATE="${GENGO_BOILERPLATE_DIR}/boilerplate/boilerplate.go.txt"
-CODEGEN_RELEASE_TAG=kubernetes-1.26.2
+CODEGEN_RELEASE_TAG=kubernetes-1.29.1
 
 if [ ! -f "$CODEGEN_SCRIPT" ]; then
     echo "$CODEGEN_SCRIPT does not exist - downloading..."
@@ -29,4 +29,4 @@ if [ ! -f "$GENGO_BOILERPLATE" ]; then
     git clone https://github.com/kubernetes/gengo "${GENGO_BOILERPLATE_DIR}"
 fi
 
-"${CODEGEN_SCRIPT}" all github.com/submariner-io/submariner/pkg/client github.com/submariner-io/submariner/pkg/apis submariner.io:v1
+"${CODEGEN_SCRIPT}" applyconfiguration,client,deepcopy,informer,lister github.com/submariner-io/submariner/pkg/client github.com/submariner-io/submariner/pkg/apis submariner.io:v1

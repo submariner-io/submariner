@@ -20,11 +20,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
-	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,25 +38,25 @@ type FakeGatewayRoutes struct {
 	ns   string
 }
 
-var gatewayroutesResource = schema.GroupVersionResource{Group: "submariner.io", Version: "v1", Resource: "gatewayroutes"}
+var gatewayroutesResource = v1.SchemeGroupVersion.WithResource("gatewayroutes")
 
-var gatewayroutesKind = schema.GroupVersionKind{Group: "submariner.io", Version: "v1", Kind: "GatewayRoute"}
+var gatewayroutesKind = v1.SchemeGroupVersion.WithKind("GatewayRoute")
 
 // Get takes name of the gatewayRoute, and returns the corresponding gatewayRoute object, and an error if there is any.
-func (c *FakeGatewayRoutes) Get(ctx context.Context, name string, options v1.GetOptions) (result *submarineriov1.GatewayRoute, err error) {
+func (c *FakeGatewayRoutes) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.GatewayRoute, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(gatewayroutesResource, c.ns, name), &submarineriov1.GatewayRoute{})
+		Invokes(testing.NewGetAction(gatewayroutesResource, c.ns, name), &v1.GatewayRoute{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*submarineriov1.GatewayRoute), err
+	return obj.(*v1.GatewayRoute), err
 }
 
 // List takes label and field selectors, and returns the list of GatewayRoutes that match those selectors.
-func (c *FakeGatewayRoutes) List(ctx context.Context, opts v1.ListOptions) (result *submarineriov1.GatewayRouteList, err error) {
+func (c *FakeGatewayRoutes) List(ctx context.Context, opts metav1.ListOptions) (result *v1.GatewayRouteList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(gatewayroutesResource, gatewayroutesKind, c.ns, opts), &submarineriov1.GatewayRouteList{})
+		Invokes(testing.NewListAction(gatewayroutesResource, gatewayroutesKind, c.ns, opts), &v1.GatewayRouteList{})
 
 	if obj == nil {
 		return nil, err
@@ -64,8 +66,8 @@ func (c *FakeGatewayRoutes) List(ctx context.Context, opts v1.ListOptions) (resu
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &submarineriov1.GatewayRouteList{ListMeta: obj.(*submarineriov1.GatewayRouteList).ListMeta}
-	for _, item := range obj.(*submarineriov1.GatewayRouteList).Items {
+	list := &v1.GatewayRouteList{ListMeta: obj.(*v1.GatewayRouteList).ListMeta}
+	for _, item := range obj.(*v1.GatewayRouteList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -74,57 +76,79 @@ func (c *FakeGatewayRoutes) List(ctx context.Context, opts v1.ListOptions) (resu
 }
 
 // Watch returns a watch.Interface that watches the requested gatewayRoutes.
-func (c *FakeGatewayRoutes) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeGatewayRoutes) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(gatewayroutesResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a gatewayRoute and creates it.  Returns the server's representation of the gatewayRoute, and an error, if there is any.
-func (c *FakeGatewayRoutes) Create(ctx context.Context, gatewayRoute *submarineriov1.GatewayRoute, opts v1.CreateOptions) (result *submarineriov1.GatewayRoute, err error) {
+func (c *FakeGatewayRoutes) Create(ctx context.Context, gatewayRoute *v1.GatewayRoute, opts metav1.CreateOptions) (result *v1.GatewayRoute, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(gatewayroutesResource, c.ns, gatewayRoute), &submarineriov1.GatewayRoute{})
+		Invokes(testing.NewCreateAction(gatewayroutesResource, c.ns, gatewayRoute), &v1.GatewayRoute{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*submarineriov1.GatewayRoute), err
+	return obj.(*v1.GatewayRoute), err
 }
 
 // Update takes the representation of a gatewayRoute and updates it. Returns the server's representation of the gatewayRoute, and an error, if there is any.
-func (c *FakeGatewayRoutes) Update(ctx context.Context, gatewayRoute *submarineriov1.GatewayRoute, opts v1.UpdateOptions) (result *submarineriov1.GatewayRoute, err error) {
+func (c *FakeGatewayRoutes) Update(ctx context.Context, gatewayRoute *v1.GatewayRoute, opts metav1.UpdateOptions) (result *v1.GatewayRoute, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(gatewayroutesResource, c.ns, gatewayRoute), &submarineriov1.GatewayRoute{})
+		Invokes(testing.NewUpdateAction(gatewayroutesResource, c.ns, gatewayRoute), &v1.GatewayRoute{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*submarineriov1.GatewayRoute), err
+	return obj.(*v1.GatewayRoute), err
 }
 
 // Delete takes name of the gatewayRoute and deletes it. Returns an error if one occurs.
-func (c *FakeGatewayRoutes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeGatewayRoutes) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(gatewayroutesResource, c.ns, name, opts), &submarineriov1.GatewayRoute{})
+		Invokes(testing.NewDeleteActionWithOptions(gatewayroutesResource, c.ns, name, opts), &v1.GatewayRoute{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeGatewayRoutes) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeGatewayRoutes) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(gatewayroutesResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &submarineriov1.GatewayRouteList{})
+	_, err := c.Fake.Invokes(action, &v1.GatewayRouteList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched gatewayRoute.
-func (c *FakeGatewayRoutes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *submarineriov1.GatewayRoute, err error) {
+func (c *FakeGatewayRoutes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.GatewayRoute, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(gatewayroutesResource, c.ns, name, pt, data, subresources...), &submarineriov1.GatewayRoute{})
+		Invokes(testing.NewPatchSubresourceAction(gatewayroutesResource, c.ns, name, pt, data, subresources...), &v1.GatewayRoute{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*submarineriov1.GatewayRoute), err
+	return obj.(*v1.GatewayRoute), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied gatewayRoute.
+func (c *FakeGatewayRoutes) Apply(ctx context.Context, gatewayRoute *submarineriov1.GatewayRouteApplyConfiguration, opts metav1.ApplyOptions) (result *v1.GatewayRoute, err error) {
+	if gatewayRoute == nil {
+		return nil, fmt.Errorf("gatewayRoute provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(gatewayRoute)
+	if err != nil {
+		return nil, err
+	}
+	name := gatewayRoute.Name
+	if name == nil {
+		return nil, fmt.Errorf("gatewayRoute.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(gatewayroutesResource, c.ns, *name, types.ApplyPatchType, data), &v1.GatewayRoute{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.GatewayRoute), err
 }

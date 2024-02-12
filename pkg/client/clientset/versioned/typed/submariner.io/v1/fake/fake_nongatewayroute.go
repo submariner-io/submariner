@@ -20,11 +20,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
-	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -36,25 +38,25 @@ type FakeNonGatewayRoutes struct {
 	ns   string
 }
 
-var nongatewayroutesResource = schema.GroupVersionResource{Group: "submariner.io", Version: "v1", Resource: "nongatewayroutes"}
+var nongatewayroutesResource = v1.SchemeGroupVersion.WithResource("nongatewayroutes")
 
-var nongatewayroutesKind = schema.GroupVersionKind{Group: "submariner.io", Version: "v1", Kind: "NonGatewayRoute"}
+var nongatewayroutesKind = v1.SchemeGroupVersion.WithKind("NonGatewayRoute")
 
 // Get takes name of the nonGatewayRoute, and returns the corresponding nonGatewayRoute object, and an error if there is any.
-func (c *FakeNonGatewayRoutes) Get(ctx context.Context, name string, options v1.GetOptions) (result *submarineriov1.NonGatewayRoute, err error) {
+func (c *FakeNonGatewayRoutes) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.NonGatewayRoute, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(nongatewayroutesResource, c.ns, name), &submarineriov1.NonGatewayRoute{})
+		Invokes(testing.NewGetAction(nongatewayroutesResource, c.ns, name), &v1.NonGatewayRoute{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*submarineriov1.NonGatewayRoute), err
+	return obj.(*v1.NonGatewayRoute), err
 }
 
 // List takes label and field selectors, and returns the list of NonGatewayRoutes that match those selectors.
-func (c *FakeNonGatewayRoutes) List(ctx context.Context, opts v1.ListOptions) (result *submarineriov1.NonGatewayRouteList, err error) {
+func (c *FakeNonGatewayRoutes) List(ctx context.Context, opts metav1.ListOptions) (result *v1.NonGatewayRouteList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(nongatewayroutesResource, nongatewayroutesKind, c.ns, opts), &submarineriov1.NonGatewayRouteList{})
+		Invokes(testing.NewListAction(nongatewayroutesResource, nongatewayroutesKind, c.ns, opts), &v1.NonGatewayRouteList{})
 
 	if obj == nil {
 		return nil, err
@@ -64,8 +66,8 @@ func (c *FakeNonGatewayRoutes) List(ctx context.Context, opts v1.ListOptions) (r
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &submarineriov1.NonGatewayRouteList{ListMeta: obj.(*submarineriov1.NonGatewayRouteList).ListMeta}
-	for _, item := range obj.(*submarineriov1.NonGatewayRouteList).Items {
+	list := &v1.NonGatewayRouteList{ListMeta: obj.(*v1.NonGatewayRouteList).ListMeta}
+	for _, item := range obj.(*v1.NonGatewayRouteList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -74,57 +76,79 @@ func (c *FakeNonGatewayRoutes) List(ctx context.Context, opts v1.ListOptions) (r
 }
 
 // Watch returns a watch.Interface that watches the requested nonGatewayRoutes.
-func (c *FakeNonGatewayRoutes) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeNonGatewayRoutes) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(nongatewayroutesResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a nonGatewayRoute and creates it.  Returns the server's representation of the nonGatewayRoute, and an error, if there is any.
-func (c *FakeNonGatewayRoutes) Create(ctx context.Context, nonGatewayRoute *submarineriov1.NonGatewayRoute, opts v1.CreateOptions) (result *submarineriov1.NonGatewayRoute, err error) {
+func (c *FakeNonGatewayRoutes) Create(ctx context.Context, nonGatewayRoute *v1.NonGatewayRoute, opts metav1.CreateOptions) (result *v1.NonGatewayRoute, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(nongatewayroutesResource, c.ns, nonGatewayRoute), &submarineriov1.NonGatewayRoute{})
+		Invokes(testing.NewCreateAction(nongatewayroutesResource, c.ns, nonGatewayRoute), &v1.NonGatewayRoute{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*submarineriov1.NonGatewayRoute), err
+	return obj.(*v1.NonGatewayRoute), err
 }
 
 // Update takes the representation of a nonGatewayRoute and updates it. Returns the server's representation of the nonGatewayRoute, and an error, if there is any.
-func (c *FakeNonGatewayRoutes) Update(ctx context.Context, nonGatewayRoute *submarineriov1.NonGatewayRoute, opts v1.UpdateOptions) (result *submarineriov1.NonGatewayRoute, err error) {
+func (c *FakeNonGatewayRoutes) Update(ctx context.Context, nonGatewayRoute *v1.NonGatewayRoute, opts metav1.UpdateOptions) (result *v1.NonGatewayRoute, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(nongatewayroutesResource, c.ns, nonGatewayRoute), &submarineriov1.NonGatewayRoute{})
+		Invokes(testing.NewUpdateAction(nongatewayroutesResource, c.ns, nonGatewayRoute), &v1.NonGatewayRoute{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*submarineriov1.NonGatewayRoute), err
+	return obj.(*v1.NonGatewayRoute), err
 }
 
 // Delete takes name of the nonGatewayRoute and deletes it. Returns an error if one occurs.
-func (c *FakeNonGatewayRoutes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeNonGatewayRoutes) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(nongatewayroutesResource, c.ns, name, opts), &submarineriov1.NonGatewayRoute{})
+		Invokes(testing.NewDeleteActionWithOptions(nongatewayroutesResource, c.ns, name, opts), &v1.NonGatewayRoute{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeNonGatewayRoutes) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeNonGatewayRoutes) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(nongatewayroutesResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &submarineriov1.NonGatewayRouteList{})
+	_, err := c.Fake.Invokes(action, &v1.NonGatewayRouteList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched nonGatewayRoute.
-func (c *FakeNonGatewayRoutes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *submarineriov1.NonGatewayRoute, err error) {
+func (c *FakeNonGatewayRoutes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.NonGatewayRoute, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(nongatewayroutesResource, c.ns, name, pt, data, subresources...), &submarineriov1.NonGatewayRoute{})
+		Invokes(testing.NewPatchSubresourceAction(nongatewayroutesResource, c.ns, name, pt, data, subresources...), &v1.NonGatewayRoute{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*submarineriov1.NonGatewayRoute), err
+	return obj.(*v1.NonGatewayRoute), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied nonGatewayRoute.
+func (c *FakeNonGatewayRoutes) Apply(ctx context.Context, nonGatewayRoute *submarineriov1.NonGatewayRouteApplyConfiguration, opts metav1.ApplyOptions) (result *v1.NonGatewayRoute, err error) {
+	if nonGatewayRoute == nil {
+		return nil, fmt.Errorf("nonGatewayRoute provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(nonGatewayRoute)
+	if err != nil {
+		return nil, err
+	}
+	name := nonGatewayRoute.Name
+	if name == nil {
+		return nil, fmt.Errorf("nonGatewayRoute.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(nongatewayroutesResource, c.ns, *name, types.ApplyPatchType, data), &v1.NonGatewayRoute{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.NonGatewayRoute), err
 }
