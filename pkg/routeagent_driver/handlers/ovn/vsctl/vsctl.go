@@ -99,7 +99,7 @@ func AddOVNBridgeMapping(netName, bridgeName string) error {
 		return nil // it was already set
 	}
 
-	if len(bridgeMappings) > 0 {
+	if bridgeMappings != "" {
 		bridgeMappings = bridgeMappings + "," + locnetMapping
 	} else {
 		bridgeMappings = locnetMapping
