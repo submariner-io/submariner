@@ -531,7 +531,7 @@ func (runner *runner) ListEntries(set string) ([]string, error) {
 	results := make([]string, 0)
 
 	for i := range strs {
-		if len(strs[i]) > 0 {
+		if strs[i] != "" {
 			results = append(results, strs[i])
 		}
 	}
