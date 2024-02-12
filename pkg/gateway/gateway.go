@@ -366,6 +366,7 @@ func (g *gatewayType) initCableHealthChecker() {
 		logger.Info("The CableEngine HealthChecker is disabled")
 	} else {
 		watcherConfig := g.WatcherConfig
+
 		g.cableHealthChecker, err = healthchecker.New(&healthchecker.Config{
 			WatcherConfig:      &watcherConfig,
 			EndpointNamespace:  g.Spec.Namespace,

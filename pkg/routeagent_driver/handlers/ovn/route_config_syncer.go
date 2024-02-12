@@ -154,6 +154,7 @@ func (ovn *Handler) handleInterfaceAddressChange() error {
 		}); err != nil {
 			return errors.Wrap(err, "error installing IPHook chain")
 		}
+
 		return nil
 	})
 

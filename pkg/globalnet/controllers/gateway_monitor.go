@@ -631,6 +631,7 @@ func (g *gatewayMonitor) markRemoteClusterTraffic(addRules bool, subnets ...stri
 			}
 		} else {
 			logger.V(log.DEBUG).Infof("Deleting rule that marks remote cluster traffic: %+v", &ruleSpec)
+
 			if err := g.pFilter.Delete(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain, &ruleSpec); err != nil {
 				logger.Errorf(err, "Error deleting iptables rule %+v", &ruleSpec)
 			}

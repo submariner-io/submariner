@@ -219,6 +219,7 @@ func getGlobalIngressIP(p tcp.ConnectivityTestParams, service *v1.Service) strin
 		podList := p.Framework.AwaitPodsByLabelSelector(p.ToCluster, labels.Set(service.Spec.Selector).AsSelector().String(),
 			service.Namespace, 1)
 		ingressIPName := fmt.Sprintf("pod-%s", podList.Items[0].Name)
+
 		return p.Framework.AwaitGlobalIngressIP(p.ToCluster, ingressIPName, service.Namespace)
 	}
 

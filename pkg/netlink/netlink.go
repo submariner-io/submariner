@@ -304,6 +304,7 @@ func DeleteIfaceAndAssociatedRoutes(iface string, tableID int) error {
 	} else {
 		for i := range currentRouteList {
 			logger.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])
+
 			if currentRouteList[i].Table == tableID {
 				if err = n.RouteDel(&currentRouteList[i]); err != nil {
 					logger.Errorf(err, "Error removing route %s", currentRouteList[i])
