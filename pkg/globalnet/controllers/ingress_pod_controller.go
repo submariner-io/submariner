@@ -65,7 +65,6 @@ func startIngressPodController(svc *corev1.Service, config *syncer.ResourceSynce
 		SourceLabelSelector: labelSelector,
 		ResourcesEquivalent: arePodsEqual,
 	})
-
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the syncer")
 	}

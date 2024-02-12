@@ -68,7 +68,6 @@ func NewNodeController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool, n
 		Transform:           controller.process,
 		ResourcesEquivalent: controller.onNodeUpdated,
 	})
-
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the federator")
 	}

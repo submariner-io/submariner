@@ -109,7 +109,6 @@ func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipa
 			key, _ := cache.MetaNamespaceKeyFunc(obj)
 			return controller.pfIface.AddEgressRulesForHeadlessSvc(key, target, reservedIPs[0], globalNetIPTableMark, tType)
 		})
-
 		if err != nil {
 			return nil, err
 		}
@@ -126,7 +125,6 @@ func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipa
 		Transform:           controller.process,
 		ResourcesEquivalent: syncer.AreSpecsEquivalent,
 	})
-
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the syncer")
 	}

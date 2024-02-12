@@ -299,7 +299,6 @@ func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 	}
 
 	err = v.vxlanIface.AddFDB(remoteIP, "00:00:00:00:00:00")
-
 	if err != nil {
 		return endpointInfo.UseIP, fmt.Errorf("failed to add remoteIP %q to the forwarding database: %w", remoteIP, err)
 	}
@@ -316,7 +315,6 @@ func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 	}
 
 	err = v.vxlanIface.AddRoute(allowedIPs, remoteVtepIP, ipAddress)
-
 	if err != nil {
 		return endpointInfo.UseIP, fmt.Errorf("failed to add route for the CIDR %q with remoteVtepIP %q and vxlanInterfaceIP %q: %w",
 			allowedIPs, remoteVtepIP, v.vxlanIface.vtepIP, err)
@@ -371,7 +369,6 @@ func (v *vxlan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint)
 	}
 
 	err = v.vxlanIface.DelRoute(allowedIPs)
-
 	if err != nil {
 		return fmt.Errorf("failed to remove route for the CIDR %q: %w", allowedIPs, err)
 	}
