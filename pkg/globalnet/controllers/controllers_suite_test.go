@@ -391,10 +391,7 @@ func (t *testDriverBase) awaitEndpointsHasIP(name, ip string) {
 
 func (t *testDriverBase) awaitHeadlessGlobalIngressIP(svcName, podName string) *submarinerv1.GlobalIngressIP {
 	ingressIP := getGlobalIngressIP(t, podName, func(gip *submarinerv1.GlobalIngressIP, name string) bool {
-		if gip.Spec.PodRef != nil && gip.Spec.PodRef.Name == name {
-			return true
-		}
-		return false
+		return gip.Spec.PodRef != nil && gip.Spec.PodRef.Name == name
 	})
 
 	Expect(ingressIP.Spec.Target).To(Equal(submarinerv1.HeadlessServicePod))
@@ -407,10 +404,7 @@ func (t *testDriverBase) awaitHeadlessGlobalIngressIP(svcName, podName string) *
 func (t *testDriverBase) awaitHeadlessGlobalIngressIPForEP(svcName, endpointsName string) *submarinerv1.GlobalIngressIP {
 	// Intentionally comparing ServiceRef.Name and endpointsName (they should be the same)
 	ingressIP := getGlobalIngressIP(t, endpointsName, func(gip *submarinerv1.GlobalIngressIP, name string) bool {
-		if gip.Spec.ServiceRef != nil && gip.Spec.ServiceRef.Name == name {
-			return true
-		}
-		return false
+		return gip.Spec.ServiceRef != nil && gip.Spec.ServiceRef.Name == name
 	})
 
 	Expect(ingressIP.Spec.Target).To(Equal(submarinerv1.HeadlessServiceEndpoints))
