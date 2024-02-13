@@ -547,7 +547,7 @@ func (t *testDriver) run() {
 		AddFunc: func(obj interface{}) {
 			t.gatewayUpdated <- obj.(*submarinerv1.Gateway)
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(_, newObj interface{}) {
 			t.gatewayUpdated <- newObj.(*submarinerv1.Gateway)
 		},
 		DeleteFunc: func(obj interface{}) {

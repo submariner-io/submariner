@@ -88,7 +88,7 @@ func createTestListener(endpoint *submarinerv1.Endpoint) (*natDiscovery, chan []
 	readyChannel := listener.GetReadyChannel()
 
 	udpSentChannel := make(chan []byte, 10)
-	listener.serverUDPWrite = func(b []byte, addr *net.UDPAddr) (int, error) {
+	listener.serverUDPWrite = func(b []byte, _ *net.UDPAddr) (int, error) {
 		udpSentChannel <- b
 		return len(b), nil
 	}
