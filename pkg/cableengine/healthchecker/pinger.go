@@ -144,7 +144,7 @@ func (p *pingerInfo) doPing() error {
 	pinger.RecordRtts = false
 	pinger.Timeout = p.pingTimeout
 
-	pinger.OnSend = func(packet *probing.Packet) {
+	pinger.OnSend = func(_ *probing.Packet) {
 		select {
 		case <-p.stopCh:
 			pinger.Stop()

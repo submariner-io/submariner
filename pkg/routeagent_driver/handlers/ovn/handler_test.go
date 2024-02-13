@@ -90,7 +90,7 @@ var _ = Describe("Handler", func() {
 				RestMapper: restMapper,
 				Client:     t.dynClient,
 			},
-			NewOVSDBClient: func(_ model.ClientDBModel, opts ...libovsdbclient.Option) (libovsdbclient.Client, error) {
+			NewOVSDBClient: func(_ model.ClientDBModel, _ ...libovsdbclient.Option) (libovsdbclient.Client, error) {
 				return ovsdbClient, nil
 			},
 		}))
