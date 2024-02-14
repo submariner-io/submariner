@@ -65,7 +65,6 @@ func startEndpointsController(name, namespace string, config *syncer.ResourceSyn
 		SourceFieldSelector: fieldSelector,
 		ResourcesEquivalent: areEndpointsEqual,
 	})
-
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the syncer")
 	}

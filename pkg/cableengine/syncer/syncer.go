@@ -217,6 +217,7 @@ func (gs *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 		gateway.Status.StatusFailure = gs.statusError.Error()
 	} else {
 		var err error
+
 		connections, err = gs.engine.ListCableConnections()
 		if err != nil {
 			msg := fmt.Sprintf("Error retrieving driver connections: %s", err)

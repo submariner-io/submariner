@@ -84,6 +84,7 @@ func (a *Adapter) InsertUnique(table TableType, chain string, position int, rule
 	for index, rule := range existingRules {
 		if ruleString == fmt.Sprintf("%+v", rule) {
 			logger.V(level.DEBUG).Infof("In %q table, rule \"%s\", exists at index %d.", table, ruleString, index)
+
 			numOccurrences++
 
 			if index == position {

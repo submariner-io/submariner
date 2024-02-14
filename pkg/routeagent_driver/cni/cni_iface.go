@@ -114,13 +114,16 @@ func AnnotateNodeWithCNIInterfaceIP(nodeName string, clientSet kubernetes.Interf
 		if annotations == nil {
 			annotations = map[string]string{}
 		}
+
 		if setAnnotation {
 			annotations[constants.CNIInterfaceIP] = cniIPAddress
 		} else {
 			delete(annotations, constants.CNIInterfaceIP)
 		}
+
 		node.SetAnnotations(annotations)
 		_, updateErr := clientSet.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
+
 		return updateErr //nolint:wrapcheck // We wrap it below in the enclosing function
 	})
 

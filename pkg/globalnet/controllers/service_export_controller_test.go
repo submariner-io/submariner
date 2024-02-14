@@ -49,6 +49,7 @@ func testClusterIPService() {
 
 	BeforeEach(func() {
 		service = newClusterIPService()
+
 		t.createPFilterChain(packetfilter.TableTypeNAT, kubeProxyIPTableChainName)
 	})
 

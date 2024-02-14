@@ -225,8 +225,8 @@ func getService(name, namespace string,
 	}
 
 	service := &corev1.Service{}
-	err = scheme.Convert(obj, service, nil)
 
+	err = scheme.Convert(obj, service, nil)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "error converting %#v to Service", obj)
 	}

@@ -79,13 +79,14 @@ func NewGlobalEgressIPController(config *syncer.ResourceSyncerConfig, pool *ipam
 	for i := range list.Items {
 		err = controller.reserveAllocatedIPs(federator, &list.Items[i], func(reservedIPs []string) error {
 			metrics.RecordAllocateGlobalEgressIPs(pool.GetCIDR(), len(reservedIPs))
+
 			specObj := util.GetSpec(&list.Items[i])
 			spec := &submarinerv1.GlobalEgressIPSpec{}
 			_ = runtime.DefaultUnstructuredConverter.FromUnstructured(specObj.(map[string]interface{}), spec)
 			key, _ := cache.MetaNamespaceKeyFunc(&list.Items[i])
+
 			return controller.programGlobalEgressRules(key, reservedIPs, spec.PodSelector, controller.newNamedSet(key))
 		})
-
 		if err != nil {
 			return nil, err
 		}
@@ -102,7 +103,6 @@ func NewGlobalEgressIPController(config *syncer.ResourceSyncerConfig, pool *ipam
 		Transform:           controller.process,
 		ResourcesEquivalent: syncer.AreSpecsEquivalent,
 	})
-
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the syncer")
 	}
@@ -373,6 +373,7 @@ func (c *globalEgressIPController) flushGlobalEgressRulesAndReleaseIPs(key, name
 ) bool {
 	return c.flushRulesAndReleaseIPs(key, numRequeues, func(allocatedIPs []string) error {
 		metrics.RecordDeallocateGlobalEgressIPs(c.pool.GetCIDR(), len(allocatedIPs))
+
 		if globalEgressIP.Spec.PodSelector != nil {
 			return c.pfIface.RemoveEgressRulesForPods(key, namedSetName,
 				getTargetSNATIPaddress(allocatedIPs), globalNetIPTableMark)

@@ -262,7 +262,9 @@ func (h *calicoIPPoolHandler) updateROKSCalicoCfg() error {
 		existing.Labels[submarinerManagedLabel] = "true"
 		existing.Annotations[submarinerPrevIPIPMode] = string(existing.Spec.IPIPMode)
 		existing.Spec.IPIPMode = calicoapi.IPIPModeAlways
+
 		logger.Infof("Setting IPIPMode of %s IPPool to Always", DefaultV4IPPoolName)
+
 		return existing, nil
 	})
 
@@ -279,6 +281,7 @@ func (h *calicoIPPoolHandler) restoreROKSCalicoCfg() error {
 		if prevIPIPModeCfg == "" {
 			return existing, nil // no need to update
 		}
+
 		existing.Spec.IPIPMode = calicoapi.IPIPMode(prevIPIPModeCfg)
 		delete(existing.Labels, submarinerManagedLabel)
 		delete(existing.Annotations, submarinerPrevIPIPMode)

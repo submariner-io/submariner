@@ -229,8 +229,10 @@ func getEndpointName(from *submarinerv1.EndpointSpec) string {
 func awaitCluster(clusters dynamic.ResourceInterface, expected *submarinerv1.ClusterSpec) {
 	test.AwaitAndVerifyResource(clusters, expected.ClusterID, func(obj *unstructured.Unstructured) bool {
 		defer GinkgoRecover()
+
 		actual := &submarinerv1.Cluster{}
 		Expect(scheme.Scheme.Convert(obj, actual, nil)).To(Succeed())
+
 		return reflect.DeepEqual(actual.Spec, *expected)
 	})
 }
@@ -238,8 +240,10 @@ func awaitCluster(clusters dynamic.ResourceInterface, expected *submarinerv1.Clu
 func awaitEndpoint(endpoints dynamic.ResourceInterface, expected *submarinerv1.EndpointSpec) {
 	test.AwaitAndVerifyResource(endpoints, getEndpointName(expected), func(obj *unstructured.Unstructured) bool {
 		defer GinkgoRecover()
+
 		actual := &submarinerv1.Endpoint{}
 		Expect(scheme.Scheme.Convert(obj, actual, nil)).To(Succeed())
+
 		return reflect.DeepEqual(actual.Spec, *expected)
 	})
 }

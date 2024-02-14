@@ -110,7 +110,6 @@ func NewClusterGlobalEgressIPController(config *syncer.ResourceSyncerConfig, loc
 		Transform:           controller.process,
 		ResourcesEquivalent: syncer.AreSpecsEquivalent,
 	})
-
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating resource syncer")
 	}

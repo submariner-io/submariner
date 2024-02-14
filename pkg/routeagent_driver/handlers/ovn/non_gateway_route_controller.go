@@ -82,7 +82,6 @@ func NewNonGatewayRouteController(config watcher.Config, connectionHandler *Conn
 	}
 
 	controller.nonGatewayRouteWatcher, err = watcher.New(&config)
-
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating resource watcher")
 	}

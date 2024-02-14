@@ -56,7 +56,6 @@ func NewServiceController(config *syncer.ResourceSyncerConfig, podControllers *I
 		Scheme:          config.Scheme,
 		Transform:       controller.process,
 	})
-
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the syncer")
 	}
