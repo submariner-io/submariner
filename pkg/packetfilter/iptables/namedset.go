@@ -25,8 +25,8 @@ import (
 )
 
 type namedSet struct {
-	pfilter *PacketFilter
-	set     ipset.IPSet
+	ipSetIface ipset.Interface
+	set        ipset.IPSet
 }
 
 func (a *PacketFilter) NewNamedSet(set *packetfilter.SetInfo) packetfilter.NamedSet {
@@ -36,7 +36,7 @@ func (a *PacketFilter) NewNamedSet(set *packetfilter.SetInfo) packetfilter.Named
 	}
 
 	return &namedSet{
-		pfilter: a,
+		ipSetIface: a.ipSetIface,
 		set: ipset.IPSet{
 			Name:       set.Name,
 			SetType:    ipset.HashNet,
@@ -50,32 +50,32 @@ func (n *namedSet) Name() string {
 }
 
 func (n *namedSet) Flush() error {
-	return errors.Wrap(n.pfilter.ipSetIface.FlushSet(n.set.Name), "Flush failed")
+	return errors.Wrap(n.ipSetIface.FlushSet(n.set.Name), "Flush failed")
 }
 
 func (n *namedSet) Destroy() error {
-	return errors.Wrap(n.pfilter.ipSetIface.DestroySet(n.set.Name), "Destroy failed")
+	return errors.Wrap(n.ipSetIface.DestroySet(n.set.Name), "Destroy failed")
 }
 
 func (n *namedSet) Create(ignoreExistErr bool) error {
-	return errors.Wrap(n.pfilter.ipSetIface.CreateSet(&n.set, ignoreExistErr), "Create failed")
+	return errors.Wrap(n.ipSetIface.CreateSet(&n.set, ignoreExistErr), "Create failed")
 }
 
 func (n *namedSet) AddEntry(entry string, ignoreExistErr bool) error {
-	return errors.Wrap(n.pfilter.ipSetIface.AddEntry(entry, &n.set, ignoreExistErr), "AddEntry failed")
+	return errors.Wrap(n.ipSetIface.AddEntry(entry, &n.set, ignoreExistErr), "AddEntry failed")
 }
 
 func (n *namedSet) DelEntry(entry string) error {
-	return errors.Wrap(n.pfilter.ipSetIface.DelEntry(entry, n.set.Name), "DelEntry failed")
+	return errors.Wrap(n.ipSetIface.DelEntry(entry, n.set.Name), "DelEntry failed")
 }
 
 func (n *namedSet) TestEntry(entry string) (bool, error) {
-	b, err := n.pfilter.ipSetIface.TestEntry(entry, n.set.Name)
+	b, err := n.ipSetIface.TestEntry(entry, n.set.Name)
 	return b, errors.Wrap(err, "TestEntry failed")
 }
 
 func (n *namedSet) ListEntries() ([]string, error) {
-	entries, err := n.pfilter.ipSetIface.ListEntries(n.set.Name)
+	entries, err := n.ipSetIface.ListEntries(n.set.Name)
 	return entries, errors.Wrap(err, "ListEntries failed")
 }
 
