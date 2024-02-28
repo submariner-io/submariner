@@ -29,14 +29,14 @@ type namedSet struct {
 	set        ipset.IPSet
 }
 
-func (a *packetFilter) NewNamedSet(set *packetfilter.SetInfo) packetfilter.NamedSet {
+func (p *packetFilter) NewNamedSet(set *packetfilter.SetInfo) packetfilter.NamedSet {
 	hashFamily := ipset.ProtocolFamilyIPV4
 	if set.Family == packetfilter.SetFamilyV6 {
 		hashFamily = ipset.ProtocolFamilyIPV6
 	}
 
 	return &namedSet{
-		ipSetIface: a.ipSetIface,
+		ipSetIface: p.ipSetIface,
 		set: ipset.IPSet{
 			Name:       set.Name,
 			SetType:    ipset.HashNet,
@@ -79,8 +79,8 @@ func (n *namedSet) ListEntries() ([]string, error) {
 	return entries, errors.Wrap(err, "ListEntries failed")
 }
 
-func (a *packetFilter) DestroySets(nameFilter func(string) bool) error {
-	namedSetList, err := a.ipSetIface.ListSets()
+func (p *packetFilter) DestroySets(nameFilter func(string) bool) error {
+	namedSetList, err := p.ipSetIface.ListSets()
 	if err != nil {
 		return errors.Wrap(err, "error listing sets")
 	}
@@ -89,7 +89,7 @@ func (a *packetFilter) DestroySets(nameFilter func(string) bool) error {
 
 	for _, set := range namedSetList {
 		if nameFilter(set) {
-			err = a.ipSetIface.DestroySet(set)
+			err = p.ipSetIface.DestroySet(set)
 			if err != nil {
 				logger.Errorf(err, "Error destroying the ipset %q", set)
 				retErr = err
