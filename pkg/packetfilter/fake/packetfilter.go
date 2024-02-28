@@ -62,12 +62,7 @@ func (i *PacketFilter) ChainExists(table packetfilter.TableType, chain string) (
 }
 
 func (i *PacketFilter) AppendUnique(table packetfilter.TableType, chain string, rule *packetfilter.Rule) error {
-	ruleSpecStr, err := json.Marshal(*rule)
-	if err != nil {
-		return errors.Wrap(err, "AppendUnique failed")
-	}
-
-	return i.addRule(table, chain, string(ruleSpecStr))
+	return i.addRule(table, chain, toRuleString(rule))
 }
 
 func (i *PacketFilter) CreateIPHookChainIfNotExists(chain *packetfilter.ChainIPHook) error {
@@ -103,23 +98,27 @@ func (i *PacketFilter) ClearChain(table packetfilter.TableType, chain string) er
 }
 
 func (i *PacketFilter) Delete(table packetfilter.TableType, chain string, rule *packetfilter.Rule) error {
-	ruleSpecStr, err := json.Marshal(*rule)
-	if err != nil {
-		return errors.Wrap(err, "Delete failed")
-	}
-
-	return i.delete(table, chain, string(ruleSpecStr))
+	return i.delete(table, chain, toRuleString(rule))
 }
 
-func fromRuleSpec(spec string) *packetfilter.Rule {
+func fromRuleString(str string) *packetfilter.Rule {
 	var rule packetfilter.Rule
 
-	err := json.Unmarshal([]byte(spec), &rule)
+	err := json.Unmarshal([]byte(str), &rule)
 	if err != nil {
-		return nil
+		panic(err)
 	}
 
 	return &rule
+}
+
+func toRuleString(rule *packetfilter.Rule) string {
+	b, err := json.Marshal(*rule)
+	if err != nil {
+		panic(err)
+	}
+
+	return string(b)
 }
 
 func (i *PacketFilter) List(table packetfilter.TableType, chain string) ([]*packetfilter.Rule, error) {
@@ -128,28 +127,18 @@ func (i *PacketFilter) List(table packetfilter.TableType, chain string) ([]*pack
 	rules := []*packetfilter.Rule{}
 
 	for _, existingRule := range existingRules {
-		rules = append(rules, fromRuleSpec(existingRule))
+		rules = append(rules, fromRuleString(existingRule))
 	}
 
 	return rules, nil
 }
 
 func (i *PacketFilter) Append(table packetfilter.TableType, chain string, rule *packetfilter.Rule) error {
-	ruleSpecStr, err := json.Marshal(*rule)
-	if err != nil {
-		return errors.Wrap(err, "Append failed")
-	}
-
-	return i.addRule(table, chain, string(ruleSpecStr))
+	return i.addRule(table, chain, toRuleString(rule))
 }
 
-func (i *PacketFilter) Insert(table packetfilter.TableType, chain string, _ int, ruleSpec *packetfilter.Rule) error {
-	ruleSpecStr, err := json.Marshal(*ruleSpec)
-	if err != nil {
-		return errors.Wrap(err, "Insert failed")
-	}
-
-	return i.addRule(table, chain, string(ruleSpecStr))
+func (i *PacketFilter) Insert(table packetfilter.TableType, chain string, _ int, rule *packetfilter.Rule) error {
+	return i.addRule(table, chain, toRuleString(rule))
 }
 
 func (i *PacketFilter) createChainIfNotExists(table uint32, chain string) error {
