@@ -87,12 +87,7 @@ func (a *packetFilter) ChainExists(table packetfilter.TableType, chain string) (
 }
 
 func (a *packetFilter) AppendUnique(table packetfilter.TableType, chain string, rule *packetfilter.Rule) error {
-	ruleSpecStr, err := ToRuleSpec(rule)
-	if err != nil {
-		return errors.Wrap(err, "AppendUnique failed")
-	}
-
-	return errors.Wrap(a.ipt.AppendUnique(tableTypeToStr[table], chain, ruleSpecStr...), "error AppendUnique rule")
+	return errors.Wrap(a.ipt.AppendUnique(tableTypeToStr[table], chain, ToRuleSpec(rule)...), "error AppendUnique rule")
 }
 
 func (a *packetFilter) CreateIPHookChainIfNotExists(chain *packetfilter.ChainIPHook) error {
@@ -112,12 +107,7 @@ func (a *packetFilter) CreateIPHookChainIfNotExists(chain *packetfilter.ChainIPH
 	}
 
 	if chain.Priority == packetfilter.ChainPriorityFirst {
-		ruleSpecStr, err := ToRuleSpec(jumpRule)
-		if err != nil {
-			return errors.Wrap(err, "Failed to translate packetfilter Rule to str")
-		}
-
-		if err := a.ipt.InsertUnique(table, chainHookToStr[chain.Hook], 1, ruleSpecStr...); err != nil {
+		if err := a.ipt.InsertUnique(table, chainHookToStr[chain.Hook], 1, ToRuleSpec(jumpRule)...); err != nil {
 			return errors.Wrap(err, "error InsertUnique rule")
 		}
 	} else {
@@ -176,12 +166,7 @@ func (a *packetFilter) ClearChain(table packetfilter.TableType, chain string) er
 }
 
 func (a *packetFilter) Delete(table packetfilter.TableType, chain string, rule *packetfilter.Rule) error {
-	ruleSpecStr, err := ToRuleSpec(rule)
-	if err != nil {
-		return errors.Wrap(err, "error translating ruleSpec to str")
-	}
-
-	return a.delete(tableTypeToStr[table], chain, ruleSpecStr...)
+	return a.delete(tableTypeToStr[table], chain, ToRuleSpec(rule)...)
 }
 
 func (a *packetFilter) List(table packetfilter.TableType, chain string) ([]*packetfilter.Rule, error) {
@@ -205,21 +190,11 @@ func (a *packetFilter) List(table packetfilter.TableType, chain string) ([]*pack
 }
 
 func (a *packetFilter) Insert(table packetfilter.TableType, chain string, pos int, rule *packetfilter.Rule) error {
-	ruleSpecStr, err := ToRuleSpec(rule)
-	if err != nil {
-		return errors.Wrap(err, "Insert failed")
-	}
-
-	return errors.Wrap(a.ipt.Insert(tableTypeToStr[table], chain, pos, ruleSpecStr...), "error inserting ruleSpec to str")
+	return errors.Wrap(a.ipt.Insert(tableTypeToStr[table], chain, pos, ToRuleSpec(rule)...), "error inserting ruleSpec to str")
 }
 
 func (a *packetFilter) Append(table packetfilter.TableType, chain string, rule *packetfilter.Rule) error {
-	ruleSpecStr, err := ToRuleSpec(rule)
-	if err != nil {
-		return errors.Wrap(err, "Append failed")
-	}
-
-	return errors.Wrap(a.ipt.Append(tableTypeToStr[table], chain, ruleSpecStr...), "error appending ruleSpec to str")
+	return errors.Wrap(a.ipt.Append(tableTypeToStr[table], chain, ToRuleSpec(rule)...), "error appending ruleSpec to str")
 }
 
 func (a *packetFilter) createChainIfNotExists(table, chain string) error {
@@ -282,7 +257,7 @@ func setToRuleSpec(ruleSpec *[]string, srcSetName, destSetName string) {
 	}
 }
 
-func ToRuleSpec(rule *packetfilter.Rule) ([]string, error) {
+func ToRuleSpec(rule *packetfilter.Rule) []string {
 	var ruleSpec []string
 	protoToRuleSpec(&ruleSpec, rule.Proto)
 
@@ -312,14 +287,10 @@ func ToRuleSpec(rule *packetfilter.Rule) ([]string, error) {
 		ruleSpec = append(ruleSpec, "--dport", rule.DPort)
 	}
 
-	switch rule.Action {
-	case packetfilter.RuleActionJump:
+	if rule.Action == packetfilter.RuleActionJump {
 		ruleSpec = append(ruleSpec, "-j", rule.TargetChain)
-	case packetfilter.RuleActionAccept, packetfilter.RuleActionMss,
-		packetfilter.RuleActionMark, packetfilter.RuleActionSNAT, packetfilter.RuleActionDNAT:
+	} else {
 		ruleSpec = append(ruleSpec, "-j", ruleActionToStr[rule.Action])
-	default:
-		return ruleSpec, errors.Errorf(" rule.Action %d is invalid", rule.Action)
 	}
 
 	if rule.SnatCIDR != "" {
@@ -336,9 +307,7 @@ func ToRuleSpec(rule *packetfilter.Rule) ([]string, error) {
 		ruleSpec = append(ruleSpec, "--set-mark", rule.MarkValue)
 	}
 
-	logger.Infof("ToRuleSpec: %s", strings.Join(ruleSpec, " "))
-
-	return ruleSpec, nil
+	return ruleSpec
 }
 
 func FromRuleSpec(spec []string) *packetfilter.Rule {
