@@ -44,12 +44,12 @@ type PacketFilter struct {
 }
 
 var (
-	iphookChainTypeToTableType = [packetfilter.ChainTypeMAX]packetfilter.TableType{
+	iphookChainTypeToTableType = []packetfilter.TableType{
 		packetfilter.TableTypeFilter,
 		packetfilter.TableTypeRoute,
 		packetfilter.TableTypeNAT,
 	}
-	chainHookToStr = [packetfilter.ChainHookMAX]string{"PREROUTING", "INPUT", "FORWARD", "OUTPUT", "POSTROUTING"}
+	chainHookToStr = []string{"PREROUTING", "INPUT", "FORWARD", "OUTPUT", "POSTROUTING"}
 )
 
 func New() *PacketFilter {

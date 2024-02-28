@@ -30,7 +30,6 @@ const (
 	TableTypeFilter TableType = iota
 	TableTypeRoute            // mangle
 	TableTypeNAT
-	TableTypeMAX
 )
 
 type TableType uint32
@@ -44,7 +43,6 @@ const (
 	RuleActionMark
 	RuleActionSNAT
 	RuleActionDNAT
-	RuleActionMAX
 )
 
 type RuleProto uint32
@@ -73,7 +71,6 @@ const (
 	ChainHookForward
 	ChainHookOutput
 	ChainHookPostrouting
-	ChainHookMAX
 )
 
 type ChainPriority uint32
@@ -89,7 +86,6 @@ const (
 	ChainTypeFilter ChainType = iota
 	ChainTypeRoute            // mangle
 	ChainTypeNAT
-	ChainTypeMAX
 )
 
 type ChainPolicy uint32

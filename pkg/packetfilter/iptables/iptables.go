@@ -31,16 +31,35 @@ import (
 )
 
 var (
-	tableTypeToStr             = [packetfilter.TableTypeMAX]string{"filter", "mangle", "nat"}
-	iphookChainTypeToStr       = [packetfilter.ChainTypeMAX]string{"filter", "mangle", "nat"}
-	iphookChainTypeToTableType = [packetfilter.ChainTypeMAX]packetfilter.TableType{
-		packetfilter.TableTypeFilter,
-		packetfilter.TableTypeRoute,
-		packetfilter.TableTypeNAT,
+	tableTypeToStr = map[packetfilter.TableType]string{
+		packetfilter.TableTypeFilter: "filter",
+		packetfilter.TableTypeRoute:  "mangle",
+		packetfilter.TableTypeNAT:    "nat",
 	}
-	chainHookToStr  = [packetfilter.ChainHookMAX]string{"PREROUTING", "INPUT", "FORWARD", "OUTPUT", "POSTROUTING"}
-	ruleActiontoStr = [packetfilter.RuleActionMAX]string{"", "ACCEPT", "TCPMSS", "MARK", "SNAT", "DNAT"}
-	logger          = log.Logger{Logger: logf.Log.WithName("IPTables")}
+
+	ipHookChainTypeToTableType = map[packetfilter.ChainType]packetfilter.TableType{
+		packetfilter.ChainTypeFilter: packetfilter.TableTypeFilter,
+		packetfilter.ChainTypeRoute:  packetfilter.TableTypeRoute,
+		packetfilter.ChainTypeNAT:    packetfilter.TableTypeNAT,
+	}
+
+	chainHookToStr = map[packetfilter.ChainHook]string{
+		packetfilter.ChainHookPrerouting:  "PREROUTING",
+		packetfilter.ChainHookInput:       "INPUT",
+		packetfilter.ChainHookForward:     "FORWARD",
+		packetfilter.ChainHookOutput:      "OUTPUT",
+		packetfilter.ChainHookPostrouting: "POSTROUTING",
+	}
+
+	ruleActionToStr = map[packetfilter.RuleAction]string{
+		packetfilter.RuleActionAccept: "ACCEPT",
+		packetfilter.RuleActionMss:    "TCPMSS",
+		packetfilter.RuleActionMark:   "MARK",
+		packetfilter.RuleActionSNAT:   "SNAT",
+		packetfilter.RuleActionDNAT:   "DNAT",
+	}
+
+	logger = log.Logger{Logger: logf.Log.WithName("IPTables")}
 )
 
 type packetFilter struct {
@@ -77,8 +96,11 @@ func (a *packetFilter) AppendUnique(table packetfilter.TableType, chain string, 
 }
 
 func (a *packetFilter) CreateIPHookChainIfNotExists(chain *packetfilter.ChainIPHook) error {
-	if err := a.createChainIfNotExists(iphookChainTypeToStr[chain.Type], chain.Name); err != nil {
-		return errors.Wrapf(err, "error creating IP tables %s:%s chain", iphookChainTypeToStr[chain.Type], chain.Name)
+	tableType := ipHookChainTypeToTableType[chain.Type]
+	table := tableTypeToStr[tableType]
+
+	if err := a.createChainIfNotExists(table, chain.Name); err != nil {
+		return errors.Wrapf(err, "error creating IP tables %s:%s chain", table, chain.Name)
 	}
 
 	jumpRule := chain.JumpRule
@@ -95,13 +117,11 @@ func (a *packetFilter) CreateIPHookChainIfNotExists(chain *packetfilter.ChainIPH
 			return errors.Wrap(err, "Failed to translate packetfilter Rule to str")
 		}
 
-		table := tableTypeToStr[iphookChainTypeToTableType[chain.Type]]
-
 		if err := a.ipt.InsertUnique(table, chainHookToStr[chain.Hook], 1, ruleSpecStr...); err != nil {
 			return errors.Wrap(err, "error InsertUnique rule")
 		}
 	} else {
-		if err := a.AppendUnique(iphookChainTypeToTableType[chain.Type], chainHookToStr[chain.Hook], jumpRule); err != nil {
+		if err := a.AppendUnique(tableType, chainHookToStr[chain.Hook], jumpRule); err != nil {
 			return errors.Wrap(err, "error AppendUnique rule")
 		}
 	}
@@ -118,7 +138,7 @@ func (a *packetFilter) CreateChainIfNotExists(table packetfilter.TableType, chai
 }
 
 func (a *packetFilter) DeleteIPHookChain(chain *packetfilter.ChainIPHook) error {
-	tableType := iphookChainTypeToTableType[chain.Type]
+	tableType := ipHookChainTypeToTableType[chain.Type]
 	jumpRule := chain.JumpRule
 
 	if jumpRule == nil {
@@ -293,12 +313,11 @@ func ToRuleSpec(rule *packetfilter.Rule) ([]string, error) {
 	}
 
 	switch rule.Action {
-	case packetfilter.RuleActionMAX:
 	case packetfilter.RuleActionJump:
 		ruleSpec = append(ruleSpec, "-j", rule.TargetChain)
 	case packetfilter.RuleActionAccept, packetfilter.RuleActionMss,
 		packetfilter.RuleActionMark, packetfilter.RuleActionSNAT, packetfilter.RuleActionDNAT:
-		ruleSpec = append(ruleSpec, "-j", ruleActiontoStr[rule.Action])
+		ruleSpec = append(ruleSpec, "-j", ruleActionToStr[rule.Action])
 	default:
 		return ruleSpec, errors.Errorf(" rule.Action %d is invalid", rule.Action)
 	}
@@ -431,9 +450,9 @@ func parseTCPSpec(spec []string, i int, rule *packetfilter.Rule) int {
 }
 
 func parseAction(s string) packetfilter.RuleAction {
-	for i := 1; i < len(ruleActiontoStr); i++ {
-		if s == ruleActiontoStr[i] {
-			return packetfilter.RuleAction(i)
+	for a, str := range ruleActionToStr {
+		if s == str {
+			return a
 		}
 	}
 
