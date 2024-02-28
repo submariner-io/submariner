@@ -30,16 +30,6 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-const (
-	remoteCIDRIPSet                    = "SUBMARINER-REMOTECIDRS"
-	localCIDRIPSet                     = "SUBMARINER-LOCALCIDRS"
-	smPostRoutingChain                 = "SUBMARINER-POSTROUTING"
-	smGlobalnetEgressChainForPods      = "SM-GN-EGRESS-PODS"
-	smGlobalnetEgressChainForNamespace = "SM-GN-EGRESS-NS"
-	gnIPSetPrefix                      = "SM-GN-"
-	DriverName                         = "IPTables"
-)
-
 var (
 	tableTypeToStr             = [packetfilter.TableTypeMAX]string{"filter", "mangle", "nat"}
 	iphookChainTypeToStr       = [packetfilter.ChainTypeMAX]string{"filter", "mangle", "nat"}
@@ -50,7 +40,7 @@ var (
 	}
 	chainHookToStr  = [packetfilter.ChainHookMAX]string{"PREROUTING", "INPUT", "FORWARD", "OUTPUT", "POSTROUTING"}
 	ruleActiontoStr = [packetfilter.RuleActionMAX]string{"", "ACCEPT", "TCPMSS", "MARK", "SNAT", "DNAT"}
-	logger          = log.Logger{Logger: logf.Log.WithName(DriverName)}
+	logger          = log.Logger{Logger: logf.Log.WithName("IPTables")}
 )
 
 type PacketFilter struct {
