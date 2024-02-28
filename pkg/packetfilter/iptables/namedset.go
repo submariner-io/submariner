@@ -29,7 +29,7 @@ type namedSet struct {
 	set        ipset.IPSet
 }
 
-func (a *PacketFilter) NewNamedSet(set *packetfilter.SetInfo) packetfilter.NamedSet {
+func (a *packetFilter) NewNamedSet(set *packetfilter.SetInfo) packetfilter.NamedSet {
 	hashFamily := ipset.ProtocolFamilyIPV4
 	if set.Family == packetfilter.SetFamilyV6 {
 		hashFamily = ipset.ProtocolFamilyIPV6
@@ -79,7 +79,7 @@ func (n *namedSet) ListEntries() ([]string, error) {
 	return entries, errors.Wrap(err, "ListEntries failed")
 }
 
-func (a *PacketFilter) DestroySets(nameFilter func(string) bool) error {
+func (a *packetFilter) DestroySets(nameFilter func(string) bool) error {
 	namedSetList, err := a.ipSetIface.ListSets()
 	if err != nil {
 		return errors.Wrap(err, "error listing sets")
