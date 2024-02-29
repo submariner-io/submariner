@@ -31,9 +31,6 @@ type namedSet struct {
 
 func (p *packetFilter) NewNamedSet(set *packetfilter.SetInfo) packetfilter.NamedSet {
 	hashFamily := ipset.ProtocolFamilyIPV4
-	if set.Family == packetfilter.SetFamilyV6 {
-		hashFamily = ipset.ProtocolFamilyIPV6
-	}
 
 	return &namedSet{
 		ipSetIface: p.ipSetIface,

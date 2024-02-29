@@ -253,8 +253,8 @@ type ChainIPHook struct {
 type SetFamily uint32
 
 const (
+	// curently only IPV4 sets are supported.
 	SetFamilyV4 SetFamily = iota
-	SetFamilyV6
 )
 
 // named set.
