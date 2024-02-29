@@ -325,7 +325,7 @@ func ToRuleSpec(rule *packetfilter.Rule) []string {
 		ruleSpec = append(ruleSpec, "--set-mark", rule.MarkValue)
 	}
 
-	logger.V(log.TRACE).Infof("ToRuleSpec: from \"%#v\" to %q", rule, strings.Join(ruleSpec, " "))
+	logger.V(log.TRACE).Infof("ToRuleSpec: from %q to %q", rule, strings.Join(ruleSpec, " "))
 
 	return ruleSpec
 }
