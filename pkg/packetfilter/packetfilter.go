@@ -19,12 +19,16 @@ limitations under the License.
 package packetfilter
 
 import (
+	"strings"
+
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var logger = log.Logger{Logger: logf.Log.WithName("Packetfilter")}
+
+const unknown = "???"
 
 const (
 	TableTypeFilter TableType = iota
@@ -33,6 +37,19 @@ const (
 )
 
 type TableType uint32
+
+func (t TableType) String() string {
+	switch t {
+	case TableTypeFilter:
+		return "Filter"
+	case TableTypeRoute:
+		return "Route"
+	case TableTypeNAT:
+		return "NAT"
+	}
+
+	return unknown
+}
 
 type RuleAction uint32
 
@@ -45,6 +62,25 @@ const (
 	RuleActionDNAT
 )
 
+func (r RuleAction) String() string {
+	switch r {
+	case RuleActionJump:
+		return "Jump"
+	case RuleActionAccept:
+		return "Accept"
+	case RuleActionMss:
+		return "MSS"
+	case RuleActionMark:
+		return "Mark"
+	case RuleActionSNAT:
+		return "SNAT"
+	case RuleActionDNAT:
+		return "DNAT"
+	}
+
+	return unknown
+}
+
 type RuleProto uint32
 
 const (
@@ -55,6 +91,23 @@ const (
 	RuleProtoICMP
 )
 
+func (r RuleProto) String() string {
+	switch r {
+	case RuleProtoUndefined:
+		return "Undefined"
+	case RuleProtoAll:
+		return "All"
+	case RuleProtoTCP:
+		return "TCP"
+	case RuleProtoUDP:
+		return "UDP"
+	case RuleProtoICMP:
+		return "ICMP"
+	}
+
+	return unknown
+}
+
 type MssClampType uint32
 
 const (
@@ -62,6 +115,19 @@ const (
 	ToPMTU
 	ToValue
 )
+
+func (m MssClampType) String() string {
+	switch m {
+	case UndefinedMSS:
+		return "Undefined"
+	case ToPMTU:
+		return "ToPMTU"
+	case ToValue:
+		return "ToValue"
+	}
+
+	return unknown
+}
 
 type ChainHook uint32
 
@@ -73,12 +139,40 @@ const (
 	ChainHookPostrouting
 )
 
+func (c ChainHook) String() string {
+	switch c {
+	case ChainHookPrerouting:
+		return "PreRouting"
+	case ChainHookInput:
+		return "Input"
+	case ChainHookForward:
+		return "Forward"
+	case ChainHookOutput:
+		return "Output"
+	case ChainHookPostrouting:
+		return "PostRouting"
+	}
+
+	return unknown
+}
+
 type ChainPriority uint32
 
 const (
 	ChainPriorityFirst ChainPriority = iota
 	ChainPriorityLast
 )
+
+func (c ChainPriority) String() string {
+	switch c {
+	case ChainPriorityFirst:
+		return "First"
+	case ChainPriorityLast:
+		return "Last"
+	}
+
+	return unknown
+}
 
 type ChainType uint32
 
@@ -88,12 +182,36 @@ const (
 	ChainTypeNAT
 )
 
+func (c ChainType) String() string {
+	switch c {
+	case ChainTypeFilter:
+		return "Filter"
+	case ChainTypeRoute:
+		return "Route"
+	case ChainTypeNAT:
+		return "NAT"
+	}
+
+	return unknown
+}
+
 type ChainPolicy uint32
 
 const (
-	ChainPolicyAccept ChainType = iota
+	ChainPolicyAccept ChainPolicy = iota
 	ChainPolicyDrop
 )
+
+func (c ChainPolicy) String() string {
+	switch c {
+	case ChainPolicyAccept:
+		return "Accept"
+	case ChainPolicyDrop:
+		return "Drop"
+	}
+
+	return unknown
+}
 
 type Rule struct {
 	DestCIDR string
@@ -211,4 +329,85 @@ func New() (Interface, error) {
 	}
 
 	return &Adapter{Driver: driver}, nil
+}
+
+func (r *Rule) String() string {
+	b := strings.Builder{}
+
+	b.WriteString("packetfilter.Rule{Action: ")
+	b.WriteString(r.Action.String())
+
+	if r.Proto != RuleProtoUndefined {
+		b.WriteString(", Proto: ")
+		b.WriteString(r.Proto.String())
+	}
+
+	if r.ClampType != UndefinedMSS {
+		b.WriteString(", ClampType: ")
+		b.WriteString(r.ClampType.String())
+	}
+
+	if r.SrcCIDR != "" {
+		b.WriteString(", SrcCIDR: ")
+		b.WriteString(r.SrcCIDR)
+	}
+
+	if r.DestCIDR != "" {
+		b.WriteString(", DestCIDR: ")
+		b.WriteString(r.DestCIDR)
+	}
+
+	if r.SnatCIDR != "" {
+		b.WriteString(", SnatCIDR: ")
+		b.WriteString(r.SnatCIDR)
+	}
+
+	if r.DnatCIDR != "" {
+		b.WriteString(", DnatCIDR: ")
+		b.WriteString(r.DnatCIDR)
+	}
+
+	if r.SrcSetName != "" {
+		b.WriteString(", SrcSetName: ")
+		b.WriteString(r.SrcSetName)
+	}
+
+	if r.DestSetName != "" {
+		b.WriteString(", DestSetName: ")
+		b.WriteString(r.DestSetName)
+	}
+
+	if r.OutInterface != "" {
+		b.WriteString(", OutInterface: ")
+		b.WriteString(r.OutInterface)
+	}
+
+	if r.InInterface != "" {
+		b.WriteString(", InInterface: ")
+		b.WriteString(r.InInterface)
+	}
+
+	if r.DPort != "" {
+		b.WriteString(", DPort: ")
+		b.WriteString(r.DPort)
+	}
+
+	if r.MarkValue != "" {
+		b.WriteString(", MarkValue: ")
+		b.WriteString(r.MarkValue)
+	}
+
+	if r.MssValue != "" {
+		b.WriteString(", MssValue: ")
+		b.WriteString(r.MssValue)
+	}
+
+	if r.TargetChain != "" {
+		b.WriteString(", TargetChain: ")
+		b.WriteString(r.TargetChain)
+	}
+
+	b.WriteByte('}')
+
+	return b.String()
 }
