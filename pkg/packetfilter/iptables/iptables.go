@@ -62,6 +62,12 @@ var (
 	logger = log.Logger{Logger: logf.Log.WithName("IPTables")}
 )
 
+type RuleSpec []string
+
+func (r RuleSpec) String() string {
+	return strings.Join(r, " ")
+}
+
 type packetFilter struct {
 	ipt        *iptables.IPTables
 	ipSetIface ipset.Interface
@@ -88,14 +94,8 @@ func (p *packetFilter) ChainExists(table packetfilter.TableType, chain string) (
 
 func (p *packetFilter) AppendUnique(table packetfilter.TableType, chain string, rule *packetfilter.Rule) error {
 	ruleSpec := ToRuleSpec(rule)
-
-	err := p.ipt.AppendUnique(tableTypeToStr[table], chain, ruleSpec...)
-	if err != nil {
-		return errors.Wrapf(err, "AppendUnique failed for table %q, chain %q, rule %q", tableTypeToStr[table], chain,
-			strings.Join(ruleSpec, " "))
-	}
-
-	return nil
+	return errors.Wrapf(p.ipt.AppendUnique(tableTypeToStr[table], chain, ruleSpec...), "AppendUnique failed for table %q, chain %q, rule %q",
+		tableTypeToStr[table], chain, ruleSpec)
 }
 
 func (p *packetFilter) CreateIPHookChainIfNotExists(chain *packetfilter.ChainIPHook) error {
@@ -118,7 +118,7 @@ func (p *packetFilter) CreateIPHookChainIfNotExists(chain *packetfilter.ChainIPH
 		ruleSpec := ToRuleSpec(jumpRule)
 		if err := p.ipt.InsertUnique(table, chainHookToStr[chain.Hook], 1, ruleSpec...); err != nil {
 			return errors.Wrapf(err, "error creating IP hook chain %q for table %q, InsertUnique failed for rule: %q",
-				chainHookToStr[chain.Hook], table, strings.Join(ruleSpec, " "))
+				chainHookToStr[chain.Hook], table, ruleSpec)
 		}
 	} else {
 		if err := p.AppendUnique(tableType, chainHookToStr[chain.Hook], jumpRule); err != nil {
@@ -174,12 +174,7 @@ func (p *packetFilter) Delete(table packetfilter.TableType, chain string, rule *
 		return nil
 	}
 
-	if err != nil {
-		return errors.Wrapf(err, "error deleting rule %q from table %q, chain %q", strings.Join(ruleSpec, " "),
-			tableTypeToStr[table], chain)
-	}
-
-	return nil
+	return errors.Wrapf(err, "error deleting rule %q from table %q, chain %q", ruleSpec, tableTypeToStr[table], chain)
 }
 
 func (p *packetFilter) List(table packetfilter.TableType, chain string) ([]*packetfilter.Rule, error) {
@@ -204,26 +199,14 @@ func (p *packetFilter) List(table packetfilter.TableType, chain string) ([]*pack
 
 func (p *packetFilter) Insert(table packetfilter.TableType, chain string, pos int, rule *packetfilter.Rule) error {
 	ruleSpec := ToRuleSpec(rule)
-
-	err := p.ipt.Insert(tableTypeToStr[table], chain, pos, ruleSpec...)
-	if err != nil {
-		return errors.Wrapf(err, "Insert failed for table %q, chain %q, rule %q", tableTypeToStr[table], chain,
-			strings.Join(ruleSpec, " "))
-	}
-
-	return nil
+	return errors.Wrapf(p.ipt.Insert(tableTypeToStr[table], chain, pos, ruleSpec...), "Insert failed for table %q, chain %q, rule %q",
+		tableTypeToStr[table], chain, ruleSpec)
 }
 
 func (p *packetFilter) Append(table packetfilter.TableType, chain string, rule *packetfilter.Rule) error {
 	ruleSpec := ToRuleSpec(rule)
-
-	err := p.ipt.Append(tableTypeToStr[table], chain, ToRuleSpec(rule)...)
-	if err != nil {
-		return errors.Wrapf(err, "Append failed for table %q, chain %q, rule %q", tableTypeToStr[table], chain,
-			strings.Join(ruleSpec, " "))
-	}
-
-	return nil
+	return errors.Wrapf(p.ipt.Append(tableTypeToStr[table], chain, ruleSpec...), "Append failed for table %q, chain %q, rule %q",
+		tableTypeToStr[table], chain, ruleSpec)
 }
 
 func (p *packetFilter) createChainIfNotExists(tableType packetfilter.TableType, chain string) error {
@@ -241,7 +224,7 @@ func (p *packetFilter) createChainIfNotExists(tableType packetfilter.TableType, 
 	return errors.Wrapf(p.ipt.NewChain(table, chain), "error creating IP table chain %q for table %q", table, chain)
 }
 
-func protoToRuleSpec(ruleSpec *[]string, proto packetfilter.RuleProto) {
+func protoToRuleSpec(ruleSpec *RuleSpec, proto packetfilter.RuleProto) {
 	switch proto {
 	case packetfilter.RuleProtoUDP:
 		*ruleSpec = append(*ruleSpec, "-p", "udp", "-m", "udp")
@@ -255,7 +238,7 @@ func protoToRuleSpec(ruleSpec *[]string, proto packetfilter.RuleProto) {
 	}
 }
 
-func mssClampToRuleSpec(ruleSpec *[]string, clampType packetfilter.MssClampType, mssValue string) {
+func mssClampToRuleSpec(ruleSpec *RuleSpec, clampType packetfilter.MssClampType, mssValue string) {
 	switch clampType {
 	case packetfilter.UndefinedMSS:
 	case packetfilter.ToPMTU:
@@ -265,7 +248,7 @@ func mssClampToRuleSpec(ruleSpec *[]string, clampType packetfilter.MssClampType,
 	}
 }
 
-func setToRuleSpec(ruleSpec *[]string, srcSetName, destSetName string) {
+func setToRuleSpec(ruleSpec *RuleSpec, srcSetName, destSetName string) {
 	if srcSetName != "" {
 		*ruleSpec = append(*ruleSpec, "-m", "set", "--match-set", srcSetName, "src")
 	}
@@ -275,8 +258,8 @@ func setToRuleSpec(ruleSpec *[]string, srcSetName, destSetName string) {
 	}
 }
 
-func ToRuleSpec(rule *packetfilter.Rule) []string {
-	var ruleSpec []string
+func ToRuleSpec(rule *packetfilter.Rule) RuleSpec {
+	var ruleSpec RuleSpec
 	protoToRuleSpec(&ruleSpec, rule.Proto)
 
 	if rule.SrcCIDR != "" {
@@ -325,7 +308,7 @@ func ToRuleSpec(rule *packetfilter.Rule) []string {
 		ruleSpec = append(ruleSpec, "--set-mark", rule.MarkValue)
 	}
 
-	logger.V(log.TRACE).Infof("ToRuleSpec: from %q to %q", rule, strings.Join(ruleSpec, " "))
+	logger.V(log.TRACE).Infof("ToRuleSpec: from %q to %q", rule, ruleSpec)
 
 	return ruleSpec
 }
