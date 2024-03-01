@@ -13,7 +13,7 @@ jobs:
     steps:
       - name: Get PR commits
         id: 'get-pr-commits'
-        uses: tim-actions/get-pr-commits@3efc1387ead42029a0d488ab98f24b7452dc3cde
+        uses: tim-actions/get-pr-commits@198af03565609bb4ed924d1260247b4881f09e7d
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -137,11 +137,11 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@b7bf0a3ed3ecfa44160715d7c442788f65f0f923
+        uses: github/codeql-action/init@8a470fddafa5cbb6266ee11b37ef4d8aae19c571
         with:
           languages: go
       - name: Run CodeQL variant analysis
-        uses: github/codeql-action/analyze@b7bf0a3ed3ecfa44160715d7c442788f65f0f923
+        uses: github/codeql-action/analyze@8a470fddafa5cbb6266ee11b37ef4d8aae19c571
       - name: Show CodeQL scan SARIF report
         if: always()
         run: cat ../results/go.sarif
@@ -164,7 +164,7 @@ jobs:
         run: cat ${{ steps.scan.outputs.sarif }}
       - name: Upload Anchore scan SARIF report
         if: always()
-        uses: github/codeql-action/upload-sarif@b7bf0a3ed3ecfa44160715d7c442788f65f0f923
+        uses: github/codeql-action/upload-sarif@8a470fddafa5cbb6266ee11b37ef4d8aae19c571
         with:
           sarif_file: ${{ steps.scan.outputs.sarif }}
 
