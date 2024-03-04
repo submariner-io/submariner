@@ -19,6 +19,7 @@ limitations under the License.
 package iptables_test
 
 import (
+	"flag"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -27,6 +28,10 @@ import (
 )
 
 var _ = BeforeSuite(func() {
+	flags := flag.NewFlagSet("kzerolog", flag.ExitOnError)
+	kzerolog.AddFlags(flags)
+	_ = flags.Parse([]string{"-v=4"})
+
 	kzerolog.InitK8sLogging()
 })
 

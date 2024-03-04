@@ -98,8 +98,7 @@ var _ = Describe("Rule conversion", func() {
 })
 
 func testRuleConversion(rule *packetfilter.Rule) {
-	spec, err := iptables.ToRuleSpec(rule)
-	Expect(err).To(Succeed())
+	spec := iptables.ToRuleSpec(rule)
 
 	parsed := iptables.FromRuleSpec(spec)
 	Expect(parsed).To(Equal(rule))
