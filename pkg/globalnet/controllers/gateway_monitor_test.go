@@ -88,7 +88,7 @@ var _ = Describe("Endpoint monitoring", func() {
 
 			It("should stop and restart the controllers", func() {
 				t.leaderElection.AwaitLeaseReleased()
-				t.awaitNoGlobalnetChains()
+				t.awaitGlobalnetChainsCleared()
 				t.ensureControllersStopped()
 
 				By("Recreating the Endpoint")
@@ -167,7 +167,7 @@ var _ = Describe("Endpoint monitoring", func() {
 
 					Expect(t.endpoints.Delete(context.TODO(), endpoint.Name, metav1.DeleteOptions{})).To(Succeed())
 
-					t.awaitNoGlobalnetChains()
+					t.awaitGlobalnetChainsCleared()
 				})
 			})
 		})
@@ -304,14 +304,19 @@ func (t *gatewayMonitorTestDriver) ensureControllersStopped() {
 func (t *gatewayMonitorTestDriver) awaitGlobalnetChains() {
 	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetIngressChain)
 	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChain)
+	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForPods)
+	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForHeadlessSvcPods)
+	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForHeadlessSvcEPs)
+	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForNamespace)
+	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForCluster)
 	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, routeAgent.SmPostRoutingChain)
 	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain)
 }
 
-func (t *gatewayMonitorTestDriver) awaitNoGlobalnetChains() {
-	t.pFilter.AwaitNoChain(packetfilter.TableTypeNAT, constants.SmGlobalnetIngressChain)
-	t.pFilter.AwaitNoChain(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChain)
-	t.pFilter.AwaitNoChain(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain)
+func (t *gatewayMonitorTestDriver) awaitGlobalnetChainsCleared() {
+	t.pFilter.AwaitNoRules(packetfilter.TableTypeNAT, constants.SmGlobalnetIngressChain)
+	t.pFilter.AwaitNoRules(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChain)
+	t.pFilter.AwaitNoRules(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain)
 }
 
 func newEndpointSpec(clusterID, hostname, subnet string) *submarinerv1.EndpointSpec {
