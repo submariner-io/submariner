@@ -505,6 +505,7 @@ func newGlobalIngressIPControllerDriver() *globalIngressIPControllerTestDriver {
 
 	BeforeEach(func() {
 		t.testDriverBase = newTestDriverBase()
+		t.testDriverBase.initChains()
 
 		var err error
 

@@ -176,6 +176,7 @@ func newServiceControllerTestDriver() *serviceControllerTestDriver {
 
 	BeforeEach(func() {
 		t.testDriverBase = newTestDriverBase()
+		t.testDriverBase.initChains()
 	})
 
 	JustBeforeEach(func() {

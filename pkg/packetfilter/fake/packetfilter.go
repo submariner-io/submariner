@@ -21,6 +21,7 @@ package fake
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 
 	. "github.com/onsi/gomega"
@@ -32,7 +33,6 @@ import (
 type PacketFilter struct {
 	mutex                    sync.Mutex
 	chainRules               map[string]set.Set[string]
-	tableChains              map[uint32]set.Set[string]
 	failOnAppendRuleMatchers []interface{}
 	failOnDeleteRuleMatchers []interface{}
 
@@ -45,9 +45,8 @@ type PacketFilter struct {
 
 func New() *PacketFilter {
 	pf := &PacketFilter{
-		chainRules:  map[string]set.Set[string]{},
-		tableChains: map[uint32]set.Set[string]{},
-		sets:        map[string]set.Set[string]{},
+		chainRules: map[string]set.Set[string]{},
+		sets:       map[string]set.Set[string]{},
 	}
 
 	packetfilter.SetNewDriverFn(func() (packetfilter.Driver, error) {
@@ -89,10 +88,12 @@ func (i *PacketFilter) ClearChain(table packetfilter.TableType, chain string) er
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	chainSet := i.tableChains[uint32(table)]
-	if chainSet != nil {
-		chainSet.Delete(chain)
+	ruleSet := i.chainRules[chainKey(uint32(table), chain)]
+	if ruleSet == nil {
+		return fmt.Errorf("chain %q for table %q does not exist", chain, table)
 	}
+
+	ruleSet.Clear()
 
 	return nil
 }
@@ -165,7 +166,7 @@ func (i *PacketFilter) delete(table packetfilter.TableType, chain, rulespec stri
 		return err
 	}
 
-	ruleSet := i.chainRules[fmt.Sprintf("%v/%s", table, chain)]
+	ruleSet := i.chainRules[chainKey(uint32(table), chain)]
 	if ruleSet != nil {
 		ruleSet.Delete(rulespec)
 	}
@@ -177,23 +178,26 @@ func (i *PacketFilter) deleteChain(table uint32, chain string) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	chainSet := i.tableChains[table]
-	if chainSet != nil {
-		chainSet.Delete(chain)
-	}
+	delete(i.chainRules, chainKey(table, chain))
 }
 
 func (i *PacketFilter) addChainsFor(table uint32, chains ...string) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	chainSet := i.tableChains[table]
-	if chainSet == nil {
-		chainSet = set.New[string]()
-		i.tableChains[table] = chainSet
-	}
+	for _, chain := range chains {
+		key := chainKey(table, chain)
 
-	chainSet.Insert(chains...)
+		ruleSet := i.chainRules[key]
+		if ruleSet == nil {
+			ruleSet = set.New[string]()
+			i.chainRules[key] = ruleSet
+		}
+	}
+}
+
+func chainKey(table uint32, chain string) string {
+	return fmt.Sprintf("%v/%s", table, chain)
 }
 
 func (i *PacketFilter) addRule(table packetfilter.TableType, chain, rulespec string) error {
@@ -205,10 +209,9 @@ func (i *PacketFilter) addRule(table packetfilter.TableType, chain, rulespec str
 		return err
 	}
 
-	ruleSet := i.chainRules[fmt.Sprintf("%v/%s", table, chain)]
+	ruleSet := i.chainRules[chainKey(uint32(table), chain)]
 	if ruleSet == nil {
-		ruleSet = set.New[string]()
-		i.chainRules[fmt.Sprintf("%v/%s", table, chain)] = ruleSet
+		return fmt.Errorf("chain %q for table %q does not exist", chain, table)
 	}
 
 	ruleSet.Insert(rulespec)
@@ -220,7 +223,7 @@ func (i *PacketFilter) listRules(table packetfilter.TableType, chain string) []s
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	rules := i.chainRules[fmt.Sprintf("%v/%s", table, chain)]
+	rules := i.chainRules[chainKey(uint32(table), chain)]
 	if rules != nil {
 		return rules.UnsortedList()
 	}
@@ -232,24 +235,23 @@ func (i *PacketFilter) listChains(table packetfilter.TableType) []string {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	chains := i.tableChains[uint32(table)]
-	if chains != nil {
-		return chains.UnsortedList()
+	var chains []string
+	tableKey := chainKey(uint32(table), "")
+
+	for k := range i.chainRules {
+		if strings.HasPrefix(k, tableKey) {
+			chains = append(chains, k[len(tableKey):])
+		}
 	}
 
-	return []string{}
+	return chains
 }
 
 func (i *PacketFilter) chainExists(table uint32, chain string) (bool, error) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	chainSet := i.tableChains[table]
-	if chainSet != nil {
-		return chainSet.Has(chain), nil
-	}
-
-	return false, nil
+	return i.chainRules[chainKey(table, chain)] != nil, nil
 }
 
 func matchRuleForError(matchers *[]interface{}, rulespec string) error {
@@ -288,6 +290,12 @@ func (i *PacketFilter) AwaitNoRule(table packetfilter.TableType, chain string, s
 	Eventually(func() []string {
 		return i.listRules(table, chain)
 	}, 5).ShouldNot(ContainElement(stringOrMatcher), "Rules for IP table %v, chain %q", table, chain)
+}
+
+func (i *PacketFilter) AwaitNoRules(table packetfilter.TableType, chain string) {
+	Eventually(func() []string {
+		return i.listRules(table, chain)
+	}, 5).Should(BeEmpty())
 }
 
 func (i *PacketFilter) AddFailOnAppendRuleMatcher(stringOrMatcher interface{}) {

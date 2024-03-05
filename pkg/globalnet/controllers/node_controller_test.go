@@ -174,6 +174,7 @@ func newNodeControllerTestDriver() *nodeControllerTestDriver {
 
 	BeforeEach(func() {
 		t.testDriverBase = newTestDriverBase()
+		t.testDriverBase.initChains()
 
 		var err error
 

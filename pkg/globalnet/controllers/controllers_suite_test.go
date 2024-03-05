@@ -142,6 +142,24 @@ func (t *testDriverBase) afterEach() {
 	t.controller.Stop()
 }
 
+func (t *testDriverBase) initChains() {
+	for _, chain := range []string{
+		constants.SmGlobalnetIngressChain,
+		constants.SmGlobalnetEgressChain,
+		constants.SmGlobalnetEgressChainForPods,
+		constants.SmGlobalnetEgressChainForHeadlessSvcPods,
+		constants.SmGlobalnetEgressChainForHeadlessSvcEPs,
+		constants.SmGlobalnetEgressChainForNamespace,
+		constants.SmGlobalnetEgressChainForCluster,
+		routeAgent.SmPostRoutingChain,
+		constants.SmGlobalnetMarkChain,
+	} {
+		Expect(t.pFilter.CreateChainIfNotExists(packetfilter.TableTypeNAT, &packetfilter.Chain{
+			Name: chain,
+		})).To(Succeed())
+	}
+}
+
 func (t *testDriverBase) verifyIPsReservedInPool(ips ...string) {
 	if t.pool == nil {
 		return
