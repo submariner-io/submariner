@@ -21,6 +21,7 @@ package fake
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 
@@ -32,7 +33,7 @@ import (
 
 type PacketFilter struct {
 	mutex                    sync.Mutex
-	chainRules               map[string]set.Set[string]
+	chainRules               map[string][]string
 	failOnAppendRuleMatchers []interface{}
 	failOnDeleteRuleMatchers []interface{}
 
@@ -45,7 +46,7 @@ type PacketFilter struct {
 
 func New() *PacketFilter {
 	pf := &PacketFilter{
-		chainRules: map[string]set.Set[string]{},
+		chainRules: map[string][]string{},
 		sets:       map[string]set.Set[string]{},
 	}
 
@@ -61,7 +62,7 @@ func (i *PacketFilter) ChainExists(table packetfilter.TableType, chain string) (
 }
 
 func (i *PacketFilter) AppendUnique(table packetfilter.TableType, chain string, rule *packetfilter.Rule) error {
-	return i.addRule(table, chain, toRuleString(rule))
+	return i.addRule(table, chain, -1, toRuleString(rule))
 }
 
 func (i *PacketFilter) CreateIPHookChainIfNotExists(chain *packetfilter.ChainIPHook) error {
@@ -73,27 +74,24 @@ func (i *PacketFilter) CreateChainIfNotExists(table packetfilter.TableType, chai
 }
 
 func (i *PacketFilter) DeleteIPHookChain(chain *packetfilter.ChainIPHook) error {
-	i.deleteChain(uint32(chain.Type), chain.Name)
-
-	return nil
+	return i.deleteChain(uint32(chain.Type), chain.Name)
 }
 
 func (i *PacketFilter) DeleteChain(table packetfilter.TableType, chain string) error {
-	i.deleteChain(uint32(table), chain)
-
-	return nil
+	return i.deleteChain(uint32(table), chain)
 }
 
 func (i *PacketFilter) ClearChain(table packetfilter.TableType, chain string) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	ruleSet := i.chainRules[chainKey(uint32(table), chain)]
-	if ruleSet == nil {
+	key := chainKey(uint32(table), chain)
+
+	if i.chainRules[key] == nil {
 		return fmt.Errorf("chain %q for table %q does not exist", chain, table)
 	}
 
-	ruleSet.Clear()
+	i.chainRules[key] = []string{}
 
 	return nil
 }
@@ -135,11 +133,15 @@ func (i *PacketFilter) List(table packetfilter.TableType, chain string) ([]*pack
 }
 
 func (i *PacketFilter) Append(table packetfilter.TableType, chain string, rule *packetfilter.Rule) error {
-	return i.addRule(table, chain, toRuleString(rule))
+	return i.addRule(table, chain, -1, toRuleString(rule))
 }
 
-func (i *PacketFilter) Insert(table packetfilter.TableType, chain string, _ int, rule *packetfilter.Rule) error {
-	return i.addRule(table, chain, toRuleString(rule))
+func (i *PacketFilter) Insert(table packetfilter.TableType, chain string, pos int, rule *packetfilter.Rule) error {
+	if pos < 0 {
+		return fmt.Errorf("invalid position %d for insert", pos)
+	}
+
+	return i.addRule(table, chain, pos, toRuleString(rule))
 }
 
 func (i *PacketFilter) createChainIfNotExists(table uint32, chain string) error {
@@ -157,28 +159,38 @@ func (i *PacketFilter) createChainIfNotExists(table uint32, chain string) error 
 	return nil
 }
 
-func (i *PacketFilter) delete(table packetfilter.TableType, chain, rulespec string) error {
+func (i *PacketFilter) delete(table packetfilter.TableType, chain, ruleSpec string) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	err := matchRuleForError(&i.failOnDeleteRuleMatchers, rulespec)
+	err := matchRuleForError(&i.failOnDeleteRuleMatchers, ruleSpec)
 	if err != nil {
 		return err
 	}
 
-	ruleSet := i.chainRules[chainKey(uint32(table), chain)]
-	if ruleSet != nil {
-		ruleSet.Delete(rulespec)
-	}
+	key := chainKey(uint32(table), chain)
+
+	i.chainRules[key] = slices.DeleteFunc(i.chainRules[key], func(e string) bool {
+		return e == ruleSpec
+	})
 
 	return nil
 }
 
-func (i *PacketFilter) deleteChain(table uint32, chain string) {
+func (i *PacketFilter) deleteChain(table uint32, chain string) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	delete(i.chainRules, chainKey(table, chain))
+	key := chainKey(table, chain)
+
+	rules := i.chainRules[key]
+	if len(rules) > 0 {
+		return fmt.Errorf("cannot delete chain %q for table %q - %d rules remain", chain, table, len(rules))
+	}
+
+	delete(i.chainRules, key)
+
+	return nil
 }
 
 func (i *PacketFilter) addChainsFor(table uint32, chains ...string) {
@@ -188,10 +200,8 @@ func (i *PacketFilter) addChainsFor(table uint32, chains ...string) {
 	for _, chain := range chains {
 		key := chainKey(table, chain)
 
-		ruleSet := i.chainRules[key]
-		if ruleSet == nil {
-			ruleSet = set.New[string]()
-			i.chainRules[key] = ruleSet
+		if i.chainRules[key] == nil {
+			i.chainRules[key] = []string{}
 		}
 	}
 }
@@ -200,21 +210,32 @@ func chainKey(table uint32, chain string) string {
 	return fmt.Sprintf("%v/%s", table, chain)
 }
 
-func (i *PacketFilter) addRule(table packetfilter.TableType, chain, rulespec string) error {
+func (i *PacketFilter) addRule(table packetfilter.TableType, chain string, pos int, ruleSpec string) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	err := matchRuleForError(&i.failOnAppendRuleMatchers, rulespec)
+	err := matchRuleForError(&i.failOnAppendRuleMatchers, ruleSpec)
 	if err != nil {
 		return err
 	}
 
-	ruleSet := i.chainRules[chainKey(uint32(table), chain)]
-	if ruleSet == nil {
+	key := chainKey(uint32(table), chain)
+
+	rules := i.chainRules[key]
+	if rules == nil {
 		return fmt.Errorf("chain %q for table %q does not exist", chain, table)
 	}
 
-	ruleSet.Insert(rulespec)
+	if pos < 0 {
+		i.chainRules[key] = append(i.chainRules[key], ruleSpec)
+		return nil
+	}
+
+	if pos > len(rules)+1 {
+		return fmt.Errorf("position %d is too large for the number of rules %d", pos, len(rules))
+	}
+
+	i.chainRules[key] = slices.Insert(rules, pos-1, ruleSpec)
 
 	return nil
 }
@@ -224,11 +245,10 @@ func (i *PacketFilter) listRules(table packetfilter.TableType, chain string) []s
 	defer i.mutex.Unlock()
 
 	rules := i.chainRules[chainKey(uint32(table), chain)]
-	if rules != nil {
-		return rules.UnsortedList()
-	}
+	ret := make([]string, len(rules))
+	copy(ret, rules)
 
-	return []string{}
+	return ret
 }
 
 func (i *PacketFilter) listChains(table packetfilter.TableType) []string {
