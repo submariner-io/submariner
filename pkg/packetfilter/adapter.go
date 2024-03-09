@@ -25,8 +25,65 @@ import (
 	level "github.com/submariner-io/admiral/pkg/log"
 )
 
-func (a *Adapter) PrependUnique(table TableType, chain string, ruleSpec *Rule) error {
-	return a.InsertUnique(table, chain, 1, ruleSpec)
+func (a *Adapter) PrependUnique(table TableType, chain string, rules ...*Rule) error {
+	// Submariner requires certain rules to be programmed at the beginning of a chain so that we can preserve the sourceIP for
+	// inter-cluster traffic and avoid K8s SDN making changes to the traffic. Sometimes after we program a rule at the
+	// beginning of the chain, K8s SDN might insert some new rules ahead of the rule that we programmed. In such cases,
+	// the rule that we programmed will not be the first rule to hit and Submariner behavior might get affected. So, we
+	// query the rules in the chain to see if a rule slipped its position, and, if so, delete all such occurrences and then
+	// re-insert the rule at the beginning of the chain.
+	existingRules, err := a.List(table, chain)
+	if err != nil {
+		return err
+	}
+
+	for i, rule := range rules {
+		err := a.ensureRuleAtPosition(table, chain, existingRules, i+1, rule)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (a *Adapter) ensureRuleAtPosition(table TableType, chain string, existingRules []*Rule, position int, rule *Rule) error {
+	isPresentAtRequiredPosition := false
+	numOccurrences := 0
+
+	for i, existing := range existingRules {
+		if *existing == *rule {
+			numOccurrences++
+
+			if i == position-1 {
+				isPresentAtRequiredPosition = true
+			} else {
+				logger.V(level.TRACE).Infof("Rule %q in table %q, chain %q is at position %d, not %d", rule, table, chain, i+1, position)
+			}
+		}
+	}
+
+	// The required rule is present in the chain, but either there are multiple occurrences or it's not at the desired position.
+	if numOccurrences > 1 || !isPresentAtRequiredPosition {
+		for i := 0; i < numOccurrences; i++ {
+			logger.V(level.TRACE).Infof("Deleting misplaced occurrence of rule %q from table %q, chain %q", rule, table, chain)
+
+			if err := a.Delete(table, chain, rule); err != nil {
+				return err
+			}
+		}
+	}
+
+	// The required rule is present only once and is at the desired position.
+	if numOccurrences == 1 && isPresentAtRequiredPosition {
+		logger.V(level.TRACE).Infof("Rule %q already exists in table %q, chain %q at position %d - not inserting", rule, table,
+			chain, position)
+		return nil
+	}
+
+	logger.V(level.TRACE).Infof("Inserting rule %q in table %q, chain %q at position %d", rule, table, chain, position)
+
+	return a.Insert(table, chain, position, rule)
 }
 
 func (a *Adapter) UpdateChainRules(table TableType, chain string, rules []*Rule) error {
@@ -73,43 +130,8 @@ func (a *Adapter) UpdateChainRules(table TableType, chain string, rules []*Rule)
 func (a *Adapter) InsertUnique(table TableType, chain string, position int, rule *Rule) error {
 	existingRules, err := a.List(table, chain)
 	if err != nil {
-		return errors.Wrapf(err, "error listing the rules in table %q, chain %q", table, chain)
+		return err
 	}
 
-	isPresentAtRequiredPosition := false
-	numOccurrences := 0
-
-	ruleString := fmt.Sprintf("%+v", rule)
-
-	for index, rule := range existingRules {
-		if ruleString == fmt.Sprintf("%+v", rule) {
-			logger.V(level.DEBUG).Infof("In %q table, rule \"%s\", exists at index %d.", table, ruleString, index)
-
-			numOccurrences++
-
-			if index == position {
-				isPresentAtRequiredPosition = true
-			}
-		}
-	}
-
-	// The required rule is present in the Chain, but either there are multiple occurrences or its
-	// not at the desired location
-	if numOccurrences > 1 || !isPresentAtRequiredPosition {
-		for i := 0; i < numOccurrences; i++ {
-			if err = a.Delete(table, chain, rule); err != nil {
-				return errors.Wrapf(err, "error deleting stale rule %q", ruleString)
-			}
-		}
-	}
-
-	// The required rule is present only once and is at the desired location
-	if numOccurrences == 1 && isPresentAtRequiredPosition {
-		logger.V(level.DEBUG).Infof("In %q table, rule \"%s\", already exists.", table, ruleString)
-		return nil
-	} else if err := a.Insert(table, chain, position, rule); err != nil {
-		return errors.Wrapf(err, "error inserting IP rule %q", ruleString)
-	}
-
-	return nil
+	return a.ensureRuleAtPosition(table, chain, existingRules, position, rule)
 }
