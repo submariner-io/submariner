@@ -450,7 +450,6 @@ func (g *gatewayMonitor) createGlobalNetMarkingChain() error {
 	return nil
 }
 
-//nolint:gocyclo // Lots of error checks, but simple logic
 func (g *gatewayMonitor) createGlobalnetChains() error {
 	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetIngressChain)
 
@@ -498,15 +497,6 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 		return err
 	}
 
-	ruleSpec = packetfilter.Rule{
-		TargetChain: constants.SmGlobalnetMarkChain,
-		Action:      packetfilter.RuleActionJump,
-	}
-
-	if err := g.pFilter.PrependUnique(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChain, &ruleSpec); err != nil {
-		logger.Errorf(err, "Error inserting iptables rule %+v", ruleSpec)
-	}
-
 	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForPods)
 
 	if err := g.pFilter.CreateChainIfNotExists(packetfilter.TableTypeNAT,
@@ -552,44 +542,32 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 		return errors.Wrapf(err, "error creating packetfilter chain %s", constants.SmGlobalnetEgressChainForCluster)
 	}
 
-	ruleSpec = packetfilter.Rule{
-		TargetChain: constants.SmGlobalnetEgressChainForPods,
-		Action:      packetfilter.RuleActionJump,
-	}
-	if err := g.pFilter.InsertUnique(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChain, 2, &ruleSpec); err != nil {
-		logger.Errorf(err, "Error inserting packetfilter rule %+v", ruleSpec)
-	}
-
-	ruleSpec = packetfilter.Rule{
-		TargetChain: constants.SmGlobalnetEgressChainForHeadlessSvcPods,
-		Action:      packetfilter.RuleActionJump,
-	}
-	if err := g.pFilter.InsertUnique(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChain, 3, &ruleSpec); err != nil {
-		logger.Errorf(err, "Error inserting packetfilter rule %+v", ruleSpec)
-	}
-
-	ruleSpec = packetfilter.Rule{
-		TargetChain: constants.SmGlobalnetEgressChainForHeadlessSvcEPs,
-		Action:      packetfilter.RuleActionJump,
-	}
-	if err := g.pFilter.InsertUnique(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChain, 4, &ruleSpec); err != nil {
-		logger.Errorf(err, "Error inserting packetfilter rule %+v", ruleSpec)
-	}
-
-	ruleSpec = packetfilter.Rule{
-		TargetChain: constants.SmGlobalnetEgressChainForNamespace,
-		Action:      packetfilter.RuleActionJump,
-	}
-	if err := g.pFilter.InsertUnique(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChain, 5, &ruleSpec); err != nil {
-		logger.Errorf(err, "Error inserting packetfilter rule %+v", ruleSpec)
-	}
-
-	ruleSpec = packetfilter.Rule{
-		TargetChain: constants.SmGlobalnetEgressChainForCluster,
-		Action:      packetfilter.RuleActionJump,
-	}
-	if err := g.pFilter.InsertUnique(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChain, 6, &ruleSpec); err != nil {
-		logger.Errorf(err, "Error inserting packetfilter rule %+v", ruleSpec)
+	if err := g.pFilter.PrependUnique(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChain,
+		&packetfilter.Rule{
+			TargetChain: constants.SmGlobalnetMarkChain,
+			Action:      packetfilter.RuleActionJump,
+		},
+		&packetfilter.Rule{
+			TargetChain: constants.SmGlobalnetEgressChainForPods,
+			Action:      packetfilter.RuleActionJump,
+		},
+		&packetfilter.Rule{
+			TargetChain: constants.SmGlobalnetEgressChainForHeadlessSvcPods,
+			Action:      packetfilter.RuleActionJump,
+		},
+		&packetfilter.Rule{
+			TargetChain: constants.SmGlobalnetEgressChainForHeadlessSvcEPs,
+			Action:      packetfilter.RuleActionJump,
+		},
+		&packetfilter.Rule{
+			TargetChain: constants.SmGlobalnetEgressChainForNamespace,
+			Action:      packetfilter.RuleActionJump,
+		},
+		&packetfilter.Rule{
+			TargetChain: constants.SmGlobalnetEgressChainForCluster,
+			Action:      packetfilter.RuleActionJump,
+		}); err != nil {
+		logger.Errorf(err, "error prepending rules to the %q chain", constants.SmGlobalnetEgressChain)
 	}
 
 	return nil
