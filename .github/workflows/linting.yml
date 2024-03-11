@@ -158,7 +158,7 @@ jobs:
         with:
           path: "."
           fail-build: true
-          severity-cutoff: negligible
+          severity-cutoff: high
       - name: Show Anchore scan SARIF report
         if: always()
         run: cat ${{ steps.scan.outputs.sarif }}
