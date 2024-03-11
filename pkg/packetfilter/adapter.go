@@ -19,8 +19,6 @@ limitations under the License.
 package packetfilter
 
 import (
-	"fmt"
-
 	"github.com/pkg/errors"
 	level "github.com/submariner-io/admiral/pkg/log"
 )
@@ -92,35 +90,34 @@ func (a *Adapter) UpdateChainRules(table TableType, chain string, rules []*Rule)
 		return errors.Wrapf(err, "error listing the rules in table %q, chain %q", table, chain)
 	}
 
-	existingRules := make(map[string]*Rule)
+	existingRules := make(map[Rule]struct{})
 	for _, existingRule := range currentRules {
-		existingRules[fmt.Sprintf("%+v", existingRule)] = existingRule
+		existingRules[*existingRule] = struct{}{}
 	}
 
 	for _, rule := range rules {
-		ruleString := fmt.Sprintf("%+v", rule)
-		_, ok := existingRules[ruleString]
+		_, ok := existingRules[*rule]
 
 		if ok {
-			delete(existingRules, ruleString)
+			delete(existingRules, *rule)
 		} else {
-			logger.V(level.DEBUG).Infof("Adding packetfilter rule in %q, %q: %q", table, chain, ruleString)
+			logger.V(level.TRACE).Infof("Adding rule %q to table %q, chain %q", rule, table, chain)
 
 			if err := a.Append(table, chain, rule); err != nil {
-				return errors.Wrapf(err, "error adding rule %q to %q, %q", ruleString, table, chain)
+				return errors.Wrapf(err, "rule %q from table %q, chain %q", rule, table, chain)
 			}
 		}
 	}
 
-	// remaining elements should not be there, remove them
-	for ruleStr, rule := range existingRules {
-		logger.V(level.DEBUG).Infof("Deleting stale packetfilter rule in %q, %q: %q", table, chain, ruleStr)
+	// Remaining elements should not be there, remove them
+	for rule := range existingRules {
+		logger.V(level.TRACE).Infof("Deleting stale rule %q from table %q, chain %q", &rule, table, chain)
 
-		if err := a.Delete(table, chain, rule); err != nil {
+		if err := a.Delete(table, chain, &rule); err != nil {
 			// Log and let go, as this is not a fatal error, or something that will make real harm,
 			// it's more harmful to keep retrying. At this point on next update deletion of stale rules
 			// will happen again
-			logger.Warningf("Unable to delete packetfilter entry from table %q, chain %q: %q", table, chain, ruleStr)
+			logger.Warningf("Unable to delete rule %q from table %q, chain %q: %v", &rule, table, chain, err)
 		}
 	}
 
