@@ -123,12 +123,3 @@ func (a *Adapter) UpdateChainRules(table TableType, chain string, rules []*Rule)
 
 	return nil
 }
-
-func (a *Adapter) InsertUnique(table TableType, chain string, position int, rule *Rule) error {
-	existingRules, err := a.List(table, chain)
-	if err != nil {
-		return err
-	}
-
-	return a.ensureRuleAtPosition(table, chain, existingRules, position, rule)
-}
