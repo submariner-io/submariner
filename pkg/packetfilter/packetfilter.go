@@ -303,8 +303,7 @@ type Driver interface {
 
 type Interface interface {
 	Driver
-	InsertUnique(table TableType, chain string, position int, ruleSpec *Rule) error
-	PrependUnique(table TableType, chain string, ruleSpec *Rule) error
+	PrependUnique(table TableType, chain string, rules ...*Rule) error
 	UpdateChainRules(table TableType, chain string, rules []*Rule) error
 }
 
