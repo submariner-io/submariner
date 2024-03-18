@@ -48,6 +48,7 @@ type Basic interface {
 	NeighDel(neigh *netlink.Neigh) error
 	RouteAdd(route *netlink.Route) error
 	RouteDel(route *netlink.Route) error
+	RouteReplace(route *netlink.Route) error
 	RouteGet(destination net.IP) ([]netlink.Route, error)
 	RouteList(link netlink.Link, family int) ([]netlink.Route, error)
 	FlushRouteTable(tableID int) error
@@ -138,6 +139,10 @@ func (n *netlinkType) RouteAdd(route *netlink.Route) error {
 
 func (n *netlinkType) RouteDel(route *netlink.Route) error {
 	return netlink.RouteDel(route)
+}
+
+func (n *netlinkType) RouteReplace(route *netlink.Route) error {
+	return netlink.RouteReplace(route)
 }
 
 func (n *netlinkType) RouteGet(destination net.IP) ([]netlink.Route, error) {

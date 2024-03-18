@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"reflect"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -217,11 +218,36 @@ func (n *basicType) NeighDel(neigh *netlink.Neigh) error {
 	return nil
 }
 
+//nolint:gocritic // Ignore hugeParam.
+func routeKey(r netlink.Route) string {
+	k := ""
+	if r.Gw != nil {
+		k = r.Gw.String()
+	}
+
+	if r.Dst != nil {
+		k += r.Dst.String()
+	}
+
+	if r.Src != nil {
+		k += r.Src.String()
+	}
+
+	k += strconv.Itoa(r.Table)
+
+	return k
+}
+
 func (n *basicType) RouteAdd(route *netlink.Route) error {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
-	n.routes[route.LinkIndex] = append(n.routes[route.LinkIndex], *route)
+	var added bool
+
+	n.routes[route.LinkIndex], added = slices.AppendIfNotPresent(n.routes[route.LinkIndex], *route, routeKey)
+	if !added {
+		return syscall.EEXIST
+	}
 
 	return nil
 }
@@ -233,10 +259,24 @@ func (n *basicType) RouteDel(route *netlink.Route) error {
 	routes := n.routes[route.LinkIndex]
 
 	for i := range routes {
-		if reflect.DeepEqual(routes[i], *route) {
+		if reflect.DeepEqual(routes[i].Dst, route.Dst) {
 			n.routes[route.LinkIndex] = append(routes[:i], routes[i+1:]...)
 			break
 		}
+	}
+
+	return nil
+}
+
+func (n *basicType) RouteReplace(route *netlink.Route) error {
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
+
+	index := slices.IndexOf(n.routes[route.LinkIndex], routeKey(*route), routeKey)
+	if index >= 0 {
+		n.routes[route.LinkIndex][index] = *route
+	} else {
+		n.routes[route.LinkIndex] = append(n.routes[route.LinkIndex], *route)
 	}
 
 	return nil

@@ -51,10 +51,10 @@ func (a *Adapter) RuleDelIfPresent(rule *netlink.Rule) error {
 }
 
 func (a *Adapter) RouteAddOrReplace(route *netlink.Route) error {
-	err := netlink.RouteAdd(route)
+	err := a.RouteAdd(route)
 
 	if errors.Is(err, syscall.EEXIST) {
-		err = netlink.RouteReplace(route)
+		err = a.RouteReplace(route)
 	}
 
 	return err
