@@ -33,6 +33,7 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/command"
 	"github.com/submariner-io/admiral/pkg/log"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
@@ -173,7 +174,7 @@ func retrieveActiveConnectionStats() (map[string]int, map[string]int, error) {
 	defer cancel()
 
 	// Retrieve active tunnels from the daemon
-	cmd := exec.CommandContext(ctx, "/usr/sbin/ipsec", "whack", "--trafficstatus")
+	cmd := command.New(exec.CommandContext(ctx, "/usr/sbin/ipsec", "whack", "--trafficstatus"))
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -319,7 +320,7 @@ func whack(args ...string) error {
 
 			logger.V(log.TRACE).Infof("Whacking with %v", args)
 
-			return cmd.Run() //nolint:wrapcheck // No need to wrap here
+			return command.New(cmd).Run() //nolint:wrapcheck // No need to wrap here
 		}()
 
 		if err == nil {

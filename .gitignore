@@ -8,7 +8,7 @@ output
 /vendor
 .project
 .settings
-*.coverprofile
+*coverprofile*
 junit.xml
 scripts/broker-info.subm*
 /Dockerfile.*
