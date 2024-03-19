@@ -34,10 +34,15 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
+type linkType struct {
+	netlink.Link
+	isSetup bool
+}
+
 type basicType struct {
 	mutex        sync.Mutex
 	linkIndices  map[string]int
-	links        map[string]netlink.Link
+	links        map[string]*linkType
 	routes       map[int][]netlink.Route
 	neighbors    map[int][]netlink.Neigh
 	rules        map[int][]netlink.Rule
@@ -66,7 +71,7 @@ func New() *NetLink {
 	return &NetLink{
 		Adapter: netlinkAPI.Adapter{Basic: &basicType{
 			linkIndices: map[string]int{},
-			links:       map[string]netlink.Link{},
+			links:       map[string]*linkType{},
 			routes:      map[int][]netlink.Route{},
 			neighbors:   map[int][]netlink.Neigh{},
 			rules:       map[int][]netlink.Rule{},
@@ -95,7 +100,7 @@ func (n *basicType) LinkAdd(link netlink.Link) error {
 	}
 
 	link.Attrs().Index = n.linkIndices[link.Attrs().Name]
-	n.links[link.Attrs().Name] = link
+	n.links[link.Attrs().Name] = &linkType{Link: link}
 
 	return nil
 }
@@ -118,10 +123,20 @@ func (n *basicType) LinkByName(name string) (netlink.Link, error) {
 		return nil, linkNotFoundError{}
 	}
 
-	return link, nil
+	return link.Link, nil
 }
 
-func (n *basicType) LinkSetUp(_ netlink.Link) error {
+func (n *basicType) LinkSetUp(link netlink.Link) error {
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
+
+	l, found := n.links[link.Attrs().Name]
+	if !found {
+		return linkNotFoundError{}
+	}
+
+	l.isSetup = true
+
 	return nil
 }
 
@@ -449,6 +464,22 @@ func (n *NetLink) AwaitNoLink(name string) {
 		_, err := n.LinkByName(name)
 		return errors.Is(err, netlink.LinkNotFoundError{})
 	}, 5).Should(BeTrue(), "Link %q exists", name)
+}
+
+func (n *NetLink) AwaitLinkSetup(name string) (link netlink.Link) {
+	Eventually(func() bool {
+		n.basic().mutex.Lock()
+		defer n.basic().mutex.Unlock()
+
+		link, found := n.basic().links[name]
+		if found {
+			return link.isSetup
+		}
+
+		return false
+	}, 5).Should(BeTrue(), "Link %q not setup", name)
+
+	return
 }
 
 func routeList[T any](n *NetLink, linkIndex, table int, f func(r *netlink.Route) *T) []T {
