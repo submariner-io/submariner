@@ -22,7 +22,6 @@ const (
 	VxLANIface         = "vx-submariner"
 	VxInterfaceWorker  = 0
 	VxInterfaceGateway = 1
-	VxLANOverhead      = 50
 
 	// Why VxLANVTepNetworkPrefix is 240?
 	// On VxLAN interfaces we need a unique IPAddress which does not collide with the
