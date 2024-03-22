@@ -44,7 +44,7 @@ const (
 
 const (
 	// TCP MSS = Default_Iface_MTU - TCP_H(20)-IP_H(20)-max_IpsecOverhed(80).
-	maxIpsecOverhead = 120
+	MaxIPSecOverhead = 120
 )
 
 type mtuHandler struct {
@@ -172,17 +172,11 @@ func (h *mtuHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 func (h *mtuHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 	subnets := extractIPv4Subnets(&endpoint.Spec)
 	for _, subnet := range subnets {
-		err := h.localIPSet.DelEntry(subnet)
-		if err != nil {
-			logger.Errorf(err, "Error deleting the subnet %q from the local IPSet", subnet)
-		}
+		logError(h.localIPSet.DelEntry(subnet), "Error deleting the subnet %q from the local IPSet", subnet)
 	}
 
 	for _, subnet := range h.localClusterCidr {
-		err := h.localIPSet.DelEntry(subnet)
-		if err != nil {
-			logger.Errorf(err, "Error deleting the subnet %q from the local IPSet", subnet)
-		}
+		logError(h.localIPSet.DelEntry(subnet), "Error deleting the subnet %q from the local IPSet", subnet)
 	}
 
 	return nil
@@ -203,10 +197,7 @@ func (h *mtuHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 func (h *mtuHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	subnets := extractIPv4Subnets(&endpoint.Spec)
 	for _, subnet := range subnets {
-		err := h.remoteIPSet.DelEntry(subnet)
-		if err != nil {
-			logger.Errorf(err, "Error deleting the subnet %q from the remote IPSet", subnet)
-		}
+		logError(h.remoteIPSet.DelEntry(subnet), "Error deleting the subnet %q from the remote IPSet", subnet)
 	}
 
 	return nil
@@ -235,36 +226,25 @@ func (h *mtuHandler) newNamedSetSet(key string) packetfilter.NamedSet {
 func (h *mtuHandler) Uninstall() error {
 	logger.Infof("Flushing packetfilter entries in %q chain of table type Route", constants.SmPostRoutingChain)
 
-	if err := h.pFilter.ClearChain(packetfilter.TableTypeRoute, constants.SmPostRoutingChain); err != nil {
-		logger.Errorf(err, "Error flushing chain %q of table type Route", constants.SmPostRoutingChain)
-	}
+	logError(h.pFilter.ClearChain(packetfilter.TableTypeRoute, constants.SmPostRoutingChain),
+		"Error flushing chain %q of table type Route", constants.SmPostRoutingChain)
 
 	logger.Infof("Deleting IPHook chain %q of table type Route", constants.SmPostRoutingChain)
 
-	if err := h.pFilter.DeleteIPHookChain(&packetfilter.ChainIPHook{
+	logError(h.pFilter.DeleteIPHookChain(&packetfilter.ChainIPHook{
 		Name:     constants.SmPostRoutingChain,
 		Type:     packetfilter.ChainTypeRoute,
 		Hook:     packetfilter.ChainHookPostrouting,
 		Priority: packetfilter.ChainPriorityFirst,
-	}); err != nil {
-		logger.Errorf(err, "Error deleting IP hook chain %q of table type Route", constants.SmPostRoutingChain)
-	}
+	}), "Error deleting IP hook chain %q of table type Route", constants.SmPostRoutingChain)
 
-	if err := h.localIPSet.Flush(); err != nil {
-		logger.Errorf(err, "Error flushing ipset %q", constants.LocalCIDRIPSet)
-	}
+	logError(h.localIPSet.Flush(), "Error flushing ipset %q", constants.LocalCIDRIPSet)
 
-	if err := h.localIPSet.Destroy(); err != nil {
-		logger.Errorf(err, "Error deleting ipset %q", constants.LocalCIDRIPSet)
-	}
+	logError(h.localIPSet.Destroy(), "Error deleting ipset %q", constants.LocalCIDRIPSet)
 
-	if err := h.remoteIPSet.Flush(); err != nil {
-		logger.Errorf(err, "Error flushing ipset %q", constants.RemoteCIDRIPSet)
-	}
+	logError(h.remoteIPSet.Flush(), "Error flushing ipset %q", constants.RemoteCIDRIPSet)
 
-	if err := h.remoteIPSet.Destroy(); err != nil {
-		logger.Errorf(err, "Error deleting ipset %q", constants.RemoteCIDRIPSet)
-	}
+	logError(h.remoteIPSet.Destroy(), "Error deleting ipset %q", constants.RemoteCIDRIPSet)
 
 	return nil
 }
@@ -279,7 +259,7 @@ func (h *mtuHandler) forceMssClamping(endpoint *submV1.Endpoint) error {
 			return errors.Wrapf(err, "Unable to find the default interface on host")
 		}
 
-		overHeadSize := maxIpsecOverhead
+		overHeadSize := MaxIPSecOverhead
 		if endpoint.Spec.Backend == vxlan.CableDriverName {
 			overHeadSize = vxlan.VxlanOverhead
 		}
@@ -312,4 +292,10 @@ func (h *mtuHandler) forceMssClamping(endpoint *submV1.Endpoint) error {
 	}
 
 	return nil
+}
+
+func logError(err error, format string, args ...interface{}) {
+	if err != nil {
+		logger.Errorf(err, format, args...)
+	}
 }
