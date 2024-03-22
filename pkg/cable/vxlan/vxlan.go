@@ -42,7 +42,7 @@ const (
 	VxlanVTepNetworkPrefix = 241
 	CableDriverName        = "vxlan"
 	TableID                = 100
-	defaultPort            = 4500
+	DefaultPort            = 4500
 )
 
 type vxLan struct {
@@ -75,7 +75,7 @@ func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.Subm
 		logger.Warning("VxLan cable-driver is supported only with no NAT deployments")
 	}
 
-	port, err := localEndpoint.Spec.GetBackendPort(v1.UDPPortConfig, defaultPort)
+	port, err := localEndpoint.Spec.GetBackendPort(v1.UDPPortConfig, DefaultPort)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get the UDP port configuration")
 	}
@@ -184,8 +184,6 @@ func (v *vxLan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 	} else {
 		logger.Errorf(nil, "Failed to get the CNI interface IP for cluster CIDR %q, host-networking use-cases may not work",
 			v.localCluster.Spec.ClusterCIDR[0])
-
-		ipAddress = nil
 	}
 
 	err = v.vxlanIface.AddRoutes(remoteVtepIP, ipAddress, TableID, allowedIPs...)
