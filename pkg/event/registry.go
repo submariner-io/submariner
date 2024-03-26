@@ -97,43 +97,43 @@ func (er *Registry) SetHandlerState(handlerState HandlerState) {
 
 func (er *Registry) StopHandlers() error {
 	return er.invokeHandlers("Stop", func(h Handler) error {
-		return h.Stop() //nolint:wrapcheck  // Let the caller wrap it
+		return h.Stop()
 	})
 }
 
 func (er *Registry) Uninstall() error {
 	return er.invokeHandlers("Uninstall", func(h Handler) error {
-		return h.Uninstall() //nolint:wrapcheck  // Let the caller wrap it
+		return h.Uninstall()
 	})
 }
 
 func (er *Registry) TransitionToNonGateway() error {
 	return er.invokeHandlers("TransitionToNonGateway", func(h Handler) error {
-		return h.TransitionToNonGateway() //nolint:wrapcheck  // Let the caller wrap it
+		return h.TransitionToNonGateway()
 	})
 }
 
 func (er *Registry) TransitionToGateway() error {
 	return er.invokeHandlers("TransitionToGateway", func(h Handler) error {
-		return h.TransitionToGateway() //nolint:wrapcheck  // Let the caller wrap it
+		return h.TransitionToGateway()
 	})
 }
 
 func (er *Registry) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 	return er.invokeHandlers("LocalEndpointCreated", func(h Handler) error {
-		return h.LocalEndpointCreated(endpoint) //nolint:wrapcheck  // Let the caller wrap it
+		return h.LocalEndpointCreated(endpoint)
 	})
 }
 
 func (er *Registry) LocalEndpointUpdated(endpoint *submV1.Endpoint) error {
 	return er.invokeHandlers("LocalEndpointUpdated", func(h Handler) error {
-		return h.LocalEndpointUpdated(endpoint) //nolint:wrapcheck  // Let the caller wrap it
+		return h.LocalEndpointUpdated(endpoint)
 	})
 }
 
 func (er *Registry) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 	return er.invokeHandlers("LocalEndpointRemoved", func(h Handler) error {
-		return h.LocalEndpointRemoved(endpoint) //nolint:wrapcheck  // Let the caller wrap it
+		return h.LocalEndpointRemoved(endpoint)
 	})
 }
 
@@ -147,7 +147,7 @@ func (er *Registry) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	}
 
 	err := er.invokeHandlers("RemoteEndpointCreated", func(h Handler) error {
-		return h.RemoteEndpointCreated(endpoint) //nolint:wrapcheck  // Let the caller wrap it
+		return h.RemoteEndpointCreated(endpoint)
 	})
 
 	if err == nil {
@@ -159,7 +159,7 @@ func (er *Registry) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 
 func (er *Registry) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
 	return er.invokeHandlers("RemoteEndpointUpdated", func(h Handler) error {
-		return h.RemoteEndpointUpdated(endpoint) //nolint:wrapcheck  // Let the caller wrap it
+		return h.RemoteEndpointUpdated(endpoint)
 	})
 }
 
@@ -175,25 +175,25 @@ func (er *Registry) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	delete(er.remoteEndpointTimeStamp, endpoint.Spec.ClusterID)
 
 	return er.invokeHandlers("RemoteEndpointRemoved", func(h Handler) error {
-		return h.RemoteEndpointRemoved(endpoint) //nolint:wrapcheck  // Let the caller wrap it
+		return h.RemoteEndpointRemoved(endpoint)
 	})
 }
 
 func (er *Registry) NodeCreated(node *k8sV1.Node) error {
 	return er.invokeHandlers("NodeCreated", func(h Handler) error {
-		return h.NodeCreated(node) //nolint:wrapcheck  // Let the caller wrap it
+		return h.NodeCreated(node)
 	})
 }
 
 func (er *Registry) NodeUpdated(node *k8sV1.Node) error {
 	return er.invokeHandlers("NodeUpdated", func(h Handler) error {
-		return h.NodeUpdated(node) //nolint:wrapcheck  // Let the caller wrap it
+		return h.NodeUpdated(node)
 	})
 }
 
 func (er *Registry) NodeRemoved(node *k8sV1.Node) error {
 	return er.invokeHandlers("NodeRemoved", func(h Handler) error {
-		return h.NodeRemoved(node) //nolint:wrapcheck  // Let the caller wrap it
+		return h.NodeRemoved(node)
 	})
 }
 

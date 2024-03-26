@@ -60,7 +60,7 @@ type calicoIPPoolHandler struct {
 }
 
 var NewClient = func(restConfig *rest.Config) (calicocs.Interface, error) {
-	return calicocs.NewForConfig(restConfig) //nolint:wrapcheck // No need to wrap
+	return calicocs.NewForConfig(restConfig)
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("CalicoIPPool")}
