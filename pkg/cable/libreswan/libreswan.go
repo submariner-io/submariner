@@ -320,7 +320,7 @@ func whack(args ...string) error {
 
 			logger.V(log.TRACE).Infof("Whacking with %v", args)
 
-			return command.New(cmd).Run() //nolint:wrapcheck // No need to wrap here
+			return command.New(cmd).Run()
 		}()
 
 		if err == nil {

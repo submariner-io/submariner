@@ -367,7 +367,6 @@ func (c *globalEgressIPController) createPodWatcher(key string, namedSet packetf
 	return true
 }
 
-//nolint:wrapcheck  // No need to wrap these errors.
 func (c *globalEgressIPController) flushGlobalEgressRulesAndReleaseIPs(key, namedSetName string, numRequeues int,
 	globalEgressIP *submarinerv1.GlobalEgressIP,
 ) bool {
