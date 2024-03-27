@@ -38,6 +38,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/versions"
+	"golang.org/x/net/http/httpproxy"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -91,6 +92,10 @@ func main() {
 	logger.FatalOnError(envconfig.Process("submariner", &submSpec), "Error processing env vars")
 
 	logger.Infof("Parsed env variables: %#v", submSpec)
+
+	proxyEnv := httpproxy.FromEnvironment()
+	logger.Infof("Proxy env variables: HTTP_PROXY: %v, HTTPS_PROXY: %v, NO_PROXY: %v",
+		proxyEnv.HTTPProxy, proxyEnv.HTTPSProxy, proxyEnv.NoProxy)
 
 	defer http.StartServer(http.Metrics|http.Profile, submSpec.MetricsPort)()
 
