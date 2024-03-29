@@ -30,19 +30,17 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	versioned "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	submclient "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	pfiface "github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -67,16 +65,13 @@ func UninstallDataPath() {
 
 	for _, chain := range natTableChains {
 		err = gnpFilter.FlushNatChain(chain)
-		if err != nil {
-			// Just log an error as this is part of uninstallation.
-			logger.Errorf(err, "Error flushing packetfilter chain %q", chain)
-		}
+
+		// Just log an error as this is part of uninstallation.
+		logError(err, "Error flushing packetfilter chain %q", chain)
 	}
 
 	err = gnpFilter.FlushNatChain(routeAgent.SmPostRoutingChain)
-	if err != nil {
-		logger.Errorf(err, "Error flushing packetfilter chain %q", routeAgent.SmPostRoutingChain)
-	}
+	logError(err, "Error flushing packetfilter chain %q", routeAgent.SmPostRoutingChain)
 
 	chain := packetfilter.ChainIPHook{
 		Name:     constants.SmGlobalnetIngressChain,
@@ -85,45 +80,37 @@ func UninstallDataPath() {
 		Priority: packetfilter.ChainPriorityFirst,
 	}
 
-	if err := pFilter.DeleteIPHookChain(&chain); err != nil {
-		logger.Errorf(err, "error creating IPHook chain %s", constants.SmGlobalnetIngressChain)
-	}
+	err = pFilter.DeleteIPHookChain(&chain)
+	logError(err, "error creating IPHook chain %s", constants.SmGlobalnetIngressChain)
 
 	for _, chain := range natTableChains {
 		if chain == constants.SmGlobalnetIngressChain {
 			continue
 		}
 
-		if err = gnpFilter.DeleteNatChain(chain); err != nil {
-			logger.Errorf(err, "Error deleting iptables chain %q", chain)
-		}
+		err = gnpFilter.DeleteNatChain(chain)
+		logError(err, "Error deleting iptables chain %q", chain)
 	}
 
 	err = pFilter.DestroySets(func(name string) bool {
 		return strings.HasPrefix(name, IPSetPrefix)
 	})
-	if err != nil {
-		logger.Errorf(err, "Error destroying sets")
-	}
+	logError(err, "Error destroying sets")
 }
 
-func DeleteGlobalnetObjects(smClientSet *versioned.Clientset, cfg *rest.Config) {
+func DeleteGlobalnetObjects(smClientSet submclient.Interface, dynClient dynamic.Interface) {
 	err := smClientSet.SubmarinerV1().ClusterGlobalEgressIPs(metav1.NamespaceAll).DeleteCollection(context.TODO(), metav1.DeleteOptions{},
 		metav1.ListOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		logger.Errorf(err, "Error deleting the clusterGlobalEgressIPs")
-	}
+	logError(err, "Error deleting the clusterGlobalEgressIPs")
 
 	err = smClientSet.SubmarinerV1().GlobalEgressIPs(metav1.NamespaceAll).DeleteCollection(context.TODO(), metav1.DeleteOptions{},
 		metav1.ListOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		logger.Errorf(err, "Error deleting the globalEgressIPs")
-	}
+	logError(err, "Error deleting the globalEgressIPs")
 
-	deleteGlobalIngressIPs(smClientSet, cfg)
+	deleteGlobalIngressIPs(smClientSet, dynClient)
 }
 
-func deleteGlobalIngressIPs(smClientSet *versioned.Clientset, cfg *rest.Config) {
+func deleteGlobalIngressIPs(smClientSet submclient.Interface, dynClient dynamic.Interface) {
 	defer deleteAllGlobalIngressIPObjs(smClientSet)
 
 	gvr := schema.GroupVersionResource{
@@ -132,85 +119,61 @@ func deleteGlobalIngressIPs(smClientSet *versioned.Clientset, cfg *rest.Config) 
 		Resource: "services",
 	}
 
-	dynClient, err := dynamic.NewForConfig(cfg)
-	if err != nil {
-		logger.Errorf(err, "Error creating dynamic client")
-		return
-	}
-
 	giipList, err := smClientSet.SubmarinerV1().GlobalIngressIPs(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		logger.Errorf(err, "Error listing the globalIngressIP objects")
-	}
+	logError(err, "Error listing the globalIngressIP objects")
 
 	services := dynClient.Resource(gvr)
 
 	for i := range giipList.Items {
-		logger.Infof("Deleting the globalnet internal service: %q", giipList.Items[i].Name)
-
-		err = deleteInternalService(&giipList.Items[i], services)
-		if err != nil && !apierrors.IsNotFound(err) {
-			logger.Errorf(err, "Error deleting the internal service")
-		}
+		deleteInternalService(&giipList.Items[i], services)
 	}
 }
 
-func deleteInternalService(ingressIP *submarinerv1.GlobalIngressIP, services dynamic.NamespaceableResourceInterface) error {
-	serviceRef := ingressIP.Spec.ServiceRef
-	internalSvc := GetInternalSvcName(serviceRef.Name)
-	key := fmt.Sprintf("%s/%s", ingressIP.Namespace, internalSvc)
-
-	service, exists, _ := getService(internalSvc, ingressIP.Namespace, services, scheme.Scheme)
-	if exists {
-		if err := finalizer.Remove(context.TODO(), resource.ForDynamic(services.Namespace(ingressIP.Namespace)),
-			resource.MustToUnstructured(service), InternalServiceFinalizer); err != nil {
-			return fmt.Errorf("error while removing the finalizer from globalnet internal service %q", key)
-		}
-
-		err := deleteService(ingressIP.Namespace, internalSvc, services)
-		if err != nil && !apierrors.IsNotFound(err) {
-			logger.Errorf(err, "Error deleting the service %q/%q", ingressIP.Namespace, internalSvc)
-		}
-	}
-
-	return nil
-}
-
-func deleteAllGlobalIngressIPObjs(smClientSet *versioned.Clientset) {
-	err := smClientSet.SubmarinerV1().GlobalIngressIPs(metav1.NamespaceAll).DeleteCollection(context.TODO(), metav1.DeleteOptions{},
-		metav1.ListOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		logger.Errorf(err, "Error deleting the globalIngressIPs")
-	}
-}
-
-func RemoveGlobalIPAnnotationOnNode(cfg *rest.Config) {
-	nodeName, ok := os.LookupEnv("NODE_NAME")
-	if !ok {
-		logger.Errorf(nil, "Error reading the NODE_NAME from the environment")
+func deleteInternalService(ingressIP *submarinerv1.GlobalIngressIP, services dynamic.NamespaceableResourceInterface) {
+	if ingressIP.Spec.ServiceRef == nil {
 		return
 	}
 
-	k8sClientSet, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		logger.Fatalf("Error building clientset: %s", err.Error())
+	internalSvc := GetInternalSvcName(ingressIP.Spec.ServiceRef.Name)
+	key := fmt.Sprintf("%s/%s", ingressIP.Namespace, internalSvc)
+
+	logger.Infof("Deleting the globalnet internal service: %q", key)
+
+	service, exists, _ := getService(internalSvc, ingressIP.Namespace, services, scheme.Scheme)
+	if exists {
+		err := finalizer.Remove(context.TODO(), resource.ForDynamic(services.Namespace(ingressIP.Namespace)),
+			resource.MustToUnstructured(service), InternalServiceFinalizer)
+		logError(err, "rror while removing the finalizer from globalnet internal service %q", key)
+
+		err = deleteService(ingressIP.Namespace, internalSvc, services)
+		logError(err, "Error deleting the service %q/%q", ingressIP.Namespace, internalSvc)
+	}
+}
+
+func deleteAllGlobalIngressIPObjs(smClientSet submclient.Interface) {
+	err := smClientSet.SubmarinerV1().GlobalIngressIPs(metav1.NamespaceAll).DeleteCollection(context.TODO(), metav1.DeleteOptions{},
+		metav1.ListOptions{})
+	logError(err, "Error deleting the globalIngressIPs")
+}
+
+func RemoveGlobalIPAnnotationOnNode(client kubernetes.Interface) {
+	nodeName, ok := os.LookupEnv("NODE_NAME")
+	if !ok {
+		logger.Error(nil, "NODE_NAME does not exist in the environment")
+		return
 	}
 
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		node, err := k8sClientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+		node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
 			return errors.Wrapf(err, "unable to get node info for node %q", nodeName)
 		}
 
 		annotations := node.GetAnnotations()
-		if annotations == nil || annotations[constants.SmGlobalIP] == "" {
-			return nil
-		}
-
 		delete(annotations, constants.SmGlobalIP)
-
 		node.SetAnnotations(annotations)
-		_, updateErr := k8sClientSet.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
+
+		_, updateErr := client.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
 
 		return updateErr //nolint:wrapcheck // We wrap it below in the enclosing function
 	})
@@ -253,4 +216,10 @@ func RemoveStaleInternalServices(config *syncer.ResourceSyncerConfig) error {
 	}
 
 	return nil
+}
+
+func logError(err error, format string, args ...interface{}) {
+	if err != nil {
+		logger.Errorf(err, format, args...)
+	}
 }
