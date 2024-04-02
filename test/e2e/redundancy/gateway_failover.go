@@ -60,7 +60,7 @@ var _ = Describe("Gateway fail-over tests", Label(TestLabel), func() {
 })
 
 func testGatewayPodRestartScenario(f *subFramework.Framework) {
-	By(fmt.Sprintln("Sanity check - find a cluster with only one gateway node"))
+	framework.By(fmt.Sprintln("Sanity check - find a cluster with only one gateway node"))
 
 	primaryCluster := subFramework.FindClusterWithSingleGateway()
 	if primaryCluster == -1 {
@@ -72,33 +72,34 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 	primaryClusterName := framework.TestContext.ClusterIDs[primaryCluster]
 	secondaryClusterName := framework.TestContext.ClusterIDs[secondaryCluster]
 
-	By(fmt.Sprintf("Detected primary cluster %q with single gateway node", primaryClusterName))
-	By(fmt.Sprintf("Detected secondary cluster %q", secondaryClusterName))
+	framework.By(fmt.Sprintf("Detected primary cluster %q with single gateway node", primaryClusterName))
+	framework.By(fmt.Sprintf("Detected secondary cluster %q", secondaryClusterName))
 
 	gatewayNodes := framework.FindGatewayNodes(primaryCluster)
 	Expect(gatewayNodes).To(HaveLen(1), fmt.Sprintf("Expected only one gateway node on %q", primaryClusterName))
-	By(fmt.Sprintf("Found gateway on node %q on %q", gatewayNodes[0].Name, primaryClusterName))
+	framework.By(fmt.Sprintf("Found gateway on node %q on %q", gatewayNodes[0].Name, primaryClusterName))
 
 	gatewayPod := f.AwaitSubmarinerGatewayPod(primaryCluster)
-	By(fmt.Sprintf("Found submariner gateway pod %q on %q, checking node and HA status labels", gatewayPod.Name, primaryClusterName))
+	framework.By(fmt.Sprintf("Found submariner gateway pod %q on %q, checking node and HA status labels", gatewayPod.Name, primaryClusterName))
 
 	Expect(gatewayPod.Labels[gatewayStatusLabel]).To(Equal(gatewayStatusActive))
 	Expect(gatewayPod.Labels[gatewayNodeLabel]).To(Equal(gatewayNodes[0].Name))
 
-	By(fmt.Sprintf("Ensuring that the gateway reports as active on %q", primaryClusterName))
+	framework.By(fmt.Sprintf("Ensuring that the gateway reports as active on %q", primaryClusterName))
 
 	activeGateway := f.AwaitGatewayFullyConnected(primaryCluster, resource.EnsureValidName(gatewayNodes[0].Name))
 
-	By(fmt.Sprintf("Deleting submariner gateway pod %q", gatewayPod.Name))
+	framework.By(fmt.Sprintf("Deleting submariner gateway pod %q", gatewayPod.Name))
 	f.DeletePod(primaryCluster, gatewayPod.Name, framework.TestContext.SubmarinerNamespace)
 
 	newGatewayPod := AwaitNewSubmarinerGatewayPod(f, primaryCluster, gatewayPod.ObjectMeta.UID)
-	By(fmt.Sprintf("Found new submariner gateway pod %q", newGatewayPod.Name))
+	framework.By(fmt.Sprintf("Found new submariner gateway pod %q", newGatewayPod.Name))
 
-	By(fmt.Sprintf("Waiting for the gateway to be up and connected %q", newGatewayPod.Name))
+	framework.By(fmt.Sprintf("Waiting for the gateway to be up and connected %q", newGatewayPod.Name))
 	AwaitNewSubmarinerGatewayFullyConnected(f, primaryCluster, activeGateway.Name, activeGateway.UID)
 
-	By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", secondaryClusterName, primaryClusterName))
+	framework.By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", secondaryClusterName,
+		primaryClusterName))
 	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
 		FromCluster:           secondaryCluster,
@@ -113,7 +114,7 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 		return
 	}
 
-	By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q",
+	framework.By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q",
 		secondaryClusterName, primaryClusterName))
 	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
@@ -175,19 +176,19 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 	clusterAName := framework.TestContext.ClusterIDs[primaryCluster]
 	clusterBName := framework.TestContext.ClusterIDs[secondaryCluster]
 
-	By(fmt.Sprintf("Found two gateway nodes on %q", clusterAName))
+	framework.By(fmt.Sprintf("Found two gateway nodes on %q", clusterAName))
 
 	initialGWPod := f.AwaitActiveGatewayPod(framework.ClusterIndex(primaryCluster), nil)
 	Expect(initialGWPod).ToNot(BeNil(), "Did not find an active gateway pod")
 
-	By(fmt.Sprintf("Ensure active gateway node %q has established connections", initialGWPod.Name))
+	framework.By(fmt.Sprintf("Ensure active gateway node %q has established connections", initialGWPod.Name))
 	gwConnection := f.AwaitGatewayWithStatus(framework.ClusterIndex(primaryCluster), initialGWPod.Spec.NodeName, subv1.HAStatusActive)
 	Expect(gwConnection.Status.Connections).NotTo(BeEmpty(), "The active gateway must have established connections")
 
 	submEndpoint := f.AwaitSubmarinerEndpoint(framework.ClusterIndex(primaryCluster), subFramework.NoopCheckEndpoint)
-	By(fmt.Sprintf("Found submariner endpoint for %q: %#v", clusterAName, submEndpoint))
+	framework.By(fmt.Sprintf("Found submariner endpoint for %q: %#v", clusterAName, submEndpoint))
 
-	By("Performing fail-over to passive gateway")
+	framework.By("Performing fail-over to passive gateway")
 	f.DoFailover(context.TODO(), framework.ClusterIndex(primaryCluster), initialGWPod.Spec.NodeName, initialGWPod.Name)
 
 	newGWPod := f.AwaitActiveGatewayPod(framework.ClusterIndex(primaryCluster), func(pod *v1.Pod) bool {
@@ -195,20 +196,20 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 	})
 
 	Expect(newGWPod).ToNot(BeNil(), "Did not find a new active gateway pod running on a different node")
-	By(fmt.Sprintf("Found new submariner gateway pod %q", newGWPod.Name))
+	framework.By(fmt.Sprintf("Found new submariner gateway pod %q", newGWPod.Name))
 
-	By(fmt.Sprintf("Waiting for the new pod %q to report as fully connected", newGWPod.Name))
+	framework.By(fmt.Sprintf("Waiting for the new pod %q to report as fully connected", newGWPod.Name))
 	f.AwaitGatewayFullyConnected(framework.ClusterIndex(primaryCluster), resource.EnsureValidName(newGWPod.Spec.NodeName))
 
 	// Verify a new Endpoint instance is created by the new gateway instance. This is a bit whitebox but it's a sanity check
 	// and also gives it a bit more of a cushion to avoid premature timeout in the connectivity test.
 	newSubmEndpoint := f.AwaitNewSubmarinerEndpoint(framework.ClusterIndex(primaryCluster), submEndpoint.ObjectMeta.UID)
-	By(fmt.Sprintf("Found new submariner endpoint for %q: %#v", clusterAName, newSubmEndpoint))
+	framework.By(fmt.Sprintf("Found new submariner endpoint for %q: %#v", clusterAName, newSubmEndpoint))
 
-	By(fmt.Sprintf("Waiting for the previous submariner endpoint %q to be removed on %q", newGWPod.Name, clusterBName))
+	framework.By(fmt.Sprintf("Waiting for the previous submariner endpoint %q to be removed on %q", newGWPod.Name, clusterBName))
 	f.AwaitSubmarinerEndpointRemoved(framework.ClusterIndex(secondaryCluster), submEndpoint.Name)
 
-	By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
+	framework.By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
 	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
 		FromCluster:           framework.ClusterIndex(secondaryCluster),
@@ -223,7 +224,7 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 		return
 	}
 
-	By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
+	framework.By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
 	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
 		FromCluster:           framework.ClusterIndex(secondaryCluster),

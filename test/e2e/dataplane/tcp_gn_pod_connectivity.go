@@ -94,7 +94,7 @@ var _ = Describe("Basic TCP connectivity tests across overlapping clusters witho
 					lpConfig.Port++
 					cpConfig.Port = lpConfig.Port
 
-					By(fmt.Sprintf("Updating service port to %d", lpConfig.Port))
+					framework.By(fmt.Sprintf("Updating service port to %d", lpConfig.Port))
 
 					err := util.Update(context.Background(), resource.ForService(framework.KubeClients[lpConfig.Cluster],
 						f.Namespace), service, func(existing *v1.Service) (*v1.Service, error) {

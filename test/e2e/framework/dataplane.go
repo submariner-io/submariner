@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"strconv"
 
-	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	resourceUtil "github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
@@ -115,7 +114,7 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams, gn Global
 
 	Expect(connectorPodGlobalIPs).ToNot(BeEmpty())
 
-	By(fmt.Sprintf("Creating a listener pod in cluster %q, which will wait for a handshake over TCP",
+	framework.By(fmt.Sprintf("Creating a listener pod in cluster %q, which will wait for a handshake over TCP",
 		framework.TestContext.ClusterIDs[p.ToCluster]))
 
 	listenerPodConfig := &framework.NetworkPodConfig{
@@ -128,7 +127,7 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams, gn Global
 
 	listenerPod := p.Framework.NewNetworkPod(listenerPodConfig)
 
-	By(fmt.Sprintf("Pointing a ClusterIP service to the listener pod in cluster %q",
+	framework.By(fmt.Sprintf("Pointing a ClusterIP service to the listener pod in cluster %q",
 		framework.TestContext.ClusterIDs[p.ToCluster]))
 
 	var service *v1.Service
@@ -144,7 +143,7 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams, gn Global
 	remoteIP := getGlobalIngressIP(p, service)
 	Expect(remoteIP).ToNot(Equal(""))
 
-	By(fmt.Sprintf("Creating a connector pod in cluster %q, which will attempt the specific UUID handshake over TCP",
+	framework.By(fmt.Sprintf("Creating a connector pod in cluster %q, which will attempt the specific UUID handshake over TCP",
 		framework.TestContext.ClusterIDs[p.FromCluster]))
 
 	connectorPodConfig := &framework.NetworkPodConfig{
@@ -177,19 +176,19 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams, gn Global
 		}, connector.Config.Cluster)
 		Expect(err).ToNot(HaveOccurred())
 
-		By(fmt.Sprintf("Connector pod is scheduled on node %q", connector.Pod.Spec.NodeName))
+		framework.By(fmt.Sprintf("Connector pod is scheduled on node %q", connector.Pod.Spec.NodeName))
 
-		By(fmt.Sprintf("Waiting for the listener pod %q on node %q to exit, returning what listener sent",
+		framework.By(fmt.Sprintf("Waiting for the listener pod %q on node %q to exit, returning what listener sent",
 			listener.Pod.Name, listener.Pod.Spec.NodeName))
 		listener.AwaitFinish()
 		listener.CheckSuccessfulFinish()
 		p.Framework.DeletePod(p.FromCluster, connector.Pod.Name, connector.Pod.Namespace)
 
-		By("Verifying that the listener got the connector's data and the connector got the listener's data")
+		framework.By("Verifying that the listener got the connector's data and the connector got the listener's data")
 		Expect(listener.TerminationMessage).To(ContainSubstring(connector.Config.Data))
 		Expect(stdOut).To(ContainSubstring(listener.Config.Data))
 
-		By(fmt.Sprintf("Verifying the output of the listener pod contains a %s global IP %v of the connector Pod",
+		framework.By(fmt.Sprintf("Verifying the output of the listener pod contains a %s global IP %v of the connector Pod",
 			gn.GlobalEgressIP, connectorPodGlobalIPs))
 
 		matchIP := ContainSubstring(connectorPodGlobalIPs[0])

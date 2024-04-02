@@ -195,7 +195,7 @@ func testExternalConnectivity(p testParams) {
 
 	clusterName := framework.TestContext.ClusterIDs[p.Cluster]
 
-	By(fmt.Sprintf("Creating a pod and a service in cluster %q", clusterName))
+	framework.By(fmt.Sprintf("Creating a pod and a service in cluster %q", clusterName))
 
 	np := p.Framework.NewNetworkPod(&framework.NetworkPodConfig{
 		Type:          framework.CustomPod,
@@ -230,13 +230,13 @@ func testExternalConnectivity(p testParams) {
 		targetIP = svcIP
 	}
 
-	By(fmt.Sprintf("Sending an http request from external app %q to %q in the cluster %q",
+	framework.By(fmt.Sprintf("Sending an http request from external app %q to %q in the cluster %q",
 		dockerIP, targetIP, clusterName))
 
 	command := []string{"curl", "-m", "3", fmt.Sprintf("%s:%d/%s%s", targetIP, framework.TestPort, p.Framework.Namespace, clusterName)}
 	_, _ = docker.RunCommandUntil(command...)
 
-	By("Verifying the pod received the request")
+	framework.By("Verifying the pod received the request")
 
 	podLog := np.GetLog()
 
@@ -246,13 +246,13 @@ func testExternalConnectivity(p testParams) {
 		Expect(podLog).To(MatchRegexp("%s .*GET /%s%s .*", dockerIP, p.Framework.Namespace, clusterName))
 	}
 
-	By(fmt.Sprintf("Sending an http request from the test pod %q %q in cluster %q to the external app %q",
+	framework.By(fmt.Sprintf("Sending an http request from the test pod %q %q in cluster %q to the external app %q",
 		np.Pod.Name, podIP, clusterName, dockerIP))
 
 	cmd := []string{"curl", "-m", "10", fmt.Sprintf("%s:%d/%s%s", dockerIP, framework.TestPort, p.Framework.Namespace, clusterName)}
 	_, _ = np.RunCommand(context.TODO(), cmd)
 
-	By("Verifying that external app received request")
+	framework.By("Verifying that external app received request")
 	// Only check stderr
 	_, dockerLog := docker.GetLog()
 

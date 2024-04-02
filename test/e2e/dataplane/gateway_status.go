@@ -38,7 +38,7 @@ var _ = Describe("Gateway status reporting", Label(TestLabel), func() {
 		It("should correctly report its status and connection information", func() {
 			clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 
-			By(fmt.Sprintf("Ensuring that only one gateway reports as active on %q", clusterAName))
+			framework.By(fmt.Sprintf("Ensuring that only one gateway reports as active on %q", clusterAName))
 
 			activeGateways := f.AwaitGatewaysWithStatus(framework.ClusterA, submarinerv1.HAStatusActive)
 			Expect(activeGateways).To(HaveLen(1))
@@ -46,7 +46,7 @@ var _ = Describe("Gateway status reporting", Label(TestLabel), func() {
 			name := activeGateways[0].Name
 			otherCluster := framework.TestContext.ClusterIDs[framework.ClusterB]
 
-			By(fmt.Sprintf("Ensuring that gateway %q reports connection information for cluster %q", name, otherCluster))
+			framework.By(fmt.Sprintf("Ensuring that gateway %q reports connection information for cluster %q", name, otherCluster))
 
 			gwClient := subFramework.SubmarinerClients[framework.ClusterA].SubmarinerV1().Gateways(
 				framework.TestContext.SubmarinerNamespace)
