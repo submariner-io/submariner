@@ -55,9 +55,9 @@ var _ = Describe("Leader election tests", func() {
 
 			gateway := f.AwaitGatewayWithStatus(cluster, gatewayPod.Spec.NodeName, subv1.HAStatusActive)
 
-			By(fmt.Sprintf("Found submariner Gateway %q on cluster %q", gateway.Name, clusterName))
+			framework.By(fmt.Sprintf("Found submariner Gateway %q on cluster %q", gateway.Name, clusterName))
 
-			By("Updating submariner-gateway Role to remove Lease update permission")
+			framework.By("Updating submariner-gateway Role to remove Lease update permission")
 
 			updateLeaseUpdatePermission(cluster, gateway.Namespace, slices.Remove[string, string])
 
@@ -65,7 +65,7 @@ var _ = Describe("Leader election tests", func() {
 				updateLeaseUpdatePermission(cluster, gateway.Namespace, slices.AppendIfNotPresent[string, string])
 			})
 
-			By(fmt.Sprintf("Ensure Gateway %q is updated to passive", gateway.Name))
+			framework.By(fmt.Sprintf("Ensure Gateway %q is updated to passive", gateway.Name))
 
 			f.AwaitGatewaysWithStatus(cluster, subv1.HAStatusPassive)
 
@@ -79,11 +79,11 @@ var _ = Describe("Leader election tests", func() {
 				Networking:            framework.PodNetworking,
 			}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
 
-			By("Updating submariner-gateway Role to add Lease update permission")
+			framework.By("Updating submariner-gateway Role to add Lease update permission")
 
 			updateLeaseUpdatePermission(cluster, gateway.Namespace, slices.AppendIfNotPresent[string, string])
 
-			By(fmt.Sprintf("Ensure Gateway %q is updated to active", gateway.Name))
+			framework.By(fmt.Sprintf("Ensure Gateway %q is updated to active", gateway.Name))
 
 			f.AwaitGatewayWithStatus(cluster, gatewayPod.Spec.NodeName, subv1.HAStatusActive)
 
