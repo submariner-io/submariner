@@ -60,19 +60,19 @@ func testRouteAgentRestart(f *subFramework.Framework, onGateway bool) {
 		return
 	}
 
-	By(fmt.Sprintf("Found node %q on %q", nodes[0].Name, clusterAName))
+	framework.By(fmt.Sprintf("Found node %q on %q", nodes[0].Name, clusterAName))
 	node := nodes[0]
 
 	routeAgentPod := f.AwaitRouteAgentPodOnNode(framework.ClusterA, node.Name, "")
-	By(fmt.Sprintf("Found route agent pod %q on node %q", routeAgentPod.Name, node.Name))
+	framework.By(fmt.Sprintf("Found route agent pod %q on node %q", routeAgentPod.Name, node.Name))
 
-	By(fmt.Sprintf("Deleting route agent pod %q", routeAgentPod.Name))
+	framework.By(fmt.Sprintf("Deleting route agent pod %q", routeAgentPod.Name))
 	f.DeletePod(framework.ClusterA, routeAgentPod.Name, framework.TestContext.SubmarinerNamespace)
 
 	newRouteAgentPod := f.AwaitRouteAgentPodOnNode(framework.ClusterA, node.Name, routeAgentPod.UID)
-	By(fmt.Sprintf("Found new route agent pod %q on node %q", newRouteAgentPod.Name, node.Name))
+	framework.By(fmt.Sprintf("Found new route agent pod %q on node %q", newRouteAgentPod.Name, node.Name))
 
-	By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
+	framework.By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
 	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
 		FromCluster:           framework.ClusterB,
@@ -82,7 +82,7 @@ func testRouteAgentRestart(f *subFramework.Framework, onGateway bool) {
 		ToEndpointType:        defaultEndpointType(),
 	}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
 
-	By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
+	framework.By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
 	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
 		FromCluster:           framework.ClusterB,

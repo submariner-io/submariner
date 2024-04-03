@@ -292,7 +292,7 @@ func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
 	extClusterIdx, err := getGatewayClusterIndex(framework.TestContext.ClusterIDs)
 	Expect(err).NotTo(HaveOccurred())
 
-	By(fmt.Sprintf("Creating a service without selector and endpoints in cluster %q", gatewayCluster))
+	framework.By(fmt.Sprintf("Creating a service without selector and endpoints in cluster %q", gatewayCluster))
 	// Get handle for existing docker
 	docker := framework.New(extAppName)
 	dockerIP := docker.GetIP(extNetName)
@@ -320,7 +320,7 @@ func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
 
 	clusterName := framework.TestContext.ClusterIDs[p.Cluster]
 
-	By(fmt.Sprintf("Creating a pod and a service in cluster %q", clusterName))
+	framework.By(fmt.Sprintf("Creating a pod and a service in cluster %q", clusterName))
 
 	np := p.Framework.NewNetworkPod(&framework.NetworkPodConfig{
 		Type:          framework.CustomPod,
@@ -342,7 +342,7 @@ func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
 	podGlobalIPs := getPodGlobalIPs(p, g, np)
 	Expect(podGlobalIPs).ToNot(BeEmpty())
 
-	By(fmt.Sprintf("Sending an http request from external app %q to the service %q in the cluster %q",
+	framework.By(fmt.Sprintf("Sending an http request from external app %q to the service %q in the cluster %q",
 		dockerIP, remoteIP, clusterName))
 
 	command := []string{"curl", "-m", "10", fmt.Sprintf("%s:%d/%s%s", remoteIP, framework.TestPort, p.Framework.Namespace, clusterName)}
@@ -353,12 +353,12 @@ func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
 	if p.Cluster == extClusterIdx {
 		// TODO: current behavior is that source IP from external app to the pod in the cluster that directly connected to
 		// external network is the gateway IP of the pod network. Consider if it can be consistent.
-		By("Verifying the pod received the request from any IP")
+		framework.By("Verifying the pod received the request from any IP")
 		Expect(podLog).To(MatchRegexp(".*GET /%s%s .*", p.Framework.Namespace, clusterName))
 	} else {
 		switch g.ExtEndpointType {
 		case ClusterIP:
-			By(fmt.Sprintf("Verifying the pod received the request from one of egressGlobalIPs %v", extEgressGlobalIPs))
+			framework.By(fmt.Sprintf("Verifying the pod received the request from one of egressGlobalIPs %v", extEgressGlobalIPs))
 			matchRegexp := MatchRegexp("%s .*GET /%s%s .*", extEgressGlobalIPs[0], p.Framework.Namespace, clusterName)
 
 			for i := 1; i < len(extEgressGlobalIPs); i++ {
@@ -367,7 +367,7 @@ func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
 			Expect(podLog).To(matchRegexp)
 		case Headless:
 			// For access from headless service, source IP is the globalIngressIP of the external app
-			By(fmt.Sprintf("Verifying the pod received the request from globalIngressIP of the external app %v", extIngressGlobalIP))
+			framework.By(fmt.Sprintf("Verifying the pod received the request from globalIngressIP of the external app %v", extIngressGlobalIP))
 			Expect(podLog).To(MatchRegexp("%s .*GET /%s%s .*", extIngressGlobalIP, p.Framework.Namespace, clusterName))
 		}
 	}
@@ -380,7 +380,7 @@ func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
 		return
 	}
 
-	By(fmt.Sprintf("Sending an http request from the test pod %q in cluster %q to the external app's ingressGlobalIP %q",
+	framework.By(fmt.Sprintf("Sending an http request from the test pod %q in cluster %q to the external app's ingressGlobalIP %q",
 		np.Pod.Name, clusterName, extIngressGlobalIP))
 
 	cmd := []string{"curl", "-m", "10", fmt.Sprintf("%s:%d/%s%s", extIngressGlobalIP, framework.TestPort, p.Framework.Namespace, clusterName)}
@@ -393,7 +393,7 @@ func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
 	case tcp.PodIP, tcp.ServiceIP:
 		framework.Failf("Unsupported ToEndpointType %v was passed", p.ToEndpointType)
 	case tcp.GlobalServiceIP:
-		By(fmt.Sprintf("Verifying that external app received request from one of podGlobalIPs %v", podGlobalIPs))
+		framework.By(fmt.Sprintf("Verifying that external app received request from one of podGlobalIPs %v", podGlobalIPs))
 		matchRegexp := MatchRegexp("%s .*GET /%s%s .*", podGlobalIPs[0], p.Framework.Namespace, clusterName)
 
 		for i := 1; i < len(podGlobalIPs); i++ {
@@ -402,7 +402,7 @@ func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
 		Expect(dockerLog).To(matchRegexp)
 	case tcp.GlobalPodIP:
 		// For access from headless service, source IP is the globalIngressIP of the pod, which is set to remoteIP
-		By(fmt.Sprintf("Verifying that external app received request from globalIngressIP of the pod %v", remoteIP))
+		framework.By(fmt.Sprintf("Verifying that external app received request from globalIngressIP of the pod %v", remoteIP))
 		Expect(dockerLog).To(MatchRegexp("%s .*GET /%s%s .*", remoteIP, p.Framework.Namespace, clusterName))
 	}
 

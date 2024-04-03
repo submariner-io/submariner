@@ -251,12 +251,12 @@ func (i *PacketFilter) listRules(table packetfilter.TableType, chain string) []s
 	return ret
 }
 
-func (i *PacketFilter) listChains(table packetfilter.TableType) []string {
+func (i *PacketFilter) listChains(table uint32) []string {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
 	var chains []string
-	tableKey := chainKey(uint32(table), "")
+	tableKey := chainKey(table, "")
 
 	for k := range i.chainRules {
 		if strings.HasPrefix(k, tableKey) {
@@ -288,16 +288,32 @@ func matchRuleForError(matchers *[]interface{}, rulespec string) error {
 	return nil
 }
 
-func (i *PacketFilter) AwaitChain(table packetfilter.TableType, stringOrMatcher interface{}) {
+func (i *PacketFilter) awaitChain(table uint32, stringOrMatcher interface{}) {
 	Eventually(func() []string {
 		return i.listChains(table)
 	}, 5).Should(ContainElement(stringOrMatcher), "IP table %v chains", table)
 }
 
-func (i *PacketFilter) AwaitNoChain(table packetfilter.TableType, stringOrMatcher interface{}) {
+func (i *PacketFilter) AwaitChain(table packetfilter.TableType, stringOrMatcher interface{}) {
+	i.awaitChain(uint32(table), stringOrMatcher)
+}
+
+func (i *PacketFilter) AwaitIPHookChain(chainType packetfilter.ChainType, stringOrMatcher interface{}) {
+	i.awaitChain(uint32(chainType), stringOrMatcher)
+}
+
+func (i *PacketFilter) awaitNoChain(table uint32, stringOrMatcher interface{}) {
 	Eventually(func() []string {
 		return i.listChains(table)
 	}, 5).ShouldNot(ContainElement(stringOrMatcher), "IP table %v chains", table)
+}
+
+func (i *PacketFilter) AwaitNoChain(table packetfilter.TableType, stringOrMatcher interface{}) {
+	i.awaitNoChain(uint32(table), stringOrMatcher)
+}
+
+func (i *PacketFilter) AwaitNoIPHookChain(chainType packetfilter.ChainType, stringOrMatcher interface{}) {
+	i.awaitNoChain(uint32(chainType), stringOrMatcher)
 }
 
 func (i *PacketFilter) AwaitRule(table packetfilter.TableType, chain string, stringOrMatcher interface{}) {
@@ -310,6 +326,12 @@ func (i *PacketFilter) AwaitNoRule(table packetfilter.TableType, chain string, s
 	Eventually(func() []string {
 		return i.listRules(table, chain)
 	}, 5).ShouldNot(ContainElement(stringOrMatcher), "Rules for IP table %v, chain %q", table, chain)
+}
+
+func (i *PacketFilter) EnsureNoRule(table packetfilter.TableType, chain string, stringOrMatcher interface{}) {
+	Consistently(func() []string {
+		return i.listRules(table, chain)
+	}).ShouldNot(ContainElement(stringOrMatcher), "Rules for IP table %v, chain %q", table, chain)
 }
 
 func (i *PacketFilter) AwaitNoRules(table packetfilter.TableType, chain string) {

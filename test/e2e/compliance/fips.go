@@ -40,7 +40,7 @@ var _ = Describe("FIPS", Label(TestLabel), func() {
 })
 
 func testFIPSGatewayStatus(f *subFramework.Framework) {
-	By(fmt.Sprintln("Find a cluster with FIPS enabled"))
+	framework.By(fmt.Sprintln("Find a cluster with FIPS enabled"))
 
 	fipsCluster := f.FindFIPSEnabledCluster()
 
@@ -49,7 +49,7 @@ func testFIPSGatewayStatus(f *subFramework.Framework) {
 	}
 
 	fipsClusterName := framework.TestContext.ClusterIDs[fipsCluster]
-	By(fmt.Sprintf("Found enabled FIPS on cluster %q", fipsClusterName))
+	framework.By(fmt.Sprintf("Found enabled FIPS on cluster %q", fipsClusterName))
 
 	submEndpoint := f.AwaitSubmarinerEndpoint(fipsCluster, subFramework.NoopCheckEndpoint)
 
@@ -57,7 +57,7 @@ func testFIPSGatewayStatus(f *subFramework.Framework) {
 		framework.Skipf(fmt.Sprintf("Cluster %q is not using the libreswan cable driver, skipping the test...", fipsClusterName))
 	}
 
-	By(fmt.Sprintf("Locate active gateway pod on cluster %q", fipsClusterName))
+	framework.By(fmt.Sprintf("Locate active gateway pod on cluster %q", fipsClusterName))
 
 	gwPod := f.AwaitActiveGatewayPod(fipsCluster, nil)
 	Expect(gwPod).ToNot(BeNil(), "Did not find an active gateway pod")
