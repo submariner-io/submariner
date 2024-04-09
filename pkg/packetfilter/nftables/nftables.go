@@ -85,9 +85,13 @@ func New() (packetfilter.Driver, error) {
 		return nil, errors.Wrap(err, "error creating knftables")
 	}
 
+	return NewWithNft(nft), nil
+}
+
+func NewWithNft(nft knftables.Interface) packetfilter.Driver {
 	return &packetFilter{
 		nftables: nft,
-	}, nil
+	}
 }
 
 func (p *packetFilter) ChainExists(_ packetfilter.TableType, chain string) (bool, error) {
