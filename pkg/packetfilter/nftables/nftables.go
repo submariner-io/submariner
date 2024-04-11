@@ -112,15 +112,6 @@ func (p *packetFilter) AppendUnique(_ packetfilter.TableType, chain string, rule
 }
 
 func (p *packetFilter) CreateIPHookChainIfNotExists(chain *packetfilter.ChainIPHook) error {
-	exists, err := p.chainExists(chain.Name)
-	if err != nil {
-		return errors.Wrapf(err, "failed to check if chain %q exists", chain.Name)
-	}
-
-	if exists {
-		return nil
-	}
-
 	tx := p.newTransactionWithTable()
 	chainPriority := iphookChainTypeToNftablesBasicPriority[chain.Type]
 
@@ -128,34 +119,25 @@ func (p *packetFilter) CreateIPHookChainIfNotExists(chain *packetfilter.ChainIPH
 		chainPriority += "-10"
 	}
 
-	nftChain := &knftables.Chain{
+	tx.Add(&knftables.Chain{
 		Name:     chain.Name,
 		Type:     ptr.To(iphookChainTypeToNftablesType[chain.Type]),
 		Hook:     ptr.To(iphookChainHookToNftablesHook[chain.Hook]),
 		Priority: ptr.To(chainPriority),
-	}
-	tx.Add(nftChain)
-	err = p.nftables.Run(context.TODO(), tx)
+	})
+
+	err := p.nftables.Run(context.TODO(), tx)
 
 	return errors.Wrapf(err, "error creating %q IPHook Chain", chain.Name)
 }
 
-func (p *packetFilter) CreateChainIfNotExists(table packetfilter.TableType, chain *packetfilter.Chain) error {
-	exists, err := p.ChainExists(table, chain.Name)
-	if err != nil {
-		return errors.Wrapf(err, "failed to check if %q chain exists", chain.Name)
-	}
-
-	if exists {
-		return nil
-	}
-
+func (p *packetFilter) CreateChainIfNotExists(_ packetfilter.TableType, chain *packetfilter.Chain) error {
 	tx := p.newTransactionWithTable()
 	tx.Add(&knftables.Chain{
 		Name: chain.Name,
 	})
 
-	err = p.nftables.Run(context.TODO(), tx)
+	err := p.nftables.Run(context.TODO(), tx)
 
 	return errors.Wrapf(err, "error creating chain %q", chain.Name)
 }
