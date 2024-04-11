@@ -63,9 +63,12 @@ func (n *namedSet) Name() string {
 
 func (n *namedSet) Flush() error {
 	tx := n.nftables.NewTransaction()
-
 	tx.Flush(&n.set)
+
 	err := n.nftables.Run(context.TODO(), tx)
+	if knftables.IsNotFound(err) {
+		return nil
+	}
 
 	return errors.Wrapf(err, "error flushing set %q", n.Name())
 }
@@ -75,6 +78,9 @@ func (n *namedSet) Destroy() error {
 	tx.Delete(&n.set)
 
 	err := n.nftables.Run(context.TODO(), tx)
+	if knftables.IsNotFound(err) {
+		return nil
+	}
 
 	return errors.Wrapf(err, "error deleting set %q", n.Name())
 }
