@@ -302,6 +302,9 @@ var _ = Describe("Interface", func() {
 
 		assertSets()
 
+		Expect(set.Destroy()).To(Succeed())
+		Expect(set.Flush()).To(Succeed())
+
 		err = set.Create(true)
 		Expect(err).To(Succeed())
 
