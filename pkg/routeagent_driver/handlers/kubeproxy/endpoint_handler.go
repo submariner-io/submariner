@@ -24,6 +24,7 @@ import (
 	"github.com/pkg/errors"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cidr"
+	"github.com/submariner-io/submariner/pkg/vxlan"
 )
 
 func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
@@ -33,31 +34,33 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 	if !kp.State().IsOnGateway() {
 		// If the node already has a vxLAN interface that points to an oldEndpoint
 		// (i.e., during gateway migration), delete it.
-		if kp.vxlanDevice != nil && kp.vxlanDevice.activeEndpointHostname != endpoint.Spec.Hostname {
-			err := kp.vxlanDevice.deleteVxLanIface()
+		if kp.vxlanDevice != nil && kp.activeEndpointHostname != endpoint.Spec.Hostname {
+			err := kp.vxlanDevice.DeleteLinkDevice()
 			if err != nil {
 				return errors.Wrapf(err, "failed to delete the vxlan interface that points to old endpoint %s",
-					kp.vxlanDevice.activeEndpointHostname)
+					kp.activeEndpointHostname)
 			}
 
 			kp.vxlanDevice = nil
+			kp.activeEndpointHostname = ""
 		}
 
 		localClusterGwNodeIP := net.ParseIP(endpoint.Spec.PrivateIP)
 
-		remoteVtepIP, err := getVxlanVtepIPAddress(localClusterGwNodeIP.String())
+		remoteVtepIP, err := vxlan.GetVtepIPAddressFrom(localClusterGwNodeIP.String(), VxLANVTepNetworkPrefix)
 		if err != nil {
 			return errors.Wrap(err, "failed to derive the remoteVtepIP")
 		}
 
 		logger.Infof("Creating the vxlan interface %s with gateway node IP %s", VxLANIface, localClusterGwNodeIP)
 
-		err = kp.createVxLANInterface(endpoint.Spec.Hostname, VxInterfaceWorker, localClusterGwNodeIP)
+		err = kp.createVxLANInterface(VxInterfaceWorker, localClusterGwNodeIP)
 		if err != nil {
 			logger.Fatalf("Unable to create VxLAN interface on non-GatewayNode (%s): %v", endpoint.Spec.Hostname, err)
 		}
 
 		kp.vxlanGwIP = &remoteVtepIP
+		kp.activeEndpointHostname = endpoint.Spec.Hostname
 
 		err = kp.reconcileRoutes(remoteVtepIP)
 		if err != nil {
@@ -70,10 +73,11 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 
 func (kp *SyncHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 	// If the vxLAN device exists and it points to the same endpoint, delete it.
-	if kp.vxlanDevice != nil && kp.vxlanDevice.activeEndpointHostname == endpoint.Spec.Hostname {
-		err := kp.vxlanDevice.deleteVxLanIface()
+	if kp.vxlanDevice != nil && kp.activeEndpointHostname == endpoint.Spec.Hostname {
+		err := kp.vxlanDevice.DeleteLinkDevice()
 		kp.vxlanDevice = nil
 		kp.vxlanGwIP = nil
+		kp.activeEndpointHostname = ""
 
 		if err != nil {
 			return errors.Wrap(err, "failed to delete the vxlan interface on Endpoint removal")

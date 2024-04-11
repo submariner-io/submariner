@@ -24,12 +24,13 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/cable/vxlan"
+	vxlandriver "github.com/submariner-io/submariner/pkg/cable/vxlan"
 	"github.com/submariner-io/submariner/pkg/cidr"
 	"github.com/submariner-io/submariner/pkg/event"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	"github.com/submariner-io/submariner/pkg/vxlan"
 	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -260,8 +261,8 @@ func (h *mtuHandler) forceMssClamping(endpoint *submV1.Endpoint) error {
 		}
 
 		overHeadSize := MaxIPSecOverhead
-		if endpoint.Spec.Backend == vxlan.CableDriverName {
-			overHeadSize = vxlan.VxlanOverhead
+		if endpoint.Spec.Backend == vxlandriver.CableDriverName {
+			overHeadSize = vxlan.MTUOverhead
 		}
 
 		tcpMssValue = defaultHostIface.MTU - overHeadSize

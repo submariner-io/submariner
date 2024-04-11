@@ -78,7 +78,13 @@ func main() {
 	logger.FatalOnError(err, "Error building kube config")
 
 	submarinerClient, err := submarinerClientset.NewForConfig(cfg)
-	logger.FatalOnError(err, "Error building submariner clientse")
+	logger.FatalOnError(err, "Error building submariner clientset")
+
+	k8sClient, err := kubernetes.NewForConfig(cfg)
+	logger.FatalOnError(err, "Error creating Kubernetes clientset")
+
+	dynClient, err := dynamic.NewForConfig(cfg)
+	logger.FatalOnError(err, "Unable to create dynamic client")
 
 	// set packetfilter driver to iptables
 	// TODO: check which driver is supported on platform
@@ -86,9 +92,10 @@ func main() {
 
 	if spec.Uninstall {
 		logger.Info("Uninstalling submariner-globalnet")
+
 		controllers.UninstallDataPath()
-		controllers.DeleteGlobalnetObjects(submarinerClient, cfg)
-		controllers.RemoveGlobalIPAnnotationOnNode(cfg)
+		controllers.DeleteGlobalnetObjects(submarinerClient, dynClient)
+		controllers.RemoveGlobalIPAnnotationOnNode(k8sClient)
 
 		return
 	}
@@ -127,14 +134,8 @@ func main() {
 		logger.Fatalf("Cluster %s is not configured to use globalCidr", spec.ClusterID)
 	}
 
-	k8sClient, err := kubernetes.NewForConfig(cfg)
-	logger.FatalOnError(err, "Error creating Kubernetes clientset")
-
 	hostname, err := os.Hostname()
 	logger.FatalOnError(err, "Unable to determine hostname")
-
-	dynClient, err := dynamic.NewForConfig(cfg)
-	logger.FatalOnError(err, "Unable to create dynamic client")
 
 	restMapper, err := util.BuildRestMapper(cfg)
 	logger.FatalOnError(err, "Unable to build the REST mapper")

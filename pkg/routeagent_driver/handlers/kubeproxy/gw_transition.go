@@ -47,7 +47,9 @@ func (kp *SyncHandler) TransitionToGateway() error {
 
 	logger.Infof("Creating the vxlan interface: %s on the gateway node", VxLANIface)
 
-	err := kp.createVxLANInterface(kp.hostname, VxInterfaceGateway, nil)
+	kp.activeEndpointHostname = kp.hostname
+
+	err := kp.createVxLANInterface(VxInterfaceGateway, nil)
 	if err != nil {
 		logger.Fatalf("Unable to create VxLAN interface on gateway node (%s): %v", kp.hostname, err)
 	}

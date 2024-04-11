@@ -30,6 +30,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	cniapi "github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
+	"github.com/submariner-io/submariner/pkg/vxlan"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/utils/set"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -41,17 +42,18 @@ type SyncHandler struct {
 	localClusterCidr []string
 	localServiceCidr []string
 
-	remoteSubnets    set.Set[string]
-	remoteSubnetGw   map[string]net.IP
-	remoteVTEPs      set.Set[string]
-	routeCacheGWNode set.Set[string]
-	pFilter          packetfilter.Interface
-	netLink          netlink.Interface
-	vxlanDevice      *vxLanIface
-	vxlanGwIP        *net.IP
-	hostname         string
-	cniIface         *cniapi.Interface
-	defaultHostIface *net.Interface
+	remoteSubnets          set.Set[string]
+	remoteSubnetGw         map[string]net.IP
+	remoteVTEPs            set.Set[string]
+	routeCacheGWNode       set.Set[string]
+	pFilter                packetfilter.Interface
+	netLink                netlink.Interface
+	vxlanDevice            *vxlan.Interface
+	vxlanGwIP              *net.IP
+	hostname               string
+	cniIface               *cniapi.Interface
+	defaultHostIface       *net.Interface
+	activeEndpointHostname string
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("KubeProxy")}

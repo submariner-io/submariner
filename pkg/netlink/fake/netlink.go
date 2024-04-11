@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"reflect"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -33,10 +34,15 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
+type linkType struct {
+	netlink.Link
+	isSetup bool
+}
+
 type basicType struct {
 	mutex        sync.Mutex
 	linkIndices  map[string]int
-	links        map[string]netlink.Link
+	links        map[string]*linkType
 	routes       map[int][]netlink.Route
 	neighbors    map[int][]netlink.Neigh
 	rules        map[int][]netlink.Rule
@@ -65,7 +71,7 @@ func New() *NetLink {
 	return &NetLink{
 		Adapter: netlinkAPI.Adapter{Basic: &basicType{
 			linkIndices: map[string]int{},
-			links:       map[string]netlink.Link{},
+			links:       map[string]*linkType{},
 			routes:      map[int][]netlink.Route{},
 			neighbors:   map[int][]netlink.Neigh{},
 			rules:       map[int][]netlink.Rule{},
@@ -94,7 +100,7 @@ func (n *basicType) LinkAdd(link netlink.Link) error {
 	}
 
 	link.Attrs().Index = n.linkIndices[link.Attrs().Name]
-	n.links[link.Attrs().Name] = link
+	n.links[link.Attrs().Name] = &linkType{Link: link}
 
 	return nil
 }
@@ -117,10 +123,20 @@ func (n *basicType) LinkByName(name string) (netlink.Link, error) {
 		return nil, linkNotFoundError{}
 	}
 
-	return link, nil
+	return link.Link, nil
 }
 
-func (n *basicType) LinkSetUp(_ netlink.Link) error {
+func (n *basicType) LinkSetUp(link netlink.Link) error {
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
+
+	l, found := n.links[link.Attrs().Name]
+	if !found {
+		return linkNotFoundError{}
+	}
+
+	l.isSetup = true
+
 	return nil
 }
 
@@ -217,11 +233,36 @@ func (n *basicType) NeighDel(neigh *netlink.Neigh) error {
 	return nil
 }
 
+//nolint:gocritic // Ignore hugeParam.
+func routeKey(r netlink.Route) string {
+	k := ""
+	if r.Gw != nil {
+		k = r.Gw.String()
+	}
+
+	if r.Dst != nil {
+		k += r.Dst.String()
+	}
+
+	if r.Src != nil {
+		k += r.Src.String()
+	}
+
+	k += strconv.Itoa(r.Table)
+
+	return k
+}
+
 func (n *basicType) RouteAdd(route *netlink.Route) error {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
-	n.routes[route.LinkIndex] = append(n.routes[route.LinkIndex], *route)
+	var added bool
+
+	n.routes[route.LinkIndex], added = slices.AppendIfNotPresent(n.routes[route.LinkIndex], *route, routeKey)
+	if !added {
+		return syscall.EEXIST
+	}
 
 	return nil
 }
@@ -233,10 +274,24 @@ func (n *basicType) RouteDel(route *netlink.Route) error {
 	routes := n.routes[route.LinkIndex]
 
 	for i := range routes {
-		if reflect.DeepEqual(routes[i], *route) {
+		if reflect.DeepEqual(routes[i].Dst, route.Dst) {
 			n.routes[route.LinkIndex] = append(routes[:i], routes[i+1:]...)
 			break
 		}
+	}
+
+	return nil
+}
+
+func (n *basicType) RouteReplace(route *netlink.Route) error {
+	n.mutex.Lock()
+	defer n.mutex.Unlock()
+
+	index := slices.IndexOf(n.routes[route.LinkIndex], routeKey(*route), routeKey)
+	if index >= 0 {
+		n.routes[route.LinkIndex][index] = *route
+	} else {
+		n.routes[route.LinkIndex] = append(n.routes[route.LinkIndex], *route)
 	}
 
 	return nil
@@ -409,6 +464,22 @@ func (n *NetLink) AwaitNoLink(name string) {
 		_, err := n.LinkByName(name)
 		return errors.Is(err, netlink.LinkNotFoundError{})
 	}, 5).Should(BeTrue(), "Link %q exists", name)
+}
+
+func (n *NetLink) AwaitLinkSetup(name string) (link netlink.Link) {
+	Eventually(func() bool {
+		n.basic().mutex.Lock()
+		defer n.basic().mutex.Unlock()
+
+		link, found := n.basic().links[name]
+		if found {
+			return link.isSetup
+		}
+
+		return false
+	}, 5).Should(BeTrue(), "Link %q not setup", name)
+
+	return
 }
 
 func routeList[T any](n *NetLink, linkIndex, table int, f func(r *netlink.Route) *T) []T {

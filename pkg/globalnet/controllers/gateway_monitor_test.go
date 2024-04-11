@@ -26,18 +26,23 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	fake "github.com/submariner-io/admiral/pkg/fake"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	testutil "github.com/submariner-io/admiral/pkg/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	fakesubmariner "github.com/submariner-io/submariner/pkg/client/clientset/versioned/fake"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	fakeNetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
-	k8sfake "k8s.io/client-go/kubernetes/fake"
+	fakek8s "k8s.io/client-go/kubernetes/fake"
 )
 
 const (
@@ -171,6 +176,32 @@ var _ = Describe("Endpoint monitoring", func() {
 				})
 			})
 		})
+
+		Context("and a stale internal service is being deleted", func() {
+			const serviceName = "stale-service"
+			internalServiceName := controllers.GetInternalSvcName(serviceName)
+
+			JustBeforeEach(func() {
+				internalService := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: internalServiceName,
+						Labels: map[string]string{
+							controllers.InternalServiceLabel: serviceName,
+						},
+						Finalizers: []string{controllers.InternalServiceFinalizer},
+					},
+				}
+
+				_, err := t.services.Create(context.Background(), resource.MustToUnstructured(internalService), metav1.CreateOptions{})
+				Expect(err).To(Succeed())
+
+				Expect(t.services.Delete(context.Background(), internalServiceName, metav1.DeleteOptions{})).To(Succeed())
+			})
+
+			It("should remove the finalizer", func() {
+				test.AwaitNoResource(t.services, internalServiceName)
+			})
+		})
 	})
 
 	Context("and a local gateway Endpoint corresponding to another host is created", func() {
@@ -205,11 +236,153 @@ var _ = Describe("Endpoint monitoring", func() {
 	})
 })
 
+var _ = Describe("Uninstall", func() {
+	var t *testDriverBase
+
+	const ipSetName = controllers.IPSetPrefix + "abd"
+
+	BeforeEach(func() {
+		t = newTestDriverBase()
+		t.initChains()
+
+		Expect(t.pFilter.NewNamedSet(&packetfilter.SetInfo{
+			Name: ipSetName,
+		}).Create(true)).To(Succeed())
+
+		Expect(t.pFilter.NewNamedSet(&packetfilter.SetInfo{
+			Name: "other",
+		}).Create(true)).To(Succeed())
+	})
+
+	Specify("UninstallDataPath should remove the IP table chains and sets", func() {
+		controllers.UninstallDataPath()
+
+		for _, chain := range []string{
+			constants.SmGlobalnetEgressChainForCluster,
+			constants.SmGlobalnetEgressChainForHeadlessSvcPods,
+			constants.SmGlobalnetEgressChainForHeadlessSvcEPs,
+			constants.SmGlobalnetEgressChainForNamespace,
+			constants.SmGlobalnetEgressChainForPods,
+			constants.SmGlobalnetIngressChain,
+			constants.SmGlobalnetMarkChain,
+			constants.SmGlobalnetEgressChain,
+		} {
+			t.pFilter.AwaitNoChain(packetfilter.TableTypeNAT, chain)
+		}
+
+		t.pFilter.AwaitSetDeleted(ipSetName)
+		t.pFilter.AwaitSet("other")
+	})
+
+	Specify("RemoveGlobalIPAnnotationOnNode should remove the annotation if it exists", func() {
+		os.Setenv("NODE_NAME", nodeName)
+
+		kubeClient := fakek8s.NewSimpleClientset()
+
+		node := &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: nodeName,
+			},
+		}
+
+		// No annotation present should be a no-op.
+		_, err := kubeClient.CoreV1().Nodes().Create(context.Background(), node, metav1.CreateOptions{})
+		Expect(err).To(Succeed())
+
+		controllers.RemoveGlobalIPAnnotationOnNode(kubeClient)
+
+		Expect(kubeClient.CoreV1().Nodes().Delete(context.Background(), nodeName, metav1.DeleteOptions{})).To(Succeed())
+
+		node.Annotations = map[string]string{constants.SmGlobalIP: "1.2.3.4"}
+
+		_, err = kubeClient.CoreV1().Nodes().Create(context.Background(), node, metav1.CreateOptions{})
+		Expect(err).To(Succeed())
+
+		controllers.RemoveGlobalIPAnnotationOnNode(kubeClient)
+
+		node, err = kubeClient.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
+		Expect(err).To(Succeed())
+		Expect(node.Annotations).ToNot(HaveKey(constants.SmGlobalIP))
+	})
+
+	Specify("DeleteGlobalnetObjects should delete all Globalnet resources and internal Services", func() {
+		submClient := fakesubmariner.NewSimpleClientset()
+		fake.AddBasicReactors(&submClient.Fake)
+
+		clusterEgressIP, err := submClient.SubmarinerV1().ClusterGlobalEgressIPs("").Create(context.Background(),
+			&submarinerv1.ClusterGlobalEgressIP{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster-egressIP",
+				},
+			}, metav1.CreateOptions{})
+		Expect(err).To(Succeed())
+
+		egressIP, err := submClient.SubmarinerV1().GlobalEgressIPs(namespace).Create(context.Background(),
+			&submarinerv1.GlobalEgressIP{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "egressIP",
+				},
+			}, metav1.CreateOptions{})
+		Expect(err).To(Succeed())
+
+		serviceName := "service"
+		internalServiceName := controllers.GetInternalSvcName(serviceName)
+
+		internalService := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: internalServiceName,
+				Labels: map[string]string{
+					controllers.InternalServiceLabel: serviceName,
+				},
+				Finalizers: []string{controllers.InternalServiceFinalizer},
+			},
+		}
+
+		_, err = t.services.Create(context.Background(), resource.MustToUnstructured(internalService), metav1.CreateOptions{})
+		Expect(err).To(Succeed())
+
+		ingressIP, err := submClient.SubmarinerV1().GlobalIngressIPs(namespace).Create(context.Background(),
+			&submarinerv1.GlobalIngressIP{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "ingressIP",
+				},
+				Spec: submarinerv1.GlobalIngressIPSpec{
+					ServiceRef: &corev1.LocalObjectReference{Name: serviceName},
+				},
+			}, metav1.CreateOptions{})
+		Expect(err).To(Succeed())
+
+		_, err = submClient.SubmarinerV1().GlobalIngressIPs(namespace).Create(context.Background(),
+			&submarinerv1.GlobalIngressIP{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "ingressIP-no-service-ref",
+				},
+			}, metav1.CreateOptions{})
+		Expect(err).To(Succeed())
+
+		controllers.DeleteGlobalnetObjects(submClient, t.dynClient)
+
+		_, err = submClient.SubmarinerV1().ClusterGlobalEgressIPs("").Get(context.Background(), clusterEgressIP.Name,
+			metav1.GetOptions{})
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
+
+		_, err = submClient.SubmarinerV1().GlobalEgressIPs(namespace).Get(context.Background(), egressIP.Name,
+			metav1.GetOptions{})
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
+
+		_, err = submClient.SubmarinerV1().GlobalIngressIPs(namespace).Get(context.Background(), ingressIP.Name,
+			metav1.GetOptions{})
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
+
+		test.AwaitNoResource(t.services, internalServiceName)
+	})
+})
+
 type gatewayMonitorTestDriver struct {
 	*testDriverBase
 	endpoints            dynamic.ResourceInterface
 	hostName             string
-	kubeClient           *k8sfake.Clientset
+	kubeClient           *fakek8s.Clientset
 	leaderElectionConfig controllers.LeaderElectionConfig
 	leaderElection       *testutil.LeaderElectionSupport
 }
@@ -223,7 +396,7 @@ func newGatewayMonitorTestDriver() *gatewayMonitorTestDriver {
 		t.endpoints = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.Endpoint{})).
 			Namespace(namespace)
 
-		t.kubeClient = k8sfake.NewSimpleClientset()
+		t.kubeClient = fakek8s.NewSimpleClientset()
 		t.leaderElectionConfig = controllers.LeaderElectionConfig{}
 		t.leaderElection = testutil.NewLeaderElectionSupport(t.kubeClient, namespace, controllers.LeaderElectionLockName)
 
