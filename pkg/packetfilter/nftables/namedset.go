@@ -108,7 +108,7 @@ func (n *namedSet) DelEntry(entry string) error {
 
 	err := n.nftables.Run(context.TODO(), tx)
 
-	return errors.Wrap(err, "error deleting entry to set")
+	return errors.Wrapf(err, "error deleting entry %q from set %q", entry, n.Name())
 }
 
 func (n *namedSet) ListEntries() ([]string, error) {
