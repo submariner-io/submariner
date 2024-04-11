@@ -23,6 +23,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/knftables"
 )
@@ -74,15 +75,7 @@ func (n *namedSet) Flush() error {
 }
 
 func (n *namedSet) Destroy() error {
-	tx := n.nftables.NewTransaction()
-	tx.Delete(&n.set)
-
-	err := n.nftables.Run(context.TODO(), tx)
-	if knftables.IsNotFound(err) {
-		return nil
-	}
-
-	return errors.Wrapf(err, "error deleting set %q", n.Name())
+	return deleteSet(n.nftables, n.set.Name)
 }
 
 func (n *namedSet) AddEntry(entry string, _ bool) error {
@@ -132,22 +125,28 @@ func (p *packetFilter) DestroySets(nameFilter func(string) bool) error {
 		return errors.Wrap(err, "error listing sets")
 	}
 
-	retErr := error(nil)
+	var errs []error
 
 	for _, set := range setsList {
 		if nameFilter(set) {
-			tx := p.nftables.NewTransaction()
-			tx.Delete(&knftables.Set{
-				Name: set,
-			})
-
-			err = p.nftables.Run(context.TODO(), tx)
-			if err != nil && !knftables.IsNotFound(err) {
-				logger.Errorf(err, "Error destroying the set %q", set)
-				retErr = err
-			}
+			err = deleteSet(p.nftables, set)
+			errs = append(errs, err)
 		}
 	}
 
-	return retErr
+	return utilerrors.NewAggregate(errs)
+}
+
+func deleteSet(nftables knftables.Interface, name string) error {
+	tx := nftables.NewTransaction()
+	tx.Delete(&knftables.Set{
+		Name: name,
+	})
+
+	err := nftables.Run(context.TODO(), tx)
+	if knftables.IsNotFound(err) {
+		return nil
+	}
+
+	return errors.Wrapf(err, "error deleting set %q", name)
 }
