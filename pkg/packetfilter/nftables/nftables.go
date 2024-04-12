@@ -108,6 +108,15 @@ func (p *packetFilter) chainExists(chain string) (bool, error) {
 }
 
 func (p *packetFilter) AppendUnique(_ packetfilter.TableType, chain string, rule *packetfilter.Rule) error {
+	_, found, err := p.getNftablesRuleFromList(chain, rule)
+	if err != nil {
+		return err
+	}
+
+	if found {
+		return nil
+	}
+
 	return p.insertRuleAtPosition(chain, rule, -1)
 }
 
