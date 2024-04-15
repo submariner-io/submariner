@@ -75,14 +75,14 @@ func (n *namedSet) Flush() error {
 }
 
 func (n *namedSet) Destroy() error {
-	return deleteSet(n.nftables, n.set.Name)
+	return deleteSet(n.nftables, n.Name())
 }
 
 func (n *namedSet) AddEntry(entry string, _ bool) error {
 	tx := n.nftables.NewTransaction()
 
 	tx.Add(&knftables.Element{
-		Set: n.set.Name,
+		Set: n.Name(),
 		Key: []string{entry},
 	})
 
@@ -95,7 +95,7 @@ func (n *namedSet) DelEntry(entry string) error {
 	tx := n.nftables.NewTransaction()
 
 	tx.Delete(&knftables.Element{
-		Set: n.set.Name,
+		Set: n.Name(),
 		Key: []string{entry},
 	})
 
@@ -105,7 +105,7 @@ func (n *namedSet) DelEntry(entry string) error {
 }
 
 func (n *namedSet) ListEntries() ([]string, error) {
-	nftablesElems, err := n.nftables.ListElements(context.TODO(), "set", n.set.Name)
+	nftablesElems, err := n.nftables.ListElements(context.TODO(), "set", n.Name())
 	if err != nil {
 		return []string{}, errors.Wrapf(err, "error listing elements for set %q", n.Name())
 	}
