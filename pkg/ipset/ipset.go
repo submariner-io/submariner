@@ -57,10 +57,13 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/command"
 	"github.com/submariner-io/admiral/pkg/log"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -480,9 +483,24 @@ func (runner *runner) FlushSet(set string) error {
 	return err
 }
 
+func (runner *runner) retryIfInUse(args []string, errFormat string, a ...interface{}) error {
+	backoff := wait.Backoff{
+		Duration: 100 * time.Millisecond,
+		Factor:   1.0,
+		Steps:    20,
+	}
+
+	//nolint:wrapcheck // No need to wrap.
+	return retry.OnError(backoff, func(err error) bool {
+		return strings.Contains(err.Error(), "is in use")
+	}, func() error {
+		return runner.run(args, errFormat, a...)
+	})
+}
+
 // DestroySet is used to destroy a named set.
 func (runner *runner) DestroySet(set string) error {
-	err := runner.run([]string{"destroy", set}, "error destroying set %q", set)
+	err := runner.retryIfInUse([]string{"destroy", set}, "error destroying set %q", set)
 	if IsNotFoundError(err) {
 		return nil
 	}
@@ -492,7 +510,7 @@ func (runner *runner) DestroySet(set string) error {
 
 // DestroyAllSets is used to destroy all sets.
 func (runner *runner) DestroyAllSets() error {
-	return runner.run([]string{"destroy"}, "error destroying all sets")
+	return runner.retryIfInUse([]string{"destroy"}, "error destroying all sets")
 }
 
 // ListSets list all set names from kernel.
