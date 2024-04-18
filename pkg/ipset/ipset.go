@@ -541,7 +541,7 @@ func (runner *runner) ListEntries(set string) ([]string, error) {
 
 	for i := range strs {
 		if strs[i] != "" {
-			results = append(results, strs[i])
+			results = append(results, strings.TrimSpace(strs[i]))
 		}
 	}
 
