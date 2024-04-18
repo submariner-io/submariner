@@ -117,6 +117,15 @@ var EntryMemberPattern = "(?m)^(.*\n)*Members:\n"
 // ipset version output is similar to "v6.10".
 var VersionPattern = "v[0-9]+\\.[0-9]+"
 
+type PortRange struct {
+	Begin uint
+	End   uint
+}
+
+func (p PortRange) String() string {
+	return fmt.Sprintf("%d-%d", p.Begin, p.End)
+}
+
 // IPSet implements an Interface to an set.
 type IPSet struct {
 	// Name is the set name.
@@ -131,7 +140,7 @@ type IPSet struct {
 	// MaxElem specifies the max element number of ipset.
 	MaxElem uint
 	// PortRange specifies the port range of bitmap:port type ipset.
-	PortRange string
+	PortRange PortRange
 	// TODO: add comment message for ipset
 }
 
@@ -143,7 +152,7 @@ type Entry struct {
 	// All entries' IP addresses in the same ip set has same the protocol, IPv4 or IPv6.
 	IP string
 	// Port is the entry's Port.
-	Port int
+	Port uint
 	// Protocol is the entry's Protocol.  The protocols of entries in the same ip set are all
 	// the same.  The accepted protocols are TCP and UDP.
 	Protocol string
@@ -160,11 +169,6 @@ type Entry struct {
 
 // Validate checks if a given ipset entry is valid or not.  The set parameter is the ipset that entry belongs to.
 func (e *Entry) Validate(set *IPSet) bool {
-	if e.Port < 0 {
-		logger.Errorf(nil, "Entry %v port number %d should be >=0 for ipset %v", e, e.Port, set)
-		return false
-	}
-
 	switch e.SetType {
 	case HashIP:
 		return e.validateHashIP(set)
@@ -236,13 +240,15 @@ func (e *Entry) validateBitmapPort(set *IPSet) bool {
 		return false
 	}
 
-	begin, end, err := parsePortRange(set.PortRange)
-	if err != nil {
-		logger.Errorf(err, "Failed to parse set %v port range %s for ipset %v", set, set.PortRange, set)
-		return false
+	beginPort := set.PortRange.Begin
+	endPort := set.PortRange.End
+
+	// switch when first port number > second port number
+	if beginPort > endPort {
+		beginPort, endPort = endPort, beginPort
 	}
 
-	if e.Port < begin || e.Port > end {
+	if e.Port < beginPort || e.Port > endPort {
 		logger.Errorf(nil, "Entry %v port number %d is not in the port range %s of its ipset %v", e, e.Port, set.PortRange, set)
 		return false
 	}
@@ -275,25 +281,25 @@ func (e *Entry) String() string {
 	case HashIPPort:
 		// Entry{192.168.1.1, udp, 53} -> 192.168.1.1,udp:53
 		// Entry{192.168.1.2, tcp, 8080} -> 192.168.1.2,tcp:8080
-		return fmt.Sprintf("%s,%s:%s", e.IP, e.Protocol, strconv.Itoa(e.Port))
+		return fmt.Sprintf("%s,%s:%d", e.IP, e.Protocol, e.Port)
 	case HashIPPortIP:
 		// Entry{192.168.1.1, udp, 53, 10.0.0.1} -> 192.168.1.1,udp:53,10.0.0.1
 		// Entry{192.168.1.2, tcp, 8080, 192.168.1.2} -> 192.168.1.2,tcp:8080,192.168.1.2
-		return fmt.Sprintf("%s,%s:%s,%s", e.IP, e.Protocol, strconv.Itoa(e.Port), e.IP2)
+		return fmt.Sprintf("%s,%s:%d,%s", e.IP, e.Protocol, e.Port, e.IP2)
 	case HashIPPortNet:
 		// Entry{192.168.1.2, udp, 80, 10.0.1.0/24} -> 192.168.1.2,udp:80,10.0.1.0/24
 		// Entry{192.168.2,25, tcp, 8080, 10.1.0.0/16} -> 192.168.2,25,tcp:8080,10.1.0.0/16
-		return fmt.Sprintf("%s,%s:%s,%s", e.IP, e.Protocol, strconv.Itoa(e.Port), e.Net)
+		return fmt.Sprintf("%s,%s:%d,%s", e.IP, e.Protocol, e.Port, e.Net)
 	case HashNet:
 		// Entry{udp, 10.0.1.0/24} -> 10.0.1.0/24
 		return e.Net
 	case HashNetPort:
 		// Entry{udp, 80, 10.0.1.0/24} -> 10.0.1.0/24,udp:80
-		return fmt.Sprintf("%s,%s:%s", e.Net, e.Protocol, strconv.Itoa(e.Port))
+		return fmt.Sprintf("%s,%s:%d", e.Net, e.Protocol, e.Port)
 	case BitmapPort:
 		// Entry{53} -> 53
 		// Entry{8080} -> 8080
-		return strconv.Itoa(e.Port)
+		return strconv.FormatUint(uint64(e.Port), 10)
 	}
 
 	return ""
@@ -343,7 +349,7 @@ func (runner *runner) CreateSet(set *IPSet, ignoreExistErr bool) error {
 		set.SetType = HashIPPort
 	}
 
-	if set.PortRange == "" {
+	if set.PortRange.Begin == 0 && set.PortRange.End == 0 {
 		set.PortRange = DefaultPortRange
 	}
 
@@ -363,7 +369,7 @@ func (runner *runner) createSet(set *IPSet, ignoreExistErr bool) error {
 	}
 
 	if set.SetType == BitmapPort {
-		args = append(args, "range", set.PortRange)
+		args = append(args, "range", set.PortRange.String())
 	}
 
 	if ignoreExistErr {
@@ -577,45 +583,4 @@ func validateProtocol(protocol string) bool {
 	logger.Errorf(nil, "Invalid entry's protocol: %s, supported protocols are [%s, %s]", protocol, ProtocolTCP, ProtocolUDP)
 
 	return false
-}
-
-// parsePortRange parse the begin and end port from a raw string(format: a-b).  beginPort <= endPort
-// in the return value.
-func parsePortRange(portRange string) (beginPort, endPort int, err error) {
-	if portRange == "" {
-		portRange = DefaultPortRange
-	}
-
-	strs := strings.Split(portRange, "-")
-	if len(strs) != 2 {
-		// port number -1 indicates invalid
-		return -1, -1, fmt.Errorf("port range should be in the format of `a-b`")
-	}
-
-	for i := range strs {
-		num, err := strconv.Atoi(strs[i])
-		if err != nil {
-			// port number -1 indicates invalid
-			return -1, -1, errors.Wrapf(err, "error converting %s to int", strs[i])
-		}
-
-		if num < 0 {
-			// port number -1 indicates invalid
-			return -1, -1, fmt.Errorf("port number %d should be >=0", num)
-		}
-
-		if i == 0 {
-			beginPort = num
-			continue
-		}
-
-		endPort = num
-		// switch when first port number > second port number
-		if beginPort > endPort {
-			endPort = beginPort
-			beginPort = num
-		}
-	}
-
-	return beginPort, endPort, nil
 }

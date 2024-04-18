@@ -77,7 +77,9 @@ const (
 )
 
 // DefaultPortRange defines the default bitmap:port valid port range.
-const DefaultPortRange string = "0-65535"
+var DefaultPortRange = PortRange{
+	End: 65535,
+}
 
 type ProtocolFamilyType string
 
