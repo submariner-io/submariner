@@ -383,12 +383,10 @@ func (runner *runner) createSet(set *IPSet, ignoreExistErr bool) error {
 // If the -exist option is specified, ipset ignores the error otherwise raised when
 // the same set (setname and create parameters are identical) already exists.
 func (runner *runner) AddEntry(entry string, set string, ignoreExistErr bool) error {
-	args := []string{"add", set, entry}
-	if ignoreExistErr {
-		args = append(args, "-exist")
-	}
-
-	return runner.run(args, "error adding entry %q to set %q", entry, set)
+	return runner.AddEntryWithOptions(&Entry{
+		SetType: HashIP,
+		IP:      entry,
+	}, set, ignoreExistErr)
 }
 
 func (runner *runner) AddEntryWithOptions(entry *Entry, set string, ignoreExistErr bool) error {
