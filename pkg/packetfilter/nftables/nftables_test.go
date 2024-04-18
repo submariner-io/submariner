@@ -62,7 +62,7 @@ var _ = Describe("Rule conversion", func() {
 		testRuleConversion(&packetfilter.Rule{
 			Proto:      packetfilter.RuleProtoAll,
 			SrcSetName: "src-set",
-			MarkValue:  "mark-value",
+			MarkValue:  "0xc0000",
 			SnatCIDR:   "172.254.1.0/24",
 			Action:     packetfilter.RuleActionSNAT,
 		})
@@ -71,7 +71,7 @@ var _ = Describe("Rule conversion", func() {
 		testRuleConversion(&packetfilter.Rule{
 			Proto:     packetfilter.RuleProtoTCP,
 			SrcCIDR:   "171.254.1.0/24",
-			MarkValue: "mark-value",
+			MarkValue: "0xc0000",
 			SnatCIDR:  "172.254.1.0/24",
 			Action:    packetfilter.RuleActionSNAT,
 		})
@@ -87,7 +87,7 @@ var _ = Describe("Rule conversion", func() {
 		// ip daddr 171.254.1.0/24 counter meta mark set mark-value
 		testRuleConversion(&packetfilter.Rule{
 			DestCIDR:  "171.254.1.0/24",
-			MarkValue: "mark-value",
+			MarkValue: "0xc0000",
 			Action:    packetfilter.RuleActionMark,
 		})
 
