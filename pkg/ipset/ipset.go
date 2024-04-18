@@ -52,7 +52,6 @@ package ipset
 import (
 	"bytes"
 	"fmt"
-	"net"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -167,111 +166,6 @@ type Entry struct {
 	Options []string
 }
 
-// Validate checks if a given ipset entry is valid or not.  The set parameter is the ipset that entry belongs to.
-func (e *Entry) Validate(set *IPSet) bool {
-	switch e.SetType {
-	case HashIP:
-		return e.validateHashIP(set)
-	case HashIPPort:
-		return e.validateHashIPPort(set)
-	case HashIPPortIP:
-		return e.validateHashIPPortIP(set)
-	case HashIPPortNet:
-		return e.validateHashIPPortNet(set)
-	case BitmapPort:
-		return e.validateBitmapPort(set)
-	case HashNet:
-		return e.validateHashNet(set)
-	case HashNetPort:
-		return e.validateHashNetPort(set)
-	}
-
-	return true
-}
-
-func (e *Entry) validateHashIP(set *IPSet) bool {
-	if net.ParseIP(e.IP) == nil {
-		logger.Errorf(nil, "Error parsing entry %v ip address %v for ipset %v", e, e.IP, set)
-		return false
-	}
-
-	return true
-}
-
-func (e *Entry) validateHashNet(set *IPSet) bool {
-	// Net can not be empty for `hash:net,port` type ip set
-	if _, ipNet, _ := net.ParseCIDR(e.Net); ipNet == nil {
-		logger.Errorf(nil, "Error parsing entry %v ip net %v for ipset %v", e, e.Net, set)
-		return false
-	}
-
-	return false
-}
-
-func (e *Entry) validateHashIPPort(set *IPSet) bool {
-	if valid := e.validateProtocol(); !valid {
-		return false
-	}
-
-	return e.validateHashIP(set)
-}
-
-func (e *Entry) validateHashIPPortIP(set *IPSet) bool {
-	if valid := e.validateHashIPPort(set); !valid {
-		return false
-	}
-	// IP2 can not be empty for `hash:ip,port,ip` type ip set
-	if net.ParseIP(e.IP2) == nil {
-		logger.Errorf(nil, "Error parsing entry %v second ip address %v for ipset %v", e, e.IP2, set)
-		return false
-	}
-
-	return true
-}
-
-func (e *Entry) validateHashIPPortNet(set *IPSet) bool {
-	return e.validateHashIP(set) && e.validateHashNetPort(set)
-}
-
-func (e *Entry) validateBitmapPort(set *IPSet) bool {
-	// check if port number satisfies its ipset's requirement of port range
-	if set == nil {
-		logger.Errorf(nil, "Unable to reference ip set where the entry %v exists", e)
-		return false
-	}
-
-	beginPort := set.PortRange.Begin
-	endPort := set.PortRange.End
-
-	// switch when first port number > second port number
-	if beginPort > endPort {
-		beginPort, endPort = endPort, beginPort
-	}
-
-	if e.Port < beginPort || e.Port > endPort {
-		logger.Errorf(nil, "Entry %v port number %d is not in the port range %s of its ipset %v", e, e.Port, set.PortRange, set)
-		return false
-	}
-
-	return true
-}
-
-func (e *Entry) validateHashNetPort(set *IPSet) bool {
-	return e.validateProtocol() && e.validateHashNet(set)
-}
-
-func (e *Entry) validateProtocol() bool {
-	if e.Protocol == "" {
-		e.Protocol = ProtocolTCP
-	}
-
-	if valid := validateProtocol(e.Protocol); !valid {
-		return false
-	}
-
-	return true
-}
-
 // String returns the string format for ipset entry.
 func (e *Entry) String() string {
 	switch e.SetType {
@@ -382,7 +276,7 @@ func (runner *runner) createSet(set *IPSet, ignoreExistErr bool) error {
 // AddEntry adds a new entry to the named set.
 // If the -exist option is specified, ipset ignores the error otherwise raised when
 // the same set (setname and create parameters are identical) already exists.
-func (runner *runner) AddEntry(entry string, set string, ignoreExistErr bool) error {
+func (runner *runner) AddEntry(entry, set string, ignoreExistErr bool) error {
 	return runner.AddEntryWithOptions(&Entry{
 		SetType: HashIP,
 		IP:      entry,
@@ -568,17 +462,6 @@ func IsNotFoundError(err error) bool {
 		// xref: https://github.com/Olipro/ipset/blob/master/lib/errcode.c#L88
 		return true
 	}
-
-	return false
-}
-
-// Checks if given protocol is supported in entry.
-func validateProtocol(protocol string) bool {
-	if protocol == ProtocolTCP || protocol == ProtocolUDP {
-		return true
-	}
-
-	logger.Errorf(nil, "Invalid entry's protocol: %s, supported protocols are [%s, %s]", protocol, ProtocolTCP, ProtocolUDP)
 
 	return false
 }
