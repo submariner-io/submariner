@@ -29,6 +29,7 @@ const (
 	MangleTable        = "mangle"
 	RemoteCIDRIPSet    = "SUBMARINER-REMOTECIDRS"
 	LocalCIDRIPSet     = "SUBMARINER-LOCALCIDRS"
+	SmOutputChain      = "SUBMARINER-OUTPUT"
 
 	// In order to support connectivity from HostNetwork to remoteCluster, route-agent tries
 	// to discover the CNIInterface[#] on the respective node and does SNAT of outgoing

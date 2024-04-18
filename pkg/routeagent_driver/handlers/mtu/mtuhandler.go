@@ -90,12 +90,12 @@ func (h *mtuHandler) Init() error {
 	}
 
 	if err := h.pFilter.CreateIPHookChainIfNotExists(&packetfilter.ChainIPHook{
-		Name:     constants.SmPostRoutingChain,
+		Name:     constants.SmOutputChain,
 		Type:     packetfilter.ChainTypeRoute,
-		Hook:     packetfilter.ChainHookPostrouting,
+		Hook:     packetfilter.ChainHookOutput,
 		Priority: packetfilter.ChainPriorityFirst,
 	}); err != nil {
-		return errors.Wrapf(err, "error creating IPHookChain chain %s", constants.SmPostRoutingChain)
+		return errors.Wrapf(err, "error creating IPHookChain chain %s", constants.SmOutputChain)
 	}
 
 	h.remoteIPSet = h.newNamedSetSet(constants.RemoteCIDRIPSet)
@@ -129,11 +129,11 @@ func (h *mtuHandler) Init() error {
 		ClampType:   packetfilter.ToPMTU,
 	}
 
-	if err := h.pFilter.AppendUnique(packetfilter.TableTypeRoute, constants.SmPostRoutingChain, ruleSpecSource); err != nil {
+	if err := h.pFilter.AppendUnique(packetfilter.TableTypeRoute, constants.SmOutputChain, ruleSpecSource); err != nil {
 		return errors.Wrapf(err, "error appending packetfilter rule %q", ruleSpecSource)
 	}
 
-	if err := h.pFilter.AppendUnique(packetfilter.TableTypeRoute, constants.SmPostRoutingChain, ruleSpecDest); err != nil {
+	if err := h.pFilter.AppendUnique(packetfilter.TableTypeRoute, constants.SmOutputChain, ruleSpecDest); err != nil {
 		return errors.Wrapf(err, "error appending packetfilter rule %q", ruleSpecDest)
 	}
 
@@ -227,17 +227,17 @@ func (h *mtuHandler) newNamedSetSet(key string) packetfilter.NamedSet {
 func (h *mtuHandler) Uninstall() error {
 	logger.Infof("Flushing packetfilter entries in %q chain of table type Route", constants.SmPostRoutingChain)
 
-	logError(h.pFilter.ClearChain(packetfilter.TableTypeRoute, constants.SmPostRoutingChain),
-		"Error flushing chain %q of table type Route", constants.SmPostRoutingChain)
+	logError(h.pFilter.ClearChain(packetfilter.TableTypeRoute, constants.SmOutputChain),
+		"Error flushing chain %q of table type Route", constants.SmOutputChain)
 
-	logger.Infof("Deleting IPHook chain %q of table type Route", constants.SmPostRoutingChain)
+	logger.Infof("Deleting IPHook chain %q of table type Route", constants.SmOutputChain)
 
 	logError(h.pFilter.DeleteIPHookChain(&packetfilter.ChainIPHook{
-		Name:     constants.SmPostRoutingChain,
+		Name:     constants.SmOutputChain,
 		Type:     packetfilter.ChainTypeRoute,
-		Hook:     packetfilter.ChainHookPostrouting,
+		Hook:     packetfilter.ChainHookOutput,
 		Priority: packetfilter.ChainPriorityFirst,
-	}), "Error deleting IP hook chain %q of table type Route", constants.SmPostRoutingChain)
+	}), "Error deleting IP hook chain %q of table type Route", constants.SmOutputChain)
 
 	logError(h.localIPSet.Flush(), "Error flushing ipset %q", constants.LocalCIDRIPSet)
 
@@ -288,8 +288,8 @@ func (h *mtuHandler) forceMssClamping(endpoint *submV1.Endpoint) error {
 	},
 	)
 
-	if err := h.pFilter.UpdateChainRules(packetfilter.TableTypeRoute, constants.SmPostRoutingChain, rules); err != nil {
-		return errors.Wrapf(err, "error updating chain %s table type Route", constants.SmPostRoutingChain)
+	if err := h.pFilter.UpdateChainRules(packetfilter.TableTypeRoute, constants.SmOutputChain, rules); err != nil {
+		return errors.Wrapf(err, "error updating chain %s table type Route", constants.SmOutputChain)
 	}
 
 	return nil
