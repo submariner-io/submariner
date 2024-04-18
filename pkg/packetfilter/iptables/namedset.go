@@ -59,7 +59,7 @@ func (n *namedSet) Create(ignoreExistErr bool) error {
 }
 
 func (n *namedSet) AddEntry(entry string, ignoreExistErr bool) error {
-	return errors.Wrap(n.ipSetIface.AddEntry(entry, &n.set, ignoreExistErr), "AddEntry failed")
+	return errors.Wrap(n.ipSetIface.AddEntry(entry, n.set.Name, ignoreExistErr), "AddEntry failed")
 }
 
 func (n *namedSet) DelEntry(entry string) error {
