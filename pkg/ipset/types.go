@@ -89,14 +89,3 @@ const (
 	// ProtocolUDP represents UDP protocol.
 	ProtocolUDP = "udp"
 )
-
-// ValidIPSetTypes defines the supported ip set type.
-var ValidIPSetTypes = []Type{
-	HashIP,
-	HashIPPort,
-	HashIPPortIP,
-	BitmapPort,
-	HashIPPortNet,
-	HashNet,
-	HashNetPort,
-}
