@@ -80,7 +80,7 @@ type Interface interface {
 	// CreateSet creates a new set.  It will ignore error when the set already exists if ignoreExistErr=true.
 	CreateSet(set *IPSet, ignoreExistErr bool) error
 	// AddEntry adds a new entry to the named set.  It will ignore error when the entry already exists if ignoreExistErr=true.
-	AddEntry(entry string, set *IPSet, ignoreExistErr bool) error
+	AddEntry(entry string, set string, ignoreExistErr bool) error
 	// DelEntry deletes one entry from the named set
 	DelEntry(entry string, set string) error
 	// Test test if an entry exists in the named set
@@ -91,7 +91,7 @@ type Interface interface {
 	ListSets() ([]string, error)
 	// GetVersion returns the "X.Y" version string for ipset.
 	GetVersion() (string, error)
-	AddEntryWithOptions(entry *Entry, set *IPSet, ignoreExistErr bool) error
+	AddEntryWithOptions(entry *Entry, set string, ignoreExistErr bool) error
 	DelEntryWithOptions(set, entry string, options ...string) error
 	ListAllSetInfo() (string, error)
 }
@@ -382,25 +382,25 @@ func (runner *runner) createSet(set *IPSet, ignoreExistErr bool) error {
 // AddEntry adds a new entry to the named set.
 // If the -exist option is specified, ipset ignores the error otherwise raised when
 // the same set (setname and create parameters are identical) already exists.
-func (runner *runner) AddEntry(entry string, set *IPSet, ignoreExistErr bool) error {
-	args := []string{"add", set.Name, entry}
+func (runner *runner) AddEntry(entry string, set string, ignoreExistErr bool) error {
+	args := []string{"add", set, entry}
 	if ignoreExistErr {
 		args = append(args, "-exist")
 	}
 
-	return runner.run(args, "error adding entry %q to set %q", entry, set.Name)
+	return runner.run(args, "error adding entry %q to set %q", entry, set)
 }
 
-func (runner *runner) AddEntryWithOptions(entry *Entry, set *IPSet, ignoreExistErr bool) error {
+func (runner *runner) AddEntryWithOptions(entry *Entry, set string, ignoreExistErr bool) error {
 	args := []string{"add"}
 	if ignoreExistErr {
 		args = append(args, "-exist")
 	}
 
-	args = append(args, set.Name, entry.String())
+	args = append(args, set, entry.String())
 	args = append(args, entry.Options...)
 
-	return runner.run(args, "error adding entry %q to set %q", entry, set.Name)
+	return runner.run(args, "error adding entry %q to set %q", entry, set)
 }
 
 // DelEntry is used to delete the specified entry from the set.
