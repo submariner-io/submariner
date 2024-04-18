@@ -127,9 +127,9 @@ type IPSet struct {
 	// The default is inet, i.e IPv4.  If users want to use IPv6, they should specify inet6.
 	HashFamily string
 	// HashSize specifies the hash table size of ipset.
-	HashSize int
+	HashSize uint
 	// MaxElem specifies the max element number of ipset.
-	MaxElem int
+	MaxElem uint
 	// PortRange specifies the port range of bitmap:port type ipset.
 	PortRange string
 	// TODO: add comment message for ipset
@@ -357,8 +357,8 @@ func (runner *runner) createSet(set *IPSet, ignoreExistErr bool) error {
 	if set.SetType == HashIPPortIP || set.SetType == HashIPPort {
 		args = append(args,
 			"family", set.HashFamily,
-			"hashsize", strconv.Itoa(set.HashSize),
-			"maxelem", strconv.Itoa(set.MaxElem),
+			"hashsize", strconv.FormatUint(uint64(set.HashSize), 10),
+			"maxelem", strconv.FormatUint(uint64(set.MaxElem), 10),
 		)
 	}
 
