@@ -137,42 +137,6 @@ type IPSet struct {
 
 var logger = log.Logger{Logger: logf.Log.WithName("IPSet")}
 
-// #lizard forgives
-// Validate checks if a given ipset is valid or not.
-func (set *IPSet) Validate() bool {
-	// Check if protocol is valid for `HashIPPort`, `HashIPPortIP` and `HashIPPortNet` type set.
-	if set.SetType == HashIPPort || set.SetType == HashIPPortIP || set.SetType == HashIPPortNet ||
-		set.SetType == HashNet || set.SetType == HashNetPort {
-		if valid := validateHashFamily(set.HashFamily); !valid {
-			return false
-		}
-	}
-	// check set type
-	if valid := validateIPSetType(set.SetType); !valid {
-		return false
-	}
-	// check port range for bitmap type set
-
-	if set.SetType == BitmapPort {
-		if valid := validatePortRange(set.PortRange); !valid {
-			return false
-		}
-	}
-
-	// check hash size value of ipset
-	if set.HashSize <= 0 {
-		return false
-	}
-
-	// check max elem value of ipset
-	if set.MaxElem <= 0 {
-		logger.Errorf(nil, "Invalid maxelem value %d, should be >0", set.MaxElem)
-		return false
-	}
-
-	return true
-}
-
 // Entry represents a ipset entry.
 type Entry struct {
 	// IP is the entry's IP.  The IP address protocol corresponds to the HashFamily of IPSet.
@@ -383,12 +347,6 @@ func (runner *runner) CreateSet(set *IPSet, ignoreExistErr bool) error {
 		set.PortRange = DefaultPortRange
 	}
 
-	// Validate ipset before creating
-	valid := set.Validate()
-	if !valid {
-		return fmt.Errorf("error creating ipset since it's invalid")
-	}
-
 	return runner.createSet(set, ignoreExistErr)
 }
 
@@ -576,57 +534,6 @@ func getIPSetVersionString() (string, error) {
 	}
 
 	return match[0], nil
-}
-
-// checks if port range is valid. The begin port number is not necessarily less than
-// end port number - ipset util can accept it.  It means both 1-100 and 100-1 are valid.
-func validatePortRange(portRange string) bool {
-	strs := strings.Split(portRange, "-")
-
-	if len(strs) != 2 {
-		logger.Errorf(nil, "Port range should be in the format of `a-b`")
-		return false
-	}
-
-	for i := range strs {
-		num, err := strconv.Atoi(strs[i])
-		if err != nil {
-			logger.Errorf(err, "Failed to parse %s, error", strs[i])
-			return false
-		}
-
-		if num < 0 {
-			logger.Errorf(nil, "Port number %d should be >=0", num)
-			return false
-		}
-	}
-
-	return true
-}
-
-// checks if the given ipset type is valid.
-func validateIPSetType(set Type) bool {
-	for _, valid := range ValidIPSetTypes {
-		if set == valid {
-			return true
-		}
-	}
-
-	logger.Errorf(nil, "Currently supported ipset types are: %v, %s is not supported", ValidIPSetTypes, set)
-
-	return false
-}
-
-// Checks if given hash family is supported in ipset.
-func validateHashFamily(family string) bool {
-	if family == ProtocolFamilyIPV4 || family == ProtocolFamilyIPV6 {
-		return true
-	}
-
-	logger.Errorf(nil, "Currently supported ip set hash families are: [%s, %s], %s is not supported", ProtocolFamilyIPV4,
-		ProtocolFamilyIPV6, family)
-
-	return false
 }
 
 // IsNotFoundError returns true if the error indicates "not found".  It parses
