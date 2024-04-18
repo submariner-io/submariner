@@ -78,8 +78,9 @@ type Interface interface {
 	DestroyAllSets() error
 	// CreateSet creates a new set.  It will ignore error when the set already exists if ignoreExistErr=true.
 	CreateSet(set *IPSet, ignoreExistErr bool) error
-	// AddEntry adds a new entry to the named set.  It will ignore error when the entry already exists if ignoreExistErr=true.
-	AddEntry(entry string, set string, ignoreExistErr bool) error
+	// AddEntry adds a new IP entry to the named set.  It will ignore error when the entry already exists if ignoreExistErr=true.
+	AddIPEntry(ip string, set string, ignoreExistErr bool) error
+	AddEntry(entry *Entry, set string, ignoreExistErr bool) error
 	// DelEntry deletes one entry from the named set
 	DelEntry(entry string, set string) error
 	// Test test if an entry exists in the named set
@@ -90,7 +91,6 @@ type Interface interface {
 	ListSets() ([]string, error)
 	// GetVersion returns the "X.Y" version string for ipset.
 	GetVersion() (string, error)
-	AddEntryWithOptions(entry *Entry, set string, ignoreExistErr bool) error
 	DelEntryWithOptions(set, entry string, options ...string) error
 	ListAllSetInfo() (string, error)
 }
@@ -273,17 +273,17 @@ func (runner *runner) createSet(set *IPSet, ignoreExistErr bool) error {
 	return runner.run(args, "error creating set %q", set.Name)
 }
 
-// AddEntry adds a new entry to the named set.
+// AddEntry adds a new IP entry to the named set.
 // If the -exist option is specified, ipset ignores the error otherwise raised when
 // the same set (setname and create parameters are identical) already exists.
-func (runner *runner) AddEntry(entry, set string, ignoreExistErr bool) error {
-	return runner.AddEntryWithOptions(&Entry{
+func (runner *runner) AddIPEntry(ip, set string, ignoreExistErr bool) error {
+	return runner.AddEntry(&Entry{
 		SetType: HashIP,
-		IP:      entry,
+		IP:      ip,
 	}, set, ignoreExistErr)
 }
 
-func (runner *runner) AddEntryWithOptions(entry *Entry, set string, ignoreExistErr bool) error {
+func (runner *runner) AddEntry(entry *Entry, set string, ignoreExistErr bool) error {
 	args := []string{"add"}
 	if ignoreExistErr {
 		args = append(args, "-exist")
