@@ -82,7 +82,8 @@ type Interface interface {
 	AddIPEntry(ip string, set string, ignoreExistErr bool) error
 	AddEntry(entry *Entry, set string, ignoreExistErr bool) error
 	// DelEntry deletes one entry from the named set
-	DelEntry(entry string, set string) error
+	DelIPEntry(ip string, set string) error
+	DelEntry(entry *Entry, set string) error
 	// Test test if an entry exists in the named set
 	TestEntry(entry string, set string) (bool, error)
 	// ListEntries lists all the entries from a named set
@@ -91,7 +92,6 @@ type Interface interface {
 	ListSets() ([]string, error)
 	// GetVersion returns the "X.Y" version string for ipset.
 	GetVersion() (string, error)
-	DelEntryWithOptions(set, entry string, options ...string) error
 	ListAllSetInfo() (string, error)
 }
 
@@ -296,18 +296,16 @@ func (runner *runner) AddEntry(entry *Entry, set string, ignoreExistErr bool) er
 }
 
 // DelEntry is used to delete the specified entry from the set.
-func (runner *runner) DelEntry(entry, set string) error {
-	err := runner.run([]string{"del", set, entry}, "error deleting entry %q from set %q", entry, set)
-	if IsNotFoundError(err) {
-		return nil
-	}
-
-	return err
+func (runner *runner) DelIPEntry(ip, set string) error {
+	return runner.DelEntry(&Entry{
+		SetType: HashIP,
+		IP:      ip,
+	}, set)
 }
 
-func (runner *runner) DelEntryWithOptions(set, entry string, _ ...string) error {
+func (runner *runner) DelEntry(entry *Entry, set string) error {
 	// ipset del should not add options
-	err := runner.run([]string{"del", set, entry}, "error deleting entry %q from set %q", entry, set)
+	err := runner.run([]string{"del", set, entry.String()}, "error deleting entry %q from set %q", entry, set)
 	if IsNotFoundError(err) {
 		return nil
 	}
