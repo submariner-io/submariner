@@ -66,7 +66,7 @@ func (kp *SyncHandler) populateRemoteVtepIps(vtepIP string, operation Operation)
 
 	logger.V(log.DEBUG).Infof("populateRemoteVtepIps is called with vtepIP %s, isGatewayNode %t", vtepIP, isOnGateway)
 
-	if isOnGateway {
+	if isOnGateway && kp.vxlanDevice != nil {
 		switch operation {
 		case Add:
 			if err := kp.vxlanDevice.AddFDB(net.ParseIP(vtepIP), "00:00:00:00:00:00"); err != nil {
