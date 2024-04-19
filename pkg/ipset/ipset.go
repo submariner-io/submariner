@@ -434,24 +434,10 @@ func IsNotFoundError(err error) bool {
 
 	es := err.Error()
 
-	if strings.Contains(es, "does not exist") {
-		// set with the same name already exists
-		// xref: https://github.com/Olipro/ipset/blob/master/lib/errcode.c#L32-L33
-		return true
-	}
-
-	if strings.Contains(es, "element is missing") {
-		// entry is missing from the set
-		// xref: https://github.com/Olipro/ipset/blob/master/lib/parse.c#L1904
-		// https://github.com/Olipro/ipset/blob/master/lib/parse.c#L1925
-		return true
-	}
-
-	if strings.Contains(es, "cannot be deleted") && strings.Contains(es, "it's not added") {
-		// Element cannot be deleted from the set: it's not added
+	// "The set with the given name does not exist"
+	// xref: https://github.com/Olipro/ipset/blob/master/lib/errcode.c#L25
+	return strings.Contains(es, "does not exist") ||
+		// "Element cannot be deleted from the set: it's not added"
 		// xref: https://github.com/Olipro/ipset/blob/master/lib/errcode.c#L88
-		return true
-	}
-
-	return false
+		strings.Contains(es, "cannot be deleted") && strings.Contains(es, "it's not added")
 }
