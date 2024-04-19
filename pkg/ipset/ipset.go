@@ -93,7 +93,6 @@ type Interface interface {
 	ListSets() ([]string, error)
 	// GetVersion returns the "X.Y" version string for ipset.
 	GetVersion() (string, error)
-	ListAllSetInfo() (string, error)
 }
 
 // IPSetCmd represents the ipset util.  We use ipset command for ipset execute.
@@ -408,10 +407,6 @@ func (runner *runner) ListEntries(set string) ([]string, error) {
 	}
 
 	return results, nil
-}
-
-func (runner *runner) ListAllSetInfo() (string, error) {
-	return runner.runWithOutput([]string{"list"}, "error listing sets")
 }
 
 // GetVersion returns the version string.
