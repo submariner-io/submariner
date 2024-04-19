@@ -50,7 +50,6 @@ limitations under the License.
 package ipset
 
 import (
-	"bytes"
 	"fmt"
 	"os/exec"
 	"regexp"
@@ -58,7 +57,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/command"
 	"github.com/submariner-io/admiral/pkg/log"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -411,25 +409,16 @@ func (runner *runner) ListEntries(set string) ([]string, error) {
 
 // GetVersion returns the version string.
 func (runner *runner) GetVersion() (string, error) {
-	return getIPSetVersionString()
-}
-
-// getIPSetVersionString runs "ipset --version" to get the version string  in the form of "X.Y", i.e "6.19".
-func getIPSetVersionString() (string, error) {
-	osCmd := exec.Command(IPSetCmd, "--version")
-	osCmd.Stdin = bytes.NewReader([]byte{})
-	cmd := command.New(osCmd)
-
-	cmdBytes, err := cmd.CombinedOutput()
+	out, err := runner.runWithOutput([]string{"--version"}, "error retrieving version")
 	if err != nil {
-		return "", errors.Wrap(err, "error executing ipset command")
+		return "", err
 	}
 
 	versionMatcher := regexp.MustCompile(VersionPattern)
 
-	match := versionMatcher.FindStringSubmatch(string(cmdBytes))
+	match := versionMatcher.FindStringSubmatch(out)
 	if match == nil {
-		return "", fmt.Errorf("no ipset version found in string: %s", cmdBytes)
+		return "", fmt.Errorf("no ipset version found in output %q", out)
 	}
 
 	return match[0], nil
