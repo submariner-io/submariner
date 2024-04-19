@@ -67,7 +67,7 @@ func (n *namedSet) DelEntry(entry string) error {
 }
 
 func (n *namedSet) TestEntry(entry string) (bool, error) {
-	b, err := n.ipSetIface.TestEntry(entry, n.set.Name)
+	b, err := n.ipSetIface.TestIPEntry(entry, n.set.Name)
 	return b, errors.Wrap(err, "TestEntry failed")
 }
 

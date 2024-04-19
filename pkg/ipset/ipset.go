@@ -85,7 +85,8 @@ type Interface interface {
 	DelIPEntry(ip string, set string) error
 	DelEntry(entry *Entry, set string) error
 	// Test test if an entry exists in the named set
-	TestEntry(entry string, set string) (bool, error)
+	TestIPEntry(ip string, set string) (bool, error)
+	TestEntry(entry *Entry, set string) (bool, error)
 	// ListEntries lists all the entries from a named set
 	ListEntries(set string) ([]string, error)
 	// ListSets list all set names from kernel
@@ -313,9 +314,16 @@ func (runner *runner) DelEntry(entry *Entry, set string) error {
 	return err
 }
 
-// TestEntry is used to check whether the specified entry is in the set or not.
-func (runner *runner) TestEntry(entry, set string) (bool, error) {
-	err := runner.run([]string{"test", set, entry}, "error testing entry %q in set %q", entry, set)
+// TestIPEntry is used to check whether the specified entry is in the set or not.
+func (runner *runner) TestIPEntry(ip, set string) (bool, error) {
+	return runner.TestEntry(&Entry{
+		SetType: HashIP,
+		IP:      ip,
+	}, set)
+}
+
+func (runner *runner) TestEntry(entry *Entry, set string) (bool, error) {
+	err := runner.run([]string{"test", set, entry.String()}, "error testing entry %q in set %q", entry, set)
 	if err != nil {
 		if strings.Contains(err.Error(), "is NOT in set") {
 			return false, nil
