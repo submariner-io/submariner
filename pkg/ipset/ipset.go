@@ -152,7 +152,7 @@ type Entry struct {
 	Port uint
 	// Protocol is the entry's Protocol.  The protocols of entries in the same ip set are all
 	// the same.  The accepted protocols are TCP and UDP.
-	Protocol string
+	Protocol ProtocolType
 	// Net is the entry's IP network address.  Network address with zero prefix size can NOT
 	// be stored.
 	Net string

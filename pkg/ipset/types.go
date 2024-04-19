@@ -90,9 +90,11 @@ const (
 	ProtocolFamilyIPV6 ProtocolFamilyType = "inet6"
 )
 
+type ProtocolType string
+
 const (
 	// ProtocolTCP represents TCP protocol.
-	ProtocolTCP = "tcp"
+	ProtocolTCP ProtocolType = "tcp"
 	// ProtocolUDP represents UDP protocol.
-	ProtocolUDP = "udp"
+	ProtocolUDP ProtocolType = "udp"
 )
