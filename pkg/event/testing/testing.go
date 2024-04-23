@@ -42,7 +42,7 @@ func (c *TestHandlerState) IsOnGateway() bool {
 	return c.Gateway
 }
 
-type TestHandler struct {
+type TestHandlerBase struct {
 	event.HandlerBase
 	Name          string
 	NetworkPlugin string
@@ -51,22 +51,43 @@ type TestHandler struct {
 	failOnEvent   sync.Map
 }
 
+type TestHandler struct {
+	TestHandlerBase
+}
+
+type TestEndpointsOnlyHandler struct {
+	TestHandlerBase
+}
+
 func NewTestHandler(name, networkPlugin string, events chan TestEvent) *TestHandler {
 	return &TestHandler{
-		Name:          name,
-		NetworkPlugin: networkPlugin,
-		Events:        events,
-		Initialized:   false,
+		TestHandlerBase{
+			Name:          name,
+			NetworkPlugin: networkPlugin,
+			Events:        events,
+			Initialized:   false,
+		},
 	}
 }
 
-func (t *TestHandler) FailOnEvent(eventName ...string) {
+func NewEndpointsOnlyHandler(name, networkPlugin string, events chan TestEvent) *TestEndpointsOnlyHandler {
+	return &TestEndpointsOnlyHandler{
+		TestHandlerBase{
+			Name:          name,
+			NetworkPlugin: networkPlugin,
+			Events:        events,
+			Initialized:   false,
+		},
+	}
+}
+
+func (t *TestHandlerBase) FailOnEvent(eventName ...string) {
 	for _, e := range eventName {
 		t.failOnEvent.Store(e, true)
 	}
 }
 
-func (t *TestHandler) addEvent(eventName string, param interface{}) error {
+func (t *TestHandlerBase) addEvent(eventName string, param interface{}) error {
 	fail, ok := t.failOnEvent.LoadAndDelete(eventName)
 	if ok && fail.(bool) {
 		return fmt.Errorf("mock handler error for %q", eventName)
@@ -83,17 +104,17 @@ func (t *TestHandler) addEvent(eventName string, param interface{}) error {
 	return nil
 }
 
-func (t *TestHandler) Init() error {
+func (t *TestHandlerBase) Init() error {
 	t.Initialized = true
 
 	return nil
 }
 
-func (t *TestHandler) GetName() string {
+func (t *TestHandlerBase) GetName() string {
 	return t.Name
 }
 
-func (t *TestHandler) GetNetworkPlugins() []string {
+func (t *TestHandlerBase) GetNetworkPlugins() []string {
 	return []string{t.NetworkPlugin}
 }
 
@@ -113,43 +134,43 @@ const (
 	EvUninstall              = "Uninstall"
 )
 
-func (t *TestHandler) Stop() error {
+func (t *TestHandlerBase) Stop() error {
 	return t.addEvent(EvStop, nil)
 }
 
-func (t *TestHandler) Uninstall() error {
+func (t *TestHandlerBase) Uninstall() error {
 	return t.addEvent(EvUninstall, nil)
 }
 
-func (t *TestHandler) TransitionToNonGateway() error {
+func (t *TestHandlerBase) TransitionToNonGateway() error {
 	return t.addEvent(EvTransitionToNonGateway, nil)
 }
 
-func (t *TestHandler) TransitionToGateway() error {
+func (t *TestHandlerBase) TransitionToGateway() error {
 	return t.addEvent(EvTransitionToGateway, nil)
 }
 
-func (t *TestHandler) LocalEndpointCreated(endpoint *v1.Endpoint) error {
+func (t *TestHandlerBase) LocalEndpointCreated(endpoint *v1.Endpoint) error {
 	return t.addEvent(EvLocalEndpointCreated, endpoint)
 }
 
-func (t *TestHandler) LocalEndpointUpdated(endpoint *v1.Endpoint) error {
+func (t *TestHandlerBase) LocalEndpointUpdated(endpoint *v1.Endpoint) error {
 	return t.addEvent(EvLocalEndpointUpdated, endpoint)
 }
 
-func (t *TestHandler) LocalEndpointRemoved(endpoint *v1.Endpoint) error {
+func (t *TestHandlerBase) LocalEndpointRemoved(endpoint *v1.Endpoint) error {
 	return t.addEvent(EvLocalEndpointRemoved, endpoint)
 }
 
-func (t *TestHandler) RemoteEndpointCreated(endpoint *v1.Endpoint) error {
+func (t *TestHandlerBase) RemoteEndpointCreated(endpoint *v1.Endpoint) error {
 	return t.addEvent(EvRemoteEndpointCreated, endpoint)
 }
 
-func (t *TestHandler) RemoteEndpointUpdated(endpoint *v1.Endpoint) error {
+func (t *TestHandlerBase) RemoteEndpointUpdated(endpoint *v1.Endpoint) error {
 	return t.addEvent(EvRemoteEndpointUpdated, endpoint)
 }
 
-func (t *TestHandler) RemoteEndpointRemoved(endpoint *v1.Endpoint) error {
+func (t *TestHandlerBase) RemoteEndpointRemoved(endpoint *v1.Endpoint) error {
 	return t.addEvent(EvRemoteEndpointRemoved, endpoint)
 }
 

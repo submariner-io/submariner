@@ -40,25 +40,7 @@ func (c *DefaultHandlerState) GetRemoteEndpoints() []submV1.Endpoint {
 	return nil
 }
 
-type Handler interface {
-	// Init is called once on startup to let the handler initialize any state it needs.
-	Init() error
-
-	// SetHandlerState is called once on startup after Init with the HandlerState that can be used to access global data from event callbacks.
-	SetState(handlerCtx HandlerState)
-
-	// GetName returns the name of the event handler
-	GetName() string
-
-	// GetNetworkPlugin returns the kubernetes network plugin that this handler supports.
-	GetNetworkPlugins() []string
-
-	// Stop is called once during shutdown to let the handler perform any cleanup.
-	Stop() error
-
-	// Uninstall is called once after shutdown to let the handler process a Submariner uninstallation.
-	Uninstall() error
-
+type EndpointHandler interface {
 	// TransitionToNonGateway is called once for each transition of the local node from Gateway to a non-Gateway.
 	TransitionToNonGateway() error
 
@@ -82,7 +64,9 @@ type Handler interface {
 
 	// RemoteEndpointRemoved is called when an endpoint associated with a remote cluster is removed
 	RemoteEndpointRemoved(endpoint *submV1.Endpoint) error
+}
 
+type NodeHandler interface {
 	// NodeCreated indicates when a node has been added to the cluster
 	NodeCreated(node *k8sV1.Node) error
 
@@ -91,6 +75,28 @@ type Handler interface {
 
 	// NodeRemoved indicates when a node has been removed from the cluster
 	NodeRemoved(node *k8sV1.Node) error
+}
+
+type Handler interface {
+	// Init is called once on startup to let the handler initialize any state it needs.
+	Init() error
+
+	// SetHandlerState is called once on startup after Init with the HandlerState that can be used to access global data from event callbacks.
+	SetState(handlerCtx HandlerState)
+
+	// GetName returns the name of the event handler
+	GetName() string
+
+	// GetNetworkPlugin returns the kubernetes network plugin that this handler supports.
+	GetNetworkPlugins() []string
+
+	// Stop is called once during shutdown to let the handler perform any cleanup.
+	Stop() error
+
+	// Uninstall is called once after shutdown to let the handler process a Submariner uninstallation.
+	Uninstall() error
+
+	EndpointHandler
 }
 
 // Base structure for event handlers that stubs out methods considered to be optional.
@@ -154,14 +160,16 @@ func (ev *HandlerBase) RemoteEndpointRemoved(_ *submV1.Endpoint) error {
 	return nil
 }
 
-func (ev *HandlerBase) NodeCreated(_ *k8sV1.Node) error {
+type NodeHandlerBase struct{}
+
+func (h *NodeHandlerBase) NodeCreated(_ *k8sV1.Node) error {
 	return nil
 }
 
-func (ev *HandlerBase) NodeUpdated(_ *k8sV1.Node) error {
+func (h *NodeHandlerBase) NodeUpdated(_ *k8sV1.Node) error {
 	return nil
 }
 
-func (ev *HandlerBase) NodeRemoved(_ *k8sV1.Node) error {
+func (h *NodeHandlerBase) NodeRemoved(_ *k8sV1.Node) error {
 	return nil
 }
