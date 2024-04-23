@@ -20,17 +20,13 @@ package controller
 
 import (
 	k8sv1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func (c *Controller) handleRemovedNode(obj runtime.Object, _ int) bool {
-	node := obj.(*k8sv1.Node)
-
+func (c *handlerController) handleRemovedNode(node *k8sv1.Node, _ int) bool {
 	c.syncMutex.Lock()
 	defer c.syncMutex.Unlock()
 
-	if err := c.handlers.NodeRemoved(node); err != nil {
+	if err := c.nodeHandler.NodeRemoved(node); err != nil {
 		logger.Error(err, "Error handling removed Node")
 		return true
 	}
@@ -38,13 +34,11 @@ func (c *Controller) handleRemovedNode(obj runtime.Object, _ int) bool {
 	return false
 }
 
-func (c *Controller) handleCreatedNode(obj runtime.Object, _ int) bool {
-	node := obj.(*k8sv1.Node)
-
+func (c *handlerController) handleCreatedNode(node *k8sv1.Node, _ int) bool {
 	c.syncMutex.Lock()
 	defer c.syncMutex.Unlock()
 
-	if err := c.handlers.NodeCreated(node); err != nil {
+	if err := c.nodeHandler.NodeCreated(node); err != nil {
 		logger.Error(err, "Error handling created Node")
 		return true
 	}
@@ -52,21 +46,14 @@ func (c *Controller) handleCreatedNode(obj runtime.Object, _ int) bool {
 	return false
 }
 
-func (c *Controller) handleUpdatedNode(obj runtime.Object, _ int) bool {
-	node := obj.(*k8sv1.Node)
-
+func (c *handlerController) handleUpdatedNode(node *k8sv1.Node, _ int) bool {
 	c.syncMutex.Lock()
 	defer c.syncMutex.Unlock()
 
-	if err := c.handlers.NodeUpdated(node); err != nil {
+	if err := c.nodeHandler.NodeUpdated(node); err != nil {
 		logger.Error(err, "Error handling updated Node")
 		return true
 	}
 
-	return false
-}
-
-func (c *Controller) isNodeEquivalent(_, _ *unstructured.Unstructured) bool {
-	// TODO: filter on changes for labels, annotations, podcidr, podcidrs, addresses
 	return false
 }

@@ -20,12 +20,14 @@ package controller_test
 
 import (
 	"sync/atomic"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/testing"
+	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -75,12 +77,84 @@ var _ = Describe("Event controller", func() {
 			t.testRemoteEndpoints()
 		})
 	})
+
+	Context("with multiple event handlers", func() {
+		const (
+			allEventsHandler     = "all-events"
+			endpointsOnlyHandler = "endpoints-only"
+		)
+
+		var handler2Events, endpointsOnlyHandlerEvents chan testing.TestEvent
+
+		BeforeEach(func() {
+			handler2Events = make(chan testing.TestEvent, 1000)
+			endpointsOnlyHandlerEvents = make(chan testing.TestEvent, 1000)
+
+			t.handlers = []event.Handler{
+				t.handler,
+				testing.NewTestHandler(allEventsHandler, event.AnyNetworkPlugin, handler2Events),
+				testing.NewEndpointsOnlyHandler(endpointsOnlyHandler, event.AnyNetworkPlugin, endpointsOnlyHandlerEvents),
+			}
+		})
+
+		It("should correctly notify all handlers", func() {
+			By("Create local Endpoint")
+
+			endpoint := t.CreateLocalHostEndpoint()
+
+			t.awaitEvent(testing.EvLocalEndpointCreated, endpoint)
+			t.awaitEvent(testing.EvTransitionToGateway, nil)
+
+			awaitEvent(allEventsHandler, testing.EvLocalEndpointCreated, endpoint, handler2Events)
+			awaitEvent(allEventsHandler, testing.EvTransitionToGateway, nil, handler2Events)
+
+			awaitEvent(endpointsOnlyHandler, testing.EvLocalEndpointCreated, endpoint, endpointsOnlyHandlerEvents)
+			awaitEvent(endpointsOnlyHandler, testing.EvTransitionToGateway, nil, endpointsOnlyHandlerEvents)
+
+			By("Create node")
+
+			node := t.CreateNode(testing.NewNode(t.Hostname))
+
+			t.awaitEvent(testing.EvNodeCreated, node)
+			awaitEvent(allEventsHandler, testing.EvNodeCreated, node, handler2Events)
+			Consistently(endpointsOnlyHandlerEvents).ShouldNot(Receive())
+		})
+	})
+
+	When("multiple remote Endpoints for the same cluster are created and removed", func() {
+		It("should only notify the handler of the latest Endpoint", func() {
+			now := time.Now()
+			aFewSecondsLater := now.Add(2 * time.Second)
+
+			latestEndpoint := t.CreateEndpoint(&submV1.Endpoint{
+				ObjectMeta: v1meta.ObjectMeta{Name: "latest", CreationTimestamp: v1meta.NewTime(aFewSecondsLater)},
+				Spec:       submV1.EndpointSpec{ClusterID: "east"},
+			})
+			t.awaitEvent(testing.EvRemoteEndpointCreated, latestEndpoint)
+
+			staleEndpoint := t.CreateEndpoint(&submV1.Endpoint{
+				ObjectMeta: v1meta.ObjectMeta{Name: "stale", CreationTimestamp: v1meta.NewTime(now)},
+				Spec:       submV1.EndpointSpec{ClusterID: "east"},
+			})
+			t.ensureNoEvents()
+
+			t.DeleteEndpoint(staleEndpoint.GetName())
+			t.ensureNoEvents()
+
+			t.DeleteEndpoint(latestEndpoint.GetName())
+			t.awaitEvent(testing.EvRemoteEndpointRemoved, latestEndpoint)
+
+			t.CreateEndpoint(staleEndpoint)
+			t.awaitEvent(testing.EvRemoteEndpointCreated, staleEndpoint)
+		})
+	})
 })
 
 type testDriver struct {
 	*testing.ControllerSupport
 	testEvents chan testing.TestEvent
 	handler    *TestHandler
+	handlers   []event.Handler
 }
 
 func newTestDriver() *testDriver {
@@ -91,24 +165,25 @@ func newTestDriver() *testDriver {
 	BeforeEach(func() {
 		t.testEvents = make(chan testing.TestEvent, 1000)
 		t.handler = &TestHandler{
-			TestHandler: &testing.TestHandler{
-				Name:          testHandlerName,
-				NetworkPlugin: event.AnyNetworkPlugin,
-				Events:        t.testEvents,
-			},
+			TestHandler: testing.NewTestHandler(testHandlerName, event.AnyNetworkPlugin, t.testEvents),
 		}
+		t.handlers = []event.Handler{t.handler}
 	})
 
 	JustBeforeEach(func() {
-		t.Start(t.handler)
+		t.Start(t.handlers...)
 	})
 
 	return t
 }
 
 func (t *testDriver) awaitEvent(name string, param interface{}) {
-	Eventually(t.testEvents).Should(Receive(Equal(
-		testing.TestEvent{Handler: testHandlerName, Name: name, Parameter: param})))
+	awaitEvent(testHandlerName, name, param, t.testEvents)
+}
+
+func awaitEvent(handler, name string, param interface{}, eventCh chan testing.TestEvent) {
+	Eventually(eventCh).Should(Receive(Equal(
+		testing.TestEvent{Handler: handler, Name: name, Parameter: param})))
 }
 
 func (t *testDriver) ensureNoEvents() {

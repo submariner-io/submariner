@@ -20,12 +20,9 @@ package controller
 
 import (
 	smv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func (c *Controller) handleRemovedEndpoint(obj runtime.Object, requeueCount int) bool {
-	endpoint := obj.(*smv1.Endpoint)
-
+func (c *handlerController) handleRemovedEndpoint(endpoint *smv1.Endpoint, requeueCount int) bool {
 	if requeueCount > maxRequeues {
 		logger.Errorf(nil, "Ignoring delete event for endpoint %q, as its requeued for more than %d times",
 			endpoint.Spec.ClusterID, maxRequeues)
@@ -36,7 +33,7 @@ func (c *Controller) handleRemovedEndpoint(obj runtime.Object, requeueCount int)
 	defer c.syncMutex.Unlock()
 
 	var err error
-	if endpoint.Spec.ClusterID != c.env.ClusterID {
+	if endpoint.Spec.ClusterID != c.clusterID {
 		err = c.handleRemovedRemoteEndpoint(endpoint)
 	} else {
 		err = c.handleRemovedLocalEndpoint(endpoint)
@@ -49,17 +46,17 @@ func (c *Controller) handleRemovedEndpoint(obj runtime.Object, requeueCount int)
 	return err != nil
 }
 
-func (c *Controller) handleRemovedLocalEndpoint(endpoint *smv1.Endpoint) error {
+func (c *handlerController) handleRemovedLocalEndpoint(endpoint *smv1.Endpoint) error {
 	if endpoint.Spec.Hostname == c.hostname {
 		c.handlerState.setIsOnGateway(false)
 	}
 
-	err := c.handlers.LocalEndpointRemoved(endpoint)
+	err := c.handler.LocalEndpointRemoved(endpoint)
 
 	if err == nil && c.handlerState.wasOnGateway && !c.handlerState.IsOnGateway() {
 		logger.Infof("Transitioned to non-gateway node %q", endpoint.Spec.Hostname)
 
-		err = c.handlers.TransitionToNonGateway()
+		err = c.handler.TransitionToNonGateway()
 	}
 
 	if err == nil {
@@ -69,7 +66,17 @@ func (c *Controller) handleRemovedLocalEndpoint(endpoint *smv1.Endpoint) error {
 	return err //nolint:wrapcheck  // Let the caller wrap it
 }
 
-func (c *Controller) handleRemovedRemoteEndpoint(endpoint *smv1.Endpoint) error {
+func (c *handlerController) handleRemovedRemoteEndpoint(endpoint *smv1.Endpoint) error {
+	lastProcessedTime, ok := c.remoteEndpointTimeStamp[endpoint.Spec.ClusterID]
+
+	if ok && lastProcessedTime.After(endpoint.CreationTimestamp.Time) {
+		logger.Infof("Ignoring deleted remote %#v since a later endpoint was already"+
+			"processed", endpoint)
+		return nil
+	}
+
+	delete(c.remoteEndpointTimeStamp, endpoint.Spec.ClusterID)
 	c.handlerState.remoteEndpoints.Delete(endpoint.Name)
-	return c.handlers.RemoteEndpointRemoved(endpoint) //nolint:wrapcheck  // Let the caller wrap it
+
+	return c.handler.RemoteEndpointRemoved(endpoint) //nolint:wrapcheck  // Let the caller wrap it
 }

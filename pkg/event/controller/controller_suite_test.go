@@ -24,6 +24,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
+	submv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 func init() {
@@ -32,6 +34,7 @@ func init() {
 
 var _ = BeforeSuite(func() {
 	kzerolog.InitK8sLogging()
+	Expect(submv1.AddToScheme(scheme.Scheme)).To(Succeed())
 })
 
 func TestWatcher(t *testing.T) {

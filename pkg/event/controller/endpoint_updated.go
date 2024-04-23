@@ -20,12 +20,9 @@ package controller
 
 import (
 	smv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func (c *Controller) handleUpdatedEndpoint(obj runtime.Object, requeueCount int) bool {
-	endpoint := obj.(*smv1.Endpoint)
-
+func (c *handlerController) handleUpdatedEndpoint(endpoint *smv1.Endpoint, requeueCount int) bool {
 	if requeueCount > maxRequeues {
 		logger.Errorf(nil, "Ignoring update event for endpoint %q, as its requeued for more than %d times",
 			endpoint.Spec.ClusterID, maxRequeues)
@@ -36,7 +33,7 @@ func (c *Controller) handleUpdatedEndpoint(obj runtime.Object, requeueCount int)
 	defer c.syncMutex.Unlock()
 
 	var err error
-	if endpoint.Spec.ClusterID != c.env.ClusterID {
+	if endpoint.Spec.ClusterID != c.clusterID {
 		err = c.handleUpdatedRemoteEndpoint(endpoint)
 	} else {
 		err = c.handleUpdatedLocalEndpoint(endpoint)
@@ -49,11 +46,11 @@ func (c *Controller) handleUpdatedEndpoint(obj runtime.Object, requeueCount int)
 	return err != nil
 }
 
-func (c *Controller) handleUpdatedLocalEndpoint(endpoint *smv1.Endpoint) error {
-	return c.handlers.LocalEndpointUpdated(endpoint) //nolint:wrapcheck  // Let the caller wrap it
+func (c *handlerController) handleUpdatedLocalEndpoint(endpoint *smv1.Endpoint) error {
+	return c.handler.LocalEndpointUpdated(endpoint) //nolint:wrapcheck  // Let the caller wrap it
 }
 
-func (c *Controller) handleUpdatedRemoteEndpoint(endpoint *smv1.Endpoint) error {
+func (c *handlerController) handleUpdatedRemoteEndpoint(endpoint *smv1.Endpoint) error {
 	c.handlerState.remoteEndpoints.Store(endpoint.Name, endpoint)
-	return c.handlers.RemoteEndpointUpdated(endpoint) //nolint:wrapcheck  // Let the caller wrap it
+	return c.handler.RemoteEndpointUpdated(endpoint) //nolint:wrapcheck  // Let the caller wrap it
 }

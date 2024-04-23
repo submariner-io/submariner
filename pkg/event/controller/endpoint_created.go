@@ -20,13 +20,10 @@ package controller
 
 import (
 	smv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func (c *Controller) handleCreatedEndpoint(obj runtime.Object, requeueCount int) bool {
+func (c *handlerController) handleCreatedEndpoint(endpoint *smv1.Endpoint, requeueCount int) bool {
 	var err error
-
-	endpoint := obj.(*smv1.Endpoint)
 
 	if requeueCount > maxRequeues {
 		logger.Errorf(nil, "Ignoring create event for endpoint %q, as its requeued for more than %d times",
@@ -37,7 +34,7 @@ func (c *Controller) handleCreatedEndpoint(obj runtime.Object, requeueCount int)
 	c.syncMutex.Lock()
 	defer c.syncMutex.Unlock()
 
-	if endpoint.Spec.ClusterID != c.env.ClusterID {
+	if endpoint.Spec.ClusterID != c.clusterID {
 		err = c.handleCreatedRemoteEndpoint(endpoint)
 	} else {
 		err = c.handleCreatedLocalEndpoint(endpoint)
@@ -50,17 +47,17 @@ func (c *Controller) handleCreatedEndpoint(obj runtime.Object, requeueCount int)
 	return err != nil
 }
 
-func (c *Controller) handleCreatedLocalEndpoint(endpoint *smv1.Endpoint) error {
+func (c *handlerController) handleCreatedLocalEndpoint(endpoint *smv1.Endpoint) error {
 	if endpoint.Spec.Hostname == c.hostname {
 		c.handlerState.setIsOnGateway(true)
 	}
 
-	err := c.handlers.LocalEndpointCreated(endpoint)
+	err := c.handler.LocalEndpointCreated(endpoint)
 
 	if err == nil && !c.handlerState.wasOnGateway && c.handlerState.IsOnGateway() {
 		logger.Infof("Transitioned to gateway node %q with endpoint private IP %s", c.hostname, endpoint.Spec.PrivateIP)
 
-		err = c.handlers.TransitionToGateway()
+		err = c.handler.TransitionToGateway()
 	}
 
 	if err == nil {
@@ -70,7 +67,16 @@ func (c *Controller) handleCreatedLocalEndpoint(endpoint *smv1.Endpoint) error {
 	return err //nolint:wrapcheck  // Let the caller wrap it
 }
 
-func (c *Controller) handleCreatedRemoteEndpoint(endpoint *smv1.Endpoint) error {
+func (c *handlerController) handleCreatedRemoteEndpoint(endpoint *smv1.Endpoint) error {
+	lastProcessedTime, ok := c.remoteEndpointTimeStamp[endpoint.Spec.ClusterID]
+
+	if ok && lastProcessedTime.After(endpoint.CreationTimestamp.Time) {
+		logger.Infof("Ignoring new remote %#v since a later endpoint was already processed", endpoint)
+		return nil
+	}
+
 	c.handlerState.remoteEndpoints.Store(endpoint.Name, endpoint)
-	return c.handlers.RemoteEndpointCreated(endpoint) //nolint:wrapcheck  // Let the caller wrap it
+	c.remoteEndpointTimeStamp[endpoint.Spec.ClusterID] = endpoint.CreationTimestamp
+
+	return c.handler.RemoteEndpointCreated(endpoint) //nolint:wrapcheck  // Let the caller wrap it
 }
