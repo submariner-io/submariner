@@ -95,6 +95,10 @@ func (er *Registry) SetHandlerState(handlerState HandlerState) {
 	})
 }
 
+func (er *Registry) GetHandlers() []Handler {
+	return er.eventHandlers
+}
+
 func (er *Registry) StopHandlers() error {
 	return er.invokeHandlers("Stop", func(h Handler) error {
 		return h.Stop()
@@ -181,19 +185,19 @@ func (er *Registry) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 
 func (er *Registry) NodeCreated(node *k8sV1.Node) error {
 	return er.invokeHandlers("NodeCreated", func(h Handler) error {
-		return h.NodeCreated(node)
+		return h.(NodeHandler).NodeCreated(node)
 	})
 }
 
 func (er *Registry) NodeUpdated(node *k8sV1.Node) error {
 	return er.invokeHandlers("NodeUpdated", func(h Handler) error {
-		return h.NodeUpdated(node)
+		return h.(NodeHandler).NodeUpdated(node)
 	})
 }
 
 func (er *Registry) NodeRemoved(node *k8sV1.Node) error {
 	return er.invokeHandlers("NodeRemoved", func(h Handler) error {
-		return h.NodeRemoved(node)
+		return h.(NodeHandler).NodeRemoved(node)
 	})
 }
 

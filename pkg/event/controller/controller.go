@@ -26,16 +26,18 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/admiral/pkg/watcher"
+	"github.com/submariner-io/admiral/pkg/syncer"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -70,14 +72,20 @@ func (s *handlerStateImpl) GetRemoteEndpoints() []subv1.Endpoint {
 }
 
 type Controller struct {
-	env             specification
-	resourceWatcher watcher.Interface
+	endpointInformer cache.SharedInformer
+	nodeInformer     cache.SharedInformer
+	syncers          []syncer.Interface
+	handlers         *event.Registry
+}
 
-	handlers     *event.Registry
-	handlerState handlerStateImpl
-
-	syncMutex sync.Mutex
-	hostname  string
+type handlerController struct {
+	syncMutex               sync.Mutex
+	handlerState            handlerStateImpl
+	handler                 event.Handler
+	nodeHandler             event.NodeHandler
+	hostname                string
+	clusterID               string
+	remoteEndpointTimeStamp map[string]v1.Time
 }
 
 // If the handler cannot recover from a failure, even after retrying for maximum requeue attempts,
@@ -86,18 +94,10 @@ const maxRequeues = 20
 
 type Config struct {
 	// Registry is the event handler registry where controller events will be sent.
-	Registry *event.Registry
-
-	// RestConfig the REST config used to access the resources to watch.
-	RestConfig *rest.Config
-
-	// RestMapper can be provided for unit testing. By default New will create its own RestMapper.
+	Registry   *event.Registry
 	RestMapper meta.RESTMapper
-
-	// Client can be provided for unit testing. By default New will create its own dynamic client.
-	Client dynamic.Interface
-
-	Scheme *runtime.Scheme
+	Client     dynamic.Interface
+	Scheme     *runtime.Scheme
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("EventController")}
@@ -110,10 +110,11 @@ func New(config *Config) (*Controller, error) {
 
 	ctl := Controller{
 		handlers: config.Registry,
-		hostname: hostname,
 	}
 
-	err = envconfig.Process("submariner", &ctl.env)
+	var env specification
+
+	err = envconfig.Process("submariner", &env)
 	if err != nil {
 		return nil, errors.Wrap(err, "error processing env vars")
 	}
@@ -123,38 +124,25 @@ func New(config *Config) (*Controller, error) {
 		return nil, errors.Wrap(err, "error adding submariner types to the scheme")
 	}
 
-	ctl.resourceWatcher, err = watcher.New(&watcher.Config{
-		Scheme:     config.Scheme,
-		RestConfig: config.RestConfig,
-		ResourceConfigs: []watcher.ResourceConfig{
-			{
-				Name:            fmt.Sprintf("Endpoint watcher for %s registry", ctl.handlers.GetName()),
-				ResourceType:    &subv1.Endpoint{},
-				SourceNamespace: ctl.env.Namespace,
-				Handler: watcher.EventHandlerFuncs{
-					OnCreateFunc: ctl.handleCreatedEndpoint,
-					OnUpdateFunc: ctl.handleUpdatedEndpoint,
-					OnDeleteFunc: ctl.handleRemovedEndpoint,
-				},
-			}, {
-				Name:                fmt.Sprintf("Node watcher for %s registry", ctl.handlers.GetName()),
-				ResourceType:        &k8sv1.Node{},
-				ResourcesEquivalent: ctl.isNodeEquivalent,
-				Handler: watcher.EventHandlerFuncs{
-					OnCreateFunc: ctl.handleCreatedNode,
-					OnUpdateFunc: ctl.handleUpdatedNode,
-					OnDeleteFunc: ctl.handleRemovedNode,
-				},
-			},
-		},
-		Client:     config.Client,
-		RestMapper: config.RestMapper,
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "error creating resource watcher")
+	syncerConfig := &syncer.ResourceSyncerConfig{
+		SourceNamespace: env.Namespace,
+		SourceClient:    config.Client,
+		RestMapper:      config.RestMapper,
+		Federator:       federate.NewNoopFederator(),
+		ResourceType:    &subv1.Endpoint{},
 	}
 
-	ctl.handlers.SetHandlerState(&ctl.handlerState)
+	ctl.endpointInformer, err = syncer.NewSharedInformer(syncerConfig)
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating endpoint informer")
+	}
+
+	for _, handler := range config.Registry.GetHandlers() {
+		err = ctl.setupHandlerController(handler, env.ClusterID, hostname, *syncerConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	return &ctl, nil
 }
@@ -163,9 +151,14 @@ func New(config *Config) (*Controller, error) {
 func (c *Controller) Start(stopCh <-chan struct{}) error {
 	logger.Info("Starting the Event controller...")
 
-	err := c.resourceWatcher.Start(stopCh)
-	if err != nil {
-		return errors.Wrap(err, "error starting the resource watcher")
+	runInformer(c.endpointInformer, stopCh)
+	runInformer(c.nodeInformer, stopCh)
+
+	for _, syncer := range c.syncers {
+		err := syncer.Start(stopCh)
+		if err != nil {
+			return errors.Wrap(err, "error starting resource syncer")
+		}
 	}
 
 	logger.Info("Event controller started")
@@ -178,5 +171,87 @@ func (c *Controller) Stop() {
 
 	if err := c.handlers.StopHandlers(); err != nil {
 		logger.Warningf("In Event Controller, StopHandlers returned error: %v", err)
+	}
+}
+
+//nolint:gocritic // Ignore hugeParam - intentional copy.
+func (c *Controller) setupHandlerController(handler event.Handler, clusterID, hostname string,
+	syncerConfig syncer.ResourceSyncerConfig,
+) error {
+	hCtrl := &handlerController{
+		handler:                 handler,
+		hostname:                hostname,
+		clusterID:               clusterID,
+		remoteEndpointTimeStamp: map[string]v1.Time{},
+	}
+
+	handler.SetState(&hCtrl.handlerState)
+
+	syncerConfig.Name = fmt.Sprintf("Endpoint watcher for handler %q", handler.GetName())
+
+	syncerConfig.Transform = func(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
+		switch op {
+		case syncer.Create:
+			return nil, hCtrl.handleCreatedEndpoint(obj.(*subv1.Endpoint), numRequeues)
+		case syncer.Update:
+			return nil, hCtrl.handleUpdatedEndpoint(obj.(*subv1.Endpoint), numRequeues)
+		case syncer.Delete:
+			return nil, hCtrl.handleRemovedEndpoint(obj.(*subv1.Endpoint), numRequeues)
+		}
+
+		return nil, false
+	}
+
+	endpointSyncer, err := syncer.NewResourceSyncerWithSharedInformer(&syncerConfig, c.endpointInformer)
+	if err != nil {
+		return errors.Wrap(err, "error creating resource syncer")
+	}
+
+	c.syncers = append(c.syncers, endpointSyncer)
+
+	var ok bool
+
+	hCtrl.nodeHandler, ok = hCtrl.handler.(event.NodeHandler)
+	if ok {
+		syncerConfig.Name = fmt.Sprintf("Node watcher for handler %q", handler.GetName())
+		syncerConfig.ResourceType = &k8sv1.Node{}
+		syncerConfig.SourceNamespace = k8sv1.NamespaceAll
+
+		if c.nodeInformer == nil {
+			c.nodeInformer, err = syncer.NewSharedInformer(&syncerConfig)
+			if err != nil {
+				return errors.Wrap(err, "error creating node informer")
+			}
+		}
+
+		syncerConfig.Transform = func(obj runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
+			switch op {
+			case syncer.Create:
+				return nil, hCtrl.handleCreatedNode(obj.(*k8sv1.Node), numRequeues)
+			case syncer.Update:
+				return nil, hCtrl.handleUpdatedNode(obj.(*k8sv1.Node), numRequeues)
+			case syncer.Delete:
+				return nil, hCtrl.handleRemovedNode(obj.(*k8sv1.Node), numRequeues)
+			}
+
+			return nil, false
+		}
+
+		nodeSyncer, err := syncer.NewResourceSyncerWithSharedInformer(&syncerConfig, c.nodeInformer)
+		if err != nil {
+			return errors.Wrap(err, "error creating resource syncer")
+		}
+
+		c.syncers = append(c.syncers, nodeSyncer)
+	}
+
+	return nil
+}
+
+func runInformer(informer cache.SharedInformer, stopCh <-chan struct{}) {
+	if informer != nil {
+		go func() {
+			informer.Run(stopCh)
+		}()
 	}
 }

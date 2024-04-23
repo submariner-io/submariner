@@ -32,6 +32,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/names"
+	"github.com/submariner-io/admiral/pkg/util"
 	admversion "github.com/submariner-io/admiral/pkg/version"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -110,6 +111,9 @@ func main() {
 	smClientset, err := submarinerClientset.NewForConfig(cfg)
 	logger.FatalOnError(err, "Error building submariner clientset")
 
+	restMapper, err := util.BuildRestMapper(cfg)
+	logger.FatalOnError(err, "Error building the REST mapper")
+
 	if env.WaitForNode {
 		waitForNodeReady(k8sClientSet)
 
@@ -163,7 +167,8 @@ func main() {
 
 	ctl, err := controller.New(&controller.Config{
 		Registry:   registry,
-		RestConfig: cfg,
+		Client:     dynamicClientSet,
+		RestMapper: restMapper,
 	})
 	logger.FatalOnError(err, "Error creating controller for event handling")
 

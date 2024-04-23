@@ -59,10 +59,15 @@ func NewControllerSupport() *ControllerSupport {
 	return c
 }
 
-func (c *ControllerSupport) Start(handler event.Handler) {
+func (c *ControllerSupport) Start(handlers ...event.Handler) {
 	stopCh := make(chan struct{})
 
-	registry, err := event.NewRegistry("test-registry", handler.GetNetworkPlugins()[0], handler)
+	networkPlugin := handlers[0].GetNetworkPlugins()[0]
+	if len(handlers) > 1 {
+		networkPlugin = event.AnyNetworkPlugin
+	}
+
+	registry, err := event.NewRegistry("test-registry", networkPlugin, handlers...)
 	Expect(err).To(Succeed())
 
 	config := controller.Config{
