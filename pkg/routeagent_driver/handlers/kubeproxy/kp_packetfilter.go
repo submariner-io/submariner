@@ -38,6 +38,7 @@ import (
 
 type SyncHandler struct {
 	event.HandlerBase
+	event.NodeHandlerBase
 	localCableDriver string
 	localClusterCidr []string
 	localServiceCidr []string
