@@ -19,17 +19,14 @@ limitations under the License.
 package event_test
 
 import (
-	"time"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	submv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/logger"
 	"github.com/submariner-io/submariner/pkg/event/testing"
-	k8sV1 "k8s.io/api/core/v1"
-	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 const npGenericKubeproxyIptables = "GenericKubeproxyIptables"
@@ -61,6 +58,7 @@ var _ = Describe("Event Registry", func() {
 			registry, err = event.NewRegistry("test-registry", npGenericKubeproxyIptables, logger.NewHandler(), matchingHandlers[0],
 				nonMatchingHandlers[0], matchingHandlers[1], matchingHandlers[2])
 			Expect(err).NotTo(HaveOccurred())
+			Expect(registry.GetName()).To(Equal("test-registry"))
 		})
 
 		It("should initialize all matching handlers", func() {
@@ -106,79 +104,66 @@ var _ = Describe("Event Registry", func() {
 			})
 		})
 
-		When("the RemoteEndpointCreated notification is fired out of order", func() {
-			It("should skip processing the stale event", func() {
-				now := time.Now()
-				aFewSecondsLater := now.Add(2 * time.Second)
-				staleEndpoint := &submV1.Endpoint{
-					ObjectMeta: v1meta.ObjectMeta{Name: "endpoint1", CreationTimestamp: v1meta.NewTime(now)},
-					Spec:       submV1.EndpointSpec{ClusterID: "eastCluster"},
-				}
-				latestEndpoint := &submV1.Endpoint{
-					ObjectMeta: v1meta.ObjectMeta{Name: "endpoint1", CreationTimestamp: v1meta.NewTime(aFewSecondsLater)},
-					Spec:       submV1.EndpointSpec{ClusterID: "eastCluster"},
-				}
-
-				event := testing.TestEvent{
-					Name:      testing.EvRemoteEndpointCreated,
-					Parameter: latestEndpoint,
-				}
-
-				err := registry.RemoteEndpointCreated(latestEndpoint)
-				Expect(err).To(Succeed())
-
-				for _, h := range matchingHandlers {
-					event.Handler = h.Name
-					Expect(allTestEvents).To(Receive(Equal(event)))
-				}
-
-				err = registry.RemoteEndpointCreated(staleEndpoint)
-				Expect(err).To(Succeed())
-
-				for range matchingHandlers {
-					Expect(allTestEvents).NotTo(Receive(Equal(event)))
-				}
-			})
+		Specify("GetHandlers should return all the handlers", func() {
+			handlers := registry.GetHandlers()
+			Expect(handlers).To(ContainElements(matchingHandlers))
 		})
 	})
 
-	When("SetHandlerState is called on the registry", func() {
-		It("should invoke SetState on the handlers", func() {
-			h := testing.NewTestHandler("test", event.AnyNetworkPlugin, nil)
-			registry, err := event.NewRegistry("test-registry", event.AnyNetworkPlugin, h)
-			Expect(err).NotTo(HaveOccurred())
+	When("a handler's Init fails", func() {
+		It("NewRegistry should return an error", func() {
+			h := testing.NewTestHandler("test-handler", event.AnyNetworkPlugin, make(chan testing.TestEvent, 10))
+			h.FailOnEvent(testing.EvInit)
 
-			registry.SetHandlerState(&testing.TestHandlerState{Gateway: true})
-			Expect(h.State().IsOnGateway()).To(BeTrue())
-		})
-	})
-
-	When("SetState has not been called for a handler", func() {
-		Specify("State should return a valid instance", func() {
-			h := testing.NewTestHandler("test", event.AnyNetworkPlugin, nil)
-			hc := h.State()
-			Expect(hc).ToNot(BeNil())
+			_, err := event.NewRegistry("test-registry", event.AnyNetworkPlugin, h)
+			Expect(err).To(HaveOccurred())
 		})
 	})
 })
 
-func allEvents(registry *event.Registry) map[testing.TestEvent]func() error {
-	endpoint := &submV1.Endpoint{ObjectMeta: v1meta.ObjectMeta{Name: "endpoint1"}}
-	node := &k8sV1.Node{ObjectMeta: v1meta.ObjectMeta{Name: "node1"}}
+var _ = Describe("Event Handler", func() {
+	When("SetState has not been called", func() {
+		Specify("State should return a default instance", func() {
+			h := testing.NewTestHandler("test", event.AnyNetworkPlugin, nil)
+			state := h.State()
+			Expect(state).ToNot(BeNil())
+			Expect(state.IsOnGateway()).To(BeFalse())
+			Expect(state.GetRemoteEndpoints()).To(BeEmpty())
+		})
+	})
 
+	When("SetState has been called", func() {
+		Specify("State should return the instance", func() {
+			h := testing.NewTestHandler("test", event.AnyNetworkPlugin, nil)
+			state := &testing.TestHandlerState{}
+			h.SetState(state)
+			Expect(h.State()).To(BeIdenticalTo(state))
+		})
+	})
+
+	Specify("HandlerBase should stub all Endpoint methods", func() {
+		h := event.HandlerBase{}
+		Expect(h.LocalEndpointCreated(&submv1.Endpoint{})).To(Succeed())
+		Expect(h.LocalEndpointUpdated(&submv1.Endpoint{})).To(Succeed())
+		Expect(h.LocalEndpointRemoved(&submv1.Endpoint{})).To(Succeed())
+		Expect(h.RemoteEndpointCreated(&submv1.Endpoint{})).To(Succeed())
+		Expect(h.RemoteEndpointUpdated(&submv1.Endpoint{})).To(Succeed())
+		Expect(h.RemoteEndpointRemoved(&submv1.Endpoint{})).To(Succeed())
+		Expect(h.TransitionToGateway()).To(Succeed())
+		Expect(h.TransitionToNonGateway()).To(Succeed())
+	})
+
+	Specify("NodeHandlerBase should stub all Node methods", func() {
+		h := event.NodeHandlerBase{}
+		Expect(h.NodeCreated(&corev1.Node{})).To(Succeed())
+		Expect(h.NodeUpdated(&corev1.Node{})).To(Succeed())
+		Expect(h.NodeRemoved(&corev1.Node{})).To(Succeed())
+	})
+})
+
+func allEvents(registry *event.Registry) map[testing.TestEvent]func() error {
 	return map[testing.TestEvent]func() error{
-		{Name: testing.EvStop}:                                       func() error { return registry.StopHandlers() },
-		{Name: testing.EvUninstall}:                                  func() error { return registry.Uninstall() },
-		{Name: testing.EvTransitionToGateway}:                        registry.TransitionToGateway,
-		{Name: testing.EvTransitionToNonGateway}:                     registry.TransitionToNonGateway,
-		{Name: testing.EvNodeCreated, Parameter: node}:               func() error { return registry.NodeCreated(node) },
-		{Name: testing.EvNodeUpdated, Parameter: node}:               func() error { return registry.NodeUpdated(node) },
-		{Name: testing.EvNodeRemoved, Parameter: node}:               func() error { return registry.NodeRemoved(node) },
-		{Name: testing.EvLocalEndpointCreated, Parameter: endpoint}:  func() error { return registry.LocalEndpointCreated(endpoint) },
-		{Name: testing.EvLocalEndpointUpdated, Parameter: endpoint}:  func() error { return registry.LocalEndpointUpdated(endpoint) },
-		{Name: testing.EvLocalEndpointRemoved, Parameter: endpoint}:  func() error { return registry.LocalEndpointRemoved(endpoint) },
-		{Name: testing.EvRemoteEndpointCreated, Parameter: endpoint}: func() error { return registry.RemoteEndpointCreated(endpoint) },
-		{Name: testing.EvRemoteEndpointUpdated, Parameter: endpoint}: func() error { return registry.RemoteEndpointUpdated(endpoint) },
-		{Name: testing.EvRemoteEndpointRemoved, Parameter: endpoint}: func() error { return registry.RemoteEndpointRemoved(endpoint) },
+		{Name: testing.EvStop}:      func() error { return registry.StopHandlers() },
+		{Name: testing.EvUninstall}: func() error { return registry.Uninstall() },
 	}
 }

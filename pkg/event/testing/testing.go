@@ -65,7 +65,6 @@ func NewTestHandler(name, networkPlugin string, events chan TestEvent) *TestHand
 			Name:          name,
 			NetworkPlugin: networkPlugin,
 			Events:        events,
-			Initialized:   false,
 		},
 	}
 }
@@ -76,7 +75,6 @@ func NewEndpointsOnlyHandler(name, networkPlugin string, events chan TestEvent) 
 			Name:          name,
 			NetworkPlugin: networkPlugin,
 			Events:        events,
-			Initialized:   false,
 		},
 	}
 }
@@ -87,10 +85,18 @@ func (t *TestHandlerBase) FailOnEvent(eventName ...string) {
 	}
 }
 
-func (t *TestHandlerBase) addEvent(eventName string, param interface{}) error {
+func (t *TestHandlerBase) checkFailOnEvent(eventName string) error {
 	fail, ok := t.failOnEvent.LoadAndDelete(eventName)
 	if ok && fail.(bool) {
 		return fmt.Errorf("mock handler error for %q", eventName)
+	}
+
+	return nil
+}
+
+func (t *TestHandlerBase) addEvent(eventName string, param interface{}) error {
+	if err := t.checkFailOnEvent(eventName); err != nil {
+		return err
 	}
 
 	ev := TestEvent{
@@ -106,8 +112,7 @@ func (t *TestHandlerBase) addEvent(eventName string, param interface{}) error {
 
 func (t *TestHandlerBase) Init() error {
 	t.Initialized = true
-
-	return nil
+	return t.checkFailOnEvent(EvInit)
 }
 
 func (t *TestHandlerBase) GetName() string {
@@ -132,6 +137,7 @@ const (
 	EvNodeRemoved            = "NodeRemoved"
 	EvStop                   = "Stop"
 	EvUninstall              = "Uninstall"
+	EvInit                   = "Init"
 )
 
 func (t *TestHandlerBase) Stop() error {
