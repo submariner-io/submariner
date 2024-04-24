@@ -53,13 +53,17 @@ import (
 	"bytes"
 	"fmt"
 	"net"
+	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/command"
 	"github.com/submariner-io/admiral/pkg/log"
-	utilexec "k8s.io/utils/exec"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -331,27 +335,17 @@ func (e *Entry) String() string {
 	return ""
 }
 
-type runner struct {
-	exec utilexec.Interface
-}
-
-var NewFunc func() Interface
+type runner struct{}
 
 // New returns a new Interface which will exec ipset.
-func New(exec utilexec.Interface) Interface {
-	if NewFunc != nil {
-		return NewFunc()
-	}
-
-	return &runner{
-		exec: exec,
-	}
+func New() Interface {
+	return &runner{}
 }
 
 func (runner *runner) runWithOutput(args []string, errFormat string, a ...interface{}) (string, error) {
 	logger.V(log.DEBUG).Infof("Running ipset %v", args)
 
-	out, err := runner.exec.Command(IPSetCmd, args...).CombinedOutput()
+	out, err := command.New(exec.Command(IPSetCmd, args...)).CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("%s: %w (%s)", fmt.Sprintf(errFormat, a...), err, out)
 	}
@@ -489,9 +483,24 @@ func (runner *runner) FlushSet(set string) error {
 	return err
 }
 
+func (runner *runner) retryIfInUse(args []string, errFormat string, a ...interface{}) error {
+	backoff := wait.Backoff{
+		Duration: 100 * time.Millisecond,
+		Factor:   1.0,
+		Steps:    20,
+	}
+
+	//nolint:wrapcheck // No need to wrap.
+	return retry.OnError(backoff, func(err error) bool {
+		return strings.Contains(err.Error(), "is in use")
+	}, func() error {
+		return runner.run(args, errFormat, a...)
+	})
+}
+
 // DestroySet is used to destroy a named set.
 func (runner *runner) DestroySet(set string) error {
-	err := runner.run([]string{"destroy", set}, "error destroying set %q", set)
+	err := runner.retryIfInUse([]string{"destroy", set}, "error destroying set %q", set)
 	if IsNotFoundError(err) {
 		return nil
 	}
@@ -501,7 +510,7 @@ func (runner *runner) DestroySet(set string) error {
 
 // DestroyAllSets is used to destroy all sets.
 func (runner *runner) DestroyAllSets() error {
-	return runner.run([]string{"destroy"}, "error destroying all sets")
+	return runner.retryIfInUse([]string{"destroy"}, "error destroying all sets")
 }
 
 // ListSets list all set names from kernel.
@@ -545,13 +554,14 @@ func (runner *runner) ListAllSetInfo() (string, error) {
 
 // GetVersion returns the version string.
 func (runner *runner) GetVersion() (string, error) {
-	return getIPSetVersionString(runner.exec)
+	return getIPSetVersionString()
 }
 
 // getIPSetVersionString runs "ipset --version" to get the version string  in the form of "X.Y", i.e "6.19".
-func getIPSetVersionString(exec utilexec.Interface) (string, error) {
-	cmd := exec.Command(IPSetCmd, "--version")
-	cmd.SetStdin(bytes.NewReader([]byte{}))
+func getIPSetVersionString() (string, error) {
+	osCmd := exec.Command(IPSetCmd, "--version")
+	osCmd.Stdin = bytes.NewReader([]byte{})
+	cmd := command.New(osCmd)
 
 	cmdBytes, err := cmd.CombinedOutput()
 	if err != nil {
