@@ -23,19 +23,15 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	k8sV1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8serrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/utils/set"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type Registry struct {
-	name                    string
-	networkPlugin           string
-	eventHandlers           []Handler
-	remoteEndpointTimeStamp map[string]v1.Time
+	name          string
+	networkPlugin string
+	eventHandlers []Handler
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("EventRegistry")}
@@ -45,10 +41,9 @@ var logger = log.Logger{Logger: logf.Log.WithName("EventRegistry")}
 // networkPlugin name are added. Non-matching Handlers are ignored. Handlers will be called in registration order.
 func NewRegistry(name, networkPlugin string, eventHandlers ...Handler) (*Registry, error) {
 	r := &Registry{
-		name:                    name,
-		networkPlugin:           strings.ToLower(networkPlugin),
-		eventHandlers:           []Handler{},
-		remoteEndpointTimeStamp: map[string]v1.Time{},
+		name:          name,
+		networkPlugin: strings.ToLower(networkPlugin),
+		eventHandlers: []Handler{},
 	}
 
 	for _, eventHandler := range eventHandlers {
@@ -88,13 +83,6 @@ func (er *Registry) addHandler(eventHandler Handler) error {
 	return nil
 }
 
-func (er *Registry) SetHandlerState(handlerState HandlerState) {
-	_ = er.invokeHandlers("SetHandlerState", func(h Handler) error {
-		h.SetState(handlerState)
-		return nil
-	})
-}
-
 func (er *Registry) GetHandlers() []Handler {
 	return er.eventHandlers
 }
@@ -108,96 +96,6 @@ func (er *Registry) StopHandlers() error {
 func (er *Registry) Uninstall() error {
 	return er.invokeHandlers("Uninstall", func(h Handler) error {
 		return h.Uninstall()
-	})
-}
-
-func (er *Registry) TransitionToNonGateway() error {
-	return er.invokeHandlers("TransitionToNonGateway", func(h Handler) error {
-		return h.TransitionToNonGateway()
-	})
-}
-
-func (er *Registry) TransitionToGateway() error {
-	return er.invokeHandlers("TransitionToGateway", func(h Handler) error {
-		return h.TransitionToGateway()
-	})
-}
-
-func (er *Registry) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
-	return er.invokeHandlers("LocalEndpointCreated", func(h Handler) error {
-		return h.LocalEndpointCreated(endpoint)
-	})
-}
-
-func (er *Registry) LocalEndpointUpdated(endpoint *submV1.Endpoint) error {
-	return er.invokeHandlers("LocalEndpointUpdated", func(h Handler) error {
-		return h.LocalEndpointUpdated(endpoint)
-	})
-}
-
-func (er *Registry) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
-	return er.invokeHandlers("LocalEndpointRemoved", func(h Handler) error {
-		return h.LocalEndpointRemoved(endpoint)
-	})
-}
-
-func (er *Registry) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
-	lastProcessedTime, ok := er.remoteEndpointTimeStamp[endpoint.Spec.ClusterID]
-
-	if ok && lastProcessedTime.After(endpoint.CreationTimestamp.Time) {
-		logger.Infof("Ignoring new remote %#v since a later endpoint was already"+
-			"processed", endpoint)
-		return nil
-	}
-
-	err := er.invokeHandlers("RemoteEndpointCreated", func(h Handler) error {
-		return h.RemoteEndpointCreated(endpoint)
-	})
-
-	if err == nil {
-		er.remoteEndpointTimeStamp[endpoint.Spec.ClusterID] = endpoint.CreationTimestamp
-	}
-
-	return err
-}
-
-func (er *Registry) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
-	return er.invokeHandlers("RemoteEndpointUpdated", func(h Handler) error {
-		return h.RemoteEndpointUpdated(endpoint)
-	})
-}
-
-func (er *Registry) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
-	lastProcessedTime, ok := er.remoteEndpointTimeStamp[endpoint.Spec.ClusterID]
-
-	if ok && lastProcessedTime.After(endpoint.CreationTimestamp.Time) {
-		logger.Infof("Ignoring deleted remote %#v since a later endpoint was already"+
-			"processed", endpoint)
-		return nil
-	}
-
-	delete(er.remoteEndpointTimeStamp, endpoint.Spec.ClusterID)
-
-	return er.invokeHandlers("RemoteEndpointRemoved", func(h Handler) error {
-		return h.RemoteEndpointRemoved(endpoint)
-	})
-}
-
-func (er *Registry) NodeCreated(node *k8sV1.Node) error {
-	return er.invokeHandlers("NodeCreated", func(h Handler) error {
-		return h.(NodeHandler).NodeCreated(node)
-	})
-}
-
-func (er *Registry) NodeUpdated(node *k8sV1.Node) error {
-	return er.invokeHandlers("NodeUpdated", func(h Handler) error {
-		return h.(NodeHandler).NodeUpdated(node)
-	})
-}
-
-func (er *Registry) NodeRemoved(node *k8sV1.Node) error {
-	return er.invokeHandlers("NodeRemoved", func(h Handler) error {
-		return h.(NodeHandler).NodeRemoved(node)
 	})
 }
 
