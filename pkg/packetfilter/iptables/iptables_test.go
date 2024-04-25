@@ -55,20 +55,20 @@ var _ = Describe("Rule conversion", func() {
 			Action:       packetfilter.RuleActionAccept,
 		})
 
-		// -p all -m mark --mark mark-value -m set --match-set src-set src -j SNAT --to-source 172.254.1.0/24
+		// -p all -m mark --mark 0xc0000/0xc0000 -m set --match-set src-set src -j SNAT --to-source 172.254.1.0/24
 		testRuleConversion(&packetfilter.Rule{
 			Proto:      packetfilter.RuleProtoAll,
 			SrcSetName: "src-set",
-			MarkValue:  "mark-value",
+			MarkValue:  "0xc0000",
 			SnatCIDR:   "172.254.1.0/24",
 			Action:     packetfilter.RuleActionSNAT,
 		})
 
-		// -p all -s 171.254.1.0/24 -m mark --mark mark-value -j SNAT --to-source 172.254.1.0/24
+		// -p all -s 171.254.1.0/24 -m mark --mark 0xc0000/0xc0000 -j SNAT --to-source 172.254.1.0/24
 		testRuleConversion(&packetfilter.Rule{
 			Proto:     packetfilter.RuleProtoTCP,
 			SrcCIDR:   "171.254.1.0/24",
-			MarkValue: "mark-value",
+			MarkValue: "0xc0000",
 			SnatCIDR:  "172.254.1.0/24",
 			Action:    packetfilter.RuleActionSNAT,
 		})
@@ -81,10 +81,10 @@ var _ = Describe("Rule conversion", func() {
 			Action:   packetfilter.RuleActionDNAT,
 		})
 
-		// -d 171.254.1.0/24 -j MARK --set-mark mark-value
+		// -d 171.254.1.0/24 -j MARK --set-mark 0xc0000/0xc0000
 		testRuleConversion(&packetfilter.Rule{
 			DestCIDR:  "171.254.1.0/24",
-			MarkValue: "mark-value",
+			MarkValue: "0xc0000",
 			Action:    packetfilter.RuleActionMark,
 		})
 

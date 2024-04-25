@@ -62,7 +62,7 @@ var _ = Describe("Rule conversion", func() {
 		testRuleConversion(&packetfilter.Rule{
 			Proto:      packetfilter.RuleProtoAll,
 			SrcSetName: "src-set",
-			MarkValue:  "mark-value",
+			MarkValue:  "0xc0000",
 			SnatCIDR:   "172.254.1.0/24",
 			Action:     packetfilter.RuleActionSNAT,
 		})
@@ -71,7 +71,7 @@ var _ = Describe("Rule conversion", func() {
 		testRuleConversion(&packetfilter.Rule{
 			Proto:     packetfilter.RuleProtoTCP,
 			SrcCIDR:   "171.254.1.0/24",
-			MarkValue: "mark-value",
+			MarkValue: "0xc0000",
 			SnatCIDR:  "172.254.1.0/24",
 			Action:    packetfilter.RuleActionSNAT,
 		})
@@ -87,7 +87,7 @@ var _ = Describe("Rule conversion", func() {
 		// ip daddr 171.254.1.0/24 counter meta mark set mark-value
 		testRuleConversion(&packetfilter.Rule{
 			DestCIDR:  "171.254.1.0/24",
-			MarkValue: "mark-value",
+			MarkValue: "0xc0000",
 			Action:    packetfilter.RuleActionMark,
 		})
 
@@ -258,9 +258,9 @@ var _ = Describe("Interface", func() {
 		By("Insert the third rule")
 
 		rule3 := &packetfilter.Rule{
-			Proto:    packetfilter.RuleProtoUDP,
-			DestCIDR: "170.254.1.0/24",
-			SrcCIDR:  "171.254.1.0/24",
+			Proto:    packetfilter.RuleProtoTCP,
+			DestCIDR: "190.254.1.0/24",
+			SrcCIDR:  "191.254.1.0/24",
 			DPort:    "d-port",
 			Action:   packetfilter.RuleActionAccept,
 		}
@@ -270,16 +270,41 @@ var _ = Describe("Interface", func() {
 
 		assertRules(rule2, rule3, rule1)
 
-		By("Delete the first rule")
+		By("Append unique the fourth rule")
+
+		rule4 := &packetfilter.Rule{
+			Proto:    packetfilter.RuleProtoICMP,
+			DestCIDR: "161.254.1.0/24",
+			SrcCIDR:  "161.254.1.0/24",
+			Action:   packetfilter.RuleActionAccept,
+		}
+
+		err = pf.AppendUnique(packetfilter.TableTypeNAT, chainName, rule4)
+		Expect(err).To(Succeed())
+
+		assertRules(rule2, rule3, rule1, rule4)
+
+		// Rule already exists - shouldn't append.
+		err = pf.AppendUnique(packetfilter.TableTypeNAT, chainName, rule3)
+		Expect(err).To(Succeed())
+
+		assertRules(rule2, rule3, rule1, rule4)
+
+		By("Delete some rules")
 
 		err = pf.Delete(packetfilter.TableTypeNAT, chainName, rule1)
 		Expect(err).To(Succeed())
 
-		assertRules(rule2, rule3)
+		assertRules(rule2, rule3, rule4)
 
 		// Try to delete again - should succeed.
 		err = pf.Delete(packetfilter.TableTypeNAT, chainName, rule1)
 		Expect(err).To(Succeed())
+
+		err = pf.Delete(packetfilter.TableTypeNAT, chainName, rule2)
+		Expect(err).To(Succeed())
+
+		assertRules(rule3, rule4)
 
 		By("Clear the chain")
 

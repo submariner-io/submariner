@@ -26,7 +26,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/ipset"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
-	utilexec "k8s.io/utils/exec"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -79,7 +78,7 @@ func New() (packetfilter.Driver, error) {
 		return nil, errors.Wrap(err, "error creating IP tables")
 	}
 
-	ipSetIface := ipset.New(utilexec.New())
+	ipSetIface := ipset.New()
 
 	return &packetFilter{
 		ipt:        ipt,
@@ -271,7 +270,7 @@ func ToRuleSpec(rule *packetfilter.Rule) RuleSpec {
 	}
 
 	if rule.MarkValue != "" && rule.Action != packetfilter.RuleActionMark {
-		ruleSpec = append(ruleSpec, "-m", "mark", "--mark", rule.MarkValue)
+		ruleSpec = append(ruleSpec, "-m", "mark", "--mark", rule.MarkValue+"/"+rule.MarkValue)
 	}
 
 	setToRuleSpec(&ruleSpec, rule.SrcSetName, rule.DestSetName)
@@ -305,7 +304,7 @@ func ToRuleSpec(rule *packetfilter.Rule) RuleSpec {
 	mssClampToRuleSpec(&ruleSpec, rule.ClampType, rule.MssValue)
 
 	if rule.MarkValue != "" && rule.Action == packetfilter.RuleActionMark {
-		ruleSpec = append(ruleSpec, "--set-mark", rule.MarkValue)
+		ruleSpec = append(ruleSpec, "--set-mark", rule.MarkValue+"/"+rule.MarkValue)
 	}
 
 	logger.V(log.TRACE).Infof("ToRuleSpec: from %q to %q", rule, ruleSpec)
@@ -340,7 +339,7 @@ func FromRuleSpec(spec []string) *packetfilter.Rule {
 		case "--dport":
 			rule.DPort, i = parseNextTerm(spec, i, noopParse)
 		case "--set-mark":
-			rule.MarkValue, i = parseNextTerm(spec, i, noopParse)
+			rule.MarkValue, i = parseNextTerm(spec, i, parseMark)
 		case "-j":
 			rule.Action, i = parseNextTerm(spec, i, parseAction)
 			if rule.Action == packetfilter.RuleActionJump {
@@ -378,7 +377,7 @@ func parseRuleMatch(spec []string, i int, rule *packetfilter.Rule) int {
 	switch spec[i] {
 	case "mark":
 		if i+2 < len(spec) && spec[i+1] == "--mark" {
-			rule.MarkValue = spec[i+2]
+			rule.MarkValue = parseMark(spec[i+2])
 			i += 2
 		}
 	case "set":
@@ -419,6 +418,14 @@ func parseTCPSpec(spec []string, i int, rule *packetfilter.Rule) int {
 	}
 
 	return i
+}
+
+func parseMark(s string) string {
+	if j := strings.Index(s, "/"); j > -1 {
+		return s[:j]
+	}
+
+	return ""
 }
 
 func parseAction(s string) packetfilter.RuleAction {
