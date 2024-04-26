@@ -40,7 +40,6 @@ import (
 	cni "github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/controller"
-	eventlogger "github.com/submariner-io/submariner/pkg/event/logger"
 	"github.com/submariner-io/submariner/pkg/node"
 	packetfilter "github.com/submariner-io/submariner/pkg/packetfilter"
 	iptables "github.com/submariner-io/submariner/pkg/packetfilter/iptables"
@@ -133,7 +132,6 @@ func main() {
 	config := &watcher.Config{RestConfig: cfg}
 
 	registry, err := event.NewRegistry("routeagent_driver", np,
-		eventlogger.NewHandler(),
 		kubeproxy.NewSyncHandler(env.ClusterCidr, env.ServiceCidr),
 		ovn.NewHandler(&ovn.HandlerConfig{
 			Namespace:     env.Namespace,
