@@ -46,7 +46,7 @@ const (
 	// be a problem because Globalnet is only marking traffic destined to Submariner
 	// connected clusters where Submariner takes full control on how the traffic is
 	// steered in the pipeline. Normal traffic should not be affected because of this.
-	globalNetIPTableMark = "0xC0000/0xC0000"
+	globalNetIPTableMark = "0xC0000"
 
 	// This is an internal annotation used between ingress pod controller and global-ingress controller.
 	headlessSvcPodIP = "submariner.io/headless-svc-pod-ip"

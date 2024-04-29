@@ -343,7 +343,8 @@ func ToRuleSpec(rule *packetfilter.Rule) RuleSpec {
 	}
 
 	if rule.MarkValue != "" && rule.Action != packetfilter.RuleActionMark {
-		ruleSpec = append(ruleSpec, "mark", rule.MarkValue)
+		// syntax for MarkValue '0xc0000': meta mark & 0xc0000 == 0xc0000
+		ruleSpec = append(ruleSpec, "meta", "mark", "&", rule.MarkValue, "==", rule.MarkValue)
 	}
 
 	setToRuleSpec(&ruleSpec, rule.SrcSetName, rule.DestSetName)
@@ -378,7 +379,8 @@ func ToRuleSpec(rule *packetfilter.Rule) RuleSpec {
 	mssClampToRuleSpec(&ruleSpec, rule.ClampType, rule.MssValue)
 
 	if rule.MarkValue != "" && rule.Action == packetfilter.RuleActionMark {
-		ruleSpec = append(ruleSpec, "set", rule.MarkValue)
+		// syntax for MarkValue '0xc0000': set mark | 0xc0000
+		ruleSpec = append(ruleSpec, "set", "mark", "|", rule.MarkValue)
 	}
 
 	logger.V(log.TRACE).Infof("ToRuleSpec: from %q to %q", rule, ruleSpec)
@@ -400,9 +402,6 @@ func FromRuleSpec(spec RuleSpec) *packetfilter.Rule {
 			rule.InInterface, i = parseNextTerm(spec, i, noopParse)
 		case "oifname":
 			rule.OutInterface, i = parseNextTerm(spec, i, noopParse)
-		case "set":
-			rule.MarkValue, i = parseNextTerm(spec, i, noopParse)
-
 		case "dport":
 			rule.DPort, i = parseNextTerm(spec, i, noopParse)
 		case "counter":
@@ -420,7 +419,7 @@ func FromRuleSpec(spec RuleSpec) *packetfilter.Rule {
 				rule.SnatCIDR, i = parseNextTerm(spec, i, noopParse)
 			}
 		case "mark":
-			rule.MarkValue, i = parseNextTerm(spec, i, noopParse)
+			rule.MarkValue, i = parseMark(spec, i)
 		}
 
 		i++
@@ -492,6 +491,20 @@ func parseIPMatch(spec []string, i int, rule *packetfilter.Rule) int {
 	return i
 }
 
+func parseMark(spec []string, i int) (string, int) {
+	i++
+	// mark | 0xc0000
+	if i+1 < len(spec) && spec[i] == "|" {
+		return spec[i+1], i + 1
+	}
+	// mark & 0xc0000 == 0xc0000
+	if i+3 < len(spec) && spec[i] == "&" {
+		return spec[i+1], i + 3
+	}
+
+	return "", i
+}
+
 func parseAction(spec []string, i int) (packetfilter.RuleAction, int) {
 	i++
 	if i >= len(spec) {
@@ -508,8 +521,8 @@ func parseAction(spec []string, i int) (packetfilter.RuleAction, int) {
 		return packetfilter.RuleActionMss, i + 2
 	}
 
-	if i+1 < len(spec) && spec[i] == "meta" && spec[i+1] == "mark" {
-		return packetfilter.RuleActionMark, i + 1
+	if i+2 < len(spec) && spec[i] == "meta" && spec[i+1] == "mark" && spec[i+2] == "set" {
+		return packetfilter.RuleActionMark, i + 2
 	}
 
 	return packetfilter.RuleActionJump, i - 1

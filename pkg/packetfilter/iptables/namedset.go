@@ -59,15 +59,15 @@ func (n *namedSet) Create(ignoreExistErr bool) error {
 }
 
 func (n *namedSet) AddEntry(entry string, ignoreExistErr bool) error {
-	return errors.Wrap(n.ipSetIface.AddEntry(entry, &n.set, ignoreExistErr), "AddEntry failed")
+	return errors.Wrap(n.ipSetIface.AddIPEntry(entry, n.set.Name, ignoreExistErr), "AddIPEntry failed")
 }
 
 func (n *namedSet) DelEntry(entry string) error {
-	return errors.Wrap(n.ipSetIface.DelEntry(entry, n.set.Name), "DelEntry failed")
+	return errors.Wrap(n.ipSetIface.DelIPEntry(entry, n.set.Name), "DelIPEntry failed")
 }
 
 func (n *namedSet) TestEntry(entry string) (bool, error) {
-	b, err := n.ipSetIface.TestEntry(entry, n.set.Name)
+	b, err := n.ipSetIface.TestIPEntry(entry, n.set.Name)
 	return b, errors.Wrap(err, "TestEntry failed")
 }
 

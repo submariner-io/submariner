@@ -77,26 +77,24 @@ const (
 )
 
 // DefaultPortRange defines the default bitmap:port valid port range.
-const DefaultPortRange string = "0-65535"
+var DefaultPortRange = PortRange{
+	End: 65535,
+}
+
+type ProtocolFamilyType string
 
 const (
 	// ProtocolFamilyIPV4 represents IPv4 protocol.
-	ProtocolFamilyIPV4 = "inet"
+	ProtocolFamilyIPV4 ProtocolFamilyType = "inet"
 	// ProtocolFamilyIPV6 represents IPv6 protocol.
-	ProtocolFamilyIPV6 = "inet6"
-	// ProtocolTCP represents TCP protocol.
-	ProtocolTCP = "tcp"
-	// ProtocolUDP represents UDP protocol.
-	ProtocolUDP = "udp"
+	ProtocolFamilyIPV6 ProtocolFamilyType = "inet6"
 )
 
-// ValidIPSetTypes defines the supported ip set type.
-var ValidIPSetTypes = []Type{
-	HashIP,
-	HashIPPort,
-	HashIPPortIP,
-	BitmapPort,
-	HashIPPortNet,
-	HashNet,
-	HashNetPort,
-}
+type ProtocolType string
+
+const (
+	// ProtocolTCP represents TCP protocol.
+	ProtocolTCP ProtocolType = "tcp"
+	// ProtocolUDP represents UDP protocol.
+	ProtocolUDP ProtocolType = "udp"
+)
