@@ -44,9 +44,17 @@ import (
 )
 
 const (
-	cableDriverName = "libreswan"
-	whackTimeout    = 5 * time.Second
-	dpdDelay        = 30 // seconds
+	cableDriverName  = "libreswan"
+	whackTimeout     = 5 * time.Second
+	dpdDelay         = 30 // seconds
+	encryptArg       = "--encrypt"
+	forceencapsArg   = "--forceencaps"
+	nameArg          = "--name"
+	hostArg          = "--host"
+	clientArg        = "--client"
+	ikeportArg       = "--ikeport"
+	dpdactionHoldArg = "--dpdaction=hold"
+	dpddelayArg      = "--dpddelay"
 )
 
 var logger = log.Logger{Logger: logf.Log.WithName("libreswan")}
@@ -225,6 +233,10 @@ func retrieveActiveConnectionStats() (map[string]int, map[string]int, error) {
 	return activeConnectionsRx, activeConnectionsTx, errors.Wrap(cmd.Wait(), "error waiting for whack to complete")
 }
 
+func toConnectionName(cableName string, lsi, rsi int) string {
+	return fmt.Sprintf("%s-%d-%d", cableName, lsi, rsi)
+}
+
 func (i *libreswan) refreshConnectionStatus() error {
 	activeConnectionsRx, activeConnectionsTx, err := retrieveActiveConnectionStats()
 	if err != nil {
@@ -243,7 +255,7 @@ func (i *libreswan) refreshConnectionStatus() error {
 
 		for lsi := range localSubnets {
 			for rsi := range remoteSubnets {
-				connectionName := fmt.Sprintf("%s-%d-%d", i.connections[j].Endpoint.CableName, lsi, rsi)
+				connectionName := toConnectionName(i.connections[j].Endpoint.CableName, lsi, rsi)
 				subRx, okRx := activeConnectionsRx[connectionName]
 				subTx, okTx := activeConnectionsTx[connectionName]
 
@@ -374,7 +386,7 @@ func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 	if len(leftSubnets) > 0 && len(rightSubnets) > 0 {
 		for lsi, leftSubnet := range leftSubnets {
 			for rsi, rightSubnet := range rightSubnets {
-				connectionName := fmt.Sprintf("%s-%d-%d", endpoint.Spec.CableName, lsi, rsi)
+				connectionName := toConnectionName(endpoint.Spec.CableName, lsi, rsi)
 
 				switch connectionMode {
 				case operationModeBidirectional:
@@ -408,76 +420,80 @@ func (i *libreswan) bidirectionalConnectToEndpoint(connectionName string, endpoi
 
 	args := []string{}
 
-	args = append(args, "--psk", "--encrypt")
+	args = append(args, "--psk", encryptArg)
 	if endpointInfo.UseNAT || i.forceUDPEncapsulation {
-		args = append(args, "--forceencaps")
+		args = append(args, forceencapsArg)
 	}
 
-	args = append(args, "--name", connectionName,
+	args = append(args, nameArg, connectionName,
 
 		// Left-hand side
 		"--id", localEndpointIdentifier,
-		"--host", i.localEndpoint.Spec.PrivateIP,
-		"--client", leftSubnet,
+		hostArg, i.localEndpoint.Spec.PrivateIP,
+		clientArg, leftSubnet,
 
-		"--ikeport", i.ipSecNATTPort,
+		ikeportArg, i.ipSecNATTPort,
 
 		"--to",
 
 		// Right-hand side
 		"--id", remoteEndpointIdentifier,
-		"--host", endpointInfo.UseIP,
-		"--client", rightSubnet,
+		hostArg, endpointInfo.UseIP,
+		clientArg, rightSubnet,
 
-		"--ikeport", strconv.Itoa(int(rightNATTPort)),
-		"--dpdaction=hold",
-		"--dpddelay", strconv.Itoa(dpdDelay))
+		ikeportArg, strconv.Itoa(int(rightNATTPort)),
+		dpdactionHoldArg,
+		dpddelayArg, strconv.Itoa(dpdDelay))
 
-	logger.Infof("Executing whack with args: %v", args)
+	logger.Infof("bidirectionalConnectToEndpoint: executing whack with args: %v", args)
 
 	if err := whack(args...); err != nil {
 		return err
 	}
 
-	if err := whack("--route", "--name", connectionName); err != nil {
+	if err := whack("--route", nameArg, connectionName); err != nil {
 		return err
 	}
 
-	return whack("--initiate", "--asynchronous", "--name", connectionName)
+	return whack("--initiate", "--asynchronous", nameArg, connectionName)
+}
+
+func toEndpointIdentifier(ip string, lsi, rsi int) string {
+	return fmt.Sprintf("@%s-%d-%d", ip, lsi, rsi)
 }
 
 func (i *libreswan) serverConnectToEndpoint(connectionName string, endpointInfo *natdiscovery.NATEndpointInfo,
 	leftSubnet, rightSubnet string, lsi, rsi int,
 ) error {
-	localEndpointIdentifier := fmt.Sprintf("@%s-%d-%d", i.localEndpoint.Spec.PrivateIP, lsi, rsi)
-	remoteEndpointIdentifier := fmt.Sprintf("@%s-%d-%d", endpointInfo.Endpoint.Spec.PrivateIP, rsi, lsi)
+	localEndpointIdentifier := toEndpointIdentifier(i.localEndpoint.Spec.PrivateIP, lsi, rsi)
+	remoteEndpointIdentifier := toEndpointIdentifier(endpointInfo.Endpoint.Spec.PrivateIP, rsi, lsi)
 
 	args := []string{}
 
-	args = append(args, "--psk", "--encrypt")
+	args = append(args, "--psk", encryptArg)
 	if endpointInfo.UseNAT || i.forceUDPEncapsulation {
-		args = append(args, "--forceencaps")
+		args = append(args, forceencapsArg)
 	}
 
-	args = append(args, "--name", connectionName,
+	args = append(args, nameArg, connectionName,
 
 		// Left-hand side.
 		"--id", localEndpointIdentifier,
-		"--host", i.localEndpoint.Spec.PrivateIP,
-		"--client", leftSubnet,
+		hostArg, i.localEndpoint.Spec.PrivateIP,
+		clientArg, leftSubnet,
 
-		"--ikeport", i.ipSecNATTPort,
+		ikeportArg, i.ipSecNATTPort,
 
 		"--to",
 
 		// Right-hand side.
 		"--id", remoteEndpointIdentifier,
-		"--host", "%any",
-		"--client", rightSubnet,
-		"--dpdaction=hold",
-		"--dpddelay", strconv.Itoa(dpdDelay))
+		hostArg, "%any",
+		clientArg, rightSubnet,
+		dpdactionHoldArg,
+		dpddelayArg, strconv.Itoa(dpdDelay))
 
-	logger.Infof("Executing whack with args: %v", args)
+	logger.Infof("serverConnectToEndpoint: executing whack with args: %v", args)
 
 	if err := whack(args...); err != nil {
 		return err
@@ -492,45 +508,45 @@ func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo 
 	leftSubnet, rightSubnet string, rightNATTPort int32, lsi, rsi int,
 ) error {
 	// Identifiers are used for authentication, they’re always the private IPs.
-	localEndpointIdentifier := fmt.Sprintf("@%s-%d-%d", i.localEndpoint.Spec.PrivateIP, lsi, rsi)
-	remoteEndpointIdentifier := fmt.Sprintf("@%s-%d-%d", endpointInfo.Endpoint.Spec.PrivateIP, rsi, lsi)
+	localEndpointIdentifier := toEndpointIdentifier(i.localEndpoint.Spec.PrivateIP, lsi, rsi)
+	remoteEndpointIdentifier := toEndpointIdentifier(endpointInfo.Endpoint.Spec.PrivateIP, rsi, lsi)
 
 	args := []string{}
 
-	args = append(args, "--psk", "--encrypt")
+	args = append(args, "--psk", encryptArg)
 	if endpointInfo.UseNAT || i.forceUDPEncapsulation {
-		args = append(args, "--forceencaps")
+		args = append(args, forceencapsArg)
 	}
 
-	args = append(args, "--name", connectionName,
+	args = append(args, nameArg, connectionName,
 
 		// Left-hand side
 		"--id", localEndpointIdentifier,
-		"--host", i.localEndpoint.Spec.PrivateIP,
-		"--client", leftSubnet,
+		hostArg, i.localEndpoint.Spec.PrivateIP,
+		clientArg, leftSubnet,
 
 		"--to",
 
 		// Right-hand side
 		"--id", remoteEndpointIdentifier,
-		"--host", endpointInfo.UseIP,
-		"--client", rightSubnet,
+		hostArg, endpointInfo.UseIP,
+		clientArg, rightSubnet,
 
-		"--ikeport", strconv.Itoa(int(rightNATTPort)),
-		"--dpdaction=hold",
-		"--dpddelay", strconv.Itoa(dpdDelay))
+		ikeportArg, strconv.Itoa(int(rightNATTPort)),
+		dpdactionHoldArg,
+		dpddelayArg, strconv.Itoa(dpdDelay))
 
-	logger.Infof("Executing whack with args: %v", args)
+	logger.Infof("clientConnectToEndpoint: executing whack with args: %v", args)
 
 	if err := whack(args...); err != nil {
 		return err
 	}
 
-	if err := whack("--route", "--name", connectionName); err != nil {
+	if err := whack("--route", nameArg, connectionName); err != nil {
 		return err
 	}
 
-	return whack("--initiate", "--asynchronous", "--name", connectionName)
+	return whack("--initiate", "--asynchronous", nameArg, connectionName)
 }
 
 // DisconnectFromEndpoint disconnects from the connection to the given endpoint.
@@ -544,8 +560,8 @@ func (i *libreswan) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint) e
 	if len(leftSubnets) > 0 && len(rightSubnets) > 0 {
 		for lsi := range leftSubnets {
 			for rsi := range rightSubnets {
-				connectionName := fmt.Sprintf("%s-%d-%d", endpoint.Spec.CableName, lsi, rsi)
-				args := []string{"--delete", "--name", connectionName}
+				connectionName := toConnectionName(endpoint.Spec.CableName, lsi, rsi)
+				args := []string{"--delete", nameArg, connectionName}
 
 				if err := whack(args...); err != nil {
 					var exitError *exec.ExitError
