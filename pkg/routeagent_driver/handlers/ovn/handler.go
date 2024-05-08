@@ -165,7 +165,7 @@ func (ovn *Handler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 
 	err := ovn.updateHostNetworkDataplane()
 	if err != nil {
-		return errors.Wrapf(err, "updateHostNetworkDataplane returned error")
+		return err
 	}
 
 	if ovn.State().IsOnGateway() {
@@ -190,7 +190,7 @@ func (ovn *Handler) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
 
 	err := ovn.updateHostNetworkDataplane()
 	if err != nil {
-		return errors.Wrapf(err, "updateHostNetworkDataplane returned error")
+		return err
 	}
 
 	if ovn.State().IsOnGateway() {
@@ -203,7 +203,7 @@ func (ovn *Handler) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
 func (ovn *Handler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	err := ovn.updateHostNetworkDataplane()
 	if err != nil {
-		return errors.Wrapf(err, "updateHostNetworkDataplane returned error")
+		return err
 	}
 
 	if ovn.State().IsOnGateway() {

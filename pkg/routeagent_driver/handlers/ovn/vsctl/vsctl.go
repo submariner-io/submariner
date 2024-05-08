@@ -29,7 +29,10 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-const ovsCommandTimeout = 15
+const (
+	ovsCommandTimeout = 15
+	ifexistsArg       = "--if-exists"
+)
 
 var logger = log.Logger{Logger: logf.Log.WithName("ovs-vsctl")}
 
@@ -65,7 +68,7 @@ func AddBridge(bridgeName string) error {
 }
 
 func DelBridge(bridgeName string) error {
-	_, err := vsctlCmd("--if-exists", "del-br", bridgeName)
+	_, err := vsctlCmd(ifexistsArg, "del-br", bridgeName)
 
 	return err
 }
@@ -79,13 +82,13 @@ func AddInternalPort(bridgeName, portName, macAddress string, mtu int) error {
 }
 
 func DelInternalPort(bridgeName, portName string) error {
-	_, err := vsctlCmd("--if-exists", "del-port", bridgeName, portName)
+	_, err := vsctlCmd(ifexistsArg, "del-port", bridgeName, portName)
 
 	return err
 }
 
 func AddOVNBridgeMapping(netName, bridgeName string) error {
-	stdout, err := vsctlCmd("--if-exists", "get", "Open_vSwitch", ".",
+	stdout, err := vsctlCmd(ifexistsArg, "get", "Open_vSwitch", ".",
 		"external_ids:ovn-bridge-mappings")
 	if err != nil {
 		return errors.Wrap(err, "failed to get ovn-bridge-mappings")
