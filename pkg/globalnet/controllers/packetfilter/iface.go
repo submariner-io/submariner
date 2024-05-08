@@ -91,11 +91,12 @@ func (i *pfilter) AddClusterEgressRules(subnet, snatIP, globalNetIPTableMark str
 		Action:    packetfilter.RuleActionSNAT,
 	}
 
-	if err := i.pFilter.AppendUnique(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForCluster, &ruleSpec); err != nil {
-		return errors.Wrapf(err, "unable to append rule %+v", &ruleSpec)
-	}
+	return i.appendNATRule(constants.SmGlobalnetEgressChainForCluster, &ruleSpec)
+}
 
-	return nil
+func (i *pfilter) deleteNATRule(chain string, rule *packetfilter.Rule) error {
+	err := i.pFilter.Delete(packetfilter.TableTypeNAT, chain, rule)
+	return errors.Wrapf(err, "error deleting packetfilter rule %q", rule)
 }
 
 func (i *pfilter) RemoveClusterEgressRules(subnet, snatIP, globalNetIPTableMark string) error {
@@ -107,11 +108,12 @@ func (i *pfilter) RemoveClusterEgressRules(subnet, snatIP, globalNetIPTableMark 
 		Action:    packetfilter.RuleActionSNAT,
 	}
 
-	if err := i.pFilter.Delete(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForCluster, &ruleSpec); err != nil {
-		return errors.Wrapf(err, "error deleting packetfilter rule %+v", &ruleSpec)
-	}
+	return i.deleteNATRule(constants.SmGlobalnetEgressChainForCluster, &ruleSpec)
+}
 
-	return nil
+func (i *pfilter) appendNATRule(chain string, rule *packetfilter.Rule) error {
+	err := i.pFilter.AppendUnique(packetfilter.TableTypeNAT, chain, rule)
+	return errors.Wrapf(err, "unable to append rule %q", rule)
 }
 
 func (i *pfilter) AddIngressRulesForHeadlessSvc(globalIP, ip string, targetType TargetType) error {
@@ -124,13 +126,10 @@ func (i *pfilter) AddIngressRulesForHeadlessSvc(globalIP, ip string, targetType 
 		DnatCIDR: ip,
 		Action:   packetfilter.RuleActionDNAT,
 	}
-	logger.V(log.DEBUG).Infof("Installing packetfilter rule for Headless SVC %+v for %s", &ruleSpec, targetType)
 
-	if err := i.pFilter.AppendUnique(packetfilter.TableTypeNAT, constants.SmGlobalnetIngressChain, &ruleSpec); err != nil {
-		return errors.Wrapf(err, "unable to append rule %+v", &ruleSpec)
-	}
+	logger.V(log.DEBUG).Infof("Installing packetfilter rule for Headless SVC %s for %s", &ruleSpec, targetType)
 
-	return nil
+	return i.appendNATRule(constants.SmGlobalnetIngressChain, &ruleSpec)
 }
 
 func (i *pfilter) RemoveIngressRulesForHeadlessSvc(globalIP, ip string, targetType TargetType) error {
@@ -143,13 +142,9 @@ func (i *pfilter) RemoveIngressRulesForHeadlessSvc(globalIP, ip string, targetTy
 		DnatCIDR: ip,
 		Action:   packetfilter.RuleActionDNAT,
 	}
-	logger.V(log.DEBUG).Infof("Deleting iptables rule for Headless SVC %+v for %s", &ruleSpec, targetType)
+	logger.V(log.DEBUG).Infof("Deleting iptables rule for Headless SVC %q for %s", &ruleSpec, targetType)
 
-	if err := i.pFilter.Delete(packetfilter.TableTypeNAT, constants.SmGlobalnetIngressChain, &ruleSpec); err != nil {
-		return errors.Wrapf(err, "error deleting packetfilter rule %+v", &ruleSpec)
-	}
-
-	return nil
+	return i.deleteNATRule(constants.SmGlobalnetIngressChain, &ruleSpec)
 }
 
 func (i *pfilter) AddIngressRulesForHealthCheck(cniIfaceIP, globalIP string) error {
@@ -159,13 +154,9 @@ func (i *pfilter) AddIngressRulesForHealthCheck(cniIfaceIP, globalIP string) err
 		DnatCIDR: cniIfaceIP,
 		Action:   packetfilter.RuleActionDNAT,
 	}
-	logger.V(log.DEBUG).Infof("Installing packetfilter ingress rules for Node: %+v", &ruleSpec)
+	logger.V(log.DEBUG).Infof("Installing packetfilter ingress rules for Node: %q", &ruleSpec)
 
-	if err := i.pFilter.AppendUnique(packetfilter.TableTypeNAT, constants.SmGlobalnetIngressChain, &ruleSpec); err != nil {
-		return errors.Wrapf(err, "unable to append rule %+v", &ruleSpec)
-	}
-
-	return nil
+	return i.appendNATRule(constants.SmGlobalnetIngressChain, &ruleSpec)
 }
 
 func (i *pfilter) RemoveIngressRulesForHealthCheck(cniIfaceIP, globalIP string) error {
@@ -177,11 +168,7 @@ func (i *pfilter) RemoveIngressRulesForHealthCheck(cniIfaceIP, globalIP string) 
 	}
 	logger.V(log.DEBUG).Infof("Deleting packetfilter ingress rules for Node: %+v", &ruleSpec)
 
-	if err := i.pFilter.Delete(packetfilter.TableTypeNAT, constants.SmGlobalnetIngressChain, &ruleSpec); err != nil {
-		return errors.Wrapf(err, "error deleting packetfilter rule %+v", &ruleSpec)
-	}
-
-	return nil
+	return i.deleteNATRule(constants.SmGlobalnetIngressChain, &ruleSpec)
 }
 
 func (i *pfilter) AddEgressRulesForHeadlessSvc(key, sourceIP, snatIP, globalNetIPTableMark string, targetType TargetType) error {
@@ -227,11 +214,7 @@ func (i *pfilter) RemoveEgressRulesForHeadlessSvc(key, sourceIP, snatIP, globalN
 		chain = constants.SmGlobalnetEgressChainForHeadlessSvcEPs
 	}
 
-	if err := i.pFilter.Delete(packetfilter.TableTypeNAT, chain, &ruleSpec); err != nil {
-		return errors.Wrapf(err, "error deleting packetfilter rule %+v", &ruleSpec)
-	}
-
-	return nil
+	return i.deleteNATRule(chain, &ruleSpec)
 }
 
 func (i *pfilter) AddEgressRulesForPods(key, namedSetName, snatIP, globalNetIPTableMark string) error {
