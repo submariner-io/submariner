@@ -29,6 +29,8 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+const matchsetArg = "--match-set"
+
 var (
 	tableTypeToStr = map[packetfilter.TableType]string{
 		packetfilter.TableTypeFilter: "filter",
@@ -249,11 +251,11 @@ func mssClampToRuleSpec(ruleSpec *RuleSpec, clampType packetfilter.MssClampType,
 
 func setToRuleSpec(ruleSpec *RuleSpec, srcSetName, destSetName string) {
 	if srcSetName != "" {
-		*ruleSpec = append(*ruleSpec, "-m", "set", "--match-set", srcSetName, "src")
+		*ruleSpec = append(*ruleSpec, "-m", "set", matchsetArg, srcSetName, "src")
 	}
 
 	if destSetName != "" {
-		*ruleSpec = append(*ruleSpec, "-m", "set", "--match-set", destSetName, "dst")
+		*ruleSpec = append(*ruleSpec, "-m", "set", matchsetArg, destSetName, "dst")
 	}
 }
 
@@ -381,7 +383,7 @@ func parseRuleMatch(spec []string, i int, rule *packetfilter.Rule) int {
 			i += 2
 		}
 	case "set":
-		if i+3 < len(spec) && spec[i+1] == "--match-set" {
+		if i+3 < len(spec) && spec[i+1] == matchsetArg {
 			if spec[i+3] == "src" {
 				rule.SrcSetName = spec[i+2]
 			} else if spec[i+3] == "dst" {
