@@ -173,42 +173,41 @@ func (ovn *Handler) setupForwardingIptables() error {
 	return ovn.updateIPtableChains(packetfilter.TableTypeFilter, ForwardingSubmarinerFWDChain, ovn.getForwardingRuleSpecs)
 }
 
-func (ovn *Handler) addNoMasqueradeIPTables(subnet string) error {
-	err := errors.Wrapf(ovn.pFilter.AppendUnique(packetfilter.TableTypeNAT, constants.SmPostRoutingChain,
-		&packetfilter.Rule{
+func (ovn *Handler) updateNoMasqueradeRules(subnet string, add bool) error {
+	rules := []packetfilter.Rule{
+		{
 			DestCIDR: subnet,
 			Action:   packetfilter.RuleActionAccept,
-		}), "error updating %q rules for subnet %q",
-		constants.SmPostRoutingChain, subnet)
-	if err != nil {
-		return err
-	}
-
-	return errors.Wrapf(ovn.pFilter.AppendUnique(packetfilter.TableTypeNAT, constants.SmPostRoutingChain,
-		&packetfilter.Rule{
+		},
+		{
 			SrcCIDR: subnet,
 			Action:  packetfilter.RuleActionAccept,
-		}), "error updating %q rules for subnet %q",
-		constants.SmPostRoutingChain, subnet)
+		},
+	}
+
+	for i := range rules {
+		var err error
+
+		if add {
+			err = ovn.pFilter.AppendUnique(packetfilter.TableTypeNAT, constants.SmPostRoutingChain, &rules[i])
+		} else {
+			err = ovn.pFilter.Delete(packetfilter.TableTypeNAT, constants.SmPostRoutingChain, &rules[i])
+		}
+
+		if err != nil {
+			return errors.Wrapf(err, "error updating %q rule for subnet %q", constants.SmPostRoutingChain, subnet)
+		}
+	}
+
+	return nil
+}
+
+func (ovn *Handler) addNoMasqueradeIPTables(subnet string) error {
+	return ovn.updateNoMasqueradeRules(subnet, true)
 }
 
 func (ovn *Handler) removeNoMasqueradeIPTables(subnet string) error {
-	err := errors.Wrapf(ovn.pFilter.Delete(packetfilter.TableTypeNAT, constants.SmPostRoutingChain,
-		&packetfilter.Rule{
-			DestCIDR: subnet,
-			Action:   packetfilter.RuleActionAccept,
-		}), "error updating %q rules for subnet %q",
-		constants.SmPostRoutingChain, subnet)
-	if err != nil {
-		return err
-	}
-
-	return errors.Wrapf(ovn.pFilter.Delete(packetfilter.TableTypeNAT, constants.SmPostRoutingChain,
-		&packetfilter.Rule{
-			SrcCIDR: subnet,
-			Action:  packetfilter.RuleActionAccept,
-		}), "error updating %q rules for subnet %q",
-		constants.SmPostRoutingChain, subnet)
+	return ovn.updateNoMasqueradeRules(subnet, false)
 }
 
 func (ovn *Handler) cleanupForwardingIptables() error {
@@ -250,7 +249,7 @@ func (ovn *Handler) initIPtablesChains() error {
 		Hook:     packetfilter.ChainHookPostrouting,
 		Priority: packetfilter.ChainPriorityFirst,
 	}); err != nil {
-		return errors.Wrap(err, "error installing IPHook chain")
+		return errors.Wrapf(err, "error installing %q IPHook chain", constants.SmPostRoutingChain)
 	}
 
 	if err := ovn.ensureForwardChains(); err != nil {
@@ -261,22 +260,15 @@ func (ovn *Handler) initIPtablesChains() error {
 }
 
 func (ovn *Handler) ensureForwardChains() error {
-	if err := ovn.pFilter.CreateIPHookChainIfNotExists(&packetfilter.ChainIPHook{
-		Name:     ForwardingSubmarinerFWDChain,
-		Type:     packetfilter.ChainTypeFilter,
-		Hook:     packetfilter.ChainHookForward,
-		Priority: packetfilter.ChainPriorityFirst,
-	}); err != nil {
-		return errors.Wrap(err, "error installing IPHook chain")
-	}
-
-	if err := ovn.pFilter.CreateIPHookChainIfNotExists(&packetfilter.ChainIPHook{
-		Name:     ForwardingSubmarinerMSSClampChain,
-		Type:     packetfilter.ChainTypeFilter,
-		Hook:     packetfilter.ChainHookForward,
-		Priority: packetfilter.ChainPriorityFirst,
-	}); err != nil {
-		return errors.Wrap(err, "error installing IPHook chain")
+	for _, chain := range []string{ForwardingSubmarinerFWDChain, ForwardingSubmarinerMSSClampChain} {
+		if err := ovn.pFilter.CreateIPHookChainIfNotExists(&packetfilter.ChainIPHook{
+			Name:     chain,
+			Type:     packetfilter.ChainTypeFilter,
+			Hook:     packetfilter.ChainHookForward,
+			Priority: packetfilter.ChainPriorityFirst,
+		}); err != nil {
+			return errors.Wrapf(err, "error installing forwarding IPHook chain %q", chain)
+		}
 	}
 
 	return nil

@@ -164,20 +164,25 @@ func (c *ConnectionHandler) createLibovsdbClient(dbModel model.ClientDBModel, ne
 	return client, nil
 }
 
+func getFile(k8sClientset clientset.Interface, url string) (string, error) {
+	file, err := clusterfiles.Get(k8sClientset, url)
+	return file, errors.Wrapf(err, "error getting config file for %q", url)
+}
+
 func getTLSConfig(k8sClientset clientset.Interface) (*tls.Config, error) {
-	certFile, err := clusterfiles.Get(k8sClientset, getOVNCertPath())
+	certFile, err := getFile(k8sClientset, getOVNCertPath())
 	if err != nil {
-		return nil, errors.Wrapf(err, "error getting config for %q", getOVNCertPath())
+		return nil, err
 	}
 
-	pkFile, err := clusterfiles.Get(k8sClientset, getOVNPrivKeyPath())
+	pkFile, err := getFile(k8sClientset, getOVNPrivKeyPath())
 	if err != nil {
-		return nil, errors.Wrapf(err, "error getting config for %q", getOVNPrivKeyPath())
+		return nil, err
 	}
 
-	caFile, err := clusterfiles.Get(k8sClientset, getOVNCaBundlePath())
+	caFile, err := getFile(k8sClientset, getOVNCaBundlePath())
 	if err != nil {
-		return nil, errors.Wrapf(err, "error getting config for %q", getOVNCaBundlePath())
+		return nil, err
 	}
 
 	tlsConfig, err := getOVNTLSConfig(pkFile, certFile, caFile)

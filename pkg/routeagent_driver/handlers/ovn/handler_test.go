@@ -148,6 +148,9 @@ var _ = Describe("Handler", func() {
 				for _, s := range endpoint.Spec.Subnets {
 					t.netLink.AwaitRule(constants.RouteAgentInterClusterNetworkTableID, s, clusterCIDR)
 					t.netLink.AwaitRule(constants.RouteAgentInterClusterNetworkTableID, s, serviceCIDR)
+
+					t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmPostRoutingChain, ContainSubstring("\"SrcCIDR\":%q", s))
+					t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmPostRoutingChain, ContainSubstring("\"DestCIDR\":%q", s))
 				}
 
 				By("Updating remote Endpoint")
@@ -173,6 +176,9 @@ var _ = Describe("Handler", func() {
 				for _, s := range endpoint.Spec.Subnets {
 					t.netLink.AwaitNoRule(constants.RouteAgentInterClusterNetworkTableID, s, clusterCIDR)
 					t.netLink.AwaitNoRule(constants.RouteAgentInterClusterNetworkTableID, s, serviceCIDR)
+
+					t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, constants.SmPostRoutingChain, ContainSubstring("\"SrcCIDR\":%q", s))
+					t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, constants.SmPostRoutingChain, ContainSubstring("\"DestCIDR\":%q", s))
 				}
 			})
 		})
