@@ -29,31 +29,38 @@ import (
 )
 
 func (kp *SyncHandler) createPFilterChains() error {
-	logger.V(log.DEBUG).Infof("Install/ensure %q/%s IPHook chain exists", constants.SmPostRoutingChain, "NAT")
-
-	if err := kp.pFilter.CreateIPHookChainIfNotExists(&packetfilter.ChainIPHook{
-		Name:     constants.SmPostRoutingChain,
-		Type:     packetfilter.ChainTypeNAT,
-		Hook:     packetfilter.ChainHookPostrouting,
-		Priority: packetfilter.ChainPriorityFirst,
-	}); err != nil {
-		return errors.Wrap(err, "error installing IPHook chain")
+	ipHookChains := []packetfilter.ChainIPHook{
+		{
+			Name:     constants.SmPostRoutingChain,
+			Type:     packetfilter.ChainTypeNAT,
+			Hook:     packetfilter.ChainHookPostrouting,
+			Priority: packetfilter.ChainPriorityFirst,
+		},
+		{
+			Name:     constants.SmInputChain,
+			Type:     packetfilter.ChainTypeFilter,
+			Hook:     packetfilter.ChainHookInput,
+			Priority: packetfilter.ChainPriorityLast,
+			JumpRule: &packetfilter.Rule{
+				Proto:       packetfilter.RuleProtoUDP,
+				Action:      packetfilter.RuleActionJump,
+				TargetChain: constants.SmInputChain,
+			},
+		},
+		{
+			Name:     constants.SmForwardChain,
+			Type:     packetfilter.ChainTypeFilter,
+			Hook:     packetfilter.ChainHookForward,
+			Priority: packetfilter.ChainPriorityFirst,
+		},
 	}
 
-	logger.V(log.DEBUG).Infof("Install/ensure %q/%s IPHook chain exists", constants.SmInputChain, "Filter")
+	for i := range ipHookChains {
+		logger.V(log.DEBUG).Infof("Install/ensure %q/%s IPHook chain exists", ipHookChains[i].Name, "NAT")
 
-	if err := kp.pFilter.CreateIPHookChainIfNotExists(&packetfilter.ChainIPHook{
-		Name:     constants.SmInputChain,
-		Type:     packetfilter.ChainTypeFilter,
-		Hook:     packetfilter.ChainHookInput,
-		Priority: packetfilter.ChainPriorityLast,
-		JumpRule: &packetfilter.Rule{
-			Proto:       packetfilter.RuleProtoUDP,
-			Action:      packetfilter.RuleActionJump,
-			TargetChain: constants.SmInputChain,
-		},
-	}); err != nil {
-		return errors.Wrap(err, "error installing IPHook chain")
+		if err := kp.pFilter.CreateIPHookChainIfNotExists(&ipHookChains[i]); err != nil {
+			return errors.Wrapf(err, "error installing IPHook chain %q", ipHookChains[i].Name)
+		}
 	}
 
 	logger.V(log.DEBUG).Infof("Allow VxLAN incoming traffic in %q Chain", constants.SmInputChain)
@@ -66,15 +73,6 @@ func (kp *SyncHandler) createPFilterChains() error {
 
 	if err := kp.pFilter.AppendUnique(packetfilter.TableTypeFilter, constants.SmInputChain, &ruleSpec); err != nil {
 		return errors.Wrapf(err, "unable to append rule %+v", &ruleSpec)
-	}
-
-	if err := kp.pFilter.CreateIPHookChainIfNotExists(&packetfilter.ChainIPHook{
-		Name:     constants.SmForwardChain,
-		Type:     packetfilter.ChainTypeFilter,
-		Hook:     packetfilter.ChainHookForward,
-		Priority: packetfilter.ChainPriorityFirst,
-	}); err != nil {
-		return errors.Wrap(err, "error installing IPHook chain")
 	}
 
 	logger.V(log.DEBUG).Infof("Insert rule to allow traffic over %s interface in %s Chain", VxLANIface, constants.SmForwardChain)
