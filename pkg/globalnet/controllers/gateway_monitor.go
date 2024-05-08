@@ -143,11 +143,7 @@ func (g *gatewayMonitor) GetNetworkPlugins() []string {
 }
 
 func (g *gatewayMonitor) Init() error {
-	if err := g.createGlobalNetMarkingChain(); err != nil {
-		return errors.Wrap(err, "error while calling createGlobalNetMarkingChain")
-	}
-
-	return nil
+	return g.createNATChain(constants.SmGlobalnetMarkChain)
 }
 
 func (g *gatewayMonitor) Stop() error {
@@ -437,51 +433,39 @@ func (g *gatewayMonitor) stopControllers(ctx context.Context, clearGlobalnetChai
 	logger.Info("Controllers stopped")
 }
 
-func (g *gatewayMonitor) createGlobalNetMarkingChain() error {
-	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetMarkChain)
+func (g *gatewayMonitor) createNATChain(chainName string) error {
+	logger.V(log.DEBUG).Infof("Install/ensure chain %q exists", chainName)
 
-	if err := g.pFilter.CreateChainIfNotExists(packetfilter.TableTypeNAT,
+	err := g.pFilter.CreateChainIfNotExists(packetfilter.TableTypeNAT,
 		&packetfilter.Chain{
-			Name: constants.SmGlobalnetMarkChain,
-		}); err != nil {
-		return errors.Wrapf(err, "error creating packetfilter chain %s", constants.SmGlobalnetMarkChain)
-	}
+			Name: chainName,
+		})
 
-	return nil
+	return errors.Wrapf(err, "error creating packetfilter chain %q", chainName)
 }
 
 func (g *gatewayMonitor) createGlobalnetChains() error {
-	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetIngressChain)
-
-	chain := packetfilter.ChainIPHook{
-		Name:     constants.SmGlobalnetIngressChain,
-		Type:     packetfilter.ChainTypeNAT,
-		Hook:     packetfilter.ChainHookPrerouting,
-		Priority: packetfilter.ChainPriorityFirst,
-	}
-	if err := g.pFilter.CreateIPHookChainIfNotExists(&chain); err != nil {
-		return errors.Wrapf(err, "error creating IPHook chain %s", constants.SmGlobalnetIngressChain)
-	}
-
-	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", routeAgent.SmPostRoutingChain)
-
-	chain = packetfilter.ChainIPHook{
-		Name:     routeAgent.SmPostRoutingChain,
-		Type:     packetfilter.ChainTypeNAT,
-		Hook:     packetfilter.ChainHookPostrouting,
-		Priority: packetfilter.ChainPriorityFirst,
-	}
-	if err := g.pFilter.CreateIPHookChainIfNotExists(&chain); err != nil {
-		return errors.Wrap(err, "error creating IPHook chain")
+	ipHookChains := []packetfilter.ChainIPHook{
+		{
+			Name:     constants.SmGlobalnetIngressChain,
+			Type:     packetfilter.ChainTypeNAT,
+			Hook:     packetfilter.ChainHookPrerouting,
+			Priority: packetfilter.ChainPriorityFirst,
+		},
+		{
+			Name:     routeAgent.SmPostRoutingChain,
+			Type:     packetfilter.ChainTypeNAT,
+			Hook:     packetfilter.ChainHookPostrouting,
+			Priority: packetfilter.ChainPriorityFirst,
+		},
 	}
 
-	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChain)
+	for i := range ipHookChains {
+		logger.V(log.DEBUG).Infof("Install/ensure IP hook chain %q exists", ipHookChains[i].Name)
 
-	if err := g.pFilter.CreateChainIfNotExists(packetfilter.TableTypeNAT,
-		&packetfilter.Chain{
-			Name: constants.SmGlobalnetEgressChain,
-		}); err != nil {
-		return errors.Wrapf(err, "error creating packetfilter chain %s", constants.SmGlobalnetEgressChain)
+		if err := g.pFilter.CreateIPHookChainIfNotExists(&ipHookChains[i]); err != nil {
+			return errors.Wrapf(err, "error creating IPHook chain %q", ipHookChains[i].Name)
+		}
 	}
 
 	ruleSpec := packetfilter.Rule{
@@ -493,53 +477,18 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 		return errors.Wrapf(err, "Error prepending rule %+v", ruleSpec)
 	}
 
-	if err := g.createGlobalNetMarkingChain(); err != nil {
-		return err
-	}
-
-	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForPods)
-
-	if err := g.pFilter.CreateChainIfNotExists(packetfilter.TableTypeNAT,
-		&packetfilter.Chain{
-			Name: constants.SmGlobalnetEgressChainForPods,
-		}); err != nil {
-		return errors.Wrapf(err, "error creating packetfilter chain %s", constants.SmGlobalnetEgressChainForPods)
-	}
-
-	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForHeadlessSvcPods)
-
-	if err := g.pFilter.CreateChainIfNotExists(packetfilter.TableTypeNAT,
-		&packetfilter.Chain{
-			Name: constants.SmGlobalnetEgressChainForHeadlessSvcPods,
-		}); err != nil {
-		return errors.Wrapf(err, "error creating packetfilter chain %s", constants.SmGlobalnetEgressChainForHeadlessSvcPods)
-	}
-
-	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForHeadlessSvcEPs)
-
-	if err := g.pFilter.CreateChainIfNotExists(packetfilter.TableTypeNAT,
-		&packetfilter.Chain{
-			Name: constants.SmGlobalnetEgressChainForHeadlessSvcEPs,
-		}); err != nil {
-		return errors.Wrapf(err, "error creating packetfilter chain %s", constants.SmGlobalnetEgressChainForHeadlessSvcEPs)
-	}
-
-	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForNamespace)
-
-	if err := g.pFilter.CreateChainIfNotExists(packetfilter.TableTypeNAT,
-		&packetfilter.Chain{
-			Name: constants.SmGlobalnetEgressChainForNamespace,
-		}); err != nil {
-		return errors.Wrapf(err, "error creating packetfilter chain %s", constants.SmGlobalnetEgressChainForNamespace)
-	}
-
-	logger.V(log.DEBUG).Infof("Install/ensure %s chain exists", constants.SmGlobalnetEgressChainForCluster)
-
-	if err := g.pFilter.CreateChainIfNotExists(packetfilter.TableTypeNAT,
-		&packetfilter.Chain{
-			Name: constants.SmGlobalnetEgressChainForCluster,
-		}); err != nil {
-		return errors.Wrapf(err, "error creating packetfilter chain %s", constants.SmGlobalnetEgressChainForCluster)
+	for _, chain := range []string{
+		constants.SmGlobalnetEgressChain,
+		constants.SmGlobalnetMarkChain,
+		constants.SmGlobalnetEgressChainForPods,
+		constants.SmGlobalnetEgressChainForHeadlessSvcPods,
+		constants.SmGlobalnetEgressChainForHeadlessSvcEPs,
+		constants.SmGlobalnetEgressChainForNamespace,
+		constants.SmGlobalnetEgressChainForCluster,
+	} {
+		if err := g.createNATChain(chain); err != nil {
+			return err
+		}
 	}
 
 	if err := g.pFilter.PrependUnique(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChain,
@@ -576,16 +525,14 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 func (g *gatewayMonitor) clearGlobalnetChains() {
 	logger.Info("Active gateway migrated, flushing Globalnet chains.")
 
-	if err := g.pFilter.ClearChain(packetfilter.TableTypeNAT, constants.SmGlobalnetIngressChain); err != nil {
-		logger.Errorf(err, "Error while flushing rules in %s chain", constants.SmGlobalnetIngressChain)
-	}
-
-	if err := g.pFilter.ClearChain(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChain); err != nil {
-		logger.Errorf(err, "Error while flushing rules in %s chain", constants.SmGlobalnetEgressChain)
-	}
-
-	if err := g.pFilter.ClearChain(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain); err != nil {
-		logger.Errorf(err, "Error while flushing rules in %s chain", constants.SmGlobalnetMarkChain)
+	for _, chain := range []string{
+		constants.SmGlobalnetIngressChain,
+		constants.SmGlobalnetEgressChain,
+		constants.SmGlobalnetMarkChain,
+	} {
+		if err := g.pFilter.ClearChain(packetfilter.TableTypeNAT, chain); err != nil {
+			logger.Errorf(err, "Error while flushing rules in chain %q", chain)
+		}
 	}
 }
 
