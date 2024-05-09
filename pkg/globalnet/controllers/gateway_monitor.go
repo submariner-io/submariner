@@ -468,15 +468,6 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 		}
 	}
 
-	ruleSpec := packetfilter.Rule{
-		TargetChain: constants.SmGlobalnetEgressChain,
-		Action:      packetfilter.RuleActionJump,
-	}
-
-	if err := g.pFilter.PrependUnique(packetfilter.TableTypeNAT, routeAgent.SmPostRoutingChain, &ruleSpec); err != nil {
-		return errors.Wrapf(err, "Error prepending rule %+v", ruleSpec)
-	}
-
 	for _, chain := range []string{
 		constants.SmGlobalnetEgressChain,
 		constants.SmGlobalnetMarkChain,
@@ -489,6 +480,15 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 		if err := g.createNATChain(chain); err != nil {
 			return err
 		}
+	}
+
+	ruleSpec := packetfilter.Rule{
+		TargetChain: constants.SmGlobalnetEgressChain,
+		Action:      packetfilter.RuleActionJump,
+	}
+
+	if err := g.pFilter.PrependUnique(packetfilter.TableTypeNAT, routeAgent.SmPostRoutingChain, &ruleSpec); err != nil {
+		return errors.Wrapf(err, "Error prepending rule %+v", ruleSpec)
 	}
 
 	if err := g.pFilter.PrependUnique(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChain,

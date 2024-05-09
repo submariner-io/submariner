@@ -62,7 +62,7 @@ func (i *PacketFilter) ChainExists(table packetfilter.TableType, chain string) (
 }
 
 func (i *PacketFilter) AppendUnique(table packetfilter.TableType, chain string, rule *packetfilter.Rule) error {
-	return i.addRule(table, chain, -1, toRuleString(rule))
+	return i.addRule(table, chain, -1, rule)
 }
 
 func (i *PacketFilter) CreateIPHookChainIfNotExists(chain *packetfilter.ChainIPHook) error {
@@ -133,7 +133,7 @@ func (i *PacketFilter) List(table packetfilter.TableType, chain string) ([]*pack
 }
 
 func (i *PacketFilter) Append(table packetfilter.TableType, chain string, rule *packetfilter.Rule) error {
-	return i.addRule(table, chain, -1, toRuleString(rule))
+	return i.addRule(table, chain, -1, rule)
 }
 
 func (i *PacketFilter) Insert(table packetfilter.TableType, chain string, pos int, rule *packetfilter.Rule) error {
@@ -141,7 +141,7 @@ func (i *PacketFilter) Insert(table packetfilter.TableType, chain string, pos in
 		return fmt.Errorf("invalid position %d for insert", pos)
 	}
 
-	return i.addRule(table, chain, pos, toRuleString(rule))
+	return i.addRule(table, chain, pos, rule)
 }
 
 func (i *PacketFilter) createChainIfNotExists(table uint32, chain string) error {
@@ -210,7 +210,9 @@ func chainKey(table uint32, chain string) string {
 	return fmt.Sprintf("%v/%s", table, chain)
 }
 
-func (i *PacketFilter) addRule(table packetfilter.TableType, chain string, pos int, ruleSpec string) error {
+func (i *PacketFilter) addRule(table packetfilter.TableType, chain string, pos int, rule *packetfilter.Rule) error {
+	ruleSpec := toRuleString(rule)
+
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
@@ -224,6 +226,12 @@ func (i *PacketFilter) addRule(table packetfilter.TableType, chain string, pos i
 	rules := i.chainRules[key]
 	if rules == nil {
 		return fmt.Errorf("chain %q for table %q does not exist", chain, table)
+	}
+
+	if rule.TargetChain != "" {
+		if i.chainRules[chainKey(uint32(table), rule.TargetChain)] == nil {
+			return fmt.Errorf("target chain %q for table %q does not exist", rule.TargetChain, table)
+		}
 	}
 
 	if pos < 0 {
