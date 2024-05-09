@@ -25,7 +25,11 @@ import (
 	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
 )
 
-const chain = "test-chain"
+const (
+	chain        = "test-chain"
+	targetChain1 = "target-chain1"
+	targetChain2 = "target-chain2"
+)
 
 var _ = Describe("Adapter", func() {
 	rule1 := &packetfilter.Rule{
@@ -56,7 +60,7 @@ var _ = Describe("Adapter", func() {
 	rule4 := &packetfilter.Rule{
 		Action:      packetfilter.RuleActionJump,
 		Proto:       packetfilter.RuleProtoICMP,
-		TargetChain: "target-chain",
+		TargetChain: targetChain1,
 	}
 
 	rule5 := &packetfilter.Rule{
@@ -98,12 +102,24 @@ var _ = Describe("Adapter", func() {
 		Expect(pFilter.CreateChainIfNotExists(packetfilter.TableTypeRoute, &packetfilter.Chain{
 			Name: chain,
 		})).To(Succeed())
+
+		Expect(pFilter.CreateChainIfNotExists(packetfilter.TableTypeNAT, &packetfilter.Chain{
+			Name: targetChain1,
+		})).To(Succeed())
+
+		Expect(pFilter.CreateChainIfNotExists(packetfilter.TableTypeRoute, &packetfilter.Chain{
+			Name: targetChain1,
+		})).To(Succeed())
+
+		Expect(pFilter.CreateChainIfNotExists(packetfilter.TableTypeNAT, &packetfilter.Chain{
+			Name: targetChain2,
+		})).To(Succeed())
 	})
 
 	Context("PrependUnique", func() {
 		otherRule := &packetfilter.Rule{
 			Action:      packetfilter.RuleActionJump,
-			TargetChain: "other-chain",
+			TargetChain: targetChain2,
 		}
 
 		When("the rules don't exist", func() {
