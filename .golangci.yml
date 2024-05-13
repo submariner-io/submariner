@@ -72,7 +72,7 @@ linters:
     - goconst
     - gocritic
     - gocyclo
-    - goerr113
+    - err113
     - godot
     # - godox #  Let's not forbid inline TODOs, FIXMEs et al
     - gofmt
@@ -158,14 +158,14 @@ issues:
     # https://github.com/Djarvur/go-err113/issues/10 for an interesting discussion of this error. While there are cases
     # where wrapped sentinel errors are useful, it seems a bit pedantic to force that pattern in all cases.
     - linters:
-        - goerr113
+        - err113
       text: "do not define dynamic errors"
 
     # Ignore certain linters for test files
     - path: _test\.go|test/|fake/
       linters:
         - gochecknoinits
-        - goerr113
+        - err113
         - wrapcheck
 
     # Ignore contextcheck on main for now
