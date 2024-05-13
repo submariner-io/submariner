@@ -19,8 +19,7 @@ limitations under the License.
 package natdiscovery
 
 import (
-	"crypto/rand"
-	"math/big"
+	"math/rand/v2"
 	"net"
 	"reflect"
 	"sync"
@@ -64,11 +63,6 @@ func New(localEndpoint *endpoint.Local) (Interface, error) {
 }
 
 func newNATDiscovery(localEndpoint *endpoint.Local) (*natDiscovery, error) {
-	requestCounter, err := randomRequestCounter()
-	if err != nil {
-		return nil, err
-	}
-
 	ndPort, err := localEndpoint.Spec().GetBackendPort(v1.NATTDiscoveryPortConfig, 0)
 	if err != nil {
 		return nil, errors.Wrap(err, "error parsing nat discovery port")
@@ -79,21 +73,9 @@ func newNATDiscovery(localEndpoint *endpoint.Local) (*natDiscovery, error) {
 		serverPort:      ndPort,
 		remoteEndpoints: map[string]*remoteEndpointNAT{},
 		findSrcIP:       endpoint.GetLocalIPForDestination,
-		requestCounter:  requestCounter,
+		requestCounter:  rand.Uint64(),
 		readyChannel:    make(chan *NATEndpointInfo, 100),
 	}, nil
-}
-
-func randomRequestCounter() (uint64, error) {
-	maximum := new(big.Int)
-	maximum.Exp(big.NewInt(2), big.NewInt(64), nil).Sub(maximum, big.NewInt(1))
-
-	n, err := rand.Int(rand.Reader, maximum)
-	if err != nil {
-		return 0, errors.Wrapf(err, "generating random request counter")
-	}
-
-	return n.Uint64(), nil
 }
 
 var errNoNATDiscoveryPort = errors.New("NATT discovery port missing in endpoint")
