@@ -44,7 +44,6 @@ import (
 	packetfilter "github.com/submariner-io/submariner/pkg/packetfilter"
 	iptables "github.com/submariner-io/submariner/pkg/packetfilter/iptables"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cabledriver"
-	cniapi "github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/calico"
@@ -192,7 +191,7 @@ func annotateNode(clusterCidr []string, k8sClientSet *kubernetes.Clientset) erro
 		return fmt.Errorf("error reading the NODE_NAME from the environment")
 	}
 
-	err := cniapi.AnnotateNodeWithCNIInterfaceIP(nodeName, k8sClientSet, clusterCidr)
+	err := cni.AnnotateNodeWithCNIInterfaceIP(nodeName, k8sClientSet, clusterCidr)
 	if err != nil {
 		return errors.Wrap(err, "error annotating node with CNI interface IP")
 	}
