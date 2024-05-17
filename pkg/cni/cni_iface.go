@@ -19,15 +19,10 @@ limitations under the License.
 package cni
 
 import (
-	"context"
 	"net"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/util/retry"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -85,57 +80,4 @@ func discover(clusterCIDR string) (*Interface, error) {
 	}
 
 	return nil, errors.Errorf("unable to find CNI Interface on the host which has IP from %q", clusterCIDR)
-}
-
-func AnnotateNodeWithCNIInterfaceIP(nodeName string, clientSet kubernetes.Interface, clusterCidr []string) error {
-	cniIPAddress := ""
-	setAnnotation := true
-
-	if len(clusterCidr) == 0 {
-		setAnnotation = false
-	}
-
-	if setAnnotation {
-		cniIface, err := Discover(clusterCidr[0])
-		if err != nil {
-			return errors.Wrapf(err, "Error retrieving the CNI interface for %s", clusterCidr[0])
-		}
-
-		cniIPAddress = cniIface.IPAddress
-	}
-
-	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		node, err := clientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-		if err != nil {
-			return errors.Wrapf(err, "unable to get node info for node %q", nodeName)
-		}
-
-		annotations := node.GetAnnotations()
-		if annotations == nil {
-			annotations = map[string]string{}
-		}
-
-		if setAnnotation {
-			annotations[constants.CNIInterfaceIP] = cniIPAddress
-		} else {
-			delete(annotations, constants.CNIInterfaceIP)
-		}
-
-		node.SetAnnotations(annotations)
-		_, updateErr := clientSet.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
-
-		return updateErr //nolint:wrapcheck // We wrap it below in the enclosing function
-	})
-
-	if retryErr != nil {
-		return errors.Wrapf(retryErr, "error updatating node %q", nodeName)
-	}
-
-	if setAnnotation {
-		logger.Infof("Successfully annotated node %q with cniIfaceIP %q", nodeName, cniIPAddress)
-	} else {
-		logger.Infof("Successfully removed %q from node %q annotation", constants.CNIInterfaceIP, nodeName)
-	}
-
-	return nil
 }
