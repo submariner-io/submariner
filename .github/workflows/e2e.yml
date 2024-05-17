@@ -69,7 +69,7 @@ jobs:
       - name: Run E2E deployment and tests
         uses: submariner-io/shipyard/gh-actions/e2e@release-0.17
         with:
-          using: ${{ matrix.cable-driver }} ${{ matrix.extra-toggles }}
+          using: ${{ matrix.globalnet }} ${{ matrix.cable-driver }} ${{ matrix.extra-toggles }}
 
       - name: Post mortem
         if: failure()
