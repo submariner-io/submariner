@@ -21,12 +21,15 @@ package dataplane
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strconv"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -44,9 +47,31 @@ var _ = Describe("Gateway status reporting", Label(TestLabel), func() {
 			Expect(activeGateways).To(HaveLen(1))
 
 			name := activeGateways[0].Name
-			otherCluster := framework.TestContext.ClusterIDs[framework.ClusterB]
+
+			otherClusterIndex := framework.ClusterB
+			otherCluster := framework.TestContext.ClusterIDs[otherClusterIndex]
+
+			gatewayPod := f.AwaitActiveGatewayPod(otherClusterIndex, nil)
+			Expect(gatewayPod).ToNot(BeNil(), "Did not find an active gateway pod for cluster %q", otherCluster)
+
+			healthCheckEnabled := false
+
+			varIndex := slices.IndexFunc(gatewayPod.Spec.Containers[0].Env, func(envVar corev1.EnvVar) bool {
+				return envVar.Name == "SUBMARINER_HEALTHCHECKENABLED"
+			})
+			if varIndex >= 0 {
+				healthCheckEnabled, _ = strconv.ParseBool(gatewayPod.Spec.Containers[0].Env[varIndex].Value)
+			}
 
 			framework.By(fmt.Sprintf("Ensuring that gateway %q reports connection information for cluster %q", name, otherCluster))
+
+			if healthCheckEnabled {
+				framework.By(fmt.Sprintf("Health check is enabled on cluster %q so will expect connection latency information reported",
+					otherCluster))
+			} else {
+				framework.By(fmt.Sprintf("Health check is not enabled on cluster %q so will not expect connection latency information"+
+					" reported", otherCluster))
+			}
 
 			gwClient := subFramework.SubmarinerClients[framework.ClusterA].SubmarinerV1().Gateways(
 				framework.TestContext.SubmarinerNamespace)
@@ -63,13 +88,13 @@ var _ = Describe("Gateway status reporting", Label(TestLabel), func() {
 						return false, "gateway not found", nil
 					}
 
-					return verifyGateway(result.(*submarinerv1.Gateway), otherCluster)
+					return verifyGateway(result.(*submarinerv1.Gateway), otherCluster, healthCheckEnabled)
 				})
 		})
 	})
 })
 
-func verifyGateway(gw *submarinerv1.Gateway, otherCluster string) (bool, string, error) {
+func verifyGateway(gw *submarinerv1.Gateway, otherCluster string, healthCheckedEnabled bool) (bool, string, error) {
 	if len(gw.Status.Connections) == 0 {
 		return false, "Gateway has no connections", nil
 	}
@@ -84,7 +109,13 @@ func verifyGateway(gw *submarinerv1.Gateway, otherCluster string) (bool, string,
 				gw.Status.Connections[i].Endpoint.ClusterID, gw.Status.Connections[i].Status, gw.Status.Connections[i].StatusMessage), nil
 		}
 
-		if gw.Status.LocalEndpoint.HealthCheckIP != "" && gw.Status.Connections[i].Endpoint.HealthCheckIP != "" {
+		if healthCheckedEnabled {
+			if gw.Status.Connections[i].Endpoint.HealthCheckIP == "" {
+				return false, fmt.Sprintf("Connection for cluster %q has no health check IP. This could be because the Gateway or"+
+					" Globalnet pod could not determine the cluster's CNI IP address. If so, this would be reported in the pod log.",
+					otherCluster), nil
+			}
+
 			if gw.Status.Connections[i].LatencyRTT == nil {
 				return false, fmt.Sprintf("Connection for cluster %q has no LatencyRTT information", otherCluster), nil
 			}
