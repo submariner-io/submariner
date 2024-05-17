@@ -102,10 +102,11 @@ type GatewayMonitorConfig struct {
 	Client     dynamic.Interface
 	Scheme     *runtime.Scheme
 	LeaderElectionConfig
-	Spec       Specification
-	LocalCIDRs []string
-	KubeClient kubernetes.Interface
-	Hostname   string
+	Spec              Specification
+	LocalCIDRs        []string
+	LocalClusterCIDRs []string
+	KubeClient        kubernetes.Interface
+	Hostname          string
 }
 
 type baseController struct {
@@ -194,6 +195,7 @@ type serviceController struct {
 type nodeController struct {
 	*baseIPAllocationController
 	nodeName string
+	cniIP    string
 	nodes    dynamic.ResourceInterface
 }
 

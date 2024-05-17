@@ -20,6 +20,7 @@ package controllers_test
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -33,6 +34,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	testutil "github.com/submariner-io/admiral/pkg/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/ipam"
@@ -61,8 +63,11 @@ const (
 	globalIngressIPName       = "nginx-ingress-ip"
 	kubeProxyIPTableChainName = "KUBE-SVC-Y7DIXXI5PNAUV7FB"
 	serviceName               = "nginx"
-	cniInterfaceIP            = "10.20.30.40"
-	globalIP                  = "169.254.1.100"
+	cniInterfaceIP            = "169.254.1.50"
+	globalCIDR                = "242.10.1.0/24"
+	globalIP1                 = "242.10.1.100"
+	globalIP2                 = "242.10.1.101"
+	globalIP3                 = "242.10.1.102"
 )
 
 func init() {
@@ -74,6 +79,17 @@ func init() {
 
 var _ = BeforeSuite(func() {
 	kzerolog.InitK8sLogging()
+
+	cni.DiscoverFunc = func(cidr string) (*cni.Interface, error) {
+		if cidr != localCIDR {
+			return nil, fmt.Errorf("invalid CIDR %q", cidr)
+		}
+
+		return &cni.Interface{
+			Name:      "veth0",
+			IPAddress: cniInterfaceIP,
+		}, nil
+	}
 })
 
 func TestControllers(t *testing.T) {
@@ -107,7 +123,7 @@ func newTestDriverBase() *testDriverBase {
 			&submarinerv1.GlobalEgressIP{}, &submarinerv1.ClusterGlobalEgressIP{}, &submarinerv1.GlobalIngressIP{}, &mcsv1a1.ServiceExport{}),
 		scheme:       runtime.NewScheme(),
 		pFilter:      fakePF.New(),
-		globalCIDR:   localCIDR,
+		globalCIDR:   globalCIDR,
 		localSubnets: []string{},
 	}
 	Expect(mcsv1a1.AddToScheme(t.scheme)).To(Succeed())
@@ -247,14 +263,13 @@ func (t *testDriverBase) getGlobalIngressIPStatus(name string) *submarinerv1.Glo
 	return status
 }
 
-func (t *testDriverBase) createNode(name, cniInterfaceIP, globalIP string) *corev1.Node {
+func (t *testDriverBase) createNode(name, globalIP string) *corev1.Node {
 	node := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 	}
 
-	addAnnotation(node, routeAgent.CNIInterfaceIP, cniInterfaceIP)
 	addAnnotation(node, constants.SmGlobalIP, globalIP)
 
 	return test.CreateResource(t.nodes, node)
@@ -279,7 +294,7 @@ func (t *testDriverBase) awaitNodeGlobalIP(oldIP string) string {
 	return globalIP
 }
 
-func (t *testDriverBase) awaitNoNodeGlobalIP() {
+func (t *testDriverBase) ensureNoNodeGlobalIP() {
 	Consistently(func() string {
 		obj, err := t.nodes.Get(context.TODO(), nodeName, metav1.GetOptions{})
 		Expect(err).To(Succeed())
