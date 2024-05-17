@@ -20,7 +20,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"io/fs"
 	"os"
 	"strconv"
@@ -44,7 +43,6 @@ import (
 	packetfilter "github.com/submariner-io/submariner/pkg/packetfilter"
 	iptables "github.com/submariner-io/submariner/pkg/packetfilter/iptables"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cabledriver"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/calico"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
@@ -151,16 +149,12 @@ func main() {
 	logger.FatalOnError(err, "Error registering the handlers")
 
 	if env.Uninstall {
-		uninstall(k8sClientSet, registry)
+		uninstall(registry)
 
 		return
 	}
 
 	defer http.StartServer(http.Profile, env.ProfilePort)()
-
-	if err = annotateNode(env.ClusterCidr, k8sClientSet); err != nil {
-		logger.Errorf(err, "Error while annotating the node")
-	}
 
 	ctl, err := controller.New(&controller.Config{
 		Registry:   registry,
@@ -185,20 +179,6 @@ func init() {
 	flag.BoolVar(&showVersion, "version", showVersion, "Show version")
 }
 
-func annotateNode(clusterCidr []string, k8sClientSet *kubernetes.Clientset) error {
-	nodeName, ok := os.LookupEnv("NODE_NAME")
-	if !ok {
-		return fmt.Errorf("error reading the NODE_NAME from the environment")
-	}
-
-	err := cni.AnnotateNodeWithCNIInterfaceIP(nodeName, k8sClientSet, clusterCidr)
-	if err != nil {
-		return errors.Wrap(err, "error annotating node with CNI interface IP")
-	}
-
-	return nil
-}
-
 func getTCPMssValue(k8sClientSet *kubernetes.Clientset) int {
 	localNode, err := node.GetLocalNode(k8sClientSet)
 	if err != nil {
@@ -221,17 +201,13 @@ func getTCPMssValue(k8sClientSet *kubernetes.Clientset) int {
 	return tcpMssValue
 }
 
-func uninstall(k8sClientSet *kubernetes.Clientset, registry *event.Registry) {
+func uninstall(registry *event.Registry) {
 	if err := registry.StopHandlers(); err != nil {
 		logger.Warningf("Error stopping handlers: %v", err)
 	}
 
 	if err := registry.Uninstall(); err != nil {
 		logger.Warningf("Error uninstalling handlers: %v", err)
-	}
-
-	if err := annotateNode([]string{}, k8sClientSet); err != nil {
-		logger.Warningf("Error removing %q annotation: %v", constants.CNIInterfaceIP, err)
 	}
 }
 
