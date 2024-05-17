@@ -30,7 +30,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
-	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -43,7 +42,7 @@ var _ = Describe("Node controller", func() {
 	Context("on startup", func() {
 		When("the Node doesn't have a global IP", func() {
 			BeforeEach(func() {
-				node = t.createNode(nodeName, cniInterfaceIP, "")
+				node = t.createNode(nodeName, "")
 			})
 
 			It("should allocate it and program the relevant iptable rules", func() {
@@ -68,7 +67,7 @@ var _ = Describe("Node controller", func() {
 
 		When("the Node has a global IP", func() {
 			BeforeEach(func() {
-				node = t.createNode(nodeName, cniInterfaceIP, "169.254.1.100")
+				node = t.createNode(nodeName, globalIP1)
 			})
 
 			It("should not reallocate it", func() {
@@ -99,59 +98,23 @@ var _ = Describe("Node controller", func() {
 				})
 			})
 		})
-	})
 
-	When("the Node's CNI interface IP is updated", func() {
-		Context("without a global IP allocated", func() {
+		When("the CNI IP discovery fails", func() {
 			BeforeEach(func() {
-				node = t.createNode(nodeName, "", "")
+				t.localCIDRs = []string{"10.128.1.0/16"}
+				node = t.createNode(nodeName, "")
 			})
 
-			JustBeforeEach(func() {
-				t.awaitNoNodeGlobalIP()
-
-				addAnnotation(node, routeAgent.CNIInterfaceIP, cniInterfaceIP)
-				test.UpdateResource(t.nodes, node)
-			})
-
-			It("should allocate a global IP and program the relevant iptable rules", func() {
-				t.awaitPacketFilterRules(t.awaitNodeGlobalIP(""))
-			})
-
-			Context("and programming of IP tables initially fails", func() {
-				BeforeEach(func() {
-					t.pFilter.AddFailOnAppendRuleMatcher(ContainSubstring(cniInterfaceIP))
-				})
-
-				It("should eventually allocate a global IP and program the relevant iptable rules", func() {
-					t.awaitPacketFilterRules(t.awaitNodeGlobalIP(""))
-				})
-			})
-		})
-
-		Context("with a global IP allocated", func() {
-			BeforeEach(func() {
-				node = t.createNode(nodeName, "50.60.70.80", "169.254.1.100")
-			})
-
-			It("re-program the iptable rules", func() {
-				oldCNIIfaceIP := node.GetAnnotations()[routeAgent.CNIInterfaceIP]
-
-				time.Sleep(time.Millisecond * 300)
-				addAnnotation(node, routeAgent.CNIInterfaceIP, cniInterfaceIP)
-				test.UpdateResource(t.nodes, node)
-
-				t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, constants.SmGlobalnetIngressChain, ContainSubstring(oldCNIIfaceIP))
-				t.awaitPacketFilterRules(node.GetAnnotations()[constants.SmGlobalIP])
-				t.verifyIPsReservedInPool(node.GetAnnotations()[constants.SmGlobalIP])
+			It("should not allocate a global IP", func() {
+				t.ensureNoNodeGlobalIP()
 			})
 		})
 	})
 
 	When("a non-local Node is created and it has a global IP", func() {
 		BeforeEach(func() {
-			t.createNode(nodeName, "", "169.254.1.100")
-			node = t.createNode("otherNode", cniInterfaceIP, "169.254.1.100")
+			t.createNode(nodeName, globalIP1)
+			node = t.createNode("otherNode", globalIP1)
 			_ = t.pool.Reserve(node.GetAnnotations()[constants.SmGlobalIP])
 		})
 
@@ -167,6 +130,7 @@ var _ = Describe("Node controller", func() {
 
 type nodeControllerTestDriver struct {
 	*testDriverBase
+	localCIDRs []string
 }
 
 func newNodeControllerTestDriver() *nodeControllerTestDriver {
@@ -180,6 +144,8 @@ func newNodeControllerTestDriver() *nodeControllerTestDriver {
 
 		t.pool, err = ipam.NewIPPool(t.globalCIDR)
 		Expect(err).To(Succeed())
+
+		t.localCIDRs = []string{localCIDR}
 	})
 
 	JustBeforeEach(func() {
@@ -200,7 +166,7 @@ func (t *nodeControllerTestDriver) start() {
 		SourceClient: t.dynClient,
 		RestMapper:   t.restMapper,
 		Scheme:       t.scheme,
-	}, t.pool, nodeName)
+	}, t.pool, nodeName, t.localCIDRs)
 
 	Expect(err).To(Succeed())
 	Expect(t.controller.Start()).To(Succeed())

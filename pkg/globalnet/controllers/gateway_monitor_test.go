@@ -59,7 +59,7 @@ var _ = Describe("Endpoint monitoring", func() {
 
 	When("a local gateway Endpoint corresponding to the controller host is created", func() {
 		JustBeforeEach(func() {
-			t.createNode(nodeName, "", "")
+			t.createNode(nodeName, "")
 			endpoint = t.createEndpoint(newEndpointSpec(clusterID, t.hostName, localCIDR))
 			t.createPFilterChain(packetfilter.TableTypeNAT, kubeProxyIPTableChainName)
 		})
@@ -80,6 +80,7 @@ var _ = Describe("Endpoint monitoring", func() {
 			t.createPod(backendPod)
 			t.createServiceExport(t.createService(service))
 			t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
+			t.awaitNodeGlobalIP("")
 		})
 
 		Context("and then deleted and recreated", func() {
@@ -231,7 +232,7 @@ var _ = Describe("Endpoint monitoring", func() {
 		It("should not add expected IP table rule(s)", func() {
 			t.createEndpoint(newEndpointSpec(remoteClusterID, t.hostName, localCIDR))
 			time.Sleep(500 * time.Millisecond)
-			t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain, ContainSubstring(localCIDR))
+			t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain, ContainSubstring(globalCIDR))
 		})
 	})
 })
@@ -423,7 +424,7 @@ func (t *gatewayMonitorTestDriver) start() {
 	os.Setenv("NODE_NAME", nodeName)
 	var err error
 
-	localSubnets := []string{}
+	localSubnets := []string{localCIDR}
 	t.hostName, err = os.Hostname()
 	Expect(err).To(Succeed())
 
@@ -434,8 +435,9 @@ func (t *gatewayMonitorTestDriver) start() {
 		Spec: controllers.Specification{
 			ClusterID:  clusterID,
 			Namespace:  namespace,
-			GlobalCIDR: []string{localCIDR},
+			GlobalCIDR: []string{globalCIDR},
 		},
+		LocalClusterCIDRs:    localSubnets,
 		LocalCIDRs:           localSubnets,
 		KubeClient:           t.kubeClient,
 		LeaderElectionConfig: t.leaderElectionConfig,

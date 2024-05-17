@@ -140,15 +140,17 @@ func main() {
 	restMapper, err := util.BuildRestMapper(cfg)
 	logger.FatalOnError(err, "Unable to build the REST mapper")
 
+	clusterCIDRs := cidr.ExtractIPv4Subnets(localCluster.Spec.ClusterCIDR)
+
 	gatewayMonitor, err := controllers.NewGatewayMonitor(&controllers.GatewayMonitorConfig{
-		Client:     dynClient,
-		RestMapper: restMapper,
-		Scheme:     scheme.Scheme,
-		Spec:       spec,
-		LocalCIDRs: append(cidr.ExtractIPv4Subnets(localCluster.Spec.ClusterCIDR),
-			cidr.ExtractIPv4Subnets(localCluster.Spec.ServiceCIDR)...),
-		KubeClient: k8sClient,
-		Hostname:   hostname,
+		Client:            dynClient,
+		RestMapper:        restMapper,
+		Scheme:            scheme.Scheme,
+		Spec:              spec,
+		LocalClusterCIDRs: clusterCIDRs,
+		LocalCIDRs:        append(clusterCIDRs, cidr.ExtractIPv4Subnets(localCluster.Spec.ServiceCIDR)...),
+		KubeClient:        k8sClient,
+		Hostname:          hostname,
 	})
 	logger.FatalOnError(err, "Error creating gatewayMonitor")
 

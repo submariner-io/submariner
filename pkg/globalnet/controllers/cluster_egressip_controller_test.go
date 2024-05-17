@@ -50,7 +50,7 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 
 			BeforeEach(func() {
 				existing = newClusterGlobalEgressIP(constants.ClusterGlobalEgressIPName, 3)
-				existing.Status.AllocatedIPs = []string{"169.254.1.100", "169.254.1.101", "169.254.1.102"}
+				existing.Status.AllocatedIPs = []string{globalIP1, globalIP2, globalIP3}
 			})
 
 			Context("and the NumberOfIPs unchanged", func() {
@@ -210,7 +210,7 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 
 		BeforeEach(func() {
 			existing = newClusterGlobalEgressIP(constants.ClusterGlobalEgressIPName, 2)
-			existing.Status.AllocatedIPs = []string{"169.254.1.100", "169.254.1.101"}
+			existing.Status.AllocatedIPs = []string{globalIP1, globalIP2}
 			t.createClusterGlobalEgressIP(existing)
 		})
 

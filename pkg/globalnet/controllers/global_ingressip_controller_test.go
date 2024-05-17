@@ -277,7 +277,7 @@ func testExistingGlobalIngressIPClusterIPSvc(t *globalIngressIPControllerTestDri
 
 	Context("with an allocated IP", func() {
 		BeforeEach(func() {
-			existing.Status.AllocatedIP = globalIP
+			existing.Status.AllocatedIP = globalIP1
 			exportedService := newClusterIPService()
 			t.createService(exportedService)
 
@@ -323,7 +323,7 @@ func testExistingGlobalIngressIPClusterIPSvc(t *globalIngressIPControllerTestDri
 
 	Context("with an allocated IP but missing internal service", func() {
 		BeforeEach(func() {
-			existing.Status.AllocatedIP = globalIP
+			existing.Status.AllocatedIP = globalIP1
 			exportedService := newClusterIPService()
 			t.createService(exportedService)
 			t.createGlobalIngressIP(existing)
@@ -336,12 +336,12 @@ func testExistingGlobalIngressIPClusterIPSvc(t *globalIngressIPControllerTestDri
 
 	Context("and external IP of internal service does not match with allocated global IP", func() {
 		BeforeEach(func() {
-			existing.Status.AllocatedIP = "169.254.1.200"
+			existing.Status.AllocatedIP = globalIP1
 			exportedService := newClusterIPService()
 			t.createService(exportedService)
 
 			internalSvc := newGlobalnetInternalService(controllers.GetInternalSvcName(serviceName))
-			internalSvc.Spec.ExternalIPs = []string{"169.254.1.111"}
+			internalSvc.Spec.ExternalIPs = []string{globalIP2}
 			t.createService(internalSvc)
 			t.createGlobalIngressIP(existing)
 		})
@@ -419,7 +419,7 @@ func testExistingGlobalIngressIPHeadlessSvc(t *globalIngressIPControllerTestDriv
 
 	Context("with an allocated IP", func() {
 		BeforeEach(func() {
-			existing.Status.AllocatedIP = globalIP
+			existing.Status.AllocatedIP = globalIP1
 			t.createGlobalIngressIP(existing)
 		})
 
