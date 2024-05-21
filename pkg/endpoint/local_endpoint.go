@@ -21,7 +21,6 @@ package endpoint
 import (
 	"context"
 	"fmt"
-	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -34,6 +33,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/util"
 	submv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cidr"
+	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/node"
 	"github.com/submariner-io/submariner/pkg/port"
 	"github.com/submariner-io/submariner/pkg/types"
@@ -166,11 +166,13 @@ func GetLocalSpec(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.
 		// In a fresh deployment, globalIP annotation for the node might take few seconds. So we listen on NodeEvents
 		// and update the endpoint HealthCheckIP (to globalIP) in datastoreSyncer at a later stage. This will trigger
 		// the HealthCheck between the clusters.
-		endpointSpec.HealthCheckIP, err = getCNIInterfaceIPAddress(submSpec.ClusterCidr)
+		cniIface, err := cni.Discover(submSpec.ClusterCidr)
 		if err != nil {
 			return nil, fmt.Errorf("error getting CNI Interface IP address: %w."+
 				"Please disable the health check if your CNI does not expose a pod IP on the nodes", err)
 		}
+
+		endpointSpec.HealthCheckIP = cniIface.IPAddress
 	}
 
 	return endpointSpec, nil
@@ -260,45 +262,4 @@ func addConfigFrom(nodeName string, configs, backendConfig map[string]string, wa
 	}
 
 	return nil
-}
-
-// TODO: to handle de-duplication of code/finding common parts with the route agent.
-func getCNIInterfaceIPAddress(clusterCIDRs []string) (string, error) {
-	for _, clusterCIDR := range clusterCIDRs {
-		_, clusterNetwork, err := net.ParseCIDR(clusterCIDR)
-		if err != nil {
-			return "", errors.Wrapf(err, "unable to ParseCIDR %q", clusterCIDR)
-		}
-
-		hostInterfaces, err := net.Interfaces()
-		if err != nil {
-			return "", errors.Wrap(err, "net.Interfaces() returned error")
-		}
-
-		for _, iface := range hostInterfaces {
-			addrs, err := iface.Addrs()
-			if err != nil {
-				return "", errors.Wrapf(err, "for interface %q, iface.Addrs returned error", iface.Name)
-			}
-
-			for i := range addrs {
-				ipAddr, _, err := net.ParseCIDR(addrs[i].String())
-				if err != nil {
-					logger.Error(nil, "Unable to ParseCIDR : %q", addrs[i].String())
-				} else if ipAddr.To4() != nil {
-					logger.V(log.DEBUG).Infof("Interface %q has %q address", iface.Name, ipAddr)
-					address := net.ParseIP(ipAddr.String())
-
-					// Verify that interface has an address from cluster CIDR.
-					if clusterNetwork.Contains(address) {
-						logger.V(log.DEBUG).Infof("Found CNI Interface %q that has IP %q from ClusterCIDR %q",
-							iface.Name, ipAddr.String(), clusterCIDR)
-						return ipAddr.String(), nil
-					}
-				}
-			}
-		}
-	}
-
-	return "", errors.Errorf("unable to find CNI Interface on the host which has IP from %q", clusterCIDRs)
 }

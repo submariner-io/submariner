@@ -34,50 +34,52 @@ type Interface struct {
 var logger = log.Logger{Logger: logf.Log.WithName("CNI")}
 
 // DiscoverFunc is a hook for unit tests.
-var DiscoverFunc func(clusterCIDR string) (*Interface, error)
+var DiscoverFunc func(clusterCIDRs []string) (*Interface, error)
 
-func Discover(clusterCIDR string) (*Interface, error) {
+func Discover(clusterCIDRs []string) (*Interface, error) {
 	if DiscoverFunc != nil {
-		return DiscoverFunc(clusterCIDR)
+		return DiscoverFunc(clusterCIDRs)
 	}
 
-	return discover(clusterCIDR)
+	return discover(clusterCIDRs)
 }
 
-func discover(clusterCIDR string) (*Interface, error) {
-	_, clusterNetwork, err := net.ParseCIDR(clusterCIDR)
-	if err != nil {
-		return nil, errors.Wrapf(err, "unable to ParseCIDR %q", clusterCIDR)
-	}
-
-	hostInterfaces, err := net.Interfaces()
-	if err != nil {
-		return nil, errors.Wrapf(err, "net.Interfaces() returned error")
-	}
-
-	for _, iface := range hostInterfaces {
-		addrs, err := iface.Addrs()
+func discover(clusterCIDRs []string) (*Interface, error) {
+	for _, clusterCIDR := range clusterCIDRs {
+		_, clusterNetwork, err := net.ParseCIDR(clusterCIDR)
 		if err != nil {
-			return nil, errors.Wrapf(err, "for interface %q, iface.Addrs returned error", iface.Name)
+			return nil, errors.Wrapf(err, "unable to ParseCIDR %q", clusterCIDR)
 		}
 
-		for i := range addrs {
-			ipAddr, _, err := net.ParseCIDR(addrs[i].String())
-			if err != nil {
-				logger.Errorf(err, "Unable to ParseCIDR : %q", addrs[i].String())
-			} else if ipAddr.To4() != nil {
-				logger.V(log.DEBUG).Infof("Interface %q has %q address", iface.Name, ipAddr)
-				address := net.ParseIP(ipAddr.String())
+		hostInterfaces, err := net.Interfaces()
+		if err != nil {
+			return nil, errors.Wrapf(err, "net.Interfaces() returned error")
+		}
 
-				// Verify that interface has an address from cluster CIDR
-				if clusterNetwork.Contains(address) {
-					logger.V(log.DEBUG).Infof("Found CNI Interface %q that has IP %q from ClusterCIDR %q",
-						iface.Name, ipAddr, clusterCIDR)
-					return &Interface{IPAddress: ipAddr.String(), Name: iface.Name}, nil
+		for _, iface := range hostInterfaces {
+			addrs, err := iface.Addrs()
+			if err != nil {
+				return nil, errors.Wrapf(err, "for interface %q, iface.Addrs returned error", iface.Name)
+			}
+
+			for i := range addrs {
+				ipAddr, _, err := net.ParseCIDR(addrs[i].String())
+				if err != nil {
+					logger.Errorf(err, "Unable to ParseCIDR : %q", addrs[i].String())
+				} else if ipAddr.To4() != nil {
+					logger.V(log.DEBUG).Infof("Interface %q has %q address", iface.Name, ipAddr)
+					address := net.ParseIP(ipAddr.String())
+
+					// Verify that interface has an address from cluster CIDR
+					if clusterNetwork.Contains(address) {
+						logger.V(log.DEBUG).Infof("Found CNI Interface %q that has IP %q from ClusterCIDR %q",
+							iface.Name, ipAddr, clusterCIDR)
+						return &Interface{IPAddress: ipAddr.String(), Name: iface.Name}, nil
+					}
 				}
 			}
 		}
 	}
 
-	return nil, errors.Errorf("unable to find CNI Interface on the host which has IP from %q", clusterCIDR)
+	return nil, errors.Errorf("unable to find CNI Interface on the host which has IP from %q", clusterCIDRs)
 }
