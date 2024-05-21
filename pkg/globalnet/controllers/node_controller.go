@@ -52,12 +52,7 @@ func NewNodeController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool, n
 		nodeName:                   nodeName,
 	}
 
-	clusterCIDR := ""
-	if len(clusterCIDRs) > 0 {
-		clusterCIDR = clusterCIDRs[0]
-	}
-
-	cniIface, err := cni.Discover(clusterCIDR)
+	cniIface, err := cni.Discover(clusterCIDRs)
 	if err == nil {
 		controller.cniIP = cniIface.IPAddress
 

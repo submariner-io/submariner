@@ -105,7 +105,7 @@ func (kp *SyncHandler) Init() error {
 		return errors.Wrapf(err, "Unable to find the default interface on host: %s", kp.hostname)
 	}
 
-	cniIface, err := cni.Discover(kp.localClusterCidr[0])
+	cniIface, err := cni.Discover(kp.localClusterCidr)
 	if err == nil {
 		// Configure CNI Specific changes
 		kp.cniIface = cniIface

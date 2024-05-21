@@ -172,7 +172,7 @@ func newTestDriver() *testDriver {
 			return t.netLink
 		}
 
-		cni.DiscoverFunc = func(_ string) (*cni.Interface, error) {
+		cni.DiscoverFunc = func(_ []string) (*cni.Interface, error) {
 			return &cni.Interface{
 				Name:      "veth0",
 				IPAddress: cniIPAddress,

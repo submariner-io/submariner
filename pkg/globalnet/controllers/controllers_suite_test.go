@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"reflect"
 	"testing"
 	"time"
 
@@ -80,9 +81,9 @@ func init() {
 var _ = BeforeSuite(func() {
 	kzerolog.InitK8sLogging()
 
-	cni.DiscoverFunc = func(cidr string) (*cni.Interface, error) {
-		if cidr != localCIDR {
-			return nil, fmt.Errorf("invalid CIDR %q", cidr)
+	cni.DiscoverFunc = func(cidrs []string) (*cni.Interface, error) {
+		if !reflect.DeepEqual(cidrs, []string{localCIDR}) {
+			return nil, fmt.Errorf("invalid CIDRs %v", cidrs)
 		}
 
 		return &cni.Interface{

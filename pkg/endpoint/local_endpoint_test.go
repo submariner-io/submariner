@@ -26,6 +26,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/types"
 	v1 "k8s.io/api/core/v1"
@@ -39,10 +40,13 @@ import (
 const testNodeName = "this-node"
 
 var _ = Describe("GetLocalSpec", func() {
-	var submSpec *types.SubmarinerSpecification
-	var client kubernetes.Interface
+	var (
+		submSpec *types.SubmarinerSpecification
+		client   kubernetes.Interface
+		node     *v1.Node
+	)
+
 	testPrivateIP := endpoint.GetLocalIP()
-	var node *v1.Node
 
 	const (
 		testIPv4Label       = "ipv4:"
@@ -53,6 +57,7 @@ var _ = Describe("GetLocalSpec", func() {
 		testPublicIPLabel   = "public-ip"
 		testNATTPortLabel   = "natt-discovery-port"
 		backendConfigPrefix = "gateway.submariner.io/"
+		cniInterfaceIP      = "127.0.0.1"
 	)
 
 	subnets := []string{"127.0.0.1/16"}
@@ -74,9 +79,20 @@ var _ = Describe("GetLocalSpec", func() {
 			},
 		}
 
-		client = fake.NewSimpleClientset(node)
-
 		os.Setenv("NODE_NAME", testNodeName)
+		os.Setenv("CE_IPSEC_NATTPORT", testClusterUDPPort)
+
+		cni.DiscoverFunc = func(clusterCIDRs []string) (*cni.Interface, error) {
+			Expect(clusterCIDRs).To(Equal(subnets))
+			return &cni.Interface{
+				Name:      "veth0",
+				IPAddress: cniInterfaceIP,
+			}, nil
+		}
+	})
+
+	JustBeforeEach(func() {
+		client = fake.NewSimpleClientset(node)
 	})
 
 	It("should return a valid EndpointSpec object", func() {
@@ -91,38 +107,33 @@ var _ = Describe("GetLocalSpec", func() {
 		Expect(spec.Subnets).To(Equal(subnets))
 		Expect(spec.NATEnabled).To(BeFalse())
 		Expect(spec.BackendConfig[testUDPPortLabel]).To(Equal(testUDPPort))
+		Expect(spec.HealthCheckIP).To(BeEmpty())
 	})
 
-	When("gateway node is not annotated with udp port", func() {
-		It("should return the udp-port backend config of the cluster", func() {
+	When("the gateway node is not annotated with udp port", func() {
+		BeforeEach(func() {
 			delete(node.Labels, backendConfigPrefix+testUDPPortLabel)
-			client = fake.NewSimpleClientset(node)
-			os.Setenv("CE_IPSEC_NATTPORT", testClusterUDPPort)
+		})
 
+		It("should return the udp-port backend config of the cluster", func() {
 			spec, err := endpoint.GetLocalSpec(submSpec, client, false)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(spec.BackendConfig[testUDPPortLabel]).To(Equal(testClusterUDPPort))
 		})
 	})
 
-	When("gateway node is annotated with udp port", func() {
-		It("should return the udp-port backend from the annotation", func() {
-			os.Setenv("CE_IPSEC_NATTPORT", testClusterUDPPort)
-			spec, err := endpoint.GetLocalSpec(submSpec, client, false)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(spec.BackendConfig[testUDPPortLabel]).To(Equal(testUDPPort))
-		})
-	})
-
 	When("no NAT discovery port label is set on the node", func() {
-		It("should return a valid EndpointSpec object", func() {
+		BeforeEach(func() {
 			delete(node.Labels, testNATTPortLabel)
+		})
+
+		It("should return a valid EndpointSpec object", func() {
 			_, err := endpoint.GetLocalSpec(submSpec, client, false)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 
-	When("gateway node is not annotated with public-ip", func() {
+	When("the gateway node is not annotated with public-ip", func() {
 		It("should use empty public-ip in the endpoint object for air-gapped deployments", func() {
 			spec, err := endpoint.GetLocalSpec(submSpec, client, true)
 
@@ -133,15 +144,41 @@ var _ = Describe("GetLocalSpec", func() {
 		})
 	})
 
-	When("gateway node is annotated with public-ip", func() {
-		It("should use the annotated public-ip for air-gapped deployments", func() {
+	When("the gateway node is annotated with public-ip", func() {
+		BeforeEach(func() {
 			node.Labels[backendConfigPrefix+testPublicIPLabel] = testIPv4Label + testPublicIP
-			client = fake.NewSimpleClientset(node)
+		})
+
+		It("should use the annotated public-ip for air-gapped deployments", func() {
 			spec, err := endpoint.GetLocalSpec(submSpec, client, true)
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(spec.PrivateIP).To(Equal(testPrivateIP))
 			Expect(spec.PublicIP).To(Equal(testPublicIP))
+		})
+	})
+
+	When("health check is enabled", func() {
+		BeforeEach(func() {
+			submSpec.HealthCheckEnabled = true
+		})
+
+		It("should set the HealthCheckIP", func() {
+			spec, err := endpoint.GetLocalSpec(submSpec, client, true)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(spec.HealthCheckIP).To(Equal(cniInterfaceIP))
+		})
+
+		Context("and globalnet is enabled", func() {
+			BeforeEach(func() {
+				submSpec.GlobalCidr = []string{"242.10.0.0/24"}
+			})
+
+			It("should not set the HealthCheckIP", func() {
+				spec, err := endpoint.GetLocalSpec(submSpec, client, true)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(spec.HealthCheckIP).To(BeEmpty())
+			})
 		})
 	})
 })
