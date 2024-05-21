@@ -25,10 +25,10 @@ import (
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	admUtil "github.com/submariner-io/admiral/pkg/util"
+	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	packetfilter "github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
 	"github.com/submariner-io/submariner/pkg/ipam"
-	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func NewNodeController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool, nodeName string) (Interface, error) {
+func NewNodeController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool, nodeName string, clusterCIDRs []string) (Interface, error) {
 	// We'll panic if config is nil, this is intentional
 	var err error
 
@@ -52,21 +52,29 @@ func NewNodeController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool, n
 		nodeName:                   nodeName,
 	}
 
+	cniIface, err := cni.Discover(clusterCIDRs)
+	if err == nil {
+		controller.cniIP = cniIface.IPAddress
+
+		logger.Infof("Discovered CNI interface IP %q", controller.cniIP)
+	} else {
+		logger.Errorf(err, "Error obtaining CNI IP address - health check functionality will not work")
+	}
+
 	federator := federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll,
 		func(oldObj *unstructured.Unstructured, newObj *unstructured.Unstructured) *unstructured.Unstructured {
 			return updateNodeAnnotation(oldObj, newObj.GetAnnotations()[constants.SmGlobalIP]).(*unstructured.Unstructured)
 		})
 
 	controller.resourceSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
-		Name:                "Node syncer",
-		ResourceType:        &corev1.Node{},
-		SourceClient:        config.SourceClient,
-		SourceNamespace:     corev1.NamespaceAll,
-		RestMapper:          config.RestMapper,
-		Federator:           federator,
-		Scheme:              config.Scheme,
-		Transform:           controller.process,
-		ResourcesEquivalent: controller.onNodeUpdated,
+		Name:            "Node syncer",
+		ResourceType:    &corev1.Node{},
+		SourceClient:    config.SourceClient,
+		SourceNamespace: corev1.NamespaceAll,
+		RestMapper:      config.RestMapper,
+		Federator:       federator,
+		Scheme:          config.Scheme,
+		Transform:       controller.process,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the federator")
@@ -115,40 +123,33 @@ func (n *nodeController) process(from runtime.Object, _ int, op syncer.Operation
 
 	logger.Infof("Processing %sd Node %q", op, node.Name)
 
-	return n.allocateIP(node, op)
+	return n.allocateIP(node)
 }
 
-func (n *nodeController) allocateIP(node *corev1.Node, op syncer.Operation) (runtime.Object, bool) {
-	cniIfaceIP := node.GetAnnotations()[routeAgent.CNIInterfaceIP]
-	if cniIfaceIP == "" {
-		// To support connectivity from HostNetwork to remoteCluster, globalnet requires the
-		// cniIfaceIP of the respective node. Route-agent running on the node annotates the
-		// respective node with the cniIfaceIP. In this API, we check for the presence of this
-		// annotation and process the node event only when the annotation exists.
-		logger.Warningf("%q annotation is missing on the node. Health-check functionality will not work.", routeAgent.CNIInterfaceIP)
+func (n *nodeController) allocateIP(node *corev1.Node) (runtime.Object, bool) {
+	if n.cniIP == "" {
+		// To support connectivity from HostNetwork to remote clusters, globalnet requires the CNI IP of the local node.
 		return nil, false
 	}
 
 	globalIP := node.GetAnnotations()[constants.SmGlobalIP]
-	if op == syncer.Create && globalIP != "" {
+	if globalIP != "" {
 		return nil, false
 	}
 
-	if globalIP == "" {
-		ips, err := n.pool.Allocate(1)
-		if err != nil {
-			logger.Errorf(err, "Error allocating IPs for node %q", node.Name)
-			return nil, true
-		}
-
-		globalIP = ips[0]
-
-		logger.Infof("Allocated global IP %s for node %q", globalIP, node.Name)
+	ips, err := n.pool.Allocate(1)
+	if err != nil {
+		logger.Errorf(err, "Error allocating IPs for node %q", node.Name)
+		return nil, true
 	}
 
-	logger.Infof("Adding ingress rules for node %q with global IP %s, CNI IP %s", node.Name, globalIP, cniIfaceIP)
+	globalIP = ips[0]
 
-	if err := n.pfIface.AddIngressRulesForHealthCheck(cniIfaceIP, globalIP); err != nil {
+	logger.Infof("Allocated global IP %s for node %q", globalIP, node.Name)
+
+	logger.Infof("Adding ingress rules for node %q with global IP %s, CNI IP %s", node.Name, globalIP, n.cniIP)
+
+	if err := n.pfIface.AddIngressRulesForHealthCheck(n.cniIP, globalIP); err != nil {
 		logger.Errorf(err, "Error programming rules for Gateway healthcheck on node %q", node.Name)
 
 		_ = n.pool.Release(globalIP)
@@ -165,19 +166,13 @@ func (n *nodeController) reserveAllocatedIP(federator federate.Federator, obj *u
 		return nil
 	}
 
-	cniIfaceIP := obj.GetAnnotations()[routeAgent.CNIInterfaceIP]
-	if cniIfaceIP == "" {
-		// To support Gateway healthCheck, globalnet requires the cniIfaceIP of the respective node.
-		// Route-agent running on the node annotates the respective node with the cniIfaceIP.
-		// In this API, we check for the presence of this annotation and process the node only
-		// when the annotation exists.
-		logger.Infof("cniIfaceIP annotation on node %q is currently missing", n.nodeName)
+	if n.cniIP == "" {
 		return nil
 	}
 
 	err := n.pool.Reserve(existingGlobalIP)
 	if err == nil {
-		err = n.pfIface.AddIngressRulesForHealthCheck(cniIfaceIP, existingGlobalIP)
+		err = n.pfIface.AddIngressRulesForHealthCheck(n.cniIP, existingGlobalIP)
 		if err != nil {
 			_ = n.pool.Release(existingGlobalIP)
 		}
@@ -185,6 +180,10 @@ func (n *nodeController) reserveAllocatedIP(federator federate.Federator, obj *u
 
 	if err != nil {
 		logger.Warningf("Could not reserve allocated GlobalIP for Node %q: %v", obj.GetName(), err)
+
+		if err := n.pfIface.RemoveIngressRulesForHealthCheck(n.cniIP, existingGlobalIP); err != nil {
+			logger.Errorf(err, "Error deleting rules for Gateway healthcheck on node %q", n.nodeName)
+		}
 
 		return errors.Wrap(federator.Distribute(context.TODO(), updateNodeAnnotation(obj, "")),
 			"error updating the Node global IP annotation")
@@ -212,33 +211,4 @@ func updateNodeAnnotation(node runtime.Object, globalIP string) runtime.Object {
 	objMeta.SetAnnotations(annotations)
 
 	return node
-}
-
-func (n *nodeController) onNodeUpdated(oldObj, newObj *unstructured.Unstructured) bool {
-	if oldObj.GetName() != n.nodeName {
-		// We return false here as we want the event to be processed for any stale globalIPs
-		return false
-	}
-
-	oldCNIIfaceIPOnNode := oldObj.GetAnnotations()[routeAgent.CNIInterfaceIP]
-	newCNIIfaceIPOnNode := newObj.GetAnnotations()[routeAgent.CNIInterfaceIP]
-	oldGlobalIPOnNode := oldObj.GetAnnotations()[constants.SmGlobalIP]
-	newGlobalIPOnNode := newObj.GetAnnotations()[constants.SmGlobalIP]
-
-	globalIPCleared := oldGlobalIPOnNode != "" && newGlobalIPOnNode == ""
-	if globalIPCleared || oldCNIIfaceIPOnNode != newCNIIfaceIPOnNode {
-		if globalIPCleared {
-			_ = n.pool.Release(oldGlobalIPOnNode)
-		}
-
-		if oldCNIIfaceIPOnNode != "" && oldGlobalIPOnNode != "" {
-			if err := n.pfIface.RemoveIngressRulesForHealthCheck(oldCNIIfaceIPOnNode, oldGlobalIPOnNode); err != nil {
-				logger.Errorf(err, "Error deleting rules for Gateway healthcheck on node %q", n.nodeName)
-			}
-		}
-
-		return false
-	}
-
-	return true
 }

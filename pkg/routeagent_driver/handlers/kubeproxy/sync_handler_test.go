@@ -25,12 +25,12 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event/testing"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	fakeNetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
 	"github.com/vishvananda/netlink"
@@ -381,7 +381,7 @@ func newTestDriver() *testDriver {
 		}
 		t.pFilter = fakePF.New()
 
-		cni.DiscoverFunc = func(_ string) (*cni.Interface, error) {
+		cni.DiscoverFunc = func(_ []string) (*cni.Interface, error) {
 			return &cni.Interface{
 				Name:      "veth0",
 				IPAddress: cniIPAddress,

@@ -324,7 +324,7 @@ func (g *gatewayMonitor) startControllers() error {
 
 	g.controllers = nil
 
-	c, err := NewNodeController(g.syncerConfig, pool, g.nodeName)
+	c, err := NewNodeController(g.syncerConfig, pool, g.nodeName, g.LocalClusterCIDRs)
 	if err != nil {
 		return errors.Wrap(err, "error creating the Node controller")
 	}

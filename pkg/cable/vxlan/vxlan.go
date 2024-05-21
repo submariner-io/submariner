@@ -29,9 +29,9 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
+	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/cni"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/vxlan"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -178,7 +178,7 @@ func (v *vxLan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 
 	var ipAddress net.IP
 
-	cniIface, err := cni.Discover(v.localCluster.Spec.ClusterCIDR[0])
+	cniIface, err := cni.Discover(v.localCluster.Spec.ClusterCIDR)
 	if err == nil {
 		ipAddress = net.ParseIP(cniIface.IPAddress)
 	} else {
