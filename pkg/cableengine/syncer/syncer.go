@@ -121,7 +121,12 @@ func (gs *GatewaySyncer) syncGatewayStatusSafe(ctx context.Context) {
 	result, err := util.CreateOrUpdate(ctx, gs.gatewayResourceInterface(), gatewayObj,
 		func(existing *v1.Gateway) (*v1.Gateway, error) {
 			existing.Status = gatewayObj.Status
-			existing.Annotations = gatewayObj.Annotations
+
+			if existing.Annotations == nil {
+				existing.Annotations = map[string]string{}
+			}
+
+			existing.Annotations[UpdateTimestampAnnotation] = gatewayObj.Annotations[UpdateTimestampAnnotation]
 
 			return existing, nil
 		})
