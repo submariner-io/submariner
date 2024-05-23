@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -107,6 +108,7 @@ type testDriverBase struct {
 	pool                   *ipam.IPPool
 	localSubnets           []string
 	globalCIDR             string
+	hostName               string
 	globalEgressIPs        dynamic.ResourceInterface
 	clusterGlobalEgressIPs dynamic.ResourceInterface
 	globalIngressIPs       dynamic.ResourceInterface
@@ -114,14 +116,15 @@ type testDriverBase struct {
 	serviceExports         dynamic.ResourceInterface
 	endpoints              dynamic.ResourceInterface
 	pods                   dynamic.NamespaceableResourceInterface
-	nodes                  dynamic.ResourceInterface
+	gateways               dynamic.ResourceInterface
 	watches                *fakeDynClient.WatchReactor
 }
 
 func newTestDriverBase() *testDriverBase {
 	t := &testDriverBase{
-		restMapper: test.GetRESTMapperFor(&submarinerv1.Endpoint{}, &corev1.Service{}, &corev1.Node{}, &corev1.Pod{}, &corev1.Endpoints{},
-			&submarinerv1.GlobalEgressIP{}, &submarinerv1.ClusterGlobalEgressIP{}, &submarinerv1.GlobalIngressIP{}, &mcsv1a1.ServiceExport{}),
+		restMapper: test.GetRESTMapperFor(&submarinerv1.Endpoint{}, &corev1.Service{}, &corev1.Pod{}, &corev1.Endpoints{},
+			&submarinerv1.GlobalEgressIP{}, &submarinerv1.ClusterGlobalEgressIP{}, &submarinerv1.GlobalIngressIP{},
+			&submarinerv1.Gateway{}, &mcsv1a1.ServiceExport{}),
 		scheme:       runtime.NewScheme(),
 		pFilter:      fakePF.New(),
 		globalCIDR:   globalCIDR,
@@ -150,7 +153,12 @@ func newTestDriverBase() *testDriverBase {
 
 	t.serviceExports = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &mcsv1a1.ServiceExport{})).Namespace(namespace)
 
-	t.nodes = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &corev1.Node{}))
+	t.gateways = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.Gateway{})).Namespace(namespace)
+
+	var err error
+
+	t.hostName, err = os.Hostname()
+	Expect(err).To(Succeed())
 
 	return t
 }
@@ -264,26 +272,30 @@ func (t *testDriverBase) getGlobalIngressIPStatus(name string) *submarinerv1.Glo
 	return status
 }
 
-func (t *testDriverBase) createNode(name, globalIP string) *corev1.Node {
-	node := &corev1.Node{
+func (t *testDriverBase) createGateway(name, globalIP string) *submarinerv1.Gateway {
+	gateway := &submarinerv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 	}
 
-	addAnnotation(node, constants.SmGlobalIP, globalIP)
+	addAnnotation(gateway, constants.SmGlobalIP, globalIP)
 
-	return test.CreateResource(t.nodes, node)
+	return test.CreateResource(t.gateways, gateway)
 }
 
-func (t *testDriverBase) awaitNodeGlobalIP(oldIP string) string {
+func (t *testDriverBase) getGatewayGlobalIP(name string) string {
+	obj, err := t.gateways.Get(context.TODO(), name, metav1.GetOptions{})
+	Expect(err).To(Succeed())
+
+	return obj.GetAnnotations()[constants.SmGlobalIP]
+}
+
+func (t *testDriverBase) awaitGatewayGlobalIP(oldIP string) string {
 	var globalIP string
 
 	Eventually(func() string {
-		obj, err := t.nodes.Get(context.TODO(), nodeName, metav1.GetOptions{})
-		Expect(err).To(Succeed())
-
-		globalIP = obj.GetAnnotations()[constants.SmGlobalIP]
+		globalIP = t.getGatewayGlobalIP(t.hostName)
 		return globalIP
 	}, 5).ShouldNot(Or(BeEmpty(), Equal(oldIP)))
 
@@ -295,13 +307,10 @@ func (t *testDriverBase) awaitNodeGlobalIP(oldIP string) string {
 	return globalIP
 }
 
-func (t *testDriverBase) ensureNoNodeGlobalIP() {
+func (t *testDriverBase) ensureGatewayGlobalIP(name, ip string) {
 	Consistently(func() string {
-		obj, err := t.nodes.Get(context.TODO(), nodeName, metav1.GetOptions{})
-		Expect(err).To(Succeed())
-
-		return obj.GetAnnotations()[constants.SmGlobalIP]
-	}, 500*time.Millisecond).Should(BeEmpty())
+		return t.getGatewayGlobalIP(name)
+	}, 500*time.Millisecond).Should(Equal(ip))
 }
 
 func addAnnotation(obj metav1.Object, key, value string) {

@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/set"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -126,14 +127,17 @@ type gatewayMonitor struct {
 	event.HandlerBase
 	*baseController
 	GatewayMonitorConfig
-	syncerConfig            *syncer.ResourceSyncerConfig
-	remoteEndpointTimeStamp map[string]metav1.Time
-	pFilter                 packetfilter.Interface
-	shuttingDown            atomic.Bool
-	leaderElectionInfo      atomic.Pointer[LeaderElectionInfo]
-	nodeName                string
-	controllersMutex        sync.Mutex // Protects controllers
-	controllers             []Interface
+	syncerConfig                *syncer.ResourceSyncerConfig
+	gatewaySharedInformer       cache.SharedInformer
+	gatewaySharedInformerStopCh chan struct{}
+	remoteEndpointTimeStamp     map[string]metav1.Time
+	pFilter                     packetfilter.Interface
+	shuttingDown                atomic.Bool
+	leaderElectionInfo          atomic.Pointer[LeaderElectionInfo]
+	nodeName                    string
+	cniIP                       string
+	controllersMutex            sync.Mutex // Protects controllers
+	controllers                 []Interface
 }
 
 type baseSyncerController struct {
@@ -192,11 +196,10 @@ type serviceController struct {
 	gipSyncer           syncer.Interface
 }
 
-type nodeController struct {
+type gatewayController struct {
 	*baseIPAllocationController
-	nodeName string
+	hostName string
 	cniIP    string
-	nodes    dynamic.ResourceInterface
 }
 
 type ingressPodController struct {
