@@ -49,7 +49,6 @@ const (
 	clusterID       = "east"
 	remoteClusterID = "west"
 	remoteCIDR      = "169.254.2.0/24"
-	nodeName        = "raiders"
 )
 
 var _ = Describe("Endpoint monitoring", func() {
@@ -59,28 +58,34 @@ var _ = Describe("Endpoint monitoring", func() {
 
 	When("a local gateway Endpoint corresponding to the controller host is created", func() {
 		JustBeforeEach(func() {
-			t.createNode(nodeName, "")
+			t.createGateway(t.hostName, "")
 			endpoint = t.createEndpoint(newEndpointSpec(clusterID, t.hostName, localCIDR))
 			t.createPFilterChain(packetfilter.TableTypeNAT, kubeProxyIPTableChainName)
 		})
 
-		It("should start the controllers", func() {
-			t.awaitControllersStarted()
+		Context("", func() {
+			AfterEach(func() {
+				t.awaitGlobalnetChainsCleared()
+			})
 
-			t.createGlobalEgressIP(newGlobalEgressIP(globalEgressIPName, nil, nil))
-			t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, 1)
+			It("should start the controllers", func() {
+				t.awaitControllersStarted()
 
-			t.createServiceExport(t.createService(newClusterIPService()))
-			t.awaitIngressIPStatusAllocated(serviceName)
+				t.createGlobalEgressIP(newGlobalEgressIP(globalEgressIPName, nil, nil))
+				t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, 1)
 
-			service := newClusterIPService()
-			service.Name = "headless-nginx"
-			service = toHeadlessService(service)
-			backendPod := newHeadlessServicePod(service.Name)
-			t.createPod(backendPod)
-			t.createServiceExport(t.createService(service))
-			t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
-			t.awaitNodeGlobalIP("")
+				t.createServiceExport(t.createService(newClusterIPService()))
+				t.awaitIngressIPStatusAllocated(serviceName)
+
+				service := newClusterIPService()
+				service.Name = "headless-nginx"
+				service = toHeadlessService(service)
+				backendPod := newHeadlessServicePod(service.Name)
+				t.createPod(backendPod)
+				t.createServiceExport(t.createService(service))
+				t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
+				t.awaitGatewayGlobalIP("")
+			})
 		})
 
 		Context("and then deleted and recreated", func() {
@@ -203,6 +208,23 @@ var _ = Describe("Endpoint monitoring", func() {
 				test.AwaitNoResource(t.services, internalServiceName)
 			})
 		})
+
+		When("and the local Gateway is deleted", func() {
+			It("should remove the ingress rules for its glonal IP", func() {
+				globalIP := t.awaitGatewayGlobalIP("")
+
+				t.pFilter.AwaitRule(packetfilter.TableTypeNAT,
+					constants.SmGlobalnetIngressChain, And(ContainSubstring(globalIP), ContainSubstring(cniInterfaceIP)))
+
+				By("Deleting local Gateway")
+
+				err := t.gateways.Delete(context.TODO(), t.hostName, metav1.DeleteOptions{})
+				Expect(err).To(Succeed())
+
+				t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT,
+					constants.SmGlobalnetIngressChain, And(ContainSubstring(globalIP), ContainSubstring(cniInterfaceIP)))
+			})
+		})
 	})
 
 	Context("and a local gateway Endpoint corresponding to another host is created", func() {
@@ -273,37 +295,6 @@ var _ = Describe("Uninstall", func() {
 
 		t.pFilter.AwaitSetDeleted(ipSetName)
 		t.pFilter.AwaitSet("other")
-	})
-
-	Specify("RemoveGlobalIPAnnotationOnNode should remove the annotation if it exists", func() {
-		os.Setenv("NODE_NAME", nodeName)
-
-		kubeClient := fakek8s.NewSimpleClientset()
-
-		node := &corev1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: nodeName,
-			},
-		}
-
-		// No annotation present should be a no-op.
-		_, err := kubeClient.CoreV1().Nodes().Create(context.Background(), node, metav1.CreateOptions{})
-		Expect(err).To(Succeed())
-
-		controllers.RemoveGlobalIPAnnotationOnNode(kubeClient)
-
-		Expect(kubeClient.CoreV1().Nodes().Delete(context.Background(), nodeName, metav1.DeleteOptions{})).To(Succeed())
-
-		node.Annotations = map[string]string{constants.SmGlobalIP: "1.2.3.4"}
-
-		_, err = kubeClient.CoreV1().Nodes().Create(context.Background(), node, metav1.CreateOptions{})
-		Expect(err).To(Succeed())
-
-		controllers.RemoveGlobalIPAnnotationOnNode(kubeClient)
-
-		node, err = kubeClient.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
-		Expect(err).To(Succeed())
-		Expect(node.Annotations).ToNot(HaveKey(constants.SmGlobalIP))
 	})
 
 	Specify("DeleteGlobalnetObjects should delete all Globalnet resources and internal Services", func() {
@@ -382,7 +373,6 @@ var _ = Describe("Uninstall", func() {
 type gatewayMonitorTestDriver struct {
 	*testDriverBase
 	endpoints            dynamic.ResourceInterface
-	hostName             string
 	kubeClient           *fakek8s.Clientset
 	leaderElectionConfig controllers.LeaderElectionConfig
 	leaderElection       *testutil.LeaderElectionSupport
@@ -413,7 +403,7 @@ func newGatewayMonitorTestDriver() *gatewayMonitorTestDriver {
 		t.start()
 	})
 
-	AfterEach(func() {
+	JustAfterEach(func() {
 		t.testDriverBase.afterEach()
 	})
 
@@ -421,12 +411,10 @@ func newGatewayMonitorTestDriver() *gatewayMonitorTestDriver {
 }
 
 func (t *gatewayMonitorTestDriver) start() {
-	os.Setenv("NODE_NAME", nodeName)
+	os.Setenv("NODE_NAME", t.hostName)
 	var err error
 
 	localSubnets := []string{localCIDR}
-	t.hostName, err = os.Hostname()
-	Expect(err).To(Succeed())
 
 	t.controller, err = controllers.NewGatewayMonitor(&controllers.GatewayMonitorConfig{
 		RestMapper: t.restMapper,

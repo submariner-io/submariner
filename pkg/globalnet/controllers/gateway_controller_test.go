@@ -25,28 +25,27 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/syncer"
-	"github.com/submariner-io/admiral/pkg/syncer/test"
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var _ = Describe("Node controller", func() {
-	t := newNodeControllerTestDriver()
+var _ = Describe("Gateway controller", func() {
+	t := newGatewayControllerTestDriver()
 
-	var node *corev1.Node
+	var gateway *submarinerv1.Gateway
 
 	Context("on startup", func() {
-		When("the Node doesn't have a global IP", func() {
+		When("the Gateway doesn't have a global IP", func() {
 			BeforeEach(func() {
-				node = t.createNode(nodeName, "")
+				gateway = t.createGateway(t.hostName, "")
 			})
 
 			It("should allocate it and program the relevant iptable rules", func() {
-				t.awaitPacketFilterRules(t.awaitNodeGlobalIP(""))
+				t.awaitPacketFilterRules(t.awaitGatewayGlobalIP(""))
 			})
 
 			Context("and the IP pool is initially exhausted", func() {
@@ -60,81 +59,84 @@ var _ = Describe("Node controller", func() {
 					time.Sleep(time.Millisecond * 300)
 					Expect(t.pool.Release(allocatedIPs...)).To(Succeed())
 
-					t.awaitNodeGlobalIP("")
+					t.awaitGatewayGlobalIP("")
 				})
 			})
 		})
 
-		When("the Node has a global IP", func() {
+		When("the Gateway has a global IP", func() {
 			BeforeEach(func() {
-				node = t.createNode(nodeName, globalIP1)
+				gateway = t.createGateway(t.hostName, globalIP1)
+				t.expectReservedIPs = []string{gateway.GetAnnotations()[constants.SmGlobalIP]}
 			})
 
 			It("should not reallocate it", func() {
 				Consistently(func() string {
-					obj, err := t.nodes.Get(context.TODO(), nodeName, metav1.GetOptions{})
+					obj, err := t.gateways.Get(context.TODO(), t.hostName, metav1.GetOptions{})
 					Expect(err).To(Succeed())
 
 					return obj.GetAnnotations()[constants.SmGlobalIP]
-				}, 200*time.Millisecond).Should(Equal(node.GetAnnotations()[constants.SmGlobalIP]))
+				}, 200*time.Millisecond).Should(Equal(gateway.GetAnnotations()[constants.SmGlobalIP]))
 			})
 
 			It("should program the relevant iptable rules", func() {
-				t.awaitPacketFilterRules(node.GetAnnotations()[constants.SmGlobalIP])
-			})
-
-			It("should reserve the global IP", func() {
-				t.verifyIPsReservedInPool(node.GetAnnotations()[constants.SmGlobalIP])
+				t.awaitPacketFilterRules(gateway.GetAnnotations()[constants.SmGlobalIP])
 			})
 
 			Context("and it's already reserved", func() {
 				BeforeEach(func() {
-					Expect(t.pool.Reserve(node.GetAnnotations()[constants.SmGlobalIP])).To(Succeed())
+					Expect(t.pool.Reserve(gateway.GetAnnotations()[constants.SmGlobalIP])).To(Succeed())
 				})
 
 				It("should reallocate the global IP", func() {
-					globalIP := t.awaitNodeGlobalIP(node.GetAnnotations()[constants.SmGlobalIP])
+					globalIP := t.awaitGatewayGlobalIP(gateway.GetAnnotations()[constants.SmGlobalIP])
 					t.awaitPacketFilterRules(globalIP)
 				})
 			})
 		})
-
-		When("the CNI IP discovery fails", func() {
-			BeforeEach(func() {
-				t.localCIDRs = []string{"10.128.1.0/16"}
-				node = t.createNode(nodeName, "")
-			})
-
-			It("should not allocate a global IP", func() {
-				t.ensureNoNodeGlobalIP()
-			})
-		})
 	})
 
-	When("a non-local Node is created and it has a global IP", func() {
+	When("a non-active Gateway exists on startup and has a global IP", func() {
 		BeforeEach(func() {
-			t.createNode(nodeName, globalIP1)
-			node = t.createNode("otherNode", globalIP1)
-			_ = t.pool.Reserve(node.GetAnnotations()[constants.SmGlobalIP])
+			gateway = t.createGateway("other-gateway", globalIP2)
+			t.expectReservedIPs = []string{gateway.GetAnnotations()[constants.SmGlobalIP]}
 		})
 
-		It("should release the global IP", func() {
-			t.awaitIPsReleasedFromPool(node.GetAnnotations()[constants.SmGlobalIP])
-			Eventually(func() string {
-				obj := test.GetResource(t.nodes, node)
-				return obj.GetAnnotations()[constants.SmGlobalIP]
-			}).Should(BeEmpty())
+		It("should reserve the global IP and preserve the annotation", func() {
+			t.ensureNoPacketFilterRules(gateway.GetAnnotations()[constants.SmGlobalIP])
+			t.ensureGatewayGlobalIP(gateway.Name, gateway.GetAnnotations()[constants.SmGlobalIP])
+		})
+
+		Context("and is subsequently deleted", func() {
+			It("should release its global IP", func() {
+				err := t.gateways.Delete(context.TODO(), gateway.Name, metav1.DeleteOptions{})
+				Expect(err).To(Succeed())
+
+				t.awaitIPsReleasedFromPool(gateway.GetAnnotations()[constants.SmGlobalIP])
+			})
+		})
+
+		Context("and it's already reserved", func() {
+			BeforeEach(func() {
+				Expect(t.pool.Reserve(gateway.GetAnnotations()[constants.SmGlobalIP])).To(Succeed())
+			})
+
+			It("should preserve the annotation", func() {
+				t.ensureNoPacketFilterRules(gateway.GetAnnotations()[constants.SmGlobalIP])
+				t.ensureGatewayGlobalIP(gateway.Name, gateway.GetAnnotations()[constants.SmGlobalIP])
+			})
 		})
 	})
 })
 
-type nodeControllerTestDriver struct {
+type gatewayControllerTestDriver struct {
 	*testDriverBase
-	localCIDRs []string
+	localCIDRs        []string
+	expectReservedIPs []string
 }
 
-func newNodeControllerTestDriver() *nodeControllerTestDriver {
-	t := &nodeControllerTestDriver{}
+func newGatewayControllerTestDriver() *gatewayControllerTestDriver {
+	t := &gatewayControllerTestDriver{}
 
 	BeforeEach(func() {
 		t.testDriverBase = newTestDriverBase()
@@ -146,6 +148,7 @@ func newNodeControllerTestDriver() *nodeControllerTestDriver {
 		Expect(err).To(Succeed())
 
 		t.localCIDRs = []string{localCIDR}
+		t.expectReservedIPs = nil
 	})
 
 	JustBeforeEach(func() {
@@ -159,20 +162,42 @@ func newNodeControllerTestDriver() *nodeControllerTestDriver {
 	return t
 }
 
-func (t *nodeControllerTestDriver) start() {
+func (t *gatewayControllerTestDriver) start() {
 	var err error
 
-	t.controller, err = controllers.NewNodeController(&syncer.ResourceSyncerConfig{
+	syncerConfig := controllers.NewGatewayResourceSyncerConfig(&syncer.ResourceSyncerConfig{
 		SourceClient: t.dynClient,
 		RestMapper:   t.restMapper,
 		Scheme:       t.scheme,
-	}, t.pool, nodeName, t.localCIDRs)
+	}, namespace)
 
+	informer, err := syncer.NewSharedInformer(syncerConfig)
 	Expect(err).To(Succeed())
+
+	stopCh := make(chan struct{})
+
+	DeferCleanup(func() {
+		close(stopCh)
+	})
+
+	t.controller, err = controllers.NewGatewayController(syncerConfig, informer, t.pool, t.hostName, namespace, cniInterfaceIP)
+	Expect(err).To(Succeed())
+
+	t.verifyIPsReservedInPool(t.expectReservedIPs...)
+
+	go func() {
+		informer.Run(stopCh)
+	}()
+
 	Expect(t.controller.Start()).To(Succeed())
 }
 
-func (t *nodeControllerTestDriver) awaitPacketFilterRules(globalIP string) {
+func (t *gatewayControllerTestDriver) awaitPacketFilterRules(globalIP string) {
 	t.pFilter.AwaitRule(packetfilter.TableTypeNAT,
+		constants.SmGlobalnetIngressChain, And(ContainSubstring(globalIP), ContainSubstring(cniInterfaceIP)))
+}
+
+func (t *gatewayControllerTestDriver) ensureNoPacketFilterRules(globalIP string) {
+	t.pFilter.EnsureNoRule(packetfilter.TableTypeNAT,
 		constants.SmGlobalnetIngressChain, And(ContainSubstring(globalIP), ContainSubstring(cniInterfaceIP)))
 }

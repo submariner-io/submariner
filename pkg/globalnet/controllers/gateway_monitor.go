@@ -25,24 +25,30 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cidr"
+	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/controller"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
+	gnpacketfilter "github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
 	"github.com/submariner-io/submariner/pkg/ipam"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	k8snet "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 	"k8s.io/utils/set"
 )
 
@@ -97,6 +103,15 @@ func NewGatewayMonitor(config *GatewayMonitorConfig) (Interface, error) {
 
 	gatewayMonitor.nodeName = nodeName
 
+	cniIface, err := cni.Discover(gatewayMonitor.LocalClusterCIDRs)
+	if err == nil {
+		gatewayMonitor.cniIP = cniIface.IPAddress
+
+		logger.Infof("Discovered CNI interface IP %q", gatewayMonitor.cniIP)
+	} else {
+		logger.Errorf(err, "Error obtaining CNI IP address - health check functionality will not work")
+	}
+
 	gatewayMonitor.syncerConfig = &syncer.ResourceSyncerConfig{
 		SourceClient:    config.Client,
 		SourceNamespace: corev1.NamespaceAll,
@@ -106,11 +121,28 @@ func NewGatewayMonitor(config *GatewayMonitorConfig) (Interface, error) {
 		Scheme:          config.Scheme,
 	}
 
+	gatewayMonitor.gatewaySharedInformer, err = syncer.NewSharedInformer(
+		NewGatewayResourceSyncerConfig(gatewayMonitor.syncerConfig, config.Spec.Namespace))
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating shared informer")
+	}
+
+	gatewayMonitor.gatewaySharedInformerStopCh = make(chan struct{})
+
 	return &gatewayMonitorInterface{monitor: gatewayMonitor}, nil
 }
 
 func (g *gatewayMonitorInterface) Start() error {
 	logger.Info("Starting GatewayMonitor to monitor the active Gateway node in the cluster.")
+
+	err := g.monitor.startLocalGatewayCleanupController()
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		g.monitor.gatewaySharedInformer.Run(g.monitor.gatewaySharedInformerStopCh)
+	}()
 
 	registry, err := event.NewRegistry("globalnet-registry", event.AnyNetworkPlugin, g.monitor)
 	if err != nil {
@@ -159,6 +191,8 @@ func (g *gatewayMonitor) Stop() error {
 	defer cancel()
 
 	g.stopControllers(ctx, true)
+
+	close(g.gatewaySharedInformerStopCh)
 
 	return nil
 }
@@ -324,14 +358,7 @@ func (g *gatewayMonitor) startControllers() error {
 
 	g.controllers = nil
 
-	c, err := NewNodeController(g.syncerConfig, pool, g.nodeName, g.LocalClusterCIDRs)
-	if err != nil {
-		return errors.Wrap(err, "error creating the Node controller")
-	}
-
-	g.controllers = append(g.controllers, c)
-
-	c, err = NewClusterGlobalEgressIPController(g.syncerConfig, g.LocalCIDRs, pool)
+	c, err := NewClusterGlobalEgressIPController(g.syncerConfig, g.LocalCIDRs, pool)
 	if err != nil {
 		return errors.Wrap(err, "error creating the ClusterGlobalEgressIP controller")
 	}
@@ -395,6 +422,15 @@ func (g *gatewayMonitor) startControllers() error {
 
 	g.controllers = append(g.controllers, c)
 
+	if g.cniIP != "" {
+		c, err := NewGatewayController(g.syncerConfig, g.gatewaySharedInformer, pool, g.Hostname, g.Spec.Namespace, g.cniIP)
+		if err != nil {
+			return errors.Wrap(err, "error creating the Gateway controller")
+		}
+
+		g.controllers = append(g.controllers, c)
+	}
+
 	for _, c := range g.controllers {
 		err = c.Start()
 		if err != nil {
@@ -431,6 +467,47 @@ func (g *gatewayMonitor) stopControllers(ctx context.Context, clearGlobalnetChai
 	leaderElectionInfo.awaitStopped(ctx)
 
 	logger.Info("Controllers stopped")
+}
+
+func (g *gatewayMonitor) startLocalGatewayCleanupController() error {
+	pfIface, err := gnpacketfilter.New()
+	if err != nil {
+		return errors.Wrap(err, "error creating the PacketFilter Interface handler")
+	}
+
+	syncerConfig := NewGatewayResourceSyncerConfig(g.syncerConfig, g.Spec.Namespace)
+	syncerConfig.Federator = federate.NewNoopFederator()
+	syncerConfig.WaitForCacheSync = ptr.To(false)
+	syncerConfig.Name = "Gateway cleanup syncer"
+
+	// Here we run a resource syncer that removes the ingress rules for the local Gateway resource when it is deleted.
+	// This occurs when the gateway pod on the same host stops which shouldn't normally occur.
+
+	syncerConfig.ShouldProcess = func(obj *unstructured.Unstructured, op syncer.Operation) bool {
+		return op == syncer.Delete && obj.GetName() == g.Hostname && obj.GetAnnotations()[constants.SmGlobalIP] != ""
+	}
+
+	syncerConfig.Transform = func(from runtime.Object, _ int, _ syncer.Operation) (runtime.Object, bool) {
+		gateway := from.(*v1.Gateway)
+
+		globalIP := gateway.GetAnnotations()[constants.SmGlobalIP]
+
+		logger.Infof("Local Gateway %q deleted - removing ingress rules for global IP %q", gateway.Name, globalIP)
+
+		if err := pfIface.RemoveIngressRulesForHealthCheck(g.cniIP, globalIP); err != nil {
+			logger.Errorf(err, "Error removing rules for local Gateway %q", gateway.Name)
+			return nil, true
+		}
+
+		return nil, false
+	}
+
+	rSyncer, err := syncer.NewResourceSyncerWithSharedInformer(syncerConfig, g.gatewaySharedInformer)
+	if err != nil {
+		return errors.Wrap(err, "error creating gateway resource syncer")
+	}
+
+	return errors.Wrap(rSyncer.Start(g.gatewaySharedInformerStopCh), "error starting gateway resource syncer")
 }
 
 func (g *gatewayMonitor) createNATChain(chainName string) error {

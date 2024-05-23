@@ -95,7 +95,6 @@ func main() {
 
 		controllers.UninstallDataPath()
 		controllers.DeleteGlobalnetObjects(submarinerClient, dynClient)
-		controllers.RemoveGlobalIPAnnotationOnNode(k8sClient)
 
 		return
 	}

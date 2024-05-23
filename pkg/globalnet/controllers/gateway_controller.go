@@ -25,142 +25,147 @@ import (
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	admUtil "github.com/submariner-io/admiral/pkg/util"
-	"github.com/submariner-io/submariner/pkg/cni"
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
-	packetfilter "github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
+	"github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
 	"github.com/submariner-io/submariner/pkg/ipam"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/cache"
 )
 
-func NewNodeController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool, nodeName string, clusterCIDRs []string) (Interface, error) {
+func NewGatewayController(config *syncer.ResourceSyncerConfig, informer cache.SharedInformer, pool *ipam.IPPool, hostName,
+	namespace, cniIP string,
+) (Interface, error) {
 	// We'll panic if config is nil, this is intentional
 	var err error
 
-	logger.Info("Creating Node controller")
+	logger.Info("Creating Gateway controller")
 
 	pfIface, err := packetfilter.New()
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the PacketFilter Interface handler")
 	}
 
-	controller := &nodeController{
+	controller := &gatewayController{
 		baseIPAllocationController: newBaseIPAllocationController(pool, pfIface),
-		nodeName:                   nodeName,
+		hostName:                   hostName,
+		cniIP:                      cniIP,
 	}
 
-	cniIface, err := cni.Discover(clusterCIDRs)
-	if err == nil {
-		controller.cniIP = cniIface.IPAddress
+	config = NewGatewayResourceSyncerConfig(config, namespace)
 
-		logger.Infof("Discovered CNI interface IP %q", controller.cniIP)
-	} else {
-		logger.Errorf(err, "Error obtaining CNI IP address - health check functionality will not work")
-	}
-
-	federator := federate.NewUpdateFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll,
+	config.Federator = federate.NewUpdateFederator(config.SourceClient, config.RestMapper, namespace,
 		func(oldObj *unstructured.Unstructured, newObj *unstructured.Unstructured) *unstructured.Unstructured {
-			return updateNodeAnnotation(oldObj, newObj.GetAnnotations()[constants.SmGlobalIP]).(*unstructured.Unstructured)
+			return updateGlobalIPAnnotation(oldObj, newObj.GetAnnotations()[constants.SmGlobalIP]).(*unstructured.Unstructured)
 		})
 
-	controller.resourceSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
-		Name:            "Node syncer",
-		ResourceType:    &corev1.Node{},
-		SourceClient:    config.SourceClient,
-		SourceNamespace: corev1.NamespaceAll,
-		RestMapper:      config.RestMapper,
-		Federator:       federator,
-		Scheme:          config.Scheme,
-		Transform:       controller.process,
-	})
+	config.Transform = controller.process
+	config.Name = "Gateway syncer"
+
+	controller.resourceSyncer, err = syncer.NewResourceSyncerWithSharedInformer(config, informer)
 	if err != nil {
-		return nil, errors.Wrap(err, "error creating the federator")
+		return nil, errors.Wrap(err, "error creating the resource syncer")
 	}
 
-	_, gvr, err := admUtil.ToUnstructuredResource(&corev1.Node{}, config.RestMapper)
+	_, gvr, err := admUtil.ToUnstructuredResource(&submarinerv1.Gateway{}, config.RestMapper)
 	if err != nil {
 		return nil, errors.Wrap(err, "error converting resource")
 	}
 
-	controller.nodes = config.SourceClient.Resource(*gvr)
+	gatewayClient := config.SourceClient.Resource(*gvr).Namespace(namespace)
 
-	localNodeInfo, err := controller.nodes.Get(context.TODO(), controller.nodeName, metav1.GetOptions{})
+	// Gateways retain their allocated global IPs regardless of their HA status (active or passive) so reserve the global IPs
+	// for all the Gateways.
+
+	gateways, err := gatewayClient.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return nil, errors.Wrapf(err, "error retrieving local Node %q", controller.nodeName)
+		return nil, errors.Wrap(err, "error listing Gateways")
 	}
 
-	if err := controller.reserveAllocatedIP(federator, localNodeInfo); err != nil {
-		return nil, err
+	for i := range gateways.Items {
+		if err := controller.reserveAllocatedIP(config.Federator, &gateways.Items[i]); err != nil {
+			return nil, err
+		}
 	}
 
 	return controller, nil
 }
 
-func (n *nodeController) process(from runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
-	node := from.(*corev1.Node)
+func NewGatewayResourceSyncerConfig(base *syncer.ResourceSyncerConfig, namespace string) *syncer.ResourceSyncerConfig {
+	return &syncer.ResourceSyncerConfig{
+		ResourceType:    &submarinerv1.Gateway{},
+		SourceClient:    base.SourceClient,
+		SourceNamespace: namespace,
+		RestMapper:      base.RestMapper,
+		Scheme:          base.Scheme,
+		ResourcesEquivalent: func(_, _ *unstructured.Unstructured) bool {
+			return true // we don't need to handle updates
+		},
+	}
+}
 
-	// If the event corresponds to a different node which has globalIP annotation, release the globalIP back to Pool.
-	if node.Name != n.nodeName {
-		if existingGlobalIP := node.GetAnnotations()[constants.SmGlobalIP]; existingGlobalIP != "" {
-			logger.Infof("Processing %sd non-gateway node %q - releasing GlobalIP %q", op, node.Name, existingGlobalIP)
+func (n *gatewayController) process(from runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
+	gateway := from.(*submarinerv1.Gateway)
 
-			if op == syncer.Delete {
-				_ = n.pool.Release(existingGlobalIP)
-
-				return nil, false
-			}
+	if op == syncer.Delete {
+		// Gateway deleted - here we just release its global IP, if any. If it's the local Gateway then the other Gateway controller
+		// started by the gatewayMonitor will remove the ingress rules in parallel.
+		if existingGlobalIP := gateway.GetAnnotations()[constants.SmGlobalIP]; existingGlobalIP != "" {
+			logger.Infof(" Gateway %q deleted - releasing its global IP %q", gateway.Name, existingGlobalIP)
 
 			_ = n.pool.Release(existingGlobalIP)
-
-			return updateNodeAnnotation(node, ""), false
 		}
 
 		return nil, false
 	}
 
-	logger.Infof("Processing %sd Node %q", op, node.Name)
+	if gateway.Name != n.hostName {
+		return nil, false
+	}
 
-	return n.allocateIP(node)
+	logger.Infof("Processing %sd local Gateway %q", op, gateway.Name)
+
+	return n.allocateIP(gateway)
 }
 
-func (n *nodeController) allocateIP(node *corev1.Node) (runtime.Object, bool) {
+func (n *gatewayController) allocateIP(gateway *submarinerv1.Gateway) (runtime.Object, bool) {
 	if n.cniIP == "" {
 		// To support connectivity from HostNetwork to remote clusters, globalnet requires the CNI IP of the local node.
 		return nil, false
 	}
 
-	globalIP := node.GetAnnotations()[constants.SmGlobalIP]
+	globalIP := gateway.GetAnnotations()[constants.SmGlobalIP]
 	if globalIP != "" {
 		return nil, false
 	}
 
 	ips, err := n.pool.Allocate(1)
 	if err != nil {
-		logger.Errorf(err, "Error allocating IPs for node %q", node.Name)
+		logger.Errorf(err, "Error allocating IPs for Gateway %q", gateway.Name)
 		return nil, true
 	}
 
 	globalIP = ips[0]
 
-	logger.Infof("Allocated global IP %s for node %q", globalIP, node.Name)
+	logger.Infof("Allocated global IP %s for Gateway %q", globalIP, gateway.Name)
 
-	logger.Infof("Adding ingress rules for node %q with global IP %s, CNI IP %s", node.Name, globalIP, n.cniIP)
+	logger.Infof("Adding ingress rules for Gateway %q with global IP %s, CNI IP %s", gateway.Name, globalIP, n.cniIP)
 
 	if err := n.pfIface.AddIngressRulesForHealthCheck(n.cniIP, globalIP); err != nil {
-		logger.Errorf(err, "Error programming rules for Gateway healthcheck on node %q", node.Name)
+		logger.Errorf(err, "Error programming ingress rules for Gateway %q", gateway.Name)
 
 		_ = n.pool.Release(globalIP)
 
 		return nil, true
 	}
 
-	return updateNodeAnnotation(node, globalIP), false
+	return updateGlobalIPAnnotation(gateway, globalIP), false
 }
 
-func (n *nodeController) reserveAllocatedIP(federator federate.Federator, obj *unstructured.Unstructured) error {
+func (n *gatewayController) reserveAllocatedIP(federator federate.Federator, obj *unstructured.Unstructured) error {
 	existingGlobalIP := obj.GetAnnotations()[constants.SmGlobalIP]
 	if existingGlobalIP == "" {
 		return nil
@@ -170,8 +175,10 @@ func (n *nodeController) reserveAllocatedIP(federator federate.Federator, obj *u
 		return nil
 	}
 
+	// If this is not the Gateway on the local host then just reserve its global IP.
+
 	err := n.pool.Reserve(existingGlobalIP)
-	if err == nil {
+	if err == nil && obj.GetName() == n.hostName {
 		err = n.pfIface.AddIngressRulesForHealthCheck(n.cniIP, existingGlobalIP)
 		if err != nil {
 			_ = n.pool.Release(existingGlobalIP)
@@ -179,23 +186,30 @@ func (n *nodeController) reserveAllocatedIP(federator federate.Federator, obj *u
 	}
 
 	if err != nil {
-		logger.Warningf("Could not reserve allocated GlobalIP for Node %q: %v", obj.GetName(), err)
+		logger.Warningf("Could not reserve allocated GlobalIP for Gateway %q: %v", obj.GetName(), err)
 
-		if err := n.pfIface.RemoveIngressRulesForHealthCheck(n.cniIP, existingGlobalIP); err != nil {
-			logger.Errorf(err, "Error deleting rules for Gateway healthcheck on node %q", n.nodeName)
+		// If this is not the Gateway on the local host/node then leave the annotation as is since we're not able to remove the
+		// ingress rules from another node. We'll let the globalnet process running on that host take care of it.
+
+		if obj.GetName() != n.hostName {
+			return nil
 		}
 
-		return errors.Wrap(federator.Distribute(context.TODO(), updateNodeAnnotation(obj, "")),
-			"error updating the Node global IP annotation")
+		if err := n.pfIface.RemoveIngressRulesForHealthCheck(n.cniIP, existingGlobalIP); err != nil {
+			logger.Errorf(err, "Error deleting rules for Gateway %q", n.hostName)
+		}
+
+		return errors.Wrap(federator.Distribute(context.TODO(), updateGlobalIPAnnotation(obj, "")),
+			"error updating the Gateway global IP annotation")
 	}
 
-	logger.Infof("Successfully reserved allocated GlobalIP %q for node %q", existingGlobalIP, obj.GetName())
+	logger.Infof("Successfully reserved allocated GlobalIP %q for Gateway %q", existingGlobalIP, obj.GetName())
 
 	return nil
 }
 
-func updateNodeAnnotation(node runtime.Object, globalIP string) runtime.Object {
-	objMeta, _ := meta.Accessor(node)
+func updateGlobalIPAnnotation(obj runtime.Object, globalIP string) runtime.Object {
+	objMeta, _ := meta.Accessor(obj)
 
 	annotations := objMeta.GetAnnotations()
 	if annotations == nil {
@@ -210,5 +224,5 @@ func updateNodeAnnotation(node runtime.Object, globalIP string) runtime.Object {
 
 	objMeta.SetAnnotations(annotations)
 
-	return node
+	return obj
 }

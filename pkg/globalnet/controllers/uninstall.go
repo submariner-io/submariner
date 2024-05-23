@@ -21,7 +21,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -39,9 +38,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/util/retry"
 )
 
 func UninstallDataPath() {
@@ -154,36 +151,6 @@ func deleteAllGlobalIngressIPObjs(smClientSet submclient.Interface) {
 	err := smClientSet.SubmarinerV1().GlobalIngressIPs(metav1.NamespaceAll).DeleteCollection(context.TODO(), metav1.DeleteOptions{},
 		metav1.ListOptions{})
 	logError(err, "Error deleting the globalIngressIPs")
-}
-
-func RemoveGlobalIPAnnotationOnNode(client kubernetes.Interface) {
-	nodeName, ok := os.LookupEnv("NODE_NAME")
-	if !ok {
-		logger.Error(nil, "NODE_NAME does not exist in the environment")
-		return
-	}
-
-	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-		if err != nil {
-			return errors.Wrapf(err, "unable to get node info for node %q", nodeName)
-		}
-
-		annotations := node.GetAnnotations()
-		delete(annotations, constants.SmGlobalIP)
-		node.SetAnnotations(annotations)
-
-		_, updateErr := client.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
-
-		return updateErr //nolint:wrapcheck // We wrap it below in the enclosing function
-	})
-
-	if retryErr != nil {
-		logger.Errorf(retryErr, "Error updating node %q", nodeName)
-		return
-	}
-
-	logger.Infof("Successfully removed globalIP annotation from node %q", nodeName)
 }
 
 func RemoveStaleInternalServices(config *syncer.ResourceSyncerConfig) error {

@@ -72,6 +72,11 @@ func (c *baseSyncerController) Start() error {
 	return c.resourceSyncer.Start(c.stopCh) //nolint:wrapcheck  // Let the caller wrap it
 }
 
+func (c *baseSyncerController) Stop() {
+	c.baseController.Stop()
+	c.resourceSyncer.AwaitStopped()
+}
+
 func (c *baseSyncerController) reconcile(client dynamic.ResourceInterface, labelSelector, fieldSelector string,
 	transform func(obj *unstructured.Unstructured) runtime.Object,
 ) {
