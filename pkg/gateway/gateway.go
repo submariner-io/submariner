@@ -339,8 +339,15 @@ func (g *gatewayType) onStoppedLeading() {
 
 	logger.Info("Controllers stopped")
 
-	if err := g.gatewayPod.SetHALabels(context.Background(), subv1.HAStatusPassive); err != nil {
-		logger.Warningf("Error updating pod label to passive: %s", err)
+	ctx := context.Background()
+	if err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (bool, error) {
+		if g.gatewayPod.SetHALabels(ctx, subv1.HAStatusPassive) != nil {
+			return false, nil //nolint:nilerr // keep trying
+		}
+
+		return true, nil
+	}); err != nil {
+		logger.Errorf(err, "Failed updating pod label to passive: %s", err)
 	}
 
 	err := g.startLeaderElection(context.Background())
