@@ -61,9 +61,8 @@ type Config struct {
 
 type controller struct {
 	sync.RWMutex
-	endpointWatcher watcher.Interface
-	pingers         map[string]PingerInterface
-	config          *Config
+	pingers map[string]PingerInterface
+	config  *Config
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("HealthChecker")}
@@ -87,13 +86,6 @@ func New(config *Config) (Interface, error) {
 		},
 	}
 
-	var err error
-
-	controller.endpointWatcher, err = watcher.New(config.WatcherConfig)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error creating watcher")
-	}
-
 	return controller, nil
 }
 
@@ -109,7 +101,12 @@ func (h *controller) GetLatencyInfo(endpoint *submarinerv1.EndpointSpec) *Latenc
 }
 
 func (h *controller) Start(stopCh <-chan struct{}) error {
-	if err := h.endpointWatcher.Start(stopCh); err != nil {
+	endpointWatcher, err := watcher.New(h.config.WatcherConfig)
+	if err != nil {
+		return errors.Wrapf(err, "error creating watcher")
+	}
+
+	if err := endpointWatcher.Start(stopCh); err != nil {
 		return errors.Wrapf(err, "error starting watcher")
 	}
 

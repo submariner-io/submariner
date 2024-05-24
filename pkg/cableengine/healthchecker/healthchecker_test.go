@@ -236,4 +236,56 @@ var _ = Describe("Controller", func() {
 			pingerMap[healthCheckIP1].AwaitNoStart()
 		})
 	})
+
+	When("Start is called", func() {
+		JustBeforeEach(func() {
+			stopCh = make(chan struct{})
+			scheme := runtime.NewScheme()
+			Expect(submarinerv1.AddToScheme(scheme)).To(Succeed())
+			Expect(submarinerv1.AddToScheme(kubeScheme.Scheme)).To(Succeed())
+
+			dynamicClient := fakeClient.NewSimpleDynamicClient(scheme)
+			restMapper := test.GetRESTMapperFor(&submarinerv1.Endpoint{})
+			endpoints = dynamicClient.Resource(*test.GetGroupVersionResourceFor(restMapper, &submarinerv1.Endpoint{})).Namespace(namespace)
+
+			var err error
+
+			config := &healthchecker.Config{
+				WatcherConfig: &watcher.Config{
+					RestMapper: restMapper,
+					Client:     dynamicClient,
+					Scheme:     scheme,
+				},
+				EndpointNamespace:  namespace,
+				ClusterID:          localClusterID,
+				PingInterval:       3,
+				MaxPacketLossCount: 4,
+			}
+
+			config.NewPinger = func(pingerCfg healthchecker.PingerConfig) healthchecker.PingerInterface {
+				defer GinkgoRecover()
+				Expect(pingerCfg.Interval).To(Equal(time.Second * time.Duration(config.PingInterval)))
+				Expect(pingerCfg.MaxPacketLossCount).To(Equal(config.MaxPacketLossCount))
+
+				p, ok := pingerMap[pingerCfg.IP]
+				Expect(ok).To(BeTrue())
+				return p
+			}
+
+			healthChecker, err = healthchecker.New(config)
+
+			Expect(err).To(Succeed())
+		})
+		It("should start the endpoint watcher and start pingers for existing endpoints", func() {
+			createEndpoint(remoteClusterID1, healthCheckIP1)
+			createEndpoint(remoteClusterID2, healthCheckIP2)
+
+			// Start the healthchecker
+			Expect(healthChecker.Start(stopCh)).To(Succeed())
+
+			// Ensure that the Pingers has started for already existing endpoints
+			pingerMap[healthCheckIP1].AwaitStart()
+			pingerMap[healthCheckIP2].AwaitStart()
+		})
+	})
 })
