@@ -21,13 +21,14 @@ package gateway
 import (
 	"context"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -279,19 +280,7 @@ func (g *gatewayType) onStartedLeading(ctx context.Context) {
 	}
 
 	g.runAsync(g.leaderComponentsStarted, func() {
-		msgLogged := atomic.Bool{}
-
-		_ = wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (bool, error) {
-			if err := g.gatewayPod.SetHALabels(ctx, subv1.HAStatusActive); err != nil {
-				if msgLogged.CompareAndSwap(false, true) {
-					logger.Warningf("Error updating pod label to active: %s", err)
-				}
-
-				return false, nil
-			}
-
-			return true, nil
-		})
+		g.updateGatewayHAStatus(ctx, subv1.HAStatusActive)
 	})
 
 	g.runAsync(g.leaderComponentsStarted, func() {
@@ -340,19 +329,41 @@ func (g *gatewayType) onStoppedLeading() {
 	logger.Info("Controllers stopped")
 
 	ctx := context.Background()
-	if err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (bool, error) {
-		if g.gatewayPod.SetHALabels(ctx, subv1.HAStatusPassive) != nil {
-			return false, nil //nolint:nilerr // keep trying
-		}
 
-		return true, nil
-	}); err != nil {
-		logger.Errorf(err, "Failed updating pod label to passive: %s", err)
-	}
+	g.updateGatewayHAStatus(ctx, subv1.HAStatusPassive)
 
-	err := g.startLeaderElection(context.Background())
+	err := g.startLeaderElection(ctx)
 	if err != nil {
 		g.fatalError <- errors.Wrap(err, "error restarting leader election")
+	}
+}
+
+func (g *gatewayType) updateGatewayHAStatus(ctx context.Context, status subv1.HAStatus) {
+	logger.Infof("Updating Gateway pod HA status to %q", status)
+
+	var lastErrMsg string
+
+	err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (bool, error) {
+		err := g.gatewayPod.SetHALabels(ctx, status)
+		if resource.IsTransientErr(err) {
+			errMsg := err.Error()
+			if !reflect.DeepEqual(errMsg, lastErrMsg) {
+				lastErrMsg = errMsg
+
+				logger.Warningf("Error updating Gateway pod HA status to %q: %v - retrying...", status, err)
+			}
+
+			return false, nil
+		}
+
+		return err == nil, errors.Wrapf(err, "error updating Gateway pod HA status to %q", status)
+	})
+	if !errors.Is(err, context.Canceled) {
+		if err == nil {
+			logger.Infof("Successfully updated Gateway pod HA status to %q", status)
+		} else {
+			logger.Errorf(err, "")
+		}
 	}
 }
 
