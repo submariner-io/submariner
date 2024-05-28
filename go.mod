@@ -14,8 +14,8 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/projectcalico/api v0.0.0-20230602153125-fb7148692637
 	github.com/prometheus-community/pro-bing v0.4.0
-	github.com/prometheus/client_golang v1.19.0
-	github.com/submariner-io/admiral v0.18.0-m3
+	github.com/prometheus/client_golang v1.19.1
+	github.com/submariner-io/admiral v0.18.0-m3.0.20240529143949-216f2c69eb25
 	github.com/submariner-io/shipyard v0.18.0-m3
 	github.com/vishvananda/netlink v1.2.1-beta.2
 	golang.org/x/net v0.25.0
@@ -27,7 +27,7 @@ require (
 	k8s.io/client-go v0.30.1
 	k8s.io/component-helpers v0.30.1
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
-	sigs.k8s.io/controller-runtime v0.18.0
+	sigs.k8s.io/controller-runtime v0.18.3
 	sigs.k8s.io/knftables v0.0.16
 	sigs.k8s.io/mcs-api v0.1.0
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1
@@ -42,7 +42,7 @@ require (
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.9.0 // indirect
-	github.com/go-logr/logr v1.4.1 // indirect
+	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
@@ -76,7 +76,7 @@ require (
 	github.com/prometheus/client_model v0.5.0 // indirect
 	github.com/prometheus/common v0.48.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
-	github.com/rs/zerolog v1.32.0 // indirect
+	github.com/rs/zerolog v1.33.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/testify v1.8.4 // indirect
 	github.com/urfave/cli/v2 v2.4.0 // indirect

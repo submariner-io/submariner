@@ -46,8 +46,10 @@ import (
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
@@ -106,20 +108,24 @@ var _ = Describe("Run", func() {
 			t.config.RetryPeriod = time.Millisecond * 20
 		})
 
-		It("should re-acquire the leader lease after the failure is cleared", func() {
+		JustBeforeEach(func() {
 			t.leaderElection.AwaitLeaseAcquired()
 			t.awaitHAStatus(submarinerv1.HAStatusActive)
 
 			t.awaitGateway(func(gw *submarinerv1.Gateway) bool {
 				return gw.Status.HAStatus == submarinerv1.HAStatusActive && reflect.DeepEqual(gw.Status.Connections, fakeDriver.Connections)
 			})
+		})
 
+		It("should re-acquire the leader lease after the failure is cleared", func() {
 			endpoint := t.awaitRemoteEndpointSyncedLocal(t.createRemoteEndpointOnBroker())
 			fakeDriver.AwaitConnectToEndpoint(&natdiscovery.NATEndpointInfo{
 				Endpoint: *endpoint,
 			})
 
 			By("Setting leases resource updates to fail")
+
+			fake.FailOnAction(&t.kubeClient.Fake, "pods", "patch", apierrors.NewTooManyRequests("too many requests", 1), true)
 
 			t.leaderElection.FailLease(t.config.RenewDeadline)
 
@@ -169,6 +175,21 @@ var _ = Describe("Run", func() {
 			})
 
 			fakeDriver.AwaitDisconnectFromEndpoint(&endpoint.Spec)
+		})
+
+		Context("and update Gateway HA status fails with a non-transient error", func() {
+			It("should not block re-election", func() {
+				By("Setting leases resource updates to fail")
+
+				fake.FailOnAction(&t.kubeClient.Fake, "pods", "patch", apierrors.NewNotFound(schema.GroupResource{}, ""), true)
+
+				t.leaderElection.FailLease(t.config.RenewDeadline)
+
+				By("Setting leases resource updates to succeed")
+
+				t.leaderElection.SucceedLease()
+				t.leaderElection.AwaitLeaseRenewed()
+			})
 		})
 	})
 
