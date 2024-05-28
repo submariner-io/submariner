@@ -68,6 +68,7 @@ func newNATDiscovery(localEndpoint *endpoint.Local) (*natDiscovery, error) {
 		return nil, errors.Wrap(err, "error parsing nat discovery port")
 	}
 
+	//nolint:gosec // Use of math/rand over crypto/rand is fine here as the request counter is not security-sensitive.
 	return &natDiscovery{
 		localEndpoint:   localEndpoint,
 		serverPort:      ndPort,
