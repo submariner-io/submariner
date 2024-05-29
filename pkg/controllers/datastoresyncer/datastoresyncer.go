@@ -20,7 +20,6 @@ package datastoresyncer
 
 import (
 	"context"
-	"os"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
@@ -33,10 +32,10 @@ import (
 	"github.com/submariner-io/submariner/pkg/cidr"
 	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/types"
-	k8sv1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic"
@@ -47,7 +46,6 @@ import (
 type DatastoreSyncer struct {
 	localCluster  types.SubmarinerCluster
 	localEndpoint *endpoint.Local
-	localNodeName string
 	syncerConfig  broker.SyncerConfig
 }
 
@@ -94,8 +92,8 @@ func (d *DatastoreSyncer) Start(ctx context.Context) error {
 	}
 
 	if len(d.localCluster.Spec.GlobalCIDR) > 0 {
-		if err := d.startNodeWatcher(ctx.Done()); err != nil {
-			return errors.WithMessage(err, "startNodeWatcher returned error")
+		if err := d.startGatewayWatcher(ctx.Done()); err != nil {
+			return errors.WithMessage(err, "startGatewayWatcher returned error")
 		}
 	}
 
@@ -231,20 +229,7 @@ func (d *DatastoreSyncer) ensureExclusiveEndpoint(ctx context.Context, syncer *b
 	return nil
 }
 
-func (d *DatastoreSyncer) startNodeWatcher(stopCh <-chan struct{}) error {
-	nodeName, ok := os.LookupEnv("NODE_NAME")
-	if !ok {
-		// Healthcheck in globalnet deployments will not work because of missing NODE_NAME.
-		logger.Error(nil, "Error reading the NODE_NAME from the env, healthChecker functionality will not work.")
-	} else {
-		d.localNodeName = nodeName
-		return d.createNodeWatcher(stopCh)
-	}
-
-	return nil
-}
-
-func (d *DatastoreSyncer) createNodeWatcher(stopCh <-chan struct{}) error {
+func (d *DatastoreSyncer) startGatewayWatcher(stopCh <-chan struct{}) error {
 	resourceWatcher, err := watcher.New(&watcher.Config{
 		Scheme:     scheme.Scheme,
 		RestConfig: d.syncerConfig.LocalRestConfig,
@@ -252,24 +237,26 @@ func (d *DatastoreSyncer) createNodeWatcher(stopCh <-chan struct{}) error {
 		Client:     d.syncerConfig.LocalClient,
 		ResourceConfigs: []watcher.ResourceConfig{
 			{
-				Name:                "Node watcher for datastoresyncer",
-				ResourceType:        &k8sv1.Node{},
-				ResourcesEquivalent: d.areNodesEquivalent,
+				Name:                "Gateway watcher for datastoresyncer",
+				ResourceType:        &submarinerv1.Gateway{},
+				SourceNamespace:     d.syncerConfig.LocalNamespace,
+				ResourcesEquivalent: d.areGatewaysEquivalent,
+				SourceFieldSelector: fields.Set(map[string]string{"metadata.name": d.localEndpoint.Spec().Hostname}).AsSelector().String(),
 				Handler: watcher.EventHandlerFuncs{
-					OnCreateFunc: d.handleCreateOrUpdateNode,
-					OnUpdateFunc: d.handleCreateOrUpdateNode,
+					OnCreateFunc: d.handleCreateOrUpdateGateway,
+					OnUpdateFunc: d.handleCreateOrUpdateGateway,
 					OnDeleteFunc: nil,
 				},
 			},
 		},
 	})
 	if err != nil {
-		return errors.Wrap(err, "error creating resource watcher for Nodes")
+		return errors.Wrap(err, "error creating Gateway resource watcher")
 	}
 
 	err = resourceWatcher.Start(stopCh)
 	if err != nil {
-		return errors.Wrap(err, "error starting the resource watcher")
+		return errors.Wrap(err, "error starting the Gateway resource watcher")
 	}
 
 	return nil
