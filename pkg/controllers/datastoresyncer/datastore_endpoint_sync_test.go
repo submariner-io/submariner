@@ -32,7 +32,6 @@ import (
 	testutil "github.com/submariner-io/admiral/pkg/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -123,30 +122,30 @@ func testEndpointSyncing() {
 		})
 	})
 
-	When("the local Node's global IP is updated", func() {
-		var node *corev1.Node
+	When("the local Gateway's global IP is updated", func() {
+		var gateway *submarinerv1.Gateway
 
 		BeforeEach(func() {
-			node = &corev1.Node{
+			gateway = &submarinerv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        nodeName,
+					Name:        t.localEndpoint.Hostname,
 					Annotations: map[string]string{constants.SmGlobalIP: "200.0.0.40"},
 				},
 			}
 
-			test.CreateResource(t.localNodes, node)
+			test.CreateResource(t.localGateways, gateway)
 		})
 
 		JustBeforeEach(func() {
-			t.localEndpoint.HealthCheckIP = node.Annotations[constants.SmGlobalIP]
+			t.localEndpoint.HealthCheckIP = gateway.Annotations[constants.SmGlobalIP]
 			awaitEndpoint(t.localEndpoints, t.localEndpoint)
 		})
 
 		It("should update the local Endpoint's HealthCheckIP", func() {
-			node.Annotations[constants.SmGlobalIP] = "200.0.0.100"
-			t.localEndpoint.HealthCheckIP = node.Annotations[constants.SmGlobalIP]
+			gateway.Annotations[constants.SmGlobalIP] = "200.0.0.100"
+			t.localEndpoint.HealthCheckIP = gateway.Annotations[constants.SmGlobalIP]
 
-			test.UpdateResource(t.localNodes, node)
+			test.UpdateResource(t.localGateways, gateway)
 			awaitEndpoint(t.localEndpoints, t.localEndpoint)
 		})
 
@@ -155,8 +154,8 @@ func testEndpointSyncing() {
 				Expect(t.localEndpoints.Delete(context.Background(), getEndpointName(t.localEndpoint), metav1.DeleteOptions{})).
 					To(Succeed())
 
-				node.Annotations[constants.SmGlobalIP] = "200.0.0.100"
-				test.UpdateResource(t.localNodes, node)
+				gateway.Annotations[constants.SmGlobalIP] = "200.0.0.100"
+				test.UpdateResource(t.localGateways, gateway)
 
 				testutil.EnsureNoResource(resource.ForDynamic(t.localEndpoints), getEndpointName(t.localEndpoint))
 			})
