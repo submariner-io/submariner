@@ -257,14 +257,19 @@ func (g *gatewayType) startLeaderElection(ctx context.Context) error {
 		return errors.Wrap(err, "error creating leader election resource lock")
 	}
 
-	go leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
+	leCtx, cancel := context.WithCancel(ctx)
+
+	go leaderelection.RunOrDie(leCtx, leaderelection.LeaderElectionConfig{
 		Lock:          rl,
 		LeaseDuration: g.LeaseDuration,
 		RenewDeadline: g.RenewDeadline,
 		RetryPeriod:   g.RetryPeriod,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: g.onStartedLeading,
-			OnStoppedLeading: g.onStoppedLeading,
+			OnStoppedLeading: func() {
+				cancel()
+				g.onStoppedLeading(ctx)
+			},
 		},
 	})
 
@@ -314,7 +319,7 @@ func (g *gatewayType) onStartedLeading(ctx context.Context) {
 	}
 }
 
-func (g *gatewayType) onStoppedLeading() {
+func (g *gatewayType) onStoppedLeading(ctx context.Context) {
 	logger.Info("Leadership lost")
 
 	// Make sure all the components were at least started before we try to restart.
@@ -328,7 +333,9 @@ func (g *gatewayType) onStoppedLeading() {
 
 	logger.Info("Controllers stopped")
 
-	ctx := context.Background()
+	if ctx.Err() != nil {
+		return
+	}
 
 	g.updateGatewayHAStatus(ctx, subv1.HAStatusPassive)
 
