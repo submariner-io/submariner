@@ -188,6 +188,14 @@ func (p *packetFilter) List(table packetfilter.TableType, chain string) ([]*pack
 
 	for _, existingRule := range existingRules {
 		ruleSpec := strings.Split(existingRule, " ")
+
+		// ipt.List ( == iptables -t <table_name> -S <chain_name>) also returns
+		// extra line '-N chain_name', we have to skip this line.
+
+		if ruleSpec[0] == "-N" {
+			continue
+		}
+
 		if ruleSpec[0] == "-A" {
 			ruleSpec = ruleSpec[2:] // remove "-A", "$chain"
 		}
