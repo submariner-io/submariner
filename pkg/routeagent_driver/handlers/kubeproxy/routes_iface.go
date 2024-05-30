@@ -298,7 +298,7 @@ func (kp *SyncHandler) updateRoutingRulesForInterClusterSupport(remoteCIDRs []st
 			}
 
 			if operation == Add {
-				err = kp.netLink.RouteAdd(&route)
+				err = kp.netLink.RouteAddOrReplace(&route)
 				if err != nil {
 					return errors.Wrapf(err, "error adding route %s", route)
 				}
