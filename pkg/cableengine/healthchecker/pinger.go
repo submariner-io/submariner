@@ -205,6 +205,7 @@ func (p *pingerInfo) GetLatencyInfo() *LatencyInfo {
 	defer p.Unlock()
 
 	return &LatencyInfo{
+		IP:               p.ip,
 		ConnectionStatus: p.connectionStatus,
 		ConnectionError:  p.failureMsg,
 		Spec: &submarinerv1.LatencyRTTSpec{
