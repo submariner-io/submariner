@@ -167,10 +167,25 @@ var _ = Describe("Controller", func() {
 			Eventually(func() *healthchecker.LatencyInfo { return healthChecker.GetLatencyInfo(&endpoint2.Spec) }).
 				Should(Equal(latencyInfo2))
 
+			By("Stopping health checker")
+
+			close(stopCh)
 			healthChecker.Stop()
 
 			Expect(healthChecker.GetLatencyInfo(&endpoint1.Spec)).To(BeNil())
 			Expect(healthChecker.GetLatencyInfo(&endpoint2.Spec)).To(BeNil())
+
+			By("Restarting health checker")
+
+			pingerMap = map[string]*fake.Pinger{
+				healthCheckIP1: fake.NewPinger(healthCheckIP1),
+				healthCheckIP2: fake.NewPinger(healthCheckIP2),
+			}
+
+			stopCh = make(chan struct{})
+			Expect(healthChecker.Start(stopCh)).To(Succeed())
+
+			pingerMap[healthCheckIP1].AwaitStart()
 		})
 	})
 
