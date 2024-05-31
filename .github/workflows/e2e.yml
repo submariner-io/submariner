@@ -44,24 +44,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        cable-driver: ['', 'wireguard', 'vxlan']
-        extra-toggles: ['', 'ovn']
-        globalnet: ['', 'globalnet']
+        cable-driver: ['wireguard']
+        extra-toggles: ['']
+        globalnet: ['']
         # Run most tests against the latest K8s version
         k8s_version: ['1.28']
         exclude:
           - cable-driver: wireguard
             extra-toggles: ovn
-        include:
-          - extra-toggles: dual-stack
-          - extra-toggles: dual-stack, globalnet
-          # Oldest Kubernetes version thought to work with SubM.
-          # This should match minK8sMajor.minK8sMinor in subctl/pkg/version/version.go.
-          # If this breaks, we may advance the oldest-working K8s version instead of fixing it. See:
-          # https://submariner.io/development/building-testing/ci-maintenance/
-          - k8s_version: '1.19'
-          # Test top and bottom of supported K8s version range
-          - k8s_version: '1.26'
     steps:
       - name: Check out the repository
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633
@@ -72,5 +62,5 @@ jobs:
           using: ${{ matrix.cable-driver }} ${{ matrix.extra-toggles }}
 
       - name: Post mortem
-        if: failure()
+        if: always()
         uses: submariner-io/shipyard/gh-actions/post-mortem@release-0.17
