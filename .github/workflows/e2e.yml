@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
+        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29
 
       - name: Build the images if necessary
         uses: submariner-io/shipyard/gh-actions/cache-images@release-0.17
@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
+        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29
 
       - name: Run E2E deployment and tests
         uses: submariner-io/shipyard/gh-actions/e2e@release-0.17
@@ -64,7 +64,7 @@ jobs:
           - k8s_version: '1.26'
     steps:
       - name: Check out the repository
-        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
+        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29
 
       - name: Run E2E deployment and tests
         uses: submariner-io/shipyard/gh-actions/e2e@release-0.17
