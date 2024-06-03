@@ -53,7 +53,7 @@ const (
 	// handshakeTimeout is maximal time from handshake a connections is still considered connected.
 	handshakeTimeout = 2*time.Minute + 10*time.Second
 
-	cableDriverName = "wireguard"
+	CableDriverName = "wireguard"
 	receiveBytes    = "ReceiveBytes"  // for peer connection status
 	transmitBytes   = "TransmitBytes" // for peer connection status
 	lastChecked     = "LastChecked"   // for connection peer status
@@ -65,7 +65,7 @@ const (
 var logger = log.Logger{Logger: logf.Log.WithName("wireguard")}
 
 func init() {
-	cable.AddDriver(cableDriverName, NewDriver)
+	cable.AddDriver(CableDriverName, NewDriver)
 }
 
 type specification struct {
@@ -203,7 +203,7 @@ func (w *wireguard) Init() error {
 }
 
 func (w *wireguard) GetName() string {
-	return cableDriverName
+	return CableDriverName
 }
 
 func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
@@ -301,7 +301,7 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 
 	logger.V(log.DEBUG).Infof("Done connecting endpoint peer %s@%s", *remoteKey, remoteIP)
 
-	cable.RecordConnection(cableDriverName, &w.localEndpoint.Spec, &connection.Endpoint, string(v1.Connected), true)
+	cable.RecordConnection(CableDriverName, &w.localEndpoint.Spec, &connection.Endpoint, string(v1.Connected), true)
 
 	return ip, nil
 }
@@ -350,7 +350,7 @@ func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpo
 	delete(w.connections, remoteEndpoint.Spec.ClusterID)
 
 	logger.V(log.DEBUG).Infof("Done removing endpoint for cluster %s", remoteEndpoint.Spec.ClusterID)
-	cable.RecordDisconnected(cableDriverName, &w.localEndpoint.Spec, &remoteEndpoint.Spec)
+	cable.RecordDisconnected(CableDriverName, &w.localEndpoint.Spec, &remoteEndpoint.Spec)
 
 	return nil
 }

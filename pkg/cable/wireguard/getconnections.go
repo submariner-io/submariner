@@ -95,7 +95,7 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 		if lc > handshakeTimeout.Milliseconds() {
 			// No initial handshake for too long.
 			connection.SetStatus(v1.ConnectionError, "no initial handshake for %.1f seconds", lcSec)
-			cable.RecordConnection(cableDriverName, &w.localEndpoint.Spec, &connection.Endpoint, string(connection.Status), false)
+			cable.RecordConnection(CableDriverName, &w.localEndpoint.Spec, &connection.Endpoint, string(connection.Status), false)
 
 			return
 		}
@@ -103,7 +103,7 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 		if tx > 0 || rx > 0 {
 			// No handshake, but at least some communication in progress.
 			connection.SetStatus(v1.Connecting, "no initial handshake yet")
-			cable.RecordConnection(cableDriverName, &w.localEndpoint.Spec, &connection.Endpoint, string(connection.Status), false)
+			cable.RecordConnection(CableDriverName, &w.localEndpoint.Spec, &connection.Endpoint, string(connection.Status), false)
 
 			return
 		}
@@ -112,7 +112,7 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 	if tx > 0 || rx > 0 {
 		// All is good.
 		connection.SetStatus(v1.Connected, "Rx=%d Bytes, Tx=%d Bytes", p.ReceiveBytes, p.TransmitBytes)
-		cable.RecordConnection(cableDriverName, &w.localEndpoint.Spec, &connection.Endpoint, string(connection.Status), false)
+		cable.RecordConnection(CableDriverName, &w.localEndpoint.Spec, &connection.Endpoint, string(connection.Status), false)
 		saveAndRecordPeerTraffic(&w.localEndpoint.Spec, &connection.Endpoint, now, p.TransmitBytes, p.ReceiveBytes)
 
 		return
@@ -124,7 +124,7 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 		// Hard error, really long time since handshake.
 		connection.SetStatus(v1.ConnectionError, "no handshake for %.1f seconds",
 			handshakeDelta.Seconds())
-		cable.RecordConnection(cableDriverName, &w.localEndpoint.Spec, &connection.Endpoint, string(connection.Status), false)
+		cable.RecordConnection(CableDriverName, &w.localEndpoint.Spec, &connection.Endpoint, string(connection.Status), false)
 
 		return
 	}
@@ -138,14 +138,14 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 	// Soft error, no traffic, stale handshake.
 	connection.SetStatus(v1.ConnectionError, "no bytes sent or received for %.1f seconds",
 		lcSec)
-	cable.RecordConnection(cableDriverName, &w.localEndpoint.Spec, &connection.Endpoint, string(connection.Status), false)
+	cable.RecordConnection(CableDriverName, &w.localEndpoint.Spec, &connection.Endpoint, string(connection.Status), false)
 }
 
 func (w *wireguard) updatePeerStatus(c *v1.Connection, key *wgtypes.Key) {
 	p, err := w.peerByKey(key)
 	if err != nil {
 		c.SetStatus(v1.ConnectionError, "cannot fetch status for peer %s: %v", key, err)
-		cable.RecordConnection(cableDriverName, &w.localEndpoint.Spec, &c.Endpoint, string(c.Status), false)
+		cable.RecordConnection(CableDriverName, &w.localEndpoint.Spec, &c.Endpoint, string(c.Status), false)
 
 		return
 	}
@@ -174,6 +174,6 @@ func saveAndRecordPeerTraffic(localEndpoint, remoteEndpoint *v1.EndpointSpec, lc
 	remoteEndpoint.BackendConfig[transmitBytes] = strconv.FormatInt(tx, 10)
 	remoteEndpoint.BackendConfig[receiveBytes] = strconv.FormatInt(rx, 10)
 
-	cable.RecordTxBytes(cableDriverName, localEndpoint, remoteEndpoint, int(tx))
-	cable.RecordRxBytes(cableDriverName, localEndpoint, remoteEndpoint, int(rx))
+	cable.RecordTxBytes(CableDriverName, localEndpoint, remoteEndpoint, int(tx))
+	cable.RecordRxBytes(CableDriverName, localEndpoint, remoteEndpoint, int(rx))
 }

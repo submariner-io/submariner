@@ -28,6 +28,7 @@ import (
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cable/wireguard"
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -78,6 +79,14 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 	gatewayNodes := framework.FindGatewayNodes(primaryCluster)
 	Expect(gatewayNodes).To(HaveLen(1), fmt.Sprintf("Expected only one gateway node on %q", primaryClusterName))
 	framework.By(fmt.Sprintf("Found gateway on node %q on %q", gatewayNodes[0].Name, primaryClusterName))
+
+	submEndpoint := f.AwaitSubmarinerEndpoint(primaryCluster, subFramework.NoopCheckEndpoint)
+
+	if submEndpoint.Spec.Backend == wireguard.CableDriverName &&
+		framework.DetectProvider(context.TODO(), primaryCluster, gatewayNodes[0].Name) == "kind" {
+		framework.Skipf("The test is known to fail on Kind 0.21+ with the wireguard cable driver - skipping the test...")
+		return
+	}
 
 	gatewayPod := f.AwaitSubmarinerGatewayPod(primaryCluster)
 	framework.By(fmt.Sprintf("Found submariner gateway pod %q on %q, checking node and HA status labels", gatewayPod.Name, primaryClusterName))
