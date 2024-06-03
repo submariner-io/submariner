@@ -422,6 +422,7 @@ func testGatewayLatencyInfo() {
 			}
 
 			t.engine.Connections = []submarinerv1.Connection{t.expectedGateway.Status.Connections[0]}
+			t.engine.Connections[0].Endpoint.HealthCheckIP = ""
 
 			t.expectedGateway.Status.Connections[0].LatencyRTT = &submarinerv1.LatencyRTTSpec{
 				Last:    "93ms",
@@ -432,6 +433,7 @@ func testGatewayLatencyInfo() {
 			}
 
 			t.pinger.SetLatencyInfo(&healthchecker.LatencyInfo{
+				IP:               t.pinger.GetIP(),
 				ConnectionStatus: healthchecker.Connected,
 				Spec:             t.expectedGateway.Status.Connections[0].LatencyRTT,
 			})
@@ -444,6 +446,7 @@ func testGatewayLatencyInfo() {
 			t.expectedGateway.Status.Connections[0].StatusMessage = "Ping failed"
 
 			t.pinger.SetLatencyInfo(&healthchecker.LatencyInfo{
+				IP:               t.pinger.GetIP(),
 				ConnectionStatus: healthchecker.ConnectionError,
 				ConnectionError:  t.expectedGateway.Status.Connections[0].StatusMessage,
 				Spec:             t.expectedGateway.Status.Connections[0].LatencyRTT,
@@ -455,6 +458,7 @@ func testGatewayLatencyInfo() {
 			t.expectedGateway.Status.Connections[0].StatusMessage = ""
 
 			t.pinger.SetLatencyInfo(&healthchecker.LatencyInfo{
+				IP:               t.pinger.GetIP(),
 				ConnectionStatus: healthchecker.Connected,
 				Spec:             t.expectedGateway.Status.Connections[0].LatencyRTT,
 			})

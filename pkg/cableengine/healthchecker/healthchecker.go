@@ -33,6 +33,7 @@ import (
 type LatencyInfo struct {
 	ConnectionError  string
 	ConnectionStatus ConnectionStatus
+	IP               string
 	Spec             *submarinerv1.LatencyRTTSpec
 }
 

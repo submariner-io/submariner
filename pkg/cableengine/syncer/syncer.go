@@ -242,6 +242,8 @@ func (gs *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 			latencyInfo := gs.healthCheck.GetLatencyInfo(&connection.Endpoint)
 			if latencyInfo != nil {
 				connection.LatencyRTT = latencyInfo.Spec
+				connection.Endpoint.HealthCheckIP = latencyInfo.IP
+
 				if connection.Status == v1.Connected {
 					lastRTT, _ := time.ParseDuration(latencyInfo.Spec.Last)
 					cable.RecordConnectionLatency(localEndpoint.Spec.Backend, &localEndpoint.Spec, &connection.Endpoint, lastRTT.Seconds())
