@@ -11,6 +11,6 @@ jobs:
     name: PR targets branch
     runs-on: ubuntu-latest
     steps:
-      - name: Check that the PR targets devel
-        if: ${{ github.base_ref != 'devel' }}
+      - name: Check that the PR targets release-0.18
+        if: ${{ github.base_ref != 'release-0.18' }}
         run: exit 1
