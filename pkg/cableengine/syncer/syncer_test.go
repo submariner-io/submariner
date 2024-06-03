@@ -193,6 +193,23 @@ func testGatewaySyncing() {
 			t.awaitGatewayUpdated(t.expectedGateway)
 		})
 	})
+
+	Context("", func() {
+		BeforeEach(func() {
+			t.expectedGateway.Annotations = map[string]string{"foo": "bar"}
+
+			_, err := t.gateways.Create(context.TODO(), t.expectedGateway, metav1.CreateOptions{})
+			Expect(err).To(Succeed())
+		})
+
+		JustBeforeEach(func() {
+			t.awaitGatewayUpdated(t.expectedGateway)
+		})
+
+		It("should preserve existing annotations", func() {
+			t.awaitGatewayUpdated(t.expectedGateway)
+		})
+	})
 }
 
 func testStaleGatewayCleanup() {
@@ -233,7 +250,7 @@ func testStaleGatewayCleanup() {
 
 	When("the Gateway's update timestamp expires", func() {
 		BeforeEach(func() {
-			staleGateway.Annotations = map[string]string{"update-timestamp": strconv.FormatInt(time.Now().UTC().Unix(), 10)}
+			staleGateway.Annotations = map[string]string{syncer.UpdateTimestampAnnotation: strconv.FormatInt(time.Now().UTC().Unix(), 10)}
 		})
 
 		It("should delete the Gateway", func() {
@@ -242,7 +259,7 @@ func testStaleGatewayCleanup() {
 		})
 	})
 
-	When("the Gateway's update-timestamp annotations is missing", func() {
+	When("the Gateway's update-timestamp annotation is missing", func() {
 		BeforeEach(func() {
 			staleGateway.Annotations = map[string]string{}
 		})
@@ -260,7 +277,7 @@ func testStaleGatewayCleanup() {
 
 	When("the Gateway's update-timestamp annotation is invalid", func() {
 		BeforeEach(func() {
-			staleGateway.Annotations = map[string]string{"update-timestamp": "invalid"}
+			staleGateway.Annotations = map[string]string{syncer.UpdateTimestampAnnotation: "invalid"}
 		})
 
 		It("should delete the Gateway", func() {
@@ -405,6 +422,7 @@ func testGatewayLatencyInfo() {
 			}
 
 			t.engine.Connections = []submarinerv1.Connection{t.expectedGateway.Status.Connections[0]}
+			t.engine.Connections[0].Endpoint.HealthCheckIP = ""
 
 			t.expectedGateway.Status.Connections[0].LatencyRTT = &submarinerv1.LatencyRTTSpec{
 				Last:    "93ms",
@@ -415,6 +433,7 @@ func testGatewayLatencyInfo() {
 			}
 
 			t.pinger.SetLatencyInfo(&healthchecker.LatencyInfo{
+				IP:               t.pinger.GetIP(),
 				ConnectionStatus: healthchecker.Connected,
 				Spec:             t.expectedGateway.Status.Connections[0].LatencyRTT,
 			})
@@ -427,6 +446,7 @@ func testGatewayLatencyInfo() {
 			t.expectedGateway.Status.Connections[0].StatusMessage = "Ping failed"
 
 			t.pinger.SetLatencyInfo(&healthchecker.LatencyInfo{
+				IP:               t.pinger.GetIP(),
 				ConnectionStatus: healthchecker.ConnectionError,
 				ConnectionError:  t.expectedGateway.Status.Connections[0].StatusMessage,
 				Spec:             t.expectedGateway.Status.Connections[0].LatencyRTT,
@@ -438,6 +458,7 @@ func testGatewayLatencyInfo() {
 			t.expectedGateway.Status.Connections[0].StatusMessage = ""
 
 			t.pinger.SetLatencyInfo(&healthchecker.LatencyInfo{
+				IP:               t.pinger.GetIP(),
 				ConnectionStatus: healthchecker.Connected,
 				Spec:             t.expectedGateway.Status.Connections[0].LatencyRTT,
 			})
@@ -608,11 +629,11 @@ func TestSyncer(t *testing.T) {
 }
 
 type equalGatewayMatcher struct {
-	expected *submarinerv1.Gateway
+	expected submarinerv1.Gateway
 }
 
 func equalGateway(expected *submarinerv1.Gateway) gomegaTypes.GomegaMatcher {
-	return &equalGatewayMatcher{expected}
+	return &equalGatewayMatcher{*expected}
 }
 
 func (m *equalGatewayMatcher) Match(x interface{}) (bool, error) {
@@ -625,16 +646,28 @@ func (m *equalGatewayMatcher) Match(x interface{}) (bool, error) {
 		return false, nil
 	}
 
+	actual = actual.DeepCopy()
+
 	if m.expected.Status.StatusFailure != "" {
 		if !strings.Contains(actual.Status.StatusFailure, m.expected.Status.StatusFailure) {
 			return false, nil
 		}
 
-		actual = actual.DeepCopy()
 		actual.Status.StatusFailure = m.expected.Status.StatusFailure
 	}
 
-	return reflect.DeepEqual(actual.Status, m.expected.Status), nil
+	if m.expected.Annotations == nil {
+		m.expected.Annotations = map[string]string{}
+	}
+
+	if actual.Annotations == nil {
+		actual.Annotations = map[string]string{}
+	}
+
+	delete(m.expected.Annotations, syncer.UpdateTimestampAnnotation)
+	delete(actual.Annotations, syncer.UpdateTimestampAnnotation)
+
+	return reflect.DeepEqual(actual.Status, m.expected.Status) && reflect.DeepEqual(actual.Annotations, m.expected.Annotations), nil
 }
 
 func (m *equalGatewayMatcher) FailureMessage(actual interface{}) string {

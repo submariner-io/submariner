@@ -21,7 +21,6 @@ package datastoresyncer_test
 import (
 	"context"
 	"fmt"
-	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -53,7 +52,6 @@ const (
 	otherClusterID  = "west"
 	localNamespace  = "submariner"
 	brokerNamespace = "submariner-broker"
-	nodeName        = "raiders"
 )
 
 func TestDatastoresyncer(t *testing.T) {
@@ -83,7 +81,7 @@ type testDriver struct {
 	localClusters    dynamic.ResourceInterface
 	brokerClusters   dynamic.ResourceInterface
 	localEndpoints   dynamic.ResourceInterface
-	localNodes       dynamic.ResourceInterface
+	localGateways    dynamic.ResourceInterface
 	brokerEndpoints  dynamic.ResourceInterface
 	syncerScheme     *runtime.Scheme
 	restMapper       meta.RESTMapper
@@ -128,7 +126,7 @@ func newTestDriver() *testDriver {
 		t.brokerClient = dynamicfake.NewSimpleDynamicClient(t.syncerScheme)
 		fake.AddBasicReactors(&t.brokerClient.Fake)
 
-		t.restMapper = test.GetRESTMapperFor(&submarinerv1.Cluster{}, &submarinerv1.Endpoint{}, &corev1.Node{})
+		t.restMapper = test.GetRESTMapperFor(&submarinerv1.Cluster{}, &submarinerv1.Endpoint{}, &submarinerv1.Gateway{}, &corev1.Node{})
 
 		clusterGVR := test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.Cluster{})
 		t.localClusters = t.localClient.Resource(*clusterGVR).Namespace(localNamespace)
@@ -138,7 +136,8 @@ func newTestDriver() *testDriver {
 		t.localEndpoints = t.localClient.Resource(*endpointGVR).Namespace(localNamespace)
 		t.brokerEndpoints = t.brokerClient.Resource(*endpointGVR).Namespace(brokerNamespace)
 
-		t.localNodes = t.localClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &corev1.Node{})).Namespace("")
+		t.localGateways = t.localClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.Gateway{})).
+			Namespace(localNamespace)
 	})
 
 	JustBeforeEach(func() {
@@ -153,8 +152,6 @@ func newTestDriver() *testDriver {
 }
 
 func (t *testDriver) run() {
-	os.Setenv("NODE_NAME", nodeName)
-
 	t.syncer = datastoresyncer.New(&broker.SyncerConfig{
 		LocalClient:     t.localClient,
 		LocalNamespace:  localNamespace,

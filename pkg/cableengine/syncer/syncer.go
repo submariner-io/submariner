@@ -121,7 +121,12 @@ func (gs *GatewaySyncer) syncGatewayStatusSafe(ctx context.Context) {
 	result, err := util.CreateOrUpdate(ctx, gs.gatewayResourceInterface(), gatewayObj,
 		func(existing *v1.Gateway) (*v1.Gateway, error) {
 			existing.Status = gatewayObj.Status
-			existing.Annotations = gatewayObj.Annotations
+
+			if existing.Annotations == nil {
+				existing.Annotations = map[string]string{}
+			}
+
+			existing.Annotations[UpdateTimestampAnnotation] = gatewayObj.Annotations[UpdateTimestampAnnotation]
 
 			return existing, nil
 		})
@@ -237,6 +242,8 @@ func (gs *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 			latencyInfo := gs.healthCheck.GetLatencyInfo(&connection.Endpoint)
 			if latencyInfo != nil {
 				connection.LatencyRTT = latencyInfo.Spec
+				connection.Endpoint.HealthCheckIP = latencyInfo.IP
+
 				if connection.Status == v1.Connected {
 					lastRTT, _ := time.ParseDuration(latencyInfo.Spec.Last)
 					cable.RecordConnectionLatency(localEndpoint.Spec.Backend, &localEndpoint.Spec, &connection.Endpoint, lastRTT.Seconds())
