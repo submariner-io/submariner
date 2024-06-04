@@ -28,7 +28,6 @@ import (
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/cable/wireguard"
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -82,7 +81,8 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 
 	submEndpoint := f.AwaitSubmarinerEndpoint(primaryCluster, subFramework.NoopCheckEndpoint)
 
-	if submEndpoint.Spec.Backend == wireguard.CableDriverName &&
+	// The cable driver name can't be imported from pkg/cable/wireguard to avoid breaking the subctl build on Windows
+	if submEndpoint.Spec.Backend == "wireguard" &&
 		framework.DetectProvider(context.TODO(), primaryCluster, gatewayNodes[0].Name) == "kind" {
 		framework.Skipf("The test is known to fail on Kind 0.21+ with the wireguard cable driver - skipping the test...")
 		return
