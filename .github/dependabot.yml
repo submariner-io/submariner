@@ -45,6 +45,15 @@ updates:
       github-actions:
         patterns:
           - "*"
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: release-0.18
+    schedule:
+      interval: monthly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
   - package-ecosystem: gomod
     directory: /
     schedule:
