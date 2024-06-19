@@ -1,10 +1,10 @@
 # Auto-generated, do not edit; see CODEOWNERS.in
-* @Oats87 @skitt @sridhargaddam @tpantelis @vthapar
-*.md @dfarrell07 @Oats87 @skitt @sridhargaddam @tpantelis @vthapar
-/.github/workflows/ @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis @vthapar
-/package/ @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis @vthapar
-/scripts/ @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis @vthapar
-Dockerfile.dapper @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis @vthapar
+* @Oats87 @skitt @sridhargaddam @tpantelis @vthapar @yboaron
+*.md @dfarrell07 @Oats87 @skitt @sridhargaddam @tpantelis @vthapar @yboaron
+/.github/workflows/ @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis @vthapar @yboaron
+/package/ @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis @vthapar @yboaron
+/scripts/ @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis @vthapar @yboaron
+Dockerfile.dapper @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis @vthapar @yboaron
 go.mod @aswinsuryan @dfarrell07 @maayanf24 @Oats87 @skitt @sridhargaddam @tpantelis @vthapar @yboaron
 go.sum @aswinsuryan @dfarrell07 @maayanf24 @Oats87 @skitt @sridhargaddam @tpantelis @vthapar @yboaron
-Makefile* @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis @vthapar
+Makefile* @mkolesnik @Oats87 @skitt @sridhargaddam @tpantelis @vthapar @yboaron
