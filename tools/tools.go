@@ -26,4 +26,5 @@ package tools
 
 import (
 	_ "github.com/uw-labs/lichen"
+	_ "k8s.io/code-generator"
 )

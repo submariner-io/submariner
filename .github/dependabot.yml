@@ -80,3 +80,11 @@ updates:
       # Managed in shipyard
       - dependency-name: k8s.io/utils
       - dependency-name: sigs.k8s.io/mcs-api
+  - package-ecosystem: gomod
+    directory: /tools
+    schedule:
+      interval: weekly
+    groups:
+      gomod:
+        patterns:
+          - "*"
