@@ -3,30 +3,26 @@
 set -e
 source "${SCRIPTS_DIR}"/lib/debug_functions
 
-# The generators assume GOPATH is set
-export GOPATH
-GOPATH="$(go env GOPATH)"
+# Clone the upstream script in a temporary directory
+CODEGEN_SCRIPT_DIR=$(mktemp -d)
+# shellcheck disable=SC2064 # We want this to be expanded now
+trap "rm -rf $CODEGEN_SCRIPT_DIR" EXIT
+CODEGEN_SCRIPT="${CODEGEN_SCRIPT_DIR}/kube_codegen.sh"
+CODEGEN_RELEASE_TAG=$(go -C tools list -m -f '{{.Version}}' k8s.io/code-generator)
+git clone --branch "$CODEGEN_RELEASE_TAG" https://github.com/kubernetes/code-generator "${CODEGEN_SCRIPT_DIR}"
 
-K8S_IO_DIR="${GOPATH:-$HOME/go}/src/k8s.io"
-CODEGEN_SCRIPT_DIR="${K8S_IO_DIR}/code-generator"
-CODEGEN_SCRIPT="${CODEGEN_SCRIPT_DIR}/generate-groups.sh"
-GENGO_BOILERPLATE_DIR="${K8S_IO_DIR}/gengo"
-GENGO_BOILERPLATE="${GENGO_BOILERPLATE_DIR}/boilerplate/boilerplate.go.txt"
-CODEGEN_RELEASE_TAG=kubernetes-1.29.1
-
-if [ ! -f "$CODEGEN_SCRIPT" ]; then
-    echo "$CODEGEN_SCRIPT does not exist - downloading..."
-    (
-        git clone --branch $CODEGEN_RELEASE_TAG https://github.com/kubernetes/code-generator "${CODEGEN_SCRIPT_DIR}"
-        cd "${CODEGEN_SCRIPT_DIR}"
-        go mod vendor
-        echo "Successfully checked out release tag $CODEGEN_RELEASE_TAG"
-    )
-fi
-
-if [ ! -f "$GENGO_BOILERPLATE" ]; then
-    echo "$GENGO_BOILERPLATE does not exist - downloading..."
-    git clone https://github.com/kubernetes/gengo "${GENGO_BOILERPLATE_DIR}"
-fi
-
-"${CODEGEN_SCRIPT}" applyconfiguration,client,deepcopy,informer,lister github.com/submariner-io/submariner/pkg/client github.com/submariner-io/submariner/pkg/apis submariner.io:v1
+# shellcheck disable=SC2034 # DEBUG_PRINT is used in the debug trap
+DEBUG_PRINT=
+# shellcheck disable=SC1090 # No need to lint a third-party script
+. "${CODEGEN_SCRIPT}"
+kube::codegen::gen_helpers \
+    --boilerplate scripts/boilerplate.go.txt \
+    pkg/apis
+kube::codegen::gen_client \
+    --output-dir pkg/client \
+    --output-pkg github.com/submariner-io/submariner/pkg/client \
+    --boilerplate scripts/boilerplate.go.txt \
+    --with-applyconfig \
+    --with-watch \
+    --one-input-api submariner.io \
+    pkg/apis
