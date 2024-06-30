@@ -79,15 +79,6 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 	Expect(gatewayNodes).To(HaveLen(1), fmt.Sprintf("Expected only one gateway node on %q", primaryClusterName))
 	framework.By(fmt.Sprintf("Found gateway on node %q on %q", gatewayNodes[0].Name, primaryClusterName))
 
-	submEndpoint := f.AwaitSubmarinerEndpoint(primaryCluster, subFramework.NoopCheckEndpoint)
-
-	// The cable driver name can't be imported from pkg/cable/wireguard to avoid breaking the subctl build on Windows
-	if submEndpoint.Spec.Backend == "wireguard" &&
-		framework.DetectProvider(context.TODO(), primaryCluster, gatewayNodes[0].Name) == "kind" {
-		framework.Skipf("The test is known to fail on Kind 0.21+ with the wireguard cable driver - skipping the test...")
-		return
-	}
-
 	gatewayPod := f.AwaitSubmarinerGatewayPod(primaryCluster)
 	framework.By(fmt.Sprintf("Found submariner gateway pod %q on %q, checking node and HA status labels", gatewayPod.Name, primaryClusterName))
 
@@ -96,6 +87,7 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 
 	framework.By(fmt.Sprintf("Ensuring that the gateway reports as active on %q", primaryClusterName))
 
+	submEndpoint := f.AwaitSubmarinerEndpoint(primaryCluster, subFramework.NoopCheckEndpoint)
 	activeGateway := f.AwaitGatewayFullyConnected(primaryCluster, resource.EnsureValidName(submEndpoint.Spec.Hostname))
 
 	framework.By(fmt.Sprintf("Deleting submariner gateway pod %q", gatewayPod.Name))
