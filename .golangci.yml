@@ -1,5 +1,15 @@
 ---
 linters-settings:
+  depguard:
+    rules:
+      # Importing WireGuard breaks downstream projects, we mustn't use it in exported packages
+      wireguard:
+        list-mode: lax
+        files:
+          - "**/test/**/*.go"
+        deny:
+          - pkg: github.com/submariner-io/submariner/pkg/cable/wireguard
+            desc: Breaks Windows builds
   gocritic:
     enabled-tags:
       - diagnostic
@@ -47,7 +57,7 @@ linters:
     - contextcheck
     # - cyclop # This is equivalent to gocyclo
     - decorder
-    # - depguard # depguard now denies by default, it should only be enabled if we actually use it
+    - depguard
     - dogsled
     - dupl
     - dupword
