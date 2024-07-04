@@ -87,7 +87,8 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 
 	framework.By(fmt.Sprintf("Ensuring that the gateway reports as active on %q", primaryClusterName))
 
-	activeGateway := f.AwaitGatewayFullyConnected(primaryCluster, resource.EnsureValidName(gatewayNodes[0].Name))
+	submEndpoint := f.AwaitSubmarinerEndpoint(primaryCluster, subFramework.NoopCheckEndpoint)
+	activeGateway := f.AwaitGatewayFullyConnected(primaryCluster, resource.EnsureValidName(submEndpoint.Spec.Hostname))
 
 	framework.By(fmt.Sprintf("Deleting submariner gateway pod %q", gatewayPod.Name))
 	f.DeletePod(primaryCluster, gatewayPod.Name, framework.TestContext.SubmarinerNamespace)
