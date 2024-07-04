@@ -66,6 +66,15 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 		if err != nil {
 			return errors.Wrap(err, "error while reconciling routes")
 		}
+	} else if kp.localCableDriver == "wireguard" {
+		// We are on Gateway node and cable is wireguard.
+		//	After GW pod failure, the wireguard network interface (named 'submariner')
+		//	is created with a new ifindex, meaning all host routes created with LinkIndex
+		//	pointing to previous wireguard ifindex are deleted.
+		//	so, we need to make sure that host routes on GW node will be
+		//  reconfigured (pointing to updated wireguard ifindex)
+		kp.routeCacheGWNode.Clear()
+		kp.updateRoutingRulesForHostNetworkSupport(kp.remoteSubnets.UnsortedList(), Add)
 	}
 
 	return nil
