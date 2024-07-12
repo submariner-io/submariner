@@ -83,3 +83,11 @@ type NonGatewayRouteListerExpansion interface{}
 // NonGatewayRouteNamespaceListerExpansion allows custom methods to be added to
 // NonGatewayRouteNamespaceLister.
 type NonGatewayRouteNamespaceListerExpansion interface{}
+
+// RouteAgentListerExpansion allows custom methods to be added to
+// RouteAgentLister.
+type RouteAgentListerExpansion interface{}
+
+// RouteAgentNamespaceListerExpansion allows custom methods to be added to
+// RouteAgentNamespaceLister.
+type RouteAgentNamespaceListerExpansion interface{}

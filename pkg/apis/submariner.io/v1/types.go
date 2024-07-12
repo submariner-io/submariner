@@ -185,6 +185,37 @@ const (
 	ConnectionError ConnectionStatus = "error"
 )
 
+// +genclient
+// +genclient:noStatus
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type RouteAgent struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Status            RouteAgentStatus `json:"status"`
+}
+
+type RouteAgentStatus struct {
+	Version         string           `json:"version"`
+	StatusFailure   string           `json:"statusFailure"`
+	RemoteEndpoints []RemoteEndpoint `json:"remoteEndpoints"`
+}
+
+type RemoteEndpoint struct {
+	Status        ConnectionStatus `json:"status"`
+	StatusMessage string           `json:"statusMessage"`
+	Spec          EndpointSpec     `json:"spec"`
+	// +optional
+	LatencyRTT *LatencyRTTSpec `json:"latencyRTT,omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type RouteAgentList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+	Items           []RouteAgent `json:"items"`
+}
+
 func NewConnection(endpointSpec *EndpointSpec, usedIP string, nat bool) *Connection {
 	return &Connection{Endpoint: *endpointSpec, UsingIP: usedIP, UsingNAT: nat}
 }

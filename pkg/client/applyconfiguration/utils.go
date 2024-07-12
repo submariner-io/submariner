@@ -67,6 +67,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &submarineriov1.LatencyRTTSpecApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("NonGatewayRoute"):
 		return &submarineriov1.NonGatewayRouteApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("RemoteEndpoint"):
+		return &submarineriov1.RemoteEndpointApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("RouteAgent"):
+		return &submarineriov1.RouteAgentApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("RouteAgentStatus"):
+		return &submarineriov1.RouteAgentStatusApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("RoutePolicySpec"):
 		return &submarineriov1.RoutePolicySpecApplyConfiguration{}
 
