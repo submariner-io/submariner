@@ -38,6 +38,7 @@ type SubmarinerV1Interface interface {
 	GlobalEgressIPsGetter
 	GlobalIngressIPsGetter
 	NonGatewayRoutesGetter
+	RouteAgentsGetter
 }
 
 // SubmarinerV1Client is used to interact with features provided by the submariner.io group.
@@ -75,6 +76,10 @@ func (c *SubmarinerV1Client) GlobalIngressIPs(namespace string) GlobalIngressIPI
 
 func (c *SubmarinerV1Client) NonGatewayRoutes(namespace string) NonGatewayRouteInterface {
 	return newNonGatewayRoutes(c, namespace)
+}
+
+func (c *SubmarinerV1Client) RouteAgents(namespace string) RouteAgentInterface {
+	return newRouteAgents(c, namespace)
 }
 
 // NewForConfig creates a new SubmarinerV1Client for the given config.

@@ -42,6 +42,8 @@ type Interface interface {
 	GlobalIngressIPs() GlobalIngressIPInformer
 	// NonGatewayRoutes returns a NonGatewayRouteInformer.
 	NonGatewayRoutes() NonGatewayRouteInformer
+	// RouteAgents returns a RouteAgentInformer.
+	RouteAgents() RouteAgentInformer
 }
 
 type version struct {
@@ -93,4 +95,9 @@ func (v *version) GlobalIngressIPs() GlobalIngressIPInformer {
 // NonGatewayRoutes returns a NonGatewayRouteInformer.
 func (v *version) NonGatewayRoutes() NonGatewayRouteInformer {
 	return &nonGatewayRouteInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// RouteAgents returns a RouteAgentInformer.
+func (v *version) RouteAgents() RouteAgentInformer {
+	return &routeAgentInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

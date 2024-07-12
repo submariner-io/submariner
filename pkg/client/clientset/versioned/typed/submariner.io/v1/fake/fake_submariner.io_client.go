@@ -62,6 +62,10 @@ func (c *FakeSubmarinerV1) NonGatewayRoutes(namespace string) v1.NonGatewayRoute
 	return &FakeNonGatewayRoutes{c, namespace}
 }
 
+func (c *FakeSubmarinerV1) RouteAgents(namespace string) v1.RouteAgentInterface {
+	return &FakeRouteAgents{c, namespace}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeSubmarinerV1) RESTClient() rest.Interface {

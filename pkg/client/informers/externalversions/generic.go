@@ -71,6 +71,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Submariner().V1().GlobalIngressIPs().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("nongatewayroutes"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Submariner().V1().NonGatewayRoutes().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("routeagents"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Submariner().V1().RouteAgents().Informer()}, nil
 
 	}
 

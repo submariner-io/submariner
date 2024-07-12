@@ -35,3 +35,5 @@ type GlobalEgressIPExpansion interface{}
 type GlobalIngressIPExpansion interface{}
 
 type NonGatewayRouteExpansion interface{}
+
+type RouteAgentExpansion interface{}
