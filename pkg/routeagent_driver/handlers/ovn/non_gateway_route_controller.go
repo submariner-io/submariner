@@ -22,10 +22,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	nodeutil "github.com/submariner-io/submariner/pkg/node"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	clientset "k8s.io/client-go/kubernetes"
 )
 
 type NonGatewayRouteController struct {
@@ -33,12 +31,12 @@ type NonGatewayRouteController struct {
 	connectionHandler      *ConnectionHandler
 	remoteSubnets          sets.Set[string]
 	stopCh                 chan struct{}
-	transitSwitchIP        string
+	transitSwitchIP        TransitSwitchIPGetter
 }
 
 //nolint:gocritic // Ignore hugeParam
 func NewNonGatewayRouteController(config watcher.Config, connectionHandler *ConnectionHandler,
-	k8sClientSet clientset.Interface, namespace string,
+	namespace string, transitSwitchIP TransitSwitchIPGetter,
 ) (*NonGatewayRouteController, error) {
 	// We'll panic if config is nil, this is intentional
 	var err error
@@ -47,6 +45,7 @@ func NewNonGatewayRouteController(config watcher.Config, connectionHandler *Conn
 		connectionHandler: connectionHandler,
 		remoteSubnets:     sets.New[string](),
 		stopCh:            make(chan struct{}),
+		transitSwitchIP:   transitSwitchIP,
 	}
 
 	config.ResourceConfigs = []watcher.ResourceConfig{
@@ -60,25 +59,6 @@ func NewNonGatewayRouteController(config watcher.Config, connectionHandler *Conn
 			},
 			SourceNamespace: namespace,
 		},
-	}
-
-	node, err := nodeutil.GetLocalNode(k8sClientSet)
-	if err != nil {
-		return nil, errors.Wrap(err, "error getting the local node info")
-	}
-
-	annotations := node.GetAnnotations()
-
-	transitSwitchIP := annotations["k8s.ovn.org/node-transit-switch-port-ifaddr"]
-	if transitSwitchIP == "" {
-		// This is a non-IC setup , so this controller will not be started.
-		logger.Infof("No transit switch IP configured on node %q", node.Name)
-		return controller, nil
-	}
-
-	controller.transitSwitchIP, err = jsonToIP(transitSwitchIP)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error parsing transit switch IP")
 	}
 
 	controller.nonGatewayRouteWatcher, err = watcher.New(&config)
@@ -129,7 +109,7 @@ func (g *NonGatewayRouteController) reconcileRemoteSubnets(submNonGWRoute *subma
 	}
 
 	// If this node belongs to same zone as gateway node, ignore the event.
-	if submNonGWRoute.RoutePolicySpec.NextHops[0] != g.transitSwitchIP {
+	if submNonGWRoute.RoutePolicySpec.NextHops[0] != g.transitSwitchIP.Get() {
 		for _, subnet := range submNonGWRoute.RoutePolicySpec.RemoteCIDRs {
 			if addSubnet {
 				g.remoteSubnets.Insert(subnet)
@@ -145,7 +125,5 @@ func (g *NonGatewayRouteController) reconcileRemoteSubnets(submNonGWRoute *subma
 }
 
 func (g *NonGatewayRouteController) stop() {
-	if g.transitSwitchIP != "" {
-		close(g.stopCh)
-	}
+	close(g.stopCh)
 }

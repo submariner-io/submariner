@@ -43,14 +43,15 @@ import (
 type NewOVSDBClientFn func(_ model.ClientDBModel, _ ...libovsdbclient.Option) (libovsdbclient.Client, error)
 
 type HandlerConfig struct {
-	Namespace      string
-	ClusterCIDR    []string
-	ServiceCIDR    []string
-	SubmClient     clientset.Interface
-	K8sClient      kubernetes.Interface
-	DynClient      dynamic.Interface
-	WatcherConfig  *watcher.Config
-	NewOVSDBClient NewOVSDBClientFn
+	Namespace       string
+	ClusterCIDR     []string
+	ServiceCIDR     []string
+	SubmClient      clientset.Interface
+	K8sClient       kubernetes.Interface
+	DynClient       dynamic.Interface
+	WatcherConfig   *watcher.Config
+	NewOVSDBClient  NewOVSDBClientFn
+	TransitSwitchIP TransitSwitchIPGetter
 }
 
 type Handler struct {
@@ -124,7 +125,7 @@ func (ovn *Handler) Init() error {
 		return err
 	}
 
-	nonGatewayRouteController, err := NewNonGatewayRouteController(*ovn.WatcherConfig, connectionHandler, ovn.K8sClient, ovn.Namespace)
+	nonGatewayRouteController, err := NewNonGatewayRouteController(*ovn.WatcherConfig, connectionHandler, ovn.Namespace, ovn.TransitSwitchIP)
 	if err != nil {
 		return err
 	}

@@ -51,7 +51,10 @@ const (
 var _ = Describe("Handler", func() {
 	t := newTestDriver()
 
-	var ovsdbClient *fakeovn.OVSDBClient
+	var (
+		ovsdbClient     *fakeovn.OVSDBClient
+		transitSwitchIP ovn.TransitSwitchIP
+	)
 
 	BeforeEach(func() {
 		ovsdbClient = fakeovn.NewOVSDBClient()
@@ -79,6 +82,8 @@ var _ = Describe("Handler", func() {
 
 		restMapper := test.GetRESTMapperFor(&submarinerv1.GatewayRoute{}, &submarinerv1.NonGatewayRoute{})
 
+		transitSwitchIP = ovn.NewTransitSwitchIP()
+
 		t.Start(ovn.NewHandler(&ovn.HandlerConfig{
 			Namespace:   testing.Namespace,
 			ClusterCIDR: []string{clusterCIDR},
@@ -93,9 +98,11 @@ var _ = Describe("Handler", func() {
 			NewOVSDBClient: func(_ model.ClientDBModel, _ ...libovsdbclient.Option) (libovsdbclient.Client, error) {
 				return ovsdbClient, nil
 			},
+			TransitSwitchIP: transitSwitchIP,
 		}))
 
 		Expect(ovsdbClient.Connected()).To(BeTrue())
+		Expect(transitSwitchIP.Init(t.k8sClient)).To(Succeed())
 	})
 
 	When("a remote Endpoint is created, updated, and deleted", func() {
@@ -254,37 +261,89 @@ var _ = Describe("Handler", func() {
 		})
 	})
 
-	When("a NonGatewayRoute is created and deleted", func() {
+	When("NonGatewayRoutes are created, updated and deleted", func() {
+		verifyLogicalRouterPolicies := func(ngr *submarinerv1.NonGatewayRoute, nextHop string) {
+			for _, cidr := range ngr.RoutePolicySpec.RemoteCIDRs {
+				ovsdbClient.AwaitModel(&nbdb.LogicalRouterPolicy{
+					Match:   cidr,
+					Nexthop: ptr.To(nextHop),
+				})
+			}
+		}
+
+		verifyNoLogicalRouterPolicies := func(ngr *submarinerv1.NonGatewayRoute, nextHop string) {
+			for _, cidr := range ngr.RoutePolicySpec.RemoteCIDRs {
+				ovsdbClient.AwaitNoModel(&nbdb.LogicalRouterPolicy{
+					Match:   cidr,
+					Nexthop: ptr.To(nextHop),
+				})
+			}
+		}
+
 		It("should correctly reconcile OVN router policies", func() {
 			client := t.dynClient.Resource(submarinerv1.SchemeGroupVersion.WithResource("nongatewayroutes")).Namespace(testing.Namespace)
 
-			nonGWRoute := &submarinerv1.NonGatewayRoute{
+			By("Creating first NonGatewayRoute")
+
+			nextHop := "172.1.1.1"
+
+			nonGWRoute1 := &submarinerv1.NonGatewayRoute{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-nongateway-route",
+					Name: "test-nongateway-route1",
 				},
 				RoutePolicySpec: submarinerv1.RoutePolicySpec{
-					NextHops:    []string{"111.1.1.1"},
-					RemoteCIDRs: []string{"192.0.1.0/24", "192.0.2.0/24"},
+					NextHops:    []string{nextHop},
+					RemoteCIDRs: []string{"111.0.1.0/24", "111.0.2.0/24"},
 				},
 			}
 
-			test.CreateResource(client, nonGWRoute)
+			test.CreateResource(client, nonGWRoute1)
 
-			for _, cidr := range nonGWRoute.RoutePolicySpec.RemoteCIDRs {
-				ovsdbClient.AwaitModel(&nbdb.LogicalRouterPolicy{
-					Match:   cidr,
-					Nexthop: ptr.To(nonGWRoute.RoutePolicySpec.NextHops[0]),
-				})
+			verifyLogicalRouterPolicies(nonGWRoute1, nextHop)
+
+			By("Creating second NonGatewayRoute")
+
+			nonGWRoute2 := &submarinerv1.NonGatewayRoute{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-nongateway-route2",
+				},
+				RoutePolicySpec: submarinerv1.RoutePolicySpec{
+					NextHops:    []string{nextHop},
+					RemoteCIDRs: []string{"222.0.1.0/24", "222.0.2.0/24"},
+				},
 			}
 
-			Expect(client.Delete(context.Background(), nonGWRoute.Name, metav1.DeleteOptions{})).To(Succeed())
+			test.CreateResource(client, nonGWRoute2)
 
-			for _, cidr := range nonGWRoute.RoutePolicySpec.RemoteCIDRs {
-				ovsdbClient.AwaitNoModel(&nbdb.LogicalRouterPolicy{
-					Match:   cidr,
-					Nexthop: ptr.To(nonGWRoute.RoutePolicySpec.NextHops[0]),
-				})
-			}
+			verifyLogicalRouterPolicies(nonGWRoute1, nextHop)
+			verifyLogicalRouterPolicies(nonGWRoute2, nextHop)
+
+			By("Updating NextHop for first NonGatewayRoute")
+
+			prevNextHop := nextHop
+			nextHop = "172.1.1.2"
+			nonGWRoute1.RoutePolicySpec.NextHops[0] = nextHop
+
+			test.UpdateResource(client, nonGWRoute1)
+
+			verifyLogicalRouterPolicies(nonGWRoute1, nextHop)
+			verifyNoLogicalRouterPolicies(nonGWRoute1, prevNextHop)
+			verifyNoLogicalRouterPolicies(nonGWRoute2, prevNextHop)
+
+			By("Updating NextHop for second NonGatewayRoute")
+
+			nonGWRoute2.RoutePolicySpec.NextHops[0] = nextHop
+
+			test.UpdateResource(client, nonGWRoute2)
+
+			verifyLogicalRouterPolicies(nonGWRoute1, nextHop)
+			verifyLogicalRouterPolicies(nonGWRoute2, nextHop)
+
+			By("Deleting first NonGatewayRoute")
+
+			Expect(client.Delete(context.Background(), nonGWRoute1.Name, metav1.DeleteOptions{})).To(Succeed())
+
+			verifyNoLogicalRouterPolicies(nonGWRoute1, nextHop)
 		})
 	})
 

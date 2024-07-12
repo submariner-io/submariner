@@ -126,21 +126,24 @@ func main() {
 		np = cni.Generic
 	}
 
+	transitSwitchIP := ovn.NewTransitSwitchIP()
+
 	config := &watcher.Config{RestConfig: cfg}
 
 	registry, err := event.NewRegistry("routeagent_driver", np,
 		kubeproxy.NewSyncHandler(env.ClusterCidr, env.ServiceCidr),
 		ovn.NewHandler(&ovn.HandlerConfig{
-			Namespace:     env.Namespace,
-			ClusterCIDR:   env.ClusterCidr,
-			ServiceCIDR:   env.ServiceCidr,
-			SubmClient:    smClientset,
-			K8sClient:     k8sClientSet,
-			DynClient:     dynamicClientSet,
-			WatcherConfig: config,
+			Namespace:       env.Namespace,
+			ClusterCIDR:     env.ClusterCidr,
+			ServiceCIDR:     env.ServiceCidr,
+			SubmClient:      smClientset,
+			K8sClient:       k8sClientSet,
+			DynClient:       dynamicClientSet,
+			WatcherConfig:   config,
+			TransitSwitchIP: transitSwitchIP,
 		}),
 		ovn.NewGatewayRouteHandler(smClientset),
-		ovn.NewNonGatewayRouteHandler(smClientset, k8sClientSet),
+		ovn.NewNonGatewayRouteHandler(smClientset, k8sClientSet, transitSwitchIP),
 		cabledriver.NewXRFMCleanupHandler(),
 		cabledriver.NewVXLANCleanup(),
 		mtu.NewMTUHandler(env.ClusterCidr, len(env.GlobalCidr) != 0, getTCPMssValue(k8sClientSet)),
