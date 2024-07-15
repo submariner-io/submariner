@@ -187,10 +187,3 @@ func RecordDisconnected(cableDriverName string, localEndpoint, remoteEndpoint *s
 	connectionsGauge.Delete(labels)
 	shortConnectionsGauge.Delete(shortLabels)
 }
-
-func RecordNoConnections() {
-	// TODO: assuming only 1 cable driver is active at a time, calling Reset() will work.
-	// once this is changed, there is a need to be updated accordingly
-	connectionsGauge.Reset()
-	shortConnectionsGauge.Reset()
-}
