@@ -214,7 +214,7 @@ func (d *DatastoreSyncer) ensureExclusiveEndpoint(ctx context.Context, syncer *b
 			continue
 		}
 
-		if existing.Spec.Equals(d.localEndpoint.Spec()) {
+		if existing.Spec.Equals(d.localEndpoint.Spec()) && existing.Spec.Backend != "wireguard" {
 			continue
 		}
 
