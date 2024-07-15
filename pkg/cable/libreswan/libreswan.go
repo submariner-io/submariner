@@ -157,7 +157,6 @@ func (i *libreswan) GetName() string {
 func (i *libreswan) Init() error {
 	// Write the secrets file:
 	// %any %any : PSK "secret"
-	// TODO Check whether the file already exists
 	file, err := os.Create("/etc/ipsec.d/submariner.secrets")
 	if err != nil {
 		return errors.Wrap(err, "error creating the secrets file")
