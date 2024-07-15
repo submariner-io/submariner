@@ -111,6 +111,9 @@ func (c *OVSDBClient) CurrentEndpoint() string {
 	return ""
 }
 
+func (c *OVSDBClient) UpdateEndpoints(_ []string) {
+}
+
 func (c *OVSDBClient) List(_ context.Context, _ interface{}) error {
 	return nil
 }
@@ -119,11 +122,20 @@ func (c *OVSDBClient) WhereCache(predicate interface{}) libovsdbclient.Condition
 	return &predicateConditionalAPI{client: c, predicate: predicate}
 }
 
-func (c *OVSDBClient) Where(m model.Model, _ ...model.Condition) libovsdbclient.ConditionalAPI {
-	return &modelConditionalAPI{client: c, model: m}
+func (c *OVSDBClient) Where(models ...model.Model) libovsdbclient.ConditionalAPI {
+	mca := &modelConditionalAPI{client: c}
+	for _, m := range models {
+		mca.models = append(mca.models, m)
+	}
+
+	return mca
 }
 
 func (c *OVSDBClient) WhereAll(_ model.Model, _ ...model.Condition) libovsdbclient.ConditionalAPI {
+	return &noopConditionalAPI{}
+}
+
+func (c *OVSDBClient) WhereAny(_ model.Model, _ ...model.Condition) libovsdbclient.ConditionalAPI {
 	return &noopConditionalAPI{}
 }
 
@@ -236,14 +248,16 @@ func (c *predicateConditionalAPI) List(_ context.Context, result interface{}) er
 type modelConditionalAPI struct {
 	noopConditionalAPI
 	client *OVSDBClient
-	model  any
+	models []any
 }
 
 func (c *modelConditionalAPI) Delete() ([]ovsdb.Operation, error) {
 	c.client.mutex.Lock()
 	defer c.client.mutex.Unlock()
 
-	c.client.models[reflect.TypeOf(c.model)], _ = slices.Remove(c.client.models[reflect.TypeOf(c.model)], c.model, resource.ToJSON)
+	for _, m := range c.models {
+		c.client.models[reflect.TypeOf(m)], _ = slices.Remove(c.client.models[reflect.TypeOf(m)], m, resource.ToJSON)
+	}
 
 	return []ovsdb.Operation{}, nil
 }
