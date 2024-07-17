@@ -15,7 +15,7 @@ require (
 	github.com/projectcalico/api v0.0.0-20230602153125-fb7148692637
 	github.com/prometheus-community/pro-bing v0.4.0
 	github.com/prometheus/client_golang v1.19.1
-	github.com/submariner-io/admiral v0.19.0-m0
+	github.com/submariner-io/admiral v0.19.0-m0.0.20240718120154-11bb4f8f51a2
 	github.com/submariner-io/shipyard v0.19.0-m0
 	github.com/vishvananda/netlink v1.2.1-beta.2
 	golang.org/x/net v0.27.0
@@ -27,7 +27,7 @@ require (
 	k8s.io/client-go v0.30.2
 	k8s.io/component-helpers v0.30.2
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
-	sigs.k8s.io/controller-runtime v0.18.3
+	sigs.k8s.io/controller-runtime v0.18.4
 	sigs.k8s.io/knftables v0.0.16
 	sigs.k8s.io/mcs-api v0.1.0
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1
