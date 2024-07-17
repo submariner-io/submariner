@@ -242,8 +242,6 @@ func (i *libreswan) refreshConnectionStatus() error {
 		return err
 	}
 
-	cable.RecordNoConnections()
-
 	localSubnets := extractSubnets(&i.localEndpoint.Spec)
 
 	for j := range i.connections {
