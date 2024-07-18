@@ -115,6 +115,11 @@ func NewLibreswan(localEndpoint *submendpoint.Local, _ *types.SubmarinerCluster)
 		return nil, errors.Wrapf(err, "error parsing %q from local endpoint", subv1.UDPPortConfig)
 	}
 
+	err = processPreferredServerConfig(localEndpoint)
+	if err != nil {
+		return nil, err
+	}
+
 	encodedPsk := ipSecSpec.PSK
 
 	if ipSecSpec.PSKSecret != "" {
