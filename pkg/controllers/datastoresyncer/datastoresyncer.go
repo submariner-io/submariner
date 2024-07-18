@@ -87,7 +87,7 @@ func (d *DatastoreSyncer) Start(ctx context.Context) error {
 		return errors.WithMessage(err, "error creating the local submariner Cluster")
 	}
 
-	if err := d.createOrUpdateLocalEndpoint(ctx, syncer.GetLocalFederator()); err != nil {
+	if err := d.createOrUpdateLocalEndpoint(ctx); err != nil {
 		return errors.WithMessage(err, "error creating the local submariner Endpoint")
 	}
 
@@ -275,10 +275,8 @@ func (d *DatastoreSyncer) createLocalCluster(ctx context.Context, federator fede
 	return federator.Distribute(ctx, cluster) //nolint:wrapcheck  // Let the caller wrap it
 }
 
-func (d *DatastoreSyncer) createOrUpdateLocalEndpoint(ctx context.Context, federator federate.Federator) error {
-	localEndpoint := d.localEndpoint.Resource()
+func (d *DatastoreSyncer) createOrUpdateLocalEndpoint(ctx context.Context) error {
+	logger.Infof("Creating local submariner Endpoint: %s", resource.ToJSON(d.localEndpoint.Resource()))
 
-	logger.Infof("Creating local submariner Endpoint: %s", resource.ToJSON(localEndpoint))
-
-	return federator.Distribute(ctx, localEndpoint) //nolint:wrapcheck  // Let the caller wrap it
+	return d.localEndpoint.Create(ctx) //nolint:wrapcheck  // Let the caller wrap it
 }
