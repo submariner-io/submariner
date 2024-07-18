@@ -91,7 +91,7 @@ func newPublicIPWatcherTestDriver() *publicIPWatcherTestDriver {
 	})
 
 	JustBeforeEach(func() {
-		test.CreateResource(t.endpointClient, t.localEndpoint.Resource())
+		Expect(t.localEndpoint.Create(context.TODO())).To(Succeed())
 
 		ipWatcher := endpoint.NewPublicIPWatcher(&endpoint.PublicIPWatcherConfig{
 			SubmSpec: &types.SubmarinerSpecification{
@@ -101,7 +101,7 @@ func newPublicIPWatcherTestDriver() *publicIPWatcherTestDriver {
 			},
 			Interval:      interval,
 			K8sClient:     t.k8sClient,
-			LocalEndpoint: endpoint.NewLocal(&t.localEPSpec, t.dynClient, testNamespace),
+			LocalEndpoint: t.localEndpoint,
 		})
 
 		ipWatcher.Run(t.stopCh)
