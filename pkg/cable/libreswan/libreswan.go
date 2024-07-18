@@ -37,6 +37,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
+	submendpoint "github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/types"
@@ -65,7 +66,7 @@ func init() {
 }
 
 type libreswan struct {
-	localEndpoint types.SubmarinerEndpoint
+	localEndpoint subv1.EndpointSpec
 	// This tracks the requested connections
 	connections []subv1.Connection
 
@@ -95,7 +96,7 @@ const (
 )
 
 // NewLibreswan starts an IKE daemon using Libreswan and configures it to manage Submariner's endpoints.
-func NewLibreswan(localEndpoint *types.SubmarinerEndpoint, _ *types.SubmarinerCluster) (cable.Driver, error) {
+func NewLibreswan(localEndpoint *submendpoint.Local, _ *types.SubmarinerCluster) (cable.Driver, error) {
 	// We'll panic if localEndpoint is nil, this is intentional
 	ipSecSpec := specification{}
 
@@ -109,7 +110,7 @@ func NewLibreswan(localEndpoint *types.SubmarinerEndpoint, _ *types.SubmarinerCl
 		return nil, errors.Wrap(err, "error parsing CR_IPSEC_NATTPORT environment variable")
 	}
 
-	nattPort, err := localEndpoint.Spec.GetBackendPort(subv1.UDPPortConfig, int32(defaultNATTPort))
+	nattPort, err := localEndpoint.Spec().GetBackendPort(subv1.UDPPortConfig, int32(defaultNATTPort))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error parsing %q from local endpoint", subv1.UDPPortConfig)
 	}
@@ -141,7 +142,7 @@ func NewLibreswan(localEndpoint *types.SubmarinerEndpoint, _ *types.SubmarinerCl
 		logFile:               ipSecSpec.LogFile,
 		ipSecNATTPort:         strconv.Itoa(int(nattPort)),
 		defaultNATTPort:       int32(defaultNATTPort),
-		localEndpoint:         *localEndpoint,
+		localEndpoint:         *localEndpoint.Spec(),
 		connections:           []subv1.Connection{},
 		forceUDPEncapsulation: ipSecSpec.ForceEncaps,
 		plutoStarted:          false,
@@ -242,7 +243,7 @@ func (i *libreswan) refreshConnectionStatus() error {
 		return err
 	}
 
-	localSubnets := extractSubnets(&i.localEndpoint.Spec)
+	localSubnets := extractSubnets(&i.localEndpoint)
 
 	for j := range i.connections {
 		isConnected := false
@@ -268,14 +269,14 @@ func (i *libreswan) refreshConnectionStatus() error {
 			}
 		}
 
-		cable.RecordConnection(cableDriverName, &i.localEndpoint.Spec, &i.connections[j].Endpoint, string(i.connections[j].Status), false)
-		cable.RecordRxBytes(cableDriverName, &i.localEndpoint.Spec, &i.connections[j].Endpoint, rx)
-		cable.RecordTxBytes(cableDriverName, &i.localEndpoint.Spec, &i.connections[j].Endpoint, tx)
+		cable.RecordConnection(cableDriverName, &i.localEndpoint, &i.connections[j].Endpoint, string(i.connections[j].Status), false)
+		cable.RecordRxBytes(cableDriverName, &i.localEndpoint, &i.connections[j].Endpoint, rx)
+		cable.RecordTxBytes(cableDriverName, &i.localEndpoint, &i.connections[j].Endpoint, tx)
 
 		if !isConnected {
 			// Pluto should be connecting for us
 			i.connections[j].Status = subv1.Connecting
-			cable.RecordConnection(cableDriverName, &i.localEndpoint.Spec, &i.connections[j].Endpoint, string(i.connections[j].Status), false)
+			cable.RecordConnection(cableDriverName, &i.localEndpoint, &i.connections[j].Endpoint, string(i.connections[j].Status), false)
 			logger.V(log.DEBUG).Infof("Connection %q not found in active connections obtained from whack: %v, %v",
 				i.connections[j].Endpoint.CableName, activeConnectionsRx, activeConnectionsTx)
 		}
@@ -368,7 +369,7 @@ func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 			endpoint.Spec.CableName, i.defaultNATTPort, err)
 	}
 
-	leftSubnets := extractSubnets(&i.localEndpoint.Spec)
+	leftSubnets := extractSubnets(&i.localEndpoint)
 	rightSubnets := extractSubnets(&endpoint.Spec)
 
 	// Ensure we’re listening
@@ -403,7 +404,7 @@ func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 
 	i.connections = append(i.connections,
 		subv1.Connection{Endpoint: endpoint.Spec, Status: subv1.Connected, UsingIP: endpointInfo.UseIP, UsingNAT: endpointInfo.UseNAT})
-	cable.RecordConnection(cableDriverName, &i.localEndpoint.Spec, &endpoint.Spec, string(subv1.Connected), true)
+	cable.RecordConnection(cableDriverName, &i.localEndpoint, &endpoint.Spec, string(subv1.Connected), true)
 
 	return endpointInfo.UseIP, nil
 }
@@ -412,7 +413,7 @@ func (i *libreswan) bidirectionalConnectToEndpoint(connectionName string, endpoi
 	leftSubnet, rightSubnet string, rightNATTPort int32,
 ) error {
 	// Identifiers are used for authentication, they’re always the private IPs
-	localEndpointIdentifier := i.localEndpoint.Spec.PrivateIP
+	localEndpointIdentifier := i.localEndpoint.PrivateIP
 	remoteEndpointIdentifier := endpointInfo.Endpoint.Spec.PrivateIP
 
 	args := []string{}
@@ -426,7 +427,7 @@ func (i *libreswan) bidirectionalConnectToEndpoint(connectionName string, endpoi
 
 		// Left-hand side
 		"--id", localEndpointIdentifier,
-		hostArg, i.localEndpoint.Spec.PrivateIP,
+		hostArg, i.localEndpoint.PrivateIP,
 		clientArg, leftSubnet,
 
 		ikeportArg, i.ipSecNATTPort,
@@ -462,7 +463,7 @@ func toEndpointIdentifier(ip string, lsi, rsi int) string {
 func (i *libreswan) serverConnectToEndpoint(connectionName string, endpointInfo *natdiscovery.NATEndpointInfo,
 	leftSubnet, rightSubnet string, lsi, rsi int,
 ) error {
-	localEndpointIdentifier := toEndpointIdentifier(i.localEndpoint.Spec.PrivateIP, lsi, rsi)
+	localEndpointIdentifier := toEndpointIdentifier(i.localEndpoint.PrivateIP, lsi, rsi)
 	remoteEndpointIdentifier := toEndpointIdentifier(endpointInfo.Endpoint.Spec.PrivateIP, rsi, lsi)
 
 	args := []string{}
@@ -476,7 +477,7 @@ func (i *libreswan) serverConnectToEndpoint(connectionName string, endpointInfo 
 
 		// Left-hand side.
 		"--id", localEndpointIdentifier,
-		hostArg, i.localEndpoint.Spec.PrivateIP,
+		hostArg, i.localEndpoint.PrivateIP,
 		clientArg, leftSubnet,
 
 		ikeportArg, i.ipSecNATTPort,
@@ -505,7 +506,7 @@ func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo 
 	leftSubnet, rightSubnet string, rightNATTPort int32, lsi, rsi int,
 ) error {
 	// Identifiers are used for authentication, they’re always the private IPs.
-	localEndpointIdentifier := toEndpointIdentifier(i.localEndpoint.Spec.PrivateIP, lsi, rsi)
+	localEndpointIdentifier := toEndpointIdentifier(i.localEndpoint.PrivateIP, lsi, rsi)
 	remoteEndpointIdentifier := toEndpointIdentifier(endpointInfo.Endpoint.Spec.PrivateIP, rsi, lsi)
 
 	args := []string{}
@@ -519,7 +520,7 @@ func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo 
 
 		// Left-hand side
 		"--id", localEndpointIdentifier,
-		hostArg, i.localEndpoint.Spec.PrivateIP,
+		hostArg, i.localEndpoint.PrivateIP,
 		clientArg, leftSubnet,
 
 		"--to",
@@ -549,7 +550,7 @@ func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo 
 // DisconnectFromEndpoint disconnects from the connection to the given endpoint.
 func (i *libreswan) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint) error {
 	// We'll panic if endpoint is nil, this is intentional
-	leftSubnets := extractSubnets(&i.localEndpoint.Spec)
+	leftSubnets := extractSubnets(&i.localEndpoint)
 	rightSubnets := extractSubnets(&endpoint.Spec)
 
 	logger.Infof("Deleting connection to %v", endpoint)
@@ -573,7 +574,7 @@ func (i *libreswan) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint) e
 	}
 
 	i.connections = removeConnectionForEndpoint(i.connections, endpoint)
-	cable.RecordDisconnected(cableDriverName, &i.localEndpoint.Spec, &endpoint.Spec)
+	cable.RecordDisconnected(cableDriverName, &i.localEndpoint, &endpoint.Spec)
 
 	return nil
 }

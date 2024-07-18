@@ -32,7 +32,7 @@ const (
 )
 
 func (i *libreswan) calculateOperationMode(remoteEndpoint *v1.EndpointSpec) operationMode {
-	leftPreferred, err := i.localEndpoint.Spec.GetBackendBool(v1.PreferredServerConfig, ptr.To(false))
+	leftPreferred, err := i.localEndpoint.GetBackendBool(v1.PreferredServerConfig, ptr.To(false))
 	if err != nil {
 		logger.Errorf(err, "Error parsing local endpoint config")
 	}
@@ -55,7 +55,7 @@ func (i *libreswan) calculateOperationMode(remoteEndpoint *v1.EndpointSpec) oper
 	}
 
 	// At this point both would like to be server, so we decide based on the cable name
-	if i.localEndpoint.Spec.CableName > remoteEndpoint.CableName {
+	if i.localEndpoint.CableName > remoteEndpoint.CableName {
 		return operationModeServer
 	}
 

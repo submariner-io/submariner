@@ -30,11 +30,14 @@ import (
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/cable/vxlan"
 	"github.com/submariner-io/submariner/pkg/cni"
+	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	fakeNetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/vishvananda/netlink"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 func init() {
@@ -142,7 +145,7 @@ func routeFieldMap(src, gw, dst string) map[string]string {
 }
 
 type testDriver struct {
-	localEndpoint *types.SubmarinerEndpoint
+	localEndpoint subv1.EndpointSpec
 	localCluster  *types.SubmarinerCluster
 	netLink       *fakeNetlink.NetLink
 	driver        cable.Driver
@@ -160,12 +163,12 @@ func newTestDriver() *testDriver {
 			},
 		}
 
-		t.localEndpoint = &types.SubmarinerEndpoint{Spec: subv1.EndpointSpec{
+		t.localEndpoint = subv1.EndpointSpec{
 			ClusterID: t.localCluster.Spec.ClusterID,
 			CableName: "submariner-cable-local-192-68-1-1",
 			PrivateIP: "192.68.1.1",
 			Subnets:   append(t.localCluster.Spec.ServiceCIDR, t.localCluster.Spec.ClusterCIDR...),
-		}}
+		}
 
 		t.netLink = fakeNetlink.New()
 		netlinkAPI.NewFunc = func() netlinkAPI.Interface {
@@ -181,7 +184,8 @@ func newTestDriver() *testDriver {
 	})
 
 	JustBeforeEach(func() {
-		d, err := vxlan.NewDriver(t.localEndpoint, t.localCluster)
+		d, err := vxlan.NewDriver(endpoint.NewLocal(&t.localEndpoint, dynamicfake.NewSimpleDynamicClient(scheme.Scheme), ""),
+			t.localCluster)
 		Expect(err).To(Succeed())
 
 		Expect(d.Init()).To(Succeed())
