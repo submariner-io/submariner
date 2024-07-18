@@ -48,7 +48,7 @@ var fakeDriver *fake.Driver
 
 var _ = BeforeSuite(func() {
 	kzerolog.InitK8sLogging()
-	cable.AddDriver(fake.DriverName, func(_ *types.SubmarinerEndpoint, _ *types.SubmarinerCluster) (cable.Driver, error) {
+	cable.AddDriver(fake.DriverName, func(_ *submendpoint.Local, _ *types.SubmarinerCluster) (cable.Driver, error) {
 		return fakeDriver, nil
 	})
 })

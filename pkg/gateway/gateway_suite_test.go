@@ -29,6 +29,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/cable/fake"
 	"github.com/submariner-io/submariner/pkg/cableengine/syncer"
+	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 )
@@ -43,7 +44,7 @@ var _ = BeforeSuite(func() {
 	kzerolog.InitK8sLogging()
 	Expect(submarinerv1.AddToScheme(scheme.Scheme)).To(Succeed())
 
-	cable.AddDriver(fake.DriverName, func(_ *types.SubmarinerEndpoint, _ *types.SubmarinerCluster) (cable.Driver, error) {
+	cable.AddDriver(fake.DriverName, func(_ *endpoint.Local, _ *types.SubmarinerCluster) (cable.Driver, error) {
 		return fakeDriver, nil
 	})
 

@@ -30,6 +30,7 @@ import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/cni"
+	submendpoint "github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/types"
@@ -46,7 +47,7 @@ const (
 )
 
 type vxLan struct {
-	localEndpoint types.SubmarinerEndpoint
+	localEndpoint v1.EndpointSpec
 	localCluster  types.SubmarinerCluster
 	connections   []v1.Connection
 	mutex         sync.Mutex
@@ -61,21 +62,21 @@ func init() {
 	cable.AddDriver(CableDriverName, NewDriver)
 }
 
-func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.SubmarinerCluster) (cable.Driver, error) {
+func NewDriver(localEndpoint *submendpoint.Local, localCluster *types.SubmarinerCluster) (cable.Driver, error) {
 	// We'll panic if localEndpoint or localCluster are nil, this is intentional
 	var err error
 
 	v := vxLan{
-		localEndpoint: *localEndpoint,
+		localEndpoint: *localEndpoint.Spec(),
 		netLink:       netlinkAPI.New(),
 		localCluster:  *localCluster,
 	}
 
-	if strings.EqualFold(localEndpoint.Spec.CableName, CableDriverName) && localEndpoint.Spec.NATEnabled {
+	if strings.EqualFold(v.localEndpoint.CableName, CableDriverName) && v.localEndpoint.NATEnabled {
 		logger.Warning("VxLan cable-driver is supported only with no NAT deployments")
 	}
 
-	port, err := localEndpoint.Spec.GetBackendPort(v1.UDPPortConfig, DefaultPort)
+	port, err := v.localEndpoint.GetBackendPort(v1.UDPPortConfig, DefaultPort)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get the UDP port configuration")
 	}
@@ -88,7 +89,7 @@ func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.Subm
 }
 
 func (v *vxLan) createVxlanInterface(port int) error {
-	ipAddr := v.localEndpoint.Spec.PrivateIP
+	ipAddr := v.localEndpoint.PrivateIP
 
 	var err error
 
@@ -100,7 +101,7 @@ func (v *vxLan) createVxlanInterface(port int) error {
 	defaultHostIface, err := netlinkAPI.GetDefaultGatewayInterface()
 	if err != nil {
 		return errors.Wrapf(err, "Unable to find the default interface on host: %s",
-			v.localEndpoint.Spec.Hostname)
+			v.localEndpoint.Hostname)
 	}
 
 	attrs := &vxlan.Attributes{
@@ -145,7 +146,7 @@ func (v *vxLan) createVxlanInterface(port int) error {
 func (v *vxLan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
 	// We'll panic if endpointInfo is nil, this is intentional
 	remoteEndpoint := endpointInfo.Endpoint
-	if v.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
+	if v.localEndpoint.ClusterID == remoteEndpoint.Spec.ClusterID {
 		logger.V(log.DEBUG).Infof("Will not connect to self")
 		return "", nil
 	}
@@ -162,7 +163,7 @@ func (v *vxLan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 	v.mutex.Lock()
 	defer v.mutex.Unlock()
 
-	cable.RecordConnection(CableDriverName, &v.localEndpoint.Spec, &remoteEndpoint.Spec, string(v1.Connected), true)
+	cable.RecordConnection(CableDriverName, &v.localEndpoint, &remoteEndpoint.Spec, string(v1.Connected), true)
 
 	privateIP := endpointInfo.Endpoint.Spec.PrivateIP
 
@@ -206,7 +207,7 @@ func (v *vxLan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint)
 	// We'll panic if remoteEndpoint is nil, this is intentional
 	logger.V(log.DEBUG).Infof("Removing endpoint %#v", remoteEndpoint)
 
-	if v.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
+	if v.localEndpoint.ClusterID == remoteEndpoint.Spec.ClusterID {
 		logger.V(log.DEBUG).Infof("Will not disconnect self")
 		return nil
 	}
@@ -246,7 +247,7 @@ func (v *vxLan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint)
 	}
 
 	v.connections = removeConnectionForEndpoint(v.connections, remoteEndpoint)
-	cable.RecordDisconnected(CableDriverName, &v.localEndpoint.Spec, &remoteEndpoint.Spec)
+	cable.RecordDisconnected(CableDriverName, &v.localEndpoint, &remoteEndpoint.Spec)
 
 	logger.V(log.DEBUG).Infof("Done removing endpoint for cluster %s", remoteEndpoint.Spec.ClusterID)
 
