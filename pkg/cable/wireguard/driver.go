@@ -95,7 +95,7 @@ func NewDriver(localEndpoint *endpoint.Local, _ *types.SubmarinerCluster) (cable
 		spec:        new(specification),
 	}
 
-	if err := envconfig.Process(specEnvPrefix, w.spec); err != nil {
+	if err = envconfig.Process(specEnvPrefix, w.spec); err != nil {
 		return nil, errors.Wrap(err, "error processing environment config for wireguard")
 	}
 
@@ -135,18 +135,7 @@ func NewDriver(localEndpoint *endpoint.Local, _ *types.SubmarinerCluster) (cable
 		return nil, errors.Wrap(err, "error generating private key")
 	}
 
-	pub = priv.PublicKey()
-
-	err = localEndpoint.Update(context.TODO(), func(existing *v1.EndpointSpec) {
-		existing.BackendConfig[PublicKey] = pub.String()
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "error updating local endpoint")
-	}
-
-	w.localEndpoint = *localEndpoint.Spec()
-
-	port, err := w.localEndpoint.GetBackendPort(v1.UDPPortConfig, int32(w.spec.NATTPort))
+	port, err := localEndpoint.Spec().GetBackendPort(v1.UDPPortConfig, int32(w.spec.NATTPort))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error parsing %q from local endpoint", v1.UDPPortConfig)
 	}
@@ -164,6 +153,18 @@ func NewDriver(localEndpoint *endpoint.Local, _ *types.SubmarinerCluster) (cable
 	if err = w.client.ConfigureDevice(DefaultDeviceName, cfg); err != nil {
 		return nil, errors.Wrap(err, "failed to configure WireGuard device")
 	}
+
+	pub = priv.PublicKey()
+
+	err = localEndpoint.Update(context.TODO(), func(existing *v1.EndpointSpec) {
+		existing.BackendConfig[PublicKey] = pub.String()
+		existing.BackendConfig[cable.InterfaceNameConfig] = DefaultDeviceName
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "error updating local endpoint")
+	}
+
+	w.localEndpoint = *localEndpoint.Spec()
 
 	logger.V(log.DEBUG).Infof("Created WireGuard %s with publicKey %s", DefaultDeviceName, pub)
 
