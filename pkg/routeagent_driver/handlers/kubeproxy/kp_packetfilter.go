@@ -38,9 +38,9 @@ import (
 type SyncHandler struct {
 	event.HandlerBase
 	event.NodeHandlerBase
-	localCableDriver string
-	localClusterCidr []string
-	localServiceCidr []string
+	localEndpointIfaceName string
+	localClusterCidr       []string
+	localServiceCidr       []string
 
 	remoteSubnets          set.Set[string]
 	remoteSubnetGw         map[string]net.IP
@@ -65,7 +65,6 @@ func NewSyncHandler(localClusterCidr, localServiceCidr []string) *SyncHandler {
 	return &SyncHandler{
 		localClusterCidr: cidr.ExtractIPv4Subnets(localClusterCidr),
 		localServiceCidr: cidr.ExtractIPv4Subnets(localServiceCidr),
-		localCableDriver: "",
 		remoteSubnets:    set.New[string](),
 		remoteSubnetGw:   map[string]net.IP{},
 		remoteVTEPs:      set.New[string](),

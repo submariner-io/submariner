@@ -25,7 +25,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/submariner/pkg/cable/wireguard"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
@@ -114,12 +113,12 @@ func (kp *SyncHandler) configureRoute(remoteSubnet string, operation Operation, 
 	}
 
 	ifaceIndex := kp.defaultHostIface.Index
-	// TODO: Add support for this in the CableDrivers themselves.
-	if kp.localCableDriver == "wireguard" {
-		if wg, err := net.InterfaceByName(wireguard.DefaultDeviceName); err == nil {
-			ifaceIndex = wg.Index
+
+	if kp.localEndpointIfaceName != "" {
+		if iface, err := net.InterfaceByName(kp.localEndpointIfaceName); err == nil {
+			ifaceIndex = iface.Index
 		} else {
-			logger.Errorf(nil, "Wireguard interface %s not found on the node.", wireguard.DefaultDeviceName)
+			logger.Errorf(err, "Error getting local endpoint interface %q", kp.localEndpointIfaceName)
 		}
 	}
 
