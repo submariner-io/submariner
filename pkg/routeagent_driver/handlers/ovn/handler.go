@@ -28,7 +28,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/cable/wireguard"
+	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/cidr"
 	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/cni"
@@ -139,11 +139,11 @@ func (ovn *Handler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 	var routingInterface *net.Interface
 	var err error
 
-	// TODO: this logic belongs to the cabledrivers instead
-	if endpoint.Spec.Backend == "wireguard" {
+	interfaceName := endpoint.Spec.BackendConfig[cable.InterfaceNameConfig]
+	if interfaceName != "" {
 		// NOTE: This assumes that LocalEndpointCreated happens before than TransitionToGatewayNode
-		if routingInterface, err = net.InterfaceByName(wireguard.DefaultDeviceName); err != nil {
-			return errors.Wrapf(err, "Wireguard interface %s not found on the node", wireguard.DefaultDeviceName)
+		if routingInterface, err = net.InterfaceByName(interfaceName); err != nil {
+			return errors.Wrapf(err, "error getting local endpoint interface %q", interfaceName)
 		}
 	} else {
 		if routingInterface, err = netlink.GetDefaultGatewayInterface(); err != nil {
