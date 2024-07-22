@@ -24,7 +24,7 @@ import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 )
 
-// RemoteEndpointApplyConfiguration represents an declarative configuration of the RemoteEndpoint type for use
+// RemoteEndpointApplyConfiguration represents a declarative configuration of the RemoteEndpoint type for use
 // with apply.
 type RemoteEndpointApplyConfiguration struct {
 	Status        *v1.ConnectionStatus              `json:"status,omitempty"`
@@ -33,7 +33,7 @@ type RemoteEndpointApplyConfiguration struct {
 	LatencyRTT    *LatencyRTTSpecApplyConfiguration `json:"latencyRTT,omitempty"`
 }
 
-// RemoteEndpointApplyConfiguration constructs an declarative configuration of the RemoteEndpoint type for use with
+// RemoteEndpointApplyConfiguration constructs a declarative configuration of the RemoteEndpoint type for use with
 // apply.
 func RemoteEndpoint() *RemoteEndpointApplyConfiguration {
 	return &RemoteEndpointApplyConfiguration{}

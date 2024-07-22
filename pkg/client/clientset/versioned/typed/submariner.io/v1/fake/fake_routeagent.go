@@ -46,22 +46,24 @@ var routeagentsKind = v1.SchemeGroupVersion.WithKind("RouteAgent")
 
 // Get takes name of the routeAgent, and returns the corresponding routeAgent object, and an error if there is any.
 func (c *FakeRouteAgents) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.RouteAgent, err error) {
+	emptyResult := &v1.RouteAgent{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(routeagentsResource, c.ns, name), &v1.RouteAgent{})
+		Invokes(testing.NewGetActionWithOptions(routeagentsResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.RouteAgent), err
 }
 
 // List takes label and field selectors, and returns the list of RouteAgents that match those selectors.
 func (c *FakeRouteAgents) List(ctx context.Context, opts metav1.ListOptions) (result *v1.RouteAgentList, err error) {
+	emptyResult := &v1.RouteAgentList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(routeagentsResource, routeagentsKind, c.ns, opts), &v1.RouteAgentList{})
+		Invokes(testing.NewListActionWithOptions(routeagentsResource, routeagentsKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -80,28 +82,30 @@ func (c *FakeRouteAgents) List(ctx context.Context, opts metav1.ListOptions) (re
 // Watch returns a watch.Interface that watches the requested routeAgents.
 func (c *FakeRouteAgents) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(routeagentsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(routeagentsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a routeAgent and creates it.  Returns the server's representation of the routeAgent, and an error, if there is any.
 func (c *FakeRouteAgents) Create(ctx context.Context, routeAgent *v1.RouteAgent, opts metav1.CreateOptions) (result *v1.RouteAgent, err error) {
+	emptyResult := &v1.RouteAgent{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(routeagentsResource, c.ns, routeAgent), &v1.RouteAgent{})
+		Invokes(testing.NewCreateActionWithOptions(routeagentsResource, c.ns, routeAgent, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.RouteAgent), err
 }
 
 // Update takes the representation of a routeAgent and updates it. Returns the server's representation of the routeAgent, and an error, if there is any.
 func (c *FakeRouteAgents) Update(ctx context.Context, routeAgent *v1.RouteAgent, opts metav1.UpdateOptions) (result *v1.RouteAgent, err error) {
+	emptyResult := &v1.RouteAgent{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(routeagentsResource, c.ns, routeAgent), &v1.RouteAgent{})
+		Invokes(testing.NewUpdateActionWithOptions(routeagentsResource, c.ns, routeAgent, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.RouteAgent), err
 }
@@ -116,7 +120,7 @@ func (c *FakeRouteAgents) Delete(ctx context.Context, name string, opts metav1.D
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeRouteAgents) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(routeagentsResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(routeagentsResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.RouteAgentList{})
 	return err
@@ -124,11 +128,12 @@ func (c *FakeRouteAgents) DeleteCollection(ctx context.Context, opts metav1.Dele
 
 // Patch applies the patch and returns the patched routeAgent.
 func (c *FakeRouteAgents) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.RouteAgent, err error) {
+	emptyResult := &v1.RouteAgent{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(routeagentsResource, c.ns, name, pt, data, subresources...), &v1.RouteAgent{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(routeagentsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.RouteAgent), err
 }
@@ -146,11 +151,12 @@ func (c *FakeRouteAgents) Apply(ctx context.Context, routeAgent *submarineriov1.
 	if name == nil {
 		return nil, fmt.Errorf("routeAgent.Name must be provided to Apply")
 	}
+	emptyResult := &v1.RouteAgent{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(routeagentsResource, c.ns, *name, types.ApplyPatchType, data), &v1.RouteAgent{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(routeagentsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.RouteAgent), err
 }

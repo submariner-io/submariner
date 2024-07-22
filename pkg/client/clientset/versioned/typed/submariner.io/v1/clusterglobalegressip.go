@@ -22,9 +22,6 @@ package v1
 
 import (
 	"context"
-	json "encoding/json"
-	"fmt"
-	"time"
 
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
@@ -32,7 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	rest "k8s.io/client-go/rest"
+	gentype "k8s.io/client-go/gentype"
 )
 
 // ClusterGlobalEgressIPsGetter has a method to return a ClusterGlobalEgressIPInterface.
@@ -45,6 +42,7 @@ type ClusterGlobalEgressIPsGetter interface {
 type ClusterGlobalEgressIPInterface interface {
 	Create(ctx context.Context, clusterGlobalEgressIP *v1.ClusterGlobalEgressIP, opts metav1.CreateOptions) (*v1.ClusterGlobalEgressIP, error)
 	Update(ctx context.Context, clusterGlobalEgressIP *v1.ClusterGlobalEgressIP, opts metav1.UpdateOptions) (*v1.ClusterGlobalEgressIP, error)
+	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 	UpdateStatus(ctx context.Context, clusterGlobalEgressIP *v1.ClusterGlobalEgressIP, opts metav1.UpdateOptions) (*v1.ClusterGlobalEgressIP, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -53,206 +51,25 @@ type ClusterGlobalEgressIPInterface interface {
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterGlobalEgressIP, err error)
 	Apply(ctx context.Context, clusterGlobalEgressIP *submarineriov1.ClusterGlobalEgressIPApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterGlobalEgressIP, err error)
+	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
 	ApplyStatus(ctx context.Context, clusterGlobalEgressIP *submarineriov1.ClusterGlobalEgressIPApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterGlobalEgressIP, err error)
 	ClusterGlobalEgressIPExpansion
 }
 
 // clusterGlobalEgressIPs implements ClusterGlobalEgressIPInterface
 type clusterGlobalEgressIPs struct {
-	client rest.Interface
-	ns     string
+	*gentype.ClientWithListAndApply[*v1.ClusterGlobalEgressIP, *v1.ClusterGlobalEgressIPList, *submarineriov1.ClusterGlobalEgressIPApplyConfiguration]
 }
 
 // newClusterGlobalEgressIPs returns a ClusterGlobalEgressIPs
 func newClusterGlobalEgressIPs(c *SubmarinerV1Client, namespace string) *clusterGlobalEgressIPs {
 	return &clusterGlobalEgressIPs{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClientWithListAndApply[*v1.ClusterGlobalEgressIP, *v1.ClusterGlobalEgressIPList, *submarineriov1.ClusterGlobalEgressIPApplyConfiguration](
+			"clusterglobalegressips",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *v1.ClusterGlobalEgressIP { return &v1.ClusterGlobalEgressIP{} },
+			func() *v1.ClusterGlobalEgressIPList { return &v1.ClusterGlobalEgressIPList{} }),
 	}
-}
-
-// Get takes name of the clusterGlobalEgressIP, and returns the corresponding clusterGlobalEgressIP object, and an error if there is any.
-func (c *clusterGlobalEgressIPs) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ClusterGlobalEgressIP, err error) {
-	result = &v1.ClusterGlobalEgressIP{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("clusterglobalegressips").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of ClusterGlobalEgressIPs that match those selectors.
-func (c *clusterGlobalEgressIPs) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterGlobalEgressIPList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1.ClusterGlobalEgressIPList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("clusterglobalegressips").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested clusterGlobalEgressIPs.
-func (c *clusterGlobalEgressIPs) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("clusterglobalegressips").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a clusterGlobalEgressIP and creates it.  Returns the server's representation of the clusterGlobalEgressIP, and an error, if there is any.
-func (c *clusterGlobalEgressIPs) Create(ctx context.Context, clusterGlobalEgressIP *v1.ClusterGlobalEgressIP, opts metav1.CreateOptions) (result *v1.ClusterGlobalEgressIP, err error) {
-	result = &v1.ClusterGlobalEgressIP{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("clusterglobalegressips").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(clusterGlobalEgressIP).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a clusterGlobalEgressIP and updates it. Returns the server's representation of the clusterGlobalEgressIP, and an error, if there is any.
-func (c *clusterGlobalEgressIPs) Update(ctx context.Context, clusterGlobalEgressIP *v1.ClusterGlobalEgressIP, opts metav1.UpdateOptions) (result *v1.ClusterGlobalEgressIP, err error) {
-	result = &v1.ClusterGlobalEgressIP{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("clusterglobalegressips").
-		Name(clusterGlobalEgressIP.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(clusterGlobalEgressIP).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *clusterGlobalEgressIPs) UpdateStatus(ctx context.Context, clusterGlobalEgressIP *v1.ClusterGlobalEgressIP, opts metav1.UpdateOptions) (result *v1.ClusterGlobalEgressIP, err error) {
-	result = &v1.ClusterGlobalEgressIP{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("clusterglobalegressips").
-		Name(clusterGlobalEgressIP.Name).
-		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(clusterGlobalEgressIP).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the clusterGlobalEgressIP and deletes it. Returns an error if one occurs.
-func (c *clusterGlobalEgressIPs) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("clusterglobalegressips").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *clusterGlobalEgressIPs) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("clusterglobalegressips").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched clusterGlobalEgressIP.
-func (c *clusterGlobalEgressIPs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterGlobalEgressIP, err error) {
-	result = &v1.ClusterGlobalEgressIP{}
-	err = c.client.Patch(pt).
-		Namespace(c.ns).
-		Resource("clusterglobalegressips").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied clusterGlobalEgressIP.
-func (c *clusterGlobalEgressIPs) Apply(ctx context.Context, clusterGlobalEgressIP *submarineriov1.ClusterGlobalEgressIPApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterGlobalEgressIP, err error) {
-	if clusterGlobalEgressIP == nil {
-		return nil, fmt.Errorf("clusterGlobalEgressIP provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(clusterGlobalEgressIP)
-	if err != nil {
-		return nil, err
-	}
-	name := clusterGlobalEgressIP.Name
-	if name == nil {
-		return nil, fmt.Errorf("clusterGlobalEgressIP.Name must be provided to Apply")
-	}
-	result = &v1.ClusterGlobalEgressIP{}
-	err = c.client.Patch(types.ApplyPatchType).
-		Namespace(c.ns).
-		Resource("clusterglobalegressips").
-		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// ApplyStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *clusterGlobalEgressIPs) ApplyStatus(ctx context.Context, clusterGlobalEgressIP *submarineriov1.ClusterGlobalEgressIPApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterGlobalEgressIP, err error) {
-	if clusterGlobalEgressIP == nil {
-		return nil, fmt.Errorf("clusterGlobalEgressIP provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(clusterGlobalEgressIP)
-	if err != nil {
-		return nil, err
-	}
-
-	name := clusterGlobalEgressIP.Name
-	if name == nil {
-		return nil, fmt.Errorf("clusterGlobalEgressIP.Name must be provided to Apply")
-	}
-
-	result = &v1.ClusterGlobalEgressIP{}
-	err = c.client.Patch(types.ApplyPatchType).
-		Namespace(c.ns).
-		Resource("clusterglobalegressips").
-		Name(*name).
-		SubResource("status").
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }

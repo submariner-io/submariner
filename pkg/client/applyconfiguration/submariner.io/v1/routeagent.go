@@ -26,7 +26,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// RouteAgentApplyConfiguration represents an declarative configuration of the RouteAgent type for use
+// RouteAgentApplyConfiguration represents a declarative configuration of the RouteAgent type for use
 // with apply.
 type RouteAgentApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -34,7 +34,7 @@ type RouteAgentApplyConfiguration struct {
 	Status                           *RouteAgentStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// RouteAgent constructs an declarative configuration of the RouteAgent type for use with
+// RouteAgent constructs a declarative configuration of the RouteAgent type for use with
 // apply.
 func RouteAgent(name, namespace string) *RouteAgentApplyConfiguration {
 	b := &RouteAgentApplyConfiguration{}
@@ -209,4 +209,10 @@ func (b *RouteAgentApplyConfiguration) ensureObjectMetaApplyConfigurationExists(
 func (b *RouteAgentApplyConfiguration) WithStatus(value *RouteAgentStatusApplyConfiguration) *RouteAgentApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *RouteAgentApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

@@ -22,8 +22,8 @@ package v1
 
 import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -40,25 +40,17 @@ type RouteAgentLister interface {
 
 // routeAgentLister implements the RouteAgentLister interface.
 type routeAgentLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1.RouteAgent]
 }
 
 // NewRouteAgentLister returns a new RouteAgentLister.
 func NewRouteAgentLister(indexer cache.Indexer) RouteAgentLister {
-	return &routeAgentLister{indexer: indexer}
-}
-
-// List lists all RouteAgents in the indexer.
-func (s *routeAgentLister) List(selector labels.Selector) (ret []*v1.RouteAgent, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.RouteAgent))
-	})
-	return ret, err
+	return &routeAgentLister{listers.New[*v1.RouteAgent](indexer, v1.Resource("routeagent"))}
 }
 
 // RouteAgents returns an object that can list and get RouteAgents.
 func (s *routeAgentLister) RouteAgents(namespace string) RouteAgentNamespaceLister {
-	return routeAgentNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return routeAgentNamespaceLister{listers.NewNamespaced[*v1.RouteAgent](s.ResourceIndexer, namespace)}
 }
 
 // RouteAgentNamespaceLister helps list and get RouteAgents.
@@ -76,26 +68,5 @@ type RouteAgentNamespaceLister interface {
 // routeAgentNamespaceLister implements the RouteAgentNamespaceLister
 // interface.
 type routeAgentNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all RouteAgents in the indexer for a given namespace.
-func (s routeAgentNamespaceLister) List(selector labels.Selector) (ret []*v1.RouteAgent, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.RouteAgent))
-	})
-	return ret, err
-}
-
-// Get retrieves the RouteAgent from the indexer for a given namespace and name.
-func (s routeAgentNamespaceLister) Get(name string) (*v1.RouteAgent, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("routeagent"), name)
-	}
-	return obj.(*v1.RouteAgent), nil
+	listers.ResourceIndexer[*v1.RouteAgent]
 }

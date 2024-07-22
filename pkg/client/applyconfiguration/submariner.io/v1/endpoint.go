@@ -26,7 +26,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// EndpointApplyConfiguration represents an declarative configuration of the Endpoint type for use
+// EndpointApplyConfiguration represents a declarative configuration of the Endpoint type for use
 // with apply.
 type EndpointApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -34,7 +34,7 @@ type EndpointApplyConfiguration struct {
 	Spec                             *EndpointSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// Endpoint constructs an declarative configuration of the Endpoint type for use with
+// Endpoint constructs a declarative configuration of the Endpoint type for use with
 // apply.
 func Endpoint(name, namespace string) *EndpointApplyConfiguration {
 	b := &EndpointApplyConfiguration{}
@@ -209,4 +209,10 @@ func (b *EndpointApplyConfiguration) ensureObjectMetaApplyConfigurationExists() 
 func (b *EndpointApplyConfiguration) WithSpec(value *EndpointSpecApplyConfiguration) *EndpointApplyConfiguration {
 	b.Spec = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *EndpointApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

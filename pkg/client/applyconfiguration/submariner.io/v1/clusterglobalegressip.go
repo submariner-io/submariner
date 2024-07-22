@@ -26,7 +26,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ClusterGlobalEgressIPApplyConfiguration represents an declarative configuration of the ClusterGlobalEgressIP type for use
+// ClusterGlobalEgressIPApplyConfiguration represents a declarative configuration of the ClusterGlobalEgressIP type for use
 // with apply.
 type ClusterGlobalEgressIPApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -35,7 +35,7 @@ type ClusterGlobalEgressIPApplyConfiguration struct {
 	Status                           *GlobalEgressIPStatusApplyConfiguration      `json:"status,omitempty"`
 }
 
-// ClusterGlobalEgressIP constructs an declarative configuration of the ClusterGlobalEgressIP type for use with
+// ClusterGlobalEgressIP constructs a declarative configuration of the ClusterGlobalEgressIP type for use with
 // apply.
 func ClusterGlobalEgressIP(name, namespace string) *ClusterGlobalEgressIPApplyConfiguration {
 	b := &ClusterGlobalEgressIPApplyConfiguration{}
@@ -218,4 +218,10 @@ func (b *ClusterGlobalEgressIPApplyConfiguration) WithSpec(value *ClusterGlobalE
 func (b *ClusterGlobalEgressIPApplyConfiguration) WithStatus(value *GlobalEgressIPStatusApplyConfiguration) *ClusterGlobalEgressIPApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ClusterGlobalEgressIPApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

@@ -20,13 +20,13 @@ limitations under the License.
 
 package v1
 
-// ClusterGlobalEgressIPSpecApplyConfiguration represents an declarative configuration of the ClusterGlobalEgressIPSpec type for use
+// ClusterGlobalEgressIPSpecApplyConfiguration represents a declarative configuration of the ClusterGlobalEgressIPSpec type for use
 // with apply.
 type ClusterGlobalEgressIPSpecApplyConfiguration struct {
 	NumberOfIPs *int `json:"numGlobalIPs,omitempty"`
 }
 
-// ClusterGlobalEgressIPSpecApplyConfiguration constructs an declarative configuration of the ClusterGlobalEgressIPSpec type for use with
+// ClusterGlobalEgressIPSpecApplyConfiguration constructs a declarative configuration of the ClusterGlobalEgressIPSpec type for use with
 // apply.
 func ClusterGlobalEgressIPSpec() *ClusterGlobalEgressIPSpecApplyConfiguration {
 	return &ClusterGlobalEgressIPSpecApplyConfiguration{}

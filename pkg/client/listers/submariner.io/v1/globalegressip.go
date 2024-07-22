@@ -22,8 +22,8 @@ package v1
 
 import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -40,25 +40,17 @@ type GlobalEgressIPLister interface {
 
 // globalEgressIPLister implements the GlobalEgressIPLister interface.
 type globalEgressIPLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1.GlobalEgressIP]
 }
 
 // NewGlobalEgressIPLister returns a new GlobalEgressIPLister.
 func NewGlobalEgressIPLister(indexer cache.Indexer) GlobalEgressIPLister {
-	return &globalEgressIPLister{indexer: indexer}
-}
-
-// List lists all GlobalEgressIPs in the indexer.
-func (s *globalEgressIPLister) List(selector labels.Selector) (ret []*v1.GlobalEgressIP, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.GlobalEgressIP))
-	})
-	return ret, err
+	return &globalEgressIPLister{listers.New[*v1.GlobalEgressIP](indexer, v1.Resource("globalegressip"))}
 }
 
 // GlobalEgressIPs returns an object that can list and get GlobalEgressIPs.
 func (s *globalEgressIPLister) GlobalEgressIPs(namespace string) GlobalEgressIPNamespaceLister {
-	return globalEgressIPNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return globalEgressIPNamespaceLister{listers.NewNamespaced[*v1.GlobalEgressIP](s.ResourceIndexer, namespace)}
 }
 
 // GlobalEgressIPNamespaceLister helps list and get GlobalEgressIPs.
@@ -76,26 +68,5 @@ type GlobalEgressIPNamespaceLister interface {
 // globalEgressIPNamespaceLister implements the GlobalEgressIPNamespaceLister
 // interface.
 type globalEgressIPNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all GlobalEgressIPs in the indexer for a given namespace.
-func (s globalEgressIPNamespaceLister) List(selector labels.Selector) (ret []*v1.GlobalEgressIP, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.GlobalEgressIP))
-	})
-	return ret, err
-}
-
-// Get retrieves the GlobalEgressIP from the indexer for a given namespace and name.
-func (s globalEgressIPNamespaceLister) Get(name string) (*v1.GlobalEgressIP, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("globalegressip"), name)
-	}
-	return obj.(*v1.GlobalEgressIP), nil
+	listers.ResourceIndexer[*v1.GlobalEgressIP]
 }

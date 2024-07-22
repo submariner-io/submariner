@@ -20,7 +20,7 @@ limitations under the License.
 
 package v1
 
-// EndpointSpecApplyConfiguration represents an declarative configuration of the EndpointSpec type for use
+// EndpointSpecApplyConfiguration represents a declarative configuration of the EndpointSpec type for use
 // with apply.
 type EndpointSpecApplyConfiguration struct {
 	ClusterID     *string           `json:"cluster_id,omitempty"`
@@ -35,7 +35,7 @@ type EndpointSpecApplyConfiguration struct {
 	BackendConfig map[string]string `json:"backend_config,omitempty"`
 }
 
-// EndpointSpecApplyConfiguration constructs an declarative configuration of the EndpointSpec type for use with
+// EndpointSpecApplyConfiguration constructs a declarative configuration of the EndpointSpec type for use with
 // apply.
 func EndpointSpec() *EndpointSpecApplyConfiguration {
 	return &EndpointSpecApplyConfiguration{}

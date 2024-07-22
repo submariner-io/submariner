@@ -22,8 +22,8 @@ package v1
 
 import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -40,25 +40,17 @@ type NonGatewayRouteLister interface {
 
 // nonGatewayRouteLister implements the NonGatewayRouteLister interface.
 type nonGatewayRouteLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1.NonGatewayRoute]
 }
 
 // NewNonGatewayRouteLister returns a new NonGatewayRouteLister.
 func NewNonGatewayRouteLister(indexer cache.Indexer) NonGatewayRouteLister {
-	return &nonGatewayRouteLister{indexer: indexer}
-}
-
-// List lists all NonGatewayRoutes in the indexer.
-func (s *nonGatewayRouteLister) List(selector labels.Selector) (ret []*v1.NonGatewayRoute, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.NonGatewayRoute))
-	})
-	return ret, err
+	return &nonGatewayRouteLister{listers.New[*v1.NonGatewayRoute](indexer, v1.Resource("nongatewayroute"))}
 }
 
 // NonGatewayRoutes returns an object that can list and get NonGatewayRoutes.
 func (s *nonGatewayRouteLister) NonGatewayRoutes(namespace string) NonGatewayRouteNamespaceLister {
-	return nonGatewayRouteNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return nonGatewayRouteNamespaceLister{listers.NewNamespaced[*v1.NonGatewayRoute](s.ResourceIndexer, namespace)}
 }
 
 // NonGatewayRouteNamespaceLister helps list and get NonGatewayRoutes.
@@ -76,26 +68,5 @@ type NonGatewayRouteNamespaceLister interface {
 // nonGatewayRouteNamespaceLister implements the NonGatewayRouteNamespaceLister
 // interface.
 type nonGatewayRouteNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all NonGatewayRoutes in the indexer for a given namespace.
-func (s nonGatewayRouteNamespaceLister) List(selector labels.Selector) (ret []*v1.NonGatewayRoute, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.NonGatewayRoute))
-	})
-	return ret, err
-}
-
-// Get retrieves the NonGatewayRoute from the indexer for a given namespace and name.
-func (s nonGatewayRouteNamespaceLister) Get(name string) (*v1.NonGatewayRoute, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("nongatewayroute"), name)
-	}
-	return obj.(*v1.NonGatewayRoute), nil
+	listers.ResourceIndexer[*v1.NonGatewayRoute]
 }

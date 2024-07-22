@@ -22,8 +22,8 @@ package v1
 
 import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -40,25 +40,17 @@ type GatewayRouteLister interface {
 
 // gatewayRouteLister implements the GatewayRouteLister interface.
 type gatewayRouteLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1.GatewayRoute]
 }
 
 // NewGatewayRouteLister returns a new GatewayRouteLister.
 func NewGatewayRouteLister(indexer cache.Indexer) GatewayRouteLister {
-	return &gatewayRouteLister{indexer: indexer}
-}
-
-// List lists all GatewayRoutes in the indexer.
-func (s *gatewayRouteLister) List(selector labels.Selector) (ret []*v1.GatewayRoute, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.GatewayRoute))
-	})
-	return ret, err
+	return &gatewayRouteLister{listers.New[*v1.GatewayRoute](indexer, v1.Resource("gatewayroute"))}
 }
 
 // GatewayRoutes returns an object that can list and get GatewayRoutes.
 func (s *gatewayRouteLister) GatewayRoutes(namespace string) GatewayRouteNamespaceLister {
-	return gatewayRouteNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return gatewayRouteNamespaceLister{listers.NewNamespaced[*v1.GatewayRoute](s.ResourceIndexer, namespace)}
 }
 
 // GatewayRouteNamespaceLister helps list and get GatewayRoutes.
@@ -76,26 +68,5 @@ type GatewayRouteNamespaceLister interface {
 // gatewayRouteNamespaceLister implements the GatewayRouteNamespaceLister
 // interface.
 type gatewayRouteNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all GatewayRoutes in the indexer for a given namespace.
-func (s gatewayRouteNamespaceLister) List(selector labels.Selector) (ret []*v1.GatewayRoute, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.GatewayRoute))
-	})
-	return ret, err
-}
-
-// Get retrieves the GatewayRoute from the indexer for a given namespace and name.
-func (s gatewayRouteNamespaceLister) Get(name string) (*v1.GatewayRoute, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("gatewayroute"), name)
-	}
-	return obj.(*v1.GatewayRoute), nil
+	listers.ResourceIndexer[*v1.GatewayRoute]
 }

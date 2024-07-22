@@ -46,22 +46,24 @@ var globalegressipsKind = v1.SchemeGroupVersion.WithKind("GlobalEgressIP")
 
 // Get takes name of the globalEgressIP, and returns the corresponding globalEgressIP object, and an error if there is any.
 func (c *FakeGlobalEgressIPs) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.GlobalEgressIP, err error) {
+	emptyResult := &v1.GlobalEgressIP{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(globalegressipsResource, c.ns, name), &v1.GlobalEgressIP{})
+		Invokes(testing.NewGetActionWithOptions(globalegressipsResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.GlobalEgressIP), err
 }
 
 // List takes label and field selectors, and returns the list of GlobalEgressIPs that match those selectors.
 func (c *FakeGlobalEgressIPs) List(ctx context.Context, opts metav1.ListOptions) (result *v1.GlobalEgressIPList, err error) {
+	emptyResult := &v1.GlobalEgressIPList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(globalegressipsResource, globalegressipsKind, c.ns, opts), &v1.GlobalEgressIPList{})
+		Invokes(testing.NewListActionWithOptions(globalegressipsResource, globalegressipsKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -80,40 +82,43 @@ func (c *FakeGlobalEgressIPs) List(ctx context.Context, opts metav1.ListOptions)
 // Watch returns a watch.Interface that watches the requested globalEgressIPs.
 func (c *FakeGlobalEgressIPs) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(globalegressipsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(globalegressipsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a globalEgressIP and creates it.  Returns the server's representation of the globalEgressIP, and an error, if there is any.
 func (c *FakeGlobalEgressIPs) Create(ctx context.Context, globalEgressIP *v1.GlobalEgressIP, opts metav1.CreateOptions) (result *v1.GlobalEgressIP, err error) {
+	emptyResult := &v1.GlobalEgressIP{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(globalegressipsResource, c.ns, globalEgressIP), &v1.GlobalEgressIP{})
+		Invokes(testing.NewCreateActionWithOptions(globalegressipsResource, c.ns, globalEgressIP, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.GlobalEgressIP), err
 }
 
 // Update takes the representation of a globalEgressIP and updates it. Returns the server's representation of the globalEgressIP, and an error, if there is any.
 func (c *FakeGlobalEgressIPs) Update(ctx context.Context, globalEgressIP *v1.GlobalEgressIP, opts metav1.UpdateOptions) (result *v1.GlobalEgressIP, err error) {
+	emptyResult := &v1.GlobalEgressIP{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(globalegressipsResource, c.ns, globalEgressIP), &v1.GlobalEgressIP{})
+		Invokes(testing.NewUpdateActionWithOptions(globalegressipsResource, c.ns, globalEgressIP, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.GlobalEgressIP), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeGlobalEgressIPs) UpdateStatus(ctx context.Context, globalEgressIP *v1.GlobalEgressIP, opts metav1.UpdateOptions) (*v1.GlobalEgressIP, error) {
+func (c *FakeGlobalEgressIPs) UpdateStatus(ctx context.Context, globalEgressIP *v1.GlobalEgressIP, opts metav1.UpdateOptions) (result *v1.GlobalEgressIP, err error) {
+	emptyResult := &v1.GlobalEgressIP{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(globalegressipsResource, "status", c.ns, globalEgressIP), &v1.GlobalEgressIP{})
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(globalegressipsResource, "status", c.ns, globalEgressIP, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.GlobalEgressIP), err
 }
@@ -128,7 +133,7 @@ func (c *FakeGlobalEgressIPs) Delete(ctx context.Context, name string, opts meta
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeGlobalEgressIPs) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(globalegressipsResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(globalegressipsResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.GlobalEgressIPList{})
 	return err
@@ -136,11 +141,12 @@ func (c *FakeGlobalEgressIPs) DeleteCollection(ctx context.Context, opts metav1.
 
 // Patch applies the patch and returns the patched globalEgressIP.
 func (c *FakeGlobalEgressIPs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.GlobalEgressIP, err error) {
+	emptyResult := &v1.GlobalEgressIP{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(globalegressipsResource, c.ns, name, pt, data, subresources...), &v1.GlobalEgressIP{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(globalegressipsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.GlobalEgressIP), err
 }
@@ -158,11 +164,12 @@ func (c *FakeGlobalEgressIPs) Apply(ctx context.Context, globalEgressIP *submari
 	if name == nil {
 		return nil, fmt.Errorf("globalEgressIP.Name must be provided to Apply")
 	}
+	emptyResult := &v1.GlobalEgressIP{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(globalegressipsResource, c.ns, *name, types.ApplyPatchType, data), &v1.GlobalEgressIP{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(globalegressipsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.GlobalEgressIP), err
 }
@@ -181,11 +188,12 @@ func (c *FakeGlobalEgressIPs) ApplyStatus(ctx context.Context, globalEgressIP *s
 	if name == nil {
 		return nil, fmt.Errorf("globalEgressIP.Name must be provided to Apply")
 	}
+	emptyResult := &v1.GlobalEgressIP{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(globalegressipsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.GlobalEgressIP{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(globalegressipsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.GlobalEgressIP), err
 }

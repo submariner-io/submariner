@@ -20,7 +20,7 @@ limitations under the License.
 
 package v1
 
-// LatencyRTTSpecApplyConfiguration represents an declarative configuration of the LatencyRTTSpec type for use
+// LatencyRTTSpecApplyConfiguration represents a declarative configuration of the LatencyRTTSpec type for use
 // with apply.
 type LatencyRTTSpecApplyConfiguration struct {
 	Last    *string `json:"last,omitempty"`
@@ -30,7 +30,7 @@ type LatencyRTTSpecApplyConfiguration struct {
 	StdDev  *string `json:"stdDev,omitempty"`
 }
 
-// LatencyRTTSpecApplyConfiguration constructs an declarative configuration of the LatencyRTTSpec type for use with
+// LatencyRTTSpecApplyConfiguration constructs a declarative configuration of the LatencyRTTSpec type for use with
 // apply.
 func LatencyRTTSpec() *LatencyRTTSpecApplyConfiguration {
 	return &LatencyRTTSpecApplyConfiguration{}

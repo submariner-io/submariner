@@ -24,14 +24,14 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// GlobalEgressIPSpecApplyConfiguration represents an declarative configuration of the GlobalEgressIPSpec type for use
+// GlobalEgressIPSpecApplyConfiguration represents a declarative configuration of the GlobalEgressIPSpec type for use
 // with apply.
 type GlobalEgressIPSpecApplyConfiguration struct {
 	NumberOfIPs *int                                `json:"numberOfIPs,omitempty"`
 	PodSelector *v1.LabelSelectorApplyConfiguration `json:"podSelector,omitempty"`
 }
 
-// GlobalEgressIPSpecApplyConfiguration constructs an declarative configuration of the GlobalEgressIPSpec type for use with
+// GlobalEgressIPSpecApplyConfiguration constructs a declarative configuration of the GlobalEgressIPSpec type for use with
 // apply.
 func GlobalEgressIPSpec() *GlobalEgressIPSpecApplyConfiguration {
 	return &GlobalEgressIPSpecApplyConfiguration{}

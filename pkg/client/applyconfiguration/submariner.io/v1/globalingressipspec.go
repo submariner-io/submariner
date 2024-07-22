@@ -25,7 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// GlobalIngressIPSpecApplyConfiguration represents an declarative configuration of the GlobalIngressIPSpec type for use
+// GlobalIngressIPSpecApplyConfiguration represents a declarative configuration of the GlobalIngressIPSpec type for use
 // with apply.
 type GlobalIngressIPSpecApplyConfiguration struct {
 	Target     *v1.TargetType               `json:"target,omitempty"`
@@ -33,7 +33,7 @@ type GlobalIngressIPSpecApplyConfiguration struct {
 	PodRef     *corev1.LocalObjectReference `json:"podRef,omitempty"`
 }
 
-// GlobalIngressIPSpecApplyConfiguration constructs an declarative configuration of the GlobalIngressIPSpec type for use with
+// GlobalIngressIPSpecApplyConfiguration constructs a declarative configuration of the GlobalIngressIPSpec type for use with
 // apply.
 func GlobalIngressIPSpec() *GlobalIngressIPSpecApplyConfiguration {
 	return &GlobalIngressIPSpecApplyConfiguration{}

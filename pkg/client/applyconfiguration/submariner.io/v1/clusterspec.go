@@ -20,7 +20,7 @@ limitations under the License.
 
 package v1
 
-// ClusterSpecApplyConfiguration represents an declarative configuration of the ClusterSpec type for use
+// ClusterSpecApplyConfiguration represents a declarative configuration of the ClusterSpec type for use
 // with apply.
 type ClusterSpecApplyConfiguration struct {
 	ClusterID   *string  `json:"cluster_id,omitempty"`
@@ -30,7 +30,7 @@ type ClusterSpecApplyConfiguration struct {
 	GlobalCIDR  []string `json:"global_cidr,omitempty"`
 }
 
-// ClusterSpecApplyConfiguration constructs an declarative configuration of the ClusterSpec type for use with
+// ClusterSpecApplyConfiguration constructs a declarative configuration of the ClusterSpec type for use with
 // apply.
 func ClusterSpec() *ClusterSpecApplyConfiguration {
 	return &ClusterSpecApplyConfiguration{}

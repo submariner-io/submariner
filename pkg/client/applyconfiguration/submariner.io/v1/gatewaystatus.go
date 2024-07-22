@@ -24,7 +24,7 @@ import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 )
 
-// GatewayStatusApplyConfiguration represents an declarative configuration of the GatewayStatus type for use
+// GatewayStatusApplyConfiguration represents a declarative configuration of the GatewayStatus type for use
 // with apply.
 type GatewayStatusApplyConfiguration struct {
 	Version       *string                         `json:"version,omitempty"`
@@ -34,7 +34,7 @@ type GatewayStatusApplyConfiguration struct {
 	Connections   []ConnectionApplyConfiguration  `json:"connections,omitempty"`
 }
 
-// GatewayStatusApplyConfiguration constructs an declarative configuration of the GatewayStatus type for use with
+// GatewayStatusApplyConfiguration constructs a declarative configuration of the GatewayStatus type for use with
 // apply.
 func GatewayStatus() *GatewayStatusApplyConfiguration {
 	return &GatewayStatusApplyConfiguration{}
