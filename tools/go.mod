@@ -4,7 +4,7 @@ go 1.22.0
 
 require (
 	github.com/uw-labs/lichen v0.1.7
-	k8s.io/code-generator v0.30.2
+	k8s.io/code-generator v0.30.3
 )
 
 require (
