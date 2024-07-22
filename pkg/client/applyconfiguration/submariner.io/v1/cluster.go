@@ -26,7 +26,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ClusterApplyConfiguration represents an declarative configuration of the Cluster type for use
+// ClusterApplyConfiguration represents a declarative configuration of the Cluster type for use
 // with apply.
 type ClusterApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -34,7 +34,7 @@ type ClusterApplyConfiguration struct {
 	Spec                             *ClusterSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// Cluster constructs an declarative configuration of the Cluster type for use with
+// Cluster constructs a declarative configuration of the Cluster type for use with
 // apply.
 func Cluster(name, namespace string) *ClusterApplyConfiguration {
 	b := &ClusterApplyConfiguration{}
@@ -209,4 +209,10 @@ func (b *ClusterApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 func (b *ClusterApplyConfiguration) WithSpec(value *ClusterSpecApplyConfiguration) *ClusterApplyConfiguration {
 	b.Spec = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ClusterApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

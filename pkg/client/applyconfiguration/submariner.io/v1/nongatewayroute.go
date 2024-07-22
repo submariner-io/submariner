@@ -26,7 +26,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// NonGatewayRouteApplyConfiguration represents an declarative configuration of the NonGatewayRoute type for use
+// NonGatewayRouteApplyConfiguration represents a declarative configuration of the NonGatewayRoute type for use
 // with apply.
 type NonGatewayRouteApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -34,7 +34,7 @@ type NonGatewayRouteApplyConfiguration struct {
 	RoutePolicySpec                  *RoutePolicySpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// NonGatewayRoute constructs an declarative configuration of the NonGatewayRoute type for use with
+// NonGatewayRoute constructs a declarative configuration of the NonGatewayRoute type for use with
 // apply.
 func NonGatewayRoute(name, namespace string) *NonGatewayRouteApplyConfiguration {
 	b := &NonGatewayRouteApplyConfiguration{}
@@ -209,4 +209,10 @@ func (b *NonGatewayRouteApplyConfiguration) ensureObjectMetaApplyConfigurationEx
 func (b *NonGatewayRouteApplyConfiguration) WithRoutePolicySpec(value *RoutePolicySpecApplyConfiguration) *NonGatewayRouteApplyConfiguration {
 	b.RoutePolicySpec = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *NonGatewayRouteApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

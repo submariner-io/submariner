@@ -22,9 +22,6 @@ package v1
 
 import (
 	"context"
-	json "encoding/json"
-	"fmt"
-	"time"
 
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
@@ -32,7 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	rest "k8s.io/client-go/rest"
+	gentype "k8s.io/client-go/gentype"
 )
 
 // ClustersGetter has a method to return a ClusterInterface.
@@ -57,154 +54,18 @@ type ClusterInterface interface {
 
 // clusters implements ClusterInterface
 type clusters struct {
-	client rest.Interface
-	ns     string
+	*gentype.ClientWithListAndApply[*v1.Cluster, *v1.ClusterList, *submarineriov1.ClusterApplyConfiguration]
 }
 
 // newClusters returns a Clusters
 func newClusters(c *SubmarinerV1Client, namespace string) *clusters {
 	return &clusters{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClientWithListAndApply[*v1.Cluster, *v1.ClusterList, *submarineriov1.ClusterApplyConfiguration](
+			"clusters",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *v1.Cluster { return &v1.Cluster{} },
+			func() *v1.ClusterList { return &v1.ClusterList{} }),
 	}
-}
-
-// Get takes name of the cluster, and returns the corresponding cluster object, and an error if there is any.
-func (c *clusters) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Cluster, err error) {
-	result = &v1.Cluster{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("clusters").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of Clusters that match those selectors.
-func (c *clusters) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1.ClusterList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("clusters").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested clusters.
-func (c *clusters) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("clusters").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a cluster and creates it.  Returns the server's representation of the cluster, and an error, if there is any.
-func (c *clusters) Create(ctx context.Context, cluster *v1.Cluster, opts metav1.CreateOptions) (result *v1.Cluster, err error) {
-	result = &v1.Cluster{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("clusters").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(cluster).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a cluster and updates it. Returns the server's representation of the cluster, and an error, if there is any.
-func (c *clusters) Update(ctx context.Context, cluster *v1.Cluster, opts metav1.UpdateOptions) (result *v1.Cluster, err error) {
-	result = &v1.Cluster{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("clusters").
-		Name(cluster.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(cluster).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the cluster and deletes it. Returns an error if one occurs.
-func (c *clusters) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("clusters").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *clusters) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("clusters").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched cluster.
-func (c *clusters) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Cluster, err error) {
-	result = &v1.Cluster{}
-	err = c.client.Patch(pt).
-		Namespace(c.ns).
-		Resource("clusters").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied cluster.
-func (c *clusters) Apply(ctx context.Context, cluster *submarineriov1.ClusterApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Cluster, err error) {
-	if cluster == nil {
-		return nil, fmt.Errorf("cluster provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(cluster)
-	if err != nil {
-		return nil, err
-	}
-	name := cluster.Name
-	if name == nil {
-		return nil, fmt.Errorf("cluster.Name must be provided to Apply")
-	}
-	result = &v1.Cluster{}
-	err = c.client.Patch(types.ApplyPatchType).
-		Namespace(c.ns).
-		Resource("clusters").
-		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }

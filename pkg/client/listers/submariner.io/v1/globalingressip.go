@@ -22,8 +22,8 @@ package v1
 
 import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -40,25 +40,17 @@ type GlobalIngressIPLister interface {
 
 // globalIngressIPLister implements the GlobalIngressIPLister interface.
 type globalIngressIPLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1.GlobalIngressIP]
 }
 
 // NewGlobalIngressIPLister returns a new GlobalIngressIPLister.
 func NewGlobalIngressIPLister(indexer cache.Indexer) GlobalIngressIPLister {
-	return &globalIngressIPLister{indexer: indexer}
-}
-
-// List lists all GlobalIngressIPs in the indexer.
-func (s *globalIngressIPLister) List(selector labels.Selector) (ret []*v1.GlobalIngressIP, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.GlobalIngressIP))
-	})
-	return ret, err
+	return &globalIngressIPLister{listers.New[*v1.GlobalIngressIP](indexer, v1.Resource("globalingressip"))}
 }
 
 // GlobalIngressIPs returns an object that can list and get GlobalIngressIPs.
 func (s *globalIngressIPLister) GlobalIngressIPs(namespace string) GlobalIngressIPNamespaceLister {
-	return globalIngressIPNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return globalIngressIPNamespaceLister{listers.NewNamespaced[*v1.GlobalIngressIP](s.ResourceIndexer, namespace)}
 }
 
 // GlobalIngressIPNamespaceLister helps list and get GlobalIngressIPs.
@@ -76,26 +68,5 @@ type GlobalIngressIPNamespaceLister interface {
 // globalIngressIPNamespaceLister implements the GlobalIngressIPNamespaceLister
 // interface.
 type globalIngressIPNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all GlobalIngressIPs in the indexer for a given namespace.
-func (s globalIngressIPNamespaceLister) List(selector labels.Selector) (ret []*v1.GlobalIngressIP, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.GlobalIngressIP))
-	})
-	return ret, err
-}
-
-// Get retrieves the GlobalIngressIP from the indexer for a given namespace and name.
-func (s globalIngressIPNamespaceLister) Get(name string) (*v1.GlobalIngressIP, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("globalingressip"), name)
-	}
-	return obj.(*v1.GlobalIngressIP), nil
+	listers.ResourceIndexer[*v1.GlobalIngressIP]
 }

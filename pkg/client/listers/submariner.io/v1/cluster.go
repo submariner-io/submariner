@@ -22,8 +22,8 @@ package v1
 
 import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -40,25 +40,17 @@ type ClusterLister interface {
 
 // clusterLister implements the ClusterLister interface.
 type clusterLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1.Cluster]
 }
 
 // NewClusterLister returns a new ClusterLister.
 func NewClusterLister(indexer cache.Indexer) ClusterLister {
-	return &clusterLister{indexer: indexer}
-}
-
-// List lists all Clusters in the indexer.
-func (s *clusterLister) List(selector labels.Selector) (ret []*v1.Cluster, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.Cluster))
-	})
-	return ret, err
+	return &clusterLister{listers.New[*v1.Cluster](indexer, v1.Resource("cluster"))}
 }
 
 // Clusters returns an object that can list and get Clusters.
 func (s *clusterLister) Clusters(namespace string) ClusterNamespaceLister {
-	return clusterNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return clusterNamespaceLister{listers.NewNamespaced[*v1.Cluster](s.ResourceIndexer, namespace)}
 }
 
 // ClusterNamespaceLister helps list and get Clusters.
@@ -76,26 +68,5 @@ type ClusterNamespaceLister interface {
 // clusterNamespaceLister implements the ClusterNamespaceLister
 // interface.
 type clusterNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all Clusters in the indexer for a given namespace.
-func (s clusterNamespaceLister) List(selector labels.Selector) (ret []*v1.Cluster, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.Cluster))
-	})
-	return ret, err
-}
-
-// Get retrieves the Cluster from the indexer for a given namespace and name.
-func (s clusterNamespaceLister) Get(name string) (*v1.Cluster, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("cluster"), name)
-	}
-	return obj.(*v1.Cluster), nil
+	listers.ResourceIndexer[*v1.Cluster]
 }

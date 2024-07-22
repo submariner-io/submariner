@@ -22,8 +22,8 @@ package v1
 
 import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -40,25 +40,17 @@ type ClusterGlobalEgressIPLister interface {
 
 // clusterGlobalEgressIPLister implements the ClusterGlobalEgressIPLister interface.
 type clusterGlobalEgressIPLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1.ClusterGlobalEgressIP]
 }
 
 // NewClusterGlobalEgressIPLister returns a new ClusterGlobalEgressIPLister.
 func NewClusterGlobalEgressIPLister(indexer cache.Indexer) ClusterGlobalEgressIPLister {
-	return &clusterGlobalEgressIPLister{indexer: indexer}
-}
-
-// List lists all ClusterGlobalEgressIPs in the indexer.
-func (s *clusterGlobalEgressIPLister) List(selector labels.Selector) (ret []*v1.ClusterGlobalEgressIP, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.ClusterGlobalEgressIP))
-	})
-	return ret, err
+	return &clusterGlobalEgressIPLister{listers.New[*v1.ClusterGlobalEgressIP](indexer, v1.Resource("clusterglobalegressip"))}
 }
 
 // ClusterGlobalEgressIPs returns an object that can list and get ClusterGlobalEgressIPs.
 func (s *clusterGlobalEgressIPLister) ClusterGlobalEgressIPs(namespace string) ClusterGlobalEgressIPNamespaceLister {
-	return clusterGlobalEgressIPNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return clusterGlobalEgressIPNamespaceLister{listers.NewNamespaced[*v1.ClusterGlobalEgressIP](s.ResourceIndexer, namespace)}
 }
 
 // ClusterGlobalEgressIPNamespaceLister helps list and get ClusterGlobalEgressIPs.
@@ -76,26 +68,5 @@ type ClusterGlobalEgressIPNamespaceLister interface {
 // clusterGlobalEgressIPNamespaceLister implements the ClusterGlobalEgressIPNamespaceLister
 // interface.
 type clusterGlobalEgressIPNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all ClusterGlobalEgressIPs in the indexer for a given namespace.
-func (s clusterGlobalEgressIPNamespaceLister) List(selector labels.Selector) (ret []*v1.ClusterGlobalEgressIP, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.ClusterGlobalEgressIP))
-	})
-	return ret, err
-}
-
-// Get retrieves the ClusterGlobalEgressIP from the indexer for a given namespace and name.
-func (s clusterGlobalEgressIPNamespaceLister) Get(name string) (*v1.ClusterGlobalEgressIP, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("clusterglobalegressip"), name)
-	}
-	return obj.(*v1.ClusterGlobalEgressIP), nil
+	listers.ResourceIndexer[*v1.ClusterGlobalEgressIP]
 }

@@ -24,7 +24,7 @@ import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 )
 
-// ConnectionApplyConfiguration represents an declarative configuration of the Connection type for use
+// ConnectionApplyConfiguration represents a declarative configuration of the Connection type for use
 // with apply.
 type ConnectionApplyConfiguration struct {
 	Status        *v1.ConnectionStatus              `json:"status,omitempty"`
@@ -35,7 +35,7 @@ type ConnectionApplyConfiguration struct {
 	LatencyRTT    *LatencyRTTSpecApplyConfiguration `json:"latencyRTT,omitempty"`
 }
 
-// ConnectionApplyConfiguration constructs an declarative configuration of the Connection type for use with
+// ConnectionApplyConfiguration constructs a declarative configuration of the Connection type for use with
 // apply.
 func Connection() *ConnectionApplyConfiguration {
 	return &ConnectionApplyConfiguration{}

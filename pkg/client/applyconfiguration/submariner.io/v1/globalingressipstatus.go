@@ -24,14 +24,14 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// GlobalIngressIPStatusApplyConfiguration represents an declarative configuration of the GlobalIngressIPStatus type for use
+// GlobalIngressIPStatusApplyConfiguration represents a declarative configuration of the GlobalIngressIPStatus type for use
 // with apply.
 type GlobalIngressIPStatusApplyConfiguration struct {
 	Conditions  []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 	AllocatedIP *string                          `json:"allocatedIP,omitempty"`
 }
 
-// GlobalIngressIPStatusApplyConfiguration constructs an declarative configuration of the GlobalIngressIPStatus type for use with
+// GlobalIngressIPStatusApplyConfiguration constructs a declarative configuration of the GlobalIngressIPStatus type for use with
 // apply.
 func GlobalIngressIPStatus() *GlobalIngressIPStatusApplyConfiguration {
 	return &GlobalIngressIPStatusApplyConfiguration{}

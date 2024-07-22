@@ -26,7 +26,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// GatewayRouteApplyConfiguration represents an declarative configuration of the GatewayRoute type for use
+// GatewayRouteApplyConfiguration represents a declarative configuration of the GatewayRoute type for use
 // with apply.
 type GatewayRouteApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -34,7 +34,7 @@ type GatewayRouteApplyConfiguration struct {
 	RoutePolicySpec                  *RoutePolicySpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// GatewayRoute constructs an declarative configuration of the GatewayRoute type for use with
+// GatewayRoute constructs a declarative configuration of the GatewayRoute type for use with
 // apply.
 func GatewayRoute(name, namespace string) *GatewayRouteApplyConfiguration {
 	b := &GatewayRouteApplyConfiguration{}
@@ -209,4 +209,10 @@ func (b *GatewayRouteApplyConfiguration) ensureObjectMetaApplyConfigurationExist
 func (b *GatewayRouteApplyConfiguration) WithRoutePolicySpec(value *RoutePolicySpecApplyConfiguration) *GatewayRouteApplyConfiguration {
 	b.RoutePolicySpec = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *GatewayRouteApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

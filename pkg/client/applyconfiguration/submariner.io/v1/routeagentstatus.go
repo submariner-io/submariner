@@ -20,7 +20,7 @@ limitations under the License.
 
 package v1
 
-// RouteAgentStatusApplyConfiguration represents an declarative configuration of the RouteAgentStatus type for use
+// RouteAgentStatusApplyConfiguration represents a declarative configuration of the RouteAgentStatus type for use
 // with apply.
 type RouteAgentStatusApplyConfiguration struct {
 	Version         *string                            `json:"version,omitempty"`
@@ -28,7 +28,7 @@ type RouteAgentStatusApplyConfiguration struct {
 	RemoteEndpoints []RemoteEndpointApplyConfiguration `json:"remoteEndpoints,omitempty"`
 }
 
-// RouteAgentStatusApplyConfiguration constructs an declarative configuration of the RouteAgentStatus type for use with
+// RouteAgentStatusApplyConfiguration constructs a declarative configuration of the RouteAgentStatus type for use with
 // apply.
 func RouteAgentStatus() *RouteAgentStatusApplyConfiguration {
 	return &RouteAgentStatusApplyConfiguration{}

@@ -46,22 +46,24 @@ var clustersKind = v1.SchemeGroupVersion.WithKind("Cluster")
 
 // Get takes name of the cluster, and returns the corresponding cluster object, and an error if there is any.
 func (c *FakeClusters) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Cluster, err error) {
+	emptyResult := &v1.Cluster{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(clustersResource, c.ns, name), &v1.Cluster{})
+		Invokes(testing.NewGetActionWithOptions(clustersResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Cluster), err
 }
 
 // List takes label and field selectors, and returns the list of Clusters that match those selectors.
 func (c *FakeClusters) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterList, err error) {
+	emptyResult := &v1.ClusterList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(clustersResource, clustersKind, c.ns, opts), &v1.ClusterList{})
+		Invokes(testing.NewListActionWithOptions(clustersResource, clustersKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -80,28 +82,30 @@ func (c *FakeClusters) List(ctx context.Context, opts metav1.ListOptions) (resul
 // Watch returns a watch.Interface that watches the requested clusters.
 func (c *FakeClusters) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(clustersResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(clustersResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a cluster and creates it.  Returns the server's representation of the cluster, and an error, if there is any.
 func (c *FakeClusters) Create(ctx context.Context, cluster *v1.Cluster, opts metav1.CreateOptions) (result *v1.Cluster, err error) {
+	emptyResult := &v1.Cluster{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(clustersResource, c.ns, cluster), &v1.Cluster{})
+		Invokes(testing.NewCreateActionWithOptions(clustersResource, c.ns, cluster, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Cluster), err
 }
 
 // Update takes the representation of a cluster and updates it. Returns the server's representation of the cluster, and an error, if there is any.
 func (c *FakeClusters) Update(ctx context.Context, cluster *v1.Cluster, opts metav1.UpdateOptions) (result *v1.Cluster, err error) {
+	emptyResult := &v1.Cluster{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(clustersResource, c.ns, cluster), &v1.Cluster{})
+		Invokes(testing.NewUpdateActionWithOptions(clustersResource, c.ns, cluster, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Cluster), err
 }
@@ -116,7 +120,7 @@ func (c *FakeClusters) Delete(ctx context.Context, name string, opts metav1.Dele
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeClusters) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(clustersResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(clustersResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.ClusterList{})
 	return err
@@ -124,11 +128,12 @@ func (c *FakeClusters) DeleteCollection(ctx context.Context, opts metav1.DeleteO
 
 // Patch applies the patch and returns the patched cluster.
 func (c *FakeClusters) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Cluster, err error) {
+	emptyResult := &v1.Cluster{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(clustersResource, c.ns, name, pt, data, subresources...), &v1.Cluster{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(clustersResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Cluster), err
 }
@@ -146,11 +151,12 @@ func (c *FakeClusters) Apply(ctx context.Context, cluster *submarineriov1.Cluste
 	if name == nil {
 		return nil, fmt.Errorf("cluster.Name must be provided to Apply")
 	}
+	emptyResult := &v1.Cluster{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(clustersResource, c.ns, *name, types.ApplyPatchType, data), &v1.Cluster{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(clustersResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Cluster), err
 }

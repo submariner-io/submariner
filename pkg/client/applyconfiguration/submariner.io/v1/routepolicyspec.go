@@ -20,14 +20,14 @@ limitations under the License.
 
 package v1
 
-// RoutePolicySpecApplyConfiguration represents an declarative configuration of the RoutePolicySpec type for use
+// RoutePolicySpecApplyConfiguration represents a declarative configuration of the RoutePolicySpec type for use
 // with apply.
 type RoutePolicySpecApplyConfiguration struct {
 	NextHops    []string `json:"nextHops,omitempty"`
 	RemoteCIDRs []string `json:"remoteCIDRs,omitempty"`
 }
 
-// RoutePolicySpecApplyConfiguration constructs an declarative configuration of the RoutePolicySpec type for use with
+// RoutePolicySpecApplyConfiguration constructs a declarative configuration of the RoutePolicySpec type for use with
 // apply.
 func RoutePolicySpec() *RoutePolicySpecApplyConfiguration {
 	return &RoutePolicySpecApplyConfiguration{}

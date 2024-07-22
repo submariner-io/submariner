@@ -26,7 +26,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// GlobalIngressIPApplyConfiguration represents an declarative configuration of the GlobalIngressIP type for use
+// GlobalIngressIPApplyConfiguration represents a declarative configuration of the GlobalIngressIP type for use
 // with apply.
 type GlobalIngressIPApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -35,7 +35,7 @@ type GlobalIngressIPApplyConfiguration struct {
 	Status                           *GlobalIngressIPStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// GlobalIngressIP constructs an declarative configuration of the GlobalIngressIP type for use with
+// GlobalIngressIP constructs a declarative configuration of the GlobalIngressIP type for use with
 // apply.
 func GlobalIngressIP(name, namespace string) *GlobalIngressIPApplyConfiguration {
 	b := &GlobalIngressIPApplyConfiguration{}
@@ -218,4 +218,10 @@ func (b *GlobalIngressIPApplyConfiguration) WithSpec(value *GlobalIngressIPSpecA
 func (b *GlobalIngressIPApplyConfiguration) WithStatus(value *GlobalIngressIPStatusApplyConfiguration) *GlobalIngressIPApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *GlobalIngressIPApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

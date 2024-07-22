@@ -22,9 +22,6 @@ package v1
 
 import (
 	"context"
-	json "encoding/json"
-	"fmt"
-	"time"
 
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
@@ -32,7 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	rest "k8s.io/client-go/rest"
+	gentype "k8s.io/client-go/gentype"
 )
 
 // GatewayRoutesGetter has a method to return a GatewayRouteInterface.
@@ -57,154 +54,18 @@ type GatewayRouteInterface interface {
 
 // gatewayRoutes implements GatewayRouteInterface
 type gatewayRoutes struct {
-	client rest.Interface
-	ns     string
+	*gentype.ClientWithListAndApply[*v1.GatewayRoute, *v1.GatewayRouteList, *submarineriov1.GatewayRouteApplyConfiguration]
 }
 
 // newGatewayRoutes returns a GatewayRoutes
 func newGatewayRoutes(c *SubmarinerV1Client, namespace string) *gatewayRoutes {
 	return &gatewayRoutes{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClientWithListAndApply[*v1.GatewayRoute, *v1.GatewayRouteList, *submarineriov1.GatewayRouteApplyConfiguration](
+			"gatewayroutes",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *v1.GatewayRoute { return &v1.GatewayRoute{} },
+			func() *v1.GatewayRouteList { return &v1.GatewayRouteList{} }),
 	}
-}
-
-// Get takes name of the gatewayRoute, and returns the corresponding gatewayRoute object, and an error if there is any.
-func (c *gatewayRoutes) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.GatewayRoute, err error) {
-	result = &v1.GatewayRoute{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("gatewayroutes").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of GatewayRoutes that match those selectors.
-func (c *gatewayRoutes) List(ctx context.Context, opts metav1.ListOptions) (result *v1.GatewayRouteList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1.GatewayRouteList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("gatewayroutes").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested gatewayRoutes.
-func (c *gatewayRoutes) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("gatewayroutes").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a gatewayRoute and creates it.  Returns the server's representation of the gatewayRoute, and an error, if there is any.
-func (c *gatewayRoutes) Create(ctx context.Context, gatewayRoute *v1.GatewayRoute, opts metav1.CreateOptions) (result *v1.GatewayRoute, err error) {
-	result = &v1.GatewayRoute{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("gatewayroutes").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(gatewayRoute).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a gatewayRoute and updates it. Returns the server's representation of the gatewayRoute, and an error, if there is any.
-func (c *gatewayRoutes) Update(ctx context.Context, gatewayRoute *v1.GatewayRoute, opts metav1.UpdateOptions) (result *v1.GatewayRoute, err error) {
-	result = &v1.GatewayRoute{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("gatewayroutes").
-		Name(gatewayRoute.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(gatewayRoute).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the gatewayRoute and deletes it. Returns an error if one occurs.
-func (c *gatewayRoutes) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("gatewayroutes").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *gatewayRoutes) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("gatewayroutes").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched gatewayRoute.
-func (c *gatewayRoutes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.GatewayRoute, err error) {
-	result = &v1.GatewayRoute{}
-	err = c.client.Patch(pt).
-		Namespace(c.ns).
-		Resource("gatewayroutes").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied gatewayRoute.
-func (c *gatewayRoutes) Apply(ctx context.Context, gatewayRoute *submarineriov1.GatewayRouteApplyConfiguration, opts metav1.ApplyOptions) (result *v1.GatewayRoute, err error) {
-	if gatewayRoute == nil {
-		return nil, fmt.Errorf("gatewayRoute provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(gatewayRoute)
-	if err != nil {
-		return nil, err
-	}
-	name := gatewayRoute.Name
-	if name == nil {
-		return nil, fmt.Errorf("gatewayRoute.Name must be provided to Apply")
-	}
-	result = &v1.GatewayRoute{}
-	err = c.client.Patch(types.ApplyPatchType).
-		Namespace(c.ns).
-		Resource("gatewayroutes").
-		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }

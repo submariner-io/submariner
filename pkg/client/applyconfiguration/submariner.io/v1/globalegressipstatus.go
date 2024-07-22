@@ -24,14 +24,14 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// GlobalEgressIPStatusApplyConfiguration represents an declarative configuration of the GlobalEgressIPStatus type for use
+// GlobalEgressIPStatusApplyConfiguration represents a declarative configuration of the GlobalEgressIPStatus type for use
 // with apply.
 type GlobalEgressIPStatusApplyConfiguration struct {
 	Conditions   []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 	AllocatedIPs []string                         `json:"allocatedIPs,omitempty"`
 }
 
-// GlobalEgressIPStatusApplyConfiguration constructs an declarative configuration of the GlobalEgressIPStatus type for use with
+// GlobalEgressIPStatusApplyConfiguration constructs a declarative configuration of the GlobalEgressIPStatus type for use with
 // apply.
 func GlobalEgressIPStatus() *GlobalEgressIPStatusApplyConfiguration {
 	return &GlobalEgressIPStatusApplyConfiguration{}

@@ -483,7 +483,7 @@ type testDriver struct {
 	gatewayDeleted       chan *submarinerv1.Gateway
 	stopSyncer           chan struct{}
 	stopInformer         chan struct{}
-	savedErrorHandlers   []func(error)
+	savedErrorHandlers   []utilruntime.ErrorHandler
 	handledError         chan error
 }
 
@@ -530,7 +530,7 @@ func newTestDriver() *testDriver {
 
 func (t *testDriver) run() {
 	//nolint:reassign // Modifying ErrorHandlers *is* the API
-	utilruntime.ErrorHandlers = append(utilruntime.ErrorHandlers, func(err error) {
+	utilruntime.ErrorHandlers = append(utilruntime.ErrorHandlers, func(_ context.Context, err error, _ string, _ ...interface{}) {
 		t.handledError <- err
 	})
 
