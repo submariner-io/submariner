@@ -38,7 +38,6 @@ type statistics struct {
 func (s *statistics) update(rtt uint64) {
 	s.lastRtt = rtt
 
-	// TODO Take more samples while resetting, for example samples in last 2 hours
 	if s.index == s.size {
 		// Resetting since the incremental SD calculated have an error factor due to truncation which
 		// could be significant as count increases.
