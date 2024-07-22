@@ -438,10 +438,10 @@ github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO
 github.com/stretchr/testify v1.8.1/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o6fzry7u4=
 github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcUk=
 github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
-github.com/submariner-io/admiral v0.19.0-m0.0.20240718120154-11bb4f8f51a2 h1:YEi2E9glruzdGOVsJvA1egQHqYg3UjCgmqlDFBcdpvI=
-github.com/submariner-io/admiral v0.19.0-m0.0.20240718120154-11bb4f8f51a2/go.mod h1:aEGLDWiU6dR8AaN+FaDt4eL49zy4teXXSn1PuoZXzDk=
-github.com/submariner-io/shipyard v0.19.0-m0 h1:JZI3TU/jYz82PNcrWBS4S6DGt8mixkxq+GIUuk5dUzs=
-github.com/submariner-io/shipyard v0.19.0-m0/go.mod h1:ytax3kLIv6gg7FgHq4jFNy6g8LJG+fUe5iJC8reTdJQ=
+github.com/submariner-io/admiral v0.19.0-m1 h1:6NOGCLFoo0u9Uls+9rC4zbGnKz3BWzEVn+gFhPHH1to=
+github.com/submariner-io/admiral v0.19.0-m1/go.mod h1:TtkBAWaesXpKMoVxMJic8qbrDdGMShUDa+pwVDwt7GY=
+github.com/submariner-io/shipyard v0.19.0-m1 h1:FO7O6rX2En59qJZ52o+uEhpJyMcIhIoMOaoWIcwShfg=
+github.com/submariner-io/shipyard v0.19.0-m1/go.mod h1:aTJO3R5vUucNTQ2rm7J6sb6PRcijlkexP0NBxfpCK8A=
 github.com/tidwall/pretty v1.0.0/go.mod h1:XNkn88O1ChpSDQmQeStsy+sBenx6DDtFZJxhVysOjyk=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
@@ -697,8 +697,8 @@ k8s.io/klog v0.0.0-20181102134211-b9b56d5dfc92/go.mod h1:Gq+BEi5rUBO/HRz0bTSXDUc
 k8s.io/klog v0.3.0/go.mod h1:Gq+BEi5rUBO/HRz0bTSXDUcqjScdoY3a9IHpCEIOOfk=
 k8s.io/klog v1.0.0/go.mod h1:4Bi6QPql/J/LkTDqv7R/cd3hPo4k2DG6Ptcz060Ez5I=
 k8s.io/klog/v2 v2.0.0/go.mod h1:PBfzABfn139FHAV07az/IF9Wp1bkk3vpT2XSJ76fSDE=
-k8s.io/klog/v2 v2.120.1 h1:QXU6cPEOIslTGvZaXvFWiP9VKyeet3sawzTOvdXb4Vw=
-k8s.io/klog/v2 v2.120.1/go.mod h1:3Jpz1GvMt720eyJH1ckRHK1EDfpxISzJ7I9OYgaDtPE=
+k8s.io/klog/v2 v2.130.1 h1:n9Xl7H1Xvksem4KFG4PYbdQCQxqc/tTUyrgXaOhHSzk=
+k8s.io/klog/v2 v2.130.1/go.mod h1:3Jpz1GvMt720eyJH1ckRHK1EDfpxISzJ7I9OYgaDtPE=
 k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c/go.mod h1:GRQhZsXIAJ1xR0C9bd8UpWHZ5plfAS9fzPjJuQ6JL3E=
 k8s.io/kube-openapi v0.0.0-20200410145947-61e04a5be9a6/go.mod h1:GRQhZsXIAJ1xR0C9bd8UpWHZ5plfAS9fzPjJuQ6JL3E=
 k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 h1:BZqlfIlq5YbRMFko6/PM7FjZpUb45WallggurYhKGag=
