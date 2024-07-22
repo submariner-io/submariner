@@ -91,9 +91,6 @@ func (ovn *Handler) updateGatewayDataplane() error {
 	return ovn.setupForwardingIptables()
 }
 
-// TODO: if the #1022 workaround needs to be sustained for some time, instead of this we should be calculating
-// the PMTU with a tool like tracepath between the gateway endpoints, reporting back so we can use such
-// information here.
 const (
 	IPTCPOverHead         = 40
 	ExpectedIPSECOverhead = 62
