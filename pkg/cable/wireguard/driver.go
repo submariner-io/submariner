@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"slices"
 	"sync"
 	"time"
 
@@ -274,7 +275,6 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 	remotePort := int(port)
 
 	// configure peer
-	ka := KeepAliveInterval
 	peerCfg := []wgtypes.PeerConfig{{
 		PublicKey:    *remoteKey,
 		Remove:       false,
@@ -284,7 +284,7 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 			IP:   remoteIP,
 			Port: remotePort,
 		},
-		PersistentKeepaliveInterval: &ka,
+		PersistentKeepaliveInterval: ptr.To(KeepAliveInterval),
 		ReplaceAllowedIPs:           true,
 		AllowedIPs:                  allowedIPs,
 	}}
@@ -297,12 +297,9 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 		return "", errors.Wrap(err, "failed to configure peer")
 	}
 
-	// verify peer was added
-	if p, err := w.peerByKey(remoteKey); err != nil {
+	err = w.verifyNewPeer(&peerCfg[0])
+	if err != nil {
 		logger.Errorf(err, "Failed to verify peer configuration")
-	} else {
-		// TODO verify configuration
-		logger.V(log.DEBUG).Infof("Peer configured, PubKey:%s, EndPoint:%s, AllowedIPs:%v", p.PublicKey, p.Endpoint, p.AllowedIPs)
 	}
 
 	logger.V(log.DEBUG).Infof("Done connecting endpoint peer %s@%s", *remoteKey, remoteIP)
@@ -447,6 +444,31 @@ func (w *wireguard) peerByKey(key *wgtypes.Key) (*wgtypes.Peer, error) {
 	}
 
 	return nil, fmt.Errorf("peer not found for key %s", key)
+}
+
+func (w *wireguard) verifyNewPeer(peerCfg *wgtypes.PeerConfig) error {
+	p, err := w.peerByKey(&peerCfg.PublicKey)
+	if err != nil {
+		return err
+	}
+
+	if p.PresharedKey.String() != peerCfg.PresharedKey.String() {
+		return fmt.Errorf("peer's PresharedKey %q does not match configured %q", p.PresharedKey.String(), peerCfg.PresharedKey.String())
+	}
+
+	if p.Endpoint.String() != peerCfg.Endpoint.String() {
+		return fmt.Errorf("peer's Endpoint %q does not match configured %q", p.Endpoint.String(), peerCfg.Endpoint.String())
+	}
+
+	if !slices.EqualFunc(p.AllowedIPs, peerCfg.AllowedIPs, func(ipn1 net.IPNet, ipn2 net.IPNet) bool {
+		return ipn1.String() == ipn2.String()
+	}) {
+		return fmt.Errorf("peer's AllowedIPs %v does not match configured %q", p.AllowedIPs, peerCfg.AllowedIPs)
+	}
+
+	logger.V(log.DEBUG).Infof("Peer configured, PublicKey: %s, EndPoint: %s, AllowedIPs: %v", p.PublicKey, p.Endpoint, p.AllowedIPs)
+
+	return nil
 }
 
 // Find if key matches connection spec (from spec clusterID).
