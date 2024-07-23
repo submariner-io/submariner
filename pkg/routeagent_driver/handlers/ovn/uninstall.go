@@ -103,7 +103,6 @@ func (ovn *Handler) cleanupRoutes() error {
 	return nil
 }
 
-// TODO need to be removed when the clusters are fully upgraded to new implementation.
 func (ovn *Handler) LegacyCleanup() {
 	err := vsctl.DelInternalPort(ovnK8sSubmarinerBridge, ovnK8sSubmarinerInterface)
 	if err != nil {
