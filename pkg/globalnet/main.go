@@ -86,8 +86,7 @@ func main() {
 	dynClient, err := dynamic.NewForConfig(cfg)
 	logger.FatalOnError(err, "Unable to create dynamic client")
 
-	// set packetfilter driver to iptables
-	// TODO: check which driver is supported on platform
+	// Set packetfilter driver to iptables. Once nftables is available, we'll check which driver is supported.
 	packetfilter.SetNewDriverFn(iptables.New)
 
 	if spec.Uninstall {
