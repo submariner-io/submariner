@@ -131,11 +131,6 @@ func (ovn *Handler) getForwardingRuleSpecs() ([]*packetfilter.Rule, error) {
 func (ovn *Handler) getMSSClampingRuleSpecs() ([]*packetfilter.Rule, error) {
 	rules := []*packetfilter.Rule{}
 
-	// NOTE: This is a workaround for submariner issues:
-	//   * https://github.com/submariner-io/submariner/issues/1278
-	//   * https://github.com/submariner-io/submariner/issues/1488
-	// TODO: get the kernel to steer the ICMPs back to ovn-k8s-sub0 interface properly, or write a packet
-	//       reflector in the route agent for that type of packets
 	for _, remoteCIDR := range ovn.getRemoteSubnets().UnsortedList() {
 		rules = append(rules, &packetfilter.Rule{
 			DestCIDR:  remoteCIDR,
