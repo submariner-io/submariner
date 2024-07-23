@@ -59,9 +59,6 @@ const (
 	receiveBytes    = "ReceiveBytes"  // for peer connection status
 	transmitBytes   = "TransmitBytes" // for peer connection status
 	lastChecked     = "LastChecked"   // for connection peer status
-
-	// TODO use submariner prefix.
-	specEnvPrefix = "ce_ipsec"
 )
 
 var logger = log.Logger{Logger: logf.Log.WithName("wireguard")}
@@ -95,7 +92,7 @@ func NewDriver(localEndpoint *endpoint.Local, _ *types.SubmarinerCluster) (cable
 		spec:        new(specification),
 	}
 
-	if err = envconfig.Process(specEnvPrefix, w.spec); err != nil {
+	if err = envconfig.Process(cable.IPSecEnvPrefix, w.spec); err != nil {
 		return nil, errors.Wrap(err, "error processing environment config for wireguard")
 	}
 
