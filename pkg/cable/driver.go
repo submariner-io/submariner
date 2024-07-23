@@ -58,6 +58,8 @@ type Driver interface {
 // Function prototype to create a new driver.
 type DriverCreateFunc func(localEndpoint *endpoint.Local, localCluster *types.SubmarinerCluster) (Driver, error)
 
+const InterfaceNameConfig = "interface-name"
+
 // Static map of supported drivers.
 var drivers = map[string]DriverCreateFunc{}
 
