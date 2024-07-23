@@ -23,12 +23,13 @@ import (
 
 	"github.com/pkg/errors"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/cidr"
 	"github.com/submariner-io/submariner/pkg/vxlan"
 )
 
 func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
-	kp.localCableDriver = endpoint.Spec.Backend
+	kp.localEndpointIfaceName = endpoint.Spec.BackendConfig[cable.InterfaceNameConfig]
 
 	// We are on nonGateway node
 	if !kp.State().IsOnGateway() {

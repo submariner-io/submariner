@@ -24,8 +24,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync/atomic"
-	"time"
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
@@ -50,28 +49,28 @@ import (
 var logger = log.Logger{Logger: logf.Log.WithName("Endpoint")}
 
 type Local struct {
-	spec      atomic.Value
+	mutex     sync.Mutex
+	spec      submv1.EndpointSpec
+	created   bool
 	endpoints dynamic.ResourceInterface
 }
 
 func NewLocal(spec *submv1.EndpointSpec, dynClient dynamic.Interface, namespace string) *Local {
-	l := &Local{
+	return &Local{
+		spec:      *spec.DeepCopy(),
 		endpoints: dynClient.Resource(submv1.EndpointGVR).Namespace(namespace),
 	}
-
-	l.spec.Store(*spec)
-
-	return l
 }
 
 func (l *Local) Spec() *submv1.EndpointSpec {
-	spec := l.spec.Load().(submv1.EndpointSpec)
-	return &spec
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	return l.spec.DeepCopy()
 }
 
 func (l *Local) Resource() *submv1.Endpoint {
-	spec := l.spec.Load().(submv1.EndpointSpec)
-	return endpointFrom(&spec)
+	return endpointFrom(l.Spec())
 }
 
 func endpointFrom(spec *submv1.EndpointSpec) *submv1.Endpoint {
@@ -87,21 +86,49 @@ func endpointFrom(spec *submv1.EndpointSpec) *submv1.Endpoint {
 }
 
 func (l *Local) Update(ctx context.Context, mutate func(existing *submv1.EndpointSpec)) error {
-	toUpdate := resource.MustToUnstructured(l.Resource())
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
 
-	var newSpec *submv1.EndpointSpec
+	var (
+		newSpec *submv1.EndpointSpec
+		err     error
+	)
 
-	err := util.Update[*unstructured.Unstructured](ctx, resource.ForDynamic(l.endpoints), toUpdate,
-		func(existing *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-			ep := resource.MustFromUnstructured(existing, &submv1.Endpoint{})
-			mutate(&ep.Spec)
-			newSpec = &ep.Spec
+	if l.created {
+		toUpdate := resource.MustToUnstructured(endpointFrom(&l.spec))
 
-			return resource.MustToUnstructured(ep), nil
-		})
-	if err == nil && newSpec != nil {
-		l.spec.Store(*newSpec)
+		err = util.MustUpdate[*unstructured.Unstructured](ctx, resource.ForDynamic(l.endpoints), toUpdate,
+			func(existing *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+				ep := resource.MustFromUnstructured(existing, &submv1.Endpoint{})
+				mutate(&ep.Spec)
+				newSpec = &ep.Spec
+
+				return resource.MustToUnstructured(ep), nil
+			})
+	} else {
+		newSpec = &l.spec
+		mutate(newSpec)
 	}
+
+	if err == nil {
+		l.spec = *newSpec
+	}
+
+	return err
+}
+
+func (l *Local) Create(ctx context.Context) error {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	toCreate := resource.MustToUnstructured(endpointFrom(&l.spec))
+
+	_, err := util.CreateOrUpdate[*unstructured.Unstructured](ctx, resource.ForDynamic(l.endpoints), toCreate,
+		func(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+			return util.CopyImmutableMetadata(obj, toCreate), nil
+		})
+
+	l.created = err == nil
 
 	return err
 }
@@ -197,33 +224,6 @@ func getBackendConfig(nodeObj *v1.Node) (map[string]string, error) {
 	// Enable and publish the natt-discovery-port by default.
 	if _, ok := backendConfig[submv1.NATTDiscoveryPortConfig]; !ok {
 		backendConfig[submv1.NATTDiscoveryPortConfig] = strconv.Itoa(port.NATTDiscovery)
-	}
-
-	// TODO: we should allow the cable drivers to capture and expose BackendConfig settings, instead of doing
-	//      it here.
-	preferredServerStr := backendConfig[submv1.PreferredServerConfig]
-
-	if preferredServerStr == "" {
-		preferredServerStr = os.Getenv("CE_IPSEC_PREFERREDSERVER")
-	}
-
-	if preferredServerStr == "" {
-		preferredServerStr = "false"
-	}
-
-	preferredServer, err := strconv.ParseBool(preferredServerStr)
-	if err != nil {
-		return backendConfig, errors.Wrapf(err, "error parsing CE_IPSEC_PREFERREDSERVER or node gateway.submariner."+
-			"io/preferred-server annotation bool: %s", preferredServerStr)
-	}
-
-	backendConfig[submv1.PreferredServerConfig] = preferredServerStr
-
-	// When this Endpoint is in "preferred-server" mode a bogus timestamp is inserted in the BackendConfig,
-	// forcing the resynchronization of the object to the broker, which will indicate all clients that the
-	// server has been restarted, and that they must re-connect to the endpoint.
-	if preferredServer {
-		backendConfig[submv1.PreferredServerConfig+"-timestamp"] = strconv.FormatInt(time.Now().UTC().Unix(), 10)
 	}
 
 	return backendConfig, nil

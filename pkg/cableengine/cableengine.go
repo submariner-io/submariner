@@ -129,7 +129,7 @@ func (i *engine) startDriver() error {
 
 	var err error
 
-	if i.driver, err = cable.NewDriver(i.GetLocalEndpoint(), &i.localCluster); err != nil {
+	if i.driver, err = cable.NewDriver(i.localEndpoint, &i.localCluster); err != nil {
 		return errors.Wrap(err, "error creating the cable driver")
 	}
 

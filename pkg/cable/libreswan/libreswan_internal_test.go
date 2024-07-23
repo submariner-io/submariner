@@ -21,13 +21,17 @@ package libreswan
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	fakecommand "github.com/submariner-io/admiral/pkg/command/fake"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 var _ = Describe("Libreswan", func() {
@@ -36,6 +40,7 @@ var _ = Describe("Libreswan", func() {
 	Describe("ConnectToEndpoint", testConnectToEndpoint)
 	Describe("DisconnectFromEndpoint", testDisconnectFromEndpoint)
 	Describe("GetConnections", testGetConnections)
+	Describe("Preferred server config", testPreferredServerConfig)
 })
 
 func testTrafficStatusRE() {
@@ -112,8 +117,8 @@ func testConnectToEndpoint() {
 		Expect(ip).To(Equal(natInfo.UseIP))
 
 		t.assertActiveConnection(natInfo)
-		t.cmdExecutor.AwaitCommand(nil, "whack", t.localEndpoint.Spec.PrivateIP, natInfo.UseIP,
-			t.localEndpoint.Spec.Subnets[0], natInfo.Endpoint.Spec.Subnets[0])
+		t.cmdExecutor.AwaitCommand(nil, "whack", t.endpointSpec.PrivateIP, natInfo.UseIP,
+			t.endpointSpec.Subnets[0], natInfo.Endpoint.Spec.Subnets[0])
 		t.cmdExecutor.AwaitCommand(nil, "whack", "--initiate")
 	}
 
@@ -124,14 +129,14 @@ func testConnectToEndpoint() {
 		Expect(ip).To(Equal(natInfo.UseIP))
 
 		t.assertActiveConnection(natInfo)
-		t.cmdExecutor.AwaitCommand(nil, "whack", t.localEndpoint.Spec.PrivateIP, t.localEndpoint.Spec.Subnets[0],
+		t.cmdExecutor.AwaitCommand(nil, "whack", t.endpointSpec.PrivateIP, t.endpointSpec.Subnets[0],
 			natInfo.Endpoint.Spec.Subnets[0])
 		t.cmdExecutor.EnsureNoCommand("whack", "--initiate")
 	}
 
 	When("only the local side prefers to be a server", func() {
 		BeforeEach(func() {
-			t.localEndpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "true"}
+			t.endpointSpec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "true"}
 			natInfo.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "false"}
 		})
 
@@ -142,7 +147,7 @@ func testConnectToEndpoint() {
 
 	When("only the remote side prefers to be a server", func() {
 		BeforeEach(func() {
-			t.localEndpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "false"}
+			t.endpointSpec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "false"}
 			natInfo.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "true"}
 		})
 
@@ -153,15 +158,15 @@ func testConnectToEndpoint() {
 			Expect(ip).To(Equal(natInfo.UseIP))
 
 			t.assertActiveConnection(natInfo)
-			t.cmdExecutor.AwaitCommand(nil, "whack", t.localEndpoint.Spec.PrivateIP, natInfo.UseIP,
-				t.localEndpoint.Spec.Subnets[0], natInfo.Endpoint.Spec.Subnets[0])
+			t.cmdExecutor.AwaitCommand(nil, "whack", t.endpointSpec.PrivateIP, natInfo.UseIP,
+				t.endpointSpec.Subnets[0], natInfo.Endpoint.Spec.Subnets[0])
 			t.cmdExecutor.AwaitCommand(nil, "whack", "--initiate")
 		})
 	})
 
 	When("neither side prefers to be a server", func() {
 		BeforeEach(func() {
-			t.localEndpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "false"}
+			t.endpointSpec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "false"}
 			natInfo.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "false"}
 		})
 
@@ -178,7 +183,7 @@ func testConnectToEndpoint() {
 
 	When("both sides prefer to be a server", func() {
 		BeforeEach(func() {
-			t.localEndpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "true"}
+			t.endpointSpec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "true"}
 			natInfo.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "true"}
 		})
 
@@ -290,8 +295,51 @@ func testGetConnections() {
 	})
 }
 
+func testPreferredServerConfig() {
+	t := newTestDriver()
+
+	AfterEach(func() {
+		os.Unsetenv("CE_IPSEC_PREFERREDSERVER")
+	})
+
+	When("the preferred server setting is present in the local endpoint's BackendConfig", func() {
+		BeforeEach(func() {
+			os.Setenv("CE_IPSEC_PREFERREDSERVER", strconv.FormatBool(false))
+			t.endpointSpec.BackendConfig = map[string]string{
+				subv1.PreferredServerConfig: strconv.FormatBool(true),
+				"other":                     "xyz",
+			}
+		})
+
+		It("should correctly update the BackendConfig", func() {
+			Expect(t.localEndpoint.Spec().BackendConfig).To(HaveKeyWithValue(subv1.PreferredServerConfig, strconv.FormatBool(true)))
+			Expect(t.localEndpoint.Spec().BackendConfig).To(HaveKey(subv1.PreferredServerConfig + "-timestamp"))
+			Expect(t.localEndpoint.Spec().BackendConfig).To(HaveKeyWithValue("other", "xyz"))
+		})
+	})
+
+	When("the preferred server setting is present in the env variable", func() {
+		BeforeEach(func() {
+			os.Setenv("CE_IPSEC_PREFERREDSERVER", strconv.FormatBool(true))
+		})
+
+		It("should correctly update the BackendConfig", func() {
+			Expect(t.localEndpoint.Spec().BackendConfig).To(HaveKeyWithValue(subv1.PreferredServerConfig, strconv.FormatBool(true)))
+			Expect(t.localEndpoint.Spec().BackendConfig).To(HaveKey(subv1.PreferredServerConfig + "-timestamp"))
+		})
+	})
+
+	When("the preferred server setting isn't present", func() {
+		It("should correctly update the BackendConfig", func() {
+			Expect(t.localEndpoint.Spec().BackendConfig).To(HaveKeyWithValue(subv1.PreferredServerConfig, strconv.FormatBool(false)))
+			Expect(t.localEndpoint.Spec().BackendConfig).ToNot(HaveKey(subv1.PreferredServerConfig + "-timestamp"))
+		})
+	})
+}
+
 type testDriver struct {
-	localEndpoint *types.SubmarinerEndpoint
+	endpointSpec  subv1.EndpointSpec
+	localEndpoint *endpoint.Local
 	cmdExecutor   *fakecommand.Executor
 	driver        *libreswan
 }
@@ -301,15 +349,16 @@ func newTestDriver() *testDriver {
 
 	BeforeEach(func() {
 		t.cmdExecutor = fakecommand.New()
-		t.localEndpoint = &types.SubmarinerEndpoint{Spec: subv1.EndpointSpec{
+		t.endpointSpec = subv1.EndpointSpec{
 			ClusterID: "local",
 			CableName: "submariner-cable-local-192-68-1-1",
 			PrivateIP: "192.68.1.1",
 			Subnets:   []string{"10.0.0.0/16"},
-		}}
+		}
 	})
 
 	JustBeforeEach(func() {
+		t.localEndpoint = endpoint.NewLocal(&t.endpointSpec, dynamicfake.NewSimpleDynamicClient(scheme.Scheme), "")
 		ls, err := NewLibreswan(t.localEndpoint, &types.SubmarinerCluster{})
 		Expect(err).NotTo(HaveOccurred())
 

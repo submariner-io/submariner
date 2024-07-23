@@ -24,6 +24,7 @@ import (
 
 	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -55,7 +56,9 @@ type Driver interface {
 }
 
 // Function prototype to create a new driver.
-type DriverCreateFunc func(localEndpoint *types.SubmarinerEndpoint, localCluster *types.SubmarinerCluster) (Driver, error)
+type DriverCreateFunc func(localEndpoint *endpoint.Local, localCluster *types.SubmarinerCluster) (Driver, error)
+
+const InterfaceNameConfig = "interface-name"
 
 // Static map of supported drivers.
 var drivers = map[string]DriverCreateFunc{}
@@ -75,9 +78,11 @@ func AddDriver(name string, driverCreate DriverCreateFunc) {
 }
 
 // Returns a new driver according the required Backend.
-func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.SubmarinerCluster) (Driver, error) {
+func NewDriver(localEndpoint *endpoint.Local, localCluster *types.SubmarinerCluster) (Driver, error) {
 	// We'll panic if localEndpoint or localCluster are nil, this is intentional
-	driverCreate, ok := drivers[localEndpoint.Spec.Backend]
+	spec := localEndpoint.Spec()
+
+	driverCreate, ok := drivers[spec.Backend]
 	if !ok {
 		var driverList strings.Builder
 
@@ -89,7 +94,7 @@ func NewDriver(localEndpoint *types.SubmarinerEndpoint, localCluster *types.Subm
 			driverList.WriteString(driver)
 		}
 
-		return nil, fmt.Errorf("unsupported cable type %s; supported types: %s", localEndpoint.Spec.Backend, driverList.String())
+		return nil, fmt.Errorf("unsupported cable type %s; supported types: %s", spec.Backend, driverList.String())
 	}
 
 	return driverCreate(localEndpoint, localCluster)

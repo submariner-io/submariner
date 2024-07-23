@@ -19,6 +19,7 @@ limitations under the License.
 package wireguard
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"net"
@@ -31,6 +32,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
+	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/vishvananda/netlink"
@@ -74,7 +76,7 @@ type specification struct {
 }
 
 type wireguard struct {
-	localEndpoint types.SubmarinerEndpoint
+	localEndpoint v1.EndpointSpec
 	connections   map[string]*v1.Connection // clusterID -> remote ep connection
 	mutex         sync.Mutex
 	client        *wgctrl.Client
@@ -84,17 +86,16 @@ type wireguard struct {
 }
 
 // NewDriver creates a new WireGuard driver.
-func NewDriver(localEndpoint *types.SubmarinerEndpoint, _ *types.SubmarinerCluster) (cable.Driver, error) {
+func NewDriver(localEndpoint *endpoint.Local, _ *types.SubmarinerCluster) (cable.Driver, error) {
 	// We'll panic if localEndpoint is nil, this is intentional
 	var err error
 
 	w := wireguard{
-		connections:   make(map[string]*v1.Connection),
-		localEndpoint: *localEndpoint,
-		spec:          new(specification),
+		connections: make(map[string]*v1.Connection),
+		spec:        new(specification),
 	}
 
-	if err := envconfig.Process(specEnvPrefix, w.spec); err != nil {
+	if err = envconfig.Process(specEnvPrefix, w.spec); err != nil {
 		return nil, errors.Wrap(err, "error processing environment config for wireguard")
 	}
 
@@ -134,11 +135,7 @@ func NewDriver(localEndpoint *types.SubmarinerEndpoint, _ *types.SubmarinerClust
 		return nil, errors.Wrap(err, "error generating private key")
 	}
 
-	pub = priv.PublicKey()
-
-	w.localEndpoint.Spec.BackendConfig[PublicKey] = pub.String()
-
-	port, err := localEndpoint.Spec.GetBackendPort(v1.UDPPortConfig, int32(w.spec.NATTPort))
+	port, err := localEndpoint.Spec().GetBackendPort(v1.UDPPortConfig, int32(w.spec.NATTPort))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error parsing %q from local endpoint", v1.UDPPortConfig)
 	}
@@ -157,6 +154,18 @@ func NewDriver(localEndpoint *types.SubmarinerEndpoint, _ *types.SubmarinerClust
 		return nil, errors.Wrap(err, "failed to configure WireGuard device")
 	}
 
+	pub = priv.PublicKey()
+
+	err = localEndpoint.Update(context.TODO(), func(existing *v1.EndpointSpec) {
+		existing.BackendConfig[PublicKey] = pub.String()
+		existing.BackendConfig[cable.InterfaceNameConfig] = DefaultDeviceName
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "error updating local endpoint")
+	}
+
+	w.localEndpoint = *localEndpoint.Spec()
+
 	logger.V(log.DEBUG).Infof("Created WireGuard %s with publicKey %s", DefaultDeviceName, pub)
 
 	return &w, nil
@@ -166,7 +175,7 @@ func (w *wireguard) Init() error {
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 
-	logger.V(log.DEBUG).Infof("Initializing WireGuard device for cluster %s", w.localEndpoint.Spec.ClusterID)
+	logger.V(log.DEBUG).Infof("Initializing WireGuard device for cluster %s", w.localEndpoint.ClusterID)
 
 	if len(w.connections) != 0 {
 		return fmt.Errorf("cannot initialize with existing connections: %+v", w.connections)
@@ -182,7 +191,7 @@ func (w *wireguard) Init() error {
 		return errors.Wrap(err, "wgctrl cannot find WireGuard device")
 	}
 
-	k, err := keyFromSpec(&w.localEndpoint.Spec)
+	k, err := keyFromSpec(&w.localEndpoint)
 	if err != nil {
 		return errors.Wrapf(err, "endpoint is missing public key %s", d.PublicKey)
 	}
@@ -211,7 +220,7 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 	remoteEndpoint := &endpointInfo.Endpoint
 	ip := endpointInfo.UseIP
 
-	if w.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
+	if w.localEndpoint.ClusterID == remoteEndpoint.Spec.ClusterID {
 		logger.V(log.DEBUG).Infof("Will not connect to self")
 		return "", nil
 	}
@@ -301,7 +310,7 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 
 	logger.V(log.DEBUG).Infof("Done connecting endpoint peer %s@%s", *remoteKey, remoteIP)
 
-	cable.RecordConnection(cableDriverName, &w.localEndpoint.Spec, &connection.Endpoint, string(v1.Connected), true)
+	cable.RecordConnection(cableDriverName, &w.localEndpoint, &connection.Endpoint, string(v1.Connected), true)
 
 	return ip, nil
 }
@@ -324,7 +333,7 @@ func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpo
 	// We'll panic if remoteEndpoint is nil, this is intentional
 	logger.V(log.DEBUG).Infof("Removing endpoint %v+", remoteEndpoint)
 
-	if w.localEndpoint.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
+	if w.localEndpoint.ClusterID == remoteEndpoint.Spec.ClusterID {
 		logger.V(log.DEBUG).Infof("Will not disconnect self")
 		return nil
 	}
@@ -350,7 +359,7 @@ func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpo
 	delete(w.connections, remoteEndpoint.Spec.ClusterID)
 
 	logger.V(log.DEBUG).Infof("Done removing endpoint for cluster %s", remoteEndpoint.Spec.ClusterID)
-	cable.RecordDisconnected(cableDriverName, &w.localEndpoint.Spec, &remoteEndpoint.Spec)
+	cable.RecordDisconnected(cableDriverName, &w.localEndpoint, &remoteEndpoint.Spec)
 
 	return nil
 }
