@@ -138,7 +138,6 @@ type IPSet struct {
 	MaxElem uint
 	// PortRange specifies the port range of bitmap:port type ipset.
 	PortRange PortRange
-	// TODO: add comment message for ipset
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("IPSet")}
