@@ -126,7 +126,6 @@ func main() {
 	logger.FatalfOnError(err, "Error while retrieving the local cluster %q info even after waiting for 5 mins", spec.ClusterID)
 
 	if localCluster.Spec.GlobalCIDR != nil && len(localCluster.Spec.GlobalCIDR) > 0 {
-		// TODO: Revisit when support for more than one globalCIDR is implemented.
 		spec.GlobalCIDR = localCluster.Spec.GlobalCIDR
 	} else {
 		logger.Fatalf("Cluster %s is not configured to use globalCidr", spec.ClusterID)
