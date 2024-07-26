@@ -122,8 +122,7 @@ func (kp *SyncHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 		kp.remoteSubnets.Delete(inputCidrBlock)
 		delete(kp.remoteSubnetGw, inputCidrBlock)
 	}
-	// TODO: Handle a remote endpoint removal use-case
-	//         - remove related iptable rules
+
 	if err := kp.updateRoutingRulesForInterClusterSupport(endpoint.Spec.Subnets, Delete); err != nil {
 		logger.Errorf(err, "updateRoutingRulesForInterClusterSupport for removed remote %#v returned error",
 			endpoint)
