@@ -119,7 +119,6 @@ func (c *ingressPodController) process(from runtime.Object, _ int, op syncer.Ope
 		return ingressIP, false
 	}
 
-	// TODO: handle phase and podIP changes?
 	if c.ingressIPMap.Has(ingressIP.Name) || pod.Status.PodIP == "" ||
 		(!c.publishNotReadyAddresses && pod.Status.Phase != corev1.PodRunning) {
 		// Avoid assigning ingressIPs to pods that are not ready with an endpoint IP
