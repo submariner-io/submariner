@@ -13,7 +13,7 @@ require (
 	github.com/ovn-org/ovn-kubernetes/go-controller v0.0.0-20220511131059-ac1ce4691c0f
 	github.com/pkg/errors v0.9.1
 	github.com/projectcalico/api v0.0.0-20230602153125-fb7148692637
-	github.com/prometheus-community/pro-bing v0.4.0
+	github.com/prometheus-community/pro-bing v0.4.1
 	github.com/prometheus/client_golang v1.19.1
 	github.com/submariner-io/admiral v0.19.0-m1
 	github.com/submariner-io/shipyard v0.19.0-m1
@@ -28,7 +28,7 @@ require (
 	k8s.io/component-helpers v0.30.3
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 	sigs.k8s.io/controller-runtime v0.18.4
-	sigs.k8s.io/knftables v0.0.16
+	sigs.k8s.io/knftables v0.0.17
 	sigs.k8s.io/mcs-api v0.1.0
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1
 )
