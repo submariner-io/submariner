@@ -21,6 +21,7 @@ package kubeproxy
 import (
 	"net"
 	"os"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
@@ -31,6 +32,8 @@ import (
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"github.com/submariner-io/submariner/pkg/vxlan"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/set"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -92,8 +95,16 @@ func (kp *SyncHandler) GetNetworkPlugins() []string {
 	return networkPlugins
 }
 
+var discoverCNIRetryConfig = wait.Backoff{
+	Cap:      1 * time.Minute,
+	Duration: 4 * time.Second,
+	Factor:   1.2,
+	Steps:    12,
+}
+
 func (kp *SyncHandler) Init() error {
 	var err error
+	var cniIface *cni.Interface
 
 	kp.hostname, err = os.Hostname()
 	if err != nil {
@@ -105,7 +116,17 @@ func (kp *SyncHandler) Init() error {
 		return errors.Wrapf(err, "Unable to find the default interface on host: %s", kp.hostname)
 	}
 
-	cniIface, err := cni.Discover(kp.localClusterCidr)
+	err = retry.OnError(discoverCNIRetryConfig, func(err error) bool {
+		logger.Infof("Waiting for CNI interface discovery: %s", err)
+		return true
+	}, func() error {
+		cniIface, err = cni.Discover(kp.localClusterCidr)
+		if err != nil {
+			return errors.Wrapf(err, "Error discovering the CNI interface")
+		}
+
+		return nil
+	})
 	if err == nil {
 		// Configure CNI Specific changes
 		kp.cniIface = cniIface
