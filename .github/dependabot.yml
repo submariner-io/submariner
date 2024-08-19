@@ -11,15 +11,6 @@ updates:
           - "*"
   - package-ecosystem: github-actions
     directory: /
-    target-branch: release-0.14
-    schedule:
-      interval: monthly
-    groups:
-      github-actions:
-        patterns:
-          - "*"
-  - package-ecosystem: github-actions
-    directory: /
     target-branch: release-0.15
     schedule:
       interval: monthly
