@@ -364,6 +364,7 @@ func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
 			for i := 1; i < len(extEgressGlobalIPs); i++ {
 				matchRegexp = Or(matchRegexp, MatchRegexp("%s .*GET /%s%s .*", extEgressGlobalIPs[i], p.Framework.Namespace, clusterName))
 			}
+
 			Expect(podLog).To(matchRegexp)
 		case Headless:
 			// For access from headless service, source IP is the globalIngressIP of the external app
@@ -399,6 +400,7 @@ func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
 		for i := 1; i < len(podGlobalIPs); i++ {
 			matchRegexp = Or(matchRegexp, MatchRegexp("%s .*GET /%s%s .*", podGlobalIPs[i], p.Framework.Namespace, clusterName))
 		}
+
 		Expect(dockerLog).To(matchRegexp)
 	case tcp.GlobalPodIP:
 		// For access from headless service, source IP is the globalIngressIP of the pod, which is set to remoteIP

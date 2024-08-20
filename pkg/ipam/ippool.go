@@ -204,6 +204,7 @@ func (p *IPPool) Reserve(ips ...string) error {
 	for i := 0; i < num; i++ {
 		p.available.Remove(intIPs[i])
 	}
+
 	metrics.RecordAllocateGlobalIPs(p.cidr, num)
 
 	return nil
