@@ -670,6 +670,6 @@ func configureTCPMTUProbe() {
 	// on Gateway node has mtu issues connecting to remoteServices.
 	err := netlink.New().ConfigureTCPMTUProbe(mtuProbe, baseMss)
 	if err != nil {
-		logger.Warningf(err.Error())
+		logger.Warning(err.Error())
 	}
 }

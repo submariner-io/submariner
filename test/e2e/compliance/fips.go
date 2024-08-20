@@ -54,7 +54,7 @@ func testFIPSGatewayStatus(f *subFramework.Framework) {
 	submEndpoint := f.AwaitSubmarinerEndpoint(fipsCluster, subFramework.NoopCheckEndpoint)
 
 	if submEndpoint.Spec.Backend != "libreswan" {
-		framework.Skipf(fmt.Sprintf("Cluster %q is not using the libreswan cable driver, skipping the test...", fipsClusterName))
+		framework.Skipf("Cluster %q is not using the libreswan cable driver, skipping the test...", fipsClusterName)
 	}
 
 	framework.By(fmt.Sprintf("Locate active gateway pod on cluster %q", fipsClusterName))
