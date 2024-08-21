@@ -80,7 +80,7 @@ var _ = Describe("public ip resolvers", func() {
 	When("a LoadBalancer with Ingress IP is specified", func() {
 		It("should return the IP", func() {
 			backendConfig[publicIPConfig] = lbPublicIP
-			client := fake.NewSimpleClientset(serviceWithIngress(v1.LoadBalancerIngress{Hostname: "", IP: testIP}))
+			client := fake.NewClientset(serviceWithIngress(v1.LoadBalancerIngress{Hostname: "", IP: testIP}))
 			ip, err := getPublicIP(submSpec, client, backendConfig, false)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ip).To(Equal(testIP))
@@ -90,7 +90,7 @@ var _ = Describe("public ip resolvers", func() {
 	When("a LoadBalancer with Ingress hostname is specified", func() {
 		It("should return the IP", func() {
 			backendConfig[publicIPConfig] = lbPublicIP
-			client := fake.NewSimpleClientset(serviceWithIngress(v1.LoadBalancerIngress{
+			client := fake.NewClientset(serviceWithIngress(v1.LoadBalancerIngress{
 				Hostname: dnsHost,
 				IP:       "",
 			}))
@@ -106,7 +106,7 @@ var _ = Describe("public ip resolvers", func() {
 			loadBalancerRetryConfig.Duration = 50 * time.Millisecond
 			loadBalancerRetryConfig.Steps = 1
 			backendConfig[publicIPConfig] = lbPublicIP
-			client := fake.NewSimpleClientset(serviceWithIngress())
+			client := fake.NewClientset(serviceWithIngress())
 			_, err := getPublicIP(submSpec, client, backendConfig, false)
 			Expect(err).To(HaveOccurred())
 		})
@@ -115,7 +115,7 @@ var _ = Describe("public ip resolvers", func() {
 	When("an IPv4 entry specified", func() {
 		It("should return the IP", func() {
 			backendConfig[publicIPConfig] = ipv4PublicIP
-			client := fake.NewSimpleClientset()
+			client := fake.NewClientset()
 			ip, err := getPublicIP(submSpec, client, backendConfig, false)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ip).To(Equal(testIP))
@@ -125,7 +125,7 @@ var _ = Describe("public ip resolvers", func() {
 	When("an IPv4 entry specified in air-gapped deployment", func() {
 		It("should return the IP and not an empty value", func() {
 			backendConfig[publicIPConfig] = ipv4PublicIP
-			client := fake.NewSimpleClientset()
+			client := fake.NewClientset()
 			ip, err := getPublicIP(submSpec, client, backendConfig, true)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ip).To(Equal(testIP))
@@ -135,7 +135,7 @@ var _ = Describe("public ip resolvers", func() {
 	When("a DNS entry specified", func() {
 		It("should return the IP", func() {
 			backendConfig[publicIPConfig] = "dns:" + dnsHost
-			client := fake.NewSimpleClientset()
+			client := fake.NewClientset()
 			ip, err := getPublicIP(submSpec, client, backendConfig, false)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ip).To(Equal(testIPDNS))
@@ -145,7 +145,7 @@ var _ = Describe("public ip resolvers", func() {
 	When("an API entry specified", func() {
 		It("should return some IP", func() {
 			backendConfig[publicIPConfig] = "api:4.icanhazip.com/"
-			client := fake.NewSimpleClientset()
+			client := fake.NewClientset()
 			ip, err := getPublicIP(submSpec, client, backendConfig, false)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(net.ParseIP(ip)).NotTo(BeNil())
@@ -155,7 +155,7 @@ var _ = Describe("public ip resolvers", func() {
 	When("multiple entries are specified", func() {
 		It("should return the first working one", func() {
 			backendConfig[publicIPConfig] = ipv4PublicIP + ",dns:" + dnsHost
-			client := fake.NewSimpleClientset()
+			client := fake.NewClientset()
 			ip, err := getPublicIP(submSpec, client, backendConfig, false)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ip).To(Equal(testIP))
@@ -165,7 +165,7 @@ var _ = Describe("public ip resolvers", func() {
 	When("multiple entries are specified and the first one doesn't succeed", func() {
 		It("should return the first working one", func() {
 			backendConfig[publicIPConfig] = "dns:thisdomaindoesntexistforsure.badbadbad,ipv4:" + testIP
-			client := fake.NewSimpleClientset()
+			client := fake.NewClientset()
 			ip, err := getPublicIP(submSpec, client, backendConfig, false)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ip).To(Equal(testIP))

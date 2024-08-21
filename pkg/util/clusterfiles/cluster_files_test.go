@@ -47,7 +47,7 @@ var _ = BeforeSuite(func() {
 var _ = Describe("Cluster Files Get", func() {
 	var client kubernetes.Interface
 	BeforeEach(func() {
-		client = fake.NewSimpleClientset(
+		client = fake.NewClientset(
 			&v1.Secret{
 				ObjectMeta: v1meta.ObjectMeta{Namespace: "ns1", Name: "my-secret"},
 				Data: map[string][]byte{

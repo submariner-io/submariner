@@ -257,7 +257,7 @@ func newTestDriver() *testDriver {
 		restMapper := test.GetRESTMapperFor(&submarinerv1.Endpoint{}, &submarinerv1.Cluster{}, &submarinerv1.Gateway{}, &corev1.Node{})
 
 		t.dynClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
-		t.kubeClient = k8sfake.NewSimpleClientset()
+		t.kubeClient = k8sfake.NewClientset()
 
 		t.cableEngine = enginefake.New()
 

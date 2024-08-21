@@ -84,7 +84,7 @@ func newPublicIPWatcherTestDriver() *publicIPWatcherTestDriver {
 		t.localEPSpec = newEndpointSpec(clusterID, cableName)
 
 		t.stopCh = make(chan struct{})
-		t.k8sClient = fake.NewSimpleClientset(loadBalancerService(v1.LoadBalancerIngress{Hostname: "", IP: initialIP}))
+		t.k8sClient = fake.NewClientset(loadBalancerService(v1.LoadBalancerIngress{Hostname: "", IP: initialIP}))
 		t.dynClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
 		t.endpointClient = t.dynClient.Resource(submarinerv1.EndpointGVR).Namespace(testNamespace)
 		t.localEndpoint = endpoint.NewLocal(&t.localEPSpec, t.dynClient, testNamespace)

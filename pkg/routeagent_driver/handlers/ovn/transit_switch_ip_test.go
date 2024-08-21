@@ -47,7 +47,7 @@ var _ = Describe("TransitSwitchIP", func() {
 		var k8sClient *fakek8s.Clientset
 
 		JustBeforeEach(func() {
-			k8sClient = fakek8s.NewSimpleClientset()
+			k8sClient = fakek8s.NewClientset()
 			node = createNode(k8sClient, nodeIP)
 		})
 
