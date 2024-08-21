@@ -52,7 +52,7 @@ func newTestDriver() *testDriver {
 	}
 
 	BeforeEach(func() {
-		t.k8sClient = fakek8s.NewSimpleClientset()
+		t.k8sClient = fakek8s.NewClientset()
 
 		t.calicoClient = calicocsfake.NewSimpleClientset()
 		fake.AddDeleteCollectionReactor(&t.calicoClient.Fake)

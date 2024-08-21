@@ -87,7 +87,7 @@ func newTestDriver() *testDriver {
 	BeforeEach(func() {
 		t.transitSwitchIP = "190.1.2.0"
 		t.submClient = fakesubm.NewSimpleClientset()
-		t.k8sClient = fakek8s.NewSimpleClientset()
+		t.k8sClient = fakek8s.NewClientset()
 		t.dynClient = fakedynamic.NewSimpleDynamicClient(scheme.Scheme)
 
 		t.netLink = fakenetlink.New()

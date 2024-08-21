@@ -387,7 +387,7 @@ func newGatewayMonitorTestDriver() *gatewayMonitorTestDriver {
 		t.endpoints = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.Endpoint{})).
 			Namespace(namespace)
 
-		t.kubeClient = fakek8s.NewSimpleClientset()
+		t.kubeClient = fakek8s.NewClientset()
 		t.leaderElectionConfig = controllers.LeaderElectionConfig{}
 		t.leaderElection = testutil.NewLeaderElectionSupport(t.kubeClient, namespace, controllers.LeaderElectionLockName)
 

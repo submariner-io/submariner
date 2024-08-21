@@ -92,7 +92,7 @@ var _ = Describe("GetLocalSpec", func() {
 	})
 
 	JustBeforeEach(func() {
-		client = fake.NewSimpleClientset(node)
+		client = fake.NewClientset(node)
 	})
 
 	It("should return a valid EndpointSpec object", func() {
