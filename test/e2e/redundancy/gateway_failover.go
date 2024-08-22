@@ -181,11 +181,13 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 	Expect(initialGWPod).ToNot(BeNil(), "Did not find an active gateway pod")
 
 	By(fmt.Sprintf("Ensure active gateway node %q has established connections", initialGWPod.Name))
-	gwConnection := f.AwaitGatewayWithStatus(framework.ClusterIndex(primaryCluster), initialGWPod.Spec.NodeName, subv1.HAStatusActive)
-	Expect(gwConnection.Status.Connections).NotTo(BeEmpty(), "The active gateway must have established connections")
 
 	submEndpoint := f.AwaitSubmarinerEndpoint(framework.ClusterIndex(primaryCluster), subFramework.NoopCheckEndpoint)
 	By(fmt.Sprintf("Found submariner endpoint for %q: %#v", clusterAName, submEndpoint))
+
+	gwConnection := f.AwaitGatewayWithStatus(framework.ClusterIndex(primaryCluster),
+		resource.EnsureValidName(submEndpoint.Spec.Hostname), subv1.HAStatusActive)
+	Expect(gwConnection.Status.Connections).NotTo(BeEmpty(), "The active gateway must have established connections")
 
 	By("Performing fail-over to passive gateway")
 	f.DoFailover(context.TODO(), framework.ClusterIndex(primaryCluster), initialGWPod.Spec.NodeName, initialGWPod.Name)
@@ -197,13 +199,14 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 	Expect(newGWPod).ToNot(BeNil(), "Did not find a new active gateway pod running on a different node")
 	By(fmt.Sprintf("Found new submariner gateway pod %q", newGWPod.Name))
 
-	By(fmt.Sprintf("Waiting for the new pod %q to report as fully connected", newGWPod.Name))
-	f.AwaitGatewayFullyConnected(framework.ClusterIndex(primaryCluster), resource.EnsureValidName(newGWPod.Spec.NodeName))
-
 	// Verify a new Endpoint instance is created by the new gateway instance. This is a bit whitebox but it's a sanity check
 	// and also gives it a bit more of a cushion to avoid premature timeout in the connectivity test.
 	newSubmEndpoint := f.AwaitNewSubmarinerEndpoint(framework.ClusterIndex(primaryCluster), submEndpoint.ObjectMeta.UID)
 	By(fmt.Sprintf("Found new submariner endpoint for %q: %#v", clusterAName, newSubmEndpoint))
+
+	By(fmt.Sprintf("Waiting for the new pod %q to report as fully connected", newGWPod.Name))
+	f.AwaitGatewayFullyConnected(framework.ClusterIndex(primaryCluster),
+		resource.EnsureValidName(resource.EnsureValidName(newSubmEndpoint.Spec.Hostname)))
 
 	By(fmt.Sprintf("Waiting for the previous submariner endpoint %q to be removed on %q", newGWPod.Name, clusterBName))
 	f.AwaitSubmarinerEndpointRemoved(framework.ClusterIndex(secondaryCluster), submEndpoint.Name)
