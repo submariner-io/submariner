@@ -153,7 +153,7 @@ func (p *pingerInfo) doPing() error {
 		}
 
 		// Pinger will mark a connection as an error if the packet loss reaches the threshold
-		if pinger.PacketsSent-pinger.PacketsRecv > int(p.maxPacketLossCount) {
+		if uint(pinger.PacketsSent-pinger.PacketsRecv) > p.maxPacketLossCount {
 			p.Lock()
 			defer p.Unlock()
 
@@ -204,16 +204,20 @@ func (p *pingerInfo) GetLatencyInfo() *LatencyInfo {
 	p.Lock()
 	defer p.Unlock()
 
+	toDurationString := func(v uint64) string {
+		return time.Duration(v).String() //nolint:gosec // We can safely ignore integer conversion error
+	}
+
 	return &LatencyInfo{
 		IP:               p.ip,
 		ConnectionStatus: p.connectionStatus,
 		ConnectionError:  p.failureMsg,
 		Spec: &submarinerv1.LatencyRTTSpec{
-			Last:    time.Duration(p.statistics.lastRtt).String(),
-			Min:     time.Duration(p.statistics.minRtt).String(),
-			Average: time.Duration(p.statistics.mean).String(),
-			Max:     time.Duration(p.statistics.maxRtt).String(),
-			StdDev:  time.Duration(p.statistics.stdDev).String(),
+			Last:    toDurationString(p.statistics.lastRtt),
+			Min:     toDurationString(p.statistics.minRtt),
+			Average: toDurationString(p.statistics.mean),
+			Max:     toDurationString(p.statistics.maxRtt),
+			StdDev:  toDurationString(p.statistics.stdDev),
 		},
 	}
 }

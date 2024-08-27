@@ -70,7 +70,7 @@ func init() {
 
 type specification struct {
 	PSK      string `default:"default psk"`
-	NATTPort int    `default:"4500"`
+	NATTPort int32  `default:"4500"`
 }
 
 type wireguard struct {
@@ -133,7 +133,7 @@ func NewDriver(localEndpoint *endpoint.Local, _ *types.SubmarinerCluster) (cable
 		return nil, errors.Wrap(err, "error generating private key")
 	}
 
-	port, err := localEndpoint.Spec().GetBackendPort(v1.UDPPortConfig, int32(w.spec.NATTPort))
+	port, err := localEndpoint.Spec().GetBackendPort(v1.UDPPortConfig, w.spec.NATTPort)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error parsing %q from local endpoint", v1.UDPPortConfig)
 	}
@@ -266,7 +266,7 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 	logger.V(log.DEBUG).Infof("Adding connection for cluster %s, %v", remoteEndpoint.Spec.ClusterID, connection)
 	w.connections[remoteEndpoint.Spec.ClusterID] = connection
 
-	port, err := remoteEndpoint.Spec.GetBackendPort(v1.UDPPortConfig, int32(w.spec.NATTPort))
+	port, err := remoteEndpoint.Spec.GetBackendPort(v1.UDPPortConfig, w.spec.NATTPort)
 	if err != nil {
 		logger.Warningf("Error parsing %q from remote endpoint %q - using port %dº instead: %v", v1.UDPPortConfig,
 			remoteEndpoint.Spec.CableName, w.spec.NATTPort, err)

@@ -82,7 +82,7 @@ func ipToInt(ip net.IP) int {
 
 func intToIP(ip int) net.IP {
 	netIP := make(net.IP, 4)
-	binary.BigEndian.PutUint32(netIP, uint32(ip))
+	binary.BigEndian.PutUint32(netIP, uint32(ip)) //nolint:gosec // int -> uint32 conversion won't overflow here
 
 	return netIP
 }
