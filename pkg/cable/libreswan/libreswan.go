@@ -90,8 +90,6 @@ type specification struct {
 	NATTPort    string `default:"4500"`
 }
 
-const defaultNATTPort = "4500"
-
 // NewLibreswan starts an IKE daemon using Libreswan and configures it to manage Submariner's endpoints.
 func NewLibreswan(localEndpoint *submendpoint.Local, _ *types.SubmarinerCluster) (cable.Driver, error) {
 	// We'll panic if localEndpoint is nil, this is intentional
@@ -102,12 +100,14 @@ func NewLibreswan(localEndpoint *submendpoint.Local, _ *types.SubmarinerCluster)
 		return nil, errors.Wrapf(err, "error processing environment config for %s", cable.IPSecEnvPrefix)
 	}
 
-	defaultNATTPort, err := strconv.ParseUint(ipSecSpec.NATTPort, 10, 16)
+	port, err := strconv.ParseUint(ipSecSpec.NATTPort, 10, 16)
 	if err != nil {
 		return nil, errors.Wrap(err, "error parsing CR_IPSEC_NATTPORT environment variable")
 	}
 
-	nattPort, err := localEndpoint.Spec().GetBackendPort(subv1.UDPPortConfig, int32(defaultNATTPort))
+	defaultNATTPort := int32(port) //nolint:gosec // We can safely ignore integer conversion error
+
+	nattPort, err := localEndpoint.Spec().GetBackendPort(subv1.UDPPortConfig, defaultNATTPort)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error parsing %q from local endpoint", subv1.UDPPortConfig)
 	}
@@ -143,7 +143,7 @@ func NewLibreswan(localEndpoint *submendpoint.Local, _ *types.SubmarinerCluster)
 		debug:                 ipSecSpec.Debug,
 		logFile:               ipSecSpec.LogFile,
 		ipSecNATTPort:         strconv.Itoa(int(nattPort)),
-		defaultNATTPort:       int32(defaultNATTPort),
+		defaultNATTPort:       defaultNATTPort,
 		localEndpoint:         *localEndpoint.Spec(),
 		connections:           []subv1.Connection{},
 		forceUDPEncapsulation: ipSecSpec.ForceEncaps,

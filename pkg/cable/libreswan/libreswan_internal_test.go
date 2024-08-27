@@ -66,7 +66,7 @@ func testIPsecPortConfiguration() {
 
 	When("NewLibreswan is called with no port environment variables set", func() {
 		It("should set the port fields from the defaults in the specification definition", func() {
-			Expect(t.driver.ipSecNATTPort).To(Equal(defaultNATTPort))
+			Expect(t.driver.ipSecNATTPort).To(Equal("4500"))
 		})
 	})
 

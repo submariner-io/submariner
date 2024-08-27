@@ -511,7 +511,7 @@ func getPodGlobalIPs(p testParams, g globalnetTestParams, np *framework.NetworkP
 }
 
 func createHeadlessTCPServiceWithoutSelector(f *framework.Framework, cluster framework.ClusterIndex,
-	svcName, portName string, port int,
+	svcName, portName string, port int32,
 ) *v1.Service {
 	serviceSpec := f.NewService(svcName, portName, port, v1.ProtocolTCP, nil, true)
 	sc := framework.KubeClients[cluster].CoreV1().Services(f.Namespace)

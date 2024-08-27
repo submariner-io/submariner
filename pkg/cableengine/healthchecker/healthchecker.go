@@ -161,7 +161,7 @@ func (h *controller) endpointCreatedOrUpdated(obj runtime.Object, _ int) bool {
 	}
 
 	if h.config.PingInterval != 0 {
-		pingerConfig.Interval = time.Second * time.Duration(h.config.PingInterval)
+		pingerConfig.Interval = time.Second * time.Duration(h.config.PingInterval) //nolint:gosec // We can safely ignore integer conversion error
 	}
 
 	newPingerFunc := h.config.NewPinger

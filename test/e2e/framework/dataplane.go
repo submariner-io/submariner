@@ -157,12 +157,12 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams, gn Global
 	}
 
 	verifyConnectivity := func(listener *framework.NetworkPod, connector *framework.NetworkPod) {
-		cmd := []string{"sh", "-c", "for j in $(seq 1 " + strconv.Itoa(int(connector.Config.NumOfDataBufs)) + "); do echo" +
+		cmd := []string{"sh", "-c", "for j in $(seq 1 " + strconv.FormatUint(uint64(connector.Config.NumOfDataBufs), 10) + "); do echo" +
 			" [dataplane] connector says " + connector.Config.Data + "; done" +
-			" | for i in $(seq " + strconv.Itoa(int(listener.Config.ConnectionAttempts)) + ");" +
-			" do if nc -v " + remoteIP + " " + strconv.Itoa(connector.Config.Port) + " -w " +
-			strconv.Itoa(int(listener.Config.ConnectionTimeout)) + ";" +
-			" then break; else sleep " + strconv.Itoa(int(listener.Config.ConnectionTimeout/2)) + "; fi; done"}
+			" | for i in $(seq " + strconv.FormatUint(uint64(listener.Config.ConnectionAttempts), 10) + ");" +
+			" do if nc -v " + remoteIP + " " + strconv.FormatUint(uint64(connector.Config.Port), 10) + " -w " +
+			strconv.FormatUint(uint64(listener.Config.ConnectionTimeout), 10) + ";" +
+			" then break; else sleep " + strconv.FormatUint(uint64(listener.Config.ConnectionTimeout/2), 10) + "; fi; done"}
 
 		stdOut, _, err := p.Framework.ExecWithOptions(context.TODO(), &framework.ExecOptions{
 			Command:            cmd,

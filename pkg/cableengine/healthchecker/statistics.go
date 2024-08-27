@@ -46,6 +46,8 @@ func (s *statistics) update(rtt uint64) {
 		s.previousRtts[1] = s.previousRtts[s.size-1]
 		s.sum = s.previousRtts[0] + s.previousRtts[1]
 		s.mean = s.sum / 2
+
+		//nolint:gosec // Ignore "integer overflow conversion uint64 -> int64" - we subtract uint64's and want to preserve sign.
 		s.sqrDiff = uint64(int64(s.previousRtts[0]-s.mean)*int64(s.previousRtts[0]-s.mean) +
 			int64(s.previousRtts[1]-s.mean)*int64(s.previousRtts[1]-s.mean))
 	}
@@ -63,6 +65,8 @@ func (s *statistics) update(rtt uint64) {
 		s.sum += rtt
 		oldMean := s.mean
 		s.mean = s.sum / (s.index + 1)
+
+		//nolint:gosec // Ignore "integer overflow conversion uint64 -> int64" - we subtract uint64's and want to preserve sign.
 		s.sqrDiff += uint64(int64(rtt-oldMean) * int64(rtt-s.mean))
 		s.stdDev = uint64(math.Sqrt(float64(s.sqrDiff / (s.index + 1))))
 	} else {
