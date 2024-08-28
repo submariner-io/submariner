@@ -26,28 +26,14 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/pinger"
 	"k8s.io/apimachinery/pkg/runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-type LatencyInfo struct {
-	ConnectionError  string
-	ConnectionStatus ConnectionStatus
-	IP               string
-	Spec             *submarinerv1.LatencyRTTSpec
-}
-
-type ConnectionStatus string
-
-const (
-	Connected         ConnectionStatus = "connected"
-	ConnectionUnknown ConnectionStatus = "unknown"
-	ConnectionError   ConnectionStatus = "error"
-)
-
 type Interface interface {
 	Start(stopCh <-chan struct{}) error
-	GetLatencyInfo(endpoint *submarinerv1.EndpointSpec) *LatencyInfo
+	GetLatencyInfo(endpoint *submarinerv1.EndpointSpec) *pinger.LatencyInfo
 	Stop()
 }
 
@@ -57,12 +43,12 @@ type Config struct {
 	ClusterID          string
 	PingInterval       uint
 	MaxPacketLossCount uint
-	NewPinger          func(PingerConfig) PingerInterface
+	NewPinger          func(pinger.Config) pinger.Interface
 }
 
 type controller struct {
 	sync.RWMutex
-	pingers map[string]PingerInterface
+	pingers map[string]pinger.Interface
 	config  *Config
 }
 
@@ -71,7 +57,7 @@ var logger = log.Logger{Logger: logf.Log.WithName("HealthChecker")}
 func New(config *Config) (Interface, error) {
 	controller := &controller{
 		config:  config,
-		pingers: map[string]PingerInterface{},
+		pingers: map[string]pinger.Interface{},
 	}
 
 	config.WatcherConfig.ResourceConfigs = []watcher.ResourceConfig{
@@ -90,12 +76,12 @@ func New(config *Config) (Interface, error) {
 	return controller, nil
 }
 
-func (h *controller) GetLatencyInfo(endpoint *submarinerv1.EndpointSpec) *LatencyInfo {
+func (h *controller) GetLatencyInfo(endpoint *submarinerv1.EndpointSpec) *pinger.LatencyInfo {
 	h.RLock()
 	defer h.RUnlock()
 
-	if pinger, found := h.pingers[endpoint.CableName]; found {
-		return pinger.GetLatencyInfo()
+	if pingerObject, found := h.pingers[endpoint.CableName]; found {
+		return pingerObject.GetLatencyInfo()
 	}
 
 	return nil
@@ -125,7 +111,7 @@ func (h *controller) Stop() {
 		p.Stop()
 	}
 
-	h.pingers = map[string]PingerInterface{}
+	h.pingers = map[string]pinger.Interface{}
 }
 
 func (h *controller) endpointCreatedOrUpdated(obj runtime.Object, _ int) bool {
@@ -145,17 +131,17 @@ func (h *controller) endpointCreatedOrUpdated(obj runtime.Object, _ int) bool {
 	h.Lock()
 	defer h.Unlock()
 
-	if pinger, found := h.pingers[endpointCreated.Spec.CableName]; found {
-		if pinger.GetIP() == endpointCreated.Spec.HealthCheckIP {
+	if pingerObject, found := h.pingers[endpointCreated.Spec.CableName]; found {
+		if pingerObject.GetIP() == endpointCreated.Spec.HealthCheckIP {
 			return false
 		}
 
 		logger.V(log.DEBUG).Infof("HealthChecker is already running for %q - stopping", endpointCreated.Name)
-		pinger.Stop()
+		pingerObject.Stop()
 		delete(h.pingers, endpointCreated.Spec.CableName)
 	}
 
-	pingerConfig := PingerConfig{
+	pingerConfig := pinger.Config{
 		IP:                 endpointCreated.Spec.HealthCheckIP,
 		MaxPacketLossCount: h.config.MaxPacketLossCount,
 	}
@@ -166,12 +152,12 @@ func (h *controller) endpointCreatedOrUpdated(obj runtime.Object, _ int) bool {
 
 	newPingerFunc := h.config.NewPinger
 	if newPingerFunc == nil {
-		newPingerFunc = NewPinger
+		newPingerFunc = pinger.NewPinger
 	}
 
-	pinger := newPingerFunc(pingerConfig)
-	h.pingers[endpointCreated.Spec.CableName] = pinger
-	pinger.Start()
+	pingerObject := newPingerFunc(pingerConfig)
+	h.pingers[endpointCreated.Spec.CableName] = pingerObject
+	pingerObject.Start()
 
 	logger.Infof("CableEngine HealthChecker started pinger for CableName: %q with HealthCheckIP %q",
 		endpointCreated.Spec.CableName, endpointCreated.Spec.HealthCheckIP)
@@ -185,8 +171,8 @@ func (h *controller) endpointDeleted(obj runtime.Object, _ int) bool {
 	h.Lock()
 	defer h.Unlock()
 
-	if pinger, found := h.pingers[endpointDeleted.Spec.CableName]; found {
-		pinger.Stop()
+	if pingerObject, found := h.pingers[endpointDeleted.Spec.CableName]; found {
+		pingerObject.Stop()
 		delete(h.pingers, endpointDeleted.Spec.CableName)
 	}
 

@@ -24,7 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
+	"github.com/submariner-io/submariner/pkg/pinger"
 )
 
 type Pinger struct {
@@ -54,17 +54,17 @@ func (p *Pinger) Stop() {
 	close(p.stop)
 }
 
-func (p *Pinger) GetLatencyInfo() *healthchecker.LatencyInfo {
+func (p *Pinger) GetLatencyInfo() *pinger.LatencyInfo {
 	o := p.latencyInfo.Load()
 	if o != nil {
-		info := o.(healthchecker.LatencyInfo)
+		info := o.(pinger.LatencyInfo)
 		return &info
 	}
 
 	return nil
 }
 
-func (p *Pinger) SetLatencyInfo(info *healthchecker.LatencyInfo) {
+func (p *Pinger) SetLatencyInfo(info *pinger.LatencyInfo) {
 	p.latencyInfo.Store(*info)
 }
 
