@@ -35,6 +35,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/cableengine"
 	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
 	v1typed "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/pinger"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -252,13 +253,13 @@ func (gs *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 						connection.StatusMessage = ""
 					}
 
-					if latencyInfo.ConnectionStatus == healthchecker.ConnectionError {
+					if latencyInfo.ConnectionStatus == pinger.ConnectionError {
 						connection.Status = v1.ConnectionError
 						connection.StatusMessage = latencyInfo.ConnectionError
-					} else if latencyInfo.ConnectionStatus == healthchecker.ConnectionUnknown {
+					} else if latencyInfo.ConnectionStatus == pinger.ConnectionUnknown {
 						connection.StatusMessage = latencyInfo.ConnectionError
 					}
-				} else if connection.Status == v1.ConnectionError && latencyInfo.ConnectionStatus == healthchecker.Connected {
+				} else if connection.Status == v1.ConnectionError && latencyInfo.ConnectionStatus == pinger.Connected {
 					connection.Status = v1.Connected
 					connection.StatusMessage = ""
 				}

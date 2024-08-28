@@ -39,11 +39,12 @@ import (
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	fakeEngine "github.com/submariner-io/submariner/pkg/cableengine/fake"
 	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
-	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker/fake"
 	"github.com/submariner-io/submariner/pkg/cableengine/syncer"
 	fakeClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned/fake"
 	submarinerClientsetv1 "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
 	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions"
+	"github.com/submariner-io/submariner/pkg/pinger"
+	"github.com/submariner-io/submariner/pkg/pinger/fake"
 	"github.com/submariner-io/submariner/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -432,9 +433,9 @@ func testGatewayLatencyInfo() {
 				StdDev:  "94ms",
 			}
 
-			t.pinger.SetLatencyInfo(&healthchecker.LatencyInfo{
+			t.pinger.SetLatencyInfo(&pinger.LatencyInfo{
 				IP:               t.pinger.GetIP(),
-				ConnectionStatus: healthchecker.Connected,
+				ConnectionStatus: pinger.Connected,
 				Spec:             t.expectedGateway.Status.Connections[0].LatencyRTT,
 			})
 
@@ -445,9 +446,9 @@ func testGatewayLatencyInfo() {
 			t.expectedGateway.Status.Connections[0].Status = submarinerv1.ConnectionError
 			t.expectedGateway.Status.Connections[0].StatusMessage = "Ping failed"
 
-			t.pinger.SetLatencyInfo(&healthchecker.LatencyInfo{
+			t.pinger.SetLatencyInfo(&pinger.LatencyInfo{
 				IP:               t.pinger.GetIP(),
-				ConnectionStatus: healthchecker.ConnectionError,
+				ConnectionStatus: pinger.ConnectionError,
 				ConnectionError:  t.expectedGateway.Status.Connections[0].StatusMessage,
 				Spec:             t.expectedGateway.Status.Connections[0].LatencyRTT,
 			})
@@ -457,9 +458,9 @@ func testGatewayLatencyInfo() {
 			t.expectedGateway.Status.Connections[0].Status = submarinerv1.Connected
 			t.expectedGateway.Status.Connections[0].StatusMessage = ""
 
-			t.pinger.SetLatencyInfo(&healthchecker.LatencyInfo{
+			t.pinger.SetLatencyInfo(&pinger.LatencyInfo{
 				IP:               t.pinger.GetIP(),
-				ConnectionStatus: healthchecker.Connected,
+				ConnectionStatus: pinger.Connected,
 				Spec:             t.expectedGateway.Status.Connections[0].LatencyRTT,
 			})
 
@@ -550,7 +551,7 @@ func (t *testDriver) run() {
 		},
 		EndpointNamespace: namespace,
 		ClusterID:         t.engine.LocalEndPoint.Spec.ClusterID,
-		NewPinger: func(pingerCfg healthchecker.PingerConfig) healthchecker.PingerInterface {
+		NewPinger: func(pingerCfg pinger.Config) pinger.Interface {
 			defer GinkgoRecover()
 			Expect(pingerCfg.IP).To(Equal(t.pinger.GetIP()))
 			return t.pinger

@@ -183,6 +183,7 @@ const (
 	Connected       ConnectionStatus = "connected"
 	Connecting      ConnectionStatus = "connecting"
 	ConnectionError ConnectionStatus = "error"
+	ConnectionNone  ConnectionStatus = "none"
 )
 
 // +genclient

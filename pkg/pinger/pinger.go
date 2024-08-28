@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package healthchecker
+package pinger
 
 import (
 	"fmt"
@@ -25,13 +25,30 @@ import (
 
 	"github.com/pkg/errors"
 	probing "github.com/prometheus-community/pro-bing"
+	"github.com/submariner-io/admiral/pkg/log"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
 	Privileged         = true
 	doPingRetryTimeout = 5
 )
+
+type ConnectionStatus string
+
+const (
+	Connected         ConnectionStatus = "connected"
+	ConnectionUnknown ConnectionStatus = "unknown"
+	ConnectionError   ConnectionStatus = "error"
+)
+
+type LatencyInfo struct {
+	ConnectionError  string
+	ConnectionStatus ConnectionStatus
+	IP               string
+	Spec             *submarinerv1.LatencyRTTSpec
+}
 
 var (
 	defaultMaxPacketLossCount uint = 5
@@ -46,23 +63,25 @@ var (
 	// Even though we set up the pinger to run continuously, we still have to give it a non-zero timeout else it will
 	// fail so set a really long one.
 	defaultPingTimeout = 87600 * time.Hour
+
+	logger = log.Logger{Logger: logf.Log.WithName("Pinger")}
 )
 
-type PingerInterface interface {
+type Interface interface {
 	Start()
 	Stop()
 	GetLatencyInfo() *LatencyInfo
 	GetIP() string
 }
 
-type PingerConfig struct {
+type Config struct {
 	IP                 string
 	Interval           time.Duration
 	Timeout            time.Duration
 	MaxPacketLossCount uint
 }
 
-type pingerInfo struct {
+type pingerImpl struct {
 	sync.Mutex
 	ip                 string
 	pingInterval       time.Duration
@@ -74,8 +93,8 @@ type pingerInfo struct {
 	stopCh             chan struct{}
 }
 
-func NewPinger(config PingerConfig) PingerInterface {
-	p := &pingerInfo{
+func NewPinger(config Config) Interface {
+	p := &pingerImpl{
 		ip:                 config.IP,
 		pingInterval:       config.Interval,
 		pingTimeout:        config.Timeout,
@@ -102,7 +121,7 @@ func NewPinger(config PingerConfig) PingerInterface {
 	return p
 }
 
-func (p *pingerInfo) Start() {
+func (p *pingerImpl) Start() {
 	logger.Infof("Starting pinger for IP %q", p.ip)
 
 	go func() {
@@ -121,7 +140,7 @@ func (p *pingerInfo) Start() {
 	}()
 }
 
-func (p *pingerInfo) Stop() {
+func (p *pingerImpl) Stop() {
 	select {
 	case <-p.stopCh:
 		return
@@ -130,7 +149,7 @@ func (p *pingerInfo) Stop() {
 	}
 }
 
-func (p *pingerInfo) doPing() error {
+func (p *pingerImpl) doPing() error {
 	pinger, err := probing.NewPinger(p.ip)
 	if err != nil {
 		p.connectionStatus = ConnectionUnknown
@@ -196,11 +215,11 @@ func (p *pingerInfo) doPing() error {
 	return nil
 }
 
-func (p *pingerInfo) GetIP() string {
+func (p *pingerImpl) GetIP() string {
 	return p.ip
 }
 
-func (p *pingerInfo) GetLatencyInfo() *LatencyInfo {
+func (p *pingerImpl) GetLatencyInfo() *LatencyInfo {
 	p.Lock()
 	defer p.Unlock()
 
