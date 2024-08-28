@@ -17,7 +17,7 @@ require (
 	github.com/prometheus/client_golang v1.19.1
 	github.com/submariner-io/admiral v0.19.0-m2.0.20240819074554-489d309b67d9
 	github.com/submariner-io/shipyard v0.19.0-m2
-	github.com/vishvananda/netlink v1.2.1-beta.2
+	github.com/vishvananda/netlink v1.3.0
 	golang.org/x/net v0.28.0
 	golang.org/x/sys v0.24.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20230429144221-925a1e7659e6
@@ -80,7 +80,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/testify v1.9.0 // indirect
 	github.com/urfave/cli/v2 v2.4.0 // indirect
-	github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae // indirect
+	github.com/vishvananda/netns v0.0.4 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	golang.org/x/crypto v0.26.0 // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
