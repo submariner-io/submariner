@@ -281,8 +281,7 @@ func newTestDriver() *testDriver {
 
 		config.NewPinger = func(pingerCfg pinger.Config) pinger.Interface {
 			defer GinkgoRecover()
-			Expect(pingerCfg.Interval).To(Equal(time.Second *
-				time.Duration(config.PingInterval))) //nolint:gosec // We can safely ignore integer conversion error
+			Expect(pingerCfg.Interval).To(Equal(time.Second * time.Duration(config.PingInterval)))
 			Expect(pingerCfg.MaxPacketLossCount).To(Equal(config.MaxPacketLossCount))
 
 			p, ok := t.pingerMap[pingerCfg.IP]

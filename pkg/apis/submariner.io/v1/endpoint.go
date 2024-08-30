@@ -63,7 +63,6 @@ func parsePort(port string) (int32, error) {
 		return -1, errors.Errorf("port %s is > 65535", port)
 	}
 
-	//nolint:gosec // We can safely ignore integer conversion error
 	return int32(portInt), nil
 }
 

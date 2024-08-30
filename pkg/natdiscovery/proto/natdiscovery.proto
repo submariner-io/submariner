@@ -67,7 +67,7 @@ message SubmarinerNATDiscoveryResponse {
 
 message IPPortPair {
   string IP = 1;
-  uint32 port = 2;
+  int32 port = 2;
 }
 
 message EndpointDetails {
