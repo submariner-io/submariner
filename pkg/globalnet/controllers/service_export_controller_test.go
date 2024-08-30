@@ -24,11 +24,12 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/ipam"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
-	"github.com/submariner-io/submariner/pkg/ipam"
+	"github.com/submariner-io/submariner/pkg/globalnet/metrics"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -465,7 +466,7 @@ func newServiceExportControllerTestDriver() *serviceExportControllerTestDriver {
 func (t *serviceExportControllerTestDriver) start() (*syncer.ResourceSyncerConfig, *controllers.IngressPodControllers, syncer.Interface) {
 	var err error
 
-	t.pool, err = ipam.NewIPPool(t.globalCIDR)
+	t.pool, err = ipam.NewIPPool(t.globalCIDR, metrics.GlobalnetMetricsReporter)
 	Expect(err).To(Succeed())
 
 	config := &syncer.ResourceSyncerConfig{
