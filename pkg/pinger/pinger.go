@@ -51,14 +51,14 @@ type LatencyInfo struct {
 }
 
 var (
-	defaultMaxPacketLossCount uint = 5
+	defaultMaxPacketLossCount = 5
 
 	defaultPingInterval = 1 * time.Second
 
 	// The RTT will be stored and will be used to calculate the statistics until
 	// the size is reached. Once the size is reached the array will be reset and
 	// the last elements will be added to the array for statistics.
-	size uint64 = 1000
+	size int64 = 1000
 
 	// Even though we set up the pinger to run continuously, we still have to give it a non-zero timeout else it will
 	// fail so set a really long one.
@@ -78,7 +78,7 @@ type Config struct {
 	IP                 string
 	Interval           time.Duration
 	Timeout            time.Duration
-	MaxPacketLossCount uint
+	MaxPacketLossCount int
 }
 
 type pingerImpl struct {
@@ -86,7 +86,7 @@ type pingerImpl struct {
 	ip                 string
 	pingInterval       time.Duration
 	pingTimeout        time.Duration
-	maxPacketLossCount uint
+	maxPacketLossCount int
 	statistics         statistics
 	failureMsg         string
 	connectionStatus   ConnectionStatus
@@ -101,7 +101,7 @@ func NewPinger(config Config) Interface {
 		maxPacketLossCount: config.MaxPacketLossCount,
 		statistics: statistics{
 			size:         size,
-			previousRtts: make([]uint64, size),
+			previousRtts: make([]int64, size),
 		},
 		stopCh: make(chan struct{}),
 	}
@@ -172,7 +172,7 @@ func (p *pingerImpl) doPing() error {
 		}
 
 		// Pinger will mark a connection as an error if the packet loss reaches the threshold
-		if uint(pinger.PacketsSent-pinger.PacketsRecv) > p.maxPacketLossCount {
+		if pinger.PacketsSent-pinger.PacketsRecv > p.maxPacketLossCount {
 			p.Lock()
 			defer p.Unlock()
 
@@ -198,7 +198,7 @@ func (p *pingerImpl) doPing() error {
 
 		p.connectionStatus = Connected
 		p.failureMsg = ""
-		p.statistics.update(uint64(packet.Rtt.Nanoseconds()))
+		p.statistics.update(packet.Rtt.Nanoseconds())
 
 		pinger.PacketsSent = 0
 		pinger.PacketsRecv = 0
@@ -223,8 +223,8 @@ func (p *pingerImpl) GetLatencyInfo() *LatencyInfo {
 	p.Lock()
 	defer p.Unlock()
 
-	toDurationString := func(v uint64) string {
-		return time.Duration(v).String() //nolint:gosec // We can safely ignore integer conversion error
+	toDurationString := func(v int64) string {
+		return time.Duration(v).String()
 	}
 
 	return &LatencyInfo{

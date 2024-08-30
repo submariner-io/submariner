@@ -87,11 +87,11 @@ func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT,
 		},
 		UsingSrc: &natproto.IPPortPair{
 			IP:   sourceIP,
-			Port: uint32(nd.serverPort),
+			Port: nd.serverPort,
 		},
 		UsingDst: &natproto.IPPortPair{
 			IP:   targetIP,
-			Port: uint32(targetPort),
+			Port: targetPort,
 		},
 	}
 

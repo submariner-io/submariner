@@ -21,7 +21,6 @@ package framework
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	. "github.com/onsi/gomega"
 	resourceUtil "github.com/submariner-io/admiral/pkg/resource"
@@ -157,12 +156,15 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams, gn Global
 	}
 
 	verifyConnectivity := func(listener *framework.NetworkPod, connector *framework.NetworkPod) {
-		cmd := []string{"sh", "-c", "for j in $(seq 1 " + strconv.FormatUint(uint64(connector.Config.NumOfDataBufs), 10) + "); do echo" +
-			" [dataplane] connector says " + connector.Config.Data + "; done" +
-			" | for i in $(seq " + strconv.FormatUint(uint64(listener.Config.ConnectionAttempts), 10) + ");" +
-			" do if nc -v " + remoteIP + " " + strconv.FormatUint(uint64(connector.Config.Port), 10) + " -w " +
-			strconv.FormatUint(uint64(listener.Config.ConnectionTimeout), 10) + ";" +
-			" then break; else sleep " + strconv.FormatUint(uint64(listener.Config.ConnectionTimeout/2), 10) + "; fi; done"}
+		cmd := []string{
+			"sh",
+			"-c",
+			fmt.Sprintf("for j in $(seq 1 %d); do echo [dataplane] connector says %s; done"+
+				" | for i in $(seq %d); do if nc -v %s %d -w %d; then break; else sleep %d; fi; done",
+				connector.Config.NumOfDataBufs, connector.Config.Data, listener.Config.ConnectionAttempts, remoteIP, connector.Config.Port,
+				listener.Config.ConnectionTimeout, listener.Config.ConnectionTimeout/2,
+			),
+		}
 
 		stdOut, _, err := p.Framework.ExecWithOptions(context.TODO(), &framework.ExecOptions{
 			Command:            cmd,
