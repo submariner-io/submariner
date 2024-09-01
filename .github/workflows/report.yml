@@ -39,7 +39,7 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
       - name: Run Anchore vulnerability scanner
-        uses: anchore/scan-action@bc9adf64917dd9444d6cf4dd68620c34ca3a5f69
+        uses: anchore/scan-action@64a33b277ea7a1215a3c142735a1091341939ff5
         id: scan
         with:
           path: "."
@@ -47,6 +47,6 @@ jobs:
       - name: Show Anchore scan SARIF report
         run: cat ${{ steps.scan.outputs.sarif }}
       - name: Upload Anchore scan SARIF report
-        uses: github/codeql-action/upload-sarif@883d8588e56d1753a8a58c1c86e88976f0c23449
+        uses: github/codeql-action/upload-sarif@4dd16135b69a43b6c8efb853346f8437d92d3c93
         with:
           sarif_file: ${{ steps.scan.outputs.sarif }}
