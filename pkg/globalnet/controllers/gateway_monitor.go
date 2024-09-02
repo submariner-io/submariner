@@ -26,6 +26,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
+	"github.com/submariner-io/admiral/pkg/ipam"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
@@ -36,7 +37,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/event/controller"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	gnpacketfilter "github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
-	"github.com/submariner-io/submariner/pkg/ipam"
+	"github.com/submariner-io/submariner/pkg/globalnet/metrics"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
@@ -351,7 +352,7 @@ func (g *gatewayMonitor) startControllers() error {
 		return err
 	}
 
-	pool, err := ipam.NewIPPool(g.GatewayMonitorConfig.Spec.GlobalCIDR[0])
+	pool, err := ipam.NewIPPool(g.GatewayMonitorConfig.Spec.GlobalCIDR[0], metrics.GlobalnetMetricsReporter)
 	if err != nil {
 		return errors.Wrap(err, "error creating the IP pool")
 	}

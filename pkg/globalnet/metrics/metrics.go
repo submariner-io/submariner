@@ -18,7 +18,10 @@ limitations under the License.
 
 package metrics
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/submariner-io/admiral/pkg/ipam"
+)
 
 const (
 	cidrLabel = "cidr"
@@ -72,6 +75,10 @@ var (
 	)
 )
 
+var GlobalnetMetricsReporter ipam.MetricsReporter = GlobalnetMetrics{}
+
+type GlobalnetMetrics struct{}
+
 func init() {
 	prometheus.MustRegister(globalIPsAvailabilityGauge, globalIPsAllocatedGauge, globalEgressIPsAllocatedGauge,
 		clusterGlobalEgressIPsAllocatedGauge, globalIngressIPsAllocatedGauge)
@@ -116,6 +123,14 @@ func RecordDeallocateGlobalIngressIPs(cidr string, count int) {
 	globalIngressIPsAllocatedGauge.With(prometheus.Labels{cidrLabel: cidr}).Sub(float64(count))
 }
 
-func RecordAvailability(cidr string, count int) {
+func (r GlobalnetMetrics) RecordAvailability(cidr string, count int) {
 	globalIPsAvailabilityGauge.With(prometheus.Labels{cidrLabel: cidr}).Set(float64(count))
+}
+
+func (r GlobalnetMetrics) RecordIPsAllocated(cidr string, count int) {
+	RecordAllocateGlobalIPs(cidr, count)
+}
+
+func (r GlobalnetMetrics) RecordIPDeallocated(cidr string) {
+	RecordDeallocateGlobalIP(cidr)
 }
