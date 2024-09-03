@@ -137,9 +137,10 @@ func main() {
 	logger.FatalOnError(err, "Error getting information on the local node")
 
 	healthcheckerConfig := &healthchecker.Config{
-		PingInterval:         submSpec.HealthCheckInterval * 60,
-		MaxPacketLossCount:   submSpec.HealthCheckMaxPacketLossCount,
-		HealthCheckerEnabled: submSpec.HealthCheckEnabled,
+		PingInterval:             submSpec.HealthCheckInterval * 60,
+		MaxPacketLossCount:       submSpec.HealthCheckMaxPacketLossCount,
+		HealthCheckerEnabled:     submSpec.HealthCheckEnabled,
+		RouteAgentUpdateInterval: 60 * time.Second,
 	}
 
 	registry, err := event.NewRegistry("routeagent_driver", np,

@@ -39,13 +39,12 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-var RouteAgentUpdateInterval = 60 * time.Second
-
 type Config struct {
-	PingInterval         uint
-	MaxPacketLossCount   uint
-	HealthCheckerEnabled bool
-	NewPinger            func(pinger.Config) pinger.Interface
+	PingInterval             uint
+	MaxPacketLossCount       uint
+	HealthCheckerEnabled     bool
+	RouteAgentUpdateInterval time.Duration
+	NewPinger                func(pinger.Config) pinger.Interface
 }
 
 type controller struct {
@@ -84,7 +83,10 @@ func (h *controller) Stop() error {
 
 	h.pingers = map[string]pinger.Interface{}
 
-	close(h.stopCh)
+	if h.stopCh != nil {
+		close(h.stopCh)
+		h.stopCh = nil
+	}
 
 	err := h.client.Delete(context.TODO(),
 		h.localNodeName, metav1.DeleteOptions{})
@@ -96,36 +98,43 @@ func (h *controller) Stop() error {
 }
 
 func (h *controller) RemoteEndpointCreated(endpoint *submarinerv1.Endpoint) error {
+	h.Lock()
+	defer h.Unlock()
+
 	if !h.config.HealthCheckerEnabled || h.State().IsOnGateway() {
 		return nil
 	}
 
-	return h.processEndpointCreatedOrUpdated(endpoint)
+	h.processEndpointCreatedOrUpdated(endpoint)
+
+	return nil
 }
 
 func (h *controller) RemoteEndpointUpdated(endpoint *submarinerv1.Endpoint) error {
+	h.Lock()
+	defer h.Unlock()
+
 	if !h.config.HealthCheckerEnabled || h.State().IsOnGateway() {
 		return nil
 	}
 
-	return h.processEndpointCreatedOrUpdated(endpoint)
+	h.processEndpointCreatedOrUpdated(endpoint)
+
+	return nil
 }
 
-func (h *controller) processEndpointCreatedOrUpdated(endpoint *submarinerv1.Endpoint) error {
+func (h *controller) processEndpointCreatedOrUpdated(endpoint *submarinerv1.Endpoint) {
 	logger.Infof("Processing Endpoint: %#v", endpoint)
 
 	if endpoint.Spec.HealthCheckIP == "" || endpoint.Spec.CableName == "" {
 		logger.Infof("HealthCheckIP (%q) and/or CableName (%q) for Endpoint %q empty - will not monitor endpoint health",
 			endpoint.Spec.HealthCheckIP, endpoint.Spec.CableName, endpoint.Name)
-		return nil
+		return
 	}
-
-	h.Lock()
-	defer h.Unlock()
 
 	if pingerObject, found := h.pingers[endpoint.Spec.CableName]; found {
 		if pingerObject.GetIP() == endpoint.Spec.HealthCheckIP {
-			return nil
+			return
 		}
 
 		logger.Infof("HealthChecker is already running for %q - stopping", endpoint.Name)
@@ -156,8 +165,6 @@ func (h *controller) processEndpointCreatedOrUpdated(endpoint *submarinerv1.Endp
 
 	logger.Infof("HealthChecker started pinger for CableName: %q with HealthCheckIP %q",
 		endpoint.Spec.CableName, endpoint.Spec.HealthCheckIP)
-
-	return nil
 }
 
 func (h *controller) RemoteEndpointRemoved(endpoint *submarinerv1.Endpoint) error {
@@ -179,7 +186,7 @@ func (h *controller) Init() error {
 			defer h.Unlock()
 
 			h.syncRouteAgentStatus()
-		}, RouteAgentUpdateInterval, h.stopCh)
+		}, h.config.RouteAgentUpdateInterval, h.stopCh)
 	}()
 
 	return nil
@@ -194,10 +201,7 @@ func (h *controller) TransitionToNonGateway() error {
 		remoteEndpoints := h.State().GetRemoteEndpoints()
 
 		for i := range remoteEndpoints {
-			err := h.processEndpointCreatedOrUpdated(&remoteEndpoints[i])
-			if err != nil {
-				return errors.Wrapf(err, "error processing remote endpoint %s", remoteEndpoints[i].Name)
-			}
+			h.processEndpointCreatedOrUpdated(&remoteEndpoints[i])
 		}
 	}
 
@@ -271,6 +275,9 @@ func (h *controller) syncRouteAgentStatus() {
 				connectionStatus = submarinerv1.Connecting
 				statusMessage = ""
 			}
+		} else {
+			connectionStatus = submarinerv1.ConnectionNone
+			statusMessage = "Health checker IP is not configured"
 		}
 
 		remoteEndpoint = submarinerv1.RemoteEndpoint{
