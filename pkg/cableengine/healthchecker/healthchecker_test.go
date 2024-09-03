@@ -29,7 +29,8 @@ import (
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
-	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker/fake"
+	"github.com/submariner-io/submariner/pkg/pinger"
+	"github.com/submariner-io/submariner/pkg/pinger/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
@@ -84,7 +85,7 @@ var _ = Describe("Controller", func() {
 			MaxPacketLossCount: 4,
 		}
 
-		config.NewPinger = func(pingerCfg healthchecker.PingerConfig) healthchecker.PingerInterface {
+		config.NewPinger = func(pingerCfg pinger.Config) pinger.Interface {
 			defer GinkgoRecover()
 			Expect(pingerCfg.Interval).To(Equal(time.Second * time.Duration(config.PingInterval)))
 			Expect(pingerCfg.MaxPacketLossCount).To(Equal(config.MaxPacketLossCount))
@@ -126,9 +127,9 @@ var _ = Describe("Controller", func() {
 		return endpoint
 	}
 
-	newLatencyInfo := func() *healthchecker.LatencyInfo {
-		return &healthchecker.LatencyInfo{
-			ConnectionStatus: healthchecker.Connected,
+	newLatencyInfo := func() *pinger.LatencyInfo {
+		return &pinger.LatencyInfo{
+			ConnectionStatus: pinger.Connected,
 			Spec: &submarinerv1.LatencyRTTSpec{
 				Last:    "93ms",
 				Min:     "90ms",
@@ -149,11 +150,11 @@ var _ = Describe("Controller", func() {
 
 			latencyInfo1 := newLatencyInfo()
 			pingerMap[healthCheckIP1].SetLatencyInfo(latencyInfo1)
-			Eventually(func() *healthchecker.LatencyInfo { return healthChecker.GetLatencyInfo(&endpoint1.Spec) }).
+			Eventually(func() *pinger.LatencyInfo { return healthChecker.GetLatencyInfo(&endpoint1.Spec) }).
 				Should(Equal(latencyInfo1))
 
-			latencyInfo2 := &healthchecker.LatencyInfo{
-				ConnectionStatus: healthchecker.ConnectionError,
+			latencyInfo2 := &pinger.LatencyInfo{
+				ConnectionStatus: pinger.ConnectionError,
 				Spec: &submarinerv1.LatencyRTTSpec{
 					Last:    "82ms",
 					Min:     "80ms",
@@ -164,7 +165,7 @@ var _ = Describe("Controller", func() {
 			}
 
 			pingerMap[healthCheckIP2].SetLatencyInfo(latencyInfo2)
-			Eventually(func() *healthchecker.LatencyInfo { return healthChecker.GetLatencyInfo(&endpoint2.Spec) }).
+			Eventually(func() *pinger.LatencyInfo { return healthChecker.GetLatencyInfo(&endpoint2.Spec) }).
 				Should(Equal(latencyInfo2))
 
 			By("Stopping health checker")
@@ -203,7 +204,7 @@ var _ = Describe("Controller", func() {
 
 			Expect(endpoints.Delete(context.TODO(), endpoint.Name, metav1.DeleteOptions{})).To(Succeed())
 			pingerMap[healthCheckIP1].AwaitStop()
-			Eventually(func() *healthchecker.LatencyInfo { return healthChecker.GetLatencyInfo(&endpoint.Spec) }).
+			Eventually(func() *pinger.LatencyInfo { return healthChecker.GetLatencyInfo(&endpoint.Spec) }).
 				Should(BeNil())
 		})
 	})
@@ -230,7 +231,7 @@ var _ = Describe("Controller", func() {
 
 				latencyInfo := newLatencyInfo()
 				pingerMap[healthCheckIP3].SetLatencyInfo(latencyInfo)
-				Eventually(func() *healthchecker.LatencyInfo { return healthChecker.GetLatencyInfo(&endpoint.Spec) }).
+				Eventually(func() *pinger.LatencyInfo { return healthChecker.GetLatencyInfo(&endpoint.Spec) }).
 					Should(Equal(latencyInfo))
 			})
 		})
