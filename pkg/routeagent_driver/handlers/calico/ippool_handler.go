@@ -161,9 +161,10 @@ func (h *calicoIPPoolHandler) createIPPool(endpoint *submV1.Endpoint) error {
 				Labels: map[string]string{SubmarinerIPPool: "true"},
 			},
 			Spec: calicoapi.IPPoolSpec{
-				CIDR:        subnet,
-				NATOutgoing: false,
-				Disabled:    true,
+				CIDR:             subnet,
+				NATOutgoing:      false,
+				Disabled:         true,
+				DisableBGPExport: true,
 			},
 		}
 		_, err := h.client.ProjectcalicoV3().IPPools().Create(context.TODO(), iPPoolObj, metav1.CreateOptions{})
