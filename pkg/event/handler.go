@@ -19,6 +19,8 @@ limitations under the License.
 package event
 
 import (
+	"sync/atomic"
+
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	k8sV1 "k8s.io/api/core/v1"
 )
@@ -101,7 +103,7 @@ type Handler interface {
 
 // Base structure for event handlers that stubs out methods considered to be optional.
 type HandlerBase struct {
-	handlerState HandlerState
+	handlerState atomic.Value
 }
 
 func (ev *HandlerBase) Init() error {
@@ -109,15 +111,16 @@ func (ev *HandlerBase) Init() error {
 }
 
 func (ev *HandlerBase) SetState(handlerState HandlerState) {
-	ev.handlerState = handlerState
+	ev.handlerState.Store(handlerState)
 }
 
 func (ev *HandlerBase) State() HandlerState {
-	if ev.handlerState == nil {
+	hs := ev.handlerState.Load()
+	if hs == nil {
 		return &DefaultHandlerState{}
 	}
 
-	return ev.handlerState
+	return hs.(HandlerState)
 }
 
 func (ev *HandlerBase) Stop() error {
