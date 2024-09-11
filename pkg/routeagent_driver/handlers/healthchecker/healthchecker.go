@@ -251,7 +251,6 @@ func (h *controller) syncRouteAgentStatus() {
 			statusMessage = "Health check is not performed on gateway nodes"
 		} else if pingerObject, found := h.pingers[remoteEndpoints[i].Spec.CableName]; found {
 			latencyInfo := pingerObject.GetLatencyInfo()
-
 			if latencyInfo != nil {
 				switch latencyInfo.ConnectionStatus {
 				case pinger.Connected:
@@ -264,10 +263,7 @@ func (h *controller) syncRouteAgentStatus() {
 						Max:     latencyInfo.Spec.Max,
 						StdDev:  latencyInfo.Spec.StdDev,
 					}
-				case pinger.ConnectionError:
-					connectionStatus = submarinerv1.ConnectionError
-					statusMessage = latencyInfo.ConnectionError
-				case pinger.ConnectionUnknown:
+				case pinger.ConnectionError, pinger.ConnectionUnknown:
 					connectionStatus = submarinerv1.ConnectionError
 					statusMessage = latencyInfo.ConnectionError
 				}
