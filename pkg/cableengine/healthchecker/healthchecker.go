@@ -41,8 +41,8 @@ type Config struct {
 	WatcherConfig      *watcher.Config
 	EndpointNamespace  string
 	ClusterID          string
-	PingInterval       uint
-	MaxPacketLossCount uint
+	PingInterval       int
+	MaxPacketLossCount int
 	NewPinger          func(pinger.Config) pinger.Interface
 }
 
@@ -147,7 +147,7 @@ func (h *controller) endpointCreatedOrUpdated(obj runtime.Object, _ int) bool {
 	}
 
 	if h.config.PingInterval != 0 {
-		pingerConfig.Interval = time.Second * time.Duration(h.config.PingInterval) //nolint:gosec // We can safely ignore integer conversion error
+		pingerConfig.Interval = time.Second * time.Duration(h.config.PingInterval)
 	}
 
 	newPingerFunc := h.config.NewPinger
