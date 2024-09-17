@@ -174,11 +174,11 @@ func createMalformedRequest(mangleFunction func(*natproto.SubmarinerNATDiscovery
 		},
 		UsingSrc: &natproto.IPPortPair{
 			IP:   testRemotePrivateIP,
-			Port: uint32(natproto.DefaultPort),
+			Port: natproto.DefaultPort,
 		},
 		UsingDst: &natproto.IPPortPair{
 			IP:   testLocalPrivateIP,
-			Port: uint32(natproto.DefaultPort),
+			Port: natproto.DefaultPort,
 		},
 	}
 

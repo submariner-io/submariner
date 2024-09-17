@@ -23,19 +23,19 @@ import (
 )
 
 type statistics struct {
-	previousRtts []uint64
-	sum          uint64
-	mean         uint64
-	stdDev       uint64
-	lastRtt      uint64
-	minRtt       uint64
-	maxRtt       uint64
-	sqrDiff      uint64
-	index        uint64
-	size         uint64
+	previousRtts []int64
+	sum          int64
+	mean         int64
+	stdDev       int64
+	lastRtt      int64
+	minRtt       int64
+	maxRtt       int64
+	sqrDiff      int64
+	index        int64
+	size         int64
 }
 
-func (s *statistics) update(rtt uint64) {
+func (s *statistics) update(rtt int64) {
 	s.lastRtt = rtt
 
 	if s.index == s.size {
@@ -47,9 +47,8 @@ func (s *statistics) update(rtt uint64) {
 		s.sum = s.previousRtts[0] + s.previousRtts[1]
 		s.mean = s.sum / 2
 
-		//nolint:gosec // Ignore "integer overflow conversion uint64 -> int64" - we subtract uint64's and want to preserve sign.
-		s.sqrDiff = uint64(int64(s.previousRtts[0]-s.mean)*int64(s.previousRtts[0]-s.mean) +
-			int64(s.previousRtts[1]-s.mean)*int64(s.previousRtts[1]-s.mean))
+		s.sqrDiff = (s.previousRtts[0]-s.mean)*(s.previousRtts[0]-s.mean) +
+			(s.previousRtts[1]-s.mean)*(s.previousRtts[1]-s.mean)
 	}
 
 	if s.index+1 > 1 {
@@ -66,9 +65,8 @@ func (s *statistics) update(rtt uint64) {
 		oldMean := s.mean
 		s.mean = s.sum / (s.index + 1)
 
-		//nolint:gosec // Ignore "integer overflow conversion uint64 -> int64" - we subtract uint64's and want to preserve sign.
-		s.sqrDiff += uint64(int64(rtt-oldMean) * int64(rtt-s.mean))
-		s.stdDev = uint64(math.Sqrt(float64(s.sqrDiff / (s.index + 1))))
+		s.sqrDiff += (rtt - oldMean) * (rtt - s.mean)
+		s.stdDev = int64(math.Sqrt(float64(s.sqrDiff / (s.index + 1))))
 	} else {
 		s.sum = rtt
 		s.sqrDiff = 0

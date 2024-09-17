@@ -40,8 +40,8 @@ import (
 )
 
 type Config struct {
-	PingInterval             uint
-	MaxPacketLossCount       uint
+	PingInterval             int
+	MaxPacketLossCount       int
 	HealthCheckerEnabled     bool
 	RouteAgentUpdateInterval time.Duration
 	NewPinger                func(pinger.Config) pinger.Interface
@@ -147,7 +147,7 @@ func (h *controller) processEndpointCreatedOrUpdated(endpoint *submarinerv1.Endp
 	}
 
 	if h.config.PingInterval != 0 {
-		pingerConfig.Interval = time.Second * time.Duration(h.config.PingInterval) //nolint:gosec // We can safely ignore integer conversion error
+		pingerConfig.Interval = time.Second * time.Duration(h.config.PingInterval)
 	}
 
 	if h.config.MaxPacketLossCount != 0 {

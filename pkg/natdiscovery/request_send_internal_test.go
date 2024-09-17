@@ -67,12 +67,12 @@ var _ = When("a request is sent", func() {
 		It("should set the using source fields correctly", func() {
 			Expect(request.UsingSrc).NotTo(BeNil())
 			Expect(request.UsingSrc.IP).To(Equal(testLocalPrivateIP))
-			Expect(request.UsingSrc.Port).To(Equal(uint32(testLocalNATPort)))
+			Expect(request.UsingSrc.Port).To(Equal(testLocalNATPort))
 		})
 
 		It("should set the using destination fields correctly", func() {
 			Expect(request.UsingDst).NotTo(BeNil())
-			Expect(request.UsingDst.Port).To(Equal(uint32(testRemoteNATPort)))
+			Expect(request.UsingDst.Port).To(Equal(testRemoteNATPort))
 			Expect(request.UsingDst.IP).To(Equal(srcIP))
 		})
 

@@ -61,6 +61,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&GatewayRouteList{},
 		&NonGatewayRoute{},
 		&NonGatewayRouteList{},
+		&RouteAgent{},
+		&RouteAgentList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 
