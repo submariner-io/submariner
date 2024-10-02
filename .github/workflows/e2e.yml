@@ -48,7 +48,7 @@ jobs:
         extra-toggles: ['', 'ovn']
         globalnet: ['', 'globalnet']
         # Run most tests against the latest K8s version
-        k8s_version: ['1.29']
+        k8s_version: ['1.31']
         exclude:
           - cable-driver: wireguard
             extra-toggles: ovn
@@ -61,7 +61,7 @@ jobs:
           # https://submariner.io/development/building-testing/ci-maintenance/
           - k8s_version: '1.19'
           # Test top and bottom of supported K8s version range
-          - k8s_version: '1.26'
+          - k8s_version: '1.28'
     steps:
       - name: Check out the repository
         uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938
