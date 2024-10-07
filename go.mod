@@ -15,16 +15,16 @@ require (
 	github.com/projectcalico/api v0.0.0-20230602153125-fb7148692637
 	github.com/prometheus-community/pro-bing v0.4.0
 	github.com/prometheus/client_golang v1.19.1
-	github.com/submariner-io/admiral v0.18.1-0.20240719125139-e24eff08e932
-	github.com/submariner-io/shipyard v0.18.0
+	github.com/submariner-io/admiral v0.18.1
+	github.com/submariner-io/shipyard v0.18.1
 	github.com/vishvananda/netlink v1.2.1-beta.2
 	golang.org/x/net v0.25.0
 	golang.org/x/sys v0.20.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20230429144221-925a1e7659e6
 	google.golang.org/protobuf v1.33.0
-	k8s.io/api v0.30.2
-	k8s.io/apimachinery v0.30.2
-	k8s.io/client-go v0.30.2
+	k8s.io/api v0.30.5
+	k8s.io/apimachinery v0.30.5
+	k8s.io/client-go v0.30.5
 	k8s.io/component-helpers v0.30.1
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 	sigs.k8s.io/controller-runtime v0.18.3
