@@ -300,6 +300,9 @@ func (h *controller) syncRouteAgentStatus() {
 
 func (h *controller) generateRouteAgentObject() *submarinerv1.RouteAgent {
 	return &submarinerv1.RouteAgent{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "RouteAgent",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: h.localNodeName,
 		},
