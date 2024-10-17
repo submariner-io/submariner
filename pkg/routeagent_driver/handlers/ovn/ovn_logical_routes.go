@@ -19,6 +19,7 @@ limitations under the License.
 package ovn
 
 import (
+	"reflect"
 	"strings"
 
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/libovsdbops"
@@ -84,7 +85,7 @@ func (c *ConnectionHandler) reconcileSubOvnLogicalRouterPolicies(remoteSubnets s
 	lrpStalePredicate := func(item *nbdb.LogicalRouterPolicy) bool {
 		subnet := strings.Split(item.Match, " ")[2]
 
-		return item.Priority == ovnRoutePoliciesPrio && !remoteSubnets.Has(subnet)
+		return item.Priority == ovnRoutePoliciesPrio && (!remoteSubnets.Has(subnet) || !reflect.DeepEqual(item.Nexthop, &nextHop))
 	}
 
 	// Cleanup any existing lrps not representing the correct set of remote subnets
