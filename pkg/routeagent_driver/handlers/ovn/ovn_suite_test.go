@@ -42,7 +42,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/kubernetes"
 	fakek8s "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 )
@@ -118,41 +117,30 @@ func newTestDriver() *testDriver {
 }
 
 func (t *testDriver) Start(handler event.Handler) {
-	node := t.createNode()
+	t.createNode()
 	t.handler = handler
 	t.ControllerSupport.Start(handler)
-	t.CreateNode(node)
 }
 
-func (t *testDriver) createNode() *corev1.Node {
-	return createNode(t.k8sClient, t.transitSwitchIP)
-}
-
-func createNode(k8sClient kubernetes.Interface, transitSwitchIP string) *corev1.Node {
+func (t *testDriver) createNode() {
 	node := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-node",
 		},
 	}
 
-	if transitSwitchIP != "" {
-		node.Annotations = map[string]string{constants.OvnTransitSwitchIPAnnotation: toTransitSwitchIPAnnotation(transitSwitchIP)}
+	if t.transitSwitchIP != "" {
+		data := map[string]string{"ipv4": t.transitSwitchIP + "/24"}
+		bytes, err := json.Marshal(data)
+		Expect(err).To(Succeed())
+
+		node.Annotations = map[string]string{constants.OvnTransitSwitchIPAnnotation: string(bytes)}
 	}
 
-	_, err := k8sClient.CoreV1().Nodes().Create(context.Background(), node, metav1.CreateOptions{})
+	_, err := t.k8sClient.CoreV1().Nodes().Create(context.Background(), node, metav1.CreateOptions{})
 	Expect(err).To(Succeed())
 
 	os.Setenv("NODE_NAME", node.Name)
-
-	return node
-}
-
-func toTransitSwitchIPAnnotation(ip string) string {
-	data := map[string]string{"ipv4": ip + "/24"}
-	bytes, err := json.Marshal(data)
-	Expect(err).To(Succeed())
-
-	return string(bytes)
 }
 
 func toIPNet(s string) *net.IPNet {

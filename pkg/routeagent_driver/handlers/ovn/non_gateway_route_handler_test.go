@@ -20,7 +20,6 @@ package ovn_test
 
 import (
 	"errors"
-	"os"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -28,17 +27,14 @@ import (
 	"github.com/submariner-io/admiral/pkg/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event/testing"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var _ = Describe("NonGatewayRouteHandler", func() {
 	t := newTestDriver()
 
 	JustBeforeEach(func() {
-		t.Start(ovn.NewNonGatewayRouteHandler(t.submClient, t.k8sClient, ovn.NewTransitSwitchIP()))
+		t.Start(ovn.NewNonGatewayRouteHandler(t.submClient, t.k8sClient))
 	})
 
 	awaitNonGatewayRoute := func(ep *submarinerv1.Endpoint) {
@@ -118,31 +114,6 @@ var _ = Describe("NonGatewayRouteHandler", func() {
 				t.CreateLocalHostEndpoint()
 				test.EnsureNoResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace), endpoint.Spec.ClusterID)
 			})
-		})
-	})
-
-	When("the local node's transit switch IP is updated", func() {
-		JustBeforeEach(func() {
-			t.CreateLocalHostEndpoint()
-		})
-
-		It("should update existing NonGatewayRoutes", func() {
-			endpoint := t.CreateEndpoint(testing.NewEndpoint("remote-cluster", "host", "193.0.4.0/24"))
-			awaitNonGatewayRoute(endpoint)
-
-			t.transitSwitchIP = "10.34.87.2"
-
-			t.UpdateNode(&corev1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        os.Getenv("NODE_NAME"),
-					Annotations: map[string]string{constants.OvnTransitSwitchIPAnnotation: toTransitSwitchIPAnnotation(t.transitSwitchIP)},
-				},
-			})
-
-			Eventually(func() string {
-				return test.AwaitResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace),
-					endpoint.Spec.ClusterID).RoutePolicySpec.NextHops[0]
-			}).Should(Equal(t.transitSwitchIP))
 		})
 	})
 })
