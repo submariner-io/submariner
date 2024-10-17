@@ -31,29 +31,26 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
 type NonGatewayRouteHandler struct {
 	event.HandlerBase
 	event.NodeHandlerBase
 	smClient        submarinerClientset.Interface
-	k8sClient       kubernetes.Interface
 	transitSwitchIP TransitSwitchIP
 }
 
-func NewNonGatewayRouteHandler(smClient submarinerClientset.Interface, k8sClient kubernetes.Interface, transitSwitchIP TransitSwitchIP,
+func NewNonGatewayRouteHandler(smClient submarinerClientset.Interface, transitSwitchIP TransitSwitchIP,
 ) *NonGatewayRouteHandler {
 	return &NonGatewayRouteHandler{
 		smClient:        smClient,
-		k8sClient:       k8sClient,
 		transitSwitchIP: transitSwitchIP,
 	}
 }
 
 func (h *NonGatewayRouteHandler) Init() error {
 	logger.Info("Starting NonGatewayRouteHandler")
-	return errors.Wrap(h.transitSwitchIP.Init(h.k8sClient), "error initializing TransitSwitchIP")
+	return nil
 }
 
 func (h *NonGatewayRouteHandler) GetName() string {
