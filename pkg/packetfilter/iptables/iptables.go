@@ -251,9 +251,9 @@ func mssClampToRuleSpec(ruleSpec *RuleSpec, clampType packetfilter.MssClampType,
 	switch clampType {
 	case packetfilter.UndefinedMSS:
 	case packetfilter.ToPMTU:
-		*ruleSpec = append(*ruleSpec, "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "--clamp-mss-to-pmtu")
+		*ruleSpec = append(*ruleSpec, "--clamp-mss-to-pmtu", "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN")
 	case packetfilter.ToValue:
-		*ruleSpec = append(*ruleSpec, "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "--set-mss", mssValue)
+		*ruleSpec = append(*ruleSpec, "--set-mss", mssValue, "-p", "tcp", "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN")
 	}
 }
 
@@ -322,6 +322,7 @@ func ToRuleSpec(rule *packetfilter.Rule) RuleSpec {
 	return ruleSpec
 }
 
+//nolint:gocyclo // This function has a lot of small case statements so ignore cyclomatic complexity.
 func FromRuleSpec(spec []string) *packetfilter.Rule {
 	rule := &packetfilter.Rule{}
 
@@ -350,6 +351,11 @@ func FromRuleSpec(spec []string) *packetfilter.Rule {
 			rule.DPort, i = parseNextTerm(spec, i, noopParse)
 		case "--set-mark":
 			rule.MarkValue, i = parseNextTerm(spec, i, parseMark)
+		case "--clamp-mss-to-pmtu":
+			rule.ClampType = packetfilter.ToPMTU
+		case "--set-mss":
+			rule.MssValue, i = parseNextTerm(spec, i, noopParse)
+			rule.ClampType = packetfilter.ToValue
 		case "-j":
 			rule.Action, i = parseNextTerm(spec, i, parseAction)
 			if rule.Action == packetfilter.RuleActionJump {
@@ -400,31 +406,6 @@ func parseRuleMatch(spec []string, i int, rule *packetfilter.Rule) int {
 
 			i += 3
 		}
-	case "tcp":
-		// Parses the form: "-m", "tcp", "--tcp-flags", "SYN,RST", "SYN", "--clamp-mss-to-pmtu"
-		i = parseTCPSpec(spec, i, rule)
-	}
-
-	return i
-}
-
-func parseTCPSpec(spec []string, i int, rule *packetfilter.Rule) int {
-	i++
-	for i < len(spec) {
-		if spec[i] == "--clamp-mss-to-pmtu" {
-			rule.ClampType = packetfilter.ToPMTU
-			break
-		} else if spec[i] == "--set-mss" {
-			rule.MssValue, i = parseNextTerm(spec, i, noopParse)
-			rule.ClampType = packetfilter.ToValue
-
-			break
-		} else if !strings.HasPrefix(spec[i], "--") && strings.HasPrefix(spec[i], "-") {
-			i--
-			break
-		}
-
-		i++
 	}
 
 	return i
