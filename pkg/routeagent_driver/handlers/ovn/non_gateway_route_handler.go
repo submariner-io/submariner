@@ -28,32 +28,47 @@ import (
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
-	corev1 "k8s.io/api/core/v1"
+	nodeutil "github.com/submariner-io/submariner/pkg/node"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	clientset "k8s.io/client-go/kubernetes"
 )
 
 type NonGatewayRouteHandler struct {
 	event.HandlerBase
-	event.NodeHandlerBase
 	smClient        submarinerClientset.Interface
-	k8sClient       kubernetes.Interface
-	transitSwitchIP TransitSwitchIP
+	k8sClient       clientset.Interface
+	transitSwitchIP string
 }
 
-func NewNonGatewayRouteHandler(smClient submarinerClientset.Interface, k8sClient kubernetes.Interface, transitSwitchIP TransitSwitchIP,
-) *NonGatewayRouteHandler {
+func NewNonGatewayRouteHandler(smClient submarinerClientset.Interface, k8sClient clientset.Interface) *NonGatewayRouteHandler {
 	return &NonGatewayRouteHandler{
-		smClient:        smClient,
-		k8sClient:       k8sClient,
-		transitSwitchIP: transitSwitchIP,
+		smClient:  smClient,
+		k8sClient: k8sClient,
 	}
 }
 
 func (h *NonGatewayRouteHandler) Init() error {
 	logger.Info("Starting NonGatewayRouteHandler")
-	return errors.Wrap(h.transitSwitchIP.Init(h.k8sClient), "error initializing TransitSwitchIP")
+
+	node, err := nodeutil.GetLocalNode(h.k8sClient)
+	if err != nil {
+		return errors.Wrap(err, "error getting the g/w node")
+	}
+
+	annotations := node.GetAnnotations()
+
+	// TODO transitSwitchIP changes support needs to be added.
+	transitSwitchIP, ok := annotations[constants.OvnTransitSwitchIPAnnotation]
+	if !ok {
+		logger.Infof("No transit switch IP configured")
+		return nil
+	}
+
+	h.transitSwitchIP, err = jsonToIP(transitSwitchIP)
+
+	return errors.Wrapf(err, "error parsing the transit switch IP")
 }
 
 func (h *NonGatewayRouteHandler) GetName() string {
@@ -65,7 +80,7 @@ func (h *NonGatewayRouteHandler) GetNetworkPlugins() []string {
 }
 
 func (h *NonGatewayRouteHandler) RemoteEndpointCreated(endpoint *submarinerv1.Endpoint) error {
-	if !h.State().IsOnGateway() || h.transitSwitchIP.Get() == "" {
+	if !h.State().IsOnGateway() || h.transitSwitchIP == "" {
 		return nil
 	}
 
@@ -83,7 +98,7 @@ func (h *NonGatewayRouteHandler) RemoteEndpointCreated(endpoint *submarinerv1.En
 }
 
 func (h *NonGatewayRouteHandler) RemoteEndpointRemoved(endpoint *submarinerv1.Endpoint) error {
-	if !h.State().IsOnGateway() || h.transitSwitchIP.Get() == "" {
+	if !h.State().IsOnGateway() || h.transitSwitchIP == "" {
 		return nil
 	}
 
@@ -98,7 +113,7 @@ func (h *NonGatewayRouteHandler) RemoteEndpointRemoved(endpoint *submarinerv1.En
 }
 
 func (h *NonGatewayRouteHandler) TransitionToGateway() error {
-	if h.transitSwitchIP.Get() == "" {
+	if h.transitSwitchIP == "" {
 		return nil
 	}
 
@@ -126,38 +141,6 @@ func (h *NonGatewayRouteHandler) TransitionToGateway() error {
 	return nil
 }
 
-func (h *NonGatewayRouteHandler) NodeUpdated(node *corev1.Node) error {
-	updated, err := h.transitSwitchIP.UpdateFrom(node)
-	if err != nil {
-		logger.Errorf(err, "Error updating transit switch IP from node: %s", resource.ToJSON(node))
-		return nil
-	}
-
-	if !updated {
-		return nil
-	}
-
-	logger.Infof("Transit switch IP updated to %s", h.transitSwitchIP.Get())
-
-	if !h.State().IsOnGateway() {
-		return nil
-	}
-
-	endpoints := h.State().GetRemoteEndpoints()
-	for i := range endpoints {
-		err = util.Update(context.TODO(), NonGatewayResourceInterface(h.smClient, endpoints[i].Namespace),
-			h.newNonGatewayRoute(&endpoints[i]), func(existing *submarinerv1.NonGatewayRoute) (*submarinerv1.NonGatewayRoute, error) {
-				existing.RoutePolicySpec.NextHops = []string{h.transitSwitchIP.Get()}
-				return existing, nil
-			})
-		if err != nil {
-			return errors.Wrapf(err, "error updating NonGatewayRoute")
-		}
-	}
-
-	return nil
-}
-
 func (h *NonGatewayRouteHandler) newNonGatewayRoute(endpoint *submarinerv1.Endpoint) *submarinerv1.NonGatewayRoute {
 	return &submarinerv1.NonGatewayRoute{
 		ObjectMeta: metav1.ObjectMeta{
@@ -166,7 +149,7 @@ func (h *NonGatewayRouteHandler) newNonGatewayRoute(endpoint *submarinerv1.Endpo
 		},
 		RoutePolicySpec: submarinerv1.RoutePolicySpec{
 			RemoteCIDRs: endpoint.Spec.Subnets,
-			NextHops:    []string{h.transitSwitchIP.Get()},
+			NextHops:    []string{h.transitSwitchIP},
 		},
 	}
 }
