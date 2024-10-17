@@ -19,6 +19,8 @@ limitations under the License.
 package iptables_test
 
 import (
+	"strings"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
@@ -27,7 +29,7 @@ import (
 
 var _ = Describe("Rule conversion", func() {
 	Specify("should correctly convert to and from a rule spec string", func() {
-		// -m set --match-set src-set src -m set --match-set dest-set dst -j TCPMSS -p tcp -m tcp --tcp-flags SYN,RST SYN --clamp-mss-to-pmtu
+		// -m set --match-set src-set src -m set --match-set dest-set dst -j TCPMSS --clamp-mss-to-pmtu -p tcp -m tcp --tcp-flags SYN,RST SYN
 		testRuleConversion(&packetfilter.Rule{
 			SrcSetName:  "src-set",
 			DestSetName: "dest-set",
@@ -35,13 +37,21 @@ var _ = Describe("Rule conversion", func() {
 			ClampType:   packetfilter.ToPMTU,
 		})
 
-		// -m set --match-set src-set src -m set --match-set dest-set dst -j TCPMSS -p tcp -m tcp --tcp-flags SYN,RST SYN --set-mss mss-value
+		// -m set --match-set src-set src -m set --match-set dest-set dst -j TCPMSS --set-mss mss-value -p tcp -m tcp --tcp-flags SYN,RST SYN
 		testRuleConversion(&packetfilter.Rule{
 			SrcSetName:  "src-set",
 			DestSetName: "dest-set",
-			MssValue:    "mss-value",
+			MssValue:    "1500",
 			Action:      packetfilter.RuleActionMss,
 			ClampType:   packetfilter.ToValue,
+		})
+
+		// -s 1.2.3.4/32 -j TCPMSS --set-mss mss-value -p tcp -m tcp --tcp-flags SYN,RST SYN
+		testRuleConversion(&packetfilter.Rule{
+			SrcCIDR:   "1.2.3.4/32",
+			MssValue:  "1500",
+			Action:    packetfilter.RuleActionMss,
+			ClampType: packetfilter.ToValue,
 		})
 
 		// -p udp -m udp -s 171.254.1.0/24 -d 170.254.1.0/24 -o out-iface -i in-iface --dport d-port -j ACCEPT
@@ -94,6 +104,17 @@ var _ = Describe("Rule conversion", func() {
 			TargetChain: "target-chain",
 			Action:      packetfilter.RuleActionJump,
 		})
+
+		// The actual iptables command returns the TCPMSS rule parts in a different order than we write it out so ensure we
+		// can parse it correctly.
+		rs := "-s 1.2.3.4/32 -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1500"
+		parsed := iptables.FromRuleSpec(strings.Split(rs, " "))
+		Expect(parsed).To(Equal(&packetfilter.Rule{
+			SrcCIDR:   "1.2.3.4/32",
+			Action:    packetfilter.RuleActionMss,
+			ClampType: packetfilter.ToValue,
+			MssValue:  "1500",
+		}))
 	})
 })
 
