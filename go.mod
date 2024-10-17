@@ -13,9 +13,9 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/projectcalico/api v0.0.0-20230602153125-fb7148692637
 	github.com/prometheus-community/pro-bing v0.4.1
-	github.com/prometheus/client_golang v1.20.2
-	github.com/submariner-io/admiral v0.19.0-m3
-	github.com/submariner-io/shipyard v0.19.0-m3
+	github.com/prometheus/client_golang v1.20.4
+	github.com/submariner-io/admiral v0.19.0-m3.0.20241008095127-6a251be52267
+	github.com/submariner-io/shipyard v0.19.0-m3.0.20241010145030-60515efbf334
 	github.com/vishvananda/netlink v1.3.0
 	golang.org/x/net v0.30.0
 	golang.org/x/sys v0.26.0
@@ -88,7 +88,7 @@ require (
 	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/term v0.25.0 // indirect
 	golang.org/x/text v0.19.0 // indirect
-	golang.org/x/time v0.6.0 // indirect
+	golang.org/x/time v0.7.0 // indirect
 	golang.org/x/tools v0.24.0 // indirect
 	golang.zx2c4.com/wireguard v0.0.0-20230325221338-052af4a8072b // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
