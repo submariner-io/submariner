@@ -156,7 +156,7 @@ func main() {
 			TransitSwitchIP: transitSwitchIP,
 		}),
 		ovn.NewGatewayRouteHandler(smClientset),
-		ovn.NewNonGatewayRouteHandler(smClientset, k8sClientSet, transitSwitchIP),
+		ovn.NewNonGatewayRouteHandler(smClientset, transitSwitchIP),
 		cabledriver.NewXRFMCleanupHandler(),
 		cabledriver.NewVXLANCleanup(),
 		mtu.NewMTUHandler(env.ClusterCidr, len(env.GlobalCidr) != 0, getTCPMssValue(localNode)),
