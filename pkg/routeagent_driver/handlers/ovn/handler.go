@@ -51,7 +51,7 @@ type HandlerConfig struct {
 	DynClient       dynamic.Interface
 	WatcherConfig   *watcher.Config
 	NewOVSDBClient  NewOVSDBClientFn
-	TransitSwitchIP TransitSwitchIPGetter
+	TransitSwitchIP TransitSwitchIP
 }
 
 type Handler struct {
@@ -112,6 +112,11 @@ func (ovn *Handler) Init() error {
 	err = connectionHandler.initClients(ovn.NewOVSDBClient)
 	if err != nil {
 		return errors.Wrapf(err, "error getting connection handler to connect to OvnDB")
+	}
+
+	err = ovn.TransitSwitchIP.Init(ovn.K8sClient)
+	if err != nil {
+		return errors.Wrap(err, "error initializing TransitSwitchIP")
 	}
 
 	gatewayRouteController, err := NewGatewayRouteController(*ovn.WatcherConfig, connectionHandler, ovn.Namespace)
