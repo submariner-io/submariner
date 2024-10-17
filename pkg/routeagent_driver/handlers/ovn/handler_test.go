@@ -102,7 +102,6 @@ var _ = Describe("Handler", func() {
 		}))
 
 		Expect(ovsdbClient.Connected()).To(BeTrue())
-		Expect(transitSwitchIP.Init(t.k8sClient)).To(Succeed())
 	})
 
 	When("a remote Endpoint is created, updated, and deleted", func() {
