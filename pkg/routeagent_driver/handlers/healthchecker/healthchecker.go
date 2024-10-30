@@ -98,16 +98,7 @@ func (h *controller) Stop() error {
 }
 
 func (h *controller) RemoteEndpointCreated(endpoint *submarinerv1.Endpoint) error {
-	h.Lock()
-	defer h.Unlock()
-
-	if !h.config.HealthCheckerEnabled || h.State().IsOnGateway() {
-		return nil
-	}
-
-	h.processEndpointCreatedOrUpdated(endpoint)
-
-	return nil
+	return h.RemoteEndpointUpdated(endpoint)
 }
 
 func (h *controller) RemoteEndpointUpdated(endpoint *submarinerv1.Endpoint) error {
