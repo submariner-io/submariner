@@ -38,4 +38,4 @@ COPY --from=builder ${SOURCE}/package/iptables-wrapper-installer.sh /usr/sbin/
 # The sanity checks can fail when building foreign arch images; we know we meet the requirements
 RUN /usr/sbin/iptables-wrapper-installer.sh --no-sanity-check
 
-ENTRYPOINT submariner-route-agent.sh
+ENTRYPOINT ["submariner-route-agent.sh"]

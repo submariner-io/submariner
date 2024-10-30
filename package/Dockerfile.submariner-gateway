@@ -35,4 +35,4 @@ COPY --from=base /output/gateway /
 
 COPY --from=builder ${SOURCE}/package/submariner.sh ${SOURCE}/package/pluto ${SOURCE}/bin/${TARGETPLATFORM}/submariner-gateway /usr/local/bin/
 
-ENTRYPOINT submariner.sh
+ENTRYPOINT ["submariner.sh"]
