@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
 
@@ -24,7 +24,7 @@ jobs:
         run: make unit
 
       - name: Run SonarScan, upload Go test results and coverage
-        uses: sonarsource/sonarcloud-github-action@eb211723266fe8e83102bac7361f0a05c3ac1d1b
+        uses: sonarsource/sonarcloud-github-action@383f7e52eae3ab0510c3cb0e7d9d150bbaeab838
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -36,13 +36,13 @@ jobs:
       security-events: write
     steps:
       - name: Check out the repository
-        uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@e2b3eafc8d227b0241d48be5f425d47c2d750a13
+        uses: github/codeql-action/init@662472033e021d55d94146f66f6058822b0b39fd
         with:
           languages: go
       - name: Run CodeQL variant analysis
-        uses: github/codeql-action/analyze@e2b3eafc8d227b0241d48be5f425d47c2d750a13
+        uses: github/codeql-action/analyze@662472033e021d55d94146f66f6058822b0b39fd
       - name: Show CodeQL scan SARIF report
         if: always()
         run: cat ../results/go.sarif
@@ -55,9 +55,9 @@ jobs:
       security-events: write
     steps:
       - name: Check out the repository
-        uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Run Anchore vulnerability scanner
-        uses: anchore/scan-action@64a33b277ea7a1215a3c142735a1091341939ff5
+        uses: anchore/scan-action@5ed195cc06065322983cae4bb31e2a751feb86fd
         id: scan
         with:
           path: "."
@@ -65,6 +65,6 @@ jobs:
       - name: Show Anchore scan SARIF report
         run: cat ${{ steps.scan.outputs.sarif }}
       - name: Upload Anchore scan SARIF report
-        uses: github/codeql-action/upload-sarif@e2b3eafc8d227b0241d48be5f425d47c2d750a13
+        uses: github/codeql-action/upload-sarif@662472033e021d55d94146f66f6058822b0b39fd
         with:
           sarif_file: ${{ steps.scan.outputs.sarif }}
