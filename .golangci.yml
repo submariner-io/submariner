@@ -53,6 +53,7 @@ linters:
     - asciicheck
     - bidichk
     - bodyclose
+    # - canonicalheader # This is a slow linter and we don't use the net/http.Header API
     - containedctx
     - contextcheck
     - copyloopvar
@@ -69,15 +70,19 @@ linters:
     - errname
     # - execinquery # No SQL
     - exhaustive
-    # - exhauststruct # Not recommended for general use - meant to be used only for special cases
+    # - exhaustruct # This is too cumbersome as it requires all string, int, pointer et al fields to be initialized even when the
+    # type's default suffices, which is most of the time
+    - fatcontext
     # - forbidigo # We don't forbid any statements
     # - forcetypeassert # There are many unchecked type assertions that would be the result of a programming error so the
     #                     reasonable recourse would be to panic anyway if checked so this doesn't seem useful
     # - funlen # gocyclo is enabled which is generally a better metric than simply LOC.
     - gci
     - ginkgolinter
+    - gocheckcompilerdirectives
     # - gochecknoglobals # We don't want to forbid global variable constants
     # - gochecknoinits # We use init functions for valid reasons
+    # - gochecksumtype # The usefulness is very narrow:w
     - gocognit
     - goconst
     - gocritic
@@ -89,24 +94,29 @@ linters:
     - gofumpt
     - goheader
     - goimports
-    # - gomnd # It doesn't seem useful in general to enforce constants for all numeric values
     # - gomoddirectives # We don't want to forbid the 'replace' directive
     # - gomodguard # We don't block any modules
     # - goprintffuncname # This doesn't seem useful at all
+    # - gosmopolitan # This is related to internationalization which is not a concern for us
     - gosec
     - gosimple
     - govet
     - grouper
+    - iface
     - importas
+    - inamedparam
     - ineffassign
     # - interfacebloat # We track complexity elsewhere
+    - intrange
     # - ireturn # The argument to always "Return Concrete Types" doesn't seem compelling. It is perfectly valid to return
     #             an interface to avoid exposing the entire underlying struct
     - lll
     - loggercheck
     - maintidx
     - makezero
+    - mirror
     - misspell
+    # - mnd # It doesn't seem useful in general to enforce constants for all numeric values
     - nakedret
     # - nestif # This calculates cognitive complexity but we're doing that elsewhere
     - nilerr
@@ -114,21 +124,28 @@ linters:
     # - nlreturn # This is reasonable with a block-size of 2 but setting it above isn't honored
     # - noctx # We don't send HTTP requests
     - nolintlint
-    # - nonamedreturns # We don't forbid named returns
-    - nosprintfhostport
+    - nonamedreturns
+    # - nosprintfhostport # The use of this is very narrow
     # - paralleltest # Not relevant for Ginkgo UTs
+    - perfsprint
     - prealloc
     - predeclared
     - promlinter
+    - protogetter
     - reassign
+    - recvcheck
     - revive
     # - rowserrcheck # We don't use SQL
+    # - sloglint # We don't use log/slog
+    # - spancheck # We don't use OpenTelemetry/OpenCensus
     # - sqlclosecheck # We don't use SQL
     - staticcheck
     - stylecheck
+    - tagalign
     # - tagliatelle # Inconsistent with stylecheck and not as good
     # - tenv # Not relevant for our Ginkgo UTs
-    - testableexamples
+    # - testableexamples # We don't need this
+    # - testifylint # We don't use testify
     - testpackage
     # - thelper # Not relevant for our Ginkgo UTs
     # - tparallel # Not relevant for our Ginkgo UTs
@@ -142,6 +159,7 @@ linters:
     - whitespace
     - wrapcheck
     - wsl
+    # - zerologlint # We use zerolog indirectly so this isn't needed
 issues:
   exclude-rules:
     # Allow dot-imports for Gomega BDD directives per idiomatic Gomega
