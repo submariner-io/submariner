@@ -72,11 +72,11 @@ var _ = Describe("Request handling", func() {
 		It("should respond with OK", func() {
 			localListener.AddEndpoint(&remoteEndpoint)
 			response := requestResponseFromRemoteToLocal(&remoteUDPAddr)
-			Expect(response[0].Response).To(Equal(natproto.ResponseType_OK))
-			Expect(response[1].Response).To(Equal(natproto.ResponseType_NAT_DETECTED))
-			Expect(response[1].DstIpNatDetected).To(BeTrue())
-			Expect(response[1].SrcIpNatDetected).To(BeFalse())
-			Expect(response[1].SrcPortNatDetected).To(BeFalse())
+			Expect(response[0].GetResponse()).To(Equal(natproto.ResponseType_OK))
+			Expect(response[1].GetResponse()).To(Equal(natproto.ResponseType_NAT_DETECTED))
+			Expect(response[1].GetDstIpNatDetected()).To(BeTrue())
+			Expect(response[1].GetSrcIpNatDetected()).To(BeFalse())
+			Expect(response[1].GetSrcPortNatDetected()).To(BeFalse())
 		})
 
 		Context("with a modified IP", func() {
@@ -84,9 +84,9 @@ var _ = Describe("Request handling", func() {
 				remoteUDPAddr.IP = net.ParseIP(testRemotePublicIP)
 				localListener.AddEndpoint(&remoteEndpoint)
 				response := requestResponseFromRemoteToLocal(&remoteUDPAddr)
-				Expect(response[0].Response).To(Equal(natproto.ResponseType_NAT_DETECTED))
-				Expect(response[0].SrcIpNatDetected).To(BeTrue())
-				Expect(response[0].SrcPortNatDetected).To(BeFalse())
+				Expect(response[0].GetResponse()).To(Equal(natproto.ResponseType_NAT_DETECTED))
+				Expect(response[0].GetSrcIpNatDetected()).To(BeTrue())
+				Expect(response[0].GetSrcPortNatDetected()).To(BeFalse())
 			})
 		})
 
@@ -95,9 +95,9 @@ var _ = Describe("Request handling", func() {
 				remoteUDPAddr.Port = int(testRemoteNATPort + 1)
 				localListener.AddEndpoint(&remoteEndpoint)
 				response := requestResponseFromRemoteToLocal(&remoteUDPAddr)
-				Expect(response[0].Response).To(Equal(natproto.ResponseType_NAT_DETECTED))
-				Expect(response[0].SrcIpNatDetected).To(BeFalse())
-				Expect(response[0].SrcPortNatDetected).To(BeTrue())
+				Expect(response[0].GetResponse()).To(Equal(natproto.ResponseType_NAT_DETECTED))
+				Expect(response[0].GetSrcIpNatDetected()).To(BeFalse())
+				Expect(response[0].GetSrcPortNatDetected()).To(BeTrue())
 			})
 		})
 	})
@@ -107,7 +107,7 @@ var _ = Describe("Request handling", func() {
 			localListener.AddEndpoint(&remoteEndpoint)
 			localEndpoint.Spec.CableName = "invalid"
 			response := requestResponseFromRemoteToLocal(&remoteUDPAddr)
-			Expect(response[0].Response).To(Equal(natproto.ResponseType_UNKNOWN_DST_ENDPOINT))
+			Expect(response[0].GetResponse()).To(Equal(natproto.ResponseType_UNKNOWN_DST_ENDPOINT))
 		})
 	})
 
@@ -116,7 +116,7 @@ var _ = Describe("Request handling", func() {
 			localListener.AddEndpoint(&remoteEndpoint)
 			localEndpoint.Spec.ClusterID = "invalid"
 			response := requestResponseFromRemoteToLocal(&remoteUDPAddr)
-			Expect(response[0].Response).To(Equal(natproto.ResponseType_UNKNOWN_DST_CLUSTER))
+			Expect(response[0].GetResponse()).To(Equal(natproto.ResponseType_UNKNOWN_DST_CLUSTER))
 		})
 	})
 
@@ -126,7 +126,7 @@ var _ = Describe("Request handling", func() {
 				msg.GetRequest().Sender = nil
 			})
 			response := parseResponseInLocalListener(request, &remoteUDPAddr)
-			Expect(response.Response).To(Equal(natproto.ResponseType_MALFORMED))
+			Expect(response.GetResponse()).To(Equal(natproto.ResponseType_MALFORMED))
 		})
 	})
 
@@ -136,7 +136,7 @@ var _ = Describe("Request handling", func() {
 				msg.GetRequest().Receiver = nil
 			})
 			response := parseResponseInLocalListener(request, &remoteUDPAddr)
-			Expect(response.Response).To(Equal(natproto.ResponseType_MALFORMED))
+			Expect(response.GetResponse()).To(Equal(natproto.ResponseType_MALFORMED))
 		})
 	})
 
@@ -146,7 +146,7 @@ var _ = Describe("Request handling", func() {
 				msg.GetRequest().UsingDst = nil
 			})
 			response := parseResponseInLocalListener(request, &remoteUDPAddr)
-			Expect(response.Response).To(Equal(natproto.ResponseType_MALFORMED))
+			Expect(response.GetResponse()).To(Equal(natproto.ResponseType_MALFORMED))
 		})
 	})
 
@@ -156,7 +156,7 @@ var _ = Describe("Request handling", func() {
 				msg.GetRequest().UsingSrc = nil
 			})
 			response := parseResponseInLocalListener(request, &remoteUDPAddr)
-			Expect(response.Response).To(Equal(natproto.ResponseType_MALFORMED))
+			Expect(response.GetResponse()).To(Equal(natproto.ResponseType_MALFORMED))
 		})
 	})
 })

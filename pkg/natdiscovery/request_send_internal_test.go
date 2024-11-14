@@ -53,27 +53,27 @@ var _ = When("a request is sent", func() {
 
 	testRequest := func(srcIP string) {
 		It("should set the sender fields correctly", func() {
-			Expect(request.Sender).NotTo(BeNil())
-			Expect(request.Sender.ClusterId).To(Equal(testLocalClusterID))
-			Expect(request.Sender.EndpointId).To(Equal(testLocalEndpointName))
+			Expect(request.GetSender()).NotTo(BeNil())
+			Expect(request.GetSender().GetClusterId()).To(Equal(testLocalClusterID))
+			Expect(request.GetSender().GetEndpointId()).To(Equal(testLocalEndpointName))
 		})
 
 		It("should set the receiver fields correctly", func() {
-			Expect(request.Receiver).NotTo(BeNil())
-			Expect(request.Receiver.ClusterId).To(Equal(testRemoteClusterID))
-			Expect(request.Receiver.EndpointId).To(Equal(testRemoteEndpointName))
+			Expect(request.GetReceiver()).NotTo(BeNil())
+			Expect(request.GetReceiver().GetClusterId()).To(Equal(testRemoteClusterID))
+			Expect(request.GetReceiver().GetEndpointId()).To(Equal(testRemoteEndpointName))
 		})
 
 		It("should set the using source fields correctly", func() {
-			Expect(request.UsingSrc).NotTo(BeNil())
-			Expect(request.UsingSrc.IP).To(Equal(testLocalPrivateIP))
-			Expect(request.UsingSrc.Port).To(Equal(testLocalNATPort))
+			Expect(request.GetUsingSrc()).NotTo(BeNil())
+			Expect(request.GetUsingSrc().GetIP()).To(Equal(testLocalPrivateIP))
+			Expect(request.GetUsingSrc().GetPort()).To(Equal(testLocalNATPort))
 		})
 
 		It("should set the using destination fields correctly", func() {
-			Expect(request.UsingDst).NotTo(BeNil())
-			Expect(request.UsingDst.Port).To(Equal(testRemoteNATPort))
-			Expect(request.UsingDst.IP).To(Equal(srcIP))
+			Expect(request.GetUsingDst()).NotTo(BeNil())
+			Expect(request.GetUsingDst().GetPort()).To(Equal(testRemoteNATPort))
+			Expect(request.GetUsingDst().GetIP()).To(Equal(srcIP))
 		})
 
 		It("should not send another request", func() {

@@ -31,19 +31,19 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscove
 	localEndpointSpec := nd.localEndpoint.Spec()
 
 	response := proto.SubmarinerNATDiscoveryResponse{
-		RequestNumber: req.RequestNumber,
+		RequestNumber: req.GetRequestNumber(),
 		Sender: &proto.EndpointDetails{
 			ClusterId:  localEndpointSpec.ClusterID,
 			EndpointId: localEndpointSpec.CableName,
 		},
-		Receiver: req.Sender,
+		Receiver: req.GetSender(),
 		ReceivedSrc: &proto.IPPortPair{
 			Port: int32(addr.Port), //nolint:gosec // We can safely ignore integer conversion error
 			IP:   addr.IP.String(),
 		},
 	}
 
-	if req.Receiver == nil || req.Sender == nil || req.UsingDst == nil || req.UsingSrc == nil {
+	if req.GetReceiver() == nil || req.GetSender() == nil || req.GetUsingDst() == nil || req.GetUsingSrc() == nil {
 		logger.Warningf("Received NAT discovery packet %#v from %s which seems to be malformed ", req, addr.String())
 
 		response.Response = proto.ResponseType_MALFORMED
@@ -52,10 +52,10 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscove
 	}
 
 	logger.V(log.DEBUG).Infof("Received request from %s:%d - REQUEST_NUMBER: 0x%x, SENDER: %q, RECEIVER: %q",
-		addr.IP.String(), addr.Port, req.RequestNumber, req.Sender.EndpointId, req.Receiver.EndpointId)
+		addr.IP.String(), addr.Port, req.GetRequestNumber(), req.GetSender().GetEndpointId(), req.GetReceiver().GetEndpointId())
 
-	if req.Receiver.GetClusterId() != localEndpointSpec.ClusterID {
-		logger.Warningf("Received NAT discovery packet for cluster %q, but we are cluster %q", req.Receiver.GetClusterId(),
+	if req.GetReceiver().GetClusterId() != localEndpointSpec.ClusterID {
+		logger.Warningf("Received NAT discovery packet for cluster %q, but we are cluster %q", req.GetReceiver().GetClusterId(),
 			localEndpointSpec.ClusterID)
 
 		response.Response = proto.ResponseType_UNKNOWN_DST_CLUSTER
@@ -63,9 +63,9 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscove
 		return nd.sendResponseToAddress(&response, addr)
 	}
 
-	if req.Receiver.GetEndpointId() != localEndpointSpec.CableName {
+	if req.GetReceiver().GetEndpointId() != localEndpointSpec.CableName {
 		logger.Warningf("Received NAT discovery packet for endpoint %q, but we are endpoint %q "+
-			"if the port for NAT discovery has been mapped somewhere an error may exist", req.Receiver.GetEndpointId(),
+			"if the port for NAT discovery has been mapped somewhere an error may exist", req.GetReceiver().GetEndpointId(),
 			localEndpointSpec.CableName)
 
 		response.Response = proto.ResponseType_UNKNOWN_DST_ENDPOINT
@@ -73,20 +73,20 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscove
 		return nd.sendResponseToAddress(&response, addr)
 	}
 
-	if req.UsingSrc.GetIP() != "" && req.UsingSrc.GetIP() != addr.IP.String() {
+	if req.GetUsingSrc().GetIP() != "" && req.GetUsingSrc().GetIP() != addr.IP.String() {
 		logger.V(log.DEBUG).Infof("Received NAT packet from endpoint %q, cluster %q, where NAT has been detected, "+
 			"source IP changed",
-			req.Sender.GetEndpointId(), req.Sender.GetClusterId())
-		logger.V(log.DEBUG).Infof("Original src IP was %q, received src IP is %q", req.UsingSrc.IP, addr.IP.String())
+			req.GetSender().GetEndpointId(), req.GetSender().GetClusterId())
+		logger.V(log.DEBUG).Infof("Original src IP was %q, received src IP is %q", req.GetUsingSrc().GetIP(), addr.IP.String())
 
 		response.SrcIpNatDetected = true
 	}
 
-	if int(req.UsingSrc.Port) != addr.Port {
+	if int(req.GetUsingSrc().GetPort()) != addr.Port {
 		logger.V(log.DEBUG).Infof("Received NAT packet from endpoint %q, cluster %q, where NAT on the source has been detected, "+
 			"src port changed",
-			req.Sender.GetEndpointId(), req.Sender.GetClusterId())
-		logger.V(log.DEBUG).Infof("Original src IP was %q, received src IP is %q", req.UsingSrc.IP, addr.IP.String())
+			req.GetSender().GetEndpointId(), req.GetSender().GetClusterId())
+		logger.V(log.DEBUG).Infof("Original src IP was %q, received src IP is %q", req.GetUsingSrc().GetIP(), addr.IP.String())
 
 		response.SrcPortNatDetected = true
 	}
@@ -94,11 +94,11 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscove
 	// Detect DST NAT with a naive implementation that assumes that we always receive on the PrivateIP,
 	// if we will listen at some point on multiple addresses we will need to implement the
 	// unix.IP_RECVORIGDSTADDR on the UDP socket, and the go recvmsg implementation instead of readfrom
-	if req.UsingDst.IP != localEndpointSpec.PrivateIP {
+	if req.GetUsingDst().GetIP() != localEndpointSpec.PrivateIP {
 		response.DstIpNatDetected = true
 	}
 
-	if response.SrcPortNatDetected || response.SrcIpNatDetected || response.DstIpNatDetected {
+	if response.GetSrcPortNatDetected() || response.GetSrcIpNatDetected() || response.GetDstIpNatDetected() {
 		response.Response = proto.ResponseType_NAT_DETECTED
 	} else {
 		response.Response = proto.ResponseType_OK
@@ -117,7 +117,7 @@ func (nd *natDiscovery) sendResponseToAddress(response *proto.SubmarinerNATDisco
 	}
 
 	logger.V(log.DEBUG).Infof("Sending response to %s:%d - REQUEST_NUMBER: 0x%x, RESPONSE: %v, SENDER: %q, RECEIVER: %q",
-		addr.IP.String(), addr.Port, response.RequestNumber, response.Response, response.GetSenderEndpointID(),
+		addr.IP.String(), addr.Port, response.GetRequestNumber(), response.GetResponse(), response.GetSenderEndpointID(),
 		response.GetReceiverEndpointID())
 
 	if length, err := nd.serverUDPWrite(buf, addr); err != nil {

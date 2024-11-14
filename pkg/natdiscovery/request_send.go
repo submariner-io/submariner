@@ -106,7 +106,7 @@ func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT,
 
 	buf, err := proto.Marshal(&message)
 	if err != nil {
-		return request.RequestNumber, errors.Wrapf(err, "error marshaling request %#v", request)
+		return request.GetRequestNumber(), errors.Wrapf(err, "error marshaling request %#v", request)
 	}
 
 	addr := net.UDPAddr{
@@ -115,17 +115,17 @@ func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT,
 	}
 
 	logger.V(log.DEBUG).Infof("Sending request - REQUEST_NUMBER: 0x%x, SENDER: %q, RECEIVER: %q, USING_SRC: %s:%d, USING_DST: %s:%d",
-		request.RequestNumber, request.Sender.EndpointId, request.Receiver.EndpointId, request.UsingSrc.IP, request.UsingSrc.Port,
-		request.UsingDst.IP, request.UsingDst.Port)
+		request.GetRequestNumber(), request.GetSender().GetEndpointId(), request.GetReceiver().GetEndpointId(),
+		request.GetUsingSrc().GetIP(), request.GetUsingSrc().GetPort(), request.GetUsingDst().GetIP(), request.GetUsingDst().GetPort())
 
 	if length, err := nd.serverUDPWrite(buf, &addr); err != nil {
-		return request.RequestNumber, errors.Wrapf(err, "error sending request packet %#v", request)
+		return request.GetRequestNumber(), errors.Wrapf(err, "error sending request packet %#v", request)
 	} else if length != len(buf) {
-		return request.RequestNumber, errors.Errorf("the sent UDP packet was smaller than requested, sent=%d, expected=%d", length,
+		return request.GetRequestNumber(), errors.Errorf("the sent UDP packet was smaller than requested, sent=%d, expected=%d", length,
 			len(buf))
 	}
 
 	remoteNAT.checkSent()
 
-	return request.RequestNumber, nil
+	return request.GetRequestNumber(), nil
 }

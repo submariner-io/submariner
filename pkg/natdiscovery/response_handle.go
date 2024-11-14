@@ -29,35 +29,36 @@ import (
 
 func (nd *natDiscovery) handleResponseFromAddress(req *proto.SubmarinerNATDiscoveryResponse, addr *net.UDPAddr) error {
 	logger.V(log.DEBUG).Infof("Received response from %s:%d - REQUEST_NUMBER: 0x%x, RESPONSE: %v, SENDER: %q, RECEIVER: %q",
-		addr.IP.String(), addr.Port, req.RequestNumber, req.Response, req.Sender.EndpointId, req.Receiver.EndpointId)
+		addr.IP.String(), addr.Port, req.GetRequestNumber(), req.GetResponse(), req.GetSender().GetEndpointId(),
+		req.GetReceiver().GetEndpointId())
 
 	if req.GetSender() == nil || req.GetReceiver() == nil || req.GetReceivedSrc() == nil {
 		return errors.Errorf("received malformed response %#v", req)
 	}
 
-	if req.Response != proto.ResponseType_OK && req.Response != proto.ResponseType_NAT_DETECTED {
+	if req.GetResponse() != proto.ResponseType_OK && req.GetResponse() != proto.ResponseType_NAT_DETECTED {
 		var ok bool
 		var name string
 
-		if name, ok = proto.ResponseType_name[int32(req.Response)]; !ok {
-			name = fmt.Sprintf("%d", req.Response)
+		if name, ok = proto.ResponseType_name[int32(req.GetResponse())]; !ok {
+			name = fmt.Sprintf("%d", req.GetResponse())
 		}
 
-		return errors.Errorf("remote endpoint %q responded with %q : %#v", req.Sender.EndpointId, name, req)
+		return errors.Errorf("remote endpoint %q responded with %q : %#v", req.GetSender().GetEndpointId(), name, req)
 	}
 
 	nd.Lock()
-	remoteNAT, ok := nd.remoteEndpoints[req.GetSender().EndpointId]
+	remoteNAT, ok := nd.remoteEndpoints[req.GetSender().GetEndpointId()]
 	defer nd.Unlock()
 
 	if !ok {
-		return errors.Errorf("received response from unknown endpoint %q", req.GetSender().EndpointId)
+		return errors.Errorf("received response from unknown endpoint %q", req.GetSender().GetEndpointId())
 	}
 
 	// response to a PublicIP request
-	if remoteNAT.lastPublicIPRequestID == req.RequestNumber {
-		useNAT := req.Response == proto.ResponseType_NAT_DETECTED
-		if !remoteNAT.transitionToPublicIP(req.GetSender().EndpointId, useNAT) {
+	if remoteNAT.lastPublicIPRequestID == req.GetRequestNumber() {
+		useNAT := req.GetResponse() == proto.ResponseType_NAT_DETECTED
+		if !remoteNAT.transitionToPublicIP(req.GetSender().GetEndpointId(), useNAT) {
 			return nil
 		}
 
@@ -67,21 +68,21 @@ func (nd *natDiscovery) handleResponseFromAddress(req *proto.SubmarinerNATDiscov
 	}
 
 	// response to a PrivateIP request
-	if remoteNAT.lastPrivateIPRequestID == req.RequestNumber {
+	if remoteNAT.lastPrivateIPRequestID == req.GetRequestNumber() {
 		if addr.IP.String() != remoteNAT.endpoint.Spec.PrivateIP {
 			return errors.Errorf("response for NAT discovery on endpoint %q private IP %q comes from different IP %q, "+
 				"NAT on private IPs is unlikely and filtered for security reasons",
-				req.GetSender().EndpointId, remoteNAT.endpoint.Spec.PrivateIP, addr.IP)
+				req.GetSender().GetEndpointId(), remoteNAT.endpoint.Spec.PrivateIP, addr.IP)
 		}
 
-		if req.Response == proto.ResponseType_NAT_DETECTED {
+		if req.GetResponse() == proto.ResponseType_NAT_DETECTED {
 			logger.Warningf("response for NAT discovery on endpoint %q private IP %q says src was modified which is unexpected",
-				req.GetSender().EndpointId, remoteNAT.endpoint.Spec.PrivateIP)
+				req.GetSender().GetEndpointId(), remoteNAT.endpoint.Spec.PrivateIP)
 		}
 
-		useNAT := req.Response == proto.ResponseType_NAT_DETECTED
+		useNAT := req.GetResponse() == proto.ResponseType_NAT_DETECTED
 
-		if !remoteNAT.transitionToPrivateIP(req.GetSender().EndpointId, useNAT) {
+		if !remoteNAT.transitionToPrivateIP(req.GetSender().GetEndpointId(), useNAT) {
 			return nil
 		}
 
@@ -91,5 +92,5 @@ func (nd *natDiscovery) handleResponseFromAddress(req *proto.SubmarinerNATDiscov
 	}
 
 	return errors.Errorf("received response for unknown request id 0x%x, lastPublicIPRequestID: %d, lastPrivateIPRequestID: %d",
-		req.RequestNumber, remoteNAT.lastPublicIPRequestID, remoteNAT.lastPrivateIPRequestID)
+		req.GetRequestNumber(), remoteNAT.lastPublicIPRequestID, remoteNAT.lastPrivateIPRequestID)
 }
