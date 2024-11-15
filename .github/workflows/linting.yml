@@ -33,6 +33,15 @@ jobs:
           flags: 'i'
           error: 'Fixup commits should be squashed into the commits under review'
 
+  check-branch-dependencies:
+    name: Check branch dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938
+      - name: Check that no dependencies include unmerged commits
+        run: make check-non-release-versions
+
   code-gen:
     name: Submariner K8s API Code Generation
     runs-on: ubuntu-latest
