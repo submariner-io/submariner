@@ -184,7 +184,7 @@ func (n *netlinkType) EnableLooseModeReversePathFilter(interfaceName string) err
 }
 
 func (n *netlinkType) EnsureLooseModeIsConfigured(interfaceName string) error {
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		// Revisit: This is a temporary work-around to fix https://github.com/submariner-io/submariner/issues/2422
 		// Allow the interface to get initialized.
 		time.Sleep(100 * time.Millisecond)

@@ -320,7 +320,7 @@ func extractSubnets(endpoint *subv1.EndpointSpec) []string {
 func whack(args ...string) error {
 	var err error
 
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		err = func() error {
 			ctx, cancel := context.WithTimeout(context.TODO(), whackTimeout)
 			defer cancel()
@@ -653,7 +653,7 @@ func (i *libreswan) waitForControlSocket() error {
 	const retryInterval = 100 * time.Millisecond
 	const controlSocketPath = "/run/pluto/pluto.ctl"
 
-	for i := 0; i < maxAttempts; i++ {
+	for range maxAttempts {
 		_, err := os.Stat(controlSocketPath)
 		if err == nil {
 			return nil

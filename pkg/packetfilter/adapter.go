@@ -63,7 +63,7 @@ func (a *Adapter) ensureRuleAtPosition(table TableType, chain string, existingRu
 
 	// The required rule is present in the chain, but either there are multiple occurrences or it's not at the desired position.
 	if numOccurrences > 1 || !isPresentAtRequiredPosition {
-		for i := 0; i < numOccurrences; i++ {
+		for range numOccurrences {
 			logger.V(level.TRACE).Infof("Deleting misplaced occurrence of rule %q from table %q, chain %q", rule, table, chain)
 
 			if err := a.Delete(table, chain, rule); err != nil {

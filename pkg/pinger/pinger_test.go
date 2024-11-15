@@ -101,7 +101,7 @@ var _ = Describe("Pinger", func() {
 	verifyPingStats := func(count int) {
 		last := &pinger.LatencyInfo{}
 
-		for i := 0; i < count; i++ {
+		for range count {
 			var current *pinger.LatencyInfo
 
 			Eventually(func() *pinger.LatencyInfo {

@@ -113,7 +113,7 @@ func main() {
 
 	var localCluster *submarinerv1.Cluster
 	// During installation, sometimes creation of clusterCRD by submariner-gateway-pod would take few secs.
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		localCluster, err = submarinerClient.SubmarinerV1().Clusters(spec.Namespace).Get(context.TODO(), spec.ClusterID,
 			metav1.GetOptions{})
 		if err == nil {

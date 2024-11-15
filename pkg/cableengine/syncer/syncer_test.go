@@ -96,7 +96,7 @@ func testGatewaySyncing() {
 		It("should periodically update the Gateway resource timestamp", func() {
 			var lastTimestamp int64
 
-			for i := 0; i < 3; i++ {
+			for range 3 {
 				var currentTimestamp int64
 
 				Eventually(func() int64 {
