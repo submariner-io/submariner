@@ -675,6 +675,6 @@ func (m *equalGatewayMatcher) FailureMessage(actual interface{}) string {
 	return format.Message(actual, "to equal", m.expected)
 }
 
-func (m *equalGatewayMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (m *equalGatewayMatcher) NegatedFailureMessage(actual interface{}) string {
 	return format.Message(actual, "not to equal", m.expected)
 }

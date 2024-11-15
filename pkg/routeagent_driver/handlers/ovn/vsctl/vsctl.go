@@ -36,7 +36,7 @@ const (
 
 var logger = log.Logger{Logger: logf.Log.WithName("ovs-vsctl")}
 
-func vsctlCmd(parameters ...string) (output string, err error) {
+func vsctlCmd(parameters ...string) (string, error) {
 	allParameters := []string{fmt.Sprintf("--timeout=%d", ovsCommandTimeout)}
 	allParameters = append(allParameters, parameters...)
 

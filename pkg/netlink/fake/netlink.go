@@ -450,13 +450,15 @@ func (n *basicType) ConfigureTCPMTUProbe(_, _ string) error {
 	return nil
 }
 
-func (n *NetLink) AwaitLink(name string) (link netlink.Link) {
+func (n *NetLink) AwaitLink(name string) netlink.Link {
+	var link netlink.Link
+
 	Eventually(func() netlink.Link {
 		link, _ = n.LinkByName(name)
 		return link
 	}, 5).ShouldNot(BeNil(), "Link %q not found", name)
 
-	return
+	return link
 }
 
 func (n *NetLink) AwaitNoLink(name string) {
@@ -466,7 +468,7 @@ func (n *NetLink) AwaitNoLink(name string) {
 	}, 5).Should(BeTrue(), "Link %q exists", name)
 }
 
-func (n *NetLink) AwaitLinkSetup(name string) (link netlink.Link) {
+func (n *NetLink) AwaitLinkSetup(name string) {
 	Eventually(func() bool {
 		n.basic().mutex.Lock()
 		defer n.basic().mutex.Unlock()
@@ -478,8 +480,6 @@ func (n *NetLink) AwaitLinkSetup(name string) (link netlink.Link) {
 
 		return false
 	}, 5).Should(BeTrue(), "Link %q not setup", name)
-
-	return
 }
 
 func routeList[T any](n *NetLink, linkIndex, table int, f func(r *netlink.Route) *T) []T {
