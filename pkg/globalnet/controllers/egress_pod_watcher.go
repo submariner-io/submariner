@@ -19,8 +19,6 @@ limitations under the License.
 package controllers
 
 import (
-	"fmt"
-
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/watcher"
@@ -53,7 +51,7 @@ func startEgressPodWatcher(name, namespace string, namedSet packetfilter.NamedSe
 		Scheme:     config.Scheme,
 		ResourceConfigs: []watcher.ResourceConfig{
 			{
-				Name:         fmt.Sprintf("Pod watcher %s", name),
+				Name:         "Pod watcher " + name,
 				ResourceType: &corev1.Pod{},
 				Handler: watcher.EventHandlerFuncs{
 					OnCreateFunc: pw.onCreateOrUpdate,

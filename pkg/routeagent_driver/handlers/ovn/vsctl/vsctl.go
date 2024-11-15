@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -75,8 +76,8 @@ func DelBridge(bridgeName string) error {
 
 func AddInternalPort(bridgeName, portName, macAddress string, mtu int) error {
 	_, err := vsctlCmd("--may-exist", "add-port", bridgeName, portName, "--",
-		"set", "interface", portName, "type=internal", "mtu_request="+fmt.Sprintf("%d", mtu),
-		fmt.Sprintf("mac=%s", strings.ReplaceAll(macAddress, ":", "\\:")))
+		"set", "interface", portName, "type=internal", "mtu_request="+strconv.Itoa(mtu),
+		"mac="+strings.ReplaceAll(macAddress, ":", "\\:"))
 
 	return err
 }
@@ -109,7 +110,7 @@ func AddOVNBridgeMapping(netName, bridgeName string) error {
 	}
 
 	if _, err = vsctlCmd("set", "Open_vSwitch", ".",
-		fmt.Sprintf("external_ids:ovn-bridge-mappings=%s", bridgeMappings)); err != nil {
+		"external_ids:ovn-bridge-mappings="+bridgeMappings); err != nil {
 		return errors.Wrap(err, "failed to set ovn-bridge-mappings")
 	}
 

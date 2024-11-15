@@ -60,7 +60,7 @@ func jsonToIP(jsonData string) (string, error) {
 
 	ipStr, found := data["ipv4"]
 	if !found {
-		return "", fmt.Errorf("json data does not contain an 'ipv4' field")
+		return "", errors.New("json data does not contain an 'ipv4' field")
 	}
 
 	ip, _, err := net.ParseCIDR(ipStr)

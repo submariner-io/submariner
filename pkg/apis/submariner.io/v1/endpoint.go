@@ -68,11 +68,11 @@ func parsePort(port string) (int32, error) {
 
 func (ep *EndpointSpec) GenerateName() (string, error) {
 	if ep.ClusterID == "" {
-		return "", fmt.Errorf("ClusterID cannot be empty")
+		return "", errors.New("ClusterID cannot be empty")
 	}
 
 	if ep.CableName == "" {
-		return "", fmt.Errorf("CableName cannot be empty")
+		return "", errors.New("CableName cannot be empty")
 	}
 
 	return resource.EnsureValidName(fmt.Sprintf("%s-%s", ep.ClusterID, ep.CableName)), nil

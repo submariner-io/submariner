@@ -274,7 +274,7 @@ func GetDefaultGatewayInterface() (*net.Interface, error) {
 	for i := range routes {
 		if routes[i].Dst == nil || routes[i].Dst.String() == allZeroAddress {
 			if routes[i].LinkIndex == 0 {
-				return nil, fmt.Errorf("default gateway interface could not be determined")
+				return nil, errors.New("default gateway interface could not be determined")
 			}
 
 			iface, err := net.InterfaceByIndex(routes[i].LinkIndex)
@@ -286,7 +286,7 @@ func GetDefaultGatewayInterface() (*net.Interface, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("unable to find default route")
+	return nil, errors.New("unable to find default route")
 }
 
 func DeleteIfaceAndAssociatedRoutes(iface string, tableID int) error {

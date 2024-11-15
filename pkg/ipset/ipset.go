@@ -50,6 +50,7 @@ limitations under the License.
 package ipset
 
 import (
+	"errors"
 	"fmt"
 	"os/exec"
 	"regexp"
@@ -384,7 +385,7 @@ func (runner *runner) ListSets() ([]string, error) {
 // ListEntries lists all the entries from a named set.
 func (runner *runner) ListEntries(set string) ([]string, error) {
 	if set == "" {
-		return nil, fmt.Errorf("set name can't be empty")
+		return nil, errors.New("set name can't be empty")
 	}
 
 	out, err := runner.runWithOutput([]string{"list", set}, "error listing set %q", set)

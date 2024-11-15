@@ -412,7 +412,7 @@ func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
 }
 
 func newGlobalEgressIPObj(namespace string, selector *metav1.LabelSelector) (*unstructured.Unstructured, error) {
-	geipName := fmt.Sprintf("test-e2e-egressip-%s", namespace)
+	geipName := "test-e2e-egressip-" + namespace
 	egressIPSpec := &submarinerv1.GlobalEgressIP{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      geipName,
@@ -461,7 +461,7 @@ func getGlobalIngressIP(p testParams, service *v1.Service) string {
 	case tcp.GlobalPodIP:
 		podList := p.Framework.AwaitPodsByLabelSelector(p.Cluster, labels.Set(service.Spec.Selector).AsSelector().String(),
 			service.Namespace, 1)
-		ingressIPName := fmt.Sprintf("pod-%s", podList.Items[0].Name)
+		ingressIPName := "pod-" + podList.Items[0].Name
 
 		return p.Framework.AwaitGlobalIngressIP(p.Cluster, ingressIPName, service.Namespace)
 	}

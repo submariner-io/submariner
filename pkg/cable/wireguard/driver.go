@@ -104,7 +104,7 @@ func NewDriver(localEndpoint *endpoint.Local, _ *types.SubmarinerCluster) (cable
 	// Create the controller.
 	if w.client, err = wgctrl.New(); err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("wgctrl is not available on this system")
+			return nil, errors.New("wgctrl is not available on this system")
 		}
 
 		return nil, errors.Wrap(err, "failed to open wgctl client")
@@ -312,7 +312,7 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 func keyFromSpec(ep *v1.EndpointSpec) (*wgtypes.Key, error) {
 	s, found := ep.BackendConfig[PublicKey]
 	if !found {
-		return nil, fmt.Errorf("endpoint is missing public key")
+		return nil, errors.New("endpoint is missing public key")
 	}
 
 	key, err := wgtypes.ParseKey(s)

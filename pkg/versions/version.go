@@ -19,7 +19,6 @@ limitations under the License.
 package versions
 
 import (
-	"fmt"
 	"runtime"
 
 	"github.com/submariner-io/admiral/pkg/log"
@@ -32,10 +31,10 @@ var (
 )
 
 func Log(logger *log.Logger) {
-	logger.Info(fmt.Sprintf("Go Version: %s", runtime.Version()))
-	logger.Info(fmt.Sprintf("Go Arch: %s", runtime.GOARCH))
-	logger.Info(fmt.Sprintf("Git Commit Hash: %s", gitCommitHash))
-	logger.Info(fmt.Sprintf("Git Commit Date: %s", gitCommitDate))
+	logger.Info("Go Version: " + runtime.Version())
+	logger.Info("Go Arch: " + runtime.GOARCH)
+	logger.Info("Git Commit Hash: " + gitCommitHash)
+	logger.Info("Git Commit Date: " + gitCommitDate)
 }
 
 // Submariner returns the version info of submariner.
