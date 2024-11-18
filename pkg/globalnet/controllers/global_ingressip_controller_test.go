@@ -132,8 +132,11 @@ var _ = Describe("GlobalIngressIP controller", func() {
 func testGlobalIngressIPCreatedClusterIPSvc(t *globalIngressIPControllerTestDriver, ingressIP *submarinerv1.GlobalIngressIP) {
 	var service *corev1.Service
 
-	JustBeforeEach(func() {
+	BeforeEach(func() {
 		service = newClusterIPService()
+	})
+
+	JustBeforeEach(func() {
 		t.createService(service)
 		t.createGlobalIngressIP(ingressIP)
 	})
@@ -150,9 +153,21 @@ func testGlobalIngressIPCreatedClusterIPSvc(t *globalIngressIPControllerTestDriv
 		Expect(intSvc.Spec.Ports).To(Equal(service.Spec.Ports))
 		Expect(intSvc.Spec.IPFamilyPolicy).ToNot(BeNil())
 		Expect(*intSvc.Spec.IPFamilyPolicy).To(Equal(corev1.IPFamilyPolicySingleStack))
+		Expect(intSvc.Spec.PublishNotReadyAddresses).To(BeFalse())
 
 		finalizer := intSvc.GetFinalizers()[0]
 		Expect(finalizer).To(Equal(controllers.InternalServiceFinalizer))
+	})
+
+	Context("and the service has PublishNotReadyAddresses set to true", func() {
+		BeforeEach(func() {
+			service.Spec.PublishNotReadyAddresses = true
+		})
+
+		It("should set PublishNotReadyAddresses to true on the internal submariner service", func() {
+			intSvc := t.awaitService(controllers.GetInternalSvcName(serviceName))
+			Expect(intSvc.Spec.PublishNotReadyAddresses).To(BeTrue())
+		})
 	})
 
 	Context("with the IP pool exhausted", func() {
