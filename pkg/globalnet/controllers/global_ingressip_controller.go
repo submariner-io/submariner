@@ -288,10 +288,11 @@ func (c *globalIngressIPController) createOrUpdateInternalService(from *corev1.S
 			Finalizers: []string{InternalServiceFinalizer},
 		},
 		Spec: corev1.ServiceSpec{
-			Ports:          from.Spec.Ports,
-			Selector:       from.Spec.Selector,
-			ExternalIPs:    []string{extIP},
-			IPFamilyPolicy: ptr.To(corev1.IPFamilyPolicySingleStack),
+			Ports:                    from.Spec.Ports,
+			Selector:                 from.Spec.Selector,
+			ExternalIPs:              []string{extIP},
+			IPFamilyPolicy:           ptr.To(corev1.IPFamilyPolicySingleStack),
+			PublishNotReadyAddresses: from.Spec.PublishNotReadyAddresses,
 		},
 	}
 
