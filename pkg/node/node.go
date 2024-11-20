@@ -25,11 +25,13 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/resource"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
+	nodeutil "k8s.io/component-helpers/node/util"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -65,4 +67,28 @@ func GetLocalNode(clientset kubernetes.Interface) (*v1.Node, error) {
 	})
 
 	return node, errors.Wrapf(err, "failed to get local node %q", nodeName)
+}
+
+func WaitForLocalNodeReady(ctx context.Context, client kubernetes.Interface) {
+	// In most cases the node will already be ready; otherwise, wait forever or until the context is cancelled.
+	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(_ context.Context) (bool, error) {
+		localNode, err := GetLocalNode(client) //nolint:contextcheck // TODO - should pass the context parameter
+
+		if err != nil {
+			logger.Error(err, "Error retrieving local node")
+		} else {
+			_, condition := nodeutil.GetNodeCondition(&localNode.Status, v1.NodeReady)
+			if condition != nil && condition.Status == v1.ConditionTrue {
+				logger.Info("Local node ready")
+				return true, nil
+			}
+
+			logger.Infof("Local node not ready - waiting. Conditions: %s", resource.ToJSON(localNode.Status.Conditions))
+		}
+
+		return false, nil
+	})
+	if err != nil {
+		logger.Error(err, "Error waiting for local node")
+	}
 }
