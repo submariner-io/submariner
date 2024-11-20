@@ -142,7 +142,7 @@ func main() {
 		RouteAgentUpdateInterval: 60 * time.Second,
 	}
 
-	registry, err := event.NewRegistry("routeagent_driver", np,
+	registry, err := event.NewRegistry(ctx, "routeagent_driver", np,
 		kubeproxy.NewSyncHandler(env.ClusterCidr, env.ServiceCidr),
 		ovn.NewHandler(&ovn.HandlerConfig{
 			Namespace:       env.Namespace,

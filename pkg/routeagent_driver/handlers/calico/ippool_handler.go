@@ -81,14 +81,14 @@ func (h *calicoIPPoolHandler) GetName() string {
 	return "Calico IPPool handler"
 }
 
-func (h *calicoIPPoolHandler) Init() error {
+func (h *calicoIPPoolHandler) Init(ctx context.Context) error {
 	var err error
 
 	if h.client, err = NewClient(h.restConfig); err != nil {
 		return errors.Wrap(err, "error initializing Calico clientset")
 	}
 
-	return h.updateROKSCalicoCfg()
+	return h.updateROKSCalicoCfg(ctx)
 }
 
 func (h *calicoIPPoolHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
@@ -213,9 +213,9 @@ func getEndpointSubnetIPPoolName(endpoint *submV1.Endpoint, subnet string) strin
 	return fmt.Sprintf("submariner-%s-%s", endpoint.Spec.ClusterID, strings.ReplaceAll(subnet, "/", "-"))
 }
 
-func (h *calicoIPPoolHandler) platformIsROKS() (bool, error) {
+func (h *calicoIPPoolHandler) platformIsROKS(ctx context.Context) (bool, error) {
 	// Submariner GW is deployed on ROKS using LB service with specific annotations.
-	service, err := h.k8sClient.CoreV1().Services(h.namespace).Get(context.TODO(), GwLBSvcName, metav1.GetOptions{})
+	service, err := h.k8sClient.CoreV1().Services(h.namespace).Get(ctx, GwLBSvcName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return false, nil
 	}
@@ -229,8 +229,8 @@ func (h *calicoIPPoolHandler) platformIsROKS() (bool, error) {
 
 // workaround to address datapath issue with default Calico IPPool configuration for ROKS platform,
 // IPIPMode of calico default IPPool should be set to 'Always'.
-func (h *calicoIPPoolHandler) updateROKSCalicoCfg() error {
-	isROKS, err := h.platformIsROKS()
+func (h *calicoIPPoolHandler) updateROKSCalicoCfg(ctx context.Context) error {
+	isROKS, err := h.platformIsROKS(ctx)
 	if err != nil {
 		return err
 	}
@@ -241,7 +241,7 @@ func (h *calicoIPPoolHandler) updateROKSCalicoCfg() error {
 
 	// platform is ROKS, make sure that IPIPMode of default IPPool is Always
 
-	err = util.Update(context.TODO(), h.iPPoolResourceInterface(), &calicoapi.IPPool{
+	err = util.Update(ctx, h.iPPoolResourceInterface(), &calicoapi.IPPool{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: DefaultV4IPPoolName,
 		},

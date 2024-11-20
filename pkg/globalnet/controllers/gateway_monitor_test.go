@@ -416,7 +416,7 @@ func (t *gatewayMonitorTestDriver) start() {
 
 	localSubnets := []string{localCIDR}
 
-	t.controller, err = controllers.NewGatewayMonitor(&controllers.GatewayMonitorConfig{
+	t.controller, err = controllers.NewGatewayMonitor(context.TODO(), &controllers.GatewayMonitorConfig{
 		RestMapper: t.restMapper,
 		Client:     t.dynClient,
 		Scheme:     t.scheme,

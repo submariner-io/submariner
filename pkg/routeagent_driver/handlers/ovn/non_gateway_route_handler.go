@@ -48,7 +48,7 @@ func NewNonGatewayRouteHandler(smClient submarinerClientset.Interface, transitSw
 	}
 }
 
-func (h *NonGatewayRouteHandler) Init() error {
+func (h *NonGatewayRouteHandler) Init(_ context.Context) error {
 	logger.Info("Starting NonGatewayRouteHandler")
 	return nil
 }

@@ -120,7 +120,8 @@ type LeaderElectionInfo struct {
 }
 
 type gatewayMonitorInterface struct {
-	monitor *gatewayMonitor
+	monitor  *gatewayMonitor
+	registry *event.Registry
 }
 
 type gatewayMonitor struct {

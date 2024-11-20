@@ -44,7 +44,7 @@ func NewGatewayRouteHandler(smClientSet submarinerClientset.Interface) *GatewayR
 	}
 }
 
-func (h *GatewayRouteHandler) Init() error {
+func (h *GatewayRouteHandler) Init(_ context.Context) error {
 	logger.Info("Starting GatewayRouteHandler")
 
 	nextHopIP, err := getNextHopOnK8sMgmtIntf()

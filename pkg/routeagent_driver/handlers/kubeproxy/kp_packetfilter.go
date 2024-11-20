@@ -19,6 +19,7 @@ limitations under the License.
 package kubeproxy
 
 import (
+	"context"
 	"net"
 	"os"
 	"time"
@@ -101,7 +102,7 @@ var discoverCNIRetryConfig = wait.Backoff{
 	Steps:    12,
 }
 
-func (kp *SyncHandler) Init() error {
+func (kp *SyncHandler) Init(_ context.Context) error {
 	var err error
 	var cniIface *cni.Interface
 

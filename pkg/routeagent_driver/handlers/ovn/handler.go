@@ -19,6 +19,7 @@ limitations under the License.
 package ovn
 
 import (
+	"context"
 	"net"
 	"sync"
 
@@ -97,7 +98,7 @@ func (ovn *Handler) GetNetworkPlugins() []string {
 	return []string{cni.OVNKubernetes}
 }
 
-func (ovn *Handler) Init() error {
+func (ovn *Handler) Init(_ context.Context) error {
 	ovn.LegacyCleanup()
 
 	err := ovn.initIPtablesChains()

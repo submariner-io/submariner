@@ -53,7 +53,7 @@ import (
 	"k8s.io/utils/set"
 )
 
-func NewGatewayMonitor(config *GatewayMonitorConfig) (Interface, error) {
+func NewGatewayMonitor(ctx context.Context, config *GatewayMonitorConfig) (Interface, error) {
 	// We'll panic if config is nil, this is intentional
 	gatewayMonitor := &gatewayMonitor{
 		baseController:          newBaseController(),
@@ -130,7 +130,12 @@ func NewGatewayMonitor(config *GatewayMonitorConfig) (Interface, error) {
 
 	gatewayMonitor.gatewaySharedInformerStopCh = make(chan struct{})
 
-	return &gatewayMonitorInterface{monitor: gatewayMonitor}, nil
+	registry, err := event.NewRegistry(ctx, "globalnet-registry", event.AnyNetworkPlugin, gatewayMonitor)
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating event registry")
+	}
+
+	return &gatewayMonitorInterface{monitor: gatewayMonitor, registry: registry}, nil
 }
 
 func (g *gatewayMonitorInterface) Start() error {
@@ -145,13 +150,8 @@ func (g *gatewayMonitorInterface) Start() error {
 		g.monitor.gatewaySharedInformer.Run(g.monitor.gatewaySharedInformerStopCh)
 	}()
 
-	registry, err := event.NewRegistry("globalnet-registry", event.AnyNetworkPlugin, g.monitor)
-	if err != nil {
-		return errors.Wrap(err, "error creating event registry")
-	}
-
 	eventController, err := controller.New(&controller.Config{
-		Registry:   registry,
+		Registry:   g.registry,
 		RestMapper: g.monitor.RestMapper,
 		Client:     g.monitor.Client,
 		Scheme:     g.monitor.Scheme,
@@ -175,7 +175,7 @@ func (g *gatewayMonitor) GetNetworkPlugins() []string {
 	return []string{event.AnyNetworkPlugin}
 }
 
-func (g *gatewayMonitor) Init() error {
+func (g *gatewayMonitor) Init(_ context.Context) error {
 	return g.createNATChain(constants.SmGlobalnetMarkChain)
 }
 

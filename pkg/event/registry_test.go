@@ -19,6 +19,8 @@ limitations under the License.
 package event_test
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	submv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -55,8 +57,8 @@ var _ = Describe("Event Registry", func() {
 
 			var err error
 
-			registry, err = event.NewRegistry("test-registry", npGenericKubeproxyIptables, logger.NewHandler(), matchingHandlers[0],
-				nonMatchingHandlers[0], matchingHandlers[1], matchingHandlers[2])
+			registry, err = event.NewRegistry(context.TODO(), "test-registry", npGenericKubeproxyIptables, logger.NewHandler(),
+				matchingHandlers[0], nonMatchingHandlers[0], matchingHandlers[1], matchingHandlers[2])
 			Expect(err).NotTo(HaveOccurred())
 			Expect(registry.GetName()).To(Equal("test-registry"))
 		})
@@ -115,7 +117,7 @@ var _ = Describe("Event Registry", func() {
 			h := testing.NewTestHandler("test-handler", event.AnyNetworkPlugin, make(chan testing.TestEvent, 10))
 			h.FailOnEvent(testing.EvInit)
 
-			_, err := event.NewRegistry("test-registry", event.AnyNetworkPlugin, h)
+			_, err := event.NewRegistry(context.TODO(), "test-registry", event.AnyNetworkPlugin, h)
 			Expect(err).To(HaveOccurred())
 		})
 	})

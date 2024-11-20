@@ -19,6 +19,7 @@ limitations under the License.
 package event
 
 import (
+	"context"
 	"sync/atomic"
 
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -81,7 +82,7 @@ type NodeHandler interface {
 
 type Handler interface {
 	// Init is called once on startup to let the handler initialize any state it needs.
-	Init() error
+	Init(ctx context.Context) error
 
 	// SetHandlerState is called once on startup after Init with the HandlerState that can be used to access global data from event callbacks.
 	SetState(handlerCtx HandlerState)
@@ -106,7 +107,7 @@ type HandlerBase struct {
 	handlerState atomic.Value
 }
 
-func (ev *HandlerBase) Init() error {
+func (ev *HandlerBase) Init(_ context.Context) error {
 	return nil
 }
 

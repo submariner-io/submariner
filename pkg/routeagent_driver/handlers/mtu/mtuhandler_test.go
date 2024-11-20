@@ -18,6 +18,7 @@ limitations under the License.
 package mtu_test
 
 import (
+	"context"
 	"strconv"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -140,7 +141,7 @@ func newTestDriver() *testDriver {
 
 	JustBeforeEach(func() {
 		t.handler = mtu.NewMTUHandler([]string{localCIDR}, t.isGlobalnet, t.tcpMssValue)
-		Expect(t.handler.Init()).To(Succeed())
+		Expect(t.handler.Init(context.TODO())).To(Succeed())
 	})
 
 	return t

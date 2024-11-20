@@ -19,6 +19,7 @@ limitations under the License.
 package event
 
 import (
+	"context"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -39,7 +40,7 @@ var logger = log.Logger{Logger: logf.Log.WithName("EventRegistry")}
 // NewRegistry creates a new registry with the given name, typically referencing the owner, to manage event
 // Handlers that match the given networkPlugin name. The given event Handlers whose associated network plugin matches the given
 // networkPlugin name are added. Non-matching Handlers are ignored. Handlers will be called in registration order.
-func NewRegistry(name, networkPlugin string, eventHandlers ...Handler) (*Registry, error) {
+func NewRegistry(ctx context.Context, name, networkPlugin string, eventHandlers ...Handler) (*Registry, error) {
 	r := &Registry{
 		name:          name,
 		networkPlugin: strings.ToLower(networkPlugin),
@@ -47,7 +48,7 @@ func NewRegistry(name, networkPlugin string, eventHandlers ...Handler) (*Registr
 	}
 
 	for _, eventHandler := range eventHandlers {
-		err := r.addHandler(eventHandler)
+		err := r.addHandler(ctx, eventHandler)
 		if err != nil {
 			return nil, err
 		}
@@ -61,7 +62,7 @@ func (er *Registry) GetName() string {
 	return er.name
 }
 
-func (er *Registry) addHandler(eventHandler Handler) error {
+func (er *Registry) addHandler(ctx context.Context, eventHandler Handler) error {
 	evNetworkPlugins := set.New[string]()
 
 	for _, np := range eventHandler.GetNetworkPlugins() {
@@ -69,7 +70,7 @@ func (er *Registry) addHandler(eventHandler Handler) error {
 	}
 
 	if evNetworkPlugins.Has(AnyNetworkPlugin) || evNetworkPlugins.Has(er.networkPlugin) {
-		if err := eventHandler.Init(); err != nil {
+		if err := eventHandler.Init(ctx); err != nil {
 			return errors.Wrapf(err, "Event handler %q failed to initialize", eventHandler.GetName())
 		}
 

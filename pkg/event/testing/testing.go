@@ -19,6 +19,7 @@ limitations under the License.
 package testing
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -110,7 +111,7 @@ func (t *TestHandlerBase) addEvent(eventName string, param interface{}) error {
 	return nil
 }
 
-func (t *TestHandlerBase) Init() error {
+func (t *TestHandlerBase) Init(_ context.Context) error {
 	t.Initialized = true
 	return t.checkFailOnEvent(EvInit)
 }

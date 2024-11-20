@@ -101,7 +101,7 @@ func main() {
 	logger.Info("Starting submariner-globalnet", spec)
 
 	// set up signals so we handle the first shutdown signal gracefully
-	stopCh := signals.SetupSignalHandler().Done()
+	ctx := signals.SetupSignalHandler()
 
 	defer http.StartServer(http.Metrics|http.Profile, spec.MetricsPort)()
 
@@ -139,7 +139,7 @@ func main() {
 
 	clusterCIDRs := cidr.ExtractIPv4Subnets(localCluster.Spec.ClusterCIDR)
 
-	gatewayMonitor, err := controllers.NewGatewayMonitor(&controllers.GatewayMonitorConfig{
+	gatewayMonitor, err := controllers.NewGatewayMonitor(ctx, &controllers.GatewayMonitorConfig{
 		Client:            dynClient,
 		RestMapper:        restMapper,
 		Scheme:            scheme.Scheme,
@@ -154,7 +154,7 @@ func main() {
 	err = gatewayMonitor.Start()
 	logger.FatalOnError(err, "Error starting the gatewayMonitor")
 
-	<-stopCh
+	<-ctx.Done()
 	gatewayMonitor.Stop()
 
 	logger.Infof("All controllers stopped or exited. Stopping main loop")

@@ -67,7 +67,7 @@ func (c *ControllerSupport) Start(handlers ...event.Handler) {
 		networkPlugin = event.AnyNetworkPlugin
 	}
 
-	registry, err := event.NewRegistry("test-registry", networkPlugin, handlers...)
+	registry, err := event.NewRegistry(context.TODO(), "test-registry", networkPlugin, handlers...)
 	Expect(err).To(Succeed())
 
 	config := controller.Config{

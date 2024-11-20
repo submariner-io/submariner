@@ -170,7 +170,8 @@ func (h *controller) RemoteEndpointRemoved(endpoint *submarinerv1.Endpoint) erro
 	return nil
 }
 
-func (h *controller) Init() error {
+func (h *controller) Init(_ context.Context) error {
+	//nolint:contextcheck // Ignore "should pass the context parameter"
 	go func() {
 		wait.Until(func() {
 			h.Lock()

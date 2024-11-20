@@ -19,6 +19,7 @@ limitations under the License.
 package mtu
 
 import (
+	"context"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -81,7 +82,7 @@ func (h *mtuHandler) GetName() string {
 	return "MTU handler"
 }
 
-func (h *mtuHandler) Init() error {
+func (h *mtuHandler) Init(_ context.Context) error {
 	var err error
 
 	h.pFilter, err = packetfilter.New()
