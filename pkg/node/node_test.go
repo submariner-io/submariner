@@ -150,7 +150,7 @@ func newTestDriver() *testDriver {
 	})
 
 	JustBeforeEach(func() {
-		t.client = fakeK8s.NewClientset(t.initialObjs...)
+		t.client = fakeK8s.NewSimpleClientset(t.initialObjs...)
 	})
 
 	return t

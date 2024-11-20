@@ -36,6 +36,7 @@ import (
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/gateway"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
+	"github.com/submariner-io/submariner/pkg/node"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/versions"
 	"golang.org/x/net/http/httpproxy"
@@ -123,6 +124,14 @@ func main() {
 
 	logger.FatalOnError(subv1.AddToScheme(scheme.Scheme), "Error adding submariner types to the scheme")
 
+	ctx := signals.SetupSignalHandler()
+
+	if submSpec.WaitForNode {
+		node.WaitForLocalNodeReady(ctx, k8sClient)
+
+		return
+	}
+
 	gw, err := gateway.New(&gateway.Config{
 		LeaderElectionConfig: gateway.LeaderElectionConfig{
 			LeaseDuration: time.Duration(gwLeadershipConfig.LeaseDuration) * time.Second,
@@ -146,7 +155,7 @@ func main() {
 	})
 	logger.FatalOnError(err, "Error creating gateway instance")
 
-	err = gw.Run(signals.SetupSignalHandler())
+	err = gw.Run(ctx)
 
 	logger.FatalOnError(err, "Error running the gateway")
 }
