@@ -19,6 +19,7 @@ limitations under the License.
 package node_test
 
 import (
+	"context"
 	"os"
 	"time"
 
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	fakeK8s "k8s.io/client-go/kubernetes/fake"
+	nodeutil "k8s.io/component-helpers/node/util"
 )
 
 const localNodeName = "local-node"
@@ -73,6 +75,50 @@ var _ = Describe("GetLocalNode", func() {
 		It("should return an error", func() {
 			_, err := node.GetLocalNode(t.client)
 			Expect(err).To(HaveOccurred())
+		})
+	})
+})
+
+var _ = Describe("WaitForLocalNodeReady", func() {
+	t := newTestDriver()
+
+	var (
+		cancel    context.CancelFunc
+		completed chan struct{}
+	)
+
+	JustBeforeEach(func() {
+		var ctx context.Context
+
+		ctx, cancel = context.WithCancel(context.Background())
+		completed = make(chan struct{}, 1)
+
+		go func() {
+			node.WaitForLocalNodeReady(ctx, t.client)
+			close(completed)
+		}()
+
+		DeferCleanup(cancel)
+
+		Consistently(completed).ShouldNot(BeClosed())
+	})
+
+	When("the local Node becomes ready", func() {
+		It("should return", func() {
+			Expect(nodeutil.SetNodeCondition(t.client, localNodeName, corev1.NodeCondition{
+				Type:   corev1.NodeReady,
+				Status: corev1.ConditionTrue,
+			})).To(Succeed())
+
+			Eventually(completed, 3*time.Second).Should(BeClosed())
+		})
+	})
+
+	When("the context is cancelled", func() {
+		It("should return", func() {
+			cancel()
+
+			Eventually(completed, 3*time.Second).Should(BeClosed())
 		})
 	})
 })
