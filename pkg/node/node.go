@@ -35,7 +35,7 @@ import (
 
 var logger = log.Logger{Logger: logf.Log.WithName("Node")}
 
-var nodeRetry = wait.Backoff{
+var Retry = wait.Backoff{
 	Steps:    5,
 	Duration: 5 * time.Second,
 	Factor:   1.2,
@@ -50,7 +50,7 @@ func GetLocalNode(clientset kubernetes.Interface) (*v1.Node, error) {
 
 	var node *v1.Node
 
-	err := retry.OnError(nodeRetry, func(err error) bool {
+	err := retry.OnError(Retry, func(err error) bool {
 		logger.Warningf("Error reading the local node - retrying: %v", err)
 		return true
 	}, func() error {
