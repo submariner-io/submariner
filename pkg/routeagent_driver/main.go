@@ -23,7 +23,6 @@ import (
 	"io/fs"
 	"os"
 	"strconv"
-	"time"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
@@ -49,7 +48,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/mtu"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
 	"github.com/submariner-io/submariner/pkg/versions"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
