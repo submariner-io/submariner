@@ -133,13 +133,13 @@ func (l *Local) Create(ctx context.Context) error {
 	return err
 }
 
-func GetLocalSpec(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface,
+func GetLocalSpec(ctx context.Context, submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface,
 	airGappedDeployment bool,
 ) (*submv1.EndpointSpec, error) {
 	// We'll panic if submSpec is nil, this is intentional
 	privateIP := GetLocalIP()
 
-	gwNode, err := node.GetLocalNode(k8sClient)
+	gwNode, err := node.GetLocalNode(ctx, k8sClient)
 	if err != nil {
 		return nil, errors.Wrap(err, "getting information on the local node")
 	}

@@ -30,21 +30,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/util/retry"
 	nodeutil "k8s.io/component-helpers/node/util"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var logger = log.Logger{Logger: logf.Log.WithName("Node")}
 
-var Retry = wait.Backoff{
-	Steps:    5,
-	Duration: 5 * time.Second,
-	Factor:   1.2,
-	Jitter:   0.1,
-}
+// These are public to allow unit tests to override.
+var (
+	PollTimeout  = time.Second * 30
+	PollInterval = time.Second
+)
 
-func GetLocalNode(clientset kubernetes.Interface) (*v1.Node, error) {
+func GetLocalNode(ctx context.Context, clientset kubernetes.Interface) (*v1.Node, error) {
 	nodeName, ok := os.LookupEnv("NODE_NAME")
 	if !ok {
 		return nil, errors.New("error reading the NODE_NAME from the environment")
@@ -52,27 +50,27 @@ func GetLocalNode(clientset kubernetes.Interface) (*v1.Node, error) {
 
 	var node *v1.Node
 
-	err := retry.OnError(Retry, func(err error) bool {
-		logger.Warningf("Error reading the local node - retrying: %v", err)
-		return true
-	}, func() error {
-		var err error
+	err := wait.PollUntilContextTimeout(ctx, PollInterval, PollTimeout, true,
+		func(ctx context.Context) (bool, error) {
+			var err error
 
-		node, err = clientset.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-		if err != nil {
-			return errors.Wrapf(err, "unable to find local node %q", nodeName)
-		}
+			node, err = clientset.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+			if err == nil {
+				return true, nil
+			}
 
-		return nil
-	})
+			logger.Warningf("Error retrieving the local node %q - retrying: %v", nodeName, err)
+
+			return false, nil
+		})
 
 	return node, errors.Wrapf(err, "failed to get local node %q", nodeName)
 }
 
 func WaitForLocalNodeReady(ctx context.Context, client kubernetes.Interface) {
 	// In most cases the node will already be ready; otherwise, wait forever or until the context is cancelled.
-	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(_ context.Context) (bool, error) {
-		localNode, err := GetLocalNode(client) //nolint:contextcheck // TODO - should pass the context parameter
+	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
+		localNode, err := GetLocalNode(ctx, client)
 
 		if err != nil {
 			logger.Error(err, "Error retrieving local node")

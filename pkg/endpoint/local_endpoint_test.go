@@ -96,7 +96,7 @@ var _ = Describe("GetLocalSpec", func() {
 	})
 
 	It("should return a valid EndpointSpec object", func() {
-		spec, err := endpoint.GetLocalSpec(submSpec, client, false)
+		spec, err := endpoint.GetLocalSpec(context.TODO(), submSpec, client, false)
 
 		Expect(err).ToNot(HaveOccurred())
 		Expect(spec.ClusterID).To(Equal("east"))
@@ -116,7 +116,7 @@ var _ = Describe("GetLocalSpec", func() {
 		})
 
 		It("should return the udp-port backend config of the cluster", func() {
-			spec, err := endpoint.GetLocalSpec(submSpec, client, false)
+			spec, err := endpoint.GetLocalSpec(context.TODO(), submSpec, client, false)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(spec.BackendConfig[testUDPPortLabel]).To(Equal(testClusterUDPPort))
 		})
@@ -128,14 +128,14 @@ var _ = Describe("GetLocalSpec", func() {
 		})
 
 		It("should return a valid EndpointSpec object", func() {
-			_, err := endpoint.GetLocalSpec(submSpec, client, false)
+			_, err := endpoint.GetLocalSpec(context.TODO(), submSpec, client, false)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 
 	When("the gateway node is not annotated with public-ip", func() {
 		It("should use empty public-ip in the endpoint object for air-gapped deployments", func() {
-			spec, err := endpoint.GetLocalSpec(submSpec, client, true)
+			spec, err := endpoint.GetLocalSpec(context.TODO(), submSpec, client, true)
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(spec.ClusterID).To(Equal("east"))
@@ -150,7 +150,7 @@ var _ = Describe("GetLocalSpec", func() {
 		})
 
 		It("should use the annotated public-ip for air-gapped deployments", func() {
-			spec, err := endpoint.GetLocalSpec(submSpec, client, true)
+			spec, err := endpoint.GetLocalSpec(context.TODO(), submSpec, client, true)
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(spec.PrivateIP).To(Equal(testPrivateIP))
@@ -164,7 +164,7 @@ var _ = Describe("GetLocalSpec", func() {
 		})
 
 		It("should set the HealthCheckIP", func() {
-			spec, err := endpoint.GetLocalSpec(submSpec, client, true)
+			spec, err := endpoint.GetLocalSpec(context.TODO(), submSpec, client, true)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(spec.HealthCheckIP).To(Equal(cniInterfaceIP))
 		})
@@ -175,7 +175,7 @@ var _ = Describe("GetLocalSpec", func() {
 			})
 
 			It("should not set the HealthCheckIP", func() {
-				spec, err := endpoint.GetLocalSpec(submSpec, client, true)
+				spec, err := endpoint.GetLocalSpec(context.TODO(), submSpec, client, true)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(spec.HealthCheckIP).To(BeEmpty())
 			})

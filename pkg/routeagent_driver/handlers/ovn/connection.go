@@ -58,14 +58,14 @@ func NewConnectionHandler(k8sClientset clientset.Interface, dynamicClient dynami
 	}
 }
 
-func (c *ConnectionHandler) initClients(newOVSDBClient NewOVSDBClientFn) error {
+func (c *ConnectionHandler) initClients(ctx context.Context, newOVSDBClient NewOVSDBClientFn) error {
 	// Create nbdb client
 	nbdbModel, err := nbdb.FullDatabaseModel()
 	if err != nil {
 		return errors.Wrap(err, "error getting OVN NBDB database model")
 	}
 
-	c.nbdb, err = c.createLibovsdbClient(nbdbModel, newOVSDBClient)
+	c.nbdb, err = c.createLibovsdbClient(ctx, nbdbModel, newOVSDBClient)
 	if err != nil {
 		return errors.Wrap(err, "error creating NBDB connection")
 	}
@@ -96,7 +96,8 @@ func getOVNTLSConfig(pkFile, certFile, caFile string) (*tls.Config, error) {
 	}, nil
 }
 
-func (c *ConnectionHandler) createLibovsdbClient(dbModel model.ClientDBModel, newClient NewOVSDBClientFn) (libovsdbclient.Client, error) {
+func (c *ConnectionHandler) createLibovsdbClient(ctx context.Context, dbModel model.ClientDBModel, newClient NewOVSDBClientFn,
+) (libovsdbclient.Client, error) {
 	options := []libovsdbclient.Option{
 		// Reading and parsing the DB after reconnect at scale can (unsurprisingly)
 		// take longer than a normal ovsdb operation. Give it a bit more time so
@@ -105,7 +106,7 @@ func (c *ConnectionHandler) createLibovsdbClient(dbModel model.ClientDBModel, ne
 		libovsdbclient.WithLogger(&logger.Logger),
 	}
 
-	localNode, err := node.GetLocalNode(c.k8sClientset)
+	localNode, err := node.GetLocalNode(ctx, c.k8sClientset)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting the node")
 	}
@@ -114,7 +115,7 @@ func (c *ConnectionHandler) createLibovsdbClient(dbModel model.ClientDBModel, ne
 	// Will use empty zone if not found
 	zoneName := annotations[constants.OvnZoneAnnotation]
 
-	dbAddress, err := discoverOvnKubernetesNetwork(context.TODO(), c.k8sClientset, c.dynamicClient, zoneName)
+	dbAddress, err := discoverOvnKubernetesNetwork(ctx, c.k8sClientset, c.dynamicClient, zoneName)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting the OVN NBDB Address")
 	}
@@ -122,7 +123,7 @@ func (c *ConnectionHandler) createLibovsdbClient(dbModel model.ClientDBModel, ne
 	options = append(options, libovsdbclient.WithEndpoint(dbAddress))
 
 	if strings.HasPrefix(dbAddress, "ssl:") {
-		tlsConfig, err := getTLSConfig(c.k8sClientset)
+		tlsConfig, err := getTLSConfig(ctx, c.k8sClientset)
 		if err != nil {
 			return nil, err
 		}
@@ -135,19 +136,19 @@ func (c *ConnectionHandler) createLibovsdbClient(dbModel model.ClientDBModel, ne
 		return nil, errors.Wrap(err, "error creating ovsdbClient")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), ovsDBTimeout)
+	clientCtx, cancel := context.WithTimeout(ctx, ovsDBTimeout)
 	defer cancel()
 
-	err = client.Connect(ctx)
+	err = client.Connect(clientCtx)
 
 	err = errors.Wrap(err, "error connecting to ovsdb")
 	if err == nil {
 		if dbModel.Name() == "OVN_Northbound" {
-			_, err = client.MonitorAll(ctx)
+			_, err = client.MonitorAll(clientCtx)
 			err = errors.Wrap(err, "error setting OVN NBDB client to monitor-all")
 		} else {
 			// Only Monitor Required SBDB tables to reduce memory overhead
-			_, err = client.Monitor(ctx,
+			_, err = client.Monitor(clientCtx,
 				client.NewMonitor(
 					libovsdbclient.WithTable(&sbdb.Chassis{}),
 				),
@@ -164,23 +165,23 @@ func (c *ConnectionHandler) createLibovsdbClient(dbModel model.ClientDBModel, ne
 	return client, nil
 }
 
-func getFile(k8sClientset clientset.Interface, url string) (string, error) {
-	file, err := clusterfiles.Get(k8sClientset, url)
+func getFile(ctx context.Context, k8sClientset clientset.Interface, url string) (string, error) {
+	file, err := clusterfiles.Get(ctx, k8sClientset, url)
 	return file, errors.Wrapf(err, "error getting config file for %q", url)
 }
 
-func getTLSConfig(k8sClientset clientset.Interface) (*tls.Config, error) {
-	certFile, err := getFile(k8sClientset, getOVNCertPath())
+func getTLSConfig(ctx context.Context, k8sClientset clientset.Interface) (*tls.Config, error) {
+	certFile, err := getFile(ctx, k8sClientset, getOVNCertPath())
 	if err != nil {
 		return nil, err
 	}
 
-	pkFile, err := getFile(k8sClientset, getOVNPrivKeyPath())
+	pkFile, err := getFile(ctx, k8sClientset, getOVNPrivKeyPath())
 	if err != nil {
 		return nil, err
 	}
 
-	caFile, err := getFile(k8sClientset, getOVNCaBundlePath())
+	caFile, err := getFile(ctx, k8sClientset, getOVNCaBundlePath())
 	if err != nil {
 		return nil, err
 	}

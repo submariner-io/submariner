@@ -132,7 +132,7 @@ func main() {
 		return
 	}
 
-	gw, err := gateway.New(&gateway.Config{
+	gw, err := gateway.New(ctx, &gateway.Config{
 		LeaderElectionConfig: gateway.LeaderElectionConfig{
 			LeaseDuration: time.Duration(gwLeadershipConfig.LeaseDuration) * time.Second,
 			RenewDeadline: time.Duration(gwLeadershipConfig.RenewDeadline) * time.Second,

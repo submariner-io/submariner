@@ -57,14 +57,14 @@ var _ = Describe("TransitSwitchIP", func() {
 			})
 
 			It("should set the TransitSwitchIP value", func() {
-				Expect(transitSwitchIP.Init(k8sClient)).To(Succeed())
+				Expect(transitSwitchIP.Init(context.TODO(), k8sClient)).To(Succeed())
 				Expect(transitSwitchIP.Get()).To(Equal(nodeIP))
 			})
 		})
 
 		When("the node annotation does not exist", func() {
 			It("should succeed and set an empty TransitSwitchIP value", func() {
-				Expect(transitSwitchIP.Init(k8sClient)).To(Succeed())
+				Expect(transitSwitchIP.Init(context.TODO(), k8sClient)).To(Succeed())
 				Expect(transitSwitchIP.Get()).To(Equal(""))
 			})
 		})
@@ -75,7 +75,7 @@ var _ = Describe("TransitSwitchIP", func() {
 			})
 
 			It("should fail", func() {
-				Expect(transitSwitchIP.Init(k8sClient)).ToNot(Succeed())
+				Expect(transitSwitchIP.Init(context.TODO(), k8sClient)).ToNot(Succeed())
 			})
 		})
 
@@ -87,7 +87,7 @@ var _ = Describe("TransitSwitchIP", func() {
 			})
 
 			It("should fail", func() {
-				Expect(transitSwitchIP.Init(k8sClient)).ToNot(Succeed())
+				Expect(transitSwitchIP.Init(context.TODO(), k8sClient)).ToNot(Succeed())
 			})
 		})
 	})

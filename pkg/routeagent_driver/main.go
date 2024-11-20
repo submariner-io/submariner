@@ -132,7 +132,7 @@ func main() {
 
 	config := &watcher.Config{RestConfig: cfg}
 
-	localNode, err := node.GetLocalNode(k8sClientSet)
+	localNode, err := node.GetLocalNode(ctx, k8sClientSet)
 	logger.FatalOnError(err, "Error getting information on the local node")
 
 	healthcheckerConfig := &healthchecker.Config{

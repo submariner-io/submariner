@@ -38,7 +38,7 @@ var logger = log.Logger{Logger: logf.Log.WithName("ClusterFiles")}
 // using an url schema that supports configmap://<namespace>/<configmap-name>/<data-file>
 // secret://<namespace>/<secret-name>/<data-file> and file:///<path> returning
 // a local path to the file.
-func Get(k8sClient kubernetes.Interface, urlAddress string) (string, error) {
+func Get(ctx context.Context, k8sClient kubernetes.Interface, urlAddress string) (string, error) {
 	logger.V(log.DEBUG).Infof("Reading cluster_file: %s", urlAddress)
 
 	parsedURL, err := url.Parse(urlAddress)
@@ -61,7 +61,7 @@ func Get(k8sClient kubernetes.Interface, urlAddress string) (string, error) {
 		return parsedURL.Path, nil
 
 	case "secret":
-		secret, err := k8sClient.CoreV1().Secrets(namespace).Get(context.TODO(), pathContainerObject, metav1.GetOptions{})
+		secret, err := k8sClient.CoreV1().Secrets(namespace).Get(ctx, pathContainerObject, metav1.GetOptions{})
 		if err != nil {
 			return "", errors.Wrapf(err, "error reading secret %q from namespace %q", pathContainerObject, namespace)
 		}
@@ -74,7 +74,7 @@ func Get(k8sClient kubernetes.Interface, urlAddress string) (string, error) {
 		}
 
 	case "configmap":
-		configMap, err := k8sClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), pathContainerObject, metav1.GetOptions{})
+		configMap, err := k8sClient.CoreV1().ConfigMaps(namespace).Get(ctx, pathContainerObject, metav1.GetOptions{})
 		if err != nil {
 			return "", errors.Wrapf(err, "error reading configmap %q from namespace %q", pathContainerObject, namespace)
 		}

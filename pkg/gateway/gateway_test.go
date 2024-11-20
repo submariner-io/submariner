@@ -321,7 +321,7 @@ func newTestDriver() *testDriver {
 	})
 
 	JustBeforeEach(func() {
-		gw, err := gateway.New(&t.config)
+		gw, err := gateway.New(context.TODO(), &t.config)
 		Expect(err).To(Succeed())
 
 		ctx, stop := context.WithCancel(context.Background())

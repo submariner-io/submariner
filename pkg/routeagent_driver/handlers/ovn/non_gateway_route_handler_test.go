@@ -19,6 +19,7 @@ limitations under the License.
 package ovn_test
 
 import (
+	"context"
 	"errors"
 	"os"
 
@@ -40,7 +41,7 @@ var _ = Describe("NonGatewayRouteHandler", func() {
 	JustBeforeEach(func() {
 		tsIP := ovn.NewTransitSwitchIP()
 		t.Start(ovn.NewNonGatewayRouteHandler(t.submClient, tsIP))
-		Expect(tsIP.Init(t.k8sClient)).To(Succeed())
+		Expect(tsIP.Init(context.TODO(), t.k8sClient)).To(Succeed())
 	})
 
 	awaitNonGatewayRoute := func(ep *submarinerv1.Endpoint) {

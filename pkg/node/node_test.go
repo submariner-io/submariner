@@ -30,7 +30,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	fakeK8s "k8s.io/client-go/kubernetes/fake"
 	nodeutil "k8s.io/component-helpers/node/util"
 )
@@ -42,7 +41,7 @@ var _ = Describe("GetLocalNode", func() {
 
 	When("the local Node resource exists", func() {
 		It("should return the resource", func() {
-			Expect(node.GetLocalNode(t.client)).To(Equal(t.node))
+			Expect(node.GetLocalNode(context.TODO(), t.client)).To(Equal(t.node))
 		})
 	})
 
@@ -52,7 +51,7 @@ var _ = Describe("GetLocalNode", func() {
 		})
 
 		It("should return an error", func() {
-			_, err := node.GetLocalNode(t.client)
+			_, err := node.GetLocalNode(context.TODO(), t.client)
 			Expect(err).To(HaveOccurred())
 		})
 	})
@@ -63,7 +62,7 @@ var _ = Describe("GetLocalNode", func() {
 		})
 
 		It("should eventually return the resource", func() {
-			Expect(node.GetLocalNode(t.client)).To(Equal(t.node))
+			Expect(node.GetLocalNode(context.TODO(), t.client)).To(Equal(t.node))
 		})
 	})
 
@@ -73,7 +72,7 @@ var _ = Describe("GetLocalNode", func() {
 		})
 
 		It("should return an error", func() {
-			_, err := node.GetLocalNode(t.client)
+			_, err := node.GetLocalNode(context.TODO(), t.client)
 			Expect(err).To(HaveOccurred())
 		})
 	})
@@ -133,10 +132,8 @@ func newTestDriver() *testDriver {
 	t := &testDriver{}
 
 	BeforeEach(func() {
-		node.Retry = wait.Backoff{
-			Steps:    2,
-			Duration: 10 * time.Millisecond,
-		}
+		node.PollTimeout = 30 * time.Millisecond
+		node.PollInterval = 10 * time.Millisecond
 
 		t.node = &corev1.Node{
 			ObjectMeta: v1meta.ObjectMeta{

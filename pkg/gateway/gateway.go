@@ -104,7 +104,7 @@ type gatewayType struct {
 
 var logger = log.Logger{Logger: logf.Log.WithName("Gateway")}
 
-func New(config *Config) (Interface, error) {
+func New(ctx context.Context, config *Config) (Interface, error) {
 	logger.Info("Initializing the gateway engine")
 
 	g := &gatewayType{
@@ -144,7 +144,7 @@ func New(config *Config) (Interface, error) {
 	g.airGapped = os.Getenv("AIR_GAPPED_DEPLOYMENT") == "true"
 	logger.Infof("AIR_GAPPED_DEPLOYMENT is set to %t", g.airGapped)
 
-	localEndpointSpec, err := endpoint.GetLocalSpec(&g.Spec, g.KubeClient, g.airGapped)
+	localEndpointSpec, err := endpoint.GetLocalSpec(ctx, &g.Spec, g.KubeClient, g.airGapped)
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating local endpoint object")
 	}

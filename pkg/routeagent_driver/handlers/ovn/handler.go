@@ -98,7 +98,7 @@ func (ovn *Handler) GetNetworkPlugins() []string {
 	return []string{cni.OVNKubernetes}
 }
 
-func (ovn *Handler) Init(_ context.Context) error {
+func (ovn *Handler) Init(ctx context.Context) error {
 	ovn.LegacyCleanup()
 
 	err := ovn.initIPtablesChains()
@@ -110,12 +110,12 @@ func (ovn *Handler) Init(_ context.Context) error {
 
 	connectionHandler := NewConnectionHandler(ovn.K8sClient, ovn.DynClient)
 
-	err = connectionHandler.initClients(ovn.NewOVSDBClient)
+	err = connectionHandler.initClients(ctx, ovn.NewOVSDBClient)
 	if err != nil {
 		return errors.Wrapf(err, "error getting connection handler to connect to OvnDB")
 	}
 
-	err = ovn.TransitSwitchIP.Init(ovn.K8sClient)
+	err = ovn.TransitSwitchIP.Init(ctx, ovn.K8sClient)
 	if err != nil {
 		return errors.Wrap(err, "error initializing TransitSwitchIP")
 	}

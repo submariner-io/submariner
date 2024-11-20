@@ -19,6 +19,7 @@ limitations under the License.
 package ovn
 
 import (
+	"context"
 	"os"
 	"sync/atomic"
 
@@ -35,7 +36,7 @@ type TransitSwitchIPGetter interface {
 
 type TransitSwitchIP interface {
 	TransitSwitchIPGetter
-	Init(k8sClient kubernetes.Interface) error
+	Init(ctx context.Context, k8sClient kubernetes.Interface) error
 	UpdateFrom(node *corev1.Node) (bool, error)
 }
 
@@ -54,8 +55,8 @@ func (t *transitSwitchIPImpl) Get() string {
 	return t.value.Load().(string)
 }
 
-func (t *transitSwitchIPImpl) Init(k8sClient kubernetes.Interface) error {
-	node, err := nodeutil.GetLocalNode(k8sClient)
+func (t *transitSwitchIPImpl) Init(ctx context.Context, k8sClient kubernetes.Interface) error {
+	node, err := nodeutil.GetLocalNode(ctx, k8sClient)
 	if err != nil {
 		return errors.Wrap(err, "error getting the local node")
 	}
