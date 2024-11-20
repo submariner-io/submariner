@@ -56,7 +56,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
-	nodeutil "k8s.io/component-helpers/node/util"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
@@ -84,7 +83,7 @@ func main() {
 
 	logger.Info("Starting submariner-route-agent using the event framework")
 	// set up signals so we handle the first shutdown signal gracefully
-	stopCh := signals.SetupSignalHandler().Done()
+	ctx := signals.SetupSignalHandler()
 
 	// Clean up "sockets" created as directories by previous versions
 	removeInvalidSockets()
@@ -113,7 +112,7 @@ func main() {
 	logger.FatalOnError(err, "Error building the REST mapper")
 
 	if env.WaitForNode {
-		waitForNodeReady(k8sClientSet)
+		node.WaitForLocalNodeReady(ctx, k8sClientSet)
 
 		return
 	}
@@ -181,6 +180,8 @@ func main() {
 	})
 	logger.FatalOnError(err, "Error creating controller for event handling")
 
+	stopCh := ctx.Done()
+
 	err = ctl.Start(stopCh)
 	logger.FatalOnError(err, "Error starting controller")
 
@@ -220,27 +221,6 @@ func uninstall(registry *event.Registry) {
 
 	if err := registry.Uninstall(); err != nil {
 		logger.Warningf("Error uninstalling handlers: %v", err)
-	}
-}
-
-func waitForNodeReady(k8sClientSet *kubernetes.Clientset) {
-	// In most cases the node will already be ready; otherwise, wait for ever
-	for {
-		localNode, err := node.GetLocalNode(k8sClientSet)
-
-		if err != nil {
-			logger.Error(err, "Error retrieving local node")
-		} else if localNode != nil {
-			_, condition := nodeutil.GetNodeCondition(&localNode.Status, corev1.NodeReady)
-			if condition != nil && condition.Status == corev1.ConditionTrue {
-				logger.Info("Node ready")
-				return
-			}
-
-			logger.Infof("Node not ready, waiting: %v", localNode.Status)
-		}
-
-		time.Sleep(1 * time.Second)
 	}
 }
 
