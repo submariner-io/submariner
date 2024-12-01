@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check that no dependencies include unmerged commits
         run: make check-non-release-versions
 
@@ -146,11 +146,11 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@662472033e021d55d94146f66f6058822b0b39fd
+        uses: github/codeql-action/init@f09c1c0a94de965c15400f5634aa42fac8fb8f88
         with:
           languages: go
       - name: Run CodeQL variant analysis
-        uses: github/codeql-action/analyze@662472033e021d55d94146f66f6058822b0b39fd
+        uses: github/codeql-action/analyze@f09c1c0a94de965c15400f5634aa42fac8fb8f88
       - name: Show CodeQL scan SARIF report
         if: always()
         run: cat ../results/go.sarif
@@ -162,7 +162,7 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Run Anchore vulnerability scanner
-        uses: anchore/scan-action@5ed195cc06065322983cae4bb31e2a751feb86fd
+        uses: anchore/scan-action@869c549e657a088dc0441b08ce4fc0ecdac2bb65
         id: scan
         with:
           path: "."
@@ -173,7 +173,7 @@ jobs:
         run: cat ${{ steps.scan.outputs.sarif }}
       - name: Upload Anchore scan SARIF report
         if: always()
-        uses: github/codeql-action/upload-sarif@662472033e021d55d94146f66f6058822b0b39fd
+        uses: github/codeql-action/upload-sarif@f09c1c0a94de965c15400f5634aa42fac8fb8f88
         with:
           sarif_file: ${{ steps.scan.outputs.sarif }}
 
