@@ -66,7 +66,7 @@ bin/protoc:
 	unzip protoc-$(PROTOC_VERSION)-linux-x86_64.zip 'bin/*' 'include/*'
 	rm -f protoc-$(PROTOC_VERSION)-linux-x86_64.zip
 
-bin/%/submariner-gateway: main.go $(shell find pkg -not \( -path 'pkg/globalnet*' -o -path 'pkg/routeagent*' \)) pkg/natdiscovery/proto/natdiscovery.pb.go
+bin/%/submariner-gateway: main.go $(shell find pkg -not \( -path 'pkg/globalnet*' -o -path 'pkg/routeagent*' -o -path 'pkg/await_node_ready*' \)) pkg/natdiscovery/proto/natdiscovery.pb.go
 	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ .
 
 bin/%/submariner-route-agent: $(shell find pkg/routeagent_driver)
@@ -75,6 +75,8 @@ bin/%/submariner-route-agent: $(shell find pkg/routeagent_driver)
 bin/%/submariner-globalnet: $(shell find pkg/globalnet)
 	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ ./pkg/globalnet
 
+bin/%/await-node-ready: $(shell find pkg/await_node_ready)
+	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ ./pkg/await_node_ready
 
 nullstring :=
 space := $(nullstring) # end of the line
@@ -84,7 +86,7 @@ comma := ,
 # This can be overridden to build for other supported architectures; the reference is the Go architecture,
 # so "make images ARCHES=arm" will build a linux/arm/v7 image
 ARCHES ?= amd64
-BINARIES = submariner-gateway submariner-route-agent submariner-globalnet
+BINARIES = submariner-gateway submariner-route-agent submariner-globalnet await-node-ready
 ARCH_BINARIES := $(foreach arch,$(subst $(comma),$(space),$(ARCHES)),$(foreach binary,$(BINARIES),bin/linux/$(call gotodockerarch,$(arch))/$(binary)))
 
 build: $(ARCH_BINARIES)

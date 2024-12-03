@@ -10,6 +10,7 @@ ARG TARGETPLATFORM
 COPY . ${SOURCE}
 
 RUN make -C ${SOURCE} LOCAL_BUILD=1 bin/${TARGETPLATFORM}/submariner-gateway
+RUN make -C ${SOURCE} LOCAL_BUILD=1 bin/${TARGETPLATFORM}/await-node-ready
 
 FROM --platform=${BUILDPLATFORM} fedora:${FEDORA_VERSION} AS base
 ARG FEDORA_VERSION
@@ -32,7 +33,7 @@ ARG TARGETPLATFORM
 WORKDIR /var/submariner
 
 COPY --from=base /output/gateway /
-
-COPY --from=builder ${SOURCE}/package/submariner.sh ${SOURCE}/package/pluto ${SOURCE}/bin/${TARGETPLATFORM}/submariner-gateway /usr/local/bin/
+COPY --from=builder ${SOURCE}/package/submariner.sh ${SOURCE}/package/pluto ${SOURCE}/bin/${TARGETPLATFORM}/submariner-gateway \
+  ${SOURCE}/package/await-node-ready.sh ${SOURCE}/bin/${TARGETPLATFORM}/await-node-ready /usr/local/bin/
 
 ENTRYPOINT submariner.sh
