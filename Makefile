@@ -1,6 +1,5 @@
 BASE_BRANCH ?= devel
 export BASE_BRANCH
-PROTOC_VERSION=3.17.3
 
 # Running in Dapper
 ifneq (,$(DAPPER_HOST_ARCH))
@@ -53,18 +52,12 @@ golangci-lint: pkg/natdiscovery/proto/natdiscovery.pb.go
 
 unit: pkg/natdiscovery/proto/natdiscovery.pb.go
 
-%.pb.go: %.proto bin/protoc-gen-go bin/protoc
+%.pb.go: %.proto bin/protoc-gen-go
 	PATH="$(CURDIR)/bin:$$PATH" protoc --go_out=$$(go env GOPATH)/src $<
 
 bin/protoc-gen-go:
 	mkdir -p $(@D)
 	GOFLAGS="" GOBIN="$(CURDIR)/bin" go install google.golang.org/protobuf/cmd/protoc-gen-go@$(shell awk '/google.golang.org\/protobuf/ {print $$2}' go.mod)
-
-bin/protoc:
-	curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v$(PROTOC_VERSION)/protoc-$(PROTOC_VERSION)-linux-x86_64.zip
-	sha256sum -c scripts/protoc.sha256
-	unzip protoc-$(PROTOC_VERSION)-linux-x86_64.zip 'bin/*' 'include/*'
-	rm -f protoc-$(PROTOC_VERSION)-linux-x86_64.zip
 
 bin/%/submariner-gateway: main.go $(shell find pkg -not \( -path 'pkg/globalnet*' -o -path 'pkg/routeagent*' -o -path 'pkg/await_node_ready*' \)) pkg/natdiscovery/proto/natdiscovery.pb.go
 	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ .
