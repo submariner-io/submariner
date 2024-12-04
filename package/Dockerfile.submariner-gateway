@@ -1,4 +1,4 @@
-ARG BASE_BRANCH
+ARG BASE_BRANCH=devel
 ARG FEDORA_VERSION=41
 ARG SOURCE=/go/src/github.com/submariner-io/submariner
 
@@ -25,7 +25,7 @@ RUN /dnf_install -a ${TARGETPLATFORM} -v ${FEDORA_VERSION} -r /output/gateway \
     glibc bash glibc-minimal-langpack coreutils-single \
     libcurl-minimal iproute libreswan kmod
 
-FROM --platform=${TARGETPLATFORM} scratch
+FROM scratch
 ARG SOURCE
 ARG TARGETPLATFORM
 
@@ -35,4 +35,4 @@ COPY --from=base /output/gateway /
 
 COPY --from=builder ${SOURCE}/package/submariner.sh ${SOURCE}/package/pluto ${SOURCE}/bin/${TARGETPLATFORM}/submariner-gateway /usr/local/bin/
 
-ENTRYPOINT submariner.sh
+ENTRYPOINT ["submariner.sh"]
