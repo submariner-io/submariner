@@ -46,7 +46,6 @@ type SubmarinerSpecification struct {
 	HealthCheckEnabled            bool `default:"true"`
 	Uninstall                     bool
 	HaltOnCertError               bool `split_words:"true"`
-	WaitForNode                   bool
 	HealthCheckInterval           int
 	HealthCheckMaxPacketLossCount int
 	MetricsPort                   int `default:"32780"`

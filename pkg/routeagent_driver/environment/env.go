@@ -26,5 +26,4 @@ type Specification struct {
 	GlobalCidr  []string
 	ProfilePort int `default:"32782"`
 	Uninstall   bool
-	WaitForNode bool
 }

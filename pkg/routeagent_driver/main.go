@@ -111,12 +111,6 @@ func main() {
 	restMapper, err := util.BuildRestMapper(cfg)
 	logger.FatalOnError(err, "Error building the REST mapper")
 
-	if env.WaitForNode {
-		node.WaitForLocalNodeReady(ctx, k8sClientSet)
-
-		return
-	}
-
 	// Set packetfilter driver to iptables. Once nftables is available, we'll check which driver is supported.
 	packetfilter.SetNewDriverFn(iptables.New)
 
