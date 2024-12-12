@@ -31,39 +31,39 @@ type FakeSubmarinerV1 struct {
 }
 
 func (c *FakeSubmarinerV1) Clusters(namespace string) v1.ClusterInterface {
-	return &FakeClusters{c, namespace}
+	return newFakeClusters(c, namespace)
 }
 
 func (c *FakeSubmarinerV1) ClusterGlobalEgressIPs(namespace string) v1.ClusterGlobalEgressIPInterface {
-	return &FakeClusterGlobalEgressIPs{c, namespace}
+	return newFakeClusterGlobalEgressIPs(c, namespace)
 }
 
 func (c *FakeSubmarinerV1) Endpoints(namespace string) v1.EndpointInterface {
-	return &FakeEndpoints{c, namespace}
+	return newFakeEndpoints(c, namespace)
 }
 
 func (c *FakeSubmarinerV1) Gateways(namespace string) v1.GatewayInterface {
-	return &FakeGateways{c, namespace}
+	return newFakeGateways(c, namespace)
 }
 
 func (c *FakeSubmarinerV1) GatewayRoutes(namespace string) v1.GatewayRouteInterface {
-	return &FakeGatewayRoutes{c, namespace}
+	return newFakeGatewayRoutes(c, namespace)
 }
 
 func (c *FakeSubmarinerV1) GlobalEgressIPs(namespace string) v1.GlobalEgressIPInterface {
-	return &FakeGlobalEgressIPs{c, namespace}
+	return newFakeGlobalEgressIPs(c, namespace)
 }
 
 func (c *FakeSubmarinerV1) GlobalIngressIPs(namespace string) v1.GlobalIngressIPInterface {
-	return &FakeGlobalIngressIPs{c, namespace}
+	return newFakeGlobalIngressIPs(c, namespace)
 }
 
 func (c *FakeSubmarinerV1) NonGatewayRoutes(namespace string) v1.NonGatewayRouteInterface {
-	return &FakeNonGatewayRoutes{c, namespace}
+	return newFakeNonGatewayRoutes(c, namespace)
 }
 
 func (c *FakeSubmarinerV1) RouteAgents(namespace string) v1.RouteAgentInterface {
-	return &FakeRouteAgents{c, namespace}
+	return newFakeRouteAgents(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

@@ -21,10 +21,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // RouteAgentLister helps list RouteAgents.
@@ -32,7 +32,7 @@ import (
 type RouteAgentLister interface {
 	// List lists all RouteAgents in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.RouteAgent, err error)
+	List(selector labels.Selector) (ret []*submarineriov1.RouteAgent, err error)
 	// RouteAgents returns an object that can list and get RouteAgents.
 	RouteAgents(namespace string) RouteAgentNamespaceLister
 	RouteAgentListerExpansion
@@ -40,17 +40,17 @@ type RouteAgentLister interface {
 
 // routeAgentLister implements the RouteAgentLister interface.
 type routeAgentLister struct {
-	listers.ResourceIndexer[*v1.RouteAgent]
+	listers.ResourceIndexer[*submarineriov1.RouteAgent]
 }
 
 // NewRouteAgentLister returns a new RouteAgentLister.
 func NewRouteAgentLister(indexer cache.Indexer) RouteAgentLister {
-	return &routeAgentLister{listers.New[*v1.RouteAgent](indexer, v1.Resource("routeagent"))}
+	return &routeAgentLister{listers.New[*submarineriov1.RouteAgent](indexer, submarineriov1.Resource("routeagent"))}
 }
 
 // RouteAgents returns an object that can list and get RouteAgents.
 func (s *routeAgentLister) RouteAgents(namespace string) RouteAgentNamespaceLister {
-	return routeAgentNamespaceLister{listers.NewNamespaced[*v1.RouteAgent](s.ResourceIndexer, namespace)}
+	return routeAgentNamespaceLister{listers.NewNamespaced[*submarineriov1.RouteAgent](s.ResourceIndexer, namespace)}
 }
 
 // RouteAgentNamespaceLister helps list and get RouteAgents.
@@ -58,15 +58,15 @@ func (s *routeAgentLister) RouteAgents(namespace string) RouteAgentNamespaceList
 type RouteAgentNamespaceLister interface {
 	// List lists all RouteAgents in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.RouteAgent, err error)
+	List(selector labels.Selector) (ret []*submarineriov1.RouteAgent, err error)
 	// Get retrieves the RouteAgent from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.RouteAgent, error)
+	Get(name string) (*submarineriov1.RouteAgent, error)
 	RouteAgentNamespaceListerExpansion
 }
 
 // routeAgentNamespaceLister implements the RouteAgentNamespaceLister
 // interface.
 type routeAgentNamespaceLister struct {
-	listers.ResourceIndexer[*v1.RouteAgent]
+	listers.ResourceIndexer[*submarineriov1.RouteAgent]
 }

@@ -21,10 +21,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // GatewayLister helps list Gateways.
@@ -32,7 +32,7 @@ import (
 type GatewayLister interface {
 	// List lists all Gateways in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.Gateway, err error)
+	List(selector labels.Selector) (ret []*submarineriov1.Gateway, err error)
 	// Gateways returns an object that can list and get Gateways.
 	Gateways(namespace string) GatewayNamespaceLister
 	GatewayListerExpansion
@@ -40,17 +40,17 @@ type GatewayLister interface {
 
 // gatewayLister implements the GatewayLister interface.
 type gatewayLister struct {
-	listers.ResourceIndexer[*v1.Gateway]
+	listers.ResourceIndexer[*submarineriov1.Gateway]
 }
 
 // NewGatewayLister returns a new GatewayLister.
 func NewGatewayLister(indexer cache.Indexer) GatewayLister {
-	return &gatewayLister{listers.New[*v1.Gateway](indexer, v1.Resource("gateway"))}
+	return &gatewayLister{listers.New[*submarineriov1.Gateway](indexer, submarineriov1.Resource("gateway"))}
 }
 
 // Gateways returns an object that can list and get Gateways.
 func (s *gatewayLister) Gateways(namespace string) GatewayNamespaceLister {
-	return gatewayNamespaceLister{listers.NewNamespaced[*v1.Gateway](s.ResourceIndexer, namespace)}
+	return gatewayNamespaceLister{listers.NewNamespaced[*submarineriov1.Gateway](s.ResourceIndexer, namespace)}
 }
 
 // GatewayNamespaceLister helps list and get Gateways.
@@ -58,15 +58,15 @@ func (s *gatewayLister) Gateways(namespace string) GatewayNamespaceLister {
 type GatewayNamespaceLister interface {
 	// List lists all Gateways in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.Gateway, err error)
+	List(selector labels.Selector) (ret []*submarineriov1.Gateway, err error)
 	// Get retrieves the Gateway from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.Gateway, error)
+	Get(name string) (*submarineriov1.Gateway, error)
 	GatewayNamespaceListerExpansion
 }
 
 // gatewayNamespaceLister implements the GatewayNamespaceLister
 // interface.
 type gatewayNamespaceLister struct {
-	listers.ResourceIndexer[*v1.Gateway]
+	listers.ResourceIndexer[*submarineriov1.Gateway]
 }

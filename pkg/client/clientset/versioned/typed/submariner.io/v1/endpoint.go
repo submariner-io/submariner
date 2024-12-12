@@ -21,10 +21,10 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	submarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	applyconfigurationsubmarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
 	scheme "github.com/submariner-io/submariner/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -40,32 +40,33 @@ type EndpointsGetter interface {
 
 // EndpointInterface has methods to work with Endpoint resources.
 type EndpointInterface interface {
-	Create(ctx context.Context, endpoint *v1.Endpoint, opts metav1.CreateOptions) (*v1.Endpoint, error)
-	Update(ctx context.Context, endpoint *v1.Endpoint, opts metav1.UpdateOptions) (*v1.Endpoint, error)
+	Create(ctx context.Context, endpoint *submarineriov1.Endpoint, opts metav1.CreateOptions) (*submarineriov1.Endpoint, error)
+	Update(ctx context.Context, endpoint *submarineriov1.Endpoint, opts metav1.UpdateOptions) (*submarineriov1.Endpoint, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Endpoint, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.EndpointList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*submarineriov1.Endpoint, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*submarineriov1.EndpointList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Endpoint, err error)
-	Apply(ctx context.Context, endpoint *submarineriov1.EndpointApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Endpoint, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *submarineriov1.Endpoint, err error)
+	Apply(ctx context.Context, endpoint *applyconfigurationsubmarineriov1.EndpointApplyConfiguration, opts metav1.ApplyOptions) (result *submarineriov1.Endpoint, err error)
 	EndpointExpansion
 }
 
 // endpoints implements EndpointInterface
 type endpoints struct {
-	*gentype.ClientWithListAndApply[*v1.Endpoint, *v1.EndpointList, *submarineriov1.EndpointApplyConfiguration]
+	*gentype.ClientWithListAndApply[*submarineriov1.Endpoint, *submarineriov1.EndpointList, *applyconfigurationsubmarineriov1.EndpointApplyConfiguration]
 }
 
 // newEndpoints returns a Endpoints
 func newEndpoints(c *SubmarinerV1Client, namespace string) *endpoints {
 	return &endpoints{
-		gentype.NewClientWithListAndApply[*v1.Endpoint, *v1.EndpointList, *submarineriov1.EndpointApplyConfiguration](
+		gentype.NewClientWithListAndApply[*submarineriov1.Endpoint, *submarineriov1.EndpointList, *applyconfigurationsubmarineriov1.EndpointApplyConfiguration](
 			"endpoints",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.Endpoint { return &v1.Endpoint{} },
-			func() *v1.EndpointList { return &v1.EndpointList{} }),
+			func() *submarineriov1.Endpoint { return &submarineriov1.Endpoint{} },
+			func() *submarineriov1.EndpointList { return &submarineriov1.EndpointList{} },
+		),
 	}
 }

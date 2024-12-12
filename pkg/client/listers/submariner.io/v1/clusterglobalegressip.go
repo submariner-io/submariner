@@ -21,10 +21,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ClusterGlobalEgressIPLister helps list ClusterGlobalEgressIPs.
@@ -32,7 +32,7 @@ import (
 type ClusterGlobalEgressIPLister interface {
 	// List lists all ClusterGlobalEgressIPs in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.ClusterGlobalEgressIP, err error)
+	List(selector labels.Selector) (ret []*submarineriov1.ClusterGlobalEgressIP, err error)
 	// ClusterGlobalEgressIPs returns an object that can list and get ClusterGlobalEgressIPs.
 	ClusterGlobalEgressIPs(namespace string) ClusterGlobalEgressIPNamespaceLister
 	ClusterGlobalEgressIPListerExpansion
@@ -40,17 +40,17 @@ type ClusterGlobalEgressIPLister interface {
 
 // clusterGlobalEgressIPLister implements the ClusterGlobalEgressIPLister interface.
 type clusterGlobalEgressIPLister struct {
-	listers.ResourceIndexer[*v1.ClusterGlobalEgressIP]
+	listers.ResourceIndexer[*submarineriov1.ClusterGlobalEgressIP]
 }
 
 // NewClusterGlobalEgressIPLister returns a new ClusterGlobalEgressIPLister.
 func NewClusterGlobalEgressIPLister(indexer cache.Indexer) ClusterGlobalEgressIPLister {
-	return &clusterGlobalEgressIPLister{listers.New[*v1.ClusterGlobalEgressIP](indexer, v1.Resource("clusterglobalegressip"))}
+	return &clusterGlobalEgressIPLister{listers.New[*submarineriov1.ClusterGlobalEgressIP](indexer, submarineriov1.Resource("clusterglobalegressip"))}
 }
 
 // ClusterGlobalEgressIPs returns an object that can list and get ClusterGlobalEgressIPs.
 func (s *clusterGlobalEgressIPLister) ClusterGlobalEgressIPs(namespace string) ClusterGlobalEgressIPNamespaceLister {
-	return clusterGlobalEgressIPNamespaceLister{listers.NewNamespaced[*v1.ClusterGlobalEgressIP](s.ResourceIndexer, namespace)}
+	return clusterGlobalEgressIPNamespaceLister{listers.NewNamespaced[*submarineriov1.ClusterGlobalEgressIP](s.ResourceIndexer, namespace)}
 }
 
 // ClusterGlobalEgressIPNamespaceLister helps list and get ClusterGlobalEgressIPs.
@@ -58,15 +58,15 @@ func (s *clusterGlobalEgressIPLister) ClusterGlobalEgressIPs(namespace string) C
 type ClusterGlobalEgressIPNamespaceLister interface {
 	// List lists all ClusterGlobalEgressIPs in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.ClusterGlobalEgressIP, err error)
+	List(selector labels.Selector) (ret []*submarineriov1.ClusterGlobalEgressIP, err error)
 	// Get retrieves the ClusterGlobalEgressIP from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.ClusterGlobalEgressIP, error)
+	Get(name string) (*submarineriov1.ClusterGlobalEgressIP, error)
 	ClusterGlobalEgressIPNamespaceListerExpansion
 }
 
 // clusterGlobalEgressIPNamespaceLister implements the ClusterGlobalEgressIPNamespaceLister
 // interface.
 type clusterGlobalEgressIPNamespaceLister struct {
-	listers.ResourceIndexer[*v1.ClusterGlobalEgressIP]
+	listers.ResourceIndexer[*submarineriov1.ClusterGlobalEgressIP]
 }

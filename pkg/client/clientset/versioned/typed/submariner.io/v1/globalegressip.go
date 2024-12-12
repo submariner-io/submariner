@@ -21,10 +21,10 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	submarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	applyconfigurationsubmarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
 	scheme "github.com/submariner-io/submariner/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -40,36 +40,37 @@ type GlobalEgressIPsGetter interface {
 
 // GlobalEgressIPInterface has methods to work with GlobalEgressIP resources.
 type GlobalEgressIPInterface interface {
-	Create(ctx context.Context, globalEgressIP *v1.GlobalEgressIP, opts metav1.CreateOptions) (*v1.GlobalEgressIP, error)
-	Update(ctx context.Context, globalEgressIP *v1.GlobalEgressIP, opts metav1.UpdateOptions) (*v1.GlobalEgressIP, error)
+	Create(ctx context.Context, globalEgressIP *submarineriov1.GlobalEgressIP, opts metav1.CreateOptions) (*submarineriov1.GlobalEgressIP, error)
+	Update(ctx context.Context, globalEgressIP *submarineriov1.GlobalEgressIP, opts metav1.UpdateOptions) (*submarineriov1.GlobalEgressIP, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, globalEgressIP *v1.GlobalEgressIP, opts metav1.UpdateOptions) (*v1.GlobalEgressIP, error)
+	UpdateStatus(ctx context.Context, globalEgressIP *submarineriov1.GlobalEgressIP, opts metav1.UpdateOptions) (*submarineriov1.GlobalEgressIP, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.GlobalEgressIP, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.GlobalEgressIPList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*submarineriov1.GlobalEgressIP, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*submarineriov1.GlobalEgressIPList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.GlobalEgressIP, err error)
-	Apply(ctx context.Context, globalEgressIP *submarineriov1.GlobalEgressIPApplyConfiguration, opts metav1.ApplyOptions) (result *v1.GlobalEgressIP, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *submarineriov1.GlobalEgressIP, err error)
+	Apply(ctx context.Context, globalEgressIP *applyconfigurationsubmarineriov1.GlobalEgressIPApplyConfiguration, opts metav1.ApplyOptions) (result *submarineriov1.GlobalEgressIP, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, globalEgressIP *submarineriov1.GlobalEgressIPApplyConfiguration, opts metav1.ApplyOptions) (result *v1.GlobalEgressIP, err error)
+	ApplyStatus(ctx context.Context, globalEgressIP *applyconfigurationsubmarineriov1.GlobalEgressIPApplyConfiguration, opts metav1.ApplyOptions) (result *submarineriov1.GlobalEgressIP, err error)
 	GlobalEgressIPExpansion
 }
 
 // globalEgressIPs implements GlobalEgressIPInterface
 type globalEgressIPs struct {
-	*gentype.ClientWithListAndApply[*v1.GlobalEgressIP, *v1.GlobalEgressIPList, *submarineriov1.GlobalEgressIPApplyConfiguration]
+	*gentype.ClientWithListAndApply[*submarineriov1.GlobalEgressIP, *submarineriov1.GlobalEgressIPList, *applyconfigurationsubmarineriov1.GlobalEgressIPApplyConfiguration]
 }
 
 // newGlobalEgressIPs returns a GlobalEgressIPs
 func newGlobalEgressIPs(c *SubmarinerV1Client, namespace string) *globalEgressIPs {
 	return &globalEgressIPs{
-		gentype.NewClientWithListAndApply[*v1.GlobalEgressIP, *v1.GlobalEgressIPList, *submarineriov1.GlobalEgressIPApplyConfiguration](
+		gentype.NewClientWithListAndApply[*submarineriov1.GlobalEgressIP, *submarineriov1.GlobalEgressIPList, *applyconfigurationsubmarineriov1.GlobalEgressIPApplyConfiguration](
 			"globalegressips",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.GlobalEgressIP { return &v1.GlobalEgressIP{} },
-			func() *v1.GlobalEgressIPList { return &v1.GlobalEgressIPList{} }),
+			func() *submarineriov1.GlobalEgressIP { return &submarineriov1.GlobalEgressIP{} },
+			func() *submarineriov1.GlobalEgressIPList { return &submarineriov1.GlobalEgressIPList{} },
+		),
 	}
 }

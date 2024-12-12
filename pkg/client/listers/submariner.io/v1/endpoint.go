@@ -21,10 +21,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // EndpointLister helps list Endpoints.
@@ -32,7 +32,7 @@ import (
 type EndpointLister interface {
 	// List lists all Endpoints in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.Endpoint, err error)
+	List(selector labels.Selector) (ret []*submarineriov1.Endpoint, err error)
 	// Endpoints returns an object that can list and get Endpoints.
 	Endpoints(namespace string) EndpointNamespaceLister
 	EndpointListerExpansion
@@ -40,17 +40,17 @@ type EndpointLister interface {
 
 // endpointLister implements the EndpointLister interface.
 type endpointLister struct {
-	listers.ResourceIndexer[*v1.Endpoint]
+	listers.ResourceIndexer[*submarineriov1.Endpoint]
 }
 
 // NewEndpointLister returns a new EndpointLister.
 func NewEndpointLister(indexer cache.Indexer) EndpointLister {
-	return &endpointLister{listers.New[*v1.Endpoint](indexer, v1.Resource("endpoint"))}
+	return &endpointLister{listers.New[*submarineriov1.Endpoint](indexer, submarineriov1.Resource("endpoint"))}
 }
 
 // Endpoints returns an object that can list and get Endpoints.
 func (s *endpointLister) Endpoints(namespace string) EndpointNamespaceLister {
-	return endpointNamespaceLister{listers.NewNamespaced[*v1.Endpoint](s.ResourceIndexer, namespace)}
+	return endpointNamespaceLister{listers.NewNamespaced[*submarineriov1.Endpoint](s.ResourceIndexer, namespace)}
 }
 
 // EndpointNamespaceLister helps list and get Endpoints.
@@ -58,15 +58,15 @@ func (s *endpointLister) Endpoints(namespace string) EndpointNamespaceLister {
 type EndpointNamespaceLister interface {
 	// List lists all Endpoints in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.Endpoint, err error)
+	List(selector labels.Selector) (ret []*submarineriov1.Endpoint, err error)
 	// Get retrieves the Endpoint from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.Endpoint, error)
+	Get(name string) (*submarineriov1.Endpoint, error)
 	EndpointNamespaceListerExpansion
 }
 
 // endpointNamespaceLister implements the EndpointNamespaceLister
 // interface.
 type endpointNamespaceLister struct {
-	listers.ResourceIndexer[*v1.Endpoint]
+	listers.ResourceIndexer[*submarineriov1.Endpoint]
 }

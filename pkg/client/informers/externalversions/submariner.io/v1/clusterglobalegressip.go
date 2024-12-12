@@ -21,13 +21,13 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	apissubmarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	versioned "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/submariner-io/submariner/pkg/client/informers/externalversions/internalinterfaces"
-	v1 "github.com/submariner-io/submariner/pkg/client/listers/submariner.io/v1"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/client/listers/submariner.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -38,7 +38,7 @@ import (
 // ClusterGlobalEgressIPs.
 type ClusterGlobalEgressIPInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.ClusterGlobalEgressIPLister
+	Lister() submarineriov1.ClusterGlobalEgressIPLister
 }
 
 type clusterGlobalEgressIPInformer struct {
@@ -73,7 +73,7 @@ func NewFilteredClusterGlobalEgressIPInformer(client versioned.Interface, namesp
 				return client.SubmarinerV1().ClusterGlobalEgressIPs(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&submarineriov1.ClusterGlobalEgressIP{},
+		&apissubmarineriov1.ClusterGlobalEgressIP{},
 		resyncPeriod,
 		indexers,
 	)
@@ -84,9 +84,9 @@ func (f *clusterGlobalEgressIPInformer) defaultInformer(client versioned.Interfa
 }
 
 func (f *clusterGlobalEgressIPInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&submarineriov1.ClusterGlobalEgressIP{}, f.defaultInformer)
+	return f.factory.InformerFor(&apissubmarineriov1.ClusterGlobalEgressIP{}, f.defaultInformer)
 }
 
-func (f *clusterGlobalEgressIPInformer) Lister() v1.ClusterGlobalEgressIPLister {
-	return v1.NewClusterGlobalEgressIPLister(f.Informer().GetIndexer())
+func (f *clusterGlobalEgressIPInformer) Lister() submarineriov1.ClusterGlobalEgressIPLister {
+	return submarineriov1.NewClusterGlobalEgressIPLister(f.Informer().GetIndexer())
 }

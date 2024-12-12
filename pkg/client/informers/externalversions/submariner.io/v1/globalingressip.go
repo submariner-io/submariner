@@ -21,13 +21,13 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	apissubmarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	versioned "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/submariner-io/submariner/pkg/client/informers/externalversions/internalinterfaces"
-	v1 "github.com/submariner-io/submariner/pkg/client/listers/submariner.io/v1"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/client/listers/submariner.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -38,7 +38,7 @@ import (
 // GlobalIngressIPs.
 type GlobalIngressIPInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.GlobalIngressIPLister
+	Lister() submarineriov1.GlobalIngressIPLister
 }
 
 type globalIngressIPInformer struct {
@@ -73,7 +73,7 @@ func NewFilteredGlobalIngressIPInformer(client versioned.Interface, namespace st
 				return client.SubmarinerV1().GlobalIngressIPs(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&submarineriov1.GlobalIngressIP{},
+		&apissubmarineriov1.GlobalIngressIP{},
 		resyncPeriod,
 		indexers,
 	)
@@ -84,9 +84,9 @@ func (f *globalIngressIPInformer) defaultInformer(client versioned.Interface, re
 }
 
 func (f *globalIngressIPInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&submarineriov1.GlobalIngressIP{}, f.defaultInformer)
+	return f.factory.InformerFor(&apissubmarineriov1.GlobalIngressIP{}, f.defaultInformer)
 }
 
-func (f *globalIngressIPInformer) Lister() v1.GlobalIngressIPLister {
-	return v1.NewGlobalIngressIPLister(f.Informer().GetIndexer())
+func (f *globalIngressIPInformer) Lister() submarineriov1.GlobalIngressIPLister {
+	return submarineriov1.NewGlobalIngressIPLister(f.Informer().GetIndexer())
 }

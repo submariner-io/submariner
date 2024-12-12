@@ -21,10 +21,10 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	submarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	applyconfigurationsubmarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
 	scheme "github.com/submariner-io/submariner/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -40,36 +40,37 @@ type GlobalIngressIPsGetter interface {
 
 // GlobalIngressIPInterface has methods to work with GlobalIngressIP resources.
 type GlobalIngressIPInterface interface {
-	Create(ctx context.Context, globalIngressIP *v1.GlobalIngressIP, opts metav1.CreateOptions) (*v1.GlobalIngressIP, error)
-	Update(ctx context.Context, globalIngressIP *v1.GlobalIngressIP, opts metav1.UpdateOptions) (*v1.GlobalIngressIP, error)
+	Create(ctx context.Context, globalIngressIP *submarineriov1.GlobalIngressIP, opts metav1.CreateOptions) (*submarineriov1.GlobalIngressIP, error)
+	Update(ctx context.Context, globalIngressIP *submarineriov1.GlobalIngressIP, opts metav1.UpdateOptions) (*submarineriov1.GlobalIngressIP, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, globalIngressIP *v1.GlobalIngressIP, opts metav1.UpdateOptions) (*v1.GlobalIngressIP, error)
+	UpdateStatus(ctx context.Context, globalIngressIP *submarineriov1.GlobalIngressIP, opts metav1.UpdateOptions) (*submarineriov1.GlobalIngressIP, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.GlobalIngressIP, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.GlobalIngressIPList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*submarineriov1.GlobalIngressIP, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*submarineriov1.GlobalIngressIPList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.GlobalIngressIP, err error)
-	Apply(ctx context.Context, globalIngressIP *submarineriov1.GlobalIngressIPApplyConfiguration, opts metav1.ApplyOptions) (result *v1.GlobalIngressIP, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *submarineriov1.GlobalIngressIP, err error)
+	Apply(ctx context.Context, globalIngressIP *applyconfigurationsubmarineriov1.GlobalIngressIPApplyConfiguration, opts metav1.ApplyOptions) (result *submarineriov1.GlobalIngressIP, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, globalIngressIP *submarineriov1.GlobalIngressIPApplyConfiguration, opts metav1.ApplyOptions) (result *v1.GlobalIngressIP, err error)
+	ApplyStatus(ctx context.Context, globalIngressIP *applyconfigurationsubmarineriov1.GlobalIngressIPApplyConfiguration, opts metav1.ApplyOptions) (result *submarineriov1.GlobalIngressIP, err error)
 	GlobalIngressIPExpansion
 }
 
 // globalIngressIPs implements GlobalIngressIPInterface
 type globalIngressIPs struct {
-	*gentype.ClientWithListAndApply[*v1.GlobalIngressIP, *v1.GlobalIngressIPList, *submarineriov1.GlobalIngressIPApplyConfiguration]
+	*gentype.ClientWithListAndApply[*submarineriov1.GlobalIngressIP, *submarineriov1.GlobalIngressIPList, *applyconfigurationsubmarineriov1.GlobalIngressIPApplyConfiguration]
 }
 
 // newGlobalIngressIPs returns a GlobalIngressIPs
 func newGlobalIngressIPs(c *SubmarinerV1Client, namespace string) *globalIngressIPs {
 	return &globalIngressIPs{
-		gentype.NewClientWithListAndApply[*v1.GlobalIngressIP, *v1.GlobalIngressIPList, *submarineriov1.GlobalIngressIPApplyConfiguration](
+		gentype.NewClientWithListAndApply[*submarineriov1.GlobalIngressIP, *submarineriov1.GlobalIngressIPList, *applyconfigurationsubmarineriov1.GlobalIngressIPApplyConfiguration](
 			"globalingressips",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.GlobalIngressIP { return &v1.GlobalIngressIP{} },
-			func() *v1.GlobalIngressIPList { return &v1.GlobalIngressIPList{} }),
+			func() *submarineriov1.GlobalIngressIP { return &submarineriov1.GlobalIngressIP{} },
+			func() *submarineriov1.GlobalIngressIPList { return &submarineriov1.GlobalIngressIPList{} },
+		),
 	}
 }

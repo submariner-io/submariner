@@ -21,10 +21,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // GatewayRouteLister helps list GatewayRoutes.
@@ -32,7 +32,7 @@ import (
 type GatewayRouteLister interface {
 	// List lists all GatewayRoutes in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.GatewayRoute, err error)
+	List(selector labels.Selector) (ret []*submarineriov1.GatewayRoute, err error)
 	// GatewayRoutes returns an object that can list and get GatewayRoutes.
 	GatewayRoutes(namespace string) GatewayRouteNamespaceLister
 	GatewayRouteListerExpansion
@@ -40,17 +40,17 @@ type GatewayRouteLister interface {
 
 // gatewayRouteLister implements the GatewayRouteLister interface.
 type gatewayRouteLister struct {
-	listers.ResourceIndexer[*v1.GatewayRoute]
+	listers.ResourceIndexer[*submarineriov1.GatewayRoute]
 }
 
 // NewGatewayRouteLister returns a new GatewayRouteLister.
 func NewGatewayRouteLister(indexer cache.Indexer) GatewayRouteLister {
-	return &gatewayRouteLister{listers.New[*v1.GatewayRoute](indexer, v1.Resource("gatewayroute"))}
+	return &gatewayRouteLister{listers.New[*submarineriov1.GatewayRoute](indexer, submarineriov1.Resource("gatewayroute"))}
 }
 
 // GatewayRoutes returns an object that can list and get GatewayRoutes.
 func (s *gatewayRouteLister) GatewayRoutes(namespace string) GatewayRouteNamespaceLister {
-	return gatewayRouteNamespaceLister{listers.NewNamespaced[*v1.GatewayRoute](s.ResourceIndexer, namespace)}
+	return gatewayRouteNamespaceLister{listers.NewNamespaced[*submarineriov1.GatewayRoute](s.ResourceIndexer, namespace)}
 }
 
 // GatewayRouteNamespaceLister helps list and get GatewayRoutes.
@@ -58,15 +58,15 @@ func (s *gatewayRouteLister) GatewayRoutes(namespace string) GatewayRouteNamespa
 type GatewayRouteNamespaceLister interface {
 	// List lists all GatewayRoutes in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.GatewayRoute, err error)
+	List(selector labels.Selector) (ret []*submarineriov1.GatewayRoute, err error)
 	// Get retrieves the GatewayRoute from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.GatewayRoute, error)
+	Get(name string) (*submarineriov1.GatewayRoute, error)
 	GatewayRouteNamespaceListerExpansion
 }
 
 // gatewayRouteNamespaceLister implements the GatewayRouteNamespaceLister
 // interface.
 type gatewayRouteNamespaceLister struct {
-	listers.ResourceIndexer[*v1.GatewayRoute]
+	listers.ResourceIndexer[*submarineriov1.GatewayRoute]
 }

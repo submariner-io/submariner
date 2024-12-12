@@ -21,10 +21,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // NonGatewayRouteLister helps list NonGatewayRoutes.
@@ -32,7 +32,7 @@ import (
 type NonGatewayRouteLister interface {
 	// List lists all NonGatewayRoutes in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.NonGatewayRoute, err error)
+	List(selector labels.Selector) (ret []*submarineriov1.NonGatewayRoute, err error)
 	// NonGatewayRoutes returns an object that can list and get NonGatewayRoutes.
 	NonGatewayRoutes(namespace string) NonGatewayRouteNamespaceLister
 	NonGatewayRouteListerExpansion
@@ -40,17 +40,17 @@ type NonGatewayRouteLister interface {
 
 // nonGatewayRouteLister implements the NonGatewayRouteLister interface.
 type nonGatewayRouteLister struct {
-	listers.ResourceIndexer[*v1.NonGatewayRoute]
+	listers.ResourceIndexer[*submarineriov1.NonGatewayRoute]
 }
 
 // NewNonGatewayRouteLister returns a new NonGatewayRouteLister.
 func NewNonGatewayRouteLister(indexer cache.Indexer) NonGatewayRouteLister {
-	return &nonGatewayRouteLister{listers.New[*v1.NonGatewayRoute](indexer, v1.Resource("nongatewayroute"))}
+	return &nonGatewayRouteLister{listers.New[*submarineriov1.NonGatewayRoute](indexer, submarineriov1.Resource("nongatewayroute"))}
 }
 
 // NonGatewayRoutes returns an object that can list and get NonGatewayRoutes.
 func (s *nonGatewayRouteLister) NonGatewayRoutes(namespace string) NonGatewayRouteNamespaceLister {
-	return nonGatewayRouteNamespaceLister{listers.NewNamespaced[*v1.NonGatewayRoute](s.ResourceIndexer, namespace)}
+	return nonGatewayRouteNamespaceLister{listers.NewNamespaced[*submarineriov1.NonGatewayRoute](s.ResourceIndexer, namespace)}
 }
 
 // NonGatewayRouteNamespaceLister helps list and get NonGatewayRoutes.
@@ -58,15 +58,15 @@ func (s *nonGatewayRouteLister) NonGatewayRoutes(namespace string) NonGatewayRou
 type NonGatewayRouteNamespaceLister interface {
 	// List lists all NonGatewayRoutes in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.NonGatewayRoute, err error)
+	List(selector labels.Selector) (ret []*submarineriov1.NonGatewayRoute, err error)
 	// Get retrieves the NonGatewayRoute from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.NonGatewayRoute, error)
+	Get(name string) (*submarineriov1.NonGatewayRoute, error)
 	NonGatewayRouteNamespaceListerExpansion
 }
 
 // nonGatewayRouteNamespaceLister implements the NonGatewayRouteNamespaceLister
 // interface.
 type nonGatewayRouteNamespaceLister struct {
-	listers.ResourceIndexer[*v1.NonGatewayRoute]
+	listers.ResourceIndexer[*submarineriov1.NonGatewayRoute]
 }
