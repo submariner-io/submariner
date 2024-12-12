@@ -1,5 +1,5 @@
-ARG BASE_BRANCH
-ARG FEDORA_VERSION=40
+ARG BASE_BRANCH=devel
+ARG FEDORA_VERSION=41
 ARG SOURCE=/go/src/github.com/submariner-io/submariner
 
 FROM --platform=${BUILDPLATFORM} quay.io/submariner/shipyard-dapper-base:${BASE_BRANCH} AS builder
@@ -23,7 +23,7 @@ RUN /dnf_install -a ${TARGETPLATFORM} -v ${FEDORA_VERSION} -r /output/route-agen
     glibc bash glibc-minimal-langpack coreutils-single \
     iproute iptables-legacy iptables-nft ipset openvswitch procps-ng grep
 
-FROM --platform=${TARGETPLATFORM} scratch
+FROM scratch
 ARG SOURCE
 ARG TARGETPLATFORM
 
@@ -39,4 +39,4 @@ COPY --from=builder ${SOURCE}/package/iptables-wrapper-installer.sh /usr/sbin/
 # The sanity checks can fail when building foreign arch images; we know we meet the requirements
 RUN /usr/sbin/iptables-wrapper-installer.sh --no-sanity-check
 
-ENTRYPOINT submariner-route-agent.sh
+ENTRYPOINT ["submariner-route-agent.sh"]

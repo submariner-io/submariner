@@ -8,10 +8,14 @@
 #
 # %arch in the package references will be replaced with the chosen arch
 
+set -e
+
 INSTALL_ROOT=/output/base
 
 # Limit the number of files so that dnf doesn't spend ages processing fds
-ulimit -n 1048576
+if [[ $(ulimit -n) -gt 1048576 ]]; then
+    ulimit -n 1048576
+fi
 
 while getopts a:kr:v: o
 do
@@ -55,7 +59,7 @@ if [[ "${INSTALL_ROOT}" != /output/base ]] && [[ ! -d "${INSTALL_ROOT}" ]] && [[
     cp -a /output/base "${INSTALL_ROOT}"
 fi
 
-dnf -y --setopt=install_weak_deps=0 --nodocs ${arch_args} \
+dnf -y --setopt=install_weak_deps=0 --nodocs --use-host-config ${arch_args} \
     --installroot "${INSTALL_ROOT}" --releasever "${FEDORA_VERSION}" \
     install "${@//\%arch/${ARCH}}"
 
