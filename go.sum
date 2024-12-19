@@ -444,10 +444,10 @@ github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO
 github.com/stretchr/testify v1.8.1/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o6fzry7u4=
 github.com/stretchr/testify v1.9.0 h1:HtqpIVDClZ4nwg75+f6Lvsy/wHu+3BoSGCbBAcpTsTg=
 github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
-github.com/submariner-io/admiral v0.20.0-m1 h1:0yKkTJB8VVoE6SUo3N8mOW6JcdQecUVM/jTFhIbDN2s=
-github.com/submariner-io/admiral v0.20.0-m1/go.mod h1:6856aYKC6ptXo9n2UVymtWKsKYMvRMvlyyzPWUxwpHM=
-github.com/submariner-io/shipyard v0.20.0-m1 h1:A1QooNpKyD69GqcfTjl5/ToSAGKQSxVyCHEg87gQFcY=
-github.com/submariner-io/shipyard v0.20.0-m1/go.mod h1:v+gjhwiIoKl2OjKPwfkFT9MwIGKc0LR3nSI7X6G14TY=
+github.com/submariner-io/admiral v0.20.0-m2 h1:J5h16JYwKXkCAup6+sI8nKbRJ7sSMAfdUTY9CfIqL3A=
+github.com/submariner-io/admiral v0.20.0-m2/go.mod h1:CsnrOfUozp1MQTFDxYt4+aphrIXDyRzvJCZg5m8p5Vg=
+github.com/submariner-io/shipyard v0.20.0-m2 h1:P0CvJ+bJrQAseoyEi2hdLcTZYvxCuWLzybe9OJyxC+U=
+github.com/submariner-io/shipyard v0.20.0-m2/go.mod h1:v+gjhwiIoKl2OjKPwfkFT9MwIGKc0LR3nSI7X6G14TY=
 github.com/tidwall/pretty v1.0.0/go.mod h1:XNkn88O1ChpSDQmQeStsy+sBenx6DDtFZJxhVysOjyk=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
@@ -719,8 +719,8 @@ k8s.io/utils v0.0.0-20240711033017-18e509b52bc8 h1:pUdcCO1Lk/tbT5ztQWOBi5HBgbBP1
 k8s.io/utils v0.0.0-20240711033017-18e509b52bc8/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.7/go.mod h1:PHgbrJT7lCHcxMU+mDHEm+nx46H4zuuHZkDP6icnhu0=
 sigs.k8s.io/controller-runtime v0.6.1/go.mod h1:XRYBPdbf5XJu9kpS84VJiZ7h/u1hF3gEORz0efEja7A=
-sigs.k8s.io/controller-runtime v0.19.2 h1:3sPrF58XQEPzbE8T81TN6selQIMGbtYwuaJ6eDssDF8=
-sigs.k8s.io/controller-runtime v0.19.2/go.mod h1:iRmWllt8IlaLjvTTDLhRBXIEtkCK6hwVBJJsYS9Ajf4=
+sigs.k8s.io/controller-runtime v0.19.3 h1:XO2GvC9OPftRst6xWCpTgBZO04S2cbp0Qqkj8bX1sPw=
+sigs.k8s.io/controller-runtime v0.19.3/go.mod h1:j4j87DqtsThvwTv5/Tc5NFRyyF/RF0ip4+62tbTSIUM=
 sigs.k8s.io/controller-tools v0.3.0/go.mod h1:enhtKGfxZD1GFEoMgP8Fdbu+uKQ/cq1/WGJhdVChfvI=
 sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd h1:EDPBXCAspyGV4jQlpZSudPeMmr1bNJefnuqLsRAsHZo=
 sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd/go.mod h1:B8JuhiUyNFVKdsE8h686QcCxMaH6HrOAZj4vswFpcB0=
