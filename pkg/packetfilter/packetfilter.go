@@ -253,8 +253,9 @@ type ChainIPHook struct {
 type SetFamily uint32
 
 const (
-	// curently only IPV4 sets are supported.
+	// IPV4 and IPV6 sets are supported.
 	SetFamilyV4 SetFamily = iota
+	SetFamilyV6
 )
 
 // named set.
@@ -307,10 +308,17 @@ type Interface interface {
 	UpdateChainRules(table TableType, chain string, rules []*Rule) error
 }
 
-var newDriverFn func() (Driver, error)
+var (
+	newDriverFn   func() (Driver, error)
+	newDriverFnV6 func() (Driver, error)
+)
 
 func SetNewDriverFn(f func() (Driver, error)) {
 	newDriverFn = f
+}
+
+func SetNewDriverFnV6(f func() (Driver, error)) {
+	newDriverFnV6 = f
 }
 
 type Adapter struct {
@@ -318,11 +326,19 @@ type Adapter struct {
 }
 
 func New() (Interface, error) {
-	if newDriverFn == nil {
+	return newImpl(newDriverFn)
+}
+
+func NewV6() (Interface, error) {
+	return newImpl(newDriverFnV6)
+}
+
+func newImpl(f func() (Driver, error)) (Interface, error) {
+	if f == nil {
 		return nil, errors.New("no driver registered")
 	}
 
-	driver, err := newDriverFn()
+	driver, err := f()
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating packet filter Driver")
 	}

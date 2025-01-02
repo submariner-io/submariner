@@ -75,9 +75,17 @@ type packetFilter struct {
 }
 
 func New() (packetfilter.Driver, error) {
-	ipt, err := iptables.New(iptables.IPFamily(iptables.ProtocolIPv4), iptables.Timeout(5))
+	return newiptables(iptables.ProtocolIPv4)
+}
+
+func NewV6() (packetfilter.Driver, error) {
+	return newiptables(iptables.ProtocolIPv6)
+}
+
+func newiptables(proto iptables.Protocol) (packetfilter.Driver, error) {
+	ipt, err := iptables.New(iptables.IPFamily(proto), iptables.Timeout(5))
 	if err != nil {
-		return nil, errors.Wrap(err, "error creating IP tables")
+		return nil, errors.Wrapf(err, "error creating IP tables for protocol %d", proto)
 	}
 
 	ipSetIface := ipset.New()
