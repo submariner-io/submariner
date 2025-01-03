@@ -65,14 +65,15 @@ func (p *PublicIPWatcher) Run(stopCh <-chan struct{}) {
 func (p *PublicIPWatcher) syncPublicIP() {
 	localEndpointSpec := p.config.LocalEndpoint.Spec()
 
-	publicIP, err := getPublicIP(p.config.SubmSpec, p.config.K8sClient, localEndpointSpec.BackendConfig, false)
+	publicIP, resolver, err := getPublicIP(p.config.SubmSpec, p.config.K8sClient, localEndpointSpec.BackendConfig, false)
 	if err != nil {
 		logger.Warningf("Could not determine public IP of the gateway node %q: %v", localEndpointSpec.Hostname, err)
 		return
 	}
 
 	if localEndpointSpec.PublicIP != publicIP {
-		logger.Infof("Public IP changed for the Gateway, updating the local endpoint with publicIP %q", publicIP)
+		logger.Infof("Public IP changed for the Gateway, updating the local endpoint with public IP %q obtained from resolver %q",
+			publicIP, resolver)
 
 		if err := p.updateLocalEndpoint(publicIP); err != nil {
 			logger.Error(err, "Error updating the public IP for local endpoint")
