@@ -59,16 +59,20 @@ bin/protoc-gen-go:
 	mkdir -p $(@D)
 	GOFLAGS="" GOBIN="$(CURDIR)/bin" go install google.golang.org/protobuf/cmd/protoc-gen-go@$(shell awk '/google.golang.org\/protobuf/ {print $$2}' go.mod)
 
-bin/%/submariner-gateway: main.go $(shell find pkg -not \( -path 'pkg/globalnet*' -o -path 'pkg/routeagent*' -o -path 'pkg/await_node_ready*' \)) pkg/natdiscovery/proto/natdiscovery.pb.go
+basepkg = github.com/submariner-io/submariner
+pkgdeps = $(shell find $$(go list -json $(1) | jq -r '.Deps[] | select(startswith("$(basepkg)")) | sub("$(basepkg)"; ".")') -name '*.go' -not -name '*_test.go')
+
+# natdiscovery.pb.go must be listed explicitly because it might not exist when Make evaluates pkgdeps
+bin/%/submariner-gateway: main.go $(call pkgdeps,.) pkg/natdiscovery/proto/natdiscovery.pb.go
 	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ .
 
-bin/%/submariner-route-agent: $(shell find pkg/routeagent_driver)
+bin/%/submariner-route-agent: $(call pkgdeps,./pkg/routeagent_driver)
 	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ ./pkg/routeagent_driver
 
-bin/%/submariner-globalnet: $(shell find pkg/globalnet)
+bin/%/submariner-globalnet: $(call pkgdeps,./pkg/globalnet)
 	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ ./pkg/globalnet
 
-bin/%/await-node-ready: $(shell find pkg/await_node_ready)
+bin/%/await-node-ready: $(call pkgdeps,./pkg/await_node_ready)
 	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ ./pkg/await_node_ready
 
 nullstring :=

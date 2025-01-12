@@ -181,10 +181,12 @@ func GetLocalSpec(ctx context.Context, submSpec *types.SubmarinerSpecification, 
 		BackendConfig: backendConfig,
 	}
 
-	publicIP, err := getPublicIP(submSpec, k8sClient, backendConfig, airGappedDeployment)
+	publicIP, resolver, err := getPublicIP(submSpec, k8sClient, backendConfig, airGappedDeployment)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not determine public IP")
 	}
+
+	logger.Infof("Obtained local endpoint public IP %q using resolver %q", publicIP, resolver)
 
 	endpointSpec.PublicIP = publicIP
 
