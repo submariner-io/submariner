@@ -21,14 +21,14 @@ limitations under the License.
 package v1
 
 import (
-	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 )
 
 // GatewayStatusApplyConfiguration represents a declarative configuration of the GatewayStatus type for use
 // with apply.
 type GatewayStatusApplyConfiguration struct {
 	Version       *string                         `json:"version,omitempty"`
-	HAStatus      *v1.HAStatus                    `json:"haStatus,omitempty"`
+	HAStatus      *submarineriov1.HAStatus        `json:"haStatus,omitempty"`
 	LocalEndpoint *EndpointSpecApplyConfiguration `json:"localEndpoint,omitempty"`
 	StatusFailure *string                         `json:"statusFailure,omitempty"`
 	Connections   []ConnectionApplyConfiguration  `json:"connections,omitempty"`
@@ -51,7 +51,7 @@ func (b *GatewayStatusApplyConfiguration) WithVersion(value string) *GatewayStat
 // WithHAStatus sets the HAStatus field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the HAStatus field is set to the value of the last call.
-func (b *GatewayStatusApplyConfiguration) WithHAStatus(value v1.HAStatus) *GatewayStatusApplyConfiguration {
+func (b *GatewayStatusApplyConfiguration) WithHAStatus(value submarineriov1.HAStatus) *GatewayStatusApplyConfiguration {
 	b.HAStatus = &value
 	return b
 }

@@ -21,10 +21,10 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	submarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	applyconfigurationsubmarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
 	scheme "github.com/submariner-io/submariner/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -40,32 +40,33 @@ type RouteAgentsGetter interface {
 
 // RouteAgentInterface has methods to work with RouteAgent resources.
 type RouteAgentInterface interface {
-	Create(ctx context.Context, routeAgent *v1.RouteAgent, opts metav1.CreateOptions) (*v1.RouteAgent, error)
-	Update(ctx context.Context, routeAgent *v1.RouteAgent, opts metav1.UpdateOptions) (*v1.RouteAgent, error)
+	Create(ctx context.Context, routeAgent *submarineriov1.RouteAgent, opts metav1.CreateOptions) (*submarineriov1.RouteAgent, error)
+	Update(ctx context.Context, routeAgent *submarineriov1.RouteAgent, opts metav1.UpdateOptions) (*submarineriov1.RouteAgent, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.RouteAgent, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.RouteAgentList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*submarineriov1.RouteAgent, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*submarineriov1.RouteAgentList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.RouteAgent, err error)
-	Apply(ctx context.Context, routeAgent *submarineriov1.RouteAgentApplyConfiguration, opts metav1.ApplyOptions) (result *v1.RouteAgent, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *submarineriov1.RouteAgent, err error)
+	Apply(ctx context.Context, routeAgent *applyconfigurationsubmarineriov1.RouteAgentApplyConfiguration, opts metav1.ApplyOptions) (result *submarineriov1.RouteAgent, err error)
 	RouteAgentExpansion
 }
 
 // routeAgents implements RouteAgentInterface
 type routeAgents struct {
-	*gentype.ClientWithListAndApply[*v1.RouteAgent, *v1.RouteAgentList, *submarineriov1.RouteAgentApplyConfiguration]
+	*gentype.ClientWithListAndApply[*submarineriov1.RouteAgent, *submarineriov1.RouteAgentList, *applyconfigurationsubmarineriov1.RouteAgentApplyConfiguration]
 }
 
 // newRouteAgents returns a RouteAgents
 func newRouteAgents(c *SubmarinerV1Client, namespace string) *routeAgents {
 	return &routeAgents{
-		gentype.NewClientWithListAndApply[*v1.RouteAgent, *v1.RouteAgentList, *submarineriov1.RouteAgentApplyConfiguration](
+		gentype.NewClientWithListAndApply[*submarineriov1.RouteAgent, *submarineriov1.RouteAgentList, *applyconfigurationsubmarineriov1.RouteAgentApplyConfiguration](
 			"routeagents",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.RouteAgent { return &v1.RouteAgent{} },
-			func() *v1.RouteAgentList { return &v1.RouteAgentList{} }),
+			func() *submarineriov1.RouteAgent { return &submarineriov1.RouteAgent{} },
+			func() *submarineriov1.RouteAgentList { return &submarineriov1.RouteAgentList{} },
+		),
 	}
 }

@@ -21,14 +21,14 @@ limitations under the License.
 package v1
 
 import (
-	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
 // GlobalIngressIPSpecApplyConfiguration represents a declarative configuration of the GlobalIngressIPSpec type for use
 // with apply.
 type GlobalIngressIPSpecApplyConfiguration struct {
-	Target     *v1.TargetType               `json:"target,omitempty"`
+	Target     *submarineriov1.TargetType   `json:"target,omitempty"`
 	ServiceRef *corev1.LocalObjectReference `json:"serviceRef,omitempty"`
 	PodRef     *corev1.LocalObjectReference `json:"podRef,omitempty"`
 }
@@ -42,7 +42,7 @@ func GlobalIngressIPSpec() *GlobalIngressIPSpecApplyConfiguration {
 // WithTarget sets the Target field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Target field is set to the value of the last call.
-func (b *GlobalIngressIPSpecApplyConfiguration) WithTarget(value v1.TargetType) *GlobalIngressIPSpecApplyConfiguration {
+func (b *GlobalIngressIPSpecApplyConfiguration) WithTarget(value submarineriov1.TargetType) *GlobalIngressIPSpecApplyConfiguration {
 	b.Target = &value
 	return b
 }

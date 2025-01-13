@@ -21,10 +21,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // GlobalEgressIPLister helps list GlobalEgressIPs.
@@ -32,7 +32,7 @@ import (
 type GlobalEgressIPLister interface {
 	// List lists all GlobalEgressIPs in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.GlobalEgressIP, err error)
+	List(selector labels.Selector) (ret []*submarineriov1.GlobalEgressIP, err error)
 	// GlobalEgressIPs returns an object that can list and get GlobalEgressIPs.
 	GlobalEgressIPs(namespace string) GlobalEgressIPNamespaceLister
 	GlobalEgressIPListerExpansion
@@ -40,17 +40,17 @@ type GlobalEgressIPLister interface {
 
 // globalEgressIPLister implements the GlobalEgressIPLister interface.
 type globalEgressIPLister struct {
-	listers.ResourceIndexer[*v1.GlobalEgressIP]
+	listers.ResourceIndexer[*submarineriov1.GlobalEgressIP]
 }
 
 // NewGlobalEgressIPLister returns a new GlobalEgressIPLister.
 func NewGlobalEgressIPLister(indexer cache.Indexer) GlobalEgressIPLister {
-	return &globalEgressIPLister{listers.New[*v1.GlobalEgressIP](indexer, v1.Resource("globalegressip"))}
+	return &globalEgressIPLister{listers.New[*submarineriov1.GlobalEgressIP](indexer, submarineriov1.Resource("globalegressip"))}
 }
 
 // GlobalEgressIPs returns an object that can list and get GlobalEgressIPs.
 func (s *globalEgressIPLister) GlobalEgressIPs(namespace string) GlobalEgressIPNamespaceLister {
-	return globalEgressIPNamespaceLister{listers.NewNamespaced[*v1.GlobalEgressIP](s.ResourceIndexer, namespace)}
+	return globalEgressIPNamespaceLister{listers.NewNamespaced[*submarineriov1.GlobalEgressIP](s.ResourceIndexer, namespace)}
 }
 
 // GlobalEgressIPNamespaceLister helps list and get GlobalEgressIPs.
@@ -58,15 +58,15 @@ func (s *globalEgressIPLister) GlobalEgressIPs(namespace string) GlobalEgressIPN
 type GlobalEgressIPNamespaceLister interface {
 	// List lists all GlobalEgressIPs in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.GlobalEgressIP, err error)
+	List(selector labels.Selector) (ret []*submarineriov1.GlobalEgressIP, err error)
 	// Get retrieves the GlobalEgressIP from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.GlobalEgressIP, error)
+	Get(name string) (*submarineriov1.GlobalEgressIP, error)
 	GlobalEgressIPNamespaceListerExpansion
 }
 
 // globalEgressIPNamespaceLister implements the GlobalEgressIPNamespaceLister
 // interface.
 type globalEgressIPNamespaceLister struct {
-	listers.ResourceIndexer[*v1.GlobalEgressIP]
+	listers.ResourceIndexer[*submarineriov1.GlobalEgressIP]
 }

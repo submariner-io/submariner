@@ -21,10 +21,10 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	submarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	applyconfigurationsubmarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
 	scheme "github.com/submariner-io/submariner/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -40,32 +40,33 @@ type ClustersGetter interface {
 
 // ClusterInterface has methods to work with Cluster resources.
 type ClusterInterface interface {
-	Create(ctx context.Context, cluster *v1.Cluster, opts metav1.CreateOptions) (*v1.Cluster, error)
-	Update(ctx context.Context, cluster *v1.Cluster, opts metav1.UpdateOptions) (*v1.Cluster, error)
+	Create(ctx context.Context, cluster *submarineriov1.Cluster, opts metav1.CreateOptions) (*submarineriov1.Cluster, error)
+	Update(ctx context.Context, cluster *submarineriov1.Cluster, opts metav1.UpdateOptions) (*submarineriov1.Cluster, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Cluster, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.ClusterList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*submarineriov1.Cluster, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*submarineriov1.ClusterList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Cluster, err error)
-	Apply(ctx context.Context, cluster *submarineriov1.ClusterApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Cluster, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *submarineriov1.Cluster, err error)
+	Apply(ctx context.Context, cluster *applyconfigurationsubmarineriov1.ClusterApplyConfiguration, opts metav1.ApplyOptions) (result *submarineriov1.Cluster, err error)
 	ClusterExpansion
 }
 
 // clusters implements ClusterInterface
 type clusters struct {
-	*gentype.ClientWithListAndApply[*v1.Cluster, *v1.ClusterList, *submarineriov1.ClusterApplyConfiguration]
+	*gentype.ClientWithListAndApply[*submarineriov1.Cluster, *submarineriov1.ClusterList, *applyconfigurationsubmarineriov1.ClusterApplyConfiguration]
 }
 
 // newClusters returns a Clusters
 func newClusters(c *SubmarinerV1Client, namespace string) *clusters {
 	return &clusters{
-		gentype.NewClientWithListAndApply[*v1.Cluster, *v1.ClusterList, *submarineriov1.ClusterApplyConfiguration](
+		gentype.NewClientWithListAndApply[*submarineriov1.Cluster, *submarineriov1.ClusterList, *applyconfigurationsubmarineriov1.ClusterApplyConfiguration](
 			"clusters",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.Cluster { return &v1.Cluster{} },
-			func() *v1.ClusterList { return &v1.ClusterList{} }),
+			func() *submarineriov1.Cluster { return &submarineriov1.Cluster{} },
+			func() *submarineriov1.ClusterList { return &submarineriov1.ClusterList{} },
+		),
 	}
 }

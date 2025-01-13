@@ -21,142 +21,31 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-	json "encoding/json"
-	"fmt"
-
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	typedsubmarineriov1 "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeEndpoints implements EndpointInterface
-type FakeEndpoints struct {
+// fakeEndpoints implements EndpointInterface
+type fakeEndpoints struct {
+	*gentype.FakeClientWithListAndApply[*v1.Endpoint, *v1.EndpointList, *submarineriov1.EndpointApplyConfiguration]
 	Fake *FakeSubmarinerV1
-	ns   string
 }
 
-var endpointsResource = v1.SchemeGroupVersion.WithResource("endpoints")
-
-var endpointsKind = v1.SchemeGroupVersion.WithKind("Endpoint")
-
-// Get takes name of the endpoint, and returns the corresponding endpoint object, and an error if there is any.
-func (c *FakeEndpoints) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Endpoint, err error) {
-	emptyResult := &v1.Endpoint{}
-	obj, err := c.Fake.
-		Invokes(testing.NewGetActionWithOptions(endpointsResource, c.ns, name, options), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
+func newFakeEndpoints(fake *FakeSubmarinerV1, namespace string) typedsubmarineriov1.EndpointInterface {
+	return &fakeEndpoints{
+		gentype.NewFakeClientWithListAndApply[*v1.Endpoint, *v1.EndpointList, *submarineriov1.EndpointApplyConfiguration](
+			fake.Fake,
+			namespace,
+			v1.SchemeGroupVersion.WithResource("endpoints"),
+			v1.SchemeGroupVersion.WithKind("Endpoint"),
+			func() *v1.Endpoint { return &v1.Endpoint{} },
+			func() *v1.EndpointList { return &v1.EndpointList{} },
+			func(dst, src *v1.EndpointList) { dst.ListMeta = src.ListMeta },
+			func(list *v1.EndpointList) []*v1.Endpoint { return gentype.ToPointerSlice(list.Items) },
+			func(list *v1.EndpointList, items []*v1.Endpoint) { list.Items = gentype.FromPointerSlice(items) },
+		),
+		fake,
 	}
-	return obj.(*v1.Endpoint), err
-}
-
-// List takes label and field selectors, and returns the list of Endpoints that match those selectors.
-func (c *FakeEndpoints) List(ctx context.Context, opts metav1.ListOptions) (result *v1.EndpointList, err error) {
-	emptyResult := &v1.EndpointList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewListActionWithOptions(endpointsResource, endpointsKind, c.ns, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1.EndpointList{ListMeta: obj.(*v1.EndpointList).ListMeta}
-	for _, item := range obj.(*v1.EndpointList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested endpoints.
-func (c *FakeEndpoints) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchActionWithOptions(endpointsResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a endpoint and creates it.  Returns the server's representation of the endpoint, and an error, if there is any.
-func (c *FakeEndpoints) Create(ctx context.Context, endpoint *v1.Endpoint, opts metav1.CreateOptions) (result *v1.Endpoint, err error) {
-	emptyResult := &v1.Endpoint{}
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateActionWithOptions(endpointsResource, c.ns, endpoint, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.Endpoint), err
-}
-
-// Update takes the representation of a endpoint and updates it. Returns the server's representation of the endpoint, and an error, if there is any.
-func (c *FakeEndpoints) Update(ctx context.Context, endpoint *v1.Endpoint, opts metav1.UpdateOptions) (result *v1.Endpoint, err error) {
-	emptyResult := &v1.Endpoint{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateActionWithOptions(endpointsResource, c.ns, endpoint, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.Endpoint), err
-}
-
-// Delete takes name of the endpoint and deletes it. Returns an error if one occurs.
-func (c *FakeEndpoints) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(endpointsResource, c.ns, name, opts), &v1.Endpoint{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeEndpoints) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionActionWithOptions(endpointsResource, c.ns, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1.EndpointList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched endpoint.
-func (c *FakeEndpoints) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Endpoint, err error) {
-	emptyResult := &v1.Endpoint{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(endpointsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.Endpoint), err
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied endpoint.
-func (c *FakeEndpoints) Apply(ctx context.Context, endpoint *submarineriov1.EndpointApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Endpoint, err error) {
-	if endpoint == nil {
-		return nil, fmt.Errorf("endpoint provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(endpoint)
-	if err != nil {
-		return nil, err
-	}
-	name := endpoint.Name
-	if name == nil {
-		return nil, fmt.Errorf("endpoint.Name must be provided to Apply")
-	}
-	emptyResult := &v1.Endpoint{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(endpointsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.Endpoint), err
 }

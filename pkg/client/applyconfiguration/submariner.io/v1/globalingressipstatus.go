@@ -21,14 +21,14 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // GlobalIngressIPStatusApplyConfiguration represents a declarative configuration of the GlobalIngressIPStatus type for use
 // with apply.
 type GlobalIngressIPStatusApplyConfiguration struct {
-	Conditions  []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
-	AllocatedIP *string                          `json:"allocatedIP,omitempty"`
+	Conditions  []metav1.ConditionApplyConfiguration `json:"conditions,omitempty"`
+	AllocatedIP *string                              `json:"allocatedIP,omitempty"`
 }
 
 // GlobalIngressIPStatusApplyConfiguration constructs a declarative configuration of the GlobalIngressIPStatus type for use with
@@ -40,7 +40,7 @@ func GlobalIngressIPStatus() *GlobalIngressIPStatusApplyConfiguration {
 // WithConditions adds the given value to the Conditions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Conditions field.
-func (b *GlobalIngressIPStatusApplyConfiguration) WithConditions(values ...*v1.ConditionApplyConfiguration) *GlobalIngressIPStatusApplyConfiguration {
+func (b *GlobalIngressIPStatusApplyConfiguration) WithConditions(values ...*metav1.ConditionApplyConfiguration) *GlobalIngressIPStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithConditions")

@@ -21,10 +21,10 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	submarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	applyconfigurationsubmarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
 	scheme "github.com/submariner-io/submariner/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -40,32 +40,33 @@ type NonGatewayRoutesGetter interface {
 
 // NonGatewayRouteInterface has methods to work with NonGatewayRoute resources.
 type NonGatewayRouteInterface interface {
-	Create(ctx context.Context, nonGatewayRoute *v1.NonGatewayRoute, opts metav1.CreateOptions) (*v1.NonGatewayRoute, error)
-	Update(ctx context.Context, nonGatewayRoute *v1.NonGatewayRoute, opts metav1.UpdateOptions) (*v1.NonGatewayRoute, error)
+	Create(ctx context.Context, nonGatewayRoute *submarineriov1.NonGatewayRoute, opts metav1.CreateOptions) (*submarineriov1.NonGatewayRoute, error)
+	Update(ctx context.Context, nonGatewayRoute *submarineriov1.NonGatewayRoute, opts metav1.UpdateOptions) (*submarineriov1.NonGatewayRoute, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.NonGatewayRoute, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.NonGatewayRouteList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*submarineriov1.NonGatewayRoute, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*submarineriov1.NonGatewayRouteList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.NonGatewayRoute, err error)
-	Apply(ctx context.Context, nonGatewayRoute *submarineriov1.NonGatewayRouteApplyConfiguration, opts metav1.ApplyOptions) (result *v1.NonGatewayRoute, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *submarineriov1.NonGatewayRoute, err error)
+	Apply(ctx context.Context, nonGatewayRoute *applyconfigurationsubmarineriov1.NonGatewayRouteApplyConfiguration, opts metav1.ApplyOptions) (result *submarineriov1.NonGatewayRoute, err error)
 	NonGatewayRouteExpansion
 }
 
 // nonGatewayRoutes implements NonGatewayRouteInterface
 type nonGatewayRoutes struct {
-	*gentype.ClientWithListAndApply[*v1.NonGatewayRoute, *v1.NonGatewayRouteList, *submarineriov1.NonGatewayRouteApplyConfiguration]
+	*gentype.ClientWithListAndApply[*submarineriov1.NonGatewayRoute, *submarineriov1.NonGatewayRouteList, *applyconfigurationsubmarineriov1.NonGatewayRouteApplyConfiguration]
 }
 
 // newNonGatewayRoutes returns a NonGatewayRoutes
 func newNonGatewayRoutes(c *SubmarinerV1Client, namespace string) *nonGatewayRoutes {
 	return &nonGatewayRoutes{
-		gentype.NewClientWithListAndApply[*v1.NonGatewayRoute, *v1.NonGatewayRouteList, *submarineriov1.NonGatewayRouteApplyConfiguration](
+		gentype.NewClientWithListAndApply[*submarineriov1.NonGatewayRoute, *submarineriov1.NonGatewayRouteList, *applyconfigurationsubmarineriov1.NonGatewayRouteApplyConfiguration](
 			"nongatewayroutes",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.NonGatewayRoute { return &v1.NonGatewayRoute{} },
-			func() *v1.NonGatewayRouteList { return &v1.NonGatewayRouteList{} }),
+			func() *submarineriov1.NonGatewayRoute { return &submarineriov1.NonGatewayRoute{} },
+			func() *submarineriov1.NonGatewayRouteList { return &submarineriov1.NonGatewayRouteList{} },
+		),
 	}
 }

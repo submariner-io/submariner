@@ -21,10 +21,10 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	submarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	applyconfigurationsubmarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
 	scheme "github.com/submariner-io/submariner/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -40,32 +40,33 @@ type GatewayRoutesGetter interface {
 
 // GatewayRouteInterface has methods to work with GatewayRoute resources.
 type GatewayRouteInterface interface {
-	Create(ctx context.Context, gatewayRoute *v1.GatewayRoute, opts metav1.CreateOptions) (*v1.GatewayRoute, error)
-	Update(ctx context.Context, gatewayRoute *v1.GatewayRoute, opts metav1.UpdateOptions) (*v1.GatewayRoute, error)
+	Create(ctx context.Context, gatewayRoute *submarineriov1.GatewayRoute, opts metav1.CreateOptions) (*submarineriov1.GatewayRoute, error)
+	Update(ctx context.Context, gatewayRoute *submarineriov1.GatewayRoute, opts metav1.UpdateOptions) (*submarineriov1.GatewayRoute, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.GatewayRoute, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.GatewayRouteList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*submarineriov1.GatewayRoute, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*submarineriov1.GatewayRouteList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.GatewayRoute, err error)
-	Apply(ctx context.Context, gatewayRoute *submarineriov1.GatewayRouteApplyConfiguration, opts metav1.ApplyOptions) (result *v1.GatewayRoute, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *submarineriov1.GatewayRoute, err error)
+	Apply(ctx context.Context, gatewayRoute *applyconfigurationsubmarineriov1.GatewayRouteApplyConfiguration, opts metav1.ApplyOptions) (result *submarineriov1.GatewayRoute, err error)
 	GatewayRouteExpansion
 }
 
 // gatewayRoutes implements GatewayRouteInterface
 type gatewayRoutes struct {
-	*gentype.ClientWithListAndApply[*v1.GatewayRoute, *v1.GatewayRouteList, *submarineriov1.GatewayRouteApplyConfiguration]
+	*gentype.ClientWithListAndApply[*submarineriov1.GatewayRoute, *submarineriov1.GatewayRouteList, *applyconfigurationsubmarineriov1.GatewayRouteApplyConfiguration]
 }
 
 // newGatewayRoutes returns a GatewayRoutes
 func newGatewayRoutes(c *SubmarinerV1Client, namespace string) *gatewayRoutes {
 	return &gatewayRoutes{
-		gentype.NewClientWithListAndApply[*v1.GatewayRoute, *v1.GatewayRouteList, *submarineriov1.GatewayRouteApplyConfiguration](
+		gentype.NewClientWithListAndApply[*submarineriov1.GatewayRoute, *submarineriov1.GatewayRouteList, *applyconfigurationsubmarineriov1.GatewayRouteApplyConfiguration](
 			"gatewayroutes",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.GatewayRoute { return &v1.GatewayRoute{} },
-			func() *v1.GatewayRouteList { return &v1.GatewayRouteList{} }),
+			func() *submarineriov1.GatewayRoute { return &submarineriov1.GatewayRoute{} },
+			func() *submarineriov1.GatewayRouteList { return &submarineriov1.GatewayRouteList{} },
+		),
 	}
 }

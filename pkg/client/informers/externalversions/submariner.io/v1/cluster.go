@@ -21,13 +21,13 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	apissubmarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	versioned "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/submariner-io/submariner/pkg/client/informers/externalversions/internalinterfaces"
-	v1 "github.com/submariner-io/submariner/pkg/client/listers/submariner.io/v1"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/client/listers/submariner.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -38,7 +38,7 @@ import (
 // Clusters.
 type ClusterInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.ClusterLister
+	Lister() submarineriov1.ClusterLister
 }
 
 type clusterInformer struct {
@@ -73,7 +73,7 @@ func NewFilteredClusterInformer(client versioned.Interface, namespace string, re
 				return client.SubmarinerV1().Clusters(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&submarineriov1.Cluster{},
+		&apissubmarineriov1.Cluster{},
 		resyncPeriod,
 		indexers,
 	)
@@ -84,9 +84,9 @@ func (f *clusterInformer) defaultInformer(client versioned.Interface, resyncPeri
 }
 
 func (f *clusterInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&submarineriov1.Cluster{}, f.defaultInformer)
+	return f.factory.InformerFor(&apissubmarineriov1.Cluster{}, f.defaultInformer)
 }
 
-func (f *clusterInformer) Lister() v1.ClusterLister {
-	return v1.NewClusterLister(f.Informer().GetIndexer())
+func (f *clusterInformer) Lister() submarineriov1.ClusterLister {
+	return submarineriov1.NewClusterLister(f.Informer().GetIndexer())
 }

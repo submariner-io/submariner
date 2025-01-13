@@ -21,179 +21,35 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-	json "encoding/json"
-	"fmt"
-
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarineriov1 "github.com/submariner-io/submariner/pkg/client/applyconfiguration/submariner.io/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	typedsubmarineriov1 "github.com/submariner-io/submariner/pkg/client/clientset/versioned/typed/submariner.io/v1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeClusterGlobalEgressIPs implements ClusterGlobalEgressIPInterface
-type FakeClusterGlobalEgressIPs struct {
+// fakeClusterGlobalEgressIPs implements ClusterGlobalEgressIPInterface
+type fakeClusterGlobalEgressIPs struct {
+	*gentype.FakeClientWithListAndApply[*v1.ClusterGlobalEgressIP, *v1.ClusterGlobalEgressIPList, *submarineriov1.ClusterGlobalEgressIPApplyConfiguration]
 	Fake *FakeSubmarinerV1
-	ns   string
 }
 
-var clusterglobalegressipsResource = v1.SchemeGroupVersion.WithResource("clusterglobalegressips")
-
-var clusterglobalegressipsKind = v1.SchemeGroupVersion.WithKind("ClusterGlobalEgressIP")
-
-// Get takes name of the clusterGlobalEgressIP, and returns the corresponding clusterGlobalEgressIP object, and an error if there is any.
-func (c *FakeClusterGlobalEgressIPs) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ClusterGlobalEgressIP, err error) {
-	emptyResult := &v1.ClusterGlobalEgressIP{}
-	obj, err := c.Fake.
-		Invokes(testing.NewGetActionWithOptions(clusterglobalegressipsResource, c.ns, name, options), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
+func newFakeClusterGlobalEgressIPs(fake *FakeSubmarinerV1, namespace string) typedsubmarineriov1.ClusterGlobalEgressIPInterface {
+	return &fakeClusterGlobalEgressIPs{
+		gentype.NewFakeClientWithListAndApply[*v1.ClusterGlobalEgressIP, *v1.ClusterGlobalEgressIPList, *submarineriov1.ClusterGlobalEgressIPApplyConfiguration](
+			fake.Fake,
+			namespace,
+			v1.SchemeGroupVersion.WithResource("clusterglobalegressips"),
+			v1.SchemeGroupVersion.WithKind("ClusterGlobalEgressIP"),
+			func() *v1.ClusterGlobalEgressIP { return &v1.ClusterGlobalEgressIP{} },
+			func() *v1.ClusterGlobalEgressIPList { return &v1.ClusterGlobalEgressIPList{} },
+			func(dst, src *v1.ClusterGlobalEgressIPList) { dst.ListMeta = src.ListMeta },
+			func(list *v1.ClusterGlobalEgressIPList) []*v1.ClusterGlobalEgressIP {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1.ClusterGlobalEgressIPList, items []*v1.ClusterGlobalEgressIP) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1.ClusterGlobalEgressIP), err
-}
-
-// List takes label and field selectors, and returns the list of ClusterGlobalEgressIPs that match those selectors.
-func (c *FakeClusterGlobalEgressIPs) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterGlobalEgressIPList, err error) {
-	emptyResult := &v1.ClusterGlobalEgressIPList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewListActionWithOptions(clusterglobalegressipsResource, clusterglobalegressipsKind, c.ns, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1.ClusterGlobalEgressIPList{ListMeta: obj.(*v1.ClusterGlobalEgressIPList).ListMeta}
-	for _, item := range obj.(*v1.ClusterGlobalEgressIPList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested clusterGlobalEgressIPs.
-func (c *FakeClusterGlobalEgressIPs) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchActionWithOptions(clusterglobalegressipsResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a clusterGlobalEgressIP and creates it.  Returns the server's representation of the clusterGlobalEgressIP, and an error, if there is any.
-func (c *FakeClusterGlobalEgressIPs) Create(ctx context.Context, clusterGlobalEgressIP *v1.ClusterGlobalEgressIP, opts metav1.CreateOptions) (result *v1.ClusterGlobalEgressIP, err error) {
-	emptyResult := &v1.ClusterGlobalEgressIP{}
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateActionWithOptions(clusterglobalegressipsResource, c.ns, clusterGlobalEgressIP, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ClusterGlobalEgressIP), err
-}
-
-// Update takes the representation of a clusterGlobalEgressIP and updates it. Returns the server's representation of the clusterGlobalEgressIP, and an error, if there is any.
-func (c *FakeClusterGlobalEgressIPs) Update(ctx context.Context, clusterGlobalEgressIP *v1.ClusterGlobalEgressIP, opts metav1.UpdateOptions) (result *v1.ClusterGlobalEgressIP, err error) {
-	emptyResult := &v1.ClusterGlobalEgressIP{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateActionWithOptions(clusterglobalegressipsResource, c.ns, clusterGlobalEgressIP, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ClusterGlobalEgressIP), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeClusterGlobalEgressIPs) UpdateStatus(ctx context.Context, clusterGlobalEgressIP *v1.ClusterGlobalEgressIP, opts metav1.UpdateOptions) (result *v1.ClusterGlobalEgressIP, err error) {
-	emptyResult := &v1.ClusterGlobalEgressIP{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceActionWithOptions(clusterglobalegressipsResource, "status", c.ns, clusterGlobalEgressIP, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ClusterGlobalEgressIP), err
-}
-
-// Delete takes name of the clusterGlobalEgressIP and deletes it. Returns an error if one occurs.
-func (c *FakeClusterGlobalEgressIPs) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(clusterglobalegressipsResource, c.ns, name, opts), &v1.ClusterGlobalEgressIP{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeClusterGlobalEgressIPs) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionActionWithOptions(clusterglobalegressipsResource, c.ns, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1.ClusterGlobalEgressIPList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched clusterGlobalEgressIP.
-func (c *FakeClusterGlobalEgressIPs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterGlobalEgressIP, err error) {
-	emptyResult := &v1.ClusterGlobalEgressIP{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(clusterglobalegressipsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ClusterGlobalEgressIP), err
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied clusterGlobalEgressIP.
-func (c *FakeClusterGlobalEgressIPs) Apply(ctx context.Context, clusterGlobalEgressIP *submarineriov1.ClusterGlobalEgressIPApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterGlobalEgressIP, err error) {
-	if clusterGlobalEgressIP == nil {
-		return nil, fmt.Errorf("clusterGlobalEgressIP provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(clusterGlobalEgressIP)
-	if err != nil {
-		return nil, err
-	}
-	name := clusterGlobalEgressIP.Name
-	if name == nil {
-		return nil, fmt.Errorf("clusterGlobalEgressIP.Name must be provided to Apply")
-	}
-	emptyResult := &v1.ClusterGlobalEgressIP{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(clusterglobalegressipsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ClusterGlobalEgressIP), err
-}
-
-// ApplyStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *FakeClusterGlobalEgressIPs) ApplyStatus(ctx context.Context, clusterGlobalEgressIP *submarineriov1.ClusterGlobalEgressIPApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterGlobalEgressIP, err error) {
-	if clusterGlobalEgressIP == nil {
-		return nil, fmt.Errorf("clusterGlobalEgressIP provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(clusterGlobalEgressIP)
-	if err != nil {
-		return nil, err
-	}
-	name := clusterGlobalEgressIP.Name
-	if name == nil {
-		return nil, fmt.Errorf("clusterGlobalEgressIP.Name must be provided to Apply")
-	}
-	emptyResult := &v1.ClusterGlobalEgressIP{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(clusterglobalegressipsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ClusterGlobalEgressIP), err
 }

@@ -21,13 +21,13 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	apissubmarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	versioned "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/submariner-io/submariner/pkg/client/informers/externalversions/internalinterfaces"
-	v1 "github.com/submariner-io/submariner/pkg/client/listers/submariner.io/v1"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/client/listers/submariner.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -38,7 +38,7 @@ import (
 // RouteAgents.
 type RouteAgentInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.RouteAgentLister
+	Lister() submarineriov1.RouteAgentLister
 }
 
 type routeAgentInformer struct {
@@ -73,7 +73,7 @@ func NewFilteredRouteAgentInformer(client versioned.Interface, namespace string,
 				return client.SubmarinerV1().RouteAgents(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&submarineriov1.RouteAgent{},
+		&apissubmarineriov1.RouteAgent{},
 		resyncPeriod,
 		indexers,
 	)
@@ -84,9 +84,9 @@ func (f *routeAgentInformer) defaultInformer(client versioned.Interface, resyncP
 }
 
 func (f *routeAgentInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&submarineriov1.RouteAgent{}, f.defaultInformer)
+	return f.factory.InformerFor(&apissubmarineriov1.RouteAgent{}, f.defaultInformer)
 }
 
-func (f *routeAgentInformer) Lister() v1.RouteAgentLister {
-	return v1.NewRouteAgentLister(f.Informer().GetIndexer())
+func (f *routeAgentInformer) Lister() submarineriov1.RouteAgentLister {
+	return submarineriov1.NewRouteAgentLister(f.Informer().GetIndexer())
 }

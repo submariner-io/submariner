@@ -21,10 +21,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	submarineriov1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ClusterLister helps list Clusters.
@@ -32,7 +32,7 @@ import (
 type ClusterLister interface {
 	// List lists all Clusters in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.Cluster, err error)
+	List(selector labels.Selector) (ret []*submarineriov1.Cluster, err error)
 	// Clusters returns an object that can list and get Clusters.
 	Clusters(namespace string) ClusterNamespaceLister
 	ClusterListerExpansion
@@ -40,17 +40,17 @@ type ClusterLister interface {
 
 // clusterLister implements the ClusterLister interface.
 type clusterLister struct {
-	listers.ResourceIndexer[*v1.Cluster]
+	listers.ResourceIndexer[*submarineriov1.Cluster]
 }
 
 // NewClusterLister returns a new ClusterLister.
 func NewClusterLister(indexer cache.Indexer) ClusterLister {
-	return &clusterLister{listers.New[*v1.Cluster](indexer, v1.Resource("cluster"))}
+	return &clusterLister{listers.New[*submarineriov1.Cluster](indexer, submarineriov1.Resource("cluster"))}
 }
 
 // Clusters returns an object that can list and get Clusters.
 func (s *clusterLister) Clusters(namespace string) ClusterNamespaceLister {
-	return clusterNamespaceLister{listers.NewNamespaced[*v1.Cluster](s.ResourceIndexer, namespace)}
+	return clusterNamespaceLister{listers.NewNamespaced[*submarineriov1.Cluster](s.ResourceIndexer, namespace)}
 }
 
 // ClusterNamespaceLister helps list and get Clusters.
@@ -58,15 +58,15 @@ func (s *clusterLister) Clusters(namespace string) ClusterNamespaceLister {
 type ClusterNamespaceLister interface {
 	// List lists all Clusters in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.Cluster, err error)
+	List(selector labels.Selector) (ret []*submarineriov1.Cluster, err error)
 	// Get retrieves the Cluster from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.Cluster, error)
+	Get(name string) (*submarineriov1.Cluster, error)
 	ClusterNamespaceListerExpansion
 }
 
 // clusterNamespaceLister implements the ClusterNamespaceLister
 // interface.
 type clusterNamespaceLister struct {
-	listers.ResourceIndexer[*v1.Cluster]
+	listers.ResourceIndexer[*submarineriov1.Cluster]
 }

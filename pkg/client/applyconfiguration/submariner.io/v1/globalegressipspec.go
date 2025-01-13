@@ -21,14 +21,14 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // GlobalEgressIPSpecApplyConfiguration represents a declarative configuration of the GlobalEgressIPSpec type for use
 // with apply.
 type GlobalEgressIPSpecApplyConfiguration struct {
-	NumberOfIPs *int                                `json:"numberOfIPs,omitempty"`
-	PodSelector *v1.LabelSelectorApplyConfiguration `json:"podSelector,omitempty"`
+	NumberOfIPs *int                                    `json:"numberOfIPs,omitempty"`
+	PodSelector *metav1.LabelSelectorApplyConfiguration `json:"podSelector,omitempty"`
 }
 
 // GlobalEgressIPSpecApplyConfiguration constructs a declarative configuration of the GlobalEgressIPSpec type for use with
@@ -48,7 +48,7 @@ func (b *GlobalEgressIPSpecApplyConfiguration) WithNumberOfIPs(value int) *Globa
 // WithPodSelector sets the PodSelector field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PodSelector field is set to the value of the last call.
-func (b *GlobalEgressIPSpecApplyConfiguration) WithPodSelector(value *v1.LabelSelectorApplyConfiguration) *GlobalEgressIPSpecApplyConfiguration {
+func (b *GlobalEgressIPSpecApplyConfiguration) WithPodSelector(value *metav1.LabelSelectorApplyConfiguration) *GlobalEgressIPSpecApplyConfiguration {
 	b.PodSelector = value
 	return b
 }

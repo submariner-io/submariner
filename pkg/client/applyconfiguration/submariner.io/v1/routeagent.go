@@ -21,17 +21,17 @@ limitations under the License.
 package v1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // RouteAgentApplyConfiguration represents a declarative configuration of the RouteAgent type for use
 // with apply.
 type RouteAgentApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Status                           *RouteAgentStatusApplyConfiguration `json:"status,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Status                               *RouteAgentStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // RouteAgent constructs a declarative configuration of the RouteAgent type for use with
@@ -49,7 +49,7 @@ func RouteAgent(name, namespace string) *RouteAgentApplyConfiguration {
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *RouteAgentApplyConfiguration) WithKind(value string) *RouteAgentApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -57,7 +57,7 @@ func (b *RouteAgentApplyConfiguration) WithKind(value string) *RouteAgentApplyCo
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *RouteAgentApplyConfiguration) WithAPIVersion(value string) *RouteAgentApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -66,7 +66,7 @@ func (b *RouteAgentApplyConfiguration) WithAPIVersion(value string) *RouteAgentA
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *RouteAgentApplyConfiguration) WithName(value string) *RouteAgentApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -75,7 +75,7 @@ func (b *RouteAgentApplyConfiguration) WithName(value string) *RouteAgentApplyCo
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *RouteAgentApplyConfiguration) WithGenerateName(value string) *RouteAgentApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -84,7 +84,7 @@ func (b *RouteAgentApplyConfiguration) WithGenerateName(value string) *RouteAgen
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *RouteAgentApplyConfiguration) WithNamespace(value string) *RouteAgentApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -93,7 +93,7 @@ func (b *RouteAgentApplyConfiguration) WithNamespace(value string) *RouteAgentAp
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *RouteAgentApplyConfiguration) WithUID(value types.UID) *RouteAgentApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -102,7 +102,7 @@ func (b *RouteAgentApplyConfiguration) WithUID(value types.UID) *RouteAgentApply
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *RouteAgentApplyConfiguration) WithResourceVersion(value string) *RouteAgentApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -111,25 +111,25 @@ func (b *RouteAgentApplyConfiguration) WithResourceVersion(value string) *RouteA
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *RouteAgentApplyConfiguration) WithGeneration(value int64) *RouteAgentApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *RouteAgentApplyConfiguration) WithCreationTimestamp(value metav1.Time) *RouteAgentApplyConfiguration {
+func (b *RouteAgentApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *RouteAgentApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *RouteAgentApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *RouteAgentApplyConfiguration {
+func (b *RouteAgentApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *RouteAgentApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -138,7 +138,7 @@ func (b *RouteAgentApplyConfiguration) WithDeletionTimestamp(value metav1.Time) 
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *RouteAgentApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *RouteAgentApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -148,11 +148,11 @@ func (b *RouteAgentApplyConfiguration) WithDeletionGracePeriodSeconds(value int6
 // overwriting an existing map entries in Labels field with the same key.
 func (b *RouteAgentApplyConfiguration) WithLabels(entries map[string]string) *RouteAgentApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -163,11 +163,11 @@ func (b *RouteAgentApplyConfiguration) WithLabels(entries map[string]string) *Ro
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *RouteAgentApplyConfiguration) WithAnnotations(entries map[string]string) *RouteAgentApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -175,13 +175,13 @@ func (b *RouteAgentApplyConfiguration) WithAnnotations(entries map[string]string
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *RouteAgentApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *RouteAgentApplyConfiguration {
+func (b *RouteAgentApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *RouteAgentApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -192,14 +192,14 @@ func (b *RouteAgentApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerRe
 func (b *RouteAgentApplyConfiguration) WithFinalizers(values ...string) *RouteAgentApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
 
 func (b *RouteAgentApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 
@@ -214,5 +214,5 @@ func (b *RouteAgentApplyConfiguration) WithStatus(value *RouteAgentStatusApplyCo
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *RouteAgentApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
 }

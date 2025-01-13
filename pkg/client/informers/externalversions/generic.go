@@ -21,7 +21,7 @@ limitations under the License.
 package externalversions
 
 import (
-	"fmt"
+	fmt "fmt"
 
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
