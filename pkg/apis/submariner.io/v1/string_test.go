@@ -26,25 +26,23 @@ import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 )
 
-const expectedString = `{"metadata":{"creationTimestamp":null},"spec":{"cluster_id":"cluster-id","cable_name":` +
-	`"cable-1","hostname":"","subnets":["10.0.0.0/24","172.0.0.0/24"],"private_ip":"1.1.1.1",` +
-	`"public_ip":"","nat_enabled":false,"backend":""}}`
+var _ = Describe("Endpoint String", func() {
+	It("should return a human readable string", func() {
+		str := (&v1.Endpoint{
+			Spec: v1.EndpointSpec{
+				ClusterID:  "east",
+				Subnets:    []string{"10.0.0.0/24"},
+				CableName:  "cable-1",
+				PublicIPs:  []string{"1.1.1.1"},
+				PrivateIPs: []string{"2.2.2.2"},
+			},
+		}).String()
 
-var _ = Describe("API v1", func() {
-	When("Endpoint String representation called", func() {
-		It("Should return a human readable string", func() {
-			endpoint := v1.Endpoint{
-				Spec: v1.EndpointSpec{
-					ClusterID: "cluster-id",
-					Subnets:   []string{"10.0.0.0/24", "172.0.0.0/24"},
-					CableName: "cable-1",
-					PublicIP:  "",
-					PrivateIP: "1.1.1.1",
-				},
-			}
-
-			Expect(endpoint.String()).To(Equal(expectedString))
-		})
+		Expect(str).To(ContainSubstring("east"))
+		Expect(str).To(ContainSubstring("10.0.0.0/24"))
+		Expect(str).To(ContainSubstring("cable-1"))
+		Expect(str).To(ContainSubstring("1.1.1.1"))
+		Expect(str).To(ContainSubstring("2.2.2.2"))
 	})
 })
 

@@ -23,16 +23,19 @@ package v1
 // EndpointSpecApplyConfiguration represents a declarative configuration of the EndpointSpec type for use
 // with apply.
 type EndpointSpecApplyConfiguration struct {
-	ClusterID     *string           `json:"cluster_id,omitempty"`
-	CableName     *string           `json:"cable_name,omitempty"`
-	HealthCheckIP *string           `json:"healthCheckIP,omitempty"`
-	Hostname      *string           `json:"hostname,omitempty"`
-	Subnets       []string          `json:"subnets,omitempty"`
-	PrivateIP     *string           `json:"private_ip,omitempty"`
-	PublicIP      *string           `json:"public_ip,omitempty"`
-	NATEnabled    *bool             `json:"nat_enabled,omitempty"`
-	Backend       *string           `json:"backend,omitempty"`
-	BackendConfig map[string]string `json:"backend_config,omitempty"`
+	ClusterID      *string           `json:"cluster_id,omitempty"`
+	CableName      *string           `json:"cable_name,omitempty"`
+	HealthCheckIP  *string           `json:"healthCheckIP,omitempty"`
+	HealthCheckIPs []string          `json:"healthCheckIPs,omitempty"`
+	Hostname       *string           `json:"hostname,omitempty"`
+	Subnets        []string          `json:"subnets,omitempty"`
+	PrivateIP      *string           `json:"private_ip,omitempty"`
+	PrivateIPs     []string          `json:"privateIPs,omitempty"`
+	PublicIP       *string           `json:"public_ip,omitempty"`
+	PublicIPs      []string          `json:"publicIPs,omitempty"`
+	NATEnabled     *bool             `json:"nat_enabled,omitempty"`
+	Backend        *string           `json:"backend,omitempty"`
+	BackendConfig  map[string]string `json:"backend_config,omitempty"`
 }
 
 // EndpointSpecApplyConfiguration constructs a declarative configuration of the EndpointSpec type for use with
@@ -65,6 +68,16 @@ func (b *EndpointSpecApplyConfiguration) WithHealthCheckIP(value string) *Endpoi
 	return b
 }
 
+// WithHealthCheckIPs adds the given value to the HealthCheckIPs field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the HealthCheckIPs field.
+func (b *EndpointSpecApplyConfiguration) WithHealthCheckIPs(values ...string) *EndpointSpecApplyConfiguration {
+	for i := range values {
+		b.HealthCheckIPs = append(b.HealthCheckIPs, values[i])
+	}
+	return b
+}
+
 // WithHostname sets the Hostname field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Hostname field is set to the value of the last call.
@@ -91,11 +104,31 @@ func (b *EndpointSpecApplyConfiguration) WithPrivateIP(value string) *EndpointSp
 	return b
 }
 
+// WithPrivateIPs adds the given value to the PrivateIPs field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the PrivateIPs field.
+func (b *EndpointSpecApplyConfiguration) WithPrivateIPs(values ...string) *EndpointSpecApplyConfiguration {
+	for i := range values {
+		b.PrivateIPs = append(b.PrivateIPs, values[i])
+	}
+	return b
+}
+
 // WithPublicIP sets the PublicIP field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PublicIP field is set to the value of the last call.
 func (b *EndpointSpecApplyConfiguration) WithPublicIP(value string) *EndpointSpecApplyConfiguration {
 	b.PublicIP = &value
+	return b
+}
+
+// WithPublicIPs adds the given value to the PublicIPs field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the PublicIPs field.
+func (b *EndpointSpecApplyConfiguration) WithPublicIPs(values ...string) *EndpointSpecApplyConfiguration {
+	for i := range values {
+		b.PublicIPs = append(b.PublicIPs, values[i])
+	}
 	return b
 }
 
