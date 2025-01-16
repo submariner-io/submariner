@@ -70,6 +70,7 @@ linters:
     - errname
     # - execinquery # No SQL
     - exhaustive
+    - exptostd
     # - exhaustruct # This is too cumbersome as it requires all string, int, pointer et al fields to be initialized even when the
     # type's default suffices, which is most of the time
     - fatcontext
@@ -120,6 +121,7 @@ linters:
     - nakedret
     # - nestif # This calculates cognitive complexity but we're doing that elsewhere
     - nilerr
+    - nilnesserr
     - nilnil
     # - nlreturn # This is reasonable with a block-size of 2 but setting it above isn't honored
     # - noctx # We don't send HTTP requests
@@ -154,6 +156,7 @@ linters:
     - unparam
     - unused
     - usestdlibvars
+    - usetesting
     # - varnamelen # It doesn't seem necessary to enforce a minimum variable name length
     - wastedassign
     - whitespace
