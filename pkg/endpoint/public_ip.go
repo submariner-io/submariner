@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
+	k8snet "k8s.io/utils/net"
 )
 
 type publicIPResolverFunction func(clientset kubernetes.Interface, namespace, value string) (string, error)
@@ -63,51 +64,58 @@ func getPublicIPResolvers() string {
 	return strings.Join(serverList, ",")
 }
 
-func getPublicIP(submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface,
+func getPublicIP(family k8snet.IPFamily, submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface,
 	backendConfig map[string]string, airGapped bool,
 ) (string, string, error) {
-	// If the node is annotated with a public-ip, the same is used as the public-ip of local endpoint.
-	config, ok := backendConfig[v1.PublicIP]
-	if !ok {
-		if submSpec.PublicIP != "" {
-			config = submSpec.PublicIP
-		} else {
-			config = getPublicIPResolvers()
-		}
-	}
-
-	if airGapped {
-		ip, resolver, err := resolveIPInAirGappedDeployment(k8sClient, submSpec.Namespace, config)
-		if err != nil {
-			logger.Errorf(err, "Error resolving public IP in an air-gapped deployment, using empty value: %s", config)
-			return "", "", nil
+	switch family {
+	case k8snet.IPv4:
+		// If the node is annotated with a public-ip, the same is used as the public-ip of local endpoint.
+		config, ok := backendConfig[v1.PublicIP]
+		if !ok {
+			if submSpec.PublicIP != "" {
+				config = submSpec.PublicIP
+			} else {
+				config = getPublicIPResolvers()
+			}
 		}
 
-		return ip, resolver, nil
-	}
+		if airGapped {
+			ip, resolver, err := resolveIPInAirGappedDeployment(k8sClient, submSpec.Namespace, config)
+			if err != nil {
+				logger.Errorf(err, "Error resolving public IP%s in an air-gapped deployment, using empty value: %s", family, config)
+				return "", "", nil
+			}
 
-	resolvers := strings.Split(config, ",")
-	errs := make([]error, 0, len(resolvers))
-
-	for _, resolver := range resolvers {
-		resolver = strings.Trim(resolver, " ")
-
-		parts := strings.Split(resolver, ":")
-		if len(parts) != 2 {
-			return "", "", errors.Errorf("invalid format for %q annotation: %q", v1.GatewayConfigPrefix+v1.PublicIP, config)
-		}
-
-		ip, err := resolvePublicIP(k8sClient, submSpec.Namespace, parts)
-		if err == nil {
 			return ip, resolver, nil
 		}
 
-		// If this resolver failed, we log it, but we fall back to the next one
-		errs = append(errs, errors.Wrapf(err, "\nResolver[%q]", resolver))
-	}
+		resolvers := strings.Split(config, ",")
+		errs := make([]error, 0, len(resolvers))
 
-	if len(resolvers) > 0 {
-		return "", "", errors.Wrapf(k8serrors.NewAggregate(errs), "Unable to resolve public IP by any of the resolver methods")
+		for _, resolver := range resolvers {
+			resolver = strings.Trim(resolver, " ")
+
+			parts := strings.Split(resolver, ":")
+			if len(parts) != 2 {
+				return "", "", errors.Errorf("invalid format for %q annotation: %q", v1.GatewayConfigPrefix+v1.PublicIP, config)
+			}
+
+			ip, err := resolvePublicIP(k8sClient, submSpec.Namespace, parts)
+			if err == nil {
+				return ip, resolver, nil
+			}
+
+			// If this resolver failed, we log it, but we fall back to the next one
+			errs = append(errs, errors.Wrapf(err, "\nResolver[%q]", resolver))
+		}
+
+		if len(resolvers) > 0 {
+			return "", "", errors.Wrapf(k8serrors.NewAggregate(errs), "Unable to resolve public IP by any of the resolver methods")
+		}
+
+	case k8snet.IPv6:
+		// TODO_IPV6: add V6 healthcheck IP
+	case k8snet.IPFamilyUnknown:
 	}
 
 	return "", "", nil

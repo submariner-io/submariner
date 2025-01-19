@@ -20,6 +20,7 @@ package types
 
 import (
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	k8snet "k8s.io/utils/net"
 )
 
 type SubmarinerCluster struct {
@@ -49,4 +50,12 @@ type SubmarinerSpecification struct {
 	HealthCheckInterval           int
 	HealthCheckMaxPacketLossCount int
 	MetricsPort                   int `default:"32780"`
+}
+
+func (subSpec *SubmarinerSpecification) GetIPFamilies() [2]k8snet.IPFamily {
+	var ipFamilies [2]k8snet.IPFamily
+	// TODO_IPV6: set ipFamilies according to ClusterCidr content
+	ipFamilies[0] = k8snet.IPv4
+
+	return ipFamilies
 }

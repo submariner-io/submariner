@@ -20,6 +20,8 @@ package endpoint
 
 import (
 	"net"
+
+	k8snet "k8s.io/utils/net"
 )
 
 func GetLocalIPForDestination(dst string) string {
@@ -34,6 +36,14 @@ func GetLocalIPForDestination(dst string) string {
 	return localAddr.IP.String()
 }
 
-func GetLocalIP() string {
-	return GetLocalIPForDestination("8.8.8.8")
+func GetLocalIP(family k8snet.IPFamily) string {
+	switch family {
+	case k8snet.IPv4:
+		return GetLocalIPForDestination("8.8.8.8")
+	case k8snet.IPv6:
+		// TODO_IPV6: add V6 healthcheck IP
+	case k8snet.IPFamilyUnknown:
+	}
+
+	return ""
 }

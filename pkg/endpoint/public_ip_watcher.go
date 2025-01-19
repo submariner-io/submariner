@@ -63,28 +63,36 @@ func (p *PublicIPWatcher) Run(stopCh <-chan struct{}) {
 }
 
 func (p *PublicIPWatcher) syncPublicIP() {
+	var publicIPs []string
 	localEndpointSpec := p.config.LocalEndpoint.Spec()
 
-	publicIP, resolver, err := getPublicIP(p.config.SubmSpec, p.config.K8sClient, localEndpointSpec.BackendConfig, false)
-	if err != nil {
-		logger.Warningf("Could not determine public IP of the gateway node %q: %v", localEndpointSpec.Hostname, err)
-		return
+	for _, family := range p.config.SubmSpec.GetIPFamilies() {
+		publicIP, _, err := getPublicIP(family, p.config.SubmSpec, p.config.K8sClient, localEndpointSpec.BackendConfig, false)
+		if err != nil {
+			logger.Warningf("Could not determine public IP for family %v of the gateway node %q: %v", family, localEndpointSpec.Hostname, err)
+			continue
+		}
+
+		if publicIP != localEndpointSpec.GetPublicIP(family) {
+			publicIPs = append(publicIPs, publicIP)
+		}
 	}
 
-	if localEndpointSpec.PublicIP != publicIP {
-		logger.Infof("Public IP changed for the Gateway, updating the local endpoint with public IP %q obtained from resolver %q",
-			publicIP, resolver)
+	if len(publicIPs) > 0 {
+		logger.Infof("Public IPs changed for the Gateway, updating the local endpoint with public IPs %q", publicIPs)
 
-		if err := p.updateLocalEndpoint(publicIP); err != nil {
+		if err := p.updateLocalEndpoint(publicIPs); err != nil {
 			logger.Error(err, "Error updating the public IP for local endpoint")
 			return
 		}
 	}
 }
 
-func (p *PublicIPWatcher) updateLocalEndpoint(publicIP string) error {
+func (p *PublicIPWatcher) updateLocalEndpoint(publicIPs []string) error {
 	err := p.config.LocalEndpoint.Update(context.TODO(), func(existing *submv1.EndpointSpec) {
-		existing.PublicIP = publicIP
+		for _, publicIP := range publicIPs {
+			existing.SetPublicIP(publicIP)
+		}
 	})
 
 	return errors.Wrap(err, "error updating the public IP of the local endpoint")

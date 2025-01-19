@@ -42,6 +42,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/set"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -136,9 +137,6 @@ func (l *Local) Create(ctx context.Context) error {
 func GetLocalSpec(ctx context.Context, submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface,
 	airGappedDeployment bool,
 ) (*submv1.EndpointSpec, error) {
-	// We'll panic if submSpec is nil, this is intentional
-	privateIP := GetLocalIP()
-
 	gwNode, err := node.GetLocalNode(ctx, k8sClient)
 	if err != nil {
 		return nil, errors.Wrap(err, "getting information on the local node")
@@ -157,6 +155,7 @@ func GetLocalSpec(ctx context.Context, submSpec *types.SubmarinerSpecification, 
 		localSubnets = submSpec.GlobalCidr
 		globalnetEnabled = true
 	} else {
+		// TODO_IPV6: set localSubnets to submSpec.ServiceCidr + submSpec.ClusterCidr
 		localSubnets = append(localSubnets, cidr.ExtractIPv4Subnets(submSpec.ServiceCidr)...)
 		localSubnets = append(localSubnets, cidr.ExtractIPv4Subnets(submSpec.ClusterCidr)...)
 	}
@@ -171,40 +170,66 @@ func GetLocalSpec(ctx context.Context, submSpec *types.SubmarinerSpecification, 
 	}
 
 	endpointSpec := &submv1.EndpointSpec{
-		CableName:     fmt.Sprintf("submariner-cable-%s-%s", submSpec.ClusterID, strings.ReplaceAll(privateIP, ".", "-")),
 		ClusterID:     submSpec.ClusterID,
 		Hostname:      hostname,
-		PrivateIP:     privateIP,
 		NATEnabled:    submSpec.NATEnabled,
 		Subnets:       localSubnets,
 		Backend:       submSpec.CableDriver,
 		BackendConfig: backendConfig,
 	}
 
-	publicIP, resolver, err := getPublicIP(submSpec, k8sClient, backendConfig, airGappedDeployment)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not determine public IP")
+	for _, family := range submSpec.GetIPFamilies() {
+		endpointSpec.SetPrivateIP(GetLocalIP(family))
 	}
 
-	logger.Infof("Obtained local endpoint public IP %q using resolver %q", publicIP, resolver)
+	endpointSpec.CableName = fmt.Sprintf("submariner-cable-%s-%s", submSpec.ClusterID,
+		strings.ReplaceAll(endpointSpec.GetPrivateIP(k8snet.IPv4), ".", "-"))
 
-	endpointSpec.PublicIP = publicIP
+	for _, family := range submSpec.GetIPFamilies() {
+		publicIP, resolver, err := getPublicIP(family, submSpec, k8sClient, backendConfig, airGappedDeployment)
+		if err != nil {
+			return nil, errors.Wrapf(err, "could not determine public IP%v", family)
+		}
+
+		logger.Infof("Obtained local endpoint public IP%v %q using resolver %q", family, publicIP, resolver)
+		endpointSpec.SetPublicIP(publicIP)
+	}
 
 	if submSpec.HealthCheckEnabled && !globalnetEnabled {
 		// When globalnet is enabled, HealthCheckIP will be the globalIP assigned to the Active GatewayNode.
 		// In a fresh deployment, globalIP annotation for the node might take few seconds. So we listen on NodeEvents
 		// and update the endpoint HealthCheckIP (to globalIP) in datastoreSyncer at a later stage. This will trigger
 		// the HealthCheck between the clusters.
-		cniIface, err := cni.Discover(submSpec.ClusterCidr)
-		if err != nil {
-			return nil, fmt.Errorf("error getting CNI Interface IP address: %w."+
-				"Please disable the health check if your CNI does not expose a pod IP on the nodes", err)
-		}
+		for _, family := range submSpec.GetIPFamilies() {
+			healthcheckIP, err := getHealthCheckIP(family, submSpec)
+			if err != nil {
+				return nil, fmt.Errorf("error getting HealthCheckIP%v: %w", family, err)
+			}
 
-		endpointSpec.HealthCheckIP = cniIface.IPAddress
+			endpointSpec.SetHealthCheckIP(healthcheckIP)
+		}
 	}
 
 	return endpointSpec, nil
+}
+
+func getHealthCheckIP(family k8snet.IPFamily, submSpec *types.SubmarinerSpecification) (string, error) {
+	switch family {
+	case k8snet.IPv4:
+		cniIface, err := cni.Discover(submSpec.ClusterCidr)
+		if err != nil {
+			return "", errors.Wrapf(err, "error getting CNI Interface IP address."+
+				"Please disable the health check if your CNI does not expose a pod IP on the nodes")
+		}
+
+		return cniIface.IPAddress, nil
+	case k8snet.IPv6:
+		// TODO_IPV6: add V6 healthcheck IP
+
+	case k8snet.IPFamilyUnknown:
+	}
+
+	return "", nil
 }
 
 func getBackendConfig(nodeObj *v1.Node) (map[string]string, error) {

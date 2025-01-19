@@ -28,6 +28,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+	k8snet "k8s.io/utils/net"
 )
 
 var _ = Describe("firstIPv4InString", func() {
@@ -81,7 +82,7 @@ var _ = Describe("public ip resolvers", func() {
 		It("should return the IP", func() {
 			backendConfig[publicIPConfig] = lbPublicIP
 			client := fake.NewClientset(serviceWithIngress(v1.LoadBalancerIngress{Hostname: "", IP: testIP}))
-			ip, resolver, err := getPublicIP(submSpec, client, backendConfig, false)
+			ip, resolver, err := getPublicIP(k8snet.IPv4, submSpec, client, backendConfig, false)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ip).To(Equal(testIP))
 			Expect(resolver).To(Equal(lbPublicIP))
@@ -95,7 +96,7 @@ var _ = Describe("public ip resolvers", func() {
 				Hostname: dnsHost,
 				IP:       "",
 			}))
-			ip, resolver, err := getPublicIP(submSpec, client, backendConfig, false)
+			ip, resolver, err := getPublicIP(k8snet.IPv4, submSpec, client, backendConfig, false)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ip).To(Equal(testIPDNS))
 			Expect(resolver).To(Equal(lbPublicIP))
@@ -109,7 +110,7 @@ var _ = Describe("public ip resolvers", func() {
 			loadBalancerRetryConfig.Steps = 1
 			backendConfig[publicIPConfig] = lbPublicIP
 			client := fake.NewClientset(serviceWithIngress())
-			_, _, err := getPublicIP(submSpec, client, backendConfig, false)
+			_, _, err := getPublicIP(k8snet.IPv4, submSpec, client, backendConfig, false)
 			Expect(err).To(HaveOccurred())
 		})
 	})
@@ -118,7 +119,7 @@ var _ = Describe("public ip resolvers", func() {
 		It("should return the IP", func() {
 			backendConfig[publicIPConfig] = ipv4PublicIP
 			client := fake.NewClientset()
-			ip, resolver, err := getPublicIP(submSpec, client, backendConfig, false)
+			ip, resolver, err := getPublicIP(k8snet.IPv4, submSpec, client, backendConfig, false)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ip).To(Equal(testIP))
 			Expect(resolver).To(Equal(ipv4PublicIP))
@@ -129,7 +130,7 @@ var _ = Describe("public ip resolvers", func() {
 		It("should return the IP and not an empty value", func() {
 			backendConfig[publicIPConfig] = ipv4PublicIP
 			client := fake.NewClientset()
-			ip, resolver, err := getPublicIP(submSpec, client, backendConfig, true)
+			ip, resolver, err := getPublicIP(k8snet.IPv4, submSpec, client, backendConfig, true)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ip).To(Equal(testIP))
 			Expect(resolver).To(Equal(ipv4PublicIP))
@@ -140,7 +141,7 @@ var _ = Describe("public ip resolvers", func() {
 		It("should return the IP", func() {
 			backendConfig[publicIPConfig] = "dns:" + dnsHost
 			client := fake.NewClientset()
-			ip, resolver, err := getPublicIP(submSpec, client, backendConfig, false)
+			ip, resolver, err := getPublicIP(k8snet.IPv4, submSpec, client, backendConfig, false)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ip).To(Equal(testIPDNS))
 			Expect(resolver).To(Equal(backendConfig[publicIPConfig]))
@@ -151,7 +152,7 @@ var _ = Describe("public ip resolvers", func() {
 		It("should return some IP", func() {
 			backendConfig[publicIPConfig] = "api:4.icanhazip.com/"
 			client := fake.NewClientset()
-			ip, resolver, err := getPublicIP(submSpec, client, backendConfig, false)
+			ip, resolver, err := getPublicIP(k8snet.IPv4, submSpec, client, backendConfig, false)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(net.ParseIP(ip)).NotTo(BeNil())
 			Expect(resolver).To(Equal(backendConfig[publicIPConfig]))
@@ -162,7 +163,7 @@ var _ = Describe("public ip resolvers", func() {
 		It("should return the first working one", func() {
 			backendConfig[publicIPConfig] = ipv4PublicIP + ",dns:" + dnsHost
 			client := fake.NewClientset()
-			ip, resolver, err := getPublicIP(submSpec, client, backendConfig, false)
+			ip, resolver, err := getPublicIP(k8snet.IPv4, submSpec, client, backendConfig, false)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ip).To(Equal(testIP))
 			Expect(resolver).To(Equal(ipv4PublicIP))
@@ -173,7 +174,7 @@ var _ = Describe("public ip resolvers", func() {
 		It("should return the first working one", func() {
 			backendConfig[publicIPConfig] = "dns:thisdomaindoesntexistforsure.badbadbad," + ipv4PublicIP
 			client := fake.NewClientset()
-			ip, resolver, err := getPublicIP(submSpec, client, backendConfig, false)
+			ip, resolver, err := getPublicIP(k8snet.IPv4, submSpec, client, backendConfig, false)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ip).To(Equal(testIP))
 			Expect(resolver).To(Equal(ipv4PublicIP))

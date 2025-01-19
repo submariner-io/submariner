@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	k8snet "k8s.io/utils/net"
 )
 
 const testNodeName = "this-node"
@@ -46,7 +47,7 @@ var _ = Describe("GetLocalSpec", func() {
 		node     *v1.Node
 	)
 
-	testPrivateIP := endpoint.GetLocalIP()
+	testPrivateIP := endpoint.GetLocalIP(k8snet.IPv4)
 
 	const (
 		testIPv4Label       = "ipv4:"
