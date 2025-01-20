@@ -25,6 +25,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"k8s.io/apimachinery/pkg/api/equality"
+	k8snet "k8s.io/utils/net"
 )
 
 func (ep *EndpointSpec) GetBackendPort(configName string, defaultValue int32) (int32, error) {
@@ -101,4 +102,61 @@ func (ep *EndpointSpec) hasSameBackendConfig(other *EndpointSpec) bool {
 	}
 
 	return equality.Semantic.DeepEqual(ep.BackendConfig, other.BackendConfig)
+}
+
+func getIPFrom(family k8snet.IPFamily, ips []string, ipv4Fallback string) string {
+	for _, ip := range ips {
+		if k8snet.IPFamilyOfString(ip) == family {
+			return ip
+		}
+	}
+
+	if family == k8snet.IPv4 {
+		return ipv4Fallback
+	}
+
+	return ""
+}
+
+func setIP(ips []string, ipv4Fallback, newIP string) ([]string, string) {
+	family := k8snet.IPFamilyOfString(newIP)
+
+	if family == k8snet.IPv4 {
+		ipv4Fallback = newIP
+	}
+
+	for i := range ips {
+		if k8snet.IPFamilyOfString(ips[i]) == family {
+			ips[i] = newIP
+			return ips, ipv4Fallback
+		}
+	}
+
+	ips = append(ips, newIP)
+
+	return ips, ipv4Fallback
+}
+
+func (ep *EndpointSpec) GetHealthCheckIP(family k8snet.IPFamily) string {
+	return getIPFrom(family, ep.HealthCheckIPs, ep.HealthCheckIP)
+}
+
+func (ep *EndpointSpec) SetHealthCheckIP(ip string) {
+	ep.HealthCheckIPs, ep.HealthCheckIP = setIP(ep.HealthCheckIPs, ep.HealthCheckIP, ip)
+}
+
+func (ep *EndpointSpec) GetPublicIP(family k8snet.IPFamily) string {
+	return getIPFrom(family, ep.PublicIPs, ep.PublicIP)
+}
+
+func (ep *EndpointSpec) SetPublicIP(ip string) {
+	ep.PublicIPs, ep.PublicIP = setIP(ep.PublicIPs, ep.PublicIP, ip)
+}
+
+func (ep *EndpointSpec) GetPrivateIP(family k8snet.IPFamily) string {
+	return getIPFrom(family, ep.PrivateIPs, ep.PrivateIP)
+}
+
+func (ep *EndpointSpec) SetPrivateIP(ip string) {
+	ep.PrivateIPs, ep.PrivateIP = setIP(ep.PrivateIPs, ep.PrivateIP, ip)
 }
