@@ -394,11 +394,12 @@ func testGatewayLatencyInfo() {
 			t.awaitGatewayUpdated(t.expectedGateway)
 
 			endpointSpec := &submarinerv1.EndpointSpec{
-				ClusterID:     "north",
-				CableName:     "submariner-cable-north-192-68-1-20",
-				PrivateIPs:    []string{"192-68-1-20"},
-				HealthCheckIP: t.pinger.GetIP(),
+				ClusterID:  "north",
+				CableName:  "submariner-cable-north-192-68-1-20",
+				PrivateIPs: []string{"192-68-1-20"},
 			}
+
+			endpointSpec.SetHealthCheckIP(t.pinger.GetIP())
 
 			endpointName, err := endpointSpec.GenerateName()
 			Expect(err).To(Succeed())
@@ -423,7 +424,7 @@ func testGatewayLatencyInfo() {
 			}
 
 			t.engine.Connections = []submarinerv1.Connection{t.expectedGateway.Status.Connections[0]}
-			t.engine.Connections[0].Endpoint.HealthCheckIP = ""
+			t.engine.Connections[0].Endpoint.HealthCheckIPs = []string{}
 
 			t.expectedGateway.Status.Connections[0].LatencyRTT = &submarinerv1.LatencyRTTSpec{
 				Last:    "93ms",

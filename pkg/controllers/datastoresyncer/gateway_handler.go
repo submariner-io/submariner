@@ -27,6 +27,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	k8snet "k8s.io/utils/net"
 )
 
 func (d *DatastoreSyncer) handleCreateOrUpdateGateway(obj runtime.Object, _ int) bool {
@@ -62,11 +63,11 @@ func (d *DatastoreSyncer) areGatewaysEquivalent(obj1, obj2 *unstructured.Unstruc
 
 func (d *DatastoreSyncer) updateLocalEndpointIfNecessary(globalIP string) bool {
 	spec := d.localEndpoint.Spec()
-	if spec.HealthCheckIP != globalIP {
+	if spec.GetHealthCheckIP(k8snet.IPv4) != globalIP {
 		logger.Infof("Updating the endpoint HealthCheckIP to globalIP %q", globalIP)
 
 		err := d.localEndpoint.Update(context.TODO(), func(existing *submarinerv1.EndpointSpec) {
-			existing.HealthCheckIP = globalIP
+			existing.SetHealthCheckIP(globalIP)
 		})
 		if err != nil {
 			logger.Warningf("Error updating the local submariner Endpoint with HealthcheckIP %s: %v", globalIP, err)

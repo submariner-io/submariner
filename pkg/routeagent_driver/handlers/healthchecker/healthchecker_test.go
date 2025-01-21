@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	kubeScheme "k8s.io/client-go/kubernetes/scheme"
+	k8snet "k8s.io/utils/net"
 )
 
 const (
@@ -160,7 +161,7 @@ var _ = Describe("RemoteEndpoint latency info", func() {
 				t.pingerMap[healthCheckIP1].AwaitStart()
 				t.pingerMap[healthCheckIP2] = fake.NewPinger(healthCheckIP2)
 
-				endpoint1.Spec.HealthCheckIP = healthCheckIP2
+				endpoint1.Spec.HealthCheckIPs = []string{healthCheckIP2}
 
 				t.UpdateEndpoint(endpoint1)
 				t.pingerMap[healthCheckIP1].AwaitStop()
@@ -176,7 +177,7 @@ var _ = Describe("RemoteEndpoint latency info", func() {
 				endpoint1.Spec.Hostname = "newHostName"
 				t.UpdateEndpoint(endpoint1)
 
-				pingerObject, found := t.pingerMap[endpoint1.Spec.HealthCheckIP]
+				pingerObject, found := t.pingerMap[endpoint1.Spec.GetHealthCheckIP(k8snet.IPv4)]
 				Expect(found).To(BeTrue())
 				Expect(pingerObject.GetIP()).To(Equal(healthCheckIP1))
 
@@ -306,7 +307,7 @@ func (t *testDriver) newSubmEndpoint(healthCheckIP string) *submarinerv1.Endpoin
 		ClusterID: remoteClusterID,
 		CableName: fmt.Sprintf("submariner-cable-%s-192-68-1-20", remoteClusterID),
 	}
-	endpointSpec.HealthCheckIP = healthCheckIP
+	endpointSpec.HealthCheckIPs = []string{healthCheckIP}
 
 	endpointName, err := endpointSpec.GenerateName()
 	Expect(err).To(Succeed())

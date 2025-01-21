@@ -107,9 +107,9 @@ var _ = Describe("Controller", func() {
 
 	createEndpoint := func(clusterID, healthCheckIP string) *submarinerv1.Endpoint {
 		endpointSpec := &submarinerv1.EndpointSpec{
-			ClusterID:     clusterID,
-			CableName:     fmt.Sprintf("submariner-cable-%s-192-68-1-20", clusterID),
-			HealthCheckIP: healthCheckIP,
+			ClusterID:      clusterID,
+			CableName:      fmt.Sprintf("submariner-cable-%s-192-68-1-20", clusterID),
+			HealthCheckIPs: []string{healthCheckIP},
 		}
 
 		endpointName, err := endpointSpec.GenerateName()
@@ -223,7 +223,7 @@ var _ = Describe("Controller", func() {
 			})
 
 			It("should stop the Pinger and start a new one", func() {
-				endpoint.Spec.HealthCheckIP = healthCheckIP3
+				endpoint.Spec.HealthCheckIPs = []string{healthCheckIP3}
 
 				test.UpdateResource(endpoints, endpoint)
 				pingerMap[healthCheckIP1].AwaitStop()

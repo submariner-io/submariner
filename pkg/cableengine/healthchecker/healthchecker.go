@@ -28,6 +28,7 @@ import (
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/pinger"
 	"k8s.io/apimachinery/pkg/runtime"
+	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -122,9 +123,9 @@ func (h *controller) endpointCreatedOrUpdated(obj runtime.Object, _ int) bool {
 		return false
 	}
 
-	if endpointCreated.Spec.HealthCheckIP == "" || endpointCreated.Spec.CableName == "" {
+	if endpointCreated.Spec.GetHealthCheckIP(k8snet.IPv4) == "" || endpointCreated.Spec.CableName == "" {
 		logger.Infof("HealthCheckIP (%q) and/or CableName (%q) for Endpoint %q empty - will not monitor endpoint health",
-			endpointCreated.Spec.HealthCheckIP, endpointCreated.Spec.CableName, endpointCreated.Name)
+			endpointCreated.Spec.GetHealthCheckIP(k8snet.IPv4), endpointCreated.Spec.CableName, endpointCreated.Name)
 		return false
 	}
 
@@ -132,7 +133,7 @@ func (h *controller) endpointCreatedOrUpdated(obj runtime.Object, _ int) bool {
 	defer h.Unlock()
 
 	if pingerObject, found := h.pingers[endpointCreated.Spec.CableName]; found {
-		if pingerObject.GetIP() == endpointCreated.Spec.HealthCheckIP {
+		if pingerObject.GetIP() == endpointCreated.Spec.GetHealthCheckIP(k8snet.IPv4) {
 			return false
 		}
 
@@ -142,7 +143,7 @@ func (h *controller) endpointCreatedOrUpdated(obj runtime.Object, _ int) bool {
 	}
 
 	pingerConfig := pinger.Config{
-		IP:                 endpointCreated.Spec.HealthCheckIP,
+		IP:                 endpointCreated.Spec.GetHealthCheckIP(k8snet.IPv4),
 		MaxPacketLossCount: h.config.MaxPacketLossCount,
 	}
 
@@ -160,7 +161,7 @@ func (h *controller) endpointCreatedOrUpdated(obj runtime.Object, _ int) bool {
 	pingerObject.Start()
 
 	logger.Infof("CableEngine HealthChecker started pinger for CableName: %q with HealthCheckIP %q",
-		endpointCreated.Spec.CableName, endpointCreated.Spec.HealthCheckIP)
+		endpointCreated.Spec.CableName, endpointCreated.Spec.GetHealthCheckIP(k8snet.IPv4))
 
 	return false
 }

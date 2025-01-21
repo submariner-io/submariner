@@ -108,7 +108,7 @@ var _ = Describe("GetLocalSpec", func() {
 		Expect(spec.Subnets).To(Equal(subnets))
 		Expect(spec.NATEnabled).To(BeFalse())
 		Expect(spec.BackendConfig[testUDPPortLabel]).To(Equal(testUDPPort))
-		Expect(spec.HealthCheckIP).To(BeEmpty())
+		Expect(spec.HealthCheckIPs).To(BeEmpty())
 	})
 
 	When("the gateway node is not annotated with udp port", func() {
@@ -167,7 +167,7 @@ var _ = Describe("GetLocalSpec", func() {
 		It("should set the HealthCheckIP", func() {
 			spec, err := endpoint.GetLocalSpec(context.TODO(), submSpec, client, true)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(spec.HealthCheckIP).To(Equal(cniInterfaceIP))
+			Expect(spec.HealthCheckIPs).To(Equal([]string{cniInterfaceIP}))
 		})
 
 		Context("and globalnet is enabled", func() {
@@ -178,7 +178,7 @@ var _ = Describe("GetLocalSpec", func() {
 			It("should not set the HealthCheckIP", func() {
 				spec, err := endpoint.GetLocalSpec(context.TODO(), submSpec, client, true)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(spec.HealthCheckIP).To(BeEmpty())
+				Expect(spec.HealthCheckIPs).To(BeEmpty())
 			})
 		})
 	})

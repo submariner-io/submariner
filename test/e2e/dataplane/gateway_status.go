@@ -110,7 +110,7 @@ func verifyGateway(gw *submarinerv1.Gateway, otherCluster string, healthCheckedE
 		}
 
 		if healthCheckedEnabled {
-			if gw.Status.Connections[i].Endpoint.HealthCheckIP == "" {
+			if len(gw.Status.Connections[i].Endpoint.HealthCheckIPs) == 0 {
 				return false, fmt.Sprintf("Connection for cluster %q has no health check IP. This could be because the Gateway or"+
 					" Globalnet pod could not determine the cluster's CNI IP address. If so, this would be reported in the pod log.",
 					otherCluster), nil

@@ -137,13 +137,13 @@ func testEndpointSyncing() {
 		})
 
 		JustBeforeEach(func() {
-			t.localEndpoint.HealthCheckIP = gateway.Annotations[constants.SmGlobalIP]
+			t.localEndpoint.SetHealthCheckIP(gateway.Annotations[constants.SmGlobalIP])
 			awaitEndpoint(t.localEndpoints, t.localEndpoint)
 		})
 
 		It("should update the local Endpoint's HealthCheckIP", func() {
 			gateway.Annotations[constants.SmGlobalIP] = "200.0.0.100"
-			t.localEndpoint.HealthCheckIP = gateway.Annotations[constants.SmGlobalIP]
+			t.localEndpoint.SetHealthCheckIP(gateway.Annotations[constants.SmGlobalIP])
 
 			test.UpdateResource(t.localGateways, gateway)
 			awaitEndpoint(t.localEndpoints, t.localEndpoint)

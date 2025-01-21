@@ -36,6 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -117,14 +118,14 @@ func (h *controller) RemoteEndpointUpdated(endpoint *submarinerv1.Endpoint) erro
 func (h *controller) processEndpointCreatedOrUpdated(endpoint *submarinerv1.Endpoint) {
 	logger.Infof("Processing Endpoint: %#v", endpoint)
 
-	if endpoint.Spec.HealthCheckIP == "" || endpoint.Spec.CableName == "" {
+	if endpoint.Spec.GetHealthCheckIP(k8snet.IPv4) == "" || endpoint.Spec.CableName == "" {
 		logger.Infof("HealthCheckIP (%q) and/or CableName (%q) for Endpoint %q empty - will not monitor endpoint health",
-			endpoint.Spec.HealthCheckIP, endpoint.Spec.CableName, endpoint.Name)
+			endpoint.Spec.GetHealthCheckIP(k8snet.IPv4), endpoint.Spec.CableName, endpoint.Name)
 		return
 	}
 
 	if pingerObject, found := h.pingers[endpoint.Spec.CableName]; found {
-		if pingerObject.GetIP() == endpoint.Spec.HealthCheckIP {
+		if pingerObject.GetIP() == endpoint.Spec.GetHealthCheckIP(k8snet.IPv4) {
 			return
 		}
 
@@ -134,7 +135,7 @@ func (h *controller) processEndpointCreatedOrUpdated(endpoint *submarinerv1.Endp
 	}
 
 	pingerConfig := pinger.Config{
-		IP: endpoint.Spec.HealthCheckIP,
+		IP: endpoint.Spec.GetHealthCheckIP(k8snet.IPv4),
 	}
 
 	if h.config.PingInterval != 0 {
@@ -155,7 +156,7 @@ func (h *controller) processEndpointCreatedOrUpdated(endpoint *submarinerv1.Endp
 	pingerObject.Start()
 
 	logger.Infof("HealthChecker started pinger for CableName: %q with HealthCheckIP %q",
-		endpoint.Spec.CableName, endpoint.Spec.HealthCheckIP)
+		endpoint.Spec.CableName, endpoint.Spec.GetHealthCheckIP(k8snet.IPv4))
 }
 
 func (h *controller) RemoteEndpointRemoved(endpoint *submarinerv1.Endpoint) error {
