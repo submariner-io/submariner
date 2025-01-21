@@ -379,7 +379,7 @@ func (t *testDriver) awaitLocalEndpoint() {
 			endpoint := toEndpoint(&l.Items[i])
 
 			if endpoint.Spec.ClusterID == t.config.Spec.ClusterID {
-				Expect(endpoint.Spec.PublicIP).To(Equal(publicIP))
+				Expect(endpoint.Spec.PublicIPs).To(Equal([]string{publicIP}))
 				Expect(endpoint.Spec.Backend).To(Equal(fakecable.DriverName))
 				Expect(endpoint.Spec.Subnets).To(Equal(t.config.Spec.GlobalCidr))
 
@@ -412,7 +412,7 @@ func (t *testDriver) newRemoteEndpoint() *submarinerv1.Endpoint {
 			Hostname:  "redsox",
 			Subnets:   []string{"169.254.3.0/24"},
 			PrivateIP: "11.1.2.3",
-			PublicIP:  "ipv4:12.1.2.3",
+			PublicIPs: []string{"ipv4:12.1.2.3"},
 			Backend:   "libreswan",
 		},
 	}

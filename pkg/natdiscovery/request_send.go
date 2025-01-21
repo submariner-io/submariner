@@ -25,6 +25,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 	"google.golang.org/protobuf/proto"
+	k8snet "k8s.io/utils/net"
 )
 
 func (nd *natDiscovery) sendCheckRequest(remoteNAT *remoteEndpointNAT) error {
@@ -38,8 +39,8 @@ func (nd *natDiscovery) sendCheckRequest(remoteNAT *remoteEndpointNAT) error {
 		}
 	}
 
-	if remoteNAT.endpoint.Spec.PublicIP != "" {
-		reqID, errPublic = nd.sendCheckRequestToTargetIP(remoteNAT, remoteNAT.endpoint.Spec.PublicIP)
+	if remoteNAT.endpoint.Spec.GetPublicIP(k8snet.IPv4) != "" {
+		reqID, errPublic = nd.sendCheckRequestToTargetIP(remoteNAT, remoteNAT.endpoint.Spec.GetPublicIP(k8snet.IPv4))
 		if errPublic == nil {
 			remoteNAT.lastPublicIPRequestID = reqID
 		}

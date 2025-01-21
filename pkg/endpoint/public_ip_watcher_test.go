@@ -52,16 +52,16 @@ var _ = Describe("PublicIPWatcher", func() {
 
 	When("using the LoadBalancer mode and the Ingress IP is modified", func() {
 		It("should update the public IP of local endpoint accordingly", func() {
-			Eventually(func() string {
-				return t.getLocalEndpoint().Spec.PublicIP
-			}, 5).Should(Equal(initialIP))
+			Eventually(func() []string {
+				return t.getLocalEndpoint().Spec.PublicIPs
+			}, 5).Should(Equal([]string{initialIP}))
 
 			// Update the load-balancer ingress ip
 			t.updateLoadbalancerService(testServiceName, testNamespace, updatedIP)
 
-			Eventually(func() string {
-				return t.getLocalEndpoint().Spec.PublicIP
-			}, 5).Should(Equal(updatedIP))
+			Eventually(func() []string {
+				return t.getLocalEndpoint().Spec.PublicIPs
+			}, 5).Should(Equal([]string{updatedIP}))
 		})
 	})
 })

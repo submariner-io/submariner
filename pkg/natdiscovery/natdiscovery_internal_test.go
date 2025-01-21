@@ -27,6 +27,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	k8snet "k8s.io/utils/net"
 )
 
 const (
@@ -44,7 +45,7 @@ var _ = When("a remote Endpoint is added", func() {
 		atomic.StoreInt64(&totalTimeout, time.Hour.Nanoseconds())
 		atomic.StoreInt64(&publicToPrivateFailoverTimeout, time.Hour.Nanoseconds())
 		forwardHowManyFromLocal = 1
-		t.remoteEndpoint.Spec.PublicIP = ""
+		t.remoteEndpoint.Spec.PublicIPs = []string{}
 	})
 
 	JustBeforeEach(func() {
@@ -59,7 +60,7 @@ var _ = When("a remote Endpoint is added", func() {
 
 	Context("with only the public IP set", func() {
 		BeforeEach(func() {
-			t.remoteEndpoint.Spec.PublicIP = testRemotePublicIP
+			t.remoteEndpoint.Spec.PublicIPs = []string{testRemotePublicIP}
 			t.remoteEndpoint.Spec.PrivateIP = ""
 		})
 
@@ -72,7 +73,7 @@ var _ = When("a remote Endpoint is added", func() {
 
 		BeforeEach(func() {
 			forwardHowManyFromLocal = 0
-			t.remoteEndpoint.Spec.PublicIP = testRemotePublicIP
+			t.remoteEndpoint.Spec.PublicIPs = []string{testRemotePublicIP}
 			t.remoteND.AddEndpoint(&t.localEndpoint)
 		})
 
@@ -89,7 +90,7 @@ var _ = When("a remote Endpoint is added", func() {
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 					Endpoint: t.remoteEndpoint,
 					UseNAT:   true,
-					UseIP:    t.remoteEndpoint.Spec.PublicIP,
+					UseIP:    t.remoteEndpoint.Spec.GetPublicIP(k8snet.IPv4),
 				})))
 
 				Expect(t.remoteND.parseAndHandleMessageFromAddress(privateIPReq, t.localUDPAddr)).
@@ -113,7 +114,7 @@ var _ = When("a remote Endpoint is added", func() {
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 					Endpoint: t.remoteEndpoint,
 					UseNAT:   true,
-					UseIP:    t.remoteEndpoint.Spec.PublicIP,
+					UseIP:    t.remoteEndpoint.Spec.GetPublicIP(k8snet.IPv4),
 				})))
 
 				Expect(t.remoteND.parseAndHandleMessageFromAddress(privateIPReq, t.localUDPAddr)).
@@ -259,7 +260,7 @@ var _ = When("a remote Endpoint is added", func() {
 
 	Context("with no NAT discovery port set", func() {
 		BeforeEach(func() {
-			t.remoteEndpoint.Spec.PublicIP = testRemotePublicIP
+			t.remoteEndpoint.Spec.PublicIPs = []string{testRemotePublicIP}
 			t.remoteEndpoint.Spec.PrivateIP = ""
 			delete(t.remoteEndpoint.Spec.BackendConfig, submarinerv1.NATTDiscoveryPortConfig)
 		})
@@ -268,7 +269,7 @@ var _ = When("a remote Endpoint is added", func() {
 			Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 				Endpoint: t.remoteEndpoint,
 				UseNAT:   true,
-				UseIP:    t.remoteEndpoint.Spec.PublicIP,
+				UseIP:    t.remoteEndpoint.Spec.GetPublicIP(k8snet.IPv4),
 			})))
 		})
 	})
@@ -292,7 +293,7 @@ var _ = When("a remote Endpoint is added", func() {
 			Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 				Endpoint: t.remoteEndpoint,
 				UseNAT:   true,
-				UseIP:    t.remoteEndpoint.Spec.PublicIP,
+				UseIP:    t.remoteEndpoint.Spec.GetPublicIP(k8snet.IPv4),
 			})))
 		})
 	})

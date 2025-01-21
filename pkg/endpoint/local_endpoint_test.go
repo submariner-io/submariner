@@ -141,7 +141,7 @@ var _ = Describe("GetLocalSpec", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(spec.ClusterID).To(Equal("east"))
 			Expect(spec.PrivateIP).To(Equal(testPrivateIP))
-			Expect(spec.PublicIP).To(Equal(""))
+			Expect(spec.PublicIPs).To(BeEmpty())
 		})
 	})
 
@@ -155,7 +155,7 @@ var _ = Describe("GetLocalSpec", func() {
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(spec.PrivateIP).To(Equal(testPrivateIP))
-			Expect(spec.PublicIP).To(Equal(testPublicIP))
+			Expect(spec.PublicIPs).To(Equal([]string{testPublicIP}))
 		})
 	})
 
@@ -197,7 +197,7 @@ var _ = Describe("Local", func() {
 			ClusterID:     "east",
 			Hostname:      "redsox",
 			PrivateIP:     "192.68.1.2",
-			PublicIP:      "1.2.3.4",
+			PublicIPs:     []string{"1.2.3.4"},
 			Subnets:       []string{"100.0.0.0/16", "10.0.0.0/14"},
 			Backend:       "ipsec",
 			BackendConfig: map[string]string{"foo": "bar"},
@@ -227,10 +227,10 @@ var _ = Describe("Local", func() {
 
 		verifyResource()
 
-		spec.PublicIP = "11.22.33.44"
+		spec.PublicIPs = []string{"11.22.33.44"}
 
 		Expect(local.Update(context.Background(), func(existing *submarinerv1.EndpointSpec) {
-			existing.PublicIP = spec.PublicIP
+			existing.PublicIPs = spec.PublicIPs
 		})).To(Succeed())
 
 		Expect(*local.Spec()).To(Equal(*spec))
@@ -239,7 +239,7 @@ var _ = Describe("Local", func() {
 
 	Specify("Create with an existing resource in the datastore should update it", func() {
 		r := local.Resource()
-		r.Spec.PublicIP = "8.8.8.8"
+		r.Spec.PublicIPs = []string{"8.8.8.8"}
 		test.CreateResource(dynClient.Resource(submarinerv1.EndpointGVR).Namespace(testNamespace), r)
 
 		Expect(local.Create(context.TODO())).To(Succeed())
@@ -248,10 +248,10 @@ var _ = Describe("Local", func() {
 	})
 
 	Specify("Update before creation should only update the cached Spec", func() {
-		spec.PublicIP = "11.22.33.44"
+		spec.PublicIPs = []string{"11.22.33.44"}
 
 		Expect(local.Update(context.Background(), func(existing *submarinerv1.EndpointSpec) {
-			existing.PublicIP = spec.PublicIP
+			existing.PublicIPs = spec.PublicIPs
 		})).To(Succeed())
 
 		Expect(*local.Spec()).To(Equal(*spec))

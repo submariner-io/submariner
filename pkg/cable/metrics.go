@@ -19,6 +19,7 @@ limitations under the License.
 package cable
 
 import (
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -136,10 +137,10 @@ func getLabels(cableDriverName string, localEndpoint, remoteEndpoint *submv1.End
 		cableDriverLabel:      cableDriverName,
 		localClusterLabel:     localEndpoint.ClusterID,
 		localHostnameLabel:    localEndpoint.Hostname,
-		localEndpointIPLabel:  localEndpoint.PublicIP,
+		localEndpointIPLabel:  strings.Join(localEndpoint.PublicIPs, ","),
 		remoteClusterLabel:    remoteEndpoint.ClusterID,
 		remoteHostnameLabel:   remoteEndpoint.Hostname,
-		remoteEndpointIPLabel: remoteEndpoint.PublicIP,
+		remoteEndpointIPLabel: strings.Join(remoteEndpoint.PublicIPs, ","),
 	}
 }
 

@@ -24,6 +24,7 @@ import (
 
 	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	k8snet "k8s.io/utils/net"
 )
 
 type endpointState int
@@ -109,14 +110,14 @@ func (rn *remoteEndpointNAT) useLegacyNATSettings() {
 	switch {
 	case rn.usingLoadBalancer:
 		rn.useNAT = true
-		rn.useIP = rn.endpoint.Spec.PublicIP
+		rn.useIP = rn.endpoint.Spec.GetPublicIP(k8snet.IPv4)
 		rn.transitionToState(selectedPublicIP)
 		logger.V(log.DEBUG).Infof("using NAT for the load balancer backed endpoint %q, using public IP %q", rn.endpoint.Spec.CableName,
 			rn.useIP)
 
 	case rn.endpoint.Spec.NATEnabled:
 		rn.useNAT = true
-		rn.useIP = rn.endpoint.Spec.PublicIP
+		rn.useIP = rn.endpoint.Spec.GetPublicIP(k8snet.IPv4)
 		rn.transitionToState(selectedPublicIP)
 		logger.V(log.DEBUG).Infof("using NAT legacy settings for endpoint %q, using public IP %q", rn.endpoint.Spec.CableName,
 			rn.useIP)
@@ -158,7 +159,7 @@ func (rn *remoteEndpointNAT) checkSent() {
 func (rn *remoteEndpointNAT) transitionToPublicIP(remoteEndpointID string, useNAT bool) bool {
 	switch rn.state {
 	case waitingForResponse:
-		rn.useIP = rn.endpoint.Spec.PublicIP
+		rn.useIP = rn.endpoint.Spec.GetPublicIP(k8snet.IPv4)
 		rn.useNAT = useNAT
 		rn.transitionToState(selectedPublicIP)
 		logger.V(log.DEBUG).Infof("selected public IP %q for endpoint %q", rn.useIP, rn.endpoint.Spec.CableName)

@@ -38,6 +38,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	k8snet "k8s.io/utils/net"
 )
 
 func init() {
@@ -76,7 +77,7 @@ var _ = Describe("Cable Engine", func() {
 				ClusterID: localClusterID,
 				CableName: fmt.Sprintf("submariner-cable-%s-1.1.1.1", localClusterID),
 				PrivateIP: "1.1.1.1",
-				PublicIP:  "2.2.2.2",
+				PublicIPs: []string{"2.2.2.2"},
 				Backend:   fake.DriverName,
 			},
 		}
@@ -89,7 +90,7 @@ var _ = Describe("Cable Engine", func() {
 				ClusterID:     remoteClusterID,
 				CableName:     fmt.Sprintf("submariner-cable-%s-1.1.1.1", remoteClusterID),
 				PrivateIP:     "1.1.1.1",
-				PublicIP:      "2.2.2.2",
+				PublicIPs:     []string{"2.2.2.2"},
 				BackendConfig: map[string]string{"port": "1234"},
 			},
 		}
@@ -189,7 +190,7 @@ var _ = Describe("Cable Engine", func() {
 
 				Context("but different endpoint IP", func() {
 					BeforeEach(func() {
-						newEndpoint.Spec.PublicIP = "3.3.3.3"
+						newEndpoint.Spec.PublicIPs = []string{"3.3.3.3"}
 					})
 
 					It("should disconnect from the previous endpoint and connect to the new one", func() {
@@ -411,7 +412,7 @@ func (n *fakeNATDiscovery) notifyReady(endpoint *subv1.Endpoint) {
 
 func natEndpointInfoFor(endpoint *subv1.Endpoint) *natdiscovery.NATEndpointInfo {
 	return &natdiscovery.NATEndpointInfo{
-		UseIP:    endpoint.Spec.PublicIP,
+		UseIP:    endpoint.Spec.GetPublicIP(k8snet.IPv4),
 		UseNAT:   true,
 		Endpoint: *endpoint,
 	}

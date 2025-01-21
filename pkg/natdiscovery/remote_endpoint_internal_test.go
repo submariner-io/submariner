@@ -24,9 +24,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	k8snet "k8s.io/utils/net"
 )
 
-//nolint:dupl // Some line blocks are very similar but not exactly duplicated, either way not worth refactoring.
 var _ = Describe("remoteEndpointNAT", func() {
 	var rnat *remoteEndpointNAT
 	var remoteEndpoint submarinerv1.Endpoint
@@ -83,7 +83,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 				rnat.endpoint.Spec.NATEnabled = true
 				rnat.useLegacyNATSettings()
 				Expect(rnat.state).To(Equal(selectedPublicIP))
-				Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.PublicIP))
+				Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.GetPublicIP(k8snet.IPv4)))
 			})
 		})
 		Context("and targeting a load balancer", func() {
@@ -93,7 +93,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 				rnat.endpoint.Spec.NATEnabled = false
 				rnat.useLegacyNATSettings()
 				Expect(rnat.state).To(Equal(selectedPublicIP))
-				Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.PublicIP))
+				Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.GetPublicIP(k8snet.IPv4)))
 				Expect(rnat.useNAT).To(BeTrue())
 			})
 		})
@@ -161,7 +161,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 		})
 
 		It("should use the public IP", func() {
-			Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.PublicIP))
+			Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.GetPublicIP(k8snet.IPv4)))
 		})
 
 		Context("with NAT discovered", func() {
@@ -204,7 +204,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 				rnat.lastTransition = rnat.lastTransition.Add(-time.Duration(publicToPrivateFailoverTimeout))
 				Expect(rnat.transitionToPrivateIP(testRemoteEndpointName, false)).To(BeFalse())
 				Expect(rnat.state).To(Equal(selectedPublicIP))
-				Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.PublicIP))
+				Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.GetPublicIP(k8snet.IPv4)))
 				Expect(rnat.useNAT).To(BeTrue())
 			})
 		})

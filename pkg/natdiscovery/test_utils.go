@@ -123,7 +123,7 @@ func createTestLocalEndpoint() submarinerv1.Endpoint {
 		Spec: submarinerv1.EndpointSpec{
 			CableName:  testLocalEndpointName,
 			ClusterID:  testLocalClusterID,
-			PublicIP:   testLocalPublicIP,
+			PublicIPs:  []string{testLocalPublicIP},
 			PrivateIP:  testLocalPrivateIP,
 			NATEnabled: true,
 			BackendConfig: map[string]string{
@@ -138,7 +138,7 @@ func createTestRemoteEndpoint() submarinerv1.Endpoint {
 		Spec: submarinerv1.EndpointSpec{
 			CableName:  testRemoteEndpointName,
 			ClusterID:  testRemoteClusterID,
-			PublicIP:   testRemotePublicIP,
+			PublicIPs:  []string{testRemotePublicIP},
 			PrivateIP:  testRemotePrivateIP,
 			NATEnabled: true,
 			BackendConfig: map[string]string{
