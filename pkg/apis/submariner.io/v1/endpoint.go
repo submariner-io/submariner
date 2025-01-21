@@ -23,10 +23,14 @@ import (
 	"strconv"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"k8s.io/apimachinery/pkg/api/equality"
 	k8snet "k8s.io/utils/net"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+var logger = log.Logger{Logger: logf.Log.WithName("EndpointAPI")}
 
 func (ep *EndpointSpec) GetBackendPort(configName string, defaultValue int32) (int32, error) {
 	if portStr := ep.BackendConfig[configName]; portStr != "" {
@@ -119,7 +123,15 @@ func getIPFrom(family k8snet.IPFamily, ips []string, ipv4Fallback string) string
 }
 
 func setIP(ips []string, ipv4Fallback, newIP string) ([]string, string) {
+	if newIP == "" {
+		return ips, ipv4Fallback
+	}
+
 	family := k8snet.IPFamilyOfString(newIP)
+	if family == k8snet.IPFamilyUnknown {
+		logger.Errorf(nil, "Unable to determine IP family for %q - ignoring", newIP)
+		return ips, ipv4Fallback
+	}
 
 	if family == k8snet.IPv4 {
 		ipv4Fallback = newIP

@@ -218,6 +218,16 @@ func testGetIP(ipsSetter func(*v1.EndpointSpec, []string, string), ipsGetter fun
 			})
 		})
 	})
+
+	When("the specified family is IPFamilyUnknown", func() {
+		BeforeEach(func() {
+			ips = []string{ipV4Addr, ipV6Addr}
+		})
+
+		It("should return empty string", func() {
+			Expect(ipsGetter(spec, k8snet.IPFamilyUnknown)).To(BeEmpty())
+		})
+	})
 }
 
 func testSetIP(initIPs func(*v1.EndpointSpec, []string), ipsSetter func(*v1.EndpointSpec, string),
@@ -307,6 +317,26 @@ func testSetIP(initIPs func(*v1.EndpointSpec, []string), ipsSetter func(*v1.Endp
 			It("should update address", func() {
 				verifyIPs([]string{ipToSet}, "")
 			})
+		})
+	})
+
+	When("the specified IP is empty", func() {
+		BeforeEach(func() {
+			initialIPs = []string{ipV6Addr}
+		})
+
+		It("should not add it", func() {
+			verifyIPs([]string{ipV6Addr}, "")
+		})
+	})
+
+	When("the specified IP is invalid", func() {
+		BeforeEach(func() {
+			ipToSet = "invalid"
+		})
+
+		It("should not add it", func() {
+			verifyIPs([]string{}, "")
 		})
 	})
 }
