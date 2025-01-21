@@ -484,10 +484,10 @@ func (t *gatewayMonitorTestDriver) awaitGlobalnetChainsCleared() {
 
 func newEndpointSpec(clusterID, hostname, subnet string) *submarinerv1.EndpointSpec {
 	return &submarinerv1.EndpointSpec{
-		CableName: fmt.Sprintf("submariner-cable-%s-%s", clusterID, hostname),
-		ClusterID: clusterID,
-		PrivateIP: "192.68.1.2",
-		Hostname:  hostname,
-		Subnets:   []string{subnet},
+		CableName:  fmt.Sprintf("submariner-cable-%s-%s", clusterID, hostname),
+		ClusterID:  clusterID,
+		PrivateIPs: []string{"192.68.1.2"},
+		Hostname:   hostname,
+		Subnets:    []string{subnet},
 	}
 }

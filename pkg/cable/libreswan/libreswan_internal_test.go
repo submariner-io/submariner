@@ -32,6 +32,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/types"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	k8snet "k8s.io/utils/net"
 )
 
 var _ = Describe("Libreswan", func() {
@@ -99,10 +100,10 @@ func testConnectToEndpoint() {
 		natInfo = &natdiscovery.NATEndpointInfo{
 			Endpoint: subv1.Endpoint{
 				Spec: subv1.EndpointSpec{
-					ClusterID: "east",
-					CableName: "submariner-cable-east-192-68-2-1",
-					PrivateIP: "192.68.2.1",
-					Subnets:   []string{"20.0.0.0/16"},
+					ClusterID:  "east",
+					CableName:  "submariner-cable-east-192-68-2-1",
+					PrivateIPs: []string{"192.68.2.1"},
+					Subnets:    []string{"20.0.0.0/16"},
 				},
 			},
 			UseIP:  "172.93.2.1",
@@ -117,7 +118,7 @@ func testConnectToEndpoint() {
 		Expect(ip).To(Equal(natInfo.UseIP))
 
 		t.assertActiveConnection(natInfo)
-		t.cmdExecutor.AwaitCommand(nil, "whack", t.endpointSpec.PrivateIP, natInfo.UseIP,
+		t.cmdExecutor.AwaitCommand(nil, "whack", t.endpointSpec.GetPrivateIP(k8snet.IPv4), natInfo.UseIP,
 			t.endpointSpec.Subnets[0], natInfo.Endpoint.Spec.Subnets[0])
 		t.cmdExecutor.AwaitCommand(nil, "whack", "--initiate")
 	}
@@ -129,7 +130,7 @@ func testConnectToEndpoint() {
 		Expect(ip).To(Equal(natInfo.UseIP))
 
 		t.assertActiveConnection(natInfo)
-		t.cmdExecutor.AwaitCommand(nil, "whack", t.endpointSpec.PrivateIP, t.endpointSpec.Subnets[0],
+		t.cmdExecutor.AwaitCommand(nil, "whack", t.endpointSpec.GetPrivateIP(k8snet.IPv4), t.endpointSpec.Subnets[0],
 			natInfo.Endpoint.Spec.Subnets[0])
 		t.cmdExecutor.EnsureNoCommand("whack", "--initiate")
 	}
@@ -158,7 +159,7 @@ func testConnectToEndpoint() {
 			Expect(ip).To(Equal(natInfo.UseIP))
 
 			t.assertActiveConnection(natInfo)
-			t.cmdExecutor.AwaitCommand(nil, "whack", t.endpointSpec.PrivateIP, natInfo.UseIP,
+			t.cmdExecutor.AwaitCommand(nil, "whack", t.endpointSpec.GetPrivateIP(k8snet.IPv4), natInfo.UseIP,
 				t.endpointSpec.Subnets[0], natInfo.Endpoint.Spec.Subnets[0])
 			t.cmdExecutor.AwaitCommand(nil, "whack", "--initiate")
 		})
@@ -200,10 +201,10 @@ func testDisconnectFromEndpoint() {
 		natInfo1 := &natdiscovery.NATEndpointInfo{
 			Endpoint: subv1.Endpoint{
 				Spec: subv1.EndpointSpec{
-					ClusterID: "remote1",
-					CableName: "submariner-cable-remote1-192-68-2-1",
-					PrivateIP: "192.68.2.1",
-					Subnets:   []string{"20.0.0.0/16"},
+					ClusterID:  "remote1",
+					CableName:  "submariner-cable-remote1-192-68-2-1",
+					PrivateIPs: []string{"192.68.2.1"},
+					Subnets:    []string{"20.0.0.0/16"},
 				},
 			},
 			UseIP: "172.93.2.1",
@@ -215,10 +216,10 @@ func testDisconnectFromEndpoint() {
 		natInfo2 := &natdiscovery.NATEndpointInfo{
 			Endpoint: subv1.Endpoint{
 				Spec: subv1.EndpointSpec{
-					ClusterID: "remote2",
-					CableName: "submariner-cable-remote2-192-68-3-1",
-					PrivateIP: "192.68.3.1",
-					Subnets:   []string{"30.0.0.0/16"},
+					ClusterID:  "remote2",
+					CableName:  "submariner-cable-remote2-192-68-3-1",
+					PrivateIPs: []string{"192.68.3.1"},
+					Subnets:    []string{"30.0.0.0/16"},
 				},
 			},
 			UseIP: "173.93.2.1",
@@ -246,10 +247,10 @@ func testGetConnections() {
 		natInfo1 := &natdiscovery.NATEndpointInfo{
 			Endpoint: subv1.Endpoint{
 				Spec: subv1.EndpointSpec{
-					ClusterID: "remote1",
-					CableName: "submariner-cable-remote1-192-68-2-1",
-					PrivateIP: "192.68.2.1",
-					Subnets:   []string{"20.0.0.0/16", "30.0.0.0/16"},
+					ClusterID:  "remote1",
+					CableName:  "submariner-cable-remote1-192-68-2-1",
+					PrivateIPs: []string{"192.68.2.1"},
+					Subnets:    []string{"20.0.0.0/16", "30.0.0.0/16"},
 				},
 			},
 			UseIP: "172.93.2.1",
@@ -261,10 +262,10 @@ func testGetConnections() {
 		natInfo2 := &natdiscovery.NATEndpointInfo{
 			Endpoint: subv1.Endpoint{
 				Spec: subv1.EndpointSpec{
-					ClusterID: "remote2",
-					CableName: "submariner-cable-remote2-192-68-3-1",
-					PrivateIP: "192.68.3.1",
-					Subnets:   []string{"11.0.0.0/16"},
+					ClusterID:  "remote2",
+					CableName:  "submariner-cable-remote2-192-68-3-1",
+					PrivateIPs: []string{"192.68.3.1"},
+					Subnets:    []string{"11.0.0.0/16"},
 				},
 			},
 			UseIP: "173.93.3.1",
@@ -350,10 +351,10 @@ func newTestDriver() *testDriver {
 	BeforeEach(func() {
 		t.cmdExecutor = fakecommand.New()
 		t.endpointSpec = subv1.EndpointSpec{
-			ClusterID: "local",
-			CableName: "submariner-cable-local-192-68-1-1",
-			PrivateIP: "192.68.1.1",
-			Subnets:   []string{"10.0.0.0/16"},
+			ClusterID:  "local",
+			CableName:  "submariner-cable-local-192-68-1-1",
+			PrivateIPs: []string{"192.68.1.1"},
+			Subnets:    []string{"10.0.0.0/16"},
 		}
 	})
 

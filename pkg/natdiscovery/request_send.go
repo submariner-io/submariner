@@ -32,8 +32,8 @@ func (nd *natDiscovery) sendCheckRequest(remoteNAT *remoteEndpointNAT) error {
 	var errPrivate, errPublic error
 	var reqID uint64
 
-	if remoteNAT.endpoint.Spec.PrivateIP != "" {
-		reqID, errPrivate = nd.sendCheckRequestToTargetIP(remoteNAT, remoteNAT.endpoint.Spec.PrivateIP)
+	if remoteNAT.endpoint.Spec.GetPrivateIP(k8snet.IPv4) != "" {
+		reqID, errPrivate = nd.sendCheckRequestToTargetIP(remoteNAT, remoteNAT.endpoint.Spec.GetPrivateIP(k8snet.IPv4))
 		if errPrivate == nil {
 			remoteNAT.lastPrivateIPRequestID = reqID
 		}

@@ -41,6 +41,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/types"
+	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -309,7 +310,7 @@ func extractSubnets(endpoint *subv1.EndpointSpec) []string {
 	subnets := make([]string, 0, len(endpoint.Subnets))
 
 	for _, subnet := range endpoint.Subnets {
-		if !strings.HasPrefix(subnet, endpoint.PrivateIP+"/") {
+		if !strings.HasPrefix(subnet, endpoint.GetPrivateIP(k8snet.IPv4)+"/") {
 			subnets = append(subnets, subnet)
 		}
 	}
@@ -415,8 +416,8 @@ func (i *libreswan) bidirectionalConnectToEndpoint(connectionName string, endpoi
 	leftSubnet, rightSubnet string, rightNATTPort int32,
 ) error {
 	// Identifiers are used for authentication, they’re always the private IPs
-	localEndpointIdentifier := i.localEndpoint.PrivateIP
-	remoteEndpointIdentifier := endpointInfo.Endpoint.Spec.PrivateIP
+	localEndpointIdentifier := i.localEndpoint.GetPrivateIP(k8snet.IPv4)
+	remoteEndpointIdentifier := endpointInfo.Endpoint.Spec.GetPrivateIP(k8snet.IPv4)
 
 	args := []string{}
 
@@ -429,7 +430,7 @@ func (i *libreswan) bidirectionalConnectToEndpoint(connectionName string, endpoi
 
 		// Left-hand side
 		"--id", localEndpointIdentifier,
-		hostArg, i.localEndpoint.PrivateIP,
+		hostArg, i.localEndpoint.GetPrivateIP(k8snet.IPv4),
 		clientArg, leftSubnet,
 
 		ikeportArg, i.ipSecNATTPort,
@@ -465,8 +466,8 @@ func toEndpointIdentifier(ip string, lsi, rsi int) string {
 func (i *libreswan) serverConnectToEndpoint(connectionName string, endpointInfo *natdiscovery.NATEndpointInfo,
 	leftSubnet, rightSubnet string, lsi, rsi int,
 ) error {
-	localEndpointIdentifier := toEndpointIdentifier(i.localEndpoint.PrivateIP, lsi, rsi)
-	remoteEndpointIdentifier := toEndpointIdentifier(endpointInfo.Endpoint.Spec.PrivateIP, rsi, lsi)
+	localEndpointIdentifier := toEndpointIdentifier(i.localEndpoint.GetPrivateIP(k8snet.IPv4), lsi, rsi)
+	remoteEndpointIdentifier := toEndpointIdentifier(endpointInfo.Endpoint.Spec.GetPrivateIP(k8snet.IPv4), rsi, lsi)
 
 	args := []string{}
 
@@ -479,7 +480,7 @@ func (i *libreswan) serverConnectToEndpoint(connectionName string, endpointInfo 
 
 		// Left-hand side.
 		"--id", localEndpointIdentifier,
-		hostArg, i.localEndpoint.PrivateIP,
+		hostArg, i.localEndpoint.GetPrivateIP(k8snet.IPv4),
 		clientArg, leftSubnet,
 
 		ikeportArg, i.ipSecNATTPort,
@@ -508,8 +509,8 @@ func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo 
 	leftSubnet, rightSubnet string, rightNATTPort int32, lsi, rsi int,
 ) error {
 	// Identifiers are used for authentication, they’re always the private IPs.
-	localEndpointIdentifier := toEndpointIdentifier(i.localEndpoint.PrivateIP, lsi, rsi)
-	remoteEndpointIdentifier := toEndpointIdentifier(endpointInfo.Endpoint.Spec.PrivateIP, rsi, lsi)
+	localEndpointIdentifier := toEndpointIdentifier(i.localEndpoint.GetPrivateIP(k8snet.IPv4), lsi, rsi)
+	remoteEndpointIdentifier := toEndpointIdentifier(endpointInfo.Endpoint.Spec.GetPrivateIP(k8snet.IPv4), rsi, lsi)
 
 	args := []string{}
 
@@ -522,7 +523,7 @@ func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo 
 
 		// Left-hand side
 		"--id", localEndpointIdentifier,
-		hostArg, i.localEndpoint.PrivateIP,
+		hostArg, i.localEndpoint.GetPrivateIP(k8snet.IPv4),
 		clientArg, leftSubnet,
 
 		"--to",

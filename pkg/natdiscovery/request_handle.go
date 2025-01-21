@@ -25,6 +25,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 	proto2 "google.golang.org/protobuf/proto"
+	k8snet "k8s.io/utils/net"
 )
 
 func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscoveryRequest, addr *net.UDPAddr) error {
@@ -94,7 +95,7 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscove
 	// Detect DST NAT with a naive implementation that assumes that we always receive on the PrivateIP,
 	// if we will listen at some point on multiple addresses we will need to implement the
 	// unix.IP_RECVORIGDSTADDR on the UDP socket, and the go recvmsg implementation instead of readfrom
-	if req.GetUsingDst().GetIP() != localEndpointSpec.PrivateIP {
+	if req.GetUsingDst().GetIP() != localEndpointSpec.GetPrivateIP(k8snet.IPv4) {
 		response.DstIpNatDetected = true
 	}
 

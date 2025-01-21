@@ -25,6 +25,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/natdiscovery/proto"
+	k8snet "k8s.io/utils/net"
 )
 
 func (nd *natDiscovery) handleResponseFromAddress(req *proto.SubmarinerNATDiscoveryResponse, addr *net.UDPAddr) error {
@@ -69,15 +70,15 @@ func (nd *natDiscovery) handleResponseFromAddress(req *proto.SubmarinerNATDiscov
 
 	// response to a PrivateIP request
 	if remoteNAT.lastPrivateIPRequestID == req.GetRequestNumber() {
-		if addr.IP.String() != remoteNAT.endpoint.Spec.PrivateIP {
+		if addr.IP.String() != remoteNAT.endpoint.Spec.GetPrivateIP(k8snet.IPv4) {
 			return errors.Errorf("response for NAT discovery on endpoint %q private IP %q comes from different IP %q, "+
 				"NAT on private IPs is unlikely and filtered for security reasons",
-				req.GetSender().GetEndpointId(), remoteNAT.endpoint.Spec.PrivateIP, addr.IP)
+				req.GetSender().GetEndpointId(), remoteNAT.endpoint.Spec.GetPrivateIP(k8snet.IPv4), addr.IP)
 		}
 
 		if req.GetResponse() == proto.ResponseType_NAT_DETECTED {
 			logger.Warningf("response for NAT discovery on endpoint %q private IP %q says src was modified which is unexpected",
-				req.GetSender().GetEndpointId(), remoteNAT.endpoint.Spec.PrivateIP)
+				req.GetSender().GetEndpointId(), remoteNAT.endpoint.Spec.GetPrivateIP(k8snet.IPv4))
 		}
 
 		useNAT := req.GetResponse() == proto.ResponseType_NAT_DETECTED

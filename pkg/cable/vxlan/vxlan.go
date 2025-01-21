@@ -35,6 +35,7 @@ import (
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/vxlan"
+	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -89,7 +90,7 @@ func NewDriver(localEndpoint *submendpoint.Local, localCluster *types.Submariner
 }
 
 func (v *vxLan) createVxlanInterface(port int) error {
-	ipAddr := v.localEndpoint.PrivateIP
+	ipAddr := v.localEndpoint.GetPrivateIP(k8snet.IPv4)
 
 	var err error
 
@@ -165,7 +166,7 @@ func (v *vxLan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 
 	cable.RecordConnection(CableDriverName, &v.localEndpoint, &remoteEndpoint.Spec, string(v1.Connected), true)
 
-	privateIP := endpointInfo.Endpoint.Spec.PrivateIP
+	privateIP := endpointInfo.Endpoint.Spec.GetPrivateIP(k8snet.IPv4)
 
 	remoteVtepIP, err := vxlan.GetVtepIPAddressFrom(privateIP, VxlanVTepNetworkPrefix)
 	if err != nil {

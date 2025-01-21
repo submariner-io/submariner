@@ -75,7 +75,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 				rnat.endpoint.Spec.NATEnabled = false
 				rnat.useLegacyNATSettings()
 				Expect(rnat.state).To(Equal(selectedPrivateIP))
-				Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.PrivateIP))
+				Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.GetPrivateIP(k8snet.IPv4)))
 			})
 		})
 		Context("and NAT is enabled", func() {
@@ -117,6 +117,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 		})
 	})
 
+	//nolint:dupl // Ignore
 	When("the private IP is selected", func() {
 		var useNAT bool
 
@@ -127,7 +128,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 		})
 
 		It("should use the private IP", func() {
-			Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.PrivateIP))
+			Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.GetPrivateIP(k8snet.IPv4)))
 		})
 
 		Context("with NAT discovered", func() {
@@ -151,6 +152,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 		})
 	})
 
+	//nolint:dupl // Ignore
 	When("the public IP is selected", func() {
 		var useNAT bool
 
@@ -192,7 +194,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 				Expect(rnat.transitionToPublicIP(testRemoteEndpointName, true)).To(BeTrue())
 				Expect(rnat.transitionToPrivateIP(testRemoteEndpointName, false)).To(BeTrue())
 				Expect(rnat.state).To(Equal(selectedPrivateIP))
-				Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.PrivateIP))
+				Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.GetPrivateIP(k8snet.IPv4)))
 				Expect(rnat.useNAT).To(BeFalse())
 			})
 		})

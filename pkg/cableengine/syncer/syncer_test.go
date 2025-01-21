@@ -158,20 +158,20 @@ func testGatewaySyncing() {
 					Status:        submarinerv1.Connecting,
 					StatusMessage: "Connecting to 1.2.3.4:400",
 					Endpoint: submarinerv1.EndpointSpec{
-						ClusterID: "west",
-						CableName: "submariner-cable-west-192-68-1-10",
-						PrivateIP: "192.6.1.11",
-						Backend:   "libreswan",
+						ClusterID:  "west",
+						CableName:  "submariner-cable-west-192-68-1-10",
+						PrivateIPs: []string{"192.6.1.11"},
+						Backend:    "libreswan",
 					},
 				},
 				{
 					Status:        submarinerv1.Connected,
 					StatusMessage: "Connected to 1.2.3.5:500",
 					Endpoint: submarinerv1.EndpointSpec{
-						ClusterID: "north",
-						CableName: "submariner-cable-north-192-68-1-20",
-						PrivateIP: "192.6.1.21",
-						Backend:   "wireguard",
+						ClusterID:  "north",
+						CableName:  "submariner-cable-north-192-68-1-20",
+						PrivateIPs: []string{"192.6.1.21"},
+						Backend:    "wireguard",
 					},
 				},
 			}
@@ -396,7 +396,7 @@ func testGatewayLatencyInfo() {
 			endpointSpec := &submarinerv1.EndpointSpec{
 				ClusterID:     "north",
 				CableName:     "submariner-cable-north-192-68-1-20",
-				PrivateIP:     "192-68-1-20",
+				PrivateIPs:    []string{"192-68-1-20"},
 				HealthCheckIP: t.pinger.GetIP(),
 			}
 
@@ -505,11 +505,11 @@ func newTestDriver() *testDriver {
 	}
 
 	t.engine.LocalEndPoint = &types.SubmarinerEndpoint{Spec: submarinerv1.EndpointSpec{
-		ClusterID: "east",
-		CableName: "submariner-cable-east-192-68-1-2",
-		Hostname:  "redsox",
-		PrivateIP: "192.6.1.3",
-		Backend:   "libreswan",
+		ClusterID:  "east",
+		CableName:  "submariner-cable-east-192-68-1-2",
+		Hostname:   "redsox",
+		PrivateIPs: []string{"192.6.1.3"},
+		Backend:    "libreswan",
 	}}
 
 	t.expectedGateway = &submarinerv1.Gateway{

@@ -120,11 +120,11 @@ func (t *publicIPWatcherTestDriver) getLocalEndpoint() *submarinerv1.Endpoint {
 
 func newEndpointSpec(clusterID, cableName string) submarinerv1.EndpointSpec {
 	return submarinerv1.EndpointSpec{
-		CableName: cableName,
-		ClusterID: clusterID,
-		PrivateIP: "192-68-10-2",
-		Hostname:  "myhost",
-		Subnets:   []string{"10.1.0.0/24", "100.1.0.0/24"},
+		CableName:  cableName,
+		ClusterID:  clusterID,
+		PrivateIPs: []string{"192-68-10-2"},
+		Hostname:   "myhost",
+		Subnets:    []string{"10.1.0.0/24", "100.1.0.0/24"},
 		BackendConfig: map[string]string{
 			UsingLoadBalancer: "true",
 		},

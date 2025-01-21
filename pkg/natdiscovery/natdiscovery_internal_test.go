@@ -61,7 +61,7 @@ var _ = When("a remote Endpoint is added", func() {
 	Context("with only the public IP set", func() {
 		BeforeEach(func() {
 			t.remoteEndpoint.Spec.PublicIPs = []string{testRemotePublicIP}
-			t.remoteEndpoint.Spec.PrivateIP = ""
+			t.remoteEndpoint.Spec.PrivateIPs = []string{}
 		})
 
 		t.testRemoteEndpointAdded(testRemotePublicIP, natExpected)
@@ -99,7 +99,7 @@ var _ = When("a remote Endpoint is added", func() {
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 					Endpoint: t.remoteEndpoint,
 					UseNAT:   false,
-					UseIP:    t.remoteEndpoint.Spec.PrivateIP,
+					UseIP:    t.remoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4),
 				})))
 			})
 		})
@@ -132,7 +132,7 @@ var _ = When("a remote Endpoint is added", func() {
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 					Endpoint: t.remoteEndpoint,
 					UseNAT:   false,
-					UseIP:    t.remoteEndpoint.Spec.PrivateIP,
+					UseIP:    t.remoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4),
 				})))
 
 				Expect(t.remoteND.parseAndHandleMessageFromAddress(publicIPReq, t.localUDPAddr)).
@@ -148,7 +148,7 @@ var _ = When("a remote Endpoint is added", func() {
 			Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 				Endpoint: t.remoteEndpoint,
 				UseNAT:   false,
-				UseIP:    t.remoteEndpoint.Spec.PrivateIP,
+				UseIP:    t.remoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4),
 			})))
 		})
 	})
@@ -164,7 +164,7 @@ var _ = When("a remote Endpoint is added", func() {
 		JustBeforeEach(func() {
 			Eventually(t.readyChannel, 5).Should(Receive())
 
-			t.remoteUDPAddr.IP = net.ParseIP(newRemoteEndpoint.Spec.PrivateIP)
+			t.remoteUDPAddr.IP = net.ParseIP(newRemoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4))
 			forwardFromUDPChan(t.localUDPSent, t.localUDPAddr, t.remoteND, 1)
 
 			t.localND.AddEndpoint(&newRemoteEndpoint)
@@ -176,16 +176,16 @@ var _ = When("a remote Endpoint is added", func() {
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 					Endpoint: t.remoteEndpoint,
 					UseNAT:   false,
-					UseIP:    t.remoteEndpoint.Spec.PrivateIP,
+					UseIP:    t.remoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4),
 				})))
 			})
 		})
 
 		Context("with the Endpoint's private IP changed", func() {
 			BeforeEach(func() {
-				newRemoteEndpoint.Spec.PrivateIP = testRemotePrivateIP2
+				newRemoteEndpoint.Spec.PrivateIPs = []string{testRemotePrivateIP2}
 				Expect(t.remoteND.localEndpoint.Update(context.Background(), func(existing *submarinerv1.EndpointSpec) {
-					existing.PrivateIP = testRemotePrivateIP2
+					existing.PrivateIPs = []string{testRemotePrivateIP2}
 				})).To(Succeed())
 			})
 
@@ -193,7 +193,7 @@ var _ = When("a remote Endpoint is added", func() {
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 					Endpoint: newRemoteEndpoint,
 					UseNAT:   false,
-					UseIP:    newRemoteEndpoint.Spec.PrivateIP,
+					UseIP:    newRemoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4),
 				})))
 			})
 		})
@@ -220,14 +220,14 @@ var _ = When("a remote Endpoint is added", func() {
 
 		Context("with the Endpoint's private IP changed", func() {
 			BeforeEach(func() {
-				newRemoteEndpoint.Spec.PrivateIP = testRemotePrivateIP2
+				newRemoteEndpoint.Spec.PrivateIPs = []string{testRemotePrivateIP2}
 				Expect(t.remoteND.localEndpoint.Update(context.Background(), func(existing *submarinerv1.EndpointSpec) {
-					existing.PrivateIP = testRemotePrivateIP2
+					existing.PrivateIPs = []string{testRemotePrivateIP2}
 				})).To(Succeed())
 			})
 
 			JustBeforeEach(func() {
-				t.remoteUDPAddr.IP = net.ParseIP(newRemoteEndpoint.Spec.PrivateIP)
+				t.remoteUDPAddr.IP = net.ParseIP(newRemoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4))
 				forwardFromUDPChan(t.localUDPSent, t.localUDPAddr, t.remoteND, -1)
 				t.localND.checkEndpointList()
 			})
@@ -236,7 +236,7 @@ var _ = When("a remote Endpoint is added", func() {
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 					Endpoint: newRemoteEndpoint,
 					UseNAT:   false,
-					UseIP:    newRemoteEndpoint.Spec.PrivateIP,
+					UseIP:    newRemoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4),
 				})))
 			})
 		})
@@ -261,7 +261,7 @@ var _ = When("a remote Endpoint is added", func() {
 	Context("with no NAT discovery port set", func() {
 		BeforeEach(func() {
 			t.remoteEndpoint.Spec.PublicIPs = []string{testRemotePublicIP}
-			t.remoteEndpoint.Spec.PrivateIP = ""
+			t.remoteEndpoint.Spec.PrivateIPs = []string{}
 			delete(t.remoteEndpoint.Spec.BackendConfig, submarinerv1.NATTDiscoveryPortConfig)
 		})
 

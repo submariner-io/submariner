@@ -124,7 +124,7 @@ func (rn *remoteEndpointNAT) useLegacyNATSettings() {
 
 	default:
 		rn.useNAT = false
-		rn.useIP = rn.endpoint.Spec.PrivateIP
+		rn.useIP = rn.endpoint.Spec.GetPrivateIP(k8snet.IPv4)
 		rn.transitionToState(selectedPrivateIP)
 		logger.V(log.DEBUG).Infof("using NAT legacy settings for endpoint %q, using private IP %q", rn.endpoint.Spec.CableName,
 			rn.useIP)
@@ -179,7 +179,7 @@ func (rn *remoteEndpointNAT) transitionToPublicIP(remoteEndpointID string, useNA
 func (rn *remoteEndpointNAT) transitionToPrivateIP(remoteEndpointID string, useNAT bool) bool {
 	switch rn.state {
 	case waitingForResponse:
-		rn.useIP = rn.endpoint.Spec.PrivateIP
+		rn.useIP = rn.endpoint.Spec.GetPrivateIP(k8snet.IPv4)
 		rn.useNAT = useNAT
 		rn.transitionToState(selectedPrivateIP)
 		logger.V(log.DEBUG).Infof("selected private IP %q for endpoint %q", rn.useIP, rn.endpoint.Spec.CableName)
@@ -194,7 +194,7 @@ func (rn *remoteEndpointNAT) transitionToPrivateIP(remoteEndpointID string, useN
 			return false
 		}
 
-		rn.useIP = rn.endpoint.Spec.PrivateIP
+		rn.useIP = rn.endpoint.Spec.GetPrivateIP(k8snet.IPv4)
 		rn.useNAT = useNAT
 		rn.transitionToState(selectedPrivateIP)
 		logger.V(log.DEBUG).Infof("updated to private IP %q for endpoint %q", rn.useIP, rn.endpoint.Spec.CableName)

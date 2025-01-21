@@ -74,11 +74,11 @@ var _ = Describe("Cable Engine", func() {
 				CreationTimestamp: metav1.Now(),
 			},
 			Spec: subv1.EndpointSpec{
-				ClusterID: localClusterID,
-				CableName: fmt.Sprintf("submariner-cable-%s-1.1.1.1", localClusterID),
-				PrivateIP: "1.1.1.1",
-				PublicIPs: []string{"2.2.2.2"},
-				Backend:   fake.DriverName,
+				ClusterID:  localClusterID,
+				CableName:  fmt.Sprintf("submariner-cable-%s-1.1.1.1", localClusterID),
+				PrivateIPs: []string{"1.1.1.1"},
+				PublicIPs:  []string{"2.2.2.2"},
+				Backend:    fake.DriverName,
 			},
 		}
 
@@ -89,7 +89,7 @@ var _ = Describe("Cable Engine", func() {
 			Spec: subv1.EndpointSpec{
 				ClusterID:     remoteClusterID,
 				CableName:     fmt.Sprintf("submariner-cable-%s-1.1.1.1", remoteClusterID),
-				PrivateIP:     "1.1.1.1",
+				PrivateIPs:    []string{"1.1.1.1"},
 				PublicIPs:     []string{"2.2.2.2"},
 				BackendConfig: map[string]string{"port": "1234"},
 			},

@@ -103,7 +103,7 @@ var _ = Describe("GetLocalSpec", func() {
 		Expect(spec.ClusterID).To(Equal("east"))
 		Expect(spec.CableName).To(HavePrefix("submariner-cable-east-"))
 		Expect(spec.Hostname).NotTo(BeEmpty())
-		Expect(spec.PrivateIP).To(Equal(testPrivateIP))
+		Expect(spec.GetPrivateIP(k8snet.IPv4)).To(Equal(testPrivateIP))
 		Expect(spec.Backend).To(Equal("backend"))
 		Expect(spec.Subnets).To(Equal(subnets))
 		Expect(spec.NATEnabled).To(BeFalse())
@@ -140,7 +140,7 @@ var _ = Describe("GetLocalSpec", func() {
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(spec.ClusterID).To(Equal("east"))
-			Expect(spec.PrivateIP).To(Equal(testPrivateIP))
+			Expect(spec.PrivateIPs).To(Equal([]string{testPrivateIP}))
 			Expect(spec.PublicIPs).To(BeEmpty())
 		})
 	})
@@ -154,7 +154,7 @@ var _ = Describe("GetLocalSpec", func() {
 			spec, err := endpoint.GetLocalSpec(context.TODO(), submSpec, client, true)
 
 			Expect(err).ToNot(HaveOccurred())
-			Expect(spec.PrivateIP).To(Equal(testPrivateIP))
+			Expect(spec.PrivateIPs).To(Equal([]string{testPrivateIP}))
 			Expect(spec.PublicIPs).To(Equal([]string{testPublicIP}))
 		})
 	})
@@ -196,7 +196,7 @@ var _ = Describe("Local", func() {
 			CableName:     "submariner-cable-192-68-1-2",
 			ClusterID:     "east",
 			Hostname:      "redsox",
-			PrivateIP:     "192.68.1.2",
+			PrivateIPs:    []string{"192.68.1.2"},
 			PublicIPs:     []string{"1.2.3.4"},
 			Subnets:       []string{"100.0.0.0/16", "10.0.0.0/14"},
 			Backend:       "ipsec",

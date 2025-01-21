@@ -26,6 +26,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/cidr"
 	"github.com/submariner-io/submariner/pkg/vxlan"
+	k8snet "k8s.io/utils/net"
 )
 
 func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
@@ -46,7 +47,7 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 			kp.activeEndpointHostname = ""
 		}
 
-		localClusterGwNodeIP := net.ParseIP(endpoint.Spec.PrivateIP)
+		localClusterGwNodeIP := net.ParseIP(endpoint.Spec.GetPrivateIP(k8snet.IPv4))
 
 		remoteVtepIP, err := vxlan.GetVtepIPAddressFrom(localClusterGwNodeIP.String(), VxLANVTepNetworkPrefix)
 		if err != nil {

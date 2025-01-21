@@ -38,7 +38,7 @@ var _ = When("a request is sent", func() {
 	BeforeEach(func() {
 		remoteEndpoint = createTestRemoteEndpoint()
 		remoteEndpoint.Spec.PublicIPs = []string{}
-		remoteEndpoint.Spec.PrivateIP = ""
+		remoteEndpoint.Spec.PrivateIPs = []string{}
 	})
 
 	JustBeforeEach(func() {
@@ -83,7 +83,7 @@ var _ = When("a request is sent", func() {
 
 	Context("with the private IP set", func() {
 		BeforeEach(func() {
-			remoteEndpoint.Spec.PrivateIP = testRemotePrivateIP
+			remoteEndpoint.Spec.PrivateIPs = []string{testRemotePrivateIP}
 		})
 
 		testRequest(testRemotePrivateIP)

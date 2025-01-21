@@ -86,11 +86,11 @@ func testEndpointSyncing() {
 			awaitEndpoint(t.brokerEndpoints, t.localEndpoint)
 
 			endpoint := newEndpoint(&submarinerv1.EndpointSpec{
-				CableName: fmt.Sprintf("submariner-cable-%s-10-253-1-2", otherClusterID),
-				ClusterID: otherClusterID,
-				Hostname:  "bruins",
-				PrivateIP: "10-253-1-2",
-				Subnets:   []string{"200.0.0.0/16", "20.0.0.0/14"},
+				CableName:  fmt.Sprintf("submariner-cable-%s-10-253-1-2", otherClusterID),
+				ClusterID:  otherClusterID,
+				Hostname:   "bruins",
+				PrivateIPs: []string{"10-253-1-2"},
+				Subnets:    []string{"200.0.0.0/16", "20.0.0.0/14"},
 			})
 
 			test.CreateResource(t.brokerEndpoints, test.SetClusterIDLabel(endpoint, endpoint.Spec.ClusterID))

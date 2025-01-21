@@ -68,10 +68,10 @@ var _ = Describe("Vxlan", func() {
 		natInfo = &natdiscovery.NATEndpointInfo{
 			Endpoint: subv1.Endpoint{
 				Spec: subv1.EndpointSpec{
-					ClusterID: "east",
-					CableName: "submariner-cable-east-192-68-2-1",
-					PrivateIP: "192.68.2.1",
-					Subnets:   []string{"20.0.0.0/16", "21.0.0.0/16"},
+					ClusterID:  "east",
+					CableName:  "submariner-cable-east-192-68-2-1",
+					PrivateIPs: []string{"192.68.2.1"},
+					Subnets:    []string{"20.0.0.0/16", "21.0.0.0/16"},
 				},
 			},
 			UseIP:  "172.93.2.1",
@@ -164,10 +164,10 @@ func newTestDriver() *testDriver {
 		}
 
 		t.localEndpoint = subv1.EndpointSpec{
-			ClusterID: t.localCluster.Spec.ClusterID,
-			CableName: "submariner-cable-local-192-68-1-1",
-			PrivateIP: "192.68.1.1",
-			Subnets:   append(t.localCluster.Spec.ServiceCIDR, t.localCluster.Spec.ClusterCIDR...),
+			ClusterID:  t.localCluster.Spec.ClusterID,
+			CableName:  "submariner-cable-local-192-68-1-1",
+			PrivateIPs: []string{"192.68.1.1"},
+			Subnets:    append(t.localCluster.Spec.ServiceCIDR, t.localCluster.Spec.ClusterCIDR...),
 		}
 
 		t.netLink = fakeNetlink.New()

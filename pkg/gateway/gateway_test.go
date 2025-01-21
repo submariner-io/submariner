@@ -407,13 +407,13 @@ func (t *testDriver) newRemoteEndpoint() *submarinerv1.Endpoint {
 			Labels: map[string]string{federate.ClusterIDLabelKey: "west"},
 		},
 		Spec: submarinerv1.EndpointSpec{
-			ClusterID: "west",
-			CableName: fmt.Sprintf("submariner-cable-west-192-168-40-%d", t.remoteIPCounter),
-			Hostname:  "redsox",
-			Subnets:   []string{"169.254.3.0/24"},
-			PrivateIP: "11.1.2.3",
-			PublicIPs: []string{"ipv4:12.1.2.3"},
-			Backend:   "libreswan",
+			ClusterID:  "west",
+			CableName:  fmt.Sprintf("submariner-cable-west-192-168-40-%d", t.remoteIPCounter),
+			Hostname:   "redsox",
+			Subnets:    []string{"169.254.3.0/24"},
+			PrivateIPs: []string{"11.1.2.3"},
+			PublicIPs:  []string{"ipv4:12.1.2.3"},
+			Backend:    "libreswan",
 		},
 	}
 

@@ -103,12 +103,12 @@ func newTestDriver() *testDriver {
 			},
 		},
 		localEndpoint: &submarinerv1.EndpointSpec{
-			CableName: fmt.Sprintf("submariner-cable-%s-192-68-1-2", clusterID),
-			ClusterID: clusterID,
-			Hostname:  "redsox",
-			PrivateIP: "192.68.1.2",
-			Subnets:   []string{"100.0.0.0/16", "10.0.0.0/14"},
-			Backend:   "ipsec",
+			CableName:  fmt.Sprintf("submariner-cable-%s-192-68-1-2", clusterID),
+			ClusterID:  clusterID,
+			Hostname:   "redsox",
+			PrivateIPs: []string{"192.68.1.2"},
+			Subnets:    []string{"100.0.0.0/16", "10.0.0.0/14"},
+			Backend:    "ipsec",
 		},
 	}
 

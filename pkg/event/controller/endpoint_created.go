@@ -19,6 +19,8 @@ limitations under the License.
 package controller
 
 import (
+	"strings"
+
 	smv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 )
 
@@ -55,7 +57,8 @@ func (c *handlerController) handleCreatedLocalEndpoint(endpoint *smv1.Endpoint) 
 	err := c.handler.LocalEndpointCreated(endpoint)
 
 	if err == nil && !c.handlerState.wasOnGateway && c.handlerState.IsOnGateway() {
-		logger.Infof("Transitioned to gateway node %q with endpoint private IP %s", c.hostname, endpoint.Spec.PrivateIP)
+		logger.Infof("Transitioned to gateway node %q with endpoint private IPs %s", c.hostname,
+			strings.Join(endpoint.Spec.PrivateIPs, ","))
 
 		err = c.handler.TransitionToGateway()
 	}

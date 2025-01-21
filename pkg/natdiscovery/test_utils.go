@@ -124,7 +124,7 @@ func createTestLocalEndpoint() submarinerv1.Endpoint {
 			CableName:  testLocalEndpointName,
 			ClusterID:  testLocalClusterID,
 			PublicIPs:  []string{testLocalPublicIP},
-			PrivateIP:  testLocalPrivateIP,
+			PrivateIPs: []string{testLocalPrivateIP},
 			NATEnabled: true,
 			BackendConfig: map[string]string{
 				submarinerv1.NATTDiscoveryPortConfig: strconv.Itoa(int(testLocalNATPort)),
@@ -139,7 +139,7 @@ func createTestRemoteEndpoint() submarinerv1.Endpoint {
 			CableName:  testRemoteEndpointName,
 			ClusterID:  testRemoteClusterID,
 			PublicIPs:  []string{testRemotePublicIP},
-			PrivateIP:  testRemotePrivateIP,
+			PrivateIPs: []string{testRemotePrivateIP},
 			NATEnabled: true,
 			BackendConfig: map[string]string{
 				submarinerv1.NATTDiscoveryPortConfig: strconv.Itoa(int(testRemoteNATPort)),

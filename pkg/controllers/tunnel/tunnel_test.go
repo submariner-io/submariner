@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	fakeClient "k8s.io/client-go/dynamic/fake"
 	kubeScheme "k8s.io/client-go/kubernetes/scheme"
+	k8snet "k8s.io/utils/net"
 )
 
 const (
@@ -78,10 +79,10 @@ var _ = Describe("Managing tunnels", func() {
 				Namespace: namespace,
 			},
 			Spec: v1.EndpointSpec{
-				CableName: "submariner-cable-east-192-68-1-1",
-				ClusterID: "east",
-				Hostname:  "redsox",
-				PrivateIP: "192.68.1.2",
+				CableName:  "submariner-cable-east-192-68-1-1",
+				ClusterID:  "east",
+				Hostname:   "redsox",
+				PrivateIPs: []string{"192.68.1.2"},
 			},
 		}
 
@@ -129,7 +130,7 @@ var _ = Describe("Managing tunnels", func() {
 
 	verifyConnectToEndpoint := func() {
 		fakeDriver.AwaitConnectToEndpoint(&natdiscovery.NATEndpointInfo{
-			UseIP:    endpoint.Spec.PrivateIP,
+			UseIP:    endpoint.Spec.GetPrivateIP(k8snet.IPv4),
 			UseNAT:   false,
 			Endpoint: *endpoint,
 		})
@@ -151,7 +152,7 @@ var _ = Describe("Managing tunnels", func() {
 			test.CreateResource(endpoints, endpoint)
 			verifyConnectToEndpoint()
 
-			endpoint.Spec.PrivateIP = "192.68.1.3"
+			endpoint.Spec.PrivateIPs = []string{"192.68.1.3"}
 			test.UpdateResource(endpoints, endpoint)
 
 			verifyConnectToEndpoint()

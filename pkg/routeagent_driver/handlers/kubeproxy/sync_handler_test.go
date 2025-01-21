@@ -38,6 +38,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	k8snet "k8s.io/utils/net"
 )
 
 const (
@@ -69,7 +70,8 @@ func testEndpoints() {
 		})
 
 		It("should add the VxLAN interface", func() {
-			Expect(toVxlan(t.netLink.AwaitLink(kubeproxy.VxLANIface)).Group.String()).To(Equal(t.localEndpoint.Spec.PrivateIP))
+			Expect(toVxlan(t.netLink.AwaitLink(kubeproxy.VxLANIface)).Group.String()).To(Equal(
+				t.localEndpoint.Spec.GetPrivateIP(k8snet.IPv4)))
 		})
 
 		Context("and old VxLAN routes are present", func() {
@@ -448,11 +450,11 @@ func newLocalEndpoint(hostname string) *submarinerv1.Endpoint {
 			Name: string(uuid.NewUUID()),
 		},
 		Spec: submarinerv1.EndpointSpec{
-			CableName: "submariner-cable-local-192-68-1-2",
-			ClusterID: testing.LocalClusterID,
-			PrivateIP: "192.68.1.2",
-			Hostname:  hostname,
-			Backend:   "libreswan",
+			CableName:  "submariner-cable-local-192-68-1-2",
+			ClusterID:  testing.LocalClusterID,
+			PrivateIPs: []string{"192.68.1.2"},
+			Hostname:   hostname,
+			Backend:    "libreswan",
 		},
 	}
 }
@@ -463,12 +465,12 @@ func newRemoteEndpoint() *submarinerv1.Endpoint {
 			Name: string(uuid.NewUUID()),
 		},
 		Spec: submarinerv1.EndpointSpec{
-			CableName: "submariner-cable-remote-192-68-1-2",
-			ClusterID: "remote",
-			PrivateIP: "192.68.1.2",
-			Hostname:  remoteNodeName,
-			Subnets:   []string{remoteSubnet1, remoteSubnet2},
-			Backend:   "libreswan",
+			CableName:  "submariner-cable-remote-192-68-1-2",
+			ClusterID:  "remote",
+			PrivateIPs: []string{"192.68.1.2"},
+			Hostname:   remoteNodeName,
+			Subnets:    []string{remoteSubnet1, remoteSubnet2},
+			Backend:    "libreswan",
 		},
 	}
 }
