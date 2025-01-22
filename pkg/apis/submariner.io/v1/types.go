@@ -78,6 +78,7 @@ type EndpointSpec struct {
 	// +kubebuilder:validation:MinLength=1
 	ClusterID string `json:"cluster_id"`
 	CableName string `json:"cable_name"`
+	// Deprecated: Get/SetHealthCheckIP() or, if necessary, HealthCheckIPs
 	// +optional
 	HealthCheckIP string `json:"healthCheckIP,omitempty"`
 	// +kubebuilder:validation:MaxItems:=2
@@ -85,11 +86,13 @@ type EndpointSpec struct {
 	HealthCheckIPs []string `json:"healthCheckIPs,omitempty"`
 	Hostname       string   `json:"hostname"`
 	Subnets        []string `json:"subnets"`
+	// Deprecated: Use Get/SetPrivateIP() or, if necessary, PrivateIPs
 	// +optional
 	PrivateIP string `json:"private_ip,omitempty"`
 	// +kubebuilder:validation:MaxItems:=2
 	// +optional
 	PrivateIPs []string `json:"privateIPs,omitempty"`
+	// Deprecated: Set/SetPublicIP() or, if necessary, PublicIPs
 	// +optional
 	PublicIP string `json:"public_ip,omitempty"`
 	// +kubebuilder:validation:MaxItems:=2
