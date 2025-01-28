@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/libovsdbops"
+	libovsdbops "github.com/ovn-org/ovn-kubernetes/go-controller/pkg/libovsdb/ops"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/nbdb"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/submariner/pkg/versions"
@@ -58,7 +58,7 @@ func (c *ConnectionHandler) reconcileOvnLogicalRouterStaticRoutes(remoteSubnets 
 			return item.Nexthop == nextHop && item.IPPrefix == lrsr.IPPrefix
 		}
 
-		err = libovsdbops.CreateOrUpdateLogicalRouterStaticRoutesWithPredicate(c.nbdb, OVNClusterRouter, lrsr, LRSRPred)
+		err = libovsdbops.CreateOrReplaceLogicalRouterStaticRouteWithPredicate(c.nbdb, OVNClusterRouter, lrsr, LRSRPred)
 		if err != nil {
 			return errors.Wrap(err, "failed to create ovn lrsr and add it to the ovn submariner router")
 		}
