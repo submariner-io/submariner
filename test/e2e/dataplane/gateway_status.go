@@ -32,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8snet "k8s.io/utils/net"
 )
 
 var _ = Describe("Gateway status reporting", Label(TestLabel), func() {
@@ -110,7 +111,8 @@ func verifyGateway(gw *submarinerv1.Gateway, otherCluster string, healthCheckedE
 		}
 
 		if healthCheckedEnabled {
-			if len(gw.Status.Connections[i].Endpoint.HealthCheckIPs) == 0 {
+			if gw.Status.Connections[i].Endpoint.GetHealthCheckIP(k8snet.IPv4) == "" &&
+				gw.Status.Connections[i].Endpoint.GetHealthCheckIP(k8snet.IPv6) == "" {
 				return false, fmt.Sprintf("Connection for cluster %q has no health check IP. This could be because the Gateway or"+
 					" Globalnet pod could not determine the cluster's CNI IP address. If so, this would be reported in the pod log.",
 					otherCluster), nil
