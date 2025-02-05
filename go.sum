@@ -441,10 +441,10 @@ github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO
 github.com/stretchr/testify v1.8.1/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o6fzry7u4=
 github.com/stretchr/testify v1.9.0 h1:HtqpIVDClZ4nwg75+f6Lvsy/wHu+3BoSGCbBAcpTsTg=
 github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
-github.com/submariner-io/admiral v0.20.0-m3.0.20250130200921-a919a18a0cdd h1:bmJAdYRm3Z23yBd3uTo62Cq0y3pBMvbNhFbS9RLJ1tI=
-github.com/submariner-io/admiral v0.20.0-m3.0.20250130200921-a919a18a0cdd/go.mod h1:wE2upVWLg1v0Ps9/8RZqRa0Dxp6MxUsp/iFXS2tP3ss=
-github.com/submariner-io/shipyard v0.20.0-m3.0.20250130182730-391836d2402a h1:Wr/SlOM1KqCO4Cqp+NAFKvcK7gkCPehB26awDIJ/KSA=
-github.com/submariner-io/shipyard v0.20.0-m3.0.20250130182730-391836d2402a/go.mod h1:JQ65yiYy8r/B6thPkG1QW/AgDtXoL0lw7fylzfIjG08=
+github.com/submariner-io/admiral v0.20.0-rc0 h1:ZfGDKkbo32e7kFnFbVahk2l1dNv8ecKYeEoo0WK46e8=
+github.com/submariner-io/admiral v0.20.0-rc0/go.mod h1:qiQMi+rY1uaOvZNwIvhn+dgOjPI/kneUpJ4D/MbMtHQ=
+github.com/submariner-io/shipyard v0.20.0-rc0 h1:bCA//A4fW5BTCu7k6LGProROnR578Km9XraghO6ZYWA=
+github.com/submariner-io/shipyard v0.20.0-rc0/go.mod h1:JQ65yiYy8r/B6thPkG1QW/AgDtXoL0lw7fylzfIjG08=
 github.com/tidwall/pretty v1.0.0/go.mod h1:XNkn88O1ChpSDQmQeStsy+sBenx6DDtFZJxhVysOjyk=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
