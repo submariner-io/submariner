@@ -36,7 +36,6 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -117,11 +116,6 @@ func New(config *Config) (*Controller, error) {
 	err = envconfig.Process("submariner", &env)
 	if err != nil {
 		return nil, errors.Wrap(err, "error processing env vars")
-	}
-
-	err = subv1.AddToScheme(scheme.Scheme)
-	if err != nil {
-		return nil, errors.Wrap(err, "error adding submariner types to the scheme")
 	}
 
 	syncerConfig := &syncer.ResourceSyncerConfig{
