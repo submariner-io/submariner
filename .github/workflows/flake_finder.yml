@@ -20,13 +20,13 @@ jobs:
         extra-toggles: ['', 'ovn']
         globalnet: ['', 'globalnet']
         # Run most tests against the latest K8s version
-        k8s_version: ['1.31']
+        k8s_version: ['1.32']
         exclude:
           - cable-driver: wireguard
             extra-toggles: ovn
         include:
           # Test top and bottom of supported K8s version range
-          - k8s_version: '1.28'
+          - k8s_version: '1.29'
     steps:
       - name: Check out the repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
