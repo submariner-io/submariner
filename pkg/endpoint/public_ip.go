@@ -41,22 +41,52 @@ import (
 	k8snet "k8s.io/utils/net"
 )
 
-type publicIPResolverFunction func(clientset kubernetes.Interface, namespace, value string) (string, error)
+type publicIPResolverFunction func(family k8snet.IPFamily, clientset kubernetes.Interface, namespace, value string) (string, error)
 
 var publicIPMethods = map[string]publicIPResolverFunction{
 	v1.API:          publicAPI,
 	v1.IPv4:         publicIP,
+	v1.IPv6:         publicIP,
 	v1.LoadBalancer: publicLoadBalancerIP,
 	v1.DNS:          publicDNSIP,
 }
 
-var IPv4RE = regexp.MustCompile(`(?:\d{1,3}\.){3}\d{1,3}`)
+var (
+	IPv4RE = regexp.MustCompile(`(?:\d{1,3}\.){3}\d{1,3}`)
+	IPv6RE = regexp.MustCompile(
+		`(?i)(?:[a-f0-9]{1,4}:){7}[a-f0-9]{1,4}|` +
+			`(?:[a-f0-9]{1,4}:){1,6}:([a-f0-9]{1,4})?|` +
+			`(?:[a-f0-9]{1,4}:){1,5}(?::[a-f0-9]{1,4}){1,2}|` +
+			`(?:[a-f0-9]{1,4}:){1,4}(?::[a-f0-9]{1,4}){1,3}|` +
+			`(?:[a-f0-9]{1,4}:){1,3}(?::[a-f0-9]{1,4}){1,4}|` +
+			`(?:[a-f0-9]{1,4}:){1,2}(?::[a-f0-9]{1,4}){1,5}|` +
+			`[a-f0-9]{1,4}(?::[a-f0-9]{1,4}){1,6}|` +
+			`::(?:[a-f0-9]{1,4}:){1,7}|` +
+			`::(?:[a-f0-9]{1,4}){1,7}|` +
+			`fe80:(?::[a-f0-9]{0,4}){0,4}%[0-9a-zA-Z]+|` +
+			`::(ffff(?::0{1,4}){0,1}:){0,1}(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?\.){3,3}` +
+			`(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)|` +
+			`(?:[a-f0-9]{1,4}:){1,4}:(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?\.){3,3}` +
+			`(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)|` +
+			`(?:[a-f0-9]{1,4}:){1,7}:?[a-f0-9]{1,4}`,
+	)
+)
 
-func getPublicIPResolvers() string {
-	serverList := []string{
-		"api:ip4.seeip.org", "api:ipecho.net/plain", "api:ifconfig.me",
-		"api:ipinfo.io/ip", "api:4.ident.me", "api:checkip.amazonaws.com", "api:4.icanhazip.com",
-		"api:myexternalip.com/raw", "api:4.tnedi.me", "api:api.ipify.org",
+func getPublicIPResolvers(family k8snet.IPFamily) string {
+	var serverList []string
+
+	switch family {
+	case k8snet.IPv4:
+		serverList = []string{
+			"api:ip4.seeip.org", "api:ipecho.net/plain", "api:ifconfig.me",
+			"api:ipinfo.io/ip", "api:4.ident.me", "api:checkip.amazonaws.com", "api:4.icanhazip.com",
+			"api:myexternalip.com/raw", "api:4.tnedi.me", "api:api.ipify.org",
+		}
+	case k8snet.IPv6:
+		serverList = []string{
+			"api:api64.ipify.org", "api:api6.ipify.org",
+		}
+	case k8snet.IPFamilyUnknown:
 	}
 
 	rand.Shuffle(len(serverList), func(i, j int) { serverList[i], serverList[j] = serverList[j], serverList[i] })
@@ -68,19 +98,19 @@ func getPublicIP(family k8snet.IPFamily, submSpec *types.SubmarinerSpecification
 	backendConfig map[string]string, airGapped bool,
 ) (string, string, error) {
 	switch family {
-	case k8snet.IPv4:
+	case k8snet.IPv4, k8snet.IPv6:
 		// If the node is annotated with a public-ip, the same is used as the public-ip of local endpoint.
 		config, ok := backendConfig[v1.PublicIP]
 		if !ok {
 			if submSpec.PublicIP != "" {
 				config = submSpec.PublicIP
 			} else {
-				config = getPublicIPResolvers()
+				config = getPublicIPResolvers(family)
 			}
 		}
 
 		if airGapped {
-			ip, resolver, err := resolveIPInAirGappedDeployment(k8sClient, submSpec.Namespace, config)
+			ip, resolver, err := resolveIPInAirGappedDeployment(family, k8sClient, submSpec.Namespace, config)
 			if err != nil {
 				logger.Errorf(err, "Error resolving public IP%s in an air-gapped deployment, using empty value: %s", family, config)
 				return "", "", nil
@@ -90,17 +120,24 @@ func getPublicIP(family k8snet.IPFamily, submSpec *types.SubmarinerSpecification
 		}
 
 		resolvers := strings.Split(config, ",")
+
 		errs := make([]error, 0, len(resolvers))
 
 		for _, resolver := range resolvers {
 			resolver = strings.Trim(resolver, " ")
 
 			parts := strings.Split(resolver, ":")
+
+			// for IPv6 format is ipv6=FD00::BE2:54:34:2
+			if len(parts) != 2 && family == k8snet.IPv6 {
+				parts = strings.Split(resolver, "=")
+			}
+
 			if len(parts) != 2 {
 				return "", "", errors.Errorf("invalid format for %q annotation: %q", v1.GatewayConfigPrefix+v1.PublicIP, config)
 			}
 
-			ip, err := resolvePublicIP(k8sClient, submSpec.Namespace, parts)
+			ip, err := resolvePublicIP(family, k8sClient, submSpec.Namespace, parts)
 			if err == nil {
 				return ip, resolver, nil
 			}
@@ -113,30 +150,35 @@ func getPublicIP(family k8snet.IPFamily, submSpec *types.SubmarinerSpecification
 			return "", "", errors.Wrapf(k8serrors.NewAggregate(errs), "Unable to resolve public IP by any of the resolver methods")
 		}
 
-	case k8snet.IPv6:
-		// TODO_IPV6: add V6 healthcheck IP
 	case k8snet.IPFamilyUnknown:
 	}
 
 	return "", "", nil
 }
 
-func resolveIPInAirGappedDeployment(k8sClient kubernetes.Interface, namespace, config string) (string, string, error) {
+func resolveIPInAirGappedDeployment(
+	family k8snet.IPFamily, k8sClient kubernetes.Interface, namespace, config string,
+) (string, string, error) {
 	resolvers := strings.Split(config, ",")
 
 	for _, resolver := range resolvers {
 		resolver = strings.Trim(resolver, " ")
 
 		parts := strings.Split(resolver, ":")
+		// for IPv6 format is ipv6=FD00::BE2:54:34:2
+		if len(parts) != 2 && family == k8snet.IPv6 {
+			parts = strings.Split(resolver, "=")
+		}
+
 		if len(parts) != 2 {
 			return "", "", errors.Errorf("invalid format for %q annotation: %q", v1.GatewayConfigPrefix+v1.PublicIP, config)
 		}
 
-		if parts[0] != v1.IPv4 {
+		if parts[0] != v1.IPv4 && parts[0] != v1.IPv6 {
 			continue
 		}
 
-		ip, err := resolvePublicIP(k8sClient, namespace, parts)
+		ip, err := resolvePublicIP(family, k8sClient, namespace, parts)
 
 		return ip, resolver, err
 	}
@@ -144,16 +186,16 @@ func resolveIPInAirGappedDeployment(k8sClient kubernetes.Interface, namespace, c
 	return "", "", nil
 }
 
-func resolvePublicIP(k8sClient kubernetes.Interface, namespace string, parts []string) (string, error) {
+func resolvePublicIP(family k8snet.IPFamily, k8sClient kubernetes.Interface, namespace string, parts []string) (string, error) {
 	method, ok := publicIPMethods[parts[0]]
 	if !ok {
 		return "", errors.Errorf("unknown resolver %q in %q annotation", parts[0], v1.GatewayConfigPrefix+v1.PublicIP)
 	}
 
-	return method(k8sClient, namespace, parts[1])
+	return method(family, k8sClient, namespace, parts[1])
 }
 
-func publicAPI(_ kubernetes.Interface, _, value string) (string, error) {
+func publicAPI(family k8snet.IPFamily, _ kubernetes.Interface, _, value string) (string, error) {
 	url := "https://" + value
 
 	httpClient := http.Client{
@@ -175,11 +217,11 @@ func publicAPI(_ kubernetes.Interface, _, value string) (string, error) {
 		return "", errors.Wrapf(err, "reading API response from %s", url)
 	}
 
-	return firstIPv4InString(string(body))
+	return firstIPInString(family, string(body))
 }
 
-func publicIP(_ kubernetes.Interface, _, value string) (string, error) {
-	return firstIPv4InString(value)
+func publicIP(family k8snet.IPFamily, _ kubernetes.Interface, _, value string) (string, error) {
+	return firstIPInString(family, value)
 }
 
 var loadBalancerRetryConfig = wait.Backoff{
@@ -189,7 +231,7 @@ var loadBalancerRetryConfig = wait.Backoff{
 	Steps:    24,
 }
 
-func publicLoadBalancerIP(clientset kubernetes.Interface, namespace, loadBalancerName string) (string, error) {
+func publicLoadBalancerIP(family k8snet.IPFamily, clientset kubernetes.Interface, namespace, loadBalancerName string) (string, error) {
 	ip := ""
 
 	err := retry.OnError(loadBalancerRetryConfig, func(err error) bool {
@@ -205,44 +247,59 @@ func publicLoadBalancerIP(clientset kubernetes.Interface, namespace, loadBalance
 			return errors.Errorf("service %q doesn't contain any LoadBalancer ingress yet", loadBalancerName)
 		}
 
-		ingress := service.Status.LoadBalancer.Ingress[0]
-
-		switch {
-		case ingress.IP != "":
-			ip = ingress.IP
-			return nil
-
-		case ingress.Hostname != "":
-			ip, err = publicDNSIP(clientset, namespace, ingress.Hostname)
-			return err
-
-		default:
-			return errors.Errorf("no IP or Hostname for service LoadBalancer %q Ingress", loadBalancerName)
+		for _, ingress := range service.Status.LoadBalancer.Ingress {
+			switch {
+			case ingress.IP != "":
+				if k8snet.IPFamilyOfString(ingress.IP) == family {
+					ip = ingress.IP
+					return nil
+				}
+			case ingress.Hostname != "":
+				ip, err = publicDNSIP(family, clientset, namespace, ingress.Hostname)
+				return err
+			}
 		}
+
+		return errors.Errorf("no IP or Hostname for service LoadBalancer %q Ingress", loadBalancerName)
 	})
 
 	return ip, err //nolint:wrapcheck  // No need to wrap here
 }
 
-func publicDNSIP(_ kubernetes.Interface, _, fqdn string) (string, error) {
+func publicDNSIP(family k8snet.IPFamily, _ kubernetes.Interface, _, fqdn string) (string, error) {
 	ips, err := net.LookupIP(fqdn)
 	if err != nil {
 		return "", errors.Wrapf(err, "error resolving DNS hostname %q for public IP", fqdn)
 	}
 
-	if len(ips) > 1 {
-		sort.Slice(ips, func(i, j int) bool {
-			return bytes.Compare(ips[i], ips[j]) < 0
+	var filteredIPs []net.IP
+
+	for _, ip := range ips {
+		if k8snet.IPFamilyOf(ip) == family {
+			filteredIPs = append(filteredIPs, ip)
+		}
+	}
+
+	if len(filteredIPs) > 1 {
+		sort.Slice(filteredIPs, func(i, j int) bool {
+			return bytes.Compare(filteredIPs[i], filteredIPs[j]) < 0
 		})
 	}
 
-	return ips[0].String(), nil
+	return filteredIPs[0].String(), nil
 }
 
-func firstIPv4InString(body string) (string, error) {
-	matches := IPv4RE.FindAllString(body, -1)
+func firstIPInString(family k8snet.IPFamily, body string) (string, error) {
+	var matches []string
+
+	if family == k8snet.IPv4 {
+		matches = IPv4RE.FindAllString(body, -1)
+	} else {
+		matches = IPv6RE.FindAllString(body, -1)
+	}
+
 	if len(matches) == 0 {
-		return "", errors.Errorf("No IPv4 found in: %q", body)
+		return "", errors.Errorf("No IPv%s found in: %q", family, body)
 	}
 
 	return matches[0], nil

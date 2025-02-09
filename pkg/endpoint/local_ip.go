@@ -19,37 +19,57 @@ limitations under the License.
 package endpoint
 
 import (
+	"fmt"
 	"net"
 
+	"github.com/pkg/errors"
+	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	k8snet "k8s.io/utils/net"
 )
 
-var familyToDestIP = map[k8snet.IPFamily]string{
-	k8snet.IPv4: "8.8.8.8",
-	k8snet.IPv6: "2001:4860:4860::8888",
-}
+var (
+	familyToDestIP = map[k8snet.IPFamily]string{
+		k8snet.IPv4: "8.8.8.8",
+		k8snet.IPv6: "2001:4860:4860::8888",
+	}
+	GetLocalIPFromRoutesFunc func(family k8snet.IPFamily) string
+)
 
-func getLocalIPv4ForDestination(dst string) string {
-	conn, err := net.Dial("udp4", dst+":53")
-	logger.FatalOnError(err, "Error getting local IP")
+func getLocalIPFromRoutes(family k8snet.IPFamily) (string, error) {
+	netlink := netlinkAPI.New()
 
-	defer conn.Close()
+	routes, err := netlink.RouteList(nil, family)
+	if err != nil {
+		return "", errors.Wrapf(err, "error listing routes for IPv%v", family)
+	}
 
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	for i := range routes {
+		if routes[i].Gw != nil {
+			return routes[i].Src.String(), nil
+		}
+	}
 
-	return localAddr.IP.String()
+	return "", errors.Errorf("couldn't find route for family %v", family)
 }
 
 func GetLocalIPForDestination(dst string, family k8snet.IPFamily) string {
-	switch family {
-	case k8snet.IPv4:
-		return getLocalIPv4ForDestination(dst)
-	case k8snet.IPv6:
-		// TODO_IPV6: add V6 healthcheck IP
-	case k8snet.IPFamilyUnknown:
+	conn, err := net.Dial("udp"+string(family), "["+dst+"]:53")
+	if err == nil {
+		defer conn.Close()
+		localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+		return localAddr.IP.String()
 	}
 
-	return ""
+	// hook for testing because GHA doesn't support IPv6
+	if GetLocalIPFromRoutesFunc != nil {
+		return GetLocalIPFromRoutesFunc(family)
+	}
+	// connection failed try fallback method
+	localIP, err := getLocalIPFromRoutes(family)
+	logger.FatalOnError(err, fmt.Sprintf("Error getting local IPv%v", family))
+
+	return localIP
 }
 
 func GetLocalIP(family k8snet.IPFamily) string {

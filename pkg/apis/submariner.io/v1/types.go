@@ -117,6 +117,7 @@ const (
 // Valid PublicIP resolvers.
 const (
 	IPv4         = "ipv4" // ipv4:1.2.3.4
+	IPv6         = "ipv6" // ipv6=FD00::BE2:54:34:2/7
 	LoadBalancer = "lb"   // lb:external-gw-lb
 	API          = "api"  // api:api.ipify.org
 	DNS          = "dns"  // dns:mygateway.dns.name.com
