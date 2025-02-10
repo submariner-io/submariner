@@ -4,6 +4,7 @@ export BASE_BRANCH
 # Running in Dapper
 ifneq (,$(DAPPER_HOST_ARCH))
 IMAGES ?= submariner-gateway submariner-route-agent submariner-globalnet
+export LOCAL_COMPONENTS := submariner-gateway submariner-globalnet submariner-routeagent
 MULTIARCH_IMAGES ?= $(IMAGES)
 PLATFORMS ?= linux/amd64,linux/arm64
 RESTART ?= all
