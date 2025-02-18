@@ -27,19 +27,38 @@ import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cableengine"
 	"k8s.io/apimachinery/pkg/runtime"
+	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type controller struct {
-	engine cableengine.Engine
+	engine          cableengine.Engine
+	localIPFamilies [2]k8snet.IPFamily
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("Tunnel")}
+
+func findCommonIPFamilies(local, remote [2]k8snet.IPFamily) []k8snet.IPFamily {
+	common := []k8snet.IPFamily{}
+
+	for _, lf := range local {
+		for _, rf := range remote {
+			if lf == rf {
+				common = append(common, lf)
+				break
+			}
+		}
+	}
+
+	return common
+}
 
 func StartController(engine cableengine.Engine, namespace string, config *watcher.Config, stopCh <-chan struct{}) error {
 	logger.Info("Starting the tunnel controller")
 
 	c := &controller{engine: engine}
+
+	c.localIPFamilies = c.engine.GetLocalEndpoint().Spec.GetIPFamilies()
 
 	config.ResourceConfigs = []watcher.ResourceConfig{
 		{
@@ -76,26 +95,42 @@ func (c *controller) handleCreatedOrUpdatedEndpoint(obj runtime.Object, _ int) b
 
 	logger.V(log.TRACE).Infof("Tunnel controller processing added or updated submariner Endpoint object: %#v", endpoint)
 
-	err := c.engine.InstallCable(endpoint)
-	if err != nil {
-		logger.Errorf(err, "Error installing cable for Endpoint %#v", endpoint)
-		return true
+	commonIPFamilies := findCommonIPFamilies(c.localIPFamilies, endpoint.Spec.GetIPFamilies())
+
+	var errs []error
+
+	for _, family := range commonIPFamilies {
+		err := c.engine.InstallCable(endpoint, family)
+		if err != nil {
+			logger.Errorf(err, "Error installing IPv%v cable for Endpoint %#v", family, endpoint)
+			errs = append(errs, err)
+		}
 	}
 
-	return false
+	return len(errs) > 0
 }
 
 func (c *controller) handleRemovedEndpoint(obj runtime.Object, _ int) bool {
 	endpoint := obj.(*v1.Endpoint)
 
+	commonIPFamilies := findCommonIPFamilies(c.localIPFamilies, endpoint.Spec.GetIPFamilies())
+
 	logger.V(log.DEBUG).Infof("Tunnel controller processing removed submariner Endpoint object: %#v", endpoint)
 
-	if err := c.engine.RemoveCable(endpoint); err != nil {
-		logger.Errorf(err, "Tunnel controller failed to remove Endpoint cable %#v from the engine", endpoint)
+	var errs []error
+
+	for _, family := range commonIPFamilies {
+		if err := c.engine.RemoveCable(endpoint, family); err != nil {
+			logger.Errorf(err, "Tunnel controller failed to remove Endpoint IPv%v cable %#v from the engine", family, endpoint)
+			errs = append(errs, err)
+		}
+	}
+
+	if len(errs) > 0 {
 		return true
 	}
 
-	logger.V(log.DEBUG).Infof("Tunnel controller successfully removed Endpoint cable %s from the engine", endpoint.Spec.CableName)
+	logger.V(log.DEBUG).Infof("Tunnel controller processing removed submariner Endpoint object: %#v", endpoint)
 
 	return false
 }

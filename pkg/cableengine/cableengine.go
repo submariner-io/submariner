@@ -31,6 +31,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	// Add supported drivers.
@@ -50,10 +51,10 @@ type Engine interface {
 	// InstallCable performs any set up work needed for connecting to given remote endpoint.
 	// Once InstallCable completes, it should be possible to connect to remote
 	// Pods or Services behind the given endpoint.
-	InstallCable(remote *v1.Endpoint) error
+	InstallCable(remote *v1.Endpoint, family k8snet.IPFamily) error
 	// RemoveCable disconnects the Engine from the given remote endpoint. Upon completion.
 	// remote Pods and Service may not be accessible anymore.
-	RemoveCable(remote *v1.Endpoint) error
+	RemoveCable(remote *v1.Endpoint, family k8snet.IPFamily) error
 	// ListCableConnections returns a list of cable connection, and the related status.
 	ListCableConnections() ([]v1.Connection, error)
 	// GetLocalEndpoint returns the local endpoint for this cable engine.
@@ -156,13 +157,14 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 	i.Lock()
 	defer i.Unlock()
 
-	if _, ok := i.natDiscoveryPending[rnat.Endpoint.Spec.CableName]; !ok {
+	familyCableName := rnat.Endpoint.Spec.GetFamilyCableName(rnat.UseFamily)
+	if _, ok := i.natDiscoveryPending[familyCableName]; !ok {
 		return nil
 	}
 
-	i.natDiscoveryPending[rnat.Endpoint.Spec.CableName]--
-	if i.natDiscoveryPending[rnat.Endpoint.Spec.CableName] == 0 {
-		delete(i.natDiscoveryPending, rnat.Endpoint.Spec.CableName)
+	i.natDiscoveryPending[familyCableName]--
+	if i.natDiscoveryPending[familyCableName] == 0 {
+		delete(i.natDiscoveryPending, familyCableName)
 	}
 
 	if !i.running {
@@ -230,7 +232,7 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 	return nil
 }
 
-func (i *engine) InstallCable(endpoint *v1.Endpoint) error {
+func (i *engine) InstallCable(endpoint *v1.Endpoint, family k8snet.IPFamily) error {
 	if endpoint.Spec.ClusterID == i.localCluster.ID {
 		logger.V(log.TRACE).Infof("Not installing cable for local cluster")
 		return nil
@@ -242,28 +244,28 @@ func (i *engine) InstallCable(endpoint *v1.Endpoint) error {
 	}
 
 	i.Lock()
-	i.natDiscoveryPending[endpoint.Spec.CableName]++
+	i.natDiscoveryPending[endpoint.Spec.GetFamilyCableName(family)]++
 	i.Unlock()
 
-	i.natDiscovery.AddEndpoint(endpoint)
+	i.natDiscovery.AddEndpoint(endpoint, family)
 
 	return nil
 }
 
-func (i *engine) RemoveCable(endpoint *v1.Endpoint) error {
+func (i *engine) RemoveCable(endpoint *v1.Endpoint, family k8snet.IPFamily) error {
 	if endpoint.Spec.ClusterID == i.localCluster.ID {
 		logger.V(log.DEBUG).Infof("Cables are not added/removed for the local cluster, skipping removal")
 		return nil
 	}
 
-	logger.Infof("Removing Endpoint cable %q", endpoint.Spec.CableName)
-
-	i.natDiscovery.RemoveEndpoint(endpoint.Spec.CableName)
+	logger.Infof("Removing Endpoint IPv%v cable %q", family, endpoint.Spec.CableName)
+	familyCableName := endpoint.Spec.GetFamilyCableName(family)
+	i.natDiscovery.RemoveEndpoint(familyCableName)
 
 	i.Lock()
 	defer i.Unlock()
 
-	delete(i.natDiscoveryPending, endpoint.Spec.CableName)
+	delete(i.natDiscoveryPending, familyCableName)
 
 	if _, ok := i.installedCables[endpoint.Spec.CableName]; !ok {
 		return nil
@@ -276,7 +278,7 @@ func (i *engine) RemoveCable(endpoint *v1.Endpoint) error {
 
 	delete(i.installedCables, endpoint.Spec.CableName)
 
-	logger.Infof("Successfully removed Endpoint cable %q", endpoint.Spec.CableName)
+	logger.Infof("Successfully removed IPv%v Endpoint cable %q", family, endpoint.Spec.CableName)
 
 	return nil
 }

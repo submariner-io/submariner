@@ -33,7 +33,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 
 	BeforeEach(func() {
 		remoteEndpoint = createTestRemoteEndpoint()
-		rnat = newRemoteEndpointNAT(&remoteEndpoint)
+		rnat = newRemoteEndpointNAT(&remoteEndpoint, k8snet.IPv4)
 	})
 
 	When("first created", func() {
@@ -62,7 +62,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 		When("targeting a load balancer", func() {
 			It("should report as timed out earlier", func() {
 				remoteEndpoint.Spec.BackendConfig[submarinerv1.UsingLoadBalancer] = "true"
-				rnat = newRemoteEndpointNAT(&remoteEndpoint)
+				rnat = newRemoteEndpointNAT(&remoteEndpoint, k8snet.IPv4)
 				rnat.started = time.Now().Add(-toDuration(&totalTimeoutLoadBalancer))
 				Expect(rnat.hasTimedOut()).To(BeTrue())
 			})
@@ -89,7 +89,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 		Context("and targeting a load balancer", func() {
 			It("should select the public IP and NAT", func() {
 				remoteEndpoint.Spec.BackendConfig[submarinerv1.UsingLoadBalancer] = "true"
-				rnat = newRemoteEndpointNAT(&remoteEndpoint)
+				rnat = newRemoteEndpointNAT(&remoteEndpoint, k8snet.IPv4)
 				rnat.endpoint.Spec.NATEnabled = false
 				rnat.useLegacyNATSettings()
 				Expect(rnat.state).To(Equal(selectedPublicIP))
@@ -102,7 +102,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 	When("the public IP is selected but no check was sent", func() {
 		It("it should not transition the state", func() {
 			oldState := rnat.state
-			Expect(rnat.transitionToPublicIP(testRemoteEndpointName, false)).To(BeFalse())
+			Expect(rnat.transitionToPublicIP(testRemoteEndpointNameAndFamily, false)).To(BeFalse())
 			Expect(rnat.state).To(Equal(oldState))
 			Expect(rnat.useIP).To(Equal(""))
 		})
@@ -111,7 +111,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 	When("the private IP is selected but no check was sent", func() {
 		It("it should not transition the state", func() {
 			oldState := rnat.state
-			Expect(rnat.transitionToPrivateIP(testRemoteEndpointName, false)).To(BeFalse())
+			Expect(rnat.transitionToPrivateIP(testRemoteEndpointNameAndFamily, false)).To(BeFalse())
 			Expect(rnat.state).To(Equal(oldState))
 			Expect(rnat.useIP).To(Equal(""))
 		})
@@ -123,7 +123,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 
 		JustBeforeEach(func() {
 			rnat.checkSent()
-			Expect(rnat.transitionToPrivateIP(testRemoteEndpointName, useNAT)).To(BeTrue())
+			Expect(rnat.transitionToPrivateIP(testRemoteEndpointNameAndFamily, useNAT)).To(BeTrue())
 			Expect(rnat.state).To(Equal(selectedPrivateIP))
 		})
 
@@ -158,7 +158,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 
 		JustBeforeEach(func() {
 			rnat.checkSent()
-			Expect(rnat.transitionToPublicIP(testRemoteEndpointName, useNAT)).To(BeTrue())
+			Expect(rnat.transitionToPublicIP(testRemoteEndpointNameAndFamily, useNAT)).To(BeTrue())
 			Expect(rnat.state).To(Equal(selectedPublicIP))
 		})
 
@@ -191,8 +191,8 @@ var _ = Describe("remoteEndpointNAT", func() {
 		Context("and the grace period has not elapsed", func() {
 			It("should use the private IP", func() {
 				rnat.checkSent()
-				Expect(rnat.transitionToPublicIP(testRemoteEndpointName, true)).To(BeTrue())
-				Expect(rnat.transitionToPrivateIP(testRemoteEndpointName, false)).To(BeTrue())
+				Expect(rnat.transitionToPublicIP(testRemoteEndpointNameAndFamily, true)).To(BeTrue())
+				Expect(rnat.transitionToPrivateIP(testRemoteEndpointNameAndFamily, false)).To(BeTrue())
 				Expect(rnat.state).To(Equal(selectedPrivateIP))
 				Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.GetPrivateIP(k8snet.IPv4)))
 				Expect(rnat.useNAT).To(BeFalse())
@@ -202,9 +202,9 @@ var _ = Describe("remoteEndpointNAT", func() {
 		Context("and the grace period has elapsed", func() {
 			It("should still use the public IP", func() {
 				rnat.checkSent()
-				Expect(rnat.transitionToPublicIP(testRemoteEndpointName, true)).To(BeTrue())
+				Expect(rnat.transitionToPublicIP(testRemoteEndpointNameAndFamily, true)).To(BeTrue())
 				rnat.lastTransition = rnat.lastTransition.Add(-time.Duration(publicToPrivateFailoverTimeout))
-				Expect(rnat.transitionToPrivateIP(testRemoteEndpointName, false)).To(BeFalse())
+				Expect(rnat.transitionToPrivateIP(testRemoteEndpointNameAndFamily, false)).To(BeFalse())
 				Expect(rnat.state).To(Equal(selectedPublicIP))
 				Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.GetPublicIP(k8snet.IPv4)))
 				Expect(rnat.useNAT).To(BeTrue())

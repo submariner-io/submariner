@@ -55,6 +55,7 @@ import (
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	k8snet "k8s.io/utils/net"
 )
 
 const publicIP = "1.2.3.4"
@@ -487,7 +488,7 @@ func (n *fakeNATDiscovery) Run(_ <-chan struct{}) error {
 	return nil
 }
 
-func (n *fakeNATDiscovery) AddEndpoint(ep *submarinerv1.Endpoint) {
+func (n *fakeNATDiscovery) AddEndpoint(ep *submarinerv1.Endpoint, _ k8snet.IPFamily) {
 	n.readyChannel <- &natdiscovery.NATEndpointInfo{
 		Endpoint: *ep,
 	}

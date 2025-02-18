@@ -130,9 +130,10 @@ var _ = Describe("Managing tunnels", func() {
 
 	verifyConnectToEndpoint := func() {
 		fakeDriver.AwaitConnectToEndpoint(&natdiscovery.NATEndpointInfo{
-			UseIP:    endpoint.Spec.GetPrivateIP(k8snet.IPv4),
-			UseNAT:   false,
-			Endpoint: *endpoint,
+			UseIP:     endpoint.Spec.GetPrivateIP(k8snet.IPv4),
+			UseNAT:    false,
+			Endpoint:  *endpoint,
+			UseFamily: k8snet.IPv4,
 		})
 	}
 

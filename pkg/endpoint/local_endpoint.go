@@ -188,10 +188,10 @@ func GetLocalSpec(ctx context.Context, submSpec *types.SubmarinerSpecification, 
 	for _, family := range submSpec.GetIPFamilies() {
 		publicIP, resolver, err := getPublicIP(family, submSpec, k8sClient, backendConfig, airGappedDeployment)
 		if err != nil {
-			return nil, errors.Wrapf(err, "could not determine public IP%v", family)
+			return nil, errors.Wrapf(err, "could not determine public IPv%v", family)
 		}
 
-		logger.Infof("Obtained local endpoint public IP%v %q using resolver %q", family, publicIP, resolver)
+		logger.Infof("Obtained local endpoint public IPv%v %q using resolver %q", family, publicIP, resolver)
 		endpointSpec.SetPublicIP(publicIP)
 	}
 
@@ -203,7 +203,7 @@ func GetLocalSpec(ctx context.Context, submSpec *types.SubmarinerSpecification, 
 		for _, family := range submSpec.GetIPFamilies() {
 			healthcheckIP, err := getHealthCheckIP(family, submSpec)
 			if err != nil {
-				return nil, fmt.Errorf("error getting HealthCheckIP%v: %w", family, err)
+				return nil, fmt.Errorf("error getting HealthCheckIPv%v: %w", family, err)
 			}
 
 			endpointSpec.SetHealthCheckIP(healthcheckIP)

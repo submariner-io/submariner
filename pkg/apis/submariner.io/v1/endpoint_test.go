@@ -39,6 +39,7 @@ var _ = Describe("EndpointSpec", func() {
 	Context("SetPublicIP", testSetPublicIP)
 	Context("GetPrivateIP", testGetPrivateIP)
 	Context("SetPrivateIP", testSetPrivateIP)
+	Context("GetFamilyCableName", testGetFamilyCableName)
 })
 
 func testGenerateName() {
@@ -395,5 +396,31 @@ func testSetPrivateIP() {
 		s.SetPrivateIP(ip)
 	}, func(s *v1.EndpointSpec) ([]string, string) {
 		return s.PrivateIPs, s.PrivateIP
+	})
+}
+
+func testGetFamilyCableName() {
+	var spec *v1.EndpointSpec
+
+	BeforeEach(func() {
+		spec = &v1.EndpointSpec{
+			CableName: "submariner-cable-east-172-16-32-5",
+		}
+	})
+
+	Context("with IPv4 family", func() {
+		It("should return the cable name with v4 suffix", func() {
+			expected := spec.CableName + "-v4"
+			result := spec.GetFamilyCableName(k8snet.IPv4)
+			Expect(result).To(Equal(expected))
+		})
+	})
+
+	Context("with IPv6 family", func() {
+		It("should return the cable name with v6 suffix", func() {
+			expected := spec.CableName + "-v6"
+			result := spec.GetFamilyCableName(k8snet.IPv6)
+			Expect(result).To(Equal(expected))
+		})
 	})
 }

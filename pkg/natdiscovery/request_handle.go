@@ -31,11 +31,16 @@ import (
 func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscoveryRequest, addr *net.UDPAddr) error {
 	localEndpointSpec := nd.localEndpoint.Spec()
 
+	family := k8snet.IPv4
+	if addr.IP.To4() == nil {
+		family = k8snet.IPv6
+	}
+
 	response := proto.SubmarinerNATDiscoveryResponse{
 		RequestNumber: req.GetRequestNumber(),
 		Sender: &proto.EndpointDetails{
 			ClusterId:  localEndpointSpec.ClusterID,
-			EndpointId: localEndpointSpec.CableName,
+			EndpointId: localEndpointSpec.GetFamilyCableName(family),
 		},
 		Receiver: req.GetSender(),
 		ReceivedSrc: &proto.IPPortPair{
@@ -64,7 +69,7 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscove
 		return nd.sendResponseToAddress(&response, addr)
 	}
 
-	if req.GetReceiver().GetEndpointId() != localEndpointSpec.CableName {
+	if req.GetReceiver().GetEndpointId() != localEndpointSpec.GetFamilyCableName(family) {
 		logger.Warningf("Received NAT discovery packet for endpoint %q, but we are endpoint %q "+
 			"if the port for NAT discovery has been mapped somewhere an error may exist", req.GetReceiver().GetEndpointId(),
 			localEndpointSpec.CableName)
