@@ -24,6 +24,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/slices"
 	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -97,4 +98,19 @@ func ExtractIPv4Subnets(cidrList []string) []string {
 	}
 
 	return ipv4Cidrs
+}
+
+func ExtractIPFamilies(fromCIDRs []string) []k8snet.IPFamily {
+	var ipFamilies []k8snet.IPFamily
+
+	for _, cidr := range fromCIDRs {
+		f := k8snet.IPFamilyOfCIDRString(cidr)
+		if f != k8snet.IPFamilyUnknown {
+			ipFamilies, _ = slices.AppendIfNotPresent(ipFamilies, f, func(e k8snet.IPFamily) k8snet.IPFamily {
+				return e
+			})
+		}
+	}
+
+	return ipFamilies
 }

@@ -121,7 +121,8 @@ var _ = Describe("Run", func() {
 		It("should re-acquire the leader lease after the failure is cleared", func() {
 			endpoint := t.awaitRemoteEndpointSyncedLocal(t.createRemoteEndpointOnBroker())
 			fakeDriver.AwaitConnectToEndpoint(&natdiscovery.NATEndpointInfo{
-				Endpoint: *endpoint,
+				Endpoint:  *endpoint,
+				UseFamily: k8snet.IPv4,
 			})
 
 			By("Setting leases resource updates to fail")
@@ -172,7 +173,8 @@ var _ = Describe("Run", func() {
 
 			endpoint2 := t.awaitRemoteEndpointSyncedLocal(brokerEndpoint)
 			fakeDriver.AwaitConnectToEndpoint(&natdiscovery.NATEndpointInfo{
-				Endpoint: *endpoint2,
+				Endpoint:  *endpoint2,
+				UseFamily: k8snet.IPv4,
 			})
 
 			fakeDriver.AwaitDisconnectFromEndpoint(&endpoint.Spec)
@@ -488,9 +490,10 @@ func (n *fakeNATDiscovery) Run(_ <-chan struct{}) error {
 	return nil
 }
 
-func (n *fakeNATDiscovery) AddEndpoint(ep *submarinerv1.Endpoint, _ k8snet.IPFamily) {
+func (n *fakeNATDiscovery) AddEndpoint(ep *submarinerv1.Endpoint, family k8snet.IPFamily) {
 	n.readyChannel <- &natdiscovery.NATEndpointInfo{
-		Endpoint: *ep,
+		Endpoint:  *ep,
+		UseFamily: family,
 	}
 }
 

@@ -47,6 +47,7 @@ import (
 
 const (
 	namespace = "submariner"
+	ipV4CIDR  = "1.2.3.4/16"
 )
 
 func init() {
@@ -64,14 +65,20 @@ var _ = BeforeSuite(func() {
 
 var _ = Describe("Managing tunnels", func() {
 	var (
-		config    *watcher.Config
-		endpoints dynamic.ResourceInterface
-		endpoint  *v1.Endpoint
-		stopCh    chan struct{}
+		config      *watcher.Config
+		endpoints   dynamic.ResourceInterface
+		endpoint    *v1.Endpoint
+		localEPSpec *v1.EndpointSpec
+		stopCh      chan struct{}
 	)
 
 	BeforeEach(func() {
 		fakeDriver = fake.New()
+
+		localEPSpec = &v1.EndpointSpec{
+			Backend: fake.DriverName,
+			Subnets: []string{ipV4CIDR},
+		}
 
 		endpoint = &v1.Endpoint{
 			ObjectMeta: metav1.ObjectMeta{
@@ -83,6 +90,7 @@ var _ = Describe("Managing tunnels", func() {
 				ClusterID:  "east",
 				Hostname:   "redsox",
 				PrivateIPs: []string{"192.68.1.2"},
+				Subnets:    []string{ipV4CIDR},
 			},
 		}
 
@@ -106,9 +114,7 @@ var _ = Describe("Managing tunnels", func() {
 	})
 
 	JustBeforeEach(func() {
-		localEp := submendpoint.NewLocal(&v1.EndpointSpec{
-			Backend: fake.DriverName,
-		}, fakeClient.NewSimpleDynamicClient(kubeScheme.Scheme), "")
+		localEp := submendpoint.NewLocal(localEPSpec, fakeClient.NewSimpleDynamicClient(kubeScheme.Scheme), "")
 
 		engine := cableengine.NewEngine(&types.SubmarinerCluster{}, localEp)
 

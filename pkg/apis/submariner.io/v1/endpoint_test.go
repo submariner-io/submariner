@@ -28,6 +28,8 @@ import (
 const (
 	ipV4Addr = "1.2.3.4"
 	ipV6Addr = "2001:db8:3333:4444:5555:6666:7777:8888"
+	ipV4CIDR = "10.16.1.0/32"
+	ipV6CIDR = "2002::1234:abcd:ffff:c0a8:101/64"
 )
 
 var _ = Describe("EndpointSpec", func() {
@@ -40,6 +42,7 @@ var _ = Describe("EndpointSpec", func() {
 	Context("GetPrivateIP", testGetPrivateIP)
 	Context("SetPrivateIP", testSetPrivateIP)
 	Context("GetFamilyCableName", testGetFamilyCableName)
+	Context("GetIPFamilies", testGetIPFamilies)
 })
 
 func testGenerateName() {
@@ -422,5 +425,14 @@ func testGetFamilyCableName() {
 			result := spec.GetFamilyCableName(k8snet.IPv6)
 			Expect(result).To(Equal(expected))
 		})
+	})
+}
+
+func testGetIPFamilies() {
+	It("should return the correct families", func() {
+		Expect((&v1.EndpointSpec{Subnets: []string{ipV4CIDR}}).GetIPFamilies()).To(Equal([]k8snet.IPFamily{k8snet.IPv4}))
+		Expect((&v1.EndpointSpec{Subnets: []string{ipV6CIDR}}).GetIPFamilies()).To(Equal([]k8snet.IPFamily{k8snet.IPv6}))
+		Expect((&v1.EndpointSpec{Subnets: []string{ipV6CIDR, ipV4CIDR}}).GetIPFamilies()).To(
+			Equal([]k8snet.IPFamily{k8snet.IPv6, k8snet.IPv4}))
 	})
 }

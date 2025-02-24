@@ -23,6 +23,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/slices"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cableengine"
@@ -33,24 +34,15 @@ import (
 
 type controller struct {
 	engine          cableengine.Engine
-	localIPFamilies [2]k8snet.IPFamily
+	localIPFamilies []k8snet.IPFamily
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("Tunnel")}
 
-func findCommonIPFamilies(local, remote [2]k8snet.IPFamily) []k8snet.IPFamily {
-	common := []k8snet.IPFamily{}
-
-	for _, lf := range local {
-		for _, rf := range remote {
-			if lf == rf {
-				common = append(common, lf)
-				break
-			}
-		}
-	}
-
-	return common
+func findCommonIPFamilies(local, remote []k8snet.IPFamily) []k8snet.IPFamily {
+	return slices.Intersect(local, remote, func(e k8snet.IPFamily) k8snet.IPFamily {
+		return e
+	})
 }
 
 func StartController(engine cableengine.Engine, namespace string, config *watcher.Config, stopCh <-chan struct{}) error {

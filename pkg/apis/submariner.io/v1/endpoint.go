@@ -25,6 +25,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/resource"
+	"github.com/submariner-io/submariner/pkg/cidr"
 	"k8s.io/apimachinery/pkg/api/equality"
 	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -173,12 +174,8 @@ func (ep *EndpointSpec) SetPrivateIP(ip string) {
 	ep.PrivateIPs, ep.PrivateIP = setIP(ep.PrivateIPs, ep.PrivateIP, ip)
 }
 
-func (ep *EndpointSpec) GetIPFamilies() [2]k8snet.IPFamily {
-	var ipFamilies [2]k8snet.IPFamily
-	// TODO_IPV6: set ipFamilies according to Subnets content
-	ipFamilies[0] = k8snet.IPv4
-
-	return ipFamilies
+func (ep *EndpointSpec) GetIPFamilies() []k8snet.IPFamily {
+	return cidr.ExtractIPFamilies(ep.Subnets)
 }
 
 func (ep *EndpointSpec) GetFamilyCableName(family k8snet.IPFamily) string {
