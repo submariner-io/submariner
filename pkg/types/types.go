@@ -21,6 +21,7 @@ package types
 import (
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	k8snet "k8s.io/utils/net"
+	"k8s.io/utils/set"
 )
 
 type SubmarinerCluster struct {
@@ -52,10 +53,11 @@ type SubmarinerSpecification struct {
 	MetricsPort                   int `default:"32780"`
 }
 
-func (subSpec *SubmarinerSpecification) GetIPFamilies() [2]k8snet.IPFamily {
-	var ipFamilies [2]k8snet.IPFamily
-	// TODO_IPV6: set ipFamilies according to ClusterCidr content
-	ipFamilies[0] = k8snet.IPv4
+func (subSpec *SubmarinerSpecification) GetIPFamilies() []k8snet.IPFamily {
+	ipFamilies := set.New[k8snet.IPFamily]()
 
-	return ipFamilies
+	// TODO_IPV6: set ipFamilies according to ClusterCidr content
+	ipFamilies.Insert(k8snet.IPv4)
+
+	return ipFamilies.UnsortedList()
 }
