@@ -38,7 +38,6 @@ import (
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/vishvananda/netlink"
-	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
@@ -79,7 +78,7 @@ type wireguard struct {
 	localEndpoint v1.EndpointSpec
 	connections   map[string]*v1.Connection // clusterID -> remote ep connection
 	mutex         sync.Mutex
-	client        *wgctrl.Client
+	client        Client
 	netLink       netlinkAPI.Interface
 	link          netlink.Link
 	spec          *specification
@@ -106,7 +105,7 @@ func NewDriver(localEndpoint *endpoint.Local, _ *types.SubmarinerCluster) (cable
 	}
 
 	// Create the controller.
-	if w.client, err = wgctrl.New(); err != nil {
+	if w.client, err = NewClient(); err != nil {
 		if os.IsNotExist(err) {
 			return nil, errors.New("wgctrl is not available on this system")
 		}
