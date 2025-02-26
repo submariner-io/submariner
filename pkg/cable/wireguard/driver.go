@@ -35,6 +35,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
+	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/vishvananda/netlink"
 	"golang.zx2c4.com/wireguard/wgctrl"
@@ -79,6 +80,7 @@ type wireguard struct {
 	connections   map[string]*v1.Connection // clusterID -> remote ep connection
 	mutex         sync.Mutex
 	client        *wgctrl.Client
+	netLink       netlinkAPI.Interface
 	link          netlink.Link
 	spec          *specification
 	psk           *wgtypes.Key
@@ -92,6 +94,7 @@ func NewDriver(localEndpoint *endpoint.Local, _ *types.SubmarinerCluster) (cable
 	w := wireguard{
 		connections: make(map[string]*v1.Connection),
 		spec:        new(specification),
+		netLink:     netlinkAPI.New(),
 	}
 
 	if err = envconfig.Process(cable.IPSecEnvPrefix, w.spec); err != nil {
@@ -180,7 +183,7 @@ func (w *wireguard) Init() error {
 		return fmt.Errorf("cannot initialize with existing connections: %+v", w.connections)
 	}
 
-	l, err := net.InterfaceByName(DefaultDeviceName)
+	l, err := w.netLink.InterfaceByName(DefaultDeviceName)
 	if err != nil {
 		return errors.Wrapf(err, "cannot get wireguard link by name %s", DefaultDeviceName)
 	}
@@ -200,7 +203,7 @@ func (w *wireguard) Init() error {
 	}
 
 	// IP link set $DefaultDeviceName up.
-	if err := netlink.LinkSetUp(w.link); err != nil {
+	if err := w.netLink.LinkSetUp(w.link); err != nil {
 		return errors.Wrap(err, "failed to bring up WireGuard device")
 	}
 
@@ -367,9 +370,9 @@ func (w *wireguard) GetActiveConnections() ([]v1.Connection, error) {
 // Create new wg link and assign addr from local subnets.
 func (w *wireguard) setWGLink() error {
 	// delete existing wg device if needed
-	if link, err := netlink.LinkByName(DefaultDeviceName); err == nil {
+	if link, err := w.netLink.LinkByName(DefaultDeviceName); err == nil {
 		// delete existing device
-		if err := netlink.LinkDel(link); err != nil {
+		if err := w.netLink.LinkDel(link); err != nil {
 			return errors.Wrap(err, "failed to delete existing WireGuard device")
 		}
 	}
@@ -377,18 +380,15 @@ func (w *wireguard) setWGLink() error {
 	// Create the wg device (ip link add dev $DefaultDeviceName type wireguard).
 	la := netlink.NewLinkAttrs()
 	la.Name = DefaultDeviceName
-	link := &netlink.GenericLink{
+
+	w.link = &netlink.GenericLink{
 		LinkAttrs: la,
 		LinkType:  "wireguard",
 	}
 
-	if err := netlink.LinkAdd(link); err == nil {
-		w.link = link
-	} else {
-		return errors.Wrap(err, "failed to add WireGuard device")
-	}
+	err := w.netLink.LinkAdd(w.link)
 
-	return nil
+	return errors.Wrap(err, "failed to add WireGuard device")
 }
 
 // Parse CIDR string and skip errors.
@@ -503,12 +503,12 @@ func genPsk(psk string) (wgtypes.Key, error) {
 func (w *wireguard) Cleanup() error {
 	logger.Info("Uninstalling the wireguard cable driver")
 
-	link, err := netlink.LinkByName(DefaultDeviceName)
+	link, err := w.netLink.LinkByName(DefaultDeviceName)
 	if err != nil && !errors.Is(err, netlink.LinkNotFoundError{}) {
 		return errors.Wrapf(err, "error retrieving the wireguard interface %q", DefaultDeviceName)
 	}
 
-	if err := netlink.LinkDel(link); err != nil {
+	if err := w.netLink.LinkDel(link); err != nil {
 		return errors.Wrapf(err, "failed to delete existing WireGuard device %q", DefaultDeviceName)
 	}
 
