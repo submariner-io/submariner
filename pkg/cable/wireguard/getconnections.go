@@ -19,7 +19,6 @@ limitations under the License.
 package wireguard
 
 import (
-	"fmt"
 	"strconv"
 	"time"
 
@@ -41,8 +40,8 @@ func (w *wireguard) GetConnections() ([]v1.Connection, error) {
 	for i := range d.Peers {
 		key := d.Peers[i].PublicKey
 
-		connection, err := w.connectionByKey(&key)
-		if err != nil {
+		connection := w.connectionByKey(&key)
+		if connection == nil {
 			logger.Warningf("Found unknown peer with key %s, removing", key)
 
 			if err := w.removePeer(&key); err != nil {
@@ -59,18 +58,17 @@ func (w *wireguard) GetConnections() ([]v1.Connection, error) {
 	return connections, nil
 }
 
-func (w *wireguard) connectionByKey(key *wgtypes.Key) (*v1.Connection, error) {
+func (w *wireguard) connectionByKey(key *wgtypes.Key) *v1.Connection {
 	for i := range w.connections {
-		if k, err := keyFromSpec(&w.connections[i].Endpoint); err == nil {
-			if key.String() == k.String() {
-				return w.connections[i], nil
-			}
-		} else {
-			logger.Errorf(err, "Could not compare key for cluster %s, skipping", i)
+		// Since the endpoint was added to the connections list, it must have a valid public key, so we can
+		// safely ignore the error.
+		k, _ := keyFromSpec(&w.connections[i].Endpoint)
+		if key.String() == k.String() {
+			return w.connections[i]
 		}
 	}
 
-	return nil, fmt.Errorf("connection not found for key %s", key)
+	return nil
 }
 
 // Update logic, based on delta from last check good state requires a handshake and traffic if no handshake or stale handshake.
@@ -92,21 +90,17 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 	connectionFamily := connection.GetFamily()
 
 	if p.LastHandshakeTime.IsZero() {
-		if lc > handshakeTimeout.Milliseconds() {
+		if lc > HandshakeTimeout.Milliseconds() {
 			// No initial handshake for too long.
 			connection.SetStatus(v1.ConnectionError, "no initial handshake for %.1f seconds", lcSec)
 			cable.RecordConnection(cableDriverName, &w.localEndpoint, &connection.Endpoint, string(connection.Status), false, connectionFamily)
-
-			return
-		}
-
-		if tx > 0 || rx > 0 {
+		} else if tx > 0 || rx > 0 {
 			// No handshake, but at least some communication in progress.
 			connection.SetStatus(v1.Connecting, "no initial handshake yet")
 			cable.RecordConnection(cableDriverName, &w.localEndpoint, &connection.Endpoint, string(connection.Status), false, connectionFamily)
-
-			return
 		}
+
+		return
 	}
 
 	if tx > 0 || rx > 0 {
@@ -120,7 +114,7 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 
 	handshakeDelta := time.Since(p.LastHandshakeTime)
 
-	if handshakeDelta > handshakeTimeout {
+	if handshakeDelta > HandshakeTimeout {
 		// Hard error, really long time since handshake.
 		connection.SetStatus(v1.ConnectionError, "no handshake for %.1f seconds",
 			handshakeDelta.Seconds())
@@ -131,10 +125,11 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 
 	if lc < 2*keepAliveMS {
 		// Grace period, leave status unchanged.
-		logger.Warningf("No traffic for %.1f seconds; handshake was %.1f seconds ago: %v", lcSec,
+		logger.Warningf("No traffic for %.1f seconds; handshake was %.1f seconds ago: %#v", lcSec,
 			handshakeDelta.Seconds(), connection)
 		return
 	}
+
 	// Soft error, no traffic, stale handshake.
 	connection.SetStatus(v1.ConnectionError, "no bytes sent or received for %.1f seconds",
 		lcSec)
