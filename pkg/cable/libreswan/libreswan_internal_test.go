@@ -228,13 +228,13 @@ func testDisconnectFromEndpoint() {
 		_, err = t.driver.ConnectToEndpoint(natInfo2)
 		Expect(err).To(Succeed())
 
-		Expect(t.driver.DisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: natInfo1.Endpoint.Spec})).To(Succeed())
+		Expect(t.driver.DisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: natInfo1.Endpoint.Spec}, k8snet.IPv4)).To(Succeed())
 		t.assertNoActiveConnection(natInfo1)
 		t.cmdExecutor.AwaitCommand(nil, "whack", "--delete")
 		t.assertActiveConnection(natInfo2)
 		t.cmdExecutor.Clear()
 
-		Expect(t.driver.DisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: natInfo2.Endpoint.Spec})).To(Succeed())
+		Expect(t.driver.DisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: natInfo2.Endpoint.Spec}, k8snet.IPv4)).To(Succeed())
 		t.assertNoActiveConnection(natInfo2)
 		t.cmdExecutor.AwaitCommand(nil, "whack", "--delete")
 	})

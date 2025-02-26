@@ -272,14 +272,17 @@ func (i *libreswan) refreshConnectionStatus() error {
 			}
 		}
 
-		cable.RecordConnection(cableDriverName, &i.localEndpoint, &i.connections[j].Endpoint, string(i.connections[j].Status), false)
-		cable.RecordRxBytes(cableDriverName, &i.localEndpoint, &i.connections[j].Endpoint, rx)
-		cable.RecordTxBytes(cableDriverName, &i.localEndpoint, &i.connections[j].Endpoint, tx)
+		connectionFamily := i.connections[j].GetFamily()
+		cable.RecordConnection(cableDriverName, &i.localEndpoint, &i.connections[j].Endpoint, string(i.connections[j].Status), false,
+			connectionFamily)
+		cable.RecordRxBytes(cableDriverName, &i.localEndpoint, &i.connections[j].Endpoint, rx, connectionFamily)
+		cable.RecordTxBytes(cableDriverName, &i.localEndpoint, &i.connections[j].Endpoint, tx, connectionFamily)
 
 		if !isConnected {
 			// Pluto should be connecting for us
 			i.connections[j].Status = subv1.Connecting
-			cable.RecordConnection(cableDriverName, &i.localEndpoint, &i.connections[j].Endpoint, string(i.connections[j].Status), false)
+			cable.RecordConnection(cableDriverName, &i.localEndpoint, &i.connections[j].Endpoint, string(i.connections[j].Status), false,
+				connectionFamily)
 			logger.V(log.DEBUG).Infof("Connection %q not found in active connections obtained from whack: %v, %v",
 				i.connections[j].Endpoint.CableName, activeConnectionsRx, activeConnectionsTx)
 		}
@@ -407,7 +410,7 @@ func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 
 	i.connections = append(i.connections,
 		subv1.Connection{Endpoint: endpoint.Spec, Status: subv1.Connected, UsingIP: endpointInfo.UseIP, UsingNAT: endpointInfo.UseNAT})
-	cable.RecordConnection(cableDriverName, &i.localEndpoint, &endpoint.Spec, string(subv1.Connected), true)
+	cable.RecordConnection(cableDriverName, &i.localEndpoint, &endpoint.Spec, string(subv1.Connected), true, endpointInfo.UseFamily)
 
 	return endpointInfo.UseIP, nil
 }
@@ -551,7 +554,7 @@ func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo 
 }
 
 // DisconnectFromEndpoint disconnects from the connection to the given endpoint.
-func (i *libreswan) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint) error {
+func (i *libreswan) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint, family k8snet.IPFamily) error {
 	// We'll panic if endpoint is nil, this is intentional
 	leftSubnets := extractSubnets(&i.localEndpoint)
 	rightSubnets := extractSubnets(&endpoint.Spec)
@@ -576,15 +579,19 @@ func (i *libreswan) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint) e
 		}
 	}
 
-	i.connections = removeConnectionForEndpoint(i.connections, endpoint)
-	cable.RecordDisconnected(cableDriverName, &i.localEndpoint, &endpoint.Spec)
+	i.connections = removeConnectionForEndpoint(i.connections, endpoint, family)
+	cable.RecordDisconnected(cableDriverName, &i.localEndpoint, &endpoint.Spec, family)
 
 	return nil
 }
 
-func removeConnectionForEndpoint(connections []subv1.Connection, endpoint *types.SubmarinerEndpoint) []subv1.Connection {
+func removeConnectionForEndpoint(
+	connections []subv1.Connection,
+	endpoint *types.SubmarinerEndpoint,
+	family k8snet.IPFamily,
+) []subv1.Connection {
 	for j := range connections {
-		if connections[j].Endpoint.CableName == endpoint.Spec.CableName {
+		if connections[j].Endpoint.CableName == endpoint.Spec.CableName && connections[j].GetFamily() == family {
 			copy(connections[j:], connections[j+1:])
 			return connections[:len(connections)-1]
 		}

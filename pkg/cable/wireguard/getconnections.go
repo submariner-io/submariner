@@ -27,6 +27,7 @@ import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	k8snet "k8s.io/utils/net"
 )
 
 func (w *wireguard) GetConnections() ([]v1.Connection, error) {
@@ -91,11 +92,13 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 	rx := peerTrafficDelta(connection, receiveBytes, p.ReceiveBytes)
 	lcSec := time.Duration(int64(time.Millisecond) * lc).Seconds()
 
+	connectionFamily := connection.GetFamily()
+
 	if p.LastHandshakeTime.IsZero() {
 		if lc > handshakeTimeout.Milliseconds() {
 			// No initial handshake for too long.
 			connection.SetStatus(v1.ConnectionError, "no initial handshake for %.1f seconds", lcSec)
-			cable.RecordConnection(cableDriverName, &w.localEndpoint, &connection.Endpoint, string(connection.Status), false)
+			cable.RecordConnection(cableDriverName, &w.localEndpoint, &connection.Endpoint, string(connection.Status), false, connectionFamily)
 
 			return
 		}
@@ -103,7 +106,7 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 		if tx > 0 || rx > 0 {
 			// No handshake, but at least some communication in progress.
 			connection.SetStatus(v1.Connecting, "no initial handshake yet")
-			cable.RecordConnection(cableDriverName, &w.localEndpoint, &connection.Endpoint, string(connection.Status), false)
+			cable.RecordConnection(cableDriverName, &w.localEndpoint, &connection.Endpoint, string(connection.Status), false, connectionFamily)
 
 			return
 		}
@@ -112,8 +115,8 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 	if tx > 0 || rx > 0 {
 		// All is good.
 		connection.SetStatus(v1.Connected, "Rx=%d Bytes, Tx=%d Bytes", p.ReceiveBytes, p.TransmitBytes)
-		cable.RecordConnection(cableDriverName, &w.localEndpoint, &connection.Endpoint, string(connection.Status), false)
-		saveAndRecordPeerTraffic(&w.localEndpoint, &connection.Endpoint, now, p.TransmitBytes, p.ReceiveBytes)
+		cable.RecordConnection(cableDriverName, &w.localEndpoint, &connection.Endpoint, string(connection.Status), false, connectionFamily)
+		saveAndRecordPeerTraffic(&w.localEndpoint, &connection.Endpoint, now, p.TransmitBytes, p.ReceiveBytes, connectionFamily)
 
 		return
 	}
@@ -124,7 +127,7 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 		// Hard error, really long time since handshake.
 		connection.SetStatus(v1.ConnectionError, "no handshake for %.1f seconds",
 			handshakeDelta.Seconds())
-		cable.RecordConnection(cableDriverName, &w.localEndpoint, &connection.Endpoint, string(connection.Status), false)
+		cable.RecordConnection(cableDriverName, &w.localEndpoint, &connection.Endpoint, string(connection.Status), false, connectionFamily)
 
 		return
 	}
@@ -138,14 +141,14 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 	// Soft error, no traffic, stale handshake.
 	connection.SetStatus(v1.ConnectionError, "no bytes sent or received for %.1f seconds",
 		lcSec)
-	cable.RecordConnection(cableDriverName, &w.localEndpoint, &connection.Endpoint, string(connection.Status), false)
+	cable.RecordConnection(cableDriverName, &w.localEndpoint, &connection.Endpoint, string(connection.Status), false, connectionFamily)
 }
 
 func (w *wireguard) updatePeerStatus(c *v1.Connection, key *wgtypes.Key) {
 	p, err := w.peerByKey(key)
 	if err != nil {
 		c.SetStatus(v1.ConnectionError, "cannot fetch status for peer %s: %v", key, err)
-		cable.RecordConnection(cableDriverName, &w.localEndpoint, &c.Endpoint, string(c.Status), false)
+		cable.RecordConnection(cableDriverName, &w.localEndpoint, &c.Endpoint, string(c.Status), false, c.GetFamily())
 
 		return
 	}
@@ -169,11 +172,11 @@ func peerTrafficDelta(c *v1.Connection, key string, newVal int64) int64 {
 }
 
 // Save backendConfig[key] and export the metrics to prometheus.
-func saveAndRecordPeerTraffic(localEndpoint, remoteEndpoint *v1.EndpointSpec, lc, tx, rx int64) {
+func saveAndRecordPeerTraffic(localEndpoint, remoteEndpoint *v1.EndpointSpec, lc, tx, rx int64, ipFamily k8snet.IPFamily) {
 	remoteEndpoint.BackendConfig[lastChecked] = strconv.FormatInt(lc, 10)
 	remoteEndpoint.BackendConfig[transmitBytes] = strconv.FormatInt(tx, 10)
 	remoteEndpoint.BackendConfig[receiveBytes] = strconv.FormatInt(rx, 10)
 
-	cable.RecordTxBytes(cableDriverName, localEndpoint, remoteEndpoint, int(tx))
-	cable.RecordRxBytes(cableDriverName, localEndpoint, remoteEndpoint, int(rx))
+	cable.RecordTxBytes(cableDriverName, localEndpoint, remoteEndpoint, int(tx), ipFamily)
+	cable.RecordRxBytes(cableDriverName, localEndpoint, remoteEndpoint, int(rx), ipFamily)
 }

@@ -164,9 +164,9 @@ func (v *vxLan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 	v.mutex.Lock()
 	defer v.mutex.Unlock()
 
-	cable.RecordConnection(CableDriverName, &v.localEndpoint, &remoteEndpoint.Spec, string(v1.Connected), true)
+	cable.RecordConnection(CableDriverName, &v.localEndpoint, &remoteEndpoint.Spec, string(v1.Connected), true, endpointInfo.UseFamily)
 
-	privateIP := endpointInfo.Endpoint.Spec.GetPrivateIP(k8snet.IPv4)
+	privateIP := endpointInfo.Endpoint.Spec.GetPrivateIP(endpointInfo.UseFamily)
 
 	remoteVtepIP, err := vxlan.GetVtepIPAddressFrom(privateIP, VxlanVTepNetworkPrefix)
 	if err != nil {
@@ -204,9 +204,9 @@ func (v *vxLan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 	return endpointInfo.UseIP, nil
 }
 
-func (v *vxLan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint) error {
+func (v *vxLan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint, family k8snet.IPFamily) error {
 	// We'll panic if remoteEndpoint is nil, this is intentional
-	logger.V(log.DEBUG).Infof("Removing endpoint %#v", remoteEndpoint)
+	logger.V(log.DEBUG).Infof("Removing IPv%v endpoint %#v", family, remoteEndpoint)
 
 	if v.localEndpoint.ClusterID == remoteEndpoint.Spec.ClusterID {
 		logger.V(log.DEBUG).Infof("Will not disconnect self")
@@ -248,7 +248,7 @@ func (v *vxLan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint)
 	}
 
 	v.connections = removeConnectionForEndpoint(v.connections, remoteEndpoint)
-	cable.RecordDisconnected(CableDriverName, &v.localEndpoint, &remoteEndpoint.Spec)
+	cable.RecordDisconnected(CableDriverName, &v.localEndpoint, &remoteEndpoint.Spec, family)
 
 	logger.V(log.DEBUG).Infof("Done removing endpoint for cluster %s", remoteEndpoint.Spec.ClusterID)
 

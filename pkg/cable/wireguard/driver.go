@@ -39,6 +39,7 @@ import (
 	"github.com/vishvananda/netlink"
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -304,7 +305,7 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 
 	logger.V(log.DEBUG).Infof("Done connecting endpoint peer %s@%s", *remoteKey, remoteIP)
 
-	cable.RecordConnection(cableDriverName, &w.localEndpoint, &connection.Endpoint, string(v1.Connected), true)
+	cable.RecordConnection(cableDriverName, &w.localEndpoint, &connection.Endpoint, string(v1.Connected), true, endpointInfo.UseFamily)
 
 	return ip, nil
 }
@@ -323,9 +324,9 @@ func keyFromSpec(ep *v1.EndpointSpec) (*wgtypes.Key, error) {
 	return &key, nil
 }
 
-func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint) error {
+func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint, family k8snet.IPFamily) error {
 	// We'll panic if remoteEndpoint is nil, this is intentional
-	logger.V(log.DEBUG).Infof("Removing endpoint %v+", remoteEndpoint)
+	logger.V(log.DEBUG).Infof("Removing IPv%v endpoint %v+", family, remoteEndpoint)
 
 	if w.localEndpoint.ClusterID == remoteEndpoint.Spec.ClusterID {
 		logger.V(log.DEBUG).Infof("Will not disconnect self")
@@ -353,7 +354,7 @@ func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpo
 	delete(w.connections, remoteEndpoint.Spec.ClusterID)
 
 	logger.V(log.DEBUG).Infof("Done removing endpoint for cluster %s", remoteEndpoint.Spec.ClusterID)
-	cable.RecordDisconnected(cableDriverName, &w.localEndpoint, &remoteEndpoint.Spec)
+	cable.RecordDisconnected(cableDriverName, &w.localEndpoint, &remoteEndpoint.Spec, family)
 
 	return nil
 }
