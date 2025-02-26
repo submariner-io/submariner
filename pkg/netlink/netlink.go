@@ -63,6 +63,7 @@ type Basic interface {
 	EnableForwarding(interfaceName string) error
 	GetReversePathFilter(interfaceName string) ([]byte, error)
 	ConfigureTCPMTUProbe(mtuProbe, baseMss string) error
+	InterfaceByName(name string) (*net.Interface, error)
 }
 
 type Interface interface {
@@ -241,6 +242,10 @@ func (n *netlinkType) ConfigureTCPMTUProbe(mtuProbe, baseMss string) error {
 	err = setSysctl("/proc/sys/net/ipv4/tcp_base_mss", []byte(baseMss))
 
 	return errors.Wrapf(err, "unable to update value of tcp_base_mss to %ss", baseMss)
+}
+
+func (n *netlinkType) InterfaceByName(name string) (*net.Interface, error) {
+	return net.InterfaceByName(name)
 }
 
 func setSysctl(path string, contents []byte) error {
