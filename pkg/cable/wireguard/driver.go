@@ -232,7 +232,7 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 		return "", fmt.Errorf("failed to parse remote IP %s", ip)
 	}
 
-	allowedIPs := parseSubnets(remoteEndpoint.Spec.Subnets)
+	allowedIPs := remoteEndpoint.Spec.ParseSubnets(endpointInfo.UseFamily)
 
 	// Parse remote public key.
 	remoteKey, err := keyFromSpec(&remoteEndpoint.Spec)
@@ -388,24 +388,6 @@ func (w *wireguard) setWGLink() error {
 	err := w.netLink.LinkAdd(w.link)
 
 	return errors.Wrap(err, "failed to add WireGuard device")
-}
-
-// Parse CIDR string and skip errors.
-func parseSubnets(subnets []string) []net.IPNet {
-	nets := make([]net.IPNet, 0, len(subnets))
-
-	for _, sn := range subnets {
-		_, cidr, err := net.ParseCIDR(sn)
-		if err != nil {
-			// This should not happen. Log and continue.
-			logger.Errorf(err, "failed to parse subnet %s", sn)
-			continue
-		}
-
-		nets = append(nets, *cidr)
-	}
-
-	return nets
 }
 
 func (w *wireguard) removePeer(key *wgtypes.Key) error {

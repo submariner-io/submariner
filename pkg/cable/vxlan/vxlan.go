@@ -157,7 +157,7 @@ func (v *vxLan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 		return "", fmt.Errorf("failed to parse remote IP %s", endpointInfo.UseIP)
 	}
 
-	allowedIPs := parseSubnets(remoteEndpoint.Spec.Subnets)
+	allowedIPs := remoteEndpoint.Spec.ParseSubnets(endpointInfo.UseFamily)
 
 	logger.V(log.DEBUG).Infof("Connecting cluster %s endpoint %s",
 		remoteEndpoint.Spec.ClusterID, remoteIP)
@@ -235,7 +235,7 @@ func (v *vxLan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint,
 		return fmt.Errorf("failed to parse remote IP %s", ip)
 	}
 
-	allowedIPs := parseSubnets(remoteEndpoint.Spec.Subnets)
+	allowedIPs := remoteEndpoint.Spec.ParseSubnets(k8snet.IPv4)
 
 	err := v.vxlanIface.DelFDB(remoteIP, "00:00:00:00:00:00")
 	if err != nil {
@@ -280,24 +280,6 @@ func (v *vxLan) Init() error {
 
 func (v *vxLan) GetName() string {
 	return CableDriverName
-}
-
-// Parse CIDR string and skip errors.
-func parseSubnets(subnets []string) []net.IPNet {
-	nets := make([]net.IPNet, 0, len(subnets))
-
-	for _, sn := range subnets {
-		_, cidr, err := net.ParseCIDR(sn)
-		if err != nil {
-			// this should not happen. Log and continue
-			logger.Errorf(err, "Failed to parse subnet %s", sn)
-			continue
-		}
-
-		nets = append(nets, *cidr)
-	}
-
-	return nets
 }
 
 func (v *vxLan) Cleanup() error {
