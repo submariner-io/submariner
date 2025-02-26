@@ -33,8 +33,11 @@ func TestCidr(t *testing.T) {
 }
 
 const (
-	ipV4CIDR = "1.2.3.4/16"
-	ipV6CIDR = "2002::1234:abcd:ffff:c0a8:101/64"
+	ipV4CIDR        = "1.2.3.4/16"
+	overlappingCIDR = "1.2.3.5/16"
+	ipV4CIDR2       = "5.6.7.8/16"
+	ipV4CIDR3       = "9.10.11.12/16"
+	ipV6CIDR        = "2002::1234:abcd:ffff:c0a8:101/64"
 )
 
 var _ = Describe("ExtractIPFamilies", func() {
@@ -45,5 +48,42 @@ var _ = Describe("ExtractIPFamilies", func() {
 		Expect(cidr.ExtractIPFamilies([]string{ipV4CIDR, ipV4CIDR})).To(Equal([]k8snet.IPFamily{k8snet.IPv4}))
 		Expect(cidr.ExtractIPFamilies([]string{})).To(BeEmpty())
 		Expect(cidr.ExtractIPFamilies([]string{"bogus"})).To(BeEmpty())
+	})
+})
+
+var _ = Describe("ExtractIPv4Subnets", func() {
+	It("should return the correct subnets", func() {
+		Expect(cidr.ExtractIPv4Subnets([]string{ipV4CIDR, ipV6CIDR})).To(Equal([]string{ipV4CIDR}))
+		Expect(cidr.ExtractIPv4Subnets([]string{ipV4CIDR, ipV4CIDR2})).To(Equal([]string{ipV4CIDR, ipV4CIDR2}))
+		Expect(cidr.ExtractIPv4Subnets([]string{})).To(BeEmpty())
+	})
+})
+
+var _ = Describe("IsOverlapping", func() {
+	It("should return the correct results", func() {
+		Expect(cidr.IsOverlapping([]string{ipV4CIDR, ipV6CIDR}, ipV4CIDR2)).To(BeFalse())
+		Expect(cidr.IsOverlapping([]string{}, ipV4CIDR)).To(BeFalse())
+
+		Expect(cidr.IsOverlapping([]string{ipV4CIDR}, overlappingCIDR)).To(BeTrue())
+		Expect(cidr.IsOverlapping([]string{overlappingCIDR}, ipV4CIDR)).To(BeTrue())
+
+		_, err := cidr.IsOverlapping([]string{"bogus"}, ipV4CIDR)
+		Expect(err).To(HaveOccurred())
+
+		_, err = cidr.IsOverlapping([]string{ipV4CIDR}, "bogus")
+		Expect(err).To(HaveOccurred())
+	})
+})
+
+var _ = Describe("OverlappingSubnets", func() {
+	It("should return the correct result", func() {
+		Expect(cidr.OverlappingSubnets([]string{ipV4CIDR}, []string{ipV4CIDR2}, []string{ipV4CIDR3})).To(Succeed())
+		Expect(cidr.OverlappingSubnets([]string{ipV4CIDR, ipV4CIDR2}, []string{}, []string{ipV4CIDR3})).To(Succeed())
+		Expect(cidr.OverlappingSubnets([]string{}, []string{ipV4CIDR, ipV4CIDR2}, []string{ipV4CIDR3})).To(Succeed())
+		Expect(cidr.OverlappingSubnets([]string{"bogus"}, []string{"bogus"}, []string{ipV4CIDR3})).To(Succeed())
+
+		Expect(cidr.OverlappingSubnets([]string{ipV4CIDR}, []string{ipV4CIDR2}, []string{overlappingCIDR})).ToNot(Succeed())
+		Expect(cidr.OverlappingSubnets([]string{ipV4CIDR2}, []string{ipV4CIDR}, []string{overlappingCIDR})).ToNot(Succeed())
+		Expect(cidr.OverlappingSubnets([]string{ipV4CIDR2, ipV4CIDR}, []string{ipV4CIDR3}, []string{overlappingCIDR})).ToNot(Succeed())
 	})
 })
