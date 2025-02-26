@@ -92,10 +92,8 @@ var _ = Describe("Pinger", func() {
 			Timeout:  pingTimeout,
 		})
 		pingerInterface.Start()
-	})
 
-	AfterEach(func() {
-		pingerInterface.Stop()
+		DeferCleanup(pingerInterface.Stop)
 	})
 
 	verifyPingStats := func(count int) {
