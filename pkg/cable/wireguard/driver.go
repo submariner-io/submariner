@@ -221,11 +221,6 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 	remoteEndpoint := &endpointInfo.Endpoint
 	ip := endpointInfo.UseIP
 
-	if w.localEndpoint.ClusterID == remoteEndpoint.Spec.ClusterID {
-		logger.V(log.DEBUG).Infof("Will not connect to self")
-		return "", nil
-	}
-
 	// Parse remote addresses and allowed IPs.
 	remoteIP := net.ParseIP(ip)
 	if remoteIP == nil {
@@ -329,11 +324,6 @@ func keyFromSpec(ep *v1.EndpointSpec) (*wgtypes.Key, error) {
 func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint, family k8snet.IPFamily) error {
 	// We'll panic if remoteEndpoint is nil, this is intentional
 	logger.V(log.DEBUG).Infof("Removing IPv%v endpoint %v+", family, remoteEndpoint)
-
-	if w.localEndpoint.ClusterID == remoteEndpoint.Spec.ClusterID {
-		logger.V(log.DEBUG).Infof("Will not disconnect self")
-		return nil
-	}
 
 	// parse remote public key
 	remoteKey, err := keyFromSpec(&remoteEndpoint.Spec)
