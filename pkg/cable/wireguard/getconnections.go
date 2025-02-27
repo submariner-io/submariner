@@ -38,9 +38,6 @@ func (w *wireguard) GetConnections() ([]v1.Connection, error) {
 
 	connections := make([]v1.Connection, 0)
 
-	w.mutex.Lock()
-	defer w.mutex.Unlock()
-
 	for i := range d.Peers {
 		key := d.Peers[i].PublicKey
 

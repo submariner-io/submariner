@@ -25,7 +25,6 @@ import (
 	"net"
 	"os"
 	"slices"
-	"sync"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
@@ -77,7 +76,6 @@ type specification struct {
 type wireguard struct {
 	localEndpoint v1.EndpointSpec
 	connections   map[string]*v1.Connection // clusterID -> remote ep connection
-	mutex         sync.Mutex
 	client        Client
 	netLink       netlinkAPI.Interface
 	link          netlink.Link
@@ -173,9 +171,6 @@ func NewDriver(localEndpoint *endpoint.Local, _ *types.SubmarinerCluster) (cable
 }
 
 func (w *wireguard) Init() error {
-	w.mutex.Lock()
-	defer w.mutex.Unlock()
-
 	logger.V(log.DEBUG).Infof("Initializing WireGuard device for cluster %s", w.localEndpoint.ClusterID)
 
 	if len(w.connections) != 0 {
@@ -237,8 +232,6 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 
 	logger.V(log.DEBUG).Infof("Connecting cluster %s endpoint %s with publicKey %s",
 		remoteEndpoint.Spec.ClusterID, remoteIP, remoteKey)
-	w.mutex.Lock()
-	defer w.mutex.Unlock()
 
 	// Delete or update old peers for ClusterID.
 	oldCon, found := w.connections[remoteEndpoint.Spec.ClusterID]
@@ -333,9 +326,6 @@ func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpo
 
 	// wg remove
 	_ = w.removePeer(remoteKey)
-
-	w.mutex.Lock()
-	defer w.mutex.Unlock()
 
 	if w.keyMismatch(remoteEndpoint.Spec.ClusterID, remoteKey) {
 		// ClusterID probably already associated with new spec. Do not remove connections.
