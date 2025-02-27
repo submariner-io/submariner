@@ -218,14 +218,15 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 		}
 	}
 
-	logger.Infof("Installing Endpoint cable %q", endpoint.Spec.CableName)
+	logger.Infof("Installing IPv%v Endpoint cable %q", rnat.UseFamily, endpoint.Spec.CableName)
 
 	remoteEndpointIP, err := i.driver.ConnectToEndpoint(rnat)
 	if err != nil {
-		return errors.Wrapf(err, "error installing Endpoint cable %q", endpoint.Spec.CableName)
+		return errors.Wrapf(err, "error installing IPv%v Endpoint cable %q", rnat.UseFamily, endpoint.Spec.CableName)
 	}
 
-	logger.Infof("Successfully installed Endpoint cable %q with remote IP %s", endpoint.Spec.CableName, remoteEndpointIP)
+	logger.Infof("Successfully installed IPv%v Endpoint cable %q with remote IP %s", rnat.UseFamily, endpoint.Spec.CableName,
+		remoteEndpointIP)
 
 	i.installedCables[rnat.Endpoint.Spec.CableName] = endpoint.CreationTimestamp
 
