@@ -50,7 +50,7 @@ var _ = When("a remote Endpoint is added", func() {
 
 	JustBeforeEach(func() {
 		forwardFromUDPChan(t.localUDPSent, t.localUDPAddr, t.remoteND, forwardHowManyFromLocal)
-		t.localND.AddEndpoint(&t.remoteEndpoint)
+		t.localND.AddEndpoint(&t.remoteEndpoint, k8snet.IPv4)
 		t.localND.checkEndpointList()
 	})
 
@@ -74,7 +74,7 @@ var _ = When("a remote Endpoint is added", func() {
 		BeforeEach(func() {
 			forwardHowManyFromLocal = 0
 			t.remoteEndpoint.Spec.PublicIPs = []string{testRemotePublicIP}
-			t.remoteND.AddEndpoint(&t.localEndpoint)
+			t.remoteND.AddEndpoint(&t.localEndpoint, k8snet.IPv4)
 		})
 
 		JustBeforeEach(func() {
@@ -88,18 +88,20 @@ var _ = When("a remote Endpoint is added", func() {
 					To(Succeed())
 
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
-					Endpoint: t.remoteEndpoint,
-					UseNAT:   true,
-					UseIP:    t.remoteEndpoint.Spec.GetPublicIP(k8snet.IPv4),
+					Endpoint:  t.remoteEndpoint,
+					UseNAT:    true,
+					UseIP:     t.remoteEndpoint.Spec.GetPublicIP(k8snet.IPv4),
+					UseFamily: k8snet.IPv4,
 				})))
 
 				Expect(t.remoteND.parseAndHandleMessageFromAddress(privateIPReq, t.localUDPAddr)).
 					To(Succeed())
 
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
-					Endpoint: t.remoteEndpoint,
-					UseNAT:   false,
-					UseIP:    t.remoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4),
+					Endpoint:  t.remoteEndpoint,
+					UseNAT:    false,
+					UseIP:     t.remoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4),
+					UseFamily: k8snet.IPv4,
 				})))
 			})
 		})
@@ -112,9 +114,10 @@ var _ = When("a remote Endpoint is added", func() {
 					To(Succeed())
 
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
-					Endpoint: t.remoteEndpoint,
-					UseNAT:   true,
-					UseIP:    t.remoteEndpoint.Spec.GetPublicIP(k8snet.IPv4),
+					Endpoint:  t.remoteEndpoint,
+					UseNAT:    true,
+					UseIP:     t.remoteEndpoint.Spec.GetPublicIP(k8snet.IPv4),
+					UseFamily: k8snet.IPv4,
 				})))
 
 				Expect(t.remoteND.parseAndHandleMessageFromAddress(privateIPReq, t.localUDPAddr)).
@@ -130,9 +133,10 @@ var _ = When("a remote Endpoint is added", func() {
 					To(Succeed())
 
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
-					Endpoint: t.remoteEndpoint,
-					UseNAT:   false,
-					UseIP:    t.remoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4),
+					Endpoint:  t.remoteEndpoint,
+					UseNAT:    false,
+					UseIP:     t.remoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4),
+					UseFamily: k8snet.IPv4,
 				})))
 
 				Expect(t.remoteND.parseAndHandleMessageFromAddress(publicIPReq, t.localUDPAddr)).
@@ -146,9 +150,10 @@ var _ = When("a remote Endpoint is added", func() {
 	Context("and the local Endpoint is not initially known to the remote process", func() {
 		It("should notify with the correct NATEndpointInfo settings", func() {
 			Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
-				Endpoint: t.remoteEndpoint,
-				UseNAT:   false,
-				UseIP:    t.remoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4),
+				Endpoint:  t.remoteEndpoint,
+				UseNAT:    false,
+				UseIP:     t.remoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4),
+				UseFamily: k8snet.IPv4,
 			})))
 		})
 	})
@@ -157,7 +162,7 @@ var _ = When("a remote Endpoint is added", func() {
 		var newRemoteEndpoint submarinerv1.Endpoint
 
 		BeforeEach(func() {
-			t.remoteND.AddEndpoint(&t.localEndpoint)
+			t.remoteND.AddEndpoint(&t.localEndpoint, k8snet.IPv4)
 			newRemoteEndpoint = t.remoteEndpoint
 		})
 
@@ -167,16 +172,17 @@ var _ = When("a remote Endpoint is added", func() {
 			t.remoteUDPAddr.IP = net.ParseIP(newRemoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4))
 			forwardFromUDPChan(t.localUDPSent, t.localUDPAddr, t.remoteND, 1)
 
-			t.localND.AddEndpoint(&newRemoteEndpoint)
+			t.localND.AddEndpoint(&newRemoteEndpoint, k8snet.IPv4)
 			t.localND.checkEndpointList()
 		})
 
 		Context("with no change to the Endpoint", func() {
 			It("should notify with the original NATEndpointInfo settings", func() {
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
-					Endpoint: t.remoteEndpoint,
-					UseNAT:   false,
-					UseIP:    t.remoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4),
+					Endpoint:  t.remoteEndpoint,
+					UseNAT:    false,
+					UseIP:     t.remoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4),
+					UseFamily: k8snet.IPv4,
 				})))
 			})
 		})
@@ -191,9 +197,10 @@ var _ = When("a remote Endpoint is added", func() {
 
 			It("should notify with new NATEndpointInfo settings", func() {
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
-					Endpoint: newRemoteEndpoint,
-					UseNAT:   false,
-					UseIP:    newRemoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4),
+					Endpoint:  newRemoteEndpoint,
+					UseNAT:    false,
+					UseIP:     newRemoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4),
+					UseFamily: k8snet.IPv4,
 				})))
 			})
 		})
@@ -204,12 +211,12 @@ var _ = When("a remote Endpoint is added", func() {
 
 		BeforeEach(func() {
 			forwardHowManyFromLocal = 0
-			t.remoteND.AddEndpoint(&t.localEndpoint)
+			t.remoteND.AddEndpoint(&t.localEndpoint, k8snet.IPv4)
 			newRemoteEndpoint = t.remoteEndpoint
 		})
 
 		JustBeforeEach(func() {
-			t.localND.AddEndpoint(&newRemoteEndpoint)
+			t.localND.AddEndpoint(&newRemoteEndpoint, k8snet.IPv4)
 		})
 
 		Context("with no change to the Endpoint", func() {
@@ -234,9 +241,10 @@ var _ = When("a remote Endpoint is added", func() {
 
 			It("should notify with the correct NATEndpointInfo settings", func() {
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
-					Endpoint: newRemoteEndpoint,
-					UseNAT:   false,
-					UseIP:    newRemoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4),
+					Endpoint:  newRemoteEndpoint,
+					UseNAT:    false,
+					UseIP:     newRemoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4),
+					UseFamily: k8snet.IPv4,
 				})))
 			})
 		})
@@ -251,7 +259,7 @@ var _ = When("a remote Endpoint is added", func() {
 			Expect(t.localUDPSent).To(Receive())
 			Consistently(t.readyChannel).ShouldNot(Receive())
 
-			t.localND.RemoveEndpoint(t.remoteEndpoint.Spec.CableName)
+			t.localND.RemoveEndpoint(t.remoteEndpoint.Spec.GetFamilyCableName(k8snet.IPv4))
 
 			t.localND.checkEndpointList()
 			Expect(t.localUDPSent).ToNot(Receive())
@@ -267,9 +275,10 @@ var _ = When("a remote Endpoint is added", func() {
 
 		It("should notify with the legacy NATEndpointInfo settings", func() {
 			Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
-				Endpoint: t.remoteEndpoint,
-				UseNAT:   true,
-				UseIP:    t.remoteEndpoint.Spec.GetPublicIP(k8snet.IPv4),
+				Endpoint:  t.remoteEndpoint,
+				UseNAT:    true,
+				UseIP:     t.remoteEndpoint.Spec.GetPublicIP(k8snet.IPv4),
+				UseFamily: k8snet.IPv4,
 			})))
 		})
 	})
@@ -291,9 +300,10 @@ var _ = When("a remote Endpoint is added", func() {
 			Expect(t.localUDPSent).ToNot(Receive())
 
 			Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
-				Endpoint: t.remoteEndpoint,
-				UseNAT:   true,
-				UseIP:    t.remoteEndpoint.Spec.GetPublicIP(k8snet.IPv4),
+				Endpoint:  t.remoteEndpoint,
+				UseNAT:    true,
+				UseIP:     t.remoteEndpoint.Spec.GetPublicIP(k8snet.IPv4),
+				UseFamily: k8snet.IPv4,
 			})))
 		})
 	})
@@ -336,10 +346,10 @@ func newDiscoveryTestDriver() *discoveryTestDriver {
 		t.localEndpoint = createTestLocalEndpoint()
 
 		t.localND, t.localUDPSent, t.readyChannel = createTestListener(&t.localEndpoint)
-		t.localND.findSrcIP = func(_ string) string { return testLocalPrivateIP }
+		t.localND.findSrcIP = func(_ string, _ k8snet.IPFamily) string { return testLocalPrivateIP }
 
 		t.remoteND, t.remoteUDPSent, _ = createTestListener(&t.remoteEndpoint)
-		t.remoteND.findSrcIP = func(_ string) string { return testRemotePrivateIP }
+		t.remoteND.findSrcIP = func(_ string, _ k8snet.IPFamily) string { return testRemotePrivateIP }
 
 		forwardFromUDPChan(t.remoteUDPSent, t.remoteUDPAddr, t.localND, -1)
 	})
@@ -358,14 +368,15 @@ func newDiscoveryTestDriver() *discoveryTestDriver {
 
 func (t *discoveryTestDriver) testRemoteEndpointAdded(expIP string, expectNAT bool) {
 	BeforeEach(func() {
-		t.remoteND.AddEndpoint(&t.localEndpoint)
+		t.remoteND.AddEndpoint(&t.localEndpoint, k8snet.IPv4)
 	})
 
 	It("should notify with the correct NATEndpointInfo settings and stop the discovery", func() {
 		Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
-			Endpoint: t.remoteEndpoint,
-			UseNAT:   expectNAT,
-			UseIP:    expIP,
+			Endpoint:  t.remoteEndpoint,
+			UseNAT:    expectNAT,
+			UseIP:     expIP,
+			UseFamily: k8snet.IPv4,
 		})))
 
 		// Verify it doesn't time out and try to notify of the legacy settings

@@ -32,15 +32,15 @@ func (nd *natDiscovery) sendCheckRequest(remoteNAT *remoteEndpointNAT) error {
 	var errPrivate, errPublic error
 	var reqID uint64
 
-	if remoteNAT.endpoint.Spec.GetPrivateIP(k8snet.IPv4) != "" {
-		reqID, errPrivate = nd.sendCheckRequestToTargetIP(remoteNAT, remoteNAT.endpoint.Spec.GetPrivateIP(k8snet.IPv4))
+	if remoteNAT.endpoint.Spec.GetPrivateIP(remoteNAT.family) != "" {
+		reqID, errPrivate = nd.sendCheckRequestToTargetIP(remoteNAT, remoteNAT.endpoint.Spec.GetPrivateIP(remoteNAT.family))
 		if errPrivate == nil {
 			remoteNAT.lastPrivateIPRequestID = reqID
 		}
 	}
 
 	if remoteNAT.endpoint.Spec.GetPublicIP(k8snet.IPv4) != "" {
-		reqID, errPublic = nd.sendCheckRequestToTargetIP(remoteNAT, remoteNAT.endpoint.Spec.GetPublicIP(k8snet.IPv4))
+		reqID, errPublic = nd.sendCheckRequestToTargetIP(remoteNAT, remoteNAT.endpoint.Spec.GetPublicIP(remoteNAT.family))
 		if errPublic == nil {
 			remoteNAT.lastPublicIPRequestID = reqID
 		}
@@ -70,7 +70,7 @@ func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT,
 		return 0, err
 	}
 
-	sourceIP := nd.findSrcIP(targetIP)
+	sourceIP := nd.findSrcIP(targetIP, remoteNAT.family)
 
 	nd.requestCounter++
 
@@ -79,11 +79,11 @@ func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT,
 	request := &natproto.SubmarinerNATDiscoveryRequest{
 		RequestNumber: nd.requestCounter,
 		Sender: &natproto.EndpointDetails{
-			EndpointId: localEndpointSpec.CableName,
+			EndpointId: localEndpointSpec.GetFamilyCableName(remoteNAT.family),
 			ClusterId:  localEndpointSpec.ClusterID,
 		},
 		Receiver: &natproto.EndpointDetails{
-			EndpointId: remoteNAT.endpoint.Spec.CableName,
+			EndpointId: remoteNAT.endpoint.Spec.GetFamilyCableName(remoteNAT.family),
 			ClusterId:  remoteNAT.endpoint.Spec.ClusterID,
 		},
 		UsingSrc: &natproto.IPPortPair{

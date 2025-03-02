@@ -26,9 +26,26 @@ import (
 	"github.com/pkg/errors"
 	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 	"google.golang.org/protobuf/proto"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	k8snet "k8s.io/utils/net"
 )
 
-func (nd *natDiscovery) runListener(stopCh <-chan struct{}) error {
+func (nd *natDiscovery) runListener(family k8snet.IPFamily, stopCh <-chan struct{}) error {
+	var errs []error
+
+	if family == k8snet.IPv4 {
+		err := nd.runListenerV4(stopCh)
+		if err != nil {
+			logger.Errorf(err, "Error running IPv%v listener", family)
+			errs = append(errs, err)
+		}
+	}
+
+	// TODO_IPV6: add V6 runListener for V6
+	return utilerrors.NewAggregate(errs)
+}
+
+func (nd *natDiscovery) runListenerV4(stopCh <-chan struct{}) error {
 	if nd.serverPort == 0 {
 		logger.Infof("NAT discovery protocol port not set for this gateway")
 		return nil

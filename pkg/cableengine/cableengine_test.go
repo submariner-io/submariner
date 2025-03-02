@@ -128,7 +128,7 @@ var _ = Describe("Cable Engine", func() {
 	When("install cable for a remote endpoint", func() {
 		Context("and no endpoint was previously installed for the cluster", func() {
 			It("should connect to the endpoint", func() {
-				Expect(engine.InstallCable(remoteEndpoint)).To(Succeed())
+				Expect(engine.InstallCable(remoteEndpoint, k8snet.IPv4)).To(Succeed())
 				fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(remoteEndpoint))
 			})
 		})
@@ -144,10 +144,10 @@ var _ = Describe("Cable Engine", func() {
 			})
 
 			JustBeforeEach(func() {
-				Expect(engine.InstallCable(prevEndpoint)).To(Succeed())
+				Expect(engine.InstallCable(prevEndpoint, k8snet.IPv4)).To(Succeed())
 				fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(prevEndpoint))
 
-				Expect(engine.InstallCable(newEndpoint)).To(Succeed())
+				Expect(engine.InstallCable(newEndpoint, k8snet.IPv4)).To(Succeed())
 			})
 
 			testTimestamps := func() {
@@ -226,10 +226,10 @@ var _ = Describe("Cable Engine", func() {
 					CableName: "submariner-cable-other-1.1.1.1",
 				}}
 
-				Expect(engine.InstallCable(&otherEndpoint)).To(Succeed())
+				Expect(engine.InstallCable(&otherEndpoint, k8snet.IPv4)).To(Succeed())
 				fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(&otherEndpoint))
 
-				Expect(engine.InstallCable(remoteEndpoint)).To(Succeed())
+				Expect(engine.InstallCable(remoteEndpoint, k8snet.IPv4)).To(Succeed())
 				fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(remoteEndpoint))
 				fakeDriver.AwaitNoDisconnectFromEndpoint()
 			})
@@ -241,11 +241,11 @@ var _ = Describe("Cable Engine", func() {
 			})
 
 			It("should not connect to the endpoint", func() {
-				Expect(engine.InstallCable(remoteEndpoint)).To(Succeed())
+				Expect(engine.InstallCable(remoteEndpoint, k8snet.IPv4)).To(Succeed())
 				Eventually(natDiscovery.captureAddEndpoint).Should(Receive())
 
-				Expect(engine.RemoveCable(remoteEndpoint)).To(Succeed())
-				Eventually(natDiscovery.removeEndpoint).Should(Receive(Equal(remoteEndpoint.Spec.CableName)))
+				Expect(engine.RemoveCable(remoteEndpoint, k8snet.IPv4)).To(Succeed())
+				Eventually(natDiscovery.removeEndpoint).Should(Receive(Equal(remoteEndpoint.Spec.GetFamilyCableName(k8snet.IPv4))))
 				fakeDriver.AwaitNoDisconnectFromEndpoint()
 
 				natDiscovery.notifyReady(remoteEndpoint)
@@ -256,21 +256,21 @@ var _ = Describe("Cable Engine", func() {
 
 	When("install cable for a local endpoint", func() {
 		It("should not connect to the endpoint", func() {
-			Expect(engine.InstallCable(localEndpoint)).To(Succeed())
+			Expect(engine.InstallCable(localEndpoint, k8snet.IPv4)).To(Succeed())
 			fakeDriver.AwaitNoConnectToEndpoint()
 		})
 	})
 
 	When("remove cable for a remote endpoint", func() {
 		JustBeforeEach(func() {
-			Expect(engine.InstallCable(remoteEndpoint)).To(Succeed())
+			Expect(engine.InstallCable(remoteEndpoint, k8snet.IPv4)).To(Succeed())
 			fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(remoteEndpoint))
 		})
 
 		It("should disconnect from the endpoint", func() {
-			Expect(engine.RemoveCable(remoteEndpoint)).To(Succeed())
+			Expect(engine.RemoveCable(remoteEndpoint, k8snet.IPv4)).To(Succeed())
 			fakeDriver.AwaitDisconnectFromEndpoint(&remoteEndpoint.Spec)
-			Eventually(natDiscovery.removeEndpoint).Should(Receive(Equal(remoteEndpoint.Spec.CableName)))
+			Eventually(natDiscovery.removeEndpoint).Should(Receive(Equal(remoteEndpoint.Spec.GetFamilyCableName(k8snet.IPv4))))
 		})
 
 		Context("and the driver fails to disconnect from the endpoint", func() {
@@ -279,19 +279,19 @@ var _ = Describe("Cable Engine", func() {
 			})
 
 			It("should return an error", func() {
-				Expect(engine.RemoveCable(remoteEndpoint)).To(HaveOccurred())
+				Expect(engine.RemoveCable(remoteEndpoint, k8snet.IPv4)).To(HaveOccurred())
 			})
 		})
 	})
 
 	When("remove cable for a local endpoint", func() {
 		JustBeforeEach(func() {
-			Expect(engine.InstallCable(remoteEndpoint)).To(Succeed())
+			Expect(engine.InstallCable(remoteEndpoint, k8snet.IPv4)).To(Succeed())
 			fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(remoteEndpoint))
 		})
 
 		It("should not disconnect from the endpoint", func() {
-			Expect(engine.RemoveCable(localEndpoint)).To(Succeed())
+			Expect(engine.RemoveCable(localEndpoint, k8snet.IPv4)).To(Succeed())
 			fakeDriver.AwaitNoDisconnectFromEndpoint()
 			Consistently(natDiscovery.removeEndpoint).ShouldNot(Receive())
 		})
@@ -389,7 +389,7 @@ func (n *fakeNATDiscovery) Run(_ <-chan struct{}) error {
 	return nil
 }
 
-func (n *fakeNATDiscovery) AddEndpoint(endpoint *subv1.Endpoint) {
+func (n *fakeNATDiscovery) AddEndpoint(endpoint *subv1.Endpoint, _ k8snet.IPFamily) {
 	if n.captureAddEndpoint != nil {
 		n.captureAddEndpoint <- endpoint
 		return
@@ -412,8 +412,9 @@ func (n *fakeNATDiscovery) notifyReady(endpoint *subv1.Endpoint) {
 
 func natEndpointInfoFor(endpoint *subv1.Endpoint) *natdiscovery.NATEndpointInfo {
 	return &natdiscovery.NATEndpointInfo{
-		UseIP:    endpoint.Spec.GetPublicIP(k8snet.IPv4),
-		UseNAT:   true,
-		Endpoint: *endpoint,
+		UseIP:     endpoint.Spec.GetPublicIP(k8snet.IPv4),
+		UseNAT:    true,
+		Endpoint:  *endpoint,
+		UseFamily: k8snet.IPv4,
 	}
 }

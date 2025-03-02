@@ -45,6 +45,7 @@ var (
 
 type remoteEndpointNAT struct {
 	endpoint               v1.Endpoint
+	family                 k8snet.IPFamily
 	state                  endpointState
 	lastCheck              time.Time
 	lastTransition         time.Time
@@ -58,22 +59,25 @@ type remoteEndpointNAT struct {
 }
 
 type NATEndpointInfo struct {
-	Endpoint v1.Endpoint
-	UseNAT   bool
-	UseIP    string
+	Endpoint  v1.Endpoint
+	UseNAT    bool
+	UseIP     string
+	UseFamily k8snet.IPFamily
 }
 
 func (rn *remoteEndpointNAT) toNATEndpointInfo() *NATEndpointInfo {
 	return &NATEndpointInfo{
-		Endpoint: rn.endpoint,
-		UseNAT:   rn.useNAT,
-		UseIP:    rn.useIP,
+		Endpoint:  rn.endpoint,
+		UseNAT:    rn.useNAT,
+		UseIP:     rn.useIP,
+		UseFamily: rn.family,
 	}
 }
 
-func newRemoteEndpointNAT(endpoint *v1.Endpoint) *remoteEndpointNAT {
+func newRemoteEndpointNAT(endpoint *v1.Endpoint, family k8snet.IPFamily) *remoteEndpointNAT {
 	rnat := &remoteEndpointNAT{
 		endpoint:       *endpoint,
+		family:         family,
 		state:          testingPrivateAndPublicIPs,
 		started:        time.Now(),
 		lastTransition: time.Now(),
@@ -110,24 +114,24 @@ func (rn *remoteEndpointNAT) useLegacyNATSettings() {
 	switch {
 	case rn.usingLoadBalancer:
 		rn.useNAT = true
-		rn.useIP = rn.endpoint.Spec.GetPublicIP(k8snet.IPv4)
+		rn.useIP = rn.endpoint.Spec.GetPublicIP(rn.family)
 		rn.transitionToState(selectedPublicIP)
-		logger.V(log.DEBUG).Infof("using NAT for the load balancer backed endpoint %q, using public IP %q", rn.endpoint.Spec.CableName,
-			rn.useIP)
+		logger.V(log.DEBUG).Infof("using NAT for the load balancer backed endpoint %q, using public IP %q",
+			rn.endpoint.Spec.GetFamilyCableName(rn.family), rn.useIP)
 
 	case rn.endpoint.Spec.NATEnabled:
 		rn.useNAT = true
-		rn.useIP = rn.endpoint.Spec.GetPublicIP(k8snet.IPv4)
+		rn.useIP = rn.endpoint.Spec.GetPublicIP(rn.family)
 		rn.transitionToState(selectedPublicIP)
-		logger.V(log.DEBUG).Infof("using NAT legacy settings for endpoint %q, using public IP %q", rn.endpoint.Spec.CableName,
+		logger.V(log.DEBUG).Infof("using NAT legacy settings for endpoint %q, using public IP %q", rn.endpoint.Spec.GetFamilyCableName(rn.family),
 			rn.useIP)
 
 	default:
 		rn.useNAT = false
-		rn.useIP = rn.endpoint.Spec.GetPrivateIP(k8snet.IPv4)
+		rn.useIP = rn.endpoint.Spec.GetPrivateIP(rn.family)
 		rn.transitionToState(selectedPrivateIP)
-		logger.V(log.DEBUG).Infof("using NAT legacy settings for endpoint %q, using private IP %q", rn.endpoint.Spec.CableName,
-			rn.useIP)
+		logger.V(log.DEBUG).Infof("using NAT legacy settings for endpoint %q, using private IP %q",
+			rn.endpoint.Spec.GetFamilyCableName(rn.family), rn.useIP)
 	}
 }
 
@@ -159,10 +163,10 @@ func (rn *remoteEndpointNAT) checkSent() {
 func (rn *remoteEndpointNAT) transitionToPublicIP(remoteEndpointID string, useNAT bool) bool {
 	switch rn.state {
 	case waitingForResponse:
-		rn.useIP = rn.endpoint.Spec.GetPublicIP(k8snet.IPv4)
+		rn.useIP = rn.endpoint.Spec.GetPublicIP(rn.family)
 		rn.useNAT = useNAT
 		rn.transitionToState(selectedPublicIP)
-		logger.V(log.DEBUG).Infof("selected public IP %q for endpoint %q", rn.useIP, rn.endpoint.Spec.CableName)
+		logger.V(log.DEBUG).Infof("selected public IP %q for endpoint %q", rn.useIP, rn.endpoint.Spec.GetFamilyCableName(rn.family))
 
 		return true
 	case selectedPrivateIP:
@@ -179,10 +183,10 @@ func (rn *remoteEndpointNAT) transitionToPublicIP(remoteEndpointID string, useNA
 func (rn *remoteEndpointNAT) transitionToPrivateIP(remoteEndpointID string, useNAT bool) bool {
 	switch rn.state {
 	case waitingForResponse:
-		rn.useIP = rn.endpoint.Spec.GetPrivateIP(k8snet.IPv4)
+		rn.useIP = rn.endpoint.Spec.GetPrivateIP(rn.family)
 		rn.useNAT = useNAT
 		rn.transitionToState(selectedPrivateIP)
-		logger.V(log.DEBUG).Infof("selected private IP %q for endpoint %q", rn.useIP, rn.endpoint.Spec.CableName)
+		logger.V(log.DEBUG).Infof("selected private IP %q for endpoint %q", rn.useIP, rn.endpoint.Spec.GetFamilyCableName(rn.family))
 
 		return true
 	case selectedPublicIP:
@@ -194,10 +198,10 @@ func (rn *remoteEndpointNAT) transitionToPrivateIP(remoteEndpointID string, useN
 			return false
 		}
 
-		rn.useIP = rn.endpoint.Spec.GetPrivateIP(k8snet.IPv4)
+		rn.useIP = rn.endpoint.Spec.GetPrivateIP(rn.family)
 		rn.useNAT = useNAT
 		rn.transitionToState(selectedPrivateIP)
-		logger.V(log.DEBUG).Infof("updated to private IP %q for endpoint %q", rn.useIP, rn.endpoint.Spec.CableName)
+		logger.V(log.DEBUG).Infof("updated to private IP %q for endpoint %q", rn.useIP, rn.endpoint.Spec.GetFamilyCableName(rn.family))
 
 		return true
 	case testingPrivateAndPublicIPs:
