@@ -61,10 +61,16 @@ bin/protoc-gen-go:
 	GOFLAGS="" GOBIN="$(CURDIR)/bin" go install google.golang.org/protobuf/cmd/protoc-gen-go@$(shell awk '/google.golang.org\/protobuf/ {print $$2}' go.mod)
 
 basepkg = github.com/submariner-io/submariner
-pkgdeps = $(shell find $$(go list -json $(1) | jq -r '.Deps[] | select(startswith("$(basepkg)")) | sub("$(basepkg)"; ".")') -name '*.go' -not -name '*_test.go')
+# This lists non-test Go files inside each directory corresponding
+# to the first argument and any Go-determined dependencies
+godeps = $(filter-out %_test.go,$(wildcard $(patsubst %,%/*.go,$(1) $(shell go list -json $(1) | jq -r '.Deps[] | select(startswith("$(basepkg)/")) | sub("$(basepkg)"; ".")'))))
+# This lists embedded files in Go dependencies
+embeddeddeps = $(wildcard $(shell grep //go:embed $(call godeps,$(1)) | sed -E 'sX[^/]+.go:.*//go:embed XX'))
+# This lists all dependencies from a given package
+pkgdeps = $(call godeps,$(1)) $(call embeddeddeps,$(1))
 
 # natdiscovery.pb.go must be listed explicitly because it might not exist when Make evaluates pkgdeps
-bin/%/submariner-gateway: main.go $(call pkgdeps,.) pkg/natdiscovery/proto/natdiscovery.pb.go
+bin/%/submariner-gateway: $(call pkgdeps,.) pkg/natdiscovery/proto/natdiscovery.pb.go
 	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ .
 
 bin/%/submariner-route-agent: $(call pkgdeps,./pkg/routeagent_driver)
