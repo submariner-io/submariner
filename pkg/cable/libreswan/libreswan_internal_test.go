@@ -47,7 +47,7 @@ var _ = Describe("Libreswan", func() {
 func testTrafficStatusRE() {
 	When("Parsing a normal connection", func() {
 		It("should match", func() {
-			matches := trafficStatusRE.FindStringSubmatch("006 #3: \"submariner-cable-cluster3-172-17-0-8-0-0\", " +
+			matches := trafficStatusRE.FindStringSubmatch("006 #3: \"submariner-cable-cluster3-172-17-0-8-v4-0-0\", " +
 				"type=ESP, add_time=1590508783, inBytes=0, outBytes=0, id='172.17.0.8'\n")
 			Expect(matches).NotTo(BeNil())
 		})
@@ -55,7 +55,22 @@ func testTrafficStatusRE() {
 
 	When("Parsing a server-side connection", func() {
 		It("should match", func() {
-			matches := trafficStatusRE.FindStringSubmatch("006 #2: \"submariner-cable-cluster3-172-17-0-8-0-0\"[1] 3.139.75.179," +
+			matches := trafficStatusRE.FindStringSubmatch("006 #2: \"submariner-cable-cluster3-172-17-0-8-v4-0-0\"[1] 3.139.75.179," +
+				" type=ESP, add_time=1617195756, inBytes=0, outBytes=0, id='@10.0.63.203-0-0'\n")
+			Expect(matches).NotTo(BeNil())
+		})
+	})
+	When("Parsing a normal v6 connection", func() {
+		It("should match", func() {
+			matches := trafficStatusRE.FindStringSubmatch("006 #3: \"submariner-cable-cluster3-fd12:3456:789a:1::1-v6-0-0\", " +
+				" type=ESP, add_time=1590508783, inBytes=0, outBytes=0, id='@10.0.63.203-0-0'/n")
+			Expect(matches).NotTo(BeNil())
+		})
+	})
+
+	When("Parsing a server-side v6 connection", func() {
+		It("should match", func() {
+			matches := trafficStatusRE.FindStringSubmatch("006 #2: \"submariner-cable-cluster3-fd12:3456:789a:1::1-v6-0-0\"[1] 3.139.75.179," +
 				" type=ESP, add_time=1617195756, inBytes=0, outBytes=0, id='@10.0.63.203-0-0'\n")
 			Expect(matches).NotTo(BeNil())
 		})
@@ -94,7 +109,11 @@ func testIPsecPortConfiguration() {
 func testConnectToEndpoint() {
 	t := newTestDriver()
 
-	var natInfo *natdiscovery.NATEndpointInfo
+	var (
+		natInfo          *natdiscovery.NATEndpointInfo
+		natInfoIPv6      *natdiscovery.NATEndpointInfo
+		natInfoDualStack *natdiscovery.NATEndpointInfo
+	)
 
 	BeforeEach(func() {
 		natInfo = &natdiscovery.NATEndpointInfo{
@@ -106,32 +125,75 @@ func testConnectToEndpoint() {
 					Subnets:    []string{"20.0.0.0/16"},
 				},
 			},
-			UseIP:  "172.93.2.1",
-			UseNAT: true,
+			UseIP:     "172.93.2.1",
+			UseNAT:    true,
+			UseFamily: k8snet.IPv4,
+		}
+		natInfoIPv6 = &natdiscovery.NATEndpointInfo{
+			Endpoint: subv1.Endpoint{
+				Spec: subv1.EndpointSpec{
+					ClusterID:  "east",
+					CableName:  "submariner-cable-east-192-68-2-1",
+					PrivateIPs: []string{"2002::1234:abcd:ffff:c0a8:101"},
+					Subnets:    []string{"2001::1234:abcd:ffff:c0a8:101/64"},
+				},
+			},
+			UseIP:     "2003:db8:3333:4444:5555:6666:7777:8888",
+			UseNAT:    true,
+			UseFamily: k8snet.IPv6,
+		}
+
+		natInfoDualStack = &natdiscovery.NATEndpointInfo{
+			Endpoint: subv1.Endpoint{
+				Spec: subv1.EndpointSpec{
+					ClusterID:  "east",
+					CableName:  "submariner-cable-east-192-68-2-1",
+					PrivateIPs: []string{"192.68.2.1", "2002::1234:abcd:ffff:c0a8:101"},
+					Subnets:    []string{"20.0.0.0/16", "2001::1234:abcd:ffff:c0a8:101/64"},
+				},
+			},
+			UseIP:     "172.93.2.1",
+			UseNAT:    true,
+			UseFamily: k8snet.IPv4,
 		}
 	})
 
-	testBiDirectionalMode := func() {
-		ip, err := t.driver.ConnectToEndpoint(natInfo)
+	testBiDirectionalMode := func(natInfoParam *natdiscovery.NATEndpointInfo) {
+		family := k8snet.IPFamilyOfString(natInfoParam.UseIP)
+		ip, err := t.driver.ConnectToEndpoint(natInfoParam)
 
 		Expect(err).To(Succeed())
-		Expect(ip).To(Equal(natInfo.UseIP))
+		Expect(ip).To(Equal(natInfoParam.UseIP))
 
-		t.assertActiveConnection(natInfo)
-		t.cmdExecutor.AwaitCommand(nil, "whack", t.endpointSpec.GetPrivateIP(k8snet.IPv4), natInfo.UseIP,
-			t.endpointSpec.Subnets[0], natInfo.Endpoint.Spec.Subnets[0])
+		t.assertActiveConnection(natInfoParam)
+		t.cmdExecutor.AwaitCommand(nil, "whack", t.endpointSpec.GetPrivateIP(family), natInfoParam.UseIP,
+			t.endpointSpec.ParseSubnets(family)[0].String(), natInfoParam.Endpoint.Spec.ParseSubnets(family)[0].String())
 		t.cmdExecutor.AwaitCommand(nil, "whack", "--initiate")
 	}
 
-	testServerMode := func() {
-		ip, err := t.driver.ConnectToEndpoint(natInfo)
+	testCreateConnection := func(natInfoParam *natdiscovery.NATEndpointInfo) {
+		family := k8snet.IPFamilyOfString(natInfoParam.UseIP)
+		ip, err := t.driver.ConnectToEndpoint(natInfoParam)
 
 		Expect(err).To(Succeed())
-		Expect(ip).To(Equal(natInfo.UseIP))
+		Expect(ip).To(Equal(natInfoParam.UseIP))
 
-		t.assertActiveConnection(natInfo)
-		t.cmdExecutor.AwaitCommand(nil, "whack", t.endpointSpec.GetPrivateIP(k8snet.IPv4), t.endpointSpec.Subnets[0],
-			natInfo.Endpoint.Spec.Subnets[0])
+		t.assertActiveConnection(natInfoParam)
+		t.cmdExecutor.AwaitCommand(nil, "whack", t.endpointSpec.GetPrivateIP(family), natInfoParam.UseIP,
+			t.endpointSpec.ParseSubnets(family)[0].String(), natInfoParam.Endpoint.Spec.ParseSubnets(family)[0].String())
+		t.cmdExecutor.AwaitCommand(nil, "whack", "--initiate")
+	}
+
+	testServerMode := func(natInfoParam *natdiscovery.NATEndpointInfo) {
+		family := k8snet.IPFamilyOfString(natInfoParam.UseIP)
+		ip, err := t.driver.ConnectToEndpoint(natInfoParam)
+
+		Expect(err).To(Succeed())
+		Expect(ip).To(Equal(natInfoParam.UseIP))
+
+		t.assertActiveConnection(natInfoParam)
+		t.cmdExecutor.AwaitCommand(nil, "whack", t.endpointSpec.GetPrivateIP(family), t.endpointSpec.ParseSubnets(family)[0].String(),
+			natInfoParam.Endpoint.Spec.ParseSubnets(family)[0].String())
 		t.cmdExecutor.EnsureNoCommand("whack", "--initiate")
 	}
 
@@ -139,10 +201,18 @@ func testConnectToEndpoint() {
 		BeforeEach(func() {
 			t.endpointSpec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "true"}
 			natInfo.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "false"}
+			natInfoIPv6.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "false"}
+			natInfoDualStack.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "false"}
 		})
 
-		It("should create a server Connection", func() {
-			testServerMode()
+		It("should create a IPv4 server Connection", func() {
+			testServerMode(natInfo)
+		})
+		It("should create a IPv6 server Connection", func() {
+			testServerMode(natInfoIPv6)
+		})
+		It("should create a IPv4 server Connection on dualstack endpoint", func() {
+			testServerMode(natInfoDualStack)
 		})
 	})
 
@@ -150,18 +220,18 @@ func testConnectToEndpoint() {
 		BeforeEach(func() {
 			t.endpointSpec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "false"}
 			natInfo.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "true"}
+			natInfoIPv6.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "true"}
+			natInfoDualStack.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "true"}
 		})
 
-		It("should create a client Connection", func() {
-			ip, err := t.driver.ConnectToEndpoint(natInfo)
-
-			Expect(err).To(Succeed())
-			Expect(ip).To(Equal(natInfo.UseIP))
-
-			t.assertActiveConnection(natInfo)
-			t.cmdExecutor.AwaitCommand(nil, "whack", t.endpointSpec.GetPrivateIP(k8snet.IPv4), natInfo.UseIP,
-				t.endpointSpec.Subnets[0], natInfo.Endpoint.Spec.Subnets[0])
-			t.cmdExecutor.AwaitCommand(nil, "whack", "--initiate")
+		It("should create a IPv4 client Connection", func() {
+			testCreateConnection(natInfo)
+		})
+		It("should create a IPv6 client Connection", func() {
+			testCreateConnection(natInfoIPv6)
+		})
+		It("should create a IPv4 client Connection on dualstack endpoint", func() {
+			testCreateConnection(natInfoDualStack)
 		})
 	})
 
@@ -169,16 +239,30 @@ func testConnectToEndpoint() {
 		BeforeEach(func() {
 			t.endpointSpec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "false"}
 			natInfo.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "false"}
+			natInfoIPv6.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "false"}
+			natInfoDualStack.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "false"}
 		})
 
-		It("should create a bi-directional Connection", func() {
-			testBiDirectionalMode()
+		It("should create a bi-directional IPv4 Connection", func() {
+			testBiDirectionalMode(natInfo)
+		})
+		It("should create a bi-directional IPv6 Connection", func() {
+			testBiDirectionalMode(natInfoIPv6)
+		})
+		It("should create a bi-directional IPv4 Connection on dualstack endpoint", func() {
+			testBiDirectionalMode(natInfoDualStack)
 		})
 	})
 
 	When("no preferred server is configured", func() {
-		It("should default to a bi-directional Connection", func() {
-			testBiDirectionalMode()
+		It("should default to a bi-directional IPv4 Connection", func() {
+			testBiDirectionalMode(natInfo)
+		})
+		It("should default to a bi-directional IPv6 Connection", func() {
+			testBiDirectionalMode(natInfoIPv6)
+		})
+		It("should default to a bi-directional IPv4 Connection on dualstack endpoint", func() {
+			testBiDirectionalMode(natInfoDualStack)
 		})
 	})
 
@@ -186,10 +270,18 @@ func testConnectToEndpoint() {
 		BeforeEach(func() {
 			t.endpointSpec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "true"}
 			natInfo.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "true"}
+			natInfoIPv6.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "true"}
+			natInfoDualStack.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "true"}
 		})
 
-		It("should create a server Connection due to comparison of the cable names", func() {
-			testServerMode()
+		It("should create a server IPv4 Connection due to comparison of the cable names", func() {
+			testServerMode(natInfo)
+		})
+		It("should create a server IPv6 Connection due to comparison of the cable names", func() {
+			testServerMode(natInfoIPv6)
+		})
+		It("should create a server IPv4 Connection on dualstack ep due to comparison of the cable names", func() {
+			testServerMode(natInfoDualStack)
 		})
 	})
 }
@@ -207,7 +299,8 @@ func testDisconnectFromEndpoint() {
 					Subnets:    []string{"20.0.0.0/16"},
 				},
 			},
-			UseIP: "172.93.2.1",
+			UseIP:     "172.93.2.1",
+			UseFamily: k8snet.IPv4,
 		}
 
 		_, err := t.driver.ConnectToEndpoint(natInfo1)
@@ -222,14 +315,37 @@ func testDisconnectFromEndpoint() {
 					Subnets:    []string{"30.0.0.0/16"},
 				},
 			},
-			UseIP: "173.93.2.1",
+			UseIP:     "173.93.2.1",
+			UseFamily: k8snet.IPv4,
 		}
 
 		_, err = t.driver.ConnectToEndpoint(natInfo2)
 		Expect(err).To(Succeed())
 
+		natInfoIPv6 := &natdiscovery.NATEndpointInfo{
+			Endpoint: subv1.Endpoint{
+				Spec: subv1.EndpointSpec{
+					ClusterID:  "remote3",
+					CableName:  "submariner-cable-east-192-68-4-1",
+					PrivateIPs: []string{"2002::1234:abcd:ffff:c0a8:101"},
+					Subnets:    []string{"2001::1234:abcd:ffff:c0a8:101/64"},
+				},
+			},
+			UseIP:     "2003:db8:3333:4444:5555:6666:7777:8888",
+			UseNAT:    true,
+			UseFamily: k8snet.IPv6,
+		}
+
+		_, err = t.driver.ConnectToEndpoint(natInfoIPv6)
+		Expect(err).To(Succeed())
+
 		Expect(t.driver.DisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: natInfo1.Endpoint.Spec}, k8snet.IPv4)).To(Succeed())
 		t.assertNoActiveConnection(natInfo1)
+		t.cmdExecutor.AwaitCommand(nil, "whack", "--delete")
+		t.cmdExecutor.Clear()
+
+		Expect(t.driver.DisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: natInfoIPv6.Endpoint.Spec}, k8snet.IPv6)).To(Succeed())
+		t.assertNoActiveConnection(natInfoIPv6)
 		t.cmdExecutor.AwaitCommand(nil, "whack", "--delete")
 		t.assertActiveConnection(natInfo2)
 		t.cmdExecutor.Clear()
@@ -237,6 +353,7 @@ func testDisconnectFromEndpoint() {
 		Expect(t.driver.DisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: natInfo2.Endpoint.Spec}, k8snet.IPv4)).To(Succeed())
 		t.assertNoActiveConnection(natInfo2)
 		t.cmdExecutor.AwaitCommand(nil, "whack", "--delete")
+		t.cmdExecutor.Clear()
 	})
 }
 
@@ -253,7 +370,8 @@ func testGetConnections() {
 					Subnets:    []string{"20.0.0.0/16", "30.0.0.0/16"},
 				},
 			},
-			UseIP: "172.93.2.1",
+			UseIP:     "172.93.2.1",
+			UseFamily: k8snet.IPv4,
 		}
 
 		_, err := t.driver.ConnectToEndpoint(natInfo1)
@@ -268,14 +386,15 @@ func testGetConnections() {
 					Subnets:    []string{"11.0.0.0/16"},
 				},
 			},
-			UseIP: "173.93.3.1",
+			UseIP:     "173.93.3.1",
+			UseFamily: k8snet.IPv4,
 		}
 
 		_, err = t.driver.ConnectToEndpoint(natInfo2)
 		Expect(err).To(Succeed())
 
 		t.cmdExecutor.SetupCommandStdOut(
-			fmt.Sprintf(" \"%s-0-0\", type=ESP, add_time=1590508783, inBytes=10, outBytes=20, id='192.68.2.1'",
+			fmt.Sprintf(" \"%s-v4-0-0\", type=ESP, add_time=1590508783, inBytes=10, outBytes=20, id='192.68.2.1'",
 				natInfo1.Endpoint.Spec.CableName),
 			nil, "whack", "--trafficstatus")
 
@@ -353,8 +472,8 @@ func newTestDriver() *testDriver {
 		t.endpointSpec = subv1.EndpointSpec{
 			ClusterID:  "local",
 			CableName:  "submariner-cable-local-192-68-1-1",
-			PrivateIPs: []string{"192.68.1.1"},
-			Subnets:    []string{"10.0.0.0/16"},
+			PrivateIPs: []string{"192.68.1.1", "2002::4321:abcd:ffff:c0a8:101"},
+			Subnets:    []string{"10.0.0.0/16", "2005::1234:abcd:ffff:c0a8:101/64"},
 		}
 	})
 

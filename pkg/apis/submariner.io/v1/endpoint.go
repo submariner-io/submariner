@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
@@ -193,6 +194,22 @@ func (ep *EndpointSpec) ParseSubnets(family k8snet.IPFamily) []net.IPNet {
 
 		if k8snet.IPFamilyOfCIDR(cidr) == family {
 			subnets = append(subnets, *cidr)
+		}
+	}
+
+	return subnets
+}
+
+func (ep *EndpointSpec) ExtractSubnetsExcludingIP(excIP string) []string {
+	var subnets []string
+
+	ipFamily := k8snet.IPFamilyOfString(excIP)
+	subnetPrefix := excIP + "/"
+
+	for _, subnet := range ep.ParseSubnets(ipFamily) {
+		subnetStr := subnet.String()
+		if !strings.HasPrefix(subnetStr, subnetPrefix) && k8snet.IPFamilyOfCIDRString(subnetStr) == ipFamily {
+			subnets = append(subnets, subnetStr)
 		}
 	}
 
