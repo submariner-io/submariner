@@ -28,6 +28,8 @@ import (
 const (
 	ipV4Addr = "1.2.3.4"
 	ipV6Addr = "2001:db8:3333:4444:5555:6666:7777:8888"
+	ipV4CIDR = "10.16.1.0/32"
+	ipV6CIDR = "2002::1234:abcd:ffff:c0a8:101/64"
 )
 
 var _ = Describe("EndpointSpec", func() {
@@ -39,6 +41,8 @@ var _ = Describe("EndpointSpec", func() {
 	Context("SetPublicIP", testSetPublicIP)
 	Context("GetPrivateIP", testGetPrivateIP)
 	Context("SetPrivateIP", testSetPrivateIP)
+	Context("GetFamilyCableName", testGetFamilyCableName)
+	Context("GetIPFamilies", testGetIPFamilies)
 })
 
 func testGenerateName() {
@@ -395,5 +399,40 @@ func testSetPrivateIP() {
 		s.SetPrivateIP(ip)
 	}, func(s *v1.EndpointSpec) ([]string, string) {
 		return s.PrivateIPs, s.PrivateIP
+	})
+}
+
+func testGetFamilyCableName() {
+	var spec *v1.EndpointSpec
+
+	BeforeEach(func() {
+		spec = &v1.EndpointSpec{
+			CableName: "submariner-cable-east-172-16-32-5",
+		}
+	})
+
+	Context("with IPv4 family", func() {
+		It("should return the cable name with v4 suffix", func() {
+			expected := spec.CableName + "-v4"
+			result := spec.GetFamilyCableName(k8snet.IPv4)
+			Expect(result).To(Equal(expected))
+		})
+	})
+
+	Context("with IPv6 family", func() {
+		It("should return the cable name with v6 suffix", func() {
+			expected := spec.CableName + "-v6"
+			result := spec.GetFamilyCableName(k8snet.IPv6)
+			Expect(result).To(Equal(expected))
+		})
+	})
+}
+
+func testGetIPFamilies() {
+	It("should return the correct families", func() {
+		Expect((&v1.EndpointSpec{Subnets: []string{ipV4CIDR}}).GetIPFamilies()).To(Equal([]k8snet.IPFamily{k8snet.IPv4}))
+		Expect((&v1.EndpointSpec{Subnets: []string{ipV6CIDR}}).GetIPFamilies()).To(Equal([]k8snet.IPFamily{k8snet.IPv6}))
+		Expect((&v1.EndpointSpec{Subnets: []string{ipV6CIDR, ipV4CIDR}}).GetIPFamilies()).To(
+			Equal([]k8snet.IPFamily{k8snet.IPv6, k8snet.IPv4}))
 	})
 }

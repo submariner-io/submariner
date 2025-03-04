@@ -24,8 +24,12 @@ import (
 	k8snet "k8s.io/utils/net"
 )
 
-func GetLocalIPForDestination(dst string) string {
-	// Revisit when IPv6 support is added.
+var familyToDestIP = map[k8snet.IPFamily]string{
+	k8snet.IPv4: "8.8.8.8",
+	k8snet.IPv6: "2001:4860:4860::8888",
+}
+
+func getLocalIPv4ForDestination(dst string) string {
 	conn, err := net.Dial("udp4", dst+":53")
 	logger.FatalOnError(err, "Error getting local IP")
 
@@ -36,14 +40,18 @@ func GetLocalIPForDestination(dst string) string {
 	return localAddr.IP.String()
 }
 
-func GetLocalIP(family k8snet.IPFamily) string {
+func GetLocalIPForDestination(dst string, family k8snet.IPFamily) string {
 	switch family {
 	case k8snet.IPv4:
-		return GetLocalIPForDestination("8.8.8.8")
+		return getLocalIPv4ForDestination(dst)
 	case k8snet.IPv6:
 		// TODO_IPV6: add V6 healthcheck IP
 	case k8snet.IPFamilyUnknown:
 	}
 
 	return ""
+}
+
+func GetLocalIP(family k8snet.IPFamily) string {
+	return GetLocalIPForDestination(familyToDestIP[family], family)
 }

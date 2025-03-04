@@ -26,6 +26,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/cableengine"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
+	k8snet "k8s.io/utils/net"
 )
 
 type Engine struct { //nolint:gocritic // This mutex is exposed but we tweak it in tests
@@ -62,7 +63,7 @@ func (e *Engine) StartEngine() error {
 func (e *Engine) Stop() {
 }
 
-func (e *Engine) InstallCable(endpoint *v1.Endpoint) error {
+func (e *Engine) InstallCable(endpoint *v1.Endpoint, _ k8snet.IPFamily) error {
 	err := e.ErrOnInstallCable
 	if err != nil {
 		e.ErrOnInstallCable = nil
@@ -74,7 +75,7 @@ func (e *Engine) InstallCable(endpoint *v1.Endpoint) error {
 	return nil
 }
 
-func (e *Engine) RemoveCable(endpoint *v1.Endpoint) error {
+func (e *Engine) RemoveCable(endpoint *v1.Endpoint, _ k8snet.IPFamily) error {
 	err := e.ErrOnRemoveCable
 	if err != nil {
 		e.ErrOnRemoveCable = nil

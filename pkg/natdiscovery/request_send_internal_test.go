@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
+	k8snet "k8s.io/utils/net"
 )
 
 var _ = When("a request is sent", func() {
@@ -43,9 +44,9 @@ var _ = When("a request is sent", func() {
 
 	JustBeforeEach(func() {
 		ndInstance, udpSent, _ = createTestListener(&localEndpoint)
-		ndInstance.findSrcIP = func(_ string) string { return testLocalPrivateIP }
+		ndInstance.findSrcIP = func(_ string, _ k8snet.IPFamily) string { return testLocalPrivateIP }
 
-		err := ndInstance.sendCheckRequest(newRemoteEndpointNAT(&remoteEndpoint))
+		err := ndInstance.sendCheckRequest(newRemoteEndpointNAT(&remoteEndpoint, k8snet.IPv4))
 		Expect(err).NotTo(HaveOccurred())
 
 		request = parseProtocolRequest(awaitChan(udpSent))
@@ -55,13 +56,13 @@ var _ = When("a request is sent", func() {
 		It("should set the sender fields correctly", func() {
 			Expect(request.GetSender()).NotTo(BeNil())
 			Expect(request.GetSender().GetClusterId()).To(Equal(testLocalClusterID))
-			Expect(request.GetSender().GetEndpointId()).To(Equal(testLocalEndpointName))
+			Expect(request.GetSender().GetEndpointId()).To(Equal(testLocalEndpointNameAndFamily))
 		})
 
 		It("should set the receiver fields correctly", func() {
 			Expect(request.GetReceiver()).NotTo(BeNil())
 			Expect(request.GetReceiver().GetClusterId()).To(Equal(testRemoteClusterID))
-			Expect(request.GetReceiver().GetEndpointId()).To(Equal(testRemoteEndpointName))
+			Expect(request.GetReceiver().GetEndpointId()).To(Equal(testRemoteEndpointNameAndFamily))
 		})
 
 		It("should set the using source fields correctly", func() {

@@ -26,6 +26,7 @@ import (
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 	"google.golang.org/protobuf/proto"
+	k8snet "k8s.io/utils/net"
 )
 
 var _ = Describe("Request handling", func() {
@@ -43,9 +44,9 @@ var _ = Describe("Request handling", func() {
 		remoteEndpoint = createTestRemoteEndpoint()
 
 		localListener, localUDPSent, _ = createTestListener(&localEndpoint)
-		localListener.findSrcIP = func(_ string) string { return testLocalPrivateIP }
+		localListener.findSrcIP = func(_ string, _ k8snet.IPFamily) string { return testLocalPrivateIP }
 		remoteListener, remoteUDPSent, _ = createTestListener(&remoteEndpoint)
-		remoteListener.findSrcIP = func(_ string) string { return testRemotePrivateIP }
+		remoteListener.findSrcIP = func(_ string, _ k8snet.IPFamily) string { return testRemotePrivateIP }
 
 		remoteUDPAddr = net.UDPAddr{
 			IP:   net.ParseIP(testRemotePrivateIP),
@@ -60,7 +61,7 @@ var _ = Describe("Request handling", func() {
 	}
 
 	requestResponseFromRemoteToLocal := func(remoteAddr *net.UDPAddr) []*natproto.SubmarinerNATDiscoveryResponse {
-		err := remoteListener.sendCheckRequest(newRemoteEndpointNAT(&localEndpoint))
+		err := remoteListener.sendCheckRequest(newRemoteEndpointNAT(&localEndpoint, k8snet.IPv4))
 		Expect(err).NotTo(HaveOccurred())
 		return []*natproto.SubmarinerNATDiscoveryResponse{
 			parseResponseInLocalListener(awaitChan(remoteUDPSent), remoteAddr), /* Private IP request */
@@ -70,7 +71,7 @@ var _ = Describe("Request handling", func() {
 
 	When("receiving a request with a known sender endpoint", func() {
 		It("should respond with OK", func() {
-			localListener.AddEndpoint(&remoteEndpoint)
+			localListener.AddEndpoint(&remoteEndpoint, k8snet.IPv4)
 			response := requestResponseFromRemoteToLocal(&remoteUDPAddr)
 			Expect(response[0].GetResponse()).To(Equal(natproto.ResponseType_OK))
 			Expect(response[1].GetResponse()).To(Equal(natproto.ResponseType_NAT_DETECTED))
@@ -82,7 +83,7 @@ var _ = Describe("Request handling", func() {
 		Context("with a modified IP", func() {
 			It("should respond with NAT_DETECTED and SrcIpNatDetected", func() {
 				remoteUDPAddr.IP = net.ParseIP(testRemotePublicIP)
-				localListener.AddEndpoint(&remoteEndpoint)
+				localListener.AddEndpoint(&remoteEndpoint, k8snet.IPv4)
 				response := requestResponseFromRemoteToLocal(&remoteUDPAddr)
 				Expect(response[0].GetResponse()).To(Equal(natproto.ResponseType_NAT_DETECTED))
 				Expect(response[0].GetSrcIpNatDetected()).To(BeTrue())
@@ -93,7 +94,7 @@ var _ = Describe("Request handling", func() {
 		Context("with a modified port", func() {
 			It("should respond with NAT_DETECTED and SrcPortNatDetected", func() {
 				remoteUDPAddr.Port = int(testRemoteNATPort + 1)
-				localListener.AddEndpoint(&remoteEndpoint)
+				localListener.AddEndpoint(&remoteEndpoint, k8snet.IPv4)
 				response := requestResponseFromRemoteToLocal(&remoteUDPAddr)
 				Expect(response[0].GetResponse()).To(Equal(natproto.ResponseType_NAT_DETECTED))
 				Expect(response[0].GetSrcIpNatDetected()).To(BeFalse())
@@ -104,7 +105,7 @@ var _ = Describe("Request handling", func() {
 
 	When("receiving a request with an unknown receiver endpoint ID", func() {
 		It("should respond with UNKNOWN_DST_ENDPOINT", func() {
-			localListener.AddEndpoint(&remoteEndpoint)
+			localListener.AddEndpoint(&remoteEndpoint, k8snet.IPv4)
 			localEndpoint.Spec.CableName = "invalid"
 			response := requestResponseFromRemoteToLocal(&remoteUDPAddr)
 			Expect(response[0].GetResponse()).To(Equal(natproto.ResponseType_UNKNOWN_DST_ENDPOINT))
@@ -113,7 +114,7 @@ var _ = Describe("Request handling", func() {
 
 	When("receiving a request with an unknown receiver cluster ID", func() {
 		It("should respond with UNKNOWN_DST_CLUSTER", func() {
-			localListener.AddEndpoint(&remoteEndpoint)
+			localListener.AddEndpoint(&remoteEndpoint, k8snet.IPv4)
 			localEndpoint.Spec.ClusterID = "invalid"
 			response := requestResponseFromRemoteToLocal(&remoteUDPAddr)
 			Expect(response[0].GetResponse()).To(Equal(natproto.ResponseType_UNKNOWN_DST_CLUSTER))
@@ -165,11 +166,11 @@ func createMalformedRequest(mangleFunction func(*natproto.SubmarinerNATDiscovery
 	request := natproto.SubmarinerNATDiscoveryRequest{
 		RequestNumber: 1,
 		Sender: &natproto.EndpointDetails{
-			EndpointId: testRemoteEndpointName,
+			EndpointId: testRemoteEndpointNameAndFamily,
 			ClusterId:  testRemoteClusterID,
 		},
 		Receiver: &natproto.EndpointDetails{
-			EndpointId: testLocalEndpointName,
+			EndpointId: testLocalEndpointNameAndFamily,
 			ClusterId:  testLocalClusterID,
 		},
 		UsingSrc: &natproto.IPPortPair{

@@ -55,6 +55,7 @@ import (
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	k8snet "k8s.io/utils/net"
 )
 
 const publicIP = "1.2.3.4"
@@ -120,7 +121,8 @@ var _ = Describe("Run", func() {
 		It("should re-acquire the leader lease after the failure is cleared", func() {
 			endpoint := t.awaitRemoteEndpointSyncedLocal(t.createRemoteEndpointOnBroker())
 			fakeDriver.AwaitConnectToEndpoint(&natdiscovery.NATEndpointInfo{
-				Endpoint: *endpoint,
+				Endpoint:  *endpoint,
+				UseFamily: k8snet.IPv4,
 			})
 
 			By("Setting leases resource updates to fail")
@@ -171,7 +173,8 @@ var _ = Describe("Run", func() {
 
 			endpoint2 := t.awaitRemoteEndpointSyncedLocal(brokerEndpoint)
 			fakeDriver.AwaitConnectToEndpoint(&natdiscovery.NATEndpointInfo{
-				Endpoint: *endpoint2,
+				Endpoint:  *endpoint2,
+				UseFamily: k8snet.IPv4,
 			})
 
 			fakeDriver.AwaitDisconnectFromEndpoint(&endpoint.Spec)
@@ -487,9 +490,10 @@ func (n *fakeNATDiscovery) Run(_ <-chan struct{}) error {
 	return nil
 }
 
-func (n *fakeNATDiscovery) AddEndpoint(ep *submarinerv1.Endpoint) {
+func (n *fakeNATDiscovery) AddEndpoint(ep *submarinerv1.Endpoint, family k8snet.IPFamily) {
 	n.readyChannel <- &natdiscovery.NATEndpointInfo{
-		Endpoint: *ep,
+		Endpoint:  *ep,
+		UseFamily: family,
 	}
 }
 

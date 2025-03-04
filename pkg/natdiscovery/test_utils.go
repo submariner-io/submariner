@@ -32,19 +32,23 @@ import (
 	"google.golang.org/protobuf/proto"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	k8snet "k8s.io/utils/net"
 )
 
 const (
 	testLocalEndpointName = "cluster-a-ep-1"
-	testLocalClusterID    = "cluster-a"
-	testLocalPublicIP     = "10.1.1.1"
-	testLocalPrivateIP    = "2.2.2.2"
+	// endpointId as formated in GetFamilyCableName.
+	testLocalEndpointNameAndFamily = testLocalEndpointName + "-v" + string(k8snet.IPv4)
+	testLocalClusterID             = "cluster-a"
+	testLocalPublicIP              = "10.1.1.1"
+	testLocalPrivateIP             = "2.2.2.2"
 
-	testRemoteEndpointName = "cluster-b-ep-1"
-	testRemoteClusterID    = "cluster-b"
-	testRemotePublicIP     = "10.3.3.3"
-	testRemotePrivateIP    = "4.4.4.4"
-	testRemotePrivateIP2   = "5.5.5.5"
+	testRemoteEndpointName          = "cluster-b-ep-1"
+	testRemoteEndpointNameAndFamily = "cluster-b-ep-1" + "-v" + string(k8snet.IPv4)
+	testRemoteClusterID             = "cluster-b"
+	testRemotePublicIP              = "10.3.3.3"
+	testRemotePrivateIP             = "4.4.4.4"
+	testRemotePrivateIP2            = "5.5.5.5"
 )
 
 var (
