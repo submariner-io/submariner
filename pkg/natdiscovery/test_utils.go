@@ -21,6 +21,7 @@ package natdiscovery
 import (
 	"net"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -56,6 +57,78 @@ var (
 	testRemoteNATPort int32 = 4321
 )
 
+type UDPReadInfo struct {
+	b    []byte
+	addr *net.UDPAddr
+}
+
+type fakeServerConnection struct {
+	addr           *net.UDPAddr
+	udpSentChannel chan []byte
+	udpReadChannel chan UDPReadInfo
+	closed         atomic.Bool
+}
+
+func (c *fakeServerConnection) Close() error {
+	if c.closed.CompareAndSwap(false, true) {
+		close(c.udpReadChannel)
+	}
+
+	return nil
+}
+
+func (c *fakeServerConnection) ReadFromUDP(b []byte) (int, *net.UDPAddr, error) {
+	i, ok := <-c.udpReadChannel
+	if !ok {
+		return 0, nil, nil
+	}
+
+	copy(b, i.b)
+
+	return len(i.b), i.addr, nil
+}
+
+func (c *fakeServerConnection) WriteToUDP(b []byte, _ *net.UDPAddr) (int, error) {
+	c.udpSentChannel <- b
+	return len(b), nil
+}
+
+func (c *fakeServerConnection) awaitSent() []byte {
+	select {
+	case res := <-c.udpSentChannel:
+		return res
+	case <-time.After(3 * time.Second):
+		Fail("Nothing received from the channel")
+		return nil
+	}
+}
+
+func (c *fakeServerConnection) forwardFromSent(to *fakeServerConnection, howMany int) {
+	if howMany == 0 {
+		return
+	}
+
+	count := 0
+
+	go func() {
+		for b := range c.udpSentChannel {
+			to.input(b, c.addr)
+
+			count++
+			if howMany > 0 && count >= howMany {
+				break
+			}
+		}
+	}()
+}
+
+func (c *fakeServerConnection) input(b []byte, addr *net.UDPAddr) {
+	c.udpReadChannel <- UDPReadInfo{
+		b:    b,
+		addr: addr,
+	}
+}
+
 func parseProtocolRequest(buf []byte) *natproto.SubmarinerNATDiscoveryRequest {
 	msg := natproto.SubmarinerNATDiscoveryMessage{}
 	if err := proto.Unmarshal(buf, &msg); err != nil {
@@ -80,7 +153,7 @@ func parseProtocolResponse(buf []byte) *natproto.SubmarinerNATDiscoveryResponse 
 	return response
 }
 
-func createTestListener(endpoint *submarinerv1.Endpoint) (*natDiscovery, chan []byte, chan *NATEndpointInfo) {
+func createTestListener(endpoint *submarinerv1.Endpoint, addr *net.UDPAddr) (*natDiscovery, *fakeServerConnection, chan *NATEndpointInfo) {
 	dynClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
 	localEndpoint := submendpoint.NewLocal(&endpoint.Spec, dynClient, "")
 
@@ -91,35 +164,28 @@ func createTestListener(endpoint *submarinerv1.Endpoint) (*natDiscovery, chan []
 
 	readyChannel := listener.GetReadyChannel()
 
-	udpSentChannel := make(chan []byte, 10)
-	listener.serverUDPWrite = func(b []byte, _ *net.UDPAddr) (int, error) {
-		udpSentChannel <- b
-		return len(b), nil
+	serverConnection := &fakeServerConnection{
+		udpSentChannel: make(chan []byte, 10),
+		udpReadChannel: make(chan UDPReadInfo, 10),
+		addr:           addr,
 	}
 
-	return listener, udpSentChannel, readyChannel
-}
-
-func forwardFromUDPChan(from chan []byte, addr *net.UDPAddr, to *natDiscovery, howMany int) {
-	if howMany == 0 {
-		return
+	listener.createServerConnection = func(_ int32, _ k8snet.IPFamily) (ServerConnection, error) {
+		return serverConnection, nil
 	}
 
-	count := 0
+	stopCh := make(chan struct{})
 
-	go func() {
-		for p := range from {
-			err := to.parseAndHandleMessageFromAddress(p, addr)
-			if err != nil {
-				logger.Errorf(err, "Error handling message")
-			}
+	DeferCleanup(func() {
+		close(stopCh)
+		Eventually(func() bool {
+			return serverConnection.closed.Load()
+		}).Should(BeTrue())
+	})
 
-			count++
-			if howMany > 0 && count >= howMany {
-				break
-			}
-		}
-	}()
+	Expect(listener.runListeners(stopCh)).To(Succeed())
+
+	return listener, serverConnection, readyChannel
 }
 
 func createTestLocalEndpoint() submarinerv1.Endpoint {
@@ -129,6 +195,7 @@ func createTestLocalEndpoint() submarinerv1.Endpoint {
 			ClusterID:  testLocalClusterID,
 			PublicIPs:  []string{testLocalPublicIP},
 			PrivateIPs: []string{testLocalPrivateIP},
+			Subnets:    []string{"10.0.0.0/16"},
 			NATEnabled: true,
 			BackendConfig: map[string]string{
 				submarinerv1.NATTDiscoveryPortConfig: strconv.Itoa(int(testLocalNATPort)),
@@ -144,20 +211,11 @@ func createTestRemoteEndpoint() submarinerv1.Endpoint {
 			ClusterID:  testRemoteClusterID,
 			PublicIPs:  []string{testRemotePublicIP},
 			PrivateIPs: []string{testRemotePrivateIP},
+			Subnets:    []string{"11.0.0.0/16"},
 			NATEnabled: true,
 			BackendConfig: map[string]string{
 				submarinerv1.NATTDiscoveryPortConfig: strconv.Itoa(int(testRemoteNATPort)),
 			},
 		},
-	}
-}
-
-func awaitChan(from chan []byte) []byte {
-	select {
-	case res := <-from:
-		return res
-	case <-time.After(3 * time.Second):
-		Fail("Nothing received from the channel")
-		return nil
 	}
 }

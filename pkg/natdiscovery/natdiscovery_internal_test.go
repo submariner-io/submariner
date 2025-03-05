@@ -49,7 +49,7 @@ var _ = When("a remote Endpoint is added", func() {
 	})
 
 	JustBeforeEach(func() {
-		forwardFromUDPChan(t.localUDPSent, t.localUDPAddr, t.remoteND, forwardHowManyFromLocal)
+		t.localConnection.forwardFromSent(t.remoteConnection, forwardHowManyFromLocal)
 		t.localND.AddEndpoint(&t.remoteEndpoint, k8snet.IPv4)
 		t.localND.checkEndpointList()
 	})
@@ -78,14 +78,13 @@ var _ = When("a remote Endpoint is added", func() {
 		})
 
 		JustBeforeEach(func() {
-			privateIPReq = awaitChan(t.localUDPSent)
-			publicIPReq = awaitChan(t.localUDPSent)
+			privateIPReq = t.localConnection.awaitSent()
+			publicIPReq = t.localConnection.awaitSent()
 		})
 
 		Context("and the private IP responds after the public IP within the grace period", func() {
 			It("should notify with the private IP NATEndpointInfo settings", func() {
-				Expect(t.remoteND.parseAndHandleMessageFromAddress(publicIPReq, t.localUDPAddr)).
-					To(Succeed())
+				t.remoteConnection.input(publicIPReq, t.localConnection.addr)
 
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 					Endpoint:  t.remoteEndpoint,
@@ -94,8 +93,7 @@ var _ = When("a remote Endpoint is added", func() {
 					UseFamily: k8snet.IPv4,
 				})))
 
-				Expect(t.remoteND.parseAndHandleMessageFromAddress(privateIPReq, t.localUDPAddr)).
-					To(Succeed())
+				t.remoteConnection.input(privateIPReq, t.localConnection.addr)
 
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 					Endpoint:  t.remoteEndpoint,
@@ -110,8 +108,7 @@ var _ = When("a remote Endpoint is added", func() {
 			It("should notify with the public IP NATEndpointInfo settings", func() {
 				atomic.StoreInt64(&publicToPrivateFailoverTimeout, 0)
 
-				Expect(t.remoteND.parseAndHandleMessageFromAddress(publicIPReq, t.localUDPAddr)).
-					To(Succeed())
+				t.remoteConnection.input(publicIPReq, t.localConnection.addr)
 
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 					Endpoint:  t.remoteEndpoint,
@@ -120,8 +117,7 @@ var _ = When("a remote Endpoint is added", func() {
 					UseFamily: k8snet.IPv4,
 				})))
 
-				Expect(t.remoteND.parseAndHandleMessageFromAddress(privateIPReq, t.localUDPAddr)).
-					To(Succeed())
+				t.remoteConnection.input(privateIPReq, t.localConnection.addr)
 
 				Consistently(t.readyChannel).ShouldNot(Receive())
 			})
@@ -129,8 +125,7 @@ var _ = When("a remote Endpoint is added", func() {
 
 		Context("and the private IP responds first", func() {
 			It("should notify with the private IP NATEndpointInfo settings", func() {
-				Expect(t.remoteND.parseAndHandleMessageFromAddress(privateIPReq, t.localUDPAddr)).
-					To(Succeed())
+				t.remoteConnection.input(privateIPReq, t.localConnection.addr)
 
 				Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 					Endpoint:  t.remoteEndpoint,
@@ -139,8 +134,7 @@ var _ = When("a remote Endpoint is added", func() {
 					UseFamily: k8snet.IPv4,
 				})))
 
-				Expect(t.remoteND.parseAndHandleMessageFromAddress(publicIPReq, t.localUDPAddr)).
-					To(Succeed())
+				t.remoteConnection.input(publicIPReq, t.localConnection.addr)
 
 				Consistently(t.readyChannel).ShouldNot(Receive())
 			})
@@ -169,8 +163,8 @@ var _ = When("a remote Endpoint is added", func() {
 		JustBeforeEach(func() {
 			Eventually(t.readyChannel, 5).Should(Receive())
 
-			t.remoteUDPAddr.IP = net.ParseIP(newRemoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4))
-			forwardFromUDPChan(t.localUDPSent, t.localUDPAddr, t.remoteND, 1)
+			t.remoteConnection.addr.IP = net.ParseIP(newRemoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4))
+			t.localConnection.forwardFromSent(t.remoteConnection, 1)
 
 			t.localND.AddEndpoint(&newRemoteEndpoint, k8snet.IPv4)
 			t.localND.checkEndpointList()
@@ -234,8 +228,8 @@ var _ = When("a remote Endpoint is added", func() {
 			})
 
 			JustBeforeEach(func() {
-				t.remoteUDPAddr.IP = net.ParseIP(newRemoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4))
-				forwardFromUDPChan(t.localUDPSent, t.localUDPAddr, t.remoteND, -1)
+				t.remoteConnection.addr.IP = net.ParseIP(newRemoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4))
+				t.localConnection.forwardFromSent(t.remoteConnection, -1)
 				t.localND.checkEndpointList()
 			})
 
@@ -256,13 +250,13 @@ var _ = When("a remote Endpoint is added", func() {
 		})
 
 		It("should stop the discovery", func() {
-			Expect(t.localUDPSent).To(Receive())
+			Expect(t.localConnection.udpSentChannel).To(Receive())
 			Consistently(t.readyChannel).ShouldNot(Receive())
 
 			t.localND.RemoveEndpoint(t.remoteEndpoint.Spec.GetFamilyCableName(k8snet.IPv4))
 
 			t.localND.checkEndpointList()
-			Expect(t.localUDPSent).ToNot(Receive())
+			Expect(t.localConnection.udpSentChannel).ToNot(Receive())
 		})
 	})
 
@@ -291,13 +285,13 @@ var _ = When("a remote Endpoint is added", func() {
 
 		It("should eventually time out and notify with the legacy NATEndpointInfo settings", func() {
 			// Drop the request sent out
-			Expect(t.localUDPSent).Should(Receive())
+			Expect(t.localConnection.udpSentChannel).Should(Receive())
 
 			Consistently(t.readyChannel, toDuration(&totalTimeout)).ShouldNot(Receive())
 			time.Sleep(50 * time.Millisecond)
 
 			t.localND.checkEndpointList()
-			Expect(t.localUDPSent).ToNot(Receive())
+			Expect(t.localConnection.udpSentChannel).ToNot(Receive())
 
 			Eventually(t.readyChannel, 5).Should(Receive(Equal(&NATEndpointInfo{
 				Endpoint:  t.remoteEndpoint,
@@ -311,13 +305,11 @@ var _ = When("a remote Endpoint is added", func() {
 
 type discoveryTestDriver struct {
 	localND                           *natDiscovery
-	localUDPSent                      chan []byte
+	localConnection                   *fakeServerConnection
 	localEndpoint                     submarinerv1.Endpoint
-	localUDPAddr                      *net.UDPAddr
 	remoteND                          *natDiscovery
-	remoteUDPSent                     chan []byte
+	remoteConnection                  *fakeServerConnection
 	remoteEndpoint                    submarinerv1.Endpoint
-	remoteUDPAddr                     *net.UDPAddr
 	readyChannel                      chan *NATEndpointInfo
 	oldRecheckTime                    int64
 	oldTotalTimeout                   int64
@@ -332,31 +324,27 @@ func newDiscoveryTestDriver() *discoveryTestDriver {
 		t.oldTotalTimeout = atomic.LoadInt64(&totalTimeout)
 		t.oldPublicToPrivateFailoverTimeout = atomic.LoadInt64(&publicToPrivateFailoverTimeout)
 
-		t.localUDPAddr = &net.UDPAddr{
-			IP:   net.ParseIP(testLocalPrivateIP),
-			Port: int(testLocalNATPort),
-		}
-
-		t.remoteUDPAddr = &net.UDPAddr{
-			IP:   net.ParseIP(testRemotePrivateIP),
-			Port: int(testRemoteNATPort),
-		}
-
 		t.remoteEndpoint = createTestRemoteEndpoint()
 		t.localEndpoint = createTestLocalEndpoint()
 
-		t.localND, t.localUDPSent, t.readyChannel = createTestListener(&t.localEndpoint)
+		t.localND, t.localConnection, t.readyChannel = createTestListener(&t.localEndpoint, &net.UDPAddr{
+			IP:   net.ParseIP(testLocalPrivateIP),
+			Port: int(testLocalNATPort),
+		})
 		t.localND.findSrcIP = func(_ string, _ k8snet.IPFamily) string { return testLocalPrivateIP }
 
-		t.remoteND, t.remoteUDPSent, _ = createTestListener(&t.remoteEndpoint)
+		t.remoteND, t.remoteConnection, _ = createTestListener(&t.remoteEndpoint, &net.UDPAddr{
+			IP:   net.ParseIP(testRemotePrivateIP),
+			Port: int(testRemoteNATPort),
+		})
 		t.remoteND.findSrcIP = func(_ string, _ k8snet.IPFamily) string { return testRemotePrivateIP }
 
-		forwardFromUDPChan(t.remoteUDPSent, t.remoteUDPAddr, t.localND, -1)
+		t.remoteConnection.forwardFromSent(t.localConnection, -1)
 	})
 
 	AfterEach(func() {
-		close(t.localUDPSent)
-		close(t.remoteUDPSent)
+		close(t.localConnection.udpSentChannel)
+		close(t.remoteConnection.udpSentChannel)
 
 		atomic.StoreInt64(&recheckTime, t.oldRecheckTime)
 		atomic.StoreInt64(&totalTimeout, t.oldTotalTimeout)
@@ -385,7 +373,7 @@ func (t *discoveryTestDriver) testRemoteEndpointAdded(expIP string, expectNAT bo
 		time.Sleep(toDuration(&totalTimeout) + 20)
 
 		t.localND.checkEndpointList()
-		Expect(t.localUDPSent).ToNot(Receive())
+		Expect(t.localConnection.udpSentChannel).ToNot(Receive())
 		Consistently(t.readyChannel).ShouldNot(Receive())
 
 		// Verify it doesn't try to send another request after the recheck time period has elapsed
@@ -393,7 +381,7 @@ func (t *discoveryTestDriver) testRemoteEndpointAdded(expIP string, expectNAT bo
 		atomic.StoreInt64(&totalTimeout, time.Hour.Nanoseconds())
 
 		t.localND.checkEndpointList()
-		Expect(t.localUDPSent).ToNot(Receive())
+		Expect(t.localConnection.udpSentChannel).ToNot(Receive())
 		Consistently(t.readyChannel).ShouldNot(Receive())
 	})
 }

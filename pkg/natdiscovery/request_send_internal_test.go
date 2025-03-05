@@ -28,10 +28,10 @@ import (
 
 var _ = When("a request is sent", func() {
 	var (
-		request        *natproto.SubmarinerNATDiscoveryRequest
-		remoteEndpoint submarinerv1.Endpoint
-		udpSent        chan []byte
-		ndInstance     *natDiscovery
+		request          *natproto.SubmarinerNATDiscoveryRequest
+		remoteEndpoint   submarinerv1.Endpoint
+		serverConnection *fakeServerConnection
+		ndInstance       *natDiscovery
 	)
 
 	localEndpoint := createTestLocalEndpoint()
@@ -43,13 +43,13 @@ var _ = When("a request is sent", func() {
 	})
 
 	JustBeforeEach(func() {
-		ndInstance, udpSent, _ = createTestListener(&localEndpoint)
+		ndInstance, serverConnection, _ = createTestListener(&localEndpoint, nil)
 		ndInstance.findSrcIP = func(_ string, _ k8snet.IPFamily) string { return testLocalPrivateIP }
 
 		err := ndInstance.sendCheckRequest(newRemoteEndpointNAT(&remoteEndpoint, k8snet.IPv4))
 		Expect(err).NotTo(HaveOccurred())
 
-		request = parseProtocolRequest(awaitChan(udpSent))
+		request = parseProtocolRequest(serverConnection.awaitSent())
 	})
 
 	testRequest := func(srcIP string) {
@@ -78,7 +78,7 @@ var _ = When("a request is sent", func() {
 		})
 
 		It("should not send another request", func() {
-			Consistently(udpSent).ShouldNot(Receive())
+			Consistently(serverConnection.udpSentChannel).ShouldNot(Receive())
 		})
 	}
 
@@ -95,7 +95,7 @@ var _ = When("a request is sent", func() {
 			})
 
 			JustBeforeEach(func() {
-				request = parseProtocolRequest(awaitChan(udpSent))
+				request = parseProtocolRequest(serverConnection.awaitSent())
 			})
 
 			testRequest(testRemotePublicIP)

@@ -48,13 +48,14 @@ type (
 
 type natDiscovery struct {
 	sync.Mutex
-	localEndpoint   *endpoint.Local
-	remoteEndpoints map[string]*remoteEndpointNAT
-	requestCounter  uint64
-	serverUDPWrite  udpWriteFunction
-	findSrcIP       findSrcIPFunction
-	serverPort      int32
-	readyChannel    chan *NATEndpointInfo
+	localEndpoint          *endpoint.Local
+	remoteEndpoints        map[string]*remoteEndpointNAT
+	requestCounter         uint64
+	serverUDPWrite         udpWriteFunction
+	findSrcIP              findSrcIPFunction
+	serverPort             int32
+	readyChannel           chan *NATEndpointInfo
+	createServerConnection func(port int32, family k8snet.IPFamily) (ServerConnection, error)
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("NAT")}
@@ -71,12 +72,13 @@ func newNATDiscovery(localEndpoint *endpoint.Local) (*natDiscovery, error) {
 
 	//nolint:gosec // Use of math/rand over crypto/rand is fine here as the request counter is not security-sensitive.
 	return &natDiscovery{
-		localEndpoint:   localEndpoint,
-		serverPort:      ndPort,
-		remoteEndpoints: map[string]*remoteEndpointNAT{},
-		findSrcIP:       endpoint.GetLocalIPForDestination,
-		requestCounter:  rand.Uint64(),
-		readyChannel:    make(chan *NATEndpointInfo, 100),
+		localEndpoint:          localEndpoint,
+		serverPort:             ndPort,
+		remoteEndpoints:        map[string]*remoteEndpointNAT{},
+		findSrcIP:              endpoint.GetLocalIPForDestination,
+		requestCounter:         rand.Uint64(),
+		readyChannel:           make(chan *NATEndpointInfo, 100),
+		createServerConnection: createServerConnection,
 	}, nil
 }
 
@@ -102,12 +104,9 @@ func (nd *natDiscovery) GetReadyChannel() chan *NATEndpointInfo {
 func (nd *natDiscovery) Run(stopCh <-chan struct{}) error {
 	logger.V(log.DEBUG).Infof("NAT discovery server starting on port %d", nd.serverPort)
 
-	for _, family := range nd.localEndpoint.Spec().GetIPFamilies() {
-		if err := nd.runListener(family, stopCh); err != nil {
-			return err
-		}
-
-		logger.V(log.TRACE).Infof("NAT discovery start listener IPv%v", family)
+	err := nd.runListeners(stopCh)
+	if err != nil {
+		return err
 	}
 
 	go wait.Until(func() {
