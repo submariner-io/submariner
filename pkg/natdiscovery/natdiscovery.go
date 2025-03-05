@@ -42,43 +42,58 @@ type Interface interface {
 }
 
 type (
-	udpWriteFunction  func(b []byte, addr *net.UDPAddr) (int, error)
-	findSrcIPFunction func(destinationIP string, family k8snet.IPFamily) string
+	udpWriteFunction         func(b []byte, addr *net.UDPAddr) (int, error)
+	FindSrcIPFunction        func(destinationIP string, family k8snet.IPFamily) string
+	CreateServerConnectionFn func(port int32, family k8snet.IPFamily) (ServerConnection, error)
 )
+
+type Config struct {
+	LocalEndpoint *endpoint.Local
+
+	// These are hooks to allow unit tests to mock behavior.
+	CreateServerConnection CreateServerConnectionFn
+	FindSourceIP           FindSrcIPFunction
+	RunLoop                func(stopCh <-chan struct{}, doCheck func())
+}
 
 type natDiscovery struct {
 	sync.Mutex
-	localEndpoint          *endpoint.Local
-	remoteEndpoints        map[string]*remoteEndpointNAT
-	requestCounter         uint64
-	serverUDPWrite         udpWriteFunction
-	findSrcIP              findSrcIPFunction
-	serverPort             int32
-	readyChannel           chan *NATEndpointInfo
-	createServerConnection func(port int32, family k8snet.IPFamily) (ServerConnection, error)
+	Config
+	remoteEndpoints map[string]*remoteEndpointNAT
+	requestCounter  uint64
+	serverUDPWrite  udpWriteFunction
+	serverPort      int32
+	readyChannel    chan *NATEndpointInfo
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("NAT")}
 
 func New(localEndpoint *endpoint.Local) (Interface, error) {
-	return newNATDiscovery(localEndpoint)
+	return NewWithConfig(Config{
+		LocalEndpoint:          localEndpoint,
+		CreateServerConnection: createServerConnection,
+		FindSourceIP:           endpoint.GetLocalIPForDestination,
+		RunLoop: func(stopCh <-chan struct{}, doCheck func()) {
+			go wait.Until(func() {
+				doCheck()
+			}, time.Second, stopCh)
+		},
+	})
 }
 
-func newNATDiscovery(localEndpoint *endpoint.Local) (*natDiscovery, error) {
-	ndPort, err := localEndpoint.Spec().GetBackendPort(v1.NATTDiscoveryPortConfig, 0)
+func NewWithConfig(config Config) (Interface, error) {
+	ndPort, err := config.LocalEndpoint.Spec().GetBackendPort(v1.NATTDiscoveryPortConfig, 0)
 	if err != nil {
 		return nil, errors.Wrap(err, "error parsing nat discovery port")
 	}
 
 	//nolint:gosec // Use of math/rand over crypto/rand is fine here as the request counter is not security-sensitive.
 	return &natDiscovery{
-		localEndpoint:          localEndpoint,
-		serverPort:             ndPort,
-		remoteEndpoints:        map[string]*remoteEndpointNAT{},
-		findSrcIP:              endpoint.GetLocalIPForDestination,
-		requestCounter:         rand.Uint64(),
-		readyChannel:           make(chan *NATEndpointInfo, 100),
-		createServerConnection: createServerConnection,
+		Config:          config,
+		serverPort:      ndPort,
+		remoteEndpoints: map[string]*remoteEndpointNAT{},
+		requestCounter:  rand.Uint64(),
+		readyChannel:    make(chan *NATEndpointInfo, 100),
 	}, nil
 }
 
@@ -109,10 +124,7 @@ func (nd *natDiscovery) Run(stopCh <-chan struct{}) error {
 		return err
 	}
 
-	go wait.Until(func() {
-		logger.V(log.TRACE).Info("NAT discovery checking endpoint list")
-		nd.checkEndpointList()
-	}, time.Second, stopCh)
+	nd.RunLoop(stopCh, nd.checkEndpointList)
 
 	return nil
 }
@@ -161,6 +173,8 @@ func (nd *natDiscovery) RemoveEndpoint(endpointName string) {
 func (nd *natDiscovery) checkEndpointList() {
 	nd.Lock()
 	defer nd.Unlock()
+
+	logger.V(log.TRACE).Info("NAT discovery checking endpoint list")
 
 	for _, endpointNAT := range nd.remoteEndpoints {
 		name := endpointNAT.endpoint.Spec.GetFamilyCableName(endpointNAT.family)

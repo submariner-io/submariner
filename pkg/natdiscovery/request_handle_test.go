@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package natdiscovery
+package natdiscovery_test
 
 import (
 	"net"
@@ -31,46 +31,46 @@ import (
 
 var _ = Describe("Request handling", func() {
 	var (
-		localListener    *natDiscovery
-		localConnection  *fakeServerConnection
-		remoteListener   *natDiscovery
-		remoteConnection *fakeServerConnection
-		localEndpoint    submarinerv1.Endpoint
-		remoteEndpoint   submarinerv1.Endpoint
+		localND        *NATDiscoveryInfo
+		remoteND       *NATDiscoveryInfo
+		localEndpoint  submarinerv1.Endpoint
+		remoteEndpoint submarinerv1.Endpoint
 	)
 
 	BeforeEach(func() {
 		localEndpoint = createTestLocalEndpoint()
 		remoteEndpoint = createTestRemoteEndpoint()
 
-		localListener, localConnection, _ = createTestListener(&localEndpoint, nil)
-		localListener.findSrcIP = func(_ string, _ k8snet.IPFamily) string { return testLocalPrivateIP }
-		remoteListener, remoteConnection, _ = createTestListener(&remoteEndpoint, &net.UDPAddr{
+		localND = newNATDiscovery(&localEndpoint, &net.UDPAddr{
+			IP:   net.ParseIP(testLocalPrivateIP),
+			Port: int(testLocalNATPort),
+		})
+
+		remoteND = newNATDiscovery(&remoteEndpoint, &net.UDPAddr{
 			IP:   net.ParseIP(testRemotePrivateIP),
 			Port: int(testRemoteNATPort),
 		})
-		remoteListener.findSrcIP = func(_ string, _ k8snet.IPFamily) string { return testRemotePrivateIP }
 	})
 
 	parseResponseInLocalListener := func(udpPacket []byte, remoteAddr *net.UDPAddr) *natproto.SubmarinerNATDiscoveryResponse {
-		err := localListener.parseAndHandleMessageFromAddress(udpPacket, remoteAddr)
-		Expect(err).NotTo(HaveOccurred())
-		return parseProtocolResponse(localConnection.awaitSent())
+		localND.ipv4Connection.inputFrom(udpPacket, remoteAddr)
+		return parseProtocolResponse(localND.ipv4Connection.awaitSent())
 	}
 
 	requestResponseFromRemoteToLocal := func(remoteAddr *net.UDPAddr) []*natproto.SubmarinerNATDiscoveryResponse {
-		err := remoteListener.sendCheckRequest(newRemoteEndpointNAT(&localEndpoint, k8snet.IPv4))
-		Expect(err).NotTo(HaveOccurred())
+		remoteND.instance.AddEndpoint(&localEndpoint, k8snet.IPv4)
+		remoteND.checkDiscovery()
+
 		return []*natproto.SubmarinerNATDiscoveryResponse{
-			parseResponseInLocalListener(remoteConnection.awaitSent(), remoteAddr), /* Private IP request */
-			parseResponseInLocalListener(remoteConnection.awaitSent(), remoteAddr), /* Public IP request */
+			parseResponseInLocalListener(remoteND.ipv4Connection.awaitSent(), remoteAddr), /* Private IP request */
+			parseResponseInLocalListener(remoteND.ipv4Connection.awaitSent(), remoteAddr), /* Public IP request */
 		}
 	}
 
 	When("receiving a request with a known sender endpoint", func() {
 		It("should respond with OK", func() {
-			localListener.AddEndpoint(&remoteEndpoint, k8snet.IPv4)
-			response := requestResponseFromRemoteToLocal(remoteConnection.addr)
+			localND.instance.AddEndpoint(&remoteEndpoint, k8snet.IPv4)
+			response := requestResponseFromRemoteToLocal(remoteND.ipv4Connection.addr)
 			Expect(response[0].GetResponse()).To(Equal(natproto.ResponseType_OK))
 			Expect(response[1].GetResponse()).To(Equal(natproto.ResponseType_NAT_DETECTED))
 			Expect(response[1].GetDstIpNatDetected()).To(BeTrue())
@@ -80,9 +80,9 @@ var _ = Describe("Request handling", func() {
 
 		Context("with a modified IP", func() {
 			It("should respond with NAT_DETECTED and SrcIpNatDetected", func() {
-				remoteConnection.addr.IP = net.ParseIP(testRemotePublicIP)
-				localListener.AddEndpoint(&remoteEndpoint, k8snet.IPv4)
-				response := requestResponseFromRemoteToLocal(remoteConnection.addr)
+				remoteND.ipv4Connection.addr.IP = net.ParseIP(testRemotePublicIP)
+				localND.instance.AddEndpoint(&remoteEndpoint, k8snet.IPv4)
+				response := requestResponseFromRemoteToLocal(remoteND.ipv4Connection.addr)
 				Expect(response[0].GetResponse()).To(Equal(natproto.ResponseType_NAT_DETECTED))
 				Expect(response[0].GetSrcIpNatDetected()).To(BeTrue())
 				Expect(response[0].GetSrcPortNatDetected()).To(BeFalse())
@@ -91,9 +91,9 @@ var _ = Describe("Request handling", func() {
 
 		Context("with a modified port", func() {
 			It("should respond with NAT_DETECTED and SrcPortNatDetected", func() {
-				remoteConnection.addr.Port = int(testRemoteNATPort + 1)
-				localListener.AddEndpoint(&remoteEndpoint, k8snet.IPv4)
-				response := requestResponseFromRemoteToLocal(remoteConnection.addr)
+				remoteND.ipv4Connection.addr.Port = int(testRemoteNATPort + 1)
+				localND.instance.AddEndpoint(&remoteEndpoint, k8snet.IPv4)
+				response := requestResponseFromRemoteToLocal(remoteND.ipv4Connection.addr)
 				Expect(response[0].GetResponse()).To(Equal(natproto.ResponseType_NAT_DETECTED))
 				Expect(response[0].GetSrcIpNatDetected()).To(BeFalse())
 				Expect(response[0].GetSrcPortNatDetected()).To(BeTrue())
@@ -103,18 +103,18 @@ var _ = Describe("Request handling", func() {
 
 	When("receiving a request with an unknown receiver endpoint ID", func() {
 		It("should respond with UNKNOWN_DST_ENDPOINT", func() {
-			localListener.AddEndpoint(&remoteEndpoint, k8snet.IPv4)
+			localND.instance.AddEndpoint(&remoteEndpoint, k8snet.IPv4)
 			localEndpoint.Spec.CableName = "invalid"
-			response := requestResponseFromRemoteToLocal(remoteConnection.addr)
+			response := requestResponseFromRemoteToLocal(remoteND.ipv4Connection.addr)
 			Expect(response[0].GetResponse()).To(Equal(natproto.ResponseType_UNKNOWN_DST_ENDPOINT))
 		})
 	})
 
 	When("receiving a request with an unknown receiver cluster ID", func() {
 		It("should respond with UNKNOWN_DST_CLUSTER", func() {
-			localListener.AddEndpoint(&remoteEndpoint, k8snet.IPv4)
+			localND.instance.AddEndpoint(&remoteEndpoint, k8snet.IPv4)
 			localEndpoint.Spec.ClusterID = "invalid"
-			response := requestResponseFromRemoteToLocal(remoteConnection.addr)
+			response := requestResponseFromRemoteToLocal(remoteND.ipv4Connection.addr)
 			Expect(response[0].GetResponse()).To(Equal(natproto.ResponseType_UNKNOWN_DST_CLUSTER))
 		})
 	})
@@ -124,7 +124,7 @@ var _ = Describe("Request handling", func() {
 			request := createMalformedRequest(func(msg *natproto.SubmarinerNATDiscoveryMessage) {
 				msg.GetRequest().Sender = nil
 			})
-			response := parseResponseInLocalListener(request, remoteConnection.addr)
+			response := parseResponseInLocalListener(request, remoteND.ipv4Connection.addr)
 			Expect(response.GetResponse()).To(Equal(natproto.ResponseType_MALFORMED))
 		})
 	})
@@ -134,7 +134,7 @@ var _ = Describe("Request handling", func() {
 			request := createMalformedRequest(func(msg *natproto.SubmarinerNATDiscoveryMessage) {
 				msg.GetRequest().Receiver = nil
 			})
-			response := parseResponseInLocalListener(request, remoteConnection.addr)
+			response := parseResponseInLocalListener(request, remoteND.ipv4Connection.addr)
 			Expect(response.GetResponse()).To(Equal(natproto.ResponseType_MALFORMED))
 		})
 	})
@@ -144,7 +144,7 @@ var _ = Describe("Request handling", func() {
 			request := createMalformedRequest(func(msg *natproto.SubmarinerNATDiscoveryMessage) {
 				msg.GetRequest().UsingDst = nil
 			})
-			response := parseResponseInLocalListener(request, remoteConnection.addr)
+			response := parseResponseInLocalListener(request, remoteND.ipv4Connection.addr)
 			Expect(response.GetResponse()).To(Equal(natproto.ResponseType_MALFORMED))
 		})
 	})
@@ -154,7 +154,7 @@ var _ = Describe("Request handling", func() {
 			request := createMalformedRequest(func(msg *natproto.SubmarinerNATDiscoveryMessage) {
 				msg.GetRequest().UsingSrc = nil
 			})
-			response := parseResponseInLocalListener(request, remoteConnection.addr)
+			response := parseResponseInLocalListener(request, remoteND.ipv4Connection.addr)
 			Expect(response.GetResponse()).To(Equal(natproto.ResponseType_MALFORMED))
 		})
 	})

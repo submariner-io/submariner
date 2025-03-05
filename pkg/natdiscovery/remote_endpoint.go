@@ -37,10 +37,10 @@ const (
 )
 
 var (
-	recheckTime                    = (2 * time.Second).Nanoseconds()
-	totalTimeout                   = (60 * time.Second).Nanoseconds()
-	totalTimeoutLoadBalancer       = (6 * time.Second).Nanoseconds()
-	publicToPrivateFailoverTimeout = time.Second.Nanoseconds()
+	RecheckTime                    = (2 * time.Second).Nanoseconds()
+	TotalTimeout                   = (60 * time.Second).Nanoseconds()
+	TotalTimeoutLoadBalancer       = (6 * time.Second).Nanoseconds()
+	PublicToPrivateFailoverTimeout = time.Second.Nanoseconds()
 )
 
 type remoteEndpointNAT struct {
@@ -88,10 +88,10 @@ func newRemoteEndpointNAT(endpoint *v1.Endpoint, family k8snet.IPFamily) *remote
 	// and we want to verify if the private IP will accessible (because it's still better)
 	usingLoadBalancer, _ := endpoint.Spec.GetBackendBool(v1.UsingLoadBalancer, nil)
 	if usingLoadBalancer != nil && *usingLoadBalancer {
-		rnat.timeout = toDuration(&totalTimeoutLoadBalancer)
+		rnat.timeout = ToDuration(&TotalTimeoutLoadBalancer)
 		rnat.usingLoadBalancer = true
 	} else {
-		rnat.timeout = toDuration(&totalTimeout)
+		rnat.timeout = ToDuration(&TotalTimeout)
 	}
 
 	return rnat
@@ -144,7 +144,7 @@ func (rn *remoteEndpointNAT) shouldCheck() bool {
 	case testingPrivateAndPublicIPs:
 		return true
 	case waitingForResponse:
-		return time.Since(rn.lastCheck) > toDuration(&recheckTime)
+		return time.Since(rn.lastCheck) > ToDuration(&RecheckTime)
 	case selectedPublicIP:
 	case selectedPrivateIP:
 	}
@@ -192,7 +192,7 @@ func (rn *remoteEndpointNAT) transitionToPrivateIP(remoteEndpointID string, useN
 	case selectedPublicIP:
 		// If a PublicIP was selected, we still allow some time for the privateIP response to arrive, and we always
 		// prefer PrivateIP with no NAT connection, as it will be more likely to work, and more efficient
-		if rn.sinceLastTransition() > toDuration(&publicToPrivateFailoverTimeout) {
+		if rn.sinceLastTransition() > ToDuration(&PublicToPrivateFailoverTimeout) {
 			logger.V(log.DEBUG).Infof("Response on private IP received too late after response on public IP for endpoint %q",
 				remoteEndpointID)
 			return false
@@ -213,6 +213,6 @@ func (rn *remoteEndpointNAT) transitionToPrivateIP(remoteEndpointID string, useN
 	return false
 }
 
-func toDuration(v *int64) time.Duration {
+func ToDuration(v *int64) time.Duration {
 	return time.Duration(atomic.LoadInt64(v))
 }

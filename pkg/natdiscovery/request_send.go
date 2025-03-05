@@ -70,11 +70,11 @@ func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT,
 		return 0, err
 	}
 
-	sourceIP := nd.findSrcIP(targetIP, remoteNAT.family)
+	sourceIP := nd.FindSourceIP(targetIP, remoteNAT.family)
 
 	nd.requestCounter++
 
-	localEndpointSpec := nd.localEndpoint.Spec()
+	localEndpointSpec := nd.LocalEndpoint.Spec()
 
 	request := &natproto.SubmarinerNATDiscoveryRequest{
 		RequestNumber: nd.requestCounter,

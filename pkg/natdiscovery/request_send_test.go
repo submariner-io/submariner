@@ -16,9 +16,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package natdiscovery
+package natdiscovery_test
 
 import (
+	"net"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -30,8 +32,7 @@ var _ = When("a request is sent", func() {
 	var (
 		request          *natproto.SubmarinerNATDiscoveryRequest
 		remoteEndpoint   submarinerv1.Endpoint
-		serverConnection *fakeServerConnection
-		ndInstance       *natDiscovery
+		serverConnection *FakeServerConnection
 	)
 
 	localEndpoint := createTestLocalEndpoint()
@@ -43,11 +44,15 @@ var _ = When("a request is sent", func() {
 	})
 
 	JustBeforeEach(func() {
-		ndInstance, serverConnection, _ = createTestListener(&localEndpoint, nil)
-		ndInstance.findSrcIP = func(_ string, _ k8snet.IPFamily) string { return testLocalPrivateIP }
+		nd := newNATDiscovery(&localEndpoint, &net.UDPAddr{
+			IP:   net.ParseIP(testLocalPrivateIP),
+			Port: int(testLocalNATPort),
+		})
 
-		err := ndInstance.sendCheckRequest(newRemoteEndpointNAT(&remoteEndpoint, k8snet.IPv4))
-		Expect(err).NotTo(HaveOccurred())
+		nd.instance.AddEndpoint(&remoteEndpoint, k8snet.IPv4)
+		nd.checkDiscovery()
+
+		serverConnection = nd.ipv4Connection
 
 		request = parseProtocolRequest(serverConnection.awaitSent())
 	})

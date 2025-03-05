@@ -37,7 +37,7 @@ type ServerConnection interface {
 }
 
 func (nd *natDiscovery) runListeners(stopCh <-chan struct{}) error {
-	for _, family := range nd.localEndpoint.Spec().GetIPFamilies() {
+	for _, family := range nd.LocalEndpoint.Spec().GetIPFamilies() {
 		if err := nd.runListener(family, stopCh); err != nil {
 			return err
 		}
@@ -53,10 +53,7 @@ func (nd *natDiscovery) runListener(family k8snet.IPFamily, stopCh <-chan struct
 
 	if family == k8snet.IPv4 {
 		err := nd.runListenerV4(stopCh)
-		if err != nil {
-			logger.Errorf(err, "Error running IPv%v listener", family)
-			errs = append(errs, err)
-		}
+		errs = append(errs, err)
 	}
 
 	// TODO_IPV6: add V6 runListener for V6
@@ -69,7 +66,7 @@ func (nd *natDiscovery) runListenerV4(stopCh <-chan struct{}) error {
 		return nil
 	}
 
-	serverConnection, err := nd.createServerConnection(nd.serverPort, k8snet.IPv4)
+	serverConnection, err := nd.CreateServerConnection(nd.serverPort, k8snet.IPv4)
 	if err != nil {
 		return err
 	}
@@ -123,15 +120,17 @@ func (nd *natDiscovery) listenerLoop(serverConnection ServerConnection) {
 
 func (nd *natDiscovery) parseAndHandleMessageFromAddress(buf []byte, addr *net.UDPAddr) error {
 	msg := natproto.SubmarinerNATDiscoveryMessage{}
-	if err := proto.Unmarshal(buf, &msg); err != nil {
-		return errors.Wrapf(err, "Error unmarshaling message received on UDP port %d", natproto.DefaultPort)
+	err := errors.Wrapf(proto.Unmarshal(buf, &msg), "Error unmarshaling message received on UDP port %d", natproto.DefaultPort)
+
+	if err == nil {
+		if request := msg.GetRequest(); request != nil {
+			err = nd.handleRequestFromAddress(request, addr)
+		} else if response := msg.GetResponse(); response != nil {
+			err = nd.handleResponseFromAddress(response, addr)
+		} else {
+			err = errors.New("message without response or request received")
+		}
 	}
 
-	if request := msg.GetRequest(); request != nil {
-		return nd.handleRequestFromAddress(request, addr)
-	} else if response := msg.GetResponse(); response != nil {
-		return nd.handleResponseFromAddress(response, addr)
-	}
-
-	return errors.Errorf("Message without response or request received from %#v", addr)
+	return err
 }
