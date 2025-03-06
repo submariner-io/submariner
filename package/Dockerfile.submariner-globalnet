@@ -9,7 +9,7 @@ ARG TARGETPLATFORM
 
 COPY . ${SOURCE}
 
-RUN make -C ${SOURCE} LOCAL_BUILD=1 bin/${TARGETPLATFORM}/submariner-globalnet
+RUN make -C ${SOURCE} LOCAL_BUILD=1 BUILD_UPX=false bin/${TARGETPLATFORM}/submariner-globalnet
 
 FROM --platform=${BUILDPLATFORM} fedora:${FEDORA_VERSION} AS base
 ARG FEDORA_VERSION
