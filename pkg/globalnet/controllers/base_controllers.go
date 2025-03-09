@@ -127,14 +127,6 @@ func (c *baseIPAllocationController) reserveAllocatedIPs(federator federate.Fede
 	}
 
 	err := c.pool.Reserve(reservedIPs...)
-
-	if err == nil && len(reservedIPs) > 0 {
-		err = postReserve(reservedIPs)
-		if err != nil {
-			_ = c.pool.Release(reservedIPs...)
-		}
-	}
-
 	if err != nil {
 		key, _ := cache.MetaNamespaceKeyFunc(obj)
 
@@ -156,6 +148,15 @@ func (c *baseIPAllocationController) reserveAllocatedIPs(federator federate.Fede
 		logger.Infof("Updating %q: %#v", key, obj)
 
 		return federator.Distribute(context.TODO(), obj) //nolint:wrapcheck  // Let the caller wrap it
+	}
+
+	if len(reservedIPs) == 0 {
+		return nil
+	}
+
+	err = postReserve(reservedIPs)
+	if err != nil {
+		return err
 	}
 
 	logger.Infof("Successfully reserved GlobalIPs %q for %s \"%s/%s\"", reservedIPs, obj.GetKind(),
