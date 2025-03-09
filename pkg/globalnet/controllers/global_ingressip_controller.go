@@ -404,23 +404,28 @@ func (c *globalIngressIPController) ensureInternalServiceExists(ingressIP *subma
 	key := fmt.Sprintf("%s/%s", ingressIP.Namespace, internalSvc)
 
 	service, exists, err := getService(internalSvc, ingressIP.Namespace, c.services, c.scheme)
-	if err != nil || !exists {
-		return fmt.Errorf("internal service created by Globalnet controller %q does not exist", key)
+	if err != nil {
+		return errors.Wrapf(err, "error retrieving Globalnet ExternalIP service %q for GlobalIngressIP %q", key, ingressIP.Name)
+	}
+
+	if !exists {
+		logger.Warningf("The Globalnet ExternalIP service %q for GlobalIngressIP %q does not exist", key, ingressIP.Name)
+		return nil
 	}
 
 	if len(service.Spec.ExternalIPs) == 0 || service.Spec.ExternalIPs[0] != ingressIP.Status.AllocatedIP {
+		logger.Warningf("The global IP %q for Globalnet ExternalIP service %q does not match that assigned to GlobalIngressIP %q",
+			c.getServiceExternalIP(service), key, ingressIP.Name)
+
 		// A user is ideally not supposed to modify the external-ip of the Globalnet internal service, but
 		// in-case its done accidentally, as part of controller start/re-start scenario, this code will fix
 		// the issue by deleting and re-creating the internal service with valid configuration.
 		if err := finalizer.Remove(context.TODO(), resource.ForDynamic(c.services.Namespace(ingressIP.Namespace)),
 			resource.MustToUnstructured(service), InternalServiceFinalizer); err != nil {
-			return fmt.Errorf("error while removing the finalizer from globalnet internal service %q", key)
+			return errors.Wrapf(err, "error while removing the finalizer from Globalnet ExternalIP service %q", key)
 		}
 
-		_ = deleteService(ingressIP.Namespace, internalSvc, c.services)
-
-		return fmt.Errorf("globalIP %q assigned to %q does not match with Internal Service ExternalIP %q",
-			c.getServiceExternalIP(service), key, ingressIP.Status.AllocatedIP)
+		return deleteService(ingressIP.Namespace, internalSvc, c.services)
 	}
 
 	return nil
