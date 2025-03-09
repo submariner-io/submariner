@@ -100,24 +100,25 @@ func TestControllers(t *testing.T) {
 }
 
 type testDriverBase struct {
-	controller             controllers.Interface
-	restMapper             meta.RESTMapper
-	dynClient              *dynamicfake.FakeDynamicClient
-	scheme                 *runtime.Scheme
-	pFilter                *fakePF.PacketFilter
-	pool                   *ipam.IPPool
-	localSubnets           []string
-	globalCIDR             string
-	hostName               string
-	globalEgressIPs        dynamic.ResourceInterface
-	clusterGlobalEgressIPs dynamic.ResourceInterface
-	globalIngressIPs       dynamic.ResourceInterface
-	services               dynamic.ResourceInterface
-	serviceExports         dynamic.ResourceInterface
-	endpoints              dynamic.ResourceInterface
-	pods                   dynamic.NamespaceableResourceInterface
-	gateways               dynamic.ResourceInterface
-	watches                *fakeDynClient.WatchReactor
+	controller               controllers.Interface
+	restMapper               meta.RESTMapper
+	dynClient                *dynamicfake.FakeDynamicClient
+	scheme                   *runtime.Scheme
+	pFilter                  *fakePF.PacketFilter
+	pool                     *ipam.IPPool
+	localSubnets             []string
+	globalCIDR               string
+	hostName                 string
+	globalEgressIPs          dynamic.ResourceInterface
+	clusterGlobalEgressIPs   dynamic.ResourceInterface
+	globalIngressIPs         dynamic.ResourceInterface
+	services                 dynamic.ResourceInterface
+	serviceExports           dynamic.ResourceInterface
+	endpoints                dynamic.ResourceInterface
+	pods                     dynamic.NamespaceableResourceInterface
+	gateways                 dynamic.ResourceInterface
+	watches                  *fakeDynClient.WatchReactor
+	expectInstantiationError bool
 }
 
 func newTestDriverBase() *testDriverBase {
@@ -125,10 +126,11 @@ func newTestDriverBase() *testDriverBase {
 		restMapper: test.GetRESTMapperFor(&submarinerv1.Endpoint{}, &corev1.Service{}, &corev1.Pod{}, &corev1.Endpoints{},
 			&submarinerv1.GlobalEgressIP{}, &submarinerv1.ClusterGlobalEgressIP{}, &submarinerv1.GlobalIngressIP{},
 			&submarinerv1.Gateway{}, &mcsv1a1.ServiceExport{}),
-		scheme:       runtime.NewScheme(),
-		pFilter:      fakePF.New(),
-		globalCIDR:   globalCIDR,
-		localSubnets: []string{},
+		scheme:                   runtime.NewScheme(),
+		pFilter:                  fakePF.New(),
+		globalCIDR:               globalCIDR,
+		localSubnets:             []string{},
+		expectInstantiationError: false,
 	}
 	Expect(mcsv1a1.AddToScheme(t.scheme)).To(Succeed())
 	Expect(submarinerv1.AddToScheme(t.scheme)).To(Succeed())
@@ -164,7 +166,9 @@ func newTestDriverBase() *testDriverBase {
 }
 
 func (t *testDriverBase) afterEach() {
-	t.controller.Stop()
+	if t.controller != nil {
+		t.controller.Stop()
+	}
 }
 
 func (t *testDriverBase) initChains() {
