@@ -308,16 +308,22 @@ type Interface interface {
 	UpdateChainRules(table TableType, chain string, rules []*Rule) error
 }
 
+type DriverFn func() (Driver, error)
+
 var (
-	newDriverFn   func() (Driver, error)
-	newDriverFnV6 func() (Driver, error)
+	newDriverFn   DriverFn
+	newDriverFnV6 DriverFn
 )
 
-func SetNewDriverFn(f func() (Driver, error)) {
+func SetNewDriverFn(f DriverFn) {
 	newDriverFn = f
 }
 
-func SetNewDriverFnV6(f func() (Driver, error)) {
+func GetNewDriverFn() DriverFn {
+	return newDriverFn
+}
+
+func SetNewDriverFnV6(f DriverFn) {
 	newDriverFnV6 = f
 }
 
