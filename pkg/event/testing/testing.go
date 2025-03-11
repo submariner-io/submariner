@@ -125,20 +125,21 @@ func (t *TestHandlerBase) GetNetworkPlugins() []string {
 }
 
 const (
-	EvTransitionToNonGateway = "TransitionToNonGateway"
-	EvTransitionToGateway    = "TransitionToGateway"
-	EvLocalEndpointCreated   = "LocalEndpointCreated"
-	EvLocalEndpointUpdated   = "LocalEndpointUpdated"
-	EvLocalEndpointRemoved   = "LocalEndpointRemoved"
-	EvRemoteEndpointCreated  = "RemoteEndpointCreated"
-	EvRemoteEndpointUpdated  = "RemoteEndpointUpdated"
-	EvRemoteEndpointRemoved  = "RemoteEndpointRemoved"
-	EvNodeCreated            = "NodeCreated"
-	EvNodeUpdated            = "NodeUpdated"
-	EvNodeRemoved            = "NodeRemoved"
-	EvStop                   = "Stop"
-	EvUninstall              = "Uninstall"
-	EvInit                   = "Init"
+	EvTransitionToNonGateway     = "TransitionToNonGateway"
+	EvTransitionToGateway        = "TransitionToGateway"
+	EvLocalEndpointCreated       = "LocalEndpointCreated"
+	EvLocalEndpointUpdated       = "LocalEndpointUpdated"
+	EvLocalEndpointRemoved       = "LocalEndpointRemoved"
+	EvRemoteEndpointCreated      = "RemoteEndpointCreated"
+	EvRemoteEndpointUpdated      = "RemoteEndpointUpdated"
+	EvRemoteEndpointRemoved      = "RemoteEndpointRemoved"
+	EvStaleRemoteEndpointRemoved = "StaleRemoteEndpointRemoved"
+	EvNodeCreated                = "NodeCreated"
+	EvNodeUpdated                = "NodeUpdated"
+	EvNodeRemoved                = "NodeRemoved"
+	EvStop                       = "Stop"
+	EvUninstall                  = "Uninstall"
+	EvInit                       = "Init"
 )
 
 func (t *TestHandlerBase) Stop() error {
@@ -179,6 +180,10 @@ func (t *TestHandlerBase) RemoteEndpointUpdated(endpoint *v1.Endpoint) error {
 
 func (t *TestHandlerBase) RemoteEndpointRemoved(endpoint *v1.Endpoint) error {
 	return t.addEvent(EvRemoteEndpointRemoved, endpoint)
+}
+
+func (t *TestHandlerBase) StaleRemoteEndpointRemoved(endpoint *v1.Endpoint) error {
+	return t.addEvent(EvStaleRemoteEndpointRemoved, endpoint)
 }
 
 func (t *TestHandler) NodeCreated(node *v12.Node) error {
