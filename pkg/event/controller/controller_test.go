@@ -137,15 +137,41 @@ var _ = Describe("Event controller", func() {
 				Spec:       submV1.EndpointSpec{ClusterID: "east"},
 			})
 			t.ensureNoEvents()
+			Expect(t.handler.remoteEndpoints.Load()).To(Equal([]submV1.Endpoint{*latestEndpoint}))
 
 			t.DeleteEndpoint(staleEndpoint.GetName())
-			t.ensureNoEvents()
+			Consistently(func() any {
+				return t.handler.remoteEndpoints.Load()
+			}).Should(Equal([]submV1.Endpoint{*latestEndpoint}))
 
 			t.DeleteEndpoint(latestEndpoint.GetName())
 			t.awaitEvent(testing.EvRemoteEndpointRemoved, latestEndpoint)
 
 			t.CreateEndpoint(staleEndpoint)
 			t.awaitEvent(testing.EvRemoteEndpointCreated, staleEndpoint)
+		})
+	})
+
+	When("a remote Endpoint is deleted after a newer Endpoint from the same cluster", func() {
+		It("should notify the handler of the stale removed Endpoint", func() {
+			now := time.Now()
+			staleEndpoint := t.CreateEndpoint(&submV1.Endpoint{
+				ObjectMeta: v1meta.ObjectMeta{Name: "stale", CreationTimestamp: v1meta.NewTime(now)},
+				Spec:       submV1.EndpointSpec{ClusterID: "east"},
+			})
+			t.awaitEvent(testing.EvRemoteEndpointCreated, staleEndpoint)
+
+			latestEndpoint := t.CreateEndpoint(&submV1.Endpoint{
+				ObjectMeta: v1meta.ObjectMeta{Name: "latest", CreationTimestamp: v1meta.NewTime(now.Add(2 * time.Second))},
+				Spec:       submV1.EndpointSpec{ClusterID: "east"},
+			})
+			t.awaitEvent(testing.EvRemoteEndpointCreated, latestEndpoint)
+			Expect(t.handler.remoteEndpoints.Load()).To(HaveLen(2))
+
+			t.DeleteEndpoint(staleEndpoint.GetName())
+			t.awaitEvent(testing.EvStaleRemoteEndpointRemoved, staleEndpoint)
+			t.ensureNoEvents()
+			Expect(t.handler.remoteEndpoints.Load()).To(Equal([]submV1.Endpoint{*latestEndpoint}))
 		})
 	})
 })
@@ -283,6 +309,11 @@ func (t *TestHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 func (t *TestHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	t.storeRemoteEndpoints()
 	return t.TestHandler.RemoteEndpointRemoved(endpoint)
+}
+
+func (t *TestHandler) StaleRemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
+	t.storeRemoteEndpoints()
+	return t.TestHandler.StaleRemoteEndpointRemoved(endpoint)
 }
 
 func (t *TestHandler) storeRemoteEndpoints() {
