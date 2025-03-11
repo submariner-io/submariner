@@ -67,16 +67,15 @@ func (c *handlerController) handleRemovedLocalEndpoint(endpoint *smv1.Endpoint) 
 }
 
 func (c *handlerController) handleRemovedRemoteEndpoint(endpoint *smv1.Endpoint) error {
+	c.handlerState.remoteEndpoints.Delete(endpoint.Name)
+
 	lastProcessedTime, ok := c.remoteEndpointTimeStamp[endpoint.Spec.ClusterID]
 
 	if ok && lastProcessedTime.After(endpoint.CreationTimestamp.Time) {
-		logger.Infof("Ignoring deleted remote %#v since a later endpoint was already"+
-			"processed", endpoint)
-		return nil
+		return c.handler.StaleRemoteEndpointRemoved(endpoint) //nolint:wrapcheck  // Let the caller wrap it
 	}
 
 	delete(c.remoteEndpointTimeStamp, endpoint.Spec.ClusterID)
-	c.handlerState.remoteEndpoints.Delete(endpoint.Name)
 
 	return c.handler.RemoteEndpointRemoved(endpoint) //nolint:wrapcheck  // Let the caller wrap it
 }
