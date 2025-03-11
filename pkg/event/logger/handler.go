@@ -76,13 +76,13 @@ func (l *Handler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 }
 
 func (l *Handler) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
-	logger.V(log.DEBUG).Infof("A new Endpoint for remote cluster %q has been updated: %#v",
+	logger.V(log.DEBUG).Infof("An Endpoint for remote cluster %q has been updated: %#v",
 		endpoint.Spec.ClusterID, endpoint.Spec)
 	return nil
 }
 
 func (l *Handler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
-	logger.V(log.DEBUG).Infof("A new Endpoint for remote cluster %q has been removed: %#v",
+	logger.V(log.DEBUG).Infof("An Endpoint for remote cluster %q has been removed: %#v",
 		endpoint.Spec.ClusterID, endpoint.Spec)
 	return nil
 }
