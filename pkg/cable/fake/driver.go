@@ -27,10 +27,15 @@ import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
+	k8snet "k8s.io/utils/net"
 )
 
 const DriverName = "fake-driver"
 
+type disconnectInfo struct {
+	endpoint *types.SubmarinerEndpoint
+	family   k8snet.IPFamily
+}
 type Driver struct {
 	mutex                       sync.Mutex
 	init                        chan struct{}
@@ -39,7 +44,7 @@ type Driver struct {
 	Connections                 interface{}
 	connectToEndpoint           chan *natdiscovery.NATEndpointInfo
 	ErrOnConnectToEndpoint      error
-	disconnectFromEndpoint      chan *types.SubmarinerEndpoint
+	disconnectFromEndpoint      chan *disconnectInfo
 	ErrOnDisconnectFromEndpoint error
 }
 
@@ -48,7 +53,7 @@ func New() *Driver {
 		init:                   make(chan struct{}),
 		activeConnections:      map[string]v1.Connection{},
 		connectToEndpoint:      make(chan *natdiscovery.NATEndpointInfo, 50),
-		disconnectFromEndpoint: make(chan *types.SubmarinerEndpoint, 50),
+		disconnectFromEndpoint: make(chan *disconnectInfo, 50),
 	}
 }
 
@@ -95,7 +100,7 @@ func (d *Driver) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (
 		return "", err
 	}
 
-	d.activeConnections[endpointInfo.Endpoint.Spec.CableName] = v1.Connection{
+	d.activeConnections[endpointInfo.Endpoint.Spec.GetFamilyCableName(endpointInfo.UseFamily)] = v1.Connection{
 		Endpoint: endpointInfo.Endpoint.Spec, UsingIP: endpointInfo.UseIP, UsingNAT: endpointInfo.UseNAT,
 	}
 
@@ -104,7 +109,7 @@ func (d *Driver) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (
 	return endpointInfo.UseIP, nil
 }
 
-func (d *Driver) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint) error {
+func (d *Driver) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint, family k8snet.IPFamily) error {
 	// We'll panic if endpoint is nil, this is intentional
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
@@ -115,9 +120,12 @@ func (d *Driver) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint) erro
 		return err
 	}
 
-	delete(d.activeConnections, endpoint.Spec.CableName)
+	delete(d.activeConnections, endpoint.Spec.GetFamilyCableName(family))
 
-	d.disconnectFromEndpoint <- endpoint
+	d.disconnectFromEndpoint <- &disconnectInfo{
+		endpoint: endpoint,
+		family:   family,
+	}
 
 	return nil
 }
@@ -138,8 +146,12 @@ func (d *Driver) AwaitNoConnectToEndpoint() {
 	Consistently(d.connectToEndpoint, 500*time.Millisecond).ShouldNot(Receive(), "ConnectToEndpoint was unexpectedly called")
 }
 
-func (d *Driver) AwaitDisconnectFromEndpoint(expected *v1.EndpointSpec) {
-	Eventually(d.disconnectFromEndpoint, 5).Should(Receive(Equal(&types.SubmarinerEndpoint{Spec: *expected})))
+func (d *Driver) AwaitDisconnectFromEndpoint(expected *v1.EndpointSpec, family k8snet.IPFamily) {
+	expectedDisconnect := &disconnectInfo{
+		endpoint: &types.SubmarinerEndpoint{Spec: *expected},
+		family:   family,
+	}
+	Eventually(d.disconnectFromEndpoint, 5).Should(Receive(Equal(expectedDisconnect)))
 }
 
 func (d *Driver) AwaitNoDisconnectFromEndpoint() {

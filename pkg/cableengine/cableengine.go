@@ -151,6 +151,19 @@ func (i *engine) SetupNATDiscovery(natDiscovery natdiscovery.Interface) {
 	}()
 }
 
+func (i *engine) shouldProceedWithInstallation(familyCableName string) bool {
+	if _, ok := i.natDiscoveryPending[familyCableName]; !ok {
+		return false
+	}
+
+	i.natDiscoveryPending[familyCableName]--
+	if i.natDiscoveryPending[familyCableName] == 0 {
+		delete(i.natDiscoveryPending, familyCableName)
+	}
+
+	return true
+}
+
 func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) error {
 	endpoint := &rnat.Endpoint
 
@@ -158,13 +171,9 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 	defer i.Unlock()
 
 	familyCableName := rnat.Endpoint.Spec.GetFamilyCableName(rnat.UseFamily)
-	if _, ok := i.natDiscoveryPending[familyCableName]; !ok {
-		return nil
-	}
 
-	i.natDiscoveryPending[familyCableName]--
-	if i.natDiscoveryPending[familyCableName] == 0 {
-		delete(i.natDiscoveryPending, familyCableName)
+	if !i.shouldProceedWithInstallation(familyCableName) {
+		return nil
 	}
 
 	if !i.running {
@@ -178,24 +187,26 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 
 	for j := range activeConnections {
 		active := &activeConnections[j]
-		logger.V(log.TRACE).Infof("Analyzing currently active connection %q", active.Endpoint.CableName)
+		activeFamily := active.GetFamily()
+		activeFamilyCableName := active.Endpoint.GetFamilyCableName(activeFamily)
+		logger.V(log.TRACE).Infof("Analyzing currently active connection %q", activeFamilyCableName)
 
-		if active.Endpoint.ClusterID != endpoint.Spec.ClusterID {
+		if active.Endpoint.ClusterID != endpoint.Spec.ClusterID || activeFamily != rnat.UseFamily {
 			continue
 		}
 
-		prevTimestamp := i.installedCables[active.Endpoint.CableName]
+		prevTimestamp := i.installedCables[activeFamilyCableName]
 
 		logger.V(log.TRACE).Infof("Found a pre-existing cable %q with timestamp %q that belongs to this cluster %s",
-			active.Endpoint.CableName, prevTimestamp, endpoint.Spec.ClusterID)
+			activeFamilyCableName, prevTimestamp, endpoint.Spec.ClusterID)
 
 		if endpoint.CreationTimestamp.Before(&prevTimestamp) {
 			logger.Warningf("The timestamp (%s) for new cable %q is older than the timestamp (%s) of the pre-existing "+
-				"cable %q - not replacing", endpoint.CreationTimestamp, endpoint.Spec.CableName, prevTimestamp, active.Endpoint.CableName)
+				"cable %q - not replacing", endpoint.CreationTimestamp, familyCableName, prevTimestamp, activeFamilyCableName)
 			return nil
 		}
 
-		if endpoint.CreationTimestamp.Equal(&prevTimestamp) && active.Endpoint.CableName == endpoint.Spec.CableName {
+		if endpoint.CreationTimestamp.Equal(&prevTimestamp) && activeFamilyCableName == familyCableName {
 			// There could be scenarios where the cableName would be the same but the endpoint IP or specific driver
 			// config has changed.
 			if active.UsingIP == rnat.UseIP && active.UsingNAT == rnat.UseNAT &&
@@ -207,14 +218,14 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 
 			logger.V(log.DEBUG).Infof("New connection info (IP: %s, NAT: %v, BackendConfig: %v) for cable %q differs from"+
 				" previous (IP: %s, NAT: %v, BackendConfig: %v) - re-installing", rnat.UseIP, rnat.UseNAT, active.Endpoint.BackendConfig,
-				active.Endpoint.CableName, active.UsingIP, active.UsingNAT, endpoint.Spec.BackendConfig)
+				activeFamilyCableName, active.UsingIP, active.UsingNAT, endpoint.Spec.BackendConfig)
 		}
 
-		logger.V(log.DEBUG).Infof("Disconnecting pre-existing cable %q", active.Endpoint.CableName)
+		logger.V(log.DEBUG).Infof("Disconnecting pre-existing cable %q", activeFamilyCableName)
 
-		err = i.driver.DisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: active.Endpoint})
+		err = i.driver.DisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: active.Endpoint}, rnat.UseFamily)
 		if err != nil {
-			return errors.Wrapf(err, "error disconnecting previous Endpoint cable %#v", active.Endpoint)
+			return errors.Wrapf(err, "error disconnecting previous Endpoint cable %#v", activeFamilyCableName)
 		}
 	}
 
@@ -228,7 +239,7 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 	logger.Infof("Successfully installed IPv%v Endpoint cable %q with remote IP %s", rnat.UseFamily, endpoint.Spec.CableName,
 		remoteEndpointIP)
 
-	i.installedCables[rnat.Endpoint.Spec.CableName] = endpoint.CreationTimestamp
+	i.installedCables[familyCableName] = endpoint.CreationTimestamp
 
 	return nil
 }
@@ -268,18 +279,18 @@ func (i *engine) RemoveCable(endpoint *v1.Endpoint, family k8snet.IPFamily) erro
 
 	delete(i.natDiscoveryPending, familyCableName)
 
-	if _, ok := i.installedCables[endpoint.Spec.CableName]; !ok {
+	if _, ok := i.installedCables[familyCableName]; !ok {
 		return nil
 	}
 
-	err := i.driver.DisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: endpoint.Spec})
+	err := i.driver.DisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: endpoint.Spec}, family)
 	if err != nil {
-		return errors.Wrapf(err, "error disconnecting Endpoint cable %q", endpoint.Spec.CableName)
+		return errors.Wrapf(err, "error disconnecting Endpoint cable %q", familyCableName)
 	}
 
-	delete(i.installedCables, endpoint.Spec.CableName)
+	delete(i.installedCables, familyCableName)
 
-	logger.Infof("Successfully removed IPv%v Endpoint cable %q", family, endpoint.Spec.CableName)
+	logger.Infof("Successfully removed IPv%v Endpoint cable %q", family, familyCableName)
 
 	return nil
 }

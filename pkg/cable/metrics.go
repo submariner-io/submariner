@@ -19,11 +19,11 @@ limitations under the License.
 package cable
 
 import (
-	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	submv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	k8snet "k8s.io/utils/net"
 )
 
 const (
@@ -132,15 +132,15 @@ func init() {
 		connectionLatencySecondsGauge)
 }
 
-func getLabels(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec) prometheus.Labels {
+func getLabels(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec, family k8snet.IPFamily) prometheus.Labels {
 	return prometheus.Labels{
 		cableDriverLabel:      cableDriverName,
 		localClusterLabel:     localEndpoint.ClusterID,
 		localHostnameLabel:    localEndpoint.Hostname,
-		localEndpointIPLabel:  strings.Join(localEndpoint.PublicIPs, ","),
+		localEndpointIPLabel:  localEndpoint.GetPublicIP(family),
 		remoteClusterLabel:    remoteEndpoint.ClusterID,
 		remoteHostnameLabel:   remoteEndpoint.Hostname,
-		remoteEndpointIPLabel: strings.Join(remoteEndpoint.PublicIPs, ","),
+		remoteEndpointIPLabel: remoteEndpoint.GetPublicIP(family),
 	}
 }
 
@@ -150,20 +150,31 @@ func getShortLabels(cableDriverName string) prometheus.Labels {
 	}
 }
 
-func RecordRxBytes(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec, bytes int) {
-	rxGauge.With(getLabels(cableDriverName, localEndpoint, remoteEndpoint)).Set(float64(bytes))
+func RecordRxBytes(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec, bytes int, family k8snet.IPFamily) {
+	rxGauge.With(getLabels(cableDriverName, localEndpoint, remoteEndpoint, family)).Set(float64(bytes))
 }
 
-func RecordTxBytes(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec, bytes int) {
-	txGauge.With(getLabels(cableDriverName, localEndpoint, remoteEndpoint)).Set(float64(bytes))
+func RecordTxBytes(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec, bytes int, family k8snet.IPFamily) {
+	txGauge.With(getLabels(cableDriverName, localEndpoint, remoteEndpoint, family)).Set(float64(bytes))
 }
 
-func RecordConnectionLatency(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec, latencySeconds float64) {
-	connectionLatencySecondsGauge.With(getLabels(cableDriverName, localEndpoint, remoteEndpoint)).Set(latencySeconds)
+func RecordConnectionLatency(
+	cableDriverName string,
+	localEndpoint, remoteEndpoint *submv1.EndpointSpec,
+	latencySeconds float64,
+	family k8snet.IPFamily,
+) {
+	connectionLatencySecondsGauge.With(getLabels(cableDriverName, localEndpoint, remoteEndpoint, family)).Set(latencySeconds)
 }
 
-func RecordConnection(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec, status string, isNew bool) {
-	labels := getLabels(cableDriverName, localEndpoint, remoteEndpoint)
+func RecordConnection(
+	cableDriverName string,
+	localEndpoint, remoteEndpoint *submv1.EndpointSpec,
+	status string,
+	isNew bool,
+	family k8snet.IPFamily,
+) {
+	labels := getLabels(cableDriverName, localEndpoint, remoteEndpoint, family)
 
 	if isNew {
 		connectionEstablishedTimestampGauge.With(labels).Set(float64(time.Now().Unix()))
@@ -177,8 +188,8 @@ func RecordConnection(cableDriverName string, localEndpoint, remoteEndpoint *sub
 	shortConnectionsGauge.With(shortLabels).Set(1)
 }
 
-func RecordDisconnected(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec) {
-	labels := getLabels(cableDriverName, localEndpoint, remoteEndpoint)
+func RecordDisconnected(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec, family k8snet.IPFamily) {
+	labels := getLabels(cableDriverName, localEndpoint, remoteEndpoint, family)
 	shortLabels := getShortLabels(cableDriverName)
 
 	connectionLatencySecondsGauge.Delete(labels)

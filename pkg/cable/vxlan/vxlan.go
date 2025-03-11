@@ -157,16 +157,16 @@ func (v *vxLan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 		return "", fmt.Errorf("failed to parse remote IP %s", endpointInfo.UseIP)
 	}
 
-	allowedIPs := parseSubnets(remoteEndpoint.Spec.Subnets)
+	allowedIPs := remoteEndpoint.Spec.ParseSubnets(endpointInfo.UseFamily)
 
 	logger.V(log.DEBUG).Infof("Connecting cluster %s endpoint %s",
 		remoteEndpoint.Spec.ClusterID, remoteIP)
 	v.mutex.Lock()
 	defer v.mutex.Unlock()
 
-	cable.RecordConnection(CableDriverName, &v.localEndpoint, &remoteEndpoint.Spec, string(v1.Connected), true)
+	cable.RecordConnection(CableDriverName, &v.localEndpoint, &remoteEndpoint.Spec, string(v1.Connected), true, endpointInfo.UseFamily)
 
-	privateIP := endpointInfo.Endpoint.Spec.GetPrivateIP(k8snet.IPv4)
+	privateIP := endpointInfo.Endpoint.Spec.GetPrivateIP(endpointInfo.UseFamily)
 
 	remoteVtepIP, err := vxlan.GetVtepIPAddressFrom(privateIP, VxlanVTepNetworkPrefix)
 	if err != nil {
@@ -204,9 +204,9 @@ func (v *vxLan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 	return endpointInfo.UseIP, nil
 }
 
-func (v *vxLan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint) error {
+func (v *vxLan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint, family k8snet.IPFamily) error {
 	// We'll panic if remoteEndpoint is nil, this is intentional
-	logger.V(log.DEBUG).Infof("Removing endpoint %#v", remoteEndpoint)
+	logger.V(log.DEBUG).Infof("Removing IPv%v endpoint %#v", family, remoteEndpoint)
 
 	if v.localEndpoint.ClusterID == remoteEndpoint.Spec.ClusterID {
 		logger.V(log.DEBUG).Infof("Will not disconnect self")
@@ -235,7 +235,7 @@ func (v *vxLan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint)
 		return fmt.Errorf("failed to parse remote IP %s", ip)
 	}
 
-	allowedIPs := parseSubnets(remoteEndpoint.Spec.Subnets)
+	allowedIPs := remoteEndpoint.Spec.ParseSubnets(k8snet.IPv4)
 
 	err := v.vxlanIface.DelFDB(remoteIP, "00:00:00:00:00:00")
 	if err != nil {
@@ -248,7 +248,7 @@ func (v *vxLan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint)
 	}
 
 	v.connections = removeConnectionForEndpoint(v.connections, remoteEndpoint)
-	cable.RecordDisconnected(CableDriverName, &v.localEndpoint, &remoteEndpoint.Spec)
+	cable.RecordDisconnected(CableDriverName, &v.localEndpoint, &remoteEndpoint.Spec, family)
 
 	logger.V(log.DEBUG).Infof("Done removing endpoint for cluster %s", remoteEndpoint.Spec.ClusterID)
 
@@ -280,24 +280,6 @@ func (v *vxLan) Init() error {
 
 func (v *vxLan) GetName() string {
 	return CableDriverName
-}
-
-// Parse CIDR string and skip errors.
-func parseSubnets(subnets []string) []net.IPNet {
-	nets := make([]net.IPNet, 0, len(subnets))
-
-	for _, sn := range subnets {
-		_, cidr, err := net.ParseCIDR(sn)
-		if err != nil {
-			// this should not happen. Log and continue
-			logger.Errorf(err, "Failed to parse subnet %s", sn)
-			continue
-		}
-
-		nets = append(nets, *cidr)
-	}
-
-	return nets
 }
 
 func (v *vxLan) Cleanup() error {

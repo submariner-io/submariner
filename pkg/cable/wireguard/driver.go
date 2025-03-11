@@ -23,22 +23,22 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"net"
-	"os"
 	"slices"
-	"sync"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/resource"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
+	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/vishvananda/netlink"
-	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -50,16 +50,18 @@ const (
 	// PublicKey is name (key) of publicKey entry in back-end map.
 	PublicKey = "publicKey"
 
-	// KeepAliveInterval to use for wg peers.
-	KeepAliveInterval = 10 * time.Second
-
-	// handshakeTimeout is maximal time from handshake a connections is still considered connected.
-	handshakeTimeout = 2*time.Minute + 10*time.Second
-
 	cableDriverName = "wireguard"
 	receiveBytes    = "ReceiveBytes"  // for peer connection status
 	transmitBytes   = "TransmitBytes" // for peer connection status
 	lastChecked     = "LastChecked"   // for connection peer status
+)
+
+var (
+	// KeepAliveInterval to use for wg peers.
+	KeepAliveInterval = 10 * time.Second
+
+	// HandshakeTimeout is maximal time from handshake a connections is still considered connected.
+	HandshakeTimeout = 2*time.Minute + 10*time.Second
 )
 
 var logger = log.Logger{Logger: logf.Log.WithName("wireguard")}
@@ -76,8 +78,8 @@ type specification struct {
 type wireguard struct {
 	localEndpoint v1.EndpointSpec
 	connections   map[string]*v1.Connection // clusterID -> remote ep connection
-	mutex         sync.Mutex
-	client        *wgctrl.Client
+	client        Client
+	netLink       netlinkAPI.Interface
 	link          netlink.Link
 	spec          *specification
 	psk           *wgtypes.Key
@@ -91,6 +93,7 @@ func NewDriver(localEndpoint *endpoint.Local, _ *types.SubmarinerCluster) (cable
 	w := wireguard{
 		connections: make(map[string]*v1.Connection),
 		spec:        new(specification),
+		netLink:     netlinkAPI.New(),
 	}
 
 	if err = envconfig.Process(cable.IPSecEnvPrefix, w.spec); err != nil {
@@ -102,11 +105,7 @@ func NewDriver(localEndpoint *endpoint.Local, _ *types.SubmarinerCluster) (cable
 	}
 
 	// Create the controller.
-	if w.client, err = wgctrl.New(); err != nil {
-		if os.IsNotExist(err) {
-			return nil, errors.New("wgctrl is not available on this system")
-		}
-
+	if w.client, err = NewClient(); err != nil {
 		return nil, errors.Wrap(err, "failed to open wgctl client")
 	}
 
@@ -170,16 +169,9 @@ func NewDriver(localEndpoint *endpoint.Local, _ *types.SubmarinerCluster) (cable
 }
 
 func (w *wireguard) Init() error {
-	w.mutex.Lock()
-	defer w.mutex.Unlock()
-
 	logger.V(log.DEBUG).Infof("Initializing WireGuard device for cluster %s", w.localEndpoint.ClusterID)
 
-	if len(w.connections) != 0 {
-		return fmt.Errorf("cannot initialize with existing connections: %+v", w.connections)
-	}
-
-	l, err := net.InterfaceByName(DefaultDeviceName)
+	l, err := w.netLink.InterfaceByName(DefaultDeviceName)
 	if err != nil {
 		return errors.Wrapf(err, "cannot get wireguard link by name %s", DefaultDeviceName)
 	}
@@ -189,17 +181,13 @@ func (w *wireguard) Init() error {
 		return errors.Wrap(err, "wgctrl cannot find WireGuard device")
 	}
 
-	k, err := keyFromSpec(&w.localEndpoint)
-	if err != nil {
-		return errors.Wrapf(err, "endpoint is missing public key %s", d.PublicKey)
-	}
-
+	k, _ := keyFromSpec(&w.localEndpoint)
 	if k.String() != d.PublicKey.String() {
 		return fmt.Errorf("endpoint public key %s is different from device key %s", k, d.PublicKey)
 	}
 
 	// IP link set $DefaultDeviceName up.
-	if err := netlink.LinkSetUp(w.link); err != nil {
+	if err := w.netLink.LinkSetUp(w.link); err != nil {
 		return errors.Wrap(err, "failed to bring up WireGuard device")
 	}
 
@@ -218,29 +206,22 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 	remoteEndpoint := &endpointInfo.Endpoint
 	ip := endpointInfo.UseIP
 
-	if w.localEndpoint.ClusterID == remoteEndpoint.Spec.ClusterID {
-		logger.V(log.DEBUG).Infof("Will not connect to self")
-		return "", nil
-	}
-
 	// Parse remote addresses and allowed IPs.
 	remoteIP := net.ParseIP(ip)
 	if remoteIP == nil {
 		return "", fmt.Errorf("failed to parse remote IP %s", ip)
 	}
 
-	allowedIPs := parseSubnets(remoteEndpoint.Spec.Subnets)
+	allowedIPs := remoteEndpoint.Spec.ParseSubnets(endpointInfo.UseFamily)
 
 	// Parse remote public key.
 	remoteKey, err := keyFromSpec(&remoteEndpoint.Spec)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to parse peer public key")
+		return "", errors.Wrapf(err, "failed to obtain public key for endpoint %s", resource.ToJSON(remoteEndpoint.Spec))
 	}
 
-	logger.V(log.DEBUG).Infof("Connecting cluster %s endpoint %s with publicKey %s",
+	logger.V(log.DEBUG).Infof("Connecting cluster %q endpoint %q with publicKey %q",
 		remoteEndpoint.Spec.ClusterID, remoteIP, remoteKey)
-	w.mutex.Lock()
-	defer w.mutex.Unlock()
 
 	// Delete or update old peers for ClusterID.
 	oldCon, found := w.connections[remoteEndpoint.Spec.ClusterID]
@@ -249,7 +230,7 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 			if oldKey.String() == remoteKey.String() {
 				// Existing connection, update status and skip.
 				w.updatePeerStatus(oldCon, oldKey)
-				logger.V(log.DEBUG).Infof("Skipping connect for existing peer key %s", oldKey)
+				logger.V(log.DEBUG).Infof("Skipping connect for existing peer key %q", oldKey)
 
 				return ip, nil
 			}
@@ -263,8 +244,10 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 	// create connection, overwrite existing connection
 	connection := v1.NewConnection(&remoteEndpoint.Spec, ip, endpointInfo.UseNAT)
 	connection.SetStatus(v1.Connecting, "Connection has been created but not yet started")
-	logger.V(log.DEBUG).Infof("Adding connection for cluster %s, %v", remoteEndpoint.Spec.ClusterID, connection)
 	w.connections[remoteEndpoint.Spec.ClusterID] = connection
+
+	logger.V(log.DEBUG).Infof("Added connection for cluster %q: %s", remoteEndpoint.Spec.ClusterID,
+		resource.ToJSON(connection))
 
 	port, err := remoteEndpoint.Spec.GetBackendPort(v1.UDPPortConfig, w.spec.NATTPort)
 	if err != nil {
@@ -302,9 +285,9 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 		logger.Errorf(err, "Failed to verify peer configuration")
 	}
 
-	logger.V(log.DEBUG).Infof("Done connecting endpoint peer %s@%s", *remoteKey, remoteIP)
+	logger.V(log.DEBUG).Infof("Successfully connected endpoint peer %q with IP %q", *remoteKey, remoteIP)
 
-	cable.RecordConnection(cableDriverName, &w.localEndpoint, &connection.Endpoint, string(v1.Connected), true)
+	cable.RecordConnection(cableDriverName, &w.localEndpoint, &connection.Endpoint, string(v1.Connected), true, endpointInfo.UseFamily)
 
 	return ip, nil
 }
@@ -312,25 +295,17 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 func keyFromSpec(ep *v1.EndpointSpec) (*wgtypes.Key, error) {
 	s, found := ep.BackendConfig[PublicKey]
 	if !found {
-		return nil, errors.New("endpoint is missing public key")
+		return &wgtypes.Key{}, errors.New("endpoint is missing public key")
 	}
 
 	key, err := wgtypes.ParseKey(s)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse public key %s", s)
-	}
 
-	return &key, nil
+	return &key, errors.Wrapf(err, "failed to parse public key %s", s)
 }
 
-func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint) error {
+func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint, family k8snet.IPFamily) error {
 	// We'll panic if remoteEndpoint is nil, this is intentional
-	logger.V(log.DEBUG).Infof("Removing endpoint %v+", remoteEndpoint)
-
-	if w.localEndpoint.ClusterID == remoteEndpoint.Spec.ClusterID {
-		logger.V(log.DEBUG).Infof("Will not disconnect self")
-		return nil
-	}
+	logger.V(log.DEBUG).Infof("Removing IPv%v endpoint %s", family, resource.ToJSON(remoteEndpoint))
 
 	// parse remote public key
 	remoteKey, err := keyFromSpec(&remoteEndpoint.Spec)
@@ -341,9 +316,6 @@ func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpo
 	// wg remove
 	_ = w.removePeer(remoteKey)
 
-	w.mutex.Lock()
-	defer w.mutex.Unlock()
-
 	if w.keyMismatch(remoteEndpoint.Spec.ClusterID, remoteKey) {
 		// ClusterID probably already associated with new spec. Do not remove connections.
 		logger.Warningf("Key mismatch for peer cluster %s, keeping existing spec", remoteEndpoint.Spec.ClusterID)
@@ -352,8 +324,8 @@ func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpo
 
 	delete(w.connections, remoteEndpoint.Spec.ClusterID)
 
-	logger.V(log.DEBUG).Infof("Done removing endpoint for cluster %s", remoteEndpoint.Spec.ClusterID)
-	cable.RecordDisconnected(cableDriverName, &w.localEndpoint, &remoteEndpoint.Spec)
+	logger.V(log.DEBUG).Infof("Done removing endpoint for cluster %q", remoteEndpoint.Spec.ClusterID)
+	cable.RecordDisconnected(cableDriverName, &w.localEndpoint, &remoteEndpoint.Spec, family)
 
 	return nil
 }
@@ -366,9 +338,9 @@ func (w *wireguard) GetActiveConnections() ([]v1.Connection, error) {
 // Create new wg link and assign addr from local subnets.
 func (w *wireguard) setWGLink() error {
 	// delete existing wg device if needed
-	if link, err := netlink.LinkByName(DefaultDeviceName); err == nil {
+	if link, err := w.netLink.LinkByName(DefaultDeviceName); err == nil {
 		// delete existing device
-		if err := netlink.LinkDel(link); err != nil {
+		if err := w.netLink.LinkDel(link); err != nil {
 			return errors.Wrap(err, "failed to delete existing WireGuard device")
 		}
 	}
@@ -376,36 +348,15 @@ func (w *wireguard) setWGLink() error {
 	// Create the wg device (ip link add dev $DefaultDeviceName type wireguard).
 	la := netlink.NewLinkAttrs()
 	la.Name = DefaultDeviceName
-	link := &netlink.GenericLink{
+
+	w.link = &netlink.GenericLink{
 		LinkAttrs: la,
 		LinkType:  "wireguard",
 	}
 
-	if err := netlink.LinkAdd(link); err == nil {
-		w.link = link
-	} else {
-		return errors.Wrap(err, "failed to add WireGuard device")
-	}
+	err := w.netLink.LinkAdd(w.link)
 
-	return nil
-}
-
-// Parse CIDR string and skip errors.
-func parseSubnets(subnets []string) []net.IPNet {
-	nets := make([]net.IPNet, 0, len(subnets))
-
-	for _, sn := range subnets {
-		_, cidr, err := net.ParseCIDR(sn)
-		if err != nil {
-			// This should not happen. Log and continue.
-			logger.Errorf(err, "failed to parse subnet %s", sn)
-			continue
-		}
-
-		nets = append(nets, *cidr)
-	}
-
-	return nets
+	return errors.Wrap(err, "failed to add WireGuard device")
 }
 
 func (w *wireguard) removePeer(key *wgtypes.Key) error {
@@ -422,13 +373,8 @@ func (w *wireguard) removePeer(key *wgtypes.Key) error {
 		ReplacePeers: false,
 		Peers:        peerCfg,
 	})
-	if err != nil {
-		return errors.Wrapf(err, "failed to remove WireGuard peer with key %s", key)
-	}
 
-	logger.V(log.DEBUG).Infof("Done removing WireGuard peer with key %s", key)
-
-	return nil
+	return errors.Wrapf(err, "failed to remove WireGuard peer with key %s", key)
 }
 
 func (w *wireguard) peerByKey(key *wgtypes.Key) (*wgtypes.Peer, error) {
@@ -479,12 +425,7 @@ func (w *wireguard) keyMismatch(cid string, key *wgtypes.Key) bool {
 		return true
 	}
 
-	oldKey, err := keyFromSpec(&c.Endpoint)
-	if err != nil {
-		logger.Warningf("Could not find old key of cluster %s, mismatched endpoint key %s", cid, key)
-		return true
-	}
-
+	oldKey, _ := keyFromSpec(&c.Endpoint)
 	if oldKey.String() != key.String() {
 		logger.Warningf("Key mismatch, cluster %s key is %s, endpoint key is %s", cid, oldKey, key)
 		return true
@@ -502,14 +443,12 @@ func genPsk(psk string) (wgtypes.Key, error) {
 func (w *wireguard) Cleanup() error {
 	logger.Info("Uninstalling the wireguard cable driver")
 
-	link, err := netlink.LinkByName(DefaultDeviceName)
+	link, err := w.netLink.LinkByName(DefaultDeviceName)
 	if err != nil && !errors.Is(err, netlink.LinkNotFoundError{}) {
 		return errors.Wrapf(err, "error retrieving the wireguard interface %q", DefaultDeviceName)
 	}
 
-	if err := netlink.LinkDel(link); err != nil {
-		return errors.Wrapf(err, "failed to delete existing WireGuard device %q", DefaultDeviceName)
-	}
+	err = w.netLink.LinkDel(link)
 
-	return nil
+	return errors.Wrapf(err, "failed to delete existing WireGuard device %q", DefaultDeviceName)
 }

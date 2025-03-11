@@ -147,7 +147,7 @@ var _ = Describe("Managing tunnels", func() {
 	}
 
 	verifyDisconnectFromEndpoint := func() {
-		fakeDriver.AwaitDisconnectFromEndpoint(&endpoint.Spec)
+		fakeDriver.AwaitDisconnectFromEndpoint(&endpoint.Spec, k8snet.IPv4)
 	}
 
 	When("an Endpoint is created", func() {

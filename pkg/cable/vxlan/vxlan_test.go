@@ -38,6 +38,7 @@ import (
 	"github.com/vishvananda/netlink"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	k8snet "k8s.io/utils/net"
 )
 
 func init() {
@@ -74,8 +75,9 @@ var _ = Describe("Vxlan", func() {
 					Subnets:    []string{"20.0.0.0/16", "21.0.0.0/16"},
 				},
 			},
-			UseIP:  "172.93.2.1",
-			UseNAT: true,
+			UseIP:     "172.93.2.1",
+			UseNAT:    true,
+			UseFamily: k8snet.IPv4,
 		}
 	})
 
@@ -117,7 +119,7 @@ var _ = Describe("Vxlan", func() {
 		_, err := t.driver.ConnectToEndpoint(natInfo)
 		Expect(err).To(Succeed())
 
-		Expect(t.driver.DisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: natInfo.Endpoint.Spec})).To(Succeed())
+		Expect(t.driver.DisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: natInfo.Endpoint.Spec}, k8snet.IPv4)).To(Succeed())
 		t.assertNoConnection(natInfo)
 		t.netLink.AwaitNoNeighbors(0, natInfo.UseIP)
 
