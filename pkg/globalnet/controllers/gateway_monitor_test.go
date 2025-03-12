@@ -258,6 +258,27 @@ var _ = Describe("Endpoint monitoring", func() {
 			t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain, ContainSubstring(globalCIDR))
 		})
 	})
+
+	When("a stale remote Endpoint is deleted", func() {
+		It("should ignore it", func() {
+			endpoint1 := t.createEndpoint(newEndpointSpec(remoteClusterID, t.hostName, remoteCIDR))
+			t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain, ContainSubstring(remoteCIDR))
+
+			test.CreateResource(t.endpoints, &submarinerv1.Endpoint{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "latest",
+					CreationTimestamp: metav1.Time{Time: metav1.Now().Add(time.Minute)},
+				},
+				Spec: *newEndpointSpec(remoteClusterID, t.hostName+"2", remoteCIDR),
+			})
+			time.Sleep(time.Millisecond * 100)
+			t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain, ContainSubstring(remoteCIDR))
+
+			Expect(t.endpoints.Delete(context.TODO(), endpoint1.Name, metav1.DeleteOptions{})).To(Succeed())
+			time.Sleep(time.Millisecond * 100)
+			t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain, ContainSubstring(remoteCIDR))
+		})
+	})
 })
 
 var _ = Describe("Uninstall", func() {
