@@ -166,6 +166,7 @@ func (ovn *Handler) setupForwardingIptables() error {
 }
 
 func (ovn *Handler) updateNoMasqueradeRules(subnet string, add bool) error {
+	var err error
 	rules := []packetfilter.Rule{
 		{
 			DestCIDR: subnet,
@@ -178,8 +179,6 @@ func (ovn *Handler) updateNoMasqueradeRules(subnet string, add bool) error {
 	}
 
 	for i := range rules {
-		var err error
-
 		if add {
 			err = ovn.pFilter.AppendUnique(packetfilter.TableTypeNAT, constants.SmPostRoutingChain, &rules[i])
 		} else {
@@ -189,6 +188,23 @@ func (ovn *Handler) updateNoMasqueradeRules(subnet string, add bool) error {
 		if err != nil {
 			return errors.Wrapf(err, "error updating %q rule for subnet %q", constants.SmPostRoutingChain, subnet)
 		}
+	}
+
+	// After OVN transition from iptables to nftables packets should be marked to avoid SNAT
+	markDontSNATRule := &packetfilter.Rule{
+		SrcCIDR:   subnet,
+		MarkValue: constants.OvnDontSNATMarkValue,
+		Action:    packetfilter.RuleActionMark,
+	}
+
+	if add {
+		err = ovn.pFilter.AppendUnique(packetfilter.TableTypeNAT, constants.SmPreRoutingChain, markDontSNATRule)
+	} else {
+		err = ovn.pFilter.Delete(packetfilter.TableTypeNAT, constants.SmPreRoutingChain, markDontSNATRule)
+	}
+
+	if err != nil {
+		return errors.Wrapf(err, "error creating mark rule for chain %q", constants.SmPreRoutingChain)
 	}
 
 	return nil
@@ -246,6 +262,15 @@ func (ovn *Handler) initIPtablesChains() error {
 
 	if err := ovn.ensureForwardChains(); err != nil {
 		return errors.Wrap(err, "error ensuring FORWARD sub-chain entries")
+	}
+
+	if err := ovn.pFilter.CreateIPHookChainIfNotExists(&packetfilter.ChainIPHook{
+		Name:     constants.SmPreRoutingChain,
+		Type:     packetfilter.ChainTypeNAT,
+		Hook:     packetfilter.ChainHookPrerouting,
+		Priority: packetfilter.ChainPriorityFirst,
+	}); err != nil {
+		return errors.Wrapf(err, "error creating IPHook chain %q", constants.SmPreRoutingChain)
 	}
 
 	return nil

@@ -82,6 +82,20 @@ func (ovn *Handler) Uninstall() error {
 			constants.SmPostRoutingChain)
 	}
 
+	if err := ovn.pFilter.ClearChain(packetfilter.TableTypeNAT, constants.SmPreRoutingChain); err != nil {
+		logger.Errorf(err, "Error flushing packetfilter chain %q of %q table", constants.SmPreRoutingChain, "NAT")
+	}
+
+	if err := ovn.pFilter.DeleteIPHookChain(&packetfilter.ChainIPHook{
+		Name:     constants.SmPreRoutingChain,
+		Type:     packetfilter.ChainTypeNAT,
+		Hook:     packetfilter.ChainHookPrerouting,
+		Priority: packetfilter.ChainPriorityFirst,
+	}); err != nil {
+		logger.Errorf(err, "DeleteIPHookChain %s returned error",
+			constants.SmPreRoutingChain)
+	}
+
 	return nil
 }
 

@@ -21,6 +21,7 @@ package constants
 const (
 	// IPTable chains used by RouteAgent.
 	SmPostRoutingChain = "SUBMARINER-POSTROUTING"
+	SmPreRoutingChain  = "SUBMARINER-PREROUTING"
 	SmInputChain       = "SUBMARINER-INPUT"
 	SmForwardChain     = "SUBMARINER-FORWARD"
 	PostRoutingChain   = "POSTROUTING"
@@ -42,4 +43,8 @@ const (
 
 	OvnTransitSwitchIPAnnotation = "k8s.ovn.org/node-transit-switch-port-ifaddr"
 	OvnZoneAnnotation            = "k8s.ovn.org/zone-name"
+
+	// To preserve the source IP for multi-cluster traffic, we need to mark packets with DontSNAT
+	// mark value defined by OVN (0x4f0).
+	OvnDontSNATMarkValue = "0x4f0"
 )
