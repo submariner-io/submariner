@@ -26,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
+	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/knftables"
@@ -66,6 +67,11 @@ var (
 		packetfilter.RuleActionJump:   {"jump"},
 	}
 
+	nftFamilies = map[k8snet.IPFamily]knftables.Family{
+		k8snet.IPv4: knftables.IPv4Family,
+		k8snet.IPv6: knftables.IPv6Family,
+	}
+
 	logger = log.Logger{Logger: logf.Log.WithName("NFTables")}
 )
 
@@ -79,10 +85,10 @@ type packetFilter struct {
 	nftables knftables.Interface
 }
 
-func New() (packetfilter.Driver, error) {
-	nft, err := knftables.New(knftables.IPv4Family, submarinerTable)
+func New(family k8snet.IPFamily) (packetfilter.Driver, error) {
+	nft, err := knftables.New(nftFamilies[family], submarinerTable)
 	if err != nil {
-		return nil, errors.Wrap(err, "error creating knftables")
+		return nil, errors.Wrapf(err, "error creating knftables for family IPv%s", family)
 	}
 
 	return NewWithNft(nft), nil

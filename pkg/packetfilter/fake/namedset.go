@@ -26,12 +26,14 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
+	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/set"
 )
 
 type namedSet struct {
 	setInfo *packetfilter.SetInfo
 	pfilter *PacketFilter
+	family  k8snet.IPFamily
 }
 
 func (n *namedSet) Name() string {
@@ -52,10 +54,18 @@ func (n *namedSet) Create(ignoreExistErr bool) error {
 }
 
 func (n *namedSet) AddEntry(entry string, ignoreExistErr bool) error {
+	if err := verifyFamilyOf(entry, "AddEntry", n.family); err != nil {
+		return err
+	}
+
 	return n.pfilter.addEntry(entry, n.setInfo, ignoreExistErr)
 }
 
 func (n *namedSet) DelEntry(entry string) error {
+	if err := verifyFamilyOf(entry, "DelEntry", n.family); err != nil {
+		return err
+	}
+
 	return n.pfilter.delEntry(entry, n.setInfo.Name)
 }
 
@@ -204,10 +214,11 @@ func (i *PacketFilter) DestroySets(nameFilter func(string) bool) error {
 	return nil
 }
 
-func (i *PacketFilter) NewNamedSet(setInfo *packetfilter.SetInfo) packetfilter.NamedSet {
+func (i *PacketFilter) NewNamedSet(setInfo *packetfilter.SetInfo, family k8snet.IPFamily) packetfilter.NamedSet {
 	return &namedSet{
 		setInfo: setInfo,
 		pfilter: i,
+		family:  family,
 	}
 }
 

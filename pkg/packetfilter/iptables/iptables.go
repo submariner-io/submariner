@@ -26,6 +26,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/ipset"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
+	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -60,6 +61,11 @@ var (
 		packetfilter.RuleActionDNAT:   "DNAT",
 	}
 
+	protocolByFamily = map[k8snet.IPFamily]iptables.Protocol{
+		k8snet.IPv4: iptables.ProtocolIPv4,
+		k8snet.IPv6: iptables.ProtocolIPv6,
+	}
+
 	logger = log.Logger{Logger: logf.Log.WithName("IPTables")}
 )
 
@@ -74,15 +80,9 @@ type packetFilter struct {
 	ipSetIface ipset.Interface
 }
 
-func New() (packetfilter.Driver, error) {
-	return newiptables(iptables.ProtocolIPv4)
-}
+func New(family k8snet.IPFamily) (packetfilter.Driver, error) {
+	proto := protocolByFamily[family]
 
-func NewV6() (packetfilter.Driver, error) {
-	return newiptables(iptables.ProtocolIPv6)
-}
-
-func newiptables(proto iptables.Protocol) (packetfilter.Driver, error) {
 	ipt, err := iptables.New(iptables.IPFamily(proto), iptables.Timeout(5))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating IP tables for protocol %d", proto)

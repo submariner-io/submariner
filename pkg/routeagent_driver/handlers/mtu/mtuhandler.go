@@ -85,7 +85,7 @@ func (h *mtuHandler) GetName() string {
 func (h *mtuHandler) Init(_ context.Context) error {
 	var err error
 
-	h.pFilter, err = packetfilter.New()
+	h.pFilter, err = packetfilter.New(k8snet.IPv4)
 	if err != nil {
 		return errors.Wrap(err, "error initializing iptables")
 	}

@@ -23,6 +23,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -308,12 +309,9 @@ type Interface interface {
 	UpdateChainRules(table TableType, chain string, rules []*Rule) error
 }
 
-type DriverFn func() (Driver, error)
+type DriverFn func(family k8snet.IPFamily) (Driver, error)
 
-var (
-	newDriverFn   DriverFn
-	newDriverFnV6 DriverFn
-)
+var newDriverFn DriverFn
 
 func SetNewDriverFn(f DriverFn) {
 	newDriverFn = f
@@ -323,28 +321,16 @@ func GetNewDriverFn() DriverFn {
 	return newDriverFn
 }
 
-func SetNewDriverFnV6(f DriverFn) {
-	newDriverFnV6 = f
-}
-
 type Adapter struct {
 	Driver
 }
 
-func New() (Interface, error) {
-	return newImpl(newDriverFn)
-}
-
-func NewV6() (Interface, error) {
-	return newImpl(newDriverFnV6)
-}
-
-func newImpl(f func() (Driver, error)) (Interface, error) {
-	if f == nil {
+func New(family k8snet.IPFamily) (Interface, error) {
+	if newDriverFn == nil {
 		return nil, errors.New("no driver registered")
 	}
 
-	driver, err := f()
+	driver, err := newDriverFn(family)
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating packet filter Driver")
 	}

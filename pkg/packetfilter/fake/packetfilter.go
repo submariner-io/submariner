@@ -28,6 +28,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
+	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/set"
 )
 
@@ -44,14 +45,22 @@ type PacketFilter struct {
 	failOnDelEntryMatchers   []interface{}
 }
 
-func New() *PacketFilter {
+func New(allowedFamilies ...k8snet.IPFamily) *PacketFilter {
+	if len(allowedFamilies) == 0 {
+		allowedFamilies = []k8snet.IPFamily{k8snet.IPv4}
+	}
+
 	pf := &PacketFilter{
 		chainRules: map[string][]string{},
 		sets:       map[string]set.Set[string]{},
 	}
 
-	packetfilter.SetNewDriverFn(func() (packetfilter.Driver, error) {
-		return pf, nil
+	packetfilter.SetNewDriverFn(func(family k8snet.IPFamily) (packetfilter.Driver, error) {
+		if slices.Contains(allowedFamilies, family) {
+			return &driverImpl{pfilter: pf, family: family}, nil
+		}
+
+		return nil, errors.Errorf("IPv%v is not allowed", family)
 	})
 
 	return pf
