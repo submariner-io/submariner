@@ -251,14 +251,6 @@ type ChainIPHook struct {
 	JumpRule *Rule
 }
 
-type SetFamily uint32
-
-const (
-	// IPV4 and IPV6 sets are supported.
-	SetFamilyV4 SetFamily = iota
-	SetFamilyV6
-)
-
 // named set.
 type SetInfo struct {
 	// Name is the set name.
@@ -267,9 +259,6 @@ type SetInfo struct {
 	SetType string
 	// nftables named set attached to tables.
 	Table TableType
-	// SetFamily specifies the protocol family of the IP addresses to be stored in the set.
-	// The default is IPv4.
-	Family SetFamily
 }
 
 type NamedSet interface {

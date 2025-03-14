@@ -83,6 +83,7 @@ func (r RuleSpec) String() string {
 
 type packetFilter struct {
 	nftables knftables.Interface
+	family   k8snet.IPFamily
 }
 
 func New(family k8snet.IPFamily) (packetfilter.Driver, error) {
@@ -91,12 +92,13 @@ func New(family k8snet.IPFamily) (packetfilter.Driver, error) {
 		return nil, errors.Wrapf(err, "error creating knftables for family IPv%s", family)
 	}
 
-	return NewWithNft(nft), nil
+	return NewWithNft(nft, family), nil
 }
 
-func NewWithNft(nft knftables.Interface) packetfilter.Driver {
+func NewWithNft(nft knftables.Interface, family k8snet.IPFamily) packetfilter.Driver {
 	return &packetFilter{
 		nftables: nft,
+		family:   family,
 	}
 }
 

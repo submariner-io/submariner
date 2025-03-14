@@ -78,6 +78,7 @@ func (r RuleSpec) String() string {
 type packetFilter struct {
 	ipt        *iptables.IPTables
 	ipSetIface ipset.Interface
+	family     k8snet.IPFamily
 }
 
 func New(family k8snet.IPFamily) (packetfilter.Driver, error) {
@@ -93,6 +94,7 @@ func New(family k8snet.IPFamily) (packetfilter.Driver, error) {
 	return &packetFilter{
 		ipt:        ipt,
 		ipSetIface: ipSetIface,
+		family:     family,
 	}, nil
 }
 

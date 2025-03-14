@@ -78,8 +78,7 @@ func New() (Interface, error) {
 
 func (i *pfilter) NewNamedSet(key string) NamedSet {
 	return i.pFilter.NewNamedSet(&packetfilter.SetInfo{
-		Name:   key,
-		Family: packetfilter.SetFamilyV4,
+		Name: key,
 	})
 }
 

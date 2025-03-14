@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"github.com/submariner-io/submariner/pkg/packetfilter/nftables"
+	k8snet "k8s.io/utils/net"
 	"sigs.k8s.io/knftables"
 )
 
@@ -111,15 +112,14 @@ var _ = Describe("Interface", func() {
 		pf            packetfilter.Driver
 
 		setInfo = &packetfilter.SetInfo{
-			Name:   setName,
-			Table:  packetfilter.TableTypeNAT,
-			Family: packetfilter.SetFamilyV4,
+			Name:  setName,
+			Table: packetfilter.TableTypeNAT,
 		}
 	)
 
 	BeforeEach(func() {
 		fakeKnftables = &fakeKnftablesWrapper{knftables.NewFake(knftables.IPv4Family, "submariner")}
-		pf = nftables.NewWithNft(fakeKnftables)
+		pf = nftables.NewWithNft(fakeKnftables, k8snet.IPv4)
 	})
 
 	assertRules := func(r ...*packetfilter.Rule) {

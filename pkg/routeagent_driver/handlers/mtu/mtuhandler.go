@@ -220,8 +220,7 @@ func extractIPv4Subnets(endpoint *submV1.EndpointSpec) []string {
 
 func (h *mtuHandler) newNamedSetSet(key string) packetfilter.NamedSet {
 	return h.pFilter.NewNamedSet(&packetfilter.SetInfo{
-		Name:   key,
-		Family: packetfilter.SetFamilyV4,
+		Name: key,
 	})
 }
 
