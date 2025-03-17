@@ -35,6 +35,11 @@ import (
 	k8snet "k8s.io/utils/net"
 )
 
+const (
+	localNATTPort  = "1234"
+	remoteNATTPort = "6789"
+)
+
 var _ = Describe("Libreswan", func() {
 	Describe("IPsec port configuration", testIPsecPortConfiguration)
 	Describe("trafficStatusRE", testTrafficStatusRE)
@@ -106,182 +111,145 @@ func testIPsecPortConfiguration() {
 	})
 }
 
-func testConnectToEndpoint() {
+func testConnectToEndpointWithNATInfo(natInfo *natdiscovery.NATEndpointInfo) {
+	natInfo.Endpoint.Spec.ClusterID = "east"
+	natInfo.Endpoint.Spec.CableName = "submariner-cable-east-192-68-2-1"
+	natInfo.Endpoint.Spec.BackendConfig = map[string]string{subv1.UDPPortConfig: remoteNATTPort}
+	natInfo.UseNAT = true
+
 	t := newTestDriver()
 
-	var (
-		natInfo          *natdiscovery.NATEndpointInfo
-		natInfoIPv6      *natdiscovery.NATEndpointInfo
-		natInfoDualStack *natdiscovery.NATEndpointInfo
-	)
-
 	BeforeEach(func() {
-		natInfo = &natdiscovery.NATEndpointInfo{
-			Endpoint: subv1.Endpoint{
-				Spec: subv1.EndpointSpec{
-					ClusterID:  "east",
-					CableName:  "submariner-cable-east-192-68-2-1",
-					PrivateIPs: []string{"192.68.2.1"},
-					Subnets:    []string{"20.0.0.0/16"},
-				},
-			},
-			UseIP:     "172.93.2.1",
-			UseNAT:    true,
-			UseFamily: k8snet.IPv4,
-		}
-		natInfoIPv6 = &natdiscovery.NATEndpointInfo{
-			Endpoint: subv1.Endpoint{
-				Spec: subv1.EndpointSpec{
-					ClusterID:  "east",
-					CableName:  "submariner-cable-east-192-68-2-1",
-					PrivateIPs: []string{"2002::1234:abcd:ffff:c0a8:101"},
-					Subnets:    []string{"2001::1234:abcd:ffff:c0a8:101/64"},
-				},
-			},
-			UseIP:     "2003:db8:3333:4444:5555:6666:7777:8888",
-			UseNAT:    true,
-			UseFamily: k8snet.IPv6,
-		}
-
-		natInfoDualStack = &natdiscovery.NATEndpointInfo{
-			Endpoint: subv1.Endpoint{
-				Spec: subv1.EndpointSpec{
-					ClusterID:  "east",
-					CableName:  "submariner-cable-east-192-68-2-1",
-					PrivateIPs: []string{"192.68.2.1", "2002::1234:abcd:ffff:c0a8:101"},
-					Subnets:    []string{"20.0.0.0/16", "2001::1234:abcd:ffff:c0a8:101/64"},
-				},
-			},
-			UseIP:     "172.93.2.1",
-			UseNAT:    true,
-			UseFamily: k8snet.IPv4,
-		}
+		t.endpointSpec.BackendConfig = map[string]string{subv1.UDPPortConfig: localNATTPort}
 	})
 
-	testBiDirectionalMode := func(natInfoParam *natdiscovery.NATEndpointInfo) {
-		family := k8snet.IPFamilyOfString(natInfoParam.UseIP)
-		ip, err := t.driver.ConnectToEndpoint(natInfoParam)
+	connectToEndpoint := func() {
+		ip, err := t.driver.ConnectToEndpoint(natInfo)
 
 		Expect(err).To(Succeed())
-		Expect(ip).To(Equal(natInfoParam.UseIP))
+		Expect(ip).To(Equal(natInfo.UseIP))
 
-		t.assertActiveConnection(natInfoParam)
-		t.cmdExecutor.AwaitCommand(nil, "whack", t.endpointSpec.GetPrivateIP(family), natInfoParam.UseIP,
-			t.endpointSpec.ParseSubnets(family)[0].String(), natInfoParam.Endpoint.Spec.ParseSubnets(family)[0].String())
+		t.assertActiveConnection(natInfo)
+	}
+
+	testBiDirectionalMode := func() {
+		connectToEndpoint()
+
+		family := k8snet.IPFamilyOfString(natInfo.UseIP)
+		t.cmdExecutor.AwaitCommand(nil, "whack", t.endpointSpec.GetPrivateIP(family), natInfo.UseIP,
+			t.endpointSpec.ParseSubnets(family)[0].String(), natInfo.Endpoint.Spec.ParseSubnets(family)[0].String(),
+			localNATTPort, remoteNATTPort)
 		t.cmdExecutor.AwaitCommand(nil, "whack", "--initiate")
 	}
 
-	testCreateConnection := func(natInfoParam *natdiscovery.NATEndpointInfo) {
-		family := k8snet.IPFamilyOfString(natInfoParam.UseIP)
-		ip, err := t.driver.ConnectToEndpoint(natInfoParam)
+	testClientMode := func() {
+		connectToEndpoint()
 
-		Expect(err).To(Succeed())
-		Expect(ip).To(Equal(natInfoParam.UseIP))
-
-		t.assertActiveConnection(natInfoParam)
-		t.cmdExecutor.AwaitCommand(nil, "whack", t.endpointSpec.GetPrivateIP(family), natInfoParam.UseIP,
-			t.endpointSpec.ParseSubnets(family)[0].String(), natInfoParam.Endpoint.Spec.ParseSubnets(family)[0].String())
+		family := k8snet.IPFamilyOfString(natInfo.UseIP)
+		t.cmdExecutor.AwaitCommand(nil, "whack", t.endpointSpec.GetPrivateIP(family), natInfo.UseIP,
+			t.endpointSpec.ParseSubnets(family)[0].String(), natInfo.Endpoint.Spec.ParseSubnets(family)[0].String(),
+			Not(ContainElement(localNATTPort)), remoteNATTPort)
 		t.cmdExecutor.AwaitCommand(nil, "whack", "--initiate")
 	}
 
-	testServerMode := func(natInfoParam *natdiscovery.NATEndpointInfo) {
-		family := k8snet.IPFamilyOfString(natInfoParam.UseIP)
-		ip, err := t.driver.ConnectToEndpoint(natInfoParam)
+	testServerMode := func() {
+		connectToEndpoint()
 
-		Expect(err).To(Succeed())
-		Expect(ip).To(Equal(natInfoParam.UseIP))
-
-		t.assertActiveConnection(natInfoParam)
-		t.cmdExecutor.AwaitCommand(nil, "whack", t.endpointSpec.GetPrivateIP(family), t.endpointSpec.ParseSubnets(family)[0].String(),
-			natInfoParam.Endpoint.Spec.ParseSubnets(family)[0].String())
+		family := k8snet.IPFamilyOfString(natInfo.UseIP)
+		t.cmdExecutor.AwaitCommand(nil, "whack", t.endpointSpec.GetPrivateIP(family), "%any",
+			t.endpointSpec.ParseSubnets(family)[0].String(), natInfo.Endpoint.Spec.ParseSubnets(family)[0].String(),
+			localNATTPort, Not(ContainElement(remoteNATTPort)))
 		t.cmdExecutor.EnsureNoCommand("whack", "--initiate")
 	}
 
 	When("only the local side prefers to be a server", func() {
 		BeforeEach(func() {
-			t.endpointSpec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "true"}
-			natInfo.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "false"}
-			natInfoIPv6.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "false"}
-			natInfoDualStack.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "false"}
+			t.endpointSpec.BackendConfig[subv1.PreferredServerConfig] = strconv.FormatBool(true)
+			natInfo.Endpoint.Spec.BackendConfig[subv1.PreferredServerConfig] = strconv.FormatBool(false)
 		})
 
-		It("should create a IPv4 server Connection", func() {
-			testServerMode(natInfo)
-		})
-		It("should create a IPv6 server Connection", func() {
-			testServerMode(natInfoIPv6)
-		})
-		It("should create a IPv4 server Connection on dualstack endpoint", func() {
-			testServerMode(natInfoDualStack)
+		It("should create a server Connection", func() {
+			testServerMode()
 		})
 	})
 
 	When("only the remote side prefers to be a server", func() {
 		BeforeEach(func() {
-			t.endpointSpec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "false"}
-			natInfo.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "true"}
-			natInfoIPv6.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "true"}
-			natInfoDualStack.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "true"}
+			t.endpointSpec.BackendConfig[subv1.PreferredServerConfig] = strconv.FormatBool(false)
+			natInfo.Endpoint.Spec.BackendConfig[subv1.PreferredServerConfig] = strconv.FormatBool(true)
 		})
 
-		It("should create a IPv4 client Connection", func() {
-			testCreateConnection(natInfo)
-		})
-		It("should create a IPv6 client Connection", func() {
-			testCreateConnection(natInfoIPv6)
-		})
-		It("should create a IPv4 client Connection on dualstack endpoint", func() {
-			testCreateConnection(natInfoDualStack)
+		It("should create a client Connection", func() {
+			testClientMode()
 		})
 	})
 
 	When("neither side prefers to be a server", func() {
 		BeforeEach(func() {
-			t.endpointSpec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "false"}
-			natInfo.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "false"}
-			natInfoIPv6.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "false"}
-			natInfoDualStack.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "false"}
+			t.endpointSpec.BackendConfig[subv1.PreferredServerConfig] = strconv.FormatBool(false)
+			natInfo.Endpoint.Spec.BackendConfig[subv1.PreferredServerConfig] = strconv.FormatBool(false)
 		})
 
-		It("should create a bi-directional IPv4 Connection", func() {
-			testBiDirectionalMode(natInfo)
-		})
-		It("should create a bi-directional IPv6 Connection", func() {
-			testBiDirectionalMode(natInfoIPv6)
-		})
-		It("should create a bi-directional IPv4 Connection on dualstack endpoint", func() {
-			testBiDirectionalMode(natInfoDualStack)
+		It("should create a bi-directional Connection", func() {
+			testBiDirectionalMode()
 		})
 	})
 
 	When("no preferred server is configured", func() {
-		It("should default to a bi-directional IPv4 Connection", func() {
-			testBiDirectionalMode(natInfo)
-		})
-		It("should default to a bi-directional IPv6 Connection", func() {
-			testBiDirectionalMode(natInfoIPv6)
-		})
-		It("should default to a bi-directional IPv4 Connection on dualstack endpoint", func() {
-			testBiDirectionalMode(natInfoDualStack)
+		It("should default to a bi-directional Connection", func() {
+			testBiDirectionalMode()
 		})
 	})
 
 	When("both sides prefer to be a server", func() {
 		BeforeEach(func() {
-			t.endpointSpec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "true"}
-			natInfo.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "true"}
-			natInfoIPv6.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "true"}
-			natInfoDualStack.Endpoint.Spec.BackendConfig = map[string]string{subv1.PreferredServerConfig: "true"}
+			t.endpointSpec.BackendConfig[subv1.PreferredServerConfig] = strconv.FormatBool(true)
+			natInfo.Endpoint.Spec.BackendConfig[subv1.PreferredServerConfig] = strconv.FormatBool(true)
 		})
 
-		It("should create a server IPv4 Connection due to comparison of the cable names", func() {
-			testServerMode(natInfo)
+		It("should create a server  Connection due to comparison of the cable names", func() {
+			testServerMode()
 		})
-		It("should create a server IPv6 Connection due to comparison of the cable names", func() {
-			testServerMode(natInfoIPv6)
+	})
+}
+
+func testConnectToEndpoint() {
+	Context("IPv4", func() {
+		testConnectToEndpointWithNATInfo(&natdiscovery.NATEndpointInfo{
+			Endpoint: subv1.Endpoint{
+				Spec: subv1.EndpointSpec{
+					PrivateIPs: []string{"192.68.2.1"},
+					Subnets:    []string{"20.0.0.0/16"},
+				},
+			},
+			UseIP:     "172.93.2.1",
+			UseFamily: k8snet.IPv4,
 		})
-		It("should create a server IPv4 Connection on dualstack ep due to comparison of the cable names", func() {
-			testServerMode(natInfoDualStack)
+	})
+
+	Context("IPv6", func() {
+		testConnectToEndpointWithNATInfo(&natdiscovery.NATEndpointInfo{
+			Endpoint: subv1.Endpoint{
+				Spec: subv1.EndpointSpec{
+					PrivateIPs: []string{"2002::1234:abcd:ffff:c0a8:101"},
+					Subnets:    []string{"2001::1234:abcd:ffff:c0a8:101/64"},
+				},
+			},
+			UseIP:     "2003:db8:3333:4444:5555:6666:7777:8888",
+			UseFamily: k8snet.IPv6,
+		})
+	})
+
+	Context("dual stack", func() {
+		testConnectToEndpointWithNATInfo(&natdiscovery.NATEndpointInfo{
+			Endpoint: subv1.Endpoint{
+				Spec: subv1.EndpointSpec{
+					PrivateIPs: []string{"192.68.2.1", "2002::1234:abcd:ffff:c0a8:101"},
+					Subnets:    []string{"20.0.0.0/16", "2001::1234:abcd:ffff:c0a8:101/64"},
+				},
+			},
+			UseIP:     "172.93.2.1",
+			UseFamily: k8snet.IPv4,
 		})
 	})
 }
