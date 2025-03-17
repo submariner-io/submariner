@@ -21,12 +21,16 @@ package libreswan
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/pkg/errors"
 	fakecommand "github.com/submariner-io/admiral/pkg/command/fake"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/endpoint"
@@ -49,6 +53,7 @@ var _ = Describe("Libreswan", func() {
 	Describe("DisconnectFromEndpoint", testDisconnectFromEndpoint)
 	Describe("GetConnections", testGetConnections)
 	Describe("Preferred server config", testPreferredServerConfig)
+	Describe("Pluto", testPluto)
 })
 
 func testTrafficStatusRE() {
@@ -461,11 +466,157 @@ func testPreferredServerConfig() {
 	})
 }
 
+func testPluto() {
+	t := newTestDriver()
+	plutoCmdMatcher := HaveSuffix("pluto")
+
+	var fatalErr atomic.Value
+
+	BeforeEach(func() {
+		fatalErr = atomic.Value{}
+
+		FatalError = func(err error, _ string) {
+			if err != nil {
+				fatalErr.Store(err)
+			}
+		}
+	})
+
+	getFatalErr := func() error {
+		err, ok := fatalErr.Load().(error)
+		if ok {
+			return err
+		}
+
+		return nil
+	}
+
+	When("the process fails to start", func() {
+		BeforeEach(func() {
+			t.cmdExecutor = fakecommand.NewWithInterceptor(func(cmd *exec.Cmd) fakecommand.InterceptorFuncs {
+				if fakecommand.CmdMatches(cmd, plutoCmdMatcher) {
+					return fakecommand.InterceptorFuncs{Start: func() error {
+						return errors.New("mock error")
+					}}
+				}
+
+				return fakecommand.InterceptorFuncs{}
+			})
+		})
+
+		It("should invoke a fatal error", func() {
+			_, _ = t.driver.ConnectToEndpoint(&natdiscovery.NATEndpointInfo{})
+
+			Expect(getFatalErr()).To(HaveOccurred())
+		})
+	})
+
+	When("IPsec debug is enabled", func() {
+		const debugEnvVar = "CE_IPSEC_DEBUG"
+
+		BeforeEach(func() {
+			os.Setenv(debugEnvVar, "true")
+
+			DeferCleanup(func() {
+				os.Unsetenv(debugEnvVar)
+			})
+		})
+
+		It("should run the process with debug", func() {
+			_, _ = t.driver.ConnectToEndpoint(&natdiscovery.NATEndpointInfo{})
+
+			t.cmdExecutor.AwaitCommand(plutoCmdMatcher, "--stderrlog")
+			t.cmdExecutor.AwaitCommand(nil, "whack", "--debug")
+		})
+	})
+
+	When("a log file is configured", func() {
+		const logFileEnvVar = "CE_IPSEC_LOGFILE"
+
+		BeforeEach(func() {
+			os.Setenv(logFileEnvVar, RootDir+"/log_file")
+
+			stopCh := make(chan struct{})
+
+			DeferCleanup(func() {
+				os.Unsetenv(logFileEnvVar)
+				close(stopCh)
+			})
+
+			t.cmdExecutor = fakecommand.NewWithInterceptor(func(cmd *exec.Cmd) fakecommand.InterceptorFuncs {
+				if fakecommand.CmdMatches(cmd, plutoCmdMatcher) {
+					return fakecommand.InterceptorFuncs{Wait: func() error {
+						<-stopCh
+						return nil
+					}}
+				}
+
+				return fakecommand.InterceptorFuncs{}
+			})
+		})
+
+		It("should redirect Pluto output to the file", func() {
+			_, _ = t.driver.ConnectToEndpoint(&natdiscovery.NATEndpointInfo{})
+
+			Expect(getFatalErr()).NotTo(HaveOccurred())
+
+			cmd := t.cmdExecutor.AwaitCommand(plutoCmdMatcher)
+
+			output := "hello!"
+			_, err := cmd.Stdout.Write([]byte(output))
+			Expect(err).NotTo(HaveOccurred())
+
+			b, err := os.ReadFile(RootDir + "/log_file")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(b)).To(Equal(output))
+		})
+	})
+
+	When("the control socket file doesn't exist", func() {
+		BeforeEach(func() {
+			Expect(t.plutoCtlFile.Close()).To(Succeed())
+			Expect(os.Remove(t.plutoCtlFile.Name())).To(Succeed())
+		})
+
+		It("should succeed when the file is eventually created", func() {
+			plutoCtlFileName := t.plutoCtlFile.Name()
+
+			go func() {
+				time.Sleep(500 * time.Millisecond)
+
+				_, err := os.Create(plutoCtlFileName)
+				Expect(err).NotTo(HaveOccurred())
+			}()
+
+			_, _ = t.driver.ConnectToEndpoint(&natdiscovery.NATEndpointInfo{})
+
+			Expect(getFatalErr()).NotTo(HaveOccurred())
+		})
+
+		Context("", func() {
+			BeforeEach(func() {
+				PlutoCtlSocketTimeout = time.Millisecond * 500
+
+				DeferCleanup(func() {
+					PlutoCtlSocketTimeout = time.Minute
+				})
+			})
+
+			It("should eventually invoke a fatal error", func() {
+				_, _ = t.driver.ConnectToEndpoint(&natdiscovery.NATEndpointInfo{})
+
+				Expect(getFatalErr()).To(HaveOccurred())
+			})
+		})
+	})
+}
+
 type testDriver struct {
 	endpointSpec  subv1.EndpointSpec
 	localEndpoint *endpoint.Local
 	cmdExecutor   *fakecommand.Executor
 	driver        *libreswan
+	plutoCtlFile  *os.File
 }
 
 func newTestDriver() *testDriver {
@@ -479,6 +630,13 @@ func newTestDriver() *testDriver {
 			PrivateIPs: []string{"192.68.1.1", "2002::4321:abcd:ffff:c0a8:101"},
 			Subnets:    []string{"10.0.0.0/16", "2005::1234:abcd:ffff:c0a8:101/64"},
 		}
+
+		FatalError = func(err error, msg string) {
+			GinkgoRecover()
+			Expect(err).NotTo(HaveOccurred(), msg)
+		}
+
+		t.setupPluto()
 	})
 
 	JustBeforeEach(func() {
@@ -487,10 +645,32 @@ func newTestDriver() *testDriver {
 		Expect(err).NotTo(HaveOccurred())
 
 		t.driver = ls.(*libreswan)
-		t.driver.plutoStarted = true
 	})
 
 	return t
+}
+
+func (t *testDriver) setupPluto() {
+	t.setupTempDir()
+
+	path := RootDir + "/run/pluto"
+	Expect(os.MkdirAll(path, 0o700)).To(Succeed())
+
+	var err error
+
+	t.plutoCtlFile, err = os.Create(path + "/pluto.ctl")
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func (t *testDriver) setupTempDir() {
+	var err error
+
+	RootDir, err = os.MkdirTemp("", "libreswan_test")
+	Expect(err).NotTo(HaveOccurred())
+
+	DeferCleanup(func() {
+		Expect(os.RemoveAll(RootDir)).To(Succeed())
+	})
 }
 
 func (t *testDriver) assertActiveConnection(natInfo *natdiscovery.NATEndpointInfo) {
