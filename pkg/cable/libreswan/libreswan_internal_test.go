@@ -21,7 +21,9 @@ package libreswan
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -329,11 +331,11 @@ func testGetConnections() {
 	t := newTestDriver()
 
 	It("should return the correct Connections", func() {
-		natInfo1 := &natdiscovery.NATEndpointInfo{
+		v4NATInfo := &natdiscovery.NATEndpointInfo{
 			Endpoint: subv1.Endpoint{
 				Spec: subv1.EndpointSpec{
 					ClusterID:  "remote1",
-					CableName:  "submariner-cable-remote1-192-68-2-1",
+					CableName:  "submariner-cable-remote1",
 					PrivateIPs: []string{"192.68.2.1"},
 					Subnets:    []string{"20.0.0.0/16", "30.0.0.0/16"},
 				},
@@ -342,44 +344,78 @@ func testGetConnections() {
 			UseFamily: k8snet.IPv4,
 		}
 
-		_, err := t.driver.ConnectToEndpoint(natInfo1)
+		_, err := t.driver.ConnectToEndpoint(v4NATInfo)
 		Expect(err).To(Succeed())
 
-		natInfo2 := &natdiscovery.NATEndpointInfo{
+		v4NATInfo2 := &natdiscovery.NATEndpointInfo{
 			Endpoint: subv1.Endpoint{
 				Spec: subv1.EndpointSpec{
 					ClusterID:  "remote2",
-					CableName:  "submariner-cable-remote2-192-68-3-1",
-					PrivateIPs: []string{"192.68.3.1"},
-					Subnets:    []string{"11.0.0.0/16"},
+					CableName:  "submariner-cable-remote2",
+					PrivateIPs: []string{"192.68.2.2"},
+					Subnets:    []string{"21.0.0.0/16", "31.0.0.0/16"},
 				},
 			},
-			UseIP:     "173.93.3.1",
+			UseIP:     "172.93.2.2",
 			UseFamily: k8snet.IPv4,
 		}
 
-		_, err = t.driver.ConnectToEndpoint(natInfo2)
+		_, err = t.driver.ConnectToEndpoint(v4NATInfo2)
+		Expect(err).To(Succeed())
+
+		v6NATInfo := &natdiscovery.NATEndpointInfo{
+			Endpoint: subv1.Endpoint{
+				Spec: subv1.EndpointSpec{
+					ClusterID:  "remote3",
+					CableName:  "submariner-cable-remote3",
+					PrivateIPs: []string{"2002::1234:abcd:ffff:c0a8:101"},
+					Subnets:    []string{"2001::1234:abcd:ffff:c0a8:101/64"},
+				},
+			},
+			UseIP:     "2003:db8:3333:4444:5555:6666:7777:8888",
+			UseFamily: k8snet.IPv6,
+		}
+
+		_, err = t.driver.ConnectToEndpoint(v6NATInfo)
 		Expect(err).To(Succeed())
 
 		t.cmdExecutor.SetupCommandStdOut(
-			fmt.Sprintf(" \"%s-v4-0-0\", type=ESP, add_time=1590508783, inBytes=10, outBytes=20, id='192.68.2.1'",
-				natInfo1.Endpoint.Spec.CableName),
+			fmt.Sprintf(" \"%s-v4-0-0\", type=ESP, add_time=1590508783, inBytes=10, outBytes=20, id='192.68.2.1'\n"+
+				" \"%s-v6-0-0\", type=ESP, add_time=1590508783, inBytes=10, outBytes=20, id='2002::1234:abcd:ffff:c0a8:101'",
+				v4NATInfo.Endpoint.Spec.CableName, v6NATInfo.Endpoint.Spec.CableName),
 			nil, "whack", "--trafficstatus")
 
-		conn, err := t.driver.GetConnections()
+		actual, err := t.driver.GetConnections()
 		Expect(err).To(Succeed())
 
-		Expect(conn).To(HaveExactElements(subv1.Connection{
-			Status:   subv1.Connected,
-			Endpoint: natInfo1.Endpoint.Spec,
-			UsingIP:  natInfo1.UseIP,
-			UsingNAT: natInfo1.UseNAT,
-		}, subv1.Connection{
-			Status:   subv1.Connecting,
-			Endpoint: natInfo2.Endpoint.Spec,
-			UsingIP:  natInfo2.UseIP,
-			UsingNAT: natInfo2.UseNAT,
-		}))
+		slices.SortFunc(actual, func(a, b subv1.Connection) int {
+			return strings.Compare(a.Endpoint.CableName, b.Endpoint.CableName)
+		})
+
+		expected := []subv1.Connection{
+			{
+				Status:   subv1.Connected,
+				Endpoint: v4NATInfo.Endpoint.Spec,
+				UsingIP:  v4NATInfo.UseIP,
+				UsingNAT: v4NATInfo.UseNAT,
+			}, {
+				Status:   subv1.Connected,
+				Endpoint: v6NATInfo.Endpoint.Spec,
+				UsingIP:  v6NATInfo.UseIP,
+				UsingNAT: v6NATInfo.UseNAT,
+			}, {
+				Status:   subv1.Connecting,
+				Endpoint: v4NATInfo2.Endpoint.Spec,
+				UsingIP:  v4NATInfo2.UseIP,
+				UsingNAT: v4NATInfo2.UseNAT,
+			},
+		}
+
+		slices.SortFunc(expected, func(a, b subv1.Connection) int {
+			return strings.Compare(a.Endpoint.CableName, b.Endpoint.CableName)
+		})
+
+		Expect(actual).To(HaveExactElements(expected))
 	})
 }
 
