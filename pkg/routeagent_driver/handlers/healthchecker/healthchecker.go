@@ -160,6 +160,8 @@ func (h *controller) processEndpointCreatedOrUpdated(endpoint *submarinerv1.Endp
 }
 
 func (h *controller) RemoteEndpointRemoved(endpoint *submarinerv1.Endpoint) error {
+	logger.Infof("Processing removed Endpoint %q", endpoint.Spec.CableName)
+
 	h.Lock()
 	defer h.Unlock()
 
@@ -169,6 +171,10 @@ func (h *controller) RemoteEndpointRemoved(endpoint *submarinerv1.Endpoint) erro
 	}
 
 	return nil
+}
+
+func (h *controller) StaleRemoteEndpointRemoved(endpoint *submarinerv1.Endpoint) error {
+	return h.RemoteEndpointRemoved(endpoint)
 }
 
 func (h *controller) Init(_ context.Context) error {
