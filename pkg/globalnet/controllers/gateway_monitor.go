@@ -92,7 +92,7 @@ func NewGatewayMonitor(ctx context.Context, config *GatewayMonitorConfig) (Inter
 
 	var err error
 
-	gatewayMonitor.pFilter, err = packetfilter.New()
+	gatewayMonitor.pFilter, err = packetfilter.New(k8snet.IPv4)
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating packetfilter")
 	}
