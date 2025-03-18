@@ -41,12 +41,12 @@ var _ = Describe("MTUHandler", func() {
 		t.pFilter.AwaitSet(Equal(constants.LocalCIDRIPSet))
 		t.pFilter.AwaitSet(Equal(constants.RemoteCIDRIPSet))
 
-		t.pFilter.AwaitRule(packetfilter.TableTypeRoute,
+		t.pFilter.AwaitRule(t.tableType,
 			constants.SmPostRoutingChain, And(
 				ContainSubstring("\"ClampType\":%d", packetfilter.ToPMTU),
 				ContainSubstring("\"SrcSetName\":%q", constants.RemoteCIDRIPSet),
 				ContainSubstring("\"DestSetName\":%q", constants.LocalCIDRIPSet)))
-		t.pFilter.AwaitRule(packetfilter.TableTypeRoute,
+		t.pFilter.AwaitRule(t.tableType,
 			constants.SmPostRoutingChain, And(
 				ContainSubstring("\"ClampType\":%d", packetfilter.ToPMTU),
 				ContainSubstring("\"SrcSetName\":%q", constants.LocalCIDRIPSet),
@@ -128,6 +128,7 @@ type testDriver struct {
 	handler     event.Handler
 	tcpMssValue int
 	isGlobalnet bool
+	tableType   packetfilter.TableType
 }
 
 func newTestDriver() *testDriver {
@@ -137,6 +138,7 @@ func newTestDriver() *testDriver {
 		t.tcpMssValue = 0
 		t.isGlobalnet = false
 		t.pFilter = fakePF.New()
+		t.tableType, _ = t.pFilter.GetMSSClampTypes()
 	})
 
 	JustBeforeEach(func() {
@@ -150,18 +152,18 @@ func newTestDriver() *testDriver {
 func (t *testDriver) testForcedMSS(expTCPMssValue int) {
 	t.pFilter.AwaitSet(Equal(constants.LocalCIDRIPSet))
 	t.pFilter.AwaitSet(Equal(constants.RemoteCIDRIPSet))
-	t.pFilter.EnsureNoRule(packetfilter.TableTypeRoute, constants.SmPostRoutingChain,
+	t.pFilter.EnsureNoRule(t.tableType, constants.SmPostRoutingChain,
 		ContainSubstring("\"ClampType\":%d", packetfilter.ToPMTU))
 
 	Expect(t.handler.LocalEndpointCreated(newSubmEndpoint([]string{"172.1.0.0/24"}))).To(Succeed())
 
-	t.pFilter.AwaitRule(packetfilter.TableTypeRoute,
+	t.pFilter.AwaitRule(t.tableType,
 		constants.SmPostRoutingChain, And(
 			ContainSubstring("\"ClampType\":%d", packetfilter.ToValue),
 			ContainSubstring("\"SrcSetName\":%q", constants.RemoteCIDRIPSet),
 			ContainSubstring("\"DestSetName\":%q", constants.LocalCIDRIPSet),
 			ContainSubstring("\"MssValue\":%q", strconv.Itoa(expTCPMssValue))))
-	t.pFilter.AwaitRule(packetfilter.TableTypeRoute,
+	t.pFilter.AwaitRule(t.tableType,
 		constants.SmPostRoutingChain, And(
 			ContainSubstring("\"ClampType\":%d", packetfilter.ToValue),
 			ContainSubstring("\"SrcSetName\":%q", constants.LocalCIDRIPSet),
