@@ -35,6 +35,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
+	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/set"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -63,7 +64,7 @@ type SyncHandler struct {
 var logger = log.Logger{Logger: logf.Log.WithName("KubeProxy")}
 
 func NewSyncHandler(localClusterCidr, localServiceCidr []string) *SyncHandler {
-	pFilter, err := packetfilter.New()
+	pFilter, err := packetfilter.New(k8snet.IPv4)
 	utilruntime.Must(err)
 
 	return &SyncHandler{

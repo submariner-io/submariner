@@ -39,13 +39,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
+	k8snet "k8s.io/utils/net"
 )
 
 func UninstallDataPath() {
 	gnpFilter, err := pfiface.New()
 	logger.FatalOnError(err, "Error initializing GN PacketFilter")
 
-	pFilter, err := packetfilter.New()
+	pFilter, err := packetfilter.New(k8snet.IPv4)
 	logger.FatalOnError(err, "Error initializing PacketFilter")
 
 	natTableChains := []string{

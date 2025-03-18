@@ -25,18 +25,19 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/submariner-io/admiral/pkg/configmap"
 	"github.com/submariner-io/admiral/pkg/http"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/names"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/util"
 	admversion "github.com/submariner-io/admiral/pkg/version"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cidr"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
-	"github.com/submariner-io/submariner/pkg/packetfilter"
-	"github.com/submariner-io/submariner/pkg/packetfilter/iptables"
+	pfconfigure "github.com/submariner-io/submariner/pkg/packetfilter/configure"
 	"github.com/submariner-io/submariner/pkg/versions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
@@ -86,8 +87,14 @@ func main() {
 	dynClient, err := dynamic.NewForConfig(cfg)
 	logger.FatalOnError(err, "Unable to create dynamic client")
 
-	// Set packetfilter driver to iptables. Once nftables is available, we'll check which driver is supported.
-	packetfilter.SetNewDriverFn(iptables.New)
+	// set up signals so we handle the first shutdown signal gracefully
+	ctx := signals.SetupSignalHandler()
+
+	globalConfigMap, err := configmap.Get(ctx, resource.ForConfigMap(k8sClient, spec.Namespace), configmap.Global)
+	logger.FatalOnError(err, "Error retrieving the global ConfigMap")
+
+	err = pfconfigure.DriverFromConfigMap(globalConfigMap)
+	logger.FatalOnError(err, "Error configuring packet filter driver")
 
 	if spec.Uninstall {
 		logger.Info("Uninstalling submariner-globalnet")
@@ -99,9 +106,6 @@ func main() {
 	}
 
 	logger.Info("Starting submariner-globalnet", spec)
-
-	// set up signals so we handle the first shutdown signal gracefully
-	ctx := signals.SetupSignalHandler()
 
 	defer http.StartServer(http.Metrics|http.Profile, spec.MetricsPort)()
 

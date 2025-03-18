@@ -67,6 +67,10 @@ type EndpointHandler interface {
 
 	// RemoteEndpointRemoved is called when an endpoint associated with a remote cluster is removed
 	RemoteEndpointRemoved(endpoint *submV1.Endpoint) error
+
+	// StaleRemoteEndpointRemoved is called in lieu of RemoteEndpointRemoved when a notification for an endpoint
+	// associated with a remote cluster is received after a newer endpoint is received from the cluster.
+	StaleRemoteEndpointRemoved(endpoint *submV1.Endpoint) error
 }
 
 type NodeHandler interface {
@@ -161,6 +165,10 @@ func (ev *HandlerBase) RemoteEndpointUpdated(_ *submV1.Endpoint) error {
 }
 
 func (ev *HandlerBase) RemoteEndpointRemoved(_ *submV1.Endpoint) error {
+	return nil
+}
+
+func (ev *HandlerBase) StaleRemoteEndpointRemoved(_ *submV1.Endpoint) error {
 	return nil
 }
 

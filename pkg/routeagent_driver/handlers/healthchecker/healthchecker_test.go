@@ -20,7 +20,6 @@ package healthchecker_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -34,9 +33,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/pinger"
 	"github.com/submariner-io/submariner/pkg/pinger/fake"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/healthchecker"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	kubeScheme "k8s.io/client-go/kubernetes/scheme"
@@ -60,27 +57,57 @@ var _ = Describe("RouteAgent syncing", func() {
 
 	When("a remote Endpoint is created/updated/deleted", func() {
 		It("should add/update/delete its RemoteEndpoint information in the RouteAgent resource", func() {
-			endpoint1 := t.CreateEndpoint(t.newSubmEndpoint(healthCheckIP1))
+			endpoint := t.CreateEndpoint(t.newSubmEndpoint(healthCheckIP1))
 
-			remoteEndpoint := t.awaitRemoteEndpoint(nil)
-			Expect(remoteEndpoint.Spec).To(Equal(endpoint1.Spec))
+			t.awaitRemoteEndpoint(func(ep *submarinerv1.RemoteEndpoint, g Gomega) {
+				g.Expect(ep.Spec).To(Equal(endpoint.Spec))
+			})
 
 			By("Updating remote endpoint")
 
-			endpoint1.Spec.Hostname = "newHostName"
-			t.UpdateEndpoint(endpoint1)
+			endpoint.Spec.Hostname = "newHostName"
+			t.UpdateEndpoint(endpoint)
 
-			remoteEndpoint = t.awaitRemoteEndpoint(func(ep *submarinerv1.RemoteEndpoint) bool {
-				return ep.Spec.Hostname == endpoint1.Spec.Hostname
+			t.awaitRemoteEndpoint(func(ep *submarinerv1.RemoteEndpoint, g Gomega) {
+				g.Expect(ep.Spec.Hostname).To(Equal(endpoint.Spec.Hostname))
+				g.Expect(ep.Spec).To(Equal(endpoint.Spec))
 			})
-			Expect(remoteEndpoint.Spec).To(Equal(endpoint1.Spec))
 
 			By("Deleting remote endpoint")
 
+			t.DeleteEndpoint(endpoint.Name)
+
+			t.awaitRouteAgent(func(ra *submarinerv1.RouteAgent, g Gomega) {
+				g.Expect(ra.Status.RemoteEndpoints).To(BeEmpty())
+			})
+		})
+	})
+
+	When("a stale remote Endpoint is deleted", func() {
+		It("should remove its RemoteEndpoint information in the RouteAgent resource", func() {
+			endpoint1 := t.CreateEndpoint(t.newSubmEndpoint(healthCheckIP1))
+
+			t.awaitRemoteEndpoint(nil)
+
+			By("Creating new remote endpoint")
+
+			endpoint2 := t.newSubmEndpoint(healthCheckIP2)
+			endpoint2.Spec.CableName = "new-cable"
+			endpoint2.Name = "new-endpoint"
+			endpoint2.CreationTimestamp = metav1.Time{Time: metav1.Now().Add(time.Second)}
+			t.CreateEndpoint(endpoint2)
+
+			t.awaitRouteAgent(func(ra *submarinerv1.RouteAgent, g Gomega) {
+				g.Expect(ra.Status.RemoteEndpoints).To(HaveLen(2))
+			})
+
+			By("Deleting stale remote endpoint")
+
 			t.DeleteEndpoint(endpoint1.Name)
 
-			t.awaitRouteAgent(func(ra *submarinerv1.RouteAgent) bool {
-				return len(ra.Status.RemoteEndpoints) == 0
+			t.awaitRouteAgent(func(ra *submarinerv1.RouteAgent, g Gomega) {
+				g.Expect(ra.Status.RemoteEndpoints).To(HaveLen(1))
+				g.Expect(ra.Status.RemoteEndpoints[0].Spec.GetHealthCheckIP(k8snet.IPv4)).To(Equal(healthCheckIP2))
 			})
 		})
 	})
@@ -97,12 +124,10 @@ var _ = Describe("RemoteEndpoint latency info", func() {
 			latencyInfo := t.newLatencyInfo()
 			t.setLatencyInfo(healthCheckIP1, latencyInfo)
 
-			remoteEndpoint := t.awaitRemoteEndpoint(func(ep *submarinerv1.RemoteEndpoint) bool {
-				return ep.Status == submarinerv1.Connected
+			t.awaitRemoteEndpoint(func(ep *submarinerv1.RemoteEndpoint, g Gomega) {
+				g.Expect(ep.Status).To(Equal(submarinerv1.Connected))
+				g.Expect(ep.LatencyRTT).To(Equal(latencyInfo.Spec))
 			})
-
-			Expect(remoteEndpoint.Status).To(Equal(submarinerv1.Connected))
-			Expect(remoteEndpoint.LatencyRTT).To(Equal(latencyInfo.Spec))
 		})
 
 		Context("with no HealthCheckIP", func() {
@@ -110,12 +135,10 @@ var _ = Describe("RemoteEndpoint latency info", func() {
 				endpoint1 := t.CreateEndpoint(t.newSubmEndpoint(""))
 				t.pingerMap[healthCheckIP1].AwaitNoStart()
 
-				remoteEndpoint := t.awaitRemoteEndpoint(func(ep *submarinerv1.RemoteEndpoint) bool {
-					return ep.Status == submarinerv1.ConnectionNone
+				t.awaitRemoteEndpoint(func(ep *submarinerv1.RemoteEndpoint, g Gomega) {
+					g.Expect(ep.Status).To(Equal(submarinerv1.ConnectionNone))
+					g.Expect(ep.Spec).To(Equal(endpoint1.Spec))
 				})
-
-				Expect(remoteEndpoint.Status).To(Equal(submarinerv1.ConnectionNone))
-				Expect(remoteEndpoint.Spec).To(Equal(endpoint1.Spec))
 			})
 		})
 
@@ -125,12 +148,10 @@ var _ = Describe("RemoteEndpoint latency info", func() {
 				endpoint1 := t.CreateEndpoint(t.newSubmEndpoint(healthCheckIP1))
 				t.pingerMap[healthCheckIP1].AwaitNoStart()
 
-				remoteEndpoint := t.awaitRemoteEndpoint(func(ep *submarinerv1.RemoteEndpoint) bool {
-					return ep.Status == submarinerv1.ConnectionNone
+				t.awaitRemoteEndpoint(func(ep *submarinerv1.RemoteEndpoint, g Gomega) {
+					g.Expect(ep.Status).To(Equal(submarinerv1.ConnectionNone))
+					g.Expect(ep.Spec).To(Equal(endpoint1.Spec))
 				})
-
-				Expect(remoteEndpoint.Status).To(Equal(submarinerv1.ConnectionNone))
-				Expect(remoteEndpoint.Spec).To(Equal(endpoint1.Spec))
 			})
 		})
 
@@ -143,12 +164,10 @@ var _ = Describe("RemoteEndpoint latency info", func() {
 				endpoint1 := t.CreateEndpoint(t.newSubmEndpoint(healthCheckIP1))
 				t.pingerMap[healthCheckIP1].AwaitNoStart()
 
-				remoteEndpoint := t.awaitRemoteEndpoint(func(ep *submarinerv1.RemoteEndpoint) bool {
-					return ep.Status == submarinerv1.ConnectionNone
+				t.awaitRemoteEndpoint(func(ep *submarinerv1.RemoteEndpoint, g Gomega) {
+					g.Expect(ep.Status).To(Equal(submarinerv1.ConnectionNone))
+					g.Expect(ep.Spec).To(Equal(endpoint1.Spec))
 				})
-
-				Expect(remoteEndpoint.Status).To(Equal(submarinerv1.ConnectionNone))
-				Expect(remoteEndpoint.Spec).To(Equal(endpoint1.Spec))
 			})
 		})
 	})
@@ -159,7 +178,6 @@ var _ = Describe("RemoteEndpoint latency info", func() {
 				endpoint1 := t.CreateEndpoint(t.newSubmEndpoint(healthCheckIP1))
 
 				t.pingerMap[healthCheckIP1].AwaitStart()
-				t.pingerMap[healthCheckIP2] = fake.NewPinger(healthCheckIP2)
 
 				endpoint1.Spec.HealthCheckIPs = []string{healthCheckIP2}
 
@@ -207,12 +225,10 @@ var _ = Describe("RemoteEndpoint latency info", func() {
 
 			t.setLatencyInfo(healthCheckIP1, latencyInfo)
 
-			remoteEndpoint := t.awaitRemoteEndpoint(func(ep *submarinerv1.RemoteEndpoint) bool {
-				return ep.Status == submarinerv1.ConnectionError
+			t.awaitRemoteEndpoint(func(ep *submarinerv1.RemoteEndpoint, g Gomega) {
+				g.Expect(ep.Status).To(Equal(submarinerv1.ConnectionError))
+				g.Expect(ep.StatusMessage).To(Equal(latencyInfo.ConnectionError))
 			})
-
-			Expect(remoteEndpoint.Status).To(Equal(submarinerv1.ConnectionError))
-			Expect(remoteEndpoint.StatusMessage).To(Equal(latencyInfo.ConnectionError))
 		})
 	})
 })
@@ -269,6 +285,7 @@ func newTestDriver() *testDriver {
 		t.client = clientset.SubmarinerV1().RouteAgents(namespace)
 		t.pingerMap = map[string]*fake.Pinger{
 			healthCheckIP1: fake.NewPinger(healthCheckIP1),
+			healthCheckIP2: fake.NewPinger(healthCheckIP2),
 		}
 	})
 
@@ -314,7 +331,8 @@ func (t *testDriver) newSubmEndpoint(healthCheckIP string) *submarinerv1.Endpoin
 
 	endpoint := &submarinerv1.Endpoint{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: endpointName,
+			Name:              endpointName,
+			CreationTimestamp: metav1.Now(),
 		},
 		Spec: *endpointSpec,
 	}
@@ -344,30 +362,23 @@ func (t *testDriver) Start(handler event.Handler) {
 	t.ControllerSupport.Start(handler)
 }
 
-func (t *testDriver) awaitRouteAgent(verify func(*submarinerv1.RouteAgent) bool) *submarinerv1.RouteAgent {
-	var routeAgent *submarinerv1.RouteAgent
+func (t *testDriver) awaitRouteAgent(verify func(*submarinerv1.RouteAgent, Gomega)) {
+	Eventually(func(g Gomega) {
+		ra, err := t.client.Get(context.TODO(), localNodeName, metav1.GetOptions{})
+		g.Expect(err).ToNot(HaveOccurred(), "Error retrieving RouteAgent")
 
-	_ = wait.PollUntilContextTimeout(context.TODO(), 20*time.Millisecond,
-		5*time.Second, true, func(ctx context.Context) (bool, error) {
-			ra, err := t.client.Get(ctx, localNodeName, metav1.GetOptions{})
-			if apierrors.IsNotFound(err) || errors.Is(err, context.DeadlineExceeded) {
-				return false, nil
-			}
-
-			Expect(err).ToNot(HaveOccurred(), "Error retrieving RouteAgent")
-
-			routeAgent = ra
-
-			return verify == nil || verify(routeAgent), nil
-		})
-
-	return routeAgent
+		if verify != nil {
+			verify(ra, g)
+		}
+	}).Within(5 * time.Second).Should(Succeed())
 }
 
-func (t *testDriver) awaitRemoteEndpoint(verify func(*submarinerv1.RemoteEndpoint) bool) *submarinerv1.RemoteEndpoint {
-	routeAgent := t.awaitRouteAgent(func(ra *submarinerv1.RouteAgent) bool {
-		return len(ra.Status.RemoteEndpoints) != 0 && (verify == nil || verify(&ra.Status.RemoteEndpoints[0]))
-	})
+func (t *testDriver) awaitRemoteEndpoint(verify func(*submarinerv1.RemoteEndpoint, Gomega)) {
+	t.awaitRouteAgent(func(ra *submarinerv1.RouteAgent, g Gomega) {
+		g.Expect(ra.Status.RemoteEndpoints).ToNot(BeEmpty())
 
-	return &routeAgent.Status.RemoteEndpoints[0]
+		if verify != nil {
+			verify(&ra.Status.RemoteEndpoints[0], g)
+		}
+	})
 }

@@ -43,6 +43,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	fakek8s "k8s.io/client-go/kubernetes/fake"
+	k8snet "k8s.io/utils/net"
 )
 
 const (
@@ -270,11 +271,11 @@ var _ = Describe("Uninstall", func() {
 
 		Expect(t.pFilter.NewNamedSet(&packetfilter.SetInfo{
 			Name: ipSetName,
-		}).Create(true)).To(Succeed())
+		}, k8snet.IPv4).Create(true)).To(Succeed())
 
 		Expect(t.pFilter.NewNamedSet(&packetfilter.SetInfo{
 			Name: "other",
-		}).Create(true)).To(Succeed())
+		}, k8snet.IPv4).Create(true)).To(Succeed())
 	})
 
 	Specify("UninstallDataPath should remove the IP table chains and sets", func() {

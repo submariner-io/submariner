@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
+	k8snet "k8s.io/utils/net"
 )
 
 const (
@@ -92,7 +93,7 @@ var _ = Describe("Adapter", func() {
 
 		var err error
 
-		adapter, err = packetfilter.New()
+		adapter, err = packetfilter.New(k8snet.IPv4)
 		Expect(err).To(Succeed())
 
 		Expect(pFilter.CreateChainIfNotExists(packetfilter.TableTypeNAT, &packetfilter.Chain{
@@ -179,7 +180,7 @@ var _ = Describe("Adapter", func() {
 	})
 })
 
-func assertRules(pFilter packetfilter.Driver, table packetfilter.TableType, expected ...*packetfilter.Rule) {
+func assertRules(pFilter *fakePF.PacketFilter, table packetfilter.TableType, expected ...*packetfilter.Rule) {
 	actual, err := pFilter.List(table, chain)
 	Expect(err).To(Succeed())
 	Expect(actual).To(Equal(expected))

@@ -38,6 +38,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -71,7 +72,7 @@ var logger = log.Logger{Logger: logf.Log.WithName("OVN")}
 
 func NewHandler(config *HandlerConfig) *Handler {
 	// We'll panic if env is nil, this is intentional
-	pFilter, err := packetfilter.New()
+	pFilter, err := packetfilter.New(k8snet.IPv4)
 	if err != nil {
 		logger.Fatalf("Error initializing packetfilter in OVN routeagent handler: %s", err)
 	}

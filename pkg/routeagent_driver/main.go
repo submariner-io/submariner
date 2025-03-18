@@ -27,21 +27,22 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/configmap"
 	"github.com/submariner-io/admiral/pkg/http"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/names"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/util"
 	admversion "github.com/submariner-io/admiral/pkg/version"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
-	cni "github.com/submariner-io/submariner/pkg/cni"
+	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/controller"
 	"github.com/submariner-io/submariner/pkg/node"
-	packetfilter "github.com/submariner-io/submariner/pkg/packetfilter"
-	iptables "github.com/submariner-io/submariner/pkg/packetfilter/iptables"
+	pfconfigure "github.com/submariner-io/submariner/pkg/packetfilter/configure"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cabledriver"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/calico"
@@ -111,8 +112,11 @@ func main() {
 	restMapper, err := util.BuildRestMapper(cfg)
 	logger.FatalOnError(err, "Error building the REST mapper")
 
-	// Set packetfilter driver to iptables. Once nftables is available, we'll check which driver is supported.
-	packetfilter.SetNewDriverFn(iptables.New)
+	globalConfigMap, err := configmap.Get(ctx, resource.ForConfigMap(k8sClientSet, env.Namespace), configmap.Global)
+	logger.FatalOnError(err, "Error retrieving the global ConfigMap")
+
+	err = pfconfigure.DriverFromConfigMap(globalConfigMap)
+	logger.FatalOnError(err, "Error configuring packet filter driver")
 
 	np := os.Getenv("SUBMARINER_NETWORKPLUGIN")
 

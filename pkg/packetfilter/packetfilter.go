@@ -23,6 +23,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -250,14 +251,6 @@ type ChainIPHook struct {
 	JumpRule *Rule
 }
 
-type SetFamily uint32
-
-const (
-	// IPV4 and IPV6 sets are supported.
-	SetFamilyV4 SetFamily = iota
-	SetFamilyV6
-)
-
 // named set.
 type SetInfo struct {
 	// Name is the set name.
@@ -266,9 +259,6 @@ type SetInfo struct {
 	SetType string
 	// nftables named set attached to tables.
 	Table TableType
-	// SetFamily specifies the protocol family of the IP addresses to be stored in the set.
-	// The default is IPv4.
-	Family SetFamily
 }
 
 type NamedSet interface {
@@ -308,37 +298,28 @@ type Interface interface {
 	UpdateChainRules(table TableType, chain string, rules []*Rule) error
 }
 
-var (
-	newDriverFn   func() (Driver, error)
-	newDriverFnV6 func() (Driver, error)
-)
+type DriverFn func(family k8snet.IPFamily) (Driver, error)
 
-func SetNewDriverFn(f func() (Driver, error)) {
+var newDriverFn DriverFn
+
+func SetNewDriverFn(f DriverFn) {
 	newDriverFn = f
 }
 
-func SetNewDriverFnV6(f func() (Driver, error)) {
-	newDriverFnV6 = f
+func GetNewDriverFn() DriverFn {
+	return newDriverFn
 }
 
 type Adapter struct {
 	Driver
 }
 
-func New() (Interface, error) {
-	return newImpl(newDriverFn)
-}
-
-func NewV6() (Interface, error) {
-	return newImpl(newDriverFnV6)
-}
-
-func newImpl(f func() (Driver, error)) (Interface, error) {
-	if f == nil {
+func New(family k8snet.IPFamily) (Interface, error) {
+	if newDriverFn == nil {
 		return nil, errors.New("no driver registered")
 	}
 
-	driver, err := f()
+	driver, err := newDriverFn(family)
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating packet filter Driver")
 	}

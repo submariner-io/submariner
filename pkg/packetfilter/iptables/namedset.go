@@ -22,6 +22,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/submariner/pkg/ipset"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
+	k8snet "k8s.io/utils/net"
 )
 
 type namedSet struct {
@@ -31,7 +32,7 @@ type namedSet struct {
 
 func (p *packetFilter) NewNamedSet(set *packetfilter.SetInfo) packetfilter.NamedSet {
 	hashFamily := ipset.ProtocolFamilyIPV4
-	if set.Family == packetfilter.SetFamilyV6 {
+	if p.family == k8snet.IPv6 {
 		hashFamily = ipset.ProtocolFamilyIPV6
 	}
 

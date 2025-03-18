@@ -20,6 +20,7 @@ package tunnel_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -146,17 +147,24 @@ var _ = Describe("Managing tunnels", func() {
 		})
 	}
 
-	verifyDisconnectFromEndpoint := func() {
-		fakeDriver.AwaitDisconnectFromEndpoint(&endpoint.Spec, k8snet.IPv4)
+	verifyDisconnectFromEndpoint := func(family k8snet.IPFamily) {
+		fakeDriver.AwaitDisconnectFromEndpoint(&endpoint.Spec, family)
 	}
 
-	When("an Endpoint is created", func() {
+	When("an Endpoint is created/deleted", func() {
+		testAddRemoveCable := func(family k8snet.IPFamily) {
+			It(fmt.Sprintf("should install/remove the IPv%s cable", family), func() {
+				verifyConnectToEndpoint(family)
+				fakeDriver.AwaitNoConnectToEndpoint()
+
+				Expect(endpoints.Delete(context.TODO(), endpoint.Name, metav1.DeleteOptions{})).To(Succeed())
+				verifyDisconnectFromEndpoint(family)
+			})
+		}
+
 		Context("that supports only IPv4", func() {
 			Context("and the local Endpoint supports only IPv4", func() {
-				It("should install the IPv4 cable", func() {
-					verifyConnectToEndpoint(k8snet.IPv4)
-					fakeDriver.AwaitNoConnectToEndpoint()
-				})
+				testAddRemoveCable(k8snet.IPv4)
 			})
 
 			Context("and the local Endpoint supports dual-stack", func() {
@@ -164,10 +172,7 @@ var _ = Describe("Managing tunnels", func() {
 					localEPSpec.Subnets = []string{ipV6CIDR, ipV4CIDR}
 				})
 
-				It("should install the IPv4 cable", func() {
-					verifyConnectToEndpoint(k8snet.IPv4)
-					fakeDriver.AwaitNoConnectToEndpoint()
-				})
+				testAddRemoveCable(k8snet.IPv4)
 			})
 
 			Context("and the local Endpoint supports only IPv6", func() {
@@ -177,6 +182,7 @@ var _ = Describe("Managing tunnels", func() {
 
 				It("should not install the cable", func() {
 					fakeDriver.AwaitNoConnectToEndpoint()
+					fakeDriver.AwaitNoDisconnectFromEndpoint()
 				})
 			})
 		})
@@ -191,10 +197,7 @@ var _ = Describe("Managing tunnels", func() {
 					localEPSpec.Subnets = []string{ipV6CIDR}
 				})
 
-				It("should install the IPv6 cable", func() {
-					verifyConnectToEndpoint(k8snet.IPv6)
-					fakeDriver.AwaitNoConnectToEndpoint()
-				})
+				testAddRemoveCable(k8snet.IPv6)
 			})
 
 			Context("and the local Endpoint supports dual-stack", func() {
@@ -202,10 +205,7 @@ var _ = Describe("Managing tunnels", func() {
 					localEPSpec.Subnets = []string{ipV6CIDR, ipV4CIDR}
 				})
 
-				It("should install the IPv6 cable", func() {
-					verifyConnectToEndpoint(k8snet.IPv6)
-					fakeDriver.AwaitNoConnectToEndpoint()
-				})
+				testAddRemoveCable(k8snet.IPv6)
 			})
 
 			Context("and the local Endpoint supports only IPv4", func() {
@@ -215,6 +215,7 @@ var _ = Describe("Managing tunnels", func() {
 
 				It("should not install the cable", func() {
 					fakeDriver.AwaitNoConnectToEndpoint()
+					fakeDriver.AwaitNoDisconnectFromEndpoint()
 				})
 			})
 		})
@@ -229,10 +230,7 @@ var _ = Describe("Managing tunnels", func() {
 					localEPSpec.Subnets = []string{ipV6CIDR}
 				})
 
-				It("should install the IPv6 cable", func() {
-					verifyConnectToEndpoint(k8snet.IPv6)
-					fakeDriver.AwaitNoConnectToEndpoint()
-				})
+				testAddRemoveCable(k8snet.IPv6)
 			})
 
 			Context("and the local Endpoint supports dual-stack", func() {
@@ -240,10 +238,13 @@ var _ = Describe("Managing tunnels", func() {
 					localEPSpec.Subnets = []string{ipV6CIDR, ipV4CIDR}
 				})
 
-				It("should install both cables", func() {
+				It("should install/remove both cables", func() {
 					verifyConnectToEndpoint(k8snet.IPv6)
 					verifyConnectToEndpoint(k8snet.IPv4)
-					fakeDriver.AwaitNoConnectToEndpoint()
+
+					Expect(endpoints.Delete(context.TODO(), endpoint.Name, metav1.DeleteOptions{})).To(Succeed())
+					verifyDisconnectFromEndpoint(k8snet.IPv6)
+					verifyDisconnectFromEndpoint(k8snet.IPv4)
 				})
 			})
 
@@ -254,6 +255,7 @@ var _ = Describe("Managing tunnels", func() {
 
 				It("should not install the IPv4 cable", func() {
 					verifyConnectToEndpoint(k8snet.IPv4)
+					fakeDriver.AwaitNoDisconnectFromEndpoint()
 				})
 			})
 		})
@@ -267,14 +269,6 @@ var _ = Describe("Managing tunnels", func() {
 			test.UpdateResource(endpoints, endpoint)
 
 			verifyConnectToEndpoint(k8snet.IPv4)
-		})
-	})
-
-	When("an Endpoint is deleted", func() {
-		It("should remove the cable", func() {
-			verifyConnectToEndpoint(k8snet.IPv4)
-			Expect(endpoints.Delete(context.TODO(), endpoint.Name, metav1.DeleteOptions{})).To(Succeed())
-			verifyDisconnectFromEndpoint()
 		})
 	})
 
@@ -298,7 +292,7 @@ var _ = Describe("Managing tunnels", func() {
 			verifyConnectToEndpoint(k8snet.IPv4)
 
 			Expect(endpoints.Delete(context.TODO(), endpoint.Name, metav1.DeleteOptions{})).To(Succeed())
-			verifyDisconnectFromEndpoint()
+			verifyDisconnectFromEndpoint(k8snet.IPv4)
 		})
 	})
 })
