@@ -55,6 +55,9 @@ jobs:
         include:
           - extra-toggles: dual-stack
           - extra-toggles: dual-stack, globalnet
+          - extra-toggles: nftables
+          - extra-toggles: nftables, ovn
+          - extra-toggles: nftables, globalnet
           # Oldest Kubernetes version thought to work with SubM.
           # This should match minK8sMajor.minK8sMinor in subctl/pkg/version/version.go.
           # If this breaks, we may advance the oldest-working K8s version instead of fixing it. See:
