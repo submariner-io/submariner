@@ -192,7 +192,7 @@ func (i *libreswan) Init() error {
 // 006 #2: "submariner-cable-cluster3-172-17-0-8-v4-0-0"[1] 3.139.75.179, type=ESP, add_time=1617195756, inBytes=0, outBytes=0, \
 // id='@10.0.63.203-0-0'"
 // .
-var trafficStatusRE = regexp.MustCompile(`.* "([^"]+-v[46]-[0-1]-[0-1])"[^,]*, .*inBytes=(\d+), outBytes=(\d+).*`)
+var TrafficStatusRE = regexp.MustCompile(`.* "([^"]+-v[46]-[0-1]-[0-1])"[^,]*, .*inBytes=(\d+), outBytes=(\d+).*`)
 
 func retrieveActiveConnectionStats() (map[string]int, map[string]int, error) {
 	ctx, cancel := context.WithTimeout(context.TODO(), whackTimeout)
@@ -217,7 +217,7 @@ func retrieveActiveConnectionStats() (map[string]int, map[string]int, error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		matches := trafficStatusRE.FindStringSubmatch(line)
+		matches := TrafficStatusRE.FindStringSubmatch(line)
 		if matches != nil {
 			_, ok := activeConnectionsRx[matches[1]]
 			if !ok {

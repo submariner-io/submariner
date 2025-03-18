@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package libreswan
+package libreswan_test
 
 import (
 	"fmt"
@@ -34,6 +34,7 @@ import (
 	fakecommand "github.com/submariner-io/admiral/pkg/command/fake"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
+	"github.com/submariner-io/submariner/pkg/cable/libreswan"
 	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
@@ -51,7 +52,7 @@ const (
 
 var _ = Describe("Libreswan", func() {
 	Describe("NATT port configuration", testNATTPortConfiguration)
-	Describe("trafficStatusRE", testTrafficStatusRE)
+	Describe("TrafficStatusRE", testTrafficStatusRE)
 	Describe("ConnectToEndpoint", testConnectToEndpoint)
 	Describe("DisconnectFromEndpoint", testDisconnectFromEndpoint)
 	Describe("GetConnections", testGetConnections)
@@ -73,33 +74,37 @@ var _ = Describe("Libreswan", func() {
 })
 
 func testTrafficStatusRE() {
-	When("Parsing a normal connection", func() {
+	When("parsing a normal connection", func() {
 		It("should match", func() {
-			matches := trafficStatusRE.FindStringSubmatch("006 #3: \"submariner-cable-cluster3-172-17-0-8-v4-0-0\", " +
+			matches := libreswan.TrafficStatusRE.FindStringSubmatch("006 #3: \"submariner-cable-cluster3-172-17-0-8-v4-0-0\", " +
 				"type=ESP, add_time=1590508783, inBytes=0, outBytes=0, id='172.17.0.8'\n")
 			Expect(matches).NotTo(BeNil())
 		})
 	})
 
-	When("Parsing a server-side connection", func() {
+	When("parsing a server-side connection", func() {
 		It("should match", func() {
-			matches := trafficStatusRE.FindStringSubmatch("006 #2: \"submariner-cable-cluster3-172-17-0-8-v4-0-0\"[1] 3.139.75.179," +
-				" type=ESP, add_time=1617195756, inBytes=0, outBytes=0, id='@10.0.63.203-0-0'\n")
-			Expect(matches).NotTo(BeNil())
-		})
-	})
-	When("Parsing a normal v6 connection", func() {
-		It("should match", func() {
-			matches := trafficStatusRE.FindStringSubmatch("006 #3: \"submariner-cable-cluster3-fd12:3456:789a:1::1-v6-0-0\", " +
-				" type=ESP, add_time=1590508783, inBytes=0, outBytes=0, id='@10.0.63.203-0-0'/n")
+			matches := libreswan.TrafficStatusRE.FindStringSubmatch(
+				"006 #2: \"submariner-cable-cluster3-172-17-0-8-v4-0-0\"[1] 3.139.75.179," +
+					" type=ESP, add_time=1617195756, inBytes=0, outBytes=0, id='@10.0.63.203-0-0'\n")
 			Expect(matches).NotTo(BeNil())
 		})
 	})
 
-	When("Parsing a server-side v6 connection", func() {
+	When("parsing a normal IPv6 connection", func() {
 		It("should match", func() {
-			matches := trafficStatusRE.FindStringSubmatch("006 #2: \"submariner-cable-cluster3-fd12:3456:789a:1::1-v6-0-0\"[1] 3.139.75.179," +
-				" type=ESP, add_time=1617195756, inBytes=0, outBytes=0, id='@10.0.63.203-0-0'\n")
+			matches := libreswan.TrafficStatusRE.FindStringSubmatch(
+				"006 #3: \"submariner-cable-cluster3-fd12:3456:789a:1::1-v6-0-0\", " +
+					" type=ESP, add_time=1590508783, inBytes=0, outBytes=0, id='@10.0.63.203-0-0'/n")
+			Expect(matches).NotTo(BeNil())
+		})
+	})
+
+	When("parsing a server-side IPv6 connection", func() {
+		It("should match", func() {
+			matches := libreswan.TrafficStatusRE.FindStringSubmatch(
+				"006 #2: \"submariner-cable-cluster3-fd12:3456:789a:1::1-v6-0-0\"[1] 3.139.75.179," +
+					" type=ESP, add_time=1617195756, inBytes=0, outBytes=0, id='@10.0.63.203-0-0'\n")
 			Expect(matches).NotTo(BeNil())
 		})
 	})
@@ -507,7 +512,7 @@ func testPluto() {
 	BeforeEach(func() {
 		fatalErr = atomic.Value{}
 
-		FatalError = func(err error, _ string) {
+		libreswan.FatalError = func(err error, _ string) {
 			if err != nil {
 				fatalErr.Store(err)
 			}
@@ -566,7 +571,7 @@ func testPluto() {
 		const logFileEnvVar = "CE_IPSEC_LOGFILE"
 
 		BeforeEach(func() {
-			os.Setenv(logFileEnvVar, RootDir+"/log_file")
+			os.Setenv(logFileEnvVar, libreswan.RootDir+"/log_file")
 
 			stopCh := make(chan struct{})
 
@@ -598,7 +603,7 @@ func testPluto() {
 			_, err := cmd.Stdout.Write([]byte(output))
 			Expect(err).NotTo(HaveOccurred())
 
-			b, err := os.ReadFile(RootDir + "/log_file")
+			b, err := os.ReadFile(libreswan.RootDir + "/log_file")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(b)).To(Equal(output))
 		})
@@ -627,10 +632,10 @@ func testPluto() {
 
 		Context("", func() {
 			BeforeEach(func() {
-				PlutoCtlSocketTimeout = time.Millisecond * 500
+				libreswan.PlutoCtlSocketTimeout = time.Millisecond * 500
 
 				DeferCleanup(func() {
-					PlutoCtlSocketTimeout = time.Minute
+					libreswan.PlutoCtlSocketTimeout = time.Minute
 				})
 			})
 
@@ -652,11 +657,11 @@ func testInit() {
 	t := newTestDriver()
 
 	BeforeEach(func() {
-		Expect(os.MkdirAll(RootDir+secretsFilePath, 0o700)).To(Succeed())
+		Expect(os.MkdirAll(libreswan.RootDir+secretsFilePath, 0o700)).To(Succeed())
 	})
 
 	verifySecretsFile := func(s string) {
-		b, err := os.ReadFile(RootDir + secretsFile)
+		b, err := os.ReadFile(libreswan.RootDir + secretsFile)
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(string(b)).To(ContainSubstring(s))
@@ -691,7 +696,7 @@ func testInit() {
 		BeforeEach(func() {
 			os.Setenv(pskSecretEnvVar, secret)
 
-			path := RootDir + "/var/run/secrets/submariner.io/" + secret
+			path := libreswan.RootDir + "/var/run/secrets/submariner.io/" + secret
 
 			Expect(os.MkdirAll(path, 0o700)).To(Succeed())
 			Expect(os.WriteFile(path+"/psk", []byte("abcdefg"), 0o600)).To(Succeed())
@@ -728,7 +733,7 @@ func newTestDriver() *testDriver {
 			Subnets:    []string{"10.0.0.0/16", "2005::1234:abcd:ffff:c0a8:101/64"},
 		}
 
-		FatalError = func(err error, msg string) {
+		libreswan.FatalError = func(err error, msg string) {
 			GinkgoRecover()
 			Expect(err).NotTo(HaveOccurred(), msg)
 		}
@@ -745,7 +750,7 @@ func newTestDriver() *testDriver {
 
 		var err error
 
-		t.driver, err = NewLibreswan(t.localEndpoint, &types.SubmarinerCluster{})
+		t.driver, err = libreswan.NewLibreswan(t.localEndpoint, &types.SubmarinerCluster{})
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -755,7 +760,7 @@ func newTestDriver() *testDriver {
 func (t *testDriver) setupPluto() {
 	t.setupTempDir()
 
-	path := RootDir + "/run/pluto"
+	path := libreswan.RootDir + "/run/pluto"
 	Expect(os.MkdirAll(path, 0o700)).To(Succeed())
 
 	var err error
@@ -767,11 +772,11 @@ func (t *testDriver) setupPluto() {
 func (t *testDriver) setupTempDir() {
 	var err error
 
-	RootDir, err = os.MkdirTemp("", "libreswan_test")
+	libreswan.RootDir, err = os.MkdirTemp("", "libreswan_test")
 	Expect(err).NotTo(HaveOccurred())
 
 	DeferCleanup(func() {
-		Expect(os.RemoveAll(RootDir)).To(Succeed())
+		Expect(os.RemoveAll(libreswan.RootDir)).To(Succeed())
 	})
 }
 
