@@ -117,7 +117,7 @@ func NewLibreswan(localEndpoint *submendpoint.Local, _ *types.SubmarinerCluster)
 
 	port, err := strconv.ParseUint(ipSecSpec.NATTPort, 10, 16)
 	if err != nil {
-		return nil, errors.Wrap(err, "error parsing CR_IPSEC_NATTPORT environment variable")
+		return nil, errors.Wrap(err, "error parsing CE_IPSEC_NATTPORT environment variable")
 	}
 
 	defaultNATTPort := int32(port)

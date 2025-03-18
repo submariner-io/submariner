@@ -33,6 +33,7 @@ import (
 	"github.com/pkg/errors"
 	fakecommand "github.com/submariner-io/admiral/pkg/command/fake"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
@@ -47,7 +48,7 @@ const (
 )
 
 var _ = Describe("Libreswan", func() {
-	Describe("IPsec port configuration", testIPsecPortConfiguration)
+	Describe("NATT port configuration", testNATTPortConfiguration)
 	Describe("trafficStatusRE", testTrafficStatusRE)
 	Describe("ConnectToEndpoint", testConnectToEndpoint)
 	Describe("DisconnectFromEndpoint", testDisconnectFromEndpoint)
@@ -89,31 +90,46 @@ func testTrafficStatusRE() {
 	})
 }
 
-func testIPsecPortConfiguration() {
+func testNATTPortConfiguration() {
+	natInfo := &natdiscovery.NATEndpointInfo{
+		Endpoint: subv1.Endpoint{
+			Spec: subv1.EndpointSpec{
+				CableName:  "test-cable",
+				PrivateIPs: []string{"192.68.2.1"},
+				Subnets:    []string{"20.0.0.0/16"},
+			},
+		},
+		UseIP:     "172.93.2.1",
+		UseFamily: k8snet.IPv4,
+	}
+
 	t := newTestDriver()
 
-	When("NewLibreswan is called with no port environment variables set", func() {
-		It("should set the port fields from the defaults in the specification definition", func() {
-			Expect(t.driver.ipSecNATTPort).To(Equal("4500"))
+	When("the NATT port is configured", func() {
+		const NATTPortEnvVar = "CE_IPSEC_NATTPORT"
+
+		BeforeEach(func() {
+			os.Setenv(NATTPortEnvVar, localNATTPort)
+
+			DeferCleanup(func() {
+				os.Unsetenv(NATTPortEnvVar)
+			})
+		})
+
+		It("should use the port", func() {
+			_, err := t.driver.ConnectToEndpoint(natInfo)
+			Expect(err).To(Succeed())
+
+			t.cmdExecutor.AwaitCommand(nil, "whack", localNATTPort)
 		})
 	})
 
-	When("NewLibreswan is called with port environment variables set", func() {
-		const (
-			NATTPort       = "4555"
-			NATTPortEnvVar = "CE_IPSEC_NATTPORT"
-		)
+	When("no NATT port is configured", func() {
+		It("should use the default port", func() {
+			_, err := t.driver.ConnectToEndpoint(natInfo)
+			Expect(err).To(Succeed())
 
-		BeforeEach(func() {
-			os.Setenv(NATTPortEnvVar, NATTPort)
-		})
-
-		AfterEach(func() {
-			os.Unsetenv(NATTPortEnvVar)
-		})
-
-		It("should set the port fields from the environment variables", func() {
-			Expect(t.driver.ipSecNATTPort).To(Equal(NATTPort))
+			t.cmdExecutor.AwaitCommand(nil, "whack", "4500")
 		})
 	})
 }
@@ -268,10 +284,11 @@ func testDisconnectFromEndpoint() {
 		natInfo1 := &natdiscovery.NATEndpointInfo{
 			Endpoint: subv1.Endpoint{
 				Spec: subv1.EndpointSpec{
-					ClusterID:  "remote1",
-					CableName:  "submariner-cable-remote1-192-68-2-1",
-					PrivateIPs: []string{"192.68.2.1"},
-					Subnets:    []string{"20.0.0.0/16"},
+					ClusterID:     "remote1",
+					CableName:     "submariner-cable-remote1-192-68-2-1",
+					PrivateIPs:    []string{"192.68.2.1"},
+					Subnets:       []string{"20.0.0.0/16"},
+					BackendConfig: map[string]string{subv1.UDPPortConfig: remoteNATTPort},
 				},
 			},
 			UseIP:     "172.93.2.1",
@@ -615,7 +632,7 @@ type testDriver struct {
 	endpointSpec  subv1.EndpointSpec
 	localEndpoint *endpoint.Local
 	cmdExecutor   *fakecommand.Executor
-	driver        *libreswan
+	driver        cable.Driver
 	plutoCtlFile  *os.File
 }
 
@@ -641,10 +658,11 @@ func newTestDriver() *testDriver {
 
 	JustBeforeEach(func() {
 		t.localEndpoint = endpoint.NewLocal(&t.endpointSpec, dynamicfake.NewSimpleDynamicClient(scheme.Scheme), "")
-		ls, err := NewLibreswan(t.localEndpoint, &types.SubmarinerCluster{})
-		Expect(err).NotTo(HaveOccurred())
 
-		t.driver = ls.(*libreswan)
+		var err error
+
+		t.driver, err = NewLibreswan(t.localEndpoint, &types.SubmarinerCluster{})
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	return t
