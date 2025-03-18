@@ -135,7 +135,7 @@ func NewLibreswan(localEndpoint *submendpoint.Local, _ *types.SubmarinerCluster)
 	encodedPsk := ipSecSpec.PSK
 
 	if ipSecSpec.PSKSecret != "" {
-		pskBytes, err := os.ReadFile(fmt.Sprintf("/var/run/secrets/submariner.io/%s/psk", ipSecSpec.PSKSecret))
+		pskBytes, err := os.ReadFile(RootDir + fmt.Sprintf("/var/run/secrets/submariner.io/%s/psk", ipSecSpec.PSKSecret))
 		if err != nil {
 			return nil, errors.Wrapf(err, "error reading secret %s", ipSecSpec.PSKSecret)
 		}

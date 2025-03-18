@@ -55,6 +55,7 @@ var _ = Describe("Libreswan", func() {
 	Describe("GetConnections", testGetConnections)
 	Describe("Preferred server config", testPreferredServerConfig)
 	Describe("Pluto", testPluto)
+	Describe("Init", testInit)
 })
 
 func testTrafficStatusRE() {
@@ -624,6 +625,71 @@ func testPluto() {
 
 				Expect(getFatalErr()).To(HaveOccurred())
 			})
+		})
+	})
+}
+
+func testInit() {
+	const (
+		secretsFilePath = "/etc/ipsec.d" //nolint:gosec // Ignore "Potential hardcoded credentials"
+		secretsFile     = secretsFilePath + "/submariner.secrets"
+	)
+
+	t := newTestDriver()
+
+	BeforeEach(func() {
+		Expect(os.MkdirAll(RootDir+secretsFilePath, 0o700)).To(Succeed())
+	})
+
+	verifySecretsFile := func(s string) {
+		b, err := os.ReadFile(RootDir + secretsFile)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(b)).To(ContainSubstring(s))
+	}
+
+	When("the PSK is specified via the environment variable", func() {
+		const (
+			pskEnvVar = "CE_IPSEC_PSK"
+			psk       = "abcdefg"
+		)
+
+		BeforeEach(func() {
+			os.Setenv(pskEnvVar, psk)
+
+			DeferCleanup(func() {
+				os.Unsetenv(pskEnvVar)
+			})
+		})
+
+		It("should write it to the secrets file", func() {
+			Expect(t.driver.Init()).To(Succeed())
+			verifySecretsFile("PSK \"" + psk)
+		})
+	})
+
+	When("the PSK secret is specified via the environment variable", func() {
+		const (
+			pskSecretEnvVar = "CE_IPSEC_PSKSECRET" //nolint:gosec // Ignore "Potential hardcoded credentials"
+			secret          = "my-secret"
+		)
+
+		BeforeEach(func() {
+			os.Setenv(pskSecretEnvVar, secret)
+
+			path := RootDir + "/var/run/secrets/submariner.io/" + secret
+
+			Expect(os.MkdirAll(path, 0o700)).To(Succeed())
+			Expect(os.WriteFile(path+"/psk", []byte("abcdefg"), 0666)).To(Succeed())
+
+			DeferCleanup(func() {
+				os.Unsetenv(pskSecretEnvVar)
+			})
+		})
+
+		It("should write the contents to the secrets file", func() {
+			Expect(t.driver.Init()).To(Succeed())
+			verifySecretsFile("PSK \"")
 		})
 	})
 }
