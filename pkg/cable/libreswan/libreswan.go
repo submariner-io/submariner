@@ -353,11 +353,7 @@ func whack(args ...string) error {
 		time.Sleep(1 * time.Second)
 	}
 
-	if err != nil {
-		return errors.Wrapf(err, "error whacking with args %v", args)
-	}
-
-	return nil
+	return errors.Wrapf(err, "error whacking with args %v", args)
 }
 
 // ConnectToEndpoint establishes a connection to the given endpoint and returns a string

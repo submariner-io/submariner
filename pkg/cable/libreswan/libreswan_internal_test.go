@@ -36,6 +36,8 @@ import (
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
+	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
+	fakeNetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
 	"github.com/submariner-io/submariner/pkg/types"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -56,6 +58,18 @@ var _ = Describe("Libreswan", func() {
 	Describe("Preferred server config", testPreferredServerConfig)
 	Describe("Pluto", testPluto)
 	Describe("Init", testInit)
+
+	Context("", func() {
+		t := newTestDriver()
+
+		Specify("GetName should return libreswan", func() {
+			Expect(t.driver.GetName()).To(Equal("libreswan"))
+		})
+
+		Specify("Cleanup should succeed", func() {
+			Expect(t.driver.Cleanup()).To(Succeed())
+		})
+	})
 })
 
 func testTrafficStatusRE() {
@@ -680,7 +694,7 @@ func testInit() {
 			path := RootDir + "/var/run/secrets/submariner.io/" + secret
 
 			Expect(os.MkdirAll(path, 0o700)).To(Succeed())
-			Expect(os.WriteFile(path+"/psk", []byte("abcdefg"), 0666)).To(Succeed())
+			Expect(os.WriteFile(path+"/psk", []byte("abcdefg"), 0o600)).To(Succeed())
 
 			DeferCleanup(func() {
 				os.Unsetenv(pskSecretEnvVar)
@@ -720,6 +734,10 @@ func newTestDriver() *testDriver {
 		}
 
 		t.setupPluto()
+
+		netlinkAPI.NewFunc = func() netlinkAPI.Interface {
+			return fakeNetlink.New()
+		}
 	})
 
 	JustBeforeEach(func() {
