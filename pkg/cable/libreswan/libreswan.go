@@ -59,7 +59,13 @@ const (
 	dpddelayArg      = "--dpddelay"
 )
 
-var logger = log.Logger{Logger: logf.Log.WithName("libreswan")}
+var (
+	logger       = log.Logger{Logger: logf.Log.WithName("libreswan")}
+	ipFamilyArgs = map[k8snet.IPFamily]string{
+		k8snet.IPv4: "--ipv4",
+		k8snet.IPv6: "--ipv6",
+	}
+)
 
 func init() {
 	cable.AddDriver(cableDriverName, NewLibreswan)
@@ -173,12 +179,12 @@ func (i *libreswan) Init() error {
 }
 
 // Line format:
-// 006 #3: "submariner-cable-cluster3-172-17-0-8-0-0", type=ESP, add_time=1590508783, inBytes=0, outBytes=0, id='172.17.0.8'
+// 006 #3: "submariner-cable-cluster3-172-17-0-8-v4-0-0", type=ESP, add_time=1590508783, inBytes=0, outBytes=0, id='172.17.0.8'
 // or:
-// 006 #2: "submariner-cable-cluster3-172-17-0-8-0-0"[1] 3.139.75.179, type=ESP, add_time=1617195756, inBytes=0, outBytes=0, \
+// 006 #2: "submariner-cable-cluster3-172-17-0-8-v4-0-0"[1] 3.139.75.179, type=ESP, add_time=1617195756, inBytes=0, outBytes=0, \
 // id='@10.0.63.203-0-0'"
 // .
-var trafficStatusRE = regexp.MustCompile(`.* "([^"]+)"[^,]*, .*inBytes=(\d+), outBytes=(\d+).*`)
+var trafficStatusRE = regexp.MustCompile(`.* "([^"]+-v[46]-[0-1]-[0-1])"[^,]*, .*inBytes=(\d+), outBytes=(\d+).*`)
 
 func retrieveActiveConnectionStats() (map[string]int, map[string]int, error) {
 	ctx, cancel := context.WithTimeout(context.TODO(), whackTimeout)
@@ -236,8 +242,8 @@ func retrieveActiveConnectionStats() (map[string]int, map[string]int, error) {
 	return activeConnectionsRx, activeConnectionsTx, errors.Wrap(cmd.Wait(), "error waiting for whack to complete")
 }
 
-func toConnectionName(cableName string, lsi, rsi int) string {
-	return fmt.Sprintf("%s-%d-%d", cableName, lsi, rsi)
+func toConnectionName(cableName string, family k8snet.IPFamily, lsi, rsi int) string {
+	return fmt.Sprintf("%s-v%s-%d-%d", cableName, family, lsi, rsi)
 }
 
 func (i *libreswan) refreshConnectionStatus() error {
@@ -246,17 +252,22 @@ func (i *libreswan) refreshConnectionStatus() error {
 		return err
 	}
 
-	localSubnets := extractSubnets(&i.localEndpoint)
+	localSubnetsByFamily := make(map[k8snet.IPFamily][]string)
+
+	localSubnetsByFamily[k8snet.IPv4] = i.localEndpoint.ExtractSubnetsExcludingIP(i.localEndpoint.GetPrivateIP(k8snet.IPv4))
+	localSubnetsByFamily[k8snet.IPv6] = i.localEndpoint.ExtractSubnetsExcludingIP(i.localEndpoint.GetPrivateIP(k8snet.IPv6))
 
 	for j := range i.connections {
 		isConnected := false
 
-		remoteSubnets := extractSubnets(&i.connections[j].Endpoint)
+		connectionFamily := i.connections[j].GetFamily()
+		remoteSubnets := i.connections[j].Endpoint.ExtractSubnetsExcludingIP(i.connections[j].Endpoint.GetPrivateIP(connectionFamily))
+
 		rx, tx := 0, 0
 
-		for lsi := range localSubnets {
+		for lsi := range localSubnetsByFamily[connectionFamily] {
 			for rsi := range remoteSubnets {
-				connectionName := toConnectionName(i.connections[j].Endpoint.CableName, lsi, rsi)
+				connectionName := toConnectionName(i.connections[j].Endpoint.CableName, connectionFamily, lsi, rsi)
 				subRx, okRx := activeConnectionsRx[connectionName]
 				subTx, okTx := activeConnectionsTx[connectionName]
 
@@ -272,7 +283,6 @@ func (i *libreswan) refreshConnectionStatus() error {
 			}
 		}
 
-		connectionFamily := i.connections[j].GetFamily()
 		cable.RecordConnection(cableDriverName, &i.localEndpoint, &i.connections[j].Endpoint, string(i.connections[j].Status), false,
 			connectionFamily)
 		cable.RecordRxBytes(cableDriverName, &i.localEndpoint, &i.connections[j].Endpoint, rx, connectionFamily)
@@ -307,18 +317,6 @@ func (i *libreswan) GetConnections() ([]subv1.Connection, error) {
 	}
 
 	return i.connections, nil
-}
-
-func extractSubnets(endpoint *subv1.EndpointSpec) []string {
-	subnets := make([]string, 0, len(endpoint.Subnets))
-
-	for _, subnet := range endpoint.Subnets {
-		if !strings.HasPrefix(subnet, endpoint.GetPrivateIP(k8snet.IPv4)+"/") {
-			subnets = append(subnets, subnet)
-		}
-	}
-
-	return subnets
 }
 
 func whack(args ...string) error {
@@ -375,8 +373,8 @@ func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 			endpoint.Spec.CableName, i.defaultNATTPort, err)
 	}
 
-	leftSubnets := extractSubnets(&i.localEndpoint)
-	rightSubnets := extractSubnets(&endpoint.Spec)
+	leftSubnets := i.localEndpoint.ExtractSubnetsExcludingIP(endpointInfo.UseIP)
+	rightSubnets := endpoint.Spec.ExtractSubnetsExcludingIP(endpointInfo.UseIP)
 
 	// Ensure we’re listening
 	if err := whack("--listen"); err != nil {
@@ -385,12 +383,12 @@ func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 
 	connectionMode := i.calculateOperationMode(&endpoint.Spec)
 
-	logger.Infof("Creating connection(s) for %v in %s mode", endpoint, connectionMode)
+	logger.Infof("Creating IPv%v connection(s) for %v in %s mode", endpointInfo.UseFamily, endpoint, connectionMode)
 
 	if len(leftSubnets) > 0 && len(rightSubnets) > 0 {
 		for lsi, leftSubnet := range leftSubnets {
 			for rsi, rightSubnet := range rightSubnets {
-				connectionName := toConnectionName(endpoint.Spec.CableName, lsi, rsi)
+				connectionName := toConnectionName(endpoint.Spec.CableName, endpointInfo.UseFamily, lsi, rsi)
 
 				switch connectionMode {
 				case operationModeBidirectional:
@@ -419,8 +417,8 @@ func (i *libreswan) bidirectionalConnectToEndpoint(connectionName string, endpoi
 	leftSubnet, rightSubnet string, rightNATTPort int32,
 ) error {
 	// Identifiers are used for authentication, they’re always the private IPs
-	localEndpointIdentifier := i.localEndpoint.GetPrivateIP(k8snet.IPv4)
-	remoteEndpointIdentifier := endpointInfo.Endpoint.Spec.GetPrivateIP(k8snet.IPv4)
+	localEndpointIdentifier := i.localEndpoint.GetPrivateIP(endpointInfo.UseFamily)
+	remoteEndpointIdentifier := endpointInfo.Endpoint.Spec.GetPrivateIP(endpointInfo.UseFamily)
 
 	args := []string{}
 
@@ -429,11 +427,11 @@ func (i *libreswan) bidirectionalConnectToEndpoint(connectionName string, endpoi
 		args = append(args, forceencapsArg)
 	}
 
-	args = append(args, nameArg, connectionName,
+	args = append(args, nameArg, connectionName, ipFamilyArgs[endpointInfo.UseFamily],
 
 		// Left-hand side
 		"--id", localEndpointIdentifier,
-		hostArg, i.localEndpoint.GetPrivateIP(k8snet.IPv4),
+		hostArg, i.localEndpoint.GetPrivateIP(endpointInfo.UseFamily),
 		clientArg, leftSubnet,
 
 		ikeportArg, i.ipSecNATTPort,
@@ -469,8 +467,8 @@ func toEndpointIdentifier(ip string, lsi, rsi int) string {
 func (i *libreswan) serverConnectToEndpoint(connectionName string, endpointInfo *natdiscovery.NATEndpointInfo,
 	leftSubnet, rightSubnet string, lsi, rsi int,
 ) error {
-	localEndpointIdentifier := toEndpointIdentifier(i.localEndpoint.GetPrivateIP(k8snet.IPv4), lsi, rsi)
-	remoteEndpointIdentifier := toEndpointIdentifier(endpointInfo.Endpoint.Spec.GetPrivateIP(k8snet.IPv4), rsi, lsi)
+	localEndpointIdentifier := toEndpointIdentifier(i.localEndpoint.GetPrivateIP(endpointInfo.UseFamily), lsi, rsi)
+	remoteEndpointIdentifier := toEndpointIdentifier(endpointInfo.Endpoint.Spec.GetPrivateIP(endpointInfo.UseFamily), rsi, lsi)
 
 	args := []string{}
 
@@ -479,11 +477,11 @@ func (i *libreswan) serverConnectToEndpoint(connectionName string, endpointInfo 
 		args = append(args, forceencapsArg)
 	}
 
-	args = append(args, nameArg, connectionName,
+	args = append(args, nameArg, connectionName, ipFamilyArgs[endpointInfo.UseFamily],
 
 		// Left-hand side.
 		"--id", localEndpointIdentifier,
-		hostArg, i.localEndpoint.GetPrivateIP(k8snet.IPv4),
+		hostArg, i.localEndpoint.GetPrivateIP(endpointInfo.UseFamily),
 		clientArg, leftSubnet,
 
 		ikeportArg, i.ipSecNATTPort,
@@ -512,8 +510,8 @@ func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo 
 	leftSubnet, rightSubnet string, rightNATTPort int32, lsi, rsi int,
 ) error {
 	// Identifiers are used for authentication, they’re always the private IPs.
-	localEndpointIdentifier := toEndpointIdentifier(i.localEndpoint.GetPrivateIP(k8snet.IPv4), lsi, rsi)
-	remoteEndpointIdentifier := toEndpointIdentifier(endpointInfo.Endpoint.Spec.GetPrivateIP(k8snet.IPv4), rsi, lsi)
+	localEndpointIdentifier := toEndpointIdentifier(i.localEndpoint.GetPrivateIP(endpointInfo.UseFamily), lsi, rsi)
+	remoteEndpointIdentifier := toEndpointIdentifier(endpointInfo.Endpoint.Spec.GetPrivateIP(endpointInfo.UseFamily), rsi, lsi)
 
 	args := []string{}
 
@@ -522,11 +520,11 @@ func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo 
 		args = append(args, forceencapsArg)
 	}
 
-	args = append(args, nameArg, connectionName,
+	args = append(args, nameArg, connectionName, ipFamilyArgs[endpointInfo.UseFamily],
 
 		// Left-hand side
 		"--id", localEndpointIdentifier,
-		hostArg, i.localEndpoint.GetPrivateIP(k8snet.IPv4),
+		hostArg, i.localEndpoint.GetPrivateIP(endpointInfo.UseFamily),
 		clientArg, leftSubnet,
 
 		"--to",
@@ -556,15 +554,15 @@ func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo 
 // DisconnectFromEndpoint disconnects from the connection to the given endpoint.
 func (i *libreswan) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint, family k8snet.IPFamily) error {
 	// We'll panic if endpoint is nil, this is intentional
-	leftSubnets := extractSubnets(&i.localEndpoint)
-	rightSubnets := extractSubnets(&endpoint.Spec)
+	leftSubnets := i.localEndpoint.ExtractSubnetsExcludingIP(i.localEndpoint.GetPrivateIP(family))
+	rightSubnets := endpoint.Spec.ExtractSubnetsExcludingIP(endpoint.Spec.GetPrivateIP(family))
 
-	logger.Infof("Deleting connection to %v", endpoint)
+	logger.Infof("Deleting IPv%v connection to %v", family, endpoint)
 
 	if len(leftSubnets) > 0 && len(rightSubnets) > 0 {
 		for lsi := range leftSubnets {
 			for rsi := range rightSubnets {
-				connectionName := toConnectionName(endpoint.Spec.CableName, lsi, rsi)
+				connectionName := toConnectionName(endpoint.Spec.CableName, family, lsi, rsi)
 				args := []string{"--delete", nameArg, connectionName}
 
 				if err := whack(args...); err != nil {
