@@ -20,13 +20,16 @@ package v1
 
 import (
 	"fmt"
+	"net"
 	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/submariner/pkg/cidr"
 	"k8s.io/apimachinery/pkg/api/equality"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -180,4 +183,35 @@ func (ep *EndpointSpec) GetIPFamilies() []k8snet.IPFamily {
 
 func (ep *EndpointSpec) GetFamilyCableName(family k8snet.IPFamily) string {
 	return ep.CableName + "-v" + string(family)
+}
+
+func (ep *EndpointSpec) ParseSubnets(family k8snet.IPFamily) []net.IPNet {
+	var subnets []net.IPNet
+
+	for i := range ep.Subnets {
+		_, cidr, err := net.ParseCIDR(ep.Subnets[i])
+		utilruntime.Must(err)
+
+		if k8snet.IPFamilyOfCIDR(cidr) == family {
+			subnets = append(subnets, *cidr)
+		}
+	}
+
+	return subnets
+}
+
+func (ep *EndpointSpec) ExtractSubnetsExcludingIP(excIP string) []string {
+	var subnets []string
+
+	ipFamily := k8snet.IPFamilyOfString(excIP)
+	subnetPrefix := excIP + "/"
+
+	for _, subnet := range ep.ParseSubnets(ipFamily) {
+		subnetStr := subnet.String()
+		if !strings.HasPrefix(subnetStr, subnetPrefix) && k8snet.IPFamilyOfCIDRString(subnetStr) == ipFamily {
+			subnets = append(subnets, subnetStr)
+		}
+	}
+
+	return subnets
 }

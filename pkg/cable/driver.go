@@ -27,6 +27,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
+	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -46,7 +47,7 @@ type Driver interface {
 	ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error)
 
 	// DisconnectFromEndpoint disconnects from the connection to the given endpoint.
-	DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint) error
+	DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint, family k8snet.IPFamily) error
 
 	// GetName returns driver's name
 	GetName() string

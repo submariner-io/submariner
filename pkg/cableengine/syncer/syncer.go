@@ -247,7 +247,8 @@ func (gs *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 
 				if connection.Status == v1.Connected {
 					lastRTT, _ := time.ParseDuration(latencyInfo.Spec.Last)
-					cable.RecordConnectionLatency(localEndpoint.Spec.Backend, &localEndpoint.Spec, &connection.Endpoint, lastRTT.Seconds())
+					cable.RecordConnectionLatency(localEndpoint.Spec.Backend, &localEndpoint.Spec, &connection.Endpoint, lastRTT.Seconds(),
+						connection.GetFamily())
 
 					if connection.StatusMessage != "" {
 						connection.StatusMessage = ""

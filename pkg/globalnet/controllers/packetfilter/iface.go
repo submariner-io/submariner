@@ -25,6 +25,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
+	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -63,7 +64,7 @@ const (
 var logger = log.Logger{Logger: logf.Log.WithName("PacketFilter")}
 
 func New() (Interface, error) {
-	pFilterHandler, err := packetfilter.New()
+	pFilterHandler, err := packetfilter.New(k8snet.IPv4)
 	if err != nil {
 		return nil, err //nolint:wrapcheck  // Let the caller wrap it
 	}
@@ -77,8 +78,7 @@ func New() (Interface, error) {
 
 func (i *pfilter) NewNamedSet(key string) NamedSet {
 	return i.pFilter.NewNamedSet(&packetfilter.SetInfo{
-		Name:   key,
-		Family: packetfilter.SetFamilyV4,
+		Name: key,
 	})
 }
 

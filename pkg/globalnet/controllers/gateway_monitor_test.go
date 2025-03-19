@@ -43,6 +43,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	fakek8s "k8s.io/client-go/kubernetes/fake"
+	k8snet "k8s.io/utils/net"
 )
 
 const (
@@ -257,6 +258,27 @@ var _ = Describe("Endpoint monitoring", func() {
 			t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain, ContainSubstring(globalCIDR))
 		})
 	})
+
+	When("a stale remote Endpoint is deleted", func() {
+		It("should ignore it", func() {
+			endpoint1 := t.createEndpoint(newEndpointSpec(remoteClusterID, t.hostName, remoteCIDR))
+			t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain, ContainSubstring(remoteCIDR))
+
+			test.CreateResource(t.endpoints, &submarinerv1.Endpoint{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "latest",
+					CreationTimestamp: metav1.Time{Time: metav1.Now().Add(time.Minute)},
+				},
+				Spec: *newEndpointSpec(remoteClusterID, t.hostName+"2", remoteCIDR),
+			})
+			time.Sleep(time.Millisecond * 100)
+			t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain, ContainSubstring(remoteCIDR))
+
+			Expect(t.endpoints.Delete(context.TODO(), endpoint1.Name, metav1.DeleteOptions{})).To(Succeed())
+			time.Sleep(time.Millisecond * 100)
+			t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain, ContainSubstring(remoteCIDR))
+		})
+	})
 })
 
 var _ = Describe("Uninstall", func() {
@@ -270,11 +292,11 @@ var _ = Describe("Uninstall", func() {
 
 		Expect(t.pFilter.NewNamedSet(&packetfilter.SetInfo{
 			Name: ipSetName,
-		}).Create(true)).To(Succeed())
+		}, k8snet.IPv4).Create(true)).To(Succeed())
 
 		Expect(t.pFilter.NewNamedSet(&packetfilter.SetInfo{
 			Name: "other",
-		}).Create(true)).To(Succeed())
+		}, k8snet.IPv4).Create(true)).To(Succeed())
 	})
 
 	Specify("UninstallDataPath should remove the IP table chains and sets", func() {

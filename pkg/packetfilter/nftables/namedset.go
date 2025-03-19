@@ -24,6 +24,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/knftables"
 )
@@ -35,6 +36,9 @@ type namedSet struct {
 
 func (p *packetFilter) NewNamedSet(set *packetfilter.SetInfo) packetfilter.NamedSet {
 	setType := "ipv4_addr"
+	if p.family == k8snet.IPv6 {
+		setType = "ipv6_addr"
+	}
 
 	return &namedSet{
 		set: knftables.Set{

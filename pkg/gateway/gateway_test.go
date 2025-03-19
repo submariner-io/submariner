@@ -177,7 +177,7 @@ var _ = Describe("Run", func() {
 				UseFamily: k8snet.IPv4,
 			})
 
-			fakeDriver.AwaitDisconnectFromEndpoint(&endpoint.Spec)
+			fakeDriver.AwaitDisconnectFromEndpoint(&endpoint.Spec, k8snet.IPv4)
 		})
 
 		Context("and update Gateway HA status fails with a non-transient error", func() {

@@ -19,6 +19,8 @@ limitations under the License.
 package v1_test
 
 import (
+	"net"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -26,10 +28,11 @@ import (
 )
 
 const (
-	ipV4Addr = "1.2.3.4"
-	ipV6Addr = "2001:db8:3333:4444:5555:6666:7777:8888"
-	ipV4CIDR = "10.16.1.0/32"
-	ipV6CIDR = "2002::1234:abcd:ffff:c0a8:101/64"
+	ipV4Addr  = "1.2.3.4"
+	ipV6Addr  = "2001:db8:3333:4444:5555:6666:7777:8888"
+	ipV4CIDR  = "10.16.1.0/24"
+	ipV4CIDR2 = "10.32.1.0/24"
+	ipV6CIDR  = "2002:0:0:1234::/64"
 )
 
 var _ = Describe("EndpointSpec", func() {
@@ -43,6 +46,8 @@ var _ = Describe("EndpointSpec", func() {
 	Context("SetPrivateIP", testSetPrivateIP)
 	Context("GetFamilyCableName", testGetFamilyCableName)
 	Context("GetIPFamilies", testGetIPFamilies)
+	Context("ParseSubnets", testParseSubnets)
+	Context("ExtractSubnetsExcludingIP", testExtractSubnetsExcludingIP)
 })
 
 func testGenerateName() {
@@ -434,5 +439,69 @@ func testGetIPFamilies() {
 		Expect((&v1.EndpointSpec{Subnets: []string{ipV6CIDR}}).GetIPFamilies()).To(Equal([]k8snet.IPFamily{k8snet.IPv6}))
 		Expect((&v1.EndpointSpec{Subnets: []string{ipV6CIDR, ipV4CIDR}}).GetIPFamilies()).To(
 			Equal([]k8snet.IPFamily{k8snet.IPv6, k8snet.IPv4}))
+	})
+}
+
+func testParseSubnets() {
+	It("should return the correct subnets", func() {
+		subnets := (&v1.EndpointSpec{Subnets: []string{ipV4CIDR, ipV6CIDR}}).ParseSubnets(k8snet.IPv4)
+		Expect(subnets).To(Equal([]net.IPNet{
+			{
+				IP:   []byte{0xa, 0x10, 0x1, 0x0},
+				Mask: net.IPv4Mask(0xff, 0xff, 0xff, 0x00),
+			},
+		}))
+
+		subnets = (&v1.EndpointSpec{Subnets: []string{ipV4CIDR, ipV6CIDR}}).ParseSubnets(k8snet.IPv6)
+		Expect(subnets).To(Equal([]net.IPNet{
+			{
+				IP:   []byte{0x20, 0x2, 0x0, 0x0, 0x0, 0x0, 0x12, 0x34, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+				Mask: []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			},
+		}))
+	})
+}
+
+func testExtractSubnetsExcludingIP() {
+	var spec *v1.EndpointSpec
+
+	BeforeEach(func() {
+		spec = &v1.EndpointSpec{
+			Subnets: []string{ipV4CIDR, ipV4CIDR2, ipV6CIDR},
+		}
+	})
+
+	Context("with two IPv4 subnets and one IPv6 subnet", func() {
+		When("an IPv4 address is provided", func() {
+			Context("and it's present in an IPv4 subnet", func() {
+				It("should return the other IPv4 subnet", func() {
+					result := spec.ExtractSubnetsExcludingIP("10.16.1.0")
+					Expect(result).To(Equal([]string{ipV4CIDR2}))
+				})
+			})
+
+			Context("and it's not present in any IPv4 subnet", func() {
+				It("should return both IPv4 subnets", func() {
+					result := spec.ExtractSubnetsExcludingIP("192.168.1.1")
+					Expect(result).To(Equal([]string{ipV4CIDR, ipV4CIDR2}))
+				})
+			})
+		})
+
+		When("an IPv6 address is provided", func() {
+			Context("and it's present in the IPv6 subnet", func() {
+				It("should return empty", func() {
+					result := spec.ExtractSubnetsExcludingIP("2002:0:0:1234::")
+					Expect(result).To(BeEmpty())
+				})
+			})
+
+			Context("and it's not present in the IPv6 subnet", func() {
+				It("should return the IPv6 subnet", func() {
+					result := spec.ExtractSubnetsExcludingIP("3002::1234:abcd:ffff:c0a8:101")
+					Expect(result).To(Equal([]string{ipV6CIDR}))
+				})
+			})
+		})
 	})
 }

@@ -450,6 +450,10 @@ func (n *basicType) ConfigureTCPMTUProbe(_, _ string) error {
 	return nil
 }
 
+func (n *basicType) InterfaceByName(name string) (*net.Interface, error) {
+	return &net.Interface{Name: name}, nil
+}
+
 func (n *NetLink) AwaitLink(name string) netlink.Link {
 	var link netlink.Link
 

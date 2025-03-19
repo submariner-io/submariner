@@ -331,23 +331,15 @@ func testExistingGlobalEgressIP(t *globalEgressIPControllerTestDriver, podSelect
 
 	Context("and programming the IP table rules fails", func() {
 		BeforeEach(func() {
+			t.expectInstantiationError = true
 			t.createGlobalEgressIP(existing)
 			t.pFilter.AddFailOnAppendRuleMatcher(ContainSubstring(existing.Status.AllocatedIPs[0]))
 		})
 
-		It("should reallocate the global IPs", func() {
-			t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, *existing.Spec.NumberOfIPs, metav1.Condition{
-				Type:   string(submarinerv1.GlobalEgressIPAllocated),
-				Status: metav1.ConditionFalse,
-				Reason: "ReserveAllocatedIPsFailed",
-			}, metav1.Condition{
-				Type:   string(submarinerv1.GlobalEgressIPAllocated),
-				Status: metav1.ConditionTrue,
-			})
-
-			allocatedIPs := getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs
-			t.awaitPacketFilterRules(egressChain, allocatedIPs...)
-			t.awaitIPsReleasedFromPool(existing.Status.AllocatedIPs...)
+		It("should return an error on instantiation and not reallocate the global IPs", func() {
+			Consistently(func() []string {
+				return getGlobalEgressIPStatus(t.globalEgressIPs, existing.Name).AllocatedIPs
+			}, 200*time.Millisecond).Should(Equal(existing.Status.AllocatedIPs))
 		})
 	})
 
@@ -623,6 +615,11 @@ func (t *globalEgressIPControllerTestDriver) start() {
 		RestMapper:   t.restMapper,
 		Scheme:       t.scheme,
 	}, t.pool)
+
+	if t.expectInstantiationError {
+		Expect(err).To(HaveOccurred())
+		return
+	}
 
 	Expect(err).To(Succeed())
 	Expect(t.controller.Start()).To(Succeed())

@@ -33,6 +33,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/metrics"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 var _ = Describe("ClusterGlobalEgressIP controller", func() {
@@ -129,23 +130,15 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 
 			Context("and programming the IP table rules fails", func() {
 				BeforeEach(func() {
+					t.expectInstantiationError = true
 					t.createClusterGlobalEgressIP(existing)
 					t.pFilter.AddFailOnAppendRuleMatcher(ContainSubstring(existing.Status.AllocatedIPs[0]))
 				})
 
-				It("should reallocate the global IPs", func() {
-					t.awaitEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, *existing.Spec.NumberOfIPs, metav1.Condition{
-						Type:   string(submarinerv1.GlobalEgressIPAllocated),
-						Status: metav1.ConditionFalse,
-						Reason: "ReserveAllocatedIPsFailed",
-					}, metav1.Condition{
-						Type:   string(submarinerv1.GlobalEgressIPAllocated),
-						Status: metav1.ConditionTrue,
-					})
-
-					allocatedIPs := getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName).AllocatedIPs
-					t.awaitPacketFilterRules(allocatedIPs...)
-					t.awaitIPsReleasedFromPool(existing.Status.AllocatedIPs...)
+				It("should return an error on instantiation and not reallocate the global IPs", func() {
+					Consistently(func() []string {
+						return getGlobalEgressIPStatus(t.clusterGlobalEgressIPs, existing.Name).AllocatedIPs
+					}, 200*time.Millisecond).Should(Equal(existing.Status.AllocatedIPs))
 				})
 			})
 		})
@@ -216,7 +209,7 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 		})
 
 		JustBeforeEach(func() {
-			existing.Spec.NumberOfIPs = &numberOfIPs
+			existing.Spec.NumberOfIPs = ptr.To(numberOfIPs)
 			test.UpdateResource(t.clusterGlobalEgressIPs, existing)
 		})
 
@@ -391,6 +384,11 @@ func (t *clusterGlobalEgressIPControllerTestDriver) start() {
 		RestMapper:   t.restMapper,
 		Scheme:       t.scheme,
 	}, t.localSubnets, t.pool)
+
+	if t.expectInstantiationError {
+		Expect(err).To(HaveOccurred())
+		return
+	}
 
 	Expect(err).To(Succeed())
 	Expect(t.controller.Start()).To(Succeed())

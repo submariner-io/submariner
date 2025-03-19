@@ -131,7 +131,6 @@ type gatewayMonitor struct {
 	syncerConfig                *syncer.ResourceSyncerConfig
 	gatewaySharedInformer       cache.SharedInformer
 	gatewaySharedInformerStopCh chan struct{}
-	remoteEndpointTimeStamp     map[string]metav1.Time
 	pFilter                     packetfilter.Interface
 	shuttingDown                atomic.Bool
 	leaderElectionInfo          atomic.Pointer[LeaderElectionInfo]

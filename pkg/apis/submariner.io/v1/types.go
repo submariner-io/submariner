@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	k8snet "k8s.io/utils/net"
 )
 
 // +genclient
@@ -238,6 +239,10 @@ func NewConnection(endpointSpec *EndpointSpec, usedIP string, nat bool) *Connect
 func (c *Connection) SetStatus(status ConnectionStatus, messageFormat string, a ...interface{}) {
 	c.Status = status
 	c.StatusMessage = fmt.Sprintf(messageFormat, a...)
+}
+
+func (c *Connection) GetFamily() k8snet.IPFamily {
+	return k8snet.IPFamilyOfString(c.UsingIP)
 }
 
 // +genclient

@@ -24,6 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/ipam"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -335,6 +336,21 @@ func testExistingGlobalIngressIPClusterIPSvc(t *globalIngressIPControllerTestDri
 				})
 			})
 		})
+
+		Context("and retrieval of the internal service fails", func() {
+			BeforeEach(func() {
+				t.expectInstantiationError = true
+				fake.FailOnAction(&t.dynClient.Fake, "services", "get", nil, true)
+			})
+
+			It("should return an error on instantiation and not reallocate the global IP", func() {
+				Consistently(func() string {
+					return t.getGlobalIngressIPStatus(existing.Name).AllocatedIP
+				}, 200*time.Millisecond).Should(Equal(existing.Status.AllocatedIP))
+
+				t.verifyIPsReservedInPool(existing.Status.AllocatedIP)
+			})
+		})
 	})
 
 	Context("with an allocated IP but missing internal service", func() {
@@ -345,12 +361,19 @@ func testExistingGlobalIngressIPClusterIPSvc(t *globalIngressIPControllerTestDri
 			t.createGlobalIngressIP(existing)
 		})
 
-		It("should release the allocated IP", func() {
-			t.awaitIPsReleasedFromPool(existing.Status.AllocatedIP)
+		It("should create the internal service and not reallocate the global IP", func() {
+			internalSvcName := controllers.GetInternalSvcName(serviceName)
+			intSvc := t.awaitService(internalSvcName)
+			Expect(intSvc.Spec.ExternalIPs).To(HaveExactElements(existing.Status.AllocatedIP))
+
+			status := t.getGlobalIngressIPStatus(existing.Name)
+			Expect(status.AllocatedIP).To(Equal(existing.Status.AllocatedIP))
+
+			t.verifyIPsReservedInPool(existing.Status.AllocatedIP)
 		})
 	})
 
-	Context("and external IP of internal service does not match with allocated global IP", func() {
+	Context("and external IP of the internal service does not match the allocated global IP", func() {
 		BeforeEach(func() {
 			existing.Status.AllocatedIP = globalIP1
 			exportedService := newClusterIPService()
@@ -362,15 +385,14 @@ func testExistingGlobalIngressIPClusterIPSvc(t *globalIngressIPControllerTestDri
 			t.createGlobalIngressIP(existing)
 		})
 
-		It("should successfully create an internal submariner service with valid configuration", func() {
-			internalSvcName := controllers.GetInternalSvcName(serviceName)
-			intSvc := t.awaitService(internalSvcName)
-			externalIP := intSvc.Spec.ExternalIPs[0]
-			Expect(externalIP).ToNot(BeEmpty())
+		It("should recreate the internal service with the allocated global IP", func() {
+			Eventually(func() []string {
+				return t.awaitService(controllers.GetInternalSvcName(serviceName)).Spec.ExternalIPs
+			}).Should(HaveExactElements(existing.Status.AllocatedIP))
 
-			Eventually(func() string {
-				return t.getGlobalIngressIPStatus(globalIngressIPName).AllocatedIP
-			}).Should(Equal(externalIP))
+			Consistently(func() string {
+				return t.getGlobalIngressIPStatus(existing.Name).AllocatedIP
+			}, 200*time.Millisecond).Should(Equal(existing.Status.AllocatedIP))
 		})
 	})
 
@@ -480,22 +502,14 @@ func testExistingGlobalIngressIPHeadlessSvc(t *globalIngressIPControllerTestDriv
 
 		Context("and programming the IP table rules fails", func() {
 			BeforeEach(func() {
+				t.expectInstantiationError = true
 				t.pFilter.AddFailOnAppendRuleMatcher(ContainSubstring(existing.Status.AllocatedIP))
 			})
 
-			It("should reallocate the global IP", func() {
-				t.awaitIngressIPStatus(globalIngressIPName, metav1.Condition{
-					Type:   string(submarinerv1.GlobalEgressIPAllocated),
-					Status: metav1.ConditionFalse,
-					Reason: "ReserveAllocatedIPsFailed",
-				}, metav1.Condition{
-					Type:   string(submarinerv1.GlobalEgressIPAllocated),
-					Status: metav1.ConditionTrue,
-				})
-
-				allocatedIP := t.getGlobalIngressIPStatus(globalIngressIPName).AllocatedIP
-				awaitPacketFilterRules(allocatedIP)
-				t.awaitIPsReleasedFromPool(existing.Status.AllocatedIP)
+			It("should return an error on instantiation and not reallocate the global IPs", func() {
+				Consistently(func() string {
+					return t.getGlobalIngressIPStatus(existing.Name).AllocatedIP
+				}, 200*time.Millisecond).Should(Equal(existing.Status.AllocatedIP))
 			})
 		})
 	})
@@ -546,9 +560,16 @@ func (t *globalIngressIPControllerTestDriver) start() syncer.Interface {
 		RestMapper:   t.restMapper,
 		Scheme:       t.scheme,
 	}, t.pool)
-	t.controller = controller
+
+	if t.expectInstantiationError {
+		Expect(err).To(HaveOccurred())
+		return nil
+	}
 
 	Expect(err).To(Succeed())
+
+	t.controller = controller
+
 	Expect(t.controller.Start()).To(Succeed())
 
 	return controller.GetSyncer()
