@@ -349,17 +349,17 @@ var _ = Describe("Interface", func() {
 		err := set.Create(true)
 		Expect(err).To(Succeed())
 
-		err = set.AddEntry("entry1", false)
+		err = set.AddEntry("1.2.3.4", false)
 		Expect(err).To(Succeed())
-		assertEntries(set, "entry1")
+		assertEntries(set, "1.2.3.4")
 
-		err = set.AddEntry("entry2", false)
+		err = set.AddEntry("10.1.2.0/16", false)
 		Expect(err).To(Succeed())
-		assertEntries(set, "entry1", "entry2")
+		assertEntries(set, "1.2.3.4", "10.1.2.0/16")
 
-		err = set.DelEntry("entry1")
+		err = set.DelEntry("1.2.3.4")
 		Expect(err).To(Succeed())
-		assertEntries(set, "entry2")
+		assertEntries(set, "10.1.2.0/16")
 
 		err = set.Flush()
 		Expect(err).To(Succeed())
