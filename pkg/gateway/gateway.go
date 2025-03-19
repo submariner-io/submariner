@@ -87,6 +87,7 @@ type Config struct {
 
 type gatewayType struct {
 	Config
+	controllersMutex        sync.Mutex
 	airGapped               bool
 	cableHealthChecker      healthchecker.Interface
 	cableEngineSyncer       *syncer.GatewaySyncer
@@ -277,6 +278,9 @@ func (g *gatewayType) startLeaderElection(ctx context.Context) error {
 }
 
 func (g *gatewayType) onStartedLeading(ctx context.Context) {
+	g.controllersMutex.Lock()
+	defer g.controllersMutex.Unlock()
+
 	logger.Info("Leadership acquired - starting controllers")
 
 	if err := g.cableEngine.StartEngine(); err != nil {
@@ -321,6 +325,9 @@ func (g *gatewayType) onStartedLeading(ctx context.Context) {
 
 func (g *gatewayType) onStoppedLeading(ctx context.Context) {
 	logger.Info("Leadership lost")
+
+	g.controllersMutex.Lock()
+	defer g.controllersMutex.Unlock()
 
 	// Make sure all the components were at least started before we try to restart.
 	g.leaderComponentsStarted.Wait()
