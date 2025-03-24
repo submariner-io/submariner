@@ -33,6 +33,10 @@ type driverImpl struct {
 	family  k8snet.IPFamily
 }
 
+func (d *driverImpl) GetMSSClampTypes() (packetfilter.TableType, packetfilter.ChainType) {
+	return d.pfilter.GetMSSClampTypes()
+}
+
 func (d *driverImpl) ChainExists(table packetfilter.TableType, chain string) (bool, error) {
 	return d.pfilter.ChainExists(table, chain)
 }

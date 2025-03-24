@@ -102,6 +102,10 @@ func NewWithNft(nft knftables.Interface, family k8snet.IPFamily) packetfilter.Dr
 	}
 }
 
+func (p *packetFilter) GetMSSClampTypes() (packetfilter.TableType, packetfilter.ChainType) {
+	return packetfilter.TableTypeFilter, packetfilter.ChainTypeFilter
+}
+
 func (p *packetFilter) ChainExists(_ packetfilter.TableType, chain string) (bool, error) {
 	return p.chainExists(chain)
 }
