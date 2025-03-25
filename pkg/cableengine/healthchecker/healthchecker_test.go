@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	fakeClient "k8s.io/client-go/dynamic/fake"
 	kubeScheme "k8s.io/client-go/kubernetes/scheme"
+	k8snet "k8s.io/utils/net"
 )
 
 var _ = Describe("Controller", func() {
@@ -48,16 +49,24 @@ var _ = Describe("Controller", func() {
 	const healthCheckIP3 = "3.3.3.3"
 
 	var (
-		healthChecker healthchecker.Interface
-		endpoints     dynamic.ResourceInterface
-		pingerMap     map[string]*fake.Pinger
-		stopCh        chan struct{}
+		healthChecker       healthchecker.Interface
+		supportedIPFamilies []k8snet.IPFamily
+		endpoints           dynamic.ResourceInterface
+		pingerMap           map[string]*fake.Pinger
+		stopCh              chan struct{}
+		checkInstantiation  func(error)
 	)
 
 	BeforeEach(func() {
+		supportedIPFamilies = []k8snet.IPFamily{k8snet.IPv4}
 		pingerMap = map[string]*fake.Pinger{
 			healthCheckIP1: fake.NewPinger(healthCheckIP1),
 			healthCheckIP2: fake.NewPinger(healthCheckIP2),
+		}
+
+		checkInstantiation = func(err error) {
+			Expect(err).To(Succeed())
+			Expect(healthChecker.Start(stopCh)).To(Succeed())
 		}
 	})
 
@@ -79,10 +88,11 @@ var _ = Describe("Controller", func() {
 				Client:     dynamicClient,
 				Scheme:     scheme,
 			},
-			EndpointNamespace:  namespace,
-			ClusterID:          localClusterID,
-			PingInterval:       3,
-			MaxPacketLossCount: 4,
+			SupportedIPFamilies: supportedIPFamilies,
+			EndpointNamespace:   namespace,
+			ClusterID:           localClusterID,
+			PingInterval:        3,
+			MaxPacketLossCount:  4,
 		}
 
 		config.NewPinger = func(pingerCfg pinger.Config) pinger.Interface {
@@ -96,20 +106,18 @@ var _ = Describe("Controller", func() {
 		}
 
 		healthChecker, err = healthchecker.New(config)
-
-		Expect(err).To(Succeed())
-		Expect(healthChecker.Start(stopCh)).To(Succeed())
+		checkInstantiation(err)
 	})
 
 	AfterEach(func() {
 		close(stopCh)
 	})
 
-	createEndpoint := func(clusterID, healthCheckIP string) *submarinerv1.Endpoint {
+	createEndpoint := func(clusterID string, healthCheckIPs ...string) *submarinerv1.Endpoint {
 		endpointSpec := &submarinerv1.EndpointSpec{
 			ClusterID:      clusterID,
 			CableName:      fmt.Sprintf("submariner-cable-%s-192-68-1-20", clusterID),
-			HealthCheckIPs: []string{healthCheckIP},
+			HealthCheckIPs: healthCheckIPs,
 		}
 
 		endpointName, err := endpointSpec.GenerateName()
@@ -141,17 +149,25 @@ var _ = Describe("Controller", func() {
 	}
 
 	When("a remote Endpoint is created", func() {
-		It("should start a Pinger and return the correct LatencyInfo", func() {
-			endpoint1 := createEndpoint(remoteClusterID1, healthCheckIP1)
+		var (
+			endpoint1 *submarinerv1.Endpoint
+			endpoint2 *submarinerv1.Endpoint
+		)
+
+		JustBeforeEach(func() {
+			endpoint1 = createEndpoint(remoteClusterID1, healthCheckIP1)
 			pingerMap[healthCheckIP1].AwaitStart()
 
-			endpoint2 := createEndpoint(remoteClusterID2, healthCheckIP2)
+			endpoint2 = createEndpoint(remoteClusterID2, healthCheckIP2)
 			pingerMap[healthCheckIP2].AwaitStart()
+		})
 
+		It("should start a Pinger and return the correct LatencyInfo", func() {
 			latencyInfo1 := newLatencyInfo()
 			pingerMap[healthCheckIP1].SetLatencyInfo(latencyInfo1)
-			Eventually(func() *pinger.LatencyInfo { return healthChecker.GetLatencyInfo(&endpoint1.Spec) }).
-				Should(Equal(latencyInfo1))
+			Eventually(func() *pinger.LatencyInfo {
+				return healthChecker.GetLatencyInfo(&endpoint1.Spec, k8snet.IPv4)
+			}).Should(Equal(latencyInfo1))
 
 			latencyInfo2 := &pinger.LatencyInfo{
 				ConnectionStatus: pinger.ConnectionError,
@@ -165,28 +181,95 @@ var _ = Describe("Controller", func() {
 			}
 
 			pingerMap[healthCheckIP2].SetLatencyInfo(latencyInfo2)
-			Eventually(func() *pinger.LatencyInfo { return healthChecker.GetLatencyInfo(&endpoint2.Spec) }).
-				Should(Equal(latencyInfo2))
+			Eventually(func() *pinger.LatencyInfo {
+				return healthChecker.GetLatencyInfo(&endpoint2.Spec, k8snet.IPv4)
+			}).Should(Equal(latencyInfo2))
+		})
 
-			By("Stopping health checker")
+		Context("and subsequently deleted", func() {
+			It("should stop the Pinger", func() {
+				Expect(endpoints.Delete(context.TODO(), endpoint1.Name, metav1.DeleteOptions{})).To(Succeed())
+				pingerMap[healthCheckIP1].AwaitStop()
+				Eventually(func() *pinger.LatencyInfo {
+					return healthChecker.GetLatencyInfo(&endpoint1.Spec, k8snet.IPv4)
+				}).Should(BeNil())
+			})
+		})
 
-			close(stopCh)
-			healthChecker.Stop()
+		Context("and the health checker is subsequently restarted", func() {
+			It("should restart the Pinger", func() {
+				By("Stopping health checker")
 
-			Expect(healthChecker.GetLatencyInfo(&endpoint1.Spec)).To(BeNil())
-			Expect(healthChecker.GetLatencyInfo(&endpoint2.Spec)).To(BeNil())
+				close(stopCh)
+				healthChecker.Stop()
 
-			By("Restarting health checker")
+				Expect(healthChecker.GetLatencyInfo(&endpoint1.Spec, k8snet.IPv4)).To(BeNil())
+				Expect(healthChecker.GetLatencyInfo(&endpoint2.Spec, k8snet.IPv4)).To(BeNil())
 
-			pingerMap = map[string]*fake.Pinger{
-				healthCheckIP1: fake.NewPinger(healthCheckIP1),
-				healthCheckIP2: fake.NewPinger(healthCheckIP2),
+				By("Restarting health checker")
+
+				pingerMap = map[string]*fake.Pinger{
+					healthCheckIP1: fake.NewPinger(healthCheckIP1),
+					healthCheckIP2: fake.NewPinger(healthCheckIP2),
+				}
+
+				stopCh = make(chan struct{})
+				Expect(healthChecker.Start(stopCh)).To(Succeed())
+
+				pingerMap[healthCheckIP1].AwaitStart()
+				pingerMap[healthCheckIP2].AwaitStart()
+			})
+		})
+	})
+
+	When("a remote Endpoint is created/deleted with dual-stack health check IPs", func() {
+		const healthCheckIPv6 = "2001:db8:3333:4444:5555:6666:7777:8888"
+
+		BeforeEach(func() {
+			supportedIPFamilies = []k8snet.IPFamily{k8snet.IPv4, k8snet.IPv6}
+			pingerMap[healthCheckIPv6] = fake.NewPinger(healthCheckIPv6)
+		})
+
+		It("should start/stop Pingers and return the correct LatencyInfo for both", func() {
+			endpoint := createEndpoint(remoteClusterID1, healthCheckIP1, healthCheckIPv6)
+			pingerMap[healthCheckIP1].AwaitStart()
+			pingerMap[healthCheckIPv6].AwaitStart()
+
+			ipv4LatencyInfo := newLatencyInfo()
+			pingerMap[healthCheckIP1].SetLatencyInfo(ipv4LatencyInfo)
+			Eventually(func() *pinger.LatencyInfo {
+				return healthChecker.GetLatencyInfo(&endpoint.Spec, k8snet.IPv4)
+			}).Should(Equal(ipv4LatencyInfo))
+
+			ipv6LatencyInfo := &pinger.LatencyInfo{
+				ConnectionStatus: pinger.ConnectionError,
+				Spec: &submarinerv1.LatencyRTTSpec{
+					Last:    "82ms",
+					Min:     "80ms",
+					Average: "85ms",
+					Max:     "89ms",
+					StdDev:  "5ms",
+				},
 			}
 
-			stopCh = make(chan struct{})
-			Expect(healthChecker.Start(stopCh)).To(Succeed())
+			pingerMap[healthCheckIPv6].SetLatencyInfo(ipv6LatencyInfo)
+			Eventually(func() *pinger.LatencyInfo {
+				return healthChecker.GetLatencyInfo(&endpoint.Spec, k8snet.IPv6)
+			}).Should(Equal(ipv6LatencyInfo))
 
-			pingerMap[healthCheckIP1].AwaitStart()
+			By("Deleting Endpoint")
+
+			Expect(endpoints.Delete(context.TODO(), endpoint.Name, metav1.DeleteOptions{})).To(Succeed())
+
+			pingerMap[healthCheckIP1].AwaitStop()
+			Eventually(func() *pinger.LatencyInfo {
+				return healthChecker.GetLatencyInfo(&endpoint.Spec, k8snet.IPv4)
+			}).Should(BeNil())
+
+			pingerMap[healthCheckIPv6].AwaitStop()
+			Eventually(func() *pinger.LatencyInfo {
+				return healthChecker.GetLatencyInfo(&endpoint.Spec, k8snet.IPv6)
+			}).Should(BeNil())
 		})
 	})
 
@@ -194,18 +277,6 @@ var _ = Describe("Controller", func() {
 		It("should not start a Pinger", func() {
 			createEndpoint(localClusterID, healthCheckIP1)
 			pingerMap[healthCheckIP1].AwaitNoStart()
-		})
-	})
-
-	When("a remote Endpoint is deleted", func() {
-		It("should stop the Pinger", func() {
-			endpoint := createEndpoint(remoteClusterID1, healthCheckIP1)
-			pingerMap[healthCheckIP1].AwaitStart()
-
-			Expect(endpoints.Delete(context.TODO(), endpoint.Name, metav1.DeleteOptions{})).To(Succeed())
-			pingerMap[healthCheckIP1].AwaitStop()
-			Eventually(func() *pinger.LatencyInfo { return healthChecker.GetLatencyInfo(&endpoint.Spec) }).
-				Should(BeNil())
 		})
 	})
 
@@ -231,8 +302,9 @@ var _ = Describe("Controller", func() {
 
 				latencyInfo := newLatencyInfo()
 				pingerMap[healthCheckIP3].SetLatencyInfo(latencyInfo)
-				Eventually(func() *pinger.LatencyInfo { return healthChecker.GetLatencyInfo(&endpoint.Spec) }).
-					Should(Equal(latencyInfo))
+				Eventually(func() *pinger.LatencyInfo {
+					return healthChecker.GetLatencyInfo(&endpoint.Spec, k8snet.IPv4)
+				}).Should(Equal(latencyInfo))
 			})
 		})
 
@@ -250,6 +322,18 @@ var _ = Describe("Controller", func() {
 		It("should not start a Pinger", func() {
 			createEndpoint(remoteClusterID1, "")
 			pingerMap[healthCheckIP1].AwaitNoStart()
+		})
+	})
+
+	When("no supported IP families are provided", func() {
+		BeforeEach(func() {
+			supportedIPFamilies = nil
+			checkInstantiation = func(err error) {
+				Expect(err).To(HaveOccurred())
+			}
+		})
+
+		Specify("the health checker should fail", func() {
 		})
 	})
 })
