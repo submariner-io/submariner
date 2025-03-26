@@ -30,7 +30,7 @@ import (
 )
 
 var _ = Describe("Rule conversion", func() {
-	Specify("should correctly convert to and from a rule spec string", func() {
+	Specify("should correctly convert to and from a serialized rule", func() {
 		// ip saddr @src-set ip daddr @dest-set tcp flags syn / syn,rst counter tcp option maxseg size set rt mtu
 		testRuleConversion(&packetfilter.Rule{
 			SrcSetName:  "src-set",
@@ -41,9 +41,9 @@ var _ = Describe("Rule conversion", func() {
 
 		// ip saddr @src-set ip daddr @dest-set tcp flags syn / syn,rst counter tcp option maxseg size set mss-value
 		testRuleConversion(&packetfilter.Rule{
-			SrcSetName:  "src-set",
-			DestSetName: "dest-set",
-			MssValue:    "mss-value",
+			SrcSetName:  "SUBMARINER-REMOTECIDRS",
+			DestSetName: "SUBMARINER-LOCALCIDRS",
+			MssValue:    "1234567890",
 			Action:      packetfilter.RuleActionMss,
 			ClampType:   packetfilter.ToValue,
 		})
@@ -51,8 +51,8 @@ var _ = Describe("Rule conversion", func() {
 		// iifname "in-iface" oifname "out-iface" ip saddr 171.254.1.0/24 ip daddr 170.254.1.0/24 udp dport d-port counter accept'
 		testRuleConversion(&packetfilter.Rule{
 			Proto:        packetfilter.RuleProtoUDP,
-			DestCIDR:     "170.254.1.0/24",
-			SrcCIDR:      "171.254.1.0/24",
+			DestCIDR:     "2001:db8:3333:4444:5555:6666:7777:8888/24",
+			SrcCIDR:      "2002:db8:3333:4444:5555:6666:7777:8888/24",
 			OutInterface: "out-iface",
 			InInterface:  "in-iface",
 			DPort:        "d-port",
@@ -98,6 +98,19 @@ var _ = Describe("Rule conversion", func() {
 			TargetChain: "target-chain",
 			Action:      packetfilter.RuleActionJump,
 		})
+	})
+
+	Specify("an invalid serialized format should return an error", func() {
+		_, err := nftables.DeserializeRule("")
+		Expect(err).To(HaveOccurred())
+	})
+
+	Specify("an invalid serialized version should return an error", func() {
+		_, err := nftables.DeserializeRule("0.04 0 1 src-set    172.254.1.0/24       0xc0000 ")
+		Expect(err).To(HaveOccurred())
+
+		_, err = nftables.DeserializeRule("bogus")
+		Expect(err).To(HaveOccurred())
 	})
 })
 
@@ -155,7 +168,7 @@ var _ = Describe("Interface", func() {
 		}
 	}
 
-	Specify("Creating and deleting a chain", func() {
+	Specify("Creating and deleting a chain should succeed", func() {
 		err := pf.CreateChainIfNotExists(packetfilter.TableTypeNAT, &packetfilter.Chain{
 			Name: chainName,
 		})
@@ -186,7 +199,7 @@ var _ = Describe("Interface", func() {
 		Expect(err).To(Succeed())
 	})
 
-	Specify("Creating and deleting an IP hook chain", func() {
+	Specify("Creating and deleting an IP hook chain should succeed", func() {
 		chainIPHook := &packetfilter.ChainIPHook{
 			Name:     chainName,
 			Type:     packetfilter.ChainTypeNAT,
@@ -220,7 +233,7 @@ var _ = Describe("Interface", func() {
 		Expect(err).To(Succeed())
 	})
 
-	Specify("Adding and deleting rules", func() {
+	Specify("Adding and deleting rules should succeed", func() {
 		err := pf.CreateChainIfNotExists(packetfilter.TableTypeNAT, &packetfilter.Chain{
 			Name: chainName,
 		})
@@ -314,7 +327,7 @@ var _ = Describe("Interface", func() {
 		assertRules()
 	})
 
-	Specify("Creating and deleting sets", func() {
+	Specify("Creating and deleting sets should succeed", func() {
 		set := pf.NewNamedSet(setInfo)
 
 		err := set.Create(true)
@@ -343,7 +356,7 @@ var _ = Describe("Interface", func() {
 		assertSets()
 	})
 
-	Specify("Adding and deleting entries from a set", func() {
+	Specify("Adding and deleting entries from a set should succeed", func() {
 		set := pf.NewNamedSet(setInfo)
 
 		err := set.Create(true)
@@ -365,16 +378,34 @@ var _ = Describe("Interface", func() {
 		Expect(err).To(Succeed())
 		assertEntries(set)
 	})
+
+	Specify("appending a rule with a non-existent set should fail", func() {
+		err := pf.CreateChainIfNotExists(packetfilter.TableTypeNAT, &packetfilter.Chain{
+			Name: chainName,
+		})
+		Expect(err).To(Succeed())
+
+		err = pf.Append(packetfilter.TableTypeNAT, chainName, &packetfilter.Rule{
+			SrcSetName:   "src-set",
+			DestSetName:  "dest-set",
+			MssValue:     "123",
+			OutInterface: "out",
+			InInterface:  "in",
+			SnatCIDR:     "1.2.3.4",
+			MarkValue:    "mark",
+			Action:       packetfilter.RuleActionMss,
+			ClampType:    packetfilter.ToValue,
+		})
+		Expect(err).To(HaveOccurred())
+	})
 })
 
 func testRuleConversion(rule *packetfilter.Rule) {
-	spec := nftables.ToRuleSpec(rule)
-	parsed := nftables.FromRuleSpec(spec)
+	serialized := nftables.SerializeRule(rule)
+	Expect(len(serialized)).To(BeNumerically("<=", 128))
 
-	// in nftables syntax protoAll represented by empty string
-	if rule.Proto == packetfilter.RuleProtoAll {
-		rule.Proto = packetfilter.RuleProtoUndefined
-	}
+	parsed, err := nftables.DeserializeRule(serialized)
+	Expect(err).ToNot(HaveOccurred())
 
 	Expect(parsed).To(Equal(rule))
 }
