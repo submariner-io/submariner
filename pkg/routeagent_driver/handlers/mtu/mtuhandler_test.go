@@ -42,12 +42,12 @@ var _ = Describe("MTUHandler", func() {
 		t.pFilter.AwaitSet(Equal(constants.RemoteCIDRIPSet))
 
 		t.pFilter.AwaitRule(t.tableType,
-			constants.SmPostRoutingChain, And(
+			constants.SmPostRoutingMssChain, And(
 				ContainSubstring("\"ClampType\":%d", packetfilter.ToPMTU),
 				ContainSubstring("\"SrcSetName\":%q", constants.RemoteCIDRIPSet),
 				ContainSubstring("\"DestSetName\":%q", constants.LocalCIDRIPSet)))
 		t.pFilter.AwaitRule(t.tableType,
-			constants.SmPostRoutingChain, And(
+			constants.SmPostRoutingMssChain, And(
 				ContainSubstring("\"ClampType\":%d", packetfilter.ToPMTU),
 				ContainSubstring("\"SrcSetName\":%q", constants.LocalCIDRIPSet),
 				ContainSubstring("\"DestSetName\":%q", constants.RemoteCIDRIPSet)))
@@ -119,7 +119,7 @@ var _ = Describe("MTUHandler", func() {
 
 		t.pFilter.AwaitSetDeleted(constants.LocalCIDRIPSet)
 		t.pFilter.AwaitSetDeleted(constants.RemoteCIDRIPSet)
-		t.pFilter.AwaitNoIPHookChain(packetfilter.ChainTypeRoute, Equal(constants.SmPostRoutingChain))
+		t.pFilter.AwaitNoIPHookChain(packetfilter.ChainTypeRoute, Equal(constants.SmPostRoutingMssChain))
 	})
 })
 
@@ -152,19 +152,19 @@ func newTestDriver() *testDriver {
 func (t *testDriver) testForcedMSS(expTCPMssValue int) {
 	t.pFilter.AwaitSet(Equal(constants.LocalCIDRIPSet))
 	t.pFilter.AwaitSet(Equal(constants.RemoteCIDRIPSet))
-	t.pFilter.EnsureNoRule(t.tableType, constants.SmPostRoutingChain,
+	t.pFilter.EnsureNoRule(t.tableType, constants.SmPostRoutingMssChain,
 		ContainSubstring("\"ClampType\":%d", packetfilter.ToPMTU))
 
 	Expect(t.handler.LocalEndpointCreated(newSubmEndpoint([]string{"172.1.0.0/24"}))).To(Succeed())
 
 	t.pFilter.AwaitRule(t.tableType,
-		constants.SmPostRoutingChain, And(
+		constants.SmPostRoutingMssChain, And(
 			ContainSubstring("\"ClampType\":%d", packetfilter.ToValue),
 			ContainSubstring("\"SrcSetName\":%q", constants.RemoteCIDRIPSet),
 			ContainSubstring("\"DestSetName\":%q", constants.LocalCIDRIPSet),
 			ContainSubstring("\"MssValue\":%q", strconv.Itoa(expTCPMssValue))))
 	t.pFilter.AwaitRule(t.tableType,
-		constants.SmPostRoutingChain, And(
+		constants.SmPostRoutingMssChain, And(
 			ContainSubstring("\"ClampType\":%d", packetfilter.ToValue),
 			ContainSubstring("\"SrcSetName\":%q", constants.LocalCIDRIPSet),
 			ContainSubstring("\"DestSetName\":%q", constants.RemoteCIDRIPSet),
