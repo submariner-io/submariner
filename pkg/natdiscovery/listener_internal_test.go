@@ -21,20 +21,25 @@ package natdiscovery
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	k8snet "k8s.io/utils/net"
 )
 
-var _ = Describe("natDiscovery listener", func() {
+var _ = Describe("Listener", func() {
 	When("the server connection is closed", func() {
 		It("should exit the listen loop", func() {
-			serverConnection, err := createServerConnection(12345)
-			Expect(err).NotTo(HaveOccurred())
 			nd := &natDiscovery{}
 			ended := make(chan struct{}, 1)
+
+			serverConnection, err := createServerConnection(12345, k8snet.IPv4)
+			Expect(err).NotTo(HaveOccurred())
+
 			go func() {
 				nd.listenerLoop(serverConnection)
 				close(ended)
 			}()
+
 			Consistently(ended).ShouldNot(BeClosed())
+
 			serverConnection.Close()
 			Eventually(ended).Should(BeClosed())
 		})

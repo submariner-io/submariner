@@ -29,13 +29,14 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/format"
 	fakeDynClient "github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/ipam"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/resource"
+	"github.com/submariner-io/admiral/pkg/slices"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	testutil "github.com/submariner-io/admiral/pkg/test"
+	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
@@ -50,7 +51,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -354,14 +354,17 @@ func getGlobalEgressIPStatus(client dynamic.ResourceInterface, name string) *sub
 func (t *testDriverBase) awaitEgressIPStatus(client dynamic.ResourceInterface, name string, expNumIPS int, expCond ...metav1.Condition) {
 	t.awaitStatusConditions(client, name, expCond...)
 
-	status := getGlobalEgressIPStatus(client, name)
+	var status *submarinerv1.GlobalEgressIPStatus
 
-	Expect(status.AllocatedIPs).To(HaveLen(expNumIPS))
+	Eventually(func(g Gomega) {
+		status = getGlobalEgressIPStatus(client, name)
+		g.Expect(status.AllocatedIPs).To(HaveLen(expNumIPS))
 
-	for _, ip := range status.AllocatedIPs {
-		Expect(isValidIPForCIDR(t.globalCIDR, ip)).To(BeTrue(), "Allocated global IP %q is not valid for CIDR %q",
-			ip, t.globalCIDR)
-	}
+		for _, ip := range status.AllocatedIPs {
+			g.Expect(isValidIPForCIDR(t.globalCIDR, ip)).To(BeTrue(), "Allocated global IP %q is not valid for CIDR %q",
+				ip, t.globalCIDR)
+		}
+	}).Should(Succeed())
 
 	t.verifyIPsReservedInPool(status.AllocatedIPs...)
 }
@@ -504,98 +507,57 @@ func (t *testDriverBase) awaitStatusConditions(client dynamic.ResourceInterface,
 		return
 	}
 
-	expType := expCond[0].Type
 	obj := test.AwaitResource(client, name)
 
 	mapping, err := t.restMapper.RESTMapping(obj.GetObjectKind().GroupVersionKind().GroupKind(),
 		obj.GetObjectKind().GroupVersionKind().Version)
 	Expect(err).To(Succeed())
 
-	var conditions []metav1.Condition
+	Eventually(func(g Gomega) {
+		var actualConditions []metav1.Condition
 
-	err = wait.PollUntilContextTimeout(context.Background(), 50*time.Millisecond, 5*time.Second, true,
-		func(_ context.Context) (bool, error) {
-			conditions = nil
-
-			actions := t.dynClient.Fake.Actions()
-			for i := range actions {
-				if actions[i].GetResource().Resource != mapping.Resource.Resource || actions[i].GetVerb() != "update" {
-					continue
-				}
-
-				update := actions[i].(k8stesting.UpdateAction)
-				objMeta := resource.MustToMeta(update.GetObject())
-
-				if objMeta.GetName() != name {
-					continue
-				}
-
-				conditions = append(conditions, extractConditions(update.GetObject().(*unstructured.Unstructured), expType)...)
+		actions := t.dynClient.Fake.Actions()
+		for i := range actions {
+			if actions[i].GetResource().Resource != mapping.Resource.Resource || actions[i].GetVerb() != "update" {
+				continue
 			}
 
-			if len(conditions) != len(expCond) {
-				return false, nil
+			update := actions[i].(k8stesting.UpdateAction)
+			objMeta := resource.MustToMeta(update.GetObject())
+
+			if objMeta.GetName() != name {
+				continue
 			}
 
-			return true, nil
-		})
-
-	if wait.Interrupted(err) {
-		if conditions == nil {
-			Fail("Status conditions not found")
+			conditions := util.ConditionsFromUnstructured(update.GetObject().(*unstructured.Unstructured), "status", "conditions")
+			for j := range conditions {
+				actualConditions, _ = slices.AppendIfNotPresent(actualConditions, conditions[j], func(c metav1.Condition) string {
+					return resource.ToJSON(c)
+				})
+			}
 		}
 
-		Fail(format.Message(conditions, "condition history to contain", expCond))
+		for i := range expCond {
+			index := slices.IndexOf(actualConditions, expCond[i].Type, func(c metav1.Condition) string {
+				return c.Type
+			})
 
-		return
-	}
+			g.Expect(index).To(BeNumerically(">=", 0), "Missing condition %s", resource.ToJSON(expCond[i]))
 
-	Expect(err).To(Succeed())
+			actual := actualConditions[index]
+			actualConditions = actualConditions[index+1:]
 
-	for i := range expCond {
-		verifyCondition(&conditions[i], &expCond[i])
-	}
+			g.Expect(actual.Status).To(Equal(expCond[i].Status), "Status for condition %q", expCond[i].Type)
+			g.Expect(actual.LastTransitionTime).To(Not(BeNil()), "LastTransitionTime is nil for condition %q", expCond[i].Type)
+			g.Expect(actual.Message).To(Not(BeEmpty()), "Message is empty for condition %q", expCond[i].Type)
 
-	actual := extractConditions(test.AwaitResource(client, name), expType)
-	Expect(actual).To(HaveLen(1))
-
-	verifyCondition(&actual[0], &expCond[len(expCond)-1])
-}
-
-func verifyCondition(actual, exp *metav1.Condition) {
-	Expect(actual.Type).To(Equal(exp.Type))
-	Expect(actual.Status).To(Equal(exp.Status))
-	Expect(actual.LastTransitionTime).To(Not(BeNil()))
-	Expect(actual.Message).To(Not(BeEmpty()))
-
-	if exp.Reason != "" {
-		Expect(actual.Reason).To(Equal(exp.Reason))
-	} else {
-		Expect(actual.Reason).To(Not(BeEmpty()))
-	}
-}
-
-func extractConditions(from *unstructured.Unstructured, ofType string) []metav1.Condition {
-	conditions := []metav1.Condition{}
-
-	slice, ok, err := unstructured.NestedSlice(from.Object, "status", "conditions")
-	Expect(err).To(Succeed())
-
-	if !ok {
-		return conditions
-	}
-
-	for i := range slice {
-		c := &metav1.Condition{}
-		err = runtime.DefaultUnstructuredConverter.FromUnstructured(slice[i].(map[string]interface{}), c)
-		Expect(err).To(Succeed())
-
-		if c.Type == ofType {
-			conditions = append(conditions, *c)
+			if expCond[i].Reason != "" {
+				g.Expect(actual.Reason).To(Equal(expCond[i].Reason), "Reason for condition %q", expCond[i].Type)
+			} else {
+				g.Expect(actual.Reason).To(Not(BeEmpty()), "Reason is empty for condition %q", expCond[i].Type)
+			}
 		}
-	}
-
-	return conditions
+	}).Should(Succeed())
 }
 
 //nolint:unparam // `name` always receives `globalEgressIPName` (`"east-region")

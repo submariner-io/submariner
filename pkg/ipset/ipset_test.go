@@ -218,11 +218,11 @@ var _ = Describe("AddEntry", func() {
 
 	var entry *ipset.Entry
 
-	testSuccess := func(args func() []string) {
+	testSuccess := func(args func() []any) {
 		It("should invoke the correct command", func() {
 			err := t.ipSet.AddEntry(entry, testSet, false)
 			Expect(err).To(Succeed())
-			t.cmdExecutor.AwaitCommand(IPSetPathMatcher, append([]string{"add", testSet}, args()...)...)
+			t.cmdExecutor.AwaitCommand(IPSetPathMatcher, append([]any{"add", testSet}, args()...)...)
 		})
 	}
 
@@ -236,8 +236,8 @@ var _ = Describe("AddEntry", func() {
 			}
 		})
 
-		testSuccess(func() []string {
-			return []string{entry.IP + "," + string(entry.Protocol) + ":123"}
+		testSuccess(func() []any {
+			return []any{entry.IP + "," + string(entry.Protocol) + ":123"}
 		})
 	})
 
@@ -252,8 +252,8 @@ var _ = Describe("AddEntry", func() {
 			}
 		})
 
-		testSuccess(func() []string {
-			return []string{entry.IP + "," + string(entry.Protocol) + ":123," + entry.IP2}
+		testSuccess(func() []any {
+			return []any{entry.IP + "," + string(entry.Protocol) + ":123," + entry.IP2}
 		})
 	})
 
@@ -265,8 +265,8 @@ var _ = Describe("AddEntry", func() {
 			}
 		})
 
-		testSuccess(func() []string {
-			return []string{entry.Net}
+		testSuccess(func() []any {
+			return []any{entry.Net}
 		})
 	})
 
@@ -280,8 +280,8 @@ var _ = Describe("AddEntry", func() {
 			}
 		})
 
-		testSuccess(func() []string {
-			return []string{entry.Net + "," + string(entry.Protocol) + ":123"}
+		testSuccess(func() []any {
+			return []any{entry.Net + "," + string(entry.Protocol) + ":123"}
 		})
 	})
 
@@ -296,8 +296,8 @@ var _ = Describe("AddEntry", func() {
 			}
 		})
 
-		testSuccess(func() []string {
-			return []string{entry.IP + "," + string(entry.Protocol) + ":123," + entry.Net}
+		testSuccess(func() []any {
+			return []any{entry.IP + "," + string(entry.Protocol) + ":123," + entry.Net}
 		})
 	})
 
@@ -309,8 +309,8 @@ var _ = Describe("AddEntry", func() {
 			}
 		})
 
-		testSuccess(func() []string {
-			return []string{"123"}
+		testSuccess(func() []any {
+			return []any{"123"}
 		})
 	})
 

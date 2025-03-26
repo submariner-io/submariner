@@ -42,8 +42,9 @@ func (p *packetFilter) NewNamedSet(set *packetfilter.SetInfo) packetfilter.Named
 
 	return &namedSet{
 		set: knftables.Set{
-			Name: set.Name,
-			Type: setType,
+			Name:  set.Name,
+			Type:  setType,
+			Flags: []knftables.SetFlag{knftables.IntervalFlag},
 		},
 		nftables: p.nftables,
 	}

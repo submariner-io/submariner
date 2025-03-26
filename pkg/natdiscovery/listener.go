@@ -30,15 +30,30 @@ import (
 	k8snet "k8s.io/utils/net"
 )
 
+type ServerConnection interface {
+	Close() error
+	ReadFromUDP(b []byte) (int, *net.UDPAddr, error)
+	WriteToUDP(b []byte, addr *net.UDPAddr) (int, error)
+}
+
+func (nd *natDiscovery) runListeners(stopCh <-chan struct{}) error {
+	for _, family := range nd.LocalEndpoint.Spec().GetIPFamilies() {
+		if err := nd.runListener(family, stopCh); err != nil {
+			return err
+		}
+
+		logger.Infof("NAT discovery started listener for IPv%v", family)
+	}
+
+	return nil
+}
+
 func (nd *natDiscovery) runListener(family k8snet.IPFamily, stopCh <-chan struct{}) error {
 	var errs []error
 
 	if family == k8snet.IPv4 {
 		err := nd.runListenerV4(stopCh)
-		if err != nil {
-			logger.Errorf(err, "Error running IPv%v listener", family)
-			errs = append(errs, err)
-		}
+		errs = append(errs, err)
 	}
 
 	// TODO_IPV6: add V6 runListener for V6
@@ -51,7 +66,7 @@ func (nd *natDiscovery) runListenerV4(stopCh <-chan struct{}) error {
 		return nil
 	}
 
-	serverConnection, err := createServerConnection(nd.serverPort)
+	serverConnection, err := nd.CreateServerConnection(nd.serverPort, k8snet.IPv4)
 	if err != nil {
 		return err
 	}
@@ -71,13 +86,15 @@ func (nd *natDiscovery) runListenerV4(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func createServerConnection(port int32) (*net.UDPConn, error) {
-	serverAddress, err := net.ResolveUDPAddr("udp4", ":"+strconv.Itoa(int(port)))
+func createServerConnection(port int32, _ k8snet.IPFamily) (ServerConnection, error) {
+	network := "udp4"
+
+	serverAddress, err := net.ResolveUDPAddr(network, ":"+strconv.Itoa(int(port)))
 	if err != nil {
 		return nil, errors.Wrap(err, "Error resolving UDP address")
 	}
 
-	serverConnection, err := net.ListenUDP("udp4", serverAddress)
+	serverConnection, err := net.ListenUDP(network, serverAddress)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Error listening on udp port %d", port)
 	}
@@ -85,7 +102,7 @@ func createServerConnection(port int32) (*net.UDPConn, error) {
 	return serverConnection, nil
 }
 
-func (nd *natDiscovery) listenerLoop(serverConnection *net.UDPConn) {
+func (nd *natDiscovery) listenerLoop(serverConnection ServerConnection) {
 	buf := make([]byte, 2048)
 
 	for {
@@ -103,15 +120,17 @@ func (nd *natDiscovery) listenerLoop(serverConnection *net.UDPConn) {
 
 func (nd *natDiscovery) parseAndHandleMessageFromAddress(buf []byte, addr *net.UDPAddr) error {
 	msg := natproto.SubmarinerNATDiscoveryMessage{}
-	if err := proto.Unmarshal(buf, &msg); err != nil {
-		return errors.Wrapf(err, "Error unmarshaling message received on UDP port %d", natproto.DefaultPort)
+	err := errors.Wrapf(proto.Unmarshal(buf, &msg), "Error unmarshaling message received on UDP port %d", natproto.DefaultPort)
+
+	if err == nil {
+		if request := msg.GetRequest(); request != nil {
+			err = nd.handleRequestFromAddress(request, addr)
+		} else if response := msg.GetResponse(); response != nil {
+			err = nd.handleResponseFromAddress(response, addr)
+		} else {
+			err = errors.New("message without response or request received")
+		}
 	}
 
-	if request := msg.GetRequest(); request != nil {
-		return nd.handleRequestFromAddress(request, addr)
-	} else if response := msg.GetResponse(); response != nil {
-		return nd.handleResponseFromAddress(response, addr)
-	}
-
-	return errors.Errorf("Message without response or request received from %#v", addr)
+	return err
 }

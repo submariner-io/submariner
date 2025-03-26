@@ -29,7 +29,7 @@ import (
 )
 
 func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscoveryRequest, addr *net.UDPAddr) error {
-	localEndpointSpec := nd.localEndpoint.Spec()
+	localEndpointSpec := nd.LocalEndpoint.Spec()
 
 	family := k8snet.IPv4
 	if addr.IP.To4() == nil {

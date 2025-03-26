@@ -66,6 +66,10 @@ func New(allowedFamilies ...k8snet.IPFamily) *PacketFilter {
 	return pf
 }
 
+func (i *PacketFilter) GetMSSClampTypes() (packetfilter.TableType, packetfilter.ChainType) {
+	return packetfilter.TableTypeRoute, packetfilter.ChainTypeRoute
+}
+
 func (i *PacketFilter) ChainExists(table packetfilter.TableType, chain string) (bool, error) {
 	return i.chainExists(uint32(table), chain)
 }

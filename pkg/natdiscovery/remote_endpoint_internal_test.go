@@ -28,12 +28,25 @@ import (
 )
 
 var _ = Describe("remoteEndpointNAT", func() {
-	var rnat *remoteEndpointNAT
-	var remoteEndpoint submarinerv1.Endpoint
+	var (
+		rnat           *remoteEndpointNAT
+		remoteEndpoint *submarinerv1.Endpoint
+	)
 
 	BeforeEach(func() {
-		remoteEndpoint = createTestRemoteEndpoint()
-		rnat = newRemoteEndpointNAT(&remoteEndpoint, k8snet.IPv4)
+		remoteEndpoint = &submarinerv1.Endpoint{
+			Spec: submarinerv1.EndpointSpec{
+				CableName:     "cable-east",
+				ClusterID:     "east",
+				PublicIPs:     []string{"10.3.3.3"},
+				PrivateIPs:    []string{"1.2.3.4"},
+				Subnets:       []string{"11.0.0.0/16"},
+				NATEnabled:    true,
+				BackendConfig: map[string]string{},
+			},
+		}
+
+		rnat = newRemoteEndpointNAT(remoteEndpoint, k8snet.IPv4)
 	})
 
 	When("first created", func() {
@@ -52,18 +65,18 @@ var _ = Describe("remoteEndpointNAT", func() {
 	Context("with the total timeout elapsed", func() {
 		When("not targeting a load balancer", func() {
 			It("should report as timed out only for the normal timeout", func() {
-				rnat.started = time.Now().Add(-toDuration(&totalTimeoutLoadBalancer))
+				rnat.started = time.Now().Add(-ToDuration(&TotalTimeoutLoadBalancer))
 				Expect(rnat.hasTimedOut()).To(BeFalse())
 
-				rnat.started = time.Now().Add(-toDuration(&totalTimeout))
+				rnat.started = time.Now().Add(-ToDuration(&TotalTimeout))
 				Expect(rnat.hasTimedOut()).To(BeTrue())
 			})
 		})
 		When("targeting a load balancer", func() {
 			It("should report as timed out earlier", func() {
 				remoteEndpoint.Spec.BackendConfig[submarinerv1.UsingLoadBalancer] = "true"
-				rnat = newRemoteEndpointNAT(&remoteEndpoint, k8snet.IPv4)
-				rnat.started = time.Now().Add(-toDuration(&totalTimeoutLoadBalancer))
+				rnat = newRemoteEndpointNAT(remoteEndpoint, k8snet.IPv4)
+				rnat.started = time.Now().Add(-ToDuration(&TotalTimeoutLoadBalancer))
 				Expect(rnat.hasTimedOut()).To(BeTrue())
 			})
 		})
@@ -89,7 +102,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 		Context("and targeting a load balancer", func() {
 			It("should select the public IP and NAT", func() {
 				remoteEndpoint.Spec.BackendConfig[submarinerv1.UsingLoadBalancer] = "true"
-				rnat = newRemoteEndpointNAT(&remoteEndpoint, k8snet.IPv4)
+				rnat = newRemoteEndpointNAT(remoteEndpoint, k8snet.IPv4)
 				rnat.endpoint.Spec.NATEnabled = false
 				rnat.useLegacyNATSettings()
 				Expect(rnat.state).To(Equal(selectedPublicIP))
@@ -102,7 +115,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 	When("the public IP is selected but no check was sent", func() {
 		It("it should not transition the state", func() {
 			oldState := rnat.state
-			Expect(rnat.transitionToPublicIP(testRemoteEndpointNameAndFamily, false)).To(BeFalse())
+			Expect(rnat.transitionToPublicIP(remoteEndpoint.Spec.GetFamilyCableName(k8snet.IPv4), false)).To(BeFalse())
 			Expect(rnat.state).To(Equal(oldState))
 			Expect(rnat.useIP).To(Equal(""))
 		})
@@ -111,7 +124,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 	When("the private IP is selected but no check was sent", func() {
 		It("it should not transition the state", func() {
 			oldState := rnat.state
-			Expect(rnat.transitionToPrivateIP(testRemoteEndpointNameAndFamily, false)).To(BeFalse())
+			Expect(rnat.transitionToPrivateIP(remoteEndpoint.Spec.GetFamilyCableName(k8snet.IPv4), false)).To(BeFalse())
 			Expect(rnat.state).To(Equal(oldState))
 			Expect(rnat.useIP).To(Equal(""))
 		})
@@ -123,7 +136,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 
 		JustBeforeEach(func() {
 			rnat.checkSent()
-			Expect(rnat.transitionToPrivateIP(testRemoteEndpointNameAndFamily, useNAT)).To(BeTrue())
+			Expect(rnat.transitionToPrivateIP(remoteEndpoint.Spec.GetFamilyCableName(k8snet.IPv4), useNAT)).To(BeTrue())
 			Expect(rnat.state).To(Equal(selectedPrivateIP))
 		})
 
@@ -158,7 +171,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 
 		JustBeforeEach(func() {
 			rnat.checkSent()
-			Expect(rnat.transitionToPublicIP(testRemoteEndpointNameAndFamily, useNAT)).To(BeTrue())
+			Expect(rnat.transitionToPublicIP(remoteEndpoint.Spec.GetFamilyCableName(k8snet.IPv4), useNAT)).To(BeTrue())
 			Expect(rnat.state).To(Equal(selectedPublicIP))
 		})
 
@@ -191,8 +204,8 @@ var _ = Describe("remoteEndpointNAT", func() {
 		Context("and the grace period has not elapsed", func() {
 			It("should use the private IP", func() {
 				rnat.checkSent()
-				Expect(rnat.transitionToPublicIP(testRemoteEndpointNameAndFamily, true)).To(BeTrue())
-				Expect(rnat.transitionToPrivateIP(testRemoteEndpointNameAndFamily, false)).To(BeTrue())
+				Expect(rnat.transitionToPublicIP(remoteEndpoint.Spec.GetFamilyCableName(k8snet.IPv4), true)).To(BeTrue())
+				Expect(rnat.transitionToPrivateIP(remoteEndpoint.Spec.GetFamilyCableName(k8snet.IPv4), false)).To(BeTrue())
 				Expect(rnat.state).To(Equal(selectedPrivateIP))
 				Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.GetPrivateIP(k8snet.IPv4)))
 				Expect(rnat.useNAT).To(BeFalse())
@@ -202,9 +215,9 @@ var _ = Describe("remoteEndpointNAT", func() {
 		Context("and the grace period has elapsed", func() {
 			It("should still use the public IP", func() {
 				rnat.checkSent()
-				Expect(rnat.transitionToPublicIP(testRemoteEndpointNameAndFamily, true)).To(BeTrue())
-				rnat.lastTransition = rnat.lastTransition.Add(-time.Duration(publicToPrivateFailoverTimeout))
-				Expect(rnat.transitionToPrivateIP(testRemoteEndpointNameAndFamily, false)).To(BeFalse())
+				Expect(rnat.transitionToPublicIP(remoteEndpoint.Spec.GetFamilyCableName(k8snet.IPv4), true)).To(BeTrue())
+				rnat.lastTransition = rnat.lastTransition.Add(-time.Duration(PublicToPrivateFailoverTimeout))
+				Expect(rnat.transitionToPrivateIP(remoteEndpoint.Spec.GetFamilyCableName(k8snet.IPv4), false)).To(BeFalse())
 				Expect(rnat.state).To(Equal(selectedPublicIP))
 				Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.GetPublicIP(k8snet.IPv4)))
 				Expect(rnat.useNAT).To(BeTrue())

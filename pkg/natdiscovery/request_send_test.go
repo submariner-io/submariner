@@ -16,9 +16,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package natdiscovery
+package natdiscovery_test
 
 import (
+	"net"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -28,10 +30,9 @@ import (
 
 var _ = When("a request is sent", func() {
 	var (
-		request        *natproto.SubmarinerNATDiscoveryRequest
-		remoteEndpoint submarinerv1.Endpoint
-		udpSent        chan []byte
-		ndInstance     *natDiscovery
+		request          *natproto.SubmarinerNATDiscoveryRequest
+		remoteEndpoint   submarinerv1.Endpoint
+		serverConnection *FakeServerConnection
 	)
 
 	localEndpoint := createTestLocalEndpoint()
@@ -43,13 +44,17 @@ var _ = When("a request is sent", func() {
 	})
 
 	JustBeforeEach(func() {
-		ndInstance, udpSent, _ = createTestListener(&localEndpoint)
-		ndInstance.findSrcIP = func(_ string, _ k8snet.IPFamily) string { return testLocalPrivateIP }
+		nd := newNATDiscovery(&localEndpoint, &net.UDPAddr{
+			IP:   net.ParseIP(testLocalPrivateIP),
+			Port: int(testLocalNATPort),
+		})
 
-		err := ndInstance.sendCheckRequest(newRemoteEndpointNAT(&remoteEndpoint, k8snet.IPv4))
-		Expect(err).NotTo(HaveOccurred())
+		nd.instance.AddEndpoint(&remoteEndpoint, k8snet.IPv4)
+		nd.checkDiscovery()
 
-		request = parseProtocolRequest(awaitChan(udpSent))
+		serverConnection = nd.ipv4Connection
+
+		request = parseProtocolRequest(serverConnection.awaitSent())
 	})
 
 	testRequest := func(srcIP string) {
@@ -78,7 +83,7 @@ var _ = When("a request is sent", func() {
 		})
 
 		It("should not send another request", func() {
-			Consistently(udpSent).ShouldNot(Receive())
+			Consistently(serverConnection.udpSentChannel).ShouldNot(Receive())
 		})
 	}
 
@@ -95,7 +100,7 @@ var _ = When("a request is sent", func() {
 			})
 
 			JustBeforeEach(func() {
-				request = parseProtocolRequest(awaitChan(udpSent))
+				request = parseProtocolRequest(serverConnection.awaitSent())
 			})
 
 			testRequest(testRemotePublicIP)

@@ -33,6 +33,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/metrics"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 var _ = Describe("ClusterGlobalEgressIP controller", func() {
@@ -208,7 +209,7 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 		})
 
 		JustBeforeEach(func() {
-			existing.Spec.NumberOfIPs = &numberOfIPs
+			existing.Spec.NumberOfIPs = ptr.To(numberOfIPs)
 			test.UpdateResource(t.clusterGlobalEgressIPs, existing)
 		})
 

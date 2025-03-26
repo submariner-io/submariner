@@ -42,7 +42,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -56,11 +55,10 @@ import (
 func NewGatewayMonitor(ctx context.Context, config *GatewayMonitorConfig) (Interface, error) {
 	// We'll panic if config is nil, this is intentional
 	gatewayMonitor := &gatewayMonitor{
-		baseController:          newBaseController(),
-		GatewayMonitorConfig:    *config,
-		shuttingDown:            atomic.Bool{},
-		remoteEndpointTimeStamp: map[string]metav1.Time{},
-		leaderElectionInfo:      atomic.Pointer[LeaderElectionInfo]{},
+		baseController:       newBaseController(),
+		GatewayMonitorConfig: *config,
+		shuttingDown:         atomic.Bool{},
+		leaderElectionInfo:   atomic.Pointer[LeaderElectionInfo]{},
 	}
 
 	// When transitioning to a non-gateway or shutting down, the GatewayMonitor cancels leader election which causes it to release the lock,
@@ -217,13 +215,6 @@ func (g *gatewayMonitor) TransitionToNonGateway() error {
 }
 
 func (g *gatewayMonitor) RemoteEndpointCreated(endpoint *v1.Endpoint) error {
-	lastProcessedTime, ok := g.remoteEndpointTimeStamp[endpoint.Spec.ClusterID]
-
-	if ok && lastProcessedTime.After(endpoint.CreationTimestamp.Time) {
-		logger.Infof("Ignoring new remote %#v since a later endpoint was already processed", endpoint)
-		return nil
-	}
-
 	logger.V(log.DEBUG).Infof("Endpoint %q, host: %q belongs to a remote cluster",
 		endpoint.Spec.ClusterID, endpoint.Spec.Hostname)
 
@@ -246,8 +237,6 @@ func (g *gatewayMonitor) RemoteEndpointCreated(endpoint *v1.Endpoint) error {
 
 	g.markRemoteClusterTraffic(AddRules, endpoint.Spec.Subnets...)
 
-	g.remoteEndpointTimeStamp[endpoint.Spec.ClusterID] = endpoint.CreationTimestamp
-
 	return nil
 }
 
@@ -256,15 +245,6 @@ func (g *gatewayMonitor) RemoteEndpointUpdated(endpoint *v1.Endpoint) error {
 }
 
 func (g *gatewayMonitor) RemoteEndpointRemoved(endpoint *v1.Endpoint) error {
-	lastProcessedTime, ok := g.remoteEndpointTimeStamp[endpoint.Spec.ClusterID]
-
-	if ok && lastProcessedTime.After(endpoint.CreationTimestamp.Time) {
-		logger.Infof("Ignoring deleted remote %#v since a later endpoint was already processed", endpoint)
-		return nil
-	}
-
-	delete(g.remoteEndpointTimeStamp, endpoint.Spec.ClusterID)
-
 	logger.V(log.DEBUG).Infof("Gateway monitor informed of removed endpoint: %v", endpoint)
 
 	// Endpoint associated with remote cluster is removed, delete the associated flows.

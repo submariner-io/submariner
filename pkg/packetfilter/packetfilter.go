@@ -214,6 +214,8 @@ func (c ChainPolicy) String() string {
 	return unknown
 }
 
+// Rule defines a packet filter rule.
+// NOTE: if this structure changes, the serialization in the nftables implementation may need to be updated as well.
 type Rule struct {
 	DestCIDR string
 	SrcCIDR  string
@@ -272,6 +274,10 @@ type NamedSet interface {
 }
 
 type Driver interface {
+	// MSS Clamp rules should be configured in different tables for iptables and nftables,
+	// TableTypeRoute for iptables and TableTypeFilter for nftables
+	GetMSSClampTypes() (TableType, ChainType)
+
 	// Chains
 	ChainExists(table TableType, chain string) (bool, error)
 	CreateIPHookChainIfNotExists(chain *ChainIPHook) error

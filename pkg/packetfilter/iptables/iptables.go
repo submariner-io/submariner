@@ -98,6 +98,10 @@ func New(family k8snet.IPFamily) (packetfilter.Driver, error) {
 	}, nil
 }
 
+func (p *packetFilter) GetMSSClampTypes() (packetfilter.TableType, packetfilter.ChainType) {
+	return packetfilter.TableTypeRoute, packetfilter.ChainTypeRoute
+}
+
 func (p *packetFilter) ChainExists(table packetfilter.TableType, chain string) (bool, error) {
 	ok, err := p.ipt.ChainExists(tableTypeToStr[table], chain)
 	return ok, errors.Wrapf(err, "error checking ChainExists for table %q, chain %q", tableTypeToStr[table], chain)
