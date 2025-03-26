@@ -21,7 +21,6 @@ package nftables
 import (
 	"context"
 	"slices"
-	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
@@ -74,12 +73,6 @@ var (
 
 	logger = log.Logger{Logger: logf.Log.WithName("NFTables")}
 )
-
-type RuleSpec []string
-
-func (r RuleSpec) String() string {
-	return strings.Join(r, " ")
-}
 
 type packetFilter struct {
 	nftables knftables.Interface
@@ -239,7 +232,7 @@ func (p *packetFilter) getNftablesRuleFromList(chain string, rule *packetfilter.
 	}
 
 	for _, existingRule := range existingRules {
-		if ToRuleSpec(rule).String() == ptr.Deref(existingRule.Comment, "") {
+		if SerializeRule(rule) == ptr.Deref(existingRule.Comment, "") {
 			return existingRule, true, nil
 		}
 	}
@@ -260,8 +253,12 @@ func (p *packetFilter) List(_ packetfilter.TableType, chain string) ([]*packetfi
 
 	for _, existingRule := range existingRules {
 		if ptr.Deref(existingRule.Comment, "") != "" {
-			ruleSpec := strings.Split(*existingRule.Comment, " ")
-			rules = append(rules, FromRuleSpec(ruleSpec))
+			rule, err := DeserializeRule(*existingRule.Comment)
+			if err != nil {
+				return nil, err
+			}
+
+			rules = append(rules, rule)
 		}
 	}
 
@@ -277,12 +274,12 @@ func (p *packetFilter) Append(_ packetfilter.TableType, chain string, rule *pack
 }
 
 func (p *packetFilter) insertRuleAtPosition(chain string, rule *packetfilter.Rule, pos int) error {
-	ruleSpec := ToRuleSpec(rule).String()
+	ruleSpec := toNftRuleSpec(rule)
 
 	knftRule := knftables.Rule{
 		Chain:   chain,
 		Rule:    ruleSpec,
-		Comment: ptr.To(ruleSpec),
+		Comment: ptr.To(SerializeRule(rule)),
 	}
 
 	tx := p.newTransactionWithTable()
@@ -301,260 +298,4 @@ func (p *packetFilter) insertRuleAtPosition(chain string, rule *packetfilter.Rul
 	err := p.nftables.Run(context.TODO(), tx)
 
 	return errors.Wrap(err, "error inserting rule")
-}
-
-func protoToRuleSpec(ruleSpec *RuleSpec, proto packetfilter.RuleProto, dPort string) {
-	switch proto {
-	case packetfilter.RuleProtoUDP:
-		*ruleSpec = append(*ruleSpec, "ip", "protocol", "udp")
-		if dPort != "" {
-			*ruleSpec = append(*ruleSpec, "udp", "dport", dPort)
-		}
-	case packetfilter.RuleProtoTCP:
-		*ruleSpec = append(*ruleSpec, "ip", "protocol", "tcp")
-		if dPort != "" {
-			*ruleSpec = append(*ruleSpec, "tcp", "dport", dPort)
-		}
-	case packetfilter.RuleProtoICMP:
-		*ruleSpec = append(*ruleSpec, "ip", "protocol", "icmp")
-	case packetfilter.RuleProtoAll:
-	case packetfilter.RuleProtoUndefined:
-	}
-}
-
-func mssClampToRuleSpec(ruleSpec *RuleSpec, clampType packetfilter.MssClampType, mssValue string) {
-	switch clampType {
-	case packetfilter.UndefinedMSS:
-	case packetfilter.ToPMTU:
-		*ruleSpec = append(*ruleSpec, "size", "set", "rt", "mtu")
-	case packetfilter.ToValue:
-		*ruleSpec = append(*ruleSpec, "size", "set", mssValue)
-	}
-}
-
-func setToRuleSpec(ruleSpec *RuleSpec, srcSetName, destSetName string) {
-	if srcSetName != "" {
-		*ruleSpec = append(*ruleSpec, "ip", "saddr", "@"+srcSetName)
-	}
-
-	if destSetName != "" {
-		*ruleSpec = append(*ruleSpec, "ip", "daddr", "@"+destSetName)
-	}
-}
-
-func ToRuleSpec(rule *packetfilter.Rule) RuleSpec {
-	var ruleSpec RuleSpec
-	protoToRuleSpec(&ruleSpec, rule.Proto, rule.DPort)
-
-	if rule.SrcCIDR != "" {
-		ruleSpec = append(ruleSpec, "ip", "saddr", rule.SrcCIDR)
-	}
-
-	if rule.DestCIDR != "" {
-		ruleSpec = append(ruleSpec, "ip", "daddr", rule.DestCIDR)
-	}
-
-	if rule.MarkValue != "" && rule.Action != packetfilter.RuleActionMark {
-		// syntax for MarkValue '0xc0000': meta mark & 0xc0000 == 0xc0000
-		ruleSpec = append(ruleSpec, "meta", "mark", "&", rule.MarkValue, "==", rule.MarkValue)
-	}
-
-	setToRuleSpec(&ruleSpec, rule.SrcSetName, rule.DestSetName)
-
-	if rule.OutInterface != "" {
-		ruleSpec = append(ruleSpec, "oifname", rule.OutInterface)
-	}
-
-	if rule.InInterface != "" {
-		ruleSpec = append(ruleSpec, "iifname", rule.InInterface)
-	}
-
-	if rule.Action == packetfilter.RuleActionMss {
-		ruleSpec = append(ruleSpec, "tcp", "flags", "syn / syn,rst")
-	}
-
-	ruleSpec = append(ruleSpec, "counter")
-	ruleSpec = append(ruleSpec, ruleActionToStr[rule.Action]...)
-
-	if rule.Action == packetfilter.RuleActionJump {
-		ruleSpec = append(ruleSpec, rule.TargetChain)
-	}
-
-	if rule.SnatCIDR != "" {
-		ruleSpec = append(ruleSpec, "to", rule.SnatCIDR)
-	}
-
-	if rule.DnatCIDR != "" {
-		ruleSpec = append(ruleSpec, "to", rule.DnatCIDR)
-	}
-
-	mssClampToRuleSpec(&ruleSpec, rule.ClampType, rule.MssValue)
-
-	if rule.MarkValue != "" && rule.Action == packetfilter.RuleActionMark {
-		// syntax for MarkValue '0xc0000': set mark | 0xc0000
-		ruleSpec = append(ruleSpec, "set", "mark", "|", rule.MarkValue)
-	}
-
-	logger.V(log.TRACE).Infof("ToRuleSpec: from %q to %q", rule, ruleSpec)
-
-	return ruleSpec
-}
-
-func FromRuleSpec(spec RuleSpec) *packetfilter.Rule {
-	rule := &packetfilter.Rule{}
-
-	length := len(spec)
-	i := 0
-
-	for i < length {
-		switch spec[i] {
-		case "ip":
-			i = parseIPMatch(spec, i, rule)
-		case "iifname":
-			rule.InInterface, i = parseNextTerm(spec, i, noopParse)
-		case "oifname":
-			rule.OutInterface, i = parseNextTerm(spec, i, noopParse)
-		case "dport":
-			rule.DPort, i = parseNextTerm(spec, i, noopParse)
-		case "counter":
-			rule.Action, i = parseAction(spec, i)
-			if rule.Action == packetfilter.RuleActionJump {
-				i++
-				rule.TargetChain = spec[i]
-			}
-		case "size":
-			i = parseTCPMssClamp(spec, i, rule)
-		case "to":
-			if rule.Action == packetfilter.RuleActionDNAT {
-				rule.DnatCIDR, i = parseNextTerm(spec, i, noopParse)
-			} else {
-				rule.SnatCIDR, i = parseNextTerm(spec, i, noopParse)
-			}
-		case "mark":
-			rule.MarkValue, i = parseMark(spec, i)
-		}
-
-		i++
-	}
-
-	if rule.Action == packetfilter.RuleActionMss {
-		rule.Proto = packetfilter.RuleProtoUndefined
-	}
-
-	return rule
-}
-
-func parseNextTerm[T any](spec []string, i int, parse func(s string) T) (T, int) {
-	if i+1 >= len(spec) {
-		return *new(T), i
-	}
-
-	i++
-
-	return parse(spec[i]), i
-}
-
-func parseTCPMssClamp(spec []string, i int, rule *packetfilter.Rule) int {
-	if i+1 >= len(spec) {
-		return i
-	}
-
-	i++
-
-	if spec[i] == "set" {
-		if i+2 < len(spec) && spec[i+1] == "rt" {
-			rule.ClampType = packetfilter.ToPMTU
-			i += 2
-		} else if i+1 < len(spec) {
-			rule.ClampType = packetfilter.ToValue
-			rule.MssValue = spec[i+1]
-			i++
-		}
-	}
-
-	return i
-}
-
-func parseIPMatch(spec []string, i int, rule *packetfilter.Rule) int {
-	if i+1 >= len(spec) {
-		return i
-	}
-
-	i++
-	switch spec[i] {
-	case "protocol":
-		if i+1 < len(spec) {
-			rule.Proto = parseProtocol(spec[i+1])
-		}
-	case "saddr":
-		rule.SrcCIDR, i = parseNextTerm(spec, i, noopParse)
-		if strings.HasPrefix(rule.SrcCIDR, "@") {
-			rule.SrcSetName = rule.SrcCIDR[1:]
-			rule.SrcCIDR = ""
-		}
-	case "daddr":
-		rule.DestCIDR, i = parseNextTerm(spec, i, noopParse)
-		if strings.HasPrefix(rule.DestCIDR, "@") {
-			rule.DestSetName = rule.DestCIDR[1:]
-			rule.DestCIDR = ""
-		}
-	}
-
-	return i
-}
-
-func parseMark(spec []string, i int) (string, int) {
-	i++
-	// mark | 0xc0000
-	if i+1 < len(spec) && spec[i] == "|" {
-		return spec[i+1], i + 1
-	}
-	// mark & 0xc0000 == 0xc0000
-	if i+3 < len(spec) && spec[i] == "&" {
-		return spec[i+1], i + 3
-	}
-
-	return "", i
-}
-
-func parseAction(spec []string, i int) (packetfilter.RuleAction, int) {
-	i++
-	if i >= len(spec) {
-		return packetfilter.RuleActionJump, i - 1
-	}
-
-	for a, str := range ruleActionToStr {
-		if len(str) == 1 && spec[i] == str[0] {
-			return a, i
-		}
-	}
-
-	if i+2 < len(spec) && spec[i] == "tcp" && spec[i+1] == "option" && spec[i+2] == "maxseg" {
-		return packetfilter.RuleActionMss, i + 2
-	}
-
-	if i+2 < len(spec) && spec[i] == "meta" && spec[i+1] == "mark" && spec[i+2] == "set" {
-		return packetfilter.RuleActionMark, i + 2
-	}
-
-	return packetfilter.RuleActionJump, i - 1
-}
-
-func parseProtocol(s string) packetfilter.RuleProto {
-	switch s {
-	case "udp":
-		return packetfilter.RuleProtoUDP
-	case "tcp":
-		return packetfilter.RuleProtoTCP
-	case "icmp":
-		return packetfilter.RuleProtoICMP
-	case "all":
-		return packetfilter.RuleProtoAll
-	default:
-		return packetfilter.RuleProtoUndefined
-	}
-}
-
-func noopParse(s string) string {
-	return s
 }

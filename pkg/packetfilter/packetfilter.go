@@ -214,6 +214,8 @@ func (c ChainPolicy) String() string {
 	return unknown
 }
 
+// Rule defines a packet filter rule.
+// NOTE: if this structure changes, the serialization in the nftables implementation may need to be updated as well.
 type Rule struct {
 	DestCIDR string
 	SrcCIDR  string
