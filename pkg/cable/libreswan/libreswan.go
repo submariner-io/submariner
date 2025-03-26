@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"regexp"
@@ -41,6 +42,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -64,6 +66,12 @@ var (
 	ipFamilyArgs = map[k8snet.IPFamily]string{
 		k8snet.IPv4: "--ipv4",
 		k8snet.IPv6: "--ipv6",
+	}
+
+	PlutoCtlSocketTimeout = time.Minute
+	RootDir               = ""
+	FatalError            = func(err error, msg string) {
+		logger.FatalOnError(err, msg)
 	}
 )
 
@@ -109,7 +117,7 @@ func NewLibreswan(localEndpoint *submendpoint.Local, _ *types.SubmarinerCluster)
 
 	port, err := strconv.ParseUint(ipSecSpec.NATTPort, 10, 16)
 	if err != nil {
-		return nil, errors.Wrap(err, "error parsing CR_IPSEC_NATTPORT environment variable")
+		return nil, errors.Wrap(err, "error parsing CE_IPSEC_NATTPORT environment variable")
 	}
 
 	defaultNATTPort := int32(port)
@@ -127,7 +135,7 @@ func NewLibreswan(localEndpoint *submendpoint.Local, _ *types.SubmarinerCluster)
 	encodedPsk := ipSecSpec.PSK
 
 	if ipSecSpec.PSKSecret != "" {
-		pskBytes, err := os.ReadFile(fmt.Sprintf("/var/run/secrets/submariner.io/%s/psk", ipSecSpec.PSKSecret))
+		pskBytes, err := os.ReadFile(RootDir + fmt.Sprintf("/var/run/secrets/submariner.io/%s/psk", ipSecSpec.PSKSecret))
 		if err != nil {
 			return nil, errors.Wrapf(err, "error reading secret %s", ipSecSpec.PSKSecret)
 		}
@@ -167,7 +175,7 @@ func (i *libreswan) GetName() string {
 func (i *libreswan) Init() error {
 	// Write the secrets file:
 	// %any %any : PSK "secret"
-	file, err := os.Create("/etc/ipsec.d/submariner.secrets")
+	file, err := os.Create(RootDir + "/etc/ipsec.d/submariner.secrets")
 	if err != nil {
 		return errors.Wrap(err, "error creating the secrets file")
 	}
@@ -184,7 +192,7 @@ func (i *libreswan) Init() error {
 // 006 #2: "submariner-cable-cluster3-172-17-0-8-v4-0-0"[1] 3.139.75.179, type=ESP, add_time=1617195756, inBytes=0, outBytes=0, \
 // id='@10.0.63.203-0-0'"
 // .
-var trafficStatusRE = regexp.MustCompile(`.* "([^"]+-v[46]-[0-1]-[0-1])"[^,]*, .*inBytes=(\d+), outBytes=(\d+).*`)
+var TrafficStatusRE = regexp.MustCompile(`.* "([^"]+-v[46]-[0-1]-[0-1])"[^,]*, .*inBytes=(\d+), outBytes=(\d+).*`)
 
 func retrieveActiveConnectionStats() (map[string]int, map[string]int, error) {
 	ctx, cancel := context.WithTimeout(context.TODO(), whackTimeout)
@@ -209,7 +217,7 @@ func retrieveActiveConnectionStats() (map[string]int, map[string]int, error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		matches := trafficStatusRE.FindStringSubmatch(line)
+		matches := TrafficStatusRE.FindStringSubmatch(line)
 		if matches != nil {
 			_, ok := activeConnectionsRx[matches[1]]
 			if !ok {
@@ -345,11 +353,7 @@ func whack(args ...string) error {
 		time.Sleep(1 * time.Second)
 	}
 
-	if err != nil {
-		return errors.Wrapf(err, "error whacking with args %v", args)
-	}
-
-	return nil
+	return errors.Wrapf(err, "error whacking with args %v", args)
 }
 
 // ConnectToEndpoint establishes a connection to the given endpoint and returns a string
@@ -358,7 +362,7 @@ func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 	if !i.plutoStarted {
 		// Ensure Pluto is started
 		if err := i.runPluto(); err != nil {
-			logger.FatalOnError(err, "Error running Pluto")
+			FatalError(err, "Error running Pluto")
 		}
 
 		i.plutoStarted = true
@@ -607,9 +611,9 @@ func (i *libreswan) runPluto() error {
 		args = append(args, "--stderrlog")
 	}
 
-	cmd := exec.Command("/usr/local/bin/pluto", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	execCmd := exec.Command("/usr/local/bin/pluto", args...)
+	execCmd.Stdout = os.Stdout
+	execCmd.Stderr = os.Stderr
 
 	var outputFile *os.File
 
@@ -619,24 +623,28 @@ func (i *libreswan) runPluto() error {
 			return errors.Wrapf(err, "failed to open log file %s", i.logFile)
 		}
 
-		cmd.Stdout = out
-		cmd.Stderr = out
+		execCmd.Stdout = out
+		execCmd.Stderr = out
 		outputFile = out
 	}
 
-	cmd.SysProcAttr = &syscall.SysProcAttr{
+	execCmd.SysProcAttr = &syscall.SysProcAttr{
 		Pdeathsig: syscall.SIGTERM,
 	}
 
+	cmd := command.New(execCmd)
 	if err := cmd.Start(); err != nil {
 		// Note - Close handles nil receiver.
 		outputFile.Close()
 		return errors.Wrapf(err, "error starting the Pluto process with args %v", args)
 	}
 
+	// Store FatalError locally to avoid a potential data race in the unit tests.
+	fatalError := FatalError
+
 	go func() {
 		defer outputFile.Close()
-		logger.Fatalf("Pluto exited: %v", cmd.Wait())
+		fatalError(cmd.Wait(), "Pluto exited")
 	}()
 
 	err := i.waitForControlSocket()
@@ -654,26 +662,21 @@ func (i *libreswan) runPluto() error {
 }
 
 func (i *libreswan) waitForControlSocket() error {
-	// Wait for upto a minute for the control socket to be created.
-	const maxAttempts = 600
-	const retryInterval = 100 * time.Millisecond
-	const controlSocketPath = "/run/pluto/pluto.ctl"
+	controlSocketPath := RootDir + "/run/pluto/pluto.ctl"
 
-	for range maxAttempts {
+	ctx, cancel := context.WithTimeout(context.TODO(), PlutoCtlSocketTimeout)
+	defer cancel()
+
+	err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(_ context.Context) (bool, error) {
 		_, err := os.Stat(controlSocketPath)
-		if err == nil {
-			return nil
+		if errors.Is(err, fs.ErrNotExist) {
+			return false, nil
 		}
 
-		if !os.IsNotExist(err) {
-			logger.Infof("Failed to stat the control socket: %v", err)
-			break
-		}
+		return err == nil, err //nolint:wrapcheck // No need to wrap
+	})
 
-		time.Sleep(retryInterval)
-	}
-
-	return fmt.Errorf("timed out waiting for the control socket at %s", controlSocketPath)
+	return errors.Wrapf(err, "timed out waiting for the control socket at %q", controlSocketPath)
 }
 
 func (i *libreswan) Cleanup() error {
