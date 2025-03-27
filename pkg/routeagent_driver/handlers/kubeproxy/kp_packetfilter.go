@@ -121,7 +121,7 @@ func (kp *SyncHandler) Init(_ context.Context) error {
 		logger.Infof("Waiting for CNI interface discovery: %s", err)
 		return true
 	}, func() error {
-		cniIface, err = cni.Discover(kp.localClusterCidr)
+		cniIface, err = cni.Discover(kp.localClusterCidr, k8snet.IPv4)
 		if err != nil {
 			return errors.Wrapf(err, "Error discovering the CNI interface")
 		}

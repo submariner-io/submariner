@@ -23,6 +23,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -31,55 +33,71 @@ type Interface struct {
 	IPAddress string
 }
 
-var logger = log.Logger{Logger: logf.Log.WithName("CNI")}
-
-// DiscoverFunc is a hook for unit tests.
-var DiscoverFunc func(clusterCIDRs []string) (*Interface, error)
-
-func Discover(clusterCIDRs []string) (*Interface, error) {
-	if DiscoverFunc != nil {
-		return DiscoverFunc(clusterCIDRs)
-	}
-
-	return discover(clusterCIDRs)
+type HostInterface struct {
+	Name string
+	Addr string
 }
 
-func discover(clusterCIDRs []string) (*Interface, error) {
+var logger = log.Logger{Logger: logf.Log.WithName("CNI")}
+
+var HostInterfaces = func() ([]HostInterface, error) {
+	netInterfaces, err := net.Interfaces()
+	if err != nil {
+		return nil, errors.Wrapf(err, "net.Interfaces() returned error")
+	}
+
+	var hostInterfaces []HostInterface
+
+	for i := range netInterfaces {
+		addrs, err := netInterfaces[i].Addrs()
+		if err != nil {
+			return nil, errors.Wrapf(err, "for interface %q, iface.Addrs returned error", netInterfaces[i].Name)
+		}
+
+		for _, a := range addrs {
+			hostInterfaces = append(hostInterfaces, HostInterface{Name: netInterfaces[i].Name, Addr: a.String()})
+		}
+	}
+
+	return hostInterfaces, nil
+}
+
+func Discover(clusterCIDRs []string, family k8snet.IPFamily) (*Interface, error) {
+	hostInterfaces, err := HostInterfaces()
+	if err != nil {
+		return nil, err
+	}
+
 	for _, clusterCIDR := range clusterCIDRs {
+		if k8snet.IPFamilyOfCIDRString(clusterCIDR) != family {
+			continue
+		}
+
 		_, clusterNetwork, err := net.ParseCIDR(clusterCIDR)
-		if err != nil {
-			return nil, errors.Wrapf(err, "unable to ParseCIDR %q", clusterCIDR)
-		}
+		utilruntime.Must(errors.Wrapf(err, "unable to ParseCIDR %q", clusterCIDR))
 
-		hostInterfaces, err := net.Interfaces()
-		if err != nil {
-			return nil, errors.Wrapf(err, "net.Interfaces() returned error")
-		}
-
-		for _, iface := range hostInterfaces {
-			addrs, err := iface.Addrs()
+		for i := range hostInterfaces {
+			ipAddr, _, err := net.ParseCIDR(hostInterfaces[i].Addr)
 			if err != nil {
-				return nil, errors.Wrapf(err, "for interface %q, iface.Addrs returned error", iface.Name)
+				logger.Errorf(err, "Unable to parse CIDR %q for host interface %q", hostInterfaces[i].Addr, hostInterfaces[i].Name)
+				continue
 			}
 
-			for i := range addrs {
-				ipAddr, _, err := net.ParseCIDR(addrs[i].String())
-				if err != nil {
-					logger.Errorf(err, "Unable to ParseCIDR : %q", addrs[i].String())
-				} else if ipAddr.To4() != nil {
-					logger.V(log.DEBUG).Infof("Interface %q has %q address", iface.Name, ipAddr)
-					address := net.ParseIP(ipAddr.String())
+			if k8snet.IPFamilyOf(ipAddr) != family {
+				continue
+			}
 
-					// Verify that interface has an address from cluster CIDR
-					if clusterNetwork.Contains(address) {
-						logger.V(log.DEBUG).Infof("Found CNI Interface %q that has IP %q from ClusterCIDR %q",
-							iface.Name, ipAddr, clusterCIDR)
-						return &Interface{IPAddress: ipAddr.String(), Name: iface.Name}, nil
-					}
-				}
+			logger.V(log.DEBUG).Infof("Host interface %q has address %q", hostInterfaces[i].Name, ipAddr)
+			address := net.ParseIP(ipAddr.String())
+
+			// Verify that interface has an address from cluster CIDR
+			if clusterNetwork.Contains(address) {
+				logger.V(log.DEBUG).Infof("Found CNI Interface %q that has IP %q from ClusterCIDR %q",
+					hostInterfaces[i].Name, ipAddr, clusterCIDR)
+				return &Interface{IPAddress: ipAddr.String(), Name: hostInterfaces[i].Name}, nil
 			}
 		}
 	}
 
-	return nil, errors.Errorf("unable to find CNI Interface on the host which has IP from %q", clusterCIDRs)
+	return nil, errors.Errorf("unable to find a CNI Interface which has an IP from the cluster CIDRs: %q", clusterCIDRs)
 }

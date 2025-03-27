@@ -42,7 +42,8 @@ import (
 )
 
 const (
-	localClusterCIDR = "169.254.1.0/24"
+	cniIPAddress     = "192.168.5.1"
+	localClusterCIDR = cniIPAddress + "/24"
 	localServiceCIDR = "169.254.2.0/24"
 	remoteSubnet1    = "170.250.1.0/24"
 	remoteSubnet2    = "171.250.1.0/24"
@@ -51,7 +52,6 @@ const (
 	remoteNodeName   = "remote-node"
 	nodeAddress1     = "10.253.10.2"
 	nodeAddress2     = "10.253.10.3"
-	cniIPAddress     = "192.168.5.1"
 )
 
 var _ = Describe("SyncHandler", func() {
@@ -383,11 +383,11 @@ func newTestDriver() *testDriver {
 		}
 		t.pFilter = fakePF.New()
 
-		cni.DiscoverFunc = func(_ []string) (*cni.Interface, error) {
-			return &cni.Interface{
-				Name:      "veth0",
-				IPAddress: cniIPAddress,
-			}, nil
+		cni.HostInterfaces = func() ([]cni.HostInterface, error) {
+			return []cni.HostInterface{{
+				Name: "veth0",
+				Addr: cniIPAddress + "/24",
+			}}, nil
 		}
 
 		t.localEndpoint = newLocalEndpoint(localNodeName1)
@@ -396,11 +396,6 @@ func newTestDriver() *testDriver {
 		t.handler = kubeproxy.NewSyncHandler([]string{localClusterCIDR}, []string{localServiceCIDR})
 
 		t.Start(t.handler)
-	})
-
-	AfterEach(func() {
-		netlinkAPI.NewFunc = nil
-		cni.DiscoverFunc = nil
 	})
 
 	return t

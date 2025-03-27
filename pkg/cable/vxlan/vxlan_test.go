@@ -161,7 +161,7 @@ func newTestDriver() *testDriver {
 			Spec: subv1.ClusterSpec{
 				ClusterID:   "local",
 				ServiceCIDR: []string{"10.0.0.0/16"},
-				ClusterCIDR: []string{"11.0.0.0/16"},
+				ClusterCIDR: []string{cniIPAddress + "/24"},
 			},
 		}
 
@@ -177,11 +177,11 @@ func newTestDriver() *testDriver {
 			return t.netLink
 		}
 
-		cni.DiscoverFunc = func(_ []string) (*cni.Interface, error) {
-			return &cni.Interface{
-				Name:      "veth0",
-				IPAddress: cniIPAddress,
-			}, nil
+		cni.HostInterfaces = func() ([]cni.HostInterface, error) {
+			return []cni.HostInterface{{
+				Name: "veth0",
+				Addr: cniIPAddress + "/24",
+			}}, nil
 		}
 	})
 

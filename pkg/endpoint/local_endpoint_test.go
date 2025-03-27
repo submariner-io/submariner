@@ -20,6 +20,7 @@ package endpoint_test
 
 import (
 	"context"
+	"errors"
 	"os"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -58,15 +59,16 @@ var _ = Describe("GetLocalSpec", func() {
 		testPublicIPLabel   = "public-ip"
 		testNATTPortLabel   = "natt-discovery-port"
 		backendConfigPrefix = "gateway.submariner.io/"
-		cniInterfaceIP      = "127.0.0.1"
+		cniInterfaceIPv4    = "127.0.0.1"
+		ipv4CIDR            = cniInterfaceIPv4 + "/16"
+		cniInterfaceIPv6    = "2001:0:0:1234::"
+		ipv6CIDR            = cniInterfaceIPv6 + "/64"
 	)
-
-	subnets := []string{"127.0.0.1/16"}
 
 	BeforeEach(func() {
 		submSpec = &types.SubmarinerSpecification{
 			ClusterID:   "east",
-			ClusterCidr: subnets,
+			ClusterCidr: []string{ipv4CIDR},
 			CableDriver: "backend",
 		}
 
@@ -83,11 +85,16 @@ var _ = Describe("GetLocalSpec", func() {
 		os.Setenv("NODE_NAME", testNodeName)
 		os.Setenv("CE_IPSEC_NATTPORT", testClusterUDPPort)
 
-		cni.DiscoverFunc = func(clusterCIDRs []string) (*cni.Interface, error) {
-			Expect(clusterCIDRs).To(Equal(subnets))
-			return &cni.Interface{
-				Name:      "veth0",
-				IPAddress: cniInterfaceIP,
+		cni.HostInterfaces = func() ([]cni.HostInterface, error) {
+			return []cni.HostInterface{
+				{
+					Name: "veth0",
+					Addr: ipv4CIDR,
+				},
+				{
+					Name: "veth1",
+					Addr: ipv6CIDR,
+				},
 			}, nil
 		}
 	})
@@ -105,7 +112,7 @@ var _ = Describe("GetLocalSpec", func() {
 		Expect(spec.Hostname).NotTo(BeEmpty())
 		Expect(spec.GetPrivateIP(k8snet.IPv4)).To(Equal(testPrivateIP))
 		Expect(spec.Backend).To(Equal("backend"))
-		Expect(spec.Subnets).To(Equal(subnets))
+		Expect(spec.Subnets).To(Equal(submSpec.ClusterCidr))
 		Expect(spec.NATEnabled).To(BeFalse())
 		Expect(spec.BackendConfig[testUDPPortLabel]).To(Equal(testUDPPort))
 		Expect(spec.HealthCheckIPs).To(BeEmpty())
@@ -167,7 +174,21 @@ var _ = Describe("GetLocalSpec", func() {
 		It("should set the HealthCheckIP", func() {
 			spec, err := endpoint.GetLocalSpec(context.TODO(), submSpec, client, true)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(spec.HealthCheckIPs).To(Equal([]string{cniInterfaceIP}))
+			Expect(spec.HealthCheckIPs).To(Equal([]string{cniInterfaceIPv4}))
+		})
+
+		Context("with dual-stack", func() {
+			BeforeEach(func() {
+				submSpec.ClusterCidr = append(submSpec.ClusterCidr, ipv6CIDR)
+			})
+
+			It("should set IPv4 and IPv6 HealthCheckIPs", func() {
+				spec, err := endpoint.GetLocalSpec(context.TODO(), submSpec, client, true)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(spec.HealthCheckIPs).To(ContainElements(cniInterfaceIPv4, cniInterfaceIPv6))
+				Expect(spec.HealthCheckIPs).To(HaveLen(2))
+			})
 		})
 
 		Context("and globalnet is enabled", func() {
@@ -179,6 +200,19 @@ var _ = Describe("GetLocalSpec", func() {
 				spec, err := endpoint.GetLocalSpec(context.TODO(), submSpec, client, true)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(spec.HealthCheckIPs).To(BeEmpty())
+			})
+		})
+
+		Context("and CNI discovery fails", func() {
+			BeforeEach(func() {
+				cni.HostInterfaces = func() ([]cni.HostInterface, error) {
+					return nil, errors.New("mock error")
+				}
+			})
+
+			It("should return an error", func() {
+				_, err := endpoint.GetLocalSpec(context.TODO(), submSpec, client, true)
+				Expect(err).To(HaveOccurred())
 			})
 		})
 	})

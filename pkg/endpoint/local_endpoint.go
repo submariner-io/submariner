@@ -214,22 +214,13 @@ func GetLocalSpec(ctx context.Context, submSpec *types.SubmarinerSpecification, 
 }
 
 func getHealthCheckIP(family k8snet.IPFamily, submSpec *types.SubmarinerSpecification) (string, error) {
-	switch family {
-	case k8snet.IPv4:
-		cniIface, err := cni.Discover(submSpec.ClusterCidr)
-		if err != nil {
-			return "", errors.Wrapf(err, "error getting CNI Interface IP address."+
-				"Please disable the health check if your CNI does not expose a pod IP on the nodes")
-		}
-
-		return cniIface.IPAddress, nil
-	case k8snet.IPv6:
-		// TODO_IPV6: add V6 healthcheck IP
-
-	case k8snet.IPFamilyUnknown:
+	cniIface, err := cni.Discover(submSpec.ClusterCidr, family)
+	if err != nil {
+		return "", errors.Wrapf(err, "error getting IPv%v CNI Interface IP address. "+
+			"Please disable the health check if your CNI does not expose a pod IP on the nodes", family)
 	}
 
-	return "", nil
+	return cniIface.IPAddress, nil
 }
 
 func getBackendConfig(nodeObj *v1.Node) (map[string]string, error) {

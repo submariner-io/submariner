@@ -102,7 +102,7 @@ func NewGatewayMonitor(ctx context.Context, config *GatewayMonitorConfig) (Inter
 
 	gatewayMonitor.nodeName = nodeName
 
-	cniIface, err := cni.Discover(gatewayMonitor.LocalClusterCIDRs)
+	cniIface, err := cni.Discover(gatewayMonitor.LocalClusterCIDRs, k8snet.IPv4)
 	if err == nil {
 		gatewayMonitor.cniIP = cniIface.IPAddress
 
