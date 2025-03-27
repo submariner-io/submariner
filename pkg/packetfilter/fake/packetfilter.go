@@ -32,6 +32,8 @@ import (
 	"k8s.io/utils/set"
 )
 
+const MaxChainLength = 29
+
 type PacketFilter struct {
 	mutex                    sync.Mutex
 	chainRules               map[string][]string
@@ -291,6 +293,11 @@ func (i *PacketFilter) listChains(table uint32) []string {
 func (i *PacketFilter) chainExists(table uint32, chain string) (bool, error) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
+
+	// iptables limits the length of a chain name.
+	if len(chain) >= MaxChainLength {
+		return false, errors.Errorf("chain name %q too long (must be under 29 chars)", chain)
+	}
 
 	return i.chainRules[chainKey(table, chain)] != nil, nil
 }
