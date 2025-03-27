@@ -20,15 +20,16 @@ package constants
 
 const (
 	// IPTable chains used by RouteAgent.
-	SmPostRoutingChain = "SUBMARINER-POSTROUTING"
-	SmInputChain       = "SUBMARINER-INPUT"
-	SmForwardChain     = "SUBMARINER-FORWARD"
-	PostRoutingChain   = "POSTROUTING"
-	InputChain         = "INPUT"
-	ForwardChain       = "FORWARD"
-	MangleTable        = "mangle"
-	RemoteCIDRIPSet    = "SUBMARINER-REMOTECIDRS"
-	LocalCIDRIPSet     = "SUBMARINER-LOCALCIDRS"
+	SmPostRoutingChain    = "SUBMARINER-POSTROUTING"
+	SmPostRoutingMssChain = "SUBMARINER-POSTROUTING-MSS"
+	SmInputChain          = "SUBMARINER-INPUT"
+	SmForwardChain        = "SUBMARINER-FORWARD"
+	PostRoutingChain      = "POSTROUTING"
+	InputChain            = "INPUT"
+	ForwardChain          = "FORWARD"
+	MangleTable           = "mangle"
+	RemoteCIDRIPSet       = "SUBMARINER-REMOTECIDRS"
+	LocalCIDRIPSet        = "SUBMARINER-LOCALCIDRS"
 
 	RouteAgentInterClusterNetworkTableID = 149
 
