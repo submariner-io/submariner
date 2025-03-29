@@ -34,17 +34,18 @@ import (
 
 type Interface interface {
 	Start(stopCh <-chan struct{}) error
-	GetLatencyInfo(endpoint *submarinerv1.EndpointSpec) *pinger.LatencyInfo
+	GetLatencyInfo(endpoint *submarinerv1.EndpointSpec, ipFamily k8snet.IPFamily) *pinger.LatencyInfo
 	Stop()
 }
 
 type Config struct {
-	WatcherConfig      *watcher.Config
-	EndpointNamespace  string
-	ClusterID          string
-	PingInterval       int
-	MaxPacketLossCount int
-	NewPinger          func(pinger.Config) pinger.Interface
+	WatcherConfig       *watcher.Config
+	SupportedIPFamilies []k8snet.IPFamily
+	EndpointNamespace   string
+	ClusterID           string
+	PingInterval        int
+	MaxPacketLossCount  int
+	NewPinger           func(pinger.Config) pinger.Interface
 }
 
 type controller struct {
@@ -56,6 +57,10 @@ type controller struct {
 var logger = log.Logger{Logger: logf.Log.WithName("HealthChecker")}
 
 func New(config *Config) (Interface, error) {
+	if len(config.SupportedIPFamilies) == 0 {
+		return nil, errors.New("SupportedIPFamilies must not be empty")
+	}
+
 	controller := &controller{
 		config:  config,
 		pingers: map[string]pinger.Interface{},
@@ -77,11 +82,11 @@ func New(config *Config) (Interface, error) {
 	return controller, nil
 }
 
-func (h *controller) GetLatencyInfo(endpoint *submarinerv1.EndpointSpec) *pinger.LatencyInfo {
+func (h *controller) GetLatencyInfo(endpoint *submarinerv1.EndpointSpec, ipFamily k8snet.IPFamily) *pinger.LatencyInfo {
 	h.RLock()
 	defer h.RUnlock()
 
-	if pingerObject, found := h.pingers[endpoint.CableName]; found {
+	if pingerObject, found := h.pingers[endpoint.GetFamilyCableName(ipFamily)]; found {
 		return pingerObject.GetLatencyInfo()
 	}
 
@@ -98,8 +103,8 @@ func (h *controller) Start(stopCh <-chan struct{}) error {
 		return errors.Wrapf(err, "error starting watcher")
 	}
 
-	logger.Infof("CableEngine HealthChecker started with PingInterval: %v, MaxPacketLossCount: %v", h.config.PingInterval,
-		h.config.MaxPacketLossCount)
+	logger.Infof("CableEngine HealthChecker started with SupportedIPFamilies: %q, PingInterval: %v, MaxPacketLossCount: %v",
+		h.config.SupportedIPFamilies, h.config.PingInterval, h.config.MaxPacketLossCount)
 
 	return nil
 }
@@ -123,27 +128,36 @@ func (h *controller) endpointCreatedOrUpdated(obj runtime.Object, _ int) bool {
 		return false
 	}
 
-	if endpointCreated.Spec.GetHealthCheckIP(k8snet.IPv4) == "" || endpointCreated.Spec.CableName == "" {
-		logger.Infof("HealthCheckIP (%q) and/or CableName (%q) for Endpoint %q empty - will not monitor endpoint health",
-			endpointCreated.Spec.GetHealthCheckIP(k8snet.IPv4), endpointCreated.Spec.CableName, endpointCreated.Name)
-		return false
-	}
-
 	h.Lock()
 	defer h.Unlock()
 
-	if pingerObject, found := h.pingers[endpointCreated.Spec.CableName]; found {
-		if pingerObject.GetIP() == endpointCreated.Spec.GetHealthCheckIP(k8snet.IPv4) {
-			return false
+	for _, family := range h.config.SupportedIPFamilies {
+		healthCheckIP := endpointCreated.Spec.GetHealthCheckIP(family)
+		if healthCheckIP == "" {
+			logger.Infof("IPv%v HealthCheckIP for Endpoint %q is empty - will not monitor endpoint health",
+				family, endpointCreated.Name)
+			continue
 		}
 
-		logger.V(log.DEBUG).Infof("HealthChecker is already running for %q - stopping", endpointCreated.Name)
+		h.startPinger(endpointCreated.Spec.GetFamilyCableName(family), healthCheckIP)
+	}
+
+	return false
+}
+
+func (h *controller) startPinger(familyCableName, healthCheckIP string) {
+	if pingerObject, found := h.pingers[familyCableName]; found {
+		if pingerObject.GetIP() == healthCheckIP {
+			return
+		}
+
+		logger.V(log.DEBUG).Infof("HealthChecker is already running for %q - stopping", familyCableName)
 		pingerObject.Stop()
-		delete(h.pingers, endpointCreated.Spec.CableName)
+		delete(h.pingers, familyCableName)
 	}
 
 	pingerConfig := pinger.Config{
-		IP:                 endpointCreated.Spec.GetHealthCheckIP(k8snet.IPv4),
+		IP:                 healthCheckIP,
 		MaxPacketLossCount: h.config.MaxPacketLossCount,
 	}
 
@@ -157,13 +171,10 @@ func (h *controller) endpointCreatedOrUpdated(obj runtime.Object, _ int) bool {
 	}
 
 	pingerObject := newPingerFunc(pingerConfig)
-	h.pingers[endpointCreated.Spec.CableName] = pingerObject
+	h.pingers[familyCableName] = pingerObject
 	pingerObject.Start()
 
-	logger.Infof("CableEngine HealthChecker started pinger for CableName: %q with HealthCheckIP %q",
-		endpointCreated.Spec.CableName, endpointCreated.Spec.GetHealthCheckIP(k8snet.IPv4))
-
-	return false
+	logger.Infof("CableEngine HealthChecker started pinger for CableName: %q with HealthCheckIP %q", familyCableName, healthCheckIP)
 }
 
 func (h *controller) endpointDeleted(obj runtime.Object, _ int) bool {
@@ -172,9 +183,12 @@ func (h *controller) endpointDeleted(obj runtime.Object, _ int) bool {
 	h.Lock()
 	defer h.Unlock()
 
-	if pingerObject, found := h.pingers[endpointDeleted.Spec.CableName]; found {
-		pingerObject.Stop()
-		delete(h.pingers, endpointDeleted.Spec.CableName)
+	for _, family := range h.config.SupportedIPFamilies {
+		familyCableName := endpointDeleted.Spec.GetFamilyCableName(family)
+		if pingerObject, found := h.pingers[familyCableName]; found {
+			pingerObject.Stop()
+			delete(h.pingers, familyCableName)
+		}
 	}
 
 	return false
