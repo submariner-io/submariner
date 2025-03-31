@@ -95,9 +95,10 @@ func newPublicIPWatcherTestDriver() *publicIPWatcherTestDriver {
 
 		ipWatcher := endpoint.NewPublicIPWatcher(&endpoint.PublicIPWatcherConfig{
 			SubmSpec: &types.SubmarinerSpecification{
-				ClusterID: clusterID,
-				Namespace: testNamespace,
-				PublicIP:  "lb:" + testServiceName,
+				ClusterID:   clusterID,
+				Namespace:   testNamespace,
+				PublicIP:    "lb:" + testServiceName,
+				ClusterCidr: []string{"127.0.0.1/16"},
 			},
 			Interval:      interval,
 			K8sClient:     t.k8sClient,

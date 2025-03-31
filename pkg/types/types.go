@@ -20,8 +20,8 @@ package types
 
 import (
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cidr"
 	k8snet "k8s.io/utils/net"
-	"k8s.io/utils/set"
 )
 
 type SubmarinerCluster struct {
@@ -54,10 +54,5 @@ type SubmarinerSpecification struct {
 }
 
 func (subSpec *SubmarinerSpecification) GetIPFamilies() []k8snet.IPFamily {
-	ipFamilies := set.New[k8snet.IPFamily]()
-
-	// TODO_IPV6: set ipFamilies according to ClusterCidr content
-	ipFamilies.Insert(k8snet.IPv4)
-
-	return ipFamilies.UnsortedList()
+	return cidr.ExtractIPFamilies(subSpec.ClusterCidr)
 }

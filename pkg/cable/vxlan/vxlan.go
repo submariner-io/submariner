@@ -180,7 +180,7 @@ func (v *vxLan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 
 	var ipAddress net.IP
 
-	cniIface, err := cni.Discover(v.localCluster.Spec.ClusterCIDR)
+	cniIface, err := cni.Discover(v.localCluster.Spec.ClusterCIDR, endpointInfo.UseFamily)
 	if err == nil {
 		ipAddress = net.ParseIP(cniIface.IPAddress)
 	} else {

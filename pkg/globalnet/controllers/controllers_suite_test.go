@@ -20,10 +20,8 @@ package controllers_test
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
@@ -82,15 +80,11 @@ func init() {
 var _ = BeforeSuite(func() {
 	kzerolog.InitK8sLogging()
 
-	cni.DiscoverFunc = func(cidrs []string) (*cni.Interface, error) {
-		if !reflect.DeepEqual(cidrs, []string{localCIDR}) {
-			return nil, fmt.Errorf("invalid CIDRs %v", cidrs)
-		}
-
-		return &cni.Interface{
-			Name:      "veth0",
-			IPAddress: cniInterfaceIP,
-		}, nil
+	cni.HostInterfaces = func() ([]cni.HostInterface, error) {
+		return []cni.HostInterface{{
+			Name: "veth0",
+			Addr: cniInterfaceIP + "/24",
+		}}, nil
 	}
 })
 
