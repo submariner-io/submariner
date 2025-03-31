@@ -53,6 +53,7 @@ import (
 	fakeClient "k8s.io/client-go/dynamic/fake"
 	kubeScheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
+	k8snet "k8s.io/utils/net"
 )
 
 const (
@@ -420,6 +421,7 @@ func testGatewayLatencyInfo() {
 				{
 					Status:   submarinerv1.Connected,
 					Endpoint: *endpointSpec,
+					UsingIP:  t.pinger.GetIP(),
 				},
 			}
 
@@ -544,20 +546,24 @@ func (t *testDriver) run() {
 
 	t.pinger = fake.NewPinger("10.130.2.2")
 
-	t.healthChecker, _ = healthchecker.New(&healthchecker.Config{
+	var err error
+
+	t.healthChecker, err = healthchecker.New(&healthchecker.Config{
 		WatcherConfig: &watcher.Config{
 			RestMapper: restMapper,
 			Client:     dynamicClient,
 			Scheme:     scheme,
 		},
-		EndpointNamespace: namespace,
-		ClusterID:         t.engine.LocalEndPoint.Spec.ClusterID,
+		SupportedIPFamilies: []k8snet.IPFamily{k8snet.IPv4},
+		EndpointNamespace:   namespace,
+		ClusterID:           t.engine.LocalEndPoint.Spec.ClusterID,
 		NewPinger: func(pingerCfg pinger.Config) pinger.Interface {
 			defer GinkgoRecover()
 			Expect(pingerCfg.IP).To(Equal(t.pinger.GetIP()))
 			return t.pinger
 		},
 	})
+	Expect(err).To(Succeed())
 
 	t.endpoints = dynamicClient.Resource(*test.GetGroupVersionResourceFor(restMapper, &submarinerv1.Endpoint{})).Namespace(namespace)
 
@@ -566,7 +572,7 @@ func (t *testDriver) run() {
 	informerFactory := submarinerInformers.NewSharedInformerFactory(t.client, 0)
 	informer := informerFactory.Submariner().V1().Gateways().Informer()
 
-	_, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			t.gatewayUpdated <- obj.(*submarinerv1.Gateway)
 		},
@@ -590,7 +596,7 @@ func (t *testDriver) run() {
 func (t *testDriver) stop() {
 	close(t.stopSyncer)
 
-	if t.expectedDeletedAfter != nil {
+	if t.healthChecker != nil && t.expectedDeletedAfter != nil {
 		t.awaitGatewayDeleted(t.expectedDeletedAfter)
 	}
 

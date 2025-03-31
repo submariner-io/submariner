@@ -400,11 +400,12 @@ func (g *gatewayType) initCableHealthChecker() {
 		watcherConfig := g.WatcherConfig
 
 		g.cableHealthChecker, err = healthchecker.New(&healthchecker.Config{
-			WatcherConfig:      &watcherConfig,
-			EndpointNamespace:  g.Spec.Namespace,
-			ClusterID:          g.Spec.ClusterID,
-			PingInterval:       g.Spec.HealthCheckInterval,
-			MaxPacketLossCount: g.Spec.HealthCheckMaxPacketLossCount,
+			WatcherConfig:       &watcherConfig,
+			SupportedIPFamilies: g.Spec.GetIPFamilies(),
+			EndpointNamespace:   g.Spec.Namespace,
+			ClusterID:           g.Spec.ClusterID,
+			PingInterval:        g.Spec.HealthCheckInterval,
+			MaxPacketLossCount:  g.Spec.HealthCheckMaxPacketLossCount,
 		})
 		if err != nil {
 			logger.Errorf(err, "Error creating healthChecker")

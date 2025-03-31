@@ -240,7 +240,7 @@ func (gs *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 		for index := range connections {
 			connection := &connections[index]
 
-			latencyInfo := gs.healthCheck.GetLatencyInfo(&connection.Endpoint)
+			latencyInfo := gs.healthCheck.GetLatencyInfo(&connection.Endpoint, connection.GetFamily())
 			if latencyInfo != nil {
 				connection.LatencyRTT = latencyInfo.Spec
 				connection.Endpoint.SetHealthCheckIP(latencyInfo.IP)
