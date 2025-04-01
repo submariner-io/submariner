@@ -549,19 +549,21 @@ func (t *testDriver) run() {
 	var err error
 
 	t.healthChecker, err = healthchecker.New(&healthchecker.Config{
-		WatcherConfig: &watcher.Config{
+		ControllerConfig: pinger.ControllerConfig{
+			SupportedIPFamilies: []k8snet.IPFamily{k8snet.IPv4},
+			NewPinger: func(pingerCfg pinger.Config) pinger.Interface {
+				defer GinkgoRecover()
+				Expect(pingerCfg.IP).To(Equal(t.pinger.GetIP()))
+				return t.pinger
+			},
+		},
+		WatcherConfig: watcher.Config{
 			RestMapper: restMapper,
 			Client:     dynamicClient,
 			Scheme:     scheme,
 		},
-		SupportedIPFamilies: []k8snet.IPFamily{k8snet.IPv4},
-		EndpointNamespace:   namespace,
-		ClusterID:           t.engine.LocalEndPoint.Spec.ClusterID,
-		NewPinger: func(pingerCfg pinger.Config) pinger.Interface {
-			defer GinkgoRecover()
-			Expect(pingerCfg.IP).To(Equal(t.pinger.GetIP()))
-			return t.pinger
-		},
+		EndpointNamespace: namespace,
+		ClusterID:         t.engine.LocalEndPoint.Spec.ClusterID,
 	})
 	Expect(err).To(Succeed())
 

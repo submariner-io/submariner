@@ -42,6 +42,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/controllers/tunnel"
 	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
+	"github.com/submariner-io/submariner/pkg/pinger"
 	"github.com/submariner-io/submariner/pkg/pod"
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/versions"
@@ -397,15 +398,15 @@ func (g *gatewayType) initCableHealthChecker() {
 	if !g.Spec.HealthCheckEnabled {
 		logger.Info("The CableEngine HealthChecker is disabled")
 	} else {
-		watcherConfig := g.WatcherConfig
-
 		g.cableHealthChecker, err = healthchecker.New(&healthchecker.Config{
-			WatcherConfig:       &watcherConfig,
-			SupportedIPFamilies: g.Spec.GetIPFamilies(),
-			EndpointNamespace:   g.Spec.Namespace,
-			ClusterID:           g.Spec.ClusterID,
-			PingInterval:        g.Spec.HealthCheckInterval,
-			MaxPacketLossCount:  g.Spec.HealthCheckMaxPacketLossCount,
+			ControllerConfig: pinger.ControllerConfig{
+				SupportedIPFamilies: g.Spec.GetIPFamilies(),
+				PingInterval:        g.Spec.HealthCheckInterval,
+				MaxPacketLossCount:  g.Spec.HealthCheckMaxPacketLossCount,
+			},
+			WatcherConfig:     g.WatcherConfig,
+			EndpointNamespace: g.Spec.Namespace,
+			ClusterID:         g.Spec.ClusterID,
 		})
 		if err != nil {
 			logger.Errorf(err, "Error creating healthChecker")
