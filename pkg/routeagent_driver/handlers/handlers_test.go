@@ -39,6 +39,7 @@ import (
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	fakenetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
 	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
+	"github.com/submariner-io/submariner/pkg/pinger"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/calico"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/healthchecker"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
@@ -53,6 +54,7 @@ import (
 	fakek8s "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	k8snet "k8s.io/utils/net"
 )
 
 var _ = Describe("", func() {
@@ -127,10 +129,11 @@ var _ = Describe("", func() {
 		Expect(calicoHandler.Init(ctx)).To(Succeed())
 
 		healthCheckerHandler := healthchecker.New(&healthchecker.Config{
-			PingInterval:             1,
-			MaxPacketLossCount:       1,
-			HealthCheckerEnabled:     true,
-			RouteAgentUpdateInterval: 100 * time.Millisecond,
+			ControllerConfig: pinger.ControllerConfig{
+				SupportedIPFamilies: []k8snet.IPFamily{k8snet.IPv4},
+			},
+			HealthCheckerEnabled:     false,
+			RouteAgentUpdateInterval: time.Hour,
 		}, submClient.SubmarinerV1().RouteAgents(testing.Namespace), "v1", "test-node")
 		Expect(healthCheckerHandler.Init(ctx)).To(Succeed())
 	})

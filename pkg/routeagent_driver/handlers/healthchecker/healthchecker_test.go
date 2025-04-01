@@ -172,35 +172,17 @@ var _ = Describe("RemoteEndpoint latency info", func() {
 		})
 	})
 
-	When("a remote Endpoint is updated", func() {
-		Context("and the HealthCheckIP was changed", func() {
-			It("should stop the pinger and start a new one", func() {
-				endpoint1 := t.CreateEndpoint(t.newSubmEndpoint(healthCheckIP1))
+	When("a remote Endpoint is updated and the HealthCheckIP was changed", func() {
+		It("should stop the pinger and start a new one", func() {
+			endpoint1 := t.CreateEndpoint(t.newSubmEndpoint(healthCheckIP1))
 
-				t.pingerMap[healthCheckIP1].AwaitStart()
+			t.pingerMap[healthCheckIP1].AwaitStart()
 
-				endpoint1.Spec.HealthCheckIPs = []string{healthCheckIP2}
+			endpoint1.Spec.HealthCheckIPs = []string{healthCheckIP2}
 
-				t.UpdateEndpoint(endpoint1)
-				t.pingerMap[healthCheckIP1].AwaitStop()
-				t.pingerMap[healthCheckIP2].AwaitStart()
-			})
-		})
-
-		Context("and the HealthCheckIP did not change", func() {
-			It("should not start a new pinger", func() {
-				endpoint1 := t.CreateEndpoint(t.newSubmEndpoint(healthCheckIP1))
-				t.pingerMap[healthCheckIP1].AwaitStart()
-
-				endpoint1.Spec.Hostname = "newHostName"
-				t.UpdateEndpoint(endpoint1)
-
-				pingerObject, found := t.pingerMap[endpoint1.Spec.GetHealthCheckIP(k8snet.IPv4)]
-				Expect(found).To(BeTrue())
-				Expect(pingerObject.GetIP()).To(Equal(healthCheckIP1))
-
-				t.pingerMap[healthCheckIP1].AwaitNoStop()
-			})
+			t.UpdateEndpoint(endpoint1)
+			t.pingerMap[healthCheckIP1].AwaitStop()
+			t.pingerMap[healthCheckIP2].AwaitStart()
 		})
 	})
 
@@ -291,22 +273,22 @@ func newTestDriver() *testDriver {
 
 	JustBeforeEach(func() {
 		config := &healthchecker.Config{
-			PingInterval:             1, // Set interval to 1 second for faster testing
-			MaxPacketLossCount:       1,
+			ControllerConfig: pinger.ControllerConfig{
+				SupportedIPFamilies: []k8snet.IPFamily{k8snet.IPv4},
+				PingInterval:        1, // Set interval to 1 second for faster testing
+				MaxPacketLossCount:  1,
+				NewPinger: func(pingerCfg pinger.Config) pinger.Interface {
+					defer GinkgoRecover()
+					p, ok := t.pingerMap[pingerCfg.IP]
+					Expect(ok).To(BeTrue())
+
+					return p
+				},
+			},
 			HealthCheckerEnabled:     t.healthcheckerEnabled,
 			RouteAgentUpdateInterval: 100 * time.Millisecond,
 		}
 
-		config.NewPinger = func(pingerCfg pinger.Config) pinger.Interface {
-			defer GinkgoRecover()
-			Expect(pingerCfg.Interval).To(Equal(time.Second * time.Duration(config.PingInterval)))
-			Expect(pingerCfg.MaxPacketLossCount).To(Equal(config.MaxPacketLossCount))
-
-			p, ok := t.pingerMap[pingerCfg.IP]
-			Expect(ok).To(BeTrue())
-
-			return p
-		}
 		t.handler = healthchecker.New(config, t.client, "v1", localNodeName)
 
 		t.Start(t.handler)

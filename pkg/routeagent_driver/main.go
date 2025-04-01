@@ -43,6 +43,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/event/controller"
 	"github.com/submariner-io/submariner/pkg/node"
 	pfconfigure "github.com/submariner-io/submariner/pkg/packetfilter/configure"
+	"github.com/submariner-io/submariner/pkg/pinger"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cabledriver"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/calico"
@@ -133,13 +134,6 @@ func main() {
 	localNode, err := node.GetLocalNode(ctx, k8sClientSet)
 	logger.FatalOnError(err, "Error getting information on the local node")
 
-	healthcheckerConfig := &healthchecker.Config{
-		PingInterval:             submSpec.HealthCheckInterval * 60,
-		MaxPacketLossCount:       submSpec.HealthCheckMaxPacketLossCount,
-		HealthCheckerEnabled:     submSpec.HealthCheckEnabled,
-		RouteAgentUpdateInterval: 60 * time.Second,
-	}
-
 	registry, err := event.NewRegistry(ctx, "routeagent_driver", np,
 		kubeproxy.NewSyncHandler(env.ClusterCidr, env.ServiceCidr),
 		ovn.NewHandler(&ovn.HandlerConfig{
@@ -158,8 +152,15 @@ func main() {
 		cabledriver.NewVXLANCleanup(),
 		mtu.NewMTUHandler(env.ClusterCidr, len(env.GlobalCidr) != 0, getTCPMssValue(localNode)),
 		calico.NewCalicoIPPoolHandler(cfg, env.Namespace, k8sClientSet),
-		healthchecker.New(healthcheckerConfig,
-			smClientset.SubmarinerV1().RouteAgents(submSpec.Namespace), versions.Submariner(), localNode.Name))
+		healthchecker.New(&healthchecker.Config{
+			ControllerConfig: pinger.ControllerConfig{
+				SupportedIPFamilies: submSpec.GetIPFamilies(),
+				PingInterval:        submSpec.HealthCheckInterval * 60,
+				MaxPacketLossCount:  submSpec.HealthCheckMaxPacketLossCount,
+			},
+			HealthCheckerEnabled:     submSpec.HealthCheckEnabled,
+			RouteAgentUpdateInterval: 60 * time.Second,
+		}, smClientset.SubmarinerV1().RouteAgents(submSpec.Namespace), versions.Submariner(), localNode.Name))
 
 	logger.FatalOnError(err, "Error registering the handlers")
 
