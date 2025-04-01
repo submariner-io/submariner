@@ -23,7 +23,16 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 )
+
+func init() {
+	kzerolog.AddFlags(nil)
+}
+
+var _ = BeforeSuite(func() {
+	kzerolog.InitK8sLogging()
+})
 
 func TestPinger(t *testing.T) {
 	RegisterFailHandler(Fail)
