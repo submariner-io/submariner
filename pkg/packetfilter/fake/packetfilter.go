@@ -32,9 +32,12 @@ import (
 	"k8s.io/utils/set"
 )
 
+const MaxChainLength = 29
+
 type PacketFilter struct {
 	mutex                    sync.Mutex
 	chainRules               map[string][]string
+	hookChains               map[string]packetfilter.ChainIPHook
 	failOnAppendRuleMatchers []interface{}
 	failOnDeleteRuleMatchers []interface{}
 
@@ -53,6 +56,7 @@ func New(allowedFamilies ...k8snet.IPFamily) *PacketFilter {
 	pf := &PacketFilter{
 		chainRules: map[string][]string{},
 		sets:       map[string]set.Set[string]{},
+		hookChains: map[string]packetfilter.ChainIPHook{},
 	}
 
 	packetfilter.SetNewDriverFn(func(family k8snet.IPFamily) (packetfilter.Driver, error) {
@@ -78,7 +82,31 @@ func (i *PacketFilter) AppendUnique(table packetfilter.TableType, chain string, 
 	return i.addRule(table, chain, -1, rule)
 }
 
+func (i *PacketFilter) ensureUniqueHookChain(chain *packetfilter.ChainIPHook) error {
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
+
+	existing, found := i.hookChains[chain.Name]
+	if !found {
+		i.hookChains[chain.Name] = *chain
+		return nil
+	}
+
+	if existing.Type == chain.Type && existing.Hook == chain.Hook && existing.Priority == chain.Priority {
+		return nil
+	}
+
+	return errors.Errorf("an IP hook chain with the name %q already exists but with differing "+
+		"Type (%q), Hook (%q) and Priority (%q). Nftables stores all chains in a single table so they must be unique.",
+		chain.Name, chain.Type, chain.Hook, chain.Priority)
+}
+
 func (i *PacketFilter) CreateIPHookChainIfNotExists(chain *packetfilter.ChainIPHook) error {
+	err := i.ensureUniqueHookChain(chain)
+	if err != nil {
+		return err
+	}
+
 	return i.createChainIfNotExists(uint32(chain.Type), chain.Name)
 }
 
@@ -291,6 +319,11 @@ func (i *PacketFilter) listChains(table uint32) []string {
 func (i *PacketFilter) chainExists(table uint32, chain string) (bool, error) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
+
+	// iptables limits the length of a chain name.
+	if len(chain) >= MaxChainLength {
+		return false, errors.Errorf("chain name %q too long (must be under 29 chars)", chain)
+	}
 
 	return i.chainRules[chainKey(table, chain)] != nil, nil
 }
