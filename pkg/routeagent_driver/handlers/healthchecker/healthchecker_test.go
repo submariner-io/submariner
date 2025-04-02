@@ -33,6 +33,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/pinger"
 	"github.com/submariner-io/submariner/pkg/pinger/fake"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/healthchecker"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
@@ -121,7 +122,7 @@ var _ = Describe("RemoteEndpoint latency info", func() {
 			t.CreateEndpoint(t.newSubmEndpoint(healthCheckIP1))
 			t.pingerMap[healthCheckIP1].AwaitStart()
 
-			latencyInfo := t.newLatencyInfo()
+			latencyInfo := t.newLatencyInfo(k8snet.IPv4)
 			t.setLatencyInfo(healthCheckIP1, latencyInfo)
 
 			t.awaitRemoteEndpoint(func(ep *submarinerv1.RemoteEndpoint, g Gomega) {
@@ -132,12 +133,14 @@ var _ = Describe("RemoteEndpoint latency info", func() {
 
 		Context("with no HealthCheckIP", func() {
 			It("should not start a pinger and should set the RemoteEndpoint Status to None", func() {
-				endpoint1 := t.CreateEndpoint(t.newSubmEndpoint(""))
+				endpoint := t.newSubmEndpoint()
+				endpoint.Spec.Subnets = []string{"2.2.2.2/24"}
+				t.CreateEndpoint(endpoint)
 				t.pingerMap[healthCheckIP1].AwaitNoStart()
 
 				t.awaitRemoteEndpoint(func(ep *submarinerv1.RemoteEndpoint, g Gomega) {
 					g.Expect(ep.Status).To(Equal(submarinerv1.ConnectionNone))
-					g.Expect(ep.Spec).To(Equal(endpoint1.Spec))
+					g.Expect(ep.Spec).To(Equal(endpoint.Spec))
 				})
 			})
 		})
@@ -196,6 +199,74 @@ var _ = Describe("RemoteEndpoint latency info", func() {
 		})
 	})
 
+	When("a remote Endpoint with dual-stack health check IPs is created/deleted", func() {
+		const healthCheckIPv6 = "2001:db8:3333:4444:5555:6666:7777:8888"
+
+		BeforeEach(func() {
+			t.supportedIPFamilies = []k8snet.IPFamily{k8snet.IPv4, k8snet.IPv6}
+			t.pingerMap[healthCheckIPv6] = fake.NewPinger(healthCheckIPv6)
+		})
+
+		It("should start/stop Pingers and return the correct LatencyInfo for both", func() {
+			endpoint := t.newSubmEndpoint(healthCheckIP1, healthCheckIPv6)
+			endpoint.Spec.PublicIPs = []string{"2002:0:0:1234::", "2.2.2.2"}
+			endpoint.Spec.PrivateIPs = []string{"2003:0:0:1234::", "3.3.3.3"}
+
+			t.CreateEndpoint(endpoint)
+			t.pingerMap[healthCheckIP1].AwaitStart()
+			t.pingerMap[healthCheckIPv6].AwaitStart()
+
+			ipv4LatencyInfo := t.newLatencyInfo(k8snet.IPv4)
+			t.setLatencyInfo(healthCheckIP1, ipv4LatencyInfo)
+
+			ipv6LatencyInfo := t.newLatencyInfo(k8snet.IPv6)
+			t.setLatencyInfo(healthCheckIPv6, ipv6LatencyInfo)
+
+			t.awaitRouteAgent(func(ra *submarinerv1.RouteAgent, g Gomega) {
+				epMap := map[string]*submarinerv1.RemoteEndpoint{}
+				for i := range ra.Status.RemoteEndpoints {
+					g.Expect(ra.Status.RemoteEndpoints[i].Spec.HealthCheckIPs).To(HaveLen(1))
+					epMap[ra.Status.RemoteEndpoints[i].Spec.HealthCheckIPs[0]] = &ra.Status.RemoteEndpoints[i]
+				}
+
+				ipv4Endpoint := epMap[healthCheckIP1]
+				g.Expect(ipv4Endpoint).ToNot(BeNil(), "RemoteEndpoint not found for IPv4 health check IP %q", healthCheckIP1)
+				g.Expect(ipv4Endpoint.Status).To(Equal(submarinerv1.Connected))
+				g.Expect(ipv4Endpoint.LatencyRTT).To(Equal(ipv4LatencyInfo.Spec))
+
+				spec := endpoint.Spec
+				spec.HealthCheckIPs = []string{healthCheckIP1}
+				spec.PublicIPs = []string{endpoint.Spec.GetPublicIP(k8snet.IPv4)}
+				spec.PrivateIPs = []string{endpoint.Spec.GetPrivateIP(k8snet.IPv4)}
+				g.Expect(ipv4Endpoint.Spec).To(Equal(spec))
+
+				ipv6Endpoint := epMap[healthCheckIPv6]
+				g.Expect(ipv6Endpoint).ToNot(BeNil(), "RemoteEndpoint not found for IPv6 health check IP %q", healthCheckIP1)
+				g.Expect(ipv6Endpoint.Status).To(Equal(submarinerv1.Connected))
+				g.Expect(ipv6Endpoint.LatencyRTT).To(Equal(ipv6LatencyInfo.Spec))
+
+				spec = endpoint.Spec
+				spec.HealthCheckIPs = []string{healthCheckIPv6}
+				spec.PublicIPs = []string{endpoint.Spec.GetPublicIP(k8snet.IPv6)}
+				spec.PrivateIPs = []string{endpoint.Spec.GetPrivateIP(k8snet.IPv6)}
+				g.Expect(ipv6Endpoint.Spec).To(Equal(spec))
+
+				g.Expect(ra.Status.RemoteEndpoints).To(HaveLen(2))
+			})
+
+			By("Deleting Endpoint")
+
+			t.DeleteEndpoint(endpoint.Name)
+
+			t.pingerMap[healthCheckIP1].AwaitStop()
+			t.pingerMap[healthCheckIPv6].AwaitStop()
+
+			t.awaitRouteAgent(func(ra *submarinerv1.RouteAgent, g Gomega) {
+				g.Expect(ra.Status.RemoteEndpoints).To(BeEmpty())
+			})
+		})
+	})
+
 	When("a pinger reports a connection error", func() {
 		It(" should set the RemoteEndpoint Status to Error", func() {
 			t.CreateEndpoint(t.newSubmEndpoint(healthCheckIP1))
@@ -240,13 +311,35 @@ var _ = Describe("Gateway transition", func() {
 	})
 })
 
+var _ = Describe("Stop", func() {
+	t := newTestDriver()
+
+	It("should stop the Pingers and delete the RouteAgent resource", func() {
+		t.CreateEndpoint(t.newSubmEndpoint(healthCheckIP1))
+		t.pingerMap[healthCheckIP1].AwaitStart()
+
+		t.awaitRouteAgent(nil)
+
+		Expect(t.handler.Stop()).To(Succeed())
+
+		t.pingerMap[healthCheckIP1].AwaitStop()
+
+		Eventually(func(g Gomega) {
+			_, err := t.client.Get(context.TODO(), localNodeName, metav1.GetOptions{})
+			g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		}).Within(5 * time.Second).Should(Succeed())
+
+		Expect(t.handler.Stop()).To(Succeed())
+	})
+})
+
 type testDriver struct {
 	*eventtesting.ControllerSupport
+	supportedIPFamilies  []k8snet.IPFamily
 	pingerMap            map[string]*fake.Pinger
 	handler              event.Handler
 	endpoints            dynamic.ResourceInterface
 	client               submarinerv1client.RouteAgentInterface
-	stopCh               chan struct{}
 	healthcheckerEnabled bool
 }
 
@@ -256,7 +349,7 @@ func newTestDriver() *testDriver {
 	}
 
 	BeforeEach(func() {
-		t.stopCh = make(chan struct{})
+		t.supportedIPFamilies = []k8snet.IPFamily{k8snet.IPv4}
 		t.healthcheckerEnabled = true
 
 		clientset := fakeClient.NewSimpleClientset()
@@ -274,7 +367,7 @@ func newTestDriver() *testDriver {
 	JustBeforeEach(func() {
 		config := &healthchecker.Config{
 			ControllerConfig: pinger.ControllerConfig{
-				SupportedIPFamilies: []k8snet.IPFamily{k8snet.IPv4},
+				SupportedIPFamilies: t.supportedIPFamilies,
 				PingInterval:        1, // Set interval to 1 second for faster testing
 				MaxPacketLossCount:  1,
 				NewPinger: func(pingerCfg pinger.Config) pinger.Interface {
@@ -294,19 +387,19 @@ func newTestDriver() *testDriver {
 		t.Start(t.handler)
 	})
 
-	AfterEach(func() {
-		close(t.stopCh)
-	})
-
 	return t
 }
 
-func (t *testDriver) newSubmEndpoint(healthCheckIP string) *submarinerv1.Endpoint {
+func (t *testDriver) newSubmEndpoint(healthCheckIPs ...string) *submarinerv1.Endpoint {
 	endpointSpec := &submarinerv1.EndpointSpec{
-		ClusterID: remoteClusterID,
-		CableName: fmt.Sprintf("submariner-cable-%s-192-68-1-20", remoteClusterID),
+		ClusterID:      remoteClusterID,
+		CableName:      fmt.Sprintf("submariner-cable-%s-192-68-1-20", remoteClusterID),
+		HealthCheckIPs: healthCheckIPs,
 	}
-	endpointSpec.HealthCheckIPs = []string{healthCheckIP}
+
+	for _, ip := range healthCheckIPs {
+		endpointSpec.Subnets = append(endpointSpec.Subnets, ip+"/24")
+	}
 
 	endpointName, err := endpointSpec.GenerateName()
 	Expect(err).To(Succeed())
@@ -322,15 +415,15 @@ func (t *testDriver) newSubmEndpoint(healthCheckIP string) *submarinerv1.Endpoin
 	return endpoint
 }
 
-func (t *testDriver) newLatencyInfo() *pinger.LatencyInfo {
+func (t *testDriver) newLatencyInfo(family k8snet.IPFamily) *pinger.LatencyInfo {
 	return &pinger.LatencyInfo{
 		ConnectionStatus: pinger.Connected,
 		Spec: &submarinerv1.LatencyRTTSpec{
-			Last:    "82ms",
-			Min:     "80ms",
-			Average: "85ms",
-			Max:     "89ms",
-			StdDev:  "5ms",
+			Last:    string(family) + "82ms",
+			Min:     string(family) + "80ms",
+			Average: string(family) + "85ms",
+			Max:     string(family) + "89ms",
+			StdDev:  string(family) + "5ms",
 		},
 	}
 }

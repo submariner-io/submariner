@@ -21,6 +21,7 @@ package healthchecker
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -164,58 +165,82 @@ func (h *controller) GetName() string {
 	return "routeAgent-health-checker"
 }
 
+func (h *controller) createRemoteEndpoint(endpointSpec *submarinerv1.EndpointSpec, family k8snet.IPFamily) submarinerv1.RemoteEndpoint {
+	var (
+		connectionStatus submarinerv1.ConnectionStatus
+		statusMessage    string
+		latencyRTT       *submarinerv1.LatencyRTTSpec
+	)
+
+	if !h.config.HealthCheckerEnabled {
+		connectionStatus = submarinerv1.ConnectionNone
+		statusMessage = "Health check is not enabled"
+	} else if h.State().IsOnGateway() {
+		connectionStatus = submarinerv1.ConnectionNone
+		statusMessage = "Health check is not performed on gateway nodes"
+	} else if pingerObject := h.pingerController.Get(endpointSpec, family); pingerObject != nil {
+		latencyInfo := pingerObject.GetLatencyInfo()
+		if latencyInfo != nil {
+			switch latencyInfo.ConnectionStatus {
+			case pinger.Connected:
+				connectionStatus = submarinerv1.Connected
+				statusMessage = ""
+				latencyRTT = &submarinerv1.LatencyRTTSpec{
+					Last:    latencyInfo.Spec.Last,
+					Min:     latencyInfo.Spec.Min,
+					Average: latencyInfo.Spec.Average,
+					Max:     latencyInfo.Spec.Max,
+					StdDev:  latencyInfo.Spec.StdDev,
+				}
+			case pinger.ConnectionError, pinger.ConnectionUnknown:
+				connectionStatus = submarinerv1.ConnectionError
+				statusMessage = latencyInfo.ConnectionError
+			}
+		} else {
+			connectionStatus = submarinerv1.Connecting
+			statusMessage = ""
+		}
+	} else {
+		connectionStatus = submarinerv1.ConnectionNone
+		statusMessage = fmt.Sprintf("IPv%s health check IP is not configured", family)
+	}
+
+	remoteEndpoint := submarinerv1.RemoteEndpoint{
+		Status:        connectionStatus,
+		StatusMessage: statusMessage,
+		Spec:          *endpointSpec,
+		LatencyRTT:    latencyRTT,
+	}
+
+	toPluralIPs := func(get func(family k8snet.IPFamily) string) []string {
+		ip := get(family)
+		if ip != "" {
+			return []string{ip}
+		}
+
+		return nil
+	}
+
+	remoteEndpoint.Spec.HealthCheckIPs = toPluralIPs(endpointSpec.GetHealthCheckIP)
+	remoteEndpoint.Spec.PublicIPs = toPluralIPs(endpointSpec.GetPublicIP)
+	remoteEndpoint.Spec.PrivateIPs = toPluralIPs(endpointSpec.GetPrivateIP)
+
+	return remoteEndpoint
+}
+
 func (h *controller) syncRouteAgentStatus() {
 	routeAgent := h.generateRouteAgentObject()
 	remoteEndpoints := h.State().GetRemoteEndpoints()
 
 	for i := range remoteEndpoints {
-		var connectionStatus submarinerv1.ConnectionStatus
-		var remoteEndpoint submarinerv1.RemoteEndpoint
-		var statusMessage string
-		var latencyRTT *submarinerv1.LatencyRTTSpec
-
-		if !h.config.HealthCheckerEnabled {
-			connectionStatus = submarinerv1.ConnectionNone
-			statusMessage = "Health check is not enabled"
-		} else if h.State().IsOnGateway() {
-			connectionStatus = submarinerv1.ConnectionNone
-			statusMessage = "Health check is not performed on gateway nodes"
-		} else if pingerObject := h.pingerController.Get(&remoteEndpoints[i].Spec, k8snet.IPv4); pingerObject != nil {
-			latencyInfo := pingerObject.GetLatencyInfo()
-			if latencyInfo != nil {
-				switch latencyInfo.ConnectionStatus {
-				case pinger.Connected:
-					connectionStatus = submarinerv1.Connected
-					statusMessage = ""
-					latencyRTT = &submarinerv1.LatencyRTTSpec{
-						Last:    latencyInfo.Spec.Last,
-						Min:     latencyInfo.Spec.Min,
-						Average: latencyInfo.Spec.Average,
-						Max:     latencyInfo.Spec.Max,
-						StdDev:  latencyInfo.Spec.StdDev,
-					}
-				case pinger.ConnectionError, pinger.ConnectionUnknown:
-					connectionStatus = submarinerv1.ConnectionError
-					statusMessage = latencyInfo.ConnectionError
-				}
-			} else {
-				connectionStatus = submarinerv1.Connecting
-				statusMessage = ""
+		for _, family := range h.config.SupportedIPFamilies {
+			if slices.Contains(remoteEndpoints[i].Spec.GetIPFamilies(), family) {
+				routeAgent.Status.RemoteEndpoints = append(routeAgent.Status.RemoteEndpoints,
+					h.createRemoteEndpoint(&remoteEndpoints[i].Spec, family))
 			}
-		} else {
-			connectionStatus = submarinerv1.ConnectionNone
-			statusMessage = "Health checker IP is not configured"
 		}
-
-		remoteEndpoint = submarinerv1.RemoteEndpoint{
-			Status:        connectionStatus,
-			StatusMessage: statusMessage,
-			Spec:          remoteEndpoints[i].Spec,
-			LatencyRTT:    latencyRTT,
-		}
-
-		routeAgent.Status.RemoteEndpoints = append(routeAgent.Status.RemoteEndpoints, remoteEndpoint)
 	}
+
 	// Use CreateOrUpdate to handle the RouteAgent resource
 	_, err := util.CreateOrUpdate(context.TODO(), h.routeAgentResourceInterface(), routeAgent,
 		func(existing *submarinerv1.RouteAgent) (*submarinerv1.RouteAgent, error) {
