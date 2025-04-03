@@ -43,7 +43,7 @@ type Basic interface {
 	LinkSetUp(link netlink.Link) error
 	AddrAdd(link netlink.Link, addr *netlink.Addr) error
 	AddrDel(link netlink.Link, addr *netlink.Addr) error
-	AddrList(link netlink.Link, family int) ([]netlink.Addr, error)
+	AddrList(link netlink.Link, family k8snet.IPFamily) ([]netlink.Addr, error)
 	AddrSubscribe(addrCh chan netlink.AddrUpdate, doneCh chan struct{}) error
 	NeighAppend(neigh *netlink.Neigh) error
 	NeighDel(neigh *netlink.Neigh) error
@@ -119,8 +119,8 @@ func (n *netlinkType) AddrDel(link netlink.Link, addr *netlink.Addr) error {
 	return netlink.AddrDel(link, addr)
 }
 
-func (n *netlinkType) AddrList(link netlink.Link, family int) ([]netlink.Addr, error) {
-	return netlink.AddrList(link, family)
+func (n *netlinkType) AddrList(link netlink.Link, family k8snet.IPFamily) ([]netlink.Addr, error) {
+	return netlink.AddrList(link, ToNetlinkFamily(family))
 }
 
 func (n *netlinkType) AddrSubscribe(addrCh chan netlink.AddrUpdate, doneCh chan struct{}) error {

@@ -198,7 +198,7 @@ func (n *basicType) AddrDel(link netlink.Link, addr *netlink.Addr) error {
 	return nil
 }
 
-func (n *basicType) AddrList(link netlink.Link, _ int) ([]netlink.Addr, error) {
+func (n *basicType) AddrList(link netlink.Link, _ k8snet.IPFamily) ([]netlink.Addr, error) {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 

@@ -29,6 +29,7 @@ import (
 	"github.com/vishvananda/netlink"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
+	k8snet "k8s.io/utils/net"
 )
 
 func (ovn *Handler) startRouteConfigSyncer(stop chan struct{}) {
@@ -61,7 +62,7 @@ func (ovn *Handler) monitorRoutingTable(stop chan struct{}) error {
 	var prevIP net.IP
 
 	assignPrevIP := func() {
-		addrs, err := ovn.netLink.AddrList(iface, netlink.FAMILY_V4)
+		addrs, err := ovn.netLink.AddrList(iface, k8snet.IPv4)
 		if err != nil {
 			logger.Warningf("Failed to get the IP4 address list for interface %q: %v", OVNK8sMgmntIntfName, err)
 		} else if len(addrs) > 0 {
@@ -80,7 +81,7 @@ func (ovn *Handler) monitorRoutingTable(stop chan struct{}) error {
 			return
 		}
 
-		addrs, err := ovn.netLink.AddrList(iface, netlink.FAMILY_V4)
+		addrs, err := ovn.netLink.AddrList(iface, k8snet.IPv4)
 		if err != nil {
 			logger.Warningf("Failed to get the IP4 address list for interface %q: %v", OVNK8sMgmntIntfName, err)
 			return

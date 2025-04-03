@@ -25,7 +25,7 @@ import (
 
 	"github.com/pkg/errors"
 	subMNetLink "github.com/submariner-io/submariner/pkg/netlink"
-	"github.com/vishvananda/netlink"
+	k8snet "k8s.io/utils/net"
 )
 
 func getNextHopOnK8sMgmtIntf() (string, error) {
@@ -36,7 +36,7 @@ func getNextHopOnK8sMgmtIntf() (string, error) {
 		return "", errors.Wrapf(err, "failed to retrieve link by name %q", OVNK8sMgmntIntfName)
 	}
 
-	addrs, err := netLink.AddrList(link, netlink.FAMILY_V4)
+	addrs, err := netLink.AddrList(link, k8snet.IPv4)
 	if err != nil || len(addrs) == 0 {
 		return "", errors.Wrapf(err, "failed to retrieve addresses for link")
 	}
