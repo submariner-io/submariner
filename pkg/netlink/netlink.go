@@ -32,6 +32,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/vishvananda/netlink"
+	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -50,7 +51,7 @@ type Basic interface {
 	RouteDel(route *netlink.Route) error
 	RouteReplace(route *netlink.Route) error
 	RouteGet(destination net.IP) ([]netlink.Route, error)
-	RouteList(link netlink.Link, family int) ([]netlink.Route, error)
+	RouteList(link netlink.Link, family k8snet.IPFamily) ([]netlink.Route, error)
 	FlushRouteTable(tableID int) error
 	RuleAdd(rule *netlink.Rule) error
 	RuleDel(rule *netlink.Rule) error
@@ -150,8 +151,8 @@ func (n *netlinkType) RouteGet(destination net.IP) ([]netlink.Route, error) {
 	return netlink.RouteGet(destination)
 }
 
-func (n *netlinkType) RouteList(link netlink.Link, family int) ([]netlink.Route, error) {
-	return netlink.RouteList(link, family)
+func (n *netlinkType) RouteList(link netlink.Link, family k8snet.IPFamily) ([]netlink.Route, error) {
+	return netlink.RouteList(link, ToNetlinkFamily(family))
 }
 
 func (n *netlinkType) RuleAdd(rule *netlink.Rule) error {
@@ -307,7 +308,7 @@ func DeleteIfaceAndAssociatedRoutes(iface string, tableID int) error {
 		return nil
 	}
 
-	currentRouteList, err := n.RouteList(link, syscall.AF_INET)
+	currentRouteList, err := n.RouteList(link, k8snet.IPv4)
 
 	if err != nil {
 		logger.Warningf("Unable to cleanup routes, error retrieving routes on the link %s: %v", iface, err)
@@ -367,4 +368,17 @@ func NewTableRule(tableID int) *netlink.Rule {
 	rule.Priority = tableID
 
 	return rule
+}
+
+func ToNetlinkFamily(family k8snet.IPFamily) int {
+	switch family {
+	case k8snet.IPv4:
+		return netlink.FAMILY_V4
+	case k8snet.IPv6:
+		return netlink.FAMILY_V6
+	case k8snet.IPFamilyUnknown:
+		return netlink.FAMILY_ALL
+	}
+
+	return netlink.FAMILY_ALL
 }

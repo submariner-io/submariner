@@ -32,6 +32,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/slices"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/vishvananda/netlink"
+	k8snet "k8s.io/utils/net"
 )
 
 type linkType struct {
@@ -332,7 +333,7 @@ func (n *basicType) RouteGet(destination net.IP) ([]netlink.Route, error) {
 	return routes, nil
 }
 
-func (n *basicType) RouteList(link netlink.Link, _ int) ([]netlink.Route, error) {
+func (n *basicType) RouteList(link netlink.Link, _ k8snet.IPFamily) ([]netlink.Route, error) {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
@@ -491,7 +492,7 @@ func routeList[T any](n *NetLink, linkIndex, table int, f func(r *netlink.Route)
 		LinkAttrs: netlink.LinkAttrs{
 			Index: linkIndex,
 		},
-	}, 0)
+	}, k8snet.IPFamilyUnknown)
 
 	result := []T{}
 

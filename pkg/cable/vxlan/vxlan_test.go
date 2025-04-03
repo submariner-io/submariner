@@ -102,7 +102,7 @@ var _ = Describe("Vxlan", func() {
 		link, err := t.netLink.LinkByName(vxlan.VxlanIface)
 		Expect(err).To(Succeed())
 
-		routes, err := t.netLink.RouteList(link, 0)
+		routes, err := t.netLink.RouteList(link, k8snet.IPFamilyUnknown)
 		Expect(err).To(Succeed())
 
 		var actualRoutes []map[string]string
@@ -126,7 +126,7 @@ var _ = Describe("Vxlan", func() {
 		link, err := t.netLink.LinkByName(vxlan.VxlanIface)
 		Expect(err).To(Succeed())
 
-		routes, err := t.netLink.RouteList(link, 0)
+		routes, err := t.netLink.RouteList(link, k8snet.IPFamilyUnknown)
 		Expect(err).To(Succeed())
 		Expect(routes).To(BeEmpty())
 	})

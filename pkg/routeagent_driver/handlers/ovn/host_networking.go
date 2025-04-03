@@ -22,12 +22,12 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"syscall"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
+	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/set"
 )
 
@@ -120,7 +120,7 @@ func (ovn *Handler) getNextHopOnK8sMgmtIntf() (*net.IP, error) {
 		return nil, errors.Wrapf(err, "error retrieving link by name %q", OVNK8sMgmntIntfName)
 	}
 
-	currentRouteList, err := ovn.netLink.RouteList(link, syscall.AF_INET)
+	currentRouteList, err := ovn.netLink.RouteList(link, k8snet.IPv4)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error retrieving routes on the link %s", OVNK8sMgmntIntfName)
 	}

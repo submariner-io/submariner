@@ -27,6 +27,7 @@ import (
 	fakeNetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
 	"github.com/submariner-io/submariner/pkg/vxlan"
 	"github.com/vishvananda/netlink"
+	k8snet "k8s.io/utils/net"
 )
 
 func TestVxlan(t *testing.T) {
@@ -170,7 +171,7 @@ var _ = Describe("Interface", func() {
 		t.netLink.AwaitDstRoutes(0, 100, destCIDR1, destCIDR2)
 
 		Expect(vxlanInterface.AddRoutes(net.ParseIP("240.17.2.3"), net.ParseIP("120.17.2.3"), 100, *ipNet1, *ipNet2)).To(Succeed())
-		list, err := t.netLink.RouteList(&netlink.GenericLink{}, 0)
+		list, err := t.netLink.RouteList(&netlink.GenericLink{}, k8snet.IPFamilyUnknown)
 		Expect(err).To(Succeed())
 		Expect(list).To(HaveLen(2))
 

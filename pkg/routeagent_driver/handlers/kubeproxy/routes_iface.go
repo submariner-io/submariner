@@ -21,13 +21,13 @@ package kubeproxy
 import (
 	"net"
 	"os"
-	"syscall"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
+	k8snet "k8s.io/utils/net"
 )
 
 func (kp *SyncHandler) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks []string, operation Operation) {
@@ -167,7 +167,7 @@ func (kp *SyncHandler) cleanVxSubmarinerRoutes() {
 		return
 	}
 
-	currentRouteList, err := kp.netLink.RouteList(link, syscall.AF_INET)
+	currentRouteList, err := kp.netLink.RouteList(link, k8snet.IPv4)
 	if err != nil {
 		logger.Errorf(err, "Unable to cleanup routes, error retrieving routes on the link %s", VxLANIface)
 		return
@@ -197,7 +197,7 @@ func (kp *SyncHandler) reconcileRoutes(vxlanGw net.IP) error {
 		return errors.Wrapf(err, "error retrieving link by name %s", VxLANIface)
 	}
 
-	currentRouteList, err := kp.netLink.RouteList(link, syscall.AF_INET)
+	currentRouteList, err := kp.netLink.RouteList(link, k8snet.IPv4)
 	if err != nil {
 		return errors.Wrapf(err, "error retrieving routes for link %s", VxLANIface)
 	}
@@ -205,7 +205,7 @@ func (kp *SyncHandler) reconcileRoutes(vxlanGw net.IP) error {
 	// First lets delete all of the routes that don't match.
 	kp.removeUnknownRoutes(vxlanGw, currentRouteList)
 
-	currentRouteList, err = kp.netLink.RouteList(link, syscall.AF_INET)
+	currentRouteList, err = kp.netLink.RouteList(link, k8snet.IPv4)
 	if err != nil {
 		return errors.Wrapf(err, "error retrieving routes for link %s", VxLANIface)
 	}
