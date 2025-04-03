@@ -58,7 +58,7 @@ type Basic interface {
 	RuleList(family k8snet.IPFamily) ([]netlink.Rule, error)
 	XfrmPolicyAdd(policy *netlink.XfrmPolicy) error
 	XfrmPolicyDel(policy *netlink.XfrmPolicy) error
-	XfrmPolicyList(family int) ([]netlink.XfrmPolicy, error)
+	XfrmPolicyList(family k8snet.IPFamily) ([]netlink.XfrmPolicy, error)
 	EnableLooseModeReversePathFilter(interfaceName string) error
 	EnsureLooseModeIsConfigured(interfaceName string) error
 	EnableForwarding(interfaceName string) error
@@ -175,8 +175,8 @@ func (n *netlinkType) XfrmPolicyDel(policy *netlink.XfrmPolicy) error {
 	return netlink.XfrmPolicyDel(policy)
 }
 
-func (n *netlinkType) XfrmPolicyList(family int) ([]netlink.XfrmPolicy, error) {
-	return netlink.XfrmPolicyList(family)
+func (n *netlinkType) XfrmPolicyList(family k8snet.IPFamily) ([]netlink.XfrmPolicy, error) {
+	return netlink.XfrmPolicyList(ToNetlinkFamily(family))
 }
 
 func (n *netlinkType) EnableLooseModeReversePathFilter(interfaceName string) error {
@@ -332,10 +332,10 @@ func DeleteIfaceAndAssociatedRoutes(iface string, tableID int) error {
 	return nil
 }
 
-func DeleteXfrmRules() error {
+func DeleteXfrmRules(family k8snet.IPFamily) error {
 	n := New()
 
-	currentXfrmPolicyList, err := n.XfrmPolicyList(syscall.AF_INET)
+	currentXfrmPolicyList, err := n.XfrmPolicyList(family)
 	if err != nil {
 		return errors.Wrap(err, "error retrieving current xfrm policies")
 	}

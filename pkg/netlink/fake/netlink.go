@@ -427,7 +427,7 @@ func (n *basicType) XfrmPolicyDel(_ *netlink.XfrmPolicy) error {
 	return nil
 }
 
-func (n *basicType) XfrmPolicyList(_ int) ([]netlink.XfrmPolicy, error) {
+func (n *basicType) XfrmPolicyList(_ k8snet.IPFamily) ([]netlink.XfrmPolicy, error) {
 	return []netlink.XfrmPolicy{}, nil
 }
 
