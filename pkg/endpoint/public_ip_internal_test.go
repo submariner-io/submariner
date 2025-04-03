@@ -235,16 +235,19 @@ var _ = Describe("public ip resolvers", func() {
 			Expect(parseIP.To4()).NotTo(BeNil())
 			Expect(resolver).To(Equal(backendConfig[publicIPConfig]))
 		})
-		It("should return some IPv6", func() {
-			backendConfig[publicIPConfig] = "api:api64.ipify.org/"
-			client := fake.NewClientset()
-			ip, resolver, err := getPublicIP(k8snet.IPv6, submSpec, client, backendConfig, false)
-			Expect(err).ToNot(HaveOccurred())
-			parseIP := net.ParseIP(ip)
-			Expect(parseIP).NotTo(BeNil())
-			Expect(parseIP.To16()).NotTo(BeNil())
-			Expect(resolver).To(Equal(backendConfig[publicIPConfig]))
-		})
+		// temporary disable this test because of GHA IPv6 limitation
+		/*
+			It("should return some IPv6", func() {
+				backendConfig[publicIPConfig] = "api:api64.ipify.org/"
+				client := fake.NewClientset()
+				ip, resolver, err := getPublicIP(k8snet.IPv6, submSpec, client, backendConfig, false)
+				Expect(err).ToNot(HaveOccurred())
+				parseIP := net.ParseIP(ip)
+				Expect(parseIP).NotTo(BeNil())
+				Expect(parseIP.To16()).NotTo(BeNil())
+				Expect(resolver).To(Equal(backendConfig[publicIPConfig]))
+			})
+		*/
 	})
 
 	When("multiple entries are specified", func() {
