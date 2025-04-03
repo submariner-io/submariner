@@ -25,6 +25,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
+	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/set"
 )
 
@@ -86,7 +87,7 @@ func (ovn *Handler) getRuleSpec(dest, src string, tableID int) (*netlink.Rule, e
 func (ovn *Handler) getExistingIPv4RuleSubnets() (set.Set[string], error) {
 	currentRuleRemotes := set.New[string]()
 
-	rules, err := ovn.netLink.RuleList(netlink.FAMILY_V4)
+	rules, err := ovn.netLink.RuleList(k8snet.IPv4)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error listing rules")
 	}

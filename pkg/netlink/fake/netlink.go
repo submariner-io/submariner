@@ -403,14 +403,14 @@ func (n *basicType) RuleDel(rule *netlink.Rule) error {
 	return nil
 }
 
-func (n *basicType) RuleList(family int) ([]netlink.Rule, error) {
+func (n *basicType) RuleList(family k8snet.IPFamily) ([]netlink.Rule, error) {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
 	var rules []netlink.Rule
 	for _, r := range n.rules {
 		for i := range r {
-			if r[i].Family == family {
+			if r[i].Family == netlinkAPI.ToNetlinkFamily(family) {
 				rules = append(rules, r[i])
 			}
 		}

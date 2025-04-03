@@ -55,7 +55,7 @@ type Basic interface {
 	FlushRouteTable(tableID int) error
 	RuleAdd(rule *netlink.Rule) error
 	RuleDel(rule *netlink.Rule) error
-	RuleList(family int) ([]netlink.Rule, error)
+	RuleList(family k8snet.IPFamily) ([]netlink.Rule, error)
 	XfrmPolicyAdd(policy *netlink.XfrmPolicy) error
 	XfrmPolicyDel(policy *netlink.XfrmPolicy) error
 	XfrmPolicyList(family int) ([]netlink.XfrmPolicy, error)
@@ -163,8 +163,8 @@ func (n *netlinkType) RuleDel(rule *netlink.Rule) error {
 	return netlink.RuleDel(rule)
 }
 
-func (n *netlinkType) RuleList(family int) ([]netlink.Rule, error) {
-	return netlink.RuleList(family)
+func (n *netlinkType) RuleList(family k8snet.IPFamily) ([]netlink.Rule, error) {
+	return netlink.RuleList(ToNetlinkFamily(family))
 }
 
 func (n *netlinkType) XfrmPolicyAdd(policy *netlink.XfrmPolicy) error {
