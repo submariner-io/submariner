@@ -153,7 +153,7 @@ func (ovn *Handler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 			return errors.Wrapf(err, "error getting local endpoint interface %q", interfaceName)
 		}
 	} else {
-		if routingInterface, err = netlink.GetDefaultGatewayInterface(); err != nil {
+		if routingInterface, err = netlink.GetDefaultGatewayInterface(k8snet.IPv4); err != nil {
 			logger.Fatalf("Unable to find the default interface on host: %s", err.Error())
 		}
 	}

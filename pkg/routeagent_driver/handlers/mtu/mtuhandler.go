@@ -259,7 +259,7 @@ func (h *mtuHandler) forceMssClamping(endpoint *submV1.Endpoint) error {
 	tcpMssValue := h.tcpMssValue
 
 	if tcpMssValue == 0 {
-		defaultHostIface, err := netlinkAPI.GetDefaultGatewayInterface()
+		defaultHostIface, err := netlinkAPI.GetDefaultGatewayInterface(k8snet.IPv4)
 		if err != nil {
 			return errors.Wrapf(err, "Unable to find the default interface on host")
 		}

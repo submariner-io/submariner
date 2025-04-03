@@ -112,7 +112,7 @@ func (kp *SyncHandler) Init(_ context.Context) error {
 		return errors.Wrapf(err, "unable to determine hostname")
 	}
 
-	kp.defaultHostIface, err = netlink.GetDefaultGatewayInterface()
+	kp.defaultHostIface, err = netlink.GetDefaultGatewayInterface(k8snet.IPv4)
 	if err != nil {
 		return errors.Wrapf(err, "Unable to find the default interface on host: %s", kp.hostname)
 	}

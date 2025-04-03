@@ -30,6 +30,7 @@ import (
 	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/mtu"
+	k8snet "k8s.io/utils/net"
 )
 
 const localCIDR = "10.1.0.0/24"
@@ -107,7 +108,7 @@ var _ = Describe("MTUHandler", func() {
 		})
 
 		It("should use the MTU value from the default gateway and add expected IP table rules", func() {
-			defaultHostIface, err := netlinkAPI.GetDefaultGatewayInterface()
+			defaultHostIface, err := netlinkAPI.GetDefaultGatewayInterface(k8snet.IPv4)
 			Expect(err).To(Succeed())
 
 			t.testForcedMSS(defaultHostIface.MTU - mtu.MaxIPSecOverhead)

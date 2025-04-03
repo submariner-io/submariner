@@ -369,7 +369,7 @@ func newTestDriver() *testDriver {
 	}
 
 	BeforeEach(func() {
-		defaultHostIface, err := netlinkAPI.GetDefaultGatewayInterface()
+		defaultHostIface, err := netlinkAPI.GetDefaultGatewayInterface(k8snet.IPv4)
 		Expect(err).To(Succeed())
 
 		t.hostInterfaceIndex = defaultHostIface.Index

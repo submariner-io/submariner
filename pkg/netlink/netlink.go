@@ -26,7 +26,6 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
-	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
@@ -271,8 +270,8 @@ func ipv4ConfPath(interfaceName string) string {
 }
 
 //nolint:wrapcheck // Let the caller wrap external errors
-func GetDefaultGatewayInterface() (*net.Interface, error) {
-	routes, err := netlink.RouteList(nil, syscall.AF_INET)
+func GetDefaultGatewayInterface(family k8snet.IPFamily) (*net.Interface, error) {
+	routes, err := netlink.RouteList(nil, ToNetlinkFamily(family))
 	if err != nil {
 		return nil, err
 	}
