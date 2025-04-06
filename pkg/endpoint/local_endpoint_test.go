@@ -97,6 +97,13 @@ var _ = Describe("GetLocalSpec", func() {
 				},
 			}, nil
 		}
+
+		endpoint.GetLocalIPFromRoutesFunc = func(family k8snet.IPFamily) string {
+			if family == k8snet.IPv4 {
+				return "1.2.3.4"
+			}
+			return "2001:0:0:4321::"
+		}
 	})
 
 	JustBeforeEach(func() {
