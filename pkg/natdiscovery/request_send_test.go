@@ -35,10 +35,10 @@ var _ = When("a request is sent", func() {
 		serverConnection *FakeServerConnection
 	)
 
-	localEndpoint := createTestLocalEndpoint()
+	localEndpoint := createTestLocalEndpoint(true, false)
 
 	BeforeEach(func() {
-		remoteEndpoint = createTestRemoteEndpoint()
+		remoteEndpoint = createTestRemoteEndpoint(true, false)
 		remoteEndpoint.Spec.PublicIPs = []string{}
 		remoteEndpoint.Spec.PrivateIPs = []string{}
 	})
@@ -47,7 +47,7 @@ var _ = When("a request is sent", func() {
 		nd := newNATDiscovery(&localEndpoint, &net.UDPAddr{
 			IP:   net.ParseIP(testLocalPrivateIP),
 			Port: int(testLocalNATPort),
-		})
+		}, nil)
 
 		nd.instance.AddEndpoint(&remoteEndpoint, k8snet.IPv4)
 		nd.checkDiscovery()

@@ -26,9 +26,13 @@ import (
 	"github.com/pkg/errors"
 	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 	"google.golang.org/protobuf/proto"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	k8snet "k8s.io/utils/net"
 )
+
+var familyToNetwork = map[k8snet.IPFamily]string{
+	k8snet.IPv4: "udp4",
+	k8snet.IPv6: "udp6",
+}
 
 type ServerConnection interface {
 	Close() error
@@ -49,24 +53,12 @@ func (nd *natDiscovery) runListeners(stopCh <-chan struct{}) error {
 }
 
 func (nd *natDiscovery) runListener(family k8snet.IPFamily, stopCh <-chan struct{}) error {
-	var errs []error
-
-	if family == k8snet.IPv4 {
-		err := nd.runListenerV4(stopCh)
-		errs = append(errs, err)
-	}
-
-	// TODO_IPV6: add V6 runListener for V6
-	return utilerrors.NewAggregate(errs)
-}
-
-func (nd *natDiscovery) runListenerV4(stopCh <-chan struct{}) error {
 	if nd.serverPort == 0 {
 		logger.Infof("NAT discovery protocol port not set for this gateway")
 		return nil
 	}
 
-	serverConnection, err := nd.CreateServerConnection(nd.serverPort, k8snet.IPv4)
+	serverConnection, err := nd.CreateServerConnection(nd.serverPort, family)
 	if err != nil {
 		return err
 	}
@@ -74,7 +66,7 @@ func (nd *natDiscovery) runListenerV4(stopCh <-chan struct{}) error {
 	// Instead of storing the server connection I save the reference to the WriteToUDP
 	// of our server connection instance, in a way that we can use this for unit testing
 	// later too.
-	nd.serverUDPWrite = serverConnection.WriteToUDP
+	nd.serverUDPWrite[family] = serverConnection.WriteToUDP
 
 	go func() {
 		<-stopCh
@@ -86,17 +78,17 @@ func (nd *natDiscovery) runListenerV4(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func createServerConnection(port int32, _ k8snet.IPFamily) (ServerConnection, error) {
-	network := "udp4"
+func createServerConnection(port int32, family k8snet.IPFamily) (ServerConnection, error) {
+	address := ":" + strconv.Itoa(int(port))
 
-	serverAddress, err := net.ResolveUDPAddr(network, ":"+strconv.Itoa(int(port)))
+	serverAddr, err := net.ResolveUDPAddr(familyToNetwork[family], address)
 	if err != nil {
-		return nil, errors.Wrap(err, "Error resolving UDP address")
+		return nil, errors.Wrapf(err, "error resolving UDP address for IPv%v", family)
 	}
 
-	serverConnection, err := net.ListenUDP(network, serverAddress)
+	serverConnection, err := net.ListenUDP(familyToNetwork[family], serverAddr)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Error listening on udp port %d", port)
+		return nil, errors.Wrapf(err, "error listening on UDP port %d for IPv%v", port, family)
 	}
 
 	return serverConnection, nil

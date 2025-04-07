@@ -25,7 +25,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	natproto "github.com/submariner-io/submariner/pkg/natdiscovery/proto"
 	"google.golang.org/protobuf/proto"
-	k8snet "k8s.io/utils/net"
 )
 
 func (nd *natDiscovery) sendCheckRequest(remoteNAT *remoteEndpointNAT) error {
@@ -39,7 +38,7 @@ func (nd *natDiscovery) sendCheckRequest(remoteNAT *remoteEndpointNAT) error {
 		}
 	}
 
-	if remoteNAT.endpoint.Spec.GetPublicIP(k8snet.IPv4) != "" {
+	if remoteNAT.endpoint.Spec.GetPublicIP(remoteNAT.family) != "" {
 		reqID, errPublic = nd.sendCheckRequestToTargetIP(remoteNAT, remoteNAT.endpoint.Spec.GetPublicIP(remoteNAT.family))
 		if errPublic == nil {
 			remoteNAT.lastPublicIPRequestID = reqID
@@ -47,18 +46,18 @@ func (nd *natDiscovery) sendCheckRequest(remoteNAT *remoteEndpointNAT) error {
 	}
 
 	if errPrivate != nil && errPublic != nil {
-		return errors.Errorf("error while trying to discover both public & private IPs of endpoint %q, [%s, %s]",
-			remoteNAT.endpoint.Spec.CableName, errPublic, errPrivate)
+		return errors.Errorf("error while trying to discover both public & private IPv%v addresses of endpoint %q, [%s, %s]",
+			remoteNAT.family, remoteNAT.endpoint.Spec.CableName, errPublic, errPrivate)
 	}
 
 	if errPrivate != nil {
-		return errors.Wrapf(errPrivate, "error while trying to NAT-discover private IP of endpoint %q",
-			remoteNAT.endpoint.Spec.CableName)
+		return errors.Wrapf(errPrivate, "error while trying to NAT-discover private IPv%v of endpoint %q",
+			remoteNAT.family, remoteNAT.endpoint.Spec.CableName)
 	}
 
 	if errPublic != nil {
-		return errors.Wrapf(errPublic, "error while trying to NAT-discover public IP of endpoint %q",
-			remoteNAT.endpoint.Spec.CableName)
+		return errors.Wrapf(errPublic, "error while trying to NAT-discover public IPv%v of endpoint %q",
+			remoteNAT.family, remoteNAT.endpoint.Spec.CableName)
 	}
 
 	return nil
@@ -119,7 +118,7 @@ func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT,
 		request.GetRequestNumber(), request.GetSender().GetEndpointId(), request.GetReceiver().GetEndpointId(),
 		request.GetUsingSrc().GetIP(), request.GetUsingSrc().GetPort(), request.GetUsingDst().GetIP(), request.GetUsingDst().GetPort())
 
-	if length, err := nd.serverUDPWrite(buf, &addr); err != nil {
+	if length, err := nd.serverUDPWrite[remoteNAT.family](buf, &addr); err != nil {
 		return request.GetRequestNumber(), errors.Wrapf(err, "error sending request packet %#v", request)
 	} else if length != len(buf) {
 		return request.GetRequestNumber(), errors.Errorf("the sent UDP packet was smaller than requested, sent=%d, expected=%d", length,

@@ -38,18 +38,18 @@ var _ = Describe("Request handling", func() {
 	)
 
 	BeforeEach(func() {
-		localEndpoint = createTestLocalEndpoint()
-		remoteEndpoint = createTestRemoteEndpoint()
+		localEndpoint = createTestLocalEndpoint(true, false)
+		remoteEndpoint = createTestRemoteEndpoint(true, false)
 
 		localND = newNATDiscovery(&localEndpoint, &net.UDPAddr{
 			IP:   net.ParseIP(testLocalPrivateIP),
 			Port: int(testLocalNATPort),
-		})
+		}, nil)
 
 		remoteND = newNATDiscovery(&remoteEndpoint, &net.UDPAddr{
 			IP:   net.ParseIP(testRemotePrivateIP),
 			Port: int(testRemoteNATPort),
-		})
+		}, nil)
 	})
 
 	parseResponseInLocalListener := func(udpPacket []byte, remoteAddr *net.UDPAddr) *natproto.SubmarinerNATDiscoveryResponse {

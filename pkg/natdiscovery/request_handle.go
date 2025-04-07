@@ -100,7 +100,7 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscove
 	// Detect DST NAT with a naive implementation that assumes that we always receive on the PrivateIP,
 	// if we will listen at some point on multiple addresses we will need to implement the
 	// unix.IP_RECVORIGDSTADDR on the UDP socket, and the go recvmsg implementation instead of readfrom
-	if req.GetUsingDst().GetIP() != localEndpointSpec.GetPrivateIP(k8snet.IPv4) {
+	if req.GetUsingDst().GetIP() != localEndpointSpec.GetPrivateIP(family) {
 		response.DstIpNatDetected = true
 	}
 
@@ -126,7 +126,7 @@ func (nd *natDiscovery) sendResponseToAddress(response *proto.SubmarinerNATDisco
 		addr.IP.String(), addr.Port, response.GetRequestNumber(), response.GetResponse(), response.GetSenderEndpointID(),
 		response.GetReceiverEndpointID())
 
-	if length, err := nd.serverUDPWrite(buf, addr); err != nil {
+	if length, err := nd.serverUDPWrite[k8snet.IPFamilyOf(addr.IP)](buf, addr); err != nil {
 		return errors.Wrapf(err, "error sending response packet %#v", response)
 	} else if length != len(buf) {
 		return errors.Errorf("the sent UDP packet was smaller than requested, sent=%d, expected=%d", length, len(buf))
