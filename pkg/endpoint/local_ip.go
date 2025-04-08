@@ -27,10 +27,13 @@ import (
 	k8snet "k8s.io/utils/net"
 )
 
-var familyToDestIP = map[k8snet.IPFamily]string{
-	k8snet.IPv4: "8.8.8.8",
-	k8snet.IPv6: "2001:4860:4860::8888",
-}
+var (
+	familyToDestIP = map[k8snet.IPFamily]string{
+		k8snet.IPv4: "8.8.8.8",
+		k8snet.IPv6: "2001:4860:4860::8888",
+	}
+	Dial = net.Dial
+)
 
 func getLocalIPFromRoutes(family k8snet.IPFamily) (string, error) {
 	netlink := netlinkAPI.New()
@@ -50,7 +53,7 @@ func getLocalIPFromRoutes(family k8snet.IPFamily) (string, error) {
 }
 
 func GetLocalIPForDestination(dst string, family k8snet.IPFamily) string {
-	conn, err := net.Dial("udp"+string(family), "["+dst+"]:53")
+	conn, err := Dial("udp"+string(family), "["+dst+"]:53")
 	if err == nil {
 		defer conn.Close()
 		localAddr := conn.LocalAddr().(*net.UDPAddr)

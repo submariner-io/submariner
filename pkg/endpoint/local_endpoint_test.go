@@ -52,8 +52,6 @@ var _ = Describe("GetLocalSpec", func() {
 		node     *v1.Node
 	)
 
-	testPrivateIP := endpoint.GetLocalIP(k8snet.IPv4)
-
 	const (
 		testIPv4Label       = "ipv4:"
 		testPublicIP        = "4.3.2.1"
@@ -67,6 +65,8 @@ var _ = Describe("GetLocalSpec", func() {
 		ipv4CIDR            = cniInterfaceIPv4 + "/16"
 		cniInterfaceIPv6    = "2001:0:0:1234::"
 		ipv6CIDR            = cniInterfaceIPv6 + "/64"
+		ipv4LocalIP         = "1.2.3.4"
+		ipv6LocalIP         = "2001:0:0:4321::"
 	)
 
 	BeforeEach(func() {
@@ -109,15 +109,24 @@ var _ = Describe("GetLocalSpec", func() {
 
 		Expect(netLink.RouteAdd(&netlink.Route{
 			LinkIndex: 1,
-			Src:       net.ParseIP("1.2.3.4"),
+			Src:       net.ParseIP(ipv4LocalIP),
 			Gw:        net.ParseIP("1.2.0.0"),
 		})).To(Succeed())
 
 		Expect(netLink.RouteAdd(&netlink.Route{
 			LinkIndex: 2,
-			Src:       net.ParseIP("2001:0:0:4321::"),
+			Src:       net.ParseIP(ipv6LocalIP),
 			Gw:        net.ParseIP("2001:0:0:0::"),
 		})).To(Succeed())
+
+		defaultDial := endpoint.Dial
+		DeferCleanup(func() {
+			endpoint.Dial = defaultDial
+		})
+
+		endpoint.Dial = func(_, _ string) (net.Conn, error) {
+			return nil, errors.New("mock error")
+		}
 	})
 
 	JustBeforeEach(func() {
@@ -131,12 +140,39 @@ var _ = Describe("GetLocalSpec", func() {
 		Expect(spec.ClusterID).To(Equal("east"))
 		Expect(spec.CableName).To(HavePrefix("submariner-cable-east-"))
 		Expect(spec.Hostname).NotTo(BeEmpty())
-		Expect(spec.GetPrivateIP(k8snet.IPv4)).To(Equal(testPrivateIP))
+		Expect(spec.GetPrivateIP(k8snet.IPv4)).To(Equal(ipv4LocalIP))
 		Expect(spec.Backend).To(Equal("backend"))
 		Expect(spec.Subnets).To(Equal(submSpec.ClusterCidr))
 		Expect(spec.NATEnabled).To(BeFalse())
 		Expect(spec.BackendConfig[testUDPPortLabel]).To(Equal(testUDPPort))
 		Expect(spec.HealthCheckIPs).To(BeEmpty())
+	})
+
+	Context("using net.Dial for IPv4", func() {
+		BeforeEach(func() {
+			endpoint.Dial = net.Dial
+		})
+
+		It("should set the IPv4 private IP", func() {
+			spec, err := endpoint.GetLocalSpec(context.TODO(), submSpec, client, true)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(spec.GetPrivateIP(k8snet.IPv4)).To(Equal(endpoint.GetLocalIP(k8snet.IPv4)))
+		})
+	})
+
+	Context("with dual-stack", func() {
+		BeforeEach(func() {
+			submSpec.ClusterCidr = append(submSpec.ClusterCidr, ipv6CIDR)
+		})
+
+		It("should set IPv4 and IPv6 private IPs", func() {
+			spec, err := endpoint.GetLocalSpec(context.TODO(), submSpec, client, true)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(spec.PrivateIPs).To(ContainElements(ipv4LocalIP, ipv6LocalIP))
+			Expect(spec.PrivateIPs).To(HaveLen(2))
+		})
 	})
 
 	When("the gateway node is not annotated with udp port", func() {
@@ -168,7 +204,7 @@ var _ = Describe("GetLocalSpec", func() {
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(spec.ClusterID).To(Equal("east"))
-			Expect(spec.PrivateIPs).To(Equal([]string{testPrivateIP}))
+			Expect(spec.PrivateIPs).To(Equal([]string{ipv4LocalIP}))
 			Expect(spec.PublicIPs).To(BeEmpty())
 		})
 	})
@@ -182,7 +218,7 @@ var _ = Describe("GetLocalSpec", func() {
 			spec, err := endpoint.GetLocalSpec(context.TODO(), submSpec, client, true)
 
 			Expect(err).ToNot(HaveOccurred())
-			Expect(spec.PrivateIPs).To(Equal([]string{testPrivateIP}))
+			Expect(spec.PrivateIPs).To(Equal([]string{ipv4LocalIP}))
 			Expect(spec.PublicIPs).To(Equal([]string{testPublicIP}))
 		})
 	})
