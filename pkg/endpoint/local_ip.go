@@ -27,13 +27,10 @@ import (
 	k8snet "k8s.io/utils/net"
 )
 
-var (
-	familyToDestIP = map[k8snet.IPFamily]string{
-		k8snet.IPv4: "8.8.8.8",
-		k8snet.IPv6: "2001:4860:4860::8888",
-	}
-	GetLocalIPFromRoutesFunc func(family k8snet.IPFamily) string
-)
+var familyToDestIP = map[k8snet.IPFamily]string{
+	k8snet.IPv4: "8.8.8.8",
+	k8snet.IPv6: "2001:4860:4860::8888",
+}
 
 func getLocalIPFromRoutes(family k8snet.IPFamily) (string, error) {
 	netlink := netlinkAPI.New()
@@ -61,10 +58,6 @@ func GetLocalIPForDestination(dst string, family k8snet.IPFamily) string {
 		return localAddr.IP.String()
 	}
 
-	// hook for testing because GHA doesn't support IPv6
-	if GetLocalIPFromRoutesFunc != nil {
-		return GetLocalIPFromRoutesFunc(family)
-	}
 	// connection failed try fallback method
 	localIP, err := getLocalIPFromRoutes(family)
 	logger.FatalOnError(err, fmt.Sprintf("Error getting local IPv%v", family))

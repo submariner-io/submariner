@@ -21,6 +21,7 @@ package endpoint_test
 import (
 	"context"
 	"errors"
+	"net"
 	"os"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -29,7 +30,10 @@ import (
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/endpoint"
+	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
+	fakeNetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
 	"github.com/submariner-io/submariner/pkg/types"
+	"github.com/vishvananda/netlink"
 	v1 "k8s.io/api/core/v1"
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
@@ -98,12 +102,22 @@ var _ = Describe("GetLocalSpec", func() {
 			}, nil
 		}
 
-		endpoint.GetLocalIPFromRoutesFunc = func(family k8snet.IPFamily) string {
-			if family == k8snet.IPv4 {
-				return "1.2.3.4"
-			}
-			return "2001:0:0:4321::"
+		netLink := fakeNetlink.New()
+		netlinkAPI.NewFunc = func() netlinkAPI.Interface {
+			return netLink
 		}
+
+		Expect(netLink.RouteAdd(&netlink.Route{
+			LinkIndex: 1,
+			Src:       net.ParseIP("1.2.3.4"),
+			Gw:        net.ParseIP("1.2.0.0"),
+		})).To(Succeed())
+
+		Expect(netLink.RouteAdd(&netlink.Route{
+			LinkIndex: 2,
+			Src:       net.ParseIP("2001:0:0:4321::"),
+			Gw:        net.ParseIP("2001:0:0:0::"),
+		})).To(Succeed())
 	})
 
 	JustBeforeEach(func() {
