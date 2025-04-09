@@ -104,7 +104,7 @@ func parseResolver(resolver string) (string, string, error) {
 	return method, config, nil
 }
 
-func getPublicIP(family k8snet.IPFamily, submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface,
+func GetPublicIP(family k8snet.IPFamily, submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface,
 	backendConfig map[string]string, airGapped bool,
 ) (string, string, error) {
 	switch family {
@@ -214,7 +214,7 @@ func publicIP(family k8snet.IPFamily, _ kubernetes.Interface, _, value string) (
 	return firstIPInString(family, value)
 }
 
-var loadBalancerRetryConfig = wait.Backoff{
+var LoadBalancerRetryConfig = wait.Backoff{
 	Cap:      6 * time.Minute,
 	Duration: 5 * time.Second,
 	Factor:   1.2,
@@ -224,7 +224,7 @@ var loadBalancerRetryConfig = wait.Backoff{
 func publicLoadBalancerIP(family k8snet.IPFamily, clientset kubernetes.Interface, namespace, loadBalancerName string) (string, error) {
 	resolvedIP := ""
 
-	err := retry.OnError(loadBalancerRetryConfig, func(err error) bool {
+	err := retry.OnError(LoadBalancerRetryConfig, func(err error) bool {
 		logger.Infof("Waiting for LoadBalancer to be ready: %s", err)
 		return true
 	}, func() error {

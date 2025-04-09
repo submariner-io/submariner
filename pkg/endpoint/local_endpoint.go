@@ -186,7 +186,7 @@ func GetLocalSpec(ctx context.Context, submSpec *types.SubmarinerSpecification, 
 		strings.ReplaceAll(endpointSpec.GetPrivateIP(k8snet.IPv4), ".", "-"))
 
 	for _, family := range submSpec.GetIPFamilies() {
-		publicIP, resolver, err := getPublicIP(family, submSpec, k8sClient, backendConfig, airGappedDeployment)
+		publicIP, resolver, err := GetPublicIP(family, submSpec, k8sClient, backendConfig, airGappedDeployment)
 		if err != nil {
 			return nil, errors.Wrapf(err, "could not determine public IPv%v", family)
 		}
