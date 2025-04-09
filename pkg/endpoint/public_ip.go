@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/resource"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -218,7 +219,7 @@ var loadBalancerRetryConfig = wait.Backoff{
 }
 
 func publicLoadBalancerIP(family k8snet.IPFamily, clientset kubernetes.Interface, namespace, loadBalancerName string) (string, error) {
-	ip := ""
+	resolvedIP := ""
 
 	err := retry.OnError(loadBalancerRetryConfig, func(err error) bool {
 		logger.Infof("Waiting for LoadBalancer to be ready: %s", err)
@@ -237,19 +238,27 @@ func publicLoadBalancerIP(family k8snet.IPFamily, clientset kubernetes.Interface
 			switch {
 			case ingress.IP != "":
 				if k8snet.IPFamilyOfString(ingress.IP) == family {
-					ip = ingress.IP
+					resolvedIP = ingress.IP
 					return nil
 				}
 			case ingress.Hostname != "":
-				ip, err = publicDNSIP(family, clientset, namespace, ingress.Hostname)
-				return err
+				ip, err := publicDNSIP(family, clientset, namespace, ingress.Hostname)
+				if err != nil {
+					return err
+				}
+
+				if ip != "" {
+					resolvedIP = ip
+					return nil
+				}
 			}
 		}
 
-		return errors.Errorf("no IP or Hostname for service LoadBalancer %q Ingress", loadBalancerName)
+		return errors.Errorf("no IP or Hostname resolved for service LoadBalancer %q Ingress: %s",
+			loadBalancerName, resource.ToJSON(service.Status.LoadBalancer.Ingress))
 	})
 
-	return ip, err //nolint:wrapcheck  // No need to wrap here
+	return resolvedIP, err //nolint:wrapcheck  // No need to wrap here
 }
 
 func publicDNSIP(family k8snet.IPFamily, _ kubernetes.Interface, _, fqdn string) (string, error) {
