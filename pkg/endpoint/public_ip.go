@@ -183,7 +183,10 @@ func resolvePublicIP(family k8snet.IPFamily, k8sClient kubernetes.Interface, nam
 }
 
 func publicAPI(family k8snet.IPFamily, _ kubernetes.Interface, _, value string) (string, error) {
-	url := "https://" + value
+	url := value
+	if !strings.HasPrefix(url, "http") {
+		url = "https://" + value
+	}
 
 	httpClient := http.Client{
 		Timeout: 30 * time.Second,
