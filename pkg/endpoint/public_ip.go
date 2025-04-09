@@ -264,8 +264,10 @@ func publicLoadBalancerIP(family k8snet.IPFamily, clientset kubernetes.Interface
 	return resolvedIP, err //nolint:wrapcheck  // No need to wrap here
 }
 
+var LookupIP = net.LookupIP
+
 func publicDNSIP(family k8snet.IPFamily, _ kubernetes.Interface, _, fqdn string) (string, error) {
-	ips, err := net.LookupIP(fqdn)
+	ips, err := LookupIP(fqdn)
 	if err != nil {
 		return "", errors.Wrapf(err, "error resolving DNS hostname %q for public IP", fqdn)
 	}
@@ -278,11 +280,13 @@ func publicDNSIP(family k8snet.IPFamily, _ kubernetes.Interface, _, fqdn string)
 		}
 	}
 
-	if len(filteredIPs) > 1 {
-		sort.Slice(filteredIPs, func(i, j int) bool {
-			return bytes.Compare(filteredIPs[i], filteredIPs[j]) < 0
-		})
+	if len(filteredIPs) == 0 {
+		return "", nil
 	}
+
+	sort.Slice(filteredIPs, func(i, j int) bool {
+		return bytes.Compare(filteredIPs[i], filteredIPs[j]) < 0
+	})
 
 	return filteredIPs[0].String(), nil
 }
@@ -297,7 +301,7 @@ func firstIPInString(family k8snet.IPFamily, body string) (string, error) {
 	}
 
 	if len(matches) == 0 {
-		return "", errors.Errorf("No IPv%s found in: %q", family, body)
+		return "", errors.Errorf("no IPv%s address found in: %q", family, body)
 	}
 
 	return matches[0], nil
