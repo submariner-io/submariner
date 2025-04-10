@@ -74,7 +74,11 @@ func (c *baseSyncerController) Start() error {
 
 func (c *baseSyncerController) Stop() {
 	c.baseController.Stop()
-	c.resourceSyncer.AwaitStopped()
+
+	err := c.resourceSyncer.AwaitStopped(context.TODO())
+	if err != nil {
+		logger.Warning(err.Error())
+	}
 }
 
 func (c *baseSyncerController) reconcile(client dynamic.ResourceInterface, labelSelector, fieldSelector string,
