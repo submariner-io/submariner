@@ -24,8 +24,8 @@ import (
 
 func (c *handlerController) handleUpdatedEndpoint(endpoint *smv1.Endpoint, requeueCount int) bool {
 	if requeueCount > maxRequeues {
-		logger.Errorf(nil, "Ignoring update event for endpoint %q, as its requeued for more than %d times",
-			endpoint.Spec.ClusterID, maxRequeues)
+		logger.Errorf(nil, "Handler %q: Ignoring update event for endpoint %q, as it's requeued for more than %d times",
+			c.handler.GetName(), endpoint.Name, maxRequeues)
 		return false
 	}
 
@@ -40,7 +40,7 @@ func (c *handlerController) handleUpdatedEndpoint(endpoint *smv1.Endpoint, reque
 	}
 
 	if err != nil {
-		logger.Error(err, "Error handling updated endpoint")
+		logger.Errorf(err, "Handler %q: Error handling updated endpoint %q", c.handler.GetName(), endpoint.Name)
 	}
 
 	return err != nil
