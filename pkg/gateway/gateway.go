@@ -36,7 +36,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/cableengine"
 	"github.com/submariner-io/submariner/pkg/cableengine/healthchecker"
 	"github.com/submariner-io/submariner/pkg/cableengine/syncer"
-	"github.com/submariner-io/submariner/pkg/cidr"
 	submclientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/controllers/datastoresyncer"
 	"github.com/submariner-io/submariner/pkg/controllers/tunnel"
@@ -53,7 +52,6 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
-	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -445,11 +443,10 @@ func submarinerClusterFrom(submSpec *types.SubmarinerSpecification) *types.Subma
 	return &types.SubmarinerCluster{
 		ID: submSpec.ClusterID,
 		Spec: subv1.ClusterSpec{
-			ClusterID:  submSpec.ClusterID,
-			ColorCodes: []string{"blue"}, // This is a fake value, used only for upgrade purposes
-			// TODO_IPV6: delete cidr.ExtractSubnets(k8snet.IPv4,
-			ServiceCIDR: cidr.ExtractSubnets(k8snet.IPv4, submSpec.ServiceCidr),
-			ClusterCIDR: cidr.ExtractSubnets(k8snet.IPv4, submSpec.ClusterCidr),
+			ClusterID:   submSpec.ClusterID,
+			ColorCodes:  []string{"blue"}, // This is a fake value, used only for upgrade purposes
+			ServiceCIDR: submSpec.ServiceCidr,
+			ClusterCIDR: submSpec.ClusterCidr,
 			GlobalCIDR:  globalCIDR,
 		},
 	}
