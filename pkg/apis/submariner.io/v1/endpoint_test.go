@@ -48,6 +48,7 @@ var _ = Describe("EndpointSpec", func() {
 	Context("GetIPFamilies", testGetIPFamilies)
 	Context("ParseSubnets", testParseSubnets)
 	Context("ExtractSubnetsExcludingIP", testExtractSubnetsExcludingIP)
+	Context("GatewayIP", testGatewayIP)
 })
 
 func testGenerateName() {
@@ -502,6 +503,30 @@ func testExtractSubnetsExcludingIP() {
 					Expect(result).To(Equal([]string{ipV6CIDR}))
 				})
 			})
+		})
+	})
+}
+
+func testGatewayIP() {
+	Context("with the public IP set", func() {
+		It("should return the correct public IP for the given IP family", func() {
+			spec := &v1.EndpointSpec{
+				PublicIPs: []string{ipV6Addr, ipV4Addr},
+			}
+
+			Expect(spec.GatewayIP(k8snet.IPv4)).To(Equal(net.ParseIP(ipV4Addr)))
+			Expect(spec.GatewayIP(k8snet.IPv6)).To(Equal(net.ParseIP(ipV6Addr)))
+		})
+	})
+
+	Context("with only the private IP set", func() {
+		It("should return the correct private IP for the given IP family", func() {
+			spec := &v1.EndpointSpec{
+				PrivateIPs: []string{ipV6Addr, ipV4Addr},
+			}
+
+			Expect(spec.GatewayIP(k8snet.IPv4)).To(Equal(net.ParseIP(ipV4Addr)))
+			Expect(spec.GatewayIP(k8snet.IPv6)).To(Equal(net.ParseIP(ipV6Addr)))
 		})
 	})
 }
