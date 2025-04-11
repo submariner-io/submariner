@@ -31,7 +31,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/util"
 	submv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/cidr"
 	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/node"
 	"github.com/submariner-io/submariner/pkg/port"
@@ -155,9 +154,8 @@ func GetLocalSpec(ctx context.Context, submSpec *types.SubmarinerSpecification, 
 		localSubnets = submSpec.GlobalCidr
 		globalnetEnabled = true
 	} else {
-		// TODO_IPV6: set localSubnets to submSpec.ServiceCidr + submSpec.ClusterCidr
-		localSubnets = append(localSubnets, cidr.ExtractIPv4Subnets(submSpec.ServiceCidr)...)
-		localSubnets = append(localSubnets, cidr.ExtractIPv4Subnets(submSpec.ClusterCidr)...)
+		localSubnets = append(localSubnets, submSpec.ServiceCidr...)
+		localSubnets = append(localSubnets, submSpec.ClusterCidr...)
 	}
 
 	backendConfig, err := getBackendConfig(gwNode)
