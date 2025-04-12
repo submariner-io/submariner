@@ -90,13 +90,15 @@ func (kp *SyncHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 }
 
 func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
-	if err := cidr.OverlappingSubnets(kp.localServiceCidr, kp.localClusterCidr, endpoint.Spec.Subnets); err != nil {
+	subnets := cidr.ExtractIPv4Subnets(endpoint.Spec.Subnets)
+
+	if err := cidr.OverlappingSubnets(kp.localServiceCidr, kp.localClusterCidr, subnets); err != nil {
 		// Skip processing the endpoint when CIDRs overlap and return nil to avoid re-queuing.
 		logger.Errorf(err, "overlappingSubnets for new remote %#v returned error", endpoint)
 		return nil
 	}
 
-	for _, inputCidrBlock := range endpoint.Spec.Subnets {
+	for _, inputCidrBlock := range subnets {
 		if !kp.remoteSubnets.Has(inputCidrBlock) {
 			kp.remoteSubnets.Insert(inputCidrBlock)
 		}
@@ -105,33 +107,35 @@ func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 		kp.remoteSubnetGw[inputCidrBlock] = gwIP
 	}
 
-	if err := kp.updateRoutingRulesForInterClusterSupport(endpoint.Spec.Subnets, Add); err != nil {
+	if err := kp.updateRoutingRulesForInterClusterSupport(subnets, Add); err != nil {
 		logger.Errorf(err, "updateRoutingRulesForInterClusterSupport for new remote %#v returned error",
 			endpoint)
 		return err
 	}
 
 	// Add routes to the new endpoint on the GatewayNode.
-	kp.updateRoutingRulesForHostNetworkSupport(endpoint.Spec.Subnets, Add)
-	kp.updateIptableRulesForInterClusterTraffic(endpoint.Spec.Subnets, Add)
+	kp.updateRoutingRulesForHostNetworkSupport(subnets, Add)
+	kp.updateIptableRulesForInterClusterTraffic(subnets, Add)
 
 	return nil
 }
 
 func (kp *SyncHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
-	for _, inputCidrBlock := range endpoint.Spec.Subnets {
+	subnets := cidr.ExtractIPv4Subnets(endpoint.Spec.Subnets)
+
+	for _, inputCidrBlock := range subnets {
 		kp.remoteSubnets.Delete(inputCidrBlock)
 		delete(kp.remoteSubnetGw, inputCidrBlock)
 	}
 
-	if err := kp.updateRoutingRulesForInterClusterSupport(endpoint.Spec.Subnets, Delete); err != nil {
+	if err := kp.updateRoutingRulesForInterClusterSupport(subnets, Delete); err != nil {
 		logger.Errorf(err, "updateRoutingRulesForInterClusterSupport for removed remote %#v returned error",
 			endpoint)
 		return err
 	}
 
-	kp.updateRoutingRulesForHostNetworkSupport(endpoint.Spec.Subnets, Delete)
-	kp.updateIptableRulesForInterClusterTraffic(endpoint.Spec.Subnets, Delete)
+	kp.updateRoutingRulesForHostNetworkSupport(subnets, Delete)
+	kp.updateIptableRulesForInterClusterTraffic(subnets, Delete)
 
 	return nil
 }
