@@ -51,11 +51,15 @@ var _ = Describe("ExtractIPFamilies", func() {
 	})
 })
 
-var _ = Describe("ExtractIPv4Subnets", func() {
+var _ = Describe("ExtractSubnets", func() {
 	It("should return the correct subnets", func() {
-		Expect(cidr.ExtractIPv4Subnets([]string{ipV4CIDR, ipV6CIDR})).To(Equal([]string{ipV4CIDR}))
-		Expect(cidr.ExtractIPv4Subnets([]string{ipV4CIDR, ipV4CIDR2})).To(Equal([]string{ipV4CIDR, ipV4CIDR2}))
-		Expect(cidr.ExtractIPv4Subnets([]string{})).To(BeEmpty())
+		Expect(cidr.ExtractSubnets(k8snet.IPv4, []string{ipV4CIDR, ipV6CIDR})).To(Equal([]string{ipV4CIDR}))
+		Expect(cidr.ExtractSubnets(k8snet.IPv4, []string{ipV6CIDR})).To(BeEmpty())
+		Expect(cidr.ExtractSubnets(k8snet.IPv4, []string{ipV4CIDR, ipV4CIDR2})).To(Equal([]string{ipV4CIDR, ipV4CIDR2}))
+		Expect(cidr.ExtractSubnets(k8snet.IPv4, []string{})).To(BeEmpty())
+
+		Expect(cidr.ExtractSubnets(k8snet.IPv6, []string{ipV4CIDR, ipV6CIDR})).To(Equal([]string{ipV6CIDR}))
+		Expect(cidr.ExtractSubnets(k8snet.IPv6, []string{ipV4CIDR})).To(BeEmpty())
 	})
 })
 

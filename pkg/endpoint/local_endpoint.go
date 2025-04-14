@@ -156,8 +156,8 @@ func GetLocalSpec(ctx context.Context, submSpec *types.SubmarinerSpecification, 
 		globalnetEnabled = true
 	} else {
 		// TODO_IPV6: set localSubnets to submSpec.ServiceCidr + submSpec.ClusterCidr
-		localSubnets = append(localSubnets, cidr.ExtractIPv4Subnets(submSpec.ServiceCidr)...)
-		localSubnets = append(localSubnets, cidr.ExtractIPv4Subnets(submSpec.ClusterCidr)...)
+		localSubnets = append(localSubnets, cidr.ExtractSubnets(k8snet.IPv4, submSpec.ServiceCidr)...)
+		localSubnets = append(localSubnets, cidr.ExtractSubnets(k8snet.IPv4, submSpec.ClusterCidr)...)
 	}
 
 	backendConfig, err := getBackendConfig(gwNode)

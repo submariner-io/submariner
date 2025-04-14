@@ -68,8 +68,8 @@ func NewSyncHandler(localClusterCidr, localServiceCidr []string) *SyncHandler {
 	utilruntime.Must(err)
 
 	return &SyncHandler{
-		localClusterCidr: cidr.ExtractIPv4Subnets(localClusterCidr),
-		localServiceCidr: cidr.ExtractIPv4Subnets(localServiceCidr),
+		localClusterCidr: cidr.ExtractSubnets(k8snet.IPv4, localClusterCidr),
+		localServiceCidr: cidr.ExtractSubnets(k8snet.IPv4, localServiceCidr),
 		remoteSubnets:    set.New[string](),
 		remoteSubnetGw:   map[string]net.IP{},
 		remoteVTEPs:      set.New[string](),

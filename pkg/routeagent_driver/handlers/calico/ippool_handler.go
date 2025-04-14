@@ -39,6 +39,7 @@ import (
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -151,7 +152,7 @@ func (h *calicoIPPoolHandler) Uninstall() error {
 }
 
 func (h *calicoIPPoolHandler) createIPPool(endpoint *submV1.Endpoint) error {
-	subnets := cidr.ExtractIPv4Subnets(endpoint.Spec.Subnets)
+	subnets := cidr.ExtractSubnets(k8snet.IPv4, endpoint.Spec.Subnets)
 	var retErrors []error
 
 	for _, subnet := range subnets {
@@ -185,7 +186,7 @@ func (h *calicoIPPoolHandler) createIPPool(endpoint *submV1.Endpoint) error {
 }
 
 func (h *calicoIPPoolHandler) deleteIPPool(endpoint *submV1.Endpoint) error {
-	subnets := cidr.ExtractIPv4Subnets(endpoint.Spec.Subnets)
+	subnets := cidr.ExtractSubnets(k8snet.IPv4, endpoint.Spec.Subnets)
 	var retErrors []error
 
 	for _, subnet := range subnets {

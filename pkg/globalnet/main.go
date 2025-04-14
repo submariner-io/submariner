@@ -44,6 +44,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
+	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
@@ -141,7 +142,7 @@ func main() {
 	restMapper, err := util.BuildRestMapper(cfg)
 	logger.FatalOnError(err, "Unable to build the REST mapper")
 
-	clusterCIDRs := cidr.ExtractIPv4Subnets(localCluster.Spec.ClusterCIDR)
+	clusterCIDRs := cidr.ExtractSubnets(k8snet.IPv4, localCluster.Spec.ClusterCIDR)
 
 	gatewayMonitor, err := controllers.NewGatewayMonitor(ctx, &controllers.GatewayMonitorConfig{
 		Client:            dynClient,
@@ -149,7 +150,7 @@ func main() {
 		Scheme:            scheme.Scheme,
 		Spec:              spec,
 		LocalClusterCIDRs: clusterCIDRs,
-		LocalCIDRs:        append(clusterCIDRs, cidr.ExtractIPv4Subnets(localCluster.Spec.ServiceCIDR)...),
+		LocalCIDRs:        append(clusterCIDRs, cidr.ExtractSubnets(k8snet.IPv4, localCluster.Spec.ServiceCIDR)...),
 		KubeClient:        k8sClient,
 		Hostname:          hostname,
 	})
