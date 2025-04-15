@@ -37,6 +37,7 @@ import (
 	admversion "github.com/submariner-io/admiral/pkg/version"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cidr"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
@@ -58,6 +59,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
+	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
@@ -134,8 +136,16 @@ func main() {
 	localNode, err := node.GetLocalNode(ctx, k8sClientSet)
 	logger.FatalOnError(err, "Error getting information on the local node")
 
-	registry, err := event.NewRegistry(ctx, "routeagent_driver", np,
-		kubeproxy.NewSyncHandler(env.ClusterCidr, env.ServiceCidr),
+	var handlers []event.Handler
+
+	for _, family := range cidr.ExtractIPFamilies(env.ClusterCidr) {
+		// For now only create v4 handler
+		if family == k8snet.IPv4 {
+			handlers = append(handlers, kubeproxy.NewSyncHandler(family, env.ClusterCidr, env.ServiceCidr))
+		}
+	}
+
+	handlers = append(handlers,
 		ovn.NewHandler(&ovn.HandlerConfig{
 			Namespace:       env.Namespace,
 			ClusterCIDR:     env.ClusterCidr,
@@ -161,6 +171,8 @@ func main() {
 			HealthCheckerEnabled:     submSpec.HealthCheckEnabled,
 			RouteAgentUpdateInterval: 60 * time.Second,
 		}, smClientset.SubmarinerV1().RouteAgents(submSpec.Namespace), versions.Submariner(), localNode.Name))
+
+	registry, err := event.NewRegistry(ctx, "routeagent_driver", np, handlers...)
 
 	logger.FatalOnError(err, "Error registering the handlers")
 

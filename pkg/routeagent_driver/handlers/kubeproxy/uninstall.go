@@ -27,7 +27,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/port"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
-	k8snet "k8s.io/utils/net"
 )
 
 func (kp *SyncHandler) Uninstall() error {
@@ -47,13 +46,13 @@ func (kp *SyncHandler) Uninstall() error {
 			constants.RouteAgentHostNetworkTableID, err)
 	}
 
-	deleteVxLANInterface()
-	deleteIPTableChains()
+	kp.deleteVxLANInterface()
+	kp.deleteIPTableChains()
 
 	return nil
 }
 
-func deleteVxLANInterface() {
+func (kp *SyncHandler) deleteVxLANInterface() {
 	iface := &netlink.Vxlan{
 		LinkAttrs: netlink.LinkAttrs{
 			Name:  VxLANIface,
@@ -72,8 +71,8 @@ func deleteVxLANInterface() {
 	}
 }
 
-func deleteIPTableChains() {
-	pFilter, err := packetfilter.New(k8snet.IPv4)
+func (kp *SyncHandler) deleteIPTableChains() {
+	pFilter, err := packetfilter.New(kp.ipFamily)
 	if err != nil {
 		logger.Errorf(err, "Failed to initialize packetfilter interface")
 		return

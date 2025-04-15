@@ -31,8 +31,7 @@ func (kp *SyncHandler) NodeCreated(node *k8sV1.Node) error {
 		node.Name, node.Status.Addresses)
 
 	for i, addr := range node.Status.Addresses {
-		// Revisit when IPv6 support is added.
-		if addr.Type == k8sV1.NodeInternalIP && k8snet.IsIPv4String(node.Status.Addresses[i].Address) {
+		if addr.Type == k8sV1.NodeInternalIP && k8snet.IPFamilyOfString(node.Status.Addresses[i].Address) == kp.ipFamily {
 			kp.populateRemoteVtepIps(node.Status.Addresses[i].Address, Add)
 			break
 		}

@@ -27,6 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cidr"
 	"github.com/submariner-io/submariner/pkg/cni"
 	evtesting "github.com/submariner-io/submariner/pkg/event/testing"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
@@ -35,6 +36,7 @@ import (
 	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
+	"github.com/submariner-io/submariner/pkg/vxlan"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	corev1 "k8s.io/api/core/v1"
@@ -44,16 +46,24 @@ import (
 )
 
 const (
-	cniIPAddress     = "192.168.5.1"
-	localClusterCIDR = cniIPAddress + "/24"
-	localServiceCIDR = "169.254.2.0/24"
-	remoteSubnet1    = "170.250.1.0/24"
-	remoteSubnet2    = "171.250.1.0/24"
-	localNodeName1   = "local-node1"
-	localNodeName2   = "local-node2"
-	remoteNodeName   = "remote-node"
-	nodeAddress1     = "10.253.10.2"
-	nodeAddress2     = "10.253.10.3"
+	cniIP4Address        = "192.168.5.1"
+	cniIP6Address        = "2001:0:0:1234::"
+	localClusterIPv4CIDR = cniIP4Address + "/24"
+	localClusterIPv6CIDR = cniIP6Address + "/64"
+	localServiceIPv4CIDR = "169.254.2.0/24"
+	localServiceIPv6CIDR = "2003:0:0:1234::"
+	remoteIPv4Subnet1    = "170.250.1.0/24"
+	remoteIPv4Subnet2    = "171.250.1.0/24"
+	remoteIPv6Subnet     = "2002:0:0:1234::/64"
+	localNodeName1       = "local-node1"
+	localNodeName2       = "local-node2"
+	remoteNodeName       = "remote-node"
+	nodeIPv4Address1     = "10.253.10.2"
+	nodeIPv4Address2     = "10.253.10.3"
+	nodeIPv6Address      = "2004:0:0:1234::"
+	hostInterfaceIndex   = 100
+	vxLanInterfaceIndex  = 200
+	hostInterfaceMTU     = 101
 )
 
 func init() {
@@ -71,13 +81,15 @@ func TestKubeProxyIPTables(t *testing.T) {
 
 type testDriver struct {
 	*evtesting.ControllerSupport
-	handler             *kubeproxy.SyncHandler
-	pFilter             *fakePF.PacketFilter
-	netLink             *fakeNetlink.NetLink
-	localEndpoint       *submarinerv1.Endpoint
-	remoteEndpoint      *submarinerv1.Endpoint
-	hostInterfaceIndex  int
-	vxLanInterfaceIndex int
+	handler           *kubeproxy.SyncHandler
+	ipFamily          k8snet.IPFamily
+	pFilter           *fakePF.PacketFilter
+	netLink           *fakeNetlink.NetLink
+	localEndpoint     *submarinerv1.Endpoint
+	remoteEndpoint    *submarinerv1.Endpoint
+	hostInterfaceAddr string
+	localClusterCIDRs []string
+	localServiceCIDRs []string
 }
 
 func newTestDriver() *testDriver {
@@ -86,32 +98,50 @@ func newTestDriver() *testDriver {
 	}
 
 	BeforeEach(func() {
-		defaultHostIface, err := netlinkAPI.GetDefaultGatewayInterface(k8snet.IPv4)
-		Expect(err).To(Succeed())
-
-		t.hostInterfaceIndex = defaultHostIface.Index
-		t.vxLanInterfaceIndex = t.hostInterfaceIndex + 1
+		t.ipFamily = k8snet.IPv4
+		t.hostInterfaceAddr = "172.19.3.1/24"
 
 		t.netLink = fakeNetlink.New()
-		t.netLink.SetLinkIndex(kubeproxy.VxLANIface, t.vxLanInterfaceIndex)
+		t.netLink.SetLinkIndex(kubeproxy.VxLANIface, vxLanInterfaceIndex)
 
 		netlinkAPI.NewFunc = func() netlinkAPI.Interface {
 			return t.netLink
 		}
-		t.pFilter = fakePF.New()
+		t.pFilter = fakePF.New(k8snet.IPv4, k8snet.IPv6)
 
 		cni.HostInterfaces = func() ([]cni.HostInterface, error) {
-			return []cni.HostInterface{{
-				Name: "veth0",
-				Addr: cniIPAddress + "/24",
-			}}, nil
+			return []cni.HostInterface{
+				{
+					Name: "veth0",
+					Addr: localClusterIPv4CIDR,
+				},
+				{
+					Name: "veth1",
+					Addr: localClusterIPv6CIDR,
+				},
+			}, nil
 		}
 
 		t.localEndpoint = newLocalEndpoint(localNodeName1)
 		t.remoteEndpoint = newRemoteEndpoint()
 
-		t.handler = kubeproxy.NewSyncHandler([]string{localClusterCIDR}, []string{localServiceCIDR})
+		t.localClusterCIDRs = []string{localClusterIPv4CIDR}
+		t.localServiceCIDRs = []string{localServiceIPv4CIDR}
+	})
 
+	JustBeforeEach(func() {
+		_, cidr, err := net.ParseCIDR(t.hostInterfaceAddr)
+		Expect(err).NotTo(HaveOccurred())
+
+		t.netLink.SetupDefaultGateway(t.ipFamily, net.Interface{
+			Index: hostInterfaceIndex,
+			MTU:   hostInterfaceMTU,
+			Name:  "gw-intf",
+		}, cidr)
+
+		t.netLink.SetAllowedIPFamilies(t.ipFamily)
+
+		t.handler = kubeproxy.NewSyncHandler(t.ipFamily, t.localClusterCIDRs, t.localServiceCIDRs)
 		t.Start(t.handler)
 	})
 
@@ -119,41 +149,53 @@ func newTestDriver() *testDriver {
 }
 
 func (t *testDriver) verifyVxLANRoutes() {
-	t.netLink.AwaitDstRoutes(t.netLink.AwaitLink(kubeproxy.VxLANIface).Attrs().Index, 0, t.remoteEndpoint.Spec.Subnets...)
+	t.netLink.AwaitDstRoutes(t.awaitVxlanLink().Attrs().Index, 0,
+		cidr.ExtractSubnets(t.ipFamily, t.remoteEndpoint.Spec.Subnets)...)
 }
 
 func (t *testDriver) verifyNoVxLANRoutes() {
 	time.Sleep(200 * time.Millisecond)
-	t.netLink.AwaitNoDstRoutes(t.vxLanInterfaceIndex, 0, t.remoteEndpoint.Spec.Subnets...)
+	t.netLink.AwaitNoDstRoutes(vxLanInterfaceIndex, 0, t.remoteEndpoint.Spec.Subnets...)
 }
 
 func (t *testDriver) verifyHostNetworkingRoutes() {
-	t.netLink.AwaitDstRoutes(t.hostInterfaceIndex, constants.RouteAgentHostNetworkTableID, t.remoteEndpoint.Spec.Subnets...)
+	t.netLink.AwaitDstRoutes(hostInterfaceIndex, constants.RouteAgentHostNetworkTableID,
+		cidr.ExtractSubnets(t.ipFamily, t.remoteEndpoint.Spec.Subnets)...)
 }
 
 func (t *testDriver) verifyNoHostNetworkingRoutes() {
 	time.Sleep(200 * time.Millisecond)
-	t.netLink.AwaitNoDstRoutes(t.hostInterfaceIndex, constants.RouteAgentHostNetworkTableID, t.remoteEndpoint.Spec.Subnets...)
+	t.netLink.AwaitNoDstRoutes(hostInterfaceIndex, constants.RouteAgentHostNetworkTableID, t.remoteEndpoint.Spec.Subnets...)
 }
 
 func (t *testDriver) verifyRemoteSubnetIPTableRules() {
-	for _, remoteCIDR := range t.remoteEndpoint.Spec.Subnets {
+	for _, remoteCIDR := range cidr.ExtractSubnets(t.ipFamily, t.remoteEndpoint.Spec.Subnets) {
 		t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmPostRoutingChain,
-			And(ContainSubstring(localClusterCIDR), ContainSubstring(remoteCIDR)))
+			And(ContainSubstring(localClusterIPv4CIDR), ContainSubstring(remoteCIDR)))
 	}
 }
 
 func (t *testDriver) addVxLANRoute(cidr string) {
+	_, err := vxlan.NewInterface(&vxlan.Attributes{
+		Name: kubeproxy.VxLANIface,
+	}, t.netLink)
+	Expect(err).To(Succeed())
+
 	_, dst, err := net.ParseCIDR(cidr)
 	Expect(err).To(Succeed())
 
-	_ = t.netLink.RouteAdd(&netlink.Route{
+	err = t.netLink.RouteAdd(&netlink.Route{
 		Dst:       dst,
 		Gw:        net.IPv4(11, 21, 31, 41),
 		Scope:     unix.RT_SCOPE_UNIVERSE,
-		LinkIndex: t.vxLanInterfaceIndex,
+		LinkIndex: vxLanInterfaceIndex,
 		Protocol:  4,
 	})
+	Expect(err).To(Succeed())
+}
+
+func (t *testDriver) awaitVxlanLink() *netlink.Vxlan {
+	return toVxlan(t.netLink.AwaitLink(kubeproxy.VxLANIface))
 }
 
 func newLocalEndpoint(hostname string) *submarinerv1.Endpoint {
@@ -181,7 +223,7 @@ func newRemoteEndpoint() *submarinerv1.Endpoint {
 			ClusterID:  "remote",
 			PrivateIPs: []string{"192.68.1.2"},
 			Hostname:   remoteNodeName,
-			Subnets:    []string{remoteSubnet1, remoteSubnet2},
+			Subnets:    []string{remoteIPv4Subnet1, remoteIPv4Subnet2},
 			Backend:    "libreswan",
 		},
 	}

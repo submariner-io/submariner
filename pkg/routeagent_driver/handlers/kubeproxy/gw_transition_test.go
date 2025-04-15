@@ -23,7 +23,6 @@ import (
 	. "github.com/onsi/gomega"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
 )
 
 func testGatewayTransition() {
@@ -38,7 +37,7 @@ func testGatewayTransition() {
 		})
 
 		It("should add the VxLAN interface", func() {
-			Expect(toVxlan(t.netLink.AwaitLink(kubeproxy.VxLANIface)).Group).To(BeNil())
+			Expect(t.awaitVxlanLink().Group).To(BeNil())
 		})
 
 		It("should add a routing rule for the RouteAgentHostNetworkTableID", func() {
@@ -51,23 +50,22 @@ func testGatewayTransition() {
 
 		Context("and previous VxLAN routes are present", func() {
 			BeforeEach(func() {
-				t.addVxLANRoute(remoteSubnet1)
-				t.CreateEndpoint(t.localEndpoint)
+				t.addVxLANRoute(remoteIPv4Subnet1)
 			})
 
 			It("should remove them", func() {
-				t.netLink.AwaitNoDstRoutes(t.vxLanInterfaceIndex, 0, remoteSubnet1)
+				t.netLink.AwaitNoDstRoutes(vxLanInterfaceIndex, 0, remoteIPv4Subnet1)
 			})
 		})
 
 		Context("and Node addresses are present", func() {
-			BeforeEach(func() {
-				t.CreateNode(newNode(nodeAddress1))
-				t.CreateNode(newNode(nodeAddress2))
+			JustBeforeEach(func() {
+				t.CreateNode(newNode(nodeIPv4Address1))
+				t.CreateNode(newNode(nodeIPv4Address2))
 			})
 
 			It("should add an FDB entry on the VxLAN interface for each address", func() {
-				t.netLink.AwaitNeighbors(t.vxLanInterfaceIndex, nodeAddress1, nodeAddress2)
+				t.netLink.AwaitNeighbors(vxLanInterfaceIndex, nodeIPv4Address1, nodeIPv4Address2)
 			})
 		})
 

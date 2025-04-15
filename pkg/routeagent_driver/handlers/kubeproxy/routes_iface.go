@@ -27,7 +27,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
-	k8snet "k8s.io/utils/net"
 )
 
 func (kp *SyncHandler) updateRoutingRulesForHostNetworkSupport(inputCidrBlocks []string, operation Operation) {
@@ -159,15 +158,14 @@ func (kp *SyncHandler) cleanVxSubmarinerRoutes() {
 	// This must be called with kp.syncHandlerMutex held
 	link, err := kp.netLink.LinkByName(VxLANIface)
 	if err != nil {
-		//nolint:errorlint // netlink.LinkNotFoundError does not implement method Is(error) bool
-		if _, ok := err.(netlink.LinkNotFoundError); !ok {
+		if !errors.Is(err, netlink.LinkNotFoundError{}) {
 			logger.Errorf(err, "Error retrieving link by name %q", VxLANIface)
 		}
 
 		return
 	}
 
-	currentRouteList, err := kp.netLink.RouteList(link, k8snet.IPv4)
+	currentRouteList, err := kp.netLink.RouteList(link, kp.ipFamily)
 	if err != nil {
 		logger.Errorf(err, "Unable to cleanup routes, error retrieving routes on the link %s", VxLANIface)
 		return
@@ -197,7 +195,7 @@ func (kp *SyncHandler) reconcileRoutes(vxlanGw net.IP) error {
 		return errors.Wrapf(err, "error retrieving link by name %s", VxLANIface)
 	}
 
-	currentRouteList, err := kp.netLink.RouteList(link, k8snet.IPv4)
+	currentRouteList, err := kp.netLink.RouteList(link, kp.ipFamily)
 	if err != nil {
 		return errors.Wrapf(err, "error retrieving routes for link %s", VxLANIface)
 	}
@@ -205,7 +203,7 @@ func (kp *SyncHandler) reconcileRoutes(vxlanGw net.IP) error {
 	// First lets delete all of the routes that don't match.
 	kp.removeUnknownRoutes(vxlanGw, currentRouteList)
 
-	currentRouteList, err = kp.netLink.RouteList(link, k8snet.IPv4)
+	currentRouteList, err = kp.netLink.RouteList(link, kp.ipFamily)
 	if err != nil {
 		return errors.Wrapf(err, "error retrieving routes for link %s", VxLANIface)
 	}

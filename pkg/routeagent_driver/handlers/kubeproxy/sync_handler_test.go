@@ -31,6 +31,7 @@ var _ = Describe("SyncHandler", func() {
 	Describe("Gateway transition", testGatewayTransition)
 	Describe("Nodes", testNodes)
 	Describe("Uninstall", testUninstall)
+	Describe("Dual-stack", testDualStack)
 })
 
 func testNodes() {
@@ -39,7 +40,7 @@ func testNodes() {
 	var node *corev1.Node
 
 	BeforeEach(func() {
-		node = newNode(nodeAddress1)
+		node = newNode(nodeIPv4Address1)
 	})
 
 	When("a Node is created and then deleted on a gateway node", func() {
@@ -49,10 +50,10 @@ func testNodes() {
 		})
 
 		It("should add/remove an FDB entry on the VxLAN interface for each Node address", func() {
-			t.netLink.AwaitNeighbors(t.vxLanInterfaceIndex, nodeAddress1)
+			t.netLink.AwaitNeighbors(vxLanInterfaceIndex, nodeIPv4Address1)
 
 			t.DeleteNode(node.Name)
-			t.netLink.AwaitNoNeighbors(t.vxLanInterfaceIndex, nodeAddress1)
+			t.netLink.AwaitNoNeighbors(vxLanInterfaceIndex, nodeIPv4Address1)
 		})
 	})
 
@@ -62,7 +63,7 @@ func testNodes() {
 		})
 
 		It("should not add an FDB entry on the VxLAN interface for each Node address", func() {
-			t.netLink.AwaitNoNeighbors(t.vxLanInterfaceIndex, nodeAddress1)
+			t.netLink.AwaitNoNeighbors(vxLanInterfaceIndex, nodeIPv4Address1)
 		})
 	})
 }

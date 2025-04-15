@@ -22,6 +22,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
+	"github.com/submariner-io/submariner/pkg/vxlan"
 	k8snet "k8s.io/utils/net"
 )
 
@@ -34,37 +35,38 @@ func testEndpoints() {
 		})
 
 		It("should add the VxLAN interface", func() {
-			Expect(toVxlan(t.netLink.AwaitLink(kubeproxy.VxLANIface)).Group.String()).To(Equal(
-				t.localEndpoint.Spec.GetPrivateIP(k8snet.IPv4)))
+			link := t.awaitVxlanLink()
+			Expect(link.Group.String()).To(Equal(t.localEndpoint.Spec.GetPrivateIP(k8snet.IPv4)))
+			Expect(link.MTU).To(Equal(hostInterfaceMTU - vxlan.MTUOverhead))
 		})
 
 		Context("and old VxLAN routes are present", func() {
 			BeforeEach(func() {
-				t.addVxLANRoute(remoteSubnet1)
+				t.addVxLANRoute(remoteIPv4Subnet1)
 			})
 
 			It("should remove them", func() {
-				t.netLink.AwaitNoDstRoutes(t.vxLanInterfaceIndex, 0, remoteSubnet1)
+				t.netLink.AwaitNoDstRoutes(vxLanInterfaceIndex, 0, remoteIPv4Subnet1)
 			})
 		})
 
 		Context("and a VxLAN interface from a previous Endpoint exists", func() {
 			JustBeforeEach(func() {
-				t.netLink.AwaitLink(kubeproxy.VxLANIface)
+				t.awaitVxlanLink()
 			})
 
 			It("should remove the previous VxLAN interface", func() {
-				t.netLink.SetLinkIndex(kubeproxy.VxLANIface, t.vxLanInterfaceIndex+1)
+				t.netLink.SetLinkIndex(kubeproxy.VxLANIface, vxLanInterfaceIndex+1)
 				t.CreateEndpoint(newLocalEndpoint(localNodeName2))
 
 				Eventually(func() int {
-					return t.netLink.AwaitLink(kubeproxy.VxLANIface).Attrs().Index
-				}).Should(Equal(t.vxLanInterfaceIndex + 1))
+					return t.awaitVxlanLink().Attrs().Index
+				}).Should(Equal(vxLanInterfaceIndex + 1))
 			})
 		})
 
 		Context("and remote subnets are present", func() {
-			BeforeEach(func() {
+			JustBeforeEach(func() {
 				t.CreateEndpoint(t.remoteEndpoint)
 			})
 
@@ -75,12 +77,9 @@ func testEndpoints() {
 	})
 
 	When("a local Endpoint is removed while on a non-gateway node", func() {
-		BeforeEach(func() {
-			t.CreateEndpoint(t.localEndpoint)
-			t.netLink.AwaitLink(kubeproxy.VxLANIface)
-		})
-
 		JustBeforeEach(func() {
+			t.CreateEndpoint(t.localEndpoint)
+			t.awaitVxlanLink()
 			t.DeleteEndpoint(t.localEndpoint.Name)
 		})
 
@@ -96,7 +95,7 @@ func testEndpoints() {
 			})
 
 			It("should not remove the existing VxLAN interface", func() {
-				t.netLink.AwaitLink(kubeproxy.VxLANIface)
+				t.awaitVxlanLink()
 			})
 		})
 
@@ -105,7 +104,7 @@ func testEndpoints() {
 				t.netLink.AwaitNoLink(kubeproxy.VxLANIface)
 
 				t.CreateEndpoint(t.localEndpoint)
-				t.netLink.AwaitLink(kubeproxy.VxLANIface)
+				t.awaitVxlanLink()
 			})
 		})
 	})
@@ -119,13 +118,22 @@ func testEndpoints() {
 	})
 
 	When("a remote Endpoint is created while on a non-gateway node", func() {
+		var beforeCreate func()
+
+		BeforeEach(func() {
+			beforeCreate = func() {}
+		})
+
 		JustBeforeEach(func() {
+			beforeCreate()
 			t.CreateEndpoint(t.remoteEndpoint)
 		})
 
 		Context("after a local Endpoint was created", func() {
 			BeforeEach(func() {
-				t.CreateEndpoint(t.localEndpoint)
+				beforeCreate = func() {
+					t.CreateEndpoint(t.localEndpoint)
+				}
 			})
 
 			It("should add VxLAN routes for the remote subnets", func() {

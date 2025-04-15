@@ -43,7 +43,7 @@ func (kp *SyncHandler) newVxlanInterface(attrs *vxlan.Attributes) (*vxlan.Interf
 func (kp *SyncHandler) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP) error {
 	ipAddr, err := kp.getHostIfaceIPAddress()
 	if err != nil {
-		return errors.Wrap(err, "unable to retrieve the IPv4 address on the Host")
+		return errors.Wrapf(err, "unable to retrieve the IPv%s address on the Host", kp.ipFamily)
 	}
 
 	vtepIP, err := vxlan.GetVtepIPAddressFrom(ipAddr.String(), VxLANVTepNetworkPrefix)
