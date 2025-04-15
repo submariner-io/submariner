@@ -215,3 +215,12 @@ func (ep *EndpointSpec) ExtractSubnetsExcludingIP(excIP string) []string {
 
 	return subnets
 }
+
+func (ep *EndpointSpec) GatewayIP(family k8snet.IPFamily) net.IP {
+	publicIP := ep.GetPublicIP(family)
+	if publicIP != "" {
+		return net.ParseIP(publicIP)
+	}
+
+	return net.ParseIP(ep.GetPrivateIP(family))
+}
