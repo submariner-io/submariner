@@ -22,6 +22,7 @@ import (
 	"net"
 	"strings"
 
+	. "github.com/onsi/ginkgo/v2"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -127,6 +128,8 @@ func verifyFamilyOf(s, name string, expectedFamily k8snet.IPFamily) error {
 		})
 	}
 
+	defer GinkgoRecover()
+
 	var family k8snet.IPFamily
 
 	if ip := net.ParseIP(s); ip != nil {
@@ -139,5 +142,9 @@ func verifyFamilyOf(s, name string, expectedFamily k8snet.IPFamily) error {
 		return nil
 	}
 
-	return errors.Errorf("the family of %q (IPv%v) for %q is not allowed", s, family, name)
+	err := errors.Errorf("the family of %q (IPv%v) for %q is not allowed", s, family, name)
+
+	Fail(err.Error())
+
+	return err
 }
