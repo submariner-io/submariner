@@ -113,14 +113,14 @@ func (ovn *Handler) getForwardingRuleSpecs() ([]*packetfilter.Rule, error) {
 		rules = append(rules, &packetfilter.Rule{
 			DestCIDR:     remoteCIDR,
 			Action:       packetfilter.RuleActionAccept,
-			OutInterface: ovn.cableRoutingInterface.Name,
+			OutInterface: ovn.cableRoutingInterface.Name(),
 			InInterface:  OVNK8sMgmntIntfName,
 		},
 			&packetfilter.Rule{
 				SrcCIDR:      remoteCIDR,
 				Action:       packetfilter.RuleActionAccept,
 				OutInterface: OVNK8sMgmntIntfName,
-				InInterface:  ovn.cableRoutingInterface.Name,
+				InInterface:  ovn.cableRoutingInterface.Name(),
 			},
 		)
 	}

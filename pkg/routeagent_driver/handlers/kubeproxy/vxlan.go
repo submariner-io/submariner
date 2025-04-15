@@ -56,7 +56,7 @@ func (kp *SyncHandler) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP)
 			Name:     VxLANIface,
 			VxlanID:  100,
 			VtepPort: port.IntraClusterVxLAN,
-			Mtu:      kp.defaultHostIface.MTU,
+			Mtu:      kp.defaultHostIface.MTU(),
 		}
 
 		kp.vxlanDevice, err = kp.newVxlanInterface(attrs)
@@ -84,7 +84,7 @@ func (kp *SyncHandler) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP)
 			VxlanID:  100,
 			Group:    gatewayNodeIP,
 			VtepPort: port.IntraClusterVxLAN,
-			Mtu:      kp.defaultHostIface.MTU,
+			Mtu:      kp.defaultHostIface.MTU(),
 		}
 
 		kp.vxlanDevice, err = kp.newVxlanInterface(attrs)

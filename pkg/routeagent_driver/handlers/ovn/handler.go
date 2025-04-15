@@ -60,7 +60,7 @@ type Handler struct {
 	event.HandlerBase
 	HandlerConfig
 	mutex                     sync.Mutex
-	cableRoutingInterface     *net.Interface
+	cableRoutingInterface     netlink.NetworkInterface
 	netLink                   netlink.Interface
 	pFilter                   packetfilter.Interface
 	gatewayRouteController    *GatewayRouteController
@@ -143,17 +143,20 @@ func (ovn *Handler) Init(ctx context.Context) error {
 }
 
 func (ovn *Handler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
-	var routingInterface *net.Interface
+	var routingInterface netlink.NetworkInterface
 	var err error
 
 	interfaceName := endpoint.Spec.BackendConfig[cable.InterfaceNameConfig]
 	if interfaceName != "" {
 		// NOTE: This assumes that LocalEndpointCreated happens before than TransitionToGatewayNode
-		if routingInterface, err = net.InterfaceByName(interfaceName); err != nil {
+		intf, err := net.InterfaceByName(interfaceName)
+		if err != nil {
 			return errors.Wrapf(err, "error getting local endpoint interface %q", interfaceName)
 		}
+
+		routingInterface = &netlink.DefaultNetworkInterface{Interface: *intf}
 	} else {
-		if routingInterface, err = netlink.GetDefaultGatewayInterface(k8snet.IPv4); err != nil {
+		if routingInterface, err = ovn.netLink.GetDefaultGatewayInterface(k8snet.IPv4); err != nil {
 			logger.Fatalf("Unable to find the default interface on host: %s", err.Error())
 		}
 	}

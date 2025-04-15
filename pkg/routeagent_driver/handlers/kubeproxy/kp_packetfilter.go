@@ -57,7 +57,7 @@ type SyncHandler struct {
 	vxlanGwIP              *net.IP
 	hostname               string
 	cniIface               *cni.Interface
-	defaultHostIface       *net.Interface
+	defaultHostIface       netlink.NetworkInterface
 	activeEndpointHostname string
 }
 
@@ -112,7 +112,7 @@ func (kp *SyncHandler) Init(_ context.Context) error {
 		return errors.Wrapf(err, "unable to determine hostname")
 	}
 
-	kp.defaultHostIface, err = netlink.GetDefaultGatewayInterface(k8snet.IPv4)
+	kp.defaultHostIface, err = kp.netLink.GetDefaultGatewayInterface(k8snet.IPv4)
 	if err != nil {
 		return errors.Wrapf(err, "Unable to find the default interface on host: %s", kp.hostname)
 	}

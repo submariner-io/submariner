@@ -112,7 +112,7 @@ func (kp *SyncHandler) configureRoute(remoteSubnet string, operation Operation, 
 		return errors.Wrapf(err, "error parsing cidr block %s", remoteSubnet)
 	}
 
-	ifaceIndex := kp.defaultHostIface.Index
+	ifaceIndex := kp.defaultHostIface.Index()
 
 	if kp.localEndpointIfaceName != "" {
 		if iface, err := net.InterfaceByName(kp.localEndpointIfaceName); err == nil {

@@ -19,6 +19,7 @@ package mtu_test
 
 import (
 	"context"
+	"net"
 	"strconv"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -26,6 +27,7 @@ import (
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
+	fakenetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
@@ -103,15 +105,15 @@ var _ = Describe("MTUHandler", func() {
 	})
 
 	When("Globalnet is enabled with no TCP MSS value specified and a local Endpoint is created", func() {
+		const defaultMTU = 1965
+
 		BeforeEach(func() {
 			t.isGlobalnet = true
+			t.netLink.SetupDefaultGateway(k8snet.IPv4, net.Interface{MTU: defaultMTU})
 		})
 
 		It("should use the MTU value from the default gateway and add expected IP table rules", func() {
-			defaultHostIface, err := netlinkAPI.GetDefaultGatewayInterface(k8snet.IPv4)
-			Expect(err).To(Succeed())
-
-			t.testForcedMSS(defaultHostIface.MTU - mtu.MaxIPSecOverhead)
+			t.testForcedMSS(defaultMTU - mtu.MaxIPSecOverhead)
 		})
 	})
 
@@ -126,6 +128,7 @@ var _ = Describe("MTUHandler", func() {
 
 type testDriver struct {
 	pFilter     *fakePF.PacketFilter
+	netLink     *fakenetlink.NetLink
 	handler     event.Handler
 	tcpMssValue int
 	isGlobalnet bool
@@ -140,6 +143,11 @@ func newTestDriver() *testDriver {
 		t.isGlobalnet = false
 		t.pFilter = fakePF.New()
 		t.tableType, _ = t.pFilter.GetMSSClampTypes()
+
+		t.netLink = fakenetlink.New()
+		netlinkAPI.NewFunc = func() netlinkAPI.Interface {
+			return t.netLink
+		}
 	})
 
 	JustBeforeEach(func() {

@@ -146,7 +146,7 @@ func (kp *SyncHandler) getHostIfaceIPAddress() (net.IP, error) {
 		for i := range addrs {
 			ipAddr, _, err := net.ParseCIDR(addrs[i].String())
 			if err != nil {
-				logger.Errorf(err, "Unable to ParseCIDR  %v", addrs)
+				return nil, errors.Errorf("unable to parse CIDR : %s", addrs[i])
 			}
 
 			if ipAddr.To4() != nil {
@@ -155,5 +155,5 @@ func (kp *SyncHandler) getHostIfaceIPAddress() (net.IP, error) {
 		}
 	}
 
-	return nil, nil
+	return nil, errors.Errorf("no default host interface IP found: %v", addrs)
 }

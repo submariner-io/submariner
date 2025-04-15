@@ -92,6 +92,10 @@ var _ = Describe("", func() {
 				Addr: localClusterCIDRs[0],
 			}}, nil
 		}
+
+		netLink.SetupDefaultGateway(k8snet.IPv4, net.Interface{
+			Name: "gw-intf",
+		}, &net.IPNet{IP: net.ParseIP("1.2.3.4"), Mask: net.CIDRMask(8, 32)})
 	})
 
 	Specify("All Route Agent handlers should successfully instantiate and initialize", func() {

@@ -40,15 +40,25 @@ type linkType struct {
 	isSetup bool
 }
 
+type networkInterface struct {
+	netlinkAPI.DefaultNetworkInterface
+	addrs []net.Addr
+}
+
+func (i *networkInterface) Addrs() ([]net.Addr, error) {
+	return i.addrs, nil
+}
+
 type basicType struct {
-	mutex        sync.Mutex
-	linkIndices  map[string]int
-	links        map[string]*linkType
-	routes       map[int][]netlink.Route
-	neighbors    map[int][]netlink.Neigh
-	rules        map[int][]netlink.Rule
-	addrs        map[int][]netlink.Addr
-	addrUpdateCh atomic.Value
+	mutex         sync.Mutex
+	linkIndices   map[string]int
+	links         map[string]*linkType
+	routes        map[int][]netlink.Route
+	neighbors     map[int][]netlink.Neigh
+	rules         map[int][]netlink.Rule
+	addrs         map[int][]netlink.Addr
+	netInterfaces map[int]*networkInterface
+	addrUpdateCh  atomic.Value
 }
 
 type NetLink struct {
@@ -71,12 +81,13 @@ func (e linkNotFoundError) Is(err error) bool {
 func New() *NetLink {
 	return &NetLink{
 		Adapter: netlinkAPI.Adapter{Basic: &basicType{
-			linkIndices: map[string]int{},
-			links:       map[string]*linkType{},
-			routes:      map[int][]netlink.Route{},
-			neighbors:   map[int][]netlink.Neigh{},
-			rules:       map[int][]netlink.Rule{},
-			addrs:       map[int][]netlink.Addr{},
+			linkIndices:   map[string]int{},
+			links:         map[string]*linkType{},
+			routes:        map[int][]netlink.Route{},
+			neighbors:     map[int][]netlink.Neigh{},
+			rules:         map[int][]netlink.Rule{},
+			addrs:         map[int][]netlink.Addr{},
+			netInterfaces: map[int]*networkInterface{},
 		}},
 	}
 }
@@ -349,8 +360,8 @@ func (n *basicType) RouteList(link netlink.Link, family k8snet.IPFamily) ([]netl
 	var retRoutes []netlink.Route
 
 	for i := range currentRoutes {
-		if family == k8snet.IPFamilyUnknown || k8snet.IPFamilyOf(currentRoutes[i].Gw) == family ||
-			k8snet.IPFamilyOf(currentRoutes[i].Src) == family {
+		if currentRoutes[i].Family == netlinkAPI.ToNetlinkFamily(family) || family == k8snet.IPFamilyUnknown ||
+			k8snet.IPFamilyOf(currentRoutes[i].Gw) == family || k8snet.IPFamilyOf(currentRoutes[i].Src) == family {
 			retRoutes = append(retRoutes, currentRoutes[i])
 		}
 	}
@@ -465,8 +476,17 @@ func (n *basicType) ConfigureTCPMTUProbe(_, _ string) error {
 	return nil
 }
 
-func (n *basicType) InterfaceByName(name string) (*net.Interface, error) {
-	return &net.Interface{Name: name}, nil
+func (n *basicType) InterfaceByName(name string) (netlinkAPI.NetworkInterface, error) {
+	return &netlinkAPI.DefaultNetworkInterface{Interface: net.Interface{Name: name}}, nil
+}
+
+func (n *basicType) InterfaceByIndex(index int) (netlinkAPI.NetworkInterface, error) {
+	i, ok := n.netInterfaces[index]
+	if ok {
+		return i, nil
+	}
+
+	return nil, errors.New("not found")
 }
 
 func (n *NetLink) AwaitLink(name string) netlink.Link {
@@ -645,4 +665,24 @@ func (n *NetLink) AwaitNoRule(table int, src, dst string) {
 	Eventually(func() *netlink.Rule {
 		return n.getRule(table, src, dst)
 	}, 5).Should(BeNil(), "Rule for %v exists", table)
+}
+
+func (n *NetLink) SetupDefaultGateway(family k8snet.IPFamily, intf net.Interface, addrs ...net.Addr) {
+	if intf.Index == 0 {
+		intf.Index = 99
+	}
+
+	err := n.RouteAdd(&netlink.Route{
+		LinkIndex: intf.Index,
+		Family:    netlinkAPI.ToNetlinkFamily(family),
+	})
+	Expect(err).NotTo(HaveOccurred())
+
+	n.basic().mutex.Lock()
+	defer n.basic().mutex.Unlock()
+
+	n.basic().netInterfaces[intf.Index] = &networkInterface{
+		DefaultNetworkInterface: netlinkAPI.DefaultNetworkInterface{Interface: intf},
+		addrs:                   addrs,
+	}
 }

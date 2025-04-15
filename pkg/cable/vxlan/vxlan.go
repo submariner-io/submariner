@@ -99,7 +99,7 @@ func (v *vxLan) createVxlanInterface(port int) error {
 		return errors.Wrapf(err, "failed to derive the vxlan vtepIP for %s", ipAddr)
 	}
 
-	defaultHostIface, err := netlinkAPI.GetDefaultGatewayInterface(k8snet.IPv4)
+	defaultHostIface, err := v.netLink.GetDefaultGatewayInterface(k8snet.IPv4)
 	if err != nil {
 		return errors.Wrapf(err, "Unable to find the default interface on host: %s",
 			v.localEndpoint.Hostname)
@@ -111,7 +111,7 @@ func (v *vxLan) createVxlanInterface(port int) error {
 		Group:    nil,
 		SrcAddr:  nil,
 		VtepPort: port,
-		Mtu:      defaultHostIface.MTU,
+		Mtu:      defaultHostIface.MTU(),
 	}
 
 	v.vxlanIface, err = vxlan.NewInterface(attrs, v.netLink)

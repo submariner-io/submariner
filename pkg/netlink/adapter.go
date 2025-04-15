@@ -26,6 +26,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/vishvananda/netlink"
+	k8snet "k8s.io/utils/net"
 )
 
 type Adapter struct {
@@ -109,4 +110,23 @@ func (a *Adapter) AddrAddIfNotPresent(link netlink.Link, addr *netlink.Addr) err
 	}
 
 	return err
+}
+
+func (a *Adapter) GetDefaultGatewayInterface(family k8snet.IPFamily) (NetworkInterface, error) {
+	routes, err := a.RouteList(nil, family)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range routes {
+		if routes[i].Dst == nil || routes[i].Dst.String() == allZeroAddress {
+			if routes[i].LinkIndex == 0 {
+				return nil, errors.New("default gateway interface could not be determined")
+			}
+
+			return a.InterfaceByIndex(routes[i].LinkIndex)
+		}
+	}
+
+	return nil, errors.New("unable to find default route")
 }

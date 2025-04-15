@@ -369,14 +369,17 @@ func newTestDriver() *testDriver {
 	}
 
 	BeforeEach(func() {
-		defaultHostIface, err := netlinkAPI.GetDefaultGatewayInterface(k8snet.IPv4)
-		Expect(err).To(Succeed())
-
-		t.hostInterfaceIndex = defaultHostIface.Index
-		t.vxLanInterfaceIndex = t.hostInterfaceIndex + 1
+		t.hostInterfaceIndex = 100
+		t.vxLanInterfaceIndex = 200
 
 		t.netLink = fakeNetlink.New()
 		t.netLink.SetLinkIndex(kubeproxy.VxLANIface, t.vxLanInterfaceIndex)
+
+		t.netLink.SetupDefaultGateway(k8snet.IPv4, net.Interface{
+			Index: t.hostInterfaceIndex,
+			MTU:   100,
+			Name:  "gw-intf",
+		}, &net.IPNet{IP: net.ParseIP("1.2.3.4"), Mask: net.CIDRMask(8, 32)})
 
 		netlinkAPI.NewFunc = func() netlinkAPI.Interface {
 			return t.netLink

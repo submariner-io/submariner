@@ -21,6 +21,7 @@ package vxlan_test
 import (
 	"flag"
 	"fmt"
+	"net"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -176,6 +177,8 @@ func newTestDriver() *testDriver {
 		netlinkAPI.NewFunc = func() netlinkAPI.Interface {
 			return t.netLink
 		}
+
+		t.netLink.SetupDefaultGateway(k8snet.IPv4, net.Interface{MTU: 10})
 
 		cni.HostInterfaces = func() ([]cni.HostInterface, error) {
 			return []cni.HostInterface{{

@@ -63,7 +63,8 @@ type Basic interface {
 	EnableForwarding(interfaceName string) error
 	GetReversePathFilter(interfaceName string) ([]byte, error)
 	ConfigureTCPMTUProbe(mtuProbe, baseMss string) error
-	InterfaceByName(name string) (*net.Interface, error)
+	InterfaceByName(name string) (NetworkInterface, error)
+	InterfaceByIndex(index int) (NetworkInterface, error)
 }
 
 type Interface interface {
@@ -74,6 +75,7 @@ type Interface interface {
 	RouteAddOrReplace(route *netlink.Route) error
 	AddDestinationRoutes(destIPs []net.IPNet, gwIP, srcIP net.IP, linkIndex, tableID int) error
 	DeleteDestinationRoutes(destIPs []net.IPNet, linkIndex, tableID int) error
+	GetDefaultGatewayInterface(family k8snet.IPFamily) (NetworkInterface, error)
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("netlink")}
@@ -244,8 +246,22 @@ func (n *netlinkType) ConfigureTCPMTUProbe(mtuProbe, baseMss string) error {
 	return errors.Wrapf(err, "unable to update value of tcp_base_mss to %ss", baseMss)
 }
 
-func (n *netlinkType) InterfaceByName(name string) (*net.Interface, error) {
-	return net.InterfaceByName(name)
+func (n *netlinkType) InterfaceByName(name string) (NetworkInterface, error) {
+	i, err := net.InterfaceByName(name)
+	if err != nil {
+		return nil, err
+	}
+
+	return &DefaultNetworkInterface{Interface: *i}, nil
+}
+
+func (n *netlinkType) InterfaceByIndex(index int) (NetworkInterface, error) {
+	i, err := net.InterfaceByIndex(index)
+	if err != nil {
+		return nil, err
+	}
+
+	return &DefaultNetworkInterface{Interface: *i}, nil
 }
 
 func setSysctl(path string, contents []byte) error {
@@ -267,31 +283,6 @@ func setSysctl(path string, contents []byte) error {
 
 func ipv4ConfPath(interfaceName string) string {
 	return "/proc/sys/net/ipv4/conf/" + interfaceName
-}
-
-//nolint:wrapcheck // Let the caller wrap external errors
-func GetDefaultGatewayInterface(family k8snet.IPFamily) (*net.Interface, error) {
-	routes, err := netlink.RouteList(nil, ToNetlinkFamily(family))
-	if err != nil {
-		return nil, err
-	}
-
-	for i := range routes {
-		if routes[i].Dst == nil || routes[i].Dst.String() == allZeroAddress {
-			if routes[i].LinkIndex == 0 {
-				return nil, errors.New("default gateway interface could not be determined")
-			}
-
-			iface, err := net.InterfaceByIndex(routes[i].LinkIndex)
-			if err != nil {
-				return nil, err
-			}
-
-			return iface, nil
-		}
-	}
-
-	return nil, errors.New("unable to find default route")
 }
 
 func DeleteIfaceAndAssociatedRoutes(iface string, tableID int) error {
