@@ -24,8 +24,8 @@ import (
 
 func (c *handlerController) handleRemovedEndpoint(endpoint *smv1.Endpoint, requeueCount int) bool {
 	if requeueCount > maxRequeues {
-		logger.Errorf(nil, "Ignoring delete event for endpoint %q, as its requeued for more than %d times",
-			endpoint.Spec.ClusterID, maxRequeues)
+		logger.Errorf(nil, "Handler %q: Ignoring delete event for endpoint %q, as its requeued for more than %d times",
+			c.handler.GetName(), endpoint.Spec.ClusterID, maxRequeues)
 		return false
 	}
 
@@ -40,7 +40,7 @@ func (c *handlerController) handleRemovedEndpoint(endpoint *smv1.Endpoint, reque
 	}
 
 	if err != nil {
-		logger.Error(err, "Error handling removed endpoint")
+		logger.Errorf(err, "Handler %q: Error handling removed endpoint %q", c.handler.GetName(), endpoint.Name)
 	}
 
 	return err != nil
@@ -54,7 +54,7 @@ func (c *handlerController) handleRemovedLocalEndpoint(endpoint *smv1.Endpoint) 
 	err := c.handler.LocalEndpointRemoved(endpoint)
 
 	if err == nil && c.handlerState.wasOnGateway && !c.handlerState.IsOnGateway() {
-		logger.Infof("Transitioned to non-gateway node %q", endpoint.Spec.Hostname)
+		logger.Infof("Handler %q: Transitioned to non-gateway node %q", c.handler.GetName(), endpoint.Spec.Hostname)
 
 		err = c.handler.TransitionToNonGateway()
 	}

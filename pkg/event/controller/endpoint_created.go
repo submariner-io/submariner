@@ -28,8 +28,8 @@ func (c *handlerController) handleCreatedEndpoint(endpoint *smv1.Endpoint, reque
 	var err error
 
 	if requeueCount > maxRequeues {
-		logger.Errorf(nil, "Ignoring create event for endpoint %q, as its requeued for more than %d times",
-			endpoint.Spec.ClusterID, maxRequeues)
+		logger.Errorf(nil, "Handler %q: Ignoring create event for endpoint %q, as its requeued for more than %d times",
+			c.handler.GetName(), endpoint.Spec.ClusterID, maxRequeues)
 		return false
 	}
 
@@ -43,7 +43,7 @@ func (c *handlerController) handleCreatedEndpoint(endpoint *smv1.Endpoint, reque
 	}
 
 	if err != nil {
-		logger.Error(err, "Error handling created endpoint")
+		logger.Errorf(err, "Handler %q: Error handling created endpoint %q", c.handler.GetName(), endpoint.Name)
 	}
 
 	return err != nil
@@ -57,8 +57,8 @@ func (c *handlerController) handleCreatedLocalEndpoint(endpoint *smv1.Endpoint) 
 	err := c.handler.LocalEndpointCreated(endpoint)
 
 	if err == nil && !c.handlerState.wasOnGateway && c.handlerState.IsOnGateway() {
-		logger.Infof("Transitioned to gateway node %q with endpoint private IPs %s", c.hostname,
-			strings.Join(endpoint.Spec.PrivateIPs, ","))
+		logger.Infof("Handler %q: Transitioned to gateway node %q with endpoint private IPs %s", c.handler.GetName(),
+			c.hostname, strings.Join(endpoint.Spec.PrivateIPs, ","))
 
 		err = c.handler.TransitionToGateway()
 	}
@@ -74,7 +74,8 @@ func (c *handlerController) handleCreatedRemoteEndpoint(endpoint *smv1.Endpoint)
 	lastProcessedTime, ok := c.remoteEndpointTimeStamp[endpoint.Spec.ClusterID]
 
 	if ok && lastProcessedTime.After(endpoint.CreationTimestamp.Time) {
-		logger.Infof("Ignoring new remote %#v since a later endpoint was already processed", endpoint)
+		logger.Infof("Handler %q: Ignoring new remote %#v since a later endpoint was already processed",
+			c.handler.GetName(), endpoint)
 		return nil
 	}
 

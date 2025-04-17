@@ -333,15 +333,29 @@ func (n *basicType) RouteGet(destination net.IP) ([]netlink.Route, error) {
 	return routes, nil
 }
 
-func (n *basicType) RouteList(link netlink.Link, _ k8snet.IPFamily) ([]netlink.Route, error) {
+func (n *basicType) RouteList(link netlink.Link, family k8snet.IPFamily) ([]netlink.Route, error) {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
-	r := n.routes[link.Attrs().Index]
-	to := make([]netlink.Route, len(r))
-	copy(to, r)
+	var currentRoutes []netlink.Route
+	if link != nil {
+		currentRoutes = n.routes[link.Attrs().Index]
+	} else {
+		for _, routes := range n.routes {
+			currentRoutes = append(currentRoutes, routes...)
+		}
+	}
 
-	return to, nil
+	var retRoutes []netlink.Route
+
+	for i := range currentRoutes {
+		if family == k8snet.IPFamilyUnknown || k8snet.IPFamilyOf(currentRoutes[i].Gw) == family ||
+			k8snet.IPFamilyOf(currentRoutes[i].Src) == family {
+			retRoutes = append(retRoutes, currentRoutes[i])
+		}
+	}
+
+	return retRoutes, nil
 }
 
 //nolint:gocritic // Ignore hugeParam.
