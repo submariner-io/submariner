@@ -28,8 +28,6 @@ const (
 	InputChain            = "INPUT"
 	ForwardChain          = "FORWARD"
 	MangleTable           = "mangle"
-	RemoteCIDRIPSet       = "SUBMARINER-REMOTECIDRS"
-	LocalCIDRIPSet        = "SUBMARINER-LOCALCIDRS"
 
 	RouteAgentInterClusterNetworkTableID = 149
 

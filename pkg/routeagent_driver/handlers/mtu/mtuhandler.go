@@ -20,6 +20,7 @@ package mtu
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -46,11 +47,16 @@ const (
 
 const (
 	// TCP MSS = Default_Iface_MTU - TCP_H(20)-IP_H(20)-max_IpsecOverhed(80).
-	MaxIPSecOverhead = 120
+	MaxIPSecOverhead    = 120
+	RemoteCIDRIPSetIPv4 = "SUBMARINER-REMOTECIDRS"
+	LocalCIDRIPSetIPv4  = "SUBMARINER-LOCALCIDRS"
+	RemoteCIDRIPSetIPv6 = "SUBMARINER-REMOTECIDRS-V6"
+	LocalCIDRIPSetIPv6  = "SUBMARINER-LOCALCIDRS-V6"
 )
 
 type mtuHandler struct {
 	event.HandlerBase
+	ipFamily         k8snet.IPFamily
 	localClusterCidr []string
 	pFilter          packetfilter.Interface
 	tableType        packetfilter.TableType
@@ -59,21 +65,33 @@ type mtuHandler struct {
 	localIPSet       packetfilter.NamedSet
 	forceMss         forceMssSts
 	tcpMssValue      int
+	localCIDRIPSet   string
+	remoteCIDRIPSet  string
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("MTU")}
 
-func NewMTUHandler(localClusterCidr []string, isGlobalnet bool, tcpMssValue int) event.Handler {
+func NewHandler(ipFamily k8snet.IPFamily, localClusterCidr []string, isGlobalnet bool, tcpMssValue int) event.Handler {
 	forceMss := notNeeded
 	if isGlobalnet || tcpMssValue != 0 {
 		forceMss = needed
 	}
 
-	return &mtuHandler{
-		localClusterCidr: cidr.ExtractSubnets(k8snet.IPv4, localClusterCidr),
+	h := &mtuHandler{
+		ipFamily:         ipFamily,
+		localClusterCidr: cidr.ExtractSubnets(ipFamily, localClusterCidr),
 		forceMss:         forceMss,
 		tcpMssValue:      tcpMssValue,
+		localCIDRIPSet:   LocalCIDRIPSetIPv4,
+		remoteCIDRIPSet:  RemoteCIDRIPSetIPv4,
 	}
+
+	if ipFamily == k8snet.IPv6 {
+		h.localCIDRIPSet = LocalCIDRIPSetIPv6
+		h.remoteCIDRIPSet = RemoteCIDRIPSetIPv6
+	}
+
+	return h
 }
 
 func (h *mtuHandler) GetNetworkPlugins() []string {
@@ -81,13 +99,13 @@ func (h *mtuHandler) GetNetworkPlugins() []string {
 }
 
 func (h *mtuHandler) GetName() string {
-	return "MTU handler"
+	return fmt.Sprintf("MTU handler IPv%s", h.ipFamily)
 }
 
 func (h *mtuHandler) Init(_ context.Context) error {
 	var err error
 
-	h.pFilter, err = packetfilter.New(k8snet.IPv4)
+	h.pFilter, err = packetfilter.New(h.ipFamily)
 	if err != nil {
 		return errors.Wrap(err, "error initializing iptables")
 	}
@@ -103,14 +121,14 @@ func (h *mtuHandler) Init(_ context.Context) error {
 		return errors.Wrapf(err, "error creating IPHookChain chain %s", constants.SmPostRoutingMssChain)
 	}
 
-	h.remoteIPSet = h.newNamedSetSet(constants.RemoteCIDRIPSet)
+	h.remoteIPSet = h.newNamedSetSet(h.remoteCIDRIPSet)
 	if err := h.remoteIPSet.Create(true); err != nil {
-		return errors.Wrapf(err, "error creating ipset %q", constants.RemoteCIDRIPSet)
+		return errors.Wrapf(err, "error creating ipset %q", h.remoteCIDRIPSet)
 	}
 
-	h.localIPSet = h.newNamedSetSet(constants.LocalCIDRIPSet)
+	h.localIPSet = h.newNamedSetSet(h.localCIDRIPSet)
 	if err := h.localIPSet.Create(true); err != nil {
-		return errors.Wrapf(err, "error creating ipset %q", constants.LocalCIDRIPSet)
+		return errors.Wrapf(err, "error creating ipset %q", h.localCIDRIPSet)
 	}
 
 	// packetfilter rules to clamp TCP MSS to a fixed value will be programmed when the local endpoint is created
@@ -121,15 +139,15 @@ func (h *mtuHandler) Init(_ context.Context) error {
 	logger.Info("Creating packetfilter clamp-mss-to-pmtu rules")
 
 	ruleSpecSource := &packetfilter.Rule{
-		SrcSetName:  constants.LocalCIDRIPSet,
-		DestSetName: constants.RemoteCIDRIPSet,
+		SrcSetName:  h.localCIDRIPSet,
+		DestSetName: h.remoteCIDRIPSet,
 		Action:      packetfilter.RuleActionMss,
 		ClampType:   packetfilter.ToPMTU,
 	}
 
 	ruleSpecDest := &packetfilter.Rule{
-		SrcSetName:  constants.RemoteCIDRIPSet,
-		DestSetName: constants.LocalCIDRIPSet,
+		SrcSetName:  h.remoteCIDRIPSet,
+		DestSetName: h.localCIDRIPSet,
 		Action:      packetfilter.RuleActionMss,
 		ClampType:   packetfilter.ToPMTU,
 	}
@@ -146,7 +164,7 @@ func (h *mtuHandler) Init(_ context.Context) error {
 }
 
 func (h *mtuHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
-	subnets := extractIPv4Subnets(&endpoint.Spec)
+	subnets := cidr.ExtractSubnets(h.ipFamily, endpoint.Spec.Subnets)
 	for _, subnet := range subnets {
 		err := h.localIPSet.AddEntry(subnet, true)
 		if err != nil {
@@ -176,7 +194,7 @@ func (h *mtuHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 }
 
 func (h *mtuHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
-	subnets := extractIPv4Subnets(&endpoint.Spec)
+	subnets := cidr.ExtractSubnets(h.ipFamily, endpoint.Spec.Subnets)
 	for _, subnet := range subnets {
 		logError(h.localIPSet.DelEntry(subnet), "Error deleting the subnet %q from the local IPSet", subnet)
 	}
@@ -189,7 +207,7 @@ func (h *mtuHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 }
 
 func (h *mtuHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
-	subnets := extractIPv4Subnets(&endpoint.Spec)
+	subnets := cidr.ExtractSubnets(h.ipFamily, endpoint.Spec.Subnets)
 	for _, subnet := range subnets {
 		err := h.remoteIPSet.AddEntry(subnet, true)
 		if err != nil {
@@ -201,25 +219,12 @@ func (h *mtuHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 }
 
 func (h *mtuHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
-	subnets := extractIPv4Subnets(&endpoint.Spec)
+	subnets := cidr.ExtractSubnets(h.ipFamily, endpoint.Spec.Subnets)
 	for _, subnet := range subnets {
 		logError(h.remoteIPSet.DelEntry(subnet), "Error deleting the subnet %q from the remote IPSet", subnet)
 	}
 
 	return nil
-}
-
-func extractIPv4Subnets(endpoint *submV1.EndpointSpec) []string {
-	subnets := make([]string, 0, len(endpoint.Subnets))
-
-	for _, subnet := range endpoint.Subnets {
-		// Revisit when IPv6 support is added.
-		if k8snet.IsIPv4CIDRString(subnet) {
-			subnets = append(subnets, subnet)
-		}
-	}
-
-	return subnets
 }
 
 func (h *mtuHandler) newNamedSetSet(key string) packetfilter.NamedSet {
@@ -243,13 +248,13 @@ func (h *mtuHandler) Uninstall() error {
 		Priority: packetfilter.ChainPriorityFirst,
 	}), "Error deleting IP hook chain %q of table type %q", constants.SmPostRoutingMssChain, h.tableType.String())
 
-	logError(h.localIPSet.Flush(), "Error flushing ipset %q", constants.LocalCIDRIPSet)
+	logError(h.localIPSet.Flush(), "Error flushing ipset %q", h.localCIDRIPSet)
 
-	logError(h.localIPSet.Destroy(), "Error deleting ipset %q", constants.LocalCIDRIPSet)
+	logError(h.localIPSet.Destroy(), "Error deleting ipset %q", h.localCIDRIPSet)
 
-	logError(h.remoteIPSet.Flush(), "Error flushing ipset %q", constants.RemoteCIDRIPSet)
+	logError(h.remoteIPSet.Flush(), "Error flushing ipset %q", h.remoteCIDRIPSet)
 
-	logError(h.remoteIPSet.Destroy(), "Error deleting ipset %q", constants.RemoteCIDRIPSet)
+	logError(h.remoteIPSet.Destroy(), "Error deleting ipset %q", h.remoteCIDRIPSet)
 
 	return nil
 }
@@ -259,7 +264,7 @@ func (h *mtuHandler) forceMssClamping(endpoint *submV1.Endpoint) error {
 	tcpMssValue := h.tcpMssValue
 
 	if tcpMssValue == 0 {
-		defaultHostIface, err := netlinkAPI.New().GetDefaultGatewayInterface(k8snet.IPv4)
+		defaultHostIface, err := netlinkAPI.New().GetDefaultGatewayInterface(h.ipFamily)
 		if err != nil {
 			return errors.Wrapf(err, "Unable to find the default interface on host")
 		}
@@ -278,14 +283,14 @@ func (h *mtuHandler) forceMssClamping(endpoint *submV1.Endpoint) error {
 	rules := []*packetfilter.Rule{}
 
 	rules = append(rules, &packetfilter.Rule{
-		SrcSetName:  constants.LocalCIDRIPSet,
-		DestSetName: constants.RemoteCIDRIPSet,
+		SrcSetName:  h.localCIDRIPSet,
+		DestSetName: h.remoteCIDRIPSet,
 		Action:      packetfilter.RuleActionMss,
 		ClampType:   packetfilter.ToValue,
 		MssValue:    strconv.Itoa(tcpMssValue),
 	}, &packetfilter.Rule{
-		DestSetName: constants.LocalCIDRIPSet,
-		SrcSetName:  constants.RemoteCIDRIPSet,
+		DestSetName: h.localCIDRIPSet,
+		SrcSetName:  h.remoteCIDRIPSet,
 		Action:      packetfilter.RuleActionMss,
 		ClampType:   packetfilter.ToValue,
 		MssValue:    strconv.Itoa(tcpMssValue),
