@@ -101,7 +101,7 @@ func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 			kp.remoteSubnets.Insert(inputCidrBlock)
 		}
 
-		gwIP := endpoint.GatewayIP()
+		gwIP := endpoint.Spec.GatewayIP(k8snet.IPv4)
 		kp.remoteSubnetGw[inputCidrBlock] = gwIP
 	}
 

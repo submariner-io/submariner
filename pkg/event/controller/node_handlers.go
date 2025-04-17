@@ -27,7 +27,7 @@ func (c *handlerController) handleRemovedNode(node *k8sv1.Node, _ int) bool {
 	defer c.syncMutex.Unlock()
 
 	if err := c.nodeHandler.NodeRemoved(node); err != nil {
-		logger.Error(err, "Error handling removed Node")
+		logger.Error(err, "Handler %q: Error handling removed Node %q", c.handler.GetName(), node.Name)
 		return true
 	}
 
@@ -39,7 +39,7 @@ func (c *handlerController) handleCreatedNode(node *k8sv1.Node, _ int) bool {
 	defer c.syncMutex.Unlock()
 
 	if err := c.nodeHandler.NodeCreated(node); err != nil {
-		logger.Error(err, "Error handling created Node")
+		logger.Error(err, "Handler %q: Error handling created Node %q", c.handler.GetName(), node.Name)
 		return true
 	}
 
@@ -51,7 +51,7 @@ func (c *handlerController) handleUpdatedNode(node *k8sv1.Node, _ int) bool {
 	defer c.syncMutex.Unlock()
 
 	if err := c.nodeHandler.NodeUpdated(node); err != nil {
-		logger.Error(err, "Error handling updated Node")
+		logger.Error(err, "Handler %q: Error handling updated Node %q", c.handler.GetName(), node.Name)
 		return true
 	}
 
