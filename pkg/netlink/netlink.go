@@ -78,12 +78,20 @@ type Interface interface {
 	GetDefaultGatewayInterface(family k8snet.IPFamily) (NetworkInterface, error)
 }
 
-var logger = log.Logger{Logger: logf.Log.WithName("netlink")}
-
-var NewFunc func() Interface
-
 const (
-	allZeroAddress = "0.0.0.0/0"
+	allZeroAddress   = "0.0.0.0/0"
+	allZeroAddressV6 = "::/0"
+)
+
+var (
+	logger = log.Logger{Logger: logf.Log.WithName("netlink")}
+
+	NewFunc func() Interface
+
+	allZeroesFamilyAddress = map[k8snet.IPFamily]string{
+		k8snet.IPv4: allZeroAddress,
+		k8snet.IPv6: allZeroAddressV6,
+	}
 )
 
 type netlinkType struct{}
@@ -336,8 +344,8 @@ func DeleteXfrmRules(family k8snet.IPFamily) error {
 
 	for i := range currentXfrmPolicyList {
 		// These xfrm rules are not programmed by Submariner, skip them.
-		if currentXfrmPolicyList[i].Dst.String() == allZeroAddress &&
-			currentXfrmPolicyList[i].Src.String() == allZeroAddress && currentXfrmPolicyList[i].Proto == 0 {
+		if currentXfrmPolicyList[i].Dst.String() == allZeroesFamilyAddress[family] &&
+			currentXfrmPolicyList[i].Src.String() == allZeroesFamilyAddress[family] && currentXfrmPolicyList[i].Proto == 0 {
 			logger.V(log.DEBUG).Infof("Skipping deletion of XFRM policy %s", currentXfrmPolicyList[i])
 			continue
 		}

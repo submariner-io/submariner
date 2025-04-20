@@ -119,7 +119,7 @@ func (a *Adapter) GetDefaultGatewayInterface(family k8snet.IPFamily) (NetworkInt
 	}
 
 	for i := range routes {
-		if routes[i].Dst == nil || routes[i].Dst.String() == allZeroAddress {
+		if routes[i].Dst == nil || routes[i].Dst.String() == allZeroesFamilyAddress[family] {
 			if routes[i].LinkIndex == 0 {
 				return nil, errors.New("default gateway interface could not be determined")
 			}
