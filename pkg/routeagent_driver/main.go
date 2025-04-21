@@ -59,7 +59,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
-	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
@@ -136,13 +135,11 @@ func main() {
 	localNode, err := node.GetLocalNode(ctx, k8sClientSet)
 	logger.FatalOnError(err, "Error getting information on the local node")
 
-	var handlers []event.Handler
+	// Max size of handlers is numBaseHandlers (=8) + max IP families(2) for kp sync handler.
+	handlers := make([]event.Handler, 0, 10)
 
 	for _, family := range cidr.ExtractIPFamilies(env.ClusterCidr) {
-		// For now only create v4 handler
-		if family == k8snet.IPv4 {
-			handlers = append(handlers, kubeproxy.NewSyncHandler(family, env.ClusterCidr, env.ServiceCidr))
-		}
+		handlers = append(handlers, kubeproxy.NewSyncHandler(family, env.ClusterCidr, env.ServiceCidr))
 	}
 
 	handlers = append(handlers,
