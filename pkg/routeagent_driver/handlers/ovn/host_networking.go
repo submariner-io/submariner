@@ -116,8 +116,7 @@ func (ovn *Handler) programRulesForRemoteSubnets(subnets []string, ruleFunc func
 
 func (ovn *Handler) getNextHopOnK8sMgmtIntf() (*net.IP, error) {
 	link, err := ovn.netLink.LinkByName(OVNK8sMgmntIntfName)
-
-	if err != nil && !errors.Is(err, netlink.LinkNotFoundError{}) {
+	if err != nil {
 		return nil, errors.Wrapf(err, "error retrieving link by name %q", OVNK8sMgmntIntfName)
 	}
 

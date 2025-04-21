@@ -71,17 +71,6 @@ type NetLink struct {
 
 var _ netlinkAPI.Interface = &NetLink{}
 
-type linkNotFoundError struct{}
-
-func (e linkNotFoundError) Error() string {
-	return "Link not found"
-}
-
-func (e linkNotFoundError) Is(err error) bool {
-	_, ok := err.(netlink.LinkNotFoundError)
-	return ok
-}
-
 func New() *NetLink {
 	return &NetLink{
 		Adapter: netlinkAPI.Adapter{Basic: &basicType{
@@ -136,7 +125,7 @@ func (n *basicType) LinkByName(name string) (netlink.Link, error) {
 
 	link, found := n.links[name]
 	if !found {
-		return nil, linkNotFoundError{}
+		return nil, netlink.LinkNotFoundError{}
 	}
 
 	return link.Link, nil
@@ -148,7 +137,7 @@ func (n *basicType) LinkSetUp(link netlink.Link) error {
 
 	l, found := n.links[link.Attrs().Name]
 	if !found {
-		return linkNotFoundError{}
+		return netlink.LinkNotFoundError{}
 	}
 
 	l.isSetup = true
@@ -569,7 +558,7 @@ func (n *NetLink) AwaitLink(name string) netlink.Link {
 func (n *NetLink) AwaitNoLink(name string) {
 	Eventually(func() bool {
 		_, err := n.LinkByName(name)
-		return errors.Is(err, netlink.LinkNotFoundError{})
+		return netlinkAPI.IsLinkNotFoundError(err)
 	}, 5).Should(BeTrue(), "Link %q exists", name)
 }
 

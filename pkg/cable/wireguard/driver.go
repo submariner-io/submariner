@@ -444,7 +444,11 @@ func (w *wireguard) Cleanup() error {
 	logger.Info("Uninstalling the wireguard cable driver")
 
 	link, err := w.netLink.LinkByName(DefaultDeviceName)
-	if err != nil && !errors.Is(err, netlink.LinkNotFoundError{}) {
+	if netlinkAPI.IsLinkNotFoundError(err) {
+		return nil
+	}
+
+	if err != nil {
 		return errors.Wrapf(err, "error retrieving the wireguard interface %q", DefaultDeviceName)
 	}
 
