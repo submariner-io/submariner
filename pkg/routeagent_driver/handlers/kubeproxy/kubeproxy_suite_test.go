@@ -171,7 +171,7 @@ func (t *testDriver) verifyNoHostNetworkingRoutes() {
 func (t *testDriver) verifyRemoteSubnetIPTableRules() {
 	for _, remoteCIDR := range cidr.ExtractSubnets(t.ipFamily, t.remoteEndpoint.Spec.Subnets) {
 		t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmPostRoutingChain,
-			And(ContainSubstring(localClusterIPv4CIDR), ContainSubstring(remoteCIDR)))
+			And(ContainSubstring(cidr.ExtractSubnets(t.ipFamily, t.localClusterCIDRs)[0]), ContainSubstring(remoteCIDR)))
 	}
 }
 

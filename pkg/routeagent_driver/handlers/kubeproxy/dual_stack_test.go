@@ -31,6 +31,8 @@ func testDualStack() {
 
 	BeforeEach(func() {
 		t.remoteEndpoint.Spec.Subnets = []string{remoteIPv6Subnet, remoteIPv4Subnet1}
+		t.remoteEndpoint.Spec.PrivateIPs = append(t.remoteEndpoint.Spec.PrivateIPs, "4000:0:0:1234::")
+		t.localEndpoint.Spec.PrivateIPs = append(t.localEndpoint.Spec.PrivateIPs, "5000:0:0:1234::")
 		t.localClusterCIDRs = []string{localClusterIPv4CIDR, localClusterIPv6CIDR}
 		t.localServiceCIDRs = []string{localServiceIPv4CIDR, localServiceIPv6CIDR}
 	})
@@ -83,13 +85,12 @@ func testDualStack() {
 		testIPFamily()
 	})
 
-	//nolint:gocritic // Ignore commentedOutCode
-	// Context("IPv6", func() {
-	//	BeforeEach(func() {
-	//		t.ipFamily = k8snet.IPv6
-	//		t.hostInterfaceAddr = "3000:0:0:1234::/64"
-	//	})
-	//
-	//	testIPFamily()
-	// })
-} //nolint:wsl // Ignore 'block should not end with a whitespace (or comment)'
+	Context("IPv6", func() {
+		BeforeEach(func() {
+			t.ipFamily = k8snet.IPv6
+			t.hostInterfaceAddr = "3000:0:0:1234::/64"
+		})
+
+		testIPFamily()
+	})
+}
