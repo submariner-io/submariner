@@ -89,7 +89,7 @@ func (kp *SyncHandler) createPFilterChains() error {
 		// Program rules to support communication from HostNetwork to remoteCluster
 		ruleSpec = packetfilter.Rule{
 			OutInterface: VxLANIface,
-			SrcCIDR:      strconv.Itoa(VxLANVTepNetworkPrefix) + ".0.0.0/8",
+			SrcCIDR:      kp.vtepPrefixCIDR,
 			SnatCIDR:     kp.cniIface.IPAddress,
 			Action:       packetfilter.RuleActionSNAT,
 		}

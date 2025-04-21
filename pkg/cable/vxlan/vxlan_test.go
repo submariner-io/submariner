@@ -111,7 +111,13 @@ var _ = Describe("Vxlan", func() {
 			actualRoutes = append(actualRoutes, routeFieldMap(routes[i].Src.String(), routes[i].Gw.String(), routes[i].Dst.String()))
 		}
 
-		gw := fmt.Sprintf("%d.68.2.1", vxlan.VxlanVTepNetworkPrefix)
+		_, cidrNet, err := net.ParseCIDR(vxlan.VxlanVTepNetworkPrefixCIDR)
+		Expect(err).To(Succeed())
+
+		prefix := cidrNet.IP.To4()
+		Expect(prefix).ToNot(BeNil(), "invalid IPv4 prefix in "+vxlan.VxlanVTepNetworkPrefixCIDR)
+
+		gw := fmt.Sprintf("%d.68.2.1", prefix[0])
 		Expect(actualRoutes).To(HaveExactElements(routeFieldMap(cniIPAddress, gw, natInfo.Endpoint.Spec.Subnets[0]),
 			routeFieldMap(cniIPAddress, gw, natInfo.Endpoint.Spec.Subnets[1])))
 	})

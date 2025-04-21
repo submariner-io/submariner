@@ -40,11 +40,11 @@ import (
 )
 
 const (
-	VxlanIface             = "vxlan-tunnel"
-	VxlanVTepNetworkPrefix = 241
-	CableDriverName        = "vxlan"
-	TableID                = 100
-	DefaultPort            = 4500
+	VxlanIface                 = "vxlan-tunnel"
+	VxlanVTepNetworkPrefixCIDR = "241.0.0.0/8"
+	CableDriverName            = "vxlan"
+	TableID                    = 100
+	DefaultPort                = 4500
 )
 
 type vxLan struct {
@@ -94,7 +94,7 @@ func (v *vxLan) createVxlanInterface(port int) error {
 
 	var err error
 
-	v.vtepIP, err = vxlan.GetVtepIPAddressFrom(ipAddr, VxlanVTepNetworkPrefix)
+	v.vtepIP, err = vxlan.GetVtepIPAddressFrom(ipAddr, VxlanVTepNetworkPrefixCIDR, k8snet.IPv4)
 	if err != nil {
 		return errors.Wrapf(err, "failed to derive the vxlan vtepIP for %s", ipAddr)
 	}
@@ -168,7 +168,7 @@ func (v *vxLan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 
 	privateIP := endpointInfo.Endpoint.Spec.GetPrivateIP(endpointInfo.UseFamily)
 
-	remoteVtepIP, err := vxlan.GetVtepIPAddressFrom(privateIP, VxlanVTepNetworkPrefix)
+	remoteVtepIP, err := vxlan.GetVtepIPAddressFrom(privateIP, VxlanVTepNetworkPrefixCIDR, k8snet.IPv4)
 	if err != nil {
 		return endpointInfo.UseIP, fmt.Errorf("failed to derive the vxlan vtepIP for %s: %w", privateIP, err)
 	}

@@ -32,6 +32,8 @@ import (
 func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 	kp.localEndpointIfaceName = endpoint.Spec.BackendConfig[cable.InterfaceNameConfig]
 
+	localClusterGwNodeIP := net.ParseIP(endpoint.Spec.GetPrivateIP(kp.ipFamily))
+
 	// We are on nonGateway node
 	if !kp.State().IsOnGateway() {
 		// If the node already has a vxLAN interface that points to an oldEndpoint
@@ -47,9 +49,7 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 			kp.activeEndpointHostname = ""
 		}
 
-		localClusterGwNodeIP := net.ParseIP(endpoint.Spec.GetPrivateIP(kp.ipFamily))
-
-		remoteVtepIP, err := vxlan.GetVtepIPAddressFrom(localClusterGwNodeIP.String(), VxLANVTepNetworkPrefix)
+		remoteVtepIP, err := vxlan.GetVtepIPAddressFrom(localClusterGwNodeIP.String(), kp.vtepPrefixCIDR, kp.ipFamily)
 		if err != nil {
 			return errors.Wrap(err, "failed to derive the remoteVtepIP")
 		}
@@ -68,6 +68,9 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 		if err != nil {
 			return errors.Wrap(err, "error while reconciling routes")
 		}
+	} else {
+		// Store local endpoint's private IP to use as the source address for the IPv6 VxLAN interface on GW.
+		kp.vxlanGwIP = &localClusterGwNodeIP
 	}
 
 	return nil

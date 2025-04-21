@@ -60,6 +60,7 @@ type SyncHandler struct {
 	cniIface               *cni.Interface
 	defaultHostIface       netlink.NetworkInterface
 	activeEndpointHostname string
+	vtepPrefixCIDR         string
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("KubeProxy")}
@@ -67,6 +68,11 @@ var logger = log.Logger{Logger: logf.Log.WithName("KubeProxy")}
 func NewSyncHandler(ipFamily k8snet.IPFamily, localClusterCidr, localServiceCidr []string) *SyncHandler {
 	pFilter, err := packetfilter.New(ipFamily)
 	utilruntime.Must(err)
+
+	vtepPrefixCIDR := VxLANVTepNetworkPrefixCIDR
+	if ipFamily == k8snet.IPv6 {
+		vtepPrefixCIDR = VxLANVTepNetworkPrefixCIDRIPv6
+	}
 
 	return &SyncHandler{
 		ipFamily:         ipFamily,
@@ -78,6 +84,7 @@ func NewSyncHandler(ipFamily k8snet.IPFamily, localClusterCidr, localServiceCidr
 		routeCacheGWNode: set.New[string](),
 		netLink:          netlink.New(),
 		pFilter:          pFilter,
+		vtepPrefixCIDR:   vtepPrefixCIDR,
 	}
 }
 

@@ -21,8 +21,6 @@ package vxlan
 import (
 	"net"
 	"os"
-	"strconv"
-	"strings"
 	"syscall"
 
 	"github.com/pkg/errors"
@@ -30,6 +28,7 @@ import (
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
+	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -134,15 +133,47 @@ func isVxlanConfigTheSame(newLink, currentLink netlink.Link) bool {
 	return true
 }
 
-func GetVtepIPAddressFrom(ipAddr string, networkPrefix int) (net.IP, error) {
-	ipSlice := strings.Split(ipAddr, ".")
-	if len(ipSlice) < 4 {
-		return nil, errors.Errorf("invalid ipAddr %q", ipAddr)
+func GetVtepIPAddressFrom(ipAddr, prefixCIDR string, family k8snet.IPFamily) (net.IP, error) {
+	ip := net.ParseIP(ipAddr)
+	if ip == nil {
+		return nil, errors.Errorf("invalid IP address: %q", ipAddr)
 	}
 
-	ipSlice[0] = strconv.Itoa(networkPrefix)
+	_, prefixNet, err := net.ParseCIDR(prefixCIDR)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to parse prefix %q", prefixCIDR)
+	}
 
-	return net.ParseIP(strings.Join(ipSlice, ".")), nil
+	switch family {
+	case k8snet.IPv4:
+		src := ip.To4()
+		prefix := prefixNet.IP.To4()
+
+		if src == nil || prefix == nil {
+			return nil, errors.Errorf("expected IPv4 addresses but got ip=%q and prefix=%q", ipAddr, prefixCIDR)
+		}
+
+		return net.IPv4(prefix[0], src[1], src[2], src[3]), nil
+	case k8snet.IPv6:
+		src := ip.To16()
+		prefix := prefixNet.IP.To16()
+
+		if src == nil || prefix == nil {
+			return nil, errors.Errorf("expected IPv6 addresses but got ip=%q and prefix=%q", ipAddr, prefixCIDR)
+		}
+
+		vtep := make(net.IP, net.IPv6len)
+		copy(vtep, prefix)
+
+		// IPv6 copy last 4 bytes
+		copy(vtep[12:], src[12:])
+
+		return vtep, nil
+	case k8snet.IPFamilyUnknown:
+		return nil, errors.Errorf("unsupported IP family %v", family)
+	default:
+		return nil, errors.Errorf("unsupported IP family %v", family)
+	}
 }
 
 func (i *Interface) ConfigureIPAddress(ipAddress net.IP, mask net.IPMask) error {

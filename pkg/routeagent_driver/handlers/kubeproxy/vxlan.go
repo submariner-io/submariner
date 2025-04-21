@@ -24,6 +24,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/submariner/pkg/port"
 	"github.com/submariner-io/submariner/pkg/vxlan"
+	k8snet "k8s.io/utils/net"
 )
 
 func (kp *SyncHandler) newVxlanInterface(attrs *vxlan.Attributes) (*vxlan.Interface, error) {
@@ -46,7 +47,7 @@ func (kp *SyncHandler) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP)
 		return errors.Wrapf(err, "unable to retrieve the IPv%s address on the Host", kp.ipFamily)
 	}
 
-	vtepIP, err := vxlan.GetVtepIPAddressFrom(ipAddr.String(), VxLANVTepNetworkPrefix)
+	vtepIP, err := vxlan.GetVtepIPAddressFrom(ipAddr.String(), kp.vtepPrefixCIDR, kp.ipFamily)
 	if err != nil {
 		return errors.Wrapf(err, "failed to derive the vxlan vtepIP for %s", ipAddr)
 	}
@@ -57,6 +58,11 @@ func (kp *SyncHandler) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP)
 			VxlanID:  100,
 			VtepPort: port.IntraClusterVxLAN,
 			Mtu:      kp.defaultHostIface.MTU(),
+		}
+
+		// For IPv6 VxLAN interface SrcAddr should be set with local IP
+		if kp.ipFamily == k8snet.IPv6 {
+			attrs.SrcAddr = *kp.vxlanGwIP
 		}
 
 		kp.vxlanDevice, err = kp.newVxlanInterface(attrs)
@@ -93,7 +99,12 @@ func (kp *SyncHandler) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP)
 		}
 	}
 
-	err = kp.vxlanDevice.ConfigureIPAddress(vtepIP, net.CIDRMask(8, 32))
+	_, ipNet, err := net.ParseCIDR(kp.vtepPrefixCIDR)
+	if err != nil {
+		return errors.Wrapf(err, "invalid VTEP CIDR %q", kp.vtepPrefixCIDR)
+	}
+
+	err = kp.vxlanDevice.ConfigureIPAddress(vtepIP, ipNet.Mask)
 	if err != nil {
 		return errors.Wrap(err, "failed to configure vxlan interface ipaddress on the Gateway Node")
 	}

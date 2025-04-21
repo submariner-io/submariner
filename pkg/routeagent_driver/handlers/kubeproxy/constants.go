@@ -23,7 +23,7 @@ const (
 	VxInterfaceWorker  = 0
 	VxInterfaceGateway = 1
 
-	// Why VxLANVTepNetworkPrefix is 240?
+	// Why VxLANVTepNetworkPrefixCIDR is 240.0.0.0/8?
 	// On VxLAN interfaces we need a unique IPAddress which does not collide with the
 	// host ip-address. This is going to be tricky as currently there is no specific
 	// CIDR in K8s that can be used for this purpose. One option is to take this as an
@@ -42,8 +42,15 @@ const (
 	// with the VxLAN ipaddress.
 	// [*] https://en.wikipedia.org/wiki/Reserved_IP_addresses
 
-	VxLANVTepNetworkPrefix = 240
-	SmRouteAgentFilter     = "app=submariner-routeagent"
+	VxLANVTepNetworkPrefixCIDR = "240.0.0.0/8"
+
+	// For IPv6, we use the fd00:100:100::/96 prefix and embed the last 4 bytes of the source IP,
+	// to the last 4 bytes of the VTEP address.
+	// For example: private IP fd00:abcd::1234:5678 will be translated to fd00:100:100::1234:5678 .
+
+	VxLANVTepNetworkPrefixCIDRIPv6 = "fd00:100:100::/96"
+
+	SmRouteAgentFilter = "app=submariner-routeagent"
 )
 
 type Operation int
