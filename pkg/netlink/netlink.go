@@ -360,10 +360,11 @@ func DeleteXfrmRules(family k8snet.IPFamily) error {
 	return nil
 }
 
-func NewTableRule(tableID int) *netlink.Rule {
+func NewTableRule(tableID int, family k8snet.IPFamily) *netlink.Rule {
 	rule := netlink.NewRule()
 	rule.Table = tableID
 	rule.Priority = tableID
+	rule.Family = ToNetlinkFamily(family)
 
 	return rule
 }

@@ -40,7 +40,7 @@ func (kp *SyncHandler) Uninstall() error {
 			constants.RouteAgentHostNetworkTableID, err)
 	}
 
-	err = kp.netLink.RuleDelIfPresent(netlinkAPI.NewTableRule(constants.RouteAgentHostNetworkTableID))
+	err = kp.netLink.RuleDelIfPresent(netlinkAPI.NewTableRule(constants.RouteAgentHostNetworkTableID, kp.ipFamily))
 	if err != nil {
 		logger.V(log.TRACE).Infof("Deleting IP Rule pointing to %d table returned error: %v",
 			constants.RouteAgentHostNetworkTableID, err)

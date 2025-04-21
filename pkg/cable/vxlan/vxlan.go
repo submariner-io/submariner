@@ -119,7 +119,7 @@ func (v *vxLan) createVxlanInterface(port int) error {
 		return errors.Wrap(err, "failed to create vxlan interface on Gateway Node")
 	}
 
-	err = v.netLink.RuleAddIfNotPresent(netlinkAPI.NewTableRule(TableID))
+	err = v.netLink.RuleAddIfNotPresent(netlinkAPI.NewTableRule(TableID, k8snet.IPv4))
 	if err != nil && !os.IsExist(err) {
 		return errors.Wrap(err, "failed to add ip rule")
 	}
@@ -290,7 +290,7 @@ func (v *vxLan) Cleanup() error {
 		logger.Errorf(nil, "Unable to delete interface %s and associated routes from table %d", VxlanIface, TableID)
 	}
 
-	err = v.netLink.RuleDelIfPresent(netlinkAPI.NewTableRule(TableID))
+	err = v.netLink.RuleDelIfPresent(netlinkAPI.NewTableRule(TableID, k8snet.IPv4))
 	if err != nil {
 		return errors.Wrapf(err, "unable to delete IP rule pointing to %d table", TableID)
 	}
