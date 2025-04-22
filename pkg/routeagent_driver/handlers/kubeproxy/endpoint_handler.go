@@ -54,7 +54,7 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 			return errors.Wrap(err, "failed to derive the remoteVtepIP")
 		}
 
-		logger.Infof("Creating the vxlan interface %s with gateway node IP %s", VxLANIface, localClusterGwNodeIP)
+		logger.Infof("Creating the vxlan interface %s with gateway node IP %s", kp.vxlanIface, localClusterGwNodeIP)
 
 		err = kp.createVxLANInterface(VxInterfaceWorker, localClusterGwNodeIP)
 		if err != nil {

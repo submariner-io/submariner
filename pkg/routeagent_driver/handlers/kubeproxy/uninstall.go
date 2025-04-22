@@ -55,7 +55,7 @@ func (kp *SyncHandler) Uninstall() error {
 func (kp *SyncHandler) deleteVxLANInterface() {
 	iface := &netlink.Vxlan{
 		LinkAttrs: netlink.LinkAttrs{
-			Name:  VxLANIface,
+			Name:  kp.vxlanIface,
 			Flags: net.FlagUp,
 		},
 		VxlanId: 100,
@@ -63,11 +63,11 @@ func (kp *SyncHandler) deleteVxLANInterface() {
 		Port:    port.IntraClusterVxLAN,
 	}
 
-	logger.Infof("Deleting the %q interface", VxLANIface)
+	logger.Infof("Deleting the %q interface", kp.vxlanIface)
 
 	err := netlinkAPI.New().LinkDel(iface)
 	if err != nil {
-		logger.Errorf(err, "Failed to delete the vxlan interface %q", VxLANIface)
+		logger.Errorf(err, "Failed to delete the vxlan interface %q", kp.vxlanIface)
 	}
 }
 

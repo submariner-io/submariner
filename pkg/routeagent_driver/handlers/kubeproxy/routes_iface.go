@@ -156,10 +156,10 @@ func (kp *SyncHandler) configureRoute(remoteSubnet string, operation Operation, 
 
 func (kp *SyncHandler) cleanVxSubmarinerRoutes() {
 	// This must be called with kp.syncHandlerMutex held
-	link, err := kp.netLink.LinkByName(VxLANIface)
+	link, err := kp.netLink.LinkByName(kp.vxlanIface)
 	if err != nil {
 		if !errors.Is(err, netlink.LinkNotFoundError{}) {
-			logger.Errorf(err, "Error retrieving link by name %q", VxLANIface)
+			logger.Errorf(err, "Error retrieving link by name %q", kp.vxlanIface)
 		}
 
 		return
@@ -167,7 +167,7 @@ func (kp *SyncHandler) cleanVxSubmarinerRoutes() {
 
 	currentRouteList, err := kp.netLink.RouteList(link, kp.ipFamily)
 	if err != nil {
-		logger.Errorf(err, "Unable to cleanup routes, error retrieving routes on the link %s", VxLANIface)
+		logger.Errorf(err, "Unable to cleanup routes, error retrieving routes on the link %s", kp.vxlanIface)
 		return
 	}
 
@@ -190,14 +190,14 @@ func (kp *SyncHandler) cleanVxSubmarinerRoutes() {
 func (kp *SyncHandler) reconcileRoutes(vxlanGw net.IP) error {
 	logger.V(log.DEBUG).Infof("Reconciling routes to gw: %s", vxlanGw.String())
 
-	link, err := kp.netLink.LinkByName(VxLANIface)
+	link, err := kp.netLink.LinkByName(kp.vxlanIface)
 	if err != nil {
-		return errors.Wrapf(err, "error retrieving link by name %s", VxLANIface)
+		return errors.Wrapf(err, "error retrieving link by name %s", kp.vxlanIface)
 	}
 
 	currentRouteList, err := kp.netLink.RouteList(link, kp.ipFamily)
 	if err != nil {
-		return errors.Wrapf(err, "error retrieving routes for link %s", VxLANIface)
+		return errors.Wrapf(err, "error retrieving routes for link %s", kp.vxlanIface)
 	}
 
 	// First lets delete all of the routes that don't match.
@@ -205,7 +205,7 @@ func (kp *SyncHandler) reconcileRoutes(vxlanGw net.IP) error {
 
 	currentRouteList, err = kp.netLink.RouteList(link, kp.ipFamily)
 	if err != nil {
-		return errors.Wrapf(err, "error retrieving routes for link %s", VxLANIface)
+		return errors.Wrapf(err, "error retrieving routes for link %s", kp.vxlanIface)
 	}
 
 	// Let's now add the routes that are missing.
@@ -275,9 +275,9 @@ func (kp *SyncHandler) updateRoutingRulesForInterClusterSupport(remoteCIDRs []st
 	}
 
 	if kp.vxlanDevice != nil && kp.vxlanGwIP != nil {
-		link, err := kp.netLink.LinkByName(VxLANIface)
+		link, err := kp.netLink.LinkByName(kp.vxlanIface)
 		if err != nil {
-			return errors.Wrapf(err, "error retrieving link by name %s", VxLANIface)
+			return errors.Wrapf(err, "error retrieving link by name %s", kp.vxlanIface)
 		}
 
 		for _, cidrBlock := range remoteCIDRs {

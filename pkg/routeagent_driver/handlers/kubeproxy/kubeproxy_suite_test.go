@@ -46,24 +46,25 @@ import (
 )
 
 const (
-	cniIP4Address        = "192.168.5.1"
-	cniIP6Address        = "2001:0:0:1234::"
-	localClusterIPv4CIDR = cniIP4Address + "/24"
-	localClusterIPv6CIDR = cniIP6Address + "/64"
-	localServiceIPv4CIDR = "169.254.2.0/24"
-	localServiceIPv6CIDR = "2003:0:0:1234::"
-	remoteIPv4Subnet1    = "170.250.1.0/24"
-	remoteIPv4Subnet2    = "171.250.1.0/24"
-	remoteIPv6Subnet     = "2002:0:0:1234::/64"
-	localNodeName1       = "local-node1"
-	localNodeName2       = "local-node2"
-	remoteNodeName       = "remote-node"
-	nodeIPv4Address1     = "10.253.10.2"
-	nodeIPv4Address2     = "10.253.10.3"
-	nodeIPv6Address      = "2004:0:0:1234::"
-	hostInterfaceIndex   = 100
-	vxLanInterfaceIndex  = 200
-	hostInterfaceMTU     = 101
+	cniIP4Address           = "192.168.5.1"
+	cniIP6Address           = "2001:0:0:1234::"
+	localClusterIPv4CIDR    = cniIP4Address + "/24"
+	localClusterIPv6CIDR    = cniIP6Address + "/64"
+	localServiceIPv4CIDR    = "169.254.2.0/24"
+	localServiceIPv6CIDR    = "2003:0:0:1234::"
+	remoteIPv4Subnet1       = "170.250.1.0/24"
+	remoteIPv4Subnet2       = "171.250.1.0/24"
+	remoteIPv6Subnet        = "2002:0:0:1234::/64"
+	localNodeName1          = "local-node1"
+	localNodeName2          = "local-node2"
+	remoteNodeName          = "remote-node"
+	nodeIPv4Address1        = "10.253.10.2"
+	nodeIPv4Address2        = "10.253.10.3"
+	nodeIPv6Address         = "2004:0:0:1234::"
+	hostInterfaceIndex      = 100
+	vxLanInterfaceIndex     = 200
+	vxLanInterfaceIndexIPv6 = 300
+	hostInterfaceMTU        = 101
 )
 
 func init() {
@@ -102,7 +103,8 @@ func newTestDriver() *testDriver {
 		t.hostInterfaceAddr = "172.19.3.1/24"
 
 		t.netLink = fakeNetlink.New()
-		t.netLink.SetLinkIndex(kubeproxy.VxLANIface, vxLanInterfaceIndex)
+		t.netLink.SetLinkIndex(kubeproxy.GetVxLANInterfaceName(k8snet.IPv4), vxLanInterfaceIndex)
+		t.netLink.SetLinkIndex(kubeproxy.GetVxLANInterfaceName(k8snet.IPv6), vxLanInterfaceIndexIPv6)
 
 		netlinkAPI.NewFunc = func() netlinkAPI.Interface {
 			return t.netLink
@@ -148,6 +150,14 @@ func newTestDriver() *testDriver {
 	return t
 }
 
+func (t *testDriver) getVxLanInterfaceIndex() int {
+	if t.ipFamily == k8snet.IPv4 {
+		return vxLanInterfaceIndex
+	}
+
+	return vxLanInterfaceIndexIPv6
+}
+
 func (t *testDriver) verifyVxLANRoutes() {
 	t.netLink.AwaitDstRoutes(t.awaitVxlanLink().Attrs().Index, 0,
 		cidr.ExtractSubnets(t.ipFamily, t.remoteEndpoint.Spec.Subnets)...)
@@ -177,7 +187,7 @@ func (t *testDriver) verifyRemoteSubnetIPTableRules() {
 
 func (t *testDriver) addVxLANRoute(cidr string) {
 	_, err := vxlan.NewInterface(&vxlan.Attributes{
-		Name: kubeproxy.VxLANIface,
+		Name: kubeproxy.GetVxLANInterfaceName(k8snet.IPv4),
 	}, t.netLink)
 	Expect(err).To(Succeed())
 
@@ -195,7 +205,7 @@ func (t *testDriver) addVxLANRoute(cidr string) {
 }
 
 func (t *testDriver) awaitVxlanLink() *netlink.Vxlan {
-	return toVxlan(t.netLink.AwaitLink(kubeproxy.VxLANIface))
+	return toVxlan(t.netLink.AwaitLink(kubeproxy.GetVxLANInterfaceName(t.ipFamily)))
 }
 
 func newLocalEndpoint(hostname string) *submarinerv1.Endpoint {

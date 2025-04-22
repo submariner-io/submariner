@@ -24,6 +24,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
 	corev1 "k8s.io/api/core/v1"
+	k8snet "k8s.io/utils/net"
 )
 
 var _ = Describe("SyncHandler", func() {
@@ -79,7 +80,7 @@ func testUninstall() {
 			Expect(t.handler.Uninstall()).To(Succeed())
 
 			t.netLink.AwaitNoRule(constants.RouteAgentHostNetworkTableID, "", "")
-			t.netLink.AwaitNoLink(kubeproxy.VxLANIface)
+			t.netLink.AwaitNoLink(kubeproxy.GetVxLANInterfaceName(k8snet.IPv4))
 			t.verifyNoHostNetworkingRoutes()
 		})
 	})

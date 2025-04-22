@@ -56,7 +56,7 @@ func testEndpoints() {
 			})
 
 			It("should remove the previous VxLAN interface", func() {
-				t.netLink.SetLinkIndex(kubeproxy.VxLANIface, vxLanInterfaceIndex+1)
+				t.netLink.SetLinkIndex(kubeproxy.GetVxLANInterfaceName(k8snet.IPv4), vxLanInterfaceIndex+1)
 				t.CreateEndpoint(newLocalEndpoint(localNodeName2))
 
 				Eventually(func() int {
@@ -85,7 +85,7 @@ func testEndpoints() {
 
 		Context("and its host name matches that associated with the existing VxLAN interface", func() {
 			It("should remove the existing VxLAN interface", func() {
-				t.netLink.AwaitNoLink(kubeproxy.VxLANIface)
+				t.netLink.AwaitNoLink(kubeproxy.GetVxLANInterfaceName(k8snet.IPv4))
 			})
 		})
 
@@ -101,7 +101,7 @@ func testEndpoints() {
 
 		Context("and is subsequently recreated", func() {
 			It("should recreate the VxLAN interface", func() {
-				t.netLink.AwaitNoLink(kubeproxy.VxLANIface)
+				t.netLink.AwaitNoLink(kubeproxy.GetVxLANInterfaceName(k8snet.IPv4))
 
 				t.CreateEndpoint(t.localEndpoint)
 				t.awaitVxlanLink()
@@ -113,7 +113,7 @@ func testEndpoints() {
 		It("should not add the VxLAN interface", func() {
 			t.localEndpoint.Spec.Hostname = t.Hostname
 			t.CreateEndpoint(t.localEndpoint)
-			t.netLink.AwaitNoLink(kubeproxy.VxLANIface)
+			t.netLink.AwaitNoLink(kubeproxy.GetVxLANInterfaceName(k8snet.IPv4))
 		})
 	})
 

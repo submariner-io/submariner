@@ -54,7 +54,7 @@ func (kp *SyncHandler) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP)
 
 	if ifaceType == VxInterfaceGateway {
 		attrs := &vxlan.Attributes{
-			Name:     VxLANIface,
+			Name:     kp.vxlanIface,
 			VxlanID:  100,
 			VtepPort: port.IntraClusterVxLAN,
 			Mtu:      kp.defaultHostIface.MTU(),
@@ -77,16 +77,16 @@ func (kp *SyncHandler) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP)
 			}
 		}
 
-		err = kp.netLink.EnsureLooseModeIsConfigured(VxLANIface)
+		err = kp.netLink.EnsureLooseModeIsConfigured(kp.vxlanIface)
 		if err != nil {
 			return errors.Wrap(err, "error while validating loose mode")
 		}
 
-		logger.Infof("Successfully configured reverse path filter to loose mode on %q", VxLANIface)
+		logger.Infof("Successfully configured reverse path filter to loose mode on %q", kp.vxlanIface)
 	} else if ifaceType == VxInterfaceWorker {
 		// non-Gateway/Worker Node
 		attrs := &vxlan.Attributes{
-			Name:     VxLANIface,
+			Name:     kp.vxlanIface,
 			VxlanID:  100,
 			Group:    gatewayNodeIP,
 			VtepPort: port.IntraClusterVxLAN,
@@ -109,9 +109,9 @@ func (kp *SyncHandler) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP)
 		return errors.Wrap(err, "failed to configure vxlan interface ipaddress on the Gateway Node")
 	}
 
-	err = kp.netLink.EnableForwarding(VxLANIface)
+	err = kp.netLink.EnableForwarding(kp.vxlanIface)
 	if err != nil {
-		return errors.Wrapf(err, "error enabling forwarding on the %q iface", VxLANIface)
+		return errors.Wrapf(err, "error enabling forwarding on the %q iface", kp.vxlanIface)
 	}
 
 	return nil

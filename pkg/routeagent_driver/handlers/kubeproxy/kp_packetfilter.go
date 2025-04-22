@@ -56,6 +56,7 @@ type SyncHandler struct {
 	netLink                netlink.Interface
 	vxlanDevice            *vxlan.Interface
 	vxlanGwIP              *net.IP
+	vxlanIface             string
 	hostname               string
 	cniIface               *cni.Interface
 	defaultHostIface       netlink.NetworkInterface
@@ -64,6 +65,16 @@ type SyncHandler struct {
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("KubeProxy")}
+
+func GetVxLANInterfaceName(ipFamily k8snet.IPFamily) string {
+	vxlanIface := VxLANIface
+
+	if ipFamily == k8snet.IPv6 {
+		vxlanIface = VxLANIface + "-" + string(ipFamily)
+	}
+
+	return vxlanIface
+}
 
 func NewSyncHandler(ipFamily k8snet.IPFamily, localClusterCidr, localServiceCidr []string) *SyncHandler {
 	pFilter, err := packetfilter.New(ipFamily)
@@ -85,6 +96,7 @@ func NewSyncHandler(ipFamily k8snet.IPFamily, localClusterCidr, localServiceCidr
 		netLink:          netlink.New(),
 		pFilter:          pFilter,
 		vtepPrefixCIDR:   vtepPrefixCIDR,
+		vxlanIface:       GetVxLANInterfaceName(ipFamily),
 	}
 }
 

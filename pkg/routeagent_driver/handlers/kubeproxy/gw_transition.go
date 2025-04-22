@@ -45,7 +45,7 @@ func (kp *SyncHandler) TransitionToGateway() error {
 
 	kp.cleanVxSubmarinerRoutes()
 
-	logger.Infof("Creating the vxlan interface: %s on the gateway node", VxLANIface)
+	logger.Infof("Creating the vxlan interface: %s on the gateway node", kp.vxlanIface)
 
 	kp.activeEndpointHostname = kp.hostname
 
