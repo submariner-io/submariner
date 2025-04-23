@@ -77,7 +77,7 @@ func (kp *SyncHandler) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP)
 			}
 		}
 
-		err = kp.netLink.EnsureLooseModeIsConfigured(kp.vxlanIface)
+		err = kp.netLink.EnsureLooseModeIsConfigured(kp.vxlanIface, kp.ipFamily)
 		if err != nil {
 			return errors.Wrap(err, "error while validating loose mode")
 		}
@@ -109,7 +109,7 @@ func (kp *SyncHandler) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP)
 		return errors.Wrap(err, "failed to configure vxlan interface ipaddress on the Gateway Node")
 	}
 
-	err = kp.netLink.EnableForwarding(kp.vxlanIface)
+	err = kp.netLink.EnableForwarding(kp.vxlanIface, kp.ipFamily)
 	if err != nil {
 		return errors.Wrapf(err, "error enabling forwarding on the %q iface", kp.vxlanIface)
 	}

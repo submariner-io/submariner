@@ -58,10 +58,9 @@ type Basic interface {
 	XfrmPolicyAdd(policy *netlink.XfrmPolicy) error
 	XfrmPolicyDel(policy *netlink.XfrmPolicy) error
 	XfrmPolicyList(family k8snet.IPFamily) ([]netlink.XfrmPolicy, error)
-	EnableLooseModeReversePathFilter(interfaceName string) error
-	EnsureLooseModeIsConfigured(interfaceName string) error
-	EnableForwarding(interfaceName string) error
-	GetReversePathFilter(interfaceName string) ([]byte, error)
+	EnableLooseModeReversePathFilter(interfaceName string, family k8snet.IPFamily) error
+	EnsureLooseModeIsConfigured(interfaceName string, family k8snet.IPFamily) error
+	EnableForwarding(interfaceName string, family k8snet.IPFamily) error
 	ConfigureTCPMTUProbe(mtuProbe, baseMss string) error
 	InterfaceByName(name string) (NetworkInterface, error)
 	InterfaceByIndex(index int) (NetworkInterface, error)
@@ -188,19 +187,29 @@ func (n *netlinkType) XfrmPolicyList(family k8snet.IPFamily) ([]netlink.XfrmPoli
 	return netlink.XfrmPolicyList(ToNetlinkFamily(family))
 }
 
-func (n *netlinkType) EnableLooseModeReversePathFilter(interfaceName string) error {
+func (n *netlinkType) EnableLooseModeReversePathFilter(interfaceName string, family k8snet.IPFamily) error {
+	if family == k8snet.IPv6 {
+		return nil
+	}
+
 	// Enable loose mode (rp_filter=2) reverse path filtering on the vxlan interface.
-	err := setSysctl(ipv4ConfPath(interfaceName)+"/rp_filter", []byte("2"))
+	err := setSysctl(ipConfPath(interfaceName, family)+"/rp_filter", []byte("2"))
+
 	return errors.Wrapf(err, "unable to update rp_filter proc entry for interface %q", interfaceName)
 }
 
-func (n *netlinkType) EnsureLooseModeIsConfigured(interfaceName string) error {
+func (n *netlinkType) EnsureLooseModeIsConfigured(interfaceName string, family k8snet.IPFamily) error {
+	// Enable loose mode (setting rp_filter) is supported only for IPv4
+	if family == k8snet.IPv6 {
+		return nil
+	}
+
 	for range 10 {
 		// Revisit: This is a temporary work-around to fix https://github.com/submariner-io/submariner/issues/2422
 		// Allow the interface to get initialized.
 		time.Sleep(100 * time.Millisecond)
 
-		rpFilterSetting, err := n.GetReversePathFilter(interfaceName)
+		rpFilterSetting, err := n.getReversePathFilter(interfaceName)
 		if err == nil {
 			if bytes.Equal(rpFilterSetting, []byte("2")) {
 				return nil
@@ -209,7 +218,7 @@ func (n *netlinkType) EnsureLooseModeIsConfigured(interfaceName string) error {
 			logger.Warningf("Error retrieving reverse path filter for %q: %v", interfaceName, err)
 		}
 
-		err = n.EnableLooseModeReversePathFilter(interfaceName)
+		err = n.EnableLooseModeReversePathFilter(interfaceName, family)
 		if err != nil {
 			return errors.Wrapf(err, "error enabling loose mode on iface %q", interfaceName)
 		}
@@ -218,13 +227,13 @@ func (n *netlinkType) EnsureLooseModeIsConfigured(interfaceName string) error {
 	return fmt.Errorf("loose mode not configured on iface %q", interfaceName)
 }
 
-func (n *netlinkType) EnableForwarding(interfaceName string) error {
-	err := setSysctl(ipv4ConfPath(interfaceName)+"/forwarding", []byte("1"))
+func (n *netlinkType) EnableForwarding(interfaceName string, family k8snet.IPFamily) error {
+	err := setSysctl(ipConfPath(interfaceName, family)+"/forwarding", []byte("1"))
 	return errors.Wrapf(err, "unable to update forwarding on interface %q", interfaceName)
 }
 
-func (n *netlinkType) GetReversePathFilter(interfaceName string) ([]byte, error) {
-	path := ipv4ConfPath(interfaceName) + "/rp_filter"
+func (n *netlinkType) getReversePathFilter(interfaceName string) ([]byte, error) {
+	path := ipConfPath(interfaceName, k8snet.IPv4) + "/rp_filter"
 
 	existing, err := os.ReadFile(path)
 	if err != nil {
@@ -289,8 +298,8 @@ func setSysctl(path string, contents []byte) error {
 	return os.WriteFile(path, contents, 0o644)
 }
 
-func ipv4ConfPath(interfaceName string) string {
-	return "/proc/sys/net/ipv4/conf/" + interfaceName
+func ipConfPath(interfaceName string, family k8snet.IPFamily) string {
+	return "/proc/sys/net/ipv" + string(family) + "/conf/" + interfaceName
 }
 
 func DeleteIfaceAndAssociatedRoutes(iface string, tableID int) error {

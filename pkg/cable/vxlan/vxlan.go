@@ -124,7 +124,7 @@ func (v *vxLan) createVxlanInterface(port int) error {
 		return errors.Wrap(err, "failed to add ip rule")
 	}
 
-	err = v.netLink.EnsureLooseModeIsConfigured(VxlanIface)
+	err = v.netLink.EnsureLooseModeIsConfigured(VxlanIface, k8snet.IPv4)
 	if err != nil {
 		return errors.Wrap(err, "error while validating loose mode")
 	}
@@ -136,7 +136,7 @@ func (v *vxLan) createVxlanInterface(port int) error {
 		return errors.Wrap(err, "failed to configure vxlan interface ipaddress on the Gateway Node")
 	}
 
-	err = v.netLink.EnableForwarding(VxlanIface)
+	err = v.netLink.EnableForwarding(VxlanIface, k8snet.IPv4)
 	if err != nil {
 		return errors.Wrapf(err, "error enabling forwarding on the %q iface", VxlanIface)
 	}

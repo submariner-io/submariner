@@ -489,20 +489,16 @@ func (n *basicType) XfrmPolicyList(_ k8snet.IPFamily) ([]netlink.XfrmPolicy, err
 	return []netlink.XfrmPolicy{}, nil
 }
 
-func (n *basicType) EnableLooseModeReversePathFilter(_ string) error {
+func (n *basicType) EnableLooseModeReversePathFilter(_ string, _ k8snet.IPFamily) error {
 	return nil
 }
 
-func (n *basicType) EnsureLooseModeIsConfigured(_ string) error {
+func (n *basicType) EnsureLooseModeIsConfigured(_ string, _ k8snet.IPFamily) error {
 	return nil
 }
 
-func (n *basicType) EnableForwarding(_ string) error {
+func (n *basicType) EnableForwarding(_ string, _ k8snet.IPFamily) error {
 	return nil
-}
-
-func (n *basicType) GetReversePathFilter(_ string) ([]byte, error) {
-	return []byte("2"), nil
 }
 
 func (n *basicType) ConfigureTCPMTUProbe(_, _ string) error {

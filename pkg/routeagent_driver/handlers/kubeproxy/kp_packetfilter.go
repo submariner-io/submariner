@@ -153,7 +153,7 @@ func (kp *SyncHandler) Init(_ context.Context) error {
 		// Configure CNI Specific changes
 		kp.cniIface = cniIface
 
-		err := kp.netLink.EnableLooseModeReversePathFilter(kp.cniIface.Name)
+		err := kp.netLink.EnableLooseModeReversePathFilter(kp.cniIface.Name, kp.ipFamily)
 		if err != nil {
 			return errors.Wrap(err, "error enabling loose mode")
 		}
