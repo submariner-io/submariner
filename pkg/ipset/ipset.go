@@ -252,16 +252,15 @@ func (runner *runner) CreateSet(set *IPSet, ignoreExistErr bool) error {
 // otherwise raised when the same set (setname and create parameters are identical) already exists.
 func (runner *runner) createSet(set *IPSet, ignoreExistErr bool) error {
 	args := []string{"create", set.Name, string(set.SetType)}
-	if set.SetType == HashIPPortIP || set.SetType == HashIPPort {
+
+	if set.SetType == BitmapPort {
+		args = append(args, "range", set.PortRange.String())
+	} else {
 		args = append(args,
 			"family", string(set.HashFamily),
 			"hashsize", strconv.FormatUint(uint64(set.HashSize), 10),
 			"maxelem", strconv.FormatUint(uint64(set.MaxElem), 10),
 		)
-	}
-
-	if set.SetType == BitmapPort {
-		args = append(args, "range", set.PortRange.String())
 	}
 
 	if ignoreExistErr {
