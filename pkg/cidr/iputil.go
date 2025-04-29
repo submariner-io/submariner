@@ -88,16 +88,16 @@ func IsOverlapping(cidrList []string, cidr string) (bool, error) {
 	return false, nil
 }
 
-func ExtractIPv4Subnets(cidrList []string) []string {
-	var ipv4Cidrs []string
+func ExtractSubnets(family k8snet.IPFamily, cidrList []string) []string {
+	var retCidrs []string
 
 	for _, subnet := range cidrList {
-		if k8snet.IsIPv4CIDRString(subnet) {
-			ipv4Cidrs = append(ipv4Cidrs, subnet)
+		if k8snet.IPFamilyOfCIDRString(subnet) == family {
+			retCidrs = append(retCidrs, subnet)
 		}
 	}
 
-	return ipv4Cidrs
+	return retCidrs
 }
 
 func ExtractIPFamilies(fromCIDRs []string) []k8snet.IPFamily {

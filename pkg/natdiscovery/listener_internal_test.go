@@ -24,24 +24,31 @@ import (
 	k8snet "k8s.io/utils/net"
 )
 
+func testListenerLoopExitsOnClose(family k8snet.IPFamily) {
+	nd := &natDiscovery{}
+	ended := make(chan struct{}, 1)
+
+	serverConnection, err := createServerConnection(12345, family)
+	Expect(err).NotTo(HaveOccurred())
+
+	go func() {
+		nd.listenerLoop(serverConnection)
+		close(ended)
+	}()
+
+	Consistently(ended).ShouldNot(BeClosed())
+
+	serverConnection.Close()
+	Eventually(ended).Should(BeClosed())
+}
+
 var _ = Describe("Listener", func() {
 	When("the server connection is closed", func() {
-		It("should exit the listen loop", func() {
-			nd := &natDiscovery{}
-			ended := make(chan struct{}, 1)
-
-			serverConnection, err := createServerConnection(12345, k8snet.IPv4)
-			Expect(err).NotTo(HaveOccurred())
-
-			go func() {
-				nd.listenerLoop(serverConnection)
-				close(ended)
-			}()
-
-			Consistently(ended).ShouldNot(BeClosed())
-
-			serverConnection.Close()
-			Eventually(ended).Should(BeClosed())
+		It("should exit the listen loop for IPv4", func() {
+			testListenerLoopExitsOnClose(k8snet.IPv4)
+		})
+		It("should exit the listen loop for IPv6", func() {
+			testListenerLoopExitsOnClose(k8snet.IPv6)
 		})
 	})
 })

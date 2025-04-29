@@ -98,13 +98,30 @@ var _ = Describe("NewInterface", func() {
 
 var _ = Describe("GetVtepIPAddressFrom", func() {
 	It("should return the correct IP", func() {
-		vtepIP, err := vxlan.GetVtepIPAddressFrom("10.17.2.3", 240)
+		vtepIP, err := vxlan.GetVtepIPAddressFrom("10.17.2.3", "240.0.0.0/8", k8snet.IPv4)
 		Expect(err).To(Succeed())
 		Expect(vtepIP).To(Equal(net.ParseIP("240.17.2.3")))
 	})
 
 	Specify("should return an error if the input IP is invalid", func() {
-		_, err := vxlan.GetVtepIPAddressFrom("10.17.2", 240)
+		_, err := vxlan.GetVtepIPAddressFrom("10.17.2", "240.0.0.0/8", k8snet.IPv4)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("should return the correct IPv6 VTEP IP", func() {
+		vtepIP, err := vxlan.GetVtepIPAddressFrom("fe80::1ff:fe23:4567:890a", "fd00:100:100::/96", k8snet.IPv6)
+		Expect(err).To(Succeed())
+		Expect(vtepIP).To(Equal(net.ParseIP("fd00:0100:0100::4567:890a")))
+	})
+
+	It("should return the correct IPv6 VTEP IP with only last byte", func() {
+		vtepIP, err := vxlan.GetVtepIPAddressFrom("fd12:3456:789a:1::1", "fd00:100:100::/96", k8snet.IPv6)
+		Expect(err).To(Succeed())
+		Expect(vtepIP).To(Equal(net.ParseIP("fd00:100:100::1")))
+	})
+
+	Specify("should return an error for invalid IPv6 input", func() {
+		_, err := vxlan.GetVtepIPAddressFrom("fc00::g", "fd00:100:100::/96", k8snet.IPv6)
 		Expect(err).To(HaveOccurred())
 	})
 })

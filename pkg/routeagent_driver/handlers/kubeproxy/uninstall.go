@@ -27,7 +27,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/port"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
-	k8snet "k8s.io/utils/net"
 )
 
 func (kp *SyncHandler) Uninstall() error {
@@ -41,22 +40,22 @@ func (kp *SyncHandler) Uninstall() error {
 			constants.RouteAgentHostNetworkTableID, err)
 	}
 
-	err = kp.netLink.RuleDelIfPresent(netlinkAPI.NewTableRule(constants.RouteAgentHostNetworkTableID))
+	err = kp.netLink.RuleDelIfPresent(netlinkAPI.NewTableRule(constants.RouteAgentHostNetworkTableID, kp.ipFamily))
 	if err != nil {
 		logger.V(log.TRACE).Infof("Deleting IP Rule pointing to %d table returned error: %v",
 			constants.RouteAgentHostNetworkTableID, err)
 	}
 
-	deleteVxLANInterface()
-	deleteIPTableChains()
+	kp.deleteVxLANInterface()
+	kp.deleteIPTableChains()
 
 	return nil
 }
 
-func deleteVxLANInterface() {
+func (kp *SyncHandler) deleteVxLANInterface() {
 	iface := &netlink.Vxlan{
 		LinkAttrs: netlink.LinkAttrs{
-			Name:  VxLANIface,
+			Name:  kp.vxlanIface,
 			Flags: net.FlagUp,
 		},
 		VxlanId: 100,
@@ -64,16 +63,16 @@ func deleteVxLANInterface() {
 		Port:    port.IntraClusterVxLAN,
 	}
 
-	logger.Infof("Deleting the %q interface", VxLANIface)
+	logger.Infof("Deleting the %q interface", kp.vxlanIface)
 
 	err := netlinkAPI.New().LinkDel(iface)
 	if err != nil {
-		logger.Errorf(err, "Failed to delete the vxlan interface %q", VxLANIface)
+		logger.Errorf(err, "Failed to delete the vxlan interface %q", kp.vxlanIface)
 	}
 }
 
-func deleteIPTableChains() {
-	pFilter, err := packetfilter.New(k8snet.IPv4)
+func (kp *SyncHandler) deleteIPTableChains() {
+	pFilter, err := packetfilter.New(kp.ipFamily)
 	if err != nil {
 		logger.Errorf(err, "Failed to initialize packetfilter interface")
 		return

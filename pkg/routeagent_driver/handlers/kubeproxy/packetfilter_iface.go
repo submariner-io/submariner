@@ -75,10 +75,10 @@ func (kp *SyncHandler) createPFilterChains() error {
 		return errors.Wrapf(err, "unable to append rule %+v", &ruleSpec)
 	}
 
-	logger.V(log.DEBUG).Infof("Insert rule to allow traffic over %s interface in %s Chain", VxLANIface, constants.SmForwardChain)
+	logger.V(log.DEBUG).Infof("Insert rule to allow traffic over %s interface in %s Chain", kp.vxlanIface, constants.SmForwardChain)
 
 	ruleSpec = packetfilter.Rule{
-		OutInterface: VxLANIface,
+		OutInterface: kp.vxlanIface,
 		Action:       packetfilter.RuleActionAccept,
 	}
 	if err := kp.pFilter.PrependUnique(packetfilter.TableTypeFilter, constants.SmForwardChain, &ruleSpec); err != nil {
@@ -88,8 +88,8 @@ func (kp *SyncHandler) createPFilterChains() error {
 	if kp.cniIface != nil {
 		// Program rules to support communication from HostNetwork to remoteCluster
 		ruleSpec = packetfilter.Rule{
-			OutInterface: VxLANIface,
-			SrcCIDR:      strconv.Itoa(VxLANVTepNetworkPrefix) + ".0.0.0/8",
+			OutInterface: kp.vxlanIface,
+			SrcCIDR:      kp.vtepPrefixCIDR,
 			SnatCIDR:     kp.cniIface.IPAddress,
 			Action:       packetfilter.RuleActionSNAT,
 		}

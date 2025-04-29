@@ -28,11 +28,13 @@ import (
 	"sync/atomic"
 	"syscall"
 
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/slices"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/vishvananda/netlink"
+	"k8s.io/apimachinery/pkg/util/sets"
 	k8snet "k8s.io/utils/net"
 )
 
@@ -41,15 +43,26 @@ type linkType struct {
 	isSetup bool
 }
 
+type networkInterface struct {
+	netlinkAPI.DefaultNetworkInterface
+	addrs []net.Addr
+}
+
+func (i *networkInterface) Addrs() ([]net.Addr, error) {
+	return i.addrs, nil
+}
+
 type basicType struct {
-	mutex        sync.Mutex
-	linkIndices  map[string]int
-	links        map[string]*linkType
-	routes       map[int][]netlink.Route
-	neighbors    map[int][]netlink.Neigh
-	rules        map[int][]netlink.Rule
-	addrs        map[int][]netlink.Addr
-	addrUpdateCh atomic.Value
+	mutex             sync.Mutex
+	linkIndices       map[string]int
+	links             map[string]*linkType
+	routes            map[int][]netlink.Route
+	neighbors         map[int][]netlink.Neigh
+	rules             map[int][]netlink.Rule
+	addrs             map[int][]netlink.Addr
+	netInterfaces     map[int]*networkInterface
+	addrUpdateCh      atomic.Value
+	allowedIPFamilies sets.Set[k8snet.IPFamily]
 }
 
 type NetLink struct {
@@ -72,12 +85,13 @@ func (e linkNotFoundError) Is(err error) bool {
 func New() *NetLink {
 	return &NetLink{
 		Adapter: netlinkAPI.Adapter{Basic: &basicType{
-			linkIndices: map[string]int{},
-			links:       map[string]*linkType{},
-			routes:      map[int][]netlink.Route{},
-			neighbors:   map[int][]netlink.Neigh{},
-			rules:       map[int][]netlink.Rule{},
-			addrs:       map[int][]netlink.Addr{},
+			linkIndices:   map[string]int{},
+			links:         map[string]*linkType{},
+			routes:        map[int][]netlink.Route{},
+			neighbors:     map[int][]netlink.Neigh{},
+			rules:         map[int][]netlink.Rule{},
+			addrs:         map[int][]netlink.Addr{},
+			netInterfaces: map[int]*networkInterface{},
 		}},
 	}
 }
@@ -160,6 +174,12 @@ func (n *basicType) sendAddrUpdate(linkIndex int, addr *netlink.Addr, added bool
 }
 
 func (n *basicType) AddrAdd(link netlink.Link, addr *netlink.Addr) error {
+	err := n.verifySameIPFamilies(errors.New("the addr, Peer, Broadcast IPs are not the same IP family"),
+		k8snet.IPFamilyOfCIDR(addr.IPNet), k8snet.IPFamilyOfCIDR(addr.Peer), k8snet.IPFamilyOf(addr.Broadcast))
+	if err != nil {
+		return err
+	}
+
 	n.mutex.Lock()
 
 	var added bool
@@ -212,6 +232,12 @@ func (n *basicType) AddrSubscribe(updateCh chan netlink.AddrUpdate, _ chan struc
 }
 
 func (n *basicType) NeighAppend(neigh *netlink.Neigh) error {
+	err := n.verifySameIPFamilies(errors.New("the IP and LLIPAddr are not the same IP family"),
+		k8snet.IPFamilyOf(neigh.IP), k8snet.IPFamilyOf(neigh.LLIPAddr))
+	if err != nil {
+		return err
+	}
+
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
@@ -256,6 +282,12 @@ func routeKey(r netlink.Route) string {
 }
 
 func (n *basicType) RouteAdd(route *netlink.Route) error {
+	err := n.verifySameIPFamilies(errors.New("the Src, Dst, and Gw are not the same IP family"),
+		k8snet.IPFamilyOf(route.Src), k8snet.IPFamilyOfCIDR(route.Dst), k8snet.IPFamilyOf(route.Gw))
+	if err != nil {
+		return err
+	}
+
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
@@ -286,6 +318,12 @@ func (n *basicType) RouteDel(route *netlink.Route) error {
 }
 
 func (n *basicType) RouteReplace(route *netlink.Route) error {
+	err := n.verifySameIPFamilies(errors.New("the Src, Dst, and Gw are not the same IP family"),
+		k8snet.IPFamilyOf(route.Src), k8snet.IPFamilyOfCIDR(route.Dst), k8snet.IPFamilyOf(route.Gw))
+	if err != nil {
+		return err
+	}
+
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
@@ -334,15 +372,29 @@ func (n *basicType) RouteGet(destination net.IP) ([]netlink.Route, error) {
 	return routes, nil
 }
 
-func (n *basicType) RouteList(link netlink.Link, _ k8snet.IPFamily) ([]netlink.Route, error) {
+func (n *basicType) RouteList(link netlink.Link, family k8snet.IPFamily) ([]netlink.Route, error) {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
-	r := n.routes[link.Attrs().Index]
-	to := make([]netlink.Route, len(r))
-	copy(to, r)
+	var currentRoutes []netlink.Route
+	if link != nil {
+		currentRoutes = n.routes[link.Attrs().Index]
+	} else {
+		for _, routes := range n.routes {
+			currentRoutes = append(currentRoutes, routes...)
+		}
+	}
 
-	return to, nil
+	var retRoutes []netlink.Route
+
+	for i := range currentRoutes {
+		if currentRoutes[i].Family == netlinkAPI.ToNetlinkFamily(family) || family == k8snet.IPFamilyUnknown ||
+			k8snet.IPFamilyOf(currentRoutes[i].Gw) == family || k8snet.IPFamilyOf(currentRoutes[i].Src) == family {
+			retRoutes = append(retRoutes, currentRoutes[i])
+		}
+	}
+
+	return retRoutes, nil
 }
 
 //nolint:gocritic // Ignore hugeParam.
@@ -360,6 +412,12 @@ func ruleKey(r netlink.Rule) string {
 }
 
 func (n *basicType) RuleAdd(rule *netlink.Rule) error {
+	err := n.verifySameIPFamilies(errors.New("the Src, and Dst are not the same IP family"),
+		k8snet.IPFamilyOfCIDR(rule.Src), k8snet.IPFamilyOfCIDR(rule.Dst))
+	if err != nil {
+		return err
+	}
+
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
@@ -452,8 +510,53 @@ func (n *basicType) ConfigureTCPMTUProbe(_, _ string) error {
 	return nil
 }
 
-func (n *basicType) InterfaceByName(name string) (*net.Interface, error) {
-	return &net.Interface{Name: name}, nil
+func (n *basicType) InterfaceByName(name string) (netlinkAPI.NetworkInterface, error) {
+	return &netlinkAPI.DefaultNetworkInterface{Interface: net.Interface{Name: name}}, nil
+}
+
+func (n *basicType) InterfaceByIndex(index int) (netlinkAPI.NetworkInterface, error) {
+	i, ok := n.netInterfaces[index]
+	if ok {
+		return i, nil
+	}
+
+	return nil, errors.New("not found")
+}
+
+func (n *basicType) checkAllowedIPFamilies(families ...k8snet.IPFamily) {
+	if n.allowedIPFamilies == nil {
+		return
+	}
+
+	defer GinkgoRecover()
+
+	for _, f := range families {
+		if f != k8snet.IPFamilyUnknown {
+			Expect(n.allowedIPFamilies.Has(f)).To(BeTrue(), "IPv%s family is not allowed", f)
+		}
+	}
+}
+
+func (n *basicType) verifySameIPFamilies(retErr error, families ...k8snet.IPFamily) error {
+	n.checkAllowedIPFamilies(families...)
+
+	last := k8snet.IPFamilyUnknown
+
+	for _, f := range families {
+		if f == k8snet.IPFamilyUnknown {
+			continue
+		}
+
+		if last == k8snet.IPFamilyUnknown {
+			last = f
+		}
+
+		if f != last {
+			return retErr
+		}
+	}
+
+	return nil
 }
 
 func (n *NetLink) AwaitLink(name string) netlink.Link {
@@ -632,4 +735,31 @@ func (n *NetLink) AwaitNoRule(table int, src, dst string) {
 	Eventually(func() *netlink.Rule {
 		return n.getRule(table, src, dst)
 	}, 5).Should(BeNil(), "Rule for %v exists", table)
+}
+
+func (n *NetLink) SetupDefaultGateway(family k8snet.IPFamily, intf net.Interface, addrs ...net.Addr) {
+	if intf.Index == 0 {
+		intf.Index = 99
+	}
+
+	err := n.RouteAdd(&netlink.Route{
+		LinkIndex: intf.Index,
+		Family:    netlinkAPI.ToNetlinkFamily(family),
+	})
+	Expect(err).NotTo(HaveOccurred())
+
+	n.basic().mutex.Lock()
+	defer n.basic().mutex.Unlock()
+
+	n.basic().netInterfaces[intf.Index] = &networkInterface{
+		DefaultNetworkInterface: netlinkAPI.DefaultNetworkInterface{Interface: intf},
+		addrs:                   addrs,
+	}
+}
+
+func (n *NetLink) SetAllowedIPFamilies(f ...k8snet.IPFamily) {
+	n.basic().mutex.Lock()
+	defer n.basic().mutex.Unlock()
+
+	n.basic().allowedIPFamilies = sets.New[k8snet.IPFamily](f...)
 }

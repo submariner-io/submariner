@@ -24,6 +24,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/submariner/pkg/port"
 	"github.com/submariner-io/submariner/pkg/vxlan"
+	k8snet "k8s.io/utils/net"
 )
 
 func (kp *SyncHandler) newVxlanInterface(attrs *vxlan.Attributes) (*vxlan.Interface, error) {
@@ -43,20 +44,25 @@ func (kp *SyncHandler) newVxlanInterface(attrs *vxlan.Attributes) (*vxlan.Interf
 func (kp *SyncHandler) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP) error {
 	ipAddr, err := kp.getHostIfaceIPAddress()
 	if err != nil {
-		return errors.Wrap(err, "unable to retrieve the IPv4 address on the Host")
+		return errors.Wrapf(err, "unable to retrieve the IPv%s address on the Host", kp.ipFamily)
 	}
 
-	vtepIP, err := vxlan.GetVtepIPAddressFrom(ipAddr.String(), VxLANVTepNetworkPrefix)
+	vtepIP, err := vxlan.GetVtepIPAddressFrom(ipAddr.String(), kp.vtepPrefixCIDR, kp.ipFamily)
 	if err != nil {
 		return errors.Wrapf(err, "failed to derive the vxlan vtepIP for %s", ipAddr)
 	}
 
 	if ifaceType == VxInterfaceGateway {
 		attrs := &vxlan.Attributes{
-			Name:     VxLANIface,
+			Name:     kp.vxlanIface,
 			VxlanID:  100,
 			VtepPort: port.IntraClusterVxLAN,
-			Mtu:      kp.defaultHostIface.MTU,
+			Mtu:      kp.defaultHostIface.MTU(),
+		}
+
+		// For IPv6 VxLAN interface SrcAddr should be set with local IP
+		if kp.ipFamily == k8snet.IPv6 {
+			attrs.SrcAddr = *kp.vxlanGwIP
 		}
 
 		kp.vxlanDevice, err = kp.newVxlanInterface(attrs)
@@ -71,20 +77,20 @@ func (kp *SyncHandler) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP)
 			}
 		}
 
-		err = kp.netLink.EnsureLooseModeIsConfigured(VxLANIface)
+		err = kp.netLink.EnsureLooseModeIsConfigured(kp.vxlanIface)
 		if err != nil {
 			return errors.Wrap(err, "error while validating loose mode")
 		}
 
-		logger.Infof("Successfully configured reverse path filter to loose mode on %q", VxLANIface)
+		logger.Infof("Successfully configured reverse path filter to loose mode on %q", kp.vxlanIface)
 	} else if ifaceType == VxInterfaceWorker {
 		// non-Gateway/Worker Node
 		attrs := &vxlan.Attributes{
-			Name:     VxLANIface,
+			Name:     kp.vxlanIface,
 			VxlanID:  100,
 			Group:    gatewayNodeIP,
 			VtepPort: port.IntraClusterVxLAN,
-			Mtu:      kp.defaultHostIface.MTU,
+			Mtu:      kp.defaultHostIface.MTU(),
 		}
 
 		kp.vxlanDevice, err = kp.newVxlanInterface(attrs)
@@ -93,14 +99,19 @@ func (kp *SyncHandler) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP)
 		}
 	}
 
-	err = kp.vxlanDevice.ConfigureIPAddress(vtepIP, net.CIDRMask(8, 32))
+	_, ipNet, err := net.ParseCIDR(kp.vtepPrefixCIDR)
+	if err != nil {
+		return errors.Wrapf(err, "invalid VTEP CIDR %q", kp.vtepPrefixCIDR)
+	}
+
+	err = kp.vxlanDevice.ConfigureIPAddress(vtepIP, ipNet.Mask)
 	if err != nil {
 		return errors.Wrap(err, "failed to configure vxlan interface ipaddress on the Gateway Node")
 	}
 
-	err = kp.netLink.EnableForwarding(VxLANIface)
+	err = kp.netLink.EnableForwarding(kp.vxlanIface)
 	if err != nil {
-		return errors.Wrapf(err, "error enabling forwarding on the %q iface", VxLANIface)
+		return errors.Wrapf(err, "error enabling forwarding on the %q iface", kp.vxlanIface)
 	}
 
 	return nil

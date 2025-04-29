@@ -61,7 +61,7 @@ type natDiscovery struct {
 	Config
 	remoteEndpoints map[string]*remoteEndpointNAT
 	requestCounter  uint64
-	serverUDPWrite  udpWriteFunction
+	serverUDPWrite  map[k8snet.IPFamily]udpWriteFunction
 	serverPort      int32
 	readyChannel    chan *NATEndpointInfo
 }
@@ -92,6 +92,7 @@ func NewWithConfig(config Config) (Interface, error) {
 		Config:          config,
 		serverPort:      ndPort,
 		remoteEndpoints: map[string]*remoteEndpointNAT{},
+		serverUDPWrite:  map[k8snet.IPFamily]udpWriteFunction{},
 		requestCounter:  rand.Uint64(),
 		readyChannel:    make(chan *NATEndpointInfo, 100),
 	}, nil

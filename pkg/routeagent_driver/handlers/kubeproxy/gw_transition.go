@@ -31,7 +31,7 @@ func (kp *SyncHandler) TransitionToNonGateway() error {
 	// If the active Gateway transitions to a new node, we flush the HostNetwork routing table.
 	kp.updateRoutingRulesForHostNetworkSupport(nil, Flush)
 
-	err := kp.netLink.RuleDelIfPresent(netlinkAPI.NewTableRule(constants.RouteAgentHostNetworkTableID))
+	err := kp.netLink.RuleDelIfPresent(netlinkAPI.NewTableRule(constants.RouteAgentHostNetworkTableID, kp.ipFamily))
 	if err != nil {
 		logger.Errorf(err, "Unable to delete ip rule to table %d on non-Gateway node %s",
 			constants.RouteAgentHostNetworkTableID, kp.hostname)
@@ -45,7 +45,7 @@ func (kp *SyncHandler) TransitionToGateway() error {
 
 	kp.cleanVxSubmarinerRoutes()
 
-	logger.Infof("Creating the vxlan interface: %s on the gateway node", VxLANIface)
+	logger.Infof("Creating the vxlan interface: %s on the gateway node", kp.vxlanIface)
 
 	kp.activeEndpointHostname = kp.hostname
 
@@ -54,7 +54,7 @@ func (kp *SyncHandler) TransitionToGateway() error {
 		logger.Fatalf("Unable to create VxLAN interface on gateway node (%s): %v", kp.hostname, err)
 	}
 
-	err = kp.netLink.RuleAddIfNotPresent(netlinkAPI.NewTableRule(constants.RouteAgentHostNetworkTableID))
+	err = kp.netLink.RuleAddIfNotPresent(netlinkAPI.NewTableRule(constants.RouteAgentHostNetworkTableID, kp.ipFamily))
 	if err != nil {
 		logger.Errorf(err, "Unable to add ip rule to table %d on Gateway node %s",
 			constants.RouteAgentHostNetworkTableID, kp.hostname)

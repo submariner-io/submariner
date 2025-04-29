@@ -40,11 +40,11 @@ import (
 )
 
 const (
-	VxlanIface             = "vxlan-tunnel"
-	VxlanVTepNetworkPrefix = 241
-	CableDriverName        = "vxlan"
-	TableID                = 100
-	DefaultPort            = 4500
+	VxlanIface                 = "vxlan-tunnel"
+	VxlanVTepNetworkPrefixCIDR = "241.0.0.0/8"
+	CableDriverName            = "vxlan"
+	TableID                    = 100
+	DefaultPort                = 4500
 )
 
 type vxLan struct {
@@ -94,12 +94,12 @@ func (v *vxLan) createVxlanInterface(port int) error {
 
 	var err error
 
-	v.vtepIP, err = vxlan.GetVtepIPAddressFrom(ipAddr, VxlanVTepNetworkPrefix)
+	v.vtepIP, err = vxlan.GetVtepIPAddressFrom(ipAddr, VxlanVTepNetworkPrefixCIDR, k8snet.IPv4)
 	if err != nil {
 		return errors.Wrapf(err, "failed to derive the vxlan vtepIP for %s", ipAddr)
 	}
 
-	defaultHostIface, err := netlinkAPI.GetDefaultGatewayInterface(k8snet.IPv4)
+	defaultHostIface, err := v.netLink.GetDefaultGatewayInterface(k8snet.IPv4)
 	if err != nil {
 		return errors.Wrapf(err, "Unable to find the default interface on host: %s",
 			v.localEndpoint.Hostname)
@@ -111,7 +111,7 @@ func (v *vxLan) createVxlanInterface(port int) error {
 		Group:    nil,
 		SrcAddr:  nil,
 		VtepPort: port,
-		Mtu:      defaultHostIface.MTU,
+		Mtu:      defaultHostIface.MTU(),
 	}
 
 	v.vxlanIface, err = vxlan.NewInterface(attrs, v.netLink)
@@ -119,7 +119,7 @@ func (v *vxLan) createVxlanInterface(port int) error {
 		return errors.Wrap(err, "failed to create vxlan interface on Gateway Node")
 	}
 
-	err = v.netLink.RuleAddIfNotPresent(netlinkAPI.NewTableRule(TableID))
+	err = v.netLink.RuleAddIfNotPresent(netlinkAPI.NewTableRule(TableID, k8snet.IPv4))
 	if err != nil && !os.IsExist(err) {
 		return errors.Wrap(err, "failed to add ip rule")
 	}
@@ -168,7 +168,7 @@ func (v *vxLan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 
 	privateIP := endpointInfo.Endpoint.Spec.GetPrivateIP(endpointInfo.UseFamily)
 
-	remoteVtepIP, err := vxlan.GetVtepIPAddressFrom(privateIP, VxlanVTepNetworkPrefix)
+	remoteVtepIP, err := vxlan.GetVtepIPAddressFrom(privateIP, VxlanVTepNetworkPrefixCIDR, k8snet.IPv4)
 	if err != nil {
 		return endpointInfo.UseIP, fmt.Errorf("failed to derive the vxlan vtepIP for %s: %w", privateIP, err)
 	}
@@ -290,7 +290,7 @@ func (v *vxLan) Cleanup() error {
 		logger.Errorf(nil, "Unable to delete interface %s and associated routes from table %d", VxlanIface, TableID)
 	}
 
-	err = v.netLink.RuleDelIfPresent(netlinkAPI.NewTableRule(TableID))
+	err = v.netLink.RuleDelIfPresent(netlinkAPI.NewTableRule(TableID, k8snet.IPv4))
 	if err != nil {
 		return errors.Wrapf(err, "unable to delete IP rule pointing to %d table", TableID)
 	}

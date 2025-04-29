@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/resource"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -94,7 +95,16 @@ func getPublicIPResolvers(family k8snet.IPFamily) string {
 	return strings.Join(serverList, ",")
 }
 
-func getPublicIP(family k8snet.IPFamily, submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface,
+func parseResolver(resolver string) (string, string, error) {
+	method, config, found := strings.Cut(strings.Trim(resolver, " "), ":")
+	if !found || method == "" || config == "" {
+		return "", "", errors.Errorf("invalid format for %q annotation: %q", v1.GatewayConfigPrefix+v1.PublicIP, resolver)
+	}
+
+	return method, config, nil
+}
+
+func GetPublicIP(family k8snet.IPFamily, submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface,
 	backendConfig map[string]string, airGapped bool,
 ) (string, string, error) {
 	switch family {
@@ -110,93 +120,73 @@ func getPublicIP(family k8snet.IPFamily, submSpec *types.SubmarinerSpecification
 		}
 
 		if airGapped {
-			ip, resolver, err := resolveIPInAirGappedDeployment(family, k8sClient, submSpec.Namespace, config)
+			ip, resolver, err := invokeResolvers(family, k8sClient, submSpec.Namespace, config, func(method string) bool {
+				return method == v1.IPv4 || method == v1.IPv6
+			})
 			if err != nil {
-				logger.Errorf(err, "Error resolving public IP%s in an air-gapped deployment, using empty value: %s", family, config)
+				logger.Errorf(err, "Unable to resolve public IPv%s in an air-gapped deployment using %q - using empty value",
+					family, config)
 				return "", "", nil
 			}
 
 			return ip, resolver, nil
 		}
 
-		resolvers := strings.Split(config, ",")
-
-		errs := make([]error, 0, len(resolvers))
-
-		for _, resolver := range resolvers {
-			resolver = strings.Trim(resolver, " ")
-
-			parts := strings.Split(resolver, ":")
-
-			// for IPv6 format is ipv6=FD00::BE2:54:34:2
-			if len(parts) != 2 && family == k8snet.IPv6 {
-				parts = strings.Split(resolver, "=")
-			}
-
-			if len(parts) != 2 {
-				return "", "", errors.Errorf("invalid format for %q annotation: %q", v1.GatewayConfigPrefix+v1.PublicIP, config)
-			}
-
-			ip, err := resolvePublicIP(family, k8sClient, submSpec.Namespace, parts)
-			if err == nil {
-				return ip, resolver, nil
-			}
-
-			// If this resolver failed, we log it, but we fall back to the next one
-			errs = append(errs, errors.Wrapf(err, "\nResolver[%q]", resolver))
-		}
-
-		if len(resolvers) > 0 {
-			return "", "", errors.Wrapf(k8serrors.NewAggregate(errs), "Unable to resolve public IP by any of the resolver methods")
-		}
-
+		return invokeResolvers(family, k8sClient, submSpec.Namespace, config, nil)
 	case k8snet.IPFamilyUnknown:
 	}
 
 	return "", "", nil
 }
 
-func resolveIPInAirGappedDeployment(
-	family k8snet.IPFamily, k8sClient kubernetes.Interface, namespace, config string,
+func invokeResolvers(family k8snet.IPFamily, k8sClient kubernetes.Interface, namespace, config string, useResolver func(string) bool,
 ) (string, string, error) {
 	resolvers := strings.Split(config, ",")
 
+	errs := make([]error, 0, len(resolvers))
+
 	for _, resolver := range resolvers {
-		resolver = strings.Trim(resolver, " ")
+		var ip string
 
-		parts := strings.Split(resolver, ":")
-		// for IPv6 format is ipv6=FD00::BE2:54:34:2
-		if len(parts) != 2 && family == k8snet.IPv6 {
-			parts = strings.Split(resolver, "=")
+		method, param, err := parseResolver(resolver)
+		if err == nil {
+			if useResolver != nil && !useResolver(method) {
+				continue
+			}
+
+			ip, err = resolvePublicIP(family, k8sClient, namespace, method, param)
 		}
 
-		if len(parts) != 2 {
-			return "", "", errors.Errorf("invalid format for %q annotation: %q", v1.GatewayConfigPrefix+v1.PublicIP, config)
+		if err == nil {
+			return ip, resolver, nil
 		}
 
-		if parts[0] != v1.IPv4 && parts[0] != v1.IPv6 {
-			continue
-		}
+		// If this resolver failed, we log it, but we fall back to the next one
+		errs = append(errs, errors.Wrapf(err, "\nResolver[%q]", resolver))
+	}
 
-		ip, err := resolvePublicIP(family, k8sClient, namespace, parts)
-
-		return ip, resolver, err
+	if len(resolvers) > 0 {
+		return "", "", errors.Wrapf(k8serrors.NewAggregate(errs),
+			"Unable to resolve public IPv%s by any of the resolver methods: %q", family, config)
 	}
 
 	return "", "", nil
 }
 
-func resolvePublicIP(family k8snet.IPFamily, k8sClient kubernetes.Interface, namespace string, parts []string) (string, error) {
-	method, ok := publicIPMethods[parts[0]]
+func resolvePublicIP(family k8snet.IPFamily, k8sClient kubernetes.Interface, namespace, method, param string) (string, error) {
+	resolverFn, ok := publicIPMethods[method]
 	if !ok {
-		return "", errors.Errorf("unknown resolver %q in %q annotation", parts[0], v1.GatewayConfigPrefix+v1.PublicIP)
+		return "", errors.Errorf("unknown resolver %q in %q annotation", method, v1.GatewayConfigPrefix+v1.PublicIP)
 	}
 
-	return method(family, k8sClient, namespace, parts[1])
+	return resolverFn(family, k8sClient, namespace, param)
 }
 
 func publicAPI(family k8snet.IPFamily, _ kubernetes.Interface, _, value string) (string, error) {
-	url := "https://" + value
+	url := value
+	if !strings.HasPrefix(url, "http") {
+		url = "https://" + value
+	}
 
 	httpClient := http.Client{
 		Timeout: 30 * time.Second,
@@ -224,7 +214,7 @@ func publicIP(family k8snet.IPFamily, _ kubernetes.Interface, _, value string) (
 	return firstIPInString(family, value)
 }
 
-var loadBalancerRetryConfig = wait.Backoff{
+var LoadBalancerRetryConfig = wait.Backoff{
 	Cap:      6 * time.Minute,
 	Duration: 5 * time.Second,
 	Factor:   1.2,
@@ -232,9 +222,9 @@ var loadBalancerRetryConfig = wait.Backoff{
 }
 
 func publicLoadBalancerIP(family k8snet.IPFamily, clientset kubernetes.Interface, namespace, loadBalancerName string) (string, error) {
-	ip := ""
+	resolvedIP := ""
 
-	err := retry.OnError(loadBalancerRetryConfig, func(err error) bool {
+	err := retry.OnError(LoadBalancerRetryConfig, func(err error) bool {
 		logger.Infof("Waiting for LoadBalancer to be ready: %s", err)
 		return true
 	}, func() error {
@@ -251,23 +241,33 @@ func publicLoadBalancerIP(family k8snet.IPFamily, clientset kubernetes.Interface
 			switch {
 			case ingress.IP != "":
 				if k8snet.IPFamilyOfString(ingress.IP) == family {
-					ip = ingress.IP
+					resolvedIP = ingress.IP
 					return nil
 				}
 			case ingress.Hostname != "":
-				ip, err = publicDNSIP(family, clientset, namespace, ingress.Hostname)
-				return err
+				ip, err := publicDNSIP(family, clientset, namespace, ingress.Hostname)
+				if err != nil {
+					return err
+				}
+
+				if ip != "" {
+					resolvedIP = ip
+					return nil
+				}
 			}
 		}
 
-		return errors.Errorf("no IP or Hostname for service LoadBalancer %q Ingress", loadBalancerName)
+		return errors.Errorf("no IP or Hostname resolved for service LoadBalancer %q Ingress: %s",
+			loadBalancerName, resource.ToJSON(service.Status.LoadBalancer.Ingress))
 	})
 
-	return ip, err //nolint:wrapcheck  // No need to wrap here
+	return resolvedIP, err //nolint:wrapcheck  // No need to wrap here
 }
 
+var LookupIP = net.LookupIP
+
 func publicDNSIP(family k8snet.IPFamily, _ kubernetes.Interface, _, fqdn string) (string, error) {
-	ips, err := net.LookupIP(fqdn)
+	ips, err := LookupIP(fqdn)
 	if err != nil {
 		return "", errors.Wrapf(err, "error resolving DNS hostname %q for public IP", fqdn)
 	}
@@ -280,11 +280,13 @@ func publicDNSIP(family k8snet.IPFamily, _ kubernetes.Interface, _, fqdn string)
 		}
 	}
 
-	if len(filteredIPs) > 1 {
-		sort.Slice(filteredIPs, func(i, j int) bool {
-			return bytes.Compare(filteredIPs[i], filteredIPs[j]) < 0
-		})
+	if len(filteredIPs) == 0 {
+		return "", nil
 	}
+
+	sort.Slice(filteredIPs, func(i, j int) bool {
+		return bytes.Compare(filteredIPs[i], filteredIPs[j]) < 0
+	})
 
 	return filteredIPs[0].String(), nil
 }
@@ -299,7 +301,7 @@ func firstIPInString(family k8snet.IPFamily, body string) (string, error) {
 	}
 
 	if len(matches) == 0 {
-		return "", errors.Errorf("No IPv%s found in: %q", family, body)
+		return "", errors.Errorf("no IPv%s address found in: %q", family, body)
 	}
 
 	return matches[0], nil

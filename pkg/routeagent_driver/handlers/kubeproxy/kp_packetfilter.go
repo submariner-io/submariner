@@ -20,6 +20,7 @@ package kubeproxy
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"time"
@@ -46,7 +47,7 @@ type SyncHandler struct {
 	localEndpointIfaceName string
 	localClusterCidr       []string
 	localServiceCidr       []string
-
+	ipFamily               k8snet.IPFamily
 	remoteSubnets          set.Set[string]
 	remoteSubnetGw         map[string]net.IP
 	remoteVTEPs            set.Set[string]
@@ -55,32 +56,52 @@ type SyncHandler struct {
 	netLink                netlink.Interface
 	vxlanDevice            *vxlan.Interface
 	vxlanGwIP              *net.IP
+	vxlanIface             string
 	hostname               string
 	cniIface               *cni.Interface
-	defaultHostIface       *net.Interface
+	defaultHostIface       netlink.NetworkInterface
 	activeEndpointHostname string
+	vtepPrefixCIDR         string
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("KubeProxy")}
 
-func NewSyncHandler(localClusterCidr, localServiceCidr []string) *SyncHandler {
-	pFilter, err := packetfilter.New(k8snet.IPv4)
+func GetVxLANInterfaceName(ipFamily k8snet.IPFamily) string {
+	vxlanIface := VxLANIface
+
+	if ipFamily == k8snet.IPv6 {
+		vxlanIface = VxLANIface + "-" + string(ipFamily)
+	}
+
+	return vxlanIface
+}
+
+func NewSyncHandler(ipFamily k8snet.IPFamily, localClusterCidr, localServiceCidr []string) *SyncHandler {
+	pFilter, err := packetfilter.New(ipFamily)
 	utilruntime.Must(err)
 
+	vtepPrefixCIDR := VxLANVTepNetworkPrefixCIDR
+	if ipFamily == k8snet.IPv6 {
+		vtepPrefixCIDR = VxLANVTepNetworkPrefixCIDRIPv6
+	}
+
 	return &SyncHandler{
-		localClusterCidr: cidr.ExtractIPv4Subnets(localClusterCidr),
-		localServiceCidr: cidr.ExtractIPv4Subnets(localServiceCidr),
+		ipFamily:         ipFamily,
+		localClusterCidr: cidr.ExtractSubnets(ipFamily, localClusterCidr),
+		localServiceCidr: cidr.ExtractSubnets(ipFamily, localServiceCidr),
 		remoteSubnets:    set.New[string](),
 		remoteSubnetGw:   map[string]net.IP{},
 		remoteVTEPs:      set.New[string](),
 		routeCacheGWNode: set.New[string](),
 		netLink:          netlink.New(),
 		pFilter:          pFilter,
+		vtepPrefixCIDR:   vtepPrefixCIDR,
+		vxlanIface:       GetVxLANInterfaceName(ipFamily),
 	}
 }
 
 func (kp *SyncHandler) GetName() string {
-	return "kubeproxy-iptables-handler"
+	return fmt.Sprintf("Kubeproxy IPv%s", kp.ipFamily)
 }
 
 func (kp *SyncHandler) GetNetworkPlugins() []string {
@@ -112,7 +133,7 @@ func (kp *SyncHandler) Init(_ context.Context) error {
 		return errors.Wrapf(err, "unable to determine hostname")
 	}
 
-	kp.defaultHostIface, err = netlink.GetDefaultGatewayInterface(k8snet.IPv4)
+	kp.defaultHostIface, err = kp.netLink.GetDefaultGatewayInterface(kp.ipFamily)
 	if err != nil {
 		return errors.Wrapf(err, "Unable to find the default interface on host: %s", kp.hostname)
 	}
@@ -121,7 +142,7 @@ func (kp *SyncHandler) Init(_ context.Context) error {
 		logger.Infof("Waiting for CNI interface discovery: %s", err)
 		return true
 	}, func() error {
-		cniIface, err = cni.Discover(kp.localClusterCidr, k8snet.IPv4)
+		cniIface, err = cni.Discover(kp.localClusterCidr, kp.ipFamily)
 		if err != nil {
 			return errors.Wrapf(err, "Error discovering the CNI interface")
 		}

@@ -45,6 +45,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	fakek8s "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	k8snet "k8s.io/utils/net"
 )
 
 const (
@@ -112,6 +113,8 @@ func newTestDriver() *testDriver {
 		Expect(t.netLink.AddrAdd(link, addr)).To(Succeed())
 
 		t.mgmntIntfIP = addr.IPNet.IP.String()
+
+		t.netLink.SetupDefaultGateway(k8snet.IPv4, net.Interface{Name: "gw-intf"})
 	})
 
 	return t

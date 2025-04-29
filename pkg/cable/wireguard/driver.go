@@ -192,7 +192,7 @@ func (w *wireguard) Init() error {
 	}
 
 	logger.V(log.DEBUG).Infof("WireGuard device %s, is up on i/f number %d, listening on port :%d, with key %s",
-		w.link.Attrs().Name, l.Index, d.ListenPort, d.PublicKey)
+		w.link.Attrs().Name, l.Index(), d.ListenPort, d.PublicKey)
 
 	return nil
 }

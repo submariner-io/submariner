@@ -92,10 +92,14 @@ var _ = Describe("", func() {
 				Addr: localClusterCIDRs[0],
 			}}, nil
 		}
+
+		netLink.SetupDefaultGateway(k8snet.IPv4, net.Interface{
+			Name: "gw-intf",
+		}, &net.IPNet{IP: net.ParseIP("1.2.3.4"), Mask: net.CIDRMask(8, 32)})
 	})
 
 	Specify("All Route Agent handlers should successfully instantiate and initialize", func() {
-		kubeproxyHandler := kubeproxy.NewSyncHandler(localClusterCIDRs, localServiceCIDRs)
+		kubeproxyHandler := kubeproxy.NewSyncHandler(k8snet.IPv4, localClusterCIDRs, localServiceCIDRs)
 		Expect(kubeproxyHandler.Init(ctx)).To(Succeed())
 
 		ovnHandler := ovn.NewHandler(&ovn.HandlerConfig{
@@ -122,7 +126,7 @@ var _ = Describe("", func() {
 		ngwRouteHandler := ovn.NewNonGatewayRouteHandler(submClient, ovn.NewTransitSwitchIP())
 		Expect(ngwRouteHandler.Init(ctx)).To(Succeed())
 
-		mtuHandler := mtu.NewMTUHandler(localClusterCIDRs, false, 0)
+		mtuHandler := mtu.NewHandler(k8snet.IPv4, localClusterCIDRs, false, 0)
 		Expect(mtuHandler.Init(ctx)).To(Succeed())
 
 		calicoHandler := calico.NewCalicoIPPoolHandler(nil, testing.Namespace, k8sClient)

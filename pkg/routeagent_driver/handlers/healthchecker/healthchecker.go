@@ -75,10 +75,7 @@ func (h *controller) Stop() error {
 	h.pingerController.Stop()
 
 	h.stopOnce.Do(func() {
-		if h.stopCh != nil {
-			close(h.stopCh)
-			h.stopCh = nil
-		}
+		close(h.stopCh)
 	})
 
 	err := h.client.Delete(context.TODO(),

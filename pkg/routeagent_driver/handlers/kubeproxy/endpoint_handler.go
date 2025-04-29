@@ -32,6 +32,8 @@ import (
 func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 	kp.localEndpointIfaceName = endpoint.Spec.BackendConfig[cable.InterfaceNameConfig]
 
+	localClusterGwNodeIP := net.ParseIP(endpoint.Spec.GetPrivateIP(kp.ipFamily))
+
 	// We are on nonGateway node
 	if !kp.State().IsOnGateway() {
 		// If the node already has a vxLAN interface that points to an oldEndpoint
@@ -47,14 +49,12 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 			kp.activeEndpointHostname = ""
 		}
 
-		localClusterGwNodeIP := net.ParseIP(endpoint.Spec.GetPrivateIP(k8snet.IPv4))
-
-		remoteVtepIP, err := vxlan.GetVtepIPAddressFrom(localClusterGwNodeIP.String(), VxLANVTepNetworkPrefix)
+		remoteVtepIP, err := vxlan.GetVtepIPAddressFrom(localClusterGwNodeIP.String(), kp.vtepPrefixCIDR, kp.ipFamily)
 		if err != nil {
 			return errors.Wrap(err, "failed to derive the remoteVtepIP")
 		}
 
-		logger.Infof("Creating the vxlan interface %s with gateway node IP %s", VxLANIface, localClusterGwNodeIP)
+		logger.Infof("Creating the vxlan interface %s with gateway node IP %s", kp.vxlanIface, localClusterGwNodeIP)
 
 		err = kp.createVxLANInterface(VxInterfaceWorker, localClusterGwNodeIP)
 		if err != nil {
@@ -68,6 +68,9 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 		if err != nil {
 			return errors.Wrap(err, "error while reconciling routes")
 		}
+	} else {
+		// Store local endpoint's private IP to use as the source address for the IPv6 VxLAN interface on GW.
+		kp.vxlanGwIP = &localClusterGwNodeIP
 	}
 
 	return nil
@@ -90,48 +93,52 @@ func (kp *SyncHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 }
 
 func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
-	if err := cidr.OverlappingSubnets(kp.localServiceCidr, kp.localClusterCidr, endpoint.Spec.Subnets); err != nil {
+	subnets := cidr.ExtractSubnets(kp.ipFamily, endpoint.Spec.Subnets)
+
+	if err := cidr.OverlappingSubnets(kp.localServiceCidr, kp.localClusterCidr, subnets); err != nil {
 		// Skip processing the endpoint when CIDRs overlap and return nil to avoid re-queuing.
 		logger.Errorf(err, "overlappingSubnets for new remote %#v returned error", endpoint)
 		return nil
 	}
 
-	for _, inputCidrBlock := range endpoint.Spec.Subnets {
+	for _, inputCidrBlock := range subnets {
 		if !kp.remoteSubnets.Has(inputCidrBlock) {
 			kp.remoteSubnets.Insert(inputCidrBlock)
 		}
 
-		gwIP := endpoint.Spec.GatewayIP(k8snet.IPv4)
+		gwIP := endpoint.Spec.GatewayIP(kp.ipFamily)
 		kp.remoteSubnetGw[inputCidrBlock] = gwIP
 	}
 
-	if err := kp.updateRoutingRulesForInterClusterSupport(endpoint.Spec.Subnets, Add); err != nil {
+	if err := kp.updateRoutingRulesForInterClusterSupport(subnets, Add); err != nil {
 		logger.Errorf(err, "updateRoutingRulesForInterClusterSupport for new remote %#v returned error",
 			endpoint)
 		return err
 	}
 
 	// Add routes to the new endpoint on the GatewayNode.
-	kp.updateRoutingRulesForHostNetworkSupport(endpoint.Spec.Subnets, Add)
-	kp.updateIptableRulesForInterClusterTraffic(endpoint.Spec.Subnets, Add)
+	kp.updateRoutingRulesForHostNetworkSupport(subnets, Add)
+	kp.updateIptableRulesForInterClusterTraffic(subnets, Add)
 
 	return nil
 }
 
 func (kp *SyncHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
-	for _, inputCidrBlock := range endpoint.Spec.Subnets {
+	subnets := cidr.ExtractSubnets(kp.ipFamily, endpoint.Spec.Subnets)
+
+	for _, inputCidrBlock := range subnets {
 		kp.remoteSubnets.Delete(inputCidrBlock)
 		delete(kp.remoteSubnetGw, inputCidrBlock)
 	}
 
-	if err := kp.updateRoutingRulesForInterClusterSupport(endpoint.Spec.Subnets, Delete); err != nil {
+	if err := kp.updateRoutingRulesForInterClusterSupport(subnets, Delete); err != nil {
 		logger.Errorf(err, "updateRoutingRulesForInterClusterSupport for removed remote %#v returned error",
 			endpoint)
 		return err
 	}
 
-	kp.updateRoutingRulesForHostNetworkSupport(endpoint.Spec.Subnets, Delete)
-	kp.updateIptableRulesForInterClusterTraffic(endpoint.Spec.Subnets, Delete)
+	kp.updateRoutingRulesForHostNetworkSupport(subnets, Delete)
+	kp.updateIptableRulesForInterClusterTraffic(subnets, Delete)
 
 	return nil
 }
@@ -142,18 +149,16 @@ func (kp *SyncHandler) getHostIfaceIPAddress() (net.IP, error) {
 		return nil, errors.Wrap(err, "error getting default host addresses")
 	}
 
-	if len(addrs) > 0 {
-		for i := range addrs {
-			ipAddr, _, err := net.ParseCIDR(addrs[i].String())
-			if err != nil {
-				logger.Errorf(err, "Unable to ParseCIDR  %v", addrs)
-			}
+	for i := range addrs {
+		ipAddr, _, err := net.ParseCIDR(addrs[i].String())
+		if err != nil {
+			return nil, errors.Errorf("unable to parse CIDR : %s", addrs[i])
+		}
 
-			if ipAddr.To4() != nil {
-				return ipAddr, nil
-			}
+		if k8snet.IPFamilyOf(ipAddr) == kp.ipFamily {
+			return ipAddr, nil
 		}
 	}
 
-	return nil, nil
+	return nil, errors.Errorf("no default host interface IP found: %v", addrs)
 }

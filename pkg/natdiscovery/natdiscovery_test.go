@@ -40,71 +40,113 @@ const (
 	natNotExpected = false
 )
 
-var _ = When("a remote Endpoint is added", func() {
-	var forwardHowManyFromLocal int
+var _ = When("IPv4 remote Endpoint is added in IPv4 env", func() {
+	t := newDiscoveryTestDriver(true, false)
 
-	t := newDiscoveryTestDriver()
+	addEndpointDiscoveryTests(
+		k8snet.IPv4,
+		t,
+		func() string { return testRemotePrivateIP },
+		func() string { return testRemotePublicIP },
+		func() string { return testRemotePrivateIP2 },
+		func(nd *NATDiscoveryInfo) *FakeServerConnection { return nd.ipv4Connection },
+	)
+})
 
-	BeforeEach(func() {
-		atomic.StoreInt64(&natdiscovery.RecheckTime, 0)
-		atomic.StoreInt64(&natdiscovery.TotalTimeout, time.Hour.Nanoseconds())
-		atomic.StoreInt64(&natdiscovery.PublicToPrivateFailoverTimeout, time.Hour.Nanoseconds())
-		forwardHowManyFromLocal = 1
-		t.remoteEndpoint.Spec.PublicIPs = []string{}
-	})
+var _ = When("IPv4 remote Endpoint is added in dualstack env", func() {
+	t := newDiscoveryTestDriver(true, true)
 
-	JustBeforeEach(func() {
-		t.localND.ipv4Connection.forwardTo(t.remoteND.ipv4Connection, forwardHowManyFromLocal)
-		t.localND.instance.AddEndpoint(&t.remoteEndpoint, k8snet.IPv4)
-		t.localND.checkDiscovery()
-	})
+	addEndpointDiscoveryTests(
+		k8snet.IPv4,
+		t,
+		func() string { return testRemotePrivateIP },
+		func() string { return testRemotePublicIP },
+		func() string { return testRemotePrivateIP2 },
+		func(nd *NATDiscoveryInfo) *FakeServerConnection { return nd.ipv4Connection },
+	)
+})
 
-	Context("with only the private IP set", func() {
-		t.testRemoteEndpointAdded(testRemotePrivateIP, natNotExpected)
-	})
+var _ = When("IPv6 remote Endpoint is added in IPv6 env", func() {
+	t := newDiscoveryTestDriver(false, true)
 
+	addEndpointDiscoveryTests(
+		k8snet.IPv6,
+		t,
+		func() string { return testRemotePrivateIPv6 },
+		func() string { return testRemotePublicIPv6 },
+		func() string { return testRemotePrivateIPv62 },
+		func(nd *NATDiscoveryInfo) *FakeServerConnection { return nd.ipv6Connection },
+	)
+})
+
+var _ = When("IPv6 remote Endpoint is added in dualstack env", func() {
+	t := newDiscoveryTestDriver(true, true)
+
+	addEndpointDiscoveryTests(
+		k8snet.IPv6,
+		t,
+		func() string { return testRemotePrivateIPv6 },
+		func() string { return testRemotePublicIPv6 },
+		func() string { return testRemotePrivateIPv62 },
+		func(nd *NATDiscoveryInfo) *FakeServerConnection { return nd.ipv6Connection },
+	)
+})
+
+func testPublicOnly(t *discoveryTestDriver, getPublicIP func() string) {
 	Context("with only the public IP set", func() {
 		BeforeEach(func() {
-			t.remoteEndpoint.Spec.PublicIPs = []string{testRemotePublicIP}
+			t.remoteEndpoint.Spec.PublicIPs = []string{getPublicIP()}
 			t.remoteEndpoint.Spec.PrivateIPs = []string{}
 		})
 
-		t.testRemoteEndpointAdded(testRemotePublicIP, natExpected)
+		t.testRemoteEndpointAdded(getPublicIP(), natExpected)
 	})
+}
+
+func testPrivateOnly(t *discoveryTestDriver, getPrivateIP func() string) {
+	Context("with only the private IP set", func() {
+		t.testRemoteEndpointAdded(getPrivateIP(), natNotExpected)
+	})
+}
+
+func testResponseOrdering(ipFamily k8snet.IPFamily, t *discoveryTestDriver,
+	getPrivateIP, getPublicIP func() string,
+	getConnection func(*NATDiscoveryInfo) *FakeServerConnection,
+	forwardHowManyFromLocal *int,
+) {
+	var privateIPReq, publicIPReq []byte
 
 	Context("with both the public IP and private IP set", func() {
-		var privateIPReq []byte
-		var publicIPReq []byte
-
 		BeforeEach(func() {
-			forwardHowManyFromLocal = 0
-			t.remoteEndpoint.Spec.PublicIPs = []string{testRemotePublicIP}
-			t.remoteND.instance.AddEndpoint(&t.localEndpoint, k8snet.IPv4)
+			*forwardHowManyFromLocal = 0
+			t.remoteEndpoint.Spec.PublicIPs = []string{getPublicIP()}
+			t.remoteND.instance.AddEndpoint(&t.localEndpoint, ipFamily)
 		})
 
 		JustBeforeEach(func() {
-			privateIPReq = t.localND.ipv4Connection.awaitSent()
-			publicIPReq = t.localND.ipv4Connection.awaitSent()
+			conn := getConnection(t.localND)
+			privateIPReq = conn.awaitSent()
+			publicIPReq = conn.awaitSent()
 		})
 
 		Context("and the private IP responds after the public IP within the grace period", func() {
 			It("should notify with the private IP NATEndpointInfo settings", func() {
-				t.remoteND.ipv4Connection.inputFrom(publicIPReq, t.localND.ipv4Connection.addr)
+				getConnection(t.remoteND).inputFrom(publicIPReq, getConnection(t.localND).addr)
 
 				Eventually(t.localND.instance.GetReadyChannel(), 5).Should(Receive(Equal(&natdiscovery.NATEndpointInfo{
 					Endpoint:  t.remoteEndpoint,
 					UseNAT:    true,
-					UseIP:     t.remoteEndpoint.Spec.GetPublicIP(k8snet.IPv4),
-					UseFamily: k8snet.IPv4,
+					UseIP:     getPublicIP(),
+					UseFamily: ipFamily,
 				})))
 
-				t.remoteND.ipv4Connection.inputFrom(privateIPReq, t.localND.ipv4Connection.addr)
+				getConnection(t.remoteND).inputFrom(privateIPReq, getConnection(t.localND).addr)
 
 				Eventually(t.localND.instance.GetReadyChannel(), 5).Should(Receive(Equal(&natdiscovery.NATEndpointInfo{
 					Endpoint:  t.remoteEndpoint,
 					UseNAT:    false,
-					UseIP:     t.remoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4),
-					UseFamily: k8snet.IPv4,
+					UseIP:     getPrivateIP(),
+					UseFamily: ipFamily,
 				})))
 			})
 		})
@@ -113,16 +155,16 @@ var _ = When("a remote Endpoint is added", func() {
 			It("should notify with the public IP NATEndpointInfo settings", func() {
 				atomic.StoreInt64(&natdiscovery.PublicToPrivateFailoverTimeout, 0)
 
-				t.remoteND.ipv4Connection.inputFrom(publicIPReq, t.localND.ipv4Connection.addr)
+				getConnection(t.remoteND).inputFrom(publicIPReq, getConnection(t.localND).addr)
 
 				Eventually(t.localND.instance.GetReadyChannel(), 5).Should(Receive(Equal(&natdiscovery.NATEndpointInfo{
 					Endpoint:  t.remoteEndpoint,
 					UseNAT:    true,
-					UseIP:     t.remoteEndpoint.Spec.GetPublicIP(k8snet.IPv4),
-					UseFamily: k8snet.IPv4,
+					UseIP:     t.remoteEndpoint.Spec.GetPublicIP(ipFamily),
+					UseFamily: ipFamily,
 				})))
 
-				t.remoteND.ipv4Connection.inputFrom(privateIPReq, t.localND.ipv4Connection.addr)
+				getConnection(t.remoteND).inputFrom(privateIPReq, getConnection(t.localND).addr)
 
 				Consistently(t.localND.instance.GetReadyChannel()).ShouldNot(Receive())
 			})
@@ -130,16 +172,16 @@ var _ = When("a remote Endpoint is added", func() {
 
 		Context("and the private IP responds first", func() {
 			It("should notify with the private IP NATEndpointInfo settings", func() {
-				t.remoteND.ipv4Connection.inputFrom(privateIPReq, t.localND.ipv4Connection.addr)
+				getConnection(t.remoteND).inputFrom(privateIPReq, getConnection(t.localND).addr)
 
 				Eventually(t.localND.instance.GetReadyChannel(), 5).Should(Receive(Equal(&natdiscovery.NATEndpointInfo{
 					Endpoint:  t.remoteEndpoint,
 					UseNAT:    false,
-					UseIP:     t.remoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4),
-					UseFamily: k8snet.IPv4,
+					UseIP:     t.remoteEndpoint.Spec.GetPrivateIP(ipFamily),
+					UseFamily: ipFamily,
 				})))
 
-				t.remoteND.ipv4Connection.inputFrom(publicIPReq, t.localND.ipv4Connection.addr)
+				getConnection(t.remoteND).inputFrom(publicIPReq, getConnection(t.localND).addr)
 
 				Consistently(t.localND.instance.GetReadyChannel()).ShouldNot(Receive())
 			})
@@ -151,27 +193,32 @@ var _ = When("a remote Endpoint is added", func() {
 			Eventually(t.localND.instance.GetReadyChannel(), 5).Should(Receive(Equal(&natdiscovery.NATEndpointInfo{
 				Endpoint:  t.remoteEndpoint,
 				UseNAT:    false,
-				UseIP:     t.remoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4),
-				UseFamily: k8snet.IPv4,
+				UseIP:     t.remoteEndpoint.Spec.GetPrivateIP(ipFamily),
+				UseFamily: ipFamily,
 			})))
 		})
 	})
+}
 
+func testReAddingEndpointAfterDiscoveryComplete(ipFamily k8snet.IPFamily, t *discoveryTestDriver,
+	getPrivateIP2 func() string,
+	getConnection func(*NATDiscoveryInfo) *FakeServerConnection,
+) {
 	Context("and then re-added after discovery is complete", func() {
 		var newRemoteEndpoint submarinerv1.Endpoint
 
 		BeforeEach(func() {
-			t.remoteND.instance.AddEndpoint(&t.localEndpoint, k8snet.IPv4)
+			t.remoteND.instance.AddEndpoint(&t.localEndpoint, ipFamily)
 			newRemoteEndpoint = t.remoteEndpoint
 		})
 
 		JustBeforeEach(func() {
 			Eventually(t.localND.instance.GetReadyChannel(), 5).Should(Receive())
 
-			t.remoteND.ipv4Connection.addr.IP = net.ParseIP(newRemoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4))
-			t.localND.ipv4Connection.forwardTo(t.remoteND.ipv4Connection, 1)
+			getConnection(t.remoteND).addr.IP = net.ParseIP(newRemoteEndpoint.Spec.GetPrivateIP(ipFamily))
+			getConnection(t.localND).forwardTo(getConnection(t.remoteND), 1)
 
-			t.localND.instance.AddEndpoint(&newRemoteEndpoint, k8snet.IPv4)
+			t.localND.instance.AddEndpoint(&newRemoteEndpoint, ipFamily)
 			t.localND.checkDiscovery()
 		})
 
@@ -180,17 +227,18 @@ var _ = When("a remote Endpoint is added", func() {
 				Eventually(t.localND.instance.GetReadyChannel(), 5).Should(Receive(Equal(&natdiscovery.NATEndpointInfo{
 					Endpoint:  t.remoteEndpoint,
 					UseNAT:    false,
-					UseIP:     t.remoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4),
-					UseFamily: k8snet.IPv4,
+					UseIP:     t.remoteEndpoint.Spec.GetPrivateIP(ipFamily),
+					UseFamily: ipFamily,
 				})))
 			})
 		})
 
 		Context("with the Endpoint's private IP changed", func() {
 			BeforeEach(func() {
-				newRemoteEndpoint.Spec.PrivateIPs = []string{testRemotePrivateIP2}
+				newRemoteEndpoint.Spec.PrivateIPs = []string{getPrivateIP2()}
+
 				Expect(t.remoteND.localEndpoint.Update(context.Background(), func(existing *submarinerv1.EndpointSpec) {
-					existing.PrivateIPs = []string{testRemotePrivateIP2}
+					existing.PrivateIPs = []string{getPrivateIP2()}
 				})).To(Succeed())
 			})
 
@@ -198,24 +246,31 @@ var _ = When("a remote Endpoint is added", func() {
 				Eventually(t.localND.instance.GetReadyChannel(), 5).Should(Receive(Equal(&natdiscovery.NATEndpointInfo{
 					Endpoint:  newRemoteEndpoint,
 					UseNAT:    false,
-					UseIP:     newRemoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4),
-					UseFamily: k8snet.IPv4,
+					UseIP:     newRemoteEndpoint.Spec.GetPrivateIP(ipFamily),
+					UseFamily: ipFamily,
 				})))
 			})
 		})
 	})
+}
 
+func testReAddingEndpointDuringDiscovery(ipFamily k8snet.IPFamily, t *discoveryTestDriver,
+	getPrivateIP2 func() string,
+	getConnection func(*NATDiscoveryInfo) *FakeServerConnection,
+	forwardHowManyFromLocal *int,
+) {
 	Context("and then re-added while discovery is in progress", func() {
 		var newRemoteEndpoint submarinerv1.Endpoint
 
 		BeforeEach(func() {
-			forwardHowManyFromLocal = 0
-			t.remoteND.instance.AddEndpoint(&t.localEndpoint, k8snet.IPv4)
+			*forwardHowManyFromLocal = 0
+
+			t.remoteND.instance.AddEndpoint(&t.localEndpoint, ipFamily)
 			newRemoteEndpoint = t.remoteEndpoint
 		})
 
 		JustBeforeEach(func() {
-			t.localND.instance.AddEndpoint(&newRemoteEndpoint, k8snet.IPv4)
+			t.localND.instance.AddEndpoint(&newRemoteEndpoint, ipFamily)
 		})
 
 		Context("with no change to the Endpoint", func() {
@@ -226,15 +281,16 @@ var _ = When("a remote Endpoint is added", func() {
 
 		Context("with the Endpoint's private IP changed", func() {
 			BeforeEach(func() {
-				newRemoteEndpoint.Spec.PrivateIPs = []string{testRemotePrivateIP2}
+				newRemoteEndpoint.Spec.PrivateIPs = []string{getPrivateIP2()}
+
 				Expect(t.remoteND.localEndpoint.Update(context.Background(), func(existing *submarinerv1.EndpointSpec) {
-					existing.PrivateIPs = []string{testRemotePrivateIP2}
+					existing.PrivateIPs = []string{getPrivateIP2()}
 				})).To(Succeed())
 			})
 
 			JustBeforeEach(func() {
-				t.remoteND.ipv4Connection.addr.IP = net.ParseIP(newRemoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4))
-				t.localND.ipv4Connection.forwardTo(t.remoteND.ipv4Connection, -1)
+				getConnection(t.remoteND).addr.IP = net.ParseIP(newRemoteEndpoint.Spec.GetPrivateIP(ipFamily))
+				getConnection(t.localND).forwardTo(getConnection(t.remoteND), -1)
 				t.localND.checkDiscovery()
 			})
 
@@ -242,8 +298,8 @@ var _ = When("a remote Endpoint is added", func() {
 				Eventually(t.localND.instance.GetReadyChannel(), 5).Should(Receive(Equal(&natdiscovery.NATEndpointInfo{
 					Endpoint:  newRemoteEndpoint,
 					UseNAT:    false,
-					UseIP:     newRemoteEndpoint.Spec.GetPrivateIP(k8snet.IPv4),
-					UseFamily: k8snet.IPv4,
+					UseIP:     newRemoteEndpoint.Spec.GetPrivateIP(ipFamily),
+					UseFamily: ipFamily,
 				})))
 			})
 		})
@@ -251,23 +307,25 @@ var _ = When("a remote Endpoint is added", func() {
 
 	Context("and then removed while discovery is in progress", func() {
 		BeforeEach(func() {
-			forwardHowManyFromLocal = 0
+			*forwardHowManyFromLocal = 0
 		})
 
 		It("should stop the discovery", func() {
-			Expect(t.localND.ipv4Connection.udpSentChannel).To(Receive())
+			Expect(getConnection(t.localND).udpSentChannel).To(Receive())
 			Consistently(t.localND.instance.GetReadyChannel()).ShouldNot(Receive())
 
-			t.localND.instance.RemoveEndpoint(t.remoteEndpoint.Spec.GetFamilyCableName(k8snet.IPv4))
+			t.localND.instance.RemoveEndpoint(t.remoteEndpoint.Spec.GetFamilyCableName(ipFamily))
 
 			t.localND.checkDiscovery()
-			Expect(t.localND.ipv4Connection.udpSentChannel).ToNot(Receive())
+			Expect(getConnection(t.localND).udpSentChannel).ToNot(Receive())
 		})
 	})
+}
 
+func testNoNatPortSet(ipFamily k8snet.IPFamily, t *discoveryTestDriver, getPublicIP func() string) {
 	Context("with no NAT discovery port set", func() {
 		BeforeEach(func() {
-			t.remoteEndpoint.Spec.PublicIPs = []string{testRemotePublicIP}
+			t.remoteEndpoint.Spec.PublicIPs = []string{getPublicIP()}
 			t.remoteEndpoint.Spec.PrivateIPs = []string{}
 			delete(t.remoteEndpoint.Spec.BackendConfig, submarinerv1.NATTDiscoveryPortConfig)
 		})
@@ -276,41 +334,95 @@ var _ = When("a remote Endpoint is added", func() {
 			Eventually(t.localND.instance.GetReadyChannel(), 5).Should(Receive(Equal(&natdiscovery.NATEndpointInfo{
 				Endpoint:  t.remoteEndpoint,
 				UseNAT:    true,
-				UseIP:     t.remoteEndpoint.Spec.GetPublicIP(k8snet.IPv4),
-				UseFamily: k8snet.IPv4,
+				UseIP:     t.remoteEndpoint.Spec.GetPublicIP(ipFamily),
+				UseFamily: ipFamily,
 			})))
 		})
 	})
+}
 
+func testTimeoutBehavior(ipFamily k8snet.IPFamily, t *discoveryTestDriver,
+	getConnection func(*NATDiscoveryInfo) *FakeServerConnection,
+	forwardHowManyFromLocal *int,
+) {
 	Context("and the remote process doesn't respond", func() {
 		BeforeEach(func() {
-			forwardHowManyFromLocal = 0
+			*forwardHowManyFromLocal = 0
+
 			atomic.StoreInt64(&natdiscovery.TotalTimeout, (100 * time.Millisecond).Nanoseconds())
 		})
 
 		It("should eventually time out and notify with the legacy NATEndpointInfo settings", func() {
 			// Drop the request sent out
-			Expect(t.localND.ipv4Connection.udpSentChannel).Should(Receive())
+			Expect(getConnection(t.localND).udpSentChannel).Should(Receive())
 
 			Consistently(t.localND.instance.GetReadyChannel(), natdiscovery.ToDuration(&natdiscovery.TotalTimeout)).ShouldNot(Receive())
 			time.Sleep(50 * time.Millisecond)
 
 			t.localND.checkDiscovery()
-			Expect(t.localND.ipv4Connection.udpSentChannel).ToNot(Receive())
+			Expect(getConnection(t.localND).udpSentChannel).ToNot(Receive())
 
 			Eventually(t.localND.instance.GetReadyChannel(), 5).Should(Receive(Equal(&natdiscovery.NATEndpointInfo{
 				Endpoint:  t.remoteEndpoint,
 				UseNAT:    true,
-				UseIP:     t.remoteEndpoint.Spec.GetPublicIP(k8snet.IPv4),
-				UseFamily: k8snet.IPv4,
+				UseIP:     t.remoteEndpoint.Spec.GetPublicIP(ipFamily),
+				UseFamily: ipFamily,
 			})))
 		})
 	})
-})
+}
+
+func addEndpointDiscoveryTests(ipFamily k8snet.IPFamily, t *discoveryTestDriver,
+	getPrivateIP, getPublicIP, getPrivateIP2 func() string,
+	getConnection func(*NATDiscoveryInfo) *FakeServerConnection,
+) {
+	var forwardHowManyFromLocal int
+
+	BeforeEach(func() {
+		atomic.StoreInt64(&natdiscovery.RecheckTime, 0)
+		atomic.StoreInt64(&natdiscovery.TotalTimeout, time.Hour.Nanoseconds())
+		atomic.StoreInt64(&natdiscovery.PublicToPrivateFailoverTimeout, time.Hour.Nanoseconds())
+
+		forwardHowManyFromLocal = 1
+
+		t.remoteEndpoint.Spec.PublicIPs = []string{}
+	})
+
+	JustBeforeEach(func() {
+		getConnection(t.localND).forwardTo(getConnection(t.remoteND), forwardHowManyFromLocal)
+		t.localND.instance.AddEndpoint(&t.remoteEndpoint, ipFamily)
+		t.localND.checkDiscovery()
+	})
+
+	testPublicOnly(t, getPublicIP)
+	testPrivateOnly(t, getPrivateIP)
+	testResponseOrdering(ipFamily, t,
+		getPrivateIP, getPublicIP,
+		getConnection,
+		&forwardHowManyFromLocal,
+	)
+
+	testReAddingEndpointAfterDiscoveryComplete(ipFamily, t,
+		getPrivateIP2,
+		getConnection,
+	)
+
+	testReAddingEndpointDuringDiscovery(ipFamily, t,
+		getPrivateIP2,
+		getConnection,
+		&forwardHowManyFromLocal,
+	)
+
+	testNoNatPortSet(ipFamily, t, getPublicIP)
+
+	testTimeoutBehavior(ipFamily, t,
+		getConnection,
+		&forwardHowManyFromLocal)
+}
 
 var _ = When(fmt.Sprintf("the %q config is invalid", submarinerv1.NATTDiscoveryPortConfig), func() {
 	It("instantiation should return an error", func() {
-		localEndpoint := createTestLocalEndpoint()
+		localEndpoint := createTestLocalEndpoint(true, false)
 		localEndpoint.Spec.BackendConfig[submarinerv1.NATTDiscoveryPortConfig] = "bogus"
 
 		_, err := natdiscovery.New(submendpoint.NewLocal(&localEndpoint.Spec, dynamicfake.NewSimpleDynamicClient(scheme.Scheme), ""))
@@ -325,7 +437,7 @@ type discoveryTestDriver struct {
 	remoteEndpoint submarinerv1.Endpoint
 }
 
-func newDiscoveryTestDriver() *discoveryTestDriver {
+func newDiscoveryTestDriver(isIPv4, isIPv6 bool) *discoveryTestDriver {
 	t := &discoveryTestDriver{}
 
 	BeforeEach(func() {
@@ -339,20 +451,44 @@ func newDiscoveryTestDriver() *discoveryTestDriver {
 			atomic.StoreInt64(&natdiscovery.PublicToPrivateFailoverTimeout, oldPublicToPrivateFailoverTimeout)
 		})
 
-		t.remoteEndpoint = createTestRemoteEndpoint()
-		t.localEndpoint = createTestLocalEndpoint()
+		var ipv4AddrL, ipv4AddrR *net.UDPAddr
+		var ipv6AddrL, ipv6AddrR *net.UDPAddr
 
-		t.localND = newNATDiscovery(&t.localEndpoint, &net.UDPAddr{
-			IP:   net.ParseIP(testLocalPrivateIP),
-			Port: int(testLocalNATPort),
-		})
+		if isIPv4 {
+			ipv4AddrL = &net.UDPAddr{
+				IP:   net.ParseIP(testLocalPrivateIP),
+				Port: int(testLocalNATPort),
+			}
+			ipv4AddrR = &net.UDPAddr{
+				IP:   net.ParseIP(testRemotePrivateIP),
+				Port: int(testRemoteNATPort),
+			}
+		}
 
-		t.remoteND = newNATDiscovery(&t.remoteEndpoint, &net.UDPAddr{
-			IP:   net.ParseIP(testRemotePrivateIP),
-			Port: int(testRemoteNATPort),
-		})
+		if isIPv6 {
+			ipv6AddrL = &net.UDPAddr{
+				IP:   net.ParseIP(testLocalPrivateIPv6),
+				Port: int(testLocalNATPort),
+			}
+			ipv6AddrR = &net.UDPAddr{
+				IP:   net.ParseIP(testRemotePrivateIPv6),
+				Port: int(testRemoteNATPort),
+			}
+		}
 
-		t.remoteND.ipv4Connection.forwardTo(t.localND.ipv4Connection, -1)
+		t.remoteEndpoint = createTestRemoteEndpoint(isIPv4, isIPv6)
+		t.localEndpoint = createTestLocalEndpoint(isIPv4, isIPv6)
+
+		t.localND = newNATDiscovery(&t.localEndpoint, ipv4AddrL, ipv6AddrL)
+		t.remoteND = newNATDiscovery(&t.remoteEndpoint, ipv4AddrR, ipv6AddrR)
+
+		if t.remoteND.ipv4Connection != nil {
+			t.remoteND.ipv4Connection.forwardTo(t.localND.ipv4Connection, -1)
+		}
+
+		if t.remoteND.ipv6Connection != nil {
+			t.remoteND.ipv6Connection.forwardTo(t.localND.ipv6Connection, -1)
+		}
 	})
 
 	return t
@@ -360,7 +496,7 @@ func newDiscoveryTestDriver() *discoveryTestDriver {
 
 func (t *discoveryTestDriver) testRemoteEndpointAdded(expIP string, expectNAT bool) {
 	BeforeEach(func() {
-		t.remoteND.instance.AddEndpoint(&t.localEndpoint, k8snet.IPv4)
+		t.remoteND.instance.AddEndpoint(&t.localEndpoint, k8snet.IPFamilyOfString(expIP))
 	})
 
 	It("should notify with the correct NATEndpointInfo settings and stop the discovery", func() {
@@ -368,7 +504,7 @@ func (t *discoveryTestDriver) testRemoteEndpointAdded(expIP string, expectNAT bo
 			Endpoint:  t.remoteEndpoint,
 			UseNAT:    expectNAT,
 			UseIP:     expIP,
-			UseFamily: k8snet.IPv4,
+			UseFamily: k8snet.IPFamilyOfString(expIP),
 		})))
 
 		// Verify it doesn't time out and try to notify of the legacy settings
@@ -377,7 +513,13 @@ func (t *discoveryTestDriver) testRemoteEndpointAdded(expIP string, expectNAT bo
 		time.Sleep(natdiscovery.ToDuration(&natdiscovery.TotalTimeout) + 20)
 
 		t.localND.checkDiscovery()
-		Expect(t.localND.ipv4Connection.udpSentChannel).ToNot(Receive())
+
+		if k8snet.IPFamilyOfString(expIP) == k8snet.IPv4 {
+			Expect(t.localND.ipv4Connection.udpSentChannel).ToNot(Receive())
+		} else {
+			Expect(t.localND.ipv6Connection.udpSentChannel).ToNot(Receive())
+		}
+
 		Consistently(t.localND.instance.GetReadyChannel()).ShouldNot(Receive())
 
 		// Verify it doesn't try to send another request after the recheck time period has elapsed
@@ -385,7 +527,13 @@ func (t *discoveryTestDriver) testRemoteEndpointAdded(expIP string, expectNAT bo
 		atomic.StoreInt64(&natdiscovery.TotalTimeout, time.Hour.Nanoseconds())
 
 		t.localND.checkDiscovery()
-		Expect(t.localND.ipv4Connection.udpSentChannel).ToNot(Receive())
+
+		if k8snet.IPFamilyOfString(expIP) == k8snet.IPv4 {
+			Expect(t.localND.ipv4Connection.udpSentChannel).ToNot(Receive())
+		} else {
+			Expect(t.localND.ipv6Connection.udpSentChannel).ToNot(Receive())
+		}
+
 		Consistently(t.localND.instance.GetReadyChannel()).ShouldNot(Receive())
 	})
 }

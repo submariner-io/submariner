@@ -67,7 +67,7 @@ func (p *PublicIPWatcher) syncPublicIP() {
 	localEndpointSpec := p.config.LocalEndpoint.Spec()
 
 	for _, family := range p.config.SubmSpec.GetIPFamilies() {
-		publicIP, _, err := getPublicIP(family, p.config.SubmSpec, p.config.K8sClient, localEndpointSpec.BackendConfig, false)
+		publicIP, _, err := GetPublicIP(family, p.config.SubmSpec, p.config.K8sClient, localEndpointSpec.BackendConfig, false)
 		if err != nil {
 			logger.Warningf("Could not determine public IP for family %v of the gateway node %q: %v", family, localEndpointSpec.Hostname, err)
 			continue

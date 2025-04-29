@@ -48,14 +48,19 @@ const (
 	testLocalEndpointNameAndFamily = testLocalEndpointName + "-v" + string(k8snet.IPv4)
 	testLocalClusterID             = "cluster-a"
 	testLocalPublicIP              = "10.1.1.1"
+	testLocalPublicIPv6            = "2a01:a041:f123:1400:1dd1:2a92:b926:8019"
 	testLocalPrivateIP             = "2.2.2.2"
+	testLocalPrivateIPv6           = "fc00:1234:4444::4"
 
 	testRemoteEndpointName          = "cluster-b-ep-1"
 	testRemoteEndpointNameAndFamily = "cluster-b-ep-1" + "-v" + string(k8snet.IPv4)
 	testRemoteClusterID             = "cluster-b"
 	testRemotePublicIP              = "10.3.3.3"
+	testRemotePublicIPv6            = "2a00:a041:f123:1400:1dd1:2a92:b926:8019"
 	testRemotePrivateIP             = "4.4.4.4"
+	testRemotePrivateIPv6           = "fc01:1234:4444::4"
 	testRemotePrivateIP2            = "5.5.5.5"
+	testRemotePrivateIPv62          = "fc02:1234:4444::4"
 )
 
 func init() {
@@ -156,25 +161,44 @@ type NATDiscoveryInfo struct {
 	localEndpoint  *submendpoint.Local
 	instance       natdiscovery.Interface
 	ipv4Connection *FakeServerConnection
+	ipv6Connection *FakeServerConnection
 	checkDiscovery func()
 }
 
-func newNATDiscovery(endpoint *submarinerv1.Endpoint, addr *net.UDPAddr) *NATDiscoveryInfo {
+func newNATDiscovery(endpoint *submarinerv1.Endpoint, addr, addrv6 *net.UDPAddr) *NATDiscoveryInfo {
 	dynClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
 	localEndpoint := submendpoint.NewLocal(&endpoint.Spec, dynClient, "")
 
 	test.CreateResource(dynClient.Resource(submarinerv1.EndpointGVR).Namespace(""), localEndpoint.Resource())
+	var ipv6Connection *FakeServerConnection
+	var ipv4Connection *FakeServerConnection
 
-	natDiscoveryInfo := &NATDiscoveryInfo{
-		localEndpoint: localEndpoint,
-		ipv4Connection: &FakeServerConnection{
+	srcIP := ""
+	srcIPv6 := ""
+
+	if addr != nil {
+		srcIP = addr.IP.String()
+		ipv4Connection = &FakeServerConnection{
 			udpSentChannel: make(chan []byte, 10),
 			udpReadChannel: make(chan UDPReadInfo, 10),
 			addr:           addr,
-		},
+		}
 	}
 
-	srcIP := addr.IP.String()
+	if addrv6 != nil {
+		srcIPv6 = addrv6.IP.String()
+		ipv6Connection = &FakeServerConnection{
+			udpSentChannel: make(chan []byte, 10),
+			udpReadChannel: make(chan UDPReadInfo, 10),
+			addr:           addrv6,
+		}
+	}
+
+	natDiscoveryInfo := &NATDiscoveryInfo{
+		localEndpoint:  localEndpoint,
+		ipv4Connection: ipv4Connection,
+		ipv6Connection: ipv6Connection,
+	}
 
 	var err error
 
@@ -183,10 +207,16 @@ func newNATDiscovery(endpoint *submarinerv1.Endpoint, addr *net.UDPAddr) *NATDis
 		CreateServerConnection: func(port int32, family k8snet.IPFamily) (natdiscovery.ServerConnection, error) {
 			defer GinkgoRecover()
 			Expect(family).ToNot(Equal(k8snet.IPFamilyUnknown))
-			Expect(int(port)).To(Equal(addr.Port))
+			if family == k8snet.IPv4 {
+				Expect(int(port)).To(Equal(addr.Port))
+			} else {
+				Expect(int(port)).To(Equal(addrv6.Port))
+			}
 
 			if family == k8snet.IPv4 {
 				return natDiscoveryInfo.ipv4Connection, nil
+			} else if family == k8snet.IPv6 {
+				return natDiscoveryInfo.ipv6Connection, nil
 			}
 
 			return nil, errors.New("unsupported IP family")
@@ -197,6 +227,9 @@ func newNATDiscovery(endpoint *submarinerv1.Endpoint, addr *net.UDPAddr) *NATDis
 
 			if family == k8snet.IPv4 {
 				return srcIP
+			}
+			if family == k8snet.IPv6 {
+				return srcIPv6
 			}
 
 			return ""
@@ -211,9 +244,18 @@ func newNATDiscovery(endpoint *submarinerv1.Endpoint, addr *net.UDPAddr) *NATDis
 
 	DeferCleanup(func() {
 		close(stopCh)
-		Eventually(func() bool {
-			return natDiscoveryInfo.ipv4Connection.closed.Load()
-		}).Should(BeTrue())
+
+		if natDiscoveryInfo.ipv4Connection != nil {
+			Eventually(func() bool {
+				return natDiscoveryInfo.ipv4Connection.closed.Load()
+			}).Should(BeTrue())
+		}
+
+		if natDiscoveryInfo.ipv6Connection != nil {
+			Eventually(func() bool {
+				return natDiscoveryInfo.ipv6Connection.closed.Load()
+			}).Should(BeTrue())
+		}
 	})
 
 	Expect(natDiscoveryInfo.instance.Run(stopCh)).To(Succeed())
@@ -221,14 +263,32 @@ func newNATDiscovery(endpoint *submarinerv1.Endpoint, addr *net.UDPAddr) *NATDis
 	return natDiscoveryInfo
 }
 
-func createTestLocalEndpoint() submarinerv1.Endpoint {
+func createTestLocalEndpoint(isIPv4, isIPv6 bool) submarinerv1.Endpoint {
+	var (
+		privateIPs []string
+		publicIPs  []string
+		subnets    []string
+	)
+
+	if isIPv4 {
+		privateIPs = append(privateIPs, testLocalPrivateIP)
+		publicIPs = append(publicIPs, testLocalPublicIP)
+		subnets = append(subnets, "10.0.0.0/16")
+	}
+
+	if isIPv6 {
+		privateIPs = append(privateIPs, testLocalPrivateIPv6)
+		publicIPs = append(publicIPs, testLocalPublicIPv6)
+		subnets = append(subnets, "fc00:1001::/48")
+	}
+
 	return submarinerv1.Endpoint{
 		Spec: submarinerv1.EndpointSpec{
 			CableName:  testLocalEndpointName,
 			ClusterID:  testLocalClusterID,
-			PublicIPs:  []string{testLocalPublicIP},
-			PrivateIPs: []string{testLocalPrivateIP},
-			Subnets:    []string{"10.0.0.0/16"},
+			PublicIPs:  publicIPs,
+			PrivateIPs: privateIPs,
+			Subnets:    subnets,
 			NATEnabled: true,
 			BackendConfig: map[string]string{
 				submarinerv1.NATTDiscoveryPortConfig: strconv.Itoa(int(testLocalNATPort)),
@@ -237,14 +297,32 @@ func createTestLocalEndpoint() submarinerv1.Endpoint {
 	}
 }
 
-func createTestRemoteEndpoint() submarinerv1.Endpoint {
+func createTestRemoteEndpoint(isIPv4, isIPv6 bool) submarinerv1.Endpoint {
+	var (
+		privateIPs []string
+		publicIPs  []string
+		subnets    []string
+	)
+
+	if isIPv4 {
+		privateIPs = append(privateIPs, testRemotePrivateIP)
+		publicIPs = append(publicIPs, testRemotePublicIP)
+		subnets = append(subnets, "11.0.0.0/16")
+	}
+
+	if isIPv6 {
+		privateIPs = append(privateIPs, testRemotePrivateIPv6)
+		publicIPs = append(publicIPs, testRemotePublicIPv6)
+		subnets = append(subnets, "fc00:2001::/48")
+	}
+
 	return submarinerv1.Endpoint{
 		Spec: submarinerv1.EndpointSpec{
 			CableName:  testRemoteEndpointName,
 			ClusterID:  testRemoteClusterID,
-			PublicIPs:  []string{testRemotePublicIP},
-			PrivateIPs: []string{testRemotePrivateIP},
-			Subnets:    []string{"11.0.0.0/16"},
+			PublicIPs:  publicIPs,
+			PrivateIPs: privateIPs,
+			Subnets:    subnets,
 			NATEnabled: true,
 			BackendConfig: map[string]string{
 				submarinerv1.NATTDiscoveryPortConfig: strconv.Itoa(int(testRemoteNATPort)),
