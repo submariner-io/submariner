@@ -23,6 +23,7 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -288,7 +289,7 @@ func trimAllocatedStatusCondition(conditions *[]metav1.Condition) {
 
 	for i := 0; i < last; i++ {
 		if (*conditions)[i].Type == string(submarinerv1.GlobalEgressIPAllocated) {
-			*conditions = append((*conditions)[:i], (*conditions)[i+1:]...)
+			*conditions = slices.Delete(*conditions, i, i+1)
 			i--
 			last--
 		}

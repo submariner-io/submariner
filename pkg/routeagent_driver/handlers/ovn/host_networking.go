@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"slices"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
@@ -136,10 +137,8 @@ func (ovn *Handler) getNextHopOnK8sMgmtIntf() (*net.IP, error) {
 		// with nexthop matching the nexthop on the ovn-k8s-mp0 interface. Basically, we want the Submariner
 		// managed traffic to be forwarded to the ovn_cluster_router and pass through the CNI network so that
 		// it reaches the active gateway node in the cluster via the submariner pipeline.
-		for _, subnet := range ovn.ClusterCIDR {
-			if currentRouteList[i].Dst.String() == subnet {
-				return &currentRouteList[i].Gw, nil
-			}
+		if slices.Contains(ovn.ClusterCIDR, currentRouteList[i].Dst.String()) {
+			return &currentRouteList[i].Gw, nil
 		}
 	}
 
