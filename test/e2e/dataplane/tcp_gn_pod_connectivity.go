@@ -61,7 +61,7 @@ var _ = Describe("Basic TCP connectivity tests across overlapping clusters witho
 				return
 			}
 
-			subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
+			subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
 				Framework:             f,
 				ToEndpointType:        toEndpointType,
 				Networking:            networking,

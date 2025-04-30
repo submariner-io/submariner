@@ -24,27 +24,56 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
+	subDataplane "github.com/submariner-io/submariner/test/e2e/dataplane"
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
 	v1 "k8s.io/api/core/v1"
+	k8snet "k8s.io/utils/net"
 )
 
 var _ = Describe("Route Agent restart tests", Label(TestLabel), func() {
 	f := subFramework.NewFramework("route-agent-restart")
 
-	When("a route agent pod running on a gateway node is restarted", func() {
-		It("should start a new route agent pod and be able to connect from another cluster", func() {
-			testRouteAgentRestart(f, true)
-		})
+	var supportedFamilies []k8snet.IPFamily
+
+	BeforeEach(func() {
+		supportedFamilies = subDataplane.GetActualIPFamilies(
+			f.DetermineIPFamilyType(framework.ClusterA),
+			f.DetermineIPFamilyType(framework.ClusterB),
+		)
 	})
 
-	When("a route agent pod running on a non-gateway node is restarted", func() {
-		It("should start a new route agent pod and be able to connect from another cluster", func() {
-			testRouteAgentRestart(f, false)
+	for _, family := range []k8snet.IPFamily{k8snet.IPv4, k8snet.IPv6} {
+		currentFamily := family
+
+		When(fmt.Sprintf("running route agent restartstests for IPv%v", currentFamily), func() {
+			BeforeEach(func() {
+				skip := true
+				for _, f := range supportedFamilies {
+					if f == family {
+						skip = false
+						break
+					}
+				}
+				if skip {
+					Skip(fmt.Sprintf("IPv%v not supported in this environment", currentFamily))
+				}
+			})
+			When("a route agent pod running on a gateway node is restarted", func() {
+				It("should start a new route agent pod and be able to connect from another cluster", func() {
+					testRouteAgentRestart(f, true, currentFamily)
+				})
+			})
+
+			When("a route agent pod running on a non-gateway node is restarted", func() {
+				It("should start a new route agent pod and be able to connect from another cluster", func() {
+					testRouteAgentRestart(f, false, currentFamily)
+				})
+			})
 		})
-	})
+	}
 })
 
-func testRouteAgentRestart(f *subFramework.Framework, onGateway bool) {
+func testRouteAgentRestart(f *subFramework.Framework, onGateway bool, ipFamily k8snet.IPFamily) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
@@ -73,22 +102,24 @@ func testRouteAgentRestart(f *subFramework.Framework, onGateway bool) {
 	framework.By(fmt.Sprintf("Found new route agent pod %q on node %q", newRouteAgentPod.Name, node.Name))
 
 	framework.By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
-	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
+	subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
 		FromCluster:           framework.ClusterB,
 		FromClusterScheduling: framework.GatewayNode,
 		ToCluster:             framework.ClusterA,
 		ToClusterScheduling:   framework.GatewayNode,
 		ToEndpointType:        defaultEndpointType(),
+		IPFamily:              ipFamily,
 	}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
 
 	framework.By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
-	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
+	subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
 		FromCluster:           framework.ClusterB,
 		FromClusterScheduling: framework.NonGatewayNode,
 		ToCluster:             framework.ClusterA,
 		ToClusterScheduling:   framework.NonGatewayNode,
 		ToEndpointType:        defaultEndpointType(),
+		IPFamily:              ipFamily,
 	}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
 }
