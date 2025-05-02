@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"reflect"
+	goslices "slices"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -252,7 +253,7 @@ func (n *basicType) NeighDel(neigh *netlink.Neigh) error {
 	neighbors := n.neighbors[neigh.LinkIndex]
 	for i := range neighbors {
 		if reflect.DeepEqual(neighbors[i], *neigh) {
-			n.neighbors[neigh.LinkIndex] = append(neighbors[:i], neighbors[i+1:]...)
+			n.neighbors[neigh.LinkIndex] = goslices.Delete(neighbors, i, i+1)
 			break
 		}
 	}
@@ -308,7 +309,7 @@ func (n *basicType) RouteDel(route *netlink.Route) error {
 
 	for i := range routes {
 		if reflect.DeepEqual(routes[i].Dst, route.Dst) {
-			n.routes[route.LinkIndex] = append(routes[:i], routes[i+1:]...)
+			n.routes[route.LinkIndex] = goslices.Delete(routes, i, i+1)
 			break
 		}
 	}

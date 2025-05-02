@@ -35,63 +35,34 @@ import (
 	k8snet "k8s.io/utils/net"
 )
 
-const localCIDR = "10.1.0.0/24"
+const (
+	localIPv4CIDR     = "10.1.0.0/24"
+	localIPv6CIDR     = "2001:0:0:1234::/64"
+	localIPv4Subnet1  = "172.1.0.0/24"
+	localIPv4Subnet2  = "172.2.0.0/24"
+	localIPv6Subnet1  = "3001:0:0:1234::/64"
+	localIPv6Subnet2  = "3002:0:0:1234::/64"
+	remoteIPv4Subnet1 = "10.0.0.0/24"
+	remoteIPv4Subnet2 = "10.1.0.0/24"
+	remoteIPv6Subnet1 = "4001:0:0:1234::/64"
+	remoteIPv6Subnet2 = "4001:0:0:1234::/64"
+)
 
-var _ = Describe("MTUHandler", func() {
+var _ = Describe("MTU Handler", func() {
 	t := newTestDriver()
 
-	Specify("Init should add expected IP sets and table rules", func() {
-		t.pFilter.AwaitSet(Equal(constants.LocalCIDRIPSet))
-		t.pFilter.AwaitSet(Equal(constants.RemoteCIDRIPSet))
-
-		t.pFilter.AwaitRule(t.tableType,
-			constants.SmPostRoutingMssChain, And(
-				ContainSubstring("\"ClampType\":%d", packetfilter.ToPMTU),
-				ContainSubstring("\"SrcSetName\":%q", constants.RemoteCIDRIPSet),
-				ContainSubstring("\"DestSetName\":%q", constants.LocalCIDRIPSet)))
-		t.pFilter.AwaitRule(t.tableType,
-			constants.SmPostRoutingMssChain, And(
-				ContainSubstring("\"ClampType\":%d", packetfilter.ToPMTU),
-				ContainSubstring("\"SrcSetName\":%q", constants.LocalCIDRIPSet),
-				ContainSubstring("\"DestSetName\":%q", constants.RemoteCIDRIPSet)))
+	Context("IPv4", func() {
+		t.testHandler(localIPv4CIDR, mtu.LocalCIDRIPSetIPv4, mtu.RemoteCIDRIPSetIPv4, []string{localIPv4Subnet1, localIPv4Subnet2},
+			[]string{remoteIPv4Subnet1, remoteIPv4Subnet2})
 	})
 
-	When("a local Endpoint is added and removed", func() {
-		It("should add and remove IP set entries", func() {
-			localEndpoint := newSubmEndpoint([]string{"172.1.0.0/24", "172.2.0.0/24"})
-			Expect(t.handler.LocalEndpointCreated(localEndpoint)).To(Succeed())
-
-			for _, subnet := range localEndpoint.Spec.Subnets {
-				t.pFilter.AwaitEntry(constants.LocalCIDRIPSet, subnet)
-			}
-
-			t.pFilter.AwaitEntry(constants.LocalCIDRIPSet, localCIDR)
-
-			Expect(t.handler.LocalEndpointRemoved(localEndpoint)).To(Succeed())
-
-			for _, subnet := range localEndpoint.Spec.Subnets {
-				t.pFilter.AwaitNoEntry(constants.LocalCIDRIPSet, subnet)
-			}
-
-			t.pFilter.AwaitNoEntry(constants.LocalCIDRIPSet, localCIDR)
+	Context("IPv6", func() {
+		BeforeEach(func() {
+			t.ipFamily = k8snet.IPv6
 		})
-	})
 
-	When("a remote Endpoint is added and removed", func() {
-		It("should add and remove IP set entries", func() {
-			remoteEndpoint := newSubmEndpoint([]string{"10.0.0.0/24", "172.0.0.0/24"})
-			Expect(t.handler.RemoteEndpointCreated(remoteEndpoint)).To(Succeed())
-
-			for _, subnet := range remoteEndpoint.Spec.Subnets {
-				t.pFilter.AwaitEntry(constants.RemoteCIDRIPSet, subnet)
-			}
-
-			Expect(t.handler.RemoteEndpointRemoved(remoteEndpoint)).To(Succeed())
-
-			for _, subnet := range remoteEndpoint.Spec.Subnets {
-				t.pFilter.AwaitNoEntry(constants.RemoteCIDRIPSet, subnet)
-			}
-		})
+		t.testHandler(localIPv6CIDR, mtu.LocalCIDRIPSetIPv6, mtu.RemoteCIDRIPSetIPv6, []string{localIPv6Subnet1, localIPv6Subnet2},
+			[]string{remoteIPv6Subnet1, remoteIPv6Subnet2})
 	})
 
 	When("TCP MSS is forced to a specific value and a local Endpoint is created", func() {
@@ -113,20 +84,20 @@ var _ = Describe("MTUHandler", func() {
 		})
 
 		It("should use the MTU value from the default gateway and add expected IP table rules", func() {
-			t.testForcedMSS(defaultMTU - mtu.MaxIPSecOverhead)
+			defaultHostIface, err := t.netLink.GetDefaultGatewayInterface(t.ipFamily)
+			Expect(err).To(Succeed())
+
+			t.testForcedMSS(defaultHostIface.MTU() - mtu.MaxIPSecOverhead)
 		})
 	})
 
-	Specify("Uninstall should remove IP sets and chains", func() {
-		Expect(t.handler.Uninstall()).To(Succeed())
-
-		t.pFilter.AwaitSetDeleted(constants.LocalCIDRIPSet)
-		t.pFilter.AwaitSetDeleted(constants.RemoteCIDRIPSet)
-		t.pFilter.AwaitNoIPHookChain(packetfilter.ChainTypeRoute, Equal(constants.SmPostRoutingMssChain))
+	Specify("GetNetworkPlugins should return any", func() {
+		Expect(t.handler.GetNetworkPlugins()).To(ContainElement(event.AnyNetworkPlugin))
 	})
 })
 
 type testDriver struct {
+	ipFamily    k8snet.IPFamily
 	pFilter     *fakePF.PacketFilter
 	netLink     *fakenetlink.NetLink
 	handler     event.Handler
@@ -139,6 +110,7 @@ func newTestDriver() *testDriver {
 	t := &testDriver{}
 
 	BeforeEach(func() {
+		t.ipFamily = k8snet.IPv4
 		t.tcpMssValue = 0
 		t.isGlobalnet = false
 		t.pFilter = fakePF.New()
@@ -151,7 +123,10 @@ func newTestDriver() *testDriver {
 	})
 
 	JustBeforeEach(func() {
-		t.handler = mtu.NewMTUHandler([]string{localCIDR}, t.isGlobalnet, t.tcpMssValue)
+		t.pFilter = fakePF.New(t.ipFamily)
+		t.tableType, _ = t.pFilter.GetMSSClampTypes()
+
+		t.handler = mtu.NewHandler(t.ipFamily, []string{localIPv4CIDR, localIPv6CIDR}, t.isGlobalnet, t.tcpMssValue)
 		Expect(t.handler.Init(context.TODO())).To(Succeed())
 	})
 
@@ -159,25 +134,93 @@ func newTestDriver() *testDriver {
 }
 
 func (t *testDriver) testForcedMSS(expTCPMssValue int) {
-	t.pFilter.AwaitSet(Equal(constants.LocalCIDRIPSet))
-	t.pFilter.AwaitSet(Equal(constants.RemoteCIDRIPSet))
+	t.pFilter.AwaitSet(Equal(mtu.LocalCIDRIPSetIPv4))
+	t.pFilter.AwaitSet(Equal(mtu.RemoteCIDRIPSetIPv4))
 	t.pFilter.EnsureNoRule(t.tableType, constants.SmPostRoutingMssChain,
 		ContainSubstring("\"ClampType\":%d", packetfilter.ToPMTU))
 
-	Expect(t.handler.LocalEndpointCreated(newSubmEndpoint([]string{"172.1.0.0/24"}))).To(Succeed())
+	Expect(t.handler.LocalEndpointCreated(newSubmEndpoint([]string{localIPv4Subnet1}))).To(Succeed())
 
 	t.pFilter.AwaitRule(t.tableType,
 		constants.SmPostRoutingMssChain, And(
 			ContainSubstring("\"ClampType\":%d", packetfilter.ToValue),
-			ContainSubstring("\"SrcSetName\":%q", constants.RemoteCIDRIPSet),
-			ContainSubstring("\"DestSetName\":%q", constants.LocalCIDRIPSet),
+			ContainSubstring("\"SrcSetName\":%q", mtu.RemoteCIDRIPSetIPv4),
+			ContainSubstring("\"DestSetName\":%q", mtu.LocalCIDRIPSetIPv4),
 			ContainSubstring("\"MssValue\":%q", strconv.Itoa(expTCPMssValue))))
 	t.pFilter.AwaitRule(t.tableType,
 		constants.SmPostRoutingMssChain, And(
 			ContainSubstring("\"ClampType\":%d", packetfilter.ToValue),
-			ContainSubstring("\"SrcSetName\":%q", constants.LocalCIDRIPSet),
-			ContainSubstring("\"DestSetName\":%q", constants.RemoteCIDRIPSet),
+			ContainSubstring("\"SrcSetName\":%q", mtu.LocalCIDRIPSetIPv4),
+			ContainSubstring("\"DestSetName\":%q", mtu.RemoteCIDRIPSetIPv4),
 			ContainSubstring("\"MssValue\":%q", strconv.Itoa(expTCPMssValue))))
+}
+
+func (t *testDriver) testHandler(localCIDR, localCIDRIPSet, remoteCIDRIPSet string, localSubnets, remoteSubnets []string) {
+	Specify("Init should add expected IP sets and table rules", func() {
+		t.pFilter.AwaitSet(Equal(localCIDRIPSet))
+		t.pFilter.AwaitSet(Equal(remoteCIDRIPSet))
+
+		t.pFilter.AwaitRule(t.tableType,
+			constants.SmPostRoutingMssChain, And(
+				ContainSubstring("\"ClampType\":%d", packetfilter.ToPMTU),
+				ContainSubstring("\"SrcSetName\":%q", remoteCIDRIPSet),
+				ContainSubstring("\"DestSetName\":%q", localCIDRIPSet)))
+		t.pFilter.AwaitRule(t.tableType,
+			constants.SmPostRoutingMssChain, And(
+				ContainSubstring("\"ClampType\":%d", packetfilter.ToPMTU),
+				ContainSubstring("\"SrcSetName\":%q", localCIDRIPSet),
+				ContainSubstring("\"DestSetName\":%q", remoteCIDRIPSet)))
+	})
+
+	When("a local Endpoint is added and removed", func() {
+		It("should add and remove IP set entries", func() {
+			localEndpoint := newSubmEndpoint([]string{localIPv4Subnet1, localIPv6Subnet1, localIPv4Subnet2, localIPv6Subnet2})
+			Expect(t.handler.LocalEndpointCreated(localEndpoint)).To(Succeed())
+
+			for _, subnet := range localSubnets {
+				t.pFilter.AwaitEntry(localCIDRIPSet, subnet)
+			}
+
+			t.pFilter.AwaitEntry(localCIDRIPSet, localCIDR)
+
+			Expect(t.handler.LocalEndpointRemoved(localEndpoint)).To(Succeed())
+
+			for _, subnet := range localEndpoint.Spec.Subnets {
+				t.pFilter.AwaitNoEntry(localCIDRIPSet, subnet)
+			}
+
+			t.pFilter.AwaitNoEntry(localCIDRIPSet, localCIDR)
+		})
+	})
+
+	When("a remote Endpoint is added and removed", func() {
+		It("should add and remove IP set entries", func() {
+			remoteEndpoint := newSubmEndpoint([]string{remoteIPv4Subnet1, remoteIPv4Subnet2, remoteIPv6Subnet1, remoteIPv6Subnet2})
+			Expect(t.handler.RemoteEndpointCreated(remoteEndpoint)).To(Succeed())
+
+			for _, subnet := range remoteSubnets {
+				t.pFilter.AwaitEntry(remoteCIDRIPSet, subnet)
+			}
+
+			Expect(t.handler.RemoteEndpointRemoved(remoteEndpoint)).To(Succeed())
+
+			for _, subnet := range remoteEndpoint.Spec.Subnets {
+				t.pFilter.AwaitNoEntry(remoteCIDRIPSet, subnet)
+			}
+		})
+	})
+
+	Specify("Uninstall should remove IP sets and chains", func() {
+		Expect(t.handler.Uninstall()).To(Succeed())
+
+		t.pFilter.AwaitSetDeleted(localCIDRIPSet)
+		t.pFilter.AwaitSetDeleted(remoteCIDRIPSet)
+		t.pFilter.AwaitNoIPHookChain(packetfilter.ChainTypeRoute, Equal(constants.SmPostRoutingMssChain))
+	})
+
+	Specify("GetName should include the IP family", func() {
+		Expect(t.handler.GetName()).To(ContainSubstring(string(t.ipFamily)))
+	})
 }
 
 func newSubmEndpoint(subnets []string) *submV1.Endpoint {

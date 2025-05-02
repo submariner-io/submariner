@@ -126,7 +126,7 @@ var _ = Describe("", func() {
 		ngwRouteHandler := ovn.NewNonGatewayRouteHandler(submClient, ovn.NewTransitSwitchIP())
 		Expect(ngwRouteHandler.Init(ctx)).To(Succeed())
 
-		mtuHandler := mtu.NewMTUHandler(localClusterCIDRs, false, 0)
+		mtuHandler := mtu.NewHandler(k8snet.IPv4, localClusterCIDRs, false, 0)
 		Expect(mtuHandler.Init(ctx)).To(Succeed())
 
 		calicoHandler := calico.NewCalicoIPPoolHandler(nil, testing.Namespace, k8sClient)

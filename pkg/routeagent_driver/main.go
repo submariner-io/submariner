@@ -135,11 +135,11 @@ func main() {
 	localNode, err := node.GetLocalNode(ctx, k8sClientSet)
 	logger.FatalOnError(err, "Error getting information on the local node")
 
-	// Max size of handlers is numBaseHandlers (=8) + max IP families(2) for kp sync handler.
-	handlers := make([]event.Handler, 0, 10)
+	var handlers []event.Handler //nolint:prealloc // Ignore
 
 	for _, family := range cidr.ExtractIPFamilies(env.ClusterCidr) {
-		handlers = append(handlers, kubeproxy.NewSyncHandler(family, env.ClusterCidr, env.ServiceCidr))
+		handlers = append(handlers, kubeproxy.NewSyncHandler(family, env.ClusterCidr, env.ServiceCidr),
+			mtu.NewHandler(family, env.ClusterCidr, len(env.GlobalCidr) != 0, getTCPMssValue(localNode)))
 	}
 
 	handlers = append(handlers,
@@ -157,7 +157,6 @@ func main() {
 		ovn.NewNonGatewayRouteHandler(smClientset, transitSwitchIP),
 		cabledriver.NewXRFMCleanupHandler(),
 		cabledriver.NewVXLANCleanup(),
-		mtu.NewMTUHandler(env.ClusterCidr, len(env.GlobalCidr) != 0, getTCPMssValue(localNode)),
 		calico.NewCalicoIPPoolHandler(cfg, env.Namespace, k8sClientSet),
 		healthchecker.New(&healthchecker.Config{
 			ControllerConfig: pinger.ControllerConfig{
