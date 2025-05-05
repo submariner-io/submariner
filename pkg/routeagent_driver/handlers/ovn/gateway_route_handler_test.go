@@ -28,13 +28,14 @@ import (
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event/testing"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
+	k8snet "k8s.io/utils/net"
 )
 
 var _ = Describe("GatewayRouteHandler", func() {
 	t := newTestDriver()
 
 	JustBeforeEach(func() {
-		t.Start(ovn.NewGatewayRouteHandler(t.submClient))
+		t.Start(ovn.NewGatewayRouteHandler(k8snet.IPv4, t.submClient))
 	})
 
 	awaitGatewayRoute := func(ep *submarinerv1.Endpoint) {

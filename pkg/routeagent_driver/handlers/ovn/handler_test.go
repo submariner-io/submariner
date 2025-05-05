@@ -39,6 +39,7 @@ import (
 	"github.com/vishvananda/netlink"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
 
@@ -84,7 +85,7 @@ var _ = Describe("Handler", func() {
 
 		transitSwitchIP = ovn.NewTransitSwitchIP()
 
-		t.Start(ovn.NewHandler(&ovn.HandlerConfig{
+		t.Start(ovn.NewHandler(k8snet.IPv4, &ovn.HandlerConfig{
 			Namespace:   testing.Namespace,
 			ClusterCIDR: []string{clusterCIDR},
 			ServiceCIDR: []string{serviceCIDR},

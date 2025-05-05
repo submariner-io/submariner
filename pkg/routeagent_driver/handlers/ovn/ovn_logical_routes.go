@@ -27,6 +27,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/submariner/pkg/versions"
 	"k8s.io/apimachinery/pkg/util/sets"
+	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
 
@@ -82,30 +83,36 @@ func buildLRSRsFromSubnets(subnetsToAdd []string, nextHop string) []*nbdb.Logica
 }
 
 func (c *ConnectionHandler) reconcileSubOvnLogicalRouterPolicies(remoteSubnets sets.Set[string], nextHop string) error {
-	lrpStalePredicate := func(item *nbdb.LogicalRouterPolicy) bool {
-		subnet := strings.Split(item.Match, " ")[2]
+	expectedLRPs := buildLRPsFromSubnets(c.ipFamily, remoteSubnets.UnsortedList(), nextHop)
 
-		return item.Priority == ovnRoutePoliciesPrio && (!remoteSubnets.Has(subnet) || !reflect.DeepEqual(item.Nexthop, &nextHop))
+	lrpStalePredicate := func(item *nbdb.LogicalRouterPolicy) bool {
+		if item.Priority != ovnRoutePoliciesPrio {
+			return false
+		}
+
+		parts := strings.Split(item.Match, " ")
+		if len(parts) < 3 {
+			return false
+		}
+
+		subnet := parts[2]
+
+		return !remoteSubnets.Has(subnet) || !reflect.DeepEqual(item.Nexthop, &nextHop)
 	}
 
 	// Cleanup any existing lrps not representing the correct set of remote subnets
-	err := libovsdbops.DeleteLogicalRouterPoliciesWithPredicate(c.nbdb, OVNClusterRouter, lrpStalePredicate)
-	if err != nil {
+	if err := libovsdbops.DeleteLogicalRouterPoliciesWithPredicate(c.nbdb, OVNClusterRouter, lrpStalePredicate); err != nil {
 		return errors.Wrapf(err, "failed to delete stale submariner logical route policies")
 	}
 
-	expectedLRPs := buildLRPsFromSubnets(remoteSubnets.UnsortedList(), nextHop)
-
 	for _, lrp := range expectedLRPs {
 		lrpSubPredicate := func(item *nbdb.LogicalRouterPolicy) bool {
-			subnet1 := strings.Split(item.Match, " ")[2]
-			subnet2 := strings.Split(lrp.Match, " ")[2]
-
-			return item.Priority == ovnRoutePoliciesPrio && subnet1 == subnet2
+			return item.Priority == lrp.Priority &&
+				item.Match == lrp.Match &&
+				reflect.DeepEqual(item.Nexthop, lrp.Nexthop)
 		}
 
-		if err := libovsdbops.CreateOrUpdateLogicalRouterPolicyWithPredicate(c.nbdb,
-			OVNClusterRouter, lrp, lrpSubPredicate); err != nil {
+		if err := libovsdbops.CreateOrUpdateLogicalRouterPolicyWithPredicate(c.nbdb, OVNClusterRouter, lrp, lrpSubPredicate); err != nil {
 			return errors.Wrapf(err, "failed to create submariner logical Router policy %v and add it to the ovn cluster router", lrp)
 		}
 	}
@@ -116,14 +123,24 @@ func (c *ConnectionHandler) reconcileSubOvnLogicalRouterPolicies(remoteSubnets s
 // getNorthSubnetsToAddAndRemove receives the existing state for the north (other clusters) routes in the OVN
 // database, and based on the known remote endpoints it will return the elements that need
 // to be added and removed.
-func buildLRPsFromSubnets(subnetsToAdd []string, nextHop string) []*nbdb.LogicalRouterPolicy {
-	toAdd := []*nbdb.LogicalRouterPolicy{}
+func buildLRPsFromSubnets(family k8snet.IPFamily, subnetsToAdd []string, nextHop string) []*nbdb.LogicalRouterPolicy {
+	toAdd := make([]*nbdb.LogicalRouterPolicy, 0, len(subnetsToAdd))
+
+	var ipMatchField string
+
+	if family == k8snet.IPv6 {
+		ipMatchField = "ip6.dst"
+	} else {
+		ipMatchField = "ip4.dst"
+	}
 
 	for _, subnet := range subnetsToAdd {
+		match := ipMatchField + " == " + subnet
+
 		toAdd = append(toAdd, &nbdb.LogicalRouterPolicy{
 			Priority: ovnRoutePoliciesPrio,
 			Action:   "reroute",
-			Match:    "ip4.dst == " + subnet,
+			Match:    match,
 			Nexthop:  ptr.To(nextHop),
 			ExternalIDs: map[string]string{
 				"submariner": versions.Submariner(),

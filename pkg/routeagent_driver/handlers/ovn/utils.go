@@ -28,7 +28,7 @@ import (
 	k8snet "k8s.io/utils/net"
 )
 
-func getNextHopOnK8sMgmtIntf() (string, error) {
+func getNextHopOnK8sMgmtIntf(family k8snet.IPFamily) (string, error) {
 	netLink := subMNetLink.New()
 
 	link, err := netLink.LinkByName(OVNK8sMgmntIntfName)
@@ -36,9 +36,9 @@ func getNextHopOnK8sMgmtIntf() (string, error) {
 		return "", errors.Wrapf(err, "failed to retrieve link by name %q", OVNK8sMgmntIntfName)
 	}
 
-	addrs, err := netLink.AddrList(link, k8snet.IPv4)
-	if err != nil || len(addrs) == 0 {
-		return "", errors.Wrapf(err, "failed to retrieve addresses for link")
+	addrs, err := netLink.AddrList(link, family)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to retrieve %v addresses for link %q", family, OVNK8sMgmntIntfName)
 	}
 
 	for _, addr := range addrs {
@@ -47,7 +47,7 @@ func getNextHopOnK8sMgmtIntf() (string, error) {
 		}
 	}
 
-	return "", nil
+	return "", errors.Errorf("no %v address found on interface %q", family, OVNK8sMgmntIntfName)
 }
 
 func jsonToIP(jsonData string) (string, error) {
