@@ -23,8 +23,6 @@ RUN /dnf_install -a ${TARGETPLATFORM} -v ${FEDORA_VERSION} -r /output/route-agen
     glibc bash glibc-minimal-langpack coreutils-single \
     iproute iptables-legacy iptables-nft nftables ipset openvswitch procps-ng grep
 
-RUN ln -sf /usr/sbin/ip6tables-nft /usr/sbin/ip6tables
-
 FROM scratch
 ARG SOURCE
 ARG TARGETPLATFORM
