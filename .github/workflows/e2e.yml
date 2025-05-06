@@ -55,6 +55,7 @@ jobs:
         include:
           - extra-toggles: dual-stack
           - extra-toggles: dual-stack, globalnet
+          - extra-toggles: ipv6-stack
           - extra-toggles: nftables
           - extra-toggles: nftables, ovn
           - extra-toggles: nftables, globalnet
