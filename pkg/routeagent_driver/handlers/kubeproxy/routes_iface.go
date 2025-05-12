@@ -24,6 +24,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
@@ -158,7 +159,7 @@ func (kp *SyncHandler) cleanVxSubmarinerRoutes() {
 	// This must be called with kp.syncHandlerMutex held
 	link, err := kp.netLink.LinkByName(kp.vxlanIface)
 	if err != nil {
-		if !errors.Is(err, netlink.LinkNotFoundError{}) {
+		if !netlinkAPI.IsLinkNotFoundError(err) {
 			logger.Errorf(err, "Error retrieving link by name %q", kp.vxlanIface)
 		}
 

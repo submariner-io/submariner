@@ -307,9 +307,8 @@ func DeleteIfaceAndAssociatedRoutes(iface string, tableID int) error {
 
 	link, err := n.LinkByName(iface)
 	if err != nil {
-		//nolint:errorlint // netlink.LinkNotFoundError does not implement method Is(error) bool
-		if _, ok := err.(netlink.LinkNotFoundError); !ok {
-			logger.Warningf("Failed to retrieve the vxlan-tunnel interface: %v", err)
+		if !IsLinkNotFoundError(err) {
+			logger.Warningf("Failed to retrieve link %q: %v", iface, err)
 		}
 
 		return nil
@@ -389,4 +388,8 @@ func ToNetlinkFamily(family k8snet.IPFamily) int {
 	}
 
 	return netlink.FAMILY_ALL
+}
+
+func IsLinkNotFoundError(err error) bool {
+	return errors.As(err, &netlink.LinkNotFoundError{}) || (err != nil && err.Error() == "Link not found")
 }
