@@ -132,14 +132,14 @@ func newTestDriver() *testDriver {
 	})
 
 	JustBeforeEach(func() {
-		_, cidr, err := net.ParseCIDR(t.hostInterfaceAddr)
+		_, hostCidr, err := net.ParseCIDR(t.hostInterfaceAddr)
 		Expect(err).NotTo(HaveOccurred())
 
 		t.netLink.SetupDefaultGateway(t.ipFamily, net.Interface{
 			Index: hostInterfaceIndex,
 			MTU:   hostInterfaceMTU,
 			Name:  "gw-intf",
-		}, cidr)
+		}, hostCidr)
 
 		t.netLink.SetAllowedIPFamilies(t.ipFamily)
 
@@ -185,13 +185,13 @@ func (t *testDriver) verifyRemoteSubnetIPTableRules() {
 	}
 }
 
-func (t *testDriver) addVxLANRoute(cidr string) {
+func (t *testDriver) addVxLANRoute(destCidr string) {
 	_, err := vxlan.NewInterface(&vxlan.Attributes{
 		Name: kubeproxy.GetVxLANInterfaceName(k8snet.IPv4),
 	}, t.netLink)
 	Expect(err).To(Succeed())
 
-	_, dst, err := net.ParseCIDR(cidr)
+	_, dst, err := net.ParseCIDR(destCidr)
 	Expect(err).To(Succeed())
 
 	err = t.netLink.RouteAdd(&netlink.Route{

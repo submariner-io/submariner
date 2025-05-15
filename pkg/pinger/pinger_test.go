@@ -67,7 +67,7 @@ var _ = Describe("Pinger", func() {
 				var errNo syscall.Errno
 				if errors.As(err, &errNo) {
 					// errNo 1 is "operation not permitted".
-					return !(opErr.Op == "listen" && sysCallErr.Syscall == "socket" && errNo == 1)
+					return opErr.Op != "listen" || sysCallErr.Syscall != "socket" || errNo != 1
 				}
 			}
 		}

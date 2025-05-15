@@ -40,7 +40,6 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-//nolint:revive // Ignore "unexported-return:... which can be annoying to use"; it's only used by unit tests.
 func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool) (*globalIngressIPController, error) {
 	// We'll panic if config is nil, this is intentional
 	var err error

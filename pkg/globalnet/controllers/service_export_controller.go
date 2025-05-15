@@ -33,7 +33,6 @@ import (
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-//nolint:revive // Ignore "unexported-return:... which can be annoying to use"; it's only used by unit tests.
 func NewServiceExportController(config *syncer.ResourceSyncerConfig, podControllers *IngressPodControllers,
 	endpointsControllers *ServiceExportEndpointsControllers,
 	ingressEndpointsControllers *IngressEndpointsControllers,

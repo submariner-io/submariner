@@ -72,9 +72,9 @@ func New(config *Config) (Interface, error) {
 }
 
 func (h *controller) GetLatencyInfo(endpoint *submarinerv1.EndpointSpec, ipFamily k8snet.IPFamily) *pinger.LatencyInfo {
-	pinger := h.pingerController.Get(endpoint, ipFamily)
-	if pinger != nil {
-		return pinger.GetLatencyInfo()
+	endpointPinger := h.pingerController.Get(endpoint, ipFamily)
+	if endpointPinger != nil {
+		return endpointPinger.GetLatencyInfo()
 	}
 
 	return nil

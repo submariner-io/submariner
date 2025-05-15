@@ -189,11 +189,11 @@ func (ep *EndpointSpec) ParseSubnets(family k8snet.IPFamily) []net.IPNet {
 	var subnets []net.IPNet
 
 	for i := range ep.Subnets {
-		_, cidr, err := net.ParseCIDR(ep.Subnets[i])
+		_, subnetCidr, err := net.ParseCIDR(ep.Subnets[i])
 		utilruntime.Must(err)
 
-		if k8snet.IPFamilyOfCIDR(cidr) == family {
-			subnets = append(subnets, *cidr)
+		if k8snet.IPFamilyOfCIDR(subnetCidr) == family {
+			subnets = append(subnets, *subnetCidr)
 		}
 	}
 

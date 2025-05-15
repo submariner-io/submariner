@@ -1,53 +1,75 @@
 ---
-linters-settings:
-  depguard:
-    rules:
-      # Importing WireGuard breaks downstream projects, we mustn't use it in exported packages
-      wireguard:
-        list-mode: lax
-        files:
-          - "**/test/**/*.go"
-        deny:
-          - pkg: github.com/submariner-io/submariner/pkg/cable/wireguard
-            desc: Breaks Windows builds
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - opinionated
-      - performance
-      - style
-    disabled-checks:
-      - ifElseChain
-      - unnamedResult
-  gocyclo:
-    min-complexity: 15
-  goheader:
-    template: |-
-      SPDX-License-Identifier: Apache-2.0
-
-      Copyright Contributors to the Submariner project.
-
-      Licensed under the Apache License, Version 2.0 (the "License");
-      you may not use this file except in compliance with the License.
-      You may obtain a copy of the License at
-
-      http://www.apache.org/licenses/LICENSE-2.0
-
-      Unless required by applicable law or agreed to in writing, software
-      distributed under the License is distributed on an "AS IS" BASIS,
-      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-      See the License for the specific language governing permissions and
-      limitations under the License.
-  govet:
-    enable:
-      - fieldalignment
-  lll:
-    line-length: 140
-  wsl:
-    # Separating explicit var declarations by blank lines seems excessive.
-    allow-cuddle-declarations: true
+version: "2"
 linters:
-  disable-all: true
+  default: none
+  settings:
+    depguard:
+      rules:
+        wireguard:
+          list-mode: lax
+          files:
+            - '**/test/**/*.go'
+          deny:
+            - pkg: github.com/submariner-io/submariner/pkg/cable/wireguard
+              desc: Breaks Windows builds
+    gocritic:
+      disabled-checks:
+        - ifElseChain
+        - unnamedResult
+      enabled-tags:
+        - diagnostic
+        - opinionated
+        - performance
+        - style
+    gocyclo:
+      min-complexity: 15
+    goheader:
+      template: |-
+        SPDX-License-Identifier: Apache-2.0
+
+        Copyright Contributors to the Submariner project.
+
+        Licensed under the Apache License, Version 2.0 (the "License");
+        you may not use this file except in compliance with the License.
+        You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+        Unless required by applicable law or agreed to in writing, software
+        distributed under the License is distributed on an "AS IS" BASIS,
+        WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+        See the License for the specific language governing permissions and
+        limitations under the License.
+    govet:
+      enable:
+        - fieldalignment
+    lll:
+      line-length: 140
+    revive:
+      rules:
+        - name: dot-imports
+          arguments:
+            - allowed-packages: ["github.com/onsi/ginkgo/v2", "github.com/onsi/gomega", "github.com/submariner-io/admiral/pkg/gomega"]
+    staticcheck:
+      dot-import-whitelist:
+        - github.com/onsi/ginkgo/v2
+        - github.com/onsi/gomega
+      checks:
+        # Defaults
+        - all
+        - -ST1000
+        - -ST1003
+        - -ST1016
+        - -ST1020
+        - -ST1021
+        - -ST1022
+        # Allow if/else constructs that could be switches
+        - -QF1003
+        # Allow unnecessary embedded field selectors
+        - -QF1008
+    wsl:
+      # Separating explicit var declarations by blank lines seems excessive.
+      allow-cuddle-declarations: true
   enable:
     - asasalint
     - asciicheck
@@ -64,43 +86,38 @@ linters:
     - dupl
     - dupword
     - durationcheck
+    - err113
     - errcheck
     - errchkjson
-    - errorlint
     - errname
-    # - execinquery # No SQL
+    - errorlint
     - exhaustive
-    - exptostd
     # - exhaustruct # This is too cumbersome as it requires all string, int, pointer et al fields to be initialized even when the
     # type's default suffices, which is most of the time
+    - exptostd
     - fatcontext
     # - forbidigo # We don't forbid any statements
     # - forcetypeassert # There are many unchecked type assertions that would be the result of a programming error so the
     #                     reasonable recourse would be to panic anyway if checked so this doesn't seem useful
+    # - funcorder # TODO Evaluate whether this is worth it
     # - funlen # gocyclo is enabled which is generally a better metric than simply LOC.
-    - gci
     - ginkgolinter
     - gocheckcompilerdirectives
     # - gochecknoglobals # We don't want to forbid global variable constants
     # - gochecknoinits # We use init functions for valid reasons
-    # - gochecksumtype # The usefulness is very narrow:w
+    # - gochecksumtype # The usefulness is very narrow
     - gocognit
     - goconst
     - gocritic
     - gocyclo
-    - err113
     - godot
     # - godox #  Let's not forbid inline TODOs, FIXMEs et al
-    - gofmt
-    - gofumpt
     - goheader
-    - goimports
     # - gomoddirectives # We don't want to forbid the 'replace' directive
     # - gomodguard # We don't block any modules
     # - goprintffuncname # This doesn't seem useful at all
-    # - gosmopolitan # This is related to internationalization which is not a concern for us
     - gosec
-    - gosimple
+    # - gosmopolitan # This is related to internationalization which is not a concern for us
     - govet
     - grouper
     - iface
@@ -118,6 +135,7 @@ linters:
     - mirror
     - misspell
     # - mnd # It doesn't seem useful in general to enforce constants for all numeric values
+    # - musttag # TODO This requires tagging JSON structs
     - nakedret
     # - nestif # This calculates cognitive complexity but we're doing that elsewhere
     - nilerr
@@ -142,16 +160,13 @@ linters:
     # - spancheck # We don't use OpenTelemetry/OpenCensus
     # - sqlclosecheck # We don't use SQL
     - staticcheck
-    - stylecheck
     - tagalign
     # - tagliatelle # Inconsistent with stylecheck and not as good
-    # - tenv # Not relevant for our Ginkgo UTs
     # - testableexamples # We don't need this
     # - testifylint # We don't use testify
     - testpackage
     # - thelper # Not relevant for our Ginkgo UTs
     # - tparallel # Not relevant for our Ginkgo UTs
-    - typecheck
     - unconvert
     - unparam
     - unused
@@ -163,43 +178,48 @@ linters:
     - wrapcheck
     - wsl
     # - zerologlint # We use zerolog indirectly so this isn't needed
-issues:
-  exclude-rules:
-    # Allow dot-imports for Gomega BDD directives per idiomatic Gomega
-    - linters:
-        - revive
-        - stylecheck
-      text: "dot imports"
-      source: "gomega"
-
-    # Allow dot-imports for Ginkgo BDD directives per idiomatic Ginkgo
-    - linters:
-        - revive
-        - stylecheck
-      text: "dot imports"
-      source: "ginkgo"
-
-    # Ignore pointer bytes in struct alignment tests (this is a very
-    # minor optimisation)
-    - linters:
-        - govet
-      text: "pointer bytes could be"
-
-    # Full text of the error is "do not define dynamic errors, use wrapped static errors instead". See
-    # https://github.com/Djarvur/go-err113/issues/10 for an interesting discussion of this error. While there are cases
-    # where wrapped sentinel errors are useful, it seems a bit pedantic to force that pattern in all cases.
-    - linters:
-        - err113
-      text: "do not define dynamic errors"
-
-    # Ignore certain linters for test files
-    - path: _test\.go|test/|fake/
-      linters:
-        - gochecknoinits
-        - err113
-        - wrapcheck
-
-    # Ignore contextcheck on main for now
-    - path: main.go
-      linters:
-        - contextcheck
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      # Ignore pointer bytes in struct alignment tests (this is a very
+      # minor optimisation)
+      - linters:
+          - govet
+        text: pointer bytes could be
+      # Full text of the error is "do not define dynamic errors, use wrapped static errors instead". See
+      # https://github.com/Djarvur/go-err113/issues/10 for an interesting discussion of this error. While there are cases
+      # where wrapped sentinel errors are useful, it seems a bit pedantic to force that pattern in all cases.
+      - linters:
+          - err113
+        text: do not define dynamic errors
+      # Ignore certain linters for test files
+      - linters:
+          - err113
+          - gochecknoinits
+          - wrapcheck
+        path: _test\.go|test/|fake/
+      # Ignore contextcheck on main for now
+      - linters:
+          - contextcheck
+        path: main.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
