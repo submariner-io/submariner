@@ -246,6 +246,18 @@ var _ = Describe("GetLocalSpec", func() {
 				Expect(spec.HealthCheckIPs).To(ContainElements(cniInterfaceIPv4, cniInterfaceIPv6))
 				Expect(spec.HealthCheckIPs).To(HaveLen(2))
 			})
+
+			Context("and globalnet enabled", func() {
+				BeforeEach(func() {
+					submSpec.GlobalCidr = []string{"242.10.0.0/24"}
+				})
+
+				It("should set the IPv6 HealthCheckIP", func() {
+					spec, err := endpoint.GetLocalSpec(context.TODO(), submSpec, client, true)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(spec.HealthCheckIPs).To(Equal([]string{cniInterfaceIPv6}))
+				})
+			})
 		})
 
 		Context("and globalnet is enabled", func() {
