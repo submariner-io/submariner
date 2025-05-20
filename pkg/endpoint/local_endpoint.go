@@ -193,12 +193,16 @@ func GetLocalSpec(ctx context.Context, submSpec *types.SubmarinerSpecification, 
 		endpointSpec.SetPublicIP(publicIP)
 	}
 
-	if submSpec.HealthCheckEnabled && !globalnetEnabled {
+	if submSpec.HealthCheckEnabled {
 		// When globalnet is enabled, HealthCheckIP will be the globalIP assigned to the Active GatewayNode.
 		// In a fresh deployment, globalIP annotation for the node might take few seconds. So we listen on NodeEvents
 		// and update the endpoint HealthCheckIP (to globalIP) in datastoreSyncer at a later stage. This will trigger
 		// the HealthCheck between the clusters.
 		for _, family := range submSpec.GetIPFamilies() {
+			if globalnetEnabled && family == k8snet.IPv4 {
+				continue
+			}
+
 			healthcheckIP, err := getHealthCheckIP(family, submSpec)
 			if err != nil {
 				return nil, fmt.Errorf("error getting HealthCheckIPv%v: %w", family, err)
