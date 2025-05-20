@@ -41,7 +41,7 @@ var _ = PDescribe("[expansion] Test expanding/shrinking an existing cluster flee
 		Expect(gatewayNode).To(BeEmpty(), fmt.Sprintf("Expected no gateway node on %q", framework.ClusterC))
 
 		framework.By(fmt.Sprintf("Verifying that a pod in cluster %q cannot connect to a pod in cluster %q", clusterAName, clusterCName))
-		tcp.RunNoConnectivityTest(tcp.ConnectivityTestParams{
+		tcp.RunNoConnectivityTest(&tcp.ConnectivityTestParams{
 			Framework:             f,
 			FromCluster:           framework.ClusterA,
 			FromClusterScheduling: framework.GatewayNode,
@@ -50,7 +50,7 @@ var _ = PDescribe("[expansion] Test expanding/shrinking an existing cluster flee
 		})
 
 		framework.By(fmt.Sprintf("Verifying that a pod in cluster %q cannot connect to a service in cluster %q", clusterBName, clusterCName))
-		tcp.RunNoConnectivityTest(tcp.ConnectivityTestParams{
+		tcp.RunNoConnectivityTest(&tcp.ConnectivityTestParams{
 			Framework:             f,
 			ToEndpointType:        tcp.ServiceIP,
 			FromCluster:           framework.ClusterB,
@@ -69,7 +69,7 @@ var _ = PDescribe("[expansion] Test expanding/shrinking an existing cluster flee
 		framework.By(fmt.Sprintf("Found submariner gateway pod %q on %q", gatewayPod.Name, clusterCName))
 
 		framework.By("Checking connectivity between clusters")
-		tcp.RunConnectivityTest(tcp.ConnectivityTestParams{
+		tcp.RunConnectivityTest(&tcp.ConnectivityTestParams{
 			Framework:             f,
 			FromCluster:           framework.ClusterB,
 			FromClusterScheduling: framework.GatewayNode,
@@ -77,7 +77,7 @@ var _ = PDescribe("[expansion] Test expanding/shrinking an existing cluster flee
 			ToClusterScheduling:   framework.GatewayNode,
 		})
 
-		tcp.RunConnectivityTest(tcp.ConnectivityTestParams{
+		tcp.RunConnectivityTest(&tcp.ConnectivityTestParams{
 			Framework:             f,
 			ToEndpointType:        tcp.ServiceIP,
 			FromCluster:           framework.ClusterA,
@@ -92,7 +92,7 @@ var _ = PDescribe("[expansion] Test expanding/shrinking an existing cluster flee
 		f.DeletePod(framework.ClusterC, gatewayPod.Name, framework.TestContext.SubmarinerNamespace)
 
 		framework.By(fmt.Sprintf("Verifying that a pod in cluster %q cannot connect to a service in cluster %q", clusterAName, clusterCName))
-		tcp.RunNoConnectivityTest(tcp.ConnectivityTestParams{
+		tcp.RunNoConnectivityTest(&tcp.ConnectivityTestParams{
 			Framework:             f,
 			FromCluster:           framework.ClusterA,
 			FromClusterScheduling: framework.GatewayNode,
@@ -101,7 +101,7 @@ var _ = PDescribe("[expansion] Test expanding/shrinking an existing cluster flee
 		})
 
 		framework.By(fmt.Sprintf("Verifying that a pod in cluster %q cannot connect to a pod in cluster %q", clusterBName, clusterCName))
-		tcp.RunNoConnectivityTest(tcp.ConnectivityTestParams{
+		tcp.RunNoConnectivityTest(&tcp.ConnectivityTestParams{
 			Framework:             f,
 			ToEndpointType:        tcp.ServiceIP,
 			FromCluster:           framework.ClusterB,

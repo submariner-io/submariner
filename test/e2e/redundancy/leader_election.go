@@ -69,7 +69,7 @@ var _ = Describe("Leader election tests", func() {
 
 			f.AwaitGatewaysWithStatus(cluster, subv1.HAStatusPassive)
 
-			subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
+			subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
 				Framework:             f.Framework,
 				FromCluster:           framework.ClusterA,
 				FromClusterScheduling: framework.NonGatewayNode,
@@ -87,7 +87,7 @@ var _ = Describe("Leader election tests", func() {
 
 			f.AwaitGatewayWithStatus(cluster, gatewayPod.Spec.NodeName, subv1.HAStatusActive)
 
-			subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
+			subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
 				Framework:             f.Framework,
 				FromCluster:           framework.ClusterA,
 				FromClusterScheduling: framework.GatewayNode,

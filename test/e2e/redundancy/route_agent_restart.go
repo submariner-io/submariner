@@ -73,7 +73,7 @@ func testRouteAgentRestart(f *subFramework.Framework, onGateway bool) {
 	framework.By(fmt.Sprintf("Found new route agent pod %q on node %q", newRouteAgentPod.Name, node.Name))
 
 	framework.By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
-	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
+	subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
 		FromCluster:           framework.ClusterB,
 		FromClusterScheduling: framework.GatewayNode,
@@ -83,7 +83,7 @@ func testRouteAgentRestart(f *subFramework.Framework, onGateway bool) {
 	}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
 
 	framework.By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
-	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
+	subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
 		FromCluster:           framework.ClusterB,
 		FromClusterScheduling: framework.NonGatewayNode,

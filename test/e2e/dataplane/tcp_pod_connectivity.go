@@ -46,7 +46,7 @@ var _ = Describe("Basic TCP connectivity tests across clusters without discovery
 				return
 			}
 
-			tcp.RunConnectivityTest(tcp.ConnectivityTestParams{
+			tcp.RunConnectivityTest(&tcp.ConnectivityTestParams{
 				Framework:             f,
 				ToEndpointType:        toEndpointType,
 				Networking:            networking,

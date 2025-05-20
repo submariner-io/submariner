@@ -101,7 +101,7 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 
 	framework.By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", secondaryClusterName,
 		primaryClusterName))
-	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
+	subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
 		FromCluster:           secondaryCluster,
 		FromClusterScheduling: framework.GatewayNode,
@@ -117,7 +117,7 @@ func testGatewayPodRestartScenario(f *subFramework.Framework) {
 
 	framework.By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q",
 		secondaryClusterName, primaryClusterName))
-	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
+	subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
 		FromCluster:           secondaryCluster,
 		FromClusterScheduling: framework.NonGatewayNode,
@@ -214,7 +214,7 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 	f.AwaitSubmarinerEndpointRemoved(framework.ClusterIndex(secondaryCluster), submEndpoint.Name)
 
 	framework.By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
-	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
+	subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
 		FromCluster:           framework.ClusterIndex(secondaryCluster),
 		FromClusterScheduling: framework.GatewayNode,
@@ -229,7 +229,7 @@ func testGatewayFailOverScenario(f *subFramework.Framework) {
 	}
 
 	framework.By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
-	subFramework.VerifyDatapathConnectivity(tcp.ConnectivityTestParams{
+	subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
 		Framework:             f.Framework,
 		FromCluster:           framework.ClusterIndex(secondaryCluster),
 		FromClusterScheduling: framework.NonGatewayNode,
