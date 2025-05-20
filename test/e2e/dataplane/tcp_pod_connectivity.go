@@ -19,8 +19,6 @@ limitations under the License.
 package dataplane
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo/v2"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
@@ -49,138 +47,121 @@ func GetActualIPFamilies(fromType, toType framework.IPFamilyType) []k8snet.IPFam
 var _ = Describe("Basic TCP connectivity tests across clusters without discovery", Label(TestLabel), func() {
 	f := framework.NewFramework("dataplane-conn-nd")
 
-	var supportedFamilies []k8snet.IPFamily
+	var (
+		toEndpointType         tcp.EndpointType
+		networking             framework.NetworkingType
+		fromCluster, toCluster framework.ClusterIndex
+		supportedFamilies      []k8snet.IPFamily
+	)
 
 	BeforeEach(func() {
 		supportedFamilies = GetActualIPFamilies(f.DetermineIPFamilyType(framework.ClusterA), f.DetermineIPFamilyType(framework.ClusterB))
 	})
 
-	for _, fam := range []k8snet.IPFamily{k8snet.IPv4, k8snet.IPv6} {
-		family := fam
-
-		When(fmt.Sprintf("IPv%v connectivity used", family), func() {
-			var toEndpointType tcp.EndpointType
-			var networking framework.NetworkingType
-			var fromCluster, toCluster framework.ClusterIndex
-
-			BeforeEach(func() {
-				// Skip this family if it's not supported
-				skip := true
-				for _, f := range supportedFamilies {
-					if f == family {
-						skip = false
-						break
-					}
-				}
-				if skip {
-					Skip(fmt.Sprintf("IPv%v not supported in this environment", family))
-				}
-			})
-
-			verifyInteraction := func(fromClusterScheduling, toClusterScheduling framework.NetworkPodScheduling) {
-				It("should have sent the expected data from the pod to the other pod", func() {
-					if framework.TestContext.GlobalnetEnabled {
-						framework.Skipf("Globalnet enabled, skipping the test...")
-						return
-					}
-
-					if !subFramework.CanExecuteNonGatewayConnectivityTest(fromClusterScheduling, toClusterScheduling,
-						framework.ClusterA, framework.ClusterB) {
-						return
-					}
-
-					tcp.RunConnectivityTest(&tcp.ConnectivityTestParams{
-						Framework:             f,
-						ToEndpointType:        toEndpointType,
-						Networking:            networking,
-						FromCluster:           fromCluster,
-						FromClusterScheduling: fromClusterScheduling,
-						ToCluster:             toCluster,
-						ToClusterScheduling:   toClusterScheduling,
-						IPFamily:              family,
-					})
-				})
+	verifyInteraction := func(fromClusterScheduling, toClusterScheduling framework.NetworkPodScheduling) {
+		It("should have sent the expected data from the pod to the other pod", func() {
+			if framework.TestContext.GlobalnetEnabled {
+				framework.Skipf("Globalnet enabled, skipping the test...")
+				return
 			}
 
-			When("a pod connects via TCP to a remote pod", func() {
-				BeforeEach(func() {
-					toEndpointType = tcp.PodIP
-					networking = framework.PodNetworking
-					fromCluster = framework.ClusterA
-					toCluster = framework.ClusterB
-				})
+			if !subFramework.CanExecuteNonGatewayConnectivityTest(fromClusterScheduling, toClusterScheduling,
+				framework.ClusterA, framework.ClusterB) {
+				return
+			}
 
-				When("the pod is not on a gateway and the remote pod is not on a gateway", Label(framework.BasicTestLabel), func() {
-					verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode)
+			for _, ipFamily := range supportedFamilies {
+				tcp.RunConnectivityTest(&tcp.ConnectivityTestParams{
+					Framework:             f,
+					ToEndpointType:        toEndpointType,
+					Networking:            networking,
+					FromCluster:           fromCluster,
+					FromClusterScheduling: fromClusterScheduling,
+					ToCluster:             toCluster,
+					ToClusterScheduling:   toClusterScheduling,
+					IPFamily:              ipFamily,
 				})
-
-				When("the pod is not on a gateway and the remote pod is on a gateway", func() {
-					verifyInteraction(framework.NonGatewayNode, framework.GatewayNode)
-				})
-
-				When("the pod is on a gateway and the remote pod is not on a gateway", func() {
-					verifyInteraction(framework.GatewayNode, framework.NonGatewayNode)
-				})
-
-				When("the pod is on a gateway and the remote pod is on a gateway", Label(framework.BasicTestLabel), func() {
-					verifyInteraction(framework.GatewayNode, framework.GatewayNode)
-				})
-			})
-
-			When("a pod connects via TCP to a remote service", func() {
-				BeforeEach(func() {
-					toEndpointType = tcp.ServiceIP
-					networking = framework.PodNetworking
-					fromCluster = framework.ClusterA
-					toCluster = framework.ClusterB
-				})
-
-				When("the pod is not on a gateway and the remote service is not on a gateway", Label(framework.BasicTestLabel), func() {
-					verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode)
-				})
-
-				When("the pod is not on a gateway and the remote service is on a gateway", func() {
-					verifyInteraction(framework.NonGatewayNode, framework.GatewayNode)
-				})
-
-				When("the pod is on a gateway and the remote service is not on a gateway", func() {
-					verifyInteraction(framework.GatewayNode, framework.NonGatewayNode)
-				})
-
-				When("the pod is on a gateway and the remote service is on a gateway", Label(framework.BasicTestLabel), func() {
-					verifyInteraction(framework.GatewayNode, framework.GatewayNode)
-				})
-			})
-
-			When("a pod with HostNetworking connects via TCP to a remote pod", func() {
-				BeforeEach(func() {
-					toEndpointType = tcp.PodIP
-					networking = framework.HostNetworking
-					fromCluster = framework.ClusterA
-					toCluster = framework.ClusterB
-				})
-
-				When("the pod is not on a gateway and the remote pod is not on a gateway", func() {
-					verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode)
-				})
-
-				When("the pod is on a gateway and the remote pod is not on a gateway", func() {
-					verifyInteraction(framework.GatewayNode, framework.NonGatewayNode)
-				})
-			})
-
-			When("a pod connects via TCP to a remote pod in reverse direction", func() {
-				BeforeEach(func() {
-					toEndpointType = tcp.PodIP
-					networking = framework.PodNetworking
-					fromCluster = framework.ClusterB
-					toCluster = framework.ClusterA
-				})
-
-				When("the pod is not on a gateway and the remote pod is not on a gateway", func() {
-					verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode)
-				})
-			})
+			}
 		})
 	}
+
+	When("a pod connects via TCP to a remote pod", func() {
+		BeforeEach(func() {
+			toEndpointType = tcp.PodIP
+			networking = framework.PodNetworking
+			fromCluster = framework.ClusterA
+			toCluster = framework.ClusterB
+		})
+
+		When("the pod is not on a gateway and the remote pod is not on a gateway", Label(framework.BasicTestLabel), func() {
+			verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode)
+		})
+
+		When("the pod is not on a gateway and the remote pod is on a gateway", func() {
+			verifyInteraction(framework.NonGatewayNode, framework.GatewayNode)
+		})
+
+		When("the pod is on a gateway and the remote pod is not on a gateway", func() {
+			verifyInteraction(framework.GatewayNode, framework.NonGatewayNode)
+		})
+
+		When("the pod is on a gateway and the remote pod is on a gateway", Label(framework.BasicTestLabel), func() {
+			verifyInteraction(framework.GatewayNode, framework.GatewayNode)
+		})
+	})
+
+	When("a pod connects via TCP to a remote service", func() {
+		BeforeEach(func() {
+			toEndpointType = tcp.ServiceIP
+			networking = framework.PodNetworking
+			fromCluster = framework.ClusterA
+			toCluster = framework.ClusterB
+		})
+
+		When("the pod is not on a gateway and the remote service is not on a gateway", Label(framework.BasicTestLabel), func() {
+			verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode)
+		})
+
+		When("the pod is not on a gateway and the remote service is on a gateway", func() {
+			verifyInteraction(framework.NonGatewayNode, framework.GatewayNode)
+		})
+
+		When("the pod is on a gateway and the remote service is not on a gateway", func() {
+			verifyInteraction(framework.GatewayNode, framework.NonGatewayNode)
+		})
+
+		When("the pod is on a gateway and the remote service is on a gateway", Label(framework.BasicTestLabel), func() {
+			verifyInteraction(framework.GatewayNode, framework.GatewayNode)
+		})
+	})
+
+	When("a pod with HostNetworking connects via TCP to a remote pod", func() {
+		BeforeEach(func() {
+			toEndpointType = tcp.PodIP
+			networking = framework.HostNetworking
+			fromCluster = framework.ClusterA
+			toCluster = framework.ClusterB
+		})
+
+		When("the pod is not on a gateway and the remote pod is not on a gateway", func() {
+			verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode)
+		})
+
+		When("the pod is on a gateway and the remote pod is not on a gateway", func() {
+			verifyInteraction(framework.GatewayNode, framework.NonGatewayNode)
+		})
+	})
+
+	When("a pod connects via TCP to a remote pod in reverse direction", func() {
+		BeforeEach(func() {
+			toEndpointType = tcp.PodIP
+			networking = framework.PodNetworking
+			fromCluster = framework.ClusterB
+			toCluster = framework.ClusterA
+		})
+
+		When("the pod is not on a gateway and the remote pod is not on a gateway", func() {
+			verifyInteraction(framework.NonGatewayNode, framework.NonGatewayNode)
+		})
+	})
 })

@@ -50,30 +50,14 @@ var _ = Describe("Leader election tests", func() {
 		)
 	})
 
-	for _, family := range []k8snet.IPFamily{k8snet.IPv4, k8snet.IPv6} {
-		currentFamily := family
-
-		When(fmt.Sprintf("running leader election tests for IPv%v", currentFamily), func() {
-			BeforeEach(func() {
-				skip := true
-				for _, f := range supportedFamilies {
-					if f == family {
-						skip = false
-						break
-					}
-				}
-				if skip {
-					Skip(fmt.Sprintf("IPv%v not supported in this environment", currentFamily))
-				}
-			})
-			It("should re-acquire the leader lease after a failure is cleared", func() {
-				testLeaderElectionFailover(f, currentFamily)
-			})
+	When("renewal of the leader lease fails", func() {
+		It("should re-acquire the leader lease after the failure is cleared", func() {
+			testLeaderElectionFailover(f, supportedFamilies)
 		})
-	}
+	})
 })
 
-func testLeaderElectionFailover(f *subFramework.Framework, ipFamily k8snet.IPFamily) {
+func testLeaderElectionFailover(f *subFramework.Framework, supportedFamilies []k8snet.IPFamily) {
 	cluster := subFramework.FindClusterWithSingleGateway()
 	if cluster == -1 {
 		framework.Skipf("The test requires single gateway node in one of the test clusters...")
@@ -100,16 +84,18 @@ func testLeaderElectionFailover(f *subFramework.Framework, ipFamily k8snet.IPFam
 	framework.By(fmt.Sprintf("Ensure Gateway %q is updated to passive", gateway.Name))
 	f.AwaitGatewaysWithStatus(cluster, subv1.HAStatusPassive)
 
-	subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
-		Framework:             f.Framework,
-		FromCluster:           framework.ClusterA,
-		FromClusterScheduling: framework.NonGatewayNode,
-		ToCluster:             framework.ClusterB,
-		ToClusterScheduling:   framework.NonGatewayNode,
-		ToEndpointType:        defaultEndpointType(),
-		Networking:            framework.PodNetworking,
-		IPFamily:              ipFamily,
-	}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
+	for _, ipFamily := range supportedFamilies {
+		subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
+			Framework:             f.Framework,
+			FromCluster:           framework.ClusterA,
+			FromClusterScheduling: framework.NonGatewayNode,
+			ToCluster:             framework.ClusterB,
+			ToClusterScheduling:   framework.NonGatewayNode,
+			ToEndpointType:        defaultEndpointType(),
+			Networking:            framework.PodNetworking,
+			IPFamily:              ipFamily,
+		}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
+	}
 
 	framework.By("Updating submariner-gateway Role to add Lease update permission")
 	updateLeaseUpdatePermission(cluster, gateway.Namespace, slices.AppendIfNotPresent[string, string])
@@ -117,16 +103,18 @@ func testLeaderElectionFailover(f *subFramework.Framework, ipFamily k8snet.IPFam
 	framework.By(fmt.Sprintf("Ensure Gateway %q is updated to active", gateway.Name))
 	f.AwaitGatewayWithStatus(cluster, gatewayPod.Spec.NodeName, subv1.HAStatusActive)
 
-	subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
-		Framework:             f.Framework,
-		FromCluster:           framework.ClusterA,
-		FromClusterScheduling: framework.GatewayNode,
-		ToCluster:             framework.ClusterB,
-		ToClusterScheduling:   framework.GatewayNode,
-		ToEndpointType:        defaultEndpointType(),
-		Networking:            framework.PodNetworking,
-		IPFamily:              ipFamily,
-	}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
+	for _, ipFamily := range supportedFamilies {
+		subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
+			Framework:             f.Framework,
+			FromCluster:           framework.ClusterA,
+			FromClusterScheduling: framework.GatewayNode,
+			ToCluster:             framework.ClusterB,
+			ToClusterScheduling:   framework.GatewayNode,
+			ToEndpointType:        defaultEndpointType(),
+			Networking:            framework.PodNetworking,
+			IPFamily:              ipFamily,
+		}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
+	}
 
 	gatewayPod, err := framework.KubeClients[cluster].CoreV1().Pods(gatewayPod.Namespace).Get(context.Background(),
 		gatewayPod.Name, metav1.GetOptions{})

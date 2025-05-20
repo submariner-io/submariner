@@ -56,34 +56,20 @@ var _ = Describe("Gateway fail-over tests", Label(TestLabel), func() {
 
 	AfterEach(f.GatewayCleanup)
 
-	for _, family := range []k8snet.IPFamily{k8snet.IPv4, k8snet.IPv6} {
-		currentFamily := family
-
-		When(fmt.Sprintf("running failover tests for IPv%v", currentFamily), func() {
-			BeforeEach(func() {
-				skip := true
-				for _, f := range supportedFamilies {
-					if f == family {
-						skip = false
-						break
-					}
-				}
-				if skip {
-					Skip(fmt.Sprintf("IPv%v not supported in this environment", currentFamily))
-				}
-			})
-			It("runs the gateway pod restart scenario", func() {
-				testGatewayPodRestartScenario(f, currentFamily)
-			})
-
-			It("runs the gateway failover scenario", func() {
-				testGatewayFailOverScenario(f, currentFamily)
-			})
+	When("one gateway node is configured and the submariner gateway pod fails", func() {
+		It("should start a new submariner gateway pod and be able to connect from another cluster", func() {
+			testGatewayPodRestartScenario(f, supportedFamilies)
 		})
-	}
+	})
+
+	When("multiple gateway nodes are configured and fail-over is initiated", func() {
+		It("should activate the passive gateway and be able to connect from another cluster", func() {
+			testGatewayFailOverScenario(f, supportedFamilies)
+		})
+	})
 })
 
-func testGatewayPodRestartScenario(f *subFramework.Framework, ipFamily k8snet.IPFamily) {
+func testGatewayPodRestartScenario(f *subFramework.Framework, supportedFamilies []k8snet.IPFamily) {
 	framework.By(fmt.Sprintln("Sanity check - find a cluster with only one gateway node"))
 
 	primaryCluster := subFramework.FindClusterWithSingleGateway()
@@ -125,15 +111,18 @@ func testGatewayPodRestartScenario(f *subFramework.Framework, ipFamily k8snet.IP
 
 	framework.By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", secondaryClusterName,
 		primaryClusterName))
-	subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
-		Framework:             f.Framework,
-		FromCluster:           secondaryCluster,
-		FromClusterScheduling: framework.GatewayNode,
-		ToCluster:             primaryCluster,
-		ToClusterScheduling:   framework.GatewayNode,
-		ToEndpointType:        defaultEndpointType(),
-		IPFamily:              ipFamily,
-	}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
+
+	for _, ipFamily := range supportedFamilies {
+		subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
+			Framework:             f.Framework,
+			FromCluster:           secondaryCluster,
+			FromClusterScheduling: framework.GatewayNode,
+			ToCluster:             primaryCluster,
+			ToClusterScheduling:   framework.GatewayNode,
+			ToEndpointType:        defaultEndpointType(),
+			IPFamily:              ipFamily,
+		}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
+	}
 
 	if !subFramework.CanExecuteNonGatewayConnectivityTest(framework.NonGatewayNode, framework.NonGatewayNode,
 		secondaryCluster, primaryCluster) {
@@ -142,15 +131,18 @@ func testGatewayPodRestartScenario(f *subFramework.Framework, ipFamily k8snet.IP
 
 	framework.By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q",
 		secondaryClusterName, primaryClusterName))
-	subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
-		Framework:             f.Framework,
-		FromCluster:           secondaryCluster,
-		FromClusterScheduling: framework.NonGatewayNode,
-		ToCluster:             primaryCluster,
-		ToClusterScheduling:   framework.NonGatewayNode,
-		ToEndpointType:        defaultEndpointType(),
-		IPFamily:              ipFamily,
-	}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
+
+	for _, ipFamily := range supportedFamilies {
+		subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
+			Framework:             f.Framework,
+			FromCluster:           secondaryCluster,
+			FromClusterScheduling: framework.NonGatewayNode,
+			ToCluster:             primaryCluster,
+			ToClusterScheduling:   framework.NonGatewayNode,
+			ToEndpointType:        defaultEndpointType(),
+			IPFamily:              ipFamily,
+		}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
+	}
 }
 
 func AwaitNewSubmarinerGatewayPod(f *subFramework.Framework, cluster framework.ClusterIndex, prevPodUID types.UID) *v1.Pod {
@@ -190,7 +182,7 @@ func defaultEndpointType() tcp.EndpointType {
 	return tcp.PodIP
 }
 
-func testGatewayFailOverScenario(f *subFramework.Framework, ipFamily k8snet.IPFamily) {
+func testGatewayFailOverScenario(f *subFramework.Framework, supportedFamilies []k8snet.IPFamily) {
 	primaryCluster := f.FindClusterWithMultipleGateways()
 
 	if primaryCluster == -1 {
@@ -240,15 +232,18 @@ func testGatewayFailOverScenario(f *subFramework.Framework, ipFamily k8snet.IPFa
 	f.AwaitSubmarinerEndpointRemoved(framework.ClusterIndex(secondaryCluster), submEndpoint.Name)
 
 	framework.By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
-	subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
-		Framework:             f.Framework,
-		FromCluster:           framework.ClusterIndex(secondaryCluster),
-		FromClusterScheduling: framework.GatewayNode,
-		ToCluster:             framework.ClusterIndex(primaryCluster),
-		ToClusterScheduling:   framework.GatewayNode,
-		ToEndpointType:        defaultEndpointType(),
-		IPFamily:              ipFamily,
-	}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
+
+	for _, ipFamily := range supportedFamilies {
+		subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
+			Framework:             f.Framework,
+			FromCluster:           framework.ClusterIndex(secondaryCluster),
+			FromClusterScheduling: framework.GatewayNode,
+			ToCluster:             framework.ClusterIndex(primaryCluster),
+			ToClusterScheduling:   framework.GatewayNode,
+			ToEndpointType:        defaultEndpointType(),
+			IPFamily:              ipFamily,
+		}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
+	}
 
 	if !subFramework.CanExecuteNonGatewayConnectivityTest(framework.NonGatewayNode, framework.NonGatewayNode,
 		framework.ClusterIndex(secondaryCluster), framework.ClusterIndex(primaryCluster)) {
@@ -256,13 +251,16 @@ func testGatewayFailOverScenario(f *subFramework.Framework, ipFamily k8snet.IPFa
 	}
 
 	framework.By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
-	subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
-		Framework:             f.Framework,
-		FromCluster:           framework.ClusterIndex(secondaryCluster),
-		FromClusterScheduling: framework.NonGatewayNode,
-		ToCluster:             framework.ClusterIndex(primaryCluster),
-		ToClusterScheduling:   framework.NonGatewayNode,
-		ToEndpointType:        defaultEndpointType(),
-		IPFamily:              ipFamily,
-	}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
+
+	for _, ipFamily := range supportedFamilies {
+		subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
+			Framework:             f.Framework,
+			FromCluster:           framework.ClusterIndex(secondaryCluster),
+			FromClusterScheduling: framework.NonGatewayNode,
+			ToCluster:             framework.ClusterIndex(primaryCluster),
+			ToClusterScheduling:   framework.NonGatewayNode,
+			ToEndpointType:        defaultEndpointType(),
+			IPFamily:              ipFamily,
+		}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
+	}
 }
