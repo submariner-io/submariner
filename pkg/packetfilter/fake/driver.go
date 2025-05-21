@@ -19,13 +19,13 @@ limitations under the License.
 package fake
 
 import (
+	goerrors "errors"
 	"net"
 	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	k8snet "k8s.io/utils/net"
 )
 
@@ -107,12 +107,10 @@ func (d *driverImpl) DestroySets(nameFilter func(string) bool) error {
 }
 
 func (d *driverImpl) verifyRule(rule *packetfilter.Rule) error {
-	var errs []error
-
-	return utilerrors.NewAggregate(append(errs, verifyFamilyOf(rule.SrcCIDR, "SrcCIDR", d.family),
+	return goerrors.Join(verifyFamilyOf(rule.SrcCIDR, "SrcCIDR", d.family),
 		verifyFamilyOf(rule.DestCIDR, "DestCIDR", d.family),
 		verifyFamilyOf(rule.SnatCIDR, "SnatCIDR", d.family),
-		verifyFamilyOf(rule.DnatCIDR, "DnatCIDR", d.family)))
+		verifyFamilyOf(rule.DnatCIDR, "DnatCIDR", d.family))
 }
 
 func verifyFamilyOf(s, name string, expectedFamily k8snet.IPFamily) error {
@@ -122,10 +120,10 @@ func verifyFamilyOf(s, name string, expectedFamily k8snet.IPFamily) error {
 
 	ipRange := strings.Split(s, "-")
 	if len(ipRange) == 2 {
-		return utilerrors.NewAggregate([]error{
+		return goerrors.Join(
 			verifyFamilyOf(ipRange[0], name, expectedFamily),
 			verifyFamilyOf(ipRange[1], name, expectedFamily),
-		})
+		)
 	}
 
 	defer GinkgoRecover()

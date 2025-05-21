@@ -20,6 +20,7 @@ package calico
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"strings"
 
@@ -36,7 +37,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	errorutils "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	k8snet "k8s.io/utils/net"
@@ -128,7 +128,7 @@ func (h *calicoIPPoolHandler) TransitionToGateway() error {
 		}
 	}
 
-	return errorutils.NewAggregate(retErrors)
+	return goerrors.Join(retErrors...)
 }
 
 func (h *calicoIPPoolHandler) Uninstall() error {
@@ -182,7 +182,7 @@ func (h *calicoIPPoolHandler) createIPPool(endpoint *submV1.Endpoint) error {
 		}
 	}
 
-	return errorutils.NewAggregate(retErrors)
+	return goerrors.Join(retErrors...)
 }
 
 func (h *calicoIPPoolHandler) deleteIPPool(endpoint *submV1.Endpoint) error {
@@ -207,7 +207,7 @@ func (h *calicoIPPoolHandler) deleteIPPool(endpoint *submV1.Endpoint) error {
 		}
 	}
 
-	return errorutils.NewAggregate(retErrors)
+	return goerrors.Join(retErrors...)
 }
 
 func getEndpointSubnetIPPoolName(endpoint *submV1.Endpoint, subnet string) string {

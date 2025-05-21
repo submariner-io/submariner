@@ -20,10 +20,10 @@ package nftables
 
 import (
 	"context"
+	goerrors "errors"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/knftables"
@@ -139,7 +139,7 @@ func (p *packetFilter) DestroySets(nameFilter func(string) bool) error {
 		}
 	}
 
-	return utilerrors.NewAggregate(errs)
+	return goerrors.Join(errs...)
 }
 
 func deleteSet(nftables knftables.Interface, name string) error {

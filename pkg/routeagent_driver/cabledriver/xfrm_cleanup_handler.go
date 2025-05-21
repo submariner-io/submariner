@@ -19,9 +19,10 @@ limitations under the License.
 package cabledriver
 
 import (
+	"errors"
+
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/netlink"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	k8snet "k8s.io/utils/net"
 )
 
@@ -47,5 +48,5 @@ func (h *xrfmCleanup) TransitionToNonGateway() error {
 	errv6 := netlink.DeleteXfrmRules(k8snet.IPv6)
 	errv4 := netlink.DeleteXfrmRules(k8snet.IPv4)
 
-	return utilerrors.NewAggregate([]error{errv6, errv4})
+	return errors.Join(errv6, errv4)
 }
