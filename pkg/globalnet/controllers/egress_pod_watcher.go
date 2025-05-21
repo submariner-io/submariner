@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
+	k8snet "k8s.io/utils/net"
 )
 
 func startEgressPodWatcher(name, namespace string, namedSet packetfilter.NamedSet, config *watcher.Config,
@@ -87,7 +88,7 @@ func (w *egressPodWatcher) onCreateOrUpdate(obj runtime.Object, _ int) bool {
 	pod := obj.(*corev1.Pod)
 	key, _ := cache.MetaNamespaceKeyFunc(pod)
 
-	if pod.Status.PodIP == "" {
+	if !k8snet.IsIPv4String(pod.Status.PodIP) {
 		return false
 	}
 

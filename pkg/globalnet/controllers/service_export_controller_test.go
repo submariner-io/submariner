@@ -114,6 +114,33 @@ func testClusterIPService() {
 			t.awaitNoGlobalIngressIP(serviceName)
 		})
 	})
+
+	When("a dual-stack Service is exported", func() {
+		BeforeEach(func() {
+			service.Spec.IPFamilies = []corev1.IPFamily{corev1.IPv6Protocol, corev1.IPv4Protocol}
+			service.Spec.ClusterIPs = []string{ipv6IP, service.Spec.ClusterIP}
+
+			t.createServiceExport(t.createService(service))
+		})
+
+		It("should create a GlobalIngressIP", func() {
+			t.awaitGlobalIngressIP(service.Name)
+		})
+	})
+
+	When("an IPv6 Service is exported", func() {
+		BeforeEach(func() {
+			service.Spec.IPFamilies = []corev1.IPFamily{corev1.IPv6Protocol}
+			service.Spec.ClusterIP = ipv6IP
+			service.Spec.ClusterIPs = []string{ipv6IP}
+
+			t.createServiceExport(t.createService(service))
+		})
+
+		It("should not create a GlobalIngressIP", func() {
+			t.ensureNoGlobalIngressIP(service.Name)
+		})
+	})
 }
 
 func testHeadlessService() {

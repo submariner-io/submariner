@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
+	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/set"
 )
 
@@ -119,7 +120,7 @@ func (c *ingressPodController) process(from runtime.Object, _ int, op syncer.Ope
 		return ingressIP, false
 	}
 
-	if c.ingressIPMap.Has(ingressIP.Name) || pod.Status.PodIP == "" ||
+	if c.ingressIPMap.Has(ingressIP.Name) || !k8snet.IsIPv4String(pod.Status.PodIP) ||
 		(!c.publishNotReadyAddresses && pod.Status.Phase != corev1.PodRunning) {
 		// Avoid assigning ingressIPs to pods that are not ready with an endpoint IP
 		return nil, false
