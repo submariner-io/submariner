@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -31,6 +32,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/util"
 	submv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cidr"
 	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/node"
 	"github.com/submariner-io/submariner/pkg/port"
@@ -151,7 +153,8 @@ func GetLocalSpec(ctx context.Context, submSpec *types.SubmarinerSpecification, 
 	globalnetEnabled := false
 
 	if len(submSpec.GlobalCidr) > 0 {
-		localSubnets = submSpec.GlobalCidr
+		localSubnets = append(slices.Clone(submSpec.GlobalCidr),
+			cidr.ExtractSubnets(k8snet.IPv6, append(submSpec.ServiceCidr, submSpec.ClusterCidr...))...)
 		globalnetEnabled = true
 	} else {
 		localSubnets = append(localSubnets, submSpec.ServiceCidr...)

@@ -49,12 +49,14 @@ type ConnectionHandler struct {
 	k8sClientset  clientset.Interface
 	dynamicClient dynamic.Interface
 	nbdb          libovsdbclient.Client
+	ipFamily      net.IPFamily
 }
 
-func NewConnectionHandler(k8sClientset clientset.Interface, dynamicClient dynamic.Interface) *ConnectionHandler {
+func NewConnectionHandler(ipFamily net.IPFamily, k8sClientset clientset.Interface, dynamicClient dynamic.Interface) *ConnectionHandler {
 	return &ConnectionHandler{
 		k8sClientset:  k8sClientset,
 		dynamicClient: dynamicClient,
+		ipFamily:      ipFamily,
 	}
 }
 

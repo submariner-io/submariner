@@ -56,11 +56,17 @@ var _ = Describe("NonGatewayRouteHandler", func() {
 		})
 
 		It("should create/delete a NonGatewayRoute", func() {
-			endpoint := t.CreateEndpoint(testing.NewEndpoint("remote-cluster", "host", "193.0.4.0/24"))
-			awaitNonGatewayRoute(endpoint)
+			endpointV4 := t.CreateEndpoint(testing.NewEndpoint("remote-cluster-v4", "host", "193.0.4.0/24"))
+			endpointV6 := t.CreateEndpoint(testing.NewEndpoint("remote-cluster-v6", "host", "193.0.4.0/24", "fd00:abcd::/64"))
 
-			t.DeleteEndpoint(endpoint.Name)
-			test.AwaitNoResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace), endpoint.Spec.ClusterID)
+			awaitNonGatewayRoute(endpointV4)
+			awaitNonGatewayRoute(endpointV6)
+
+			t.DeleteEndpoint(endpointV4.Name)
+			t.DeleteEndpoint(endpointV6.Name)
+
+			test.AwaitNoResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace), endpointV4.Spec.ClusterID)
+			test.AwaitNoResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace), endpointV6.Spec.ClusterID)
 		})
 
 		Context("and the NonGatewayRoute operations initially fail", func() {

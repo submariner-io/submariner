@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"slices"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
@@ -120,15 +119,25 @@ func (ovn *Handler) getNextHopOnK8sMgmtIntf() (*net.IP, error) {
 		return nil, errors.Wrapf(err, "error retrieving link by name %q", OVNK8sMgmntIntfName)
 	}
 
-	currentRouteList, err := ovn.netLink.RouteList(link, k8snet.IPv4)
+	routes, err := ovn.netLink.RouteList(link, ovn.ipFamily)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error retrieving routes on the link %s", OVNK8sMgmntIntfName)
+		return nil, errors.Wrapf(err, "error retrieving IPv%v routes on link %s", ovn.ipFamily, OVNK8sMgmntIntfName)
 	}
 
-	for i := range currentRouteList {
-		logger.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])
+	parsedClusterCIDRs := make([]*net.IPNet, 0, len(ovn.ClusterCIDR))
 
-		if currentRouteList[i].Dst == nil || currentRouteList[i].Gw == nil {
+	for _, subnet := range ovn.ClusterCIDR {
+		_, cidrNet, err := net.ParseCIDR(subnet)
+		if err != nil {
+			logger.Error(err, "Failed to parse CIDR", "subnet", subnet)
+			continue
+		}
+
+		parsedClusterCIDRs = append(parsedClusterCIDRs, cidrNet)
+	}
+
+	for i := range routes {
+		if routes[i].Dst == nil {
 			continue
 		}
 
@@ -136,10 +145,24 @@ func (ovn *Handler) getNextHopOnK8sMgmtIntf() (*net.IP, error) {
 		// with nexthop matching the nexthop on the ovn-k8s-mp0 interface. Basically, we want the Submariner
 		// managed traffic to be forwarded to the ovn_cluster_router and pass through the CNI network so that
 		// it reaches the active gateway node in the cluster via the submariner pipeline.
-		if slices.Contains(ovn.ClusterCIDR, currentRouteList[i].Dst.String()) {
-			return &currentRouteList[i].Gw, nil
+		logger.V(log.TRACE).Info("Processing route", "Dst", routes[i].Dst.String(), "Gw", routes[i].Gw.String())
+
+		for _, cidrNet := range parsedClusterCIDRs {
+			if routes[i].Dst.String() == cidrNet.String() ||
+				cidrNet.Contains(routes[i].Dst.IP) ||
+				routes[i].Dst.Contains(cidrNet.IP) {
+				logger.V(log.TRACE).Info("Matched route", "Dst", routes[i].Dst.String(), "Gw", routes[i].Gw.String())
+
+				if routes[i].Gw != nil {
+					return &routes[i].Gw, nil
+				}
+
+				localIP := routes[i].Dst.IP
+
+				return &localIP, nil
+			}
 		}
 	}
 
-	return nil, fmt.Errorf("could not find the route to %v via %q", ovn.ClusterCIDR, OVNK8sMgmntIntfName)
+	return nil, fmt.Errorf("could not find the route to any of %v via %q", ovn.ClusterCIDR, OVNK8sMgmntIntfName)
 }

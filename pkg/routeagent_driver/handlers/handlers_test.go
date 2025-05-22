@@ -102,7 +102,7 @@ var _ = Describe("", func() {
 		kubeproxyHandler := kubeproxy.NewSyncHandler(k8snet.IPv4, localClusterCIDRs, localServiceCIDRs)
 		Expect(kubeproxyHandler.Init(ctx)).To(Succeed())
 
-		ovnHandler := ovn.NewHandler(&ovn.HandlerConfig{
+		ovnHandler := ovn.NewHandler(k8snet.IPv4, &ovn.HandlerConfig{
 			Namespace:   testing.Namespace,
 			ClusterCIDR: localClusterCIDRs,
 			ServiceCIDR: localServiceCIDRs,
@@ -120,7 +120,7 @@ var _ = Describe("", func() {
 		})
 		Expect(ovnHandler.Init(ctx)).To(Succeed())
 
-		gwRouteHandler := ovn.NewGatewayRouteHandler(submClient)
+		gwRouteHandler := ovn.NewGatewayRouteHandler(k8snet.IPv4, submClient)
 		Expect(gwRouteHandler.Init(ctx)).To(Succeed())
 
 		ngwRouteHandler := ovn.NewNonGatewayRouteHandler(submClient, ovn.NewTransitSwitchIP())
