@@ -30,24 +30,27 @@ import (
 	"github.com/submariner-io/submariner/pkg/event"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8snet "k8s.io/utils/net"
 )
 
 type GatewayRouteHandler struct {
 	event.HandlerBase
 	smClient  submarinerClientset.Interface
 	nextHopIP string
+	ipFamily  k8snet.IPFamily
 }
 
-func NewGatewayRouteHandler(smClientSet submarinerClientset.Interface) *GatewayRouteHandler {
+func NewGatewayRouteHandler(ipFamily k8snet.IPFamily, smClientSet submarinerClientset.Interface) *GatewayRouteHandler {
 	return &GatewayRouteHandler{
 		smClient: smClientSet,
+		ipFamily: ipFamily,
 	}
 }
 
 func (h *GatewayRouteHandler) Init(_ context.Context) error {
 	logger.Info("Starting GatewayRouteHandler")
 
-	nextHopIP, err := getNextHopOnK8sMgmtIntf()
+	nextHopIP, err := getNextHopOnK8sMgmtIntf(h.ipFamily)
 	if err != nil || nextHopIP == "" {
 		return errors.Wrapf(err, "error getting the ovn kubernetes management interface IP")
 	}

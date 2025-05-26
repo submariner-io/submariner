@@ -24,6 +24,7 @@ import (
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	k8snet "k8s.io/utils/net"
 )
 
 type GatewayRouteController struct {
@@ -35,7 +36,7 @@ type GatewayRouteController struct {
 }
 
 //nolint:gocritic // Ignore hugeParam
-func NewGatewayRouteController(config watcher.Config, connectionHandler *ConnectionHandler,
+func NewGatewayRouteController(ipFamily k8snet.IPFamily, config watcher.Config, connectionHandler *ConnectionHandler,
 	namespace string,
 ) (*GatewayRouteController, error) {
 	var err error
@@ -64,7 +65,7 @@ func NewGatewayRouteController(config watcher.Config, connectionHandler *Connect
 		return nil, errors.Wrap(err, "error creating resource watcher")
 	}
 
-	mgmtIP, err := getNextHopOnK8sMgmtIntf()
+	mgmtIP, err := getNextHopOnK8sMgmtIntf(ipFamily)
 	if err != nil {
 		return nil, err
 	}

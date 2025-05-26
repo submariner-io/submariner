@@ -15,7 +15,6 @@ require (
 	github.com/prometheus-community/pro-bing v0.7.0
 	github.com/prometheus/client_golang v1.22.0
 	github.com/submariner-io/admiral v0.21.0-m2
-	github.com/submariner-io/shipyard v0.21.0-m2
 	github.com/vishvananda/netlink v1.3.0
 	golang.org/x/net v0.39.0
 	golang.org/x/sys v0.32.0
@@ -77,6 +76,7 @@ require (
 	github.com/rs/zerolog v1.34.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/testify v1.10.0 // indirect
+	github.com/submariner-io/shipyard v0.21.0-m2.0.20250512150441-ff6a84565ac2 // indirect
 	github.com/urfave/cli/v2 v2.4.0 // indirect
 	github.com/vishvananda/netns v0.0.4 // indirect
 	github.com/x448/float16 v0.8.4 // indirect

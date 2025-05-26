@@ -66,13 +66,14 @@ type Handler struct {
 	gatewayRouteController    *GatewayRouteController
 	nonGatewayRouteController *NonGatewayRouteController
 	stopCh                    chan struct{}
+	ipFamily                  k8snet.IPFamily
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("OVN")}
 
-func NewHandler(config *HandlerConfig) *Handler {
+func NewHandler(ipFamily k8snet.IPFamily, config *HandlerConfig) *Handler {
 	// We'll panic if env is nil, this is intentional
-	pFilter, err := packetfilter.New(k8snet.IPv4)
+	pFilter, err := packetfilter.New(ipFamily)
 	if err != nil {
 		logger.Fatalf("Error initializing packetfilter in OVN routeagent handler: %s", err)
 	}
@@ -82,6 +83,7 @@ func NewHandler(config *HandlerConfig) *Handler {
 		netLink:       netlink.New(),
 		pFilter:       pFilter,
 		stopCh:        make(chan struct{}),
+		ipFamily:      ipFamily,
 	}
 
 	if h.NewOVSDBClient == nil {
@@ -109,7 +111,7 @@ func (ovn *Handler) Init(ctx context.Context) error {
 
 	ovn.startRouteConfigSyncer(ovn.stopCh)
 
-	connectionHandler := NewConnectionHandler(ovn.K8sClient, ovn.DynClient)
+	connectionHandler := NewConnectionHandler(ovn.ipFamily, ovn.K8sClient, ovn.DynClient)
 
 	err = connectionHandler.initClients(ctx, ovn.NewOVSDBClient)
 	if err != nil {
@@ -121,7 +123,7 @@ func (ovn *Handler) Init(ctx context.Context) error {
 		return errors.Wrap(err, "error initializing TransitSwitchIP")
 	}
 
-	gatewayRouteController, err := NewGatewayRouteController(*ovn.WatcherConfig, connectionHandler, ovn.Namespace)
+	gatewayRouteController, err := NewGatewayRouteController(ovn.ipFamily, *ovn.WatcherConfig, connectionHandler, ovn.Namespace)
 	if err != nil {
 		return err
 	}
@@ -156,7 +158,7 @@ func (ovn *Handler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 
 		routingInterface = &netlink.DefaultNetworkInterface{Interface: *intf}
 	} else {
-		if routingInterface, err = ovn.netLink.GetDefaultGatewayInterface(k8snet.IPv4); err != nil {
+		if routingInterface, err = ovn.netLink.GetDefaultGatewayInterface(ovn.ipFamily); err != nil {
 			logger.Fatalf("Unable to find the default interface on host: %s", err.Error())
 		}
 	}

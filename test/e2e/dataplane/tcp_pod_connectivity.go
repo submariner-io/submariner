@@ -23,16 +23,40 @@ import (
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
+	k8snet "k8s.io/utils/net"
 )
 
 const TestLabel = "dataplane"
 
+func GetActualIPFamilies(fromType, toType framework.IPFamilyType) []k8snet.IPFamily {
+	var families []k8snet.IPFamily
+
+	if (fromType == framework.SingleStackIPv4 || fromType == framework.DualStack) &&
+		(toType == framework.SingleStackIPv4 || toType == framework.DualStack) {
+		families = append(families, k8snet.IPv4)
+	}
+
+	if (fromType == framework.SingleStackIPv6 || fromType == framework.DualStack) &&
+		(toType == framework.SingleStackIPv6 || toType == framework.DualStack) {
+		families = append(families, k8snet.IPv6)
+	}
+
+	return families
+}
+
 var _ = Describe("Basic TCP connectivity tests across clusters without discovery", Label(TestLabel), func() {
 	f := framework.NewFramework("dataplane-conn-nd")
-	var toEndpointType tcp.EndpointType
-	var networking framework.NetworkingType
-	var fromCluster framework.ClusterIndex
-	var toCluster framework.ClusterIndex
+
+	var (
+		toEndpointType         tcp.EndpointType
+		networking             framework.NetworkingType
+		fromCluster, toCluster framework.ClusterIndex
+		supportedFamilies      []k8snet.IPFamily
+	)
+
+	BeforeEach(func() {
+		supportedFamilies = GetActualIPFamilies(f.DetermineIPFamilyType(framework.ClusterA), f.DetermineIPFamilyType(framework.ClusterB))
+	})
 
 	verifyInteraction := func(fromClusterScheduling, toClusterScheduling framework.NetworkPodScheduling) {
 		It("should have sent the expected data from the pod to the other pod", func() {
@@ -46,15 +70,18 @@ var _ = Describe("Basic TCP connectivity tests across clusters without discovery
 				return
 			}
 
-			tcp.RunConnectivityTest(tcp.ConnectivityTestParams{
-				Framework:             f,
-				ToEndpointType:        toEndpointType,
-				Networking:            networking,
-				FromCluster:           fromCluster,
-				FromClusterScheduling: fromClusterScheduling,
-				ToCluster:             toCluster,
-				ToClusterScheduling:   toClusterScheduling,
-			})
+			for _, ipFamily := range supportedFamilies {
+				tcp.RunConnectivityTest(&tcp.ConnectivityTestParams{
+					Framework:             f,
+					ToEndpointType:        toEndpointType,
+					Networking:            networking,
+					FromCluster:           fromCluster,
+					FromClusterScheduling: fromClusterScheduling,
+					ToCluster:             toCluster,
+					ToClusterScheduling:   toClusterScheduling,
+					IPFamily:              ipFamily,
+				})
+			}
 		})
 	}
 

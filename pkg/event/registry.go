@@ -20,11 +20,11 @@ package event
 
 import (
 	"context"
+	goerrors "errors"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	k8serrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/utils/set"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -110,5 +110,5 @@ func (er *Registry) invokeHandlers(eventName string, invoke func(h Handler) erro
 		}
 	}
 
-	return errors.Wrapf(k8serrors.NewAggregate(errs), "%s failed", eventName)
+	return errors.Wrapf(goerrors.Join(errs...), "%s failed", eventName)
 }

@@ -21,6 +21,7 @@ package endpoint
 import (
 	"bytes"
 	"context"
+	goerrors "errors"
 	"io"
 	"math/rand/v2"
 	"net"
@@ -35,7 +36,6 @@ import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8serrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
@@ -166,7 +166,7 @@ func invokeResolvers(family k8snet.IPFamily, k8sClient kubernetes.Interface, nam
 	}
 
 	if len(resolvers) > 0 {
-		return "", "", errors.Wrapf(k8serrors.NewAggregate(errs),
+		return "", "", errors.Wrapf(goerrors.Join(errs...),
 			"Unable to resolve public IPv%s by any of the resolver methods: %q", family, config)
 	}
 

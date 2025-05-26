@@ -68,7 +68,7 @@ type GlobalnetTestParams struct {
 	RunAdditionalTest RunAdditionalTestFn
 }
 
-func VerifyDatapathConnectivity(p tcp.ConnectivityTestParams, gn GlobalnetTestParams) {
+func VerifyDatapathConnectivity(p *tcp.ConnectivityTestParams, gn GlobalnetTestParams) {
 	if gn.GlobalnetEnabled {
 		verifyGlobalnetDatapathConnectivity(p, gn)
 	} else {
@@ -76,7 +76,7 @@ func VerifyDatapathConnectivity(p tcp.ConnectivityTestParams, gn GlobalnetTestPa
 	}
 }
 
-func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams, gn GlobalnetTestParams) {
+func verifyGlobalnetDatapathConnectivity(p *tcp.ConnectivityTestParams, gn GlobalnetTestParams) {
 	Expect(p.ToEndpointType).To(BeElementOf([]tcp.EndpointType{tcp.GlobalServiceIP, tcp.GlobalPodIP}))
 
 	if p.ConnectionTimeout == 0 {
@@ -213,7 +213,7 @@ func verifyGlobalnetDatapathConnectivity(p tcp.ConnectivityTestParams, gn Global
 	p.Framework.DeleteService(p.ToCluster, service.Name)
 }
 
-func getGlobalIngressIP(p tcp.ConnectivityTestParams, service *v1.Service) string {
+func getGlobalIngressIP(p *tcp.ConnectivityTestParams, service *v1.Service) string {
 	if p.ToEndpointType == tcp.GlobalServiceIP {
 		return p.Framework.AwaitGlobalIngressIP(p.ToCluster, service.Name, service.Namespace)
 	} else if p.ToEndpointType == tcp.GlobalPodIP {
