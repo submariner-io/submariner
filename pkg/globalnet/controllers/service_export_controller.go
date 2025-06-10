@@ -19,6 +19,8 @@ limitations under the License.
 package controllers
 
 import (
+	"slices"
+
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/syncer"
@@ -169,6 +171,10 @@ func (c *serviceExportController) onCreate(serviceExport *mcsv1a1.ServiceExport)
 		}
 		// Headless service
 		return c.onCreateHeadless(key, service)
+	}
+
+	if !slices.Contains(service.Spec.IPFamilies, corev1.IPv4Protocol) {
+		return nil, false
 	}
 
 	ingressIP := &submarinerv1.GlobalIngressIP{

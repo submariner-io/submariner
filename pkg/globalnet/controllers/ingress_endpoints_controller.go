@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
+	k8snet "k8s.io/utils/net"
 )
 
 func startIngressEndpointsController(svc *corev1.Service, config *syncer.ResourceSyncerConfig) (*ingressEndpointsController, error) {
@@ -117,7 +118,9 @@ func (c *ingressEndpointsController) onCreateOrUpdate(endpoints *corev1.Endpoint
 
 	for _, subset := range endpoints.Subsets {
 		for _, addr := range subset.Addresses {
-			usedEpIPs[addr.IP] = true
+			if k8snet.IsIPv4String(addr.IP) {
+				usedEpIPs[addr.IP] = true
+			}
 		}
 	}
 
