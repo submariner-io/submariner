@@ -25,6 +25,7 @@ import (
 	"syscall"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/vishvananda/netlink"
 	k8snet "k8s.io/utils/net"
 )
@@ -119,14 +120,10 @@ func (a *Adapter) GetDefaultGatewayInterface(family k8snet.IPFamily) (NetworkInt
 	}
 
 	for i := range routes {
-		if routes[i].Dst == nil || routes[i].Dst.String() == allZeroesFamilyAddress[family] {
-			if routes[i].LinkIndex == 0 {
-				return nil, errors.New("default gateway interface could not be determined")
-			}
-
+		if (routes[i].Dst == nil || routes[i].Dst.String() == allZeroesFamilyAddress[family]) && routes[i].LinkIndex > 0 {
 			return a.InterfaceByIndex(routes[i].LinkIndex)
 		}
 	}
 
-	return nil, errors.New("unable to find default route")
+	return nil, errors.Errorf("default gateway interface could not be determined from routes: %s", resource.ToJSON(routes))
 }
