@@ -55,12 +55,16 @@ func jsonToIP(jsonData string) (string, error) {
 
 	err := json.Unmarshal([]byte(jsonData), &data)
 	if err != nil {
-		return "", errors.Wrapf(err, "error unmarshalling the json ip")
+		return "", errors.Wrapf(err, "error unmarshalling the JSON IP")
 	}
 
-	ipStr, found := data["ipv4"]
-	if !found {
-		return "", errors.New("json data does not contain an 'ipv4' field")
+	var ipStr string
+	if val, found := data["ipv4"]; found {
+		ipStr = val
+	} else if val, found := data["ipv6"]; found {
+		ipStr = val
+	} else {
+		return "", errors.New("JSON data does not contain 'ipv4' or 'ipv6' field")
 	}
 
 	ip, _, err := net.ParseCIDR(ipStr)

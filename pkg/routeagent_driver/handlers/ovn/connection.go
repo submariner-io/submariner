@@ -42,17 +42,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/utils/net"
+	k8snet "k8s.io/utils/net"
 )
 
 type ConnectionHandler struct {
 	k8sClientset  clientset.Interface
 	dynamicClient dynamic.Interface
 	nbdb          libovsdbclient.Client
-	ipFamily      net.IPFamily
+	ipFamily      k8snet.IPFamily
 }
 
-func NewConnectionHandler(ipFamily net.IPFamily, k8sClientset clientset.Interface, dynamicClient dynamic.Interface) *ConnectionHandler {
+func NewConnectionHandler(ipFamily k8snet.IPFamily, k8sClientset clientset.Interface, dynamicClient dynamic.Interface) *ConnectionHandler {
 	return &ConnectionHandler{
 		k8sClientset:  k8sClientset,
 		dynamicClient: dynamicClient,
@@ -117,7 +117,7 @@ func (c *ConnectionHandler) createLibovsdbClient(ctx context.Context, dbModel mo
 	// Will use empty zone if not found
 	zoneName := annotations[constants.OvnZoneAnnotation]
 
-	dbAddress, err := discoverOvnKubernetesNetwork(ctx, c.k8sClientset, c.dynamicClient, zoneName)
+	dbAddress, err := discoverOvnKubernetesNetwork(c.ipFamily, ctx, c.k8sClientset, c.dynamicClient, zoneName)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting the OVN NBDB Address")
 	}
@@ -196,7 +196,7 @@ func getTLSConfig(ctx context.Context, k8sClientset clientset.Interface) (*tls.C
 	return tlsConfig, nil
 }
 
-func discoverOvnKubernetesNetwork(ctx context.Context, k8sClientset clientset.Interface,
+func discoverOvnKubernetesNetwork(family k8snet.IPFamily, ctx context.Context, k8sClientset clientset.Interface,
 	dynamicClient dynamic.Interface, zoneName string,
 ) (string, error) {
 	openshiftNetwork, err := FindOpenshiftNetwork(ctx, dynamicClient)
@@ -208,7 +208,7 @@ func discoverOvnKubernetesNetwork(ctx context.Context, k8sClientset clientset.In
 		return discoverOpenshiftOvnKubernetesNetwork(ctx, k8sClientset)
 	}
 
-	return discoverKindOvnKubernetesNetwork(ctx, k8sClientset, zoneName)
+	return discoverKindOvnKubernetesNetwork(family, ctx, k8sClientset, zoneName)
 }
 
 /*
@@ -245,7 +245,9 @@ The discovery method varies based on the deployment type.
 	kind ic with one node per zone: we will have no endpoints matching hence we will return default kind socket path
 */
 
-func discoverKindOvnKubernetesNetwork(ctx context.Context, k8sClientSet clientset.Interface, zoneName string) (string, error) {
+func discoverKindOvnKubernetesNetwork(family k8snet.IPFamily, ctx context.Context, k8sClientSet clientset.Interface,
+	zoneName string,
+) (string, error) {
 	ovnDBPod, err := FindPod(ctx, k8sClientSet, "name=ovnkube-db")
 	if err != nil {
 		return "", err
@@ -264,7 +266,7 @@ func discoverKindOvnKubernetesNetwork(ctx context.Context, k8sClientSet clientse
 		return "", fmt.Errorf("error finding the pod with label %q", ovnPodLabel)
 	}
 
-	return discoverKindOvnNodeClusterNetwork(ctx, k8sClientSet, zoneName, ovnPod)
+	return discoverKindOvnNodeClusterNetwork(family, ctx, k8sClientSet, zoneName, ovnPod)
 }
 
 func discoverKindOvnDBClusterNetwork(ctx context.Context, ovnDBPod *corev1.Pod, k8sClientSet clientset.Interface) (string, error) {
@@ -278,7 +280,7 @@ func discoverKindOvnDBClusterNetwork(ctx context.Context, ovnDBPod *corev1.Pod, 
 	return fmt.Sprintf("%s:%s.%s:%d", dbConnectionProtocol, ovnKubeService, ovnDBPod.Namespace, ovnNBDBDefaultPort), nil
 }
 
-func discoverKindOvnNodeClusterNetwork(ctx context.Context, k8sClientset clientset.Interface,
+func discoverKindOvnNodeClusterNetwork(family k8snet.IPFamily, ctx context.Context, k8sClientset clientset.Interface,
 	zoneName string, ovnPod *corev1.Pod,
 ) (string, error) {
 	endpointList, err := findEndpoint(ctx, k8sClientset, ovnPod.Namespace)
@@ -291,7 +293,7 @@ func discoverKindOvnNodeClusterNetwork(ctx context.Context, k8sClientset clients
 	if endpointList == nil || len(endpointList.Items) == 0 {
 		nbdbAddress = defaultOVNUnixSocket
 	} else {
-		nbdbAddress, err = createClusterNetworkWithEndpoints(endpointList.Items, zoneName)
+		nbdbAddress, err = createClusterNetworkWithEndpoints(family, endpointList.Items, zoneName)
 		if err != nil {
 			return "", err
 		}
@@ -300,21 +302,33 @@ func discoverKindOvnNodeClusterNetwork(ctx context.Context, k8sClientset clients
 	return nbdbAddress, nil
 }
 
-func createClusterNetworkWithEndpoints(endPoints []corev1.Endpoints, zoneName string) (string, error) {
-	for index := range endPoints {
-		for _, subset := range endPoints[index].Subsets {
-			if strings.Contains(endPoints[index].Name, zoneName) {
+func createClusterNetworkWithEndpoints(family k8snet.IPFamily, endPoints []corev1.Endpoints, zoneName string) (string, error) {
+	for i := range endPoints {
+		if !strings.Contains(endPoints[i].Name, zoneName) {
+			continue
+		}
+
+		for _, subset := range endPoints[i].Subsets {
+			for _, addr := range subset.Addresses {
+				ip := addr.IP
+				if k8snet.IPFamilyOfString(ip) != family {
+					continue
+				}
+
 				for _, port := range subset.Ports {
-					if strings.Contains(port.Name, "north") && net.IsIPv4String(subset.Addresses[0].IP) {
-						return fmt.Sprintf("%s:%s:%d",
-							port.Protocol, subset.Addresses[0].IP, ovnNBDBDefaultPort), nil
+					if strings.Contains(port.Name, "north") {
+						if family == k8snet.IPv6 {
+							return fmt.Sprintf("%s:[%s]:%d", port.Protocol, ip, ovnNBDBDefaultPort), nil
+						}
+
+						return fmt.Sprintf("%s:%s:%d", port.Protocol, ip, ovnNBDBDefaultPort), nil
 					}
 				}
 			}
 		}
 	}
 
-	return "", fmt.Errorf("error finding an endpoint for the zone %q", zoneName)
+	return "", fmt.Errorf("error finding an endpoint for the zone %q with IP family %v", zoneName, family)
 }
 
 func findEndpoint(ctx context.Context, k8sClientset clientset.Interface, endpointNameSpace string) (*corev1.EndpointsList, error) {

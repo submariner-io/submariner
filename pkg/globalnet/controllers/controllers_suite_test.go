@@ -68,6 +68,7 @@ const (
 	globalIP1                 = "242.10.1.100"
 	globalIP2                 = "242.10.1.101"
 	globalIP3                 = "242.10.1.102"
+	ipv6IP                    = "fc00:2001::6757"
 )
 
 func init() {
@@ -596,8 +597,9 @@ func newClusterIPService() *corev1.Service {
 			Name: serviceName,
 		},
 		Spec: corev1.ServiceSpec{
-			ClusterIP: "1.2.3.4",
-			Type:      corev1.ServiceTypeClusterIP,
+			ClusterIP:  "1.2.3.4",
+			Type:       corev1.ServiceTypeClusterIP,
+			IPFamilies: []corev1.IPFamily{corev1.IPv4Protocol},
 			Ports: []corev1.ServicePort{{
 				Name:       serviceName,
 				Port:       int32(8080),
