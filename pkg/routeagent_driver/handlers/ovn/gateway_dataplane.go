@@ -19,15 +19,19 @@ limitations under the License.
 package ovn
 
 import (
+	"context"
 	"os"
 	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	nodeutil "github.com/submariner-io/submariner/pkg/node"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
 )
+
+const ovnNodeDontSNATSubnets = "k8s.ovn.org/node-ingress-snat-exclude-subnets"
 
 func (ovn *Handler) cleanupGatewayDataplane() error {
 	currentRemoteSubnets, err := ovn.getExistingIPv4RuleSubnets()
@@ -166,6 +170,13 @@ func (ovn *Handler) setupForwardingIptables() error {
 }
 
 func (ovn *Handler) updateNoMasqueradeRules(subnet string, add bool) error {
+	// to prevent SNAT by OVNK (with nftables) subnet should added to node annotation
+	err := nodeutil.ModifyLocalNodeAnnotationList(context.Background(),
+		ovn.K8sClient, ovnNodeDontSNATSubnets, subnet, add, nodeutil.JSONListAnnotationModifier)
+	if err != nil {
+		return errors.Wrapf(err, "error adding subnet %v to nodes annotation[%v]", subnet, ovnNodeDontSNATSubnets)
+	}
+
 	rules := []packetfilter.Rule{
 		{
 			DestCIDR: subnet,

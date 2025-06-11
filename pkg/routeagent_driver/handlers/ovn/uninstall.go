@@ -19,7 +19,10 @@ limitations under the License.
 package ovn
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
+	nodeutil "github.com/submariner-io/submariner/pkg/node"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn/vsctl"
@@ -82,6 +85,8 @@ func (ovn *Handler) Uninstall() error {
 			constants.SmPostRoutingChain)
 	}
 
+	// TODO: delete only subnets added by Submariner
+	nodeutil.ClearLocalNodeAnnotation(context.Background(), ovn.K8sClient, ovnNodeDontSNATSubnets)
 	return nil
 }
 
