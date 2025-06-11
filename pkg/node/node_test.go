@@ -71,9 +71,10 @@ var _ = Describe("GetLocalNode", func() {
 			os.Unsetenv("NODE_NAME")
 		})
 
-		It("should return an error", func() {
-			_, err := node.GetLocalNode(context.TODO(), t.client)
-			Expect(err).To(HaveOccurred())
+		It("should panic", func() {
+			Expect(func() {
+				_, _ = node.GetLocalNode(context.TODO(), t.client)
+			}).To(Panic())
 		})
 	})
 })
