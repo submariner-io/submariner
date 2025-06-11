@@ -160,6 +160,8 @@ var _ = Describe("Handler", func() {
 					t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmPostRoutingChain, ContainSubstring("\"DestCIDR\":%q", s))
 				}
 
+				t.awaitOVNKNodeAnnotationContaining(endpoint.Spec.Subnets...)
+
 				By("Updating remote Endpoint")
 
 				oldSubnets := endpoint.Spec.Subnets
@@ -187,6 +189,10 @@ var _ = Describe("Handler", func() {
 					t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, constants.SmPostRoutingChain, ContainSubstring("\"SrcCIDR\":%q", s))
 					t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, constants.SmPostRoutingChain, ContainSubstring("\"DestCIDR\":%q", s))
 				}
+
+				// Since we updated the subnets above, the original second one will remain b/c the annotation isn't currently
+				// updated on an Endpoint update.
+				t.awaitOVNKNodeAnnotationContaining("192.0.2.0/24")
 			})
 		})
 	})
@@ -204,6 +210,8 @@ var _ = Describe("Handler", func() {
 				t.netLink.AwaitRule(constants.RouteAgentInterClusterNetworkTableID, s, serviceCIDR)
 			}
 
+			t.awaitOVNKNodeAnnotationContaining(endpoint.Spec.Subnets...)
+
 			t.netLink.AwaitGwRoutes(0, constants.RouteAgentInterClusterNetworkTableID, OVNK8sMgmntIntGw)
 
 			By("Deleting local gateway Endpoint")
@@ -214,6 +222,8 @@ var _ = Describe("Handler", func() {
 				t.netLink.AwaitNoRule(constants.RouteAgentInterClusterNetworkTableID, s, clusterCIDR)
 				t.netLink.AwaitNoRule(constants.RouteAgentInterClusterNetworkTableID, s, serviceCIDR)
 			}
+
+			t.awaitOVNKNodeAnnotationContaining()
 
 			t.netLink.AwaitNoGwRoutes(0, constants.RouteAgentInterClusterNetworkTableID, OVNK8sMgmntIntGw)
 		})

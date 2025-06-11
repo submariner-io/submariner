@@ -42,11 +42,17 @@ var (
 	PollInterval = time.Second
 )
 
-func GetLocalNode(ctx context.Context, clientset kubernetes.Interface) (*v1.Node, error) {
+func GetLocalNodeName() string {
 	nodeName, ok := os.LookupEnv("NODE_NAME")
 	if !ok {
-		return nil, errors.New("error reading the NODE_NAME from the environment")
+		panic("Error reading the NODE_NAME from the environment")
 	}
+
+	return nodeName
+}
+
+func GetLocalNode(ctx context.Context, clientset kubernetes.Interface) (*v1.Node, error) {
+	nodeName := GetLocalNodeName()
 
 	var node *v1.Node
 

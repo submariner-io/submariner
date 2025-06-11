@@ -69,9 +69,9 @@ var _ = Describe("TransitSwitchIP", func() {
 			})
 		})
 
-		When("the local node isn't found due to missing NODE_NAME env var", func() {
+		When("the local node isn't found", func() {
 			JustBeforeEach(func() {
-				os.Unsetenv("NODE_NAME")
+				os.Setenv("NODE_NAME", "bogus")
 			})
 
 			It("should fail", func() {

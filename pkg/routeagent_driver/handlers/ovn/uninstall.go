@@ -19,10 +19,16 @@ limitations under the License.
 package ovn
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/util"
+	nodeutil "github.com/submariner-io/submariner/pkg/node"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn/vsctl"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8snet "k8s.io/utils/net"
 )
 
@@ -80,6 +86,16 @@ func (ovn *Handler) Uninstall() error {
 	}); err != nil {
 		logger.Errorf(err, "DeleteIPHookChain %s returned error",
 			constants.SmPostRoutingChain)
+	}
+
+	err = util.Update[*corev1.Node](context.TODO(), ovn.nodeResourceInterface(), &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: nodeutil.GetLocalNodeName()},
+	}, func(existing *corev1.Node) (*corev1.Node, error) {
+		delete(existing.Annotations, OVNKSNATExcludeSubnetsAnnotation)
+		return existing, nil
+	})
+	if err != nil {
+		logger.Errorf(err, "Error removing node annotation %q", OVNKSNATExcludeSubnetsAnnotation)
 	}
 
 	return nil

@@ -21,16 +21,17 @@ package ovn
 import "time"
 
 const (
-	ovnK8sSubmarinerInterface     = "ovn-k8s-sub0"
-	ovnK8sSubmarinerBridge        = "br-submariner"
-	ovsDBTimeout                  = 20 * time.Second
-	ovnCert                       = "secret://openshift-ovn-kubernetes/ovn-cert/tls.crt"
-	ovnPrivKey                    = "secret://openshift-ovn-kubernetes/ovn-cert/tls.key"
-	ovnCABundle                   = "configmap://openshift-ovn-kubernetes/ovn-ca/ca-bundle.crt"
-	ovnKubeService                = "ovnkube-db"
-	defaultOVNUnixSocket          = "unix:/var/run/openvswitch/ovnnb_db.sock"
-	defaultOVNOpenshiftUnixSocket = "unix:/var/run/ovn-ic/ovnnb_db.sock"
-	ovnNBDBDefaultPort            = 6641
-	defaultOpenshiftOVNNBDB       = "ssl:ovnkube-db.openshift-ovn-kubernetes.svc.cluster.local:9641"
-	ovnPodLabel                   = "app=ovnkube-node"
+	ovnK8sSubmarinerInterface        = "ovn-k8s-sub0"
+	ovnK8sSubmarinerBridge           = "br-submariner"
+	ovsDBTimeout                     = 20 * time.Second
+	ovnCert                          = "secret://openshift-ovn-kubernetes/ovn-cert/tls.crt"
+	ovnPrivKey                       = "secret://openshift-ovn-kubernetes/ovn-cert/tls.key"
+	ovnCABundle                      = "configmap://openshift-ovn-kubernetes/ovn-ca/ca-bundle.crt"
+	ovnKubeService                   = "ovnkube-db"
+	defaultOVNUnixSocket             = "unix:/var/run/openvswitch/ovnnb_db.sock"
+	defaultOVNOpenshiftUnixSocket    = "unix:/var/run/ovn-ic/ovnnb_db.sock"
+	ovnNBDBDefaultPort               = 6641
+	defaultOpenshiftOVNNBDB          = "ssl:ovnkube-db.openshift-ovn-kubernetes.svc.cluster.local:9641"
+	ovnPodLabel                      = "app=ovnkube-node"
+	OVNKSNATExcludeSubnetsAnnotation = "k8s.ovn.org/node-ingress-snat-exclude-subnets"
 )

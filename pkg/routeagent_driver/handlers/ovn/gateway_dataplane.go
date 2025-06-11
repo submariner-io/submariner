@@ -19,14 +19,23 @@ limitations under the License.
 package ovn
 
 import (
+	"context"
+	"encoding/json"
 	"os"
 	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/resource"
+	"github.com/submariner-io/admiral/pkg/slices"
+	"github.com/submariner-io/admiral/pkg/util"
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	nodeutil "github.com/submariner-io/submariner/pkg/node"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func (ovn *Handler) cleanupGatewayDataplane() error {
@@ -194,14 +203,6 @@ func (ovn *Handler) updateNoMasqueradeRules(subnet string, add bool) error {
 	return nil
 }
 
-func (ovn *Handler) addNoMasqueradeIPTables(subnet string) error {
-	return ovn.updateNoMasqueradeRules(subnet, true)
-}
-
-func (ovn *Handler) removeNoMasqueradeIPTables(subnet string) error {
-	return ovn.updateNoMasqueradeRules(subnet, false)
-}
-
 func (ovn *Handler) cleanupForwardingIptables() error {
 	if err := ovn.pFilter.DeleteIPHookChain(&packetfilter.ChainIPHook{
 		Name:     ForwardingSubmarinerMSSClampChain,
@@ -273,4 +274,65 @@ func (ovn *Handler) updateIPtableChains(table packetfilter.TableType, chain stri
 	}
 
 	return errors.Wrap(ovn.pFilter.UpdateChainRules(table, chain, ruleSpecs), "error updating chain rules")
+}
+
+func (ovn *Handler) processEndpointSubnets(add bool, endpoints ...submarinerv1.Endpoint) error {
+	var allSubnets []string
+
+	for i := range endpoints {
+		for _, subnet := range endpoints[i].Spec.Subnets {
+			if err := ovn.updateNoMasqueradeRules(subnet, add); err != nil {
+				return err
+			}
+
+			allSubnets = append(allSubnets, subnet)
+		}
+	}
+
+	if len(allSubnets) == 0 {
+		return nil
+	}
+
+	// To prevent SNAT by OVNK (with nftables), the subnets should be added to the node annotation.
+
+	err := util.MustUpdate[*corev1.Node](context.TODO(), ovn.nodeResourceInterface(), &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: nodeutil.GetLocalNodeName()},
+	}, func(existing *corev1.Node) (*corev1.Node, error) {
+		var list []string
+
+		currentJSON := existing.Annotations[OVNKSNATExcludeSubnetsAnnotation]
+		if currentJSON != "" {
+			if err := json.Unmarshal([]byte(currentJSON), &list); err != nil {
+				return nil, errors.Wrap(err, "failed to unmarshal annotation list")
+			}
+		}
+
+		for _, subnet := range allSubnets {
+			if add {
+				list, _ = slices.AppendIfNotPresent(list, subnet, slices.Key[string])
+			} else {
+				list, _ = slices.Remove(list, subnet, slices.Key[string])
+			}
+		}
+
+		newBytes, err := json.Marshal(list)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to marshal annotation list")
+		}
+
+		existing.Annotations[OVNKSNATExcludeSubnetsAnnotation] = string(newBytes)
+
+		logger.Infof("Updating local Node's %q annotation to %q", OVNKSNATExcludeSubnetsAnnotation, string(newBytes))
+
+		return existing, nil
+	})
+
+	return errors.Wrapf(err, "error updating node annotation %q", OVNKSNATExcludeSubnetsAnnotation)
+}
+
+func (ovn *Handler) nodeResourceInterface() resource.Interface[*corev1.Node] {
+	return &resource.InterfaceFuncs[*corev1.Node]{
+		GetFunc:    ovn.K8sClient.CoreV1().Nodes().Get,
+		UpdateFunc: ovn.K8sClient.CoreV1().Nodes().Update,
+	}
 }

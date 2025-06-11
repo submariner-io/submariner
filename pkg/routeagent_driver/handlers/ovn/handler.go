@@ -27,6 +27,7 @@ import (
 	"github.com/ovn-org/libovsdb/model"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
@@ -182,10 +183,8 @@ func (ovn *Handler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	}
 
 	if ovn.State().IsOnGateway() {
-		for _, subnet := range endpoint.Spec.Subnets {
-			if err = ovn.addNoMasqueradeIPTables(subnet); err != nil {
-				return errors.Wrapf(err, "error adding no-masquerade rules for subnet %q", subnet)
-			}
+		if err = ovn.processEndpointSubnets(true, *endpoint); err != nil {
+			return errors.Wrapf(err, "error processing created Endpoint %s", resource.ToJSON(endpoint))
 		}
 
 		return ovn.updateGatewayDataplane()
@@ -220,10 +219,8 @@ func (ovn *Handler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	}
 
 	if ovn.State().IsOnGateway() {
-		for _, subnet := range endpoint.Spec.Subnets {
-			if err = ovn.removeNoMasqueradeIPTables(subnet); err != nil {
-				return errors.Wrapf(err, "error removing no-masquerade rules for subnet %q", subnet)
-			}
+		if err = ovn.processEndpointSubnets(false, *endpoint); err != nil {
+			return errors.Wrapf(err, "error processing removed Endpoint %s", resource.ToJSON(endpoint))
 		}
 
 		return ovn.updateGatewayDataplane()
@@ -233,26 +230,16 @@ func (ovn *Handler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 }
 
 func (ovn *Handler) TransitionToNonGateway() error {
-	endpoints := ovn.State().GetRemoteEndpoints()
-	for i := range endpoints {
-		for _, subnet := range endpoints[i].Spec.Subnets {
-			if err := ovn.removeNoMasqueradeIPTables(subnet); err != nil {
-				return errors.Wrapf(err, "error removing no-masquerade rules for subnet %q", subnet)
-			}
-		}
+	if err := ovn.processEndpointSubnets(false, ovn.State().GetRemoteEndpoints()...); err != nil {
+		return errors.Wrapf(err, "error processing Endpoints on non-gateway transiton")
 	}
 
 	return ovn.cleanupGatewayDataplane()
 }
 
 func (ovn *Handler) TransitionToGateway() error {
-	endpoints := ovn.State().GetRemoteEndpoints()
-	for i := range endpoints {
-		for _, subnet := range endpoints[i].Spec.Subnets {
-			if err := ovn.addNoMasqueradeIPTables(subnet); err != nil {
-				return errors.Wrapf(err, "error adding no-masquerade rules for subnet %q", subnet)
-			}
-		}
+	if err := ovn.processEndpointSubnets(true, ovn.State().GetRemoteEndpoints()...); err != nil {
+		return errors.Wrapf(err, "error processing Endpoints on gateway transiton")
 	}
 
 	return ovn.updateGatewayDataplane()

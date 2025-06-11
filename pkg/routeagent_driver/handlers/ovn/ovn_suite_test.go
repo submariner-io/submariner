@@ -23,7 +23,9 @@ import (
 	"encoding/json"
 	"net"
 	"os"
+	"sort"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -34,6 +36,7 @@ import (
 	eventtesting "github.com/submariner-io/submariner/pkg/event/testing"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	fakenetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
+	nodeutil "github.com/submariner-io/submariner/pkg/node"
 	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
@@ -131,6 +134,29 @@ func (t *testDriver) createNode() *corev1.Node {
 	return createNode(t.k8sClient, t.transitSwitchIP)
 }
 
+func (t *testDriver) awaitOVNKNodeAnnotationContaining(expected ...string) {
+	if expected == nil {
+		expected = []string{}
+	}
+
+	Eventually(func(g Gomega) {
+		node, err := t.k8sClient.CoreV1().Nodes().Get(context.TODO(), nodeutil.GetLocalNodeName(), metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		var actual []string
+
+		if node.Annotations[ovn.OVNKSNATExcludeSubnetsAnnotation] != "" {
+			err = json.Unmarshal([]byte(node.Annotations[ovn.OVNKSNATExcludeSubnetsAnnotation]), &actual)
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		sort.Strings(expected)
+		sort.Strings(actual)
+
+		g.Expect(actual).To(Equal(expected))
+	}).Within(3 * time.Second).Should(Succeed())
+}
+
 func createNode(k8sClient kubernetes.Interface, transitSwitchIP string) *corev1.Node {
 	node := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -146,6 +172,9 @@ func createNode(k8sClient kubernetes.Interface, transitSwitchIP string) *corev1.
 	Expect(err).To(Succeed())
 
 	os.Setenv("NODE_NAME", node.Name)
+
+	nodeutil.PollTimeout = 100 * time.Millisecond
+	nodeutil.PollInterval = 10 * time.Millisecond
 
 	return node
 }
