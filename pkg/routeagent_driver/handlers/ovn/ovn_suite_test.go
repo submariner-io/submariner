@@ -21,6 +21,7 @@ package ovn_test
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"net"
 	"os"
 	"sort"
@@ -32,12 +33,10 @@ import (
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	fakesubm "github.com/submariner-io/submariner/pkg/client/clientset/versioned/fake"
-	"github.com/submariner-io/submariner/pkg/event"
 	eventtesting "github.com/submariner-io/submariner/pkg/event/testing"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	fakenetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
 	nodeutil "github.com/submariner-io/submariner/pkg/node"
-	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
 	"github.com/vishvananda/netlink"
@@ -53,11 +52,14 @@ import (
 
 const (
 	OVNK8sMgmntIntIndex = 99
+	remoteClusterID     = "remote-cluster"
 )
 
-var OVNK8sMgmntIntCIDR = toIPNet("128.1.20.2/24")
-
 func init() {
+	flags := flag.NewFlagSet("kzerolog", flag.ExitOnError)
+	kzerolog.AddFlags(flags)
+	_ = flags.Parse([]string{"-v=2"})
+
 	kzerolog.AddFlags(nil)
 }
 
@@ -73,14 +75,13 @@ func TestOvn(t *testing.T) {
 
 type testDriver struct {
 	*eventtesting.ControllerSupport
-	submClient      *fakesubm.Clientset
-	k8sClient       *fakek8s.Clientset
-	dynClient       *fakedynamic.FakeDynamicClient
-	netLink         *fakenetlink.NetLink
-	pFilter         *fakePF.PacketFilter
-	handler         event.Handler
-	transitSwitchIP string
-	mgmntIntfIP     string
+	submClient         *fakesubm.Clientset
+	k8sClient          *fakek8s.Clientset
+	dynClient          *fakedynamic.FakeDynamicClient
+	netLink            *fakenetlink.NetLink
+	transitSwitchIP    map[k8snet.IPFamily]string
+	OVNK8sMgmntIntCIDR map[k8snet.IPFamily]*net.IPNet
+	node               *corev1.Node
 }
 
 func newTestDriver() *testDriver {
@@ -89,16 +90,20 @@ func newTestDriver() *testDriver {
 	}
 
 	BeforeEach(func() {
-		t.transitSwitchIP = "190.1.2.0"
+		t.transitSwitchIP = map[k8snet.IPFamily]string{k8snet.IPv4: "190.1.2.0", k8snet.IPv6: "1a00:200::"}
 		t.submClient = fakesubm.NewSimpleClientset()
 		t.k8sClient = fakek8s.NewClientset()
 		t.dynClient = fakedynamic.NewSimpleDynamicClient(scheme.Scheme)
+		t.OVNK8sMgmntIntCIDR = map[k8snet.IPFamily]*net.IPNet{}
 
 		t.netLink = fakenetlink.New()
 		netlinkAPI.NewFunc = func() netlinkAPI.Interface {
 			return t.netLink
 		}
-		t.pFilter = fakePF.New()
+	})
+
+	JustBeforeEach(func() {
+		t.createNode()
 
 		link := &netlink.GenericLink{
 			LinkAttrs: netlink.LinkAttrs{
@@ -110,28 +115,22 @@ func newTestDriver() *testDriver {
 		t.netLink.SetLinkIndex(ovn.OVNK8sMgmntIntfName, link.Index)
 		Expect(t.netLink.LinkAdd(link)).To(Succeed())
 
-		addr := &netlink.Addr{
-			IPNet: OVNK8sMgmntIntCIDR,
+		cidrs := []*net.IPNet{toIPNet("128.1.20.2/24"), toIPNet("a000:200::/64")}
+		for _, c := range cidrs {
+			Expect(t.netLink.AddrAdd(link, &netlink.Addr{
+				IPNet: c,
+			})).To(Succeed())
 		}
-		Expect(t.netLink.AddrAdd(link, addr)).To(Succeed())
 
-		t.mgmntIntfIP = addr.IPNet.IP.String()
-
-		t.netLink.SetupDefaultGateway(k8snet.IPv4, net.Interface{Name: "gw-intf"})
+		t.OVNK8sMgmntIntCIDR[k8snet.IPv4] = cidrs[0]
+		t.OVNK8sMgmntIntCIDR[k8snet.IPv6] = cidrs[1]
 	})
 
 	return t
 }
 
-func (t *testDriver) Start(handler event.Handler) {
-	node := t.createNode()
-	t.handler = handler
-	t.ControllerSupport.Start(handler)
-	t.CreateNode(node)
-}
-
-func (t *testDriver) createNode() *corev1.Node {
-	return createNode(t.k8sClient, t.transitSwitchIP)
+func (t *testDriver) createNode() {
+	t.node = createNode(t.k8sClient, t.transitSwitchIP[k8snet.IPv4], t.transitSwitchIP[k8snet.IPv6])
 }
 
 func (t *testDriver) awaitOVNKNodeAnnotationContaining(expected ...string) {
@@ -157,15 +156,20 @@ func (t *testDriver) awaitOVNKNodeAnnotationContaining(expected ...string) {
 	}).Within(3 * time.Second).Should(Succeed())
 }
 
-func createNode(k8sClient kubernetes.Interface, transitSwitchIP string) *corev1.Node {
+func (t *testDriver) createEndpoint(subnets ...string) *submV1.Endpoint {
+	return t.CreateEndpoint(eventtesting.NewEndpoint(remoteClusterID, "host", subnets...))
+}
+
+func createNode(k8sClient kubernetes.Interface, transitSwitchIP ...string) *corev1.Node {
 	node := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-node",
 		},
 	}
 
-	if transitSwitchIP != "" {
-		node.Annotations = map[string]string{constants.OvnTransitSwitchIPAnnotation: toTransitSwitchIPAnnotation(transitSwitchIP)}
+	tsIPAnnotation := toTransitSwitchIPAnnotation(transitSwitchIP...)
+	if tsIPAnnotation != "" {
+		node.Annotations = map[string]string{constants.OvnTransitSwitchIPAnnotation: tsIPAnnotation}
 	}
 
 	_, err := k8sClient.CoreV1().Nodes().Create(context.Background(), node, metav1.CreateOptions{})
@@ -179,8 +183,21 @@ func createNode(k8sClient kubernetes.Interface, transitSwitchIP string) *corev1.
 	return node
 }
 
-func toTransitSwitchIPAnnotation(ip string) string {
-	data := map[string]string{"ipv4": ip + "/24"}
+func toTransitSwitchIPAnnotation(ips ...string) string {
+	data := map[string]string{}
+
+	for _, ip := range ips {
+		if k8snet.IsIPv4String(ip) {
+			data["ipv4"] = ip + "/24"
+		} else if k8snet.IsIPv6String(ip) {
+			data["ipv6"] = ip + "/64"
+		}
+	}
+
+	if len(data) == 0 {
+		return ""
+	}
+
 	bytes, err := json.Marshal(data)
 	Expect(err).To(Succeed())
 

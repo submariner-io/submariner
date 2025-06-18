@@ -20,14 +20,18 @@ package ovn_test
 
 import (
 	"context"
-	"errors"
+	"fmt"
+	"net"
 	"os"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/testing"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
@@ -37,33 +41,114 @@ import (
 )
 
 var _ = Describe("NonGatewayRouteHandler", func() {
-	t := newTestDriver()
+	ipv4Subnets := []string{"193.0.4.0/24", "194.0.4.0/24"}
+	ipv6Subnets := []string{"ec00:abcd::/64", "ed00:abcd::/64"}
 
-	JustBeforeEach(func() {
-		tsIP := ovn.NewTransitSwitchIP(k8snet.IPv4)
-		t.Start(ovn.NewNonGatewayRouteHandler(k8snet.IPv4, t.submClient, tsIP))
-		Expect(tsIP.Init(context.TODO(), t.k8sClient)).To(Succeed())
+	t := &nonGWRouteHandlerTestDriver{testDriver: newTestDriver()}
+
+	Context("IPv4", func() {
+		t.testRemoteEndpoints(k8snet.IPv4, ipv4Subnets, ipv6Subnets)
 	})
 
-	awaitNonGatewayRoute := func(ep *submarinerv1.Endpoint) {
-		nonGWRoute := test.AwaitResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace), ep.Spec.ClusterID)
-		Expect(nonGWRoute.RoutePolicySpec.RemoteCIDRs).To(Equal(ep.Spec.Subnets))
-		Expect(nonGWRoute.RoutePolicySpec.NextHops).To(Equal([]string{t.transitSwitchIP}))
-	}
+	Context("IPv6", func() {
+		t.testRemoteEndpoints(k8snet.IPv6, ipv6Subnets, ipv4Subnets)
+	})
 
-	When("a remote Endpoint is created and deleted on the gateway", func() {
+	Context("Dual-stack", func() {
 		JustBeforeEach(func() {
+			t.start(k8snet.IPv4, k8snet.IPv6)
 			t.CreateLocalHostEndpoint()
 		})
 
-		It("should create/delete a NonGatewayRoute", func() {
-			endpointV4 := t.CreateEndpoint(testing.NewEndpoint("remote-cluster-v4", "host", "193.0.4.0/24"))
+		It("should create NonGatewayRoutes for IPv4 and IPv6", func() {
+			t.createEndpoint(append(ipv6Subnets, ipv4Subnets...)...)
 
-			awaitNonGatewayRoute(endpointV4)
+			t.awaitNonGatewayRoute(k8snet.IPv4, ipv4Subnets)
+			t.awaitNonGatewayRoute(k8snet.IPv6, ipv6Subnets)
+		})
+	})
 
-			t.DeleteEndpoint(endpointV4.Name)
+	Context("on transition to gateway", func() {
+		JustBeforeEach(func() {
+			t.start(k8snet.IPv4)
+		})
 
-			test.AwaitNoResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace), endpointV4.Spec.ClusterID)
+		It("should create NonGatewayRoutes for all remote Endpoints", func() {
+			t.createEndpoint(ipv4Subnets...)
+			t.ensureNumNonGatewayRoutes(0)
+
+			localEndpoint := t.CreateLocalHostEndpoint()
+			t.awaitNonGatewayRoute(k8snet.IPv4, ipv4Subnets)
+
+			t.DeleteEndpoint(localEndpoint.Name)
+
+			t.submClient.Fake.ClearActions()
+			t.CreateLocalHostEndpoint()
+
+			test.EnsureNoActionsForResource(&t.submClient.Fake, "nongatewayroutes", "create")
+		})
+
+		Context("with no transit switch IP configured", func() {
+			BeforeEach(func() {
+				t.transitSwitchIP = map[k8snet.IPFamily]string{}
+			})
+
+			It("should not create any NonGatewayRoutes", func() {
+				t.createEndpoint(ipv4Subnets...)
+				t.CreateLocalHostEndpoint()
+				t.ensureNumNonGatewayRoutes(0)
+			})
+		})
+	})
+})
+
+type nonGWRouteHandlerTestDriver struct {
+	*testDriver
+}
+
+func (t *nonGWRouteHandlerTestDriver) start(ipFamilies ...k8snet.IPFamily) {
+	h := make([]event.Handler, len(ipFamilies))
+
+	for i := range ipFamilies {
+		tsIP := ovn.NewTransitSwitchIP(ipFamilies[i])
+		Expect(tsIP.Init(context.TODO(), t.k8sClient)).To(Succeed())
+		h[i] = ovn.NewNonGatewayRouteHandler(ipFamilies[i], t.submClient, tsIP)
+	}
+
+	t.Start(h...)
+	t.CreateNode(t.node)
+}
+
+func (t *nonGWRouteHandlerTestDriver) testRemoteEndpoints(ipFamily k8snet.IPFamily, ipFamilySubnets, nonIPFamilySubnets []string) {
+	var endpoint *submarinerv1.Endpoint
+
+	JustBeforeEach(func() {
+		t.start(ipFamily)
+
+		t.CreateLocalHostEndpoint()
+
+		By(fmt.Sprintf("Creating remote Endpoint with subnets %v", ipFamilySubnets))
+
+		endpoint = t.createEndpoint(ipFamilySubnets...)
+	})
+
+	When("a remote Endpoint is created and deleted on the gateway", func() {
+		It("should create/delete NonGatewayRoutes", func() {
+			nonGWRouteName := t.awaitNonGatewayRoute(ipFamily, ipFamilySubnets)
+
+			t.CreateEndpoint(testing.NewEndpoint("other"+remoteClusterID, "host", nonIPFamilySubnets...))
+			t.ensureNumNonGatewayRoutes(1)
+
+			By("Deleting remote Endpoint")
+
+			t.DeleteEndpoint(endpoint.Name)
+			test.AwaitNoResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace), nonGWRouteName)
+
+			By(fmt.Sprintf("Creating remote Endpoint with subnets %v", append(ipFamilySubnets, nonIPFamilySubnets...)))
+
+			t.createEndpoint(append(ipFamilySubnets, nonIPFamilySubnets...)...)
+			t.awaitNonGatewayRoute(ipFamily, ipFamilySubnets)
+			t.ensureNumNonGatewayRoutes(1)
 		})
 
 		Context("and the NonGatewayRoute operations initially fail", func() {
@@ -75,22 +160,20 @@ var _ = Describe("NonGatewayRouteHandler", func() {
 			})
 
 			It("should eventually create/delete a NonGatewayRoute", func() {
-				endpoint := t.CreateEndpoint(testing.NewEndpoint("remote-cluster", "host", "193.0.4.0/24"))
-				awaitNonGatewayRoute(endpoint)
+				nonGWRouteName := t.awaitNonGatewayRoute(ipFamily, nil)
 
 				t.DeleteEndpoint(endpoint.Name)
-				test.AwaitNoResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace), endpoint.Spec.ClusterID)
+				test.AwaitNoResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace), nonGWRouteName)
 			})
 		})
 
 		Context("and no transit switch IP configured", func() {
 			BeforeEach(func() {
-				t.transitSwitchIP = ""
+				t.transitSwitchIP = map[k8snet.IPFamily]string{}
 			})
 
 			It("should not create a NonGatewayRoute", func() {
-				endpoint := t.CreateEndpoint(testing.NewEndpoint("remote-cluster", "host", "193.0.4.0/24"))
-				test.EnsureNoResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace), endpoint.Spec.ClusterID)
+				t.ensureNumNonGatewayRoutes(0)
 
 				t.submClient.Fake.ClearActions()
 				t.DeleteEndpoint(endpoint.Name)
@@ -99,56 +182,62 @@ var _ = Describe("NonGatewayRouteHandler", func() {
 		})
 	})
 
-	Context("on transition to gateway", func() {
-		It("should create NonGatewayRoutes for all remote Endpoints", func() {
-			endpoint := t.CreateEndpoint(testing.NewEndpoint("remote-cluster", "host", "193.0.4.0/24"))
-			test.EnsureNoResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace), endpoint.Spec.ClusterID)
-
-			localEndpoint := t.CreateLocalHostEndpoint()
-			awaitNonGatewayRoute(endpoint)
-
-			t.DeleteEndpoint(localEndpoint.Name)
-
-			t.submClient.Fake.ClearActions()
-			t.CreateLocalHostEndpoint()
-			test.EnsureNoActionsForResource(&t.submClient.Fake, "nongatewayroutes", "create")
-		})
-
-		Context("with no transit switch IP configured", func() {
-			BeforeEach(func() {
-				t.transitSwitchIP = ""
-			})
-
-			It("should not create any NonGatewayRoutes", func() {
-				endpoint := t.CreateEndpoint(testing.NewEndpoint("remote-cluster", "host", "193.0.4.0/24"))
-				t.CreateLocalHostEndpoint()
-				test.EnsureNoResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace), endpoint.Spec.ClusterID)
-			})
-		})
-	})
-
 	When("the local node's transit switch IP is updated", func() {
-		JustBeforeEach(func() {
-			t.CreateLocalHostEndpoint()
-		})
-
 		It("should update existing NonGatewayRoutes", func() {
-			endpoint := t.CreateEndpoint(testing.NewEndpoint("remote-cluster", "host", "193.0.4.0/24"))
-			awaitNonGatewayRoute(endpoint)
+			t.awaitNonGatewayRoute(ipFamily, ipFamilySubnets)
 
-			t.transitSwitchIP = "10.34.87.2"
+			newIP := net.ParseIP(t.transitSwitchIP[ipFamily])
+			newIP[len(newIP)-1]++
+			t.transitSwitchIP[ipFamily] = newIP.String()
 
 			t.UpdateNode(&corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        os.Getenv("NODE_NAME"),
-					Annotations: map[string]string{constants.OvnTransitSwitchIPAnnotation: toTransitSwitchIPAnnotation(t.transitSwitchIP)},
+					Name: os.Getenv("NODE_NAME"),
+					Annotations: map[string]string{
+						constants.OvnTransitSwitchIPAnnotation: toTransitSwitchIPAnnotation(t.transitSwitchIP[k8snet.IPv4], t.transitSwitchIP[k8snet.IPv6]),
+					},
 				},
 			})
 
-			Eventually(func() string {
-				return test.AwaitResource(ovn.NonGatewayResourceInterface(t.submClient, testing.Namespace),
-					endpoint.Spec.ClusterID).RoutePolicySpec.NextHops[0]
-			}).Should(Equal(t.transitSwitchIP))
+			t.awaitNonGatewayRoute(ipFamily, ipFamilySubnets)
 		})
 	})
-})
+}
+
+func (t *nonGWRouteHandlerTestDriver) awaitNonGatewayRoute(ipFamily k8snet.IPFamily, subnets []string) string {
+	var nonGWRoute *submarinerv1.NonGatewayRoute
+
+	Eventually(func(g Gomega) {
+		list, err := t.submClient.SubmarinerV1().NonGatewayRoutes(testing.Namespace).List(context.TODO(), metav1.ListOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		for i := range list.Items {
+			Expect(list.Items[i].RoutePolicySpec.NextHops).To(HaveLen(1))
+
+			if k8snet.IPFamilyOfString(list.Items[i].RoutePolicySpec.NextHops[0]) != ipFamily {
+				continue
+			}
+
+			nonGWRoute = &list.Items[i]
+
+			if len(subnets) > 0 {
+				g.Expect(nonGWRoute.RoutePolicySpec.RemoteCIDRs).To(Equal(subnets))
+			}
+
+			g.Expect(nonGWRoute.RoutePolicySpec.NextHops[0]).To(Equal(t.transitSwitchIP[ipFamily]))
+		}
+
+		g.Expect(nonGWRoute).NotTo(BeNil(), "NonGatewayRoute for IPv%s not found", ipFamily)
+	}).Within(time.Second * 3).Should(Succeed())
+
+	return nonGWRoute.Name
+}
+
+func (t *nonGWRouteHandlerTestDriver) ensureNumNonGatewayRoutes(num int) {
+	Consistently(func() int {
+		list, err := t.submClient.SubmarinerV1().NonGatewayRoutes(testing.Namespace).List(context.TODO(), metav1.ListOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		return len(list.Items)
+	}).Should(Equal(num))
+}

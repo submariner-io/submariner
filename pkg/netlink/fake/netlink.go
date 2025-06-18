@@ -208,11 +208,20 @@ func (n *basicType) AddrDel(link netlink.Link, addr *netlink.Addr) error {
 	return nil
 }
 
-func (n *basicType) AddrList(link netlink.Link, _ k8snet.IPFamily) ([]netlink.Addr, error) {
+func (n *basicType) AddrList(link netlink.Link, family k8snet.IPFamily) ([]netlink.Addr, error) {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
-	return n.addrs[link.Attrs().Index], nil
+	var retAddrs []netlink.Addr
+
+	addrs := n.addrs[link.Attrs().Index]
+	for i := range addrs {
+		if k8snet.IPFamilyOfCIDR(addrs[i].IPNet) == family {
+			retAddrs = append(retAddrs, addrs[i])
+		}
+	}
+
+	return retAddrs, nil
 }
 
 func (n *basicType) AddrSubscribe(updateCh chan netlink.AddrUpdate, _ chan struct{}) error {
@@ -720,6 +729,12 @@ func (n *NetLink) AwaitNoRule(table int, src, dst string) {
 	Eventually(func() *netlink.Rule {
 		return n.getRule(table, src, dst)
 	}, 5).Should(BeNil(), "Rule for %v exists", table)
+}
+
+func (n *NetLink) EnsureNoRule(table int, src, dst string) {
+	Consistently(func() *netlink.Rule {
+		return n.getRule(table, src, dst)
+	}).Should(BeNil(), "Rule for %v exists", table)
 }
 
 func (n *NetLink) SetupDefaultGateway(family k8snet.IPFamily, intf net.Interface, addrs ...net.Addr) {

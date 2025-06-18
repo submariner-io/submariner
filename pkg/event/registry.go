@@ -69,7 +69,7 @@ func (er *Registry) addHandler(ctx context.Context, eventHandler Handler) error 
 		evNetworkPlugins.Insert(strings.ToLower(np))
 	}
 
-	if evNetworkPlugins.Has(AnyNetworkPlugin) || evNetworkPlugins.Has(er.networkPlugin) {
+	if er.networkPlugin == AnyNetworkPlugin || evNetworkPlugins.Has(AnyNetworkPlugin) || evNetworkPlugins.Has(er.networkPlugin) {
 		if err := eventHandler.Init(ctx); err != nil {
 			return errors.Wrapf(err, "Event handler %q failed to initialize", eventHandler.GetName())
 		}

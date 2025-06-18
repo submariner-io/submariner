@@ -25,6 +25,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
 	"k8s.io/utils/set"
@@ -105,7 +106,7 @@ func (ovn *Handler) programRulesForRemoteSubnets(subnets []string, ruleFunc func
 
 		err = ruleFunc(rule)
 		if err != nil && !ignoredErrorFunc(err) {
-			return errors.Wrapf(err, "error handling rule %#v", rule)
+			return errors.Wrapf(err, "error handling rule: %s", resource.ToJSON(rule))
 		}
 	}
 

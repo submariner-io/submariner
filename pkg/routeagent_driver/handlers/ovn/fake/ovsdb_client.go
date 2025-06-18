@@ -154,7 +154,7 @@ func (c *OVSDBClient) Create(models ...model.Model) ([]ovsdb.Operation, error) {
 	return []ovsdb.Operation{}, nil
 }
 
-func (c *OVSDBClient) hasModel(m any) bool {
+func (c *OVSDBClient) hasModel(m any) (bool, string) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -163,28 +163,46 @@ func (c *OVSDBClient) hasModel(m any) bool {
 		case *nbdb.LogicalRouterPolicy:
 			if strings.Contains(o.(*nbdb.LogicalRouterPolicy).Match, t.Match) &&
 				reflect.DeepEqual(o.(*nbdb.LogicalRouterPolicy).Nexthop, t.Nexthop) {
-				return true
+				return true, ""
 			}
 		case *nbdb.LogicalRouterStaticRoute:
 			if o.(*nbdb.LogicalRouterStaticRoute).IPPrefix == t.IPPrefix {
-				return true
+				return true, ""
 			}
 		}
 	}
 
-	return false
+	return false, resource.ToJSON(c.models[reflect.TypeOf(m)])
 }
 
 func (c *OVSDBClient) AwaitModel(m any) {
-	Eventually(func() bool {
-		return c.hasModel(m)
-	}).Should(BeTrue(), "OVSBD model not found: %s", resource.ToJSON(m))
+	Eventually(func(g Gomega) {
+		found, existing := c.hasModel(m)
+		g.Expect(found).To(BeTrue(), "OVSBD model not found: %s. Actual models: %v", resource.ToJSON(m), existing)
+	}).Should(Succeed())
 }
 
 func (c *OVSDBClient) AwaitNoModel(m any) {
 	Eventually(func() bool {
-		return c.hasModel(m)
+		found, _ := c.hasModel(m)
+		return found
 	}).Should(BeFalse(), "OVSBD model exists: %s", resource.ToJSON(m))
+}
+
+func (c *OVSDBClient) EnsureNoModel(m any) {
+	Consistently(func() bool {
+		found, _ := c.hasModel(m)
+		return found
+	}).Should(BeFalse(), "OVSBD model exists: %s", resource.ToJSON(m))
+}
+
+func (c *OVSDBClient) EnsureNoModelsOfType(m any) {
+	Consistently(func() bool {
+		c.mutex.Lock()
+		defer c.mutex.Unlock()
+
+		return len(c.models[reflect.TypeOf(m)]) == 0
+	}).Should(BeFalse(), "OVSBD models exist")
 }
 
 type noopConditionalAPI struct{}

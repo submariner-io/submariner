@@ -79,7 +79,7 @@ func NewGatewayRouteController(ipFamily k8snet.IPFamily, config watcher.Config, 
 		return nil, errors.Wrapf(err, "error starting the resource watcher")
 	}
 
-	logger.Info("Started GatewayRouteController")
+	logger.Infof("Started GatewayRouteController for IPv%s with mgmt IP %q", controller.ipFamily, controller.mgmtIP)
 
 	return controller, nil
 }
@@ -117,6 +117,7 @@ func (g *GatewayRouteController) reconcileRemoteSubnets(subMGWRoute *submarinerv
 	}
 
 	if subMGWRoute.RoutePolicySpec.NextHops[0] != g.mgmtIP {
+		logger.Infof("reconcileRemoteSubnets skipping: %q, %q", subMGWRoute.RoutePolicySpec.NextHops[0], g.mgmtIP)
 		// The current node is not the gateway node and hence ignore the event
 		return nil
 	}

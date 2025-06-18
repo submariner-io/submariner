@@ -74,7 +74,7 @@ func NewNonGatewayRouteController(ipFamily k8snet.IPFamily, config watcher.Confi
 		return nil, errors.Wrapf(err, "error starting non gateway route controller")
 	}
 
-	logger.Info("Started NonGatewayRouteController")
+	logger.Info("Started NonGatewayRouteController for IPv%s", controller.ipFamily)
 
 	return controller, nil
 }
