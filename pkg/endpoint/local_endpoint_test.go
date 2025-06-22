@@ -23,6 +23,7 @@ import (
 	"errors"
 	"net"
 	"os"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -185,6 +186,22 @@ var _ = Describe("GetLocalSpec", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(spec.Subnets).To(HaveExactElements(globalnetCIDR, ipv6CIDR))
 			})
+		})
+	})
+
+	Context("with ipv6-stack", func() {
+		BeforeEach(func() {
+			submSpec.ClusterCidr = []string{ipv6CIDR}
+		})
+
+		It("should set IPv6 private IP", func() {
+			spec, err := endpoint.GetLocalSpec(context.TODO(), submSpec, client, true)
+			Expect(err).ToNot(HaveOccurred())
+
+			ipv6PrivateAddr := spec.GetPrivateIP(k8snet.IPv6)
+			Expect(ipv6PrivateAddr).To(Equal(endpoint.GetLocalIP(k8snet.IPv6)))
+
+			Expect(spec.CableName).To(ContainSubstring(strings.ReplaceAll(ipv6PrivateAddr, ":", "-")))
 		})
 	})
 
