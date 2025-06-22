@@ -183,8 +183,16 @@ func GetLocalSpec(ctx context.Context, submSpec *types.SubmarinerSpecification, 
 		endpointSpec.SetPrivateIP(GetLocalIP(family))
 	}
 
-	endpointSpec.CableName = fmt.Sprintf("submariner-cable-%s-%s", submSpec.ClusterID,
-		strings.ReplaceAll(endpointSpec.GetPrivateIP(k8snet.IPv4), ".", "-"))
+	var replacedIP string
+
+	if ip := endpointSpec.GetPrivateIP(k8snet.IPv4); ip != "" {
+		replacedIP = strings.ReplaceAll(ip, ".", "-")
+	} else {
+		ip := endpointSpec.GetPrivateIP(k8snet.IPv6)
+		replacedIP = strings.ReplaceAll(ip, ":", "-")
+	}
+
+	endpointSpec.CableName = fmt.Sprintf("submariner-cable-%s-%s", submSpec.ClusterID, replacedIP)
 
 	for _, family := range submSpec.GetIPFamilies() {
 		publicIP, resolver, err := GetPublicIP(family, submSpec, k8sClient, backendConfig, airGappedDeployment)
