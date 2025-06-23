@@ -117,6 +117,12 @@ var _ = Describe("GetLocalSpec", func() {
 
 		Expect(netLink.RouteAdd(&netlink.Route{
 			LinkIndex: 2,
+			Src:       net.ParseIP("fd69::2"),
+			Gw:        net.ParseIP("2001:0:0:0::"),
+		})).To(Succeed())
+
+		Expect(netLink.RouteAdd(&netlink.Route{
+			LinkIndex: 2,
 			Src:       net.ParseIP(ipv6LocalIP),
 			Gw:        net.ParseIP("2001:0:0:0::"),
 		})).To(Succeed())
