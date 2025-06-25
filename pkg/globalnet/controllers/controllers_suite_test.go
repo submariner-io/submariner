@@ -75,7 +75,7 @@ func init() {
 	kzerolog.AddFlags(nil)
 
 	_ = submarinerv1.AddToScheme(scheme.Scheme)
-	_ = mcsv1a1.AddToScheme(scheme.Scheme)
+	_ = mcsv1a1.Install(scheme.Scheme)
 }
 
 var _ = BeforeSuite(func() {
@@ -127,7 +127,7 @@ func newTestDriverBase() *testDriverBase {
 		localSubnets:             []string{},
 		expectInstantiationError: false,
 	}
-	Expect(mcsv1a1.AddToScheme(t.scheme)).To(Succeed())
+	Expect(mcsv1a1.Install(t.scheme)).To(Succeed())
 	Expect(submarinerv1.AddToScheme(t.scheme)).To(Succeed())
 	Expect(corev1.AddToScheme(t.scheme)).To(Succeed())
 

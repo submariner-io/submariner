@@ -110,7 +110,7 @@ func main() {
 
 	defer http.StartServer(http.Metrics|http.Profile, spec.MetricsPort)()
 
-	err = mcsv1a1.AddToScheme(scheme.Scheme)
+	err = mcsv1a1.Install(scheme.Scheme)
 	logger.FatalOnError(err, "Error adding Multicluster v1alpha1 to the scheme")
 
 	err = submarinerv1.AddToScheme(scheme.Scheme)
