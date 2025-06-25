@@ -23,6 +23,7 @@ import (
 	"net"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/submariner/pkg/cni"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	k8snet "k8s.io/utils/net"
 )
@@ -74,14 +75,16 @@ func GetLocalIPForDestination(dst string, family k8snet.IPFamily) string {
 			return localAddr.IP.String()
 		}
 
-		logger.Warningf("IP %q returned from Dial isn't usable - trying to find another IP from the same interface", localAddr.IP)
+		logger.Infof("IP %q returned from Dial isn't usable - trying to find another IP from the same interface", localAddr.IP)
 
 		// Try to find a valid global-scope IP from the same interface
 		ifaceIP, err := getValidGlobalIPv6FromSameInterface(localAddr.IP)
-		if err == nil {
+		if err != nil {
+			logger.Errorf(err, "Error retrieving valid IPv6 address for %q", localAddr.IP)
+		} else if ifaceIP != "" {
 			return ifaceIP
 		} else {
-			logger.Warningf("Failed to retrieve valid IPv6 address for %q: %v", localAddr.IP, err)
+			logger.Infof("No acceptable IPv6 found on same interface as %q, trying route-based discovery", localAddr.IP)
 		}
 	}
 
@@ -102,66 +105,29 @@ func isAcceptableIPv6(ip net.IP) bool {
 }
 
 func getValidGlobalIPv6FromSameInterface(ip net.IP) (string, error) {
-	interfaces, err := net.Interfaces()
+	hostInterfaces, err := cni.HostInterfaces()
 	if err != nil {
 		return "", errors.Wrap(err, "failed to list interfaces")
 	}
-	var (
-		ownedIfaceName  string
-		ownedIfaceAddrs []net.Addr
-	)
 
-	for _, iface := range interfaces {
-		addrs, err := iface.Addrs()
-		if err != nil {
-			logger.Warningf("Failed to list the address from the interface %v", iface.Name)
+	var ownedIfaceName string
+
+	for i := range hostInterfaces {
+		actualIP, _, err := net.ParseCIDR(hostInterfaces[i].Addr)
+		if err != nil || k8snet.IPFamilyOf(actualIP) != k8snet.IPv6 {
 			continue
 		}
 
-		// Confirm this interface owns the original (non-global) IP
-		ownsIP := false
-
-		for _, addr := range addrs {
-			ipNet, ok := addr.(*net.IPNet)
-			if !ok || ipNet.IP.To4() != nil {
-				continue
-			}
-
-			if ipNet.Contains(ip) {
-				ownsIP = true
-				break
-			}
+		if ownedIfaceName == "" && actualIP.Equal(ip) {
+			ownedIfaceName = hostInterfaces[i].Name
 		}
 
-		if ownsIP {
-			ownedIfaceName = iface.Name
-			ownedIfaceAddrs = addrs
-
-			break
+		if ownedIfaceName != "" && ownedIfaceName == hostInterfaces[i].Name && isAcceptableIPv6(actualIP) {
+			return actualIP.String(), nil
 		}
 	}
 
-	if len(ownedIfaceAddrs) == 0 {
-		return "", fmt.Errorf("no interface for IP %q was found", ip)
-	}
-	// Scan for a valid global IPv6 on the same interface
-	for _, addr := range ownedIfaceAddrs {
-		ipNet, ok := addr.(*net.IPNet)
-		if !ok {
-			continue
-		}
-
-		// Skip IPv4 addresses
-		if ipNet.IP.To4() != nil {
-			continue
-		}
-
-		if isAcceptableIPv6(ipNet.IP) {
-			return ipNet.IP.String(), nil
-		}
-	}
-
-	return "", fmt.Errorf("no valid global IPv6 found on interface %q for IP %q", ownedIfaceName, ip)
+	return "", nil
 }
 
 func GetLocalIP(family k8snet.IPFamily) string {

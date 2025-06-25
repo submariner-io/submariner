@@ -48,9 +48,10 @@ const testNodeName = "this-node"
 
 var _ = Describe("GetLocalSpec", func() {
 	var (
-		submSpec *types.SubmarinerSpecification
-		client   kubernetes.Interface
-		node     *v1.Node
+		submSpec     *types.SubmarinerSpecification
+		client       kubernetes.Interface
+		node         *v1.Node
+		originalDial = endpoint.Dial
 	)
 
 	const (
@@ -127,9 +128,8 @@ var _ = Describe("GetLocalSpec", func() {
 			Gw:        net.ParseIP("2001:0:0:0::"),
 		})).To(Succeed())
 
-		defaultDial := endpoint.Dial
 		DeferCleanup(func() {
-			endpoint.Dial = defaultDial
+			endpoint.Dial = originalDial
 		})
 
 		endpoint.Dial = func(_, _ string) (net.Conn, error) {
