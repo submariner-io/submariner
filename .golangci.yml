@@ -207,6 +207,10 @@ linters:
       - linters:
           - contextcheck
         path: main.go
+      # Allow corev1.Endpoints and related types, they are not going away (https://github.com/kubernetes/kubernetes/pull/130098)
+      - linters:
+          - staticcheck
+        text: "SA1019: corev1.Endpoint"
     paths:
       - third_party$
       - builtin$
