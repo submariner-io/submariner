@@ -32,6 +32,10 @@ var (
 		k8snet.IPv4: "8.8.8.8",
 		k8snet.IPv6: "2001:4860:4860::8888",
 	}
+
+	// Holds IPv6 address reserved by OVN-Kubernetes for internal usage.
+	infraInternalIPv6 = net.ParseIP("fd69::2")
+
 	Dial = net.Dial
 )
 
@@ -49,7 +53,7 @@ func getLocalIPFromRoutes(family k8snet.IPFamily) (string, error) {
 			// these IPs are used internally by OVNK infra dataplane, and they should
 			// not be selected as private IPs.
 			ip := routes[i].Src
-			if family == k8snet.IPv6 && !isValidGlobalIPv6(ip) {
+			if family == k8snet.IPv6 && !isAcceptableIPv6(ip) {
 				continue
 			}
 
@@ -66,7 +70,7 @@ func GetLocalIPForDestination(dst string, family k8snet.IPFamily) string {
 		defer conn.Close()
 		localAddr := conn.LocalAddr().(*net.UDPAddr)
 
-		if family == k8snet.IPv4 || isValidGlobalIPv6(localAddr.IP) {
+		if family == k8snet.IPv4 || isAcceptableIPv6(localAddr.IP) {
 			return localAddr.IP.String()
 		}
 
@@ -88,14 +92,13 @@ func GetLocalIPForDestination(dst string, family k8snet.IPFamily) string {
 	return localIP
 }
 
-func isValidGlobalIPv6(ip net.IP) bool {
-	// fd00::/8 - avoid locally assigned ULA
-	if ip.To16() == nil || ip.IsLoopback() || ip.IsLinkLocalUnicast() ||
-		ip[0] == 0xfd {
-		return false
-	}
-	// Accept fc00::/8 or global unicast (2000::/3)
-	return ip[0] == 0xfc || (ip[0]&0xe0 == 0x20)
+func isAcceptableIPv6(ip net.IP) bool {
+	ip = ip.To16()
+
+	return ip != nil &&
+		!ip.IsLoopback() &&
+		!ip.IsLinkLocalUnicast() &&
+		!ip.Equal(infraInternalIPv6)
 }
 
 func getValidGlobalIPv6FromSameInterface(ip net.IP) (string, error) {
@@ -148,7 +151,12 @@ func getValidGlobalIPv6FromSameInterface(ip net.IP) (string, error) {
 			continue
 		}
 
-		if isValidGlobalIPv6(ipNet.IP) {
+		// Skip IPv4 addresses
+		if ipNet.IP.To4() != nil {
+			continue
+		}
+
+		if isAcceptableIPv6(ipNet.IP) {
 			return ipNet.IP.String(), nil
 		}
 	}
