@@ -48,7 +48,7 @@ jobs:
         extra-toggles: ['', 'ovn']
         globalnet: ['', 'globalnet']
         # Run most tests against the latest K8s version
-        k8s_version: ['1.32']
+        k8s_version: ['k8s-latest']
         exclude:
           - cable-driver: wireguard
             extra-toggles: ovn
@@ -61,12 +61,11 @@ jobs:
           - extra-toggles: nftables, globalnet
           - extra-toggles: dual-stack, ovn
           # Oldest Kubernetes version thought to work with SubM.
-          # This should match minK8sMajor.minK8sMinor in subctl/pkg/version/version.go.
           # If this breaks, we may advance the oldest-working K8s version instead of fixing it. See:
           # https://submariner.io/development/building-testing/ci-maintenance/
-          - k8s_version: '1.19'
+          - k8s_version: 'k8s-oldest-working'
           # Test top and bottom of supported K8s version range
-          - k8s_version: '1.29'
+          - k8s_version: 'k8s-oldest-supported'
     steps:
       - name: Check out the repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
