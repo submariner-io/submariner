@@ -72,7 +72,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Run E2E deployment and tests
-        uses: submariner-io/shipyard/gh-actions/e2e@devel
+        uses: submariner-io/shipyard/gh-actions/e2e@e9840c64ccb07efeb0cadc6f69215b8778dc471d
         with:
           using: ${{ matrix.globalnet }} ${{ matrix.cable-driver }} ${{ matrix.extra-toggles }}
 
