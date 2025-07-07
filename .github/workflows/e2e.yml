@@ -59,6 +59,8 @@ jobs:
           - extra-toggles: nftables
           - extra-toggles: nftables, ovn
           - extra-toggles: nftables, globalnet
+          - extra-toggles: nftables, vxlan
+          - extra-toggles: nftables, globalnet, vxlan
           - extra-toggles: dual-stack, ovn
           # Oldest Kubernetes version thought to work with SubM.
           # This should match minK8sMajor.minK8sMinor in subctl/pkg/version/version.go.
