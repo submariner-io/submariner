@@ -64,13 +64,25 @@ func NewFilteredClusterGlobalEgressIPInformer(client versioned.Interface, namesp
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.SubmarinerV1().ClusterGlobalEgressIPs(namespace).List(context.TODO(), options)
+				return client.SubmarinerV1().ClusterGlobalEgressIPs(namespace).List(context.Background(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.SubmarinerV1().ClusterGlobalEgressIPs(namespace).Watch(context.TODO(), options)
+				return client.SubmarinerV1().ClusterGlobalEgressIPs(namespace).Watch(context.Background(), options)
+			},
+			ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.SubmarinerV1().ClusterGlobalEgressIPs(namespace).List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.SubmarinerV1().ClusterGlobalEgressIPs(namespace).Watch(ctx, options)
 			},
 		},
 		&apissubmarineriov1.ClusterGlobalEgressIP{},
