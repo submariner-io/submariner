@@ -36,6 +36,7 @@ import (
 	"github.com/vishvananda/netlink"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	k8snet "k8s.io/utils/net"
 )
 
@@ -291,6 +292,19 @@ func (ovn *Handler) processEndpointSubnets(add bool, endpoints ...submarinerv1.E
 			}
 
 			allSubnets = append(allSubnets, subnet)
+		}
+	}
+
+	// for GlobalNet case, add IPv4 cluster CIDRs to avoid SNAT annotation list
+	localSubnetsSet := sets.NewString(ovn.localSubnets...)
+
+	for _, cidr := range ovn.HandlerConfig.ClusterCIDR {
+		if k8snet.IPFamilyOfCIDRString(cidr) != k8snet.IPv4 {
+			continue
+		}
+
+		if !localSubnetsSet.Has(cidr) {
+			allSubnets = append(allSubnets, cidr)
 		}
 	}
 

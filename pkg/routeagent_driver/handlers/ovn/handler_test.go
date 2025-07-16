@@ -41,6 +41,7 @@ import (
 	"github.com/vishvananda/netlink"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
@@ -79,12 +80,12 @@ var _ = Describe("Handler", func() {
 			t.clusterCIDR = ipv4ClusterCIDR
 			t.serviceCIDR = ipv4serviceCIDR
 			t.OVNK8sMgmntIntGw = ipv4OVNK8sMgmntIntGw
+			t.localSubnets = []string{ipv4ClusterCIDR}
 		} else {
 			t.clusterCIDR = ipv6ClusterCIDR
 			t.serviceCIDR = ipv6serviceCIDR
 			t.OVNK8sMgmntIntGw = ipv6OVNK8sMgmntIntGw
 		}
-
 		_, err := t.k8sClient.CoreV1().Pods(testing.Namespace).Create(context.Background(), &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "ovn-pod",
@@ -208,6 +209,7 @@ type handlerTestDriver struct {
 	serviceCIDR      string
 	OVNK8sMgmntIntGw string
 	ovsdbClient      *fakeovn.OVSDBClient
+	localSubnets     []string
 }
 
 func (t *handlerTestDriver) Start(handler event.Handler) {
@@ -290,7 +292,13 @@ func (t *handlerTestDriver) testRemoteEndpoint(ipFamilySubnets, nonIPFamilySubne
 					t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmPostRoutingChain, ContainSubstring("\"DestCIDR\":%q", s))
 				}
 
-				t.awaitOVNKNodeAnnotationContaining(endpointSubnets...)
+				s := sets.NewString(endpointSubnets...)
+				if t.ipFamily == k8snet.IPv4 {
+					s.Insert(t.localSubnets...)
+				}
+
+				uniqueSubnets := s.List()
+				t.awaitOVNKNodeAnnotationContaining(uniqueSubnets...)
 
 				By("Updating remote Endpoint")
 
@@ -350,7 +358,14 @@ func (t *handlerTestDriver) testGatewayTransitions(ipFamilySubnets, nonIPFamilyS
 				t.netLink.EnsureNoRule(constants.RouteAgentInterClusterNetworkTableID, s, t.clusterCIDR)
 			}
 
-			t.awaitOVNKNodeAnnotationContaining(ipFamilySubnets...)
+			s := sets.NewString(ipFamilySubnets...)
+			if t.ipFamily == k8snet.IPv4 {
+				s.Insert(t.localSubnets...)
+			}
+
+			uniqueSubnets := s.List()
+
+			t.awaitOVNKNodeAnnotationContaining(uniqueSubnets...)
 
 			t.netLink.AwaitGwRoutes(0, constants.RouteAgentInterClusterNetworkTableID, t.OVNK8sMgmntIntGw)
 

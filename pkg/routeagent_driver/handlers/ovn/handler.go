@@ -68,6 +68,7 @@ type Handler struct {
 	nonGatewayRouteController *NonGatewayRouteController
 	stopCh                    chan struct{}
 	ipFamily                  k8snet.IPFamily
+	localSubnets              []string
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("OVN")}
@@ -151,6 +152,8 @@ func (ovn *Handler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 	var err error
 
 	interfaceName := endpoint.Spec.BackendConfig[cable.InterfaceNameConfig]
+	ovn.localSubnets = endpoint.Spec.Subnets
+
 	if interfaceName != "" {
 		// NOTE: This assumes that LocalEndpointCreated happens before than TransitionToGatewayNode
 		intf, err := net.InterfaceByName(interfaceName)
