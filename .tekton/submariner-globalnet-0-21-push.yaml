@@ -29,6 +29,8 @@ spec:
     - linux/x86_64
   - name: dockerfile
     value: package/Dockerfile.submariner-globalnet.konflux
+  - name: build-source-image
+    value: "true"
   pipelineSpec:
     description: |
       This pipeline is ideal for building multi-arch container images from a Containerfile while maintaining trust after pipeline customization.
