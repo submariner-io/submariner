@@ -32,7 +32,6 @@ ARG BASE_BRANCH
 ARG SOURCE
 ARG TARGETPLATFORM
 
-# Installs only the necessary nftables packages available in UBI 9.
 RUN microdnf -y update && \
     microdnf -y install --nodocs iproute iptables-nft nftables ipset shadow-utils grep && \
     microdnf clean all
