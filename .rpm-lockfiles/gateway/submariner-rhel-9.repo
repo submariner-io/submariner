@@ -1,0 +1,37 @@
+# NOTE: This file points to the official Red Hat Enterprise Linux 9 repositories.
+# Access requires a valid Red Hat subscription and entitlement certificates.
+#
+# The tool running this (rpm-lockfile-prototype) must have access to your
+# entitlement certificates at the paths specified by 'sslclientcert' and
+# 'sslclientkey' below. If you are running the tool in a container, you may
+# need to mount your host's /etc/pki/entitlement directory.
+
+[rhel-9-for-$basearch-baseos-rpms]
+name = Red Hat Enterprise Linux 9 for $basearch - BaseOS (RPMs)
+baseurl = https://cdn.redhat.com/content/dist/rhel9/9/$basearch/baseos/os
+enabled = 1
+gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+gpgcheck = 1
+sslverify = 0
+sslclientcert = /etc/pki/entitlement/8042786796365856351.pem
+sslclientkey = /etc/pki/entitlement/8042786796365856351-key.pem
+
+[rhel-9-for-$basearch-appstream-rpms]
+name = Red Hat Enterprise Linux 9 for $basearch - AppStream (RPMs)
+baseurl = https://cdn.redhat.com/content/dist/rhel9/9/$basearch/appstream/os
+enabled = 1
+gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+gpgcheck = 1
+sslverify = 0
+sslclientcert = /etc/pki/entitlement/8042786796365856351.pem
+sslclientkey = /etc/pki/entitlement/8042786796365856351-key.pem
+
+[codeready-builder-for-rhel-9-$basearch-rpms]
+name = Red Hat CodeReady Linux Builder for RHEL 9 $basearch (RPMs)
+baseurl = https://cdn.redhat.com/content/dist/rhel9/9/$basearch/codeready-builder/os
+enabled = 1
+gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+gpgcheck = 1
+sslverify = 0
+sslclientcert = /etc/pki/entitlement/8042786796365856351.pem
+sslclientkey = /etc/pki/entitlement/8042786796365856351-key.pem
