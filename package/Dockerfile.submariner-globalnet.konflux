@@ -27,14 +27,14 @@ RUN CGO_ENABLED=0 GOARCH=${TARGETPLATFORM##*/} go build \
     -v -o ${SOURCE}/bin/${TARGETPLATFORM}/submariner-globalnet \
     ${SOURCE}/pkg/globalnet
 
-FROM --platform=${TARGETPLATFORM} registry.redhat.io/ubi9-minimal:latest
+FROM --platform=${TARGETPLATFORM} registry.redhat.io/ubi9:latest
 ARG BASE_BRANCH
 ARG SOURCE
 ARG TARGETPLATFORM
 
-RUN microdnf -y update && \
-    microdnf -y install --nodocs iproute iptables-nft nftables ipset shadow-utils grep && \
-    microdnf clean all
+RUN dnf -y update && \
+    dnf -y install --nodocs iproute iptables-nft nftables ipset shadow-utils grep && \
+    dnf clean all
 
 RUN adduser -r -l -u 1001010000 submariner
 
