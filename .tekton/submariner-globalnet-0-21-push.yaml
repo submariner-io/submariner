@@ -31,6 +31,10 @@ spec:
     value: package/Dockerfile.submariner-globalnet.konflux
   - name: build-source-image
     value: "true"
+  - name: prefetch-input
+    value: '[{"type": "gomod", "path": "."}, {"type": "gomod", "path": "tools"}]'
+  - name: hermetic
+    value: "true"
   pipelineSpec:
     description: |
       This pipeline is ideal for building multi-arch container images from a Containerfile while maintaining trust after pipeline customization.
