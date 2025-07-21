@@ -1,0 +1,166 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: aarch64
+  packages:
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/d/dnf-plugins-core-4.3.0-20.el9.noarch.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 42088
+    checksum: sha256:2b210700d5b260b61931922395603b5cbaab04c61092fc91b8710c8abf8232e3
+    name: dnf-plugins-core
+    evr: 4.3.0-20.el9
+    sourcerpm: dnf-plugins-core-4.3.0-20.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/i/ipset-7.11-11.el9_5.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 45643
+    checksum: sha256:279946f3c482efea0e7b3ec7608a00434736f2d0669a03b1e8ea278503ef3b77
+    name: ipset
+    evr: 7.11-11.el9_5
+    sourcerpm: ipset-7.11-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/i/ipset-libs-7.11-11.el9_5.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 70577
+    checksum: sha256:af06e8035b4c13a22ed5ff54ff2fb2694711e7a29f830f96598495f1392de9ab
+    name: ipset-libs
+    evr: 7.11-11.el9_5
+    sourcerpm: ipset-7.11-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/i/iptables-libs-1.8.10-11.el9_5.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 477723
+    checksum: sha256:73eadf9d16ea9ebb340664873522ef83ad0c28106751783d61c6315a8f0d466f
+    name: iptables-libs
+    evr: 1.8.10-11.el9_5
+    sourcerpm: iptables-1.8.10-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/i/iptables-nft-1.8.10-11.el9_5.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 212143
+    checksum: sha256:5789f27966252aadd8bf0eae25d324defc2528312ff21b21c4ddb80d1c0b104d
+    name: iptables-nft
+    evr: 1.8.10-11.el9_5
+    sourcerpm: iptables-1.8.10-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/j/jansson-2.14-1.el9.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 50251
+    checksum: sha256:7c002eb9c81bad49b8a11d9790af6220cce5fb882be7ca11335882d079d1473f
+    name: jansson
+    evr: 2.14-1.el9
+    sourcerpm: jansson-2.14-1.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/l/libnetfilter_conntrack-1.0.9-1.el9.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 61151
+    checksum: sha256:28d0047c487c8d8bc6b9544fa0a6ac837a50c309641c689e834a4959d6f1ac01
+    name: libnetfilter_conntrack
+    evr: 1.0.9-1.el9
+    sourcerpm: libnetfilter_conntrack-1.0.9-1.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/l/libnfnetlink-1.0.1-23.el9_5.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 31790
+    checksum: sha256:3bc75fd1a2cf80c51709901538ad65555406ffb0805a91fd59ce02f1a8ddd67c
+    name: libnfnetlink
+    evr: 1.0.1-23.el9_5
+    sourcerpm: libnfnetlink-1.0.1-23.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/l/libnftnl-1.2.6-4.el9_4.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 88780
+    checksum: sha256:3e5aa1f38999f45d1720a28af8363a0989e41e8627d70cb18556f2c96841700f
+    name: libnftnl
+    evr: 1.2.6-4.el9_4
+    sourcerpm: libnftnl-1.2.6-4.el9_4.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/n/nftables-1.0.9-3.el9.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 430289
+    checksum: sha256:fb8f6e51225d67ec0051c7adae8fec711a666f9cd349099b221b5e0b53ed7e0b
+    name: nftables
+    evr: 1:1.0.9-3.el9
+    sourcerpm: nftables-1.0.9-3.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/p/procps-ng-3.3.17-14.el9.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 363344
+    checksum: sha256:a8c7514beb4c3cafa6341f43bbe285319d863b2893a34d91159dc8e90f615dd2
+    name: procps-ng
+    evr: 3.3.17-14.el9
+    sourcerpm: procps-ng-3.3.17-14.el9.src.rpm
+  source: []
+  module_metadata: []
+- arch: x86_64
+  packages:
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/d/dnf-plugins-core-4.3.0-20.el9.noarch.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 42088
+    checksum: sha256:2b210700d5b260b61931922395603b5cbaab04c61092fc91b8710c8abf8232e3
+    name: dnf-plugins-core
+    evr: 4.3.0-20.el9
+    sourcerpm: dnf-plugins-core-4.3.0-20.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/i/ipset-7.11-11.el9_5.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 45774
+    checksum: sha256:853a048135da647d6b84039d3218300c334444a5b64769ae592a5f967aebeb5d
+    name: ipset
+    evr: 7.11-11.el9_5
+    sourcerpm: ipset-7.11-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/i/ipset-libs-7.11-11.el9_5.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 72301
+    checksum: sha256:74e95b61324dbdb44060672764ec18b72eeb7f368bb12de1481c0b7b5feaa176
+    name: ipset-libs
+    evr: 7.11-11.el9_5
+    sourcerpm: ipset-7.11-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/i/iptables-libs-1.8.10-11.el9_5.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 476678
+    checksum: sha256:3e79ca4cc3d35c1f1e0ac6c9f05c5be56b7ab6dd1f8ae719a21ec1b9e3bfa018
+    name: iptables-libs
+    evr: 1.8.10-11.el9_5
+    sourcerpm: iptables-1.8.10-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/i/iptables-nft-1.8.10-11.el9_5.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 214056
+    checksum: sha256:54e031813637738af285ff4b1c2e4a20b913f2ea643a29940a07ccaf8bd197f5
+    name: iptables-nft
+    evr: 1.8.10-11.el9_5
+    sourcerpm: iptables-1.8.10-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/j/jansson-2.14-1.el9.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 49137
+    checksum: sha256:4e9aec51ee46d7265d6edd1245b5d5ab5e8336dc2a4ca17f2cace2ce8bae3761
+    name: jansson
+    evr: 2.14-1.el9
+    sourcerpm: jansson-2.14-1.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/l/libnetfilter_conntrack-1.0.9-1.el9.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 62066
+    checksum: sha256:beeb73e78390077c6afd9ed6177bad8bad278dbfaae9d90edf7243cdf6a44a3f
+    name: libnetfilter_conntrack
+    evr: 1.0.9-1.el9
+    sourcerpm: libnetfilter_conntrack-1.0.9-1.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/l/libnfnetlink-1.0.1-23.el9_5.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 32236
+    checksum: sha256:177882bfe48c9c9effc7b1bce6b58b2466988c53e400c07fb1ba2d3a4ebe6f40
+    name: libnfnetlink
+    evr: 1.0.1-23.el9_5
+    sourcerpm: libnfnetlink-1.0.1-23.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/l/libnftnl-1.2.6-4.el9_4.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 91380
+    checksum: sha256:e64d7b270be4be36af80ed220852cb760a1069e34667b1ba9eec7a02762a14bf
+    name: libnftnl
+    evr: 1.2.6-4.el9_4
+    sourcerpm: libnftnl-1.2.6-4.el9_4.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/n/nftables-1.0.9-3.el9.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 437243
+    checksum: sha256:1e02a3396ca514706f1a0814e3e7a03f15cff6fb7af1d5b1bf49d3d991f0d927
+    name: nftables
+    evr: 1:1.0.9-3.el9
+    sourcerpm: nftables-1.0.9-3.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/p/procps-ng-3.3.17-14.el9.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 361526
+    checksum: sha256:506ad778f63821e8d9647ca8e0a3ff21b8af9c1666060d5200f9b26ee718333c
+    name: procps-ng
+    evr: 3.3.17-14.el9
+    sourcerpm: procps-ng-3.3.17-14.el9.src.rpm
+  source: []
+  module_metadata: []
