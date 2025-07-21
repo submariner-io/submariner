@@ -1,0 +1,180 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: aarch64
+  packages:
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/l/ldns-1.7.1-12.el9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-appstream-rpms
+    size: 160183
+    checksum: sha256:dc2771e743664f35653bc34309b0da3402ee0e67f79548afcb9286edee4e813d
+    name: ldns
+    evr: 1.7.1-12.el9
+    sourcerpm: ldns-1.7.1-12.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/l/libreswan-4.15-8.el9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-appstream-rpms
+    size: 1427745
+    checksum: sha256:fc2e10ce0c094040d170e253938dc7e5679f96798a837931994cbd7b761b0682
+    name: libreswan
+    evr: 4.15-8.el9
+    sourcerpm: libreswan-4.15-8.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/n/nspr-4.35.0-17.el9_2.aarch64.rpm
+    repoid: rhel-9-for-aarch64-appstream-rpms
+    size: 136412
+    checksum: sha256:d6bf6ce947ef0fc91a4d0e3d3d0bff464d6e9483a3df353df16996dd2504bcb3
+    name: nspr
+    evr: 4.35.0-17.el9_2
+    sourcerpm: nss-3.101.0-10.el9_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/n/nss-3.101.0-10.el9_2.aarch64.rpm
+    repoid: rhel-9-for-aarch64-appstream-rpms
+    size: 715233
+    checksum: sha256:82382945fd9b359d78eee74fa631774ed9867f0e51031afe90c167eb3904a02e
+    name: nss
+    evr: 3.101.0-10.el9_2
+    sourcerpm: nss-3.101.0-10.el9_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/n/nss-softokn-3.101.0-10.el9_2.aarch64.rpm
+    repoid: rhel-9-for-aarch64-appstream-rpms
+    size: 395776
+    checksum: sha256:d300da461a1a1d791d8d8358415fdfcbd06fce516eeb3a6d24f2ed31682faa70
+    name: nss-softokn
+    evr: 3.101.0-10.el9_2
+    sourcerpm: nss-3.101.0-10.el9_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/n/nss-softokn-freebl-3.101.0-10.el9_2.aarch64.rpm
+    repoid: rhel-9-for-aarch64-appstream-rpms
+    size: 310319
+    checksum: sha256:9eedc117413f39248290d35b07c89f915432fd872e1204c63643cef3c7bc463c
+    name: nss-softokn-freebl
+    evr: 3.101.0-10.el9_2
+    sourcerpm: nss-3.101.0-10.el9_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/n/nss-sysinit-3.101.0-10.el9_2.aarch64.rpm
+    repoid: rhel-9-for-aarch64-appstream-rpms
+    size: 21018
+    checksum: sha256:5408f22abccf0ae737bb0ed9263422b47287352c0edc3f4eba7b10465f8dc125
+    name: nss-sysinit
+    evr: 3.101.0-10.el9_2
+    sourcerpm: nss-3.101.0-10.el9_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/n/nss-tools-3.101.0-10.el9_2.aarch64.rpm
+    repoid: rhel-9-for-aarch64-appstream-rpms
+    size: 453636
+    checksum: sha256:c2f46a3967812c7e513e4aba51b3b93111c2a90215f1fc650878fa9980392a52
+    name: nss-tools
+    evr: 3.101.0-10.el9_2
+    sourcerpm: nss-3.101.0-10.el9_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/n/nss-util-3.101.0-10.el9_2.aarch64.rpm
+    repoid: rhel-9-for-aarch64-appstream-rpms
+    size: 90707
+    checksum: sha256:ae2c232b98ebe609c404fcfaf6c75dfbb034fc12391e3913466dc410c107560f
+    name: nss-util
+    evr: 3.101.0-10.el9_2
+    sourcerpm: nss-3.101.0-10.el9_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/u/unbound-libs-1.16.2-19.el9_6.aarch64.rpm
+    repoid: rhel-9-for-aarch64-appstream-rpms
+    size: 542129
+    checksum: sha256:19c58d7725b22c442acba5d685a4fd1036298dbfba213739d2954bac228c7400
+    name: unbound-libs
+    evr: 1.16.2-19.el9_6
+    sourcerpm: unbound-1.16.2-19.el9_6.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/k/kmod-28-10.el9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 130824
+    checksum: sha256:02835d70e5283383d02367e1bb3431a74033bbd1be5e3961e572623e1cbca4ca
+    name: kmod
+    evr: 28-10.el9
+    sourcerpm: kmod-28-10.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/p/protobuf-c-1.3.3-13.el9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 38582
+    checksum: sha256:d68a518f80e00df5e63ba24d4be5058998d857e24b1af316f37001dfc91d3149
+    name: protobuf-c
+    evr: 1.3.3-13.el9
+    sourcerpm: protobuf-c-1.3.3-13.el9.src.rpm
+  source: []
+  module_metadata: []
+- arch: x86_64
+  packages:
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/l/ldns-1.7.1-12.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 164902
+    checksum: sha256:f37161dbe3d929e62495d06374179329094d69c15269c40602474765cc011357
+    name: ldns
+    evr: 1.7.1-12.el9
+    sourcerpm: ldns-1.7.1-12.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/l/libreswan-4.15-8.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 1429523
+    checksum: sha256:216eaa8bcdbeb0bc54e81288f2d03c235bcbf946ab515e967beb25cf23963c13
+    name: libreswan
+    evr: 4.15-8.el9
+    sourcerpm: libreswan-4.15-8.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/n/nspr-4.35.0-17.el9_2.x86_64.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 140607
+    checksum: sha256:2e0acde0bc7ae98792638c1aae305461486c9891ecc02817362bc0e76ae505b4
+    name: nspr
+    evr: 4.35.0-17.el9_2
+    sourcerpm: nss-3.101.0-10.el9_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/n/nss-3.101.0-10.el9_2.x86_64.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 736821
+    checksum: sha256:c642ba6fc4cf83466640f05b98ca75968db524e1f4418a2e7b30a7512aed6808
+    name: nss
+    evr: 3.101.0-10.el9_2
+    sourcerpm: nss-3.101.0-10.el9_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/n/nss-softokn-3.101.0-10.el9_2.x86_64.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 402822
+    checksum: sha256:b633b9b499984d9e02d7ffdcf575bacf54f7075173466fbba42c4a5818eae6c8
+    name: nss-softokn
+    evr: 3.101.0-10.el9_2
+    sourcerpm: nss-3.101.0-10.el9_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/n/nss-softokn-freebl-3.101.0-10.el9_2.x86_64.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 320699
+    checksum: sha256:a664810fcd953ce4c940ff6bf3693dd1dc484c1dc8ff24ca98580864fc06c367
+    name: nss-softokn-freebl
+    evr: 3.101.0-10.el9_2
+    sourcerpm: nss-3.101.0-10.el9_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/n/nss-sysinit-3.101.0-10.el9_2.x86_64.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 21285
+    checksum: sha256:16c68e2a826f0c4d27b90310c99cf1dac1d81301f7d72f24dc8a39c27a9e9925
+    name: nss-sysinit
+    evr: 3.101.0-10.el9_2
+    sourcerpm: nss-3.101.0-10.el9_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/n/nss-tools-3.101.0-10.el9_2.x86_64.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 459918
+    checksum: sha256:3e939e4436eafbb9b55cd18ab476a97a73cacffe5893f85da78716587ee4f9c8
+    name: nss-tools
+    evr: 3.101.0-10.el9_2
+    sourcerpm: nss-3.101.0-10.el9_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/n/nss-util-3.101.0-10.el9_2.x86_64.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 94111
+    checksum: sha256:1138da0bc3c4e0ead78842dc3180f1d5a60bc3824223cd1bca38eaf0c026dd9e
+    name: nss-util
+    evr: 3.101.0-10.el9_2
+    sourcerpm: nss-3.101.0-10.el9_2.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/u/unbound-libs-1.16.2-19.el9_6.x86_64.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 563280
+    checksum: sha256:8679ca436814e79f837b7760289550dd01fef3d017d7e6d0a62a682fd07b05eb
+    name: unbound-libs
+    evr: 1.16.2-19.el9_6
+    sourcerpm: unbound-1.16.2-19.el9_6.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/k/kmod-28-10.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 132888
+    checksum: sha256:e9ccad17d4c6c30524ec5c2aab8d8d351f2776ab564baccdbd2df9b54e28baea
+    name: kmod
+    evr: 28-10.el9
+    sourcerpm: kmod-28-10.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/p/protobuf-c-1.3.3-13.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 38224
+    checksum: sha256:9669f5bed1c9532ede399cd1ea6f8937ae7d18cfb56d59f2939a4b456390035f
+    name: protobuf-c
+    evr: 1.3.3-13.el9
+    sourcerpm: protobuf-c-1.3.3-13.el9.src.rpm
+  source: []
+  module_metadata: []
