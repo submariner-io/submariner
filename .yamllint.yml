@@ -11,3 +11,4 @@ rules:
 ignore: |
   **/vendor
   .tekton
+  deploy/crds
