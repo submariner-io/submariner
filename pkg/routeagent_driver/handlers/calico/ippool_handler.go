@@ -52,7 +52,6 @@ const (
 	GwLBSvcName                 = "submariner-gateway"
 	GwLBSvcROKSAnnotation       = "service.kubernetes.io/ibm-load-balancer-cloud-provider-ip-type"
 	DefaultV4IPPoolName         = "default-ipv4-ippool"
-	encapsulationIPIP           = "IPIP"
 	submarinerManagedLabel      = "submariner-managed"
 	submarinerPrevEncapsulation = "submariner-prev-encapsulation"
 )
@@ -231,24 +230,32 @@ func getEndpointSubnetIPPoolName(endpoint *submV1.Endpoint, subnet string) strin
 	return fmt.Sprintf("submariner-%s-%s", endpoint.Spec.ClusterID, strings.ReplaceAll(subnet, "/", "-"))
 }
 
-func GetDefaultInstallationEncapsulation(dynamicClient dynamic.Interface, gvr schema.GroupVersionResource) (string, error) {
+func GetDefaultInstallation(dynamicClient dynamic.Interface, gvr schema.GroupVersionResource) (tigerav1.Installation, error) {
 	installationUnstructured, err := dynamicClient.Resource(gvr).Get(context.TODO(), "default", metav1.GetOptions{})
+	var installation tigerav1.Installation
+
 	if err != nil {
-		return "", err
+		return installation, err
 	}
 
 	bytes, err := installationUnstructured.MarshalJSON()
 	if err != nil {
-		return "", err
+		return installation, err
 	}
 
-	var installation tigerav1.Installation
 	err = json.Unmarshal(bytes, &installation)
 	if err != nil {
-		return "", err
+		return installation, err
 	}
 
-	return installation.Spec.CalicoNetwork.IPPools[0].Encapsulation.String(), nil
+	return installation, nil
+}
+
+func PatchCalicoNetworkIpPoolsEncapsulation(dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, encapsulation string) error {
+	patch := []byte(`[{"op": "replace", "path": "/spec/calicoNetwork/ipPools/0/encapsulation", "value": "` + encapsulation + `"}]`)
+	_, err := dynamicClient.Resource(gvr).Patch(context.TODO(), "default", types.JSONPatchType, patch, metav1.PatchOptions{})
+
+	return err
 }
 
 func (h *calicoIPPoolHandler) platformIsROKS(ctx context.Context) (bool, error) {
@@ -319,18 +326,7 @@ func (h *calicoIPPoolHandler) updateROKSCalicoCfg(ctx context.Context) error {
 		})
 	*/
 
-	installationUnstructured, err := h.dynClient.Resource(gvrInstallations).Get(context.TODO(), "default", metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	bytes, err := installationUnstructured.MarshalJSON()
-	if err != nil {
-		return err
-	}
-
-	var installation tigerav1.Installation
-	err = json.Unmarshal(bytes, &installation)
+	installation, err := GetDefaultInstallation(h.dynClient, gvrInstallations)
 	if err != nil {
 		return err
 	}
@@ -343,8 +339,7 @@ func (h *calicoIPPoolHandler) updateROKSCalicoCfg(ctx context.Context) error {
 		return err
 	}
 
-	patch = []byte(`[{"op": "replace", "path": "/spec/calicoNetwork/ipPools/0/encapsulation", "value": "` + encapsulationIPIP + `"}]`)
-	_, err = h.dynClient.Resource(gvrInstallations).Patch(context.TODO(), "default", types.JSONPatchType, patch, metav1.PatchOptions{})
+	err = PatchCalicoNetworkIpPoolsEncapsulation(h.dynClient, gvrInstallations, tigerav1.EncapsulationIPIP.String())
 	if err != nil {
 		return err
 	}
@@ -374,18 +369,7 @@ func (h *calicoIPPoolHandler) restoreROKSCalicoCfg() error {
 		return errors.Wrap(err, "error updating default ippool")
 	*/
 
-	installationUnstructured, err := h.dynClient.Resource(gvrInstallations).Get(context.TODO(), "default", metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	bytes, err := installationUnstructured.MarshalJSON()
-	if err != nil {
-		return err
-	}
-
-	var installation tigerav1.Installation
-	err = json.Unmarshal(bytes, &installation)
+	installation, err := GetDefaultInstallation(h.dynClient, gvrInstallations)
 	if err != nil {
 		return err
 	}

@@ -32,6 +32,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/event"
 	eventtesting "github.com/submariner-io/submariner/pkg/event/testing"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/calico"
+	tigerav1 "github.com/tigera/operator/api/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -46,6 +47,12 @@ type testDriver struct {
 	handler      event.Handler
 	dynClient    *dynamicfake.FakeDynamicClient
 	calicoClient *calicocsfake.Clientset
+}
+
+var gvrInstallations = schema.GroupVersionResource{
+	Group:    "operator.tigera.io",
+	Version:  "v1",
+	Resource: "installations",
 }
 
 func newTestDriver() *testDriver {
@@ -65,7 +72,7 @@ func newTestDriver() *testDriver {
 				"calicoNetwork": map[string]interface{}{
 					"ipPools": []interface{}{
 						map[string]interface{}{
-							"encapsulation": "IPIP",
+							"encapsulation": "IPIPCrossSubnet",
 						},
 					},
 				},
@@ -155,16 +162,16 @@ func (t *testDriver) getDefaultIPPoolIPIPMode() string {
 }
 
 func (t *testDriver) getDefaultInstallationEncapsulation() string {
-	gvrInstallations := schema.GroupVersionResource{
-		Group:    "operator.tigera.io",
-		Version:  "v1",
-		Resource: "installations",
-	}
 
-	encapsulation, err := calico.GetDefaultInstallationEncapsulation(t.dynClient, gvrInstallations)
+	installation, err := calico.GetDefaultInstallation(t.dynClient, gvrInstallations)
 	Expect(err).To(Succeed())
 
-	return encapsulation
+	return installation.Spec.CalicoNetwork.IPPools[0].Encapsulation.String()
+}
+
+func (t *testDriver) patchCalicoNetworkIpPoolsEncapsulation() {
+	err := calico.PatchCalicoNetworkIpPoolsEncapsulation(t.dynClient, gvrInstallations, tigerav1.EncapsulationIPIP.String())
+	Expect(err).To(Succeed())
 }
 
 func (t *testDriver) createSubmarinerGwLBService(annotations map[string]string) {

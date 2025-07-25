@@ -84,6 +84,7 @@ var _ = Describe("IPPool Handler", func() {
 	When("the platform is ROKS", func() {
 		BeforeEach(func() {
 			t.createSubmarinerGwLBService(map[string]string{calico.GwLBSvcROKSAnnotation: "foo"})
+			t.patchCalicoNetworkIpPoolsEncapsulation()
 		})
 
 		It("should update the default Installation's Encapsulation to IPIP", func() {
