@@ -29,12 +29,14 @@ import (
 	calicocsfake "github.com/projectcalico/api/pkg/client/clientset_generated/clientset/fake"
 	"github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
+	"github.com/submariner-io/admiral/pkg/syncer/test"
 	"github.com/submariner-io/submariner/pkg/event"
 	eventtesting "github.com/submariner-io/submariner/pkg/event/testing"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/calico"
+	tigerav1 "github.com/tigera/operator/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	fakek8s "k8s.io/client-go/kubernetes/fake"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 )
@@ -42,7 +44,7 @@ import (
 type testDriver struct {
 	*eventtesting.ControllerSupport
 	handler      event.Handler
-	k8sClient    *fakek8s.Clientset
+	dynClient    *dynamicfake.FakeDynamicClient
 	calicoClient *calicocsfake.Clientset
 }
 
@@ -52,7 +54,21 @@ func newTestDriver() *testDriver {
 	}
 
 	BeforeEach(func() {
-		t.k8sClient = fakek8s.NewClientset()
+		t.dynClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme, &tigerav1.Installation{
+			TypeMeta: metav1.TypeMeta{},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: calico.DefaultInstallationName,
+			},
+			Spec: tigerav1.InstallationSpec{
+				CalicoNetwork: &tigerav1.CalicoNetworkSpec{
+					IPPools: []tigerav1.IPPool{
+						{
+							Encapsulation: tigerav1.EncapsulationIPIPCrossSubnet,
+						},
+					},
+				},
+			},
+		})
 
 		t.calicoClient = calicocsfake.NewSimpleClientset()
 		fake.AddDeleteCollectionReactor(&t.calicoClient.Fake)
@@ -68,6 +84,7 @@ func newTestDriver() *testDriver {
 var _ = BeforeSuite(func() {
 	kzerolog.InitK8sLogging()
 	Expect(calicoapi.AddToScheme(scheme.Scheme)).To(Succeed())
+	Expect(tigerav1.AddToScheme(scheme.Scheme)).To(Succeed())
 })
 
 func TestCalico(t *testing.T) {
@@ -135,14 +152,24 @@ func (t *testDriver) getDefaultIPPoolIPIPMode() string {
 	return string(p.Spec.IPIPMode)
 }
 
+func (t *testDriver) getDefaultInstallationEncapsulation() string {
+	installation := test.GetResource(t.dynClient.Resource(calico.InstallationsGVR), &tigerav1.Installation{ObjectMeta: metav1.ObjectMeta{
+		Name: calico.DefaultInstallationName,
+	}})
+	Expect(installation.Spec.CalicoNetwork).NotTo(BeNil())
+	Expect(installation.Spec.CalicoNetwork.IPPools).NotTo(BeEmpty())
+
+	return installation.Spec.CalicoNetwork.IPPools[0].Encapsulation.String()
+}
+
 func (t *testDriver) createSubmarinerGwLBService(annotations map[string]string) {
-	_, err := t.k8sClient.CoreV1().Services(eventtesting.Namespace).Create(context.Background(), &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        calico.GwLBSvcName,
-			Annotations: annotations,
-		},
-	}, metav1.CreateOptions{})
-	Expect(err).To(Succeed())
+	test.CreateResource(t.dynClient.Resource(corev1.SchemeGroupVersion.WithResource("services")).Namespace(eventtesting.Namespace),
+		&corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        calico.GwLBSvcName,
+				Annotations: annotations,
+			},
+		})
 }
 
 func toAny(s []string) []any {
