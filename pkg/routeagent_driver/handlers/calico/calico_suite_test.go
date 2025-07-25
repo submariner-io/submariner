@@ -32,9 +32,11 @@ import (
 	"github.com/submariner-io/submariner/pkg/event"
 	eventtesting "github.com/submariner-io/submariner/pkg/event/testing"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/calico"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	fakek8s "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 )
@@ -42,7 +44,7 @@ import (
 type testDriver struct {
 	*eventtesting.ControllerSupport
 	handler      event.Handler
-	k8sClient    *fakek8s.Clientset
+	dynClient    *dynamicfake.FakeDynamicClient
 	calicoClient *calicocsfake.Clientset
 }
 
@@ -52,7 +54,24 @@ func newTestDriver() *testDriver {
 	}
 
 	BeforeEach(func() {
-		t.k8sClient = fakek8s.NewClientset()
+		installation := &unstructured.Unstructured{}
+		installation.SetUnstructuredContent(map[string]interface{}{
+			"apiVersion": "operator.tigera.io/v1",
+			"kind":       "Installation",
+			"metadata": map[string]interface{}{
+				"name": "default",
+			},
+			"spec": map[string]interface{}{
+				"calicoNetwork": map[string]interface{}{
+					"ipPools": []interface{}{
+						map[string]interface{}{
+							"encapsulation": "IPIP",
+						},
+					},
+				},
+			},
+		})
+		t.dynClient = dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), installation)
 
 		t.calicoClient = calicocsfake.NewSimpleClientset()
 		fake.AddDeleteCollectionReactor(&t.calicoClient.Fake)
@@ -135,13 +154,44 @@ func (t *testDriver) getDefaultIPPoolIPIPMode() string {
 	return string(p.Spec.IPIPMode)
 }
 
+func (t *testDriver) getDefaultInstallationEncapsulation() string {
+	gvrInstallations := schema.GroupVersionResource{
+		Group:    "operator.tigera.io",
+		Version:  "v1",
+		Resource: "installations",
+	}
+
+	encapsulation, err := calico.GetDefaultInstallationEncapsulation(t.dynClient, gvrInstallations)
+	Expect(err).To(Succeed())
+
+	return encapsulation
+}
+
 func (t *testDriver) createSubmarinerGwLBService(annotations map[string]string) {
-	_, err := t.k8sClient.CoreV1().Services(eventtesting.Namespace).Create(context.Background(), &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        calico.GwLBSvcName,
-			Annotations: annotations,
+	gvrService := schema.GroupVersionResource{
+		Group:    "", // Core API group
+		Version:  "v1",
+		Resource: "services",
+	}
+
+	metadata := map[string]interface{}{
+		"name":      calico.GwLBSvcName,
+		"namespace": eventtesting.Namespace,
+	}
+
+	/*if len(annotations) > 0 {
+		metadata["annotations"] = annotations
+	}
+	*/
+	service := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Service",
+			"metadata":   metadata,
 		},
-	}, metav1.CreateOptions{})
+	}
+
+	_, err := t.dynClient.Resource(gvrService).Namespace(eventtesting.Namespace).Create(context.Background(), service, metav1.CreateOptions{})
 	Expect(err).To(Succeed())
 }
 
