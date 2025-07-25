@@ -147,7 +147,7 @@ func main() {
 	handlers = append(handlers,
 		cabledriver.NewXRFMCleanupHandler(),
 		cabledriver.NewVXLANCleanup(),
-		calico.NewCalicoIPPoolHandler(cfg, env.Namespace, k8sClientSet),
+		calico.NewCalicoIPPoolHandler(cfg, env.Namespace, dynamicClientSet),
 		healthchecker.New(&healthchecker.Config{
 			ControllerConfig: pinger.ControllerConfig{
 				SupportedIPFamilies: submSpec.GetIPFamilies(),
