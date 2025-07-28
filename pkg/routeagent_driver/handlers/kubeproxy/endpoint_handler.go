@@ -25,6 +25,8 @@ import (
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/cidr"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/vxlan"
 	k8snet "k8s.io/utils/net"
 )
@@ -68,9 +70,14 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 		if err != nil {
 			return errors.Wrap(err, "error while reconciling routes")
 		}
+
 	} else {
 		// Store local endpoint's private IP to use as the source address for the IPv6 VxLAN interface on GW.
 		kp.vxlanGwIP = &localClusterGwNodeIP
+	}
+
+	if err := kp.pFilter.SelfSNAT(packetfilter.TableTypeNAT, constants.SmSelfSnatChain, kp.localClusterCidr[0]); err != nil {
+		return errors.Wrapf(err, "error creating SelfSNAT rule for %v", kp.localClusterCidr[0])
 	}
 
 	return nil
