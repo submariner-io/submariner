@@ -95,6 +95,16 @@ func NewWithNft(nft knftables.Interface, family k8snet.IPFamily) packetfilter.Dr
 	}
 }
 
+func (p *packetFilter) SelfSNAT(table packetfilter.TableType, chain, sourceCIDR string) error {
+	ruleSpec := packetfilter.Rule{
+		SrcCIDR:  sourceCIDR,
+		SnatCIDR: "ip saddr", // self SNAT
+		Action:   packetfilter.RuleActionSNAT,
+	}
+
+	return p.AppendUnique(table, chain, &ruleSpec)
+}
+
 func (p *packetFilter) GetMSSClampTypes() (packetfilter.TableType, packetfilter.ChainType) {
 	return packetfilter.TableTypeFilter, packetfilter.ChainTypeFilter
 }
@@ -131,6 +141,8 @@ func (p *packetFilter) CreateIPHookChainIfNotExists(chain *packetfilter.ChainIPH
 
 	if chain.Priority == packetfilter.ChainPriorityFirst {
 		chainPriority += "-10"
+	} else if chain.Priority == packetfilter.ChainPriorityMiddle {
+		chainPriority += "-5"
 	}
 
 	tx.Add(&knftables.Chain{

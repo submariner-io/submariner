@@ -98,6 +98,10 @@ func New(family k8snet.IPFamily) (packetfilter.Driver, error) {
 	}, nil
 }
 
+func (p *packetFilter) SelfSNAT(table packetfilter.TableType, chain, sourceCIDR string) error {
+	return nil
+}
+
 func (p *packetFilter) GetMSSClampTypes() (packetfilter.TableType, packetfilter.ChainType) {
 	return packetfilter.TableTypeRoute, packetfilter.ChainTypeRoute
 }

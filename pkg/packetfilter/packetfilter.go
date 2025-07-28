@@ -161,6 +161,7 @@ type ChainPriority uint32
 
 const (
 	ChainPriorityFirst ChainPriority = iota
+	ChainPriorityMiddle
 	ChainPriorityLast
 )
 
@@ -168,6 +169,8 @@ func (c ChainPriority) String() string {
 	switch c {
 	case ChainPriorityFirst:
 		return "First"
+	case ChainPriorityMiddle:
+		return "Middle"
 	case ChainPriorityLast:
 		return "Last"
 	}
@@ -296,6 +299,9 @@ type Driver interface {
 	// named Sets.
 	NewNamedSet(set *SetInfo) NamedSet
 	DestroySets(nameFilter func(string) bool) error
+
+	// SNAT to the packet's source IP address (applicable only when using nftables)
+	SelfSNAT(table TableType, chain, sourceCIDR string) error
 }
 
 type Interface interface {
