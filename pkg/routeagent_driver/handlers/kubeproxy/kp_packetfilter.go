@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"time"
 
 	"github.com/pkg/errors"
@@ -165,6 +166,9 @@ func (kp *SyncHandler) Init(_ context.Context) error {
 		logger.Errorf(err, "Error discovering the CNI interface")
 	}
 
+	// workaround to avoid ingress SNAT by kube-proxy nftables
+	go flushKubeProxyNatPostroutingPeriodically(context.TODO())
+
 	// Create the necessary IPTable chains in the filter and nat tables.
 	err = kp.createPFilterChains()
 	if err != nil {
@@ -172,4 +176,23 @@ func (kp *SyncHandler) Init(_ context.Context) error {
 	}
 
 	return nil
+}
+
+func flushKubeProxyNatPostroutingPeriodically(ctx context.Context) {
+	ticker := time.NewTicker(2 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			cmd := exec.Command("/sbin/nft", "flush", "chain", "ip", "kube-proxy", "nat-postrouting")
+			output, err := cmd.CombinedOutput()
+
+			if err != nil {
+				logger.Errorf(err, "Error flushing kube-proxy nat-postrouting chain %s", output)
+			}
+		}
+	}
 }
