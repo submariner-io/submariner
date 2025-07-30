@@ -53,6 +53,12 @@ func (kp *SyncHandler) createPFilterChains() error {
 			Hook:     packetfilter.ChainHookForward,
 			Priority: packetfilter.ChainPriorityFirst,
 		},
+		{
+			Name:     constants.SmSelfSnatChain,
+			Type:     packetfilter.ChainTypeNAT,
+			Hook:     packetfilter.ChainHookPostrouting,
+			Priority: packetfilter.ChainPriorityMiddle,
+		},
 	}
 
 	for i := range ipHookChains {

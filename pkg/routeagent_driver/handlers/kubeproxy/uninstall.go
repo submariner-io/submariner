@@ -122,4 +122,23 @@ func (kp *SyncHandler) deleteIPTableChains() {
 		logger.Errorf(err, "Error deleting IPHook chain %q of %q table", constants.InputChain,
 			constants.FilterTable)
 	}
+
+	logger.Infof("Flushing packetfilter entries in %q chain of %q table", constants.SmSelfSnatChain, constants.NATTable)
+
+	if err := pFilter.ClearChain(packetfilter.TableTypeNAT, constants.SmSelfSnatChain); err != nil {
+		logger.Errorf(err, "Error flushing packetfilter chain %q of %q table", constants.SmSelfSnatChain,
+			constants.NATTable)
+	}
+
+	chain = packetfilter.ChainIPHook{
+		Name:     constants.SmSelfSnatChain,
+		Type:     packetfilter.ChainTypeNAT,
+		Hook:     packetfilter.ChainHookPostrouting,
+		Priority: packetfilter.ChainPriorityMiddle,
+	}
+
+	if err := pFilter.DeleteIPHookChain(&chain); err != nil {
+		logger.Errorf(err, "Error deleting IPHook chain %q of %q table", constants.SmSelfSnatChain,
+			constants.NATTable)
+	}
 }
