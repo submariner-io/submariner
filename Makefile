@@ -69,6 +69,29 @@ embeddeddeps = $(wildcard $(shell grep //go:embed $(call godeps,$(1)) | sed -E '
 # This lists all dependencies from a given package
 pkgdeps = $(call godeps,$(1)) $(call embeddeddeps,$(1))
 
+# Generated YAMLs
+GENERATED_YAMLS := deploy/crds/submariner.io_clusterglobalegressips.yaml \
+                   deploy/crds/submariner.io_clusters.yaml \
+                   deploy/crds/submariner.io_endpoints.yaml \
+                   deploy/crds/submariner.io_gatewayroutes.yaml \
+                   deploy/crds/submariner.io_gateways.yaml \
+                   deploy/crds/submariner.io_globalegressips.yaml \
+                   deploy/crds/submariner.io_globalingressips.yaml \
+                   deploy/crds/submariner.io_nongatewayroutes.yaml \
+                   deploy/crds/submariner.io_routeagents.yaml
+generatedyamls: $(GENERATED_YAMLS)
+
+CONTROLLER_GEN := $(CURDIR)/bin/controller-gen
+CRD_OPTIONS ?= "crd:crdVersions=v1"
+
+$(CONTROLLER_GEN):
+	mkdir -p $(@D)
+	$(GO) -C tools build -o $@ sigs.k8s.io/controller-tools/cmd/controller-gen
+
+$(GENERATED_YAMLS): pkg/apis/submariner.io/v1/types.go | $(CONTROLLER_GEN)
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) paths="./pkg/apis/..." output:crd:artifacts:config=deploy/crds
+	test -f $@
+
 # natdiscovery.pb.go must be listed explicitly because it might not exist when Make evaluates pkgdeps
 bin/%/submariner-gateway: $(call pkgdeps,.) pkg/natdiscovery/proto/natdiscovery.pb.go
 	GOARCH=$(call dockertogoarch,$(patsubst bin/linux/%/,%,$(dir $@))) ${SCRIPTS_DIR}/compile.sh $@ .

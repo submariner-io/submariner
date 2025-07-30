@@ -185,3 +185,14 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Run yamllint
         run: make yamllint
+
+  yamls:
+    name: Embedded YAMLs up-to-date
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Run make generatedyamls to update embedded YAMLs
+        run: make -B generatedyamls
+      - name: Validate that nothing has changed
+        run: git add -A && git diff -Icontroller-gen.kubebuilder.io/version --staged --exit-code
