@@ -30,6 +30,7 @@ import (
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	subDataplane "github.com/submariner-io/submariner/test/e2e/dataplane"
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
+	"github.com/submariner-io/submariner/test/e2e/labels"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	k8snet "k8s.io/utils/net"
@@ -39,10 +40,9 @@ const (
 	gatewayStatusLabel  = "gateway.submariner.io/status"
 	gatewayStatusActive = "active"
 	gatewayNodeLabel    = "gateway.submariner.io/node"
-	TestLabel           = "redundancy"
 )
 
-var _ = Describe("Gateway fail-over tests", Label(TestLabel), func() {
+var _ = Describe("Gateway fail-over tests", Label(labels.Redundancy), func() {
 	f := subFramework.NewFramework("gateway-redundancy")
 
 	var supportedFamilies []k8snet.IPFamily

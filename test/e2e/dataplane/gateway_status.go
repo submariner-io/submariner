@@ -29,13 +29,14 @@ import (
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
+	"github.com/submariner-io/submariner/test/e2e/labels"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8snet "k8s.io/utils/net"
 )
 
-var _ = Describe("Gateway status reporting", Label(TestLabel), func() {
+var _ = Describe("Gateway status reporting", Label(labels.Dataplane), func() {
 	f := subFramework.NewFramework("dataplane-gateway-status")
 
 	When("a gateway node is configured", func() {

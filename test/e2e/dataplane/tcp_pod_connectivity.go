@@ -23,10 +23,9 @@ import (
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
+	"github.com/submariner-io/submariner/test/e2e/labels"
 	k8snet "k8s.io/utils/net"
 )
-
-const TestLabel = "dataplane"
 
 func GetActualIPFamilies(fromType, toType framework.IPFamilyType) []k8snet.IPFamily {
 	var families []k8snet.IPFamily
@@ -44,7 +43,7 @@ func GetActualIPFamilies(fromType, toType framework.IPFamilyType) []k8snet.IPFam
 	return families
 }
 
-var _ = Describe("Basic TCP connectivity tests across clusters without discovery", Label(TestLabel), func() {
+var _ = Describe("Basic TCP connectivity tests across clusters without discovery", Label(labels.Dataplane), func() {
 	f := framework.NewFramework("dataplane-conn-nd")
 
 	var (
