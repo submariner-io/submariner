@@ -58,12 +58,13 @@ var (
 	}
 
 	ruleActionToStr = map[packetfilter.RuleAction][]string{
-		packetfilter.RuleActionAccept: {"accept"},
-		packetfilter.RuleActionMss:    {"tcp", "option", "maxseg"},
-		packetfilter.RuleActionMark:   {"meta", "mark"},
-		packetfilter.RuleActionSNAT:   {"snat"},
-		packetfilter.RuleActionDNAT:   {"dnat"},
-		packetfilter.RuleActionJump:   {"jump"},
+		packetfilter.RuleActionAccept:   {"accept"},
+		packetfilter.RuleActionMss:      {"tcp", "option", "maxseg"},
+		packetfilter.RuleActionMark:     {"meta", "mark"},
+		packetfilter.RuleActionSNAT:     {"snat"},
+		packetfilter.RuleActionDNAT:     {"dnat"},
+		packetfilter.RuleActionJump:     {"jump"},
+		packetfilter.RuleActionSelfSNAT: {"snat to ip saddr"},
 	}
 
 	logger = log.Logger{Logger: logf.Log.WithName("NFTables")}
@@ -126,6 +127,8 @@ func (p *packetFilter) CreateIPHookChainIfNotExists(chain *packetfilter.ChainIPH
 
 	if chain.Priority == packetfilter.ChainPriorityFirst {
 		chainPriority += "-10"
+	} else if chain.Priority == packetfilter.ChainPriorityMiddle {
+		chainPriority += "-5"
 	}
 
 	tx.Add(&knftables.Chain{
