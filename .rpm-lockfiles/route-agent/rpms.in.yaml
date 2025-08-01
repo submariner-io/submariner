@@ -12,6 +12,7 @@ packages:
   - nftables
   - ipset
   - procps-ng
+  - openvswitch2.17
   - grep
 arches:
   - x86_64

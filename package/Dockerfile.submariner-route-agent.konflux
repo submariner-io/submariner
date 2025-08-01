@@ -40,9 +40,8 @@ ARG BASE_BRANCH
 ARG SOURCE
 ARG TARGETPLATFORM
 
-# TODO: Install openvswitch2.17; requires enabling the fast-datapath repository.
 RUN dnf -y update && \
-    dnf -y install --nodocs iproute iptables-nft nftables ipset procps-ng grep && \
+    dnf -y install --nodocs iproute iptables-nft nftables ipset procps-ng openvswitch2.17 grep && \
     dnf clean all
 
 WORKDIR /var/submariner
