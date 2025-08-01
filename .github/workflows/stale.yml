@@ -16,7 +16,7 @@ jobs:
       issues: write
       pull-requests: write
     steps:
-      - uses: actions/stale@128b2c81d01bedfe5b59d56fc08176aecd3fe6b9
+      - uses: actions/stale@8f717f0dfca33b78d3c933452e42558e4456c8e7
         with:
           days-before-issue-stale: 120
           days-before-pr-stale: 14
