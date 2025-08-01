@@ -18,3 +18,46 @@ baseurl = https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/$basearch/co
 enabled = 1
 gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 gpgcheck = 1
+
+[fast-datapath-for-rhel-9-$basearch-source-rpms]
+name = Fast Datapath for RHEL 9 ARM 64 (Source RPMs)
+baseurl = https://cdn.redhat.com/content/dist/layered/rhel9/$basearch/fast-datapath/source/SRPMS
+enabled = 0
+gpgcheck = 1
+gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+sslverify = 1
+sslcacert = /etc/rhsm/ca/redhat-uep.pem
+sslclientkey = /etc/pki/entitlement/9079749150426373024-key.pem
+sslclientcert = /etc/pki/entitlement/9079749150426373024.pem
+sslverifystatus = 1
+metadata_expire = 86400
+enabled_metadata = 0
+
+[fast-datapath-for-rhel-9-$basearch-rpms]
+name = Fast Datapath for RHEL 9 ARM 64 (RPMs)
+baseurl = https://cdn.redhat.com/content/dist/layered/rhel9/$basearch/fast-datapath/os
+enabled = 1
+gpgcheck = 1
+gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+sslverify = 1
+sslcacert = /etc/rhsm/ca/redhat-uep.pem
+sslclientkey = /etc/pki/entitlement/9079749150426373024-key.pem
+sslclientcert = /etc/pki/entitlement/9079749150426373024.pem
+sslverifystatus = 1
+metadata_expire = 86400
+enabled_metadata = 1
+
+[fast-datapath-for-rhel-9-$basearch-debug-rpms]
+name = Fast Datapath for RHEL 9 ARM 64 (Debug RPMs)
+baseurl = https://cdn.redhat.com/content/dist/layered/rhel9/$basearch/fast-datapath/debug
+enabled = 0
+gpgcheck = 1
+gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+sslverify = 1
+sslcacert = /etc/rhsm/ca/redhat-uep.pem
+sslclientkey = /etc/pki/entitlement/9079749150426373024-key.pem
+sslclientcert = /etc/pki/entitlement/9079749150426373024.pem
+sslverifystatus = 1
+metadata_expire = 86400
+enabled_metadata = 0
+
