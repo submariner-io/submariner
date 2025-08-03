@@ -108,7 +108,13 @@ func (p *packetFilter) ChainExists(table packetfilter.TableType, chain string) (
 }
 
 func (p *packetFilter) AppendUnique(table packetfilter.TableType, chain string, rule *packetfilter.Rule) error {
+	if rule.Action == packetfilter.RuleActionSelfSNAT {
+		// No-op for iptables driver
+		return nil
+	}
+
 	ruleSpec := ToRuleSpec(rule)
+
 	return errors.Wrapf(p.ipt.AppendUnique(tableTypeToStr[table], chain, ruleSpec...), "AppendUnique failed for table %q, chain %q, rule %q",
 		tableTypeToStr[table], chain, ruleSpec)
 }
@@ -179,6 +185,11 @@ func (p *packetFilter) ClearChain(table packetfilter.TableType, chain string) er
 }
 
 func (p *packetFilter) Delete(table packetfilter.TableType, chain string, rule *packetfilter.Rule) error {
+	if rule.Action == packetfilter.RuleActionSelfSNAT {
+		// No-op for iptables driver
+		return nil
+	}
+
 	ruleSpec := ToRuleSpec(rule)
 	err := p.ipt.Delete(tableTypeToStr[table], chain, ruleSpec...)
 
@@ -221,13 +232,25 @@ func (p *packetFilter) List(table packetfilter.TableType, chain string) ([]*pack
 }
 
 func (p *packetFilter) Insert(table packetfilter.TableType, chain string, pos int, rule *packetfilter.Rule) error {
+	if rule.Action == packetfilter.RuleActionSelfSNAT {
+		// No-op for iptables driver
+		return nil
+	}
+
 	ruleSpec := ToRuleSpec(rule)
+
 	return errors.Wrapf(p.ipt.Insert(tableTypeToStr[table], chain, pos, ruleSpec...), "Insert failed for table %q, chain %q, rule %q",
 		tableTypeToStr[table], chain, ruleSpec)
 }
 
 func (p *packetFilter) Append(table packetfilter.TableType, chain string, rule *packetfilter.Rule) error {
+	if rule.Action == packetfilter.RuleActionSelfSNAT {
+		// No-op for iptables driver
+		return nil
+	}
+
 	ruleSpec := ToRuleSpec(rule)
+
 	return errors.Wrapf(p.ipt.Append(tableTypeToStr[table], chain, ruleSpec...), "Append failed for table %q, chain %q, rule %q",
 		tableTypeToStr[table], chain, ruleSpec)
 }

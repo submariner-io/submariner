@@ -58,12 +58,13 @@ var (
 	}
 
 	ruleActionToStr = map[packetfilter.RuleAction][]string{
-		packetfilter.RuleActionAccept: {"accept"},
-		packetfilter.RuleActionMss:    {"tcp", "option", "maxseg"},
-		packetfilter.RuleActionMark:   {"meta", "mark"},
-		packetfilter.RuleActionSNAT:   {"snat"},
-		packetfilter.RuleActionDNAT:   {"dnat"},
-		packetfilter.RuleActionJump:   {"jump"},
+		packetfilter.RuleActionAccept:   {"accept"},
+		packetfilter.RuleActionMss:      {"tcp", "option", "maxseg"},
+		packetfilter.RuleActionMark:     {"meta", "mark"},
+		packetfilter.RuleActionSNAT:     {"snat"},
+		packetfilter.RuleActionDNAT:     {"dnat"},
+		packetfilter.RuleActionJump:     {"jump"},
+		packetfilter.RuleActionSelfSNAT: {"snat to ip saddr"},
 	}
 
 	nftFamilies = map[k8snet.IPFamily]knftables.Family{
@@ -131,6 +132,8 @@ func (p *packetFilter) CreateIPHookChainIfNotExists(chain *packetfilter.ChainIPH
 
 	if chain.Priority == packetfilter.ChainPriorityFirst {
 		chainPriority += "-10"
+	} else if chain.Priority == packetfilter.ChainPriorityMiddle {
+		chainPriority += "-5"
 	}
 
 	tx.Add(&knftables.Chain{

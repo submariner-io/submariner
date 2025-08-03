@@ -61,6 +61,7 @@ const (
 	RuleActionMark
 	RuleActionSNAT
 	RuleActionDNAT
+	RuleActionSelfSNAT
 )
 
 func (r RuleAction) String() string {
@@ -77,6 +78,8 @@ func (r RuleAction) String() string {
 		return "SNAT"
 	case RuleActionDNAT:
 		return "DNAT"
+	case RuleActionSelfSNAT:
+		return "SelfSNAT"
 	}
 
 	return unknown
@@ -161,6 +164,7 @@ type ChainPriority uint32
 
 const (
 	ChainPriorityFirst ChainPriority = iota
+	ChainPriorityMiddle
 	ChainPriorityLast
 )
 
@@ -168,6 +172,8 @@ func (c ChainPriority) String() string {
 	switch c {
 	case ChainPriorityFirst:
 		return "First"
+	case ChainPriorityMiddle:
+		return "Middle"
 	case ChainPriorityLast:
 		return "Last"
 	}
