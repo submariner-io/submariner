@@ -26,11 +26,12 @@ import (
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
 	subDataplane "github.com/submariner-io/submariner/test/e2e/dataplane"
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
+	"github.com/submariner-io/submariner/test/e2e/labels"
 	v1 "k8s.io/api/core/v1"
 	k8snet "k8s.io/utils/net"
 )
 
-var _ = Describe("Route Agent restart tests", Label(TestLabel), func() {
+var _ = Describe("Route Agent restart tests", Label(labels.Redundancy), func() {
 	f := subFramework.NewFramework("route-agent-restart")
 
 	var supportedFamilies []k8snet.IPFamily
