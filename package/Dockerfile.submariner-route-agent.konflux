@@ -44,6 +44,8 @@ RUN dnf -y update && \
     dnf -y install --nodocs iproute iptables-nft nftables ipset procps-ng openvswitch2.17 grep && \
     dnf clean all
 
+RUN adduser -r -l -u 1001010000 submariner
+
 WORKDIR /var/submariner
 
 COPY --from=builder \
@@ -60,6 +62,8 @@ RUN chown 0:0 /usr/local/bin/* && \
               /usr/local/bin/await-node-ready.sh
 
 COPY --from=builder ${SOURCE}/LICENSE /licenses/LICENSE
+
+USER 1001010000
 
 ENTRYPOINT ["/usr/local/bin/submariner-route-agent.sh"]
 

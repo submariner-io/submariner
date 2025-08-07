@@ -51,6 +51,8 @@ RUN chown 0:0 /usr/local/bin/* && \
 
 COPY --from=builder ${SOURCE}/LICENSE /licenses/LICENSE
 
+USER 1001010000
+
 ENTRYPOINT ["/usr/local/bin/submariner-globalnet.sh"]
 
 LABEL com.redhat.component="submariner-globalnet-container" \
