@@ -55,12 +55,16 @@ func startEndpointsController(name, namespace string, config *syncer.ResourceSyn
 	fieldSelector := fields.Set(map[string]string{"metadata.name": name}).AsSelector().String()
 
 	controller.resourceSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
-		Name:                "Endpoints syncer",
-		ResourceType:        &corev1.Endpoints{},
-		SourceClient:        config.SourceClient,
-		SourceNamespace:     namespace,
-		RestMapper:          config.RestMapper,
-		Federator:           federate.NewCreateOrUpdateFederator(config.SourceClient, config.RestMapper, namespace, "" /* localClusterID */),
+		Name:            "Endpoints syncer",
+		ResourceType:    &corev1.Endpoints{},
+		SourceClient:    config.SourceClient,
+		SourceNamespace: namespace,
+		RestMapper:      config.RestMapper,
+		Federator: federate.NewCreateOrUpdateFederator(federate.CreateOrUpdateOptions{
+			Client:          config.SourceClient,
+			RestMapper:      config.RestMapper,
+			TargetNamespace: namespace,
+		}),
 		Transform:           controller.process,
 		SourceFieldSelector: fieldSelector,
 		ResourcesEquivalent: areEndpointsEqual,

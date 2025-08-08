@@ -29,7 +29,6 @@ import (
 	"github.com/submariner-io/admiral/pkg/ipam"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer"
-	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cidr"
 	"github.com/submariner-io/submariner/pkg/cni"
@@ -116,8 +115,12 @@ func NewGatewayMonitor(ctx context.Context, config *GatewayMonitorConfig) (Inter
 		SourceNamespace: corev1.NamespaceAll,
 		Direction:       syncer.RemoteToLocal,
 		RestMapper:      config.RestMapper,
-		Federator:       broker.NewFederator(config.Client, config.RestMapper, corev1.NamespaceAll, ""),
-		Scheme:          config.Scheme,
+		Federator: federate.NewCreateOrUpdateFederator(federate.CreateOrUpdateOptions{
+			Client:          config.Client,
+			RestMapper:      config.RestMapper,
+			TargetNamespace: corev1.NamespaceAll,
+		}),
+		Scheme: config.Scheme,
 	}
 
 	gatewayMonitor.gatewaySharedInformer, err = syncer.NewSharedInformer(
