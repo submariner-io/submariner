@@ -19,7 +19,7 @@ RUN git config --global --add safe.directory ${SOURCE}
 
 WORKDIR ${SOURCE}
 
-RUN CGO_ENABLED=0 GOARCH=${TARGETPLATFORM##*/} go build \
+RUN CGO_ENABLED=1 GOARCH=${TARGETPLATFORM##*/} go build \
     -ldflags "-s -w \
     -X github.com/submariner-io/submariner/pkg/versions.version=${BASE_BRANCH} \
     -X github.com/submariner-io/submariner/pkg/versions.gitCommitHash=$(git rev-parse --short HEAD)" \
@@ -27,7 +27,7 @@ RUN CGO_ENABLED=0 GOARCH=${TARGETPLATFORM##*/} go build \
     -v -o ${SOURCE}/bin/${TARGETPLATFORM}/submariner-route-agent \
     ${SOURCE}/pkg/routeagent_driver
 
-RUN CGO_ENABLED=0 GOARCH=${TARGETPLATFORM##*/} go build \
+RUN CGO_ENABLED=1 GOARCH=${TARGETPLATFORM##*/} go build \
     -ldflags "-s -w \
     -X github.com/submariner-io/submariner/pkg/versions.version=${BASE_BRANCH} \
     -X github.com/submariner-io/submariner/pkg/versions.gitCommitHash=$(git rev-parse --short HEAD)" \
