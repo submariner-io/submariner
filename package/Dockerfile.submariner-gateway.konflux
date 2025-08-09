@@ -44,7 +44,9 @@ RUN dnf -y update && \
     dnf -y install --nodocs iproute libreswan kmod shadow-utils && \
     dnf clean all
 
-RUN adduser -r -l -u 1001010000 submariner
+RUN adduser -r -l -u 1001 -G root submariner
+
+RUN mkdir -p /etc/ipsec /etc/ipsec.d && chmod -R 775 /etc/ipsec.d
 
 WORKDIR /var/submariner
 
@@ -56,16 +58,12 @@ COPY --from=builder \
     ${SOURCE}/package/await-node-ready.sh \
     /usr/local/bin/
 
-RUN chown 0:0 /usr/local/bin/* && \
-    chmod 500 /usr/local/bin/submariner-gateway \
-              /usr/local/bin/await-node-ready \
-              /usr/local/bin/submariner.sh \
-              /usr/local/bin/pluto \
-              /usr/local/bin/await-node-ready.sh
+RUN chown -Rc submariner:root /usr/local/bin && \
+    chmod -Rc 775 /usr/local/bin
 
 COPY --from=builder ${SOURCE}/LICENSE /licenses/LICENSE
 
-USER 1001010000
+USER submariner
 
 ENTRYPOINT ["/usr/local/bin/submariner.sh"]
 

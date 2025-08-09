@@ -36,7 +36,7 @@ RUN dnf -y update && \
     dnf -y install --nodocs iproute iptables-nft nftables ipset shadow-utils grep && \
     dnf clean all
 
-RUN adduser -r -l -u 1001010000 submariner
+RUN adduser -r -l -u 1001 -G root submariner
 
 WORKDIR /var/submariner
 
@@ -45,13 +45,12 @@ COPY --from=builder \
     ${SOURCE}/package/submariner-globalnet.sh \
     /usr/local/bin/
 
-RUN chown 0:0 /usr/local/bin/* && \
-    chmod 500 /usr/local/bin/submariner-globalnet \
-              /usr/local/bin/submariner-globalnet.sh
+RUN chown -Rc submariner:root /usr/local/bin
+RUN chmod -Rc 775 /usr/local/bin
 
 COPY --from=builder ${SOURCE}/LICENSE /licenses/LICENSE
 
-USER 1001010000
+USER submariner
 
 ENTRYPOINT ["/usr/local/bin/submariner-globalnet.sh"]
 
