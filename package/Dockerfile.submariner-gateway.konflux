@@ -24,8 +24,7 @@ RUN CGO_ENABLED=1 GOARCH=${TARGETPLATFORM##*/} go build \
     -X github.com/submariner-io/submariner/pkg/versions.version=${BASE_BRANCH} \
     -X github.com/submariner-io/submariner/pkg/versions.gitCommitHash=$(git rev-parse --short HEAD)" \
     -tags "${BUILD_TAGS}" \
-    -v -o ${SOURCE}/bin/${TARGETPLATFORM}/submariner-gateway \
-    ${SOURCE}/pkg/gateway
+    -v -o ${SOURCE}/bin/${TARGETPLATFORM}/submariner-gateway ${SOURCE}
 
 RUN CGO_ENABLED=1 GOARCH=${TARGETPLATFORM##*/} go build \
     -ldflags "-s -w \
