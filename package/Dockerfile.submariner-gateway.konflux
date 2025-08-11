@@ -62,7 +62,8 @@ RUN chown -Rc submariner:root /usr/local/bin && \
 
 COPY --from=builder ${SOURCE}/LICENSE /licenses/LICENSE
 
-USER submariner
+# Pluto fails with `permission denied (must be superuser)` if running as submariner user
+USER root
 
 ENTRYPOINT ["/usr/local/bin/submariner.sh"]
 
