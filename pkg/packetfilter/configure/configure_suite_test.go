@@ -39,7 +39,7 @@ const (
 	NfTables
 )
 
-const defaultDriver = IPTables
+const defaultDriver = NfTables
 
 var _ = Describe("DriverFromConfigMap", func() {
 	var cm *corev1.ConfigMap
