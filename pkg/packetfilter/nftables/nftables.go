@@ -277,7 +277,7 @@ func (p *packetFilter) Append(_ packetfilter.TableType, chain string, rule *pack
 }
 
 func (p *packetFilter) insertRuleAtPosition(chain string, rule *packetfilter.Rule, pos int) error {
-	ruleSpec := toNftRuleSpec(rule)
+	ruleSpec := toNftRuleSpec(rule, (p.family == k8snet.IPv6))
 
 	knftRule := knftables.Rule{
 		Chain:   chain,
