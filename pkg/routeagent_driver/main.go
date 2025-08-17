@@ -52,6 +52,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/versions"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -59,6 +60,8 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
+
+const globalConfigMapName = "submariner-global"
 
 var (
 	masterURL   string
@@ -136,7 +139,7 @@ func main() {
 		RouteAgentUpdateInterval: 60 * time.Second,
 	}
 
-	registry, err := event.NewRegistry(ctx, "routeagent_driver", np,
+	handlers := []event.Handler{
 		kubeproxy.NewSyncHandler(env.ClusterCidr, env.ServiceCidr),
 		ovn.NewHandler(&ovn.HandlerConfig{
 			Namespace:       env.Namespace,
@@ -155,8 +158,21 @@ func main() {
 		mtu.NewMTUHandler(env.ClusterCidr, len(env.GlobalCidr) != 0, getTCPMssValue(localNode)),
 		calico.NewCalicoIPPoolHandler(cfg, env.Namespace, k8sClientSet),
 		healthchecker.New(healthcheckerConfig,
-			smClientset.SubmarinerV1().RouteAgents(submSpec.Namespace), versions.Submariner(), localNode.Name))
+			smClientset.SubmarinerV1().RouteAgents(submSpec.Namespace), versions.Submariner(), localNode.Name),
+	}
 
+	globalConfigMap, err := k8sClientSet.CoreV1().ConfigMaps(env.Namespace).Get(ctx, globalConfigMapName, metav1.GetOptions{})
+	enableAvoidSNAT, err := ovn.NeedToEnableAvoidSNATHandler(globalConfigMap)
+	logger.FatalOnError(err, "Error determining avoid SNAT enablement")
+
+	if err == nil && enableAvoidSNAT {
+		logger.Info("avoid SNAT handler is enabled")
+		handlers = append(handlers, ovn.NewAvoidSNATHandler())
+	} else {
+		logger.Info("avoid SNAT handler is disabled")
+	}
+
+	registry, err := event.NewRegistry(ctx, "routeagent_driver", np, handlers...)
 	logger.FatalOnError(err, "Error registering the handlers")
 
 	if env.Uninstall {

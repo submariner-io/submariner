@@ -339,6 +339,10 @@ func NewV6() (Interface, error) {
 	return newImpl(newDriverFnV6)
 }
 
+func NewWithDriver(f func() (Driver, error)) (Interface, error) {
+	return newImpl(f)
+}
+
 func newImpl(f func() (Driver, error)) (Interface, error) {
 	if f == nil {
 		return nil, errors.New("no driver registered")
