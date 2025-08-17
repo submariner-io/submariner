@@ -312,10 +312,17 @@ type Interface interface {
 
 type DriverFn func(family k8snet.IPFamily) (Driver, error)
 
-var newDriverFn DriverFn
+var (
+	newDriverFn       DriverFn
+	secondaryDriverFn DriverFn
+)
 
 func SetNewDriverFn(f DriverFn) {
 	newDriverFn = f
+}
+
+func SetSecondaryDriverFn(f DriverFn) {
+	secondaryDriverFn = f
 }
 
 func GetNewDriverFn() DriverFn {
@@ -327,11 +334,19 @@ type Adapter struct {
 }
 
 func New(family k8snet.IPFamily) (Interface, error) {
-	if newDriverFn == nil {
+	return newWithFn(family, newDriverFn)
+}
+
+func NewSecondary(family k8snet.IPFamily) (Interface, error) {
+	return newWithFn(family, secondaryDriverFn)
+}
+
+func newWithFn(family k8snet.IPFamily, fn DriverFn) (Interface, error) {
+	if fn == nil {
 		return nil, errors.New("no driver registered")
 	}
 
-	driver, err := newDriverFn(family)
+	driver, err := fn(family)
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating packet filter Driver")
 	}

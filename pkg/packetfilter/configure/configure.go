@@ -54,6 +54,7 @@ func DriverFromConfigMap(cm *corev1.ConfigMap) error {
 	} else {
 		logger.Info("Using iptables packet filter driver")
 		packetfilter.SetNewDriverFn(iptables.New)
+		packetfilter.SetSecondaryDriverFn(nftables.New)
 	}
 
 	return nil
