@@ -152,7 +152,8 @@ func main() {
 				TransitSwitchIP: transitSwitchIP,
 			}),
 			ovn.NewGatewayRouteHandler(family, smClientset),
-			ovn.NewNonGatewayRouteHandler(family, smClientset, transitSwitchIP))
+			ovn.NewNonGatewayRouteHandler(family, smClientset, transitSwitchIP),
+			ovn.NewAvoidSNATHandler(family))
 	}
 
 	handlers = append(handlers,
