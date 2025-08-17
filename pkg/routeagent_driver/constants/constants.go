@@ -23,6 +23,7 @@ const (
 	SmPostRoutingChain = "SUBMARINER-POSTROUTING"
 	SmInputChain       = "SUBMARINER-INPUT"
 	SmForwardChain     = "SUBMARINER-FORWARD"
+	SmSelfSnatChain    = "SUBMARINER-SELF-SNAT"
 	PostRoutingChain   = "POSTROUTING"
 	InputChain         = "INPUT"
 	ForwardChain       = "FORWARD"
