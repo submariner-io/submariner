@@ -118,11 +118,5 @@ func (c *controller) handleRemovedEndpoint(obj runtime.Object, _ int) bool {
 		}
 	}
 
-	if len(errs) > 0 {
-		return true
-	}
-
-	logger.V(log.DEBUG).Infof("Tunnel controller processing removed submariner Endpoint object: %#v", endpoint)
-
-	return false
+	return len(errs) > 0
 }
