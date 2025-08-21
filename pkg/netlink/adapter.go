@@ -16,7 +16,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-//nolint:wrapcheck // Most of the functions are simple wrappers so we'll let the caller wrap errors.
 package netlink
 
 import (
@@ -95,7 +94,7 @@ func (a *Adapter) DeleteDestinationRoutes(destIPs []net.IPNet, linkIndex, tableI
 			Table:     tableID,
 		}
 
-		err := netlink.RouteDel(route)
+		err := a.RouteDel(route)
 		if err != nil {
 			return errors.Wrapf(err, "unable to delete the route entry %#v", route)
 		}
@@ -105,7 +104,7 @@ func (a *Adapter) DeleteDestinationRoutes(destIPs []net.IPNet, linkIndex, tableI
 }
 
 func (a *Adapter) AddrAddIfNotPresent(link netlink.Link, addr *netlink.Addr) error {
-	err := netlink.AddrAdd(link, addr)
+	err := a.AddrAdd(link, addr)
 	if err != nil && !errors.Is(err, syscall.EEXIST) {
 		return nil
 	}
