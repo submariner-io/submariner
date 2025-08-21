@@ -660,6 +660,14 @@ func (n *NetLink) AwaitNoGwRoutes(linkIndex, table int, gwIPs ...string) {
 	}
 }
 
+func (n *NetLink) EnsureNoGwRoutes(linkIndex, table int, gwIPs ...string) {
+	for _, ip := range gwIPs {
+		Consistently(func() []net.IP {
+			return n.routeGwList(linkIndex, table)
+		}).ShouldNot(ContainElement(net.ParseIP(ip)), "Route for %q exists", ip)
+	}
+}
+
 func (n *NetLink) neighborIPList(linkIndex int) []net.IP {
 	n.basic().mutex.Lock()
 	defer n.basic().mutex.Unlock()

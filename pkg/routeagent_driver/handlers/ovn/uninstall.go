@@ -34,7 +34,11 @@ import (
 
 func (ovn *Handler) Stop() error {
 	ovn.gatewayRouteController.stop()
-	ovn.nonGatewayRouteController.stop()
+
+	if ovn.nonGatewayRouteController != nil {
+		ovn.nonGatewayRouteController.stop()
+	}
+
 	close(ovn.stopCh)
 
 	return nil

@@ -21,13 +21,16 @@ package ovn_test
 import (
 	"context"
 	"net"
+	"os"
 
+	"github.com/kelseyhightower/envconfig"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	libovsdbclient "github.com/ovn-org/libovsdb/client"
 	"github.com/ovn-org/libovsdb/model"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/nbdb"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
+	assert "github.com/submariner-io/admiral/pkg/test"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event"
@@ -36,6 +39,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
 	fakeovn "github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn/fake"
 	"github.com/vishvananda/netlink"
@@ -54,14 +58,123 @@ const (
 	ipv6OVNK8sMgmntIntGw = "b000:100::"
 )
 
-var _ = Describe("Handler", func() {
-	ipv4Subnets := []string{"192.0.1.0/24", "192.0.2.0/24", "192.0.3.0/24"}
-	ipv6Subnets := []string{"fc00:100::/64", "fd00:100::/64", "fe00:100::/64"}
+var (
+	ipv4Subnets = []string{"192.0.1.0/24", "192.0.2.0/24", "192.0.3.0/24"}
+	ipv6Subnets = []string{"fc00:100::/64", "fd00:100::/64", "fe00:100::/64"}
+)
 
+var _ = Describe("Handler", func() {
+	t := newHandlerTestDriver()
+
+	Context("IPv4", func() {
+		t.testRemoteEndpoint(ipv4Subnets, ipv6Subnets)
+		t.testGatewayTransitions(ipv4Subnets, ipv6Subnets)
+		t.testGatewayRoute(ipv4Subnets, ipv6OVNK8sMgmntIntGw, ipv6Subnets)
+		t.testNonGatewayRoutes(ipv4OVNK8sMgmntIntGw, ipv4Subnets, []string{"172.0.1.0/24"}, ipv6OVNK8sMgmntIntGw, ipv6Subnets)
+	})
+
+	Context("IPv6", func() {
+		BeforeEach(func() {
+			t.ipFamily = k8snet.IPv6
+		})
+
+		t.testRemoteEndpoint(ipv6Subnets, ipv4Subnets)
+		t.testGatewayTransitions(ipv6Subnets, ipv4Subnets)
+		t.testGatewayRoute(ipv6Subnets, ipv4OVNK8sMgmntIntGw, ipv4Subnets)
+		t.testNonGatewayRoutes(ipv6OVNK8sMgmntIntGw, ipv6Subnets, []string{"ab00:100::/64"}, ipv4OVNK8sMgmntIntGw, ipv4Subnets)
+	})
+
+	When("the OVN management interface address changes", t.testOVNMgmtInterfaceAddressChange)
+
+	Context("on Uninstall", t.testUninstall)
+
+	When("Intra-cluster routing is disabled", t.testIntraClusterRoutingDisabled)
+})
+
+var _ = Describe("GetHandlers", func() {
+	t := newTestDriver()
+
+	var env environment.Specification
+
+	BeforeEach(func() {
+		fakePF.New(k8snet.IPv4)
+
+		os.Setenv("SUBMARINER_CLUSTERCIDR", ipv4ClusterCIDR)
+		os.Setenv("SUBMARINER_SERVICECIDR", ipv4serviceCIDR)
+		os.Setenv("SUBMARINER_NAMESPACE", testing.Namespace)
+
+		DeferCleanup(func() {
+			os.Unsetenv("SUBMARINER_CLUSTERCIDR")
+			os.Unsetenv("SUBMARINER_SERVICECIDR")
+			os.Unsetenv("SUBMARINER_NAMESPACE")
+		})
+	})
+
+	JustBeforeEach(func() {
+		Expect(envconfig.Process("submariner", &env)).To(Succeed())
+	})
+
+	It("should return the correct Handlers", func() {
+		handlers := ovn.GetHandlers(k8snet.IPv4, &env, t.submClient, t.k8sClient, t.dynClient, &watcher.Config{
+			Client: t.dynClient,
+		})
+
+		Expect(handlers).To(HaveLen(3))
+
+		ovnHandler, ok := handlers[0].(*ovn.Handler)
+		Expect(ok).To(BeTrue())
+		Expect(ovnHandler.Namespace).To(Equal(env.Namespace))
+		Expect(ovnHandler.ClusterCIDR).To(Equal(env.ClusterCidr))
+		Expect(ovnHandler.ServiceCIDR).To(Equal(env.ServiceCidr))
+		Expect(ovnHandler.IntraRoutingDisabled).To(BeFalse())
+
+		_, ok = handlers[1].(*ovn.GatewayRouteHandler)
+		Expect(ok).To(BeTrue())
+
+		_, ok = handlers[2].(*ovn.NonGatewayRouteHandler)
+		Expect(ok).To(BeTrue())
+	})
+
+	When("Intra-cluster routing is disabled", func() {
+		BeforeEach(func() {
+			os.Setenv("SUBMARINER_INTRAROUTINGDISABLED", "true")
+
+			DeferCleanup(func() {
+				os.Unsetenv("SUBMARINER_INTRAROUTINGDISABLED")
+			})
+		})
+
+		It("should not return the NonGatewayRouteHandler", func() {
+			handlers := ovn.GetHandlers(k8snet.IPv4, &env, t.submClient, t.k8sClient, t.dynClient, &watcher.Config{
+				Client: t.dynClient,
+			})
+
+			for _, h := range handlers {
+				_, ok := h.(*ovn.NonGatewayRouteHandler)
+				Expect(ok).To(BeFalse())
+			}
+		})
+	})
+})
+
+type handlerTestDriver struct {
+	*testDriver
+	handler              event.Handler
+	pFilter              *fakePF.PacketFilter
+	ipFamily             k8snet.IPFamily
+	clusterCIDR          string
+	serviceCIDR          string
+	OVNK8sMgmntIntGw     string
+	ovsdbClient          *fakeovn.OVSDBClient
+	intraRoutingDisabled bool
+}
+
+func newHandlerTestDriver() *handlerTestDriver {
 	t := &handlerTestDriver{testDriver: newTestDriver()}
 
 	BeforeEach(func() {
 		t.ipFamily = k8snet.IPv4
+		t.intraRoutingDisabled = false
 	})
 
 	JustBeforeEach(func() {
@@ -118,7 +231,8 @@ var _ = Describe("Handler", func() {
 			NewOVSDBClient: func(_ model.ClientDBModel, _ ...libovsdbclient.Option) (libovsdbclient.Client, error) {
 				return t.ovsdbClient, nil
 			},
-			TransitSwitchIP: transitSwitchIP,
+			TransitSwitchIP:      transitSwitchIP,
+			IntraRoutingDisabled: t.intraRoutingDisabled,
 		})
 
 		t.Start(t.handler)
@@ -126,88 +240,7 @@ var _ = Describe("Handler", func() {
 		Expect(t.ovsdbClient.Connected()).To(BeTrue())
 	})
 
-	Context("IPv4", func() {
-		t.testRemoteEndpoint(ipv4Subnets, ipv6Subnets)
-		t.testGatewayTransitions(ipv4Subnets, ipv6Subnets)
-		t.testGatewayRoute(ipv4Subnets, ipv6OVNK8sMgmntIntGw, ipv6Subnets)
-		t.testNonGatewayRoutes(ipv4OVNK8sMgmntIntGw, ipv4Subnets, []string{"172.0.1.0/24"}, ipv6OVNK8sMgmntIntGw, ipv6Subnets)
-	})
-
-	Context("IPv6", func() {
-		BeforeEach(func() {
-			t.ipFamily = k8snet.IPv6
-		})
-
-		t.testRemoteEndpoint(ipv6Subnets, ipv4Subnets)
-		t.testGatewayTransitions(ipv6Subnets, ipv4Subnets)
-		t.testGatewayRoute(ipv6Subnets, ipv4OVNK8sMgmntIntGw, ipv4Subnets)
-		t.testNonGatewayRoutes(ipv6OVNK8sMgmntIntGw, ipv6Subnets, []string{"ab00:100::/64"}, ipv4OVNK8sMgmntIntGw, ipv4Subnets)
-	})
-
-	When("the OVN management interface address changes", func() {
-		JustBeforeEach(func() {
-			t.CreateLocalHostEndpoint()
-			t.netLink.AwaitGwRoutes(0, constants.RouteAgentInterClusterNetworkTableID, t.OVNK8sMgmntIntGw)
-
-			t.createEndpoint("192.0.1.0/24")
-			t.netLink.AwaitGwRoutes(0, constants.RouteAgentHostNetworkTableID, t.OVNK8sMgmntIntGw)
-		})
-
-		It("should update the gateway and host network dataplanes", func() {
-			Expect(t.netLink.FlushRouteTable(constants.RouteAgentInterClusterNetworkTableID)).To(Succeed())
-			Expect(t.netLink.FlushRouteTable(constants.RouteAgentHostNetworkTableID)).To(Succeed())
-
-			link, err := t.netLink.LinkByName(ovn.OVNK8sMgmntIntfName)
-			Expect(err).To(Succeed())
-
-			Expect(t.netLink.AddrDel(link, &netlink.Addr{
-				IPNet: t.OVNK8sMgmntIntCIDR[k8snet.IPv4],
-			})).To(Succeed())
-
-			t.OVNK8sMgmntIntCIDR[k8snet.IPv4] = toIPNet("128.2.30.3/24")
-			Expect(t.netLink.AddrAdd(link, &netlink.Addr{
-				IPNet: t.OVNK8sMgmntIntCIDR[k8snet.IPv4],
-			})).To(Succeed())
-
-			t.netLink.AwaitGwRoutes(0, constants.RouteAgentInterClusterNetworkTableID, t.OVNK8sMgmntIntGw)
-			t.netLink.AwaitGwRoutes(0, constants.RouteAgentHostNetworkTableID, t.OVNK8sMgmntIntGw)
-		})
-	})
-
-	Context("on Uninstall", func() {
-		It("should delete the table rules", func() {
-			Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain)).To(BeTrue())
-			Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerMSSClampChain)).To(BeTrue())
-
-			_ = t.netLink.RuleAdd(&netlink.Rule{
-				Table:  constants.RouteAgentHostNetworkTableID,
-				Family: netlink.FAMILY_V4,
-			})
-
-			_ = t.netLink.RuleAdd(&netlink.Rule{
-				Table:  constants.RouteAgentInterClusterNetworkTableID,
-				Family: netlink.FAMILY_V4,
-			})
-
-			Expect(t.handler.Uninstall()).To(Succeed())
-
-			t.netLink.AwaitNoRule(constants.RouteAgentHostNetworkTableID, "", "")
-			t.netLink.AwaitNoRule(constants.RouteAgentInterClusterNetworkTableID, "", "")
-
-			Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain)).To(BeFalse())
-		})
-	})
-})
-
-type handlerTestDriver struct {
-	*testDriver
-	handler          event.Handler
-	pFilter          *fakePF.PacketFilter
-	ipFamily         k8snet.IPFamily
-	clusterCIDR      string
-	serviceCIDR      string
-	OVNK8sMgmntIntGw string
-	ovsdbClient      *fakeovn.OVSDBClient
+	return t
 }
 
 func (t *handlerTestDriver) Start(handler event.Handler) {
@@ -532,5 +565,129 @@ func (t *handlerTestDriver) testNonGatewayRoutes(ipFamilyNextHop string, ipFamil
 				})
 			}
 		})
+	})
+}
+
+func (t *handlerTestDriver) testOVNMgmtInterfaceAddressChange() {
+	JustBeforeEach(func() {
+		t.CreateLocalHostEndpoint()
+		t.netLink.AwaitGwRoutes(0, constants.RouteAgentInterClusterNetworkTableID, t.OVNK8sMgmntIntGw)
+
+		t.createEndpoint("192.0.1.0/24")
+		t.netLink.AwaitGwRoutes(0, constants.RouteAgentHostNetworkTableID, t.OVNK8sMgmntIntGw)
+	})
+
+	It("should update the gateway and host network dataplanes", func() {
+		Expect(t.netLink.FlushRouteTable(constants.RouteAgentInterClusterNetworkTableID)).To(Succeed())
+		Expect(t.netLink.FlushRouteTable(constants.RouteAgentHostNetworkTableID)).To(Succeed())
+
+		link, err := t.netLink.LinkByName(ovn.OVNK8sMgmntIntfName)
+		Expect(err).To(Succeed())
+
+		Expect(t.netLink.AddrDel(link, &netlink.Addr{
+			IPNet: t.OVNK8sMgmntIntCIDR[k8snet.IPv4],
+		})).To(Succeed())
+
+		t.OVNK8sMgmntIntCIDR[k8snet.IPv4] = toIPNet("128.2.30.3/24")
+		Expect(t.netLink.AddrAdd(link, &netlink.Addr{
+			IPNet: t.OVNK8sMgmntIntCIDR[k8snet.IPv4],
+		})).To(Succeed())
+
+		t.netLink.AwaitGwRoutes(0, constants.RouteAgentInterClusterNetworkTableID, t.OVNK8sMgmntIntGw)
+		t.netLink.AwaitGwRoutes(0, constants.RouteAgentHostNetworkTableID, t.OVNK8sMgmntIntGw)
+	})
+}
+
+func (t *handlerTestDriver) testUninstall() {
+	It("should delete the table rules", func() {
+		Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain)).To(BeTrue())
+		Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerMSSClampChain)).To(BeTrue())
+
+		_ = t.netLink.RuleAdd(&netlink.Rule{
+			Table:  constants.RouteAgentHostNetworkTableID,
+			Family: netlink.FAMILY_V4,
+		})
+
+		_ = t.netLink.RuleAdd(&netlink.Rule{
+			Table:  constants.RouteAgentInterClusterNetworkTableID,
+			Family: netlink.FAMILY_V4,
+		})
+
+		Expect(t.handler.Uninstall()).To(Succeed())
+
+		t.netLink.AwaitNoRule(constants.RouteAgentHostNetworkTableID, "", "")
+		t.netLink.AwaitNoRule(constants.RouteAgentInterClusterNetworkTableID, "", "")
+
+		Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain)).To(BeFalse())
+	})
+}
+
+func (t *handlerTestDriver) testIntraClusterRoutingDisabled() {
+	BeforeEach(func() {
+		t.intraRoutingDisabled = true
+	})
+
+	When("not on the gateway", func() {
+		It("should not update the host network dataplane on remote Endpoint creation and deletion", func() {
+			By("Creating remote Endpoint")
+
+			endpoint := t.createEndpoint(ipv4Subnets[0])
+
+			t.netLink.EnsureNoRule(constants.RouteAgentHostNetworkTableID, "", ipv4Subnets[0])
+			t.netLink.EnsureNoGwRoutes(0, constants.RouteAgentHostNetworkTableID, t.OVNK8sMgmntIntGw)
+
+			By("Deleting remote Endpoint")
+
+			t.DeleteEndpoint(endpoint.Name)
+
+			t.netLink.EnsureNoGwRoutes(0, constants.RouteAgentHostNetworkTableID, t.OVNK8sMgmntIntGw)
+		})
+	})
+
+	When("on the gateway", func() {
+		JustBeforeEach(func() {
+			t.CreateLocalHostEndpoint()
+		})
+
+		It("should update the host network dataplane on remote Endpoint creation and deletion", func() {
+			By("Creating remote Endpoint")
+
+			endpoint := t.createEndpoint(ipv4Subnets[0])
+
+			t.netLink.AwaitRule(constants.RouteAgentHostNetworkTableID, "", ipv4Subnets[0])
+
+			By("Deleting remote Endpoint")
+
+			t.DeleteEndpoint(endpoint.Name)
+
+			t.netLink.AwaitNoRule(constants.RouteAgentHostNetworkTableID, "", ipv4Subnets[0])
+		})
+	})
+
+	Context("on gateway transitions", func() {
+		It("should correctly update the host network dataplane for existing remote Endpoints", func() {
+			By("Creating remote Endpoint")
+
+			t.createEndpoint(ipv4Subnets[0])
+
+			t.netLink.EnsureNoRule(constants.RouteAgentHostNetworkTableID, "", ipv4Subnets[0])
+
+			By("Creating local gateway Endpoint")
+
+			localEP := t.CreateLocalHostEndpoint()
+
+			t.netLink.AwaitRule(constants.RouteAgentHostNetworkTableID, "", ipv4Subnets[0])
+
+			By("Deleting local gateway Endpoint")
+
+			t.DeleteEndpoint(localEP.Name)
+
+			t.netLink.AwaitNoRule(constants.RouteAgentHostNetworkTableID, "", ipv4Subnets[0])
+			t.netLink.AwaitNoGwRoutes(0, constants.RouteAgentHostNetworkTableID, t.OVNK8sMgmntIntGw)
+		})
+	})
+
+	It("should not try to process NonGatewayRoutes", func() {
+		assert.EnsureNoActionsForResource(&t.dynClient.Fake, "nongatewayroutes", "watch")
 	})
 }

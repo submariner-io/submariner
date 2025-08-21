@@ -39,12 +39,23 @@ func (ovn *Handler) updateHostNetworkDataplane() error {
 	ovn.mutex.Lock()
 	defer ovn.mutex.Unlock()
 
+	var (
+		endpointSubnets set.Set[string]
+		cleanup         bool
+	)
+
+	if !ovn.State().IsOnGateway() && ovn.IntraRoutingDisabled {
+		// Set to empty so we delete all the rules.
+		endpointSubnets = set.New[string]()
+		cleanup = true
+	} else {
+		endpointSubnets = ovn.getRemoteSubnets()
+	}
+
 	currentRuleRemotes, err := ovn.getExistingHostNetworkRoutes()
 	if err != nil {
 		return errors.Wrapf(err, "error reading ip rule list for IPv4")
 	}
-
-	endpointSubnets := ovn.getRemoteSubnets()
 
 	toAdd := endpointSubnets.Difference(currentRuleRemotes).UnsortedList()
 
@@ -70,12 +81,21 @@ func (ovn *Handler) updateHostNetworkDataplane() error {
 		Table: constants.RouteAgentHostNetworkTableID,
 	}
 
-	err = ovn.netLink.RouteAdd(route)
-	if err != nil && !os.IsExist(err) {
-		return errors.Wrap(err, "error adding submariner default")
+	if cleanup {
+		err = ovn.netLink.RouteDel(route)
+		if os.IsNotExist(err) {
+			err = nil
+		}
+
+		return errors.Wrapf(err, "error deleting submariner default route with Gw %q", nextHop.String())
 	}
 
-	return nil
+	err = ovn.netLink.RouteAdd(route)
+	if os.IsExist(err) {
+		err = nil
+	}
+
+	return errors.Wrapf(err, "error adding submariner default route with Gw %q", nextHop.String())
 }
 
 func (ovn *Handler) getExistingHostNetworkRoutes() (set.Set[string], error) {

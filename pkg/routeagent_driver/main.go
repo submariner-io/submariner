@@ -137,22 +137,11 @@ func main() {
 	var handlers []event.Handler //nolint:prealloc // Ignore
 
 	for _, family := range cidr.ExtractIPFamilies(env.ClusterCidr) {
-		transitSwitchIP := ovn.NewTransitSwitchIP(family)
+		handlers = append(handlers,
+			kubeproxy.NewSyncHandler(family, env.ClusterCidr, env.ServiceCidr),
+			mtu.NewHandler(family, env.ClusterCidr, len(env.GlobalCidr) != 0, getTCPMssValue(localNode)))
 
-		handlers = append(handlers, kubeproxy.NewSyncHandler(family, env.ClusterCidr, env.ServiceCidr),
-			mtu.NewHandler(family, env.ClusterCidr, len(env.GlobalCidr) != 0, getTCPMssValue(localNode)),
-			ovn.NewHandler(family, &ovn.HandlerConfig{
-				Namespace:       env.Namespace,
-				ClusterCIDR:     env.ClusterCidr,
-				ServiceCIDR:     env.ServiceCidr,
-				SubmClient:      smClientset,
-				K8sClient:       k8sClientSet,
-				DynClient:       dynamicClientSet,
-				WatcherConfig:   config,
-				TransitSwitchIP: transitSwitchIP,
-			}),
-			ovn.NewGatewayRouteHandler(family, smClientset),
-			ovn.NewNonGatewayRouteHandler(family, smClientset, transitSwitchIP))
+		handlers = append(handlers, ovn.GetHandlers(family, &env, smClientset, k8sClientSet, dynamicClientSet, config)...)
 	}
 
 	handlers = append(handlers,

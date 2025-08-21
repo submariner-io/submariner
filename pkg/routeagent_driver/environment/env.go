@@ -19,11 +19,12 @@ limitations under the License.
 package environment
 
 type Specification struct {
-	ClusterID   string
-	Namespace   string
-	ClusterCidr []string
-	ServiceCidr []string
-	GlobalCidr  []string
-	ProfilePort int `default:"32782"`
-	Uninstall   bool
+	ClusterID            string
+	Namespace            string
+	ClusterCidr          []string
+	ServiceCidr          []string
+	GlobalCidr           []string
+	ProfilePort          int `default:"32782"`
+	Uninstall            bool
+	IntraRoutingDisabled bool
 }
