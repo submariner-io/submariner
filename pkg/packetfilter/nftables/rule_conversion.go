@@ -64,27 +64,39 @@ func mssClampToRuleSpec(ruleSpec []string, clampType packetfilter.MssClampType, 
 	return ruleSpec
 }
 
-func setToRuleSpec(ruleSpec []string, srcSetName, destSetName string) []string {
+func setToRuleSpec(ruleSpec []string, srcSetName, destSetName string, isIPv6Set bool) []string {
+	setPrefix := "ip"
+
+	if isIPv6Set {
+		setPrefix = "ip6"
+	}
+
 	if srcSetName != "" {
-		ruleSpec = append(ruleSpec, "ip", "saddr", "@"+srcSetName)
+		ruleSpec = append(ruleSpec, setPrefix, "saddr", "@"+srcSetName)
 	}
 
 	if destSetName != "" {
-		ruleSpec = append(ruleSpec, "ip", "daddr", "@"+destSetName)
+		ruleSpec = append(ruleSpec, setPrefix, "daddr", "@"+destSetName)
 	}
 
 	return ruleSpec
 }
 
-func toNftRuleSpec(rule *packetfilter.Rule) string {
+func toNftRuleSpec(rule *packetfilter.Rule, isIPv6Set bool) string {
 	ruleSpec := protoToRuleSpec([]string{}, rule.Proto, rule.DPort)
 
+	setPrefix := "ip"
+
+	if isIPv6Set {
+		setPrefix = "ip6"
+	}
+
 	if rule.SrcCIDR != "" {
-		ruleSpec = append(ruleSpec, "ip", "saddr", rule.SrcCIDR)
+		ruleSpec = append(ruleSpec, setPrefix, "saddr", rule.SrcCIDR)
 	}
 
 	if rule.DestCIDR != "" {
-		ruleSpec = append(ruleSpec, "ip", "daddr", rule.DestCIDR)
+		ruleSpec = append(ruleSpec, setPrefix, "daddr", rule.DestCIDR)
 	}
 
 	if rule.MarkValue != "" && rule.Action != packetfilter.RuleActionMark {
@@ -92,7 +104,7 @@ func toNftRuleSpec(rule *packetfilter.Rule) string {
 		ruleSpec = append(ruleSpec, "meta", "mark", "&", rule.MarkValue, "==", rule.MarkValue)
 	}
 
-	ruleSpec = setToRuleSpec(ruleSpec, rule.SrcSetName, rule.DestSetName)
+	ruleSpec = setToRuleSpec(ruleSpec, rule.SrcSetName, rule.DestSetName, isIPv6Set)
 
 	if rule.OutInterface != "" {
 		ruleSpec = append(ruleSpec, "oifname", rule.OutInterface)
