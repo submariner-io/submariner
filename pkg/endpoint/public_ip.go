@@ -188,23 +188,25 @@ func publicAPI(family k8snet.IPFamily, _ kubernetes.Interface, _, value string) 
 		url = "https://" + value
 	}
 
-	httpClient := http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-		},
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	var response *http.Response
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	if err == nil {
+		response, err = http.DefaultClient.Do(req)
 	}
 
-	response, err := httpClient.Get(url)
 	if err != nil {
-		return "", errors.Wrapf(err, "retrieving public IP from %s", url)
+		return "", errors.Wrapf(err, "error retrieving public IP from %s", url)
 	}
 
 	defer response.Body.Close()
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		return "", errors.Wrapf(err, "reading API response from %s", url)
+		return "", errors.Wrapf(err, "error reading API response from %s", url)
 	}
 
 	return firstIPInString(family, string(body))
