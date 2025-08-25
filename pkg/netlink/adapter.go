@@ -19,7 +19,6 @@ limitations under the License.
 package netlink
 
 import (
-	"net"
 	"os"
 	"syscall"
 
@@ -56,57 +55,6 @@ func (a *Adapter) RouteAddOrReplace(route *netlink.Route) error {
 
 	if errors.Is(err, syscall.EEXIST) {
 		err = a.RouteReplace(route)
-	}
-
-	return err
-}
-
-func (a *Adapter) AddDestinationRoutes(destIPs []net.IPNet, gwIP, srcIP net.IP, linkIndex, tableID int) error {
-	for i := range destIPs {
-		route := &netlink.Route{
-			LinkIndex: linkIndex,
-			Src:       srcIP,
-			Dst:       &destIPs[i],
-			Gw:        gwIP,
-			Type:      netlink.NDA_DST,
-			Flags:     netlink.NTF_SELF,
-			Priority:  100,
-			Table:     tableID,
-		}
-
-		err := a.RouteAddOrReplace(route)
-		if err != nil {
-			return errors.Wrapf(err, "unable to add the route entry %#v", route)
-		}
-	}
-
-	return nil
-}
-
-func (a *Adapter) DeleteDestinationRoutes(destIPs []net.IPNet, linkIndex, tableID int) error {
-	for i := range destIPs {
-		route := &netlink.Route{
-			LinkIndex: linkIndex,
-			Dst:       &destIPs[i],
-			Type:      netlink.NDA_DST,
-			Flags:     netlink.NTF_SELF,
-			Priority:  100,
-			Table:     tableID,
-		}
-
-		err := a.RouteDel(route)
-		if err != nil {
-			return errors.Wrapf(err, "unable to delete the route entry %#v", route)
-		}
-	}
-
-	return nil
-}
-
-func (a *Adapter) AddrAddIfNotPresent(link netlink.Link, addr *netlink.Addr) error {
-	err := a.AddrAdd(link, addr)
-	if err != nil && !errors.Is(err, syscall.EEXIST) {
-		return nil
 	}
 
 	return err
