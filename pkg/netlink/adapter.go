@@ -19,8 +19,7 @@ limitations under the License.
 package netlink
 
 import (
-	"os"
-	"syscall"
+	"io/fs"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/resource"
@@ -34,7 +33,7 @@ type Adapter struct {
 
 func (a *Adapter) RuleAddIfNotPresent(rule *netlink.Rule) error {
 	err := a.RuleAdd(rule)
-	if err != nil && !os.IsExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrExist) {
 		return errors.Wrapf(err, "failed to add rule %s", rule)
 	}
 
@@ -43,7 +42,7 @@ func (a *Adapter) RuleAddIfNotPresent(rule *netlink.Rule) error {
 
 func (a *Adapter) RuleDelIfPresent(rule *netlink.Rule) error {
 	err := a.RuleDel(rule)
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return errors.Wrapf(err, "failed to delete rule %s", rule)
 	}
 
@@ -53,7 +52,7 @@ func (a *Adapter) RuleDelIfPresent(rule *netlink.Rule) error {
 func (a *Adapter) RouteAddOrReplace(route *netlink.Route) error {
 	err := a.RouteAdd(route)
 
-	if errors.Is(err, syscall.EEXIST) {
+	if errors.Is(err, fs.ErrExist) {
 		err = a.RouteReplace(route)
 	}
 
