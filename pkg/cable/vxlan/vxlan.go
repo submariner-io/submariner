@@ -39,11 +39,12 @@ import (
 )
 
 const (
-	VxlanIface                 = "vxlan-tunnel"
-	VxlanVTepNetworkPrefixCIDR = "241.0.0.0/8"
-	CableDriverName            = "vxlan"
-	TableID                    = 100
-	DefaultPort                = 4500
+	VxlanIface                   = "vxlan-tunnel"
+	VxlanVTepNetworkPrefixCIDR   = "241.0.0.0/8"
+	VxlanVTepNetworkPrefixCIDRv6 = "fd00:100:200::/96"
+	CableDriverName              = "vxlan"
+	TableID                      = 100
+	DefaultPort                  = 4500
 )
 
 type vxLan struct {
@@ -51,12 +52,27 @@ type vxLan struct {
 	localCluster  types.SubmarinerCluster
 	connections   []v1.Connection
 	mutex         sync.Mutex
-	vxlanIface    *vxlan.Interface
+	vxlanIfaces   map[k8snet.IPFamily]*vxlan.Interface
 	netLink       netlinkAPI.Interface
-	vtepIP        net.IP
+	vtepIPs       map[k8snet.IPFamily]net.IP
 }
 
-var logger = log.Logger{Logger: logf.Log.WithName("vxlan")}
+var (
+	vtepPrefixCIDRByFamily = map[k8snet.IPFamily]string{
+		k8snet.IPv4: VxlanVTepNetworkPrefixCIDR,
+		k8snet.IPv6: VxlanVTepNetworkPrefixCIDRv6,
+	}
+
+	logger = log.Logger{Logger: logf.Log.WithName("vxlan")}
+)
+
+func GetVxlanInterfaceName(ipFamily k8snet.IPFamily) string {
+	if ipFamily == k8snet.IPv6 {
+		return VxlanIface + "-6"
+	}
+
+	return VxlanIface
+}
 
 func init() {
 	cable.AddDriver(CableDriverName, NewDriver)
@@ -70,6 +86,8 @@ func NewDriver(localEndpoint *submendpoint.Local, localCluster *types.Submariner
 		localEndpoint: *localEndpoint.Spec(),
 		netLink:       netlinkAPI.New(),
 		localCluster:  *localCluster,
+		vxlanIfaces:   make(map[k8snet.IPFamily]*vxlan.Interface),
+		vtepIPs:       make(map[k8snet.IPFamily]net.IP),
 	}
 
 	if strings.EqualFold(v.localEndpoint.CableName, CableDriverName) && v.localEndpoint.NATEnabled {
@@ -81,31 +99,38 @@ func NewDriver(localEndpoint *submendpoint.Local, localCluster *types.Submariner
 		return nil, errors.Wrap(err, "failed to get the UDP port configuration")
 	}
 
-	if err = v.createVxlanInterface(int(port)); err != nil {
-		return nil, errors.Wrap(err, "failed to setup Vxlan link")
+	// Create VXLAN interface for each IP family supported by the endpoint
+	for _, family := range v.localEndpoint.GetIPFamilies() {
+		if err = v.createVxlanInterface(int(port), family); err != nil {
+			return nil, errors.Wrapf(err, "failed to setup Vxlan link for IPv%v", family)
+		}
 	}
 
 	return &v, nil
 }
 
-func (v *vxLan) createVxlanInterface(port int) error {
-	ipAddr := v.localEndpoint.GetPrivateIP(k8snet.IPv4)
+func (v *vxLan) createVxlanInterface(port int, family k8snet.IPFamily) error {
+	ipAddr := v.localEndpoint.GetPrivateIP(family)
 
-	var err error
+	vtepPrefixCIDR := vtepPrefixCIDRByFamily[family]
 
-	v.vtepIP, err = vxlan.GetVtepIPAddressFrom(ipAddr, VxlanVTepNetworkPrefixCIDR, k8snet.IPv4)
+	vtepIP, err := vxlan.GetVtepIPAddressFrom(ipAddr, vtepPrefixCIDR, family)
 	if err != nil {
 		return errors.Wrapf(err, "failed to derive the vxlan vtepIP for %s", ipAddr)
 	}
 
-	defaultHostIface, err := v.netLink.GetDefaultGatewayInterface(k8snet.IPv4)
+	v.vtepIPs[family] = vtepIP
+
+	logger.V(log.DEBUG).Infof("Derived VTEP IPv%v %s from private IP %s", family, vtepIP, ipAddr)
+
+	defaultHostIface, err := v.netLink.GetDefaultGatewayInterface(family)
 	if err != nil {
-		return errors.Wrapf(err, "Unable to find the default interface on host: %s",
-			v.localEndpoint.Hostname)
+		return errors.Wrapf(err, "Unable to find the default IPv%v interface on host: %s", family, v.localEndpoint.Hostname)
 	}
 
+	interfaceName := GetVxlanInterfaceName(family)
 	attrs := &vxlan.Attributes{
-		Name:     VxlanIface,
+		Name:     interfaceName,
 		VxlanID:  1000,
 		Group:    nil,
 		SrcAddr:  nil,
@@ -113,32 +138,52 @@ func (v *vxLan) createVxlanInterface(port int) error {
 		Mtu:      defaultHostIface.MTU(),
 	}
 
-	v.vxlanIface, err = vxlan.NewInterface(attrs, v.netLink)
-	if err != nil {
-		return errors.Wrap(err, "failed to create vxlan interface on Gateway Node")
+	// For IPv6 VxLAN interface SrcAddr should be set with local IP
+	if family == k8snet.IPv6 {
+		localIP := net.ParseIP(ipAddr)
+		attrs.SrcAddr = localIP
 	}
 
-	err = v.netLink.RuleAddIfNotPresent(netlinkAPI.NewTableRule(TableID, k8snet.IPv4))
+	vxlanIface, err := vxlan.NewInterface(attrs, v.netLink)
 	if err != nil {
-		return errors.Wrap(err, "failed to add ip rule")
+		return errors.Wrapf(err, "failed to create vxlan interface %s on Gateway Node", interfaceName)
 	}
 
-	err = v.netLink.EnsureLooseModeIsConfigured(VxlanIface, k8snet.IPv4)
+	v.vxlanIfaces[family] = vxlanIface
+
+	err = vxlanIface.SetupLink()
 	if err != nil {
-		return errors.Wrap(err, "error while validating loose mode")
+		return errors.Wrapf(err, "failed to setup link for vxlan interface %s", interfaceName)
 	}
 
-	logger.V(log.DEBUG).Infof("Successfully configured rp_filter to loose mode(2) on %s", VxlanIface)
-
-	err = v.vxlanIface.ConfigureIPAddress(v.vtepIP, net.CIDRMask(8, 32))
+	err = v.netLink.RuleAddIfNotPresent(netlinkAPI.NewTableRule(TableID, family))
 	if err != nil {
-		return errors.Wrap(err, "failed to configure vxlan interface ipaddress on the Gateway Node")
+		return errors.Wrapf(err, "failed to add IPv%v ip rule", family)
 	}
 
-	err = v.netLink.EnableForwarding(VxlanIface, k8snet.IPv4)
+	err = v.netLink.EnsureLooseModeIsConfigured(interfaceName, family)
 	if err != nil {
-		return errors.Wrapf(err, "error enabling forwarding on the %q iface", VxlanIface)
+		return errors.Wrapf(err, "error while validating loose mode for IPv%v", family)
 	}
+
+	logger.V(log.DEBUG).Infof("Successfully configured rp_filter to loose mode(2) on %s for IPv%v", interfaceName, family)
+
+	_, ipNet, err := net.ParseCIDR(vtepPrefixCIDR)
+	if err != nil {
+		return errors.Wrapf(err, "invalid VTEP CIDR %q", vtepPrefixCIDR)
+	}
+
+	err = vxlanIface.ConfigureIPAddress(vtepIP, ipNet.Mask)
+	if err != nil {
+		return errors.Wrapf(err, "failed to configure vxlan interface ipaddress on %s", interfaceName)
+	}
+
+	err = v.netLink.EnableForwarding(interfaceName, family)
+	if err != nil {
+		return errors.Wrapf(err, "error enabling forwarding on the %q iface for IPv%v", interfaceName, family)
+	}
+
+	logger.V(log.DEBUG).Infof("Successfully configured VXLAN interface for IPv%v with VTEP IP %s", family, vtepIP)
 
 	return nil
 }
@@ -151,35 +196,44 @@ func (v *vxLan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 		return "", nil
 	}
 
+	family := endpointInfo.UseFamily
 	remoteIP := net.ParseIP(endpointInfo.UseIP)
+
 	if remoteIP == nil {
 		return "", fmt.Errorf("failed to parse remote IP %s", endpointInfo.UseIP)
 	}
 
-	allowedIPs := remoteEndpoint.Spec.ParseSubnets(endpointInfo.UseFamily)
+	allowedIPs := remoteEndpoint.Spec.ParseSubnets(family)
 
-	logger.V(log.DEBUG).Infof("Connecting cluster %s endpoint %s",
-		remoteEndpoint.Spec.ClusterID, remoteIP)
+	logger.V(log.DEBUG).Infof("Connecting cluster %s endpoint %s for IPv%v",
+		remoteEndpoint.Spec.ClusterID, remoteIP, family)
+
 	v.mutex.Lock()
 	defer v.mutex.Unlock()
 
-	cable.RecordConnection(CableDriverName, &v.localEndpoint, &remoteEndpoint.Spec, string(v1.Connected), true, endpointInfo.UseFamily)
+	vxlanIface, exists := v.vxlanIfaces[family]
+	if !exists {
+		return "", fmt.Errorf("no VXLAN interface configured for IPv%v", family)
+	}
 
-	privateIP := endpointInfo.Endpoint.Spec.GetPrivateIP(endpointInfo.UseFamily)
+	cable.RecordConnection(CableDriverName, &v.localEndpoint, &remoteEndpoint.Spec, string(v1.Connected), true, family)
 
-	remoteVtepIP, err := vxlan.GetVtepIPAddressFrom(privateIP, VxlanVTepNetworkPrefixCIDR, k8snet.IPv4)
+	privateIP := endpointInfo.Endpoint.Spec.GetPrivateIP(family)
+	vtepPrefixCIDR := vtepPrefixCIDRByFamily[family]
+
+	remoteVtepIP, err := vxlan.GetVtepIPAddressFrom(privateIP, vtepPrefixCIDR, family)
 	if err != nil {
 		return endpointInfo.UseIP, fmt.Errorf("failed to derive the vxlan vtepIP for %s: %w", privateIP, err)
 	}
 
-	err = v.vxlanIface.AddFDB(remoteIP, "00:00:00:00:00:00")
+	err = vxlanIface.AddFDB(remoteIP, "00:00:00:00:00:00")
 	if err != nil {
 		return endpointInfo.UseIP, fmt.Errorf("failed to add remoteIP %q to the forwarding database: %w", remoteIP, err)
 	}
 
 	var ipAddress net.IP
 
-	cniIface, err := cni.Discover(v.localCluster.Spec.ClusterCIDR, endpointInfo.UseFamily)
+	cniIface, err := cni.Discover(v.localCluster.Spec.ClusterCIDR, family)
 	if err == nil {
 		ipAddress = net.ParseIP(cniIface.IPAddress)
 	} else {
@@ -187,10 +241,10 @@ func (v *vxLan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 			v.localCluster.Spec.ClusterCIDR[0])
 	}
 
-	err = v.vxlanIface.AddRoutes(remoteVtepIP, ipAddress, TableID, allowedIPs...)
+	err = vxlanIface.AddRoutes(remoteVtepIP, ipAddress, TableID, allowedIPs...)
 	if err != nil {
-		return endpointInfo.UseIP, fmt.Errorf("failed to add route for the CIDR %q with remoteVtepIP %q and vxlanInterfaceIP %q: %w",
-			allowedIPs, remoteVtepIP, v.vtepIP, err)
+		return endpointInfo.UseIP, fmt.Errorf("failed to add route for the CIDR %q with remoteVtepIP %q: %w",
+			allowedIPs, remoteVtepIP, err)
 	}
 
 	v.connections = append(v.connections, v1.Connection{
@@ -198,7 +252,8 @@ func (v *vxLan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (s
 		UsingIP: endpointInfo.UseIP, UsingNAT: endpointInfo.UseNAT,
 	})
 
-	logger.V(log.DEBUG).Infof("Done adding endpoint for cluster %s", remoteEndpoint.Spec.ClusterID)
+	logger.V(log.DEBUG).Infof("Done adding IPv%v endpoint for cluster %s with VTEP %s -> %s",
+		family, remoteEndpoint.Spec.ClusterID, v.vtepIPs[family], remoteVtepIP)
 
 	return endpointInfo.UseIP, nil
 }
@@ -215,10 +270,15 @@ func (v *vxLan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint,
 	v.mutex.Lock()
 	defer v.mutex.Unlock()
 
+	vxlanIface, exists := v.vxlanIfaces[family]
+	if !exists {
+		return fmt.Errorf("no VXLAN interface configured for IPv%v", family)
+	}
+
 	var ip string
 
 	for i := range v.connections {
-		if v.connections[i].Endpoint.CableName == remoteEndpoint.Spec.CableName {
+		if v.connections[i].Endpoint.CableName == remoteEndpoint.Spec.CableName && v.connections[i].GetFamily() == family {
 			ip = v.connections[i].UsingIP
 		}
 	}
@@ -229,24 +289,23 @@ func (v *vxLan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint,
 	}
 
 	remoteIP := net.ParseIP(ip)
-
 	if remoteIP == nil {
 		return fmt.Errorf("failed to parse remote IP %s", ip)
 	}
 
-	allowedIPs := remoteEndpoint.Spec.ParseSubnets(k8snet.IPv4)
+	allowedIPs := remoteEndpoint.Spec.ParseSubnets(family)
 
-	err := v.vxlanIface.DelFDB(remoteIP, "00:00:00:00:00:00")
+	err := vxlanIface.DelFDB(remoteIP, "00:00:00:00:00:00")
 	if err != nil {
 		return fmt.Errorf("failed to delete remoteIP %q from the forwarding database: %w", remoteIP, err)
 	}
 
-	err = v.vxlanIface.DelRoutes(TableID, allowedIPs...)
+	err = vxlanIface.DelRoutes(TableID, allowedIPs...)
 	if err != nil {
 		return fmt.Errorf("failed to remove route for the CIDR %q: %w", allowedIPs, err)
 	}
 
-	v.connections = removeConnectionForEndpoint(v.connections, remoteEndpoint)
+	v.connections = removeConnectionForEndpoint(v.connections, remoteEndpoint, family)
 	cable.RecordDisconnected(CableDriverName, &v.localEndpoint, &remoteEndpoint.Spec, family)
 
 	logger.V(log.DEBUG).Infof("Done removing endpoint for cluster %s", remoteEndpoint.Spec.ClusterID)
@@ -254,9 +313,9 @@ func (v *vxLan) DisconnectFromEndpoint(remoteEndpoint *types.SubmarinerEndpoint,
 	return nil
 }
 
-func removeConnectionForEndpoint(connections []v1.Connection, endpoint *types.SubmarinerEndpoint) []v1.Connection {
+func removeConnectionForEndpoint(connections []v1.Connection, endpoint *types.SubmarinerEndpoint, family k8snet.IPFamily) []v1.Connection {
 	for j := range connections {
-		if connections[j].Endpoint.CableName == endpoint.Spec.CableName {
+		if connections[j].Endpoint.CableName == endpoint.Spec.CableName && connections[j].GetFamily() == family {
 			copy(connections[j:], connections[j+1:])
 			return connections[:len(connections)-1]
 		}
@@ -284,14 +343,24 @@ func (v *vxLan) GetName() string {
 func (v *vxLan) Cleanup() error {
 	logger.Infof("Uninstalling the vxlan cable driver")
 
-	err := netlinkAPI.DeleteIfaceAndAssociatedRoutes(VxlanIface, TableID)
-	if err != nil {
-		logger.Errorf(nil, "Unable to delete interface %s and associated routes from table %d", VxlanIface, TableID)
+	// Clean up rules for all configured families
+	families := v.localEndpoint.GetIPFamilies()
+	if len(families) == 0 {
+		families = []k8snet.IPFamily{k8snet.IPv4}
 	}
 
-	err = v.netLink.RuleDelIfPresent(netlinkAPI.NewTableRule(TableID, k8snet.IPv4))
-	if err != nil {
-		return errors.Wrapf(err, "unable to delete IP rule pointing to %d table", TableID)
+	for _, family := range families {
+		interfaceName := GetVxlanInterfaceName(family)
+
+		err := netlinkAPI.DeleteIfaceAndAssociatedRoutes(interfaceName, TableID, family)
+		if err != nil {
+			logger.Errorf(nil, "Unable to delete interface %s and associated routes from table %d", interfaceName, TableID)
+		}
+
+		err = v.netLink.RuleDelIfPresent(netlinkAPI.NewTableRule(TableID, family))
+		if err != nil {
+			logger.Errorf(err, "Unable to delete IPv%v IP rule pointing to %d table", family, TableID)
+		}
 	}
 
 	return nil
