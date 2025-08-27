@@ -24,7 +24,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/vishvananda/netlink"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -147,12 +146,7 @@ func (ovn *Handler) handleInterfaceAddressChange() error {
 
 		logger.V(log.DEBUG).Infof("Install/ensure %q/%s IPHook chain exists", constants.SmPostRoutingChain, "NAT")
 
-		if err := ovn.pFilter.CreateIPHookChainIfNotExists(&packetfilter.ChainIPHook{
-			Name:     constants.SmPostRoutingChain,
-			Type:     packetfilter.ChainTypeNAT,
-			Hook:     packetfilter.ChainHookPostrouting,
-			Priority: packetfilter.ChainPriorityFirst,
-		}); err != nil {
+		if err := ovn.pFilter.CreateIPHookChainIfNotExists(newPostRoutingChain()); err != nil {
 			return errors.Wrap(err, "error installing IPHook chain")
 		}
 

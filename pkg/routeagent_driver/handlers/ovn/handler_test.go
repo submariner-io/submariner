@@ -605,26 +605,41 @@ func (t *handlerTestDriver) testOVNMgmtInterfaceAddressChange() {
 }
 
 func (t *handlerTestDriver) testUninstall() {
-	It("should delete the table rules", func() {
+	It("should delete the table rules and chains", func() {
 		Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain)).To(BeTrue())
 		Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerMSSClampChain)).To(BeTrue())
+		Expect(t.pFilter.ChainExists(packetfilter.TableTypeNAT, constants.SmPostRoutingChain)).To(BeTrue())
 
-		_ = t.netLink.RuleAdd(&netlink.Rule{
+		Expect(t.netLink.RuleAdd(&netlink.Rule{
 			Table:  constants.RouteAgentHostNetworkTableID,
 			Family: netlink.FAMILY_V4,
-		})
+		})).To(Succeed())
 
-		_ = t.netLink.RuleAdd(&netlink.Rule{
+		Expect(t.netLink.RuleAdd(&netlink.Rule{
 			Table:  constants.RouteAgentInterClusterNetworkTableID,
 			Family: netlink.FAMILY_V4,
-		})
+		})).To(Succeed())
+
+		Expect(t.pFilter.Append(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain, &packetfilter.Rule{
+			DestCIDR: "1.2.3.4/16",
+			Action:   packetfilter.RuleActionAccept,
+		})).To(Succeed())
+
+		Expect(t.pFilter.Append(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain, &packetfilter.Rule{
+			DestCIDR:  "1.2.3.4/16",
+			Action:    packetfilter.RuleActionMss,
+			ClampType: packetfilter.ToValue,
+			MssValue:  "5",
+		})).To(Succeed())
 
 		Expect(t.handler.Uninstall()).To(Succeed())
 
 		t.netLink.AwaitNoRule(constants.RouteAgentHostNetworkTableID, "", "")
 		t.netLink.AwaitNoRule(constants.RouteAgentInterClusterNetworkTableID, "", "")
 
+		Expect(t.pFilter.ChainExists(packetfilter.TableTypeNAT, constants.SmPostRoutingChain)).To(BeFalse())
 		Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain)).To(BeFalse())
+		Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerMSSClampChain)).To(BeFalse())
 	})
 }
 

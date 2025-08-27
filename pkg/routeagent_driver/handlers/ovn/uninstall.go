@@ -64,33 +64,9 @@ func (ovn *Handler) Uninstall() error {
 			constants.RouteAgentHostNetworkTableID)
 	}
 
-	if err := ovn.pFilter.ClearChain(packetfilter.TableTypeFilter, ForwardingSubmarinerFWDChain); err != nil {
-		logger.Errorf(err, "Error flushing packetfilter chain %q of %q table", ForwardingSubmarinerFWDChain, "Filter")
-	}
-
-	if err := ovn.pFilter.DeleteIPHookChain(&packetfilter.ChainIPHook{
-		Name:     ForwardingSubmarinerFWDChain,
-		Type:     packetfilter.ChainTypeFilter,
-		Hook:     packetfilter.ChainHookForward,
-		Priority: packetfilter.ChainPriorityFirst,
-	}); err != nil {
-		logger.Errorf(err, "DeleteIPHookChain %s returned error",
-			ForwardingSubmarinerFWDChain)
-	}
-
-	if err := ovn.pFilter.ClearChain(packetfilter.TableTypeNAT, constants.SmPostRoutingChain); err != nil {
-		logger.Errorf(err, "Error flushing packetfilter chain %q of %q table", constants.SmPostRoutingChain, "NAT")
-	}
-
-	if err := ovn.pFilter.DeleteIPHookChain(&packetfilter.ChainIPHook{
-		Name:     constants.SmPostRoutingChain,
-		Type:     packetfilter.ChainTypeNAT,
-		Hook:     packetfilter.ChainHookPostrouting,
-		Priority: packetfilter.ChainPriorityFirst,
-	}); err != nil {
-		logger.Errorf(err, "DeleteIPHookChain %s returned error",
-			constants.SmPostRoutingChain)
-	}
+	ovn.deleteIPHookChain(packetfilter.TableTypeFilter, newSubmarinerFWDChain())
+	ovn.deleteIPHookChain(packetfilter.TableTypeFilter, newSubmarinerMSSClampChain())
+	ovn.deleteIPHookChain(packetfilter.TableTypeNAT, newPostRoutingChain())
 
 	err = util.Update[*corev1.Node](context.TODO(), ovn.nodeResourceInterface(), &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: nodeutil.GetLocalNodeName()},
@@ -103,6 +79,16 @@ func (ovn *Handler) Uninstall() error {
 	}
 
 	return nil
+}
+
+func (ovn *Handler) deleteIPHookChain(table packetfilter.TableType, chain *packetfilter.ChainIPHook) {
+	if err := ovn.pFilter.ClearChain(table, chain.Name); err != nil {
+		logger.Errorf(err, "Error clearing IP hook chain %q from %q table", chain.Name, table)
+	}
+
+	if err := ovn.pFilter.DeleteIPHookChain(chain); err != nil {
+		logger.Errorf(err, "Error deleting IP hook chain %q from %q table", chain.Name, table)
+	}
 }
 
 func (ovn *Handler) cleanupRoutes() error {
