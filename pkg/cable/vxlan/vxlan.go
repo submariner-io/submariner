@@ -21,7 +21,6 @@ package vxlan
 import (
 	"fmt"
 	"net"
-	"os"
 	"strings"
 	"sync"
 
@@ -120,7 +119,7 @@ func (v *vxLan) createVxlanInterface(port int) error {
 	}
 
 	err = v.netLink.RuleAddIfNotPresent(netlinkAPI.NewTableRule(TableID, k8snet.IPv4))
-	if err != nil && !os.IsExist(err) {
+	if err != nil {
 		return errors.Wrap(err, "failed to add ip rule")
 	}
 
