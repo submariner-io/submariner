@@ -377,10 +377,14 @@ func (t *handlerTestDriver) testGatewayTransitions(ipFamilySubnets, nonIPFamilyS
 			for _, s := range ipFamilySubnets {
 				t.netLink.AwaitRule(constants.RouteAgentInterClusterNetworkTableID, s, t.clusterCIDR)
 				t.netLink.AwaitRule(constants.RouteAgentInterClusterNetworkTableID, s, t.serviceCIDR)
+				t.pFilter.AwaitRule(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain, ContainSubstring(s))
+				t.pFilter.AwaitRule(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerMSSClampChain, ContainSubstring(s))
 			}
 
 			for _, s := range nonIPFamilySubnets {
 				t.netLink.EnsureNoRule(constants.RouteAgentInterClusterNetworkTableID, s, t.clusterCIDR)
+				t.pFilter.EnsureNoRule(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain, ContainSubstring(s))
+				t.pFilter.EnsureNoRule(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerMSSClampChain, ContainSubstring(s))
 			}
 
 			t.awaitOVNKNodeAnnotationContaining(ipFamilySubnets...)
@@ -394,6 +398,8 @@ func (t *handlerTestDriver) testGatewayTransitions(ipFamilySubnets, nonIPFamilyS
 			for _, s := range ipFamilySubnets {
 				t.netLink.AwaitNoRule(constants.RouteAgentInterClusterNetworkTableID, s, t.clusterCIDR)
 				t.netLink.AwaitNoRule(constants.RouteAgentInterClusterNetworkTableID, s, t.serviceCIDR)
+				t.pFilter.AwaitNoRule(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain, ContainSubstring(s))
+				t.pFilter.AwaitNoRule(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerMSSClampChain, ContainSubstring(s))
 			}
 
 			t.awaitOVNKNodeAnnotationContaining()
