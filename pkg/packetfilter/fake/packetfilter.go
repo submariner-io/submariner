@@ -153,10 +153,8 @@ func fromRuleString(str string) *packetfilter.Rule {
 }
 
 func toRuleString(rule *packetfilter.Rule) string {
-	b, err := json.Marshal(*rule)
-	if err != nil {
-		panic(err)
-	}
+	// The definition of Rule ensures it can be encoded, no need to check for errors
+	b, _ := json.Marshal(*rule)
 
 	return string(b)
 }
