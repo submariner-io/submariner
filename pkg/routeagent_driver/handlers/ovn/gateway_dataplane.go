@@ -229,12 +229,7 @@ func (ovn *Handler) getRouteToOVNDataPlane() (*netlink.Route, error) {
 func (ovn *Handler) initIPtablesChains() error {
 	logger.V(log.DEBUG).Infof("Install/ensure %q/%s IPHook chain exists", constants.SmPostRoutingChain, "NAT")
 
-	if err := ovn.pFilter.CreateIPHookChainIfNotExists(&packetfilter.ChainIPHook{
-		Name:     constants.SmPostRoutingChain,
-		Type:     packetfilter.ChainTypeNAT,
-		Hook:     packetfilter.ChainHookPostrouting,
-		Priority: packetfilter.ChainPriorityFirst,
-	}); err != nil {
+	if err := ovn.pFilter.CreateIPHookChainIfNotExists(newPostRoutingChain()); err != nil {
 		return errors.Wrapf(err, "error installing %q IPHook chain", constants.SmPostRoutingChain)
 	}
 
@@ -246,14 +241,9 @@ func (ovn *Handler) initIPtablesChains() error {
 }
 
 func (ovn *Handler) ensureForwardChains() error {
-	for _, chain := range []string{ForwardingSubmarinerFWDChain, ForwardingSubmarinerMSSClampChain} {
-		if err := ovn.pFilter.CreateIPHookChainIfNotExists(&packetfilter.ChainIPHook{
-			Name:     chain,
-			Type:     packetfilter.ChainTypeFilter,
-			Hook:     packetfilter.ChainHookForward,
-			Priority: packetfilter.ChainPriorityFirst,
-		}); err != nil {
-			return errors.Wrapf(err, "error installing forwarding IPHook chain %q", chain)
+	for _, chain := range []*packetfilter.ChainIPHook{newSubmarinerFWDChain(), newSubmarinerMSSClampChain()} {
+		if err := ovn.pFilter.CreateIPHookChainIfNotExists(chain); err != nil {
+			return errors.Wrapf(err, "error creating forwarding IPHook chain %q", chain.Name)
 		}
 	}
 
@@ -331,5 +321,32 @@ func (ovn *Handler) nodeResourceInterface() resource.Interface[*corev1.Node] {
 	return &resource.InterfaceFuncs[*corev1.Node]{
 		GetFunc:    ovn.K8sClient.CoreV1().Nodes().Get,
 		UpdateFunc: ovn.K8sClient.CoreV1().Nodes().Update,
+	}
+}
+
+func newPostRoutingChain() *packetfilter.ChainIPHook {
+	return &packetfilter.ChainIPHook{
+		Name:     constants.SmPostRoutingChain,
+		Type:     packetfilter.ChainTypeNAT,
+		Hook:     packetfilter.ChainHookPostrouting,
+		Priority: packetfilter.ChainPriorityFirst,
+	}
+}
+
+func newSubmarinerFWDChain() *packetfilter.ChainIPHook {
+	return &packetfilter.ChainIPHook{
+		Name:     ForwardingSubmarinerFWDChain,
+		Type:     packetfilter.ChainTypeFilter,
+		Hook:     packetfilter.ChainHookForward,
+		Priority: packetfilter.ChainPriorityFirst,
+	}
+}
+
+func newSubmarinerMSSClampChain() *packetfilter.ChainIPHook {
+	return &packetfilter.ChainIPHook{
+		Name:     ForwardingSubmarinerMSSClampChain,
+		Type:     packetfilter.ChainTypeFilter,
+		Hook:     packetfilter.ChainHookForward,
+		Priority: packetfilter.ChainPriorityFirst,
 	}
 }
