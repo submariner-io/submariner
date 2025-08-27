@@ -21,6 +21,7 @@ package ovn
 import (
 	"context"
 	"encoding/json"
+	goerrors "errors"
 	"os"
 	"strconv"
 
@@ -205,21 +206,12 @@ func (ovn *Handler) updateNoMasqueradeRules(subnet string, add bool) error {
 }
 
 func (ovn *Handler) cleanupForwardingIptables() error {
-	if err := ovn.pFilter.DeleteIPHookChain(&packetfilter.ChainIPHook{
-		Name:     ForwardingSubmarinerMSSClampChain,
-		Type:     packetfilter.ChainTypeFilter,
-		Hook:     packetfilter.ChainHookForward,
-		Priority: packetfilter.ChainPriorityFirst,
-	}); err != nil {
-		return errors.Wrapf(err, "error clearing chain %q", ForwardingSubmarinerMSSClampChain)
-	}
-
-	return errors.Wrapf(ovn.pFilter.DeleteIPHookChain(&packetfilter.ChainIPHook{
-		Name:     ForwardingSubmarinerFWDChain,
-		Type:     packetfilter.ChainTypeFilter,
-		Hook:     packetfilter.ChainHookForward,
-		Priority: packetfilter.ChainPriorityFirst,
-	}), "error clearing chain %q", ForwardingSubmarinerFWDChain)
+	return goerrors.Join(
+		errors.Wrapf(ovn.pFilter.ClearChain(packetfilter.TableTypeFilter, ForwardingSubmarinerMSSClampChain),
+			"error clearing chain %q", ForwardingSubmarinerMSSClampChain),
+		errors.Wrapf(ovn.pFilter.ClearChain(packetfilter.TableTypeFilter, ForwardingSubmarinerFWDChain),
+			"error clearing chain %q", ForwardingSubmarinerFWDChain),
+	)
 }
 
 func (ovn *Handler) getRouteToOVNDataPlane() (*netlink.Route, error) {
