@@ -198,8 +198,8 @@ func toTransitSwitchIPAnnotation(ips ...string) string {
 		return ""
 	}
 
-	bytes, err := json.Marshal(data)
-	Expect(err).To(Succeed())
+	// Maps of strings can always be encoded, no need to check for errors
+	bytes, _ := json.Marshal(data)
 
 	return string(bytes)
 }

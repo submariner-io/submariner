@@ -31,12 +31,12 @@ import (
 	"sigs.k8s.io/knftables"
 )
 
-const (
-	/* Single table named 'submariner' is used for nftables configuration.*/
-	submarinerTable = "submariner"
-)
-
 var (
+	ipFamilyToNftTableName = map[k8snet.IPFamily]string{
+		k8snet.IPv4: "submariner-ipv4",
+		k8snet.IPv6: "submariner-ipv6",
+	}
+
 	iphookChainTypeToNftablesType = map[packetfilter.ChainType]knftables.BaseChainType{
 		packetfilter.ChainTypeFilter: knftables.FilterType,
 		packetfilter.ChainTypeRoute:  knftables.RouteType,
@@ -81,7 +81,7 @@ type packetFilter struct {
 }
 
 func New(family k8snet.IPFamily) (packetfilter.Driver, error) {
-	nft, err := knftables.New(nftFamilies[family], submarinerTable)
+	nft, err := knftables.New(nftFamilies[family], ipFamilyToNftTableName[family])
 	if err != nil {
 		return nil, errors.Wrapf(err, "error creating knftables for family IPv%s", family)
 	}
@@ -277,7 +277,7 @@ func (p *packetFilter) Append(_ packetfilter.TableType, chain string, rule *pack
 }
 
 func (p *packetFilter) insertRuleAtPosition(chain string, rule *packetfilter.Rule, pos int) error {
-	ruleSpec := toNftRuleSpec(rule)
+	ruleSpec := toNftRuleSpec(rule, (p.family == k8snet.IPv6))
 
 	knftRule := knftables.Rule{
 		Chain:   chain,

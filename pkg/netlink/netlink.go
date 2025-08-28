@@ -31,6 +31,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/vishvananda/netlink"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
 	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -68,12 +70,9 @@ type Basic interface {
 
 type Interface interface {
 	Basic
-	AddrAddIfNotPresent(link netlink.Link, addr *netlink.Addr) error
 	RuleAddIfNotPresent(rule *netlink.Rule) error
 	RuleDelIfPresent(rule *netlink.Rule) error
 	RouteAddOrReplace(route *netlink.Route) error
-	AddDestinationRoutes(destIPs []net.IPNet, gwIP, srcIP net.IP, linkIndex, tableID int) error
-	DeleteDestinationRoutes(destIPs []net.IPNet, linkIndex, tableID int) error
 	GetDefaultGatewayInterface(family k8snet.IPFamily) (NetworkInterface, error)
 }
 
@@ -92,6 +91,34 @@ var (
 		k8snet.IPv6: allZeroAddressV6,
 	}
 )
+
+const (
+	// MaxRetries is the maximum number of retries for interrupted netlink operations.
+	MaxRetries = 5
+)
+
+// retryOnInterrupted wraps netlink operations that can be interrupted and retries them using exponential backoff.
+func retryOnInterrupted[T any](operation func() (T, error)) (T, error) {
+	var result T
+
+	backOff := wait.Backoff{
+		Steps:    MaxRetries,
+		Duration: 10 * time.Millisecond,
+		Factor:   1.0,
+		Jitter:   0.1,
+	}
+
+	err := retry.OnError(backOff, func(err error) bool {
+		return errors.Is(err, netlink.ErrDumpInterrupted)
+	}, func() error {
+		var opErr error
+		result, opErr = operation()
+
+		return opErr
+	})
+
+	return result, err
+}
 
 type netlinkType struct{}
 
@@ -112,7 +139,9 @@ func (n *netlinkType) LinkDel(link netlink.Link) error {
 }
 
 func (n *netlinkType) LinkByName(name string) (netlink.Link, error) {
-	return netlink.LinkByName(name)
+	return retryOnInterrupted(func() (netlink.Link, error) {
+		return netlink.LinkByName(name)
+	})
 }
 
 func (n *netlinkType) LinkSetUp(link netlink.Link) error {
@@ -128,7 +157,9 @@ func (n *netlinkType) AddrDel(link netlink.Link, addr *netlink.Addr) error {
 }
 
 func (n *netlinkType) AddrList(link netlink.Link, family k8snet.IPFamily) ([]netlink.Addr, error) {
-	return netlink.AddrList(link, ToNetlinkFamily(family))
+	return retryOnInterrupted(func() ([]netlink.Addr, error) {
+		return netlink.AddrList(link, ToNetlinkFamily(family))
+	})
 }
 
 func (n *netlinkType) AddrSubscribe(addrCh chan netlink.AddrUpdate, doneCh chan struct{}) error {
@@ -156,11 +187,15 @@ func (n *netlinkType) RouteReplace(route *netlink.Route) error {
 }
 
 func (n *netlinkType) RouteGet(destination net.IP) ([]netlink.Route, error) {
-	return netlink.RouteGet(destination)
+	return retryOnInterrupted(func() ([]netlink.Route, error) {
+		return netlink.RouteGet(destination)
+	})
 }
 
 func (n *netlinkType) RouteList(link netlink.Link, family k8snet.IPFamily) ([]netlink.Route, error) {
-	return netlink.RouteList(link, ToNetlinkFamily(family))
+	return retryOnInterrupted(func() ([]netlink.Route, error) {
+		return netlink.RouteList(link, ToNetlinkFamily(family))
+	})
 }
 
 func (n *netlinkType) RuleAdd(rule *netlink.Rule) error {
@@ -172,7 +207,9 @@ func (n *netlinkType) RuleDel(rule *netlink.Rule) error {
 }
 
 func (n *netlinkType) RuleList(family k8snet.IPFamily) ([]netlink.Rule, error) {
-	return netlink.RuleList(ToNetlinkFamily(family))
+	return retryOnInterrupted(func() ([]netlink.Rule, error) {
+		return netlink.RuleList(ToNetlinkFamily(family))
+	})
 }
 
 func (n *netlinkType) XfrmPolicyAdd(policy *netlink.XfrmPolicy) error {
@@ -184,7 +221,9 @@ func (n *netlinkType) XfrmPolicyDel(policy *netlink.XfrmPolicy) error {
 }
 
 func (n *netlinkType) XfrmPolicyList(family k8snet.IPFamily) ([]netlink.XfrmPolicy, error) {
-	return netlink.XfrmPolicyList(ToNetlinkFamily(family))
+	return retryOnInterrupted(func() ([]netlink.XfrmPolicy, error) {
+		return netlink.XfrmPolicyList(ToNetlinkFamily(family))
+	})
 }
 
 func (n *netlinkType) EnableLooseModeReversePathFilter(interfaceName string, family k8snet.IPFamily) error {
