@@ -19,9 +19,7 @@ limitations under the License.
 package netlink
 
 import (
-	"net"
-	"os"
-	"syscall"
+	"io/fs"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/resource"
@@ -35,7 +33,7 @@ type Adapter struct {
 
 func (a *Adapter) RuleAddIfNotPresent(rule *netlink.Rule) error {
 	err := a.RuleAdd(rule)
-	if err != nil && !os.IsExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrExist) {
 		return errors.Wrapf(err, "failed to add rule %s", rule)
 	}
 
@@ -44,7 +42,7 @@ func (a *Adapter) RuleAddIfNotPresent(rule *netlink.Rule) error {
 
 func (a *Adapter) RuleDelIfPresent(rule *netlink.Rule) error {
 	err := a.RuleDel(rule)
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return errors.Wrapf(err, "failed to delete rule %s", rule)
 	}
 
@@ -54,59 +52,8 @@ func (a *Adapter) RuleDelIfPresent(rule *netlink.Rule) error {
 func (a *Adapter) RouteAddOrReplace(route *netlink.Route) error {
 	err := a.RouteAdd(route)
 
-	if errors.Is(err, syscall.EEXIST) {
+	if errors.Is(err, fs.ErrExist) {
 		err = a.RouteReplace(route)
-	}
-
-	return err
-}
-
-func (a *Adapter) AddDestinationRoutes(destIPs []net.IPNet, gwIP, srcIP net.IP, linkIndex, tableID int) error {
-	for i := range destIPs {
-		route := &netlink.Route{
-			LinkIndex: linkIndex,
-			Src:       srcIP,
-			Dst:       &destIPs[i],
-			Gw:        gwIP,
-			Type:      netlink.NDA_DST,
-			Flags:     netlink.NTF_SELF,
-			Priority:  100,
-			Table:     tableID,
-		}
-
-		err := a.RouteAddOrReplace(route)
-		if err != nil {
-			return errors.Wrapf(err, "unable to add the route entry %#v", route)
-		}
-	}
-
-	return nil
-}
-
-func (a *Adapter) DeleteDestinationRoutes(destIPs []net.IPNet, linkIndex, tableID int) error {
-	for i := range destIPs {
-		route := &netlink.Route{
-			LinkIndex: linkIndex,
-			Dst:       &destIPs[i],
-			Type:      netlink.NDA_DST,
-			Flags:     netlink.NTF_SELF,
-			Priority:  100,
-			Table:     tableID,
-		}
-
-		err := a.RouteDel(route)
-		if err != nil {
-			return errors.Wrapf(err, "unable to delete the route entry %#v", route)
-		}
-	}
-
-	return nil
-}
-
-func (a *Adapter) AddrAddIfNotPresent(link netlink.Link, addr *netlink.Addr) error {
-	err := a.AddrAdd(link, addr)
-	if err != nil && !errors.Is(err, syscall.EEXIST) {
-		return nil
 	}
 
 	return err
