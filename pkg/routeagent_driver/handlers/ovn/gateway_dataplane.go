@@ -21,7 +21,8 @@ package ovn
 import (
 	"context"
 	"encoding/json"
-	"os"
+	goerrors "errors"
+	"io/fs"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -45,7 +46,7 @@ func (ovn *Handler) cleanupGatewayDataplane() error {
 		return errors.Wrapf(err, "error reading ip rule list for IPv4")
 	}
 
-	err = ovn.handleSubnets(currentRemoteSubnets.UnsortedList(), ovn.netLink.RuleDel, os.IsNotExist)
+	err = ovn.handleSubnets(currentRemoteSubnets.UnsortedList(), ovn.netLink.RuleDelIfPresent)
 	if err != nil {
 		return errors.Wrapf(err, "error removing routing rule")
 	}
@@ -56,7 +57,7 @@ func (ovn *Handler) cleanupGatewayDataplane() error {
 	}
 
 	err = ovn.netLink.RouteDel(defaultRoute)
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return errors.Wrap(err, "error deleting submariner default route")
 	}
 
@@ -76,14 +77,14 @@ func (ovn *Handler) updateGatewayDataplane() error {
 
 	toAdd := endpointSubnets.Difference(currentRuleRemotes).UnsortedList()
 
-	err = ovn.handleSubnets(toAdd, ovn.netLink.RuleAdd, os.IsExist)
+	err = ovn.handleSubnets(toAdd, ovn.netLink.RuleAddIfNotPresent)
 	if err != nil {
 		return errors.Wrap(err, "error adding routing rule")
 	}
 
 	toRemove := currentRuleRemotes.Difference(endpointSubnets).UnsortedList()
 
-	err = ovn.handleSubnets(toRemove, ovn.netLink.RuleDel, os.IsNotExist)
+	err = ovn.handleSubnets(toRemove, ovn.netLink.RuleDelIfPresent)
 	if err != nil {
 		return errors.Wrapf(err, "error removing routing rule")
 	}
@@ -94,7 +95,7 @@ func (ovn *Handler) updateGatewayDataplane() error {
 	}
 
 	err = ovn.netLink.RouteAdd(defaultRoute)
-	if err != nil && !os.IsExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrExist) {
 		return errors.Wrap(err, "error adding submariner default")
 	}
 
@@ -205,21 +206,12 @@ func (ovn *Handler) updateNoMasqueradeRules(subnet string, add bool) error {
 }
 
 func (ovn *Handler) cleanupForwardingIptables() error {
-	if err := ovn.pFilter.DeleteIPHookChain(&packetfilter.ChainIPHook{
-		Name:     ForwardingSubmarinerMSSClampChain,
-		Type:     packetfilter.ChainTypeFilter,
-		Hook:     packetfilter.ChainHookForward,
-		Priority: packetfilter.ChainPriorityFirst,
-	}); err != nil {
-		return errors.Wrapf(err, "error clearing chain %q", ForwardingSubmarinerMSSClampChain)
-	}
-
-	return errors.Wrapf(ovn.pFilter.DeleteIPHookChain(&packetfilter.ChainIPHook{
-		Name:     ForwardingSubmarinerFWDChain,
-		Type:     packetfilter.ChainTypeFilter,
-		Hook:     packetfilter.ChainHookForward,
-		Priority: packetfilter.ChainPriorityFirst,
-	}), "error clearing chain %q", ForwardingSubmarinerFWDChain)
+	return goerrors.Join(
+		errors.Wrapf(ovn.pFilter.ClearChain(packetfilter.TableTypeFilter, ForwardingSubmarinerMSSClampChain),
+			"error clearing chain %q", ForwardingSubmarinerMSSClampChain),
+		errors.Wrapf(ovn.pFilter.ClearChain(packetfilter.TableTypeFilter, ForwardingSubmarinerFWDChain),
+			"error clearing chain %q", ForwardingSubmarinerFWDChain),
+	)
 }
 
 func (ovn *Handler) getRouteToOVNDataPlane() (*netlink.Route, error) {
@@ -237,12 +229,7 @@ func (ovn *Handler) getRouteToOVNDataPlane() (*netlink.Route, error) {
 func (ovn *Handler) initIPtablesChains() error {
 	logger.V(log.DEBUG).Infof("Install/ensure %q/%s IPHook chain exists", constants.SmPostRoutingChain, "NAT")
 
-	if err := ovn.pFilter.CreateIPHookChainIfNotExists(&packetfilter.ChainIPHook{
-		Name:     constants.SmPostRoutingChain,
-		Type:     packetfilter.ChainTypeNAT,
-		Hook:     packetfilter.ChainHookPostrouting,
-		Priority: packetfilter.ChainPriorityFirst,
-	}); err != nil {
+	if err := ovn.pFilter.CreateIPHookChainIfNotExists(newPostRoutingChain()); err != nil {
 		return errors.Wrapf(err, "error installing %q IPHook chain", constants.SmPostRoutingChain)
 	}
 
@@ -254,14 +241,9 @@ func (ovn *Handler) initIPtablesChains() error {
 }
 
 func (ovn *Handler) ensureForwardChains() error {
-	for _, chain := range []string{ForwardingSubmarinerFWDChain, ForwardingSubmarinerMSSClampChain} {
-		if err := ovn.pFilter.CreateIPHookChainIfNotExists(&packetfilter.ChainIPHook{
-			Name:     chain,
-			Type:     packetfilter.ChainTypeFilter,
-			Hook:     packetfilter.ChainHookForward,
-			Priority: packetfilter.ChainPriorityFirst,
-		}); err != nil {
-			return errors.Wrapf(err, "error installing forwarding IPHook chain %q", chain)
+	for _, chain := range []*packetfilter.ChainIPHook{newSubmarinerFWDChain(), newSubmarinerMSSClampChain()} {
+		if err := ovn.pFilter.CreateIPHookChainIfNotExists(chain); err != nil {
+			return errors.Wrapf(err, "error creating forwarding IPHook chain %q", chain.Name)
 		}
 	}
 
@@ -339,5 +321,32 @@ func (ovn *Handler) nodeResourceInterface() resource.Interface[*corev1.Node] {
 	return &resource.InterfaceFuncs[*corev1.Node]{
 		GetFunc:    ovn.K8sClient.CoreV1().Nodes().Get,
 		UpdateFunc: ovn.K8sClient.CoreV1().Nodes().Update,
+	}
+}
+
+func newPostRoutingChain() *packetfilter.ChainIPHook {
+	return &packetfilter.ChainIPHook{
+		Name:     constants.SmPostRoutingChain,
+		Type:     packetfilter.ChainTypeNAT,
+		Hook:     packetfilter.ChainHookPostrouting,
+		Priority: packetfilter.ChainPriorityFirst,
+	}
+}
+
+func newSubmarinerFWDChain() *packetfilter.ChainIPHook {
+	return &packetfilter.ChainIPHook{
+		Name:     ForwardingSubmarinerFWDChain,
+		Type:     packetfilter.ChainTypeFilter,
+		Hook:     packetfilter.ChainHookForward,
+		Priority: packetfilter.ChainPriorityFirst,
+	}
+}
+
+func newSubmarinerMSSClampChain() *packetfilter.ChainIPHook {
+	return &packetfilter.ChainIPHook{
+		Name:     ForwardingSubmarinerMSSClampChain,
+		Type:     packetfilter.ChainTypeFilter,
+		Hook:     packetfilter.ChainHookForward,
+		Priority: packetfilter.ChainPriorityFirst,
 	}
 }

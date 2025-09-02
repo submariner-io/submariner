@@ -25,6 +25,7 @@ import (
 	"strings"
 	"sync"
 
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
@@ -217,15 +218,15 @@ func (i *PacketFilter) delete(table packetfilter.TableType, chain, ruleSpec stri
 }
 
 func (i *PacketFilter) deleteChain(table uint32, chain string) error {
+	defer GinkgoRecover()
+
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
 	key := chainKey(table, chain)
 
 	rules := i.chainRules[key]
-	if len(rules) > 0 {
-		return fmt.Errorf("cannot delete chain %q for table %q - %d rules remain", chain, table, len(rules))
-	}
+	Expect(rules).To(BeEmpty(), "cannot delete chain %q for table %q - %d rules remain", chain, table, len(rules))
 
 	delete(i.chainRules, key)
 

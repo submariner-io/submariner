@@ -19,8 +19,8 @@ limitations under the License.
 package vxlan
 
 import (
+	"io/fs"
 	"net"
-	"os"
 	"syscall"
 
 	"github.com/pkg/errors"
@@ -288,7 +288,7 @@ func (i *Interface) DelRoutes(tableID int, destCIDRs ...net.IPNet) error {
 		}
 
 		err := i.netLink.RouteDel(route)
-		if err != nil && !os.IsNotExist(err) {
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return errors.Wrapf(err, "unable to delete the route entry %v", route)
 		}
 
