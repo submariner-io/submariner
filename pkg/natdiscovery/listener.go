@@ -95,17 +95,31 @@ func createServerConnection(port int32, family k8snet.IPFamily) (ServerConnectio
 }
 
 func (nd *natDiscovery) listenerLoop(serverConnection ServerConnection) {
-	buf := make([]byte, 2048)
+	const maxUDPMessageSize = 2048
+
+	buf := make([]byte, maxUDPMessageSize)
 
 	for {
 		length, addr, err := serverConnection.ReadFromUDP(buf)
-		if length == 0 {
-			logger.Info("Stopping NAT listener")
-			return
-		} else if err != nil {
-			logger.Errorf(err, "Error receiving from udp")
-		} else if err := nd.parseAndHandleMessageFromAddress(buf[:length], addr); err != nil {
-			logger.Errorf(err, "Error handling message from address %s:\n%s", addr.String(), hex.Dump(buf[:length]))
+		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				logger.Info("Stopping NAT listener")
+				return
+			}
+
+			logger.Error(err, "Error receiving from UDP")
+
+			continue
+		}
+
+		if length > 0 {
+			if err := nd.parseAndHandleMessageFromAddress(buf[:length], addr); err != nil {
+				if length == maxUDPMessageSize {
+					logger.Warningf("UDP message from %s may have been truncated (received %d bytes)", addr.String(), length)
+				}
+
+				logger.Errorf(err, "Error handling message from address %s:\n%s", addr.String(), hex.Dump(buf[:length]))
+			}
 		}
 	}
 }

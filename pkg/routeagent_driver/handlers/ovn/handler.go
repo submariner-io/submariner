@@ -20,6 +20,7 @@ package ovn
 
 import (
 	"context"
+	goerrors "errors"
 	"net"
 	"sync"
 
@@ -27,7 +28,6 @@ import (
 	"github.com/ovn-org/libovsdb/model"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
@@ -37,6 +37,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	k8snet "k8s.io/utils/net"
@@ -46,15 +47,16 @@ import (
 type NewOVSDBClientFn func(_ model.ClientDBModel, _ ...libovsdbclient.Option) (libovsdbclient.Client, error)
 
 type HandlerConfig struct {
-	Namespace       string
-	ClusterCIDR     []string
-	ServiceCIDR     []string
-	SubmClient      clientset.Interface
-	K8sClient       kubernetes.Interface
-	DynClient       dynamic.Interface
-	WatcherConfig   *watcher.Config
-	NewOVSDBClient  NewOVSDBClientFn
-	TransitSwitchIP TransitSwitchIP
+	Namespace            string
+	ClusterCIDR          []string
+	ServiceCIDR          []string
+	SubmClient           clientset.Interface
+	K8sClient            kubernetes.Interface
+	DynClient            dynamic.Interface
+	WatcherConfig        *watcher.Config
+	NewOVSDBClient       NewOVSDBClientFn
+	TransitSwitchIP      TransitSwitchIP
+	IntraRoutingDisabled bool
 }
 
 type Handler struct {
@@ -71,6 +73,33 @@ type Handler struct {
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("OVN")}
+
+func GetHandlers(ipFamily k8snet.IPFamily, env *environment.Specification, submClient clientset.Interface, k8sClient kubernetes.Interface,
+	dynClient dynamic.Interface, watcherConfig *watcher.Config,
+) []event.Handler {
+	transitSwitchIP := NewTransitSwitchIP(ipFamily)
+
+	handlers := []event.Handler{
+		NewHandler(ipFamily, &HandlerConfig{
+			Namespace:            env.Namespace,
+			ClusterCIDR:          env.ClusterCidr,
+			ServiceCIDR:          env.ServiceCidr,
+			SubmClient:           submClient,
+			K8sClient:            k8sClient,
+			DynClient:            dynClient,
+			WatcherConfig:        watcherConfig,
+			TransitSwitchIP:      transitSwitchIP,
+			IntraRoutingDisabled: env.IntraRoutingDisabled,
+		}),
+		NewGatewayRouteHandler(ipFamily, submClient),
+	}
+
+	if !env.IntraRoutingDisabled {
+		handlers = append(handlers, NewNonGatewayRouteHandler(ipFamily, submClient, transitSwitchIP))
+	}
+
+	return handlers
+}
 
 func NewHandler(ipFamily k8snet.IPFamily, config *HandlerConfig) *Handler {
 	// We'll panic if env is nil, this is intentional
@@ -135,13 +164,15 @@ func (ovn *Handler) Init(ctx context.Context) error {
 		return err
 	}
 
-	nonGatewayRouteController, err := NewNonGatewayRouteController(ovn.ipFamily, *ovn.WatcherConfig, connectionHandler,
-		ovn.Namespace, ovn.TransitSwitchIP)
-	if err != nil {
-		return err
-	}
+	if !ovn.IntraRoutingDisabled {
+		nonGatewayRouteController, err := NewNonGatewayRouteController(ovn.ipFamily, *ovn.WatcherConfig, connectionHandler,
+			ovn.Namespace, ovn.TransitSwitchIP)
+		if err != nil {
+			return err
+		}
 
-	ovn.nonGatewayRouteController = nonGatewayRouteController
+		ovn.nonGatewayRouteController = nonGatewayRouteController
+	}
 
 	return err
 }
@@ -178,20 +209,20 @@ func (ovn *Handler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 		return nil
 	}
 
-	err := ovn.updateHostNetworkDataplane()
-	if err != nil {
-		return err
+	errs := []error{
+		errors.Wrapf(ovn.updateHostNetworkDataplane(), "error updating host network dataplane on creation of remote endpoint %q",
+			endpoint.Name),
 	}
 
 	if ovn.State().IsOnGateway() {
-		if err = ovn.processEndpointSubnets(true, *endpoint); err != nil {
-			return errors.Wrapf(err, "error processing created Endpoint %s", resource.ToJSON(endpoint))
-		}
-
-		return ovn.updateGatewayDataplane()
+		errs = append(errs,
+			errors.Wrapf(ovn.processEndpointSubnets(true, *endpoint), "error processing created Endpoint %q", endpoint.Name),
+			errors.Wrapf(ovn.updateGatewayDataplane(), "error updating gateway dataplane on creation of remote endpoint %q",
+				endpoint.Name),
+		)
 	}
 
-	return nil
+	return goerrors.Join(errs...)
 }
 
 func (ovn *Handler) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
@@ -201,47 +232,52 @@ func (ovn *Handler) RemoteEndpointUpdated(endpoint *submV1.Endpoint) error {
 		return nil
 	}
 
-	err := ovn.updateHostNetworkDataplane()
-	if err != nil {
-		return err
+	errs := []error{
+		errors.Wrapf(ovn.updateHostNetworkDataplane(), "error updating host network dataplane on update of remote endpoint %q",
+			endpoint.Name),
 	}
 
 	if ovn.State().IsOnGateway() {
-		return ovn.updateGatewayDataplane()
+		errs = append(errs,
+			errors.Wrapf(ovn.updateGatewayDataplane(), "error updating gateway dataplane on update of remote endpoint %q",
+				endpoint.Name),
+		)
 	}
 
-	return nil
+	return goerrors.Join(errs...)
 }
 
 func (ovn *Handler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
-	err := ovn.updateHostNetworkDataplane()
-	if err != nil {
-		return err
+	errs := []error{
+		errors.Wrapf(ovn.updateHostNetworkDataplane(), "error updating host network dataplane on removal of remote endpoint %q",
+			endpoint.Name),
 	}
 
 	if ovn.State().IsOnGateway() {
-		if err = ovn.processEndpointSubnets(false, *endpoint); err != nil {
-			return errors.Wrapf(err, "error processing removed Endpoint %s", resource.ToJSON(endpoint))
-		}
-
-		return ovn.updateGatewayDataplane()
+		errs = append(errs,
+			errors.Wrapf(ovn.processEndpointSubnets(false, *endpoint), "error processing removed Endpoint %q", endpoint.Name),
+			errors.Wrapf(ovn.updateGatewayDataplane(), "error updating gateway dataplane on removal of remote endpoint %q",
+				endpoint.Name),
+		)
 	}
 
-	return nil
+	return goerrors.Join(errs...)
 }
 
 func (ovn *Handler) TransitionToNonGateway() error {
-	if err := ovn.processEndpointSubnets(false, ovn.State().GetRemoteEndpoints()...); err != nil {
-		return errors.Wrapf(err, "error processing Endpoints on non-gateway transiton")
-	}
-
-	return ovn.cleanupGatewayDataplane()
+	return goerrors.Join(
+		errors.Wrap(ovn.processEndpointSubnets(false, ovn.State().GetRemoteEndpoints()...),
+			"error processing Endpoints on non-gateway transition"),
+		errors.Wrap(ovn.cleanupGatewayDataplane(), "error cleaning up gateway dataplane on non-gateway transition"),
+		errors.Wrap(ovn.updateHostNetworkDataplane(), "error updating host network dataplane on non-gateway transition"),
+	)
 }
 
 func (ovn *Handler) TransitionToGateway() error {
-	if err := ovn.processEndpointSubnets(true, ovn.State().GetRemoteEndpoints()...); err != nil {
-		return errors.Wrapf(err, "error processing Endpoints on gateway transiton")
-	}
-
-	return ovn.updateGatewayDataplane()
+	return goerrors.Join(
+		errors.Wrap(ovn.processEndpointSubnets(true, ovn.State().GetRemoteEndpoints()...),
+			"error processing Endpoints on gateway transition"),
+		errors.Wrap(ovn.updateGatewayDataplane(), "error updating gateway dataplane on non-gateway transition"),
+		errors.Wrap(ovn.updateHostNetworkDataplane(), "error updating host network dataplane on non-gateway transition"),
+	)
 }

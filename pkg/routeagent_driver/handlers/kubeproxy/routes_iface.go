@@ -19,8 +19,8 @@ limitations under the License.
 package kubeproxy
 
 import (
+	"io/fs"
 	"net"
-	"os"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
@@ -141,7 +141,7 @@ func (kp *SyncHandler) configureRoute(remoteSubnet string, operation Operation, 
 	switch operation {
 	case Add:
 		err = kp.netLink.RouteAdd(&route)
-		if err != nil && !os.IsExist(err) {
+		if err != nil && !errors.Is(err, fs.ErrExist) {
 			return errors.Wrapf(err, "error adding the route %s", route)
 		}
 	case Delete:

@@ -16,15 +16,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package environment
+package netlink_test
 
-type Specification struct {
-	ClusterID            string
-	Namespace            string
-	ClusterCidr          []string
-	ServiceCidr          []string
-	GlobalCidr           []string
-	ProfilePort          int `default:"32782"`
-	Uninstall            bool
-	IntraRoutingDisabled bool
+import (
+	"flag"
+	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/log/kzerolog"
+)
+
+var _ = BeforeSuite(func() {
+	flags := flag.NewFlagSet("kzerolog", flag.ExitOnError)
+	kzerolog.AddFlags(flags)
+	_ = flags.Parse([]string{"-v=4"})
+
+	kzerolog.InitK8sLogging()
+})
+
+func TestNetlink(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Netlink Suite")
 }

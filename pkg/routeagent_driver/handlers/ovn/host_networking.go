@@ -20,6 +20,7 @@ package ovn
 
 import (
 	"fmt"
+	"io/fs"
 	"net"
 	"os"
 
@@ -39,23 +40,34 @@ func (ovn *Handler) updateHostNetworkDataplane() error {
 	ovn.mutex.Lock()
 	defer ovn.mutex.Unlock()
 
+	var (
+		endpointSubnets set.Set[string]
+		cleanup         bool
+	)
+
+	if !ovn.State().IsOnGateway() && ovn.IntraRoutingDisabled {
+		// Set to empty so we delete all the rules.
+		endpointSubnets = set.New[string]()
+		cleanup = true
+	} else {
+		endpointSubnets = ovn.getRemoteSubnets()
+	}
+
 	currentRuleRemotes, err := ovn.getExistingHostNetworkRoutes()
 	if err != nil {
 		return errors.Wrapf(err, "error reading ip rule list for IPv4")
 	}
 
-	endpointSubnets := ovn.getRemoteSubnets()
-
 	toAdd := endpointSubnets.Difference(currentRuleRemotes).UnsortedList()
 
-	err = ovn.programRulesForRemoteSubnets(toAdd, ovn.netLink.RuleAdd, os.IsExist)
+	err = ovn.programRulesForRemoteSubnets(toAdd, ovn.netLink.RuleAddIfNotPresent)
 	if err != nil {
 		return errors.Wrap(err, "error adding routing rule")
 	}
 
 	toRemove := currentRuleRemotes.Difference(endpointSubnets).UnsortedList()
 
-	err = ovn.programRulesForRemoteSubnets(toRemove, ovn.netLink.RuleDel, os.IsNotExist)
+	err = ovn.programRulesForRemoteSubnets(toRemove, ovn.netLink.RuleDelIfPresent)
 	if err != nil {
 		return errors.Wrapf(err, "error removing routing rule")
 	}
@@ -70,12 +82,21 @@ func (ovn *Handler) updateHostNetworkDataplane() error {
 		Table: constants.RouteAgentHostNetworkTableID,
 	}
 
-	err = ovn.netLink.RouteAdd(route)
-	if err != nil && !os.IsExist(err) {
-		return errors.Wrap(err, "error adding submariner default")
+	if cleanup {
+		err = ovn.netLink.RouteDel(route)
+		if os.IsNotExist(err) {
+			err = nil
+		}
+
+		return errors.Wrapf(err, "error deleting submariner default route with Gw %q", nextHop.String())
 	}
 
-	return nil
+	err = ovn.netLink.RouteAdd(route)
+	if errors.Is(err, fs.ErrExist) {
+		err = nil
+	}
+
+	return errors.Wrapf(err, "error adding submariner default route with Gw %q", nextHop.String())
 }
 
 func (ovn *Handler) getExistingHostNetworkRoutes() (set.Set[string], error) {
@@ -95,9 +116,7 @@ func (ovn *Handler) getExistingHostNetworkRoutes() (set.Set[string], error) {
 	return currentRuleRemotes, nil
 }
 
-func (ovn *Handler) programRulesForRemoteSubnets(subnets []string, ruleFunc func(rule *netlink.Rule) error,
-	ignoredErrorFunc func(error) bool,
-) error {
+func (ovn *Handler) programRulesForRemoteSubnets(subnets []string, ruleFunc func(rule *netlink.Rule) error) error {
 	for _, remoteSubnet := range subnets {
 		rule, err := ovn.getRuleSpec(remoteSubnet, "", constants.RouteAgentHostNetworkTableID)
 		if err != nil {
@@ -105,7 +124,7 @@ func (ovn *Handler) programRulesForRemoteSubnets(subnets []string, ruleFunc func
 		}
 
 		err = ruleFunc(rule)
-		if err != nil && !ignoredErrorFunc(err) {
+		if err != nil {
 			return errors.Wrapf(err, "error handling rule: %s", resource.ToJSON(rule))
 		}
 	}

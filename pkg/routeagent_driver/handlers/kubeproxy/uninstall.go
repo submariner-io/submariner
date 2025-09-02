@@ -78,14 +78,14 @@ func (kp *SyncHandler) deleteIPTableChains() {
 		return
 	}
 
-	logger.Infof("Flushing packetfilter entries in %q chain of %q table", constants.SmPostRoutingChain, constants.NATTable)
+	logger.Infof("Flushing IPv%v packetfilter entries in %q chain of %q table", kp.ipFamily, constants.SmPostRoutingChain, constants.NATTable)
 
 	if err := pFilter.ClearChain(packetfilter.TableTypeNAT, constants.SmPostRoutingChain); err != nil {
 		logger.Errorf(err, "Error flushing packetfilter chain %q of %q table", constants.SmPostRoutingChain,
 			constants.NATTable)
 	}
 
-	logger.Infof("Deleting iptable entry in %q chain of %q table", constants.PostRoutingChain, constants.NATTable)
+	logger.Infof("Deleting IPv%v packetfilter entry in %q chain of %q table", kp.ipFamily, constants.PostRoutingChain, constants.NATTable)
 
 	chain := packetfilter.ChainIPHook{
 		Name:     constants.SmPostRoutingChain,
@@ -94,18 +94,18 @@ func (kp *SyncHandler) deleteIPTableChains() {
 		Priority: packetfilter.ChainPriorityFirst,
 	}
 	if err := pFilter.DeleteIPHookChain(&chain); err != nil {
-		logger.Errorf(err, "Error deleting IPHook chain %q of %q table", constants.SmPostRoutingChain,
+		logger.Errorf(err, "Error deleting IPv%v IPHook chain %q of %q table", kp.ipFamily, constants.SmPostRoutingChain,
 			constants.NATTable)
 	}
 
-	logger.Infof("Flushing iptable entries in %q chain of %q table", constants.SmInputChain, constants.FilterTable)
+	logger.Infof("Flushing IPv%v packetfilter entries in %q chain of %q table", kp.ipFamily, constants.SmInputChain, constants.FilterTable)
 
 	if err := pFilter.ClearChain(packetfilter.TableTypeFilter, constants.SmInputChain); err != nil {
-		logger.Errorf(err, "Error flushing packetfilter chain %q of %q table", constants.SmInputChain,
+		logger.Errorf(err, "Error flushing IPv%v packetfilter chain %q of %q table", kp.ipFamily, constants.SmInputChain,
 			constants.FilterTable)
 	}
 
-	logger.Infof("Deleting iptable entry in %q chain of %q table", constants.InputChain, constants.FilterTable)
+	logger.Infof("Deleting IPv%v packetfilter entry in %q chain of %q table", kp.ipFamily, constants.InputChain, constants.FilterTable)
 
 	chain = packetfilter.ChainIPHook{
 		Name:     constants.SmInputChain,
@@ -119,14 +119,14 @@ func (kp *SyncHandler) deleteIPTableChains() {
 		},
 	}
 	if err := pFilter.DeleteIPHookChain(&chain); err != nil {
-		logger.Errorf(err, "Error deleting IPHook chain %q of %q table", constants.InputChain,
+		logger.Errorf(err, "Error deleting IPv%v IPHook chain %q of %q table", kp.ipFamily, constants.InputChain,
 			constants.FilterTable)
 	}
 
-	logger.Infof("Flushing packetfilter entries in %q chain of %q table", constants.SmSelfSnatChain, constants.NATTable)
+	logger.Infof("Flushing IPv%v packetfilter entries in %q chain of %q table", kp.ipFamily, constants.SmSelfSnatChain, constants.NATTable)
 
 	if err := pFilter.ClearChain(packetfilter.TableTypeNAT, constants.SmSelfSnatChain); err != nil {
-		logger.Errorf(err, "Error flushing packetfilter chain %q of %q table", constants.SmSelfSnatChain,
+		logger.Errorf(err, "Error flushing IPv%v packetfilter chain %q of %q table", kp.ipFamily, constants.SmSelfSnatChain,
 			constants.NATTable)
 	}
 
@@ -138,7 +138,26 @@ func (kp *SyncHandler) deleteIPTableChains() {
 	}
 
 	if err := pFilter.DeleteIPHookChain(&chain); err != nil {
-		logger.Errorf(err, "Error deleting IPHook chain %q of %q table", constants.SmSelfSnatChain,
+		logger.Errorf(err, "Error deleting IPv%v IPHook chain %q of %q table", kp.ipFamily, constants.SmSelfSnatChain,
 			constants.NATTable)
+	}
+
+	logger.Infof("Flushing IPv%v packetfilter entries in %q chain of %q table", kp.ipFamily, constants.SmForwardChain, constants.FilterTable)
+
+	if err := pFilter.ClearChain(packetfilter.TableTypeFilter, constants.SmForwardChain); err != nil {
+		logger.Errorf(err, "Error flushing IPv%v packetfilter chain %q of %q table", kp.ipFamily, constants.SmForwardChain,
+			constants.FilterTable)
+	}
+
+	chain = packetfilter.ChainIPHook{
+		Name:     constants.SmForwardChain,
+		Type:     packetfilter.ChainTypeFilter,
+		Hook:     packetfilter.ChainHookForward,
+		Priority: packetfilter.ChainPriorityFirst,
+	}
+
+	if err := pFilter.DeleteIPHookChain(&chain); err != nil {
+		logger.Errorf(err, "Error deleting IPv%v IPHook chain %q of %q table", kp.ipFamily, constants.SmForwardChain,
+			constants.FilterTable)
 	}
 }
