@@ -377,10 +377,14 @@ func (t *handlerTestDriver) testGatewayTransitions(ipFamilySubnets, nonIPFamilyS
 			for _, s := range ipFamilySubnets {
 				t.netLink.AwaitRule(constants.RouteAgentInterClusterNetworkTableID, s, t.clusterCIDR)
 				t.netLink.AwaitRule(constants.RouteAgentInterClusterNetworkTableID, s, t.serviceCIDR)
+				t.pFilter.AwaitRule(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain, ContainSubstring(s))
+				t.pFilter.AwaitRule(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerMSSClampChain, ContainSubstring(s))
 			}
 
 			for _, s := range nonIPFamilySubnets {
 				t.netLink.EnsureNoRule(constants.RouteAgentInterClusterNetworkTableID, s, t.clusterCIDR)
+				t.pFilter.EnsureNoRule(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain, ContainSubstring(s))
+				t.pFilter.EnsureNoRule(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerMSSClampChain, ContainSubstring(s))
 			}
 
 			t.awaitOVNKNodeAnnotationContaining(ipFamilySubnets...)
@@ -394,6 +398,8 @@ func (t *handlerTestDriver) testGatewayTransitions(ipFamilySubnets, nonIPFamilyS
 			for _, s := range ipFamilySubnets {
 				t.netLink.AwaitNoRule(constants.RouteAgentInterClusterNetworkTableID, s, t.clusterCIDR)
 				t.netLink.AwaitNoRule(constants.RouteAgentInterClusterNetworkTableID, s, t.serviceCIDR)
+				t.pFilter.AwaitNoRule(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain, ContainSubstring(s))
+				t.pFilter.AwaitNoRule(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerMSSClampChain, ContainSubstring(s))
 			}
 
 			t.awaitOVNKNodeAnnotationContaining()
@@ -599,26 +605,41 @@ func (t *handlerTestDriver) testOVNMgmtInterfaceAddressChange() {
 }
 
 func (t *handlerTestDriver) testUninstall() {
-	It("should delete the table rules", func() {
+	It("should delete the table rules and chains", func() {
 		Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain)).To(BeTrue())
 		Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerMSSClampChain)).To(BeTrue())
+		Expect(t.pFilter.ChainExists(packetfilter.TableTypeNAT, constants.SmPostRoutingChain)).To(BeTrue())
 
-		_ = t.netLink.RuleAdd(&netlink.Rule{
+		Expect(t.netLink.RuleAdd(&netlink.Rule{
 			Table:  constants.RouteAgentHostNetworkTableID,
 			Family: netlink.FAMILY_V4,
-		})
+		})).To(Succeed())
 
-		_ = t.netLink.RuleAdd(&netlink.Rule{
+		Expect(t.netLink.RuleAdd(&netlink.Rule{
 			Table:  constants.RouteAgentInterClusterNetworkTableID,
 			Family: netlink.FAMILY_V4,
-		})
+		})).To(Succeed())
+
+		Expect(t.pFilter.Append(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain, &packetfilter.Rule{
+			DestCIDR: "1.2.3.4/16",
+			Action:   packetfilter.RuleActionAccept,
+		})).To(Succeed())
+
+		Expect(t.pFilter.Append(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain, &packetfilter.Rule{
+			DestCIDR:  "1.2.3.4/16",
+			Action:    packetfilter.RuleActionMss,
+			ClampType: packetfilter.ToValue,
+			MssValue:  "5",
+		})).To(Succeed())
 
 		Expect(t.handler.Uninstall()).To(Succeed())
 
 		t.netLink.AwaitNoRule(constants.RouteAgentHostNetworkTableID, "", "")
 		t.netLink.AwaitNoRule(constants.RouteAgentInterClusterNetworkTableID, "", "")
 
+		Expect(t.pFilter.ChainExists(packetfilter.TableTypeNAT, constants.SmPostRoutingChain)).To(BeFalse())
 		Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain)).To(BeFalse())
+		Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerMSSClampChain)).To(BeFalse())
 	})
 }
 

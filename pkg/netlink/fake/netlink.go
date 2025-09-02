@@ -306,7 +306,7 @@ func (n *basicType) RouteDel(route *netlink.Route) error {
 	routes := n.routes[route.LinkIndex]
 
 	for i := range routes {
-		if reflect.DeepEqual(routes[i].Dst, route.Dst) {
+		if routes[i].Table == route.Table && (reflect.DeepEqual(routes[i].Gw, route.Gw) || reflect.DeepEqual(routes[i].Dst, route.Dst)) {
 			n.routes[route.LinkIndex] = goslices.Delete(routes, i, i+1)
 			break
 		}
