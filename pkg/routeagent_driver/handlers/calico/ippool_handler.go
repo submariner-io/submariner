@@ -229,7 +229,10 @@ func getEndpointSubnetIPPoolName(endpoint *submV1.Endpoint, subnet string) strin
 
 func (h *calicoIPPoolHandler) platformIsROKS(ctx context.Context) (bool, error) {
 	// Submariner GW is deployed on ROKS using LB service with specific annotations.
-	serviceUnstructured, err := h.dynClient.Resource(corev1.SchemeGroupVersion.WithResource("services")).Namespace(h.namespace).Get(ctx, GwLBSvcName, metav1.GetOptions{})
+	serviceUnstructured, err := h.dynClient.
+		Resource(corev1.SchemeGroupVersion.WithResource("services")).
+		Namespace(h.namespace).
+		Get(ctx, GwLBSvcName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return false, nil
 	}
@@ -255,7 +258,7 @@ func (h *calicoIPPoolHandler) updateROKSCalicoCfg(ctx context.Context) error {
 
 	// platform is ROKS, make sure that encapsulation of default Installation is set to IPIP
 	// In this way the Tigera Operator will set IPIPMode of default IPPool to Always
-	return util.Update(ctx, resource.ForDynamic(h.dynClient.Resource(InstallationsGVR)),
+	err = util.Update(ctx, resource.ForDynamic(h.dynClient.Resource(InstallationsGVR)),
 		resource.MustToUnstructured(&tigerav1.Installation{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: DefaultInstallationName,
@@ -271,7 +274,7 @@ func (h *calicoIPPoolHandler) updateROKSCalicoCfg(ctx context.Context) error {
 
 			ipPools := installation.Spec.CalicoNetwork.IPPools
 			if len(ipPools) > 0 && ipPools[0].Encapsulation == tigerav1.EncapsulationIPIP {
-				logger.Infof("Encapsulation of " + DefaultInstallationName + " Installations already set to IPIP")
+				logger.Infof("Encapsulation of %s Installation already set to IPIP", DefaultInstallationName)
 				return existing, nil
 			}
 
@@ -291,10 +294,12 @@ func (h *calicoIPPoolHandler) updateROKSCalicoCfg(ctx context.Context) error {
 
 			return resource.MustToUnstructured(installation), nil
 		})
+
+	return errors.Wrapf(err, "failed to update Installation %q", DefaultInstallationName)
 }
 
 func (h *calicoIPPoolHandler) restoreROKSCalicoCfg() error {
-	return util.Update(context.TODO(), resource.ForDynamic(h.dynClient.Resource(InstallationsGVR)),
+	err := util.Update(context.TODO(), resource.ForDynamic(h.dynClient.Resource(InstallationsGVR)),
 		resource.MustToUnstructured(&tigerav1.Installation{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: DefaultInstallationName,
@@ -313,9 +318,12 @@ func (h *calicoIPPoolHandler) restoreROKSCalicoCfg() error {
 			if len(ipPools) > 0 {
 				ipPools[0].Encapsulation = tigerav1.EncapsulationType(prevEncapsulation)
 			}
+
 			delete(installation.Labels, submarinerManagedLabel)
 			delete(installation.Annotations, submarinerPrevEncapsulation)
 
 			return resource.MustToUnstructured(installation), nil
 		})
+
+	return errors.Wrapf(err, "failed to restore ROKS Calico config for Installation %q", DefaultInstallationName)
 }

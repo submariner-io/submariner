@@ -54,8 +54,6 @@ func newTestDriver() *testDriver {
 	}
 
 	BeforeEach(func() {
-		tigerav1.AddToScheme(scheme.Scheme)
-
 		t.dynClient = dynamicfake.NewSimpleDynamicClient(scheme.Scheme, &tigerav1.Installation{
 			TypeMeta: metav1.TypeMeta{},
 			ObjectMeta: metav1.ObjectMeta{
@@ -86,6 +84,7 @@ func newTestDriver() *testDriver {
 var _ = BeforeSuite(func() {
 	kzerolog.InitK8sLogging()
 	Expect(calicoapi.AddToScheme(scheme.Scheme)).To(Succeed())
+	Expect(tigerav1.AddToScheme(scheme.Scheme)).To(Succeed())
 })
 
 func TestCalico(t *testing.T) {
