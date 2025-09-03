@@ -20,6 +20,7 @@ package cableengine_test
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"testing"
 	"time"
@@ -42,7 +43,14 @@ import (
 )
 
 func init() {
-	kzerolog.AddFlags(nil)
+	flags := flag.NewFlagSet("kzerolog", flag.ExitOnError)
+	kzerolog.AddFlags(flags)
+	_ = flags.Parse([]string{"-v=2"})
+}
+
+func TestCableEngine(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Cable Engine Suite")
 }
 
 var fakeDriver *fake.Driver
@@ -166,11 +174,6 @@ var _ = Describe("Cable Engine", func() {
 	})
 })
 
-func TestCableEngine(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Cable Engine Suite")
-}
-
 type testDriver struct {
 	engine         cableengine.Engine
 	natDiscovery   *fakeNATDiscovery
@@ -207,6 +210,7 @@ func newTestDriver() *testDriver {
 				CableName:     fmt.Sprintf("submariner-cable-%s-1.1.1.1", remoteClusterID),
 				PrivateIPs:    []string{"1.1.1.1", "FDC7:BF8B:E62C:ABCD:1111:2222:3333:4444"},
 				PublicIPs:     []string{"2.2.2.2", "FDC7:BF8B:E62C:ABCD:1111:2222:3333:5555"},
+				Subnets:       []string{"172.19.0.0/16", "2001:0:0:1234::/64"},
 				BackendConfig: map[string]string{"port": "1234"},
 			},
 		}
@@ -254,8 +258,7 @@ func (t *testDriver) testRemoteEndpoint(ipFamily k8snet.IPFamily) {
 			var newEndpoint *subv1.Endpoint
 
 			BeforeEach(func() {
-				c := *t.remoteEndpoint
-				newEndpoint = &c
+				newEndpoint = t.remoteEndpoint.DeepCopy()
 				prevEndpoint = t.remoteEndpoint
 			})
 
@@ -269,7 +272,7 @@ func (t *testDriver) testRemoteEndpoint(ipFamily k8snet.IPFamily) {
 			testTimestamps := func() {
 				Context("and older creation timestamp", func() {
 					BeforeEach(func() {
-						newEndpoint.CreationTimestamp = metav1.Time{metav1.Now().Add(100 * time.Millisecond)}
+						newEndpoint.CreationTimestamp = metav1.Time{Time: metav1.Now().Add(100 * time.Millisecond)}
 					})
 
 					It("should disconnect from the previous endpoint and connect to the new one", func() {
@@ -281,7 +284,7 @@ func (t *testDriver) testRemoteEndpoint(ipFamily k8snet.IPFamily) {
 				Context("and newer creation timestamp", func() {
 					BeforeEach(func() {
 						newEndpoint.CreationTimestamp = metav1.Now()
-						prevEndpoint.CreationTimestamp = metav1.Time{newEndpoint.CreationTimestamp.Add(100 * time.Millisecond)}
+						prevEndpoint.CreationTimestamp = metav1.Time{Time: newEndpoint.CreationTimestamp.Add(100 * time.Millisecond)}
 					})
 
 					It("should not disconnect from the previous endpoint nor connect to the new one", func() {
@@ -316,6 +319,21 @@ func (t *testDriver) testRemoteEndpoint(ipFamily k8snet.IPFamily) {
 				Context("but different backend configuration", func() {
 					BeforeEach(func() {
 						newEndpoint.Spec.BackendConfig = map[string]string{"port": "6789"}
+					})
+
+					It("should disconnect from the previous endpoint and connect to the new one", func() {
+						fakeDriver.AwaitDisconnectFromEndpoint(&prevEndpoint.Spec, ipFamily)
+						fakeDriver.AwaitConnectToEndpoint(natEndpointInfoFor(newEndpoint, ipFamily))
+					})
+				})
+
+				Context("but different subnets", func() {
+					BeforeEach(func() {
+						if ipFamily == k8snet.IPv4 {
+							newEndpoint.Spec.Subnets[0] = "192.64.0.0/16"
+						} else {
+							newEndpoint.Spec.Subnets[1] = "1800:0:0:21::/64"
+						}
 					})
 
 					It("should disconnect from the previous endpoint and connect to the new one", func() {

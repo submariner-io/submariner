@@ -27,6 +27,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
+	"github.com/submariner-io/submariner/pkg/cidr"
 	submendpoint "github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
@@ -152,6 +153,10 @@ func (i *engine) SetupNATDiscovery(natDiscovery natdiscovery.Interface) {
 }
 
 func (i *engine) shouldProceedWithInstallation(familyCableName string) bool {
+	if !i.running {
+		return false
+	}
+
 	if _, ok := i.natDiscoveryPending[familyCableName]; !ok {
 		return false
 	}
@@ -173,10 +178,6 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 	familyCableName := rnat.Endpoint.Spec.GetFamilyCableName(rnat.UseFamily)
 
 	if !i.shouldProceedWithInstallation(familyCableName) {
-		return nil
-	}
-
-	if !i.running {
 		return nil
 	}
 
@@ -207,21 +208,28 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 		}
 
 		if endpoint.CreationTimestamp.Equal(&prevTimestamp) && activeFamilyCableName == familyCableName {
-			// There could be scenarios where the cableName would be the same but the endpoint IP or specific driver
+			// There could be scenarios where the cableName would be the same but the endpoint IP, subnets or specific driver
 			// config has changed.
+			activeSubnets := cidr.ExtractSubnets(rnat.UseFamily, active.Endpoint.Subnets)
+			newSubnets := cidr.ExtractSubnets(rnat.UseFamily, endpoint.Spec.Subnets)
+
 			if active.UsingIP == rnat.UseIP && active.UsingNAT == rnat.UseNAT &&
+				reflect.DeepEqual(activeSubnets, newSubnets) &&
 				reflect.DeepEqual(active.Endpoint.BackendConfig, endpoint.Spec.BackendConfig) {
-				logger.V(log.TRACE).Infof("Connection info (IP: %s, NAT: %v, BackendConfig: %v) for cable %q is unchanged"+
-					" - not re-installing", active.UsingIP, active.UsingNAT, active.Endpoint.BackendConfig, active.Endpoint.CableName)
+				logger.V(log.TRACE).Infof("IPv%v Connection info (IP: %s, NAT: %v, Subnets: %v, BackendConfig: %v) for cable %q is unchanged"+
+					" - not re-installing", rnat.UseFamily, active.UsingIP, active.UsingNAT, activeSubnets, active.Endpoint.BackendConfig,
+					active.Endpoint.CableName)
+
 				return nil
 			}
 
-			logger.V(log.DEBUG).Infof("New connection info (IP: %s, NAT: %v, BackendConfig: %v) for cable %q differs from"+
-				" previous (IP: %s, NAT: %v, BackendConfig: %v) - re-installing", rnat.UseIP, rnat.UseNAT, active.Endpoint.BackendConfig,
-				activeFamilyCableName, active.UsingIP, active.UsingNAT, endpoint.Spec.BackendConfig)
+			logger.V(log.DEBUG).Infof("New IPv%v connection info (IP: %s, NAT: %v, Subnets: %v, BackendConfig: %v) for cable %q differs from"+
+				" previous (IP: %s, NAT: %v, Subnets: %v, BackendConfig: %v) - re-installing", rnat.UseFamily, rnat.UseIP, rnat.UseNAT,
+				newSubnets, endpoint.Spec.BackendConfig, activeFamilyCableName, active.UsingIP, active.UsingNAT,
+				activeSubnets, active.Endpoint.BackendConfig)
 		}
 
-		logger.V(log.DEBUG).Infof("Disconnecting pre-existing cable %q", activeFamilyCableName)
+		logger.Infof("Disconnecting pre-existing IPv%v cable %q", rnat.UseFamily, active.Endpoint.CableName)
 
 		err = i.driver.DisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: active.Endpoint}, rnat.UseFamily)
 		if err != nil {
