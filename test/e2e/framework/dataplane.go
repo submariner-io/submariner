@@ -274,5 +274,11 @@ func CanExecuteNonGatewayConnectivityTest(sourceNode, destNode framework.Network
 		return false
 	}
 
+	if (destNode == framework.NonGatewayNode || sourceNode == framework.NonGatewayNode) &&
+		framework.TestContext.SkipIntraClusterConnectivityTests {
+		framework.Skipf("Skipping intra-cluster connectivity test")
+		return false
+	}
+
 	return true
 }
