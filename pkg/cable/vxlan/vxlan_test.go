@@ -36,6 +36,7 @@ import (
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	fakeNetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
 	"github.com/submariner-io/submariner/pkg/types"
+	pkgvxlan "github.com/submariner-io/submariner/pkg/vxlan"
 	"github.com/vishvananda/netlink"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -59,15 +60,16 @@ func TestVxlan(t *testing.T) {
 	RunSpecs(t, "Vxlan Cable Driver Suite")
 }
 
-const cniIPAddress = "192.168.5.1"
+const (
+	cniIPAddress   = "192.168.5.1"
+	cniIPv6Address = "fd12:3456:789a:1::1"
+)
 
 var _ = Describe("Vxlan", func() {
 	t := newTestDriver()
 
-	var natInfo *natdiscovery.NATEndpointInfo
-
-	BeforeEach(func() {
-		natInfo = &natdiscovery.NATEndpointInfo{
+	Context("IPv4", func() {
+		testVxlanConnectivity(t, &natdiscovery.NATEndpointInfo{
 			Endpoint: subv1.Endpoint{
 				Spec: subv1.EndpointSpec{
 					ClusterID:  "east",
@@ -79,11 +81,55 @@ var _ = Describe("Vxlan", func() {
 			UseIP:     "172.93.2.1",
 			UseNAT:    true,
 			UseFamily: k8snet.IPv4,
+		})
+	})
+
+	Context("IPv6", func() {
+		testVxlanConnectivity(t, &natdiscovery.NATEndpointInfo{
+			Endpoint: subv1.Endpoint{
+				Spec: subv1.EndpointSpec{
+					ClusterID:  "east",
+					CableName:  "submariner-cable-east-2002-1234-abcd-ffff-c0a8-101",
+					PrivateIPs: []string{"2002::1234:abcd:ffff:c0a8:101"},
+					Subnets:    []string{"2001::1234:abcd:ffff:c0a8:101/64"},
+				},
+			},
+			UseIP:     "2003:db8:3333:4444:5555:6666:7777:8888",
+			UseFamily: k8snet.IPv6,
+		})
+	})
+
+	Context("dual stack", func() {
+		testVxlanConnectivity(t, &natdiscovery.NATEndpointInfo{
+			Endpoint: subv1.Endpoint{
+				Spec: subv1.EndpointSpec{
+					ClusterID:  "east",
+					CableName:  "submariner-cable-east-dual-stack",
+					PrivateIPs: []string{"192.68.2.1", "2002::1234:abcd:ffff:c0a8:101"},
+					Subnets:    []string{"20.0.0.0/16", "2001::1234:abcd:ffff:c0a8:101/64"},
+				},
+			},
+			UseIP:     "172.93.2.1", // Test with IPv4 on dual-stack endpoint
+			UseFamily: k8snet.IPv4,
+		})
+	})
+})
+
+func testVxlanConnectivity(t *testDriver, natInfo *natdiscovery.NATEndpointInfo) {
+	var expectedVTepPrefix string
+
+	BeforeEach(func() {
+		if natInfo.UseFamily == k8snet.IPv6 {
+			expectedVTepPrefix = vxlan.VxlanVTepNetworkPrefixCIDRv6
+		} else {
+			expectedVTepPrefix = vxlan.VxlanVTepNetworkPrefixCIDR
 		}
 	})
 
 	JustBeforeEach(func() {
-		link := t.netLink.AwaitLink(vxlan.VxlanIface)
+		// Wait for the family-specific interface
+		interfaceName := vxlan.GetVxlanInterfaceName(natInfo.UseFamily)
+		link := t.netLink.AwaitLink(interfaceName)
 		vxLan, ok := link.(*netlink.Vxlan)
 		Expect(ok).To(BeTrue(), "Unexpected Link type: %T", link)
 
@@ -98,9 +144,13 @@ var _ = Describe("Vxlan", func() {
 		Expect(ip).To(Equal(natInfo.UseIP))
 
 		t.assertConnection(natInfo)
+
+		// FDB entries should use endpoint IP, not VTEP IP (matches working devel branch)
 		t.netLink.AwaitNeighbors(0, natInfo.UseIP)
 
-		link, err := t.netLink.LinkByName(vxlan.VxlanIface)
+		// Use family-specific interface name
+		interfaceName := vxlan.GetVxlanInterfaceName(natInfo.UseFamily)
+		link, err := t.netLink.LinkByName(interfaceName)
 		Expect(err).To(Succeed())
 
 		routes, err := t.netLink.RouteList(link, k8snet.IPFamilyUnknown)
@@ -111,26 +161,53 @@ var _ = Describe("Vxlan", func() {
 			actualRoutes = append(actualRoutes, routeFieldMap(routes[i].Src.String(), routes[i].Gw.String(), routes[i].Dst.String()))
 		}
 
-		_, cidrNet, err := net.ParseCIDR(vxlan.VxlanVTepNetworkPrefixCIDR)
+		_, cidrNet, err := net.ParseCIDR(expectedVTepPrefix)
 		Expect(err).To(Succeed())
 
-		prefix := cidrNet.IP.To4()
-		Expect(prefix).ToNot(BeNil(), "invalid IPv4 prefix in "+vxlan.VxlanVTepNetworkPrefixCIDR)
+		var gw string
 
-		gw := fmt.Sprintf("%d.68.2.1", prefix[0])
-		Expect(actualRoutes).To(HaveExactElements(routeFieldMap(cniIPAddress, gw, natInfo.Endpoint.Spec.Subnets[0]),
-			routeFieldMap(cniIPAddress, gw, natInfo.Endpoint.Spec.Subnets[1])))
+		if natInfo.UseFamily == k8snet.IPv6 {
+			// For IPv6, derive VTEP IP from the private IP
+			privateIP := natInfo.Endpoint.Spec.GetPrivateIP(natInfo.UseFamily)
+			vtepIP, err := pkgvxlan.GetVtepIPAddressFrom(privateIP, expectedVTepPrefix, natInfo.UseFamily)
+			Expect(err).To(Succeed())
+
+			gw = vtepIP.String()
+		} else {
+			// For IPv4, use the original logic
+			prefix := cidrNet.IP.To4()
+			Expect(prefix).ToNot(BeNil(), "invalid IPv4 prefix in "+expectedVTepPrefix)
+			gw = fmt.Sprintf("%d.68.2.1", prefix[0])
+		}
+
+		// Filter subnets by the family we're testing
+		allowedIPs := natInfo.Endpoint.Spec.ParseSubnets(natInfo.UseFamily)
+
+		// Use the appropriate CNI IP based on the family
+		cniIP := cniIPAddress
+		if natInfo.UseFamily == k8snet.IPv6 {
+			cniIP = cniIPv6Address
+		}
+
+		var expectedRoutes []map[string]string
+		for _, subnet := range allowedIPs {
+			expectedRoutes = append(expectedRoutes, routeFieldMap(cniIP, gw, subnet.String()))
+		}
+
+		Expect(actualRoutes).To(HaveExactElements(expectedRoutes))
 	})
 
 	Specify("DisconnectFromEndpoint should remove the Connection and its data-plane components", func() {
 		_, err := t.driver.ConnectToEndpoint(natInfo)
 		Expect(err).To(Succeed())
 
-		Expect(t.driver.DisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: natInfo.Endpoint.Spec}, k8snet.IPv4)).To(Succeed())
+		Expect(t.driver.DisconnectFromEndpoint(&types.SubmarinerEndpoint{Spec: natInfo.Endpoint.Spec}, natInfo.UseFamily)).To(Succeed())
 		t.assertNoConnection(natInfo)
 		t.netLink.AwaitNoNeighbors(0, natInfo.UseIP)
 
-		link, err := t.netLink.LinkByName(vxlan.VxlanIface)
+		// Use family-specific interface name
+		interfaceName := vxlan.GetVxlanInterfaceName(natInfo.UseFamily)
+		link, err := t.netLink.LinkByName(interfaceName)
 		Expect(err).To(Succeed())
 
 		routes, err := t.netLink.RouteList(link, k8snet.IPFamilyUnknown)
@@ -143,7 +220,7 @@ var _ = Describe("Vxlan", func() {
 		t.netLink.AwaitNoLink(vxlan.VxlanIface)
 		t.netLink.AwaitNoRule(vxlan.TableID, "", "")
 	})
-})
+}
 
 func routeFieldMap(src, gw, dst string) map[string]string {
 	return map[string]string{
@@ -167,15 +244,15 @@ func newTestDriver() *testDriver {
 		t.localCluster = &types.SubmarinerCluster{
 			Spec: subv1.ClusterSpec{
 				ClusterID:   "local",
-				ServiceCIDR: []string{"10.0.0.0/16"},
-				ClusterCIDR: []string{cniIPAddress + "/24"},
+				ServiceCIDR: []string{"10.0.0.0/16", "fd12:3456:789a:1::/112"},
+				ClusterCIDR: []string{cniIPAddress + "/24", cniIPv6Address + "/64"},
 			},
 		}
 
 		t.localEndpoint = subv1.EndpointSpec{
 			ClusterID:  t.localCluster.Spec.ClusterID,
 			CableName:  "submariner-cable-local-192-68-1-1",
-			PrivateIPs: []string{"192.68.1.1"},
+			PrivateIPs: []string{"192.68.1.1", "fd12:3456:789a:1::1"}, // Add IPv6 for dual-stack testing
 			Subnets:    append(t.localCluster.Spec.ServiceCIDR, t.localCluster.Spec.ClusterCIDR...),
 		}
 
@@ -184,13 +261,20 @@ func newTestDriver() *testDriver {
 			return t.netLink
 		}
 
-		t.netLink.SetupDefaultGateway(k8snet.IPv4, net.Interface{MTU: 10})
+		t.netLink.SetupDefaultGateway(k8snet.IPv4, net.Interface{Index: 99, MTU: 10})
+		t.netLink.SetupDefaultGateway(k8snet.IPv6, net.Interface{Index: 100, MTU: 10})
 
 		cni.HostInterfaces = func() ([]cni.HostInterface, error) {
-			return []cni.HostInterface{{
-				Name: "veth0",
-				Addr: cniIPAddress + "/24",
-			}}, nil
+			return []cni.HostInterface{
+				{
+					Name: "veth0",
+					Addr: cniIPAddress + "/24",
+				},
+				{
+					Name: "veth0",
+					Addr: cniIPv6Address + "/64",
+				},
+			}, nil
 		}
 	})
 

@@ -341,7 +341,7 @@ func ipConfPath(interfaceName string, family k8snet.IPFamily) string {
 	return "/proc/sys/net/ipv" + string(family) + "/conf/" + interfaceName
 }
 
-func DeleteIfaceAndAssociatedRoutes(iface string, tableID int) error {
+func DeleteIfaceAndAssociatedRoutes(iface string, tableID int, family k8snet.IPFamily) error {
 	n := New()
 
 	link, err := n.LinkByName(iface)
@@ -353,10 +353,10 @@ func DeleteIfaceAndAssociatedRoutes(iface string, tableID int) error {
 		return nil
 	}
 
-	currentRouteList, err := n.RouteList(link, k8snet.IPv4)
+	currentRouteList, err := n.RouteList(link, family)
 
 	if err != nil {
-		logger.Warningf("Unable to cleanup routes, error retrieving routes on the link %s: %v", iface, err)
+		logger.Warningf("Unable to cleanup routes, error retrieving IPv%v routes on the link %s: %v", family, iface, err)
 	} else {
 		for i := range currentRouteList {
 			logger.V(log.DEBUG).Infof("Processing route %v", currentRouteList[i])

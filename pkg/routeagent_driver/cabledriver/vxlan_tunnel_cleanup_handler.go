@@ -19,10 +19,13 @@ limitations under the License.
 package cabledriver
 
 import (
+	"errors"
+
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/cable/vxlan"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/netlink"
+	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -47,5 +50,8 @@ func (h *vxlanCleanup) GetName() string {
 func (h *vxlanCleanup) TransitionToNonGateway() error {
 	logger.Infof("Cleaning up the routes")
 
-	return netlink.DeleteIfaceAndAssociatedRoutes(vxlan.VxlanIface, vxlan.TableID) //nolint:wrapcheck  // No need to wrap this error
+	errv6 := netlink.DeleteIfaceAndAssociatedRoutes(vxlan.GetVxlanInterfaceName(k8snet.IPv6), vxlan.TableID, k8snet.IPv6)
+	errv4 := netlink.DeleteIfaceAndAssociatedRoutes(vxlan.GetVxlanInterfaceName(k8snet.IPv4), vxlan.TableID, k8snet.IPv4)
+
+	return errors.Join(errv6, errv4)
 }

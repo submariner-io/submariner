@@ -22,7 +22,7 @@ import (
 	"context"
 	"encoding/json"
 	goerrors "errors"
-	"os"
+	"io/fs"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -46,7 +46,7 @@ func (ovn *Handler) cleanupGatewayDataplane() error {
 		return errors.Wrapf(err, "error reading ip rule list for IPv4")
 	}
 
-	err = ovn.handleSubnets(currentRemoteSubnets.UnsortedList(), ovn.netLink.RuleDel, os.IsNotExist)
+	err = ovn.handleSubnets(currentRemoteSubnets.UnsortedList(), ovn.netLink.RuleDelIfPresent)
 	if err != nil {
 		return errors.Wrapf(err, "error removing routing rule")
 	}
@@ -57,7 +57,7 @@ func (ovn *Handler) cleanupGatewayDataplane() error {
 	}
 
 	err = ovn.netLink.RouteDel(defaultRoute)
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return errors.Wrap(err, "error deleting submariner default route")
 	}
 
@@ -77,14 +77,14 @@ func (ovn *Handler) updateGatewayDataplane() error {
 
 	toAdd := endpointSubnets.Difference(currentRuleRemotes).UnsortedList()
 
-	err = ovn.handleSubnets(toAdd, ovn.netLink.RuleAdd, os.IsExist)
+	err = ovn.handleSubnets(toAdd, ovn.netLink.RuleAddIfNotPresent)
 	if err != nil {
 		return errors.Wrap(err, "error adding routing rule")
 	}
 
 	toRemove := currentRuleRemotes.Difference(endpointSubnets).UnsortedList()
 
-	err = ovn.handleSubnets(toRemove, ovn.netLink.RuleDel, os.IsNotExist)
+	err = ovn.handleSubnets(toRemove, ovn.netLink.RuleDelIfPresent)
 	if err != nil {
 		return errors.Wrapf(err, "error removing routing rule")
 	}
@@ -95,7 +95,7 @@ func (ovn *Handler) updateGatewayDataplane() error {
 	}
 
 	err = ovn.netLink.RouteAdd(defaultRoute)
-	if err != nil && !os.IsExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrExist) {
 		return errors.Wrap(err, "error adding submariner default")
 	}
 

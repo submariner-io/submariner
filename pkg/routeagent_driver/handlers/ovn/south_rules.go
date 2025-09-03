@@ -33,9 +33,7 @@ import (
 // handleSubnets builds ip rules, and passes them to the specified netlink function
 //
 //	for provided subnet list
-func (ovn *Handler) handleSubnets(remoteSubnets []string, ruleFunc func(rule *netlink.Rule) error,
-	ignoredErrorFunc func(error) bool,
-) error {
+func (ovn *Handler) handleSubnets(remoteSubnets []string, ruleFunc func(rule *netlink.Rule) error) error {
 	localCIDRs := set.New(cidr.ExtractSubnets(ovn.ipFamily, ovn.ClusterCIDR)...)
 	localCIDRs.Insert(cidr.ExtractSubnets(ovn.ipFamily, ovn.ServiceCIDR)...)
 
@@ -49,7 +47,7 @@ func (ovn *Handler) handleSubnets(remoteSubnets []string, ruleFunc func(rule *ne
 			logger.V(log.DEBUG).Infof("Adding routes in table 149: %v", rule)
 
 			err = ruleFunc(rule)
-			if err != nil && !ignoredErrorFunc(err) {
+			if err != nil {
 				return errors.Wrapf(err, "error handling rule: %s", resource.ToJSON(rule))
 			}
 		}

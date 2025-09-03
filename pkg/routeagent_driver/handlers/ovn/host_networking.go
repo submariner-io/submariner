@@ -20,6 +20,7 @@ package ovn
 
 import (
 	"fmt"
+	"io/fs"
 	"net"
 	"os"
 
@@ -59,14 +60,14 @@ func (ovn *Handler) updateHostNetworkDataplane() error {
 
 	toAdd := endpointSubnets.Difference(currentRuleRemotes).UnsortedList()
 
-	err = ovn.programRulesForRemoteSubnets(toAdd, ovn.netLink.RuleAdd, os.IsExist)
+	err = ovn.programRulesForRemoteSubnets(toAdd, ovn.netLink.RuleAddIfNotPresent)
 	if err != nil {
 		return errors.Wrap(err, "error adding routing rule")
 	}
 
 	toRemove := currentRuleRemotes.Difference(endpointSubnets).UnsortedList()
 
-	err = ovn.programRulesForRemoteSubnets(toRemove, ovn.netLink.RuleDel, os.IsNotExist)
+	err = ovn.programRulesForRemoteSubnets(toRemove, ovn.netLink.RuleDelIfPresent)
 	if err != nil {
 		return errors.Wrapf(err, "error removing routing rule")
 	}
@@ -91,7 +92,7 @@ func (ovn *Handler) updateHostNetworkDataplane() error {
 	}
 
 	err = ovn.netLink.RouteAdd(route)
-	if os.IsExist(err) {
+	if errors.Is(err, fs.ErrExist) {
 		err = nil
 	}
 
@@ -115,9 +116,7 @@ func (ovn *Handler) getExistingHostNetworkRoutes() (set.Set[string], error) {
 	return currentRuleRemotes, nil
 }
 
-func (ovn *Handler) programRulesForRemoteSubnets(subnets []string, ruleFunc func(rule *netlink.Rule) error,
-	ignoredErrorFunc func(error) bool,
-) error {
+func (ovn *Handler) programRulesForRemoteSubnets(subnets []string, ruleFunc func(rule *netlink.Rule) error) error {
 	for _, remoteSubnet := range subnets {
 		rule, err := ovn.getRuleSpec(remoteSubnet, "", constants.RouteAgentHostNetworkTableID)
 		if err != nil {
@@ -125,7 +124,7 @@ func (ovn *Handler) programRulesForRemoteSubnets(subnets []string, ruleFunc func
 		}
 
 		err = ruleFunc(rule)
-		if err != nil && !ignoredErrorFunc(err) {
+		if err != nil {
 			return errors.Wrapf(err, "error handling rule: %s", resource.ToJSON(rule))
 		}
 	}

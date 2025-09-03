@@ -62,6 +62,8 @@ jobs:
           - extra-toggles: nftables, globalnet, ovn
           - extra-toggles: nftables, ovn, dual-stack
           - extra-toggles: dual-stack, ovn
+          - extra-toggles: dual-stack, vxlan
+          - extra-toggles: dual-stack, ovn, vxlan
           # Oldest Kubernetes version thought to work with SubM.
           # If this breaks, we may advance the oldest-working K8s version instead of fixing it. See:
           # https://submariner.io/development/building-testing/ci-maintenance/

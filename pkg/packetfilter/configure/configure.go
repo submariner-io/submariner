@@ -35,7 +35,7 @@ const UseNftablesKey = "use-nftables"
 var logger = log.Logger{Logger: logf.Log.WithName("Packetfilter")}
 
 func DriverFromConfigMap(cm *corev1.ConfigMap) error {
-	useNftables := false
+	useNftables := true
 
 	if cm != nil {
 		if value, ok := cm.Data[UseNftablesKey]; ok {
