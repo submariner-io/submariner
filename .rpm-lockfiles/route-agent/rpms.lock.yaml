@@ -1,0 +1,460 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: aarch64
+  packages:
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/d/dnf-plugins-core-4.3.0-20.el9.noarch.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 42088
+    checksum: sha256:2b210700d5b260b61931922395603b5cbaab04c61092fc91b8710c8abf8232e3
+    name: dnf-plugins-core
+    evr: 4.3.0-20.el9
+    sourcerpm: dnf-plugins-core-4.3.0-20.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/i/ipset-7.11-11.el9_5.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 45643
+    checksum: sha256:279946f3c482efea0e7b3ec7608a00434736f2d0669a03b1e8ea278503ef3b77
+    name: ipset
+    evr: 7.11-11.el9_5
+    sourcerpm: ipset-7.11-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/i/ipset-libs-7.11-11.el9_5.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 70577
+    checksum: sha256:af06e8035b4c13a22ed5ff54ff2fb2694711e7a29f830f96598495f1392de9ab
+    name: ipset-libs
+    evr: 7.11-11.el9_5
+    sourcerpm: ipset-7.11-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/i/iptables-libs-1.8.10-11.el9_5.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 477723
+    checksum: sha256:73eadf9d16ea9ebb340664873522ef83ad0c28106751783d61c6315a8f0d466f
+    name: iptables-libs
+    evr: 1.8.10-11.el9_5
+    sourcerpm: iptables-1.8.10-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/i/iptables-nft-1.8.10-11.el9_5.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 212143
+    checksum: sha256:5789f27966252aadd8bf0eae25d324defc2528312ff21b21c4ddb80d1c0b104d
+    name: iptables-nft
+    evr: 1.8.10-11.el9_5
+    sourcerpm: iptables-1.8.10-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/j/jansson-2.14-1.el9.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 50251
+    checksum: sha256:7c002eb9c81bad49b8a11d9790af6220cce5fb882be7ca11335882d079d1473f
+    name: jansson
+    evr: 2.14-1.el9
+    sourcerpm: jansson-2.14-1.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/l/libnetfilter_conntrack-1.0.9-1.el9.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 61151
+    checksum: sha256:28d0047c487c8d8bc6b9544fa0a6ac837a50c309641c689e834a4959d6f1ac01
+    name: libnetfilter_conntrack
+    evr: 1.0.9-1.el9
+    sourcerpm: libnetfilter_conntrack-1.0.9-1.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/l/libnfnetlink-1.0.1-23.el9_5.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 31790
+    checksum: sha256:3bc75fd1a2cf80c51709901538ad65555406ffb0805a91fd59ce02f1a8ddd67c
+    name: libnfnetlink
+    evr: 1.0.1-23.el9_5
+    sourcerpm: libnfnetlink-1.0.1-23.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/l/libnftnl-1.2.6-4.el9_4.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 88780
+    checksum: sha256:3e5aa1f38999f45d1720a28af8363a0989e41e8627d70cb18556f2c96841700f
+    name: libnftnl
+    evr: 1.2.6-4.el9_4
+    sourcerpm: libnftnl-1.2.6-4.el9_4.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/n/nftables-1.0.9-3.el9.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 430289
+    checksum: sha256:fb8f6e51225d67ec0051c7adae8fec711a666f9cd349099b221b5e0b53ed7e0b
+    name: nftables
+    evr: 1:1.0.9-3.el9
+    sourcerpm: nftables-1.0.9-3.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/p/procps-ng-3.3.17-14.el9.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 363344
+    checksum: sha256:a8c7514beb4c3cafa6341f43bbe285319d863b2893a34d91159dc8e90f615dd2
+    name: procps-ng
+    evr: 3.3.17-14.el9
+    sourcerpm: procps-ng-3.3.17-14.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/aarch64/fast-datapath/os/Packages/o/openvswitch-selinux-extra-policy-1.0-39.el9fdp.noarch.rpm
+    repoid: fast-datapath-for-rhel-9-aarch64-rpms
+    size: 12566
+    checksum: sha256:9bed3d04036ddb4dff37e9d3e7a4bc6644e607fe40b61d10493b806d290fc27e
+    name: openvswitch-selinux-extra-policy
+    evr: 1.0-39.el9fdp
+    sourcerpm: openvswitch-selinux-extra-policy-1.0-39.el9fdp.src.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/aarch64/fast-datapath/os/Packages/o/openvswitch2.17-2.17.0-158.el9fdp.aarch64.rpm
+    repoid: fast-datapath-for-rhel-9-aarch64-rpms
+    size: 3017046
+    checksum: sha256:ed8568fcccc2c0711e0016ceac33a25e9883cdabb5c506ae4a4202a4c6d804c3
+    name: openvswitch2.17
+    evr: 2.17.0-158.el9fdp
+    sourcerpm: openvswitch2.17-2.17.0-158.el9fdp.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/c/checkpolicy-3.6-1.el9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-appstream-rpms
+    size: 360096
+    checksum: sha256:be68ea8774a5aa3b0220043aa21aa93213d4ec0e1cf0c1e9114369ed16ada37e
+    name: checkpolicy
+    evr: 3.6-1.el9
+    sourcerpm: checkpolicy-3.6-1.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/p/policycoreutils-python-utils-3.6-2.1.el9.noarch.rpm
+    repoid: rhel-9-for-aarch64-appstream-rpms
+    size: 82931
+    checksum: sha256:fcbe07b75cd10b0a2752d558a8b7750cb13b59473439701d8c568195f05c3805
+    name: policycoreutils-python-utils
+    evr: 3.6-2.1.el9
+    sourcerpm: policycoreutils-3.6-2.1.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/p/python3-audit-3.1.5-4.el9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-appstream-rpms
+    size: 88077
+    checksum: sha256:64aa38b4c72581b383e0002a498f2804d89640f01a7daac0d8abec2eb1aa4808
+    name: python3-audit
+    evr: 3.1.5-4.el9
+    sourcerpm: audit-3.1.5-4.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/p/python3-distro-1.5.0-7.el9.noarch.rpm
+    repoid: rhel-9-for-aarch64-appstream-rpms
+    size: 41452
+    checksum: sha256:5cf4276217a72649895226707d4c0e3edd6ea64b66702793fab3907177c73069
+    name: python3-distro
+    evr: 1.5.0-7.el9
+    sourcerpm: python-distro-1.5.0-7.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/p/python3-libselinux-3.6-3.el9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-appstream-rpms
+    size: 191826
+    checksum: sha256:dcc609ec4df45a30606ce85999c9cf45e819d4f8e8479662dfaf6bfb1b27dd2d
+    name: python3-libselinux
+    evr: 3.6-3.el9
+    sourcerpm: libselinux-3.6-3.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/p/python3-libsemanage-3.6-5.el9_6.aarch64.rpm
+    repoid: rhel-9-for-aarch64-appstream-rpms
+    size: 82350
+    checksum: sha256:1a32b9c090a98ddffe5ef70e4485dae8c295d942d87e15753e1cb5f01e23bc97
+    name: python3-libsemanage
+    evr: 3.6-5.el9_6
+    sourcerpm: libsemanage-3.6-5.el9_6.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/p/python3-policycoreutils-3.6-2.1.el9.noarch.rpm
+    repoid: rhel-9-for-aarch64-appstream-rpms
+    size: 2216589
+    checksum: sha256:7dbe7be855cc83e372add890e9e0c5256ef57132d9731b5db204c425bf21b194
+    name: python3-policycoreutils
+    evr: 3.6-2.1.el9
+    sourcerpm: policycoreutils-3.6-2.1.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/u/unbound-libs-1.16.2-19.el9_6.1.aarch64.rpm
+    repoid: rhel-9-for-aarch64-appstream-rpms
+    size: 543541
+    checksum: sha256:58dc5268cf6477cb643a44446277abec96692ff7d3ce321dfeca606214f90b78
+    name: unbound-libs
+    evr: 1.16.2-19.el9_6.1
+    sourcerpm: unbound-1.16.2-19.el9_6.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/d/diffutils-3.7-12.el9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 405687
+    checksum: sha256:524412f7ce56095508190116cb8ae141737857e4447979330c3cf75ca7017e6b
+    name: diffutils
+    evr: 3.7-12.el9
+    sourcerpm: diffutils-3.7-12.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/k/kmod-28-10.el9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 130824
+    checksum: sha256:02835d70e5283383d02367e1bb3431a74033bbd1be5e3961e572623e1cbca4ca
+    name: kmod
+    evr: 28-10.el9
+    sourcerpm: kmod-28-10.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libatomic-11.5.0-5.el9_5.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 30699
+    checksum: sha256:11f6a22c1408245ca361984716b963170e5337a0764bd77c2e8951f0684ece25
+    name: libatomic
+    evr: 11.5.0-5.el9_5
+    sourcerpm: gcc-11.5.0-5.el9_5.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libselinux-utils-3.6-3.el9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 197588
+    checksum: sha256:63fc5e8f22ddff6ae1428b6802f7cfc4ef75c50199de107abecbff3937ad0c35
+    name: libselinux-utils
+    evr: 3.6-3.el9
+    sourcerpm: libselinux-3.6-3.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/p/policycoreutils-3.6-2.1.el9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 251813
+    checksum: sha256:81e7f4a37458072b2f0f86bdb36321ea5e30ef114ffb6a4e0a37fb29fd1c99a6
+    name: policycoreutils
+    evr: 3.6-2.1.el9
+    sourcerpm: policycoreutils-3.6-2.1.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/p/protobuf-c-1.3.3-13.el9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 38582
+    checksum: sha256:d68a518f80e00df5e63ba24d4be5058998d857e24b1af316f37001dfc91d3149
+    name: protobuf-c
+    evr: 1.3.3-13.el9
+    sourcerpm: protobuf-c-1.3.3-13.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/p/python3-setools-4.4.4-1.el9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 613411
+    checksum: sha256:f8e347a37155ff1b805c7d7ed1ad98db8df8fdfcf3d04c13c819e796604c892f
+    name: python3-setools
+    evr: 4.4.4-1.el9
+    sourcerpm: setools-4.4.4-1.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/r/rpm-plugin-selinux-4.16.1.3-37.el9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 18085
+    checksum: sha256:0d94ed16615eb2de3668133d3d5318f8af183d6ccc048f7687990e1a88f6c710
+    name: rpm-plugin-selinux
+    evr: 4.16.1.3-37.el9
+    sourcerpm: rpm-4.16.1.3-37.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/s/selinux-policy-38.1.53-5.el9_6.noarch.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 46473
+    checksum: sha256:e397424c237fb3b0b19f7ba7b1d59ec5a54e8c184ae8be1b1d12223f5ec1f3b7
+    name: selinux-policy
+    evr: 38.1.53-5.el9_6
+    sourcerpm: selinux-policy-38.1.53-5.el9_6.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/s/selinux-policy-targeted-38.1.53-5.el9_6.noarch.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 7251875
+    checksum: sha256:e5a1a2e4ca35e6639ac12a651c3fcb4aede1b62755d71920c9819c7939430b5b
+    name: selinux-policy-targeted
+    evr: 38.1.53-5.el9_6
+    sourcerpm: selinux-policy-38.1.53-5.el9_6.src.rpm
+  source: []
+  module_metadata: []
+- arch: x86_64
+  packages:
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/d/dnf-plugins-core-4.3.0-20.el9.noarch.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 42088
+    checksum: sha256:2b210700d5b260b61931922395603b5cbaab04c61092fc91b8710c8abf8232e3
+    name: dnf-plugins-core
+    evr: 4.3.0-20.el9
+    sourcerpm: dnf-plugins-core-4.3.0-20.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/i/ipset-7.11-11.el9_5.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 45774
+    checksum: sha256:853a048135da647d6b84039d3218300c334444a5b64769ae592a5f967aebeb5d
+    name: ipset
+    evr: 7.11-11.el9_5
+    sourcerpm: ipset-7.11-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/i/ipset-libs-7.11-11.el9_5.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 72301
+    checksum: sha256:74e95b61324dbdb44060672764ec18b72eeb7f368bb12de1481c0b7b5feaa176
+    name: ipset-libs
+    evr: 7.11-11.el9_5
+    sourcerpm: ipset-7.11-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/i/iptables-libs-1.8.10-11.el9_5.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 476678
+    checksum: sha256:3e79ca4cc3d35c1f1e0ac6c9f05c5be56b7ab6dd1f8ae719a21ec1b9e3bfa018
+    name: iptables-libs
+    evr: 1.8.10-11.el9_5
+    sourcerpm: iptables-1.8.10-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/i/iptables-nft-1.8.10-11.el9_5.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 214056
+    checksum: sha256:54e031813637738af285ff4b1c2e4a20b913f2ea643a29940a07ccaf8bd197f5
+    name: iptables-nft
+    evr: 1.8.10-11.el9_5
+    sourcerpm: iptables-1.8.10-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/j/jansson-2.14-1.el9.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 49137
+    checksum: sha256:4e9aec51ee46d7265d6edd1245b5d5ab5e8336dc2a4ca17f2cace2ce8bae3761
+    name: jansson
+    evr: 2.14-1.el9
+    sourcerpm: jansson-2.14-1.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/l/libnetfilter_conntrack-1.0.9-1.el9.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 62066
+    checksum: sha256:beeb73e78390077c6afd9ed6177bad8bad278dbfaae9d90edf7243cdf6a44a3f
+    name: libnetfilter_conntrack
+    evr: 1.0.9-1.el9
+    sourcerpm: libnetfilter_conntrack-1.0.9-1.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/l/libnfnetlink-1.0.1-23.el9_5.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 32236
+    checksum: sha256:177882bfe48c9c9effc7b1bce6b58b2466988c53e400c07fb1ba2d3a4ebe6f40
+    name: libnfnetlink
+    evr: 1.0.1-23.el9_5
+    sourcerpm: libnfnetlink-1.0.1-23.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/l/libnftnl-1.2.6-4.el9_4.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 91380
+    checksum: sha256:e64d7b270be4be36af80ed220852cb760a1069e34667b1ba9eec7a02762a14bf
+    name: libnftnl
+    evr: 1.2.6-4.el9_4
+    sourcerpm: libnftnl-1.2.6-4.el9_4.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/n/nftables-1.0.9-3.el9.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 437243
+    checksum: sha256:1e02a3396ca514706f1a0814e3e7a03f15cff6fb7af1d5b1bf49d3d991f0d927
+    name: nftables
+    evr: 1:1.0.9-3.el9
+    sourcerpm: nftables-1.0.9-3.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/p/procps-ng-3.3.17-14.el9.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 361526
+    checksum: sha256:506ad778f63821e8d9647ca8e0a3ff21b8af9c1666060d5200f9b26ee718333c
+    name: procps-ng
+    evr: 3.3.17-14.el9
+    sourcerpm: procps-ng-3.3.17-14.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/x86_64/fast-datapath/os/Packages/o/openvswitch-selinux-extra-policy-1.0-39.el9fdp.noarch.rpm
+    repoid: fast-datapath-for-rhel-9-x86_64-rpms
+    size: 12566
+    checksum: sha256:9bed3d04036ddb4dff37e9d3e7a4bc6644e607fe40b61d10493b806d290fc27e
+    name: openvswitch-selinux-extra-policy
+    evr: 1.0-39.el9fdp
+    sourcerpm: openvswitch-selinux-extra-policy-1.0-39.el9fdp.src.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/x86_64/fast-datapath/os/Packages/o/openvswitch2.17-2.17.0-158.el9fdp.x86_64.rpm
+    repoid: fast-datapath-for-rhel-9-x86_64-rpms
+    size: 6936016
+    checksum: sha256:8dd3c83df23a01be1355a015eb5312a11ce0565a5cf0e6f811d63540c74ad4b2
+    name: openvswitch2.17
+    evr: 2.17.0-158.el9fdp
+    sourcerpm: openvswitch2.17-2.17.0-158.el9fdp.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/c/checkpolicy-3.6-1.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 365931
+    checksum: sha256:3d12bc7e21276434108c97561f75d1854283afb73d4fface3b836acee09f8d98
+    name: checkpolicy
+    evr: 3.6-1.el9
+    sourcerpm: checkpolicy-3.6-1.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/p/policycoreutils-python-utils-3.6-2.1.el9.noarch.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 82931
+    checksum: sha256:fcbe07b75cd10b0a2752d558a8b7750cb13b59473439701d8c568195f05c3805
+    name: policycoreutils-python-utils
+    evr: 3.6-2.1.el9
+    sourcerpm: policycoreutils-3.6-2.1.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/p/python3-audit-3.1.5-4.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 88009
+    checksum: sha256:023ddd2c1dda3422bc1b067e562b39621eaefdf778efd0dae07fc144ba188fb5
+    name: python3-audit
+    evr: 3.1.5-4.el9
+    sourcerpm: audit-3.1.5-4.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/p/python3-distro-1.5.0-7.el9.noarch.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 41452
+    checksum: sha256:5cf4276217a72649895226707d4c0e3edd6ea64b66702793fab3907177c73069
+    name: python3-distro
+    evr: 1.5.0-7.el9
+    sourcerpm: python-distro-1.5.0-7.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/p/python3-libselinux-3.6-3.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 196472
+    checksum: sha256:7af821a0ee7c7b56df79de25fe35cc2d0fd6f45df5c3bcec2c5e72d7378ba265
+    name: python3-libselinux
+    evr: 3.6-3.el9
+    sourcerpm: libselinux-3.6-3.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/p/python3-libsemanage-3.6-5.el9_6.x86_64.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 82730
+    checksum: sha256:8a17df19f0ff5dbb98fe608999cb2370983d8565658df01d0993b3028cbf28d6
+    name: python3-libsemanage
+    evr: 3.6-5.el9_6
+    sourcerpm: libsemanage-3.6-5.el9_6.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/p/python3-policycoreutils-3.6-2.1.el9.noarch.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 2216589
+    checksum: sha256:7dbe7be855cc83e372add890e9e0c5256ef57132d9731b5db204c425bf21b194
+    name: python3-policycoreutils
+    evr: 3.6-2.1.el9
+    sourcerpm: policycoreutils-3.6-2.1.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/u/unbound-libs-1.16.2-19.el9_6.1.x86_64.rpm
+    repoid: rhel-9-for-x86_64-appstream-rpms
+    size: 564481
+    checksum: sha256:a0588ea4d96ab5c7820d8a4e0067289c6e8fd04b8001a3bd0f87d5916722725c
+    name: unbound-libs
+    evr: 1.16.2-19.el9_6.1
+    sourcerpm: unbound-1.16.2-19.el9_6.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/d/diffutils-3.7-12.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 411559
+    checksum: sha256:2d4c4fdfc10215af3c957c24995b79a26e27e6d76de4ed1f5198d25bf7ef9671
+    name: diffutils
+    evr: 3.7-12.el9
+    sourcerpm: diffutils-3.7-12.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/k/kmod-28-10.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 132888
+    checksum: sha256:e9ccad17d4c6c30524ec5c2aab8d8d351f2776ab564baccdbd2df9b54e28baea
+    name: kmod
+    evr: 28-10.el9
+    sourcerpm: kmod-28-10.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libibverbs-54.0-1.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 466434
+    checksum: sha256:fc593dc18f73c296df4fa808341cb2dbee7e5082fb872b79e7984c3b24279d3b
+    name: libibverbs
+    evr: 54.0-1.el9
+    sourcerpm: rdma-core-54.0-1.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libnl3-3.11.0-1.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 376137
+    checksum: sha256:89728a253a5bf1c8e01c40573f1283d40188e003bdbd4ac565f8b0f05bced55c
+    name: libnl3
+    evr: 3.11.0-1.el9
+    sourcerpm: libnl3-3.11.0-1.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libselinux-utils-3.6-3.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 198410
+    checksum: sha256:e5d79885864cd5b2a307065b43ba1af1523ec7ac26eace2717c70ede1b6e4c56
+    name: libselinux-utils
+    evr: 3.6-3.el9
+    sourcerpm: libselinux-3.6-3.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/n/numactl-libs-2.0.19-1.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 33709
+    checksum: sha256:ce2f00b2527e29f6b389e5899750e2b6eb1e5ce484ddfdcd6f01fa311efe7860
+    name: numactl-libs
+    evr: 2.0.19-1.el9
+    sourcerpm: numactl-2.0.19-1.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/p/policycoreutils-3.6-2.1.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 251967
+    checksum: sha256:8dcd39960d3103f7a4ad2b9f7a0e15469ebf4da98f6c215cddfffdb830dc12b5
+    name: policycoreutils
+    evr: 3.6-2.1.el9
+    sourcerpm: policycoreutils-3.6-2.1.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/p/protobuf-c-1.3.3-13.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 38224
+    checksum: sha256:9669f5bed1c9532ede399cd1ea6f8937ae7d18cfb56d59f2939a4b456390035f
+    name: protobuf-c
+    evr: 1.3.3-13.el9
+    sourcerpm: protobuf-c-1.3.3-13.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/p/python3-setools-4.4.4-1.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 623460
+    checksum: sha256:91946d729d2b03b4abe1c43962f22d110468db0163241cda7b1d549c615d0261
+    name: python3-setools
+    evr: 4.4.4-1.el9
+    sourcerpm: setools-4.4.4-1.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/r/rpm-plugin-selinux-4.16.1.3-37.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 18109
+    checksum: sha256:1e21fe626bb81ccf59e8de8194395017e3a5fa929cbf6c6da82ba1598f6bb27f
+    name: rpm-plugin-selinux
+    evr: 4.16.1.3-37.el9
+    sourcerpm: rpm-4.16.1.3-37.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/s/selinux-policy-38.1.53-5.el9_6.noarch.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 46473
+    checksum: sha256:e397424c237fb3b0b19f7ba7b1d59ec5a54e8c184ae8be1b1d12223f5ec1f3b7
+    name: selinux-policy
+    evr: 38.1.53-5.el9_6
+    sourcerpm: selinux-policy-38.1.53-5.el9_6.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/s/selinux-policy-targeted-38.1.53-5.el9_6.noarch.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 7251875
+    checksum: sha256:e5a1a2e4ca35e6639ac12a651c3fcb4aede1b62755d71920c9819c7939430b5b
+    name: selinux-policy-targeted
+    evr: 38.1.53-5.el9_6
+    sourcerpm: selinux-policy-38.1.53-5.el9_6.src.rpm
+  source: []
+  module_metadata: []
