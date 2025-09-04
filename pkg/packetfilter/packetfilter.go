@@ -302,6 +302,8 @@ type Driver interface {
 	// named Sets.
 	NewNamedSet(set *SetInfo) NamedSet
 	DestroySets(nameFilter func(string) bool) error
+
+	Uninstall() error
 }
 
 type Interface interface {

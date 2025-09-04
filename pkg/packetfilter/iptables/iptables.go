@@ -98,6 +98,11 @@ func New(family k8snet.IPFamily) (packetfilter.Driver, error) {
 	}, nil
 }
 
+// No action required on Uninstall when using iptables..
+func (p *packetFilter) Uninstall() error {
+	return nil
+}
+
 func (p *packetFilter) GetMSSClampTypes() (packetfilter.TableType, packetfilter.ChainType) {
 	return packetfilter.TableTypeRoute, packetfilter.ChainTypeRoute
 }

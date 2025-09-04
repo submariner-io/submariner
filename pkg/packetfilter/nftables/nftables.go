@@ -96,6 +96,16 @@ func NewWithNft(nft knftables.Interface, family k8snet.IPFamily) packetfilter.Dr
 	}
 }
 
+func (p *packetFilter) Uninstall() error {
+	tx := p.nftables.NewTransaction()
+	tx.Flush(&knftables.Table{})
+	tx.Delete(&knftables.Table{})
+
+	err := p.nftables.Run(context.TODO(), tx)
+
+	return errors.Wrapf(err, "error CleanUp table")
+}
+
 func (p *packetFilter) GetMSSClampTypes() (packetfilter.TableType, packetfilter.ChainType) {
 	return packetfilter.TableTypeFilter, packetfilter.ChainTypeFilter
 }
