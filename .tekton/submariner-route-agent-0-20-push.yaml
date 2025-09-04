@@ -27,8 +27,9 @@ spec:
   - name: build-platforms
     value:
     - linux/x86_64
+    - linux/arm64
   - name: dockerfile
-    value: package/Dockerfile.submariner-route-agent
+    value: package/Dockerfile.submariner-route-agent.konflux
   pipelineSpec:
     description: |
       This pipeline is ideal for building multi-arch container images from a Containerfile while maintaining trust after pipeline customization.
@@ -64,11 +65,12 @@ spec:
       description: Skip checks against built image
       name: skip-checks
       type: string
-    - default: "false"
+    - default: "true"
       description: Execute the build with network isolation
       name: hermetic
       type: string
-    - default: ""
+    - default: |
+        [{"type": "gomod", "path": "."}, {"type": "gomod", "path": "tools"}, {"type": "rpm", "path": "./.rpm-lockfiles/route-agent"}]
       description: Build dependencies to be prefetched
       name: prefetch-input
       type: string
@@ -77,7 +79,7 @@ spec:
         1h, 2d, 3w for hours, days, and weeks, respectively.
       name: image-expires-after
       type: string
-    - default: "false"
+    - default: "true"
       description: Build a source image.
       name: build-source-image
       type: string
@@ -100,6 +102,7 @@ spec:
       type: string
     - default:
       - linux/x86_64
+      - linux/arm64
       description: List of platforms to build the container images on. The available
         set of values is determined by the configuration of the multi-platform-controller.
       name: build-platforms
@@ -168,6 +171,8 @@ spec:
       params:
       - name: input
         value: $(params.prefetch-input)
+      - name: dev-package-managers
+        value: "true"
       - name: SOURCE_ARTIFACT
         value: $(tasks.clone-repository.results.SOURCE_ARTIFACT)
       - name: ociStorage
