@@ -44,6 +44,7 @@ func GatewayRoute(name, namespace string) *GatewayRouteApplyConfiguration {
 	b.WithAPIVersion("submariner.io/v1")
 	return b
 }
+func (b GatewayRouteApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -211,8 +212,24 @@ func (b *GatewayRouteApplyConfiguration) WithRoutePolicySpec(value *RoutePolicyS
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *GatewayRouteApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *GatewayRouteApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *GatewayRouteApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *GatewayRouteApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }
