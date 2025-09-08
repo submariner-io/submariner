@@ -72,6 +72,11 @@ func testRouteAgentRestart(f *subFramework.Framework, onGateway bool, supportedF
 		return
 	}
 
+	if !onGateway && framework.TestContext.SkipIntraClusterConnectivityTests {
+		framework.Skipf("Skipping intra-cluster connectivity test")
+		return
+	}
+
 	framework.By(fmt.Sprintf("Found node %q on %q", nodes[0].Name, clusterAName))
 	node := nodes[0]
 

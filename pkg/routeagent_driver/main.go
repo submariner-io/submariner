@@ -43,6 +43,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/controller"
 	"github.com/submariner-io/submariner/pkg/node"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
 	pfconfigure "github.com/submariner-io/submariner/pkg/packetfilter/configure"
 	"github.com/submariner-io/submariner/pkg/pinger"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cabledriver"
@@ -164,6 +165,18 @@ func main() {
 
 	if env.Uninstall {
 		uninstall(registry)
+
+		for _, family := range cidr.ExtractIPFamilies(env.ClusterCidr) {
+			pFilter, err := packetfilter.New(family)
+			if err != nil {
+				logger.Errorf(err, "error creating packetfilter instance for IPv%v", family)
+				continue
+			}
+
+			if err := pFilter.Uninstall(); err != nil {
+				logger.Errorf(err, "error Cleanup packetfilter table for IPv%v", family)
+			}
+		}
 
 		return
 	}

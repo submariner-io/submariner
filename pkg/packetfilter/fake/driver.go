@@ -34,6 +34,10 @@ type driverImpl struct {
 	family  k8snet.IPFamily
 }
 
+func (d *driverImpl) Uninstall() error {
+	return nil
+}
+
 func (d *driverImpl) GetMSSClampTypes() (packetfilter.TableType, packetfilter.ChainType) {
 	return d.pfilter.GetMSSClampTypes()
 }
