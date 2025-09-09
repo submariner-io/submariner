@@ -129,7 +129,7 @@ var _ = Describe("", func() {
 		mtuHandler := mtu.NewHandler(k8snet.IPv4, localClusterCIDRs, false, 0)
 		Expect(mtuHandler.Init(ctx)).To(Succeed())
 
-		calicoHandler := calico.NewCalicoIPPoolHandler(nil, testing.Namespace, k8sClient)
+		calicoHandler := calico.NewCalicoIPPoolHandler(nil, testing.Namespace, dynClient)
 		Expect(calicoHandler.Init(ctx)).To(Succeed())
 
 		healthCheckerHandler := healthchecker.New(&healthchecker.Config{
