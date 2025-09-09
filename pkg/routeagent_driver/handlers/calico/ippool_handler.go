@@ -34,29 +34,36 @@ import (
 	"github.com/submariner-io/submariner/pkg/cidr"
 	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
+	tigerav1 "github.com/tigera/operator/api/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
-	SubmarinerIPPool       = "submariner.io/ippool"
-	GwLBSvcName            = "submariner-gateway"
-	GwLBSvcROKSAnnotation  = "service.kubernetes.io/ibm-load-balancer-cloud-provider-ip-type"
-	DefaultV4IPPoolName    = "default-ipv4-ippool"
-	submarinerManagedLabel = "submariner-managed"
-	submarinerPrevIPIPMode = "submariner-prev-ipipmode"
+	SubmarinerIPPool            = "submariner.io/ippool"
+	GwLBSvcName                 = "submariner-gateway"
+	GwLBSvcROKSAnnotation       = "service.kubernetes.io/ibm-load-balancer-cloud-provider-ip-type"
+	DefaultV4IPPoolName         = "default-ipv4-ippool"
+	submarinerManagedLabel      = "submariner-managed"
+	submarinerPrevEncapsulation = "submariner-prev-encapsulation"
+	DefaultInstallationName     = "default"
 )
 
 type calicoIPPoolHandler struct {
 	event.HandlerBase
 	restConfig *rest.Config
 	client     calicocs.Interface
-	k8sClient  clientset.Interface
+	dynClient  dynamic.Interface
 	namespace  string
 }
 
@@ -66,11 +73,13 @@ var NewClient = func(restConfig *rest.Config) (calicocs.Interface, error) {
 
 var logger = log.Logger{Logger: logf.Log.WithName("CalicoIPPool")}
 
-func NewCalicoIPPoolHandler(restConfig *rest.Config, namespace string, k8sClient clientset.Interface) event.Handler {
+var InstallationsGVR = tigerav1.GroupVersion.WithResource("installations")
+
+func NewCalicoIPPoolHandler(restConfig *rest.Config, namespace string, dynClient dynamic.Interface) event.Handler {
 	return &calicoIPPoolHandler{
 		restConfig: restConfig,
 		namespace:  namespace,
-		k8sClient:  k8sClient,
+		dynClient:  dynClient,
 	}
 }
 
@@ -87,6 +96,10 @@ func (h *calicoIPPoolHandler) Init(ctx context.Context) error {
 
 	if h.client, err = NewClient(h.restConfig); err != nil {
 		return errors.Wrap(err, "error initializing Calico clientset")
+	}
+
+	if err = tigerav1.AddToScheme(scheme.Scheme); err != nil {
+		return errors.Wrap(err, "Error adding tigera operator to the scheme")
 	}
 
 	return h.updateROKSCalicoCfg(ctx)
@@ -216,7 +229,10 @@ func getEndpointSubnetIPPoolName(endpoint *submV1.Endpoint, subnet string) strin
 
 func (h *calicoIPPoolHandler) platformIsROKS(ctx context.Context) (bool, error) {
 	// Submariner GW is deployed on ROKS using LB service with specific annotations.
-	service, err := h.k8sClient.CoreV1().Services(h.namespace).Get(ctx, GwLBSvcName, metav1.GetOptions{})
+	serviceUnstructured, err := h.dynClient.
+		Resource(corev1.SchemeGroupVersion.WithResource("services")).
+		Namespace(h.namespace).
+		Get(ctx, GwLBSvcName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return false, nil
 	}
@@ -225,7 +241,7 @@ func (h *calicoIPPoolHandler) platformIsROKS(ctx context.Context) (bool, error) 
 		return false, errors.Wrap(err, "error reading gw lb service")
 	}
 
-	return service.GetAnnotations()[GwLBSvcROKSAnnotation] != "", nil
+	return serviceUnstructured.GetAnnotations()[GwLBSvcROKSAnnotation] != "", nil
 }
 
 // workaround to address datapath issue with default Calico IPPool configuration for ROKS platform,
@@ -240,65 +256,74 @@ func (h *calicoIPPoolHandler) updateROKSCalicoCfg(ctx context.Context) error {
 		return nil
 	}
 
-	// platform is ROKS, make sure that IPIPMode of default IPPool is Always
+	// platform is ROKS, make sure that encapsulation of default Installation is set to IPIP
+	// In this way the Tigera Operator will set IPIPMode of default IPPool to Always
+	err = util.Update(ctx, resource.ForDynamic(h.dynClient.Resource(InstallationsGVR)),
+		resource.MustToUnstructured(&tigerav1.Installation{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: DefaultInstallationName,
+			},
+		}), func(existing *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+			installation := &tigerav1.Installation{}
+			err := runtime.DefaultUnstructuredConverter.FromUnstructured(existing.Object, installation)
+			utilruntime.Must(err)
 
-	err = util.Update(ctx, h.iPPoolResourceInterface(), &calicoapi.IPPool{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: DefaultV4IPPoolName,
-		},
-	}, func(existing *calicoapi.IPPool) (*calicoapi.IPPool, error) {
-		if existing.Spec.IPIPMode == calicoapi.IPIPModeAlways {
-			logger.Infof("IPIPMode of %s IPPool already set to Always", DefaultV4IPPoolName)
-			return existing, nil // no need to update
-		}
+			if installation.Spec.CalicoNetwork == nil {
+				installation.Spec.CalicoNetwork = &tigerav1.CalicoNetworkSpec{}
+			}
 
-		if existing.Labels == nil {
-			existing.Labels = make(map[string]string)
-		}
+			ipPools := installation.Spec.CalicoNetwork.IPPools
+			if len(ipPools) > 0 && ipPools[0].Encapsulation == tigerav1.EncapsulationIPIP {
+				logger.Infof("Encapsulation of %s Installation already set to IPIP", DefaultInstallationName)
+				return existing, nil
+			}
 
-		if existing.Annotations == nil {
-			existing.Annotations = make(map[string]string)
-		}
+			if len(ipPools) == 0 {
+				logger.Infof("IPPools is empty, so nothing changed")
+				return existing, nil
+			}
 
-		// mark 'submariner-managed' label for persistency
-		existing.Labels[submarinerManagedLabel] = "true"
-		existing.Annotations[submarinerPrevIPIPMode] = string(existing.Spec.IPIPMode)
-		existing.Spec.IPIPMode = calicoapi.IPIPModeAlways
+			if installation.Annotations == nil {
+				installation.Annotations = map[string]string{}
+			}
 
-		logger.Infof("Setting IPIPMode of %s IPPool to Always", DefaultV4IPPoolName)
+			installation.Annotations[submarinerPrevEncapsulation] = ipPools[0].Encapsulation.String()
+			installation.Annotations[submarinerManagedLabel] = "true"
 
-		return existing, nil
-	})
+			ipPools[0].Encapsulation = tigerav1.EncapsulationIPIP
 
-	return errors.Wrap(err, "error updating default ippool")
+			return resource.MustToUnstructured(installation), nil
+		})
+
+	return errors.Wrapf(err, "failed to update Installation %q", DefaultInstallationName)
 }
 
 func (h *calicoIPPoolHandler) restoreROKSCalicoCfg() error {
-	err := util.Update(context.TODO(), h.iPPoolResourceInterface(), &calicoapi.IPPool{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: DefaultV4IPPoolName,
-		},
-	}, func(existing *calicoapi.IPPool) (*calicoapi.IPPool, error) {
-		prevIPIPModeCfg := existing.Annotations[submarinerPrevIPIPMode]
-		if prevIPIPModeCfg == "" {
-			return existing, nil // no need to update
-		}
+	err := util.Update(context.TODO(), resource.ForDynamic(h.dynClient.Resource(InstallationsGVR)),
+		resource.MustToUnstructured(&tigerav1.Installation{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: DefaultInstallationName,
+			},
+		}), func(existing *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+			installation := &tigerav1.Installation{}
+			err := runtime.DefaultUnstructuredConverter.FromUnstructured(existing.Object, installation)
+			utilruntime.Must(err)
 
-		existing.Spec.IPIPMode = calicoapi.IPIPMode(prevIPIPModeCfg)
-		delete(existing.Labels, submarinerManagedLabel)
-		delete(existing.Annotations, submarinerPrevIPIPMode)
+			prevEncapsulation := installation.Annotations[submarinerPrevEncapsulation]
+			if prevEncapsulation == "" {
+				return existing, nil // no need to update
+			}
 
-		return existing, nil
-	})
+			ipPools := installation.Spec.CalicoNetwork.IPPools
+			if len(ipPools) > 0 {
+				ipPools[0].Encapsulation = tigerav1.EncapsulationType(prevEncapsulation)
+			}
 
-	return errors.Wrap(err, "error updating default ippool")
-}
+			delete(installation.Labels, submarinerManagedLabel)
+			delete(installation.Annotations, submarinerPrevEncapsulation)
 
-func (h *calicoIPPoolHandler) iPPoolResourceInterface() resource.Interface[*calicoapi.IPPool] {
-	return &resource.InterfaceFuncs[*calicoapi.IPPool]{
-		GetFunc:    h.client.ProjectcalicoV3().IPPools().Get,
-		CreateFunc: h.client.ProjectcalicoV3().IPPools().Create,
-		UpdateFunc: h.client.ProjectcalicoV3().IPPools().Update,
-		DeleteFunc: h.client.ProjectcalicoV3().IPPools().Delete,
-	}
+			return resource.MustToUnstructured(installation), nil
+		})
+
+	return errors.Wrapf(err, "failed to restore ROKS Calico config for Installation %q", DefaultInstallationName)
 }

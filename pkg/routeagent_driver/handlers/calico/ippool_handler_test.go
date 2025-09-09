@@ -26,6 +26,7 @@ import (
 	calicoapi "github.com/projectcalico/api/pkg/apis/projectcalico/v3"
 	"github.com/submariner-io/submariner/pkg/event/testing"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/calico"
+	tigerav1 "github.com/tigera/operator/api/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -33,7 +34,7 @@ var _ = Describe("IPPool Handler", func() {
 	t := newTestDriver()
 
 	JustBeforeEach(func() {
-		t.Start(calico.NewCalicoIPPoolHandler(nil, testing.Namespace, t.k8sClient))
+		t.Start(calico.NewCalicoIPPoolHandler(nil, testing.Namespace, t.dynClient))
 	})
 
 	When("remote Endpoints are created and deleted", func() {
@@ -71,7 +72,7 @@ var _ = Describe("IPPool Handler", func() {
 
 		Context("because the Submariner GW load balancer does not have the ROKS annotation", func() {
 			BeforeEach(func() {
-				t.createSubmarinerGwLBService(map[string]string{})
+				t.createSubmarinerGwLBService(map[string]string{calico.GwLBSvcROKSAnnotation: "foo"})
 			})
 
 			It("should not update the default IPPool's IPIPMode", func() {
@@ -85,14 +86,14 @@ var _ = Describe("IPPool Handler", func() {
 			t.createSubmarinerGwLBService(map[string]string{calico.GwLBSvcROKSAnnotation: "foo"})
 		})
 
-		It("should update the default IPPool's IPIPMode to Always", func() {
-			Expect(t.getDefaultIPPoolIPIPMode()).Should(Equal(string(calicoapi.IPIPModeAlways)))
+		It("should update the default Installation's Encapsulation to IPIP", func() {
+			Expect(t.getDefaultInstallationEncapsulation()).Should(Equal(tigerav1.EncapsulationIPIP.String()))
 		})
 	})
 
 	Context("on Uninstall", func() {
 		BeforeEach(func() {
-			t.createSubmarinerGwLBService(map[string]string{calico.GwLBSvcROKSAnnotation: "foo"})
+			t.createSubmarinerGwLBService(map[string]string{})
 
 			_, err := t.calicoClient.ProjectcalicoV3().IPPools().Create(context.Background(), &calicoapi.IPPool{
 				ObjectMeta: metav1.ObjectMeta{
@@ -123,8 +124,8 @@ var _ = Describe("IPPool Handler", func() {
 			Expect(list.Items).To(BeEmpty())
 		})
 
-		It("should reset the default IPPool's IPIPMode", func() {
-			Expect(t.getDefaultIPPoolIPIPMode()).Should(Equal(string(calicoapi.IPIPModeNever)))
+		It("should reset the default Installation's Encapsulation", func() {
+			Expect(t.getDefaultInstallationEncapsulation()).Should(Equal(tigerav1.EncapsulationIPIPCrossSubnet.String()))
 		})
 	})
 })
