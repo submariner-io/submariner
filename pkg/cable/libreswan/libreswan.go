@@ -52,7 +52,7 @@ const (
 	whackTimeout     = 5 * time.Second
 	dpdDelay         = 30 // seconds
 	encryptArg       = "--encrypt"
-	forceencapsArg   = "--forceencaps"
+	forceencapsArg   = "--encapsulation=yes"
 	nameArg          = "--name"
 	hostArg          = "--host"
 	clientArg        = "--client"
