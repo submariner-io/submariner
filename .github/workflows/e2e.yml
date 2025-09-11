@@ -61,6 +61,7 @@ jobs:
           - extra-toggles: nftables, globalnet
           - extra-toggles: nftables, globalnet, ovn
           - extra-toggles: nftables, ovn, dual-stack
+          - extra-toggles: nftables, ovn, dual-stack, force-udp-encaps
           - extra-toggles: dual-stack, ovn
           - extra-toggles: dual-stack, vxlan
           - extra-toggles: dual-stack, ovn, vxlan
