@@ -296,7 +296,10 @@ func (g *gatewayMonitor) startLeaderElection() {
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(_ context.Context) {
 				err := g.startControllers() //nolint:contextcheck // Intentional to not pass context
-				logger.FatalOnError(err, "Error starting the controllers")
+				if err != nil {
+					logger.Error(err, "Error starting the controllers - stopping leader election")
+					leaderElectionInfo.stop()
+				}
 			},
 			OnStoppedLeading: func() {
 				logger.Info("Leader election stopped")

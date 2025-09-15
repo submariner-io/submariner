@@ -20,6 +20,7 @@ package controllers_test
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"testing"
@@ -29,6 +30,7 @@ import (
 	. "github.com/onsi/gomega"
 	fakeDynClient "github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/ipam"
+	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/slices"
@@ -86,6 +88,11 @@ var _ = BeforeSuite(func() {
 			Name: "veth0",
 			Addr: cniInterfaceIP + "/24",
 		}}, nil
+	}
+
+	log.Exit = func(code int) {
+		defer GinkgoRecover()
+		Fail(fmt.Sprintf("Exited with code %d", code))
 	}
 })
 

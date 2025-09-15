@@ -22,10 +22,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync/atomic"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/pkg/errors"
 	fake "github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
@@ -41,8 +43,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	fakek8s "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/testing"
 	k8snet "k8s.io/utils/net"
 )
 
@@ -52,7 +56,13 @@ const (
 	remoteCIDR      = "169.254.2.0/24"
 )
 
-var _ = Describe("Endpoint monitoring", func() {
+var _ = Describe("Gateway Monitor", func() {
+	Describe("Endpoint monitoring", testEndpointMonitoring)
+	Describe("Uninstall", testUninstall)
+})
+
+//nolint:maintidx // Ignore for unit test.
+func testEndpointMonitoring() {
 	t := newGatewayMonitorTestDriver()
 
 	var endpoint *submarinerv1.Endpoint
@@ -210,7 +220,7 @@ var _ = Describe("Endpoint monitoring", func() {
 			})
 		})
 
-		When("and the local Gateway is deleted", func() {
+		Context("and the local Gateway is deleted", func() {
 			It("should remove the ingress rules for its glonal IP", func() {
 				globalIP := t.awaitGatewayGlobalIP("")
 
@@ -224,6 +234,54 @@ var _ = Describe("Endpoint monitoring", func() {
 
 				t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT,
 					constants.SmGlobalnetIngressChain, And(ContainSubstring(globalIP), ContainSubstring(cniInterfaceIP)))
+			})
+		})
+
+		Context("and the controllers initially fail to start", func() {
+			Context("", func() {
+				BeforeEach(func() {
+					fake.FailOnAction(&t.dynClient.Fake, "clusterglobalegressips", "get", nil, true)
+				})
+
+				It("should eventually start the controllers", func() {
+					t.awaitControllersStarted()
+				})
+			})
+
+			Context("and renewal of the leader lock also initially fails", func() {
+				var leaseFailed chan struct{}
+
+				BeforeEach(func() {
+					t.leaderElectionConfig.RenewDeadline = time.Millisecond * 200
+					t.leaderElectionConfig.RetryPeriod = time.Millisecond * 20
+
+					leaseFailed = make(chan struct{})
+
+					t.dynClient.Fake.Lock()
+					defer t.dynClient.Fake.Unlock()
+
+					var fail atomic.Bool
+					fail.Store(true)
+
+					t.dynClient.Fake.PrependReactor("get", "clusterglobalegressips",
+						func(_ testing.Action) (bool, runtime.Object, error) {
+							if fail.Load() {
+								fail.Store(false)
+								t.leaderElection.FailLease(t.leaderElectionConfig.RenewDeadline)
+								close(leaseFailed)
+
+								return true, nil, errors.New("mock error")
+							}
+
+							return false, nil, nil
+						})
+				})
+
+				It("should eventually start the controllers", func() {
+					Eventually(leaseFailed).Within(5 * time.Second).Should(BeClosed())
+					t.leaderElection.SucceedLease()
+					t.awaitControllersStarted()
+				})
 			})
 		})
 	})
@@ -279,9 +337,9 @@ var _ = Describe("Endpoint monitoring", func() {
 			t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain, ContainSubstring(remoteCIDR))
 		})
 	})
-})
+}
 
-var _ = Describe("Uninstall", func() {
+func testUninstall() {
 	var t *testDriverBase
 
 	const ipSetName = controllers.IPSetPrefix + "abd"
@@ -390,7 +448,7 @@ var _ = Describe("Uninstall", func() {
 
 		test.AwaitNoResource(t.services, internalServiceName)
 	})
-})
+}
 
 type gatewayMonitorTestDriver struct {
 	*testDriverBase
