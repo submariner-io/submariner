@@ -6,22 +6,22 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/coreos/go-iptables v0.8.0
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/onsi/ginkgo/v2 v2.25.2
+	github.com/onsi/ginkgo/v2 v2.25.3
 	github.com/onsi/gomega v1.38.2
 	github.com/ovn-org/libovsdb v0.7.0
 	github.com/ovn-org/ovn-kubernetes/go-controller v0.0.0-20220511131059-ac1ce4691c0f
 	github.com/pkg/errors v0.9.1
 	github.com/projectcalico/api v0.0.0-20230602153125-fb7148692637
 	github.com/prometheus-community/pro-bing v0.7.0
-	github.com/prometheus/client_golang v1.23.0
-	github.com/submariner-io/admiral v0.22.0-m1
-	github.com/submariner-io/shipyard v0.22.0-m1.0.20250903175641-94a7cc9512a0
+	github.com/prometheus/client_golang v1.23.2
+	github.com/submariner-io/admiral v0.22.0-m1.0.20250912121413-2076a89e6423
+	github.com/submariner-io/shipyard v0.22.0-m1.0.20250910180202-4e01bc8eaa79
 	github.com/tigera/operator/api v0.0.0-20250829192342-96fd517a8419
 	github.com/vishvananda/netlink v1.3.1
 	golang.org/x/net v0.44.0
 	golang.org/x/sys v0.36.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20230429144221-925a1e7659e6
-	google.golang.org/protobuf v1.36.7
+	google.golang.org/protobuf v1.36.8
 	k8s.io/api v0.33.5
 	k8s.io/apimachinery v0.33.5
 	k8s.io/client-go v0.33.5
@@ -73,22 +73,23 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.80.1 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
-	github.com/prometheus/common v0.65.0 // indirect
+	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/rs/zerolog v1.34.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/stretchr/testify v1.10.0 // indirect
+	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/urfave/cli/v2 v2.4.0 // indirect
 	github.com/vishvananda/netns v0.0.5 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
+	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.42.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/sync v0.17.0 // indirect
 	golang.org/x/term v0.35.0 // indirect
 	golang.org/x/text v0.29.0 // indirect
-	golang.org/x/time v0.12.0 // indirect
+	golang.org/x/time v0.13.0 // indirect
 	golang.org/x/tools v0.36.0 // indirect
 	golang.zx2c4.com/wireguard v0.0.0-20230325221338-052af4a8072b // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
