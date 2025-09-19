@@ -77,4 +77,5 @@ LABEL com.redhat.component="submariner-gateway-container" \
       io.openshift.tags="submariner, submariner-gateway, rhacm" \
       maintainer="multi-cluster-networking@redhat.com" \
       com.github.url="https://github.com/submariner-io/submariner" \
-      com.github.commit="${BASE_BRANCH}"
+      com.github.commit="${BASE_BRANCH}" \
+      cpe="cpe:/a:redhat:acm:2.14::el9"
