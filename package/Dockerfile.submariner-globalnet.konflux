@@ -55,6 +55,7 @@ USER submariner
 ENTRYPOINT ["/usr/local/bin/submariner-globalnet.sh"]
 
 LABEL com.redhat.component="submariner-globalnet-container" \
+      com.redhat.component.cpe="cpe:/a:redhat:acm:2.14::el9" \
       name="rhacm2/submariner-globalnet-rhel9" \
       version="${BASE_BRANCH}" \
       summary="Submariner Globalnet" \
