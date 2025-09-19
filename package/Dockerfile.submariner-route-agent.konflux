@@ -73,5 +73,6 @@ LABEL com.redhat.component="submariner-route-agent-container" \
       io.k8s.description="The Submariner Route Agent programs network routes on each node." \
       io.openshift.tags="submariner, submariner-route-agent, rhacm" \
       maintainer="multi-cluster-networking@redhat.com" \
+      cpe="cpe:/a:redhat:acm:2.14::el9" \
       com.github.url="https://github.com/submariner-io/submariner" \
       com.github.commit="${BASE_BRANCH}"
