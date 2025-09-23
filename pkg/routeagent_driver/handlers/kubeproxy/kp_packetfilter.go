@@ -35,7 +35,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/vxlan"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/util/retry"
 	k8snet "k8s.io/utils/net"
 	"k8s.io/utils/set"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -124,7 +123,7 @@ var discoverCNIRetryConfig = wait.Backoff{
 	Steps:    12,
 }
 
-func (kp *SyncHandler) Init(_ context.Context) error {
+func (kp *SyncHandler) Init(ctx context.Context) error {
 	var err error
 	var cniIface *cni.Interface
 
@@ -138,17 +137,17 @@ func (kp *SyncHandler) Init(_ context.Context) error {
 		return errors.Wrapf(err, "Unable to find the default interface on host: %s", kp.hostname)
 	}
 
-	err = retry.OnError(discoverCNIRetryConfig, func(err error) bool {
-		logger.Infof("Waiting for CNI interface discovery: %s", err)
-		return true
-	}, func() error {
+	err = wait.ExponentialBackoffWithContext(ctx, discoverCNIRetryConfig, func(ctx context.Context) (bool, error) {
 		cniIface, err = cni.Discover(kp.localClusterCidr, kp.ipFamily)
-		if err != nil {
-			return errors.Wrapf(err, "Error discovering the CNI interface")
+		if err == nil {
+			return true, nil
 		}
 
-		return nil
+		logger.Error(err, "Error discovering the CNI interface - retrying")
+
+		return false, nil
 	})
+
 	if err == nil {
 		// Configure CNI Specific changes
 		kp.cniIface = cniIface
