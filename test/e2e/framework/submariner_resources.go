@@ -48,30 +48,30 @@ func NoopCheckEndpoint(_ *submarinerv1.Endpoint) (bool, string, error) {
 func (f *Framework) AwaitSubmarinerEndpoint(cluster framework.ClusterIndex, checkEndpoint CheckEndpointFunc) *submarinerv1.Endpoint {
 	var retEndpoint *submarinerv1.Endpoint
 
-	framework.AwaitUntil("find the submariner endpoint for "+framework.TestContext.ClusterIDs[cluster], func() (interface{}, error) {
-		return SubmarinerClients[cluster].SubmarinerV1().Endpoints(framework.TestContext.SubmarinerNamespace).List(
-			context.TODO(), metav1.ListOptions{})
-	}, func(result interface{}) (bool, string, error) {
-		endpoints := result.(*submarinerv1.EndpointList)
-		retEndpoint = nil
+	framework.AwaitUntil("find the submariner endpoint for "+framework.TestContext.ClusterIDs[cluster],
+		func() (*submarinerv1.EndpointList, error) {
+			return SubmarinerClients[cluster].SubmarinerV1().Endpoints(framework.TestContext.SubmarinerNamespace).List(
+				context.TODO(), metav1.ListOptions{})
+		}, func(endpoints *submarinerv1.EndpointList) (bool, string, error) {
+			retEndpoint = nil
 
-		for i := range endpoints.Items {
-			if endpoints.Items[i].Spec.ClusterID == framework.TestContext.ClusterIDs[cluster] {
-				if retEndpoint == nil {
-					retEndpoint = &endpoints.Items[i]
-				} else {
-					// We expect one Endpoint at a time per cluster
-					return false, "Multiple endpoints found", nil
+			for i := range endpoints.Items {
+				if endpoints.Items[i].Spec.ClusterID == framework.TestContext.ClusterIDs[cluster] {
+					if retEndpoint == nil {
+						retEndpoint = &endpoints.Items[i]
+					} else {
+						// We expect one Endpoint at a time per cluster
+						return false, "Multiple endpoints found", nil
+					}
 				}
 			}
-		}
 
-		if retEndpoint == nil {
-			return false, "No endpoint found", nil
-		}
+			if retEndpoint == nil {
+				return false, "No endpoint found", nil
+			}
 
-		return checkEndpoint(retEndpoint)
-	})
+			return checkEndpoint(retEndpoint)
+		})
 
 	return retEndpoint
 }
@@ -89,7 +89,7 @@ func (f *Framework) AwaitNewSubmarinerEndpoint(cluster framework.ClusterIndex, p
 func (f *Framework) AwaitSubmarinerEndpointRemoved(cluster framework.ClusterIndex, endpointName string) {
 	framework.AwaitUntil(fmt.Sprintf("await submariner Endpoint %q on %q removed", endpointName,
 		framework.TestContext.ClusterIDs[cluster]),
-		func() (interface{}, error) {
+		func() (bool, error) {
 			_, err := SubmarinerClients[cluster].SubmarinerV1().Endpoints(framework.TestContext.SubmarinerNamespace).Get(
 				context.TODO(), endpointName, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
@@ -98,7 +98,7 @@ func (f *Framework) AwaitSubmarinerEndpointRemoved(cluster framework.ClusterInde
 
 			return false, err
 		},
-		func(result interface{}) (bool, string, error) {
-			return result.(bool), "", nil
+		func(result bool) (bool, string, error) {
+			return result, "", nil
 		})
 }

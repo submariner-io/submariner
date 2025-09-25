@@ -181,8 +181,8 @@ github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/submariner-io/admiral v0.22.0-m2 h1:xqTAG4K3KZK/njZzFhHvHSUmySFccH5tjt7eZyAQbS4=
 github.com/submariner-io/admiral v0.22.0-m2/go.mod h1:hUo1VXXN4u1MUF0S6KS4Zro4NsjvGo7Rb0QjhGOhHU0=
-github.com/submariner-io/shipyard v0.22.0-m2 h1:gP9tcFtbgbIML59F7vFShl9jbjdzVDicMasPg3bGsdQ=
-github.com/submariner-io/shipyard v0.22.0-m2/go.mod h1:ZwubwufiF8aZ/jetFWWC/SuIOagKgq8G6pFePYB5t6w=
+github.com/submariner-io/shipyard v0.22.0-m2.0.20251001113420-533a08875d8a h1:Lu5bHDhke8X5RGuSliBkjQMyRbtE7leJBOrQSxOekr4=
+github.com/submariner-io/shipyard v0.22.0-m2.0.20251001113420-533a08875d8a/go.mod h1:TmDIW/DT0VABavNDZ7/gX05GxK9J6mskGszXhpyayWY=
 github.com/tigera/operator/api v0.0.0-20250829192342-96fd517a8419 h1:Shdwa7T6XNY6oKRiJVKkbH9L4V9iyAb6xb8k4FJ9OB4=
 github.com/tigera/operator/api v0.0.0-20250829192342-96fd517a8419/go.mod h1:VHTGNLahatombm93XGzp3ikt3dCaZVqWEEt6o38ZLZA=
 github.com/urfave/cli/v2 v2.4.0 h1:m2pxjjDFgDxSPtO8WSdbndj17Wu2y8vOT86wE/tjr+I=

@@ -78,19 +78,19 @@ var _ = Describe("Gateway status reporting", Label(labels.Dataplane), func() {
 			gwClient := subFramework.SubmarinerClients[framework.ClusterA].SubmarinerV1().Gateways(
 				framework.TestContext.SubmarinerNamespace)
 			framework.AwaitUntil(fmt.Sprintf("await active connection on Gateway %q", name),
-				func() (interface{}, error) {
+				func() (*submarinerv1.Gateway, error) {
 					resGw, err := gwClient.Get(context.TODO(), name, metav1.GetOptions{})
 					if apierrors.IsNotFound(err) {
 						return nil, nil //nolint:nilnil // Returning nil value is intentional
 					}
 					return resGw, err
 				},
-				func(result interface{}) (bool, string, error) {
+				func(result *submarinerv1.Gateway) (bool, string, error) {
 					if result == nil {
 						return false, "gateway not found", nil
 					}
 
-					return verifyGateway(result.(*submarinerv1.Gateway), otherCluster, healthCheckEnabled)
+					return verifyGateway(result, otherCluster, healthCheckEnabled)
 				})
 		})
 	})

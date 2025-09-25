@@ -15,7 +15,7 @@ require (
 	github.com/prometheus-community/pro-bing v0.7.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/submariner-io/admiral v0.22.0-m2
-	github.com/submariner-io/shipyard v0.22.0-m2
+	github.com/submariner-io/shipyard v0.22.0-m2.0.20251001113420-533a08875d8a
 	github.com/tigera/operator/api v0.0.0-20250829192342-96fd517a8419
 	github.com/vishvananda/netlink v1.3.1
 	golang.org/x/net v0.44.0
