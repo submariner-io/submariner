@@ -176,7 +176,7 @@ func AwaitNewSubmarinerGatewayFullyConnected(f *subFramework.Framework, cluster 
 
 func defaultEndpointType() tcp.EndpointType {
 	if framework.TestContext.GlobalnetEnabled {
-		return tcp.GlobalIP
+		return tcp.GlobalServiceIP
 	}
 
 	return tcp.PodIP
