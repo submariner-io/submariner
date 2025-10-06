@@ -24,6 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/global"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"github.com/submariner-io/submariner/pkg/packetfilter/configure"
 	"github.com/submariner-io/submariner/pkg/packetfilter/iptables"
@@ -41,7 +42,7 @@ const (
 
 const defaultDriver = NfTables
 
-var _ = Describe("DriverFromConfigMap", func() {
+var _ = Describe("DriverFromGlobalConfig", func() {
 	var cm *corev1.ConfigMap
 
 	BeforeEach(func() {
@@ -53,19 +54,29 @@ var _ = Describe("DriverFromConfigMap", func() {
 		}
 	})
 
+	JustBeforeEach(func() {
+		global.Init(cm)
+	})
+
 	When(configure.UseNftablesKey+" key is present", func() {
 		Context("and set to true", func() {
-			It("should set the nftables driver", func() {
+			BeforeEach(func() {
 				cm.Data[configure.UseNftablesKey] = "true"
-				Expect(configure.DriverFromConfigMap(cm)).To(Succeed())
+			})
+
+			It("should set the nftables driver", func() {
+				configure.DriverFromGlobalConfig()
 				verifyDriverFn(NfTables)
 			})
 		})
 
 		Context("and set to false", func() {
-			It("should set the iptables driver", func() {
+			BeforeEach(func() {
 				cm.Data[configure.UseNftablesKey] = "false"
-				Expect(configure.DriverFromConfigMap(cm)).To(Succeed())
+			})
+
+			It("should set the iptables driver", func() {
+				configure.DriverFromGlobalConfig()
 				verifyDriverFn(IPTables)
 			})
 		})
@@ -73,29 +84,7 @@ var _ = Describe("DriverFromConfigMap", func() {
 
 	When(configure.UseNftablesKey+" key is not present", func() {
 		It("should set the default driver", func() {
-			Expect(configure.DriverFromConfigMap(cm)).To(Succeed())
-			verifyDriverFn(defaultDriver)
-		})
-	})
-
-	When("the Data map is nil", func() {
-		It("should set the default driver", func() {
-			cm.Data = nil
-			Expect(configure.DriverFromConfigMap(cm)).To(Succeed())
-			verifyDriverFn(defaultDriver)
-		})
-	})
-
-	When(configure.UseNftablesKey+" key value is invalid", func() {
-		It("should return an error", func() {
-			cm.Data[configure.UseNftablesKey] = "bogus"
-			Expect(configure.DriverFromConfigMap(cm)).ToNot(Succeed())
-		})
-	})
-
-	When("the ConfigMap is nil", func() {
-		It("should set the default driver", func() {
-			Expect(configure.DriverFromConfigMap(nil)).To(Succeed())
+			configure.DriverFromGlobalConfig()
 			verifyDriverFn(defaultDriver)
 		})
 	})

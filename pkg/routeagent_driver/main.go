@@ -128,8 +128,7 @@ func main() {
 
 	configmap.WatchAndSignalOnChange(ctx, k8sClientSet, env.Namespace, syscall.SIGINT, configmap.Global, names.GatewayComponent)
 
-	err = pfconfigure.DriverFromConfigMap(globalConfigMap)
-	logger.FatalOnError(err, "Error configuring packet filter driver")
+	pfconfigure.DriverFromGlobalConfig()
 
 	np := os.Getenv("SUBMARINER_NETWORKPLUGIN")
 

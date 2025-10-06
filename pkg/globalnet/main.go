@@ -103,8 +103,7 @@ func main() {
 
 	configmap.WatchAndSignalOnChange(ctx, k8sClient, spec.Namespace, syscall.SIGINT, configmap.Global, names.GlobalnetComponent)
 
-	err = pfconfigure.DriverFromConfigMap(globalConfigMap)
-	logger.FatalOnError(err, "Error configuring packet filter driver")
+	pfconfigure.DriverFromGlobalConfig()
 
 	if spec.Uninstall {
 		logger.Info("Uninstalling submariner-globalnet")
