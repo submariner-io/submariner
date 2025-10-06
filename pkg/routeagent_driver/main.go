@@ -23,11 +23,13 @@ import (
 	"io/fs"
 	"os"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/configmap"
+	"github.com/submariner-io/admiral/pkg/global"
 	"github.com/submariner-io/admiral/pkg/http"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
@@ -118,6 +120,13 @@ func main() {
 
 	globalConfigMap, err := configmap.Get(ctx, resource.ForConfigMap(k8sClientSet, env.Namespace), configmap.Global)
 	logger.FatalOnError(err, "Error retrieving the global ConfigMap")
+
+	configMap, err := configmap.Get(ctx, resource.ForConfigMap(k8sClientSet, env.Namespace), names.RouteAgentComponent)
+	logger.FatalOnError(err, "Error retrieving ConfigMap")
+
+	global.Init(globalConfigMap, configMap)
+
+	configmap.WatchAndSignalOnChange(ctx, k8sClientSet, env.Namespace, syscall.SIGINT, configmap.Global, names.GatewayComponent)
 
 	err = pfconfigure.DriverFromConfigMap(globalConfigMap)
 	logger.FatalOnError(err, "Error configuring packet filter driver")

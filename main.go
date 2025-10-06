@@ -20,14 +20,18 @@ package main
 
 import (
 	"flag"
+	"syscall"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/submariner-io/admiral/pkg/certificate"
+	"github.com/submariner-io/admiral/pkg/configmap"
+	"github.com/submariner-io/admiral/pkg/global"
 	"github.com/submariner-io/admiral/pkg/http"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/names"
+	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/util"
 	admversion "github.com/submariner-io/admiral/pkg/version"
@@ -125,6 +129,13 @@ func main() {
 	logger.FatalOnError(subv1.AddToScheme(scheme.Scheme), "Error adding submariner types to the scheme")
 
 	ctx := signals.SetupSignalHandler()
+
+	configMap, err := configmap.Get(ctx, resource.ForConfigMap(k8sClient, submSpec.Namespace), names.GatewayComponent)
+	logger.FatalOnError(err, "Error retrieving ConfigMap")
+
+	global.Init(configMap)
+
+	configmap.WatchAndSignalOnChange(ctx, k8sClient, submSpec.Namespace, syscall.SIGINT, names.GatewayComponent)
 
 	gw, err := gateway.New(ctx, &gateway.Config{
 		LeaderElectionConfig: gateway.LeaderElectionConfig{
