@@ -25,10 +25,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/finalizer"
+	"github.com/submariner-io/admiral/pkg/global"
 	"github.com/submariner-io/admiral/pkg/ipam"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
+	"github.com/submariner-io/admiral/pkg/workqueue"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	pfiface "github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
 	"github.com/submariner-io/submariner/pkg/globalnet/metrics"
@@ -124,6 +126,8 @@ func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipa
 		Scheme:              config.Scheme,
 		Transform:           controller.process,
 		ResourcesEquivalent: syncer.AreSpecsEquivalent,
+		WorkQueueConfig:     workqueue.ConfigFromGlobal("global-inressip", nil),
+		MaxLogVerbosity:     global.Get("global-inressip.syncer.max-verbosity", 0),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the syncer")

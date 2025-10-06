@@ -21,8 +21,10 @@ package controllers
 import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
+	"github.com/submariner-io/admiral/pkg/global"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
+	"github.com/submariner-io/admiral/pkg/workqueue"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,6 +57,8 @@ func NewServiceController(config *syncer.ResourceSyncerConfig, podControllers *I
 		Federator:       federate.NewUpdateStatusFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll),
 		Scheme:          config.Scheme,
 		Transform:       controller.process,
+		WorkQueueConfig: workqueue.ConfigFromGlobal("service", nil),
+		MaxLogVerbosity: global.Get("service.syncer.max-verbosity", 0),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the syncer")

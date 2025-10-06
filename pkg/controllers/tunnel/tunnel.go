@@ -22,9 +22,11 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/global"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/slices"
 	"github.com/submariner-io/admiral/pkg/watcher"
+	"github.com/submariner-io/admiral/pkg/workqueue"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cableengine"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -62,6 +64,8 @@ func StartController(engine cableengine.Engine, namespace string, config *watche
 				OnDeleteFunc: c.handleRemovedEndpoint,
 			},
 			SourceNamespace: namespace,
+			WorkQueueConfig: workqueue.ConfigFromGlobal("tunnel-endpoint", nil),
+			MaxLogVerbosity: global.Get("tunnel-endpoint.watcher.max-verbosity", 0),
 		},
 	}
 

@@ -20,7 +20,9 @@ package ovn
 
 import (
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/global"
 	"github.com/submariner-io/admiral/pkg/watcher"
+	"github.com/submariner-io/admiral/pkg/workqueue"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -61,6 +63,8 @@ func NewNonGatewayRouteController(ipFamily k8snet.IPFamily, config watcher.Confi
 				OnDeleteFunc: controller.nonGatewayRouteDeleted,
 			},
 			SourceNamespace: namespace,
+			WorkQueueConfig: workqueue.ConfigFromGlobal("nongateway-route", nil),
+			MaxLogVerbosity: global.Get("nongateway-route.watcher.max-verbosity", 0),
 		},
 	}
 

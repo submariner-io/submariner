@@ -20,8 +20,10 @@ package healthchecker
 
 import (
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/global"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/watcher"
+	"github.com/submariner-io/admiral/pkg/workqueue"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/pinger"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -65,6 +67,8 @@ func New(config *Config) (Interface, error) {
 				OnDeleteFunc: c.endpointDeleted,
 			},
 			SourceNamespace: config.EndpointNamespace,
+			WorkQueueConfig: workqueue.ConfigFromGlobal("healthcheck-endpoint", nil),
+			MaxLogVerbosity: global.Get("healthcheck-endpoint.watcher.max-verbosity", 0),
 		},
 	}
 

@@ -26,10 +26,12 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
+	"github.com/submariner-io/admiral/pkg/global"
 	"github.com/submariner-io/admiral/pkg/ipam"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
 	"github.com/submariner-io/admiral/pkg/watcher"
+	"github.com/submariner-io/admiral/pkg/workqueue"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
 	"github.com/submariner-io/submariner/pkg/globalnet/metrics"
@@ -102,6 +104,8 @@ func NewGlobalEgressIPController(config *syncer.ResourceSyncerConfig, pool *ipam
 		Scheme:              config.Scheme,
 		Transform:           controller.process,
 		ResourcesEquivalent: syncer.AreSpecsEquivalent,
+		WorkQueueConfig:     workqueue.ConfigFromGlobal("global-egressip", nil),
+		MaxLogVerbosity:     global.Get("global-egressip.syncer.max-verbosity", 0),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the syncer")

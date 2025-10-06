@@ -23,11 +23,13 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
+	"github.com/submariner-io/admiral/pkg/global"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/resource"
 	resourceSyncer "github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/watcher"
+	"github.com/submariner-io/admiral/pkg/workqueue"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cidr"
 	"github.com/submariner-io/submariner/pkg/endpoint"
@@ -166,17 +168,23 @@ func (d *DatastoreSyncer) cleanupResources(ctx context.Context, client dynamic.N
 func (d *DatastoreSyncer) createSyncer() (*broker.Syncer, error) {
 	d.syncerConfig.ResourceConfigs = []broker.ResourceConfig{
 		{
-			LocalSourceNamespace: d.syncerConfig.LocalNamespace,
-			LocalResourceType:    &submarinerv1.Cluster{},
-			BrokerResourceType:   &submarinerv1.Cluster{},
+			LocalSourceNamespace:  d.syncerConfig.LocalNamespace,
+			LocalResourceType:     &submarinerv1.Cluster{},
+			LocalWorkQueueConfig:  workqueue.ConfigFromGlobal("local-submariner-cluster", nil),
+			BrokerResourceType:    &submarinerv1.Cluster{},
+			BrokerWorkQueueConfig: workqueue.ConfigFromGlobal("broker-submariner-cluster", nil),
 		},
 		{
 			LocalSourceNamespace:   d.syncerConfig.LocalNamespace,
 			LocalResourceType:      &submarinerv1.Endpoint{},
+			LocalWorkQueueConfig:   workqueue.ConfigFromGlobal("local-submariner-endpoint", nil),
 			TransformBrokerToLocal: d.shouldSyncRemoteEndpoint,
 			BrokerResourceType:     &submarinerv1.Endpoint{},
+			BrokerWorkQueueConfig:  workqueue.ConfigFromGlobal("broker-submariner-endpointr", nil),
 		},
 	}
+
+	d.syncerConfig.MaxLogVerbosity = global.Get("datastore-broker.syncer.max-verbosity", 0)
 
 	syncer, err := broker.NewSyncer(d.syncerConfig)
 
@@ -247,6 +255,8 @@ func (d *DatastoreSyncer) startGatewayWatcher(stopCh <-chan struct{}) error {
 					OnUpdateFunc: d.handleCreateOrUpdateGateway,
 					OnDeleteFunc: nil,
 				},
+				WorkQueueConfig: workqueue.ConfigFromGlobal("gateway", nil),
+				MaxLogVerbosity: global.Get("gateway.watcher.max-verbosity", 0),
 			},
 		},
 	})

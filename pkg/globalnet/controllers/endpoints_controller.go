@@ -23,8 +23,10 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
+	"github.com/submariner-io/admiral/pkg/global"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/util"
+	"github.com/submariner-io/admiral/pkg/workqueue"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -68,6 +70,8 @@ func startEndpointsController(name, namespace string, config *syncer.ResourceSyn
 		Transform:           controller.process,
 		SourceFieldSelector: fieldSelector,
 		ResourcesEquivalent: areEndpointsEqual,
+		WorkQueueConfig:     workqueue.ConfigFromGlobal("service-endpoints", nil),
+		MaxLogVerbosity:     global.Get("service-endpoints.syncer.max-verbosity", 0),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating the syncer")
