@@ -50,19 +50,16 @@ func NewCertificateHandler(clusterID string) *CertificateHandler {
 	}
 }
 
-func initNSSDatabase(nssDBDir string) error {
-	if _, err := os.Stat(nssDBDir + "/cert9.db"); err == nil {
+func (c *CertificateHandler) initNSSDatabase(ctx context.Context) error {
+	if _, err := os.Stat(c.nssDBDir + "/cert9.db"); err == nil {
 		certLogger.Info("NSS database already exists , using existing database")
 		return nil
 	}
 
 	certLogger.Info("NSS database does not exist, initializing new database")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
 	//nolint:gosec // certutil args are from trusted config
-	cmd := command.New(exec.CommandContext(ctx, "certutil", "-N", "-d", "sql:"+nssDBDir, "--empty-password"))
+	cmd := command.New(exec.CommandContext(ctx, "certutil", "-N", "-d", "sql:"+c.nssDBDir, "--empty-password"))
 
 	if err := cmd.Run(); err != nil {
 		return errors.Wrap(err, "failed to initialize NSS database")
@@ -73,19 +70,19 @@ func initNSSDatabase(nssDBDir string) error {
 	return nil
 }
 
-func loadCertificatesIntoNSS(nssDBDir string, tlsCert, tlsKey, caCert []byte) error {
+func (c *CertificateHandler) loadCertificatesIntoNSS(ctx context.Context, tlsCert, tlsKey, caCert []byte) error {
 	// Load CA certificate
-	if err := loadCertificate(nssDBDir, caCert, "ca-cert", "C,,", "c"); err != nil {
+	if err := c.loadCertificate(ctx, caCert, "ca-cert", "C,,", "c"); err != nil {
 		return errors.Wrap(err, "failed to load CA certificate")
 	}
 
 	// Load client certificate
-	if err := loadCertificate(nssDBDir, tlsCert, "client-cert", "C,,", "c"); err != nil {
+	if err := c.loadCertificate(ctx, tlsCert, "client-cert", "C,,", "c"); err != nil {
 		return errors.Wrap(err, "failed to load client certificate")
 	}
 
 	// Load client private key
-	if err := loadPrivateKey(nssDBDir, tlsKey, "client-key"); err != nil {
+	if err := c.loadPrivateKey(ctx, tlsKey, "client-key"); err != nil {
 		return errors.Wrap(err, "failed to load client private key")
 	}
 
@@ -94,12 +91,9 @@ func loadCertificatesIntoNSS(nssDBDir string, tlsCert, tlsKey, caCert []byte) er
 	return nil
 }
 
-func loadCertificate(nssDBDir string, certData []byte, nickname, trustFlags, certType string) error {
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	defer cancel()
-
+func (c *CertificateHandler) loadCertificate(ctx context.Context, certData []byte, nickname, trustFlags, certType string) error {
 	//nolint:gosec // certutil args are from trusted config
-	execCmd := exec.CommandContext(ctx, "certutil", "-A", "-d", "sql:"+nssDBDir, "-n", nickname, "-t", trustFlags, "-i", "-", "-a")
+	execCmd := exec.CommandContext(ctx, "certutil", "-A", "-d", "sql:"+c.nssDBDir, "-n", nickname, "-t", trustFlags, "-i", "-", "-a")
 	execCmd.Stdin = bytes.NewReader(certData)
 
 	cmd := command.New(execCmd)
@@ -111,12 +105,9 @@ func loadCertificate(nssDBDir string, certData []byte, nickname, trustFlags, cer
 	return nil
 }
 
-func loadPrivateKey(nssDBDir string, keyData []byte, nickname string) error {
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	defer cancel()
-
+func (c *CertificateHandler) loadPrivateKey(ctx context.Context, keyData []byte, nickname string) error {
 	//nolint:gosec // certutil args are from trusted config
-	execCmd := exec.CommandContext(ctx, "certutil", "-A", "-d", "sql:"+nssDBDir, "-n", nickname, "-t", "u,u,u", "-i", "-", "-a")
+	execCmd := exec.CommandContext(ctx, "certutil", "-A", "-d", "sql:"+c.nssDBDir, "-n", nickname, "-t", "u,u,u", "-i", "-", "-a")
 	execCmd.Stdin = bytes.NewReader(keyData)
 
 	cmd := command.New(execCmd)
@@ -179,11 +170,14 @@ func (c *CertificateHandler) OnSignedCallback(secretData map[string][]byte) erro
 
 	certLogger.Info("Certificate ready, loading into NSS database")
 
-	if err := initNSSDatabase(c.nssDBDir); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := c.initNSSDatabase(ctx); err != nil {
 		return errors.Wrap(err, "failed to initialize NSS database")
 	}
 
-	if err := loadCertificatesIntoNSS(c.nssDBDir, tlsCert, tlsKey, caCert); err != nil {
+	if err := c.loadCertificatesIntoNSS(ctx, tlsCert, tlsKey, caCert); err != nil {
 		return errors.Wrap(err, "failed to load certificates into NSS database")
 	}
 
