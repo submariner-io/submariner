@@ -295,7 +295,7 @@ func (g *gatewayType) onStartedLeading(ctx context.Context) {
 		g.SigningRequestor = signingRequestor
 	}
 
-	if err := g.cableEngine.StartEngine(g.SigningRequestor); err != nil {
+	if err := g.cableEngine.StartEngine(ctx, g.SigningRequestor); err != nil {
 		g.fatalError <- errors.Wrap(err, "error starting the cable engine")
 		return
 	}
@@ -430,7 +430,7 @@ func (g *gatewayType) uninstall(ctx context.Context) error {
 		_ = g.SigningRequestor.Uninstall(ctx)
 	}
 
-	err := g.cableEngine.StartEngine(g.SigningRequestor)
+	err := g.cableEngine.StartEngine(ctx, g.SigningRequestor)
 	if err != nil {
 		// As we are in the process of cleaning up, ignore any initialization errors.
 		logger.Errorf(err, "Error starting the cable driver")

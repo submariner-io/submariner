@@ -19,6 +19,7 @@ limitations under the License.
 package libreswan_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -769,7 +770,7 @@ func testInit() {
 		})
 
 		It("should write it to the secrets file", func() {
-			Expect(t.driver.Init()).To(Succeed())
+			Expect(t.driver.Init(context.TODO())).To(Succeed())
 			verifySecretsFile("PSK \"" + psk)
 		})
 	})
@@ -794,7 +795,7 @@ func testInit() {
 		})
 
 		It("should write the contents to the secrets file", func() {
-			Expect(t.driver.Init()).To(Succeed())
+			Expect(t.driver.Init(context.TODO())).To(Succeed())
 			verifySecretsFile("PSK \"")
 		})
 	})

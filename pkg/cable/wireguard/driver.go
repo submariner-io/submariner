@@ -171,7 +171,7 @@ func NewDriver(localEndpoint *endpoint.Local, _ *types.SubmarinerCluster,
 	return &w, nil
 }
 
-func (w *wireguard) Init() error {
+func (w *wireguard) Init(_ context.Context) error {
 	logger.V(log.DEBUG).Infof("Initializing WireGuard device for cluster %s", w.localEndpoint.ClusterID)
 
 	l, err := w.netLink.InterfaceByName(DefaultDeviceName)

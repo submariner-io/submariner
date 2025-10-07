@@ -19,6 +19,7 @@ limitations under the License.
 package fake
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -57,7 +58,7 @@ func New() *Driver {
 	}
 }
 
-func (d *Driver) Init() error {
+func (d *Driver) Init(_ context.Context) error {
 	defer GinkgoRecover()
 	Expect(d.init).ToNot(BeClosed())
 	close(d.init)

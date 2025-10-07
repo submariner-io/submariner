@@ -203,7 +203,7 @@ func (i *libreswan) GetName() string {
 }
 
 // Init initializes the driver with any state it needs.
-func (i *libreswan) Init() error {
+func (i *libreswan) Init(ctx context.Context) error {
 	logger.Infof("Initializing libreswan driver with authentication mode: %s", i.authMode)
 
 	if i.authMode == AuthModePSK {
@@ -227,7 +227,7 @@ func (i *libreswan) Init() error {
 
 		i.certificateHandler = NewCertificateHandler(i.localEndpoint.ClusterID)
 
-		err = i.signingRequestor.Issue(context.TODO(), "libreswan-"+i.localEndpoint.Hostname, sanIPs, i.certificateHandler.OnSignedCallback)
+		err = i.signingRequestor.Issue(ctx, "libreswan-"+i.localEndpoint.Hostname, sanIPs, i.certificateHandler.OnSignedCallback)
 		if err != nil {
 			logger.Warningf("Unable to issue certificate: %v", err)
 		}

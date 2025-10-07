@@ -19,6 +19,7 @@ limitations under the License.
 package vxlan
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -335,7 +336,7 @@ func (v *vxLan) GetActiveConnections() ([]v1.Connection, error) {
 	return v.connections, nil
 }
 
-func (v *vxLan) Init() error {
+func (v *vxLan) Init(_ context.Context) error {
 	return nil
 }
 

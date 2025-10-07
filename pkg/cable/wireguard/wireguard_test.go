@@ -19,6 +19,7 @@ limitations under the License.
 package wireguard_test
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -129,7 +130,7 @@ func testInit() {
 	t := newTestDriver()
 
 	It("should succeed", func() {
-		Expect(t.driver.Init()).To(Succeed())
+		Expect(t.driver.Init(context.TODO())).To(Succeed())
 		t.netLink.AwaitLinkSetup(wireguard.DefaultDeviceName)
 	})
 
@@ -138,7 +139,7 @@ func testInit() {
 			link := t.netLink.AwaitLink(wireguard.DefaultDeviceName)
 			_ = t.netLink.LinkDel(link)
 
-			Expect(t.driver.Init()).NotTo(Succeed())
+			Expect(t.driver.Init(context.TODO())).NotTo(Succeed())
 		})
 	})
 }

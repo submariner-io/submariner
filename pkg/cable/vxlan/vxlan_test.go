@@ -19,6 +19,7 @@ limitations under the License.
 package vxlan_test
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net"
@@ -284,7 +285,7 @@ func newTestDriver() *testDriver {
 			t.localCluster, nil)
 		Expect(err).To(Succeed())
 
-		Expect(d.Init()).To(Succeed())
+		Expect(d.Init(context.TODO())).To(Succeed())
 		Expect(d.GetName()).To(Equal(vxlan.CableDriverName))
 
 		t.driver = d

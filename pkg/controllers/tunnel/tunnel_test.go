@@ -128,7 +128,7 @@ var _ = Describe("Managing tunnels", func() {
 
 		engine.SetupNATDiscovery(nat)
 
-		Expect(engine.StartEngine(nil)).To(Succeed())
+		Expect(engine.StartEngine(context.TODO(), nil)).To(Succeed())
 
 		stopCh = make(chan struct{})
 

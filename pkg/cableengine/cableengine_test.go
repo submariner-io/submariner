@@ -19,6 +19,7 @@ limitations under the License.
 package cableengine_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -231,7 +232,7 @@ func newTestDriver() *testDriver {
 			return
 		}
 
-		err := t.engine.StartEngine(nil)
+		err := t.engine.StartEngine(context.TODO(), nil)
 		if fakeDriver.ErrOnInit != nil {
 			Expect(err).To(ContainErrorSubstring(fakeDriver.ErrOnInit))
 		} else {

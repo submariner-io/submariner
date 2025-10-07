@@ -19,6 +19,7 @@ limitations under the License.
 package cable
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -35,7 +36,7 @@ import (
 // Driver is used by the ipsec engine to actually connect the tunnels.
 type Driver interface {
 	// Init initializes the driver with any state it needs.
-	Init() error
+	Init(ctx context.Context) error
 
 	// GetActiveConnections returns an array of all the active connections.
 	GetActiveConnections() ([]v1.Connection, error)
