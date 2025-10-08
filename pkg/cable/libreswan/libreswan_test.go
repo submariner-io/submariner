@@ -63,7 +63,6 @@ var _ = Describe("Libreswan", func() {
 	Describe("Preferred server config", testPreferredServerConfig)
 	Describe("Pluto", testPluto)
 	Describe("Init", testInit)
-	Describe("Certificate", testCertificate)
 
 	Context("", func() {
 		t := newTestDriver()
@@ -95,7 +94,7 @@ var _ = Describe("Libreswan", func() {
 				}
 				localEndpoint := endpoint.NewLocal(&endpointSpec, dynamicfake.NewSimpleDynamicClient(scheme.Scheme), "")
 
-				_, err := libreswan.NewLibreswan(localEndpoint, &types.SubmarinerCluster{}, &mockSigningRequestor{})
+				_, err := libreswan.NewLibreswan(localEndpoint, &types.SubmarinerCluster{}, t.signingRequestor)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("invalid authentication mode"))
 			})
@@ -799,21 +798,39 @@ func testInit() {
 			verifySecretsFile("PSK \"")
 		})
 	})
+
+	When("certificate authentication mode is enabled", func() {
+		BeforeEach(func() {
+			os.Setenv(authModeEnvVar, "cert")
+			DeferCleanup(func() {
+				os.Unsetenv(authModeEnvVar)
+			})
+		})
+
+		It("should issue a request with the SigningRequestor", func() {
+			Expect(t.driver.Init(context.TODO())).To(Succeed())
+			Expect(t.signingRequestor.issuedCh).To(Receive(ContainElements(append(t.localEndpoint.Spec().PrivateIPs,
+				t.localEndpoint.Spec().PublicIPs...))))
+			t.cmdExecutor.AwaitCommand(ContainSubstring("certutil"))
+		})
+	})
 }
 
 type testDriver struct {
-	endpointSpec  subv1.EndpointSpec
-	localEndpoint *endpoint.Local
-	cmdExecutor   *fakecommand.Executor
-	driver        cable.Driver
-	plutoCtlFile  *os.File
-	expectErr     bool
+	endpointSpec     subv1.EndpointSpec
+	localEndpoint    *endpoint.Local
+	cmdExecutor      *fakecommand.Executor
+	driver           cable.Driver
+	plutoCtlFile     *os.File
+	expectErr        bool
+	signingRequestor *mockSigningRequestor
 }
 
 func newTestDriver() *testDriver {
 	t := &testDriver{}
 
 	BeforeEach(func() {
+		t.signingRequestor = &mockSigningRequestor{issuedCh: make(chan []string, 10)}
 		t.cmdExecutor = fakecommand.New()
 		t.endpointSpec = subv1.EndpointSpec{
 			ClusterID:  "local",
@@ -839,7 +856,7 @@ func newTestDriver() *testDriver {
 
 		var err error
 
-		t.driver, err = libreswan.NewLibreswan(t.localEndpoint, &types.SubmarinerCluster{}, &mockSigningRequestor{})
+		t.driver, err = libreswan.NewLibreswan(t.localEndpoint, &types.SubmarinerCluster{}, t.signingRequestor)
 
 		if t.expectErr {
 			Expect(err).To(HaveOccurred())
@@ -852,7 +869,7 @@ func newTestDriver() *testDriver {
 }
 
 func (t *testDriver) setupPluto() {
-	t.setupTempDir()
+	setupTempDir()
 
 	path := libreswan.RootDir + "/run/pluto"
 	Expect(os.MkdirAll(path, 0o700)).To(Succeed())
@@ -864,17 +881,6 @@ func (t *testDriver) setupPluto() {
 
 	t.plutoCtlFile, err = os.Create(path + "/pluto.ctl")
 	Expect(err).NotTo(HaveOccurred())
-}
-
-func (t *testDriver) setupTempDir() {
-	var err error
-
-	libreswan.RootDir, err = os.MkdirTemp("", "libreswan_test")
-	Expect(err).NotTo(HaveOccurred())
-
-	DeferCleanup(func() {
-		Expect(os.RemoveAll(libreswan.RootDir)).To(Succeed())
-	})
 }
 
 func (t *testDriver) assertActiveConnection(natInfo *natdiscovery.NATEndpointInfo) {

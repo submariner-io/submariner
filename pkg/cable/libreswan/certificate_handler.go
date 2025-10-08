@@ -46,13 +46,13 @@ type CertificateHandler struct {
 func NewCertificateHandler(clusterID string) *CertificateHandler {
 	return &CertificateHandler{
 		clusterID: clusterID,
-		nssDBDir:  "/var/lib/ipsec/nss",
+		nssDBDir:  RootDir + "/var/lib/ipsec/nss",
 	}
 }
 
 func (c *CertificateHandler) initNSSDatabase(ctx context.Context) error {
-	if _, err := os.Stat(c.nssDBDir + "/cert9.db"); err == nil {
-		certLogger.Info("NSS database already exists , using existing database")
+	if _, err := os.Stat(c.NSSDatabaseFile()); err == nil {
+		certLogger.Info("NSS database already exists, using existing database")
 		return nil
 	}
 
@@ -82,13 +82,9 @@ func (c *CertificateHandler) loadCertificatesIntoNSS(ctx context.Context, tlsCer
 	}
 
 	// Load client private key
-	if err := c.loadPrivateKey(ctx, tlsKey, "client-key"); err != nil {
-		return errors.Wrap(err, "failed to load client private key")
-	}
+	err := c.loadPrivateKey(ctx, tlsKey, "client-key")
 
-	certLogger.Info("Certificates successfully loaded into NSS database")
-
-	return nil
+	return errors.Wrap(err, "failed to load client private key")
 }
 
 func (c *CertificateHandler) loadCertificate(ctx context.Context, certData []byte, nickname, trustFlags, certType string) error {
@@ -168,7 +164,7 @@ func (c *CertificateHandler) OnSignedCallback(secretData map[string][]byte) erro
 		return nil
 	}
 
-	certLogger.Info("Certificate ready, loading into NSS database")
+	certLogger.Info("Loading certificates into the NSS database via callback")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -181,9 +177,13 @@ func (c *CertificateHandler) OnSignedCallback(secretData map[string][]byte) erro
 		return errors.Wrap(err, "failed to load certificates into NSS database")
 	}
 
-	certLogger.Info("Certificates successfully loaded into NSS database via callback")
+	certLogger.Info("Certificates successfully loaded into NSS database")
 
 	c.lastCertHash = certHash
 
 	return nil
+}
+
+func (c *CertificateHandler) NSSDatabaseFile() string {
+	return c.nssDBDir + "/cert9.db"
 }

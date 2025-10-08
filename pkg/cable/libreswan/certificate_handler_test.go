@@ -20,96 +20,85 @@ package libreswan_test
 
 import (
 	"context"
+	"maps"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/certificate"
 	fakecommand "github.com/submariner-io/admiral/pkg/command/fake"
-	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable/libreswan"
-	"github.com/submariner-io/submariner/pkg/endpoint"
-	"github.com/submariner-io/submariner/pkg/types"
-	dynamicfake "k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/kubernetes/scheme"
 )
 
-type mockSigningRequestor struct{}
-
-func (m *mockSigningRequestor) Issue(ctx context.Context, name string, sanIPs []string, callback certificate.OnSignedFn) error {
+var _ = Describe("CertificateHandler", func() {
 	certData := map[string][]byte{
-		certificate.TLSDataKey:        []byte("mock-tls-cert"),
-		certificate.PrivateKeyDataKey: []byte("mock-tls-key"),
-		certificate.CADataKey:         []byte("mock-ca-cert"),
+		certificate.CADataKey:         []byte("-----BEGIN CERTIFICATE-----\nMOCK_CA_CERT\n-----END CERTIFICATE-----"),
+		certificate.TLSDataKey:        []byte("-----BEGIN CERTIFICATE-----\nMOCK_CLIENT_CERT\n-----END CERTIFICATE-----"),
+		certificate.PrivateKeyDataKey: []byte("-----BEGIN PRIVATE KEY-----\nMOCK_CLIENT_KEY\n-----END PRIVATE KEY-----"),
 	}
 
-	return callback(certData)
-}
-
-func (m *mockSigningRequestor) Uninstall(ctx context.Context) error {
-	return nil
-}
-
-func (m *mockSigningRequestor) Remove(ctx context.Context, name string) error {
-	return nil
-}
-
-func testCertificate() {
-	_ = newTestDriver()
-
-	When("certificate authentication mode is enabled", func() {
-		It("should create driver with certificate mode", func() {
-			os.Setenv(authModeEnvVar, "cert")
-			defer os.Unsetenv(authModeEnvVar)
-
-			endpointSpec := subv1.EndpointSpec{
-				ClusterID:  "local",
-				CableName:  "submariner-cable-local-192-68-1-1",
-				PrivateIPs: []string{"192.68.1.1"},
-				Subnets:    []string{"10.0.0.0/16"},
-			}
-			localEndpoint := endpoint.NewLocal(&endpointSpec, dynamicfake.NewSimpleDynamicClient(scheme.Scheme), "")
-
-			driver, err := libreswan.NewLibreswan(localEndpoint, &types.SubmarinerCluster{}, &mockSigningRequestor{})
-			Expect(err).NotTo(HaveOccurred())
-
-			Expect(driver).NotTo(BeNil())
-			Expect(driver.GetName()).To(Equal("libreswan"))
-		})
-	})
-
-	Context("Certificate loading", func() {
-		var cmdExecutor *fakecommand.Executor
-		var handler *libreswan.CertificateHandler
+	Context("OnSignedCallback", func() {
+		var (
+			cmdExecutor *fakecommand.Executor
+			handler     *libreswan.CertificateHandler
+		)
 
 		BeforeEach(func() {
+			setupTempDir()
+
 			cmdExecutor = fakecommand.New()
 			handler = libreswan.NewCertificateHandler("test-cluster")
 			Expect(handler).NotTo(BeNil())
 			DeferCleanup(cmdExecutor.Clear)
 		})
 
-		It("should successfully load certificates into NSS database", func() {
-			certData := map[string][]byte{
-				certificate.CADataKey:         []byte("-----BEGIN CERTIFICATE-----\nMOCK_CA_CERT\n-----END CERTIFICATE-----"),
-				certificate.TLSDataKey:        []byte("-----BEGIN CERTIFICATE-----\nMOCK_CLIENT_CERT\n-----END CERTIFICATE-----"),
-				certificate.PrivateKeyDataKey: []byte("-----BEGIN PRIVATE KEY-----\nMOCK_CLIENT_KEY\n-----END PRIVATE KEY-----"),
-			}
-
-			err := handler.OnSignedCallback(certData)
+		assertCmdStdIn := func(cmd *exec.Cmd, expBytes []byte) {
+			data := make([]byte, len(expBytes))
+			n, err := cmd.Stdin.Read(data)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(n).To(Equal(len(expBytes)))
+			Expect(data).To(Equal(expBytes))
+		}
 
-			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-N", "--empty-password")
+		It("should successfully load the certificates into the NSS database", func() {
+			Expect(handler.OnSignedCallback(certData)).To(Succeed())
+
+			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-N")
+			assertCmdStdIn(cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", "ca-cert"),
+				certData[certificate.CADataKey])
+			assertCmdStdIn(cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", "client-cert"),
+				certData[certificate.TLSDataKey])
+			assertCmdStdIn(cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", "client-key"),
+				certData[certificate.PrivateKeyDataKey])
+			cmdExecutor.Clear()
+
+			By("Invoking OnSignedCallback with new cert data")
+
+			newCertData := map[string][]byte{
+				certificate.CADataKey:         []byte("NEW_CA_CERT"),
+				certificate.TLSDataKey:        []byte("NEW_CLIENT_CERT"),
+				certificate.PrivateKeyDataKey: []byte("NEW_CLIENT_KEY"),
+			}
+			Expect(handler.OnSignedCallback(newCertData)).To(Succeed())
+
 			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", "ca-cert")
 			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", "client-cert")
 			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", "client-key")
+			cmdExecutor.Clear()
+
+			By("Invoking OnSignedCallback with unchanged cert data")
+
+			Expect(handler.OnSignedCallback(newCertData)).To(Succeed())
+
+			cmdExecutor.EnsureNoCommand(ContainSubstring("certutil"))
 		})
 
 		It("should handle NSS database initialization failure", func() {
 			cmdExecutor = fakecommand.NewWithInterceptor(func(cmd *exec.Cmd) fakecommand.InterceptorFuncs {
-				if fakecommand.CmdMatches(cmd, ContainSubstring("certutil"), "-N", "--empty-password") {
+				if fakecommand.CmdMatches(cmd, ContainSubstring("certutil"), "-N") {
 					return fakecommand.InterceptorFuncs{Run: func() error {
 						return errors.New("database init failed")
 					}}
@@ -118,14 +107,7 @@ func testCertificate() {
 				return fakecommand.InterceptorFuncs{}
 			})
 
-			certData := map[string][]byte{
-				certificate.CADataKey:         []byte("-----BEGIN CERTIFICATE-----\nMOCK_CA_CERT\n-----END CERTIFICATE-----"),
-				certificate.TLSDataKey:        []byte("-----BEGIN CERTIFICATE-----\nMOCK_CLIENT_CERT\n-----END CERTIFICATE-----"),
-				certificate.PrivateKeyDataKey: []byte("-----BEGIN PRIVATE KEY-----\nMOCK_CLIENT_KEY\n-----END PRIVATE KEY-----"),
-			}
-
-			err := handler.OnSignedCallback(certData)
-			Expect(err).To(HaveOccurred())
+			Expect(handler.OnSignedCallback(certData)).NotTo(Succeed())
 		})
 
 		It("should handle certificate loading failure", func() {
@@ -139,14 +121,51 @@ func testCertificate() {
 				return fakecommand.InterceptorFuncs{}
 			})
 
-			certData := map[string][]byte{
-				certificate.CADataKey:         []byte("-----BEGIN CERTIFICATE-----\nMOCK_CA_CERT\n-----END CERTIFICATE-----"),
-				certificate.TLSDataKey:        []byte("-----BEGIN CERTIFICATE-----\nMOCK_CLIENT_CERT\n-----END CERTIFICATE-----"),
-				certificate.PrivateKeyDataKey: []byte("-----BEGIN PRIVATE KEY-----\nMOCK_CLIENT_KEY\n-----END PRIVATE KEY-----"),
-			}
+			Expect(handler.OnSignedCallback(certData)).NotTo(Succeed())
+		})
 
-			err := handler.OnSignedCallback(certData)
-			Expect(err).To(HaveOccurred())
+		It("should only initialize the NSS database once", func() {
+			Expect(handler.OnSignedCallback(certData)).To(Succeed())
+
+			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-N")
+			cmdExecutor.Clear()
+
+			nssDBFile := handler.NSSDatabaseFile()
+			Expect(os.MkdirAll(filepath.Dir(nssDBFile), 0o700)).To(Succeed())
+			_, err := os.Create(nssDBFile)
+			Expect(err).NotTo(HaveOccurred())
+
+			newCertData := maps.Clone(certData)
+			newCertData[certificate.CADataKey] = []byte("NEW_CA_CERT")
+			Expect(handler.OnSignedCallback(newCertData)).To(Succeed())
+
+			cmdExecutor.EnsureNoCommand(ContainSubstring("certutil"), "-N")
 		})
 	})
+})
+
+type mockSigningRequestor struct {
+	issuedCh chan []string
+}
+
+func (m *mockSigningRequestor) Issue(_ context.Context, _ string, sanIPs []string, onSigned certificate.OnSignedFn) error {
+	if m.issuedCh != nil {
+		m.issuedCh <- sanIPs
+	}
+
+	certData := map[string][]byte{
+		certificate.TLSDataKey:        []byte("mock-tls-cert"),
+		certificate.PrivateKeyDataKey: []byte("mock-tls-key"),
+		certificate.CADataKey:         []byte("mock-ca-cert"),
+	}
+
+	return onSigned(certData)
+}
+
+func (m *mockSigningRequestor) Uninstall(_ context.Context) error {
+	return nil
+}
+
+func (m *mockSigningRequestor) Remove(_ context.Context, name string) error {
+	return nil
 }
