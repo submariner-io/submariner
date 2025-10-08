@@ -763,7 +763,7 @@ func (i *libreswan) Cleanup(ctx context.Context) error {
 	logger.Info("Uninstalling the libreswan cable driver")
 
 	if i.certificateHandler != nil {
-		i.certificateHandler.Cleanup()
+		i.certificateHandler.Cleanup(ctx)
 	}
 
 	// Delete submariner.conf on uninstall

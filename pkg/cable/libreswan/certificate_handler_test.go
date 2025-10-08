@@ -40,21 +40,21 @@ var _ = Describe("CertificateHandler", func() {
 		certificate.PrivateKeyDataKey: []byte("-----BEGIN PRIVATE KEY-----\nMOCK_CLIENT_KEY\n-----END PRIVATE KEY-----"),
 	}
 
+	var (
+		cmdExecutor *fakecommand.Executor
+		handler     *libreswan.CertificateHandler
+	)
+
+	BeforeEach(func() {
+		setupTempDir()
+
+		cmdExecutor = fakecommand.New()
+		handler = libreswan.NewCertificateHandler("test-cluster")
+		Expect(handler).NotTo(BeNil())
+		DeferCleanup(cmdExecutor.Clear)
+	})
+
 	Context("OnSignedCallback", func() {
-		var (
-			cmdExecutor *fakecommand.Executor
-			handler     *libreswan.CertificateHandler
-		)
-
-		BeforeEach(func() {
-			setupTempDir()
-
-			cmdExecutor = fakecommand.New()
-			handler = libreswan.NewCertificateHandler("test-cluster")
-			Expect(handler).NotTo(BeNil())
-			DeferCleanup(cmdExecutor.Clear)
-		})
-
 		assertCmdStdIn := func(cmd *exec.Cmd, expBytes []byte) {
 			data := make([]byte, len(expBytes))
 			n, err := cmd.Stdin.Read(data)
@@ -67,11 +67,11 @@ var _ = Describe("CertificateHandler", func() {
 			Expect(handler.OnSignedCallback(certData)).To(Succeed())
 
 			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-N")
-			assertCmdStdIn(cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", "ca-cert"),
+			assertCmdStdIn(cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", libreswan.CACertName),
 				certData[certificate.CADataKey])
-			assertCmdStdIn(cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", "client-cert"),
+			assertCmdStdIn(cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", libreswan.ClientCertName),
 				certData[certificate.TLSDataKey])
-			assertCmdStdIn(cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", "client-key"),
+			assertCmdStdIn(cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", libreswan.ClientKeyName),
 				certData[certificate.PrivateKeyDataKey])
 			cmdExecutor.Clear()
 
@@ -84,9 +84,9 @@ var _ = Describe("CertificateHandler", func() {
 			}
 			Expect(handler.OnSignedCallback(newCertData)).To(Succeed())
 
-			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", "ca-cert")
-			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", "client-cert")
-			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", "client-key")
+			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", libreswan.CACertName)
+			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", libreswan.ClientCertName)
+			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", libreswan.ClientKeyName)
 			cmdExecutor.Clear()
 
 			By("Invoking OnSignedCallback with unchanged cert data")
@@ -99,8 +99,8 @@ var _ = Describe("CertificateHandler", func() {
 		It("should handle NSS database initialization failure", func() {
 			cmdExecutor = fakecommand.NewWithInterceptor(func(cmd *exec.Cmd) fakecommand.InterceptorFuncs {
 				if fakecommand.CmdMatches(cmd, ContainSubstring("certutil"), "-N") {
-					return fakecommand.InterceptorFuncs{Run: func() error {
-						return errors.New("database init failed")
+					return fakecommand.InterceptorFuncs{CombinedOutput: func() ([]byte, error) {
+						return []byte("database init failed"), errors.New("exit status 255")
 					}}
 				}
 
@@ -112,9 +112,9 @@ var _ = Describe("CertificateHandler", func() {
 
 		It("should handle certificate loading failure", func() {
 			cmdExecutor = fakecommand.NewWithInterceptor(func(cmd *exec.Cmd) fakecommand.InterceptorFuncs {
-				if fakecommand.CmdMatches(cmd, ContainSubstring("certutil"), "-A", "ca-cert") {
-					return fakecommand.InterceptorFuncs{Run: func() error {
-						return errors.New("certificate load failed")
+				if fakecommand.CmdMatches(cmd, ContainSubstring("certutil"), "-A", libreswan.CACertName) {
+					return fakecommand.InterceptorFuncs{CombinedOutput: func() ([]byte, error) {
+						return []byte("certificate load failed"), errors.New("exit status 255")
 					}}
 				}
 
@@ -140,6 +140,16 @@ var _ = Describe("CertificateHandler", func() {
 			Expect(handler.OnSignedCallback(newCertData)).To(Succeed())
 
 			cmdExecutor.EnsureNoCommand(ContainSubstring("certutil"), "-N")
+		})
+	})
+
+	Context("Cleanup", func() {
+		It("should delete certificates from the NSS database", func() {
+			handler.Cleanup(context.TODO())
+
+			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-D", libreswan.CACertName)
+			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-D", libreswan.ClientCertName)
+			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-D", libreswan.ClientKeyName)
 		})
 	})
 })

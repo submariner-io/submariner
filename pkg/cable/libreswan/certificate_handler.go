@@ -36,6 +36,12 @@ import (
 
 var certLogger = log.Logger{Logger: logf.Log.WithName("CertHandler")}
 
+const (
+	CACertName     = "subm-ca-cert"
+	ClientCertName = "subm-client-cert"
+	ClientKeyName  = "subm-client-key"
+)
+
 // CertificateHandler handles NSS database operations for certificates.
 type CertificateHandler struct {
 	clusterID    string
@@ -58,10 +64,7 @@ func (c *CertificateHandler) initNSSDatabase(ctx context.Context) error {
 
 	certLogger.Info("NSS database does not exist, initializing new database")
 
-	//nolint:gosec // certutil args are from trusted config
-	cmd := command.New(exec.CommandContext(ctx, "certutil", "-N", "-d", "sql:"+c.nssDBDir, "--empty-password"))
-
-	if err := cmd.Run(); err != nil {
+	if err := execCertUtil(command.New(c.newCertUtilCmd(ctx, "-N", "--empty-password"))); err != nil {
 		return errors.Wrap(err, "failed to initialize NSS database")
 	}
 
@@ -72,79 +75,60 @@ func (c *CertificateHandler) initNSSDatabase(ctx context.Context) error {
 
 func (c *CertificateHandler) loadCertificatesIntoNSS(ctx context.Context, tlsCert, tlsKey, caCert []byte) error {
 	// Load CA certificate
-	if err := c.loadCertificate(ctx, caCert, "ca-cert", "C,,", "c"); err != nil {
+	if err := c.loadCertificate(ctx, caCert, CACertName, "C,,"); err != nil {
 		return errors.Wrap(err, "failed to load CA certificate")
 	}
 
 	// Load client certificate
-	if err := c.loadCertificate(ctx, tlsCert, "client-cert", "C,,", "c"); err != nil {
+	if err := c.loadCertificate(ctx, tlsCert, ClientCertName, "C,,"); err != nil {
 		return errors.Wrap(err, "failed to load client certificate")
 	}
 
 	// Load client private key
-	err := c.loadPrivateKey(ctx, tlsKey, "client-key")
+	err := c.loadPrivateKey(ctx, tlsKey, ClientKeyName)
 
 	return errors.Wrap(err, "failed to load client private key")
 }
 
-func (c *CertificateHandler) loadCertificate(ctx context.Context, certData []byte, nickname, trustFlags, certType string) error {
-	//nolint:gosec // certutil args are from trusted config
-	execCmd := exec.CommandContext(ctx, "certutil", "-A", "-d", "sql:"+c.nssDBDir, "-n", nickname, "-t", trustFlags, "-i", "-", "-a")
+func (c *CertificateHandler) loadCertificate(ctx context.Context, certData []byte, nickname, trustFlags string) error {
+	execCmd := c.newCertUtilCmd(ctx, "-A", "-n", nickname, "-t", trustFlags, "-i", "-", "-a")
 	execCmd.Stdin = bytes.NewReader(certData)
 
 	cmd := command.New(execCmd)
 
-	if err := cmd.Run(); err != nil {
-		return errors.Wrapf(err, "failed to load %s", certType)
+	if err := execCertUtil(cmd); err != nil {
+		return errors.Wrapf(err, "failed to load certificate %q", nickname)
 	}
 
 	return nil
 }
 
 func (c *CertificateHandler) loadPrivateKey(ctx context.Context, keyData []byte, nickname string) error {
-	//nolint:gosec // certutil args are from trusted config
-	execCmd := exec.CommandContext(ctx, "certutil", "-A", "-d", "sql:"+c.nssDBDir, "-n", nickname, "-t", "u,u,u", "-i", "-", "-a")
+	execCmd := c.newCertUtilCmd(ctx, "-A", "-n", nickname, "-t", "u,u,u", "-i", "-", "-a")
 	execCmd.Stdin = bytes.NewReader(keyData)
 
 	cmd := command.New(execCmd)
 
-	if err := cmd.Run(); err != nil {
+	if err := execCertUtil(cmd); err != nil {
 		return errors.Wrap(err, "failed to load private key")
 	}
 
 	return nil
 }
 
-func (c *CertificateHandler) Cleanup() {
+func (c *CertificateHandler) Cleanup(ctx context.Context) {
 	certLogger.Info("Cleaning up certificate handler")
-	c.cleanupCertificateFromNSS()
-}
 
-func (c *CertificateHandler) cleanupCertificateFromNSS() {
-	certName := "submariner-client-" + c.clusterID
-	caName := "submariner-ca"
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
-
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	// Delete client certificate
-	//nolint:gosec // certutil args are from trusted config
-	cmd := command.New(exec.CommandContext(ctx, "certutil", "-D", "-d", "sql:"+c.nssDBDir, "-n", certName))
-
-	if err := cmd.Run(); err != nil {
-		certLogger.Warningf("Failed to delete client certificate from NSS database: %v", err)
-	} else {
-		certLogger.Infof("Deleted Submariner client certificate from NSS database: %s", certName)
-	}
-
-	// Delete CA certificate
-	//nolint:gosec // certutil args are from trusted config
-	cmd = command.New(exec.CommandContext(ctx, "certutil", "-D", "-d", "sql:"+c.nssDBDir, "-n", caName))
-
-	if err := cmd.Run(); err != nil {
-		certLogger.Warningf("Failed to delete CA certificate from NSS database: %v", err)
-	} else {
-		certLogger.Infof("Deleted Submariner CA certificate from NSS database: %s", caName)
+	for _, certName := range []string{CACertName, ClientCertName, ClientKeyName} {
+		err := execCertUtil(command.New(c.newCertUtilCmd(ctx, "-D", "-n", certName)))
+		if err != nil {
+			certLogger.Errorf(err, "Failed to delete certificate %q from NSS database", certName)
+		} else {
+			certLogger.Infof("Deleted certificate %q from NSS database", certName)
+		}
 	}
 }
 
@@ -186,4 +170,14 @@ func (c *CertificateHandler) OnSignedCallback(secretData map[string][]byte) erro
 
 func (c *CertificateHandler) NSSDatabaseFile() string {
 	return c.nssDBDir + "/cert9.db"
+}
+
+func (c *CertificateHandler) newCertUtilCmd(ctx context.Context, args ...string) *exec.Cmd {
+	//nolint:gosec // certutil args are from trusted config
+	return exec.CommandContext(ctx, "certutil", append(args, "-d", "sql:"+c.nssDBDir)...)
+}
+
+func execCertUtil(cmd command.Interface) error {
+	out, err := cmd.CombinedOutput()
+	return errors.Wrapf(err, "failed to execute certutil: %s", string(out))
 }
