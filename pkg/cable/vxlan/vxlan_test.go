@@ -217,7 +217,7 @@ func testVxlanConnectivity(t *testDriver, natInfo *natdiscovery.NATEndpointInfo)
 	})
 
 	Specify("Cleanup should remove the VxLAN link device", func() {
-		Expect(t.driver.Cleanup()).To(Succeed())
+		Expect(t.driver.Cleanup(context.TODO())).To(Succeed())
 		t.netLink.AwaitNoLink(vxlan.VxlanIface)
 		t.netLink.AwaitNoRule(vxlan.TableID, "", "")
 	})

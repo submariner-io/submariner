@@ -55,7 +55,7 @@ type Driver interface {
 	GetName() string
 
 	// Cleanup performs the necessary uninstallation.
-	Cleanup() error
+	Cleanup(ctx context.Context) error
 }
 
 // Function prototype to create a new driver.

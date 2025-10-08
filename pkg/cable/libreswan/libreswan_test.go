@@ -72,7 +72,7 @@ var _ = Describe("Libreswan", func() {
 		})
 
 		Specify("Cleanup should succeed", func() {
-			Expect(t.driver.Cleanup()).To(Succeed())
+			Expect(t.driver.Cleanup(context.TODO())).To(Succeed())
 		})
 
 		When("an invalid authentication mode is specified", func() {

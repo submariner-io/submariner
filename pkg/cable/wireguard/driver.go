@@ -443,7 +443,7 @@ func genPsk(psk string) (wgtypes.Key, error) {
 	return wgtypes.NewKey(pskBytes[:]) //nolint:wrapcheck // Let the caller wrap it
 }
 
-func (w *wireguard) Cleanup() error {
+func (w *wireguard) Cleanup(_ context.Context) error {
 	logger.Info("Uninstalling the wireguard cable driver")
 
 	link, err := w.netLink.LinkByName(DefaultDeviceName)

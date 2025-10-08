@@ -410,7 +410,7 @@ func testCleanup() {
 	t := newTestDriver()
 
 	It("should remove the wireguard link", func() {
-		Expect(t.driver.Cleanup()).To(Succeed())
+		Expect(t.driver.Cleanup(context.TODO())).To(Succeed())
 		t.netLink.AwaitNoLink(wireguard.DefaultDeviceName)
 	})
 }

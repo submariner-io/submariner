@@ -759,7 +759,7 @@ func (i *libreswan) waitForControlSocket() error {
 	return errors.Wrapf(err, "timed out waiting for the control socket at %q", controlSocketPath)
 }
 
-func (i *libreswan) Cleanup() error {
+func (i *libreswan) Cleanup(ctx context.Context) error {
 	logger.Info("Uninstalling the libreswan cable driver")
 
 	if i.certificateHandler != nil {

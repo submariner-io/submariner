@@ -344,7 +344,7 @@ func (v *vxLan) GetName() string {
 	return CableDriverName
 }
 
-func (v *vxLan) Cleanup() error {
+func (v *vxLan) Cleanup(_ context.Context) error {
 	logger.Infof("Uninstalling the vxlan cable driver")
 
 	// Clean up rules for all configured families

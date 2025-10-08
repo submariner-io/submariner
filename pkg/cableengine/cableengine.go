@@ -67,7 +67,7 @@ type Engine interface {
 	SetupNATDiscovery(natDiscovery natdiscovery.Interface)
 
 	// Cleanup performs the necessary steps to uninstall the cable driver.
-	Cleanup() error
+	Cleanup(ctx context.Context) error
 }
 
 type engine struct {
@@ -323,9 +323,9 @@ func (i *engine) ListCableConnections() ([]v1.Connection, error) {
 	return []v1.Connection{}, nil
 }
 
-func (i *engine) Cleanup() error {
+func (i *engine) Cleanup(ctx context.Context) error {
 	if i.driver != nil {
-		return i.driver.Cleanup() //nolint:wrapcheck  // No need to wrap this error
+		return i.driver.Cleanup(ctx) //nolint:wrapcheck  // No need to wrap this error
 	}
 
 	return nil

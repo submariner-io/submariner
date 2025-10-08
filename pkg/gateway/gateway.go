@@ -439,7 +439,7 @@ func (g *gatewayType) uninstall(ctx context.Context) error {
 	// The Gateway object has to be deleted before invoking the cableEngine.Cleanup
 	g.cableEngineSyncer.CleanupGatewayEntry(ctx)
 
-	err = g.cableEngine.Cleanup()
+	err = g.cableEngine.Cleanup(ctx)
 	if err != nil {
 		logger.Errorf(err, "Error while cleaning up of cable drivers")
 	}
