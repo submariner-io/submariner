@@ -195,6 +195,10 @@ func testConnectToEndpointWithNATInfo(natInfo *natdiscovery.NATEndpointInfo, aut
 		t.endpointSpec.BackendConfig = map[string]string{subv1.UDPPortConfig: localNATTPort}
 	})
 
+	JustBeforeEach(func() {
+		Expect(t.driver.Init(context.TODO())).To(Succeed())
+	})
+
 	connectToEndpoint := func() {
 		ip, err := t.driver.ConnectToEndpoint(natInfo)
 
@@ -372,6 +376,10 @@ func testDisconnectFromEndpoint(authMode libreswan.AuthMode) {
 		DeferCleanup(func() {
 			os.Unsetenv(authModeEnvVar)
 		})
+	})
+
+	JustBeforeEach(func() {
+		Expect(t.driver.Init(context.TODO())).To(Succeed())
 	})
 
 	verifyConnectionRemoved := func(name string, expNoneRemaining bool) {
