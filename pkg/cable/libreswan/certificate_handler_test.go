@@ -20,10 +20,16 @@ package libreswan_test
 
 import (
 	"context"
-	"maps"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -34,16 +40,57 @@ import (
 )
 
 var _ = Describe("CertificateHandler", func() {
-	certData := map[string][]byte{
-		certificate.CADataKey:         []byte("-----BEGIN CERTIFICATE-----\nMOCK_CA_CERT\n-----END CERTIFICATE-----"),
-		certificate.TLSDataKey:        []byte("-----BEGIN CERTIFICATE-----\nMOCK_CLIENT_CERT\n-----END CERTIFICATE-----"),
-		certificate.PrivateKeyDataKey: []byte("-----BEGIN PRIVATE KEY-----\nMOCK_CLIENT_KEY\n-----END PRIVATE KEY-----"),
-	}
-
 	var (
-		cmdExecutor *fakecommand.Executor
-		handler     *libreswan.CertificateHandler
+		cmdExecutor  *fakecommand.Executor
+		handler      *libreswan.CertificateHandler
+		testCertData map[string][]byte
+		newCertData  map[string][]byte
 	)
+
+	BeforeEach(func() {
+		// CA
+		caKey, caCert, err := certificate.CreateCAKeyAndCertificate("CA", 24*365*10*time.Hour)
+		Expect(err).NotTo(HaveOccurred())
+		caDER, err := x509.CreateCertificate(rand.Reader, caCert, caCert, &caKey.PublicKey, caKey)
+		Expect(err).NotTo(HaveOccurred())
+
+		caPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caDER})
+
+		createSignedCertificate := func(name string) map[string][]byte {
+			privateKey, err := rsa.GenerateKey(rand.Reader, certificate.RSABitSize)
+			Expect(err).NotTo(HaveOccurred())
+
+			serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+			Expect(err).NotTo(HaveOccurred())
+
+			cert := &x509.Certificate{
+				SerialNumber: serialNumber,
+				Subject: pkix.Name{
+					CommonName:   name,
+					Organization: []string{"submariner.io"},
+				},
+				NotBefore:   time.Now(),
+				NotAfter:    time.Now().AddDate(10, 0, 0),
+				KeyUsage:    x509.KeyUsageDigitalSignature,
+				ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+			}
+
+			certDER, err := x509.CreateCertificate(rand.Reader, cert, caCert, &privateKey.PublicKey, caKey)
+			Expect(err).NotTo(HaveOccurred())
+
+			return map[string][]byte{
+				certificate.CADataKey:         caPEM,
+				certificate.TLSDataKey:        pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER}),
+				certificate.PrivateKeyDataKey: pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(privateKey)}),
+			}
+		}
+
+		// First test certificate
+		testCertData = createSignedCertificate("test")
+
+		// New test certificate
+		newCertData = createSignedCertificate("new")
+	})
 
 	BeforeEach(func() {
 		setupTempDir()
@@ -64,22 +111,15 @@ var _ = Describe("CertificateHandler", func() {
 		}
 
 		It("should successfully load the certificates into the NSS database", func() {
-			Expect(handler.OnSignedCallback(certData)).To(Succeed())
+			Expect(handler.OnSignedCallback(testCertData)).To(Succeed())
 
 			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-N", "-d", "sql:"+handler.NSSDatabaseDir())
 			assertCmdStdIn(cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", libreswan.CACertName,
-				"-d", "sql:"+handler.NSSDatabaseDir()), certData[certificate.CADataKey])
-			cmdExecutor.AwaitCommand(ContainSubstring("openssl"), "pkcs12", "-export", "-name", libreswan.ClientCertName)
+				"-d", "sql:"+handler.NSSDatabaseDir()), testCertData[certificate.CADataKey])
 			cmdExecutor.AwaitCommand(ContainSubstring("pk12util"), "-d", "sql:"+handler.NSSDatabaseDir())
 			cmdExecutor.Clear()
 
 			By("Invoking OnSignedCallback with new cert data")
-
-			newCertData := map[string][]byte{
-				certificate.CADataKey:         []byte("NEW_CA_CERT"),
-				certificate.TLSDataKey:        []byte("NEW_CLIENT_CERT"),
-				certificate.PrivateKeyDataKey: []byte("NEW_CLIENT_KEY"),
-			}
 			Expect(handler.OnSignedCallback(newCertData)).To(Succeed())
 
 			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", libreswan.CACertName)
@@ -103,7 +143,7 @@ var _ = Describe("CertificateHandler", func() {
 				return fakecommand.InterceptorFuncs{}
 			})
 
-			Expect(handler.OnSignedCallback(certData)).NotTo(Succeed())
+			Expect(handler.OnSignedCallback(testCertData)).NotTo(Succeed())
 		})
 
 		It("should handle certificate loading failure", func() {
@@ -117,22 +157,21 @@ var _ = Describe("CertificateHandler", func() {
 				return fakecommand.InterceptorFuncs{}
 			})
 
-			Expect(handler.OnSignedCallback(certData)).NotTo(Succeed())
+			Expect(handler.OnSignedCallback(testCertData)).NotTo(Succeed())
 		})
 
 		It("should only initialize the NSS database once", func() {
-			Expect(handler.OnSignedCallback(certData)).To(Succeed())
+			Expect(handler.OnSignedCallback(testCertData)).To(Succeed())
 
 			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-N")
 			cmdExecutor.Clear()
 
 			nssDBFile := handler.NSSDatabaseFile()
 			Expect(os.MkdirAll(filepath.Dir(nssDBFile), 0o700)).To(Succeed())
-			_, err := os.Create(nssDBFile)
+			f, err := os.Create(nssDBFile)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(f.Close()).NotTo(HaveOccurred())
 
-			newCertData := maps.Clone(certData)
-			newCertData[certificate.CADataKey] = []byte("NEW_CA_CERT")
 			Expect(handler.OnSignedCallback(newCertData)).To(Succeed())
 
 			cmdExecutor.EnsureNoCommand(ContainSubstring("certutil"), "-N")

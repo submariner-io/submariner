@@ -22,11 +22,14 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"os"
 	"os/exec"
 	"time"
 
+	"github.com/cert-manager/go-pkcs12"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/certificate"
 	"github.com/submariner-io/admiral/pkg/command"
@@ -91,53 +94,41 @@ func (c *CertificateHandler) loadCertificate(ctx context.Context, certData []byt
 	return errors.Wrapf(err, "failed to load certificate %q", nickname)
 }
 
-//nolint:gosec // openssl/pk12util args are from trusted config
+//nolint:gosec // pk12util args are from trusted config
 func (c *CertificateHandler) loadPrivateKey(ctx context.Context, certData, keyData []byte, nickname string) error {
-	// Write cert and key to temporary files
-	certFile, err := os.CreateTemp(RootDir, "submariner-cert-*.crt")
+	leafCert, certChain, err := decodeLeafAndCertificateChain(certData)
 	if err != nil {
-		return errors.Wrap(err, "failed to create temporary cert file")
-	}
-	defer os.Remove(certFile.Name())
-
-	if _, err := certFile.Write(certData); err != nil {
-		return errors.Wrap(err, "failed to write certificate to temporary file")
+		return err
 	}
 
-	certFile.Close()
-
-	keyFile, err := os.CreateTemp(RootDir, "submariner-key-*.key")
+	// Parse key data
+	parsedKey, err := decodePrivateKey(keyData)
 	if err != nil {
-		return errors.Wrap(err, "failed to create temporary key file")
-	}
-	defer os.Remove(keyFile.Name())
-
-	if _, err := keyFile.Write(keyData); err != nil {
-		return errors.Wrap(err, "failed to write key to temporary file")
+		return err
 	}
 
-	keyFile.Close()
-
-	// Create PKCS#12 file with openssl
+	// Export PKCS#12 file
 	p12File, err := os.CreateTemp(RootDir, "submariner-client-*.p12")
 	if err != nil {
 		return errors.Wrap(err, "failed to create temporary pkcs12 file")
 	}
 
 	defer os.Remove(p12File.Name())
-	p12File.Close()
 
 	// Use empty password for PKCS#12
 	pkcs12Password := ""
 
-	opensslCmd := exec.CommandContext(ctx, "openssl", "pkcs12", "-export",
-		"-in", certFile.Name(),
-		"-inkey", keyFile.Name(),
-		"-out", p12File.Name(),
-		"-name", nickname,
-		"-passout", "pass:"+pkcs12Password)
-	if err := execWithOutput(command.New(opensslCmd)); err != nil {
-		return errors.Wrap(err, "failed to create PKCS#12 file")
+	pkcsData, err := pkcs12.Modern.EncodeWithFriendlyName(nickname, parsedKey, leafCert, certChain, pkcs12Password)
+	if err != nil {
+		return errors.Wrap(err, "error encoding to PKCS#12")
+	}
+
+	if _, err := p12File.Write(pkcsData); err != nil {
+		return errors.Wrap(err, "error writing PKCS#12 file")
+	}
+
+	if err := p12File.Close(); err != nil {
+		return errors.Wrap(err, "error closing PKCS#12 file")
 	}
 
 	// Import PKCS#12 into NSS using pk12util
@@ -145,6 +136,60 @@ func (c *CertificateHandler) loadPrivateKey(ctx context.Context, certData, keyDa
 	err = execWithOutput(command.New(pk12Cmd))
 
 	return errors.Wrap(err, "failed to import PKCS#12 into NSS database")
+}
+
+func decodeLeafAndCertificateChain(certData []byte) (*x509.Certificate, []*x509.Certificate, error) {
+	var leafCert *x509.Certificate
+	var certChain []*x509.Certificate
+
+	for block, rest := pem.Decode(certData); block != nil; block, rest = pem.Decode(rest) {
+		switch block.Type {
+		case "CERTIFICATE":
+			if parsedCert, err := x509.ParseCertificate(block.Bytes); err != nil {
+				return nil, nil, errors.Wrap(err, "error parsing certificate data")
+			} else if leafCert == nil {
+				leafCert = parsedCert
+			} else {
+				certChain = append(certChain, parsedCert)
+			}
+		default:
+			return nil, nil, fmt.Errorf("unexpected block type %q in certificate data", block.Type)
+		}
+	}
+
+	if leafCert == nil {
+		return nil, nil, errors.New("no certificate found in certificate data")
+	}
+
+	return leafCert, certChain, nil
+}
+
+func decodePrivateKey(keyData []byte) (any, error) {
+	var parsedKey any
+	var err error
+
+	for block, rest := pem.Decode(keyData); parsedKey == nil && block != nil; block, rest = pem.Decode(rest) {
+		switch block.Type {
+		case "PRIVATE KEY":
+			parsedKey, err = x509.ParsePKCS8PrivateKey(block.Bytes)
+			if err != nil {
+				return nil, errors.Wrap(err, "error parsing key data")
+			}
+		case "RSA PRIVATE KEY":
+			parsedKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
+			if err != nil {
+				return nil, errors.Wrap(err, "error parsing key data")
+			}
+		default:
+			return nil, fmt.Errorf("unexpected block type %q in key data", block.Type)
+		}
+	}
+
+	if parsedKey == nil {
+		return nil, errors.New("no private key found in key data")
+	}
+
+	return parsedKey, nil
 }
 
 func (c *CertificateHandler) Cleanup(ctx context.Context) {

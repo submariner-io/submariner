@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/cenkalti/backoff/v4 v4.3.0
+	github.com/cert-manager/go-pkcs12 v0.0.0-20251218073410-44b982790b7c
 	github.com/coreos/go-iptables v0.8.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/onsi/ginkgo/v2 v2.28.1
