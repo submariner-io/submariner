@@ -30,7 +30,7 @@ import (
 
 func (i *libreswan) connectToEndpointCertMode(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
 	endpoint := &endpointInfo.Endpoint
-	leftID := "submariner-client-" + i.localEndpoint.ClusterID
+	leftID := ClientCertName
 	left := i.localEndpoint.GetPrivateIP(endpointInfo.UseFamily)
 	right := endpointInfo.UseIP
 

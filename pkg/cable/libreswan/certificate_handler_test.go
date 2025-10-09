@@ -49,7 +49,7 @@ var _ = Describe("CertificateHandler", func() {
 		setupTempDir()
 
 		cmdExecutor = fakecommand.New()
-		handler = libreswan.NewCertificateHandler("test-cluster")
+		handler = libreswan.NewCertificateHandler()
 		Expect(handler).NotTo(BeNil())
 		DeferCleanup(cmdExecutor.Clear)
 	})
@@ -66,13 +66,11 @@ var _ = Describe("CertificateHandler", func() {
 		It("should successfully load the certificates into the NSS database", func() {
 			Expect(handler.OnSignedCallback(certData)).To(Succeed())
 
-			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-N")
-			assertCmdStdIn(cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", libreswan.CACertName),
-				certData[certificate.CADataKey])
-			assertCmdStdIn(cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", libreswan.ClientCertName),
-				certData[certificate.TLSDataKey])
-			assertCmdStdIn(cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", libreswan.ClientKeyName),
-				certData[certificate.PrivateKeyDataKey])
+			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-N", "-d", "sql:"+handler.NSSDatabaseDir())
+			assertCmdStdIn(cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", libreswan.CACertName,
+				"-d", "sql:"+handler.NSSDatabaseDir()), certData[certificate.CADataKey])
+			cmdExecutor.AwaitCommand(ContainSubstring("openssl"), "pkcs12", "-export", "-name", libreswan.ClientCertName)
+			cmdExecutor.AwaitCommand(ContainSubstring("pk12util"), "-d", "sql:"+handler.NSSDatabaseDir())
 			cmdExecutor.Clear()
 
 			By("Invoking OnSignedCallback with new cert data")
@@ -85,8 +83,6 @@ var _ = Describe("CertificateHandler", func() {
 			Expect(handler.OnSignedCallback(newCertData)).To(Succeed())
 
 			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", libreswan.CACertName)
-			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", libreswan.ClientCertName)
-			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-A", libreswan.ClientKeyName)
 			cmdExecutor.Clear()
 
 			By("Invoking OnSignedCallback with unchanged cert data")
@@ -149,7 +145,6 @@ var _ = Describe("CertificateHandler", func() {
 
 			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-D", libreswan.CACertName)
 			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-D", libreswan.ClientCertName)
-			cmdExecutor.AwaitCommand(ContainSubstring("certutil"), "-D", libreswan.ClientKeyName)
 		})
 	})
 })

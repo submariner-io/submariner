@@ -229,7 +229,7 @@ func (i *libreswan) Init(ctx context.Context) error {
 
 		var err error
 
-		i.certificateHandler = NewCertificateHandler(i.localEndpoint.ClusterID)
+		i.certificateHandler = NewCertificateHandler()
 
 		err = i.signingRequestor.Issue(ctx, "libreswan-"+i.localEndpoint.Hostname, sanIPs, i.certificateHandler.OnSignedCallback)
 		if err != nil {

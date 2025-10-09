@@ -39,20 +39,17 @@ var certLogger = log.Logger{Logger: logf.Log.WithName("CertHandler")}
 const (
 	CACertName     = "subm-ca-cert"
 	ClientCertName = "subm-client-cert"
-	ClientKeyName  = "subm-client-key"
 )
 
 // CertificateHandler handles NSS database operations for certificates.
 type CertificateHandler struct {
-	clusterID    string
 	nssDBDir     string
 	lastCertHash string
 }
 
-func NewCertificateHandler(clusterID string) *CertificateHandler {
+func NewCertificateHandler() *CertificateHandler {
 	return &CertificateHandler{
-		clusterID: clusterID,
-		nssDBDir:  RootDir + "/var/lib/ipsec/nss",
+		nssDBDir: RootDir + "/var/lib/ipsec/nss",
 	}
 }
 
@@ -64,7 +61,7 @@ func (c *CertificateHandler) initNSSDatabase(ctx context.Context) error {
 
 	certLogger.Info("NSS database does not exist, initializing new database")
 
-	if err := execCertUtil(command.New(c.newCertUtilCmd(ctx, "-N", "--empty-password"))); err != nil {
+	if err := execWithOutput(command.New(c.newCertUtilCmd(ctx, "-N", "--empty-password"))); err != nil {
 		return errors.Wrap(err, "failed to initialize NSS database")
 	}
 
@@ -75,45 +72,79 @@ func (c *CertificateHandler) initNSSDatabase(ctx context.Context) error {
 
 func (c *CertificateHandler) loadCertificatesIntoNSS(ctx context.Context, tlsCert, tlsKey, caCert []byte) error {
 	// Load CA certificate
-	if err := c.loadCertificate(ctx, caCert, CACertName, "C,,"); err != nil {
+	if err := c.loadCertificate(ctx, caCert, CACertName, "CT,"); err != nil {
 		return errors.Wrap(err, "failed to load CA certificate")
 	}
 
-	// Load client certificate
-	if err := c.loadCertificate(ctx, tlsCert, ClientCertName, "C,,"); err != nil {
-		return errors.Wrap(err, "failed to load client certificate")
-	}
+	// Load client certificate and key using pk12util
+	err := c.loadPrivateKey(ctx, tlsCert, tlsKey, ClientCertName)
 
-	// Load client private key
-	err := c.loadPrivateKey(ctx, tlsKey, ClientKeyName)
-
-	return errors.Wrap(err, "failed to load client private key")
+	return errors.Wrap(err, "failed to load client certificate with key")
 }
 
 func (c *CertificateHandler) loadCertificate(ctx context.Context, certData []byte, nickname, trustFlags string) error {
-	execCmd := c.newCertUtilCmd(ctx, "-A", "-n", nickname, "-t", trustFlags, "-i", "-", "-a")
+	execCmd := c.newCertUtilCmd(ctx, "-A", "-n", nickname, "-t", trustFlags, "-a")
 	execCmd.Stdin = bytes.NewReader(certData)
 
-	cmd := command.New(execCmd)
+	err := execWithOutput(command.New(execCmd))
 
-	if err := execCertUtil(cmd); err != nil {
-		return errors.Wrapf(err, "failed to load certificate %q", nickname)
-	}
-
-	return nil
+	return errors.Wrapf(err, "failed to load certificate %q", nickname)
 }
 
-func (c *CertificateHandler) loadPrivateKey(ctx context.Context, keyData []byte, nickname string) error {
-	execCmd := c.newCertUtilCmd(ctx, "-A", "-n", nickname, "-t", "u,u,u", "-i", "-", "-a")
-	execCmd.Stdin = bytes.NewReader(keyData)
+//nolint:gosec // openssl/pk12util args are from trusted config
+func (c *CertificateHandler) loadPrivateKey(ctx context.Context, certData, keyData []byte, nickname string) error {
+	// Write cert and key to temporary files
+	certFile, err := os.CreateTemp(RootDir, "submariner-cert-*.crt")
+	if err != nil {
+		return errors.Wrap(err, "failed to create temporary cert file")
+	}
+	defer os.Remove(certFile.Name())
 
-	cmd := command.New(execCmd)
-
-	if err := execCertUtil(cmd); err != nil {
-		return errors.Wrap(err, "failed to load private key")
+	if _, err := certFile.Write(certData); err != nil {
+		return errors.Wrap(err, "failed to write certificate to temporary file")
 	}
 
-	return nil
+	certFile.Close()
+
+	keyFile, err := os.CreateTemp(RootDir, "submariner-key-*.key")
+	if err != nil {
+		return errors.Wrap(err, "failed to create temporary key file")
+	}
+	defer os.Remove(keyFile.Name())
+
+	if _, err := keyFile.Write(keyData); err != nil {
+		return errors.Wrap(err, "failed to write key to temporary file")
+	}
+
+	keyFile.Close()
+
+	// Create PKCS#12 file with openssl
+	p12File, err := os.CreateTemp(RootDir, "submariner-client-*.p12")
+	if err != nil {
+		return errors.Wrap(err, "failed to create temporary pkcs12 file")
+	}
+
+	defer os.Remove(p12File.Name())
+	p12File.Close()
+
+	// Use empty password for PKCS#12
+	pkcs12Password := ""
+
+	opensslCmd := exec.CommandContext(ctx, "openssl", "pkcs12", "-export",
+		"-in", certFile.Name(),
+		"-inkey", keyFile.Name(),
+		"-out", p12File.Name(),
+		"-name", nickname,
+		"-passout", "pass:"+pkcs12Password)
+	if err := execWithOutput(command.New(opensslCmd)); err != nil {
+		return errors.Wrap(err, "failed to create PKCS#12 file")
+	}
+
+	// Import PKCS#12 into NSS using pk12util
+	pk12Cmd := exec.CommandContext(ctx, "pk12util", "-i", p12File.Name(), "-d", "sql:"+c.nssDBDir, "-W", pkcs12Password)
+	err = execWithOutput(command.New(pk12Cmd))
+
+	return errors.Wrap(err, "failed to import PKCS#12 into NSS database")
 }
 
 func (c *CertificateHandler) Cleanup(ctx context.Context) {
@@ -122,8 +153,8 @@ func (c *CertificateHandler) Cleanup(ctx context.Context) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	for _, certName := range []string{CACertName, ClientCertName, ClientKeyName} {
-		err := execCertUtil(command.New(c.newCertUtilCmd(ctx, "-D", "-n", certName)))
+	for _, certName := range []string{CACertName, ClientCertName} {
+		err := execWithOutput(command.New(c.newCertUtilCmd(ctx, "-D", "-n", certName)))
 		if err != nil {
 			certLogger.Errorf(err, "Failed to delete certificate %q from NSS database", certName)
 		} else {
@@ -172,12 +203,16 @@ func (c *CertificateHandler) NSSDatabaseFile() string {
 	return c.nssDBDir + "/cert9.db"
 }
 
+func (c *CertificateHandler) NSSDatabaseDir() string {
+	return c.nssDBDir
+}
+
 func (c *CertificateHandler) newCertUtilCmd(ctx context.Context, args ...string) *exec.Cmd {
 	//nolint:gosec // certutil args are from trusted config
 	return exec.CommandContext(ctx, "certutil", append(args, "-d", "sql:"+c.nssDBDir)...)
 }
 
-func execCertUtil(cmd command.Interface) error {
+func execWithOutput(cmd command.Interface) error {
 	out, err := cmd.CombinedOutput()
 	return errors.Wrapf(err, "failed to execute certutil: %s", string(out))
 }
