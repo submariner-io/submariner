@@ -149,9 +149,7 @@ func (i *libreswan) connectToEndpointCertMode(endpointInfo *natdiscovery.NATEndp
 			logger.Infof("Connection mode for %s: %v", connName, connectionMode)
 
 			if connectionMode == operationModeClient || connectionMode == operationModeBidirectional {
-				whackArgs := []string{"--name", connName, "--initiate"}
-				//nolint:gosec // ipsec whack args are from trusted config
-				output, err = command.New(exec.Command("ipsec", append([]string{"whack"}, whackArgs...)...)).CombinedOutput()
+				output, err = command.New(exec.Command("ipsec", "whack", "--name", connName, "--initiate")).CombinedOutput()
 				if err != nil {
 					return "", errors.Wrapf(err, "failed to bring up connection %s with whack: %s", connName, string(output))
 				}
