@@ -22,6 +22,7 @@ import (
 	"context"
 	"sync"
 
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/certificate"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -58,7 +59,10 @@ func New() *Engine {
 	}
 }
 
-func (e *Engine) StartEngine(_ context.Context, _ certificate.SigningRequestor) error {
+func (e *Engine) StartEngine(_ context.Context, sr certificate.SigningRequestor) error {
+	defer GinkgoRecover()
+	Expect(sr).NotTo(BeNil())
+
 	return e.ErrOnStart
 }
 

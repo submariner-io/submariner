@@ -84,8 +84,8 @@ type Config struct {
 	LeaderElectionClient kubernetes.Interface
 	NewCableEngine       func(localCluster *types.SubmarinerCluster,
 		localEndpoint *endpoint.Local) cableengine.Engine
-	NewNATDiscovery  func(localEndpoint *endpoint.Local) (natdiscovery.Interface, error)
-	SigningRequestor certificate.SigningRequestor
+	NewNATDiscovery       func(localEndpoint *endpoint.Local) (natdiscovery.Interface, error)
+	StartSigningRequestor func(syncerConfig broker.SyncerConfig, stopCh <-chan struct{}) (certificate.SigningRequestor, error)
 }
 
 type gatewayType struct {
@@ -163,6 +163,7 @@ func New(ctx context.Context, config *Config) (Interface, error) {
 	logger.Info("Creating the datastore syncer")
 
 	g.SyncerConfig.LocalNamespace = g.Spec.Namespace
+	g.SyncerConfig.LocalClusterID = g.Spec.ClusterID
 
 	g.datastoreSyncer = datastoresyncer.New(&g.SyncerConfig, localCluster, g.localEndpoint)
 
@@ -286,16 +287,13 @@ func (g *gatewayType) onStartedLeading(ctx context.Context) {
 
 	logger.Info("Leadership acquired - starting controllers")
 
-	if g.SigningRequestor == nil {
-		signingRequestor, err := certificate.StartSigningRequestor(g.SyncerConfig, ctx.Done())
-		if err != nil {
-			g.fatalError <- errors.Wrap(err, "error creating SigningRequestor")
-		}
-
-		g.SigningRequestor = signingRequestor
+	signingRequestor, err := g.StartSigningRequestor(g.SyncerConfig, ctx.Done())
+	if err != nil {
+		g.fatalError <- errors.Wrap(err, "error starting the SigningRequestor")
+		return
 	}
 
-	if err := g.cableEngine.StartEngine(ctx, g.SigningRequestor); err != nil {
+	if err := g.cableEngine.StartEngine(ctx, signingRequestor); err != nil {
 		g.fatalError <- errors.Wrap(err, "error starting the cable engine")
 		return
 	}
@@ -426,11 +424,12 @@ func (g *gatewayType) initCableHealthChecker() {
 }
 
 func (g *gatewayType) uninstall(ctx context.Context) error {
-	if g.SigningRequestor != nil {
-		_ = g.SigningRequestor.Uninstall(ctx)
+	signingRequestor, err := g.StartSigningRequestor(g.SyncerConfig, ctx.Done())
+	if err != nil {
+		return errors.Wrap(err, "Error starting SigningRequestor")
 	}
 
-	err := g.cableEngine.StartEngine(ctx, g.SigningRequestor)
+	err = g.cableEngine.StartEngine(ctx, signingRequestor)
 	if err != nil {
 		// As we are in the process of cleaning up, ignore any initialization errors.
 		logger.Errorf(err, "Error starting the cable driver")
@@ -442,6 +441,11 @@ func (g *gatewayType) uninstall(ctx context.Context) error {
 	err = g.cableEngine.Cleanup(ctx)
 	if err != nil {
 		logger.Errorf(err, "Error while cleaning up of cable drivers")
+	}
+
+	err = signingRequestor.Uninstall(ctx)
+	if err != nil {
+		logger.Errorf(err, "Error uninstalling the SigningRequestor")
 	}
 
 	dsErr := g.datastoreSyncer.Cleanup(ctx)

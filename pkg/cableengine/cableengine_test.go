@@ -28,6 +28,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/certificate"
+	fakecertificate "github.com/submariner-io/admiral/pkg/certificate/fake"
 	. "github.com/submariner-io/admiral/pkg/gomega"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -232,7 +233,7 @@ func newTestDriver() *testDriver {
 			return
 		}
 
-		err := t.engine.StartEngine(context.TODO(), nil)
+		err := t.engine.StartEngine(context.TODO(), fakecertificate.NewSigningRequestor())
 		if fakeDriver.ErrOnInit != nil {
 			Expect(err).To(ContainErrorSubstring(fakeDriver.ErrOnInit))
 		} else {

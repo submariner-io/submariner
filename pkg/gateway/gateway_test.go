@@ -29,6 +29,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/certificate"
+	fakecertificate "github.com/submariner-io/admiral/pkg/certificate/fake"
 	"github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/federate"
 	. "github.com/submariner-io/admiral/pkg/gomega"
@@ -61,21 +62,6 @@ import (
 )
 
 const publicIP = "1.2.3.4"
-
-type mockSigningRequestor struct{}
-
-func (m *mockSigningRequestor) Issue(ctx context.Context, name string, sanIPs []string, callback certificate.OnSignedFn,
-) error {
-	return callback(map[string][]byte{})
-}
-
-func (m *mockSigningRequestor) Uninstall(ctx context.Context) error {
-	return nil
-}
-
-func (m *mockSigningRequestor) Remove(ctx context.Context, name string) error {
-	return nil
-}
 
 var _ = Describe("Run", func() {
 	t := newTestDriver()
@@ -238,6 +224,7 @@ var _ = Describe("Run", func() {
 		It("should perform cleanup", func() {
 			t.awaitNoEndpoints()
 			t.cableEngine.AwaitCleanup()
+			t.signingRequestor.AwaitUninstall()
 		})
 
 		When("an error occurs", func() {
@@ -255,16 +242,17 @@ var _ = Describe("Run", func() {
 })
 
 type testDriver struct {
-	config          gateway.Config
-	localPodName    string
-	nodeName        string
-	endpoints       dynamic.NamespaceableResourceInterface
-	expectedRunErr  error
-	cableEngine     *enginefake.Engine
-	kubeClient      *k8sfake.Clientset
-	dynClient       *dynamicfake.FakeDynamicClient
-	leaderElection  *testutil.LeaderElectionSupport
-	remoteIPCounter int
+	config           gateway.Config
+	localPodName     string
+	nodeName         string
+	endpoints        dynamic.NamespaceableResourceInterface
+	expectedRunErr   error
+	cableEngine      *enginefake.Engine
+	signingRequestor *fakecertificate.SigningRequestor
+	kubeClient       *k8sfake.Clientset
+	dynClient        *dynamicfake.FakeDynamicClient
+	leaderElection   *testutil.LeaderElectionSupport
+	remoteIPCounter  int
 }
 
 func newTestDriver() *testDriver {
@@ -281,6 +269,8 @@ func newTestDriver() *testDriver {
 		t.kubeClient = k8sfake.NewClientset()
 
 		t.cableEngine = enginefake.New()
+
+		t.signingRequestor = fakecertificate.NewSigningRequestor()
 
 		t.config = gateway.Config{
 			Spec: types.SubmarinerSpecification{
@@ -313,13 +303,15 @@ func newTestDriver() *testDriver {
 			SubmarinerClient:     submfake.NewSimpleClientset(),
 			KubeClient:           t.kubeClient,
 			LeaderElectionClient: t.kubeClient,
-			SigningRequestor:     &mockSigningRequestor{},
 			NewCableEngine: func(_ *types.SubmarinerCluster, lep *submendpoint.Local) cableengine.Engine {
 				t.cableEngine.LocalEndPoint = &types.SubmarinerEndpoint{Spec: *lep.Spec()}
 				return t.cableEngine
 			},
 			NewNATDiscovery: func(_ *submendpoint.Local) (natdiscovery.Interface, error) {
 				return &fakeNATDiscovery{}, nil
+			},
+			StartSigningRequestor: func(_ broker.SyncerConfig, _ <-chan struct{}) (certificate.SigningRequestor, error) {
+				return t.signingRequestor, nil
 			},
 		}
 

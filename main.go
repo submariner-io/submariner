@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/submariner-io/admiral/pkg/certificate"
 	"github.com/submariner-io/admiral/pkg/http"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
@@ -141,11 +142,12 @@ func main() {
 		WatcherConfig: watcher.Config{
 			RestConfig: restConfig,
 		},
-		SubmarinerClient:     submarinerClient,
-		KubeClient:           k8sClient,
-		LeaderElectionClient: leClient,
-		NewCableEngine:       cableengine.NewEngine,
-		NewNATDiscovery:      natdiscovery.New,
+		SubmarinerClient:      submarinerClient,
+		KubeClient:            k8sClient,
+		LeaderElectionClient:  leClient,
+		NewCableEngine:        cableengine.NewEngine,
+		NewNATDiscovery:       natdiscovery.New,
+		StartSigningRequestor: certificate.StartSigningRequestor,
 	})
 	logger.FatalOnError(err, "Error creating gateway instance")
 

@@ -32,6 +32,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
+	fakecertificate "github.com/submariner-io/admiral/pkg/certificate/fake"
 	fakecommand "github.com/submariner-io/admiral/pkg/command/fake"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
@@ -817,8 +818,7 @@ func testInit() {
 
 		It("should issue a request with the SigningRequestor", func() {
 			Expect(t.driver.Init(context.TODO())).To(Succeed())
-			Expect(t.signingRequestor.issuedCh).To(Receive(ContainElements(append(t.localEndpoint.Spec().PrivateIPs,
-				t.localEndpoint.Spec().PublicIPs...))))
+			t.signingRequestor.AwaitIssued(append(t.localEndpoint.Spec().PrivateIPs, t.localEndpoint.Spec().PublicIPs...))
 			t.cmdExecutor.AwaitCommand(ContainSubstring("certutil"))
 		})
 	})
@@ -831,14 +831,14 @@ type testDriver struct {
 	driver           cable.Driver
 	plutoCtlFile     *os.File
 	expectErr        bool
-	signingRequestor *mockSigningRequestor
+	signingRequestor *fakecertificate.SigningRequestor
 }
 
 func newTestDriver() *testDriver {
 	t := &testDriver{}
 
 	BeforeEach(func() {
-		t.signingRequestor = &mockSigningRequestor{issuedCh: make(chan []string, 10)}
+		t.signingRequestor = fakecertificate.NewSigningRequestor()
 		t.cmdExecutor = fakecommand.New()
 		t.endpointSpec = subv1.EndpointSpec{
 			ClusterID:  "local",

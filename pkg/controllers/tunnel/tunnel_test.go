@@ -28,6 +28,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/certificate"
+	fakecertificate "github.com/submariner-io/admiral/pkg/certificate/fake"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	"github.com/submariner-io/admiral/pkg/watcher"
@@ -128,7 +129,7 @@ var _ = Describe("Managing tunnels", func() {
 
 		engine.SetupNATDiscovery(nat)
 
-		Expect(engine.StartEngine(context.TODO(), nil)).To(Succeed())
+		Expect(engine.StartEngine(context.TODO(), fakecertificate.NewSigningRequestor())).To(Succeed())
 
 		stopCh = make(chan struct{})
 

@@ -148,29 +148,3 @@ var _ = Describe("CertificateHandler", func() {
 		})
 	})
 })
-
-type mockSigningRequestor struct {
-	issuedCh chan []string
-}
-
-func (m *mockSigningRequestor) Issue(_ context.Context, _ string, sanIPs []string, onSigned certificate.OnSignedFn) error {
-	if m.issuedCh != nil {
-		m.issuedCh <- sanIPs
-	}
-
-	certData := map[string][]byte{
-		certificate.TLSDataKey:        []byte("mock-tls-cert"),
-		certificate.PrivateKeyDataKey: []byte("mock-tls-key"),
-		certificate.CADataKey:         []byte("mock-ca-cert"),
-	}
-
-	return onSigned(certData)
-}
-
-func (m *mockSigningRequestor) Uninstall(_ context.Context) error {
-	return nil
-}
-
-func (m *mockSigningRequestor) Remove(_ context.Context, name string) error {
-	return nil
-}
