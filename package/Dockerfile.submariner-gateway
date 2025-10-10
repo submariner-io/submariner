@@ -1,5 +1,5 @@
 ARG BASE_BRANCH=devel
-ARG FEDORA_VERSION=42
+ARG FEDORA_VERSION=43
 ARG SOURCE=/go/src/github.com/submariner-io/submariner
 
 FROM --platform=${BUILDPLATFORM} quay.io/submariner/shipyard-dapper-base:${BASE_BRANCH} AS builder
@@ -25,7 +25,7 @@ COPY package/dnf_install /
 RUN /dnf_install -a ${TARGETPLATFORM} -v ${FEDORA_VERSION} -r /output/gateway \
     glibc bash glibc-minimal-langpack coreutils-single \
     libcurl-minimal iproute libreswan kmod \
-    openssl nss-tools
+    openssl procps-ng nss-tools util-linux-core
 
 FROM scratch
 ARG SOURCE
