@@ -107,6 +107,7 @@ type libreswan struct {
 	authMode              AuthMode
 
 	certificateHandler *CertificateHandler
+	connectionFile     *ConnectionFile
 	signingRequestor   certificate.SigningRequestor
 }
 
@@ -203,7 +204,7 @@ func (i *libreswan) GetName() string {
 }
 
 // Init initializes the driver with any state it needs.
-func (i *libreswan) Init() error {
+func (i *libreswan) Init(ctx context.Context) error {
 	logger.Infof("Initializing libreswan driver with authentication mode: %s", i.authMode)
 
 	if i.authMode == AuthModePSK {
@@ -218,16 +219,19 @@ func (i *libreswan) Init() error {
 
 		fmt.Fprintf(file, "%%any %%any : PSK \"%s\"\n", i.secretKey)
 	} else if i.authMode == AuthModeCert {
+		i.connectionFile = &ConnectionFile{Path: SubmarinerConfPath()}
+
 		logger.Infof("Issuing certificate with Private IPs %s Public IPs %s", i.localEndpoint.PrivateIPs, i.localEndpoint.PublicIPs)
+
 		sanIPs := make([]string, 0, len(i.localEndpoint.PrivateIPs)+len(i.localEndpoint.PublicIPs))
 		sanIPs = append(sanIPs, i.localEndpoint.PrivateIPs...)
 		sanIPs = append(sanIPs, i.localEndpoint.PublicIPs...)
 
 		var err error
 
-		i.certificateHandler = NewCertificateHandler(i.localEndpoint.ClusterID)
+		i.certificateHandler = NewCertificateHandler()
 
-		err = i.signingRequestor.Issue(context.TODO(), "libreswan-"+i.localEndpoint.Hostname, sanIPs, i.certificateHandler.OnSignedCallback)
+		err = i.signingRequestor.Issue(ctx, "libreswan-"+i.localEndpoint.Hostname, sanIPs, i.certificateHandler.OnSignedCallback)
 		if err != nil {
 			logger.Warningf("Unable to issue certificate: %v", err)
 		}
@@ -413,6 +417,9 @@ func whack(args ...string) error {
 // ConnectToEndpoint establishes a connection to the given endpoint and returns a string
 // representation of the IP address of the target endpoint.
 func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
+	logger.Infof("Creating IPv%v connection(s) for %#v with %q authentication",
+		endpointInfo.UseFamily, endpointInfo.Endpoint, i.authMode)
+
 	if i.authMode == AuthModeCert {
 		return i.connectToEndpointCertMode(endpointInfo)
 	}
@@ -448,9 +455,6 @@ func (i *libreswan) connectToEndpointPSKMode(endpointInfo *natdiscovery.NATEndpo
 	}
 
 	connectionMode := i.calculateOperationMode(&endpoint.Spec)
-
-	logger.Infof("Creating IPv%v connection(s) for %v in %s mode with %s authentication",
-		endpointInfo.UseFamily, endpoint, connectionMode, i.authMode)
 
 	if len(leftSubnets) > 0 && len(rightSubnets) > 0 {
 		for lsi, leftSubnet := range leftSubnets {
@@ -624,7 +628,7 @@ func (i *libreswan) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint, f
 	leftSubnets := i.localEndpoint.ExtractSubnetsExcludingIP(i.localEndpoint.GetPrivateIP(family))
 	rightSubnets := endpoint.Spec.ExtractSubnetsExcludingIP(endpoint.Spec.GetPrivateIP(family))
 
-	logger.Infof("Deleting IPv%v connection to %v", family, endpoint)
+	logger.Infof("Deleting IPv%v connection for %#v", family, endpoint)
 
 	if len(leftSubnets) > 0 && len(rightSubnets) > 0 {
 		for lsi := range leftSubnets {
@@ -759,11 +763,11 @@ func (i *libreswan) waitForControlSocket() error {
 	return errors.Wrapf(err, "timed out waiting for the control socket at %q", controlSocketPath)
 }
 
-func (i *libreswan) Cleanup() error {
+func (i *libreswan) Cleanup(ctx context.Context) error {
 	logger.Info("Uninstalling the libreswan cable driver")
 
 	if i.certificateHandler != nil {
-		i.certificateHandler.Cleanup()
+		i.certificateHandler.Cleanup(ctx)
 	}
 
 	// Delete submariner.conf on uninstall

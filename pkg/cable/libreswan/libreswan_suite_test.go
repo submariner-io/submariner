@@ -20,11 +20,13 @@ package libreswan_test
 
 import (
 	"flag"
+	"os"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
+	"github.com/submariner-io/submariner/pkg/cable/libreswan"
 )
 
 func init() {
@@ -42,4 +44,15 @@ var _ = BeforeSuite(func() {
 func TestLibreswan(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Libreswan Suite")
+}
+
+func setupTempDir() {
+	var err error
+
+	libreswan.RootDir, err = os.MkdirTemp("", "libreswan_test")
+	Expect(err).NotTo(HaveOccurred())
+
+	DeferCleanup(func() {
+		Expect(os.RemoveAll(libreswan.RootDir)).To(Succeed())
+	})
 }

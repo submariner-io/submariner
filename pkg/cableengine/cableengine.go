@@ -20,6 +20,7 @@ package cableengine
 
 //nolint:gci // The supported driver imports are kept separate.
 import (
+	"context"
 	"reflect"
 	"sync"
 
@@ -47,7 +48,7 @@ import (
 // a secure connection to remote clusters.
 type Engine interface {
 	// StartEngine performs any general set up work needed independent of any remote connections.
-	StartEngine(signingRequestor certificate.SigningRequestor) error
+	StartEngine(ctx context.Context, signingRequestor certificate.SigningRequestor) error
 	Stop()
 	// InstallCable performs any set up work needed for connecting to given remote endpoint.
 	// Once InstallCable completes, it should be possible to connect to remote
@@ -66,7 +67,7 @@ type Engine interface {
 	SetupNATDiscovery(natDiscovery natdiscovery.Interface)
 
 	// Cleanup performs the necessary steps to uninstall the cable driver.
-	Cleanup() error
+	Cleanup(ctx context.Context) error
 }
 
 type engine struct {
@@ -100,11 +101,11 @@ func (i *engine) GetLocalEndpoint() *types.SubmarinerEndpoint {
 	}
 }
 
-func (i *engine) StartEngine(signingRequestor certificate.SigningRequestor) error {
+func (i *engine) StartEngine(ctx context.Context, signingRequestor certificate.SigningRequestor) error {
 	i.Lock()
 	defer i.Unlock()
 
-	if err := i.startDriver(signingRequestor); err != nil {
+	if err := i.startDriver(ctx, signingRequestor); err != nil {
 		return err
 	}
 
@@ -124,7 +125,7 @@ func (i *engine) Stop() {
 	logger.Info("CableEngine stopped")
 }
 
-func (i *engine) startDriver(signingRequestor certificate.SigningRequestor) error {
+func (i *engine) startDriver(ctx context.Context, signingRequestor certificate.SigningRequestor) error {
 	if i.driver != nil {
 		return nil
 	}
@@ -135,7 +136,7 @@ func (i *engine) startDriver(signingRequestor certificate.SigningRequestor) erro
 		return errors.Wrap(err, "error creating the cable driver")
 	}
 
-	return errors.Wrap(i.driver.Init(), "error initializing the cable driver")
+	return errors.Wrap(i.driver.Init(ctx), "error initializing the cable driver")
 }
 
 func (i *engine) SetupNATDiscovery(natDiscovery natdiscovery.Interface) {
@@ -322,9 +323,9 @@ func (i *engine) ListCableConnections() ([]v1.Connection, error) {
 	return []v1.Connection{}, nil
 }
 
-func (i *engine) Cleanup() error {
+func (i *engine) Cleanup(ctx context.Context) error {
 	if i.driver != nil {
-		return i.driver.Cleanup() //nolint:wrapcheck  // No need to wrap this error
+		return i.driver.Cleanup(ctx) //nolint:wrapcheck  // No need to wrap this error
 	}
 
 	return nil

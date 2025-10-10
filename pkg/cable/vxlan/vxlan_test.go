@@ -19,6 +19,7 @@ limitations under the License.
 package vxlan_test
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net"
@@ -216,7 +217,7 @@ func testVxlanConnectivity(t *testDriver, natInfo *natdiscovery.NATEndpointInfo)
 	})
 
 	Specify("Cleanup should remove the VxLAN link device", func() {
-		Expect(t.driver.Cleanup()).To(Succeed())
+		Expect(t.driver.Cleanup(context.TODO())).To(Succeed())
 		t.netLink.AwaitNoLink(vxlan.VxlanIface)
 		t.netLink.AwaitNoRule(vxlan.TableID, "", "")
 	})
@@ -284,7 +285,7 @@ func newTestDriver() *testDriver {
 			t.localCluster, nil)
 		Expect(err).To(Succeed())
 
-		Expect(d.Init()).To(Succeed())
+		Expect(d.Init(context.TODO())).To(Succeed())
 		Expect(d.GetName()).To(Equal(vxlan.CableDriverName))
 
 		t.driver = d

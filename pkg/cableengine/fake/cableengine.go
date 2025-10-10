@@ -19,6 +19,7 @@ limitations under the License.
 package fake
 
 import (
+	"context"
 	"sync"
 
 	. "github.com/onsi/gomega"
@@ -57,7 +58,7 @@ func New() *Engine {
 	}
 }
 
-func (e *Engine) StartEngine(signingRequestor certificate.SigningRequestor) error {
+func (e *Engine) StartEngine(_ context.Context, _ certificate.SigningRequestor) error {
 	return e.ErrOnStart
 }
 
@@ -122,7 +123,7 @@ func (e *Engine) VerifyRemoveCable(expected *v1.EndpointSpec) {
 func (e *Engine) SetupNATDiscovery(_ natdiscovery.Interface) {
 }
 
-func (e *Engine) Cleanup() error {
+func (e *Engine) Cleanup(_ context.Context) error {
 	close(e.onCleanup)
 	return e.ErrOnCleanup
 }
