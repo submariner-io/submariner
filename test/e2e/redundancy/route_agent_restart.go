@@ -19,15 +19,21 @@ limitations under the License.
 package redundancy
 
 import (
+	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	subDataplane "github.com/submariner-io/submariner/test/e2e/dataplane"
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
 	"github.com/submariner-io/submariner/test/e2e/labels"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	k8snet "k8s.io/utils/net"
 )
 
@@ -83,6 +89,8 @@ func testRouteAgentRestart(f *subFramework.Framework, onGateway bool, supportedF
 	routeAgentPod := f.AwaitRouteAgentPodOnNode(framework.ClusterA, node.Name, "")
 	framework.By(fmt.Sprintf("Found route agent pod %q on node %q", routeAgentPod.Name, node.Name))
 
+	assertRouteAgentResource(framework.ClusterA, node.Name, routeAgentPod.Name)
+
 	framework.By(fmt.Sprintf("Deleting route agent pod %q", routeAgentPod.Name))
 	f.DeletePod(framework.ClusterA, routeAgentPod.Name, framework.TestContext.SubmarinerNamespace)
 
@@ -116,4 +124,25 @@ func testRouteAgentRestart(f *subFramework.Framework, onGateway bool, supportedF
 			IPFamily:              ipFamily,
 		}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
 	}
+}
+
+func assertRouteAgentResource(cluster framework.ClusterIndex, name, ownerName string) {
+	raClient := framework.DynClients[cluster].Resource(submarinerv1.SchemeGroupVersion.WithResource("routeagents")).Namespace(
+		framework.TestContext.SubmarinerNamespace)
+
+	routeAgent := framework.AwaitUntil(fmt.Sprintf("await RouteAgent %q", name),
+		func() (*unstructured.Unstructured, error) {
+			ra, err := raClient.Get(context.TODO(), name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				return nil, nil //nolint:nilnil // OK
+			}
+
+			return ra, err
+		},
+		func(ra *unstructured.Unstructured) (bool, string, error) {
+			return ra != nil, "RouteAgent not found yet", nil
+		})
+
+	Expect(routeAgent.GetOwnerReferences()).To(HaveLen(1))
+	Expect(routeAgent.GetOwnerReferences()[0].Name).To(Equal(ownerName))
 }

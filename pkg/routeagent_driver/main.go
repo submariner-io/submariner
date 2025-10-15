@@ -56,6 +56,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/versions"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -135,6 +136,9 @@ func main() {
 	localNode, err := node.GetLocalNode(ctx, k8sClientSet)
 	logger.FatalOnError(err, "Error getting information on the local node")
 
+	pod, err := k8sClientSet.CoreV1().Pods(submSpec.Namespace).Get(ctx, os.Getenv("POD_NAME"), metav1.GetOptions{})
+	logger.FatalOnError(err, "Error getting local Pod %q", os.Getenv("POD_NAME"))
+
 	var handlers []event.Handler //nolint:prealloc // Ignore
 
 	for _, family := range cidr.ExtractIPFamilies(env.ClusterCidr) {
@@ -157,7 +161,11 @@ func main() {
 			},
 			HealthCheckerEnabled:     submSpec.HealthCheckEnabled,
 			RouteAgentUpdateInterval: 60 * time.Second,
-		}, smClientset.SubmarinerV1().RouteAgents(submSpec.Namespace), versions.Submariner(), localNode.Name))
+			RouteAgentOwner:          pod,
+			LocalNodeName:            localNode.Name,
+			Version:                  versions.Submariner(),
+			Namespace:                submSpec.Namespace,
+		}, smClientset.SubmarinerV1()))
 
 	registry, err := event.NewRegistry(ctx, "routeagent_driver", np, handlers...)
 
