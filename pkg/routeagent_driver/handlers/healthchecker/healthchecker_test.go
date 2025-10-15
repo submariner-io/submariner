@@ -33,8 +33,10 @@ import (
 	"github.com/submariner-io/submariner/pkg/pinger"
 	"github.com/submariner-io/submariner/pkg/pinger/fake"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/healthchecker"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	kubeScheme "k8s.io/client-go/kubernetes/scheme"
@@ -47,6 +49,7 @@ const (
 	healthCheckIP1  = "1.1.1.1"
 	healthCheckIP2  = "2.2.2.2"
 	localNodeName   = "nodeName"
+	ownerName       = "owner-name"
 )
 
 var _ = Describe("RouteAgent syncing", func() {
@@ -110,6 +113,22 @@ var _ = Describe("RouteAgent syncing", func() {
 				g.Expect(ra.Status.RemoteEndpoints).To(HaveLen(1))
 				g.Expect(ra.Status.RemoteEndpoints[0].Spec.GetHealthCheckIP(k8snet.IPv4)).To(Equal(healthCheckIP2))
 			})
+		})
+	})
+
+	When("the RouteAgent resource exists on startup without the OwnerReference", func() {
+		BeforeEach(func() {
+			_, err := t.routeAgents.Create(context.TODO(), &submarinerv1.RouteAgent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      localNodeName,
+					Namespace: namespace,
+				},
+			}, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should add the OwnerReference", func() {
+			t.awaitRouteAgent(nil)
 		})
 	})
 })
@@ -325,7 +344,7 @@ var _ = Describe("Stop", func() {
 		t.pingerMap[healthCheckIP1].AwaitStop()
 
 		Eventually(func(g Gomega) {
-			_, err := t.client.Get(context.TODO(), localNodeName, metav1.GetOptions{})
+			_, err := t.routeAgents.Get(context.TODO(), localNodeName, metav1.GetOptions{})
 			g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
 		}).Within(5 * time.Second).Should(Succeed())
 
@@ -339,7 +358,8 @@ type testDriver struct {
 	pingerMap            map[string]*fake.Pinger
 	handler              event.Handler
 	endpoints            dynamic.ResourceInterface
-	client               submarinerv1client.RouteAgentInterface
+	routeAgents          submarinerv1client.RouteAgentInterface
+	submClient           *fakeClient.Clientset
 	healthcheckerEnabled bool
 }
 
@@ -352,12 +372,12 @@ func newTestDriver() *testDriver {
 		t.supportedIPFamilies = []k8snet.IPFamily{k8snet.IPv4}
 		t.healthcheckerEnabled = true
 
-		clientset := fakeClient.NewSimpleClientset()
+		t.submClient = fakeClient.NewSimpleClientset()
 
 		dynamicClient := dynamicfake.NewSimpleDynamicClient(kubeScheme.Scheme)
 
 		t.endpoints = dynamicClient.Resource(submarinerv1.SchemeGroupVersion.WithResource("endpoints")).Namespace(namespace)
-		t.client = clientset.SubmarinerV1().RouteAgents(namespace)
+		t.routeAgents = t.submClient.SubmarinerV1().RouteAgents(namespace)
 		t.pingerMap = map[string]*fake.Pinger{
 			healthCheckIP1: fake.NewPinger(healthCheckIP1),
 			healthCheckIP2: fake.NewPinger(healthCheckIP2),
@@ -380,9 +400,19 @@ func newTestDriver() *testDriver {
 			},
 			HealthCheckerEnabled:     t.healthcheckerEnabled,
 			RouteAgentUpdateInterval: 100 * time.Millisecond,
+			LocalNodeName:            localNodeName,
+			Version:                  "v1",
+			Namespace:                namespace,
+			RouteAgentOwner: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      ownerName,
+					Namespace: namespace,
+					UID:       uuid.NewUUID(),
+				},
+			},
 		}
 
-		t.handler = healthchecker.New(config, t.client, "v1", localNodeName)
+		t.handler = healthchecker.New(config, t.submClient.SubmarinerV1())
 
 		t.Start(t.handler)
 	})
@@ -439,8 +469,12 @@ func (t *testDriver) Start(handler event.Handler) {
 
 func (t *testDriver) awaitRouteAgent(verify func(*submarinerv1.RouteAgent, Gomega)) {
 	Eventually(func(g Gomega) {
-		ra, err := t.client.Get(context.TODO(), localNodeName, metav1.GetOptions{})
+		ra, err := t.routeAgents.Get(context.TODO(), localNodeName, metav1.GetOptions{})
 		g.Expect(err).ToNot(HaveOccurred(), "Error retrieving RouteAgent")
+
+		g.Expect(ra.OwnerReferences).To(HaveLen(1))
+		g.Expect(ra.OwnerReferences[0].Name).To(Equal(ownerName))
+		g.Expect(ra.OwnerReferences[0].Kind).To(Equal("Pod"))
 
 		if verify != nil {
 			verify(ra, g)

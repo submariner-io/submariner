@@ -37,7 +37,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes/scheme"
 	k8snet "k8s.io/utils/net"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -45,13 +47,15 @@ type Config struct {
 	pinger.ControllerConfig
 	HealthCheckerEnabled     bool
 	RouteAgentUpdateInterval time.Duration
+	RouteAgentOwner          metav1.Object
+	Namespace                string
+	LocalNodeName            string
+	Version                  string
 }
 
 type controller struct {
 	event.HandlerBase
 	pingerController pinger.Controller
-	localNodeName    string
-	version          string
 	config           Config
 	stopCh           chan struct{}
 	stopOnce         sync.Once
@@ -60,14 +64,12 @@ type controller struct {
 
 var logger = log.Logger{Logger: logf.Log.WithName("HealthChecker")}
 
-func New(config *Config, client v1typed.RouteAgentInterface, version, nodeName string) event.Handler {
+func New(config *Config, client v1typed.SubmarinerV1Interface) event.Handler {
 	return &controller{
 		pingerController: pinger.NewController(config.ControllerConfig),
 		config:           *config,
-		version:          version,
-		client:           client,
+		client:           client.RouteAgents(config.Namespace),
 		stopCh:           make(chan struct{}),
-		localNodeName:    nodeName,
 	}
 }
 
@@ -79,9 +81,9 @@ func (h *controller) Stop() error {
 	})
 
 	err := h.client.Delete(context.TODO(),
-		h.localNodeName, metav1.DeleteOptions{})
+		h.config.LocalNodeName, metav1.DeleteOptions{})
 	if err != nil && !apiError.IsNotFound(err) {
-		return errors.Wrapf(err, "Error deleting RouteAgent: %s", h.localNodeName)
+		return errors.Wrapf(err, "Error deleting RouteAgent: %s", h.config.LocalNodeName)
 	}
 
 	return nil
@@ -241,6 +243,7 @@ func (h *controller) syncRouteAgentStatus() {
 	// Use CreateOrUpdate to handle the RouteAgent resource
 	_, err := util.CreateOrUpdate(context.TODO(), h.routeAgentResourceInterface(), routeAgent,
 		func(existing *submarinerv1.RouteAgent) (*submarinerv1.RouteAgent, error) {
+			existing.OwnerReferences = routeAgent.OwnerReferences
 			existing.Status = routeAgent.Status
 
 			return existing, nil
@@ -252,16 +255,24 @@ func (h *controller) syncRouteAgentStatus() {
 }
 
 func (h *controller) generateRouteAgentObject() *submarinerv1.RouteAgent {
-	return &submarinerv1.RouteAgent{
+	ra := &submarinerv1.RouteAgent{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: h.localNodeName,
+			Name:      h.config.LocalNodeName,
+			Namespace: h.config.Namespace,
 		},
 		Status: submarinerv1.RouteAgentStatus{
-			Version:         h.version,
+			Version:         h.config.Version,
 			StatusFailure:   "",
 			RemoteEndpoints: []submarinerv1.RemoteEndpoint{},
 		},
 	}
+
+	err := controllerutil.SetOwnerReference(h.config.RouteAgentOwner, ra, scheme.Scheme)
+	if err != nil {
+		logger.Errorf(err, "Error setting owner reference")
+	}
+
+	return ra
 }
 
 func (h *controller) routeAgentResourceInterface() resource.Interface[*submarinerv1.RouteAgent] {
