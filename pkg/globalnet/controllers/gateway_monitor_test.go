@@ -75,6 +75,10 @@ func testEndpointMonitoring() {
 		})
 
 		Context("", func() {
+			BeforeEach(func() {
+				t.createGlobalEgressIP(newGlobalEgressIP(globalEgressIPName, nil, nil))
+			})
+
 			AfterEach(func() {
 				t.awaitGlobalnetChainsCleared()
 			})
@@ -82,7 +86,6 @@ func testEndpointMonitoring() {
 			It("should start the controllers", func() {
 				t.awaitControllersStarted()
 
-				t.createGlobalEgressIP(newGlobalEgressIP(globalEgressIPName, nil, nil))
 				t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, 1)
 
 				t.createServiceExport(t.createService(newClusterIPService()))
@@ -94,7 +97,12 @@ func testEndpointMonitoring() {
 				backendPod := newHeadlessServicePod(service.Name)
 				t.createPod(backendPod)
 				t.createServiceExport(t.createService(service))
-				t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
+
+				Eventually(func(g Gomega) {
+					gip := t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
+					g.Expect(gip.Status.AllocatedIP).NotTo(BeEmpty(), resource.ToJSON(gip))
+				}).To(Succeed())
+
 				t.awaitGatewayGlobalIP("")
 			})
 		})
