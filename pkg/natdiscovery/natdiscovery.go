@@ -56,11 +56,9 @@ type Config struct {
 	FindSourceIP           FindSrcIPFunction
 	RunLoop                func(stopCh <-chan struct{}, doCheck func())
 }
-
 type natDiscovery struct {
-	sync.Mutex
 	Config
-	remoteEndpoints map[string]*remoteEndpointNAT
+	remoteEndpoints sync.Map
 	requestCounter  atomic.Uint64
 	serverUDPWrite  map[k8snet.IPFamily]udpWriteFunction
 	serverPort      int32
@@ -89,11 +87,10 @@ func NewWithConfig(config Config) (Interface, error) {
 	}
 
 	nd := &natDiscovery{
-		Config:          config,
-		serverPort:      ndPort,
-		remoteEndpoints: map[string]*remoteEndpointNAT{},
-		serverUDPWrite:  map[k8snet.IPFamily]udpWriteFunction{},
-		readyChannel:    make(chan *NATEndpointInfo, 100),
+		Config:         config,
+		serverPort:     ndPort,
+		serverUDPWrite: map[k8snet.IPFamily]udpWriteFunction{},
+		readyChannel:   make(chan *NATEndpointInfo, 100),
 	}
 
 	//nolint:gosec // Use of math/rand over crypto/rand is fine here as the request counter is not security-sensitive.
@@ -135,23 +132,6 @@ func (nd *natDiscovery) Run(stopCh <-chan struct{}) error {
 }
 
 func (nd *natDiscovery) AddEndpoint(endPoint *v1.Endpoint, family k8snet.IPFamily) {
-	nd.Lock()
-	defer nd.Unlock()
-
-	if ep, exists := nd.remoteEndpoints[endPoint.Spec.GetFamilyCableName(family)]; exists {
-		if reflect.DeepEqual(ep.endpoint.Spec, endPoint.Spec) {
-			if ep.isDiscoveryComplete() {
-				nd.readyChannel <- ep.toNATEndpointInfo()
-			}
-
-			return
-		}
-
-		logger.V(log.DEBUG).Infof("NAT discovery updated endpoint IPv%v %q", family, endPoint.Spec.CableName)
-
-		delete(nd.remoteEndpoints, endPoint.Spec.GetFamilyCableName(family))
-	}
-
 	remoteNAT := newRemoteEndpointNAT(endPoint, family)
 
 	// support nat discovery disabled or a remote cluster endpoint which still hasn't implemented this protocol
@@ -166,24 +146,43 @@ func (nd *natDiscovery) AddEndpoint(endPoint *v1.Endpoint, family k8snet.IPFamil
 		logger.Infof("Starting NAT discovery for endpoint %q", endPoint.Spec.CableName)
 	}
 
-	nd.remoteEndpoints[endPoint.Spec.GetFamilyCableName(family)] = remoteNAT
+	cableName := endPoint.Spec.GetFamilyCableName(family)
+
+	v, found := nd.remoteEndpoints.Load(cableName)
+	if !found {
+		nd.remoteEndpoints.Store(cableName, remoteNAT)
+		return
+	}
+
+	existing := v.(*remoteEndpointNAT)
+	if reflect.DeepEqual(existing.endpoint.Spec, endPoint.Spec) {
+		if existing.isDiscoveryComplete() {
+			nd.readyChannel <- existing.toNATEndpointInfo()
+		}
+
+		return
+	}
+
+	logger.V(log.DEBUG).Infof("NAT discovery updated endpoint IPv%v %q", family, endPoint.Spec.CableName)
+
+	nd.remoteEndpoints.Store(cableName, remoteNAT)
 }
 
 func (nd *natDiscovery) RemoveEndpoint(endpointName string) {
-	nd.Lock()
-	defer nd.Unlock()
-	delete(nd.remoteEndpoints, endpointName)
+	nd.remoteEndpoints.Delete(endpointName)
 }
 
 func (nd *natDiscovery) checkEndpointList() {
-	nd.Lock()
-	defer nd.Unlock()
-
 	logger.V(log.TRACE).Info("NAT discovery checking endpoint list")
 
-	for _, endpointNAT := range nd.remoteEndpoints {
+	nd.remoteEndpoints.Range(func(key, value interface{}) bool {
+		endpointNAT := value.(*remoteEndpointNAT)
 		name := endpointNAT.endpoint.Spec.GetFamilyCableName(endpointNAT.family)
+
 		logger.V(log.TRACE).Infof("NAT processing remote endpoint %q", name)
+
+		endpointNAT.Lock()
+		defer endpointNAT.Unlock()
 
 		if endpointNAT.shouldCheck() {
 			if endpointNAT.hasTimedOut() {
@@ -196,5 +195,7 @@ func (nd *natDiscovery) checkEndpointList() {
 		} else {
 			logger.V(log.TRACE).Infof("NAT shouldCheck() == false for  %q", name)
 		}
-	}
+
+		return true
+	})
 }

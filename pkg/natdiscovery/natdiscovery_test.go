@@ -40,57 +40,31 @@ const (
 	natNotExpected = false
 )
 
-var _ = When("IPv4 remote Endpoint is added in IPv4 env", func() {
-	t := newDiscoveryTestDriver(true, false)
-
-	addEndpointDiscoveryTests(
-		k8snet.IPv4,
-		t,
+var _ = DescribeTableSubtree("Discovery", runEndpointDiscoveryTests,
+	Entry("an IPv4 remote Endpoint added in IPv4 env",
+		true, false, k8snet.IPv4,
 		func() string { return testRemotePrivateIP },
 		func() string { return testRemotePublicIP },
 		func() string { return testRemotePrivateIP2 },
-		func(nd *NATDiscoveryInfo) *FakeServerConnection { return nd.ipv4Connection },
-	)
-})
-
-var _ = When("IPv4 remote Endpoint is added in dualstack env", func() {
-	t := newDiscoveryTestDriver(true, true)
-
-	addEndpointDiscoveryTests(
-		k8snet.IPv4,
-		t,
+		func(nd *NATDiscoveryInfo) *FakeServerConnection { return nd.ipv4Connection }),
+	Entry("an IPv4 remote Endpoint added in dual stack env",
+		true, true, k8snet.IPv4,
 		func() string { return testRemotePrivateIP },
 		func() string { return testRemotePublicIP },
 		func() string { return testRemotePrivateIP2 },
-		func(nd *NATDiscoveryInfo) *FakeServerConnection { return nd.ipv4Connection },
-	)
-})
-
-var _ = When("IPv6 remote Endpoint is added in IPv6 env", func() {
-	t := newDiscoveryTestDriver(false, true)
-
-	addEndpointDiscoveryTests(
-		k8snet.IPv6,
-		t,
+		func(nd *NATDiscoveryInfo) *FakeServerConnection { return nd.ipv4Connection }),
+	Entry("an IPv6 remote Endpoint added in IPv6 env",
+		false, true, k8snet.IPv6,
 		func() string { return testRemotePrivateIPv6 },
 		func() string { return testRemotePublicIPv6 },
 		func() string { return testRemotePrivateIPv62 },
-		func(nd *NATDiscoveryInfo) *FakeServerConnection { return nd.ipv6Connection },
-	)
-})
-
-var _ = When("IPv6 remote Endpoint is added in dualstack env", func() {
-	t := newDiscoveryTestDriver(true, true)
-
-	addEndpointDiscoveryTests(
-		k8snet.IPv6,
-		t,
+		func(nd *NATDiscoveryInfo) *FakeServerConnection { return nd.ipv6Connection }),
+	Entry("an IPv6 remote Endpoint added in dual stack env",
+		true, true, k8snet.IPv6,
 		func() string { return testRemotePrivateIPv6 },
 		func() string { return testRemotePublicIPv6 },
 		func() string { return testRemotePrivateIPv62 },
-		func(nd *NATDiscoveryInfo) *FakeServerConnection { return nd.ipv6Connection },
-	)
-})
+		func(nd *NATDiscoveryInfo) *FakeServerConnection { return nd.ipv6Connection }))
 
 func testPublicOnly(t *discoveryTestDriver, getPublicIP func() string) {
 	Context("with only the public IP set", func() {
@@ -219,7 +193,6 @@ func testReAddingEndpointAfterDiscoveryComplete(ipFamily k8snet.IPFamily, t *dis
 			getConnection(t.localND).forwardTo(getConnection(t.remoteND), 1)
 
 			t.localND.instance.AddEndpoint(&newRemoteEndpoint, ipFamily)
-			t.localND.checkDiscovery()
 		})
 
 		Context("with no change to the Endpoint", func() {
@@ -243,6 +216,10 @@ func testReAddingEndpointAfterDiscoveryComplete(ipFamily k8snet.IPFamily, t *dis
 			})
 
 			It("should notify with new NATEndpointInfo settings", func() {
+				Consistently(t.localND.instance.GetReadyChannel()).ShouldNot(Receive())
+
+				t.localND.checkDiscovery()
+
 				Eventually(t.localND.instance.GetReadyChannel(), 5).Should(Receive(Equal(&natdiscovery.NATEndpointInfo{
 					Endpoint:  newRemoteEndpoint,
 					UseNAT:    false,
@@ -372,11 +349,13 @@ func testTimeoutBehavior(ipFamily k8snet.IPFamily, t *discoveryTestDriver,
 	})
 }
 
-func addEndpointDiscoveryTests(ipFamily k8snet.IPFamily, t *discoveryTestDriver,
+func runEndpointDiscoveryTests(ipv4, ipv6 bool, ipFamily k8snet.IPFamily,
 	getPrivateIP, getPublicIP, getPrivateIP2 func() string,
 	getConnection func(*NATDiscoveryInfo) *FakeServerConnection,
 ) {
 	var forwardHowManyFromLocal int
+
+	t := newDiscoveryTestDriver(ipv4, ipv6)
 
 	BeforeEach(func() {
 		atomic.StoreInt64(&natdiscovery.RecheckTime, 0)

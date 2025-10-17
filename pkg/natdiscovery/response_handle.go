@@ -47,13 +47,15 @@ func (nd *natDiscovery) handleResponseFromAddress(req *proto.SubmarinerNATDiscov
 		return errors.Errorf("remote endpoint %q responded with %q : %#v", req.GetSender().GetEndpointId(), name, req)
 	}
 
-	nd.Lock()
-	remoteNAT, ok := nd.remoteEndpoints[req.GetSender().GetEndpointId()]
-	defer nd.Unlock()
-
+	v, ok := nd.remoteEndpoints.Load(req.GetSender().GetEndpointId())
 	if !ok {
 		return errors.Errorf("received response from unknown endpoint %q", req.GetSender().GetEndpointId())
 	}
+
+	remoteNAT := v.(*remoteEndpointNAT)
+
+	remoteNAT.Lock()
+	defer remoteNAT.Unlock()
 
 	// response to a PublicIP request
 	if remoteNAT.lastPublicIPRequestID == req.GetRequestNumber() {
