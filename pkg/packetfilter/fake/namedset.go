@@ -181,7 +181,7 @@ func (i *PacketFilter) listSets() []string {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	names := []string{}
+	var names []string //nolint:prealloc // OK
 
 	for name := range i.sets {
 		names = append(names, name)
@@ -194,7 +194,7 @@ func (i *PacketFilter) DestroySets(nameFilter func(string) bool) error {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
-	names := []string{}
+	var names []string //nolint:prealloc // OK
 
 	for name := range i.sets {
 		names = append(names, name)

@@ -104,7 +104,7 @@ func (kp *SyncHandler) GetName() string {
 }
 
 func (kp *SyncHandler) GetNetworkPlugins() []string {
-	networkPlugins := []string{}
+	var networkPlugins []string
 
 	// This handles everything but OVN
 	for _, plugin := range cni.GetNetworkPlugins() {

@@ -237,7 +237,7 @@ func list[T any](client *OVSDBClient, t T, p any, result *[]T) {
 	client.mutex.Lock()
 	defer client.mutex.Unlock()
 
-	r := []T{}
+	var r []T
 	fn := reflect.ValueOf(p)
 
 	for _, o := range client.models[reflect.TypeOf(t)] {

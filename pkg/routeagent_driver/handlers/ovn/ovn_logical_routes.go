@@ -68,16 +68,16 @@ func (c *ConnectionHandler) reconcileOvnLogicalRouterStaticRoutes(remoteSubnets 
 }
 
 func buildLRSRsFromSubnets(subnetsToAdd []string, nextHop string) []*nbdb.LogicalRouterStaticRoute {
-	toAdd := []*nbdb.LogicalRouterStaticRoute{}
+	toAdd := make([]*nbdb.LogicalRouterStaticRoute, len(subnetsToAdd))
 
-	for _, subnet := range subnetsToAdd {
-		toAdd = append(toAdd, &nbdb.LogicalRouterStaticRoute{
+	for i, subnet := range subnetsToAdd {
+		toAdd[i] = &nbdb.LogicalRouterStaticRoute{
 			Nexthop:  nextHop,
 			IPPrefix: subnet,
 			ExternalIDs: map[string]string{
 				"submariner": versions.Submariner(),
 			},
-		})
+		}
 	}
 
 	return toAdd

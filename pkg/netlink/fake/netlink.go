@@ -340,7 +340,7 @@ func (n *basicType) FlushRouteTable(table int) error {
 	defer n.mutex.Unlock()
 
 	for index, routes := range n.routes {
-		newRoutes := []netlink.Route{}
+		var newRoutes []netlink.Route
 
 		for i := range routes {
 			if routes[i].Table != table {
@@ -358,7 +358,7 @@ func (n *basicType) RouteGet(destination net.IP) ([]netlink.Route, error) {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
-	routes := []netlink.Route{}
+	var routes []netlink.Route
 	for i := range n.routes {
 		for j := range n.routes[i] {
 			if n.routes[i][j].Dst != nil && reflect.DeepEqual(n.routes[i][j].Dst.IP, destination) {
@@ -592,7 +592,7 @@ func routeList[T any](n *NetLink, linkIndex, table int, f func(r *netlink.Route)
 		},
 	}, k8snet.IPFamilyUnknown)
 
-	result := []T{}
+	var result []T
 
 	for i := range routes {
 		if routes[i].Table != table {
@@ -672,9 +672,9 @@ func (n *NetLink) neighborIPList(linkIndex int) []net.IP {
 	n.basic().mutex.Lock()
 	defer n.basic().mutex.Unlock()
 
-	ips := []net.IP{}
+	ips := make([]net.IP, len(n.basic().neighbors[linkIndex]))
 	for i := range n.basic().neighbors[linkIndex] {
-		ips = append(ips, n.basic().neighbors[linkIndex][i].IP)
+		ips[i] = n.basic().neighbors[linkIndex][i].IP
 	}
 
 	return ips
