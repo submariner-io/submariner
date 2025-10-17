@@ -22,8 +22,6 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
-	"strconv"
-	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
@@ -37,7 +35,7 @@ const (
 
 var logger = log.Logger{Logger: logf.Log.WithName("ovs-vsctl")}
 
-func vsctlCmd(parameters ...string) (string, error) {
+func vsctlCmd(parameters ...string) error {
 	allParameters := []string{fmt.Sprintf("--timeout=%d", ovsCommandTimeout)}
 	allParameters = append(allParameters, parameters...)
 
@@ -53,66 +51,18 @@ func vsctlCmd(parameters ...string) (string, error) {
 	stdout := string(out)
 
 	if err != nil {
-		stdErrOut := stderr.String()
-		logger.Errorf(err, "Error running ovs-vsctl, output:\n%s", stdErrOut)
+		logger.Errorf(err, "Error running ovs-vsctl, stdout:\n%s\nstderr:\n%s", stdout, stderr.String())
 
-		return stdErrOut, errors.Wrap(err, "error running ovs-vsctl")
-	}
-
-	return stdout, nil
-}
-
-func AddBridge(bridgeName string) error {
-	_, err := vsctlCmd("--may-exist", "add-br", bridgeName)
-
-	return err
-}
-
-func DelBridge(bridgeName string) error {
-	_, err := vsctlCmd(ifexistsArg, "del-br", bridgeName)
-
-	return err
-}
-
-func AddInternalPort(bridgeName, portName, macAddress string, mtu int) error {
-	_, err := vsctlCmd("--may-exist", "add-port", bridgeName, portName, "--",
-		"set", "interface", portName, "type=internal", "mtu_request="+strconv.Itoa(mtu),
-		"mac="+strings.ReplaceAll(macAddress, ":", "\\:"))
-
-	return err
-}
-
-func DelInternalPort(bridgeName, portName string) error {
-	_, err := vsctlCmd(ifexistsArg, "del-port", bridgeName, portName)
-
-	return err
-}
-
-func AddOVNBridgeMapping(netName, bridgeName string) error {
-	stdout, err := vsctlCmd(ifexistsArg, "get", "Open_vSwitch", ".",
-		"external_ids:ovn-bridge-mappings")
-	if err != nil {
-		return errors.Wrap(err, "failed to get ovn-bridge-mappings")
-	}
-
-	// cleanup the ovs-vsctl output, and remove quotes
-	bridgeMappings := strings.Trim(strings.TrimSpace(stdout), "\"")
-
-	locnetMapping := fmt.Sprintf("%s:%s", netName, bridgeName)
-	if strings.Contains(bridgeMappings, locnetMapping) {
-		return nil // it was already set
-	}
-
-	if bridgeMappings != "" {
-		bridgeMappings = bridgeMappings + "," + locnetMapping
-	} else {
-		bridgeMappings = locnetMapping
-	}
-
-	if _, err = vsctlCmd("set", "Open_vSwitch", ".",
-		"external_ids:ovn-bridge-mappings="+bridgeMappings); err != nil {
-		return errors.Wrap(err, "failed to set ovn-bridge-mappings")
+		return errors.Wrap(err, "error running ovs-vsctl")
 	}
 
 	return nil
+}
+
+func DelBridge(bridgeName string) error {
+	return vsctlCmd(ifexistsArg, "del-br", bridgeName)
+}
+
+func DelInternalPort(bridgeName, portName string) error {
+	return vsctlCmd(ifexistsArg, "del-port", bridgeName, portName)
 }

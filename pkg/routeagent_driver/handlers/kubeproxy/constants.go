@@ -49,8 +49,6 @@ const (
 	// For example: private IP fd00:abcd::1234:5678 will be translated to fd00:100:100::1234:5678 .
 
 	VxLANVTepNetworkPrefixCIDRIPv6 = "fd00:100:100::/96"
-
-	SmRouteAgentFilter = "app=submariner-routeagent"
 )
 
 type Operation int

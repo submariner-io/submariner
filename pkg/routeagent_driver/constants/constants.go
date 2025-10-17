@@ -27,8 +27,6 @@ const (
 	SmSelfSnatChain       = "SUBMARINER-SELF-SNAT"
 	PostRoutingChain      = "POSTROUTING"
 	InputChain            = "INPUT"
-	ForwardChain          = "FORWARD"
-	MangleTable           = "mangle"
 
 	RouteAgentInterClusterNetworkTableID = 149
 

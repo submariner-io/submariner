@@ -81,7 +81,7 @@ func init() {
 }
 
 func NewDriver(localEndpoint *submendpoint.Local,
-	localCluster *types.SubmarinerCluster, signingRequestor certificate.SigningRequestor,
+	localCluster *types.SubmarinerCluster, _ certificate.SigningRequestor,
 ) (cable.Driver, error) {
 	// We'll panic if localEndpoint or localCluster are nil, this is intentional
 	var err error
