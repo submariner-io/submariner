@@ -217,8 +217,11 @@ func (i *libreswan) Init(ctx context.Context) error {
 		}
 		defer file.Close()
 
-		fmt.Fprintf(file, "%%any %%any : PSK \"%s\"\n", i.secretKey)
+		if _, err = fmt.Fprintf(file, "%%any %%any : PSK \"%s\"\n", i.secretKey); err != nil {
+			return errors.Wrap(err, "error writing the secrets file")
+		}
 	} else if i.authMode == AuthModeCert {
+		i.plutoStarted = true
 		i.connectionFile = &ConnectionFile{Path: SubmarinerConfPath()}
 
 		logger.Infof("Issuing certificate with Private IPs %s Public IPs %s", i.localEndpoint.PrivateIPs, i.localEndpoint.PublicIPs)
@@ -227,16 +230,12 @@ func (i *libreswan) Init(ctx context.Context) error {
 		sanIPs = append(sanIPs, i.localEndpoint.PrivateIPs...)
 		sanIPs = append(sanIPs, i.localEndpoint.PublicIPs...)
 
-		var err error
-
 		i.certificateHandler = NewCertificateHandler()
 
-		err = i.signingRequestor.Issue(ctx, "libreswan-"+i.localEndpoint.Hostname, sanIPs, i.certificateHandler.OnSignedCallback)
-		if err != nil {
-			logger.Warningf("Unable to issue certificate: %v", err)
+		if err := i.signingRequestor.Issue(ctx, "libreswan-"+i.localEndpoint.Hostname, sanIPs,
+			i.certificateHandler.OnSignedCallback); err != nil {
+			return errors.Wrap(err, "unable to issue certificate")
 		}
-
-		i.plutoStarted = true
 
 		logger.Info("Successfully issued certificate")
 	}
@@ -491,9 +490,7 @@ func (i *libreswan) bidirectionalConnectToEndpoint(connectionName string, endpoi
 	localEndpointIdentifier := i.localEndpoint.GetPrivateIP(endpointInfo.UseFamily)
 	remoteEndpointIdentifier := endpointInfo.Endpoint.Spec.GetPrivateIP(endpointInfo.UseFamily)
 
-	args := []string{}
-
-	args = append(args, "--psk", encryptArg)
+	args := []string{"--psk", encryptArg}
 	if endpointInfo.UseNAT || i.forceUDPEncapsulation {
 		args = append(args, forceencapsArg)
 	}
@@ -541,9 +538,7 @@ func (i *libreswan) serverConnectToEndpoint(connectionName string, endpointInfo 
 	localEndpointIdentifier := toEndpointIdentifier(i.localEndpoint.GetPrivateIP(endpointInfo.UseFamily), lsi, rsi)
 	remoteEndpointIdentifier := toEndpointIdentifier(endpointInfo.Endpoint.Spec.GetPrivateIP(endpointInfo.UseFamily), rsi, lsi)
 
-	args := []string{}
-
-	args = append(args, "--psk", encryptArg)
+	args := []string{"--psk", encryptArg}
 	if endpointInfo.UseNAT || i.forceUDPEncapsulation {
 		args = append(args, forceencapsArg)
 	}
@@ -584,9 +579,7 @@ func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo 
 	localEndpointIdentifier := toEndpointIdentifier(i.localEndpoint.GetPrivateIP(endpointInfo.UseFamily), lsi, rsi)
 	remoteEndpointIdentifier := toEndpointIdentifier(endpointInfo.Endpoint.Spec.GetPrivateIP(endpointInfo.UseFamily), rsi, lsi)
 
-	args := []string{}
-
-	args = append(args, "--psk", encryptArg)
+	args := []string{"--psk", encryptArg}
 	if endpointInfo.UseNAT || i.forceUDPEncapsulation {
 		args = append(args, forceencapsArg)
 	}
@@ -689,10 +682,9 @@ func removeConnectionForEndpoint(
 func (i *libreswan) runPluto() error {
 	logger.Info("Starting Pluto")
 
-	args := []string{}
-
+	var args []string
 	if i.debug {
-		args = append(args, "--stderrlog")
+		args = []string{"--stderrlog"}
 	}
 
 	execCmd := exec.Command("/usr/local/bin/pluto", args...)
