@@ -23,6 +23,7 @@ import (
 	"net"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pkg/errors"
@@ -60,7 +61,7 @@ type natDiscovery struct {
 	sync.Mutex
 	Config
 	remoteEndpoints map[string]*remoteEndpointNAT
-	requestCounter  uint64
+	requestCounter  atomic.Uint64
 	serverUDPWrite  map[k8snet.IPFamily]udpWriteFunction
 	serverPort      int32
 	readyChannel    chan *NATEndpointInfo
@@ -87,15 +88,18 @@ func NewWithConfig(config Config) (Interface, error) {
 		return nil, errors.Wrap(err, "error parsing nat discovery port")
 	}
 
-	//nolint:gosec // Use of math/rand over crypto/rand is fine here as the request counter is not security-sensitive.
-	return &natDiscovery{
+	nd := &natDiscovery{
 		Config:          config,
 		serverPort:      ndPort,
 		remoteEndpoints: map[string]*remoteEndpointNAT{},
 		serverUDPWrite:  map[k8snet.IPFamily]udpWriteFunction{},
-		requestCounter:  rand.Uint64(),
 		readyChannel:    make(chan *NATEndpointInfo, 100),
-	}, nil
+	}
+
+	//nolint:gosec // Use of math/rand over crypto/rand is fine here as the request counter is not security-sensitive.
+	nd.requestCounter.Store(rand.Uint64())
+
+	return nd, nil
 }
 
 var errNoNATDiscoveryPort = errors.New("NATT discovery port missing in endpoint")
