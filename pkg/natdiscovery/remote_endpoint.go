@@ -19,6 +19,7 @@ limitations under the License.
 package natdiscovery
 
 import (
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -44,6 +45,7 @@ var (
 )
 
 type remoteEndpointNAT struct {
+	sync.Mutex
 	endpoint               v1.Endpoint
 	family                 k8snet.IPFamily
 	state                  endpointState
