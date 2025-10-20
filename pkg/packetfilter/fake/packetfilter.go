@@ -163,10 +163,10 @@ func toRuleString(rule *packetfilter.Rule) string {
 func (i *PacketFilter) List(table packetfilter.TableType, chain string) ([]*packetfilter.Rule, error) {
 	existingRules := i.listRules(table, chain)
 
-	rules := []*packetfilter.Rule{}
+	rules := make([]*packetfilter.Rule, len(existingRules))
 
-	for _, existingRule := range existingRules {
-		rules = append(rules, fromRuleString(existingRule))
+	for i, existingRule := range existingRules {
+		rules[i] = fromRuleString(existingRule)
 	}
 
 	return rules, nil

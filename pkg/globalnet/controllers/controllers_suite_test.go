@@ -627,7 +627,7 @@ func newGlobalnetInternalService(svcName string) *corev1.Service {
 			Ports: []corev1.ServicePort{{
 				Name:       serviceName,
 				Port:       int32(8080),
-				TargetPort: intstr.FromInt(8080),
+				TargetPort: intstr.FromInt32(8080),
 				Protocol:   corev1.ProtocolTCP,
 			}},
 		},

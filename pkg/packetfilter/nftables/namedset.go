@@ -115,10 +115,10 @@ func (n *namedSet) ListEntries() ([]string, error) {
 		return []string{}, errors.Wrapf(err, "error listing elements for set %q", n.Name())
 	}
 
-	strElems := []string{}
+	strElems := make([]string, len(nftablesElems))
 
-	for _, existingElem := range nftablesElems {
-		strElems = append(strElems, existingElem.Key[0])
+	for i, existingElem := range nftablesElems {
+		strElems[i] = existingElem.Key[0]
 	}
 
 	return strElems, nil

@@ -33,10 +33,9 @@ import (
 )
 
 var (
-	masterURL   string
-	kubeconfig  string
-	logger      = log.Logger{Logger: logf.Log.WithName("main")}
-	showVersion = false
+	masterURL  string
+	kubeconfig string
+	logger     = log.Logger{Logger: logf.Log.WithName("main")}
 )
 
 func main() {
@@ -44,10 +43,6 @@ func main() {
 	flag.Parse()
 
 	admversion.Print("await-node-ready", versions.Submariner())
-
-	if showVersion {
-		return
-	}
 
 	kzerolog.InitK8sLogging()
 

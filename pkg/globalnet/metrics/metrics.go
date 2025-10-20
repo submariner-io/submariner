@@ -84,11 +84,6 @@ func init() {
 		clusterGlobalEgressIPsAllocatedGauge, globalIngressIPsAllocatedGauge)
 }
 
-func RecordAllocateGlobalIP(cidr string) {
-	globalIPsAllocatedGauge.With(prometheus.Labels{cidrLabel: cidr}).Inc()
-	globalIPsAvailabilityGauge.With(prometheus.Labels{cidrLabel: cidr}).Dec()
-}
-
 func RecordAllocateGlobalIPs(cidr string, count int) {
 	globalIPsAllocatedGauge.With(prometheus.Labels{cidrLabel: cidr}).Add(float64(count))
 	globalIPsAvailabilityGauge.With(prometheus.Labels{cidrLabel: cidr}).Sub(float64(count))

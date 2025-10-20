@@ -224,16 +224,16 @@ func (c *clusterGlobalEgressIPController) deleteClusterGlobalEgressRules(srcIPLi
 
 func (c *clusterGlobalEgressIPController) programClusterGlobalEgressRules(allocatedIPs []string) error {
 	snatIP := getTargetSNATIPaddress(allocatedIPs)
-	egressRulesProgrammed := []string{}
+	egressRulesProgrammed := make([]string, len(c.localSubnets))
 
-	for _, srcIP := range c.localSubnets {
+	for i, srcIP := range c.localSubnets {
 		if err := c.pfIface.AddClusterEgressRules(srcIP, snatIP, globalNetIPTableMark); err != nil {
 			_ = c.deleteClusterGlobalEgressRules(egressRulesProgrammed, snatIP)
 
 			return err //nolint:wrapcheck  // Let the caller wrap it
 		}
 
-		egressRulesProgrammed = append(egressRulesProgrammed, srcIP)
+		egressRulesProgrammed[i] = srcIP
 	}
 
 	return nil

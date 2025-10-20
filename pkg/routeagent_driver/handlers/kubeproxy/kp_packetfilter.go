@@ -28,7 +28,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/cidr"
-	cni "github.com/submariner-io/submariner/pkg/cni"
+	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
@@ -104,7 +104,7 @@ func (kp *SyncHandler) GetName() string {
 }
 
 func (kp *SyncHandler) GetNetworkPlugins() []string {
-	networkPlugins := []string{}
+	var networkPlugins []string
 
 	// This handles everything but OVN
 	for _, plugin := range cni.GetNetworkPlugins() {

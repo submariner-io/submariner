@@ -31,9 +31,8 @@ import (
 )
 
 const (
-	testSet      = "test-set"
-	entryIP      = "192.168.1.1"
-	invalidValue = "bogus"
+	testSet = "test-set"
+	entryIP = "192.168.1.1"
 )
 
 var IPSetPathMatcher = HaveSuffix(ipset.IPSetCmd)

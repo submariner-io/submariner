@@ -70,9 +70,12 @@ func (d *Driver) GetActiveConnections() ([]v1.Connection, error) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
-	ret := []v1.Connection{}
+	ret := make([]v1.Connection, len(d.activeConnections))
+	i := 0
+
 	for k := range d.activeConnections {
-		ret = append(ret, d.activeConnections[k])
+		ret[i] = d.activeConnections[k]
+		i++
 	}
 
 	return ret, nil

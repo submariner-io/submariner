@@ -102,7 +102,8 @@ func testAPIResolver() {
 	BeforeEach(func() {
 		t.setupHTTPServer(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, "v4 %s v6 %s", testIPv4DNS, testIPv6DNS)
+			_, err := fmt.Fprintf(w, "v4 %s v6 %s", testIPv4DNS, testIPv6DNS)
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 

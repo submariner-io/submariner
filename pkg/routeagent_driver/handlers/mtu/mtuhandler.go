@@ -280,22 +280,22 @@ func (h *mtuHandler) forceMssClamping(endpoint *submV1.Endpoint) error {
 
 	logger.Infof("forceMssClamping to: %d (%s) ", tcpMssValue, tcpMssSrc)
 
-	rules := []*packetfilter.Rule{}
-
-	rules = append(rules, &packetfilter.Rule{
-		SrcSetName:  h.localCIDRIPSet,
-		DestSetName: h.remoteCIDRIPSet,
-		Action:      packetfilter.RuleActionMss,
-		ClampType:   packetfilter.ToValue,
-		MssValue:    strconv.Itoa(tcpMssValue),
-	}, &packetfilter.Rule{
-		DestSetName: h.localCIDRIPSet,
-		SrcSetName:  h.remoteCIDRIPSet,
-		Action:      packetfilter.RuleActionMss,
-		ClampType:   packetfilter.ToValue,
-		MssValue:    strconv.Itoa(tcpMssValue),
-	},
-	)
+	rules := []*packetfilter.Rule{
+		{
+			SrcSetName:  h.localCIDRIPSet,
+			DestSetName: h.remoteCIDRIPSet,
+			Action:      packetfilter.RuleActionMss,
+			ClampType:   packetfilter.ToValue,
+			MssValue:    strconv.Itoa(tcpMssValue),
+		},
+		{
+			DestSetName: h.localCIDRIPSet,
+			SrcSetName:  h.remoteCIDRIPSet,
+			Action:      packetfilter.RuleActionMss,
+			ClampType:   packetfilter.ToValue,
+			MssValue:    strconv.Itoa(tcpMssValue),
+		},
+	}
 
 	if err := h.pFilter.UpdateChainRules(h.tableType, constants.SmPostRoutingMssChain, rules); err != nil {
 		return errors.Wrapf(err, "error updating chain %s table type %q", constants.SmPostRoutingMssChain, h.tableType.String())

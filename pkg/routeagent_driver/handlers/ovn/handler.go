@@ -160,10 +160,6 @@ func (ovn *Handler) Init(ctx context.Context) error {
 
 	ovn.gatewayRouteController = gatewayRouteController
 
-	if err != nil {
-		return err
-	}
-
 	if !ovn.IntraRoutingDisabled {
 		nonGatewayRouteController, err := NewNonGatewayRouteController(ovn.ipFamily, *ovn.WatcherConfig, connectionHandler,
 			ovn.Namespace, ovn.TransitSwitchIP)

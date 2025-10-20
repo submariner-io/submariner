@@ -148,8 +148,8 @@ func (c *Controller) Start(stopCh <-chan struct{}) error {
 	runInformer(c.endpointInformer, stopCh)
 	runInformer(c.nodeInformer, stopCh)
 
-	for _, syncer := range c.syncers {
-		err := syncer.Start(stopCh)
+	for _, s := range c.syncers {
+		err := s.Start(stopCh)
 		if err != nil {
 			return errors.Wrap(err, "error starting resource syncer")
 		}

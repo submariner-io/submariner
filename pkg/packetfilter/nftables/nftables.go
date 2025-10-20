@@ -259,7 +259,7 @@ func (p *packetFilter) List(_ packetfilter.TableType, chain string) ([]*packetfi
 		return nil, errors.Wrapf(err, "failed to list rules of chain %q", chain)
 	}
 
-	rules := []*packetfilter.Rule{}
+	var rules []*packetfilter.Rule
 
 	// Note: since currently ListRules returns only `Comment` and `Handle` fields
 	// of Rule object. When creating a new rule `Comment` will be set to RuleSpec.
