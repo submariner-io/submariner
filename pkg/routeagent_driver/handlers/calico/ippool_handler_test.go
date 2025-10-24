@@ -49,12 +49,12 @@ var _ = Describe("IPPool Handler", func() {
 			// Ensure it handles existing IPPools.
 			Expect(t.handler.RemoteEndpointCreated(remoteEP1)).To(Succeed())
 
+			t.DeleteEndpoint(remoteEP1.Name)
+			t.awaitNoIPPools(subnets1...)
+
 			subnets2 := []string{"192.0.4.0/24"}
 			remoteEP2 := t.CreateEndpoint(testing.NewEndpoint("remote-cluster1", "host", subnets2...))
 			t.awaitIPPools(subnets2...)
-
-			t.DeleteEndpoint(remoteEP1.Name)
-			t.awaitNoIPPools(subnets1...)
 
 			t.DeleteEndpoint(localEP.Name)
 

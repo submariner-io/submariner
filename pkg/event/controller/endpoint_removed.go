@@ -69,13 +69,15 @@ func (c *handlerController) handleRemovedLocalEndpoint(endpoint *smv1.Endpoint) 
 func (c *handlerController) handleRemovedRemoteEndpoint(endpoint *smv1.Endpoint) error {
 	c.handlerState.remoteEndpoints.Delete(endpoint.Name)
 
-	lastProcessedTime, ok := c.remoteEndpointTimeStamp[endpoint.Spec.ClusterID]
-
-	if ok && lastProcessedTime.After(endpoint.CreationTimestamp.Time) {
+	// It's possible due to timing of notifications across the broker that we could observe a remove event for an
+	// older Endpoint for a cluster after the create event for the new Endpoint, in which case we'll notify of a
+	// stale removed Endpoint.
+	lastClusterEndpoint, ok := c.lastRemoteEndpoint[endpoint.Spec.ClusterID]
+	if ok && lastClusterEndpoint.UID != endpoint.UID {
 		return c.handler.StaleRemoteEndpointRemoved(endpoint) //nolint:wrapcheck  // Let the caller wrap it
 	}
 
-	delete(c.remoteEndpointTimeStamp, endpoint.Spec.ClusterID)
+	delete(c.lastRemoteEndpoint, endpoint.Spec.ClusterID)
 
 	return c.handler.RemoteEndpointRemoved(endpoint) //nolint:wrapcheck  // Let the caller wrap it
 }

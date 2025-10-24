@@ -153,26 +153,11 @@ var _ = Describe("Event controller", func() {
 	})
 
 	When("a remote Endpoint is deleted after a newer Endpoint from the same cluster", func() {
-		It("should notify the handler of the stale removed Endpoint", func() {
-			now := time.Now()
-			staleEndpoint := t.CreateEndpoint(&submV1.Endpoint{
-				ObjectMeta: v1meta.ObjectMeta{Name: "stale", CreationTimestamp: v1meta.NewTime(now)},
-				Spec:       submV1.EndpointSpec{ClusterID: "east"},
-			})
-			t.awaitEvent(testing.EvRemoteEndpointCreated, staleEndpoint)
+		t.testStaleRemovedEndpoint(2 * time.Second)
+	})
 
-			latestEndpoint := t.CreateEndpoint(&submV1.Endpoint{
-				ObjectMeta: v1meta.ObjectMeta{Name: "latest", CreationTimestamp: v1meta.NewTime(now.Add(2 * time.Second))},
-				Spec:       submV1.EndpointSpec{ClusterID: "east"},
-			})
-			t.awaitEvent(testing.EvRemoteEndpointCreated, latestEndpoint)
-			Expect(t.handler.remoteEndpoints.Load()).To(HaveLen(2))
-
-			t.DeleteEndpoint(staleEndpoint.GetName())
-			t.awaitEvent(testing.EvStaleRemoteEndpointRemoved, staleEndpoint)
-			t.ensureNoEvents()
-			Expect(t.handler.remoteEndpoints.Load()).To(Equal([]submV1.Endpoint{*latestEndpoint}))
-		})
+	When("a remote Endpoint with thw same CreationTimestamp as the last Endpoint from the same cluster is deleted", func() {
+		t.testStaleRemovedEndpoint(0)
 	})
 })
 
@@ -280,6 +265,32 @@ func (t *testDriver) testRemoteEndpoints() {
 	t.awaitEvent(testing.EvRemoteEndpointRemoved, endpoint1)
 	Expect(t.handler.remoteEndpoints.Load()).To(BeEmpty())
 	t.ensureNoEvents()
+}
+
+func (t *testDriver) testStaleRemovedEndpoint(tsDiff time.Duration) {
+	It("should notify the handler of the stale removed Endpoint", func() {
+		now := time.Now()
+		staleEndpoint := t.CreateEndpoint(&submV1.Endpoint{
+			ObjectMeta: v1meta.ObjectMeta{Name: "stale", CreationTimestamp: v1meta.NewTime(now)},
+			Spec:       submV1.EndpointSpec{ClusterID: "east"},
+		})
+		t.awaitEvent(testing.EvRemoteEndpointCreated, staleEndpoint)
+
+		latestEndpoint := t.CreateEndpoint(&submV1.Endpoint{
+			ObjectMeta: v1meta.ObjectMeta{Name: "latest", CreationTimestamp: v1meta.NewTime(now.Add(tsDiff))},
+			Spec:       submV1.EndpointSpec{ClusterID: "east"},
+		})
+		t.awaitEvent(testing.EvRemoteEndpointCreated, latestEndpoint)
+		Expect(t.handler.remoteEndpoints.Load()).To(HaveLen(2))
+
+		t.DeleteEndpoint(staleEndpoint.GetName())
+		t.awaitEvent(testing.EvStaleRemoteEndpointRemoved, staleEndpoint)
+		t.ensureNoEvents()
+		Expect(t.handler.remoteEndpoints.Load()).To(Equal([]submV1.Endpoint{*latestEndpoint}))
+
+		t.DeleteEndpoint(latestEndpoint.GetName())
+		t.awaitEvent(testing.EvRemoteEndpointRemoved, latestEndpoint)
+	})
 }
 
 type TestHandler struct {

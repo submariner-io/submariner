@@ -90,35 +90,40 @@ func (h *controller) Stop() error {
 }
 
 func (h *controller) RemoteEndpointCreated(endpoint *submarinerv1.Endpoint) error {
-	return h.RemoteEndpointUpdated(endpoint)
+	return h.onRemoteEndpint(endpoint, "created")
 }
 
 func (h *controller) RemoteEndpointUpdated(endpoint *submarinerv1.Endpoint) error {
+	return h.onRemoteEndpint(endpoint, "updated")
+}
+
+func (h *controller) onRemoteEndpint(endpoint *submarinerv1.Endpoint, op string) error {
 	if !h.config.HealthCheckerEnabled || h.State().IsOnGateway() {
 		return nil
 	}
 
-	h.processEndpointCreatedOrUpdated(endpoint)
+	h.processEndpointCreatedOrUpdated(endpoint, op)
 
 	return nil
 }
 
-func (h *controller) processEndpointCreatedOrUpdated(endpoint *submarinerv1.Endpoint) {
-	logger.Infof("Processing Endpoint: %#v", endpoint)
-
+func (h *controller) processEndpointCreatedOrUpdated(endpoint *submarinerv1.Endpoint, op string) {
+	logger.Infof("Processing %s Endpoint: %s", op, resource.ToJSON(endpoint))
 	h.pingerController.EndpointCreatedOrUpdated(&endpoint.Spec)
 }
 
 func (h *controller) RemoteEndpointRemoved(endpoint *submarinerv1.Endpoint) error {
 	logger.Infof("Processing removed Endpoint %q", endpoint.Spec.CableName)
-
 	h.pingerController.EndpointRemoved(&endpoint.Spec)
 
 	return nil
 }
 
 func (h *controller) StaleRemoteEndpointRemoved(endpoint *submarinerv1.Endpoint) error {
-	return h.RemoteEndpointRemoved(endpoint)
+	logger.Infof("Processing stale removed Endpoint: %s", resource.ToJSON(endpoint))
+	h.pingerController.EndpointRemoved(&endpoint.Spec)
+
+	return nil
 }
 
 func (h *controller) Init(_ context.Context) error {
@@ -138,7 +143,7 @@ func (h *controller) TransitionToNonGateway() error {
 		remoteEndpoints := h.State().GetRemoteEndpoints()
 
 		for i := range remoteEndpoints {
-			h.processEndpointCreatedOrUpdated(&remoteEndpoints[i])
+			h.processEndpointCreatedOrUpdated(&remoteEndpoints[i], "existing")
 		}
 	}
 
