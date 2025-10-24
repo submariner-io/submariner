@@ -33,7 +33,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/event"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
@@ -78,13 +77,13 @@ type Controller struct {
 }
 
 type handlerController struct {
-	syncMutex               sync.Mutex
-	handlerState            handlerStateImpl
-	handler                 event.Handler
-	nodeHandler             event.NodeHandler
-	hostname                string
-	clusterID               string
-	remoteEndpointTimeStamp map[string]v1.Time
+	syncMutex          sync.Mutex
+	handlerState       handlerStateImpl
+	handler            event.Handler
+	nodeHandler        event.NodeHandler
+	hostname           string
+	clusterID          string
+	lastRemoteEndpoint map[string]*subv1.Endpoint
 }
 
 // If the handler cannot recover from a failure, even after retrying for maximum requeue attempts,
@@ -173,10 +172,10 @@ func (c *Controller) setupHandlerController(handler event.Handler, clusterID, ho
 	syncerConfig syncer.ResourceSyncerConfig,
 ) error {
 	hCtrl := &handlerController{
-		handler:                 handler,
-		hostname:                hostname,
-		clusterID:               clusterID,
-		remoteEndpointTimeStamp: map[string]v1.Time{},
+		handler:            handler,
+		hostname:           hostname,
+		clusterID:          clusterID,
+		lastRemoteEndpoint: map[string]*subv1.Endpoint{},
 	}
 
 	handler.SetState(&hCtrl.handlerState)
