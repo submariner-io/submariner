@@ -71,16 +71,16 @@ func (c *handlerController) handleCreatedLocalEndpoint(endpoint *smv1.Endpoint) 
 }
 
 func (c *handlerController) handleCreatedRemoteEndpoint(endpoint *smv1.Endpoint) error {
-	lastProcessedTime, ok := c.remoteEndpointTimeStamp[endpoint.Spec.ClusterID]
+	lastClusterEndpoint, ok := c.lastRemoteEndpoint[endpoint.Spec.ClusterID]
 
-	if ok && lastProcessedTime.After(endpoint.CreationTimestamp.Time) {
-		logger.Infof("Handler %q: Ignoring new remote %#v since a later endpoint was already processed",
-			c.handler.GetName(), endpoint)
+	if ok && lastClusterEndpoint.CreationTimestamp.After(endpoint.CreationTimestamp.Time) {
+		logger.Infof("Handler %q: Ignoring new remote %#v since a later endpoint %q was already processed",
+			c.handler.GetName(), endpoint, lastClusterEndpoint.Spec.CableName)
 		return nil
 	}
 
 	c.handlerState.remoteEndpoints.Store(endpoint.Name, endpoint)
-	c.remoteEndpointTimeStamp[endpoint.Spec.ClusterID] = endpoint.CreationTimestamp
+	c.lastRemoteEndpoint[endpoint.Spec.ClusterID] = endpoint
 
 	return c.handler.RemoteEndpointCreated(endpoint) //nolint:wrapcheck  // Let the caller wrap it
 }

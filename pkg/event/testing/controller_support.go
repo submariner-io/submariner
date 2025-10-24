@@ -111,7 +111,9 @@ func (c *ControllerSupport) CreateLocalHostEndpoint() *submV1.Endpoint {
 }
 
 func (c *ControllerSupport) CreateEndpoint(endpoint *submV1.Endpoint) *submV1.Endpoint {
+	endpoint.UID = uuid.NewUUID()
 	Expect(scheme.Scheme.Convert(test.CreateResource(c.endpoints, endpoint), endpoint, nil)).To(Succeed())
+
 	return endpoint
 }
 

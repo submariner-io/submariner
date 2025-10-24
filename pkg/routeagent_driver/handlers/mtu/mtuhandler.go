@@ -207,6 +207,8 @@ func (h *mtuHandler) LocalEndpointRemoved(endpoint *submV1.Endpoint) error {
 }
 
 func (h *mtuHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
+	logger.Infof("Processing created Endpoint %q", endpoint.Spec.CableName)
+
 	subnets := cidr.ExtractSubnets(h.ipFamily, endpoint.Spec.Subnets)
 	for _, subnet := range subnets {
 		err := h.remoteIPSet.AddEntry(subnet, true)
@@ -219,6 +221,8 @@ func (h *mtuHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 }
 
 func (h *mtuHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
+	logger.Infof("Processing removed Endpoint %q", endpoint.Spec.CableName)
+
 	subnets := cidr.ExtractSubnets(h.ipFamily, endpoint.Spec.Subnets)
 	for _, subnet := range subnets {
 		logError(h.remoteIPSet.DelEntry(subnet), "Error deleting the subnet %q from the remote IPSet", subnet)
