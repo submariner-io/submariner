@@ -27,6 +27,7 @@ const (
 	SmGlobalnetMarkChain    = "SUBMARINER-GN-MARK"
 
 	// The following chains are added as part of GN 2.0 implementation.
+
 	SmGlobalnetEgressChainForPods            = "SM-GN-EGRESS-PODS"
 	SmGlobalnetEgressChainForHeadlessSvcPods = "SM-GN-EGRESS-HDLS-PODS"
 	SmGlobalnetEgressChainForHeadlessSvcEPs  = "SM-GN-EGRESS-HDLS-EPS"

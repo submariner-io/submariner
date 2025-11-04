@@ -248,7 +248,7 @@ func (i *libreswan) Init(ctx context.Context) error {
 // or:
 // 006 #2: "submariner-cable-cluster3-172-17-0-8-v4-0-0"[1] 3.139.75.179, type=ESP, add_time=1617195756, inBytes=0, outBytes=0, \
 // id='@10.0.63.203-0-0'"
-// .
+
 var TrafficStatusRE = regexp.MustCompile(`.* "([^"]+-v[46]-[0-1]-[0-1])"[^,]*, .*inBytes=(\d+), outBytes=(\d+).*`)
 
 func retrieveActiveConnectionStats() (map[string]int, map[string]int, error) {

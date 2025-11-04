@@ -70,7 +70,7 @@ func init() {
 	prometheus.MustRegister(gatewaySyncIterations)
 }
 
-// NewEngine creates a new Engine for the local cluster.
+// NewGatewaySyncer creates a new Engine for the local cluster.
 func NewGatewaySyncer(engine cableengine.Engine, client v1typed.GatewayInterface,
 	version string, healthCheck healthchecker.Interface,
 ) *GatewaySyncer {

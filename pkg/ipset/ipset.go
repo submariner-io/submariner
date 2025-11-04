@@ -270,7 +270,7 @@ func (runner *runner) createSet(set *IPSet, ignoreExistErr bool) error {
 	return runner.run(args, "error creating set %q", set.Name)
 }
 
-// AddEntry adds a new IP entry to the named set.
+// AddIPEntry adds a new IP entry to the named set.
 // If the -exist option is specified, ipset ignores the error otherwise raised when
 // the same set (setname and create parameters are identical) already exists.
 func (runner *runner) AddIPEntry(ip, set string, ignoreExistErr bool) error {
@@ -292,7 +292,7 @@ func (runner *runner) AddEntry(entry *Entry, set string, ignoreExistErr bool) er
 	return runner.run(args, "error adding entry %q to set %q", entry, set)
 }
 
-// DelEntry is used to delete the specified entry from the set.
+// DelIPEntry is used to delete the specified entry from the set.
 func (runner *runner) DelIPEntry(ip, set string) error {
 	return runner.DelEntry(&Entry{
 		SetType: HashIP,

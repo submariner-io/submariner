@@ -245,6 +245,7 @@ type Rule struct {
 }
 
 // Supported policy values are accept (which is the default) or drop.
+
 type Chain struct {
 	Name   string
 	Policy ChainPolicy
@@ -258,8 +259,6 @@ type ChainIPHook struct {
 	Policy   ChainPolicy
 	JumpRule *Rule
 }
-
-// named set.
 type SetInfo struct {
 	// Name is the set name.
 	Name string

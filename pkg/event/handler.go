@@ -106,7 +106,7 @@ type Handler interface {
 	EndpointHandler
 }
 
-// Base structure for event handlers that stubs out methods considered to be optional.
+// HandlerBase structure for event handlers that stubs out methods considered to be optional.
 type HandlerBase struct {
 	handlerState atomic.Value
 }

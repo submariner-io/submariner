@@ -98,7 +98,8 @@ func New(family k8snet.IPFamily) (packetfilter.Driver, error) {
 	}, nil
 }
 
-// No action required on Uninstall when using iptables..
+// No action required on Uninstall when using iptables.
+
 func (p *packetFilter) Uninstall() error {
 	return nil
 }

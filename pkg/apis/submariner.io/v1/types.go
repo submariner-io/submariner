@@ -149,7 +149,7 @@ type GatewayStatus struct {
 	Connections   []Connection `json:"connections"`
 }
 
-// LatencySpec describes the round trip time information for a packet
+// LatencyRTTSpec describes the round trip time information for a packet
 // between the gateway pods of two clusters.
 type LatencyRTTSpec struct {
 	Last    string `json:"last,omitempty"`
@@ -196,6 +196,7 @@ const (
 // +genclient
 // +genclient:noStatus
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type RouteAgent struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -296,12 +297,11 @@ type GlobalEgressIPList struct {
 	Items []GlobalEgressIP `json:"items"`
 }
 
+// ClusterGlobalEgressIP defines a policy for allocating GlobalIPs at the cluster level to be used when no GlobalEgressIP applies.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:scope="Cluster",shortName="cgeip"
 // +kubebuilder:subresource:status
-// ClusterGlobalEgressIP defines a policy for allocating GlobalIPs at the cluster level to be used when no GlobalEgressIP
-// applies.
 type ClusterGlobalEgressIP struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
