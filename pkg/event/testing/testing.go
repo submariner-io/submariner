@@ -31,7 +31,7 @@ import (
 type TestEvent struct {
 	Name      string
 	Handler   string
-	Parameter interface{}
+	Parameter any
 }
 
 type TestHandlerState struct {
@@ -95,7 +95,7 @@ func (t *TestHandlerBase) checkFailOnEvent(eventName string) error {
 	return nil
 }
 
-func (t *TestHandlerBase) addEvent(eventName string, param interface{}) error {
+func (t *TestHandlerBase) addEvent(eventName string, param any) error {
 	if err := t.checkFailOnEvent(eventName); err != nil {
 		return err
 	}

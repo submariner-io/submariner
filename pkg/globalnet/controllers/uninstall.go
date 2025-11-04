@@ -186,7 +186,7 @@ func RemoveStaleInternalServices(config *syncer.ResourceSyncerConfig) error {
 	return nil
 }
 
-func logError(err error, format string, args ...interface{}) {
+func logError(err error, format string, args ...any) {
 	if err != nil {
 		logger.Errorf(err, format, args...)
 	}

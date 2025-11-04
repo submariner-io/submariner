@@ -332,7 +332,7 @@ func addAnnotation(obj metav1.Object, key, value string) {
 	obj.GetAnnotations()[key] = value
 }
 
-func getStatus(client dynamic.ResourceInterface, name string, status interface{}) {
+func getStatus(client dynamic.ResourceInterface, name string, status any) {
 	obj, err := client.Get(context.TODO(), name, metav1.GetOptions{})
 	Expect(err).To(Succeed())
 

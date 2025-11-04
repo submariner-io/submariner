@@ -228,7 +228,7 @@ func NewConnection(endpointSpec *EndpointSpec, usedIP string, nat bool) *Connect
 	return &Connection{Endpoint: *endpointSpec, UsingIP: usedIP, UsingNAT: nat}
 }
 
-func (c *Connection) SetStatus(status ConnectionStatus, messageFormat string, a ...interface{}) {
+func (c *Connection) SetStatus(status ConnectionStatus, messageFormat string, a ...any) {
 	c.Status = status
 	c.StatusMessage = fmt.Sprintf(messageFormat, a...)
 }

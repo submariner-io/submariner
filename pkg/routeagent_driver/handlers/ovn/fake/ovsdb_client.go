@@ -114,11 +114,11 @@ func (c *OVSDBClient) CurrentEndpoint() string {
 func (c *OVSDBClient) UpdateEndpoints(_ []string) {
 }
 
-func (c *OVSDBClient) List(_ context.Context, _ interface{}) error {
+func (c *OVSDBClient) List(_ context.Context, _ any) error {
 	return nil
 }
 
-func (c *OVSDBClient) WhereCache(predicate interface{}) libovsdbclient.ConditionalAPI {
+func (c *OVSDBClient) WhereCache(predicate any) libovsdbclient.ConditionalAPI {
 	return &predicateConditionalAPI{client: c, predicate: predicate}
 }
 
@@ -207,7 +207,7 @@ func (c *OVSDBClient) EnsureNoModelsOfType(m any) {
 
 type noopConditionalAPI struct{}
 
-func (c noopConditionalAPI) List(_ context.Context, _ interface{}) error {
+func (c noopConditionalAPI) List(_ context.Context, _ any) error {
 	return nil
 }
 
@@ -215,7 +215,7 @@ func (c noopConditionalAPI) Mutate(_ model.Model, _ ...model.Mutation) ([]ovsdb.
 	return []ovsdb.Operation{}, nil
 }
 
-func (c noopConditionalAPI) Update(_ model.Model, _ ...interface{}) ([]ovsdb.Operation, error) {
+func (c noopConditionalAPI) Update(_ model.Model, _ ...any) ([]ovsdb.Operation, error) {
 	return []ovsdb.Operation{}, nil
 }
 
@@ -223,7 +223,7 @@ func (c noopConditionalAPI) Delete() ([]ovsdb.Operation, error) {
 	return []ovsdb.Operation{}, nil
 }
 
-func (c noopConditionalAPI) Wait(_ ovsdb.WaitCondition, _ *int, _ model.Model, _ ...interface{}) ([]ovsdb.Operation, error) {
+func (c noopConditionalAPI) Wait(_ ovsdb.WaitCondition, _ *int, _ model.Model, _ ...any) ([]ovsdb.Operation, error) {
 	return []ovsdb.Operation{}, nil
 }
 
@@ -250,7 +250,7 @@ func list[T any](client *OVSDBClient, t T, p any, result *[]T) {
 	*result = r
 }
 
-func (c *predicateConditionalAPI) List(_ context.Context, result interface{}) error {
+func (c *predicateConditionalAPI) List(_ context.Context, result any) error {
 	switch r := result.(type) {
 	case *[]*nbdb.LogicalRouter:
 		list(c.client, &nbdb.LogicalRouter{}, c.predicate, r)

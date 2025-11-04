@@ -222,14 +222,14 @@ func (i *PacketFilter) NewNamedSet(setInfo *packetfilter.SetInfo, family k8snet.
 	}
 }
 
-func (i *PacketFilter) AwaitSet(stringOrMatcher interface{}) {
+func (i *PacketFilter) AwaitSet(stringOrMatcher any) {
 	Eventually(func() []string {
 		s := i.listSets()
 		return s
 	}, 5).Should(ContainElement(stringOrMatcher))
 }
 
-func (i *PacketFilter) AwaitOneSet(stringOrMatcher interface{}) string {
+func (i *PacketFilter) AwaitOneSet(stringOrMatcher any) string {
 	Eventually(func() []string {
 		s := i.listSets()
 		return s
@@ -247,56 +247,56 @@ func (i *PacketFilter) AwaitSetDeleted(setName string) {
 	}, 5).ShouldNot(ContainElement(setName))
 }
 
-func (i *PacketFilter) AwaitEntry(setName string, stringOrMatcher interface{}) {
+func (i *PacketFilter) AwaitEntry(setName string, stringOrMatcher any) {
 	Eventually(func() []string {
 		e, _ := i.listEntries(setName)
 		return e
 	}, 5).Should(ContainElement(stringOrMatcher))
 }
 
-func (i *PacketFilter) AwaitEntryDeleted(setName string, stringOrMatcher interface{}) {
+func (i *PacketFilter) AwaitEntryDeleted(setName string, stringOrMatcher any) {
 	Eventually(func() []string {
 		e, _ := i.listEntries(setName)
 		return e
 	}, 5).ShouldNot(ContainElement(stringOrMatcher))
 }
 
-func (i *PacketFilter) AwaitNoEntry(setName string, stringOrMatcher interface{}) {
+func (i *PacketFilter) AwaitNoEntry(setName string, stringOrMatcher any) {
 	Consistently(func() []string {
 		e, _ := i.listEntries(setName)
 		return e
 	}, 300*time.Millisecond).ShouldNot(ContainElement(stringOrMatcher))
 }
 
-func (i *PacketFilter) AddFailOnDestroySetMatchers(stringOrMatcher interface{}) {
+func (i *PacketFilter) AddFailOnDestroySetMatchers(stringOrMatcher any) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
 	i.failOnDestroySetMatchers = append(i.failOnDestroySetMatchers, stringOrMatcher)
 }
 
-func (i *PacketFilter) AddFailOnCreateSetMatchers(stringOrMatcher interface{}) {
+func (i *PacketFilter) AddFailOnCreateSetMatchers(stringOrMatcher any) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
 	i.failOnCreateSetMatchers = append(i.failOnCreateSetMatchers, stringOrMatcher)
 }
 
-func (i *PacketFilter) AddFailOnAddEntryMatchers(stringOrMatcher interface{}) {
+func (i *PacketFilter) AddFailOnAddEntryMatchers(stringOrMatcher any) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
 	i.failOnAddEntryMatchers = append(i.failOnAddEntryMatchers, stringOrMatcher)
 }
 
-func (i *PacketFilter) AddFailOnDelEntryMatchers(stringOrMatcher interface{}) {
+func (i *PacketFilter) AddFailOnDelEntryMatchers(stringOrMatcher any) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
 	i.failOnDelEntryMatchers = append(i.failOnDelEntryMatchers, stringOrMatcher)
 }
 
-func matchForError(matchers *[]interface{}, rulespec ...string) error {
+func matchForError(matchers *[]any, rulespec ...string) error {
 	for i, m := range *matchers {
 		matches, err := ContainElement(m).Match([]string{strings.Join(rulespec, " ")})
 		Expect(err).To(Succeed())

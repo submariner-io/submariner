@@ -39,14 +39,14 @@ type PacketFilter struct {
 	mutex                    sync.Mutex
 	chainRules               map[string][]string
 	hookChains               map[string]packetfilter.ChainIPHook
-	failOnAppendRuleMatchers []interface{}
-	failOnDeleteRuleMatchers []interface{}
+	failOnAppendRuleMatchers []any
+	failOnDeleteRuleMatchers []any
 
 	sets                     map[string]set.Set[string]
-	failOnDestroySetMatchers []interface{}
-	failOnCreateSetMatchers  []interface{}
-	failOnAddEntryMatchers   []interface{}
-	failOnDelEntryMatchers   []interface{}
+	failOnDestroySetMatchers []any
+	failOnCreateSetMatchers  []any
+	failOnAddEntryMatchers   []any
+	failOnDelEntryMatchers   []any
 }
 
 func New(allowedFamilies ...k8snet.IPFamily) *PacketFilter {
@@ -327,7 +327,7 @@ func (i *PacketFilter) chainExists(table uint32, chain string) (bool, error) {
 	return i.chainRules[chainKey(table, chain)] != nil, nil
 }
 
-func matchRuleForError(matchers *[]interface{}, rulespec string) error {
+func matchRuleForError(matchers *[]any, rulespec string) error {
 	for i, m := range *matchers {
 		matches, err := ContainElement(m).Match([]string{rulespec})
 		Expect(err).To(Succeed())
@@ -341,47 +341,47 @@ func matchRuleForError(matchers *[]interface{}, rulespec string) error {
 	return nil
 }
 
-func (i *PacketFilter) awaitChain(table uint32, stringOrMatcher interface{}) {
+func (i *PacketFilter) awaitChain(table uint32, stringOrMatcher any) {
 	Eventually(func() []string {
 		return i.listChains(table)
 	}, 5).Should(ContainElement(stringOrMatcher), "IP table %v chains", table)
 }
 
-func (i *PacketFilter) AwaitChain(table packetfilter.TableType, stringOrMatcher interface{}) {
+func (i *PacketFilter) AwaitChain(table packetfilter.TableType, stringOrMatcher any) {
 	i.awaitChain(uint32(table), stringOrMatcher)
 }
 
-func (i *PacketFilter) AwaitIPHookChain(chainType packetfilter.ChainType, stringOrMatcher interface{}) {
+func (i *PacketFilter) AwaitIPHookChain(chainType packetfilter.ChainType, stringOrMatcher any) {
 	i.awaitChain(uint32(chainType), stringOrMatcher)
 }
 
-func (i *PacketFilter) awaitNoChain(table uint32, stringOrMatcher interface{}) {
+func (i *PacketFilter) awaitNoChain(table uint32, stringOrMatcher any) {
 	Eventually(func() []string {
 		return i.listChains(table)
 	}, 5).ShouldNot(ContainElement(stringOrMatcher), "IP table %v chains", table)
 }
 
-func (i *PacketFilter) AwaitNoChain(table packetfilter.TableType, stringOrMatcher interface{}) {
+func (i *PacketFilter) AwaitNoChain(table packetfilter.TableType, stringOrMatcher any) {
 	i.awaitNoChain(uint32(table), stringOrMatcher)
 }
 
-func (i *PacketFilter) AwaitNoIPHookChain(chainType packetfilter.ChainType, stringOrMatcher interface{}) {
+func (i *PacketFilter) AwaitNoIPHookChain(chainType packetfilter.ChainType, stringOrMatcher any) {
 	i.awaitNoChain(uint32(chainType), stringOrMatcher)
 }
 
-func (i *PacketFilter) AwaitRule(table packetfilter.TableType, chain string, stringOrMatcher interface{}) {
+func (i *PacketFilter) AwaitRule(table packetfilter.TableType, chain string, stringOrMatcher any) {
 	Eventually(func() []string {
 		return i.listRules(table, chain)
 	}, 5).Should(ContainElement(stringOrMatcher), "Rules for IP table %v, chain %q", table, chain)
 }
 
-func (i *PacketFilter) AwaitNoRule(table packetfilter.TableType, chain string, stringOrMatcher interface{}) {
+func (i *PacketFilter) AwaitNoRule(table packetfilter.TableType, chain string, stringOrMatcher any) {
 	Eventually(func() []string {
 		return i.listRules(table, chain)
 	}, 5).ShouldNot(ContainElement(stringOrMatcher), "Rules for IP table %v, chain %q", table, chain)
 }
 
-func (i *PacketFilter) EnsureNoRule(table packetfilter.TableType, chain string, stringOrMatcher interface{}) {
+func (i *PacketFilter) EnsureNoRule(table packetfilter.TableType, chain string, stringOrMatcher any) {
 	Consistently(func() []string {
 		return i.listRules(table, chain)
 	}).ShouldNot(ContainElement(stringOrMatcher), "Rules for IP table %v, chain %q", table, chain)
@@ -393,14 +393,14 @@ func (i *PacketFilter) AwaitNoRules(table packetfilter.TableType, chain string) 
 	}, 5).Should(BeEmpty())
 }
 
-func (i *PacketFilter) AddFailOnAppendRuleMatcher(stringOrMatcher interface{}) {
+func (i *PacketFilter) AddFailOnAppendRuleMatcher(stringOrMatcher any) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 
 	i.failOnAppendRuleMatchers = append(i.failOnAppendRuleMatchers, stringOrMatcher)
 }
 
-func (i *PacketFilter) AddFailOnDeleteRuleMatcher(stringOrMatcher interface{}) {
+func (i *PacketFilter) AddFailOnDeleteRuleMatcher(stringOrMatcher any) {
 	i.mutex.Lock()
 	defer i.mutex.Unlock()
 

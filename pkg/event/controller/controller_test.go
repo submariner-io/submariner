@@ -188,11 +188,11 @@ func newTestDriver() *testDriver {
 	return t
 }
 
-func (t *testDriver) awaitEvent(name string, param interface{}) {
+func (t *testDriver) awaitEvent(name string, param any) {
 	awaitEvent(testHandlerName, name, param, t.testEvents)
 }
 
-func awaitEvent(handler, name string, param interface{}, eventCh chan testing.TestEvent) {
+func awaitEvent(handler, name string, param any, eventCh chan testing.TestEvent) {
 	Eventually(eventCh).Should(Receive(Equal(
 		testing.TestEvent{Handler: handler, Name: name, Parameter: param})))
 }

@@ -204,7 +204,7 @@ func New() Interface {
 	return &runner{}
 }
 
-func (runner *runner) runWithOutput(args []string, errFormat string, a ...interface{}) (string, error) {
+func (runner *runner) runWithOutput(args []string, errFormat string, a ...any) (string, error) {
 	logger.V(log.DEBUG).Infof("Running ipset %v", args)
 
 	out, err := command.New(exec.Command(IPSetCmd, args...)).CombinedOutput()
@@ -215,7 +215,7 @@ func (runner *runner) runWithOutput(args []string, errFormat string, a ...interf
 	return string(out), nil
 }
 
-func (runner *runner) run(args []string, errFormat string, a ...interface{}) error {
+func (runner *runner) run(args []string, errFormat string, a ...any) error {
 	_, err := runner.runWithOutput(args, errFormat, a...)
 	return err
 }
@@ -341,7 +341,7 @@ func (runner *runner) FlushSet(set string) error {
 	return err
 }
 
-func (runner *runner) retryIfInUse(args []string, errFormat string, a ...interface{}) error {
+func (runner *runner) retryIfInUse(args []string, errFormat string, a ...any) error {
 	backoff := wait.Backoff{
 		Duration: 100 * time.Millisecond,
 		Factor:   1.0,

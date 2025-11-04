@@ -534,7 +534,7 @@ func newTestDriver() *testDriver {
 
 func (t *testDriver) run() {
 	//nolint:reassign // Modifying ErrorHandlers *is* the API
-	utilruntime.ErrorHandlers = append(utilruntime.ErrorHandlers, func(_ context.Context, err error, _ string, _ ...interface{}) {
+	utilruntime.ErrorHandlers = append(utilruntime.ErrorHandlers, func(_ context.Context, err error, _ string, _ ...any) {
 		t.handledError <- err
 	})
 
@@ -576,13 +576,13 @@ func (t *testDriver) run() {
 	informer := informerFactory.Submariner().V1().Gateways().Informer()
 
 	_, err = informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+		AddFunc: func(obj any) {
 			t.gatewayUpdated <- obj.(*submarinerv1.Gateway)
 		},
-		UpdateFunc: func(_, newObj interface{}) {
+		UpdateFunc: func(_, newObj any) {
 			t.gatewayUpdated <- newObj.(*submarinerv1.Gateway)
 		},
-		DeleteFunc: func(obj interface{}) {
+		DeleteFunc: func(obj any) {
 			t.gatewayDeleted <- obj.(*submarinerv1.Gateway)
 		},
 	})
@@ -647,7 +647,7 @@ func equalGateway(expected *submarinerv1.Gateway) gomegaTypes.GomegaMatcher {
 	return &equalGatewayMatcher{*expected}
 }
 
-func (m *equalGatewayMatcher) Match(x interface{}) (bool, error) {
+func (m *equalGatewayMatcher) Match(x any) (bool, error) {
 	actual := x.(*submarinerv1.Gateway)
 	if actual == nil {
 		return false, nil
@@ -681,10 +681,10 @@ func (m *equalGatewayMatcher) Match(x interface{}) (bool, error) {
 	return reflect.DeepEqual(actual.Status, m.expected.Status) && reflect.DeepEqual(actual.Annotations, m.expected.Annotations), nil
 }
 
-func (m *equalGatewayMatcher) FailureMessage(actual interface{}) string {
+func (m *equalGatewayMatcher) FailureMessage(actual any) string {
 	return format.Message(actual, "to equal", m.expected)
 }
 
-func (m *equalGatewayMatcher) NegatedFailureMessage(actual interface{}) string {
+func (m *equalGatewayMatcher) NegatedFailureMessage(actual any) string {
 	return format.Message(actual, "not to equal", m.expected)
 }
