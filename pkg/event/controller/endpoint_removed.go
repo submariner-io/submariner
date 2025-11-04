@@ -26,6 +26,7 @@ func (c *handlerController) handleRemovedEndpoint(endpoint *smv1.Endpoint, reque
 	if requeueCount > maxRequeues {
 		logger.Errorf(nil, "Handler %q: Ignoring delete event for endpoint %q, as its requeued for more than %d times",
 			c.handler.GetName(), endpoint.Spec.ClusterID, maxRequeues)
+
 		return false
 	}
 

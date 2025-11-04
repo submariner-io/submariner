@@ -76,6 +76,7 @@ func (a *Adapter) ensureRuleAtPosition(table TableType, chain string, existingRu
 	if numOccurrences == 1 && isPresentAtRequiredPosition {
 		logger.V(level.TRACE).Infof("Rule %q already exists in table %q, chain %q at position %d - not inserting", rule, table,
 			chain, position)
+
 		return nil
 	}
 

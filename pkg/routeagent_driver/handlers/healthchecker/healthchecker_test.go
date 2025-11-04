@@ -392,6 +392,7 @@ func newTestDriver() *testDriver {
 				MaxPacketLossCount:  1,
 				NewPinger: func(pingerCfg pinger.Config) pinger.Interface {
 					defer GinkgoRecover()
+
 					p, ok := t.pingerMap[pingerCfg.IP]
 					Expect(ok).To(BeTrue())
 

@@ -554,6 +554,7 @@ func (t *testDriver) run() {
 			NewPinger: func(pingerCfg pinger.Config) pinger.Interface {
 				defer GinkgoRecover()
 				Expect(pingerCfg.IP).To(Equal(t.pinger.GetIP()))
+
 				return t.pinger
 			},
 		},

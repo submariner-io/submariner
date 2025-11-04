@@ -66,8 +66,7 @@ func (c *controller) EndpointCreatedOrUpdated(spec *submarinerv1.EndpointSpec) {
 	for _, family := range c.SupportedIPFamilies {
 		healthCheckIP := spec.GetHealthCheckIP(family)
 		if healthCheckIP == "" {
-			logger.Infof("IPv%v HealthCheckIP for Endpoint %q is empty - will not monitor endpoint health",
-				family, spec.CableName)
+			logger.Infof("IPv%v HealthCheckIP for Endpoint %q is empty - will not monitor endpoint health", family, spec.CableName)
 			continue
 		}
 

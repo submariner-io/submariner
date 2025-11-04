@@ -77,7 +77,6 @@ func WaitForLocalNodeReady(ctx context.Context, client kubernetes.Interface) {
 	// In most cases the node will already be ready; otherwise, wait forever or until the context is cancelled.
 	err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
 		localNode, err := GetLocalNode(ctx, client)
-
 		if err != nil {
 			logger.Error(err, "Error retrieving local node")
 		} else {

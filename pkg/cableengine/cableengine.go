@@ -205,6 +205,7 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 		if endpoint.CreationTimestamp.Before(&prevTimestamp) {
 			logger.Warningf("The timestamp (%s) for new cable %q is older than the timestamp (%s) of the pre-existing "+
 				"cable %q - not replacing", endpoint.CreationTimestamp, familyCableName, prevTimestamp, activeFamilyCableName)
+
 			return nil
 		}
 
@@ -215,6 +216,7 @@ func (i *engine) installCableWithNATInfo(rnat *natdiscovery.NATEndpointInfo) err
 				reflect.DeepEqual(active.Endpoint.BackendConfig, endpoint.Spec.BackendConfig) {
 				logger.V(log.TRACE).Infof("Connection info (IP: %s, NAT: %v, BackendConfig: %v) for cable %q is unchanged"+
 					" - not re-installing", active.UsingIP, active.UsingNAT, active.Endpoint.BackendConfig, active.Endpoint.CableName)
+
 				return nil
 			}
 

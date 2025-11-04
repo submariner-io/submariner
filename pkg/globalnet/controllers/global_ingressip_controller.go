@@ -324,6 +324,7 @@ func (c *globalIngressIPController) onUpdate(ingressIP *submarinerv1.GlobalIngre
 	if err != nil {
 		logger.Errorf(err, "Error retrieving exported Service \"%s/%s\" - re-queueing", ingressIP.Namespace,
 			ingressIP.Spec.ServiceRef.Name)
+
 		return true
 	}
 

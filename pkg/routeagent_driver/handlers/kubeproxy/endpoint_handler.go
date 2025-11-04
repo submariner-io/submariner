@@ -142,8 +142,7 @@ func (kp *SyncHandler) RemoteEndpointCreated(endpoint *submV1.Endpoint) error {
 	}
 
 	if err := kp.updateRoutingRulesForInterClusterSupport(subnets, Add); err != nil {
-		logger.Errorf(err, "updateRoutingRulesForInterClusterSupport for new remote %#v returned error",
-			endpoint)
+		logger.Errorf(err, "updateRoutingRulesForInterClusterSupport for new remote %#v returned error", endpoint)
 		return err
 	}
 
@@ -163,8 +162,7 @@ func (kp *SyncHandler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	}
 
 	if err := kp.updateRoutingRulesForInterClusterSupport(subnets, Delete); err != nil {
-		logger.Errorf(err, "updateRoutingRulesForInterClusterSupport for removed remote %#v returned error",
-			endpoint)
+		logger.Errorf(err, "updateRoutingRulesForInterClusterSupport for removed remote %#v returned error", endpoint)
 		return err
 	}
 

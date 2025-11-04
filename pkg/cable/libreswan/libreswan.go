@@ -401,7 +401,6 @@ func whack(args ...string) error {
 
 			return command.New(cmd).Run()
 		}()
-
 		if err == nil {
 			break
 		}

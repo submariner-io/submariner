@@ -147,7 +147,6 @@ func (kp *SyncHandler) Init(ctx context.Context) error {
 
 		return false, nil
 	})
-
 	if err == nil {
 		// Configure CNI Specific changes
 		kp.cniIface = cniIface

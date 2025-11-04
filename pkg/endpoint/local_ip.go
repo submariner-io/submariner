@@ -68,8 +68,8 @@ func GetLocalIPForDestination(dst string, family k8snet.IPFamily) string {
 	conn, err := Dial("udp"+string(family), net.JoinHostPort(dst, "53"))
 	if err == nil {
 		defer conn.Close()
-		localAddr := conn.LocalAddr().(*net.UDPAddr)
 
+		localAddr := conn.LocalAddr().(*net.UDPAddr)
 		if family == k8snet.IPv4 || isAcceptableIPv6(localAddr.IP) {
 			return localAddr.IP.String()
 		}

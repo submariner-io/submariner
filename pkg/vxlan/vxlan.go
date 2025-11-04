@@ -109,24 +109,26 @@ func isVxlanConfigTheSame(newLink, currentLink netlink.Link) bool {
 	if required.VxlanId != existing.VxlanId {
 		logger.Warningf("VxlanId of existing interface (%d) does not match with required VxlanId (%d)",
 			existing.VxlanId, required.VxlanId)
+
 		return false
 	}
 
 	if !required.Group.Equal(existing.Group) {
 		logger.Warningf("Vxlan Group (%v) of existing interface does not match with required Group (%v)",
 			existing.Group, required.Group)
+
 		return false
 	}
 
 	if !required.SrcAddr.Equal(existing.SrcAddr) {
 		logger.Warningf("Vxlan SrcAddr (%v) of existing interface does not match with required SrcAddr (%v)",
 			existing.SrcAddr, required.SrcAddr)
+
 		return false
 	}
 
 	if required.Port != existing.Port {
-		logger.Warningf("Vxlan Port (%d) of existing interface does not match with required Port (%d)",
-			existing.Port, required.Port)
+		logger.Warningf("Vxlan Port (%d) of existing interface does not match with required Port (%d)", existing.Port, required.Port)
 		return false
 	}
 

@@ -30,6 +30,7 @@ func (c *handlerController) handleCreatedEndpoint(endpoint *smv1.Endpoint, reque
 	if requeueCount > maxRequeues {
 		logger.Errorf(nil, "Handler %q: Ignoring create event for endpoint %q, as its requeued for more than %d times",
 			c.handler.GetName(), endpoint.Spec.ClusterID, maxRequeues)
+
 		return false
 	}
 
@@ -76,6 +77,7 @@ func (c *handlerController) handleCreatedRemoteEndpoint(endpoint *smv1.Endpoint)
 	if ok && lastClusterEndpoint.CreationTimestamp.After(endpoint.CreationTimestamp.Time) {
 		logger.Infof("Handler %q: Ignoring new remote %#v since a later endpoint %q was already processed",
 			c.handler.GetName(), endpoint, lastClusterEndpoint.Spec.CableName)
+
 		return nil
 	}
 
