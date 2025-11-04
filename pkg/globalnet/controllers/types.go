@@ -99,10 +99,10 @@ type LeaderElectionConfig struct {
 }
 
 type GatewayMonitorConfig struct {
-	RestMapper meta.RESTMapper
-	Client     dynamic.Interface
-	Scheme     *runtime.Scheme
 	LeaderElectionConfig
+	RestMapper        meta.RESTMapper
+	Client            dynamic.Interface
+	Scheme            *runtime.Scheme
 	Spec              Specification
 	LocalCIDRs        []string
 	LocalClusterCIDRs []string
