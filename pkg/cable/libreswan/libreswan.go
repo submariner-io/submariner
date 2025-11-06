@@ -52,7 +52,7 @@ const (
 	whackTimeout     = 5 * time.Second
 	dpdDelay         = 30 // seconds
 	encryptArg       = "--encrypt"
-	forceencapsArg   = "--encaps=yes"
+	forceencapsArg   = "--encaps="
 	nameArg          = "--name"
 	hostArg          = "--host"
 	clientArg        = "--client"
@@ -491,7 +491,9 @@ func (i *libreswan) bidirectionalConnectToEndpoint(connectionName string, endpoi
 
 	args := []string{"--psk", encryptArg}
 	if endpointInfo.UseNAT || i.forceUDPEncapsulation {
-		args = append(args, forceencapsArg)
+		args = append(args, forceencapsArg+"yes")
+	} else {
+		args = append(args, forceencapsArg+"auto")
 	}
 
 	args = append(args, nameArg, connectionName, ipFamilyArgs[endpointInfo.UseFamily],
@@ -539,7 +541,9 @@ func (i *libreswan) serverConnectToEndpoint(connectionName string, endpointInfo 
 
 	args := []string{"--psk", encryptArg}
 	if endpointInfo.UseNAT || i.forceUDPEncapsulation {
-		args = append(args, forceencapsArg)
+		args = append(args, forceencapsArg+"yes")
+	} else {
+		args = append(args, forceencapsArg+"auto")
 	}
 
 	args = append(args, nameArg, connectionName, ipFamilyArgs[endpointInfo.UseFamily],
@@ -580,7 +584,9 @@ func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo 
 
 	args := []string{"--psk", encryptArg}
 	if endpointInfo.UseNAT || i.forceUDPEncapsulation {
-		args = append(args, forceencapsArg)
+		args = append(args, forceencapsArg+"yes")
+	} else {
+		args = append(args, forceencapsArg+"auto")
 	}
 
 	args = append(args, nameArg, connectionName, ipFamilyArgs[endpointInfo.UseFamily],
