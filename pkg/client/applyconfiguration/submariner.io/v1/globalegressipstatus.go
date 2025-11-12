@@ -27,8 +27,9 @@ import (
 // GlobalEgressIPStatusApplyConfiguration represents a declarative configuration of the GlobalEgressIPStatus type for use
 // with apply.
 type GlobalEgressIPStatusApplyConfiguration struct {
-	Conditions   []metav1.ConditionApplyConfiguration `json:"conditions,omitempty"`
-	AllocatedIPs []string                             `json:"allocatedIPs,omitempty"`
+	Conditions []metav1.ConditionApplyConfiguration `json:"conditions,omitempty"`
+	// The list of allocated GlobalIPs.
+	AllocatedIPs []string `json:"allocatedIPs,omitempty"`
 }
 
 // GlobalEgressIPStatusApplyConfiguration constructs a declarative configuration of the GlobalEgressIPStatus type for use with

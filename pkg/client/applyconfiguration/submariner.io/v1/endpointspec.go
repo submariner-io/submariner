@@ -23,19 +23,22 @@ package v1
 // EndpointSpecApplyConfiguration represents a declarative configuration of the EndpointSpec type for use
 // with apply.
 type EndpointSpecApplyConfiguration struct {
-	ClusterID      *string           `json:"cluster_id,omitempty"`
-	CableName      *string           `json:"cable_name,omitempty"`
-	HealthCheckIP  *string           `json:"healthCheckIP,omitempty"`
-	HealthCheckIPs []string          `json:"healthCheckIPs,omitempty"`
-	Hostname       *string           `json:"hostname,omitempty"`
-	Subnets        []string          `json:"subnets,omitempty"`
-	PrivateIP      *string           `json:"private_ip,omitempty"`
-	PrivateIPs     []string          `json:"privateIPs,omitempty"`
-	PublicIP       *string           `json:"public_ip,omitempty"`
-	PublicIPs      []string          `json:"publicIPs,omitempty"`
-	NATEnabled     *bool             `json:"nat_enabled,omitempty"`
-	Backend        *string           `json:"backend,omitempty"`
-	BackendConfig  map[string]string `json:"backend_config,omitempty"`
+	ClusterID *string `json:"cluster_id,omitempty"`
+	CableName *string `json:"cable_name,omitempty"`
+	// Deprecated: Get/SetHealthCheckIP() or, if necessary, HealthCheckIPs
+	HealthCheckIP  *string  `json:"healthCheckIP,omitempty"`
+	HealthCheckIPs []string `json:"healthCheckIPs,omitempty"`
+	Hostname       *string  `json:"hostname,omitempty"`
+	Subnets        []string `json:"subnets,omitempty"`
+	// Deprecated: Use Get/SetPrivateIP() or, if necessary, PrivateIPs
+	PrivateIP  *string  `json:"private_ip,omitempty"`
+	PrivateIPs []string `json:"privateIPs,omitempty"`
+	// Deprecated: Set/SetPublicIP() or, if necessary, PublicIPs
+	PublicIP      *string           `json:"public_ip,omitempty"`
+	PublicIPs     []string          `json:"publicIPs,omitempty"`
+	NATEnabled    *bool             `json:"nat_enabled,omitempty"`
+	Backend       *string           `json:"backend,omitempty"`
+	BackendConfig map[string]string `json:"backend_config,omitempty"`
 }
 
 // EndpointSpecApplyConfiguration constructs a declarative configuration of the EndpointSpec type for use with

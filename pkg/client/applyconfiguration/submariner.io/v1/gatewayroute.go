@@ -44,6 +44,7 @@ func GatewayRoute(name, namespace string) *GatewayRouteApplyConfiguration {
 	b.WithAPIVersion("submariner.io/v1")
 	return b
 }
+
 func (b GatewayRouteApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

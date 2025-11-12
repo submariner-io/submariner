@@ -59,7 +59,7 @@ func NewGlobalIngressIPInformer(client versioned.Interface, namespace string, re
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredGlobalIngressIPInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
-		&cache.ListWatch{
+		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
@@ -84,7 +84,7 @@ func NewFilteredGlobalIngressIPInformer(client versioned.Interface, namespace st
 				}
 				return client.SubmarinerV1().GlobalIngressIPs(namespace).Watch(ctx, options)
 			},
-		},
+		}, client),
 		&apissubmarineriov1.GlobalIngressIP{},
 		resyncPeriod,
 		indexers,

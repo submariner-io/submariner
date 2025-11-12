@@ -28,9 +28,12 @@ import (
 // GlobalIngressIPSpecApplyConfiguration represents a declarative configuration of the GlobalIngressIPSpec type for use
 // with apply.
 type GlobalIngressIPSpecApplyConfiguration struct {
-	Target     *submarineriov1.TargetType   `json:"target,omitempty"`
+	// Specifies the type of the entity targeted by this object.
+	Target *submarineriov1.TargetType `json:"target,omitempty"`
+	// The reference to a targeted Service, if applicable.
 	ServiceRef *corev1.LocalObjectReference `json:"serviceRef,omitempty"`
-	PodRef     *corev1.LocalObjectReference `json:"podRef,omitempty"`
+	// The reference to a targeted Pod, if applicable.
+	PodRef *corev1.LocalObjectReference `json:"podRef,omitempty"`
 }
 
 // GlobalIngressIPSpecApplyConfiguration constructs a declarative configuration of the GlobalIngressIPSpec type for use with

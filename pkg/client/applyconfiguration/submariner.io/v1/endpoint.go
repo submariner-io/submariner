@@ -44,6 +44,7 @@ func Endpoint(name, namespace string) *EndpointApplyConfiguration {
 	b.WithAPIVersion("submariner.io/v1")
 	return b
 }
+
 func (b EndpointApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

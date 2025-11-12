@@ -31,8 +31,10 @@ import (
 type GlobalIngressIPApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration    `json:",inline"`
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *GlobalIngressIPSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *GlobalIngressIPStatusApplyConfiguration `json:"status,omitempty"`
+	// Spec is the specification of desired behavior of GlobalIngressIP object.
+	Spec *GlobalIngressIPSpecApplyConfiguration `json:"spec,omitempty"`
+	// Observed status of GlobalIngressIP. Its a read-only field.
+	Status *GlobalIngressIPStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // GlobalIngressIP constructs a declarative configuration of the GlobalIngressIP type for use with
@@ -45,6 +47,7 @@ func GlobalIngressIP(name, namespace string) *GlobalIngressIPApplyConfiguration 
 	b.WithAPIVersion("submariner.io/v1")
 	return b
 }
+
 func (b GlobalIngressIPApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

@@ -91,7 +91,7 @@ func newTestDriver() *testDriver {
 
 	BeforeEach(func() {
 		t.transitSwitchIP = map[k8snet.IPFamily]string{k8snet.IPv4: "190.1.2.0", k8snet.IPv6: "1a00:200::"}
-		t.submClient = fakesubm.NewSimpleClientset()
+		t.submClient = fakesubm.NewSimpleClientset() //nolint:staticcheck // NewClientset fails with a schema error
 		t.k8sClient = fakek8s.NewClientset()
 		t.dynClient = fakedynamic.NewSimpleDynamicClient(scheme.Scheme)
 		t.OVNK8sMgmntIntCIDR = map[k8snet.IPFamily]*net.IPNet{}

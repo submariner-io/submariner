@@ -23,7 +23,9 @@ package v1
 // RoutePolicySpecApplyConfiguration represents a declarative configuration of the RoutePolicySpec type for use
 // with apply.
 type RoutePolicySpecApplyConfiguration struct {
-	NextHops    []string `json:"nextHops,omitempty"`
+	// Specifies the next hops to reach the remote CIDRs
+	NextHops []string `json:"nextHops,omitempty"`
+	// Specifies the remote CIDRs available via the next hop
 	RemoteCIDRs []string `json:"remoteCIDRs,omitempty"`
 }
 
