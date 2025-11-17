@@ -9,12 +9,52 @@
 #   # Update a single component
 #   ./.rpm-lockfile/update-lockfile.sh gateway
 #
+# Authentication (if needed):
+#   sudo subscription-manager register --org="YOUR_ORG_ID" --activationkey="YOUR_ACTIVATION_KEY" --force
+#   sudo subscription-manager refresh
+#
+#   After re-registering, update certificate IDs in .repo files:
+#     NEW_ID=$(ls /etc/pki/entitlement/*.pem | grep -v key | head -1 | sed 's/.*\///;s/.pem//')
+#     find .rpm-lockfiles -name "*.repo" -exec sed -i "s/[0-9]\{19\}/$NEW_ID/g" {} \;
+#
 
 set -euo pipefail
 
 SCRIPT_PATH=$(realpath "$0")
 SCRIPT_DIR=$(dirname "${SCRIPT_PATH}")
 REPO_ROOT=$(realpath "${SCRIPT_DIR}/..")
+
+# Verify entitlement certificates exist
+if ! ls /etc/pki/entitlement/*.pem &> /dev/null; then
+  echo "ERROR: No entitlement certificates found in /etc/pki/entitlement/"
+  echo "Run: sudo subscription-manager register --org=\"YOUR_ORG_ID\" --activationkey=\"YOUR_ACTIVATION_KEY\" --force"
+  echo "Then: sudo subscription-manager refresh"
+  exit 1
+fi
+
+# Verify registry authentication
+if [ ! -s "${HOME}/.docker/config.json" ]; then
+  echo "ERROR: registry credentials not found at ${HOME}/.docker/config.json"
+  echo "Run: podman login registry.redhat.io"
+  exit 1
+fi
+
+# Verify certificate IDs in .repo files match actual certificates
+CURRENT_CERT_ID=$(ls /etc/pki/entitlement/*.pem 2>/dev/null | grep -v key | head -1 | xargs basename | sed 's/.pem//')
+REPO_CERT_IDS=$(grep -h "sslclientcert.*pem" "${REPO_ROOT}/.rpm-lockfiles"/*/*.repo 2>/dev/null | sed 's/.*\/\([0-9]*\)\.pem/\1/' | sort -u)
+
+if [ -n "$CURRENT_CERT_ID" ] && [ -n "$REPO_CERT_IDS" ]; then
+  MISMATCHES=$(echo "$REPO_CERT_IDS" | grep -v "^${CURRENT_CERT_ID}$" || true)
+  if [ -n "$MISMATCHES" ]; then
+    echo "ERROR: Certificate ID mismatch detected"
+    echo "Current certificate: ${CURRENT_CERT_ID}"
+    echo "Mismatched IDs in .repo files: ${MISMATCHES}"
+    echo ""
+    echo "Fix with: NEW_ID=\$(ls /etc/pki/entitlement/*.pem | grep -v key | head -1 | sed 's/.*\///;s/.pem//')"
+    echo "          find .rpm-lockfiles -name \"*.repo\" -exec sed -i \"s/[0-9]\\{19\\}/\$NEW_ID/g\" {} \\;"
+    exit 1
+  fi
+fi
 
 # Create a temporary directory for entitlement certificates to avoid SELinux issues.
 # The trap command ensures the temporary directory is cleaned up on script exit.
@@ -38,7 +78,7 @@ update_component_lockfile() {
 
   podman run --rm -v "${REPO_ROOT}:/workspace:z" \
          -v "${entitlements_dir}:/etc/pki/entitlement:ro,Z" \
-         -v "${XDG_RUNTIME_DIR}/containers/auth.json:/run/containers/0/auth.json:ro" \
+         -v "${HOME}/.docker/config.json:/run/containers/0/auth.json:ro,Z" \
          registry.access.redhat.com/ubi9/ubi:latest \
          /bin/bash -c "
            set -x
