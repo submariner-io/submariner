@@ -1,6 +1,6 @@
 ---
 context:
-  containerfile: ../package/Dockerfile.submariner-route-agent.konflux
+  containerfile: ../../package/Dockerfile.submariner-route-agent.konflux
 
 contentOrigin:
   repofiles:
