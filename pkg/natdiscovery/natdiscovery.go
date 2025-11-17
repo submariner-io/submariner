@@ -175,7 +175,7 @@ func (nd *natDiscovery) RemoveEndpoint(endpointName string) {
 func (nd *natDiscovery) checkEndpointList() {
 	logger.V(log.TRACE).Info("NAT discovery checking endpoint list")
 
-	nd.remoteEndpoints.Range(func(key, value interface{}) bool {
+	nd.remoteEndpoints.Range(func(key, value any) bool {
 		endpointNAT := value.(*remoteEndpointNAT)
 		name := endpointNAT.endpoint.Spec.GetFamilyCableName(endpointNAT.family)
 

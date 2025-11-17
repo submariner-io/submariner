@@ -213,7 +213,7 @@ func getTargetSNATIPaddress(allocIPs []string) string {
 	return snatIP
 }
 
-func checkStatusChanged(oldStatus, newStatus interface{}, retObj runtime.Object) runtime.Object {
+func checkStatusChanged(oldStatus, newStatus any, retObj runtime.Object) runtime.Object {
 	if equality.Semantic.DeepEqual(oldStatus, newStatus) {
 		return nil
 	}

@@ -126,6 +126,7 @@ func GetPublicIP(family k8snet.IPFamily, submSpec *types.SubmarinerSpecification
 			if err != nil {
 				logger.Errorf(err, "Unable to resolve public IPv%s in an air-gapped deployment using %q - using empty value",
 					family, config)
+
 				return "", "", nil
 			}
 

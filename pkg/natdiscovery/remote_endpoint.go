@@ -197,6 +197,7 @@ func (rn *remoteEndpointNAT) transitionToPrivateIP(remoteEndpointID string, useN
 		if rn.sinceLastTransition() > ToDuration(&PublicToPrivateFailoverTimeout) {
 			logger.V(log.DEBUG).Infof("Response on private IP received too late after response on public IP for endpoint %q",
 				remoteEndpointID)
+
 			return false
 		}
 

@@ -94,6 +94,7 @@ func Discover(clusterCIDRs []string, family k8snet.IPFamily) (*Interface, error)
 			if clusterNetwork.Contains(address) {
 				logger.V(log.DEBUG).Infof("Found CNI Interface %q that has IP %q from ClusterCIDR %q",
 					hostInterfaces[i].Name, ipAddr, clusterCIDR)
+
 				return &Interface{IPAddress: ipAddr.String(), Name: hostInterfaces[i].Name}, nil
 			}
 		}

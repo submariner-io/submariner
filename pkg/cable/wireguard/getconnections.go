@@ -125,8 +125,7 @@ func (w *wireguard) updateConnectionForPeer(p *wgtypes.Peer, connection *v1.Conn
 
 	if lc < 2*keepAliveMS {
 		// Grace period, leave status unchanged.
-		logger.Warningf("No traffic for %.1f seconds; handshake was %.1f seconds ago: %#v", lcSec,
-			handshakeDelta.Seconds(), connection)
+		logger.Warningf("No traffic for %.1f seconds; handshake was %.1f seconds ago: %#v", lcSec, handshakeDelta.Seconds(), connection)
 		return
 	}
 

@@ -181,8 +181,8 @@ func (h *calicoIPPoolHandler) createIPPool(endpoint *submV1.Endpoint) error {
 				DisableBGPExport: true,
 			},
 		}
-		_, err := h.client.ProjectcalicoV3().IPPools().Create(context.TODO(), iPPoolObj, metav1.CreateOptions{})
 
+		_, err := h.client.ProjectcalicoV3().IPPools().Create(context.TODO(), iPPoolObj, metav1.CreateOptions{})
 		if err == nil {
 			logger.Infof("Successfully created Calico IPPool %q", iPPoolObj.GetName())
 			continue
@@ -207,7 +207,6 @@ func (h *calicoIPPoolHandler) deleteIPPool(endpoint *submV1.Endpoint) error {
 
 		err := h.client.ProjectcalicoV3().IPPools().Delete(context.TODO(),
 			poolName, metav1.DeleteOptions{})
-
 		if err == nil {
 			logger.Infof("Successfully deleted Calico IPPool %q", poolName)
 			continue

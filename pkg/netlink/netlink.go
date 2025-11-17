@@ -354,7 +354,6 @@ func DeleteIfaceAndAssociatedRoutes(iface string, tableID int, family k8snet.IPF
 	}
 
 	currentRouteList, err := n.RouteList(link, family)
-
 	if err != nil {
 		logger.Warningf("Unable to cleanup routes, error retrieving IPv%v routes on the link %s: %v", family, iface, err)
 	} else {

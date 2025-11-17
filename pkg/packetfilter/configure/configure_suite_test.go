@@ -91,7 +91,7 @@ var _ = Describe("DriverFromGlobalConfig", func() {
 })
 
 func verifyDriverFn(dType DriverType) {
-	fnValue := func(v interface{}) string {
+	fnValue := func(v any) string {
 		return fmt.Sprintf("%v", v)
 	}
 

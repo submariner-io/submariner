@@ -20,6 +20,7 @@ package constants
 
 const (
 	// IPTable chains used by RouteAgent.
+
 	SmPostRoutingChain    = "SUBMARINER-POSTROUTING"
 	SmPostRoutingMssChain = "SUBMARINER-POSTROUTING-MSS"
 	SmInputChain          = "SUBMARINER-INPUT"
@@ -33,6 +34,7 @@ const (
 	// To support connectivity for Pods with HostNetworking on the GatewayNode, we program
 	// certain routing rules in table 150. As part of these routes, we set the source-ip of
 	// the egress traffic to the corresponding CNIInterfaceIP on that host.
+
 	RouteAgentHostNetworkTableID = 150
 
 	NATTable    = "nat"

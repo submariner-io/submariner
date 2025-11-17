@@ -46,7 +46,7 @@ const (
 )
 
 const (
-	// TCP MSS = Default_Iface_MTU - TCP_H(20)-IP_H(20)-max_IpsecOverhed(80).
+	// MaxIPSecOverhead - TCP MSS = Default_Iface_MTU - TCP_H(20)-IP_H(20)-max_IpsecOverhed(80).
 	MaxIPSecOverhead    = 120
 	RemoteCIDRIPSetIPv4 = "SUBMARINER-REMOTECIDRS"
 	LocalCIDRIPSetIPv4  = "SUBMARINER-LOCALCIDRS"
@@ -308,7 +308,7 @@ func (h *mtuHandler) forceMssClamping(endpoint *submV1.Endpoint) error {
 	return nil
 }
 
-func logError(err error, format string, args ...interface{}) {
+func logError(err error, format string, args ...any) {
 	if err != nil {
 		logger.Errorf(err, format, args...)
 	}

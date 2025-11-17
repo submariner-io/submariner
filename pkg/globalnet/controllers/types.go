@@ -68,7 +68,7 @@ const (
 	// to protect them from accidental deletion.
 	InternalServiceFinalizer = "submariner.io/globalnet-internal-service"
 
-	// The prefix used for the ipset chains created by Globalnet pod.
+	// IPSetPrefix is the prefix used for the ipset chains created by Globalnet pod.
 	IPSetPrefix = "SM-GN-"
 
 	AddRules    = true
@@ -99,10 +99,10 @@ type LeaderElectionConfig struct {
 }
 
 type GatewayMonitorConfig struct {
-	RestMapper meta.RESTMapper
-	Client     dynamic.Interface
-	Scheme     *runtime.Scheme
 	LeaderElectionConfig
+	RestMapper        meta.RESTMapper
+	Client            dynamic.Interface
+	Scheme            *runtime.Scheme
 	Spec              Specification
 	LocalCIDRs        []string
 	LocalClusterCIDRs []string

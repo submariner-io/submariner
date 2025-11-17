@@ -207,6 +207,7 @@ func newNATDiscovery(endpoint *submarinerv1.Endpoint, addr, addrv6 *net.UDPAddr)
 		CreateServerConnection: func(port int32, family k8snet.IPFamily) (natdiscovery.ServerConnection, error) {
 			defer GinkgoRecover()
 			Expect(family).ToNot(Equal(k8snet.IPFamilyUnknown))
+
 			if family == k8snet.IPv4 {
 				Expect(int(port)).To(Equal(addr.Port))
 			} else {
@@ -228,6 +229,7 @@ func newNATDiscovery(endpoint *submarinerv1.Endpoint, addr, addrv6 *net.UDPAddr)
 			if family == k8snet.IPv4 {
 				return srcIP
 			}
+
 			if family == k8snet.IPv6 {
 				return srcIPv6
 			}

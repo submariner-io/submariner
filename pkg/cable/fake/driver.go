@@ -42,7 +42,7 @@ type Driver struct {
 	init                        chan struct{}
 	ErrOnInit                   error
 	activeConnections           map[string]v1.Connection
-	Connections                 interface{}
+	Connections                 any
 	connectToEndpoint           chan *natdiscovery.NATEndpointInfo
 	ErrOnConnectToEndpoint      error
 	disconnectFromEndpoint      chan *disconnectInfo

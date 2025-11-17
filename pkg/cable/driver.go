@@ -58,7 +58,7 @@ type Driver interface {
 	Cleanup(ctx context.Context) error
 }
 
-// Function prototype to create a new driver.
+// DriverCreateFunc prototype to create a new driver.
 type DriverCreateFunc func(localEndpoint *endpoint.Local,
 	localCluster *types.SubmarinerCluster, signingRequestor certificate.SigningRequestor) (Driver, error)
 
@@ -75,7 +75,7 @@ var defaultCableDriver string
 
 var logger = log.Logger{Logger: logf.Log.WithName("CableDriver")}
 
-// Adds a supported driver, prints a fatal error in the case of double registration.
+// AddDriver adds a supported driver, prints a fatal error in the case of double registration.
 func AddDriver(name string, driverCreate DriverCreateFunc) {
 	if drivers[name] != nil {
 		logger.Fatalf("Multiple cable engine drivers attempting to register with name %q", name)
@@ -84,7 +84,7 @@ func AddDriver(name string, driverCreate DriverCreateFunc) {
 	drivers[name] = driverCreate
 }
 
-// Returns a new driver according the required Backend.
+// NewDriver creates a new driver according the required Backend.
 func NewDriver(localEndpoint *endpoint.Local, localCluster *types.SubmarinerCluster,
 	signingRequestor certificate.SigningRequestor,
 ) (Driver, error) {
@@ -109,12 +109,12 @@ func NewDriver(localEndpoint *endpoint.Local, localCluster *types.SubmarinerClus
 	return driverCreate(localEndpoint, localCluster, signingRequestor)
 }
 
-// Sets the default cable driver name, if it is not specified by user.
+// SetDefaultCableDriver sets the default cable driver name, if it is not specified by user.
 func SetDefaultCableDriver(driver string) {
 	defaultCableDriver = driver
 }
 
-// Returns the default cable driver name.
+// GetDefaultCableDriver returns the default cable driver name.
 func GetDefaultCableDriver() string {
 	return defaultCableDriver
 }

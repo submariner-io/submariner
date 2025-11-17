@@ -26,6 +26,7 @@ func (c *handlerController) handleUpdatedEndpoint(endpoint *smv1.Endpoint, reque
 	if requeueCount > maxRequeues {
 		logger.Errorf(nil, "Handler %q: Ignoring update event for endpoint %q, as it's requeued for more than %d times",
 			c.handler.GetName(), endpoint.Name, maxRequeues)
+
 		return false
 	}
 

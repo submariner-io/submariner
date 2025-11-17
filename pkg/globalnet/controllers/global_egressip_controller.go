@@ -84,7 +84,7 @@ func NewGlobalEgressIPController(config *syncer.ResourceSyncerConfig, pool *ipam
 
 			specObj := util.GetSpec(&list.Items[i])
 			spec := &submarinerv1.GlobalEgressIPSpec{}
-			_ = runtime.DefaultUnstructuredConverter.FromUnstructured(specObj.(map[string]interface{}), spec)
+			_ = runtime.DefaultUnstructuredConverter.FromUnstructured(specObj.(map[string]any), spec)
 			key, _ := cache.MetaNamespaceKeyFunc(&list.Items[i])
 
 			return controller.programGlobalEgressRules(key, reservedIPs, spec.PodSelector, controller.newNamedSet(key))
