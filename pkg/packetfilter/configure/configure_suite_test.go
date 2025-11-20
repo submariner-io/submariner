@@ -33,14 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type DriverType int
-
-const (
-	IPTables DriverType = iota
-	NfTables
-)
-
-const defaultDriver = NfTables
+const defaultDriver = configure.NfTables
 
 var _ = Describe("DriverFromGlobalConfig", func() {
 	var cm *corev1.ConfigMap
@@ -66,7 +59,7 @@ var _ = Describe("DriverFromGlobalConfig", func() {
 
 			It("should set the nftables driver", func() {
 				configure.DriverFromGlobalConfig()
-				verifyDriverFn(NfTables)
+				verifyDriverFn(configure.NfTables)
 			})
 		})
 
@@ -77,7 +70,7 @@ var _ = Describe("DriverFromGlobalConfig", func() {
 
 			It("should set the iptables driver", func() {
 				configure.DriverFromGlobalConfig()
-				verifyDriverFn(IPTables)
+				verifyDriverFn(configure.IPTables)
 			})
 		})
 	})
@@ -90,12 +83,12 @@ var _ = Describe("DriverFromGlobalConfig", func() {
 	})
 })
 
-func verifyDriverFn(dType DriverType) {
+func verifyDriverFn(dType configure.DriverType) {
 	fnValue := func(v any) string {
 		return fmt.Sprintf("%v", v)
 	}
 
-	if dType == NfTables {
+	if dType == configure.NfTables {
 		Expect(fnValue(packetfilter.GetNewDriverFn())).To(Equal(fnValue(nftables.New)))
 	} else {
 		Expect(fnValue(packetfilter.GetNewDriverFn())).To(Equal(fnValue(iptables.New)))
