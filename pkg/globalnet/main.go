@@ -38,8 +38,11 @@ import (
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cidr"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
+	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
+	"github.com/submariner-io/submariner/pkg/packetfilter"
 	pfconfigure "github.com/submariner-io/submariner/pkg/packetfilter/configure"
+	"github.com/submariner-io/submariner/pkg/packetfilter/iptables"
 	"github.com/submariner-io/submariner/pkg/versions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
@@ -167,6 +170,8 @@ func main() {
 	err = gatewayMonitor.Start()
 	logger.FatalOnError(err, "Error starting the gatewayMonitor")
 
+	cleanupLegacyIptables()
+
 	<-ctx.Done()
 	gatewayMonitor.Stop()
 
@@ -178,4 +183,58 @@ func init() {
 	flag.StringVar(&masterURL, "master", "",
 		"The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 	flag.BoolVar(&showVersion, "version", showVersion, "Show version")
+}
+
+// =============================================================================
+// TEMPORARY: Legacy iptables cleanup for migration to nftables
+// This entire section can be removed once migration is complete
+// =============================================================================
+
+func cleanupLegacyIptables() {
+	if pfconfigure.GetDriverType() == pfconfigure.IPTables {
+		return
+	}
+
+	// Globalnet only supports IPv4
+	pIPtables, err := iptables.New(k8snet.IPv4)
+	if err != nil {
+		logger.Errorf(err, "Failed to create IPv%v iptables driver for cleanup", k8snet.IPv4)
+		return
+	}
+
+	_ = pIPtables.ClearChain(packetfilter.TableTypeNAT, constants.SmGlobalnetIngressChain)
+
+	if err := pIPtables.DeleteIPHookChain(&packetfilter.ChainIPHook{
+		Name:     constants.SmGlobalnetIngressChain,
+		Type:     packetfilter.ChainTypeNAT,
+		Hook:     packetfilter.ChainHookPrerouting,
+		Priority: packetfilter.ChainPriorityFirst,
+	}); err != nil {
+		logger.V(log.DEBUG).Infof("Failed to delete IPv%v iptables IP hook chain %q: %v", k8snet.IPv4, constants.SmGlobalnetIngressChain, err)
+	} else {
+		logger.Infof("Cleaned up IPv%v iptables IP hook chain %q", k8snet.IPv4, constants.SmGlobalnetIngressChain)
+	}
+
+	regularChains := []struct {
+		Table packetfilter.TableType
+		Chain string
+	}{
+		{Table: packetfilter.TableTypeNAT, Chain: constants.SmGlobalnetEgressChainForCluster},
+		{Table: packetfilter.TableTypeNAT, Chain: constants.SmGlobalnetEgressChainForHeadlessSvcPods},
+		{Table: packetfilter.TableTypeNAT, Chain: constants.SmGlobalnetEgressChainForHeadlessSvcEPs},
+		{Table: packetfilter.TableTypeNAT, Chain: constants.SmGlobalnetEgressChainForNamespace},
+		{Table: packetfilter.TableTypeNAT, Chain: constants.SmGlobalnetEgressChainForPods},
+		{Table: packetfilter.TableTypeNAT, Chain: constants.SmGlobalnetMarkChain},
+		{Table: packetfilter.TableTypeNAT, Chain: constants.SmGlobalnetEgressChain},
+	}
+
+	for _, item := range regularChains {
+		_ = pIPtables.ClearChain(item.Table, item.Chain)
+
+		if err := pIPtables.DeleteChain(item.Table, item.Chain); err != nil {
+			logger.V(log.DEBUG).Infof("Failed to delete IPv%v iptables chain %q: %v", k8snet.IPv4, item.Chain, err)
+		} else {
+			logger.Infof("Cleaned up IPv%v iptables chain %q", k8snet.IPv4, item.Chain)
+		}
+	}
 }
