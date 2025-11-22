@@ -22,6 +22,6 @@ make markdownlint
 
 @.agents/workflows/cve-fix.md
 
-### Konflux Builds
+### Konflux Component Setup
 
-(future - planned for separate effort)
+@.agents/workflows/konflux-component-setup.md
