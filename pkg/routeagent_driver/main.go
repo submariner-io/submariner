@@ -50,7 +50,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/packetfilter/iptables"
 	"github.com/submariner-io/submariner/pkg/pinger"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cabledriver"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/chains"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/calico"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/healthchecker"
@@ -285,58 +285,28 @@ func cleanupLegacyIptables(clusterCidr []string) {
 	}{
 		{
 			Table: packetfilter.TableTypeNAT,
-			Chain: &packetfilter.ChainIPHook{
-				Name:     constants.SmPostRoutingChain,
-				Type:     packetfilter.ChainTypeNAT,
-				Hook:     packetfilter.ChainHookPostrouting,
-				Priority: packetfilter.ChainPriorityFirst,
-			},
+			Chain: chains.NewPostRouting(),
 		},
 		{
 			Table: packetfilter.TableTypeFilter,
-			Chain: &packetfilter.ChainIPHook{
-				Name:     constants.SmInputChain,
-				Type:     packetfilter.ChainTypeFilter,
-				Hook:     packetfilter.ChainHookInput,
-				Priority: packetfilter.ChainPriorityLast,
-				JumpRule: &packetfilter.Rule{
-					Proto:       packetfilter.RuleProtoUDP,
-					Action:      packetfilter.RuleActionJump,
-					TargetChain: constants.SmInputChain,
-				},
-			},
+			Chain: chains.NewInput(),
 		},
 		{
 			Table: packetfilter.TableTypeNAT,
-			Chain: &packetfilter.ChainIPHook{
-				Name:     constants.SmSelfSnatChain,
-				Type:     packetfilter.ChainTypeNAT,
-				Hook:     packetfilter.ChainHookPostrouting,
-				Priority: packetfilter.ChainPriorityMiddle,
-			},
+			Chain: chains.NewSelfSnat(),
 		},
 		{
 			Table: packetfilter.TableTypeFilter,
-			Chain: &packetfilter.ChainIPHook{
-				Name:     constants.SmForwardChain,
-				Type:     packetfilter.ChainTypeFilter,
-				Hook:     packetfilter.ChainHookForward,
-				Priority: packetfilter.ChainPriorityFirst,
-			},
+			Chain: chains.NewForwarding(),
 		},
 		{
 			Table: packetfilter.TableTypeFilter,
-			Chain: &packetfilter.ChainIPHook{
-				Name:     ovn.ForwardingSubmarinerMSSClampChain,
-				Type:     packetfilter.ChainTypeFilter,
-				Hook:     packetfilter.ChainHookForward,
-				Priority: packetfilter.ChainPriorityFirst,
-			},
+			Chain: chains.NewForwardingMSSClamp(),
 		},
 		{
 			Table: packetfilter.TableTypeRoute,
 			Chain: &packetfilter.ChainIPHook{
-				Name:     constants.SmPostRoutingMssChain,
+				Name:     chains.SmPostRoutingMss,
 				Type:     packetfilter.ChainTypeRoute,
 				Hook:     packetfilter.ChainHookPostrouting,
 				Priority: packetfilter.ChainPriorityFirst,

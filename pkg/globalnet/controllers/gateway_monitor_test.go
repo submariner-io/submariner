@@ -39,7 +39,7 @@ import (
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	fakeNetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
-	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	routeagentchains "github.com/submariner-io/submariner/pkg/routeagent_driver/chains"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -560,7 +560,7 @@ func (t *gatewayMonitorTestDriver) awaitGlobalnetChains() {
 	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForHeadlessSvcEPs)
 	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForNamespace)
 	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForCluster)
-	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, routeAgent.SmPostRoutingChain)
+	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, routeagentchains.SmPostRouting)
 	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain)
 }
 

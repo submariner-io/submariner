@@ -33,7 +33,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	pfiface "github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
-	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	routeagentchains "github.com/submariner-io/submariner/pkg/routeagent_driver/chains"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -68,8 +68,8 @@ func UninstallDataPath() {
 		logError(err, "Error flushing packetfilter chain %q", chain)
 	}
 
-	err = gnpFilter.FlushNatChain(routeAgent.SmPostRoutingChain)
-	logError(err, "Error flushing packetfilter chain %q", routeAgent.SmPostRoutingChain)
+	err = gnpFilter.FlushNatChain(routeagentchains.SmPostRouting)
+	logError(err, "Error flushing packetfilter chain %q", routeagentchains.SmPostRouting)
 
 	chain := packetfilter.ChainIPHook{
 		Name:     constants.SmGlobalnetIngressChain,

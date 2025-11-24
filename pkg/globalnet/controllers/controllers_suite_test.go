@@ -43,7 +43,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
-	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	routeagentchains "github.com/submariner-io/submariner/pkg/routeagent_driver/chains"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -182,7 +182,7 @@ func (t *testDriverBase) initChains() {
 		constants.SmGlobalnetEgressChainForHeadlessSvcEPs,
 		constants.SmGlobalnetEgressChainForNamespace,
 		constants.SmGlobalnetEgressChainForCluster,
-		routeAgent.SmPostRoutingChain,
+		routeagentchains.SmPostRouting,
 		constants.SmGlobalnetMarkChain,
 	} {
 		Expect(t.pFilter.CreateChainIfNotExists(packetfilter.TableTypeNAT, &packetfilter.Chain{

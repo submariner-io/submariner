@@ -24,7 +24,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/chains"
 	"github.com/vishvananda/netlink"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -144,9 +144,9 @@ func (ovn *Handler) handleInterfaceAddressChange() error {
 			return errors.Wrap(err, "error syncing host network routes")
 		}
 
-		logger.V(log.DEBUG).Infof("Install/ensure %q/%s IPHook chain exists", constants.SmPostRoutingChain, "NAT")
+		logger.V(log.DEBUG).Infof("Install/ensure %q/%s IPHook chain exists", chains.SmPostRouting, "NAT")
 
-		if err := ovn.pFilter.CreateIPHookChainIfNotExists(newPostRoutingChain()); err != nil {
+		if err := ovn.pFilter.CreateIPHookChainIfNotExists(chains.NewPostRouting()); err != nil {
 			return errors.Wrap(err, "error installing IPHook chain")
 		}
 

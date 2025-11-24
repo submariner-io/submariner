@@ -31,7 +31,7 @@ import (
 	fakenetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/chains"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/mtu"
 	k8snet "k8s.io/utils/net"
 )
@@ -137,19 +137,19 @@ func newTestDriver() *testDriver {
 func (t *testDriver) testForcedMSS(expTCPMssValue int) {
 	t.pFilter.AwaitSet(Equal(mtu.LocalCIDRIPSetIPv4))
 	t.pFilter.AwaitSet(Equal(mtu.RemoteCIDRIPSetIPv4))
-	t.pFilter.EnsureNoRule(t.tableType, constants.SmPostRoutingMssChain,
+	t.pFilter.EnsureNoRule(t.tableType, chains.SmPostRoutingMss,
 		ContainSubstring("\"ClampType\":%d", packetfilter.ToPMTU))
 
 	Expect(t.handler.LocalEndpointCreated(newSubmEndpoint([]string{localIPv4Subnet1}))).To(Succeed())
 
 	t.pFilter.AwaitRule(t.tableType,
-		constants.SmPostRoutingMssChain, And(
+		chains.SmPostRoutingMss, And(
 			ContainSubstring("\"ClampType\":%d", packetfilter.ToValue),
 			ContainSubstring("\"SrcSetName\":%q", mtu.RemoteCIDRIPSetIPv4),
 			ContainSubstring("\"DestSetName\":%q", mtu.LocalCIDRIPSetIPv4),
 			ContainSubstring("\"MssValue\":%q", strconv.Itoa(expTCPMssValue))))
 	t.pFilter.AwaitRule(t.tableType,
-		constants.SmPostRoutingMssChain, And(
+		chains.SmPostRoutingMss, And(
 			ContainSubstring("\"ClampType\":%d", packetfilter.ToValue),
 			ContainSubstring("\"SrcSetName\":%q", mtu.LocalCIDRIPSetIPv4),
 			ContainSubstring("\"DestSetName\":%q", mtu.RemoteCIDRIPSetIPv4),
@@ -162,12 +162,12 @@ func (t *testDriver) testHandler(localCIDR, localCIDRIPSet, remoteCIDRIPSet stri
 		t.pFilter.AwaitSet(Equal(remoteCIDRIPSet))
 
 		t.pFilter.AwaitRule(t.tableType,
-			constants.SmPostRoutingMssChain, And(
+			chains.SmPostRoutingMss, And(
 				ContainSubstring("\"ClampType\":%d", packetfilter.ToPMTU),
 				ContainSubstring("\"SrcSetName\":%q", remoteCIDRIPSet),
 				ContainSubstring("\"DestSetName\":%q", localCIDRIPSet)))
 		t.pFilter.AwaitRule(t.tableType,
-			constants.SmPostRoutingMssChain, And(
+			chains.SmPostRoutingMss, And(
 				ContainSubstring("\"ClampType\":%d", packetfilter.ToPMTU),
 				ContainSubstring("\"SrcSetName\":%q", localCIDRIPSet),
 				ContainSubstring("\"DestSetName\":%q", remoteCIDRIPSet)))
@@ -216,7 +216,7 @@ func (t *testDriver) testHandler(localCIDR, localCIDRIPSet, remoteCIDRIPSet stri
 
 		t.pFilter.AwaitSetDeleted(localCIDRIPSet)
 		t.pFilter.AwaitSetDeleted(remoteCIDRIPSet)
-		t.pFilter.AwaitNoIPHookChain(packetfilter.ChainTypeRoute, Equal(constants.SmPostRoutingMssChain))
+		t.pFilter.AwaitNoIPHookChain(packetfilter.ChainTypeRoute, Equal(chains.SmPostRoutingMss))
 	})
 
 	Specify("GetName should include the IP family", func() {

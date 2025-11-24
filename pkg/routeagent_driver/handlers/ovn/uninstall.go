@@ -25,6 +25,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/util"
 	nodeutil "github.com/submariner-io/submariner/pkg/node"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/chains"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn/vsctl"
 	corev1 "k8s.io/api/core/v1"
@@ -64,9 +65,9 @@ func (ovn *Handler) Uninstall() error {
 			constants.RouteAgentHostNetworkTableID)
 	}
 
-	ovn.deleteIPHookChain(packetfilter.TableTypeFilter, newSubmarinerFWDChain())
-	ovn.deleteIPHookChain(packetfilter.TableTypeFilter, newSubmarinerMSSClampChain())
-	ovn.deleteIPHookChain(packetfilter.TableTypeNAT, newPostRoutingChain())
+	ovn.deleteIPHookChain(packetfilter.TableTypeFilter, chains.NewForwarding())
+	ovn.deleteIPHookChain(packetfilter.TableTypeFilter, chains.NewForwardingMSSClamp())
+	ovn.deleteIPHookChain(packetfilter.TableTypeNAT, chains.NewPostRouting())
 
 	err = util.Update[*corev1.Node](context.TODO(), ovn.nodeResourceInterface(), &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: nodeutil.GetLocalNodeName()},

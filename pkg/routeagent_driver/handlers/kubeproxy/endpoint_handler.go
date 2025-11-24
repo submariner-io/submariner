@@ -26,7 +26,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/cidr"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/chains"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/mtu"
 	"github.com/submariner-io/submariner/pkg/vxlan"
 	k8snet "k8s.io/utils/net"
@@ -90,7 +90,7 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 		Action:      packetfilter.RuleActionSelfSNAT,
 	}
 
-	if err := kp.pFilter.AppendUnique(packetfilter.TableTypeNAT, constants.SmSelfSnatChain, &ruleSpec); err != nil {
+	if err := kp.pFilter.AppendUnique(packetfilter.TableTypeNAT, chains.SmSelfSnat, &ruleSpec); err != nil {
 		return errors.Wrapf(err, "unable to append rule %+v", &ruleSpec)
 	}
 
@@ -100,7 +100,7 @@ func (kp *SyncHandler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 		Action:      packetfilter.RuleActionSelfSNAT,
 	}
 
-	if err := kp.pFilter.AppendUnique(packetfilter.TableTypeNAT, constants.SmSelfSnatChain, &ruleSpec); err != nil {
+	if err := kp.pFilter.AppendUnique(packetfilter.TableTypeNAT, chains.SmSelfSnat, &ruleSpec); err != nil {
 		return errors.Wrapf(err, "unable to append rule %+v", &ruleSpec)
 	}
 

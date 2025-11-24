@@ -25,51 +25,26 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"github.com/submariner-io/submariner/pkg/port"
-	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/chains"
 )
 
 func (kp *SyncHandler) createPFilterChains() error {
-	ipHookChains := []packetfilter.ChainIPHook{
-		{
-			Name:     constants.SmPostRoutingChain,
-			Type:     packetfilter.ChainTypeNAT,
-			Hook:     packetfilter.ChainHookPostrouting,
-			Priority: packetfilter.ChainPriorityFirst,
-		},
-		{
-			Name:     constants.SmInputChain,
-			Type:     packetfilter.ChainTypeFilter,
-			Hook:     packetfilter.ChainHookInput,
-			Priority: packetfilter.ChainPriorityLast,
-			JumpRule: &packetfilter.Rule{
-				Proto:       packetfilter.RuleProtoUDP,
-				Action:      packetfilter.RuleActionJump,
-				TargetChain: constants.SmInputChain,
-			},
-		},
-		{
-			Name:     constants.SmForwardChain,
-			Type:     packetfilter.ChainTypeFilter,
-			Hook:     packetfilter.ChainHookForward,
-			Priority: packetfilter.ChainPriorityFirst,
-		},
-		{
-			Name:     constants.SmSelfSnatChain,
-			Type:     packetfilter.ChainTypeNAT,
-			Hook:     packetfilter.ChainHookPostrouting,
-			Priority: packetfilter.ChainPriorityMiddle,
-		},
+	ipHookChains := []*packetfilter.ChainIPHook{
+		chains.NewPostRouting(),
+		chains.NewInput(),
+		chains.NewForwarding(),
+		chains.NewSelfSnat(),
 	}
 
 	for i := range ipHookChains {
 		logger.V(log.DEBUG).Infof("Install/ensure %q/%s IPHook chain exists", ipHookChains[i].Name, "NAT")
 
-		if err := kp.pFilter.CreateIPHookChainIfNotExists(&ipHookChains[i]); err != nil {
+		if err := kp.pFilter.CreateIPHookChainIfNotExists(ipHookChains[i]); err != nil {
 			return errors.Wrapf(err, "error installing IPHook chain %q", ipHookChains[i].Name)
 		}
 	}
 
-	logger.V(log.DEBUG).Infof("Allow VxLAN incoming traffic in %q Chain", constants.SmInputChain)
+	logger.V(log.DEBUG).Infof("Allow VxLAN incoming traffic in %q Chain", chains.SmInput)
 
 	ruleSpec := packetfilter.Rule{
 		Proto:  packetfilter.RuleProtoUDP,
@@ -77,17 +52,17 @@ func (kp *SyncHandler) createPFilterChains() error {
 		Action: packetfilter.RuleActionAccept,
 	}
 
-	if err := kp.pFilter.AppendUnique(packetfilter.TableTypeFilter, constants.SmInputChain, &ruleSpec); err != nil {
+	if err := kp.pFilter.AppendUnique(packetfilter.TableTypeFilter, chains.SmInput, &ruleSpec); err != nil {
 		return errors.Wrapf(err, "unable to append rule %+v", &ruleSpec)
 	}
 
-	logger.V(log.DEBUG).Infof("Insert rule to allow traffic over %s interface in %s Chain", kp.vxlanIface, constants.SmForwardChain)
+	logger.V(log.DEBUG).Infof("Insert rule to allow traffic over %s interface in %s Chain", kp.vxlanIface, chains.SmForward)
 
 	ruleSpec = packetfilter.Rule{
 		OutInterface: kp.vxlanIface,
 		Action:       packetfilter.RuleActionAccept,
 	}
-	if err := kp.pFilter.PrependUnique(packetfilter.TableTypeFilter, constants.SmForwardChain, &ruleSpec); err != nil {
+	if err := kp.pFilter.PrependUnique(packetfilter.TableTypeFilter, chains.SmForward, &ruleSpec); err != nil {
 		return errors.Wrapf(err, "unable to append rule %+v to allow vxlan traffic", &ruleSpec)
 	}
 
@@ -102,7 +77,7 @@ func (kp *SyncHandler) createPFilterChains() error {
 
 		logger.V(log.DEBUG).Infof("Installing rule for host network to remote cluster communication: %+v", ruleSpec)
 
-		if err := kp.pFilter.AppendUnique(packetfilter.TableTypeNAT, constants.SmPostRoutingChain, &ruleSpec); err != nil {
+		if err := kp.pFilter.AppendUnique(packetfilter.TableTypeNAT, chains.SmPostRouting, &ruleSpec); err != nil {
 			return errors.Wrapf(err, "unable to append rule %+v", &ruleSpec)
 		}
 	}
@@ -135,25 +110,25 @@ func (kp *SyncHandler) programIptableRulesForInterClusterTraffic(remoteCidrBlock
 		if operation == Add {
 			logger.V(log.DEBUG).Infof("Installing packetfilter rule for outgoing traffic: %+v", outboundRule)
 
-			if err := kp.pFilter.AppendUnique(packetfilter.TableTypeNAT, constants.SmPostRoutingChain, &outboundRule); err != nil {
+			if err := kp.pFilter.AppendUnique(packetfilter.TableTypeNAT, chains.SmPostRouting, &outboundRule); err != nil {
 				return errors.Wrapf(err, "error appending packetfilter rule %+v", outboundRule)
 			}
 
 			logger.V(log.DEBUG).Infof("Installing packetfilter rule for incoming traffic: %+v", incomingRule)
 
-			if err := kp.pFilter.AppendUnique(packetfilter.TableTypeNAT, constants.SmPostRoutingChain, &incomingRule); err != nil {
+			if err := kp.pFilter.AppendUnique(packetfilter.TableTypeNAT, chains.SmPostRouting, &incomingRule); err != nil {
 				return errors.Wrapf(err, "error appending packetfilter rule %+v", incomingRule)
 			}
 		} else if operation == Delete {
 			logger.V(log.DEBUG).Infof("Deleting packetfilter rule for outgoing traffic: %+v", outboundRule)
 
-			if err := kp.pFilter.Delete(packetfilter.TableTypeNAT, constants.SmPostRoutingChain, &outboundRule); err != nil {
+			if err := kp.pFilter.Delete(packetfilter.TableTypeNAT, chains.SmPostRouting, &outboundRule); err != nil {
 				return errors.Wrapf(err, "error deleting packetfilter rule %+v", outboundRule)
 			}
 
 			logger.V(log.DEBUG).Infof("Deleting packetfilter rule for incoming traffic: %+v", incomingRule)
 
-			if err := kp.pFilter.Delete(packetfilter.TableTypeNAT, constants.SmPostRoutingChain, &incomingRule); err != nil {
+			if err := kp.pFilter.Delete(packetfilter.TableTypeNAT, chains.SmPostRouting, &incomingRule); err != nil {
 				return errors.Wrapf(err, "error deleting packetfilter rule %+v", incomingRule)
 			}
 		}

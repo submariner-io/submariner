@@ -39,7 +39,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/globalnet/metrics"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
-	routeAgent "github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	routeagentchains "github.com/submariner-io/submariner/pkg/routeagent_driver/chains"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -516,12 +516,7 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 			Hook:     packetfilter.ChainHookPrerouting,
 			Priority: packetfilter.ChainPriorityFirst,
 		},
-		{
-			Name:     routeAgent.SmPostRoutingChain,
-			Type:     packetfilter.ChainTypeNAT,
-			Hook:     packetfilter.ChainHookPostrouting,
-			Priority: packetfilter.ChainPriorityFirst,
-		},
+		*routeagentchains.NewPostRouting(),
 	}
 
 	for i := range ipHookChains {
@@ -551,7 +546,7 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 		Action:      packetfilter.RuleActionJump,
 	}
 
-	if err := g.pFilter.PrependUnique(packetfilter.TableTypeNAT, routeAgent.SmPostRoutingChain, &ruleSpec); err != nil {
+	if err := g.pFilter.PrependUnique(packetfilter.TableTypeNAT, routeagentchains.SmPostRouting, &ruleSpec); err != nil {
 		return errors.Wrapf(err, "Error prepending rule %+v", ruleSpec)
 	}
 

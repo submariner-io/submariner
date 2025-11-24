@@ -19,16 +19,6 @@ limitations under the License.
 package constants
 
 const (
-	// IPTable chains used by RouteAgent.
-
-	SmPostRoutingChain    = "SUBMARINER-POSTROUTING"
-	SmPostRoutingMssChain = "SUBMARINER-POSTROUTING-MSS"
-	SmInputChain          = "SUBMARINER-INPUT"
-	SmForwardChain        = "SUBMARINER-FORWARD"
-	SmSelfSnatChain       = "SUBMARINER-SELF-SNAT"
-	PostRoutingChain      = "POSTROUTING"
-	InputChain            = "INPUT"
-
 	RouteAgentInterClusterNetworkTableID = 149
 
 	// To support connectivity for Pods with HostNetworking on the GatewayNode, we program

@@ -38,6 +38,7 @@ import (
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/chains"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/ovn"
@@ -319,8 +320,8 @@ func (t *handlerTestDriver) testRemoteEndpoint(ipFamilySubnets, nonIPFamilySubne
 					t.netLink.AwaitRule(constants.RouteAgentInterClusterNetworkTableID, s, t.clusterCIDR)
 					t.netLink.AwaitRule(constants.RouteAgentInterClusterNetworkTableID, s, t.serviceCIDR)
 
-					t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmPostRoutingChain, ContainSubstring("\"SrcCIDR\":%q", s))
-					t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmPostRoutingChain, ContainSubstring("\"DestCIDR\":%q", s))
+					t.pFilter.AwaitRule(packetfilter.TableTypeNAT, chains.SmPostRouting, ContainSubstring("\"SrcCIDR\":%q", s))
+					t.pFilter.AwaitRule(packetfilter.TableTypeNAT, chains.SmPostRouting, ContainSubstring("\"DestCIDR\":%q", s))
 				}
 
 				t.awaitOVNKNodeAnnotationContaining(endpointSubnets...)
@@ -353,8 +354,8 @@ func (t *handlerTestDriver) testRemoteEndpoint(ipFamilySubnets, nonIPFamilySubne
 					t.netLink.AwaitNoRule(constants.RouteAgentInterClusterNetworkTableID, s, t.clusterCIDR)
 					t.netLink.AwaitNoRule(constants.RouteAgentInterClusterNetworkTableID, s, t.serviceCIDR)
 
-					t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, constants.SmPostRoutingChain, ContainSubstring("\"SrcCIDR\":%q", s))
-					t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, constants.SmPostRoutingChain, ContainSubstring("\"DestCIDR\":%q", s))
+					t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, chains.SmPostRouting, ContainSubstring("\"SrcCIDR\":%q", s))
+					t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, chains.SmPostRouting, ContainSubstring("\"DestCIDR\":%q", s))
 				}
 
 				// Since we updated the subnets above, the original second one will remain b/c the annotation isn't currently
@@ -377,14 +378,14 @@ func (t *handlerTestDriver) testGatewayTransitions(ipFamilySubnets, nonIPFamilyS
 			for _, s := range ipFamilySubnets {
 				t.netLink.AwaitRule(constants.RouteAgentInterClusterNetworkTableID, s, t.clusterCIDR)
 				t.netLink.AwaitRule(constants.RouteAgentInterClusterNetworkTableID, s, t.serviceCIDR)
-				t.pFilter.AwaitRule(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain, ContainSubstring(s))
-				t.pFilter.AwaitRule(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerMSSClampChain, ContainSubstring(s))
+				t.pFilter.AwaitRule(packetfilter.TableTypeFilter, chains.SmForward, ContainSubstring(s))
+				t.pFilter.AwaitRule(packetfilter.TableTypeFilter, chains.SmForwardMSSClamp, ContainSubstring(s))
 			}
 
 			for _, s := range nonIPFamilySubnets {
 				t.netLink.EnsureNoRule(constants.RouteAgentInterClusterNetworkTableID, s, t.clusterCIDR)
-				t.pFilter.EnsureNoRule(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain, ContainSubstring(s))
-				t.pFilter.EnsureNoRule(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerMSSClampChain, ContainSubstring(s))
+				t.pFilter.EnsureNoRule(packetfilter.TableTypeFilter, chains.SmForward, ContainSubstring(s))
+				t.pFilter.EnsureNoRule(packetfilter.TableTypeFilter, chains.SmForwardMSSClamp, ContainSubstring(s))
 			}
 
 			t.awaitOVNKNodeAnnotationContaining(ipFamilySubnets...)
@@ -398,8 +399,8 @@ func (t *handlerTestDriver) testGatewayTransitions(ipFamilySubnets, nonIPFamilyS
 			for _, s := range ipFamilySubnets {
 				t.netLink.AwaitNoRule(constants.RouteAgentInterClusterNetworkTableID, s, t.clusterCIDR)
 				t.netLink.AwaitNoRule(constants.RouteAgentInterClusterNetworkTableID, s, t.serviceCIDR)
-				t.pFilter.AwaitNoRule(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain, ContainSubstring(s))
-				t.pFilter.AwaitNoRule(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerMSSClampChain, ContainSubstring(s))
+				t.pFilter.AwaitNoRule(packetfilter.TableTypeFilter, chains.SmForward, ContainSubstring(s))
+				t.pFilter.AwaitNoRule(packetfilter.TableTypeFilter, chains.SmForwardMSSClamp, ContainSubstring(s))
 			}
 
 			t.awaitOVNKNodeAnnotationContaining()
@@ -606,9 +607,9 @@ func (t *handlerTestDriver) testOVNMgmtInterfaceAddressChange() {
 
 func (t *handlerTestDriver) testUninstall() {
 	It("should delete the table rules and chains", func() {
-		Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain)).To(BeTrue())
-		Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerMSSClampChain)).To(BeTrue())
-		Expect(t.pFilter.ChainExists(packetfilter.TableTypeNAT, constants.SmPostRoutingChain)).To(BeTrue())
+		Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, chains.SmForward)).To(BeTrue())
+		Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, chains.SmForwardMSSClamp)).To(BeTrue())
+		Expect(t.pFilter.ChainExists(packetfilter.TableTypeNAT, chains.SmPostRouting)).To(BeTrue())
 
 		Expect(t.netLink.RuleAdd(&netlink.Rule{
 			Table:  constants.RouteAgentHostNetworkTableID,
@@ -620,12 +621,12 @@ func (t *handlerTestDriver) testUninstall() {
 			Family: netlink.FAMILY_V4,
 		})).To(Succeed())
 
-		Expect(t.pFilter.Append(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain, &packetfilter.Rule{
+		Expect(t.pFilter.Append(packetfilter.TableTypeFilter, chains.SmForward, &packetfilter.Rule{
 			DestCIDR: "1.2.3.4/16",
 			Action:   packetfilter.RuleActionAccept,
 		})).To(Succeed())
 
-		Expect(t.pFilter.Append(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain, &packetfilter.Rule{
+		Expect(t.pFilter.Append(packetfilter.TableTypeFilter, chains.SmForward, &packetfilter.Rule{
 			DestCIDR:  "1.2.3.4/16",
 			Action:    packetfilter.RuleActionMss,
 			ClampType: packetfilter.ToValue,
@@ -637,9 +638,9 @@ func (t *handlerTestDriver) testUninstall() {
 		t.netLink.AwaitNoRule(constants.RouteAgentHostNetworkTableID, "", "")
 		t.netLink.AwaitNoRule(constants.RouteAgentInterClusterNetworkTableID, "", "")
 
-		Expect(t.pFilter.ChainExists(packetfilter.TableTypeNAT, constants.SmPostRoutingChain)).To(BeFalse())
-		Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerFWDChain)).To(BeFalse())
-		Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, ovn.ForwardingSubmarinerMSSClampChain)).To(BeFalse())
+		Expect(t.pFilter.ChainExists(packetfilter.TableTypeNAT, chains.SmPostRouting)).To(BeFalse())
+		Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, chains.SmForward)).To(BeFalse())
+		Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, chains.SmForwardMSSClamp)).To(BeFalse())
 	})
 }
 

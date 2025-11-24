@@ -34,6 +34,7 @@ import (
 	fakeNetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/chains"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
 	"github.com/submariner-io/submariner/pkg/vxlan"
@@ -180,7 +181,7 @@ func (t *testDriver) verifyNoHostNetworkingRoutes() {
 
 func (t *testDriver) verifyRemoteSubnetIPTableRules() {
 	for _, remoteCIDR := range cidr.ExtractSubnets(t.ipFamily, t.remoteEndpoint.Spec.Subnets) {
-		t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmPostRoutingChain,
+		t.pFilter.AwaitRule(packetfilter.TableTypeNAT, chains.SmPostRouting,
 			And(ContainSubstring(cidr.ExtractSubnets(t.ipFamily, t.localClusterCIDRs)[0]), ContainSubstring(remoteCIDR)))
 	}
 }
