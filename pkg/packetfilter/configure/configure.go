@@ -39,9 +39,8 @@ const UseNftablesKey = "use-nftables"
 var logger = log.Logger{Logger: logf.Log.WithName("Packetfilter")}
 
 func DriverFromGlobalConfig() {
-	useNftables := global.Get(UseNftablesKey, true)
-
-	if useNftables {
+	driverType := GetDriverType()
+	if driverType == NfTables {
 		logger.Info("Using nftables packet filter driver")
 		packetfilter.SetNewDriverFn(nftables.New)
 	} else {
