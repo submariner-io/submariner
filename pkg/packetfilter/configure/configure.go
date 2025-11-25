@@ -27,6 +27,13 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+type DriverType int
+
+const (
+	IPTables DriverType = iota
+	NfTables
+)
+
 const UseNftablesKey = "use-nftables"
 
 var logger = log.Logger{Logger: logf.Log.WithName("Packetfilter")}
@@ -41,4 +48,12 @@ func DriverFromGlobalConfig() {
 		logger.Info("Using iptables packet filter driver")
 		packetfilter.SetNewDriverFn(iptables.New)
 	}
+}
+
+func GetDriverType() DriverType {
+	if global.Get(UseNftablesKey, true) {
+		return NfTables
+	}
+
+	return IPTables
 }

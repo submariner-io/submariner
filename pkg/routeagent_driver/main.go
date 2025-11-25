@@ -47,8 +47,10 @@ import (
 	"github.com/submariner-io/submariner/pkg/node"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	pfconfigure "github.com/submariner-io/submariner/pkg/packetfilter/configure"
+	"github.com/submariner-io/submariner/pkg/packetfilter/iptables"
 	"github.com/submariner-io/submariner/pkg/pinger"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cabledriver"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/calico"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/healthchecker"
@@ -211,6 +213,8 @@ func main() {
 	err = ctl.Start(stopCh)
 	logger.FatalOnError(err, "Error starting controller")
 
+	cleanupLegacyIptables(env.ClusterCidr)
+
 	<-stopCh
 	ctl.Stop()
 
@@ -260,6 +264,100 @@ func removeInvalidSockets() {
 				logger.Errorf(err, "Failed to delete invalid socket %s", dir)
 			} else {
 				logger.Infof("Deleted invalid socket %s", dir)
+			}
+		}
+	}
+}
+
+// =============================================================================
+// TEMPORARY: iptables cleanup for migration to nftables
+// This entire section can be removed once migration is complete
+// =============================================================================
+
+func cleanupLegacyIptables(clusterCidr []string) {
+	if pfconfigure.GetDriverType() == pfconfigure.IPTables {
+		return
+	}
+
+	ipHookChains := []struct {
+		Table packetfilter.TableType
+		Chain *packetfilter.ChainIPHook
+	}{
+		{
+			Table: packetfilter.TableTypeNAT,
+			Chain: &packetfilter.ChainIPHook{
+				Name:     constants.SmPostRoutingChain,
+				Type:     packetfilter.ChainTypeNAT,
+				Hook:     packetfilter.ChainHookPostrouting,
+				Priority: packetfilter.ChainPriorityFirst,
+			},
+		},
+		{
+			Table: packetfilter.TableTypeFilter,
+			Chain: &packetfilter.ChainIPHook{
+				Name:     constants.SmInputChain,
+				Type:     packetfilter.ChainTypeFilter,
+				Hook:     packetfilter.ChainHookInput,
+				Priority: packetfilter.ChainPriorityLast,
+				JumpRule: &packetfilter.Rule{
+					Proto:       packetfilter.RuleProtoUDP,
+					Action:      packetfilter.RuleActionJump,
+					TargetChain: constants.SmInputChain,
+				},
+			},
+		},
+		{
+			Table: packetfilter.TableTypeNAT,
+			Chain: &packetfilter.ChainIPHook{
+				Name:     constants.SmSelfSnatChain,
+				Type:     packetfilter.ChainTypeNAT,
+				Hook:     packetfilter.ChainHookPostrouting,
+				Priority: packetfilter.ChainPriorityMiddle,
+			},
+		},
+		{
+			Table: packetfilter.TableTypeFilter,
+			Chain: &packetfilter.ChainIPHook{
+				Name:     constants.SmForwardChain,
+				Type:     packetfilter.ChainTypeFilter,
+				Hook:     packetfilter.ChainHookForward,
+				Priority: packetfilter.ChainPriorityFirst,
+			},
+		},
+		{
+			Table: packetfilter.TableTypeFilter,
+			Chain: &packetfilter.ChainIPHook{
+				Name:     ovn.ForwardingSubmarinerMSSClampChain,
+				Type:     packetfilter.ChainTypeFilter,
+				Hook:     packetfilter.ChainHookForward,
+				Priority: packetfilter.ChainPriorityFirst,
+			},
+		},
+		{
+			Table: packetfilter.TableTypeRoute,
+			Chain: &packetfilter.ChainIPHook{
+				Name:     constants.SmPostRoutingMssChain,
+				Type:     packetfilter.ChainTypeRoute,
+				Hook:     packetfilter.ChainHookPostrouting,
+				Priority: packetfilter.ChainPriorityFirst,
+			},
+		},
+	}
+
+	for _, family := range cidr.ExtractIPFamilies(clusterCidr) {
+		pIPtables, err := iptables.New(family)
+		if err != nil {
+			logger.Errorf(err, "Failed to create IPv%v iptables driver for cleanup", family)
+			continue
+		}
+
+		for _, item := range ipHookChains {
+			_ = pIPtables.ClearChain(item.Table, item.Chain.Name)
+
+			if err := pIPtables.DeleteIPHookChain(item.Chain); err != nil {
+				logger.V(log.DEBUG).Infof("Failed to delete IPv%v iptables IP hook chain %q: %v", family, item.Chain.Name, err)
+			} else {
+				logger.Infof("Cleaned up IPv%v iptables IP hook chain %q", family, item.Chain.Name)
 			}
 		}
 	}
