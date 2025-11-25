@@ -1,0 +1,83 @@
+ARG BASE_BRANCH=release-0.22
+ARG SOURCE=/go/src/github.com/submariner-io/submariner
+
+FROM --platform=${BUILDPLATFORM} registry.redhat.io/ubi9/go-toolset:latest AS builder
+ARG SOURCE
+ARG TARGETPLATFORM
+ARG BASE_BRANCH
+
+ENV GOEXPERIMENT=strictfipsruntime
+ARG BUILD_TAGS="strictfipsruntime"
+
+COPY . ${SOURCE}
+
+USER root
+RUN chown -R 1001:0 ${SOURCE}
+USER 1001
+
+RUN git config --global --add safe.directory ${SOURCE}
+
+WORKDIR ${SOURCE}
+
+RUN CGO_ENABLED=1 GOARCH=${TARGETPLATFORM##*/} go build \
+    -ldflags "-s -w \
+    -X github.com/submariner-io/submariner/pkg/versions.version=${BASE_BRANCH} \
+    -X github.com/submariner-io/submariner/pkg/versions.gitCommitHash=$(git rev-parse --short HEAD)" \
+    -tags "${BUILD_TAGS}" \
+    -v -o ${SOURCE}/bin/${TARGETPLATFORM}/submariner-gateway ${SOURCE}
+
+RUN CGO_ENABLED=1 GOARCH=${TARGETPLATFORM##*/} go build \
+    -ldflags "-s -w \
+    -X github.com/submariner-io/submariner/pkg/versions.version=${BASE_BRANCH} \
+    -X github.com/submariner-io/submariner/pkg/versions.gitCommitHash=$(git rev-parse --short HEAD)" \
+    -tags "${BUILD_TAGS}" \
+    -v -o ${SOURCE}/bin/${TARGETPLATFORM}/await-node-ready \
+    ${SOURCE}/pkg/await_node_ready
+
+FROM --platform=${TARGETPLATFORM} registry.redhat.io/ubi9:latest
+ARG BASE_BRANCH
+ARG SOURCE
+ARG SOURCE_DATE_EPOCH
+ARG TARGETPLATFORM
+
+RUN dnf -y update && \
+    dnf -y install --nodocs iproute libreswan kmod shadow-utils && \
+    dnf clean all
+
+RUN adduser -r -l -u 1001 -G root submariner
+
+RUN mkdir -p /etc/ipsec /etc/ipsec.d && chmod -R 775 /etc/ipsec.d
+
+WORKDIR /var/submariner
+
+COPY --from=builder \
+    ${SOURCE}/bin/${TARGETPLATFORM}/submariner-gateway \
+    ${SOURCE}/bin/${TARGETPLATFORM}/await-node-ready \
+    ${SOURCE}/package/submariner.sh \
+    ${SOURCE}/package/pluto \
+    ${SOURCE}/package/await-node-ready.sh \
+    /usr/local/bin/
+
+RUN chown -Rc submariner:root /usr/local/bin && \
+    chmod -Rc 775 /usr/local/bin
+
+COPY --from=builder ${SOURCE}/LICENSE /licenses/LICENSE
+
+# Pluto fails with `permission denied (must be superuser)` if running as submariner user
+USER root
+
+ENTRYPOINT ["/usr/local/bin/submariner.sh"]
+
+LABEL com.redhat.component="submariner-gateway-container" \
+      name="rhacm2/submariner-gateway-rhel9" \
+      version="${BASE_BRANCH}" \
+      summary="Submariner Gateway" \
+      description="The Submariner Gateway facilitates secure connections between clusters." \
+      io.k8s.display-name="Submariner Gateway" \
+      io.k8s.description="The Submariner Gateway handles the IPsec or WireGuard tunnels between clusters." \
+      io.openshift.tags="submariner, submariner-gateway, rhacm" \
+      maintainer="multi-cluster-networking@redhat.com" \
+      com.github.url="https://github.com/submariner-io/submariner" \
+      com.github.commit="${BASE_BRANCH}" \
+      cpe="cpe:/a:redhat:acm:2.15::el9" \
+      org.opencontainers.image.created="${SOURCE_DATE_EPOCH}"
