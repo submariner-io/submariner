@@ -37,6 +37,8 @@ spec:
     value: '[{"type": "gomod", "path": "."}, {"type": "gomod", "path": "tools"}, {"type": "rpm", "path": "./.rpm-lockfiles/gateway"}]'
   - name: hermetic
     value: "true"
+  - name: build-source-image
+    value: "true"
   pipelineSpec:
     description: |
       This pipeline is ideal for building multi-arch container images from a Containerfile while maintaining trust after pipeline customization.
