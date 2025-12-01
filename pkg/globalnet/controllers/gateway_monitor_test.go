@@ -34,7 +34,7 @@ import (
 	testutil "github.com/submariner-io/admiral/pkg/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	fakesubmariner "github.com/submariner-io/submariner/pkg/client/clientset/versioned/fake"
-	"github.com/submariner-io/submariner/pkg/globalnet/constants"
+	"github.com/submariner-io/submariner/pkg/globalnet/chains"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	fakeNetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
@@ -233,7 +233,7 @@ func testEndpointMonitoring() {
 				globalIP := t.awaitGatewayGlobalIP("")
 
 				t.pFilter.AwaitRule(packetfilter.TableTypeNAT,
-					constants.SmGlobalnetIngressChain, And(ContainSubstring(globalIP), ContainSubstring(cniInterfaceIP)))
+					chains.SmGlobalnetIngress, And(ContainSubstring(globalIP), ContainSubstring(cniInterfaceIP)))
 
 				By("Deleting local Gateway")
 
@@ -241,7 +241,7 @@ func testEndpointMonitoring() {
 				Expect(err).To(Succeed())
 
 				t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT,
-					constants.SmGlobalnetIngressChain, And(ContainSubstring(globalIP), ContainSubstring(cniInterfaceIP)))
+					chains.SmGlobalnetIngress, And(ContainSubstring(globalIP), ContainSubstring(cniInterfaceIP)))
 			})
 		})
 
@@ -310,10 +310,10 @@ func testEndpointMonitoring() {
 	When("a remote Endpoint with non-overlapping CIDRs is created then removed", func() {
 		It("should add/remove appropriate IP table rule(s)", func() {
 			endpoint := t.createEndpoint(newEndpointSpec(remoteClusterID, t.hostName, remoteCIDR))
-			t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain, ContainSubstring(remoteCIDR))
+			t.pFilter.AwaitRule(packetfilter.TableTypeNAT, chains.SmGlobalnetMark, ContainSubstring(remoteCIDR))
 
 			Expect(t.endpoints.Delete(context.TODO(), endpoint.Name, metav1.DeleteOptions{})).To(Succeed())
-			t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain, ContainSubstring(remoteCIDR))
+			t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, chains.SmGlobalnetMark, ContainSubstring(remoteCIDR))
 		})
 	})
 
@@ -321,14 +321,14 @@ func testEndpointMonitoring() {
 		It("should not add expected IP table rule(s)", func() {
 			t.createEndpoint(newEndpointSpec(remoteClusterID, t.hostName, localCIDR))
 			time.Sleep(500 * time.Millisecond)
-			t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain, ContainSubstring(globalCIDR))
+			t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, chains.SmGlobalnetMark, ContainSubstring(globalCIDR))
 		})
 	})
 
 	When("a stale remote Endpoint is deleted", func() {
 		It("should ignore it", func() {
 			endpoint1 := t.createEndpoint(newEndpointSpec(remoteClusterID, t.hostName, remoteCIDR))
-			t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain, ContainSubstring(remoteCIDR))
+			t.pFilter.AwaitRule(packetfilter.TableTypeNAT, chains.SmGlobalnetMark, ContainSubstring(remoteCIDR))
 
 			test.CreateResource(t.endpoints, &submarinerv1.Endpoint{
 				ObjectMeta: metav1.ObjectMeta{
@@ -338,11 +338,11 @@ func testEndpointMonitoring() {
 				Spec: *newEndpointSpec(remoteClusterID, t.hostName+"2", remoteCIDR),
 			})
 			time.Sleep(time.Millisecond * 100)
-			t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain, ContainSubstring(remoteCIDR))
+			t.pFilter.AwaitRule(packetfilter.TableTypeNAT, chains.SmGlobalnetMark, ContainSubstring(remoteCIDR))
 
 			Expect(t.endpoints.Delete(context.TODO(), endpoint1.Name, metav1.DeleteOptions{})).To(Succeed())
 			time.Sleep(time.Millisecond * 100)
-			t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain, ContainSubstring(remoteCIDR))
+			t.pFilter.AwaitRule(packetfilter.TableTypeNAT, chains.SmGlobalnetMark, ContainSubstring(remoteCIDR))
 		})
 	})
 }
@@ -369,14 +369,14 @@ func testUninstall() {
 		controllers.UninstallDataPath()
 
 		for _, chain := range []string{
-			constants.SmGlobalnetEgressChainForCluster,
-			constants.SmGlobalnetEgressChainForHeadlessSvcPods,
-			constants.SmGlobalnetEgressChainForHeadlessSvcEPs,
-			constants.SmGlobalnetEgressChainForNamespace,
-			constants.SmGlobalnetEgressChainForPods,
-			constants.SmGlobalnetIngressChain,
-			constants.SmGlobalnetMarkChain,
-			constants.SmGlobalnetEgressChain,
+			chains.SmGlobalnetEgressForCluster,
+			chains.SmGlobalnetEgressForHeadlessSvcPods,
+			chains.SmGlobalnetEgressForHeadlessSvcEPs,
+			chains.SmGlobalnetEgressForNamespace,
+			chains.SmGlobalnetEgressForPods,
+			chains.SmGlobalnetIngress,
+			chains.SmGlobalnetMark,
+			chains.SmGlobalnetEgress,
 		} {
 			t.pFilter.AwaitNoChain(packetfilter.TableTypeNAT, chain)
 		}
@@ -523,7 +523,7 @@ func (t *gatewayMonitorTestDriver) start() {
 	Expect(err).To(Succeed())
 	Expect(t.controller.Start()).To(Succeed())
 
-	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain)
+	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, chains.SmGlobalnetMark)
 }
 
 func (t *gatewayMonitorTestDriver) createEndpoint(spec *submarinerv1.EndpointSpec) *submarinerv1.Endpoint {
@@ -553,21 +553,21 @@ func (t *gatewayMonitorTestDriver) ensureControllersStopped() {
 }
 
 func (t *gatewayMonitorTestDriver) awaitGlobalnetChains() {
-	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetIngressChain)
-	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChain)
-	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForPods)
-	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForHeadlessSvcPods)
-	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForHeadlessSvcEPs)
-	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForNamespace)
-	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForCluster)
+	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, chains.SmGlobalnetIngress)
+	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, chains.SmGlobalnetEgress)
+	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, chains.SmGlobalnetMark)
+	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, chains.SmGlobalnetEgressForPods)
+	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, chains.SmGlobalnetEgressForHeadlessSvcPods)
+	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, chains.SmGlobalnetEgressForHeadlessSvcEPs)
+	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, chains.SmGlobalnetEgressForNamespace)
+	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, chains.SmGlobalnetEgressForCluster)
 	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, routeagentchains.SmPostRouting)
-	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain)
 }
 
 func (t *gatewayMonitorTestDriver) awaitGlobalnetChainsCleared() {
-	t.pFilter.AwaitNoRules(packetfilter.TableTypeNAT, constants.SmGlobalnetIngressChain)
-	t.pFilter.AwaitNoRules(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChain)
-	t.pFilter.AwaitNoRules(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain)
+	t.pFilter.AwaitNoRules(packetfilter.TableTypeNAT, chains.SmGlobalnetIngress)
+	t.pFilter.AwaitNoRules(packetfilter.TableTypeNAT, chains.SmGlobalnetEgress)
+	t.pFilter.AwaitNoRules(packetfilter.TableTypeNAT, chains.SmGlobalnetMark)
 }
 
 func newEndpointSpec(clusterID, hostname, subnet string) *submarinerv1.EndpointSpec {

@@ -38,7 +38,7 @@ import (
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cidr"
 	submarinerClientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
-	"github.com/submariner-io/submariner/pkg/globalnet/constants"
+	"github.com/submariner-io/submariner/pkg/globalnet/chains"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	pfconfigure "github.com/submariner-io/submariner/pkg/packetfilter/configure"
@@ -202,30 +202,25 @@ func cleanupLegacyIptables() {
 		return
 	}
 
-	_ = pIPtables.ClearChain(packetfilter.TableTypeNAT, constants.SmGlobalnetIngressChain)
+	_ = pIPtables.ClearChain(packetfilter.TableTypeNAT, chains.SmGlobalnetIngress)
 
-	if err := pIPtables.DeleteIPHookChain(&packetfilter.ChainIPHook{
-		Name:     constants.SmGlobalnetIngressChain,
-		Type:     packetfilter.ChainTypeNAT,
-		Hook:     packetfilter.ChainHookPrerouting,
-		Priority: packetfilter.ChainPriorityFirst,
-	}); err != nil {
-		logger.V(log.DEBUG).Infof("Failed to delete IPv%v iptables IP hook chain %q: %v", k8snet.IPv4, constants.SmGlobalnetIngressChain, err)
+	if err := pIPtables.DeleteIPHookChain(chains.NewGlobalnetIngress()); err != nil {
+		logger.V(log.DEBUG).Infof("Failed to delete IPv%v iptables IP hook chain %q: %v", k8snet.IPv4, chains.SmGlobalnetIngress, err)
 	} else {
-		logger.Infof("Cleaned up IPv%v iptables IP hook chain %q", k8snet.IPv4, constants.SmGlobalnetIngressChain)
+		logger.Infof("Cleaned up IPv%v iptables IP hook chain %q", k8snet.IPv4, chains.SmGlobalnetIngress)
 	}
 
 	regularChains := []struct {
 		Table packetfilter.TableType
 		Chain string
 	}{
-		{Table: packetfilter.TableTypeNAT, Chain: constants.SmGlobalnetEgressChainForCluster},
-		{Table: packetfilter.TableTypeNAT, Chain: constants.SmGlobalnetEgressChainForHeadlessSvcPods},
-		{Table: packetfilter.TableTypeNAT, Chain: constants.SmGlobalnetEgressChainForHeadlessSvcEPs},
-		{Table: packetfilter.TableTypeNAT, Chain: constants.SmGlobalnetEgressChainForNamespace},
-		{Table: packetfilter.TableTypeNAT, Chain: constants.SmGlobalnetEgressChainForPods},
-		{Table: packetfilter.TableTypeNAT, Chain: constants.SmGlobalnetMarkChain},
-		{Table: packetfilter.TableTypeNAT, Chain: constants.SmGlobalnetEgressChain},
+		{Table: packetfilter.TableTypeNAT, Chain: chains.SmGlobalnetEgressForCluster},
+		{Table: packetfilter.TableTypeNAT, Chain: chains.SmGlobalnetEgressForHeadlessSvcPods},
+		{Table: packetfilter.TableTypeNAT, Chain: chains.SmGlobalnetEgressForHeadlessSvcEPs},
+		{Table: packetfilter.TableTypeNAT, Chain: chains.SmGlobalnetEgressForNamespace},
+		{Table: packetfilter.TableTypeNAT, Chain: chains.SmGlobalnetEgressForPods},
+		{Table: packetfilter.TableTypeNAT, Chain: chains.SmGlobalnetMark},
+		{Table: packetfilter.TableTypeNAT, Chain: chains.SmGlobalnetEgress},
 	}
 
 	for _, item := range regularChains {

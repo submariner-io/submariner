@@ -29,7 +29,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/globalnet/constants"
+	"github.com/submariner-io/submariner/pkg/globalnet/chains"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/globalnet/metrics"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
@@ -78,9 +78,9 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 		numberOfIPs = nil
 
 		if podSelector == nil {
-			egressChain = constants.SmGlobalnetEgressChainForNamespace
+			egressChain = chains.SmGlobalnetEgressForNamespace
 		} else {
-			egressChain = constants.SmGlobalnetEgressChainForPods
+			egressChain = chains.SmGlobalnetEgressForPods
 		}
 	})
 
@@ -238,9 +238,9 @@ func testExistingGlobalEgressIP(t *globalEgressIPControllerTestDriver, podSelect
 
 	BeforeEach(func() {
 		if podSelector == nil {
-			egressChain = constants.SmGlobalnetEgressChainForNamespace
+			egressChain = chains.SmGlobalnetEgressForNamespace
 		} else {
-			egressChain = constants.SmGlobalnetEgressChainForPods
+			egressChain = chains.SmGlobalnetEgressForPods
 		}
 
 		n := 3
@@ -383,9 +383,9 @@ func testGlobalEgressIPUpdated(t *globalEgressIPControllerTestDriver, podSelecto
 		numberOfIPs = 2
 
 		if podSelector == nil {
-			egressChain = constants.SmGlobalnetEgressChainForNamespace
+			egressChain = chains.SmGlobalnetEgressForNamespace
 		} else {
-			egressChain = constants.SmGlobalnetEgressChainForPods
+			egressChain = chains.SmGlobalnetEgressForPods
 		}
 
 		n := numberOfIPs
@@ -475,7 +475,7 @@ func testEgressPodEvents(t *globalEgressIPControllerTestDriver) {
 	)
 
 	BeforeEach(func() {
-		egressChain = constants.SmGlobalnetEgressChainForNamespace
+		egressChain = chains.SmGlobalnetEgressForNamespace
 		pod = newPod(namespace)
 		egressIP = newGlobalEgressIP(globalEgressIPName, nil, nil)
 	})
@@ -496,7 +496,7 @@ func testEgressPodEvents(t *globalEgressIPControllerTestDriver) {
 
 		Context("", func() {
 			BeforeEach(func() {
-				egressChain = constants.SmGlobalnetEgressChainForPods
+				egressChain = chains.SmGlobalnetEgressForPods
 				egressIP.Spec.PodSelector = &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}}
 			})
 

@@ -39,6 +39,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cni"
+	"github.com/submariner-io/submariner/pkg/globalnet/chains"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
@@ -175,15 +176,15 @@ func (t *testDriverBase) afterEach() {
 
 func (t *testDriverBase) initChains() {
 	for _, chain := range []string{
-		constants.SmGlobalnetIngressChain,
-		constants.SmGlobalnetEgressChain,
-		constants.SmGlobalnetEgressChainForPods,
-		constants.SmGlobalnetEgressChainForHeadlessSvcPods,
-		constants.SmGlobalnetEgressChainForHeadlessSvcEPs,
-		constants.SmGlobalnetEgressChainForNamespace,
-		constants.SmGlobalnetEgressChainForCluster,
+		chains.SmGlobalnetIngress,
+		chains.SmGlobalnetEgress,
+		chains.SmGlobalnetMark,
+		chains.SmGlobalnetEgressForPods,
+		chains.SmGlobalnetEgressForHeadlessSvcPods,
+		chains.SmGlobalnetEgressForHeadlessSvcEPs,
+		chains.SmGlobalnetEgressForNamespace,
+		chains.SmGlobalnetEgressForCluster,
 		routeagentchains.SmPostRouting,
-		constants.SmGlobalnetMarkChain,
 	} {
 		Expect(t.pFilter.CreateChainIfNotExists(packetfilter.TableTypeNAT, &packetfilter.Chain{
 			Name: chain,

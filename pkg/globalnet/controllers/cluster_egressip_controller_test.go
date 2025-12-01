@@ -28,6 +28,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/globalnet/chains"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/globalnet/metrics"
@@ -395,13 +396,13 @@ func (t *clusterGlobalEgressIPControllerTestDriver) start() {
 }
 
 func (t *clusterGlobalEgressIPControllerTestDriver) awaitPacketFilterRules(ips ...string) {
-	t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForCluster, ContainSubstring(getSNATAddress(ips...)))
+	t.pFilter.AwaitRule(packetfilter.TableTypeNAT, chains.SmGlobalnetEgressForCluster, ContainSubstring(getSNATAddress(ips...)))
 
 	for _, localSubnet := range t.localSubnets {
-		t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForCluster, ContainSubstring(localSubnet))
+		t.pFilter.AwaitRule(packetfilter.TableTypeNAT, chains.SmGlobalnetEgressForCluster, ContainSubstring(localSubnet))
 	}
 }
 
 func (t *clusterGlobalEgressIPControllerTestDriver) awaitNoPacketFilterRules(ips ...string) {
-	t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForCluster, ContainSubstring(getSNATAddress(ips...)))
+	t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, chains.SmGlobalnetEgressForCluster, ContainSubstring(getSNATAddress(ips...)))
 }

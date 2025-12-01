@@ -27,6 +27,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/ipam"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/globalnet/chains"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/globalnet/metrics"
@@ -195,10 +196,10 @@ func (t *gatewayControllerTestDriver) start() {
 
 func (t *gatewayControllerTestDriver) awaitPacketFilterRules(globalIP string) {
 	t.pFilter.AwaitRule(packetfilter.TableTypeNAT,
-		constants.SmGlobalnetIngressChain, And(ContainSubstring(globalIP), ContainSubstring(cniInterfaceIP)))
+		chains.SmGlobalnetIngress, And(ContainSubstring(globalIP), ContainSubstring(cniInterfaceIP)))
 }
 
 func (t *gatewayControllerTestDriver) ensureNoPacketFilterRules(globalIP string) {
 	t.pFilter.EnsureNoRule(packetfilter.TableTypeNAT,
-		constants.SmGlobalnetIngressChain, And(ContainSubstring(globalIP), ContainSubstring(cniInterfaceIP)))
+		chains.SmGlobalnetIngress, And(ContainSubstring(globalIP), ContainSubstring(cniInterfaceIP)))
 }

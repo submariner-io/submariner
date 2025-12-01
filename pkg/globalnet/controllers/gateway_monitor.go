@@ -34,6 +34,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/controller"
+	"github.com/submariner-io/submariner/pkg/globalnet/chains"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	gnpacketfilter "github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
 	"github.com/submariner-io/submariner/pkg/globalnet/metrics"
@@ -177,7 +178,7 @@ func (g *gatewayMonitor) GetNetworkPlugins() []string {
 }
 
 func (g *gatewayMonitor) Init(_ context.Context) error {
-	return g.createNATChain(constants.SmGlobalnetMarkChain)
+	return g.createNATChain(chains.SmGlobalnetMark)
 }
 
 func (g *gatewayMonitor) Stop() error {
@@ -510,12 +511,7 @@ func (g *gatewayMonitor) createNATChain(chainName string) error {
 
 func (g *gatewayMonitor) createGlobalnetChains() error {
 	ipHookChains := []packetfilter.ChainIPHook{
-		{
-			Name:     constants.SmGlobalnetIngressChain,
-			Type:     packetfilter.ChainTypeNAT,
-			Hook:     packetfilter.ChainHookPrerouting,
-			Priority: packetfilter.ChainPriorityFirst,
-		},
+		*chains.NewGlobalnetIngress(),
 		*routeagentchains.NewPostRouting(),
 	}
 
@@ -528,13 +524,13 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 	}
 
 	for _, chain := range []string{
-		constants.SmGlobalnetEgressChain,
-		constants.SmGlobalnetMarkChain,
-		constants.SmGlobalnetEgressChainForPods,
-		constants.SmGlobalnetEgressChainForHeadlessSvcPods,
-		constants.SmGlobalnetEgressChainForHeadlessSvcEPs,
-		constants.SmGlobalnetEgressChainForNamespace,
-		constants.SmGlobalnetEgressChainForCluster,
+		chains.SmGlobalnetEgress,
+		chains.SmGlobalnetMark,
+		chains.SmGlobalnetEgressForPods,
+		chains.SmGlobalnetEgressForHeadlessSvcPods,
+		chains.SmGlobalnetEgressForHeadlessSvcEPs,
+		chains.SmGlobalnetEgressForNamespace,
+		chains.SmGlobalnetEgressForCluster,
 	} {
 		if err := g.createNATChain(chain); err != nil {
 			return err
@@ -542,7 +538,7 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 	}
 
 	ruleSpec := packetfilter.Rule{
-		TargetChain: constants.SmGlobalnetEgressChain,
+		TargetChain: chains.SmGlobalnetEgress,
 		Action:      packetfilter.RuleActionJump,
 	}
 
@@ -550,32 +546,32 @@ func (g *gatewayMonitor) createGlobalnetChains() error {
 		return errors.Wrapf(err, "Error prepending rule %+v", ruleSpec)
 	}
 
-	if err := g.pFilter.PrependUnique(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChain,
+	if err := g.pFilter.PrependUnique(packetfilter.TableTypeNAT, chains.SmGlobalnetEgress,
 		&packetfilter.Rule{
-			TargetChain: constants.SmGlobalnetMarkChain,
+			TargetChain: chains.SmGlobalnetMark,
 			Action:      packetfilter.RuleActionJump,
 		},
 		&packetfilter.Rule{
-			TargetChain: constants.SmGlobalnetEgressChainForPods,
+			TargetChain: chains.SmGlobalnetEgressForPods,
 			Action:      packetfilter.RuleActionJump,
 		},
 		&packetfilter.Rule{
-			TargetChain: constants.SmGlobalnetEgressChainForHeadlessSvcPods,
+			TargetChain: chains.SmGlobalnetEgressForHeadlessSvcPods,
 			Action:      packetfilter.RuleActionJump,
 		},
 		&packetfilter.Rule{
-			TargetChain: constants.SmGlobalnetEgressChainForHeadlessSvcEPs,
+			TargetChain: chains.SmGlobalnetEgressForHeadlessSvcEPs,
 			Action:      packetfilter.RuleActionJump,
 		},
 		&packetfilter.Rule{
-			TargetChain: constants.SmGlobalnetEgressChainForNamespace,
+			TargetChain: chains.SmGlobalnetEgressForNamespace,
 			Action:      packetfilter.RuleActionJump,
 		},
 		&packetfilter.Rule{
-			TargetChain: constants.SmGlobalnetEgressChainForCluster,
+			TargetChain: chains.SmGlobalnetEgressForCluster,
 			Action:      packetfilter.RuleActionJump,
 		}); err != nil {
-		logger.Errorf(err, "error prepending rules to the %q chain", constants.SmGlobalnetEgressChain)
+		logger.Errorf(err, "error prepending rules to the %q chain", chains.SmGlobalnetEgress)
 	}
 
 	return nil
@@ -585,9 +581,9 @@ func (g *gatewayMonitor) clearGlobalnetChains() {
 	logger.Info("Active gateway migrated, flushing Globalnet chains.")
 
 	for _, chain := range []string{
-		constants.SmGlobalnetIngressChain,
-		constants.SmGlobalnetEgressChain,
-		constants.SmGlobalnetMarkChain,
+		chains.SmGlobalnetIngress,
+		chains.SmGlobalnetEgress,
+		chains.SmGlobalnetMark,
 	} {
 		if err := g.pFilter.ClearChain(packetfilter.TableTypeNAT, chain); err != nil {
 			logger.Errorf(err, "Error while flushing rules in chain %q", chain)
@@ -610,13 +606,13 @@ func (g *gatewayMonitor) markRemoteClusterTraffic(addRules bool, subnets ...stri
 		if addRules {
 			logger.V(log.DEBUG).Infof("Marking traffic destined to remote cluster: %+v", &ruleSpec)
 
-			if err := g.pFilter.AppendUnique(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain, &ruleSpec); err != nil {
+			if err := g.pFilter.AppendUnique(packetfilter.TableTypeNAT, chains.SmGlobalnetMark, &ruleSpec); err != nil {
 				logger.Errorf(err, "Error appending packetfilter rule %+v", &ruleSpec)
 			}
 		} else {
 			logger.V(log.DEBUG).Infof("Deleting rule that marks remote cluster traffic: %+v", &ruleSpec)
 
-			if err := g.pFilter.Delete(packetfilter.TableTypeNAT, constants.SmGlobalnetMarkChain, &ruleSpec); err != nil {
+			if err := g.pFilter.Delete(packetfilter.TableTypeNAT, chains.SmGlobalnetMark, &ruleSpec); err != nil {
 				logger.Errorf(err, "Error deleting iptables rule %+v", &ruleSpec)
 			}
 		}

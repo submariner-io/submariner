@@ -28,7 +28,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/ipam"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	"github.com/submariner-io/submariner/pkg/globalnet/constants"
+	"github.com/submariner-io/submariner/pkg/globalnet/chains"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/globalnet/metrics"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
@@ -576,39 +576,37 @@ func (t *globalIngressIPControllerTestDriver) start() syncer.Interface {
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitPodEgressRules(podIP, snatIP string) {
-	t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForHeadlessSvcPods, And(ContainSubstring(podIP),
+	t.pFilter.AwaitRule(packetfilter.TableTypeNAT, chains.SmGlobalnetEgressForHeadlessSvcPods, And(ContainSubstring(podIP),
 		ContainSubstring(snatIP)))
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitNoPodEgressRules(podIP, snatIP string) {
-	t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, constants.SmGlobalnetEgressChainForHeadlessSvcPods, Or(ContainSubstring(podIP),
+	t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, chains.SmGlobalnetEgressForHeadlessSvcPods, Or(ContainSubstring(podIP),
 		ContainSubstring(snatIP)))
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitPodIngressRules(podIP, snatIP string) {
-	t.pFilter.AwaitRule(packetfilter.TableTypeNAT, constants.SmGlobalnetIngressChain, And(ContainSubstring(podIP), ContainSubstring(snatIP)))
+	t.pFilter.AwaitRule(packetfilter.TableTypeNAT, chains.SmGlobalnetIngress, And(ContainSubstring(podIP), ContainSubstring(snatIP)))
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitNoPodIngressRules(podIP, snatIP string) {
-	t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, constants.SmGlobalnetIngressChain, Or(ContainSubstring(podIP), ContainSubstring(snatIP)))
+	t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, chains.SmGlobalnetIngress, Or(ContainSubstring(podIP), ContainSubstring(snatIP)))
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitEndpointsEgressRules(endpointsIP, snatIP string) {
 	t.pFilter.AwaitRule(packetfilter.TableTypeNAT,
-		constants.SmGlobalnetEgressChainForHeadlessSvcEPs, And(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
+		chains.SmGlobalnetEgressForHeadlessSvcEPs, And(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitNoEndpointsEgressRules(endpointsIP, snatIP string) {
 	t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT,
-		constants.SmGlobalnetEgressChainForHeadlessSvcEPs, Or(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
+		chains.SmGlobalnetEgressForHeadlessSvcEPs, Or(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitEndpointsIngressRules(endpointsIP, snatIP string) {
-	t.pFilter.AwaitRule(packetfilter.TableTypeNAT,
-		constants.SmGlobalnetIngressChain, And(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
+	t.pFilter.AwaitRule(packetfilter.TableTypeNAT, chains.SmGlobalnetIngress, And(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
 }
 
 func (t *globalIngressIPControllerTestDriver) awaitNoEndpointsIngressRules(endpointsIP, snatIP string) {
-	t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT,
-		constants.SmGlobalnetIngressChain, Or(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
+	t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, chains.SmGlobalnetIngress, Or(ContainSubstring(endpointsIP), ContainSubstring(snatIP)))
 }

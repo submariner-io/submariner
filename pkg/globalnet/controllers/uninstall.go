@@ -30,7 +30,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submclient "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
-	"github.com/submariner-io/submariner/pkg/globalnet/constants"
+	"github.com/submariner-io/submariner/pkg/globalnet/chains"
 	pfiface "github.com/submariner-io/submariner/pkg/globalnet/controllers/packetfilter"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	routeagentchains "github.com/submariner-io/submariner/pkg/routeagent_driver/chains"
@@ -51,14 +51,14 @@ func UninstallDataPath() {
 
 	natTableChains := []string{
 		// The chains have to be deleted in a specific order.
-		constants.SmGlobalnetEgressChainForCluster,
-		constants.SmGlobalnetEgressChainForHeadlessSvcPods,
-		constants.SmGlobalnetEgressChainForHeadlessSvcEPs,
-		constants.SmGlobalnetEgressChainForNamespace,
-		constants.SmGlobalnetEgressChainForPods,
-		constants.SmGlobalnetIngressChain,
-		constants.SmGlobalnetMarkChain,
-		constants.SmGlobalnetEgressChain,
+		chains.SmGlobalnetEgressForCluster,
+		chains.SmGlobalnetEgressForHeadlessSvcPods,
+		chains.SmGlobalnetEgressForHeadlessSvcEPs,
+		chains.SmGlobalnetEgressForNamespace,
+		chains.SmGlobalnetEgressForPods,
+		chains.SmGlobalnetIngress,
+		chains.SmGlobalnetMark,
+		chains.SmGlobalnetEgress,
 	}
 
 	for _, chain := range natTableChains {
@@ -71,18 +71,11 @@ func UninstallDataPath() {
 	err = gnpFilter.FlushNatChain(routeagentchains.SmPostRouting)
 	logError(err, "Error flushing packetfilter chain %q", routeagentchains.SmPostRouting)
 
-	chain := packetfilter.ChainIPHook{
-		Name:     constants.SmGlobalnetIngressChain,
-		Type:     packetfilter.ChainTypeNAT,
-		Hook:     packetfilter.ChainHookPrerouting,
-		Priority: packetfilter.ChainPriorityFirst,
-	}
-
-	err = pFilter.DeleteIPHookChain(&chain)
-	logError(err, "error creating IPHook chain %s", constants.SmGlobalnetIngressChain)
+	err = pFilter.DeleteIPHookChain(chains.NewGlobalnetIngress())
+	logError(err, "error creating IPHook chain %s", chains.SmGlobalnetIngress)
 
 	for _, chain := range natTableChains {
-		if chain == constants.SmGlobalnetIngressChain {
+		if chain == chains.SmGlobalnetIngress {
 			continue
 		}
 
