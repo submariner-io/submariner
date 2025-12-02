@@ -2,20 +2,39 @@
 #
 # Regenerates RPM lockfiles for Konflux hermetic builds.
 #
+# Konflux requires hermetic builds where all dependencies are pre-resolved.
+# This script uses rpm-lockfile-prototype to resolve RPM packages from
+# Red Hat repos and generate lockfiles that pin exact versions/checksums.
+#
+# Components:
+#   gateway     - VPN gateway (libreswan) - x86_64, aarch64 only
+#   route-agent - Network routing (openvswitch) - x86_64, aarch64 only
+#   globalnet   - Overlapping CIDR support - all architectures
+#
+# Architecture Support:
+#   x86_64, aarch64: Full support (RHEL GA + fast-datapath repos)
+#   ppc64le, s390x:  Only globalnet (UBI repos only, no subscription needed)
+#
+#   Gateway/route-agent blocked on ppc64le/s390x because:
+#   - RHEL GA repos return 403 (Red Hat Developer Subscription limitation)
+#   - fast-datapath repo returns 403 (same limitation)
+#   - Packages exist in CentOS Stream 9 but policy approval needed to use
+#
 # Usage:
-#   # Update all components
-#   ./.rpm-lockfile/update-lockfile.sh
+#   ./.rpm-lockfiles/update-lockfile.sh           # Update all components
+#   ./.rpm-lockfiles/update-lockfile.sh gateway   # Update single component
 #
-#   # Update a single component
-#   ./.rpm-lockfile/update-lockfile.sh gateway
+# Prerequisites:
+#   1. Red Hat subscription with entitlement certificates:
+#      sudo subscription-manager register --org="ORG_ID" --activationkey="KEY"
+#      sudo subscription-manager refresh
 #
-# Authentication (if needed):
-#   sudo subscription-manager register --org="YOUR_ORG_ID" --activationkey="YOUR_ACTIVATION_KEY" --force
-#   sudo subscription-manager refresh
+#   2. Registry authentication for Red Hat container images:
+#      podman login registry.redhat.io
 #
-#   After re-registering, update certificate IDs in .repo files:
-#     NEW_ID=$(ls /etc/pki/entitlement/*.pem | grep -v key | head -1 | sed 's/.*\///;s/.pem//')
-#     find .rpm-lockfiles -name "*.repo" -exec sed -i "s/[0-9]\{19\}/$NEW_ID/g" {} \;
+# Notes:
+#   - Certificate IDs in .repo files are auto-updated if they don't match
+#   - Run demo-multiarch-access.sh to diagnose repository access issues
 #
 
 set -euo pipefail
@@ -39,20 +58,18 @@ if [ ! -s "${HOME}/.docker/config.json" ]; then
   exit 1
 fi
 
-# Verify certificate IDs in .repo files match actual certificates
-CURRENT_CERT_ID=$(ls /etc/pki/entitlement/*.pem 2>/dev/null | grep -v key | head -1 | xargs basename | sed 's/.pem//')
+# Auto-fix certificate IDs in .repo files if they don't match current certificates
+CURRENT_CERT_ID=
+for f in /etc/pki/entitlement/*.pem; do
+  [[ -f "$f" && "$f" != *-key.pem ]] && { CURRENT_CERT_ID=$(basename "$f" .pem); break; }
+done
 REPO_CERT_IDS=$(grep -h "sslclientcert.*pem" "${REPO_ROOT}/.rpm-lockfiles"/*/*.repo 2>/dev/null | sed 's/.*\/\([0-9]*\)\.pem/\1/' | sort -u)
 
 if [ -n "$CURRENT_CERT_ID" ] && [ -n "$REPO_CERT_IDS" ]; then
   MISMATCHES=$(echo "$REPO_CERT_IDS" | grep -v "^${CURRENT_CERT_ID}$" || true)
   if [ -n "$MISMATCHES" ]; then
-    echo "ERROR: Certificate ID mismatch detected"
-    echo "Current certificate: ${CURRENT_CERT_ID}"
-    echo "Mismatched IDs in .repo files: ${MISMATCHES}"
-    echo ""
-    echo "Fix with: NEW_ID=\$(ls /etc/pki/entitlement/*.pem | grep -v key | head -1 | sed 's/.*\///;s/.pem//')"
-    echo "          find .rpm-lockfiles -name \"*.repo\" -exec sed -i \"s/[0-9]\\{19\\}/\$NEW_ID/g\" {} \\;"
-    exit 1
+    echo "Updating .repo certificate IDs from ${MISMATCHES} to ${CURRENT_CERT_ID}"
+    find "${REPO_ROOT}/.rpm-lockfiles" -name "*.repo" -exec sed -i "s/[0-9]\{19\}/${CURRENT_CERT_ID}/g" {} \;
   fi
 fi
 

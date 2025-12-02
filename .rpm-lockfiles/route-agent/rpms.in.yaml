@@ -6,7 +6,6 @@ contentOrigin:
   repofiles:
     - submariner-rhel-9.repo
 packages:
-  - dnf-plugins-core
   - iproute
   - iptables-nft
   - nftables
