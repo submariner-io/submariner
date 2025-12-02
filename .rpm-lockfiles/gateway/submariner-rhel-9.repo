@@ -25,13 +25,3 @@ gpgcheck = 1
 sslverify = 0
 sslclientcert = /etc/pki/entitlement/*.pem
 sslclientkey = /etc/pki/entitlement/*-key.pem
-
-[codeready-builder-for-rhel-9-$basearch-rpms]
-name = Red Hat CodeReady Linux Builder for RHEL 9 $basearch (RPMs)
-baseurl = https://cdn.redhat.com/content/dist/rhel9/9/$basearch/codeready-builder/os
-enabled = 1
-gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
-gpgcheck = 1
-sslverify = 0
-sslclientcert = /etc/pki/entitlement/*.pem
-sslclientkey = /etc/pki/entitlement/*-key.pem
