@@ -10,3 +10,5 @@ rules:
 
 ignore: |
   **/vendor
+  .tekton
+  .rpm-lockfiles
