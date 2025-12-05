@@ -44,7 +44,7 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscove
 		},
 		Receiver: req.GetSender(),
 		ReceivedSrc: &proto.IPPortPair{
-			Port: int32(addr.Port), //nolint:gosec // We can safely ignore integer conversion error
+			Port: int32(addr.Port),
 			IP:   addr.IP.String(),
 		},
 	}
