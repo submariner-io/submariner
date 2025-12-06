@@ -13,8 +13,8 @@ enabled = 1
 gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 gpgcheck = 1
 sslverify = 0
-sslclientcert = /etc/pki/entitlement/2713869142313201886.pem
-sslclientkey = /etc/pki/entitlement/2713869142313201886-key.pem
+sslclientcert = /etc/pki/entitlement/*.pem
+sslclientkey = /etc/pki/entitlement/*-key.pem
 
 [rhel-9-for-$basearch-appstream-rpms]
 name = Red Hat Enterprise Linux 9 for $basearch - AppStream (RPMs)
@@ -23,6 +23,5 @@ enabled = 1
 gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 gpgcheck = 1
 sslverify = 0
-sslclientcert = /etc/pki/entitlement/2713869142313201886.pem
-sslclientkey = /etc/pki/entitlement/2713869142313201886-key.pem
-
+sslclientcert = /etc/pki/entitlement/*.pem
+sslclientkey = /etc/pki/entitlement/*-key.pem
