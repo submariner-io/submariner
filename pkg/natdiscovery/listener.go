@@ -127,7 +127,7 @@ func (nd *natDiscovery) listenerLoop(serverConnection ServerConnection) {
 func (nd *natDiscovery) parseAndHandleMessageFromAddress(buf []byte, addr *net.UDPAddr) error {
 	msg := natproto.SubmarinerNATDiscoveryMessage{}
 
-	err := errors.Wrapf(proto.Unmarshal(buf, &msg), "Error unmarshaling message received on UDP port %d", natproto.DefaultPort)
+	err := errors.Wrapf(proto.Unmarshal(buf, &msg), "Error unmarshaling message received on UDP port %d", nd.serverPort)
 	if err == nil {
 		if request := msg.GetRequest(); request != nil {
 			err = nd.handleRequestFromAddress(request, addr)
