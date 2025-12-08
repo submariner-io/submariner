@@ -29,20 +29,15 @@ import (
 
 func (nd *natDiscovery) sendCheckRequest(remoteNAT *remoteEndpointNAT) error {
 	var errPrivate, errPublic error
-	var reqID uint64
 
 	if remoteNAT.endpoint.Spec.GetPrivateIP(remoteNAT.family) != "" {
-		reqID, errPrivate = nd.sendCheckRequestToTargetIP(remoteNAT, remoteNAT.endpoint.Spec.GetPrivateIP(remoteNAT.family))
-		if errPrivate == nil {
-			remoteNAT.lastPrivateIPRequestID = reqID
-		}
+		errPrivate = nd.sendCheckRequestToTargetIP(remoteNAT, remoteNAT.endpoint.Spec.GetPrivateIP(remoteNAT.family),
+			&remoteNAT.lastPrivateIPRequestID)
 	}
 
 	if remoteNAT.endpoint.Spec.GetPublicIP(remoteNAT.family) != "" {
-		reqID, errPublic = nd.sendCheckRequestToTargetIP(remoteNAT, remoteNAT.endpoint.Spec.GetPublicIP(remoteNAT.family))
-		if errPublic == nil {
-			remoteNAT.lastPublicIPRequestID = reqID
-		}
+		errPublic = nd.sendCheckRequestToTargetIP(remoteNAT, remoteNAT.endpoint.Spec.GetPublicIP(remoteNAT.family),
+			&remoteNAT.lastPublicIPRequestID)
 	}
 
 	if errPrivate != nil && errPublic != nil {
@@ -63,20 +58,18 @@ func (nd *natDiscovery) sendCheckRequest(remoteNAT *remoteEndpointNAT) error {
 	return nil
 }
 
-func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT, targetIP string) (uint64, error) {
+func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT, targetIP string, reqNumber *uint64) error {
 	targetPort, err := extractNATDiscoveryPort(&remoteNAT.endpoint.Spec)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	sourceIP := nd.FindSourceIP(targetIP, remoteNAT.family)
 
-	reqNumber := nd.requestCounter.Add(1)
-
 	localEndpointSpec := nd.LocalEndpoint.Spec()
 
 	request := &natproto.SubmarinerNATDiscoveryRequest{
-		RequestNumber: reqNumber,
+		RequestNumber: nd.requestCounter.Add(1),
 		Sender: &natproto.EndpointDetails{
 			EndpointId: localEndpointSpec.GetFamilyCableName(remoteNAT.family),
 			ClusterId:  localEndpointSpec.ClusterID,
@@ -106,7 +99,7 @@ func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT,
 
 	buf, err := proto.Marshal(&message)
 	if err != nil {
-		return request.GetRequestNumber(), errors.Wrapf(err, "error marshaling request %#v", request)
+		return errors.Wrapf(err, "error marshaling request %#v", request)
 	}
 
 	addr := net.UDPAddr{
@@ -118,14 +111,17 @@ func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT,
 		request.GetRequestNumber(), request.GetSender().GetEndpointId(), request.GetReceiver().GetEndpointId(),
 		request.GetUsingSrc().GetIP(), request.GetUsingSrc().GetPort(), request.GetUsingDst().GetIP(), request.GetUsingDst().GetPort())
 
+	*reqNumber = request.GetRequestNumber()
+
 	if length, err := nd.serverUDPWrite[remoteNAT.family](buf, &addr); err != nil {
-		return request.GetRequestNumber(), errors.Wrapf(err, "error sending request packet %#v", request)
+		*reqNumber = 0
+		return errors.Wrapf(err, "error sending request packet %#v", request)
 	} else if length != len(buf) {
-		return request.GetRequestNumber(), errors.Errorf("the sent UDP packet was smaller than requested, sent=%d, expected=%d", length,
-			len(buf))
+		*reqNumber = 0
+		return errors.Errorf("the sent UDP packet was smaller than requested, sent=%d, expected=%d", length, len(buf))
 	}
 
 	remoteNAT.checkSent()
 
-	return request.GetRequestNumber(), nil
+	return nil
 }
