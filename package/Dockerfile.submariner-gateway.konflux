@@ -70,7 +70,7 @@ ENTRYPOINT ["/usr/local/bin/submariner.sh"]
 
 LABEL com.redhat.component="submariner-gateway-container" \
       name="rhacm2/submariner-gateway-rhel9" \
-      version="${BASE_BRANCH}" \
+      version="v0.21.2" \
       summary="Submariner Gateway" \
       description="The Submariner Gateway facilitates secure connections between clusters." \
       io.k8s.display-name="Submariner Gateway" \

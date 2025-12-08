@@ -67,7 +67,7 @@ ENTRYPOINT ["/usr/local/bin/submariner-route-agent.sh"]
 
 LABEL com.redhat.component="submariner-route-agent-container" \
       name="rhacm2/submariner-route-agent-rhel9" \
-      version="${BASE_BRANCH}" \
+      version="v0.21.2" \
       summary="Submariner Route Agent" \
       description="The Submariner Route Agent programs network routes on each node to facilitate cross-cluster communication." \
       io.k8s.display-name="Submariner Route Agent" \
