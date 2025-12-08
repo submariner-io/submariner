@@ -92,7 +92,7 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscove
 		logger.V(log.DEBUG).Infof("Received NAT packet from endpoint %q, cluster %q, where NAT on the source has been detected, "+
 			"src port changed",
 			req.GetSender().GetEndpointId(), req.GetSender().GetClusterId())
-		logger.V(log.DEBUG).Infof("Original src IP was %q, received src IP is %q", req.GetUsingSrc().GetIP(), addr.IP.String())
+		logger.V(log.DEBUG).Infof("Original src port was %d, received src port is %d", req.GetUsingSrc().GetPort(), addr.Port)
 
 		response.SrcPortNatDetected = true
 	}
