@@ -71,7 +71,7 @@ func (nd *natDiscovery) handleResponseFromAddress(req *proto.SubmarinerNATDiscov
 
 	// response to a PrivateIP request
 	if remoteNAT.lastPrivateIPRequestID == req.GetRequestNumber() {
-		if addr.IP.String() != remoteNAT.endpoint.Spec.GetPrivateIP(remoteNAT.family) {
+		if !addr.IP.Equal(net.ParseIP(remoteNAT.endpoint.Spec.GetPrivateIP(remoteNAT.family))) {
 			return errors.Errorf("response for NAT discovery on endpoint %q private IP %q comes from different IP %q, "+
 				"NAT on private IPs is unlikely and filtered for security reasons",
 				req.GetSender().GetEndpointId(), remoteNAT.endpoint.Spec.GetPrivateIP(remoteNAT.family), addr.IP)
