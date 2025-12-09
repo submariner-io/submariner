@@ -72,7 +72,7 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscove
 	if req.GetReceiver().GetEndpointId() != localEndpointSpec.GetFamilyCableName(family) {
 		logger.Warningf("Received NAT discovery packet for endpoint %q, but we are endpoint %q "+
 			"if the port for NAT discovery has been mapped somewhere an error may exist", req.GetReceiver().GetEndpointId(),
-			localEndpointSpec.CableName)
+			localEndpointSpec.GetFamilyCableName(family))
 
 		response.Response = proto.ResponseType_UNKNOWN_DST_ENDPOINT
 
