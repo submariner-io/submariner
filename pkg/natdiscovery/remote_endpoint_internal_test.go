@@ -65,10 +65,10 @@ var _ = Describe("remoteEndpointNAT", func() {
 	Context("with the total timeout elapsed", func() {
 		When("not targeting a load balancer", func() {
 			It("should report as timed out only for the normal timeout", func() {
-				rnat.started = time.Now().Add(-ToDuration(&TotalTimeoutLoadBalancer))
+				rnat.started = time.Now().Add(-time.Duration(TotalTimeoutLoadBalancer.Load()))
 				Expect(rnat.hasTimedOut()).To(BeFalse())
 
-				rnat.started = time.Now().Add(-ToDuration(&TotalTimeout))
+				rnat.started = time.Now().Add(-time.Duration(TotalTimeout.Load()))
 				Expect(rnat.hasTimedOut()).To(BeTrue())
 			})
 		})
@@ -76,7 +76,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 			It("should report as timed out earlier", func() {
 				remoteEndpoint.Spec.BackendConfig[submarinerv1.UsingLoadBalancer] = "true"
 				rnat = newRemoteEndpointNAT(remoteEndpoint, k8snet.IPv4)
-				rnat.started = time.Now().Add(-ToDuration(&TotalTimeoutLoadBalancer))
+				rnat.started = time.Now().Add(-time.Duration(TotalTimeoutLoadBalancer.Load()))
 				Expect(rnat.hasTimedOut()).To(BeTrue())
 			})
 		})
@@ -216,7 +216,7 @@ var _ = Describe("remoteEndpointNAT", func() {
 			It("should still use the public IP", func() {
 				rnat.checkSent()
 				Expect(rnat.transitionToPublicIP(remoteEndpoint.Spec.GetFamilyCableName(k8snet.IPv4), true)).To(BeTrue())
-				rnat.lastTransition = rnat.lastTransition.Add(-time.Duration(PublicToPrivateFailoverTimeout))
+				rnat.lastTransition = rnat.lastTransition.Add(-time.Duration(PublicToPrivateFailoverTimeout.Load()))
 				Expect(rnat.transitionToPrivateIP(remoteEndpoint.Spec.GetFamilyCableName(k8snet.IPv4), false)).To(BeFalse())
 				Expect(rnat.state).To(Equal(selectedPublicIP))
 				Expect(rnat.useIP).To(Equal(rnat.endpoint.Spec.GetPublicIP(k8snet.IPv4)))

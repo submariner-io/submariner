@@ -38,11 +38,18 @@ const (
 )
 
 var (
-	RecheckTime                    = (2 * time.Second).Nanoseconds()
-	TotalTimeout                   = (60 * time.Second).Nanoseconds()
-	TotalTimeoutLoadBalancer       = (6 * time.Second).Nanoseconds()
-	PublicToPrivateFailoverTimeout = time.Second.Nanoseconds()
+	RecheckTime                    atomic.Int64
+	TotalTimeout                   atomic.Int64
+	TotalTimeoutLoadBalancer       atomic.Int64
+	PublicToPrivateFailoverTimeout atomic.Int64
 )
+
+func init() {
+	RecheckTime.Store((2 * time.Second).Nanoseconds())
+	TotalTimeout.Store((60 * time.Second).Nanoseconds())
+	TotalTimeoutLoadBalancer.Store((6 * time.Second).Nanoseconds())
+	PublicToPrivateFailoverTimeout.Store(time.Second.Nanoseconds())
+}
 
 type remoteEndpointNAT struct {
 	sync.Mutex
@@ -90,10 +97,10 @@ func newRemoteEndpointNAT(endpoint *v1.Endpoint, family k8snet.IPFamily) *remote
 	// and we want to verify if the private IP will accessible (because it's still better)
 	usingLoadBalancer, _ := endpoint.Spec.GetBackendBool(v1.UsingLoadBalancer, false)
 	if usingLoadBalancer {
-		rnat.timeout = ToDuration(&TotalTimeoutLoadBalancer)
+		rnat.timeout = time.Duration(TotalTimeoutLoadBalancer.Load())
 		rnat.usingLoadBalancer = true
 	} else {
-		rnat.timeout = ToDuration(&TotalTimeout)
+		rnat.timeout = time.Duration(TotalTimeout.Load())
 	}
 
 	return rnat
@@ -146,7 +153,7 @@ func (rn *remoteEndpointNAT) shouldCheck() bool {
 	case testingPrivateAndPublicIPs:
 		return true
 	case waitingForResponse:
-		return time.Since(rn.lastCheck) > ToDuration(&RecheckTime)
+		return time.Since(rn.lastCheck) > time.Duration(RecheckTime.Load())
 	case selectedPublicIP:
 	case selectedPrivateIP:
 	}
@@ -194,7 +201,7 @@ func (rn *remoteEndpointNAT) transitionToPrivateIP(remoteEndpointID string, useN
 	case selectedPublicIP:
 		// If a PublicIP was selected, we still allow some time for the privateIP response to arrive, and we always
 		// prefer PrivateIP with no NAT connection, as it will be more likely to work, and more efficient
-		if rn.sinceLastTransition() > ToDuration(&PublicToPrivateFailoverTimeout) {
+		if rn.sinceLastTransition() > time.Duration(PublicToPrivateFailoverTimeout.Load()) {
 			logger.V(log.DEBUG).Infof("Response on private IP received too late after response on public IP for endpoint %q",
 				remoteEndpointID)
 
@@ -214,8 +221,4 @@ func (rn *remoteEndpointNAT) transitionToPrivateIP(remoteEndpointID string, useN
 	logger.Errorf(nil, "Received unexpected transition from %v to private IP for endpoint %q", rn.state, remoteEndpointID)
 
 	return false
-}
-
-func ToDuration(v *int64) time.Duration {
-	return time.Duration(atomic.LoadInt64(v))
 }

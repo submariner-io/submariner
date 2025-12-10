@@ -22,7 +22,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"sync/atomic"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -127,7 +126,7 @@ func testResponseOrdering(ipFamily k8snet.IPFamily, t *discoveryTestDriver,
 
 		Context("and the private IP responds after the public IP but after the grace period has elapsed", func() {
 			It("should notify with the public IP NATEndpointInfo settings", func() {
-				atomic.StoreInt64(&natdiscovery.PublicToPrivateFailoverTimeout, 0)
+				natdiscovery.PublicToPrivateFailoverTimeout.Store(0)
 
 				getConnection(t.remoteND).inputFrom(publicIPReq, getConnection(t.localND).addr)
 
@@ -326,14 +325,14 @@ func testTimeoutBehavior(ipFamily k8snet.IPFamily, t *discoveryTestDriver,
 		BeforeEach(func() {
 			*forwardHowManyFromLocal = 0
 
-			atomic.StoreInt64(&natdiscovery.TotalTimeout, (100 * time.Millisecond).Nanoseconds())
+			natdiscovery.TotalTimeout.Store((100 * time.Millisecond).Nanoseconds())
 		})
 
 		It("should eventually time out and notify with the legacy NATEndpointInfo settings", func() {
 			// Drop the request sent out
 			Expect(getConnection(t.localND).udpSentChannel).Should(Receive())
 
-			Consistently(t.localND.instance.GetReadyChannel(), natdiscovery.ToDuration(&natdiscovery.TotalTimeout)).ShouldNot(Receive())
+			Consistently(t.localND.instance.GetReadyChannel(), time.Duration(natdiscovery.TotalTimeout.Load())).ShouldNot(Receive())
 			time.Sleep(50 * time.Millisecond)
 
 			t.localND.checkDiscovery()
@@ -358,9 +357,9 @@ func runEndpointDiscoveryTests(ipv4, ipv6 bool, ipFamily k8snet.IPFamily,
 	t := newDiscoveryTestDriver(ipv4, ipv6)
 
 	BeforeEach(func() {
-		atomic.StoreInt64(&natdiscovery.RecheckTime, 0)
-		atomic.StoreInt64(&natdiscovery.TotalTimeout, time.Hour.Nanoseconds())
-		atomic.StoreInt64(&natdiscovery.PublicToPrivateFailoverTimeout, time.Hour.Nanoseconds())
+		natdiscovery.RecheckTime.Store(0)
+		natdiscovery.TotalTimeout.Store(time.Hour.Nanoseconds())
+		natdiscovery.PublicToPrivateFailoverTimeout.Store(time.Hour.Nanoseconds())
 
 		forwardHowManyFromLocal = 1
 
@@ -420,14 +419,14 @@ func newDiscoveryTestDriver(isIPv4, isIPv6 bool) *discoveryTestDriver {
 	t := &discoveryTestDriver{}
 
 	BeforeEach(func() {
-		oldRecheckTime := atomic.LoadInt64(&natdiscovery.RecheckTime)
-		oldTotalTimeout := atomic.LoadInt64(&natdiscovery.TotalTimeout)
-		oldPublicToPrivateFailoverTimeout := atomic.LoadInt64(&natdiscovery.PublicToPrivateFailoverTimeout)
+		oldRecheckTime := natdiscovery.RecheckTime.Load()
+		oldTotalTimeout := natdiscovery.TotalTimeout.Load()
+		oldPublicToPrivateFailoverTimeout := natdiscovery.PublicToPrivateFailoverTimeout.Load()
 
 		DeferCleanup(func() {
-			atomic.StoreInt64(&natdiscovery.RecheckTime, oldRecheckTime)
-			atomic.StoreInt64(&natdiscovery.TotalTimeout, oldTotalTimeout)
-			atomic.StoreInt64(&natdiscovery.PublicToPrivateFailoverTimeout, oldPublicToPrivateFailoverTimeout)
+			natdiscovery.RecheckTime.Store(oldRecheckTime)
+			natdiscovery.TotalTimeout.Store(oldTotalTimeout)
+			natdiscovery.PublicToPrivateFailoverTimeout.Store(oldPublicToPrivateFailoverTimeout)
 		})
 
 		var ipv4AddrL, ipv4AddrR *net.UDPAddr
@@ -488,8 +487,8 @@ func (t *discoveryTestDriver) testRemoteEndpointAdded(expIP string, expectNAT bo
 
 		// Verify it doesn't time out and try to notify of the legacy settings
 
-		atomic.StoreInt64(&natdiscovery.TotalTimeout, (100 * time.Millisecond).Nanoseconds())
-		time.Sleep(natdiscovery.ToDuration(&natdiscovery.TotalTimeout) + 20)
+		natdiscovery.TotalTimeout.Store((100 * time.Millisecond).Nanoseconds())
+		time.Sleep(time.Duration(natdiscovery.TotalTimeout.Load()) + 20*time.Millisecond)
 
 		t.localND.checkDiscovery()
 
@@ -503,7 +502,7 @@ func (t *discoveryTestDriver) testRemoteEndpointAdded(expIP string, expectNAT bo
 
 		// Verify it doesn't try to send another request after the recheck time period has elapsed
 
-		atomic.StoreInt64(&natdiscovery.TotalTimeout, time.Hour.Nanoseconds())
+		natdiscovery.TotalTimeout.Store(time.Hour.Nanoseconds())
 
 		t.localND.checkDiscovery()
 
