@@ -38,6 +38,8 @@ const (
 var _ = Describe("EndpointSpec", func() {
 	Context("GenerateName", testGenerateName)
 	Context("Equals", testEquals)
+	Context("GetBackendBool", testGetBackendBool)
+	Context("GetBackendPort", testGetBackendPort)
 	Context("GetHealthCheckIP", testGetHealthCheckIP)
 	Context("SetHealthCheckIP", testSetHealthCheckIP)
 	Context("GetPublicIP", testGetPublicIP)
@@ -157,6 +159,154 @@ func testEquals() {
 			other.BackendConfig = map[string]string{"key": "bbb"}
 			spec.BackendConfig = map[string]string{"key": "aaa"}
 			Expect(spec.Equals(other)).To(BeFalse())
+		})
+	})
+}
+
+func testGetBackendBool() {
+	const configName = "bool-config"
+
+	var spec *v1.EndpointSpec
+
+	BeforeEach(func() {
+		spec = &v1.EndpointSpec{
+			BackendConfig: map[string]string{},
+		}
+	})
+
+	When("the config value is set to 'true'", func() {
+		It("should return true and no error", func() {
+			spec.BackendConfig[configName] = "true"
+			result, err := spec.GetBackendBool(configName, false)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(BeTrue())
+		})
+	})
+
+	When("the config value is set to 'false'", func() {
+		It("should return false and no error", func() {
+			spec.BackendConfig[configName] = "false"
+			result, err := spec.GetBackendBool(configName, true)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(BeFalse())
+		})
+	})
+
+	When("the config value is an invalid string", func() {
+		It("should return the default value and an error", func() {
+			spec.BackendConfig[configName] = "invalid-bool"
+			result, err := spec.GetBackendBool(configName, true)
+			Expect(err).To(HaveOccurred())
+			Expect(result).To(BeTrue())
+		})
+	})
+
+	When("the config value is an empty string", func() {
+		It("should return the default value and no error", func() {
+			spec.BackendConfig[configName] = ""
+			result, err := spec.GetBackendBool(configName, true)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(BeTrue())
+		})
+	})
+
+	When("the config key does not exist", func() {
+		It("should return the default value and no error", func() {
+			result, err := spec.GetBackendBool(configName, true)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(BeTrue())
+		})
+	})
+}
+
+func testGetBackendPort() {
+	const configName = "port-config"
+
+	var spec *v1.EndpointSpec
+
+	BeforeEach(func() {
+		spec = &v1.EndpointSpec{
+			BackendConfig: map[string]string{},
+		}
+	})
+
+	When("the config value is set to a valid port", func() {
+		It("should return the port value and no error", func() {
+			spec.BackendConfig[configName] = "8080"
+			result, err := spec.GetBackendPort(configName, 443)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(Equal(int32(8080)))
+		})
+	})
+
+	When("the config value is set to the minimum valid port", func() {
+		It("should return the port value and no error", func() {
+			spec.BackendConfig[configName] = "1"
+			result, err := spec.GetBackendPort(configName, 443)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(Equal(int32(1)))
+		})
+	})
+
+	When("the config value is set to the maximum valid port", func() {
+		It("should return the port value and no error", func() {
+			spec.BackendConfig[configName] = "65535"
+			result, err := spec.GetBackendPort(configName, 443)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(Equal(int32(65535)))
+		})
+	})
+
+	When("the config value is set to an invalid string", func() {
+		It("should return the default value and an error", func() {
+			spec.BackendConfig[configName] = "invalid-port"
+			result, err := spec.GetBackendPort(configName, 443)
+			Expect(err).To(HaveOccurred())
+			Expect(result).To(Equal(int32(443)))
+		})
+	})
+
+	When("the config value is set to a negative number", func() {
+		It("should return the default value and an error", func() {
+			spec.BackendConfig[configName] = "-1"
+			result, err := spec.GetBackendPort(configName, 443)
+			Expect(err).To(HaveOccurred())
+			Expect(result).To(Equal(int32(443)))
+		})
+	})
+
+	When("the config value is set to zero", func() {
+		It("should return the default value and an error", func() {
+			spec.BackendConfig[configName] = "0"
+			result, err := spec.GetBackendPort(configName, 443)
+			Expect(err).To(HaveOccurred())
+			Expect(result).To(Equal(int32(443)))
+		})
+	})
+
+	When("the config value is set to a port greater than 65535", func() {
+		It("should return the default value and an error", func() {
+			spec.BackendConfig[configName] = "65536"
+			result, err := spec.GetBackendPort(configName, 443)
+			Expect(err).To(HaveOccurred())
+			Expect(result).To(Equal(int32(443)))
+		})
+	})
+
+	When("the config value is an empty string", func() {
+		It("should return the default value and no error", func() {
+			spec.BackendConfig[configName] = ""
+			result, err := spec.GetBackendPort(configName, 443)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(Equal(int32(443)))
+		})
+	})
+
+	When("the config key does not exist", func() {
+		It("should return the default value and no error", func() {
+			result, err := spec.GetBackendPort(configName, 443)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(Equal(int32(443)))
 		})
 	})
 }

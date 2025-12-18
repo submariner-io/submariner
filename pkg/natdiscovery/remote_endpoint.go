@@ -88,8 +88,8 @@ func newRemoteEndpointNAT(endpoint *v1.Endpoint, family k8snet.IPFamily) *remote
 	// Due to a network load balancer issue in the AWS implementation https://github.com/submariner-io/submariner/issues/1410
 	// we want to try on the IPs, but not hold on connecting for a minute, because IPSEC will succeed in that case,
 	// and we want to verify if the private IP will accessible (because it's still better)
-	usingLoadBalancer, _ := endpoint.Spec.GetBackendBool(v1.UsingLoadBalancer, nil)
-	if usingLoadBalancer != nil && *usingLoadBalancer {
+	usingLoadBalancer, _ := endpoint.Spec.GetBackendBool(v1.UsingLoadBalancer, false)
+	if usingLoadBalancer {
 		rnat.timeout = ToDuration(&TotalTimeoutLoadBalancer)
 		rnat.usingLoadBalancer = true
 	} else {
