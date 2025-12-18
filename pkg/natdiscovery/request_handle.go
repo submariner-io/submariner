@@ -115,7 +115,7 @@ func (nd *natDiscovery) handleRequestFromAddress(req *proto.SubmarinerNATDiscove
 
 func (nd *natDiscovery) sendResponseToAddress(response *proto.SubmarinerNATDiscoveryResponse, addr *net.UDPAddr) error {
 	msgResponse := proto.SubmarinerNATDiscoveryMessage_Response{Response: response}
-	message := proto.SubmarinerNATDiscoveryMessage{Message: &msgResponse}
+	message := proto.SubmarinerNATDiscoveryMessage{Message: &msgResponse, Version: proto.Version}
 
 	buf, err := proto2.Marshal(&message)
 	if err != nil {
