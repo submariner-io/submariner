@@ -151,9 +151,11 @@ func (c *FakeServerConnection) inputFrom(b []byte, addr *net.UDPAddr) {
 	c.Lock()
 	defer c.Unlock()
 
-	c.udpReadChannel <- UDPReadInfo{
-		b:    b,
-		addr: addr,
+	if !c.closed.Load() {
+		c.udpReadChannel <- UDPReadInfo{
+			b:    b,
+			addr: addr,
+		}
 	}
 }
 
