@@ -49,14 +49,14 @@ func (ep *EndpointSpec) GetBackendPort(configName string, defaultValue int32) (i
 	return defaultValue, nil
 }
 
-func (ep *EndpointSpec) GetBackendBool(configName string, defaultValue *bool) (*bool, error) {
+func (ep *EndpointSpec) GetBackendBool(configName string, defaultValue bool) (bool, error) {
 	if boolStr := ep.BackendConfig[configName]; boolStr != "" {
 		boolValue, err := strconv.ParseBool(boolStr)
 		if err != nil {
 			return defaultValue, errors.Wrapf(err, "error parsing backend config %s", configName)
 		}
 
-		return &boolValue, nil
+		return boolValue, nil
 	}
 
 	return defaultValue, nil
@@ -68,8 +68,6 @@ func parsePort(port string) (int32, error) {
 		return -1, errors.Wrapf(err, "error parsing port %s", port)
 	} else if portInt < 1 {
 		return -1, errors.Errorf("port %s is < 1", port)
-	} else if portInt > 65535 {
-		return -1, errors.Errorf("port %s is > 65535", port)
 	}
 
 	return int32(portInt), nil

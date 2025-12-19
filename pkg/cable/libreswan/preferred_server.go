@@ -27,7 +27,6 @@ import (
 	"github.com/pkg/errors"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	submendpoint "github.com/submariner-io/submariner/pkg/endpoint"
-	"k8s.io/utils/ptr"
 )
 
 type operationMode int
@@ -39,25 +38,25 @@ const (
 )
 
 func (i *libreswan) calculateOperationMode(remoteEndpoint *v1.EndpointSpec) operationMode {
-	leftPreferred, err := i.localEndpoint.GetBackendBool(v1.PreferredServerConfig, ptr.To(false))
+	leftPreferred, err := i.localEndpoint.GetBackendBool(v1.PreferredServerConfig, false)
 	if err != nil {
 		logger.Errorf(err, "Error parsing local endpoint config")
 	}
 
-	rightPreferred, err := remoteEndpoint.GetBackendBool(v1.PreferredServerConfig, nil)
+	rightPreferred, err := remoteEndpoint.GetBackendBool(v1.PreferredServerConfig, false)
 	if err != nil {
 		logger.Errorf(err, "Error parsing remote endpoint config %q", remoteEndpoint.CableName)
 	}
 
-	if rightPreferred == nil || !*leftPreferred && !*rightPreferred {
+	if !leftPreferred && !rightPreferred {
 		return operationModeBidirectional
 	}
 
-	if *leftPreferred && !*rightPreferred {
+	if leftPreferred && !rightPreferred {
 		return operationModeServer
 	}
 
-	if *rightPreferred && !*leftPreferred {
+	if rightPreferred && !leftPreferred {
 		return operationModeClient
 	}
 
