@@ -18,13 +18,14 @@ ARG SOURCE
 ARG TARGETPLATFORM
 
 COPY package/dnf_install /
+COPY package/libreswan-5.2-1.fc42.x86_64.rpm /
 
 # iproute and iptables are used internally
 # libreswan provides IKE
 # kmod is required so that libreswan can load modules
 RUN /dnf_install -a ${TARGETPLATFORM} -v ${FEDORA_VERSION} -r /output/gateway \
     glibc bash glibc-minimal-langpack coreutils-single \
-    libcurl-minimal iproute libreswan kmod \
+    libcurl-minimal iproute /libreswan-5.2-1.fc42.x86_64.rpm kmod \
     openssl procps-ng nss-tools util-linux-core
 
 FROM scratch
