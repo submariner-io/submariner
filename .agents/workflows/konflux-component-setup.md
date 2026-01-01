@@ -48,6 +48,8 @@ git commit -s -m "Add RPM lockfile support for <component>"
 
 **Note:** Script copied per-component; Git deduplicates on merge.
 
+**See also:** On `devel`, `.rpm-lockfiles/` has documentation (`README.md`) and diagnostic scripts (`check-repo-access.sh`, `verify-packages.sh`).
+
 ##### 4. Add Konflux Dockerfile and Configure Tekton to Use It
 
 ```bash

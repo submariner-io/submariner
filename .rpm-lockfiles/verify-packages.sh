@@ -31,8 +31,9 @@ trap cleanup EXIT
 
 # If branch specified, extract .rpm-lockfiles from that branch
 if [[ -n "$BRANCH" ]]; then
-    echo "Fetching $BRANCH..."
-    git fetch origin "$BRANCH" || { echo "Failed to fetch $BRANCH"; exit 1; }
+    # Try to fetch, but continue if branch already exists locally
+    git fetch origin "$BRANCH" 2>/dev/null || git rev-parse "origin/$BRANCH" >/dev/null 2>&1 || \
+        { echo "Branch $BRANCH not found (fetch failed and not cached locally)"; exit 1; }
 
     CLEANUP_DIR=$(mktemp -d)
     LOCKFILES_DIR="$CLEANUP_DIR"
@@ -53,7 +54,7 @@ fi
 command -v podman &>/dev/null || { echo "Requires: podman"; exit 1; }
 
 # Get current cert ID
-CERT_ID=$(ls /etc/pki/entitlement/*.pem 2>/dev/null | grep -v key | head -1 | xargs -r basename | sed 's/.pem//')
+CERT_ID=$(basename "$(find /etc/pki/entitlement -maxdepth 1 -name '*.pem' ! -name '*-key.pem' 2>/dev/null | head -1)" .pem)
 [[ -n "$CERT_ID" ]] || { echo "No entitlement certs in /etc/pki/entitlement/"; exit 1; }
 
 # Copy certs to temp dir (avoids SELinux issues)
@@ -107,11 +108,12 @@ podman run --rm \
             for arch in $arches; do
                 (
                     # Get pkg@repo format, simplify repo names (remove arch, -rpms suffix)
-                    dnf -q repoquery --forcearch="$arch" --queryformat="%{name}@%{repoid}\n" $pkgs 2>/dev/null |
+                    # Use --arch to filter by target architecture (avoids false positives from cross-arch repos)
+                    dnf -q repoquery --forcearch="$arch" --arch="$arch,noarch" --queryformat="%{name}@%{repoid}\n" $pkgs 2>/dev/null |
                         sed "s/-for-rhel-9-[^-]*//; s/-for-ubi-9-[^-]*//; s/-9-for-[^-]*//; s/-rpms$//" |
                         sort -u | grep . > "$tmpdir/$arch" || true
                     # Also check bash to detect repo access issues
-                    dnf -q repoquery --forcearch="$arch" bash 2>/dev/null | grep -q . && echo "1" > "$tmpdir/${arch}_access" || true
+                    dnf -q repoquery --forcearch="$arch" --arch="$arch" bash 2>/dev/null | grep -q . && echo "1" > "$tmpdir/${arch}_access" || true
                 ) &
             done
             wait

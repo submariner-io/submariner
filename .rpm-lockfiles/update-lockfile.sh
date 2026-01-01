@@ -40,14 +40,14 @@ BRANCH=$1
 COMPONENT=${2:-}
 FIX_BRANCH="update-rpm-lockfiles-${BRANCH#release-}"
 
-# Fetch latest from origin
-echo "--- Fetching ${BRANCH} from origin ---"
-if ! git fetch origin "${BRANCH}"; then
-  echo ""
-  echo "ERROR: Failed to fetch '${BRANCH}' from origin"
-  echo "Available release branches:"
-  git branch -r | grep 'origin/release-' | sed 's/^/  /'
-  exit 1
+# Fetch latest from origin (continue if branch already exists locally)
+if ! git fetch origin "${BRANCH}" 2>/dev/null; then
+  if ! git rev-parse "origin/${BRANCH}" >/dev/null 2>&1; then
+    echo "ERROR: Branch '${BRANCH}' not found (fetch failed and not cached locally)"
+    echo "Available release branches:"
+    git branch -r | grep 'origin/release-' | sed 's/^/  /'
+    exit 1
+  fi
 fi
 
 # Verify entitlement certificates exist

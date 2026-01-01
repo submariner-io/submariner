@@ -43,10 +43,10 @@ echo
 echo -e "${B}Component    Package       Repository       x86_64  aarch64 ppc64le s390x${N}"
 echo "----------   -----------   --------------   ------  ------- ------- -----"
 
-# gateway: libreswan from RHEL 9 GA
-printf "gateway      libreswan     RHEL 9 GA        "
+# gateway: libreswan from RHEL 9 AppStream
+printf "gateway      libreswan     RHEL 9 AppStream "
 for arch in x86_64 aarch64 ppc64le s390x; do
-    if check "$RHEL/$arch/baseos/os/repodata/repomd.xml"; then
+    if check "$RHEL/$arch/appstream/os/repodata/repomd.xml"; then
         printf "${G}%-8s${N}" "OK"
     else
         printf "${R}%-8s${N}" "403"
