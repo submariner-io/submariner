@@ -90,6 +90,94 @@ arches:
     sourcerpm: protobuf-c-1.3.3-13.el9.src.rpm
   source: []
   module_metadata: []
+- arch: s390x
+  packages:
+  - url: https://cdn.redhat.com/content/eus/rhel9/9.4/s390x/appstream/os/Packages/l/ldns-1.7.1-11.el9.s390x.rpm
+    repoid: rhel-9-for-s390x-appstream-eus-rpms
+    size: 163422
+    checksum: sha256:3caf1cb1cf17b4a056466b5ab7af9cf0a0c31d6df3ff93f44dc51b16e8f55065
+    name: ldns
+    evr: 1.7.1-11.el9
+    sourcerpm: ldns-1.7.1-11.el9.src.rpm
+  - url: https://cdn.redhat.com/content/eus/rhel9/9.4/s390x/appstream/os/Packages/l/libreswan-4.12-3.el9_4.1.s390x.rpm
+    repoid: rhel-9-for-s390x-appstream-eus-rpms
+    size: 1379365
+    checksum: sha256:f8b12a183f9acc7411a0fb92499dc016a1dc0c5010e600917ebd8b2dce9f1271
+    name: libreswan
+    evr: 4.12-3.el9_4.1
+    sourcerpm: libreswan-4.12-3.el9_4.1.src.rpm
+  - url: https://cdn.redhat.com/content/eus/rhel9/9.4/s390x/appstream/os/Packages/n/nspr-4.36.0-4.el9_4.s390x.rpm
+    repoid: rhel-9-for-s390x-appstream-eus-rpms
+    size: 135799
+    checksum: sha256:54fbd8f7a41548d165c2b3d6140e3175d3d48f8ee79301d9757cab0a8788d2d2
+    name: nspr
+    evr: 4.36.0-4.el9_4
+    sourcerpm: nss-3.112.0-4.el9_4.src.rpm
+  - url: https://cdn.redhat.com/content/eus/rhel9/9.4/s390x/appstream/os/Packages/n/nss-3.112.0-4.el9_4.s390x.rpm
+    repoid: rhel-9-for-s390x-appstream-eus-rpms
+    size: 694219
+    checksum: sha256:963396fd7816a9c1b92ef17695046c35a626f556251397aa3351a386c3f6b137
+    name: nss
+    evr: 3.112.0-4.el9_4
+    sourcerpm: nss-3.112.0-4.el9_4.src.rpm
+  - url: https://cdn.redhat.com/content/eus/rhel9/9.4/s390x/appstream/os/Packages/n/nss-softokn-3.112.0-4.el9_4.s390x.rpm
+    repoid: rhel-9-for-s390x-appstream-eus-rpms
+    size: 391378
+    checksum: sha256:1d3639c8fd1a8d9916ebe8c1f68bdd63c0b54d3c1eef9d844a44346659acb594
+    name: nss-softokn
+    evr: 3.112.0-4.el9_4
+    sourcerpm: nss-3.112.0-4.el9_4.src.rpm
+  - url: https://cdn.redhat.com/content/eus/rhel9/9.4/s390x/appstream/os/Packages/n/nss-softokn-freebl-3.112.0-4.el9_4.s390x.rpm
+    repoid: rhel-9-for-s390x-appstream-eus-rpms
+    size: 417708
+    checksum: sha256:fc2c460ce088b06dae6f82998754868899c404c80b0cd574b7e935c0f303a5ed
+    name: nss-softokn-freebl
+    evr: 3.112.0-4.el9_4
+    sourcerpm: nss-3.112.0-4.el9_4.src.rpm
+  - url: https://cdn.redhat.com/content/eus/rhel9/9.4/s390x/appstream/os/Packages/n/nss-sysinit-3.112.0-4.el9_4.s390x.rpm
+    repoid: rhel-9-for-s390x-appstream-eus-rpms
+    size: 18087
+    checksum: sha256:69f2bb25e414bca1d2eac2786c3a915fc0ff50f8e3dd7dba7bb3fd06d4bd17d3
+    name: nss-sysinit
+    evr: 3.112.0-4.el9_4
+    sourcerpm: nss-3.112.0-4.el9_4.src.rpm
+  - url: https://cdn.redhat.com/content/eus/rhel9/9.4/s390x/appstream/os/Packages/n/nss-tools-3.112.0-4.el9_4.s390x.rpm
+    repoid: rhel-9-for-s390x-appstream-eus-rpms
+    size: 449584
+    checksum: sha256:a3dd0701f9bbf8784b68125b37459845dfff743d4c9f301841366d099819195e
+    name: nss-tools
+    evr: 3.112.0-4.el9_4
+    sourcerpm: nss-3.112.0-4.el9_4.src.rpm
+  - url: https://cdn.redhat.com/content/eus/rhel9/9.4/s390x/appstream/os/Packages/n/nss-util-3.112.0-4.el9_4.s390x.rpm
+    repoid: rhel-9-for-s390x-appstream-eus-rpms
+    size: 90586
+    checksum: sha256:3c3d6cca2c14c25144b46fa25e0ab7186db29612cb7117304174bbde18b347b2
+    name: nss-util
+    evr: 3.112.0-4.el9_4
+    sourcerpm: nss-3.112.0-4.el9_4.src.rpm
+  - url: https://cdn.redhat.com/content/eus/rhel9/9.4/s390x/appstream/os/Packages/u/unbound-libs-1.16.2-8.el9_4.2.s390x.rpm
+    repoid: rhel-9-for-s390x-appstream-eus-rpms
+    size: 534461
+    checksum: sha256:f8b99dd4765ee20686c72ed8c733409ba884994fb10f33877150a91ced6a289b
+    name: unbound-libs
+    evr: 1.16.2-8.el9_4.2
+    sourcerpm: unbound-1.16.2-8.el9_4.2.src.rpm
+  - url: https://cdn.redhat.com/content/eus/rhel9/9.4/s390x/baseos/os/Packages/k/kmod-28-9.el9.s390x.rpm
+    repoid: rhel-9-for-s390x-baseos-eus-rpms
+    size: 131796
+    checksum: sha256:b32d495767e9e88bd935d6cdbab69cebe4a99baea544c38189554fca959d8453
+    name: kmod
+    evr: 28-9.el9
+    sourcerpm: kmod-28-9.el9.src.rpm
+  - url: https://cdn.redhat.com/content/eus/rhel9/9.4/s390x/baseos/os/Packages/p/protobuf-c-1.3.3-13.el9.s390x.rpm
+    repoid: rhel-9-for-s390x-baseos-eus-rpms
+    size: 38450
+    checksum: sha256:0ba1d0bcbc80c2dc53fdac3eecf2606aab133ca22ba7cf857d720c78cb120782
+    name: protobuf-c
+    evr: 1.3.3-13.el9
+    sourcerpm: protobuf-c-1.3.3-13.el9.src.rpm
+  source: []
+  module_metadata: []
 - arch: x86_64
   packages:
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/l/ldns-1.7.1-12.el9.x86_64.rpm
