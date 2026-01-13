@@ -455,8 +455,8 @@ func parseRuleMatch(spec []string, i int, rule *packetfilter.Rule) int {
 }
 
 func parseMark(s string) string {
-	if j := strings.Index(s, "/"); j > -1 {
-		return s[:j]
+	if before, _, found := strings.Cut(s, "/"); found {
+		return before
 	}
 
 	return ""
