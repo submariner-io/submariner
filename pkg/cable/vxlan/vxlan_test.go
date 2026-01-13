@@ -157,7 +157,7 @@ func testVxlanConnectivity(t *testDriver, natInfo *natdiscovery.NATEndpointInfo)
 		routes, err := t.netLink.RouteList(link, k8snet.IPFamilyUnknown)
 		Expect(err).To(Succeed())
 
-		var actualRoutes []map[string]string
+		actualRoutes := make([]map[string]string, 0, len(routes))
 		for i := range routes {
 			actualRoutes = append(actualRoutes, routeFieldMap(routes[i].Src.String(), routes[i].Gw.String(), routes[i].Dst.String()))
 		}
@@ -190,7 +190,7 @@ func testVxlanConnectivity(t *testDriver, natInfo *natdiscovery.NATEndpointInfo)
 			cniIP = cniIPv6Address
 		}
 
-		var expectedRoutes []map[string]string
+		expectedRoutes := make([]map[string]string, 0, len(allowedIPs))
 		for _, subnet := range allowedIPs {
 			expectedRoutes = append(expectedRoutes, routeFieldMap(cniIP, gw, subnet.String()))
 		}
