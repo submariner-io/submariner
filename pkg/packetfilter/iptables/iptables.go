@@ -215,7 +215,7 @@ func (p *packetFilter) List(table packetfilter.TableType, chain string) ([]*pack
 		return []*packetfilter.Rule{}, errors.Wrapf(err, "error listing the rules in table %q, chain %q", tableTypeToStr[table], chain)
 	}
 
-	var rules []*packetfilter.Rule //nolint:prealloc // Can't
+	var rules []*packetfilter.Rule
 
 	for _, existingRule := range existingRules {
 		ruleSpec := strings.Split(existingRule, " ")

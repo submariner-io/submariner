@@ -149,7 +149,7 @@ func main() {
 	pod, err := k8sClientSet.CoreV1().Pods(submSpec.Namespace).Get(ctx, os.Getenv("POD_NAME"), metav1.GetOptions{})
 	logger.FatalOnError(err, "Error getting local Pod %q", os.Getenv("POD_NAME"))
 
-	var handlers []event.Handler //nolint:prealloc // Ignore
+	var handlers []event.Handler
 
 	for _, family := range cidr.ExtractIPFamilies(env.ClusterCidr) {
 		handlers = append(handlers,

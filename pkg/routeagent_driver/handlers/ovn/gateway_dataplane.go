@@ -120,7 +120,7 @@ func (ovn *Handler) getForwardingRuleSpecs() ([]*packetfilter.Rule, error) {
 	// To reroute incoming traffic over the ovn-k8s-mp0 interface, we employ routes in table 149. Before the traffic
 	// hits ovn-k8s-mp0, firewall rules would be processed. Therefore, we include these firewall rules in the FORWARDing
 	// chain to allow such traffic. Similar thing happens for outbound traffic as well, and we use routes in table 150.
-	var rules []*packetfilter.Rule //nolint:prealloc // OK
+	var rules []*packetfilter.Rule
 
 	for _, remoteCIDR := range ovn.getRemoteSubnets().UnsortedList() {
 		rules = append(rules, &packetfilter.Rule{
