@@ -10,7 +10,7 @@
 - `<X-Y>`: Version with dashes (e.g., `0-22`)
 - `<component>`: Component name (gateway, globalnet, or route-agent)
 
-**Repeat steps 1-9 for each component:**
+**Repeat steps 1-10 for each component:**
 
 ##### 1. Checkout Bot's PR Branch
 
@@ -20,7 +20,17 @@ Bot creates PRs on branches named `konflux-submariner-<component>-<X-Y>`.
 git checkout konflux-submariner-<component>-<X-Y>
 ```
 
-##### 2. Configure YAMLlint to Ignore Generated Directories
+##### 2. Remove Files That Should Only Be on Devel
+
+These files are maintained on `devel` only. Remove if present.
+
+```bash
+[[ $(git branch --show-current) == devel ]] && { echo "ERROR: Don't remove these files from devel"; exit 1; }
+git rm -f --ignore-unmatch CLAUDE.md .agents/ .rpm-lockfiles/README.md .rpm-lockfiles/check-repo-access.sh .rpm-lockfiles/verify-packages.sh
+git diff --staged --quiet || git commit -s -m "Remove devel-only files"
+```
+
+##### 3. Configure YAMLlint to Ignore Generated Directories
 
 Add `.tekton` and `.rpm-lockfiles` to yamllint ignore list (idempotent, preserves existing rules).
 
@@ -31,7 +41,7 @@ git add .yamllint.yml
 git commit -s -m "Configure yamllint to ignore .tekton and .rpm-lockfiles"
 ```
 
-##### 3. Add RPM Lockfile Support
+##### 4. Add RPM Lockfile Support
 
 ```bash
 # Extract target version once, validate once, derive previous version
@@ -48,9 +58,9 @@ git commit -s -m "Add RPM lockfile support for <component>"
 
 **Note:** Script copied per-component; Git deduplicates on merge.
 
-**See also:** On `devel`, `.rpm-lockfiles/` has documentation (`README.md`) and diagnostic scripts (`check-repo-access.sh`, `verify-packages.sh`).
+**See also:** On the `devel` branch, `.rpm-lockfiles/` has documentation (`README.md`) and diagnostic scripts (`check-repo-access.sh`, `verify-packages.sh`).
 
-##### 4. Add Konflux Dockerfile and Configure Tekton to Use It
+##### 5. Add Konflux Dockerfile and Configure Tekton to Use It
 
 ```bash
 # Extract target version once, validate once, derive all version values
@@ -69,7 +79,7 @@ git add package/Dockerfile.submariner-<component>.konflux .tekton/*.yaml
 git commit -s -m "Add Konflux dockerfile for <component> and configure tekton to use it"
 ```
 
-##### 5. Enable Hermetic Builds
+##### 6. Enable Hermetic Builds
 
 ```bash
 # Only add if not already present (idempotent)
@@ -81,7 +91,7 @@ git add .tekton/*.yaml
 git commit -s -m "Enable hermetic builds with gomod and RPM prefetching for <component>"
 ```
 
-##### 6. Add Multi-Platform Support
+##### 7. Add Multi-Platform Support
 
 ```bash
 # Only add if not already present (idempotent)
@@ -90,7 +100,7 @@ git add .tekton/*.yaml
 git commit -s -m "Add multi-platform build support for <component>"
 ```
 
-##### 7. Enable SBOM Generation
+##### 8. Enable SBOM Generation
 
 ```bash
 # Only add if not already present (idempotent)
@@ -103,7 +113,7 @@ git add .tekton/*.yaml
 git commit -s -m "Enable SBOM generation for <component>"
 ```
 
-##### 8. Update Task References
+##### 9. Update Task References
 
 ```bash
 bash << 'EOF'
@@ -127,7 +137,7 @@ git diff --quiet .tekton/*.yaml || { git add .tekton/*.yaml && git commit -s -m 
 
 **Note:** Updates task references if outdated.
 
-##### 9. Review and Push
+##### 10. Review and Push
 
 ```bash
 git log origin/<target-branch>..HEAD
@@ -135,9 +145,9 @@ git status
 git push
 ```
 
-Expected: 7-8 commits (bot's initial + 6-7 from steps 2-8), clean working tree.
+Expected: 8-9 commits, clean working tree.
 
-##### 10. Verify All Component PRs
+##### 11. Verify All Component PRs
 
 After completing all 3 components:
 

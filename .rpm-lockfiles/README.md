@@ -4,7 +4,7 @@ This directory contains RPM lockfiles and tooling for Konflux hermetic container
 
 **Directory Structure:**
 
-- Scripts and docs (this README) live on `devel`
+- Scripts and docs (this README) live on the `devel` branch
 - Component configs (`<component>/rpms.in.yaml`, `.repo` files) live on release branches
 
 ## Prerequisites
