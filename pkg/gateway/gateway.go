@@ -206,7 +206,7 @@ func (g *gatewayType) Run(ctx context.Context) error {
 
 	var waitGroup sync.WaitGroup
 
-	g.runAsync(&waitGroup, func() {
+	waitGroup.Go(func() {
 		//nolint:contextcheck // Intentionally not passing the context b/c it can't be used after cancellation.
 		g.cableEngineSyncer.Run(ctx.Done())
 	})
@@ -237,15 +237,6 @@ func (g *gatewayType) Run(ctx context.Context) error {
 	logger.Info("Gateway engine stopped")
 
 	return nil
-}
-
-func (g *gatewayType) runAsync(waitGroup *sync.WaitGroup, run func()) {
-	waitGroup.Add(1)
-
-	go func() {
-		defer waitGroup.Done()
-		run()
-	}()
 }
 
 func (g *gatewayType) startLeaderElection(ctx context.Context) error {
@@ -298,11 +289,11 @@ func (g *gatewayType) onStartedLeading(ctx context.Context) {
 		return
 	}
 
-	g.runAsync(g.leaderComponentsStarted, func() {
+	g.leaderComponentsStarted.Go(func() {
 		g.updateGatewayHAStatus(ctx, subv1.HAStatusActive)
 	})
 
-	g.runAsync(g.leaderComponentsStarted, func() {
+	g.leaderComponentsStarted.Go(func() {
 		err := g.datastoreSyncer.Start(ctx)
 		if errors.Is(err, context.Canceled) {
 			return
@@ -313,7 +304,7 @@ func (g *gatewayType) onStartedLeading(ctx context.Context) {
 		}
 	})
 
-	g.runAsync(g.leaderComponentsStarted, func() {
+	g.leaderComponentsStarted.Go(func() {
 		watcherConfig := g.WatcherConfig
 		if err := tunnel.StartController(g.cableEngine, g.Spec.Namespace, &watcherConfig, ctx.Done()); err != nil {
 			g.fatalError <- errors.Wrap(err, "error running the tunnel controller")
@@ -321,7 +312,7 @@ func (g *gatewayType) onStartedLeading(ctx context.Context) {
 	})
 
 	if g.cableHealthChecker != nil {
-		g.runAsync(g.leaderComponentsStarted, func() {
+		g.leaderComponentsStarted.Go(func() {
 			if err := g.cableHealthChecker.Start(ctx.Done()); err != nil {
 				logger.Errorf(err, "Error starting healthChecker")
 			}
