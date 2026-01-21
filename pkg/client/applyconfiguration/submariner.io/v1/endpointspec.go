@@ -33,7 +33,7 @@ type EndpointSpecApplyConfiguration struct {
 	// Deprecated: Use Get/SetPrivateIP() or, if necessary, PrivateIPs
 	PrivateIP  *string  `json:"private_ip,omitempty"`
 	PrivateIPs []string `json:"privateIPs,omitempty"`
-	// Deprecated: Set/SetPublicIP() or, if necessary, PublicIPs
+	// Deprecated: Use Get/SetPublicIP() or, if necessary, PublicIPs
 	PublicIP      *string           `json:"public_ip,omitempty"`
 	PublicIPs     []string          `json:"publicIPs,omitempty"`
 	NATEnabled    *bool             `json:"nat_enabled,omitempty"`

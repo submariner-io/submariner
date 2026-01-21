@@ -84,7 +84,7 @@ type EndpointSpec struct {
 	// +kubebuilder:validation:MaxItems:=2
 	// +optional
 	PrivateIPs []string `json:"privateIPs,omitempty"`
-	// Deprecated: Set/SetPublicIP() or, if necessary, PublicIPs
+	// Deprecated: Use Get/SetPublicIP() or, if necessary, PublicIPs
 	// +optional
 	PublicIP string `json:"public_ip,omitempty"`
 	// +kubebuilder:validation:MaxItems:=2
