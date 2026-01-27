@@ -9,168 +9,114 @@ This directory contains RPM lockfiles and tooling for Konflux hermetic container
 
 ## Prerequisites
 
-Red Hat entitlement certificates are required to run the lockfile scripts.
+### 1. Red Hat Customer Portal Login ID
 
-### Activation Key Setup
+This is a separate account from your normal Red Hat SSO/Kerberos credentials.
+The login ID must follow a specific naming convention. See
+[Slack thread](https://redhat-internal.slack.com/archives/CKPULPXL3/p1767769916219789)
+for details on how to request one.
 
-Go to [Red Hat Console](https://console.redhat.com) → RHEL → Inventory → System Configuration →
-Activation Keys. Create or modify a key with required repos:
+### 2. Create Activation Key
 
-| Architecture | Repos to Add |
-|--------------|--------------|
-| x86_64 | `fast-datapath-for-rhel-9-x86_64-rpms` |
-| aarch64 | `fast-datapath-for-rhel-9-aarch64-rpms` |
+Log in with your Customer Portal credentials (not SSO) and create an activation key:
+
+https://console.redhat.com/insights/connector/activation-keys/
+
+**Note:** The activation key name is used as a secret. Keep the random default
+and add something like `yourname-yourproject-randomstring`.
+
+### 3. Add Repos to Activation Key
+
+Add the following repositories to the activation key:
+
+| Repository | Repo ID | Used By |
+|------------|---------|---------|
+| Fast Datapath for RHEL 9 x86_64 | `fast-datapath-for-rhel-9-x86_64-rpms` | route-agent |
+| Fast Datapath for RHEL 9 ARM 64 | `fast-datapath-for-rhel-9-aarch64-rpms` | route-agent |
+| Fast Datapath for RHEL 9 Power, little endian | `fast-datapath-for-rhel-9-ppc64le-rpms` | route-agent |
+| Fast Datapath for RHEL 9 IBM z Systems | `fast-datapath-for-rhel-9-s390x-rpms` | route-agent |
 
 **Notes:**
+- RHEL 9 BaseOS and AppStream are auto-enabled (needed for gateway's libreswan)
+- UBI repos are public and don't require activation key (used by globalnet)
 
-- BaseOS and AppStream are auto-enabled; only additional repos listed above need to be added.
-- s390x gateway uses EUS repos configured in `.repo` files (no activation key changes needed).
-- ppc64le/s390x fast-datapath repos exist but require different subscriptions (see Blocking Issues).
-
-### Register Your System
+### 4. Register Your System
 
 Red Hat VPN may be required.
 
 ```bash
-# If switching keys, unregister and clean first:
 sudo subscription-manager unregister
 sudo subscription-manager clean
-
-sudo subscription-manager register --org="YOUR_ORG_ID" --activationkey="YOUR_KEY_NAME"
+sudo subscription-manager register --org='<ORG_ID>' --activationkey='<KEY_NAME>'
 ```
 
-### Verify Access
+Find your org ID on the [activation key page](https://console.redhat.com/insights/connector/activation-keys/).
+
+### 5. Registry Login
+
+```bash
+podman login registry.redhat.io
+```
+
+This uses your Red Hat account (not the new Customer Portal account).
+
+## Verification
+
+### 6. Verify Repository Access
 
 ```bash
 .rpm-lockfiles/check-repo-access.sh
 ```
 
-## Current Status
-
-| Component | x86_64 | aarch64 | ppc64le | s390x |
-|-----------|--------|---------|---------|-------|
-| gateway   | OK     | OK      | 403     | EUS   |
-| route-agent | OK   | OK      | 403     | 403   |
-| globalnet | OK     | OK      | OK      | OK    |
-
-**Legend:**
-
-- OK = working with standard RHEL 9 repos or UBI (public)
-- EUS = working with Extended Update Support repos (see s390x EUS Solution)
-- 403 = repos inaccessible with current subscription (see Blocking Issues)
-
-## s390x EUS Solution
-
-Standard RHEL 9 repos return 403 for s390x with self-serve subscriptions. However,
-**EUS (Extended Update Support) repos are accessible** and contain all required packages
-for the gateway component.
-
-The solution (implemented on release branches for gateway):
-
-1. Add `skip_if_unavailable = 1` to standard repo entries (allows graceful fallback)
-2. Add s390x-specific EUS repo entries pointing to `content/eus/rhel9/9.4/s390x/`
-3. Add s390x to `rpms.in.yaml` arches and regenerate lockfile
-4. Add `linux/s390x` to Tekton pipeline build-platforms
-
-See release branch `.rpm-lockfiles/gateway/` for working implementation.
-
-**Note:** This solution does NOT work for route-agent because openvswitch2.17 (from
-fast-datapath repo) is not available in any s390x repo we can access.
-
-## Blocking Issues
-
-### route-agent ppc64le/s390x
-
-Fast-datapath repos for ppc64le/s390x **exist**
-(per [Red Hat errata](https://access.redhat.com/errata/RHBA-2024:1971))
-but aren't in self-serve activation keys (403).
-They require OpenStack, OpenShift, or RHV subscriptions.
-
-### gateway ppc64le
-
-All RHEL 9 repos for ppc64le return 403 with self-serve activation keys:
-- Standard repos: 403
-- EUS repos: 403
-- TUS/E4S/AUS repos: 403
-
-May require OpenShift Platform Plus or enterprise subscription with ppc64le entitlements.
-
-## Component Details
-
-### gateway
-
-| Package | Available In |
-|---------|--------------|
-| libreswan | RHEL 9 AppStream |
-| iproute, kmod, shadow-utils | UBI (public) |
-
-libreswan is **not in UBI** - only RHEL 9 AppStream. s390x uses EUS repos; ppc64le requires a different subscription.
-
-### route-agent
-
-| Package | Available In |
-|---------|--------------|
-| openvswitch2.17 | fast-datapath (see Blocking Issues for ppc64le/s390x) |
-| dnf-plugins-core, iproute, iptables-nft, nftables, ipset, procps-ng, grep | UBI (public) |
-
-### globalnet
-
-All packages in UBI - works for all 4 architectures.
-
-## Verification Scripts
-
-### Quick Access Check
-
-```bash
-.rpm-lockfiles/check-repo-access.sh
-```
-
-Example output (actual results depend on your subscription):
+Expected output (all OK):
 
 ```text
+Submariner RPM Dependency Status
+=================================
+
 Component    Package       Repository       x86_64  aarch64 ppc64le s390x
 ----------   -----------   --------------   ------  ------- ------- -----
-gateway      libreswan     RHEL 9 AppStream OK      OK      403     403
-route-agent  openvswitch   fast-datapath    OK      OK      403     403
+gateway      libreswan     RHEL 9 AppStream OK      OK      OK      OK
+route-agent  openvswitch   fast-datapath    OK      OK      OK      OK
 globalnet    iptables-nft  UBI (public)     OK      OK      OK      OK
+
+Legend: OK=accessible  403=subscription lacks this arch
 ```
 
-**Note:** gateway s390x shows 403 because the script tests standard repos. The EUS repos
-(configured in `.repo` files on release branches) are accessible - see s390x EUS Solution.
-
-### Detailed Package Verification
+### 7. Verify Packages (Optional)
 
 ```bash
-.rpm-lockfiles/verify-packages.sh [branch]
+.rpm-lockfiles/verify-packages.sh <branch>
 ```
 
-Example output (actual results depend on your subscription and branch configuration):
+Runs dnf inside a container to verify each package is available for each architecture.
+Branch is required since component configs live on release branches, not devel.
+
+Expected output:
 
 ```text
-gateway (repos: rhel-9-for-appstream-rpms rhel-9-for-baseos-rpms rhel-9-for-s390x-appstream-eus-rpms ...)
+gateway (repos: rhel-9-for-appstream-rpms rhel-9-for-baseos-rpms)
   x86_64   OK: iproute@rhel-baseos kmod@rhel-baseos libreswan@rhel-appstream shadow-utils@rhel-baseos
   aarch64  OK: iproute@rhel-baseos kmod@rhel-baseos libreswan@rhel-appstream shadow-utils@rhel-baseos
-  ppc64le  NO REPO ACCESS (subscription lacks ppc64le)
-  s390x    OK: iproute@rhel-baseos-eus kmod@rhel-baseos-eus libreswan@rhel-appstream-eus ...
+  ppc64le  OK: iproute@rhel-baseos kmod@rhel-baseos libreswan@rhel-appstream shadow-utils@rhel-baseos
+  s390x    OK: iproute@rhel-baseos kmod@rhel-baseos libreswan@rhel-appstream shadow-utils@rhel-baseos
 
 route-agent (repos: fast-datapath-for-rhel-9-rpms ubi-9-for-appstream-rpms ubi-9-for-baseos-rpms)
-  x86_64   OK: openvswitch2.17@fast-datapath dnf-plugins-core@ubi-baseos ...
-  aarch64  OK: openvswitch2.17@fast-datapath dnf-plugins-core@ubi-baseos ...
-  ppc64le  NO REPO ACCESS (subscription lacks ppc64le)
-  s390x    NO REPO ACCESS (subscription lacks s390x)
+  x86_64   OK: dnf-plugins-core@ubi-baseos grep@ubi-baseos iproute@ubi-baseos ipset@ubi-baseos iptables-nft@ubi-baseos nftables@ubi-baseos openvswitch2.17@fast-datapath procps-ng@ubi-baseos
+  aarch64  OK: dnf-plugins-core@ubi-baseos grep@ubi-baseos iproute@ubi-baseos ipset@ubi-baseos iptables-nft@ubi-baseos nftables@ubi-baseos openvswitch2.17@fast-datapath procps-ng@ubi-baseos
+  ppc64le  OK: dnf-plugins-core@ubi-baseos grep@ubi-baseos iproute@ubi-baseos ipset@ubi-baseos iptables-nft@ubi-baseos nftables@ubi-baseos openvswitch2.17@fast-datapath procps-ng@ubi-baseos
+  s390x    OK: dnf-plugins-core@ubi-baseos grep@ubi-baseos iproute@ubi-baseos ipset@ubi-baseos iptables-nft@ubi-baseos nftables@ubi-baseos openvswitch2.17@fast-datapath procps-ng@ubi-baseos
 
 globalnet (repos: ubi-9-for-baseos-rpms)
-  x86_64   OK: grep@ubi-baseos iproute@ubi-baseos ipset@ubi-baseos iptables-nft@ubi-baseos
-               nftables@ubi-baseos shadow-utils@ubi-baseos
-  aarch64  OK: grep@ubi-baseos iproute@ubi-baseos ipset@ubi-baseos iptables-nft@ubi-baseos
-               nftables@ubi-baseos shadow-utils@ubi-baseos
-  ppc64le  OK: grep@ubi-baseos iproute@ubi-baseos ipset@ubi-baseos iptables-nft@ubi-baseos
-               nftables@ubi-baseos shadow-utils@ubi-baseos
-  s390x    OK: grep@ubi-baseos iproute@ubi-baseos ipset@ubi-baseos iptables-nft@ubi-baseos
-               nftables@ubi-baseos shadow-utils@ubi-baseos
+  x86_64   OK: grep@ubi-baseos iproute@ubi-baseos ipset@ubi-baseos iptables-nft@ubi-baseos nftables@ubi-baseos shadow-utils@ubi-baseos
+  aarch64  OK: grep@ubi-baseos iproute@ubi-baseos ipset@ubi-baseos iptables-nft@ubi-baseos nftables@ubi-baseos shadow-utils@ubi-baseos
+  ppc64le  OK: grep@ubi-baseos iproute@ubi-baseos ipset@ubi-baseos iptables-nft@ubi-baseos nftables@ubi-baseos shadow-utils@ubi-baseos
+  s390x    OK: grep@ubi-baseos iproute@ubi-baseos ipset@ubi-baseos iptables-nft@ubi-baseos nftables@ubi-baseos shadow-utils@ubi-baseos
 ```
 
-### Update Lockfiles
+## Updating Lockfiles
+
+### 8. Generate Lockfiles
 
 ```bash
 .rpm-lockfiles/update-lockfile.sh <branch> [component]
@@ -178,4 +124,87 @@ globalnet (repos: ubi-9-for-baseos-rpms)
 
 Generates `rpms.lock.yaml` from component configs on the specified branch.
 
-**Additional prerequisite:** `podman login registry.redhat.io`
+Example:
+```bash
+.rpm-lockfiles/update-lockfile.sh release-0.19 gateway
+```
+
+### 9. Update Tekton Pipeline Architectures
+
+Ensure the `build-platforms` in `.tekton/<component>-*-push.yaml` and
+`.tekton/<component>-*-pull-request.yaml` match the arches in `rpms.in.yaml`.
+
+Example from a push pipeline:
+```yaml
+  - name: build-platforms
+    value:
+    - linux/x86_64
+    - linux/arm64
+    - linux/ppc64le
+    - linux/s390x
+```
+
+**Note:** Tekton uses `arm64` while lockfiles use `aarch64` - these refer to the same architecture.
+
+### 10. Upload Activation Key to Konflux
+
+Once local validation is complete, create a secret in your Konflux tenant namespace
+so builds can access subscription content.
+
+Login to the Konflux cluster:
+```bash
+oc login --web https://api.kflux-prd-rh02.0fk9.p1.openshiftapps.com:6443/
+```
+
+Check current state (record existing values before making changes):
+```bash
+oc get secret activation-key -n submariner-tenant -o yaml 2>/dev/null || echo "Secret does not exist yet"
+```
+
+Create or update the activation key secret:
+```bash
+oc create secret generic activation-key -n submariner-tenant \
+  --from-literal=org='<ORG_ID>' \
+  --from-literal=activationkey='<KEY_NAME>' \
+  --dry-run=client -o yaml | oc apply -f -
+```
+
+Verify both fields match what you set:
+```bash
+oc get secret activation-key -n submariner-tenant -o jsonpath='{.data.org}' | base64 -d && echo
+oc get secret activation-key -n submariner-tenant -o jsonpath='{.data.activationkey}' | base64 -d && echo
+```
+
+Confirm the output matches `<ORG_ID>` and `<KEY_NAME>` from the create command above.
+
+Using the default name `activation-key` applies it to all builds in the namespace.
+
+See [Konflux activation key docs](https://konflux-ci.dev/docs/building/activation-keys-subscription/).
+
+---
+
+## Reference
+
+### Component Details
+
+#### gateway
+
+| Package | Source |
+|---------|--------|
+| libreswan | RHEL 9 AppStream |
+| iproute, kmod, shadow-utils | RHEL 9 BaseOS |
+
+#### route-agent
+
+| Package | Source |
+|---------|--------|
+| openvswitch2.17 | fast-datapath |
+| dnf-plugins-core, iproute, iptables-nft, nftables, ipset, procps-ng, grep | UBI 9 BaseOS |
+
+#### globalnet
+
+| Package | Source |
+|---------|--------|
+| grep, iproute, ipset, iptables-nft, nftables, shadow-utils | UBI 9 BaseOS |
+
+UBI repos are public and don't require entitlements.
