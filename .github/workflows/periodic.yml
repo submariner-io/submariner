@@ -17,7 +17,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Check out the repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Update internal submariner-io/* dependencies to latest
         run: |
@@ -26,7 +26,7 @@ jobs:
           done
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@98357b18bf14b5342f975ff684046ec3b2a07725
+        uses: peter-evans/create-pull-request@c0f553fe549906ede9cf27b5156039d195d2ece0
         with:
           title: Update submariner-io/* dependencies to latest
           body: |
@@ -51,7 +51,7 @@ jobs:
       issues: write
     steps:
       - name: Check out the repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Run markdown-link-check
         uses: gaurav-nelson/github-action-markdown-link-check@3c3b66f1f7d0900e37b71eca45b63ea9eedfce31
