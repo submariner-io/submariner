@@ -1,11 +1,3 @@
-# NOTE: This file points to the official Red Hat Enterprise Linux 9 repositories.
-# Access requires a valid Red Hat subscription and entitlement certificates.
-#
-# The tool running this (rpm-lockfile-prototype) must have access to your
-# entitlement certificates at the paths specified by 'sslclientcert' and
-# 'sslclientkey' below. If you are running the tool in a container, you may
-# need to mount your host's /etc/pki/entitlement directory.
-
 [rhel-9-for-$basearch-baseos-rpms]
 name = Red Hat Enterprise Linux 9 for $basearch - BaseOS (RPMs)
 baseurl = https://cdn.redhat.com/content/dist/rhel9/9/$basearch/baseos/os
@@ -27,24 +19,3 @@ sslverify = 0
 sslclientcert = /etc/pki/entitlement/*.pem
 sslclientkey = /etc/pki/entitlement/*-key.pem
 skip_if_unavailable = 1
-
-# s390x requires EUS repos (standard RHEL 9 repos lack s390x in self-serve subscriptions)
-[rhel-9-for-s390x-baseos-eus-rpms]
-name = Red Hat Enterprise Linux 9 for s390x - BaseOS EUS (RPMs)
-baseurl = https://cdn.redhat.com/content/eus/rhel9/9.4/s390x/baseos/os
-enabled = 1
-gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
-gpgcheck = 1
-sslverify = 0
-sslclientcert = /etc/pki/entitlement/*.pem
-sslclientkey = /etc/pki/entitlement/*-key.pem
-
-[rhel-9-for-s390x-appstream-eus-rpms]
-name = Red Hat Enterprise Linux 9 for s390x - AppStream EUS (RPMs)
-baseurl = https://cdn.redhat.com/content/eus/rhel9/9.4/s390x/appstream/os
-enabled = 1
-gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
-gpgcheck = 1
-sslverify = 0
-sslclientcert = /etc/pki/entitlement/*.pem
-sslclientkey = /etc/pki/entitlement/*-key.pem
