@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.20.0
   name: gateways.submariner.io
 spec:
   group: submariner.io
@@ -82,7 +82,7 @@ spec:
                           maxItems: 2
                           type: array
                         public_ip:
-                          description: 'Deprecated: Set/SetPublicIP() or, if necessary,
+                          description: 'Deprecated: Use Get/SetPublicIP() or, if necessary,
                             PublicIPs'
                           type: string
                         publicIPs:
@@ -171,7 +171,7 @@ spec:
                     maxItems: 2
                     type: array
                   public_ip:
-                    description: 'Deprecated: Set/SetPublicIP() or, if necessary,
+                    description: 'Deprecated: Use Get/SetPublicIP() or, if necessary,
                       PublicIPs'
                     type: string
                   publicIPs:

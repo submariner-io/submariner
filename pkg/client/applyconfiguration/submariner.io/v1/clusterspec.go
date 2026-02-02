@@ -23,7 +23,8 @@ package v1
 // ClusterSpecApplyConfiguration represents a declarative configuration of the ClusterSpec type for use
 // with apply.
 type ClusterSpecApplyConfiguration struct {
-	ClusterID   *string  `json:"cluster_id,omitempty"`
+	ClusterID *string `json:"cluster_id,omitempty"`
+	// perhaps this could just be a hash of the name...?
 	ColorCodes  []string `json:"color_codes,omitempty"`
 	ServiceCIDR []string `json:"service_cidr,omitempty"`
 	ClusterCIDR []string `json:"cluster_cidr,omitempty"`

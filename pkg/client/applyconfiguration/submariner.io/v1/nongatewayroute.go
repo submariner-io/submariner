@@ -44,6 +44,7 @@ func NonGatewayRoute(name, namespace string) *NonGatewayRouteApplyConfiguration 
 	b.WithAPIVersion("submariner.io/v1")
 	return b
 }
+
 func (b NonGatewayRouteApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

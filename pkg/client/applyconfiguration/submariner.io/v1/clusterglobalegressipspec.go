@@ -23,6 +23,8 @@ package v1
 // ClusterGlobalEgressIPSpecApplyConfiguration represents a declarative configuration of the ClusterGlobalEgressIPSpec type for use
 // with apply.
 type ClusterGlobalEgressIPSpecApplyConfiguration struct {
+	// The requested number of contiguous GlobalIPs to allocate from the Globalnet CIDR assigned to the cluster.
+	// If not specified, defaults to 1.
 	NumberOfIPs *int `json:"numGlobalIPs,omitempty"`
 }
 

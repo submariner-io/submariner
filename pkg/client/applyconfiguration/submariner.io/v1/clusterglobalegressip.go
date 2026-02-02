@@ -28,11 +28,15 @@ import (
 
 // ClusterGlobalEgressIPApplyConfiguration represents a declarative configuration of the ClusterGlobalEgressIP type for use
 // with apply.
+//
+// ClusterGlobalEgressIP defines a policy for allocating GlobalIPs at the cluster level to be used when no GlobalEgressIP applies.
 type ClusterGlobalEgressIPApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration    `json:",inline"`
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *ClusterGlobalEgressIPSpecApplyConfiguration `json:"spec,omitempty"`
-	Status                               *GlobalEgressIPStatusApplyConfiguration      `json:"status,omitempty"`
+	// Spec is the specification of desired behavior.
+	Spec *ClusterGlobalEgressIPSpecApplyConfiguration `json:"spec,omitempty"`
+	// The most recently observed status. Read-only.
+	Status *GlobalEgressIPStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // ClusterGlobalEgressIP constructs a declarative configuration of the ClusterGlobalEgressIP type for use with
@@ -45,6 +49,7 @@ func ClusterGlobalEgressIP(name, namespace string) *ClusterGlobalEgressIPApplyCo
 	b.WithAPIVersion("submariner.io/v1")
 	return b
 }
+
 func (b ClusterGlobalEgressIPApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

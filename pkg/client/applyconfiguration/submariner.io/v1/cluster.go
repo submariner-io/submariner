@@ -44,6 +44,7 @@ func Cluster(name, namespace string) *ClusterApplyConfiguration {
 	b.WithAPIVersion("submariner.io/v1")
 	return b
 }
+
 func (b ClusterApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

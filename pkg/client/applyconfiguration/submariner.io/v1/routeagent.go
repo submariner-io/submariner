@@ -44,6 +44,7 @@ func RouteAgent(name, namespace string) *RouteAgentApplyConfiguration {
 	b.WithAPIVersion("submariner.io/v1")
 	return b
 }
+
 func (b RouteAgentApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

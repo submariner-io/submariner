@@ -27,7 +27,13 @@ import (
 // GlobalEgressIPSpecApplyConfiguration represents a declarative configuration of the GlobalEgressIPSpec type for use
 // with apply.
 type GlobalEgressIPSpecApplyConfiguration struct {
-	NumberOfIPs *int                                    `json:"numberOfIPs,omitempty"`
+	// The requested number of contiguous GlobalIPs to allocate from the Globalnet CIDR assigned to the cluster.
+	// If not specified, defaults to 1.
+	NumberOfIPs *int `json:"numberOfIPs,omitempty"`
+	// Selects specific pods in the namespace of this GlobalEgressIP to which this GlobalEgressIP applies. If not specified,
+	// all pods in the namespace are selected.
+	// If a pod matches multiple GlobalEgressIP objects, there is no guarantee from which GlobalEgressIP its
+	// GlobalIP will be assigned.
 	PodSelector *metav1.LabelSelectorApplyConfiguration `json:"podSelector,omitempty"`
 }
 

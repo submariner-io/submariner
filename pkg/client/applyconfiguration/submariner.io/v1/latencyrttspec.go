@@ -22,6 +22,9 @@ package v1
 
 // LatencyRTTSpecApplyConfiguration represents a declarative configuration of the LatencyRTTSpec type for use
 // with apply.
+//
+// LatencyRTTSpec describes the round trip time information for a packet
+// between the gateway pods of two clusters.
 type LatencyRTTSpecApplyConfiguration struct {
 	Last    *string `json:"last,omitempty"`
 	Min     *string `json:"min,omitempty"`
