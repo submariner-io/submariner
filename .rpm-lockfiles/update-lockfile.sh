@@ -40,14 +40,23 @@ BRANCH=$1
 COMPONENT=${2:-}
 FIX_BRANCH="update-rpm-lockfiles-${BRANCH#release-}"
 
-# Fetch latest from origin (continue if branch already exists locally)
-if ! git fetch origin "${BRANCH}" 2>/dev/null; then
-  if ! git rev-parse "origin/${BRANCH}" >/dev/null 2>&1; then
+# Determine how to handle the branch argument
+# Priority: local branch > cached origin branch > fetch from remote
+if git rev-parse --verify "${BRANCH}" >/dev/null 2>&1; then
+  # Branch exists locally - will just check it out
+  USE_LOCAL_BRANCH=true
+elif git rev-parse --verify "origin/${BRANCH}" >/dev/null 2>&1; then
+  # Branch exists on origin (cached locally) - will create fix branch
+  USE_LOCAL_BRANCH=false
+else
+  # Neither exists locally - try to fetch
+  git fetch origin "${BRANCH}" 2>/dev/null || {
     echo "ERROR: Branch '${BRANCH}' not found (fetch failed and not cached locally)"
     echo "Available release branches:"
     git branch -r | grep 'origin/release-' | sed 's/^/  /'
     exit 1
-  fi
+  }
+  USE_LOCAL_BRANCH=false
 fi
 
 # Verify entitlement certificates exist
@@ -65,9 +74,14 @@ if [ ! -s "${HOME}/.docker/config.json" ]; then
   exit 1
 fi
 
-# Create fix branch from target branch
-echo "--- Creating branch ${FIX_BRANCH} from ${BRANCH} ---"
-git checkout -B "${FIX_BRANCH}" "origin/${BRANCH}"
+# Check out the appropriate branch
+if [ "${USE_LOCAL_BRANCH}" = true ]; then
+  echo "--- Using local branch ${BRANCH} ---"
+  git checkout "${BRANCH}"
+else
+  echo "--- Creating branch ${FIX_BRANCH} from ${BRANCH} ---"
+  git checkout -B "${FIX_BRANCH}" "origin/${BRANCH}"
+fi
 
 # Check if .rpm-lockfiles exists
 if [ ! -d ".rpm-lockfiles" ]; then
@@ -146,9 +160,18 @@ if git diff --quiet .rpm-lockfiles/*/rpms.lock.yaml 2>/dev/null; then
 else
   echo "=== Done. Review changes with: git diff ==="
   echo ""
-  echo "To commit and create PR:"
+  echo "To commit:"
   echo "  git add .rpm-lockfiles/*/rpms.lock.yaml"
-  echo "  git commit -s -m 'Update RPM lockfiles'"
-  echo "  git push origin ${FIX_BRANCH}"
-  echo "  gh pr create --base ${BRANCH} --head ${FIX_BRANCH}"
+  echo "  git commit -s -m 'Regenerate RPM lockfiles'"
+  if [ "${USE_LOCAL_BRANCH}" = true ]; then
+    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    echo ""
+    echo "To push:"
+    echo "  git push origin ${CURRENT_BRANCH}"
+  else
+    echo ""
+    echo "To push and create PR:"
+    echo "  git push origin ${FIX_BRANCH}"
+    echo "  gh pr create --base ${BRANCH} --head ${FIX_BRANCH}"
+  fi
 fi

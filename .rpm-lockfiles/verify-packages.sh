@@ -31,9 +31,19 @@ trap cleanup EXIT
 
 # If branch specified, extract .rpm-lockfiles from that branch
 if [[ -n "$BRANCH" ]]; then
-    # Try to fetch, but continue if branch already exists locally
-    git fetch origin "$BRANCH" 2>/dev/null || git rev-parse "origin/$BRANCH" >/dev/null 2>&1 || \
-        { echo "Branch $BRANCH not found (fetch failed and not cached locally)"; exit 1; }
+    # Determine git ref to use: local branch > origin/branch > fetch
+    if git rev-parse --verify "$BRANCH" >/dev/null 2>&1; then
+        # Local branch exists - use it directly
+        GIT_REF="$BRANCH"
+    elif git rev-parse --verify "origin/$BRANCH" >/dev/null 2>&1; then
+        # origin/branch cached - use it
+        GIT_REF="origin/$BRANCH"
+    else
+        # Neither exists - try to fetch
+        git fetch origin "$BRANCH" 2>/dev/null || \
+            { echo "Branch $BRANCH not found (fetch failed and not cached locally)"; exit 1; }
+        GIT_REF="origin/$BRANCH"
+    fi
 
     CLEANUP_DIR=$(mktemp -d)
     LOCKFILES_DIR="$CLEANUP_DIR"
@@ -41,8 +51,8 @@ if [[ -n "$BRANCH" ]]; then
     # Extract .rpm-lockfiles from the branch
     for comp in gateway route-agent globalnet; do
         mkdir -p "$LOCKFILES_DIR/$comp"
-        git show "origin/$BRANCH:.rpm-lockfiles/$comp/rpms.in.yaml" > "$LOCKFILES_DIR/$comp/rpms.in.yaml" 2>/dev/null || continue
-        git show "origin/$BRANCH:.rpm-lockfiles/$comp/submariner-rhel-9.repo" > "$LOCKFILES_DIR/$comp/submariner-rhel-9.repo" 2>/dev/null || true
+        git show "$GIT_REF:.rpm-lockfiles/$comp/rpms.in.yaml" > "$LOCKFILES_DIR/$comp/rpms.in.yaml" 2>/dev/null || continue
+        git show "$GIT_REF:.rpm-lockfiles/$comp/submariner-rhel-9.repo" > "$LOCKFILES_DIR/$comp/submariner-rhel-9.repo" 2>/dev/null || true
     done
     echo "Verifying packages for $BRANCH"
 else
