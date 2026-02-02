@@ -19,24 +19,3 @@ sslverify = 0
 sslclientcert = /etc/pki/entitlement/*.pem
 sslclientkey = /etc/pki/entitlement/*-key.pem
 skip_if_unavailable = 1
-
-# s390x requires EUS repos (standard RHEL 9 repos lack s390x in self-serve subscriptions)
-[rhel-9-for-s390x-baseos-eus-rpms]
-name = Red Hat Enterprise Linux 9 for s390x - BaseOS EUS (RPMs)
-baseurl = https://cdn.redhat.com/content/eus/rhel9/9.4/s390x/baseos/os
-enabled = 1
-gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
-gpgcheck = 1
-sslverify = 0
-sslclientcert = /etc/pki/entitlement/*.pem
-sslclientkey = /etc/pki/entitlement/*-key.pem
-
-[rhel-9-for-s390x-appstream-eus-rpms]
-name = Red Hat Enterprise Linux 9 for s390x - AppStream EUS (RPMs)
-baseurl = https://cdn.redhat.com/content/eus/rhel9/9.4/s390x/appstream/os
-enabled = 1
-gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
-gpgcheck = 1
-sslverify = 0
-sslclientcert = /etc/pki/entitlement/*.pem
-sslclientkey = /etc/pki/entitlement/*-key.pem
