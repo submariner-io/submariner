@@ -215,106 +215,85 @@ var _ = Describe("AddIPEntry", func() {
 var _ = Describe("AddEntry", func() {
 	t := newTestDriver()
 
-	var entry *ipset.Entry
-
-	testSuccess := func(args func() []any) {
+	testSuccess := func(entry *ipset.Entry, args ...any) {
 		It("should invoke the correct command", func() {
 			err := t.ipSet.AddEntry(entry, testSet, false)
 			Expect(err).To(Succeed())
-			t.cmdExecutor.AwaitCommand(IPSetPathMatcher, append([]any{"add", testSet}, args()...)...)
+			t.cmdExecutor.AwaitCommand(IPSetPathMatcher, append([]any{"add", testSet}, args...)...)
 		})
 	}
 
 	Context("with set type HashIPPort", func() {
-		BeforeEach(func() {
-			entry = &ipset.Entry{
-				SetType:  ipset.HashIPPort,
-				IP:       entryIP,
-				Port:     123,
-				Protocol: ipset.ProtocolTCP,
-			}
-		})
+		entry := &ipset.Entry{
+			SetType:  ipset.HashIPPort,
+			IP:       entryIP,
+			Port:     123,
+			Protocol: ipset.ProtocolTCP,
+		}
 
-		testSuccess(func() []any {
-			return []any{entry.IP + "," + string(entry.Protocol) + ":123"}
-		})
+		testSuccess(entry, entry.IP+","+string(entry.Protocol)+":123")
 	})
 
 	Context("with set type HashIPPortIP", func() {
-		BeforeEach(func() {
-			entry = &ipset.Entry{
-				SetType:  ipset.HashIPPortIP,
-				IP:       entryIP,
-				Port:     123,
-				Protocol: ipset.ProtocolTCP,
-				IP2:      "192.168.1.2",
-			}
-		})
+		entry := &ipset.Entry{
+			SetType:  ipset.HashIPPortIP,
+			IP:       entryIP,
+			Port:     123,
+			Protocol: ipset.ProtocolTCP,
+			IP2:      "192.168.1.2",
+		}
 
-		testSuccess(func() []any {
-			return []any{entry.IP + "," + string(entry.Protocol) + ":123," + entry.IP2}
-		})
+		testSuccess(entry, entry.IP+","+string(entry.Protocol)+":123,"+entry.IP2)
 	})
 
 	Context("with set type HashNet", func() {
-		BeforeEach(func() {
-			entry = &ipset.Entry{
-				SetType: ipset.HashNet,
-				Net:     "10.0.1.0/24",
-			}
-		})
+		entry := &ipset.Entry{
+			SetType: ipset.HashNet,
+			Net:     "10.0.1.0/24",
+		}
 
-		testSuccess(func() []any {
-			return []any{entry.Net}
-		})
+		testSuccess(entry, entry.Net)
 	})
 
 	Context("with set type HashNetPort", func() {
-		BeforeEach(func() {
-			entry = &ipset.Entry{
-				SetType:  ipset.HashNetPort,
-				Protocol: ipset.ProtocolUDP,
-				Port:     123,
-				Net:      "10.0.1.0/24",
-			}
-		})
+		entry := &ipset.Entry{
+			SetType:  ipset.HashNetPort,
+			Protocol: ipset.ProtocolUDP,
+			Port:     123,
+			Net:      "10.0.1.0/24",
+		}
 
-		testSuccess(func() []any {
-			return []any{entry.Net + "," + string(entry.Protocol) + ":123"}
-		})
+		testSuccess(entry, entry.Net+","+string(entry.Protocol)+":123")
 	})
 
 	Context("with set type HashIPPortNet", func() {
-		BeforeEach(func() {
-			entry = &ipset.Entry{
-				SetType:  ipset.HashIPPortNet,
-				IP:       entryIP,
-				Protocol: ipset.ProtocolUDP,
-				Port:     123,
-				Net:      "10.0.1.0/24",
-			}
-		})
+		entry := &ipset.Entry{
+			SetType:  ipset.HashIPPortNet,
+			IP:       entryIP,
+			Protocol: ipset.ProtocolUDP,
+			Port:     123,
+			Net:      "10.0.1.0/24",
+		}
 
-		testSuccess(func() []any {
-			return []any{entry.IP + "," + string(entry.Protocol) + ":123," + entry.Net}
-		})
+		testSuccess(entry, entry.IP+","+string(entry.Protocol)+":123,"+entry.Net)
 	})
 
 	Context("with set type BitmapPort", func() {
-		BeforeEach(func() {
-			entry = &ipset.Entry{
-				SetType: ipset.BitmapPort,
-				Port:    123,
-			}
-		})
+		entry := &ipset.Entry{
+			SetType: ipset.BitmapPort,
+			Port:    123,
+		}
 
-		testSuccess(func() []any {
-			return []any{"123"}
-		})
+		testSuccess(entry, "123")
 	})
 
 	When("the command fails", func() {
 		It("should return an error", func() {
+			entry := &ipset.Entry{
+				SetType: ipset.BitmapPort,
+				Port:    123,
+			}
+
 			t.cmdExecutor.SetupCommandOutputWithError("", errors.New("exit status 1"), IPSetPathMatcher, "add")
 			err := t.ipSet.AddEntry(entry, testSet, false)
 			Expect(err).To(HaveOccurred())
