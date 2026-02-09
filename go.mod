@@ -14,8 +14,8 @@ require (
 	github.com/projectcalico/api v0.0.0-20230602153125-fb7148692637
 	github.com/prometheus-community/pro-bing v0.7.0
 	github.com/prometheus/client_golang v1.23.2
-	github.com/submariner-io/admiral v0.23.0-m0.0.20260121163245-60a10fed6460
-	github.com/submariner-io/shipyard v0.23.0-m0.0.20260121161247-366b31d697ca
+	github.com/submariner-io/admiral v0.23.0-rc0
+	github.com/submariner-io/shipyard v0.23.0-rc0
 	github.com/tigera/operator/api v0.0.0-20250829192342-96fd517a8419
 	github.com/vishvananda/netlink v1.3.1
 	golang.org/x/net v0.49.0
