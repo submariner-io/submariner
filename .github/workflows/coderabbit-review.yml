@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   trigger-review:
-    uses: submariner-io/submariner-bot/.github/workflows/coderabbit-trigger.yml@devel
+    uses: submariner-io/submariner-bot/.github/workflows/coderabbit-trigger.yml@release-0.23
     with:
       pr_number: ${{ github.event.pull_request.number }}
     secrets: inherit

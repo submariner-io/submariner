@@ -1,4 +1,4 @@
-BASE_BRANCH ?= devel
+BASE_BRANCH ?= release-0.23
 export BASE_BRANCH
 
 # Running in Dapper
