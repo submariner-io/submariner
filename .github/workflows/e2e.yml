@@ -30,6 +30,8 @@ jobs:
 
       - name: Run E2E deployment and tests
         uses: submariner-io/shipyard/gh-actions/e2e@devel
+        with:
+          plugin: scripts/e2e/hook
 
       - name: Post mortem
         if: failure()
@@ -83,6 +85,7 @@ jobs:
         uses: submariner-io/shipyard/gh-actions/e2e@devel
         with:
           using: ${{ matrix.globalnet }} ${{ matrix.cable-driver }} ${{ matrix.extra-toggles }}
+          plugin: scripts/e2e/hook
 
       - name: Post mortem
         if: failure()

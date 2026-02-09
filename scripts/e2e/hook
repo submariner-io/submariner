@@ -1,0 +1,23 @@
+# shellcheck shell=bash
+# shellcheck source=scripts/e2e/hook
+
+### Hook functions for E2E tests ###
+
+function pre_deploy() {
+    # TEMPORARY WORKAROUND FOR PR #3763:
+    # Upgrade nftables on KIND nodes to resolve F43 compatibility issues.
+    # See scripts/upgrade-kind-nftables.sh for details.
+    #
+    # This should be removed when KIND base images are updated to
+    # Debian 13 or Ubuntu 24.04 (which include nftables v1.1.1+)
+
+    echo ""
+    echo "Running pre_deploy hook to upgrade nftables..."
+    echo ""
+
+    if [ -f "${DAPPER_SOURCE}/scripts/upgrade-kind-nftables.sh" ]; then
+        "${DAPPER_SOURCE}/scripts/upgrade-kind-nftables.sh"
+    else
+        echo "WARNING: upgrade-kind-nftables.sh not found, skipping nftables upgrade"
+    fi
+}

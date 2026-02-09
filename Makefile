@@ -29,6 +29,11 @@ export TESTDIR = test/external
 override export PLUGIN = scripts/e2e/external/hook
 endif
 
+# TEMPORARY: Apply nftables upgrade workaround for Fedora 43 compatibility
+ifneq (,$(filter nftables,$(_using)))
+override export PLUGIN = scripts/e2e/hook
+endif
+
 # When cross-building, we need to map Go architectures and operating systems to Docker buildx platforms:
 # Docker buildx platform | Fedora support? | Go
 # --------------------------------------------------
