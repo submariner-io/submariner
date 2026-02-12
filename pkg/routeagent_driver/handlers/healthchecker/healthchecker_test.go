@@ -243,6 +243,7 @@ var _ = Describe("RemoteEndpoint latency info", func() {
 
 			t.awaitRouteAgent(func(ra *submarinerv1.RouteAgent, g Gomega) {
 				epMap := map[string]*submarinerv1.RemoteEndpoint{}
+
 				for i := range ra.Status.RemoteEndpoints {
 					g.Expect(ra.Status.RemoteEndpoints[i].Spec.HealthCheckIPs).To(HaveLen(1))
 					epMap[ra.Status.RemoteEndpoints[i].Spec.HealthCheckIPs[0]] = &ra.Status.RemoteEndpoints[i]

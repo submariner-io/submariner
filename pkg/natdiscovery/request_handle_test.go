@@ -70,6 +70,7 @@ var _ = Describe("Request handling", func() {
 	When("receiving a request with a known sender endpoint", func() {
 		It("should respond with OK", func() {
 			localND.instance.AddEndpoint(&remoteEndpoint, k8snet.IPv4)
+
 			response := requestResponseFromRemoteToLocal(remoteND.ipv4Connection.addr)
 			Expect(response[0].GetResponse()).To(Equal(natproto.ResponseType_OK))
 			Expect(response[1].GetResponse()).To(Equal(natproto.ResponseType_NAT_DETECTED))
@@ -82,6 +83,7 @@ var _ = Describe("Request handling", func() {
 			It("should respond with NAT_DETECTED and SrcIpNatDetected", func() {
 				remoteND.ipv4Connection.addr.IP = net.ParseIP(testRemotePublicIP)
 				localND.instance.AddEndpoint(&remoteEndpoint, k8snet.IPv4)
+
 				response := requestResponseFromRemoteToLocal(remoteND.ipv4Connection.addr)
 				Expect(response[0].GetResponse()).To(Equal(natproto.ResponseType_NAT_DETECTED))
 				Expect(response[0].GetSrcIpNatDetected()).To(BeTrue())
@@ -93,6 +95,7 @@ var _ = Describe("Request handling", func() {
 			It("should respond with NAT_DETECTED and SrcPortNatDetected", func() {
 				remoteND.ipv4Connection.addr.Port = int(testRemoteNATPort + 1)
 				localND.instance.AddEndpoint(&remoteEndpoint, k8snet.IPv4)
+
 				response := requestResponseFromRemoteToLocal(remoteND.ipv4Connection.addr)
 				Expect(response[0].GetResponse()).To(Equal(natproto.ResponseType_NAT_DETECTED))
 				Expect(response[0].GetSrcIpNatDetected()).To(BeFalse())
@@ -104,6 +107,7 @@ var _ = Describe("Request handling", func() {
 	When("receiving a request with an unknown receiver endpoint ID", func() {
 		It("should respond with UNKNOWN_DST_ENDPOINT", func() {
 			localND.instance.AddEndpoint(&remoteEndpoint, k8snet.IPv4)
+
 			localEndpoint.Spec.CableName = "invalid"
 			response := requestResponseFromRemoteToLocal(remoteND.ipv4Connection.addr)
 			Expect(response[0].GetResponse()).To(Equal(natproto.ResponseType_UNKNOWN_DST_ENDPOINT))
@@ -113,6 +117,7 @@ var _ = Describe("Request handling", func() {
 	When("receiving a request with an unknown receiver cluster ID", func() {
 		It("should respond with UNKNOWN_DST_CLUSTER", func() {
 			localND.instance.AddEndpoint(&remoteEndpoint, k8snet.IPv4)
+
 			localEndpoint.Spec.ClusterID = "invalid"
 			response := requestResponseFromRemoteToLocal(remoteND.ipv4Connection.addr)
 			Expect(response[0].GetResponse()).To(Equal(natproto.ResponseType_UNKNOWN_DST_CLUSTER))

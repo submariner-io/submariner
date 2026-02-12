@@ -37,6 +37,7 @@ var _ = PDescribe("[expansion] Test expanding/shrinking an existing cluster flee
 		clusterCName := framework.TestContext.ClusterIDs[framework.ClusterC]
 
 		framework.By(fmt.Sprintf("Verifying no GW nodes are present on cluster %q", clusterCName))
+
 		gatewayNode := framework.FindGatewayNodes(framework.ClusterC)
 		Expect(gatewayNode).To(BeEmpty(), fmt.Sprintf("Expected no gateway node on %q", framework.ClusterC))
 

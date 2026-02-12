@@ -67,6 +67,7 @@ func init() {
 
 var _ = BeforeSuite(func() {
 	kzerolog.InitK8sLogging()
+
 	syncer.GatewayUpdateInterval = 200 * time.Millisecond
 	syncer.GatewayStaleTimeout = 1 * time.Second
 })

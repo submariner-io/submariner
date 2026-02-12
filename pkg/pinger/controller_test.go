@@ -67,6 +67,7 @@ var _ = Describe("Controller", func() {
 
 				p, ok := pingerMap[pingerCfg.IP]
 				Expect(ok).To(BeTrue())
+
 				return p
 			},
 		})

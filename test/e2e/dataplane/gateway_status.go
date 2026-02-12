@@ -83,6 +83,7 @@ var _ = Describe("Gateway status reporting", Label(labels.Dataplane), func() {
 					if apierrors.IsNotFound(err) {
 						return nil, nil //nolint:nilnil // Returning nil value is intentional
 					}
+
 					return resGw, err
 				},
 				func(result *submarinerv1.Gateway) (bool, string, error) {

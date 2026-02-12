@@ -102,6 +102,7 @@ var _ = Describe("Basic TCP connectivity tests across overlapping clusters witho
 							f.Namespace), service, func(existing *v1.Service) (*v1.Service, error) {
 							existing.Spec.Ports[0].Port = lpConfig.Port
 							existing.Spec.Ports[0].TargetPort = intstr.FromInt32(lpConfig.Port)
+
 							return existing, nil
 						})
 						Expect(err).To(Succeed())

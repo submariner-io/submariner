@@ -188,6 +188,7 @@ var _ = Describe("Interface", func() {
 		t.netLink.AwaitDstRoutes(0, 100, destCIDR1, destCIDR2)
 
 		Expect(vxlanInterface.AddRoutes(net.ParseIP("240.17.2.3"), net.ParseIP("120.17.2.3"), 100, *ipNet1, *ipNet2)).To(Succeed())
+
 		list, err := t.netLink.RouteList(&netlink.GenericLink{}, k8snet.IPFamilyUnknown)
 		Expect(err).To(Succeed())
 		Expect(list).To(HaveLen(2))

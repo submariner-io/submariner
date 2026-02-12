@@ -42,6 +42,7 @@ var _ = Describe("retryOnInterrupted", func() {
 			if callCount < 4 {
 				return "", netlink.ErrDumpInterrupted
 			}
+
 			return "success after retries", nil
 		})
 		Expect(err).To(Succeed())
