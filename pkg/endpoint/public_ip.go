@@ -196,7 +196,7 @@ func publicAPI(family k8snet.IPFamily, _ kubernetes.Interface, _, value string) 
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err == nil {
-		response, err = http.DefaultClient.Do(req)
+		response, err = http.DefaultClient.Do(req) //nolint:gosec // URL from trusted gateway configuration
 	}
 
 	if err != nil {
