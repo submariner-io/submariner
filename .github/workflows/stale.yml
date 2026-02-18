@@ -15,6 +15,7 @@ jobs:
     permissions:
       issues: write
       pull-requests: write
+      actions: write
     steps:
       - uses: actions/stale@997185467fa4f803885201cee163a9f38240193d
         with:
