@@ -128,7 +128,7 @@ func main() {
 
 	global.Init(globalConfigMap, configMap)
 
-	configmap.WatchAndSignalOnChange(ctx, k8sClientSet, env.Namespace, syscall.SIGINT, configmap.Global, names.GatewayComponent)
+	configmap.WatchAndSignalOnChange(ctx, k8sClientSet, env.Namespace, syscall.SIGINT, configmap.Global, names.RouteAgentComponent)
 
 	pfconfigure.DriverFromGlobalConfig()
 
