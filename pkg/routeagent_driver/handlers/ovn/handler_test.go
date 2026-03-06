@@ -282,7 +282,8 @@ func (t *handlerTestDriver) testRemoteEndpoint(ipFamilySubnets, nonIPFamilySubne
 			By("Updating remote Endpoint")
 
 			oldSubnets := endpointSubnets
-			endpointSubnets = []string{newEndpointSubnet}
+			endpointSubnets := make([]string, 0, 1+len(nonIPFamilySubnets))
+			endpointSubnets = append(endpointSubnets, newEndpointSubnet)
 
 			//nolint:gocritic // Ignore "append result not assigned to the same slice"
 			endpoint.Spec.Subnets = append(endpointSubnets, nonIPFamilySubnets...)
@@ -329,7 +330,8 @@ func (t *handlerTestDriver) testRemoteEndpoint(ipFamilySubnets, nonIPFamilySubne
 				By("Updating remote Endpoint")
 
 				oldSubnets := endpointSubnets
-				endpointSubnets = []string{oldSubnets[0], newEndpointSubnet}
+				endpointSubnets := make([]string, 0, 2+len(nonIPFamilySubnets))
+				endpointSubnets = append(endpointSubnets, oldSubnets[0], newEndpointSubnet)
 
 				//nolint:gocritic // Ignore "append result not assigned to the same slice"
 				endpoint.Spec.Subnets = append(endpointSubnets, nonIPFamilySubnets...)
