@@ -189,11 +189,39 @@ func (c *OVSDBClient) AwaitNoModel(m any) {
 	}).Should(BeFalse(), "OVSBD model exists: %s", resource.ToJSON(m))
 }
 
+func (c *OVSDBClient) EnsureModel(m any) {
+	Consistently(func(g Gomega) {
+		found, existing := c.hasModel(m)
+		g.Expect(found).To(BeTrue(), "OVSDB model not found: %s. Actual models: %v", resource.ToJSON(m), existing)
+	}).Should(Succeed())
+}
+
 func (c *OVSDBClient) EnsureNoModel(m any) {
 	Consistently(func() bool {
 		found, _ := c.hasModel(m)
 		return found
 	}).Should(BeFalse(), "OVSBD model exists: %s", resource.ToJSON(m))
+}
+
+func (c *OVSDBClient) GetModel(m any) any {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	for _, o := range c.models[reflect.TypeOf(m)] {
+		switch t := m.(type) {
+		case *nbdb.LogicalRouterPolicy:
+			if strings.Contains(o.(*nbdb.LogicalRouterPolicy).Match, t.Match) &&
+				reflect.DeepEqual(o.(*nbdb.LogicalRouterPolicy).Nexthop, t.Nexthop) {
+				return o
+			}
+		case *nbdb.LogicalRouterStaticRoute:
+			if o.(*nbdb.LogicalRouterStaticRoute).IPPrefix == t.IPPrefix {
+				return o
+			}
+		}
+	}
+
+	return nil
 }
 
 func (c *OVSDBClient) EnsureNoModelsOfType(m any) {
