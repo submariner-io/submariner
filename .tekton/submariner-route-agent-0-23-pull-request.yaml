@@ -31,7 +31,7 @@ spec:
     value:
     - linux/x86_64
   - name: dockerfile
-    value: package/Dockerfile.submariner-route-agent
+    value: package/Dockerfile.submariner-route-agent.konflux
   pipelineSpec:
     description: |
       This pipeline is ideal for building multi-arch container images from a Containerfile while maintaining trust after pipeline customization.
