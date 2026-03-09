@@ -32,15 +32,21 @@ import (
 )
 
 const (
-	OVNClusterRouter       = "ovn_cluster_router"
-	ovnRoutePoliciesPrioV4 = 20000
-	ovnRoutePoliciesPrioV6 = 20100
+	OVNClusterRouter        = "ovn_cluster_router"
+	ovnRoutePoliciesPrioV4  = 20000
+	ovnRoutePoliciesPrioV6  = 20100
+	SubmarinerExternalIDKey = "submariner"
 )
 
 func (c *ConnectionHandler) reconcileOvnLogicalRouterStaticRoutes(remoteSubnets sets.Set[string],
 	nextHop string,
 ) error {
 	staleLRSRPred := func(item *nbdb.LogicalRouterStaticRoute) bool {
+		// Only manage routes that Submariner created, ignore rest of the system's routes.
+		if _, ok := item.ExternalIDs[SubmarinerExternalIDKey]; !ok {
+			return false
+		}
+
 		// Legacy routes will have same prefix but different nextHop
 		return (item.Nexthop == nextHop && !remoteSubnets.Has(item.IPPrefix)) ||
 			(item.Nexthop != nextHop && remoteSubnets.Has(item.IPPrefix))
@@ -75,7 +81,7 @@ func buildLRSRsFromSubnets(subnetsToAdd []string, nextHop string) []*nbdb.Logica
 			Nexthop:  nextHop,
 			IPPrefix: subnet,
 			ExternalIDs: map[string]string{
-				"submariner": versions.Submariner(),
+				SubmarinerExternalIDKey: versions.Submariner(),
 			},
 		}
 	}
@@ -92,6 +98,11 @@ func (c *ConnectionHandler) reconcileSubOvnLogicalRouterPolicies(remoteSubnets s
 	expectedLRPs := buildLRPsFromSubnets(c.ipFamily, remoteSubnets.UnsortedList(), nextHop, priority)
 
 	lrpStalePredicate := func(item *nbdb.LogicalRouterPolicy) bool {
+		// Only manage policies that Submariner created, ignore rest of the system's policies.
+		if _, ok := item.ExternalIDs[SubmarinerExternalIDKey]; !ok {
+			return false
+		}
+
 		if item.Priority != priority {
 			return false
 		}
@@ -149,7 +160,7 @@ func buildLRPsFromSubnets(family k8snet.IPFamily, subnetsToAdd []string, nextHop
 			Match:    match,
 			Nexthop:  ptr.To(nextHop),
 			ExternalIDs: map[string]string{
-				"submariner": versions.Submariner(),
+				SubmarinerExternalIDKey: versions.Submariner(),
 			},
 		})
 	}
