@@ -1,0 +1,21 @@
+---
+context:
+  containerfile: ../../package/Dockerfile.submariner-route-agent.konflux
+
+contentOrigin:
+  repofiles:
+    - submariner-rhel-9.repo
+packages:
+  - dnf-plugins-core
+  - iproute
+  - iptables-nft
+  - nftables
+  - ipset
+  - procps-ng
+  - openvswitch2.17
+  - grep
+arches:
+  - x86_64
+  - aarch64
+  - ppc64le
+  - s390x
