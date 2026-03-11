@@ -20,7 +20,7 @@ require (
 	github.com/tigera/operator/api v0.0.0-20250829192342-96fd517a8419
 	github.com/vishvananda/netlink v1.3.1
 	golang.org/x/net v0.51.0
-	golang.org/x/sys v0.41.0
+	golang.org/x/sys v0.42.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20230429144221-925a1e7659e6
 	google.golang.org/protobuf v1.36.8
 	k8s.io/api v0.35.2
