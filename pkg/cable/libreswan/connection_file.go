@@ -91,5 +91,6 @@ func (c *ConnectionFile) RemoveConnectionStanza(connName string) error {
 		return errors.Wrapf(os.Remove(c.Path), "error removing file %q", c.Path)
 	}
 
+	//nolint:gosec // Path is set internally by libreswan cable driver, not from user input
 	return errors.Wrapf(os.WriteFile(c.Path, []byte(strings.Join(lines, "\n")+"\n"), 0o600), "error writing file %q", c.Path)
 }
