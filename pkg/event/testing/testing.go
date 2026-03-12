@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event"
@@ -106,9 +107,12 @@ func (t *TestHandlerBase) addEvent(eventName string, param any) error {
 		Handler:   t.Name,
 	}
 
-	t.Events <- ev
-
-	return nil
+	select {
+	case t.Events <- ev:
+		return nil
+	case <-time.After(5 * time.Second):
+		return fmt.Errorf("timeout sending event %q to channel", eventName)
+	}
 }
 
 func (t *TestHandlerBase) Init(_ context.Context) error {
