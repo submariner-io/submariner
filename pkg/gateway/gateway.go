@@ -320,7 +320,7 @@ func (g *gatewayType) onStartedLeading(ctx context.Context) {
 	}
 
 	if g.publicIPWatcher != nil {
-		go g.publicIPWatcher.Run(ctx.Done())
+		go g.publicIPWatcher.Run(ctx)
 	}
 }
 

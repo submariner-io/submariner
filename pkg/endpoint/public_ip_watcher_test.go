@@ -31,6 +31,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/types"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
@@ -105,7 +106,7 @@ func newPublicIPWatcherTestDriver() *publicIPWatcherTestDriver {
 			LocalEndpoint: t.localEndpoint,
 		})
 
-		ipWatcher.Run(t.stopCh)
+		ipWatcher.Run(wait.ContextForChannel(t.stopCh))
 	})
 
 	AfterEach(func() {
