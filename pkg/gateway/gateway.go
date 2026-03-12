@@ -327,7 +327,9 @@ func (g *gatewayType) onStartedLeading(ctx context.Context) {
 	}
 
 	if g.publicIPWatcher != nil {
-		go g.publicIPWatcher.Run(ctx)
+		g.leaderComponentsStarted.Go(func() {
+			g.publicIPWatcher.Run(ctx)
+		})
 	}
 }
 
