@@ -107,7 +107,7 @@ func storeToDisk(pathContainerObject string, parsedURL *url.URL, data []byte) (s
 	diskFilePath := path.Join(storageDirectory, parsedURL.Path)
 	dir := path.Join(storageDirectory, pathContainerObject)
 
-	err = os.MkdirAll(dir, 0o700) //nolint:gosec // Directory created in temp directory with validated inputs
+	err = os.MkdirAll(dir, 0o700)
 	if err != nil {
 		return "", errors.Wrapf(err, "error creating %s directory to store %s", dir, diskFilePath)
 	}
