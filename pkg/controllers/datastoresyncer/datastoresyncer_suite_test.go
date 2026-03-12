@@ -165,6 +165,7 @@ func (t *testDriver) run() {
 	if t.doStart {
 		var ctx context.Context
 
+		//nolint:gosec // Cancel function is stored and called in stop() method
 		ctx, t.stopFn = context.WithCancel(context.Background())
 		t.startCompleted = make(chan error, 1)
 
