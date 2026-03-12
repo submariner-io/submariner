@@ -34,16 +34,28 @@ import (
 
 var logger = log.Logger{Logger: logf.Log.WithName("ClusterFiles")}
 
+var noopCleanup = func() {}
+
 // Get retrieves a config from a secret, configmap or file within the k8s cluster
 // using an url schema that supports configmap://<namespace>/<configmap-name>/<data-file>
 // secret://<namespace>/<secret-name>/<data-file> and file:///<path> returning
-// a local path to the file.
-func Get(ctx context.Context, k8sClient kubernetes.Interface, urlAddress string) (string, error) {
+// a local path to the file and a cleanup function. The cleanup function should be called
+// when the file is no longer needed to remove temporary files. For file:// URLs, the
+// cleanup function is a no-op since the file is not temporary.
+func Get(ctx context.Context, k8sClient kubernetes.Interface, urlAddress string) (string, func(), error) {
 	logger.V(log.DEBUG).Infof("Reading cluster_file: %s", urlAddress)
 
 	parsedURL, err := url.Parse(urlAddress)
 	if err != nil {
-		return "", errors.Wrapf(err, "error parsing cluster file URL %q", urlAddress)
+		return "", noopCleanup, errors.Wrapf(err, "error parsing cluster file URL %q", urlAddress)
+	}
+
+	if parsedURL.Scheme == "file" {
+		if parsedURL.Host != "" || parsedURL.Path == "" {
+			return "", noopCleanup, errors.Errorf("cluster file URL %q is not well formed", urlAddress)
+		}
+
+		return parsedURL.Path, noopCleanup, nil
 	}
 
 	namespace := parsedURL.Host
@@ -51,32 +63,29 @@ func Get(ctx context.Context, k8sClient kubernetes.Interface, urlAddress string)
 	pathContainerObject = strings.Trim(pathContainerObject, "/")
 
 	if pathContainerObject == "" || pathFile == "" {
-		return "", errors.Errorf("cluster file URL %q is not well formed", urlAddress)
+		return "", noopCleanup, errors.Errorf("cluster file URL %q is not well formed", urlAddress)
 	}
 
 	var data []byte
 
 	switch parsedURL.Scheme {
-	case "file":
-		return parsedURL.Path, nil
-
 	case "secret":
 		secret, err := k8sClient.CoreV1().Secrets(namespace).Get(ctx, pathContainerObject, metav1.GetOptions{})
 		if err != nil {
-			return "", errors.Wrapf(err, "error reading secret %q from namespace %q", pathContainerObject, namespace)
+			return "", noopCleanup, errors.Wrapf(err, "error reading secret %q from namespace %q", pathContainerObject, namespace)
 		}
 
 		var ok bool
 
 		data, ok = secret.Data[pathFile]
 		if !ok {
-			return "", errors.Errorf("cluster file data %q not found in secret %s", pathFile, secret.Name)
+			return "", noopCleanup, errors.Errorf("cluster file data %q not found in secret %s", pathFile, secret.Name)
 		}
 
 	case "configmap":
 		configMap, err := k8sClient.CoreV1().ConfigMaps(namespace).Get(ctx, pathContainerObject, metav1.GetOptions{})
 		if err != nil {
-			return "", errors.Wrapf(err, "error reading configmap %q from namespace %q", pathContainerObject, namespace)
+			return "", noopCleanup, errors.Wrapf(err, "error reading configmap %q from namespace %q", pathContainerObject, namespace)
 		}
 
 		var ok bool
@@ -85,23 +94,32 @@ func Get(ctx context.Context, k8sClient kubernetes.Interface, urlAddress string)
 		if !ok {
 			dataStr, ok := configMap.Data[pathFile]
 			if !ok {
-				return "", errors.Errorf("cluster file data %q not found in %#v", pathFile, configMap)
+				return "", noopCleanup, errors.Errorf("cluster file data %q not found in configmap %q in namespace %q",
+					pathFile, configMap.Name, configMap.Namespace)
 			}
 
 			data = []byte(dataStr)
 		}
 
 	default:
-		return "", errors.Errorf("the scheme %q in cluster file URL %q is not supported ", parsedURL.Scheme, urlAddress)
+		return "", noopCleanup, errors.Errorf("the scheme %q in cluster file URL %q is not supported ", parsedURL.Scheme, urlAddress)
 	}
 
 	return storeToDisk(pathContainerObject, parsedURL, data)
 }
 
-func storeToDisk(pathContainerObject string, parsedURL *url.URL, data []byte) (string, error) {
+func storeToDisk(pathContainerObject string, parsedURL *url.URL, data []byte) (string, func(), error) {
 	storageDirectory, err := os.MkdirTemp("", "cluster_files")
 	if err != nil {
-		return "", errors.Wrap(err, "error creating cluster_files directory")
+		return "", noopCleanup, errors.Wrap(err, "error creating cluster_files directory")
+	}
+
+	cleanup := func() {
+		if err := os.RemoveAll(storageDirectory); err != nil {
+			logger.Warningf("Failed to cleanup temporary directory %s: %v", storageDirectory, err)
+		} else {
+			logger.V(log.DEBUG).Infof("Cleaned up temporary directory: %s", storageDirectory)
+		}
 	}
 
 	diskFilePath := path.Join(storageDirectory, parsedURL.Path)
@@ -109,13 +127,15 @@ func storeToDisk(pathContainerObject string, parsedURL *url.URL, data []byte) (s
 
 	err = os.MkdirAll(dir, 0o700)
 	if err != nil {
-		return "", errors.Wrapf(err, "error creating %s directory to store %s", dir, diskFilePath)
+		cleanup()
+		return "", noopCleanup, errors.Wrapf(err, "error creating %s directory to store %s", dir, diskFilePath)
 	}
 
 	err = os.WriteFile(diskFilePath, data, 0o400) //nolint:gosec // File written to temp directory with validated inputs
 	if err != nil {
-		return "", errors.Wrapf(err, "error writing cluster file to  %q", diskFilePath)
+		cleanup()
+		return "", noopCleanup, errors.Wrapf(err, "error writing cluster file to  %q", diskFilePath)
 	}
 
-	return diskFilePath, nil
+	return diskFilePath, cleanup, nil
 }
