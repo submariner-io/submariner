@@ -198,8 +198,9 @@ See [Konflux activation key docs](https://konflux-ci.dev/docs/building/activatio
 
 | Package | Source |
 |---------|--------|
-| openvswitch2.17 | fast-datapath |
-| dnf-plugins-core, iproute, iptables-nft, nftables, ipset, procps-ng, grep | UBI 9 BaseOS |
+| openvswitch3.5 | fast-datapath (RHEL 10) |
+| iptables-nft, nftables, ipset | RHEL 10 AppStream |
+| dnf-plugins-core, iproute, procps-ng, grep | RHEL 10 BaseOS |
 
 #### globalnet
 
