@@ -4,7 +4,7 @@ context:
 
 contentOrigin:
   repofiles:
-    - submariner-rhel-9.repo
+    - submariner-rhel-10.repo
 packages:
   - dnf-plugins-core
   - iproute
@@ -12,7 +12,7 @@ packages:
   - nftables
   - ipset
   - procps-ng
-  - openvswitch2.17
+  - openvswitch3.5
   - grep
 arches:
   - x86_64
