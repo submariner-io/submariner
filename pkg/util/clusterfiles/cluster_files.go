@@ -36,14 +36,13 @@ var logger = log.Logger{Logger: logf.Log.WithName("ClusterFiles")}
 
 // Get retrieves a config from a secret, configmap or file within the k8s cluster
 // using an url schema that supports configmap://<namespace>/<configmap-name>/<data-file>
-// secret://<namespace>/<secret-name>/<data-file> and file:///<path> returning
-// a local path to the file.
-func Get(ctx context.Context, k8sClient kubernetes.Interface, urlAddress string) (string, error) {
+// secret://<namespace>/<secret-name>/<data-file> and file:///<path>.
+func Get(ctx context.Context, k8sClient kubernetes.Interface, urlAddress string) ([]byte, error) {
 	logger.V(log.DEBUG).Infof("Reading cluster_file: %s", urlAddress)
 
 	parsedURL, err := url.Parse(urlAddress)
 	if err != nil {
-		return "", errors.Wrapf(err, "error parsing cluster file URL %q", urlAddress)
+		return nil, errors.Wrapf(err, "error parsing cluster file URL %q", urlAddress)
 	}
 
 	namespace := parsedURL.Host
@@ -51,71 +50,54 @@ func Get(ctx context.Context, k8sClient kubernetes.Interface, urlAddress string)
 	pathContainerObject = strings.Trim(pathContainerObject, "/")
 
 	if pathContainerObject == "" || pathFile == "" {
-		return "", errors.Errorf("cluster file URL %q is not well formed", urlAddress)
+		return nil, errors.Errorf("cluster file URL %q is not well formed", urlAddress)
 	}
-
-	var data []byte
 
 	switch parsedURL.Scheme {
 	case "file":
-		return parsedURL.Path, nil
+		if parsedURL.Host != "" {
+			return nil, errors.Errorf("cluster file %q is not well formed (file: URIs shouldn't specify a host)", urlAddress)
+		}
+
+		data, err := os.ReadFile(parsedURL.Path)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error reading file %q", parsedURL.Path)
+		}
+
+		return data, nil
 
 	case "secret":
 		secret, err := k8sClient.CoreV1().Secrets(namespace).Get(ctx, pathContainerObject, metav1.GetOptions{})
 		if err != nil {
-			return "", errors.Wrapf(err, "error reading secret %q from namespace %q", pathContainerObject, namespace)
+			return nil, errors.Wrapf(err, "error reading secret %q from namespace %q", pathContainerObject, namespace)
 		}
 
-		var ok bool
-
-		data, ok = secret.Data[pathFile]
+		data, ok := secret.Data[pathFile]
 		if !ok {
-			return "", errors.Errorf("cluster file data %q not found in secret %s", pathFile, secret.Name)
+			return nil, errors.Errorf("cluster file data %q not found in secret %s", pathFile, secret.Name)
 		}
+
+		return data, nil
 
 	case "configmap":
 		configMap, err := k8sClient.CoreV1().ConfigMaps(namespace).Get(ctx, pathContainerObject, metav1.GetOptions{})
 		if err != nil {
-			return "", errors.Wrapf(err, "error reading configmap %q from namespace %q", pathContainerObject, namespace)
+			return nil, errors.Wrapf(err, "error reading configmap %q from namespace %q", pathContainerObject, namespace)
 		}
 
-		var ok bool
-
-		data, ok = configMap.BinaryData[pathFile]
+		data, ok := configMap.BinaryData[pathFile]
 		if !ok {
 			dataStr, ok := configMap.Data[pathFile]
 			if !ok {
-				return "", errors.Errorf("cluster file data %q not found in %#v", pathFile, configMap)
+				return nil, errors.Errorf("cluster file data %q not found in %#v", pathFile, configMap)
 			}
 
 			data = []byte(dataStr)
 		}
 
+		return data, nil
+
 	default:
-		return "", errors.Errorf("the scheme %q in cluster file URL %q is not supported ", parsedURL.Scheme, urlAddress)
+		return nil, errors.Errorf("the scheme %q in cluster file URL %q is not supported ", parsedURL.Scheme, urlAddress)
 	}
-
-	return storeToDisk(pathContainerObject, parsedURL, data)
-}
-
-func storeToDisk(pathContainerObject string, parsedURL *url.URL, data []byte) (string, error) {
-	storageDirectory, err := os.MkdirTemp("", "cluster_files")
-	if err != nil {
-		return "", errors.Wrap(err, "error creating cluster_files directory")
-	}
-
-	diskFilePath := path.Join(storageDirectory, parsedURL.Path)
-	dir := path.Join(storageDirectory, pathContainerObject)
-
-	err = os.MkdirAll(dir, 0o700)
-	if err != nil {
-		return "", errors.Wrapf(err, "error creating %s directory to store %s", dir, diskFilePath)
-	}
-
-	err = os.WriteFile(diskFilePath, data, 0o400) //nolint:gosec // File written to temp directory with validated inputs
-	if err != nil {
-		return "", errors.Wrapf(err, "error writing cluster file to  %q", diskFilePath)
-	}
-
-	return diskFilePath, nil
 }

@@ -23,7 +23,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/cenkalti/backoff/v4"
@@ -75,20 +74,17 @@ func (c *ConnectionHandler) initClients(ctx context.Context, newOVSDBClient NewO
 	return nil
 }
 
-func getOVNTLSConfig(pkFile, certFile, caFile string) (*tls.Config, error) {
-	cert, err := tls.LoadX509KeyPair(certFile, pkFile)
+func getOVNTLSConfig(pkData, certData, caData []byte) (*tls.Config, error) {
+	cert, err := tls.X509KeyPair(certData, pkData)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failure loading ovn certificates")
 	}
 
 	rootCAs := x509.NewCertPool()
 
-	data, err := os.ReadFile(caFile)
-	if err != nil {
-		return nil, errors.Wrap(err, "failure loading OVNDB ca bundle")
+	if !rootCAs.AppendCertsFromPEM(caData) {
+		return nil, errors.New("failed to parse any certificates from the provided CA data")
 	}
-
-	rootCAs.AppendCertsFromPEM(data)
 
 	return &tls.Config{
 		Certificates: []tls.Certificate{cert},
@@ -167,28 +163,23 @@ func (c *ConnectionHandler) createLibovsdbClient(ctx context.Context, dbModel mo
 	return client, nil
 }
 
-func getFile(ctx context.Context, k8sClientset clientset.Interface, url string) (string, error) {
-	file, err := clusterfiles.Get(ctx, k8sClientset, url)
-	return file, errors.Wrapf(err, "error getting config file for %q", url)
-}
-
 func getTLSConfig(ctx context.Context, k8sClientset clientset.Interface) (*tls.Config, error) {
-	certFile, err := getFile(ctx, k8sClientset, getOVNCertPath())
+	certData, err := clusterfiles.Get(ctx, k8sClientset, getOVNCertPath())
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "error retrieving certificate data from %q", getOVNCertPath())
 	}
 
-	pkFile, err := getFile(ctx, k8sClientset, getOVNPrivKeyPath())
+	pkData, err := clusterfiles.Get(ctx, k8sClientset, getOVNPrivKeyPath())
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "error retrieving private key data from %q", getOVNPrivKeyPath())
 	}
 
-	caFile, err := getFile(ctx, k8sClientset, getOVNCaBundlePath())
+	caData, err := clusterfiles.Get(ctx, k8sClientset, getOVNCaBundlePath())
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "error retrieving CA data from %q", getOVNCaBundlePath())
 	}
 
-	tlsConfig, err := getOVNTLSConfig(pkFile, certFile, caFile)
+	tlsConfig, err := getOVNTLSConfig(pkData, certData, caData)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting OVN TLS config")
 	}
