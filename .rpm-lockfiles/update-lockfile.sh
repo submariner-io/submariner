@@ -131,7 +131,7 @@ update_component_lockfile() {
   podman run --rm -v "$(pwd):/workspace:z" \
          -v "${ENTITLEMENTS_DIR}:/etc/pki/entitlement:ro,Z" \
          -v "${HOME}/.docker/config.json:/run/containers/0/auth.json:ro,Z" \
-         registry.access.redhat.com/ubi9/ubi:latest \
+         registry.access.redhat.com/ubi10/ubi:latest \
          /bin/bash -c "
            set -e
            cd \"/workspace/${lockfile_dir}\"

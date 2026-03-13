@@ -52,7 +52,7 @@ if [[ -n "$BRANCH" ]]; then
     for comp in gateway route-agent globalnet; do
         mkdir -p "$LOCKFILES_DIR/$comp"
         git show "$GIT_REF:.rpm-lockfiles/$comp/rpms.in.yaml" > "$LOCKFILES_DIR/$comp/rpms.in.yaml" 2>/dev/null || continue
-        git show "$GIT_REF:.rpm-lockfiles/$comp/submariner-rhel-9.repo" > "$LOCKFILES_DIR/$comp/submariner-rhel-9.repo" 2>/dev/null || true
+        git show "$GIT_REF:.rpm-lockfiles/$comp/submariner-rhel-10.repo" > "$LOCKFILES_DIR/$comp/submariner-rhel-10.repo" 2>/dev/null || true
     done
     echo "Verifying packages for $BRANCH"
 else
@@ -83,7 +83,7 @@ podman run --rm \
     -v "$CERTS/entitlement:/etc/pki/entitlement:ro,Z" \
     -v "$CERTS/rhsm-ca:/etc/rhsm/ca:ro,Z" \
     -e "CERT_ID=$CERT_ID" \
-    registry.access.redhat.com/ubi9/ubi:latest bash -c '
+    registry.access.redhat.com/ubi10/ubi:latest bash -c '
         G="\033[32m" R="\033[31m" Y="\033[33m" B="\033[1m" N="\033[0m"
 
         # Disable subscription-manager plugin (avoids conflicts)
@@ -121,7 +121,7 @@ podman run --rm \
                     # Use --arch to filter by target architecture (avoids false positives from cross-arch repos)
                     # Use awk to keep only first repo per package (handles packages in multiple repos like standard+EUS)
                     dnf -q repoquery --forcearch="$arch" --arch="$arch,noarch" --queryformat="%{name}@%{repoid}\n" $pkgs 2>/dev/null |
-                        sed "s/-for-rhel-9-[^-]*//; s/-for-ubi-9-[^-]*//; s/-9-for-[^-]*//; s/-rpms$//" |
+                        sed "s/-for-rhel-10-[^-]*//; s/-for-ubi-10-[^-]*//; s/-10-for-[^-]*//; s/-rpms$//" |
                         sort -u | awk -F@ '\''!seen[$1]++'\'' | grep . > "$tmpdir/$arch" || true
                     # Also check bash to detect repo access issues
                     dnf -q repoquery --forcearch="$arch" --arch="$arch" bash 2>/dev/null | grep -q . && echo "1" > "$tmpdir/${arch}_access" || true
