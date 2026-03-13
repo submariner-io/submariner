@@ -1,7 +1,7 @@
 ARG BASE_BRANCH=release-0.23
 ARG SOURCE=/go/src/github.com/submariner-io/submariner
 
-FROM --platform=${BUILDPLATFORM} registry.redhat.io/ubi9/go-toolset:latest AS builder
+FROM --platform=${BUILDPLATFORM} registry.redhat.io/ubi10/go-toolset:latest AS builder
 ARG SOURCE
 ARG TARGETPLATFORM
 ARG BASE_BRANCH
@@ -34,7 +34,7 @@ RUN CGO_ENABLED=1 GOARCH=${TARGETPLATFORM##*/} go build \
     -v -o ${SOURCE}/bin/${TARGETPLATFORM}/await-node-ready \
     ${SOURCE}/pkg/await_node_ready
 
-FROM --platform=${TARGETPLATFORM} registry.redhat.io/ubi9:latest
+FROM --platform=${TARGETPLATFORM} registry.redhat.io/ubi10:latest
 ARG BASE_BRANCH
 ARG SOURCE
 ARG SOURCE_DATE_EPOCH
@@ -69,7 +69,7 @@ USER root
 ENTRYPOINT ["/usr/local/bin/submariner.sh"]
 
 LABEL com.redhat.component="submariner-gateway-container" \
-      name="rhacm2/submariner-gateway-rhel9" \
+      name="rhacm2/submariner-gateway-rhel10" \
       version="v0.23.0" \
       summary="Submariner Gateway" \
       description="The Submariner Gateway facilitates secure connections between clusters." \
@@ -83,5 +83,5 @@ LABEL com.redhat.component="submariner-gateway-container" \
       vendor="Red Hat, Inc." \
       com.github.url="https://github.com/submariner-io/submariner" \
       com.github.commit="${BASE_BRANCH}" \
-      cpe="cpe:/a:redhat:acm:2.16::el9" \
+      cpe="cpe:/a:redhat:acm:2.16::el10" \
       org.opencontainers.image.created="${SOURCE_DATE_EPOCH}"

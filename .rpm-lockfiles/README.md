@@ -191,8 +191,8 @@ See [Konflux activation key docs](https://konflux-ci.dev/docs/building/activatio
 
 | Package | Source |
 |---------|--------|
-| libreswan | RHEL 9 AppStream |
-| iproute, kmod, shadow-utils | RHEL 9 BaseOS |
+| libreswan | RHEL 10 AppStream |
+| iproute, kmod, shadow-utils | RHEL 10 BaseOS |
 
 #### route-agent
 
