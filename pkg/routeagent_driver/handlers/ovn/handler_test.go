@@ -282,7 +282,8 @@ func (t *handlerTestDriver) testRemoteEndpoint(ipFamilySubnets, nonIPFamilySubne
 			By("Updating remote Endpoint")
 
 			oldSubnets := endpointSubnets
-			endpointSubnets = []string{newEndpointSubnet}
+			endpointSubnets := make([]string, 0, 1+len(nonIPFamilySubnets))
+			endpointSubnets = append(endpointSubnets, newEndpointSubnet)
 
 			//nolint:gocritic // Ignore "append result not assigned to the same slice"
 			endpoint.Spec.Subnets = append(endpointSubnets, nonIPFamilySubnets...)
@@ -329,7 +330,8 @@ func (t *handlerTestDriver) testRemoteEndpoint(ipFamilySubnets, nonIPFamilySubne
 				By("Updating remote Endpoint")
 
 				oldSubnets := endpointSubnets
-				endpointSubnets = []string{oldSubnets[0], newEndpointSubnet}
+				endpointSubnets := make([]string, 0, 2+len(nonIPFamilySubnets))
+				endpointSubnets = append(endpointSubnets, oldSubnets[0], newEndpointSubnet)
 
 				//nolint:gocritic // Ignore "append result not assigned to the same slice"
 				endpoint.Spec.Subnets = append(endpointSubnets, nonIPFamilySubnets...)
@@ -460,6 +462,140 @@ func (t *handlerTestDriver) testGatewayRoute(ipFamilySubnets []string, nonIPFami
 					RemoteCIDRs: nonIPFamilySubnets,
 				},
 			})
+		})
+	})
+
+	When("a non-Submariner route exists with the same nexthop", func() {
+		It("should not delete the non-Submariner route during reconciliation", func() {
+			client := t.dynClient.Resource(submarinerv1.SchemeGroupVersion.WithResource("gatewayroutes")).Namespace(testing.Namespace)
+
+			// Create a route that simulates an OVN-K managed route (no submariner external_id)
+			// This uses the same nexthop as Submariner but has a different prefix (local cluster subnet)
+			ovnkRoute := &nbdb.LogicalRouterStaticRoute{
+				IPPrefix:    t.clusterCIDR,
+				Nexthop:     t.OVNK8sMgmntIntCIDR[t.ipFamily].IP.String(),
+				ExternalIDs: map[string]string{},
+			}
+
+			_, err := t.ovsdbClient.Create(ovnkRoute)
+			Expect(err).To(Succeed())
+
+			// Create a GatewayRoute which will trigger reconciliation
+			gwRoute := &submarinerv1.GatewayRoute{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-gateway-route-preserve",
+				},
+				RoutePolicySpec: submarinerv1.RoutePolicySpec{
+					NextHops:    []string{ovnkRoute.Nexthop},
+					RemoteCIDRs: ipFamilySubnets,
+				},
+			}
+
+			test.CreateResource(client, gwRoute)
+
+			// Wait for Submariner routes to be reconciled.
+			for _, cidr := range gwRoute.RoutePolicySpec.RemoteCIDRs {
+				t.ovsdbClient.AwaitModel(&nbdb.LogicalRouterStaticRoute{
+					IPPrefix: cidr,
+				})
+			}
+
+			// Verify the OVN-K route still exists and is untagged
+			t.ovsdbClient.EnsureModel(&nbdb.LogicalRouterStaticRoute{
+				IPPrefix: ovnkRoute.IPPrefix,
+			})
+			retrievedRoute := t.ovsdbClient.GetModel(&nbdb.LogicalRouterStaticRoute{
+				IPPrefix: ovnkRoute.IPPrefix,
+			}).(*nbdb.LogicalRouterStaticRoute)
+			Expect(retrievedRoute.ExternalIDs).ToNot(HaveKey(ovn.SubmarinerExternalIDKey),
+				"OVN-K route should not be tagged with submariner")
+
+			Expect(client.Delete(context.Background(), gwRoute.Name, metav1.DeleteOptions{})).To(Succeed())
+
+			// Check the OVN-K route still exists and remains untagged after removing the gateway
+			t.ovsdbClient.EnsureModel(&nbdb.LogicalRouterStaticRoute{
+				IPPrefix: ovnkRoute.IPPrefix,
+			})
+			retrievedRoute = t.ovsdbClient.GetModel(&nbdb.LogicalRouterStaticRoute{
+				IPPrefix: ovnkRoute.IPPrefix,
+			}).(*nbdb.LogicalRouterStaticRoute)
+			Expect(retrievedRoute.ExternalIDs).ToNot(HaveKey(ovn.SubmarinerExternalIDKey),
+				"OVN-K route should not be tagged with submariner after cleanup")
+		})
+	})
+
+	When("a non-Submariner policy exists with the same priority", func() {
+		It("should not delete the non-Submariner policy during reconciliation", func() {
+			client := t.dynClient.Resource(submarinerv1.SchemeGroupVersion.WithResource("gatewayroutes")).Namespace(testing.Namespace)
+
+			// Determine priority and match field based on IP family
+			priority := 20000
+			ipMatchField := "ip4.dst"
+
+			if t.ipFamily == k8snet.IPv6 {
+				priority = 20100
+				ipMatchField = "ip6.dst"
+			}
+
+			// Create a policy that simulates an OVN-K managed policy (no submariner external_id)
+			// This uses the same priority as Submariner but has a different match
+			ovnkPolicy := &nbdb.LogicalRouterPolicy{
+				Priority:    priority,
+				Match:       ipMatchField + " == " + t.clusterCIDR,
+				Action:      "reroute",
+				Nexthop:     ptr.To(t.OVNK8sMgmntIntCIDR[t.ipFamily].IP.String()),
+				ExternalIDs: map[string]string{}, // No submariner tag
+			}
+
+			_, err := t.ovsdbClient.Create(ovnkPolicy)
+			Expect(err).To(Succeed())
+
+			// Create a GatewayRoute which will trigger reconciliation
+			gwRoute := &submarinerv1.GatewayRoute{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-gateway-route-preserve-policy",
+				},
+				RoutePolicySpec: submarinerv1.RoutePolicySpec{
+					NextHops:    []string{*ovnkPolicy.Nexthop},
+					RemoteCIDRs: ipFamilySubnets,
+				},
+			}
+
+			test.CreateResource(client, gwRoute)
+
+			// Wait for Submariner policies to be reconciled
+			for _, cidr := range gwRoute.RoutePolicySpec.RemoteCIDRs {
+				t.ovsdbClient.AwaitModel(&nbdb.LogicalRouterPolicy{
+					Match:   ipMatchField + " == " + cidr,
+					Nexthop: ovnkPolicy.Nexthop,
+				})
+			}
+
+			// Verify the OVN-K policy still exists and is untagged
+			t.ovsdbClient.EnsureModel(&nbdb.LogicalRouterPolicy{
+				Match:   ovnkPolicy.Match,
+				Nexthop: ovnkPolicy.Nexthop,
+			})
+			retrievedPolicy := t.ovsdbClient.GetModel(&nbdb.LogicalRouterPolicy{
+				Match:   ovnkPolicy.Match,
+				Nexthop: ovnkPolicy.Nexthop,
+			}).(*nbdb.LogicalRouterPolicy)
+			Expect(retrievedPolicy.ExternalIDs).ToNot(HaveKey(ovn.SubmarinerExternalIDKey),
+				"OVN-K policy should not be tagged with submariner")
+
+			Expect(client.Delete(context.Background(), gwRoute.Name, metav1.DeleteOptions{})).To(Succeed())
+
+			// Check the OVN-K policy still exists and remains untagged after removing the gateway
+			t.ovsdbClient.EnsureModel(&nbdb.LogicalRouterPolicy{
+				Match:   ovnkPolicy.Match,
+				Nexthop: ovnkPolicy.Nexthop,
+			})
+			retrievedPolicy = t.ovsdbClient.GetModel(&nbdb.LogicalRouterPolicy{
+				Match:   ovnkPolicy.Match,
+				Nexthop: ovnkPolicy.Nexthop,
+			}).(*nbdb.LogicalRouterPolicy)
+			Expect(retrievedPolicy.ExternalIDs).ToNot(HaveKey(ovn.SubmarinerExternalIDKey),
+				"OVN-K policy should not be tagged with submariner after cleanup")
 		})
 	})
 }

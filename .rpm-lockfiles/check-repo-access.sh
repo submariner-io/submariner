@@ -33,9 +33,9 @@ check_public() {
 }
 
 # Repo URLs
-RHEL="https://cdn.redhat.com/content/dist/rhel9/9"
-FDP="https://cdn.redhat.com/content/dist/layered/rhel9"
-UBI="https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9"
+RHEL="https://cdn.redhat.com/content/dist/rhel10/10"
+FDP="https://cdn.redhat.com/content/dist/layered/rhel10"
+UBI="https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10"
 
 echo -e "${B}Submariner RPM Dependency Status${N}"
 echo "================================="
@@ -43,8 +43,8 @@ echo
 echo -e "${B}Component    Package       Repository       x86_64  aarch64 ppc64le s390x${N}"
 echo "----------   -----------   --------------   ------  ------- ------- -----"
 
-# gateway: libreswan from RHEL 9 AppStream
-printf "gateway      libreswan     RHEL 9 AppStream "
+# gateway: libreswan from RHEL 10 AppStream
+printf "gateway      libreswan     RHEL 10 AppStream "
 for arch in x86_64 aarch64 ppc64le s390x; do
     if check "$RHEL/$arch/appstream/os/repodata/repomd.xml"; then
         printf "${G}%-8s${N}" "OK"
@@ -65,13 +65,13 @@ for arch in x86_64 aarch64 ppc64le s390x; do
 done
 echo
 
-# globalnet: iptables-nft from UBI (public)
-printf "globalnet    iptables-nft  UBI (public)     "
+# globalnet: iptables-nft from RHEL 10 AppStream
+printf "globalnet    iptables-nft  RHEL 10 AppStream "
 for arch in x86_64 aarch64 ppc64le s390x; do
-    if check_public "$UBI/$arch/baseos/os/repodata/repomd.xml"; then
+    if check "$RHEL/$arch/appstream/os/repodata/repomd.xml"; then
         printf "${G}%-8s${N}" "OK"
     else
-        printf "${R}%-8s${N}" "N/A"
+        printf "${R}%-8s${N}" "403"
     fi
 done
 echo

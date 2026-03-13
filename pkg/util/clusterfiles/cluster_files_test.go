@@ -103,41 +103,54 @@ var _ = Describe("Cluster Files Get", func() {
 		})
 	})
 
-	When("the source secret exist", func() {
-		It("should return the data in a tmp file", func() {
-			file, err := clusterfiles.Get(ctx, client, "secret://ns1/my-secret/data1")
+	When("the source secret exists", func() {
+		It("should return the data", func() {
+			secretContent, err := clusterfiles.Get(ctx, client, "secret://ns1/my-secret/data1")
 			Expect(err).NotTo(HaveOccurred())
-			fileContent, err := os.ReadFile(file)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(fileContent).To(Equal(theData))
+			Expect(secretContent).To(Equal(theData))
 		})
 	})
 
-	When("the source configmap exist", func() {
-		It("should return the data in a tmp file", func() {
-			file, err := clusterfiles.Get(ctx, client, "configmap://ns1/my-configmap/data1")
+	When("the source configmap exists", func() {
+		It("should return the data", func() {
+			configMapContent, err := clusterfiles.Get(ctx, client, "configmap://ns1/my-configmap/data1")
 			Expect(err).NotTo(HaveOccurred())
-			fileContent, err := os.ReadFile(file)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(fileContent).To(Equal(theData))
+			Expect(configMapContent).To(Equal(theData))
 		})
 	})
 
-	When("the source configmap exist and has binary data", func() {
-		It("should return the data in a tmp file", func() {
-			file, err := clusterfiles.Get(ctx, client, "configmap://ns1/my-configmap-binary/data1")
+	When("the source configmap exists and has binary data", func() {
+		It("should return the data", func() {
+			configMapContent, err := clusterfiles.Get(ctx, client, "configmap://ns1/my-configmap-binary/data1")
 			Expect(err).NotTo(HaveOccurred())
-			fileContent, err := os.ReadFile(file)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(fileContent).To(Equal(theData))
+			Expect(configMapContent).To(Equal(theData))
 		})
 	})
 
 	When("the source is a file", func() {
-		It("should return the original path for the file:/// scheme", func() {
-			file, err := clusterfiles.Get(ctx, nil, "file:///dir/file")
+		It("should fail on file: URIs with hosts", func() {
+			_, err := clusterfiles.Get(ctx, nil, "file://host/file")
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should return the file's content", func() {
+			filename := func() string {
+				file, err := os.CreateTemp("", "testdata")
+				Expect(err).NotTo(HaveOccurred())
+
+				defer func() { Expect(file.Close()).NotTo(HaveOccurred()) }()
+
+				_, err = file.Write(theData)
+				Expect(err).NotTo(HaveOccurred())
+
+				return file.Name()
+			}()
+
+			defer func() { Expect(os.Remove(filename)).NotTo(HaveOccurred()) }()
+
+			fileContent, err := clusterfiles.Get(ctx, nil, "file://"+filename)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(file).To(Equal("/dir/file"))
+			Expect(fileContent).To(Equal(theData))
 		})
 	})
 })

@@ -708,7 +708,7 @@ func testPluto() {
 	When("the control socket file doesn't exist", func() {
 		BeforeEach(func() {
 			Expect(t.plutoCtlFile.Close()).To(Succeed())
-			Expect(os.Remove(t.plutoCtlFile.Name())).To(Succeed()) //nolint:gosec // Test file created by test setup
+			Expect(os.Remove(t.plutoCtlFile.Name())).To(Succeed())
 		})
 
 		It("should succeed when the file is eventually created", func() {

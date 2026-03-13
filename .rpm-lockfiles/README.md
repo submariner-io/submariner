@@ -31,14 +31,14 @@ Add the following repositories to the activation key:
 
 | Repository | Repo ID | Used By |
 |------------|---------|---------|
-| Fast Datapath for RHEL 9 x86_64 | `fast-datapath-for-rhel-9-x86_64-rpms` | route-agent |
-| Fast Datapath for RHEL 9 ARM 64 | `fast-datapath-for-rhel-9-aarch64-rpms` | route-agent |
-| Fast Datapath for RHEL 9 Power, little endian | `fast-datapath-for-rhel-9-ppc64le-rpms` | route-agent |
-| Fast Datapath for RHEL 9 IBM z Systems | `fast-datapath-for-rhel-9-s390x-rpms` | route-agent |
+| Fast Datapath for RHEL 10 x86_64 | `fast-datapath-for-rhel-10-x86_64-rpms` | route-agent |
+| Fast Datapath for RHEL 10 ARM 64 | `fast-datapath-for-rhel-10-aarch64-rpms` | route-agent |
+| Fast Datapath for RHEL 10 Power, little endian | `fast-datapath-for-rhel-10-ppc64le-rpms` | route-agent |
+| Fast Datapath for RHEL 10 IBM z Systems | `fast-datapath-for-rhel-10-s390x-rpms` | route-agent |
 
 **Notes:**
-- RHEL 9 BaseOS and AppStream are auto-enabled (needed for gateway's libreswan)
-- UBI repos are public and don't require activation key (used by globalnet)
+- RHEL 10 BaseOS and AppStream are auto-enabled (needed for gateway, globalnet, route-agent)
+- iptables-nft was removed from UBI 10, requiring RHEL repos for globalnet and route-agent
 
 ### 4. Register Your System
 
@@ -74,11 +74,11 @@ Expected output (all OK):
 Submariner RPM Dependency Status
 =================================
 
-Component    Package       Repository       x86_64  aarch64 ppc64le s390x
-----------   -----------   --------------   ------  ------- ------- -----
-gateway      libreswan     RHEL 9 AppStream OK      OK      OK      OK
-route-agent  openvswitch   fast-datapath    OK      OK      OK      OK
-globalnet    iptables-nft  UBI (public)     OK      OK      OK      OK
+Component    Package       Repository        x86_64  aarch64 ppc64le s390x
+----------   -----------   ---------------   ------  ------- ------- -----
+gateway      libreswan     RHEL 10 AppStream OK      OK      OK      OK
+route-agent  openvswitch   fast-datapath     OK      OK      OK      OK
+globalnet    iptables-nft  RHEL 10 AppStream OK      OK      OK      OK
 
 Legend: OK=accessible  403=subscription lacks this arch
 ```
@@ -95,23 +95,23 @@ Branch is required since component configs live on release branches, not devel.
 Expected output:
 
 ```text
-gateway (repos: rhel-9-for-appstream-rpms rhel-9-for-baseos-rpms)
+gateway (repos: rhel-10-for-appstream-rpms rhel-10-for-baseos-rpms)
   x86_64   OK: iproute@rhel-baseos kmod@rhel-baseos libreswan@rhel-appstream shadow-utils@rhel-baseos
   aarch64  OK: iproute@rhel-baseos kmod@rhel-baseos libreswan@rhel-appstream shadow-utils@rhel-baseos
   ppc64le  OK: iproute@rhel-baseos kmod@rhel-baseos libreswan@rhel-appstream shadow-utils@rhel-baseos
   s390x    OK: iproute@rhel-baseos kmod@rhel-baseos libreswan@rhel-appstream shadow-utils@rhel-baseos
 
-route-agent (repos: fast-datapath-for-rhel-9-rpms ubi-9-for-appstream-rpms ubi-9-for-baseos-rpms)
-  x86_64   OK: dnf-plugins-core@ubi-baseos grep@ubi-baseos iproute@ubi-baseos ipset@ubi-baseos iptables-nft@ubi-baseos nftables@ubi-baseos openvswitch2.17@fast-datapath procps-ng@ubi-baseos
-  aarch64  OK: dnf-plugins-core@ubi-baseos grep@ubi-baseos iproute@ubi-baseos ipset@ubi-baseos iptables-nft@ubi-baseos nftables@ubi-baseos openvswitch2.17@fast-datapath procps-ng@ubi-baseos
-  ppc64le  OK: dnf-plugins-core@ubi-baseos grep@ubi-baseos iproute@ubi-baseos ipset@ubi-baseos iptables-nft@ubi-baseos nftables@ubi-baseos openvswitch2.17@fast-datapath procps-ng@ubi-baseos
-  s390x    OK: dnf-plugins-core@ubi-baseos grep@ubi-baseos iproute@ubi-baseos ipset@ubi-baseos iptables-nft@ubi-baseos nftables@ubi-baseos openvswitch2.17@fast-datapath procps-ng@ubi-baseos
+route-agent (repos: fast-datapath-for-rhel-10-rpms rhel-10-for-appstream-rpms rhel-10-for-baseos-rpms)
+  x86_64   OK: dnf-plugins-core@rhel-baseos grep@rhel-baseos iproute@rhel-baseos ipset@rhel-appstream iptables-nft@rhel-appstream nftables@rhel-appstream openvswitch3.5@fast-datapath procps-ng@rhel-baseos
+  aarch64  OK: dnf-plugins-core@rhel-baseos grep@rhel-baseos iproute@rhel-baseos ipset@rhel-appstream iptables-nft@rhel-appstream nftables@rhel-appstream openvswitch3.5@fast-datapath procps-ng@rhel-baseos
+  ppc64le  OK: dnf-plugins-core@rhel-baseos grep@rhel-baseos iproute@rhel-baseos ipset@rhel-appstream iptables-nft@rhel-appstream nftables@rhel-appstream openvswitch3.5@fast-datapath procps-ng@rhel-baseos
+  s390x    OK: dnf-plugins-core@rhel-baseos grep@rhel-baseos iproute@rhel-baseos ipset@rhel-appstream iptables-nft@rhel-appstream nftables@rhel-appstream openvswitch3.5@fast-datapath procps-ng@rhel-baseos
 
-globalnet (repos: ubi-9-for-baseos-rpms)
-  x86_64   OK: grep@ubi-baseos iproute@ubi-baseos ipset@ubi-baseos iptables-nft@ubi-baseos nftables@ubi-baseos shadow-utils@ubi-baseos
-  aarch64  OK: grep@ubi-baseos iproute@ubi-baseos ipset@ubi-baseos iptables-nft@ubi-baseos nftables@ubi-baseos shadow-utils@ubi-baseos
-  ppc64le  OK: grep@ubi-baseos iproute@ubi-baseos ipset@ubi-baseos iptables-nft@ubi-baseos nftables@ubi-baseos shadow-utils@ubi-baseos
-  s390x    OK: grep@ubi-baseos iproute@ubi-baseos ipset@ubi-baseos iptables-nft@ubi-baseos nftables@ubi-baseos shadow-utils@ubi-baseos
+globalnet (repos: rhel-10-for-appstream-rpms rhel-10-for-baseos-rpms)
+  x86_64   OK: grep@rhel-baseos iproute@rhel-baseos ipset@rhel-appstream iptables-nft@rhel-appstream nftables@rhel-appstream shadow-utils@rhel-baseos
+  aarch64  OK: grep@rhel-baseos iproute@rhel-baseos ipset@rhel-appstream iptables-nft@rhel-appstream nftables@rhel-appstream shadow-utils@rhel-baseos
+  ppc64le  OK: grep@rhel-baseos iproute@rhel-baseos ipset@rhel-appstream iptables-nft@rhel-appstream nftables@rhel-appstream shadow-utils@rhel-baseos
+  s390x    OK: grep@rhel-baseos iproute@rhel-baseos ipset@rhel-appstream iptables-nft@rhel-appstream nftables@rhel-appstream shadow-utils@rhel-baseos
 ```
 
 ## Updating Lockfiles
