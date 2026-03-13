@@ -26,6 +26,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/ipam"
 	"github.com/submariner-io/admiral/pkg/syncer"
+	testutil "github.com/submariner-io/admiral/pkg/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
@@ -191,6 +192,8 @@ func (t *gatewayControllerTestDriver) start() {
 	}()
 
 	Expect(t.controller.Start()).To(Succeed())
+
+	testutil.AwaitWatchAction(&t.dynClient.Fake, "gatewaies")
 }
 
 func (t *gatewayControllerTestDriver) awaitPacketFilterRules(globalIP string) {

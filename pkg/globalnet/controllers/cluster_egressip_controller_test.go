@@ -27,6 +27,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/ipam"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
+	testutil "github.com/submariner-io/admiral/pkg/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
@@ -392,6 +393,8 @@ func (t *clusterGlobalEgressIPControllerTestDriver) start() {
 
 	Expect(err).To(Succeed())
 	Expect(t.controller.Start()).To(Succeed())
+
+	testutil.AwaitWatchAction(&t.dynClient.Fake, "clusterglobalegressips")
 }
 
 func (t *clusterGlobalEgressIPControllerTestDriver) awaitPacketFilterRules(ips ...string) {

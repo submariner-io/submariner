@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
+	testutil "github.com/submariner-io/admiral/pkg/test"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/event/controller"
@@ -86,6 +87,8 @@ func (c *ControllerSupport) Start(handlers ...event.Handler) {
 
 	Expect(err).To(Succeed())
 	Expect(eventController.Start(stopCh)).To(Succeed())
+
+	testutil.AwaitWatchAction(&(config.Client.(*dynamicfake.FakeDynamicClient)).Fake, "endpoints")
 
 	DeferCleanup(func() {
 		close(stopCh)
