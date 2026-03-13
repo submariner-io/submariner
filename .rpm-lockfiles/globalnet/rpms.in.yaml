@@ -4,7 +4,7 @@ context:
 
 contentOrigin:
   repofiles:
-    - submariner-rhel-9.repo
+    - submariner-rhel-10.repo
 packages:
   - iproute
   - iptables-nft
