@@ -80,27 +80,30 @@ func testEndpoints() {
 		JustBeforeEach(func() {
 			t.CreateEndpoint(t.localEndpoint)
 			t.awaitVxlanLink()
-			t.DeleteEndpoint(t.localEndpoint.Name)
 		})
 
 		Context("and its host name matches that associated with the existing VxLAN interface", func() {
 			It("should remove the existing VxLAN interface", func() {
+				t.DeleteEndpoint(t.localEndpoint.Name)
 				t.netLink.AwaitNoLink(kubeproxy.GetVxLANInterfaceName(k8snet.IPv4))
 			})
 		})
 
 		Context("and its host name does not match that associated with the existing VxLAN interface", func() {
-			BeforeEach(func() {
-				t.localEndpoint.Spec.Hostname = localNodeName2
-			})
-
 			It("should not remove the existing VxLAN interface", func() {
-				t.awaitVxlanLink()
+				t.localEndpoint.Spec.Hostname = localNodeName2
+				t.UpdateEndpoint(t.localEndpoint)
+				t.DeleteEndpoint(t.localEndpoint.Name)
+
+				Consistently(func(_ Gomega) {
+					t.awaitVxlanLink()
+				}).Should(Succeed())
 			})
 		})
 
 		Context("and is subsequently recreated", func() {
 			It("should recreate the VxLAN interface", func() {
+				t.DeleteEndpoint(t.localEndpoint.Name)
 				t.netLink.AwaitNoLink(kubeproxy.GetVxLANInterfaceName(k8snet.IPv4))
 
 				t.CreateEndpoint(t.localEndpoint)
