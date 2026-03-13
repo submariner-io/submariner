@@ -205,6 +205,5 @@ See [Konflux activation key docs](https://konflux-ci.dev/docs/building/activatio
 
 | Package | Source |
 |---------|--------|
-| grep, iproute, ipset, iptables-nft, nftables, shadow-utils | UBI 9 BaseOS |
-
-UBI repos are public and don't require entitlements.
+| iptables-nft, nftables, ipset | RHEL 10 AppStream |
+| grep, iproute, shadow-utils | RHEL 10 BaseOS |
