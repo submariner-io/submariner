@@ -54,15 +54,15 @@ func NewPublicIPWatcher(config *PublicIPWatcherConfig) *PublicIPWatcher {
 	return controller
 }
 
-func (p *PublicIPWatcher) Run(stopCh <-chan struct{}) {
+func (p *PublicIPWatcher) Run(ctx context.Context) {
 	logger.Info("Starting the public IP watcher.")
 
 	go func() {
-		wait.Until(p.syncPublicIP, p.config.Interval, stopCh)
+		wait.UntilWithContext(ctx, p.syncPublicIP, p.config.Interval)
 	}()
 }
 
-func (p *PublicIPWatcher) syncPublicIP() {
+func (p *PublicIPWatcher) syncPublicIP(ctx context.Context) {
 	var publicIPs []string
 	localEndpointSpec := p.config.LocalEndpoint.Spec()
 
@@ -81,15 +81,15 @@ func (p *PublicIPWatcher) syncPublicIP() {
 	if len(publicIPs) > 0 {
 		logger.Infof("Public IPs changed for the Gateway, updating the local endpoint with public IPs %q", publicIPs)
 
-		if err := p.updateLocalEndpoint(publicIPs); err != nil {
+		if err := p.updateLocalEndpoint(ctx, publicIPs); err != nil {
 			logger.Error(err, "Error updating the public IP for local endpoint")
 			return
 		}
 	}
 }
 
-func (p *PublicIPWatcher) updateLocalEndpoint(publicIPs []string) error {
-	err := p.config.LocalEndpoint.Update(context.TODO(), func(existing *submv1.EndpointSpec) {
+func (p *PublicIPWatcher) updateLocalEndpoint(ctx context.Context, publicIPs []string) error {
+	err := p.config.LocalEndpoint.Update(ctx, func(existing *submv1.EndpointSpec) {
 		for _, publicIP := range publicIPs {
 			existing.SetPublicIP(publicIP)
 		}
