@@ -52,7 +52,12 @@ if [[ -n "$BRANCH" ]]; then
     for comp in gateway route-agent globalnet; do
         mkdir -p "$LOCKFILES_DIR/$comp"
         git show "$GIT_REF:.rpm-lockfiles/$comp/rpms.in.yaml" > "$LOCKFILES_DIR/$comp/rpms.in.yaml" 2>/dev/null || continue
-        git show "$GIT_REF:.rpm-lockfiles/$comp/submariner-rhel-10.repo" > "$LOCKFILES_DIR/$comp/submariner-rhel-10.repo" 2>/dev/null || true
+
+        # Extract repo filename from rpms.in.yaml
+        repo_file=$(grep -A1 "repofiles:" "$LOCKFILES_DIR/$comp/rpms.in.yaml" | grep "^ *-" | sed 's/.*- //' | head -1)
+        if [[ -n "$repo_file" ]]; then
+            git show "$GIT_REF:.rpm-lockfiles/$comp/$repo_file" > "$LOCKFILES_DIR/$comp/$repo_file"
+        fi
     done
     echo "Verifying packages for $BRANCH"
 else
