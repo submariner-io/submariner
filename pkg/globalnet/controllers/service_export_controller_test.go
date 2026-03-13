@@ -27,6 +27,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/ipam"
 	"github.com/submariner-io/admiral/pkg/syncer"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
+	testutil "github.com/submariner-io/admiral/pkg/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
 	"github.com/submariner-io/submariner/pkg/globalnet/metrics"
@@ -516,6 +517,8 @@ func (t *serviceExportControllerTestDriver) start() (*syncer.ResourceSyncerConfi
 
 	Expect(err).To(Succeed())
 	Expect(t.controller.Start()).To(Succeed())
+
+	testutil.AwaitWatchAction(&t.dynClient.Fake, "serviceexports")
 
 	return config, podControllers, controller.GetSyncer()
 }
