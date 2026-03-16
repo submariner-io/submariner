@@ -160,6 +160,12 @@ func invokeResolvers(ctx context.Context,
 			ip, err = resolvePublicIP(ctx, family, k8sClient, namespace, method, param)
 		}
 
+		// If the context has been cancelled, log it and bail out
+		if ctx.Err() != nil {
+			errs = append(errs, errors.Wrapf(ctx.Err(), "\nResolver[%q]", resolver))
+			break
+		}
+
 		if err == nil {
 			return ip, resolver, nil
 		}
