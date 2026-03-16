@@ -38,7 +38,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/util/retry"
 	k8snet "k8s.io/utils/net"
 )
 
@@ -236,18 +235,18 @@ var LoadBalancerRetryConfig = wait.Backoff{
 func publicLoadBalancerIP(ctx context.Context, family k8snet.IPFamily, clientset kubernetes.Interface, namespace, loadBalancerName string,
 ) (string, error) {
 	resolvedIP := ""
+	var lastErr error
 
-	err := retry.OnError(LoadBalancerRetryConfig, func(err error) bool {
-		logger.Infof("Waiting for LoadBalancer to be ready: %s", err)
-		return true
-	}, func() error {
+	err := wait.ExponentialBackoffWithContext(ctx, LoadBalancerRetryConfig, func(ctx context.Context) (bool, error) {
 		service, err := clientset.CoreV1().Services(namespace).Get(ctx, loadBalancerName, metav1.GetOptions{})
 		if err != nil {
-			return errors.Wrapf(err, "error getting service %q for the public IP address", loadBalancerName)
+			lastErr = errors.Wrapf(err, "error getting service %q for the public IP address", loadBalancerName)
+			return false, nil
 		}
 
 		if len(service.Status.LoadBalancer.Ingress) < 1 {
-			return errors.Errorf("service %q doesn't contain any LoadBalancer ingress yet", loadBalancerName)
+			lastErr = errors.Errorf("service %q doesn't contain any LoadBalancer ingress yet", loadBalancerName)
+			return false, nil
 		}
 
 		for _, ingress := range service.Status.LoadBalancer.Ingress {
@@ -255,26 +254,34 @@ func publicLoadBalancerIP(ctx context.Context, family k8snet.IPFamily, clientset
 			case ingress.IP != "":
 				if k8snet.IPFamilyOfString(ingress.IP) == family {
 					resolvedIP = ingress.IP
-					return nil
+					return true, nil
 				}
 			case ingress.Hostname != "":
 				ip, err := publicDNSIP(ctx, family, clientset, namespace, ingress.Hostname)
 				if err != nil {
-					return err
+					lastErr = err
+					return false, nil //nolint:nilerr // This retries on error until timeout
 				}
 
 				if ip != "" {
 					resolvedIP = ip
-					return nil
+					return true, nil
 				}
 			}
 		}
 
-		return errors.Errorf("no IP or Hostname resolved for service LoadBalancer %q Ingress: %s",
+		lastErr = errors.Errorf("no IP or Hostname resolved for service LoadBalancer %q Ingress: %s",
 			loadBalancerName, resource.ToJSON(service.Status.LoadBalancer.Ingress))
-	})
 
-	return resolvedIP, err //nolint:wrapcheck  // No need to wrap here
+		return false, nil
+	})
+	if wait.Interrupted(err) {
+		if lastErr != nil {
+			return resolvedIP, lastErr
+		}
+	}
+
+	return resolvedIP, errors.Wrapf(err, "error resolving service LoadBalancer %q", loadBalancerName)
 }
 
 var LookupIP = net.DefaultResolver.LookupIP
