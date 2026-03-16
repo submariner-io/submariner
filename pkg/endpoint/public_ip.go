@@ -42,7 +42,8 @@ import (
 	k8snet "k8s.io/utils/net"
 )
 
-type publicIPResolverFunction func(family k8snet.IPFamily, clientset kubernetes.Interface, namespace, value string) (string, error)
+type publicIPResolverFunction func(ctx context.Context, family k8snet.IPFamily, clientset kubernetes.Interface, namespace, value string,
+) (string, error)
 
 var publicIPMethods = map[string]publicIPResolverFunction{
 	v1.API:          publicAPI,
@@ -104,7 +105,7 @@ func parseResolver(resolver string) (string, string, error) {
 	return method, config, nil
 }
 
-func GetPublicIP(family k8snet.IPFamily, submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface,
+func GetPublicIP(ctx context.Context, family k8snet.IPFamily, submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface,
 	backendConfig map[string]string, airGapped bool,
 ) (string, string, error) {
 	switch family {
@@ -120,7 +121,7 @@ func GetPublicIP(family k8snet.IPFamily, submSpec *types.SubmarinerSpecification
 		}
 
 		if airGapped {
-			ip, resolver, err := invokeResolvers(family, k8sClient, submSpec.Namespace, config, func(method string) bool {
+			ip, resolver, err := invokeResolvers(ctx, family, k8sClient, submSpec.Namespace, config, func(method string) bool {
 				return method == v1.IPv4 || method == v1.IPv6
 			})
 			if err != nil {
@@ -133,14 +134,15 @@ func GetPublicIP(family k8snet.IPFamily, submSpec *types.SubmarinerSpecification
 			return ip, resolver, nil
 		}
 
-		return invokeResolvers(family, k8sClient, submSpec.Namespace, config, nil)
+		return invokeResolvers(ctx, family, k8sClient, submSpec.Namespace, config, nil)
 	case k8snet.IPFamilyUnknown:
 	}
 
 	return "", "", nil
 }
 
-func invokeResolvers(family k8snet.IPFamily, k8sClient kubernetes.Interface, namespace, config string, useResolver func(string) bool,
+func invokeResolvers(ctx context.Context,
+	family k8snet.IPFamily, k8sClient kubernetes.Interface, namespace, config string, useResolver func(string) bool,
 ) (string, string, error) {
 	resolvers := strings.Split(config, ",")
 
@@ -155,7 +157,7 @@ func invokeResolvers(family k8snet.IPFamily, k8sClient kubernetes.Interface, nam
 				continue
 			}
 
-			ip, err = resolvePublicIP(family, k8sClient, namespace, method, param)
+			ip, err = resolvePublicIP(ctx, family, k8sClient, namespace, method, param)
 		}
 
 		if err == nil {
@@ -174,22 +176,23 @@ func invokeResolvers(family k8snet.IPFamily, k8sClient kubernetes.Interface, nam
 	return "", "", nil
 }
 
-func resolvePublicIP(family k8snet.IPFamily, k8sClient kubernetes.Interface, namespace, method, param string) (string, error) {
+func resolvePublicIP(ctx context.Context, family k8snet.IPFamily, k8sClient kubernetes.Interface, namespace, method, param string,
+) (string, error) {
 	resolverFn, ok := publicIPMethods[method]
 	if !ok {
 		return "", errors.Errorf("unknown resolver %q in %q annotation", method, v1.GatewayConfigPrefix+v1.PublicIP)
 	}
 
-	return resolverFn(family, k8sClient, namespace, param)
+	return resolverFn(ctx, family, k8sClient, namespace, param)
 }
 
-func publicAPI(family k8snet.IPFamily, _ kubernetes.Interface, _, value string) (string, error) {
+func publicAPI(ctx context.Context, family k8snet.IPFamily, _ kubernetes.Interface, _, value string) (string, error) {
 	url := value
 	if !strings.HasPrefix(url, "http") {
 		url = "https://" + value
 	}
 
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	var response *http.Response
@@ -213,7 +216,7 @@ func publicAPI(family k8snet.IPFamily, _ kubernetes.Interface, _, value string) 
 	return firstIPInString(family, string(body))
 }
 
-func publicIP(family k8snet.IPFamily, _ kubernetes.Interface, _, value string) (string, error) {
+func publicIP(_ context.Context, family k8snet.IPFamily, _ kubernetes.Interface, _, value string) (string, error) {
 	return firstIPInString(family, value)
 }
 
@@ -224,14 +227,15 @@ var LoadBalancerRetryConfig = wait.Backoff{
 	Steps:    24,
 }
 
-func publicLoadBalancerIP(family k8snet.IPFamily, clientset kubernetes.Interface, namespace, loadBalancerName string) (string, error) {
+func publicLoadBalancerIP(ctx context.Context, family k8snet.IPFamily, clientset kubernetes.Interface, namespace, loadBalancerName string,
+) (string, error) {
 	resolvedIP := ""
 
 	err := retry.OnError(LoadBalancerRetryConfig, func(err error) bool {
 		logger.Infof("Waiting for LoadBalancer to be ready: %s", err)
 		return true
 	}, func() error {
-		service, err := clientset.CoreV1().Services(namespace).Get(context.TODO(), loadBalancerName, metav1.GetOptions{})
+		service, err := clientset.CoreV1().Services(namespace).Get(ctx, loadBalancerName, metav1.GetOptions{})
 		if err != nil {
 			return errors.Wrapf(err, "error getting service %q for the public IP address", loadBalancerName)
 		}
@@ -248,7 +252,7 @@ func publicLoadBalancerIP(family k8snet.IPFamily, clientset kubernetes.Interface
 					return nil
 				}
 			case ingress.Hostname != "":
-				ip, err := publicDNSIP(family, clientset, namespace, ingress.Hostname)
+				ip, err := publicDNSIP(ctx, family, clientset, namespace, ingress.Hostname)
 				if err != nil {
 					return err
 				}
@@ -267,10 +271,10 @@ func publicLoadBalancerIP(family k8snet.IPFamily, clientset kubernetes.Interface
 	return resolvedIP, err //nolint:wrapcheck  // No need to wrap here
 }
 
-var LookupIP = net.LookupIP
+var LookupIP = net.DefaultResolver.LookupIP
 
-func publicDNSIP(family k8snet.IPFamily, _ kubernetes.Interface, _, fqdn string) (string, error) {
-	ips, err := LookupIP(fqdn)
+func publicDNSIP(ctx context.Context, family k8snet.IPFamily, _ kubernetes.Interface, _, fqdn string) (string, error) {
+	ips, err := LookupIP(ctx, "ip"+string(family), fqdn)
 	if err != nil {
 		return "", errors.Wrapf(err, "error resolving DNS hostname %q for public IP", fqdn)
 	}

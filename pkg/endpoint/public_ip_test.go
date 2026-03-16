@@ -19,6 +19,7 @@ limitations under the License.
 package endpoint_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -61,9 +62,9 @@ func testIPFamilyResolver() {
 
 	testGetPublicIP := func(family k8snet.IPFamily, prefix, expectedIP string) {
 		When(fmt.Sprintf("an IPv%s entry is specified", family), func() {
-			It("should return the IP address", func() {
+			It("should return the IP address", func(ctx context.Context) {
 				backendConfig := map[string]string{submarinerv1.PublicIP: prefix + ":" + expectedIP}
-				ip, resolver, err := endpoint.GetPublicIP(family, t.submSpec, fake.NewClientset(), backendConfig, false)
+				ip, resolver, err := endpoint.GetPublicIP(ctx, family, t.submSpec, fake.NewClientset(), backendConfig, false)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(ip).To(Equal(expectedIP))
@@ -81,9 +82,9 @@ func testDNSResolver() {
 
 	testGetPublicIP := func(family k8snet.IPFamily, hostname, expectedIP string) {
 		When(fmt.Sprintf("an IPv%s host name is specified", family), func() {
-			It("should return the resolved IP address", func() {
+			It("should return the resolved IP address", func(ctx context.Context) {
 				backendConfig := map[string]string{submarinerv1.PublicIP: submarinerv1.DNS + ":" + hostname}
-				ip, resolver, err := endpoint.GetPublicIP(family, t.submSpec, fake.NewClientset(), backendConfig, false)
+				ip, resolver, err := endpoint.GetPublicIP(ctx, family, t.submSpec, fake.NewClientset(), backendConfig, false)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(ip).To(Equal(expectedIP))
@@ -109,9 +110,9 @@ func testAPIResolver() {
 
 	testGetPublicIP := func(family k8snet.IPFamily, expectedIP string) {
 		Context(fmt.Sprintf("with IPv%s requested", family), func() {
-			It(fmt.Sprintf("should return a valid IPv%s address", family), func() {
+			It(fmt.Sprintf("should return a valid IPv%s address", family), func(ctx context.Context) {
 				backendConfig := map[string]string{submarinerv1.PublicIP: submarinerv1.API + ":" + t.httpServerURL}
-				ip, resolver, err := endpoint.GetPublicIP(family, t.submSpec, fake.NewClientset(), backendConfig, false)
+				ip, resolver, err := endpoint.GetPublicIP(ctx, family, t.submSpec, fake.NewClientset(), backendConfig, false)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(ip).To(Equal(expectedIP))
@@ -143,8 +144,8 @@ func testLoadBalancerResolver() {
 	v6IngressithHostname := v1.LoadBalancerIngress{Hostname: dnsHostv6}
 	dnsIPs := map[k8snet.IPFamily]string{k8snet.IPv4: testIPv4DNS, k8snet.IPv6: testIPv6DNS}
 
-	invokeGetPublicIP := func(family k8snet.IPFamily, ingresses ...v1.LoadBalancerIngress) (string, string, error) {
-		ip, resolver, err := endpoint.GetPublicIP(family, t.submSpec, fake.NewClientset(&v1.Service{
+	invokeGetPublicIP := func(ctx context.Context, family k8snet.IPFamily, ingresses ...v1.LoadBalancerIngress) (string, string, error) {
+		ip, resolver, err := endpoint.GetPublicIP(ctx, family, t.submSpec, fake.NewClientset(&v1.Service{
 			ObjectMeta: v1meta.ObjectMeta{
 				Name:      testServiceName,
 				Namespace: testNamespace,
@@ -159,8 +160,8 @@ func testLoadBalancerResolver() {
 		return ip, resolver, err
 	}
 
-	testGetPublicIP := func(family k8snet.IPFamily, expectedIP string, ingresses ...v1.LoadBalancerIngress) {
-		ip, resolver, err := invokeGetPublicIP(family, ingresses...)
+	testGetPublicIP := func(ctx context.Context, family k8snet.IPFamily, expectedIP string, ingresses ...v1.LoadBalancerIngress) {
+		ip, resolver, err := invokeGetPublicIP(ctx, family, ingresses...)
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ip).To(Equal(expectedIP))
@@ -169,47 +170,47 @@ func testLoadBalancerResolver() {
 
 	for _, family := range []k8snet.IPFamily{k8snet.IPv4, k8snet.IPv6} {
 		When(fmt.Sprintf("an IPv%s Ingress IP is configured", family), func() {
-			It("should return the IP address", func() {
-				testGetPublicIP(family, ipIngressses[family].IP, v4IngressWithIP, v6IngressWithIP)
+			It("should return the IP address", func(ctx context.Context) {
+				testGetPublicIP(ctx, family, ipIngressses[family].IP, v4IngressWithIP, v6IngressWithIP)
 			})
 		})
 
 		When(fmt.Sprintf("an IPv%s Ingress Hostname is configured", family), func() {
-			It("should return the resolved IP address", func() {
-				testGetPublicIP(family, dnsIPs[family], v4IngressWithHostname, v6IngressithHostname)
+			It("should return the resolved IP address", func(ctx context.Context) {
+				testGetPublicIP(ctx, family, dnsIPs[family], v4IngressWithHostname, v6IngressithHostname)
 			})
 		})
 	}
 
 	When("no Ingress is configured", func() {
-		It("should return an error", func() {
-			_, _, err := invokeGetPublicIP(k8snet.IPv4)
+		It("should return an error", func(ctx context.Context) {
+			_, _, err := invokeGetPublicIP(ctx, k8snet.IPv4)
 			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	When("the Ingress Hostname lookup fails", func() {
 		BeforeEach(func() {
-			endpoint.LookupIP = func(_ string) ([]net.IP, error) {
+			endpoint.LookupIP = func(_ context.Context, _, _ string) ([]net.IP, error) {
 				return nil, errors.New("mock error")
 			}
 		})
 
-		It("should return an error", func() {
-			_, _, err := invokeGetPublicIP(k8snet.IPv4, v4IngressWithHostname)
+		It("should return an error", func(ctx context.Context) {
+			_, _, err := invokeGetPublicIP(ctx, k8snet.IPv4, v4IngressWithHostname)
 			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	When("no Ingress resolves", func() {
 		BeforeEach(func() {
-			endpoint.LookupIP = func(_ string) ([]net.IP, error) {
+			endpoint.LookupIP = func(_ context.Context, _, _ string) ([]net.IP, error) {
 				return []net.IP{}, nil
 			}
 		})
 
-		It("should return an error", func() {
-			_, _, err := invokeGetPublicIP(k8snet.IPv4, v4IngressWithHostname)
+		It("should return an error", func(ctx context.Context) {
+			_, _, err := invokeGetPublicIP(ctx, k8snet.IPv4, v4IngressWithHostname)
 			Expect(err).To(HaveOccurred())
 		})
 	})
@@ -220,12 +221,12 @@ func testResolverInAirGapped() {
 
 	testGetPublicIP := func(family k8snet.IPFamily, expectedIP string) {
 		Context(fmt.Sprintf("with IPv%s requested", family), func() {
-			It(fmt.Sprintf("should return a valid IPv%s address", family), func() {
+			It(fmt.Sprintf("should return a valid IPv%s address", family), func(ctx context.Context) {
 				backendConfig := map[string]string{
 					submarinerv1.PublicIP: fmt.Sprintf("%s:bogus,%s:%s,%s:%s", submarinerv1.API, submarinerv1.IPv4, testIPv4,
 						submarinerv1.IPv6, testIPv6),
 				}
-				ip, _, err := endpoint.GetPublicIP(family, t.submSpec, fake.NewClientset(), backendConfig, true)
+				ip, _, err := endpoint.GetPublicIP(ctx, family, t.submSpec, fake.NewClientset(), backendConfig, true)
 
 				Expect(err).NotTo(HaveOccurred())
 				Expect(ip).To(Equal(expectedIP))
@@ -237,8 +238,8 @@ func testResolverInAirGapped() {
 	testGetPublicIP(k8snet.IPv6, testIPv6)
 
 	When("no resolver succeeds", func() {
-		It("should return an empty IP", func() {
-			ip, _, err := endpoint.GetPublicIP(k8snet.IPv4, t.submSpec, fake.NewClientset(), map[string]string{
+		It("should return an empty IP", func(ctx context.Context) {
+			ip, _, err := endpoint.GetPublicIP(ctx, k8snet.IPv4, t.submSpec, fake.NewClientset(), map[string]string{
 				submarinerv1.PublicIP: submarinerv1.IPv4 + ":",
 			}, true)
 
@@ -248,8 +249,8 @@ func testResolverInAirGapped() {
 	})
 
 	When("theres no IP family resolver", func() {
-		It("should return an empty IP", func() {
-			ip, _, err := endpoint.GetPublicIP(k8snet.IPv4, t.submSpec, fake.NewClientset(), map[string]string{
+		It("should return an empty IP", func(ctx context.Context) {
+			ip, _, err := endpoint.GetPublicIP(ctx, k8snet.IPv4, t.submSpec, fake.NewClientset(), map[string]string{
 				submarinerv1.PublicIP: submarinerv1.API + ":bogus",
 			}, true)
 
@@ -265,7 +266,7 @@ func testMultipleResolvers() {
 	var resolvers []string
 
 	BeforeEach(func() {
-		endpoint.LookupIP = func(_ string) ([]net.IP, error) {
+		endpoint.LookupIP = func(_ context.Context, _, _ string) ([]net.IP, error) {
 			return nil, errors.New("unknown host")
 		}
 
@@ -281,19 +282,19 @@ func testMultipleResolvers() {
 		}
 	})
 
-	It("should return the first successful one", func() {
+	It("should return the first successful one", func(ctx context.Context) {
 		working := submarinerv1.IPv4 + ":1.2.3.4"
 		backendConfig := map[string]string{submarinerv1.PublicIP: strings.Join(append(resolvers, working), ",")}
-		_, resolver, err := endpoint.GetPublicIP(k8snet.IPv4, t.submSpec, fake.NewClientset(), backendConfig, false)
+		_, resolver, err := endpoint.GetPublicIP(ctx, k8snet.IPv4, t.submSpec, fake.NewClientset(), backendConfig, false)
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(resolver).To(Equal(working))
 	})
 
 	When("no resolver succeeds", func() {
-		It("should return an error", func() {
+		It("should return an error", func(ctx context.Context) {
 			backendConfig := map[string]string{submarinerv1.PublicIP: strings.Join(resolvers, ",")}
-			_, _, err := endpoint.GetPublicIP(k8snet.IPv4, t.submSpec, fake.NewClientset(), backendConfig, false)
+			_, _, err := endpoint.GetPublicIP(ctx, k8snet.IPv4, t.submSpec, fake.NewClientset(), backendConfig, false)
 
 			Expect(err).To(HaveOccurred())
 		})
@@ -313,7 +314,7 @@ func newResolverTestDriver() *resolverTestDriver {
 			Namespace: testNamespace,
 		}
 
-		endpoint.LookupIP = func(host string) ([]net.IP, error) {
+		endpoint.LookupIP = func(_ context.Context, _, host string) ([]net.IP, error) {
 			if host == dnsHostv4 {
 				return []net.IP{net.ParseIP(testIPv4DNS)}, nil
 			} else if host == dnsHostv6 {
