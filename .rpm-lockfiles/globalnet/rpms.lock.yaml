@@ -4,269 +4,269 @@ lockfileVendor: redhat
 arches:
 - arch: aarch64
   packages:
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/aarch64/appstream/os/Packages/i/iptables-nft-1.8.11-12.el10_1.aarch64.rpm
-    repoid: rhel-10-for-aarch64-appstream-rpms
-    size: 203829
-    checksum: sha256:c498e55ddcfb21cece798674cb1533638ae931ff2c11759f983eafc4342618d5
-    name: iptables-nft
-    evr: 1.8.11-12.el10_1
-    sourcerpm: iptables-1.8.11-12.el10_1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/aarch64/baseos/os/Packages/i/ipset-7.22-9.el10_1.aarch64.rpm
-    repoid: rhel-10-for-aarch64-baseos-rpms
-    size: 45115
-    checksum: sha256:33df3e13dc8fc74aca25795ac0ee98f1a7c6c35db603f416201d6ad9f6731394
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/i/ipset-7.11-11.el9_5.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 45643
+    checksum: sha256:279946f3c482efea0e7b3ec7608a00434736f2d0669a03b1e8ea278503ef3b77
     name: ipset
-    evr: 7.22-9.el10_1
-    sourcerpm: ipset-7.22-9.el10_1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/aarch64/baseos/os/Packages/i/ipset-libs-7.22-9.el10_1.aarch64.rpm
-    repoid: rhel-10-for-aarch64-baseos-rpms
-    size: 68698
-    checksum: sha256:0ed4d6974b494281ccd85abbdb05d6dd0e8103d2de1404f0dfdea34efea96002
+    evr: 7.11-11.el9_5
+    sourcerpm: ipset-7.11-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/i/ipset-libs-7.11-11.el9_5.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 70577
+    checksum: sha256:af06e8035b4c13a22ed5ff54ff2fb2694711e7a29f830f96598495f1392de9ab
     name: ipset-libs
-    evr: 7.22-9.el10_1
-    sourcerpm: ipset-7.22-9.el10_1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/aarch64/baseos/os/Packages/i/iptables-libs-1.8.11-12.el10_1.aarch64.rpm
-    repoid: rhel-10-for-aarch64-baseos-rpms
-    size: 472434
-    checksum: sha256:c9e6f19c824195c8fb5252ddfadbbaa8dd1d73cfa3b01fca819acdcd530f4811
+    evr: 7.11-11.el9_5
+    sourcerpm: ipset-7.11-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/i/iptables-libs-1.8.10-11.el9_5.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 477723
+    checksum: sha256:73eadf9d16ea9ebb340664873522ef83ad0c28106751783d61c6315a8f0d466f
     name: iptables-libs
-    evr: 1.8.11-12.el10_1
-    sourcerpm: iptables-1.8.11-12.el10_1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/aarch64/baseos/os/Packages/j/jansson-2.14-3.el10.aarch64.rpm
-    repoid: rhel-10-for-aarch64-baseos-rpms
-    size: 50745
-    checksum: sha256:c086696b0319fe183481eeb8a8f61679fe538f14e78fe83b9bb7995095f9d701
+    evr: 1.8.10-11.el9_5
+    sourcerpm: iptables-1.8.10-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/i/iptables-nft-1.8.10-11.el9_5.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 212143
+    checksum: sha256:5789f27966252aadd8bf0eae25d324defc2528312ff21b21c4ddb80d1c0b104d
+    name: iptables-nft
+    evr: 1.8.10-11.el9_5
+    sourcerpm: iptables-1.8.10-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/j/jansson-2.14-1.el9.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 50251
+    checksum: sha256:7c002eb9c81bad49b8a11d9790af6220cce5fb882be7ca11335882d079d1473f
     name: jansson
-    evr: 2.14-3.el10
-    sourcerpm: jansson-2.14-3.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/aarch64/baseos/os/Packages/l/libnetfilter_conntrack-1.0.9-12.el10.aarch64.rpm
-    repoid: rhel-10-for-aarch64-baseos-rpms
-    size: 62102
-    checksum: sha256:af209839e761282682df314bf8a49c21c56e895224b03b14bec1a5dc23f542e5
+    evr: 2.14-1.el9
+    sourcerpm: jansson-2.14-1.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/l/libnetfilter_conntrack-1.0.9-1.el9.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 61151
+    checksum: sha256:28d0047c487c8d8bc6b9544fa0a6ac837a50c309641c689e834a4959d6f1ac01
     name: libnetfilter_conntrack
-    evr: 1.0.9-12.el10
-    sourcerpm: libnetfilter_conntrack-1.0.9-12.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/aarch64/baseos/os/Packages/l/libnfnetlink-1.0.2-3.el10.aarch64.rpm
-    repoid: rhel-10-for-aarch64-baseos-rpms
-    size: 32719
-    checksum: sha256:f60b0d300a90d854ad5a3742659a750015d045f34bfa79c860c0dc0bc9ded904
+    evr: 1.0.9-1.el9
+    sourcerpm: libnetfilter_conntrack-1.0.9-1.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/l/libnfnetlink-1.0.1-23.el9_5.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 31790
+    checksum: sha256:3bc75fd1a2cf80c51709901538ad65555406ffb0805a91fd59ce02f1a8ddd67c
     name: libnfnetlink
-    evr: 1.0.2-3.el10
-    sourcerpm: libnfnetlink-1.0.2-3.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/aarch64/baseos/os/Packages/l/libnftnl-1.2.8-4.el10_1.aarch64.rpm
-    repoid: rhel-10-for-aarch64-baseos-rpms
-    size: 83877
-    checksum: sha256:2fff20a282bd709cc8021997195bfecfbfb6e31abf4bd3655333ef271be33ed4
+    evr: 1.0.1-23.el9_5
+    sourcerpm: libnfnetlink-1.0.1-23.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/l/libnftnl-1.2.6-4.el9_4.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 88780
+    checksum: sha256:3e5aa1f38999f45d1720a28af8363a0989e41e8627d70cb18556f2c96841700f
     name: libnftnl
-    evr: 1.2.8-4.el10_1
-    sourcerpm: libnftnl-1.2.8-4.el10_1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/aarch64/baseos/os/Packages/n/nftables-1.1.1-9.el10_1.aarch64.rpm
-    repoid: rhel-10-for-aarch64-baseos-rpms
-    size: 435272
-    checksum: sha256:bb3252ccfdbad990e80e019f055a027c37eda3553279982260d3d9512a389de2
+    evr: 1.2.6-4.el9_4
+    sourcerpm: libnftnl-1.2.6-4.el9_4.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/n/nftables-1.0.9-6.el9_7.aarch64.rpm
+    repoid: ubi-9-for-aarch64-baseos-rpms
+    size: 430880
+    checksum: sha256:c1701cb63a5df1368ba89cc0c53e23ff582a50ab10881ec6ab682a10a4c4cd86
     name: nftables
-    evr: 1:1.1.1-9.el10_1
-    sourcerpm: nftables-1.1.1-9.el10_1.src.rpm
+    evr: 1:1.0.9-6.el9_7
+    sourcerpm: nftables-1.0.9-6.el9_7.src.rpm
   source: []
   module_metadata: []
 - arch: ppc64le
   packages:
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/ppc64le/appstream/os/Packages/i/iptables-nft-1.8.11-12.el10_1.ppc64le.rpm
-    repoid: rhel-10-for-ppc64le-appstream-rpms
-    size: 219189
-    checksum: sha256:ae6821608646ef9456e92a981c614075ca2bd31b8524bd80f1140890c4bac366
-    name: iptables-nft
-    evr: 1.8.11-12.el10_1
-    sourcerpm: iptables-1.8.11-12.el10_1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/ppc64le/baseos/os/Packages/i/ipset-7.22-9.el10_1.ppc64le.rpm
-    repoid: rhel-10-for-ppc64le-baseos-rpms
-    size: 45199
-    checksum: sha256:032faa00d11383b8f4a04056f19c26fcc66ea4ba41af69b40c7e591318e29006
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/i/ipset-7.11-11.el9_5.ppc64le.rpm
+    repoid: ubi-9-for-ppc64le-baseos-rpms
+    size: 45855
+    checksum: sha256:8d97110f13a6e1eec6ddd4d6ca65961040b4603492bfbd69c261afddb2477388
     name: ipset
-    evr: 7.22-9.el10_1
-    sourcerpm: ipset-7.22-9.el10_1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/ppc64le/baseos/os/Packages/i/ipset-libs-7.22-9.el10_1.ppc64le.rpm
-    repoid: rhel-10-for-ppc64le-baseos-rpms
-    size: 76362
-    checksum: sha256:a55eca3af0a05e6d99b47a4764d15d8fd01cfb9e4ad494643e95f34283e79024
+    evr: 7.11-11.el9_5
+    sourcerpm: ipset-7.11-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/i/ipset-libs-7.11-11.el9_5.ppc64le.rpm
+    repoid: ubi-9-for-ppc64le-baseos-rpms
+    size: 78295
+    checksum: sha256:31781e7a64d9d9c950c2981161607fb4bf367d02ce2054ec750194fdcfb3042c
     name: ipset-libs
-    evr: 7.22-9.el10_1
-    sourcerpm: ipset-7.22-9.el10_1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/ppc64le/baseos/os/Packages/i/iptables-libs-1.8.11-12.el10_1.ppc64le.rpm
-    repoid: rhel-10-for-ppc64le-baseos-rpms
-    size: 483010
-    checksum: sha256:1feb8062c5e43ec6a6c1530e3d0e2c4b39bf18c8dd495feadc640d54932c5aca
+    evr: 7.11-11.el9_5
+    sourcerpm: ipset-7.11-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/i/iptables-libs-1.8.10-11.el9_5.ppc64le.rpm
+    repoid: ubi-9-for-ppc64le-baseos-rpms
+    size: 495425
+    checksum: sha256:0a84672ce1e4031e791cdb97cd444d8289d3adb631ed2bd173181246e0342135
     name: iptables-libs
-    evr: 1.8.11-12.el10_1
-    sourcerpm: iptables-1.8.11-12.el10_1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/ppc64le/baseos/os/Packages/j/jansson-2.14-3.el10.ppc64le.rpm
-    repoid: rhel-10-for-ppc64le-baseos-rpms
-    size: 54545
-    checksum: sha256:976ccb162fda98a3708628cf2e47f8b6b364e8cd468ce7b72662ff32a3bf18ad
+    evr: 1.8.10-11.el9_5
+    sourcerpm: iptables-1.8.10-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/i/iptables-nft-1.8.10-11.el9_5.ppc64le.rpm
+    repoid: ubi-9-for-ppc64le-baseos-rpms
+    size: 235703
+    checksum: sha256:55da0e69f96d80fd54b95e21ccc93a95d5216bb01080193ea0532877ac84f86b
+    name: iptables-nft
+    evr: 1.8.10-11.el9_5
+    sourcerpm: iptables-1.8.10-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/j/jansson-2.14-1.el9.ppc64le.rpm
+    repoid: ubi-9-for-ppc64le-baseos-rpms
+    size: 54001
+    checksum: sha256:ab715a91f15f52f07c2c5a8219b8f2074386882ad90e5131f89f78ba89e6bc4e
     name: jansson
-    evr: 2.14-3.el10
-    sourcerpm: jansson-2.14-3.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/ppc64le/baseos/os/Packages/l/libnetfilter_conntrack-1.0.9-12.el10.ppc64le.rpm
-    repoid: rhel-10-for-ppc64le-baseos-rpms
-    size: 67133
-    checksum: sha256:d5f4f2c495d4f9ccedbc1b53419b6890bb2f5819de528b4ef686716cba275f3b
+    evr: 2.14-1.el9
+    sourcerpm: jansson-2.14-1.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/l/libnetfilter_conntrack-1.0.9-1.el9.ppc64le.rpm
+    repoid: ubi-9-for-ppc64le-baseos-rpms
+    size: 66225
+    checksum: sha256:b22a10d614fe52ea3d0fd47002f114004cb80a4a99eaa4a31ba4a22b06f430db
     name: libnetfilter_conntrack
-    evr: 1.0.9-12.el10
-    sourcerpm: libnetfilter_conntrack-1.0.9-12.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/ppc64le/baseos/os/Packages/l/libnfnetlink-1.0.2-3.el10.ppc64le.rpm
-    repoid: rhel-10-for-ppc64le-baseos-rpms
-    size: 34024
-    checksum: sha256:8c02e93819b9598b859ded2aeb13144fd858e06e3d5142d1403e9c6c6a6fae70
+    evr: 1.0.9-1.el9
+    sourcerpm: libnetfilter_conntrack-1.0.9-1.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/l/libnfnetlink-1.0.1-23.el9_5.ppc64le.rpm
+    repoid: ubi-9-for-ppc64le-baseos-rpms
+    size: 32973
+    checksum: sha256:32d7277ac399eb091c7d2ea67652a5973b786dd12be7fe07da1e15759949b764
     name: libnfnetlink
-    evr: 1.0.2-3.el10
-    sourcerpm: libnfnetlink-1.0.2-3.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/ppc64le/baseos/os/Packages/l/libnftnl-1.2.8-4.el10_1.ppc64le.rpm
-    repoid: rhel-10-for-ppc64le-baseos-rpms
-    size: 92258
-    checksum: sha256:aec69e23d62a646db0acaa41506051e9f6f026f8aeb881dba2e01137f85d2419
+    evr: 1.0.1-23.el9_5
+    sourcerpm: libnfnetlink-1.0.1-23.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/l/libnftnl-1.2.6-4.el9_4.ppc64le.rpm
+    repoid: ubi-9-for-ppc64le-baseos-rpms
+    size: 97430
+    checksum: sha256:107d1a8b268a1c5af66ae7d14ea6cca6d10cc147e36804a232221b06c48b43d0
     name: libnftnl
-    evr: 1.2.8-4.el10_1
-    sourcerpm: libnftnl-1.2.8-4.el10_1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/ppc64le/baseos/os/Packages/n/nftables-1.1.1-9.el10_1.ppc64le.rpm
-    repoid: rhel-10-for-ppc64le-baseos-rpms
-    size: 468083
-    checksum: sha256:bdbe3c015bd98e0fc753eb4e347bc2d731a449b2c42f92fe3e24bc6825d2889c
+    evr: 1.2.6-4.el9_4
+    sourcerpm: libnftnl-1.2.6-4.el9_4.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/n/nftables-1.0.9-6.el9_7.ppc64le.rpm
+    repoid: ubi-9-for-ppc64le-baseos-rpms
+    size: 464676
+    checksum: sha256:ed0b6e83ba0c85af793a7d9f9c3eb658e0edf3b1920bd0f41069db84463b2d91
     name: nftables
-    evr: 1:1.1.1-9.el10_1
-    sourcerpm: nftables-1.1.1-9.el10_1.src.rpm
+    evr: 1:1.0.9-6.el9_7
+    sourcerpm: nftables-1.0.9-6.el9_7.src.rpm
   source: []
   module_metadata: []
 - arch: s390x
   packages:
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/s390x/appstream/os/Packages/i/iptables-nft-1.8.11-12.el10_1.s390x.rpm
-    repoid: rhel-10-for-s390x-appstream-rpms
-    size: 208356
-    checksum: sha256:972dc7351a4ad84c970d4af8e1385f820cdf4ffeebf1e247b353ee52667d822e
-    name: iptables-nft
-    evr: 1.8.11-12.el10_1
-    sourcerpm: iptables-1.8.11-12.el10_1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/s390x/baseos/os/Packages/i/ipset-7.22-9.el10_1.s390x.rpm
-    repoid: rhel-10-for-s390x-baseos-rpms
-    size: 44844
-    checksum: sha256:f91a8b4b156384f24ec5a6a8a5c9a660222807a0681a713117007055cc0a958e
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/i/ipset-7.11-11.el9_5.s390x.rpm
+    repoid: ubi-9-for-s390x-baseos-rpms
+    size: 45599
+    checksum: sha256:ddec3920c0b65fcffd40c6900467fc291308f7bbc314e8e9078bff2e5f2f15d3
     name: ipset
-    evr: 7.22-9.el10_1
-    sourcerpm: ipset-7.22-9.el10_1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/s390x/baseos/os/Packages/i/ipset-libs-7.22-9.el10_1.s390x.rpm
-    repoid: rhel-10-for-s390x-baseos-rpms
-    size: 72299
-    checksum: sha256:3b772325809e44d10f7b8bf35db74a6e03fed9b4cc96db0d2cbe5e2345ee3413
+    evr: 7.11-11.el9_5
+    sourcerpm: ipset-7.11-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/i/ipset-libs-7.11-11.el9_5.s390x.rpm
+    repoid: ubi-9-for-s390x-baseos-rpms
+    size: 70480
+    checksum: sha256:1d69d64316b2ecb7c2fca143d7d492deccceeb8751294e1fd9e172b4024936a4
     name: ipset-libs
-    evr: 7.22-9.el10_1
-    sourcerpm: ipset-7.22-9.el10_1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/s390x/baseos/os/Packages/i/iptables-libs-1.8.11-12.el10_1.s390x.rpm
-    repoid: rhel-10-for-s390x-baseos-rpms
-    size: 470474
-    checksum: sha256:fa549c093225276aaf1f522aff118f9a3d030d35914a1cee51e3fae4fabc3378
+    evr: 7.11-11.el9_5
+    sourcerpm: ipset-7.11-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/i/iptables-libs-1.8.10-11.el9_5.s390x.rpm
+    repoid: ubi-9-for-s390x-baseos-rpms
+    size: 466972
+    checksum: sha256:9cd049dcd4d67a299b18969adb40ad77f81f373a2f67388c9b5dbb67fc2ab35d
     name: iptables-libs
-    evr: 1.8.11-12.el10_1
-    sourcerpm: iptables-1.8.11-12.el10_1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/s390x/baseos/os/Packages/j/jansson-2.14-3.el10.s390x.rpm
-    repoid: rhel-10-for-s390x-baseos-rpms
-    size: 49596
-    checksum: sha256:2001f74fcf0c32f12588e821e8742013cb7da3185a1bcf4e2390ac6c87ae9de8
+    evr: 1.8.10-11.el9_5
+    sourcerpm: iptables-1.8.10-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/i/iptables-nft-1.8.10-11.el9_5.s390x.rpm
+    repoid: ubi-9-for-s390x-baseos-rpms
+    size: 215178
+    checksum: sha256:93bdd10b9b1256077cda7e6815d9f244daf8e3a5598c28390c1d9d96a369df06
+    name: iptables-nft
+    evr: 1.8.10-11.el9_5
+    sourcerpm: iptables-1.8.10-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/j/jansson-2.14-1.el9.s390x.rpm
+    repoid: ubi-9-for-s390x-baseos-rpms
+    size: 47657
+    checksum: sha256:3da6821430545cab897d8119cc63c24c7dde32a8604b89f4fc0dd98beaf2714a
     name: jansson
-    evr: 2.14-3.el10
-    sourcerpm: jansson-2.14-3.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/s390x/baseos/os/Packages/l/libnetfilter_conntrack-1.0.9-12.el10.s390x.rpm
-    repoid: rhel-10-for-s390x-baseos-rpms
-    size: 64190
-    checksum: sha256:501d7293b5215662779b0d3cb0892f87cad8a4e7d7acfb0a94c9aa44b8c2b82f
+    evr: 2.14-1.el9
+    sourcerpm: jansson-2.14-1.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/l/libnetfilter_conntrack-1.0.9-1.el9.s390x.rpm
+    repoid: ubi-9-for-s390x-baseos-rpms
+    size: 60433
+    checksum: sha256:ce17551e7a729ee5ef5c171eb20c28d8d1901e91539b7f45a6e1fdfc1ab0495d
     name: libnetfilter_conntrack
-    evr: 1.0.9-12.el10
-    sourcerpm: libnetfilter_conntrack-1.0.9-12.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/s390x/baseos/os/Packages/l/libnfnetlink-1.0.2-3.el10.s390x.rpm
-    repoid: rhel-10-for-s390x-baseos-rpms
-    size: 32705
-    checksum: sha256:efd280b5774622c5a9bf6574404c8e6147f18d8a8db2c37fdc9ce6e21edfd7ae
+    evr: 1.0.9-1.el9
+    sourcerpm: libnetfilter_conntrack-1.0.9-1.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/l/libnfnetlink-1.0.1-23.el9_5.s390x.rpm
+    repoid: ubi-9-for-s390x-baseos-rpms
+    size: 31516
+    checksum: sha256:4e97b4216a32a22acceac622dd3cc76d18d4095404e1ef675a29a1bfeec72b03
     name: libnfnetlink
-    evr: 1.0.2-3.el10
-    sourcerpm: libnfnetlink-1.0.2-3.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/s390x/baseos/os/Packages/l/libnftnl-1.2.8-4.el10_1.s390x.rpm
-    repoid: rhel-10-for-s390x-baseos-rpms
-    size: 85741
-    checksum: sha256:09613f3096606a02a1413f9655452823433409f33ecbe948beb04d091b42ff85
+    evr: 1.0.1-23.el9_5
+    sourcerpm: libnfnetlink-1.0.1-23.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/l/libnftnl-1.2.6-4.el9_4.s390x.rpm
+    repoid: ubi-9-for-s390x-baseos-rpms
+    size: 86183
+    checksum: sha256:0bcdbb4cd732e4c88625ba0eef15f4327f618ff0d40768c0cf5d897e9334e8de
     name: libnftnl
-    evr: 1.2.8-4.el10_1
-    sourcerpm: libnftnl-1.2.8-4.el10_1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/s390x/baseos/os/Packages/n/nftables-1.1.1-9.el10_1.s390x.rpm
-    repoid: rhel-10-for-s390x-baseos-rpms
-    size: 470575
-    checksum: sha256:bde08cfc18d4f3812838a3d6ad6529f16147a7f37c68732a2e663f4f07d0e361
+    evr: 1.2.6-4.el9_4
+    sourcerpm: libnftnl-1.2.6-4.el9_4.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/n/nftables-1.0.9-6.el9_7.s390x.rpm
+    repoid: ubi-9-for-s390x-baseos-rpms
+    size: 421482
+    checksum: sha256:9bbc4b5022d2b93f8635bf8403b03defee311bc355db09831136b8683e7ffe3f
     name: nftables
-    evr: 1:1.1.1-9.el10_1
-    sourcerpm: nftables-1.1.1-9.el10_1.src.rpm
+    evr: 1:1.0.9-6.el9_7
+    sourcerpm: nftables-1.0.9-6.el9_7.src.rpm
   source: []
   module_metadata: []
 - arch: x86_64
   packages:
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/appstream/os/Packages/i/iptables-nft-1.8.11-12.el10_1.x86_64.rpm
-    repoid: rhel-10-for-x86_64-appstream-rpms
-    size: 203966
-    checksum: sha256:79b67dec680b9d9be53768321d551cc03f51299529af021901559805dcc1feae
-    name: iptables-nft
-    evr: 1.8.11-12.el10_1
-    sourcerpm: iptables-1.8.11-12.el10_1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/i/ipset-7.22-9.el10_1.x86_64.rpm
-    repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 45028
-    checksum: sha256:37cb0d9307ccc4567fb2b9bb4488dfe9983fdde3e2ecc1f3e8dd7b8f4fe85e99
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/i/ipset-7.11-11.el9_5.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 45774
+    checksum: sha256:853a048135da647d6b84039d3218300c334444a5b64769ae592a5f967aebeb5d
     name: ipset
-    evr: 7.22-9.el10_1
-    sourcerpm: ipset-7.22-9.el10_1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/i/ipset-libs-7.22-9.el10_1.x86_64.rpm
-    repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 70473
-    checksum: sha256:6c8796d61ba07727929efa4b82a528377bcc659593a3aca86be4709fe97612a5
+    evr: 7.11-11.el9_5
+    sourcerpm: ipset-7.11-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/i/ipset-libs-7.11-11.el9_5.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 72301
+    checksum: sha256:74e95b61324dbdb44060672764ec18b72eeb7f368bb12de1481c0b7b5feaa176
     name: ipset-libs
-    evr: 7.22-9.el10_1
-    sourcerpm: ipset-7.22-9.el10_1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/i/iptables-libs-1.8.11-12.el10_1.x86_64.rpm
-    repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 457603
-    checksum: sha256:6c432bd72858f15f6122121f20735c156be929dbd14477ed5eb90a0d27412d04
+    evr: 7.11-11.el9_5
+    sourcerpm: ipset-7.11-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/i/iptables-libs-1.8.10-11.el9_5.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 476678
+    checksum: sha256:3e79ca4cc3d35c1f1e0ac6c9f05c5be56b7ab6dd1f8ae719a21ec1b9e3bfa018
     name: iptables-libs
-    evr: 1.8.11-12.el10_1
-    sourcerpm: iptables-1.8.11-12.el10_1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/j/jansson-2.14-3.el10.x86_64.rpm
-    repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 49616
-    checksum: sha256:b5d6eeea14961f64ece8b3bbefeb53a61424822ccbaedb833f7fc7e50f6707c5
+    evr: 1.8.10-11.el9_5
+    sourcerpm: iptables-1.8.10-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/i/iptables-nft-1.8.10-11.el9_5.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 214056
+    checksum: sha256:54e031813637738af285ff4b1c2e4a20b913f2ea643a29940a07ccaf8bd197f5
+    name: iptables-nft
+    evr: 1.8.10-11.el9_5
+    sourcerpm: iptables-1.8.10-11.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/j/jansson-2.14-1.el9.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 49137
+    checksum: sha256:4e9aec51ee46d7265d6edd1245b5d5ab5e8336dc2a4ca17f2cace2ce8bae3761
     name: jansson
-    evr: 2.14-3.el10
-    sourcerpm: jansson-2.14-3.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libnetfilter_conntrack-1.0.9-12.el10.x86_64.rpm
-    repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 62319
-    checksum: sha256:65bca16a66f3505bf1758fb3930c5b3a70c8d03f3487cec18d482809911f4826
+    evr: 2.14-1.el9
+    sourcerpm: jansson-2.14-1.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/l/libnetfilter_conntrack-1.0.9-1.el9.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 62066
+    checksum: sha256:beeb73e78390077c6afd9ed6177bad8bad278dbfaae9d90edf7243cdf6a44a3f
     name: libnetfilter_conntrack
-    evr: 1.0.9-12.el10
-    sourcerpm: libnetfilter_conntrack-1.0.9-12.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libnfnetlink-1.0.2-3.el10.x86_64.rpm
-    repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 32991
-    checksum: sha256:2dbcc359e7750c6cc633718ed168805b6f96453f6cb052669ecd1f82ba8f4abc
+    evr: 1.0.9-1.el9
+    sourcerpm: libnetfilter_conntrack-1.0.9-1.el9.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/l/libnfnetlink-1.0.1-23.el9_5.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 32236
+    checksum: sha256:177882bfe48c9c9effc7b1bce6b58b2466988c53e400c07fb1ba2d3a4ebe6f40
     name: libnfnetlink
-    evr: 1.0.2-3.el10
-    sourcerpm: libnfnetlink-1.0.2-3.el10.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/l/libnftnl-1.2.8-4.el10_1.x86_64.rpm
-    repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 86541
-    checksum: sha256:ef6ccdc28bf016acf870407654852e4a09a3b7c05bfb7a84f2cb761284b4b423
+    evr: 1.0.1-23.el9_5
+    sourcerpm: libnfnetlink-1.0.1-23.el9_5.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/l/libnftnl-1.2.6-4.el9_4.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 91380
+    checksum: sha256:e64d7b270be4be36af80ed220852cb760a1069e34667b1ba9eec7a02762a14bf
     name: libnftnl
-    evr: 1.2.8-4.el10_1
-    sourcerpm: libnftnl-1.2.8-4.el10_1.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel10/10/x86_64/baseos/os/Packages/n/nftables-1.1.1-9.el10_1.x86_64.rpm
-    repoid: rhel-10-for-x86_64-baseos-rpms
-    size: 447362
-    checksum: sha256:4f090c509c6df755b9903cc2715af92c892b9766e680a03a596931e31b16c3b9
+    evr: 1.2.6-4.el9_4
+    sourcerpm: libnftnl-1.2.6-4.el9_4.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/n/nftables-1.0.9-6.el9_7.x86_64.rpm
+    repoid: ubi-9-for-x86_64-baseos-rpms
+    size: 437469
+    checksum: sha256:9ef3679a12f899ab4ebd5da31090c6624cfe35812d96f0f4609666aef7786e47
     name: nftables
-    evr: 1:1.1.1-9.el10_1
-    sourcerpm: nftables-1.1.1-9.el10_1.src.rpm
+    evr: 1:1.0.9-6.el9_7
+    sourcerpm: nftables-1.0.9-6.el9_7.src.rpm
   source: []
   module_metadata: []
