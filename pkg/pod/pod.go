@@ -22,19 +22,18 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
+	"github.com/submariner-io/admiral/pkg/resource"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
-
-type GatewayPodInterface interface {
-	SetHALabels(status submV1.HAStatus) error
-}
 
 type GatewayPod struct {
 	namespace string
@@ -66,7 +65,7 @@ func NewGatewayPod(ctx context.Context, k8sClient kubernetes.Interface) (*Gatewa
 	}
 
 	if err := gp.SetHALabels(ctx, submV1.HAStatusPassive); err != nil {
-		logger.Warningf("Error updating pod label: %s", err)
+		return nil, errors.Wrap(err, "error setting initial passive HA status")
 	}
 
 	return gp, nil
@@ -75,13 +74,35 @@ func NewGatewayPod(ctx context.Context, k8sClient kubernetes.Interface) (*Gatewa
 const patchFormat = `{"metadata": {"labels": {"gateway.submariner.io/node": "%s", "gateway.submariner.io/status": "%s"}}}`
 
 func (gp *GatewayPod) SetHALabels(ctx context.Context, status submV1.HAStatus) error {
+	logger.Infof("Updating Gateway pod HA status to %q", status)
+
 	podsInterface := gp.clientset.CoreV1().Pods(gp.namespace)
 	patch := fmt.Sprintf(patchFormat, gp.node, status)
 
-	_, err := podsInterface.Patch(ctx, gp.name, types.MergePatchType, []byte(patch), v1.PatchOptions{})
-	if err != nil {
-		return errors.Wrapf(err, "Error patching own pod %q in namespace %q with %s", gp.name, gp.namespace, patch)
+	var lastErrMsg string
+
+	err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (bool, error) {
+		_, err := podsInterface.Patch(ctx, gp.name, types.MergePatchType, []byte(patch), v1.PatchOptions{})
+		if err != nil {
+			if resource.IsTransientErr(err) {
+				errMsg := err.Error()
+				if errMsg != lastErrMsg {
+					lastErrMsg = errMsg
+
+					logger.Warningf("Error updating Gateway pod HA status to %q: %v - retrying...", status, err)
+				}
+
+				return false, nil
+			}
+
+			return false, errors.Wrapf(err, "error patching own pod %q in namespace %q with %s", gp.name, gp.namespace, patch)
+		}
+
+		return true, nil
+	})
+	if err == nil {
+		logger.Infof("Successfully updated Gateway pod HA status to %q", status)
 	}
 
-	return nil
+	return err //nolint:wrapcheck // No need to wrap
 }
