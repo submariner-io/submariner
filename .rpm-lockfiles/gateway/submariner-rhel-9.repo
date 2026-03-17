@@ -27,3 +27,17 @@ sslverify = 0
 sslclientcert = /etc/pki/entitlement/3677764407411845181.pem
 sslclientkey = /etc/pki/entitlement/3677764407411845181-key.pem
 skip_if_unavailable = 1
+
+[fast-datapath-for-rhel-9-$basearch-rpms]
+name = Fast Datapath for RHEL 9 $basearch (RPMs)
+baseurl = https://cdn.redhat.com/content/dist/layered/rhel9/$basearch/fast-datapath/os
+enabled = 1
+gpgcheck = 1
+gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+sslverify = 1
+sslcacert = /etc/rhsm/ca/redhat-uep.pem
+sslclientkey = /etc/pki/entitlement/*.pem
+sslclientcert = /etc/pki/entitlement/*.pem
+sslverifystatus = 1
+metadata_expire = 86400
+enabled_metadata = 1
