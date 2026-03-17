@@ -4,6 +4,13 @@ lockfileVendor: redhat
 arches:
 - arch: aarch64
   packages:
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/aarch64/fast-datapath/os/Packages/l/libreswan-5.2-1.el9fdp.aarch64.rpm
+    repoid: fast-datapath-for-rhel-9-aarch64-rpms
+    size: 1646470
+    checksum: sha256:9594c5199b4d3baec460282d55288cb280ec8f9453c80de309676d883b6121eb
+    name: libreswan
+    evr: 5.2-1.el9fdp
+    sourcerpm: libreswan-5.2-1.el9fdp.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/l/ldns-1.7.1-12.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
     size: 160183
@@ -11,13 +18,6 @@ arches:
     name: ldns
     evr: 1.7.1-12.el9
     sourcerpm: ldns-1.7.1-12.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/l/libreswan-4.15-8.el9.aarch64.rpm
-    repoid: rhel-9-for-aarch64-appstream-rpms
-    size: 1427745
-    checksum: sha256:fc2e10ce0c094040d170e253938dc7e5679f96798a837931994cbd7b761b0682
-    name: libreswan
-    evr: 4.15-8.el9
-    sourcerpm: libreswan-4.15-8.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/n/nspr-4.36.0-4.el9_4.aarch64.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
     size: 132948
@@ -81,6 +81,20 @@ arches:
     name: kmod
     evr: 28-11.el9
     sourcerpm: kmod-28-11.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/logrotate-3.18.0-12.el9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 74117
+    checksum: sha256:9b8142fb8bd0a89c48655a385a58357e3d78ffa9a119db4eb24cec67b6e8ded8
+    name: logrotate
+    evr: 3.18.0-12.el9
+    sourcerpm: logrotate-3.18.0-12.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/p/procps-ng-3.3.17-14.el9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 363344
+    checksum: sha256:a8c7514beb4c3cafa6341f43bbe285319d863b2893a34d91159dc8e90f615dd2
+    name: procps-ng
+    evr: 3.3.17-14.el9
+    sourcerpm: procps-ng-3.3.17-14.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/p/protobuf-c-1.3.3-13.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 38582
@@ -92,6 +106,13 @@ arches:
   module_metadata: []
 - arch: ppc64le
   packages:
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/ppc64le/fast-datapath/os/Packages/l/libreswan-5.2-1.el9fdp.ppc64le.rpm
+    repoid: fast-datapath-for-rhel-9-ppc64le-rpms
+    size: 1679615
+    checksum: sha256:d5a5834dff53698019e3f023e5244b42ead4716677fedc473d6a1d83947729a5
+    name: libreswan
+    evr: 5.2-1.el9fdp
+    sourcerpm: libreswan-5.2-1.el9fdp.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/l/ldns-1.7.1-12.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
     size: 184448
@@ -99,13 +120,6 @@ arches:
     name: ldns
     evr: 1.7.1-12.el9
     sourcerpm: ldns-1.7.1-12.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/l/libreswan-4.15-8.el9.ppc64le.rpm
-    repoid: rhel-9-for-ppc64le-appstream-rpms
-    size: 1457797
-    checksum: sha256:7d474ab20c30c41f49ca9b6f3f034db1353bbcf2080cd01b195e078f0c7e5899
-    name: libreswan
-    evr: 4.15-8.el9
-    sourcerpm: libreswan-4.15-8.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/n/nspr-4.36.0-4.el9_4.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
     size: 150220
@@ -169,6 +183,20 @@ arches:
     name: kmod
     evr: 28-11.el9
     sourcerpm: kmod-28-11.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/logrotate-3.18.0-12.el9.ppc64le.rpm
+    repoid: rhel-9-for-ppc64le-baseos-rpms
+    size: 78762
+    checksum: sha256:dcea25e569717a6ea3137a71e55f88fcc8e1deaba7b075553674976b3fc227e1
+    name: logrotate
+    evr: 3.18.0-12.el9
+    sourcerpm: logrotate-3.18.0-12.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/p/procps-ng-3.3.17-14.el9.ppc64le.rpm
+    repoid: rhel-9-for-ppc64le-baseos-rpms
+    size: 378421
+    checksum: sha256:d76d17ceec32bdf37c72a8ff52582b202fff7b7a3514dc2102ce3fcb42ff1382
+    name: procps-ng
+    evr: 3.3.17-14.el9
+    sourcerpm: procps-ng-3.3.17-14.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/p/protobuf-c-1.3.3-13.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 41163
@@ -180,6 +208,13 @@ arches:
   module_metadata: []
 - arch: s390x
   packages:
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/s390x/fast-datapath/os/Packages/l/libreswan-5.2-1.el9fdp.s390x.rpm
+    repoid: fast-datapath-for-rhel-9-s390x-rpms
+    size: 1588343
+    checksum: sha256:5b015670b5072cc40b258150efac4c2ed275b8f7b0bab5a66af50770b118ecd0
+    name: libreswan
+    evr: 5.2-1.el9fdp
+    sourcerpm: libreswan-5.2-1.el9fdp.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/l/ldns-1.7.1-12.el9.s390x.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
     size: 162142
@@ -187,13 +222,6 @@ arches:
     name: ldns
     evr: 1.7.1-12.el9
     sourcerpm: ldns-1.7.1-12.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/l/libreswan-4.15-8.el9.s390x.rpm
-    repoid: rhel-9-for-s390x-appstream-rpms
-    size: 1377428
-    checksum: sha256:8814ea8a6da25d72f985636cadb483f69177aff221729a9f63008a3e1ca3f4e5
-    name: libreswan
-    evr: 4.15-8.el9
-    sourcerpm: libreswan-4.15-8.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/n/nspr-4.36.0-4.el9_4.s390x.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
     size: 135799
@@ -257,6 +285,20 @@ arches:
     name: kmod
     evr: 28-11.el9
     sourcerpm: kmod-28-11.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/logrotate-3.18.0-12.el9.s390x.rpm
+    repoid: rhel-9-for-s390x-baseos-rpms
+    size: 74466
+    checksum: sha256:c3477c9810504e5e223835c65e7e905817a48a678020e7071d289213d17dfe12
+    name: logrotate
+    evr: 3.18.0-12.el9
+    sourcerpm: logrotate-3.18.0-12.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/p/procps-ng-3.3.17-14.el9.s390x.rpm
+    repoid: rhel-9-for-s390x-baseos-rpms
+    size: 354331
+    checksum: sha256:540d734809d1a9ef380a47c5ef3039b2ab736bea53ba8f34d2456d654dc92f1b
+    name: procps-ng
+    evr: 3.3.17-14.el9
+    sourcerpm: procps-ng-3.3.17-14.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/p/protobuf-c-1.3.3-13.el9.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 38450
@@ -268,6 +310,13 @@ arches:
   module_metadata: []
 - arch: x86_64
   packages:
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/x86_64/fast-datapath/os/Packages/l/libreswan-5.2-1.el9fdp.x86_64.rpm
+    repoid: fast-datapath-for-rhel-9-x86_64-rpms
+    size: 1645648
+    checksum: sha256:6ab4f6c0e9f541aae2a4ba45100f93d073420dec88601c2d02ad61da7f6da50a
+    name: libreswan
+    evr: 5.2-1.el9fdp
+    sourcerpm: libreswan-5.2-1.el9fdp.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/l/ldns-1.7.1-12.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
     size: 164902
@@ -275,13 +324,6 @@ arches:
     name: ldns
     evr: 1.7.1-12.el9
     sourcerpm: ldns-1.7.1-12.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/l/libreswan-4.15-8.el9.x86_64.rpm
-    repoid: rhel-9-for-x86_64-appstream-rpms
-    size: 1429523
-    checksum: sha256:216eaa8bcdbeb0bc54e81288f2d03c235bcbf946ab515e967beb25cf23963c13
-    name: libreswan
-    evr: 4.15-8.el9
-    sourcerpm: libreswan-4.15-8.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/n/nspr-4.36.0-4.el9_4.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
     size: 136524
@@ -345,6 +387,20 @@ arches:
     name: kmod
     evr: 28-11.el9
     sourcerpm: kmod-28-11.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/logrotate-3.18.0-12.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 76162
+    checksum: sha256:ffa6b348d400fd25151f9a8042ed33cbf9b0dd305ee532e80c5f342e30e6fdf6
+    name: logrotate
+    evr: 3.18.0-12.el9
+    sourcerpm: logrotate-3.18.0-12.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/p/procps-ng-3.3.17-14.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 361526
+    checksum: sha256:506ad778f63821e8d9647ca8e0a3ff21b8af9c1666060d5200f9b26ee718333c
+    name: procps-ng
+    evr: 3.3.17-14.el9
+    sourcerpm: procps-ng-3.3.17-14.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/p/protobuf-c-1.3.3-13.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 38224
