@@ -21,7 +21,6 @@ package gateway
 import (
 	"context"
 	"os"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -29,7 +28,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/certificate"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -47,7 +45,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/versions"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/leaderelection"
@@ -363,31 +360,8 @@ func (g *gatewayType) onStoppedLeading(ctx context.Context) {
 }
 
 func (g *gatewayType) updateGatewayHAStatus(ctx context.Context, status subv1.HAStatus) {
-	logger.Infof("Updating Gateway pod HA status to %q", status)
-
-	var lastErrMsg string
-
-	err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (bool, error) {
-		err := g.gatewayPod.SetHALabels(ctx, status)
-		if resource.IsTransientErr(err) {
-			errMsg := err.Error()
-			if !reflect.DeepEqual(errMsg, lastErrMsg) {
-				lastErrMsg = errMsg
-
-				logger.Warningf("Error updating Gateway pod HA status to %q: %v - retrying...", status, err)
-			}
-
-			return false, nil
-		}
-
-		return err == nil, errors.Wrapf(err, "error updating Gateway pod HA status to %q", status)
-	})
-	if !errors.Is(err, context.Canceled) {
-		if err == nil {
-			logger.Infof("Successfully updated Gateway pod HA status to %q", status)
-		} else {
-			logger.Errorf(err, "")
-		}
+	if err := g.gatewayPod.SetHALabels(ctx, status); err != nil && !errors.Is(err, context.Canceled) {
+		logger.Errorf(err, "Failed to update Gateway pod HA status to %q", status)
 	}
 }
 
