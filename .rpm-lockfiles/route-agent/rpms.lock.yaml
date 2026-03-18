@@ -151,13 +151,13 @@ arches:
     name: libselinux-utils
     evr: 3.6-3.el9
     sourcerpm: libselinux-3.6-3.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/n/nftables-1.0.9-5.el9_7.aarch64.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/n/nftables-1.0.9-6.el9_7.aarch64.rpm
     repoid: ubi-9-for-aarch64-baseos-rpms
-    size: 423636
-    checksum: sha256:1930178c6337115003a48d4f1e82b2b4a312385948a551d133d786a2174980b1
+    size: 430880
+    checksum: sha256:c1701cb63a5df1368ba89cc0c53e23ff582a50ab10881ec6ab682a10a4c4cd86
     name: nftables
-    evr: 1:1.0.9-5.el9_7
-    sourcerpm: nftables-1.0.9-5.el9_7.src.rpm
+    evr: 1:1.0.9-6.el9_7
+    sourcerpm: nftables-1.0.9-6.el9_7.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/p/policycoreutils-3.6-3.el9.aarch64.rpm
     repoid: ubi-9-for-aarch64-baseos-rpms
     size: 244356
@@ -193,20 +193,20 @@ arches:
     name: rpm-plugin-selinux
     evr: 4.16.1.3-39.el9
     sourcerpm: rpm-4.16.1.3-39.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/s/selinux-policy-38.1.65-1.el9.noarch.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/s/selinux-policy-38.1.65-1.el9_7.1.noarch.rpm
     repoid: ubi-9-for-aarch64-baseos-rpms
-    size: 43109
-    checksum: sha256:fb9d24fa5770a76e3c15677ec3c74f6910f89ded1d519dc94baedd8ee2db1938
+    size: 44151
+    checksum: sha256:2febb9f769974bd968cb9a5a023f4c596bd68777b782e1320c8472bfdf28d20b
     name: selinux-policy
-    evr: 38.1.65-1.el9
-    sourcerpm: selinux-policy-38.1.65-1.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/s/selinux-policy-targeted-38.1.65-1.el9.noarch.rpm
+    evr: 38.1.65-1.el9_7.1
+    sourcerpm: selinux-policy-38.1.65-1.el9_7.1.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/s/selinux-policy-targeted-38.1.65-1.el9_7.1.noarch.rpm
     repoid: ubi-9-for-aarch64-baseos-rpms
-    size: 7266040
-    checksum: sha256:30e7116093e0a96b5a156c017fc4a975ca0892fbe70ddf4b33eac12dad5965f5
+    size: 7269373
+    checksum: sha256:d2374ed366fd3ef8618cc222ff141ecbf33033607c66ccccc593197a4e742a5c
     name: selinux-policy-targeted
-    evr: 38.1.65-1.el9
-    sourcerpm: selinux-policy-38.1.65-1.el9.src.rpm
+    evr: 38.1.65-1.el9_7.1
+    sourcerpm: selinux-policy-38.1.65-1.el9_7.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/layered/rhel9/aarch64/fast-datapath/os/Packages/o/openvswitch-selinux-extra-policy-1.0-39.el9fdp.noarch.rpm
     repoid: fast-datapath-for-rhel-9-aarch64-rpms
     size: 12566
@@ -372,13 +372,13 @@ arches:
     name: libselinux-utils
     evr: 3.6-3.el9
     sourcerpm: libselinux-3.6-3.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/n/nftables-1.0.9-5.el9_7.ppc64le.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/n/nftables-1.0.9-6.el9_7.ppc64le.rpm
     repoid: ubi-9-for-ppc64le-baseos-rpms
-    size: 457356
-    checksum: sha256:b70b3f1135b3fdf57d5965862e462cc95c1d02603b512aa21503f18899e07277
+    size: 464676
+    checksum: sha256:ed0b6e83ba0c85af793a7d9f9c3eb658e0edf3b1920bd0f41069db84463b2d91
     name: nftables
-    evr: 1:1.0.9-5.el9_7
-    sourcerpm: nftables-1.0.9-5.el9_7.src.rpm
+    evr: 1:1.0.9-6.el9_7
+    sourcerpm: nftables-1.0.9-6.el9_7.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/n/numactl-libs-2.0.19-3.el9.ppc64le.rpm
     repoid: ubi-9-for-ppc64le-baseos-rpms
     size: 34217
@@ -421,20 +421,20 @@ arches:
     name: rpm-plugin-selinux
     evr: 4.16.1.3-39.el9
     sourcerpm: rpm-4.16.1.3-39.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/s/selinux-policy-38.1.65-1.el9.noarch.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/s/selinux-policy-38.1.65-1.el9_7.1.noarch.rpm
     repoid: ubi-9-for-ppc64le-baseos-rpms
-    size: 43109
-    checksum: sha256:fb9d24fa5770a76e3c15677ec3c74f6910f89ded1d519dc94baedd8ee2db1938
+    size: 44151
+    checksum: sha256:2febb9f769974bd968cb9a5a023f4c596bd68777b782e1320c8472bfdf28d20b
     name: selinux-policy
-    evr: 38.1.65-1.el9
-    sourcerpm: selinux-policy-38.1.65-1.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/s/selinux-policy-targeted-38.1.65-1.el9.noarch.rpm
+    evr: 38.1.65-1.el9_7.1
+    sourcerpm: selinux-policy-38.1.65-1.el9_7.1.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/s/selinux-policy-targeted-38.1.65-1.el9_7.1.noarch.rpm
     repoid: ubi-9-for-ppc64le-baseos-rpms
-    size: 7266040
-    checksum: sha256:30e7116093e0a96b5a156c017fc4a975ca0892fbe70ddf4b33eac12dad5965f5
+    size: 7269373
+    checksum: sha256:d2374ed366fd3ef8618cc222ff141ecbf33033607c66ccccc593197a4e742a5c
     name: selinux-policy-targeted
-    evr: 38.1.65-1.el9
-    sourcerpm: selinux-policy-38.1.65-1.el9.src.rpm
+    evr: 38.1.65-1.el9_7.1
+    sourcerpm: selinux-policy-38.1.65-1.el9_7.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/layered/rhel9/ppc64le/fast-datapath/os/Packages/o/openvswitch-selinux-extra-policy-1.0-39.el9fdp.noarch.rpm
     repoid: fast-datapath-for-rhel-9-ppc64le-rpms
     size: 12566
@@ -600,13 +600,13 @@ arches:
     name: libselinux-utils
     evr: 3.6-3.el9
     sourcerpm: libselinux-3.6-3.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/n/nftables-1.0.9-5.el9_7.s390x.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/n/nftables-1.0.9-6.el9_7.s390x.rpm
     repoid: ubi-9-for-s390x-baseos-rpms
-    size: 414312
-    checksum: sha256:bd15785d37971dab6ed3f309a5e1fd0a8dc948c5dd3c50ceca7bcbd836386e6c
+    size: 421482
+    checksum: sha256:9bbc4b5022d2b93f8635bf8403b03defee311bc355db09831136b8683e7ffe3f
     name: nftables
-    evr: 1:1.0.9-5.el9_7
-    sourcerpm: nftables-1.0.9-5.el9_7.src.rpm
+    evr: 1:1.0.9-6.el9_7
+    sourcerpm: nftables-1.0.9-6.el9_7.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/p/policycoreutils-3.6-3.el9.s390x.rpm
     repoid: ubi-9-for-s390x-baseos-rpms
     size: 243581
@@ -642,20 +642,20 @@ arches:
     name: rpm-plugin-selinux
     evr: 4.16.1.3-39.el9
     sourcerpm: rpm-4.16.1.3-39.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/s/selinux-policy-38.1.65-1.el9.noarch.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/s/selinux-policy-38.1.65-1.el9_7.1.noarch.rpm
     repoid: ubi-9-for-s390x-baseos-rpms
-    size: 43109
-    checksum: sha256:fb9d24fa5770a76e3c15677ec3c74f6910f89ded1d519dc94baedd8ee2db1938
+    size: 44151
+    checksum: sha256:2febb9f769974bd968cb9a5a023f4c596bd68777b782e1320c8472bfdf28d20b
     name: selinux-policy
-    evr: 38.1.65-1.el9
-    sourcerpm: selinux-policy-38.1.65-1.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/s/selinux-policy-targeted-38.1.65-1.el9.noarch.rpm
+    evr: 38.1.65-1.el9_7.1
+    sourcerpm: selinux-policy-38.1.65-1.el9_7.1.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/s/selinux-policy-targeted-38.1.65-1.el9_7.1.noarch.rpm
     repoid: ubi-9-for-s390x-baseos-rpms
-    size: 7266040
-    checksum: sha256:30e7116093e0a96b5a156c017fc4a975ca0892fbe70ddf4b33eac12dad5965f5
+    size: 7269373
+    checksum: sha256:d2374ed366fd3ef8618cc222ff141ecbf33033607c66ccccc593197a4e742a5c
     name: selinux-policy-targeted
-    evr: 38.1.65-1.el9
-    sourcerpm: selinux-policy-38.1.65-1.el9.src.rpm
+    evr: 38.1.65-1.el9_7.1
+    sourcerpm: selinux-policy-38.1.65-1.el9_7.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/layered/rhel9/s390x/fast-datapath/os/Packages/o/openvswitch-selinux-extra-policy-1.0-39.el9fdp.noarch.rpm
     repoid: fast-datapath-for-rhel-9-s390x-rpms
     size: 12566
@@ -828,13 +828,13 @@ arches:
     name: libselinux-utils
     evr: 3.6-3.el9
     sourcerpm: libselinux-3.6-3.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/n/nftables-1.0.9-5.el9_7.x86_64.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/n/nftables-1.0.9-6.el9_7.x86_64.rpm
     repoid: ubi-9-for-x86_64-baseos-rpms
-    size: 430248
-    checksum: sha256:b6d2dc3e700eba3b9c4aa0fa8e13240e525ba3f1acf7654860a5689132d1982c
+    size: 437469
+    checksum: sha256:9ef3679a12f899ab4ebd5da31090c6624cfe35812d96f0f4609666aef7786e47
     name: nftables
-    evr: 1:1.0.9-5.el9_7
-    sourcerpm: nftables-1.0.9-5.el9_7.src.rpm
+    evr: 1:1.0.9-6.el9_7
+    sourcerpm: nftables-1.0.9-6.el9_7.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/n/numactl-libs-2.0.19-3.el9.x86_64.rpm
     repoid: ubi-9-for-x86_64-baseos-rpms
     size: 31071
@@ -877,20 +877,20 @@ arches:
     name: rpm-plugin-selinux
     evr: 4.16.1.3-39.el9
     sourcerpm: rpm-4.16.1.3-39.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/s/selinux-policy-38.1.65-1.el9.noarch.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/s/selinux-policy-38.1.65-1.el9_7.1.noarch.rpm
     repoid: ubi-9-for-x86_64-baseos-rpms
-    size: 43109
-    checksum: sha256:fb9d24fa5770a76e3c15677ec3c74f6910f89ded1d519dc94baedd8ee2db1938
+    size: 44151
+    checksum: sha256:2febb9f769974bd968cb9a5a023f4c596bd68777b782e1320c8472bfdf28d20b
     name: selinux-policy
-    evr: 38.1.65-1.el9
-    sourcerpm: selinux-policy-38.1.65-1.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/s/selinux-policy-targeted-38.1.65-1.el9.noarch.rpm
+    evr: 38.1.65-1.el9_7.1
+    sourcerpm: selinux-policy-38.1.65-1.el9_7.1.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/s/selinux-policy-targeted-38.1.65-1.el9_7.1.noarch.rpm
     repoid: ubi-9-for-x86_64-baseos-rpms
-    size: 7266040
-    checksum: sha256:30e7116093e0a96b5a156c017fc4a975ca0892fbe70ddf4b33eac12dad5965f5
+    size: 7269373
+    checksum: sha256:d2374ed366fd3ef8618cc222ff141ecbf33033607c66ccccc593197a4e742a5c
     name: selinux-policy-targeted
-    evr: 38.1.65-1.el9
-    sourcerpm: selinux-policy-38.1.65-1.el9.src.rpm
+    evr: 38.1.65-1.el9_7.1
+    sourcerpm: selinux-policy-38.1.65-1.el9_7.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/layered/rhel9/x86_64/fast-datapath/os/Packages/o/openvswitch-selinux-extra-policy-1.0-39.el9fdp.noarch.rpm
     repoid: fast-datapath-for-rhel-9-x86_64-rpms
     size: 12566
