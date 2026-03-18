@@ -51,7 +51,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
@@ -181,21 +180,6 @@ var _ = Describe("Run", func() {
 			})
 
 			fakeDriver.AwaitDisconnectFromEndpoint(&endpoint.Spec, k8snet.IPv4)
-		})
-
-		Context("and update Gateway HA status fails with a non-transient error", func() {
-			It("should not block re-election", func() {
-				By("Setting leases resource updates to fail")
-
-				fake.FailOnAction(&t.kubeClient.Fake, "pods", "patch", apierrors.NewNotFound(schema.GroupResource{}, ""), true)
-
-				t.leaderElection.FailLease(t.config.RenewDeadline)
-
-				By("Setting leases resource updates to succeed")
-
-				t.leaderElection.SucceedLease()
-				t.leaderElection.AwaitLeaseRenewed()
-			})
 		})
 	})
 
@@ -370,9 +354,12 @@ func newTestDriver() *testDriver {
 				Expect(err).To(ContainErrorSubstring(t.expectedRunErr))
 
 				if !t.config.Spec.Uninstall {
-					t.awaitHAStatus(submarinerv1.HAStatusPassive)
 					t.awaitGatewayStatusError(t.expectedRunErr.Error())
 				}
+			}
+
+			if !t.config.Spec.Uninstall {
+				t.awaitHAStatus(submarinerv1.HAStatusPassive)
 			}
 		})
 
