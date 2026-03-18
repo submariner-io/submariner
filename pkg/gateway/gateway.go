@@ -231,6 +231,16 @@ func (g *gatewayType) Run(ctx context.Context) error {
 
 	waitGroup.Wait()
 
+	// Always set passive status on graceful shutdown after all components have stopped.
+	// Use a timeout context to avoid blocking shutdown indefinitely.
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	//nolint:contextcheck // Ignore "Non-inherited new context" - can't use ctx b/c it's already cancelled.
+	if err := g.gatewayPod.SetHALabels(timeoutCtx, subv1.HAStatusPassive); err != nil {
+		logger.Warningf("Error updating pod label to passive on shutdown: %s", err)
+	}
+
 	logger.Info("Gateway engine stopped")
 
 	return nil
