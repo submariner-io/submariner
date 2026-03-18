@@ -28,11 +28,20 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/resource"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+)
+
+const (
+	// GatewayNodeLabel is the label key for the gateway node name.
+	GatewayNodeLabel = "gateway.submariner.io/node"
+
+	// GatewayStatusLabel is the label key for the gateway HA status.
+	GatewayStatusLabel = "gateway.submariner.io/status"
 )
 
 type GatewayPod struct {
@@ -71,7 +80,7 @@ func NewGatewayPod(ctx context.Context, k8sClient kubernetes.Interface) (*Gatewa
 	return gp, nil
 }
 
-const patchFormat = `{"metadata": {"labels": {"gateway.submariner.io/node": "%s", "gateway.submariner.io/status": "%s"}}}`
+var patchFormat = fmt.Sprintf(`{"metadata": {"labels": {%q: "%%s", %q: "%%s"}}}`, GatewayNodeLabel, GatewayStatusLabel)
 
 func (gp *GatewayPod) SetHALabels(ctx context.Context, status submV1.HAStatus) error {
 	logger.Infof("Updating Gateway pod HA status to %q", status)
@@ -84,7 +93,7 @@ func (gp *GatewayPod) SetHALabels(ctx context.Context, status submV1.HAStatus) e
 	err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (bool, error) {
 		_, err := podsInterface.Patch(ctx, gp.name, types.MergePatchType, []byte(patch), v1.PatchOptions{})
 		if err != nil {
-			if resource.IsTransientErr(err) {
+			if resource.IsTransientErr(err) || apierrors.IsConflict(err) {
 				errMsg := err.Error()
 				if errMsg != lastErrMsg {
 					lastErrMsg = errMsg
