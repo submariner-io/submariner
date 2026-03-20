@@ -493,7 +493,7 @@ type testDriver struct {
 }
 
 func newTestDriver() *testDriver {
-	client := fakeClientset.NewSimpleClientset() //nolint:staticcheck // NewClientset fails with a schema error
+	client := fakeClientset.NewSimpleClientset()
 
 	t := &testDriver{
 		engine:             fakeEngine.New(),

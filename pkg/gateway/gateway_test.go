@@ -284,7 +284,7 @@ func newTestDriver() *testDriver {
 				RestMapper: restMapper,
 				Client:     t.dynClient,
 			},
-			SubmarinerClient:     submfake.NewSimpleClientset(), //nolint:staticcheck // NewClientset fails with a schema error
+			SubmarinerClient:     submfake.NewSimpleClientset(),
 			KubeClient:           t.kubeClient,
 			LeaderElectionClient: t.kubeClient,
 			NewCableEngine: func(_ *types.SubmarinerCluster, lep *submendpoint.Local) cableengine.Engine {

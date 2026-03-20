@@ -23,10 +23,10 @@ require (
 	golang.org/x/sys v0.42.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20230429144221-925a1e7659e6
 	google.golang.org/protobuf v1.36.8
-	k8s.io/api v0.35.2
-	k8s.io/apimachinery v0.35.2
-	k8s.io/client-go v0.35.2
-	k8s.io/component-helpers v0.35.2
+	k8s.io/api v0.35.3
+	k8s.io/apimachinery v0.35.3
+	k8s.io/client-go v0.35.3
+	k8s.io/component-helpers v0.35.3
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
 	sigs.k8s.io/controller-runtime v0.23.0
 	sigs.k8s.io/knftables v0.0.21
