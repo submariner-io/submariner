@@ -386,7 +386,7 @@ func testUninstall() {
 	})
 
 	Specify("DeleteGlobalnetObjects should delete all Globalnet resources and internal Services", func() {
-		submClient := fakesubmariner.NewSimpleClientset() //nolint:staticcheck // NewClientset fails with a schema error
+		submClient := fakesubmariner.NewSimpleClientset()
 		fake.AddBasicReactors(&submClient.Fake)
 
 		clusterEgressIP, err := submClient.SubmarinerV1().ClusterGlobalEgressIPs("").Create(context.Background(),
