@@ -20,6 +20,7 @@ package syncer_test
 
 import (
 	"context"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -45,19 +46,24 @@ import (
 	submarinerInformers "github.com/submariner-io/submariner/pkg/client/informers/externalversions"
 	"github.com/submariner-io/submariner/pkg/pinger"
 	"github.com/submariner-io/submariner/pkg/pinger/fake"
+	gwpod "github.com/submariner-io/submariner/pkg/pod"
 	"github.com/submariner-io/submariner/pkg/types"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic"
 	fakeClient "k8s.io/client-go/dynamic/fake"
+	k8sfake "k8s.io/client-go/kubernetes/fake"
 	kubeScheme "k8s.io/client-go/kubernetes/scheme"
+	corev1typed "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	k8snet "k8s.io/utils/net"
 )
 
 const (
-	namespace = "submariner"
+	namespace           = "submariner"
+	localGatewayPodName = "local-gateway-pod"
 )
 
 func init() {
@@ -75,24 +81,13 @@ var _ = BeforeSuite(func() {
 var _ = Describe("", func() {
 	Context("Gateway syncing", testGatewaySyncing)
 	Context("Stale Gateway cleanup", testStaleGatewayCleanup)
+	Context("Stale Gateway pod HA status cleanup", testStaleGatewayPodCleanup)
 	Context("Gateway sync errors", testGatewaySyncErrors)
 	Context("Gateway latency info", testGatewayLatencyInfo)
 })
 
 func testGatewaySyncing() {
-	var t *testDriver
-
-	BeforeEach(func() {
-		t = newTestDriver()
-	})
-
-	JustBeforeEach(func() {
-		t.run()
-	})
-
-	AfterEach(func() {
-		t.stop()
-	})
+	t := newTestDriver()
 
 	testPeriodicTimestampUpdate := func() {
 		It("should periodically update the Gateway resource timestamp", func() {
@@ -216,13 +211,13 @@ func testGatewaySyncing() {
 }
 
 func testStaleGatewayCleanup() {
-	var t *testDriver
+	t := newTestDriver()
+
 	var staleGateway *submarinerv1.Gateway
 
 	expectedErr := errors.New("fake error")
 
 	BeforeEach(func() {
-		t = newTestDriver()
 		staleGateway = &submarinerv1.Gateway{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "raiders",
@@ -237,18 +232,12 @@ func testStaleGatewayCleanup() {
 	})
 
 	JustBeforeEach(func() {
-		t.run()
-
 		t.awaitGatewayUpdated(t.expectedGateway)
 
 		_, err := t.gateways.Create(context.TODO(), staleGateway, metav1.CreateOptions{})
 		Expect(err).To(Succeed())
 
 		t.awaitGatewayUpdated(staleGateway)
-	})
-
-	AfterEach(func() {
-		t.stop()
 	})
 
 	When("the Gateway's update timestamp expires", func() {
@@ -310,22 +299,54 @@ func testStaleGatewayCleanup() {
 	})
 }
 
+func testStaleGatewayPodCleanup() {
+	const otherGatewayPodName = "other-gateway-pod"
+
+	t := newTestDriver()
+
+	BeforeEach(func() {
+		t.expectedGateway.Status.HAStatus = submarinerv1.HAStatusActive
+		t.engine.HAStatus = t.expectedGateway.Status.HAStatus
+	})
+
+	It("should not update the local Pod HA status", func() {
+		Consistently(func(g Gomega) {
+			pod, err := t.pods.Get(context.TODO(), localGatewayPodName, metav1.GetOptions{})
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(pod.Labels).To(HaveKeyWithValue(gwpod.GatewayStatusLabel, string(submarinerv1.HAStatusActive)))
+		}).Within(time.Millisecond * 500).To(Succeed())
+	})
+
+	When("another Gateway pod's HA status is active", func() {
+		JustBeforeEach(func() {
+			_, err := t.pods.Create(context.TODO(), &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      otherGatewayPodName,
+					Namespace: namespace,
+					Labels:    map[string]string{gwpod.GatewayStatusLabel: string(submarinerv1.HAStatusActive)},
+				},
+			}, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should update it to passive", func() {
+			Eventually(func(g Gomega) {
+				pod, err := t.pods.Get(context.TODO(), otherGatewayPodName, metav1.GetOptions{})
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(pod.Labels).To(HaveKeyWithValue(gwpod.GatewayStatusLabel, string(submarinerv1.HAStatusPassive)))
+			}).Within(3 * time.Second).To(Succeed())
+		})
+	})
+}
+
 func testGatewaySyncErrors() {
-	var t *testDriver
+	t := newTestDriver()
+
 	var expectedErr error
 
 	BeforeEach(func() {
-		t = newTestDriver()
 		expectedErr = errors.New("fake error")
 		t.expectedDeletedAfter = nil
-	})
-
-	JustBeforeEach(func() {
-		t.run()
-	})
-
-	AfterEach(func() {
-		t.stop()
 	})
 
 	When("Gateway create fails", func() {
@@ -377,19 +398,7 @@ func testGatewaySyncErrors() {
 }
 
 func testGatewayLatencyInfo() {
-	var t *testDriver
-
-	BeforeEach(func() {
-		t = newTestDriver()
-	})
-
-	JustBeforeEach(func() {
-		t.run()
-	})
-
-	AfterEach(func() {
-		t.stop()
-	})
+	t := newTestDriver()
 
 	When("the health checker provides latency info", func() {
 		It("should correctly update the Gateway Status information", func() {
@@ -478,6 +487,7 @@ type testDriver struct {
 	client               *fakeClientset.Clientset
 	gateways             submarinerClientsetv1.GatewayInterface
 	gatewayReactor       *fakeReactor.FailingReactor
+	pods                 corev1typed.PodInterface
 	syncer               *syncer.GatewaySyncer
 	healthChecker        healthchecker.Interface
 	pinger               *fake.Pinger
@@ -493,120 +503,135 @@ type testDriver struct {
 }
 
 func newTestDriver() *testDriver {
-	client := fakeClientset.NewSimpleClientset()
+	t := &testDriver{}
 
-	t := &testDriver{
-		engine:             fakeEngine.New(),
-		client:             client,
-		gateways:           client.SubmarinerV1().Gateways(namespace),
-		gatewayReactor:     fakeReactor.NewFailingReactorForResource(&client.Fake, "gateways"),
-		gatewayUpdated:     make(chan *submarinerv1.Gateway, 10),
-		gatewayDeleted:     make(chan *submarinerv1.Gateway, 10),
-		stopSyncer:         make(chan struct{}),
-		stopInformer:       make(chan struct{}),
-		savedErrorHandlers: utilruntime.ErrorHandlers,
-		handledError:       make(chan error, 10),
-	}
+	BeforeEach(func() {
+		t.engine = fakeEngine.New()
+		t.client = fakeClientset.NewSimpleClientset()
+		t.gateways = t.client.SubmarinerV1().Gateways(namespace)
+		t.gatewayReactor = fakeReactor.NewFailingReactorForResource(&t.client.Fake, "gateways")
+		t.gatewayUpdated = make(chan *submarinerv1.Gateway, 10)
+		t.gatewayDeleted = make(chan *submarinerv1.Gateway, 10)
+		t.stopSyncer = make(chan struct{})
+		t.stopInformer = make(chan struct{})
+		t.savedErrorHandlers = utilruntime.ErrorHandlers
+		t.handledError = make(chan error, 10)
 
-	t.engine.LocalEndPoint = &types.SubmarinerEndpoint{Spec: submarinerv1.EndpointSpec{
-		ClusterID:  "east",
-		CableName:  "submariner-cable-east-192-68-1-2",
-		Hostname:   "redsox",
-		PrivateIPs: []string{"192.6.1.3"},
-		Backend:    "libreswan",
-	}}
+		k8sClient := k8sfake.NewClientset(&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      localGatewayPodName,
+				Namespace: namespace,
+				Labels:    map[string]string{gwpod.GatewayStatusLabel: string(submarinerv1.HAStatusActive)},
+			},
+		})
 
-	t.expectedGateway = &submarinerv1.Gateway{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: t.engine.LocalEndPoint.Spec.Hostname,
-		},
-		Status: submarinerv1.GatewayStatus{
-			Version:       "1",
-			HAStatus:      t.engine.GetHAStatus(),
-			LocalEndpoint: t.engine.LocalEndPoint.Spec,
-			Connections:   t.engine.Connections,
-		},
-	}
+		t.pods = k8sClient.CoreV1().Pods(namespace)
 
-	t.expectedDeletedAfter = t.expectedGateway
+		t.engine.LocalEndPoint = &types.SubmarinerEndpoint{Spec: submarinerv1.EndpointSpec{
+			ClusterID:  "east",
+			CableName:  "submariner-cable-east-192-68-1-2",
+			Hostname:   "redsox",
+			PrivateIPs: []string{"192.6.1.3"},
+			Backend:    "libreswan",
+		}}
+
+		t.expectedGateway = &submarinerv1.Gateway{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: t.engine.LocalEndPoint.Spec.Hostname,
+			},
+			Status: submarinerv1.GatewayStatus{
+				Version:       "1",
+				HAStatus:      t.engine.GetHAStatus(),
+				LocalEndpoint: t.engine.LocalEndPoint.Spec,
+				Connections:   t.engine.Connections,
+			},
+		}
+
+		t.expectedDeletedAfter = t.expectedGateway
+
+		os.Setenv("POD_NAME", localGatewayPodName)
+	})
+
+	JustBeforeEach(func() {
+		//nolint:reassign // Modifying ErrorHandlers *is* the API
+		utilruntime.ErrorHandlers = append(utilruntime.ErrorHandlers, func(_ context.Context, err error, _ string, _ ...any) {
+			t.handledError <- err
+		})
+
+		scheme := runtime.NewScheme()
+		Expect(submarinerv1.AddToScheme(scheme)).To(Succeed())
+
+		dynamicClient := fakeClient.NewSimpleDynamicClient(scheme)
+		restMapper := test.GetRESTMapperFor(&submarinerv1.Endpoint{})
+
+		t.pinger = fake.NewPinger("10.130.2.2")
+
+		var err error
+
+		t.healthChecker, err = healthchecker.New(&healthchecker.Config{
+			ControllerConfig: pinger.ControllerConfig{
+				SupportedIPFamilies: []k8snet.IPFamily{k8snet.IPv4},
+				NewPinger: func(pingerCfg pinger.Config) pinger.Interface {
+					defer GinkgoRecover()
+					Expect(pingerCfg.IP).To(Equal(t.pinger.GetIP()))
+
+					return t.pinger
+				},
+			},
+			WatcherConfig: watcher.Config{
+				RestMapper: restMapper,
+				Client:     dynamicClient,
+				Scheme:     scheme,
+			},
+			EndpointNamespace: namespace,
+			ClusterID:         t.engine.LocalEndPoint.Spec.ClusterID,
+		})
+		Expect(err).To(Succeed())
+
+		t.endpoints = dynamicClient.Resource(*test.GetGroupVersionResourceFor(restMapper, &submarinerv1.Endpoint{})).Namespace(namespace)
+
+		t.syncer = syncer.NewGatewaySyncer(t.engine, t.gateways, t.pods, t.expectedGateway.Status.Version, t.healthChecker)
+
+		informerFactory := submarinerInformers.NewSharedInformerFactory(t.client, 0)
+		informer := informerFactory.Submariner().V1().Gateways().Informer()
+
+		_, err = informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj any) {
+				t.gatewayUpdated <- obj.(*submarinerv1.Gateway)
+			},
+			UpdateFunc: func(_, newObj any) {
+				t.gatewayUpdated <- newObj.(*submarinerv1.Gateway)
+			},
+			DeleteFunc: func(obj any) {
+				t.gatewayDeleted <- obj.(*submarinerv1.Gateway)
+			},
+		})
+		Expect(err).To(Succeed())
+
+		go informer.Run(t.stopInformer)
+		Expect(cache.WaitForCacheSync(t.stopInformer, informer.HasSynced)).To(BeTrue())
+
+		go t.syncer.Run(t.stopSyncer)
+
+		Expect(t.healthChecker.Start(t.stopSyncer)).To(Succeed())
+	})
+
+	JustAfterEach(func() {
+		os.Unsetenv("POD_NAME")
+
+		close(t.stopSyncer)
+
+		if t.healthChecker != nil && t.expectedDeletedAfter != nil {
+			t.awaitGatewayDeleted(t.expectedDeletedAfter)
+		}
+
+		close(t.stopInformer)
+
+		//nolint:reassign // Modifying ErrorHandlers *is* the API
+		utilruntime.ErrorHandlers = t.savedErrorHandlers
+	})
 
 	return t
-}
-
-func (t *testDriver) run() {
-	//nolint:reassign // Modifying ErrorHandlers *is* the API
-	utilruntime.ErrorHandlers = append(utilruntime.ErrorHandlers, func(_ context.Context, err error, _ string, _ ...any) {
-		t.handledError <- err
-	})
-
-	scheme := runtime.NewScheme()
-	Expect(submarinerv1.AddToScheme(scheme)).To(Succeed())
-
-	dynamicClient := fakeClient.NewSimpleDynamicClient(scheme)
-	restMapper := test.GetRESTMapperFor(&submarinerv1.Endpoint{})
-
-	t.pinger = fake.NewPinger("10.130.2.2")
-
-	var err error
-
-	t.healthChecker, err = healthchecker.New(&healthchecker.Config{
-		ControllerConfig: pinger.ControllerConfig{
-			SupportedIPFamilies: []k8snet.IPFamily{k8snet.IPv4},
-			NewPinger: func(pingerCfg pinger.Config) pinger.Interface {
-				defer GinkgoRecover()
-				Expect(pingerCfg.IP).To(Equal(t.pinger.GetIP()))
-
-				return t.pinger
-			},
-		},
-		WatcherConfig: watcher.Config{
-			RestMapper: restMapper,
-			Client:     dynamicClient,
-			Scheme:     scheme,
-		},
-		EndpointNamespace: namespace,
-		ClusterID:         t.engine.LocalEndPoint.Spec.ClusterID,
-	})
-	Expect(err).To(Succeed())
-
-	t.endpoints = dynamicClient.Resource(*test.GetGroupVersionResourceFor(restMapper, &submarinerv1.Endpoint{})).Namespace(namespace)
-
-	t.syncer = syncer.NewGatewaySyncer(t.engine, t.gateways, t.expectedGateway.Status.Version, t.healthChecker)
-
-	informerFactory := submarinerInformers.NewSharedInformerFactory(t.client, 0)
-	informer := informerFactory.Submariner().V1().Gateways().Informer()
-
-	_, err = informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj any) {
-			t.gatewayUpdated <- obj.(*submarinerv1.Gateway)
-		},
-		UpdateFunc: func(_, newObj any) {
-			t.gatewayUpdated <- newObj.(*submarinerv1.Gateway)
-		},
-		DeleteFunc: func(obj any) {
-			t.gatewayDeleted <- obj.(*submarinerv1.Gateway)
-		},
-	})
-	Expect(err).To(Succeed())
-
-	go informer.Run(t.stopInformer)
-	Expect(cache.WaitForCacheSync(t.stopInformer, informer.HasSynced)).To(BeTrue())
-
-	go t.syncer.Run(t.stopSyncer)
-
-	Expect(t.healthChecker.Start(t.stopSyncer)).To(Succeed())
-}
-
-func (t *testDriver) stop() {
-	close(t.stopSyncer)
-
-	if t.healthChecker != nil && t.expectedDeletedAfter != nil {
-		t.awaitGatewayDeleted(t.expectedDeletedAfter)
-	}
-
-	close(t.stopInformer)
-	//nolint:reassign // Modifying ErrorHandlers *is* the API
-	utilruntime.ErrorHandlers = t.savedErrorHandlers
 }
 
 func (t *testDriver) awaitGatewayUpdated(expected *submarinerv1.Gateway) {

@@ -171,6 +171,7 @@ func New(ctx context.Context, config *Config) (Interface, error) {
 	g.cableEngineSyncer = syncer.NewGatewaySyncer(
 		g.cableEngine,
 		g.SubmarinerClient.SubmarinerV1().Gateways(g.Spec.Namespace),
+		g.KubeClient.CoreV1().Pods(g.Spec.Namespace),
 		versions.Submariner(), g.cableHealthChecker)
 
 	eventBroadcaster := record.NewBroadcaster()
