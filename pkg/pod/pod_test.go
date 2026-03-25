@@ -20,12 +20,14 @@ package pod_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/fake"
+	. "github.com/submariner-io/admiral/pkg/gomega"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/pod"
 	corev1 "k8s.io/api/core/v1"
@@ -52,44 +54,44 @@ func testNewGatewayPod() {
 	t := newTestDriver()
 
 	When("all environment variables are set", func() {
-		It("should create GatewayPod successfully and set passive HA status", func() {
-			gw, err := pod.NewGatewayPod(context.TODO(), t.client)
+		It("should create GatewayPod successfully and set passive HA status", func(ctx context.Context) {
+			gw, err := pod.NewGatewayPod(ctx, t.client)
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(gw).ToNot(BeNil())
-			t.verifyPodLabels(submarinerv1.HAStatusPassive)
+			t.verifyPodLabels(ctx, submarinerv1.HAStatusPassive)
 		})
 	})
 
 	When("SUBMARINER_NAMESPACE is not set", func() {
 		BeforeEach(func() {
-			os.Unsetenv("SUBMARINER_NAMESPACE")
+			Expect(os.Unsetenv("SUBMARINER_NAMESPACE")).To(Succeed())
 		})
 
-		It("should return an error", func() {
-			_, err := pod.NewGatewayPod(context.TODO(), t.client)
+		It("should return an error", func(ctx context.Context) {
+			_, err := pod.NewGatewayPod(ctx, t.client)
 			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	When("NODE_NAME is not set", func() {
 		BeforeEach(func() {
-			os.Unsetenv("NODE_NAME")
+			Expect(os.Unsetenv("NODE_NAME")).To(Succeed())
 		})
 
-		It("should return an error", func() {
-			_, err := pod.NewGatewayPod(context.TODO(), t.client)
+		It("should return an error", func(ctx context.Context) {
+			_, err := pod.NewGatewayPod(ctx, t.client)
 			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	When("POD_NAME is not set", func() {
 		BeforeEach(func() {
-			os.Unsetenv("POD_NAME")
+			Expect(os.Unsetenv("POD_NAME")).To(Succeed())
 		})
 
-		It("should return an error", func() {
-			_, err := pod.NewGatewayPod(context.TODO(), t.client)
+		It("should return an error", func(ctx context.Context) {
+			_, err := pod.NewGatewayPod(ctx, t.client)
 			Expect(err).To(HaveOccurred())
 		})
 	})
@@ -99,8 +101,8 @@ func testNewGatewayPod() {
 			fake.FailOnAction(&t.client.Fake, "pods", "patch", apierrors.NewNotFound(schema.GroupResource{}, testPodName), false)
 		})
 
-		It("should return an error", func() {
-			_, err := pod.NewGatewayPod(context.TODO(), t.client)
+		It("should return an error", NodeTimeout(5*time.Second), func(ctx context.Context) {
+			_, err := pod.NewGatewayPod(ctx, t.client)
 			Expect(err).To(HaveOccurred())
 		})
 	})
@@ -119,10 +121,10 @@ func testSetHALabels() {
 	})
 
 	When("setting HA status to active", func() {
-		It("should update the pod labels successfully", func() {
-			err := gatewayPod.SetHALabels(context.TODO(), submarinerv1.HAStatusActive)
+		It("should update the pod labels successfully", NodeTimeout(5*time.Second), func(ctx context.Context) {
+			err := gatewayPod.SetHALabels(ctx, submarinerv1.HAStatusActive)
 			Expect(err).To(Succeed())
-			t.verifyPodLabels(submarinerv1.HAStatusActive)
+			t.verifyPodLabels(ctx, submarinerv1.HAStatusActive)
 		})
 	})
 
@@ -139,44 +141,40 @@ func testSetHALabels() {
 			})
 		})
 
-		It("should retry and eventually succeed", func() {
-			err := gatewayPod.SetHALabels(context.TODO(), submarinerv1.HAStatusActive)
+		It("should retry and eventually succeed", NodeTimeout(5*time.Second), func(ctx context.Context) {
+			err := gatewayPod.SetHALabels(ctx, submarinerv1.HAStatusActive)
 			Expect(err).To(Succeed())
-			t.verifyPodLabels(submarinerv1.HAStatusActive)
+			t.verifyPodLabels(ctx, submarinerv1.HAStatusActive)
 		})
 	})
 
-	When("the patch operation initially returns a transient error", func() {
-		JustBeforeEach(func() {
-			fake.FailOnAction(&t.client.Fake, "pods", "patch", apierrors.NewServerTimeout(schema.GroupResource{}, "patch", 1), true)
-		})
+	DescribeTableSubtree("the patch operation initially returns error",
+		func(retErr error) {
+			JustBeforeEach(func() {
+				fake.FailOnAction(&t.client.Fake, "pods", "patch", retErr, true)
+			})
 
-		It("should retry and eventually succeed", func() {
-			err := gatewayPod.SetHALabels(context.TODO(), submarinerv1.HAStatusActive)
-			Expect(err).To(Succeed())
-			t.verifyPodLabels(submarinerv1.HAStatusActive)
-		})
-	})
+			It("should retry and eventually succeed", NodeTimeout(5*time.Second), func(ctx context.Context) {
+				err := gatewayPod.SetHALabels(ctx, submarinerv1.HAStatusActive)
+				Expect(err).To(Succeed())
+				t.verifyPodLabels(ctx, submarinerv1.HAStatusActive)
+			})
+		},
+		Entry("ServerTimeout", apierrors.NewServerTimeout(schema.GroupResource{}, "patch", 1)),
+		Entry("InternalError", apierrors.NewInternalError(errors.New("internal error"))),
+		Entry("ServiceUnavailable", apierrors.NewServiceUnavailable("etcdserver: request timed out")),
+		Entry("TimeoutError", apierrors.NewTimeoutError("request timed out", 1)),
+		Entry("TooManyRequests", apierrors.NewTooManyRequests("too many requests", 1)),
+	)
 
-	When("the patch operation returns a non-transient error", func() {
-		JustBeforeEach(func() {
-			fake.FailOnAction(&t.client.Fake, "pods", "patch", apierrors.NewNotFound(schema.GroupResource{}, testPodName), false)
-		})
-
-		It("should return an error without retrying", func() {
-			err := gatewayPod.SetHALabels(context.TODO(), submarinerv1.HAStatusActive)
-			Expect(err).To(HaveOccurred())
-		})
-	})
-
-	When("multiple transient errors occur", func() {
+	When("persistent errors occur", func() {
 		JustBeforeEach(func() {
 			fake.FailOnAction(&t.client.Fake, "pods", "patch", apierrors.NewServerTimeout(schema.GroupResource{}, "patch", 1), false)
 		})
 
 		Context("and the context is cancelled", func() {
-			It("should return an error", func() {
-				ctx, cancel := context.WithCancel(context.Background())
+			It("should return an error", func(parentCtx context.Context) {
+				ctx, cancel := context.WithCancel(parentCtx)
 
 				go func() {
 					time.Sleep(350 * time.Millisecond)
@@ -185,49 +183,49 @@ func testSetHALabels() {
 
 				err := gatewayPod.SetHALabels(ctx, submarinerv1.HAStatusActive)
 				Expect(err).To(HaveOccurred())
-				Expect(err).To(Equal(ctx.Err()))
+				Expect(err).To(ContainErrorSubstring(ctx.Err()))
 			})
 		})
 
 		Context("and the context times out", func() {
-			It("should return an error", func() {
-				ctx, cancel := context.WithTimeout(context.Background(), 350*time.Millisecond)
+			It("should return an error", func(parentCtx context.Context) {
+				ctx, cancel := context.WithTimeout(parentCtx, 350*time.Millisecond)
 				defer cancel()
 
 				err := gatewayPod.SetHALabels(ctx, submarinerv1.HAStatusActive)
 				Expect(err).To(HaveOccurred())
-				Expect(err).To(Equal(ctx.Err()))
+				Expect(err).To(ContainErrorSubstring(ctx.Err()))
 			})
 		})
 	})
 
-	When("multiple transient errors occur with different error messages", func() {
+	When("errors initially occur that exhaust the first backoff cycle", func() {
+		BeforeEach(func() {
+			originalBackOffCap := pod.BackOffCap
+			pod.BackOffCap = 500 * time.Millisecond
+
+			DeferCleanup(func() {
+				pod.BackOffCap = originalBackOffCap
+			})
+		})
+
 		JustBeforeEach(func() {
-			attemptCount := 0
-			errorMessages := []string{
-				"first transient error",
-				"first transient error", // Repeat to test duplicate consecutive message suppression
-				"second transient error",
-				"first transient error",
-			}
+			startTime := time.Now()
 
 			t.client.Fake.PrependReactor("patch", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
-				if attemptCount < len(errorMessages) {
-					err := apierrors.NewTooManyRequests(errorMessages[attemptCount], 1)
-					attemptCount++
-
-					return true, nil, err
+				// Fail for the first 1 second, then succeed
+				if time.Since(startTime) < time.Second {
+					return true, nil, errors.New("mock error")
 				}
 
 				return false, nil, nil
 			})
 		})
 
-		It("should log each unique error message only once", func() {
-			// For now, log output is visually inspected. A future enhancement would be to implement a log sink that captures output.
-			err := gatewayPod.SetHALabels(context.TODO(), submarinerv1.HAStatusActive)
+		It("should retry with a fresh backoff and eventually succeed", NodeTimeout(5*time.Second), func(ctx context.Context) {
+			err := gatewayPod.SetHALabels(ctx, submarinerv1.HAStatusActive)
 			Expect(err).To(Succeed())
-			t.verifyPodLabels(submarinerv1.HAStatusActive)
+			t.verifyPodLabels(ctx, submarinerv1.HAStatusActive)
 		})
 	})
 }
@@ -240,9 +238,15 @@ func newTestDriver() *testDriver {
 	t := &testDriver{}
 
 	BeforeEach(func() {
-		os.Setenv("SUBMARINER_NAMESPACE", testNamespace)
-		os.Setenv("NODE_NAME", testNodeName)
-		os.Setenv("POD_NAME", testPodName)
+		_ = os.Setenv("SUBMARINER_NAMESPACE", testNamespace)
+		_ = os.Setenv("NODE_NAME", testNodeName)
+		_ = os.Setenv("POD_NAME", testPodName)
+
+		DeferCleanup(func() {
+			_ = os.Unsetenv("SUBMARINER_NAMESPACE")
+			_ = os.Unsetenv("NODE_NAME")
+			_ = os.Unsetenv("POD_NAME")
+		})
 
 		t.client = k8sfake.NewClientset(&corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -252,17 +256,11 @@ func newTestDriver() *testDriver {
 		})
 	})
 
-	AfterEach(func() {
-		os.Unsetenv("SUBMARINER_NAMESPACE")
-		os.Unsetenv("NODE_NAME")
-		os.Unsetenv("POD_NAME")
-	})
-
 	return t
 }
 
-func (t *testDriver) verifyPodLabels(status submarinerv1.HAStatus) {
-	updatedPod, err := t.client.CoreV1().Pods(testNamespace).Get(context.TODO(), testPodName, metav1.GetOptions{})
+func (t *testDriver) verifyPodLabels(ctx context.Context, status submarinerv1.HAStatus) {
+	updatedPod, err := t.client.CoreV1().Pods(testNamespace).Get(ctx, testPodName, metav1.GetOptions{})
 	Expect(err).To(Succeed())
 	Expect(updatedPod.Labels).To(HaveKeyWithValue(pod.GatewayStatusLabel, string(status)))
 	Expect(updatedPod.Labels).To(HaveKeyWithValue(pod.GatewayNodeLabel, testNodeName))
