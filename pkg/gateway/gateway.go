@@ -221,10 +221,7 @@ func (g *gatewayType) Run(ctx context.Context) error {
 	case <-ctx.Done():
 	case fatalErr := <-g.fatalError:
 		g.cableEngineSyncer.SetGatewayStatusError(ctx, fatalErr)
-
-		if err := g.gatewayPod.SetHALabels(ctx, subv1.HAStatusPassive); err != nil {
-			logger.Warningf("Error updating pod label: %s", err)
-		}
+		g.updateGatewayHAStatus(ctx, subv1.HAStatusPassive)
 
 		return fatalErr
 	}
@@ -237,9 +234,7 @@ func (g *gatewayType) Run(ctx context.Context) error {
 	defer cancel()
 
 	//nolint:contextcheck // Ignore "Non-inherited new context" - can't use ctx b/c it's already cancelled.
-	if err := g.gatewayPod.SetHALabels(timeoutCtx, subv1.HAStatusPassive); err != nil {
-		logger.Warningf("Error updating pod label to passive on shutdown: %s", err)
-	}
+	g.updateGatewayHAStatus(timeoutCtx, subv1.HAStatusPassive)
 
 	logger.Info("Gateway engine stopped")
 
@@ -361,8 +356,8 @@ func (g *gatewayType) onStoppedLeading(ctx context.Context) {
 }
 
 func (g *gatewayType) updateGatewayHAStatus(ctx context.Context, status subv1.HAStatus) {
-	if err := g.gatewayPod.SetHALabels(ctx, status); err != nil && !errors.Is(err, context.Canceled) {
-		logger.Errorf(err, "Failed to update Gateway pod HA status to %q", status)
+	if err := g.gatewayPod.SetHALabels(ctx, status); err != nil {
+		logger.Error(err, "")
 	}
 }
 
