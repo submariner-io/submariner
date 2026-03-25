@@ -26,7 +26,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/admiral/pkg/resource"
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -80,7 +79,11 @@ func NewGatewayPod(ctx context.Context, k8sClient kubernetes.Interface) (*Gatewa
 	return gp, nil
 }
 
-var patchFormat = fmt.Sprintf(`{"metadata": {"labels": {%q: "%%s", %q: "%%s"}}}`, GatewayNodeLabel, GatewayStatusLabel)
+var (
+	BackOffCap = 5 * time.Second
+
+	patchFormat = fmt.Sprintf(`{"metadata": {"labels": {%q: "%%s", %q: "%%s"}}}`, GatewayNodeLabel, GatewayStatusLabel)
+)
 
 func (gp *GatewayPod) SetHALabels(ctx context.Context, status submV1.HAStatus) error {
 	logger.Infof("Updating Gateway pod HA status to %q", status)
@@ -88,30 +91,52 @@ func (gp *GatewayPod) SetHALabels(ctx context.Context, status submV1.HAStatus) e
 	podsInterface := gp.clientset.CoreV1().Pods(gp.namespace)
 	patch := fmt.Sprintf(patchFormat, gp.node, status)
 
-	var lastErrMsg string
-
-	err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (bool, error) {
-		_, err := podsInterface.Patch(ctx, gp.name, types.MergePatchType, []byte(patch), v1.PatchOptions{})
-		if err != nil {
-			if resource.IsTransientErr(err) || apierrors.IsConflict(err) {
-				errMsg := err.Error()
-				if errMsg != lastErrMsg {
-					lastErrMsg = errMsg
-
-					logger.Warningf("Error updating Gateway pod HA status to %q: %v - retrying...", status, err)
-				}
-
-				return false, nil
-			}
-
-			return false, errors.Wrapf(err, "error patching own pod %q in namespace %q with %s", gp.name, gp.namespace, patch)
-		}
-
-		return true, nil
-	})
-	if err == nil {
-		logger.Infof("Successfully updated Gateway pod HA status to %q", status)
+	backoff := wait.Backoff{
+		Steps:    10,
+		Duration: 100 * time.Millisecond,
+		Factor:   2.0,
+		Cap:      BackOffCap,
 	}
 
-	return err //nolint:wrapcheck // No need to wrap
+	logRetryWarning := func(err error) {
+		logger.Warningf("Error updating Gateway pod %q HA status to %q: %v - retrying...", gp.name, status, err)
+	}
+
+	// Retry indefinitely with exponential backoff until success or context cancellation
+	for {
+		var lastError error
+
+		err := wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (bool, error) {
+			_, err := podsInterface.Patch(ctx, gp.name, types.MergePatchType, []byte(patch), v1.PatchOptions{})
+			if apierrors.IsNotFound(err) {
+				return false, err //nolint:wrapcheck // No need to wrap
+			}
+
+			if err == nil {
+				return true, nil
+			}
+
+			if lastError == nil || err.Error() != lastError.Error() {
+				logRetryWarning(err)
+			}
+
+			lastError = err
+
+			return false, nil
+		})
+
+		// If succeeded, return nil
+		if err == nil {
+			logger.Infof("Successfully updated Gateway pod %q HA status to %q", gp.name, status)
+			return nil
+		}
+
+		// If context was cancelled or deadline exceeded or pod not found, return the error
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || apierrors.IsNotFound(err) {
+			return errors.Wrapf(err, "failed to update Gateway pod %q HA status to %q", gp.name, status)
+		}
+
+		// Otherwise it exhausted backoff steps, restart with fresh backoff
+		logRetryWarning(lastError)
+	}
 }
