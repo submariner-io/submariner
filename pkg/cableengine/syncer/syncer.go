@@ -280,7 +280,7 @@ func (gs *GatewaySyncer) generateGatewayObject() *v1.Gateway {
 // CleanupGatewayEntry removes this Gateway entry from the k8s API, it does not
 // propagate error up because it's a termination function that we also provide externally.
 func (gs *GatewaySyncer) CleanupGatewayEntry(ctx context.Context) {
-	hostName := gs.engine.GetLocalEndpoint().Spec.Hostname
+	hostName := resource.EnsureValidName(gs.engine.GetLocalEndpoint().Spec.Hostname)
 
 	err := gs.client.Delete(ctx, hostName, metav1.DeleteOptions{})
 	if err != nil {
