@@ -83,17 +83,18 @@ func NewGatewaySyncer(engine cableengine.Engine, client v1typed.GatewayInterface
 }
 
 func (gs *GatewaySyncer) Run(stopCh <-chan struct{}) {
-	wait.Until(gs.syncGatewayStatus, GatewayUpdateInterval, stopCh)
+	wait.UntilWithContext(wait.ContextForChannel(stopCh), gs.syncGatewayStatus, GatewayUpdateInterval)
+
 	gs.CleanupGatewayEntry(context.Background())
 
 	logger.Info("CableEngine syncer stopped")
 }
 
-func (gs *GatewaySyncer) syncGatewayStatus() {
+func (gs *GatewaySyncer) syncGatewayStatus(ctx context.Context) {
 	gs.mutex.Lock()
 	defer gs.mutex.Unlock()
 
-	gs.syncGatewayStatusSafe(context.Background())
+	gs.syncGatewayStatusSafe(ctx)
 }
 
 func (gs *GatewaySyncer) SetGatewayStatusError(ctx context.Context, err error) {
