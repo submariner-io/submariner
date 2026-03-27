@@ -322,7 +322,9 @@ func (g *gatewayType) onStartedLeading(ctx context.Context) {
 	}
 
 	if g.publicIPWatcher != nil {
-		go g.publicIPWatcher.Run(ctx)
+		g.leaderComponentsStarted.Go(func() {
+			g.publicIPWatcher.Run(ctx)
+		})
 	}
 }
 
@@ -333,7 +335,26 @@ func (g *gatewayType) onStoppedLeading(ctx context.Context) {
 	defer g.controllersMutex.Unlock()
 
 	// Make sure all the components were at least started before we try to restart.
-	g.leaderComponentsStarted.Wait()
+	done := make(chan struct{})
+
+	go func() {
+		g.leaderComponentsStarted.Wait()
+		close(done)
+	}()
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+waitLoop:
+	for {
+		select {
+		case <-done:
+			logger.Info("All leader components have finished starting")
+			break waitLoop
+		case <-ticker.C:
+			logger.Warning("Still waiting for leader components to finish starting...")
+		}
+	}
 
 	if g.cableHealthChecker != nil {
 		g.cableHealthChecker.Stop()
