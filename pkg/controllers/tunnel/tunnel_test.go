@@ -41,7 +41,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	fakeClient "k8s.io/client-go/dynamic/fake"
 	kubeScheme "k8s.io/client-go/kubernetes/scheme"
@@ -62,11 +61,14 @@ var fakeDriver *fake.Driver
 
 var _ = BeforeSuite(func() {
 	kzerolog.InitK8sLogging()
+
 	cable.AddDriver(fake.DriverName, func(_ *submendpoint.Local, _ *types.SubmarinerCluster,
 		_ certificate.SigningRequestor,
 	) (cable.Driver, error) {
 		return fakeDriver, nil
 	})
+
+	Expect(v1.AddToScheme(kubeScheme.Scheme)).To(Succeed())
 })
 
 var _ = Describe("Managing tunnels", func() {
@@ -75,7 +77,6 @@ var _ = Describe("Managing tunnels", func() {
 		endpoints   dynamic.ResourceInterface
 		endpoint    *v1.Endpoint
 		localEPSpec *v1.EndpointSpec
-		stopCh      chan struct{}
 	)
 
 	BeforeEach(func() {
@@ -100,23 +101,7 @@ var _ = Describe("Managing tunnels", func() {
 			},
 		}
 
-		Expect(v1.AddToScheme(kubeScheme.Scheme)).To(Succeed())
-
-		scheme := runtime.NewScheme()
-		Expect(v1.AddToScheme(scheme)).To(Succeed())
-
-		client := fakeClient.NewSimpleDynamicClient(scheme)
-
-		restMapper := test.GetRESTMapperFor(&v1.Endpoint{}, &v1.Cluster{})
-		gvr := test.GetGroupVersionResourceFor(restMapper, &v1.Endpoint{})
-
-		endpoints = client.Resource(*gvr).Namespace(namespace)
-
-		config = &watcher.Config{
-			RestMapper: restMapper,
-			Client:     client,
-			Scheme:     scheme,
-		}
+		config = &watcher.Config{}
 	})
 
 	JustBeforeEach(func() {
@@ -131,15 +116,23 @@ var _ = Describe("Managing tunnels", func() {
 
 		Expect(engine.StartEngine(context.TODO(), fakecertificate.NewSigningRequestor())).To(Succeed())
 
-		stopCh = make(chan struct{})
+		stopCh := make(chan struct{})
+
+		DeferCleanup(func() {
+			close(stopCh)
+		})
+
+		client := fakeClient.NewSimpleDynamicClient(kubeScheme.Scheme, endpoint)
+
+		restMapper := test.GetRESTMapperFor(&v1.Endpoint{}, &v1.Cluster{})
+		gvr := test.GetGroupVersionResourceFor(restMapper, &v1.Endpoint{})
+
+		endpoints = client.Resource(*gvr).Namespace(namespace)
+
+		config.RestMapper = restMapper
+		config.Client = client
 
 		Expect(tunnel.StartController(engine, namespace, config, stopCh)).To(Succeed())
-
-		test.CreateResource(endpoints, endpoint)
-	})
-
-	AfterEach(func() {
-		close(stopCh)
 	})
 
 	verifyConnectToEndpoint := func(family k8snet.IPFamily) {
