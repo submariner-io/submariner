@@ -35,7 +35,7 @@ type Interface struct {
 
 type HostInterface struct {
 	Name string
-	Addr string
+	Addr net.IP
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("CNI")}
@@ -55,7 +55,12 @@ var HostInterfaces = func() ([]HostInterface, error) {
 		}
 
 		for _, a := range addrs {
-			hostInterfaces = append(hostInterfaces, HostInterface{Name: netInterfaces[i].Name, Addr: a.String()})
+			ipNet, ok := a.(*net.IPNet)
+			if !ok {
+				continue
+			}
+
+			hostInterfaces = append(hostInterfaces, HostInterface{Name: netInterfaces[i].Name, Addr: ipNet.IP})
 		}
 	}
 
@@ -77,21 +82,16 @@ func Discover(clusterCIDRs []string, family k8snet.IPFamily) (*Interface, error)
 		utilruntime.Must(errors.Wrapf(err, "unable to ParseCIDR %q", clusterCIDR))
 
 		for i := range hostInterfaces {
-			ipAddr, _, err := net.ParseCIDR(hostInterfaces[i].Addr)
-			if err != nil {
-				logger.Errorf(err, "Unable to parse CIDR %q for host interface %q", hostInterfaces[i].Addr, hostInterfaces[i].Name)
-				continue
-			}
+			ipAddr := hostInterfaces[i].Addr
 
 			if k8snet.IPFamilyOf(ipAddr) != family {
 				continue
 			}
 
 			logger.V(log.DEBUG).Infof("Host interface %q has address %q", hostInterfaces[i].Name, ipAddr)
-			address := net.ParseIP(ipAddr.String())
 
 			// Verify that interface has an address from cluster CIDR
-			if clusterNetwork.Contains(address) {
+			if clusterNetwork.Contains(ipAddr) {
 				logger.V(log.DEBUG).Infof("Found CNI Interface %q that has IP %q from ClusterCIDR %q",
 					hostInterfaces[i].Name, ipAddr, clusterCIDR)
 

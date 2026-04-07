@@ -87,7 +87,7 @@ var _ = BeforeSuite(func() {
 	cni.HostInterfaces = func() ([]cni.HostInterface, error) {
 		return []cni.HostInterface{{
 			Name: "veth0",
-			Addr: cniInterfaceIP + "/24",
+			Addr: net.ParseIP(cniInterfaceIP),
 		}}, nil
 	}
 

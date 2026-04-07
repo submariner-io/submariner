@@ -20,6 +20,7 @@ package cni_test
 
 import (
 	"errors"
+	"net"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -39,17 +40,17 @@ const (
 var (
 	v4HostInterface1 = cni.HostInterface{
 		Name: "v4-iface1",
-		Addr: ipV4CIDR1,
+		Addr: net.ParseIP(ipV4Addr1),
 	}
 
 	v4HostInterface2 = cni.HostInterface{
 		Name: "v4-iface2",
-		Addr: ipV4CIDR2,
+		Addr: net.ParseIP(ipV4Addr2),
 	}
 
 	v6HostInterface = cni.HostInterface{
 		Name: "v6-iface",
-		Addr: ipV6CIDR,
+		Addr: net.ParseIP(ipV6Addr),
 	}
 )
 
@@ -99,20 +100,6 @@ var _ = Describe("Discover", func() {
 
 			_, err := cni.Discover([]string{ipV4CIDR2}, k8snet.IPv4)
 			Expect(err).To(HaveOccurred())
-		})
-	})
-
-	When("the address for a host interface is not a CIDR", func() {
-		It("should ignore it", func() {
-			setupHostInterfaces(cni.HostInterface{
-				Name: "no-cidr",
-				Addr: "1.1.1.1",
-			}, v4HostInterface1)
-
-			cniInterface, err := cni.Discover([]string{ipV4CIDR1}, k8snet.IPv4)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(cniInterface.Name).To(Equal(v4HostInterface1.Name))
-			Expect(cniInterface.IPAddress).To(Equal(ipV4Addr1))
 		})
 	})
 

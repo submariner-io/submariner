@@ -89,7 +89,7 @@ var _ = Describe("", func() {
 		cni.HostInterfaces = func() ([]cni.HostInterface, error) {
 			return []cni.HostInterface{{
 				Name: "veth0",
-				Addr: localClusterCIDRs[0],
+				Addr: net.ParseIP("10.1.0.0"),
 			}}, nil
 		}
 

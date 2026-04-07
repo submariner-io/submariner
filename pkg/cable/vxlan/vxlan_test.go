@@ -269,11 +269,11 @@ func newTestDriver() *testDriver {
 			return []cni.HostInterface{
 				{
 					Name: "veth0",
-					Addr: cniIPAddress + "/24",
+					Addr: net.ParseIP(cniIPAddress),
 				},
 				{
 					Name: "veth0",
-					Addr: cniIPv6Address + "/64",
+					Addr: net.ParseIP(cniIPv6Address),
 				},
 			}, nil
 		}

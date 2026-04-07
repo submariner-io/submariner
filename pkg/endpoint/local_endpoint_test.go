@@ -96,11 +96,11 @@ var _ = Describe("GetLocalSpec", func() {
 			return []cni.HostInterface{
 				{
 					Name: "veth0",
-					Addr: ipv4CIDR,
+					Addr: net.ParseIP(cniInterfaceIPv4),
 				},
 				{
 					Name: "veth1",
-					Addr: ipv6CIDR,
+					Addr: net.ParseIP(cniInterfaceIPv6),
 				},
 			}, nil
 		}

@@ -116,11 +116,11 @@ func newTestDriver() *testDriver {
 			return []cni.HostInterface{
 				{
 					Name: "veth0",
-					Addr: localClusterIPv4CIDR,
+					Addr: net.ParseIP(cniIP4Address),
 				},
 				{
 					Name: "veth1",
-					Addr: localClusterIPv6CIDR,
+					Addr: net.ParseIP(cniIP6Address),
 				},
 			}, nil
 		}

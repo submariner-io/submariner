@@ -113,8 +113,9 @@ func getValidGlobalIPv6FromSameInterface(ip net.IP) (string, error) {
 	var ownedIfaceName string
 
 	for i := range hostInterfaces {
-		actualIP, _, err := net.ParseCIDR(hostInterfaces[i].Addr)
-		if err != nil || k8snet.IPFamilyOf(actualIP) != k8snet.IPv6 {
+		actualIP := hostInterfaces[i].Addr
+
+		if k8snet.IPFamilyOf(actualIP) != k8snet.IPv6 {
 			continue
 		}
 

@@ -135,7 +135,7 @@ var _ = Describe("GetLocalIP", func() {
 						return []cni.HostInterface{
 							{
 								Name: "v6-owns",
-								Addr: "fe80::14b:b63:c7e1:1558/64",
+								Addr: net.ParseIP("fe80::14b:b63:c7e1:1558"),
 							},
 						}, nil
 					}
@@ -150,28 +150,24 @@ var _ = Describe("GetLocalIP", func() {
 					cni.HostInterfaces = func() ([]cni.HostInterface, error) {
 						return []cni.HostInterface{
 							{
-								Name: "not-a-cidr",
-								Addr: "not-a-cidr",
-							},
-							{
 								Name: "v4",
-								Addr: "10.34.1.0/24",
+								Addr: net.ParseIP("10.34.1.0"),
 							},
 							{
 								Name: "v6-not-owns",
-								Addr: "ff00::1/8",
+								Addr: net.ParseIP("ff00::1"),
 							},
 							{
 								Name: "v6-other",
-								Addr: "2001::14b:b63:c7e1:123/64",
+								Addr: net.ParseIP("2001::14b:b63:c7e1:123"),
 							},
 							{
 								Name: "v6-owns",
-								Addr: "fe80::14b:b63:c7e1:1558/64",
+								Addr: net.ParseIP("fe80::14b:b63:c7e1:1558"),
 							},
 							{
 								Name: "v6-owns",
-								Addr: "fc00::14b:b63:c7e1:aaa/8",
+								Addr: net.ParseIP("fc00::14b:b63:c7e1:aaa"),
 							},
 						}, nil
 					}
