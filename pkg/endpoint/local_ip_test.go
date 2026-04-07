@@ -72,7 +72,9 @@ var _ = Describe("GetLocalIP", func() {
 	Context("IPv4", func() {
 		When("Dial succeeds", func() {
 			It("should return the IP", func() {
-				Expect(endpoint.GetLocalIP(k8snet.IPv4)).To(Equal(ipv4DialIP))
+				ip, err := endpoint.GetLocalIP(k8snet.IPv4)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(ip).To(Equal(ipv4DialIP))
 			})
 		})
 
@@ -81,16 +83,30 @@ var _ = Describe("GetLocalIP", func() {
 				endpoint.Dial = func(_, _ string) (net.Conn, error) {
 					return nil, errors.New("mock error")
 				}
-
-				Expect(netLink.RouteAdd(&netlink.Route{
-					LinkIndex: 1,
-					Src:       net.ParseIP(ipv4RouteIP),
-					Gw:        net.ParseIP("1.2.0.0"),
-				})).To(Succeed())
 			})
 
-			It("should return a route local IP", func() {
-				Expect(endpoint.GetLocalIP(k8snet.IPv4)).To(Equal(ipv4RouteIP))
+			Context("and route lookup succeeds", func() {
+				BeforeEach(func() {
+					Expect(netLink.RouteAdd(&netlink.Route{
+						LinkIndex: 1,
+						Src:       net.ParseIP(ipv4RouteIP),
+						Gw:        net.ParseIP("1.2.0.0"),
+					})).To(Succeed())
+				})
+
+				It("should return a route local IP", func() {
+					ip, err := endpoint.GetLocalIP(k8snet.IPv4)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(ip).To(Equal(ipv4RouteIP))
+				})
+			})
+
+			Context("and route lookup also fails", func() {
+				It("should return an error", func() {
+					// No routes added, so route lookup will fail
+					_, err := endpoint.GetLocalIP(k8snet.IPv4)
+					Expect(err).To(HaveOccurred())
+				})
 			})
 		})
 	})
@@ -107,7 +123,9 @@ var _ = Describe("GetLocalIP", func() {
 		When("Dial succeeds", func() {
 			Context("and the IP is usable", func() {
 				It("should return the IP", func() {
-					Expect(endpoint.GetLocalIP(k8snet.IPv6)).To(Equal(ipv6DialIP))
+					ip, err := endpoint.GetLocalIP(k8snet.IPv6)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(ip).To(Equal(ipv6DialIP))
 				})
 			})
 
@@ -126,10 +144,14 @@ var _ = Describe("GetLocalIP", func() {
 					})).To(Succeed())
 
 					ipv6DialIP = net.IPv6loopback.String()
-					Expect(endpoint.GetLocalIP(k8snet.IPv6)).To(Equal(ipv6RouteIP))
+					ip, err := endpoint.GetLocalIP(k8snet.IPv6)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(ip).To(Equal(ipv6RouteIP))
 
 					ipv6DialIP = ipv6LinkLocalUnicast // link-local unicast address
-					Expect(endpoint.GetLocalIP(k8snet.IPv6)).To(Equal(ipv6RouteIP))
+					ip, err = endpoint.GetLocalIP(k8snet.IPv6)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(ip).To(Equal(ipv6RouteIP))
 
 					cni.HostInterfaces = func() ([]cni.HostInterface, error) {
 						return []cni.HostInterface{
@@ -141,7 +163,9 @@ var _ = Describe("GetLocalIP", func() {
 					}
 
 					ipv6DialIP = ipv6LinkLocalUnicast
-					Expect(endpoint.GetLocalIP(k8snet.IPv6)).To(Equal(ipv6RouteIP))
+					ip, err = endpoint.GetLocalIP(k8snet.IPv6)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(ip).To(Equal(ipv6RouteIP))
 				})
 			})
 
@@ -173,7 +197,9 @@ var _ = Describe("GetLocalIP", func() {
 					}
 
 					ipv6DialIP = "fe80::14b:b63:c7e1:1558"
-					Expect(endpoint.GetLocalIP(k8snet.IPv6)).To(Equal("fc00::14b:b63:c7e1:aaa"))
+					ip, err := endpoint.GetLocalIP(k8snet.IPv6)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(ip).To(Equal("fc00::14b:b63:c7e1:aaa"))
 				})
 			})
 		})

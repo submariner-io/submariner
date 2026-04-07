@@ -19,7 +19,6 @@ limitations under the License.
 package endpoint
 
 import (
-	"fmt"
 	"net"
 
 	"github.com/pkg/errors"
@@ -65,14 +64,14 @@ func getLocalIPFromRoutes(family k8snet.IPFamily) (string, error) {
 	return "", errors.Errorf("couldn't find route for family %v", family)
 }
 
-func GetLocalIPForDestination(dst string, family k8snet.IPFamily) string {
+func GetLocalIPForDestination(dst string, family k8snet.IPFamily) (string, error) {
 	conn, err := Dial("udp"+string(family), net.JoinHostPort(dst, "53"))
 	if err == nil {
 		defer conn.Close()
 
 		localAddr := conn.LocalAddr().(*net.UDPAddr)
 		if family == k8snet.IPv4 || isAcceptableIPv6(localAddr.IP) {
-			return localAddr.IP.String()
+			return localAddr.IP.String(), nil
 		}
 
 		logger.Infof("IP %q returned from Dial isn't usable - trying to find another IP from the same interface", localAddr.IP)
@@ -82,7 +81,7 @@ func GetLocalIPForDestination(dst string, family k8snet.IPFamily) string {
 		if err != nil {
 			logger.Errorf(err, "Error retrieving valid IPv6 address for %q", localAddr.IP)
 		} else if ifaceIP != "" {
-			return ifaceIP
+			return ifaceIP, nil
 		} else {
 			logger.Infof("No acceptable IPv6 found on same interface as %q, trying route-based discovery", localAddr.IP)
 		}
@@ -90,9 +89,8 @@ func GetLocalIPForDestination(dst string, family k8snet.IPFamily) string {
 
 	// connection failed try fallback method
 	localIP, err := getLocalIPFromRoutes(family)
-	logger.FatalOnError(err, fmt.Sprintf("Error getting local IPv%v", family))
 
-	return localIP
+	return localIP, errors.Wrapf(err, "error getting local IPv%v", family)
 }
 
 func isAcceptableIPv6(ip net.IP) bool {
@@ -131,6 +129,6 @@ func getValidGlobalIPv6FromSameInterface(ip net.IP) (string, error) {
 	return "", nil
 }
 
-func GetLocalIP(family k8snet.IPFamily) string {
+func GetLocalIP(family k8snet.IPFamily) (string, error) {
 	return GetLocalIPForDestination(familyToDestIP[family], family)
 }

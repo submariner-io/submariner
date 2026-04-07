@@ -44,7 +44,7 @@ type Interface interface {
 
 type (
 	udpWriteFunction         func(b []byte, addr *net.UDPAddr) (int, error)
-	FindSrcIPFunction        func(destinationIP string, family k8snet.IPFamily) string
+	FindSrcIPFunction        func(destinationIP string, family k8snet.IPFamily) (string, error)
 	CreateServerConnectionFn func(port int32, family k8snet.IPFamily) (ServerConnection, error)
 )
 

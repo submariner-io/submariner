@@ -135,6 +135,7 @@ func (l *Local) Create(ctx context.Context) error {
 	return err
 }
 
+//nolint:gocyclo // Function complexity from multiple IP families and optional features - refactoring would reduce readability
 func GetLocalSpec(ctx context.Context, submSpec *types.SubmarinerSpecification, k8sClient kubernetes.Interface,
 	airGappedDeployment bool,
 ) (*submv1.EndpointSpec, error) {
@@ -180,7 +181,12 @@ func GetLocalSpec(ctx context.Context, submSpec *types.SubmarinerSpecification, 
 	}
 
 	for _, family := range submSpec.GetIPFamilies() {
-		endpointSpec.SetPrivateIP(GetLocalIP(family))
+		privateIP, err := GetLocalIP(family)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error getting local IP for family %v", family)
+		}
+
+		endpointSpec.SetPrivateIP(privateIP)
 	}
 
 	var replacedIP string

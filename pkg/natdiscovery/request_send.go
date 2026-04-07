@@ -64,7 +64,10 @@ func (nd *natDiscovery) sendCheckRequestToTargetIP(remoteNAT *remoteEndpointNAT,
 		return err
 	}
 
-	sourceIP := nd.FindSourceIP(targetIP, remoteNAT.family)
+	sourceIP, err := nd.FindSourceIP(targetIP, remoteNAT.family)
+	if err != nil {
+		return errors.Wrapf(err, "error finding source IP for target %s", targetIP)
+	}
 
 	localEndpointSpec := nd.LocalEndpoint.Spec()
 

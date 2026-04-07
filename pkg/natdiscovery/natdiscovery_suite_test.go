@@ -224,19 +224,19 @@ func newNATDiscovery(endpoint *submarinerv1.Endpoint, addr, addrv6 *net.UDPAddr)
 
 			return nil, errors.New("unsupported IP family")
 		},
-		FindSourceIP: func(_ string, family k8snet.IPFamily) string {
+		FindSourceIP: func(_ string, family k8snet.IPFamily) (string, error) {
 			defer GinkgoRecover()
 			Expect(family).ToNot(Equal(k8snet.IPFamilyUnknown))
 
 			if family == k8snet.IPv4 {
-				return srcIP
+				return srcIP, nil
 			}
 
 			if family == k8snet.IPv6 {
-				return srcIPv6
+				return srcIPv6, nil
 			}
 
-			return ""
+			return "", errors.New("unsupported IP family")
 		},
 		RunLoop: func(_ <-chan struct{}, doCheck func()) {
 			natDiscoveryInfo.checkDiscovery = doCheck

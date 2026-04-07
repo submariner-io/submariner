@@ -163,9 +163,11 @@ var _ = Describe("GetLocalSpec", func() {
 
 		It("should set the IPv4 private IP", func() {
 			spec, err := endpoint.GetLocalSpec(context.TODO(), submSpec, client, true)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 
-			Expect(spec.GetPrivateIP(k8snet.IPv4)).To(Equal(endpoint.GetLocalIP(k8snet.IPv4)))
+			expectedIP, err := endpoint.GetLocalIP(k8snet.IPv4)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(spec.GetPrivateIP(k8snet.IPv4)).To(Equal(expectedIP))
 		})
 	})
 
@@ -202,10 +204,13 @@ var _ = Describe("GetLocalSpec", func() {
 
 		It("should set IPv6 private IP", func() {
 			spec, err := endpoint.GetLocalSpec(context.TODO(), submSpec, client, true)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
+
+			expectedIP, err := endpoint.GetLocalIP(k8snet.IPv6)
+			Expect(err).NotTo(HaveOccurred())
 
 			ipv6PrivateAddr := spec.GetPrivateIP(k8snet.IPv6)
-			Expect(ipv6PrivateAddr).To(Equal(endpoint.GetLocalIP(k8snet.IPv6)))
+			Expect(ipv6PrivateAddr).To(Equal(expectedIP))
 
 			Expect(spec.CableName).To(ContainSubstring(strings.ReplaceAll(ipv6PrivateAddr, ":", "-")))
 		})
@@ -319,6 +324,17 @@ var _ = Describe("GetLocalSpec", func() {
 				_, err := endpoint.GetLocalSpec(context.TODO(), submSpec, client, true)
 				Expect(err).To(HaveOccurred())
 			})
+		})
+	})
+
+	When("obtaining a public IP fails", func() {
+		BeforeEach(func() {
+			node.Labels[backendConfigPrefix+testPublicIPLabel] = "ipv4:"
+		})
+
+		It("should return an error", func() {
+			_, err := endpoint.GetLocalSpec(context.TODO(), submSpec, client, false)
+			Expect(err).To(HaveOccurred())
 		})
 	})
 })
