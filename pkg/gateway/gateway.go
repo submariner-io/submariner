@@ -21,7 +21,6 @@ package gateway
 import (
 	"context"
 	"os"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -29,7 +28,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/certificate"
 	"github.com/submariner-io/admiral/pkg/log"
-	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/watcher"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -47,7 +45,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/types"
 	"github.com/submariner-io/submariner/pkg/versions"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/leaderelection"
@@ -224,15 +221,20 @@ func (g *gatewayType) Run(ctx context.Context) error {
 	case <-ctx.Done():
 	case fatalErr := <-g.fatalError:
 		g.cableEngineSyncer.SetGatewayStatusError(ctx, fatalErr)
-
-		if err := g.gatewayPod.SetHALabels(ctx, subv1.HAStatusPassive); err != nil {
-			logger.Warningf("Error updating pod label: %s", err)
-		}
+		g.updateGatewayHAStatus(ctx, subv1.HAStatusPassive)
 
 		return fatalErr
 	}
 
 	waitGroup.Wait()
+
+	// Always set passive status on graceful shutdown after all components have stopped.
+	// Use a timeout context to avoid blocking shutdown indefinitely.
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	//nolint:contextcheck // Ignore "Non-inherited new context" - can't use ctx b/c it's already cancelled.
+	g.updateGatewayHAStatus(timeoutCtx, subv1.HAStatusPassive)
 
 	logger.Info("Gateway engine stopped")
 
@@ -320,7 +322,9 @@ func (g *gatewayType) onStartedLeading(ctx context.Context) {
 	}
 
 	if g.publicIPWatcher != nil {
-		go g.publicIPWatcher.Run(ctx)
+		g.leaderComponentsStarted.Go(func() {
+			g.publicIPWatcher.Run(ctx)
+		})
 	}
 }
 
@@ -331,7 +335,26 @@ func (g *gatewayType) onStoppedLeading(ctx context.Context) {
 	defer g.controllersMutex.Unlock()
 
 	// Make sure all the components were at least started before we try to restart.
-	g.leaderComponentsStarted.Wait()
+	done := make(chan struct{})
+
+	go func() {
+		g.leaderComponentsStarted.Wait()
+		close(done)
+	}()
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+waitLoop:
+	for {
+		select {
+		case <-done:
+			logger.Info("All leader components have finished starting")
+			break waitLoop
+		case <-ticker.C:
+			logger.Warning("Still waiting for leader components to finish starting...")
+		}
+	}
 
 	if g.cableHealthChecker != nil {
 		g.cableHealthChecker.Stop()
@@ -354,31 +377,8 @@ func (g *gatewayType) onStoppedLeading(ctx context.Context) {
 }
 
 func (g *gatewayType) updateGatewayHAStatus(ctx context.Context, status subv1.HAStatus) {
-	logger.Infof("Updating Gateway pod HA status to %q", status)
-
-	var lastErrMsg string
-
-	err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (bool, error) {
-		err := g.gatewayPod.SetHALabels(ctx, status)
-		if resource.IsTransientErr(err) {
-			errMsg := err.Error()
-			if !reflect.DeepEqual(errMsg, lastErrMsg) {
-				lastErrMsg = errMsg
-
-				logger.Warningf("Error updating Gateway pod HA status to %q: %v - retrying...", status, err)
-			}
-
-			return false, nil
-		}
-
-		return err == nil, errors.Wrapf(err, "error updating Gateway pod HA status to %q", status)
-	})
-	if !errors.Is(err, context.Canceled) {
-		if err == nil {
-			logger.Infof("Successfully updated Gateway pod HA status to %q", status)
-		} else {
-			logger.Errorf(err, "")
-		}
+	if err := g.gatewayPod.SetHALabels(ctx, status); err != nil {
+		logger.Error(err, "")
 	}
 }
 

@@ -16,36 +16,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package endpoint_test
+package pod_test
 
 import (
-	"fmt"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
-	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/kubernetes/scheme"
 )
 
 func init() {
 	kzerolog.AddFlags(nil)
-	utilruntime.Must(submarinerv1.AddToScheme(scheme.Scheme))
 }
 
 var _ = BeforeSuite(func() {
 	kzerolog.InitK8sLogging()
-
-	log.Exit = func(code int) {
-		defer GinkgoRecover()
-		Fail(fmt.Sprintf("Exited with code %d", code))
-	}
 })
 
-func TestEndpoint(t *testing.T) {
+func TestPod(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Endpoint Suite")
+	RunSpecs(t, "Pod Suite")
 }

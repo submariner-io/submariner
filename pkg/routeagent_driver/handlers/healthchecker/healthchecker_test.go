@@ -373,7 +373,7 @@ func newTestDriver() *testDriver {
 		t.supportedIPFamilies = []k8snet.IPFamily{k8snet.IPv4}
 		t.healthcheckerEnabled = true
 
-		t.submClient = fakeClient.NewSimpleClientset() //nolint:staticcheck // NewClientset fails with a schema error
+		t.submClient = fakeClient.NewSimpleClientset()
 
 		dynamicClient := dynamicfake.NewSimpleDynamicClient(kubeScheme.Scheme)
 

@@ -195,7 +195,7 @@ func GetLocalSpec(ctx context.Context, submSpec *types.SubmarinerSpecification, 
 	endpointSpec.CableName = fmt.Sprintf("submariner-cable-%s-%s", submSpec.ClusterID, replacedIP)
 
 	for _, family := range submSpec.GetIPFamilies() {
-		publicIP, resolver, err := GetPublicIP(family, submSpec, k8sClient, backendConfig, airGappedDeployment)
+		publicIP, resolver, err := GetPublicIP(ctx, family, submSpec, k8sClient, backendConfig, airGappedDeployment)
 		if err != nil {
 			return nil, errors.Wrapf(err, "could not determine public IPv%v", family)
 		}

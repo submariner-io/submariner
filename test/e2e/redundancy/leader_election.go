@@ -84,17 +84,19 @@ func testLeaderElectionFailover(f *subFramework.Framework, supportedFamilies []k
 	framework.By(fmt.Sprintf("Ensure Gateway %q is updated to passive", gateway.Name))
 	f.AwaitGatewaysWithStatus(cluster, subv1.HAStatusPassive)
 
-	for _, ipFamily := range supportedFamilies {
-		subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
-			Framework:             f.Framework,
-			FromCluster:           framework.ClusterA,
-			FromClusterScheduling: framework.NonGatewayNode,
-			ToCluster:             framework.ClusterB,
-			ToClusterScheduling:   framework.NonGatewayNode,
-			ToEndpointType:        defaultEndpointType(),
-			Networking:            framework.PodNetworking,
-			IPFamily:              ipFamily,
-		}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
+	if !framework.TestContext.SkipIntraClusterConnectivityTests {
+		for _, ipFamily := range supportedFamilies {
+			subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
+				Framework:             f.Framework,
+				FromCluster:           framework.ClusterA,
+				FromClusterScheduling: framework.NonGatewayNode,
+				ToCluster:             framework.ClusterB,
+				ToClusterScheduling:   framework.NonGatewayNode,
+				ToEndpointType:        defaultEndpointType(),
+				Networking:            framework.PodNetworking,
+				IPFamily:              ipFamily,
+			}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
+		}
 	}
 
 	framework.By("Updating submariner-gateway Role to add Lease update permission")

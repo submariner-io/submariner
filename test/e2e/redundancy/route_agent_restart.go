@@ -111,6 +111,11 @@ func testRouteAgentRestart(f *subFramework.Framework, onGateway bool, supportedF
 		}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
 	}
 
+	if framework.TestContext.SkipIntraClusterConnectivityTests {
+		framework.Skipf("Skipping non-gateway TCP test as intra-cluster routing is disabled")
+		return
+	}
+
 	framework.By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
 
 	for _, ipFamily := range supportedFamilies {

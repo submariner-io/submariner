@@ -27,6 +27,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/fake"
 	"github.com/submariner-io/admiral/pkg/ipam"
 	"github.com/submariner-io/admiral/pkg/syncer"
+	testutil "github.com/submariner-io/admiral/pkg/test"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/chains"
 	"github.com/submariner-io/submariner/pkg/globalnet/controllers"
@@ -571,6 +572,8 @@ func (t *globalIngressIPControllerTestDriver) start() syncer.Interface {
 	t.controller = controller
 
 	Expect(t.controller.Start()).To(Succeed())
+
+	testutil.AwaitWatchAction(&t.dynClient.Fake, "globalingressips")
 
 	return controller.GetSyncer()
 }
