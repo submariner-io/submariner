@@ -40,7 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/utils/ptr"
 )
 
 func NewGlobalIngressIPController(ctx context.Context, config *syncer.ResourceSyncerConfig, pool *ipam.IPPool,
@@ -298,7 +297,7 @@ func (c *globalIngressIPController) createOrUpdateInternalService(ctx context.Co
 			Ports:                    from.Spec.Ports,
 			Selector:                 from.Spec.Selector,
 			ExternalIPs:              []string{extIP},
-			IPFamilyPolicy:           ptr.To(corev1.IPFamilyPolicySingleStack),
+			IPFamilyPolicy:           new(corev1.IPFamilyPolicySingleStack),
 			PublishNotReadyAddresses: from.Spec.PublishNotReadyAddresses,
 		},
 	}

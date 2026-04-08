@@ -40,7 +40,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/utils/ptr"
 )
 
 func NewClusterGlobalEgressIPController(ctx context.Context, config *syncer.ResourceSyncerConfig, localSubnets []string,
@@ -68,7 +67,7 @@ func NewClusterGlobalEgressIPController(ctx context.Context, config *syncer.Reso
 			Name: constants.ClusterGlobalEgressIPName,
 		},
 		Spec: submarinerv1.ClusterGlobalEgressIPSpec{
-			NumberOfIPs: ptr.To(DefaultNumberOfClusterEgressIPs),
+			NumberOfIPs: new(DefaultNumberOfClusterEgressIPs),
 		},
 	}
 
