@@ -39,7 +39,7 @@ var _ = PDescribe("[expansion] Test expanding/shrinking an existing cluster flee
 		framework.By(fmt.Sprintf("Verifying no GW nodes are present on cluster %q", clusterCName))
 
 		gatewayNode := framework.FindGatewayNodes(ctx, framework.ClusterC)
-		Expect(gatewayNode).To(BeEmpty(), fmt.Sprintf("Expected no gateway node on %q", framework.ClusterC))
+		Expect(gatewayNode).To(BeEmpty(), fmt.Sprintf("Expected no gateway node on cluster %d", framework.ClusterC))
 
 		framework.By(fmt.Sprintf("Verifying that a pod in cluster %q cannot connect to a pod in cluster %q", clusterAName, clusterCName))
 		tcp.RunNoConnectivityTest(ctx, &tcp.ConnectivityTestParams{
