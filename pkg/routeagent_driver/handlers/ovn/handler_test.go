@@ -47,7 +47,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8snet "k8s.io/utils/net"
-	"k8s.io/utils/ptr"
 )
 
 const (
@@ -432,7 +431,7 @@ func (t *handlerTestDriver) testGatewayRoute(ipFamilySubnets []string, nonIPFami
 			for _, cidr := range gwRoute.RoutePolicySpec.RemoteCIDRs {
 				t.ovsdbClient.AwaitModel(&nbdb.LogicalRouterPolicy{
 					Match:   cidr,
-					Nexthop: ptr.To(gwRoute.RoutePolicySpec.NextHops[0]),
+					Nexthop: new(gwRoute.RoutePolicySpec.NextHops[0]),
 				})
 
 				t.ovsdbClient.AwaitModel(&nbdb.LogicalRouterStaticRoute{
@@ -445,7 +444,7 @@ func (t *handlerTestDriver) testGatewayRoute(ipFamilySubnets []string, nonIPFami
 			for _, cidr := range gwRoute.RoutePolicySpec.RemoteCIDRs {
 				t.ovsdbClient.AwaitNoModel(&nbdb.LogicalRouterPolicy{
 					Match:   cidr,
-					Nexthop: ptr.To(gwRoute.RoutePolicySpec.NextHops[0]),
+					Nexthop: new(gwRoute.RoutePolicySpec.NextHops[0]),
 				})
 
 				t.ovsdbClient.AwaitNoModel(&nbdb.LogicalRouterStaticRoute{
@@ -543,7 +542,7 @@ func (t *handlerTestDriver) testGatewayRoute(ipFamilySubnets []string, nonIPFami
 				Priority:    priority,
 				Match:       ipMatchField + " == " + t.clusterCIDR,
 				Action:      "reroute",
-				Nexthop:     ptr.To(t.OVNK8sMgmntIntCIDR[t.ipFamily].IP.String()),
+				Nexthop:     new(t.OVNK8sMgmntIntCIDR[t.ipFamily].IP.String()),
 				ExternalIDs: map[string]string{}, // No submariner tag
 			}
 
@@ -608,7 +607,7 @@ func (t *handlerTestDriver) testNonGatewayRoutes(ipFamilyNextHop string, ipFamil
 			for _, cidr := range ngr.RoutePolicySpec.RemoteCIDRs {
 				t.ovsdbClient.AwaitModel(&nbdb.LogicalRouterPolicy{
 					Match:   cidr,
-					Nexthop: ptr.To(nextHop),
+					Nexthop: new(nextHop),
 				})
 			}
 		}
@@ -617,7 +616,7 @@ func (t *handlerTestDriver) testNonGatewayRoutes(ipFamilyNextHop string, ipFamil
 			for _, cidr := range ngr.RoutePolicySpec.RemoteCIDRs {
 				t.ovsdbClient.AwaitNoModel(&nbdb.LogicalRouterPolicy{
 					Match:   cidr,
-					Nexthop: ptr.To(nextHop),
+					Nexthop: new(nextHop),
 				})
 			}
 		}
@@ -704,7 +703,7 @@ func (t *handlerTestDriver) testNonGatewayRoutes(ipFamilyNextHop string, ipFamil
 			for _, cidr := range nonIPFamilyCIDRs {
 				t.ovsdbClient.EnsureNoModel(&nbdb.LogicalRouterPolicy{
 					Match:   cidr,
-					Nexthop: ptr.To(nonIPFamilyNextHop),
+					Nexthop: new(nonIPFamilyNextHop),
 				})
 			}
 		})

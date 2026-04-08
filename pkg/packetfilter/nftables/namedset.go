@@ -25,7 +25,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	k8snet "k8s.io/utils/net"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/knftables"
 )
 
@@ -54,7 +53,7 @@ func (n *namedSet) Create(_ bool) error {
 	tx := n.nftables.NewTransaction()
 
 	tx.Add(&knftables.Table{
-		Comment: ptr.To("rules for submariner"),
+		Comment: new("rules for submariner"),
 	})
 
 	tx.Add(&n.set)

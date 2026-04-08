@@ -28,7 +28,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/versions"
 	"k8s.io/apimachinery/pkg/util/sets"
 	k8snet "k8s.io/utils/net"
-	"k8s.io/utils/ptr"
 )
 
 const (
@@ -158,7 +157,7 @@ func buildLRPsFromSubnets(family k8snet.IPFamily, subnetsToAdd []string, nextHop
 			Priority: priority,
 			Action:   "reroute",
 			Match:    match,
-			Nexthop:  ptr.To(nextHop),
+			Nexthop:  new(nextHop),
 			ExternalIDs: map[string]string{
 				SubmarinerExternalIDKey: versions.Submariner(),
 			},
