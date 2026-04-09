@@ -178,7 +178,7 @@ func newHandlerTestDriver() *handlerTestDriver {
 		t.intraRoutingDisabled = false
 	})
 
-	JustBeforeEach(func() {
+	JustBeforeEach(func(ctx context.Context) {
 		t.ovsdbClient = fakeovn.NewOVSDBClient()
 
 		_, _ = t.ovsdbClient.Create(&nbdb.LogicalRouter{
@@ -199,7 +199,7 @@ func newHandlerTestDriver() *handlerTestDriver {
 			t.OVNK8sMgmntIntGw = ipv6OVNK8sMgmntIntGw
 		}
 
-		_, err := t.k8sClient.CoreV1().Pods(testing.Namespace).Create(context.Background(), &corev1.Pod{
+		_, err := t.k8sClient.CoreV1().Pods(testing.Namespace).Create(ctx, &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "ovn-pod",
 				Labels: map[string]string{"app": "ovnkube-node"},
@@ -236,7 +236,7 @@ func newHandlerTestDriver() *handlerTestDriver {
 			IntraRoutingDisabled: t.intraRoutingDisabled,
 		})
 
-		t.Start(t.handler)
+		t.Start(ctx, t.handler)
 
 		Expect(t.ovsdbClient.Connected()).To(BeTrue())
 	})
@@ -244,9 +244,9 @@ func newHandlerTestDriver() *handlerTestDriver {
 	return t
 }
 
-func (t *handlerTestDriver) Start(handler event.Handler) {
-	t.ControllerSupport.Start(handler)
-	t.CreateNode(t.node)
+func (t *handlerTestDriver) Start(ctx context.Context, handler event.Handler) {
+	t.ControllerSupport.Start(ctx, handler)
+	t.CreateNode(ctx, t.node)
 }
 
 //nolint:gocognit // Ignore "cognitive complexity ... is high".
@@ -262,10 +262,10 @@ func (t *handlerTestDriver) testRemoteEndpoint(ipFamilySubnets, nonIPFamilySubne
 	})
 
 	When("a remote Endpoint is created, updated, and deleted", func() {
-		It("should correctly update the host network dataplane", func() {
+		It("should correctly update the host network dataplane", func(ctx context.Context) {
 			By("Creating remote Endpoint")
 
-			endpoint := t.createEndpoint(append(endpointSubnets, nonIPFamilySubnets...)...)
+			endpoint := t.createEndpoint(ctx, append(endpointSubnets, nonIPFamilySubnets...)...)
 
 			for _, s := range endpointSubnets {
 				t.netLink.AwaitRule(constants.RouteAgentHostNetworkTableID, "", s)
@@ -288,7 +288,7 @@ func (t *handlerTestDriver) testRemoteEndpoint(ipFamilySubnets, nonIPFamilySubne
 			//nolint:gocritic // Ignore "append result not assigned to the same slice"
 			endpoint.Spec.Subnets = append(endpointSubnets, nonIPFamilySubnets...)
 
-			t.UpdateEndpoint(endpoint)
+			t.UpdateEndpoint(ctx, endpoint)
 
 			for _, s := range oldSubnets {
 				t.netLink.AwaitNoRule(constants.RouteAgentHostNetworkTableID, "", s)
@@ -300,7 +300,7 @@ func (t *handlerTestDriver) testRemoteEndpoint(ipFamilySubnets, nonIPFamilySubne
 
 			By("Deleting remote Endpoint")
 
-			t.DeleteEndpoint(endpoint.Name)
+			t.DeleteEndpoint(ctx, endpoint.Name)
 
 			for _, s := range endpointSubnets {
 				t.netLink.AwaitNoRule(constants.RouteAgentHostNetworkTableID, "", s)
@@ -308,14 +308,14 @@ func (t *handlerTestDriver) testRemoteEndpoint(ipFamilySubnets, nonIPFamilySubne
 		})
 
 		Context("on the gateway", func() {
-			JustBeforeEach(func() {
-				t.CreateLocalHostEndpoint()
+			JustBeforeEach(func(ctx context.Context) {
+				t.CreateLocalHostEndpoint(ctx)
 			})
 
-			It("should correctly update the gateway dataplane", func() {
+			It("should correctly update the gateway dataplane", func(ctx context.Context) {
 				By("Creating remote Endpoint")
 
-				endpoint := t.createEndpoint(append(endpointSubnets, nonIPFamilySubnets...)...)
+				endpoint := t.createEndpoint(ctx, append(endpointSubnets, nonIPFamilySubnets...)...)
 
 				for _, s := range endpointSubnets {
 					t.netLink.AwaitRule(constants.RouteAgentInterClusterNetworkTableID, s, t.clusterCIDR)
@@ -325,7 +325,7 @@ func (t *handlerTestDriver) testRemoteEndpoint(ipFamilySubnets, nonIPFamilySubne
 					t.pFilter.AwaitRule(packetfilter.TableTypeNAT, chains.SmPostRouting, ContainSubstring("\"DestCIDR\":%q", s))
 				}
 
-				t.awaitOVNKNodeAnnotationContaining(endpointSubnets...)
+				t.awaitOVNKNodeAnnotationContaining(ctx, endpointSubnets...)
 
 				By("Updating remote Endpoint")
 
@@ -336,7 +336,7 @@ func (t *handlerTestDriver) testRemoteEndpoint(ipFamilySubnets, nonIPFamilySubne
 				//nolint:gocritic // Ignore "append result not assigned to the same slice"
 				endpoint.Spec.Subnets = append(endpointSubnets, nonIPFamilySubnets...)
 
-				t.UpdateEndpoint(endpoint)
+				t.UpdateEndpoint(ctx, endpoint)
 
 				for i := 1; i < len(oldSubnets); i++ {
 					t.netLink.AwaitNoRule(constants.RouteAgentInterClusterNetworkTableID, oldSubnets[i], t.clusterCIDR)
@@ -350,7 +350,7 @@ func (t *handlerTestDriver) testRemoteEndpoint(ipFamilySubnets, nonIPFamilySubne
 
 				By("Deleting remote Endpoint")
 
-				t.DeleteEndpoint(endpoint.Name)
+				t.DeleteEndpoint(ctx, endpoint.Name)
 
 				for _, s := range endpointSubnets {
 					t.netLink.AwaitNoRule(constants.RouteAgentInterClusterNetworkTableID, s, t.clusterCIDR)
@@ -362,7 +362,7 @@ func (t *handlerTestDriver) testRemoteEndpoint(ipFamilySubnets, nonIPFamilySubne
 
 				// Since we updated the subnets above, the original second one will remain b/c the annotation isn't currently
 				// updated on an Endpoint update.
-				t.awaitOVNKNodeAnnotationContaining(oldSubnets[1])
+				t.awaitOVNKNodeAnnotationContaining(ctx, oldSubnets[1])
 			})
 		})
 	})
@@ -370,12 +370,12 @@ func (t *handlerTestDriver) testRemoteEndpoint(ipFamilySubnets, nonIPFamilySubne
 
 func (t *handlerTestDriver) testGatewayTransitions(ipFamilySubnets, nonIPFamilySubnets []string) {
 	Context("on gateway transitions", func() {
-		It("should correctly update the gateway dataplane", func() {
-			t.createEndpoint(append(ipFamilySubnets, nonIPFamilySubnets...)...)
+		It("should correctly update the gateway dataplane", func(ctx context.Context) {
+			t.createEndpoint(ctx, append(ipFamilySubnets, nonIPFamilySubnets...)...)
 
 			By("Creating local gateway Endpoint")
 
-			localEP := t.CreateLocalHostEndpoint()
+			localEP := t.CreateLocalHostEndpoint(ctx)
 
 			for _, s := range ipFamilySubnets {
 				t.netLink.AwaitRule(constants.RouteAgentInterClusterNetworkTableID, s, t.clusterCIDR)
@@ -390,13 +390,13 @@ func (t *handlerTestDriver) testGatewayTransitions(ipFamilySubnets, nonIPFamilyS
 				t.pFilter.EnsureNoRule(packetfilter.TableTypeFilter, chains.SmForwardMSSClamp, ContainSubstring(s))
 			}
 
-			t.awaitOVNKNodeAnnotationContaining(ipFamilySubnets...)
+			t.awaitOVNKNodeAnnotationContaining(ctx, ipFamilySubnets...)
 
 			t.netLink.AwaitGwRoutes(0, constants.RouteAgentInterClusterNetworkTableID, t.OVNK8sMgmntIntGw)
 
 			By("Deleting local gateway Endpoint")
 
-			t.DeleteEndpoint(localEP.Name)
+			t.DeleteEndpoint(ctx, localEP.Name)
 
 			for _, s := range ipFamilySubnets {
 				t.netLink.AwaitNoRule(constants.RouteAgentInterClusterNetworkTableID, s, t.clusterCIDR)
@@ -405,7 +405,7 @@ func (t *handlerTestDriver) testGatewayTransitions(ipFamilySubnets, nonIPFamilyS
 				t.pFilter.AwaitNoRule(packetfilter.TableTypeFilter, chains.SmForwardMSSClamp, ContainSubstring(s))
 			}
 
-			t.awaitOVNKNodeAnnotationContaining()
+			t.awaitOVNKNodeAnnotationContaining(ctx)
 
 			t.netLink.AwaitNoGwRoutes(0, constants.RouteAgentInterClusterNetworkTableID, t.OVNK8sMgmntIntGw)
 		})
@@ -414,7 +414,7 @@ func (t *handlerTestDriver) testGatewayTransitions(ipFamilySubnets, nonIPFamilyS
 
 func (t *handlerTestDriver) testGatewayRoute(ipFamilySubnets []string, nonIPFamilyNextHop string, nonIPFamilySubnets []string) {
 	When("a GatewayRoute is created and deleted", func() {
-		It("should correctly reconcile OVN router policies", func() {
+		It("should correctly reconcile OVN router policies", func(ctx context.Context) {
 			client := t.dynClient.Resource(submarinerv1.SchemeGroupVersion.WithResource("gatewayroutes")).Namespace(testing.Namespace)
 
 			gwRoute := &submarinerv1.GatewayRoute{
@@ -427,7 +427,7 @@ func (t *handlerTestDriver) testGatewayRoute(ipFamilySubnets []string, nonIPFami
 				},
 			}
 
-			test.CreateResource(client, gwRoute)
+			test.CreateResource(ctx, client, gwRoute)
 
 			for _, cidr := range gwRoute.RoutePolicySpec.RemoteCIDRs {
 				t.ovsdbClient.AwaitModel(&nbdb.LogicalRouterPolicy{
@@ -440,7 +440,7 @@ func (t *handlerTestDriver) testGatewayRoute(ipFamilySubnets []string, nonIPFami
 				})
 			}
 
-			Expect(client.Delete(context.Background(), gwRoute.Name, metav1.DeleteOptions{})).To(Succeed())
+			Expect(client.Delete(ctx, gwRoute.Name, metav1.DeleteOptions{})).To(Succeed())
 
 			for _, cidr := range gwRoute.RoutePolicySpec.RemoteCIDRs {
 				t.ovsdbClient.AwaitNoModel(&nbdb.LogicalRouterPolicy{
@@ -453,7 +453,7 @@ func (t *handlerTestDriver) testGatewayRoute(ipFamilySubnets []string, nonIPFami
 				})
 			}
 
-			test.CreateResource(client, &submarinerv1.GatewayRoute{
+			test.CreateResource(ctx, client, &submarinerv1.GatewayRoute{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-gateway-route",
 				},
@@ -466,7 +466,7 @@ func (t *handlerTestDriver) testGatewayRoute(ipFamilySubnets []string, nonIPFami
 	})
 
 	When("a non-Submariner route exists with the same nexthop", func() {
-		It("should not delete the non-Submariner route during reconciliation", func() {
+		It("should not delete the non-Submariner route during reconciliation", func(ctx context.Context) {
 			client := t.dynClient.Resource(submarinerv1.SchemeGroupVersion.WithResource("gatewayroutes")).Namespace(testing.Namespace)
 
 			// Create a route that simulates an OVN-K managed route (no submariner external_id)
@@ -491,7 +491,7 @@ func (t *handlerTestDriver) testGatewayRoute(ipFamilySubnets []string, nonIPFami
 				},
 			}
 
-			test.CreateResource(client, gwRoute)
+			test.CreateResource(ctx, client, gwRoute)
 
 			// Wait for Submariner routes to be reconciled.
 			for _, cidr := range gwRoute.RoutePolicySpec.RemoteCIDRs {
@@ -510,7 +510,7 @@ func (t *handlerTestDriver) testGatewayRoute(ipFamilySubnets []string, nonIPFami
 			Expect(retrievedRoute.ExternalIDs).ToNot(HaveKey(ovn.SubmarinerExternalIDKey),
 				"OVN-K route should not be tagged with submariner")
 
-			Expect(client.Delete(context.Background(), gwRoute.Name, metav1.DeleteOptions{})).To(Succeed())
+			Expect(client.Delete(ctx, gwRoute.Name, metav1.DeleteOptions{})).To(Succeed())
 
 			// Check the OVN-K route still exists and remains untagged after removing the gateway
 			t.ovsdbClient.EnsureModel(&nbdb.LogicalRouterStaticRoute{
@@ -525,7 +525,7 @@ func (t *handlerTestDriver) testGatewayRoute(ipFamilySubnets []string, nonIPFami
 	})
 
 	When("a non-Submariner policy exists with the same priority", func() {
-		It("should not delete the non-Submariner policy during reconciliation", func() {
+		It("should not delete the non-Submariner policy during reconciliation", func(ctx context.Context) {
 			client := t.dynClient.Resource(submarinerv1.SchemeGroupVersion.WithResource("gatewayroutes")).Namespace(testing.Namespace)
 
 			// Determine priority and match field based on IP family
@@ -561,7 +561,7 @@ func (t *handlerTestDriver) testGatewayRoute(ipFamilySubnets []string, nonIPFami
 				},
 			}
 
-			test.CreateResource(client, gwRoute)
+			test.CreateResource(ctx, client, gwRoute)
 
 			// Wait for Submariner policies to be reconciled
 			for _, cidr := range gwRoute.RoutePolicySpec.RemoteCIDRs {
@@ -583,7 +583,7 @@ func (t *handlerTestDriver) testGatewayRoute(ipFamilySubnets []string, nonIPFami
 			Expect(retrievedPolicy.ExternalIDs).ToNot(HaveKey(ovn.SubmarinerExternalIDKey),
 				"OVN-K policy should not be tagged with submariner")
 
-			Expect(client.Delete(context.Background(), gwRoute.Name, metav1.DeleteOptions{})).To(Succeed())
+			Expect(client.Delete(ctx, gwRoute.Name, metav1.DeleteOptions{})).To(Succeed())
 
 			// Check the OVN-K policy still exists and remains untagged after removing the gateway
 			t.ovsdbClient.EnsureModel(&nbdb.LogicalRouterPolicy{
@@ -622,7 +622,7 @@ func (t *handlerTestDriver) testNonGatewayRoutes(ipFamilyNextHop string, ipFamil
 			}
 		}
 
-		It("should correctly reconcile OVN router policies", func() {
+		It("should correctly reconcile OVN router policies", func(ctx context.Context) {
 			client := t.dynClient.Resource(submarinerv1.SchemeGroupVersion.WithResource("nongatewayroutes")).Namespace(testing.Namespace)
 
 			By("Creating first NonGatewayRoute")
@@ -637,7 +637,7 @@ func (t *handlerTestDriver) testNonGatewayRoutes(ipFamilyNextHop string, ipFamil
 				},
 			}
 
-			test.CreateResource(client, nonGWRoute1)
+			test.CreateResource(ctx, client, nonGWRoute1)
 
 			verifyLogicalRouterPolicies(nonGWRoute1, ipFamilyNextHop)
 
@@ -653,7 +653,7 @@ func (t *handlerTestDriver) testNonGatewayRoutes(ipFamilyNextHop string, ipFamil
 				},
 			}
 
-			test.CreateResource(client, nonGWRoute2)
+			test.CreateResource(ctx, client, nonGWRoute2)
 
 			verifyLogicalRouterPolicies(nonGWRoute1, ipFamilyNextHop)
 			verifyLogicalRouterPolicies(nonGWRoute2, ipFamilyNextHop)
@@ -668,7 +668,7 @@ func (t *handlerTestDriver) testNonGatewayRoutes(ipFamilyNextHop string, ipFamil
 
 			nonGWRoute1.RoutePolicySpec.NextHops[0] = ipFamilyNextHop
 
-			test.UpdateResource(client, nonGWRoute1)
+			test.UpdateResource(ctx, client, nonGWRoute1)
 
 			verifyLogicalRouterPolicies(nonGWRoute1, ipFamilyNextHop)
 			verifyNoLogicalRouterPolicies(nonGWRoute1, prevNextHop)
@@ -678,20 +678,20 @@ func (t *handlerTestDriver) testNonGatewayRoutes(ipFamilyNextHop string, ipFamil
 
 			nonGWRoute2.RoutePolicySpec.NextHops[0] = ipFamilyNextHop
 
-			test.UpdateResource(client, nonGWRoute2)
+			test.UpdateResource(ctx, client, nonGWRoute2)
 
 			verifyLogicalRouterPolicies(nonGWRoute1, ipFamilyNextHop)
 			verifyLogicalRouterPolicies(nonGWRoute2, ipFamilyNextHop)
 
 			By("Deleting first NonGatewayRoute")
 
-			Expect(client.Delete(context.Background(), nonGWRoute1.Name, metav1.DeleteOptions{})).To(Succeed())
+			Expect(client.Delete(ctx, nonGWRoute1.Name, metav1.DeleteOptions{})).To(Succeed())
 
 			verifyNoLogicalRouterPolicies(nonGWRoute1, ipFamilyNextHop)
 
 			By("Creating NonGatewayRoute for other IP family")
 
-			test.CreateResource(client, &submarinerv1.NonGatewayRoute{
+			test.CreateResource(ctx, client, &submarinerv1.NonGatewayRoute{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-nongateway-route-other",
 				},
@@ -712,11 +712,11 @@ func (t *handlerTestDriver) testNonGatewayRoutes(ipFamilyNextHop string, ipFamil
 }
 
 func (t *handlerTestDriver) testOVNMgmtInterfaceAddressChange() {
-	JustBeforeEach(func() {
-		t.CreateLocalHostEndpoint()
+	JustBeforeEach(func(ctx context.Context) {
+		t.CreateLocalHostEndpoint(ctx)
 		t.netLink.AwaitGwRoutes(0, constants.RouteAgentInterClusterNetworkTableID, t.OVNK8sMgmntIntGw)
 
-		t.createEndpoint("192.0.1.0/24")
+		t.createEndpoint(ctx, "192.0.1.0/24")
 		t.netLink.AwaitGwRoutes(0, constants.RouteAgentHostNetworkTableID, t.OVNK8sMgmntIntGw)
 	})
 
@@ -786,59 +786,59 @@ func (t *handlerTestDriver) testIntraClusterRoutingDisabled() {
 	})
 
 	When("not on the gateway", func() {
-		It("should not update the host network dataplane on remote Endpoint creation and deletion", func() {
+		It("should not update the host network dataplane on remote Endpoint creation and deletion", func(ctx context.Context) {
 			By("Creating remote Endpoint")
 
-			endpoint := t.createEndpoint(ipv4Subnets[0])
+			endpoint := t.createEndpoint(ctx, ipv4Subnets[0])
 
 			t.netLink.EnsureNoRule(constants.RouteAgentHostNetworkTableID, "", ipv4Subnets[0])
 			t.netLink.EnsureNoGwRoutes(0, constants.RouteAgentHostNetworkTableID, t.OVNK8sMgmntIntGw)
 
 			By("Deleting remote Endpoint")
 
-			t.DeleteEndpoint(endpoint.Name)
+			t.DeleteEndpoint(ctx, endpoint.Name)
 
 			t.netLink.EnsureNoGwRoutes(0, constants.RouteAgentHostNetworkTableID, t.OVNK8sMgmntIntGw)
 		})
 	})
 
 	When("on the gateway", func() {
-		JustBeforeEach(func() {
-			t.CreateLocalHostEndpoint()
+		JustBeforeEach(func(ctx context.Context) {
+			t.CreateLocalHostEndpoint(ctx)
 		})
 
-		It("should update the host network dataplane on remote Endpoint creation and deletion", func() {
+		It("should update the host network dataplane on remote Endpoint creation and deletion", func(ctx context.Context) {
 			By("Creating remote Endpoint")
 
-			endpoint := t.createEndpoint(ipv4Subnets[0])
+			endpoint := t.createEndpoint(ctx, ipv4Subnets[0])
 
 			t.netLink.AwaitRule(constants.RouteAgentHostNetworkTableID, "", ipv4Subnets[0])
 
 			By("Deleting remote Endpoint")
 
-			t.DeleteEndpoint(endpoint.Name)
+			t.DeleteEndpoint(ctx, endpoint.Name)
 
 			t.netLink.AwaitNoRule(constants.RouteAgentHostNetworkTableID, "", ipv4Subnets[0])
 		})
 	})
 
 	Context("on gateway transitions", func() {
-		It("should correctly update the host network dataplane for existing remote Endpoints", func() {
+		It("should correctly update the host network dataplane for existing remote Endpoints", func(ctx context.Context) {
 			By("Creating remote Endpoint")
 
-			t.createEndpoint(ipv4Subnets[0])
+			t.createEndpoint(ctx, ipv4Subnets[0])
 
 			t.netLink.EnsureNoRule(constants.RouteAgentHostNetworkTableID, "", ipv4Subnets[0])
 
 			By("Creating local gateway Endpoint")
 
-			localEP := t.CreateLocalHostEndpoint()
+			localEP := t.CreateLocalHostEndpoint(ctx)
 
 			t.netLink.AwaitRule(constants.RouteAgentHostNetworkTableID, "", ipv4Subnets[0])
 
 			By("Deleting local gateway Endpoint")
 
-			t.DeleteEndpoint(localEP.Name)
+			t.DeleteEndpoint(ctx, localEP.Name)
 
 			t.netLink.AwaitNoRule(constants.RouteAgentHostNetworkTableID, "", ipv4Subnets[0])
 			t.netLink.AwaitNoGwRoutes(0, constants.RouteAgentHostNetworkTableID, t.OVNK8sMgmntIntGw)

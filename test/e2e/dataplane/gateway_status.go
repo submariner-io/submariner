@@ -40,12 +40,12 @@ var _ = Describe("Gateway status reporting", Label(labels.Dataplane), func() {
 	f := subFramework.NewFramework("dataplane-gateway-status")
 
 	When("a gateway node is configured", func() {
-		It("should correctly report its status and connection information", func() {
+		It("should correctly report its status and connection information", func(ctx context.Context) {
 			clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 
 			framework.By(fmt.Sprintf("Ensuring that only one gateway reports as active on %q", clusterAName))
 
-			activeGateways := f.AwaitGatewaysWithStatus(framework.ClusterA, submarinerv1.HAStatusActive)
+			activeGateways := f.AwaitGatewaysWithStatus(ctx, framework.ClusterA, submarinerv1.HAStatusActive)
 			Expect(activeGateways).To(HaveLen(1))
 
 			name := activeGateways[0].Name
@@ -53,7 +53,7 @@ var _ = Describe("Gateway status reporting", Label(labels.Dataplane), func() {
 			otherClusterIndex := framework.ClusterB
 			otherCluster := framework.TestContext.ClusterIDs[otherClusterIndex]
 
-			gatewayPod := f.AwaitActiveGatewayPod(otherClusterIndex, nil)
+			gatewayPod := f.AwaitActiveGatewayPod(ctx, otherClusterIndex, nil)
 			Expect(gatewayPod).ToNot(BeNil(), "Did not find an active gateway pod for cluster %q", otherCluster)
 
 			healthCheckEnabled := false
@@ -77,9 +77,9 @@ var _ = Describe("Gateway status reporting", Label(labels.Dataplane), func() {
 
 			gwClient := subFramework.SubmarinerClients[framework.ClusterA].SubmarinerV1().Gateways(
 				framework.TestContext.SubmarinerNamespace)
-			framework.AwaitUntil(fmt.Sprintf("await active connection on Gateway %q", name),
-				func() (*submarinerv1.Gateway, error) {
-					resGw, err := gwClient.Get(context.TODO(), name, metav1.GetOptions{})
+			framework.AwaitUntil(ctx, fmt.Sprintf("await active connection on Gateway %q", name),
+				func(ctx context.Context) (*submarinerv1.Gateway, error) {
+					resGw, err := gwClient.Get(ctx, name, metav1.GetOptions{})
 					if apierrors.IsNotFound(err) {
 						return nil, nil //nolint:nilnil // Returning nil value is intentional
 					}

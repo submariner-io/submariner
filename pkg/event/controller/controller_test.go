@@ -19,6 +19,7 @@ limitations under the License.
 package controller_test
 
 import (
+	"context"
 	"sync/atomic"
 	"time"
 
@@ -38,17 +39,17 @@ var _ = Describe("Event controller", func() {
 	t := newTestDriver()
 
 	When("a Node is created, updated and deleted", func() {
-		It("should correctly notify the handler", func() {
-			node := t.CreateNode(testing.NewNode(t.Hostname))
+		It("should correctly notify the handler", func(ctx context.Context) {
+			node := t.CreateNode(ctx, testing.NewNode(t.Hostname))
 
 			t.awaitEvent(testing.EvNodeCreated, node)
 
 			node.Labels = map[string]string{"labeled-i-am": "i-am"}
-			t.UpdateNode(node)
+			t.UpdateNode(ctx, node)
 
 			t.awaitEvent(testing.EvNodeUpdated, node)
 
-			t.DeleteNode(node.GetName())
+			t.DeleteNode(ctx, node.GetName())
 
 			t.awaitEvent(testing.EvNodeRemoved, node)
 			t.ensureNoEvents()
@@ -56,25 +57,25 @@ var _ = Describe("Event controller", func() {
 	})
 
 	When("a local Endpoint on this host is created, updated and deleted", func() {
-		It("should correctly notify the handler", func() {
-			t.testLocalEndpoint()
+		It("should correctly notify the handler", func(ctx context.Context) {
+			t.testLocalEndpoint(ctx)
 		})
 	})
 
 	When("remote Endpoints are created, updated and deleted", func() {
-		It("should correctly notify the handler", func() {
-			t.testRemoteEndpoints()
+		It("should correctly notify the handler", func(ctx context.Context) {
+			t.testRemoteEndpoints(ctx)
 		})
 	})
 
 	When("the handler returns an error from an event notification", func() {
-		It("should retry the event", func() {
+		It("should retry the event", func(ctx context.Context) {
 			t.handler.FailOnEvent(testing.EvLocalEndpointCreated, testing.EvLocalEndpointUpdated, testing.EvLocalEndpointRemoved,
 				testing.EvTransitionToGateway, testing.EvTransitionToNonGateway, testing.EvRemoteEndpointCreated,
 				testing.EvRemoteEndpointUpdated, testing.EvRemoteEndpointRemoved)
 
-			t.testLocalEndpoint()
-			t.testRemoteEndpoints()
+			t.testLocalEndpoint(ctx)
+			t.testRemoteEndpoints(ctx)
 		})
 	})
 
@@ -97,10 +98,10 @@ var _ = Describe("Event controller", func() {
 			}
 		})
 
-		It("should correctly notify all handlers", func() {
+		It("should correctly notify all handlers", func(ctx context.Context) {
 			By("Create local Endpoint")
 
-			endpoint := t.CreateLocalHostEndpoint()
+			endpoint := t.CreateLocalHostEndpoint(ctx)
 
 			t.awaitEvent(testing.EvLocalEndpointCreated, endpoint)
 			t.awaitEvent(testing.EvTransitionToGateway, nil)
@@ -113,7 +114,7 @@ var _ = Describe("Event controller", func() {
 
 			By("Create node")
 
-			node := t.CreateNode(testing.NewNode(t.Hostname))
+			node := t.CreateNode(ctx, testing.NewNode(t.Hostname))
 
 			t.awaitEvent(testing.EvNodeCreated, node)
 			awaitEvent(allEventsHandler, testing.EvNodeCreated, node, handler2Events)
@@ -122,32 +123,32 @@ var _ = Describe("Event controller", func() {
 	})
 
 	When("multiple remote Endpoints for the same cluster are created and removed", func() {
-		It("should only notify the handler of the latest Endpoint", func() {
+		It("should only notify the handler of the latest Endpoint", func(ctx context.Context) {
 			now := time.Now()
 			aFewSecondsLater := now.Add(2 * time.Second)
 
-			latestEndpoint := t.CreateEndpoint(&submV1.Endpoint{
+			latestEndpoint := t.CreateEndpoint(ctx, &submV1.Endpoint{
 				ObjectMeta: v1meta.ObjectMeta{Name: "latest", CreationTimestamp: v1meta.NewTime(aFewSecondsLater)},
 				Spec:       submV1.EndpointSpec{ClusterID: "east"},
 			})
 			t.awaitEvent(testing.EvRemoteEndpointCreated, latestEndpoint)
 
-			staleEndpoint := t.CreateEndpoint(&submV1.Endpoint{
+			staleEndpoint := t.CreateEndpoint(ctx, &submV1.Endpoint{
 				ObjectMeta: v1meta.ObjectMeta{Name: "stale", CreationTimestamp: v1meta.NewTime(now)},
 				Spec:       submV1.EndpointSpec{ClusterID: "east"},
 			})
 			t.ensureNoEvents()
 			Expect(t.handler.remoteEndpoints.Load()).To(Equal([]submV1.Endpoint{*latestEndpoint}))
 
-			t.DeleteEndpoint(staleEndpoint.GetName())
+			t.DeleteEndpoint(ctx, staleEndpoint.GetName())
 			Consistently(func() any {
 				return t.handler.remoteEndpoints.Load()
 			}).Should(Equal([]submV1.Endpoint{*latestEndpoint}))
 
-			t.DeleteEndpoint(latestEndpoint.GetName())
+			t.DeleteEndpoint(ctx, latestEndpoint.GetName())
 			t.awaitEvent(testing.EvRemoteEndpointRemoved, latestEndpoint)
 
-			t.CreateEndpoint(staleEndpoint)
+			t.CreateEndpoint(ctx, staleEndpoint)
 			t.awaitEvent(testing.EvRemoteEndpointCreated, staleEndpoint)
 		})
 	})
@@ -181,8 +182,8 @@ func newTestDriver() *testDriver {
 		t.handlers = []event.Handler{t.handler}
 	})
 
-	JustBeforeEach(func() {
-		t.Start(t.handlers...)
+	JustBeforeEach(func(ctx context.Context) {
+		t.Start(ctx, t.handlers...)
 	})
 
 	return t
@@ -201,45 +202,45 @@ func (t *testDriver) ensureNoEvents() {
 	Consistently(t.testEvents).ShouldNot(Receive())
 }
 
-func (t *testDriver) testLocalEndpoint() {
+func (t *testDriver) testLocalEndpoint(ctx context.Context) {
 	By("Create local Endpoint")
 
-	endpoint := t.CreateLocalHostEndpoint()
+	endpoint := t.CreateLocalHostEndpoint(ctx)
 
 	t.awaitEvent(testing.EvLocalEndpointCreated, endpoint)
 	t.awaitEvent(testing.EvTransitionToGateway, nil)
 
-	t.CreateLocalHostEndpoint()
+	t.CreateLocalHostEndpoint(ctx)
 	Consistently(t.testEvents).ShouldNot(Receive(Equal(
 		testing.TestEvent{Handler: testHandlerName, Name: testing.EvTransitionToGateway})))
 
 	By("Update local Endpoint")
 
 	endpoint.Labels = map[string]string{"labeled-i-am": "i-am"}
-	t.UpdateEndpoint(endpoint)
+	t.UpdateEndpoint(ctx, endpoint)
 
 	t.awaitEvent(testing.EvLocalEndpointUpdated, endpoint)
 
 	By("Delete local Endpoint")
 
-	t.DeleteEndpoint(endpoint.GetName())
+	t.DeleteEndpoint(ctx, endpoint.GetName())
 
 	t.awaitEvent(testing.EvLocalEndpointRemoved, endpoint)
 	t.awaitEvent(testing.EvTransitionToNonGateway, endpoint)
 	t.ensureNoEvents()
 }
 
-func (t *testDriver) testRemoteEndpoints() {
+func (t *testDriver) testRemoteEndpoints(ctx context.Context) {
 	By("Create first remote Endpoint")
 
-	endpoint1 := t.CreateEndpoint(testing.NewEndpoint("remote-cluster1", "host"))
+	endpoint1 := t.CreateEndpoint(ctx, testing.NewEndpoint("remote-cluster1", "host"))
 
 	t.awaitEvent(testing.EvRemoteEndpointCreated, endpoint1)
 	Expect(t.handler.remoteEndpoints.Load()).To(Equal([]submV1.Endpoint{*endpoint1}))
 
 	By("Create second remote Endpoint")
 
-	endpoint2 := t.CreateEndpoint(testing.NewEndpoint("remote-cluster2", "host"))
+	endpoint2 := t.CreateEndpoint(ctx, testing.NewEndpoint("remote-cluster2", "host"))
 
 	t.awaitEvent(testing.EvRemoteEndpointCreated, endpoint2)
 	Expect(t.handler.remoteEndpoints.Load()).To(ContainElements(*endpoint1, *endpoint2))
@@ -247,20 +248,20 @@ func (t *testDriver) testRemoteEndpoints() {
 	By("Update first remote Endpoint")
 
 	endpoint1.Labels = map[string]string{"labeled-i-am": "i-am"}
-	t.UpdateEndpoint(endpoint1)
+	t.UpdateEndpoint(ctx, endpoint1)
 
 	t.awaitEvent(testing.EvRemoteEndpointUpdated, endpoint1)
 
 	By("Delete second remote Endpoint")
 
-	t.DeleteEndpoint(endpoint2.GetName())
+	t.DeleteEndpoint(ctx, endpoint2.GetName())
 
 	t.awaitEvent(testing.EvRemoteEndpointRemoved, endpoint2)
 	Expect(t.handler.remoteEndpoints.Load()).To(Equal([]submV1.Endpoint{*endpoint1}))
 
 	By("Delete first remote Endpoint")
 
-	t.DeleteEndpoint(endpoint1.GetName())
+	t.DeleteEndpoint(ctx, endpoint1.GetName())
 
 	t.awaitEvent(testing.EvRemoteEndpointRemoved, endpoint1)
 	Expect(t.handler.remoteEndpoints.Load()).To(BeEmpty())
@@ -268,27 +269,27 @@ func (t *testDriver) testRemoteEndpoints() {
 }
 
 func (t *testDriver) testStaleRemovedEndpoint(tsDiff time.Duration) {
-	It("should notify the handler of the stale removed Endpoint", func() {
+	It("should notify the handler of the stale removed Endpoint", func(ctx context.Context) {
 		now := time.Now()
-		staleEndpoint := t.CreateEndpoint(&submV1.Endpoint{
+		staleEndpoint := t.CreateEndpoint(ctx, &submV1.Endpoint{
 			ObjectMeta: v1meta.ObjectMeta{Name: "stale", CreationTimestamp: v1meta.NewTime(now)},
 			Spec:       submV1.EndpointSpec{ClusterID: "east"},
 		})
 		t.awaitEvent(testing.EvRemoteEndpointCreated, staleEndpoint)
 
-		latestEndpoint := t.CreateEndpoint(&submV1.Endpoint{
+		latestEndpoint := t.CreateEndpoint(ctx, &submV1.Endpoint{
 			ObjectMeta: v1meta.ObjectMeta{Name: "latest", CreationTimestamp: v1meta.NewTime(now.Add(tsDiff))},
 			Spec:       submV1.EndpointSpec{ClusterID: "east"},
 		})
 		t.awaitEvent(testing.EvRemoteEndpointCreated, latestEndpoint)
 		Expect(t.handler.remoteEndpoints.Load()).To(HaveLen(2))
 
-		t.DeleteEndpoint(staleEndpoint.GetName())
+		t.DeleteEndpoint(ctx, staleEndpoint.GetName())
 		t.awaitEvent(testing.EvStaleRemoteEndpointRemoved, staleEndpoint)
 		t.ensureNoEvents()
 		Expect(t.handler.remoteEndpoints.Load()).To(Equal([]submV1.Endpoint{*latestEndpoint}))
 
-		t.DeleteEndpoint(latestEndpoint.GetName())
+		t.DeleteEndpoint(ctx, latestEndpoint.GetName())
 		t.awaitEvent(testing.EvRemoteEndpointRemoved, latestEndpoint)
 	})
 }

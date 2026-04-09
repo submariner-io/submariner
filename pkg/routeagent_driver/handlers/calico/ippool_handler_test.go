@@ -33,32 +33,32 @@ import (
 var _ = Describe("IPPool Handler", func() {
 	t := newTestDriver()
 
-	JustBeforeEach(func() {
-		t.Start(calico.NewCalicoIPPoolHandler(nil, testing.Namespace, t.dynClient))
+	JustBeforeEach(func(ctx context.Context) {
+		t.Start(ctx, calico.NewCalicoIPPoolHandler(nil, testing.Namespace, t.dynClient))
 	})
 
 	When("remote Endpoints are created and deleted", func() {
-		It("should create and delete IPPools", func() {
+		It("should create and delete IPPools", func(ctx context.Context) {
 			subnets1 := []string{"192.0.2.0/24", "192.0.3.0/24"}
-			remoteEP1 := t.CreateEndpoint(testing.NewEndpoint("remote-cluster1", "host", subnets1...))
+			remoteEP1 := t.CreateEndpoint(ctx, testing.NewEndpoint("remote-cluster1", "host", subnets1...))
 			t.ensureNoIPPools(subnets1...)
 
-			localEP := t.CreateLocalHostEndpoint()
+			localEP := t.CreateLocalHostEndpoint(ctx)
 			t.awaitIPPools(subnets1...)
 
 			// Ensure it handles existing IPPools.
 			Expect(t.handler.RemoteEndpointCreated(remoteEP1)).To(Succeed())
 
-			t.DeleteEndpoint(remoteEP1.Name)
+			t.DeleteEndpoint(ctx, remoteEP1.Name)
 			t.awaitNoIPPools(subnets1...)
 
 			subnets2 := []string{"192.0.4.0/24"}
-			remoteEP2 := t.CreateEndpoint(testing.NewEndpoint("remote-cluster1", "host", subnets2...))
+			remoteEP2 := t.CreateEndpoint(ctx, testing.NewEndpoint("remote-cluster1", "host", subnets2...))
 			t.awaitIPPools(subnets2...)
 
-			t.DeleteEndpoint(localEP.Name)
+			t.DeleteEndpoint(ctx, localEP.Name)
 
-			t.DeleteEndpoint(remoteEP2.Name)
+			t.DeleteEndpoint(ctx, remoteEP2.Name)
 			t.ensureIPPools(subnets2...)
 		})
 	})
@@ -71,8 +71,8 @@ var _ = Describe("IPPool Handler", func() {
 		})
 
 		Context("because the Submariner GW load balancer does not have the ROKS annotation", func() {
-			BeforeEach(func() {
-				t.createSubmarinerGwLBService(map[string]string{calico.GwLBSvcROKSAnnotation: "foo"})
+			BeforeEach(func(ctx context.Context) {
+				t.createSubmarinerGwLBService(ctx, map[string]string{calico.GwLBSvcROKSAnnotation: "foo"})
 			})
 
 			It("should not update the default IPPool's IPIPMode", func() {
@@ -82,20 +82,20 @@ var _ = Describe("IPPool Handler", func() {
 	})
 
 	When("the platform is ROKS", func() {
-		BeforeEach(func() {
-			t.createSubmarinerGwLBService(map[string]string{calico.GwLBSvcROKSAnnotation: "foo"})
+		BeforeEach(func(ctx context.Context) {
+			t.createSubmarinerGwLBService(ctx, map[string]string{calico.GwLBSvcROKSAnnotation: "foo"})
 		})
 
-		It("should update the default Installation's Encapsulation to IPIP", func() {
-			Expect(t.getDefaultInstallationEncapsulation()).Should(Equal(tigerav1.EncapsulationIPIP.String()))
+		It("should update the default Installation's Encapsulation to IPIP", func(ctx context.Context) {
+			Expect(t.getDefaultInstallationEncapsulation(ctx)).Should(Equal(tigerav1.EncapsulationIPIP.String()))
 		})
 	})
 
 	Context("on Uninstall", func() {
-		BeforeEach(func() {
-			t.createSubmarinerGwLBService(map[string]string{})
+		BeforeEach(func(ctx context.Context) {
+			t.createSubmarinerGwLBService(ctx, map[string]string{})
 
-			_, err := t.calicoClient.ProjectcalicoV3().IPPools().Create(context.Background(), &calicoapi.IPPool{
+			_, err := t.calicoClient.ProjectcalicoV3().IPPools().Create(ctx, &calicoapi.IPPool{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "pool1",
 					Labels: map[string]string{calico.SubmarinerIPPool: "true"},
@@ -103,7 +103,7 @@ var _ = Describe("IPPool Handler", func() {
 			}, metav1.CreateOptions{})
 			Expect(err).To(Succeed())
 
-			_, err = t.calicoClient.ProjectcalicoV3().IPPools().Create(context.Background(), &calicoapi.IPPool{
+			_, err = t.calicoClient.ProjectcalicoV3().IPPools().Create(ctx, &calicoapi.IPPool{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "pool2",
 					Labels: map[string]string{calico.SubmarinerIPPool: "true"},
@@ -116,16 +116,16 @@ var _ = Describe("IPPool Handler", func() {
 			Expect(t.handler.Uninstall(ctx)).To(Succeed())
 		})
 
-		It("should delete all IPPools", func() {
-			list, err := t.calicoClient.ProjectcalicoV3().IPPools().List(context.Background(), metav1.ListOptions{
+		It("should delete all IPPools", func(ctx context.Context) {
+			list, err := t.calicoClient.ProjectcalicoV3().IPPools().List(ctx, metav1.ListOptions{
 				LabelSelector: calico.SubmarinerIPPool + "=true",
 			})
 			Expect(err).To(Succeed())
 			Expect(list.Items).To(BeEmpty())
 		})
 
-		It("should reset the default Installation's Encapsulation", func() {
-			Expect(t.getDefaultInstallationEncapsulation()).Should(Equal(tigerav1.EncapsulationIPIPCrossSubnet.String()))
+		It("should reset the default Installation's Encapsulation", func(ctx context.Context) {
+			Expect(t.getDefaultInstallationEncapsulation(ctx)).Should(Equal(tigerav1.EncapsulationIPIPCrossSubnet.String()))
 		})
 	})
 })

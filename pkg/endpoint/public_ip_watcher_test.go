@@ -52,16 +52,16 @@ var _ = Describe("PublicIPWatcher", func() {
 	t := newPublicIPWatcherTestDriver()
 
 	When("using the LoadBalancer mode and the Ingress IP is modified", func() {
-		It("should update the public IP of local endpoint accordingly", func() {
-			Eventually(func() []string {
-				return t.getLocalEndpoint().Spec.PublicIPs
+		It("should update the public IP of local endpoint accordingly", func(ctx context.Context) {
+			Eventually(ctx, func(ctx context.Context) []string {
+				return t.getLocalEndpoint(ctx).Spec.PublicIPs
 			}, 5).Should(Equal([]string{initialIP}))
 
 			// Update the load-balancer ingress ip
 			t.updateLoadbalancerService(testServiceName, testNamespace, updatedIP)
 
-			Eventually(func() []string {
-				return t.getLocalEndpoint().Spec.PublicIPs
+			Eventually(ctx, func(ctx context.Context) []string {
+				return t.getLocalEndpoint(ctx).Spec.PublicIPs
 			}, 5).Should(Equal([]string{updatedIP}))
 		})
 	})
@@ -116,8 +116,8 @@ func newPublicIPWatcherTestDriver() *publicIPWatcherTestDriver {
 	return t
 }
 
-func (t *publicIPWatcherTestDriver) getLocalEndpoint() *submarinerv1.Endpoint {
-	return test.GetResource(t.endpointClient, t.localEndpoint.Resource())
+func (t *publicIPWatcherTestDriver) getLocalEndpoint(ctx context.Context) *submarinerv1.Endpoint {
+	return test.GetResource(ctx, t.endpointClient, t.localEndpoint.Resource())
 }
 
 func newEndpointSpec(clusterID, cableName string) submarinerv1.EndpointSpec {

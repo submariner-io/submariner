@@ -43,8 +43,8 @@ var _ = When("a request is sent", func() {
 		remoteEndpoint.Spec.PrivateIPs = []string{}
 	})
 
-	JustBeforeEach(func() {
-		nd := newNATDiscovery(&localEndpoint, &net.UDPAddr{
+	JustBeforeEach(func(ctx SpecContext) {
+		nd := newNATDiscovery(ctx, &localEndpoint, &net.UDPAddr{
 			IP:   net.ParseIP(testLocalPrivateIP),
 			Port: int(testLocalNATPort),
 		}, nil)

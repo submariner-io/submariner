@@ -89,13 +89,14 @@ var _ = Describe("[external-dataplane-globalnet] Connectivity", func() {
 	var err error
 
 	verifyInteraction := func(clusterScheduling framework.NetworkPodScheduling, extEpType ExtEndpointType) {
-		It("should be able to connect from/to an external app to/from a pod in a cluster", func() {
+		It("should be able to connect from/to an external app to/from a pod in a cluster", func(ctx context.Context) {
 			if !framework.TestContext.GlobalnetEnabled {
 				framework.Skipf("Globalnet is not enabled, skipping the test...")
 				return
 			}
 
 			testGlobalNetExternalConnectivity(
+				ctx,
 				testParams{
 					Framework:         f,
 					ToEndpointType:    toEndpointType,
@@ -287,7 +288,7 @@ var _ = Describe("[external-dataplane-globalnet] Connectivity", func() {
 	})
 })
 
-func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
+func testGlobalNetExternalConnectivity(ctx context.Context, p testParams, g globalnetTestParams) {
 	gatewayCluster := getGatewayClusterName(framework.TestContext.ClusterIDs)
 	extClusterIdx, err := getGatewayClusterIndex(framework.TestContext.ClusterIDs)
 	Expect(err).NotTo(HaveOccurred())
@@ -302,27 +303,27 @@ func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
 
 	switch g.ExtEndpointType {
 	case ClusterIP:
-		extSvc = p.Framework.CreateTCPServiceWithoutSelector(extClusterIdx, "extsvc", "http", framework.TestPort)
+		extSvc = p.Framework.CreateTCPServiceWithoutSelector(ctx, extClusterIdx, "extsvc", "http", framework.TestPort)
 	case Headless:
 		// TODO: move this method to framework
-		extSvc = createHeadlessTCPServiceWithoutSelector(p.Framework, extClusterIdx, "extsvc", "http", framework.TestPort)
+		extSvc = createHeadlessTCPServiceWithoutSelector(ctx, p.Framework, extClusterIdx, "extsvc", "http", framework.TestPort)
 	}
 
-	p.Framework.CreateTCPEndpoints(extClusterIdx, extSvc.Name, "http", dockerIP, framework.TestPort)
-	p.Framework.CreateServiceExport(extClusterIdx, extSvc.Name)
+	p.Framework.CreateTCPEndpoints(ctx, extClusterIdx, extSvc.Name, "http", dockerIP, framework.TestPort)
+	p.Framework.CreateServiceExport(ctx, extClusterIdx, extSvc.Name)
 
 	// Get globalIPs for the extApp to use later
-	extIngressGlobalIP := getGlobalIngressIPForExternal(p, g, extSvc, dockerIP)
+	extIngressGlobalIP := getGlobalIngressIPForExternal(ctx, p, g, extSvc, dockerIP)
 	Expect(extIngressGlobalIP).ToNot(Equal(""))
 
-	extEgressGlobalIPs := p.Framework.AwaitClusterGlobalEgressIPs(extClusterIdx, constants.ClusterGlobalEgressIPName)
+	extEgressGlobalIPs := p.Framework.AwaitClusterGlobalEgressIPs(ctx, extClusterIdx, constants.ClusterGlobalEgressIPName)
 	Expect(extEgressGlobalIPs).ToNot(BeEmpty())
 
 	clusterName := framework.TestContext.ClusterIDs[p.Cluster]
 
 	framework.By(fmt.Sprintf("Creating a pod and a service in cluster %q", clusterName))
 
-	np := p.Framework.NewNetworkPod(&framework.NetworkPodConfig{
+	np := p.Framework.NewNetworkPod(ctx, &framework.NetworkPodConfig{
 		Type:          framework.CustomPod,
 		Port:          framework.TestPort,
 		Cluster:       p.Cluster,
@@ -332,14 +333,14 @@ func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
 		ImageName:     testImage,
 		Command:       simpleHTTPServerCommand,
 	})
-	svc := createSvc(p, np)
-	p.Framework.CreateServiceExport(np.Config.Cluster, svc.Name)
+	svc := createSvc(ctx, p, np)
+	p.Framework.CreateServiceExport(ctx, np.Config.Cluster, svc.Name)
 
 	// Get globalIPs for the network pod to use later
-	remoteIP := getGlobalIngressIP(p, svc)
+	remoteIP := getGlobalIngressIP(ctx, p, svc)
 	Expect(remoteIP).ToNot(Equal(""))
 
-	podGlobalIPs := getPodGlobalIPs(p, g, np)
+	podGlobalIPs := getPodGlobalIPs(ctx, p, g, np)
 	Expect(podGlobalIPs).ToNot(BeEmpty())
 
 	framework.By(fmt.Sprintf("Sending an http request from external app %q to the service %q in the cluster %q",
@@ -348,7 +349,7 @@ func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
 	command := []string{"curl", "-m", "10", fmt.Sprintf("%s:%d/%s%s", remoteIP, framework.TestPort, p.Framework.Namespace, clusterName)}
 	_, _ = docker.RunCommand(command...)
 
-	podLog := np.GetLog()
+	podLog := np.GetLog(ctx)
 
 	if p.Cluster == extClusterIdx {
 		// TODO: current behavior is that source IP from external app to the pod in the cluster that directly connected to
@@ -385,7 +386,7 @@ func testGlobalNetExternalConnectivity(p testParams, g globalnetTestParams) {
 		np.Pod.Name, clusterName, extIngressGlobalIP))
 
 	cmd := []string{"curl", "-m", "10", fmt.Sprintf("%s:%d/%s%s", extIngressGlobalIP, framework.TestPort, p.Framework.Namespace, clusterName)}
-	_, _ = np.RunCommand(context.TODO(), cmd)
+	_, _ = np.RunCommand(ctx, cmd)
 	_, dockerLog := docker.GetLog()
 
 	switch p.ToEndpointType {
@@ -434,87 +435,87 @@ func newGlobalEgressIPObj(namespace string, selector *metav1.LabelSelector) (*un
 	return unstructuredEgressIPSpec, nil
 }
 
-func createSvc(p testParams, np *framework.NetworkPod) *v1.Service {
+func createSvc(ctx context.Context, p testParams, np *framework.NetworkPod) *v1.Service {
 	switch p.ToEndpointType {
 	default:
 		fallthrough
 	case tcp.PodIP, tcp.ServiceIP:
 		framework.Failf("Unsupported ToEndpointType %v was passed", p.ToEndpointType)
 	case tcp.GlobalServiceIP:
-		return np.CreateService()
+		return np.CreateService(ctx)
 	case tcp.GlobalPodIP:
-		return p.Framework.CreateHeadlessTCPService(np.Config.Cluster, np.Pod.Labels["test-app"],
+		return p.Framework.CreateHeadlessTCPService(ctx, np.Config.Cluster, np.Pod.Labels["test-app"],
 			np.Config.Port)
 	}
 
 	return nil
 }
 
-func getGlobalIngressIP(p testParams, service *v1.Service) string {
+func getGlobalIngressIP(ctx context.Context, p testParams, service *v1.Service) string {
 	switch p.ToEndpointType {
 	default:
 		fallthrough
 	case tcp.PodIP, tcp.ServiceIP:
 		framework.Failf("Unsupported ToEndpointType %v was passed", p.ToEndpointType)
 	case tcp.GlobalServiceIP:
-		return p.Framework.AwaitGlobalIngressIP(p.Cluster, service.Name, service.Namespace)
+		return p.Framework.AwaitGlobalIngressIP(ctx, p.Cluster, service.Name, service.Namespace)
 	case tcp.GlobalPodIP:
-		podList := p.Framework.AwaitPodsByLabelSelector(p.Cluster, labels.Set(service.Spec.Selector).AsSelector().String(),
+		podList := p.Framework.AwaitPodsByLabelSelector(ctx, p.Cluster, labels.Set(service.Spec.Selector).AsSelector().String(),
 			service.Namespace, 1)
 		ingressIPName := "pod-" + podList.Items[0].Name
 
-		return p.Framework.AwaitGlobalIngressIP(p.Cluster, ingressIPName, service.Namespace)
+		return p.Framework.AwaitGlobalIngressIP(ctx, p.Cluster, ingressIPName, service.Namespace)
 	}
 
 	return ""
 }
 
-func getGlobalIngressIPForExternal(p testParams, g globalnetTestParams, service *v1.Service, dockerIP string) string {
+func getGlobalIngressIPForExternal(ctx context.Context, p testParams, g globalnetTestParams, service *v1.Service, dockerIP string) string {
 	extClusterIdx, err := getGatewayClusterIndex(framework.TestContext.ClusterIDs)
 	Expect(err).NotTo(HaveOccurred())
 
 	switch g.ExtEndpointType {
 	case ClusterIP:
-		return p.Framework.AwaitGlobalIngressIP(extClusterIdx, service.Name, service.Namespace)
+		return p.Framework.AwaitGlobalIngressIP(ctx, extClusterIdx, service.Name, service.Namespace)
 	case Headless:
 		ingressIPName := fmt.Sprintf("ep-%.44s-%.15s", service.Name, dockerIP)
-		return p.Framework.AwaitGlobalIngressIP(extClusterIdx, ingressIPName, service.Namespace)
+		return p.Framework.AwaitGlobalIngressIP(ctx, extClusterIdx, ingressIPName, service.Namespace)
 	}
 
 	return ""
 }
 
-func getPodGlobalIPs(p testParams, g globalnetTestParams, np *framework.NetworkPod) []string {
+func getPodGlobalIPs(ctx context.Context, p testParams, g globalnetTestParams, np *framework.NetworkPod) []string {
 	switch g.ClusterEgressIPType {
 	case subFramework.ClusterSelector:
-		return p.Framework.AwaitClusterGlobalEgressIPs(p.Cluster, constants.ClusterGlobalEgressIPName)
+		return p.Framework.AwaitClusterGlobalEgressIPs(ctx, p.Cluster, constants.ClusterGlobalEgressIPName)
 	case subFramework.NameSpaceSelector:
 		geipObject, err := newGlobalEgressIPObj(np.Pod.Namespace, nil)
 		Expect(err).To(Succeed())
 
-		err = framework.CreateGlobalEgressIP(p.Cluster, geipObject)
+		err = framework.CreateGlobalEgressIP(ctx, p.Cluster, geipObject)
 		Expect(err).To(Succeed())
 
-		return framework.AwaitGlobalEgressIPs(p.Cluster, geipObject.GetName(), np.Pod.Namespace)
+		return framework.AwaitGlobalEgressIPs(ctx, p.Cluster, geipObject.GetName(), np.Pod.Namespace)
 	case subFramework.PodSelector:
 		podSelector := &metav1.LabelSelector{MatchLabels: map[string]string{"test-app": "custom"}}
 		geipObject, err := newGlobalEgressIPObj(np.Pod.Namespace, podSelector)
 		Expect(err).To(Succeed())
 
-		err = framework.CreateGlobalEgressIP(p.Cluster, geipObject)
+		err = framework.CreateGlobalEgressIP(ctx, p.Cluster, geipObject)
 		Expect(err).To(Succeed())
 
-		return framework.AwaitGlobalEgressIPs(p.Cluster, geipObject.GetName(), np.Pod.Namespace)
+		return framework.AwaitGlobalEgressIPs(ctx, p.Cluster, geipObject.GetName(), np.Pod.Namespace)
 	}
 
 	return []string{}
 }
 
-func createHeadlessTCPServiceWithoutSelector(f *framework.Framework, cluster framework.ClusterIndex,
+func createHeadlessTCPServiceWithoutSelector(ctx context.Context, f *framework.Framework, cluster framework.ClusterIndex,
 	svcName, portName string, port int32,
 ) *v1.Service {
 	serviceSpec := f.NewService(svcName, portName, port, v1.ProtocolTCP, nil, true, nil)
 	sc := framework.KubeClients[cluster].CoreV1().Services(f.Namespace)
 
-	return f.CreateService(sc, serviceSpec)
+	return f.CreateService(ctx, sc, serviceSpec)
 }

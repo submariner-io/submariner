@@ -52,7 +52,7 @@ var _ = Describe("Basic TCP connectivity tests across overlapping clusters witho
 		})
 
 		verifyInteraction := func(fromClusterScheduling, toClusterScheduling framework.NetworkPodScheduling) {
-			It("should have sent the expected data from the pod to the other pod", func() {
+			It("should have sent the expected data from the pod to the other pod", func(ctx context.Context) {
 				if !framework.TestContext.GlobalnetEnabled {
 					framework.Skipf("Globalnet is not enabled, skipping the test...")
 					return
@@ -63,7 +63,7 @@ var _ = Describe("Basic TCP connectivity tests across overlapping clusters witho
 					return
 				}
 
-				subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
+				subFramework.VerifyDatapathConnectivity(ctx, &tcp.ConnectivityTestParams{
 					Framework:             f,
 					ToEndpointType:        toEndpointType,
 					Networking:            networking,
@@ -90,8 +90,8 @@ var _ = Describe("Basic TCP connectivity tests across overlapping clusters witho
 
 			When("the pod is not on a gateway and the remote service is not on a gateway", Label(framework.BasicTestLabel), func() {
 				BeforeEach(func() {
-					runAdditionalTest = func(lpConfig framework.NetworkPodConfig, cpConfig framework.NetworkPodConfig, service *v1.Service,
-						verifyConnectivity func(listener *framework.NetworkPod, connector *framework.NetworkPod),
+					runAdditionalTest = func(ctx context.Context, lpConfig framework.NetworkPodConfig, cpConfig framework.NetworkPodConfig,
+						service *v1.Service, verifyConnectivity func(listener *framework.NetworkPod, connector *framework.NetworkPod),
 					) {
 						lpConfig.Port++
 						cpConfig.Port = lpConfig.Port
@@ -107,7 +107,7 @@ var _ = Describe("Basic TCP connectivity tests across overlapping clusters witho
 						})
 						Expect(err).To(Succeed())
 
-						verifyConnectivity(f.NewNetworkPod(&lpConfig), f.NewNetworkPod(&cpConfig))
+						verifyConnectivity(f.NewNetworkPod(ctx, &lpConfig), f.NewNetworkPod(ctx, &cpConfig))
 					}
 				})
 

@@ -34,7 +34,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 var _ = Describe("ServiceExport controller", func() {
@@ -56,90 +55,90 @@ func testClusterIPService() {
 	})
 
 	When("an existing Service is exported", func() {
-		BeforeEach(func() {
-			t.createServiceExport(t.createService(service))
+		BeforeEach(func(ctx context.Context) {
+			t.createServiceExport(ctx, t.createService(ctx, service))
 		})
 
-		It("should create an appropriate GlobalIngressIP", func() {
-			ingressIP := t.awaitGlobalIngressIP(service.Name)
+		It("should create an appropriate GlobalIngressIP", func(ctx context.Context) {
+			ingressIP := t.awaitGlobalIngressIP(ctx, service.Name)
 			Expect(ingressIP.Spec.Target).To(Equal(submarinerv1.ClusterIPService))
 			Expect(ingressIP.Spec.ServiceRef).ToNot(BeNil())
 			Expect(ingressIP.Spec.ServiceRef.Name).To(Equal(service.Name))
 		})
 
 		Context("and then unexported", func() {
-			It("should delete the GlobalIngressIP", func() {
-				t.awaitGlobalIngressIP(service.Name)
-				Expect(t.serviceExports.Delete(context.TODO(), service.Name, metav1.DeleteOptions{})).To(Succeed())
-				t.awaitNoGlobalIngressIP(service.Name)
+			It("should delete the GlobalIngressIP", func(ctx context.Context) {
+				t.awaitGlobalIngressIP(ctx, service.Name)
+				Expect(t.serviceExports.Delete(ctx, service.Name, metav1.DeleteOptions{})).To(Succeed())
+				t.awaitNoGlobalIngressIP(ctx, service.Name)
 			})
 		})
 	})
 
 	When("a Service is created after being exported", func() {
-		BeforeEach(func() {
-			t.createServiceExport(service)
+		BeforeEach(func(ctx context.Context) {
+			t.createServiceExport(ctx, service)
 		})
 
-		It("should eventually create a GlobalIngressIP", func() {
-			t.ensureNoGlobalIngressIP(service.Name)
-			t.createService(service)
-			t.awaitGlobalIngressIP(service.Name)
+		It("should eventually create a GlobalIngressIP", func(ctx context.Context) {
+			t.ensureNoGlobalIngressIP(ctx, service.Name)
+			t.createService(ctx, service)
+			t.awaitGlobalIngressIP(ctx, service.Name)
 		})
 	})
 
 	When("an unsupported type Service is exported", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx context.Context) {
 			service.Spec.Type = corev1.ServiceTypeNodePort
-			t.createServiceExport(t.createService(service))
+			t.createServiceExport(ctx, t.createService(ctx, service))
 		})
 
-		It("should not create a GlobalIngressIP", func() {
-			t.ensureNoGlobalIngressIP(service.Name)
+		It("should not create a GlobalIngressIP", func(ctx context.Context) {
+			t.ensureNoGlobalIngressIP(ctx, service.Name)
 		})
 	})
 
 	When("a GlobalIngressIP is stale on startup due to a missed ServiceExport delete event", func() {
-		BeforeEach(func() {
-			t.createServiceExport(t.createService(service))
+		BeforeEach(func(ctx context.Context) {
+			t.createServiceExport(ctx, t.createService(ctx, service))
 		})
 
 		It("should delete the GlobalIngressIP on reconciliation", func(ctx context.Context) {
-			t.awaitGlobalIngressIP(serviceName)
+			t.awaitGlobalIngressIP(ctx, serviceName)
 
 			t.controller.Stop(ctx)
 			time.Sleep(500 * time.Millisecond)
 			Expect(t.serviceExports.Delete(ctx, serviceName, metav1.DeleteOptions{})).To(Succeed())
 
 			t.start(ctx)
-			t.awaitNoGlobalIngressIP(serviceName)
+			t.awaitNoGlobalIngressIP(ctx, serviceName)
 		})
 	})
 
 	When("a dual-stack Service is exported", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx context.Context) {
 			service.Spec.IPFamilies = []corev1.IPFamily{corev1.IPv6Protocol, corev1.IPv4Protocol}
 			service.Spec.ClusterIPs = []string{ipv6IP, service.Spec.ClusterIP}
 
-			t.createServiceExport(t.createService(service))
+			t.createServiceExport(ctx, t.createService(ctx, service))
 		})
 
-		It("should create a GlobalIngressIP", func() {
-			t.awaitGlobalIngressIP(service.Name)
+		It("should create a GlobalIngressIP", func(ctx context.Context) {
+			t.awaitGlobalIngressIP(ctx, service.Name)
 		})
 	})
 
 	When("an IPv6 Service is exported", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx context.Context) {
 			service.Spec.IPFamilies = []corev1.IPFamily{corev1.IPv6Protocol}
 			service.Spec.ClusterIP = ipv6IP
 			service.Spec.ClusterIPs = []string{ipv6IP}
 
-			t.createServiceExport(t.createService(service))
+			t.createServiceExport(ctx, t.createService(ctx, service))
 		})
 
-		It("should not create a GlobalIngressIP", func() {
-			t.ensureNoGlobalIngressIP(service.Name)
+		It("should not create a GlobalIngressIP", func(ctx context.Context) {
+			t.ensureNoGlobalIngressIP(ctx, service.Name)
 		})
 	})
 }
@@ -155,13 +154,13 @@ func testHeadlessService() {
 		backendPod = newHeadlessServicePod(service.Name)
 	})
 
-	JustBeforeEach(func() {
-		t.createServiceExport(t.createService(service))
+	JustBeforeEach(func(ctx context.Context) {
+		t.createServiceExport(ctx, t.createService(ctx, service))
 	})
 
 	When("a backend Pod for an exported Service is created", func() {
-		BeforeEach(func() {
-			t.createPod(backendPod)
+		BeforeEach(func(ctx context.Context) {
+			t.createPod(ctx, backendPod)
 		})
 
 		It("should create an appropriate GlobalIngressIP", func(ctx context.Context) {
@@ -172,22 +171,22 @@ func testHeadlessService() {
 			It("should delete the GlobalIngressIP", func(ctx context.Context) {
 				ingressIP := t.awaitHeadlessGlobalIngressIP(ctx, service.Name, backendPod.Name)
 				t.deletePod(ctx, backendPod)
-				t.awaitNoGlobalIngressIP(ingressIP.Name)
+				t.awaitNoGlobalIngressIP(ctx, ingressIP.Name)
 			})
 		})
 	})
 
 	When("a backend Pod for an exported Service isn't running", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx context.Context) {
 			backendPod.Status.Phase = corev1.PodPending
-			t.createPod(backendPod)
+			t.createPod(ctx, backendPod)
 		})
 
 		It("should eventually create a GlobalIngressIP after the Pod transitions to running", func(ctx context.Context) {
 			t.ensureNoGlobalIngressIPs(ctx)
 
 			backendPod.Status.Phase = corev1.PodRunning
-			test.UpdateResource(t.pods.Namespace(namespace), backendPod)
+			test.UpdateResource(ctx, t.pods.Namespace(namespace), backendPod)
 			t.awaitHeadlessGlobalIngressIP(ctx, service.Name, backendPod.Name)
 		})
 
@@ -203,16 +202,16 @@ func testHeadlessService() {
 	})
 
 	When("a backend Pod for an exported Service doesn't initially have an IP", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx context.Context) {
 			backendPod.Status.PodIP = ""
-			t.createPod(backendPod)
+			t.createPod(ctx, backendPod)
 		})
 
 		It("should eventually create a GlobalIngressIP", func(ctx context.Context) {
 			t.ensureNoGlobalIngressIPs(ctx)
 
 			backendPod.Status.PodIP = "154.67.82.2"
-			test.UpdateResource(t.pods.Namespace(namespace), backendPod)
+			test.UpdateResource(ctx, t.pods.Namespace(namespace), backendPod)
 			t.awaitHeadlessGlobalIngressIP(ctx, service.Name, backendPod.Name)
 		})
 	})
@@ -221,10 +220,10 @@ func testHeadlessService() {
 		var backendPod2 *corev1.Pod
 		var otherPod *corev1.Pod
 
-		BeforeEach(func() {
-			t.createPod(backendPod)
-			backendPod2 = t.createPod(newHeadlessServicePod(service.Name))
-			otherPod = t.createPod(newPod(namespace))
+		BeforeEach(func(ctx context.Context) {
+			t.createPod(ctx, backendPod)
+			backendPod2 = t.createPod(ctx, newHeadlessServicePod(service.Name))
+			otherPod = t.createPod(ctx, newPod(namespace))
 		})
 
 		It("should delete the GlobalIngressIP objects associated with the backend Pods", func(ctx context.Context) {
@@ -232,20 +231,20 @@ func testHeadlessService() {
 			ingressIP2 := t.awaitHeadlessGlobalIngressIP(ctx, service.Name, backendPod2.Name)
 
 			Expect(t.serviceExports.Delete(ctx, service.Name, metav1.DeleteOptions{})).To(Succeed())
-			t.awaitNoGlobalIngressIP(ingressIP1.Name)
-			t.awaitNoGlobalIngressIP(ingressIP2.Name)
+			t.awaitNoGlobalIngressIP(ctx, ingressIP1.Name)
+			t.awaitNoGlobalIngressIP(ctx, ingressIP2.Name)
 
-			test.GetResource(t.pods.Namespace(namespace), otherPod)
+			test.GetResource(ctx, t.pods.Namespace(namespace), otherPod)
 
 			// Ensure GlobalIngressIPs are no longer created for the service.
-			t.createPod(newHeadlessServicePod(service.Name))
+			t.createPod(ctx, newHeadlessServicePod(service.Name))
 			t.ensureNoGlobalIngressIPs(ctx)
 		})
 	})
 
 	When("a Pod not associated to an exported Service is created", func() {
-		BeforeEach(func() {
-			t.createPod(newPod(namespace))
+		BeforeEach(func(ctx context.Context) {
+			t.createPod(ctx, newPod(namespace))
 		})
 
 		It("should not create a GlobalIngressIP", func(ctx context.Context) {
@@ -256,9 +255,9 @@ func testHeadlessService() {
 	When("backend Pod GlobalIngressIPs are stale on startup due to a missed ServiceExport delete event", func() {
 		var backendPod2 *corev1.Pod
 
-		BeforeEach(func() {
-			t.createPod(backendPod)
-			backendPod2 = t.createPod(newHeadlessServicePod(service.Name))
+		BeforeEach(func(ctx context.Context) {
+			t.createPod(ctx, backendPod)
+			backendPod2 = t.createPod(ctx, newHeadlessServicePod(service.Name))
 		})
 
 		It("should delete the GlobalIngressIPs on reconciliation", func(ctx context.Context) {
@@ -271,7 +270,7 @@ func testHeadlessService() {
 
 			t.start(ctx)
 
-			Eventually(func(g Gomega) {
+			Eventually(ctx, func(g Gomega, ctx context.Context) {
 				list, err := t.globalIngressIPs.List(ctx, metav1.ListOptions{})
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(list.Items).To(BeEmpty())
@@ -280,8 +279,8 @@ func testHeadlessService() {
 	})
 
 	When("a backend Pod GlobalIngressIP is stale on startup due to a missed Pod delete event", func() {
-		BeforeEach(func() {
-			t.createPod(backendPod)
+		BeforeEach(func(ctx context.Context) {
+			t.createPod(ctx, backendPod)
 		})
 
 		It("should delete the GlobalIngressIPs on reconciliation", func(ctx context.Context) {
@@ -292,10 +291,11 @@ func testHeadlessService() {
 			Expect(t.pods.Namespace(backendPod.Namespace).Delete(ctx, backendPod.Name, metav1.DeleteOptions{})).To(Succeed())
 
 			t.start(ctx)
-			Eventually(func() []unstructured.Unstructured {
-				list, _ := t.globalIngressIPs.List(ctx, metav1.ListOptions{})
-				return list.Items
-			}).Within(time.Second * 3).Should(BeEmpty())
+			Eventually(ctx, func(g Gomega, ctx context.Context) {
+				list, err := t.globalIngressIPs.List(ctx, metav1.ListOptions{})
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(list.Items).To(BeEmpty())
+			}).Within(time.Second * 3).Should(Succeed())
 		})
 	})
 }
@@ -312,22 +312,22 @@ func testServiceWithoutSelector() {
 	})
 
 	When("Endpoints resource is created before service is exported", func() {
-		BeforeEach(func() {
-			t.createService(service)
-			endpoints = t.createEndpoints(endpoints)
-			t.awaitEndpoints(endpoints.Name)
-			t.createServiceExport(service)
+		BeforeEach(func(ctx context.Context) {
+			t.createService(ctx, service)
+			endpoints = t.createEndpoints(ctx, endpoints)
+			t.awaitEndpoints(ctx, endpoints.Name)
+			t.createServiceExport(ctx, service)
 		})
 
-		It("should create an appropriate cloned Endpoints resource", func() {
-			t.awaitEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+		It("should create an appropriate cloned Endpoints resource", func(ctx context.Context) {
+			t.awaitEndpoints(ctx, controllers.GetInternalSvcName(endpoints.Name))
 		})
 
 		Context("and then original Endpoints resource is deleted", func() {
 			It("should delete the cloned endpoints", func(ctx context.Context) {
-				t.awaitEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+				t.awaitEndpoints(ctx, controllers.GetInternalSvcName(endpoints.Name))
 				t.deleteEndpoints(ctx, endpoints)
-				t.awaitNoEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+				t.awaitNoEndpoints(ctx, controllers.GetInternalSvcName(endpoints.Name))
 			})
 		})
 
@@ -336,7 +336,7 @@ func testServiceWithoutSelector() {
 				oldIP := "172.45.5.6" // defined in newEndpoints()
 				newIP := "172.45.5.7"
 
-				clonedEp := t.awaitEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+				clonedEp := t.awaitEndpoints(ctx, controllers.GetInternalSvcName(endpoints.Name))
 
 				// Confirm that both endpoints and clonedEP have oldIP
 				t.awaitEndpointsHasIP(ctx, endpoints.Name, oldIP)
@@ -344,7 +344,7 @@ func testServiceWithoutSelector() {
 
 				// Update endpoints to have newIP
 				updatedEp := newEndpoints(endpoints.Name, newIP, endpoints.Labels)
-				updatedEp = t.updateEndpoints(updatedEp)
+				updatedEp = t.updateEndpoints(ctx, updatedEp)
 
 				// Confirm that both endpoints and clonedEP have newIP
 				t.awaitEndpointsHasIP(ctx, updatedEp.Name, newIP)
@@ -354,22 +354,22 @@ func testServiceWithoutSelector() {
 	})
 
 	When("Endpoints resource is created after service is exported", func() {
-		BeforeEach(func() {
-			t.createService(service)
-			t.createServiceExport(service)
-			endpoints = t.createEndpoints(endpoints)
-			t.awaitEndpoints(endpoints.Name)
+		BeforeEach(func(ctx context.Context) {
+			t.createService(ctx, service)
+			t.createServiceExport(ctx, service)
+			endpoints = t.createEndpoints(ctx, endpoints)
+			t.awaitEndpoints(ctx, endpoints.Name)
 		})
 
-		It("should create an appropriate cloned Endpoints resource", func() {
-			t.awaitEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+		It("should create an appropriate cloned Endpoints resource", func(ctx context.Context) {
+			t.awaitEndpoints(ctx, controllers.GetInternalSvcName(endpoints.Name))
 		})
 
 		Context("and then original endpoints is deleted", func() {
 			It("should delete the cloned endpoints", func(ctx context.Context) {
-				t.awaitEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+				t.awaitEndpoints(ctx, controllers.GetInternalSvcName(endpoints.Name))
 				t.deleteEndpoints(ctx, endpoints)
-				t.awaitNoEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+				t.awaitNoEndpoints(ctx, controllers.GetInternalSvcName(endpoints.Name))
 			})
 		})
 
@@ -378,7 +378,7 @@ func testServiceWithoutSelector() {
 				oldIP := "172.45.5.6" // defined in newEndpoints()
 				newIP := "172.45.5.7"
 
-				clonedEp := t.awaitEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+				clonedEp := t.awaitEndpoints(ctx, controllers.GetInternalSvcName(endpoints.Name))
 
 				// Confirm that both endpoints and clonedEP have oldIP
 				t.awaitEndpointsHasIP(ctx, endpoints.Name, oldIP)
@@ -386,7 +386,7 @@ func testServiceWithoutSelector() {
 
 				// Update endpoints to have newIP
 				updatedEp := newEndpoints(endpoints.Name, newIP, endpoints.Labels)
-				updatedEp = t.updateEndpoints(updatedEp)
+				updatedEp = t.updateEndpoints(ctx, updatedEp)
 
 				// Confirm that both endpoints and clonedEP have newIP
 				t.awaitEndpointsHasIP(ctx, updatedEp.Name, newIP)
@@ -396,12 +396,12 @@ func testServiceWithoutSelector() {
 	})
 
 	When("cloned Endpoints resource is created", func() {
-		JustBeforeEach(func() {
-			t.createService(service)
-			t.createServiceExport(service)
-			endpoints = t.createEndpoints(endpoints)
-			t.awaitEndpoints(endpoints.Name)
-			t.awaitEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+		JustBeforeEach(func(ctx context.Context) {
+			t.createService(ctx, service)
+			t.createServiceExport(ctx, service)
+			endpoints = t.createEndpoints(ctx, endpoints)
+			t.awaitEndpoints(ctx, endpoints.Name)
+			t.awaitEndpoints(ctx, controllers.GetInternalSvcName(endpoints.Name))
 		})
 
 		Context("and then controller is stopped", func() {
@@ -410,14 +410,14 @@ func testServiceWithoutSelector() {
 					t.controller.Stop(ctx)
 
 					time.Sleep(50 * time.Millisecond)
-					t.awaitEndpoints(endpoints.Name)
-					t.awaitEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+					t.awaitEndpoints(ctx, endpoints.Name)
+					t.awaitEndpoints(ctx, controllers.GetInternalSvcName(endpoints.Name))
 
 					// Restart controller
 					t.start(ctx)
 
 					time.Sleep(50 * time.Millisecond)
-					t.awaitEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+					t.awaitEndpoints(ctx, controllers.GetInternalSvcName(endpoints.Name))
 				})
 
 			It("should delete the cloned Endpoints resource on controller restart if the original has been deleted",
@@ -425,16 +425,16 @@ func testServiceWithoutSelector() {
 					t.controller.Stop(ctx)
 
 					time.Sleep(50 * time.Millisecond)
-					t.awaitEndpoints(endpoints.Name)
-					t.awaitEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+					t.awaitEndpoints(ctx, endpoints.Name)
+					t.awaitEndpoints(ctx, controllers.GetInternalSvcName(endpoints.Name))
 
 					// Delete original endpoints before restart controller
 					t.deleteEndpoints(ctx, endpoints)
-					t.awaitNoEndpoints(endpoints.Name)
+					t.awaitNoEndpoints(ctx, endpoints.Name)
 
 					t.start(ctx)
 
-					t.ensureNoEndpoints(controllers.GetInternalSvcName(endpoints.Name))
+					t.ensureNoEndpoints(ctx, controllers.GetInternalSvcName(endpoints.Name))
 				})
 		})
 	})
@@ -446,15 +446,15 @@ func testHeadlessServiceWithoutSelector() {
 	var service *corev1.Service
 	var endpoints *corev1.Endpoints
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx context.Context) {
 		service = newHeadlessServiceWithoutSelector()
 		endpoints = newHeadlessServiceEndpoints(service.Name)
-		t.createServiceExport(t.createService(service))
+		t.createServiceExport(ctx, t.createService(ctx, service))
 	})
 
 	When("an endpoint for an exported Service is created", func() {
-		BeforeEach(func() {
-			t.createEndpoints(endpoints)
+		BeforeEach(func(ctx context.Context) {
+			t.createEndpoints(ctx, endpoints)
 		})
 
 		It("should create an appropriate GlobalIngressIP", func(ctx context.Context) {
@@ -465,7 +465,7 @@ func testHeadlessServiceWithoutSelector() {
 			It("should delete the GlobalIngressIP", func(ctx context.Context) {
 				ingressIP := t.awaitHeadlessGlobalIngressIPForEP(ctx, service.Name, endpoints.Name)
 				t.deleteEndpoints(ctx, endpoints)
-				t.awaitNoGlobalIngressIP(ingressIP.Name)
+				t.awaitNoGlobalIngressIP(ctx, ingressIP.Name)
 			})
 		})
 	})

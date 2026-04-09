@@ -82,7 +82,8 @@ type Config struct {
 	NewCableEngine       func(localCluster *types.SubmarinerCluster,
 		localEndpoint *endpoint.Local) cableengine.Engine
 	NewNATDiscovery       func(localEndpoint *endpoint.Local) (natdiscovery.Interface, error)
-	StartSigningRequestor func(syncerConfig broker.SyncerConfig, stopCh <-chan struct{}) (certificate.SigningRequestor, error)
+	StartSigningRequestor func(ctx context.Context, syncerConfig broker.SyncerConfig,
+		stopCh <-chan struct{}) (certificate.SigningRequestor, error)
 }
 
 type gatewayType struct {
@@ -280,7 +281,7 @@ func (g *gatewayType) onStartedLeading(ctx context.Context) {
 
 	logger.Info("Leadership acquired - starting controllers")
 
-	signingRequestor, err := g.StartSigningRequestor(g.SyncerConfig, ctx.Done())
+	signingRequestor, err := g.StartSigningRequestor(ctx, g.SyncerConfig, ctx.Done())
 	if err != nil {
 		g.fatalError <- errors.Wrap(err, "error starting the SigningRequestor")
 		return
@@ -415,7 +416,7 @@ func (g *gatewayType) initCableHealthChecker() {
 }
 
 func (g *gatewayType) uninstall(ctx context.Context) error {
-	signingRequestor, err := g.StartSigningRequestor(g.SyncerConfig, ctx.Done())
+	signingRequestor, err := g.StartSigningRequestor(ctx, g.SyncerConfig, ctx.Done())
 	if err != nil {
 		return errors.Wrap(err, "Error starting SigningRequestor")
 	}

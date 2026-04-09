@@ -59,8 +59,9 @@ func (t GlobalEgressIPType) String() string {
 	return "unknown"
 }
 
-type RunAdditionalTestFn func(listenerPodConfig framework.NetworkPodConfig, connectorPodConfig framework.NetworkPodConfig,
-	service *v1.Service, verifyConnectivity func(listener *framework.NetworkPod, connector *framework.NetworkPod))
+type RunAdditionalTestFn func(ctx context.Context, listenerPodConfig framework.NetworkPodConfig,
+	connectorPodConfig framework.NetworkPodConfig, service *v1.Service,
+	verifyConnectivity func(listener *framework.NetworkPod, connector *framework.NetworkPod))
 
 type GlobalnetTestParams struct {
 	GlobalnetEnabled  bool
@@ -68,15 +69,15 @@ type GlobalnetTestParams struct {
 	RunAdditionalTest RunAdditionalTestFn
 }
 
-func VerifyDatapathConnectivity(p *tcp.ConnectivityTestParams, gn GlobalnetTestParams) {
+func VerifyDatapathConnectivity(ctx context.Context, p *tcp.ConnectivityTestParams, gn GlobalnetTestParams) {
 	if gn.GlobalnetEnabled {
-		verifyGlobalnetDatapathConnectivity(p, gn)
+		verifyGlobalnetDatapathConnectivity(ctx, p, gn)
 	} else {
-		tcp.RunConnectivityTest(p)
+		tcp.RunConnectivityTest(ctx, p)
 	}
 }
 
-func verifyGlobalnetDatapathConnectivity(p *tcp.ConnectivityTestParams, gn GlobalnetTestParams) {
+func verifyGlobalnetDatapathConnectivity(ctx context.Context, p *tcp.ConnectivityTestParams, gn GlobalnetTestParams) {
 	Expect(p.ToEndpointType).To(BeElementOf([]tcp.EndpointType{tcp.GlobalServiceIP, tcp.GlobalPodIP}))
 
 	if p.ConnectionTimeout == 0 {
@@ -91,24 +92,24 @@ func verifyGlobalnetDatapathConnectivity(p *tcp.ConnectivityTestParams, gn Globa
 
 	switch gn.GlobalEgressIP {
 	case ClusterSelector:
-		connectorPodGlobalIPs = p.Framework.AwaitClusterGlobalEgressIPs(p.FromCluster, constants.ClusterGlobalEgressIPName)
+		connectorPodGlobalIPs = p.Framework.AwaitClusterGlobalEgressIPs(ctx, p.FromCluster, constants.ClusterGlobalEgressIPName)
 	case NameSpaceSelector:
 		geipObject, err := newGlobalEgressIPObj(p.Framework.Namespace, nil)
 		Expect(err).To(Succeed())
 
-		err = framework.CreateGlobalEgressIP(p.FromCluster, geipObject)
+		err = framework.CreateGlobalEgressIP(ctx, p.FromCluster, geipObject)
 		Expect(err).To(Succeed())
 
-		connectorPodGlobalIPs = framework.AwaitGlobalEgressIPs(p.FromCluster, geipObject.GetName(), p.Framework.Namespace)
+		connectorPodGlobalIPs = framework.AwaitGlobalEgressIPs(ctx, p.FromCluster, geipObject.GetName(), p.Framework.Namespace)
 	case PodSelector:
 		podSelector := &metav1.LabelSelector{MatchLabels: map[string]string{"test-app": "custom"}}
 		geipObject, err := newGlobalEgressIPObj(p.Framework.Namespace, podSelector)
 		Expect(err).To(Succeed())
 
-		err = framework.CreateGlobalEgressIP(p.FromCluster, geipObject)
+		err = framework.CreateGlobalEgressIP(ctx, p.FromCluster, geipObject)
 		Expect(err).To(Succeed())
 
-		connectorPodGlobalIPs = framework.AwaitGlobalEgressIPs(p.FromCluster, geipObject.GetName(), p.Framework.Namespace)
+		connectorPodGlobalIPs = framework.AwaitGlobalEgressIPs(ctx, p.FromCluster, geipObject.GetName(), p.Framework.Namespace)
 	}
 
 	Expect(connectorPodGlobalIPs).ToNot(BeEmpty())
@@ -124,22 +125,22 @@ func verifyGlobalnetDatapathConnectivity(p *tcp.ConnectivityTestParams, gn Globa
 		ConnectionAttempts: p.ConnectionAttempts,
 	}
 
-	listenerPod := p.Framework.NewNetworkPod(listenerPodConfig)
+	listenerPod := p.Framework.NewNetworkPod(ctx, listenerPodConfig)
 
 	framework.By(fmt.Sprintf("Pointing a ClusterIP service to the listener pod in cluster %q",
 		framework.TestContext.ClusterIDs[p.ToCluster]))
 
 	var service *v1.Service
 	if p.ToEndpointType == tcp.GlobalServiceIP {
-		service = listenerPod.CreateService()
+		service = listenerPod.CreateService(ctx)
 	} else if p.ToEndpointType == tcp.GlobalPodIP {
-		service = p.Framework.CreateHeadlessTCPService(listenerPod.Config.Cluster, listenerPod.Pod.Labels[testAppLabel],
+		service = p.Framework.CreateHeadlessTCPService(ctx, listenerPod.Config.Cluster, listenerPod.Pod.Labels[testAppLabel],
 			listenerPod.Config.Port)
 	}
 
-	p.Framework.CreateServiceExport(p.ToCluster, service.Name)
+	p.Framework.CreateServiceExport(ctx, p.ToCluster, service.Name)
 
-	remoteIP := getGlobalIngressIP(p, service)
+	remoteIP := getGlobalIngressIP(ctx, p, service)
 	Expect(remoteIP).ToNot(Equal(""))
 
 	framework.By(fmt.Sprintf("Creating a connector pod in cluster %q, which will attempt the specific UUID handshake over TCP",
@@ -166,7 +167,7 @@ func verifyGlobalnetDatapathConnectivity(p *tcp.ConnectivityTestParams, gn Globa
 			),
 		}
 
-		stdOut, _, err := p.Framework.ExecWithOptions(context.TODO(), &framework.ExecOptions{
+		stdOut, _, err := p.Framework.ExecWithOptions(ctx, &framework.ExecOptions{
 			Command:            cmd,
 			Namespace:          connector.Pod.Namespace,
 			PodName:            connector.Pod.Name,
@@ -182,9 +183,9 @@ func verifyGlobalnetDatapathConnectivity(p *tcp.ConnectivityTestParams, gn Globa
 
 		framework.By(fmt.Sprintf("Waiting for the listener pod %q on node %q to exit, returning what listener sent",
 			listener.Pod.Name, listener.Pod.Spec.NodeName))
-		listener.AwaitFinish()
+		listener.AwaitFinish(ctx)
 		listener.CheckSuccessfulFinish()
-		p.Framework.DeletePod(p.FromCluster, connector.Pod.Name, connector.Pod.Namespace)
+		p.Framework.DeletePod(ctx, p.FromCluster, connector.Pod.Name, connector.Pod.Namespace)
 
 		framework.By("Verifying that the listener got the connector's data and the connector got the listener's data")
 		Expect(listener.TerminationMessage).To(ContainSubstring(connector.Config.Data))
@@ -200,28 +201,28 @@ func verifyGlobalnetDatapathConnectivity(p *tcp.ConnectivityTestParams, gn Globa
 
 		Expect(listener.TerminationMessage).To(matchIP)
 
-		p.Framework.DeletePod(listener.Config.Cluster, listener.Pod.Name, listener.Pod.Namespace)
+		p.Framework.DeletePod(ctx, listener.Config.Cluster, listener.Pod.Name, listener.Pod.Namespace)
 	}
 
-	verifyConnectivity(listenerPod, p.Framework.NewNetworkPod(connectorPodConfig))
+	verifyConnectivity(listenerPod, p.Framework.NewNetworkPod(ctx, connectorPodConfig))
 
 	if gn.RunAdditionalTest != nil {
-		gn.RunAdditionalTest(*listenerPodConfig, *connectorPodConfig, service, verifyConnectivity)
+		gn.RunAdditionalTest(ctx, *listenerPodConfig, *connectorPodConfig, service, verifyConnectivity)
 	}
 
-	p.Framework.DeleteServiceExport(p.ToCluster, service.Name)
-	p.Framework.DeleteService(p.ToCluster, service.Name)
+	p.Framework.DeleteServiceExport(ctx, p.ToCluster, service.Name)
+	p.Framework.DeleteService(ctx, p.ToCluster, service.Name)
 }
 
-func getGlobalIngressIP(p *tcp.ConnectivityTestParams, service *v1.Service) string {
+func getGlobalIngressIP(ctx context.Context, p *tcp.ConnectivityTestParams, service *v1.Service) string {
 	if p.ToEndpointType == tcp.GlobalServiceIP {
-		return p.Framework.AwaitGlobalIngressIP(p.ToCluster, service.Name, service.Namespace)
+		return p.Framework.AwaitGlobalIngressIP(ctx, p.ToCluster, service.Name, service.Namespace)
 	} else if p.ToEndpointType == tcp.GlobalPodIP {
-		podList := p.Framework.AwaitPodsByLabelSelector(p.ToCluster, labels.Set(service.Spec.Selector).AsSelector().String(),
+		podList := p.Framework.AwaitPodsByLabelSelector(ctx, p.ToCluster, labels.Set(service.Spec.Selector).AsSelector().String(),
 			service.Namespace, 1)
 		ingressIPName := "pod-" + podList.Items[0].Name
 
-		return p.Framework.AwaitGlobalIngressIP(p.ToCluster, ingressIPName, service.Namespace)
+		return p.Framework.AwaitGlobalIngressIP(ctx, p.ToCluster, ingressIPName, service.Namespace)
 	}
 
 	return ""

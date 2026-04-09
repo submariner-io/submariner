@@ -37,16 +37,16 @@ var _ = Describe("Request handling", func() {
 		remoteEndpoint submarinerv1.Endpoint
 	)
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		localEndpoint = createTestLocalEndpoint(true, false)
 		remoteEndpoint = createTestRemoteEndpoint(true, false)
 
-		localND = newNATDiscovery(&localEndpoint, &net.UDPAddr{
+		localND = newNATDiscovery(ctx, &localEndpoint, &net.UDPAddr{
 			IP:   net.ParseIP(testLocalPrivateIP),
 			Port: int(testLocalNATPort),
 		}, nil)
 
-		remoteND = newNATDiscovery(&remoteEndpoint, &net.UDPAddr{
+		remoteND = newNATDiscovery(ctx, &remoteEndpoint, &net.UDPAddr{
 			IP:   net.ParseIP(testRemotePrivateIP),
 			Port: int(testRemoteNATPort),
 		}, nil)

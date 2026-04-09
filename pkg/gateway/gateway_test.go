@@ -65,20 +65,20 @@ const publicIP = "1.2.3.4"
 var _ = Describe("Run", func() {
 	t := newTestDriver()
 
-	It("should start the controllers", func() {
+	It("should start the controllers", func(ctx context.Context) {
 		t.leaderElection.AwaitLeaseAcquired()
-		t.awaitLocalEndpoint()
-		t.awaitHAStatus(submarinerv1.HAStatusActive)
+		t.awaitLocalEndpoint(ctx)
+		t.awaitHAStatus(ctx, submarinerv1.HAStatusActive)
 
 		t.cableEngine.Lock()
 		t.cableEngine.HAStatus = submarinerv1.HAStatusActive
 		t.cableEngine.Unlock()
 
-		t.awaitGateway(func(gw *submarinerv1.Gateway) bool {
+		t.awaitGateway(ctx, func(gw *submarinerv1.Gateway) bool {
 			return gw.Status.HAStatus == submarinerv1.HAStatusActive
 		})
 
-		endpoint := t.awaitRemoteEndpointSyncedLocal(t.createRemoteEndpointOnBroker())
+		endpoint := t.awaitRemoteEndpointSyncedLocal(ctx, t.createRemoteEndpointOnBroker(ctx))
 		t.cableEngine.VerifyInstallCable(&endpoint.Spec)
 	})
 
@@ -111,17 +111,17 @@ var _ = Describe("Run", func() {
 			t.config.RetryPeriod = time.Millisecond * 20
 		})
 
-		JustBeforeEach(func() {
+		JustBeforeEach(func(ctx context.Context) {
 			t.leaderElection.AwaitLeaseAcquired()
-			t.awaitHAStatus(submarinerv1.HAStatusActive)
+			t.awaitHAStatus(ctx, submarinerv1.HAStatusActive)
 
-			t.awaitGateway(func(gw *submarinerv1.Gateway) bool {
+			t.awaitGateway(ctx, func(gw *submarinerv1.Gateway) bool {
 				return gw.Status.HAStatus == submarinerv1.HAStatusActive && reflect.DeepEqual(gw.Status.Connections, fakeDriver.Connections)
 			})
 		})
 
-		It("should re-acquire the leader lease after the failure is cleared", func() {
-			endpoint := t.awaitRemoteEndpointSyncedLocal(t.createRemoteEndpointOnBroker())
+		It("should re-acquire the leader lease after the failure is cleared", func(ctx context.Context) {
+			endpoint := t.awaitRemoteEndpointSyncedLocal(ctx, t.createRemoteEndpointOnBroker(ctx))
 			fakeDriver.AwaitConnectToEndpoint(&natdiscovery.NATEndpointInfo{
 				Endpoint:  *endpoint,
 				UseFamily: k8snet.IPv4,
@@ -135,26 +135,26 @@ var _ = Describe("Run", func() {
 
 			By("Ensuring controllers are stopped")
 
-			t.awaitHAStatus(submarinerv1.HAStatusPassive)
+			t.awaitHAStatus(ctx, submarinerv1.HAStatusPassive)
 
 			// The Gateway status should reflect that the CableEngine is stopped.
-			t.awaitGateway(func(gw *submarinerv1.Gateway) bool {
+			t.awaitGateway(ctx, func(gw *submarinerv1.Gateway) bool {
 				return gw.Status.HAStatus == submarinerv1.HAStatusPassive && len(gw.Status.Connections) == 0
 			})
 
 			// Ensure the datastore syncer is stopped.
-			brokerEndpoint := t.createRemoteEndpointOnBroker()
-			t.ensureNoRemoteEndpointSyncedLocal(brokerEndpoint)
+			brokerEndpoint := t.createRemoteEndpointOnBroker(ctx)
+			t.ensureNoRemoteEndpointSyncedLocal(ctx, brokerEndpoint)
 
 			// Ensure the tunnel controller is stopped.
-			Expect(t.endpoints.Namespace(t.config.Spec.Namespace).Delete(context.Background(), endpoint.Name, metav1.DeleteOptions{})).
+			Expect(t.endpoints.Namespace(t.config.Spec.Namespace).Delete(ctx, endpoint.Name, metav1.DeleteOptions{})).
 				To(Succeed())
 			fakeDriver.AwaitNoDisconnectFromEndpoint()
 
 			// Delete the endpoint from the broker and recreate locally to simulate a stale remote endpoint.
-			Expect(t.endpoints.Namespace(t.config.SyncerConfig.BrokerNamespace).Delete(context.Background(), endpoint.Name,
+			Expect(t.endpoints.Namespace(t.config.SyncerConfig.BrokerNamespace).Delete(ctx, endpoint.Name,
 				metav1.DeleteOptions{})).To(Succeed())
-			t.createEndpoint(t.config.Spec.Namespace, endpoint)
+			t.createEndpoint(ctx, t.config.Spec.Namespace, endpoint)
 
 			By("Setting leases resource updates to succeed")
 
@@ -166,14 +166,14 @@ var _ = Describe("Run", func() {
 
 			By("Ensuring controllers are restarted")
 
-			t.awaitHAStatus(submarinerv1.HAStatusActive)
+			t.awaitHAStatus(ctx, submarinerv1.HAStatusActive)
 
 			// The Gateway status should reflect that the CableEngine is re-started.
-			t.awaitGateway(func(gw *submarinerv1.Gateway) bool {
+			t.awaitGateway(ctx, func(gw *submarinerv1.Gateway) bool {
 				return gw.Status.HAStatus == submarinerv1.HAStatusActive && reflect.DeepEqual(gw.Status.Connections, fakeDriver.Connections)
 			})
 
-			endpoint2 := t.awaitRemoteEndpointSyncedLocal(brokerEndpoint)
+			endpoint2 := t.awaitRemoteEndpointSyncedLocal(ctx, brokerEndpoint)
 			fakeDriver.AwaitConnectToEndpoint(&natdiscovery.NATEndpointInfo{
 				Endpoint:  *endpoint2,
 				UseFamily: k8snet.IPv4,
@@ -184,13 +184,13 @@ var _ = Describe("Run", func() {
 	})
 
 	Context("on uninstall", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx context.Context) {
 			t.config.Spec.Uninstall = true
 
 			hostName, err := os.Hostname()
 			Expect(err).To(Succeed())
 
-			_, err = t.config.SubmarinerClient.SubmarinerV1().Gateways(t.config.Spec.Namespace).Create(context.Background(),
+			_, err = t.config.SubmarinerClient.SubmarinerV1().Gateways(t.config.Spec.Namespace).Create(ctx,
 				&submarinerv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: hostName,
@@ -198,15 +198,15 @@ var _ = Describe("Run", func() {
 				}, metav1.CreateOptions{})
 			Expect(err).To(Succeed())
 
-			test.CreateResource(t.endpoints.Namespace(t.config.Spec.Namespace), &submarinerv1.Endpoint{
+			test.CreateResource(ctx, t.endpoints.Namespace(t.config.Spec.Namespace), &submarinerv1.Endpoint{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "some-endpoint",
 				},
 			})
 		})
 
-		It("should perform cleanup", func() {
-			t.awaitNoEndpoints()
+		It("should perform cleanup", func(ctx context.Context) {
+			t.awaitNoEndpoints(ctx)
 			t.cableEngine.AwaitCleanup()
 			t.signingRequestor.AwaitUninstall()
 		})
@@ -242,7 +242,7 @@ type testDriver struct {
 func newTestDriver() *testDriver {
 	t := &testDriver{}
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx context.Context) {
 		t.expectedRunErr = nil
 		t.remoteIPCounter = 1
 
@@ -294,7 +294,7 @@ func newTestDriver() *testDriver {
 			NewNATDiscovery: func(_ *submendpoint.Local) (natdiscovery.Interface, error) {
 				return &fakeNATDiscovery{}, nil
 			},
-			StartSigningRequestor: func(_ broker.SyncerConfig, _ <-chan struct{}) (certificate.SigningRequestor, error) {
+			StartSigningRequestor: func(_ context.Context, _ broker.SyncerConfig, _ <-chan struct{}) (certificate.SigningRequestor, error) {
 				return t.signingRequestor, nil
 			},
 		}
@@ -310,14 +310,14 @@ func newTestDriver() *testDriver {
 		os.Setenv("NODE_NAME", t.nodeName)
 		os.Setenv("POD_NAME", t.localPodName)
 
-		_, err := t.config.KubeClient.CoreV1().Nodes().Create(context.Background(), &corev1.Node{
+		_, err := t.config.KubeClient.CoreV1().Nodes().Create(ctx, &corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: t.nodeName,
 			},
 		}, metav1.CreateOptions{})
 		Expect(err).To(Succeed())
 
-		_, err = t.config.KubeClient.CoreV1().Pods(t.config.Spec.Namespace).Create(context.Background(), &corev1.Pod{
+		_, err = t.config.KubeClient.CoreV1().Pods(t.config.Spec.Namespace).Create(ctx, &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: t.localPodName,
 			},
@@ -325,14 +325,14 @@ func newTestDriver() *testDriver {
 		Expect(err).To(Succeed())
 	})
 
-	JustBeforeEach(func() {
-		gw, err := gateway.New(context.TODO(), &t.config)
+	JustBeforeEach(func(ctx context.Context) {
+		gw, err := gateway.New(ctx, &t.config)
 		Expect(err).To(Succeed())
 
-		ctx, stop := context.WithCancel(context.Background())
+		ctx, stop := context.WithCancel(context.Background()) //nolint:contextcheck // Need a long-lived parent context
 		runCompleted := make(chan error, 1)
 
-		DeferCleanup(func() {
+		DeferCleanup(func(ctx context.Context) {
 			if t.expectedRunErr == nil {
 				stop()
 			}
@@ -349,17 +349,17 @@ func newTestDriver() *testDriver {
 
 			if t.expectedRunErr == nil {
 				Expect(err).To(Succeed())
-				t.awaitNoGateway()
+				t.awaitNoGateway(ctx)
 			} else {
 				Expect(err).To(ContainErrorSubstring(t.expectedRunErr))
 
 				if !t.config.Spec.Uninstall {
-					t.awaitGatewayStatusError(t.expectedRunErr.Error())
+					t.awaitGatewayStatusError(ctx, t.expectedRunErr.Error())
 				}
 			}
 
 			if !t.config.Spec.Uninstall {
-				t.awaitHAStatus(submarinerv1.HAStatusPassive)
+				t.awaitHAStatus(ctx, submarinerv1.HAStatusPassive)
 			}
 		})
 
@@ -378,9 +378,9 @@ func toEndpoint(from *unstructured.Unstructured) *submarinerv1.Endpoint {
 	return endpoint
 }
 
-func (t *testDriver) awaitLocalEndpoint() {
-	Eventually(func() bool {
-		l, err := t.endpoints.Namespace(t.config.Spec.Namespace).List(context.Background(), metav1.ListOptions{})
+func (t *testDriver) awaitLocalEndpoint(ctx context.Context) {
+	Eventually(func(ctx context.Context) bool {
+		l, err := t.endpoints.Namespace(t.config.Spec.Namespace).List(ctx, metav1.ListOptions{})
 		Expect(err).To(Succeed())
 
 		for i := range l.Items {
@@ -396,12 +396,12 @@ func (t *testDriver) awaitLocalEndpoint() {
 		}
 
 		return false
-	}, 3).Should(BeTrue())
+	}).Within(3 * time.Second).WithContext(ctx).Should(BeTrue())
 }
 
-func (t *testDriver) awaitNoEndpoints() {
+func (t *testDriver) awaitNoEndpoints(ctx context.Context) {
 	Eventually(func() int {
-		l, err := t.endpoints.Namespace(t.config.Spec.Namespace).List(context.Background(), metav1.ListOptions{})
+		l, err := t.endpoints.Namespace(t.config.Spec.Namespace).List(ctx, metav1.ListOptions{})
 		Expect(err).To(Succeed())
 
 		return len(l.Items)
@@ -430,34 +430,33 @@ func (t *testDriver) newRemoteEndpoint() *submarinerv1.Endpoint {
 	return ep
 }
 
-func (t *testDriver) createEndpoint(ns string, endpoint *submarinerv1.Endpoint) *submarinerv1.Endpoint {
-	return test.CreateResource(t.endpoints.Namespace(ns), endpoint)
+func (t *testDriver) createEndpoint(ctx context.Context, ns string, endpoint *submarinerv1.Endpoint) *submarinerv1.Endpoint {
+	return test.CreateResource(ctx, t.endpoints.Namespace(ns), endpoint)
 }
 
-func (t *testDriver) createRemoteEndpointOnBroker() *submarinerv1.Endpoint {
-	return t.createEndpoint(t.config.SyncerConfig.BrokerNamespace, t.newRemoteEndpoint())
+func (t *testDriver) createRemoteEndpointOnBroker(ctx context.Context) *submarinerv1.Endpoint {
+	return t.createEndpoint(ctx, t.config.SyncerConfig.BrokerNamespace, t.newRemoteEndpoint())
 }
 
-func (t *testDriver) awaitRemoteEndpointSyncedLocal(endpoint *submarinerv1.Endpoint) *submarinerv1.Endpoint {
-	return toEndpoint(test.AwaitResource(t.endpoints.Namespace(t.config.Spec.Namespace), endpoint.Name))
+func (t *testDriver) awaitRemoteEndpointSyncedLocal(ctx context.Context, endpoint *submarinerv1.Endpoint) *submarinerv1.Endpoint {
+	return toEndpoint(test.AwaitResource(ctx, t.endpoints.Namespace(t.config.Spec.Namespace), endpoint.Name))
 }
 
-func (t *testDriver) ensureNoRemoteEndpointSyncedLocal(endpoint *submarinerv1.Endpoint) {
-	testutil.EnsureNoResource(resource.ForDynamic(t.endpoints.Namespace(t.config.Spec.Namespace)), endpoint.Name)
+func (t *testDriver) ensureNoRemoteEndpointSyncedLocal(ctx context.Context, endpoint *submarinerv1.Endpoint) {
+	testutil.EnsureNoResource(ctx, resource.ForDynamic(t.endpoints.Namespace(t.config.Spec.Namespace)), endpoint.Name)
 }
 
-func (t *testDriver) awaitHAStatus(status submarinerv1.HAStatus) {
-	Eventually(func() string {
-		pod, err := t.config.KubeClient.CoreV1().Pods(t.config.Spec.Namespace).Get(context.Background(), t.localPodName, metav1.GetOptions{})
-		Expect(err).To(Succeed())
-
-		return pod.Labels["gateway.submariner.io/status"]
-	}, 3).Should(Equal(string(status)))
+func (t *testDriver) awaitHAStatus(ctx context.Context, status submarinerv1.HAStatus) {
+	Eventually(func(g Gomega, ctx context.Context) {
+		pod, err := t.config.KubeClient.CoreV1().Pods(t.config.Spec.Namespace).Get(ctx, t.localPodName, metav1.GetOptions{})
+		g.Expect(err).To(Succeed())
+		g.Expect(pod.Labels["gateway.submariner.io/status"]).To(Equal(string(status)))
+	}).Within(3 * time.Second).WithContext(ctx).Should(Succeed())
 }
 
-func (t *testDriver) awaitGateway(verify func(*submarinerv1.Gateway) bool) {
-	Eventually(func() []submarinerv1.Gateway {
-		l, err := t.config.SubmarinerClient.SubmarinerV1().Gateways(t.config.Spec.Namespace).List(context.Background(), metav1.ListOptions{})
+func (t *testDriver) awaitGateway(ctx context.Context, verify func(*submarinerv1.Gateway) bool) {
+	Eventually(func(ctx context.Context) []submarinerv1.Gateway {
+		l, err := t.config.SubmarinerClient.SubmarinerV1().Gateways(t.config.Spec.Namespace).List(ctx, metav1.ListOptions{})
 		Expect(err).To(Succeed())
 
 		if len(l.Items) == 1 && (verify == nil || verify(&l.Items[0])) {
@@ -465,26 +464,24 @@ func (t *testDriver) awaitGateway(verify func(*submarinerv1.Gateway) bool) {
 		}
 
 		return l.Items
-	}, 3).Should(BeEmpty())
+	}).Within(3 * time.Second).WithContext(ctx).Should(BeEmpty())
 }
 
-func (t *testDriver) awaitNoGateway() {
-	Eventually(func() int {
-		l, err := t.config.SubmarinerClient.SubmarinerV1().Gateways(t.config.Spec.Namespace).List(context.Background(), metav1.ListOptions{})
-		Expect(err).To(Succeed())
-
-		return len(l.Items)
-	}, 3).Should(BeZero())
+func (t *testDriver) awaitNoGateway(ctx context.Context) {
+	Eventually(func(g Gomega, ctx context.Context) {
+		l, err := t.config.SubmarinerClient.SubmarinerV1().Gateways(t.config.Spec.Namespace).List(ctx, metav1.ListOptions{})
+		g.Expect(err).To(Succeed())
+		g.Expect(l.Items).Should(BeEmpty())
+	}).Within(3 * time.Second).WithContext(ctx).Should(Succeed())
 }
 
-func (t *testDriver) awaitGatewayStatusError(s string) {
-	Eventually(func() string {
-		l, err := t.config.SubmarinerClient.SubmarinerV1().Gateways(t.config.Spec.Namespace).List(context.Background(), metav1.ListOptions{})
-		Expect(err).To(Succeed())
-		Expect(l.Items).To(HaveLen(1))
-
-		return l.Items[0].Status.StatusFailure
-	}, 3).Should(ContainSubstring(s))
+func (t *testDriver) awaitGatewayStatusError(ctx context.Context, s string) {
+	Eventually(func(g Gomega, ctx context.Context) {
+		l, err := t.config.SubmarinerClient.SubmarinerV1().Gateways(t.config.Spec.Namespace).List(ctx, metav1.ListOptions{})
+		g.Expect(err).To(Succeed())
+		g.Expect(l.Items).To(HaveLen(1))
+		g.Expect(l.Items[0].Status.StatusFailure).To(ContainSubstring(s))
+	}).Within(3 * time.Second).WithContext(ctx).Should(Succeed())
 }
 
 type fakeNATDiscovery struct {

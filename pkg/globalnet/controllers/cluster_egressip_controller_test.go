@@ -58,8 +58,8 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 			})
 
 			Context("and the NumberOfIPs unchanged", func() {
-				BeforeEach(func() {
-					t.createClusterGlobalEgressIP(existing)
+				BeforeEach(func(ctx context.Context) {
+					t.createClusterGlobalEgressIP(ctx, existing)
 				})
 
 				It("should not reallocate the global IPs", func(ctx context.Context) {
@@ -84,10 +84,10 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 			})
 
 			Context("and the NumberOfIPs changed", func() {
-				BeforeEach(func() {
+				BeforeEach(func(ctx context.Context) {
 					n := *existing.Spec.NumberOfIPs + 1
 					existing.Spec.NumberOfIPs = &n
-					t.createClusterGlobalEgressIP(existing)
+					t.createClusterGlobalEgressIP(ctx, existing)
 				})
 
 				It("should reallocate the global IPs", func(ctx context.Context) {
@@ -102,7 +102,7 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 			})
 
 			Context("and they're already reserved", func() {
-				BeforeEach(func() {
+				BeforeEach(func(ctx context.Context) {
 					existing.Status.Conditions = []metav1.Condition{
 						{
 							Type:    string(submarinerv1.GlobalEgressIPAllocated),
@@ -112,7 +112,7 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 						},
 					}
 
-					t.createClusterGlobalEgressIP(existing)
+					t.createClusterGlobalEgressIP(ctx, existing)
 					Expect(t.pool.Reserve(existing.Status.AllocatedIPs...)).To(Succeed())
 				})
 
@@ -132,9 +132,9 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 			})
 
 			Context("and programming the IP table rules fails", func() {
-				BeforeEach(func() {
+				BeforeEach(func(ctx context.Context) {
 					t.expectInstantiationError = true
-					t.createClusterGlobalEgressIP(existing)
+					t.createClusterGlobalEgressIP(ctx, existing)
 					t.pFilter.AddFailOnAppendRuleMatcher(ContainSubstring(existing.Status.AllocatedIPs[0]))
 				})
 
@@ -147,8 +147,8 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 		})
 
 		Context("with the NumberOfIPs negative", func() {
-			BeforeEach(func() {
-				t.createClusterGlobalEgressIP(newClusterGlobalEgressIP(constants.ClusterGlobalEgressIPName, -1))
+			BeforeEach(func(ctx context.Context) {
+				t.createClusterGlobalEgressIP(ctx, newClusterGlobalEgressIP(constants.ClusterGlobalEgressIPName, -1))
 			})
 
 			It("should add an appropriate Status condition", func(ctx context.Context) {
@@ -161,8 +161,8 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 		})
 
 		Context("with the NumberOfIPs zero", func() {
-			BeforeEach(func() {
-				t.createClusterGlobalEgressIP(newClusterGlobalEgressIP(constants.ClusterGlobalEgressIPName, 0))
+			BeforeEach(func(ctx context.Context) {
+				t.createClusterGlobalEgressIP(ctx, newClusterGlobalEgressIP(constants.ClusterGlobalEgressIPName, 0))
 			})
 
 			It("should add an appropriate Status condition", func(ctx context.Context) {
@@ -175,7 +175,7 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 		})
 
 		Context("with previously appended Status conditions", func() {
-			BeforeEach(func() {
+			BeforeEach(func(ctx context.Context) {
 				existing := newClusterGlobalEgressIP(constants.ClusterGlobalEgressIPName, 1)
 				existing.Status.Conditions = []metav1.Condition{
 					{
@@ -192,7 +192,7 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 					},
 				}
 
-				t.createClusterGlobalEgressIP(existing)
+				t.createClusterGlobalEgressIP(ctx, existing)
 			})
 
 			It("should trim the Status conditions", func(ctx context.Context) {
@@ -205,15 +205,15 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 		var existing *submarinerv1.ClusterGlobalEgressIP
 		var numberOfIPs int
 
-		BeforeEach(func() {
+		BeforeEach(func(ctx context.Context) {
 			existing = newClusterGlobalEgressIP(constants.ClusterGlobalEgressIPName, 2)
 			existing.Status.AllocatedIPs = []string{globalIP1, globalIP2}
-			t.createClusterGlobalEgressIP(existing)
+			t.createClusterGlobalEgressIP(ctx, existing)
 		})
 
-		JustBeforeEach(func() {
+		JustBeforeEach(func(ctx context.Context) {
 			existing.Spec.NumberOfIPs = ptr.To(numberOfIPs)
-			test.UpdateResource(t.clusterGlobalEgressIPs, existing)
+			test.UpdateResource(ctx, t.clusterGlobalEgressIPs, existing)
 		})
 
 		Context("with the NumberOfIPs greater", func() {
@@ -305,8 +305,8 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 				numberOfIPs = t.pool.Size() + 1
 			})
 
-			It("should add an appropriate Status condition", func() {
-				t.awaitStatusConditions(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, metav1.Condition{
+			It("should add an appropriate Status condition", func(ctx context.Context) {
+				t.awaitStatusConditions(ctx, t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, metav1.Condition{
 					Type:   string(submarinerv1.GlobalEgressIPAllocated),
 					Status: metav1.ConditionFalse,
 					Reason: "IPPoolAllocationFailed",
@@ -318,8 +318,8 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 	When("the well-known ClusterGlobalEgressIP is deleted", func() {
 		var allocatedIPs []string
 
-		BeforeEach(func() {
-			t.createClusterGlobalEgressIP(newClusterGlobalEgressIP(constants.ClusterGlobalEgressIPName, 1))
+		BeforeEach(func(ctx context.Context) {
+			t.createClusterGlobalEgressIP(ctx, newClusterGlobalEgressIP(constants.ClusterGlobalEgressIPName, 1))
 		})
 
 		JustBeforeEach(func(ctx context.Context) {
@@ -335,8 +335,8 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 	})
 
 	When("a ClusterGlobalEgressIP is created without the well-known name", func() {
-		JustBeforeEach(func() {
-			t.createClusterGlobalEgressIP(newClusterGlobalEgressIP("other name", 1))
+		JustBeforeEach(func(ctx context.Context) {
+			t.createClusterGlobalEgressIP(ctx, newClusterGlobalEgressIP("other name", 1))
 		})
 
 		It("should not allocate the global IP", func(ctx context.Context) {

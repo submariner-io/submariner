@@ -19,6 +19,8 @@ limitations under the License.
 package framework
 
 import (
+	"context"
+
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
@@ -57,8 +59,8 @@ func beforeSuite() {
 		SubmarinerClients = append(SubmarinerClients, createSubmarinerClient(restConfig))
 	}
 
-	framework.DetectGlobalnet()
-	Expect(framework.InitNumClusterNodes()).ToNot(HaveOccurred())
+	framework.DetectGlobalnet(context.TODO())
+	Expect(framework.InitNumClusterNodes(context.TODO())).ToNot(HaveOccurred())
 }
 
 func (f *Framework) GetGatewayInformer(cluster framework.ClusterIndex) (cache.SharedIndexInformer, chan struct{}) {

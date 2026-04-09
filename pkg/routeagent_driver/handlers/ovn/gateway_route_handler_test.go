@@ -50,39 +50,39 @@ var _ = Describe("GatewayRouteHandler", func() {
 	})
 
 	Context("Dual-stack", func() {
-		JustBeforeEach(func() {
-			t.Start(ovn.NewGatewayRouteHandler(k8snet.IPv4, t.submClient), ovn.NewGatewayRouteHandler(k8snet.IPv6, t.submClient))
+		JustBeforeEach(func(ctx context.Context) {
+			t.Start(ctx, ovn.NewGatewayRouteHandler(k8snet.IPv4, t.submClient), ovn.NewGatewayRouteHandler(k8snet.IPv6, t.submClient))
 
-			t.CreateLocalHostEndpoint()
+			t.CreateLocalHostEndpoint(ctx)
 		})
 
-		It("should create GatewayRoutes for IPv4 and IPv6", func() {
-			t.createEndpoint(append(ipv6Subnets, ipv4Subnets...)...)
+		It("should create GatewayRoutes for IPv4 and IPv6", func(ctx context.Context) {
+			t.createEndpoint(ctx, append(ipv6Subnets, ipv4Subnets...)...)
 
-			t.awaitGatewayRoute(k8snet.IPv4, ipv4Subnets)
-			t.awaitGatewayRoute(k8snet.IPv6, ipv6Subnets)
+			t.awaitGatewayRoute(ctx, k8snet.IPv4, ipv4Subnets)
+			t.awaitGatewayRoute(ctx, k8snet.IPv6, ipv6Subnets)
 		})
 	})
 
 	Context("on transition to gateway", func() {
-		JustBeforeEach(func() {
-			t.Start(ovn.NewGatewayRouteHandler(k8snet.IPv4, t.submClient))
+		JustBeforeEach(func(ctx context.Context) {
+			t.Start(ctx, ovn.NewGatewayRouteHandler(k8snet.IPv4, t.submClient))
 		})
 
-		It("should create GatewayRoutes for all remote Endpoints", func() {
-			t.createEndpoint(ipv4Subnets...)
-			t.ensureNumGatewayRoutes(0)
+		It("should create GatewayRoutes for all remote Endpoints", func(ctx context.Context) {
+			t.createEndpoint(ctx, ipv4Subnets...)
+			t.ensureNumGatewayRoutes(ctx, 0)
 
-			localEndpoint := t.CreateLocalHostEndpoint()
-			t.awaitGatewayRoute(k8snet.IPv4, ipv4Subnets)
+			localEndpoint := t.CreateLocalHostEndpoint(ctx)
+			t.awaitGatewayRoute(ctx, k8snet.IPv4, ipv4Subnets)
 
-			t.DeleteEndpoint(localEndpoint.Name)
+			t.DeleteEndpoint(ctx, localEndpoint.Name)
 
 			t.submClient.Fake.ClearActions()
-			t.CreateLocalHostEndpoint()
+			t.CreateLocalHostEndpoint(ctx)
 
 			test.EnsureNoActionsForResource(&t.submClient.Fake, "gatewayroutes", "create")
-			t.awaitGatewayRoute(k8snet.IPv4, ipv4Subnets)
+			t.awaitGatewayRoute(ctx, k8snet.IPv4, ipv4Subnets)
 		})
 	})
 })
@@ -94,35 +94,35 @@ type gwRouteHandlerTestDriver struct {
 func (t *gwRouteHandlerTestDriver) testRemoteEndpoints(ipFamily k8snet.IPFamily, ipFamilySubnets, nonIPFamilySubnets []string) {
 	var endpoint *submarinerv1.Endpoint
 
-	JustBeforeEach(func() {
-		t.Start(ovn.NewGatewayRouteHandler(ipFamily, t.submClient))
+	JustBeforeEach(func(ctx context.Context) {
+		t.Start(ctx, ovn.NewGatewayRouteHandler(ipFamily, t.submClient))
 	})
 
 	When("a remote Endpoint is created and deleted on the gateway", func() {
-		JustBeforeEach(func() {
-			t.CreateLocalHostEndpoint()
+		JustBeforeEach(func(ctx context.Context) {
+			t.CreateLocalHostEndpoint(ctx)
 
 			By(fmt.Sprintf("Creating remote Endpoint with subnets %v", ipFamilySubnets))
 
-			endpoint = t.createEndpoint(ipFamilySubnets...)
+			endpoint = t.createEndpoint(ctx, ipFamilySubnets...)
 		})
 
-		It("should create/delete GatewayRoutes", func() {
-			gwRouteName := t.awaitGatewayRoute(ipFamily, ipFamilySubnets)
+		It("should create/delete GatewayRoutes", func(ctx context.Context) {
+			gwRouteName := t.awaitGatewayRoute(ctx, ipFamily, ipFamilySubnets)
 
-			t.CreateEndpoint(testing.NewEndpoint("other"+remoteClusterID, "host", nonIPFamilySubnets...))
-			t.ensureNumGatewayRoutes(1)
+			t.CreateEndpoint(ctx, testing.NewEndpoint("other"+remoteClusterID, "host", nonIPFamilySubnets...))
+			t.ensureNumGatewayRoutes(ctx, 1)
 
 			By("Deleting remote Endpoint")
 
-			t.DeleteEndpoint(endpoint.Name)
-			test.AwaitNoResource(ovn.GatewayResourceInterface(t.submClient, testing.Namespace), gwRouteName)
+			t.DeleteEndpoint(ctx, endpoint.Name)
+			test.AwaitNoResource(ctx, ovn.GatewayResourceInterface(t.submClient, testing.Namespace), gwRouteName)
 
 			By(fmt.Sprintf("Creating remote Endpoint with subnets %v", append(ipFamilySubnets, nonIPFamilySubnets...)))
 
-			t.createEndpoint(append(ipFamilySubnets, nonIPFamilySubnets...)...)
-			t.awaitGatewayRoute(ipFamily, ipFamilySubnets)
-			t.ensureNumGatewayRoutes(1)
+			t.createEndpoint(ctx, append(ipFamilySubnets, nonIPFamilySubnets...)...)
+			t.awaitGatewayRoute(ctx, ipFamily, ipFamilySubnets)
+			t.ensureNumGatewayRoutes(ctx, 1)
 		})
 
 		Context("and the GatewayRoute operations initially fail", func() {
@@ -133,21 +133,21 @@ func (t *gwRouteHandlerTestDriver) testRemoteEndpoints(ipFamily k8snet.IPFamily,
 				r.SetFailOnDelete(errors.New("mock GatewayRoute delete error"))
 			})
 
-			It("should eventually create/delete a GatewayRoute", func() {
-				gwRouteName := t.awaitGatewayRoute(ipFamily, nil)
+			It("should eventually create/delete a GatewayRoute", func(ctx context.Context) {
+				gwRouteName := t.awaitGatewayRoute(ctx, ipFamily, nil)
 
-				t.DeleteEndpoint(endpoint.Name)
-				test.AwaitNoResource(ovn.GatewayResourceInterface(t.submClient, testing.Namespace), gwRouteName)
+				t.DeleteEndpoint(ctx, endpoint.Name)
+				test.AwaitNoResource(ctx, ovn.GatewayResourceInterface(t.submClient, testing.Namespace), gwRouteName)
 			})
 		})
 	})
 }
 
-func (t *gwRouteHandlerTestDriver) awaitGatewayRoute(ipFamily k8snet.IPFamily, subnets []string) string {
+func (t *gwRouteHandlerTestDriver) awaitGatewayRoute(ctx context.Context, ipFamily k8snet.IPFamily, subnets []string) string {
 	var gwRoute *submarinerv1.GatewayRoute
 
 	Eventually(func(g Gomega) {
-		list, err := t.submClient.SubmarinerV1().GatewayRoutes(testing.Namespace).List(context.TODO(), metav1.ListOptions{})
+		list, err := t.submClient.SubmarinerV1().GatewayRoutes(testing.Namespace).List(ctx, metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		for i := range list.Items {
@@ -172,9 +172,9 @@ func (t *gwRouteHandlerTestDriver) awaitGatewayRoute(ipFamily k8snet.IPFamily, s
 	return gwRoute.Name
 }
 
-func (t *gwRouteHandlerTestDriver) ensureNumGatewayRoutes(num int) {
+func (t *gwRouteHandlerTestDriver) ensureNumGatewayRoutes(ctx context.Context, num int) {
 	Consistently(func() int {
-		list, err := t.submClient.SubmarinerV1().GatewayRoutes(testing.Namespace).List(context.TODO(), metav1.ListOptions{})
+		list, err := t.submClient.SubmarinerV1().GatewayRoutes(testing.Namespace).List(ctx, metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		return len(list.Items)

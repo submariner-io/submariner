@@ -365,8 +365,8 @@ var _ = Describe("Local", func() {
 		local = endpoint.NewLocal(spec, dynClient, testNamespace)
 	})
 
-	verifyResource := func() {
-		endpoint := test.GetResource(dynClient.Resource(submarinerv1.EndpointGVR).Namespace(testNamespace),
+	verifyResource := func(ctx context.Context) {
+		endpoint := test.GetResource(ctx, dynClient.Resource(submarinerv1.EndpointGVR).Namespace(testNamespace),
 			&submarinerv1.Endpoint{
 				ObjectMeta: v1meta.ObjectMeta{Name: local.Resource().Name},
 			})
@@ -377,10 +377,10 @@ var _ = Describe("Local", func() {
 		Expect(*local.Spec()).To(Equal(*spec))
 	})
 
-	Specify("Create followed by Update should create/update the resource in the datastore", func() {
-		Expect(local.Create(context.TODO())).To(Succeed())
+	Specify("Create followed by Update should create/update the resource in the datastore", func(ctx context.Context) {
+		Expect(local.Create(ctx)).To(Succeed())
 
-		verifyResource()
+		verifyResource(ctx)
 
 		spec.PublicIPs = []string{"11.22.33.44"}
 
@@ -389,17 +389,17 @@ var _ = Describe("Local", func() {
 		})).To(Succeed())
 
 		Expect(*local.Spec()).To(Equal(*spec))
-		verifyResource()
+		verifyResource(ctx)
 	})
 
-	Specify("Create with an existing resource in the datastore should update it", func() {
+	Specify("Create with an existing resource in the datastore should update it", func(ctx context.Context) {
 		r := local.Resource()
 		r.Spec.PublicIPs = []string{"8.8.8.8"}
-		test.CreateResource(dynClient.Resource(submarinerv1.EndpointGVR).Namespace(testNamespace), r)
+		test.CreateResource(ctx, dynClient.Resource(submarinerv1.EndpointGVR).Namespace(testNamespace), r)
 
-		Expect(local.Create(context.TODO())).To(Succeed())
+		Expect(local.Create(ctx)).To(Succeed())
 
-		verifyResource()
+		verifyResource(ctx)
 	})
 
 	Specify("Update before creation should only update the cached Spec", func() {

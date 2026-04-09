@@ -60,7 +60,7 @@ func NewControllerSupport() *ControllerSupport {
 	return c
 }
 
-func (c *ControllerSupport) Start(handlers ...event.Handler) {
+func (c *ControllerSupport) Start(ctx context.Context, handlers ...event.Handler) {
 	stopCh := make(chan struct{})
 
 	networkPlugin := handlers[0].GetNetworkPlugins()[0]
@@ -68,7 +68,7 @@ func (c *ControllerSupport) Start(handlers ...event.Handler) {
 		networkPlugin = event.AnyNetworkPlugin
 	}
 
-	registry, err := event.NewRegistry(context.TODO(), "test-registry", networkPlugin, handlers...)
+	registry, err := event.NewRegistry(ctx, "test-registry", networkPlugin, handlers...)
 	Expect(err).To(Succeed())
 
 	config := controller.Config{
@@ -92,7 +92,7 @@ func (c *ControllerSupport) Start(handlers ...event.Handler) {
 
 	DeferCleanup(func() {
 		close(stopCh)
-		eventController.Stop(context.TODO())
+		eventController.Stop(ctx)
 	})
 }
 
@@ -109,23 +109,23 @@ func NewEndpoint(clusterID, hostname string, subnets ...string) *submV1.Endpoint
 	}
 }
 
-func (c *ControllerSupport) CreateLocalHostEndpoint() *submV1.Endpoint {
-	return c.CreateEndpoint(NewEndpoint(LocalClusterID, c.Hostname))
+func (c *ControllerSupport) CreateLocalHostEndpoint(ctx context.Context) *submV1.Endpoint {
+	return c.CreateEndpoint(ctx, NewEndpoint(LocalClusterID, c.Hostname))
 }
 
-func (c *ControllerSupport) CreateEndpoint(endpoint *submV1.Endpoint) *submV1.Endpoint {
+func (c *ControllerSupport) CreateEndpoint(ctx context.Context, endpoint *submV1.Endpoint) *submV1.Endpoint {
 	endpoint.UID = uuid.NewUUID()
-	Expect(scheme.Scheme.Convert(test.CreateResource(c.endpoints, endpoint), endpoint, nil)).To(Succeed())
+	Expect(scheme.Scheme.Convert(test.CreateResource(ctx, c.endpoints, endpoint), endpoint, nil)).To(Succeed())
 
 	return endpoint
 }
 
-func (c *ControllerSupport) UpdateEndpoint(endpoint *submV1.Endpoint) {
-	test.UpdateResource(c.endpoints, endpoint)
+func (c *ControllerSupport) UpdateEndpoint(ctx context.Context, endpoint *submV1.Endpoint) {
+	test.UpdateResource(ctx, c.endpoints, endpoint)
 }
 
-func (c *ControllerSupport) DeleteEndpoint(name string) {
-	Expect(c.endpoints.Delete(context.TODO(), name, metav1.DeleteOptions{})).To(Succeed())
+func (c *ControllerSupport) DeleteEndpoint(ctx context.Context, name string) {
+	Expect(c.endpoints.Delete(ctx, name, metav1.DeleteOptions{})).To(Succeed())
 }
 
 func NewNode(name string) *corev1.Node {
@@ -136,15 +136,15 @@ func NewNode(name string) *corev1.Node {
 	}
 }
 
-func (c *ControllerSupport) CreateNode(node *corev1.Node) *corev1.Node {
-	Expect(scheme.Scheme.Convert(test.CreateResource(c.nodes, node), node, nil)).To(Succeed())
+func (c *ControllerSupport) CreateNode(ctx context.Context, node *corev1.Node) *corev1.Node {
+	Expect(scheme.Scheme.Convert(test.CreateResource(ctx, c.nodes, node), node, nil)).To(Succeed())
 	return node
 }
 
-func (c *ControllerSupport) UpdateNode(node *corev1.Node) {
-	test.UpdateResource(c.nodes, node)
+func (c *ControllerSupport) UpdateNode(ctx context.Context, node *corev1.Node) {
+	test.UpdateResource(ctx, c.nodes, node)
 }
 
-func (c *ControllerSupport) DeleteNode(name string) {
-	Expect(c.nodes.Delete(context.TODO(), name, metav1.DeleteOptions{})).To(Succeed())
+func (c *ControllerSupport) DeleteNode(ctx context.Context, name string) {
+	Expect(c.nodes.Delete(ctx, name, metav1.DeleteOptions{})).To(Succeed())
 }

@@ -87,13 +87,13 @@ var _ = Describe("[external-dataplane] Connectivity", func() {
 	var err error
 
 	verifyInteraction := func(clusterScheduling framework.NetworkPodScheduling) {
-		It("should be able to connect from/to an external app to/from a pod in a cluster", func() {
+		It("should be able to connect from/to an external app to/from a pod in a cluster", func(ctx context.Context) {
 			if framework.TestContext.GlobalnetEnabled {
 				framework.Skipf("Globalnet is enabled, skipping the test...")
 				return
 			}
 
-			testExternalConnectivity(testParams{
+			testExternalConnectivity(ctx, testParams{
 				Framework:         f,
 				ToEndpointType:    toEndpointType,
 				Networking:        networking,
@@ -190,14 +190,14 @@ var _ = Describe("[external-dataplane] Connectivity", func() {
 	})
 })
 
-func testExternalConnectivity(p testParams) {
+func testExternalConnectivity(ctx context.Context, p testParams) {
 	gatewayCluster := getGatewayClusterName(framework.TestContext.ClusterIDs)
 
 	clusterName := framework.TestContext.ClusterIDs[p.Cluster]
 
 	framework.By(fmt.Sprintf("Creating a pod and a service in cluster %q", clusterName))
 
-	np := p.Framework.NewNetworkPod(&framework.NetworkPodConfig{
+	np := p.Framework.NewNetworkPod(ctx, &framework.NetworkPodConfig{
 		Type:          framework.CustomPod,
 		Port:          framework.TestPort,
 		Cluster:       p.Cluster,
@@ -207,7 +207,7 @@ func testExternalConnectivity(p testParams) {
 		ImageName:     testImage,
 		Command:       simpleHTTPServerCommand,
 	})
-	svc := np.CreateService()
+	svc := np.CreateService(ctx)
 
 	// Get handle for existing docker
 	docker := framework.New(extAppName)
@@ -238,7 +238,7 @@ func testExternalConnectivity(p testParams) {
 
 	framework.By("Verifying the pod received the request")
 
-	podLog := np.GetLog()
+	podLog := np.GetLog(ctx)
 
 	if clusterName == gatewayCluster {
 		Expect(podLog).To(MatchRegexp(".*GET /%s%s .*", p.Framework.Namespace, clusterName))
@@ -250,7 +250,7 @@ func testExternalConnectivity(p testParams) {
 		np.Pod.Name, podIP, clusterName, dockerIP))
 
 	cmd := []string{"curl", "-m", "10", fmt.Sprintf("%s:%d/%s%s", dockerIP, framework.TestPort, p.Framework.Namespace, clusterName)}
-	_, _ = np.RunCommand(context.TODO(), cmd)
+	_, _ = np.RunCommand(ctx, cmd)
 
 	framework.By("Verifying that external app received request")
 	// Only check stderr

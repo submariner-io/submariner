@@ -71,7 +71,7 @@ func (d *DatastoreSyncer) Start(ctx context.Context) error {
 
 	logger.Info("Starting the datastore syncer")
 
-	syncer, err := d.createSyncer()
+	syncer, err := d.createSyncer(ctx)
 	if err != nil {
 		return err
 	}
@@ -105,7 +105,7 @@ func (d *DatastoreSyncer) Start(ctx context.Context) error {
 }
 
 func (d *DatastoreSyncer) Cleanup(ctx context.Context) error {
-	syncer, err := d.createSyncer()
+	syncer, err := d.createSyncer(ctx)
 	if err != nil {
 		return err
 	}
@@ -165,7 +165,7 @@ func (d *DatastoreSyncer) cleanupResources(ctx context.Context, client dynamic.N
 	return nil
 }
 
-func (d *DatastoreSyncer) createSyncer() (*broker.Syncer, error) {
+func (d *DatastoreSyncer) createSyncer(ctx context.Context) (*broker.Syncer, error) {
 	d.syncerConfig.ResourceConfigs = []broker.ResourceConfig{
 		{
 			LocalSourceNamespace:  d.syncerConfig.LocalNamespace,
@@ -186,7 +186,7 @@ func (d *DatastoreSyncer) createSyncer() (*broker.Syncer, error) {
 
 	d.syncerConfig.MaxLogVerbosity = global.Get("datastore-broker.syncer.max-verbosity", 0)
 
-	syncer, err := broker.NewSyncer(d.syncerConfig)
+	syncer, err := broker.NewSyncer(ctx, d.syncerConfig)
 
 	return syncer, errors.Wrap(err, "error creating the syncer")
 }

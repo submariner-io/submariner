@@ -19,6 +19,8 @@ limitations under the License.
 package framework
 
 import (
+	"context"
+
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -26,27 +28,29 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func (f *Framework) AwaitGatewayWithStatus(cluster framework.ClusterIndex, name string,
+func (f *Framework) AwaitGatewayWithStatus(ctx context.Context, cluster framework.ClusterIndex, name string,
 	status submarinerv1.HAStatus,
 ) *submarinerv1.Gateway {
-	return toGateway(f.Framework.AwaitGatewayWithStatus(cluster, name, string(status)))
+	return toGateway(f.Framework.AwaitGatewayWithStatus(ctx, cluster, name, string(status)))
 }
 
-func (f *Framework) AwaitGatewaysWithStatus(cluster framework.ClusterIndex, status submarinerv1.HAStatus) []submarinerv1.Gateway {
-	return toGateways(f.Framework.AwaitGatewaysWithStatus(cluster, string(status)))
+func (f *Framework) AwaitGatewaysWithStatus(ctx context.Context, cluster framework.ClusterIndex, status submarinerv1.HAStatus,
+) []submarinerv1.Gateway {
+	return toGateways(f.Framework.AwaitGatewaysWithStatus(ctx, cluster, string(status)))
 }
 
-func (f *Framework) AwaitGatewayFullyConnected(cluster framework.ClusterIndex, name string) *submarinerv1.Gateway {
-	return toGateway(f.Framework.AwaitGatewayFullyConnected(cluster, name))
+func (f *Framework) AwaitGatewayFullyConnected(ctx context.Context, cluster framework.ClusterIndex, name string) *submarinerv1.Gateway {
+	return toGateway(f.Framework.AwaitGatewayFullyConnected(ctx, cluster, name))
 }
 
-func (f *Framework) GetGatewaysWithHAStatus(cluster framework.ClusterIndex, status submarinerv1.HAStatus) []submarinerv1.Gateway {
-	return toGateways(f.Framework.GetGatewaysWithHAStatus(cluster, string(status)))
+func (f *Framework) GetGatewaysWithHAStatus(ctx context.Context, cluster framework.ClusterIndex, status submarinerv1.HAStatus,
+) []submarinerv1.Gateway {
+	return toGateways(f.Framework.GetGatewaysWithHAStatus(ctx, cluster, string(status)))
 }
 
-func FindClusterWithSingleGateway() framework.ClusterIndex {
+func FindClusterWithSingleGateway(ctx context.Context) framework.ClusterIndex {
 	for cluster := range framework.TestContext.ClusterIDs {
-		gatewayNodes := framework.FindGatewayNodes(framework.ClusterIndex(cluster))
+		gatewayNodes := framework.FindGatewayNodes(ctx, framework.ClusterIndex(cluster))
 		if len(gatewayNodes) == 1 {
 			return framework.ClusterIndex(cluster)
 		}

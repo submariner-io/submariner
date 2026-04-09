@@ -43,8 +43,8 @@ var _ = Describe("Gateway controller", func() {
 
 	Context("on startup", func() {
 		When("the Gateway doesn't have a global IP", func() {
-			BeforeEach(func() {
-				gateway = t.createGateway(t.hostName, "")
+			BeforeEach(func(ctx context.Context) {
+				gateway = t.createGateway(ctx, t.hostName, "")
 			})
 
 			It("should allocate it and program the relevant iptable rules", func(ctx context.Context) {
@@ -68,8 +68,8 @@ var _ = Describe("Gateway controller", func() {
 		})
 
 		When("the Gateway has a global IP", func() {
-			BeforeEach(func() {
-				gateway = t.createGateway(t.hostName, globalIP1)
+			BeforeEach(func(ctx context.Context) {
+				gateway = t.createGateway(ctx, t.hostName, globalIP1)
 				t.expectReservedIPs = []string{gateway.GetAnnotations()[constants.SmGlobalIP]}
 			})
 
@@ -100,8 +100,8 @@ var _ = Describe("Gateway controller", func() {
 	})
 
 	When("a non-active Gateway exists on startup and has a global IP", func() {
-		BeforeEach(func() {
-			gateway = t.createGateway("other-gateway", globalIP2)
+		BeforeEach(func(ctx context.Context) {
+			gateway = t.createGateway(ctx, "other-gateway", globalIP2)
 			t.expectReservedIPs = []string{gateway.GetAnnotations()[constants.SmGlobalIP]}
 		})
 

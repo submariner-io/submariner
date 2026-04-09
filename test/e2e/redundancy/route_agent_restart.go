@@ -42,35 +42,35 @@ var _ = Describe("Route Agent restart tests", Label(labels.Redundancy), func() {
 
 	var supportedFamilies []k8snet.IPFamily
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx context.Context) {
 		supportedFamilies = subDataplane.GetActualIPFamilies(
-			f.DetermineIPFamilyType(framework.ClusterA),
-			f.DetermineIPFamilyType(framework.ClusterB),
+			f.DetermineIPFamilyType(ctx, framework.ClusterA),
+			f.DetermineIPFamilyType(ctx, framework.ClusterB),
 		)
 	})
 
 	When("a route agent pod running on a gateway node is restarted", func() {
-		It("should start a new route agent pod and be able to connect from another cluster", func() {
-			testRouteAgentRestart(f, true, supportedFamilies)
+		It("should start a new route agent pod and be able to connect from another cluster", func(ctx context.Context) {
+			testRouteAgentRestart(ctx, f, true, supportedFamilies)
 		})
 	})
 
 	When("a route agent pod running on a non-gateway node is restarted", func() {
-		It("should start a new route agent pod and be able to connect from another cluster", func() {
-			testRouteAgentRestart(f, false, supportedFamilies)
+		It("should start a new route agent pod and be able to connect from another cluster", func(ctx context.Context) {
+			testRouteAgentRestart(ctx, f, false, supportedFamilies)
 		})
 	})
 })
 
-func testRouteAgentRestart(f *subFramework.Framework, onGateway bool, supportedFamilies []k8snet.IPFamily) {
+func testRouteAgentRestart(ctx context.Context, f *subFramework.Framework, onGateway bool, supportedFamilies []k8snet.IPFamily) {
 	clusterAName := framework.TestContext.ClusterIDs[framework.ClusterA]
 	clusterBName := framework.TestContext.ClusterIDs[framework.ClusterB]
 
 	var nodes []v1.Node
 	if onGateway {
-		nodes = framework.FindGatewayNodes(framework.ClusterA)
+		nodes = framework.FindGatewayNodes(ctx, framework.ClusterA)
 	} else {
-		nodes = framework.FindNonGatewayNodes(framework.ClusterA)
+		nodes = framework.FindNonGatewayNodes(ctx, framework.ClusterA)
 	}
 
 	if len(nodes) == 0 && !onGateway {
@@ -86,21 +86,21 @@ func testRouteAgentRestart(f *subFramework.Framework, onGateway bool, supportedF
 	framework.By(fmt.Sprintf("Found node %q on %q", nodes[0].Name, clusterAName))
 	node := nodes[0]
 
-	routeAgentPod := f.AwaitRouteAgentPodOnNode(framework.ClusterA, node.Name, "")
+	routeAgentPod := f.AwaitRouteAgentPodOnNode(ctx, framework.ClusterA, node.Name, "")
 	framework.By(fmt.Sprintf("Found route agent pod %q on node %q", routeAgentPod.Name, node.Name))
 
-	assertRouteAgentResource(framework.ClusterA, node.Name, routeAgentPod.Name)
+	assertRouteAgentResource(ctx, framework.ClusterA, node.Name, routeAgentPod.Name)
 
 	framework.By(fmt.Sprintf("Deleting route agent pod %q", routeAgentPod.Name))
-	f.DeletePod(framework.ClusterA, routeAgentPod.Name, framework.TestContext.SubmarinerNamespace)
+	f.DeletePod(ctx, framework.ClusterA, routeAgentPod.Name, framework.TestContext.SubmarinerNamespace)
 
-	newRouteAgentPod := f.AwaitRouteAgentPodOnNode(framework.ClusterA, node.Name, routeAgentPod.UID)
+	newRouteAgentPod := f.AwaitRouteAgentPodOnNode(ctx, framework.ClusterA, node.Name, routeAgentPod.UID)
 	framework.By(fmt.Sprintf("Found new route agent pod %q on node %q", newRouteAgentPod.Name, node.Name))
 
 	framework.By(fmt.Sprintf("Verifying TCP connectivity from gateway node on %q to gateway node on %q", clusterBName, clusterAName))
 
 	for _, ipFamily := range supportedFamilies {
-		subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
+		subFramework.VerifyDatapathConnectivity(ctx, &tcp.ConnectivityTestParams{
 			Framework:             f.Framework,
 			FromCluster:           framework.ClusterB,
 			FromClusterScheduling: framework.GatewayNode,
@@ -119,7 +119,7 @@ func testRouteAgentRestart(f *subFramework.Framework, onGateway bool, supportedF
 	framework.By(fmt.Sprintf("Verifying TCP connectivity from non-gateway node on %q to non-gateway node on %q", clusterBName, clusterAName))
 
 	for _, ipFamily := range supportedFamilies {
-		subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
+		subFramework.VerifyDatapathConnectivity(ctx, &tcp.ConnectivityTestParams{
 			Framework:             f.Framework,
 			FromCluster:           framework.ClusterB,
 			FromClusterScheduling: framework.NonGatewayNode,
@@ -131,13 +131,13 @@ func testRouteAgentRestart(f *subFramework.Framework, onGateway bool, supportedF
 	}
 }
 
-func assertRouteAgentResource(cluster framework.ClusterIndex, name, ownerName string) {
+func assertRouteAgentResource(ctx context.Context, cluster framework.ClusterIndex, name, ownerName string) {
 	raClient := framework.DynClients[cluster].Resource(submarinerv1.SchemeGroupVersion.WithResource("routeagents")).Namespace(
 		framework.TestContext.SubmarinerNamespace)
 
-	routeAgent := framework.AwaitUntil(fmt.Sprintf("await RouteAgent %q", name),
-		func() (*unstructured.Unstructured, error) {
-			ra, err := raClient.Get(context.TODO(), name, metav1.GetOptions{})
+	routeAgent := framework.AwaitUntil(ctx, fmt.Sprintf("await RouteAgent %q", name),
+		func(ctx context.Context) (*unstructured.Unstructured, error) {
+			ra, err := raClient.Get(ctx, name, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				return nil, nil //nolint:nilnil // OK
 			}

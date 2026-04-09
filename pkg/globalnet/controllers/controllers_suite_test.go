@@ -208,16 +208,16 @@ func (t *testDriverBase) awaitIPsReleasedFromPool(ips ...string) {
 	}, 3*time.Second).Should(Succeed())
 }
 
-func (t *testDriverBase) createGlobalEgressIP(egressIP *submarinerv1.GlobalEgressIP) {
-	test.CreateResource(t.globalEgressIPs, egressIP)
+func (t *testDriverBase) createGlobalEgressIP(ctx context.Context, egressIP *submarinerv1.GlobalEgressIP) {
+	test.CreateResource(ctx, t.globalEgressIPs, egressIP)
 }
 
-func (t *testDriverBase) createClusterGlobalEgressIP(egressIP *submarinerv1.ClusterGlobalEgressIP) {
-	test.CreateResource(t.clusterGlobalEgressIPs, egressIP)
+func (t *testDriverBase) createClusterGlobalEgressIP(ctx context.Context, egressIP *submarinerv1.ClusterGlobalEgressIP) {
+	test.CreateResource(ctx, t.clusterGlobalEgressIPs, egressIP)
 }
 
-func (t *testDriverBase) createGlobalIngressIP(ingressIP *submarinerv1.GlobalIngressIP) {
-	test.CreateResource(t.globalIngressIPs, ingressIP)
+func (t *testDriverBase) createGlobalIngressIP(ctx context.Context, ingressIP *submarinerv1.GlobalIngressIP) {
+	test.CreateResource(ctx, t.globalIngressIPs, ingressIP)
 }
 
 //nolint:unparam // `name` always receives `globalEgressIPName`
@@ -229,16 +229,16 @@ func (t *testDriverBase) awaitClusterGlobalEgressIPStatusAllocated(ctx context.C
 	t.awaitEgressIPStatusAllocated(ctx, t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, expNumIPS)
 }
 
-func (t *testDriverBase) createPod(p *corev1.Pod) *corev1.Pod {
-	return test.CreateResource(t.pods.Namespace(p.Namespace), p)
+func (t *testDriverBase) createPod(ctx context.Context, p *corev1.Pod) *corev1.Pod {
+	return test.CreateResource(ctx, t.pods.Namespace(p.Namespace), p)
 }
 
 func (t *testDriverBase) deletePod(ctx context.Context, p *corev1.Pod) {
 	Expect(t.pods.Namespace(p.Namespace).Delete(ctx, p.Name, metav1.DeleteOptions{})).To(Succeed())
 }
 
-func (t *testDriverBase) createEndpoints(ep *corev1.Endpoints) *corev1.Endpoints {
-	test.CreateResource(t.endpoints, ep)
+func (t *testDriverBase) createEndpoints(ctx context.Context, ep *corev1.Endpoints) *corev1.Endpoints {
+	test.CreateResource(ctx, t.endpoints, ep)
 	return ep
 }
 
@@ -247,18 +247,18 @@ func (t *testDriverBase) deleteEndpoints(ctx context.Context, ep *corev1.Endpoin
 	Expect(err).To(Succeed())
 }
 
-func (t *testDriverBase) updateEndpoints(ep *corev1.Endpoints) *corev1.Endpoints {
-	test.UpdateResource(t.endpoints, ep)
+func (t *testDriverBase) updateEndpoints(ctx context.Context, ep *corev1.Endpoints) *corev1.Endpoints {
+	test.UpdateResource(ctx, t.endpoints, ep)
 	return ep
 }
 
-func (t *testDriverBase) createService(service *corev1.Service) *corev1.Service {
-	test.CreateResource(t.services, service)
+func (t *testDriverBase) createService(ctx context.Context, service *corev1.Service) *corev1.Service {
+	test.CreateResource(ctx, t.services, service)
 	return service
 }
 
-func (t *testDriverBase) createServiceExport(s *corev1.Service) {
-	test.CreateResource(t.serviceExports, &mcsv1a1.ServiceExport{
+func (t *testDriverBase) createServiceExport(ctx context.Context, s *corev1.Service) {
+	test.CreateResource(ctx, t.serviceExports, &mcsv1a1.ServiceExport{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      s.GetName(),
 			Namespace: s.GetNamespace(),
@@ -279,7 +279,7 @@ func (t *testDriverBase) getGlobalIngressIPStatus(ctx context.Context, name stri
 	return status
 }
 
-func (t *testDriverBase) createGateway(name, globalIP string) *submarinerv1.Gateway {
+func (t *testDriverBase) createGateway(ctx context.Context, name, globalIP string) *submarinerv1.Gateway {
 	gateway := &submarinerv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -288,7 +288,7 @@ func (t *testDriverBase) createGateway(name, globalIP string) *submarinerv1.Gate
 
 	addAnnotation(gateway, constants.SmGlobalIP, globalIP)
 
-	return test.CreateResource(t.gateways, gateway)
+	return test.CreateResource(ctx, t.gateways, gateway)
 }
 
 func (t *testDriverBase) getGatewayGlobalIP(ctx context.Context, name string) string {
@@ -357,7 +357,7 @@ func getGlobalEgressIPStatus(ctx context.Context, client dynamic.ResourceInterfa
 func (t *testDriverBase) awaitEgressIPStatus(ctx context.Context, client dynamic.ResourceInterface, name string, expNumIPS int,
 	expCond ...metav1.Condition,
 ) {
-	t.awaitStatusConditions(client, name, expCond...)
+	t.awaitStatusConditions(ctx, client, name, expCond...)
 
 	var status *submarinerv1.GlobalEgressIPStatus
 
@@ -382,7 +382,7 @@ func (t *testDriverBase) awaitEgressIPStatusAllocated(ctx context.Context, clien
 }
 
 func (t *testDriverBase) awaitIngressIPStatus(ctx context.Context, name string, expCond ...metav1.Condition) {
-	t.awaitStatusConditions(t.globalIngressIPs, name, expCond...)
+	t.awaitStatusConditions(ctx, t.globalIngressIPs, name, expCond...)
 
 	status := t.getGlobalIngressIPStatus(ctx, name)
 
@@ -400,28 +400,28 @@ func (t *testDriverBase) awaitIngressIPStatusAllocated(ctx context.Context, name
 	})
 }
 
-func (t *testDriverBase) awaitGlobalIngressIP(name string) *submarinerv1.GlobalIngressIP {
-	return resource.MustFromUnstructured(test.AwaitResource(t.globalIngressIPs, name), &submarinerv1.GlobalIngressIP{})
+func (t *testDriverBase) awaitGlobalIngressIP(ctx context.Context, name string) *submarinerv1.GlobalIngressIP {
+	return resource.MustFromUnstructured(test.AwaitResource(ctx, t.globalIngressIPs, name), &submarinerv1.GlobalIngressIP{})
 }
 
-func (t *testDriverBase) awaitService(name string) *corev1.Service {
-	return resource.MustFromUnstructured(test.AwaitResource(t.services, name), &corev1.Service{})
+func (t *testDriverBase) awaitService(ctx context.Context, name string) *corev1.Service {
+	return resource.MustFromUnstructured(test.AwaitResource(ctx, t.services, name), &corev1.Service{})
 }
 
-func (t *testDriverBase) awaitNoService(name string) {
-	test.AwaitNoResource(t.services, name)
+func (t *testDriverBase) awaitNoService(ctx context.Context, name string) {
+	test.AwaitNoResource(ctx, t.services, name)
 }
 
-func (t *testDriverBase) awaitEndpoints(name string) *corev1.Endpoints {
-	return resource.MustFromUnstructured(test.AwaitResource(t.endpoints, name), &corev1.Endpoints{})
+func (t *testDriverBase) awaitEndpoints(ctx context.Context, name string) *corev1.Endpoints {
+	return resource.MustFromUnstructured(test.AwaitResource(ctx, t.endpoints, name), &corev1.Endpoints{})
 }
 
-func (t *testDriverBase) awaitNoEndpoints(name string) {
-	test.AwaitNoResource(t.endpoints, name)
+func (t *testDriverBase) awaitNoEndpoints(ctx context.Context, name string) {
+	test.AwaitNoResource(ctx, t.endpoints, name)
 }
 
-func (t *testDriverBase) ensureNoEndpoints(name string) {
-	testutil.EnsureNoResource(resource.ForDynamic(t.endpoints), name)
+func (t *testDriverBase) ensureNoEndpoints(ctx context.Context, name string) {
+	testutil.EnsureNoResource(ctx, resource.ForDynamic(t.endpoints), name)
 }
 
 func (t *testDriverBase) awaitEndpointsHasIP(ctx context.Context, name, ip string) {
@@ -494,12 +494,12 @@ func getGlobalIngressIP(ctx context.Context, t *testDriverBase, name string, com
 	return ingressIP
 }
 
-func (t *testDriverBase) awaitNoGlobalIngressIP(name string) {
-	test.AwaitNoResource(t.globalIngressIPs, name)
+func (t *testDriverBase) awaitNoGlobalIngressIP(ctx context.Context, name string) {
+	test.AwaitNoResource(ctx, t.globalIngressIPs, name)
 }
 
-func (t *testDriverBase) ensureNoGlobalIngressIP(name string) {
-	testutil.EnsureNoResource(resource.ForDynamic(t.globalIngressIPs), name)
+func (t *testDriverBase) ensureNoGlobalIngressIP(ctx context.Context, name string) {
+	testutil.EnsureNoResource(ctx, resource.ForDynamic(t.globalIngressIPs), name)
 }
 
 func (t *testDriverBase) ensureNoGlobalIngressIPs(ctx context.Context) {
@@ -511,12 +511,14 @@ func (t *testDriverBase) ensureNoGlobalIngressIPs(ctx context.Context) {
 	}).Within(time.Millisecond * 300).WithContext(ctx).Should(BeEmpty())
 }
 
-func (t *testDriverBase) awaitStatusConditions(client dynamic.ResourceInterface, name string, expCond ...metav1.Condition) {
+func (t *testDriverBase) awaitStatusConditions(ctx context.Context, client dynamic.ResourceInterface, name string,
+	expCond ...metav1.Condition,
+) {
 	if len(expCond) == 0 {
 		return
 	}
 
-	obj := test.AwaitResource(client, name)
+	obj := test.AwaitResource(ctx, client, name)
 
 	mapping, err := t.restMapper.RESTMapping(obj.GetObjectKind().GroupVersionKind().GroupKind(),
 		obj.GetObjectKind().GroupVersionKind().Version)

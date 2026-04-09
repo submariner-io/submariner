@@ -43,50 +43,50 @@ var _ = Describe("Leader election tests", func() {
 
 	var supportedFamilies []k8snet.IPFamily
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx context.Context) {
 		supportedFamilies = subDataplane.GetActualIPFamilies(
-			f.DetermineIPFamilyType(framework.ClusterA),
-			f.DetermineIPFamilyType(framework.ClusterB),
+			f.DetermineIPFamilyType(ctx, framework.ClusterA),
+			f.DetermineIPFamilyType(ctx, framework.ClusterB),
 		)
 	})
 
 	When("renewal of the leader lease fails", func() {
-		It("should re-acquire the leader lease after the failure is cleared", func() {
-			testLeaderElectionFailover(f, supportedFamilies)
+		It("should re-acquire the leader lease after the failure is cleared", func(ctx context.Context) {
+			testLeaderElectionFailover(ctx, f, supportedFamilies)
 		})
 	})
 })
 
-func testLeaderElectionFailover(f *subFramework.Framework, supportedFamilies []k8snet.IPFamily) {
-	cluster := subFramework.FindClusterWithSingleGateway()
+func testLeaderElectionFailover(ctx context.Context, f *subFramework.Framework, supportedFamilies []k8snet.IPFamily) {
+	cluster := subFramework.FindClusterWithSingleGateway(ctx)
 	if cluster == -1 {
 		framework.Skipf("The test requires single gateway node in one of the test clusters...")
 	}
 
 	clusterName := framework.TestContext.ClusterIDs[cluster]
 
-	gatewayPod := f.AwaitActiveGatewayPod(cluster, nil)
+	gatewayPod := f.AwaitActiveGatewayPod(ctx, cluster, nil)
 	Expect(gatewayPod).ToNot(BeNil(), "Did not find an active gateway pod")
 
 	restartCount := gatewayPod.Status.ContainerStatuses[0].RestartCount
 
-	gateway := f.AwaitGatewayWithStatus(cluster, gatewayPod.Spec.NodeName, subv1.HAStatusActive)
+	gateway := f.AwaitGatewayWithStatus(ctx, cluster, gatewayPod.Spec.NodeName, subv1.HAStatusActive)
 
 	framework.By(fmt.Sprintf("Found submariner Gateway %q on cluster %q", gateway.Name, clusterName))
 
 	framework.By("Updating submariner-gateway Role to remove Lease update permission")
-	updateLeaseUpdatePermission(cluster, gateway.Namespace, slices.Remove[string, string])
+	updateLeaseUpdatePermission(ctx, cluster, gateway.Namespace, slices.Remove[string, string])
 
-	DeferCleanup(func() {
-		updateLeaseUpdatePermission(cluster, gateway.Namespace, slices.AppendIfNotPresent[string, string])
+	DeferCleanup(func(ctx context.Context) {
+		updateLeaseUpdatePermission(ctx, cluster, gateway.Namespace, slices.AppendIfNotPresent[string, string])
 	})
 
 	framework.By(fmt.Sprintf("Ensure Gateway %q is updated to passive", gateway.Name))
-	f.AwaitGatewaysWithStatus(cluster, subv1.HAStatusPassive)
+	f.AwaitGatewaysWithStatus(ctx, cluster, subv1.HAStatusPassive)
 
 	if !framework.TestContext.SkipIntraClusterConnectivityTests {
 		for _, ipFamily := range supportedFamilies {
-			subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
+			subFramework.VerifyDatapathConnectivity(ctx, &tcp.ConnectivityTestParams{
 				Framework:             f.Framework,
 				FromCluster:           framework.ClusterA,
 				FromClusterScheduling: framework.NonGatewayNode,
@@ -100,13 +100,13 @@ func testLeaderElectionFailover(f *subFramework.Framework, supportedFamilies []k
 	}
 
 	framework.By("Updating submariner-gateway Role to add Lease update permission")
-	updateLeaseUpdatePermission(cluster, gateway.Namespace, slices.AppendIfNotPresent[string, string])
+	updateLeaseUpdatePermission(ctx, cluster, gateway.Namespace, slices.AppendIfNotPresent[string, string])
 
 	framework.By(fmt.Sprintf("Ensure Gateway %q is updated to active", gateway.Name))
-	f.AwaitGatewayWithStatus(cluster, gatewayPod.Spec.NodeName, subv1.HAStatusActive)
+	f.AwaitGatewayWithStatus(ctx, cluster, gatewayPod.Spec.NodeName, subv1.HAStatusActive)
 
 	for _, ipFamily := range supportedFamilies {
-		subFramework.VerifyDatapathConnectivity(&tcp.ConnectivityTestParams{
+		subFramework.VerifyDatapathConnectivity(ctx, &tcp.ConnectivityTestParams{
 			Framework:             f.Framework,
 			FromCluster:           framework.ClusterA,
 			FromClusterScheduling: framework.GatewayNode,
@@ -118,18 +118,17 @@ func testLeaderElectionFailover(f *subFramework.Framework, supportedFamilies []k
 		}, subFramework.GetGlobalnetEgressParams(subFramework.ClusterSelector))
 	}
 
-	gatewayPod, err := framework.KubeClients[cluster].CoreV1().Pods(gatewayPod.Namespace).Get(context.Background(),
-		gatewayPod.Name, metav1.GetOptions{})
+	gatewayPod, err := framework.KubeClients[cluster].CoreV1().Pods(gatewayPod.Namespace).Get(ctx, gatewayPod.Name, metav1.GetOptions{})
 	Expect(err).To(Succeed())
 
 	Expect(gatewayPod.Status.ContainerStatuses[0].RestartCount).To(Equal(restartCount),
 		"Gateway pod %q was restarted", gatewayPod.Name)
 }
 
-func updateLeaseUpdatePermission(cluster framework.ClusterIndex, ns string,
-	updateFn func([]string, string, func(string) string) ([]string, bool),
+func updateLeaseUpdatePermission(ctx context.Context, cluster framework.ClusterIndex, ns string, updateFn func([]string, string,
+	func(string) string) ([]string, bool),
 ) {
-	err := util.Update[*rbacv1.Role](context.Background(), resource.ForRole(framework.KubeClients[cluster], ns),
+	err := util.Update(ctx, resource.ForRole(framework.KubeClients[cluster], ns),
 		&rbacv1.Role{
 			ObjectMeta: metav1.ObjectMeta{Name: "submariner-gateway"},
 		},

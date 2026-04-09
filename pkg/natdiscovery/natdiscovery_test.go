@@ -206,10 +206,10 @@ func testReAddingEndpointAfterDiscoveryComplete(ipFamily k8snet.IPFamily, t *dis
 		})
 
 		Context("with the Endpoint's private IP changed", func() {
-			BeforeEach(func() {
+			BeforeEach(func(ctx SpecContext) {
 				newRemoteEndpoint.Spec.PrivateIPs = []string{getPrivateIP2()}
 
-				Expect(t.remoteND.localEndpoint.Update(context.Background(), func(existing *submarinerv1.EndpointSpec) {
+				Expect(t.remoteND.localEndpoint.Update(ctx, func(existing *submarinerv1.EndpointSpec) {
 					existing.PrivateIPs = []string{getPrivateIP2()}
 				})).To(Succeed())
 			})
@@ -256,10 +256,10 @@ func testReAddingEndpointDuringDiscovery(ipFamily k8snet.IPFamily, t *discoveryT
 		})
 
 		Context("with the Endpoint's private IP changed", func() {
-			BeforeEach(func() {
+			BeforeEach(func(ctx SpecContext) {
 				newRemoteEndpoint.Spec.PrivateIPs = []string{getPrivateIP2()}
 
-				Expect(t.remoteND.localEndpoint.Update(context.Background(), func(existing *submarinerv1.EndpointSpec) {
+				Expect(t.remoteND.localEndpoint.Update(ctx, func(existing *submarinerv1.EndpointSpec) {
 					existing.PrivateIPs = []string{getPrivateIP2()}
 				})).To(Succeed())
 			})
@@ -418,7 +418,7 @@ type discoveryTestDriver struct {
 func newDiscoveryTestDriver(isIPv4, isIPv6 bool) *discoveryTestDriver {
 	t := &discoveryTestDriver{}
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx context.Context) {
 		oldRecheckTime := natdiscovery.RecheckTime.Load()
 		oldTotalTimeout := natdiscovery.TotalTimeout.Load()
 		oldPublicToPrivateFailoverTimeout := natdiscovery.PublicToPrivateFailoverTimeout.Load()
@@ -457,8 +457,8 @@ func newDiscoveryTestDriver(isIPv4, isIPv6 bool) *discoveryTestDriver {
 		t.remoteEndpoint = createTestRemoteEndpoint(isIPv4, isIPv6)
 		t.localEndpoint = createTestLocalEndpoint(isIPv4, isIPv6)
 
-		t.localND = newNATDiscovery(&t.localEndpoint, ipv4AddrL, ipv6AddrL)
-		t.remoteND = newNATDiscovery(&t.remoteEndpoint, ipv4AddrR, ipv6AddrR)
+		t.localND = newNATDiscovery(ctx, &t.localEndpoint, ipv4AddrL, ipv6AddrL)
+		t.remoteND = newNATDiscovery(ctx, &t.remoteEndpoint, ipv4AddrR, ipv6AddrR)
 
 		if t.remoteND.ipv4Connection != nil {
 			t.remoteND.ipv4Connection.forwardTo(t.localND.ipv4Connection, -1)

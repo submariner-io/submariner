@@ -92,8 +92,8 @@ func TestCalico(t *testing.T) {
 	RunSpecs(t, "Calico Suite")
 }
 
-func (t *testDriver) Start(handler event.Handler) {
-	_, err := t.calicoClient.ProjectcalicoV3().IPPools().Create(context.Background(), &calicoapi.IPPool{
+func (t *testDriver) Start(ctx context.Context, handler event.Handler) {
+	_, err := t.calicoClient.ProjectcalicoV3().IPPools().Create(ctx, &calicoapi.IPPool{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: calico.DefaultV4IPPoolName,
 		},
@@ -104,7 +104,7 @@ func (t *testDriver) Start(handler event.Handler) {
 	Expect(err).To(Succeed())
 
 	t.handler = handler
-	t.ControllerSupport.Start(handler)
+	t.ControllerSupport.Start(ctx, handler)
 }
 
 func (t *testDriver) getIPPoolCIDRs() []string {
@@ -152,8 +152,8 @@ func (t *testDriver) getDefaultIPPoolIPIPMode() string {
 	return string(p.Spec.IPIPMode)
 }
 
-func (t *testDriver) getDefaultInstallationEncapsulation() string {
-	installation := test.GetResource(t.dynClient.Resource(calico.InstallationsGVR), &tigerav1.Installation{ObjectMeta: metav1.ObjectMeta{
+func (t *testDriver) getDefaultInstallationEncapsulation(ctx context.Context) string {
+	installation := test.GetResource(ctx, t.dynClient.Resource(calico.InstallationsGVR), &tigerav1.Installation{ObjectMeta: metav1.ObjectMeta{
 		Name: calico.DefaultInstallationName,
 	}})
 	Expect(installation.Spec.CalicoNetwork).NotTo(BeNil())
@@ -162,8 +162,8 @@ func (t *testDriver) getDefaultInstallationEncapsulation() string {
 	return installation.Spec.CalicoNetwork.IPPools[0].Encapsulation.String()
 }
 
-func (t *testDriver) createSubmarinerGwLBService(annotations map[string]string) {
-	test.CreateResource(t.dynClient.Resource(corev1.SchemeGroupVersion.WithResource("services")).Namespace(eventtesting.Namespace),
+func (t *testDriver) createSubmarinerGwLBService(ctx context.Context, annotations map[string]string) {
+	test.CreateResource(ctx, t.dynClient.Resource(corev1.SchemeGroupVersion.WithResource("services")).Namespace(eventtesting.Namespace),
 		&corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        calico.GwLBSvcName,

@@ -186,13 +186,13 @@ func testGatewaySyncing() {
 	})
 
 	When("a specific status error is set", func() {
-		It("should update the Gateway resource with the correct StatusFailure", func() {
+		It("should update the Gateway resource with the correct StatusFailure", func(ctx SpecContext) {
 			t.awaitGatewayUpdated(t.expectedGateway)
 
 			statusErr := errors.New("fake error")
 			t.expectedGateway.Status.StatusFailure = statusErr.Error()
 
-			t.syncer.SetGatewayStatusError(context.Background(), statusErr)
+			t.syncer.SetGatewayStatusError(ctx, statusErr)
 			t.awaitGatewayUpdated(t.expectedGateway)
 		})
 	})
@@ -392,7 +392,7 @@ func testGatewayLatencyInfo() {
 	})
 
 	When("the health checker provides latency info", func() {
-		It("should correctly update the Gateway Status information", func() {
+		It("should correctly update the Gateway Status information", func(ctx context.Context) {
 			t.awaitGatewayUpdated(t.expectedGateway)
 
 			endpointSpec := &submarinerv1.EndpointSpec{
@@ -406,7 +406,7 @@ func testGatewayLatencyInfo() {
 			endpointName, err := endpointSpec.GenerateName()
 			Expect(err).To(Succeed())
 
-			test.CreateResource(t.endpoints, &submarinerv1.Endpoint{
+			test.CreateResource(ctx, t.endpoints, &submarinerv1.Endpoint{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: endpointName,
 				},

@@ -105,7 +105,7 @@ var _ = Describe("Controller", func() {
 		close(stopCh)
 	})
 
-	createEndpoint := func(clusterID string, healthCheckIPs ...string) *submarinerv1.Endpoint {
+	createEndpoint := func(ctx context.Context, clusterID string, healthCheckIPs ...string) *submarinerv1.Endpoint {
 		endpointSpec := &submarinerv1.EndpointSpec{
 			ClusterID:      clusterID,
 			CableName:      fmt.Sprintf("submariner-cable-%s-192-68-1-20", clusterID),
@@ -122,7 +122,7 @@ var _ = Describe("Controller", func() {
 			Spec: *endpointSpec,
 		}
 
-		test.CreateResource(endpoints, endpoint)
+		test.CreateResource(ctx, endpoints, endpoint)
 
 		return endpoint
 	}
@@ -146,11 +146,11 @@ var _ = Describe("Controller", func() {
 			endpoint2 *submarinerv1.Endpoint
 		)
 
-		JustBeforeEach(func() {
-			endpoint1 = createEndpoint(remoteClusterID1, healthCheckIP1)
+		JustBeforeEach(func(ctx context.Context) {
+			endpoint1 = createEndpoint(ctx, remoteClusterID1, healthCheckIP1)
 			pingerMap[healthCheckIP1].AwaitStart()
 
-			endpoint2 = createEndpoint(remoteClusterID2, healthCheckIP2)
+			endpoint2 = createEndpoint(ctx, remoteClusterID2, healthCheckIP2)
 			pingerMap[healthCheckIP2].AwaitStart()
 		})
 
@@ -222,8 +222,8 @@ var _ = Describe("Controller", func() {
 			pingerMap[healthCheckIPv6] = fake.NewPinger(healthCheckIPv6)
 		})
 
-		It("should start/stop Pingers and return the correct LatencyInfo for both", func() {
-			endpoint := createEndpoint(remoteClusterID1, healthCheckIP1, healthCheckIPv6)
+		It("should start/stop Pingers and return the correct LatencyInfo for both", func(ctx context.Context) {
+			endpoint := createEndpoint(ctx, remoteClusterID1, healthCheckIP1, healthCheckIPv6)
 			pingerMap[healthCheckIP1].AwaitStart()
 			pingerMap[healthCheckIPv6].AwaitStart()
 
@@ -266,8 +266,8 @@ var _ = Describe("Controller", func() {
 	})
 
 	When("a local Endpoint is created", func() {
-		It("should not start a Pinger", func() {
-			createEndpoint(localClusterID, healthCheckIP1)
+		It("should not start a Pinger", func(ctx context.Context) {
+			createEndpoint(ctx, localClusterID, healthCheckIP1)
 			pingerMap[healthCheckIP1].AwaitNoStart()
 		})
 	})
@@ -279,15 +279,15 @@ var _ = Describe("Controller", func() {
 			pingerMap[healthCheckIP3] = fake.NewPinger(healthCheckIP3)
 		})
 
-		JustBeforeEach(func() {
-			endpoint = createEndpoint(remoteClusterID1, healthCheckIP1)
+		JustBeforeEach(func(ctx context.Context) {
+			endpoint = createEndpoint(ctx, remoteClusterID1, healthCheckIP1)
 			pingerMap[healthCheckIP1].AwaitStart()
 		})
 
-		It("should stop the Pinger and start a new one", func() {
+		It("should stop the Pinger and start a new one", func(ctx context.Context) {
 			endpoint.Spec.HealthCheckIPs = []string{healthCheckIP3}
 
-			test.UpdateResource(endpoints, endpoint)
+			test.UpdateResource(ctx, endpoints, endpoint)
 			pingerMap[healthCheckIP1].AwaitStop()
 			pingerMap[healthCheckIP3].AwaitStart()
 

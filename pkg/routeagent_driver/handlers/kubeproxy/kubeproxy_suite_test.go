@@ -19,6 +19,7 @@ limitations under the License.
 package kubeproxy_test
 
 import (
+	"context"
 	"net"
 	"testing"
 	"time"
@@ -132,7 +133,7 @@ func newTestDriver() *testDriver {
 		t.localServiceCIDRs = []string{localServiceIPv4CIDR}
 	})
 
-	JustBeforeEach(func() {
+	JustBeforeEach(func(ctx context.Context) {
 		_, hostCidr, err := net.ParseCIDR(t.hostInterfaceAddr)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -145,7 +146,7 @@ func newTestDriver() *testDriver {
 		t.netLink.SetAllowedIPFamilies(t.ipFamily)
 
 		t.handler = kubeproxy.NewSyncHandler(t.ipFamily, t.localClusterCIDRs, t.localServiceCIDRs)
-		t.Start(t.handler)
+		t.Start(ctx, t.handler)
 	})
 
 	return t

@@ -47,9 +47,9 @@ func testEndpointSyncing() {
 	t := newTestDriver()
 
 	Context("on startup", func() {
-		It("should create a new Endpoint locally and sync to the broker", func() {
-			awaitEndpoint(t.localEndpoints, t.localEndpoint)
-			awaitEndpoint(t.brokerEndpoints, t.localEndpoint)
+		It("should create a new Endpoint locally and sync to the broker", func(ctx context.Context) {
+			awaitEndpoint(ctx, t.localEndpoints, t.localEndpoint)
+			awaitEndpoint(ctx, t.brokerEndpoints, t.localEndpoint)
 		})
 
 		When("creation of the local Endpoint fails", func() {
@@ -65,25 +65,25 @@ func testEndpointSyncing() {
 		When("a stale remote Endpoint exists locally", func() {
 			var remoteEndpoint *submarinerv1.Endpoint
 
-			BeforeEach(func() {
+			BeforeEach(func(ctx context.Context) {
 				remoteEndpoint = newEndpoint(&submarinerv1.EndpointSpec{
 					CableName: fmt.Sprintf("submariner-cable-%s-10-253-1-2", otherClusterID),
 					ClusterID: otherClusterID,
 				})
 
 				test.SetClusterIDLabel(remoteEndpoint, otherClusterID)
-				test.CreateResource(t.localEndpoints, remoteEndpoint)
+				test.CreateResource(ctx, t.localEndpoints, remoteEndpoint)
 			})
 
-			It("it should delete the Endpoint", func() {
-				test.AwaitNoResource(t.localEndpoints, remoteEndpoint.GetName())
+			It("it should delete the Endpoint", func(ctx context.Context) {
+				test.AwaitNoResource(ctx, t.localEndpoints, remoteEndpoint.GetName())
 			})
 		})
 	})
 
 	When("a remote Endpoint is created, updated and deleted on the broker", func() {
-		It("should correctly sync the local datastore", func() {
-			awaitEndpoint(t.brokerEndpoints, t.localEndpoint)
+		It("should correctly sync the local datastore", func(ctx context.Context) {
+			awaitEndpoint(ctx, t.brokerEndpoints, t.localEndpoint)
 
 			endpoint := newEndpoint(&submarinerv1.EndpointSpec{
 				CableName:  fmt.Sprintf("submariner-cable-%s-10-253-1-2", otherClusterID),
@@ -93,39 +93,39 @@ func testEndpointSyncing() {
 				Subnets:    []string{"200.0.0.0/16", "20.0.0.0/14"},
 			})
 
-			test.CreateResource(t.brokerEndpoints, test.SetClusterIDLabel(endpoint, endpoint.Spec.ClusterID))
-			awaitEndpoint(t.localEndpoints, &endpoint.Spec)
+			test.CreateResource(ctx, t.brokerEndpoints, test.SetClusterIDLabel(endpoint, endpoint.Spec.ClusterID))
+			awaitEndpoint(ctx, t.localEndpoints, &endpoint.Spec)
 
 			endpoint.Spec.Hostname = "celtics"
 			endpoint.Spec.Subnets = append(endpoint.Spec.Subnets, "201.0.0.0/16")
-			test.UpdateResource(t.brokerEndpoints, endpoint)
-			awaitEndpoint(t.localEndpoints, &endpoint.Spec)
+			test.UpdateResource(ctx, t.brokerEndpoints, endpoint)
+			awaitEndpoint(ctx, t.localEndpoints, &endpoint.Spec)
 
-			Expect(t.brokerEndpoints.Delete(context.TODO(), endpoint.GetName(), metav1.DeleteOptions{})).To(Succeed())
-			test.AwaitNoResource(t.localEndpoints, endpoint.GetName())
+			Expect(t.brokerEndpoints.Delete(ctx, endpoint.GetName(), metav1.DeleteOptions{})).To(Succeed())
+			test.AwaitNoResource(ctx, t.localEndpoints, endpoint.GetName())
 		})
 	})
 
 	When("a remote Endpoint is synced locally", func() {
-		It("should not try to re-sync to the broker", func() {
-			awaitEndpoint(t.brokerEndpoints, t.localEndpoint)
+		It("should not try to re-sync to the broker", func(ctx context.Context) {
+			awaitEndpoint(ctx, t.brokerEndpoints, t.localEndpoint)
 
 			endpoint := newEndpoint(&submarinerv1.EndpointSpec{
 				CableName: fmt.Sprintf("submariner-cable-%s-10-253-1-2", otherClusterID),
 				ClusterID: otherClusterID,
 			})
 
-			name := test.CreateResource(t.localEndpoints, test.SetClusterIDLabel(endpoint, endpoint.Spec.ClusterID)).GetName()
+			name := test.CreateResource(ctx, t.localEndpoints, test.SetClusterIDLabel(endpoint, endpoint.Spec.ClusterID)).GetName()
 
 			time.Sleep(500 * time.Millisecond)
-			test.AwaitNoResource(t.brokerEndpoints, name)
+			test.AwaitNoResource(ctx, t.brokerEndpoints, name)
 		})
 	})
 
 	When("the local Gateway's global IP is updated", func() {
 		var gateway *submarinerv1.Gateway
 
-		BeforeEach(func() {
+		BeforeEach(func(ctx context.Context) {
 			gateway = &submarinerv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        t.localEndpoint.Hostname,
@@ -133,31 +133,31 @@ func testEndpointSyncing() {
 				},
 			}
 
-			test.CreateResource(t.localGateways, gateway)
+			test.CreateResource(ctx, t.localGateways, gateway)
 		})
 
-		JustBeforeEach(func() {
+		JustBeforeEach(func(ctx context.Context) {
 			t.localEndpoint.SetHealthCheckIP(gateway.Annotations[constants.SmGlobalIP])
-			awaitEndpoint(t.localEndpoints, t.localEndpoint)
+			awaitEndpoint(ctx, t.localEndpoints, t.localEndpoint)
 		})
 
-		It("should update the local Endpoint's HealthCheckIP", func() {
+		It("should update the local Endpoint's HealthCheckIP", func(ctx context.Context) {
 			gateway.Annotations[constants.SmGlobalIP] = "200.0.0.100"
 			t.localEndpoint.SetHealthCheckIP(gateway.Annotations[constants.SmGlobalIP])
 
-			test.UpdateResource(t.localGateways, gateway)
-			awaitEndpoint(t.localEndpoints, t.localEndpoint)
+			test.UpdateResource(ctx, t.localGateways, gateway)
+			awaitEndpoint(ctx, t.localEndpoints, t.localEndpoint)
 		})
 
 		Context("but the local Endpoint no longer exists", func() {
-			It("should not recreate the local Endpoint", func() {
-				Expect(t.localEndpoints.Delete(context.Background(), getEndpointName(t.localEndpoint), metav1.DeleteOptions{})).
+			It("should not recreate the local Endpoint", func(ctx context.Context) {
+				Expect(t.localEndpoints.Delete(ctx, getEndpointName(t.localEndpoint), metav1.DeleteOptions{})).
 					To(Succeed())
 
 				gateway.Annotations[constants.SmGlobalIP] = "200.0.0.100"
-				test.UpdateResource(t.localGateways, gateway)
+				test.UpdateResource(ctx, t.localGateways, gateway)
 
-				testutil.EnsureNoResource(resource.ForDynamic(t.localEndpoints), getEndpointName(t.localEndpoint))
+				testutil.EnsureNoResource(ctx, resource.ForDynamic(t.localEndpoints), getEndpointName(t.localEndpoint))
 			})
 		})
 	})
@@ -169,19 +169,19 @@ func testEndpointExclusivity() {
 	When("an Endpoint initially exists that doesn't match the local Endpoint", func() {
 		var existingEndpoint *submarinerv1.Endpoint
 
-		BeforeEach(func() {
+		BeforeEach(func(ctx context.Context) {
 			existingEndpoint = newEndpoint(&submarinerv1.EndpointSpec{
 				CableName: "submariner-cable-east-1-2-3-4",
 				ClusterID: clusterID,
 			})
 
-			test.CreateResource(t.localEndpoints, existingEndpoint)
-			test.CreateResource(t.brokerEndpoints, test.SetClusterIDLabel(existingEndpoint, clusterID))
+			test.CreateResource(ctx, t.localEndpoints, existingEndpoint)
+			test.CreateResource(ctx, t.brokerEndpoints, test.SetClusterIDLabel(existingEndpoint, clusterID))
 		})
 
-		It("should delete the Endpoint from the local datastore and the broker", func() {
-			test.AwaitNoResource(t.localEndpoints, existingEndpoint.GetName())
-			test.AwaitNoResource(t.brokerEndpoints, existingEndpoint.GetName())
+		It("should delete the Endpoint from the local datastore and the broker", func(ctx context.Context) {
+			test.AwaitNoResource(ctx, t.localEndpoints, existingEndpoint.GetName())
+			test.AwaitNoResource(ctx, t.brokerEndpoints, existingEndpoint.GetName())
 		})
 
 		When("deletion of the Endpoint from the local datastore fails", func() {
@@ -200,20 +200,20 @@ func testEndpointExclusivity() {
 					apierrors.NewNotFound(schema.GroupResource{}, existingEndpoint.Spec.CableName), false)
 			})
 
-			It("should ignore it", func() {
-				awaitEndpoint(t.brokerEndpoints, t.localEndpoint)
+			It("should ignore it", func(ctx context.Context) {
+				awaitEndpoint(ctx, t.brokerEndpoints, t.localEndpoint)
 			})
 		})
 	})
 
 	When("an Endpoint initially exists that matches the local Endpoint", func() {
-		BeforeEach(func() {
-			test.CreateResource(t.localEndpoints, newEndpoint(t.localEndpoint))
+		BeforeEach(func(ctx context.Context) {
+			test.CreateResource(ctx, t.localEndpoints, newEndpoint(t.localEndpoint))
 		})
 
-		It("should not delete it", func() {
+		It("should not delete it", func(ctx context.Context) {
 			time.Sleep(500 * time.Millisecond)
-			awaitEndpoint(t.localEndpoints, t.localEndpoint)
+			awaitEndpoint(ctx, t.localEndpoints, t.localEndpoint)
 			testutil.EnsureNoActionsForResource(&t.localClient.Fake, submarinerv1.EndpointGVR.Resource, "delete")
 		})
 	})
@@ -221,7 +221,7 @@ func testEndpointExclusivity() {
 	When("an Endpoint from another cluster initially exists", func() {
 		var remoteEndpointName string
 
-		BeforeEach(func() {
+		BeforeEach(func(ctx context.Context) {
 			endpoint := newEndpoint(&submarinerv1.EndpointSpec{
 				CableName: fmt.Sprintf("submariner-cable-%s-10-253-1-2", otherClusterID),
 				ClusterID: otherClusterID,
@@ -230,13 +230,13 @@ func testEndpointExclusivity() {
 			remoteEndpointName = endpoint.Name
 
 			endpoint = test.SetClusterIDLabel(endpoint, endpoint.Spec.ClusterID)
-			test.CreateResource(t.localEndpoints, endpoint)
-			test.CreateResource(t.brokerEndpoints, endpoint)
+			test.CreateResource(ctx, t.localEndpoints, endpoint)
+			test.CreateResource(ctx, t.brokerEndpoints, endpoint)
 		})
 
-		It("should not delete it", func() {
+		It("should not delete it", func(ctx context.Context) {
 			time.Sleep(500 * time.Millisecond)
-			test.AwaitResource(t.localEndpoints, remoteEndpointName)
+			test.AwaitResource(ctx, t.localEndpoints, remoteEndpointName)
 		})
 	})
 }
@@ -249,7 +249,7 @@ func testEndpointCleanup() {
 		existingRemoteEndpoint *submarinerv1.Endpoint
 	)
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx context.Context) {
 		t.doStart = false
 
 		existingLocalEndpoint = newEndpoint(&submarinerv1.EndpointSpec{
@@ -257,31 +257,31 @@ func testEndpointCleanup() {
 			ClusterID: clusterID,
 		})
 
-		test.CreateResource(t.localEndpoints, existingLocalEndpoint)
-		test.CreateResource(t.brokerEndpoints, test.SetClusterIDLabel(existingLocalEndpoint, clusterID))
+		test.CreateResource(ctx, t.localEndpoints, existingLocalEndpoint)
+		test.CreateResource(ctx, t.brokerEndpoints, test.SetClusterIDLabel(existingLocalEndpoint, clusterID))
 
 		existingRemoteEndpoint = newEndpoint(&submarinerv1.EndpointSpec{
 			CableName: fmt.Sprintf("submariner-cable-%s-10-253-1-2", otherClusterID),
 			ClusterID: otherClusterID,
 		})
 
-		test.CreateResource(t.localEndpoints, test.SetClusterIDLabel(existingRemoteEndpoint, existingRemoteEndpoint.Spec.ClusterID))
-		test.CreateResource(t.brokerEndpoints, test.SetClusterIDLabel(existingRemoteEndpoint, existingRemoteEndpoint.Spec.ClusterID))
+		test.CreateResource(ctx, t.localEndpoints, test.SetClusterIDLabel(existingRemoteEndpoint, existingRemoteEndpoint.Spec.ClusterID))
+		test.CreateResource(ctx, t.brokerEndpoints, test.SetClusterIDLabel(existingRemoteEndpoint, existingRemoteEndpoint.Spec.ClusterID))
 	})
 
-	It("should remove local Endpoints from the remote datastore", func() {
-		Expect(t.syncer.Cleanup(context.Background())).To(Succeed())
+	It("should remove local Endpoints from the remote datastore", func(ctx context.Context) {
+		Expect(t.syncer.Cleanup(ctx)).To(Succeed())
 
-		test.AwaitNoResource(t.brokerEndpoints, existingLocalEndpoint.GetName())
+		test.AwaitNoResource(ctx, t.brokerEndpoints, existingLocalEndpoint.GetName())
 
 		time.Sleep(500 * time.Millisecond)
-		test.AwaitResource(t.brokerEndpoints, existingRemoteEndpoint.GetName())
+		test.AwaitResource(ctx, t.brokerEndpoints, existingRemoteEndpoint.GetName())
 	})
 
-	It("should remove all Endpoints from the local datastore", func() {
-		Expect(t.syncer.Cleanup(context.Background())).To(Succeed())
+	It("should remove all Endpoints from the local datastore", func(ctx context.Context) {
+		Expect(t.syncer.Cleanup(ctx)).To(Succeed())
 
-		test.AwaitNoResource(t.localEndpoints, existingLocalEndpoint.GetName())
-		test.AwaitNoResource(t.localEndpoints, existingRemoteEndpoint.GetName())
+		test.AwaitNoResource(ctx, t.localEndpoints, existingLocalEndpoint.GetName())
+		test.AwaitNoResource(ctx, t.localEndpoints, existingRemoteEndpoint.GetName())
 	})
 }
