@@ -19,6 +19,7 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
 	"slices"
 
 	"github.com/pkg/errors"
@@ -33,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
@@ -97,20 +99,20 @@ func (c *serviceExportController) GetSyncer() syncer.Interface {
 	return c.resourceSyncer
 }
 
-func (c *serviceExportController) Stop() {
-	c.baseController.Stop()
-	c.podControllers.stopAll()
-	c.endpointsControllers.stopAll()
-	c.ingressEndpointsControllers.stopAll()
+func (c *serviceExportController) Stop(ctx context.Context) {
+	c.baseController.Stop(ctx)
+	c.podControllers.stopAll(ctx)
+	c.endpointsControllers.stopAll(ctx)
+	c.ingressEndpointsControllers.stopAll(ctx)
 }
 
-func (c *serviceExportController) Start() error {
-	err := c.baseSyncerController.Start()
+func (c *serviceExportController) Start(ctx context.Context) error {
+	err := c.baseSyncerController.Start(ctx)
 	if err != nil {
 		return err
 	}
 
-	c.reconcile(c.ingressIPs, "" /* labelSelector */, "", /* fieldSelector */
+	c.reconcile(ctx, c.ingressIPs, "" /* labelSelector */, "", /* fieldSelector */
 		func(obj *unstructured.Unstructured) runtime.Object {
 			name, exists, _ := unstructured.NestedString(obj.Object, "spec", "serviceRef", "name")
 			if exists {
@@ -129,23 +131,25 @@ func (c *serviceExportController) Start() error {
 }
 
 func (c *serviceExportController) process(from runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
+	ctx := wait.ContextForChannel(c.stopCh)
+
 	serviceExport := from.(*mcsv1a1.ServiceExport)
 
 	switch op {
 	case syncer.Create:
-		return c.onCreate(serviceExport)
+		return c.onCreate(ctx, serviceExport)
 	case syncer.Delete:
-		return c.onDelete(serviceExport)
+		return c.onDelete(ctx, serviceExport)
 	case syncer.Update:
 	}
 
 	return nil, false
 }
 
-func (c *serviceExportController) onCreate(serviceExport *mcsv1a1.ServiceExport) (runtime.Object, bool) {
+func (c *serviceExportController) onCreate(ctx context.Context, serviceExport *mcsv1a1.ServiceExport) (runtime.Object, bool) {
 	key, _ := cache.MetaNamespaceKeyFunc(serviceExport)
 
-	service, exists, err := getService(serviceExport.Name, serviceExport.Namespace, c.services, c.scheme)
+	service, exists, err := getService(ctx, serviceExport.Name, serviceExport.Namespace, c.services, c.scheme)
 	if err != nil || !exists {
 		logger.Infof("Exported Service %q does not exist yet - re-queueing", key)
 		return nil, true
@@ -161,7 +165,7 @@ func (c *serviceExportController) onCreate(serviceExport *mcsv1a1.ServiceExport)
 
 	if len(service.Spec.Selector) == 0 && service.Spec.ClusterIP != corev1.ClusterIPNone {
 		// Service without selector and not headless service
-		err = c.endpointsControllers.start(serviceExport)
+		err = c.endpointsControllers.start(ctx, serviceExport)
 		if err != nil {
 			logger.Errorf(err, "Failed to create endpoints controller for serviceExport %q", key)
 			return nil, true
@@ -171,10 +175,10 @@ func (c *serviceExportController) onCreate(serviceExport *mcsv1a1.ServiceExport)
 	if service.Spec.ClusterIP == corev1.ClusterIPNone {
 		if len(service.Spec.Selector) == 0 {
 			// Headless service without selector
-			return c.onCreateHeadlessWithoutSelector(key, service)
+			return c.onCreateHeadlessWithoutSelector(ctx, key, service)
 		}
 		// Headless service
-		return c.onCreateHeadless(key, service)
+		return c.onCreateHeadless(ctx, key, service)
 	}
 
 	if !slices.Contains(service.Spec.IPFamilies, corev1.IPv4Protocol) {
@@ -198,14 +202,14 @@ func (c *serviceExportController) onCreate(serviceExport *mcsv1a1.ServiceExport)
 	return ingressIP, false
 }
 
-func (c *serviceExportController) onDelete(serviceExport *mcsv1a1.ServiceExport) (runtime.Object, bool) {
+func (c *serviceExportController) onDelete(ctx context.Context, serviceExport *mcsv1a1.ServiceExport) (runtime.Object, bool) {
 	key, _ := cache.MetaNamespaceKeyFunc(serviceExport)
 
 	logger.Infof("ServiceExport %q deleted", key)
 
-	c.podControllers.stopAndCleanup(serviceExport.Name, serviceExport.Namespace)
-	c.endpointsControllers.stopAndCleanup(serviceExport.Name, serviceExport.Namespace)
-	c.ingressEndpointsControllers.stopAndCleanup(serviceExport.Name, serviceExport.Namespace)
+	c.podControllers.stopAndCleanup(ctx, serviceExport.Name, serviceExport.Namespace)
+	c.endpointsControllers.stopAndCleanup(ctx, serviceExport.Name, serviceExport.Namespace)
+	c.ingressEndpointsControllers.stopAndCleanup(ctx, serviceExport.Name, serviceExport.Namespace)
 
 	return &submarinerv1.GlobalIngressIP{
 		ObjectMeta: metav1.ObjectMeta{
@@ -215,8 +219,8 @@ func (c *serviceExportController) onDelete(serviceExport *mcsv1a1.ServiceExport)
 	}, false
 }
 
-func (c *serviceExportController) onCreateHeadless(key string, service *corev1.Service) (runtime.Object, bool) {
-	err := c.podControllers.start(service)
+func (c *serviceExportController) onCreateHeadless(ctx context.Context, key string, service *corev1.Service) (runtime.Object, bool) {
+	err := c.podControllers.start(ctx, service)
 	if err != nil {
 		logger.Errorf(err, "Failed to create pod controller for service %q", key)
 		return nil, true
@@ -225,8 +229,10 @@ func (c *serviceExportController) onCreateHeadless(key string, service *corev1.S
 	return nil, false
 }
 
-func (c *serviceExportController) onCreateHeadlessWithoutSelector(key string, service *corev1.Service) (runtime.Object, bool) {
-	err := c.ingressEndpointsControllers.start(service)
+func (c *serviceExportController) onCreateHeadlessWithoutSelector(ctx context.Context, key string,
+	service *corev1.Service,
+) (runtime.Object, bool) {
+	err := c.ingressEndpointsControllers.start(ctx, service)
 	if err != nil {
 		logger.Errorf(err, "Failed to create endpoints controller for service %q", key)
 		return nil, true

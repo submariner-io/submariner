@@ -51,7 +51,7 @@ func newBaseController() *baseController {
 	}
 }
 
-func (c *baseController) Stop() {
+func (c *baseController) Stop(_ context.Context) {
 	close(c.stopCh)
 }
 
@@ -69,24 +69,24 @@ func newBaseIPAllocationController(pool *ipam.IPPool, pfIface pfiface.Interface)
 	}
 }
 
-func (c *baseSyncerController) Start() error {
+func (c *baseSyncerController) Start(_ context.Context) error {
 	return c.resourceSyncer.Start(c.stopCh) //nolint:wrapcheck  // Let the caller wrap it
 }
 
-func (c *baseSyncerController) Stop() {
-	c.baseController.Stop()
+func (c *baseSyncerController) Stop(ctx context.Context) {
+	c.baseController.Stop(ctx)
 
-	err := c.resourceSyncer.AwaitStopped(context.TODO())
+	err := c.resourceSyncer.AwaitStopped(ctx)
 	if err != nil {
 		logger.Warning(err.Error())
 	}
 }
 
-func (c *baseSyncerController) reconcile(client dynamic.ResourceInterface, labelSelector, fieldSelector string,
+func (c *baseSyncerController) reconcile(ctx context.Context, client dynamic.ResourceInterface, labelSelector, fieldSelector string,
 	transform func(obj *unstructured.Unstructured) runtime.Object,
 ) {
 	c.resourceSyncer.Reconcile(func() []runtime.Object {
-		objList, err := client.List(context.TODO(), metav1.ListOptions{
+		objList, err := client.List(ctx, metav1.ListOptions{
 			LabelSelector: labelSelector,
 			FieldSelector: fieldSelector,
 		})
@@ -108,11 +108,10 @@ func (c *baseSyncerController) reconcile(client dynamic.ResourceInterface, label
 	})
 }
 
-func (c *baseIPAllocationController) reserveAllocatedIPs(federator federate.Federator, obj *unstructured.Unstructured,
-	postReserve func(allocatedIPs []string) error,
+func (c *baseIPAllocationController) reserveAllocatedIPs(ctx context.Context, federator federate.Federator, obj *unstructured.Unstructured,
+	postReserve func(ctx context.Context, allocatedIPs []string) error,
 ) error {
 	var reservedIPs []string
-
 	clearAllocatedIPs := func() {}
 
 	ips, ok, _ := unstructured.NestedStringSlice(obj.Object, "status", "allocatedIPs")
@@ -152,14 +151,14 @@ func (c *baseIPAllocationController) reserveAllocatedIPs(federator federate.Fede
 
 		logger.Infof("Updating %q: %#v", key, obj)
 
-		return federator.Distribute(context.TODO(), obj) //nolint:wrapcheck  // Let the caller wrap it
+		return federator.Distribute(ctx, obj) //nolint:wrapcheck  // Let the caller wrap it
 	}
 
 	if len(reservedIPs) == 0 {
 		return nil
 	}
 
-	err = postReserve(reservedIPs)
+	err = postReserve(ctx, reservedIPs)
 	if err != nil {
 		return err
 	}
@@ -223,10 +222,9 @@ func checkStatusChanged(oldStatus, newStatus any, retObj runtime.Object) runtime
 	return retObj
 }
 
-func getService(name, namespace string,
-	client dynamic.NamespaceableResourceInterface, scheme *runtime.Scheme,
+func getService(ctx context.Context, name, namespace string, client dynamic.NamespaceableResourceInterface, scheme *runtime.Scheme,
 ) (*corev1.Service, bool, error) {
-	obj, err := client.Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	obj, err := client.Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil, false, nil
 	}
@@ -245,10 +243,8 @@ func getService(name, namespace string,
 	return service, true, nil
 }
 
-func deleteService(namespace, name string,
-	client dynamic.NamespaceableResourceInterface,
-) error {
-	err := client.Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+func deleteService(ctx context.Context, namespace, name string, client dynamic.NamespaceableResourceInterface) error {
+	err := client.Namespace(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 	if apierrors.IsNotFound(err) {
 		logger.Warningf("Could not find Service %s/%s to delete", namespace, name)
 		return nil
@@ -265,10 +261,8 @@ func GetInternalSvcName(name string) string {
 	return strings.ToLower(svcName)
 }
 
-func deleteEndpoints(namespace, name string,
-	client dynamic.NamespaceableResourceInterface,
-) error {
-	err := client.Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+func deleteEndpoints(ctx context.Context, namespace, name string, client dynamic.NamespaceableResourceInterface) error {
+	err := client.Namespace(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 	if apierrors.IsNotFound(err) {
 		logger.Warningf("Could not find Endpoints %s/%s to delete", namespace, name)
 		return nil

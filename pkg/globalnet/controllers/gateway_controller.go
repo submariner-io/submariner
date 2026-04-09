@@ -36,8 +36,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func NewGatewayController(config *syncer.ResourceSyncerConfig, informer cache.SharedInformer, pool *ipam.IPPool, hostName,
-	namespace, cniIP string,
+func NewGatewayController(ctx context.Context, config *syncer.ResourceSyncerConfig, informer cache.SharedInformer, pool *ipam.IPPool,
+	hostName, namespace, cniIP string,
 ) (Interface, error) {
 	// We'll panic if config is nil, this is intentional
 	var err error
@@ -80,13 +80,13 @@ func NewGatewayController(config *syncer.ResourceSyncerConfig, informer cache.Sh
 	// Gateways retain their allocated global IPs regardless of their HA status (active or passive) so reserve the global IPs
 	// for all the Gateways.
 
-	gateways, err := gatewayClient.List(context.TODO(), metav1.ListOptions{})
+	gateways, err := gatewayClient.List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "error listing Gateways")
 	}
 
 	for i := range gateways.Items {
-		if err := controller.reserveAllocatedIP(config.Federator, &gateways.Items[i]); err != nil {
+		if err := controller.reserveAllocatedIP(ctx, config.Federator, &gateways.Items[i]); err != nil {
 			return nil, err
 		}
 	}
@@ -165,7 +165,7 @@ func (n *gatewayController) allocateIP(gateway *submarinerv1.Gateway) (runtime.O
 	return updateGlobalIPAnnotation(gateway, globalIP), false
 }
 
-func (n *gatewayController) reserveAllocatedIP(federator federate.Federator, obj *unstructured.Unstructured) error {
+func (n *gatewayController) reserveAllocatedIP(ctx context.Context, federator federate.Federator, obj *unstructured.Unstructured) error {
 	existingGlobalIP := obj.GetAnnotations()[constants.SmGlobalIP]
 	if existingGlobalIP == "" {
 		return nil
@@ -199,7 +199,7 @@ func (n *gatewayController) reserveAllocatedIP(federator federate.Federator, obj
 			logger.Errorf(err, "Error deleting rules for Gateway %q", n.hostName)
 		}
 
-		return errors.Wrap(federator.Distribute(context.TODO(), updateGlobalIPAnnotation(obj, "")),
+		return errors.Wrap(federator.Distribute(ctx, updateGlobalIPAnnotation(obj, "")),
 			"error updating the Gateway global IP annotation")
 	}
 

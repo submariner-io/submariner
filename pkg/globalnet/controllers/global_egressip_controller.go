@@ -43,7 +43,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func NewGlobalEgressIPController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool) (Interface, error) {
+func NewGlobalEgressIPController(ctx context.Context, config *syncer.ResourceSyncerConfig, pool *ipam.IPPool) (Interface, error) {
 	// We'll panic if config is nil, this is intentional
 	var err error
 
@@ -71,7 +71,7 @@ func NewGlobalEgressIPController(config *syncer.ResourceSyncerConfig, pool *ipam
 
 	client := config.SourceClient.Resource(*gvr).Namespace(corev1.NamespaceAll)
 
-	list, err := client.List(context.TODO(), metav1.ListOptions{})
+	list, err := client.List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "error listing the resources")
 	}
@@ -79,7 +79,7 @@ func NewGlobalEgressIPController(config *syncer.ResourceSyncerConfig, pool *ipam
 	federator := federate.NewUpdateStatusFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
 
 	for i := range list.Items {
-		err = controller.reserveAllocatedIPs(federator, &list.Items[i], func(reservedIPs []string) error {
+		err = controller.reserveAllocatedIPs(ctx, federator, &list.Items[i], func(ctx context.Context, reservedIPs []string) error {
 			metrics.RecordAllocateGlobalEgressIPs(pool.GetCIDR(), len(reservedIPs))
 
 			specObj := util.GetSpec(&list.Items[i])
@@ -114,8 +114,8 @@ func NewGlobalEgressIPController(config *syncer.ResourceSyncerConfig, pool *ipam
 	return controller, nil
 }
 
-func (c *globalEgressIPController) Stop() {
-	c.baseController.Stop()
+func (c *globalEgressIPController) Stop(ctx context.Context) {
+	c.baseController.Stop(ctx)
 
 	c.Lock()
 	defer c.Unlock()

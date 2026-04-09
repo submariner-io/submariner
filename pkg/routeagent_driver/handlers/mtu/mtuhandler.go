@@ -237,7 +237,7 @@ func (h *mtuHandler) newNamedSetSet(key string) packetfilter.NamedSet {
 	})
 }
 
-func (h *mtuHandler) Uninstall() error {
+func (h *mtuHandler) Uninstall(ctx context.Context) error {
 	logger.Infof("Flushing packetfilter entries in %q chain of table type %q", chains.SmPostRoutingMss, h.tableType.String())
 
 	logError(h.pFilter.ClearChain(h.tableType, chains.SmPostRoutingMss),

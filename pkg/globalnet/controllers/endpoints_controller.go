@@ -19,6 +19,7 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
 	"reflect"
 
 	"github.com/pkg/errors"
@@ -36,7 +37,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func startEndpointsController(name, namespace string, config *syncer.ResourceSyncerConfig) (*endpointsController, error) {
+func startEndpointsController(ctx context.Context, name, namespace string,
+	config *syncer.ResourceSyncerConfig,
+) (*endpointsController, error) {
 	// We'll panic if config is nil, this is intentional
 	var err error
 
@@ -77,24 +80,11 @@ func startEndpointsController(name, namespace string, config *syncer.ResourceSyn
 		return nil, errors.Wrap(err, "error creating the syncer")
 	}
 
-	if err := controller.Start(); err != nil {
+	if err := controller.Start(ctx); err != nil {
 		return nil, err
 	}
 
 	return controller, nil
-}
-
-func (c *endpointsController) Stop() {
-	c.baseController.Stop()
-}
-
-func (c *endpointsController) Start() error {
-	err := c.baseSyncerController.Start()
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (c *endpointsController) process(from runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {

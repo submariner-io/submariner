@@ -211,8 +211,8 @@ func (t *testDriver) testHandler(localCIDR, localCIDRIPSet, remoteCIDRIPSet stri
 		})
 	})
 
-	Specify("Uninstall should remove IP sets and chains", func() {
-		Expect(t.handler.Uninstall()).To(Succeed())
+	Specify("Uninstall should remove IP sets and chains", func(ctx context.Context) {
+		Expect(t.handler.Uninstall(ctx)).To(Succeed())
 
 		t.pFilter.AwaitSetDeleted(localCIDRIPSet)
 		t.pFilter.AwaitSetDeleted(remoteCIDRIPSet)

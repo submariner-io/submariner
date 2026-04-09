@@ -38,11 +38,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/ptr"
 )
 
-func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipam.IPPool) (*globalIngressIPController, error) {
+func NewGlobalIngressIPController(ctx context.Context, config *syncer.ResourceSyncerConfig, pool *ipam.IPPool,
+) (*globalIngressIPController, error) {
 	// We'll panic if config is nil, this is intentional
 	var err error
 
@@ -73,7 +75,7 @@ func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipa
 
 	client := config.SourceClient.Resource(*gvr)
 
-	list, err := client.Namespace(corev1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+	list, err := client.Namespace(corev1.NamespaceAll).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "error listing the resources")
 	}
@@ -84,14 +86,14 @@ func NewGlobalIngressIPController(config *syncer.ResourceSyncerConfig, pool *ipa
 		_ = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, gip)
 
 		//nolint:wrapcheck  // No need to wrap these errors.
-		err = controller.reserveAllocatedIPs(federator, obj, func(reservedIPs []string) error {
+		err = controller.reserveAllocatedIPs(ctx, federator, obj, func(ctx context.Context, reservedIPs []string) error {
 			var target string
 			var tType pfiface.TargetType
 
 			metrics.RecordAllocateGlobalIngressIPs(pool.GetCIDR(), len(reservedIPs))
 
 			if gip.Spec.Target == submarinerv1.ClusterIPService {
-				return controller.ensureInternalServiceExists(gip)
+				return controller.ensureInternalServiceExists(ctx, gip)
 			} else if gip.Spec.Target == submarinerv1.HeadlessServicePod {
 				target = gip.GetAnnotations()[headlessSvcPodIP]
 				tType = pfiface.PodTarget
@@ -141,6 +143,8 @@ func (c *globalIngressIPController) GetSyncer() syncer.Interface {
 }
 
 func (c *globalIngressIPController) process(from runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
+	ctx := wait.ContextForChannel(c.stopCh)
+
 	ingressIP := from.(*submarinerv1.GlobalIngressIP)
 
 	logger.Infof("Processing %sd %s/%s, TargetRef: %q, %q, Status: %#v", op, ingressIP.Namespace,
@@ -152,22 +156,22 @@ func (c *globalIngressIPController) process(from runtime.Object, numRequeues int
 
 		trimAllocatedStatusCondition(&ingressIP.Status.Conditions)
 
-		requeue := c.onCreate(ingressIP)
+		requeue := c.onCreate(ctx, ingressIP)
 
 		return checkStatusChanged(&prevStatus, &ingressIP.Status, ingressIP), requeue
 	case syncer.Delete:
-		return nil, c.onDelete(ingressIP, numRequeues)
+		return nil, c.onDelete(ctx, ingressIP, numRequeues)
 	case syncer.Update:
 	}
 
 	return nil, false
 }
 
-func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngressIP) bool {
+func (c *globalIngressIPController) onCreate(ctx context.Context, ingressIP *submarinerv1.GlobalIngressIP) bool {
 	// If the Ingress GlobalIP is already allocated, we may have gotten here due to an underlying service update (eg ports changed) in
 	// which case we need to update the internal service for non-headless.
 	if ingressIP.Status.AllocatedIP != "" {
-		return c.onUpdate(ingressIP)
+		return c.onUpdate(ctx, ingressIP)
 	}
 
 	key, _ := cache.MetaNamespaceKeyFunc(ingressIP)
@@ -191,7 +195,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 	if ingressIP.Spec.Target == submarinerv1.ClusterIPService {
 		serviceRef := ingressIP.Spec.ServiceRef
 
-		service, exists, err := getService(serviceRef.Name, ingressIP.Namespace, c.services, c.scheme)
+		service, exists, err := getService(ctx, serviceRef.Name, ingressIP.Namespace, c.services, c.scheme)
 		if err != nil || !exists {
 			_ = c.pool.Release(ips...)
 
@@ -205,7 +209,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 			return false
 		}
 
-		err = c.createOrUpdateInternalService(service, ips[0])
+		err = c.createOrUpdateInternalService(ctx, service, ips[0])
 		if err != nil {
 			_ = c.pool.Release(ips...)
 
@@ -281,7 +285,7 @@ func (c *globalIngressIPController) onCreate(ingressIP *submarinerv1.GlobalIngre
 	return false
 }
 
-func (c *globalIngressIPController) createOrUpdateInternalService(from *corev1.Service, extIP string) error {
+func (c *globalIngressIPController) createOrUpdateInternalService(ctx context.Context, from *corev1.Service, extIP string) error {
 	internalService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: GetInternalSvcName(from.Name),
@@ -300,7 +304,7 @@ func (c *globalIngressIPController) createOrUpdateInternalService(from *corev1.S
 	}
 
 	obj := resource.MustToUnstructured(internalService)
-	result, err := util.CreateOrUpdate(context.TODO(), resource.ForDynamic(c.services.Namespace(from.Namespace)), obj, util.Replace(obj))
+	result, err := util.CreateOrUpdate(ctx, resource.ForDynamic(c.services.Namespace(from.Namespace)), obj, util.Replace(obj))
 
 	if result == util.OperationResultCreated {
 		logger.Infof("Created internal service \"%s/%s\"", from.Namespace, internalService.Name)
@@ -311,12 +315,12 @@ func (c *globalIngressIPController) createOrUpdateInternalService(from *corev1.S
 	return err //nolint:wrapcheck  // No need to wrap here
 }
 
-func (c *globalIngressIPController) onUpdate(ingressIP *submarinerv1.GlobalIngressIP) bool {
+func (c *globalIngressIPController) onUpdate(ctx context.Context, ingressIP *submarinerv1.GlobalIngressIP) bool {
 	if ingressIP.Spec.Target != submarinerv1.ClusterIPService {
 		return false
 	}
 
-	service, exists, err := getService(ingressIP.Spec.ServiceRef.Name, ingressIP.Namespace, c.services, c.scheme)
+	service, exists, err := getService(ctx, ingressIP.Spec.ServiceRef.Name, ingressIP.Namespace, c.services, c.scheme)
 	if !exists {
 		return false
 	}
@@ -328,7 +332,7 @@ func (c *globalIngressIPController) onUpdate(ingressIP *submarinerv1.GlobalIngre
 		return true
 	}
 
-	err = c.createOrUpdateInternalService(service, ingressIP.Status.AllocatedIP)
+	err = c.createOrUpdateInternalService(ctx, service, ingressIP.Status.AllocatedIP)
 	if err != nil {
 		logger.Errorf(err, "Failed to update the internal Service for \"%s/%s\"", ingressIP.Namespace, ingressIP.Name)
 		return true
@@ -338,7 +342,7 @@ func (c *globalIngressIPController) onUpdate(ingressIP *submarinerv1.GlobalIngre
 }
 
 //nolint:wrapcheck  // No need to wrap these errors.
-func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngressIP, numRequeues int) bool {
+func (c *globalIngressIPController) onDelete(ctx context.Context, ingressIP *submarinerv1.GlobalIngressIP, numRequeues int) bool {
 	if ingressIP.Status.AllocatedIP == "" {
 		return false
 	}
@@ -349,20 +353,20 @@ func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngre
 		intSvcName := GetInternalSvcName(ingressIP.Spec.ServiceRef.Name)
 		logger.Infof("Deleting the service %q/%q created by Globalnet controller", ingressIP.Namespace, intSvcName)
 
-		intSvc, exists, err := getService(intSvcName, ingressIP.Namespace, c.services, c.scheme)
+		intSvc, exists, err := getService(ctx, intSvcName, ingressIP.Namespace, c.services, c.scheme)
 		if err != nil {
 			logger.Errorf(err, "Error retrieving the internal service created by Globalnet controller %q", key)
 			return shouldRequeue(numRequeues)
 		}
 
 		if exists {
-			if err = finalizer.Remove(context.TODO(), resource.ForDynamic(c.services.Namespace(ingressIP.Namespace)),
+			if err = finalizer.Remove(ctx, resource.ForDynamic(c.services.Namespace(ingressIP.Namespace)),
 				resource.MustToUnstructured(intSvc), InternalServiceFinalizer); err != nil {
 				logger.Errorf(err, "Error while removing the finalizer from service %q", key)
 				return true
 			}
 
-			err = deleteService(ingressIP.Namespace, intSvcName, c.services)
+			err = deleteService(ctx, ingressIP.Namespace, intSvcName, c.services)
 			if err != nil {
 				logger.Errorf(err, "Error while deleting the internal %q", key)
 				return true
@@ -402,12 +406,12 @@ func (c *globalIngressIPController) onDelete(ingressIP *submarinerv1.GlobalIngre
 	}, ingressIP.Status.AllocatedIP)
 }
 
-func (c *globalIngressIPController) ensureInternalServiceExists(ingressIP *submarinerv1.GlobalIngressIP) error {
+func (c *globalIngressIPController) ensureInternalServiceExists(ctx context.Context, ingressIP *submarinerv1.GlobalIngressIP) error {
 	serviceRef := ingressIP.Spec.ServiceRef
 	internalSvc := GetInternalSvcName(serviceRef.Name)
 	key := fmt.Sprintf("%s/%s", ingressIP.Namespace, internalSvc)
 
-	service, exists, err := getService(internalSvc, ingressIP.Namespace, c.services, c.scheme)
+	service, exists, err := getService(ctx, internalSvc, ingressIP.Namespace, c.services, c.scheme)
 	if err != nil {
 		return errors.Wrapf(err, "error retrieving Globalnet ExternalIP service %q for GlobalIngressIP %q", key, ingressIP.Name)
 	}
@@ -424,12 +428,12 @@ func (c *globalIngressIPController) ensureInternalServiceExists(ingressIP *subma
 		// A user is ideally not supposed to modify the external-ip of the Globalnet internal service, but
 		// in-case its done accidentally, as part of controller start/re-start scenario, this code will fix
 		// the issue by deleting and re-creating the internal service with valid configuration.
-		if err := finalizer.Remove(context.TODO(), resource.ForDynamic(c.services.Namespace(ingressIP.Namespace)),
+		if err := finalizer.Remove(ctx, resource.ForDynamic(c.services.Namespace(ingressIP.Namespace)),
 			resource.MustToUnstructured(service), InternalServiceFinalizer); err != nil {
 			return errors.Wrapf(err, "error while removing the finalizer from Globalnet ExternalIP service %q", key)
 		}
 
-		return deleteService(ingressIP.Namespace, internalSvc, c.services)
+		return deleteService(ctx, ingressIP.Namespace, internalSvc, c.services)
 	}
 
 	return nil

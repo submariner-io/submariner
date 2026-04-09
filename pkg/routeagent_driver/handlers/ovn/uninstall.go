@@ -33,7 +33,7 @@ import (
 	k8snet "k8s.io/utils/net"
 )
 
-func (ovn *Handler) Stop() error {
+func (ovn *Handler) Stop(_ context.Context) error {
 	ovn.gatewayRouteController.stop()
 
 	if ovn.nonGatewayRouteController != nil {
@@ -45,7 +45,7 @@ func (ovn *Handler) Stop() error {
 	return nil
 }
 
-func (ovn *Handler) Uninstall() error {
+func (ovn *Handler) Uninstall(ctx context.Context) error {
 	logger.Infof("Uninstalling OVN components from the node")
 
 	err := ovn.cleanupRoutes()
@@ -69,7 +69,7 @@ func (ovn *Handler) Uninstall() error {
 	ovn.deleteIPHookChain(packetfilter.TableTypeFilter, chains.NewForwardingMSSClamp())
 	ovn.deleteIPHookChain(packetfilter.TableTypeNAT, chains.NewPostRouting())
 
-	err = util.Update[*corev1.Node](context.TODO(), ovn.nodeResourceInterface(), &corev1.Node{
+	err = util.Update[*corev1.Node](ctx, ovn.nodeResourceInterface(), &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: nodeutil.GetLocalNodeName()},
 	}, func(existing *corev1.Node) (*corev1.Node, error) {
 		delete(existing.Annotations, OVNKSNATExcludeSubnetsAnnotation)

@@ -31,7 +31,8 @@ import (
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
-func NewServiceExportEndpointsControllers(config *syncer.ResourceSyncerConfig) (*ServiceExportEndpointsControllers, error) {
+func NewServiceExportEndpointsControllers(ctx context.Context, config *syncer.ResourceSyncerConfig,
+) (*ServiceExportEndpointsControllers, error) {
 	// We'll panic if config is nil, this is intentional
 	// Ensure that cloned endpoints whose original endpoints are deleted while the controller stops are deleted.
 	_, gvr, err := util.ToUnstructuredResource(&corev1.Endpoints{}, config.RestMapper)
@@ -41,7 +42,7 @@ func NewServiceExportEndpointsControllers(config *syncer.ResourceSyncerConfig) (
 
 	client := config.SourceClient.Resource(*gvr)
 
-	err = ensureClonedHasOriginal(client)
+	err = ensureClonedHasOriginal(ctx, client)
 	if err != nil {
 		return nil, errors.Wrap(err, "error ensuring cloned Endpoints has original")
 	}
@@ -52,7 +53,7 @@ func NewServiceExportEndpointsControllers(config *syncer.ResourceSyncerConfig) (
 	}, nil
 }
 
-func (c *ServiceExportEndpointsControllers) start(se *mcsv1a1.ServiceExport) error {
+func (c *ServiceExportEndpointsControllers) start(ctx context.Context, se *mcsv1a1.ServiceExport) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -61,7 +62,7 @@ func (c *ServiceExportEndpointsControllers) start(se *mcsv1a1.ServiceExport) err
 		return nil
 	}
 
-	controller, err := startEndpointsController(se.Name, se.Namespace, &c.config)
+	controller, err := startEndpointsController(ctx, se.Name, se.Namespace, &c.config)
 	if err != nil {
 		return err
 	}
@@ -71,18 +72,18 @@ func (c *ServiceExportEndpointsControllers) start(se *mcsv1a1.ServiceExport) err
 	return nil
 }
 
-func (c *ServiceExportEndpointsControllers) stopAll() {
+func (c *ServiceExportEndpointsControllers) stopAll(ctx context.Context) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
 	for _, controller := range c.controllers {
-		controller.Stop()
+		controller.Stop(ctx)
 	}
 
 	c.controllers = map[string]*endpointsController{}
 }
 
-func (c *ServiceExportEndpointsControllers) stopAndCleanup(seName, seNamespace string) {
+func (c *ServiceExportEndpointsControllers) stopAndCleanup(ctx context.Context, seName, seNamespace string) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -90,13 +91,13 @@ func (c *ServiceExportEndpointsControllers) stopAndCleanup(seName, seNamespace s
 
 	controller, exists := c.controllers[key]
 	if exists {
-		controller.Stop()
+		controller.Stop(ctx)
 		delete(c.controllers, key)
 	}
 }
 
-func ensureClonedHasOriginal(client dynamic.NamespaceableResourceInterface) error {
-	list, err := client.Namespace(corev1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+func ensureClonedHasOriginal(ctx context.Context, client dynamic.NamespaceableResourceInterface) error {
+	list, err := client.Namespace(corev1.NamespaceAll).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return errors.Wrap(err, "error listing the resources")
 	}
@@ -129,7 +130,7 @@ func ensureClonedHasOriginal(client dynamic.NamespaceableResourceInterface) erro
 		logger.Infof("Deleting cloned Endpoints %s/%s that doesn't have original Endpoints %s/%s",
 			obj1.GetNamespace(), obj1.GetName(), obj1.GetNamespace(), origEp)
 
-		err := deleteEndpoints(obj1.GetNamespace(), obj1.GetName(), client)
+		err := deleteEndpoints(ctx, obj1.GetNamespace(), obj1.GetName(), client)
 		if err != nil {
 			return errors.Wrap(err, "error deleting cloned Endpoints without original")
 		}

@@ -91,9 +91,9 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 	})
 
 	Context("with the NumberOfIPs unspecified", func() {
-		It("should allocate one global IP and program the necessary IP table rules", func() {
-			t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, 1)
-			t.awaitPacketFilterRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
+		It("should allocate one global IP and program the necessary IP table rules", func(ctx context.Context) {
+			t.awaitGlobalEgressIPStatusAllocated(ctx, globalEgressIPName, 1)
+			t.awaitPacketFilterRules(egressChain, getGlobalEgressIPStatus(ctx, t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
 		})
 
 		It("should start a Pod watcher", func() {
@@ -107,9 +107,9 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 			numberOfIPs = &n
 		})
 
-		It("should allocate the specified number of global IPs and program the necessary IP table rules", func() {
-			t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, *numberOfIPs)
-			t.awaitPacketFilterRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
+		It("should allocate the specified number of global IPs and program the necessary IP table rules", func(ctx context.Context) {
+			t.awaitGlobalEgressIPStatusAllocated(ctx, globalEgressIPName, *numberOfIPs)
+			t.awaitPacketFilterRules(egressChain, getGlobalEgressIPStatus(ctx, t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
 		})
 	})
 
@@ -119,8 +119,8 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 			numberOfIPs = &n
 		})
 
-		It("should add an appropriate Status condition", func() {
-			t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, 0, metav1.Condition{
+		It("should add an appropriate Status condition", func(ctx context.Context) {
+			t.awaitEgressIPStatus(ctx, t.globalEgressIPs, globalEgressIPName, 0, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionFalse,
 				Reason: "InvalidInput",
@@ -134,8 +134,8 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 			numberOfIPs = &n
 		})
 
-		It("should add an appropriate Status condition", func() {
-			t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, 0, metav1.Condition{
+		It("should add an appropriate Status condition", func(ctx context.Context) {
+			t.awaitEgressIPStatus(ctx, t.globalEgressIPs, globalEgressIPName, 0, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionFalse,
 				Reason: "ZeroInput",
@@ -153,8 +153,8 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 			t.pFilter.AddFailOnCreateSetMatchers(Not(BeEmpty()))
 		})
 
-		It("should eventually allocate the global IP and program the IP table rules", func() {
-			t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, 1, metav1.Condition{
+		It("should eventually allocate the global IP and program the IP table rules", func(ctx context.Context) {
+			t.awaitEgressIPStatus(ctx, t.globalEgressIPs, globalEgressIPName, 1, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionFalse,
 				Reason: "ProgramIPTableRulesFailed",
@@ -163,7 +163,7 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 				Status: metav1.ConditionTrue,
 			})
 
-			t.awaitPacketFilterRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
+			t.awaitPacketFilterRules(egressChain, getGlobalEgressIPStatus(ctx, t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
 			t.watches.AwaitWatchStarted("pods")
 		})
 	})
@@ -203,9 +203,9 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 		var allocatedIPs []string
 		var namedSetName string
 
-		JustBeforeEach(func() {
-			t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, 1)
-			allocatedIPs = getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs
+		JustBeforeEach(func(ctx context.Context) {
+			t.awaitGlobalEgressIPStatusAllocated(ctx, globalEgressIPName, 1)
+			allocatedIPs = getGlobalEgressIPStatus(ctx, t.globalEgressIPs, globalEgressIPName).AllocatedIPs
 			namedSetName = t.awaitPacketFilterRules(egressChain, allocatedIPs...)
 		})
 
@@ -254,20 +254,20 @@ func testExistingGlobalEgressIP(t *globalEgressIPControllerTestDriver, podSelect
 			t.createGlobalEgressIP(existing)
 		})
 
-		It("should not reallocate the global IPs", func() {
+		It("should not reallocate the global IPs", func(ctx context.Context) {
 			Consistently(func() []string {
-				return getGlobalEgressIPStatus(t.globalEgressIPs, existing.Name).AllocatedIPs
+				return getGlobalEgressIPStatus(ctx, t.globalEgressIPs, existing.Name).AllocatedIPs
 			}, 200*time.Millisecond).Should(Equal(existing.Status.AllocatedIPs))
 		})
 
-		It("should not update the Status conditions", func() {
+		It("should not update the Status conditions", func(ctx context.Context) {
 			Consistently(func() int {
-				return len(getGlobalEgressIPStatus(t.globalEgressIPs, existing.Name).Conditions)
+				return len(getGlobalEgressIPStatus(ctx, t.globalEgressIPs, existing.Name).Conditions)
 			}, 200*time.Millisecond).Should(Equal(0))
 		})
 
-		It("should reserve the previously allocated IPs", func() {
-			t.verifyIPsReservedInPool(getGlobalEgressIPStatus(t.globalEgressIPs, existing.Name).AllocatedIPs...)
+		It("should reserve the previously allocated IPs", func(ctx context.Context) {
+			t.verifyIPsReservedInPool(getGlobalEgressIPStatus(ctx, t.globalEgressIPs, existing.Name).AllocatedIPs...)
 		})
 
 		It("should program the necessary IP table rules for the allocated IPs", func() {
@@ -286,9 +286,9 @@ func testExistingGlobalEgressIP(t *globalEgressIPControllerTestDriver, podSelect
 			t.createGlobalEgressIP(existing)
 		})
 
-		It("should reallocate the global IPs", func() {
-			t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, *existing.Spec.NumberOfIPs)
-			t.awaitPacketFilterRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
+		It("should reallocate the global IPs", func(ctx context.Context) {
+			t.awaitGlobalEgressIPStatusAllocated(ctx, globalEgressIPName, *existing.Spec.NumberOfIPs)
+			t.awaitPacketFilterRules(egressChain, getGlobalEgressIPStatus(ctx, t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
 		})
 
 		It("should release the previously allocated IPs", func() {
@@ -316,8 +316,8 @@ func testExistingGlobalEgressIP(t *globalEgressIPControllerTestDriver, podSelect
 			Expect(t.pool.Reserve(existing.Status.AllocatedIPs...)).To(Succeed())
 		})
 
-		It("should reallocate the global IPs", func() {
-			t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, *existing.Spec.NumberOfIPs, metav1.Condition{
+		It("should reallocate the global IPs", func(ctx context.Context) {
+			t.awaitEgressIPStatus(ctx, t.globalEgressIPs, globalEgressIPName, *existing.Spec.NumberOfIPs, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionFalse,
 				Reason: "ReserveAllocatedIPsFailed",
@@ -326,7 +326,7 @@ func testExistingGlobalEgressIP(t *globalEgressIPControllerTestDriver, podSelect
 				Status: metav1.ConditionTrue,
 			})
 
-			t.awaitPacketFilterRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
+			t.awaitPacketFilterRules(egressChain, getGlobalEgressIPStatus(ctx, t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
 		})
 	})
 
@@ -337,9 +337,9 @@ func testExistingGlobalEgressIP(t *globalEgressIPControllerTestDriver, podSelect
 			t.pFilter.AddFailOnAppendRuleMatcher(ContainSubstring(existing.Status.AllocatedIPs[0]))
 		})
 
-		It("should return an error on instantiation and not reallocate the global IPs", func() {
+		It("should return an error on instantiation and not reallocate the global IPs", func(ctx context.Context) {
 			Consistently(func() []string {
-				return getGlobalEgressIPStatus(t.globalEgressIPs, existing.Name).AllocatedIPs
+				return getGlobalEgressIPStatus(ctx, t.globalEgressIPs, existing.Name).AllocatedIPs
 			}, 200*time.Millisecond).Should(Equal(existing.Status.AllocatedIPs))
 		})
 	})
@@ -403,12 +403,12 @@ func testGlobalEgressIPUpdated(t *globalEgressIPControllerTestDriver, podSelecto
 		test.UpdateResource(t.globalEgressIPs, existing)
 	})
 
-	testReallocated := func() {
+	testReallocated := func(ctx context.Context) {
 		t.awaitIPsReleasedFromPool(existing.Status.AllocatedIPs...)
 		t.awaitNoPacketFilterRules(egressChain, existing.Status.AllocatedIPs...)
 
-		t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, *existing.Spec.NumberOfIPs)
-		t.awaitPacketFilterRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
+		t.awaitGlobalEgressIPStatusAllocated(ctx, globalEgressIPName, *existing.Spec.NumberOfIPs)
+		t.awaitPacketFilterRules(egressChain, getGlobalEgressIPStatus(ctx, t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
 
 		t.watches.AwaitNoWatchStopped("pods")
 	}
@@ -434,11 +434,11 @@ func testGlobalEgressIPUpdated(t *globalEgressIPControllerTestDriver, podSelecto
 			numberOfIPs = 0
 		})
 
-		It("should release the previously allocated IPs and update the status", func() {
+		It("should release the previously allocated IPs and update the status", func(ctx context.Context) {
 			t.awaitIPsReleasedFromPool(existing.Status.AllocatedIPs...)
 			t.awaitNoPacketFilterRules(egressChain, existing.Status.AllocatedIPs...)
 
-			t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, 0, metav1.Condition{
+			t.awaitEgressIPStatus(ctx, t.globalEgressIPs, globalEgressIPName, 0, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionFalse,
 				Reason: "ZeroInput",
@@ -455,8 +455,8 @@ func testGlobalEgressIPUpdated(t *globalEgressIPControllerTestDriver, podSelecto
 			}
 		})
 
-		It("should update the status appropriately", func() {
-			t.awaitEgressIPStatus(t.globalEgressIPs, globalEgressIPName, numberOfIPs, metav1.Condition{
+		It("should update the status appropriately", func(ctx context.Context) {
+			t.awaitEgressIPStatus(ctx, t.globalEgressIPs, globalEgressIPName, numberOfIPs, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPUpdated),
 				Status: metav1.ConditionFalse,
 				Reason: "PodSelectorUpdateNotSupported",
@@ -481,10 +481,10 @@ func testEgressPodEvents(t *globalEgressIPControllerTestDriver) {
 		egressIP = newGlobalEgressIP(globalEgressIPName, nil, nil)
 	})
 
-	JustBeforeEach(func() {
+	JustBeforeEach(func(ctx context.Context) {
 		t.createGlobalEgressIP(egressIP)
-		t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, 1)
-		ipSet = t.awaitPacketFilterRules(egressChain, getGlobalEgressIPStatus(t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
+		t.awaitGlobalEgressIPStatusAllocated(ctx, globalEgressIPName, 1)
+		ipSet = t.awaitPacketFilterRules(egressChain, getGlobalEgressIPStatus(ctx, t.globalEgressIPs, globalEgressIPName).AllocatedIPs...)
 		t.createPod(pod)
 	})
 
@@ -519,9 +519,9 @@ func testEgressPodEvents(t *globalEgressIPControllerTestDriver) {
 		})
 
 		Context("and then deleted", func() {
-			JustBeforeEach(func() {
+			JustBeforeEach(func(ctx context.Context) {
 				t.pFilter.AwaitEntry(ipSet, pod.Status.PodIP)
-				t.deletePod(pod)
+				t.deletePod(ctx, pod)
 			})
 
 			It("should remove the Pod IP from the IP set", func() {
@@ -597,21 +597,21 @@ func newGlobalEgressIPControllerTestDriver() *globalEgressIPControllerTestDriver
 		t.watches = fakeDynClient.NewWatchReactor(&t.dynClient.Fake)
 	})
 
-	JustBeforeEach(func() {
-		t.start()
+	JustBeforeEach(func(ctx context.Context) {
+		t.start(ctx)
 	})
 
-	AfterEach(func() {
-		t.testDriverBase.afterEach()
+	AfterEach(func(ctx context.Context) {
+		t.testDriverBase.afterEach(ctx)
 	})
 
 	return t
 }
 
-func (t *globalEgressIPControllerTestDriver) start() {
+func (t *globalEgressIPControllerTestDriver) start(ctx context.Context) {
 	var err error
 
-	t.controller, err = controllers.NewGlobalEgressIPController(&syncer.ResourceSyncerConfig{
+	t.controller, err = controllers.NewGlobalEgressIPController(ctx, &syncer.ResourceSyncerConfig{
 		SourceClient: t.dynClient,
 		RestMapper:   t.restMapper,
 		Scheme:       t.scheme,
@@ -623,7 +623,7 @@ func (t *globalEgressIPControllerTestDriver) start() {
 	}
 
 	Expect(err).To(Succeed())
-	Expect(t.controller.Start()).To(Succeed())
+	Expect(t.controller.Start(ctx)).To(Succeed())
 
 	testutil.AwaitWatchAction(&t.dynClient.Fake, "globalegressips")
 }

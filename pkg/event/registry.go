@@ -88,15 +88,15 @@ func (er *Registry) GetHandlers() []Handler {
 	return er.eventHandlers
 }
 
-func (er *Registry) StopHandlers() error {
+func (er *Registry) StopHandlers(ctx context.Context) error {
 	return er.invokeHandlers("Stop", func(h Handler) error {
-		return h.Stop()
+		return h.Stop(ctx)
 	})
 }
 
-func (er *Registry) Uninstall() error {
+func (er *Registry) Uninstall(ctx context.Context) error {
 	return er.invokeHandlers("Uninstall", func(h Handler) error {
-		return h.Uninstall()
+		return h.Uninstall(ctx)
 	})
 }
 

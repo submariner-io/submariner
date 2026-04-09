@@ -144,11 +144,11 @@ func (h *calicoIPPoolHandler) TransitionToGateway() error {
 	return goerrors.Join(retErrors...)
 }
 
-func (h *calicoIPPoolHandler) Uninstall() error {
+func (h *calicoIPPoolHandler) Uninstall(ctx context.Context) error {
 	logger.Info("Uninstalling Calico IPPools used for Submariner")
 
 	labelSelector := labels.SelectorFromSet(map[string]string{SubmarinerIPPool: "true"}).String()
-	err := h.client.ProjectcalicoV3().IPPools().DeleteCollection(context.TODO(), metav1.DeleteOptions{},
+	err := h.client.ProjectcalicoV3().IPPools().DeleteCollection(ctx, metav1.DeleteOptions{},
 		metav1.ListOptions{LabelSelector: labelSelector})
 
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -157,7 +157,7 @@ func (h *calicoIPPoolHandler) Uninstall() error {
 
 	logger.Infof("Successfully delete Calico IPPools using labelSelector %q", labelSelector)
 
-	if err := h.restoreROKSCalicoCfg(); err != nil {
+	if err := h.restoreROKSCalicoCfg(ctx); err != nil {
 		return err
 	}
 
@@ -297,8 +297,8 @@ func (h *calicoIPPoolHandler) updateROKSCalicoCfg(ctx context.Context) error {
 	return errors.Wrapf(err, "failed to update Installation %q", DefaultInstallationName)
 }
 
-func (h *calicoIPPoolHandler) restoreROKSCalicoCfg() error {
-	err := util.Update(context.TODO(), resource.ForDynamic(h.dynClient.Resource(InstallationsGVR)),
+func (h *calicoIPPoolHandler) restoreROKSCalicoCfg(ctx context.Context) error {
+	err := util.Update(ctx, resource.ForDynamic(h.dynClient.Resource(InstallationsGVR)),
 		resource.MustToUnstructured(&tigerav1.Installation{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: DefaultInstallationName,

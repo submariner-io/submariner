@@ -19,6 +19,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"io/fs"
 	"os"
@@ -182,7 +183,7 @@ func main() {
 	logger.FatalOnError(err, "Error registering the handlers")
 
 	if env.Uninstall {
-		uninstall(registry)
+		uninstall(ctx, registry)
 
 		for _, family := range cidr.ExtractIPFamilies(env.ClusterCidr) {
 			pFilter, err := packetfilter.New(family)
@@ -216,7 +217,12 @@ func main() {
 	cleanupLegacyIptables(env.ClusterCidr)
 
 	<-stopCh
-	ctl.Stop()
+
+	// Stop should be pretty quick but put a deadline on it, so we don't block shutdown indefinitely.
+	stopCtx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	ctl.Stop(stopCtx)
 
 	logger.Info("All controllers stopped or exited. Stopping submariner-route-agent")
 }
@@ -244,12 +250,12 @@ func getTCPMssValue(localNode *corev1.Node) int {
 	return tcpMssValue
 }
 
-func uninstall(registry *event.Registry) {
-	if err := registry.StopHandlers(); err != nil {
+func uninstall(ctx context.Context, registry *event.Registry) {
+	if err := registry.StopHandlers(ctx); err != nil {
 		logger.Warningf("Error stopping handlers: %v", err)
 	}
 
-	if err := registry.Uninstall(); err != nil {
+	if err := registry.Uninstall(ctx); err != nil {
 		logger.Warningf("Error uninstalling handlers: %v", err)
 	}
 }

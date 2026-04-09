@@ -19,6 +19,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
@@ -159,10 +160,10 @@ func (c *Controller) Start(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func (c *Controller) Stop() {
+func (c *Controller) Stop(ctx context.Context) {
 	logger.Info("Event controller stopping")
 
-	if err := c.handlers.StopHandlers(); err != nil {
+	if err := c.handlers.StopHandlers(ctx); err != nil {
 		logger.Warningf("In Event Controller, StopHandlers returned error: %v", err)
 	}
 }

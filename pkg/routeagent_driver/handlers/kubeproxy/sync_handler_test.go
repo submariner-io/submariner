@@ -19,6 +19,8 @@ limitations under the License.
 package kubeproxy_test
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
@@ -73,11 +75,11 @@ func testUninstall() {
 	t := newTestDriver()
 
 	Context("on Uninstall", func() {
-		It("should clean up dataplane artifacts", func() {
+		It("should clean up dataplane artifacts", func(ctx context.Context) {
 			t.CreateLocalHostEndpoint()
 			t.netLink.AwaitRule(constants.RouteAgentHostNetworkTableID, "", "")
 
-			Expect(t.handler.Uninstall()).To(Succeed())
+			Expect(t.handler.Uninstall(ctx)).To(Succeed())
 
 			t.netLink.AwaitNoRule(constants.RouteAgentHostNetworkTableID, "", "")
 			t.netLink.AwaitNoLink(kubeproxy.GetVxLANInterfaceName(k8snet.IPv4))

@@ -83,13 +83,13 @@ func testEndpointMonitoring() {
 				t.awaitGlobalnetChainsCleared()
 			})
 
-			It("should start the controllers", func() {
-				t.awaitControllersStarted()
+			It("should start the controllers", func(ctx context.Context) {
+				t.awaitControllersStarted(ctx)
 
-				t.awaitGlobalEgressIPStatusAllocated(globalEgressIPName, 1)
+				t.awaitGlobalEgressIPStatusAllocated(ctx, globalEgressIPName, 1)
 
 				t.createServiceExport(t.createService(newClusterIPService()))
-				t.awaitIngressIPStatusAllocated(serviceName)
+				t.awaitIngressIPStatusAllocated(ctx, serviceName)
 
 				service := newClusterIPService()
 				service.Name = "headless-nginx"
@@ -98,25 +98,25 @@ func testEndpointMonitoring() {
 				t.createPod(backendPod)
 				t.createServiceExport(t.createService(service))
 
-				Eventually(func(g Gomega) {
-					gip := t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
+				Eventually(func(g Gomega, ctx context.Context) {
+					gip := t.awaitHeadlessGlobalIngressIP(ctx, service.Name, backendPod.Name)
 					g.Expect(gip.Status.AllocatedIP).NotTo(BeEmpty(), resource.ToJSON(gip))
-				}).To(Succeed())
+				}).WithContext(ctx).To(Succeed())
 
-				t.awaitGatewayGlobalIP("")
+				t.awaitGatewayGlobalIP(ctx, "")
 			})
 		})
 
 		Context("and then deleted and recreated", func() {
-			JustBeforeEach(func() {
-				t.awaitControllersStarted()
+			JustBeforeEach(func(ctx context.Context) {
+				t.awaitControllersStarted(ctx)
 
 				By("Deleting the Endpoint")
 
-				Expect(t.endpoints.Delete(context.TODO(), endpoint.Name, metav1.DeleteOptions{})).To(Succeed())
+				Expect(t.endpoints.Delete(ctx, endpoint.Name, metav1.DeleteOptions{})).To(Succeed())
 			})
 
-			It("should stop and restart the controllers", func() {
+			It("should stop and restart the controllers", func(ctx context.Context) {
 				t.leaderElection.AwaitLeaseReleased()
 				t.awaitGlobalnetChainsCleared()
 				t.ensureControllersStopped()
@@ -129,7 +129,7 @@ func testEndpointMonitoring() {
 				t.leaderElection.AwaitLeaseAcquired()
 				t.awaitGlobalnetChains()
 
-				t.awaitIngressIPStatusAllocated(serviceName)
+				t.awaitIngressIPStatusAllocated(ctx, serviceName)
 			})
 		})
 
@@ -140,8 +140,8 @@ func testEndpointMonitoring() {
 				t.leaderElectionConfig.RetryPeriod = time.Hour
 			})
 
-			JustBeforeEach(func() {
-				t.awaitControllersStarted()
+			JustBeforeEach(func(ctx context.Context) {
+				t.awaitControllersStarted(ctx)
 
 				// Since the RenewDeadline and RetryPeriod are set very high and the leader lock has been acquired, leader election should
 				// not try to renew the leader lock at this point, but we'll wait a bit more just in case to give it plenty of time. After
@@ -166,8 +166,8 @@ func testEndpointMonitoring() {
 				t.leaderElectionConfig.RetryPeriod = time.Millisecond * 20
 			})
 
-			JustBeforeEach(func() {
-				t.awaitControllersStarted()
+			JustBeforeEach(func(ctx context.Context) {
+				t.awaitControllersStarted(ctx)
 
 				By("Setting leases resource updates to fail")
 
@@ -179,7 +179,7 @@ func testEndpointMonitoring() {
 				t.awaitGlobalnetChains()
 			})
 
-			It("should re-acquire the leader lock after the failure is cleared", func() {
+			It("should re-acquire the leader lock after the failure is cleared", func(ctx context.Context) {
 				By("Setting leases resource updates to succeed")
 
 				t.leaderElection.SucceedLease()
@@ -188,7 +188,7 @@ func testEndpointMonitoring() {
 
 				t.leaderElection.AwaitLeaseRenewed()
 
-				t.awaitIngressIPStatusAllocated(serviceName)
+				t.awaitIngressIPStatusAllocated(ctx, serviceName)
 			})
 
 			Context("and then the gateway Endpoint is deleted", func() {
@@ -229,15 +229,15 @@ func testEndpointMonitoring() {
 		})
 
 		Context("and the local Gateway is deleted", func() {
-			It("should remove the ingress rules for its glonal IP", func() {
-				globalIP := t.awaitGatewayGlobalIP("")
+			It("should remove the ingress rules for its glonal IP", func(ctx context.Context) {
+				globalIP := t.awaitGatewayGlobalIP(ctx, "")
 
 				t.pFilter.AwaitRule(packetfilter.TableTypeNAT,
 					chains.SmGlobalnetIngress, And(ContainSubstring(globalIP), ContainSubstring(cniInterfaceIP)))
 
 				By("Deleting local Gateway")
 
-				err := t.gateways.Delete(context.TODO(), t.hostName, metav1.DeleteOptions{})
+				err := t.gateways.Delete(ctx, t.hostName, metav1.DeleteOptions{})
 				Expect(err).To(Succeed())
 
 				t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT,
@@ -251,8 +251,8 @@ func testEndpointMonitoring() {
 					fake.FailOnAction(&t.dynClient.Fake, "clusterglobalegressips", "get", nil, true)
 				})
 
-				It("should eventually start the controllers", func() {
-					t.awaitControllersStarted()
+				It("should eventually start the controllers", func(ctx context.Context) {
+					t.awaitControllersStarted(ctx)
 				})
 			})
 
@@ -285,10 +285,10 @@ func testEndpointMonitoring() {
 						})
 				})
 
-				It("should eventually start the controllers", func() {
+				It("should eventually start the controllers", func(ctx context.Context) {
 					Eventually(leaseFailed).Within(5 * time.Second).Should(BeClosed())
 					t.leaderElection.SucceedLease()
-					t.awaitControllersStarted()
+					t.awaitControllersStarted(ctx)
 				})
 			})
 		})
@@ -385,11 +385,11 @@ func testUninstall() {
 		t.pFilter.AwaitSet("other")
 	})
 
-	Specify("DeleteGlobalnetObjects should delete all Globalnet resources and internal Services", func() {
+	Specify("DeleteGlobalnetObjects should delete all Globalnet resources and internal Services", func(ctx context.Context) {
 		submClient := fakesubmariner.NewSimpleClientset()
 		fake.AddBasicReactors(&submClient.Fake)
 
-		clusterEgressIP, err := submClient.SubmarinerV1().ClusterGlobalEgressIPs("").Create(context.Background(),
+		clusterEgressIP, err := submClient.SubmarinerV1().ClusterGlobalEgressIPs("").Create(ctx,
 			&submarinerv1.ClusterGlobalEgressIP{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster-egressIP",
@@ -397,7 +397,7 @@ func testUninstall() {
 			}, metav1.CreateOptions{})
 		Expect(err).To(Succeed())
 
-		egressIP, err := submClient.SubmarinerV1().GlobalEgressIPs(namespace).Create(context.Background(),
+		egressIP, err := submClient.SubmarinerV1().GlobalEgressIPs(namespace).Create(ctx,
 			&submarinerv1.GlobalEgressIP{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "egressIP",
@@ -418,10 +418,10 @@ func testUninstall() {
 			},
 		}
 
-		_, err = t.services.Create(context.Background(), resource.MustToUnstructured(internalService), metav1.CreateOptions{})
+		_, err = t.services.Create(ctx, resource.MustToUnstructured(internalService), metav1.CreateOptions{})
 		Expect(err).To(Succeed())
 
-		ingressIP, err := submClient.SubmarinerV1().GlobalIngressIPs(namespace).Create(context.Background(),
+		ingressIP, err := submClient.SubmarinerV1().GlobalIngressIPs(namespace).Create(ctx,
 			&submarinerv1.GlobalIngressIP{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "ingressIP",
@@ -432,7 +432,7 @@ func testUninstall() {
 			}, metav1.CreateOptions{})
 		Expect(err).To(Succeed())
 
-		_, err = submClient.SubmarinerV1().GlobalIngressIPs(namespace).Create(context.Background(),
+		_, err = submClient.SubmarinerV1().GlobalIngressIPs(namespace).Create(ctx,
 			&submarinerv1.GlobalIngressIP{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "ingressIP-no-service-ref",
@@ -440,17 +440,17 @@ func testUninstall() {
 			}, metav1.CreateOptions{})
 		Expect(err).To(Succeed())
 
-		controllers.DeleteGlobalnetObjects(submClient, t.dynClient)
+		controllers.DeleteGlobalnetObjects(ctx, submClient, t.dynClient)
 
-		_, err = submClient.SubmarinerV1().ClusterGlobalEgressIPs("").Get(context.Background(), clusterEgressIP.Name,
+		_, err = submClient.SubmarinerV1().ClusterGlobalEgressIPs("").Get(ctx, clusterEgressIP.Name,
 			metav1.GetOptions{})
 		Expect(apierrors.IsNotFound(err)).To(BeTrue())
 
-		_, err = submClient.SubmarinerV1().GlobalEgressIPs(namespace).Get(context.Background(), egressIP.Name,
+		_, err = submClient.SubmarinerV1().GlobalEgressIPs(namespace).Get(ctx, egressIP.Name,
 			metav1.GetOptions{})
 		Expect(apierrors.IsNotFound(err)).To(BeTrue())
 
-		_, err = submClient.SubmarinerV1().GlobalIngressIPs(namespace).Get(context.Background(), ingressIP.Name,
+		_, err = submClient.SubmarinerV1().GlobalIngressIPs(namespace).Get(ctx, ingressIP.Name,
 			metav1.GetOptions{})
 		Expect(apierrors.IsNotFound(err)).To(BeTrue())
 
@@ -487,24 +487,24 @@ func newGatewayMonitorTestDriver() *gatewayMonitorTestDriver {
 		}
 	})
 
-	JustBeforeEach(func() {
-		t.start()
+	JustBeforeEach(func(ctx context.Context) {
+		t.start(ctx)
 	})
 
-	JustAfterEach(func() {
-		t.testDriverBase.afterEach()
+	JustAfterEach(func(ctx context.Context) {
+		t.testDriverBase.afterEach(ctx)
 	})
 
 	return t
 }
 
-func (t *gatewayMonitorTestDriver) start() {
+func (t *gatewayMonitorTestDriver) start(ctx context.Context) {
 	os.Setenv("NODE_NAME", t.hostName)
 	var err error
 
 	localSubnets := []string{localCIDR}
 
-	t.controller, err = controllers.NewGatewayMonitor(context.TODO(), &controllers.GatewayMonitorConfig{
+	t.controller, err = controllers.NewGatewayMonitor(ctx, &controllers.GatewayMonitorConfig{
 		RestMapper: t.restMapper,
 		Client:     t.dynClient,
 		Scheme:     t.scheme,
@@ -521,7 +521,7 @@ func (t *gatewayMonitorTestDriver) start() {
 	})
 
 	Expect(err).To(Succeed())
-	Expect(t.controller.Start()).To(Succeed())
+	Expect(t.controller.Start(ctx)).To(Succeed())
 
 	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, chains.SmGlobalnetMark)
 }
@@ -540,10 +540,10 @@ func (t *gatewayMonitorTestDriver) createEndpoint(spec *submarinerv1.EndpointSpe
 	return test.CreateResource(t.endpoints, endpoint)
 }
 
-func (t *gatewayMonitorTestDriver) awaitControllersStarted() {
+func (t *gatewayMonitorTestDriver) awaitControllersStarted(ctx context.Context) {
 	t.leaderElection.AwaitLeaseAcquired()
 	t.awaitGlobalnetChains()
-	t.awaitClusterGlobalEgressIPStatusAllocated(controllers.DefaultNumberOfClusterEgressIPs)
+	t.awaitClusterGlobalEgressIPStatusAllocated(ctx, controllers.DefaultNumberOfClusterEgressIPs)
 }
 
 func (t *gatewayMonitorTestDriver) ensureControllersStopped() {

@@ -99,26 +99,27 @@ var _ = Describe("Service controller", func() {
 			t.createServiceExport(t.createService(service))
 		})
 
-		JustBeforeEach(func() {
+		JustBeforeEach(func(ctx context.Context) {
 			t.createPod(backendPod)
-			t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
+			t.awaitHeadlessGlobalIngressIP(ctx, service.Name, backendPod.Name)
 		})
 
-		It("should delete the GlobalIngressIP objects associated with the backend Pods and then re-create them", func() {
-			By("Deleting the service")
+		It("should delete the GlobalIngressIP objects associated with the backend Pods and then re-create them",
+			func(ctx context.Context) {
+				By("Deleting the service")
 
-			Expect(t.services.Delete(context.TODO(), service.Name, metav1.DeleteOptions{})).To(Succeed())
+				Expect(t.services.Delete(ctx, service.Name, metav1.DeleteOptions{})).To(Succeed())
 
-			Eventually(func() []unstructured.Unstructured {
-				list, _ := t.globalIngressIPs.List(context.TODO(), metav1.ListOptions{})
-				return list.Items
-			}, 5).Should(BeEmpty())
+				Eventually(func() []unstructured.Unstructured {
+					list, _ := t.globalIngressIPs.List(ctx, metav1.ListOptions{})
+					return list.Items
+				}, 5).Should(BeEmpty())
 
-			By("Re-creating the service")
+				By("Re-creating the service")
 
-			t.createService(service)
-			t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
-		})
+				t.createService(service)
+				t.awaitHeadlessGlobalIngressIP(ctx, service.Name, backendPod.Name)
+			})
 	})
 
 	When("a GlobalIngressIP is stale on startup due to a missed delete event", func() {
@@ -180,32 +181,32 @@ func newServiceControllerTestDriver() *serviceControllerTestDriver {
 		t.testDriverBase.initChains()
 	})
 
-	JustBeforeEach(func() {
-		t.start()
+	JustBeforeEach(func(ctx context.Context) {
+		t.start(ctx)
 	})
 
-	AfterEach(func() {
-		t.testDriverBase.afterEach()
+	AfterEach(func(ctx context.Context) {
+		t.testDriverBase.afterEach(ctx)
 	})
 
 	return t
 }
 
-func (t *serviceControllerTestDriver) start() {
+func (t *serviceControllerTestDriver) start(ctx context.Context) {
 	seTestDriver := &serviceExportControllerTestDriver{}
 	seTestDriver.testDriverBase = t.testDriverBase
-	config, podControllers, sesyncer := seTestDriver.start()
+	config, podControllers, sesyncer := seTestDriver.start(ctx)
 
 	gipTestDriver := &globalIngressIPControllerTestDriver{}
 	gipTestDriver.testDriverBase = t.testDriverBase
-	gipSyncer := gipTestDriver.start()
+	gipSyncer := gipTestDriver.start(ctx)
 
 	var err error
 
 	t.controller, err = controllers.NewServiceController(config, podControllers, sesyncer, gipSyncer)
 
 	Expect(err).To(Succeed())
-	Expect(t.controller.Start()).To(Succeed())
+	Expect(t.controller.Start(ctx)).To(Succeed())
 
 	testutil.AwaitWatchAction(&t.dynClient.Fake, "services")
 }

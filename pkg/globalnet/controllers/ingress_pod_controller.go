@@ -19,6 +19,7 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -38,7 +39,9 @@ import (
 	"k8s.io/utils/set"
 )
 
-func startIngressPodController(svc *corev1.Service, config *syncer.ResourceSyncerConfig) (*ingressPodController, error) {
+func startIngressPodController(ctx context.Context, svc *corev1.Service,
+	config *syncer.ResourceSyncerConfig,
+) (*ingressPodController, error) {
 	var err error
 
 	_, gvr, err := util.ToUnstructuredResource(&submarinerv1.GlobalIngressIP{}, config.RestMapper)
@@ -74,7 +77,7 @@ func startIngressPodController(svc *corev1.Service, config *syncer.ResourceSynce
 		return nil, errors.Wrap(err, "error creating the syncer")
 	}
 
-	if err := controller.Start(); err != nil {
+	if err := controller.Start(ctx); err != nil {
 		return nil, errors.Wrap(err, "error starting the syncer")
 	}
 
@@ -84,7 +87,7 @@ func startIngressPodController(svc *corev1.Service, config *syncer.ResourceSynce
 
 	ingressIPSelector := labels.Set(selector).AsSelector().String()
 	ingressIPs := config.SourceClient.Resource(*gvr).Namespace(corev1.NamespaceAll)
-	controller.reconcile(ingressIPs, ingressIPSelector, "" /* fieldSelector*/, func(obj *unstructured.Unstructured) runtime.Object {
+	controller.reconcile(ctx, ingressIPs, ingressIPSelector, "" /* fieldSelector*/, func(obj *unstructured.Unstructured) runtime.Object {
 		podName, exists, _ := unstructured.NestedString(obj.Object, "spec", "podRef", "name")
 		if exists {
 			return &corev1.Pod{

@@ -112,7 +112,7 @@ func main() {
 		logger.Info("Uninstalling submariner-globalnet")
 
 		controllers.UninstallDataPath()
-		controllers.DeleteGlobalnetObjects(submarinerClient, dynClient)
+		controllers.DeleteGlobalnetObjects(ctx, submarinerClient, dynClient)
 
 		return
 	}
@@ -167,13 +167,18 @@ func main() {
 	})
 	logger.FatalOnError(err, "Error creating gatewayMonitor")
 
-	err = gatewayMonitor.Start()
+	err = gatewayMonitor.Start(ctx)
 	logger.FatalOnError(err, "Error starting the gatewayMonitor")
 
 	cleanupLegacyIptables()
 
 	<-ctx.Done()
-	gatewayMonitor.Stop()
+
+	// Stop should be pretty quick but put a deadline on it, so we don't block shutdown indefinitely.
+	stopCtx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	gatewayMonitor.Stop(stopCtx)
 
 	logger.Infof("All controllers stopped or exited. Stopping main loop")
 }
