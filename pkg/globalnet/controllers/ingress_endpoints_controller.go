@@ -35,11 +35,14 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	k8snet "k8s.io/utils/net"
 )
 
-func startIngressEndpointsController(svc *corev1.Service, config *syncer.ResourceSyncerConfig) (*ingressEndpointsController, error) {
+func startIngressEndpointsController(ctx context.Context, svc *corev1.Service,
+	config *syncer.ResourceSyncerConfig,
+) (*ingressEndpointsController, error) {
 	var err error
 
 	_, gvr, err := util.ToUnstructuredResource(&submarinerv1.GlobalIngressIP{}, config.RestMapper)
@@ -75,12 +78,12 @@ func startIngressEndpointsController(svc *corev1.Service, config *syncer.Resourc
 		return nil, errors.Wrap(err, "error creating the endpoints syncer")
 	}
 
-	if err := controller.Start(); err != nil {
+	if err := controller.Start(ctx); err != nil {
 		return nil, errors.Wrap(err, "error starting the endpoint syncer")
 	}
 
 	ingressIPs := config.SourceClient.Resource(*gvr).Namespace(corev1.NamespaceAll)
-	controller.reconcile(ingressIPs, "" /* labelSelector */, fieldSelector, func(obj *unstructured.Unstructured) runtime.Object {
+	controller.reconcile(ctx, ingressIPs, "" /* labelSelector */, fieldSelector, func(obj *unstructured.Unstructured) runtime.Object {
 		endpointsName, exists, _ := unstructured.NestedString(obj.Object, "spec", "serviceRef", "name")
 		if exists {
 			return &corev1.Endpoints{
@@ -100,19 +103,22 @@ func startIngressEndpointsController(svc *corev1.Service, config *syncer.Resourc
 }
 
 func (c *ingressEndpointsController) process(from runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
+	ctx := wait.ContextForChannel(c.stopCh)
+
 	endpoints := from.(*corev1.Endpoints)
 
 	switch op {
 	case syncer.Create, syncer.Update:
-		return c.onCreateOrUpdate(endpoints, op)
+		return c.onCreateOrUpdate(ctx, endpoints, op)
 	case syncer.Delete:
-		return c.onDelete(endpoints)
+		return c.onDelete(ctx, endpoints)
 	}
 
 	return nil, false
 }
 
-func (c *ingressEndpointsController) onCreateOrUpdate(endpoints *corev1.Endpoints, op syncer.Operation) (runtime.Object, bool) {
+func (c *ingressEndpointsController) onCreateOrUpdate(ctx context.Context, endpoints *corev1.Endpoints, op syncer.Operation,
+) (runtime.Object, bool) {
 	key, _ := cache.MetaNamespaceKeyFunc(endpoints)
 
 	logger.Infof("%q ingress Endpoints %s for service %s", op, key, c.svcName)
@@ -131,7 +137,7 @@ func (c *ingressEndpointsController) onCreateOrUpdate(endpoints *corev1.Endpoint
 	// Get List of existing ingressIPs
 	selector := labels.SelectorFromSet(map[string]string{ServiceRefLabel: endpoints.Name}).String()
 
-	existingIngressIPs, err := c.ingressIPs.Namespace(endpoints.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector})
+	existingIngressIPs, err := c.ingressIPs.Namespace(endpoints.Namespace).List(ctx, metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		return nil, true
 	}
@@ -149,7 +155,7 @@ func (c *ingressEndpointsController) onCreateOrUpdate(endpoints *corev1.Endpoint
 			}
 		}
 
-		err := c.ingressIPs.Namespace(ingressIP.GetNamespace()).Delete(context.TODO(), ingressIP.GetName(), metav1.DeleteOptions{})
+		err := c.ingressIPs.Namespace(ingressIP.GetNamespace()).Delete(ctx, ingressIP.GetName(), metav1.DeleteOptions{})
 		if err != nil {
 			return nil, true
 		}
@@ -173,7 +179,7 @@ func (c *ingressEndpointsController) onCreateOrUpdate(endpoints *corev1.Endpoint
 			return nil, true
 		}
 
-		_, err = c.ingressIPs.Namespace(ingressIP.GetNamespace()).Create(context.TODO(), uIngressIP, metav1.CreateOptions{})
+		_, err = c.ingressIPs.Namespace(ingressIP.GetNamespace()).Create(ctx, uIngressIP, metav1.CreateOptions{})
 		if err != nil {
 			return nil, true
 		}
@@ -182,12 +188,12 @@ func (c *ingressEndpointsController) onCreateOrUpdate(endpoints *corev1.Endpoint
 	return nil, false
 }
 
-func (c *ingressEndpointsController) onDelete(endpoints *corev1.Endpoints) (runtime.Object, bool) {
+func (c *ingressEndpointsController) onDelete(ctx context.Context, endpoints *corev1.Endpoints) (runtime.Object, bool) {
 	key, _ := cache.MetaNamespaceKeyFunc(endpoints)
 
 	selector := labels.SelectorFromSet(map[string]string{ServiceRefLabel: endpoints.Name}).String()
 
-	err := c.ingressIPs.Namespace(endpoints.Namespace).DeleteCollection(context.TODO(), metav1.DeleteOptions{},
+	err := c.ingressIPs.Namespace(endpoints.Namespace).DeleteCollection(ctx, metav1.DeleteOptions{},
 		metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		return nil, true

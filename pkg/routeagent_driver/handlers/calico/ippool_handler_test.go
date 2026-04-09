@@ -112,8 +112,8 @@ var _ = Describe("IPPool Handler", func() {
 			Expect(err).To(Succeed())
 		})
 
-		JustBeforeEach(func() {
-			Expect(t.handler.Uninstall()).To(Succeed())
+		JustBeforeEach(func(ctx context.Context) {
+			Expect(t.handler.Uninstall(ctx)).To(Succeed())
 		})
 
 		It("should delete all IPPools", func() {

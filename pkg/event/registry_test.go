@@ -165,7 +165,7 @@ var _ = Describe("Event Handler", func() {
 
 func allEvents(registry *event.Registry) map[testing.TestEvent]func() error {
 	return map[testing.TestEvent]func() error{
-		{Name: testing.EvStop}:      func() error { return registry.StopHandlers() },
-		{Name: testing.EvUninstall}: func() error { return registry.Uninstall() },
+		{Name: testing.EvStop}:      func() error { return registry.StopHandlers(context.TODO()) },
+		{Name: testing.EvUninstall}: func() error { return registry.Uninstall(context.TODO()) },
 	}
 }

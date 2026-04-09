@@ -19,6 +19,7 @@ limitations under the License.
 package kubeproxy
 
 import (
+	"context"
 	"net"
 
 	"github.com/submariner-io/admiral/pkg/log"
@@ -30,7 +31,7 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-func (kp *SyncHandler) Uninstall() error {
+func (kp *SyncHandler) Uninstall(_ context.Context) error {
 	logger.Infof("Uninstalling Submariner changes from the node %q", kp.hostname)
 	logger.Infof("Flushing route table %d entries", constants.RouteAgentHostNetworkTableID)
 

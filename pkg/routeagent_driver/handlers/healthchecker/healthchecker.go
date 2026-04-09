@@ -73,15 +73,14 @@ func New(config *Config, client v1typed.SubmarinerV1Interface) event.Handler {
 	}
 }
 
-func (h *controller) Stop() error {
+func (h *controller) Stop(ctx context.Context) error {
 	h.pingerController.Stop()
 
 	h.stopOnce.Do(func() {
 		close(h.stopCh)
 	})
 
-	err := h.client.Delete(context.TODO(),
-		h.config.LocalNodeName, metav1.DeleteOptions{})
+	err := h.client.Delete(ctx, h.config.LocalNodeName, metav1.DeleteOptions{})
 	if err != nil && !apiError.IsNotFound(err) {
 		return errors.Wrapf(err, "Error deleting RouteAgent: %s", h.config.LocalNodeName)
 	}

@@ -146,11 +146,11 @@ const (
 	EvInit                       = "Init"
 )
 
-func (t *TestHandlerBase) Stop() error {
+func (t *TestHandlerBase) Stop(_ context.Context) error {
 	return t.addEvent(EvStop, nil)
 }
 
-func (t *TestHandlerBase) Uninstall() error {
+func (t *TestHandlerBase) Uninstall(_ context.Context) error {
 	return t.addEvent(EvUninstall, nil)
 }
 

@@ -47,8 +47,8 @@ var _ = Describe("Gateway controller", func() {
 				gateway = t.createGateway(t.hostName, "")
 			})
 
-			It("should allocate it and program the relevant iptable rules", func() {
-				t.awaitPacketFilterRules(t.awaitGatewayGlobalIP(""))
+			It("should allocate it and program the relevant iptable rules", func(ctx context.Context) {
+				t.awaitPacketFilterRules(t.awaitGatewayGlobalIP(ctx, ""))
 			})
 
 			Context("and the IP pool is initially exhausted", func() {
@@ -58,11 +58,11 @@ var _ = Describe("Gateway controller", func() {
 					allocatedIPs, _ = t.pool.Allocate(t.pool.Size())
 				})
 
-				It("should eventually allocate a global IP", func() {
+				It("should eventually allocate a global IP", func(ctx context.Context) {
 					time.Sleep(time.Millisecond * 300)
 					Expect(t.pool.Release(allocatedIPs...)).To(Succeed())
 
-					t.awaitGatewayGlobalIP("")
+					t.awaitGatewayGlobalIP(ctx, "")
 				})
 			})
 		})
@@ -91,8 +91,8 @@ var _ = Describe("Gateway controller", func() {
 					Expect(t.pool.Reserve(gateway.GetAnnotations()[constants.SmGlobalIP])).To(Succeed())
 				})
 
-				It("should reallocate the global IP", func() {
-					globalIP := t.awaitGatewayGlobalIP(gateway.GetAnnotations()[constants.SmGlobalIP])
+				It("should reallocate the global IP", func(ctx context.Context) {
+					globalIP := t.awaitGatewayGlobalIP(ctx, gateway.GetAnnotations()[constants.SmGlobalIP])
 					t.awaitPacketFilterRules(globalIP)
 				})
 			})
@@ -105,9 +105,9 @@ var _ = Describe("Gateway controller", func() {
 			t.expectReservedIPs = []string{gateway.GetAnnotations()[constants.SmGlobalIP]}
 		})
 
-		It("should reserve the global IP and preserve the annotation", func() {
+		It("should reserve the global IP and preserve the annotation", func(ctx context.Context) {
 			t.ensureNoPacketFilterRules(gateway.GetAnnotations()[constants.SmGlobalIP])
-			t.ensureGatewayGlobalIP(gateway.Name, gateway.GetAnnotations()[constants.SmGlobalIP])
+			t.ensureGatewayGlobalIP(ctx, gateway.Name, gateway.GetAnnotations()[constants.SmGlobalIP])
 		})
 
 		Context("and is subsequently deleted", func() {
@@ -124,9 +124,9 @@ var _ = Describe("Gateway controller", func() {
 				Expect(t.pool.Reserve(gateway.GetAnnotations()[constants.SmGlobalIP])).To(Succeed())
 			})
 
-			It("should preserve the annotation", func() {
+			It("should preserve the annotation", func(ctx context.Context) {
 				t.ensureNoPacketFilterRules(gateway.GetAnnotations()[constants.SmGlobalIP])
-				t.ensureGatewayGlobalIP(gateway.Name, gateway.GetAnnotations()[constants.SmGlobalIP])
+				t.ensureGatewayGlobalIP(ctx, gateway.Name, gateway.GetAnnotations()[constants.SmGlobalIP])
 			})
 		})
 	})
@@ -154,18 +154,18 @@ func newGatewayControllerTestDriver() *gatewayControllerTestDriver {
 		t.expectReservedIPs = nil
 	})
 
-	JustBeforeEach(func() {
-		t.start()
+	JustBeforeEach(func(ctx context.Context) {
+		t.start(ctx)
 	})
 
-	AfterEach(func() {
-		t.testDriverBase.afterEach()
+	AfterEach(func(ctx context.Context) {
+		t.testDriverBase.afterEach(ctx)
 	})
 
 	return t
 }
 
-func (t *gatewayControllerTestDriver) start() {
+func (t *gatewayControllerTestDriver) start(ctx context.Context) {
 	var err error
 
 	syncerConfig := controllers.NewGatewayResourceSyncerConfig(&syncer.ResourceSyncerConfig{
@@ -183,7 +183,7 @@ func (t *gatewayControllerTestDriver) start() {
 		close(stopCh)
 	})
 
-	t.controller, err = controllers.NewGatewayController(syncerConfig, informer, t.pool, t.hostName, namespace, cniInterfaceIP)
+	t.controller, err = controllers.NewGatewayController(ctx, syncerConfig, informer, t.pool, t.hostName, namespace, cniInterfaceIP)
 	Expect(err).To(Succeed())
 
 	t.verifyIPsReservedInPool(t.expectReservedIPs...)
@@ -192,7 +192,7 @@ func (t *gatewayControllerTestDriver) start() {
 		informer.Run(stopCh)
 	}()
 
-	Expect(t.controller.Start()).To(Succeed())
+	Expect(t.controller.Start(ctx)).To(Succeed())
 
 	testutil.AwaitWatchAction(&t.dynClient.Fake, "gatewaies")
 }

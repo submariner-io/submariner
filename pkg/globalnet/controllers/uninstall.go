@@ -89,38 +89,41 @@ func UninstallDataPath() {
 	logError(err, "Error destroying sets")
 }
 
-func DeleteGlobalnetObjects(smClientSet submclient.Interface, dynClient dynamic.Interface) {
-	err := smClientSet.SubmarinerV1().ClusterGlobalEgressIPs(metav1.NamespaceAll).DeleteCollection(context.TODO(), metav1.DeleteOptions{},
+func DeleteGlobalnetObjects(ctx context.Context, smClientSet submclient.Interface, dynClient dynamic.Interface) {
+	err := smClientSet.SubmarinerV1().ClusterGlobalEgressIPs(metav1.NamespaceAll).DeleteCollection(ctx, metav1.DeleteOptions{},
 		metav1.ListOptions{})
 	logError(err, "Error deleting the clusterGlobalEgressIPs")
 
-	err = smClientSet.SubmarinerV1().GlobalEgressIPs(metav1.NamespaceAll).DeleteCollection(context.TODO(), metav1.DeleteOptions{},
+	err = smClientSet.SubmarinerV1().GlobalEgressIPs(metav1.NamespaceAll).DeleteCollection(ctx, metav1.DeleteOptions{},
 		metav1.ListOptions{})
 	logError(err, "Error deleting the globalEgressIPs")
 
-	deleteGlobalIngressIPs(smClientSet, dynClient)
+	deleteGlobalIngressIPs(ctx, smClientSet, dynClient)
 }
 
-func deleteGlobalIngressIPs(smClientSet submclient.Interface, dynClient dynamic.Interface) {
-	defer deleteAllGlobalIngressIPObjs(smClientSet)
-
+func deleteGlobalIngressIPs(ctx context.Context, smClientSet submclient.Interface, dynClient dynamic.Interface) {
 	gvr := schema.GroupVersionResource{
 		Group:    corev1.SchemeGroupVersion.Group,
 		Version:  corev1.SchemeGroupVersion.Version,
 		Resource: "services",
 	}
 
-	giipList, err := smClientSet.SubmarinerV1().GlobalIngressIPs(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
-	logError(err, "Error listing the globalIngressIP objects")
+	giipList, err := smClientSet.SubmarinerV1().GlobalIngressIPs(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		logError(err, "Error listing the globalIngressIP objects")
+		return
+	}
+
+	defer deleteAllGlobalIngressIPObjs(ctx, smClientSet)
 
 	services := dynClient.Resource(gvr)
 
 	for i := range giipList.Items {
-		deleteInternalService(&giipList.Items[i], services)
+		deleteInternalService(ctx, &giipList.Items[i], services)
 	}
 }
 
-func deleteInternalService(ingressIP *submarinerv1.GlobalIngressIP, services dynamic.NamespaceableResourceInterface) {
+func deleteInternalService(ctx context.Context, ingressIP *submarinerv1.GlobalIngressIP, services dynamic.NamespaceableResourceInterface) {
 	if ingressIP.Spec.ServiceRef == nil {
 		return
 	}
@@ -130,24 +133,29 @@ func deleteInternalService(ingressIP *submarinerv1.GlobalIngressIP, services dyn
 
 	logger.Infof("Deleting the globalnet internal service: %q", key)
 
-	service, exists, _ := getService(internalSvc, ingressIP.Namespace, services, scheme.Scheme)
-	if exists {
-		err := finalizer.Remove(context.TODO(), resource.ForDynamic(services.Namespace(ingressIP.Namespace)),
-			resource.MustToUnstructured(service), InternalServiceFinalizer)
-		logError(err, "rror while removing the finalizer from globalnet internal service %q", key)
+	service, exists, err := getService(ctx, internalSvc, ingressIP.Namespace, services, scheme.Scheme)
+	if err != nil {
+		logError(err, "Error retrieving the globalnet internal service %q", key)
+		return
+	}
 
-		err = deleteService(ingressIP.Namespace, internalSvc, services)
+	if exists {
+		err := finalizer.Remove(ctx, resource.ForDynamic(services.Namespace(ingressIP.Namespace)),
+			resource.MustToUnstructured(service), InternalServiceFinalizer)
+		logError(err, "Error while removing the finalizer from globalnet internal service %q", key)
+
+		err = deleteService(ctx, ingressIP.Namespace, internalSvc, services)
 		logError(err, "Error deleting the service %q/%q", ingressIP.Namespace, internalSvc)
 	}
 }
 
-func deleteAllGlobalIngressIPObjs(smClientSet submclient.Interface) {
-	err := smClientSet.SubmarinerV1().GlobalIngressIPs(metav1.NamespaceAll).DeleteCollection(context.TODO(), metav1.DeleteOptions{},
+func deleteAllGlobalIngressIPObjs(ctx context.Context, smClientSet submclient.Interface) {
+	err := smClientSet.SubmarinerV1().GlobalIngressIPs(metav1.NamespaceAll).DeleteCollection(ctx, metav1.DeleteOptions{},
 		metav1.ListOptions{})
 	logError(err, "Error deleting the globalIngressIPs")
 }
 
-func RemoveStaleInternalServices(config *syncer.ResourceSyncerConfig) error {
+func RemoveStaleInternalServices(ctx context.Context, config *syncer.ResourceSyncerConfig) error {
 	_, gvr, err := util.ToUnstructuredResource(&corev1.Service{}, config.RestMapper)
 	if err != nil {
 		return errors.Wrap(err, "error converting resource")
@@ -155,7 +163,7 @@ func RemoveStaleInternalServices(config *syncer.ResourceSyncerConfig) error {
 
 	services := config.SourceClient.Resource(*gvr)
 
-	svcList, err := services.Namespace(corev1.NamespaceAll).List(context.TODO(), metav1.ListOptions{
+	svcList, err := services.Namespace(corev1.NamespaceAll).List(ctx, metav1.ListOptions{
 		LabelSelector: InternalServiceLabel,
 	})
 	if err != nil {
@@ -167,7 +175,7 @@ func RemoveStaleInternalServices(config *syncer.ResourceSyncerConfig) error {
 		if !svc.GetDeletionTimestamp().IsZero() {
 			logger.Warningf("Globalnet internal service %s/%s has deletionTimestamp set", svc.GetNamespace(), svc.GetName())
 
-			err := finalizer.Remove(context.TODO(), resource.ForDynamic(services.Namespace(svc.GetNamespace())),
+			err := finalizer.Remove(ctx, resource.ForDynamic(services.Namespace(svc.GetNamespace())),
 				resource.MustToUnstructured(svc), InternalServiceFinalizer)
 			if err != nil {
 				return errors.Wrapf(err, "error while removing the finalizer from globalnet internal service %q/%q",

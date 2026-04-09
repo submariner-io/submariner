@@ -334,13 +334,13 @@ var _ = Describe("Gateway transition", func() {
 var _ = Describe("Stop", func() {
 	t := newTestDriver()
 
-	It("should stop the Pingers and delete the RouteAgent resource", func() {
+	It("should stop the Pingers and delete the RouteAgent resource", func(ctx context.Context) {
 		t.CreateEndpoint(t.newSubmEndpoint(healthCheckIP1))
 		t.pingerMap[healthCheckIP1].AwaitStart()
 
 		t.awaitRouteAgent(nil)
 
-		Expect(t.handler.Stop()).To(Succeed())
+		Expect(t.handler.Stop(ctx)).To(Succeed())
 
 		t.pingerMap[healthCheckIP1].AwaitStop()
 
@@ -349,7 +349,7 @@ var _ = Describe("Stop", func() {
 			g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
 		}).Within(5 * time.Second).Should(Succeed())
 
-		Expect(t.handler.Stop()).To(Succeed())
+		Expect(t.handler.Stop(ctx)).To(Succeed())
 	})
 })
 

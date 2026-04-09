@@ -43,7 +43,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func NewClusterGlobalEgressIPController(config *syncer.ResourceSyncerConfig, localSubnets []string,
+func NewClusterGlobalEgressIPController(ctx context.Context, config *syncer.ResourceSyncerConfig, localSubnets []string,
 	pool *ipam.IPPool,
 ) (Interface, error) {
 	// We'll panic if config is nil, this is intentional
@@ -79,11 +79,11 @@ func NewClusterGlobalEgressIPController(config *syncer.ResourceSyncerConfig, loc
 
 	client := config.SourceClient.Resource(*gvr)
 
-	obj, err := client.Get(context.TODO(), defaultEgressIP.Name, metav1.GetOptions{})
+	obj, err := client.Get(ctx, defaultEgressIP.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		logger.Infof("Creating ClusterGlobalEgressIP resource %q", defaultEgressIP.Name)
 
-		_, err = client.Create(context.TODO(), defaultEgressIPObj, metav1.CreateOptions{})
+		_, err = client.Create(ctx, defaultEgressIPObj, metav1.CreateOptions{})
 		if err != nil {
 			return nil, errors.Wrapf(err, "error creating ClusterGlobalEgressIP resource %q", defaultEgressIP.Name)
 		}
@@ -92,7 +92,7 @@ func NewClusterGlobalEgressIPController(config *syncer.ResourceSyncerConfig, loc
 	}
 
 	if obj != nil {
-		err := controller.reserveAllocatedIPs(federator, obj, func(reservedIPs []string) error {
+		err := controller.reserveAllocatedIPs(ctx, federator, obj, func(_ context.Context, reservedIPs []string) error {
 			metrics.RecordAllocateClusterGlobalEgressIPs(pool.GetCIDR(), len(reservedIPs))
 			return controller.programClusterGlobalEgressRules(reservedIPs)
 		})

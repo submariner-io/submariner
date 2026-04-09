@@ -742,7 +742,7 @@ func (t *handlerTestDriver) testOVNMgmtInterfaceAddressChange() {
 }
 
 func (t *handlerTestDriver) testUninstall() {
-	It("should delete the table rules and chains", func() {
+	It("should delete the table rules and chains", func(ctx context.Context) {
 		Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, chains.SmForward)).To(BeTrue())
 		Expect(t.pFilter.ChainExists(packetfilter.TableTypeFilter, chains.SmForwardMSSClamp)).To(BeTrue())
 		Expect(t.pFilter.ChainExists(packetfilter.TableTypeNAT, chains.SmPostRouting)).To(BeTrue())
@@ -769,7 +769,7 @@ func (t *handlerTestDriver) testUninstall() {
 			MssValue:  "5",
 		})).To(Succeed())
 
-		Expect(t.handler.Uninstall()).To(Succeed())
+		Expect(t.handler.Uninstall(ctx)).To(Succeed())
 
 		t.netLink.AwaitNoRule(constants.RouteAgentHostNetworkTableID, "", "")
 		t.netLink.AwaitNoRule(constants.RouteAgentInterClusterNetworkTableID, "", "")

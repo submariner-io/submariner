@@ -19,6 +19,8 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/federate"
 	"github.com/submariner-io/admiral/pkg/global"
@@ -30,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -74,13 +77,13 @@ func NewServiceController(config *syncer.ResourceSyncerConfig, podControllers *I
 	return controller, nil
 }
 
-func (c *serviceController) Start() error {
-	err := c.baseSyncerController.Start()
+func (c *serviceController) Start(ctx context.Context) error {
+	err := c.baseSyncerController.Start(ctx)
 	if err != nil {
 		return err
 	}
 
-	c.reconcile(c.ingressIPs, "" /* labelSelector */, "", /* fieldSelector */
+	c.reconcile(ctx, c.ingressIPs, "" /* labelSelector */, "", /* fieldSelector */
 		func(obj *unstructured.Unstructured) runtime.Object {
 			name, exists, _ := unstructured.NestedString(obj.Object, "spec", "serviceRef", "name")
 			if exists {
@@ -102,6 +105,8 @@ func (c *serviceController) Start() error {
 }
 
 func (c *serviceController) process(from runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
+	ctx := wait.ContextForChannel(c.stopCh)
+
 	service := from.(*corev1.Service)
 
 	if service.Spec.Type != corev1.ServiceTypeClusterIP {
@@ -116,7 +121,7 @@ func (c *serviceController) process(from runtime.Object, _ int, op syncer.Operat
 		// For Create, requeue the associated ServiceExport, if any, to re-create the GlobalIngressIP.
 		c.serviceExportSyncer.RequeueResource(service.Name, service.Namespace)
 	case syncer.Delete:
-		return c.onDelete(service)
+		return c.onDelete(ctx, service)
 	case syncer.Update:
 		c.gipSyncer.RequeueResource(service.Name, service.Namespace)
 	}
@@ -124,8 +129,8 @@ func (c *serviceController) process(from runtime.Object, _ int, op syncer.Operat
 	return nil, false
 }
 
-func (c *serviceController) onDelete(service *corev1.Service) (runtime.Object, bool) {
-	c.podControllers.stopAndCleanup(service.Name, service.Namespace)
+func (c *serviceController) onDelete(ctx context.Context, service *corev1.Service) (runtime.Object, bool) {
+	c.podControllers.stopAndCleanup(ctx, service.Name, service.Namespace)
 
 	if service.Spec.ClusterIP == corev1.ClusterIPNone {
 		return nil, false

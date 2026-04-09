@@ -92,7 +92,7 @@ func (c *ControllerSupport) Start(handlers ...event.Handler) {
 
 	DeferCleanup(func() {
 		close(stopCh)
-		eventController.Stop()
+		eventController.Stop(context.TODO())
 	})
 }
 

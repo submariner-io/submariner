@@ -140,7 +140,7 @@ func NewGatewayMonitor(ctx context.Context, config *GatewayMonitorConfig) (Inter
 	return &gatewayMonitorInterface{monitor: gatewayMonitor, registry: registry}, nil
 }
 
-func (g *gatewayMonitorInterface) Start() error {
+func (g *gatewayMonitorInterface) Start(ctx context.Context) error {
 	logger.Info("Starting GatewayMonitor to monitor the active Gateway node in the cluster.")
 
 	err := g.monitor.startLocalGatewayCleanupController()
@@ -165,8 +165,8 @@ func (g *gatewayMonitorInterface) Start() error {
 	return eventController.Start(g.monitor.stopCh) //nolint // No need to wrap
 }
 
-func (g *gatewayMonitorInterface) Stop() {
-	_ = g.monitor.Stop()
+func (g *gatewayMonitorInterface) Stop(ctx context.Context) {
+	_ = g.monitor.Stop(ctx)
 }
 
 func (g *gatewayMonitor) GetName() string {
@@ -181,17 +181,12 @@ func (g *gatewayMonitor) Init(_ context.Context) error {
 	return g.createNATChain(chains.SmGlobalnetMark)
 }
 
-func (g *gatewayMonitor) Stop() error {
+func (g *gatewayMonitor) Stop(ctx context.Context) error {
 	logger.Info("GatewayMonitor stopping")
 
 	g.shuttingDown.Store(true)
 
-	g.baseController.Stop()
-
-	// stopControllers should be pretty quick but put a deadline on it, so we don't block shutdown for a long time.
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	g.baseController.Stop(ctx)
 
 	g.stopControllers(ctx, true)
 
@@ -296,7 +291,7 @@ func (g *gatewayMonitor) startLeaderElection() {
 		ReleaseOnCancel: true,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(_ context.Context) {
-				err := g.startControllers() //nolint:contextcheck // Intentional to not pass context
+				err := g.startControllers(context.Background()) //nolint:contextcheck // Intentional to not pass context
 				if err != nil {
 					logger.Error(err, "Error starting the controllers - stopping leader election")
 					leaderElectionInfo.stop()
@@ -322,7 +317,7 @@ func (g *gatewayMonitor) startLeaderElection() {
 }
 
 //nolint:gocyclo // Ignore cyclomatic complexity here
-func (g *gatewayMonitor) startControllers() error {
+func (g *gatewayMonitor) startControllers(ctx context.Context) error {
 	g.controllersMutex.Lock()
 	defer g.controllersMutex.Unlock()
 
@@ -346,14 +341,14 @@ func (g *gatewayMonitor) startControllers() error {
 
 	g.controllers = nil
 
-	c, err := NewClusterGlobalEgressIPController(g.syncerConfig, g.LocalCIDRs, pool)
+	c, err := NewClusterGlobalEgressIPController(ctx, g.syncerConfig, g.LocalCIDRs, pool)
 	if err != nil {
 		return errors.Wrap(err, "error creating the ClusterGlobalEgressIP controller")
 	}
 
 	g.controllers = append(g.controllers, c)
 
-	c, err = NewGlobalEgressIPController(g.syncerConfig, pool)
+	c, err = NewGlobalEgressIPController(ctx, g.syncerConfig, pool)
 	if err != nil {
 		return errors.Wrap(err, "error creating the GlobalEgressIP controller")
 	}
@@ -365,7 +360,7 @@ func (g *gatewayMonitor) startControllers() error {
 	// remains until the finalizer is removed. We have seen that this intermediate state of
 	// the service can potentially create issues in some deployments. Hence, we identify such internal
 	// services and delete them when the Globalnet controller pod comes up.
-	err = RemoveStaleInternalServices(g.syncerConfig)
+	err = RemoveStaleInternalServices(ctx, g.syncerConfig)
 	if err != nil {
 		// Just log an error message as it's non-fatal
 		logger.Errorf(err, "Error removing stale internal services created by Globalnet controller")
@@ -373,7 +368,7 @@ func (g *gatewayMonitor) startControllers() error {
 
 	// The GlobalIngressIP controller needs to be started before the ServiceExport and Service controllers to ensure
 	// reconciliation works properly.
-	gipController, err := NewGlobalIngressIPController(g.syncerConfig, pool)
+	gipController, err := NewGlobalIngressIPController(ctx, g.syncerConfig, pool)
 	if err != nil {
 		return errors.Wrap(err, "error creating the GlobalIngressIP controller")
 	}
@@ -385,7 +380,7 @@ func (g *gatewayMonitor) startControllers() error {
 		return errors.Wrap(err, "error creating the IngressPodControllers")
 	}
 
-	endpointsControllers, err := NewServiceExportEndpointsControllers(g.syncerConfig)
+	endpointsControllers, err := NewServiceExportEndpointsControllers(ctx, g.syncerConfig)
 	if err != nil {
 		return errors.Wrap(err, "error creating the Endpoints controller")
 	}
@@ -411,7 +406,7 @@ func (g *gatewayMonitor) startControllers() error {
 	g.controllers = append(g.controllers, c)
 
 	if g.cniIP != "" {
-		c, err := NewGatewayController(g.syncerConfig, g.gatewaySharedInformer, pool, g.Hostname, g.Spec.Namespace, g.cniIP)
+		c, err := NewGatewayController(ctx, g.syncerConfig, g.gatewaySharedInformer, pool, g.Hostname, g.Spec.Namespace, g.cniIP)
 		if err != nil {
 			return errors.Wrap(err, "error creating the Gateway controller")
 		}
@@ -420,7 +415,7 @@ func (g *gatewayMonitor) startControllers() error {
 	}
 
 	for _, c := range g.controllers {
-		err = c.Start()
+		err = c.Start(ctx)
 		if err != nil {
 			return err //nolint:wrapcheck  // Let the caller wrap it
 		}
@@ -437,7 +432,7 @@ func (g *gatewayMonitor) stopControllers(ctx context.Context, clearGlobalnetChai
 	logger.Infof("Stopping %d controllers", len(g.controllers))
 
 	for _, c := range g.controllers {
-		c.Stop()
+		c.Stop(ctx)
 	}
 
 	g.controllers = nil

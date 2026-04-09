@@ -168,9 +168,9 @@ func newTestDriverBase() *testDriverBase {
 	return t
 }
 
-func (t *testDriverBase) afterEach() {
+func (t *testDriverBase) afterEach(ctx context.Context) {
 	if t.controller != nil {
-		t.controller.Stop()
+		t.controller.Stop(ctx)
 	}
 }
 
@@ -221,20 +221,20 @@ func (t *testDriverBase) createGlobalIngressIP(ingressIP *submarinerv1.GlobalIng
 }
 
 //nolint:unparam // `name` always receives `globalEgressIPName`
-func (t *testDriverBase) awaitGlobalEgressIPStatusAllocated(name string, expNumIPS int) {
-	t.awaitEgressIPStatusAllocated(t.globalEgressIPs, name, expNumIPS)
+func (t *testDriverBase) awaitGlobalEgressIPStatusAllocated(ctx context.Context, name string, expNumIPS int) {
+	t.awaitEgressIPStatusAllocated(ctx, t.globalEgressIPs, name, expNumIPS)
 }
 
-func (t *testDriverBase) awaitClusterGlobalEgressIPStatusAllocated(expNumIPS int) {
-	t.awaitEgressIPStatusAllocated(t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, expNumIPS)
+func (t *testDriverBase) awaitClusterGlobalEgressIPStatusAllocated(ctx context.Context, expNumIPS int) {
+	t.awaitEgressIPStatusAllocated(ctx, t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, expNumIPS)
 }
 
 func (t *testDriverBase) createPod(p *corev1.Pod) *corev1.Pod {
 	return test.CreateResource(t.pods.Namespace(p.Namespace), p)
 }
 
-func (t *testDriverBase) deletePod(p *corev1.Pod) {
-	Expect(t.pods.Namespace(p.Namespace).Delete(context.TODO(), p.Name, metav1.DeleteOptions{})).To(Succeed())
+func (t *testDriverBase) deletePod(ctx context.Context, p *corev1.Pod) {
+	Expect(t.pods.Namespace(p.Namespace).Delete(ctx, p.Name, metav1.DeleteOptions{})).To(Succeed())
 }
 
 func (t *testDriverBase) createEndpoints(ep *corev1.Endpoints) *corev1.Endpoints {
@@ -242,8 +242,8 @@ func (t *testDriverBase) createEndpoints(ep *corev1.Endpoints) *corev1.Endpoints
 	return ep
 }
 
-func (t *testDriverBase) deleteEndpoints(ep *corev1.Endpoints) {
-	err := t.endpoints.Delete(context.TODO(), ep.Name, metav1.DeleteOptions{})
+func (t *testDriverBase) deleteEndpoints(ctx context.Context, ep *corev1.Endpoints) {
+	err := t.endpoints.Delete(ctx, ep.Name, metav1.DeleteOptions{})
 	Expect(err).To(Succeed())
 }
 
@@ -272,9 +272,9 @@ func (t *testDriverBase) createPFilterChain(table packetfilter.TableType, chain 
 	})
 }
 
-func (t *testDriverBase) getGlobalIngressIPStatus(name string) *submarinerv1.GlobalIngressIPStatus {
+func (t *testDriverBase) getGlobalIngressIPStatus(ctx context.Context, name string) *submarinerv1.GlobalIngressIPStatus {
 	status := &submarinerv1.GlobalIngressIPStatus{}
-	getStatus(t.globalIngressIPs, name, status)
+	getStatus(ctx, t.globalIngressIPs, name, status)
 
 	return status
 }
@@ -291,20 +291,20 @@ func (t *testDriverBase) createGateway(name, globalIP string) *submarinerv1.Gate
 	return test.CreateResource(t.gateways, gateway)
 }
 
-func (t *testDriverBase) getGatewayGlobalIP(name string) string {
-	obj, err := t.gateways.Get(context.TODO(), name, metav1.GetOptions{})
+func (t *testDriverBase) getGatewayGlobalIP(ctx context.Context, name string) string {
+	obj, err := t.gateways.Get(ctx, name, metav1.GetOptions{})
 	Expect(err).To(Succeed())
 
 	return obj.GetAnnotations()[constants.SmGlobalIP]
 }
 
-func (t *testDriverBase) awaitGatewayGlobalIP(oldIP string) string {
+func (t *testDriverBase) awaitGatewayGlobalIP(ctx context.Context, oldIP string) string {
 	var globalIP string
 
-	Eventually(func() string {
-		globalIP = t.getGatewayGlobalIP(t.hostName)
-		return globalIP
-	}, 5).ShouldNot(Or(BeEmpty(), Equal(oldIP)))
+	Eventually(func(g Gomega, ctx context.Context) {
+		globalIP = t.getGatewayGlobalIP(ctx, t.hostName)
+		g.Expect(globalIP).NotTo(Or(BeEmpty(), Equal(oldIP)))
+	}).Within(5 * time.Second).WithContext(ctx).Should(Succeed())
 
 	Expect(isValidIPForCIDR(t.globalCIDR, globalIP)).To(BeTrue(), "Allocated global IP %q is not valid for CIDR %q",
 		globalIP, t.globalCIDR)
@@ -314,10 +314,10 @@ func (t *testDriverBase) awaitGatewayGlobalIP(oldIP string) string {
 	return globalIP
 }
 
-func (t *testDriverBase) ensureGatewayGlobalIP(name, ip string) {
-	Consistently(func() string {
-		return t.getGatewayGlobalIP(name)
-	}, 500*time.Millisecond).Should(Equal(ip))
+func (t *testDriverBase) ensureGatewayGlobalIP(ctx context.Context, name, ip string) {
+	Consistently(func(ctx context.Context) string {
+		return t.getGatewayGlobalIP(ctx, name)
+	}).Within(500 * time.Millisecond).WithContext(ctx).Should(Equal(ip))
 }
 
 func addAnnotation(obj metav1.Object, key, value string) {
@@ -333,8 +333,8 @@ func addAnnotation(obj metav1.Object, key, value string) {
 	obj.GetAnnotations()[key] = value
 }
 
-func getStatus(client dynamic.ResourceInterface, name string, status any) {
-	obj, err := client.Get(context.TODO(), name, metav1.GetOptions{})
+func getStatus(ctx context.Context, client dynamic.ResourceInterface, name string, status any) {
+	obj, err := client.Get(ctx, name, metav1.GetOptions{})
 	Expect(err).To(Succeed())
 
 	statusObj, ok, err := unstructured.NestedMap(obj.Object, "status")
@@ -347,42 +347,44 @@ func getStatus(client dynamic.ResourceInterface, name string, status any) {
 	Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(statusObj, status)).To(Succeed())
 }
 
-func getGlobalEgressIPStatus(client dynamic.ResourceInterface, name string) *submarinerv1.GlobalEgressIPStatus {
+func getGlobalEgressIPStatus(ctx context.Context, client dynamic.ResourceInterface, name string) *submarinerv1.GlobalEgressIPStatus {
 	status := &submarinerv1.GlobalEgressIPStatus{}
-	getStatus(client, name, status)
+	getStatus(ctx, client, name, status)
 
 	return status
 }
 
-func (t *testDriverBase) awaitEgressIPStatus(client dynamic.ResourceInterface, name string, expNumIPS int, expCond ...metav1.Condition) {
+func (t *testDriverBase) awaitEgressIPStatus(ctx context.Context, client dynamic.ResourceInterface, name string, expNumIPS int,
+	expCond ...metav1.Condition,
+) {
 	t.awaitStatusConditions(client, name, expCond...)
 
 	var status *submarinerv1.GlobalEgressIPStatus
 
-	Eventually(func(g Gomega) {
-		status = getGlobalEgressIPStatus(client, name)
+	Eventually(func(g Gomega, ctx context.Context) {
+		status = getGlobalEgressIPStatus(ctx, client, name)
 		g.Expect(status.AllocatedIPs).To(HaveLen(expNumIPS))
 
 		for _, ip := range status.AllocatedIPs {
 			g.Expect(isValidIPForCIDR(t.globalCIDR, ip)).To(BeTrue(), "Allocated global IP %q is not valid for CIDR %q",
 				ip, t.globalCIDR)
 		}
-	}).Should(Succeed())
+	}).WithContext(ctx).Should(Succeed())
 
 	t.verifyIPsReservedInPool(status.AllocatedIPs...)
 }
 
-func (t *testDriverBase) awaitEgressIPStatusAllocated(client dynamic.ResourceInterface, name string, expNumIPS int) {
-	t.awaitEgressIPStatus(client, name, expNumIPS, metav1.Condition{
+func (t *testDriverBase) awaitEgressIPStatusAllocated(ctx context.Context, client dynamic.ResourceInterface, name string, expNumIPS int) {
+	t.awaitEgressIPStatus(ctx, client, name, expNumIPS, metav1.Condition{
 		Type:   string(submarinerv1.GlobalEgressIPAllocated),
 		Status: metav1.ConditionTrue,
 	})
 }
 
-func (t *testDriverBase) awaitIngressIPStatus(name string, expCond ...metav1.Condition) {
+func (t *testDriverBase) awaitIngressIPStatus(ctx context.Context, name string, expCond ...metav1.Condition) {
 	t.awaitStatusConditions(t.globalIngressIPs, name, expCond...)
 
-	status := t.getGlobalIngressIPStatus(name)
+	status := t.getGlobalIngressIPStatus(ctx, name)
 
 	Expect(status.AllocatedIP).ToNot(BeEmpty())
 	Expect(isValidIPForCIDR(t.globalCIDR, status.AllocatedIP)).To(BeTrue(), "Allocated global IP %q is not valid for CIDR %q",
@@ -391,8 +393,8 @@ func (t *testDriverBase) awaitIngressIPStatus(name string, expCond ...metav1.Con
 	t.verifyIPsReservedInPool(status.AllocatedIP)
 }
 
-func (t *testDriverBase) awaitIngressIPStatusAllocated(name string) {
-	t.awaitIngressIPStatus(name, metav1.Condition{
+func (t *testDriverBase) awaitIngressIPStatusAllocated(ctx context.Context, name string) {
+	t.awaitIngressIPStatus(ctx, name, metav1.Condition{
 		Type:   string(submarinerv1.GlobalEgressIPAllocated),
 		Status: metav1.ConditionTrue,
 	})
@@ -422,9 +424,9 @@ func (t *testDriverBase) ensureNoEndpoints(name string) {
 	testutil.EnsureNoResource(resource.ForDynamic(t.endpoints), name)
 }
 
-func (t *testDriverBase) awaitEndpointsHasIP(name, ip string) {
-	Eventually(func() bool {
-		obj, err := t.endpoints.Get(context.TODO(), name, metav1.GetOptions{})
+func (t *testDriverBase) awaitEndpointsHasIP(ctx context.Context, name, ip string) {
+	Eventually(func(ctx context.Context) bool {
+		obj, err := t.endpoints.Get(ctx, name, metav1.GetOptions{})
 		Expect(err).To(Succeed())
 
 		ep := &corev1.Endpoints{}
@@ -439,11 +441,11 @@ func (t *testDriverBase) awaitEndpointsHasIP(name, ip string) {
 		}
 
 		return false
-	}, 5).Should(BeTrue())
+	}).Within(5 * time.Second).WithContext(ctx).Should(BeTrue())
 }
 
-func (t *testDriverBase) awaitHeadlessGlobalIngressIP(svcName, podName string) *submarinerv1.GlobalIngressIP {
-	ingressIP := getGlobalIngressIP(t, podName, func(gip *submarinerv1.GlobalIngressIP, name string) bool {
+func (t *testDriverBase) awaitHeadlessGlobalIngressIP(ctx context.Context, svcName, podName string) *submarinerv1.GlobalIngressIP {
+	ingressIP := getGlobalIngressIP(ctx, t, podName, func(gip *submarinerv1.GlobalIngressIP, name string) bool {
 		return gip.Spec.PodRef != nil && gip.Spec.PodRef.Name == name
 	})
 
@@ -454,9 +456,10 @@ func (t *testDriverBase) awaitHeadlessGlobalIngressIP(svcName, podName string) *
 	return ingressIP
 }
 
-func (t *testDriverBase) awaitHeadlessGlobalIngressIPForEP(svcName, endpointsName string) *submarinerv1.GlobalIngressIP {
+func (t *testDriverBase) awaitHeadlessGlobalIngressIPForEP(ctx context.Context, svcName, endpointsName string,
+) *submarinerv1.GlobalIngressIP {
 	// Intentionally comparing ServiceRef.Name and endpointsName (they should be the same)
-	ingressIP := getGlobalIngressIP(t, endpointsName, func(gip *submarinerv1.GlobalIngressIP, name string) bool {
+	ingressIP := getGlobalIngressIP(ctx, t, endpointsName, func(gip *submarinerv1.GlobalIngressIP, name string) bool {
 		return gip.Spec.ServiceRef != nil && gip.Spec.ServiceRef.Name == name
 	})
 
@@ -467,25 +470,26 @@ func (t *testDriverBase) awaitHeadlessGlobalIngressIPForEP(svcName, endpointsNam
 	return ingressIP
 }
 
-func getGlobalIngressIP(t *testDriverBase, name string,
-	compFunc func(*submarinerv1.GlobalIngressIP, string) bool,
+func getGlobalIngressIP(ctx context.Context, t *testDriverBase, name string, compFunc func(*submarinerv1.GlobalIngressIP, string) bool,
 ) *submarinerv1.GlobalIngressIP {
 	var ingressIP *submarinerv1.GlobalIngressIP
 
-	Eventually(func() bool {
-		list, _ := t.globalIngressIPs.List(context.TODO(), metav1.ListOptions{})
+	Eventually(func(g Gomega, ctx context.Context) {
+		list, err := t.globalIngressIPs.List(ctx, metav1.ListOptions{})
+		g.Expect(err).NotTo(HaveOccurred())
+
 		for i := range list.Items {
 			gip := &submarinerv1.GlobalIngressIP{}
 			Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(list.Items[i].Object, gip)).To(Succeed())
 
 			if compFunc(gip, name) {
 				ingressIP = gip
-				return true
+				break
 			}
 		}
 
-		return false
-	}, 5).Should(BeTrue(), "GlobalIngressIP not found")
+		g.Expect(ingressIP).NotTo(BeNil(), "GlobalIngressIP not found")
+	}).WithContext(ctx).Within(time.Second * 5).Should(Succeed())
 
 	return ingressIP
 }
@@ -498,11 +502,13 @@ func (t *testDriverBase) ensureNoGlobalIngressIP(name string) {
 	testutil.EnsureNoResource(resource.ForDynamic(t.globalIngressIPs), name)
 }
 
-func (t *testDriverBase) ensureNoGlobalIngressIPs() {
-	Consistently(func() []unstructured.Unstructured {
-		list, _ := t.globalIngressIPs.List(context.TODO(), metav1.ListOptions{})
+func (t *testDriverBase) ensureNoGlobalIngressIPs(ctx context.Context) {
+	Consistently(func(ctx context.Context) []unstructured.Unstructured {
+		list, err := t.globalIngressIPs.List(ctx, metav1.ListOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
 		return list.Items
-	}, time.Millisecond*300).Should(BeEmpty())
+	}).Within(time.Millisecond * 300).WithContext(ctx).Should(BeEmpty())
 }
 
 func (t *testDriverBase) awaitStatusConditions(client dynamic.ResourceInterface, name string, expCond ...metav1.Condition) {

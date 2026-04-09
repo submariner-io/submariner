@@ -98,10 +98,10 @@ type Handler interface {
 	GetNetworkPlugins() []string
 
 	// Stop is called once during shutdown to let the handler perform any cleanup.
-	Stop() error
+	Stop(ctx context.Context) error
 
 	// Uninstall is called once after shutdown to let the handler process a Submariner uninstallation.
-	Uninstall() error
+	Uninstall(ctx context.Context) error
 
 	EndpointHandler
 }
@@ -128,11 +128,11 @@ func (ev *HandlerBase) State() HandlerState {
 	return hs.(HandlerState)
 }
 
-func (ev *HandlerBase) Stop() error {
+func (ev *HandlerBase) Stop(_ context.Context) error {
 	return nil
 }
 
-func (ev *HandlerBase) Uninstall() error {
+func (ev *HandlerBase) Uninstall(_ context.Context) error {
 	return nil
 }
 

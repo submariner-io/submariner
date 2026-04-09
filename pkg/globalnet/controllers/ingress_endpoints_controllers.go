@@ -45,7 +45,7 @@ func NewIngressEndpointsControllers(config *syncer.ResourceSyncerConfig) (*Ingre
 	}, nil
 }
 
-func (c *IngressEndpointsControllers) start(service *corev1.Service) error {
+func (c *IngressEndpointsControllers) start(ctx context.Context, service *corev1.Service) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -54,7 +54,7 @@ func (c *IngressEndpointsControllers) start(service *corev1.Service) error {
 		return nil
 	}
 
-	controller, err := startIngressEndpointsController(service, &c.config)
+	controller, err := startIngressEndpointsController(ctx, service, &c.config)
 	if err != nil {
 		return err
 	}
@@ -64,18 +64,18 @@ func (c *IngressEndpointsControllers) start(service *corev1.Service) error {
 	return nil
 }
 
-func (c *IngressEndpointsControllers) stopAll() {
+func (c *IngressEndpointsControllers) stopAll(ctx context.Context) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
 	for _, controller := range c.controllers {
-		controller.Stop()
+		controller.Stop(ctx)
 	}
 
 	c.controllers = map[string]*ingressEndpointsController{}
 }
 
-func (c *IngressEndpointsControllers) stopAndCleanup(serviceName, serviceNamespace string) {
+func (c *IngressEndpointsControllers) stopAndCleanup(ctx context.Context, serviceName, serviceNamespace string) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -83,12 +83,12 @@ func (c *IngressEndpointsControllers) stopAndCleanup(serviceName, serviceNamespa
 	controller, exists := c.controllers[key]
 
 	if exists {
-		controller.Stop()
+		controller.Stop(ctx)
 		delete(c.controllers, key)
 	}
 
 	svcSelector := labels.SelectorFromSet(map[string]string{ServiceRefLabel: serviceName}).String()
-	err := c.ingressIPs.Namespace(serviceNamespace).DeleteCollection(context.TODO(), metav1.DeleteOptions{},
+	err := c.ingressIPs.Namespace(serviceNamespace).DeleteCollection(ctx, metav1.DeleteOptions{},
 		metav1.ListOptions{LabelSelector: svcSelector})
 
 	if err != nil && !apierrors.IsNotFound(err) {
