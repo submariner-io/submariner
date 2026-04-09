@@ -68,15 +68,15 @@ func testEndpointMonitoring() {
 	var endpoint *submarinerv1.Endpoint
 
 	When("a local gateway Endpoint corresponding to the controller host is created", func() {
-		JustBeforeEach(func() {
-			t.createGateway(t.hostName, "")
-			endpoint = t.createEndpoint(newEndpointSpec(clusterID, t.hostName, localCIDR))
+		JustBeforeEach(func(ctx context.Context) {
+			t.createGateway(ctx, t.hostName, "")
+			endpoint = t.createEndpoint(ctx, newEndpointSpec(clusterID, t.hostName, localCIDR))
 			t.createPFilterChain(packetfilter.TableTypeNAT, kubeProxyIPTableChainName)
 		})
 
 		Context("", func() {
-			BeforeEach(func() {
-				t.createGlobalEgressIP(newGlobalEgressIP(globalEgressIPName, nil, nil))
+			BeforeEach(func(ctx context.Context) {
+				t.createGlobalEgressIP(ctx, newGlobalEgressIP(globalEgressIPName, nil, nil))
 			})
 
 			AfterEach(func() {
@@ -88,15 +88,15 @@ func testEndpointMonitoring() {
 
 				t.awaitGlobalEgressIPStatusAllocated(ctx, globalEgressIPName, 1)
 
-				t.createServiceExport(t.createService(newClusterIPService()))
+				t.createServiceExport(ctx, t.createService(ctx, newClusterIPService()))
 				t.awaitIngressIPStatusAllocated(ctx, serviceName)
 
 				service := newClusterIPService()
 				service.Name = "headless-nginx"
 				service = toHeadlessService(service)
 				backendPod := newHeadlessServicePod(service.Name)
-				t.createPod(backendPod)
-				t.createServiceExport(t.createService(service))
+				t.createPod(ctx, backendPod)
+				t.createServiceExport(ctx, t.createService(ctx, service))
 
 				Eventually(func(g Gomega, ctx context.Context) {
 					gip := t.awaitHeadlessGlobalIngressIP(ctx, service.Name, backendPod.Name)
@@ -119,12 +119,12 @@ func testEndpointMonitoring() {
 			It("should stop and restart the controllers", func(ctx context.Context) {
 				t.leaderElection.AwaitLeaseReleased()
 				t.awaitGlobalnetChainsCleared()
-				t.ensureControllersStopped()
+				t.ensureControllersStopped(ctx)
 
 				By("Recreating the Endpoint")
 
 				time.Sleep(time.Millisecond * 300)
-				t.createEndpoint(newEndpointSpec(clusterID, t.hostName, localCIDR))
+				t.createEndpoint(ctx, newEndpointSpec(clusterID, t.hostName, localCIDR))
 
 				t.leaderElection.AwaitLeaseAcquired()
 				t.awaitGlobalnetChains()
@@ -152,7 +152,7 @@ func testEndpointMonitoring() {
 				By("Updating the Endpoint")
 
 				endpoint.Annotations = map[string]string{"foo": "bar"}
-				test.UpdateResource(t.endpoints, endpoint)
+				test.UpdateResource(ctx, t.endpoints, endpoint)
 			})
 
 			It("should not try to re-acquire the leader lock", func() {
@@ -175,7 +175,7 @@ func testEndpointMonitoring() {
 
 				By("Ensuring controllers are stopped and globalnet chains are not cleared")
 
-				t.ensureControllersStopped()
+				t.ensureControllersStopped(ctx)
 				t.awaitGlobalnetChains()
 			})
 
@@ -192,10 +192,10 @@ func testEndpointMonitoring() {
 			})
 
 			Context("and then the gateway Endpoint is deleted", func() {
-				It("should clear the globalnet chains", func() {
+				It("should clear the globalnet chains", func(ctx context.Context) {
 					By("Deleting the Endpoint")
 
-					Expect(t.endpoints.Delete(context.TODO(), endpoint.Name, metav1.DeleteOptions{})).To(Succeed())
+					Expect(t.endpoints.Delete(ctx, endpoint.Name, metav1.DeleteOptions{})).To(Succeed())
 
 					t.awaitGlobalnetChainsCleared()
 				})
@@ -206,7 +206,7 @@ func testEndpointMonitoring() {
 			const serviceName = "stale-service"
 			internalServiceName := controllers.GetInternalSvcName(serviceName)
 
-			JustBeforeEach(func() {
+			JustBeforeEach(func(ctx context.Context) {
 				internalService := &corev1.Service{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: internalServiceName,
@@ -217,14 +217,14 @@ func testEndpointMonitoring() {
 					},
 				}
 
-				_, err := t.services.Create(context.Background(), resource.MustToUnstructured(internalService), metav1.CreateOptions{})
+				_, err := t.services.Create(ctx, resource.MustToUnstructured(internalService), metav1.CreateOptions{})
 				Expect(err).To(Succeed())
 
-				Expect(t.services.Delete(context.Background(), internalServiceName, metav1.DeleteOptions{})).To(Succeed())
+				Expect(t.services.Delete(ctx, internalServiceName, metav1.DeleteOptions{})).To(Succeed())
 			})
 
-			It("should remove the finalizer", func() {
-				test.AwaitNoResource(t.services, internalServiceName)
+			It("should remove the finalizer", func(ctx context.Context) {
+				test.AwaitNoResource(ctx, t.services, internalServiceName)
 			})
 		})
 
@@ -295,42 +295,42 @@ func testEndpointMonitoring() {
 	})
 
 	Context("and a local gateway Endpoint corresponding to another host is created", func() {
-		JustBeforeEach(func() {
-			endpoint = t.createEndpoint(newEndpointSpec(clusterID, t.hostName+"-other", localCIDR))
+		JustBeforeEach(func(ctx context.Context) {
+			endpoint = t.createEndpoint(ctx, newEndpointSpec(clusterID, t.hostName+"-other", localCIDR))
 		})
 
-		It("should not start the controllers", func() {
+		It("should not start the controllers", func(ctx context.Context) {
 			t.leaderElection.EnsureLeaseNotAcquired()
 
-			t.createServiceExport(t.createService(newClusterIPService()))
-			t.ensureNoGlobalIngressIP(serviceName)
+			t.createServiceExport(ctx, t.createService(ctx, newClusterIPService()))
+			t.ensureNoGlobalIngressIP(ctx, serviceName)
 		})
 	})
 
 	When("a remote Endpoint with non-overlapping CIDRs is created then removed", func() {
-		It("should add/remove appropriate IP table rule(s)", func() {
-			endpoint := t.createEndpoint(newEndpointSpec(remoteClusterID, t.hostName, remoteCIDR))
+		It("should add/remove appropriate IP table rule(s)", func(ctx context.Context) {
+			endpoint := t.createEndpoint(ctx, newEndpointSpec(remoteClusterID, t.hostName, remoteCIDR))
 			t.pFilter.AwaitRule(packetfilter.TableTypeNAT, chains.SmGlobalnetMark, ContainSubstring(remoteCIDR))
 
-			Expect(t.endpoints.Delete(context.TODO(), endpoint.Name, metav1.DeleteOptions{})).To(Succeed())
+			Expect(t.endpoints.Delete(ctx, endpoint.Name, metav1.DeleteOptions{})).To(Succeed())
 			t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, chains.SmGlobalnetMark, ContainSubstring(remoteCIDR))
 		})
 	})
 
 	When("a remote Endpoint with an overlapping CIDR is created", func() {
-		It("should not add expected IP table rule(s)", func() {
-			t.createEndpoint(newEndpointSpec(remoteClusterID, t.hostName, localCIDR))
+		It("should not add expected IP table rule(s)", func(ctx context.Context) {
+			t.createEndpoint(ctx, newEndpointSpec(remoteClusterID, t.hostName, localCIDR))
 			time.Sleep(500 * time.Millisecond)
 			t.pFilter.AwaitNoRule(packetfilter.TableTypeNAT, chains.SmGlobalnetMark, ContainSubstring(globalCIDR))
 		})
 	})
 
 	When("a stale remote Endpoint is deleted", func() {
-		It("should ignore it", func() {
-			endpoint1 := t.createEndpoint(newEndpointSpec(remoteClusterID, t.hostName, remoteCIDR))
+		It("should ignore it", func(ctx context.Context) {
+			endpoint1 := t.createEndpoint(ctx, newEndpointSpec(remoteClusterID, t.hostName, remoteCIDR))
 			t.pFilter.AwaitRule(packetfilter.TableTypeNAT, chains.SmGlobalnetMark, ContainSubstring(remoteCIDR))
 
-			test.CreateResource(t.endpoints, &submarinerv1.Endpoint{
+			test.CreateResource(ctx, t.endpoints, &submarinerv1.Endpoint{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "latest",
 					CreationTimestamp: metav1.Time{Time: metav1.Now().Add(time.Minute)},
@@ -340,7 +340,7 @@ func testEndpointMonitoring() {
 			time.Sleep(time.Millisecond * 100)
 			t.pFilter.AwaitRule(packetfilter.TableTypeNAT, chains.SmGlobalnetMark, ContainSubstring(remoteCIDR))
 
-			Expect(t.endpoints.Delete(context.TODO(), endpoint1.Name, metav1.DeleteOptions{})).To(Succeed())
+			Expect(t.endpoints.Delete(ctx, endpoint1.Name, metav1.DeleteOptions{})).To(Succeed())
 			time.Sleep(time.Millisecond * 100)
 			t.pFilter.AwaitRule(packetfilter.TableTypeNAT, chains.SmGlobalnetMark, ContainSubstring(remoteCIDR))
 		})
@@ -454,7 +454,7 @@ func testUninstall() {
 			metav1.GetOptions{})
 		Expect(apierrors.IsNotFound(err)).To(BeTrue())
 
-		test.AwaitNoResource(t.services, internalServiceName)
+		test.AwaitNoResource(ctx, t.services, internalServiceName)
 	})
 }
 
@@ -526,7 +526,7 @@ func (t *gatewayMonitorTestDriver) start(ctx context.Context) {
 	t.pFilter.AwaitChain(packetfilter.TableTypeNAT, chains.SmGlobalnetMark)
 }
 
-func (t *gatewayMonitorTestDriver) createEndpoint(spec *submarinerv1.EndpointSpec) *submarinerv1.Endpoint {
+func (t *gatewayMonitorTestDriver) createEndpoint(ctx context.Context, spec *submarinerv1.EndpointSpec) *submarinerv1.Endpoint {
 	endpointName, err := spec.GenerateName()
 	Expect(err).To(Succeed())
 
@@ -537,7 +537,7 @@ func (t *gatewayMonitorTestDriver) createEndpoint(spec *submarinerv1.EndpointSpe
 		Spec: *spec,
 	}
 
-	return test.CreateResource(t.endpoints, endpoint)
+	return test.CreateResource(ctx, t.endpoints, endpoint)
 }
 
 func (t *gatewayMonitorTestDriver) awaitControllersStarted(ctx context.Context) {
@@ -546,10 +546,10 @@ func (t *gatewayMonitorTestDriver) awaitControllersStarted(ctx context.Context) 
 	t.awaitClusterGlobalEgressIPStatusAllocated(ctx, controllers.DefaultNumberOfClusterEgressIPs)
 }
 
-func (t *gatewayMonitorTestDriver) ensureControllersStopped() {
+func (t *gatewayMonitorTestDriver) ensureControllersStopped(ctx context.Context) {
 	time.Sleep(300 * time.Millisecond)
-	t.createServiceExport(t.createService(newClusterIPService()))
-	t.ensureNoGlobalIngressIP(serviceName)
+	t.createServiceExport(ctx, t.createService(ctx, newClusterIPService()))
+	t.ensureNoGlobalIngressIP(ctx, serviceName)
 }
 
 func (t *gatewayMonitorTestDriver) awaitGlobalnetChains() {

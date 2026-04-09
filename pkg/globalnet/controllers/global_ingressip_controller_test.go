@@ -138,9 +138,9 @@ func testGlobalIngressIPCreatedClusterIPSvc(t *globalIngressIPControllerTestDriv
 		service = newClusterIPService()
 	})
 
-	JustBeforeEach(func() {
-		t.createService(service)
-		t.createGlobalIngressIP(ingressIP)
+	JustBeforeEach(func(ctx context.Context) {
+		t.createService(ctx, service)
+		t.createGlobalIngressIP(ctx, ingressIP)
 	})
 
 	It("should create an internal submariner service with an allocated global IP", func(ctx context.Context) {
@@ -149,7 +149,7 @@ func testGlobalIngressIPCreatedClusterIPSvc(t *globalIngressIPControllerTestDriv
 		Expect(allocatedIP).ToNot(BeEmpty())
 
 		internalSvcName := controllers.GetInternalSvcName(serviceName)
-		intSvc := t.awaitService(internalSvcName)
+		intSvc := t.awaitService(ctx, internalSvcName)
 		externalIP := intSvc.Spec.ExternalIPs[0]
 		Expect(externalIP).To(Equal(allocatedIP))
 		Expect(intSvc.Spec.Ports).To(Equal(service.Spec.Ports))
@@ -166,8 +166,8 @@ func testGlobalIngressIPCreatedClusterIPSvc(t *globalIngressIPControllerTestDriv
 			service.Spec.PublishNotReadyAddresses = true
 		})
 
-		It("should set PublishNotReadyAddresses to true on the internal submariner service", func() {
-			intSvc := t.awaitService(controllers.GetInternalSvcName(serviceName))
+		It("should set PublishNotReadyAddresses to true on the internal submariner service", func(ctx context.Context) {
+			intSvc := t.awaitService(ctx, controllers.GetInternalSvcName(serviceName))
 			Expect(intSvc.Spec.PublishNotReadyAddresses).To(BeTrue())
 		})
 	})
@@ -178,8 +178,8 @@ func testGlobalIngressIPCreatedClusterIPSvc(t *globalIngressIPControllerTestDriv
 			Expect(err).To(Succeed())
 		})
 
-		It("should add an appropriate Status condition", func() {
-			t.awaitStatusConditions(t.globalIngressIPs, globalIngressIPName, metav1.Condition{
+		It("should add an appropriate Status condition", func(ctx context.Context) {
+			t.awaitStatusConditions(ctx, t.globalIngressIPs, globalIngressIPName, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionFalse,
 				Reason: "IPPoolAllocationFailed",
@@ -201,9 +201,9 @@ func testGlobalIngressIPCreatedClusterIPSvc(t *globalIngressIPControllerTestDriv
 			t.awaitIPsReleasedFromPool(allocatedIP)
 		})
 
-		It("should delete the internal service", func() {
+		It("should delete the internal service", func(ctx context.Context) {
 			internalSvcName := controllers.GetInternalSvcName(serviceName)
-			t.awaitNoService(internalSvcName)
+			t.awaitNoService(ctx, internalSvcName)
 		})
 	})
 }
@@ -211,10 +211,10 @@ func testGlobalIngressIPCreatedClusterIPSvc(t *globalIngressIPControllerTestDriv
 func testGlobalIngressIPCreatedHeadlessSvc(t *globalIngressIPControllerTestDriver, ingressIP *submarinerv1.GlobalIngressIP,
 	awaitPacketFilterRules, awaitNoPacketFilterRules func(string), ruleMatch string,
 ) {
-	JustBeforeEach(func() {
+	JustBeforeEach(func(ctx context.Context) {
 		service := newClusterIPService()
-		t.createService(service)
-		t.createGlobalIngressIP(ingressIP)
+		t.createService(ctx, service)
+		t.createGlobalIngressIP(ctx, ingressIP)
 	})
 
 	It("should successfully allocate a global IP", func(ctx context.Context) {
@@ -230,8 +230,8 @@ func testGlobalIngressIPCreatedHeadlessSvc(t *globalIngressIPControllerTestDrive
 			Expect(err).To(Succeed())
 		})
 
-		It("should add an appropriate Status condition", func() {
-			t.awaitStatusConditions(t.globalIngressIPs, globalIngressIPName, metav1.Condition{
+		It("should add an appropriate Status condition", func(ctx context.Context) {
+			t.awaitStatusConditions(ctx, t.globalIngressIPs, globalIngressIPName, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionFalse,
 				Reason: "IPPoolAllocationFailed",
@@ -245,7 +245,7 @@ func testGlobalIngressIPCreatedHeadlessSvc(t *globalIngressIPControllerTestDrive
 		})
 
 		It("should eventually allocate a global IP", func(ctx context.Context) {
-			t.awaitStatusConditions(t.globalIngressIPs, globalIngressIPName, metav1.Condition{
+			t.awaitStatusConditions(ctx, t.globalIngressIPs, globalIngressIPName, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionFalse,
 				Reason: "ProgramIPTableRulesFailed",
@@ -294,15 +294,15 @@ func testExistingGlobalIngressIPClusterIPSvc(t *globalIngressIPControllerTestDri
 	})
 
 	Context("with an allocated IP", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx context.Context) {
 			existing.Status.AllocatedIP = globalIP1
 			exportedService := newClusterIPService()
-			t.createService(exportedService)
+			t.createService(ctx, exportedService)
 
 			internalSvc := newGlobalnetInternalService(controllers.GetInternalSvcName(serviceName))
 			internalSvc.Spec.ExternalIPs = []string{existing.Status.AllocatedIP}
-			t.createService(internalSvc)
-			t.createGlobalIngressIP(existing)
+			t.createService(ctx, internalSvc)
+			t.createGlobalIngressIP(ctx, existing)
 		})
 
 		It("should not reallocate the global IP", func(ctx context.Context) {
@@ -355,16 +355,16 @@ func testExistingGlobalIngressIPClusterIPSvc(t *globalIngressIPControllerTestDri
 	})
 
 	Context("with an allocated IP but missing internal service", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx context.Context) {
 			existing.Status.AllocatedIP = globalIP1
 			exportedService := newClusterIPService()
-			t.createService(exportedService)
-			t.createGlobalIngressIP(existing)
+			t.createService(ctx, exportedService)
+			t.createGlobalIngressIP(ctx, existing)
 		})
 
 		It("should create the internal service and not reallocate the global IP", func(ctx context.Context) {
 			internalSvcName := controllers.GetInternalSvcName(serviceName)
-			intSvc := t.awaitService(internalSvcName)
+			intSvc := t.awaitService(ctx, internalSvcName)
 			Expect(intSvc.Spec.ExternalIPs).To(HaveExactElements(existing.Status.AllocatedIP))
 
 			status := t.getGlobalIngressIPStatus(ctx, existing.Name)
@@ -375,20 +375,20 @@ func testExistingGlobalIngressIPClusterIPSvc(t *globalIngressIPControllerTestDri
 	})
 
 	Context("and external IP of the internal service does not match the allocated global IP", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx context.Context) {
 			existing.Status.AllocatedIP = globalIP1
 			exportedService := newClusterIPService()
-			t.createService(exportedService)
+			t.createService(ctx, exportedService)
 
 			internalSvc := newGlobalnetInternalService(controllers.GetInternalSvcName(serviceName))
 			internalSvc.Spec.ExternalIPs = []string{globalIP2}
-			t.createService(internalSvc)
-			t.createGlobalIngressIP(existing)
+			t.createService(ctx, internalSvc)
+			t.createGlobalIngressIP(ctx, existing)
 		})
 
 		It("should recreate the internal service with the allocated global IP", func(ctx context.Context) {
-			Eventually(func() []string {
-				return t.awaitService(controllers.GetInternalSvcName(serviceName)).Spec.ExternalIPs
+			Eventually(ctx, func(ctx context.Context) []string {
+				return t.awaitService(ctx, controllers.GetInternalSvcName(serviceName)).Spec.ExternalIPs
 			}).Should(HaveExactElements(existing.Status.AllocatedIP))
 
 			Consistently(func() string {
@@ -398,10 +398,10 @@ func testExistingGlobalIngressIPClusterIPSvc(t *globalIngressIPControllerTestDri
 	})
 
 	Context("without an allocated IP", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx context.Context) {
 			service := newClusterIPService()
-			t.createService(service)
-			t.createGlobalIngressIP(existing)
+			t.createService(ctx, service)
+			t.createGlobalIngressIP(ctx, existing)
 		})
 
 		It("should allocate it", func(ctx context.Context) {
@@ -410,16 +410,16 @@ func testExistingGlobalIngressIPClusterIPSvc(t *globalIngressIPControllerTestDri
 			Expect(allocatedIP).ToNot(BeEmpty())
 		})
 
-		It("should create an internal submariner service", func() {
+		It("should create an internal submariner service", func(ctx context.Context) {
 			internalSvcName := controllers.GetInternalSvcName(serviceName)
-			intSvc := t.awaitService(internalSvcName)
+			intSvc := t.awaitService(ctx, internalSvcName)
 			externalIP := intSvc.Spec.ExternalIPs[0]
 			Expect(externalIP).ToNot(BeEmpty())
 		})
 	})
 
 	Context("with previously appended Status conditions", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx context.Context) {
 			existing.Status.Conditions = []metav1.Condition{
 				{
 					Type:    string(submarinerv1.GlobalEgressIPAllocated),
@@ -435,11 +435,11 @@ func testExistingGlobalIngressIPClusterIPSvc(t *globalIngressIPControllerTestDri
 				},
 			}
 
-			t.createGlobalIngressIP(existing)
+			t.createGlobalIngressIP(ctx, existing)
 		})
 
-		It("should trim the Status conditions", func() {
-			t.awaitStatusConditions(t.globalIngressIPs, existing.Name, metav1.Condition{
+		It("should trim the Status conditions", func(ctx context.Context) {
+			t.awaitStatusConditions(ctx, t.globalIngressIPs, existing.Name, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionTrue,
 			})
@@ -457,9 +457,9 @@ func testExistingGlobalIngressIPHeadlessSvc(t *globalIngressIPControllerTestDriv
 	})
 
 	Context("with an allocated IP", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx context.Context) {
 			existing.Status.AllocatedIP = globalIP1
-			t.createGlobalIngressIP(existing)
+			t.createGlobalIngressIP(ctx, existing)
 		})
 
 		It("should not reallocate the global IP", func(ctx context.Context) {
@@ -516,8 +516,8 @@ func testExistingGlobalIngressIPHeadlessSvc(t *globalIngressIPControllerTestDriv
 	})
 
 	Context("without an allocated IP", func() {
-		BeforeEach(func() {
-			t.createGlobalIngressIP(existing)
+		BeforeEach(func(ctx context.Context) {
+			t.createGlobalIngressIP(ctx, existing)
 		})
 
 		It("should allocate it and program the relevant IP table rules", func(ctx context.Context) {

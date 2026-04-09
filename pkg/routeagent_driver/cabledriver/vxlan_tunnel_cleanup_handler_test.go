@@ -19,6 +19,7 @@ limitations under the License.
 package cabledriver_test
 
 import (
+	"context"
 	"net"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -84,9 +85,9 @@ var _ = Describe("VXLAN Cleanup Handler", func() {
 		})
 
 		Context("and the local endpoint uses the VXLAN cable driver", func() {
-			It("should delete the VXLAN interfaces", func() {
-				endpoint := t.createLocalEndpointWithBackend(vxlan.CableDriverName)
-				t.DeleteEndpoint(endpoint.Name)
+			It("should delete the VXLAN interfaces", func(ctx context.Context) {
+				endpoint := t.createLocalEndpointWithBackend(ctx, vxlan.CableDriverName)
+				t.DeleteEndpoint(ctx, endpoint.Name)
 
 				Eventually(func(g Gomega) {
 					_, err := t.netLink.LinkByName(vxlan.GetVxlanInterfaceName(k8snet.IPv4))
@@ -99,9 +100,9 @@ var _ = Describe("VXLAN Cleanup Handler", func() {
 		})
 
 		Context("and the local endpoint uses a different cable driver", func() {
-			It("should not delete the VXLAN interfaces", func() {
-				endpoint := t.createLocalEndpointWithBackend("libreswan")
-				t.DeleteEndpoint(endpoint.Name)
+			It("should not delete the VXLAN interfaces", func(ctx context.Context) {
+				endpoint := t.createLocalEndpointWithBackend(ctx, "libreswan")
+				t.DeleteEndpoint(ctx, endpoint.Name)
 
 				Consistently(func(g Gomega) {
 					_, err := t.netLink.LinkByName(vxlan.GetVxlanInterfaceName(k8snet.IPv4))
@@ -133,17 +134,17 @@ func newTestDriver() *testDriver {
 		}
 	})
 
-	JustBeforeEach(func() {
+	JustBeforeEach(func(ctx context.Context) {
 		t.handler = cabledriver.NewVXLANCleanup()
-		t.ControllerSupport.Start(t.handler)
+		t.ControllerSupport.Start(ctx, t.handler)
 	})
 
 	return t
 }
 
-func (t *testDriver) createLocalEndpointWithBackend(backend string) *submv1.Endpoint {
+func (t *testDriver) createLocalEndpointWithBackend(ctx context.Context, backend string) *submv1.Endpoint {
 	endpoint := eventtesting.NewEndpoint(eventtesting.LocalClusterID, t.Hostname)
 	endpoint.Spec.Backend = backend
 
-	return t.CreateEndpoint(endpoint)
+	return t.CreateEndpoint(ctx, endpoint)
 }

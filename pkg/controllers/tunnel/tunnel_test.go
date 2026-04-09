@@ -259,11 +259,11 @@ var _ = Describe("Managing tunnels", func() {
 	})
 
 	When("an Endpoint is updated", func() {
-		It("should install the cable", func() {
+		It("should install the cable", func(ctx context.Context) {
 			verifyConnectToEndpoint(k8snet.IPv4)
 
 			endpoint.Spec.PrivateIPs = []string{"192.68.1.3"}
-			test.UpdateResource(endpoints, endpoint)
+			test.UpdateResource(ctx, endpoints, endpoint)
 
 			verifyConnectToEndpoint(k8snet.IPv4)
 		})

@@ -47,22 +47,22 @@ func testNodes() {
 	})
 
 	When("a Node is created and then deleted on a gateway node", func() {
-		JustBeforeEach(func() {
-			t.CreateLocalHostEndpoint()
-			t.CreateNode(node)
+		JustBeforeEach(func(ctx context.Context) {
+			t.CreateLocalHostEndpoint(ctx)
+			t.CreateNode(ctx, node)
 		})
 
-		It("should add/remove an FDB entry on the VxLAN interface for each Node address", func() {
+		It("should add/remove an FDB entry on the VxLAN interface for each Node address", func(ctx context.Context) {
 			t.netLink.AwaitNeighbors(vxLanInterfaceIndex, nodeIPv4Address1)
 
-			t.DeleteNode(node.Name)
+			t.DeleteNode(ctx, node.Name)
 			t.netLink.AwaitNoNeighbors(vxLanInterfaceIndex, nodeIPv4Address1)
 		})
 	})
 
 	When("a Node is created on a non-gateway node", func() {
-		JustBeforeEach(func() {
-			t.CreateNode(node)
+		JustBeforeEach(func(ctx context.Context) {
+			t.CreateNode(ctx, node)
 		})
 
 		It("should not add an FDB entry on the VxLAN interface for each Node address", func() {
@@ -76,7 +76,7 @@ func testUninstall() {
 
 	Context("on Uninstall", func() {
 		It("should clean up dataplane artifacts", func(ctx context.Context) {
-			t.CreateLocalHostEndpoint()
+			t.CreateLocalHostEndpoint(ctx)
 			t.netLink.AwaitRule(constants.RouteAgentHostNetworkTableID, "", "")
 
 			Expect(t.handler.Uninstall(ctx)).To(Succeed())

@@ -19,6 +19,8 @@ limitations under the License.
 package dataplane
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	"github.com/submariner-io/shipyard/test/e2e/tcp"
@@ -53,12 +55,13 @@ var _ = Describe("Basic TCP connectivity tests across clusters without discovery
 		supportedFamilies      []k8snet.IPFamily
 	)
 
-	BeforeEach(func() {
-		supportedFamilies = GetActualIPFamilies(f.DetermineIPFamilyType(framework.ClusterA), f.DetermineIPFamilyType(framework.ClusterB))
+	BeforeEach(func(ctx context.Context) {
+		supportedFamilies = GetActualIPFamilies(f.DetermineIPFamilyType(ctx, framework.ClusterA),
+			f.DetermineIPFamilyType(ctx, framework.ClusterB))
 	})
 
 	verifyInteraction := func(fromClusterScheduling, toClusterScheduling framework.NetworkPodScheduling) {
-		It("should have sent the expected data from the pod to the other pod", func() {
+		It("should have sent the expected data from the pod to the other pod", func(ctx context.Context) {
 			if framework.TestContext.GlobalnetEnabled {
 				framework.Skipf("Globalnet enabled, skipping the test...")
 				return
@@ -70,7 +73,7 @@ var _ = Describe("Basic TCP connectivity tests across clusters without discovery
 			}
 
 			for _, ipFamily := range supportedFamilies {
-				tcp.RunConnectivityTest(&tcp.ConnectivityTestParams{
+				tcp.RunConnectivityTest(ctx, &tcp.ConnectivityTestParams{
 					Framework:             f,
 					ToEndpointType:        toEndpointType,
 					Networking:            networking,

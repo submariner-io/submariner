@@ -40,22 +40,22 @@ func testClusterSyncing() {
 	t := newTestDriver()
 
 	Context("on startup", func() {
-		It("should create a new Cluster locally and sync to the broker", func() {
-			awaitCluster(t.localClusters, &t.localCluster.Spec)
-			awaitCluster(t.brokerClusters, &t.localCluster.Spec)
+		It("should create a new Cluster locally and sync to the broker", func(ctx context.Context) {
+			awaitCluster(ctx, t.localClusters, &t.localCluster.Spec)
+			awaitCluster(ctx, t.brokerClusters, &t.localCluster.Spec)
 		})
 
 		When("a local Cluster already exists", func() {
-			BeforeEach(func() {
-				test.CreateResource(t.localClusters, newCluster(&t.localCluster.Spec))
+			BeforeEach(func(ctx context.Context) {
+				test.CreateResource(ctx, t.localClusters, newCluster(&t.localCluster.Spec))
 
 				t.localCluster.Spec.GlobalCIDR = []string{"10.1.2.0/32"}
 				t.localCluster.Spec.ServiceCIDR = append(t.localCluster.Spec.ServiceCIDR, "101.1.0.0/16")
 			})
 
-			It("should update it locally and sync to the broker", func() {
-				awaitCluster(t.localClusters, &t.localCluster.Spec)
-				awaitCluster(t.brokerClusters, &t.localCluster.Spec)
+			It("should update it locally and sync to the broker", func(ctx context.Context) {
+				awaitCluster(ctx, t.localClusters, &t.localCluster.Spec)
+				awaitCluster(ctx, t.brokerClusters, &t.localCluster.Spec)
 			})
 		})
 
@@ -71,49 +71,49 @@ func testClusterSyncing() {
 	})
 
 	When("a local Cluster is deleted", func() {
-		It("should delete it from the broker", func() {
-			awaitCluster(t.brokerClusters, &t.localCluster.Spec)
+		It("should delete it from the broker", func(ctx context.Context) {
+			awaitCluster(ctx, t.brokerClusters, &t.localCluster.Spec)
 
 			name := t.localCluster.Spec.ClusterID
-			Expect(t.localClusters.Delete(context.TODO(), name, metav1.DeleteOptions{})).To(Succeed())
-			test.AwaitNoResource(t.brokerClusters, name)
+			Expect(t.localClusters.Delete(ctx, name, metav1.DeleteOptions{})).To(Succeed())
+			test.AwaitNoResource(ctx, t.brokerClusters, name)
 		})
 	})
 
 	When("a remote Cluster is created, updated and deleted on the broker", func() {
-		It("should correctly sync the local datastore", func() {
-			awaitCluster(t.brokerClusters, &t.localCluster.Spec)
+		It("should correctly sync the local datastore", func(ctx context.Context) {
+			awaitCluster(ctx, t.brokerClusters, &t.localCluster.Spec)
 
 			cluster := newCluster(&submarinerv1.ClusterSpec{
 				ClusterID:   otherClusterID,
 				ServiceCIDR: []string{"200.0.0.0/16"},
 			})
 
-			test.CreateResource(t.brokerClusters, test.SetClusterIDLabel(cluster, cluster.Spec.ClusterID))
-			awaitCluster(t.localClusters, &cluster.Spec)
+			test.CreateResource(ctx, t.brokerClusters, test.SetClusterIDLabel(cluster, cluster.Spec.ClusterID))
+			awaitCluster(ctx, t.localClusters, &cluster.Spec)
 
 			cluster.Spec.ClusterCIDR = []string{"300.0.0.0/14"}
 			cluster.Spec.ServiceCIDR = append(cluster.Spec.ServiceCIDR, "201.0.0.0/16")
-			test.UpdateResource(t.brokerClusters, cluster)
-			awaitCluster(t.localClusters, &cluster.Spec)
+			test.UpdateResource(ctx, t.brokerClusters, cluster)
+			awaitCluster(ctx, t.localClusters, &cluster.Spec)
 
-			Expect(t.brokerClusters.Delete(context.TODO(), cluster.GetName(), metav1.DeleteOptions{})).To(Succeed())
-			test.AwaitNoResource(t.localClusters, cluster.GetName())
+			Expect(t.brokerClusters.Delete(ctx, cluster.GetName(), metav1.DeleteOptions{})).To(Succeed())
+			test.AwaitNoResource(ctx, t.localClusters, cluster.GetName())
 		})
 	})
 
 	When("a remote Cluster is synced locally", func() {
-		It("should not try to re-sync to the broker", func() {
-			awaitCluster(t.brokerClusters, &t.localCluster.Spec)
+		It("should not try to re-sync to the broker", func(ctx context.Context) {
+			awaitCluster(ctx, t.brokerClusters, &t.localCluster.Spec)
 
 			cluster := newCluster(&submarinerv1.ClusterSpec{
 				ClusterID: otherClusterID,
 			})
 
-			name := test.CreateResource(t.localClusters, test.SetClusterIDLabel(cluster, cluster.Spec.ClusterID)).GetName()
+			name := test.CreateResource(ctx, t.localClusters, test.SetClusterIDLabel(cluster, cluster.Spec.ClusterID)).GetName()
 
 			time.Sleep(500 * time.Millisecond)
-			test.AwaitNoResource(t.brokerClusters, name)
+			test.AwaitNoResource(ctx, t.brokerClusters, name)
 		})
 	})
 }
@@ -121,33 +121,33 @@ func testClusterSyncing() {
 func testClusterCleanup() {
 	t := newTestDriver()
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx context.Context) {
 		t.doStart = false
 
-		test.CreateResource(t.localClusters, newCluster(&t.localCluster.Spec))
-		test.CreateResource(t.brokerClusters, newCluster(&t.localCluster.Spec))
+		test.CreateResource(ctx, t.localClusters, newCluster(&t.localCluster.Spec))
+		test.CreateResource(ctx, t.brokerClusters, newCluster(&t.localCluster.Spec))
 
-		test.CreateResource(t.localClusters, newCluster(&submarinerv1.ClusterSpec{
+		test.CreateResource(ctx, t.localClusters, newCluster(&submarinerv1.ClusterSpec{
 			ClusterID: otherClusterID,
 		}))
-		test.CreateResource(t.brokerClusters, newCluster(&submarinerv1.ClusterSpec{
+		test.CreateResource(ctx, t.brokerClusters, newCluster(&submarinerv1.ClusterSpec{
 			ClusterID: otherClusterID,
 		}))
 	})
 
-	It("should remove local Clusters from the remote datastore", func() {
-		Expect(t.syncer.Cleanup(context.Background())).To(Succeed())
+	It("should remove local Clusters from the remote datastore", func(ctx context.Context) {
+		Expect(t.syncer.Cleanup(ctx)).To(Succeed())
 
-		test.AwaitNoResource(t.brokerClusters, clusterID)
+		test.AwaitNoResource(ctx, t.brokerClusters, clusterID)
 
 		time.Sleep(500 * time.Millisecond)
-		test.AwaitResource(t.brokerClusters, otherClusterID)
+		test.AwaitResource(ctx, t.brokerClusters, otherClusterID)
 	})
 
-	It("should remove all Clusters from the local datastore", func() {
-		Expect(t.syncer.Cleanup(context.Background())).To(Succeed())
+	It("should remove all Clusters from the local datastore", func(ctx context.Context) {
+		Expect(t.syncer.Cleanup(ctx)).To(Succeed())
 
-		test.AwaitNoResource(t.localClusters, clusterID)
-		test.AwaitNoResource(t.localClusters, otherClusterID)
+		test.AwaitNoResource(ctx, t.localClusters, clusterID)
+		test.AwaitNoResource(ctx, t.localClusters, otherClusterID)
 	})
 }

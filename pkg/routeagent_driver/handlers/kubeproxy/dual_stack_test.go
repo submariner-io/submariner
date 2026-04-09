@@ -19,6 +19,8 @@ limitations under the License.
 package kubeproxy_test
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	k8snet "k8s.io/utils/net"
@@ -39,9 +41,9 @@ func testDualStack() {
 
 	testIPFamily := func() {
 		When("a dual-stack remote Endpoint is created while on a gateway node", func() {
-			JustBeforeEach(func() {
-				t.CreateLocalHostEndpoint()
-				t.CreateEndpoint(t.remoteEndpoint)
+			JustBeforeEach(func(ctx context.Context) {
+				t.CreateLocalHostEndpoint(ctx)
+				t.CreateEndpoint(ctx, t.remoteEndpoint)
 			})
 
 			It("should only add rules for the target IP family", func() {
@@ -51,9 +53,9 @@ func testDualStack() {
 		})
 
 		When("a dual-stack remote Endpoint is created while on a non-gateway node", func() {
-			JustBeforeEach(func() {
-				t.CreateEndpoint(t.localEndpoint)
-				t.CreateEndpoint(t.remoteEndpoint)
+			JustBeforeEach(func(ctx context.Context) {
+				t.CreateEndpoint(ctx, t.localEndpoint)
+				t.CreateEndpoint(ctx, t.remoteEndpoint)
 			})
 
 			It("should only add VxLAN routes for the target IP family", func() {
@@ -63,11 +65,11 @@ func testDualStack() {
 		})
 
 		When("a Node with dual-stack addresses is created on a gateway node", func() {
-			JustBeforeEach(func() {
-				t.CreateLocalHostEndpoint()
+			JustBeforeEach(func(ctx context.Context) {
+				t.CreateLocalHostEndpoint(ctx)
 
 				for _, addr := range nodeAddresses {
-					t.CreateNode(newNode(addr))
+					t.CreateNode(ctx, newNode(addr))
 				}
 			})
 

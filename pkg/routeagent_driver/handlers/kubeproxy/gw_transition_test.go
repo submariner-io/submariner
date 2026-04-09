@@ -19,6 +19,8 @@ limitations under the License.
 package kubeproxy_test
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
@@ -31,9 +33,9 @@ func testGatewayTransition() {
 	When("transition to gateway", func() {
 		var localHostEP *submarinerv1.Endpoint
 
-		JustBeforeEach(func() {
-			t.CreateEndpoint(t.remoteEndpoint)
-			localHostEP = t.CreateLocalHostEndpoint()
+		JustBeforeEach(func(ctx context.Context) {
+			t.CreateEndpoint(ctx, t.remoteEndpoint)
+			localHostEP = t.CreateLocalHostEndpoint(ctx)
 		})
 
 		It("should add the VxLAN interface", func() {
@@ -59,9 +61,9 @@ func testGatewayTransition() {
 		})
 
 		Context("and Node addresses are present", func() {
-			JustBeforeEach(func() {
-				t.CreateNode(newNode(nodeIPv4Address1))
-				t.CreateNode(newNode(nodeIPv4Address2))
+			JustBeforeEach(func(ctx context.Context) {
+				t.CreateNode(ctx, newNode(nodeIPv4Address1))
+				t.CreateNode(ctx, newNode(nodeIPv4Address2))
 			})
 
 			It("should add an FDB entry on the VxLAN interface for each address", func() {
@@ -70,9 +72,9 @@ func testGatewayTransition() {
 		})
 
 		Context("and then to non-gateway", func() {
-			JustBeforeEach(func() {
+			JustBeforeEach(func(ctx context.Context) {
 				t.netLink.AwaitRule(constants.RouteAgentHostNetworkTableID, "", "")
-				t.DeleteEndpoint(localHostEP.Name)
+				t.DeleteEndpoint(ctx, localHostEP.Name)
 			})
 
 			It("should remove the routing rule for the RouteAgentHostNetworkTableID", func() {

@@ -19,6 +19,7 @@ limitations under the License.
 package natdiscovery_test
 
 import (
+	"context"
 	"errors"
 	"net"
 	"strconv"
@@ -167,11 +168,11 @@ type NATDiscoveryInfo struct {
 	checkDiscovery func()
 }
 
-func newNATDiscovery(endpoint *submarinerv1.Endpoint, addr, addrv6 *net.UDPAddr) *NATDiscoveryInfo {
+func newNATDiscovery(ctx context.Context, endpoint *submarinerv1.Endpoint, addr, addrv6 *net.UDPAddr) *NATDiscoveryInfo {
 	dynClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
 	localEndpoint := submendpoint.NewLocal(&endpoint.Spec, dynClient, "")
 
-	test.CreateResource(dynClient.Resource(submarinerv1.EndpointGVR).Namespace(""), localEndpoint.Resource())
+	test.CreateResource(ctx, dynClient.Resource(submarinerv1.EndpointGVR).Namespace(""), localEndpoint.Resource())
 	var ipv6Connection *FakeServerConnection
 	var ipv4Connection *FakeServerConnection
 

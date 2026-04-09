@@ -19,6 +19,7 @@ limitations under the License.
 package compliance
 
 import (
+	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -32,16 +33,16 @@ var _ = Describe("FIPS", Label(labels.Compliance), func() {
 	f := subFramework.NewFramework("fips-gateway-status")
 
 	When("FIPS mode is enabled for the active gateway node", func() {
-		It("should use FIPS mode in the libreswan cable driver", func() {
-			testFIPSGatewayStatus(f)
+		It("should use FIPS mode in the libreswan cable driver", func(ctx context.Context) {
+			testFIPSGatewayStatus(ctx, f)
 		})
 	})
 })
 
-func testFIPSGatewayStatus(f *subFramework.Framework) {
+func testFIPSGatewayStatus(ctx context.Context, f *subFramework.Framework) {
 	framework.By(fmt.Sprintln("Find a cluster with FIPS enabled"))
 
-	fipsCluster := f.FindFIPSEnabledCluster()
+	fipsCluster := f.FindFIPSEnabledCluster(ctx)
 
 	if fipsCluster == -1 {
 		framework.Skipf("No cluster found with FIPS enabled, skipping the test...")
@@ -50,7 +51,7 @@ func testFIPSGatewayStatus(f *subFramework.Framework) {
 	fipsClusterName := framework.TestContext.ClusterIDs[fipsCluster]
 	framework.By(fmt.Sprintf("Found enabled FIPS on cluster %q", fipsClusterName))
 
-	submEndpoint := f.AwaitSubmarinerEndpoint(fipsCluster, subFramework.NoopCheckEndpoint)
+	submEndpoint := f.AwaitSubmarinerEndpoint(ctx, fipsCluster, subFramework.NoopCheckEndpoint)
 
 	if submEndpoint.Spec.Backend != "libreswan" {
 		framework.Skipf("Cluster %q is not using the libreswan cable driver, skipping the test...", fipsClusterName)
@@ -58,8 +59,8 @@ func testFIPSGatewayStatus(f *subFramework.Framework) {
 
 	framework.By(fmt.Sprintf("Locate active gateway pod on cluster %q", fipsClusterName))
 
-	gwPod := f.AwaitActiveGatewayPod(fipsCluster, nil)
+	gwPod := f.AwaitActiveGatewayPod(ctx, fipsCluster, nil)
 	Expect(gwPod).ToNot(BeNil(), "Did not find an active gateway pod")
 
-	f.TestGatewayNodeFIPSMode(fipsCluster, gwPod.Name)
+	f.TestGatewayNodeFIPSMode(ctx, fipsCluster, gwPod.Name)
 }

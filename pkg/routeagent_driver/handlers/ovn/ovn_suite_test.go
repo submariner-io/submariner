@@ -84,6 +84,8 @@ type testDriver struct {
 	node               *corev1.Node
 }
 
+// SpecCtx is inherited from embedded ControllerSupport for Ginkgo-driven tests.
+
 func newTestDriver() *testDriver {
 	t := &testDriver{
 		ControllerSupport: eventtesting.NewControllerSupport(),
@@ -133,13 +135,13 @@ func (t *testDriver) createNode() {
 	t.node = createNode(t.k8sClient, t.transitSwitchIP[k8snet.IPv4], t.transitSwitchIP[k8snet.IPv6])
 }
 
-func (t *testDriver) awaitOVNKNodeAnnotationContaining(expected ...string) {
+func (t *testDriver) awaitOVNKNodeAnnotationContaining(ctx context.Context, expected ...string) {
 	if expected == nil {
 		expected = []string{}
 	}
 
 	Eventually(func(g Gomega) {
-		node, err := t.k8sClient.CoreV1().Nodes().Get(context.TODO(), nodeutil.GetLocalNodeName(), metav1.GetOptions{})
+		node, err := t.k8sClient.CoreV1().Nodes().Get(ctx, nodeutil.GetLocalNodeName(), metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		var actual []string
@@ -156,8 +158,8 @@ func (t *testDriver) awaitOVNKNodeAnnotationContaining(expected ...string) {
 	}).Within(3 * time.Second).Should(Succeed())
 }
 
-func (t *testDriver) createEndpoint(subnets ...string) *submV1.Endpoint {
-	return t.CreateEndpoint(eventtesting.NewEndpoint(remoteClusterID, "host", subnets...))
+func (t *testDriver) createEndpoint(ctx context.Context, subnets ...string) *submV1.Endpoint {
+	return t.CreateEndpoint(ctx, eventtesting.NewEndpoint(remoteClusterID, "host", subnets...))
 }
 
 func createNode(k8sClient kubernetes.Interface, transitSwitchIP ...string) *corev1.Node {

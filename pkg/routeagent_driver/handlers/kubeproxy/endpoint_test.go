@@ -19,6 +19,8 @@ limitations under the License.
 package kubeproxy_test
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
@@ -30,8 +32,8 @@ func testEndpoints() {
 	t := newTestDriver()
 
 	When("a local Endpoint is created while on a non-gateway node", func() {
-		JustBeforeEach(func() {
-			t.CreateEndpoint(t.localEndpoint)
+		JustBeforeEach(func(ctx context.Context) {
+			t.CreateEndpoint(ctx, t.localEndpoint)
 		})
 
 		It("should add the VxLAN interface", func() {
@@ -55,9 +57,9 @@ func testEndpoints() {
 				t.awaitVxlanLink()
 			})
 
-			It("should remove the previous VxLAN interface", func() {
+			It("should remove the previous VxLAN interface", func(ctx context.Context) {
 				t.netLink.SetLinkIndex(kubeproxy.GetVxLANInterfaceName(k8snet.IPv4), vxLanInterfaceIndex+1)
-				t.CreateEndpoint(newLocalEndpoint(localNodeName2))
+				t.CreateEndpoint(ctx, newLocalEndpoint(localNodeName2))
 
 				Eventually(func() int {
 					return t.awaitVxlanLink().Attrs().Index
@@ -66,8 +68,8 @@ func testEndpoints() {
 		})
 
 		Context("and remote subnets are present", func() {
-			JustBeforeEach(func() {
-				t.CreateEndpoint(t.remoteEndpoint)
+			JustBeforeEach(func(ctx context.Context) {
+				t.CreateEndpoint(ctx, t.remoteEndpoint)
 			})
 
 			It("should add VxLAN routes for the remote subnets", func() {
@@ -77,23 +79,23 @@ func testEndpoints() {
 	})
 
 	When("a local Endpoint is removed while on a non-gateway node", func() {
-		JustBeforeEach(func() {
-			t.CreateEndpoint(t.localEndpoint)
+		JustBeforeEach(func(ctx context.Context) {
+			t.CreateEndpoint(ctx, t.localEndpoint)
 			t.awaitVxlanLink()
 		})
 
 		Context("and its host name matches that associated with the existing VxLAN interface", func() {
-			It("should remove the existing VxLAN interface", func() {
-				t.DeleteEndpoint(t.localEndpoint.Name)
+			It("should remove the existing VxLAN interface", func(ctx context.Context) {
+				t.DeleteEndpoint(ctx, t.localEndpoint.Name)
 				t.netLink.AwaitNoLink(kubeproxy.GetVxLANInterfaceName(k8snet.IPv4))
 			})
 		})
 
 		Context("and its host name does not match that associated with the existing VxLAN interface", func() {
-			It("should not remove the existing VxLAN interface", func() {
+			It("should not remove the existing VxLAN interface", func(ctx context.Context) {
 				t.localEndpoint.Spec.Hostname = localNodeName2
-				t.UpdateEndpoint(t.localEndpoint)
-				t.DeleteEndpoint(t.localEndpoint.Name)
+				t.UpdateEndpoint(ctx, t.localEndpoint)
+				t.DeleteEndpoint(ctx, t.localEndpoint.Name)
 
 				Consistently(func(_ Gomega) {
 					t.awaitVxlanLink()
@@ -102,40 +104,40 @@ func testEndpoints() {
 		})
 
 		Context("and is subsequently recreated", func() {
-			It("should recreate the VxLAN interface", func() {
-				t.DeleteEndpoint(t.localEndpoint.Name)
+			It("should recreate the VxLAN interface", func(ctx context.Context) {
+				t.DeleteEndpoint(ctx, t.localEndpoint.Name)
 				t.netLink.AwaitNoLink(kubeproxy.GetVxLANInterfaceName(k8snet.IPv4))
 
-				t.CreateEndpoint(t.localEndpoint)
+				t.CreateEndpoint(ctx, t.localEndpoint)
 				t.awaitVxlanLink()
 			})
 		})
 	})
 
 	When("a local Endpoint is created while on a gateway node", func() {
-		It("should not add the VxLAN interface", func() {
+		It("should not add the VxLAN interface", func(ctx context.Context) {
 			t.localEndpoint.Spec.Hostname = t.Hostname
-			t.CreateEndpoint(t.localEndpoint)
+			t.CreateEndpoint(ctx, t.localEndpoint)
 			t.netLink.AwaitNoLink(kubeproxy.GetVxLANInterfaceName(k8snet.IPv4))
 		})
 	})
 
 	When("a remote Endpoint is created while on a non-gateway node", func() {
-		var beforeCreate func()
+		var beforeCreate func(ctx context.Context)
 
 		BeforeEach(func() {
-			beforeCreate = func() {}
+			beforeCreate = func(ctx context.Context) {}
 		})
 
-		JustBeforeEach(func() {
-			beforeCreate()
-			t.CreateEndpoint(t.remoteEndpoint)
+		JustBeforeEach(func(ctx context.Context) {
+			beforeCreate(ctx)
+			t.CreateEndpoint(ctx, t.remoteEndpoint)
 		})
 
 		Context("after a local Endpoint was created", func() {
 			BeforeEach(func() {
-				beforeCreate = func() {
-					t.CreateEndpoint(t.localEndpoint)
+				beforeCreate = func(ctx context.Context) {
+					t.CreateEndpoint(ctx, t.localEndpoint)
 				}
 			})
 
@@ -152,8 +154,8 @@ func testEndpoints() {
 			})
 
 			Context("and is subsequently removed", func() {
-				JustBeforeEach(func() {
-					t.DeleteEndpoint(t.remoteEndpoint.Name)
+				JustBeforeEach(func(ctx context.Context) {
+					t.DeleteEndpoint(ctx, t.remoteEndpoint.Name)
 				})
 
 				It("should remove the VxLAN routes for the remote subnets", func() {
@@ -173,9 +175,9 @@ func testEndpoints() {
 		})
 
 		Context("and is subsequently removed followed by a local Endpoint created", func() {
-			JustBeforeEach(func() {
-				t.DeleteEndpoint(t.remoteEndpoint.Name)
-				t.CreateEndpoint(t.localEndpoint)
+			JustBeforeEach(func(ctx context.Context) {
+				t.DeleteEndpoint(ctx, t.remoteEndpoint.Name)
+				t.CreateEndpoint(ctx, t.localEndpoint)
 			})
 
 			It("should not add VxLAN routes for the remote subnets", func() {
@@ -185,9 +187,9 @@ func testEndpoints() {
 	})
 
 	When("a remote Endpoint is created while on a gateway node", func() {
-		JustBeforeEach(func() {
-			t.CreateLocalHostEndpoint()
-			t.CreateEndpoint(t.remoteEndpoint)
+		JustBeforeEach(func(ctx context.Context) {
+			t.CreateLocalHostEndpoint(ctx)
+			t.CreateEndpoint(ctx, t.remoteEndpoint)
 		})
 
 		It("should not add VxLAN routes for the remote subnets", func() {
@@ -203,8 +205,8 @@ func testEndpoints() {
 		})
 
 		Context("and is subsequently removed", func() {
-			JustBeforeEach(func() {
-				t.DeleteEndpoint(t.remoteEndpoint.Name)
+			JustBeforeEach(func(ctx context.Context) {
+				t.DeleteEndpoint(ctx, t.remoteEndpoint.Name)
 			})
 
 			It("should remove routing rules for host networking", func() {
