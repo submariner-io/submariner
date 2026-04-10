@@ -3,13 +3,8 @@
 set -e
 source "${SCRIPTS_DIR}"/lib/debug_functions
 
-# Clone the upstream script in a temporary directory
-CODEGEN_SCRIPT_DIR=$(mktemp -d)
-# shellcheck disable=SC2064 # We want this to be expanded now
-trap "rm -rf $CODEGEN_SCRIPT_DIR" EXIT
+CODEGEN_SCRIPT_DIR=$(go -C tools mod download -json k8s.io/code-generator | jq -r .Dir)
 CODEGEN_SCRIPT="${CODEGEN_SCRIPT_DIR}/kube_codegen.sh"
-CODEGEN_RELEASE_TAG=$(go -C tools list -m -f '{{.Version}}' k8s.io/code-generator)
-git clone --branch "$CODEGEN_RELEASE_TAG" https://github.com/kubernetes/code-generator "${CODEGEN_SCRIPT_DIR}"
 
 # shellcheck disable=SC2034 # DEBUG_PRINT is used in the debug trap
 DEBUG_PRINT=
