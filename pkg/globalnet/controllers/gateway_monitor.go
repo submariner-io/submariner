@@ -290,8 +290,8 @@ func (g *gatewayMonitor) startLeaderElection() {
 		RetryPeriod:     g.RetryPeriod,
 		ReleaseOnCancel: true,
 		Callbacks: leaderelection.LeaderCallbacks{
-			OnStartedLeading: func(_ context.Context) {
-				err := g.startControllers(context.Background()) //nolint:contextcheck // Intentional to not pass context
+			OnStartedLeading: func(ctx context.Context) {
+				err := g.startControllers(ctx)
 				if err != nil {
 					logger.Error(err, "Error starting the controllers - stopping leader election")
 					leaderElectionInfo.stop()
