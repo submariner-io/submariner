@@ -22,6 +22,7 @@ import (
 	"errors"
 
 	"github.com/submariner-io/admiral/pkg/log"
+	submv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable/vxlan"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/netlink"
@@ -31,6 +32,7 @@ import (
 
 type vxlanCleanup struct {
 	event.HandlerBase
+	lastRemovedEndpoint *submv1.Endpoint
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("CableDriver")}
@@ -48,10 +50,28 @@ func (h *vxlanCleanup) GetName() string {
 }
 
 func (h *vxlanCleanup) TransitionToNonGateway() error {
+	lastEndpoint := h.lastRemovedEndpoint
+	h.lastRemovedEndpoint = nil
+
+	// During libreswan to vxlan cable driver update, new vxlan interface is created before old endpoint is deleted.
+	// Skip cleanup if removed endpoint wasn't vxlan to avoid deleting the newly created vxlan interface.
+	if lastEndpoint != nil && lastEndpoint.Spec.Backend != vxlan.CableDriverName {
+		logger.Infof("Skipping VXLAN cleanup - removed endpoint cable driver was %q, not vxlan",
+			lastEndpoint.Spec.Backend)
+
+		return nil
+	}
+
 	logger.Infof("Cleaning up the routes")
 
 	errv6 := netlink.DeleteIfaceAndAssociatedRoutes(vxlan.GetVxlanInterfaceName(k8snet.IPv6), vxlan.TableID, k8snet.IPv6)
 	errv4 := netlink.DeleteIfaceAndAssociatedRoutes(vxlan.GetVxlanInterfaceName(k8snet.IPv4), vxlan.TableID, k8snet.IPv4)
 
 	return errors.Join(errv6, errv4)
+}
+
+func (h *vxlanCleanup) LocalEndpointRemoved(endpoint *submv1.Endpoint) error {
+	h.lastRemovedEndpoint = endpoint
+
+	return nil
 }
