@@ -225,7 +225,7 @@ func (t *testDriver) testLocalEndpoint() {
 	t.DeleteEndpoint(endpoint.GetName())
 
 	t.awaitEvent(testing.EvLocalEndpointRemoved, endpoint)
-	t.awaitEvent(testing.EvTransitionToNonGateway, nil)
+	t.awaitEvent(testing.EvTransitionToNonGateway, endpoint)
 	t.ensureNoEvents()
 }
 

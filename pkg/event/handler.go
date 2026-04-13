@@ -45,7 +45,7 @@ func (c *DefaultHandlerState) GetRemoteEndpoints() []submV1.Endpoint {
 
 type EndpointHandler interface {
 	// TransitionToNonGateway is called once for each transition of the local node from Gateway to a non-Gateway.
-	TransitionToNonGateway() error
+	TransitionToNonGateway(localEndpoint *submV1.Endpoint) error
 
 	// TransitionToGateway is called once for each transition of the local node from non-Gateway to a Gateway.
 	TransitionToGateway() error
@@ -136,7 +136,7 @@ func (ev *HandlerBase) Uninstall(_ context.Context) error {
 	return nil
 }
 
-func (ev *HandlerBase) TransitionToNonGateway() error {
+func (ev *HandlerBase) TransitionToNonGateway(_ *submV1.Endpoint) error {
 	return nil
 }
 

@@ -152,7 +152,7 @@ var _ = Describe("Event Handler", func() {
 		Expect(h.RemoteEndpointUpdated(&submv1.Endpoint{})).To(Succeed())
 		Expect(h.RemoteEndpointRemoved(&submv1.Endpoint{})).To(Succeed())
 		Expect(h.TransitionToGateway()).To(Succeed())
-		Expect(h.TransitionToNonGateway()).To(Succeed())
+		Expect(h.TransitionToNonGateway(&submv1.Endpoint{})).To(Succeed())
 	})
 
 	Specify("NodeHandlerBase should stub all Node methods", func() {

@@ -32,7 +32,6 @@ import (
 
 type vxlanCleanup struct {
 	event.HandlerBase
-	lastRemovedEndpoint *submv1.Endpoint
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("CableDriver")}
@@ -49,15 +48,12 @@ func (h *vxlanCleanup) GetName() string {
 	return "VXLAN cleanup handler"
 }
 
-func (h *vxlanCleanup) TransitionToNonGateway() error {
-	lastEndpoint := h.lastRemovedEndpoint
-	h.lastRemovedEndpoint = nil
-
+func (h *vxlanCleanup) TransitionToNonGateway(localEndpoint *submv1.Endpoint) error {
 	// During libreswan to vxlan cable driver update, new vxlan interface is created before old endpoint is deleted.
 	// Skip cleanup if removed endpoint wasn't vxlan to avoid deleting the newly created vxlan interface.
-	if lastEndpoint != nil && lastEndpoint.Spec.Backend != vxlan.CableDriverName {
+	if localEndpoint.Spec.Backend != vxlan.CableDriverName {
 		logger.Infof("Skipping VXLAN cleanup - removed endpoint cable driver was %q, not vxlan",
-			lastEndpoint.Spec.Backend)
+			localEndpoint.Spec.Backend)
 
 		return nil
 	}
@@ -68,10 +64,4 @@ func (h *vxlanCleanup) TransitionToNonGateway() error {
 	errv4 := netlink.DeleteIfaceAndAssociatedRoutes(vxlan.GetVxlanInterfaceName(k8snet.IPv4), vxlan.TableID, k8snet.IPv4)
 
 	return errors.Join(errv6, errv4)
-}
-
-func (h *vxlanCleanup) LocalEndpointRemoved(endpoint *submv1.Endpoint) error {
-	h.lastRemovedEndpoint = endpoint
-
-	return nil
 }

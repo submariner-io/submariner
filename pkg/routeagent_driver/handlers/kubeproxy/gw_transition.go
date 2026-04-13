@@ -20,11 +20,12 @@ package kubeproxy
 
 import (
 	"github.com/submariner-io/admiral/pkg/log"
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 )
 
-func (kp *SyncHandler) TransitionToNonGateway() error {
+func (kp *SyncHandler) TransitionToNonGateway(_ *submarinerv1.Endpoint) error {
 	logger.V(log.DEBUG).Info("The current node is no longer a Gateway")
 
 	kp.cleanVxSubmarinerRoutes()

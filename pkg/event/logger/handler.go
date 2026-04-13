@@ -44,7 +44,7 @@ func (l *Handler) GetNetworkPlugins() []string {
 	return []string{event.AnyNetworkPlugin}
 }
 
-func (l *Handler) TransitionToNonGateway() error {
+func (l *Handler) TransitionToNonGateway(_ *submV1.Endpoint) error {
 	logger.V(log.DEBUG).Info("The current node is no longer a Gateway")
 	return nil
 }
