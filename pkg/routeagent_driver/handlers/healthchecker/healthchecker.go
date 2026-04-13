@@ -137,7 +137,7 @@ func (h *controller) Init(_ context.Context) error {
 }
 
 // TransitionToNonGateway is called once for each transition of the local node from Gateway to a non-Gateway.
-func (h *controller) TransitionToNonGateway() error {
+func (h *controller) TransitionToNonGateway(_ *submarinerv1.Endpoint) error {
 	if h.config.HealthCheckerEnabled {
 		remoteEndpoints := h.State().GetRemoteEndpoints()
 

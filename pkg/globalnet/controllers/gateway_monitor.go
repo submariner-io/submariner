@@ -208,7 +208,7 @@ func (g *gatewayMonitor) TransitionToGateway() error {
 	return nil
 }
 
-func (g *gatewayMonitor) TransitionToNonGateway() error {
+func (g *gatewayMonitor) TransitionToNonGateway(_ *v1.Endpoint) error {
 	g.stopControllers(context.Background(), true)
 	return nil
 }

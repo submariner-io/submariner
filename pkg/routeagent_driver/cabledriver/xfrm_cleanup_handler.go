@@ -21,6 +21,7 @@ package cabledriver
 import (
 	"errors"
 
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/event"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	k8snet "k8s.io/utils/net"
@@ -42,7 +43,7 @@ func (h *xrfmCleanup) GetNetworkPlugins() []string {
 	return []string{event.AnyNetworkPlugin}
 }
 
-func (h *xrfmCleanup) TransitionToNonGateway() error {
+func (h *xrfmCleanup) TransitionToNonGateway(_ *submarinerv1.Endpoint) error {
 	logger.Info("Transitioned to non-Gateway, cleaning up the IPsec xfrm rules")
 
 	errv6 := netlink.DeleteXfrmRules(k8snet.IPv6)

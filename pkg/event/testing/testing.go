@@ -154,8 +154,8 @@ func (t *TestHandlerBase) Uninstall(_ context.Context) error {
 	return t.addEvent(EvUninstall, nil)
 }
 
-func (t *TestHandlerBase) TransitionToNonGateway() error {
-	return t.addEvent(EvTransitionToNonGateway, nil)
+func (t *TestHandlerBase) TransitionToNonGateway(endpoint *v1.Endpoint) error {
+	return t.addEvent(EvTransitionToNonGateway, endpoint)
 }
 
 func (t *TestHandlerBase) TransitionToGateway() error {

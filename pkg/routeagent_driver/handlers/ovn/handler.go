@@ -260,7 +260,7 @@ func (ovn *Handler) RemoteEndpointRemoved(endpoint *submV1.Endpoint) error {
 	return goerrors.Join(errs...)
 }
 
-func (ovn *Handler) TransitionToNonGateway() error {
+func (ovn *Handler) TransitionToNonGateway(_ *submV1.Endpoint) error {
 	return goerrors.Join(
 		errors.Wrap(ovn.processEndpointSubnets(false, ovn.State().GetRemoteEndpoints()...),
 			"error processing Endpoints on non-gateway transition"),

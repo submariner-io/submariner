@@ -57,7 +57,7 @@ func (c *handlerController) handleRemovedLocalEndpoint(endpoint *smv1.Endpoint) 
 	if err == nil && c.handlerState.wasOnGateway && !c.handlerState.IsOnGateway() {
 		logger.Infof("Handler %q: Transitioned to non-gateway node %q", c.handler.GetName(), endpoint.Spec.Hostname)
 
-		err = c.handler.TransitionToNonGateway()
+		err = c.handler.TransitionToNonGateway(endpoint)
 	}
 
 	if err == nil {
