@@ -17,6 +17,8 @@ endif
 
 include $(SHIPYARD_DIR)/Makefile.inc
 
+GO ?= go
+
 TARGETS := $(shell ls -p scripts | grep -v -e /)
 GIT_COMMIT_HASH := $(shell git show -s --format='format:%H')
 GIT_COMMIT_DATE := $(shell git show -s --format='format:%cI')
@@ -81,14 +83,10 @@ GENERATED_YAMLS := deploy/crds/submariner.io_clusterglobalegressips.yaml \
                    deploy/crds/submariner.io_routeagents.yaml
 generatedyamls: $(GENERATED_YAMLS)
 
-CONTROLLER_GEN := $(CURDIR)/bin/controller-gen
+CONTROLLER_GEN = $(shell $(GO) -C tools tool -n sigs.k8s.io/controller-tools/cmd/controller-gen)
 CRD_OPTIONS ?= "crd:crdVersions=v1"
 
-$(CONTROLLER_GEN):
-	mkdir -p $(@D)
-	$(GO) -C tools build -o $@ sigs.k8s.io/controller-tools/cmd/controller-gen
-
-$(GENERATED_YAMLS): pkg/apis/submariner.io/v1/types.go | $(CONTROLLER_GEN)
+$(GENERATED_YAMLS): pkg/apis/submariner.io/v1/types.go
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) paths="./pkg/apis/..." output:crd:artifacts:config=deploy/crds
 	test -f $@
 
@@ -118,13 +116,11 @@ ARCH_BINARIES := $(foreach arch,$(subst $(comma),$(space),$(ARCHES)),$(foreach b
 
 build: $(ARCH_BINARIES)
 
-licensecheck: export BUILD_DEBUG = true
-licensecheck: $(ARCH_BINARIES) bin/lichen
-	bin/lichen -c .lichen.yaml $(ARCH_BINARIES)
+LICHEN = $(shell $(GO) -C tools tool -n github.com/uw-labs/lichen)
 
-bin/lichen:
-	mkdir -p $(@D)
-	cd tools && go build -o $(CURDIR)/$@ github.com/uw-labs/lichen
+licensecheck: export BUILD_DEBUG = true
+licensecheck: $(ARCH_BINARIES)
+	$(LICHEN) -c .lichen.yaml $(ARCH_BINARIES)
 
 $(TARGETS):
 	./scripts/$@
