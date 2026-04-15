@@ -53,9 +53,8 @@ const (
 	SubmarinerIPPool            = "submariner.io/ippool"
 	GwLBSvcName                 = "submariner-gateway"
 	GwLBSvcROKSAnnotation       = "service.kubernetes.io/ibm-load-balancer-cloud-provider-ip-type"
-	DefaultV4IPPoolName         = "default-ipv4-ippool"
-	submarinerManagedLabel      = "submariner-managed"
-	submarinerPrevEncapsulation = "submariner-prev-encapsulation"
+	SubmarinerManagedLabel      = "submariner-managed"
+	SubmarinerPrevEncapsulation = "submariner-prev-encapsulation"
 	DefaultInstallationName     = "default"
 )
 
@@ -286,8 +285,8 @@ func (h *calicoIPPoolHandler) updateROKSCalicoCfg(ctx context.Context) error {
 				installation.Annotations = map[string]string{}
 			}
 
-			installation.Annotations[submarinerPrevEncapsulation] = ipPools[0].Encapsulation.String()
-			installation.Annotations[submarinerManagedLabel] = "true"
+			installation.Annotations[SubmarinerPrevEncapsulation] = ipPools[0].Encapsulation.String()
+			installation.Annotations[SubmarinerManagedLabel] = "true"
 
 			ipPools[0].Encapsulation = tigerav1.EncapsulationIPIP
 
@@ -308,7 +307,7 @@ func (h *calicoIPPoolHandler) restoreROKSCalicoCfg(ctx context.Context) error {
 			err := runtime.DefaultUnstructuredConverter.FromUnstructured(existing.Object, installation)
 			utilruntime.Must(err)
 
-			prevEncapsulation := installation.Annotations[submarinerPrevEncapsulation]
+			prevEncapsulation := installation.Annotations[SubmarinerPrevEncapsulation]
 			if prevEncapsulation == "" {
 				return existing, nil // no need to update
 			}
@@ -318,8 +317,8 @@ func (h *calicoIPPoolHandler) restoreROKSCalicoCfg(ctx context.Context) error {
 				ipPools[0].Encapsulation = tigerav1.EncapsulationType(prevEncapsulation)
 			}
 
-			delete(installation.Labels, submarinerManagedLabel)
-			delete(installation.Annotations, submarinerPrevEncapsulation)
+			delete(installation.Annotations, SubmarinerManagedLabel)
+			delete(installation.Annotations, SubmarinerPrevEncapsulation)
 
 			return resource.MustToUnstructured(installation), nil
 		})

@@ -63,7 +63,7 @@ func newTestDriver() *testDriver {
 				CalicoNetwork: &tigerav1.CalicoNetworkSpec{
 					IPPools: []tigerav1.IPPool{
 						{
-							Encapsulation: tigerav1.EncapsulationIPIPCrossSubnet,
+							Encapsulation: tigerav1.EncapsulationNone,
 						},
 					},
 				},
@@ -93,16 +93,6 @@ func TestCalico(t *testing.T) {
 }
 
 func (t *testDriver) Start(ctx context.Context, handler event.Handler) {
-	_, err := t.calicoClient.ProjectcalicoV3().IPPools().Create(ctx, &calicoapi.IPPool{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: calico.DefaultV4IPPoolName,
-		},
-		Spec: calicoapi.IPPoolSpec{
-			IPIPMode: calicoapi.IPIPModeNever,
-		},
-	}, metav1.CreateOptions{})
-	Expect(err).To(Succeed())
-
 	t.handler = handler
 	t.ControllerSupport.Start(ctx, handler)
 }
@@ -145,17 +135,14 @@ func (t *testDriver) awaitNoIPPools(subnets ...string) {
 	}).ShouldNot(ContainElements(toAny(subnets)...))
 }
 
-func (t *testDriver) getDefaultIPPoolIPIPMode() string {
-	p, err := t.calicoClient.ProjectcalicoV3().IPPools().Get(context.Background(), calico.DefaultV4IPPoolName, metav1.GetOptions{})
-	Expect(err).To(Succeed())
-
-	return string(p.Spec.IPIPMode)
+func (t *testDriver) getDefaultInstallation(ctx context.Context) *tigerav1.Installation {
+	return test.GetResource(ctx, t.dynClient.Resource(calico.InstallationsGVR), &tigerav1.Installation{ObjectMeta: metav1.ObjectMeta{
+		Name: calico.DefaultInstallationName,
+	}})
 }
 
 func (t *testDriver) getDefaultInstallationEncapsulation(ctx context.Context) string {
-	installation := test.GetResource(ctx, t.dynClient.Resource(calico.InstallationsGVR), &tigerav1.Installation{ObjectMeta: metav1.ObjectMeta{
-		Name: calico.DefaultInstallationName,
-	}})
+	installation := t.getDefaultInstallation(ctx)
 	Expect(installation.Spec.CalicoNetwork).NotTo(BeNil())
 	Expect(installation.Spec.CalicoNetwork.IPPools).NotTo(BeEmpty())
 
