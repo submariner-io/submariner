@@ -9,6 +9,7 @@ rules:
     ignore: '.github/workflows/*.yml'
 
 ignore: |
+  .rpm-lockfiles
   **/vendor
   .tekton
   deploy/crds
