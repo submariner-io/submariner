@@ -197,7 +197,6 @@ func testGatewayFailOverScenario(ctx context.Context, f *subFramework.Framework,
 	framework.By(fmt.Sprintf("Found two gateway nodes on %q", clusterAName))
 
 	initialGWPod := f.AwaitActiveGatewayPod(ctx, framework.ClusterIndex(primaryCluster), nil)
-	Expect(initialGWPod).ToNot(BeNil(), "Did not find an active gateway pod")
 
 	framework.By(fmt.Sprintf("Ensure active gateway node %q has established connections", initialGWPod.Name))
 
@@ -213,9 +212,8 @@ func testGatewayFailOverScenario(ctx context.Context, f *subFramework.Framework,
 
 	newGWPod := f.AwaitActiveGatewayPod(ctx, framework.ClusterIndex(primaryCluster), func(pod *v1.Pod) bool {
 		return pod.Spec.NodeName != initialGWPod.Spec.NodeName
-	})
+	}, "Did not find a new active gateway pod running on a different node")
 
-	Expect(newGWPod).ToNot(BeNil(), "Did not find a new active gateway pod running on a different node")
 	framework.By(fmt.Sprintf("Found new submariner gateway pod %q", newGWPod.Name))
 
 	// Verify a new Endpoint instance is created by the new gateway instance. This is a bit whitebox but it's a sanity check
