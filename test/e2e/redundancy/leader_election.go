@@ -66,7 +66,6 @@ func testLeaderElectionFailover(ctx context.Context, f *subFramework.Framework, 
 	clusterName := framework.TestContext.ClusterIDs[cluster]
 
 	gatewayPod := f.AwaitActiveGatewayPod(ctx, cluster, nil)
-	Expect(gatewayPod).ToNot(BeNil(), "Did not find an active gateway pod")
 
 	restartCount := gatewayPod.Status.ContainerStatuses[0].RestartCount
 

@@ -54,7 +54,6 @@ var _ = Describe("Gateway status reporting", Label(labels.Dataplane), func() {
 			otherCluster := framework.TestContext.ClusterIDs[otherClusterIndex]
 
 			gatewayPod := f.AwaitActiveGatewayPod(ctx, otherClusterIndex, nil)
-			Expect(gatewayPod).ToNot(BeNil(), "Did not find an active gateway pod for cluster %q", otherCluster)
 
 			healthCheckEnabled := false
 

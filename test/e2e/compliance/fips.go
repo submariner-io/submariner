@@ -23,7 +23,6 @@ import (
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	"github.com/submariner-io/shipyard/test/e2e/framework"
 	subFramework "github.com/submariner-io/submariner/test/e2e/framework"
 	"github.com/submariner-io/submariner/test/e2e/labels"
@@ -60,7 +59,6 @@ func testFIPSGatewayStatus(ctx context.Context, f *subFramework.Framework) {
 	framework.By(fmt.Sprintf("Locate active gateway pod on cluster %q", fipsClusterName))
 
 	gwPod := f.AwaitActiveGatewayPod(ctx, fipsCluster, nil)
-	Expect(gwPod).ToNot(BeNil(), "Did not find an active gateway pod")
 
 	f.TestGatewayNodeFIPSMode(ctx, fipsCluster, gwPod.Name)
 }
