@@ -65,18 +65,18 @@ var _ = Describe("IPPool Handler", func() {
 
 	When("the platform is not ROKS", func() {
 		Context("because the Submariner GW load balancer is not deployed", func() {
-			It("should not update the default IPPool's IPIPMode", func() {
-				Expect(t.getDefaultIPPoolIPIPMode()).Should(Equal(string(calicoapi.IPIPModeNever)))
+			It("should not update the default Installation's Encapsulation", func(ctx context.Context) {
+				Expect(t.getDefaultInstallationEncapsulation(ctx)).Should(Equal(tigerav1.EncapsulationNone.String()))
 			})
 		})
 
 		Context("because the Submariner GW load balancer does not have the ROKS annotation", func() {
 			BeforeEach(func(ctx context.Context) {
-				t.createSubmarinerGwLBService(ctx, map[string]string{calico.GwLBSvcROKSAnnotation: "foo"})
+				t.createSubmarinerGwLBService(ctx, map[string]string{})
 			})
 
-			It("should not update the default IPPool's IPIPMode", func() {
-				Expect(t.getDefaultIPPoolIPIPMode()).Should(Equal(string(calicoapi.IPIPModeNever)))
+			It("should not update the default Installation's Encapsulation", func(ctx context.Context) {
+				Expect(t.getDefaultInstallationEncapsulation(ctx)).Should(Equal(tigerav1.EncapsulationNone.String()))
 			})
 		})
 	})
@@ -89,12 +89,15 @@ var _ = Describe("IPPool Handler", func() {
 		It("should update the default Installation's Encapsulation to IPIP", func(ctx context.Context) {
 			Expect(t.getDefaultInstallationEncapsulation(ctx)).Should(Equal(tigerav1.EncapsulationIPIP.String()))
 		})
+
+		It("should set the Submariner annotations on the default Installation", func(ctx context.Context) {
+			Expect(t.getDefaultInstallation(ctx).Annotations).To(
+				And(HaveKey(calico.SubmarinerManagedLabel), HaveKey(calico.SubmarinerPrevEncapsulation)))
+		})
 	})
 
 	Context("on Uninstall", func() {
 		BeforeEach(func(ctx context.Context) {
-			t.createSubmarinerGwLBService(ctx, map[string]string{})
-
 			_, err := t.calicoClient.ProjectcalicoV3().IPPools().Create(ctx, &calicoapi.IPPool{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "pool1",
@@ -124,8 +127,19 @@ var _ = Describe("IPPool Handler", func() {
 			Expect(list.Items).To(BeEmpty())
 		})
 
-		It("should reset the default Installation's Encapsulation", func(ctx context.Context) {
-			Expect(t.getDefaultInstallationEncapsulation(ctx)).Should(Equal(tigerav1.EncapsulationIPIPCrossSubnet.String()))
+		Context("and the platform is ROKS", func() {
+			BeforeEach(func(ctx context.Context) {
+				t.createSubmarinerGwLBService(ctx, map[string]string{calico.GwLBSvcROKSAnnotation: "foo"})
+			})
+
+			It("should reset the default Installation's Encapsulation", func(ctx context.Context) {
+				Expect(t.getDefaultInstallationEncapsulation(ctx)).Should(Equal(tigerav1.EncapsulationNone.String()))
+			})
+
+			It("should remove the Submariner annotations on the default Installation", func(ctx context.Context) {
+				Expect(t.getDefaultInstallation(ctx).Annotations).NotTo(
+					Or(HaveKey(calico.SubmarinerManagedLabel), HaveKey(calico.SubmarinerPrevEncapsulation)))
+			})
 		})
 	})
 })
