@@ -423,7 +423,7 @@ var _ = Describe("IPv6 rules", func() {
 		return rules[0].Rule
 	}
 
-	Specify("should use ip6 nexthdr for UDP", func() {
+	Specify("should use 'ip6 nexthdr' for UDP", func() {
 		Expect(pf6.Append(packetfilter.TableTypeNAT, chainName6, &packetfilter.Rule{
 			Proto: packetfilter.RuleProtoUDP, DPort: "4500", Action: packetfilter.RuleActionAccept,
 		})).To(Succeed())
@@ -433,17 +433,17 @@ var _ = Describe("IPv6 rules", func() {
 		))
 	})
 
-	Specify("should use ip6 nexthdr icmpv6 for ICMP", func() {
+	Specify("should use 'ip6 nexthdr icmpv6' for ICMP", func() {
 		Expect(pf6.Append(packetfilter.TableTypeNAT, chainName6, &packetfilter.Rule{
 			Proto: packetfilter.RuleProtoICMP, Action: packetfilter.RuleActionAccept,
 		})).To(Succeed())
 		Expect(getRuleSpec6()).To(And(
 			ContainSubstring("ip6 nexthdr icmpv6"),
-			Not(ContainSubstring("ip nexthdr icmp")),
+			Not(ContainSubstring("ip protocol icmp")),
 		))
 	})
 
-	Specify("should use ip6 saddr for SelfSNAT", func() {
+	Specify("should use 'ip6 saddr' for SelfSNAT", func() {
 		Expect(pf6.Append(packetfilter.TableTypeNAT, chainName6, &packetfilter.Rule{
 			Action: packetfilter.RuleActionSelfSNAT,
 		})).To(Succeed())
