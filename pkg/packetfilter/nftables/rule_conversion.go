@@ -29,22 +29,35 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
-const serializedVersion = "1.0"
+const (
+	serializedVersion = "1.0"
+	ipv6Family        = "ip6"
+)
 
-func protoToRuleSpec(ruleSpec []string, proto packetfilter.RuleProto, dPort string) []string {
+func protoToRuleSpec(ruleSpec []string, proto packetfilter.RuleProto, dPort string, isIPv6 bool) []string {
+	addrFamily, protoKW := "ip", "protocol"
+	if isIPv6 {
+		addrFamily, protoKW = ipv6Family, "nexthdr"
+	}
+
 	switch proto {
 	case packetfilter.RuleProtoUDP:
-		ruleSpec = append(ruleSpec, "ip", "protocol", "udp")
+		ruleSpec = append(ruleSpec, addrFamily, protoKW, "udp")
 		if dPort != "" {
 			ruleSpec = append(ruleSpec, "udp", "dport", dPort)
 		}
 	case packetfilter.RuleProtoTCP:
-		ruleSpec = append(ruleSpec, "ip", "protocol", "tcp")
+		ruleSpec = append(ruleSpec, addrFamily, protoKW, "tcp")
 		if dPort != "" {
 			ruleSpec = append(ruleSpec, "tcp", "dport", dPort)
 		}
 	case packetfilter.RuleProtoICMP:
-		ruleSpec = append(ruleSpec, "ip", "protocol", "icmp")
+		icmpProto := "icmp"
+		if isIPv6 {
+			icmpProto = "icmpv6"
+		}
+
+		ruleSpec = append(ruleSpec, addrFamily, protoKW, icmpProto)
 	case packetfilter.RuleProtoAll:
 	case packetfilter.RuleProtoUndefined:
 	}
@@ -64,11 +77,11 @@ func mssClampToRuleSpec(ruleSpec []string, clampType packetfilter.MssClampType, 
 	return ruleSpec
 }
 
-func setToRuleSpec(ruleSpec []string, srcSetName, destSetName string, isIPv6Set bool) []string {
+func setToRuleSpec(ruleSpec []string, srcSetName, destSetName string, isIPv6 bool) []string {
 	setPrefix := "ip"
 
-	if isIPv6Set {
-		setPrefix = "ip6"
+	if isIPv6 {
+		setPrefix = ipv6Family
 	}
 
 	if srcSetName != "" {
@@ -82,13 +95,13 @@ func setToRuleSpec(ruleSpec []string, srcSetName, destSetName string, isIPv6Set 
 	return ruleSpec
 }
 
-func toNftRuleSpec(rule *packetfilter.Rule, isIPv6Set bool) string {
-	ruleSpec := protoToRuleSpec([]string{}, rule.Proto, rule.DPort)
+func toNftRuleSpec(rule *packetfilter.Rule, isIPv6 bool) string {
+	ruleSpec := protoToRuleSpec([]string{}, rule.Proto, rule.DPort, isIPv6)
 
 	setPrefix := "ip"
 
-	if isIPv6Set {
-		setPrefix = "ip6"
+	if isIPv6 {
+		setPrefix = ipv6Family
 	}
 
 	if rule.SrcCIDR != "" {
@@ -104,7 +117,7 @@ func toNftRuleSpec(rule *packetfilter.Rule, isIPv6Set bool) string {
 		ruleSpec = append(ruleSpec, "meta", "mark", "&", rule.MarkValue, "==", rule.MarkValue)
 	}
 
-	ruleSpec = setToRuleSpec(ruleSpec, rule.SrcSetName, rule.DestSetName, isIPv6Set)
+	ruleSpec = setToRuleSpec(ruleSpec, rule.SrcSetName, rule.DestSetName, isIPv6)
 
 	if rule.OutInterface != "" {
 		ruleSpec = append(ruleSpec, "oifname", rule.OutInterface)
@@ -119,7 +132,12 @@ func toNftRuleSpec(rule *packetfilter.Rule, isIPv6Set bool) string {
 	}
 
 	ruleSpec = append(ruleSpec, "counter")
-	ruleSpec = append(ruleSpec, ruleActionToStr[rule.Action]...)
+
+	if rule.Action == packetfilter.RuleActionSelfSNAT {
+		ruleSpec = append(ruleSpec, "snat", "to", setPrefix, "saddr")
+	} else {
+		ruleSpec = append(ruleSpec, ruleActionToStr[rule.Action]...)
+	}
 
 	if rule.Action == packetfilter.RuleActionJump {
 		ruleSpec = append(ruleSpec, rule.TargetChain)
