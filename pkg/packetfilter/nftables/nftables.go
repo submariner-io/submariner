@@ -58,13 +58,12 @@ var (
 	}
 
 	ruleActionToStr = map[packetfilter.RuleAction][]string{
-		packetfilter.RuleActionAccept:   {"accept"},
-		packetfilter.RuleActionMss:      {"tcp", "option", "maxseg"},
-		packetfilter.RuleActionMark:     {"meta", "mark"},
-		packetfilter.RuleActionSNAT:     {"snat"},
-		packetfilter.RuleActionDNAT:     {"dnat"},
-		packetfilter.RuleActionJump:     {"jump"},
-		packetfilter.RuleActionSelfSNAT: {"snat to ip saddr"},
+		packetfilter.RuleActionAccept: {"accept"},
+		packetfilter.RuleActionMss:    {"tcp", "option", "maxseg"},
+		packetfilter.RuleActionMark:   {"meta", "mark"},
+		packetfilter.RuleActionSNAT:   {"snat"},
+		packetfilter.RuleActionDNAT:   {"dnat"},
+		packetfilter.RuleActionJump:   {"jump"},
 	}
 
 	nftFamilies = map[k8snet.IPFamily]knftables.Family{
