@@ -400,6 +400,57 @@ var _ = Describe("Interface", func() {
 	})
 })
 
+var _ = Describe("IPv6 rules", func() {
+	const chainName6 = "test-chain"
+
+	var (
+		fakeNft6 *fakeKnftablesWrapper
+		pf6      packetfilter.Driver
+	)
+
+	BeforeEach(func() {
+		fakeNft6 = &fakeKnftablesWrapper{knftables.NewFake(knftables.IPv6Family, "submariner-ipv6")}
+		pf6 = nftables.NewWithNft(fakeNft6, k8snet.IPv6)
+
+		Expect(pf6.CreateChainIfNotExists(packetfilter.TableTypeNAT, &packetfilter.Chain{Name: chainName6})).To(Succeed())
+	})
+
+	getRuleSpec6 := func() string {
+		rules, err := fakeNft6.Fake.ListRules(context.TODO(), chainName6)
+		Expect(err).To(Succeed())
+		Expect(rules).To(HaveLen(1))
+
+		return rules[0].Rule
+	}
+
+	Specify("should use ip6 nexthdr for UDP", func() {
+		Expect(pf6.Append(packetfilter.TableTypeNAT, chainName6, &packetfilter.Rule{
+			Proto: packetfilter.RuleProtoUDP, DPort: "4500", Action: packetfilter.RuleActionAccept,
+		})).To(Succeed())
+		Expect(getRuleSpec6()).To(And(
+			ContainSubstring("ip6 nexthdr udp"),
+			Not(ContainSubstring("ip protocol udp")),
+		))
+	})
+
+	Specify("should use ip6 nexthdr icmpv6 for ICMP", func() {
+		Expect(pf6.Append(packetfilter.TableTypeNAT, chainName6, &packetfilter.Rule{
+			Proto: packetfilter.RuleProtoICMP, Action: packetfilter.RuleActionAccept,
+		})).To(Succeed())
+		Expect(getRuleSpec6()).To(And(
+			ContainSubstring("ip6 nexthdr icmpv6"),
+			Not(ContainSubstring("ip nexthdr icmp")),
+		))
+	})
+
+	Specify("should use ip6 saddr for SelfSNAT", func() {
+		Expect(pf6.Append(packetfilter.TableTypeNAT, chainName6, &packetfilter.Rule{
+			Action: packetfilter.RuleActionSelfSNAT,
+		})).To(Succeed())
+		Expect(getRuleSpec6()).To(ContainSubstring("snat to ip6 saddr"))
+	})
+})
+
 func testRuleConversion(rule *packetfilter.Rule) {
 	serialized := nftables.SerializeRule(rule)
 	Expect(len(serialized)).To(BeNumerically("<=", 128))
