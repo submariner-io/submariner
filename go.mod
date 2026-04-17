@@ -2,8 +2,6 @@ module github.com/submariner-io/submariner
 
 go 1.23.0
 
-toolchain go1.23.8
-
 require (
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/coreos/go-iptables v0.7.0
@@ -69,7 +67,7 @@ require (
 	github.com/mdlayher/genetlink v1.3.2 // indirect
 	github.com/mdlayher/netlink v1.7.2 // indirect
 	github.com/mdlayher/socket v0.4.1 // indirect
-	github.com/moby/spdystream v0.2.0 // indirect
+	github.com/moby/spdystream v0.5.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
