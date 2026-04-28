@@ -53,8 +53,7 @@ if [[ -n "$BRANCH" ]]; then
         mkdir -p "$LOCKFILES_DIR/$comp"
         git show "$GIT_REF:.rpm-lockfiles/$comp/rpms.in.yaml" > "$LOCKFILES_DIR/$comp/rpms.in.yaml" 2>/dev/null || continue
 
-        # Extract repo filename from rpms.in.yaml
-        repo_file=$(grep -A1 "repofiles:" "$LOCKFILES_DIR/$comp/rpms.in.yaml" | grep "^ *-" | sed 's/.*- //' | head -1)
+        repo_file=$(yq '.contentOrigin.repofiles[0] // ""' "$LOCKFILES_DIR/$comp/rpms.in.yaml")
         if [[ -n "$repo_file" ]]; then
             git show "$GIT_REF:.rpm-lockfiles/$comp/$repo_file" > "$LOCKFILES_DIR/$comp/$repo_file"
         fi
@@ -67,6 +66,7 @@ fi
 
 # Check prerequisites
 command -v podman &>/dev/null || { echo "Requires: podman"; exit 1; }
+command -v yq &>/dev/null || { echo "Requires: yq"; exit 1; }
 
 # Get current cert ID
 CERT_ID=$(basename "$(find /etc/pki/entitlement -maxdepth 1 -name '*.pem' ! -name '*-key.pem' 2>/dev/null | head -1)" .pem)
