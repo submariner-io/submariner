@@ -121,6 +121,10 @@ spec:
       default: 'true'
       description: Use the package registry proxy when prefetching dependencies
       type: string
+    - name: sast-target-dirs
+      type: string
+      default: .
+      description: Target directories to scan with SAST tools. Multiple values should be separated with commas.
     results:
     - description: ""
       name: IMAGE_URL
@@ -144,7 +148,7 @@ spec:
         - name: name
           value: init
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-init:0.4@sha256:b797dd453ddad669365de6de4649e3a9e37e77aa26eb9862ca079a36cbfe64a4
+          value: quay.io/konflux-ci/tekton-catalog/task-init:0.4@sha256:5a423246792ac501ea279229b42ee57da9927da441c04b5c9ff86817b0856b08
         - name: kind
           value: task
         resolver: bundles
@@ -191,7 +195,7 @@ spec:
         - name: name
           value: prefetch-dependencies-oci-ta
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-prefetch-dependencies-oci-ta:0.3@sha256:1b209c0d93e52e418f3e6cd4b4fd915a84e4bd7f68e1cfd0d6446133540d7f43
+          value: quay.io/konflux-ci/tekton-catalog/task-prefetch-dependencies-oci-ta:0.3@sha256:a2efbcdcecfa5293a622eb356a18f5c88e5714046b214fe8730b43b1a7dbb77d
         - name: kind
           value: task
         resolver: bundles
@@ -314,7 +318,7 @@ spec:
         - name: name
           value: deprecated-image-check
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-deprecated-image-check:0.5@sha256:5ff16b7e6b4a8aa1adb352e74b9f831f77ff97bafd1b89ddb0038d63335f1a67
+          value: quay.io/konflux-ci/tekton-catalog/task-deprecated-image-check:0.5@sha256:e78d0d3baf3c8cfc1a5ad278196b74032d9568b143a87c7a79ab780fedfb296e
         - name: kind
           value: task
         resolver: bundles
@@ -341,7 +345,7 @@ spec:
         - name: name
           value: clair-scan
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-clair-scan:0.3@sha256:cd49cdea7e5403a87c4774bd8ea10bc4e6aeb83841ff490cbe42b782779513a7
+          value: quay.io/konflux-ci/tekton-catalog/task-clair-scan:0.3@sha256:8fad4c2e2f470f82ee43d6b2ac72327b4d9c6e9cb514a678911c1c9359c29894
         - name: kind
           value: task
         resolver: bundles
@@ -366,7 +370,7 @@ spec:
         - name: name
           value: ecosystem-cert-preflight-checks
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-ecosystem-cert-preflight-checks:0.2@sha256:2468c01818fbaad2235e4fca438f28e847260e3e354cf5a441bbd671684af2db
+          value: quay.io/konflux-ci/tekton-catalog/task-ecosystem-cert-preflight-checks:0.2@sha256:e2bcf1174a6dae9969b8f12e94babe2a5881bc77a509f10823b6a9eac6392850
         - name: kind
           value: task
         resolver: bundles
@@ -385,6 +389,8 @@ spec:
         value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
       - name: CACHI2_ARTIFACT
         value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
+      - name: TARGET_DIRS
+        value: $(params.sast-target-dirs)
       runAfter:
       - build-image-index
       taskRef:
@@ -419,7 +425,7 @@ spec:
         - name: name
           value: clamav-scan
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-clamav-scan:0.3@sha256:171eca520b545a0c860c6d59249796ffe5db5be1dab87f3a328fc5ef1fd68af2
+          value: quay.io/konflux-ci/tekton-catalog/task-clamav-scan:0.3@sha256:567cb66bd2e1f4b58b9d4d756f3317fc62479e0b40aa0de66094b1f12d296cfc
         - name: kind
           value: task
         resolver: bundles
@@ -457,6 +463,8 @@ spec:
         value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
       - name: CACHI2_ARTIFACT
         value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
+      - name: TARGET_DIRS
+        value: $(params.sast-target-dirs)
       runAfter:
       - coverity-availability-check
       taskRef:
@@ -504,6 +512,8 @@ spec:
         value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
       - name: CACHI2_ARTIFACT
         value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
+      - name: TARGET_DIRS
+        value: $(params.sast-target-dirs)
       runAfter:
       - build-image-index
       taskRef:
@@ -530,6 +540,8 @@ spec:
         value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
       - name: CACHI2_ARTIFACT
         value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
+      - name: TARGET_DIRS
+        value: $(params.sast-target-dirs)
       runAfter:
       - build-image-index
       taskRef:
@@ -537,7 +549,7 @@ spec:
         - name: name
           value: sast-unicode-check-oci-ta
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-sast-unicode-check-oci-ta:0.4@sha256:0854d9261760b2dc8f092569739685a5ab0a5c620e9cb8c1b78fef9e2d077a29
+          value: quay.io/konflux-ci/tekton-catalog/task-sast-unicode-check-oci-ta:0.4@sha256:90efa582de7770d55102b74014a765cd16a25a56f2cf644b56a788c70c4dc749
         - name: kind
           value: task
         resolver: bundles
