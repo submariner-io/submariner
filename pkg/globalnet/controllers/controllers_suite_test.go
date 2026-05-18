@@ -56,7 +56,7 @@ import (
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	k8stesting "k8s.io/client-go/testing"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 const (
@@ -78,7 +78,7 @@ func init() {
 	kzerolog.AddFlags(nil)
 
 	_ = submarinerv1.AddToScheme(scheme.Scheme)
-	_ = mcsv1a1.Install(scheme.Scheme)
+	_ = mcsv1b1.Install(scheme.Scheme)
 }
 
 var _ = BeforeSuite(func() {
@@ -128,14 +128,14 @@ func newTestDriverBase() *testDriverBase {
 	t := &testDriverBase{
 		restMapper: test.GetRESTMapperFor(&submarinerv1.Endpoint{}, &corev1.Service{}, &corev1.Pod{}, &corev1.Endpoints{},
 			&submarinerv1.GlobalEgressIP{}, &submarinerv1.ClusterGlobalEgressIP{}, &submarinerv1.GlobalIngressIP{},
-			&submarinerv1.Gateway{}, &mcsv1a1.ServiceExport{}),
+			&submarinerv1.Gateway{}, &mcsv1b1.ServiceExport{}),
 		scheme:                   runtime.NewScheme(),
 		pFilter:                  fakePF.New(),
 		globalCIDR:               globalCIDR,
 		localSubnets:             []string{},
 		expectInstantiationError: false,
 	}
-	Expect(mcsv1a1.Install(t.scheme)).To(Succeed())
+	Expect(mcsv1b1.Install(t.scheme)).To(Succeed())
 	Expect(submarinerv1.AddToScheme(t.scheme)).To(Succeed())
 	Expect(corev1.AddToScheme(t.scheme)).To(Succeed())
 
@@ -156,7 +156,7 @@ func newTestDriverBase() *testDriverBase {
 
 	t.services = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &corev1.Service{})).Namespace(namespace)
 
-	t.serviceExports = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &mcsv1a1.ServiceExport{})).Namespace(namespace)
+	t.serviceExports = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &mcsv1b1.ServiceExport{})).Namespace(namespace)
 
 	t.gateways = t.dynClient.Resource(*test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.Gateway{})).Namespace(namespace)
 
@@ -258,7 +258,7 @@ func (t *testDriverBase) createService(ctx context.Context, service *corev1.Serv
 }
 
 func (t *testDriverBase) createServiceExport(ctx context.Context, s *corev1.Service) {
-	test.CreateResource(ctx, t.serviceExports, &mcsv1a1.ServiceExport{
+	test.CreateResource(ctx, t.serviceExports, &mcsv1b1.ServiceExport{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      s.GetName(),
 			Namespace: s.GetNamespace(),
