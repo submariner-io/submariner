@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 func NewServiceExportController(config *syncer.ResourceSyncerConfig, podControllers *IngressPodControllers,
@@ -64,7 +64,7 @@ func NewServiceExportController(config *syncer.ResourceSyncerConfig, podControll
 
 	controller.resourceSyncer, err = syncer.NewResourceSyncer(&syncer.ResourceSyncerConfig{
 		Name:            "ServiceExport syncer",
-		ResourceType:    &mcsv1a1.ServiceExport{},
+		ResourceType:    &mcsv1b1.ServiceExport{},
 		SourceClient:    config.SourceClient,
 		SourceNamespace: corev1.NamespaceAll,
 		RestMapper:      config.RestMapper,
@@ -116,7 +116,7 @@ func (c *serviceExportController) Start(ctx context.Context) error {
 		func(obj *unstructured.Unstructured) runtime.Object {
 			name, exists, _ := unstructured.NestedString(obj.Object, "spec", "serviceRef", "name")
 			if exists {
-				return &mcsv1a1.ServiceExport{
+				return &mcsv1b1.ServiceExport{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      name,
 						Namespace: obj.GetNamespace(),
@@ -133,7 +133,7 @@ func (c *serviceExportController) Start(ctx context.Context) error {
 func (c *serviceExportController) process(from runtime.Object, _ int, op syncer.Operation) (runtime.Object, bool) {
 	ctx := wait.ContextForChannel(c.stopCh)
 
-	serviceExport := from.(*mcsv1a1.ServiceExport)
+	serviceExport := from.(*mcsv1b1.ServiceExport)
 
 	switch op {
 	case syncer.Create:
@@ -146,7 +146,7 @@ func (c *serviceExportController) process(from runtime.Object, _ int, op syncer.
 	return nil, false
 }
 
-func (c *serviceExportController) onCreate(ctx context.Context, serviceExport *mcsv1a1.ServiceExport) (runtime.Object, bool) {
+func (c *serviceExportController) onCreate(ctx context.Context, serviceExport *mcsv1b1.ServiceExport) (runtime.Object, bool) {
 	key, _ := cache.MetaNamespaceKeyFunc(serviceExport)
 
 	service, exists, err := getService(ctx, serviceExport.Name, serviceExport.Namespace, c.services, c.scheme)
@@ -202,7 +202,7 @@ func (c *serviceExportController) onCreate(ctx context.Context, serviceExport *m
 	return ingressIP, false
 }
 
-func (c *serviceExportController) onDelete(ctx context.Context, serviceExport *mcsv1a1.ServiceExport) (runtime.Object, bool) {
+func (c *serviceExportController) onDelete(ctx context.Context, serviceExport *mcsv1b1.ServiceExport) (runtime.Object, bool) {
 	key, _ := cache.MetaNamespaceKeyFunc(serviceExport)
 
 	logger.Infof("ServiceExport %q deleted", key)

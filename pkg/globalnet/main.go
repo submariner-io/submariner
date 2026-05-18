@@ -52,7 +52,7 @@ import (
 	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 var (
@@ -121,8 +121,8 @@ func main() {
 
 	defer http.StartServer(http.Metrics|http.Profile, spec.MetricsPort)()
 
-	err = mcsv1a1.Install(scheme.Scheme)
-	logger.FatalOnError(err, "Error adding Multicluster v1alpha1 to the scheme")
+	err = mcsv1b1.Install(scheme.Scheme)
+	logger.FatalOnError(err, "Error adding Multicluster v1beta1 to the scheme")
 
 	err = submarinerv1.AddToScheme(scheme.Scheme)
 	logger.FatalOnError(err, "Error adding submariner to the scheme")

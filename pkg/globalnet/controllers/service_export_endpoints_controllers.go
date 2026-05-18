@@ -28,7 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
-	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
+	mcsv1b1 "sigs.k8s.io/mcs-api/pkg/apis/v1beta1"
 )
 
 func NewServiceExportEndpointsControllers(ctx context.Context, config *syncer.ResourceSyncerConfig,
@@ -53,7 +53,7 @@ func NewServiceExportEndpointsControllers(ctx context.Context, config *syncer.Re
 	}, nil
 }
 
-func (c *ServiceExportEndpointsControllers) start(ctx context.Context, se *mcsv1a1.ServiceExport) error {
+func (c *ServiceExportEndpointsControllers) start(ctx context.Context, se *mcsv1b1.ServiceExport) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
