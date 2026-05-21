@@ -10,3 +10,13 @@ ignore:
   - vulnerability: CVE-2021-22570
     package:
       name: google.golang.org/protobuf
+
+  # Update requires Go 1.24.0, incompatible with release-0.20's Go 1.23.0. Medium severity doesn't justify breaking changes.
+  - vulnerability: GHSA-j5w8-q4qc-rx2x
+    package:
+      name: golang.org/x/crypto
+
+  # Update requires Go 1.24.0, incompatible with release-0.20's Go 1.23.0. Medium severity doesn't justify breaking changes.
+  - vulnerability: GHSA-f6x5-jh6r-wrfv
+    package:
+      name: golang.org/x/crypto
