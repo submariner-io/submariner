@@ -14,18 +14,18 @@ require (
 	github.com/projectcalico/api v0.0.0-20230602153125-fb7148692637
 	github.com/prometheus-community/pro-bing v0.7.0
 	github.com/prometheus/client_golang v1.22.0
-	github.com/submariner-io/admiral v0.21.2
-	github.com/submariner-io/shipyard v0.21.2
+	github.com/submariner-io/admiral v0.21.3
+	github.com/submariner-io/shipyard v0.21.3
 	github.com/tigera/operator/api v0.0.0-20250829192342-96fd517a8419
 	github.com/vishvananda/netlink v1.3.1
 	golang.org/x/net v0.47.0
 	golang.org/x/sys v0.38.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20230429144221-925a1e7659e6
 	google.golang.org/protobuf v1.36.5
-	k8s.io/api v0.33.5
-	k8s.io/apimachinery v0.33.5
-	k8s.io/client-go v0.33.5
-	k8s.io/component-helpers v0.32.6
+	k8s.io/api v0.33.12
+	k8s.io/apimachinery v0.33.12
+	k8s.io/client-go v0.33.12
+	k8s.io/component-helpers v0.33.12
 	k8s.io/utils v0.0.0-20241210054802-24370beab758
 	sigs.k8s.io/controller-runtime v0.20.4
 	sigs.k8s.io/knftables v0.0.18
@@ -43,7 +43,7 @@ require (
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
-	github.com/go-logr/logr v1.4.2 // indirect
+	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
@@ -76,7 +76,7 @@ require (
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/rs/zerolog v1.34.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/stretchr/testify v1.10.0 // indirect
+	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/urfave/cli/v2 v2.4.0 // indirect
 	github.com/vishvananda/netns v0.0.5 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
