@@ -7,16 +7,16 @@ require (
 	github.com/cert-manager/go-pkcs12 v0.0.0-20251218073410-44b982790b7c
 	github.com/coreos/go-iptables v0.8.0
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/onsi/ginkgo/v2 v2.28.3
-	github.com/onsi/gomega v1.40.0
+	github.com/onsi/ginkgo/v2 v2.29.0
+	github.com/onsi/gomega v1.41.0
 	github.com/ovn-org/libovsdb v0.7.0
 	github.com/ovn-org/ovn-kubernetes/go-controller v0.0.0-20220511131059-ac1ce4691c0f
 	github.com/pkg/errors v0.9.1
 	github.com/projectcalico/api v0.0.0-20230602153125-fb7148692637
 	github.com/prometheus-community/pro-bing v0.8.0
 	github.com/prometheus/client_golang v1.23.2
-	github.com/submariner-io/admiral v0.24.0-m0.0.20260414184357-802f5267fa1c
-	github.com/submariner-io/shipyard v0.24.0-m0.0.20260508204850-b306434bc296
+	github.com/submariner-io/admiral v0.24.0-m0.0.20260504071955-504d709fa512
+	github.com/submariner-io/shipyard v0.24.0-m0.0.20260520163211-1077a2e6a4e8
 	github.com/tigera/operator/api v0.0.0-20250829192342-96fd517a8419
 	github.com/vishvananda/netlink v1.3.1
 	golang.org/x/net v0.55.0
@@ -75,7 +75,7 @@ require (
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
-	github.com/rs/zerolog v1.35.0 // indirect
+	github.com/rs/zerolog v1.35.1 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/urfave/cli/v2 v2.4.0 // indirect
