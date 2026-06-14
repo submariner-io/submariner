@@ -1,27 +1,6 @@
 # submariner
 
-Development guidelines for the submariner repository.
+[AGENTS.md](./AGENTS.md)
 
-## Commit Messages
-
-@.agents/commit-templates.md
-
-## Workflows
-
-### Testing
-
-#### Markdown
-
-Run after editing any `.md` file, before committing:
-
-```bash
-make markdownlint
-```
-
-### CVE Fixes
-
-@.agents/workflows/cve-fix.md
-
-### Konflux Component Setup
-
-@.agents/workflows/konflux-component-setup.md
+This project uses [AGENTS.md](./AGENTS.md) as the standard for
+providing context to AI coding agents.
