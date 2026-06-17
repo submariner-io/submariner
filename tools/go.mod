@@ -1,6 +1,6 @@
 module github.com/submariner-io/submariner/tools
 
-go 1.23.0
+go 1.25.0
 
 require (
 	github.com/uw-labs/lichen v0.1.7
@@ -36,7 +36,7 @@ require (
 	github.com/urfave/cli/v2 v2.4.0 // indirect
 	golang.org/x/mod v0.21.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/sys v0.26.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/text v0.19.0 // indirect
 	golang.org/x/tools v0.26.0 // indirect
 	google.golang.org/protobuf v1.35.1 // indirect
