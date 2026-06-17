@@ -17,7 +17,7 @@ require (
 	github.com/submariner-io/admiral v0.20.2
 	github.com/submariner-io/shipyard v0.20.2
 	github.com/vishvananda/netlink v1.3.0
-	golang.org/x/net v0.54.0
+	golang.org/x/net v0.55.0
 	golang.org/x/sys v0.45.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20230429144221-925a1e7659e6
 	google.golang.org/protobuf v1.36.1
