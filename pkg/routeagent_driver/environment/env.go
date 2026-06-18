@@ -24,7 +24,8 @@ type Specification struct {
 	ClusterCidr          []string
 	ServiceCidr          []string
 	GlobalCidr           []string
-	ProfilePort          int `default:"32782"`
+	ProfilePort          int  `default:"32782"`
+	Debug                bool `default:"false"`
 	Uninstall            bool
 	IntraRoutingDisabled bool
 }

@@ -200,7 +200,12 @@ func main() {
 		return
 	}
 
-	defer http.StartServer(http.Profile, env.ProfilePort)()
+	if env.Debug {
+		logger.Warningf("SECURITY WARNING: Profiling endpoints enabled (debug mode). Port: %d", env.ProfilePort)
+		defer http.StartServer(http.Profile, env.ProfilePort)()
+	} else {
+		logger.Infof("Profiling endpoints disabled (production mode)")
+	}
 
 	ctl, err := controller.New(&controller.Config{
 		Registry:   registry,
