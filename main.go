@@ -97,7 +97,15 @@ func main() {
 	logger.Infof("Proxy env variables: HTTP_PROXY: %v, HTTPS_PROXY: %v, NO_PROXY: %v",
 		proxyEnv.HTTPProxy, proxyEnv.HTTPSProxy, proxyEnv.NoProxy)
 
-	defer http.StartServer(http.Metrics|http.Profile, submSpec.MetricsPort)()
+	endpoints := http.Metrics // Always enable metrics for Prometheus
+
+	if submSpec.Debug {
+		logger.Warningf("SECURITY WARNING: Profiling endpoints enabled (debug mode). Port: %d", submSpec.MetricsPort)
+
+		endpoints |= http.Profile
+	}
+
+	defer http.StartServer(endpoints, submSpec.MetricsPort)()
 
 	var err error
 
