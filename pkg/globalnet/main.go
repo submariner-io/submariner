@@ -119,7 +119,15 @@ func main() {
 
 	logger.Info("Starting submariner-globalnet", spec)
 
-	defer http.StartServer(http.Metrics|http.Profile, spec.MetricsPort)()
+	endpoints := http.Metrics // Always enable metrics
+
+	if spec.Debug {
+		logger.Warningf("SECURITY WARNING: Profiling endpoints enabled (debug mode). Port: %d", spec.MetricsPort)
+
+		endpoints |= http.Profile
+	}
+
+	defer http.StartServer(endpoints, spec.MetricsPort)()
 
 	err = mcsv1a1.Install(scheme.Scheme)
 	logger.FatalOnError(err, "Error adding Multicluster v1alpha1 to the scheme")
