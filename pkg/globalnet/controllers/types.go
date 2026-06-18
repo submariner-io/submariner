@@ -88,7 +88,8 @@ type Specification struct {
 	ClusterID   string
 	Namespace   string
 	GlobalCIDR  []string
-	MetricsPort int `default:"32781"`
+	MetricsPort int  `default:"32781"`
+	Debug       bool `default:"false"`
 	Uninstall   bool
 }
 
