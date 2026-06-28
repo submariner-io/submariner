@@ -24,6 +24,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io/fs"
+	"net"
 	"os"
 	"os/exec"
 	"regexp"
@@ -73,7 +74,50 @@ var (
 	FatalError            = func(err error, msg string) {
 		logger.FatalOnError(err, msg)
 	}
+
+	// cableNamePattern matches safe characters for connection names (alphanumeric, dash, underscore, dot).
+	cableNamePattern = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
 )
+
+// validateCableName ensures the cable name doesn't contain injection characters.
+func validateCableName(cableName string) error {
+	if cableName == "" {
+		return errors.New("cable name is empty")
+	}
+
+	if !cableNamePattern.MatchString(cableName) {
+		return fmt.Errorf("cable name %q contains invalid characters", cableName)
+	}
+
+	return nil
+}
+
+// validateEndpointInputs validates endpoint configuration to prevent injection attacks.
+func validateEndpointInputs(endpoint *subv1.EndpointSpec, localIP, remoteIP string) error {
+	// Validate cable name
+	if err := validateCableName(endpoint.CableName); err != nil {
+		return err
+	}
+
+	// Validate all subnets
+	for _, subnet := range endpoint.Subnets {
+		if _, _, err := net.ParseCIDR(subnet); err != nil {
+			return errors.Wrapf(err, "invalid CIDR %q", subnet)
+		}
+	}
+
+	// Validate remote IP address
+	if net.ParseIP(remoteIP) == nil {
+		return fmt.Errorf("invalid IP address %q", remoteIP)
+	}
+
+	// Validate local IP address
+	if net.ParseIP(localIP) == nil {
+		return fmt.Errorf("invalid IP address %q", localIP)
+	}
+
+	return nil
+}
 
 func init() {
 	cable.AddDriver(cableDriverName, NewLibreswan)
@@ -370,6 +414,12 @@ func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 
 	// We'll panic if endpointInfo is nil, this is intentional
 	endpoint := &endpointInfo.Endpoint
+
+	// Validate endpoint inputs to prevent config injection
+	localIP := i.localEndpoint.GetPrivateIP(endpointInfo.UseFamily)
+	if err := validateEndpointInputs(&endpoint.Spec, localIP, endpointInfo.UseIP); err != nil {
+		return "", err
+	}
 
 	rightNATTPort, err := endpoint.Spec.GetBackendPort(subv1.UDPPortConfig, i.defaultNATTPort)
 	if err != nil {
