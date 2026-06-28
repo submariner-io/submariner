@@ -98,6 +98,10 @@ func NewDriver(localEndpoint *types.SubmarinerEndpoint, _ *types.SubmarinerClust
 		return nil, errors.Wrap(err, "error processing environment config for wireguard")
 	}
 
+	if w.spec.PSK == "" || w.spec.PSK == "default psk" {
+		return nil, errors.New("CE_IPSEC_PSK must be set to a strong random value for the WireGuard driver")
+	}
+
 	if err = w.setWGLink(); err != nil {
 		return nil, errors.Wrap(err, "failed to setup WireGuard link")
 	}
