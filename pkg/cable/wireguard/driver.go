@@ -101,6 +101,10 @@ func NewDriver(localEndpoint *endpoint.Local, _ *types.SubmarinerCluster, _ cert
 		return nil, errors.Wrap(err, "error processing environment config for wireguard")
 	}
 
+	if w.spec.PSK == "" || w.spec.PSK == "default psk" {
+		return nil, errors.New("CE_IPSEC_PSK must be set to a strong random value for the WireGuard driver")
+	}
+
 	if err = w.setWGLink(); err != nil {
 		return nil, errors.Wrap(err, "failed to setup WireGuard link")
 	}
@@ -400,7 +404,7 @@ func (w *wireguard) verifyNewPeer(peerCfg *wgtypes.PeerConfig) error {
 	}
 
 	if p.PresharedKey.String() != peerCfg.PresharedKey.String() {
-		return fmt.Errorf("peer PresharedKey does not match configured value")
+		return errors.New("peer PresharedKey does not match configured value")
 	}
 
 	if p.Endpoint.String() != peerCfg.Endpoint.String() {
