@@ -400,7 +400,7 @@ func (w *wireguard) verifyNewPeer(peerCfg *wgtypes.PeerConfig) error {
 	}
 
 	if p.PresharedKey.String() != peerCfg.PresharedKey.String() {
-		return fmt.Errorf("peer's PresharedKey %q does not match configured %q", p.PresharedKey.String(), peerCfg.PresharedKey.String())
+		return fmt.Errorf("peer PresharedKey does not match configured value")
 	}
 
 	if p.Endpoint.String() != peerCfg.Endpoint.String() {
