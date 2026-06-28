@@ -40,7 +40,6 @@ type SubmarinerSpecification struct {
 	ClusterID                     string
 	Namespace                     string
 	PublicIP                      string
-	Token                         string
 	Debug                         bool
 	NATEnabled                    bool
 	HealthCheckEnabled            bool `default:"true"`
