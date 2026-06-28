@@ -32,6 +32,12 @@ func (i *libreswan) connectToEndpointCertMode(endpointInfo *natdiscovery.NATEndp
 	endpoint := &endpointInfo.Endpoint
 	leftID := ClientCertName
 	left := i.localEndpoint.GetPrivateIP(endpointInfo.UseFamily)
+
+	// Validate endpoint inputs to prevent config injection
+	if err := validateEndpointInputs(&endpoint.Spec, left, endpointInfo.UseIP); err != nil {
+		return "", err
+	}
+
 	right := endpointInfo.UseIP
 
 	leftSubnets := i.localEndpoint.ExtractSubnetsExcludingIP(endpointInfo.UseIP)
