@@ -31,7 +31,7 @@ require (
 	sigs.k8s.io/controller-runtime v0.23.1
 	sigs.k8s.io/knftables v0.0.21
 	sigs.k8s.io/mcs-api v0.5.0
-	sigs.k8s.io/structured-merge-diff/v6 v6.4.0
+	sigs.k8s.io/structured-merge-diff/v6 v6.4.1
 )
 
 require (
