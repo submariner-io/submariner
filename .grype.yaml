@@ -10,3 +10,49 @@ ignore:
   - vulnerability: CVE-2021-22570
     package:
       name: google.golang.org/protobuf
+  # Fix requires Go 1.25. Low severity doesn't justify Go version bump.
+  - vulnerability: GO-2026-5024
+    package:
+      name: golang.org/x/sys
+  # Fix requires x/crypto v0.52.0+ (Go 1.25). Medium severity.
+  - vulnerability: GHSA-78mq-xcr3-xm33
+    package:
+      name: golang.org/x/crypto
+  - vulnerability: GHSA-45gg-vh54-h5m9
+    package:
+      name: golang.org/x/crypto
+  - vulnerability: GHSA-9m57-25v3-79x9
+    package:
+      name: golang.org/x/crypto
+  - vulnerability: GO-2026-5033
+    package:
+      name: golang.org/x/crypto
+  - vulnerability: GHSA-qpw4-5x99-6vjp
+    package:
+      name: golang.org/x/crypto
+  - vulnerability: GO-2026-5016
+    package:
+      name: golang.org/x/crypto
+  # Fix requires x/net v0.51.0+ (Go 1.25). Medium severity.
+  - vulnerability: GHSA-5cv4-jp36-h3mw
+    package:
+      name: golang.org/x/net
+  - vulnerability: GO-2026-5028
+    package:
+      name: golang.org/x/net
+  - vulnerability: GO-2026-5025
+    package:
+      name: golang.org/x/net
+  - vulnerability: GO-2026-5027
+    package:
+      name: golang.org/x/net
+  - vulnerability: GO-2026-5029
+    package:
+      name: golang.org/x/net
+  - vulnerability: GO-2026-5030
+    package:
+      name: golang.org/x/net
+  # No fixed version available yet.
+  - vulnerability: GO-2026-5932
+    package:
+      name: golang.org/x/crypto
