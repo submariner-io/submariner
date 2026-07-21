@@ -286,6 +286,64 @@ func (i *Interface) DelFDB(ipAddress net.IP, hwAddr string) error {
 	return nil
 }
 
+// AddNeighbor installs a permanent L3 neighbor entry so VTEP IPs resolve
+// without ARP (avoids relying on zero-MAC FDB flood for discovery).
+func (i *Interface) AddNeighbor(ipAddress net.IP, hwAddr string) error {
+	macAddr, err := net.ParseMAC(hwAddr)
+	if err != nil {
+		return errors.Wrapf(err, "invalid MAC Address %q", hwAddr)
+	}
+
+	neigh := &netlink.Neigh{
+		LinkIndex:    i.link.Index,
+		Family:       ipFamilyOf(ipAddress),
+		State:        netlink.NUD_PERMANENT,
+		IP:           ipAddress,
+		HardwareAddr: macAddr,
+	}
+
+	err = i.netLink.NeighAppend(neigh)
+	if err != nil {
+		return errors.Wrapf(err, "unable to add the neighbor entry %v", neigh)
+	}
+
+	logger.V(log.DEBUG).Infof("Successfully added the neighbor entry %v", neigh)
+
+	return nil
+}
+
+func (i *Interface) DelNeighbor(ipAddress net.IP, hwAddr string) error {
+	macAddr, err := net.ParseMAC(hwAddr)
+	if err != nil {
+		return errors.Wrapf(err, "invalid MAC Address %q", hwAddr)
+	}
+
+	neigh := &netlink.Neigh{
+		LinkIndex:    i.link.Index,
+		Family:       ipFamilyOf(ipAddress),
+		State:        netlink.NUD_PERMANENT,
+		IP:           ipAddress,
+		HardwareAddr: macAddr,
+	}
+
+	err = i.netLink.NeighDel(neigh)
+	if err != nil {
+		return errors.Wrapf(err, "unable to delete the neighbor entry %v", neigh)
+	}
+
+	logger.V(log.DEBUG).Infof("Successfully deleted the neighbor entry %v", neigh)
+
+	return nil
+}
+
+func ipFamilyOf(ip net.IP) int {
+	if ip.To4() != nil {
+		return unix.AF_INET
+	}
+
+	return unix.AF_INET6
+}
+
 func (i *Interface) AddRoutes(gwIP, srcIP net.IP, tableID int, destCIDRs ...net.IPNet) error {
 	for j := range destCIDRs {
 		route := &netlink.Route{

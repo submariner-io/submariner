@@ -242,7 +242,11 @@ func newRemoteEndpoint() *submarinerv1.Endpoint {
 }
 
 func newNode(addr string) *corev1.Node {
-	return &corev1.Node{
+	return newNodeWithPodCIDR(addr, "")
+}
+
+func newNodeWithPodCIDR(addr, podCIDR string) *corev1.Node {
+	node := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(uuid.NewUUID()),
 		},
@@ -258,6 +262,13 @@ func newNode(addr string) *corev1.Node {
 			},
 		},
 	}
+
+	if podCIDR != "" {
+		node.Spec.PodCIDR = podCIDR
+		node.Spec.PodCIDRs = []string{podCIDR}
+	}
+
+	return node
 }
 
 func toVxlan(link netlink.Link) *netlink.Vxlan {

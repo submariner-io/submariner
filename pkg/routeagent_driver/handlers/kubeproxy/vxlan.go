@@ -75,12 +75,8 @@ func (kp *SyncHandler) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP)
 			return errors.Wrap(err, "failed to create vxlan interface on Gateway Node")
 		}
 
-		for _, fdbAddress := range kp.remoteVTEPs.UnsortedList() {
-			err = kp.vxlanDevice.AddFDB(net.ParseIP(fdbAddress), "00:00:00:00:00:00")
-			if err != nil {
-				return errors.Wrap(err, "failed to add FDB entry on the Gateway Node vxlan iface")
-			}
-		}
+		// Remote-node FDB/neigh/routes are programmed by TransitionToGateway via
+		// syncAllRemoteNodesOnGateway after the interface exists.
 
 		err = kp.netLink.EnsureLooseModeIsConfigured(kp.vxlanIface, kp.ipFamily)
 		if err != nil {

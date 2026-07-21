@@ -28,6 +28,7 @@ import (
 func (kp *SyncHandler) TransitionToNonGateway(_ *submarinerv1.Endpoint) error {
 	logger.V(log.DEBUG).Info("The current node is no longer a Gateway")
 
+	kp.clearAllRemoteNodesOnGateway()
 	kp.cleanVxSubmarinerRoutes()
 	// If the active Gateway transitions to a new node, we flush the HostNetwork routing table.
 	kp.updateRoutingRulesForHostNetworkSupport(nil, Flush)
@@ -63,6 +64,9 @@ func (kp *SyncHandler) TransitionToGateway() error {
 
 	// Add routes to the new endpoint on the GatewayNode.
 	kp.updateRoutingRulesForHostNetworkSupport(kp.remoteSubnets.UnsortedList(), Add)
+
+	// Ensure node podCIDR ingress routes/FDB/neighbors are present (e.g. after iface recreate).
+	kp.syncAllRemoteNodesOnGateway()
 
 	return nil
 }

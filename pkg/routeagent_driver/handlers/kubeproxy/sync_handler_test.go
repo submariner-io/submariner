@@ -43,7 +43,7 @@ func testNodes() {
 	var node *corev1.Node
 
 	BeforeEach(func() {
-		node = newNode(nodeIPv4Address1)
+		node = newNodeWithPodCIDR(nodeIPv4Address1, "10.244.1.0/24")
 	})
 
 	When("a Node is created and then deleted on a gateway node", func() {
@@ -57,6 +57,14 @@ func testNodes() {
 
 			t.DeleteNode(ctx, node.Name)
 			t.netLink.AwaitNoNeighbors(vxLanInterfaceIndex, nodeIPv4Address1)
+		})
+
+		It("should add/remove an ingress route for the Node pod CIDR via its VTEP", func(ctx context.Context) {
+			vxlanLink := t.awaitVxlanLink()
+			t.netLink.AwaitDstRoutes(vxlanLink.Attrs().Index, 0, "10.244.1.0/24")
+
+			t.DeleteNode(ctx, node.Name)
+			t.netLink.AwaitNoDstRoutes(vxlanLink.Attrs().Index, 0, "10.244.1.0/24")
 		})
 	})
 
