@@ -28,8 +28,10 @@ const (
 	OpenShiftSDN  = "OpenShiftSDN"
 	OVNKubernetes = "OVNKubernetes"
 	WeaveNet      = "weave-net"
+	// AmazonVPCCNI is the AWS VPC CNI used by EKS.
+	AmazonVPCCNI = "amazon-vpc-cni"
 )
 
 func GetNetworkPlugins() []string {
-	return []string{Generic, Calico, CanalFlannel, Flannel, KindNet, OpenShiftSDN, OVNKubernetes, WeaveNet}
+	return []string{Generic, Calico, CanalFlannel, Flannel, KindNet, OpenShiftSDN, OVNKubernetes, WeaveNet, AmazonVPCCNI}
 }

@@ -40,6 +40,7 @@ import (
 	fakenetlink "github.com/submariner-io/submariner/pkg/netlink/fake"
 	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
 	"github.com/submariner-io/submariner/pkg/pinger"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/awsvpc"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/calico"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/healthchecker"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
@@ -131,6 +132,9 @@ var _ = Describe("", func() {
 
 		calicoHandler := calico.NewCalicoIPPoolHandler(nil, testing.Namespace, dynClient)
 		Expect(calicoHandler.Init(ctx)).To(Succeed())
+
+		awsVPCHandler := awsvpc.NewHandler(k8sClient, k8snet.IPv4)
+		Expect(awsVPCHandler.Init(ctx)).To(Succeed())
 
 		healthCheckerHandler := healthchecker.New(&healthchecker.Config{
 			ControllerConfig: pinger.ControllerConfig{

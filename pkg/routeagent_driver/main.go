@@ -53,6 +53,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/cabledriver"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/chains"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/environment"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/awsvpc"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/calico"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/healthchecker"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
@@ -158,6 +159,7 @@ func main() {
 			mtu.NewHandler(family, env.ClusterCidr, len(env.GlobalCidr) != 0, getTCPMssValue(localNode)))
 
 		handlers = append(handlers, ovn.GetHandlers(family, &env, smClientset, k8sClientSet, dynamicClientSet, config)...)
+		handlers = append(handlers, awsvpc.NewHandler(k8sClientSet, family))
 	}
 
 	handlers = append(handlers,
