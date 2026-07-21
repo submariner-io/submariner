@@ -19,6 +19,7 @@ limitations under the License.
 package vxlan_test
 
 import (
+	"crypto/rand"
 	"net"
 	"testing"
 
@@ -93,8 +94,97 @@ var _ = Describe("NewInterface", func() {
 				t.assertLink(&newAttrs)
 			})
 		})
+
+		Context("and the HardwareAddr differs", func() {
+			It("should re-create it", func() {
+				newAttrs.HardwareAddr = net.HardwareAddr{0x02, 0x00, 0x01, 0x02, 0x03, 0x04}
+				_ = t.newInterface(&newAttrs)
+				t.assertLink(&newAttrs)
+			})
+		})
 	})
 })
+
+var _ = Describe("HardwareAddrFromIP", func() {
+	It("should return nil for an invalid IP", func() {
+		Expect(vxlan.HardwareAddrFromIP(nil)).To(BeNil())
+		Expect(vxlan.HardwareAddrFromIP(net.IP{})).To(BeNil())
+	})
+
+	DescribeTableSubtree("for random addresses",
+		func(randomIP func() net.IP) {
+			It("should be stable, locally-administered, unicast, and unique", func() {
+				const samples = 32
+
+				ips := make([]net.IP, 0, samples)
+				seenIP := map[string]bool{}
+
+				for len(ips) < samples {
+					ip := randomIP()
+					if seenIP[ip.String()] {
+						continue
+					}
+
+					seenIP[ip.String()] = true
+					ips = append(ips, ip)
+				}
+
+				seenMAC := map[string]bool{}
+
+				for _, ip := range ips {
+					mac := vxlan.HardwareAddrFromIP(ip)
+					Expect(mac).ToNot(BeNil())
+					Expect(mac).To(HaveLen(6))
+
+					// Stable for a given input.
+					Expect(vxlan.HardwareAddrFromIP(ip)).To(Equal(mac))
+
+					// Locally administered (U/L bit) and unicast (I/G bit clear).
+					Expect(mac[0] & 0x02).NotTo(BeZero())
+					Expect(mac[0] & 0x01).To(BeZero())
+
+					Expect(seenMAC).NotTo(HaveKey(mac.String()))
+					seenMAC[mac.String()] = true
+				}
+			})
+		},
+		Entry("IPv4", randomIPv4),
+		Entry("IPv6", randomIPv6),
+	)
+
+	It("should derive different MACs when IPv6 addresses share a suffix but differ in prefix", func() {
+		suffix := []byte{0x01, 0x02, 0x03, 0x04, 0x05}
+
+		ip1 := make(net.IP, net.IPv6len)
+		ip1[0] = 0x20
+		copy(ip1[11:], suffix)
+
+		ip2 := make(net.IP, net.IPv6len)
+		ip2[0] = 0xfd
+		copy(ip2[11:], suffix)
+
+		mac1 := vxlan.HardwareAddrFromIP(ip1)
+		mac2 := vxlan.HardwareAddrFromIP(ip2)
+
+		Expect(mac1).ToNot(Equal(mac2))
+	})
+})
+
+func randomIPv4() net.IP {
+	b := make([]byte, 4)
+	_, err := rand.Read(b)
+	Expect(err).NotTo(HaveOccurred())
+
+	return net.IP(b)
+}
+
+func randomIPv6() net.IP {
+	b := make([]byte, 16)
+	_, err := rand.Read(b)
+	Expect(err).NotTo(HaveOccurred())
+
+	return net.IP(b)
+}
 
 var _ = Describe("GetVtepIPAddressFrom", func() {
 	It("should return the correct IP", func() {
@@ -235,4 +325,8 @@ func (t *testDriver) assertLink(attrs *vxlan.Attributes) {
 	Expect(link.Group).To(Equal(attrs.Group))
 	Expect(link.Port).To(Equal(attrs.VtepPort))
 	Expect(link.MTU).To(Equal(attrs.Mtu - vxlan.MTUOverhead))
+
+	if len(attrs.HardwareAddr) > 0 {
+		Expect(link.HardwareAddr).To(Equal(attrs.HardwareAddr))
+	}
 }
