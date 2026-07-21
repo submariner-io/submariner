@@ -19,6 +19,8 @@ limitations under the License.
 package vxlan
 
 import (
+	"bytes"
+	"hash/fnv"
 	"io/fs"
 	"net"
 	"syscall"
@@ -33,12 +35,13 @@ import (
 )
 
 type Attributes struct {
-	Name     string
-	VxlanID  int
-	Group    net.IP
-	SrcAddr  net.IP
-	VtepPort int
-	Mtu      int
+	Name         string
+	VxlanID      int
+	Group        net.IP
+	SrcAddr      net.IP
+	VtepPort     int
+	Mtu          int
+	HardwareAddr net.HardwareAddr
 }
 
 type Interface struct {
@@ -62,12 +65,35 @@ func NewInterface(attrs *Attributes, netLink netlinkAPI.Interface) (*Interface, 
 	}, nil
 }
 
+// HardwareAddrFromIP returns a locally-administered unicast MAC derived from the
+// given IP. This avoids Linux VXLAN loopback drops when gateway and worker
+// vx-submariner interfaces would otherwise share the same kernel-assigned MAC
+// (see https://github.com/submariner-io/submariner/issues/4024).
+func HardwareAddrFromIP(ip net.IP) net.HardwareAddr {
+	if ip4 := ip.To4(); ip4 != nil {
+		return net.HardwareAddr{0x02, 0x00, ip4[0], ip4[1], ip4[2], ip4[3]}
+	}
+
+	if ip6 := ip.To16(); ip6 != nil {
+		h := fnv.New64a()
+		_, _ = h.Write(ip6)
+		sum := h.Sum64()
+
+		// Truncation to bytes is intentional for a 40-bit MAC payload.
+		//nolint:gosec // G115: truncate hash to MAC bytes
+		return net.HardwareAddr{0x02, byte(sum >> 32), byte(sum >> 24), byte(sum >> 16), byte(sum >> 8), byte(sum)}
+	}
+
+	return nil
+}
+
 func createLinkDevice(attrs *Attributes, netLink netlinkAPI.Interface) (*netlink.Vxlan, error) {
 	link := &netlink.Vxlan{
 		LinkAttrs: netlink.LinkAttrs{
-			Name:  attrs.Name,
-			MTU:   attrs.Mtu - MTUOverhead,
-			Flags: net.FlagUp,
+			Name:         attrs.Name,
+			MTU:          attrs.Mtu - MTUOverhead,
+			Flags:        net.FlagUp,
+			HardwareAddr: attrs.HardwareAddr,
 		},
 		VxlanId: attrs.VxlanID,
 		SrcAddr: attrs.SrcAddr,
@@ -129,6 +155,13 @@ func isVxlanConfigTheSame(newLink, currentLink netlink.Link) bool {
 
 	if required.Port != existing.Port {
 		logger.Warningf("Vxlan Port (%d) of existing interface does not match with required Port (%d)", existing.Port, required.Port)
+		return false
+	}
+
+	if len(required.HardwareAddr) > 0 && !bytes.Equal(required.HardwareAddr, existing.HardwareAddr) {
+		logger.Warningf("Vxlan HardwareAddr (%v) of existing interface does not match with required HardwareAddr (%v)",
+			existing.HardwareAddr, required.HardwareAddr)
+
 		return false
 	}
 
