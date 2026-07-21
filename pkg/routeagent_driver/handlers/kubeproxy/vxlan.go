@@ -52,17 +52,22 @@ func (kp *SyncHandler) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP)
 		return errors.Wrapf(err, "failed to derive the vxlan vtepIP for %s", ipAddr)
 	}
 
+	hwAddr := vxlan.HardwareAddrFromIP(ipAddr)
+
 	if ifaceType == VxInterfaceGateway {
 		attrs := &vxlan.Attributes{
-			Name:     kp.vxlanIface,
-			VxlanID:  100,
-			VtepPort: port.IntraClusterVxLAN,
-			Mtu:      kp.defaultHostIface.MTU(),
+			Name:         kp.vxlanIface,
+			VxlanID:      100,
+			VtepPort:     port.IntraClusterVxLAN,
+			Mtu:          kp.defaultHostIface.MTU(),
+			SrcAddr:      ipAddr,
+			HardwareAddr: hwAddr,
 		}
 
-		// For IPv6 VxLAN interface SrcAddr should be set with local IP
-		if kp.ipFamily == k8snet.IPv6 {
+		// For IPv6, prefer the gateway VTEP/local endpoint IP when available.
+		if kp.ipFamily == k8snet.IPv6 && kp.vxlanGwIP != nil {
 			attrs.SrcAddr = *kp.vxlanGwIP
+			attrs.HardwareAddr = vxlan.HardwareAddrFromIP(attrs.SrcAddr)
 		}
 
 		kp.vxlanDevice, err = kp.newVxlanInterface(attrs)
@@ -86,11 +91,13 @@ func (kp *SyncHandler) createVxLANInterface(ifaceType int, gatewayNodeIP net.IP)
 	} else if ifaceType == VxInterfaceWorker {
 		// non-Gateway/Worker Node
 		attrs := &vxlan.Attributes{
-			Name:     kp.vxlanIface,
-			VxlanID:  100,
-			Group:    gatewayNodeIP,
-			VtepPort: port.IntraClusterVxLAN,
-			Mtu:      kp.defaultHostIface.MTU(),
+			Name:         kp.vxlanIface,
+			VxlanID:      100,
+			Group:        gatewayNodeIP,
+			VtepPort:     port.IntraClusterVxLAN,
+			Mtu:          kp.defaultHostIface.MTU(),
+			SrcAddr:      ipAddr,
+			HardwareAddr: hwAddr,
 		}
 
 		kp.vxlanDevice, err = kp.newVxlanInterface(attrs)
