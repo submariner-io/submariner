@@ -44,13 +44,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        cable-driver: ['', 'wireguard', 'vxlan']
+        cable-driver: ['', 'wireguard', 'amneziawg', 'vxlan']
         extra-toggles: ['', 'ovn']
         globalnet: ['', 'globalnet']
         # Run most tests against the latest K8s version
         k8s_version: ['k8s-latest']
         exclude:
           - cable-driver: wireguard
+            extra-toggles: ovn
+          - cable-driver: amneziawg
             extra-toggles: ovn
           - globalnet: globalnet
             extra-toggles: ovn
