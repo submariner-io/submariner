@@ -3,6 +3,8 @@ module github.com/submariner-io/submariner
 go 1.26.0
 
 require (
+	github.com/advanced-wg/awgctrl-go v1.0.0
+	github.com/amnezia-vpn/amneziawg-go v0.2.20-0.20260709022233-c1e9bb3758e7
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/cert-manager/go-pkcs12 v0.0.0-20251218073410-44b982790b7c
 	github.com/coreos/go-iptables v0.8.0
@@ -90,7 +92,8 @@ require (
 	golang.org/x/text v0.40.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.47.0 // indirect
-	golang.zx2c4.com/wireguard v0.0.0-20230325221338-052af4a8072b // indirect
+	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect
+	golang.zx2c4.com/wireguard v0.0.0-20250521234502-f333402bd9cb // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect

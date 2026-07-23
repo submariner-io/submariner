@@ -37,6 +37,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	// Add supported drivers.
+	_ "github.com/submariner-io/submariner/pkg/cable/amneziawg"
 	_ "github.com/submariner-io/submariner/pkg/cable/libreswan"
 	_ "github.com/submariner-io/submariner/pkg/cable/vxlan"
 	_ "github.com/submariner-io/submariner/pkg/cable/wireguard"
