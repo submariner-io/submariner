@@ -58,4 +58,11 @@ var _ = Describe("ClusterMesh keys", func() {
 		Expect(cfg.ID).To(Equal(uint32(99)))
 		Expect(cfg.Capabilities.MaxConnectedClusters).To(Equal(uint32(255)))
 	})
+
+	It("should canonicalize CIDRs with host bits when building keys", func() {
+		pair, key, err := buildIPIdentityPair("10.151.0.5/16", "10.0.0.2", 99)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pair.IP.String()).To(Equal("10.151.0.0"))
+		Expect(key).To(Equal("cilium/state/ip/v1/default/10.151.0.0/16"))
+	})
 })

@@ -123,16 +123,19 @@ func prefixString(pair *ipIdentityPair) string {
 
 func parseCIDR(s string) (net.IP, net.IPMask, error) {
 	if strings.Contains(s, "/") {
-		ip, ipnet, err := net.ParseCIDR(s)
+		_, ipnet, err := net.ParseCIDR(s)
 		if err != nil {
 			return nil, nil, err //nolint:wrapcheck // passthrough
 		}
 
-		if v4 := ip.To4(); v4 != nil {
+		// Use the masked network address so keys stay canonical even if the
+		// input CIDR carries host bits (e.g. 10.151.0.5/16 → 10.151.0.0/16).
+		networkIP := ipnet.IP
+		if v4 := networkIP.To4(); v4 != nil {
 			return v4, ipnet.Mask, nil
 		}
 
-		return ip, ipnet.Mask, nil
+		return networkIP, ipnet.Mask, nil
 	}
 
 	ip := net.ParseIP(s)

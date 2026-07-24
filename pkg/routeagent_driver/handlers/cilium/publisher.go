@@ -54,6 +54,10 @@ const (
 	defaultCMClusterID  = uint32(99)
 	defaultCMClientURL  = "http://127.0.0.1:12379"
 	defaultCMPeerURL    = "http://127.0.0.1:12380"
+
+	// reconcileTimeout bounds event-driven reconciles so a stuck apiserver
+	// cannot hold h.mu forever and block Stop/shutdown.
+	reconcileTimeout = 30 * time.Second
 )
 
 // PublisherConfig configures the ClusterMesh-compatible CIDR publisher.
@@ -329,51 +333,58 @@ func (h *clusterMeshPublisher) stopHeartbeat() {
 	<-done
 }
 
+func (h *clusterMeshPublisher) reconcileOnEvent() error {
+	ctx, cancel := context.WithTimeout(context.Background(), reconcileTimeout)
+	defer cancel()
+
+	return h.reconcile(ctx)
+}
+
 func (h *clusterMeshPublisher) RemoteEndpointCreated(_ *submV1.Endpoint) error {
-	return h.reconcile(context.TODO())
+	return h.reconcileOnEvent()
 }
 
 func (h *clusterMeshPublisher) RemoteEndpointUpdated(_ *submV1.Endpoint) error {
-	return h.reconcile(context.TODO())
+	return h.reconcileOnEvent()
 }
 
 func (h *clusterMeshPublisher) RemoteEndpointRemoved(_ *submV1.Endpoint) error {
-	return h.reconcile(context.TODO())
+	return h.reconcileOnEvent()
 }
 
 func (h *clusterMeshPublisher) StaleRemoteEndpointRemoved(_ *submV1.Endpoint) error {
-	return h.reconcile(context.TODO())
+	return h.reconcileOnEvent()
 }
 
 func (h *clusterMeshPublisher) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 	h.setGatewayIP(endpoint)
-	return h.reconcile(context.TODO())
+	return h.reconcileOnEvent()
 }
 
 func (h *clusterMeshPublisher) LocalEndpointUpdated(endpoint *submV1.Endpoint) error {
 	h.setGatewayIP(endpoint)
-	return h.reconcile(context.TODO())
+	return h.reconcileOnEvent()
 }
 
 func (h *clusterMeshPublisher) TransitionToGateway() error {
-	return h.reconcile(context.TODO())
+	return h.reconcileOnEvent()
 }
 
 func (h *clusterMeshPublisher) TransitionToNonGateway(localEndpoint *submV1.Endpoint) error {
 	h.setGatewayIP(localEndpoint)
-	return h.reconcile(context.TODO())
+	return h.reconcileOnEvent()
 }
 
 func (h *clusterMeshPublisher) NodeCreated(_ *corev1.Node) error {
-	return h.reconcile(context.TODO())
+	return h.reconcileOnEvent()
 }
 
 func (h *clusterMeshPublisher) NodeUpdated(_ *corev1.Node) error {
-	return h.reconcile(context.TODO())
+	return h.reconcileOnEvent()
 }
 
 func (h *clusterMeshPublisher) NodeRemoved(_ *corev1.Node) error {
-	return h.reconcile(context.TODO())
+	return h.reconcileOnEvent()
 }
 
 func (h *clusterMeshPublisher) setGatewayIP(endpoint *submV1.Endpoint) {

@@ -102,27 +102,13 @@ func startEtcdStore(ctx context.Context, cfg *EtcdStoreConfig) (*etcdStore, erro
 		return nil, errors.Wrap(ctx.Err(), "waiting for embedded etcd")
 	}
 
-	cCfg := clientv3.Config{
-		Endpoints:   []string{cfg.AdvertiseClientURL},
-		DialTimeout: defaultEtcdDialTimeout,
+	cCfg, err := newEtcdClientConfig(cfg, ecfg, lc)
+	if err != nil {
+		cleanupFailedStart()
+		return nil, err
 	}
 
-	if lc.Hostname() == "0.0.0.0" || lc.Hostname() == "" {
-		cCfg.Endpoints = []string{fmt.Sprintf("%s://127.0.0.1:%s", lc.Scheme, lc.Port())}
-	}
-
-	if !ecfg.ClientTLSInfo.Empty() {
-		tlsCfg, err := ecfg.ClientTLSInfo.ClientConfig()
-		if err != nil {
-			cleanupFailedStart()
-			return nil, errors.Wrap(err, "etcd client TLS")
-		}
-
-		tlsCfg.InsecureSkipVerify = true
-		cCfg.TLS = tlsCfg
-	}
-
-	cli, err := clientv3.New(cCfg)
+	cli, err := clientv3.New(*cCfg)
 	if err != nil {
 		cleanupFailedStart()
 		return nil, errors.Wrap(err, "create etcd client")
@@ -134,6 +120,35 @@ func startEtcdStore(ctx context.Context, cfg *EtcdStoreConfig) (*etcdStore, erro
 		dataDir:       cfg.DataDir,
 		removeDataDir: removeDataDir,
 	}, nil
+}
+
+func newEtcdClientConfig(cfg *EtcdStoreConfig, ecfg *embed.Config, lc *url.URL) (*clientv3.Config, error) {
+	cCfg := &clientv3.Config{
+		Endpoints:   []string{cfg.AdvertiseClientURL},
+		DialTimeout: defaultEtcdDialTimeout,
+	}
+
+	// Prefer loopback for the in-process client so TLS ServerName matches the
+	// publisher cert SANs (127.0.0.1 / localhost).
+	switch lc.Hostname() {
+	case "0.0.0.0", "", "127.0.0.1", "localhost":
+		cCfg.Endpoints = []string{fmt.Sprintf("%s://127.0.0.1:%s", lc.Scheme, lc.Port())}
+	}
+
+	if ecfg.ClientTLSInfo.Empty() {
+		return cCfg, nil
+	}
+
+	tlsCfg, err := ecfg.ClientTLSInfo.ClientConfig()
+	if err != nil {
+		return nil, errors.Wrap(err, "etcd client TLS")
+	}
+
+	// Keep certificate verification; pin ServerName to the loopback SAN.
+	tlsCfg.ServerName = "localhost"
+	cCfg.TLS = tlsCfg
+
+	return cCfg, nil
 }
 
 func setEtcdStoreDefaults(cfg *EtcdStoreConfig) {
