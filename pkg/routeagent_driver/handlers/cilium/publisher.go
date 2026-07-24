@@ -81,23 +81,21 @@ type PublisherConfig struct {
 	PreferredHostIP string
 
 	// ClusterID is the synthetic remote cluster-id advertised in cluster-config.
-	ClusterID      uint32
-	ClientCertAuth bool
+	ClusterID uint32
 }
 
 // PublisherEnv holds optional env overrides (prefix submariner via Process).
 // Activation is via SUBMARINER_NETWORKPLUGIN=cilium (same as other CNI handlers).
 type PublisherEnv struct {
-	CiliumCMRemoteName     string `default:"submariner"             envconfig:"CILIUM_CM_REMOTE_NAME"`
-	CiliumCMListenURL      string `default:"http://127.0.0.1:12379" envconfig:"CILIUM_CM_LISTEN_URL"`
-	CiliumCMPeerURL        string `default:"http://127.0.0.1:12380" envconfig:"CILIUM_CM_PEER_URL"`
-	CiliumCMDataDir        string `envconfig:"CILIUM_CM_DATA_DIR"`
-	CiliumCMCertFile       string `envconfig:"CILIUM_CM_CERT_FILE"`
-	CiliumCMKeyFile        string `envconfig:"CILIUM_CM_KEY_FILE"`
-	CiliumCMCAFile         string `envconfig:"CILIUM_CM_CA_FILE"`
-	CiliumCMHostIP         string `envconfig:"CILIUM_CM_HOST_IP"`
-	CiliumCMClusterID      uint32 `default:"99"                     envconfig:"CILIUM_CM_CLUSTER_ID"`
-	CiliumCMClientCertAuth bool   `default:"true"                   envconfig:"CILIUM_CM_CLIENT_CERT_AUTH"`
+	CiliumCMRemoteName string `default:"submariner"             envconfig:"CILIUM_CM_REMOTE_NAME"`
+	CiliumCMListenURL  string `default:"http://127.0.0.1:12379" envconfig:"CILIUM_CM_LISTEN_URL"`
+	CiliumCMPeerURL    string `default:"http://127.0.0.1:12380" envconfig:"CILIUM_CM_PEER_URL"`
+	CiliumCMDataDir    string `envconfig:"CILIUM_CM_DATA_DIR"`
+	CiliumCMCertFile   string `envconfig:"CILIUM_CM_CERT_FILE"`
+	CiliumCMKeyFile    string `envconfig:"CILIUM_CM_KEY_FILE"`
+	CiliumCMCAFile     string `envconfig:"CILIUM_CM_CA_FILE"`
+	CiliumCMHostIP     string `envconfig:"CILIUM_CM_HOST_IP"`
+	CiliumCMClusterID  uint32 `default:"99"                     envconfig:"CILIUM_CM_CLUSTER_ID"`
 }
 
 type clusterMeshPublisher struct {
@@ -184,7 +182,6 @@ func (h *clusterMeshPublisher) Init(ctx context.Context) error {
 			CertFile:           h.cfg.CertFile,
 			KeyFile:            h.cfg.KeyFile,
 			CAFile:             h.cfg.CAFile,
-			ClientCertAuth:     h.cfg.ClientCertAuth,
 		})
 		if err != nil {
 			return errors.Wrap(err, "start ClusterMesh publisher etcd")

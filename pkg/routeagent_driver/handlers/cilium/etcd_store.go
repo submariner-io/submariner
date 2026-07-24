@@ -47,7 +47,6 @@ type EtcdStoreConfig struct {
 	CertFile           string
 	KeyFile            string
 	CAFile             string
-	ClientCertAuth     bool
 }
 
 type etcdStore struct {
@@ -221,11 +220,13 @@ func newEmbedEtcdConfig(cfg *EtcdStoreConfig) (*embed.Config, *url.URL, error) {
 	ecfg.InitialCluster = ecfg.InitialClusterFromName(ecfg.Name)
 
 	if cfg.CertFile != "" && cfg.KeyFile != "" {
+		// Always require client certs: Cilium agents present the ClusterMesh
+		// client cert, and the publisher's local etcd client uses the same bundle.
 		ecfg.ClientTLSInfo = transport.TLSInfo{
 			CertFile:       cfg.CertFile,
 			KeyFile:        cfg.KeyFile,
 			TrustedCAFile:  cfg.CAFile,
-			ClientCertAuth: cfg.ClientCertAuth,
+			ClientCertAuth: true,
 		}
 	}
 

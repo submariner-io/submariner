@@ -42,8 +42,8 @@ import (
 	fakek8s "k8s.io/client-go/kubernetes/fake"
 )
 
-var _ = Describe("embedded etcd TLS with ClientCertAuth", func() {
-	It("should serve HTTPS and accept the publisher client when ClientCertAuth is true", func(ctx context.Context) {
+var _ = Describe("embedded etcd TLS with client cert auth", func() {
+	It("should serve HTTPS and accept the publisher client", func(ctx context.Context) {
 		dir := GinkgoT().TempDir()
 		paths := writeTestTLSBundle(dir)
 
@@ -62,7 +62,6 @@ var _ = Describe("embedded etcd TLS with ClientCertAuth", func() {
 			CertFile:           paths.serverCert,
 			KeyFile:            paths.serverKey,
 			CAFile:             paths.caCert,
-			ClientCertAuth:     true,
 		})
 		Expect(err).NotTo(HaveOccurred())
 		DeferCleanup(func() {
@@ -97,7 +96,6 @@ var _ = Describe("embedded etcd TLS with ClientCertAuth", func() {
 			CertFile:           paths.serverCert,
 			KeyFile:            paths.serverKey,
 			CAFile:             paths.caCert,
-			ClientCertAuth:     true,
 		})
 		Expect(err).NotTo(HaveOccurred())
 		DeferCleanup(func() {
@@ -129,7 +127,7 @@ var _ = Describe("embedded etcd TLS with ClientCertAuth", func() {
 		Expect(resp.Kvs).To(HaveLen(1))
 	})
 
-	It("should reject clients that do not present a certificate when ClientCertAuth is true", func(ctx context.Context) {
+	It("should reject clients that do not present a certificate", func(ctx context.Context) {
 		dir := GinkgoT().TempDir()
 		paths := writeTestTLSBundle(dir)
 
@@ -148,7 +146,6 @@ var _ = Describe("embedded etcd TLS with ClientCertAuth", func() {
 			CertFile:           paths.serverCert,
 			KeyFile:            paths.serverKey,
 			CAFile:             paths.caCert,
-			ClientCertAuth:     true,
 		})
 		Expect(err).NotTo(HaveOccurred())
 		DeferCleanup(func() {
@@ -180,14 +177,14 @@ var _ = Describe("embedded etcd TLS with ClientCertAuth", func() {
 	})
 })
 
-var _ = Describe("ClusterMesh publisher TLS with ClientCertAuth", func() {
+var _ = Describe("ClusterMesh publisher TLS with client cert auth", func() {
 	const (
 		localIP    = "10.0.0.1"
 		gatewayIP  = "10.0.0.2"
 		remoteCIDR = "10.151.0.0/16"
 	)
 
-	It("should Init/Stop with HTTPS ClientCertAuth enabled", func(ctx context.Context) {
+	It("should Init/Stop with HTTPS and client cert auth", func(ctx context.Context) {
 		dir := GinkgoT().TempDir()
 		paths := writeTestTLSBundle(dir)
 
@@ -209,7 +206,6 @@ var _ = Describe("ClusterMesh publisher TLS with ClientCertAuth", func() {
 			CertFile:           paths.serverCert,
 			KeyFile:            paths.serverKey,
 			CAFile:             paths.caCert,
-			ClientCertAuth:     true,
 		})
 		pub := h.(*clusterMeshPublisher)
 		pub.SetState(&eventtesting.TestHandlerState{})
@@ -250,7 +246,6 @@ var _ = Describe("ClusterMesh publisher TLS with ClientCertAuth", func() {
 			CertFile:           paths.serverCert,
 			KeyFile:            paths.serverKey,
 			CAFile:             paths.caCert,
-			ClientCertAuth:     true,
 		})
 		support.Start(ctx, h)
 

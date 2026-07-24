@@ -183,7 +183,6 @@ func main() {
 			CertFile:           pubEnv.CiliumCMCertFile,
 			KeyFile:            pubEnv.CiliumCMKeyFile,
 			CAFile:             pubEnv.CiliumCMCAFile,
-			ClientCertAuth:     pubEnv.CiliumCMClientCertAuth,
 			LocalNodeName:      localNode.Name,
 			LocalNodeIP:        cilium.InternalIPv4(localNode),
 			PreferredHostIP:    pubEnv.CiliumCMHostIP,
