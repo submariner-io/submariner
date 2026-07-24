@@ -137,7 +137,7 @@ func (s *memoryStore) getHeartbeat() string {
 	return string(s.heartbeat)
 }
 
-func (s *memoryStore) getRoute(cidrStr string) []byte { //nolint:unparam // keyed lookup for tests
+func (s *memoryStore) getRoute(cidrStr string) []byte {
 	ip, mask, err := parseCIDR(cidrStr)
 	if err != nil {
 		return nil

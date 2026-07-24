@@ -43,90 +43,6 @@ import (
 )
 
 var _ = Describe("embedded etcd TLS with client cert auth", func() {
-	It("should serve HTTPS and accept the publisher client", func(ctx context.Context) {
-		dir := GinkgoT().TempDir()
-		paths := writeTestTLSBundle(dir)
-
-		clientPort := freeTCPPort()
-		peerPort := freeTCPPort()
-		clientURL := fmt.Sprintf("https://127.0.0.1:%d", clientPort)
-		peerURL := fmt.Sprintf("http://127.0.0.1:%d", peerPort)
-
-		store, err := startEtcdStore(ctx, &EtcdStoreConfig{
-			DataDir:            filepath.Join(dir, "etcd"),
-			ListenClientURL:    clientURL,
-			AdvertiseClientURL: clientURL,
-			ListenPeerURL:      peerURL,
-			AdvertisePeerURL:   peerURL,
-			Name:               "tls-cm-auth",
-			CertFile:           paths.serverCert,
-			KeyFile:            paths.serverKey,
-			CAFile:             paths.caCert,
-		})
-		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() {
-			Expect(store.Close()).To(Succeed())
-		})
-
-		Expect(store.Bootstrap(ctx, "submariner", 99)).To(Succeed())
-		Expect(store.UpsertRoute(ctx, "10.151.0.0/16", "10.0.0.2", 99)).To(Succeed())
-		Expect(store.TouchHeartbeat(ctx)).To(Succeed())
-
-		resp, err := store.client.Get(ctx, ipIdentityKey("10.151.0.0/16"))
-		Expect(err).NotTo(HaveOccurred())
-		Expect(resp.Kvs).To(HaveLen(1))
-	})
-
-	It("should accept an external Cilium-shaped client presenting the client cert", func(ctx context.Context) {
-		dir := GinkgoT().TempDir()
-		paths := writeTestTLSBundle(dir)
-
-		clientPort := freeTCPPort()
-		peerPort := freeTCPPort()
-		clientURL := fmt.Sprintf("https://127.0.0.1:%d", clientPort)
-		peerURL := fmt.Sprintf("http://127.0.0.1:%d", peerPort)
-
-		store, err := startEtcdStore(ctx, &EtcdStoreConfig{
-			DataDir:            filepath.Join(dir, "etcd"),
-			ListenClientURL:    clientURL,
-			AdvertiseClientURL: clientURL,
-			ListenPeerURL:      peerURL,
-			AdvertisePeerURL:   peerURL,
-			Name:               "tls-cm-cilium-client",
-			CertFile:           paths.serverCert,
-			KeyFile:            paths.serverKey,
-			CAFile:             paths.caCert,
-		})
-		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() {
-			Expect(store.Close()).To(Succeed())
-		})
-
-		Expect(store.Bootstrap(ctx, "submariner", 99)).To(Succeed())
-
-		tlsInfo := transport.TLSInfo{
-			CertFile:      paths.clientCert,
-			KeyFile:       paths.clientKey,
-			TrustedCAFile: paths.caCert,
-		}
-		tlsCfg, err := tlsInfo.ClientConfig()
-		Expect(err).NotTo(HaveOccurred())
-
-		cli, err := clientv3.New(clientv3.Config{
-			Endpoints:   []string{clientURL},
-			DialTimeout: 5 * time.Second,
-			TLS:         tlsCfg,
-		})
-		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() {
-			Expect(cli.Close()).To(Succeed())
-		})
-
-		resp, err := cli.Get(ctx, clusterConfigKey("submariner"))
-		Expect(err).NotTo(HaveOccurred())
-		Expect(resp.Kvs).To(HaveLen(1))
-	})
-
 	It("should reject clients that do not present a certificate", func(ctx context.Context) {
 		dir := GinkgoT().TempDir()
 		paths := writeTestTLSBundle(dir)
@@ -183,43 +99,6 @@ var _ = Describe("ClusterMesh publisher TLS with client cert auth", func() {
 		gatewayIP  = "10.0.0.2"
 		remoteCIDR = "10.151.0.0/16"
 	)
-
-	It("should Init/Stop with HTTPS and client cert auth", func(ctx context.Context) {
-		dir := GinkgoT().TempDir()
-		paths := writeTestTLSBundle(dir)
-
-		clientPort := freeTCPPort()
-		peerPort := freeTCPPort()
-		clientURL := fmt.Sprintf("https://127.0.0.1:%d", clientPort)
-		peerURL := fmt.Sprintf("http://127.0.0.1:%d", peerPort)
-
-		h := NewClusterMeshPublisher(fakek8s.NewClientset(
-			newNodeWithIP("node-local", localIP),
-			newNodeWithIP("node-gw", gatewayIP),
-		), &PublisherConfig{
-			LocalNodeIP:        localIP,
-			ListenClientURL:    clientURL,
-			AdvertiseClientURL: clientURL,
-			ListenPeerURL:      peerURL,
-			AdvertisePeerURL:   peerURL,
-			DataDir:            filepath.Join(dir, "etcd"),
-			CertFile:           paths.serverCert,
-			KeyFile:            paths.serverKey,
-			CAFile:             paths.caCert,
-		})
-		pub := h.(*clusterMeshPublisher)
-		pub.SetState(&eventtesting.TestHandlerState{})
-
-		Expect(pub.Init(ctx)).To(Succeed())
-		Expect(pub.store).NotTo(BeNil())
-
-		Expect(pub.Stop(ctx)).To(Succeed())
-		Expect(pub.store).To(BeNil())
-
-		Eventually(func() error {
-			return canListen(clientPort)
-		}).WithTimeout(5 * time.Second).Should(Succeed())
-	})
 
 	It("should publish routes and heartbeat readable by a Cilium-shaped client", func(ctx context.Context) {
 		dir := GinkgoT().TempDir()

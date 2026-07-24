@@ -158,6 +158,53 @@ var _ = Describe("ClusterMesh publisher", func() {
 			Eventually(func() int { return store.routeCount() }).Should(Equal(0))
 		})
 
+		It("should republish when HostIP changes after LocalEndpointUpdated", func(ctx context.Context) {
+			support.CreateEndpoint(ctx, eventtesting.NewEndpoint("west", "host", remoteCIDR))
+			Eventually(func() string { return routeHostIP(store, remoteCIDR) }).Should(Equal(gatewayIP))
+
+			localEP := eventtesting.NewEndpoint("east", "local-gw", "10.0.0.0/16")
+			localEP.Spec.SetPrivateIP(otherIP)
+			Expect(handler.LocalEndpointUpdated(localEP)).To(Succeed())
+
+			Eventually(func() string { return routeHostIP(store, remoteCIDR) }).Should(Equal(otherIP))
+			Expect(store.routeCount()).To(Equal(1))
+		})
+
+		It("should sync route keys when remote Endpoint subnets change", func(ctx context.Context) {
+			const (
+				cidrA = "10.151.0.0/16"
+				cidrB = "10.152.0.0/16"
+				cidrC = "10.153.0.0/16"
+			)
+
+			ep := support.CreateEndpoint(ctx, eventtesting.NewEndpoint("west", "host", cidrA))
+			Eventually(func() int { return store.routeCount() }).Should(Equal(1))
+			Expect(store.getRoute(cidrA)).NotTo(BeNil())
+
+			ep.Spec.Subnets = []string{cidrB, cidrC}
+			support.UpdateEndpoint(ctx, ep)
+
+			Eventually(func() int { return store.routeCount() }).Should(Equal(2))
+			Expect(store.getRoute(cidrA)).To(BeNil())
+			Expect(store.getRoute(cidrB)).NotTo(BeNil())
+			Expect(store.getRoute(cidrC)).NotTo(BeNil())
+		})
+
+		It("should compact overlapping CIDRs across remote Endpoints", func(ctx context.Context) {
+			const (
+				shared = "10.151.0.0/16"
+				extra  = "10.152.0.0/16"
+			)
+
+			support.CreateEndpoint(ctx, eventtesting.NewEndpoint("west", "host-a", shared))
+			Eventually(func() int { return store.routeCount() }).Should(Equal(1))
+
+			support.CreateEndpoint(ctx, eventtesting.NewEndpoint("north", "host-b", shared, extra))
+			Eventually(func() int { return store.routeCount() }).Should(Equal(2))
+			Expect(store.getRoute(shared)).NotTo(BeNil())
+			Expect(store.getRoute(extra)).NotTo(BeNil())
+		})
+
 		It("should delete published keys on Stop before closing the store", func(ctx context.Context) {
 			support.CreateEndpoint(ctx, eventtesting.NewEndpoint("west", "host", remoteCIDR))
 			Eventually(func() int { return store.routeCount() }).Should(Equal(1))
@@ -167,6 +214,33 @@ var _ = Describe("ClusterMesh publisher", func() {
 			Expect(store.routeCount()).To(Equal(0))
 			Expect(store.config).NotTo(HaveKey("cilium/cluster-config/submariner"))
 		})
+	})
+
+	When("no HostIP candidate exists", func() {
+		BeforeEach(func() {
+			k8sClient = fakek8s.NewClientset(newNodeWithIP("node-local", localIP))
+		})
+
+		It("should skip publishing without failing reconcile", func(ctx context.Context) {
+			Eventually(func() string { return store.getHeartbeat() }).ShouldNot(BeEmpty())
+
+			support.CreateEndpoint(ctx, eventtesting.NewEndpoint("west", "host", remoteCIDR))
+			Consistently(func() int { return store.routeCount() }).WithTimeout(500 * time.Millisecond).
+				Should(Equal(0))
+			Expect(store.config).NotTo(HaveKey("cilium/cluster-config/submariner"))
+		})
+	})
+})
+
+var _ = Describe("ClusterMesh publisher Init", func() {
+	It("should reject empty LocalNodeIP", func(ctx context.Context) {
+		h := NewClusterMeshPublisher(fakek8s.NewClientset(), &PublisherConfig{
+			Store: newMemoryStore(),
+		})
+		pub := h.(*clusterMeshPublisher)
+		pub.SetState(&eventtesting.TestHandlerState{})
+
+		Expect(pub.Init(ctx)).To(MatchError(ContainSubstring("LocalNodeIP")))
 	})
 })
 
@@ -245,6 +319,20 @@ var _ = Describe("embedded etcd store", func() {
 		Expect(resp.Kvs).To(BeEmpty())
 	})
 })
+
+func routeHostIP(store *memoryStore, cidrStr string) string {
+	raw := store.getRoute(cidrStr)
+	if raw == nil {
+		return ""
+	}
+
+	var pair ipIdentityPair
+	if err := json.Unmarshal(raw, &pair); err != nil {
+		return ""
+	}
+
+	return pair.HostIP.String()
+}
 
 func newNodeWithIP(name, ip string) *corev1.Node {
 	return &corev1.Node{
