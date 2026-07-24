@@ -16,21 +16,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cni
+package cilium_test
 
-// Supported network plugins.
-const (
-	Generic       = "generic"
-	Calico        = "calico"
-	CanalFlannel  = "canal-flannel"
-	Cilium        = "cilium"
-	Flannel       = "flannel"
-	KindNet       = "kindnet"
-	OpenShiftSDN  = "OpenShiftSDN"
-	OVNKubernetes = "OVNKubernetes"
-	WeaveNet      = "weave-net"
+import (
+	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/submariner-io/admiral/pkg/log/kzerolog"
 )
 
-func GetNetworkPlugins() []string {
-	return []string{Generic, Calico, CanalFlannel, Cilium, Flannel, KindNet, OpenShiftSDN, OVNKubernetes, WeaveNet}
+func init() {
+	kzerolog.AddFlags(nil)
+}
+
+var _ = BeforeSuite(func() {
+	kzerolog.InitK8sLogging()
+})
+
+func TestCilium(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Cilium Suite")
 }

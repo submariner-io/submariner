@@ -41,6 +41,7 @@ import (
 	fakePF "github.com/submariner-io/submariner/pkg/packetfilter/fake"
 	"github.com/submariner-io/submariner/pkg/pinger"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/calico"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/cilium"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/healthchecker"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/mtu"
@@ -131,6 +132,15 @@ var _ = Describe("", func() {
 
 		calicoHandler := calico.NewCalicoIPPoolHandler(nil, testing.Namespace, dynClient)
 		Expect(calicoHandler.Init(ctx)).To(Succeed())
+
+		ciliumHandler := cilium.NewClusterMeshPublisher(k8sClient, &cilium.PublisherConfig{
+			LocalNodeIP: "10.0.0.1",
+			Store:       cilium.NewMemoryRouteStore(),
+		})
+		Expect(ciliumHandler.Init(ctx)).To(Succeed())
+		DeferCleanup(func() {
+			Expect(ciliumHandler.Stop(ctx)).To(Succeed())
+		})
 
 		healthCheckerHandler := healthchecker.New(&healthchecker.Config{
 			ControllerConfig: pinger.ControllerConfig{
