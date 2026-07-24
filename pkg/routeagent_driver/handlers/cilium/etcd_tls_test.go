@@ -116,7 +116,7 @@ var _ = Describe("ClusterMesh publisher TLS with client cert auth", func() {
 		), &PublisherConfig{
 			LocalNodeIP:        localIP,
 			RemoteName:         "submariner",
-			ClusterID:          99,
+			ClusterID:          255,
 			ListenClientURL:    clientURL,
 			AdvertiseClientURL: clientURL,
 			ListenPeerURL:      peerURL,

@@ -55,8 +55,8 @@ var _ = Describe("etcd store lifecycle", func() {
 		_, err = os.Stat(dataDir)
 		Expect(err).NotTo(HaveOccurred())
 
-		Expect(store.Bootstrap(ctx, "submariner", 99)).To(Succeed())
-		Expect(store.UpsertRoute(ctx, "10.151.0.0/16", "10.0.0.2", 99)).To(Succeed())
+		Expect(store.Bootstrap(ctx, "submariner", 255)).To(Succeed())
+		Expect(store.UpsertRoute(ctx, "10.151.0.0/16", "10.0.0.2", 255)).To(Succeed())
 
 		Expect(store.Close()).To(Succeed())
 		Expect(store.Close()).To(Succeed()) // idempotent

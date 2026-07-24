@@ -51,9 +51,11 @@ var logger = log.Logger{Logger: logf.Log.WithName("Cilium")}
 
 const (
 	defaultCMRemoteName = "submariner"
-	defaultCMClusterID  = uint32(99)
-	defaultCMClientURL  = "http://127.0.0.1:12379"
-	defaultCMPeerURL    = "http://127.0.0.1:12380"
+	// defaultCMClusterID is reserved for the synthetic Submariner peer; local
+	// Cilium cluster-id must not use this value (see operator/subctl checks).
+	defaultCMClusterID = uint32(255)
+	defaultCMClientURL = "http://127.0.0.1:12379"
+	defaultCMPeerURL   = "http://127.0.0.1:12380"
 
 	// reconcileTimeout bounds event-driven reconciles so a stuck apiserver
 	// cannot hold h.mu forever and block Stop/shutdown.
@@ -95,7 +97,7 @@ type PublisherEnv struct {
 	CiliumCMKeyFile    string `envconfig:"CILIUM_CM_KEY_FILE"`
 	CiliumCMCAFile     string `envconfig:"CILIUM_CM_CA_FILE"`
 	CiliumCMHostIP     string `envconfig:"CILIUM_CM_HOST_IP"`
-	CiliumCMClusterID  uint32 `default:"99"                     envconfig:"CILIUM_CM_CLUSTER_ID"`
+	CiliumCMClusterID  uint32 `default:"255"                    envconfig:"CILIUM_CM_CLUSTER_ID"`
 }
 
 type clusterMeshPublisher struct {

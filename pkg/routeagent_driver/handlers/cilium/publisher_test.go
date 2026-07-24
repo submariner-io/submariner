@@ -68,7 +68,7 @@ var _ = Describe("ClusterMesh publisher", func() {
 			LocalNodeIP:     localIP,
 			PreferredHostIP: preferredHostIP,
 			RemoteName:      "submariner",
-			ClusterID:       99,
+			ClusterID:       255,
 			Store:           store,
 		})
 		Expect(h).NotTo(BeNil())
@@ -102,7 +102,7 @@ var _ = Describe("ClusterMesh publisher", func() {
 			Expect(json.Unmarshal(raw, &pair)).To(Succeed())
 			Expect(pair.HostIP.String()).NotTo(Equal(localIP))
 			Expect(pair.HostIP.String()).To(Equal(gatewayIP))
-			Expect(pair.ID).To(Equal(uint32(6489064)))
+			Expect(pair.ID).To(Equal(uint32(16712680))) // (255 << 16) | 1000
 
 			Expect(store.config).To(HaveKey("cilium/cluster-config/submariner"))
 		})
@@ -295,8 +295,8 @@ var _ = Describe("embedded etcd store", func() {
 			Expect(store.Close()).To(Succeed())
 		})
 
-		Expect(store.Bootstrap(ctx, "submariner", 99)).To(Succeed())
-		Expect(store.UpsertRoute(ctx, "10.151.0.0/16", "10.0.0.2", 99)).To(Succeed())
+		Expect(store.Bootstrap(ctx, "submariner", 255)).To(Succeed())
+		Expect(store.UpsertRoute(ctx, "10.151.0.0/16", "10.0.0.2", 255)).To(Succeed())
 		Expect(store.TouchHeartbeat(ctx)).To(Succeed())
 
 		resp, err := store.client.Get(ctx, ipIdentityKey("10.151.0.0/16"))

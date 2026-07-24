@@ -33,11 +33,11 @@ var _ = Describe("ClusterMesh keys", func() {
 	})
 
 	It("should encode IPIdentityPair JSON with HostIP and identity", func() {
-		pair, key, err := buildIPIdentityPair("10.151.0.0/16", "46.224.67.227", 99)
+		pair, key, err := buildIPIdentityPair("10.151.0.0/16", "46.224.67.227", 255)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(key).To(Equal("cilium/state/ip/v1/default/10.151.0.0/16"))
-		Expect(pair.ID).To(Equal(identityForCluster(99, 1000)))
-		Expect(pair.ID).To(Equal(uint32(6489064)))
+		Expect(pair.ID).To(Equal(identityForCluster(255, 1000)))
+		Expect(pair.ID).To(Equal(uint32(16712680))) // (255 << 16) | 1000
 
 		b, err := marshalIPIdentityPair(pair)
 		Expect(err).NotTo(HaveOccurred())
@@ -50,17 +50,17 @@ var _ = Describe("ClusterMesh keys", func() {
 	})
 
 	It("should marshal default cluster-config", func() {
-		b, err := marshalClusterConfig(defaultClusterConfig(99))
+		b, err := marshalClusterConfig(defaultClusterConfig(255))
 		Expect(err).NotTo(HaveOccurred())
 
 		var cfg ciliumClusterConfig
 		Expect(json.Unmarshal(b, &cfg)).To(Succeed())
-		Expect(cfg.ID).To(Equal(uint32(99)))
+		Expect(cfg.ID).To(Equal(uint32(255)))
 		Expect(cfg.Capabilities.MaxConnectedClusters).To(Equal(uint32(255)))
 	})
 
 	It("should canonicalize CIDRs with host bits when building keys", func() {
-		pair, key, err := buildIPIdentityPair("10.151.0.5/16", "10.0.0.2", 99)
+		pair, key, err := buildIPIdentityPair("10.151.0.5/16", "10.0.0.2", 255)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pair.IP.String()).To(Equal("10.151.0.0"))
 		Expect(key).To(Equal("cilium/state/ip/v1/default/10.151.0.0/16"))
