@@ -16,21 +16,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cilium //nolint:testpackage // Tests exercise unexported publisher implementation details.
+package cilium
 
 import (
 	"context"
 	"encoding/json"
 	"net"
-	"path/filepath"
-	"strconv"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/pkg/errors"
 	"github.com/submariner-io/submariner/pkg/cni"
 	"github.com/submariner-io/submariner/pkg/event"
 	eventtesting "github.com/submariner-io/submariner/pkg/event/testing"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/cilium/fake"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	fakek8s "k8s.io/client-go/kubernetes/fake"
@@ -46,7 +46,7 @@ var _ = Describe("ClusterMesh publisher", func() {
 
 	var (
 		k8sClient       *fakek8s.Clientset
-		store           *memoryStore
+		etcdClient      *fake.EtcdClient
 		handler         event.Handler
 		support         *eventtesting.ControllerSupport
 		preferredHostIP string
@@ -59,7 +59,7 @@ var _ = Describe("ClusterMesh publisher", func() {
 			newNodeWithIP("node-gw", gatewayIP),
 			newNodeWithIP("node-other", otherIP),
 		)
-		store = newMemoryStore()
+		etcdClient = fake.NewEtcdClient()
 		support = eventtesting.NewControllerSupport()
 	})
 
@@ -69,7 +69,7 @@ var _ = Describe("ClusterMesh publisher", func() {
 			PreferredHostIP: preferredHostIP,
 			RemoteName:      "submariner",
 			ClusterID:       255,
-			Store:           store,
+			EtcdClient:      etcdClient,
 		})
 		Expect(h).NotTo(BeNil())
 		handler = h
@@ -82,9 +82,9 @@ var _ = Describe("ClusterMesh publisher", func() {
 	})
 
 	It("should write cilium/.heartbeat on start", func() {
-		Eventually(func() string { return store.getHeartbeat() }).ShouldNot(BeEmpty())
+		Eventually(func() string { return string(etcdClient.Value(cmHeartbeatKey)) }).ShouldNot(BeEmpty())
 
-		ts, err := time.Parse(time.RFC3339, store.getHeartbeat())
+		ts, err := time.Parse(time.RFC3339, string(etcdClient.Value(cmHeartbeatKey)))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ts).To(BeTemporally("~", time.Now().UTC(), 5*time.Second))
 	})
@@ -93,9 +93,9 @@ var _ = Describe("ClusterMesh publisher", func() {
 		It("should publish CIDR routes with HostIP != local", func(ctx context.Context) {
 			support.CreateEndpoint(ctx, eventtesting.NewEndpoint("west", "host", remoteCIDR))
 
-			Eventually(func() int { return store.routeCount() }).Should(Equal(1))
+			Eventually(func() int { return routeKeyCount(etcdClient) }).Should(Equal(1))
 
-			raw := store.getRoute(remoteCIDR)
+			raw := etcdClient.Value(ipIdentityKey(remoteCIDR))
 			Expect(raw).NotTo(BeNil())
 
 			var pair ipIdentityPair
@@ -104,7 +104,7 @@ var _ = Describe("ClusterMesh publisher", func() {
 			Expect(pair.HostIP.String()).To(Equal(gatewayIP))
 			Expect(pair.ID).To(Equal(uint32(16712680))) // (255 << 16) | 1000
 
-			Expect(store.config).To(HaveKey("cilium/cluster-config/submariner"))
+			Expect(etcdClient.HasKey(clusterConfigKey("submariner"))).To(BeTrue())
 		})
 
 		It("should prefer LocalEndpoint PrivateIP as HostIP", func(ctx context.Context) {
@@ -115,15 +115,7 @@ var _ = Describe("ClusterMesh publisher", func() {
 			support.CreateEndpoint(ctx, eventtesting.NewEndpoint("west", "host", remoteCIDR))
 
 			Eventually(func() string {
-				raw := store.getRoute(remoteCIDR)
-				if raw == nil {
-					return ""
-				}
-
-				var pair ipIdentityPair
-				_ = json.Unmarshal(raw, &pair)
-
-				return pair.HostIP.String()
+				return routeHostIP(etcdClient, remoteCIDR)
 			}).Should(Equal(otherIP))
 		})
 
@@ -136,15 +128,7 @@ var _ = Describe("ClusterMesh publisher", func() {
 				support.CreateEndpoint(ctx, eventtesting.NewEndpoint("west", "host", remoteCIDR))
 
 				Eventually(func() string {
-					raw := store.getRoute(remoteCIDR)
-					if raw == nil {
-						return ""
-					}
-
-					var pair ipIdentityPair
-					_ = json.Unmarshal(raw, &pair)
-
-					return pair.HostIP.String()
+					return routeHostIP(etcdClient, remoteCIDR)
 				}).Should(Equal("10.0.0.9"))
 			})
 		})
@@ -152,22 +136,22 @@ var _ = Describe("ClusterMesh publisher", func() {
 		It("should delete routes when the remote Endpoint is removed", func(ctx context.Context) {
 			ep := eventtesting.NewEndpoint("west", "host", remoteCIDR)
 			support.CreateEndpoint(ctx, ep)
-			Eventually(func() int { return store.routeCount() }).Should(Equal(1))
+			Eventually(func() int { return routeKeyCount(etcdClient) }).Should(Equal(1))
 
 			support.DeleteEndpoint(ctx, ep.Name)
-			Eventually(func() int { return store.routeCount() }).Should(Equal(0))
+			Eventually(func() int { return routeKeyCount(etcdClient) }).Should(Equal(0))
 		})
 
 		It("should republish when HostIP changes after LocalEndpointUpdated", func(ctx context.Context) {
 			support.CreateEndpoint(ctx, eventtesting.NewEndpoint("west", "host", remoteCIDR))
-			Eventually(func() string { return routeHostIP(store, remoteCIDR) }).Should(Equal(gatewayIP))
+			Eventually(func() string { return routeHostIP(etcdClient, remoteCIDR) }).Should(Equal(gatewayIP))
 
 			localEP := eventtesting.NewEndpoint("east", "local-gw", "10.0.0.0/16")
 			localEP.Spec.SetPrivateIP(otherIP)
 			Expect(handler.LocalEndpointUpdated(localEP)).To(Succeed())
 
-			Eventually(func() string { return routeHostIP(store, remoteCIDR) }).Should(Equal(otherIP))
-			Expect(store.routeCount()).To(Equal(1))
+			Eventually(func() string { return routeHostIP(etcdClient, remoteCIDR) }).Should(Equal(otherIP))
+			Expect(routeKeyCount(etcdClient)).To(Equal(1))
 		})
 
 		It("should sync route keys when remote Endpoint subnets change", func(ctx context.Context) {
@@ -178,16 +162,16 @@ var _ = Describe("ClusterMesh publisher", func() {
 			)
 
 			ep := support.CreateEndpoint(ctx, eventtesting.NewEndpoint("west", "host", cidrA))
-			Eventually(func() int { return store.routeCount() }).Should(Equal(1))
-			Expect(store.getRoute(cidrA)).NotTo(BeNil())
+			Eventually(func() int { return routeKeyCount(etcdClient) }).Should(Equal(1))
+			Expect(etcdClient.Value(ipIdentityKey(cidrA))).NotTo(BeNil())
 
 			ep.Spec.Subnets = []string{cidrB, cidrC}
 			support.UpdateEndpoint(ctx, ep)
 
-			Eventually(func() int { return store.routeCount() }).Should(Equal(2))
-			Expect(store.getRoute(cidrA)).To(BeNil())
-			Expect(store.getRoute(cidrB)).NotTo(BeNil())
-			Expect(store.getRoute(cidrC)).NotTo(BeNil())
+			Eventually(func() int { return routeKeyCount(etcdClient) }).Should(Equal(2))
+			Expect(etcdClient.Value(ipIdentityKey(cidrA))).To(BeNil())
+			Expect(etcdClient.Value(ipIdentityKey(cidrB))).NotTo(BeNil())
+			Expect(etcdClient.Value(ipIdentityKey(cidrC))).NotTo(BeNil())
 		})
 
 		It("should compact overlapping CIDRs across remote Endpoints", func(ctx context.Context) {
@@ -197,22 +181,24 @@ var _ = Describe("ClusterMesh publisher", func() {
 			)
 
 			support.CreateEndpoint(ctx, eventtesting.NewEndpoint("west", "host-a", shared))
-			Eventually(func() int { return store.routeCount() }).Should(Equal(1))
+			Eventually(func() int { return routeKeyCount(etcdClient) }).Should(Equal(1))
 
 			support.CreateEndpoint(ctx, eventtesting.NewEndpoint("north", "host-b", shared, extra))
-			Eventually(func() int { return store.routeCount() }).Should(Equal(2))
-			Expect(store.getRoute(shared)).NotTo(BeNil())
-			Expect(store.getRoute(extra)).NotTo(BeNil())
+			Eventually(func() int { return routeKeyCount(etcdClient) }).Should(Equal(2))
+			Expect(etcdClient.Value(ipIdentityKey(shared))).NotTo(BeNil())
+			Expect(etcdClient.Value(ipIdentityKey(extra))).NotTo(BeNil())
 		})
 
 		It("should delete published keys on Stop before closing the store", func(ctx context.Context) {
 			support.CreateEndpoint(ctx, eventtesting.NewEndpoint("west", "host", remoteCIDR))
-			Eventually(func() int { return store.routeCount() }).Should(Equal(1))
-			Expect(store.config).To(HaveKey("cilium/cluster-config/submariner"))
+			Eventually(func() int { return routeKeyCount(etcdClient) }).Should(Equal(1))
+			Expect(etcdClient.HasKey(clusterConfigKey("submariner"))).To(BeTrue())
 
 			Expect(handler.Stop(ctx)).To(Succeed())
-			Expect(store.routeCount()).To(Equal(0))
-			Expect(store.config).NotTo(HaveKey("cilium/cluster-config/submariner"))
+			Expect(handler.Stop(ctx)).To(Succeed()) // sync.Once — idempotent
+			Expect(routeKeyCount(etcdClient)).To(Equal(0))
+			Expect(etcdClient.HasKey(clusterConfigKey("submariner"))).To(BeFalse())
+			Expect(etcdClient.Closed()).To(BeTrue())
 		})
 	})
 
@@ -222,12 +208,12 @@ var _ = Describe("ClusterMesh publisher", func() {
 		})
 
 		It("should skip publishing without failing reconcile", func(ctx context.Context) {
-			Eventually(func() string { return store.getHeartbeat() }).ShouldNot(BeEmpty())
+			Eventually(func() string { return string(etcdClient.Value(cmHeartbeatKey)) }).ShouldNot(BeEmpty())
 
 			support.CreateEndpoint(ctx, eventtesting.NewEndpoint("west", "host", remoteCIDR))
-			Consistently(func() int { return store.routeCount() }).WithTimeout(500 * time.Millisecond).
+			Consistently(func() int { return routeKeyCount(etcdClient) }).WithTimeout(500 * time.Millisecond).
 				Should(Equal(0))
-			Expect(store.config).NotTo(HaveKey("cilium/cluster-config/submariner"))
+			Expect(etcdClient.HasKey(clusterConfigKey("submariner"))).To(BeFalse())
 		})
 	})
 })
@@ -235,12 +221,30 @@ var _ = Describe("ClusterMesh publisher", func() {
 var _ = Describe("ClusterMesh publisher Init", func() {
 	It("should reject empty LocalNodeIP", func(ctx context.Context) {
 		h := NewClusterMeshPublisher(fakek8s.NewClientset(), &PublisherConfig{
-			Store: newMemoryStore(),
+			EtcdClient: fake.NewEtcdClient(),
 		})
 		pub := h.(*clusterMeshPublisher)
 		pub.SetState(&eventtesting.TestHandlerState{})
 
 		Expect(pub.Init(ctx)).To(MatchError(ContainSubstring("LocalNodeIP")))
+	})
+
+	It("should close the store if Init reconcile fails", func(ctx context.Context) {
+		etcdClient := fake.NewEtcdClient()
+		etcdClient.SetPutError(errors.New("bootstrap failed"))
+
+		h := NewClusterMeshPublisher(fakek8s.NewClientset(
+			newNodeWithIP("node-local", "10.0.0.1"),
+			newNodeWithIP("node-gw", "10.0.0.2"),
+		), &PublisherConfig{
+			LocalNodeIP: "10.0.0.1",
+			EtcdClient:  etcdClient,
+		})
+		pub := h.(*clusterMeshPublisher)
+		pub.SetState(&eventtesting.TestHandlerState{})
+
+		Expect(pub.Init(ctx)).NotTo(Succeed())
+		Expect(etcdClient.Closed()).To(BeTrue())
 	})
 })
 
@@ -256,19 +260,19 @@ var _ = Describe("ClusterMesh publisher HostIP != self", func() {
 			newNodeWithIP("node-local", localIP),
 			newNodeWithIP("node-gw", gatewayIP),
 		)
-		store := newMemoryStore()
+		etcdClient := fake.NewEtcdClient()
 		support := eventtesting.NewControllerSupport()
 
 		h := NewClusterMeshPublisher(k8sClient, &PublisherConfig{
 			LocalNodeIP: localIP,
-			Store:       store,
+			EtcdClient:  etcdClient,
 		})
 		support.Start(ctx, h)
 
 		support.CreateEndpoint(ctx, eventtesting.NewEndpoint("west", "host", remoteCIDR))
-		Eventually(func() int { return store.routeCount() }).Should(Equal(1))
+		Eventually(func() int { return routeKeyCount(etcdClient) }).Should(Equal(1))
 
-		raw := store.getRoute(remoteCIDR)
+		raw := etcdClient.Value(ipIdentityKey(remoteCIDR))
 		Expect(raw).NotTo(BeNil())
 
 		var pair ipIdentityPair
@@ -278,50 +282,12 @@ var _ = Describe("ClusterMesh publisher HostIP != self", func() {
 	})
 })
 
-var _ = Describe("embedded etcd store", func() {
-	It("should bootstrap and upsert/delete routes", func(ctx context.Context) {
-		dir := GinkgoT().TempDir()
-		clientPort := freeTCPPort()
-		peerPort := freeTCPPort()
+func routeKeyCount(c *fake.EtcdClient) int {
+	return c.KeyCountWithPrefix(cmIPStatePrefix + "/")
+}
 
-		store, err := startEtcdStore(ctx, &EtcdStoreConfig{
-			DataDir:         filepath.Join(dir, "etcd"),
-			ListenClientURL: "http://127.0.0.1:" + strconv.Itoa(clientPort),
-			ListenPeerURL:   "http://127.0.0.1:" + strconv.Itoa(peerPort),
-			Name:            "test-cm",
-		})
-		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() {
-			Expect(store.Close()).To(Succeed())
-		})
-
-		Expect(store.Bootstrap(ctx, "submariner", 255)).To(Succeed())
-		Expect(store.UpsertRoute(ctx, "10.151.0.0/16", "10.0.0.2", 255)).To(Succeed())
-		Expect(store.TouchHeartbeat(ctx)).To(Succeed())
-
-		resp, err := store.client.Get(ctx, ipIdentityKey("10.151.0.0/16"))
-		Expect(err).NotTo(HaveOccurred())
-		Expect(resp.Kvs).To(HaveLen(1))
-
-		var pair ipIdentityPair
-		Expect(json.Unmarshal(resp.Kvs[0].Value, &pair)).To(Succeed())
-		Expect(pair.HostIP.String()).To(Equal("10.0.0.2"))
-
-		hb, err := store.client.Get(ctx, cmHeartbeatKey)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(hb.Kvs).To(HaveLen(1))
-		_, err = time.Parse(time.RFC3339, string(hb.Kvs[0].Value))
-		Expect(err).NotTo(HaveOccurred())
-
-		Expect(store.DeleteRoute(ctx, "10.151.0.0/16")).To(Succeed())
-		resp, err = store.client.Get(ctx, ipIdentityKey("10.151.0.0/16"))
-		Expect(err).NotTo(HaveOccurred())
-		Expect(resp.Kvs).To(BeEmpty())
-	})
-})
-
-func routeHostIP(store *memoryStore, cidrStr string) string {
-	raw := store.getRoute(cidrStr)
+func routeHostIP(c *fake.EtcdClient, cidrStr string) string {
+	raw := c.Value(ipIdentityKey(cidrStr))
 	if raw == nil {
 		return ""
 	}
@@ -346,13 +312,4 @@ func newNodeWithIP(name, ip string) *corev1.Node {
 			},
 		},
 	}
-}
-
-func freeTCPPort() int {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	Expect(err).NotTo(HaveOccurred())
-
-	defer l.Close()
-
-	return l.Addr().(*net.TCPAddr).Port
 }

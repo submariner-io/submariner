@@ -19,33 +19,16 @@ limitations under the License.
 package cilium
 
 import (
-	"net"
+	"context"
 
-	"github.com/pkg/errors"
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
-func buildIPIdentityPair(cidrStr, hostIP string, clusterID uint32) (*ipIdentityPair, string, error) {
-	ip, mask, err := parseCIDR(cidrStr)
-	if err != nil {
-		return nil, "", errors.Wrap(err, "parse CIDR")
-	}
-
-	hip := net.ParseIP(hostIP)
-	if hip == nil {
-		return nil, "", errors.Errorf("invalid hostIP %q", hostIP)
-	}
-
-	if v4 := hip.To4(); v4 != nil {
-		hip = v4
-	}
-
-	pair := &ipIdentityPair{
-		IP:     ip,
-		Mask:   mask,
-		HostIP: hip,
-		ID:     identityForCluster(clusterID, defaultRemoteIdentityLocalID),
-		Key:    0,
-	}
-
-	return pair, ipIdentityKey(prefixString(pair)), nil
+// EtcdClient is the subset of clientv3.Client used by etcdStore.
+// *clientv3.Client satisfies this interface; unit tests inject a fake.
+type EtcdClient interface {
+	Put(ctx context.Context, key, val string, opts ...clientv3.OpOption) (*clientv3.PutResponse, error)
+	Get(ctx context.Context, key string, opts ...clientv3.OpOption) (*clientv3.GetResponse, error)
+	Delete(ctx context.Context, key string, opts ...clientv3.OpOption) (*clientv3.DeleteResponse, error)
+	Close() error
 }

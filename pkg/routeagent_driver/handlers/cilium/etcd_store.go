@@ -20,9 +20,11 @@ package cilium
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"net/url"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -51,10 +53,14 @@ type EtcdStoreConfig struct {
 
 type etcdStore struct {
 	etcd          *embed.Etcd
-	client        *clientv3.Client
+	client        EtcdClient
 	dataDir       string
 	removeDataDir bool
-	closed        bool
+	closeOnce     sync.Once
+}
+
+func newEtcdStoreWithClient(client EtcdClient) *etcdStore {
+	return &etcdStore{client: client}
 }
 
 func startEtcdStore(ctx context.Context, cfg *EtcdStoreConfig) (*etcdStore, error) {
@@ -298,36 +304,33 @@ func (s *etcdStore) TouchHeartbeat(ctx context.Context) error {
 }
 
 func (s *etcdStore) Close() error {
-	if s == nil || s.closed {
-		return nil
-	}
+	var err error
 
-	s.closed = true
+	s.closeOnce.Do(func() {
+		err = s.close()
+	})
 
+	return err
+}
+
+func (s *etcdStore) close() error {
 	var errs []error
 
 	if s.client != nil {
-		if err := s.client.Close(); err != nil {
-			errs = append(errs, err)
+		if closeErr := s.client.Close(); closeErr != nil {
+			errs = append(errs, closeErr)
 		}
-
-		s.client = nil
 	}
 
 	if s.etcd != nil {
 		s.etcd.Close()
-		s.etcd = nil
 	}
 
 	if s.removeDataDir && s.dataDir != "" {
-		if err := os.RemoveAll(s.dataDir); err != nil {
-			errs = append(errs, errors.Wrap(err, "remove etcd data dir"))
+		if removeErr := os.RemoveAll(s.dataDir); removeErr != nil {
+			errs = append(errs, errors.Wrap(removeErr, "remove etcd data dir"))
 		}
 	}
 
-	if len(errs) > 0 {
-		return errors.Errorf("close etcd store: %v", errs)
-	}
-
-	return nil
+	return stderrors.Join(errs...)
 }

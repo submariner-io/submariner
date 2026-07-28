@@ -42,6 +42,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/pinger"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/calico"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/cilium"
+	ciliumfake "github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/cilium/fake"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/healthchecker"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/mtu"
@@ -135,7 +136,7 @@ var _ = Describe("", func() {
 
 		ciliumHandler := cilium.NewClusterMeshPublisher(k8sClient, &cilium.PublisherConfig{
 			LocalNodeIP: "10.0.0.1",
-			Store:       cilium.NewMemoryRouteStore(),
+			EtcdClient:  ciliumfake.NewEtcdClient(),
 		})
 		Expect(ciliumHandler.Init(ctx)).To(Succeed())
 		DeferCleanup(func() {

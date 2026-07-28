@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cilium //nolint:testpackage // Tests exercise unexported ClusterMesh key helpers.
+package cilium
 
 import (
 	"encoding/json"

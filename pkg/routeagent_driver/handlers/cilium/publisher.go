@@ -42,6 +42,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/event"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -58,14 +59,14 @@ const (
 	defaultCMPeerURL   = "http://127.0.0.1:12380"
 
 	// reconcileTimeout bounds event-driven reconciles so a stuck apiserver
-	// cannot hold h.mu forever and block Stop/shutdown.
+	// cannot block Stop/shutdown indefinitely.
 	reconcileTimeout = 30 * time.Second
 )
 
 // PublisherConfig configures the ClusterMesh-compatible CIDR publisher.
 type PublisherConfig struct {
-	// Store, when set, skips starting embedded etcd (tests).
-	Store RouteStore
+	// EtcdClient, when set, backs the store without starting embedded etcd (tests).
+	EtcdClient EtcdClient
 	// RemoteName is the synthetic Cilium ClusterMesh peer name (Secret key prefix).
 	RemoteName         string
 	ListenClientURL    string
@@ -107,8 +108,7 @@ type clusterMeshPublisher struct {
 	client kubernetes.Interface
 	cfg    PublisherConfig
 
-	mu           sync.Mutex
-	store        RouteStore
+	store        *etcdStore
 	gatewayIP    string
 	published    map[string]string // cidr -> hostIP
 	started      bool
@@ -116,6 +116,8 @@ type clusterMeshPublisher struct {
 
 	heartbeatCancel context.CancelFunc
 	heartbeatDone   chan struct{}
+
+	stopOnce sync.Once
 }
 
 // NewClusterMeshPublisher returns a handler that publishes remote Submariner
@@ -172,8 +174,8 @@ func (h *clusterMeshPublisher) Init(ctx context.Context) error {
 		return errors.New("ClusterMesh publisher requires LocalNodeIP")
 	}
 
-	if h.cfg.Store != nil {
-		h.store = h.cfg.Store
+	if h.cfg.EtcdClient != nil {
+		h.store = newEtcdStoreWithClient(h.cfg.EtcdClient)
 	} else {
 		store, err := startEtcdStore(ctx, &EtcdStoreConfig{
 			DataDir:            h.cfg.DataDir,
@@ -202,8 +204,10 @@ func (h *clusterMeshPublisher) Init(ctx context.Context) error {
 	// Registry only calls Stop for handlers that successfully Init. If reconcile
 	// fails here, close the store ourselves to avoid leaking etcd/goroutines/ports.
 	if err := h.reconcile(ctx); err != nil {
-		if stopErr := h.closeStore(); stopErr != nil {
-			logger.Errorf(stopErr, "error closing ClusterMesh publisher after Init failure")
+		h.stopHeartbeat()
+
+		if stopErr := h.store.Close(); stopErr != nil {
+			logger.Errorf(stopErr, "error closing store after Init failure")
 		}
 
 		return err
@@ -215,7 +219,13 @@ func (h *clusterMeshPublisher) Init(ctx context.Context) error {
 func (h *clusterMeshPublisher) Stop(ctx context.Context) error {
 	// Delete keys while etcd is still up so watching cilium-agents observe removals
 	// before the peer disappears. uninstall() calls StopHandlers before Uninstall.
-	return h.shutdown(ctx)
+	var err error
+
+	h.stopOnce.Do(func() {
+		err = h.shutdown(ctx)
+	})
+
+	return err
 }
 
 func (h *clusterMeshPublisher) Uninstall(_ context.Context) error {
@@ -225,111 +235,52 @@ func (h *clusterMeshPublisher) Uninstall(_ context.Context) error {
 }
 
 func (h *clusterMeshPublisher) shutdown(ctx context.Context) error {
-	h.stopHeartbeat()
-
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	if h.store != nil {
-		for cidr := range h.published {
-			if err := h.store.DeleteRoute(ctx, cidr); err != nil {
-				logger.Warningf("Failed to delete Cilium CM route %s on shutdown: %v", cidr, err)
-			}
-		}
-
-		h.published = map[string]string{}
-
-		if err := h.store.DeleteClusterConfig(ctx, h.cfg.RemoteName); err != nil {
-			logger.Warningf("Failed to delete Cilium CM cluster-config %q on shutdown: %v",
-				h.cfg.RemoteName, err)
-		}
-
-		if err := h.store.Close(); err != nil {
-			h.store = nil
-			h.started = false
-			h.bootstrapped = false
-
-			return errors.Wrap(err, "close ClusterMesh publisher store")
-		}
-
-		h.store = nil
-	}
-
-	h.started = false
-	h.bootstrapped = false
-
-	return nil
-}
-
-func (h *clusterMeshPublisher) closeStore() error {
-	h.stopHeartbeat()
-
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
 	if h.store == nil {
-		h.started = false
 		return nil
 	}
 
-	err := h.store.Close()
-	h.store = nil
-	h.started = false
-	h.bootstrapped = false
-
-	return errors.Wrap(err, "close ClusterMesh publisher store")
-}
-
-func (h *clusterMeshPublisher) startHeartbeat(parentCtx context.Context) {
 	h.stopHeartbeat()
 
-	ctx, cancel := context.WithCancel(parentCtx)
-	done := make(chan struct{})
+	h.started = false
 
-	h.mu.Lock()
-	h.heartbeatCancel = cancel
-	h.heartbeatDone = done
-	store := h.store
-	h.mu.Unlock()
+	for publishedCIDR := range h.published {
+		if err := h.store.DeleteRoute(ctx, publishedCIDR); err != nil {
+			logger.Warningf("Failed to delete Cilium CM route %s on shutdown: %v", publishedCIDR, err)
+		}
+	}
+
+	h.published = map[string]string{}
+
+	if err := h.store.DeleteClusterConfig(ctx, h.cfg.RemoteName); err != nil {
+		logger.Warningf("Failed to delete Cilium CM cluster-config %q on shutdown: %v",
+			h.cfg.RemoteName, err)
+	}
+
+	return errors.Wrap(h.store.Close(), "error closing ClusterMesh publisher store")
+}
+
+func (h *clusterMeshPublisher) startHeartbeat(ctx context.Context) {
+	ctx, h.heartbeatCancel = context.WithCancel(ctx)
+	h.heartbeatDone = make(chan struct{})
 
 	go func() {
-		defer close(done)
+		defer close(h.heartbeatDone)
 
-		// Immediate touch so Cilium agents see count>=1 right after connect.
-		if err := store.TouchHeartbeat(ctx); err != nil && ctx.Err() == nil {
-			logger.Warningf("Failed to write initial Cilium CM heartbeat: %v", err)
-		}
-
-		ticker := time.NewTicker(cmHeartbeatInterval)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				if err := store.TouchHeartbeat(ctx); err != nil && ctx.Err() == nil {
-					logger.Warningf("Failed to update Cilium CM heartbeat: %v", err)
-				}
+		wait.Until(func() {
+			if err := h.store.TouchHeartbeat(ctx); err != nil && ctx.Err() == nil {
+				logger.Warningf("Failed to update heartbeat: %v", err)
 			}
-		}
+		}, cmHeartbeatInterval, ctx.Done())
 	}()
 }
 
 func (h *clusterMeshPublisher) stopHeartbeat() {
-	h.mu.Lock()
-	cancel := h.heartbeatCancel
-	done := h.heartbeatDone
-	h.heartbeatCancel = nil
-	h.heartbeatDone = nil
-	h.mu.Unlock()
-
-	if cancel == nil {
+	if h.heartbeatCancel == nil {
 		return
 	}
 
-	cancel()
-	<-done
+	h.heartbeatCancel()
+	<-h.heartbeatDone
 }
 
 func (h *clusterMeshPublisher) reconcileOnEvent() error {
@@ -392,21 +343,16 @@ func (h *clusterMeshPublisher) setGatewayIP(endpoint *submV1.Endpoint) {
 	}
 
 	if ip := endpoint.Spec.GetPrivateIP(k8snet.IPv4); ip != "" {
-		h.mu.Lock()
 		h.gatewayIP = ip
-		h.mu.Unlock()
 	}
 }
 
 func (h *clusterMeshPublisher) reconcile(ctx context.Context) error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
 	if !h.started || h.store == nil {
 		return nil
 	}
 
-	hostIP, err := h.resolveHostIPLocked(ctx)
+	hostIP, err := h.resolveHostIP(ctx)
 	if err != nil {
 		logger.Warningf("Cilium ClusterMesh publisher: cannot select HostIP on node %q: %v",
 			h.cfg.LocalNodeName, err)
@@ -422,7 +368,7 @@ func (h *clusterMeshPublisher) reconcile(ctx context.Context) error {
 		h.bootstrapped = true
 	}
 
-	desired := h.desiredRemoteCIDRsLocked()
+	desired := h.desiredRemoteCIDRs()
 	desiredSet := make(map[string]struct{}, len(desired))
 
 	for _, c := range desired {
@@ -456,7 +402,7 @@ func (h *clusterMeshPublisher) reconcile(ctx context.Context) error {
 	return nil
 }
 
-func (h *clusterMeshPublisher) desiredRemoteCIDRsLocked() []string {
+func (h *clusterMeshPublisher) desiredRemoteCIDRs() []string {
 	desired := make([]string, 0, len(h.State().GetRemoteEndpoints()))
 
 	for i := range h.State().GetRemoteEndpoints() {
@@ -469,7 +415,7 @@ func (h *clusterMeshPublisher) desiredRemoteCIDRsLocked() []string {
 	return slices.Compact(desired)
 }
 
-func (h *clusterMeshPublisher) resolveHostIPLocked(ctx context.Context) (string, error) {
+func (h *clusterMeshPublisher) resolveHostIP(ctx context.Context) (string, error) {
 	nodeIPs, err := h.listHostIPCandidateIPs(ctx)
 	if err != nil {
 		return "", err
