@@ -108,6 +108,7 @@ type clusterMeshPublisher struct {
 	client kubernetes.Interface
 	cfg    PublisherConfig
 
+	mu           sync.Mutex
 	store        *etcdStore
 	gatewayIP    string
 	published    map[string]string // cidr -> hostIP
@@ -235,6 +236,9 @@ func (h *clusterMeshPublisher) Uninstall(_ context.Context) error {
 }
 
 func (h *clusterMeshPublisher) shutdown(ctx context.Context) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
 	if h.store == nil {
 		return nil
 	}
@@ -343,12 +347,18 @@ func (h *clusterMeshPublisher) setGatewayIP(endpoint *submV1.Endpoint) {
 	}
 
 	if ip := endpoint.Spec.GetPrivateIP(k8snet.IPv4); ip != "" {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+
 		h.gatewayIP = ip
 	}
 }
 
 func (h *clusterMeshPublisher) reconcile(ctx context.Context) error {
-	if !h.started || h.store == nil {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if !h.started {
 		return nil
 	}
 
