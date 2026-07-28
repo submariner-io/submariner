@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	k8snet "k8s.io/utils/net"
 )
 
 func testGatewayTransition() {
@@ -66,8 +67,10 @@ func testGatewayTransition() {
 				t.CreateNode(ctx, newNode(nodeIPv4Address2))
 			})
 
-			It("should add an FDB entry on the VxLAN interface for each address", func() {
-				t.netLink.AwaitNeighbors(vxLanInterfaceIndex, nodeIPv4Address1, nodeIPv4Address2)
+			It("should add underlay FDB and VTEP neighbor entries for each address", func() {
+				t.netLink.AwaitNeighbors(vxLanInterfaceIndex,
+					nodeIPv4Address1, expectedNodeVTEP(nodeIPv4Address1, k8snet.IPv4),
+					nodeIPv4Address2, expectedNodeVTEP(nodeIPv4Address2, k8snet.IPv4))
 			})
 		})
 

@@ -271,6 +271,18 @@ func newNodeWithPodCIDR(addr, podCIDR string) *corev1.Node {
 	return node
 }
 
+func expectedNodeVTEP(nodeIP string, family k8snet.IPFamily) string {
+	prefix := kubeproxy.VxLANVTepNetworkPrefixCIDR
+	if family == k8snet.IPv6 {
+		prefix = kubeproxy.VxLANVTepNetworkPrefixCIDRIPv6
+	}
+
+	vtepIP, err := vxlan.GetVtepIPAddressFrom(nodeIP, prefix, family)
+	Expect(err).NotTo(HaveOccurred())
+
+	return vtepIP.String()
+}
+
 func toVxlan(link netlink.Link) *netlink.Vxlan {
 	vxLan, ok := link.(*netlink.Vxlan)
 	Expect(ok).To(BeTrue(), "Unexpected Link type: %T", link)

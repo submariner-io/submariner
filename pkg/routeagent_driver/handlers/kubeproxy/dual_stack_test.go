@@ -73,8 +73,9 @@ func testDualStack() {
 				}
 			})
 
-			It("should only add an FDB entry on the VxLAN interface for the target IP family address", func() {
-				t.netLink.AwaitNeighbors(t.getVxLanInterfaceIndex(), nodeAddresses[t.ipFamily])
+			It("should only add underlay FDB and VTEP neighbor entries for the target IP family address", func() {
+				nodeIP := nodeAddresses[t.ipFamily]
+				t.netLink.AwaitNeighbors(t.getVxLanInterfaceIndex(), nodeIP, expectedNodeVTEP(nodeIP, t.ipFamily))
 			})
 		})
 	}

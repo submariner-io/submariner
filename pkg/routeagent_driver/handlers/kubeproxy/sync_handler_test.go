@@ -52,11 +52,11 @@ func testNodes() {
 			t.CreateNode(ctx, node)
 		})
 
-		It("should add/remove an FDB entry on the VxLAN interface for each Node address", func(ctx context.Context) {
-			t.netLink.AwaitNeighbors(vxLanInterfaceIndex, nodeIPv4Address1)
+		It("should add/remove underlay FDB and VTEP neighbor entries for each Node address", func(ctx context.Context) {
+			t.netLink.AwaitNeighbors(vxLanInterfaceIndex, nodeIPv4Address1, expectedNodeVTEP(nodeIPv4Address1, k8snet.IPv4))
 
 			t.DeleteNode(ctx, node.Name)
-			t.netLink.AwaitNoNeighbors(vxLanInterfaceIndex, nodeIPv4Address1)
+			t.netLink.AwaitNoNeighbors(vxLanInterfaceIndex, nodeIPv4Address1, expectedNodeVTEP(nodeIPv4Address1, k8snet.IPv4))
 		})
 
 		It("should add/remove an ingress route for the Node pod CIDR via its VTEP", func(ctx context.Context) {
