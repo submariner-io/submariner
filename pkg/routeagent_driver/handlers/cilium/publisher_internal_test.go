@@ -115,7 +115,7 @@ var _ = Describe("ClusterMesh publisher", func() {
 			support.CreateEndpoint(ctx, eventtesting.NewEndpoint("west", "host", remoteCIDR))
 
 			Eventually(func() string {
-				return routeHostIP(etcdClient, remoteCIDR)
+				return routeHostIP(etcdClient)
 			}).Should(Equal(otherIP))
 		})
 
@@ -128,7 +128,7 @@ var _ = Describe("ClusterMesh publisher", func() {
 				support.CreateEndpoint(ctx, eventtesting.NewEndpoint("west", "host", remoteCIDR))
 
 				Eventually(func() string {
-					return routeHostIP(etcdClient, remoteCIDR)
+					return routeHostIP(etcdClient)
 				}).Should(Equal("10.0.0.9"))
 			})
 		})
@@ -144,13 +144,13 @@ var _ = Describe("ClusterMesh publisher", func() {
 
 		It("should republish when HostIP changes after LocalEndpointUpdated", func(ctx context.Context) {
 			support.CreateEndpoint(ctx, eventtesting.NewEndpoint("west", "host", remoteCIDR))
-			Eventually(func() string { return routeHostIP(etcdClient, remoteCIDR) }).Should(Equal(gatewayIP))
+			Eventually(func() string { return routeHostIP(etcdClient) }).Should(Equal(gatewayIP))
 
 			localEP := eventtesting.NewEndpoint("east", "local-gw", "10.0.0.0/16")
 			localEP.Spec.SetPrivateIP(otherIP)
 			Expect(handler.LocalEndpointUpdated(localEP)).To(Succeed())
 
-			Eventually(func() string { return routeHostIP(etcdClient, remoteCIDR) }).Should(Equal(otherIP))
+			Eventually(func() string { return routeHostIP(etcdClient) }).Should(Equal(otherIP))
 			Expect(routeKeyCount(etcdClient)).To(Equal(1))
 		})
 
@@ -286,8 +286,8 @@ func routeKeyCount(c *fake.EtcdClient) int {
 	return c.KeyCountWithPrefix(cmIPStatePrefix + "/")
 }
 
-func routeHostIP(c *fake.EtcdClient, cidrStr string) string {
-	raw := c.Value(ipIdentityKey(cidrStr))
+func routeHostIP(c *fake.EtcdClient) string {
+	raw := c.Value(ipIdentityKey("10.151.0.0/16"))
 	if raw == nil {
 		return ""
 	}

@@ -105,20 +105,17 @@ type clusterMeshPublisher struct {
 	event.HandlerBase
 	event.NodeHandlerBase
 
-	client kubernetes.Interface
-	cfg    PublisherConfig
-
-	mu           sync.Mutex
-	store        *etcdStore
-	gatewayIP    string
-	published    map[string]string // cidr -> hostIP
-	started      bool
-	bootstrapped bool
-
+	client          kubernetes.Interface
 	heartbeatCancel context.CancelFunc
+	published       map[string]string // cidr -> hostIP
 	heartbeatDone   chan struct{}
-
-	stopOnce sync.Once
+	store           *etcdStore
+	gatewayIP       string
+	cfg             PublisherConfig
+	stopOnce        sync.Once
+	mu              sync.Mutex
+	started         bool
+	bootstrapped    bool
 }
 
 // NewClusterMeshPublisher returns a handler that publishes remote Submariner
