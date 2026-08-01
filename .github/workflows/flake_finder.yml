@@ -35,7 +35,7 @@ jobs:
           - k8s_version: 'k8s-oldest-supported'
     steps:
       - name: Check out the repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Run E2E deployment and tests
         uses: submariner-io/shipyard/gh-actions/e2e@devel

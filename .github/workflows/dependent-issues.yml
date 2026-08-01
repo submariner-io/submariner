@@ -18,7 +18,7 @@ jobs:
     if: github.repository_owner == 'submariner-io'
     runs-on: ubuntu-latest
     steps:
-      - uses: depends-on/depends-on-action@826c144163ac67bf08347590a5f81afd45da63ca  # v0.16.0
+      - uses: depends-on/depends-on-action@c7ac9a6932a7069e83aef80c202d9f60f91e43fd  # v0.17.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           check-unmerged-pr: true
