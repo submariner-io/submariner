@@ -32,10 +32,18 @@ import (
 // AmneziaWG always applies these defaults (there is no "plain WireGuard" mode via options):
 // the driver is intentionally an obfuscating tunnel, not a WG drop-in with optional junk.
 //
-// H1–H4 and S1–S4 MUST be identical on every Submariner peer (every cluster using this driver).
+// The vendored github.com/amnezia-vpn/amneziawg-go device only implements the subset of the
+// AmneziaWG protocol below: magic headers (H1-H4) are single uint32 values, not "min-max"
+// ranges, and there is no S3 (cookie) / S4 (transport) padding support. Sending either of
+// those over the UAPI configuration protocol fails the whole "set" operation with EINVAL,
+// which previously broke every fresh AmneziaWG gateway (see the issue link below).
+//
+// H1–H4 and S1–S2 MUST be identical on every Submariner peer (every cluster using this driver).
 // Jc / Jmin / Jmax / I1–I5 may differ per side, but the shipped defaults keep both sides symmetric
 // so a single cableDriverOptions map (or no overrides) works out of the box. Mismatched H*/S*
 // typically yields silent connectivity failure — override carefully and keep clusters in sync.
+//
+// Report: https://github.com/submariner-io/submariner/issues/4118
 func obfuscationOptionTable(cfg *wgtypes.Config) []cableDriverOption {
 	return []cableDriverOption{
 		// Junk packets before each handshake (helps break WG size signatures).
@@ -43,18 +51,16 @@ func obfuscationOptionTable(cfg *wgtypes.Config) []cableDriverOption {
 		option("jmin", "80", parsePositiveInt, &cfg.Jmin),
 		option("jmax", "200", parsePositiveInt, &cfg.Jmax),
 
-		// Message padding (AWG 2.0: S3 cookie, S4 transport). Must match on every peer.
+		// Message padding. Must match on every peer.
 		option("s1", "45", parseNonNegativeInt, &cfg.S1),
 		option("s2", "60", parseNonNegativeInt, &cfg.S2),
-		option("s3", "35", parseNonNegativeInt, &cfg.S3),
-		option("s4", "12", parseNonNegativeInt, &cfg.S4),
 
-		// Magic headers as non-overlapping ranges (AWG 2.0) — not the fixed WG types 1–4.
+		// Magic headers (single uint32 per packet type) — not the fixed WG types 1–4.
 		// Must match on every peer.
-		option("h1", "200000000-280000000", parseHeader, &cfg.H1),
-		option("h2", "400000000-480000000", parseHeader, &cfg.H2),
-		option("h3", "600000000-680000000", parseHeader, &cfg.H3),
-		option("h4", "800000000-880000000", parseHeader, &cfg.H4),
+		option("h1", "240000000", parseHeader, &cfg.H1),
+		option("h2", "440000000", parseHeader, &cfg.H2),
+		option("h3", "640000000", parseHeader, &cfg.H3),
+		option("h4", "840000000", parseHeader, &cfg.H4),
 
 		// Custom init packets (AWG 2.0) — random-looking UDP before handshake.
 		option("i1", "<r 40>", parseInitPacket, &cfg.I1),
@@ -76,13 +82,12 @@ func validateObfuscationOptions(table []cableDriverOption) []error {
 			"invalid AmneziaWG options: jmin (%d) must be <= jmax (%d)", *jmin, *jmax))
 	}
 
-	type namedRange struct {
+	type namedHeader struct {
 		name  string
-		value string
-		r     headerRange
+		value uint64
 	}
 
-	headers := make([]namedRange, 0, 4)
+	headers := make([]namedHeader, 0, 4)
 
 	for _, key := range []string{"h1", "h2", "h3", "h4"} {
 		val, ok := optionValue[*string](table, key)
@@ -90,22 +95,21 @@ func validateObfuscationOptions(table []cableDriverOption) []error {
 			continue
 		}
 
-		r, err := parseHeaderRange(*val)
+		// Already validated by parseHeader; the error was reported there.
+		n, err := strconv.ParseUint(*val, 10, 32)
 		if err != nil {
-			errs = append(errs, errors.Wrapf(err, "invalid AmneziaWG option %q", key))
 			continue
 		}
 
-		headers = append(headers, namedRange{name: key, value: *val, r: r})
+		headers = append(headers, namedHeader{name: key, value: n})
 	}
 
 	for i := range headers {
 		for j := i + 1; j < len(headers); j++ {
-			left, right := headers[i], headers[j]
-			if left.r.start <= right.r.end && right.r.start <= left.r.end {
+			if headers[i].value == headers[j].value {
 				errs = append(errs, errors.Errorf(
-					"invalid AmneziaWG options: %s (%s) overlaps %s (%s)",
-					left.name, left.value, right.name, right.value))
+					"invalid AmneziaWG options: %s and %s must not have the same value (%d)",
+					headers[i].name, headers[j].name, headers[i].value))
 			}
 		}
 	}
@@ -113,44 +117,13 @@ func validateObfuscationOptions(table []cableDriverOption) []error {
 	return errs
 }
 
-type headerRange struct {
-	start uint64
-	end   uint64
-}
-
+// parseHeader mirrors amneziawg-go's handleDeviceLine for h1-h4: a single uint32, not a range.
 func parseHeader(key, value string) (*string, error) {
-	if _, err := parseHeaderRange(value); err != nil {
-		return nil, errors.Wrapf(err, "invalid AmneziaWG option %q=%q", key, value)
+	if _, err := strconv.ParseUint(value, 10, 32); err != nil {
+		return nil, errors.Wrapf(err, "invalid AmneziaWG option %q=%q: must be a single uint32", key, value)
 	}
 
 	return new(value), nil
-}
-
-// parseHeaderRange mirrors amneziawg-go newMagicHeader: single uint32 or min-max with min <= max.
-func parseHeaderRange(value string) (headerRange, error) {
-	parts := strings.Split(value, "-")
-	if len(parts) < 1 || len(parts) > 2 {
-		return headerRange{}, errors.New("expected uint32 or min-max range")
-	}
-
-	start, err := strconv.ParseUint(parts[0], 10, 32)
-	if err != nil {
-		return headerRange{}, errors.Wrap(err, "invalid range start")
-	}
-
-	end := start
-	if len(parts) == 2 {
-		end, err = strconv.ParseUint(parts[1], 10, 32)
-		if err != nil {
-			return headerRange{}, errors.Wrap(err, "invalid range end")
-		}
-	}
-
-	if end < start {
-		return headerRange{}, errors.New("range start must be <= end")
-	}
-
-	return headerRange{start: start, end: end}, nil
 }
 
 func parseInitPacket(key, value string) (*string, error) {

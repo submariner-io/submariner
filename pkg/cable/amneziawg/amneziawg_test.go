@@ -158,10 +158,8 @@ func testNewDriver() {
 		Expect(device.Jmax).To(Equal(200))
 		Expect(device.S1).To(Equal(45))
 		Expect(device.S2).To(Equal(60))
-		Expect(device.S3).To(Equal(35))
-		Expect(device.S4).To(Equal(12))
-		Expect(device.H1).To(Equal("200000000-280000000"))
-		Expect(device.H2).To(Equal("400000000-480000000"))
+		Expect(device.H1).To(Equal("240000000"))
+		Expect(device.H2).To(Equal("440000000"))
 		Expect(device.I1).To(Equal("<r 40>"))
 		Expect(device.Peers).To(BeEmpty(), "ReplacePeers should clear the pre-seeded peer")
 
@@ -171,7 +169,7 @@ func testNewDriver() {
 
 	When("cable driver options are set", func() {
 		BeforeEach(func() {
-			os.Setenv(cable.CableDriverOptionsEnv, `{"jc":"3","h1":"10-20","i1":"<b 0x64>"}`)
+			os.Setenv(cable.CableDriverOptionsEnv, `{"jc":"3","h1":"300000000","i1":"<b 0x64>"}`)
 		})
 
 		AfterEach(func() {
@@ -181,9 +179,9 @@ func testNewDriver() {
 		It("should override the default obfuscation parameters", func() {
 			device := t.client.devices[amneziawg.DefaultDeviceName]
 			Expect(device.Jc).To(Equal(3))
-			Expect(device.H1).To(Equal("10-20"))
+			Expect(device.H1).To(Equal("300000000"))
 			Expect(device.I1).To(Equal("<b 0x64>"))
-			Expect(device.S3).To(Equal(35))
+			Expect(device.S1).To(Equal(45))
 		})
 	})
 
