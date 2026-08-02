@@ -23,14 +23,14 @@ import (
 	"net"
 	"sync"
 
-	"github.com/amnezia-vpn/amneziawg-go/conn"
-	"github.com/amnezia-vpn/amneziawg-go/device"
-	"github.com/amnezia-vpn/amneziawg-go/ipc"
-	"github.com/amnezia-vpn/amneziawg-go/tun"
+	"github.com/amnezia-vpn/amneziawg-go/v3/conn"
+	"github.com/amnezia-vpn/amneziawg-go/v3/device"
+	"github.com/amnezia-vpn/amneziawg-go/v3/ipc"
+	"github.com/amnezia-vpn/amneziawg-go/v3/tun"
 	"github.com/pkg/errors"
 )
 
-// UserspaceDevice is the embedded amneziawg-go daemon. Unit tests may substitute a no-op.
+// UserspaceDevice is the embedded amneziawg-go/v3 daemon. Unit tests may substitute a no-op.
 type UserspaceDevice interface {
 	Close() error
 }
@@ -61,7 +61,7 @@ func (d *embeddedDaemon) Close() error {
 	return errors.Wrap(err, "error closing AmneziaWG UAPI listener")
 }
 
-// StartUserspaceDevice creates the embedded amneziawg-go daemon. Unit tests may override this.
+// StartUserspaceDevice creates the embedded amneziawg-go/v3 daemon. Unit tests may override this.
 var StartUserspaceDevice = func(ifaceName string) (UserspaceDevice, error) {
 	tdev, err := tun.CreateTUN(ifaceName, device.DefaultMTU)
 	if err != nil {
