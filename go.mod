@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/advanced-wg/awgctrl-go v1.0.0
-	github.com/amnezia-vpn/amneziawg-go v1.0.4
+	github.com/amnezia-vpn/amneziawg-go/v3 v3.0.3
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/cert-manager/go-pkcs12 v0.0.0-20251218073410-44b982790b7c
 	github.com/coreos/go-iptables v0.8.0
@@ -79,11 +79,9 @@ require (
 	github.com/rs/zerolog v1.35.1 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
-	github.com/tevino/abool v1.2.0 // indirect
 	github.com/urfave/cli/v2 v2.4.0 // indirect
 	github.com/vishvananda/netns v0.0.5 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	go.uber.org/atomic v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.54.0 // indirect

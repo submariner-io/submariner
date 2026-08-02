@@ -43,20 +43,21 @@ func obfuscationOptionTable(cfg *wgtypes.Config) []cableDriverOption {
 		option("jmin", "80", parsePositiveInt, &cfg.Jmin),
 		option("jmax", "200", parsePositiveInt, &cfg.Jmax),
 
-		// Message padding (AWG 2.0: S3 cookie, S4 transport). Must match on every peer.
+		// Message padding (AWG 2+/3: S3 cookie, S4 transport). Must match on every peer.
+		// S4 default is 12 so optional AWG 3 header protection (nonce size) can be enabled later.
 		option("s1", "45", parseNonNegativeInt, &cfg.S1),
 		option("s2", "60", parseNonNegativeInt, &cfg.S2),
 		option("s3", "35", parseNonNegativeInt, &cfg.S3),
 		option("s4", "12", parseNonNegativeInt, &cfg.S4),
 
-		// Magic headers as non-overlapping ranges (AWG 2.0) — not the fixed WG types 1–4.
+		// Magic headers as non-overlapping ranges (AWG 2+/3) — not the fixed WG types 1–4.
 		// Must match on every peer.
 		option("h1", "200000000-280000000", parseHeader, &cfg.H1),
 		option("h2", "400000000-480000000", parseHeader, &cfg.H2),
 		option("h3", "600000000-680000000", parseHeader, &cfg.H3),
 		option("h4", "800000000-880000000", parseHeader, &cfg.H4),
 
-		// Custom init packets (AWG 2.0) — random-looking UDP before handshake.
+		// Custom init packets (AWG 2+/3) — random-looking UDP before handshake.
 		option("i1", "<r 40>", parseInitPacket, &cfg.I1),
 		option("i2", "<r 25>", parseInitPacket, &cfg.I2),
 		option("i3", "<r 20>", parseInitPacket, &cfg.I3),
@@ -126,7 +127,7 @@ func parseHeader(key, value string) (*string, error) {
 	return new(value), nil
 }
 
-// parseHeaderRange mirrors amneziawg-go newMagicHeader: single uint32 or min-max with min <= max.
+// parseHeaderRange mirrors amneziawg-go/v3 UintRange.FromString: single uint32 or min-max with min <= max.
 func parseHeaderRange(value string) (headerRange, error) {
 	parts := strings.Split(value, "-")
 	if len(parts) < 1 || len(parts) > 2 {
