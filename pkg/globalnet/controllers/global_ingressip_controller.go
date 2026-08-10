@@ -74,6 +74,7 @@ func NewGlobalIngressIPController(ctx context.Context, config *syncer.ResourceSy
 	federator := federate.NewUpdateStatusFederator(config.SourceClient, config.RestMapper, corev1.NamespaceAll)
 
 	client := config.SourceClient.Resource(*gvr)
+	controller.globalIngressIPs = client
 
 	list, err := client.Namespace(corev1.NamespaceAll).List(ctx, metav1.ListOptions{})
 	if err != nil {
@@ -142,6 +143,22 @@ func (c *globalIngressIPController) GetSyncer() syncer.Interface {
 	return c.resourceSyncer
 }
 
+func (c *globalIngressIPController) fetchLatestFromAPIServer(ctx context.Context, ingressIP *submarinerv1.GlobalIngressIP) error {
+	key, _ := cache.MetaNamespaceKeyFunc(ingressIP)
+
+	freshObj, err := c.globalIngressIPs.Namespace(ingressIP.Namespace).Get(ctx, ingressIP.Name, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "error retrieving latest GlobalIngressIP %q from API server", key)
+	}
+
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(freshObj.Object, ingressIP)
+	if err != nil {
+		return errors.Wrapf(err, "error converting GlobalIngressIP %q", key)
+	}
+
+	return nil
+}
+
 func (c *globalIngressIPController) process(from runtime.Object, numRequeues int, op syncer.Operation) (runtime.Object, bool) {
 	ctx := wait.ContextForChannel(c.stopCh)
 
@@ -152,6 +169,14 @@ func (c *globalIngressIPController) process(from runtime.Object, numRequeues int
 
 	switch op {
 	case syncer.Create:
+		// Always fetch the latest version from the API server to avoid processing stale cached data.
+		// This can happen when the service controller re-queues the GlobalIngressIP immediately after initial allocation,
+		// before the syncer's cache has been updated with the new status.
+		if err := c.fetchLatestFromAPIServer(ctx, ingressIP); err != nil {
+			logger.Error(err, "Failed to fetch latest GlobalIngressIP from API server")
+			return nil, true
+		}
+
 		prevStatus := ingressIP.Status
 
 		trimAllocatedStatusCondition(&ingressIP.Status.Conditions)
