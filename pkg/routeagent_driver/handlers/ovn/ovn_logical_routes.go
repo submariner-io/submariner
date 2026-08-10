@@ -114,7 +114,9 @@ func (c *ConnectionHandler) reconcileSubOvnLogicalRouterPolicies(remoteSubnets s
 
 		subnet := parts[2]
 
-		return !remoteSubnets.Has(subnet) || !reflect.DeepEqual(item.Nexthop, &nextHop)
+		// Delete stale policies: wrong subnet or wrong nexthops.
+		// This also migrates old policies that used deprecated Nexthop field (will have empty Nexthops).
+		return !remoteSubnets.Has(subnet) || !reflect.DeepEqual(item.Nexthops, []string{nextHop})
 	}
 
 	// Cleanup any existing lrps not representing the correct set of remote subnets
@@ -126,7 +128,7 @@ func (c *ConnectionHandler) reconcileSubOvnLogicalRouterPolicies(remoteSubnets s
 		lrpSubPredicate := func(item *nbdb.LogicalRouterPolicy) bool {
 			return item.Priority == lrp.Priority &&
 				item.Match == lrp.Match &&
-				reflect.DeepEqual(item.Nexthop, lrp.Nexthop)
+				reflect.DeepEqual(item.Nexthops, lrp.Nexthops)
 		}
 
 		if err := libovsdbops.CreateOrUpdateLogicalRouterPolicyWithPredicate(c.nbdb, OVNClusterRouter, lrp, lrpSubPredicate); err != nil {
@@ -158,7 +160,7 @@ func buildLRPsFromSubnets(family k8snet.IPFamily, subnetsToAdd []string, nextHop
 			Priority: priority,
 			Action:   "reroute",
 			Match:    match,
-			Nexthop:  ptr.To(nextHop),
+			Nexthops: []string{nextHop},
 			ExternalIDs: map[string]string{
 				SubmarinerExternalIDKey: versions.Submariner(),
 			},
