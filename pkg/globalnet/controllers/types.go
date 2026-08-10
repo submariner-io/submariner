@@ -174,8 +174,9 @@ type clusterGlobalEgressIPController struct {
 
 type globalIngressIPController struct {
 	*baseIPAllocationController
-	services dynamic.NamespaceableResourceInterface
-	scheme   *runtime.Scheme
+	services         dynamic.NamespaceableResourceInterface
+	globalIngressIPs dynamic.NamespaceableResourceInterface
+	scheme           *runtime.Scheme
 }
 
 type serviceExportController struct {
