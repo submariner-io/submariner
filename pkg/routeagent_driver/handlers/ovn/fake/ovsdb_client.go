@@ -148,7 +148,29 @@ func (c *OVSDBClient) Create(models ...model.Model) ([]ovsdb.Operation, error) {
 	defer c.mutex.Unlock()
 
 	for _, m := range models {
-		c.models[reflect.TypeOf(m)] = append(c.models[reflect.TypeOf(m)], m)
+		// For LogicalRouterPolicy, check if one with the same Match already exists and replace it
+		if policy, ok := m.(*nbdb.LogicalRouterPolicy); ok {
+			existing := c.models[reflect.TypeOf(m)]
+			replaced := false
+
+			for i, e := range existing {
+				if existingPolicy, ok := e.(*nbdb.LogicalRouterPolicy); ok {
+					if existingPolicy.Match == policy.Match {
+						// Replace existing policy with the new one
+						existing[i] = m
+						replaced = true
+
+						break
+					}
+				}
+			}
+
+			if !replaced {
+				c.models[reflect.TypeOf(m)] = append(c.models[reflect.TypeOf(m)], m)
+			}
+		} else {
+			c.models[reflect.TypeOf(m)] = append(c.models[reflect.TypeOf(m)], m)
+		}
 	}
 
 	return []ovsdb.Operation{}, nil
@@ -162,7 +184,7 @@ func (c *OVSDBClient) hasModel(m any) (bool, string) {
 		switch t := m.(type) {
 		case *nbdb.LogicalRouterPolicy:
 			if strings.Contains(o.(*nbdb.LogicalRouterPolicy).Match, t.Match) &&
-				reflect.DeepEqual(o.(*nbdb.LogicalRouterPolicy).Nexthop, t.Nexthop) {
+				reflect.DeepEqual(o.(*nbdb.LogicalRouterPolicy).Nexthops, t.Nexthops) {
 				return true, ""
 			}
 		case *nbdb.LogicalRouterStaticRoute:
@@ -211,7 +233,7 @@ func (c *OVSDBClient) GetModel(m any) any {
 		switch t := m.(type) {
 		case *nbdb.LogicalRouterPolicy:
 			if strings.Contains(o.(*nbdb.LogicalRouterPolicy).Match, t.Match) &&
-				reflect.DeepEqual(o.(*nbdb.LogicalRouterPolicy).Nexthop, t.Nexthop) {
+				reflect.DeepEqual(o.(*nbdb.LogicalRouterPolicy).Nexthops, t.Nexthops) {
 				return o
 			}
 		case *nbdb.LogicalRouterStaticRoute:
@@ -289,6 +311,32 @@ func (c *predicateConditionalAPI) List(_ context.Context, result any) error {
 	}
 
 	return nil
+}
+
+func (c *predicateConditionalAPI) Delete() ([]ovsdb.Operation, error) {
+	c.client.mutex.Lock()
+	defer c.client.mutex.Unlock()
+
+	// Delete models that match the predicate
+	fn := reflect.ValueOf(c.predicate)
+
+	// Get the first parameter type to determine which model type we're filtering
+	predType := fn.Type().In(0)
+	models := c.client.models[predType]
+
+	var remaining []any
+
+	for _, o := range models {
+		v := fn.Call([]reflect.Value{reflect.ValueOf(o)})
+		// Keep models where predicate returns FALSE (delete where predicate returns TRUE)
+		if !v[0].Bool() {
+			remaining = append(remaining, o)
+		}
+	}
+
+	c.client.models[predType] = remaining
+
+	return []ovsdb.Operation{}, nil
 }
 
 type modelConditionalAPI struct {
