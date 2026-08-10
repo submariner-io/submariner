@@ -114,9 +114,9 @@ func (c *ConnectionHandler) reconcileSubOvnLogicalRouterPolicies(remoteSubnets s
 
 		subnet := parts[2]
 
-		// Delete stale policies: wrong subnet or wrong nexthops.
-		// This also migrates old policies that used deprecated Nexthop field (will have empty Nexthops).
-		return !remoteSubnets.Has(subnet) || !reflect.DeepEqual(item.Nexthops, []string{nextHop})
+		// Delete stale policies: wrong subnet, wrong nexthops, or has deprecated Nexthop field.
+		// This migrates old policies that used deprecated Nexthop field, even if Nexthops is correct.
+		return !remoteSubnets.Has(subnet) || !reflect.DeepEqual(item.Nexthops, []string{nextHop}) || item.Nexthop != nil
 	}
 
 	// Cleanup any existing lrps not representing the correct set of remote subnets
