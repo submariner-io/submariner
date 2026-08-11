@@ -5,8 +5,8 @@ github.com/advanced-wg/awgctrl-go v1.0.0 h1:Zkp90k7n9uWDni0OlDFdLPa7DHXNG0KJhkK8
 github.com/advanced-wg/awgctrl-go v1.0.0/go.mod h1:uYzDR5QOkzOglbeoExOwUh9xEWUGleggeUEHCIR/1pY=
 github.com/alexflint/go-filemutex v0.0.0-20171022225611-72bdc8eae2ae h1:AMzIhMUqU3jMrZiTuW0zkYeKlKDAFD+DG20IoO421/Y=
 github.com/alexflint/go-filemutex v0.0.0-20171022225611-72bdc8eae2ae/go.mod h1:CgnQgUtFrFz9mxFNtED3jI5tLDjKlOM+oUF/sTk6ps0=
-github.com/amnezia-vpn/amneziawg-go/v3 v3.0.3 h1:XYR85mN53hj2DTzToHs3OxIHrNA59QMg1m3+oiOnBi4=
-github.com/amnezia-vpn/amneziawg-go/v3 v3.0.3/go.mod h1:YoPc6qcOZqD7TXZ1xpedD8Sx3aSKsxN05ZqEFmXDNHk=
+github.com/amnezia-vpn/amneziawg-go/v3 v3.0.20260805 h1:hpa8uv2LgP3EbWxZPgodrCuGJkeabPmUlIcWs9K4cSg=
+github.com/amnezia-vpn/amneziawg-go/v3 v3.0.20260805/go.mod h1:YoPc6qcOZqD7TXZ1xpedD8Sx3aSKsxN05ZqEFmXDNHk=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
