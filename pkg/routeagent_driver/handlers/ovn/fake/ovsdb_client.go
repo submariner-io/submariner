@@ -183,8 +183,16 @@ func (c *OVSDBClient) hasModel(m any) (bool, string) {
 	for _, o := range c.models[reflect.TypeOf(m)] {
 		switch t := m.(type) {
 		case *nbdb.LogicalRouterPolicy:
-			if strings.Contains(o.(*nbdb.LogicalRouterPolicy).Match, t.Match) &&
-				reflect.DeepEqual(o.(*nbdb.LogicalRouterPolicy).Nexthops, t.Nexthops) {
+			policy := o.(*nbdb.LogicalRouterPolicy)
+			matchesNexthop := true
+
+			if t.Nexthop != nil {
+				matchesNexthop = reflect.DeepEqual(policy.Nexthop, t.Nexthop)
+			}
+
+			if strings.Contains(policy.Match, t.Match) &&
+				reflect.DeepEqual(policy.Nexthops, t.Nexthops) &&
+				matchesNexthop {
 				return true, ""
 			}
 		case *nbdb.LogicalRouterStaticRoute:
@@ -232,8 +240,16 @@ func (c *OVSDBClient) GetModel(m any) any {
 	for _, o := range c.models[reflect.TypeOf(m)] {
 		switch t := m.(type) {
 		case *nbdb.LogicalRouterPolicy:
-			if strings.Contains(o.(*nbdb.LogicalRouterPolicy).Match, t.Match) &&
-				reflect.DeepEqual(o.(*nbdb.LogicalRouterPolicy).Nexthops, t.Nexthops) {
+			policy := o.(*nbdb.LogicalRouterPolicy)
+			matchesNexthop := true
+
+			if t.Nexthop != nil {
+				matchesNexthop = reflect.DeepEqual(policy.Nexthop, t.Nexthop)
+			}
+
+			if strings.Contains(policy.Match, t.Match) &&
+				reflect.DeepEqual(policy.Nexthops, t.Nexthops) &&
+				matchesNexthop {
 				return o
 			}
 		case *nbdb.LogicalRouterStaticRoute:

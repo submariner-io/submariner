@@ -28,7 +28,6 @@ import (
 	"github.com/submariner-io/submariner/pkg/versions"
 	"k8s.io/apimachinery/pkg/util/sets"
 	k8snet "k8s.io/utils/net"
-	"k8s.io/utils/ptr"
 )
 
 const (
