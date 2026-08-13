@@ -15,3 +15,8 @@ ignore:
   - vulnerability: GO-2026-5841
     package:
       name: github.com/klauspost/compress
+
+  # No fixed version available in Go module registry; Unknown severity
+  - vulnerability: GO-2026-5932
+    package:
+      name: golang.org/x/crypto
