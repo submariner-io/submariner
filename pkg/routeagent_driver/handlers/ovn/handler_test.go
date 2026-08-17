@@ -818,6 +818,155 @@ func (t *handlerTestDriver) testOVNMgmtInterfaceAddressChange() {
 		t.netLink.AwaitGwRoutes(0, constants.RouteAgentInterClusterNetworkTableID, t.OVNK8sMgmntIntGw)
 		t.netLink.AwaitGwRoutes(0, constants.RouteAgentHostNetworkTableID, t.OVNK8sMgmntIntGw)
 	})
+
+	It("should skip network address routes and use valid gateway when route order changes", func(ctx context.Context) {
+		// This reproduces issue #4121 where after ROKS node reboot, route ordering changes
+		// and Submariner picks the wrong route (network address instead of valid gateway)
+		//
+		// Scenario:
+		// - Multiple routes exist for the same destination (cluster CIDR)
+		// - One route has Gw=nil (would use Dst.IP = network address like 171.0.1.0)
+		// - Another route has valid Gw=171.0.1.1
+		// - After reboot, the bad route (Gw=nil) comes FIRST in iteration order
+		// - Bug: Code returns first match (network address 171.0.1.0)
+		// - Fix: Code skips network addresses and continues to find valid gateway
+		link, err := t.netLink.LinkByName(ovn.OVNK8sMgmntIntfName)
+		Expect(err).To(Succeed())
+
+		// Remove existing routes
+		routes, err := t.netLink.RouteList(link, t.ipFamily)
+		Expect(err).To(Succeed())
+
+		for i := range routes {
+			if routes[i].Dst != nil && routes[i].Dst.String() == t.clusterCIDR {
+				Expect(t.netLink.RouteDel(&routes[i])).To(Succeed())
+			}
+		}
+
+		// Simulate "after reboot" scenario: Add routes in the order that causes the bug
+		// Route 1 (comes FIRST): Dst=cluster CIDR, Gw=nil (will use network address)
+		networkAddr := toIPNet(t.clusterCIDR)
+		Expect(t.netLink.RouteAdd(&netlink.Route{
+			LinkIndex: OVNK8sMgmntIntIndex,
+			Family:    netlinkAPI.ToNetlinkFamily(t.ipFamily),
+			Dst:       networkAddr,
+			Gw:        nil, // No gateway - Dst.IP is network address (e.g., 171.0.1.0)
+		})).To(Succeed())
+
+		// Route 2 (comes SECOND): Dst=cluster CIDR, Gw=valid gateway IP
+		validGateway := net.ParseIP(t.OVNK8sMgmntIntGw)
+		Expect(t.netLink.RouteAdd(&netlink.Route{
+			LinkIndex: OVNK8sMgmntIntIndex,
+			Family:    netlinkAPI.ToNetlinkFamily(t.ipFamily),
+			Dst:       networkAddr,
+			Gw:        validGateway, // Valid gateway (e.g., 171.0.1.1)
+		})).To(Succeed())
+
+		// Create a remote endpoint to trigger updateHostNetworkDataplane
+		endpoint := t.createEndpoint(ctx, ipv4Subnets[0])
+
+		// With the bug: Would use the first route's network address (171.0.1.0)
+		// With the fix: Should skip first route and use second route's valid gateway (171.0.1.1)
+		t.netLink.AwaitGwRoutes(0, constants.RouteAgentHostNetworkTableID, t.OVNK8sMgmntIntGw)
+
+		// Verify the correct gateway was chosen
+		routes150, err := t.netLink.RouteList(nil, t.ipFamily)
+		Expect(err).To(Succeed())
+
+		foundValidRoute := false
+
+		for i := range routes150 {
+			if routes150[i].Table == constants.RouteAgentHostNetworkTableID && routes150[i].Gw != nil {
+				foundValidRoute = true
+
+				// Must use the valid gateway, not the network address
+				Expect(routes150[i].Gw.String()).To(Equal(t.OVNK8sMgmntIntGw),
+					"Should use valid gateway %s, not network address", t.OVNK8sMgmntIntGw)
+
+				// Double-check: Gateway should NOT be a network address (last octet != 0)
+				gwBytes := routes150[i].Gw.To4()
+				if gwBytes != nil {
+					Expect(gwBytes[3]).NotTo(Equal(byte(0)),
+						"Gateway %s is a network address (ends in .0)", routes150[i].Gw.String())
+				}
+			}
+		}
+
+		Expect(foundValidRoute).To(BeTrue(), "Should have created route with valid gateway")
+
+		t.DeleteEndpoint(ctx, endpoint.Name)
+	})
+
+	It("should accept host routes (/32 or /128) with Gw=nil", func(ctx context.Context) {
+		// This tests that we don't reject valid host routes (/32 IPv4 or /128 IPv6)
+		// when Gw=nil. A host route's Dst.IP is a valid host address even though
+		// it equals Dst.IP.Mask(Dst.Mask) (because mask is all 1s).
+		link, err := t.netLink.LinkByName(ovn.OVNK8sMgmntIntfName)
+		Expect(err).To(Succeed())
+
+		// Remove existing routes
+		routes, err := t.netLink.RouteList(link, t.ipFamily)
+		Expect(err).To(Succeed())
+
+		for i := range routes {
+			if routes[i].Dst != nil && routes[i].Dst.String() == t.clusterCIDR {
+				Expect(t.netLink.RouteDel(&routes[i])).To(Succeed())
+			}
+		}
+
+		// Add a network address route (should be skipped)
+		networkAddr := toIPNet(t.clusterCIDR)
+		Expect(t.netLink.RouteAdd(&netlink.Route{
+			LinkIndex: OVNK8sMgmntIntIndex,
+			Family:    netlinkAPI.ToNetlinkFamily(t.ipFamily),
+			Dst:       networkAddr,
+			Gw:        nil, // Network address - should be skipped
+		})).To(Succeed())
+
+		// Add a /32 host route with Gw=nil (should be accepted)
+		hostIP := net.ParseIP(t.OVNK8sMgmntIntGw)
+		hostRoute := &net.IPNet{
+			IP:   hostIP,
+			Mask: net.CIDRMask(32, 32), // /32 for IPv4 or /128 for IPv6
+		}
+
+		if t.ipFamily == k8snet.IPv6 {
+			hostRoute.Mask = net.CIDRMask(128, 128)
+		}
+
+		Expect(t.netLink.RouteAdd(&netlink.Route{
+			LinkIndex: OVNK8sMgmntIntIndex,
+			Family:    netlinkAPI.ToNetlinkFamily(t.ipFamily),
+			Dst:       hostRoute,
+			Gw:        nil, // No gateway - will use Dst.IP which is a valid host IP
+		})).To(Succeed())
+
+		// Create a remote endpoint to trigger updateHostNetworkDataplane
+		endpoint := t.createEndpoint(ctx, ipv4Subnets[0])
+
+		// Should use the host route's Dst.IP, not the network address
+		t.netLink.AwaitGwRoutes(0, constants.RouteAgentHostNetworkTableID, t.OVNK8sMgmntIntGw)
+
+		// Verify the correct IP was chosen
+		routes150, err := t.netLink.RouteList(nil, t.ipFamily)
+		Expect(err).To(Succeed())
+
+		foundValidRoute := false
+
+		for i := range routes150 {
+			if routes150[i].Table == constants.RouteAgentHostNetworkTableID && routes150[i].Gw != nil {
+				foundValidRoute = true
+
+				// Must use the host route's IP
+				Expect(routes150[i].Gw.String()).To(Equal(t.OVNK8sMgmntIntGw),
+					"Should use host route IP %s", t.OVNK8sMgmntIntGw)
+			}
+		}
+
+		Expect(foundValidRoute).To(BeTrue(), "Should have created route with host route IP")
+
+		t.DeleteEndpoint(ctx, endpoint.Name)
+	})
 }
 
 func (t *handlerTestDriver) testUninstall() {
