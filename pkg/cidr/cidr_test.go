@@ -63,6 +63,20 @@ var _ = Describe("ExtractSubnets", func() {
 	})
 })
 
+var _ = Describe("IsContained", func() {
+	It("should return the correct results", func() {
+		Expect(cidr.IsContained([]string{"10.0.0.0/14"}, "10.1.0.0/16")).To(BeTrue())
+		Expect(cidr.IsContained([]string{"10.0.0.0/14", ipV6CIDR}, "10.0.0.0/14")).To(BeTrue())
+		Expect(cidr.IsContained([]string{"10.1.0.0/16"}, "10.0.0.0/14")).To(BeFalse())
+		Expect(cidr.IsContained([]string{"10.0.0.0/14"}, "11.0.0.0/16")).To(BeFalse())
+		Expect(cidr.IsContained([]string{}, "10.0.0.0/14")).To(BeFalse())
+		Expect(cidr.IsContained([]string{ipV6CIDR}, "10.0.0.0/14")).To(BeFalse())
+
+		_, err := cidr.IsContained([]string{ipV4CIDR}, "bogus")
+		Expect(err).To(HaveOccurred())
+	})
+})
+
 var _ = Describe("IsOverlapping", func() {
 	It("should return the correct results", func() {
 		Expect(cidr.IsOverlapping([]string{ipV4CIDR, ipV6CIDR}, ipV4CIDR2)).To(BeFalse())
