@@ -49,7 +49,10 @@ type DatastoreSyncer struct {
 	localCluster  types.SubmarinerCluster
 	localEndpoint *endpoint.Local
 	syncerConfig  broker.SyncerConfig
+	syncer        *broker.Syncer
 }
+
+const maxRemoteEndpointRequeues = 20
 
 var logger = log.Logger{Logger: logf.Log.WithName("DSSyncer")}
 
@@ -75,6 +78,8 @@ func (d *DatastoreSyncer) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	d.syncer = syncer
 
 	err = syncer.Start(ctx.Done())
 	if err != nil {
@@ -191,10 +196,14 @@ func (d *DatastoreSyncer) createSyncer(ctx context.Context) (*broker.Syncer, err
 	return syncer, errors.Wrap(err, "error creating the syncer")
 }
 
-func (d *DatastoreSyncer) shouldSyncRemoteEndpoint(obj runtime.Object, _ int,
-	_ resourceSyncer.Operation,
+func (d *DatastoreSyncer) shouldSyncRemoteEndpoint(obj runtime.Object, numRequeues int,
+	op resourceSyncer.Operation,
 ) (runtime.Object, bool) {
 	remoteEndpoint := obj.(*submarinerv1.Endpoint)
+
+	if op == resourceSyncer.Delete {
+		return obj, false
+	}
 
 	for _, localSubnet := range d.localEndpoint.Spec().Subnets {
 		overlap, err := cidr.IsOverlapping(remoteEndpoint.Spec.Subnets, localSubnet)
@@ -209,7 +218,97 @@ func (d *DatastoreSyncer) shouldSyncRemoteEndpoint(obj runtime.Object, _ int,
 		}
 	}
 
+	if rejected, requeue := d.validateRemoteEndpointSubnets(remoteEndpoint, numRequeues); rejected {
+		return nil, requeue
+	}
+
 	return obj, false
+}
+
+// validateRemoteEndpointSubnets ensures that subnets in a broker-supplied remote Endpoint are
+// consistent with that cluster's declared CIDRs and do not conflict with subnets already
+// accepted from other clusters. A remote Endpoint is rejected unless every Spec.Subnets entry
+// (i) is wholly contained in the CIDRs declared by that cluster's own Cluster CR
+// (Service/Cluster/Global), and (ii) does not overlap any subnet already accepted from a
+// different remote cluster. Returns (rejected, requeue).
+//
+//nolint:gocyclo // Method is not really that complex.
+func (d *DatastoreSyncer) validateRemoteEndpointSubnets(remoteEndpoint *submarinerv1.Endpoint, numRequeues int) (bool, bool) {
+	if len(remoteEndpoint.Spec.Subnets) == 0 || d.syncer == nil {
+		return false, false
+	}
+
+	var remoteCluster *submarinerv1.Cluster
+
+	for _, o := range d.syncer.ListLocalResources(&submarinerv1.Cluster{}) {
+		c := o.(*submarinerv1.Cluster)
+		if c.Spec.ClusterID == remoteEndpoint.Spec.ClusterID {
+			remoteCluster = c
+			break
+		}
+	}
+
+	if remoteCluster == nil {
+		if numRequeues < maxRemoteEndpointRequeues {
+			logger.V(log.DEBUG).Infof("Cluster CR for %q not yet synced; re-queueing remote Endpoint %q",
+				remoteEndpoint.Spec.ClusterID, remoteEndpoint.Name)
+
+			return true, true
+		}
+
+		logger.Errorf(nil, "Rejecting remote Endpoint %q: no Cluster CR found for cluster %q after %d retries",
+			remoteEndpoint.Name, remoteEndpoint.Spec.ClusterID, numRequeues)
+
+		return true, false
+	}
+
+	allowed := make([]string, 0, len(remoteCluster.Spec.ServiceCIDR)+len(remoteCluster.Spec.ClusterCIDR)+len(remoteCluster.Spec.GlobalCIDR))
+	allowed = append(allowed, remoteCluster.Spec.ServiceCIDR...)
+	allowed = append(allowed, remoteCluster.Spec.ClusterCIDR...)
+	allowed = append(allowed, remoteCluster.Spec.GlobalCIDR...)
+
+	for _, subnet := range remoteEndpoint.Spec.Subnets {
+		contained, err := cidr.IsContained(allowed, subnet)
+		if err != nil {
+			logger.Errorf(err, "Rejecting remote Endpoint %q: invalid subnet %q", remoteEndpoint.Name, subnet)
+			return true, false
+		}
+
+		if !contained {
+			logger.Errorf(nil, "Rejecting remote Endpoint %q: subnet %q is not within Cluster %q declared CIDRs %v",
+				remoteEndpoint.Name, subnet, remoteCluster.Spec.ClusterID, allowed)
+
+			return true, false
+		}
+	}
+
+	for _, o := range d.syncer.ListLocalResources(&submarinerv1.Endpoint{}) {
+		other := o.(*submarinerv1.Endpoint)
+		if other.Spec.ClusterID == remoteEndpoint.Spec.ClusterID || other.Spec.ClusterID == d.localCluster.Spec.ClusterID {
+			continue
+		}
+
+		for _, subnet := range remoteEndpoint.Spec.Subnets {
+			overlap, err := cidr.IsOverlapping(other.Spec.Subnets, subnet)
+			if err != nil {
+				logger.Errorf(err, "Rejecting remote Endpoint %q: unable to validate overlap with cluster %q",
+					remoteEndpoint.Name, other.Spec.ClusterID)
+
+				return true, false
+			}
+
+			if !overlap {
+				continue
+			}
+
+			logger.Errorf(nil, "Rejecting remote Endpoint %q: subnet %q overlaps subnet already accepted from cluster %q (%v)",
+				remoteEndpoint.Name, subnet, other.Spec.ClusterID, other.Spec.Subnets)
+
+			return true, false
+		}
+	}
+
+	return false, false
 }
 
 func (d *DatastoreSyncer) ensureExclusiveEndpoint(ctx context.Context, syncer *broker.Syncer) error {

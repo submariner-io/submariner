@@ -85,6 +85,8 @@ func testEndpointSyncing() {
 		It("should correctly sync the local datastore", func(ctx context.Context) {
 			awaitEndpoint(ctx, t.brokerEndpoints, t.localEndpoint)
 
+			t.createRemoteCluster(ctx, otherClusterID, "200.0.0.0/16", "201.0.0.0/16", "20.0.0.0/14")
+
 			endpoint := newEndpoint(&submarinerv1.EndpointSpec{
 				CableName:  fmt.Sprintf("submariner-cable-%s-10-253-1-2", otherClusterID),
 				ClusterID:  otherClusterID,
@@ -103,6 +105,49 @@ func testEndpointSyncing() {
 
 			Expect(t.brokerEndpoints.Delete(ctx, endpoint.GetName(), metav1.DeleteOptions{})).To(Succeed())
 			test.AwaitNoResource(ctx, t.localEndpoints, endpoint.GetName())
+		})
+	})
+
+	When("a remote Endpoint advertises a subnet not declared by its Cluster CR", func() {
+		It("should not sync it to the local datastore", func(ctx context.Context) {
+			awaitEndpoint(ctx, t.brokerEndpoints, t.localEndpoint)
+
+			t.createRemoteCluster(ctx, otherClusterID, "20.0.0.0/14")
+
+			endpoint := newEndpoint(&submarinerv1.EndpointSpec{
+				CableName: fmt.Sprintf("submariner-cable-%s-10-253-1-2", otherClusterID),
+				ClusterID: otherClusterID,
+				Subnets:   []string{"20.0.0.0/14", "30.0.0.0/14"},
+			})
+
+			test.CreateResource(ctx, t.brokerEndpoints, test.SetClusterIDLabel(endpoint, endpoint.Spec.ClusterID))
+			testutil.EnsureNoResource(ctx, resource.ForDynamic(t.localEndpoints), endpoint.GetName())
+		})
+	})
+
+	When("a remote Endpoint advertises a subnet that overlaps another remote cluster's accepted subnets", func() {
+		const thirdClusterID = "south"
+
+		It("should not sync it to the local datastore", func(ctx context.Context) {
+			awaitEndpoint(ctx, t.brokerEndpoints, t.localEndpoint)
+
+			t.createRemoteCluster(ctx, otherClusterID, "20.0.0.0/14")
+			victim := newEndpoint(&submarinerv1.EndpointSpec{
+				CableName: fmt.Sprintf("submariner-cable-%s-10-253-1-2", otherClusterID),
+				ClusterID: otherClusterID,
+				Subnets:   []string{"20.0.0.0/14"},
+			})
+			test.CreateResource(ctx, t.brokerEndpoints, test.SetClusterIDLabel(victim, victim.Spec.ClusterID))
+			awaitEndpoint(ctx, t.localEndpoints, &victim.Spec)
+
+			t.createRemoteCluster(ctx, thirdClusterID, "20.0.0.0/14")
+			attacker := newEndpoint(&submarinerv1.EndpointSpec{
+				CableName: fmt.Sprintf("submariner-cable-%s-10-254-1-2", thirdClusterID),
+				ClusterID: thirdClusterID,
+				Subnets:   []string{"20.0.0.0/16"},
+			})
+			test.CreateResource(ctx, t.brokerEndpoints, test.SetClusterIDLabel(attacker, attacker.Spec.ClusterID))
+			testutil.EnsureNoResource(ctx, resource.ForDynamic(t.localEndpoints), attacker.GetName())
 		})
 	})
 
