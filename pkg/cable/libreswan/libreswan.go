@@ -412,7 +412,7 @@ func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 	endpoint := &endpointInfo.Endpoint
 
 	// Validate endpoint inputs to prevent config injection
-	localIP := i.localEndpoint.GetPrivateIP(k8snet.IPv4)
+	localIP := i.localEndpoint.Spec.PrivateIP
 	if err := validateEndpointInputs(&endpoint.Spec, localIP, endpointInfo.UseIP); err != nil {
 		return "", err
 	}
