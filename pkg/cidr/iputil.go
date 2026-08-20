@@ -67,6 +67,31 @@ func OverlappingSubnets(localServiceCIDRs, localPodCIDRs, remoteSubnets []string
 	return nil
 }
 
+// IsContained returns true iff inner is wholly contained within at least one CIDR in outerList
+// (i.e. every address of inner is also an address of some outer). An empty outerList contains nothing.
+func IsContained(outerList []string, inner string) (bool, error) {
+	_, innerNet, err := net.ParseCIDR(inner)
+	if err != nil {
+		return false, errors.Wrapf(err, "error parsing CIDR %q", inner)
+	}
+
+	innerOnes, innerBits := innerNet.Mask.Size()
+
+	for _, o := range outerList {
+		_, outerNet, err := net.ParseCIDR(o)
+		if err != nil {
+			return false, errors.Wrapf(err, "error parsing CIDR %q", o)
+		}
+
+		outerOnes, outerBits := outerNet.Mask.Size()
+		if outerBits == innerBits && outerOnes <= innerOnes && outerNet.Contains(innerNet.IP) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func IsOverlapping(cidrList []string, cidr string) (bool, error) {
 	_, newNet, err := net.ParseCIDR(cidr)
 	if err != nil {
