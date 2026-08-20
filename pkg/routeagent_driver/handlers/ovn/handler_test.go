@@ -73,6 +73,7 @@ var _ = Describe("Handler", func() {
 		t.testGatewayTransitions(ipv4Subnets, ipv6Subnets)
 		t.testGatewayRoute(ipv4Subnets, ipv6OVNK8sMgmntIntGw, ipv6Subnets)
 		t.testNonGatewayRoutes(ipv4OVNK8sMgmntIntGw, ipv4Subnets, []string{"172.0.1.0/24"}, ipv6OVNK8sMgmntIntGw, ipv6Subnets)
+		When("the OVN management interface address changes", t.testOVNMgmtInterfaceAddressChange)
 	})
 
 	Context("IPv6", func() {
@@ -84,9 +85,8 @@ var _ = Describe("Handler", func() {
 		t.testGatewayTransitions(ipv6Subnets, ipv4Subnets)
 		t.testGatewayRoute(ipv6Subnets, ipv4OVNK8sMgmntIntGw, ipv4Subnets)
 		t.testNonGatewayRoutes(ipv6OVNK8sMgmntIntGw, ipv6Subnets, []string{"ab00:100::/64"}, ipv4OVNK8sMgmntIntGw, ipv4Subnets)
+		When("the OVN management interface address changes", t.testOVNMgmtInterfaceAddressChange)
 	})
-
-	When("the OVN management interface address changes", t.testOVNMgmtInterfaceAddressChange)
 
 	Context("on Uninstall", t.testUninstall)
 
@@ -864,7 +864,12 @@ func (t *handlerTestDriver) testOVNMgmtInterfaceAddressChange() {
 		})).To(Succeed())
 
 		// Create a remote endpoint to trigger updateHostNetworkDataplane
-		endpoint := t.createEndpoint(ctx, ipv4Subnets[0])
+		endpointSubnet := ipv4Subnets[0]
+		if t.ipFamily == k8snet.IPv6 {
+			endpointSubnet = ipv6Subnets[0]
+		}
+
+		endpoint := t.createEndpoint(endpointSubnet)
 
 		// With the bug: Would use the first route's network address (171.0.1.0)
 		// With the fix: Should skip first route and use second route's valid gateway (171.0.1.1)
@@ -895,7 +900,7 @@ func (t *handlerTestDriver) testOVNMgmtInterfaceAddressChange() {
 
 		Expect(foundValidRoute).To(BeTrue(), "Should have created route with valid gateway")
 
-		t.DeleteEndpoint(ctx, endpoint.Name)
+		t.DeleteEndpoint(endpoint.Name)
 	})
 
 	It("should accept host routes (/32 or /128) with Gw=nil", func(ctx context.Context) {
@@ -943,7 +948,12 @@ func (t *handlerTestDriver) testOVNMgmtInterfaceAddressChange() {
 		})).To(Succeed())
 
 		// Create a remote endpoint to trigger updateHostNetworkDataplane
-		endpoint := t.createEndpoint(ctx, ipv4Subnets[0])
+		endpointSubnet := ipv4Subnets[0]
+		if t.ipFamily == k8snet.IPv6 {
+			endpointSubnet = ipv6Subnets[0]
+		}
+
+		endpoint := t.createEndpoint(endpointSubnet)
 
 		// Should use the host route's Dst.IP, not the network address
 		t.netLink.AwaitGwRoutes(0, constants.RouteAgentHostNetworkTableID, t.OVNK8sMgmntIntGw)
@@ -966,7 +976,7 @@ func (t *handlerTestDriver) testOVNMgmtInterfaceAddressChange() {
 
 		Expect(foundValidRoute).To(BeTrue(), "Should have created route with host route IP")
 
-		t.DeleteEndpoint(ctx, endpoint.Name)
+		t.DeleteEndpoint(endpoint.Name)
 	})
 }
 
