@@ -63,8 +63,9 @@ const (
 var (
 	logger = log.Logger{Logger: logf.Log.WithName("libreswan")}
 
-	// cableNamePattern matches safe characters for connection names (alphanumeric, dash, underscore, dot).
-	cableNamePattern = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
+	// cableNamePattern matches safe characters for connection names (alphanumeric, dash, underscore, dot)
+	// and caps length at 200 to prevent oversized ipsec.conf stanzas.
+	cableNamePattern = regexp.MustCompile(`^[a-zA-Z0-9._-]{1,200}$`)
 )
 
 // validateCableName ensures the cable name doesn't contain injection characters.
