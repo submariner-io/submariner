@@ -21,7 +21,6 @@ package libreswan
 import (
 	"bufio"
 	"context"
-	"encoding/base64"
 	"fmt"
 	"net"
 	"os"
@@ -38,6 +37,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
+	"github.com/submariner-io/submariner/pkg/cable/psk"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/types"
@@ -161,23 +161,9 @@ func NewLibreswan(localEndpoint *types.SubmarinerEndpoint, _ *types.SubmarinerCl
 		return nil, errors.Wrapf(err, "error parsing %q from local endpoint", subv1.UDPPortConfig)
 	}
 
-	encodedPsk := ipSecSpec.PSK
-
-	if ipSecSpec.PSKSecret != "" {
-		pskBytes, err := os.ReadFile(fmt.Sprintf("/var/run/secrets/submariner.io/%s/psk", ipSecSpec.PSKSecret))
-		if err != nil {
-			return nil, errors.Wrapf(err, "error reading secret %s", ipSecSpec.PSKSecret)
-		}
-		var psk strings.Builder
-		encoder := base64.NewEncoder(base64.StdEncoding, &psk)
-
-		if _, err := encoder.Write(pskBytes); err != nil {
-			return nil, errors.Wrap(err, "error encoding secret")
-		}
-
-		encoder.Close()
-
-		encodedPsk = psk.String()
+	encodedPsk, err := psk.Resolve(ipSecSpec.PSK, ipSecSpec.PSKSecret, "")
+	if err != nil {
+		return nil, err //nolint:wrapcheck // No need to wrap
 	}
 
 	logger.Infof("Using NATT UDP port %d", nattPort)
