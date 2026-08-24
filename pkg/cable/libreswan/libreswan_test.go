@@ -299,10 +299,6 @@ func testConnectToEndpoint() {
 	When("the remote Endpoint has a CableName exceeding 200 characters", func() {
 		t := newTestDriver()
 
-		JustBeforeEach(func() {
-			Expect(t.driver.Init(context.TODO())).To(Succeed())
-		})
-
 		It("should reject the connection", func() {
 			longName := strings.Repeat("a", 201)
 			_, err := t.driver.ConnectToEndpoint(&natdiscovery.NATEndpointInfo{
@@ -324,10 +320,6 @@ func testConnectToEndpoint() {
 
 	When("the remote Endpoint has a CableName of exactly 200 characters", func() {
 		t := newTestDriver()
-
-		JustBeforeEach(func() {
-			Expect(t.driver.Init(context.TODO())).To(Succeed())
-		})
 
 		It("should not reject it for length", func() {
 			maxName := strings.Repeat("a", 200)

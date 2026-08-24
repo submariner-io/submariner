@@ -32,6 +32,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/resource"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
+	"github.com/submariner-io/submariner/pkg/cable/psk"
 	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
@@ -71,8 +72,9 @@ func init() {
 }
 
 type specification struct {
-	PSK      string `default:"default psk"`
-	NATTPort int32  `default:"4500"`
+	PSK       string `default:"default psk"`
+	PSKSecret string
+	NATTPort  int32 `default:"4500"`
 }
 
 type wireguard struct {
@@ -100,7 +102,12 @@ func NewDriver(localEndpoint *endpoint.Local, _ *types.SubmarinerCluster) (cable
 		return nil, errors.Wrap(err, "error processing environment config for wireguard")
 	}
 
-	if w.spec.PSK == "" || w.spec.PSK == "default psk" {
+	resolvedPSK, err := psk.Resolve(w.spec.PSK, w.spec.PSKSecret, "")
+	if err != nil {
+		return nil, err //nolint:wrapcheck // No need to wrap
+	}
+
+	if resolvedPSK == "" || resolvedPSK == "default psk" {
 		return nil, errors.New("CE_IPSEC_PSK must be set to a strong random value for the WireGuard driver")
 	}
 
@@ -124,13 +131,13 @@ func NewDriver(localEndpoint *endpoint.Local, _ *types.SubmarinerCluster) (cable
 	}()
 
 	// Generate local keys and set public key in BackendConfig.
-	var priv, pub, psk wgtypes.Key
+	var priv, pub, psKey wgtypes.Key
 
-	if psk, err = genPsk(w.spec.PSK); err != nil {
+	if psKey, err = genPsk(resolvedPSK); err != nil {
 		return nil, errors.Wrap(err, "error generating pre-shared key")
 	}
 
-	w.psk = &psk
+	w.psk = &psKey
 
 	if priv, err = wgtypes.GeneratePrivateKey(); err != nil {
 		return nil, errors.Wrap(err, "error generating private key")
@@ -438,9 +445,9 @@ func (w *wireguard) keyMismatch(cid string, key *wgtypes.Key) bool {
 	return false
 }
 
-func genPsk(psk string) (wgtypes.Key, error) {
+func genPsk(psKey string) (wgtypes.Key, error) {
 	// Convert spec PSK string to right length byte array, using sha256.Size == wgtypes.KeyLen.
-	pskBytes := sha256.Sum256([]byte(psk))
+	pskBytes := sha256.Sum256([]byte(psKey))
 	return wgtypes.NewKey(pskBytes[:]) //nolint:wrapcheck // Let the caller wrap it
 }
 
