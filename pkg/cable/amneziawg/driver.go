@@ -34,6 +34,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/resource"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
+	"github.com/submariner-io/submariner/pkg/cable/psk"
 	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
@@ -71,8 +72,9 @@ func init() {
 }
 
 type specification struct {
-	PSK      string `default:"default psk"`
-	NATTPort int32  `default:"4500"`
+	PSK       string `default:"default psk"`
+	PSKSecret string
+	NATTPort  int32 `default:"4500"`
 }
 
 type amneziawgDriver struct {
@@ -88,6 +90,8 @@ type amneziawgDriver struct {
 }
 
 // NewDriver creates a new AmneziaWG cable driver.
+//
+//nolint:gocyclo // Just barely exceeds threshold.
 func NewDriver(localEndpoint *endpoint.Local, _ *types.SubmarinerCluster, _ certificate.SigningRequestor) (cable.Driver, error) {
 	// We'll panic if localEndpoint is nil, this is intentional
 	var err error
@@ -102,7 +106,12 @@ func NewDriver(localEndpoint *endpoint.Local, _ *types.SubmarinerCluster, _ cert
 		return nil, errors.Wrap(err, "error processing environment config for amneziawg")
 	}
 
-	if a.spec.PSK == "" || a.spec.PSK == "default psk" {
+	resolvedPSK, err := psk.Resolve(a.spec.PSK, a.spec.PSKSecret, "")
+	if err != nil {
+		return nil, err //nolint:wrapcheck // No need to wrap
+	}
+
+	if resolvedPSK == "" || resolvedPSK == "default psk" {
 		return nil, errors.New("CE_IPSEC_PSK must be set to a strong random value for the AmneziaWG driver")
 	}
 
@@ -134,13 +143,13 @@ func NewDriver(localEndpoint *endpoint.Local, _ *types.SubmarinerCluster, _ cert
 		return nil, errors.Wrap(err, "failed to open awgctrl client")
 	}
 
-	var priv, pub, psk wgtypes.Key
+	var priv, pub, psKey wgtypes.Key
 
-	if psk, err = genPsk(a.spec.PSK); err != nil {
+	if psKey, err = genPsk(resolvedPSK); err != nil {
 		return nil, errors.Wrap(err, "error generating pre-shared key")
 	}
 
-	a.psk = &psk
+	a.psk = &psKey
 
 	if priv, err = wgtypes.GeneratePrivateKey(); err != nil {
 		return nil, errors.Wrap(err, "error generating private key")
@@ -460,8 +469,8 @@ func (a *amneziawgDriver) keyMismatch(cid string, key *wgtypes.Key) bool {
 	return false
 }
 
-func genPsk(psk string) (wgtypes.Key, error) {
-	pskBytes := sha256.Sum256([]byte(psk))
+func genPsk(psKey string) (wgtypes.Key, error) {
+	pskBytes := sha256.Sum256([]byte(psKey))
 	return wgtypes.NewKey(pskBytes[:]) //nolint:wrapcheck // Let the caller wrap it
 }
 
