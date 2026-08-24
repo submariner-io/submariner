@@ -7,5 +7,6 @@ ignore:
 
   # No fixed version available in Go module registry; Unknown severity
   - vulnerability: GO-2026-5932
+    fix-state: not-fixed
     package:
       name: golang.org/x/crypto
