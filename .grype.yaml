@@ -5,3 +5,9 @@ ignore:
     fix-state: not-fixed
     package:
       name: golang.org/x/crypto
+  # No fix available for golang.org/x/crypto.
+  - vulnerability: GO-2026-5932
+    fix-state: not-fixed
+    package:
+      name: golang.org/x/crypto
+      location: /go.mod
