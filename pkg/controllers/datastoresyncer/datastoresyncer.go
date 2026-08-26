@@ -52,8 +52,6 @@ type DatastoreSyncer struct {
 	syncer        *broker.Syncer
 }
 
-const maxRemoteEndpointRequeues = 20
-
 var logger = log.Logger{Logger: logf.Log.WithName("DSSyncer")}
 
 func New(syncerConfig *broker.SyncerConfig, localCluster *types.SubmarinerCluster,
@@ -231,9 +229,7 @@ func (d *DatastoreSyncer) shouldSyncRemoteEndpoint(obj runtime.Object, numRequeu
 // (i) is wholly contained in the CIDRs declared by that cluster's own Cluster CR
 // (Service/Cluster/Global), and (ii) does not overlap any subnet already accepted from a
 // different remote cluster. Returns (rejected, requeue).
-//
-//nolint:gocyclo // Method is not really that complex.
-func (d *DatastoreSyncer) validateRemoteEndpointSubnets(remoteEndpoint *submarinerv1.Endpoint, numRequeues int) (bool, bool) {
+func (d *DatastoreSyncer) validateRemoteEndpointSubnets(remoteEndpoint *submarinerv1.Endpoint, _ int) (bool, bool) {
 	if len(remoteEndpoint.Spec.Subnets) == 0 || d.syncer == nil {
 		return false, false
 	}
@@ -249,17 +245,10 @@ func (d *DatastoreSyncer) validateRemoteEndpointSubnets(remoteEndpoint *submarin
 	}
 
 	if remoteCluster == nil {
-		if numRequeues < maxRemoteEndpointRequeues {
-			logger.V(log.DEBUG).Infof("Cluster CR for %q not yet synced; re-queueing remote Endpoint %q",
-				remoteEndpoint.Spec.ClusterID, remoteEndpoint.Name)
+		logger.V(log.DEBUG).Infof("Cluster CR for %q not yet synced; re-queueing remote Endpoint %q",
+			remoteEndpoint.Spec.ClusterID, remoteEndpoint.Name)
 
-			return true, true
-		}
-
-		logger.Errorf(nil, "Rejecting remote Endpoint %q: no Cluster CR found for cluster %q after %d retries",
-			remoteEndpoint.Name, remoteEndpoint.Spec.ClusterID, numRequeues)
-
-		return true, false
+		return true, true
 	}
 
 	allowed := make([]string, 0, len(remoteCluster.Spec.ServiceCIDR)+len(remoteCluster.Spec.ClusterCIDR)+len(remoteCluster.Spec.GlobalCIDR))
