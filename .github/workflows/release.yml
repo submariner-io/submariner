@@ -8,7 +8,9 @@ on:
       - release-0.18
       - release-*
 
-permissions: {}
+permissions:
+  id-token: write   # cosign keyless via Sigstore OIDC
+  contents: read
 
 jobs:
   release:
