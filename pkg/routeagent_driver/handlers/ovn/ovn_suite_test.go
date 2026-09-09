@@ -22,6 +22,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"maps"
 	"net"
 	"os"
 	"sort"
@@ -75,13 +76,14 @@ func TestOvn(t *testing.T) {
 
 type testDriver struct {
 	*eventtesting.ControllerSupport
-	submClient         *fakesubm.Clientset
-	k8sClient          *fakek8s.Clientset
-	dynClient          *fakedynamic.FakeDynamicClient
-	netLink            *fakenetlink.NetLink
-	transitSwitchIP    map[k8snet.IPFamily]string
-	OVNK8sMgmntIntCIDR map[k8snet.IPFamily]*net.IPNet
-	node               *corev1.Node
+	submClient           *fakesubm.Clientset
+	k8sClient            *fakek8s.Clientset
+	dynClient            *fakedynamic.FakeDynamicClient
+	netLink              *fakenetlink.NetLink
+	transitSwitchIP      map[k8snet.IPFamily]string
+	OVNK8sMgmntIntCIDR   map[k8snet.IPFamily]*net.IPNet
+	node                 *corev1.Node
+	extraNodeAnnotations map[string]string
 }
 
 func newTestDriver() *testDriver {
@@ -95,6 +97,7 @@ func newTestDriver() *testDriver {
 		t.k8sClient = fakek8s.NewClientset()
 		t.dynClient = fakedynamic.NewSimpleDynamicClient(scheme.Scheme)
 		t.OVNK8sMgmntIntCIDR = map[k8snet.IPFamily]*net.IPNet{}
+		t.extraNodeAnnotations = nil
 
 		t.netLink = fakenetlink.New()
 		netlinkAPI.NewFunc = func() netlinkAPI.Interface {
@@ -130,7 +133,7 @@ func newTestDriver() *testDriver {
 }
 
 func (t *testDriver) createNode() {
-	t.node = createNode(t.k8sClient, t.transitSwitchIP[k8snet.IPv4], t.transitSwitchIP[k8snet.IPv6])
+	t.node = createNode(t.k8sClient, t.extraNodeAnnotations, t.transitSwitchIP[k8snet.IPv4], t.transitSwitchIP[k8snet.IPv6])
 }
 
 func (t *testDriver) awaitOVNKNodeAnnotationContaining(expected ...string) {
@@ -160,16 +163,19 @@ func (t *testDriver) createEndpoint(subnets ...string) *submV1.Endpoint {
 	return t.CreateEndpoint(eventtesting.NewEndpoint(remoteClusterID, "host", subnets...))
 }
 
-func createNode(k8sClient kubernetes.Interface, transitSwitchIP ...string) *corev1.Node {
+func createNode(k8sClient kubernetes.Interface, extraAnnotations map[string]string, transitSwitchIP ...string) *corev1.Node {
 	node := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-node",
+			Name:        "test-node",
+			Annotations: map[string]string{},
 		},
 	}
 
+	maps.Copy(node.Annotations, extraAnnotations)
+
 	tsIPAnnotation := toTransitSwitchIPAnnotation(transitSwitchIP...)
 	if tsIPAnnotation != "" {
-		node.Annotations = map[string]string{constants.OvnTransitSwitchIPAnnotation: tsIPAnnotation}
+		node.Annotations[constants.OvnTransitSwitchIPAnnotation] = tsIPAnnotation
 	}
 
 	_, err := k8sClient.CoreV1().Nodes().Create(context.Background(), node, metav1.CreateOptions{})
