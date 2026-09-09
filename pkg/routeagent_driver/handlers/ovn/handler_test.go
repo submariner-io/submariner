@@ -29,6 +29,7 @@ import (
 	libovsdbclient "github.com/ovn-org/libovsdb/client"
 	"github.com/ovn-org/libovsdb/model"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/nbdb"
+	"github.com/submariner-io/admiral/pkg/global"
 	"github.com/submariner-io/admiral/pkg/syncer/test"
 	assert "github.com/submariner-io/admiral/pkg/test"
 	"github.com/submariner-io/admiral/pkg/watcher"
@@ -73,6 +74,7 @@ var _ = Describe("Handler", func() {
 		t.testGatewayTransitions(ipv4Subnets, ipv6Subnets)
 		t.testGatewayRoute(ipv4Subnets, ipv6OVNK8sMgmntIntGw, ipv6Subnets)
 		t.testNonGatewayRoutes(ipv4OVNK8sMgmntIntGw, ipv4Subnets, []string{"172.0.1.0/24"}, ipv6OVNK8sMgmntIntGw, ipv6Subnets)
+		t.testOVNSelfSNAT()
 	})
 
 	Context("IPv6", func() {
@@ -84,6 +86,7 @@ var _ = Describe("Handler", func() {
 		t.testGatewayTransitions(ipv6Subnets, ipv4Subnets)
 		t.testGatewayRoute(ipv6Subnets, ipv4OVNK8sMgmntIntGw, ipv4Subnets)
 		t.testNonGatewayRoutes(ipv6OVNK8sMgmntIntGw, ipv6Subnets, []string{"ab00:100::/64"}, ipv4OVNK8sMgmntIntGw, ipv4Subnets)
+		t.testOVNSelfSNAT()
 	})
 
 	When("the OVN management interface address changes", t.testOVNMgmtInterfaceAddressChange)
@@ -169,6 +172,7 @@ type handlerTestDriver struct {
 	OVNK8sMgmntIntGw     string
 	ovsdbClient          *fakeovn.OVSDBClient
 	intraRoutingDisabled bool
+	localGWMode          bool
 }
 
 func newHandlerTestDriver() *handlerTestDriver {
@@ -177,6 +181,12 @@ func newHandlerTestDriver() *handlerTestDriver {
 	BeforeEach(func() {
 		t.ipFamily = k8snet.IPv4
 		t.intraRoutingDisabled = false
+		t.localGWMode = false
+		t.testDriver.extraNodeAnnotations = nil
+		global.Init()
+		DeferCleanup(func() {
+			global.Init()
+		})
 	})
 
 	JustBeforeEach(func(ctx context.Context) {
@@ -1075,5 +1085,72 @@ func (t *handlerTestDriver) testIntraClusterRoutingDisabled() {
 
 	It("should not try to process NonGatewayRoutes", func() {
 		assert.EnsureNoActionsForResource(&t.dynClient.Fake, "nongatewayroutes", "watch")
+	})
+}
+
+func (t *handlerTestDriver) testOVNSelfSNAT() {
+	Context("OVN Self-SNAT workaround", func() {
+		When("OVN-K local gateway mode is detected", func() {
+			BeforeEach(func() {
+				t.localGWMode = true
+				t.testDriver.extraNodeAnnotations = map[string]string{
+					"k8s.ovn.org/l3-gateway-config": `{"default":{"mode":"local"}}`,
+				}
+			})
+
+			When("on gateway node", func() {
+				JustBeforeEach(func(ctx context.Context) {
+					t.CreateLocalHostEndpoint(ctx)
+				})
+
+				It("should add self-SNAT rules for local cluster CIDRs", func() {
+					t.pFilter.AwaitRule(packetfilter.TableTypeNAT, chains.SmSelfSnat,
+						ContainSubstring("\"Action\":6"))
+				})
+
+				It("should use remote CIDR sets for efficiency", func() {
+					if t.ipFamily == k8snet.IPv4 {
+						t.pFilter.AwaitRule(packetfilter.TableTypeNAT, chains.SmSelfSnat,
+							ContainSubstring("SUBMARINER-REMOTECIDRS"))
+					} else {
+						t.pFilter.AwaitRule(packetfilter.TableTypeNAT, chains.SmSelfSnat,
+							ContainSubstring("SUBMARINER-REMOTECIDRS-V6"))
+					}
+				})
+			})
+
+			When("not on gateway node", func() {
+				It("should not add self-SNAT rules", func() {
+					t.pFilter.EnsureNoRule(packetfilter.TableTypeNAT, chains.SmSelfSnat,
+						ContainSubstring("\"Action\":6"))
+				})
+			})
+
+			When("disable-ovn-selfsnat is set in ConfigMap", func() {
+				BeforeEach(func() {
+					global.Init(&corev1.ConfigMap{Data: map[string]string{"disable-ovn-selfsnat": "true"}})
+				})
+
+				JustBeforeEach(func(ctx context.Context) {
+					t.CreateLocalHostEndpoint(ctx)
+				})
+
+				It("should not add self-SNAT rules", func() {
+					t.pFilter.EnsureNoRule(packetfilter.TableTypeNAT, chains.SmSelfSnat,
+						ContainSubstring("\"Action\":6"))
+				})
+			})
+		})
+
+		When("OVN-K shared gateway mode is detected", func() {
+			JustBeforeEach(func(ctx context.Context) {
+				t.CreateLocalHostEndpoint(ctx)
+			})
+
+			It("should not add self-SNAT rules", func() {
+				t.pFilter.EnsureNoRule(packetfilter.TableTypeNAT, chains.SmSelfSnat,
+					ContainSubstring("\"Action\":6"))
+			})
+		})
 	})
 }
