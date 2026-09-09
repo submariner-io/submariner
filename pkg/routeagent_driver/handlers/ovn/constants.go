@@ -34,4 +34,5 @@ const (
 	defaultOpenshiftOVNNBDB          = "ssl:ovnkube-db.openshift-ovn-kubernetes.svc.cluster.local:9641"
 	ovnPodLabel                      = "app=ovnkube-node"
 	OVNKSNATExcludeSubnetsAnnotation = "k8s.ovn.org/node-ingress-snat-exclude-subnets"
+	ovnGatewayConfigAnnotation       = "k8s.ovn.org/l3-gateway-config"
 )
