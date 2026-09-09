@@ -35,6 +35,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/resource"
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/types"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -120,14 +121,10 @@ func GetPublicIP(ctx context.Context, family k8snet.IPFamily, submSpec *types.Su
 		}
 
 		if airGapped {
-			ip, resolver, err := invokeResolvers(ctx, family, k8sClient, submSpec.Namespace, config, func(method string) bool {
-				return method == v1.IPv4 || method == v1.IPv6
-			})
+			ip, resolver, err := resolvePublicIPAirGapped(ctx, family, k8sClient, submSpec.Namespace, config)
 			if err != nil {
 				logger.Errorf(err, "Unable to resolve public IPv%s in an air-gapped deployment using %q - using empty value",
 					family, config)
-
-				return "", "", nil
 			}
 
 			return ip, resolver, nil
@@ -140,8 +137,48 @@ func GetPublicIP(ctx context.Context, family k8snet.IPFamily, submSpec *types.Su
 	return "", "", nil
 }
 
+func resolvePublicIPAirGapped(ctx context.Context, family k8snet.IPFamily, k8sClient kubernetes.Interface, namespace, config string,
+) (string, string, error) {
+	var errs []error
+
+	ip, resolver, err := invokeResolvers(ctx, family, k8sClient, namespace, config, func(method string) bool {
+		return method == v1.IPv4 || method == v1.IPv6
+	})
+	if ip != "" {
+		return ip, resolver, nil
+	}
+
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	for r := range strings.SplitSeq(config, ",") {
+		method, param, parseErr := parseResolver(r)
+		if parseErr != nil {
+			errs = append(errs, parseErr)
+			continue
+		}
+
+		if method != v1.LoadBalancer {
+			continue
+		}
+
+		ip, lbErr := publicLoadBalancerDirectIP(ctx, family, k8sClient, namespace, param)
+		if lbErr == nil && ip != "" {
+			return ip, r, nil
+		}
+
+		if lbErr != nil {
+			errs = append(errs, errors.Wrapf(lbErr, "\nResolver[%q]", r))
+		}
+	}
+
+	return "", "", goerrors.Join(errs...)
+}
+
 func invokeResolvers(ctx context.Context,
-	family k8snet.IPFamily, k8sClient kubernetes.Interface, namespace, config string, useResolver func(string) bool,
+	family k8snet.IPFamily, k8sClient kubernetes.Interface, namespace, config string,
+	useResolver func(string) bool,
 ) (string, string, error) {
 	resolvers := strings.Split(config, ",")
 
@@ -234,6 +271,21 @@ var LoadBalancerRetryConfig = wait.Backoff{
 
 func publicLoadBalancerIP(ctx context.Context, family k8snet.IPFamily, clientset kubernetes.Interface, namespace, loadBalancerName string,
 ) (string, error) {
+	return resolveLoadBalancerIP(ctx, family, clientset, namespace, loadBalancerName, publicDNSIP)
+}
+
+// publicLoadBalancerDirectIP resolves the public IP from a LoadBalancer service using only direct
+// IP entries in the ingress status. Hostname entries are skipped, making this safe for air-gapped
+// deployments where DNS may not be available.
+func publicLoadBalancerDirectIP(ctx context.Context, family k8snet.IPFamily, clientset kubernetes.Interface,
+	namespace, loadBalancerName string,
+) (string, error) {
+	return resolveLoadBalancerIP(ctx, family, clientset, namespace, loadBalancerName, nil)
+}
+
+func resolveLoadBalancerIP(ctx context.Context, family k8snet.IPFamily, clientset kubernetes.Interface, namespace, loadBalancerName string,
+	hostnameResolver publicIPResolverFunction,
+) (string, error) {
 	resolvedIP := ""
 	var lastErr error
 
@@ -249,31 +301,15 @@ func publicLoadBalancerIP(ctx context.Context, family k8snet.IPFamily, clientset
 			return false, nil
 		}
 
-		for _, ingress := range service.Status.LoadBalancer.Ingress {
-			switch {
-			case ingress.IP != "":
-				if k8snet.IPFamilyOfString(ingress.IP) == family {
-					resolvedIP = ingress.IP
-					return true, nil
-				}
-			case ingress.Hostname != "":
-				ip, err := publicDNSIP(ctx, family, clientset, namespace, ingress.Hostname)
-				if err != nil {
-					lastErr = err
-					return false, nil //nolint:nilerr // This retries on error until timeout
-				}
-
-				if ip != "" {
-					resolvedIP = ip
-					return true, nil
-				}
-			}
+		ip, done, resolveErr := resolveIngressIP(ctx, family, clientset, namespace, loadBalancerName,
+			service.Status.LoadBalancer.Ingress, hostnameResolver)
+		if resolveErr != nil {
+			lastErr = resolveErr
 		}
 
-		lastErr = errors.Errorf("no IP or Hostname resolved for service LoadBalancer %q Ingress: %s",
-			loadBalancerName, resource.ToJSON(service.Status.LoadBalancer.Ingress))
+		resolvedIP = ip
 
-		return false, nil
+		return done, nil
 	})
 	if wait.Interrupted(err) {
 		if lastErr != nil {
@@ -282,6 +318,54 @@ func publicLoadBalancerIP(ctx context.Context, family k8snet.IPFamily, clientset
 	}
 
 	return resolvedIP, errors.Wrapf(err, "error resolving service LoadBalancer %q", loadBalancerName)
+}
+
+func resolveIngressIP(ctx context.Context, family k8snet.IPFamily, clientset kubernetes.Interface, namespace, loadBalancerName string,
+	ingresses []corev1.LoadBalancerIngress, hostnameResolver publicIPResolverFunction,
+) (string, bool, error) {
+	hasAnyDirectIP := false
+
+	for _, ingress := range ingresses {
+		if ingress.IP != "" {
+			hasAnyDirectIP = true
+
+			if k8snet.IPFamilyOfString(ingress.IP) == family {
+				return ingress.IP, true, nil
+			}
+		}
+	}
+
+	if hostnameResolver == nil {
+		if !hasAnyDirectIP {
+			for _, ingress := range ingresses {
+				if ingress.Hostname != "" {
+					logger.Warningf("Skipping hostname ingress %q for service %q: DNS resolution is not available "+
+						"in air-gapped mode; only LoadBalancer services with a direct IP in the ingress status are supported",
+						ingress.Hostname, loadBalancerName)
+				}
+			}
+
+			return "", true, nil
+		}
+	} else {
+		for _, ingress := range ingresses {
+			if ingress.Hostname == "" {
+				continue
+			}
+
+			ip, err := hostnameResolver(ctx, family, clientset, namespace, ingress.Hostname)
+			if err != nil {
+				return "", false, err
+			}
+
+			if ip != "" {
+				return ip, true, nil
+			}
+		}
+	}
+
+	return "", false, errors.Errorf("no IP or Hostname resolved for service LoadBalancer %q Ingress: %s",
+		loadBalancerName, resource.ToJSON(ingresses))
 }
 
 var LookupIP = net.DefaultResolver.LookupIP

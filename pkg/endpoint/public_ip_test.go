@@ -182,6 +182,40 @@ func testLoadBalancerResolver() {
 		})
 	}
 
+	When("both a direct IP and a hostname Ingress are configured", func() {
+		It("should return the direct IP without DNS resolution", func(ctx context.Context) {
+			dnsLookupCalled := false
+
+			endpoint.LookupIP = func(_ context.Context, _, _ string) ([]net.IP, error) {
+				dnsLookupCalled = true
+				return []net.IP{net.ParseIP(testIPv4DNS)}, nil
+			}
+
+			ip, _, err := invokeGetPublicIP(ctx, k8snet.IPv4, v4IngressWithIP, v4IngressWithHostname)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ip).To(Equal(testIPv4))
+			Expect(dnsLookupCalled).To(BeFalse())
+		})
+	})
+
+	When("the hostname Ingress is listed before the direct IP Ingress", func() {
+		It("should still return the direct IP without DNS resolution", func(ctx context.Context) {
+			dnsLookupCalled := false
+
+			endpoint.LookupIP = func(_ context.Context, _, _ string) ([]net.IP, error) {
+				dnsLookupCalled = true
+				return []net.IP{net.ParseIP(testIPv4DNS)}, nil
+			}
+
+			ip, _, err := invokeGetPublicIP(ctx, k8snet.IPv4, v4IngressWithHostname, v4IngressWithIP)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ip).To(Equal(testIPv4))
+			Expect(dnsLookupCalled).To(BeFalse())
+		})
+	})
+
 	When("no Ingress is configured", func() {
 		It("should return an error", func(ctx context.Context) {
 			_, _, err := invokeGetPublicIP(ctx, k8snet.IPv4)
@@ -219,6 +253,12 @@ func testLoadBalancerResolver() {
 func testResolverInAirGapped() {
 	t := newResolverTestDriver()
 
+	BeforeEach(func() {
+		endpoint.LoadBalancerRetryConfig.Cap = 1 * time.Second
+		endpoint.LoadBalancerRetryConfig.Duration = 50 * time.Millisecond
+		endpoint.LoadBalancerRetryConfig.Steps = 1
+	})
+
 	testGetPublicIP := func(family k8snet.IPFamily, expectedIP string) {
 		Context(fmt.Sprintf("with IPv%s requested", family), func() {
 			It(fmt.Sprintf("should return a valid IPv%s address", family), func(ctx context.Context) {
@@ -253,6 +293,101 @@ func testResolverInAirGapped() {
 			ip, _, err := endpoint.GetPublicIP(ctx, k8snet.IPv4, t.submSpec, fake.NewClientset(), map[string]string{
 				submarinerv1.PublicIP: submarinerv1.API + ":bogus",
 			}, true)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ip).To(BeEmpty())
+		})
+	})
+
+	newLBClient := func(ingresses ...v1.LoadBalancerIngress) *fake.Clientset {
+		return fake.NewClientset(&v1.Service{
+			ObjectMeta: v1meta.ObjectMeta{Name: testServiceName, Namespace: testNamespace},
+			Status:     v1.ServiceStatus{LoadBalancer: v1.LoadBalancerStatus{Ingress: ingresses}},
+		})
+	}
+
+	lbConfig := map[string]string{submarinerv1.PublicIP: submarinerv1.LoadBalancer + ":" + testServiceName}
+
+	for _, family := range []k8snet.IPFamily{k8snet.IPv4, k8snet.IPv6} {
+		expectedIP := map[k8snet.IPFamily]string{k8snet.IPv4: testIPv4, k8snet.IPv6: testIPv6}[family]
+		ingressWithIP := map[k8snet.IPFamily]v1.LoadBalancerIngress{
+			k8snet.IPv4: {IP: testIPv4},
+			k8snet.IPv6: {IP: testIPv6},
+		}[family]
+
+		When(fmt.Sprintf("a LoadBalancer resolver with a direct IPv%s is configured", family), func() {
+			It("should return the IP address without DNS lookup", func(ctx context.Context) {
+				ip, resolver, err := endpoint.GetPublicIP(ctx, family, t.submSpec,
+					newLBClient(ingressWithIP), lbConfig, true)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(ip).To(Equal(expectedIP))
+				Expect(resolver).To(Equal(lbConfig[submarinerv1.PublicIP]))
+			})
+		})
+	}
+
+	When("a LoadBalancer resolver has only a hostname ingress", func() {
+		It("should not attempt DNS resolution and return an empty IP", func(ctx context.Context) {
+			dnsLookupCalled := false
+
+			endpoint.LookupIP = func(_ context.Context, _, _ string) ([]net.IP, error) {
+				dnsLookupCalled = true
+				return []net.IP{net.ParseIP(testIPv4DNS)}, nil
+			}
+
+			ip, _, err := endpoint.GetPublicIP(ctx, k8snet.IPv4, t.submSpec,
+				newLBClient(v1.LoadBalancerIngress{Hostname: dnsHostv4}), lbConfig, true)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ip).To(BeEmpty())
+			Expect(dnsLookupCalled).To(BeFalse(), "DNS should not be called in air-gapped mode")
+		})
+	})
+
+	When("a LoadBalancer resolver has both a direct IP and a hostname ingress", func() {
+		It("should return the direct IP without attempting DNS resolution", func(ctx context.Context) {
+			dnsLookupCalled := false
+
+			endpoint.LookupIP = func(_ context.Context, _, _ string) ([]net.IP, error) {
+				dnsLookupCalled = true
+				return []net.IP{net.ParseIP(testIPv4DNS)}, nil
+			}
+
+			ip, resolver, err := endpoint.GetPublicIP(ctx, k8snet.IPv4, t.submSpec,
+				newLBClient(v1.LoadBalancerIngress{IP: testIPv4}, v1.LoadBalancerIngress{Hostname: dnsHostv4}),
+				lbConfig, true)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ip).To(Equal(testIPv4))
+			Expect(resolver).To(Equal(lbConfig[submarinerv1.PublicIP]))
+			Expect(dnsLookupCalled).To(BeFalse(), "DNS should not be called in air-gapped mode")
+		})
+	})
+
+	When("a LoadBalancer resolver has a direct IP for the wrong family and a hostname ingress", func() {
+		It("should not stop retrying immediately and return an empty IP without calling DNS", func(ctx context.Context) {
+			dnsLookupCalled := false
+
+			endpoint.LookupIP = func(_ context.Context, _, _ string) ([]net.IP, error) {
+				dnsLookupCalled = true
+				return []net.IP{net.ParseIP(testIPv4DNS)}, nil
+			}
+
+			ip, _, err := endpoint.GetPublicIP(ctx, k8snet.IPv4, t.submSpec,
+				newLBClient(v1.LoadBalancerIngress{IP: testIPv6}, v1.LoadBalancerIngress{Hostname: dnsHostv4}),
+				lbConfig, true)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(ip).To(BeEmpty())
+			Expect(dnsLookupCalled).To(BeFalse())
+		})
+	})
+
+	When("a LoadBalancer resolver config string is malformed", func() {
+		It("should return an empty IP and include the parse error", func(ctx context.Context) {
+			ip, _, err := endpoint.GetPublicIP(ctx, k8snet.IPv4, t.submSpec, fake.NewClientset(),
+				map[string]string{submarinerv1.PublicIP: "lb:"}, true)
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(ip).To(BeEmpty())
