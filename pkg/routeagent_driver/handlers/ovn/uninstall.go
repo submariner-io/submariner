@@ -68,6 +68,7 @@ func (ovn *Handler) Uninstall(ctx context.Context) error {
 	ovn.deleteIPHookChain(packetfilter.TableTypeFilter, chains.NewForwarding())
 	ovn.deleteIPHookChain(packetfilter.TableTypeFilter, chains.NewForwardingMSSClamp())
 	ovn.deleteIPHookChain(packetfilter.TableTypeNAT, chains.NewPostRouting())
+	ovn.deleteIPHookChain(packetfilter.TableTypeNAT, chains.NewSelfSnat())
 
 	err = util.Update[*corev1.Node](ctx, ovn.nodeResourceInterface(), &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: nodeutil.GetLocalNodeName()},
