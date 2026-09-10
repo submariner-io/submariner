@@ -57,7 +57,7 @@ ENTRYPOINT ["/usr/local/bin/submariner-globalnet.sh"]
 
 LABEL com.redhat.component="submariner-globalnet-container" \
       name="rhacm2/submariner-globalnet-rhel9" \
-      version="v0.24.0" \
+      version="v0.24.1" \
       summary="Submariner Globalnet" \
       description="The Submariner Globalnet component provides connectivity for overlapping CIDRs in different clusters." \
       distribution-scope="public" \

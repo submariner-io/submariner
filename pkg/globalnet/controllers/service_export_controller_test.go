@@ -35,6 +35,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
 var _ = Describe("ServiceExport controller", func() {
@@ -296,6 +298,69 @@ func testHeadlessService() {
 				list, _ := t.globalIngressIPs.List(ctx, metav1.ListOptions{})
 				return list.Items
 			}).Within(time.Second * 3).Should(BeEmpty())
+		})
+	})
+
+	When("the same headless Service name is exported from another namespace", func() {
+		const otherNamespace = "other-ns"
+
+		var otherService *corev1.Service
+		var otherPod *corev1.Pod
+
+		BeforeEach(func() {
+			t.createPod(backendPod)
+
+			otherService = newHeadlessService()
+			otherService.Namespace = otherNamespace
+
+			otherPod = newHeadlessServicePod(otherService.Name)
+			otherPod.Namespace = otherNamespace
+			otherPod.Status.PodIP = "172.45.4.4"
+		})
+
+		It("should retain GlobalIngressIPs for both namespaces", func(ctx context.Context) {
+			localIngressIP := t.awaitHeadlessGlobalIngressIP(ctx, service.Name, backendPod.Name)
+
+			gvrService := *test.GetGroupVersionResourceFor(t.restMapper, &corev1.Service{})
+			gvrServiceExport := *test.GetGroupVersionResourceFor(t.restMapper, &mcsv1a1.ServiceExport{})
+			gvrGlobalIngressIP := *test.GetGroupVersionResourceFor(t.restMapper, &submarinerv1.GlobalIngressIP{})
+
+			test.CreateResource(t.dynClient.Resource(gvrService).Namespace(otherNamespace), otherService)
+			t.createPod(otherPod)
+			test.CreateResource(t.dynClient.Resource(gvrServiceExport).Namespace(otherNamespace), &mcsv1a1.ServiceExport{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      otherService.Name,
+					Namespace: otherNamespace,
+				},
+			})
+
+			var otherIngressIP *submarinerv1.GlobalIngressIP
+
+			Eventually(ctx, func(g Gomega, ctx context.Context) {
+				list, err := t.dynClient.Resource(gvrGlobalIngressIP).Namespace(otherNamespace).List(ctx, metav1.ListOptions{})
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(list.Items).NotTo(BeEmpty())
+
+				gip := &submarinerv1.GlobalIngressIP{}
+				g.Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(list.Items[0].Object, gip)).To(Succeed())
+				otherIngressIP = gip
+			}).Within(5 * time.Second).Should(Succeed())
+
+			Expect(otherIngressIP.Spec.ServiceRef.Name).To(Equal(otherService.Name))
+			Expect(otherIngressIP.Spec.PodRef.Name).To(Equal(otherPod.Name))
+
+			Consistently(ctx, func(ctx context.Context) error {
+				_, err := t.globalIngressIPs.Get(ctx, localIngressIP.Name, metav1.GetOptions{})
+
+				return err
+			}).Within(2 * time.Second).Should(Succeed())
+
+			Consistently(ctx, func(ctx context.Context) error {
+				_, err := t.dynClient.Resource(gvrGlobalIngressIP).Namespace(otherNamespace).
+					Get(ctx, otherIngressIP.Name, metav1.GetOptions{})
+
+				return err
+			}).Within(2 * time.Second).Should(Succeed())
 		})
 	})
 }

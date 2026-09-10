@@ -82,7 +82,9 @@ func startIngressEndpointsController(ctx context.Context, svc *corev1.Service,
 		return nil, errors.Wrap(err, "error starting the endpoint syncer")
 	}
 
-	ingressIPs := config.SourceClient.Resource(*gvr).Namespace(corev1.NamespaceAll)
+	// Scope reconcile to this Service's namespace so a same-named headless Service
+	// in another namespace does not have its GlobalIngressIPs deleted.
+	ingressIPs := config.SourceClient.Resource(*gvr).Namespace(svc.Namespace)
 	controller.reconcile(ctx, ingressIPs, "" /* labelSelector */, fieldSelector, func(obj *unstructured.Unstructured) runtime.Object {
 		endpointsName, exists, _ := unstructured.NestedString(obj.Object, "spec", "serviceRef", "name")
 		if exists {

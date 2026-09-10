@@ -167,6 +167,7 @@ func (ovn *Handler) getNextHopOnK8sMgmtIntf() (*net.IP, error) {
 		logger.V(log.TRACE).Info("Processing route", "Dst", routes[i].Dst.String(), "Gw", routes[i].Gw.String())
 
 		for _, cidrNet := range parsedClusterCIDRs {
+			//nolint:gocritic // Pre-existing nesting, not introduced by this fix
 			if routes[i].Dst.String() == cidrNet.String() ||
 				cidrNet.Contains(routes[i].Dst.IP) ||
 				routes[i].Dst.Contains(cidrNet.IP) {
@@ -174,6 +175,19 @@ func (ovn *Handler) getNextHopOnK8sMgmtIntf() (*net.IP, error) {
 
 				if routes[i].Gw != nil {
 					return &routes[i].Gw, nil
+				}
+
+				// If no explicit gateway, validate that Dst.IP is a valid host address, not a network address.
+				// A network address (e.g., 172.22.0.0/16) should not be used as a gateway.
+				// Skip routes where Dst.IP is the network address, but allow host routes (/32 or /128).
+				ones, bits := routes[i].Dst.Mask.Size()
+				isHostRoute := ones == bits // /32 for IPv4 or /128 for IPv6
+
+				if !isHostRoute && routes[i].Dst.IP.Equal(routes[i].Dst.IP.Mask(routes[i].Dst.Mask)) {
+					logger.V(log.DEBUG).Info("Skipping route with network address",
+						"Dst", routes[i].Dst.String(), "IP", routes[i].Dst.IP.String())
+
+					continue
 				}
 
 				localIP := routes[i].Dst.IP
