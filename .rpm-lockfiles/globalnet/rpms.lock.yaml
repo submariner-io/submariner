@@ -60,13 +60,13 @@ arches:
     name: libnftnl
     evr: 1.2.6-4.el9_4
     sourcerpm: libnftnl-1.2.6-4.el9_4.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/n/nftables-1.0.9-6.el9_7.aarch64.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/n/nftables-1.0.9-9.el9_8.aarch64.rpm
     repoid: ubi-9-for-aarch64-baseos-rpms
-    size: 430880
-    checksum: sha256:c1701cb63a5df1368ba89cc0c53e23ff582a50ab10881ec6ab682a10a4c4cd86
+    size: 467195
+    checksum: sha256:71080fba834245674aa5ed3badf2cb675254b1860fc585d28dd88829b2d5a43a
     name: nftables
-    evr: 1:1.0.9-6.el9_7
-    sourcerpm: nftables-1.0.9-6.el9_7.src.rpm
+    evr: 1:1.0.9-9.el9_8
+    sourcerpm: nftables-1.0.9-9.el9_8.src.rpm
   source: []
   module_metadata: []
 - arch: ppc64le
@@ -127,13 +127,13 @@ arches:
     name: libnftnl
     evr: 1.2.6-4.el9_4
     sourcerpm: libnftnl-1.2.6-4.el9_4.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/n/nftables-1.0.9-6.el9_7.ppc64le.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/n/nftables-1.0.9-9.el9_8.ppc64le.rpm
     repoid: ubi-9-for-ppc64le-baseos-rpms
-    size: 464676
-    checksum: sha256:ed0b6e83ba0c85af793a7d9f9c3eb658e0edf3b1920bd0f41069db84463b2d91
+    size: 500821
+    checksum: sha256:c6029d5bf38140ae74e4aaa1417eb1a70de0965efeedb54f1bdc88d2e3f5352d
     name: nftables
-    evr: 1:1.0.9-6.el9_7
-    sourcerpm: nftables-1.0.9-6.el9_7.src.rpm
+    evr: 1:1.0.9-9.el9_8
+    sourcerpm: nftables-1.0.9-9.el9_8.src.rpm
   source: []
   module_metadata: []
 - arch: s390x
@@ -194,13 +194,13 @@ arches:
     name: libnftnl
     evr: 1.2.6-4.el9_4
     sourcerpm: libnftnl-1.2.6-4.el9_4.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/n/nftables-1.0.9-6.el9_7.s390x.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/n/nftables-1.0.9-9.el9_8.s390x.rpm
     repoid: ubi-9-for-s390x-baseos-rpms
-    size: 421482
-    checksum: sha256:9bbc4b5022d2b93f8635bf8403b03defee311bc355db09831136b8683e7ffe3f
+    size: 457246
+    checksum: sha256:aa0ab6b278696fc9fa989128704ba480750e4009ae1ba7f71d47d34546e4f85e
     name: nftables
-    evr: 1:1.0.9-6.el9_7
-    sourcerpm: nftables-1.0.9-6.el9_7.src.rpm
+    evr: 1:1.0.9-9.el9_8
+    sourcerpm: nftables-1.0.9-9.el9_8.src.rpm
   source: []
   module_metadata: []
 - arch: x86_64
@@ -261,12 +261,12 @@ arches:
     name: libnftnl
     evr: 1.2.6-4.el9_4
     sourcerpm: libnftnl-1.2.6-4.el9_4.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/n/nftables-1.0.9-6.el9_7.x86_64.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/n/nftables-1.0.9-9.el9_8.x86_64.rpm
     repoid: ubi-9-for-x86_64-baseos-rpms
-    size: 437469
-    checksum: sha256:9ef3679a12f899ab4ebd5da31090c6624cfe35812d96f0f4609666aef7786e47
+    size: 473262
+    checksum: sha256:c2ed618abe918bb6f8f4ce93ab0654289edf51693fc4bd15350ab71c54198f19
     name: nftables
-    evr: 1:1.0.9-6.el9_7
-    sourcerpm: nftables-1.0.9-6.el9_7.src.rpm
+    evr: 1:1.0.9-9.el9_8
+    sourcerpm: nftables-1.0.9-9.el9_8.src.rpm
   source: []
   module_metadata: []

@@ -207,6 +207,15 @@ func newEndpoint(spec *submarinerv1.EndpointSpec) *submarinerv1.Endpoint {
 	}
 }
 
+func (t *testDriver) createRemoteCluster(id string, cidrs ...string) {
+	cluster := newCluster(&submarinerv1.ClusterSpec{
+		ClusterID:   id,
+		ClusterCIDR: cidrs,
+	})
+	test.CreateResource(t.brokerClusters, test.SetClusterIDLabel(cluster, id))
+	awaitCluster(t.localClusters, &cluster.Spec)
+}
+
 func newCluster(spec *submarinerv1.ClusterSpec) *submarinerv1.Cluster {
 	return &submarinerv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{

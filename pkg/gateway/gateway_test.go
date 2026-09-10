@@ -60,7 +60,10 @@ import (
 	k8snet "k8s.io/utils/net"
 )
 
-const publicIP = "1.2.3.4"
+const (
+	publicIP        = "1.2.3.4"
+	remoteClusterID = "west"
+)
 
 var _ = Describe("Run", func() {
 	t := newTestDriver()
@@ -78,6 +81,7 @@ var _ = Describe("Run", func() {
 			return gw.Status.HAStatus == submarinerv1.HAStatusActive
 		})
 
+		t.createRemoteClusterOnBroker()
 		endpoint := t.awaitRemoteEndpointSyncedLocal(t.createRemoteEndpointOnBroker())
 		t.cableEngine.VerifyInstallCable(&endpoint.Spec)
 	})
@@ -121,6 +125,8 @@ var _ = Describe("Run", func() {
 		})
 
 		It("should re-acquire the leader lease after the failure is cleared", func() {
+			t.createRemoteClusterOnBroker()
+
 			endpoint := t.awaitRemoteEndpointSyncedLocal(t.createRemoteEndpointOnBroker())
 			fakeDriver.AwaitConnectToEndpoint(&natdiscovery.NATEndpointInfo{
 				Endpoint:  *endpoint,
@@ -230,6 +236,7 @@ type testDriver struct {
 	localPodName     string
 	nodeName         string
 	endpoints        dynamic.NamespaceableResourceInterface
+	clusters         dynamic.NamespaceableResourceInterface
 	expectedRunErr   error
 	cableEngine      *enginefake.Engine
 	signingRequestor *fakecertificate.SigningRequestor
@@ -302,6 +309,7 @@ func newTestDriver() *testDriver {
 		t.leaderElection = testutil.NewLeaderElectionSupport(t.kubeClient, t.config.Spec.Namespace, gateway.LeaderElectionLockName)
 
 		t.endpoints = t.config.SyncerConfig.LocalClient.Resource(*test.GetGroupVersionResourceFor(restMapper, &submarinerv1.Endpoint{}))
+		t.clusters = t.config.SyncerConfig.LocalClient.Resource(*test.GetGroupVersionResourceFor(restMapper, &submarinerv1.Cluster{}))
 
 		t.localPodName = "local-pod"
 		t.nodeName = "raiders"
@@ -412,10 +420,10 @@ func (t *testDriver) newRemoteEndpoint() *submarinerv1.Endpoint {
 	ep := &submarinerv1.Endpoint{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   string(uuid.NewUUID()),
-			Labels: map[string]string{federate.ClusterIDLabelKey: "west"},
+			Labels: map[string]string{federate.ClusterIDLabelKey: remoteClusterID},
 		},
 		Spec: submarinerv1.EndpointSpec{
-			ClusterID:  "west",
+			ClusterID:  remoteClusterID,
 			CableName:  fmt.Sprintf("submariner-cable-west-192-168-40-%d", t.remoteIPCounter),
 			Hostname:   "redsox",
 			Subnets:    []string{"169.254.3.0/24"},
@@ -436,6 +444,19 @@ func (t *testDriver) createEndpoint(ns string, endpoint *submarinerv1.Endpoint) 
 
 func (t *testDriver) createRemoteEndpointOnBroker() *submarinerv1.Endpoint {
 	return t.createEndpoint(t.config.SyncerConfig.BrokerNamespace, t.newRemoteEndpoint())
+}
+
+func (t *testDriver) createRemoteClusterOnBroker() {
+	test.CreateResource(t.clusters.Namespace(t.config.SyncerConfig.BrokerNamespace), &submarinerv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   remoteClusterID,
+			Labels: map[string]string{federate.ClusterIDLabelKey: remoteClusterID},
+		},
+		Spec: submarinerv1.ClusterSpec{
+			ClusterID:   remoteClusterID,
+			ClusterCIDR: []string{"169.254.0.0/16"},
+		},
+	})
 }
 
 func (t *testDriver) awaitRemoteEndpointSyncedLocal(endpoint *submarinerv1.Endpoint) *submarinerv1.Endpoint {

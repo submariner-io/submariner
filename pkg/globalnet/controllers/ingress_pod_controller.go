@@ -82,8 +82,11 @@ func startIngressPodController(svc *corev1.Service, config *syncer.ResourceSynce
 		ServiceRefLabel: svc.Name,
 	}
 
+	// Reconcile only GlobalIngressIPs in this Service's namespace. Listing across
+	// NamespaceAll with just the service name label incorrectly deletes GIPs for
+	// other namespaces that export a headless Service with the same name.
 	ingressIPSelector := labels.Set(selector).AsSelector().String()
-	ingressIPs := config.SourceClient.Resource(*gvr).Namespace(corev1.NamespaceAll)
+	ingressIPs := config.SourceClient.Resource(*gvr).Namespace(svc.Namespace)
 	controller.reconcile(ingressIPs, ingressIPSelector, "" /* fieldSelector*/, func(obj *unstructured.Unstructured) runtime.Object {
 		podName, exists, _ := unstructured.NestedString(obj.Object, "spec", "podRef", "name")
 		if exists {

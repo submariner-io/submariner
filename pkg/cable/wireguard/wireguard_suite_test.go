@@ -76,6 +76,8 @@ func newTestDriver() *testDriver {
 	t := &testDriver{}
 
 	BeforeEach(func() {
+		os.Setenv("CE_IPSEC_PSK", "test-psk-value")
+
 		t.endpointSpec = submarinerv1.EndpointSpec{
 			ClusterID:  "local",
 			CableName:  "submariner-cable-local-192-68-1-1",
