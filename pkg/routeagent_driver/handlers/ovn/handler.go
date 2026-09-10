@@ -70,6 +70,7 @@ type Handler struct {
 	nonGatewayRouteController *NonGatewayRouteController
 	stopCh                    chan struct{}
 	ipFamily                  k8snet.IPFamily
+	isLocalGWMode             bool
 }
 
 var logger = log.Logger{Logger: logf.Log.WithName("OVN")}
@@ -152,6 +153,8 @@ func (ovn *Handler) Init(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "error initializing TransitSwitchIP")
 	}
+
+	ovn.isLocalGWMode = ovn.detectLocalGWMode(ctx)
 
 	gatewayRouteController, err := NewGatewayRouteController(ovn.ipFamily, *ovn.WatcherConfig, connectionHandler, ovn.Namespace)
 	if err != nil {
