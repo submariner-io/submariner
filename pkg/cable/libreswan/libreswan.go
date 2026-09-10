@@ -21,8 +21,8 @@ package libreswan
 import (
 	"bufio"
 	"context"
-	"encoding/base64"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"regexp"
@@ -37,6 +37,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
+	"github.com/submariner-io/submariner/pkg/cable/psk"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
 	"github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/submariner-io/submariner/pkg/types"
@@ -57,7 +58,53 @@ const (
 	dpddelayArg      = "--dpddelay"
 )
 
-var logger = log.Logger{Logger: logf.Log.WithName("libreswan")}
+var (
+	logger = log.Logger{Logger: logf.Log.WithName("libreswan")}
+
+	// cableNamePattern matches safe characters for connection names (alphanumeric, dash, underscore, dot)
+	// and caps length at 200 to prevent oversized ipsec.conf stanzas.
+	cableNamePattern = regexp.MustCompile(`^[a-zA-Z0-9._-]{1,200}$`)
+)
+
+// validateCableName ensures the cable name doesn't contain injection characters.
+func validateCableName(cableName string) error {
+	if cableName == "" {
+		return errors.New("cable name is empty")
+	}
+
+	if !cableNamePattern.MatchString(cableName) {
+		return fmt.Errorf("cable name %q contains invalid characters", cableName)
+	}
+
+	return nil
+}
+
+// validateEndpointInputs validates endpoint configuration to prevent injection attacks.
+func validateEndpointInputs(endpoint *subv1.EndpointSpec, localIP, remoteIP string) error {
+	// Validate cable name
+	if err := validateCableName(endpoint.CableName); err != nil {
+		return err
+	}
+
+	// Validate all subnets
+	for _, subnet := range endpoint.Subnets {
+		if _, _, err := net.ParseCIDR(subnet); err != nil {
+			return errors.Wrapf(err, "invalid CIDR %q", subnet)
+		}
+	}
+
+	// Validate remote IP address
+	if net.ParseIP(remoteIP) == nil {
+		return fmt.Errorf("invalid IP address %q", remoteIP)
+	}
+
+	// Validate local IP address
+	if net.ParseIP(localIP) == nil {
+		return fmt.Errorf("invalid IP address %q", localIP)
+	}
+
+	return nil
+}
 
 func init() {
 	cable.AddDriver(cableDriverName, NewLibreswan)
@@ -114,23 +161,9 @@ func NewLibreswan(localEndpoint *types.SubmarinerEndpoint, _ *types.SubmarinerCl
 		return nil, errors.Wrapf(err, "error parsing %q from local endpoint", subv1.UDPPortConfig)
 	}
 
-	encodedPsk := ipSecSpec.PSK
-
-	if ipSecSpec.PSKSecret != "" {
-		pskBytes, err := os.ReadFile(fmt.Sprintf("/var/run/secrets/submariner.io/%s/psk", ipSecSpec.PSKSecret))
-		if err != nil {
-			return nil, errors.Wrapf(err, "error reading secret %s", ipSecSpec.PSKSecret)
-		}
-		var psk strings.Builder
-		encoder := base64.NewEncoder(base64.StdEncoding, &psk)
-
-		if _, err := encoder.Write(pskBytes); err != nil {
-			return nil, errors.Wrap(err, "error encoding secret")
-		}
-
-		encoder.Close()
-
-		encodedPsk = psk.String()
+	encodedPsk, err := psk.Resolve(ipSecSpec.PSK, ipSecSpec.PSKSecret, "")
+	if err != nil {
+		return nil, err //nolint:wrapcheck // No need to wrap
 	}
 
 	logger.Infof("Using NATT UDP port %d", nattPort)
@@ -364,6 +397,12 @@ func (i *libreswan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 
 	// We'll panic if endpointInfo is nil, this is intentional
 	endpoint := &endpointInfo.Endpoint
+
+	// Validate endpoint inputs to prevent config injection
+	localIP := i.localEndpoint.Spec.PrivateIP
+	if err := validateEndpointInputs(&endpoint.Spec, localIP, endpointInfo.UseIP); err != nil {
+		return "", err
+	}
 
 	rightNATTPort, err := endpoint.Spec.GetBackendPort(subv1.UDPPortConfig, i.defaultNATTPort)
 	if err != nil {
