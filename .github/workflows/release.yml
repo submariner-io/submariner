@@ -24,7 +24,7 @@ jobs:
           fetch-depth: 0
 
       - name: Build and release new images
-        uses: submariner-io/shipyard/gh-actions/release-images@devel
+        uses: submariner-io/shipyard/gh-actions/release-images@aebe295bef9f84c38e483e97a01cc8978c94b813  # devel
         with:
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_PASSWORD }}
