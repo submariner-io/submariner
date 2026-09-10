@@ -366,6 +366,32 @@ func testConnectToEndpoint() {
 			UseIP:     "172.93.2.1",
 			UseFamily: k8snet.IPv4,
 		}, libreswan.AuthModeCert)
+
+		When("the remote Endpoint has a CableName exceeding 200 characters", func() {
+			t := newTestDriver()
+
+			JustBeforeEach(func() {
+				Expect(t.driver.Init(context.TODO())).To(Succeed())
+			})
+
+			It("should reject the connection", func() {
+				longName := strings.Repeat("a", 201)
+				_, err := t.driver.ConnectToEndpoint(&natdiscovery.NATEndpointInfo{
+					Endpoint: subv1.Endpoint{
+						Spec: subv1.EndpointSpec{
+							ClusterID:  "remote",
+							CableName:  longName,
+							PrivateIPs: []string{"192.68.2.1"},
+							Subnets:    []string{"20.0.0.0/16"},
+						},
+					},
+					UseIP:     "172.93.2.1",
+					UseFamily: k8snet.IPv4,
+				})
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("invalid characters"))
+			})
+		})
 	})
 }
 
