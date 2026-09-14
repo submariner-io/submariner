@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - devel
+      - release-0.25
       - release-*
 
 permissions:
@@ -24,7 +24,7 @@ jobs:
           fetch-depth: 0
 
       - name: Build and release new images
-        uses: submariner-io/shipyard/gh-actions/release-images@aebe295bef9f84c38e483e97a01cc8978c94b813  # devel
+        uses: submariner-io/shipyard/gh-actions/release-images@aebe295bef9f84c38e483e97a01cc8978c94b813  # release-0.25
         with:
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_PASSWORD }}
