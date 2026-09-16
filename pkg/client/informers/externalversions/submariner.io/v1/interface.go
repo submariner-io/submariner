@@ -27,23 +27,23 @@ import (
 // Interface provides access to all the informers in this group version.
 type Interface interface {
 	// Clusters returns a ClusterInformer.
-	Clusters() ClusterInformer
+	Clusters() TypedClusterInformer
 	// ClusterGlobalEgressIPs returns a ClusterGlobalEgressIPInformer.
-	ClusterGlobalEgressIPs() ClusterGlobalEgressIPInformer
+	ClusterGlobalEgressIPs() TypedClusterGlobalEgressIPInformer
 	// Endpoints returns a EndpointInformer.
-	Endpoints() EndpointInformer
+	Endpoints() TypedEndpointInformer
 	// Gateways returns a GatewayInformer.
-	Gateways() GatewayInformer
+	Gateways() TypedGatewayInformer
 	// GatewayRoutes returns a GatewayRouteInformer.
-	GatewayRoutes() GatewayRouteInformer
+	GatewayRoutes() TypedGatewayRouteInformer
 	// GlobalEgressIPs returns a GlobalEgressIPInformer.
-	GlobalEgressIPs() GlobalEgressIPInformer
+	GlobalEgressIPs() TypedGlobalEgressIPInformer
 	// GlobalIngressIPs returns a GlobalIngressIPInformer.
-	GlobalIngressIPs() GlobalIngressIPInformer
+	GlobalIngressIPs() TypedGlobalIngressIPInformer
 	// NonGatewayRoutes returns a NonGatewayRouteInformer.
-	NonGatewayRoutes() NonGatewayRouteInformer
+	NonGatewayRoutes() TypedNonGatewayRouteInformer
 	// RouteAgents returns a RouteAgentInformer.
-	RouteAgents() RouteAgentInformer
+	RouteAgents() TypedRouteAgentInformer
 }
 
 type version struct {
@@ -57,47 +57,47 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// Clusters returns a ClusterInformer.
-func (v *version) Clusters() ClusterInformer {
+// Clusters returns a TypedClusterInformer.
+func (v *version) Clusters() TypedClusterInformer {
 	return &clusterInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// ClusterGlobalEgressIPs returns a ClusterGlobalEgressIPInformer.
-func (v *version) ClusterGlobalEgressIPs() ClusterGlobalEgressIPInformer {
+// ClusterGlobalEgressIPs returns a TypedClusterGlobalEgressIPInformer.
+func (v *version) ClusterGlobalEgressIPs() TypedClusterGlobalEgressIPInformer {
 	return &clusterGlobalEgressIPInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// Endpoints returns a EndpointInformer.
-func (v *version) Endpoints() EndpointInformer {
+// Endpoints returns a TypedEndpointInformer.
+func (v *version) Endpoints() TypedEndpointInformer {
 	return &endpointInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// Gateways returns a GatewayInformer.
-func (v *version) Gateways() GatewayInformer {
+// Gateways returns a TypedGatewayInformer.
+func (v *version) Gateways() TypedGatewayInformer {
 	return &gatewayInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// GatewayRoutes returns a GatewayRouteInformer.
-func (v *version) GatewayRoutes() GatewayRouteInformer {
+// GatewayRoutes returns a TypedGatewayRouteInformer.
+func (v *version) GatewayRoutes() TypedGatewayRouteInformer {
 	return &gatewayRouteInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// GlobalEgressIPs returns a GlobalEgressIPInformer.
-func (v *version) GlobalEgressIPs() GlobalEgressIPInformer {
+// GlobalEgressIPs returns a TypedGlobalEgressIPInformer.
+func (v *version) GlobalEgressIPs() TypedGlobalEgressIPInformer {
 	return &globalEgressIPInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// GlobalIngressIPs returns a GlobalIngressIPInformer.
-func (v *version) GlobalIngressIPs() GlobalIngressIPInformer {
+// GlobalIngressIPs returns a TypedGlobalIngressIPInformer.
+func (v *version) GlobalIngressIPs() TypedGlobalIngressIPInformer {
 	return &globalIngressIPInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// NonGatewayRoutes returns a NonGatewayRouteInformer.
-func (v *version) NonGatewayRoutes() NonGatewayRouteInformer {
+// NonGatewayRoutes returns a TypedNonGatewayRouteInformer.
+func (v *version) NonGatewayRoutes() TypedNonGatewayRouteInformer {
 	return &nonGatewayRouteInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// RouteAgents returns a RouteAgentInformer.
-func (v *version) RouteAgents() RouteAgentInformer {
+// RouteAgents returns a TypedRouteAgentInformer.
+func (v *version) RouteAgents() TypedRouteAgentInformer {
 	return &routeAgentInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

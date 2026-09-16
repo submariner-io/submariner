@@ -29,7 +29,7 @@ import (
 // RouteAgentApplyConfiguration represents a declarative configuration of the RouteAgent type for use
 // with apply.
 type RouteAgentApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration    `json:""`
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Status                               *RouteAgentStatusApplyConfiguration `json:"status,omitempty"`
 }
