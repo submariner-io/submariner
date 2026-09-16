@@ -36,11 +36,39 @@ import (
 )
 
 // NonGatewayRouteInformer provides access to a shared informer and lister for
-// NonGatewayRoutes.
+// NonGatewayRoutes. Prefer using the type-safe variant (see [TypedNonGatewayRouteInformer]).
 type NonGatewayRouteInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() submarineriov1.NonGatewayRouteLister
 }
+
+// TypedNonGatewayRouteInformer provides access to a shared informer and lister for
+// NonGatewayRoutes, including the type-safe TypedInformer variant.
+// It is a superset of NonGatewayRouteInformer.
+type TypedNonGatewayRouteInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() NonGatewayRouteIndexInformer
+	Lister() submarineriov1.NonGatewayRouteLister
+}
+
+// NonGatewayRouteIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type NonGatewayRouteIndexInformer cache.TypedSharedIndexInformer[*apissubmarineriov1.NonGatewayRoute]
+
+// NonGatewayRouteHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for NonGatewayRoute.
+type NonGatewayRouteHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apissubmarineriov1.NonGatewayRoute]
+
+// NonGatewayRouteDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for NonGatewayRoute.
+type NonGatewayRouteDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apissubmarineriov1.NonGatewayRoute]
+
+// NonGatewayRouteFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for NonGatewayRoute.
+type NonGatewayRouteFilteringHandler = cache.TypedFilteringResourceEventHandler[*apissubmarineriov1.NonGatewayRoute]
+
+// NonGatewayRouteIndexers is a specialization of [cache.TypedIndexers] for NonGatewayRoute.
+type NonGatewayRouteIndexers = cache.TypedIndexers[*apissubmarineriov1.NonGatewayRoute]
+
+// DeletedNonGatewayRoute is a specialization of [cache.DeletedObject] for NonGatewayRoute.
+type DeletedNonGatewayRoute = cache.DeletedObject[*apissubmarineriov1.NonGatewayRoute]
 
 type nonGatewayRouteInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -51,25 +79,49 @@ type nonGatewayRouteInformer struct {
 // NewNonGatewayRouteInformer constructs a new informer for NonGatewayRoute type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedNonGatewayRouteInformer]).
 func NewNonGatewayRouteInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewNonGatewayRouteInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedNonGatewayRouteInformer constructs a new informer for NonGatewayRoute type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedNonGatewayRouteInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers NonGatewayRouteIndexers) NonGatewayRouteIndexInformer {
+	return NewTypedNonGatewayRouteInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredNonGatewayRouteInformer constructs a new informer for NonGatewayRoute type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredNonGatewayRouteInformer]).
 func NewFilteredNonGatewayRouteInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewNonGatewayRouteInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedNonGatewayRouteInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredNonGatewayRouteInformer constructs a new informer for NonGatewayRoute type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredNonGatewayRouteInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers NonGatewayRouteIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) NonGatewayRouteIndexInformer {
+	return NewTypedNonGatewayRouteInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewNonGatewayRouteInformerWithOptions constructs a new informer for NonGatewayRoute type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedNonGatewayRouteInformerWithOptions]).
 func NewNonGatewayRouteInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedNonGatewayRouteInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedNonGatewayRouteInformerWithOptions constructs a new informer for NonGatewayRoute type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedNonGatewayRouteInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) NonGatewayRouteIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "submariner.io", Version: "v1", Resource: "nongatewayroutes"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apissubmarineriov1.NonGatewayRoute](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -102,17 +154,57 @@ func NewNonGatewayRouteInformerWithOptions(client versioned.Interface, namespace
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *nonGatewayRouteInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewNonGatewayRouteInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedNonGatewayRouteInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *nonGatewayRouteInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apissubmarineriov1.NonGatewayRoute{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *nonGatewayRouteInformer) TypedInformer() NonGatewayRouteIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apissubmarineriov1.NonGatewayRoute](f.factory.InformerFor(&apissubmarineriov1.NonGatewayRoute{}, f.defaultInformer))
 }
 
 func (f *nonGatewayRouteInformer) Lister() submarineriov1.NonGatewayRouteLister {
 	return submarineriov1.NewNonGatewayRouteLister(f.Informer().GetIndexer())
+}
+
+// ToTypedNonGatewayRouteInformer converts an untyped informer into a TypedNonGatewayRouteInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *NonGatewayRoute. If that is not the case, calling type-safe methods of the returned
+// TypedNonGatewayRouteInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedNonGatewayRouteInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedNonGatewayRouteInformer(informer NonGatewayRouteInformer) TypedNonGatewayRouteInformer {
+	if informer, ok := informer.(TypedNonGatewayRouteInformer); ok {
+		return informer
+	}
+	return &nonGatewayRouteTypedInformerAdapter{informer}
+}
+
+type nonGatewayRouteTypedInformerAdapter struct {
+	NonGatewayRouteInformer
+}
+
+func (a *nonGatewayRouteTypedInformerAdapter) TypedInformer() NonGatewayRouteIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apissubmarineriov1.NonGatewayRoute](a.Informer())
+}
+
+// ToNonGatewayRouteIndexInformer converts an untyped informer into a NonGatewayRouteIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *NonGatewayRoute. If that is not the case, calling type-safe methods of the returned
+// NonGatewayRouteIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a NonGatewayRouteIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToNonGatewayRouteIndexInformer(informer cache.SharedIndexInformer) NonGatewayRouteIndexInformer {
+	if informer, ok := informer.(NonGatewayRouteIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apissubmarineriov1.NonGatewayRoute](informer)
 }

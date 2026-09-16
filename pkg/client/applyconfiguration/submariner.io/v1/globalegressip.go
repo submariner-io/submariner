@@ -31,7 +31,7 @@ import (
 //
 // GlobalEgressIP defines a policy for allocating GlobalIPs for selected pods in the namespace of the GlobalEgressIP object.
 type GlobalEgressIPApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration    `json:""`
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// Spec is the specification of the desired behavior.
 	Spec *GlobalEgressIPSpecApplyConfiguration `json:"spec,omitempty"`
