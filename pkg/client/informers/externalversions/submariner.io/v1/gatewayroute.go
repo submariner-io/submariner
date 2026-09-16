@@ -36,11 +36,39 @@ import (
 )
 
 // GatewayRouteInformer provides access to a shared informer and lister for
-// GatewayRoutes.
+// GatewayRoutes. Prefer using the type-safe variant (see [TypedGatewayRouteInformer]).
 type GatewayRouteInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() submarineriov1.GatewayRouteLister
 }
+
+// TypedGatewayRouteInformer provides access to a shared informer and lister for
+// GatewayRoutes, including the type-safe TypedInformer variant.
+// It is a superset of GatewayRouteInformer.
+type TypedGatewayRouteInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() GatewayRouteIndexInformer
+	Lister() submarineriov1.GatewayRouteLister
+}
+
+// GatewayRouteIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type GatewayRouteIndexInformer cache.TypedSharedIndexInformer[*apissubmarineriov1.GatewayRoute]
+
+// GatewayRouteHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for GatewayRoute.
+type GatewayRouteHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apissubmarineriov1.GatewayRoute]
+
+// GatewayRouteDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for GatewayRoute.
+type GatewayRouteDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apissubmarineriov1.GatewayRoute]
+
+// GatewayRouteFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for GatewayRoute.
+type GatewayRouteFilteringHandler = cache.TypedFilteringResourceEventHandler[*apissubmarineriov1.GatewayRoute]
+
+// GatewayRouteIndexers is a specialization of [cache.TypedIndexers] for GatewayRoute.
+type GatewayRouteIndexers = cache.TypedIndexers[*apissubmarineriov1.GatewayRoute]
+
+// DeletedGatewayRoute is a specialization of [cache.DeletedObject] for GatewayRoute.
+type DeletedGatewayRoute = cache.DeletedObject[*apissubmarineriov1.GatewayRoute]
 
 type gatewayRouteInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -51,25 +79,49 @@ type gatewayRouteInformer struct {
 // NewGatewayRouteInformer constructs a new informer for GatewayRoute type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedGatewayRouteInformer]).
 func NewGatewayRouteInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewGatewayRouteInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedGatewayRouteInformer constructs a new informer for GatewayRoute type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedGatewayRouteInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers GatewayRouteIndexers) GatewayRouteIndexInformer {
+	return NewTypedGatewayRouteInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredGatewayRouteInformer constructs a new informer for GatewayRoute type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredGatewayRouteInformer]).
 func NewFilteredGatewayRouteInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewGatewayRouteInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedGatewayRouteInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredGatewayRouteInformer constructs a new informer for GatewayRoute type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredGatewayRouteInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers GatewayRouteIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) GatewayRouteIndexInformer {
+	return NewTypedGatewayRouteInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewGatewayRouteInformerWithOptions constructs a new informer for GatewayRoute type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedGatewayRouteInformerWithOptions]).
 func NewGatewayRouteInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedGatewayRouteInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedGatewayRouteInformerWithOptions constructs a new informer for GatewayRoute type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedGatewayRouteInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) GatewayRouteIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "submariner.io", Version: "v1", Resource: "gatewayroutes"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apissubmarineriov1.GatewayRoute](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -102,17 +154,57 @@ func NewGatewayRouteInformerWithOptions(client versioned.Interface, namespace st
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *gatewayRouteInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewGatewayRouteInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedGatewayRouteInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *gatewayRouteInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apissubmarineriov1.GatewayRoute{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *gatewayRouteInformer) TypedInformer() GatewayRouteIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apissubmarineriov1.GatewayRoute](f.factory.InformerFor(&apissubmarineriov1.GatewayRoute{}, f.defaultInformer))
 }
 
 func (f *gatewayRouteInformer) Lister() submarineriov1.GatewayRouteLister {
 	return submarineriov1.NewGatewayRouteLister(f.Informer().GetIndexer())
+}
+
+// ToTypedGatewayRouteInformer converts an untyped informer into a TypedGatewayRouteInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *GatewayRoute. If that is not the case, calling type-safe methods of the returned
+// TypedGatewayRouteInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedGatewayRouteInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedGatewayRouteInformer(informer GatewayRouteInformer) TypedGatewayRouteInformer {
+	if informer, ok := informer.(TypedGatewayRouteInformer); ok {
+		return informer
+	}
+	return &gatewayRouteTypedInformerAdapter{informer}
+}
+
+type gatewayRouteTypedInformerAdapter struct {
+	GatewayRouteInformer
+}
+
+func (a *gatewayRouteTypedInformerAdapter) TypedInformer() GatewayRouteIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apissubmarineriov1.GatewayRoute](a.Informer())
+}
+
+// ToGatewayRouteIndexInformer converts an untyped informer into a GatewayRouteIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *GatewayRoute. If that is not the case, calling type-safe methods of the returned
+// GatewayRouteIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a GatewayRouteIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToGatewayRouteIndexInformer(informer cache.SharedIndexInformer) GatewayRouteIndexInformer {
+	if informer, ok := informer.(GatewayRouteIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apissubmarineriov1.GatewayRoute](informer)
 }

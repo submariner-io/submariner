@@ -31,7 +31,7 @@ import (
 //
 // ClusterGlobalEgressIP defines a policy for allocating GlobalIPs at the cluster level to be used when no GlobalEgressIP applies.
 type ClusterGlobalEgressIPApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration    `json:""`
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// Spec is the specification of desired behavior.
 	Spec *ClusterGlobalEgressIPSpecApplyConfiguration `json:"spec,omitempty"`

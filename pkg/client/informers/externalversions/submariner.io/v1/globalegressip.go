@@ -36,11 +36,39 @@ import (
 )
 
 // GlobalEgressIPInformer provides access to a shared informer and lister for
-// GlobalEgressIPs.
+// GlobalEgressIPs. Prefer using the type-safe variant (see [TypedGlobalEgressIPInformer]).
 type GlobalEgressIPInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() submarineriov1.GlobalEgressIPLister
 }
+
+// TypedGlobalEgressIPInformer provides access to a shared informer and lister for
+// GlobalEgressIPs, including the type-safe TypedInformer variant.
+// It is a superset of GlobalEgressIPInformer.
+type TypedGlobalEgressIPInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() GlobalEgressIPIndexInformer
+	Lister() submarineriov1.GlobalEgressIPLister
+}
+
+// GlobalEgressIPIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type GlobalEgressIPIndexInformer cache.TypedSharedIndexInformer[*apissubmarineriov1.GlobalEgressIP]
+
+// GlobalEgressIPHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for GlobalEgressIP.
+type GlobalEgressIPHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apissubmarineriov1.GlobalEgressIP]
+
+// GlobalEgressIPDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for GlobalEgressIP.
+type GlobalEgressIPDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apissubmarineriov1.GlobalEgressIP]
+
+// GlobalEgressIPFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for GlobalEgressIP.
+type GlobalEgressIPFilteringHandler = cache.TypedFilteringResourceEventHandler[*apissubmarineriov1.GlobalEgressIP]
+
+// GlobalEgressIPIndexers is a specialization of [cache.TypedIndexers] for GlobalEgressIP.
+type GlobalEgressIPIndexers = cache.TypedIndexers[*apissubmarineriov1.GlobalEgressIP]
+
+// DeletedGlobalEgressIP is a specialization of [cache.DeletedObject] for GlobalEgressIP.
+type DeletedGlobalEgressIP = cache.DeletedObject[*apissubmarineriov1.GlobalEgressIP]
 
 type globalEgressIPInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -51,25 +79,49 @@ type globalEgressIPInformer struct {
 // NewGlobalEgressIPInformer constructs a new informer for GlobalEgressIP type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedGlobalEgressIPInformer]).
 func NewGlobalEgressIPInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewGlobalEgressIPInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedGlobalEgressIPInformer constructs a new informer for GlobalEgressIP type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedGlobalEgressIPInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers GlobalEgressIPIndexers) GlobalEgressIPIndexInformer {
+	return NewTypedGlobalEgressIPInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredGlobalEgressIPInformer constructs a new informer for GlobalEgressIP type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredGlobalEgressIPInformer]).
 func NewFilteredGlobalEgressIPInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewGlobalEgressIPInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedGlobalEgressIPInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredGlobalEgressIPInformer constructs a new informer for GlobalEgressIP type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredGlobalEgressIPInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers GlobalEgressIPIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) GlobalEgressIPIndexInformer {
+	return NewTypedGlobalEgressIPInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewGlobalEgressIPInformerWithOptions constructs a new informer for GlobalEgressIP type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedGlobalEgressIPInformerWithOptions]).
 func NewGlobalEgressIPInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedGlobalEgressIPInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedGlobalEgressIPInformerWithOptions constructs a new informer for GlobalEgressIP type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedGlobalEgressIPInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) GlobalEgressIPIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "submariner.io", Version: "v1", Resource: "globalegressips"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apissubmarineriov1.GlobalEgressIP](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -102,17 +154,57 @@ func NewGlobalEgressIPInformerWithOptions(client versioned.Interface, namespace 
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *globalEgressIPInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewGlobalEgressIPInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedGlobalEgressIPInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *globalEgressIPInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apissubmarineriov1.GlobalEgressIP{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *globalEgressIPInformer) TypedInformer() GlobalEgressIPIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apissubmarineriov1.GlobalEgressIP](f.factory.InformerFor(&apissubmarineriov1.GlobalEgressIP{}, f.defaultInformer))
 }
 
 func (f *globalEgressIPInformer) Lister() submarineriov1.GlobalEgressIPLister {
 	return submarineriov1.NewGlobalEgressIPLister(f.Informer().GetIndexer())
+}
+
+// ToTypedGlobalEgressIPInformer converts an untyped informer into a TypedGlobalEgressIPInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *GlobalEgressIP. If that is not the case, calling type-safe methods of the returned
+// TypedGlobalEgressIPInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedGlobalEgressIPInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedGlobalEgressIPInformer(informer GlobalEgressIPInformer) TypedGlobalEgressIPInformer {
+	if informer, ok := informer.(TypedGlobalEgressIPInformer); ok {
+		return informer
+	}
+	return &globalEgressIPTypedInformerAdapter{informer}
+}
+
+type globalEgressIPTypedInformerAdapter struct {
+	GlobalEgressIPInformer
+}
+
+func (a *globalEgressIPTypedInformerAdapter) TypedInformer() GlobalEgressIPIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apissubmarineriov1.GlobalEgressIP](a.Informer())
+}
+
+// ToGlobalEgressIPIndexInformer converts an untyped informer into a GlobalEgressIPIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *GlobalEgressIP. If that is not the case, calling type-safe methods of the returned
+// GlobalEgressIPIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a GlobalEgressIPIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToGlobalEgressIPIndexInformer(informer cache.SharedIndexInformer) GlobalEgressIPIndexInformer {
+	if informer, ok := informer.(GlobalEgressIPIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apissubmarineriov1.GlobalEgressIP](informer)
 }
