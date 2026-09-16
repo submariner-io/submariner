@@ -29,7 +29,7 @@ import (
 // GlobalIngressIPApplyConfiguration represents a declarative configuration of the GlobalIngressIP type for use
 // with apply.
 type GlobalIngressIPApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration    `json:""`
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// Spec is the specification of desired behavior of GlobalIngressIP object.
 	Spec *GlobalIngressIPSpecApplyConfiguration `json:"spec,omitempty"`

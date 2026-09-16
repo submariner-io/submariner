@@ -36,11 +36,39 @@ import (
 )
 
 // RouteAgentInformer provides access to a shared informer and lister for
-// RouteAgents.
+// RouteAgents. Prefer using the type-safe variant (see [TypedRouteAgentInformer]).
 type RouteAgentInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() submarineriov1.RouteAgentLister
 }
+
+// TypedRouteAgentInformer provides access to a shared informer and lister for
+// RouteAgents, including the type-safe TypedInformer variant.
+// It is a superset of RouteAgentInformer.
+type TypedRouteAgentInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() RouteAgentIndexInformer
+	Lister() submarineriov1.RouteAgentLister
+}
+
+// RouteAgentIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type RouteAgentIndexInformer cache.TypedSharedIndexInformer[*apissubmarineriov1.RouteAgent]
+
+// RouteAgentHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for RouteAgent.
+type RouteAgentHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apissubmarineriov1.RouteAgent]
+
+// RouteAgentDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for RouteAgent.
+type RouteAgentDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apissubmarineriov1.RouteAgent]
+
+// RouteAgentFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for RouteAgent.
+type RouteAgentFilteringHandler = cache.TypedFilteringResourceEventHandler[*apissubmarineriov1.RouteAgent]
+
+// RouteAgentIndexers is a specialization of [cache.TypedIndexers] for RouteAgent.
+type RouteAgentIndexers = cache.TypedIndexers[*apissubmarineriov1.RouteAgent]
+
+// DeletedRouteAgent is a specialization of [cache.DeletedObject] for RouteAgent.
+type DeletedRouteAgent = cache.DeletedObject[*apissubmarineriov1.RouteAgent]
 
 type routeAgentInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -51,25 +79,49 @@ type routeAgentInformer struct {
 // NewRouteAgentInformer constructs a new informer for RouteAgent type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedRouteAgentInformer]).
 func NewRouteAgentInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewRouteAgentInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedRouteAgentInformer constructs a new informer for RouteAgent type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedRouteAgentInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers RouteAgentIndexers) RouteAgentIndexInformer {
+	return NewTypedRouteAgentInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredRouteAgentInformer constructs a new informer for RouteAgent type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredRouteAgentInformer]).
 func NewFilteredRouteAgentInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewRouteAgentInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedRouteAgentInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredRouteAgentInformer constructs a new informer for RouteAgent type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredRouteAgentInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers RouteAgentIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) RouteAgentIndexInformer {
+	return NewTypedRouteAgentInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewRouteAgentInformerWithOptions constructs a new informer for RouteAgent type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedRouteAgentInformerWithOptions]).
 func NewRouteAgentInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedRouteAgentInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedRouteAgentInformerWithOptions constructs a new informer for RouteAgent type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedRouteAgentInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) RouteAgentIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "submariner.io", Version: "v1", Resource: "routeagents"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apissubmarineriov1.RouteAgent](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -102,17 +154,57 @@ func NewRouteAgentInformerWithOptions(client versioned.Interface, namespace stri
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *routeAgentInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewRouteAgentInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedRouteAgentInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *routeAgentInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apissubmarineriov1.RouteAgent{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *routeAgentInformer) TypedInformer() RouteAgentIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apissubmarineriov1.RouteAgent](f.factory.InformerFor(&apissubmarineriov1.RouteAgent{}, f.defaultInformer))
 }
 
 func (f *routeAgentInformer) Lister() submarineriov1.RouteAgentLister {
 	return submarineriov1.NewRouteAgentLister(f.Informer().GetIndexer())
+}
+
+// ToTypedRouteAgentInformer converts an untyped informer into a TypedRouteAgentInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *RouteAgent. If that is not the case, calling type-safe methods of the returned
+// TypedRouteAgentInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedRouteAgentInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedRouteAgentInformer(informer RouteAgentInformer) TypedRouteAgentInformer {
+	if informer, ok := informer.(TypedRouteAgentInformer); ok {
+		return informer
+	}
+	return &routeAgentTypedInformerAdapter{informer}
+}
+
+type routeAgentTypedInformerAdapter struct {
+	RouteAgentInformer
+}
+
+func (a *routeAgentTypedInformerAdapter) TypedInformer() RouteAgentIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apissubmarineriov1.RouteAgent](a.Informer())
+}
+
+// ToRouteAgentIndexInformer converts an untyped informer into a RouteAgentIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *RouteAgent. If that is not the case, calling type-safe methods of the returned
+// RouteAgentIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a RouteAgentIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToRouteAgentIndexInformer(informer cache.SharedIndexInformer) RouteAgentIndexInformer {
+	if informer, ok := informer.(RouteAgentIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apissubmarineriov1.RouteAgent](informer)
 }

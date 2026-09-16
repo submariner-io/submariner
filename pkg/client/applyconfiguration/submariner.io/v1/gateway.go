@@ -29,7 +29,7 @@ import (
 // GatewayApplyConfiguration represents a declarative configuration of the Gateway type for use
 // with apply.
 type GatewayApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration    `json:""`
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Status                               *GatewayStatusApplyConfiguration `json:"status,omitempty"`
 }

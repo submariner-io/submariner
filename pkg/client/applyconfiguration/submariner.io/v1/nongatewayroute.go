@@ -29,7 +29,7 @@ import (
 // NonGatewayRouteApplyConfiguration represents a declarative configuration of the NonGatewayRoute type for use
 // with apply.
 type NonGatewayRouteApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration    `json:""`
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	RoutePolicySpec                      *RoutePolicySpecApplyConfiguration `json:"spec,omitempty"`
 }
