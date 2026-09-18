@@ -99,7 +99,7 @@ func testEndpointMonitoring() {
 				t.createServiceExport(t.createService(service))
 
 				Eventually(func(g Gomega) {
-					gip := t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
+					gip := t.awaitHeadlessGlobalIngressIP(context.TODO(), service.Name, backendPod.Name)
 					g.Expect(gip.Status.AllocatedIP).NotTo(BeEmpty(), resource.ToJSON(gip))
 				}).To(Succeed())
 
