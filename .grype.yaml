@@ -1,11 +1,6 @@
 ---
 ignore:
-  # No fixed version available in Go module registry; Unknown severity
-  - vulnerability: GO-2026-5932
-    fix-state: not-fixed
-    package:
-      name: golang.org/x/crypto
-  # No fix available for golang.org/x/crypto.
+  # No fix is available; govulncheck confirms the vulnerable symbol is not called.
   - vulnerability: GO-2026-5932
     fix-state: unknown
     package:
