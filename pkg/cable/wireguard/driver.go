@@ -41,7 +41,6 @@ import (
 	"github.com/vishvananda/netlink"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	k8snet "k8s.io/utils/net"
-	"k8s.io/utils/ptr"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -149,11 +148,13 @@ func NewDriver(localEndpoint *endpoint.Local, _ *types.SubmarinerCluster, _ cert
 		return nil, errors.Wrapf(err, "error parsing %q from local endpoint", v1.UDPPortConfig)
 	}
 
+	listenPort := int(port)
+
 	// Configure the device - still not up.
 	peerConfigs := make([]wgtypes.PeerConfig, 0)
 	cfg := wgtypes.Config{
 		PrivateKey:   &priv,
-		ListenPort:   ptr.To(int(port)),
+		ListenPort:   &listenPort,
 		FirewallMark: nil,
 		ReplacePeers: true,
 		Peers:        peerConfigs,
@@ -279,7 +280,7 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 			IP:   remoteIP,
 			Port: remotePort,
 		},
-		PersistentKeepaliveInterval: ptr.To(KeepAliveInterval),
+		PersistentKeepaliveInterval: new(KeepAliveInterval),
 		ReplaceAllowedIPs:           true,
 		AllowedIPs:                  allowedIPs,
 	}}

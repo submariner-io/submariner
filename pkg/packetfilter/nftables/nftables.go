@@ -147,9 +147,9 @@ func (p *packetFilter) CreateIPHookChainIfNotExists(chain *packetfilter.ChainIPH
 
 	tx.Add(&knftables.Chain{
 		Name:     chain.Name,
-		Type:     ptr.To(iphookChainTypeToNftablesType[chain.Type]),
-		Hook:     ptr.To(iphookChainHookToNftablesHook[chain.Hook]),
-		Priority: ptr.To(chainPriority),
+		Type:     new(iphookChainTypeToNftablesType[chain.Type]),
+		Hook:     new(iphookChainHookToNftablesHook[chain.Hook]),
+		Priority: new(chainPriority),
 	})
 
 	err := p.nftables.Run(context.TODO(), tx)
@@ -171,7 +171,7 @@ func (p *packetFilter) CreateChainIfNotExists(_ packetfilter.TableType, chain *p
 func (p *packetFilter) newTransactionWithTable() *knftables.Transaction {
 	tx := p.nftables.NewTransaction()
 	tx.Add(&knftables.Table{
-		Comment: ptr.To("rules for submariner"),
+		Comment: new("rules for submariner"),
 	})
 
 	return tx
@@ -291,7 +291,7 @@ func (p *packetFilter) insertRuleAtPosition(chain string, rule *packetfilter.Rul
 	knftRule := knftables.Rule{
 		Chain:   chain,
 		Rule:    ruleSpec,
-		Comment: ptr.To(SerializeRule(rule)),
+		Comment: new(SerializeRule(rule)),
 	}
 
 	tx := p.newTransactionWithTable()
@@ -301,7 +301,7 @@ func (p *packetFilter) insertRuleAtPosition(chain string, rule *packetfilter.Rul
 	} else {
 		if pos > 1 {
 			// Index is the number of a rule (counting from 0) to add this rule after
-			knftRule.Index = ptr.To(pos - 2)
+			knftRule.Index = new(pos - 2)
 		}
 
 		tx.Add(&knftRule)
