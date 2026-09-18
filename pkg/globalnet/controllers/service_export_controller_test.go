@@ -167,12 +167,12 @@ func testHeadlessService() {
 		})
 
 		It("should create an appropriate GlobalIngressIP", func() {
-			t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
+			t.awaitHeadlessGlobalIngressIP(context.TODO(), service.Name, backendPod.Name)
 		})
 
 		Context("and then deleted", func() {
 			It("should delete the GlobalIngressIP", func() {
-				ingressIP := t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
+				ingressIP := t.awaitHeadlessGlobalIngressIP(context.TODO(), service.Name, backendPod.Name)
 				t.deletePod(backendPod)
 				t.awaitNoGlobalIngressIP(ingressIP.Name)
 			})
@@ -190,7 +190,7 @@ func testHeadlessService() {
 
 			backendPod.Status.Phase = corev1.PodRunning
 			test.UpdateResource(t.pods.Namespace(namespace), backendPod)
-			t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
+			t.awaitHeadlessGlobalIngressIP(context.TODO(), service.Name, backendPod.Name)
 		})
 
 		Context("and PublishNotReadyAddresses is set to true on the Service", func() {
@@ -199,7 +199,7 @@ func testHeadlessService() {
 			})
 
 			It("should create a GlobalIngressIP", func() {
-				t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
+				t.awaitHeadlessGlobalIngressIP(context.TODO(), service.Name, backendPod.Name)
 			})
 		})
 	})
@@ -215,7 +215,7 @@ func testHeadlessService() {
 
 			backendPod.Status.PodIP = "154.67.82.2"
 			test.UpdateResource(t.pods.Namespace(namespace), backendPod)
-			t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
+			t.awaitHeadlessGlobalIngressIP(context.TODO(), service.Name, backendPod.Name)
 		})
 	})
 
@@ -230,8 +230,8 @@ func testHeadlessService() {
 		})
 
 		It("should delete the GlobalIngressIP objects associated with the backend Pods", func() {
-			ingressIP1 := t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
-			ingressIP2 := t.awaitHeadlessGlobalIngressIP(service.Name, backendPod2.Name)
+			ingressIP1 := t.awaitHeadlessGlobalIngressIP(context.TODO(), service.Name, backendPod.Name)
+			ingressIP2 := t.awaitHeadlessGlobalIngressIP(context.TODO(), service.Name, backendPod2.Name)
 
 			Expect(t.serviceExports.Delete(context.TODO(), service.Name, metav1.DeleteOptions{})).To(Succeed())
 			t.awaitNoGlobalIngressIP(ingressIP1.Name)
@@ -264,8 +264,8 @@ func testHeadlessService() {
 		})
 
 		It("should delete the GlobalIngressIPs on reconciliation", func() {
-			t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
-			t.awaitHeadlessGlobalIngressIP(service.Name, backendPod2.Name)
+			t.awaitHeadlessGlobalIngressIP(context.TODO(), service.Name, backendPod.Name)
+			t.awaitHeadlessGlobalIngressIP(context.TODO(), service.Name, backendPod2.Name)
 
 			t.controller.Stop()
 			time.Sleep(500 * time.Millisecond)
@@ -286,7 +286,7 @@ func testHeadlessService() {
 		})
 
 		It("should delete the GlobalIngressIPs on reconciliation", func() {
-			t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
+			t.awaitHeadlessGlobalIngressIP(context.TODO(), service.Name, backendPod.Name)
 
 			t.controller.Stop()
 			time.Sleep(500 * time.Millisecond)
@@ -318,7 +318,7 @@ func testHeadlessService() {
 		})
 
 		It("should retain GlobalIngressIPs for both namespaces", func(ctx context.Context) {
-			localIngressIP := t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
+			localIngressIP := t.awaitHeadlessGlobalIngressIP(ctx, service.Name, backendPod.Name)
 
 			gvrService := *test.GetGroupVersionResourceFor(t.restMapper, &corev1.Service{})
 			gvrServiceExport := *test.GetGroupVersionResourceFor(t.restMapper, &mcsv1a1.ServiceExport{})

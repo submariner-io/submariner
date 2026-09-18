@@ -216,7 +216,7 @@ func (d *DatastoreSyncer) shouldSyncRemoteEndpoint(obj runtime.Object, numRequeu
 		}
 	}
 
-	if rejected, requeue := d.validateRemoteEndpointSubnets(remoteEndpoint, numRequeues); rejected {
+	if rejected, requeue := d.validateRemoteEndpointSubnets(remoteEndpoint); rejected {
 		return nil, requeue
 	}
 
@@ -229,9 +229,7 @@ func (d *DatastoreSyncer) shouldSyncRemoteEndpoint(obj runtime.Object, numRequeu
 // (i) is wholly contained in the CIDRs declared by that cluster's own Cluster CR
 // (Service/Cluster/Global), and (ii) does not overlap any subnet already accepted from a
 // different remote cluster. Returns (rejected, requeue).
-//
-//nolint:gocyclo // Method is not really that complex.
-func (d *DatastoreSyncer) validateRemoteEndpointSubnets(remoteEndpoint *submarinerv1.Endpoint, numRequeues int) (bool, bool) {
+func (d *DatastoreSyncer) validateRemoteEndpointSubnets(remoteEndpoint *submarinerv1.Endpoint) (bool, bool) {
 	if len(remoteEndpoint.Spec.Subnets) == 0 || d.syncer == nil {
 		return false, false
 	}

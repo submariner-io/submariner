@@ -101,7 +101,7 @@ var _ = Describe("Service controller", func() {
 
 		JustBeforeEach(func() {
 			t.createPod(backendPod)
-			t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
+			t.awaitHeadlessGlobalIngressIP(context.TODO(), service.Name, backendPod.Name)
 		})
 
 		It("should delete the GlobalIngressIP objects associated with the backend Pods and then re-create them", func() {
@@ -117,7 +117,7 @@ var _ = Describe("Service controller", func() {
 			By("Re-creating the service")
 
 			t.createService(service)
-			t.awaitHeadlessGlobalIngressIP(service.Name, backendPod.Name)
+			t.awaitHeadlessGlobalIngressIP(context.TODO(), service.Name, backendPod.Name)
 		})
 	})
 

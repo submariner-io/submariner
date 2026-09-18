@@ -442,8 +442,8 @@ func (t *testDriverBase) awaitEndpointsHasIP(name, ip string) {
 	}, 5).Should(BeTrue())
 }
 
-func (t *testDriverBase) awaitHeadlessGlobalIngressIP(svcName, podName string) *submarinerv1.GlobalIngressIP {
-	ingressIP := getGlobalIngressIP(t, podName, func(gip *submarinerv1.GlobalIngressIP, name string) bool {
+func (t *testDriverBase) awaitHeadlessGlobalIngressIP(ctx context.Context, svcName, podName string) *submarinerv1.GlobalIngressIP {
+	ingressIP := getGlobalIngressIP(ctx, t, podName, func(gip *submarinerv1.GlobalIngressIP, name string) bool {
 		return gip.Spec.PodRef != nil && gip.Spec.PodRef.Name == name
 	})
 
@@ -456,7 +456,7 @@ func (t *testDriverBase) awaitHeadlessGlobalIngressIP(svcName, podName string) *
 
 func (t *testDriverBase) awaitHeadlessGlobalIngressIPForEP(svcName, endpointsName string) *submarinerv1.GlobalIngressIP {
 	// Intentionally comparing ServiceRef.Name and endpointsName (they should be the same)
-	ingressIP := getGlobalIngressIP(t, endpointsName, func(gip *submarinerv1.GlobalIngressIP, name string) bool {
+	ingressIP := getGlobalIngressIP(context.TODO(), t, endpointsName, func(gip *submarinerv1.GlobalIngressIP, name string) bool {
 		return gip.Spec.ServiceRef != nil && gip.Spec.ServiceRef.Name == name
 	})
 
@@ -467,13 +467,13 @@ func (t *testDriverBase) awaitHeadlessGlobalIngressIPForEP(svcName, endpointsNam
 	return ingressIP
 }
 
-func getGlobalIngressIP(t *testDriverBase, name string,
+func getGlobalIngressIP(ctx context.Context, t *testDriverBase, name string,
 	compFunc func(*submarinerv1.GlobalIngressIP, string) bool,
 ) *submarinerv1.GlobalIngressIP {
 	var ingressIP *submarinerv1.GlobalIngressIP
 
 	Eventually(func() bool {
-		list, _ := t.globalIngressIPs.List(context.TODO(), metav1.ListOptions{})
+		list, _ := t.globalIngressIPs.List(ctx, metav1.ListOptions{})
 		for i := range list.Items {
 			gip := &submarinerv1.GlobalIngressIP{}
 			Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(list.Items[i].Object, gip)).To(Succeed())

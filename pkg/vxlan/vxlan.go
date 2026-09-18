@@ -80,7 +80,6 @@ func HardwareAddrFromIP(ip net.IP) net.HardwareAddr {
 		sum := h.Sum64()
 
 		// Truncation to bytes is intentional for a 40-bit MAC payload.
-		//nolint:gosec // G115: truncate hash to MAC bytes
 		return net.HardwareAddr{0x02, byte(sum >> 32), byte(sum >> 24), byte(sum >> 16), byte(sum >> 8), byte(sum)}
 	}
 
