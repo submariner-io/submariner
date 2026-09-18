@@ -191,7 +191,7 @@ func (i *PacketFilter) createChainIfNotExists(table uint32, chain string) error 
 	}
 
 	if err != nil {
-		return errors.Wrapf(err, "error finding IP table chain %q in table %q", chain, table)
+		return errors.Wrapf(err, "error finding IP table chain %q in table %d", chain, table)
 	}
 
 	i.addChainsFor(table, chain)
