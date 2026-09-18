@@ -48,6 +48,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	k8snet "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 	"k8s.io/utils/set"
 )
 
@@ -464,7 +465,7 @@ func (g *gatewayMonitor) startLocalGatewayCleanupController() error {
 
 	syncerConfig := NewGatewayResourceSyncerConfig(g.syncerConfig, g.Spec.Namespace)
 	syncerConfig.Federator = federate.NewNoopFederator()
-	syncerConfig.WaitForCacheSync = new(false)
+	syncerConfig.WaitForCacheSync = ptr.To(false)
 	syncerConfig.Name = "Gateway cleanup syncer"
 
 	// Here we run a resource syncer that removes the ingress rules for the local Gateway resource when it is deleted.
