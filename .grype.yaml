@@ -1,7 +1,8 @@
 ---
 ignore:
-  # No fix available
+  # Scoped CVE ignore
   - vulnerability: GO-2026-5932
-    fix-state: not-fixed
+    fix-state: unknown
     package:
       name: golang.org/x/crypto
+      location: /go.mod
