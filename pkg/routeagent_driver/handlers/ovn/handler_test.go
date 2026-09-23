@@ -1110,8 +1110,8 @@ func (t *handlerTestDriver) testOVNSelfSNAT() {
 			})
 
 			When("on gateway node", func() {
-				JustBeforeEach(func(ctx context.Context) {
-					t.CreateLocalHostEndpoint(ctx)
+				JustBeforeEach(func() {
+					t.CreateLocalHostEndpoint()
 				})
 
 				It("should add self-SNAT rules for local cluster CIDRs", func() {
@@ -1142,8 +1142,8 @@ func (t *handlerTestDriver) testOVNSelfSNAT() {
 					global.Init(&corev1.ConfigMap{Data: map[string]string{"disable-ovn-selfsnat": "true"}})
 				})
 
-				JustBeforeEach(func(ctx context.Context) {
-					t.CreateLocalHostEndpoint(ctx)
+				JustBeforeEach(func() {
+					t.CreateLocalHostEndpoint()
 				})
 
 				It("should not add self-SNAT rules", func() {
@@ -1154,8 +1154,8 @@ func (t *handlerTestDriver) testOVNSelfSNAT() {
 		})
 
 		When("OVN-K shared gateway mode is detected", func() {
-			JustBeforeEach(func(ctx context.Context) {
-				t.CreateLocalHostEndpoint(ctx)
+			JustBeforeEach(func() {
+				t.CreateLocalHostEndpoint()
 			})
 
 			It("should not add self-SNAT rules", func() {
