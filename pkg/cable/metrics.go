@@ -19,6 +19,9 @@ limitations under the License.
 package cable
 
 import (
+	"maps"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -132,6 +135,114 @@ func init() {
 		connectionLatencySecondsGauge)
 }
 
+type cableStatus struct {
+	labels    prometheus.Labels
+	status    string
+	cableName string
+}
+
+type shortConnectionKey struct {
+	cableDriverName string
+	status          string
+}
+
+var (
+	cableStatusMutex sync.Mutex
+	// cableStatuses is keyed by remote cluster rather than by the full set of labels, as the cable
+	// drivers key their own connections, so that a cable replacing an earlier one to the same cluster
+	// takes its place instead of leaving it behind.
+	cableStatuses = map[string]cableStatus{}
+	// publishedShortConnections is what shortConnectionsGauge currently reports.
+	publishedShortConnections = map[shortConnectionKey]int{}
+)
+
+func cableKey(cableDriverName, remoteClusterID string, family k8snet.IPFamily) string {
+	return strings.Join([]string{cableDriverName, remoteClusterID, string(family)}, "/")
+}
+
+// setCableStatus returns the status it replaced and whether anything changed.
+func setCableStatus(key string, current cableStatus) (cableStatus, bool) {
+	cableStatusMutex.Lock()
+	defer cableStatusMutex.Unlock()
+
+	previous, exists := cableStatuses[key]
+
+	// Stored unconditionally so the cable name cannot go stale, but kept out of the comparison: a
+	// name-only change would otherwise delete the series just recorded for the cable.
+	cableStatuses[key] = current
+
+	if exists && previous.status == current.status && maps.Equal(previous.labels, current.labels) {
+		return cableStatus{}, false
+	}
+
+	recordShortConnections()
+
+	return previous, true
+}
+
+// deleteCableStatus reports whether the cable is the one recorded, and so whether its series should go.
+func deleteCableStatus(key, cableName string, labels prometheus.Labels) bool {
+	cableStatusMutex.Lock()
+	defer cableStatusMutex.Unlock()
+
+	existing, exists := cableStatuses[key]
+	if !exists {
+		return true
+	}
+
+	// A cable superseded by another to the same cluster is disconnected after its replacement was
+	// installed. The replacement can carry the same labels, as the cable name is derived from the
+	// private IP while the labels carry the public one, so compare the name too.
+	if existing.cableName != cableName || !maps.Equal(existing.labels, labels) {
+		return false
+	}
+
+	delete(cableStatuses, key)
+
+	recordShortConnections()
+
+	return true
+}
+
+// recordShortConnections recalculates the summary gauge as the number of connections per cable
+// driver and status, updating the series that still apply in place so that a scrape never observes
+// it partially rebuilt. It must be called with cableStatusMutex held.
+func recordShortConnections() {
+	counts := map[shortConnectionKey]int{}
+
+	for _, cs := range cableStatuses {
+		counts[shortConnectionKey{cableDriverName: cs.labels[cableDriverLabel], status: cs.status}]++
+	}
+
+	for key, count := range counts {
+		shortConnectionsGauge.With(shortLabels(key)).Set(float64(count))
+	}
+
+	for key := range publishedShortConnections {
+		if _, ok := counts[key]; !ok {
+			shortConnectionsGauge.Delete(shortLabels(key))
+		}
+	}
+
+	publishedShortConnections = counts
+}
+
+func shortLabels(key shortConnectionKey) prometheus.Labels {
+	return prometheus.Labels{
+		cableDriverLabel:       key.cableDriverName,
+		connectionsStatusLabel: key.status,
+	}
+}
+
+// withStatus copies the labels rather than adding to them, as they are retained in cableStatuses.
+func withStatus(labels prometheus.Labels, status string) prometheus.Labels {
+	labelsWithStatus := make(prometheus.Labels, len(labels)+1)
+	maps.Copy(labelsWithStatus, labels)
+	labelsWithStatus[connectionsStatusLabel] = status
+
+	return labelsWithStatus
+}
+
 func getLabels(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec, family k8snet.IPFamily) prometheus.Labels {
 	return prometheus.Labels{
 		cableDriverLabel:      cableDriverName,
@@ -141,12 +252,6 @@ func getLabels(cableDriverName string, localEndpoint, remoteEndpoint *submv1.End
 		remoteClusterLabel:    remoteEndpoint.ClusterID,
 		remoteHostnameLabel:   remoteEndpoint.Hostname,
 		remoteEndpointIPLabel: remoteEndpoint.GetPublicIP(family),
-	}
-}
-
-func getShortLabels(cableDriverName string) prometheus.Labels {
-	return prometheus.Labels{
-		cableDriverLabel: cableDriverName,
 	}
 }
 
@@ -167,6 +272,7 @@ func RecordConnectionLatency(
 	connectionLatencySecondsGauge.With(getLabels(cableDriverName, localEndpoint, remoteEndpoint, family)).Set(latencySeconds)
 }
 
+// RecordConnection and RecordDisconnected rely on the cable engine serializing their callers.
 func RecordConnection(
 	cableDriverName string,
 	localEndpoint, remoteEndpoint *submv1.EndpointSpec,
@@ -180,22 +286,38 @@ func RecordConnection(
 		connectionEstablishedTimestampGauge.With(labels).Set(float64(time.Now().Unix()))
 	}
 
-	labels[connectionsStatusLabel] = status
-	connectionsGauge.With(labels).Set(1)
+	previous, changed := setCableStatus(cableKey(cableDriverName, remoteEndpoint.ClusterID, family),
+		cableStatus{labels: labels, status: status, cableName: remoteEndpoint.CableName})
 
-	shortLabels := getShortLabels(cableDriverName)
-	shortLabels[connectionsStatusLabel] = status
-	shortConnectionsGauge.With(shortLabels).Set(1)
+	connectionsGauge.With(withStatus(labels, status)).Set(1)
+
+	if !changed || previous.labels == nil {
+		return
+	}
+
+	// Removed after the current status is recorded, so that a scrape never sees the cable missing.
+	if maps.Equal(previous.labels, labels) {
+		connectionsGauge.Delete(withStatus(previous.labels, previous.status))
+	} else {
+		removeCableMetrics(previous.labels)
+	}
 }
 
 func RecordDisconnected(cableDriverName string, localEndpoint, remoteEndpoint *submv1.EndpointSpec, family k8snet.IPFamily) {
 	labels := getLabels(cableDriverName, localEndpoint, remoteEndpoint, family)
-	shortLabels := getShortLabels(cableDriverName)
 
+	if deleteCableStatus(cableKey(cableDriverName, remoteEndpoint.ClusterID, family), remoteEndpoint.CableName, labels) {
+		removeCableMetrics(labels)
+	}
+}
+
+func removeCableMetrics(labels prometheus.Labels) {
 	connectionLatencySecondsGauge.Delete(labels)
 	connectionEstablishedTimestampGauge.Delete(labels)
 	rxGauge.Delete(labels)
 	txGauge.Delete(labels)
-	connectionsGauge.Delete(labels)
-	shortConnectionsGauge.Delete(shortLabels)
+
+	// The connections gauge carries an additional status label, so an exact match on the labels
+	// above never removes its series.
+	connectionsGauge.DeletePartialMatch(labels)
 }
