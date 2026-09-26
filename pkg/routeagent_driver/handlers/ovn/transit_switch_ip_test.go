@@ -49,7 +49,7 @@ var _ = Describe("TransitSwitchIP", func() {
 
 		JustBeforeEach(func() {
 			k8sClient = fakek8s.NewClientset()
-			node = createNode(k8sClient, nodeIP)
+			node = createNode(k8sClient, nil, nodeIP)
 		})
 
 		When("the node annotation exists", func() {

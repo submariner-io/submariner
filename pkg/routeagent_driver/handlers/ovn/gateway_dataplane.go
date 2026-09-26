@@ -26,15 +26,18 @@ import (
 	"strconv"
 
 	"github.com/pkg/errors"
+	"github.com/submariner-io/admiral/pkg/global"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/resource"
 	"github.com/submariner-io/admiral/pkg/slices"
 	"github.com/submariner-io/admiral/pkg/util"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	"github.com/submariner-io/submariner/pkg/cidr"
 	nodeutil "github.com/submariner-io/submariner/pkg/node"
 	"github.com/submariner-io/submariner/pkg/packetfilter"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/chains"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/mtu"
 	"github.com/vishvananda/netlink"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -169,7 +172,12 @@ func (ovn *Handler) setupForwardingIptables() error {
 		return err
 	}
 
-	return ovn.updateIPtableChains(packetfilter.TableTypeFilter, chains.SmForward, ovn.getForwardingRuleSpecs)
+	if err := ovn.updateIPtableChains(packetfilter.TableTypeFilter, chains.SmForward, ovn.getForwardingRuleSpecs); err != nil {
+		return err
+	}
+
+	// Setup OVN self-SNAT workaround
+	return ovn.setupOVNSelfSNAT()
 }
 
 func (ovn *Handler) updateNoMasqueradeRules(subnet string, add bool) error {
@@ -231,6 +239,10 @@ func (ovn *Handler) initIPtablesChains() error {
 
 	if err := ovn.ensureForwardChains(); err != nil {
 		return errors.Wrap(err, "error ensuring FORWARD sub-chain entries")
+	}
+
+	if err := ovn.pFilter.CreateIPHookChainIfNotExists(chains.NewSelfSnat()); err != nil {
+		return errors.Wrapf(err, "error installing %q IPHook chain", chains.SmSelfSnat)
 	}
 
 	return nil
@@ -318,4 +330,93 @@ func (ovn *Handler) nodeResourceInterface() resource.Interface[*corev1.Node] {
 		GetFunc:    ovn.K8sClient.CoreV1().Nodes().Get,
 		UpdateFunc: ovn.K8sClient.CoreV1().Nodes().Update,
 	}
+}
+
+const disableOVNSelfSNATKey = "disable-ovn-selfsnat"
+
+func (ovn *Handler) shouldApplyOVNSelfSNAT() bool {
+	if global.Get(disableOVNSelfSNATKey, false) {
+		logger.V(log.DEBUG).Info("OVN self-SNAT explicitly disabled via submariner-global ConfigMap")
+		return false
+	}
+
+	if ovn.isLocalGWMode {
+		logger.Infof("OVN self-SNAT auto enabled (OVN-K local gateway mode detected)")
+	} else {
+		logger.V(log.DEBUG).Info("OVN self-SNAT disabled (OVN-K shared gateway mode detected)")
+	}
+
+	return ovn.isLocalGWMode
+}
+
+func (ovn *Handler) detectLocalGWMode(ctx context.Context) bool {
+	node, err := nodeutil.GetLocalNode(ctx, ovn.K8sClient)
+	if err != nil {
+		logger.Errorf(err, "Error getting local node to detect OVN-K gateway mode — assuming shared gateway")
+		return false
+	}
+
+	annotation, ok := node.Annotations[ovnGatewayConfigAnnotation]
+	if !ok {
+		return false
+	}
+
+	var gwConfig map[string]struct {
+		Mode string `json:"mode"`
+	}
+
+	if err := json.Unmarshal([]byte(annotation), &gwConfig); err != nil {
+		logger.Errorf(err, "Error parsing %q annotation — assuming shared gateway", ovnGatewayConfigAnnotation)
+		return false
+	}
+
+	isLocal := gwConfig["default"].Mode == "local"
+	if isLocal {
+		logger.Infof("OVN-K local gateway mode detected via %q annotation", ovnGatewayConfigAnnotation)
+	}
+
+	return isLocal
+}
+
+func (ovn *Handler) getOVNSelfSNATRuleSpecs() []*packetfilter.Rule {
+	if !ovn.State().IsOnGateway() {
+		logger.V(log.DEBUG).Info("Skipping OVN self-SNAT rules - not on gateway node")
+		return nil
+	}
+
+	if !ovn.shouldApplyOVNSelfSNAT() {
+		return nil
+	}
+
+	var rules []*packetfilter.Rule
+
+	var remoteSetName string
+	if ovn.ipFamily == k8snet.IPv4 {
+		remoteSetName = mtu.RemoteCIDRIPSetIPv4
+	} else {
+		remoteSetName = mtu.RemoteCIDRIPSetIPv6
+	}
+
+	// Create SNAT-to-self rules using existing remote CIDR sets
+	for _, localCIDR := range cidr.ExtractSubnets(ovn.ipFamily, ovn.ClusterCIDR) {
+		// SNAT-to-self rule: when traffic from local cluster CIDR goes to any remote CIDR the set
+		rule := &packetfilter.Rule{
+			SrcCIDR:     localCIDR,
+			DestSetName: remoteSetName, // Use existing set instead of individual CIDRs
+			Action:      packetfilter.RuleActionSelfSNAT,
+		}
+		rules = append(rules, rule)
+	}
+
+	if len(rules) > 0 {
+		logger.Infof("Adding %d OVN self-SNAT rules using remote CIDR set %q (workaround enabled via ConfigMap)",
+			len(rules), remoteSetName)
+	}
+
+	return rules
+}
+
+func (ovn *Handler) setupOVNSelfSNAT() error {
+	return errors.Wrap(ovn.pFilter.UpdateChainRules(packetfilter.TableTypeNAT, chains.SmSelfSnat,
+		ovn.getOVNSelfSNATRuleSpecs()), "error updating OVN self-SNAT rules")
 }
