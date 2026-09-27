@@ -257,7 +257,7 @@ func newHandlerTestDriver() *handlerTestDriver {
 
 func (t *handlerTestDriver) Start(ctx context.Context, handler event.Handler) {
 	t.ControllerSupport.Start(handler) //nolint:contextcheck // release-0.24 signature doesn't accept context
-	t.CreateNode(t.node)                //nolint:contextcheck // release-0.24 signature doesn't accept context
+	t.CreateNode(t.node)
 }
 
 //nolint:gocognit // Ignore "cognitive complexity ... is high".
@@ -416,7 +416,7 @@ func (t *handlerTestDriver) testGatewayTransitions(ipFamilySubnets, nonIPFamilyS
 				t.pFilter.AwaitNoRule(packetfilter.TableTypeFilter, chains.SmForwardMSSClamp, ContainSubstring(s))
 			}
 
-			t.awaitOVNKNodeAnnotationContaining()
+			t.awaitOVNKNodeAnnotationContaining() //nolint:contextcheck // release-0.24 signature doesn't accept context
 
 			t.netLink.AwaitNoGwRoutes(0, constants.RouteAgentInterClusterNetworkTableID, t.OVNK8sMgmntIntGw)
 		})
@@ -910,7 +910,7 @@ func (t *handlerTestDriver) testOVNMgmtInterfaceAddressChange() {
 
 		Expect(foundValidRoute).To(BeTrue(), "Should have created route with valid gateway")
 
-		t.DeleteEndpoint(endpoint.Name)
+		t.DeleteEndpoint(endpoint.Name) //nolint:contextcheck // release-0.24 signature doesn't accept context
 	})
 
 	It("should accept host routes (/32 or /128) with Gw=nil", func(ctx context.Context) {
@@ -986,7 +986,7 @@ func (t *handlerTestDriver) testOVNMgmtInterfaceAddressChange() {
 
 		Expect(foundValidRoute).To(BeTrue(), "Should have created route with host route IP")
 
-		t.DeleteEndpoint(endpoint.Name)
+		t.DeleteEndpoint(endpoint.Name) //nolint:contextcheck // release-0.24 signature doesn't accept context
 	})
 }
 
@@ -1045,7 +1045,7 @@ func (t *handlerTestDriver) testIntraClusterRoutingDisabled() {
 
 			By("Deleting remote Endpoint")
 
-			t.DeleteEndpoint(endpoint.Name)
+			t.DeleteEndpoint(endpoint.Name) //nolint:contextcheck // release-0.24 signature doesn't accept context
 
 			t.netLink.EnsureNoGwRoutes(0, constants.RouteAgentHostNetworkTableID, t.OVNK8sMgmntIntGw)
 		})
@@ -1065,7 +1065,7 @@ func (t *handlerTestDriver) testIntraClusterRoutingDisabled() {
 
 			By("Deleting remote Endpoint")
 
-			t.DeleteEndpoint(endpoint.Name)
+			t.DeleteEndpoint(endpoint.Name) //nolint:contextcheck // release-0.24 signature doesn't accept context
 
 			t.netLink.AwaitNoRule(constants.RouteAgentHostNetworkTableID, "", ipv4Subnets[0])
 		})
@@ -1087,7 +1087,7 @@ func (t *handlerTestDriver) testIntraClusterRoutingDisabled() {
 
 			By("Deleting local gateway Endpoint")
 
-			t.DeleteEndpoint(localEP.Name)
+			t.DeleteEndpoint(localEP.Name) //nolint:contextcheck // release-0.24 signature doesn't accept context
 
 			t.netLink.AwaitNoRule(constants.RouteAgentHostNetworkTableID, "", ipv4Subnets[0])
 			t.netLink.AwaitNoGwRoutes(0, constants.RouteAgentHostNetworkTableID, t.OVNK8sMgmntIntGw)
@@ -1137,7 +1137,7 @@ func (t *handlerTestDriver) testOVNSelfSNAT() {
 				})
 			})
 
-					When("disable-ovn-selfsnat is set in ConfigMap", func() {
+			When("disable-ovn-selfsnat is set in ConfigMap", func() {
 				BeforeEach(func() {
 					global.Init(&corev1.ConfigMap{Data: map[string]string{"disable-ovn-selfsnat": "true"}})
 				})
