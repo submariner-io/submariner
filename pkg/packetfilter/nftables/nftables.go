@@ -64,7 +64,6 @@ var (
 		packetfilter.RuleActionSNAT:     {"snat"},
 		packetfilter.RuleActionDNAT:     {"dnat"},
 		packetfilter.RuleActionJump:     {"jump"},
-		packetfilter.RuleActionSelfSNAT: {"snat to ip saddr"},
 	}
 
 	nftFamilies = map[k8snet.IPFamily]knftables.Family{
