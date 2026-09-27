@@ -119,7 +119,12 @@ func toNftRuleSpec(rule *packetfilter.Rule, isIPv6Set bool) string {
 	}
 
 	ruleSpec = append(ruleSpec, "counter")
-	ruleSpec = append(ruleSpec, ruleActionToStr[rule.Action]...)
+
+	if rule.Action == packetfilter.RuleActionSelfSNAT {
+		ruleSpec = append(ruleSpec, "snat", "to", setPrefix, "saddr")
+	} else {
+		ruleSpec = append(ruleSpec, ruleActionToStr[rule.Action]...)
+	}
 
 	if rule.Action == packetfilter.RuleActionJump {
 		ruleSpec = append(ruleSpec, rule.TargetChain)
