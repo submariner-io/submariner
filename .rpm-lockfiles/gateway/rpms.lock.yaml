@@ -4,13 +4,13 @@ lockfileVendor: redhat
 arches:
 - arch: aarch64
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/aarch64/fast-datapath/os/Packages/l/libreswan-5.3.2-1.el9fdp.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/aarch64/fast-datapath/os/Packages/l/libreswan-5.3.2-2.el9fdp.aarch64.rpm
     repoid: fast-datapath-for-rhel-9-aarch64-rpms
-    size: 1739286
-    checksum: sha256:65054d1d5429a504b0881981b1e34e5986d695e9c0301ebb7d6dab89507fb5ef
+    size: 1738916
+    checksum: sha256:cf869231cdb9c2d9e2bbb036c03862ebe9d8b1eafb4bd92f70857cdb0e0ce002
     name: libreswan
-    evr: 5.3.2-1.el9fdp
-    sourcerpm: libreswan-5.3.2-1.el9fdp.src.rpm
+    evr: 5.3.2-2.el9fdp
+    sourcerpm: libreswan-5.3.2-2.el9fdp.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/l/ldns-1.7.1-12.el9_8.1.aarch64.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
     size: 163234
@@ -67,13 +67,13 @@ arches:
     name: nss-util
     evr: 3.124.0-5.el9_6
     sourcerpm: nss-3.124.0-5.el9_6.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/u/unbound-libs-1.24.2-3.el9_8.4.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/u/unbound-libs-1.24.2-3.el9_8.8.aarch64.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
-    size: 577589
-    checksum: sha256:9f6cecdac1545e71257c36c5ed73dbf70d29e5f229b13b986e11cae67b02817a
+    size: 579936
+    checksum: sha256:5249484d85465732c380d1199f3d98660393a6ee5ff3496eb9dedf2ecccbe561
     name: unbound-libs
-    evr: 1.24.2-3.el9_8.4
-    sourcerpm: unbound-1.24.2-3.el9_8.4.src.rpm
+    evr: 1.24.2-3.el9_8.8
+    sourcerpm: unbound-1.24.2-3.el9_8.8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/k/kmod-28-11.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 125869
@@ -106,13 +106,13 @@ arches:
   module_metadata: []
 - arch: ppc64le
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/ppc64le/fast-datapath/os/Packages/l/libreswan-5.3.2-1.el9fdp.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/ppc64le/fast-datapath/os/Packages/l/libreswan-5.3.2-2.el9fdp.ppc64le.rpm
     repoid: fast-datapath-for-rhel-9-ppc64le-rpms
-    size: 1760448
-    checksum: sha256:3307aa2d5f9915d706093f5bca4ee2dc56fd65bbb1ada3f131fbe6194a1db6ab
+    size: 1759551
+    checksum: sha256:af84a5c6a0dc2bdccd5fe329668a94b87817c104fc7119ce912007071fe891d5
     name: libreswan
-    evr: 5.3.2-1.el9fdp
-    sourcerpm: libreswan-5.3.2-1.el9fdp.src.rpm
+    evr: 5.3.2-2.el9fdp
+    sourcerpm: libreswan-5.3.2-2.el9fdp.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/l/ldns-1.7.1-12.el9_8.1.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
     size: 189292
@@ -169,13 +169,13 @@ arches:
     name: nss-util
     evr: 3.124.0-5.el9_6
     sourcerpm: nss-3.124.0-5.el9_6.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/u/unbound-libs-1.24.2-3.el9_8.4.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/u/unbound-libs-1.24.2-3.el9_8.8.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
-    size: 642210
-    checksum: sha256:6e71472b371d552d92ea85118ae4d378f571e1b845932ee55d8fbe5a939d1967
+    size: 644021
+    checksum: sha256:3d0fdabadb08fb84e75bb3d5c4306a722f56af341b97559c95b6d747c985bed5
     name: unbound-libs
-    evr: 1.24.2-3.el9_8.4
-    sourcerpm: unbound-1.24.2-3.el9_8.4.src.rpm
+    evr: 1.24.2-3.el9_8.8
+    sourcerpm: unbound-1.24.2-3.el9_8.8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/k/kmod-28-11.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 139808
@@ -208,13 +208,13 @@ arches:
   module_metadata: []
 - arch: s390x
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/s390x/fast-datapath/os/Packages/l/libreswan-5.3.2-1.el9fdp.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/s390x/fast-datapath/os/Packages/l/libreswan-5.3.2-2.el9fdp.s390x.rpm
     repoid: fast-datapath-for-rhel-9-s390x-rpms
-    size: 1676103
-    checksum: sha256:ff759d329c50186685aa147c657cea0e2bc739fc0524eb96d247569ee111ed72
+    size: 1677545
+    checksum: sha256:6670ad68d05f975db8d85ce01639b21c573d9e421099ae8f1c8d2aba3a358df6
     name: libreswan
-    evr: 5.3.2-1.el9fdp
-    sourcerpm: libreswan-5.3.2-1.el9fdp.src.rpm
+    evr: 5.3.2-2.el9fdp
+    sourcerpm: libreswan-5.3.2-2.el9fdp.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/l/ldns-1.7.1-12.el9_8.1.s390x.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
     size: 165239
@@ -271,13 +271,13 @@ arches:
     name: nss-util
     evr: 3.124.0-5.el9_6
     sourcerpm: nss-3.124.0-5.el9_6.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/u/unbound-libs-1.24.2-3.el9_8.4.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/u/unbound-libs-1.24.2-3.el9_8.8.s390x.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
-    size: 569382
-    checksum: sha256:74e8989d394a22b7df4efe6e641cacca3700c3d0c234dfd2cd918d17a98c3fe5
+    size: 571923
+    checksum: sha256:d02c8ba2047c014805c76610016d56692e5071925b2a76814b6c6f1c7e6725f4
     name: unbound-libs
-    evr: 1.24.2-3.el9_8.4
-    sourcerpm: unbound-1.24.2-3.el9_8.4.src.rpm
+    evr: 1.24.2-3.el9_8.8
+    sourcerpm: unbound-1.24.2-3.el9_8.8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/k/kmod-28-11.el9.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 126577
@@ -310,13 +310,13 @@ arches:
   module_metadata: []
 - arch: x86_64
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/x86_64/fast-datapath/os/Packages/l/libreswan-5.3.2-1.el9fdp.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/x86_64/fast-datapath/os/Packages/l/libreswan-5.3.2-2.el9fdp.x86_64.rpm
     repoid: fast-datapath-for-rhel-9-x86_64-rpms
-    size: 1742241
-    checksum: sha256:ec6f2bd7fe7b0087d9f0e2a8a07161b952f89193ccbd594135b643849f79365d
+    size: 1744031
+    checksum: sha256:9091c89c1c30b9c8c63bdd3dcb956cb6821f21a78f12c861d934dfb36a5c9616
     name: libreswan
-    evr: 5.3.2-1.el9fdp
-    sourcerpm: libreswan-5.3.2-1.el9fdp.src.rpm
+    evr: 5.3.2-2.el9fdp
+    sourcerpm: libreswan-5.3.2-2.el9fdp.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/l/ldns-1.7.1-12.el9_8.1.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
     size: 171124
@@ -373,13 +373,13 @@ arches:
     name: nss-util
     evr: 3.124.0-5.el9_6
     sourcerpm: nss-3.124.0-5.el9_6.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/u/unbound-libs-1.24.2-3.el9_8.4.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/u/unbound-libs-1.24.2-3.el9_8.8.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
-    size: 600222
-    checksum: sha256:38801fb33335493c416f133c30436b96b87c5b7d5823ecc51493c7ea10bdcc91
+    size: 602333
+    checksum: sha256:fe305f2f4b898bf17742a70db5fa977f0e80a302012252ab142e5bb2bbb00f52
     name: unbound-libs
-    evr: 1.24.2-3.el9_8.4
-    sourcerpm: unbound-1.24.2-3.el9_8.4.src.rpm
+    evr: 1.24.2-3.el9_8.8
+    sourcerpm: unbound-1.24.2-3.el9_8.8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/k/kmod-28-11.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 127775

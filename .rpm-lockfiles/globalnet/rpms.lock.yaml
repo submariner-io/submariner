@@ -261,12 +261,12 @@ arches:
     name: libnftnl
     evr: 1.2.6-4.el9_4
     sourcerpm: libnftnl-1.2.6-4.el9_4.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/n/nftables-1.0.9-7.el9_8.x86_64.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/n/nftables-1.0.9-9.el9_8.x86_64.rpm
     repoid: ubi-9-for-x86_64-baseos-rpms
-    size: 437853
-    checksum: sha256:175e5a5110125df894ef6f7cf7cb657cf16a3c5cee2b2847cb6e285d56c79396
+    size: 473262
+    checksum: sha256:c2ed618abe918bb6f8f4ce93ab0654289edf51693fc4bd15350ab71c54198f19
     name: nftables
-    evr: 1:1.0.9-7.el9_8
-    sourcerpm: nftables-1.0.9-7.el9_8.src.rpm
+    evr: 1:1.0.9-9.el9_8
+    sourcerpm: nftables-1.0.9-9.el9_8.src.rpm
   source: []
   module_metadata: []
