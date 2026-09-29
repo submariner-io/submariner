@@ -53,13 +53,13 @@ arches:
     name: python3-policycoreutils
     evr: 3.6-5.el9
     sourcerpm: policycoreutils-3.6-5.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/appstream/os/Packages/u/unbound-libs-1.24.2-3.el9_8.4.aarch64.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/appstream/os/Packages/u/unbound-libs-1.24.2-3.el9_8.8.aarch64.rpm
     repoid: ubi-9-for-aarch64-appstream-rpms
-    size: 577589
-    checksum: sha256:9f6cecdac1545e71257c36c5ed73dbf70d29e5f229b13b986e11cae67b02817a
+    size: 579936
+    checksum: sha256:5249484d85465732c380d1199f3d98660393a6ee5ff3496eb9dedf2ecccbe561
     name: unbound-libs
-    evr: 1.24.2-3.el9_8.4
-    sourcerpm: unbound-1.24.2-3.el9_8.4.src.rpm
+    evr: 1.24.2-3.el9_8.8
+    sourcerpm: unbound-1.24.2-3.el9_8.8.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/d/diffutils-3.7-12.el9.aarch64.rpm
     repoid: ubi-9-for-aarch64-baseos-rpms
     size: 405687
@@ -274,13 +274,13 @@ arches:
     name: python3-policycoreutils
     evr: 3.6-5.el9
     sourcerpm: policycoreutils-3.6-5.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/appstream/os/Packages/u/unbound-libs-1.24.2-3.el9_8.4.ppc64le.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/appstream/os/Packages/u/unbound-libs-1.24.2-3.el9_8.8.ppc64le.rpm
     repoid: ubi-9-for-ppc64le-appstream-rpms
-    size: 642210
-    checksum: sha256:6e71472b371d552d92ea85118ae4d378f571e1b845932ee55d8fbe5a939d1967
+    size: 644021
+    checksum: sha256:3d0fdabadb08fb84e75bb3d5c4306a722f56af341b97559c95b6d747c985bed5
     name: unbound-libs
-    evr: 1.24.2-3.el9_8.4
-    sourcerpm: unbound-1.24.2-3.el9_8.4.src.rpm
+    evr: 1.24.2-3.el9_8.8
+    sourcerpm: unbound-1.24.2-3.el9_8.8.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/d/diffutils-3.7-12.el9.ppc64le.rpm
     repoid: ubi-9-for-ppc64le-baseos-rpms
     size: 426776
@@ -502,13 +502,13 @@ arches:
     name: python3-policycoreutils
     evr: 3.6-5.el9
     sourcerpm: policycoreutils-3.6-5.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/appstream/os/Packages/u/unbound-libs-1.24.2-3.el9_8.4.s390x.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/appstream/os/Packages/u/unbound-libs-1.24.2-3.el9_8.8.s390x.rpm
     repoid: ubi-9-for-s390x-appstream-rpms
-    size: 569382
-    checksum: sha256:74e8989d394a22b7df4efe6e641cacca3700c3d0c234dfd2cd918d17a98c3fe5
+    size: 571923
+    checksum: sha256:d02c8ba2047c014805c76610016d56692e5071925b2a76814b6c6f1c7e6725f4
     name: unbound-libs
-    evr: 1.24.2-3.el9_8.4
-    sourcerpm: unbound-1.24.2-3.el9_8.4.src.rpm
+    evr: 1.24.2-3.el9_8.8
+    sourcerpm: unbound-1.24.2-3.el9_8.8.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/d/diffutils-3.7-12.el9.s390x.rpm
     repoid: ubi-9-for-s390x-baseos-rpms
     size: 410465
@@ -723,13 +723,13 @@ arches:
     name: python3-policycoreutils
     evr: 3.6-5.el9
     sourcerpm: policycoreutils-3.6-5.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/appstream/os/Packages/u/unbound-libs-1.24.2-3.el9_8.4.x86_64.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/appstream/os/Packages/u/unbound-libs-1.24.2-3.el9_8.8.x86_64.rpm
     repoid: ubi-9-for-x86_64-appstream-rpms
-    size: 600222
-    checksum: sha256:38801fb33335493c416f133c30436b96b87c5b7d5823ecc51493c7ea10bdcc91
+    size: 602333
+    checksum: sha256:fe305f2f4b898bf17742a70db5fa977f0e80a302012252ab142e5bb2bbb00f52
     name: unbound-libs
-    evr: 1.24.2-3.el9_8.4
-    sourcerpm: unbound-1.24.2-3.el9_8.4.src.rpm
+    evr: 1.24.2-3.el9_8.8
+    sourcerpm: unbound-1.24.2-3.el9_8.8.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/d/diffutils-3.7-12.el9.x86_64.rpm
     repoid: ubi-9-for-x86_64-baseos-rpms
     size: 411559
@@ -828,13 +828,13 @@ arches:
     name: libselinux-utils
     evr: 3.6-3.el9
     sourcerpm: libselinux-3.6-3.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/n/nftables-1.0.9-7.el9_8.x86_64.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/n/nftables-1.0.9-9.el9_8.x86_64.rpm
     repoid: ubi-9-for-x86_64-baseos-rpms
-    size: 437853
-    checksum: sha256:175e5a5110125df894ef6f7cf7cb657cf16a3c5cee2b2847cb6e285d56c79396
+    size: 473262
+    checksum: sha256:c2ed618abe918bb6f8f4ce93ab0654289edf51693fc4bd15350ab71c54198f19
     name: nftables
-    evr: 1:1.0.9-7.el9_8
-    sourcerpm: nftables-1.0.9-7.el9_8.src.rpm
+    evr: 1:1.0.9-9.el9_8
+    sourcerpm: nftables-1.0.9-9.el9_8.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/n/numactl-libs-2.0.19-3.el9.x86_64.rpm
     repoid: ubi-9-for-x86_64-baseos-rpms
     size: 31071
