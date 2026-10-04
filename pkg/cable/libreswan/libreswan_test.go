@@ -56,11 +56,15 @@ const (
 var _ = Describe("Libreswan", func() {
 	Describe("NATT port configuration", testNATTPortConfiguration)
 	Describe("TrafficStatusRE", testTrafficStatusRE)
+	Describe("LoadedConnectionRE", testLoadedConnectionRE)
 	Describe("ConnectToEndpoint", testConnectToEndpoint)
 	DescribeTableSubtree("DisconnectFromEndpoint", testDisconnectFromEndpoint,
 		Entry("psk auth mode", libreswan.AuthModePSK),
 		Entry("cert auth mode", libreswan.AuthModeCert))
 	Describe("GetConnections", testGetConnections)
+	DescribeTableSubtree("Connection reconciliation", testConnectionReconciliation,
+		Entry("psk auth mode", libreswan.AuthModePSK),
+		Entry("cert auth mode", libreswan.AuthModeCert))
 	Describe("Preferred server config", testPreferredServerConfig)
 	Describe("Pluto", testPluto)
 	Describe("Init", testInit)
@@ -580,6 +584,196 @@ func testGetConnections() {
 		})
 
 		Expect(actual).To(HaveExactElements(expected))
+	})
+}
+
+func testLoadedConnectionRE() {
+	const connName = "submariner-cable-cluster3-172-17-0-8-v4-0-0"
+
+	// Some Libreswan versions prefix every line with a three-digit status code and some don't, so both
+	// forms are covered.
+	DescribeTable("should extract the name of a loaded connection",
+		func(line string) {
+			matches := libreswan.LoadedConnectionRE.FindStringSubmatch(line)
+			Expect(matches).NotTo(BeNil())
+			Expect(matches[1]).To(Equal(connName))
+		},
+		Entry("definition line", `"`+connName+`": 10.0.0.0/16===192.68.1.1[%fromcert]...172.17.0.8===20.0.0.0/16; routed-tunnel;`),
+		Entry("definition line with a status code", `000 "`+connName+`": 10.0.0.0/16===192.68.1.1[%fromcert]; routed-tunnel;`),
+		Entry("detail line", `"`+connName+`":   host: oriented; local: 192.68.1.1; remote: 172.17.0.8;`),
+		Entry("detail line with a status code", `000 "`+connName+`":   host: oriented; local: 192.68.1.1;`),
+	)
+
+	DescribeTable("should not match a line that doesn't define a connection",
+		func(line string) {
+			Expect(libreswan.LoadedConnectionRE.FindStringSubmatch(line)).To(BeNil())
+		},
+		Entry("SA state line", `#56: "`+connName+`":500 ESTABLISHED_CHILD_SA (established Child SA); newest; idle;`),
+		Entry("SA state line with a status code", `000 #56: "`+connName+`":500 ESTABLISHED_CHILD_SA (established Child SA);`),
+		Entry("traffic status line", `006 #3: "`+connName+`", type=ESP, add_time=1590508783, inBytes=0, outBytes=0`),
+		Entry("interface line", `interface lo [::1]:UDP/4500 (NAT)`),
+		Entry("header line", `using kernel interface: xfrm`),
+	)
+}
+
+func testConnectionReconciliation(authMode libreswan.AuthMode) {
+	const (
+		connName  = "submariner-cable-remote-192-68-2-1-v4-0-0"
+		connName2 = "submariner-cable-remote-192-68-2-1-v4-0-1"
+	)
+
+	t := newTestDriver()
+
+	var natInfo *natdiscovery.NATEndpointInfo
+
+	// setTrafficStatus makes the next "whack --trafficstatus" invocations report the connection as either
+	// having an established IPsec SA or not.
+	setTrafficStatus := func(established bool) {
+		output := ""
+		if established {
+			output = fmt.Sprintf(" %q, type=ESP, add_time=1590508783, inBytes=10, outBytes=20, id='192.68.2.1'", connName)
+		}
+
+		t.cmdExecutor.SetupCommandStdOut(output, nil, "whack", "--trafficstatus")
+	}
+
+	// setLoadedInPluto makes the next "whack --status" invocations report the given connections, and only
+	// those, as loaded in Pluto. Pluto prints a block of lines per loaded connection, each prefixed with the
+	// quoted connection name, while SA state lines are prefixed with "#<num>: ".
+	setLoadedInPluto := func(loaded ...string) {
+		var output strings.Builder
+
+		output.WriteString(`"ovn-2e3031-0-in-1": 10.48.126.23/32/UDP/6081===10.48.126.26/32/UDP; routed-tunnel;` + "\n" +
+			`#56: "ovn-2e3031-0-in-1":500 ESTABLISHED_CHILD_SA (established Child SA); newest; idle;` + "\n")
+
+		for _, name := range loaded {
+			fmt.Fprintf(&output, "%q: 10.0.0.0/16===192.68.1.1[%%fromcert]...172.93.2.1[%%fromcert]===20.0.0.0/16; routed-tunnel;\n"+
+				"%q:   host: oriented; local: 192.68.1.1; remote: 172.93.2.1;\n", name, name)
+		}
+
+		t.cmdExecutor.SetupCommandStdOut(output.String(), nil, "whack", "--status")
+	}
+
+	refreshStatus := func(times int, expStatus subv1.ConnectionStatus) {
+		for range times {
+			conns, err := t.driver.GetConnections()
+			Expect(err).To(Succeed())
+			Expect(conns).To(HaveLen(1))
+			Expect(conns[0].Status).To(Equal(expStatus))
+		}
+	}
+
+	// ensureNoReconcile asserts that Pluto was neither queried nor re-configured, ie that refreshing the
+	// connection status issued nothing beyond "whack --trafficstatus".
+	ensureNoReconcile := func() {
+		t.cmdExecutor.EnsureNoCommand(nil, "whack", "--status")
+		t.cmdExecutor.EnsureNoCommand(nil, "auto", "--add")
+		t.cmdExecutor.EnsureNoCommand(nil, "--initiate")
+	}
+
+	BeforeEach(func() {
+		natInfo = &natdiscovery.NATEndpointInfo{
+			Endpoint: subv1.Endpoint{
+				Spec: subv1.EndpointSpec{
+					ClusterID:  "remote",
+					CableName:  "submariner-cable-remote-192-68-2-1",
+					PrivateIPs: []string{"192.68.2.1"},
+					Subnets:    []string{"20.0.0.0/16"},
+				},
+			},
+			UseIP:     "172.93.2.1",
+			UseFamily: k8snet.IPv4,
+		}
+
+		os.Setenv(authModeEnvVar, string(authMode))
+		DeferCleanup(func() {
+			os.Unsetenv(authModeEnvVar)
+		})
+	})
+
+	JustBeforeEach(func() {
+		Expect(t.driver.Init(context.TODO())).To(Succeed())
+
+		_, err := t.driver.ConnectToEndpoint(natInfo)
+		Expect(err).To(Succeed())
+
+		setTrafficStatus(false)
+		t.cmdExecutor.Clear()
+	})
+
+	When("a Connection has no established IPsec SA and is no longer loaded in Pluto", func() {
+		It("should re-install it once the threshold is reached", func() {
+			setLoadedInPluto()
+
+			refreshStatus(2, subv1.Connecting)
+			ensureNoReconcile()
+
+			refreshStatus(1, subv1.Connecting)
+
+			if authMode == libreswan.AuthModeCert {
+				t.cmdExecutor.AwaitCommand(nil, "whack", "--status")
+				t.cmdExecutor.AwaitCommand(nil, "auto", "--add", connName)
+				t.cmdExecutor.AwaitCommand(nil, "whack", "--name", connName, "--initiate")
+			} else {
+				// In PSK mode Submariner owns the Pluto daemon and configures DPD so Pluto recovers on its own.
+				ensureNoReconcile()
+			}
+		})
+	})
+
+	When("a Connection has no established IPsec SA but is still loaded in Pluto", func() {
+		It("should not re-install it", func() {
+			setLoadedInPluto(connName)
+
+			refreshStatus(6, subv1.Connecting)
+
+			if authMode == libreswan.AuthModeCert {
+				// Pluto still has the connection so it's responsible for establishing it.
+				t.cmdExecutor.AwaitCommand(nil, "whack", "--status")
+				t.cmdExecutor.EnsureNoCommand(nil, "auto", "--add")
+				t.cmdExecutor.EnsureNoCommand(nil, "--initiate")
+			} else {
+				ensureNoReconcile()
+			}
+		})
+	})
+
+	When("a Connection is intermittently missing an established IPsec SA", func() {
+		It("should not query Pluto or re-install it", func() {
+			setLoadedInPluto()
+
+			refreshStatus(2, subv1.Connecting)
+
+			setTrafficStatus(true)
+			refreshStatus(1, subv1.Connected)
+
+			setTrafficStatus(false)
+			refreshStatus(2, subv1.Connecting)
+
+			ensureNoReconcile()
+		})
+	})
+
+	When("only some of the Libreswan connections for a Connection are no longer loaded in Pluto", func() {
+		BeforeEach(func() {
+			natInfo.Endpoint.Spec.Subnets = []string{"20.0.0.0/16", "21.0.0.0/16"}
+		})
+
+		It("should only re-install those", func() {
+			setLoadedInPluto(connName)
+
+			refreshStatus(3, subv1.Connecting)
+
+			if authMode == libreswan.AuthModeCert {
+				t.cmdExecutor.AwaitCommand(nil, "auto", "--add", connName2)
+
+				// Re-adding a connection Pluto still has would terminate the SA it's negotiating for it.
+				t.cmdExecutor.EnsureNoCommand(nil, "auto", "--add", connName)
+				t.cmdExecutor.EnsureNoCommand(nil, "--name", connName, "--initiate")
+			} else {
+				ensureNoReconcile()
+			}
+		})
 	})
 }
 
