@@ -1,8 +1,8 @@
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/Masterminds/semver/v3 v3.4.0 h1:Zog+i5UMtVoCU8oKka5P7i9q9HgrJeGzI9SA1Xbatp0=
 github.com/Masterminds/semver/v3 v3.4.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lprf4nC11bSS5beM=
-github.com/advanced-wg/awgctrl-go v1.2.3 h1:k9gYerEwwTfDuyeqn2mONrzQwXOCZ80CMd2jU+RJGAQ=
-github.com/advanced-wg/awgctrl-go v1.2.3/go.mod h1:XqBQOHFUlHF/67pRvZ8VJn/zOp4T1LMA57AED1P180E=
+github.com/advanced-wg/awgctrl-go v1.2.4 h1:K3xdD7XNcjwPAwjsW9pyfGiqSQAUVjZuQTeoBk0U6vM=
+github.com/advanced-wg/awgctrl-go v1.2.4/go.mod h1:XqBQOHFUlHF/67pRvZ8VJn/zOp4T1LMA57AED1P180E=
 github.com/alexflint/go-filemutex v0.0.0-20171022225611-72bdc8eae2ae h1:AMzIhMUqU3jMrZiTuW0zkYeKlKDAFD+DG20IoO421/Y=
 github.com/alexflint/go-filemutex v0.0.0-20171022225611-72bdc8eae2ae/go.mod h1:CgnQgUtFrFz9mxFNtED3jI5tLDjKlOM+oUF/sTk6ps0=
 github.com/amnezia-vpn/amneziawg-go/v3 v3.1.20260828 h1:D8d8gGvwXcTxUIsE4z6F6vjy4/VZddu95vMNtOygh1c=
