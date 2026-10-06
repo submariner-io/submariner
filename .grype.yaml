@@ -20,3 +20,9 @@ ignore:
   - vulnerability: GHSA-f6x5-jh6r-wrfv
     package:
       name: golang.org/x/crypto
+
+  # No fix available
+  - vulnerability: GO-2026-5932
+    fix-state: unknown
+    package:
+      name: golang.org/x/crypto
