@@ -153,6 +153,10 @@ type libreswan struct {
 	certificateHandler *CertificateHandler
 	connectionFile     *ConnectionFile
 	signingRequestor   certificate.SigningRequestor
+
+	// Counts the consecutive status refreshes in which a connection had no established IPsec SA. Only
+	// allocated in cert mode, so it's nil in PSK mode and any inadvertent write to it would panic.
+	missedRefreshes map[string]int
 }
 
 type specification struct {
@@ -253,6 +257,7 @@ func (i *libreswan) Init(ctx context.Context) error {
 	} else if i.authMode == AuthModeCert {
 		i.plutoStarted = true
 		i.connectionFile = &ConnectionFile{Path: SubmarinerConfPath()}
+		i.missedRefreshes = map[string]int{}
 
 		logger.Infof("Issuing certificate with Private IPs %s Public IPs %s", i.localEndpoint.PrivateIPs, i.localEndpoint.PublicIPs)
 
@@ -391,6 +396,10 @@ func (i *libreswan) refreshConnectionStatus() error {
 			logger.V(log.DEBUG).Infof("Connection %q not found in active connections obtained from whack: %v, %v",
 				i.connections[j].Endpoint.CableName, activeConnectionsRx, activeConnectionsTx)
 		}
+	}
+
+	if i.authMode == AuthModeCert {
+		i.reconcileCertModeConnections()
 	}
 
 	return nil
@@ -685,6 +694,11 @@ func (i *libreswan) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint, f
 	}
 
 	i.connections = removeConnectionForEndpoint(i.connections, endpoint, family)
+
+	if i.authMode == AuthModeCert {
+		delete(i.missedRefreshes, missedRefreshesKey(endpoint.Spec.CableName, family))
+	}
+
 	cable.RecordDisconnected(cableDriverName, &i.localEndpoint, &endpoint.Spec, family)
 
 	return nil
