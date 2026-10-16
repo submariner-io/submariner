@@ -13,6 +13,7 @@
 - [Architecture](#architecture)
   - [Network Path](#network-path)
 - [Prerequisites](#prerequisites)
+  - [systemd-networkd](#systemd-networkd)
 - [Installation](#installation)
   - [Installation using subctl](#installation-using-subctl)
   - [Installation using Helm](#installation-using-helm)
@@ -52,6 +53,19 @@ node.
 ## Prerequisites
 
 See the [Prerequisites docs](https://submariner.io/getting-started/#prerequisites) on Submariner's website.
+
+### systemd-networkd
+
+On nodes managed by `systemd-networkd` (e.g. Flatcar, Ubuntu Server), the routes and routing policy rules programmed by Submariner may be removed because `systemd-networkd` treats them as foreign. On every gateway node, create
+`/etc/systemd/networkd.conf.d/10-submariner-foreign-routes.conf` with the following content and restart `systemd-networkd`:
+
+```ini
+[Network]
+ManageForeignRoutes=no
+ManageForeignRoutingPolicyRules=no
+```
+
+If the nodes are not reachable over SSH, use a DaemonSet to write the file on each gateway node.
 
 ## Installation
 
