@@ -21,6 +21,7 @@ package pinger
 import (
 	"fmt"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
@@ -91,6 +92,8 @@ type pingerImpl struct {
 	failureMsg         string
 	connectionStatus   ConnectionStatus
 	stopCh             chan struct{}
+	// Failed sends since the last reply, across restarts: when every send fails, each restart fails on its first send.
+	sendErrors int
 }
 
 func NewPinger(config Config) Interface {
@@ -133,7 +136,12 @@ func (p *pingerImpl) Start() {
 				err := p.doPing()
 				if err != nil {
 					logger.Errorf(err, "Unable to start pinger for IP %q - retry in %d seconds", p.ip, doPingRetryTimeout)
-					time.Sleep(doPingRetryTimeout * time.Second)
+
+					select {
+					case <-p.stopCh:
+						return
+					case <-time.After(doPingRetryTimeout * time.Second):
+					}
 				}
 			}
 		}
@@ -152,6 +160,9 @@ func (p *pingerImpl) Stop() {
 func (p *pingerImpl) doPing() error {
 	pinger, err := probing.NewPinger(p.ip)
 	if err != nil {
+		p.Lock()
+		defer p.Unlock()
+
 		p.connectionStatus = ConnectionUnknown
 		p.failureMsg = fmt.Sprintf("Failed to create the pinger for the remote endpoint IP %q: %v", p.ip, err)
 
@@ -163,16 +174,23 @@ func (p *pingerImpl) doPing() error {
 	pinger.RecordRtts = false
 	pinger.Timeout = p.pingTimeout
 
-	pinger.OnSend = func(_ *probing.Packet) {
+	// OnSend isn't called when a send fails, so Stop can't be handled there.
+	runDone := make(chan struct{})
+	defer close(runDone)
+
+	go func() {
 		select {
 		case <-p.stopCh:
 			pinger.Stop()
-			return
-		default:
+		case <-runDone:
 		}
+	}()
 
-		// Pinger will mark a connection as an error if the packet loss reaches the threshold
-		if pinger.PacketsSent-pinger.PacketsRecv > p.maxPacketLossCount {
+	checkPacketLoss := func() {
+		// Pinger will mark a connection as an error if the packet loss reaches the threshold. Failed sends aren't counted
+		// in PacketsSent but have to count as lost, else a path where every send fails (for example blocked by an IPsec
+		// policy) never reaches it.
+		if pinger.PacketsSent+p.sendErrors-pinger.PacketsRecv > p.maxPacketLossCount {
 			p.Lock()
 			defer p.Unlock()
 
@@ -186,6 +204,20 @@ func (p *pingerImpl) doPing() error {
 
 			pinger.Stop()
 		}
+	}
+
+	pinger.OnSend = func(_ *probing.Packet) {
+		checkPacketLoss()
+	}
+
+	pinger.OnSendError = func(_ *probing.Packet, err error) {
+		// pro-bing resends the same packet right away on ENOBUFS, so that isn't a lost packet.
+		if errors.Is(err, syscall.ENOBUFS) {
+			return
+		}
+
+		p.sendErrors++
+		checkPacketLoss()
 	}
 
 	pinger.OnRecv = func(packet *probing.Packet) {
@@ -202,11 +234,19 @@ func (p *pingerImpl) doPing() error {
 
 		pinger.PacketsSent = 0
 		pinger.PacketsRecv = 0
+		p.sendErrors = 0
 	}
 
 	err = pinger.Run()
 	if err != nil {
-		p.connectionStatus = ConnectionUnknown
+		p.Lock()
+		defer p.Unlock()
+
+		// Keep reporting the error until a reply comes back.
+		if p.connectionStatus != ConnectionError {
+			p.connectionStatus = ConnectionUnknown
+		}
+
 		p.failureMsg = fmt.Sprintf("Failed to run the pinger for the remote endpoint IP %q: %v", p.ip, err)
 
 		return errors.Wrapf(err, "error running the pinger")

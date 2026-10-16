@@ -45,32 +45,7 @@ var _ = Describe("Pinger", func() {
 		testsEnabled    bool
 	)
 
-	testsEnabled = func() bool {
-		// Run a pinger to check if listening on an ICMP socket is permitted.
-		err := func() error {
-			p, err := probing.NewPinger("127.0.0.1")
-			if err != nil {
-				return err
-			}
-
-			p.Count = 1
-			p.Timeout = 50 * time.Millisecond
-			p.SetPrivileged(pinger.Privileged)
-
-			return p.Run()
-		}()
-
-		if opErr, ok := errors.AsType[*net.OpError](err); ok {
-			if sysCallErr, ok := errors.AsType[*os.SyscallError](err); ok {
-				if errNo, ok := errors.AsType[syscall.Errno](err); ok {
-					// errNo 1 is "operation not permitted".
-					return opErr.Op != "listen" || sysCallErr.Syscall != "socket" || errNo != 1
-				}
-			}
-		}
-
-		return true
-	}()
+	testsEnabled = pingPermitted()
 
 	BeforeEach(func() {
 		if !testsEnabled {
@@ -80,6 +55,7 @@ var _ = Describe("Pinger", func() {
 
 		ip = "127.0.0.1"
 		pingInterval = 300 * time.Millisecond
+		pingTimeout = 0
 	})
 
 	JustBeforeEach(func() {
@@ -157,3 +133,30 @@ var _ = Describe("Pinger", func() {
 		})
 	})
 })
+
+// pingPermitted runs a pinger to check if listening on an ICMP socket is permitted.
+func pingPermitted() bool {
+	err := func() error {
+		p, err := probing.NewPinger("127.0.0.1")
+		if err != nil {
+			return err
+		}
+
+		p.Count = 1
+		p.Timeout = 50 * time.Millisecond
+		p.SetPrivileged(pinger.Privileged)
+
+		return p.Run()
+	}()
+
+	if opErr, ok := errors.AsType[*net.OpError](err); ok {
+		if sysCallErr, ok := errors.AsType[*os.SyscallError](err); ok {
+			if errNo, ok := errors.AsType[syscall.Errno](err); ok {
+				// errNo 1 is "operation not permitted".
+				return opErr.Op != "listen" || sysCallErr.Syscall != "socket" || errNo != 1
+			}
+		}
+	}
+
+	return true
+}
