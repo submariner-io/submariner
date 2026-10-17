@@ -21,7 +21,6 @@ package cable
 import (
 	"maps"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -147,7 +146,6 @@ type shortConnectionKey struct {
 }
 
 var (
-	cableStatusMutex sync.Mutex
 	// cableStatuses is keyed by remote cluster rather than by the full set of labels, as the cable
 	// drivers key their own connections, so that a cable replacing an earlier one to the same cluster
 	// takes its place instead of leaving it behind.
@@ -162,9 +160,6 @@ func cableKey(cableDriverName, remoteClusterID string, family k8snet.IPFamily) s
 
 // setCableStatus returns the status it replaced and whether anything changed.
 func setCableStatus(key string, current cableStatus) (cableStatus, bool) {
-	cableStatusMutex.Lock()
-	defer cableStatusMutex.Unlock()
-
 	previous, exists := cableStatuses[key]
 
 	// Stored unconditionally so the cable name cannot go stale, but kept out of the comparison: a
@@ -182,9 +177,6 @@ func setCableStatus(key string, current cableStatus) (cableStatus, bool) {
 
 // deleteCableStatus reports whether the cable is the one recorded, and so whether its series should go.
 func deleteCableStatus(key, cableName string, labels prometheus.Labels) bool {
-	cableStatusMutex.Lock()
-	defer cableStatusMutex.Unlock()
-
 	existing, exists := cableStatuses[key]
 	if !exists {
 		return true
@@ -206,7 +198,7 @@ func deleteCableStatus(key, cableName string, labels prometheus.Labels) bool {
 
 // recordShortConnections recalculates the summary gauge as the number of connections per cable
 // driver and status, updating the series that still apply in place so that a scrape never observes
-// it partially rebuilt. It must be called with cableStatusMutex held.
+// it partially rebuilt.
 func recordShortConnections() {
 	counts := map[shortConnectionKey]int{}
 

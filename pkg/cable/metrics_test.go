@@ -21,6 +21,7 @@ package cable_test
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -178,10 +179,14 @@ var _ = Describe("Connection metrics", func() {
 				}
 			}()
 
+			timeout := time.After(10 * time.Second)
+
 			for {
 				select {
 				case <-done:
 					return
+				case <-timeout:
+					Fail("timed out waiting for the connections to be recorded")
 				default:
 					Expect(gatheredCount("submariner_connections")).To(Equal(1))
 					Expect(gatheredCount("submariner_connections_short")).To(Equal(1))
@@ -212,10 +217,14 @@ var _ = Describe("Connection metrics", func() {
 				}
 			}()
 
+			timeout := time.After(10 * time.Second)
+
 			for {
 				select {
 				case <-done:
 					return
+				case <-timeout:
+					Fail("timed out waiting for the connections to be recorded")
 				default:
 					Expect(gatheredCount("submariner_connections")).ToNot(BeZero())
 					Expect(gatheredCount("submariner_connections_short")).ToNot(BeZero())
