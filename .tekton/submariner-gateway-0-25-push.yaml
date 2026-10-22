@@ -7,8 +7,7 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "release-0.25"
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "release-0.25" && (".tekton/submariner-gateway-0-25-pull-request.yaml".pathChanged() || ".tekton/submariner-gateway-0-25-push.yaml".pathChanged() || "package/Dockerfile.submariner-gateway.konflux".pathChanged() || ".rpm-lockfiles/gateway/***".pathChanged())
   labels:
     appstudio.openshift.io/application: submariner-0-25
     appstudio.openshift.io/component: submariner-gateway-0-25
