@@ -1,0 +1,19 @@
+---
+context:
+  containerfile: ../../package/Dockerfile.submariner-globalnet.konflux
+
+contentOrigin:
+  repofiles:
+    - submariner-rhel-9.repo
+packages:
+  - iproute
+  - iptables-nft
+  - nftables
+  - ipset
+  - shadow-utils
+  - grep
+arches:
+  - x86_64
+  - aarch64
+  - ppc64le
+  - s390x
