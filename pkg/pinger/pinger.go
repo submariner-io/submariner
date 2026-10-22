@@ -21,6 +21,7 @@ package pinger
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -93,7 +94,7 @@ type pingerImpl struct {
 	connectionStatus   ConnectionStatus
 	stopCh             chan struct{}
 	// Failed sends since the last reply, across restarts: when every send fails, each restart fails on its first send.
-	sendErrors int
+	sendErrors atomic.Int32
 }
 
 func NewPinger(config Config) Interface {
@@ -190,7 +191,7 @@ func (p *pingerImpl) doPing() error {
 		// Pinger will mark a connection as an error if the packet loss reaches the threshold. Failed sends aren't counted
 		// in PacketsSent but have to count as lost, else a path where every send fails (for example blocked by an IPsec
 		// policy) never reaches it.
-		if pinger.PacketsSent+p.sendErrors-pinger.PacketsRecv > p.maxPacketLossCount {
+		if pinger.PacketsSent+int(p.sendErrors.Load())-pinger.PacketsRecv > p.maxPacketLossCount {
 			p.Lock()
 			defer p.Unlock()
 
@@ -216,7 +217,7 @@ func (p *pingerImpl) doPing() error {
 			return
 		}
 
-		p.sendErrors++
+		p.sendErrors.Add(1)
 		checkPacketLoss()
 	}
 
@@ -234,7 +235,7 @@ func (p *pingerImpl) doPing() error {
 
 		pinger.PacketsSent = 0
 		pinger.PacketsRecv = 0
-		p.sendErrors = 0
+		p.sendErrors.Store(0)
 	}
 
 	err = pinger.Run()
