@@ -135,7 +135,7 @@ func (i *libreswan) installCertModeConnections(endpoint *subv1.EndpointSpec, use
 			logger.Infof("Connection mode for %q: %v", connName, connectionMode)
 
 			if connectionMode == operationModeClient || connectionMode == operationModeBidirectional {
-				output, err = command.New(exec.Command("ipsec", "whack", "--name", connName, "--initiate")).CombinedOutput()
+				output, err = command.New(exec.Command("ipsec", "whack", "--name", connName, "--asynchronous", "--initiate")).CombinedOutput()
 				if err != nil {
 					return errors.Wrapf(err, "failed to bring up connection %s with whack: %s", connName, string(output))
 				}
