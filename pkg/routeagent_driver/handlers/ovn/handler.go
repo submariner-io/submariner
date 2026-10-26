@@ -57,6 +57,7 @@ type HandlerConfig struct {
 	NewOVSDBClient       NewOVSDBClientFn
 	TransitSwitchIP      TransitSwitchIP
 	IntraRoutingDisabled bool
+	TCPMssValue          int
 }
 
 type Handler struct {
@@ -76,7 +77,7 @@ type Handler struct {
 var logger = log.Logger{Logger: logf.Log.WithName("OVN")}
 
 func GetHandlers(ipFamily k8snet.IPFamily, env *environment.Specification, submClient clientset.Interface, k8sClient kubernetes.Interface,
-	dynClient dynamic.Interface, watcherConfig *watcher.Config,
+	dynClient dynamic.Interface, watcherConfig *watcher.Config, tcpMssValue int,
 ) []event.Handler {
 	transitSwitchIP := NewTransitSwitchIP(ipFamily)
 
@@ -91,6 +92,7 @@ func GetHandlers(ipFamily k8snet.IPFamily, env *environment.Specification, submC
 			WatcherConfig:        watcherConfig,
 			TransitSwitchIP:      transitSwitchIP,
 			IntraRoutingDisabled: env.IntraRoutingDisabled,
+			TCPMssValue:          tcpMssValue,
 		}),
 		NewGatewayRouteHandler(ipFamily, submClient),
 	}
