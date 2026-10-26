@@ -147,17 +147,23 @@ func (ovn *Handler) getForwardingRuleSpecs() ([]*packetfilter.Rule, error) {
 func (ovn *Handler) getMSSClampingRuleSpecs() ([]*packetfilter.Rule, error) {
 	var rules []*packetfilter.Rule //nolint:prealloc // OK
 
+	// Use annotation value if provided, otherwise default to 1398 for backwards compatibility
+	mssValue := ovn.TCPMssValue
+	if mssValue == 0 {
+		mssValue = MSSFor1500MTU
+	}
+
 	for _, remoteCIDR := range ovn.getRemoteSubnets().UnsortedList() {
 		rules = append(rules, &packetfilter.Rule{
 			DestCIDR:  remoteCIDR,
 			Action:    packetfilter.RuleActionMss,
 			ClampType: packetfilter.ToValue,
-			MssValue:  strconv.Itoa(MSSFor1500MTU),
+			MssValue:  strconv.Itoa(mssValue),
 		}, &packetfilter.Rule{
 			SrcCIDR:   remoteCIDR,
 			Action:    packetfilter.RuleActionMss,
 			ClampType: packetfilter.ToValue,
-			MssValue:  strconv.Itoa(MSSFor1500MTU),
+			MssValue:  strconv.Itoa(mssValue),
 		})
 	}
 
