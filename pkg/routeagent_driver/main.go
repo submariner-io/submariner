@@ -254,6 +254,11 @@ func getTCPMssValue(localNode *corev1.Node) int {
 		return 0
 	}
 
+	if tcpMssValue < 0 {
+		logger.Warningf("Invalid negative value %d for %q annotation, ignoring", tcpMssValue, v1.TCPMssValue)
+		return 0
+	}
+
 	return tcpMssValue
 }
 
