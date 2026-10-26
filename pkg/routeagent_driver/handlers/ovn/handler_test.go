@@ -122,7 +122,7 @@ var _ = Describe("GetHandlers", func() {
 	It("should return the correct Handlers", func() {
 		handlers := ovn.GetHandlers(k8snet.IPv4, &env, t.submClient, t.k8sClient, t.dynClient, &watcher.Config{
 			Client: t.dynClient,
-		})
+		}, 0)
 
 		Expect(handlers).To(HaveLen(3))
 
@@ -152,7 +152,7 @@ var _ = Describe("GetHandlers", func() {
 		It("should not return the NonGatewayRouteHandler", func() {
 			handlers := ovn.GetHandlers(k8snet.IPv4, &env, t.submClient, t.k8sClient, t.dynClient, &watcher.Config{
 				Client: t.dynClient,
-			})
+			}, 0)
 
 			for _, h := range handlers {
 				_, ok := h.(*ovn.NonGatewayRouteHandler)
