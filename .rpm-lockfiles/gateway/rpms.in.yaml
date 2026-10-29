@@ -1,0 +1,17 @@
+---
+context:
+  containerfile: ../../package/Dockerfile.submariner-gateway.konflux
+
+contentOrigin:
+  repofiles:
+    - submariner-rhel-9.repo
+packages:
+  - iproute
+  - libreswan
+  - kmod
+  - shadow-utils
+arches:
+  - x86_64
+  - aarch64
+  - ppc64le
+  - s390x
