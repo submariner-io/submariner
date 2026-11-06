@@ -182,7 +182,7 @@ func testGlobalIngressIPCreatedClusterIPSvc(t *globalIngressIPControllerTestDriv
 			t.awaitStatusConditions(ctx, t.globalIngressIPs, globalIngressIPName, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionFalse,
-				Reason: "IPPoolAllocationFailed",
+				Reason: string(submarinerv1.IPPoolAllocationFailed),
 			})
 		})
 	})
@@ -234,7 +234,7 @@ func testGlobalIngressIPCreatedHeadlessSvc(t *globalIngressIPControllerTestDrive
 			t.awaitStatusConditions(ctx, t.globalIngressIPs, globalIngressIPName, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionFalse,
-				Reason: "IPPoolAllocationFailed",
+				Reason: string(submarinerv1.IPPoolAllocationFailed),
 			})
 		})
 	})
@@ -248,7 +248,7 @@ func testGlobalIngressIPCreatedHeadlessSvc(t *globalIngressIPControllerTestDrive
 			t.awaitStatusConditions(ctx, t.globalIngressIPs, globalIngressIPName, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionFalse,
-				Reason: "ProgramIPTableRulesFailed",
+				Reason: string(submarinerv1.ProgramIPTableRulesFailed),
 			}, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionTrue,

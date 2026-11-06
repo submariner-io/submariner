@@ -174,7 +174,7 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 			t.awaitEgressIPStatus(ctx, t.globalEgressIPs, globalEgressIPName, 1, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionFalse,
-				Reason: "ProgramIPTableRulesFailed",
+				Reason: string(submarinerv1.ProgramIPTableRulesFailed),
 			}, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionTrue,
@@ -199,7 +199,7 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 			t.awaitStatusConditions(ctx, t.globalEgressIPs, globalEgressIPName, metav1.Condition{
 				Type:   string(submarinerv1.GlobalEgressIPAllocated),
 				Status: metav1.ConditionFalse,
-				Reason: "IPPoolAllocationFailed",
+				Reason: string(submarinerv1.IPPoolAllocationFailed),
 			})
 
 			t.watches.AwaitNoWatchStarted("pods")
