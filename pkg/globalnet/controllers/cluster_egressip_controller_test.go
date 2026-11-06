@@ -106,7 +106,7 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 						{
 							Type:    string(submarinerv1.GlobalEgressIPAllocated),
 							Status:  metav1.ConditionTrue,
-							Reason:  "Success",
+							Reason:  metav1.StatusSuccess,
 							Message: "Allocated global IPs",
 						},
 					}

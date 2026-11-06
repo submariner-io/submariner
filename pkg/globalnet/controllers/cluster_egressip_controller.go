@@ -286,7 +286,7 @@ func (c *clusterGlobalEgressIPController) allocateGlobalIPs(key string, numberOf
 	meta.SetStatusCondition(&status.Conditions, metav1.Condition{
 		Type:    string(submarinerv1.GlobalEgressIPAllocated),
 		Status:  metav1.ConditionTrue,
-		Reason:  "Success",
+		Reason:  metav1.StatusSuccess,
 		Message: fmt.Sprintf("Allocated %d global IP(s)", numberOfIPs),
 	})
 
