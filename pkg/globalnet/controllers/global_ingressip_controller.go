@@ -302,7 +302,7 @@ func (c *globalIngressIPController) onCreate(ctx context.Context, ingressIP *sub
 	meta.SetStatusCondition(&ingressIP.Status.Conditions, metav1.Condition{
 		Type:    string(submarinerv1.GlobalEgressIPAllocated),
 		Status:  metav1.ConditionTrue,
-		Reason:  "Success",
+		Reason:  metav1.StatusSuccess,
 		Message: "Allocated global IP",
 	})
 
