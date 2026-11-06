@@ -279,6 +279,13 @@ const (
 	GlobalEgressIPUpdated   GlobalEgressIPConditionType = "Updated"
 )
 
+type ConditionFailureReason string
+
+const (
+	IPPoolAllocationFailed    ConditionFailureReason = "IPPoolAllocationFailed"
+	ProgramIPTableRulesFailed ConditionFailureReason = "ProgramIPTableRulesFailed"
+)
+
 type GlobalEgressIPStatus struct {
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
