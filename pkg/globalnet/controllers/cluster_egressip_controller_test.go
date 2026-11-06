@@ -290,7 +290,7 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 				t.awaitEgressIPStatus(ctx, t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, numberOfIPs, metav1.Condition{
 					Type:   string(submarinerv1.GlobalEgressIPAllocated),
 					Status: metav1.ConditionFalse,
-					Reason: "ProgramIPTableRulesFailed",
+					Reason: string(submarinerv1.ProgramIPTableRulesFailed),
 				}, metav1.Condition{
 					Type:   string(submarinerv1.GlobalEgressIPAllocated),
 					Status: metav1.ConditionTrue,
@@ -308,7 +308,7 @@ var _ = Describe("ClusterGlobalEgressIP controller", func() {
 				t.awaitStatusConditions(ctx, t.clusterGlobalEgressIPs, constants.ClusterGlobalEgressIPName, metav1.Condition{
 					Type:   string(submarinerv1.GlobalEgressIPAllocated),
 					Status: metav1.ConditionFalse,
-					Reason: "IPPoolAllocationFailed",
+					Reason: string(submarinerv1.IPPoolAllocationFailed),
 				})
 			})
 		})

@@ -207,7 +207,7 @@ func (c *globalIngressIPController) onCreate(ctx context.Context, ingressIP *sub
 		meta.SetStatusCondition(&ingressIP.Status.Conditions, metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
-			Reason:  "IPPoolAllocationFailed",
+			Reason:  string(submarinerv1.IPPoolAllocationFailed),
 			Message: fmt.Sprintf("Error allocating a global IP from the pool: %v", err),
 		})
 
@@ -287,7 +287,7 @@ func (c *globalIngressIPController) onCreate(ctx context.Context, ingressIP *sub
 			meta.SetStatusCondition(&ingressIP.Status.Conditions, metav1.Condition{
 				Type:    string(submarinerv1.GlobalEgressIPAllocated),
 				Status:  metav1.ConditionFalse,
-				Reason:  "ProgramIPTableRulesFailed",
+				Reason:  string(submarinerv1.ProgramIPTableRulesFailed),
 				Message: err.Error(),
 			})
 
