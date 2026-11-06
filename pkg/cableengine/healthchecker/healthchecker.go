@@ -118,6 +118,6 @@ func (h *controller) endpointCreatedOrUpdated(obj runtime.Object, _ int) bool {
 }
 
 func (h *controller) endpointDeleted(obj runtime.Object, _ int) bool {
-	h.pingerController.EndpointRemoved(&(obj.(*submarinerv1.Endpoint)).Spec)
+	h.pingerController.EndpointRemoved(&obj.(*submarinerv1.Endpoint).Spec)
 	return false
 }
