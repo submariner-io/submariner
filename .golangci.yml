@@ -208,7 +208,7 @@ linters:
       # minor optimisation)
       - linters:
           - govet
-        text: pointer bytes could be
+        text: leading bytes of pointer data but optimal value is
       # Full text of the error is "do not define dynamic errors, use wrapped static errors instead". See
       # https://github.com/Djarvur/go-err113/issues/10 for an interesting discussion of this error. While there are cases
       # where wrapped sentinel errors are useful, it seems a bit pedantic to force that pattern in all cases.
@@ -219,6 +219,7 @@ linters:
       - linters:
           - err113
           - gochecknoinits
+          - goconst
           - wrapcheck
         path: _test\.go|test/|fake/
       # Ignore contextcheck on main for now
@@ -228,7 +229,7 @@ linters:
       # Allow corev1.Endpoints and related types, they are not going away (https://github.com/kubernetes/kubernetes/pull/130098)
       - linters:
           - staticcheck
-        text: "SA1019: corev1.Endpoint"
+        text: "SA1019:.*k8s\\.io/api/core/v1\\.Endpoint"
       # Specifying "omitempty" for CRD structs (eg ObjectMeta, Status) is the norm so allow it.
       - linter:
           - modernize
