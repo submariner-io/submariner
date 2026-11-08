@@ -91,6 +91,7 @@ func getPublicIPResolvers(family k8snet.IPFamily) string {
 	case k8snet.IPFamilyUnknown:
 	}
 
+	//nolint:gosec // We don't need cryptographically-secure randomness here
 	rand.Shuffle(len(serverList), func(i, j int) { serverList[i], serverList[j] = serverList[j], serverList[i] })
 
 	return strings.Join(serverList, ",")
