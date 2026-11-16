@@ -4,13 +4,13 @@ lockfileVendor: redhat
 arches:
 - arch: aarch64
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/aarch64/fast-datapath/os/Packages/l/libreswan-5.3.2-1.el9fdp.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/aarch64/fast-datapath/os/Packages/l/libreswan-5.3.3-3.el9fdp.aarch64.rpm
     repoid: fast-datapath-for-rhel-9-aarch64-rpms
-    size: 1739286
-    checksum: sha256:65054d1d5429a504b0881981b1e34e5986d695e9c0301ebb7d6dab89507fb5ef
+    size: 1739968
+    checksum: sha256:2f26c8d54e98000242eaa009b65f0230f087979cb6e83e73b66ed10be95f7d07
     name: libreswan
-    evr: 5.3.2-1.el9fdp
-    sourcerpm: libreswan-5.3.2-1.el9fdp.src.rpm
+    evr: 5.3.3-3.el9fdp
+    sourcerpm: libreswan-5.3.3-3.el9fdp.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/l/ldns-1.7.1-12.el9_8.1.aarch64.rpm
     repoid: rhel-9-for-aarch64-appstream-rpms
     size: 163234
@@ -67,13 +67,6 @@ arches:
     name: nss-util
     evr: 3.124.0-5.el9_6
     sourcerpm: nss-3.124.0-5.el9_6.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/appstream/os/Packages/u/unbound-libs-1.24.2-3.el9_8.4.aarch64.rpm
-    repoid: rhel-9-for-aarch64-appstream-rpms
-    size: 577589
-    checksum: sha256:9f6cecdac1545e71257c36c5ed73dbf70d29e5f229b13b986e11cae67b02817a
-    name: unbound-libs
-    evr: 1.24.2-3.el9_8.4
-    sourcerpm: unbound-1.24.2-3.el9_8.4.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/k/kmod-28-11.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 125869
@@ -88,13 +81,13 @@ arches:
     name: logrotate
     evr: 3.18.0-12.el9
     sourcerpm: logrotate-3.18.0-12.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/p/procps-ng-3.3.17-14.el9.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/p/procps-ng-3.3.17-15.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 363344
-    checksum: sha256:a8c7514beb4c3cafa6341f43bbe285319d863b2893a34d91159dc8e90f615dd2
+    size: 361037
+    checksum: sha256:b20a3923176f72910d13e68ca304982a8871790f4768571048ad65f9c5569966
     name: procps-ng
-    evr: 3.3.17-14.el9
-    sourcerpm: procps-ng-3.3.17-14.el9.src.rpm
+    evr: 3.3.17-15.el9
+    sourcerpm: procps-ng-3.3.17-15.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/p/protobuf-c-1.3.3-13.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 38582
@@ -102,17 +95,24 @@ arches:
     name: protobuf-c
     evr: 1.3.3-13.el9
     sourcerpm: protobuf-c-1.3.3-13.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/u/unbound-libs-1.26.1-1.el9_9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 594713
+    checksum: sha256:6bc98f754cfbf6e3717ab9507c80a90cc62278991eb9893266ae0ea36151e1cb
+    name: unbound-libs
+    evr: 1.26.1-1.el9_9
+    sourcerpm: unbound-1.26.1-1.el9_9.src.rpm
   source: []
   module_metadata: []
 - arch: ppc64le
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/ppc64le/fast-datapath/os/Packages/l/libreswan-5.3.2-1.el9fdp.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/ppc64le/fast-datapath/os/Packages/l/libreswan-5.3.3-3.el9fdp.ppc64le.rpm
     repoid: fast-datapath-for-rhel-9-ppc64le-rpms
-    size: 1760448
-    checksum: sha256:3307aa2d5f9915d706093f5bca4ee2dc56fd65bbb1ada3f131fbe6194a1db6ab
+    size: 1761469
+    checksum: sha256:b412cdf8722b79784ffe93b463b1dcb9dce0d277dbe3ce6612c8a003afa4f903
     name: libreswan
-    evr: 5.3.2-1.el9fdp
-    sourcerpm: libreswan-5.3.2-1.el9fdp.src.rpm
+    evr: 5.3.3-3.el9fdp
+    sourcerpm: libreswan-5.3.3-3.el9fdp.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/l/ldns-1.7.1-12.el9_8.1.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-appstream-rpms
     size: 189292
@@ -169,13 +169,6 @@ arches:
     name: nss-util
     evr: 3.124.0-5.el9_6
     sourcerpm: nss-3.124.0-5.el9_6.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/appstream/os/Packages/u/unbound-libs-1.24.2-3.el9_8.4.ppc64le.rpm
-    repoid: rhel-9-for-ppc64le-appstream-rpms
-    size: 642210
-    checksum: sha256:6e71472b371d552d92ea85118ae4d378f571e1b845932ee55d8fbe5a939d1967
-    name: unbound-libs
-    evr: 1.24.2-3.el9_8.4
-    sourcerpm: unbound-1.24.2-3.el9_8.4.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/k/kmod-28-11.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 139808
@@ -190,13 +183,13 @@ arches:
     name: logrotate
     evr: 3.18.0-12.el9
     sourcerpm: logrotate-3.18.0-12.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/p/procps-ng-3.3.17-14.el9.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/p/procps-ng-3.3.17-15.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 378421
-    checksum: sha256:d76d17ceec32bdf37c72a8ff52582b202fff7b7a3514dc2102ce3fcb42ff1382
+    size: 376845
+    checksum: sha256:f90b37c40a0bc2c72bb953d2792002895d90b2fbd305a66631a252bc303d95c3
     name: procps-ng
-    evr: 3.3.17-14.el9
-    sourcerpm: procps-ng-3.3.17-14.el9.src.rpm
+    evr: 3.3.17-15.el9
+    sourcerpm: procps-ng-3.3.17-15.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/p/protobuf-c-1.3.3-13.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 41163
@@ -204,17 +197,24 @@ arches:
     name: protobuf-c
     evr: 1.3.3-13.el9
     sourcerpm: protobuf-c-1.3.3-13.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/u/unbound-libs-1.26.1-1.el9_9.ppc64le.rpm
+    repoid: rhel-9-for-ppc64le-baseos-rpms
+    size: 660844
+    checksum: sha256:e72ab79ce35e255f9a4c341f5e852c24a58962c732f799d1c5d7cd767ae382e1
+    name: unbound-libs
+    evr: 1.26.1-1.el9_9
+    sourcerpm: unbound-1.26.1-1.el9_9.src.rpm
   source: []
   module_metadata: []
 - arch: s390x
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/s390x/fast-datapath/os/Packages/l/libreswan-5.3.2-1.el9fdp.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/s390x/fast-datapath/os/Packages/l/libreswan-5.3.3-3.el9fdp.s390x.rpm
     repoid: fast-datapath-for-rhel-9-s390x-rpms
-    size: 1676103
-    checksum: sha256:ff759d329c50186685aa147c657cea0e2bc739fc0524eb96d247569ee111ed72
+    size: 1677655
+    checksum: sha256:d9d1247ef3e4578769a685fcc913bfcad1987c8b562a38b0f4f03385755925e6
     name: libreswan
-    evr: 5.3.2-1.el9fdp
-    sourcerpm: libreswan-5.3.2-1.el9fdp.src.rpm
+    evr: 5.3.3-3.el9fdp
+    sourcerpm: libreswan-5.3.3-3.el9fdp.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/l/ldns-1.7.1-12.el9_8.1.s390x.rpm
     repoid: rhel-9-for-s390x-appstream-rpms
     size: 165239
@@ -271,13 +271,6 @@ arches:
     name: nss-util
     evr: 3.124.0-5.el9_6
     sourcerpm: nss-3.124.0-5.el9_6.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/appstream/os/Packages/u/unbound-libs-1.24.2-3.el9_8.4.s390x.rpm
-    repoid: rhel-9-for-s390x-appstream-rpms
-    size: 569382
-    checksum: sha256:74e8989d394a22b7df4efe6e641cacca3700c3d0c234dfd2cd918d17a98c3fe5
-    name: unbound-libs
-    evr: 1.24.2-3.el9_8.4
-    sourcerpm: unbound-1.24.2-3.el9_8.4.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/k/kmod-28-11.el9.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 126577
@@ -292,13 +285,13 @@ arches:
     name: logrotate
     evr: 3.18.0-12.el9
     sourcerpm: logrotate-3.18.0-12.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/p/procps-ng-3.3.17-14.el9.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/p/procps-ng-3.3.17-15.el9.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 354331
-    checksum: sha256:540d734809d1a9ef380a47c5ef3039b2ab736bea53ba8f34d2456d654dc92f1b
+    size: 352573
+    checksum: sha256:07e0244e5e486f82de585b8dcb171b4619cdf56562bc114edf9fbc0a26fe57f2
     name: procps-ng
-    evr: 3.3.17-14.el9
-    sourcerpm: procps-ng-3.3.17-14.el9.src.rpm
+    evr: 3.3.17-15.el9
+    sourcerpm: procps-ng-3.3.17-15.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/p/protobuf-c-1.3.3-13.el9.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 38450
@@ -306,17 +299,24 @@ arches:
     name: protobuf-c
     evr: 1.3.3-13.el9
     sourcerpm: protobuf-c-1.3.3-13.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/u/unbound-libs-1.26.1-1.el9_9.s390x.rpm
+    repoid: rhel-9-for-s390x-baseos-rpms
+    size: 586619
+    checksum: sha256:0c67478b5d078995a04421c969bfe15b467bbfb7ea61e96ddf025093b63b586b
+    name: unbound-libs
+    evr: 1.26.1-1.el9_9
+    sourcerpm: unbound-1.26.1-1.el9_9.src.rpm
   source: []
   module_metadata: []
 - arch: x86_64
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel9/x86_64/fast-datapath/os/Packages/l/libreswan-5.3.2-1.el9fdp.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/x86_64/fast-datapath/os/Packages/l/libreswan-5.3.3-3.el9fdp.x86_64.rpm
     repoid: fast-datapath-for-rhel-9-x86_64-rpms
-    size: 1742241
-    checksum: sha256:ec6f2bd7fe7b0087d9f0e2a8a07161b952f89193ccbd594135b643849f79365d
+    size: 1743944
+    checksum: sha256:5e07af342554dd020039c7f3ce0a8f41a5bb723689052434ed5b76daf4d72e8a
     name: libreswan
-    evr: 5.3.2-1.el9fdp
-    sourcerpm: libreswan-5.3.2-1.el9fdp.src.rpm
+    evr: 5.3.3-3.el9fdp
+    sourcerpm: libreswan-5.3.3-3.el9fdp.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/l/ldns-1.7.1-12.el9_8.1.x86_64.rpm
     repoid: rhel-9-for-x86_64-appstream-rpms
     size: 171124
@@ -373,13 +373,6 @@ arches:
     name: nss-util
     evr: 3.124.0-5.el9_6
     sourcerpm: nss-3.124.0-5.el9_6.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/appstream/os/Packages/u/unbound-libs-1.24.2-3.el9_8.4.x86_64.rpm
-    repoid: rhel-9-for-x86_64-appstream-rpms
-    size: 600222
-    checksum: sha256:38801fb33335493c416f133c30436b96b87c5b7d5823ecc51493c7ea10bdcc91
-    name: unbound-libs
-    evr: 1.24.2-3.el9_8.4
-    sourcerpm: unbound-1.24.2-3.el9_8.4.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/k/kmod-28-11.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 127775
@@ -394,13 +387,13 @@ arches:
     name: logrotate
     evr: 3.18.0-12.el9
     sourcerpm: logrotate-3.18.0-12.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/p/procps-ng-3.3.17-14.el9.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/p/procps-ng-3.3.17-15.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 361526
-    checksum: sha256:506ad778f63821e8d9647ca8e0a3ff21b8af9c1666060d5200f9b26ee718333c
+    size: 360004
+    checksum: sha256:37909df8f645eb2df481b7b5d7fee63617917a70811780a298746a4b681c87f9
     name: procps-ng
-    evr: 3.3.17-14.el9
-    sourcerpm: procps-ng-3.3.17-14.el9.src.rpm
+    evr: 3.3.17-15.el9
+    sourcerpm: procps-ng-3.3.17-15.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/p/protobuf-c-1.3.3-13.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 38224
@@ -408,5 +401,12 @@ arches:
     name: protobuf-c
     evr: 1.3.3-13.el9
     sourcerpm: protobuf-c-1.3.3-13.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/u/unbound-libs-1.26.1-1.el9_9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 618074
+    checksum: sha256:77c126617e00eb261630a40086975afef8127c6134f859bb6c772fc7ff00a9ae
+    name: unbound-libs
+    evr: 1.26.1-1.el9_9
+    sourcerpm: unbound-1.26.1-1.el9_9.src.rpm
   source: []
   module_metadata: []
