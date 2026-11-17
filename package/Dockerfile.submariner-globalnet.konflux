@@ -21,7 +21,7 @@ WORKDIR ${SOURCE}
 
 RUN CGO_ENABLED=1 GOARCH=${TARGETPLATFORM##*/} go build \
     -ldflags "-s -w \
-    -X github.com/submariner-io/submariner/pkg/versions.version=v0.24.2 \
+    -X github.com/submariner-io/submariner/pkg/versions.version=v0.24.3 \
     -X github.com/submariner-io/submariner/pkg/versions.gitCommitHash=$(git rev-parse --short HEAD)" \
     -tags "${BUILD_TAGS}" \
     -v -o ${SOURCE}/bin/${TARGETPLATFORM}/submariner-globalnet \
@@ -57,7 +57,7 @@ ENTRYPOINT ["/usr/local/bin/submariner-globalnet.sh"]
 
 LABEL com.redhat.component="submariner-globalnet-container" \
       name="rhacm2/submariner-globalnet-rhel9" \
-      version="v0.24.2" \
+      version="v0.24.3" \
       summary="Submariner Globalnet" \
       description="The Submariner Globalnet component provides connectivity for overlapping CIDRs in different clusters." \
       distribution-scope="public" \
