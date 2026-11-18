@@ -22,6 +22,7 @@ import (
 	"context"
 	goerrors "errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -146,7 +147,7 @@ func (h *calicoIPPoolHandler) TransitionToGateway() error {
 func (h *calicoIPPoolHandler) Uninstall(ctx context.Context) error {
 	logger.Info("Uninstalling Calico IPPools used for Submariner")
 
-	labelSelector := labels.SelectorFromSet(map[string]string{SubmarinerIPPool: "true"}).String()
+	labelSelector := labels.SelectorFromSet(map[string]string{SubmarinerIPPool: strconv.FormatBool(true)}).String()
 	err := h.client.ProjectcalicoV3().IPPools().DeleteCollection(ctx, metav1.DeleteOptions{},
 		metav1.ListOptions{LabelSelector: labelSelector})
 
@@ -171,7 +172,7 @@ func (h *calicoIPPoolHandler) createIPPool(endpoint *submV1.Endpoint) error {
 		iPPoolObj := &calicoapi.IPPool{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   getEndpointSubnetIPPoolName(endpoint, subnet),
-				Labels: map[string]string{SubmarinerIPPool: "true"},
+				Labels: map[string]string{SubmarinerIPPool: strconv.FormatBool(true)},
 			},
 			Spec: calicoapi.IPPoolSpec{
 				CIDR:             subnet,
@@ -286,7 +287,7 @@ func (h *calicoIPPoolHandler) updateROKSCalicoCfg(ctx context.Context) error {
 			}
 
 			installation.Annotations[SubmarinerPrevEncapsulation] = ipPools[0].Encapsulation.String()
-			installation.Annotations[SubmarinerManagedLabel] = "true"
+			installation.Annotations[SubmarinerManagedLabel] = strconv.FormatBool(true)
 
 			ipPools[0].Encapsulation = tigerav1.EncapsulationIPIP
 

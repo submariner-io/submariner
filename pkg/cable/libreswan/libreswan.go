@@ -48,17 +48,9 @@ import (
 )
 
 const (
-	cableDriverName  = "libreswan"
-	whackTimeout     = 5 * time.Second
-	dpdDelay         = 30 // seconds
-	encryptArg       = "--encrypt"
-	forceencapsArg   = "--encaps="
-	nameArg          = "--name"
-	hostArg          = "--host"
-	clientArg        = "--client"
-	ikeportArg       = "--ikeport"
-	dpdactionHoldArg = "--dpdaction=hold"
-	dpddelayArg      = "--dpddelay"
+	cableDriverName = "libreswan"
+	whackTimeout    = 5 * time.Second
+	dpdDelay        = 30 // seconds
 )
 
 // AuthMode defines the authentication mode for libreswan.
@@ -527,6 +519,48 @@ func (i *libreswan) connectToEndpointPSKMode(endpointInfo *natdiscovery.NATEndpo
 	return endpointInfo.UseIP, nil
 }
 
+func whackConnectionArguments(connectionName string, ipFamily k8snet.IPFamily, leftId, leftHost, leftClient string, leftNATTPort *string,
+	rightId, rightHost, rightClient string, rightNATTPort *string,
+) []string {
+	args := []string{
+		"--name", connectionName, ipFamilyArgs[ipFamily],
+		// Left-hand side
+		"--id", leftId,
+		"--host", leftHost,
+		"--client", leftClient,
+	}
+	if leftNATTPort != nil {
+		args = append(args, "--ikeport", *leftNATTPort)
+	}
+
+	args = append(args, "--to",
+		// Right-hand side
+		"--id", rightId,
+		"--host", rightHost,
+		"--client", rightClient,
+	)
+	if rightNATTPort != nil {
+		args = append(args, "--ikeport", *rightNATTPort)
+	}
+
+	return args
+}
+
+func whackDPDArguments() []string {
+	return []string{"--dpdaction=hold", "--dpddelay", strconv.Itoa(dpdDelay)}
+}
+
+func whackEncapsulation(force bool) []string {
+	args := []string{"--psk", "--encrypt"}
+	if force {
+		args = append(args, "--encaps=yes")
+	} else {
+		args = append(args, "--encaps=auto")
+	}
+
+	return args
+}
+
 func (i *libreswan) bidirectionalConnectToEndpoint(connectionName string, endpointInfo *natdiscovery.NATEndpointInfo,
 	leftSubnet, rightSubnet string, rightNATTPort int32,
 ) error {
@@ -534,32 +568,13 @@ func (i *libreswan) bidirectionalConnectToEndpoint(connectionName string, endpoi
 	localEndpointIdentifier := i.localEndpoint.GetPrivateIP(endpointInfo.UseFamily)
 	remoteEndpointIdentifier := endpointInfo.Endpoint.Spec.GetPrivateIP(endpointInfo.UseFamily)
 
-	args := []string{"--psk", encryptArg}
-	if endpointInfo.UseNAT || i.forceUDPEncapsulation {
-		args = append(args, forceencapsArg+"yes")
-	} else {
-		args = append(args, forceencapsArg+"auto")
-	}
+	args := whackEncapsulation(endpointInfo.UseNAT || i.forceUDPEncapsulation)
 
-	args = append(args, nameArg, connectionName, ipFamilyArgs[endpointInfo.UseFamily],
+	args = append(args, whackConnectionArguments(connectionName, endpointInfo.UseFamily,
+		localEndpointIdentifier, i.localEndpoint.GetPrivateIP(endpointInfo.UseFamily), leftSubnet, &i.ipSecNATTPort,
+		remoteEndpointIdentifier, endpointInfo.UseIP, rightSubnet, new(strconv.Itoa(int(rightNATTPort))))...)
 
-		// Left-hand side
-		"--id", localEndpointIdentifier,
-		hostArg, i.localEndpoint.GetPrivateIP(endpointInfo.UseFamily),
-		clientArg, leftSubnet,
-
-		ikeportArg, i.ipSecNATTPort,
-
-		"--to",
-
-		// Right-hand side
-		"--id", remoteEndpointIdentifier,
-		hostArg, endpointInfo.UseIP,
-		clientArg, rightSubnet,
-
-		ikeportArg, strconv.Itoa(int(rightNATTPort)),
-		dpdactionHoldArg,
-		dpddelayArg, strconv.Itoa(dpdDelay))
+	args = append(args, whackDPDArguments()...)
 
 	logger.Infof("bidirectionalConnectToEndpoint: executing whack with args: %v", args)
 
@@ -567,11 +582,11 @@ func (i *libreswan) bidirectionalConnectToEndpoint(connectionName string, endpoi
 		return err
 	}
 
-	if err := whack("--route", nameArg, connectionName); err != nil {
+	if err := whack("--route", "--name", connectionName); err != nil {
 		return err
 	}
 
-	return whack("--initiate", "--asynchronous", nameArg, connectionName)
+	return whack("--initiate", "--asynchronous", "--name", connectionName)
 }
 
 func toEndpointIdentifier(ip string, lsi, rsi int) string {
@@ -584,30 +599,13 @@ func (i *libreswan) serverConnectToEndpoint(connectionName string, endpointInfo 
 	localEndpointIdentifier := toEndpointIdentifier(i.localEndpoint.GetPrivateIP(endpointInfo.UseFamily), lsi, rsi)
 	remoteEndpointIdentifier := toEndpointIdentifier(endpointInfo.Endpoint.Spec.GetPrivateIP(endpointInfo.UseFamily), rsi, lsi)
 
-	args := []string{"--psk", encryptArg}
-	if endpointInfo.UseNAT || i.forceUDPEncapsulation {
-		args = append(args, forceencapsArg+"yes")
-	} else {
-		args = append(args, forceencapsArg+"auto")
-	}
+	args := whackEncapsulation(endpointInfo.UseNAT || i.forceUDPEncapsulation)
 
-	args = append(args, nameArg, connectionName, ipFamilyArgs[endpointInfo.UseFamily],
+	args = append(args, whackConnectionArguments(connectionName, endpointInfo.UseFamily,
+		localEndpointIdentifier, i.localEndpoint.GetPrivateIP(endpointInfo.UseFamily), leftSubnet, &i.ipSecNATTPort,
+		remoteEndpointIdentifier, "%any", rightSubnet, nil)...)
 
-		// Left-hand side.
-		"--id", localEndpointIdentifier,
-		hostArg, i.localEndpoint.GetPrivateIP(endpointInfo.UseFamily),
-		clientArg, leftSubnet,
-
-		ikeportArg, i.ipSecNATTPort,
-
-		"--to",
-
-		// Right-hand side.
-		"--id", remoteEndpointIdentifier,
-		hostArg, "%any",
-		clientArg, rightSubnet,
-		dpdactionHoldArg,
-		dpddelayArg, strconv.Itoa(dpdDelay))
+	args = append(args, whackDPDArguments()...)
 
 	logger.Infof("serverConnectToEndpoint: executing whack with args: %v", args)
 
@@ -627,30 +625,13 @@ func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo 
 	localEndpointIdentifier := toEndpointIdentifier(i.localEndpoint.GetPrivateIP(endpointInfo.UseFamily), lsi, rsi)
 	remoteEndpointIdentifier := toEndpointIdentifier(endpointInfo.Endpoint.Spec.GetPrivateIP(endpointInfo.UseFamily), rsi, lsi)
 
-	args := []string{"--psk", encryptArg}
-	if endpointInfo.UseNAT || i.forceUDPEncapsulation {
-		args = append(args, forceencapsArg+"yes")
-	} else {
-		args = append(args, forceencapsArg+"auto")
-	}
+	args := whackEncapsulation(endpointInfo.UseNAT || i.forceUDPEncapsulation)
 
-	args = append(args, nameArg, connectionName, ipFamilyArgs[endpointInfo.UseFamily],
+	args = append(args, whackConnectionArguments(connectionName, endpointInfo.UseFamily,
+		localEndpointIdentifier, i.localEndpoint.GetPrivateIP(endpointInfo.UseFamily), leftSubnet, nil,
+		remoteEndpointIdentifier, endpointInfo.UseIP, rightSubnet, new(strconv.Itoa(int(rightNATTPort))))...)
 
-		// Left-hand side
-		"--id", localEndpointIdentifier,
-		hostArg, i.localEndpoint.GetPrivateIP(endpointInfo.UseFamily),
-		clientArg, leftSubnet,
-
-		"--to",
-
-		// Right-hand side
-		"--id", remoteEndpointIdentifier,
-		hostArg, endpointInfo.UseIP,
-		clientArg, rightSubnet,
-
-		ikeportArg, strconv.Itoa(int(rightNATTPort)),
-		dpdactionHoldArg,
-		dpddelayArg, strconv.Itoa(dpdDelay))
+	args = append(args, whackDPDArguments()...)
 
 	logger.Infof("clientConnectToEndpoint: executing whack with args: %v", args)
 
@@ -658,11 +639,11 @@ func (i *libreswan) clientConnectToEndpoint(connectionName string, endpointInfo 
 		return err
 	}
 
-	if err := whack("--route", nameArg, connectionName); err != nil {
+	if err := whack("--route", "--name", connectionName); err != nil {
 		return err
 	}
 
-	return whack("--initiate", "--asynchronous", nameArg, connectionName)
+	return whack("--initiate", "--asynchronous", "--name", connectionName)
 }
 
 // DisconnectFromEndpoint disconnects from the connection to the given endpoint.
@@ -705,7 +686,7 @@ func (i *libreswan) DisconnectFromEndpoint(endpoint *types.SubmarinerEndpoint, f
 }
 
 func (i *libreswan) disconnectPSKMode(connectionName string) error {
-	args := []string{"--delete", nameArg, connectionName}
+	args := []string{"--delete", "--name", connectionName}
 
 	if err := whack(args...); err != nil {
 		var exitError *exec.ExitError

@@ -227,7 +227,7 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 		meta.SetStatusCondition(&globalEgressIP.Status.Conditions, metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
-			Reason:  "IPPoolAllocationFailed",
+			Reason:  string(submarinerv1.IPPoolAllocationFailed),
 			Message: fmt.Sprintf("Error allocating %d global IP(s) from the pool: %v", numberOfIPs, err),
 		})
 
@@ -241,7 +241,7 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 		meta.SetStatusCondition(&globalEgressIP.Status.Conditions, metav1.Condition{
 			Type:    string(submarinerv1.GlobalEgressIPAllocated),
 			Status:  metav1.ConditionFalse,
-			Reason:  "ProgramIPTableRulesFailed",
+			Reason:  string(submarinerv1.ProgramIPTableRulesFailed),
 			Message: fmt.Sprintf("Error programming egress rules: %v", err),
 		})
 
@@ -255,7 +255,7 @@ func (c *globalEgressIPController) allocateGlobalIPs(key string, numberOfIPs int
 	meta.SetStatusCondition(&globalEgressIP.Status.Conditions, metav1.Condition{
 		Type:    string(submarinerv1.GlobalEgressIPAllocated),
 		Status:  metav1.ConditionTrue,
-		Reason:  "Success",
+		Reason:  metav1.StatusSuccess,
 		Message: fmt.Sprintf("Allocated %d global IP(s)", numberOfIPs),
 	})
 

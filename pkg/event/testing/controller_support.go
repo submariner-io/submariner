@@ -88,7 +88,7 @@ func (c *ControllerSupport) Start(ctx context.Context, handlers ...event.Handler
 	Expect(err).To(Succeed())
 	Expect(eventController.Start(stopCh)).To(Succeed())
 
-	testutil.AwaitWatchAction(&(config.Client.(*dynamicfake.FakeDynamicClient)).Fake, "endpoints")
+	testutil.AwaitWatchAction(&config.Client.(*dynamicfake.FakeDynamicClient).Fake, "endpoints")
 
 	DeferCleanup(func() {
 		close(stopCh)
