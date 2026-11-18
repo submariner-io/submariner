@@ -152,12 +152,14 @@ func main() {
 
 	var handlers []event.Handler
 
+	tcpMssValue := getTCPMssValue(localNode)
+
 	for _, family := range cidr.ExtractIPFamilies(env.ClusterCidr) {
 		handlers = append(handlers,
 			kubeproxy.NewSyncHandler(family, env.ClusterCidr, env.ServiceCidr),
-			mtu.NewHandler(family, env.ClusterCidr, len(env.GlobalCidr) != 0, getTCPMssValue(localNode)))
+			mtu.NewHandler(family, env.ClusterCidr, len(env.GlobalCidr) != 0, tcpMssValue))
 
-		handlers = append(handlers, ovn.GetHandlers(family, &env, smClientset, k8sClientSet, dynamicClientSet, config)...)
+		handlers = append(handlers, ovn.GetHandlers(family, &env, smClientset, k8sClientSet, dynamicClientSet, config, tcpMssValue)...)
 	}
 
 	handlers = append(handlers,
@@ -249,6 +251,11 @@ func getTCPMssValue(localNode *corev1.Node) int {
 	tcpMssValue, err := strconv.Atoi(tcpMssStr)
 	if err != nil {
 		logger.Errorf(err, "Error parsing %q annotation", v1.TCPMssValue)
+		return 0
+	}
+
+	if tcpMssValue < 0 {
+		logger.Warningf("Invalid negative value %d for %q annotation, ignoring", tcpMssValue, v1.TCPMssValue)
 		return 0
 	}
 
