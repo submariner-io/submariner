@@ -295,7 +295,7 @@ func (c *globalEgressIPController) onDelete(numRequeues int, globalEgressIP *sub
 
 	namedSet := c.newNamedSet(key)
 
-	if len(globalEgressIP.Status.AllocatedIPs) == 0 && len(podWatcher.allocatedIPs) > 0 {
+	if found && len(globalEgressIP.Status.AllocatedIPs) == 0 && len(podWatcher.allocatedIPs) > 0 {
 		// Refer to issue for more details: https://github.com/submariner-io/submariner/issues/2388
 		logger.Warningf("Using the cached allocatedIPs %q to delete the iptables rules for key %q", podWatcher.allocatedIPs, key)
 		globalEgressIP.Status.AllocatedIPs = podWatcher.allocatedIPs
