@@ -145,6 +145,23 @@ func testGlobalEgressIPCreated(t *globalEgressIPControllerTestDriver, podSelecto
 		It("should not start a Pod watcher", func() {
 			t.watches.AwaitNoWatchStarted("pods")
 		})
+
+		Context("and then deleted", func() {
+			It("should keep processing GlobalEgressIPs", func(ctx context.Context) {
+				t.awaitEgressIPStatus(ctx, t.globalEgressIPs, globalEgressIPName, 0, metav1.Condition{
+					Type:   string(submarinerv1.GlobalEgressIPAllocated),
+					Status: metav1.ConditionFalse,
+					Reason: "ZeroInput",
+				})
+
+				Expect(t.globalEgressIPs.Delete(ctx, globalEgressIPName, metav1.DeleteOptions{})).To(Succeed())
+
+				numIPs := 1
+
+				t.createGlobalEgressIP(ctx, newGlobalEgressIP("west-region", &numIPs, podSelector))
+				t.awaitEgressIPStatusAllocated(ctx, t.globalEgressIPs, "west-region", numIPs)
+			})
+		})
 	})
 
 	Context("and programming the IP table rules initially fails", func() {
