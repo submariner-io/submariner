@@ -60,7 +60,7 @@ Submariner is always deployed using a Go-based Kubernetes custom controller, cal
 the *`subctl`* command line utility and Helm charts wrap the Operator. The recommended deployment method is `subctl`, as it is currently the
 default in CI and provides diagnostic features.
 
-See the [Deplyment docs](https://submariner.io/operations/deployment/) on Submariner's website.
+See the [Deployment docs](https://submariner.io/operations/deployment/) on Submariner's website.
 
 ### Installation using subctl
 

@@ -63,8 +63,12 @@ func (kp *SyncHandler) updateRoutingRulesForCIDRBlock(inputCidrBlock string, ope
 		gwIP := kp.remoteSubnetGw[inputCidrBlock]
 
 		routes, err := kp.netLink.RouteGet(gwIP)
-		if err != nil {
-			logger.Errorf(err, "Failed to find route to remote gateway IP %s for cidr %s", gwIP.String(), inputCidrBlock)
+		if err != nil || len(routes) == 0 {
+			// Without the next hop the route would send traffic for the remote gateway out directly on the host interface.
+			logger.Errorf(err, "Failed to find route to remote gateway IP %s for cidr %s - not updating its route",
+				gwIP.String(), inputCidrBlock)
+
+			return
 		}
 
 		viaGW = &routes[0].Gw

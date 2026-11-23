@@ -108,20 +108,26 @@ func getValidGlobalIPv6FromSameInterface(ip net.IP) (string, error) {
 		return "", errors.Wrap(err, "failed to list interfaces")
 	}
 
+	// First determine which interface owns the given IP.
 	var ownedIfaceName string
 
 	for i := range hostInterfaces {
+		if hostInterfaces[i].Addr.Equal(ip) {
+			ownedIfaceName = hostInterfaces[i].Name
+			break
+		}
+	}
+
+	if ownedIfaceName == "" {
+		return "", nil
+	}
+
+	// Then return any acceptable IPv6 address on that interface. We can't assume anything about the
+	// ordering of the addresses, so an acceptable address may appear before or after the owned IP.
+	for i := range hostInterfaces {
 		actualIP := hostInterfaces[i].Addr
 
-		if k8snet.IPFamilyOf(actualIP) != k8snet.IPv6 {
-			continue
-		}
-
-		if ownedIfaceName == "" && actualIP.Equal(ip) {
-			ownedIfaceName = hostInterfaces[i].Name
-		}
-
-		if ownedIfaceName != "" && ownedIfaceName == hostInterfaces[i].Name && isAcceptableIPv6(actualIP) {
+		if hostInterfaces[i].Name == ownedIfaceName && k8snet.IPFamilyOf(actualIP) == k8snet.IPv6 && isAcceptableIPv6(actualIP) {
 			return actualIP.String(), nil
 		}
 	}
