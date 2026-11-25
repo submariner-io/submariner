@@ -179,13 +179,13 @@ arches:
     name: python3-setools
     evr: 4.4.4-1.el9
     sourcerpm: setools-4.4.4-1.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/r/rpm-plugin-selinux-4.16.1.3-40.el9.aarch64.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/r/rpm-plugin-selinux-4.16.1.3-43.el9_9.aarch64.rpm
     repoid: ubi-9-for-aarch64-baseos-rpms
-    size: 15662
-    checksum: sha256:643e78467e756dad9a5ada1d09e49ffe29e1b8b11c4fcf8cd4f06f1239bbb932
+    size: 20655
+    checksum: sha256:2ebcc9a1928d7030f8427c091b79d405c9b739d1029c5c4612f1c6305681892a
     name: rpm-plugin-selinux
-    evr: 4.16.1.3-40.el9
-    sourcerpm: rpm-4.16.1.3-40.el9.src.rpm
+    evr: 4.16.1.3-43.el9_9
+    sourcerpm: rpm-4.16.1.3-43.el9_9.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/s/selinux-policy-38.1.86-1.el9.noarch.rpm
     repoid: ubi-9-for-aarch64-baseos-rpms
     size: 49327
@@ -400,13 +400,6 @@ arches:
     name: protobuf-c
     evr: 1.3.3-13.el9
     sourcerpm: protobuf-c-1.3.3-13.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/p/python3-rpm-4.16.1.3-43.el9_9.ppc64le.rpm
-    repoid: ubi-9-for-ppc64le-baseos-rpms
-    size: 74636
-    checksum: sha256:a54a0b8020acdec9fbbb9d41e3c71888f4fabb024ba64dbb46fcf9ead47bd0e9
-    name: python3-rpm
-    evr: 4.16.1.3-43.el9_9
-    sourcerpm: rpm-4.16.1.3-43.el9_9.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/p/python3-setools-4.4.4-1.el9.ppc64le.rpm
     repoid: ubi-9-for-ppc64le-baseos-rpms
     size: 630876
@@ -414,39 +407,11 @@ arches:
     name: python3-setools
     evr: 4.4.4-1.el9
     sourcerpm: setools-4.4.4-1.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/r/rpm-4.16.1.3-43.el9_9.ppc64le.rpm
-    repoid: ubi-9-for-ppc64le-baseos-rpms
-    size: 550344
-    checksum: sha256:9947862d4c0733a779a7cded6309f67112e55839c6ab6eebc29cbfd98303b33a
-    name: rpm
-    evr: 4.16.1.3-43.el9_9
-    sourcerpm: rpm-4.16.1.3-43.el9_9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/r/rpm-build-libs-4.16.1.3-43.el9_9.ppc64le.rpm
-    repoid: ubi-9-for-ppc64le-baseos-rpms
-    size: 103704
-    checksum: sha256:603e827bc9073f231f49d55254a2ae919903207b84e688d73f68ab4e317932ae
-    name: rpm-build-libs
-    evr: 4.16.1.3-43.el9_9
-    sourcerpm: rpm-4.16.1.3-43.el9_9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/r/rpm-libs-4.16.1.3-43.el9_9.ppc64le.rpm
-    repoid: ubi-9-for-ppc64le-baseos-rpms
-    size: 364743
-    checksum: sha256:7157a35523c467417344f148f4975aa623986774e8b98aa7e4600cb24eb7adcf
-    name: rpm-libs
-    evr: 4.16.1.3-43.el9_9
-    sourcerpm: rpm-4.16.1.3-43.el9_9.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/r/rpm-plugin-selinux-4.16.1.3-43.el9_9.ppc64le.rpm
     repoid: ubi-9-for-ppc64le-baseos-rpms
     size: 20651
     checksum: sha256:5a3a0f6a6606bb33f4bb688482720cfedc2b960aa67d540fbf0e38aa9808ff51
     name: rpm-plugin-selinux
-    evr: 4.16.1.3-43.el9_9
-    sourcerpm: rpm-4.16.1.3-43.el9_9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/r/rpm-sign-libs-4.16.1.3-43.el9_9.ppc64le.rpm
-    repoid: ubi-9-for-ppc64le-baseos-rpms
-    size: 24911
-    checksum: sha256:b391263fec0aee36a0e9169e1c9623cef6007357b05aaf53c06298b75f4129b9
-    name: rpm-sign-libs
     evr: 4.16.1.3-43.el9_9
     sourcerpm: rpm-4.16.1.3-43.el9_9.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/s/selinux-policy-38.1.86-1.el9.noarch.rpm
@@ -656,13 +621,6 @@ arches:
     name: protobuf-c
     evr: 1.3.3-13.el9
     sourcerpm: protobuf-c-1.3.3-13.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/p/python3-rpm-4.16.1.3-43.el9_9.s390x.rpm
-    repoid: ubi-9-for-s390x-baseos-rpms
-    size: 71044
-    checksum: sha256:60cc309ca8899a0d23b2844e40055197e92d4e8109286926393deab9e6f9e3dd
-    name: python3-rpm
-    evr: 4.16.1.3-43.el9_9
-    sourcerpm: rpm-4.16.1.3-43.el9_9.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/p/python3-setools-4.4.4-1.el9.s390x.rpm
     repoid: ubi-9-for-s390x-baseos-rpms
     size: 599860
@@ -670,39 +628,11 @@ arches:
     name: python3-setools
     evr: 4.4.4-1.el9
     sourcerpm: setools-4.4.4-1.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/r/rpm-4.16.1.3-43.el9_9.s390x.rpm
-    repoid: ubi-9-for-s390x-baseos-rpms
-    size: 550039
-    checksum: sha256:972dea566c2cedfb665fda014eb20eff14c349b8dd8811ce55d8162a46aa79aa
-    name: rpm
-    evr: 4.16.1.3-43.el9_9
-    sourcerpm: rpm-4.16.1.3-43.el9_9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/r/rpm-build-libs-4.16.1.3-43.el9_9.s390x.rpm
-    repoid: ubi-9-for-s390x-baseos-rpms
-    size: 93357
-    checksum: sha256:e955c7f8e7a420c43b73ac0f8cdda4394ed720f77bdc3b622ac922def437f4cd
-    name: rpm-build-libs
-    evr: 4.16.1.3-43.el9_9
-    sourcerpm: rpm-4.16.1.3-43.el9_9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/r/rpm-libs-4.16.1.3-43.el9_9.s390x.rpm
-    repoid: ubi-9-for-s390x-baseos-rpms
-    size: 317917
-    checksum: sha256:d0968836484e661f86228ef30fa537cd1f42896720cf42b0774ce41b1d7dd9e3
-    name: rpm-libs
-    evr: 4.16.1.3-43.el9_9
-    sourcerpm: rpm-4.16.1.3-43.el9_9.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/r/rpm-plugin-selinux-4.16.1.3-43.el9_9.s390x.rpm
     repoid: ubi-9-for-s390x-baseos-rpms
     size: 20451
     checksum: sha256:d9d00f9fd71f2b91ba0d3b433f29a280f820eed8db26046e5d7e632f9fff1198
     name: rpm-plugin-selinux
-    evr: 4.16.1.3-43.el9_9
-    sourcerpm: rpm-4.16.1.3-43.el9_9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/r/rpm-sign-libs-4.16.1.3-43.el9_9.s390x.rpm
-    repoid: ubi-9-for-s390x-baseos-rpms
-    size: 24532
-    checksum: sha256:e04b82c1ee7e80d7806f4ed100a3adcb8b8b501d7060172440ff98816dc161c2
-    name: rpm-sign-libs
     evr: 4.16.1.3-43.el9_9
     sourcerpm: rpm-4.16.1.3-43.el9_9.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/s/selinux-policy-38.1.86-1.el9.noarch.rpm
@@ -933,13 +863,13 @@ arches:
     name: python3-setools
     evr: 4.4.4-1.el9
     sourcerpm: setools-4.4.4-1.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/r/rpm-plugin-selinux-4.16.1.3-40.el9.x86_64.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/r/rpm-plugin-selinux-4.16.1.3-43.el9_9.x86_64.rpm
     repoid: ubi-9-for-x86_64-baseos-rpms
-    size: 15732
-    checksum: sha256:8c22ac3d44a0380c7cbb6e1565a916864d92814b85522c084e5fe8d99f776362
+    size: 20723
+    checksum: sha256:f81a734d3935799569f0d315004c2aaabbac42865c2f4f217eabacd9aea49529
     name: rpm-plugin-selinux
-    evr: 4.16.1.3-40.el9
-    sourcerpm: rpm-4.16.1.3-40.el9.src.rpm
+    evr: 4.16.1.3-43.el9_9
+    sourcerpm: rpm-4.16.1.3-43.el9_9.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/s/selinux-policy-38.1.86-1.el9.noarch.rpm
     repoid: ubi-9-for-x86_64-baseos-rpms
     size: 49327
