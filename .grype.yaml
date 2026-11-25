@@ -1,8 +1,2 @@
 ---
 ignore:
-  # No fix is available; govulncheck confirms the vulnerable symbol is not called.
-  - vulnerability: GO-2026-5932
-    fix-state: unknown
-    package:
-      name: golang.org/x/crypto
-      location: /go.mod
