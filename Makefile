@@ -55,12 +55,10 @@ golangci-lint: pkg/natdiscovery/proto/natdiscovery.pb.go
 
 unit: pkg/natdiscovery/proto/natdiscovery.pb.go
 
-%.pb.go: %.proto bin/protoc-gen-go
-	PATH="$(CURDIR)/bin:$$PATH" protoc --go_out=$$(go env GOPATH)/src $<
-
-bin/protoc-gen-go:
-	mkdir -p $(@D)
-	GOFLAGS="" GOBIN="$(CURDIR)/bin" go install google.golang.org/protobuf/cmd/protoc-gen-go@$(shell awk '/google.golang.org\/protobuf/ {print $$2}' go.mod)
+%.pb.go: %.proto
+# Ensure the build fails if go tool fails
+	pggpath=$$(dirname $$(GOARCH= GOOS= $(GO) tool -n protoc-gen-go)) && \
+	PATH="$${pggpath}:$${PATH}" protoc --go_out=$$(go env GOPATH)/src $<
 
 basepkg = github.com/submariner-io/submariner
 # This lists non-test Go files inside each directory corresponding

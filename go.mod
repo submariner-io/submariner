@@ -115,3 +115,7 @@ require (
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
+
+// This is tracked here, not in tools, because we want
+// to use the same version as protobuf pulled in transitively
+tool google.golang.org/protobuf/cmd/protoc-gen-go
