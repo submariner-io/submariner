@@ -571,7 +571,6 @@ func (t *testDriverBase) awaitStatusConditions(ctx context.Context, client dynam
 	}).Should(Succeed())
 }
 
-//nolint:unparam // `name` always receives `globalEgressIPName` (`"east-region")
 func newGlobalEgressIP(name string, numberOfIPs *int, podSelector *metav1.LabelSelector) *submarinerv1.GlobalEgressIP {
 	return &submarinerv1.GlobalEgressIP{
 		ObjectMeta: metav1.ObjectMeta{

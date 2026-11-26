@@ -20,11 +20,14 @@ package kubeproxy_test
 
 import (
 	"context"
+	"net"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/handlers/kubeproxy"
 	"github.com/submariner-io/submariner/pkg/vxlan"
+	"github.com/vishvananda/netlink"
 	k8snet "k8s.io/utils/net"
 )
 
@@ -211,6 +214,39 @@ func testEndpoints() {
 
 			It("should remove routing rules for host networking", func() {
 				t.verifyNoHostNetworkingRoutes()
+			})
+		})
+
+		Context("and the remote gateway IP is within one of the remote subnets", func() {
+			const (
+				remoteGatewayIP = "170.250.1.10"
+				nextHopIP       = "172.19.3.254"
+			)
+
+			BeforeEach(func() {
+				t.remoteEndpoint.Spec.PrivateIPs = []string{remoteGatewayIP}
+			})
+
+			Context("and there is a route to the remote gateway IP", func() {
+				BeforeEach(func() {
+					Expect(t.netLink.RouteAdd(&netlink.Route{
+						Dst:       &net.IPNet{IP: net.ParseIP(remoteGatewayIP), Mask: net.CIDRMask(32, 32)},
+						Gw:        net.ParseIP(nextHopIP),
+						LinkIndex: hostInterfaceIndex,
+					})).To(Succeed())
+				})
+
+				It("should add routing rules for host networking via the next hop of that route", func() {
+					t.verifyHostNetworkingRoutes()
+					t.netLink.AwaitGwRoutes(hostInterfaceIndex, constants.RouteAgentHostNetworkTableID, nextHopIP)
+				})
+			})
+
+			Context("and there is no route to the remote gateway IP", func() {
+				It("should only add routing rules for host networking for the other remote subnets", func() {
+					t.netLink.AwaitDstRoutes(hostInterfaceIndex, constants.RouteAgentHostNetworkTableID, remoteIPv4Subnet2)
+					t.netLink.AwaitNoDstRoutes(hostInterfaceIndex, constants.RouteAgentHostNetworkTableID, remoteIPv4Subnet1)
+				})
 			})
 		})
 	})

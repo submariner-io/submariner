@@ -202,6 +202,28 @@ var _ = Describe("GetLocalIP", func() {
 					Expect(ip).To(Equal("fc00::14b:b63:c7e1:aaa"))
 				})
 			})
+
+			Context("and the IP isn't usable and a usable IPv6 precedes it on the same interface", func() {
+				It("should return the usable IPv6 from the same interface", func() {
+					cni.HostInterfaces = func() ([]cni.HostInterface, error) {
+						return []cni.HostInterface{
+							{
+								Name: "v6-owns",
+								Addr: net.ParseIP("fc00::14b:b63:c7e1:aaa"),
+							},
+							{
+								Name: "v6-owns",
+								Addr: net.ParseIP("fe80::14b:b63:c7e1:1558"),
+							},
+						}, nil
+					}
+
+					ipv6DialIP = "fe80::14b:b63:c7e1:1558"
+					ip, err := endpoint.GetLocalIP(k8snet.IPv6)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(ip).To(Equal("fc00::14b:b63:c7e1:aaa"))
+				})
+			})
 		})
 	})
 })
